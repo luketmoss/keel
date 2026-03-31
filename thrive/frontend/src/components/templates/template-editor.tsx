@@ -1,14 +1,20 @@
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import { templates } from '../../state/store';
 import { addTemplate, editTemplate, removeTemplate } from '../../state/actions';
 import { useAuth } from '../../auth/auth-context';
 import { navigate } from '../../router/router';
 import { AddExerciseModal } from '../exercises/add-exercise-modal';
-import { TemplateExerciseRow } from './template-exercise-row';
-import type { TemplateExerciseSlot } from './template-exercise-row';
+import { ExerciseCompactCard } from '../shared/exercise-compact-card';
+import { SectionPicker } from '../shared/section-picker';
 import type { ExerciseWithRow } from '../../api/types';
 
-const SECTIONS = ['warmup', 'primary', 'SS1', 'SS2', 'SS3', 'burnout', 'cooldown'] as const;
+export interface TemplateExerciseSlot {
+  exercise_id: string;
+  exercise_name: string;
+  section: string;
+  sets: string;
+  reps: string;
+}
 
 interface Props {
   templateId?: string;
@@ -22,23 +28,27 @@ export function TemplateEditor({ templateId }: Props) {
   const [editingIndex, setEditingIndex] = useState(-1);
   const [saving, setSaving] = useState(false);
 
+  // Track initial state for dirty checking
+  const initialState = useRef({ name: '', exercises: '' });
+
   // Populate state in edit mode
   useEffect(() => {
-    if (!templateId) return;
+    if (!templateId) {
+      initialState.current = { name: '', exercises: '' };
+      return;
+    }
     const tpl = templates.value.find((t) => t.id === templateId);
     if (tpl) {
+      const mapped = tpl.exercises.map((r) => ({
+        exercise_id: r.exercise_id,
+        exercise_name: r.exercise_name,
+        section: r.section as string,
+        sets: r.sets,
+        reps: r.reps,
+      }));
       setName(tpl.name);
-      setExercises(
-        tpl.exercises.map((r) => ({
-          exercise_id: r.exercise_id,
-          exercise_name: r.exercise_name,
-          section: r.section as string,
-          sets: r.sets,
-          reps: r.reps,
-          rest_seconds: r.rest_seconds,
-          group_rest_seconds: r.group_rest_seconds,
-        })),
-      );
+      setExercises(mapped);
+      initialState.current = { name: tpl.name, exercises: JSON.stringify(mapped) };
     }
   }, [templateId]);
 
@@ -47,10 +57,8 @@ export function TemplateEditor({ templateId }: Props) {
       exercise_id: ex.id,
       exercise_name: ex.name,
       section: 'primary',
-      sets: '3',
-      reps: '10',
-      rest_seconds: '',
-      group_rest_seconds: '',
+      sets: '1',
+      reps: '',
     };
     setExercises((prev) => [...prev, slot]);
     setShowExercisePicker(false);
@@ -99,21 +107,19 @@ export function TemplateEditor({ templateId }: Props) {
         exercise_id: ex.exercise_id,
         exercise_name: ex.exercise_name,
         section: ex.section,
-        sets: ex.sets,
+        sets: ex.sets || '1',
         reps: ex.reps,
-        rest_seconds: ex.rest_seconds,
-        group_rest_seconds: ex.group_rest_seconds,
       }));
 
       if (templateId) {
-        // Edit mode: get existing rows for deletion
         const tpl = templates.value.find((t) => t.id === templateId);
         const existingRows = tpl?.exercises ?? [];
         await editTemplate(templateId, name.trim(), inputs, existingRows, token);
+        navigate(`/templates/${templateId}`);
       } else {
         await addTemplate(name.trim(), inputs, token);
+        navigate('/templates');
       }
-      navigate('/templates');
     } catch {
       // Error toast shown by action
     } finally {
@@ -123,6 +129,7 @@ export function TemplateEditor({ templateId }: Props) {
 
   const handleDelete = async () => {
     if (!token || !templateId) return;
+    if (!confirm('Delete this template? This cannot be undone.')) return;
     const tpl = templates.value.find((t) => t.id === templateId);
     if (!tpl) return;
     setSaving(true);
@@ -136,15 +143,27 @@ export function TemplateEditor({ templateId }: Props) {
     }
   };
 
-  const showGroupRest = (section: string) =>
-    section === 'primary' || section.startsWith('SS');
+  const isDirty = () => {
+    if (name !== initialState.current.name) return true;
+    if (JSON.stringify(exercises) !== initialState.current.exercises) return true;
+    return false;
+  };
+
+  const handleDiscard = () => {
+    if (isDirty() && !confirm('Discard changes? Your edits will not be saved.')) return;
+    if (templateId) {
+      navigate(`/templates/${templateId}`);
+    } else {
+      navigate('/templates');
+    }
+  };
 
   return (
     <div class="screen template-editor">
       <div class="template-editor-header">
         <button
           class="template-editor-back"
-          onClick={() => navigate('/templates')}
+          onClick={handleDiscard}
           aria-label="Back"
         >
           ← Back
@@ -154,7 +173,7 @@ export function TemplateEditor({ templateId }: Props) {
           onClick={handleSave}
           disabled={saving || !name.trim() || exercises.length === 0}
         >
-          {saving ? 'Saving...' : 'Save'}
+          {saving ? 'Saving...' : 'Save Template'}
         </button>
       </div>
 
@@ -169,7 +188,7 @@ export function TemplateEditor({ templateId }: Props) {
         />
       </div>
 
-      <div class="template-exercise-list">
+      <div class="compact-card-list">
         {exercises.length === 0 && (
           <div class="empty-state">
             <p>No exercises yet</p>
@@ -179,42 +198,36 @@ export function TemplateEditor({ templateId }: Props) {
 
         {exercises.map((ex, i) => (
           <div key={`${ex.exercise_id}-${i}`}>
-            <TemplateExerciseRow
-              exercise={ex}
+            <ExerciseCompactCard
+              section={ex.section}
+              exerciseName={ex.exercise_name}
+              sets={ex.sets}
+              reps={ex.reps}
+              editable
               index={i}
               total={exercises.length}
               onMoveUp={() => moveUp(i)}
               onMoveDown={() => moveDown(i)}
-              onEdit={() => setEditingIndex(editingIndex === i ? -1 : i)}
+              onClick={() => setEditingIndex(editingIndex === i ? -1 : i)}
               onRemove={() => removeExercise(i)}
             />
 
             {editingIndex === i && (
               <div class="template-exercise-config">
-                <div class="form-group">
-                  <label class="form-label">Section</label>
-                  <select
-                    class="form-select section-select"
-                    value={ex.section}
-                    onChange={(e) =>
-                      updateExercise(i, { section: (e.target as HTMLSelectElement).value })
-                    }
-                  >
-                    {SECTIONS.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <SectionPicker
+                  value={ex.section}
+                  onChange={(section) => updateExercise(i, { section })}
+                />
 
-                <div class="config-row">
+                <div class="config-row" style={{ marginTop: 'var(--space-sm)' }}>
                   <div class="form-group" style={{ flex: 1 }}>
                     <label class="form-label">Sets</label>
                     <input
                       class="form-input"
-                      type="text"
-                      placeholder="e.g. 3 or 4-5"
+                      type="number"
+                      min="1"
+                      max="20"
+                      placeholder="e.g. 3"
                       value={ex.sets}
                       onInput={(e) =>
                         updateExercise(i, { sets: (e.target as HTMLInputElement).value })
@@ -225,43 +238,15 @@ export function TemplateEditor({ templateId }: Props) {
                     <label class="form-label">Reps</label>
                     <input
                       class="form-input"
-                      type="text"
-                      placeholder="e.g. 10 or 8-12"
+                      type="number"
+                      min="0"
+                      placeholder="e.g. 10"
                       value={ex.reps}
                       onInput={(e) =>
                         updateExercise(i, { reps: (e.target as HTMLInputElement).value })
                       }
                     />
                   </div>
-                </div>
-
-                <div class="config-row">
-                  <div class="form-group" style={{ flex: 1 }}>
-                    <label class="form-label">Rest (s)</label>
-                    <input
-                      class="form-input"
-                      type="text"
-                      placeholder="e.g. 90"
-                      value={ex.rest_seconds}
-                      onInput={(e) =>
-                        updateExercise(i, { rest_seconds: (e.target as HTMLInputElement).value })
-                      }
-                    />
-                  </div>
-                  {showGroupRest(ex.section) && (
-                    <div class="form-group" style={{ flex: 1 }}>
-                      <label class="form-label">Group Rest (s)</label>
-                      <input
-                        class="form-input"
-                        type="text"
-                        placeholder="e.g. 120"
-                        value={ex.group_rest_seconds}
-                        onInput={(e) =>
-                          updateExercise(i, { group_rest_seconds: (e.target as HTMLInputElement).value })
-                        }
-                      />
-                    </div>
-                  )}
                 </div>
               </div>
             )}
@@ -278,14 +263,23 @@ export function TemplateEditor({ templateId }: Props) {
       </button>
 
       {templateId && (
-        <button
-          class="btn btn-danger"
-          style={{ width: '100%', marginTop: 'var(--space-md)' }}
-          onClick={handleDelete}
-          disabled={saving}
-        >
-          Delete Template
-        </button>
+        <>
+          <button
+            class="btn btn-ghost"
+            style={{ width: '100%', marginTop: 'var(--space-md)' }}
+            onClick={handleDiscard}
+          >
+            Discard Changes
+          </button>
+          <button
+            class="btn btn-danger"
+            style={{ width: '100%', marginTop: 'var(--space-sm)' }}
+            onClick={handleDelete}
+            disabled={saving}
+          >
+            Delete Template
+          </button>
+        </>
       )}
 
       {showExercisePicker && (

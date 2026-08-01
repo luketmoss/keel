@@ -67,9 +67,9 @@ gh issue view <issue> --repo luketmoss/keel --json state
 hand, set the card, and say so: this one really is `/develop` not doing its job.
 
 **Closed, card didn't move** — nothing is wrong with the PR. Project #6's *Item
-closed → Done* workflow is not enabled. It is off by default and lives under the
-project's ⚙ menu → Workflows; ask the user to turn it on, since it is theirs to
-click and it fixes every future merge at once.
+closed → Done* workflow is not enabled. Ask the user to turn it on at
+`https://github.com/users/luketmoss/projects/6/workflows`; it is theirs to
+click, and it fixes every future merge at once.
 
 `board.py set <issue> --status Done` rescues a card already stranded. It is not
 the remedy — reaching for it after every merge is how a one-click board setting

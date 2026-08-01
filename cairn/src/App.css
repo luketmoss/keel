@@ -1,0 +1,22 @@
+.app {
+  display: flex;
+  height: 100%;
+  width: 100%;
+}
+
+.app__map {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  /* Shows through until the first tiles arrive, so the load reads as dark
+     chrome rather than as a broken white rectangle. */
+  background: var(--surface-solid);
+}
+
+/* Below the breakpoint the sidebar docks to the bottom instead. Source order
+   keeps the sidebar first for reading order; column-reverse moves it visually. */
+@media (max-width: 719px) {
+  .app {
+    flex-direction: column-reverse;
+  }
+}

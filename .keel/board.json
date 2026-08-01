@@ -1,0 +1,26 @@
+{
+  "owner": "luketmoss",
+  "repo": "luketmoss/keel",
+  "projectNumber": 6,
+  "projectId": "PVT_kwHOAJR9ys4BfHIL",
+  "projectUrl": "https://github.com/users/luketmoss/projects/6",
+  "fields": {
+    "status": {
+      "id": "PVTSSF_lAHOAJR9ys4BfHILzhZcYQk",
+      "options": {
+        "To Do": "eb581245",
+        "PM Refining": "4255d952",
+        "UX": "3ec1066b",
+        "Refined": "592de83e",
+        "In Development": "523166fe",
+        "Testing": "9e301544",
+        "Code Review": "a6c57e86",
+        "Done": "3cb5bf75"
+      }
+    },
+    "project": { "id": "PVTSSF_lAHOAJR9ys4BfHILzhZcYW8" },
+    "priority": { "id": "PVTSSF_lAHOAJR9ys4BfHILzhZcYXA" },
+    "size": { "id": "PVTSSF_lAHOAJR9ys4BfHILzhZcYXE" },
+    "type": { "id": "PVTSSF_lAHOAJR9ys4BfHILzhZcYXI" }
+  }
+}

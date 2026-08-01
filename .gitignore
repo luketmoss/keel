@@ -1,0 +1,12 @@
+# Keel workspace-level ignores.
+# Project folders add their own .gitignore for stack-specific artifacts.
+
+.DS_Store
+Thumbs.db
+*.log
+
+.env
+.env.*
+!.env.example
+
+.claude/settings.local.json

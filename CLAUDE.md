@@ -47,9 +47,13 @@ Project #6, `https://github.com/users/luketmoss/projects/6`. IDs live in
 | Ready to Ship | `/ship` | **agree with the implementation?** |
 | Done | — | |
 
-Two unattended runs — refinement (`/idea` → Refined) and delivery (Refined →
-Ready to Ship) — each ending at a gate. `/ship` merges and is the only
-irreversible action; never invoke it as part of a run.
+Two unattended runs, each ending at a gate: **`/refine`** (`/idea` → `/pm` →
+`/ux` → Refined) and **`/finish`** (`/develop` → `/test` → `/review` → Ready to
+Ship). `/ship` merges and is the only irreversible action; never invoke it as
+part of a run.
+
+All board writes go through `python .keel/board.py` — never hand-write GraphQL
+against the project.
 
 Ready to Ship is the inbox: everything in it is waiting on you. Code Review is
 transient and nothing should rest there.

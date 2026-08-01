@@ -31,6 +31,8 @@ only irreversible action, and the only one triggered by hand.
 
 | Command | Does |
 |---|---|
+| `/refine` | Runs the refinement chain to Refined (gate 1) |
+| `/finish` | Runs the delivery chain to Ready to Ship (gate 2) |
 | `/idea` | Captures a thought as a well-formed issue |
 | `/pm` | Problem statement, acceptance criteria, scope |
 | `/ux` | Behavior, states, edge cases → `docs/design/` |

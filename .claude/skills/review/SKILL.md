@@ -26,6 +26,14 @@ Check `statusCheckRollup`. If the run failed, the issue goes back to In
 Development with the failure quoted. If it's still pending, wait for it rather
 than reporting a result you don't have.
 
+**If it comes back empty, no check ran at all — treat that as not green.** An
+absent run and a passing run look identical from the board, and with required
+status checks off nothing else will notice. Name the workflow that should have
+covered this change, compare the PR's files against its `paths` filter, and
+stop. Either the project has no workflow or its filter doesn't reach the change;
+both are findings, and both send the issue back to In Development. Do not
+advance to Ready to Ship on a check that never reported.
+
 ## Review the diff
 
 Read it against the acceptance criteria and the project's stack skill. Look for:

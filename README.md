@@ -11,17 +11,18 @@ Starting a project means adding a folder — not provisioning infrastructure.
 
 ## How work moves
 
-Issues travel through eight stages in two unattended runs, separated by two
-gates where work waits for a human.
+Issues travel through nine stages in two unattended runs, each ending at a gate
+where work waits for a human.
 
 ```
-/idea → PM Refining → UX → [ Refined ] → In Development → Testing → [ Code Review ] → Done
-        └──── refinement run ────┘         └──────── delivery run ────────┘
-                                 gate 1                              gate 2
+/idea → PM Refining → UX → [ Refined ] → In Development → Testing → Code Review → [ Ready to Ship ] → Done
+        └─── refinement run ───┘           └─────────── delivery run ───────────┘                /ship
+                               gate 1                                                gate 2
 ```
 
 **Gate 1 — Refined.** Do you agree with the solution?
-**Gate 2 — Code Review.** Do you agree with the implementation?
+**Gate 2 — Ready to Ship.** Do you agree with the implementation? This column is
+the inbox — everything in it is reviewed, green, and waiting only on you.
 
 Both runs are fully unattended because neither can reach `main`. `/ship` is the
 only irreversible action, and the only one triggered by hand.
@@ -36,7 +37,7 @@ only irreversible action, and the only one triggered by hand.
 | `/develop` | Cuts the branch, writes the code, opens a draft PR |
 | `/test` | Verifies acceptance criteria, takes the PR out of draft |
 | `/review` | Reviews the diff, posts comments, checks CI |
-| `/ship` | Merges |
+| `/ship` | Merges — the only irreversible action, never part of a run |
 | `/new-project` | Adds a project folder, CLAUDE.md, board option, CI workflow |
 
 ## Documentation

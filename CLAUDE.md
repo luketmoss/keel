@@ -43,12 +43,16 @@ Project #6, `https://github.com/users/luketmoss/projects/6`. IDs live in
 | Refined | — | **agree with the solution?** |
 | In Development | `/develop` | |
 | Testing | `/test` | |
-| Code Review | `/review`, then `/ship` | **agree with the implementation?** |
+| Code Review | `/review` | |
+| Ready to Ship | `/ship` | **agree with the implementation?** |
 | Done | — | |
 
 Two unattended runs — refinement (`/idea` → Refined) and delivery (Refined →
-Code Review) — separated by gates. `/ship` merges and is the only irreversible
-action; never invoke it as part of a run.
+Ready to Ship) — each ending at a gate. `/ship` merges and is the only
+irreversible action; never invoke it as part of a run.
+
+Ready to Ship is the inbox: everything in it is waiting on you. Code Review is
+transient and nothing should rest there.
 
 ## Adding a project option to the board
 

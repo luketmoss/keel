@@ -46,7 +46,7 @@ two places to record the same fact guarantees they disagree.
 
 | Field | Type | Values |
 |---|---|---|
-| Status | single-select | the 8 stages below |
+| Status | single-select | the 9 stages below |
 | Project | single-select | one option per project folder |
 | Priority | single-select | P0, P1, P2 |
 | Size | single-select | XS, S, M, L, XL |
@@ -94,11 +94,12 @@ without advancing.
 **Gate 1 — Refined.** Do you agree with the *solution*? An issue you disagree
 with goes back to PM Refining; it does not get fixed in flight.
 
-**The delivery run** — In Development → Testing → stops at **Code Review**.
-Invoked as "finish up issue X".
+**The delivery run** — In Development → Testing → Code Review → stops at
+**Ready to Ship**. Invoked as "finish up issue X".
 
-**Gate 2 — Code Review.** Do you agree with the *implementation*? The PR is
-open, green, and carries a review; nothing has touched main.
+**Gate 2 — Ready to Ship.** Do you agree with the *implementation*? The PR is
+open, reviewed, and green; nothing has touched main. This column is your inbox —
+everything in it is waiting on you and nothing else is.
 
 **The merge** — `/ship`. The only irreversible action in the system, and the
 only one you trigger by hand. Nothing merges to main without you asking for it.
@@ -110,7 +111,7 @@ mechanism.
 
 ## The pipeline
 
-Eight stages. Not every issue touches every stage; the skip rules are explicit
+Nine stages. Not every issue touches every stage; the skip rules are explicit
 below. A stage with no defined exit criteria is a stage that will silently
 collect work forever, so each one has them.
 
@@ -182,31 +183,42 @@ failure sends the issue back to In Development, not forward with a caveat.
 
 Where acceptance criteria cannot be verified without physical hardware, a stack
 skill may declare Testing human-gated. The delivery run then halts here rather
-than at Code Review, and says so. Firmware is the obvious case — a green build
+than at Ready to Ship, and says so. Firmware is the obvious case — a green build
 is not evidence that a solenoid fired at the right microsecond.
 
 ### 7. Code Review
 
-The PR is open and out of draft. Review comments live on the PR, where they
-belong — the board records only that the issue is in review.
+The PR is open and out of draft, and is being reviewed or is waiting on CI.
+Transient — nothing should rest here. Review comments live on the PR, where they
+belong; the board records only that the issue is in review.
 
 **Command:** `/review` — reviews the diff against the acceptance criteria, posts
 comments on the PR, and confirms the workflow run passed. Because required
 status checks are deliberately not used (see below), that confirmation is the
-only thing standing between a red build and a PR that looks ready. Findings send
-the issue back to In Development.
+only thing standing between a red build and a PR that looks ready.
 
-The delivery run ends here and waits. This is the second gate, and the run can
-be unattended precisely because it stops short of main — the cost of it being
-wrong is a PR you close, not a commit you revert.
+**Exit:** review found nothing blocking and CI is green. Findings send the issue
+back to In Development, not forward with a caveat.
 
-GitHub does not allow approving your own PR, so on a solo repo there is no
-approval event to wait on. The gate is you reading the PR and running `/ship`.
+### 8. Ready to Ship
+
+Reviewed clean, CI green, PR out of draft, main untouched. Everything is done
+except the merge.
+
+**This column is the inbox.** Its whole job is to answer "what is waiting on
+me?" at a glance — a question nothing else can answer, because GitHub does not
+permit approving your own PR and so records no approval event on a solo repo.
+Without this column, an item in Code Review might be un-reviewed, mid-CI, or
+ready, and the card looks identical in all three cases.
+
+It is also what lets the delivery run be fully unattended: the run stops here,
+so the worst case of a bad run is a PR you close, not a commit you revert.
 
 **Command:** `/ship` — merges, which closes the issue and triggers the build.
+The only irreversible action in the system, and never part of a run.
 **Exit:** merged.
 
-### 8. Done
+### 9. Done
 
 **Merged is deployed** — CI builds on merge to main, so there is no separate
 deploy stage. Done means the change is live.
@@ -250,8 +262,8 @@ jobs:
 **Required status checks are not used.** A required check that is path-filtered
 out never reports, and GitHub blocks the PR forever waiting for a run that will
 not happen. The workarounds are worse than the problem at this scale, so
-`/review` verifies the run instead, and no PR is reported ready without a green
-build. Do not turn them on in branch protection.
+`/review` verifies the run instead, and nothing reaches Ready to Ship without a
+green build. Do not turn them on in branch protection.
 
 **Secrets are repo-wide** — every workflow can read every secret. If a project
 ever needs isolation, scope its credentials with a GitHub Environment.

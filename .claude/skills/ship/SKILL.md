@@ -55,10 +55,25 @@ gh pr merge <pr> --repo luketmoss/keel --squash --delete-branch
 Squash — one issue, one commit on main. The branch is deleted; the shared branch
 namespace fills up fast otherwise.
 
-`Closes #<issue>` in the PR body closes the issue and moves the card to Done. If
-the card doesn't move, the PR was missing that line — fix the board with
-`board.py set <issue> --status Done` and mention it, since it means `/develop`
-didn't do its job.
+`Closes #<issue>` in the PR body closes the issue. The card then moves to Done
+by way of the board's *Item closed → Done* workflow — a second, separate
+mechanism. When the card doesn't move, one line says which of the two failed:
+
+```bash
+gh issue view <issue> --repo luketmoss/keel --json state
+```
+
+**Still open** — the PR body was missing `Closes #<issue>`. Close the issue by
+hand, set the card, and say so: this one really is `/develop` not doing its job.
+
+**Closed, card didn't move** — nothing is wrong with the PR. Project #6's *Item
+closed → Done* workflow is not enabled. Ask the user to turn it on at
+`https://github.com/users/luketmoss/projects/6/workflows`; it is theirs to
+click, and it fixes every future merge at once.
+
+`board.py set <issue> --status Done` rescues a card already stranded. It is not
+the remedy — reaching for it after every merge is how a one-click board setting
+stays broken forever.
 
 ## Report
 

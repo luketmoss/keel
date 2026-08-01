@@ -1,0 +1,33 @@
+name: keel
+on:
+  pull_request:
+    paths:
+      - 'CONVENTIONS.md'
+      - 'CLAUDE.md'
+      - 'README.md'
+      - '.claude/skills/**'
+      - '.keel/**'
+      - '.github/workflows/**'
+      - 'docs/**'
+  push:
+    branches: [main]
+    paths:
+      - 'CONVENTIONS.md'
+      - 'CLAUDE.md'
+      - 'README.md'
+      - '.claude/skills/**'
+      - '.keel/**'
+      - '.github/workflows/**'
+      - 'docs/**'
+concurrency:
+  group: keel-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python .keel/check.py

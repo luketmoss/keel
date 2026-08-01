@@ -14,6 +14,8 @@ keel/
 ├── CONVENTIONS.md          # this file
 ├── CLAUDE.md               # monorepo rules, loaded in every session
 ├── .claude/skills/         # lifecycle + stack skills
+├── .keel/                  # board.json, board.py, check.py
+├── docs/design/            # keel's own UX artifacts
 └── <project-slug>/         # one folder per project
     ├── CLAUDE.md           # names the stack, pins its stack skill
     └── docs/design/        # UX artifacts, one file per issue
@@ -22,6 +24,18 @@ keel/
 A session opened in `keel/my-app/` loads both the root `CLAUDE.md` and the
 project's own. The project file is what tells Claude which stack skill is
 authoritative — never inferred from issue text.
+
+### keel is one of the projects
+
+Its folder is the repository root. Work on the conventions, the skills, `.keel/`,
+or CI is a `keel` issue, and everything a project folder gets, keel gets from the
+root: its project `CLAUDE.md` is the root `CLAUDE.md`, its stack skill is
+`.claude/skills/stack-keel/SKILL.md`, its CI is `.github/workflows/keel.yml`, and
+its design notes go in `docs/design/` rather than under a project folder.
+
+There is no `keel/` directory. The rule is location, never inference, and keel's
+location is everything no project folder claims — which is also why its workflow
+lists its paths explicitly instead of globbing a folder.
 
 ### Naming
 

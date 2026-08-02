@@ -20,9 +20,12 @@ const INITIAL_ZOOM = 2
 
 interface MapViewProps {
   files: ImportedFile[]
+  /** Passed straight through to `TrackLayer` — see its own doc for what this
+      drives. */
+  hoveredFileId?: string | null
 }
 
-export function MapView({ files }: MapViewProps) {
+export function MapView({ files, hoveredFileId }: MapViewProps) {
   /* Google validates the key asynchronously, after the provider has mounted,
      so a bad key cannot be caught by the check below. */
   const [keyRejected, setKeyRejected] = useState(false)
@@ -69,7 +72,7 @@ export function MapView({ files }: MapViewProps) {
         disableDefaultUI
         zoomControl
       >
-        <TrackLayer files={files} />
+        <TrackLayer files={files} hoveredFileId={hoveredFileId} />
       </Map>
     </APIProvider>
   )

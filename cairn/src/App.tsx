@@ -108,6 +108,10 @@ function DefaultShell({
      them, so a plain boolean flickers the overlay off mid-drag — a depth
      counter only clears it once the drag has actually left the window. */
   const dragDepth = useRef(0)
+  /* Lifted here rather than held by either TrackList or MapView (#49) —
+     they're siblings, and the hover originates in the sidebar's track row
+     but the glow it drives is drawn on the map. */
+  const [hoveredFileId, setHoveredFileId] = useState<string | null>(null)
 
   function handleDragEnter(event: DragEvent<HTMLDivElement>) {
     if (!dataTransferHasFiles(event.dataTransfer)) return
@@ -155,11 +159,12 @@ function DefaultShell({
           files={files}
           onToggleVisibility={trackImport.toggleVisibility}
           onRemove={trackImport.removeFile}
+          onHoverFile={setHoveredFileId}
         />
       </Sidebar>
       <div className="app__map">
         <Routes>
-          <Route path="/" element={<MapView files={files} />} />
+          <Route path="/" element={<MapView files={files} hoveredFileId={hoveredFileId} />} />
           <Route
             path="/trips"
             element={<TripList trips={trips} onCreate={createTrip} onDelete={deleteTrip} />}

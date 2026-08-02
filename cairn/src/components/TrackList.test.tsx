@@ -191,4 +191,30 @@ describe('TrackList', () => {
 
     expect(screen.getByText('No tracks yet')).toBeDefined()
   })
+
+  it('reports the hovered file id on mouse enter and null on mouse leave (#49)', () => {
+    const onHoverFile = vi.fn()
+    render(
+      <TrackList
+        files={[importedFile()]}
+        onToggleVisibility={vi.fn()}
+        onRemove={vi.fn()}
+        onHoverFile={onHoverFile}
+      />,
+    )
+
+    const row = screen.getByText('trip.kml', { exact: false }).closest('li')!
+    fireEvent.mouseEnter(row)
+    expect(onHoverFile).toHaveBeenCalledWith('f1')
+
+    fireEvent.mouseLeave(row)
+    expect(onHoverFile).toHaveBeenCalledWith(null)
+  })
+
+  it('does nothing on hover when onHoverFile is omitted', () => {
+    render(<TrackList files={[importedFile()]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />)
+
+    const row = screen.getByText('trip.kml', { exact: false }).closest('li')!
+    expect(() => fireEvent.mouseEnter(row)).not.toThrow()
+  })
 })

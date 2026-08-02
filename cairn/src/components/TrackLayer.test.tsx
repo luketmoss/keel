@@ -1,7 +1,23 @@
-import { render } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { act, render } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TrackLayer } from './TrackLayer'
 import type { ImportedFile } from '../import/types'
+
+/** jsdom has no `matchMedia` at all — every case that doesn't care about
+    reduced motion must leave it absent, which is what "no stub installed"
+    means here (see map/motion.ts's own guard for the `undefined` case). */
+function stubReducedMotion(matches: boolean) {
+  window.matchMedia = ((query: string) => ({
+    matches: matches && query.includes('reduce'),
+    media: query,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+    onchange: null,
+  })) as unknown as typeof window.matchMedia
+}
 
 const { fitTracksToBounds } = vi.hoisted(() => ({ fitTracksToBounds: vi.fn() }))
 vi.mock('../map/fitBounds', () => ({ fitTracksToBounds }))
@@ -145,5 +161,90 @@ describe('TrackLayer', () => {
     )
 
     expect(fitTracksToBounds).toHaveBeenCalledTimes(2)
+  })
+
+  describe('draw-on (#49)', () => {
+    afterEach(() => {
+      vi.useRealTimers()
+      // @ts-expect-error -- removing the stub installed per-test, not a real API
+      delete window.matchMedia
+    })
+
+    it('reveals a newly imported track a point at a time, reaching the full path', () => {
+      vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'performance'] })
+      const points = Array.from({ length: 10 }, (_, i) => ({ lat: i, lon: i }))
+      const { container } = render(
+        <TrackLayer files={[importedFile({ tracks: [{ name: 'Track', points }] })]} />,
+      )
+
+      const colored = () =>
+        Array.from(container.querySelectorAll('[data-testid="polyline"]')).find(
+          (el) => el.getAttribute('data-color') === '#FF3B30',
+        )!
+
+      const firstFrame = Number(colored().getAttribute('data-points'))
+      expect(firstFrame).toBeLessThan(10)
+
+      act(() => {
+        vi.advanceTimersByTime(320)
+      })
+
+      expect(Number(colored().getAttribute('data-points'))).toBe(10)
+    })
+
+    it('shows the complete track immediately under prefers-reduced-motion, with no partial frame', () => {
+      stubReducedMotion(true)
+      const points = Array.from({ length: 10 }, (_, i) => ({ lat: i, lon: i }))
+      const { container } = render(
+        <TrackLayer files={[importedFile({ tracks: [{ name: 'Track', points }] })]} />,
+      )
+
+      const colored = Array.from(container.querySelectorAll('[data-testid="polyline"]')).find(
+        (el) => el.getAttribute('data-color') === '#FF3B30',
+      )!
+      expect(Number(colored.getAttribute('data-points'))).toBe(10)
+    })
+
+    it('does not replay the animation when a track is hidden and shown again', () => {
+      vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'performance'] })
+      const points = Array.from({ length: 10 }, (_, i) => ({ lat: i, lon: i }))
+      const file = importedFile({ tracks: [{ name: 'Track', points }] })
+      const { container, rerender } = render(<TrackLayer files={[file]} />)
+
+      act(() => {
+        vi.advanceTimersByTime(320)
+      })
+
+      rerender(<TrackLayer files={[{ ...file, visible: false }]} />)
+      rerender(<TrackLayer files={[file]} />)
+
+      const colored = Array.from(container.querySelectorAll('[data-testid="polyline"]')).find(
+        (el) => el.getAttribute('data-color') === '#FF3B30',
+      )!
+      expect(Number(colored.getAttribute('data-points'))).toBe(10)
+    })
+  })
+
+  describe('hover glow (#49)', () => {
+    it('renders an extra low-opacity polyline for the hovered file, and none when nothing is hovered', () => {
+      const { container, rerender } = render(
+        <TrackLayer files={[importedFile({ id: 'a' })]} hoveredFileId={null} />,
+      )
+      expect(container.querySelectorAll('[data-testid="polyline"]')).toHaveLength(2)
+
+      rerender(<TrackLayer files={[importedFile({ id: 'a' })]} hoveredFileId="a" />)
+      expect(container.querySelectorAll('[data-testid="polyline"]')).toHaveLength(3)
+    })
+
+    it('does not glow a file other than the one hovered', () => {
+      const { container } = render(
+        <TrackLayer
+          files={[importedFile({ id: 'a' }), importedFile({ id: 'b', colorIndex: 1 })]}
+          hoveredFileId="b"
+        />,
+      )
+      // 2 tracks × 2 polylines each, plus exactly one glow polyline for 'b'.
+      expect(container.querySelectorAll('[data-testid="polyline"]')).toHaveLength(5)
+    })
   })
 })

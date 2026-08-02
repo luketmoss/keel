@@ -221,7 +221,8 @@ def cmd_show(args):
     if values is None:
         sys.exit("Issue #{} is not on the board. Run: board.py sync {}".format(
             args.issue, args.issue))
-    print(json.dumps(values, indent=2))
+    full = {name: values.get(name) for name in FIELDS}
+    print(json.dumps(full, indent=2))
 
 
 def cmd_sync(args):

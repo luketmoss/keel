@@ -1,8 +1,8 @@
 .trip-detail-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 14px 16px;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-4);
 }
 
 .trip-detail-header__back {
@@ -14,7 +14,7 @@
   height: 24px;
   color: var(--text-muted);
   text-decoration: none;
-  font-size: 16px;
+  font-size: var(--text-lg);
 }
 
 .trip-detail-header__back:hover {
@@ -28,18 +28,18 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 16px;
+  font-size: var(--text-lg);
   font-weight: 600;
   color: var(--text);
 }
 
 .trip-detail__loading {
-  margin: 24px 0;
+  margin: var(--space-6) 0;
   text-align: center;
-  font-size: 14px;
+  font-size: var(--text-base);
   color: var(--text-muted);
 }
 
 .track-list--missing {
-  margin-top: 4px;
+  margin-top: var(--space-1);
 }

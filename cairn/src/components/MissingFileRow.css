@@ -11,5 +11,5 @@
   align-items: center;
   justify-content: center;
   color: var(--danger);
-  font-size: 14px;
+  font-size: var(--text-sm);
 }

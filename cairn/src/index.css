@@ -1,18 +1,49 @@
 :root {
-  --surface: #14171ae6;
-  --surface-solid: #14171a;
-  --text: #f2f4f5;
-  --text-muted: #9aa3ab;
-  --border: #2c3238;
-  --accent: #4c9aff;
-  --danger: #ff6b6b;
+  /* Colour — cairn/docs/design/design-language.md, "Colour" */
+  --ground: #121523;
+  --surface: #1b1f33;
+  --surface-lift: #262b42;
+  --text: #f1f3fa;
+  --text-muted: #8d93b0;
+  --border: rgba(255, 255, 255, 0.07);
+  --accent: #ff7a4d;
+  --on-accent: #1b0c05;
+  --danger: #ff4e6a;
+
+  --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
+  --muted-soft: color-mix(in srgb, var(--text-muted) 18%, transparent);
+  --hover: color-mix(in srgb, var(--text) 6%, transparent);
+  --pressed: color-mix(in srgb, var(--text) 12%, transparent);
+
+  /* Scale — "Scale" */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 18px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  --radius-sm: 10px;
+  --radius-md: 18px;
+  --radius-full: 999px;
+
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-base: 15px;
+  --text-lg: 18px;
+  --text-xl: 24px;
+
+  /* Elevation — "Elevation" */
+  --blur: 20px;
+  --shadow-lifted: 0 10px 30px rgba(6, 8, 18, 0.55);
 
   --sidebar-width: 320px;
   --sidebar-height-mobile: 45vh;
 
   color-scheme: dark;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  font-size: 14px;
+  font-size: var(--text-base);
   line-height: 1.45;
   color: var(--text);
 }
@@ -27,7 +58,7 @@ body,
 
 body {
   margin: 0;
-  background: var(--surface-solid);
+  background: var(--ground);
 }
 
 :focus-visible {

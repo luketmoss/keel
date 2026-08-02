@@ -5,32 +5,32 @@
 }
 
 .track-list--empty {
-  padding: 24px 16px;
+  padding: var(--space-6) var(--space-4);
   text-align: center;
 }
 
 .track-list__empty-title {
-  margin: 0 0 4px;
-  font-size: 14px;
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-base);
   color: var(--text-muted);
   font-weight: 600;
 }
 
 .track-list__empty-detail {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--text-muted);
 }
 
 .track-row {
-  padding: 10px 16px;
+  padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--border);
 }
 
 .track-row__main {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .track-row__swatch {
@@ -50,7 +50,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 14px;
+  font-size: var(--text-base);
   color: var(--text);
 }
 
@@ -60,14 +60,14 @@
 
 .track-row__count {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 
 /* Full contrast even when the row is hidden — hiding a track on the map
    does not make its numbers less true. */
 .track-row__stats {
-  margin: 4px 0 0 18px;
-  font-size: 12px;
+  margin: var(--space-1) 0 0 var(--space-5);
+  font-size: var(--text-xs);
   color: var(--text-muted);
 }
 
@@ -83,7 +83,7 @@
   background: none;
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--text-base);
   padding: 0;
 }
 

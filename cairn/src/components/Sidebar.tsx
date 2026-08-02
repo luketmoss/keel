@@ -7,13 +7,14 @@ const SHORT_VIEWPORT = 400
 
 type SidebarProps = {
   children?: ReactNode
+  accountRow?: ReactNode
 }
 
 function navLinkClassName({ isActive }: { isActive: boolean }) {
   return `sidebar__nav-link${isActive ? ' sidebar__nav-link--active' : ''}`
 }
 
-export function Sidebar({ children }: SidebarProps) {
+export function Sidebar({ children, accountRow }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(
     () => window.innerHeight < SHORT_VIEWPORT,
   )
@@ -41,6 +42,7 @@ export function Sidebar({ children }: SidebarProps) {
           </NavLink>
         </nav>
       </div>
+      {accountRow}
       <div className="sidebar__body">{children}</div>
     </aside>
   )

@@ -19,9 +19,10 @@ vi.mock('@vis.gl/react-google-maps', () => ({
 /* `env.ts` reads `import.meta.env` once at module evaluation, mirroring
    MapView.test.tsx — the key has to be stubbed and modules reset before App
    (which pulls in MapView) is imported. */
-async function renderApp(path = '/') {
+async function renderApp(path = '/', { googleClientId }: { googleClientId?: string } = {}) {
   window.history.pushState({}, '', path)
   vi.stubEnv('VITE_GOOGLE_MAPS_API_KEY', 'a-browser-key')
+  if (googleClientId) vi.stubEnv('VITE_GOOGLE_CLIENT_ID', googleClientId)
   vi.resetModules()
   const { App } = await import('./App')
   return render(<App />)
@@ -99,6 +100,65 @@ describe('App drag-and-drop', () => {
 
     expect(screen.queryByTestId('drop-overlay')).toBeNull()
     await screen.findByText('trip.kml', { exact: false })
+  })
+})
+
+describe('App account row', () => {
+  it('renders no sign-in control when VITE_GOOGLE_CLIENT_ID is unset, and the rest of the app works', async () => {
+    await renderApp('/')
+    expect(screen.queryByRole('button', { name: 'Sign in with Google' })).toBeNull()
+    expect(screen.getByTestId('map')).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Import tracks' })).toBeDefined()
+  })
+
+  it('shows a sign-in control when a client id is configured, and the rest of the app still works', async () => {
+    await renderApp('/', { googleClientId: 'a-client-id' })
+    expect(screen.getByRole('button', { name: 'Sign in with Google' })).toBeDefined()
+    expect(screen.getByTestId('map')).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Import tracks' })).toBeDefined()
+  })
+
+  it('signing out leaves tracks already loaded in the session untouched', async () => {
+    ;(window as unknown as { google?: unknown }).google = {
+      accounts: {
+        oauth2: {
+          initTokenClient: (config: { callback: (r: { access_token: string }) => void }) => ({
+            requestAccessToken: () => config.callback({ access_token: 'tok' }),
+          }),
+        },
+      },
+    }
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      const href = String(url)
+      if (href.includes('/about')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ user: { emailAddress: 'jane@gmail.com' } }),
+        } as Response
+      }
+      return { ok: true, status: 200, json: async () => ({ files: [] }) } as Response
+    })
+
+    await renderApp('/', { googleClientId: 'a-client-id' })
+    const app = screen.getByTestId('map').closest('.app') as HTMLElement
+    await act(async () => {
+      fireEvent.drop(app, { dataTransfer: fileDataTransfer(['trip.kml']) })
+    })
+    await screen.findByText('trip.kml', { exact: false })
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Sign in with Google' }))
+    })
+    await screen.findByText('jane@gmail.com')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
+
+    expect(screen.getByText('trip.kml', { exact: false })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Sign in with Google' })).toBeDefined()
+
+    fetchSpy.mockRestore()
+    delete (window as unknown as { google?: unknown }).google
   })
 })
 

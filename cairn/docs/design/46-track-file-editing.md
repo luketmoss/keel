@@ -4,6 +4,10 @@ Tokens, row anatomy, and visibility toggling from [6-track-list.md](6-track-list
 Colours are the fixed eight-colour palette from [5-track-rendering.md](5-track-rendering.md).
 Click-to-edit and save-failure conventions from [35-trip-detail-view.md](35-trip-detail-view.md)'s
 trip header — this note reuses that pattern rather than inventing a second one.
+Tokens, hit targets, interaction states, elevation, and motion are
+[design-language.md](design-language.md)'s (Alpenglow, landed via #47–#49 after
+this note was first drafted) — every value below is named from there rather than
+picked fresh, including on the three new controls #6 and #35 didn't have yet.
 
 Assumes #46's `tracks.json` per-trip sidecar (`{ [fileId]: { displayName?, color?, order } }`),
 written next to the trip's other Drive-backed files. Applies on top of the file
@@ -18,14 +22,32 @@ listing #34/#35 already load; nothing here changes how files are fetched.
 └──────────────────────────────────┘
 ```
 
-- **Drag handle** (`⠿`, `--text-muted`) — new, leftmost. 24px hit target,
-  `aria-label` `Reorder <name>`. Grabbing it is the only way to reorder; the
-  row itself is not draggable, so clicking the name or stats never
-  accidentally starts a drag.
-- **Swatch** — same 10px circle, now also a button. Click opens the colour
-  picker (below). `aria-label` `Change colour for <name>`.
+- **Drag handle** (`⠿`, `--text-muted`) — new, leftmost. 40px hit target,
+  absorbed into the row's existing padding via negative margin, same technique
+  #48 used for the eye/remove pair — the row does not grow. `aria-label`
+  `Reorder <name>`. Grabbing it is the only way to reorder; the row itself is
+  not draggable, so clicking the name or stats never accidentally starts a
+  drag.
+- **Swatch** — same 10px circle, now also a button with its own 40px hit
+  target (same technique). Click opens the colour picker (below). `aria-label`
+  `Change colour for <name>`.
 - **Name** — same position, now click-to-edit. Click enters edit mode; the
   eye and remove buttons stay where they are.
+
+## Interaction states
+
+Six states per [design-language.md](design-language.md)'s table, mapped onto
+the three controls #48's per-component table doesn't cover because they didn't
+exist yet:
+
+| Control | Rest | Hover | Pressed | Focus | Selected | Disabled |
+|---|---|---|---|---|---|---|
+| Drag handle | `--text-muted` icon | `--text` icon, `--hover` fill | `--pressed` fill | 2px accent outline | — | `opacity: .4`, `cursor: default`, no hover response |
+| Swatch (recolour trigger) | file's colour, no chrome | `--hover` fill behind swatch | `--pressed` fill behind swatch | 2px accent outline | — | n/a — never disabled independent of the row |
+| Popover colour option | palette colour, no chrome | `--hover` fill behind swatch | `--pressed` fill behind swatch | 2px accent outline | ring in `--accent` (see below) | n/a |
+
+The rename input inherits the global focus outline and the row's existing
+text-input styling; it doesn't need its own row here.
 
 ## Rename
 
@@ -34,7 +56,12 @@ autofocus, existing name pre-filled and selected. Same commit rules as the
 trip header's `NameEditor`:
 
 - **Enter or blur** commits. Read mode returns immediately with the thin
-  `--accent` underline that fades over 300ms, confirming the save landed.
+  `--accent` underline that fades over `--motion-base`, confirming the save
+  landed — the same state-change duration the interaction-states table uses
+  elsewhere for a transient confirmation, not one of the two effects
+  [design-language.md](design-language.md)'s Motion section licenses by name
+  (draw-on, active-track glow), since it's a fade tied to a save outcome
+  rather than a standing visual effect.
 - **Escape** discards, reverts to the prior name, does not save.
 - **Empty commit** (blur or Enter with the field cleared) reverts to the prior
   name without attempting a write — same as Escape, not an error.
@@ -52,29 +79,41 @@ on another row commits or discards whatever edit was already in progress.
 
 ## Reorder
 
-Drag the handle to move a row. While dragging: the dragged row lifts slightly
-(subtle shadow, no rotation — this is a list, not a card sort), and a 2px
-`--accent` line shows between rows to mark the drop position, updating as the
-row passes over others. Dropping commits the new order immediately (optimistic,
-same underline-fade confirmation as rename) and writes `order` for every track
-in the trip to `tracks.json` in one request.
+Drag the handle to move a row. While dragging: the dragged row lifts to **L2**
+— it now floats over the list rather than sitting attached in it, so it takes
+the L2 shadow (`0 10px 30px rgba(6,8,18,.55)`), no rotation and no scale (this
+is a list, not a card sort) — and a 2px `--accent` line shows between rows to
+mark the drop position, updating as the row passes over others. Dropping
+commits the new order immediately (optimistic, same underline-fade confirmation
+as rename) and writes `order` for every track in the trip to `tracks.json` in
+one request. The lift and drop-line both collapse to an instant cut under
+`prefers-reduced-motion`, same global rule #49 established for the map camera
+and route draw-on.
 
-Drag handles are disabled (`--text-muted` at reduced opacity, not clickable)
-while the trip is in [#35's **Partially loaded**](35-trip-detail-view.md) state.
-Reordering a list that's still gaining rows underneath the cursor produces a
-result nobody intended; handles activate once the batch settles.
+Drag handles take the table's canonical **Disabled** treatment — `opacity: .4`,
+`cursor: default`, no hover response — while the trip is in [#35's **Partially
+loaded**](35-trip-detail-view.md) state. Reordering a list that's still gaining
+rows underneath the cursor produces a result nobody intended; handles activate
+once the batch settles.
 
 **Save failure** on drop: the list reverts to its prior order and the same
 danger-text pattern as rename appears — `Couldn't save order — reverted.`
 
 ## Recolour
 
-Click the swatch to open a small popover anchored below it: the eight
-`TRACK_COLORS` swatches in a row, 20px circles, the current colour marked with
-a `--accent` ring. Click a swatch to select — closes the popover, updates the
-row's swatch and the track's line colour on the map immediately, same
-underline-fade confirmation. Click outside the popover or press Escape closes
-it without changing anything.
+Click the swatch to open a popover anchored below it: **L2** elevation, same as
+any floating chrome that touches no edge — the shared blur token, `--radius-md`,
+and the `0 10px 30px rgba(6,8,18,.55)` shadow. Inside it, the eight
+`TRACK_COLORS` swatches sit in a row, 20px circles each with their own 40px hit
+target (spacing between them, not the visible circles, carries the extra
+32px — same non-growing technique as the row's own icon buttons), the current
+colour marked with a `--accent` ring rather than the table's usual
+`--accent-soft` fill: a translucent orange wash over the swatch would tint the
+very colour identity it's marking as selected, which is the one place this note
+departs from the standard Selected treatment and why. Click a swatch to select
+— closes the popover, updates the row's swatch and the track's line colour on
+the map immediately, same underline-fade confirmation. Click outside the
+popover or press Escape closes it without changing anything.
 
 Each option's `aria-label` is the colour name from the palette comment (`Red`,
 `Cyan`, `Yellow`, `Magenta`, `Orange`, `Chartreuse`, `Violet`, `Spring green`).

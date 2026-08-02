@@ -117,6 +117,49 @@ describe('App account row', () => {
     expect(screen.getByTestId('map')).toBeDefined()
     expect(screen.getByRole('button', { name: 'Import tracks' })).toBeDefined()
   })
+
+  it('signing out leaves tracks already loaded in the session untouched', async () => {
+    ;(window as unknown as { google?: unknown }).google = {
+      accounts: {
+        oauth2: {
+          initTokenClient: (config: { callback: (r: { access_token: string }) => void }) => ({
+            requestAccessToken: () => config.callback({ access_token: 'tok' }),
+          }),
+        },
+      },
+    }
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      const href = String(url)
+      if (href.includes('/about')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ user: { emailAddress: 'jane@gmail.com' } }),
+        } as Response
+      }
+      return { ok: true, status: 200, json: async () => ({ files: [] }) } as Response
+    })
+
+    await renderApp('/', { googleClientId: 'a-client-id' })
+    const app = screen.getByTestId('map').closest('.app') as HTMLElement
+    await act(async () => {
+      fireEvent.drop(app, { dataTransfer: fileDataTransfer(['trip.kml']) })
+    })
+    await screen.findByText('trip.kml', { exact: false })
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Sign in with Google' }))
+    })
+    await screen.findByText('jane@gmail.com')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
+
+    expect(screen.getByText('trip.kml', { exact: false })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Sign in with Google' })).toBeDefined()
+
+    fetchSpy.mockRestore()
+    delete (window as unknown as { google?: unknown }).google
+  })
 })
 
 describe('App routing', () => {

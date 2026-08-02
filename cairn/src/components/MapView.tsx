@@ -1,7 +1,8 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import { APIProvider, Map } from '@vis.gl/react-google-maps'
 import { googleMapsApiKey } from '../env'
 import { TrackLayer } from './TrackLayer'
+import { MapUnavailable } from './MapUnavailable'
 import type { ImportedFile } from '../import/types'
 import './MapView.css'
 
@@ -71,14 +72,5 @@ export function MapView({ files }: MapViewProps) {
         <TrackLayer files={files} />
       </Map>
     </APIProvider>
-  )
-}
-
-function MapUnavailable({ children }: { children: ReactNode }) {
-  return (
-    <div className="map-unavailable">
-      <p className="map-unavailable__title">Map unavailable</p>
-      <p className="map-unavailable__detail">{children}</p>
-    </div>
   )
 }

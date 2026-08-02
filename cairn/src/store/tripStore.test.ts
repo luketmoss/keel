@@ -192,4 +192,96 @@ describe('LocalTripStore', () => {
 
     expect(store.getTrip(trip.id)).toBe(store.getTrip(trip.id))
   })
+
+  describe('overview', () => {
+    it('returns null for a trip whose overview has never been saved', () => {
+      const store = new LocalTripStore(fakeStorage())
+      const trip = store.createTrip('Hokkaido')
+
+      expect(store.getOverview(trip.id)).toBeNull()
+    })
+
+    it('computes and persists a simplified LineString per track, notifying subscribers', () => {
+      const store = new LocalTripStore(fakeStorage())
+      const trip = store.createTrip('Hokkaido')
+      const listener = vi.fn()
+      store.subscribe(listener)
+
+      store.saveOverview(trip.id, [
+        { name: 'Day 1', points: [{ lat: 37, lon: -122 }, { lat: 38, lon: -121 }] },
+      ])
+
+      const overview = store.getOverview(trip.id)
+      expect(overview?.type).toBe('FeatureCollection')
+      expect(overview?.features).toHaveLength(1)
+      expect(overview?.features[0].geometry.type).toBe('LineString')
+      expect(listener).toHaveBeenCalledTimes(1)
+    })
+
+    it('saves an empty FeatureCollection for a trip with no tracks, not null', () => {
+      const store = new LocalTripStore(fakeStorage())
+      const trip = store.createTrip('Hokkaido')
+
+      store.saveOverview(trip.id, [])
+
+      expect(store.getOverview(trip.id)).toEqual({ type: 'FeatureCollection', features: [] })
+    })
+
+    it('overwrites a previously saved overview on a later save', () => {
+      const store = new LocalTripStore(fakeStorage())
+      const trip = store.createTrip('Hokkaido')
+
+      store.saveOverview(trip.id, [
+        { name: 'Day 1', points: [{ lat: 37, lon: -122 }, { lat: 38, lon: -121 }] },
+      ])
+      store.saveOverview(trip.id, [])
+
+      expect(store.getOverview(trip.id)?.features).toHaveLength(0)
+    })
+
+    it('persists an overview across a reload of a new store over the same storage', () => {
+      const storage = fakeStorage()
+      const first = new LocalTripStore(storage)
+      const trip = first.createTrip('Hokkaido')
+      first.saveOverview(trip.id, [
+        { name: 'Day 1', points: [{ lat: 37, lon: -122 }, { lat: 38, lon: -121 }] },
+      ])
+
+      const second = new LocalTripStore(storage)
+
+      expect(second.getOverview(trip.id)?.features).toHaveLength(1)
+    })
+
+    it('removes the overview from storage when the trip is deleted', () => {
+      const storage = fakeStorage()
+      const store = new LocalTripStore(storage)
+      const trip = store.createTrip('Hokkaido')
+      store.saveOverview(trip.id, [
+        { name: 'Day 1', points: [{ lat: 37, lon: -122 }, { lat: 38, lon: -121 }] },
+      ])
+
+      store.deleteTrip(trip.id)
+
+      expect(storage.getItem(`cairn.trips.overview.${trip.id}`)).toBeNull()
+      expect(store.getOverview(trip.id)).toBeNull()
+    })
+
+    it('treats a corrupted overview as missing rather than throwing', () => {
+      const storage = fakeStorage()
+      const store = new LocalTripStore(storage)
+      const trip = store.createTrip('Hokkaido')
+      storage.setItem(`cairn.trips.overview.${trip.id}`, 'not json')
+
+      expect(store.getOverview(trip.id)).toBeNull()
+    })
+
+    it('treats a well-formed but non-FeatureCollection value as missing', () => {
+      const storage = fakeStorage()
+      const store = new LocalTripStore(storage)
+      const trip = store.createTrip('Hokkaido')
+      storage.setItem(`cairn.trips.overview.${trip.id}`, JSON.stringify({ oops: true }))
+
+      expect(store.getOverview(trip.id)).toBeNull()
+    })
+  })
 })

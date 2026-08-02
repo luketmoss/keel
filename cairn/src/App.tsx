@@ -6,6 +6,7 @@ import { ImportPanel } from './components/ImportPanel'
 import { TrackList } from './components/TrackList'
 import { TripList } from './components/TripList'
 import { TripDetail } from './components/TripDetail'
+import { WorldMap } from './components/WorldMap'
 import { DropOverlay } from './components/DropOverlay'
 import { useTrackImport } from './import/useTrackImport'
 import { dataTransferHasFiles, filesFromDataTransfer } from './import/dataTransfer'
@@ -70,6 +71,7 @@ function AppShell() {
             trackImport={trackImport}
             account={account}
             trips={trips}
+            tripStore={tripStore}
             createTrip={createTrip}
             deleteTrip={deleteTrip}
           />
@@ -84,14 +86,23 @@ interface DefaultShellProps {
   trackImport: ReturnType<typeof useTrackImport>
   account: GoogleAccount
   trips: TripIndexEntry[]
+  tripStore: LocalTripStore
   createTrip: (name: string) => void
   deleteTrip: (id: string) => void
 }
 
-/** The map (`/`) and trips list (`/trips`) — v1's shell, unchanged from
-    before #34 except for living in its own component so the trip detail
-    page can bypass it entirely. */
-function DefaultShell({ files, trackImport, account, trips, createTrip, deleteTrip }: DefaultShellProps) {
+/** The map (`/`), trips list (`/trips`), and world map (`/world`, #37) —
+    v1's shell, unchanged from before #34 except for living in its own
+    component so the trip detail page can bypass it entirely. */
+function DefaultShell({
+  files,
+  trackImport,
+  account,
+  trips,
+  tripStore,
+  createTrip,
+  deleteTrip,
+}: DefaultShellProps) {
   const [dragActive, setDragActive] = useState(false)
   /* Nested elements each fire their own enter/leave as the pointer crosses
      them, so a plain boolean flickers the overlay off mid-drag — a depth
@@ -153,6 +164,7 @@ function DefaultShell({ files, trackImport, account, trips, createTrip, deleteTr
             path="/trips"
             element={<TripList trips={trips} onCreate={createTrip} onDelete={deleteTrip} />}
           />
+          <Route path="/world" element={<WorldMap trips={trips} tripStore={tripStore} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>

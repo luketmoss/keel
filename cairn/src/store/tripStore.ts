@@ -1,3 +1,7 @@
+import type { FeatureCollection, LineString } from 'geojson'
+import type { Track } from '../kml/parse'
+import { buildOverviewGeoJSON } from '../geo/overview'
+
 export type TripStatus = 'planned' | 'completed'
 
 /** The full record for one trip. Rename, status changes, and notes editing
@@ -54,6 +58,19 @@ export interface TripStore {
       there. */
   updateTrip(id: string, patch: TripUpdate): TripRecord | null
   deleteTrip(id: string): void
+  /** The trip's precomputed overview geometry (#36's `buildOverviewGeoJSON`
+      output) — what `/world` (#37) reads, never a trip's source tracks.
+      `null` when the trip has never had a track set saved, when its last
+      saved set produced no geometry (no tracks, or all-empty tracks), or
+      when the stored value can't be read back — every one of those cases
+      is "nothing to draw" to a caller, and none of them is worth a thrown
+      error over. */
+  getOverview(id: string): FeatureCollection<LineString> | null
+  /** Recomputes and persists a trip's overview from its current tracks.
+      The regeneration contract `geo/overview.ts` describes: called by
+      whatever owns a trip's track set, whenever that set changes. Pure
+      w.r.t. the tracks given — same tracks in, same stored geometry out. */
+  saveOverview(id: string, tracks: Track[]): void
   /** Notified after any mutation. Returns an unsubscribe function — the
       shape `useSyncExternalStore` expects directly. */
   subscribe(listener: () => void): () => void
@@ -61,6 +78,7 @@ export interface TripStore {
 
 const INDEX_KEY = 'cairn.trips.index'
 const recordKey = (id: string): string => `cairn.trips.trip.${id}`
+const overviewKey = (id: string): string => `cairn.trips.overview.${id}`
 
 function generateId(): string {
   return `trip-${crypto.randomUUID()}`
@@ -166,7 +184,26 @@ export class LocalTripStore implements TripStore {
     this.index = this.index.filter((entry) => entry.id !== id)
     this.writeIndex()
     this.storage.removeItem(recordKey(id))
+    this.storage.removeItem(overviewKey(id))
     this.records.delete(id)
+    this.notify()
+  }
+
+  getOverview = (id: string): FeatureCollection<LineString> | null => {
+    const raw = this.storage.getItem(overviewKey(id))
+    if (!raw) return null
+    try {
+      const parsed = JSON.parse(raw)
+      if (!isFeatureCollection(parsed)) return null
+      return parsed
+    } catch {
+      return null
+    }
+  }
+
+  saveOverview = (id: string, tracks: Track[]): void => {
+    const overview = buildOverviewGeoJSON(tracks)
+    this.storage.setItem(overviewKey(id), JSON.stringify(overview))
     this.notify()
   }
 
@@ -214,6 +251,15 @@ function isTripIndexEntry(value: unknown): value is TripIndexEntry {
     typeof entry.name === 'string' &&
     (entry.status === 'planned' || entry.status === 'completed')
   )
+}
+
+// Same "corrupted is missing, not thrown" stance as the index/record guards
+// above — a hand-edited or partially-written value just reads back as "no
+// overview yet" rather than surfacing a parse error to `/world`.
+function isFeatureCollection(value: unknown): value is FeatureCollection<LineString> {
+  if (typeof value !== 'object' || value === null) return false
+  const collection = value as Record<string, unknown>
+  return collection.type === 'FeatureCollection' && Array.isArray(collection.features)
 }
 
 // A record written by an older shape, or corrupted by hand, is treated as

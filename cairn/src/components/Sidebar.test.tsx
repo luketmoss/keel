@@ -12,10 +12,14 @@ function renderAt(path: string) {
 }
 
 describe('Sidebar nav', () => {
-  it('shows "Map" and "Trips" links', () => {
+  it('shows "Map", "Trips", and "World" links, in that order', () => {
     renderAt('/')
     expect(screen.getByRole('link', { name: 'Map' })).toBeDefined()
     expect(screen.getByRole('link', { name: 'Trips' })).toBeDefined()
+    expect(screen.getByRole('link', { name: 'World' })).toBeDefined()
+
+    const links = screen.getAllByRole('link').map((link) => link.textContent)
+    expect(links).toEqual(['Map', 'Trips', 'World'])
   })
 
   it('marks only "Map" active at the exact root path', () => {
@@ -26,11 +30,27 @@ describe('Sidebar nav', () => {
     expect(screen.getByRole('link', { name: 'Trips' }).className).not.toContain(
       'sidebar__nav-link--active',
     )
+    expect(screen.getByRole('link', { name: 'World' }).className).not.toContain(
+      'sidebar__nav-link--active',
+    )
   })
 
-  it('marks "Trips" active on the trip detail path, not "Map"', () => {
+  it('marks "Trips" active on the trip detail path, not "Map" or "World"', () => {
     renderAt('/trips/xyz')
     expect(screen.getByRole('link', { name: 'Trips' }).className).toContain(
+      'sidebar__nav-link--active',
+    )
+    expect(screen.getByRole('link', { name: 'Map' }).className).not.toContain(
+      'sidebar__nav-link--active',
+    )
+    expect(screen.getByRole('link', { name: 'World' }).className).not.toContain(
+      'sidebar__nav-link--active',
+    )
+  })
+
+  it('marks "World" active on the world map path', () => {
+    renderAt('/world')
+    expect(screen.getByRole('link', { name: 'World' }).className).toContain(
       'sidebar__nav-link--active',
     )
     expect(screen.getByRole('link', { name: 'Map' }).className).not.toContain(

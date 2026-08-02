@@ -47,6 +47,9 @@ export function Sidebar({ children, accountRow, header }: SidebarProps) {
               <NavLink to="/trips" className={navLinkClassName}>
                 Trips
               </NavLink>
+              <NavLink to="/world" className={navLinkClassName}>
+                World
+              </NavLink>
             </nav>
           </>
         )}

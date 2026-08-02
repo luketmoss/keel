@@ -1,14 +1,16 @@
-import { useMemo, useRef, useState, useSyncExternalStore, type DragEvent } from 'react'
+import { useCallback, useMemo, useRef, useState, useSyncExternalStore, type DragEvent } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { Sidebar } from './components/Sidebar'
 import { MapView } from './components/MapView'
 import { ImportPanel } from './components/ImportPanel'
 import { TrackList } from './components/TrackList'
+import { TripList } from './components/TripList'
 import { DropOverlay } from './components/DropOverlay'
 import { RoutePlaceholder } from './components/RoutePlaceholder'
 import { useTrackImport } from './import/useTrackImport'
 import { dataTransferHasFiles, filesFromDataTransfer } from './import/dataTransfer'
 import { InMemoryTrackStore } from './store/trackStore'
+import { LocalTripStore } from './store/tripStore'
 import { useGoogleAccount } from './auth/useGoogleAccount'
 import { AccountRow } from './auth/AccountRow'
 import './App.css'
@@ -36,6 +38,13 @@ function AppShell() {
   const files = useSyncExternalStore(store.subscribe, store.getFiles)
   const trackImport = useTrackImport(store)
   const account = useGoogleAccount()
+  /* Same rule as InMemoryTrackStore above: this is the one module allowed
+     to import LocalTripStore directly — everything else depends on the
+     TripStore interface. */
+  const tripStore = useMemo(() => new LocalTripStore(), [])
+  const trips = useSyncExternalStore(tripStore.subscribe, tripStore.getTrips)
+  const createTrip = useCallback((name: string) => tripStore.createTrip(name), [tripStore])
+  const deleteTrip = useCallback((id: string) => tripStore.deleteTrip(id), [tripStore])
   const [dragActive, setDragActive] = useState(false)
   /* Nested elements each fire their own enter/leave as the pointer crosses
      them, so a plain boolean flickers the overlay off mid-drag — a depth
@@ -95,9 +104,7 @@ function AppShell() {
           <Route path="/" element={<MapView files={files} />} />
           <Route
             path="/trips"
-            element={
-              <RoutePlaceholder heading="Trips" subtext="Trip list is coming soon." />
-            }
+            element={<TripList trips={trips} onCreate={createTrip} onDelete={deleteTrip} />}
           />
           <Route path="/trips/:id" element={<TripDetailPlaceholder />} />
           <Route path="*" element={<Navigate to="/" replace />} />

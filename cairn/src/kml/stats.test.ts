@@ -46,6 +46,18 @@ describe('computeTrackStats', () => {
     expect(computeTrackStats(track).durationSeconds).toBeUndefined()
   })
 
+  it('leaves duration undefined for a single timestamped point — one point has no span', () => {
+    const track: Track = {
+      name: 'One timestamp',
+      points: [
+        { lat: 37, lon: -122, time: '2020-01-01T08:00:00Z' },
+        { lat: 37.1, lon: -122.1 },
+      ],
+    }
+
+    expect(computeTrackStats(track).durationSeconds).toBeUndefined()
+  })
+
   it('takes the span as max minus min, not last minus first, for out-of-order timestamps', () => {
     const track: Track = {
       name: 'Scrambled',

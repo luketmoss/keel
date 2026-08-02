@@ -72,6 +72,23 @@ describe('useTrackImport', () => {
     expect(result.current.files.map((f) => f.name)).toEqual(['a.kml', 'b.kml', 'c.kml'])
   })
 
+  it('assigns each file a distinct, monotonically increasing colour index', async () => {
+    parseKmlOrKmz
+      .mockResolvedValueOnce(track('Day 1'))
+      .mockResolvedValueOnce({ ok: false, error: 'broken' })
+      .mockResolvedValueOnce(track('Day 3'))
+    const { result } = renderHook(() => useTrackImport())
+
+    await act(() =>
+      result.current.importFiles([file('a.kml'), file('bad.kml'), file('c.kml')]),
+    )
+
+    expect(result.current.files).toHaveLength(2)
+    expect(result.current.files[1].colorIndex).toBeGreaterThan(
+      result.current.files[0].colorIndex,
+    )
+  })
+
   it('imports a file whose name matches one already loaded, keeping both distinguishable', async () => {
     parseKmlOrKmz.mockResolvedValueOnce(track('First')).mockResolvedValueOnce(track('Second'))
     const { result } = renderHook(() => useTrackImport())

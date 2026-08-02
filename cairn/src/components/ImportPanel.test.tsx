@@ -78,10 +78,11 @@ describe('ImportPanel', () => {
       <ImportPanel
         {...baseProps({
           files: [
-            { id: '1', name: 'trip.kml', tracks: [{ name: 'a', points: [] }] },
+            { id: '1', name: 'trip.kml', tracks: [{ name: 'a', points: [] }], colorIndex: 0 },
             {
               id: '2',
               name: 'trip.kml',
+              colorIndex: 1,
               tracks: [
                 { name: 'a', points: [] },
                 { name: 'b', points: [] },

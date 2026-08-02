@@ -8,7 +8,12 @@ vi.mock('@vis.gl/react-google-maps', () => ({
   APIProvider: ({ children }: { children?: React.ReactNode }) => (
     <div data-testid="api-provider">{children}</div>
   ),
-  Map: () => <div data-testid="map" />,
+  Map: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid="map">{children}</div>
+  ),
+  Marker: () => null,
+  Polyline: () => null,
+  useMap: () => null,
 }))
 
 /* `env.ts` reads `import.meta.env` once at module evaluation, mirroring

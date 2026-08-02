@@ -15,6 +15,13 @@ function generateId(prefix: string): string {
   return `${prefix}-${nextId}`
 }
 
+let nextColorIndex = 0
+function generateColorIndex(): number {
+  const index = nextColorIndex
+  nextColorIndex += 1
+  return index
+}
+
 export interface UseTrackImport {
   files: ImportedFile[]
   failures: ImportFailure[]
@@ -70,7 +77,12 @@ export function useTrackImport(): UseTrackImport {
 
       setFiles((prev) => [
         ...prev,
-        { id: generateId('file'), name: file.name, tracks: result.tracks },
+        {
+          id: generateId('file'),
+          name: file.name,
+          tracks: result.tracks,
+          colorIndex: generateColorIndex(),
+        },
       ])
     }
 

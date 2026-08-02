@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { APIProvider, Map } from '@vis.gl/react-google-maps'
 import { googleMapsApiKey } from '../env'
+import { TrackLayer } from './TrackLayer'
+import type { ImportedFile } from '../import/types'
 import './MapView.css'
 
 declare global {
@@ -15,7 +17,11 @@ declare global {
 const INITIAL_CENTER = { lat: 20, lng: 0 }
 const INITIAL_ZOOM = 2
 
-export function MapView() {
+interface MapViewProps {
+  files: ImportedFile[]
+}
+
+export function MapView({ files }: MapViewProps) {
   /* Google validates the key asynchronously, after the provider has mounted,
      so a bad key cannot be caught by the check below. */
   const [keyRejected, setKeyRejected] = useState(false)
@@ -61,7 +67,9 @@ export function MapView() {
         gestureHandling="greedy"
         disableDefaultUI
         zoomControl
-      />
+      >
+        <TrackLayer files={files} />
+      </Map>
     </APIProvider>
   )
 }

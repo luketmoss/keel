@@ -1,0 +1,144 @@
+export type TripStatus = 'planned' | 'completed'
+
+/** The full record for one trip. Rename, status changes, and notes editing
+    are #35's job — this issue only ever writes `name`, `status` and
+    `createdAt`, but the shape includes the fields #35 will need so the swap
+    to a Drive-backed implementation doesn't reshape data written today. */
+export interface TripRecord {
+  id: string
+  name: string
+  status: TripStatus
+  startDate: string | null
+  endDate: string | null
+  notes: string
+  createdAt: string
+}
+
+/** What the list reads. A cache, not the truth — see the store's
+    "corrupted index" handling below — so it carries only what a row
+    renders, not the full record. */
+export interface TripIndexEntry {
+  id: string
+  name: string
+  status: TripStatus
+  startDate: string | null
+  endDate: string | null
+  createdAt: string
+}
+
+/* The seam a future Drive-backed store's async reads/writes hook into:
+   consumers depend only on this interface, never on a concrete
+   implementation, so swapping local storage for Drive touches this module
+   and nothing else. Mirrors `TrackStore` (#31) in shape and intent. */
+export interface TripStore {
+  getTrips(): TripIndexEntry[]
+  createTrip(name: string): TripIndexEntry
+  deleteTrip(id: string): void
+  /** Notified after any mutation. Returns an unsubscribe function — the
+      shape `useSyncExternalStore` expects directly. */
+  subscribe(listener: () => void): () => void
+}
+
+const INDEX_KEY = 'cairn.trips.index'
+const recordKey = (id: string): string => `cairn.trips.trip.${id}`
+
+function generateId(): string {
+  return `trip-${crypto.randomUUID()}`
+}
+
+/* The only implementation for now — `localStorage`, matching what #32/#34
+   will eventually write: one record per trip plus a lightweight index the
+   list reads instead of loading every trip. The index's `If-Match`/etag
+   concern is a Drive-specific concurrency problem, out of scope here. */
+export class LocalTripStore implements TripStore {
+  private index: TripIndexEntry[]
+  private readonly listeners = new Set<() => void>()
+
+  constructor(private readonly storage: Storage = window.localStorage) {
+    this.index = this.readIndex()
+  }
+
+  getTrips = (): TripIndexEntry[] => {
+    return this.index
+  }
+
+  createTrip = (name: string): TripIndexEntry => {
+    const trimmed = name.trim()
+    const record: TripRecord = {
+      id: generateId(),
+      name: trimmed,
+      status: 'planned',
+      startDate: null,
+      endDate: null,
+      notes: '',
+      createdAt: new Date().toISOString(),
+    }
+    const entry: TripIndexEntry = {
+      id: record.id,
+      name: record.name,
+      status: record.status,
+      startDate: record.startDate,
+      endDate: record.endDate,
+      createdAt: record.createdAt,
+    }
+    this.writeRecord(record)
+    // Newest-created trip at the top — a trips list is revisited over
+    // weeks, unlike the track list's import-order stance (#6).
+    this.index = [entry, ...this.index]
+    this.writeIndex()
+    this.notify()
+    return entry
+  }
+
+  deleteTrip = (id: string): void => {
+    this.index = this.index.filter((entry) => entry.id !== id)
+    this.writeIndex()
+    this.storage.removeItem(recordKey(id))
+    this.notify()
+  }
+
+  subscribe = (listener: () => void): (() => void) => {
+    this.listeners.add(listener)
+    return () => {
+      this.listeners.delete(listener)
+    }
+  }
+
+  private notify(): void {
+    for (const listener of this.listeners) listener()
+  }
+
+  private writeIndex(): void {
+    this.storage.setItem(INDEX_KEY, JSON.stringify(this.index))
+  }
+
+  private writeRecord(record: TripRecord): void {
+    this.storage.setItem(recordKey(record.id), JSON.stringify(record))
+  }
+
+  // A broken or unreadable index (manually edited, quota exceeded, a future
+  // migration mismatch) is indistinguishable from "no trips" without a
+  // dedicated recovery flow this issue doesn't build — treated as empty
+  // rather than thrown.
+  private readIndex(): TripIndexEntry[] {
+    const raw = this.storage.getItem(INDEX_KEY)
+    if (!raw) return []
+    try {
+      const parsed = JSON.parse(raw)
+      if (!Array.isArray(parsed)) return []
+      return parsed.filter(isTripIndexEntry)
+    } catch {
+      return []
+    }
+  }
+}
+
+function isTripIndexEntry(value: unknown): value is TripIndexEntry {
+  if (typeof value !== 'object' || value === null) return false
+  const entry = value as Record<string, unknown>
+  return (
+    typeof entry.id === 'string' &&
+    typeof entry.name === 'string' &&
+    (entry.status === 'planned' || entry.status === 'completed')
+  )
+}

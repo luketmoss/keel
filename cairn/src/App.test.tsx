@@ -171,11 +171,12 @@ describe('App routing', () => {
     expect(screen.getByRole('button', { name: 'Import tracks' })).toBeDefined()
   })
 
-  it('keeps the sidebar and shows a placeholder at /trips', async () => {
+  it('keeps the sidebar and shows the trip list at /trips', async () => {
     await renderApp('/trips')
     expect(screen.queryByTestId('map')).toBeNull()
     expect(screen.getByRole('heading', { name: 'Trips' })).toBeDefined()
-    expect(screen.getByText('Trip list is coming soon.')).toBeDefined()
+    expect(screen.getByPlaceholderText('Trip name')).toBeDefined()
+    expect(screen.getByText('No trips yet')).toBeDefined()
     expect(screen.getByRole('button', { name: 'Import tracks' })).toBeDefined()
   })
 

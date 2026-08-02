@@ -3,6 +3,28 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useTripImport } from './useTripImport'
 import type { ParseResult } from '../kml/parse'
 import { DriveAuthError } from '../drive/cairnFolder'
+import { LocalTrackOverridesStore } from '../store/trackOverridesStore'
+
+/** A minimal in-memory `Storage`, same helper `tripStore.test.ts` and
+    `trackOverridesStore.test.ts` use — isolates each test's overrides from
+    the default store's real `localStorage` and from each other. */
+function fakeStorage(): Storage {
+  const data = new Map<string, string>()
+  return {
+    getItem: (key: string) => data.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      data.set(key, value)
+    },
+    removeItem: (key: string) => {
+      data.delete(key)
+    },
+    clear: () => data.clear(),
+    key: () => null,
+    get length() {
+      return data.size
+    },
+  }
+}
 
 const { findOrCreateTripFolder } = vi.hoisted(() => ({ findOrCreateTripFolder: vi.fn() }))
 vi.mock('../drive/tripFolder', () => ({ findOrCreateTripFolder }))
@@ -207,5 +229,132 @@ describe('useTripImport', () => {
 
     expect(startResumableUpload).not.toHaveBeenCalled()
     expect(result.current.tracks).toHaveLength(0)
+  })
+})
+
+describe('useTripImport — #46 track overrides', () => {
+  it('renames a track without touching its Drive-listing name on reload', async () => {
+    const store = new LocalTrackOverridesStore(fakeStorage())
+    listTrackFiles.mockResolvedValue([{ id: 'drive-1', name: 'day-1.kml' }])
+    downloadTrackFile.mockResolvedValue(file('day-1.kml'))
+    parseKmlOrKmz.mockResolvedValue(track('Day 1'))
+
+    const { result } = renderHook(() =>
+      useTripImport('trip-1', 'token', 'cairn-folder-id', store),
+    )
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    const autoColorIndex = result.current.tracks[0].colorIndex
+    let ok = false
+    act(() => {
+      ok = result.current.renameTrack(result.current.tracks[0].id, 'Ridge day')
+    })
+    expect(ok).toBe(true)
+    expect(result.current.tracks[0].name).toBe('Ridge day')
+    // Renaming sets only the name override — colour still falls back to its
+    // auto-assigned default, per-field rather than per-file (design doc).
+    expect(result.current.tracks[0].colorIndex).toBe(autoColorIndex)
+
+    // A fresh mount for the same trip (simulating a reload) reads the
+    // override back rather than starting over from the raw Drive filename.
+    const { result: reloaded } = renderHook(() =>
+      useTripImport('trip-1', 'token', 'cairn-folder-id', store),
+    )
+    await waitFor(() => expect(reloaded.current.loading).toBe(false))
+    expect(reloaded.current.tracks[0].name).toBe('Ridge day')
+  })
+
+  it('recolours a track, overriding its auto-assigned colour index', async () => {
+    const store = new LocalTrackOverridesStore(fakeStorage())
+    listTrackFiles.mockResolvedValue([{ id: 'drive-1', name: 'day-1.kml' }])
+    downloadTrackFile.mockResolvedValue(file('day-1.kml'))
+    parseKmlOrKmz.mockResolvedValue(track('Day 1'))
+
+    const { result } = renderHook(() =>
+      useTripImport('trip-1', 'token', 'cairn-folder-id', store),
+    )
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    const autoColorIndex = result.current.tracks[0].colorIndex
+
+    act(() => {
+      result.current.recolorTrack(result.current.tracks[0].id, autoColorIndex + 1)
+    })
+
+    expect(result.current.tracks[0].colorIndex).toBe(autoColorIndex + 1)
+  })
+
+  it('reorders tracks and persists the new order across a reload', async () => {
+    const store = new LocalTrackOverridesStore(fakeStorage())
+    listTrackFiles.mockResolvedValue([
+      { id: 'drive-1', name: 'a.kml' },
+      { id: 'drive-2', name: 'b.kml' },
+    ])
+    downloadTrackFile.mockResolvedValueOnce(file('a.kml')).mockResolvedValueOnce(file('b.kml'))
+    parseKmlOrKmz.mockResolvedValue(track('Day'))
+
+    const { result } = renderHook(() =>
+      useTripImport('trip-1', 'token', 'cairn-folder-id', store),
+    )
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.tracks.map((t) => t.name)).toEqual(['a.kml', 'b.kml'])
+
+    const [first, second] = result.current.tracks
+    act(() => {
+      result.current.reorderTracks([second.id, first.id])
+    })
+    expect(result.current.tracks.map((t) => t.name)).toEqual(['b.kml', 'a.kml'])
+
+    const { result: reloaded } = renderHook(() =>
+      useTripImport('trip-1', 'token', 'cairn-folder-id', store),
+    )
+    await waitFor(() => expect(reloaded.current.loading).toBe(false))
+    expect(reloaded.current.tracks.map((t) => t.name)).toEqual(['b.kml', 'a.kml'])
+  })
+
+  it('falls back to defaults for a track with no stored override', async () => {
+    const store = new LocalTrackOverridesStore(fakeStorage())
+    listTrackFiles.mockResolvedValue([{ id: 'drive-1', name: 'untouched.kml' }])
+    downloadTrackFile.mockResolvedValue(file('untouched.kml'))
+    parseKmlOrKmz.mockResolvedValue(track('Untouched'))
+
+    const { result } = renderHook(() =>
+      useTripImport('trip-1', 'token', 'cairn-folder-id', store),
+    )
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    expect(result.current.tracks[0].name).toBe('untouched.kml')
+  })
+
+  it('ignores a stored override for a track no longer in the Drive listing, rather than erroring', async () => {
+    const store = new LocalTrackOverridesStore(fakeStorage())
+    // Pre-seed an override for a file id the trip's current listing will
+    // never mention — as if it were removed independently after the
+    // override was written.
+    store.setOverride('trip-1', 'drive-gone', { displayName: 'Ghost' }, ['drive-gone'])
+    listTrackFiles.mockResolvedValue([{ id: 'drive-1', name: 'day-1.kml' }])
+    downloadTrackFile.mockResolvedValue(file('day-1.kml'))
+    parseKmlOrKmz.mockResolvedValue(track('Day 1'))
+
+    const { result } = renderHook(() =>
+      useTripImport('trip-1', 'token', 'cairn-folder-id', store),
+    )
+
+    await expect(waitFor(() => expect(result.current.loading).toBe(false))).resolves.not.toThrow()
+    expect(result.current.tracks).toHaveLength(1)
+    expect(result.current.tracks[0].name).toBe('day-1.kml')
+  })
+
+  it('returns false and leaves state unchanged when the id has no matching track', async () => {
+    const store = new LocalTrackOverridesStore(fakeStorage())
+    const { result } = renderHook(() =>
+      useTripImport('trip-1', 'token', 'cairn-folder-id', store),
+    )
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    let ok = true
+    act(() => {
+      ok = result.current.renameTrack('no-such-id', 'New name')
+    })
+    expect(ok).toBe(false)
   })
 })

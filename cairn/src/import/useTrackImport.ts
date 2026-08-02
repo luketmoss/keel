@@ -86,6 +86,9 @@ export function useTrackImport(store: TrackStore): UseTrackImport {
         store.addFile({
           id: generateId('file'),
           name: file.name,
+          // No Drive file behind the v1 import path — #46's overrides are
+          // trip-scoped and never apply here.
+          driveFileId: '',
           tracks: result.tracks,
           trackStats: result.tracks.map(computeTrackStats),
           colorIndex: generateColorIndex(),

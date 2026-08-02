@@ -6,6 +6,7 @@ function importedFile(id: string, overrides: Partial<ImportedFile> = {}): Import
   return {
     id,
     name: `${id}.kml`,
+    driveFileId: `drive-${id}`,
     tracks: [],
     trackStats: [],
     colorIndex: 0,

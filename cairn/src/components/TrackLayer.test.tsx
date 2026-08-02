@@ -41,6 +41,7 @@ function importedFile(overrides: Partial<ImportedFile> = {}): ImportedFile {
   return {
     id: 'f1',
     name: 'trip.kml',
+    driveFileId: 'drive-f1',
     colorIndex: 0,
     visible: true,
     tracks: [{ name: 'Track', points: [{ lat: 37, lon: -122 }, { lat: 37.1, lon: -122.1 }] }],

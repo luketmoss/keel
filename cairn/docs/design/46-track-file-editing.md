@@ -9,9 +9,16 @@ Tokens, hit targets, interaction states, elevation, and motion are
 this note was first drafted) — every value below is named from there rather than
 picked fresh, including on the three new controls #6 and #35 didn't have yet.
 
-Assumes #46's `tracks.json` per-trip sidecar (`{ [fileId]: { displayName?, color?, order } }`),
-written next to the trip's other Drive-backed files. Applies on top of the file
-listing #34/#35 already load; nothing here changes how files are fetched.
+Assumes #46's per-trip overrides record (`{ [driveFileId]: { displayName?, color?, order } }`),
+keyed by each track's actual Drive file id (stable across reloads, unlike
+`ImportedFile.id`, which `useTripImport` regenerates every mount). Persisted to
+`localStorage`, matching `LocalTripStore`'s actual pattern today — despite the
+name, `overview.geojson` is `localStorage`-backed too, not a real Drive file;
+there is no genuine Drive-backed metadata storage anywhere in cairn yet, only
+the KML/KMZ track files themselves go through Drive. Syncing this (and trip
+metadata) to real Drive storage is deliberately left to #59 rather than built
+here. Applies on top of the file listing #34/#35 already load; nothing here
+changes how files are fetched.
 
 ## Row anatomy, updated
 
@@ -65,14 +72,15 @@ trip header's `NameEditor`:
 - **Escape** discards, reverts to the prior name, does not save.
 - **Empty commit** (blur or Enter with the field cleared) reverts to the prior
   name without attempting a write — same as Escape, not an error.
-- **Save failure** (Drive write rejected, offline, etag conflict on
-  `tracks.json`): reverts to the prior name and shows `Couldn't save name —
-  reverted.` in `--danger` beneath the track list, clearing on the next
-  successful edit to any track in the trip.
+- **Save failure** (`localStorage.setItem` throws — quota exceeded is the
+  realistic case here, there's no network to be offline from): reverts to the
+  prior name and shows `Couldn't save name — reverted.` in `--danger` beneath
+  the track list, clearing on the next successful edit to any track in the
+  trip.
 
-Renaming sets `displayName` in `tracks.json` only. The file's actual name in
-Drive is never touched — the `title` attribute and any Drive-side view of the
-file continue to show the original filename.
+Renaming sets `displayName` in the overrides record only. The file's actual
+name in Drive is never touched — the `title` attribute and any Drive-side view
+of the file continue to show the original filename.
 
 Only one row edits at a time, same rule as the trip header: starting a rename
 on another row commits or discards whatever edit was already in progress.
@@ -85,8 +93,8 @@ the L2 shadow (`0 10px 30px rgba(6,8,18,.55)`), no rotation and no scale (this
 is a list, not a card sort) — and a 2px `--accent` line shows between rows to
 mark the drop position, updating as the row passes over others. Dropping
 commits the new order immediately (optimistic, same underline-fade confirmation
-as rename) and writes `order` for every track in the trip to `tracks.json` in
-one request. The lift and drop-line both collapse to an instant cut under
+as rename) and writes `order` for every track in the trip to the overrides
+record in one write. The lift and drop-line both collapse to an instant cut under
 `prefers-reduced-motion`, same global rule #49 established for the map camera
 and route draw-on.
 
@@ -120,7 +128,7 @@ Each option's `aria-label` is the colour name from the palette comment (`Red`,
 The trigger's `aria-label` is `Change colour for <name>`; the popover's
 `aria-label` is `Colours for <name>`.
 
-Recolouring sets `color` in `tracks.json` — an explicit palette index — which
+Recolouring sets `color` in the overrides record — an explicit palette index — which
 takes over from the auto-assigned `colorIndex` for that file going forward,
 even if it now matches or collides with another track's colour. Two tracks
 sharing a colour is allowed; the palette repeats past eight tracks already
@@ -133,30 +141,30 @@ and the same danger-text pattern appears — `Couldn't save colour — reverted.
 
 ## States
 
-**No overrides yet** — first use of this feature on a trip; `tracks.json`
-doesn't exist. Every row uses today's defaults (Drive filename, Drive-listing
-order, auto-assigned `colorIndex`), identical to current behaviour. The file is
-created on the first successful rename, reorder, or recolour — not eagerly on
-trip load.
+**No overrides yet** — first use of this feature on a trip; nothing is stored
+under this trip's overrides key. Every row uses today's defaults (Drive
+filename, Drive-listing order, auto-assigned `colorIndex`), identical to
+current behaviour. The key is written on the first successful rename,
+reorder, or recolour — not eagerly on trip load.
 
-**Overrides loaded** — `tracks.json` exists and has been fetched alongside the
-file listing. Rows apply `displayName`/`color`/`order` on top of the raw Drive
-data before first render, so there's no flash of default-then-overridden
-values.
+**Overrides loaded** — the trip's overrides record exists in `localStorage`
+and has been read alongside the file listing. Rows apply
+`displayName`/`color`/`order` on top of the raw Drive data before first
+render, so there's no flash of default-then-overridden values.
 
-**Track missing an override** — a file present in Drive but absent from
-`tracks.json` (newly attached since the sidecar was last written) falls back
-to defaults for whichever fields it lacks: original filename if no
+**Track missing an override** — a file present in Drive but absent from the
+overrides record (newly attached since it was last written) falls back to
+defaults for whichever fields it lacks: original filename if no
 `displayName`, appended to the end of the order if no `order`, next
 auto-assigned colour if no `color`. This can happen per-field, not just
 per-file — a track can have a saved colour but no saved name yet.
 
-**Stale override** — `tracks.json` names a file ID no longer in the Drive
-listing (removed via the existing `×` control, or independently in Drive).
-Ignored silently; not surfaced as an edge case in the UI, since #35 already
-handles a missing *file* — this is a missing metadata *entry*, which is just
-absence. On the next successful write to `tracks.json` for any track in the
-trip, stale entries are pruned so the file doesn't grow unbounded over a trip's
+**Stale override** — the overrides record names a Drive file id no longer in
+the listing (removed via the existing `×` control, or independently in
+Drive). Ignored silently; not surfaced as an edge case in the UI, since #35
+already handles a missing *file* — this is a missing metadata *entry*, which
+is just absence. On the next successful write to the record for any track in
+the trip, stale entries are pruned so it doesn't grow unbounded over a trip's
 lifetime.
 
 ## Edge cases

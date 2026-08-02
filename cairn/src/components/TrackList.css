@@ -74,17 +74,33 @@
 .track-row__visibility,
 .track-row__remove {
   flex: none;
-  width: 24px;
-  height: 24px;
+  width: 40px;
+  height: 40px;
+  /* Absorbs into the row's own vertical padding rather than growing the
+     row — the row was already 24px + 2*space-3 tall, so a 40px target
+     needs 8px of the row's own padding on each side, not new height. */
+  margin: calc(var(--space-2) * -1) 0;
   display: flex;
   align-items: center;
   justify-content: center;
   border: none;
+  border-radius: var(--radius-sm);
   background: none;
   color: var(--text-muted);
   cursor: pointer;
   font-size: var(--text-base);
   padding: 0;
+}
+
+.track-row__visibility:hover,
+.track-row__remove:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.track-row__visibility:active,
+.track-row__remove:active {
+  background: var(--pressed);
 }
 
 .track-row__remove:hover {

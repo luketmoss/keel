@@ -14,10 +14,19 @@
   cursor: pointer;
 }
 
+.trip-import-panel__button:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.trip-import-panel__button:active:not(:disabled) {
+  filter: brightness(0.95);
+}
+
 .trip-import-panel__button:disabled {
   background: var(--border);
   color: var(--text-muted);
   cursor: default;
+  opacity: 0.4;
 }
 
 .trip-import-panel__input {
@@ -58,6 +67,10 @@
   text-decoration: underline;
 }
 
+.trip-import-panel__failure--retryable:hover {
+  color: var(--text);
+}
+
 .trip-import-panel__dismiss {
   border: none;
   background: none;
@@ -67,4 +80,8 @@
   font-size: var(--text-xs);
   text-decoration: underline;
   cursor: pointer;
+}
+
+.trip-import-panel__dismiss:hover {
+  color: var(--text);
 }

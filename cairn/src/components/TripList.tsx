@@ -71,7 +71,11 @@ export function TripList({ trips, onCreate, onDelete }: TripListProps) {
             value={name}
             onChange={(event) => handleNameChange(event.target.value)}
           />
-          <button type="submit" className="trip-create__submit">
+          <button
+            type="submit"
+            className="trip-create__submit"
+            disabled={name.trim().length === 0}
+          >
             Create
           </button>
         </div>

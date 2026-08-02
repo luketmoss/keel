@@ -30,9 +30,24 @@
   cursor: pointer;
 }
 
+.world-map__filter-segment:hover {
+  color: var(--text);
+}
+
+.world-map__filter-segment:active {
+  background: var(--pressed);
+}
+
 .world-map__filter-segment--active {
   background: var(--ground);
   color: var(--text);
+}
+
+/* Pressing the already-selected segment darkens it slightly rather than
+   doing nothing — selected and pressed have to read as distinct even when
+   they co-occur. */
+.world-map__filter-segment--active:active {
+  background: color-mix(in srgb, var(--ground) 80%, var(--text) 12%);
 }
 
 .world-map__empty {

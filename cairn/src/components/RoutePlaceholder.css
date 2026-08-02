@@ -1,0 +1,24 @@
+.route-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 100%;
+  width: 100%;
+  background: var(--surface-solid);
+  text-align: center;
+}
+
+.route-placeholder__heading {
+  margin: 0;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.route-placeholder__subtext {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}

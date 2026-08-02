@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /* Unmocked, APIProvider injects Google's script tag and the suite makes a
    network call from CI. The stub renders just enough to tell "the map
@@ -19,12 +19,17 @@ vi.mock('@vis.gl/react-google-maps', () => ({
 /* `env.ts` reads `import.meta.env` once at module evaluation, mirroring
    MapView.test.tsx — the key has to be stubbed and modules reset before App
    (which pulls in MapView) is imported. */
-async function renderApp() {
+async function renderApp(path = '/') {
+  window.history.pushState({}, '', path)
   vi.stubEnv('VITE_GOOGLE_MAPS_API_KEY', 'a-browser-key')
   vi.resetModules()
   const { App } = await import('./App')
   return render(<App />)
 }
+
+beforeEach(() => {
+  window.history.pushState({}, '', '/')
+})
 
 afterEach(() => {
   vi.unstubAllEnvs()
@@ -94,5 +99,68 @@ describe('App drag-and-drop', () => {
 
     expect(screen.queryByTestId('drop-overlay')).toBeNull()
     await screen.findByText('trip.kml', { exact: false })
+  })
+})
+
+describe('App routing', () => {
+  it('renders the map and sidebar at /', async () => {
+    await renderApp('/')
+    expect(screen.getByTestId('map')).toBeDefined()
+    expect(screen.getByRole('link', { name: 'Map' })).toBeDefined()
+    expect(screen.getByRole('link', { name: 'Trips' })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Import tracks' })).toBeDefined()
+  })
+
+  it('keeps the sidebar and shows a placeholder at /trips', async () => {
+    await renderApp('/trips')
+    expect(screen.queryByTestId('map')).toBeNull()
+    expect(screen.getByRole('heading', { name: 'Trips' })).toBeDefined()
+    expect(screen.getByText('Trip list is coming soon.')).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Import tracks' })).toBeDefined()
+  })
+
+  it('shows the id in the placeholder at /trips/:id', async () => {
+    await renderApp('/trips/abc')
+    expect(screen.getByRole('heading', { name: 'Trip abc' })).toBeDefined()
+    expect(screen.getByText('Trip detail is coming soon.')).toBeDefined()
+  })
+
+  it('redirects an unrecognized path to /', async () => {
+    await renderApp('/nonsense')
+    expect(screen.getByTestId('map')).toBeDefined()
+    expect(window.location.pathname).toBe('/')
+  })
+
+  it('marks "Map" active only at / and "Trips" active at /trips and /trips/:id', async () => {
+    const first = await renderApp('/')
+    expect(screen.getByRole('link', { name: 'Map' }).className).toContain('--active')
+    expect(screen.getByRole('link', { name: 'Trips' }).className).not.toContain('--active')
+    first.unmount()
+
+    await renderApp('/trips/abc')
+    expect(screen.getByRole('link', { name: 'Map' }).className).not.toContain('--active')
+    expect(screen.getByRole('link', { name: 'Trips' }).className).toContain('--active')
+  })
+
+  it('navigates via the sidebar links and supports back/forward', async () => {
+    await renderApp('/')
+
+    fireEvent.click(screen.getByRole('link', { name: 'Trips' }))
+    expect(await screen.findByRole('heading', { name: 'Trips' })).toBeDefined()
+    expect(window.location.pathname).toBe('/trips')
+
+    fireEvent.click(screen.getByRole('link', { name: 'Map' }))
+    expect(await screen.findByTestId('map')).toBeDefined()
+    expect(window.location.pathname).toBe('/')
+
+    await act(async () => {
+      window.history.back()
+    })
+    expect(await screen.findByRole('heading', { name: 'Trips' })).toBeDefined()
+
+    await act(async () => {
+      window.history.forward()
+    })
+    expect(await screen.findByTestId('map')).toBeDefined()
   })
 })

@@ -1,14 +1,31 @@
 import { useRef, useState, type DragEvent } from 'react'
+import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { Sidebar } from './components/Sidebar'
 import { MapView } from './components/MapView'
 import { ImportPanel } from './components/ImportPanel'
 import { TrackList } from './components/TrackList'
 import { DropOverlay } from './components/DropOverlay'
+import { RoutePlaceholder } from './components/RoutePlaceholder'
 import { useTrackImport } from './import/useTrackImport'
 import { dataTransferHasFiles, filesFromDataTransfer } from './import/dataTransfer'
 import './App.css'
 
+function TripDetailPlaceholder() {
+  const { id } = useParams()
+  return (
+    <RoutePlaceholder heading={`Trip ${id}`} subtext="Trip detail is coming soon." />
+  )
+}
+
 export function App() {
+  return (
+    <BrowserRouter>
+      <AppShell />
+    </BrowserRouter>
+  )
+}
+
+function AppShell() {
   const trackImport = useTrackImport()
   const [dragActive, setDragActive] = useState(false)
   /* Nested elements each fire their own enter/leave as the pointer crosses
@@ -65,7 +82,17 @@ export function App() {
         />
       </Sidebar>
       <div className="app__map">
-        <MapView files={trackImport.files} />
+        <Routes>
+          <Route path="/" element={<MapView files={trackImport.files} />} />
+          <Route
+            path="/trips"
+            element={
+              <RoutePlaceholder heading="Trips" subtext="Trip list is coming soon." />
+            }
+          />
+          <Route path="/trips/:id" element={<TripDetailPlaceholder />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </div>
       {dragActive && <DropOverlay />}
     </div>

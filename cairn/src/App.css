@@ -10,7 +10,7 @@
   min-height: 0;
   /* Shows through until the first tiles arrive, so the load reads as dark
      chrome rather than as a broken white rectangle. */
-  background: var(--surface-solid);
+  background: var(--ground);
 }
 
 /* Below the breakpoint the sidebar docks to the bottom instead. Source order

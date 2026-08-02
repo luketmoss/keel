@@ -9,29 +9,29 @@
    content here, not a document. */
 .world-map__filter {
   position: absolute;
-  top: 16px;
-  left: 16px;
+  top: var(--space-4);
+  left: var(--space-4);
   z-index: 1;
   display: flex;
-  gap: 2px;
-  padding: 4px;
-  border-radius: 8px;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
   background: var(--surface);
   backdrop-filter: blur(8px);
 }
 
 .world-map__filter-segment {
   border: none;
-  border-radius: 6px;
-  padding: 8px;
-  font-size: 13px;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  font-size: var(--text-sm);
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
 }
 
 .world-map__filter-segment--active {
-  background: var(--surface-solid);
+  background: var(--ground);
   color: var(--text);
 }
 
@@ -43,16 +43,16 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 24px;
-  background: var(--surface-solid);
+  gap: var(--space-2);
+  padding: var(--space-6);
+  background: var(--ground);
   text-align: center;
   pointer-events: none;
 }
 
 .world-map__empty-title {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--text-lg);
   font-weight: 600;
 }
 

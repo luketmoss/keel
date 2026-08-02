@@ -1,6 +1,6 @@
 .drop-overlay {
   position: fixed;
-  inset: 16px;
+  inset: var(--space-4);
   z-index: 10;
   display: flex;
   align-items: center;
@@ -8,12 +8,12 @@
   background: var(--surface);
   backdrop-filter: blur(2px);
   border: 2px dashed var(--accent);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   pointer-events: none;
 }
 
 .drop-overlay__label {
   margin: 0;
-  font-size: 18px;
+  font-size: var(--text-lg);
   color: var(--text);
 }

@@ -5,6 +5,20 @@ header from [35-trip-detail-view.md](35-trip-detail-view.md); row anatomy from
 [6-track-list.md](6-track-list.md). Markers and the shared selection from
 [54-photo-markers.md](54-photo-markers.md). Images through #53's cache.
 
+## New tokens
+
+| Token | Value | For |
+|---|---|---|
+| `--photo-thumb` | `32px` | list row thumbnail |
+| `--row-touch` | `44px` | minimum row height on touch |
+| `--scrim` | `color-mix(in srgb, var(--ground) 70%, transparent)` | modal backdrop |
+
+`--row-touch` names the 44px the design language's Interaction states section
+already states in prose but never tokenised. `--scrim` is mixed rather than
+hand-picked, following that document's rule that derived values are computed so
+a palette change propagates. `--marker-size` and `--hit-target` come from
+[54-photo-markers.md](54-photo-markers.md) and are not redefined here.
+
 ## The list
 
 A section in the trip sidebar, beneath the track list — tracks are the trip's
@@ -22,9 +36,9 @@ shape and photos are what happened along it, so shape comes first.
 └──────────────────────────────┘
 ```
 
-**Rows** are 44px minimum, per the design language's touch rule. A 32px
-thumbnail with `--radius-sm`, the capture time in `--text-sm` tabular numerals,
-and the filename in `--text-muted` truncated with the full name in `title`.
+**Rows** are `--row-touch` minimum. A `--photo-thumb` thumbnail at
+`--radius-sm`, the capture time in `--text-sm` tabular numerals, and the
+filename in `--text-muted` truncated with the full name in `title`.
 
 Derived rows carry a small `--text-muted` marker after the time — the same
 dashed vocabulary as #54's ring, in text form. Recorded rows carry nothing;
@@ -64,10 +78,14 @@ has no marker. The map does not move.
 Opening a photo — clicking its row, or its already-selected marker — shows it at
 full size over the map.
 
-**Treatment** is elevation L2: `--surface` at `--radius-md`, the deep diffuse
-shadow, no border, over a `--ground` scrim at 70%. Lifted chrome touching no
-edge, so no seam. It is not full-bleed; the map staying visible at the margins
-is what keeps it feeling like a layer over a place rather than a separate page.
+**Treatment** is elevation L2 exactly as #49 reclassified it: `--surface` at
+`--radius-md`, `backdrop-filter: blur(var(--blur))`, `--shadow-lifted`, and no
+border — it touches no edge, so it needs no seam. Over a `--scrim` backdrop.
+
+It is not full-bleed; the map staying visible at the margins is what keeps it
+feeling like a layer over a place rather than a separate page, and it is also
+what makes the blur mean something. The design language's "blur only over the
+map" rule is satisfied here for the same reason it is not on `/trips`.
 
 **Contents**: the image, scaled to fit within the viewport with its aspect
 preserved and never upscaled beyond its natural size. Beneath it, one
@@ -75,7 +93,8 @@ preserved and never upscaled beyond its natural size. Beneath it, one
 track` when derived. The provenance the marker gave up while selected reappears
 here.
 
-**Controls**: previous and next affordances, a close button, all 40px targets.
+**Controls**: previous and next affordances, a close button, all `--hit-target`
+squares.
 
 **Keyboard**: `←` and `→` move through the list in its displayed order. `Esc`
 closes. Focus is trapped inside while open and returns to the control that
@@ -146,6 +165,9 @@ not eject you from the trip.
   none. This is the case #35 got wrong for tracks and worth not repeating.
 - **List scrolled far from a newly selected marker** — `scrollIntoView` handles
   it; under `prefers-reduced-motion` the scroll is instant rather than smooth.
+  This one needs an explicit `matchMedia` check in JS: `index.css`'s global
+  reduced-motion block collapses CSS animations and transitions, and
+  `scrollIntoView({ behavior: 'smooth' })` is neither, so it slips through.
 - **Selecting a row while the lightbox is open** — the lightbox is modal and
   traps focus, so this cannot happen from the list. Arrow keys are the only way
   to change photo while open, which is the point of trapping.

@@ -6,12 +6,29 @@ polylines from [5-track-rendering.md](5-track-rendering.md); trip map from
 [51-photo-import.md](51-photo-import.md), positions from #52, images through
 #53's cache.
 
+## New tokens
+
+The design language has no marker vocabulary — it predates photos. These are
+proposed additions rather than values invented inline, per the `/ux` skill's
+rule that a raw value in a note is a value nobody can change afterwards.
+
+| Token | Value | For |
+|---|---|---|
+| `--marker-size` | `28px` | photo marker diameter |
+| `--marker-ring` | `2px` | provenance ring width |
+| `--marker-ring-selected` | `3px` | selected ring width |
+| `--hit-target` | `40px` | minimum interactive square |
+
+`--hit-target` generalises a number #48 already applied by hand in four places.
+Naming it here means the next component does not have to rediscover it, and the
+design language's Interaction states section is where the value comes from.
+
 ## Marker form
 
-A 28px circle showing the photo's thumbnail, with a 2px ring and the
-elevation-L2 shadow so it reads as lifted off the imagery rather than printed
-on it. Circular rather than the classic teardrop pin: a teardrop's point claims
-a precision the position does not have, and it is worse still for an
+A `--marker-size` circle showing the photo's thumbnail, with a `--marker-ring`
+ring and `--shadow-lifted` so it reads as lifted off the imagery rather than
+printed on it. Circular rather than the classic teardrop pin: a teardrop's point
+claims a precision the position does not have, and it is worse still for an
 interpolated one.
 
 Thumbnails rather than dots because a photo map whose photos are invisible is a
@@ -25,8 +42,8 @@ twice over.
 
 | Provenance | Ring | Meaning |
 |---|---|---|
-| Recorded | solid 2px `--text` | GPS in the file |
-| Derived | dashed 2px `--text-muted` | interpolated from track time |
+| Recorded | solid `--marker-ring` `--text` | GPS in the file |
+| Derived | dashed `--marker-ring` `--text-muted` | interpolated from track time |
 
 Dashed reads as "inferred" without a legend, and it is the same instinct #37
 already uses for planned trips — reusing that vocabulary rather than inventing a
@@ -38,9 +55,9 @@ adjacent.
 
 ## Clustering
 
-Markers whose circles would overlap collapse into one cluster marker: same 28px
-circle, `--surface` fill, no thumbnail, the count in `--text-sm` tabular
-numerals. A cluster of two shows `2`.
+Markers whose circles would overlap collapse into one cluster marker: same
+`--marker-size` circle, `--surface` fill, no thumbnail, the count in `--text-sm`
+tabular numerals. A cluster of two shows `2`.
 
 A hundred photos from one afternoon at one viewpoint is the normal case, not the
 edge case. Uncllustered, that is one opaque blob that hides the track beneath it.
@@ -58,10 +75,18 @@ nothing is not.
 Selecting a marker sets it as the trip's selected photo — a single selection
 shared with #55's list, not a separate one.
 
-Selected marker: `--accent` ring at 3px, replacing whatever provenance ring it
-had, plus the active-track glow treatment the design language licenses
-(`drop-shadow(0 0 7px)`) in `--accent`. One at a time, which is the condition
-that language attaches to the effect.
+Selected marker: `--accent` ring at `--marker-ring-selected`, replacing whatever
+provenance ring it had, plus the glow the design language licenses —
+`drop-shadow(0 0 7px)` in `--accent`. One at a time, which is the condition that
+language attaches to the effect.
+
+**The glow works here even though #49 could not use it.** #49 found that
+`drop-shadow` does not apply to a Google Maps `Polyline`, which is not an SVG
+element, and implemented the track glow as a second wider, lower-opacity
+polyline underneath. Markers are different: they are HTML content in an
+`AdvancedMarkerElement`, so CSS filters apply normally and the doc's literal
+treatment can be used as written. Anyone reading #49 first should not conclude
+otherwise — the workaround there is a property of polylines, not of the effect.
 
 Provenance is not shown while selected — the ring is spent on selection, and the
 list row and the viewer both still carry it. Losing one signal on one marker for
@@ -70,8 +95,9 @@ as long as it is selected is a fair trade for an unambiguous selected state.
 Clicking a cluster zooms to fit its members rather than selecting anything.
 There is no sensible single answer to "which photo did you mean".
 
-Hit target is 40px square regardless of the 28px visual, per the design
-language's touch minimum.
+Hit target is `--hit-target` square regardless of the smaller visual, expanded
+by transparent padding rather than by growing the circle — the same technique
+#48 used to fit two 40px targets inside an unchanged track row.
 
 ## Layering
 

@@ -71,6 +71,11 @@ complication to buy back later if a real batch proves it necessary.
 Longest edge 512px, aspect preserved, JPEG at quality 0.82. Named
 `<originalName>.thumb.jpg` alongside the original in the trip folder.
 
+These are raw values on purpose and are not design tokens. They describe a
+stored asset, not chrome — the same category as #5's track polyline colours,
+which the design language also exempts. A token would imply the number can be
+changed later, and it cannot: it is baked into every thumbnail already uploaded.
+
 512 is chosen against the two consumers: #54's map markers render at 28px and
 #55's list rows at 32px, both far below it, while the list must still look right
 on a 3× display and a marker may be enlarged on selection. It is small enough
@@ -89,8 +94,12 @@ identical.
 
 **Idle** — control reads `Import files`, enabled.
 
-**Dragging over** — the existing #4 overlay, unchanged. Copy widens to
-`Drop tracks or photos`.
+**Dragging over** — the existing drop overlay, unchanged in form. Note that
+#49 has since reclassified it: it keeps its own lighter `blur(2px)` rather than
+the shared `--blur`, because a strong blur over a full-viewport drag target
+obscures the thing being dropped onto, and it gained `--shadow-lifted`. Its
+dashed border remains the primary "this is a drop target" signal. Only the copy
+changes here, widening to `Drop tracks or photos`.
 
 **Importing** — control disabled, reads `Importing…`. Beneath it, two muted
 `--text-xs` lines: the current file's name, and `12 of 50`. One line per batch,

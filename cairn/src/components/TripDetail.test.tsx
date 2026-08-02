@@ -119,7 +119,7 @@ describe('TripDetail — #51 partitioning a mixed drop between tracks and photos
     usePhotoImport.mockReturnValue(basePhotoImport({ importFiles: photoImportFiles }))
 
     renderTrip()
-    const app = screen.getByTestId('map').closest('.app') as HTMLElement
+    const app = document.querySelector('.app') as HTMLElement
 
     await act(async () => {
       fireEvent.drop(app, {
@@ -160,7 +160,7 @@ describe('TripDetail — #51 partitioning a mixed drop between tracks and photos
 
   it('shows the widened drop-overlay copy while dragging over an open trip', () => {
     renderTrip()
-    const app = screen.getByTestId('map').closest('.app') as HTMLElement
+    const app = document.querySelector('.app') as HTMLElement
 
     fireEvent.dragEnter(app, { dataTransfer: fileDataTransfer(['a.jpg']) })
 

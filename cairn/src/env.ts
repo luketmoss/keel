@@ -5,3 +5,12 @@
  */
 export const googleMapsApiKey: string | null =
   import.meta.env.VITE_GOOGLE_MAPS_API_KEY?.trim() || null
+
+/**
+ * The OAuth browser client ID used for Google sign-in. Same either-is-missing
+ * rule as the Maps key: absent on a fresh clone and in CI, and the account row
+ * simply doesn't render rather than the app crashing or showing a broken
+ * control.
+ */
+export const googleClientId: string | null =
+  import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() || null

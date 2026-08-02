@@ -19,9 +19,10 @@ vi.mock('@vis.gl/react-google-maps', () => ({
 /* `env.ts` reads `import.meta.env` once at module evaluation, mirroring
    MapView.test.tsx — the key has to be stubbed and modules reset before App
    (which pulls in MapView) is imported. */
-async function renderApp(path = '/') {
+async function renderApp(path = '/', { googleClientId }: { googleClientId?: string } = {}) {
   window.history.pushState({}, '', path)
   vi.stubEnv('VITE_GOOGLE_MAPS_API_KEY', 'a-browser-key')
+  if (googleClientId) vi.stubEnv('VITE_GOOGLE_CLIENT_ID', googleClientId)
   vi.resetModules()
   const { App } = await import('./App')
   return render(<App />)
@@ -99,6 +100,22 @@ describe('App drag-and-drop', () => {
 
     expect(screen.queryByTestId('drop-overlay')).toBeNull()
     await screen.findByText('trip.kml', { exact: false })
+  })
+})
+
+describe('App account row', () => {
+  it('renders no sign-in control when VITE_GOOGLE_CLIENT_ID is unset, and the rest of the app works', async () => {
+    await renderApp('/')
+    expect(screen.queryByRole('button', { name: 'Sign in with Google' })).toBeNull()
+    expect(screen.getByTestId('map')).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Import tracks' })).toBeDefined()
+  })
+
+  it('shows a sign-in control when a client id is configured, and the rest of the app still works', async () => {
+    await renderApp('/', { googleClientId: 'a-client-id' })
+    expect(screen.getByRole('button', { name: 'Sign in with Google' })).toBeDefined()
+    expect(screen.getByTestId('map')).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Import tracks' })).toBeDefined()
   })
 })
 

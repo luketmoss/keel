@@ -9,6 +9,8 @@ import { RoutePlaceholder } from './components/RoutePlaceholder'
 import { useTrackImport } from './import/useTrackImport'
 import { dataTransferHasFiles, filesFromDataTransfer } from './import/dataTransfer'
 import { InMemoryTrackStore } from './store/trackStore'
+import { useGoogleAccount } from './auth/useGoogleAccount'
+import { AccountRow } from './auth/AccountRow'
 import './App.css'
 
 function TripDetailPlaceholder() {
@@ -33,6 +35,7 @@ function AppShell() {
   const store = useMemo(() => new InMemoryTrackStore(), [])
   const files = useSyncExternalStore(store.subscribe, store.getFiles)
   const trackImport = useTrackImport(store)
+  const account = useGoogleAccount()
   const [dragActive, setDragActive] = useState(false)
   /* Nested elements each fire their own enter/leave as the pointer crosses
      them, so a plain boolean flickers the overlay off mid-drag — a depth
@@ -74,7 +77,7 @@ function AppShell() {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <Sidebar>
+      <Sidebar accountRow={<AccountRow account={account} />}>
         <ImportPanel
           failures={trackImport.failures}
           progress={trackImport.progress}

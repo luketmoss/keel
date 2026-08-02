@@ -66,14 +66,25 @@ gh issue view <issue> --repo luketmoss/keel --json state
 **Still open** — the PR body was missing `Closes #<issue>`. Close the issue by
 hand, set the card, and say so: this one really is `/develop` not doing its job.
 
-**Closed, card didn't move** — nothing is wrong with the PR. Project #6's *Item
-closed → Done* workflow is not enabled. Ask the user to turn it on at
+**Closed, card didn't move** — nothing is wrong with the PR. Check whether
+Project #6's *Item closed → Done* workflow is actually enabled before assuming
+it:
+
+```bash
+gh api graphql -f query='query { user(login:"luketmoss") { projectV2(number:6) { workflows(first:30) { nodes { number name enabled } } } } }'
+```
+
+If the *Item closed* workflow is `enabled: false`, that's the cause. Ask the
+user to turn it on at
 `https://github.com/users/luketmoss/projects/6/workflows`; it is theirs to
-click, and it fixes every future merge at once.
+click, and it fixes every future merge at once. If it's already `enabled:
+true`, something else stranded the card — say so explicitly rather than
+reaching for the same diagnosis anyway.
 
 `board.py set <issue> --status Done` rescues a card already stranded. It is not
-the remedy — reaching for it after every merge is how a one-click board setting
-stays broken forever.
+the remedy, and it isn't the first move — reach for it only after the check
+above has run, so using it always means you looked. Reaching for it out of habit
+after every merge is how a one-click board setting stays broken forever.
 
 ## Report
 

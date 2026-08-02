@@ -21,7 +21,9 @@ gh issue view <issue> --repo luketmoss/keel --json title,body
 
 Read the project's `CLAUDE.md` and stack skill. Read any existing files under
 `<project>/docs/design/` — consistency with what's already been decided matters
-more than any individual choice here.
+more than any individual choice here. If the project has a
+`docs/design/design-language.md`, read it first; it is standing and outranks any
+single issue note.
 
 ## Specify
 
@@ -44,6 +46,23 @@ to scan' in `textMuted`, with the fire button disabled" is.
 Where a genuine choice exists between two reasonable approaches, pick one, say
 which, and say why in a sentence. Do not present the user a menu — that is what
 Gate 1 is for.
+
+## Visual language
+
+**Reference tokens by name; never write a raw value.** `--space-4`, not `16px`.
+A note that says `16px` is a note whose padding cannot be changed anywhere but
+by hand, in every file that copied it — which is how a project ends up with
+seven border radii nobody chose.
+
+Where the design language has no token for what the issue needs, say so
+explicitly: name the proposed token, its value, and what it is for, under a
+`## New tokens` heading in the note. That makes adding to the system a visible
+decision rather than a side effect, and it is the only place a raw value
+belongs.
+
+A project with no `design-language.md` yet is not a licence to invent freely.
+Match the values already in use, and if the issue is the third to reach for
+something the system doesn't have, say that the project needs one.
 
 ## Exit
 

@@ -1,0 +1,27 @@
+.trip-not-found {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background: var(--surface-solid);
+}
+
+.trip-not-found__title {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.trip-not-found__detail {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.trip-not-found__link {
+  color: var(--accent);
+  text-decoration: none;
+}

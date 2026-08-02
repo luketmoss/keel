@@ -69,6 +69,54 @@ describe('useTripImport', () => {
     expect(findOrCreateTripFolder).toHaveBeenCalledWith('token', 'cairn-folder-id', 'trip-1')
   })
 
+  it('renders a missing-file entry when a track file 404s, without blocking the rest', async () => {
+    listTrackFiles.mockResolvedValue([
+      { id: 'drive-1', name: 'deleted.kml' },
+      { id: 'drive-2', name: 'day-2.kml' },
+    ])
+    downloadTrackFile
+      .mockRejectedValueOnce(new Error('404'))
+      .mockResolvedValueOnce(file('day-2.kml'))
+    parseKmlOrKmz.mockResolvedValueOnce(track('Day 2'))
+
+    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    expect(result.current.tracks).toHaveLength(1)
+    expect(result.current.tracks[0].name).toBe('day-2.kml')
+    expect(result.current.missingFiles).toHaveLength(1)
+    expect(result.current.missingFiles[0].name).toBe('deleted.kml')
+  })
+
+  it('renders each file as its own read settles rather than waiting for the whole trip', async () => {
+    let resolveSecond: (() => void) | undefined
+    listTrackFiles.mockResolvedValue([
+      { id: 'drive-1', name: 'day-1.kml' },
+      { id: 'drive-2', name: 'day-2.kml' },
+    ])
+    downloadTrackFile.mockResolvedValueOnce(file('day-1.kml')).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveSecond = () => resolve(file('day-2.kml'))
+        }),
+    )
+    parseKmlOrKmz.mockResolvedValue(track('Day'))
+
+    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id'))
+
+    // The first file lands while the second is still in flight — the trip
+    // is not waiting for the whole batch before showing anything.
+    await waitFor(() => expect(result.current.tracks).toHaveLength(1))
+    expect(result.current.loading).toBe(true)
+
+    await act(async () => {
+      resolveSecond?.()
+    })
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.tracks).toHaveLength(2)
+  })
+
   it('is not loading and does not attempt a read when signed out', async () => {
     const { result } = renderHook(() => useTripImport('trip-1', null, null))
 

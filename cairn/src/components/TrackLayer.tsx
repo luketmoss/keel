@@ -15,37 +15,54 @@ interface RenderedTrack {
   points: LatLng[]
 }
 
+function visibleFilesKey(files: ImportedFile[]): string {
+  return files
+    .filter((file) => file.visible)
+    .map((file) => file.id)
+    .sort()
+    .join(',')
+}
+
 export function TrackLayer({ files }: TrackLayerProps) {
   const map = useMap()
   const previousFileCount = useRef(0)
+  const previousVisibleKey = useRef('')
 
+  const visibleFiles = useMemo(() => files.filter((file) => file.visible), [files])
+
+  /* Hidden tracks are excluded here, at the source — they never reach either
+     the map or the bounds calculation below. */
   const renderedTracks = useMemo<RenderedTrack[]>(
     () =>
-      files.flatMap((file) =>
+      visibleFiles.flatMap((file) =>
         file.tracks.map((track, trackIndex) => ({
           key: `${file.id}-${trackIndex}`,
           color: trackColor(file.colorIndex),
           points: normalizeAntimeridian(dropInvalidLatitudes(track.points)),
         })),
       ),
-    [files],
+    [visibleFiles],
   )
 
-  /* Re-fits on import (the file count growing), never on removal — a
-     viewport lurching because something was deleted is worse than a
-     slightly loose fit. #6 will extend this to re-fit on visibility
-     changes too, once hiding a track is possible. */
+  /* Re-fits on import (the file count growing) and on a visibility toggle,
+     never on removal — a viewport lurching because something was deleted is
+     worse than a slightly loose fit. */
   useEffect(() => {
     if (!map) return
-    if (files.length <= previousFileCount.current) {
-      previousFileCount.current = files.length
-      return
-    }
+
+    const currentVisibleKey = visibleFilesKey(files)
+    const imported = files.length > previousFileCount.current
+    const toggled =
+      files.length === previousFileCount.current && currentVisibleKey !== previousVisibleKey.current
+
     previousFileCount.current = files.length
+    previousVisibleKey.current = currentVisibleKey
+
+    if (!imported && !toggled) return
 
     const allPoints = renderedTracks.flatMap((track) => track.points)
     fitTracksToBounds(map, allPoints)
-  }, [map, files.length, renderedTracks])
+  }, [map, files, renderedTracks])
 
   return (
     <>

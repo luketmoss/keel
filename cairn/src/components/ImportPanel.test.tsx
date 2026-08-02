@@ -1,11 +1,17 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { ImportPanel } from './ImportPanel'
-import type { UseTrackImport } from '../import/useTrackImport'
+import type { ImportFailure, ImportProgress } from '../import/types'
 
-function baseProps(overrides: Partial<UseTrackImport> = {}): UseTrackImport {
+interface BaseProps {
+  failures: ImportFailure[]
+  progress: ImportProgress | null
+  importFiles: (incoming: File[]) => Promise<void>
+  dismissFailures: () => void
+}
+
+function baseProps(overrides: Partial<BaseProps> = {}): BaseProps {
   return {
-    files: [],
     failures: [],
     progress: null,
     importFiles: vi.fn(),
@@ -71,31 +77,5 @@ describe('ImportPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
     expect(dismissFailures).toHaveBeenCalledTimes(1)
-  })
-
-  it('lists every imported file, distinguishing repeats and naming multi-track counts', () => {
-    render(
-      <ImportPanel
-        {...baseProps({
-          files: [
-            { id: '1', name: 'trip.kml', tracks: [{ name: 'a', points: [] }], colorIndex: 0 },
-            {
-              id: '2',
-              name: 'trip.kml',
-              colorIndex: 1,
-              tracks: [
-                { name: 'a', points: [] },
-                { name: 'b', points: [] },
-                { name: 'c', points: [] },
-              ],
-            },
-          ],
-        })}
-      />,
-    )
-
-    const rows = screen.getAllByText('trip.kml', { exact: false })
-    expect(rows).toHaveLength(2)
-    expect(screen.getByText('(3)', { exact: false })).toBeDefined()
   })
 })

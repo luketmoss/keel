@@ -8,6 +8,7 @@ export interface ImportedFile {
       position in the array — so removing an earlier file (#6) never
       recolours the ones after it. */
   colorIndex: number
+  visible: boolean
 }
 
 export interface ImportFailure {

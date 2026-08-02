@@ -140,4 +140,32 @@ describe('useTrackImport', () => {
     await act(() => result.current.importFiles([file('fine.kml')]))
     expect(result.current.failures).toHaveLength(0)
   })
+
+  it('imports a file as visible and toggles its visibility without affecting others', async () => {
+    parseKmlOrKmz.mockResolvedValueOnce(track('A')).mockResolvedValueOnce(track('B'))
+    const { result } = renderHook(() => useTrackImport())
+    await act(() => result.current.importFiles([file('a.kml'), file('b.kml')]))
+
+    expect(result.current.files.every((f) => f.visible)).toBe(true)
+    const targetId = result.current.files[0].id
+
+    act(() => result.current.toggleVisibility(targetId))
+    expect(result.current.files.find((f) => f.id === targetId)?.visible).toBe(false)
+    expect(result.current.files.find((f) => f.id !== targetId)?.visible).toBe(true)
+
+    act(() => result.current.toggleVisibility(targetId))
+    expect(result.current.files.find((f) => f.id === targetId)?.visible).toBe(true)
+  })
+
+  it('removes a file by id, leaving the others in place', async () => {
+    parseKmlOrKmz.mockResolvedValueOnce(track('A')).mockResolvedValueOnce(track('B'))
+    const { result } = renderHook(() => useTrackImport())
+    await act(() => result.current.importFiles([file('a.kml'), file('b.kml')]))
+    const [first, second] = result.current.files
+
+    act(() => result.current.removeFile(first.id))
+
+    expect(result.current.files).toHaveLength(1)
+    expect(result.current.files[0].id).toBe(second.id)
+  })
 })

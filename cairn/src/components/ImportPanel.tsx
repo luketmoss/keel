@@ -1,10 +1,15 @@
 import { useRef, type ChangeEvent } from 'react'
-import type { UseTrackImport } from '../import/useTrackImport'
+import type { ImportFailure, ImportProgress } from '../import/types'
 import './ImportPanel.css'
 
-type ImportPanelProps = UseTrackImport
+interface ImportPanelProps {
+  failures: ImportFailure[]
+  progress: ImportProgress | null
+  importFiles: (incoming: File[]) => Promise<void>
+  dismissFailures: () => void
+}
 
-export function ImportPanel({ files, failures, progress, importFiles, dismissFailures }: ImportPanelProps) {
+export function ImportPanel({ failures, progress, importFiles, dismissFailures }: ImportPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const busy = progress !== null
 
@@ -50,19 +55,6 @@ export function ImportPanel({ files, failures, progress, importFiles, dismissFai
             Dismiss
           </button>
         </div>
-      )}
-
-      {files.length > 0 && (
-        <ul className="import-panel__files">
-          {files.map((imported) => (
-            <li key={imported.id} className="import-panel__file">
-              {imported.name}
-              {imported.tracks.length > 1 && (
-                <span className="import-panel__file-count"> ({imported.tracks.length})</span>
-              )}
-            </li>
-          ))}
-        </ul>
       )}
     </div>
   )

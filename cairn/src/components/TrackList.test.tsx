@@ -4,12 +4,18 @@ import { TrackList } from './TrackList'
 import type { ImportedFile } from '../import/types'
 
 function importedFile(overrides: Partial<ImportedFile> = {}): ImportedFile {
+  const tracks = overrides.tracks ?? [{ name: 'Track', points: [] }]
   return {
     id: 'f1',
     name: 'trip.kml',
     colorIndex: 0,
     visible: true,
-    tracks: [{ name: 'Track', points: [] }],
+    tracks,
+    trackStats: tracks.map(() => ({
+      distanceMeters: 0,
+      durationSeconds: undefined,
+      elevationGainMeters: undefined,
+    })),
     ...overrides,
   }
 }
@@ -55,6 +61,64 @@ describe('TrackList', () => {
     const swatch = container.querySelector('.track-row__swatch') as HTMLElement
     expect(swatch.style.backgroundColor).toBe('rgb(255, 59, 48)') // #FF3B30
     expect(screen.getByText('3 tracks', { exact: false })).toBeDefined()
+  })
+
+  it('shows the formatted statistics line for a single-track file', () => {
+    render(
+      <TrackList
+        files={[
+          importedFile({
+            trackStats: [
+              { distanceMeters: 8.1 * 1609.344, durationSeconds: 47 * 60, elevationGainMeters: 0 },
+            ],
+          }),
+        ]}
+        onToggleVisibility={vi.fn()}
+        onRemove={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('8.1 mi · 47m · 0 ft ↑')).toBeDefined()
+  })
+
+  it('shows no statistics line for a multi-track file — aggregation is out of scope', () => {
+    render(
+      <TrackList
+        files={[
+          importedFile({
+            tracks: [
+              { name: 'a', points: [] },
+              { name: 'b', points: [] },
+            ],
+            trackStats: [
+              { distanceMeters: 1000, durationSeconds: 60, elevationGainMeters: 10 },
+              { distanceMeters: 2000, durationSeconds: 120, elevationGainMeters: 20 },
+            ],
+          }),
+        ]}
+        onToggleVisibility={vi.fn()}
+        onRemove={vi.fn()}
+      />,
+    )
+
+    expect(document.querySelector('.track-row__stats')).toBeNull()
+  })
+
+  it('keeps the statistics line present when the row is hidden', () => {
+    render(
+      <TrackList
+        files={[
+          importedFile({
+            visible: false,
+            trackStats: [{ distanceMeters: 1609.344, durationSeconds: 60, elevationGainMeters: 5 }],
+          }),
+        ]}
+        onToggleVisibility={vi.fn()}
+        onRemove={vi.fn()}
+      />,
+    )
+
+    expect(document.querySelector('.track-row__stats')).not.toBeNull()
   })
 
   it('says nothing about count for a single-track file', () => {

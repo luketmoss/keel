@@ -49,6 +49,10 @@ token line.
 propose the split, and leave the issue in PM Refining. Do not size optimistically
 to get it moving.
 
+**Priority** — P0/P1/P2 per `CONVENTIONS.md`, the same kind of call as Size: a
+judgment you make, not a question you ask. P0 if it's broken or blocking, P1 if
+it's the current focus, P2 if it's real but not now.
+
 ## Stop rather than guess
 
 If a question genuinely needs the user's judgment — a product decision, a
@@ -66,7 +70,7 @@ lead to materially different work?"
 
 ```bash
 gh issue edit <issue> --repo luketmoss/keel --body-file <path>
-python .keel/board.py set <issue> --size <XS|S|M|L> --status <next>
+python .keel/board.py set <issue> --size <XS|S|M|L> --priority <P0|P1|P2> --status <next>
 ```
 
 Next stage is **UX** if the issue has a user-facing surface — anything a person

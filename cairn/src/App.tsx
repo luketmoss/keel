@@ -1,4 +1,4 @@
-import { useRef, useState, type DragEvent } from 'react'
+import { useMemo, useRef, useState, useSyncExternalStore, type DragEvent } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { Sidebar } from './components/Sidebar'
 import { MapView } from './components/MapView'
@@ -8,6 +8,7 @@ import { DropOverlay } from './components/DropOverlay'
 import { RoutePlaceholder } from './components/RoutePlaceholder'
 import { useTrackImport } from './import/useTrackImport'
 import { dataTransferHasFiles, filesFromDataTransfer } from './import/dataTransfer'
+import { InMemoryTrackStore } from './store/trackStore'
 import './App.css'
 
 function TripDetailPlaceholder() {
@@ -26,7 +27,12 @@ export function App() {
 }
 
 function AppShell() {
-  const trackImport = useTrackImport()
+  /* Constructed once per app instance; this is the one module allowed to
+     import InMemoryTrackStore directly — everything else depends on the
+     TrackStore interface. */
+  const store = useMemo(() => new InMemoryTrackStore(), [])
+  const files = useSyncExternalStore(store.subscribe, store.getFiles)
+  const trackImport = useTrackImport(store)
   const [dragActive, setDragActive] = useState(false)
   /* Nested elements each fire their own enter/leave as the pointer crosses
      them, so a plain boolean flickers the overlay off mid-drag — a depth
@@ -76,14 +82,14 @@ function AppShell() {
           dismissFailures={trackImport.dismissFailures}
         />
         <TrackList
-          files={trackImport.files}
+          files={files}
           onToggleVisibility={trackImport.toggleVisibility}
           onRemove={trackImport.removeFile}
         />
       </Sidebar>
       <div className="app__map">
         <Routes>
-          <Route path="/" element={<MapView files={trackImport.files} />} />
+          <Route path="/" element={<MapView files={files} />} />
           <Route
             path="/trips"
             element={

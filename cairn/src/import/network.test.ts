@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useTrackImport } from './useTrackImport'
+import { InMemoryTrackStore } from '../store/trackStore'
 
 function loadFixture(name: string): File {
   const buffer = readFileSync(join(__dirname, '../kml/fixtures', name))
@@ -17,11 +18,12 @@ describe('useTrackImport network behaviour', () => {
   it('imports entirely client-side — no request carries the file contents', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
     const xhrOpenSpy = vi.spyOn(XMLHttpRequest.prototype, 'open')
-    const { result } = renderHook(() => useTrackImport())
+    const store = new InMemoryTrackStore()
+    const { result } = renderHook(() => useTrackImport(store))
 
     await act(() => result.current.importFiles([loadFixture('linestring.kml')]))
 
-    expect(result.current.files).toHaveLength(1)
+    expect(store.getFiles()).toHaveLength(1)
     expect(fetchSpy).not.toHaveBeenCalled()
     expect(xhrOpenSpy).not.toHaveBeenCalled()
   })

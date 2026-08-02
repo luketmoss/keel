@@ -61,7 +61,7 @@ jobs:
       run:
         working-directory: <slug>
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true

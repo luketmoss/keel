@@ -1,26 +1,19 @@
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore, type DragEvent } from 'react'
-import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Sidebar } from './components/Sidebar'
 import { MapView } from './components/MapView'
 import { ImportPanel } from './components/ImportPanel'
 import { TrackList } from './components/TrackList'
 import { TripList } from './components/TripList'
+import { TripDetail } from './components/TripDetail'
 import { DropOverlay } from './components/DropOverlay'
-import { RoutePlaceholder } from './components/RoutePlaceholder'
 import { useTrackImport } from './import/useTrackImport'
 import { dataTransferHasFiles, filesFromDataTransfer } from './import/dataTransfer'
 import { InMemoryTrackStore } from './store/trackStore'
-import { LocalTripStore } from './store/tripStore'
-import { useGoogleAccount } from './auth/useGoogleAccount'
+import { LocalTripStore, type TripIndexEntry } from './store/tripStore'
+import { useGoogleAccount, type GoogleAccount } from './auth/useGoogleAccount'
 import { AccountRow } from './auth/AccountRow'
 import './App.css'
-
-function TripDetailPlaceholder() {
-  const { id } = useParams()
-  return (
-    <RoutePlaceholder heading={`Trip ${id}`} subtext="Trip detail is coming soon." />
-  )
-}
 
 export function App() {
   return (
@@ -45,6 +38,60 @@ function AppShell() {
   const trips = useSyncExternalStore(tripStore.subscribe, tripStore.getTrips)
   const createTrip = useCallback((name: string) => tripStore.createTrip(name), [tripStore])
   const deleteTrip = useCallback((id: string) => tripStore.deleteTrip(id), [tripStore])
+
+  const accessToken = account.state.status === 'signed-in' ? account.state.accessToken : null
+  const cairnFolderId = account.state.status === 'signed-in' ? account.state.folderId : null
+
+  return (
+    <Routes>
+      {/* The trip detail page owns its own full shell (sidebar + map) —
+          see TripDetail — rather than slotting into the v1 sidebar below,
+          since its header and import panel differ from v1's. Matched
+          first and exclusively: it is never mounted alongside the v1
+          shell, which is what lets its drag-and-drop target this trip
+          without fighting a window-wide v1 handler for the same drop. */}
+      <Route
+        path="/trips/:id"
+        element={
+          <TripDetail
+            trips={trips}
+            accessToken={accessToken}
+            cairnFolderId={cairnFolderId}
+            accountRow={<AccountRow account={account} />}
+            onReconnect={() => void account.reconnect()}
+          />
+        }
+      />
+      <Route
+        path="*"
+        element={
+          <DefaultShell
+            files={files}
+            trackImport={trackImport}
+            account={account}
+            trips={trips}
+            createTrip={createTrip}
+            deleteTrip={deleteTrip}
+          />
+        }
+      />
+    </Routes>
+  )
+}
+
+interface DefaultShellProps {
+  files: ReturnType<InMemoryTrackStore['getFiles']>
+  trackImport: ReturnType<typeof useTrackImport>
+  account: GoogleAccount
+  trips: TripIndexEntry[]
+  createTrip: (name: string) => void
+  deleteTrip: (id: string) => void
+}
+
+/** The map (`/`) and trips list (`/trips`) — v1's shell, unchanged from
+    before #34 except for living in its own component so the trip detail
+    page can bypass it entirely. */
+function DefaultShell({ files, trackImport, account, trips, createTrip, deleteTrip }: DefaultShellProps) {
   const [dragActive, setDragActive] = useState(false)
   /* Nested elements each fire their own enter/leave as the pointer crosses
      them, so a plain boolean flickers the overlay off mid-drag — a depth
@@ -106,7 +153,6 @@ function AppShell() {
             path="/trips"
             element={<TripList trips={trips} onCreate={createTrip} onDelete={deleteTrip} />}
           />
-          <Route path="/trips/:id" element={<TripDetailPlaceholder />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>

@@ -54,7 +54,7 @@ export function App() {
         <ImportPanel {...trackImport} />
       </Sidebar>
       <div className="app__map">
-        <MapView />
+        <MapView files={trackImport.files} />
       </div>
       {dragActive && <DropOverlay />}
     </div>

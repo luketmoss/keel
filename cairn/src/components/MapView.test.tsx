@@ -8,7 +8,12 @@ vi.mock('@vis.gl/react-google-maps', () => ({
   APIProvider: ({ children }: { children?: React.ReactNode }) => (
     <div data-testid="api-provider">{children}</div>
   ),
-  Map: () => <div data-testid="map" />,
+  Map: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid="map">{children}</div>
+  ),
+  Marker: () => null,
+  Polyline: () => null,
+  useMap: () => null,
 }))
 
 /* `env.ts` reads `import.meta.env` once at module evaluation, so a stub set
@@ -18,7 +23,7 @@ async function renderMapView(key?: string) {
   vi.stubEnv('VITE_GOOGLE_MAPS_API_KEY', key)
   vi.resetModules()
   const { MapView } = await import('./MapView')
-  return render(<MapView />)
+  return render(<MapView files={[]} />)
 }
 
 afterEach(() => {

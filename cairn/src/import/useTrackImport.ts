@@ -28,6 +28,8 @@ export interface UseTrackImport {
   progress: ImportProgress | null
   importFiles: (incoming: File[]) => Promise<void>
   dismissFailures: () => void
+  toggleVisibility: (id: string) => void
+  removeFile: (id: string) => void
 }
 
 /* One file at a time, deliberately — parallel parsing of a large batch
@@ -82,6 +84,7 @@ export function useTrackImport(): UseTrackImport {
           name: file.name,
           tracks: result.tracks,
           colorIndex: generateColorIndex(),
+          visible: true,
         },
       ])
     }
@@ -91,5 +94,23 @@ export function useTrackImport(): UseTrackImport {
 
   const dismissFailures = useCallback(() => setFailures([]), [])
 
-  return { files, failures, progress, importFiles, dismissFailures }
+  const toggleVisibility = useCallback((id: string) => {
+    setFiles((prev) =>
+      prev.map((file) => (file.id === id ? { ...file, visible: !file.visible } : file)),
+    )
+  }, [])
+
+  const removeFile = useCallback((id: string) => {
+    setFiles((prev) => prev.filter((file) => file.id !== id))
+  }, [])
+
+  return {
+    files,
+    failures,
+    progress,
+    importFiles,
+    dismissFailures,
+    toggleVisibility,
+    removeFile,
+  }
 }

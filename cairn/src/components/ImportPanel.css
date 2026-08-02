@@ -51,18 +51,3 @@
   cursor: pointer;
 }
 
-.import-panel__files {
-  margin: 12px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.import-panel__file {
-  padding: 6px 0;
-  border-bottom: 1px solid var(--border);
-  font-size: 13px;
-}
-
-.import-panel__file-count {
-  color: var(--text-muted);
-}

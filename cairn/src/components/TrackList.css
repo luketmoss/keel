@@ -1,0 +1,81 @@
+.track-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.track-list--empty {
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.track-list__empty-title {
+  margin: 0 0 4px;
+  font-size: 14px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.track-list__empty-detail {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.track-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.track-row__swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.track-row--hidden .track-row__swatch {
+  opacity: 0.4;
+}
+
+.track-row__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.track-row--hidden .track-row__name {
+  color: var(--text-muted);
+}
+
+.track-row__count {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.track-row__visibility,
+.track-row__remove {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+}
+
+.track-row__remove:hover {
+  color: var(--danger);
+}

@@ -2,6 +2,7 @@ import { useRef, useState, type DragEvent } from 'react'
 import { Sidebar } from './components/Sidebar'
 import { MapView } from './components/MapView'
 import { ImportPanel } from './components/ImportPanel'
+import { TrackList } from './components/TrackList'
 import { DropOverlay } from './components/DropOverlay'
 import { useTrackImport } from './import/useTrackImport'
 import { dataTransferHasFiles, filesFromDataTransfer } from './import/dataTransfer'
@@ -51,7 +52,17 @@ export function App() {
       onDrop={handleDrop}
     >
       <Sidebar>
-        <ImportPanel {...trackImport} />
+        <ImportPanel
+          failures={trackImport.failures}
+          progress={trackImport.progress}
+          importFiles={trackImport.importFiles}
+          dismissFailures={trackImport.dismissFailures}
+        />
+        <TrackList
+          files={trackImport.files}
+          onToggleVisibility={trackImport.toggleVisibility}
+          onRemove={trackImport.removeFile}
+        />
       </Sidebar>
       <div className="app__map">
         <MapView files={trackImport.files} />

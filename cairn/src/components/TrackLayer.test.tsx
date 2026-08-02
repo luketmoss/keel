@@ -26,6 +26,7 @@ function importedFile(overrides: Partial<ImportedFile> = {}): ImportedFile {
     id: 'f1',
     name: 'trip.kml',
     colorIndex: 0,
+    visible: true,
     tracks: [{ name: 'Track', points: [{ lat: 37, lon: -122 }, { lat: 37.1, lon: -122.1 }] }],
     ...overrides,
   }
@@ -99,5 +100,49 @@ describe('TrackLayer', () => {
     rerender(<TrackLayer files={[importedFile({ id: 'a' })]} />)
 
     expect(fitTracksToBounds).toHaveBeenCalledTimes(1)
+  })
+
+  it('excludes a hidden file from both the map and the bounds fit', () => {
+    fitTracksToBounds.mockClear()
+    const { container } = render(
+      <TrackLayer
+        files={[
+          importedFile({ id: 'a', visible: true }),
+          importedFile({
+            id: 'b',
+            colorIndex: 1,
+            visible: false,
+            tracks: [{ name: 'Hidden', points: [{ lat: 50, lon: 50 }, { lat: 51, lon: 51 }] }],
+          }),
+        ]}
+      />,
+    )
+
+    const colors = Array.from(container.querySelectorAll('[data-testid="polyline"]'))
+      .map((el) => el.getAttribute('data-color'))
+      .filter((color) => color !== '#00000059')
+    expect(colors).toEqual(['#FF3B30'])
+    expect(fitTracksToBounds).toHaveBeenCalledWith(
+      fakeMap,
+      expect.not.arrayContaining([{ lat: 50, lng: 50 }]),
+    )
+  })
+
+  it('re-fits when a file is toggled visible again, without the file count changing', () => {
+    fitTracksToBounds.mockClear()
+    const { rerender } = render(
+      <TrackLayer
+        files={[importedFile({ id: 'a', visible: false }), importedFile({ id: 'b', colorIndex: 1 })]}
+      />,
+    )
+    expect(fitTracksToBounds).toHaveBeenCalledTimes(1)
+
+    rerender(
+      <TrackLayer
+        files={[importedFile({ id: 'a', visible: true }), importedFile({ id: 'b', colorIndex: 1 })]}
+      />,
+    )
+
+    expect(fitTracksToBounds).toHaveBeenCalledTimes(2)
   })
 })

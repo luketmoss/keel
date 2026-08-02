@@ -14,6 +14,7 @@ vi.mock('@vis.gl/react-google-maps', () => ({
   Polyline: (props: {
     strokeColor?: string
     strokeOpacity?: number
+    clickable?: boolean
     onClick?: () => void
   }) => (
     <button
@@ -21,6 +22,7 @@ vi.mock('@vis.gl/react-google-maps', () => ({
       data-testid="polyline"
       data-color={props.strokeColor}
       data-dashed={props.strokeOpacity === 0}
+      data-clickable={props.clickable === true}
       onClick={props.onClick}
     />
   ),
@@ -83,8 +85,18 @@ afterEach(() => {
   fitTracksToBounds.mockClear()
 })
 
+/** Each route draws as an invisible, wide, clickable casing plus a visible
+    line on top of it (the click-target-padding treatment `TrackLayer`
+    gives its own tracks) — so counting "routes on screen" means counting
+    the non-clickable, visible ones, not every `Polyline` element. */
+function visibleLines(container: HTMLElement): Element[] {
+  return Array.from(container.querySelectorAll('[data-testid="polyline"]')).filter(
+    (el) => el.getAttribute('data-clickable') !== 'true',
+  )
+}
+
 describe('WorldMap', () => {
-  it('renders one polyline per route, styled by status', async () => {
+  it('renders one visible polyline per route, styled by status, each with its own wider clickable casing', async () => {
     const trips = [
       tripEntry({ id: 'a', status: 'completed' }),
       tripEntry({ id: 'b', status: 'planned' }),
@@ -96,10 +108,12 @@ describe('WorldMap', () => {
 
     const { container } = await renderWorldMap(trips, store, 'a-browser-key')
 
-    const polylines = container.querySelectorAll('[data-testid="polyline"]')
-    expect(polylines).toHaveLength(2)
-    const dashed = Array.from(polylines).map((el) => el.getAttribute('data-dashed'))
-    expect(dashed).toEqual(['false', 'true'])
+    const visible = visibleLines(container)
+    expect(visible).toHaveLength(2)
+    expect(visible.map((el) => el.getAttribute('data-dashed'))).toEqual(['false', 'true'])
+
+    const clickable = container.querySelectorAll('[data-testid="polyline"][data-clickable="true"]')
+    expect(clickable).toHaveLength(2)
   })
 
   it('fits bounds once on load to the union of all routes', async () => {
@@ -136,7 +150,7 @@ describe('WorldMap', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Planned' }))
 
-    expect(container.querySelectorAll('[data-testid="polyline"]')).toHaveLength(1)
+    expect(visibleLines(container)).toHaveLength(1)
     expect(fitTracksToBounds).toHaveBeenCalledTimes(1)
   })
 
@@ -156,7 +170,7 @@ describe('WorldMap', () => {
 
     const { container } = await renderWorldMap(trips, store, 'a-browser-key')
 
-    expect(container.querySelectorAll('[data-testid="polyline"]')).toHaveLength(1)
+    expect(visibleLines(container)).toHaveLength(1)
   })
 
   it('excludes a trip whose overview has no features, same as a missing one', async () => {
@@ -165,7 +179,7 @@ describe('WorldMap', () => {
 
     const { container } = await renderWorldMap(trips, store, 'a-browser-key')
 
-    expect(container.querySelectorAll('[data-testid="polyline"]')).toHaveLength(0)
+    expect(visibleLines(container)).toHaveLength(0)
     expect(screen.getByText('No trips yet')).toBeDefined()
   })
 

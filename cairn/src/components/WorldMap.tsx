@@ -206,44 +206,60 @@ function WorldRouteLayer({ routes, onSelectTrip }: WorldRouteLayerProps) {
   )
 }
 
+/** Padding, in pixels, added either side of the visible stroke for the
+    actual click target — same "wider hit area than the visible line"
+    treatment `TrackLayer`'s casing polyline gives `/`'s own tracks. */
+const CLICK_TARGET_WIDTH = 16
+
 function WorldRoutePolyline({ route, onSelect }: { route: WorldRoute; onSelect: () => void }) {
   const [hovered, setHovered] = useState(false)
   const color = route.status === 'completed' ? COMPLETED_COLOR : PLANNED_COLOR
   const strokeWeight = hovered ? 5 : 3
-
-  if (route.status === 'planned') {
-    // Google Maps' `Polyline` has no dashed-stroke option of its own — a
-    // dashed line is a solid one made invisible and replaced with a small
-    // line symbol repeated along the path, the documented way to fake it.
-    return (
-      <Polyline
-        path={route.points}
-        strokeOpacity={0}
-        strokeWeight={strokeWeight}
-        clickable
-        onClick={onSelect}
-        onMouseOver={() => setHovered(true)}
-        onMouseOut={() => setHovered(false)}
-        icons={[
-          {
-            icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, strokeColor: color, scale: strokeWeight },
-            offset: '0',
-            repeat: '16px',
-          },
-        ]}
-      />
-    )
+  const hoverHandlers = {
+    onMouseOver: () => setHovered(true),
+    onMouseOut: () => setHovered(false),
   }
 
   return (
-    <Polyline
-      path={route.points}
-      strokeColor={color}
-      strokeWeight={strokeWeight}
-      clickable
-      onClick={onSelect}
-      onMouseOver={() => setHovered(true)}
-      onMouseOut={() => setHovered(false)}
-    />
+    <>
+      {/* Invisible and wider than what's drawn — carries the click target
+          and the hover state, so a route is easy to hit without the visible
+          line itself having to be that fat. The visible line underneath it
+          is never clickable itself; a click always lands here first. */}
+      <Polyline
+        path={route.points}
+        strokeOpacity={0}
+        strokeWeight={CLICK_TARGET_WIDTH}
+        clickable
+        onClick={onSelect}
+        {...hoverHandlers}
+      />
+      {route.status === 'planned' ? (
+        // Google Maps' `Polyline` has no dashed-stroke option of its own —
+        // a dashed line is a solid one made invisible and replaced with a
+        // small line symbol repeated along the path, the documented way to
+        // fake it.
+        <Polyline
+          path={route.points}
+          strokeOpacity={0}
+          strokeWeight={strokeWeight}
+          clickable={false}
+          icons={[
+            {
+              icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, strokeColor: color, scale: strokeWeight },
+              offset: '0',
+              repeat: '16px',
+            },
+          ]}
+        />
+      ) : (
+        <Polyline
+          path={route.points}
+          strokeColor={color}
+          strokeWeight={strokeWeight}
+          clickable={false}
+        />
+      )}
+    </>
   )
 }

@@ -11,7 +11,7 @@ import { DropOverlay } from './components/DropOverlay'
 import { useTrackImport } from './import/useTrackImport'
 import { dataTransferHasFiles, filesFromDataTransfer } from './import/dataTransfer'
 import { InMemoryTrackStore } from './store/trackStore'
-import { LocalTripStore, type TripIndexEntry } from './store/tripStore'
+import { LocalTripStore, type TripIndexEntry, type TripStore } from './store/tripStore'
 import { useGoogleAccount, type GoogleAccount } from './auth/useGoogleAccount'
 import { AccountRow } from './auth/AccountRow'
 import './App.css'
@@ -86,7 +86,7 @@ interface DefaultShellProps {
   trackImport: ReturnType<typeof useTrackImport>
   account: GoogleAccount
   trips: TripIndexEntry[]
-  tripStore: LocalTripStore
+  tripStore: TripStore
   createTrip: (name: string) => void
   deleteTrip: (id: string) => void
 }

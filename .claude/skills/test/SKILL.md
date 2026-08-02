@@ -33,6 +33,13 @@ Three outcomes per criterion:
 A criterion you didn't actually check is a failure, not a pass. Do not infer
 from a green build that behaviour is correct — a compile proves syntax.
 
+When a criterion's evidence is an automated test, a green run proves the test
+passes, not that it would fail if the behavior it claims to cover broke. Before
+recording that criterion as passing, confirm the test can fail: briefly break
+the behavior, run the test, confirm it fails, then restore the behavior. A test
+that renders a component and asserts something trivially true is exactly as
+green as a real one — the only way to tell them apart is to watch it fail.
+
 ## If anything fails
 
 ```bash

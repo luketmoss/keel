@@ -1,4 +1,4 @@
-import { useRef, useState, useSyncExternalStore, type DragEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, type DragEvent, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { MapView } from './MapView'
@@ -35,6 +35,19 @@ export function TripDetail({ tripStore, accessToken, cairnFolderId, accountRow, 
   const tripImport = useTripImport(tripId, accessToken, cairnFolderId)
   const [dragActive, setDragActive] = useState(false)
   const dragDepth = useRef(0)
+
+  // Keeps the trip's precomputed overview (#36, read by `/world`, #37) in
+  // step with its actual tracks — regenerated whenever the settled set
+  // changes: the initial Drive read-back, and any add/remove afterward.
+  // Skipped while `tripImport` is still mid-batch so a trip with many
+  // files doesn't write a partial overview once per arrival.
+  useEffect(() => {
+    if (!trip || tripImport.loading) return
+    tripStore.saveOverview(
+      trip.id,
+      tripImport.tracks.flatMap((file) => file.tracks),
+    )
+  }, [tripStore, trip, tripImport.loading, tripImport.tracks])
 
   function handleDragEnter(event: DragEvent<HTMLDivElement>) {
     if (!dataTransferHasFiles(event.dataTransfer)) return

@@ -57,6 +57,21 @@ describe('useTrackImport', () => {
     expect(result.current.failures[0].message).toContain('.kmz')
   })
 
+  it('rejects a photo dropped where no trip is open, naming that a trip must be open first', async () => {
+    // #51 edge case: this v1 shell (`/`, `/trips`) has no open trip to
+    // attach a photo to, so a dropped photo gets a more specific rejection
+    // than the generic "unsupported type" one every other extension gets.
+    const store = new InMemoryTrackStore()
+    const { result } = renderHook(() => useTrackImport(store))
+
+    await act(() => result.current.importFiles([file('IMG_1.jpg'), file('IMG_2.heic')]))
+
+    expect(parseKmlOrKmz).not.toHaveBeenCalled()
+    expect(result.current.failures).toHaveLength(2)
+    expect(result.current.failures[0].message).toBe('Photos belong to a trip — open one first.')
+    expect(result.current.failures[1].message).toBe('Photos belong to a trip — open one first.')
+  })
+
   it('reports a parse failure against its own file and continues the batch', async () => {
     parseKmlOrKmz
       .mockResolvedValueOnce({ ok: false, error: 'File is not well-formed XML' })

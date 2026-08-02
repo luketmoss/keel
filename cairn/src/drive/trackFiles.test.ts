@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   DriveAuthError,
+  DriveQuotaError,
   DriveRequestError,
   startResumableUpload,
   uploadFileContent,
@@ -120,5 +121,26 @@ describe('uploadFileContent', () => {
     await expect(
       uploadFileContent('https://upload.example/session-1', file('hello'), 'token'),
     ).rejects.toBeInstanceOf(DriveAuthError)
+  })
+
+  it('throws DriveQuotaError, a DriveRequestError subclass, when Drive reports the account is full', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      response(
+        { error: { status: 'RESOURCE_EXHAUSTED', errors: [{ reason: 'storageQuotaExceeded' }] } },
+        { status: 403 },
+      ),
+    )
+
+    const failure = uploadFileContent('https://upload.example/session-1', file('hello'), 'token')
+    await expect(failure).rejects.toBeInstanceOf(DriveQuotaError)
+    await expect(failure).rejects.toBeInstanceOf(DriveRequestError)
+  })
+
+  it('throws the plain DriveRequestError for a rejected upload that is not a quota failure', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(response({}, { status: 500 }))
+
+    const failure = uploadFileContent('https://upload.example/session-1', file('hello'), 'token')
+    await expect(failure).rejects.toBeInstanceOf(DriveRequestError)
+    await expect(failure).rejects.not.toBeInstanceOf(DriveQuotaError)
   })
 })

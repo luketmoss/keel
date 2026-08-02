@@ -1,4 +1,12 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type DragEvent, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type DragEvent,
+  type ReactNode,
+} from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { MapView } from './MapView'
@@ -10,8 +18,24 @@ import { MissingFileRow } from './MissingFileRow'
 import { DropOverlay } from './DropOverlay'
 import { dataTransferHasFiles, filesFromDataTransfer } from '../import/dataTransfer'
 import { useTripImport } from '../import/useTripImport'
+import { usePhotoImport } from '../photo/usePhotoImport'
 import type { TripStore } from '../store/tripStore'
 import './TripDetail.css'
+
+const TRACK_EXTENSIONS = ['.kml', '.kmz']
+
+/** True for the two file extensions the existing #34 track pipeline
+    accepts. Everything else — every image extension `usePhotoImport`
+    knows about, HEIC/HEIF (rejected there with its own named copy), and
+    any other extension entirely — goes down the photo path instead, which
+    already produces the right rejection copy for "not actually a
+    photo" (design doc: "Files are partitioned by extension. Tracks take
+    the existing #34 path; images enter this one. Anything else is
+    rejected by name."). */
+function isTrackFile(name: string): boolean {
+  const lower = name.toLowerCase()
+  return TRACK_EXTENSIONS.some((ext) => lower.endsWith(ext))
+}
 
 interface TripDetailProps {
   tripStore: TripStore
@@ -33,9 +57,45 @@ export function TripDetail({ tripStore, accessToken, cairnFolderId, accountRow, 
   const tripId = id ?? ''
   const trip = useSyncExternalStore(tripStore.subscribe, () => tripStore.getTrip(tripId))
   const tripImport = useTripImport(tripId, accessToken, cairnFolderId)
+  const photoImport = usePhotoImport(tripId, accessToken, cairnFolderId)
   const [dragActive, setDragActive] = useState(false)
   const dragDepth = useRef(0)
   const [hoveredFileId, setHoveredFileId] = useState<string | null>(null)
+
+  // One control, one drop target, two pipelines (design doc: "One import
+  // control, not two"). Files are partitioned by extension before either
+  // pipeline sees them, so a folder containing both tracks and photos
+  // imports both without the user having to sort them first.
+  const importFiles = useCallback(
+    (incoming: File[]) => {
+      const tracks = incoming.filter((file) => isTrackFile(file.name))
+      const photos = incoming.filter((file) => !isTrackFile(file.name))
+      const tasks: Promise<void>[] = []
+      if (tracks.length > 0) tasks.push(tripImport.importFiles(tracks))
+      if (photos.length > 0) tasks.push(photoImport.importFiles(photos))
+      return Promise.all(tasks).then(() => undefined)
+    },
+    [tripImport, photoImport],
+  )
+
+  const combinedProgress = [...tripImport.progress, ...photoImport.progress]
+  const combinedFailures = [...tripImport.failures, ...photoImport.failures]
+
+  // Failure ids are prefixed distinctly by their owning hook
+  // (`failure-`/`photo-failure-`), which is what lets one `Retry` action on
+  // the shared panel route to the pipeline that actually produced the row.
+  const retryFailure = useCallback(
+    (id: string) => {
+      if (tripImport.failures.some((f) => f.id === id)) return tripImport.retryFailure(id)
+      return photoImport.retryFailure(id)
+    },
+    [tripImport, photoImport],
+  )
+
+  const dismissFailures = useCallback(() => {
+    tripImport.dismissFailures()
+    photoImport.dismissFailures()
+  }, [tripImport, photoImport])
 
   // Keeps the trip's precomputed overview (#36, read by `/world`, #37) in
   // step with its actual tracks — regenerated whenever the settled set
@@ -74,7 +134,7 @@ export function TripDetail({ tripStore, accessToken, cairnFolderId, accountRow, 
     dragDepth.current = 0
     setDragActive(false)
     const dropped = filesFromDataTransfer(event.dataTransfer)
-    if (dropped.length > 0) void tripImport.importFiles(dropped)
+    if (dropped.length > 0) void importFiles(dropped)
   }
 
   // A broken detail view should never trap the user — the back link works
@@ -116,11 +176,11 @@ export function TripDetail({ tripStore, accessToken, cairnFolderId, accountRow, 
         <TripMetadataHeader trip={trip} onUpdate={(patch) => tripStore.updateTrip(trip.id, patch)} />
         <TripImportPanel
           signedIn={accessToken !== null && cairnFolderId !== null}
-          progress={tripImport.progress}
-          failures={tripImport.failures}
-          importFiles={tripImport.importFiles}
-          retryFailure={tripImport.retryFailure}
-          dismissFailures={tripImport.dismissFailures}
+          progress={combinedProgress}
+          failures={combinedFailures}
+          importFiles={importFiles}
+          retryFailure={retryFailure}
+          dismissFailures={dismissFailures}
           onReconnect={onReconnect}
         />
         {fetching ? (
@@ -167,7 +227,7 @@ export function TripDetail({ tripStore, accessToken, cairnFolderId, accountRow, 
       <div className="app__map">
         <MapView files={tripImport.tracks} hoveredFileId={hoveredFileId} />
       </div>
-      {dragActive && <DropOverlay />}
+      {dragActive && <DropOverlay label="Drop tracks or photos" />}
     </div>
   )
 }

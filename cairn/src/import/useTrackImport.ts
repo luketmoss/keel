@@ -5,10 +5,20 @@ import type { ImportFailure, ImportProgress } from './types'
 import type { TrackStore } from '../store/trackStore'
 
 const ACCEPTED_EXTENSIONS = ['.kml', '.kmz']
+// Recognised only to give a photo a more useful rejection than "unsupported
+// type" here — this v1 shell (`/`, `/trips`) has no trip to attach a photo
+// to, so photos never enter its pipeline regardless (design doc edge case:
+// "Photo dropped while no trip is open").
+const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif']
 
 function hasAcceptedExtension(name: string): boolean {
   const lower = name.toLowerCase()
   return ACCEPTED_EXTENSIONS.some((ext) => lower.endsWith(ext))
+}
+
+function isImageExtension(name: string): boolean {
+  const lower = name.toLowerCase()
+  return IMAGE_EXTENSIONS.some((ext) => lower.endsWith(ext))
 }
 
 let nextId = 0
@@ -60,7 +70,9 @@ export function useTrackImport(store: TrackStore): UseTrackImport {
             {
               id: generateId('failure'),
               name: file.name,
-              message: 'only .kml and .kmz files can be imported',
+              message: isImageExtension(file.name)
+                ? 'Photos belong to a trip — open one first.'
+                : 'only .kml and .kmz files can be imported',
             },
           ])
           continue

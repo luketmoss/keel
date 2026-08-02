@@ -12,6 +12,39 @@ const DRIVE_FILES_URL = 'https://www.googleapis.com/drive/v3/files'
 const DRIVE_UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable'
 const MAX_UPLOAD_ATTEMPTS = 3
 
+/** A `DriveRequestError` specifically for a full Drive — `storageQuotaExceeded`
+    in the API's error body. A subclass rather than a sibling of
+    `DriveRequestError` so existing `instanceof DriveRequestError` checks
+    (track import's generic failure handling) keep working unchanged; only a
+    caller that wants the friendlier "Drive is out of space" copy (#51's
+    photo import) needs to check for this specifically. */
+export class DriveQuotaError extends DriveRequestError {
+  constructor() {
+    super('Drive storage quota exceeded')
+    this.name = 'DriveQuotaError'
+  }
+}
+
+/** Best-effort read of a failed response's error reason, used only to tell
+    a full Drive apart from any other rejected upload. Never throws — a
+    body that isn't JSON, or doesn't have the shape expected, just means
+    "not detectably a quota error". */
+async function isQuotaExceeded(response: Response): Promise<boolean> {
+  try {
+    const body = (await response.json()) as {
+      error?: { errors?: { reason?: string }[]; status?: string }
+    }
+    const reasons = body.error?.errors?.map((e) => e.reason) ?? []
+    return reasons.includes('storageQuotaExceeded') || body.error?.status === 'RESOURCE_EXHAUSTED'
+  } catch {
+    return false
+  }
+}
+
+async function uploadRequestError(response: Response, message: string): Promise<DriveRequestError> {
+  return (await isQuotaExceeded(response)) ? new DriveQuotaError() : new DriveRequestError(message)
+}
+
 export interface DriveTrackFile {
   id: string
   name: string
@@ -90,7 +123,7 @@ export async function startResumableUpload(
 
   if (response.status === 401) throw new DriveAuthError()
   if (!response.ok) {
-    throw new DriveRequestError(`Drive upload session failed with status ${response.status}`)
+    throw await uploadRequestError(response, `Drive upload session failed with status ${response.status}`)
   }
 
   const location = response.headers.get('Location')
@@ -165,9 +198,13 @@ export async function uploadFileContent(
       if (response.ok) {
         return (await response.json()) as { id: string }
       }
-      throw new DriveRequestError(`Drive upload failed with status ${response.status}`)
+      throw await uploadRequestError(response, `Drive upload failed with status ${response.status}`)
     } catch (error) {
-      if (error instanceof DriveAuthError) throw error
+      // Neither is worth retrying: a fresh token is needed before an auth
+      // error can succeed, and a full Drive won't free space between
+      // attempts — retrying either just burns the attempt budget on a
+      // failure that's already fully diagnosed.
+      if (error instanceof DriveAuthError || error instanceof DriveQuotaError) throw error
       if (attempt >= MAX_UPLOAD_ATTEMPTS) {
         throw error instanceof DriveRequestError
           ? error

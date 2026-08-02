@@ -43,6 +43,14 @@
   color: var(--text-muted);
 }
 
+.trip-metadata__status:hover {
+  background: var(--hover);
+}
+
+.trip-metadata__status:active {
+  background: var(--pressed);
+}
+
 .trip-metadata__status--planned {
   color: var(--accent);
 }
@@ -107,6 +115,10 @@
   font-size: var(--text-xs);
   color: var(--accent);
   cursor: pointer;
+}
+
+.trip-metadata__show-more:hover {
+  color: var(--text);
 }
 
 .trip-metadata__error {

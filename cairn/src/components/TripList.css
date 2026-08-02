@@ -56,6 +56,20 @@
   cursor: pointer;
 }
 
+.trip-create__submit:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.trip-create__submit:active:not(:disabled) {
+  filter: brightness(0.95);
+}
+
+.trip-create__submit:disabled {
+  opacity: 0.4;
+  cursor: default;
+  filter: none;
+}
+
 .trip-create__error {
   margin: var(--space-2) 0 0;
   font-size: var(--text-xs);
@@ -102,7 +116,9 @@
 .trip-row__link {
   display: block;
   text-decoration: none;
-  padding-right: 28px;
+  /* Clearance for the 40px remove button plus a small gap, not a
+     spacing-scale value — tied to that sibling's width, not decoration. */
+  padding-right: calc(40px + var(--space-1));
 }
 
 .trip-row__main {
@@ -153,14 +169,17 @@
 
 .trip-row__remove {
   position: absolute;
-  top: var(--space-3);
+  /* Centers the larger 40px target on the same point the old 24px one
+     occupied, relative to the row's own vertical padding. */
+  top: calc(var(--space-3) - var(--space-2));
   right: 0;
-  width: 24px;
-  height: 24px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
   border: none;
+  border-radius: var(--radius-sm);
   background: none;
   color: var(--text-muted);
   cursor: pointer;
@@ -170,6 +189,11 @@
 
 .trip-row__remove:hover {
   color: var(--danger);
+  background: var(--hover);
+}
+
+.trip-row__remove:active {
+  background: var(--pressed);
 }
 
 .trip-row__confirm {
@@ -194,21 +218,35 @@
   gap: var(--space-2);
 }
 
-.trip-row__confirm-delete {
+.trip-row__confirm-delete,
+.trip-row__confirm-cancel {
   font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--danger);
   background: none;
   border: none;
   cursor: pointer;
-  padding: 0;
+  border-radius: var(--radius-sm);
+  /* Padding gives the pressed fill somewhere to land. Vertical-only
+     negative margin cancels that back out; horizontal stays natural since
+     these two buttons share a flex gap and canceling both sides would
+     make them overlap. */
+  padding: var(--space-1) var(--space-2);
+  margin: calc(var(--space-1) * -1) 0;
+}
+
+.trip-row__confirm-delete {
+  font-weight: 600;
+  color: var(--danger);
 }
 
 .trip-row__confirm-cancel {
-  font-size: var(--text-sm);
   color: var(--text-muted);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
+}
+
+.trip-row__confirm-cancel:hover {
+  color: var(--text);
+}
+
+.trip-row__confirm-delete:active,
+.trip-row__confirm-cancel:active {
+  background: var(--pressed);
 }

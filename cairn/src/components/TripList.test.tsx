@@ -66,22 +66,52 @@ describe('TripList', () => {
     expect(input.value).toBe('')
   })
 
-  it('blocks submitting an empty name with an inline error, without calling onCreate', () => {
+  it('disables the submit button while the name is empty', () => {
+    renderList()
+
+    const button = screen.getByRole('button', { name: 'Create' }) as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+  })
+
+  it('disables the submit button for a whitespace-only name', () => {
+    renderList()
+
+    fireEvent.change(screen.getByPlaceholderText('Trip name'), { target: { value: '   ' } })
+    const button = screen.getByRole('button', { name: 'Create' }) as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+  })
+
+  it('re-enables the submit button once a non-whitespace character is typed', () => {
+    renderList()
+    const input = screen.getByPlaceholderText('Trip name')
+    const button = screen.getByRole('button', { name: 'Create' }) as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+
+    fireEvent.change(input, { target: { value: 'H' } })
+    expect(button.disabled).toBe(false)
+  })
+
+  // The button being disabled is the primary defense, but the same
+  // validation still guards a direct form submission (Enter in the
+  // input, or any other implicit-submit path a disabled button doesn't
+  // block) — exercised here via fireEvent.submit rather than a click,
+  // since a click can no longer reach a disabled button at all.
+  it('blocks a direct form submission with an empty name, with an inline error', () => {
     const onCreate = vi.fn()
     renderList({ onCreate })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+    fireEvent.submit(screen.getByRole('button', { name: 'Create' }).closest('form')!)
 
     expect(screen.getByText('A trip needs a name.')).toBeDefined()
     expect(onCreate).not.toHaveBeenCalled()
   })
 
-  it('blocks a whitespace-only name the same as an empty one', () => {
+  it('blocks a direct form submission with a whitespace-only name the same as an empty one', () => {
     const onCreate = vi.fn()
     renderList({ onCreate })
 
     fireEvent.change(screen.getByPlaceholderText('Trip name'), { target: { value: '   ' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+    fireEvent.submit(screen.getByRole('button', { name: 'Create' }).closest('form')!)
 
     expect(screen.getByText('A trip needs a name.')).toBeDefined()
     expect(onCreate).not.toHaveBeenCalled()
@@ -91,7 +121,7 @@ describe('TripList', () => {
     renderList({ onCreate: vi.fn() })
     const input = screen.getByPlaceholderText('Trip name')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+    fireEvent.submit(screen.getByRole('button', { name: 'Create' }).closest('form')!)
     expect(screen.getByText('A trip needs a name.')).toBeDefined()
 
     fireEvent.change(input, { target: { value: 'H' } })

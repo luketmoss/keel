@@ -14,10 +14,19 @@
   cursor: pointer;
 }
 
+.import-panel__button:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.import-panel__button:active:not(:disabled) {
+  filter: brightness(0.95);
+}
+
 .import-panel__button:disabled {
   background: var(--border);
   color: var(--text-muted);
   cursor: default;
+  opacity: 0.4;
 }
 
 .import-panel__input {
@@ -49,4 +58,8 @@
   font-size: var(--text-xs);
   text-decoration: underline;
   cursor: pointer;
+}
+
+.import-panel__dismiss:hover {
+  color: var(--text);
 }

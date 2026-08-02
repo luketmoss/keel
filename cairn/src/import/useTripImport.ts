@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { parseKmlOrKmz } from '../kml/parse'
 import { computeTrackStats } from '../kml/stats'
 import { runWithConcurrency } from './concurrency'
@@ -11,6 +11,7 @@ import {
 } from '../drive/trackFiles'
 import { findOrCreateTripFolder } from '../drive/tripFolder'
 import { DriveAuthError } from '../drive/cairnFolder'
+import { LocalTrackOverridesStore, type TrackOverridesStore } from '../store/trackOverridesStore'
 
 const ACCEPTED_EXTENSIONS = ['.kml', '.kmz']
 /* Matches #4's stance for v1: bounded, not unlimited, so a large batch does
@@ -34,6 +35,11 @@ function generateColorIndex(): number {
   nextColorIndex += 1
   return index
 }
+
+// Shared across every `useTripImport` instance that doesn't get its own
+// (tests inject a fake-storage-backed one) — #46's overrides record,
+// `localStorage`-only for now, see #59 on migrating it to Drive.
+const defaultOverridesStore = new LocalTrackOverridesStore()
 
 export type ImportPhase = 'uploading' | 'parsing'
 
@@ -84,6 +90,18 @@ export interface UseTripImport {
   dismissFailures: () => void
   toggleVisibility: (id: string) => void
   removeFile: (id: string) => void
+  /** #46: sets a display-name override for one track. Never touches the
+      file's actual name in Drive. Returns `false` on a storage write
+      failure — the caller reverts its optimistic UI update. */
+  renameTrack: (id: string, displayName: string) => boolean
+  /** #46: sets a `TRACK_COLORS` index override for one track, taking over
+      from its auto-assigned `colorIndex`. Returns `false` on a storage
+      write failure. */
+  recolorTrack: (id: string, color: number) => boolean
+  /** #46: restates the full display order for the trip's tracks as a list
+      of `id`s (not Drive file ids) in their new order. Returns `false` on a
+      storage write failure. */
+  reorderTracks: (orderedIds: string[]) => boolean
 }
 
 /* Drive-aware sibling of `useTrackImport`: upload then parse instead of
@@ -93,12 +111,18 @@ export function useTripImport(
   tripId: string,
   accessToken: string | null,
   cairnFolderId: string | null,
+  overridesStore: TrackOverridesStore = defaultOverridesStore,
 ): UseTripImport {
   const [tracks, setTracks] = useState<ImportedFile[]>([])
   const [missingFiles, setMissingFiles] = useState<MissingTripFile[]>([])
   const [loading, setLoading] = useState(true)
   const [progressMap, setProgressMap] = useState<Map<string, TripImportProgress>>(new Map())
   const [failures, setFailures] = useState<TripImportFailure[]>([])
+  // #46: display-name/order/colour overrides, read from `overridesStore` on
+  // mount and whenever `tripId` changes, then kept in step with every
+  // successful write so `effectiveTracks` below doesn't re-read storage on
+  // every render.
+  const [overrides, setOverrides] = useState(() => overridesStore.getOverrides(tripId))
   /* Read inside async callbacks (retryFailure) where a closure over the
      `failures` state at render time would go stale. */
   const failuresRef = useRef<TripImportFailure[]>(failures)
@@ -106,6 +130,10 @@ export function useTripImport(
   useEffect(() => {
     failuresRef.current = failures
   }, [failures])
+
+  useEffect(() => {
+    setOverrides(overridesStore.getOverrides(tripId))
+  }, [tripId, overridesStore])
 
   // On mount (and whenever the account becomes available), read back
   // whatever's already attached to this trip. A read failure — including
@@ -148,6 +176,7 @@ export function useTripImport(
               {
                 id: generateId('file'),
                 name: driveFile.name,
+                driveFileId: driveFile.id,
                 tracks: result.tracks,
                 trackStats: result.tracks.map(computeTrackStats),
                 colorIndex: generateColorIndex(),
@@ -216,7 +245,7 @@ export function useTripImport(
 
       try {
         const sessionUri = await startResumableUpload(token, folderId, file.name)
-        await uploadFileContent(sessionUri, file, token)
+        const uploaded = await uploadFileContent(sessionUri, file, token)
 
         setProgressEntry(key, { name: file.name, index: index + 1, total, phase: 'parsing' })
 
@@ -235,6 +264,7 @@ export function useTripImport(
           {
             id: generateId('file'),
             name: file.name,
+            driveFileId: uploaded.id,
             tracks: result.tracks,
             trackStats: result.tracks.map(computeTrackStats),
             colorIndex: generateColorIndex(),
@@ -330,14 +360,90 @@ export function useTripImport(
 
   // Local-list removal only — deleting the underlying Drive file is out of
   // scope for this issue (no reparse/replace/multi-trip semantics either).
+  // The removed file's override (if any) is left in place and pruned on the
+  // next write elsewhere in the trip — see #46's "Stale override" state.
   const removeFile = useCallback((id: string) => {
     setTracks((prev) => prev.filter((file) => file.id !== id))
   }, [])
 
+  const renameTrack = useCallback(
+    (id: string, displayName: string): boolean => {
+      const file = tracks.find((f) => f.id === id)
+      if (!file) return false
+      const ok = overridesStore.setOverride(
+        tripId,
+        file.driveFileId,
+        { displayName },
+        tracks.map((f) => f.driveFileId),
+      )
+      if (ok) setOverrides(overridesStore.getOverrides(tripId))
+      return ok
+    },
+    [tracks, tripId, overridesStore],
+  )
+
+  const recolorTrack = useCallback(
+    (id: string, color: number): boolean => {
+      const file = tracks.find((f) => f.id === id)
+      if (!file) return false
+      const ok = overridesStore.setOverride(
+        tripId,
+        file.driveFileId,
+        { color },
+        tracks.map((f) => f.driveFileId),
+      )
+      if (ok) setOverrides(overridesStore.getOverrides(tripId))
+      return ok
+    },
+    [tracks, tripId, overridesStore],
+  )
+
+  const reorderTracks = useCallback(
+    (orderedIds: string[]): boolean => {
+      const driveFileIdById = new Map(tracks.map((f) => [f.id, f.driveFileId]))
+      const orderedDriveFileIds = orderedIds
+        .map((id) => driveFileIdById.get(id))
+        .filter((driveFileId): driveFileId is string => driveFileId !== undefined)
+      const ok = overridesStore.setOrder(
+        tripId,
+        orderedDriveFileIds,
+        tracks.map((f) => f.driveFileId),
+      )
+      if (ok) setOverrides(overridesStore.getOverrides(tripId))
+      return ok
+    },
+    [tracks, tripId, overridesStore],
+  )
+
+  // #46: overrides applied on top of the raw Drive-listing data — a track
+  // missing an override for a given field falls back to that field's
+  // existing default (original filename, auto-assigned colour, and
+  // insertion order via the stable sort below). `order`-less files sort
+  // to the end, in whatever order they arrived.
+  const effectiveTracks = useMemo(() => {
+    const withOverrides = tracks.map((file) => {
+      const override = overrides[file.driveFileId]
+      if (!override) return file
+      return {
+        ...file,
+        name: override.displayName ?? file.name,
+        colorIndex: override.color ?? file.colorIndex,
+      }
+    })
+    return [...withOverrides].sort((a, b) => {
+      const orderA = overrides[a.driveFileId]?.order
+      const orderB = overrides[b.driveFileId]?.order
+      if (orderA === undefined && orderB === undefined) return 0
+      if (orderA === undefined) return 1
+      if (orderB === undefined) return -1
+      return orderA - orderB
+    })
+  }, [tracks, overrides])
+
   const progress = Array.from(progressMap.values()).sort((a, b) => a.index - b.index)
 
   return {
-    tracks,
+    tracks: effectiveTracks,
     missingFiles,
     loading,
     progress,
@@ -347,5 +453,8 @@ export function useTripImport(
     dismissFailures,
     toggleVisibility,
     removeFile,
+    renameTrack,
+    recolorTrack,
+    reorderTracks,
   }
 }

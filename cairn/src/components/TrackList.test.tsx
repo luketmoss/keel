@@ -8,6 +8,7 @@ function importedFile(overrides: Partial<ImportedFile> = {}): ImportedFile {
   return {
     id: 'f1',
     name: 'trip.kml',
+    driveFileId: 'drive-f1',
     colorIndex: 0,
     visible: true,
     tracks,
@@ -216,5 +217,156 @@ describe('TrackList', () => {
 
     const row = screen.getByText('trip.kml', { exact: false }).closest('li')!
     expect(() => fireEvent.mouseEnter(row)).not.toThrow()
+  })
+
+  it('does not render a drag handle, editable name, or colour button when their handlers are omitted (#46)', () => {
+    render(<TrackList files={[importedFile()]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />)
+
+    expect(screen.queryByLabelText('Reorder trip.kml')).toBeNull()
+    expect(screen.queryByLabelText('Change colour for trip.kml')).toBeNull()
+    expect(screen.getByText('trip.kml', { exact: false })).not.toHaveProperty(
+      'onclick',
+      expect.anything(),
+    )
+  })
+
+  it('renames a track via click-to-edit and calls onRename with the trimmed value (#46)', () => {
+    const onRename = vi.fn().mockReturnValue(true)
+    render(
+      <TrackList
+        files={[importedFile()]}
+        onToggleVisibility={vi.fn()}
+        onRemove={vi.fn()}
+        onRename={onRename}
+      />,
+    )
+
+    fireEvent.click(screen.getByText('trip.kml', { exact: false }))
+    const input = screen.getByDisplayValue('trip.kml')
+    fireEvent.change(input, { target: { value: '  Ridge day  ' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(onRename).toHaveBeenCalledWith('f1', 'Ridge day')
+  })
+
+  it('reverts to read mode without saving on an empty rename commit (#46)', () => {
+    const onRename = vi.fn()
+    render(
+      <TrackList
+        files={[importedFile()]}
+        onToggleVisibility={vi.fn()}
+        onRemove={vi.fn()}
+        onRename={onRename}
+      />,
+    )
+
+    fireEvent.click(screen.getByText('trip.kml', { exact: false }))
+    const input = screen.getByDisplayValue('trip.kml')
+    fireEvent.change(input, { target: { value: '   ' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(onRename).not.toHaveBeenCalled()
+    expect(screen.getByText('trip.kml', { exact: false })).toBeDefined()
+  })
+
+  it('discards an in-progress rename on Escape (#46)', () => {
+    const onRename = vi.fn()
+    render(
+      <TrackList
+        files={[importedFile()]}
+        onToggleVisibility={vi.fn()}
+        onRemove={vi.fn()}
+        onRename={onRename}
+      />,
+    )
+
+    fireEvent.click(screen.getByText('trip.kml', { exact: false }))
+    const input = screen.getByDisplayValue('trip.kml')
+    fireEvent.change(input, { target: { value: 'Something else' } })
+    fireEvent.keyDown(input, { key: 'Escape' })
+
+    expect(onRename).not.toHaveBeenCalled()
+    expect(screen.getByText('trip.kml', { exact: false })).toBeDefined()
+  })
+
+  it('shows a save-failure message beneath the list when a rename fails, without changing the name (#46)', () => {
+    const onRename = vi.fn().mockReturnValue(false)
+    render(
+      <TrackList
+        files={[importedFile()]}
+        onToggleVisibility={vi.fn()}
+        onRemove={vi.fn()}
+        onRename={onRename}
+      />,
+    )
+
+    fireEvent.click(screen.getByText('trip.kml', { exact: false }))
+    fireEvent.change(screen.getByDisplayValue('trip.kml'), { target: { value: 'New name' } })
+    fireEvent.keyDown(screen.getByDisplayValue('New name'), { key: 'Enter' })
+
+    expect(screen.getByText("Couldn't save name — reverted.")).toBeDefined()
+    expect(screen.getByText('trip.kml', { exact: false })).toBeDefined()
+  })
+
+  it('opens a colour popover from the swatch button and calls onRecolor with the chosen index (#46)', () => {
+    const onRecolor = vi.fn().mockReturnValue(true)
+    render(
+      <TrackList
+        files={[importedFile()]}
+        onToggleVisibility={vi.fn()}
+        onRemove={vi.fn()}
+        onRecolor={onRecolor}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Change colour for trip.kml' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cyan' }))
+
+    expect(onRecolor).toHaveBeenCalledWith('f1', 1)
+    expect(screen.queryByRole('button', { name: 'Cyan' })).toBeNull()
+  })
+
+  it('reorders tracks by dragging one row onto another and calls onReorder with the new id order (#46)', () => {
+    const onReorder = vi.fn().mockReturnValue(true)
+    render(
+      <TrackList
+        files={[importedFile({ id: 'a', name: 'a.kml' }), importedFile({ id: 'b', name: 'b.kml' })]}
+        onToggleVisibility={vi.fn()}
+        onRemove={vi.fn()}
+        onReorder={onReorder}
+      />,
+    )
+
+    const handleA = screen.getByLabelText('Reorder a.kml')
+    const rowB = screen.getByText('b.kml', { exact: false }).closest('li')!
+    Object.defineProperty(rowB, 'getBoundingClientRect', {
+      value: () => ({ top: 0, height: 40 }),
+      configurable: true,
+    })
+
+    fireEvent.dragStart(handleA)
+    // Below the row's vertical midpoint — a drop here lands "a" after "b".
+    fireEvent.dragOver(rowB, { clientY: 40 })
+    fireEvent.drop(rowB)
+
+    expect(onReorder).toHaveBeenCalledWith(['b', 'a'])
+  })
+
+  it('does not attach a drag handler when canReorder is false (#46)', () => {
+    const onReorder = vi.fn()
+    render(
+      <TrackList
+        files={[importedFile()]}
+        onToggleVisibility={vi.fn()}
+        onRemove={vi.fn()}
+        onReorder={onReorder}
+        canReorder={false}
+      />,
+    )
+
+    const handle = screen.getByLabelText('Reorder trip.kml')
+    expect(handle.className).toContain('track-row__handle--disabled')
+    fireEvent.dragStart(handle)
+    expect(onReorder).not.toHaveBeenCalled()
   })
 })

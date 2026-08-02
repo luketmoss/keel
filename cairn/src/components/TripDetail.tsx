@@ -133,6 +133,10 @@ export function TripDetail({ tripStore, accessToken, cairnFolderId, accountRow, 
             onToggleVisibility={tripImport.toggleVisibility}
             onRemove={tripImport.removeFile}
             onHoverFile={setHoveredFileId}
+            onRename={tripImport.renameTrack}
+            onRecolor={tripImport.recolorTrack}
+            onReorder={tripImport.reorderTracks}
+            canReorder={!tripImport.loading}
           />
         ) : (
           <>
@@ -142,6 +146,10 @@ export function TripDetail({ tripStore, accessToken, cairnFolderId, accountRow, 
                 onToggleVisibility={tripImport.toggleVisibility}
                 onRemove={tripImport.removeFile}
                 onHoverFile={setHoveredFileId}
+                onRename={tripImport.renameTrack}
+                onRecolor={tripImport.recolorTrack}
+                onReorder={tripImport.reorderTracks}
+                canReorder={!tripImport.loading}
               />
             )}
             {tripImport.missingFiles.length > 0 && (

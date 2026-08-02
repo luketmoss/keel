@@ -106,3 +106,163 @@
 .track-row__remove:hover {
   color: var(--danger);
 }
+
+/* #46 — drag handle. 40px hit target absorbed into the row's own vertical
+   padding via negative margin, same technique as the eye/remove pair above,
+   so the row doesn't grow. */
+.track-row__handle {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  margin: calc(var(--space-2) * -1) calc(var(--space-2) * -1) calc(var(--space-2) * -1) 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: grab;
+  font-size: var(--text-base);
+}
+
+.track-row__handle:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.track-row__handle:active {
+  background: var(--pressed);
+}
+
+.track-row__handle--disabled {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+
+.track-row--dragging {
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lifted);
+}
+
+.track-row--drop-before {
+  box-shadow: inset 0 2px 0 0 var(--accent);
+}
+
+.track-row--drop-after {
+  box-shadow: inset 0 -2px 0 0 var(--accent);
+}
+
+/* #46 — recolour swatch, now a button with its own 40px hit target around
+   the same 10px visible swatch, same non-growing technique. */
+.track-row__swatch-wrap {
+  position: relative;
+  flex: none;
+}
+
+.track-row__swatch-button {
+  width: 40px;
+  height: 40px;
+  margin: calc(var(--space-2) * -1) calc(var(--space-2) * -1) calc(var(--space-2) * -1) 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.track-row__swatch-button:hover {
+  background: var(--hover);
+}
+
+.track-row__swatch-button:active {
+  background: var(--pressed);
+}
+
+.track-row__field--saved {
+  box-shadow: inset 0 -2px 0 0 var(--accent);
+  transition: box-shadow var(--motion-base) var(--ease);
+}
+
+.track-row__name--editable {
+  cursor: text;
+}
+
+.track-row__name-input {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-base);
+  color: var(--text);
+  background: none;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1);
+}
+
+/* #46 — colour popover. L2 elevation: floats over the list, touches no
+   edge, same shared blur/shadow tokens as the world map's filter row. */
+.track-row__color-popover {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 2;
+  margin-top: var(--space-1);
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur));
+  box-shadow: var(--shadow-lifted);
+}
+
+.track-row__color-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+}
+
+/* 40px hit target wrapping a 20px visible swatch — the swatch itself never
+   grows, same non-growing principle as the row's own icon buttons, just
+   applied via an inner element instead of padding, since the swatch's own
+   background carries the palette colour and can't also carry a hover
+   fill on the same box. */
+.track-row__color-option {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.track-row__color-option:hover {
+  background: var(--hover);
+}
+
+.track-row__color-option:active {
+  background: var(--pressed);
+}
+
+.track-row__color-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+}
+
+.track-row__color-swatch--selected {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.track-list__error {
+  margin: var(--space-2) var(--space-4) 0;
+  font-size: var(--text-xs);
+  color: var(--danger);
+}

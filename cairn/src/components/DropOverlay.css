@@ -6,7 +6,12 @@
   align-items: center;
   justify-content: center;
   background: var(--surface);
+  /* Deliberately lighter than the shared --blur — this sits over the full
+     viewport during an active drag, and a strong blur there would obscure
+     the very thing being dropped onto. Still L2: it floats, so it still
+     gets the shadow. */
   backdrop-filter: blur(2px);
+  box-shadow: var(--shadow-lifted);
   border: 2px dashed var(--accent);
   border-radius: var(--radius-md);
   pointer-events: none;

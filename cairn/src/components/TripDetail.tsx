@@ -35,6 +35,7 @@ export function TripDetail({ tripStore, accessToken, cairnFolderId, accountRow, 
   const tripImport = useTripImport(tripId, accessToken, cairnFolderId)
   const [dragActive, setDragActive] = useState(false)
   const dragDepth = useRef(0)
+  const [hoveredFileId, setHoveredFileId] = useState<string | null>(null)
 
   // Keeps the trip's precomputed overview (#36, read by `/world`, #37) in
   // step with its actual tracks — regenerated whenever the settled set
@@ -131,6 +132,7 @@ export function TripDetail({ tripStore, accessToken, cairnFolderId, accountRow, 
             files={tripImport.tracks}
             onToggleVisibility={tripImport.toggleVisibility}
             onRemove={tripImport.removeFile}
+            onHoverFile={setHoveredFileId}
           />
         ) : (
           <>
@@ -139,6 +141,7 @@ export function TripDetail({ tripStore, accessToken, cairnFolderId, accountRow, 
                 files={tripImport.tracks}
                 onToggleVisibility={tripImport.toggleVisibility}
                 onRemove={tripImport.removeFile}
+                onHoverFile={setHoveredFileId}
               />
             )}
             {tripImport.missingFiles.length > 0 && (
@@ -154,7 +157,7 @@ export function TripDetail({ tripStore, accessToken, cairnFolderId, accountRow, 
         )}
       </Sidebar>
       <div className="app__map">
-        <MapView files={tripImport.tracks} />
+        <MapView files={tripImport.tracks} hoveredFileId={hoveredFileId} />
       </div>
       {dragActive && <DropOverlay />}
     </div>

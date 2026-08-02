@@ -17,7 +17,8 @@
   padding: var(--space-1);
   border-radius: var(--radius-md);
   background: var(--surface);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(var(--blur));
+  box-shadow: var(--shadow-lifted);
 }
 
 .world-map__filter-segment {

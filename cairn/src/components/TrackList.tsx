@@ -7,9 +7,13 @@ interface TrackListProps {
   files: ImportedFile[]
   onToggleVisibility: (id: string) => void
   onRemove: (id: string) => void
+  /** Reports which file's row the pointer is over (#49) — drives the
+      map's hover glow. Omitted entirely on `TripDetail`'s reuse of this
+      component, which has no glow-capable map beside it. */
+  onHoverFile?: (id: string | null) => void
 }
 
-export function TrackList({ files, onToggleVisibility, onRemove }: TrackListProps) {
+export function TrackList({ files, onToggleVisibility, onRemove, onHoverFile }: TrackListProps) {
   if (files.length === 0) {
     return (
       <div className="track-list track-list--empty">
@@ -29,6 +33,7 @@ export function TrackList({ files, onToggleVisibility, onRemove }: TrackListProp
           file={file}
           onToggleVisibility={onToggleVisibility}
           onRemove={onRemove}
+          onHoverFile={onHoverFile}
         />
       ))}
     </ul>
@@ -39,10 +44,12 @@ function TrackRow({
   file,
   onToggleVisibility,
   onRemove,
+  onHoverFile,
 }: {
   file: ImportedFile
   onToggleVisibility: (id: string) => void
   onRemove: (id: string) => void
+  onHoverFile?: (id: string | null) => void
 }) {
   const color = trackColor(file.colorIndex)
   /* Aggregating statistics across a multi-track file is out of scope (v2,
@@ -51,7 +58,11 @@ function TrackRow({
   const statsLine = file.tracks.length === 1 ? formatStatsLine(file.trackStats[0]) : null
 
   return (
-    <li className={`track-row${file.visible ? '' : ' track-row--hidden'}`}>
+    <li
+      className={`track-row${file.visible ? '' : ' track-row--hidden'}`}
+      onMouseEnter={() => onHoverFile?.(file.id)}
+      onMouseLeave={() => onHoverFile?.(null)}
+    >
       <div className="track-row__main">
         <span className="track-row__swatch" style={{ backgroundColor: color }} />
         <span className="track-row__name" title={file.name}>

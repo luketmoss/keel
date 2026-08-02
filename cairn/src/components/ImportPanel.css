@@ -1,0 +1,68 @@
+.import-panel {
+  padding: 16px;
+}
+
+.import-panel__button {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--surface-solid);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.import-panel__button:disabled {
+  background: var(--border);
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.import-panel__input {
+  display: none;
+}
+
+.import-panel__progress {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.import-panel__failures {
+  margin-top: 12px;
+}
+
+.import-panel__failure {
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: var(--danger);
+}
+
+.import-panel__dismiss {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.import-panel__files {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.import-panel__file {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.import-panel__file-count {
+  color: var(--text-muted);
+}

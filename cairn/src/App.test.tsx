@@ -180,17 +180,58 @@ describe('App routing', () => {
     expect(screen.getByRole('button', { name: 'Import tracks' })).toBeDefined()
   })
 
-  it('shows the trip detail shell at /trips/:id, with no matching trip yet', async () => {
+  it('shows a not-found state at /trips/:id when no trip matches the id', async () => {
     await renderApp('/trips/abc')
     expect(screen.getByRole('link', { name: 'Back to trips' })).toBeDefined()
-    expect(screen.getByRole('button', { name: 'Import tracks' })).toBeDefined()
-    expect(screen.getByText('No tracks yet')).toBeDefined()
+    expect(screen.getByText('Trip not found')).toBeDefined()
+    expect(screen.queryByRole('button', { name: 'Import tracks' })).toBeNull()
   })
 
   it('redirects an unrecognized path to /', async () => {
     await renderApp('/nonsense')
     expect(screen.getByTestId('map')).toBeDefined()
     expect(window.location.pathname).toBe('/')
+  })
+
+  it('renders and edits trip metadata for an existing trip at /trips/:id', async () => {
+    const tripId = 'trip-existing-1'
+    window.localStorage.setItem(
+      'cairn.trips.index',
+      JSON.stringify([
+        { id: tripId, name: 'Hokkaido', status: 'planned', startDate: null, endDate: null, createdAt: '2026-01-01T00:00:00.000Z' },
+      ]),
+    )
+    window.localStorage.setItem(
+      `cairn.trips.trip.${tripId}`,
+      JSON.stringify({
+        id: tripId,
+        name: 'Hokkaido',
+        status: 'planned',
+        startDate: null,
+        endDate: null,
+        notes: '',
+        createdAt: '2026-01-01T00:00:00.000Z',
+      }),
+    )
+
+    try {
+      await renderApp(`/trips/${tripId}`)
+
+      expect(screen.getByText('Hokkaido')).toBeDefined()
+      expect(screen.getByText('planned')).toBeDefined()
+      expect(screen.queryByText('Trip not found')).toBeNull()
+
+      fireEvent.click(screen.getByText('planned'))
+      fireEvent.change(screen.getByRole('combobox'), { target: { value: 'completed' } })
+
+      expect(await screen.findByText('completed')).toBeDefined()
+      expect(JSON.parse(window.localStorage.getItem(`cairn.trips.trip.${tripId}`) ?? '{}').status).toBe(
+        'completed',
+      )
+    } finally {
+      window.localStorage.removeItem('cairn.trips.index')
+      window.localStorage.removeItem(`cairn.trips.trip.${tripId}`)
+    }
   })
 
   it('marks "Map" active only at / and "Trips" active at /trips', async () => {

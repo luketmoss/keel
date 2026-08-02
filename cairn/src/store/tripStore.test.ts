@@ -127,4 +127,69 @@ describe('LocalTripStore', () => {
 
     expect(store.getTrips()).toEqual([])
   })
+
+  it('returns null for a trip that does not exist', () => {
+    const store = new LocalTripStore(fakeStorage())
+
+    expect(store.getTrip('no-such-id')).toBeNull()
+  })
+
+  it('reads back the full record, including notes the index omits', () => {
+    const store = new LocalTripStore(fakeStorage())
+    const trip = store.createTrip('Hokkaido')
+
+    expect(store.getTrip(trip.id)).toMatchObject({
+      id: trip.id,
+      name: 'Hokkaido',
+      status: 'planned',
+      notes: '',
+    })
+  })
+
+  it('applies a partial edit, notifies subscribers, and reflects it in both the record and the index', () => {
+    const store = new LocalTripStore(fakeStorage())
+    const trip = store.createTrip('Hokkaido')
+    const listener = vi.fn()
+    store.subscribe(listener)
+
+    const updated = store.updateTrip(trip.id, { status: 'completed', notes: 'Great trip' })
+
+    expect(updated).toMatchObject({ status: 'completed', notes: 'Great trip', name: 'Hokkaido' })
+    expect(store.getTrip(trip.id)).toMatchObject({ status: 'completed', notes: 'Great trip' })
+    expect(store.getTrips()[0]).toMatchObject({ status: 'completed' })
+    expect(listener).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns null from updateTrip for a trip that does not exist', () => {
+    const store = new LocalTripStore(fakeStorage())
+
+    expect(store.updateTrip('no-such-id', { notes: 'x' })).toBeNull()
+  })
+
+  it('discards an edit that would save an empty name, leaving the prior name in place', () => {
+    const store = new LocalTripStore(fakeStorage())
+    const trip = store.createTrip('Hokkaido')
+
+    const updated = store.updateTrip(trip.id, { name: '   ' })
+
+    expect(updated?.name).toBe('Hokkaido')
+  })
+
+  it('persists an update across a reload of a new store over the same storage', () => {
+    const storage = fakeStorage()
+    const first = new LocalTripStore(storage)
+    const trip = first.createTrip('Hokkaido')
+    first.updateTrip(trip.id, { notes: 'Great trip' })
+
+    const second = new LocalTripStore(storage)
+
+    expect(second.getTrip(trip.id)?.notes).toBe('Great trip')
+  })
+
+  it('returns the same record reference across calls until the next mutation', () => {
+    const store = new LocalTripStore(fakeStorage())
+    const trip = store.createTrip('Hokkaido')
+
+    expect(store.getTrip(trip.id)).toBe(store.getTrip(trip.id))
+  })
 })

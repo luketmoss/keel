@@ -1,0 +1,15 @@
+.missing-file-row__swatch {
+  opacity: 0.4;
+  background: var(--text-muted);
+}
+
+.missing-file-row__warning {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--danger);
+  font-size: 14px;
+}

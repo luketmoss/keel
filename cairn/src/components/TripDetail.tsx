@@ -1,17 +1,20 @@
-import { useRef, useState, type DragEvent, type ReactNode } from 'react'
+import { useRef, useState, useSyncExternalStore, type DragEvent, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { MapView } from './MapView'
 import { TrackList } from './TrackList'
 import { TripImportPanel } from './TripImportPanel'
+import { TripMetadataHeader } from './TripMetadataHeader'
+import { TripNotFound } from './TripNotFound'
+import { MissingFileRow } from './MissingFileRow'
 import { DropOverlay } from './DropOverlay'
 import { dataTransferHasFiles, filesFromDataTransfer } from '../import/dataTransfer'
 import { useTripImport } from '../import/useTripImport'
-import type { TripIndexEntry } from '../store/tripStore'
+import type { TripStore } from '../store/tripStore'
 import './TripDetail.css'
 
 interface TripDetailProps {
-  trips: TripIndexEntry[]
+  tripStore: TripStore
   accessToken: string | null
   cairnFolderId: string | null
   accountRow: ReactNode
@@ -25,10 +28,11 @@ interface TripDetailProps {
     `MapView` unmodified. Mounted instead of the v1 shell (never alongside
     it — see `App.tsx`), so its drag-and-drop never has to fight the
     window-wide v1 handlers for the same drop. */
-export function TripDetail({ trips, accessToken, cairnFolderId, accountRow, onReconnect }: TripDetailProps) {
+export function TripDetail({ tripStore, accessToken, cairnFolderId, accountRow, onReconnect }: TripDetailProps) {
   const { id } = useParams()
-  const trip = trips.find((entry) => entry.id === id)
-  const tripImport = useTripImport(id ?? '', accessToken, cairnFolderId)
+  const tripId = id ?? ''
+  const trip = useSyncExternalStore(tripStore.subscribe, () => tripStore.getTrip(tripId))
+  const tripImport = useTripImport(tripId, accessToken, cairnFolderId)
   const [dragActive, setDragActive] = useState(false)
   const dragDepth = useRef(0)
 
@@ -59,16 +63,32 @@ export function TripDetail({ trips, accessToken, cairnFolderId, accountRow, onRe
     if (dropped.length > 0) void tripImport.importFiles(dropped)
   }
 
-  const header = (
-    <div className="trip-detail-header">
-      <Link to="/trips" className="trip-detail-header__back" aria-label="Back to trips">
-        ←
-      </Link>
-      <h1 className="trip-detail-header__name" title={trip?.name ?? ''}>
-        {trip?.name ?? 'Trip'}
-      </h1>
-    </div>
+  // A broken detail view should never trap the user — the back link works
+  // regardless of load state, including when the trip doesn't exist at all.
+  const backLink = (
+    <Link to="/trips" className="trip-detail-header__back" aria-label="Back to trips">
+      ←
+    </Link>
   )
+
+  if (!trip) {
+    return (
+      <div className="app">
+        <Sidebar header={<div className="trip-detail-header">{backLink}</div>} accountRow={accountRow}>
+          <div />
+        </Sidebar>
+        <div className="app__map">
+          <TripNotFound />
+        </div>
+      </div>
+    )
+  }
+
+  const header = <div className="trip-detail-header">{backLink}</div>
+
+  // Fetching — nothing has arrived yet. File list shows nothing beyond the
+  // placeholder text; the map shows its own loading treatment via MapView.
+  const fetching = tripImport.loading && tripImport.tracks.length === 0 && tripImport.missingFiles.length === 0
 
   return (
     <div
@@ -79,6 +99,7 @@ export function TripDetail({ trips, accessToken, cairnFolderId, accountRow, onRe
       onDrop={handleDrop}
     >
       <Sidebar header={header} accountRow={accountRow}>
+        <TripMetadataHeader trip={trip} onUpdate={(patch) => tripStore.updateTrip(trip.id, patch)} />
         <TripImportPanel
           signedIn={accessToken !== null && cairnFolderId !== null}
           progress={tripImport.progress}
@@ -88,14 +109,35 @@ export function TripDetail({ trips, accessToken, cairnFolderId, accountRow, onRe
           dismissFailures={tripImport.dismissFailures}
           onReconnect={onReconnect}
         />
-        {tripImport.loading ? (
+        {fetching ? (
           <p className="trip-detail__loading">Loading tracks…</p>
-        ) : (
+        ) : tripImport.tracks.length === 0 && tripImport.missingFiles.length === 0 ? (
+          // Empty trip — the existing #6 empty state, unmodified: it
+          // already describes the way to get files into a trip today.
           <TrackList
             files={tripImport.tracks}
             onToggleVisibility={tripImport.toggleVisibility}
             onRemove={tripImport.removeFile}
           />
+        ) : (
+          <>
+            {tripImport.tracks.length > 0 && (
+              <TrackList
+                files={tripImport.tracks}
+                onToggleVisibility={tripImport.toggleVisibility}
+                onRemove={tripImport.removeFile}
+              />
+            )}
+            {tripImport.missingFiles.length > 0 && (
+              // Every file missing renders no extra banner — the rows
+              // already say it (#35 edge case).
+              <ul className="track-list track-list--missing">
+                {tripImport.missingFiles.map((file) => (
+                  <MissingFileRow key={file.id} file={file} />
+                ))}
+              </ul>
+            )}
+          </>
         )}
       </Sidebar>
       <div className="app__map">

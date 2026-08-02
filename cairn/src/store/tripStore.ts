@@ -14,6 +14,16 @@ export interface TripRecord {
   createdAt: string
 }
 
+/** The fields #35's metadata header can edit. `id` and `createdAt` are
+    immutable once a trip exists. */
+export interface TripUpdate {
+  name?: string
+  status?: TripStatus
+  startDate?: string | null
+  endDate?: string | null
+  notes?: string
+}
+
 /** What the list reads. A cache, not the truth — see the store's
     "corrupted index" handling below — so it carries only what a row
     renders, not the full record. */
@@ -32,7 +42,17 @@ export interface TripIndexEntry {
    and nothing else. Mirrors `TrackStore` (#31) in shape and intent. */
 export interface TripStore {
   getTrips(): TripIndexEntry[]
+  /** The full record for one trip — what #35's detail view reads, including
+      `notes`, which the index deliberately omits. `null` for an id that
+      doesn't exist (deleted, or never created). */
+  getTrip(id: string): TripRecord | null
   createTrip(name: string): TripIndexEntry
+  /** Applies a partial edit and returns the resulting record, or `null` if
+      `id` no longer names a trip (deleted out from under an open detail
+      view). Same object reference is returned by `getTrip` until the next
+      mutation, so `useSyncExternalStore` doesn't see a change that isn't
+      there. */
+  updateTrip(id: string, patch: TripUpdate): TripRecord | null
   deleteTrip(id: string): void
   /** Notified after any mutation. Returns an unsubscribe function — the
       shape `useSyncExternalStore` expects directly. */
@@ -52,6 +72,11 @@ function generateId(): string {
    concern is a Drive-specific concurrency problem, out of scope here. */
 export class LocalTripStore implements TripStore {
   private index: TripIndexEntry[]
+  /** Cache of full records already read from storage, keyed by id — so
+      `getTrip` returns the same reference across renders until a mutation
+      actually changes it, rather than a freshly-parsed object every call
+      (which would make `useSyncExternalStore` re-render forever). */
+  private readonly records = new Map<string, TripRecord>()
   private readonly listeners = new Set<() => void>()
 
   constructor(private readonly storage: Storage = window.localStorage) {
@@ -60,6 +85,22 @@ export class LocalTripStore implements TripStore {
 
   getTrips = (): TripIndexEntry[] => {
     return this.index
+  }
+
+  getTrip = (id: string): TripRecord | null => {
+    const cached = this.records.get(id)
+    if (cached) return cached
+
+    const raw = this.storage.getItem(recordKey(id))
+    if (!raw) return null
+    try {
+      const parsed = JSON.parse(raw)
+      if (!isTripRecord(parsed)) return null
+      this.records.set(id, parsed)
+      return parsed
+    } catch {
+      return null
+    }
   }
 
   createTrip = (name: string): TripIndexEntry => {
@@ -81,6 +122,7 @@ export class LocalTripStore implements TripStore {
       endDate: record.endDate,
       createdAt: record.createdAt,
     }
+    this.records.set(record.id, record)
     this.writeRecord(record)
     // Newest-created trip at the top — a trips list is revisited over
     // weeks, unlike the track list's import-order stance (#6).
@@ -90,10 +132,41 @@ export class LocalTripStore implements TripStore {
     return entry
   }
 
+  updateTrip = (id: string, patch: TripUpdate): TripRecord | null => {
+    const current = this.getTrip(id)
+    if (!current) return null
+
+    // An empty name is an aborted edit, not a saved one — matches the
+    // design doc's "commit nothing" rule rather than writing a blank name.
+    const next: TripRecord = {
+      ...current,
+      ...patch,
+      name: patch.name !== undefined ? patch.name.trim() || current.name : current.name,
+    }
+
+    this.records.set(id, next)
+    this.writeRecord(next)
+    this.index = this.index.map((entry) =>
+      entry.id === id
+        ? {
+            ...entry,
+            name: next.name,
+            status: next.status,
+            startDate: next.startDate,
+            endDate: next.endDate,
+          }
+        : entry,
+    )
+    this.writeIndex()
+    this.notify()
+    return next
+  }
+
   deleteTrip = (id: string): void => {
     this.index = this.index.filter((entry) => entry.id !== id)
     this.writeIndex()
     this.storage.removeItem(recordKey(id))
+    this.records.delete(id)
     this.notify()
   }
 
@@ -140,5 +213,21 @@ function isTripIndexEntry(value: unknown): value is TripIndexEntry {
     typeof entry.id === 'string' &&
     typeof entry.name === 'string' &&
     (entry.status === 'planned' || entry.status === 'completed')
+  )
+}
+
+// A record written by an older shape, or corrupted by hand, is treated as
+// missing rather than thrown — same stance as the index above.
+function isTripRecord(value: unknown): value is TripRecord {
+  if (typeof value !== 'object' || value === null) return false
+  const record = value as Record<string, unknown>
+  return (
+    typeof record.id === 'string' &&
+    typeof record.name === 'string' &&
+    (record.status === 'planned' || record.status === 'completed') &&
+    (record.startDate === null || typeof record.startDate === 'string') &&
+    (record.endDate === null || typeof record.endDate === 'string') &&
+    typeof record.notes === 'string' &&
+    typeof record.createdAt === 'string'
   )
 }

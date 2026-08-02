@@ -63,8 +63,19 @@ export interface TripImportFailure {
   reconnect?: boolean
 }
 
+/** A file the trip's index names but Drive can no longer produce — deleted
+    behind the app's back, or unreadable for any other reason. Rendered as
+    an error row (#35) rather than silently dropped. */
+export interface MissingTripFile {
+  id: string
+  name: string
+}
+
 export interface UseTripImport {
   tracks: ImportedFile[]
+  /** Files the trip's index named that could not be read back — see
+      `MissingTripFile`. */
+  missingFiles: MissingTripFile[]
   loading: boolean
   progress: TripImportProgress[]
   failures: TripImportFailure[]
@@ -84,6 +95,7 @@ export function useTripImport(
   cairnFolderId: string | null,
 ): UseTripImport {
   const [tracks, setTracks] = useState<ImportedFile[]>([])
+  const [missingFiles, setMissingFiles] = useState<MissingTripFile[]>([])
   const [loading, setLoading] = useState(true)
   const [progressMap, setProgressMap] = useState<Map<string, TripImportProgress>>(new Map())
   const [failures, setFailures] = useState<TripImportFailure[]>([])
@@ -112,34 +124,48 @@ export function useTripImport(
     let cancelled = false
 
     async function load() {
+      if (!cancelled) {
+        setTracks([])
+        setMissingFiles([])
+      }
+
       try {
         const folderId = await findOrCreateTripFolder(token, cairnId, tripId)
         const driveFiles = await listTrackFiles(token, folderId)
-        const loaded: ImportedFile[] = []
 
+        // Sequential, not batched: each file lands in `tracks` (or
+        // `missingFiles`) as soon as its own read settles, rather than
+        // waiting for the whole trip — see #35's "partially loaded" state.
         for (const driveFile of driveFiles) {
+          if (cancelled) return
           try {
             const file = await downloadTrackFile(token, driveFile.id, driveFile.name)
             const result = await parseKmlOrKmz(file)
             if (!result.ok || result.tracks.length === 0) continue
-            loaded.push({
-              id: generateId('file'),
-              name: driveFile.name,
-              tracks: result.tracks,
-              trackStats: result.tracks.map(computeTrackStats),
-              colorIndex: generateColorIndex(),
-              visible: true,
-            })
+            if (cancelled) return
+            setTracks((prev) => [
+              ...prev,
+              {
+                id: generateId('file'),
+                name: driveFile.name,
+                tracks: result.tracks,
+                trackStats: result.tracks.map(computeTrackStats),
+                colorIndex: generateColorIndex(),
+                visible: true,
+              },
+            ])
           } catch {
-            // One unreadable file among many falls back to skipping just
-            // that one rather than failing the whole read.
+            // The trip's index names this file but Drive couldn't produce
+            // it — deleted behind the app's back, or any other read
+            // failure. Rendered as an error row rather than skipped, and
+            // does not block the files after it.
+            if (cancelled) return
+            setMissingFiles((prev) => [...prev, { id: generateId('missing'), name: driveFile.name }])
           }
         }
-
-        if (!cancelled) setTracks(loaded)
       } catch {
-        // Whole read failed (folder lookup, list, or a token that expired
-        // mid-read) — leave whatever was already rendered in place.
+        // Whole read failed (folder lookup or list) — leave whatever was
+        // already rendered in place.
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -312,6 +338,7 @@ export function useTripImport(
 
   return {
     tracks,
+    missingFiles,
     loading,
     progress,
     failures,

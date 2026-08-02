@@ -54,7 +54,7 @@ function AppShell() {
         path="/trips/:id"
         element={
           <TripDetail
-            trips={trips}
+            tripStore={tripStore}
             accessToken={accessToken}
             cairnFolderId={cairnFolderId}
             accountRow={<AccountRow account={account} />}

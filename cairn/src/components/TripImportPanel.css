@@ -1,0 +1,70 @@
+.trip-import-panel {
+  padding: 16px;
+}
+
+.trip-import-panel__button {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--surface-solid);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.trip-import-panel__button:disabled {
+  background: var(--border);
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.trip-import-panel__input {
+  display: none;
+}
+
+.trip-import-panel__signed-out {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.trip-import-panel__progress {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.trip-import-panel__failures {
+  margin-top: 12px;
+}
+
+.trip-import-panel__failure {
+  display: block;
+  width: 100%;
+  margin: 0 0 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  font: inherit;
+  font-size: 12px;
+  color: var(--danger);
+}
+
+.trip-import-panel__failure--retryable {
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.trip-import-panel__dismiss {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}

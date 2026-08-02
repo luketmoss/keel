@@ -180,10 +180,11 @@ describe('App routing', () => {
     expect(screen.getByRole('button', { name: 'Import tracks' })).toBeDefined()
   })
 
-  it('shows the id in the placeholder at /trips/:id', async () => {
+  it('shows the trip detail shell at /trips/:id, with no matching trip yet', async () => {
     await renderApp('/trips/abc')
-    expect(screen.getByRole('heading', { name: 'Trip abc' })).toBeDefined()
-    expect(screen.getByText('Trip detail is coming soon.')).toBeDefined()
+    expect(screen.getByRole('link', { name: 'Back to trips' })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Import tracks' })).toBeDefined()
+    expect(screen.getByText('No tracks yet')).toBeDefined()
   })
 
   it('redirects an unrecognized path to /', async () => {
@@ -192,15 +193,21 @@ describe('App routing', () => {
     expect(window.location.pathname).toBe('/')
   })
 
-  it('marks "Map" active only at / and "Trips" active at /trips and /trips/:id', async () => {
+  it('marks "Map" active only at / and "Trips" active at /trips', async () => {
     const first = await renderApp('/')
     expect(screen.getByRole('link', { name: 'Map' }).className).toContain('--active')
     expect(screen.getByRole('link', { name: 'Trips' }).className).not.toContain('--active')
     first.unmount()
 
-    await renderApp('/trips/abc')
+    const second = await renderApp('/trips')
     expect(screen.getByRole('link', { name: 'Map' }).className).not.toContain('--active')
     expect(screen.getByRole('link', { name: 'Trips' }).className).toContain('--active')
+    second.unmount()
+
+    // /trips/:id replaces the nav with a back arrow — see TripDetail.
+    await renderApp('/trips/abc')
+    expect(screen.queryByRole('link', { name: 'Map' })).toBeNull()
+    expect(screen.getByRole('link', { name: 'Back to trips' })).toBeDefined()
   })
 
   it('navigates via the sidebar links and supports back/forward', async () => {

@@ -244,12 +244,16 @@ describe('useTripImport — #46 track overrides', () => {
     )
     await waitFor(() => expect(result.current.loading).toBe(false))
 
+    const autoColorIndex = result.current.tracks[0].colorIndex
     let ok = false
     act(() => {
       ok = result.current.renameTrack(result.current.tracks[0].id, 'Ridge day')
     })
     expect(ok).toBe(true)
     expect(result.current.tracks[0].name).toBe('Ridge day')
+    // Renaming sets only the name override — colour still falls back to its
+    // auto-assigned default, per-field rather than per-file (design doc).
+    expect(result.current.tracks[0].colorIndex).toBe(autoColorIndex)
 
     // A fresh mount for the same trip (simulating a reload) reads the
     // override back rather than starting over from the raw Drive filename.
@@ -319,6 +323,25 @@ describe('useTripImport — #46 track overrides', () => {
     await waitFor(() => expect(result.current.loading).toBe(false))
 
     expect(result.current.tracks[0].name).toBe('untouched.kml')
+  })
+
+  it('ignores a stored override for a track no longer in the Drive listing, rather than erroring', async () => {
+    const store = new LocalTrackOverridesStore(fakeStorage())
+    // Pre-seed an override for a file id the trip's current listing will
+    // never mention — as if it were removed independently after the
+    // override was written.
+    store.setOverride('trip-1', 'drive-gone', { displayName: 'Ghost' }, ['drive-gone'])
+    listTrackFiles.mockResolvedValue([{ id: 'drive-1', name: 'day-1.kml' }])
+    downloadTrackFile.mockResolvedValue(file('day-1.kml'))
+    parseKmlOrKmz.mockResolvedValue(track('Day 1'))
+
+    const { result } = renderHook(() =>
+      useTripImport('trip-1', 'token', 'cairn-folder-id', store),
+    )
+
+    await expect(waitFor(() => expect(result.current.loading).toBe(false))).resolves.not.toThrow()
+    expect(result.current.tracks).toHaveLength(1)
+    expect(result.current.tracks[0].name).toBe('day-1.kml')
   })
 
   it('returns false and leaves state unchanged when the id has no matching track', async () => {

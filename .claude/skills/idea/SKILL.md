@@ -43,6 +43,11 @@ gh issue create --repo luketmoss/keel --title "..." --body "..."
 python .keel/board.py set <number> --status "To Do" --project <slug> --type <Code|Design|Docs|Chore>
 ```
 
+On Windows, if the title starts with `/` — an idea about a skill, e.g.
+`/ship asserts...` — Git Bash rewrites it to a filesystem path
+(`C:/Program Files/Git/ship asserts...`) before `gh` ever sees it. Prefix the
+command with `MSYS_NO_PATHCONV=1` whenever the title starts with `/`.
+
 Set Priority only if the user signalled urgency. Leave Size alone — sizing is a
 refinement judgment and guessing it here just puts a wrong number on the board.
 

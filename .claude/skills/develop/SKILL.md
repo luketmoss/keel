@@ -25,12 +25,16 @@ the design note under `docs/design/` if one exists.
 
 ```bash
 python .keel/board.py set <issue> --status "In Development"
-git checkout main && git pull
-git checkout -b <slug>/<issue>-<short-desc>
+git fetch origin
+git checkout -b <slug>/<issue>-<short-desc> origin/main
 ```
 
 Branch names follow `CONVENTIONS.md`. The slug prefix is not optional — every
 project shares one branch namespace.
+
+Branch from `origin/main`, not local `main`. Local `main` can be ahead of
+`origin/main` — unpushed work from an earlier session, say — and branching from
+it pulls those commits into this PR's history silently.
 
 ## Build it
 

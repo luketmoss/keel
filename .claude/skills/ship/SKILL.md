@@ -33,6 +33,10 @@ Refuse, and say why, if:
 
 Don't work around any of these. Report and stop.
 
+`mergeable` often comes back `UNKNOWN` immediately after checks finish — GitHub
+computes it asynchronously. That is not a conflict; wait a few seconds and
+re-query rather than refusing on it.
+
 ## Write the Results first
 
 Before merging, fill in `## Results` on the issue body — what actually happened,

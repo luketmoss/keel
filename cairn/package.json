@@ -11,12 +11,16 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@tmcw/togeojson": "^7.1.2",
+    "@types/geojson": "^7946.0.16",
     "@vis.gl/react-google-maps": "^1.9.0",
+    "jszip": "^3.10.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@testing-library/react": "^16.1.0",
+    "@types/node": "^26.1.2",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <Placemark>
+      <name>Day 1</name>
+      <LineString>
+        <coordinates>-122.0,37.0 -122.1,37.1 -122.2,37.2</coordinates>
+      </LineString>
+    </Placemark>
+    <Placemark>
+      <name>Day 2</name>
+      <LineString>
+        <coordinates>-121.0,36.0 -121.1,36.1 -121.2,36.2</coordinates>
+      </LineString>
+    </Placemark>
+  </Document>
+</kml>

@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useTrackImport } from './useTrackImport'
+import { InMemoryTrackStore } from '../store/trackStore'
 import type { ParseResult } from '../kml/parse'
 
 const { parseKmlOrKmz } = vi.hoisted(() => ({ parseKmlOrKmz: vi.fn() }))
@@ -29,25 +30,27 @@ function file(name: string): File {
 }
 
 describe('useTrackImport', () => {
-  it('imports a valid file and adds it to the file list', async () => {
+  it('imports a valid file and adds it to the store', async () => {
     parseKmlOrKmz.mockResolvedValueOnce(track('Ridge Trail'))
-    const { result } = renderHook(() => useTrackImport())
+    const store = new InMemoryTrackStore()
+    const { result } = renderHook(() => useTrackImport(store))
 
     await act(() => result.current.importFiles([file('a.kml')]))
 
-    expect(result.current.files).toHaveLength(1)
-    expect(result.current.files[0].name).toBe('a.kml')
-    expect(result.current.files[0].tracks[0].name).toBe('Ridge Trail')
+    expect(store.getFiles()).toHaveLength(1)
+    expect(store.getFiles()[0].name).toBe('a.kml')
+    expect(store.getFiles()[0].tracks[0].name).toBe('Ridge Trail')
     expect(result.current.failures).toHaveLength(0)
   })
 
   it('rejects a file with an unsupported extension, naming the accepted types', async () => {
-    const { result } = renderHook(() => useTrackImport())
+    const store = new InMemoryTrackStore()
+    const { result } = renderHook(() => useTrackImport(store))
 
     await act(() => result.current.importFiles([file('a.gpx')]))
 
     expect(parseKmlOrKmz).not.toHaveBeenCalled()
-    expect(result.current.files).toHaveLength(0)
+    expect(store.getFiles()).toHaveLength(0)
     expect(result.current.failures).toHaveLength(1)
     expect(result.current.failures[0].name).toBe('a.gpx')
     expect(result.current.failures[0].message).toContain('.kml')
@@ -58,14 +61,15 @@ describe('useTrackImport', () => {
     parseKmlOrKmz
       .mockResolvedValueOnce({ ok: false, error: 'File is not well-formed XML' })
       .mockResolvedValueOnce(track('Day 2'))
-    const { result } = renderHook(() => useTrackImport())
+    const store = new InMemoryTrackStore()
+    const { result } = renderHook(() => useTrackImport(store))
 
     await act(() => result.current.importFiles([file('broken.kml'), file('good.kml')]))
 
     expect(result.current.failures).toHaveLength(1)
     expect(result.current.failures[0].name).toBe('broken.kml')
-    expect(result.current.files).toHaveLength(1)
-    expect(result.current.files[0].name).toBe('good.kml')
+    expect(store.getFiles()).toHaveLength(1)
+    expect(store.getFiles()[0].name).toBe('good.kml')
   })
 
   it('imports every file when selecting several at once', async () => {
@@ -73,13 +77,14 @@ describe('useTrackImport', () => {
       .mockResolvedValueOnce(track('Day 1'))
       .mockResolvedValueOnce(track('Day 2'))
       .mockResolvedValueOnce(track('Day 3'))
-    const { result } = renderHook(() => useTrackImport())
+    const store = new InMemoryTrackStore()
+    const { result } = renderHook(() => useTrackImport(store))
 
     await act(() =>
       result.current.importFiles([file('a.kml'), file('b.kml'), file('c.kml')]),
     )
 
-    expect(result.current.files.map((f) => f.name)).toEqual(['a.kml', 'b.kml', 'c.kml'])
+    expect(store.getFiles().map((f) => f.name)).toEqual(['a.kml', 'b.kml', 'c.kml'])
   })
 
   it('assigns each file a distinct, monotonically increasing colour index', async () => {
@@ -87,28 +92,28 @@ describe('useTrackImport', () => {
       .mockResolvedValueOnce(track('Day 1'))
       .mockResolvedValueOnce({ ok: false, error: 'broken' })
       .mockResolvedValueOnce(track('Day 3'))
-    const { result } = renderHook(() => useTrackImport())
+    const store = new InMemoryTrackStore()
+    const { result } = renderHook(() => useTrackImport(store))
 
     await act(() =>
       result.current.importFiles([file('a.kml'), file('bad.kml'), file('c.kml')]),
     )
 
-    expect(result.current.files).toHaveLength(2)
-    expect(result.current.files[1].colorIndex).toBeGreaterThan(
-      result.current.files[0].colorIndex,
-    )
+    expect(store.getFiles()).toHaveLength(2)
+    expect(store.getFiles()[1].colorIndex).toBeGreaterThan(store.getFiles()[0].colorIndex)
   })
 
   it('imports a file whose name matches one already loaded, keeping both distinguishable', async () => {
     parseKmlOrKmz.mockResolvedValueOnce(track('First')).mockResolvedValueOnce(track('Second'))
-    const { result } = renderHook(() => useTrackImport())
+    const store = new InMemoryTrackStore()
+    const { result } = renderHook(() => useTrackImport(store))
 
     await act(() => result.current.importFiles([file('trip.kml')]))
     await act(() => result.current.importFiles([file('trip.kml')]))
 
-    expect(result.current.files).toHaveLength(2)
-    expect(result.current.files[0].id).not.toBe(result.current.files[1].id)
-    expect(result.current.files.map((f) => f.name)).toEqual(['trip.kml', 'trip.kml'])
+    expect(store.getFiles()).toHaveLength(2)
+    expect(store.getFiles()[0].id).not.toBe(store.getFiles()[1].id)
+    expect(store.getFiles().map((f) => f.name)).toEqual(['trip.kml', 'trip.kml'])
   })
 
   it('shows a busy state naming the current file and its position while a batch parses', async () => {
@@ -119,7 +124,8 @@ describe('useTrackImport', () => {
       }),
     )
     parseKmlOrKmz.mockResolvedValueOnce(track('Day 2'))
-    const { result } = renderHook(() => useTrackImport())
+    const store = new InMemoryTrackStore()
+    const { result } = renderHook(() => useTrackImport(store))
 
     let importDone: Promise<void>
     act(() => {
@@ -138,7 +144,8 @@ describe('useTrackImport', () => {
 
   it('clears failures at the start of a new import and dismissFailures clears them on demand', async () => {
     parseKmlOrKmz.mockResolvedValueOnce({ ok: false, error: 'nope' })
-    const { result } = renderHook(() => useTrackImport())
+    const store = new InMemoryTrackStore()
+    const { result } = renderHook(() => useTrackImport(store))
 
     await act(() => result.current.importFiles([file('bad.kml')]))
     expect(result.current.failures).toHaveLength(1)
@@ -153,42 +160,45 @@ describe('useTrackImport', () => {
 
   it('imports a file as visible and toggles its visibility without affecting others', async () => {
     parseKmlOrKmz.mockResolvedValueOnce(track('A')).mockResolvedValueOnce(track('B'))
-    const { result } = renderHook(() => useTrackImport())
+    const store = new InMemoryTrackStore()
+    const { result } = renderHook(() => useTrackImport(store))
     await act(() => result.current.importFiles([file('a.kml'), file('b.kml')]))
 
-    expect(result.current.files.every((f) => f.visible)).toBe(true)
-    const targetId = result.current.files[0].id
+    expect(store.getFiles().every((f) => f.visible)).toBe(true)
+    const targetId = store.getFiles()[0].id
 
     act(() => result.current.toggleVisibility(targetId))
-    expect(result.current.files.find((f) => f.id === targetId)?.visible).toBe(false)
-    expect(result.current.files.find((f) => f.id !== targetId)?.visible).toBe(true)
+    expect(store.getFiles().find((f) => f.id === targetId)?.visible).toBe(false)
+    expect(store.getFiles().find((f) => f.id !== targetId)?.visible).toBe(true)
 
     act(() => result.current.toggleVisibility(targetId))
-    expect(result.current.files.find((f) => f.id === targetId)?.visible).toBe(true)
+    expect(store.getFiles().find((f) => f.id === targetId)?.visible).toBe(true)
   })
 
   it('removes a file by id, leaving the others in place', async () => {
     parseKmlOrKmz.mockResolvedValueOnce(track('A')).mockResolvedValueOnce(track('B'))
-    const { result } = renderHook(() => useTrackImport())
+    const store = new InMemoryTrackStore()
+    const { result } = renderHook(() => useTrackImport(store))
     await act(() => result.current.importFiles([file('a.kml'), file('b.kml')]))
-    const [first, second] = result.current.files
+    const [first, second] = store.getFiles()
 
     act(() => result.current.removeFile(first.id))
 
-    expect(result.current.files).toHaveLength(1)
-    expect(result.current.files[0].id).toBe(second.id)
+    expect(store.getFiles()).toHaveLength(1)
+    expect(store.getFiles()[0].id).toBe(second.id)
   })
 
   it('computes statistics once at import, not again on a later re-render', async () => {
     parseKmlOrKmz.mockResolvedValueOnce(track('A'))
-    const { result, rerender } = renderHook(() => useTrackImport())
+    const store = new InMemoryTrackStore()
+    const { result, rerender } = renderHook(() => useTrackImport(store))
 
     await act(() => result.current.importFiles([file('a.kml')]))
     expect(computeTrackStats).toHaveBeenCalledTimes(1)
 
     rerender()
     rerender()
-    act(() => result.current.toggleVisibility(result.current.files[0].id))
+    act(() => result.current.toggleVisibility(store.getFiles()[0].id))
     rerender()
 
     expect(computeTrackStats).toHaveBeenCalledTimes(1)

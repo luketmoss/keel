@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import { parseKmlOrKmz } from '../kml/parse'
+import { computeTrackStats } from '../kml/stats'
 import type { ImportedFile, ImportFailure, ImportProgress } from './types'
 
 const ACCEPTED_EXTENSIONS = ['.kml', '.kmz']
@@ -83,6 +84,7 @@ export function useTrackImport(): UseTrackImport {
           id: generateId('file'),
           name: file.name,
           tracks: result.tracks,
+          trackStats: result.tracks.map(computeTrackStats),
           colorIndex: generateColorIndex(),
           visible: true,
         },

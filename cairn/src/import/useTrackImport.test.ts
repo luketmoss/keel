@@ -6,8 +6,18 @@ import type { ParseResult } from '../kml/parse'
 const { parseKmlOrKmz } = vi.hoisted(() => ({ parseKmlOrKmz: vi.fn() }))
 vi.mock('../kml/parse', () => ({ parseKmlOrKmz }))
 
+const { computeTrackStats } = vi.hoisted(() => ({
+  computeTrackStats: vi.fn(() => ({
+    distanceMeters: 0,
+    durationSeconds: undefined,
+    elevationGainMeters: undefined,
+  })),
+}))
+vi.mock('../kml/stats', () => ({ computeTrackStats }))
+
 beforeEach(() => {
   parseKmlOrKmz.mockReset()
+  computeTrackStats.mockClear()
 })
 
 function track(name: string): ParseResult {
@@ -167,5 +177,20 @@ describe('useTrackImport', () => {
 
     expect(result.current.files).toHaveLength(1)
     expect(result.current.files[0].id).toBe(second.id)
+  })
+
+  it('computes statistics once at import, not again on a later re-render', async () => {
+    parseKmlOrKmz.mockResolvedValueOnce(track('A'))
+    const { result, rerender } = renderHook(() => useTrackImport())
+
+    await act(() => result.current.importFiles([file('a.kml')]))
+    expect(computeTrackStats).toHaveBeenCalledTimes(1)
+
+    rerender()
+    rerender()
+    act(() => result.current.toggleVisibility(result.current.files[0].id))
+    rerender()
+
+    expect(computeTrackStats).toHaveBeenCalledTimes(1)
   })
 })

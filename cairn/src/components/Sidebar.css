@@ -11,12 +11,37 @@
 
 .sidebar__header {
   display: flex;
+  flex-direction: column;
+  flex: none;
+}
+
+.sidebar__title-row {
+  display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  flex: none;
   padding: 14px 16px;
+}
+
+.sidebar__nav {
+  display: flex;
+  gap: 8px;
+  padding: 8px 16px;
   border-bottom: 1px solid var(--border);
+}
+
+.sidebar__nav-link {
+  display: inline-flex;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 13px;
+  padding-bottom: 2px;
+  border-bottom: 2px solid transparent;
+}
+
+.sidebar__nav-link--active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
 }
 
 .sidebar__title {

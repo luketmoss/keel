@@ -47,6 +47,12 @@
   --sidebar-width: 320px;
   --sidebar-height-mobile: 45vh;
 
+  /* Markers — cairn/docs/design/54-photo-markers.md, "New tokens" */
+  --marker-size: 28px;
+  --marker-ring: 2px;
+  --marker-ring-selected: 3px;
+  --hit-target: 40px;
+
   color-scheme: dark;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   font-size: var(--text-base);

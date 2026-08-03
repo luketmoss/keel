@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -19,6 +20,7 @@ import { DropOverlay } from './DropOverlay'
 import { dataTransferHasFiles, filesFromDataTransfer } from '../import/dataTransfer'
 import { useTripImport } from '../import/useTripImport'
 import { usePhotoImport } from '../photo/usePhotoImport'
+import { positionPhotos } from '../photo/positionPhotos'
 import type { TripStore } from '../store/tripStore'
 import './TripDetail.css'
 
@@ -61,6 +63,18 @@ export function TripDetail({ tripStore, accessToken, cairnFolderId, accountRow, 
   const [dragActive, setDragActive] = useState(false)
   const dragDepth = useRef(0)
   const [hoveredFileId, setHoveredFileId] = useState<string | null>(null)
+  // Shared with #55's list, not a separate selection (design doc's
+  // Selection section) — #54 only has to expose it, not build the list.
+  const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null)
+
+  // #52's positionPhoto, wired in here per #54: every photo against every
+  // track across the whole trip (not per-file), same pool `saveOverview`
+  // below already flattens tracks from. Recomputed only when the settled
+  // photo or track sets actually change, not on every render.
+  const positionedPhotos = useMemo(
+    () => positionPhotos(photoImport.photos, tripImport.tracks.flatMap((file) => file.tracks)),
+    [photoImport.photos, tripImport.tracks],
+  )
 
   // One control, one drop target, two pipelines (design doc: "One import
   // control, not two"). Files are partitioned by extension before either
@@ -225,7 +239,14 @@ export function TripDetail({ tripStore, accessToken, cairnFolderId, accountRow, 
         )}
       </Sidebar>
       <div className="app__map">
-        <MapView files={tripImport.tracks} hoveredFileId={hoveredFileId} />
+        <MapView
+          files={tripImport.tracks}
+          hoveredFileId={hoveredFileId}
+          photos={positionedPhotos}
+          accessToken={accessToken}
+          selectedPhotoId={selectedPhotoId}
+          onSelectPhoto={setSelectedPhotoId}
+        />
       </div>
       {dragActive && <DropOverlay label="Drop tracks or photos" />}
     </div>

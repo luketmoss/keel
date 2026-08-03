@@ -1,0 +1,42 @@
+/* cairn/docs/design/54-photo-markers.md — Marker form, Clustering, Selection */
+
+.photo-marker-hit {
+  width: var(--hit-target);
+  height: var(--hit-target);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  /* Transparent padding expands the click target without growing the
+     visible circle — #48's technique, reused per the design doc. */
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.photo-marker {
+  width: var(--marker-size);
+  height: var(--marker-size);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  box-shadow: var(--shadow-lifted);
+  background: var(--surface-lift);
+  box-sizing: border-box;
+}
+
+.photo-marker img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.photo-marker--cluster {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}

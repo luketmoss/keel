@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fitTracksToBounds } from './fitBounds'
+import { fitTracksToBounds, zoomToFitCluster } from './fitBounds'
 
 interface FakeLatLng {
   lat: number
@@ -114,5 +114,58 @@ describe('fitTracksToBounds', () => {
     const idleCallback = addListenerOnce.mock.calls[0][2]
     idleCallback()
     expect(map.setZoom).not.toHaveBeenCalled()
+  })
+})
+
+describe('zoomToFitCluster', () => {
+  beforeEach(() => {
+    installFakeGoogleMaps()
+  })
+
+  it('does nothing for an empty member list', () => {
+    const map = fakeMap()
+
+    zoomToFitCluster(map as unknown as google.maps.Map, [])
+
+    expect(map.fitBounds).not.toHaveBeenCalled()
+  })
+
+  it('fits the bounds of the cluster members with padding', () => {
+    const map = fakeMap()
+    const points = [
+      { lat: 10, lng: 20 },
+      { lat: 10.001, lng: 20.001 },
+    ]
+
+    zoomToFitCluster(map as unknown as google.maps.Map, points)
+
+    expect(map.fitBounds).toHaveBeenCalledWith(expect.any(FakeLatLngBounds), 48)
+  })
+
+  it('does nothing for two identical coordinates — a cluster that can never separate (edge case)', () => {
+    const map = fakeMap()
+
+    zoomToFitCluster(map as unknown as google.maps.Map, [
+      { lat: 10, lng: 20 },
+      { lat: 10, lng: 20 },
+    ])
+
+    expect(map.fitBounds).not.toHaveBeenCalled()
+    expect(map.setZoom).not.toHaveBeenCalled()
+  })
+
+  it('caps the zoom once the fit settles beyond the cluster maximum', () => {
+    const map = fakeMap()
+    map.getZoom.mockReturnValue(21)
+    const { addListenerOnce } = installFakeGoogleMaps()
+
+    zoomToFitCluster(map as unknown as google.maps.Map, [
+      { lat: 10, lng: 20 },
+      { lat: 10.001, lng: 20.001 },
+    ])
+
+    const idleCallback = addListenerOnce.mock.calls[0][2]
+    idleCallback()
+    expect(map.setZoom).toHaveBeenCalledWith(20)
   })
 })

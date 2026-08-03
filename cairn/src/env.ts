@@ -14,3 +14,13 @@ export const googleMapsApiKey: string | null =
  */
 export const googleClientId: string | null =
   import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() || null
+
+/**
+ * The Map ID that enables Advanced Markers (#54) — a classic `Marker` has no
+ * way to render arbitrary HTML/CSS content, so photo markers need one. Same
+ * either-is-missing rule as the other two: absent on a fresh clone and in CI,
+ * and `MapView` degrades by not rendering advanced markers rather than
+ * crashing (Google refuses to mount `AdvancedMarker` at all without a Map ID).
+ */
+export const googleMapsMapId: string | null =
+  import.meta.env.VITE_GOOGLE_MAPS_MAP_ID?.trim() || null

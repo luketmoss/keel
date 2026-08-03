@@ -1,0 +1,37 @@
+name: cairn-pages
+on:
+  push:
+    branches: [main]
+    paths: ['cairn/**', '.github/workflows/cairn-pages.yml']
+concurrency:
+  group: cairn-pages-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cairn
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: cairn/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+        env:
+          VITE_BASE_PATH: /keel/cairn/
+          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.CAIRN_GOOGLE_MAPS_API_KEY }}
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.CAIRN_GOOGLE_CLIENT_ID }}
+          VITE_GOOGLE_MAPS_MAP_ID: ${{ secrets.CAIRN_GOOGLE_MAPS_MAP_ID }}
+      - run: cp dist/index.html dist/404.html
+      - uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: cairn/dist
+          destination_dir: cairn
+          keep_files: true

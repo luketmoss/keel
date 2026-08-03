@@ -53,6 +53,11 @@
   --marker-ring-selected: 3px;
   --hit-target: 40px;
 
+  /* Photo list & lightbox — cairn/docs/design/55-photo-list-lightbox.md, "New tokens" */
+  --photo-thumb: 32px;
+  --row-touch: 44px;
+  --scrim: color-mix(in srgb, var(--ground) 70%, transparent);
+
   color-scheme: dark;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   font-size: var(--text-base);

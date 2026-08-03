@@ -212,6 +212,48 @@ describe('PhotoLayer', () => {
     expect(container.querySelectorAll('[data-testid="photo-marker"]')).toHaveLength(2)
   })
 
+  it('clicking an already-selected marker opens the lightbox instead of reselecting (#55 wiring)', () => {
+    const onSelectPhoto = vi.fn()
+    const onOpenPhoto = vi.fn()
+    const { container } = render(
+      <PhotoLayer
+        photos={[positionedPhoto({ id: 'a' })]}
+        accessToken="token"
+        selectedPhotoId="a"
+        onSelectPhoto={onSelectPhoto}
+        onOpenPhoto={onOpenPhoto}
+      />,
+    )
+
+    container
+      .querySelector('[data-testid="advanced-marker"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+
+    expect(onOpenPhoto).toHaveBeenCalledWith('a')
+    expect(onSelectPhoto).not.toHaveBeenCalled()
+  })
+
+  it('clicking a not-yet-selected marker only selects it, never opens (#55 wiring)', () => {
+    const onSelectPhoto = vi.fn()
+    const onOpenPhoto = vi.fn()
+    const { container } = render(
+      <PhotoLayer
+        photos={[positionedPhoto({ id: 'a' })]}
+        accessToken="token"
+        selectedPhotoId={null}
+        onSelectPhoto={onSelectPhoto}
+        onOpenPhoto={onOpenPhoto}
+      />,
+    )
+
+    container
+      .querySelector('[data-testid="advanced-marker"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+
+    expect(onSelectPhoto).toHaveBeenCalledWith('a')
+    expect(onOpenPhoto).not.toHaveBeenCalled()
+  })
+
   it('resolves a thumbnail through the image cache and renders it once ready', async () => {
     const { container } = render(
       <PhotoLayer

@@ -15,10 +15,10 @@ interface TrackListProps {
   /** #46: rename/reorder/recolour are trip-scoped — omitted on v1's
       non-trip list (`App.tsx`), which hides the corresponding controls
       entirely rather than rendering them disabled. */
-  onRename?: (id: string, displayName: string) => boolean
-  onRecolor?: (id: string, color: number) => boolean
+  onRename?: (id: string, displayName: string) => Promise<boolean>
+  onRecolor?: (id: string, color: number) => Promise<boolean>
   /** Called with every row's `id` in its new order once a drag completes. */
-  onReorder?: (orderedIds: string[]) => boolean
+  onReorder?: (orderedIds: string[]) => Promise<boolean>
   /** Drag handles render disabled while the trip is still gaining rows
       during #35's Partially loaded state — reordering a list that's still
       settling underneath the cursor produces a result nobody intended.
@@ -69,7 +69,7 @@ export function TrackList({
     setDragState((prev) => (prev ? { ...prev, overId: id, before } : prev))
   }
 
-  function handleDrop() {
+  async function handleDrop() {
     const state = dragState
     setDragState(null)
     if (!state || !onReorder || !state.overId || state.overId === state.draggedId) return
@@ -80,7 +80,7 @@ export function TrackList({
     const insertAt = state.before ? overIndex : overIndex + 1
     const next = [...withoutDragged.slice(0, insertAt), state.draggedId, ...withoutDragged.slice(insertAt)]
 
-    if (!onReorder(next)) setError("Couldn't save order — reverted.")
+    if (!(await onReorder(next))) setError("Couldn't save order — reverted.")
     else setError(null)
   }
 
@@ -140,8 +140,8 @@ function TrackRow({
   onToggleVisibility: (id: string) => void
   onRemove: (id: string) => void
   onHoverFile?: (id: string | null) => void
-  onRename?: (id: string, displayName: string) => boolean
-  onRecolor?: (id: string, color: number) => boolean
+  onRename?: (id: string, displayName: string) => Promise<boolean>
+  onRecolor?: (id: string, color: number) => Promise<boolean>
   onSaveError: (message: string | null) => void
   showHandle: boolean
   draggable: boolean
@@ -167,14 +167,14 @@ function TrackRow({
     setTimeout(() => setSavedField(null), 180)
   }
 
-  function commitName(value: string) {
+  async function commitName(value: string) {
     setEditingName(false)
     const trimmed = value.trim()
     // Empty commit is an aborted edit, not a saved one — same rule as the
     // trip header's name field.
     if (trimmed.length === 0) return
     if (!onRename) return
-    if (onRename(file.id, trimmed)) {
+    if (await onRename(file.id, trimmed)) {
       onSaveError(null)
       flashSaved('name')
     } else {
@@ -182,10 +182,10 @@ function TrackRow({
     }
   }
 
-  function selectColor(index: number) {
+  async function selectColor(index: number) {
     setColorPickerOpen(false)
     if (!onRecolor) return
-    if (onRecolor(file.id, index)) {
+    if (await onRecolor(file.id, index)) {
       onSaveError(null)
       flashSaved('color')
     } else {

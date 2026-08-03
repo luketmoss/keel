@@ -53,10 +53,18 @@ export interface TripStore {
   createTrip(name: string): TripIndexEntry
   /** Applies a partial edit and returns the resulting record, or `null` if
       `id` no longer names a trip (deleted out from under an open detail
-      view). Same object reference is returned by `getTrip` until the next
-      mutation, so `useSyncExternalStore` doesn't see a change that isn't
-      there. */
-  updateTrip(id: string, patch: TripUpdate): TripRecord | null
+      view) **or** the write failed after already applying locally — a
+      Drive-backed implementation reverts its local copy before resolving
+      `null`, so a caller never has to distinguish "not found" from "save
+      failed" to know it should show the revert. Async because a real
+      implementation is a network write, not a `localStorage.setItem`; the
+      local (optimistic) value is visible through `getTrip`/`subscribe`
+      immediately, before this promise settles — see #35's "shows read-mode
+      display immediately, reverts on failure" contract, which this signature
+      exists to support. Same object reference is returned by `getTrip`
+      until the next mutation, so `useSyncExternalStore` doesn't see a
+      change that isn't there. */
+  updateTrip(id: string, patch: TripUpdate): Promise<TripRecord | null>
   deleteTrip(id: string): void
   /** The trip's precomputed overview geometry (#36's `buildOverviewGeoJSON`
       output) — what `/world` (#37) reads, never a trip's source tracks.
@@ -74,6 +82,13 @@ export interface TripStore {
   /** Notified after any mutation. Returns an unsubscribe function — the
       shape `useSyncExternalStore` expects directly. */
   subscribe(listener: () => void): () => void
+  /** Only meaningful for a Drive-backed implementation: hydrates every
+      trip's index entry and overview from Drive (Drive wins over any local
+      copy of a trip that exists in both), then migrates any trip that
+      exists only locally up to Drive. `LocalTripStore` has nothing to
+      connect to and simply doesn't implement this — callers that always
+      have a `TripStore` rather than a concrete class use `store.connect?.()`. */
+  connect?(accessToken: string, cairnFolderId: string): Promise<void>
 }
 
 const INDEX_KEY = 'cairn.trips.index'
@@ -84,10 +99,12 @@ function generateId(): string {
   return `trip-${crypto.randomUUID()}`
 }
 
-/* The only implementation for now — `localStorage`, matching what #32/#34
-   will eventually write: one record per trip plus a lightweight index the
-   list reads instead of loading every trip. The index's `If-Match`/etag
-   concern is a Drive-specific concurrency problem, out of scope here. */
+/* Local-only implementation: one record per trip plus a lightweight index
+   the list reads instead of loading every trip. `DriveTripStore` (#59) is
+   the Drive-backed sibling — it composes an instance of this class as its
+   synchronous local cache and adds the network layer (and the `If-Match`/
+   etag concurrency check, meaningless for a single-writer local store) on
+   top, rather than duplicating the record/index bookkeeping here. */
 export class LocalTripStore implements TripStore {
   private index: TripIndexEntry[]
   /** Cache of full records already read from storage, keyed by id — so
@@ -150,7 +167,16 @@ export class LocalTripStore implements TripStore {
     return entry
   }
 
-  updateTrip = (id: string, patch: TripUpdate): TripRecord | null => {
+  /** `localStorage` writes are synchronous, so this always resolves
+      immediately — the `Promise` wrapper exists only to satisfy `TripStore`,
+      whose async signature is there for the Drive-backed implementation.
+      Behaviourally identical to a synchronous update: still resolves before
+      the microtask queue does anything else. */
+  updateTrip = async (id: string, patch: TripUpdate): Promise<TripRecord | null> => {
+    return this.updateTripSync(id, patch)
+  }
+
+  private updateTripSync(id: string, patch: TripUpdate): TripRecord | null {
     const current = this.getTrip(id)
     if (!current) return null
 
@@ -178,6 +204,37 @@ export class LocalTripStore implements TripStore {
     this.writeIndex()
     this.notify()
     return next
+  }
+
+  /** Seeds (or overwrites) the local cache with a record read from Drive,
+      under its own id rather than a freshly generated one — used only by a
+      Drive-backed implementation's hydration pass. Inserts into the index
+      if the id is new, replaces in place if not, and always re-sorts
+      newest-`createdAt`-first afterward, since hydration can arrive in
+      whatever order Drive listed the trip folders in. */
+  hydrate(record: TripRecord): void {
+    this.records.set(record.id, record)
+    this.writeRecord(record)
+    const entry: TripIndexEntry = {
+      id: record.id,
+      name: record.name,
+      status: record.status,
+      startDate: record.startDate,
+      endDate: record.endDate,
+      createdAt: record.createdAt,
+    }
+    const withoutExisting = this.index.filter((e) => e.id !== record.id)
+    this.index = [...withoutExisting, entry].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    this.writeIndex()
+    this.notify()
+  }
+
+  /** Seeds the local overview cache from Drive — the hydration counterpart
+      to `hydrate` above, kept separate since a trip can hydrate before its
+      overview is known (or have no overview yet). */
+  hydrateOverview(id: string, overview: FeatureCollection<LineString>): void {
+    this.storage.setItem(overviewKey(id), JSON.stringify(overview))
+    this.notify()
   }
 
   deleteTrip = (id: string): void => {
@@ -255,16 +312,20 @@ function isTripIndexEntry(value: unknown): value is TripIndexEntry {
 
 // Same "corrupted is missing, not thrown" stance as the index/record guards
 // above — a hand-edited or partially-written value just reads back as "no
-// overview yet" rather than surfacing a parse error to `/world`.
-function isFeatureCollection(value: unknown): value is FeatureCollection<LineString> {
+// overview yet" rather than surfacing a parse error to `/world`. Exported
+// for `DriveTripStore`, which applies the same guard to a `overview.geojson`
+// read back from Drive.
+export function isFeatureCollection(value: unknown): value is FeatureCollection<LineString> {
   if (typeof value !== 'object' || value === null) return false
   const collection = value as Record<string, unknown>
   return collection.type === 'FeatureCollection' && Array.isArray(collection.features)
 }
 
 // A record written by an older shape, or corrupted by hand, is treated as
-// missing rather than thrown — same stance as the index above.
-function isTripRecord(value: unknown): value is TripRecord {
+// missing rather than thrown — same stance as the index above. Exported for
+// `DriveTripStore`, which applies the same guard to a `trip.json` read back
+// from Drive.
+export function isTripRecord(value: unknown): value is TripRecord {
   if (typeof value !== 'object' || value === null) return false
   const record = value as Record<string, unknown>
   return (

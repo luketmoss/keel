@@ -246,8 +246,8 @@ describe('useTripImport — #46 track overrides', () => {
 
     const autoColorIndex = result.current.tracks[0].colorIndex
     let ok = false
-    act(() => {
-      ok = result.current.renameTrack(result.current.tracks[0].id, 'Ridge day')
+    await act(async () => {
+      ok = await result.current.renameTrack(result.current.tracks[0].id, 'Ridge day')
     })
     expect(ok).toBe(true)
     expect(result.current.tracks[0].name).toBe('Ridge day')
@@ -276,8 +276,8 @@ describe('useTripImport — #46 track overrides', () => {
     await waitFor(() => expect(result.current.loading).toBe(false))
     const autoColorIndex = result.current.tracks[0].colorIndex
 
-    act(() => {
-      result.current.recolorTrack(result.current.tracks[0].id, autoColorIndex + 1)
+    await act(async () => {
+      await result.current.recolorTrack(result.current.tracks[0].id, autoColorIndex + 1)
     })
 
     expect(result.current.tracks[0].colorIndex).toBe(autoColorIndex + 1)
@@ -299,8 +299,8 @@ describe('useTripImport — #46 track overrides', () => {
     expect(result.current.tracks.map((t) => t.name)).toEqual(['a.kml', 'b.kml'])
 
     const [first, second] = result.current.tracks
-    act(() => {
-      result.current.reorderTracks([second.id, first.id])
+    await act(async () => {
+      await result.current.reorderTracks([second.id, first.id])
     })
     expect(result.current.tracks.map((t) => t.name)).toEqual(['b.kml', 'a.kml'])
 
@@ -352,8 +352,8 @@ describe('useTripImport — #46 track overrides', () => {
     await waitFor(() => expect(result.current.loading).toBe(false))
 
     let ok = true
-    act(() => {
-      ok = result.current.renameTrack('no-such-id', 'New name')
+    await act(async () => {
+      ok = await result.current.renameTrack('no-such-id', 'New name')
     })
     expect(ok).toBe(false)
   })

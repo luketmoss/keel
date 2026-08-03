@@ -146,13 +146,13 @@ describe('LocalTripStore', () => {
     })
   })
 
-  it('applies a partial edit, notifies subscribers, and reflects it in both the record and the index', () => {
+  it('applies a partial edit, notifies subscribers, and reflects it in both the record and the index', async () => {
     const store = new LocalTripStore(fakeStorage())
     const trip = store.createTrip('Hokkaido')
     const listener = vi.fn()
     store.subscribe(listener)
 
-    const updated = store.updateTrip(trip.id, { status: 'completed', notes: 'Great trip' })
+    const updated = await store.updateTrip(trip.id, { status: 'completed', notes: 'Great trip' })
 
     expect(updated).toMatchObject({ status: 'completed', notes: 'Great trip', name: 'Hokkaido' })
     expect(store.getTrip(trip.id)).toMatchObject({ status: 'completed', notes: 'Great trip' })
@@ -160,26 +160,26 @@ describe('LocalTripStore', () => {
     expect(listener).toHaveBeenCalledTimes(1)
   })
 
-  it('returns null from updateTrip for a trip that does not exist', () => {
+  it('returns null from updateTrip for a trip that does not exist', async () => {
     const store = new LocalTripStore(fakeStorage())
 
-    expect(store.updateTrip('no-such-id', { notes: 'x' })).toBeNull()
+    expect(await store.updateTrip('no-such-id', { notes: 'x' })).toBeNull()
   })
 
-  it('discards an edit that would save an empty name, leaving the prior name in place', () => {
+  it('discards an edit that would save an empty name, leaving the prior name in place', async () => {
     const store = new LocalTripStore(fakeStorage())
     const trip = store.createTrip('Hokkaido')
 
-    const updated = store.updateTrip(trip.id, { name: '   ' })
+    const updated = await store.updateTrip(trip.id, { name: '   ' })
 
     expect(updated?.name).toBe('Hokkaido')
   })
 
-  it('persists an update across a reload of a new store over the same storage', () => {
+  it('persists an update across a reload of a new store over the same storage', async () => {
     const storage = fakeStorage()
     const first = new LocalTripStore(storage)
     const trip = first.createTrip('Hokkaido')
-    first.updateTrip(trip.id, { notes: 'Great trip' })
+    await first.updateTrip(trip.id, { notes: 'Great trip' })
 
     const second = new LocalTripStore(storage)
 

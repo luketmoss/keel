@@ -6,7 +6,7 @@ type Field = 'name' | 'status' | 'dates' | 'notes'
 
 interface TripMetadataHeaderProps {
   trip: TripRecord
-  onUpdate: (patch: TripUpdate) => TripRecord | null
+  onUpdate: (patch: TripUpdate) => Promise<TripRecord | null>
 }
 
 function formatDateRange(startDate: string | null, endDate: string | null): string {
@@ -43,9 +43,9 @@ export function TripMetadataHeader({ trip, onUpdate }: TripMetadataHeaderProps) 
     savedTimeoutRef.current = setTimeout(() => setSavedField(null), 300)
   }
 
-  function commit(field: Field, patch: TripUpdate) {
+  async function commit(field: Field, patch: TripUpdate) {
     setEditing(null)
-    const result = onUpdate(patch)
+    const result = await onUpdate(patch)
     if (result === null) {
       setError(`Couldn't save — ${field} reverted.`)
       return

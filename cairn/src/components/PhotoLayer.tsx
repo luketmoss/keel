@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AdvancedMarker, useMap } from '@vis.gl/react-google-maps'
 import type { PositionedPhoto } from '../photo/positionPhotos'
 import { clusterMarkers, type MarkerCluster } from '../map/cluster'
 import { zoomToFitCluster } from '../map/fitBounds'
 import { clusterAriaLabel, clusterProvenance, markerAriaLabel, ringStyleForPhoto } from '../photo/provenance'
-import { usePhotoThumbnail } from '../photo/usePhotoThumbnail'
+import { usePhotoImage } from '../photo/usePhotoImage'
 import './PhotoLayer.css'
 
 /* --marker-size from index.css, transcribed — AdvancedMarker content takes
@@ -20,9 +20,14 @@ interface PhotoLayerProps {
       a thumbnail that hasn't arrived yet. */
   accessToken: string | null
   selectedPhotoId: string | null
-  /** Out of scope for #54 to consume beyond exposing it: a later issue
-      (#55) owns the list/viewer this drives. */
   onSelectPhoto: (photoId: string) => void
+  /** #55: clicking an *already-selected* marker opens the lightbox rather
+      than reselecting (design doc's "Opening a photo" section — clicking
+      its row, or its already-selected marker). Clicking a marker that
+      isn't yet selected still only selects it, via `onSelectPhoto` above —
+      the two are never both called for the same click. Optional so a
+      future caller with no lightbox can omit it. */
+  onOpenPhoto?: (photoId: string) => void
 }
 
 /** Renders positioned photos as clustered `AdvancedMarker`s above the
@@ -32,7 +37,7 @@ interface PhotoLayerProps {
     (`overlayMouseTarget`) already sits above `Polyline`'s
     (`overlayLayer`) regardless of mount order; sibling-after just keeps
     DOM order legible for anyone reading the tree. */
-export function PhotoLayer({ photos, accessToken, selectedPhotoId, onSelectPhoto }: PhotoLayerProps) {
+export function PhotoLayer({ photos, accessToken, selectedPhotoId, onSelectPhoto, onOpenPhoto }: PhotoLayerProps) {
   const map = useMap()
   const [zoom, setZoom] = useState<number>(() => map?.getZoom() ?? 2)
 
@@ -72,6 +77,7 @@ export function PhotoLayer({ photos, accessToken, selectedPhotoId, onSelectPhoto
               accessToken={accessToken}
               selected={selectedPhotoId === photo.id}
               onSelect={onSelectPhoto}
+              onOpen={onOpenPhoto}
             />
           )
         }
@@ -90,23 +96,41 @@ function PhotoMarker({
   accessToken,
   selected,
   onSelect,
+  onOpen,
 }: {
   photo: PositionedPhoto
   accessToken: string | null
   selected: boolean
   onSelect: (photoId: string) => void
+  onOpen?: (photoId: string) => void
 }) {
-  const thumbnailUrl = usePhotoThumbnail(accessToken, photo.thumbnailDriveFileId)
+  const thumbnailUrl = usePhotoImage(accessToken, photo.thumbnailDriveFileId).url
   const ring = ringStyleForPhoto(photo.source, selected)
   const label = markerAriaLabel(photo.source, undefined)
+  // `tabIndex={-1}`: focusable via `.focus()` below (so #55's lightbox can
+  // return focus here on close, per its design doc) without joining the
+  // tab order — this element was never keyboard-reachable before #55 and
+  // making it so is out of this issue's scope.
+  const hitRef = useRef<HTMLDivElement>(null)
+
+  function handleClick() {
+    hitRef.current?.focus()
+    if (selected) {
+      onOpen?.(photo.id)
+    } else {
+      onSelect(photo.id)
+    }
+  }
 
   return (
     <AdvancedMarker
       position={{ lat: photo.latitude, lng: photo.longitude }}
       zIndex={selected ? 1 : 0}
-      onClick={() => onSelect(photo.id)}
+      onClick={handleClick}
     >
       <div
+        ref={hitRef}
+        tabIndex={-1}
         className="photo-marker-hit"
         role="button"
         aria-label={label}

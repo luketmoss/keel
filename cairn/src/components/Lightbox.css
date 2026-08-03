@@ -1,0 +1,125 @@
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* The scrim, not a solid fill — the map stays visible at the margins,
+     which is what keeps this reading as a layer over a place rather than
+     a separate page (design doc's "The lightbox" section). */
+  background: var(--scrim);
+}
+
+/* L2 elevation exactly as #49 reclassified it — same material and shadow
+   as DropOverlay's precedent, no border since it touches no edge. Not
+   full-bleed: inset from the viewport on every side. */
+.lightbox__dialog {
+  position: relative;
+  margin: var(--space-8);
+  max-width: calc(100vw - var(--space-8) * 2);
+  max-height: calc(100vh - var(--space-8) * 2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-6);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur));
+  box-shadow: var(--shadow-lifted);
+}
+
+.lightbox__frame {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  max-height: 70vh;
+}
+
+.lightbox__image,
+.lightbox__placeholder {
+  max-width: 100%;
+  max-height: 70vh;
+  /* Never upscaled beyond natural size (design doc's Contents section). */
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+}
+
+.lightbox__placeholder {
+  filter: blur(16px);
+  transform: scale(1.05);
+}
+
+.lightbox__error {
+  position: absolute;
+  bottom: var(--space-3);
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: var(--text-sm);
+  color: var(--danger);
+  white-space: nowrap;
+}
+
+.lightbox__caption {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.lightbox__control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--hit-target);
+  height: var(--hit-target);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text);
+  font-size: var(--text-xl);
+  cursor: pointer;
+}
+
+.lightbox__control:hover {
+  background: var(--hover);
+}
+
+.lightbox__control:active {
+  background: var(--pressed);
+}
+
+/* Rendered disabled rather than hidden so the frame doesn't reflow when a
+   second photo is added (design doc's "One photo in the trip" edge case). */
+.lightbox__control:disabled {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+
+.lightbox__close {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+}
+
+.lightbox__prev {
+  position: absolute;
+  left: var(--space-2);
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.lightbox__next {
+  position: absolute;
+  right: var(--space-2);
+  top: 50%;
+  transform: translateY(-50%);
+}

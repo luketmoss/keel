@@ -34,9 +34,12 @@ interface MapViewProps {
       alongside `photos`. */
   accessToken?: string | null
   selectedPhotoId?: string | null
-  /** #54 only needs to expose this callback; a later issue (#55) owns the
-      list/viewer that consumes the selection it drives. */
+  /** #54 only needs to expose this callback; #55's list/viewer is what
+      consumes the selection it drives. */
   onSelectPhoto?: (photoId: string) => void
+  /** #55: clicking an already-selected marker opens the lightbox — see
+      `PhotoLayer`'s doc for the selected-vs-not distinction. */
+  onOpenPhoto?: (photoId: string) => void
 }
 
 export function MapView({
@@ -46,6 +49,7 @@ export function MapView({
   accessToken = null,
   selectedPhotoId = null,
   onSelectPhoto,
+  onOpenPhoto,
 }: MapViewProps) {
   /* Google validates the key asynchronously, after the provider has mounted,
      so a bad key cannot be caught by the check below. */
@@ -106,6 +110,7 @@ export function MapView({
             accessToken={accessToken}
             selectedPhotoId={selectedPhotoId}
             onSelectPhoto={onSelectPhoto ?? (() => {})}
+            onOpenPhoto={onOpenPhoto}
           />
         )}
       </Map>

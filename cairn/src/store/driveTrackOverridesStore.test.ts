@@ -98,6 +98,32 @@ describe('DriveTrackOverridesStore', () => {
     expect(store.getOverrides('trip-1')).toEqual({})
   })
 
+  it('serializes connect (migration) and an immediately-following edit so the edit overwrites rather than duplicating the create', async () => {
+    // Reproduces the race a trip's overrides are most exposed to: an edit
+    // fired the instant a detail view mounts, before `connect`'s own
+    // migration write has resolved. Unserialized, both would see no ref yet
+    // and both call `writeJsonFile` with `existing: null`, creating two
+    // `overrides.json` files instead of one.
+    findJsonFile.mockResolvedValue(null) // no overrides.json yet -> migration path
+    writeJsonFile.mockResolvedValue({ fileId: 'overrides-file', version: '1' })
+    const store = new DriveTrackOverridesStore(fakeStorage())
+    // Local-only pre-seed, before any connection — `connect` below is what
+    // discovers it needs migrating.
+    await store.setOverride('trip-1', 'drive-1', { displayName: 'Day 3' }, ['drive-1'])
+
+    const connectPromise = store.connect('trip-1', 'token', 'cairn-folder-id') // queues the migration write
+    // No await here — the edit queues right behind it while it's still in
+    // flight.
+    const editOk = await store.setOverride('trip-1', 'drive-1', { color: 2 }, ['drive-1'])
+    await connectPromise
+
+    expect(editOk).toBe(true)
+    const writes = writeJsonFile.mock.calls.filter((call) => call[2] === 'overrides.json')
+    expect(writes).toHaveLength(2)
+    expect(writes[0][4]).toBeNull() // migration's create
+    expect(writes[1][4]).not.toBeNull() // the edit's overwrite, not a second create
+  })
+
   it('on a conflict, re-hydrates from Drive rather than reverting to the pre-edit value', async () => {
     findJsonFile.mockResolvedValue(null)
     const store = new DriveTrackOverridesStore(fakeStorage())

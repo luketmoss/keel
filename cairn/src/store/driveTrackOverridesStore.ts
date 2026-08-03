@@ -32,9 +32,25 @@ export class DriveTrackOverridesStore implements TrackOverridesStore {
   private readonly local: LocalTrackOverridesStore
   private readonly refs = new Map<string, OverridesDriveRef>()
   private accessToken: string | null = null
+  /** Serializes `connect` and `flush` per trip id — both read `refs.get(tripId)`
+      then (async) `refs.set(tripId, ...)`, and a write landing while
+      `connect`'s own hydration/migration for that same trip is still in
+      flight (e.g. recolouring a track the instant its detail view mounts,
+      before `connect` has finished) would compute against a stale snapshot
+      and clobber whichever ref `connect` sets — same failure mode
+      `DriveTripStore.queues` closes, here scoped to one trip at a time since
+      that's this store's own natural unit. */
+  private readonly queues = new Map<string, Promise<unknown>>()
 
   constructor(storage: Storage = window.localStorage) {
     this.local = new LocalTrackOverridesStore(storage)
+  }
+
+  private enqueue<T>(id: string, task: () => Promise<T>): Promise<T> {
+    const prior = this.queues.get(id) ?? Promise.resolve()
+    const settled = prior.catch(() => {}).then(task)
+    this.queues.set(id, settled.catch(() => {}))
+    return settled
   }
 
   getOverrides = (tripId: string): TrackOverrides => this.local.getOverrides(tripId)
@@ -48,7 +64,7 @@ export class DriveTrackOverridesStore implements TrackOverridesStore {
     const previous = this.local.getOverrides(tripId)
     const ok = await this.local.setOverride(tripId, driveFileId, patch, validDriveFileIds)
     if (!ok) return false
-    return this.flush(tripId, previous)
+    return this.enqueue(tripId, () => this.flush(tripId, previous))
   }
 
   setOrder = async (
@@ -59,7 +75,7 @@ export class DriveTrackOverridesStore implements TrackOverridesStore {
     const previous = this.local.getOverrides(tripId)
     const ok = await this.local.setOrder(tripId, orderedDriveFileIds, validDriveFileIds)
     if (!ok) return false
-    return this.flush(tripId, previous)
+    return this.enqueue(tripId, () => this.flush(tripId, previous))
   }
 
   /** Called once per trip, when its detail view mounts (`useTripImport`'s
@@ -69,8 +85,12 @@ export class DriveTrackOverridesStore implements TrackOverridesStore {
       overrides up if it doesn't — the same policy `DriveTripStore.connect`
       applies at the whole-app level, scoped down to one trip since that's
       the only trip whose overrides matter at this point. */
-  connect = async (tripId: string, accessToken: string, folderId: string): Promise<void> => {
+  connect = (tripId: string, accessToken: string, folderId: string): Promise<void> => {
     this.accessToken = accessToken
+    return this.enqueue(tripId, () => this.connectTrip(tripId, accessToken, folderId))
+  }
+
+  private async connectTrip(tripId: string, accessToken: string, folderId: string): Promise<void> {
     const tripFolderId = await findOrCreateTripFolder(accessToken, folderId, tripId)
     const file = await findJsonFile(accessToken, tripFolderId, 'overrides.json')
 

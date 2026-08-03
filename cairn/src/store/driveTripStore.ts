@@ -52,9 +52,30 @@ export class DriveTripStore implements TripStore {
   private readonly local: LocalTripStore
   private readonly refs = new Map<string, TripDriveRef>()
   private credentials: { accessToken: string; cairnFolderId: string } | null = null
+  /** Serializes every operation that reads-then-writes `refs` for a given
+      trip id — `migrateTrip`, `flushTrip`, `flushOverview`, and connect's
+      hydration all do `refs.get(id)` then (async) `refs.set(id, ...)`, and
+      running two of those concurrently for the same id (e.g. a freshly
+      created trip's migration racing a rename fired before it finishes, or
+      `saveOverview`'s effect landing next to a header edit) let each one
+      compute its write against a stale snapshot and clobber the other's ref
+      on write-back — silently creating a duplicate Drive file and losing
+      track of one of them. Queuing per id closes that: each task only
+      starts once the previous one for the same id has settled. */
+  private readonly queues = new Map<string, Promise<unknown>>()
 
   constructor(storage: Storage = window.localStorage) {
     this.local = new LocalTripStore(storage)
+  }
+
+  private enqueue<T>(id: string, task: () => Promise<T>): Promise<T> {
+    const prior = this.queues.get(id) ?? Promise.resolve()
+    // `prior.catch` so one task's rejection doesn't wedge the queue for
+    // every task after it — each caller still sees its own task's outcome
+    // via the returned (unswallowed) promise.
+    const settled = prior.catch(() => {}).then(task)
+    this.queues.set(id, settled.catch(() => {}))
+    return settled
   }
 
   getTrips = (): TripIndexEntry[] => this.local.getTrips()
@@ -64,7 +85,7 @@ export class DriveTripStore implements TripStore {
 
   createTrip = (name: string): TripIndexEntry => {
     const entry = this.local.createTrip(name)
-    void this.migrateTrip(entry.id)
+    void this.enqueue(entry.id, () => this.migrateTrip(entry.id))
     return entry
   }
 
@@ -73,7 +94,7 @@ export class DriveTripStore implements TripStore {
     const next = await this.local.updateTrip(id, patch)
     if (!next) return null
 
-    const result = await this.flushTrip(id)
+    const result = await this.enqueue(id, () => this.flushTrip(id))
     if (result === 'ok') return next
     // A conflict already re-hydrates the local copy to Drive's current
     // value inside flushTrip — reverting to `previous` here would overwrite
@@ -88,6 +109,7 @@ export class DriveTripStore implements TripStore {
     const ref = this.refs.get(id)
     this.local.deleteTrip(id)
     this.refs.delete(id)
+    this.queues.delete(id)
     if (this.credentials && ref?.folderId) {
       const { accessToken } = this.credentials
       // Best-effort: an orphaned Drive folder costs negligible space and
@@ -98,7 +120,7 @@ export class DriveTripStore implements TripStore {
 
   saveOverview = (id: string, tracks: Track[]): void => {
     this.local.saveOverview(id, tracks)
-    void this.flushOverview(id)
+    void this.enqueue(id, () => this.flushOverview(id))
   }
 
   connect = async (accessToken: string, cairnFolderId: string): Promise<void> => {
@@ -117,29 +139,11 @@ export class DriveTripStore implements TripStore {
     const driveTripIds = new Set<string>()
     for (const folder of folders) {
       const tripId = folder.name
-      try {
-        const tripFile = await findJsonFile(accessToken, folder.id, 'trip.json')
-        if (!tripFile) continue
-        const trip = await readJsonFile<TripRecord>(accessToken, tripFile.fileId)
-        if (!isTripRecord(trip.data)) continue
-
-        driveTripIds.add(tripId)
-        this.local.hydrate(trip.data)
-        const ref: TripDriveRef = { folderId: folder.id, trip: { fileId: tripFile.fileId, version: trip.version } }
-
-        const overviewFile = await findJsonFile(accessToken, folder.id, 'overview.geojson')
-        if (overviewFile) {
-          const overview = await readJsonFile<FeatureCollection<LineString>>(accessToken, overviewFile.fileId)
-          if (isFeatureCollection(overview.data)) {
-            this.local.hydrateOverview(trip.data.id, overview.data)
-            ref.overview = { fileId: overviewFile.fileId, version: overview.version }
-          }
-        }
-        this.refs.set(tripId, ref)
-      } catch {
-        // One trip's hydration failing (a network blip mid-pass) shouldn't
-        // stop the rest — this one is retried on the next `connect()` call.
-      }
+      // Queued (not called directly) so this doesn't race a concurrent
+      // user-triggered flush/migrate for the same trip — see the `queues`
+      // field doc comment.
+      const found = await this.enqueue(tripId, () => this.hydrateTrip(folder.id, tripId))
+      if (found) driveTripIds.add(tripId)
     }
 
     // Trips this session already knows about that Drive has never heard of
@@ -147,8 +151,51 @@ export class DriveTripStore implements TripStore {
     // best-effort per trip.
     const localOnly = this.local.getTrips().filter((entry) => !driveTripIds.has(entry.id))
     for (const entry of localOnly) {
-      void this.migrateTrip(entry.id)
+      void this.enqueue(entry.id, () => this.migrateTrip(entry.id))
     }
+  }
+
+  /** One trip folder's hydration: `trip.json` and, if present,
+      `overview.geojson`. Returns whether a trip was actually found there,
+      which is what `connect` uses to decide whether this id still needs
+      migrating — determined by `trip.json` alone. A failure reading
+      `overview.geojson` (a network blip mid-pass) doesn't make the trip
+      look unmigrated, or `migrateTrip` would try to create a second
+      `trip.json` next to the one that hydrated just fine; it's retried on
+      the next `connect()` call instead, same as any other transient
+      failure here. */
+  private async hydrateTrip(folderId: string, tripId: string): Promise<boolean> {
+    if (!this.credentials) return false
+    const { accessToken } = this.credentials
+    let trip: { data: TripRecord; version: string }
+    try {
+      const tripFile = await findJsonFile(accessToken, folderId, 'trip.json')
+      if (!tripFile) return false
+      trip = await readJsonFile<TripRecord>(accessToken, tripFile.fileId)
+      if (!isTripRecord(trip.data)) return false
+
+      this.local.hydrate(trip.data)
+      this.refs.set(tripId, { folderId, trip: { fileId: tripFile.fileId, version: trip.version } })
+    } catch {
+      return false
+    }
+
+    try {
+      const overviewFile = await findJsonFile(accessToken, folderId, 'overview.geojson')
+      if (overviewFile) {
+        const overview = await readJsonFile<FeatureCollection<LineString>>(accessToken, overviewFile.fileId)
+        if (isFeatureCollection(overview.data)) {
+          this.local.hydrateOverview(trip.data.id, overview.data)
+          const ref = this.refs.get(tripId)
+          if (ref) this.refs.set(tripId, { ...ref, overview: { fileId: overviewFile.fileId, version: overview.version } })
+        }
+      }
+    } catch {
+      // The trip itself is already hydrated and its ref already set above —
+      // only the overview read failed, retried the next time `saveOverview`
+      // or `connect` runs.
+    }
+    return true
   }
 
   private async migrateTrip(id: string): Promise<void> {

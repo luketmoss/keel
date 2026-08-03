@@ -203,4 +203,29 @@ describe('DriveTripStore', () => {
 
     expect(trashFolder).toHaveBeenCalledWith('token', 'folder-1')
   })
+
+  it('flushes a recomputed overview to Drive once connected', async () => {
+    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', version: '1' })
+    const store = new DriveTripStore(fakeStorage())
+    const entry = store.createTrip('Hokkaido')
+    await store.connect('token', 'cairn-folder-id')
+    await Promise.resolve()
+    await Promise.resolve()
+    writeJsonFile.mockClear()
+    writeJsonFile.mockResolvedValue({ fileId: 'overview-file', version: '1' })
+
+    store.saveOverview(entry.id, [
+      { name: 'Day 1', points: [{ lat: 37, lon: -122 }, { lat: 38, lon: -121 }] },
+    ])
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(writeJsonFile).toHaveBeenCalledWith(
+      'token',
+      'folder-1',
+      'overview.geojson',
+      expect.objectContaining({ type: 'FeatureCollection' }),
+      null,
+    )
+  })
 })

@@ -25,8 +25,8 @@ describe('TripMetadataHeader', () => {
     expect(screen.getByText('Planned — no dates set')).toBeDefined()
   })
 
-  it('saves a name edit on blur', () => {
-    const onUpdate = vi.fn().mockReturnValue(trip({ name: 'Iceland' }))
+  it('saves a name edit on blur', async () => {
+    const onUpdate = vi.fn().mockResolvedValue(trip({ name: 'Iceland' }))
     render(<TripMetadataHeader trip={trip()} onUpdate={onUpdate} />)
 
     fireEvent.click(screen.getByText('Hokkaido'))
@@ -63,8 +63,8 @@ describe('TripMetadataHeader', () => {
     expect(screen.getByText('Hokkaido')).toBeDefined()
   })
 
-  it('shows a failure message and reverts when the update returns null', () => {
-    const onUpdate = vi.fn().mockReturnValue(null)
+  it('shows a failure message and reverts when the update resolves null', async () => {
+    const onUpdate = vi.fn().mockResolvedValue(null)
     render(<TripMetadataHeader trip={trip()} onUpdate={onUpdate} />)
 
     fireEvent.click(screen.getByText('Hokkaido'))
@@ -72,11 +72,11 @@ describe('TripMetadataHeader', () => {
     fireEvent.change(input, { target: { value: 'Iceland' } })
     fireEvent.blur(input)
 
-    expect(screen.getByText("Couldn't save — name reverted.")).toBeDefined()
+    expect(await screen.findByText("Couldn't save — name reverted.")).toBeDefined()
   })
 
-  it('renders notes and lets them be edited', () => {
-    const onUpdate = vi.fn().mockReturnValue(trip({ notes: 'Great trip' }))
+  it('renders notes and lets them be edited', async () => {
+    const onUpdate = vi.fn().mockResolvedValue(trip({ notes: 'Great trip' }))
     render(<TripMetadataHeader trip={trip({ notes: 'Draft notes' })} onUpdate={onUpdate} />)
 
     fireEvent.click(screen.getByText('Draft notes'))
@@ -88,7 +88,7 @@ describe('TripMetadataHeader', () => {
   })
 
   it('changes status via the selector', () => {
-    const onUpdate = vi.fn().mockReturnValue(trip({ status: 'completed' }))
+    const onUpdate = vi.fn().mockResolvedValue(trip({ status: 'completed' }))
     render(<TripMetadataHeader trip={trip()} onUpdate={onUpdate} />)
 
     fireEvent.click(screen.getByText('planned'))

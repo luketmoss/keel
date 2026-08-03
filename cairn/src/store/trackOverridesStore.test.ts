@@ -28,35 +28,35 @@ describe('LocalTrackOverridesStore', () => {
     expect(store.getOverrides('trip-1')).toEqual({})
   })
 
-  it('sets and reads back a display name override', () => {
+  it('sets and reads back a display name override', async () => {
     const store = new LocalTrackOverridesStore(fakeStorage())
-    store.setOverride('trip-1', 'drive-1', { displayName: 'Day 3' }, ['drive-1'])
+    await store.setOverride('trip-1', 'drive-1', { displayName: 'Day 3' }, ['drive-1'])
 
     expect(store.getOverrides('trip-1')).toEqual({ 'drive-1': { displayName: 'Day 3' } })
   })
 
-  it('merges a new field onto an existing override without clobbering the others', () => {
+  it('merges a new field onto an existing override without clobbering the others', async () => {
     const store = new LocalTrackOverridesStore(fakeStorage())
-    store.setOverride('trip-1', 'drive-1', { displayName: 'Day 3' }, ['drive-1'])
-    store.setOverride('trip-1', 'drive-1', { color: 2 }, ['drive-1'])
+    await store.setOverride('trip-1', 'drive-1', { displayName: 'Day 3' }, ['drive-1'])
+    await store.setOverride('trip-1', 'drive-1', { color: 2 }, ['drive-1'])
 
     expect(store.getOverrides('trip-1')).toEqual({
       'drive-1': { displayName: 'Day 3', color: 2 },
     })
   })
 
-  it('keeps overrides for different trips separate', () => {
+  it('keeps overrides for different trips separate', async () => {
     const store = new LocalTrackOverridesStore(fakeStorage())
-    store.setOverride('trip-1', 'drive-1', { displayName: 'Day 3' }, ['drive-1'])
-    store.setOverride('trip-2', 'drive-1', { displayName: 'Other trip' }, ['drive-1'])
+    await store.setOverride('trip-1', 'drive-1', { displayName: 'Day 3' }, ['drive-1'])
+    await store.setOverride('trip-2', 'drive-1', { displayName: 'Other trip' }, ['drive-1'])
 
     expect(store.getOverrides('trip-1')).toEqual({ 'drive-1': { displayName: 'Day 3' } })
     expect(store.getOverrides('trip-2')).toEqual({ 'drive-1': { displayName: 'Other trip' } })
   })
 
-  it('renumbers order for the whole list on a reorder', () => {
+  it('renumbers order for the whole list on a reorder', async () => {
     const store = new LocalTrackOverridesStore(fakeStorage())
-    store.setOrder('trip-1', ['drive-2', 'drive-1', 'drive-3'], ['drive-1', 'drive-2', 'drive-3'])
+    await store.setOrder('trip-1', ['drive-2', 'drive-1', 'drive-3'], ['drive-1', 'drive-2', 'drive-3'])
 
     expect(store.getOverrides('trip-1')).toEqual({
       'drive-2': { order: 0 },
@@ -65,11 +65,11 @@ describe('LocalTrackOverridesStore', () => {
     })
   })
 
-  it('prunes an override for a file no longer in the valid set before writing', () => {
+  it('prunes an override for a file no longer in the valid set before writing', async () => {
     const store = new LocalTrackOverridesStore(fakeStorage())
-    store.setOverride('trip-1', 'drive-1', { displayName: 'Gone soon' }, ['drive-1', 'drive-2'])
+    await store.setOverride('trip-1', 'drive-1', { displayName: 'Gone soon' }, ['drive-1', 'drive-2'])
 
-    store.setOverride('trip-1', 'drive-2', { color: 1 }, ['drive-2'])
+    await store.setOverride('trip-1', 'drive-2', { color: 1 }, ['drive-2'])
 
     expect(store.getOverrides('trip-1')).toEqual({ 'drive-2': { color: 1 } })
   })
@@ -82,7 +82,7 @@ describe('LocalTrackOverridesStore', () => {
     expect(store.getOverrides('trip-1')).toEqual({})
   })
 
-  it('returns false when the underlying write throws', () => {
+  it('returns false when the underlying write throws', async () => {
     const storage = fakeStorage()
     const failing: Storage = {
       ...storage,
@@ -92,6 +92,15 @@ describe('LocalTrackOverridesStore', () => {
     }
     const store = new LocalTrackOverridesStore(failing)
 
-    expect(store.setOverride('trip-1', 'drive-1', { displayName: 'x' }, ['drive-1'])).toBe(false)
+    expect(await store.setOverride('trip-1', 'drive-1', { displayName: 'x' }, ['drive-1'])).toBe(false)
+  })
+
+  it('replaceAll overwrites the whole record for a trip', async () => {
+    const store = new LocalTrackOverridesStore(fakeStorage())
+    await store.setOverride('trip-1', 'drive-1', { displayName: 'Day 3' }, ['drive-1'])
+
+    store.replaceAll('trip-1', { 'drive-2': { displayName: 'Restored' } })
+
+    expect(store.getOverrides('trip-1')).toEqual({ 'drive-2': { displayName: 'Restored' } })
   })
 })

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, useSyncExternalStore, type DragEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type DragEvent } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Sidebar } from './components/Sidebar'
 import { MapView } from './components/MapView'
@@ -11,7 +11,8 @@ import { DropOverlay } from './components/DropOverlay'
 import { useTrackImport } from './import/useTrackImport'
 import { dataTransferHasFiles, filesFromDataTransfer } from './import/dataTransfer'
 import { InMemoryTrackStore } from './store/trackStore'
-import { LocalTripStore, type TripIndexEntry, type TripStore } from './store/tripStore'
+import { DriveTripStore } from './store/driveTripStore'
+import type { TripIndexEntry, TripStore } from './store/tripStore'
 import { useGoogleAccount, type GoogleAccount } from './auth/useGoogleAccount'
 import { AccountRow } from './auth/AccountRow'
 import './App.css'
@@ -33,15 +34,25 @@ function AppShell() {
   const trackImport = useTrackImport(store)
   const account = useGoogleAccount()
   /* Same rule as InMemoryTrackStore above: this is the one module allowed
-     to import LocalTripStore directly — everything else depends on the
+     to import DriveTripStore directly — everything else depends on the
      TripStore interface. */
-  const tripStore = useMemo(() => new LocalTripStore(), [])
+  const tripStore = useMemo(() => new DriveTripStore(), [])
   const trips = useSyncExternalStore(tripStore.subscribe, tripStore.getTrips)
   const createTrip = useCallback((name: string) => tripStore.createTrip(name), [tripStore])
   const deleteTrip = useCallback((id: string) => tripStore.deleteTrip(id), [tripStore])
 
   const accessToken = account.state.status === 'signed-in' ? account.state.accessToken : null
   const cairnFolderId = account.state.status === 'signed-in' ? account.state.folderId : null
+
+  // Hydrates every trip's index/overview from Drive and migrates any
+  // local-only trip up, per #59's design note. Re-runs whenever the token
+  // changes (a fresh sign-in, or a reconnect after expiry) — each run is
+  // idempotent, so there's no harm re-hydrating on a token refresh that
+  // didn't actually need it.
+  useEffect(() => {
+    if (!accessToken || !cairnFolderId) return
+    void tripStore.connect(accessToken, cairnFolderId)
+  }, [tripStore, accessToken, cairnFolderId])
 
   return (
     <Routes>

@@ -53,7 +53,7 @@ function fakeTripStore(overviews: Record<string, FeatureCollection<LineString> |
     getTrips: () => [],
     getTrip: (): TripRecord | null => null,
     createTrip: () => tripEntry(),
-    updateTrip: (): TripRecord | null => null,
+    updateTrip: async (): Promise<TripRecord | null> => null,
     deleteTrip: () => {},
     getOverview: (id: string) => overviews[id] ?? null,
     saveOverview: () => {},

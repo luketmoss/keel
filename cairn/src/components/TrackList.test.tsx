@@ -231,7 +231,7 @@ describe('TrackList', () => {
   })
 
   it('renames a track via click-to-edit and calls onRename with the trimmed value (#46)', () => {
-    const onRename = vi.fn().mockReturnValue(true)
+    const onRename = vi.fn().mockResolvedValue(true)
     render(
       <TrackList
         files={[importedFile()]}
@@ -289,8 +289,8 @@ describe('TrackList', () => {
     expect(screen.getByText('trip.kml', { exact: false })).toBeDefined()
   })
 
-  it('shows a save-failure message beneath the list when a rename fails, without changing the name (#46)', () => {
-    const onRename = vi.fn().mockReturnValue(false)
+  it('shows a save-failure message beneath the list when a rename fails, without changing the name (#46)', async () => {
+    const onRename = vi.fn().mockResolvedValue(false)
     render(
       <TrackList
         files={[importedFile()]}
@@ -304,12 +304,12 @@ describe('TrackList', () => {
     fireEvent.change(screen.getByDisplayValue('trip.kml'), { target: { value: 'New name' } })
     fireEvent.keyDown(screen.getByDisplayValue('New name'), { key: 'Enter' })
 
-    expect(screen.getByText("Couldn't save name — reverted.")).toBeDefined()
+    expect(await screen.findByText("Couldn't save name — reverted.")).toBeDefined()
     expect(screen.getByText('trip.kml', { exact: false })).toBeDefined()
   })
 
   it('opens a colour popover from the swatch button and calls onRecolor with the chosen index (#46)', () => {
-    const onRecolor = vi.fn().mockReturnValue(true)
+    const onRecolor = vi.fn().mockResolvedValue(true)
     render(
       <TrackList
         files={[importedFile()]}
@@ -327,7 +327,7 @@ describe('TrackList', () => {
   })
 
   it('reorders tracks by dragging one row onto another and calls onReorder with the new id order (#46)', () => {
-    const onReorder = vi.fn().mockReturnValue(true)
+    const onReorder = vi.fn().mockResolvedValue(true)
     render(
       <TrackList
         files={[importedFile({ id: 'a', name: 'a.kml' }), importedFile({ id: 'b', name: 'b.kml' })]}

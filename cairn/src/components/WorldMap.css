@@ -117,7 +117,8 @@
 }
 
 .world-map__dot-hit:hover .world-map__dot,
-.world-map__dot-hit:focus-within .world-map__dot {
+.world-map__dot-hit:focus-within .world-map__dot,
+.world-map__dot-hit--emphasized .world-map__dot {
   transform: scale(1.35);
 }
 
@@ -137,7 +138,8 @@
 }
 
 .world-map__dot-hit:hover .world-map__dot-label,
-.world-map__dot-hit:focus-within .world-map__dot-label {
+.world-map__dot-hit:focus-within .world-map__dot-label,
+.world-map__dot-hit--emphasized .world-map__dot-label {
   opacity: 1;
 }
 

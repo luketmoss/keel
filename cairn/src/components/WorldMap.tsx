@@ -4,6 +4,12 @@ import { APIProvider, AdvancedMarker, Map, useMap } from '@vis.gl/react-google-m
 import { googleMapsApiKey } from '../env'
 import { MapUnavailable } from './MapUnavailable'
 import type { TripIndexEntry, TripStatus } from '../store/tripStore'
+import {
+  matchesTripFilters,
+  tripDayIndex,
+  type StatusFilter,
+  type TripFilters,
+} from '../store/tripFilters'
 import { fitTracksToBounds, zoomToFitCluster } from '../map/fitBounds'
 import { clusterMarkers, type MarkerCluster } from '../map/cluster'
 import './WorldMap.css'
@@ -12,23 +18,19 @@ import './WorldMap.css'
 const INITIAL_CENTER = { lat: 20, lng: 0 }
 const INITIAL_ZOOM = 2
 
-const MS_PER_DAY = 86_400_000
-
 /* --marker-size from index.css, transcribed for the same reason PhotoLayer's
    own copy is — clustering's projection math wants real pixels, not a CSS
    var. Keep in step with index.css by hand. */
 const MARKER_FOOTPRINT_PX = 28
 
 /** The map's centre and zoom survive a trip visit and return, for the
-    session — #79's point, and what makes the map browsable at all now
-    that a trip visit unmounts it (#78 doesn't yet make it survive
-    navigation to /trips; #80 does). Module-level rather than component
-    state so it isn't wiped by `WorldMap` itself remounting, and never
-    persisted anywhere, so a reload starts fresh — the better opening frame
-    per the design note. */
+    session — #79's point. `/` and `/trips` no longer unmount `WorldMap` at
+    all (#80 — it stays mounted behind the trips panel), so this is only
+    still doing work across a visit to `/trips/:id`, which remains its own
+    top-level route and unmounts everything above it. Module-level rather
+    than component state for that reason, and never persisted anywhere, so
+    a reload starts fresh — the better opening frame per the design note. */
 let lastCamera: { center: google.maps.LatLngLiteral; zoom: number } | null = null
-
-type StatusFilter = 'all' | TripStatus
 
 interface Place {
   tripId: string
@@ -36,12 +38,6 @@ interface Place {
   status: TripStatus
   lat: number
   lng: number
-  /** `startDate` if the trip has one, `createdAt` otherwise — the "date a
-      trip never chose" the design note's Notes section describes. Used to
-      place the trip on the range slider's span; `dated` is what decides
-      whether the slider can ever exclude it. */
-  timestamp: number
-  dated: boolean
 }
 
 function placesForTrips(trips: TripIndexEntry[]): Place[] {
@@ -53,31 +49,41 @@ function placesForTrips(trips: TripIndexEntry[]): Place[] {
     .filter((trip): trip is TripIndexEntry & { origin: NonNullable<TripIndexEntry['origin']> } =>
       Boolean(trip.origin),
     )
-    .map((trip) => {
-      const dated = trip.startDate !== null
-      const timestamp = new Date(trip.startDate ?? trip.createdAt).getTime()
-      return {
-        tripId: trip.id,
-        name: trip.name,
-        status: trip.status,
-        lat: trip.origin.lat,
-        lng: trip.origin.lng,
-        timestamp,
-        dated,
-      }
-    })
-    .filter((place) => Number.isFinite(place.timestamp))
+    .map((trip) => ({
+      tripId: trip.id,
+      name: trip.name,
+      status: trip.status,
+      lat: trip.origin.lat,
+      lng: trip.origin.lng,
+    }))
 }
 
-function dayIndex(timestampMs: number): number {
-  return Math.floor(timestampMs / MS_PER_DAY)
+interface WorldMapProps {
+  trips: TripIndexEntry[]
+  filters: TripFilters
+  onFiltersChange: (filters: TripFilters) => void
+  /** #80: the status pills move into the trips panel's header while it's
+      open, rather than being duplicated — this is what lets `WorldMap`
+      stop drawing its own copy without losing the control entirely. */
+  hideStatusPills?: boolean
+  hoveredTripId: string | null
+  onHoverTrip: (tripId: string | null) => void
 }
 
 /** `/` (#78 makes it the homepage; #79 replaces what it draws): every trip
     with a place draws as one dot rather than its full route — a route
-    means the import is not saved yet (#81), and a dot means it is. */
-export function WorldMap({ trips }: WorldMapProps) {
-  const [filter, setFilter] = useState<StatusFilter>('all')
+    means the import is not saved yet (#81), and a dot means it is. Stays
+    mounted behind the trips panel at `/trips` (#80) rather than being
+    replaced by it, which is what makes the camera and the map itself
+    survive that navigation without any special-casing here. */
+export function WorldMap({
+  trips,
+  filters,
+  onFiltersChange,
+  hideStatusPills,
+  hoveredTripId,
+  onHoverTrip,
+}: WorldMapProps) {
   const [keyRejected, setKeyRejected] = useState(false)
   const navigate = useNavigate()
 
@@ -91,36 +97,44 @@ export function WorldMap({ trips }: WorldMapProps) {
   const places = useMemo(() => placesForTrips(trips), [trips])
 
   const dateSpan = useMemo(() => {
-    if (places.length === 0) return null
-    const days = places.map((place) => dayIndex(place.timestamp))
+    if (trips.length === 0) return null
+    const days = trips.map((trip) => tripDayIndex(trip))
     return { min: Math.min(...days), max: Math.max(...days) }
-  }, [places])
+  }, [trips])
 
-  const [range, setRange] = useState<[number, number] | null>(() =>
-    dateSpan ? [dateSpan.min, dateSpan.max] : null,
-  )
   // The slider's range resets to the full span whenever the span itself
   // changes shape (a trip gaining or losing a date) rather than every
   // render — narrowing it back to `[min, max]` on every trip update would
   // make a filter the user just set snap back the moment anything else
-  // about the trip list changed.
+  // about the trip list changed. It also refills whenever something
+  // outside this component clears `filters.range` to `null` — #80's
+  // trips panel does exactly that from its "Clear filters" action, which
+  // is specified to reset the date range along with name and status.
+  //
+  // An effect, not a render-time call: since #80 lifted `filters` into
+  // whatever mounts this component, calling `onFiltersChange`
+  // synchronously during render would be updating a different
+  // component's state mid-render, which React (rightly) warns about —
+  // the update belongs after render commits.
   const spanKey = dateSpan ? `${dateSpan.min}-${dateSpan.max}` : ''
-  const previousSpanKey = useRef(spanKey)
-  if (previousSpanKey.current !== spanKey) {
+  const previousSpanKey = useRef<string | null>(null)
+  const range = filters.range
+  useEffect(() => {
+    const spanChanged = previousSpanKey.current !== spanKey
+    if (!spanChanged && range !== null) return
     previousSpanKey.current = spanKey
-    setRange(dateSpan ? [dateSpan.min, dateSpan.max] : null)
-  }
+    onFiltersChange({ ...filters, range: dateSpan ? [dateSpan.min, dateSpan.max] : null })
+    // `filters` deliberately excluded — this effect only reacts to the
+    // span changing or `range` being cleared, not to the caller passing a
+    // new `filters` object after every keystroke in the name field.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spanKey, dateSpan, range, onFiltersChange])
 
-  const visiblePlaces = useMemo(() => {
-    return places.filter((place) => {
-      if (filter !== 'all' && place.status !== filter) return false
-      if (place.dated && range) {
-        const day = dayIndex(place.timestamp)
-        if (day < range[0] || day > range[1]) return false
-      }
-      return true
-    })
-  }, [places, filter, range])
+  const visibleTrips = useMemo(
+    () => trips.filter((trip) => matchesTripFilters(trip, filters)),
+    [trips, filters],
+  )
+  const visiblePlaces = useMemo(() => placesForTrips(visibleTrips), [visibleTrips])
 
   if (!googleMapsApiKey) {
     return (
@@ -145,9 +159,19 @@ export function WorldMap({ trips }: WorldMapProps) {
 
   return (
     <div className="world-map">
-      {!noPlaces && <FilterRow filter={filter} onChange={setFilter} />}
-      {!noPlaces && dateSpan && dateSpan.min !== dateSpan.max && range && (
-        <DateRangeControl min={dateSpan.min} max={dateSpan.max} value={range} onChange={setRange} />
+      {!noPlaces && !hideStatusPills && (
+        <StatusFilterRow
+          status={filters.status}
+          onChange={(status) => onFiltersChange({ ...filters, status })}
+        />
+      )}
+      {!noPlaces && dateSpan && dateSpan.min !== dateSpan.max && filters.range && (
+        <DateRangeControl
+          min={dateSpan.min}
+          max={dateSpan.max}
+          value={filters.range}
+          onChange={(range) => onFiltersChange({ ...filters, range })}
+        />
       )}
       <APIProvider apiKey={googleMapsApiKey} onError={() => setKeyRejected(true)}>
         <Map
@@ -159,7 +183,12 @@ export function WorldMap({ trips }: WorldMapProps) {
           disableDefaultUI
           zoomControl
         >
-          <PlaceLayer places={visiblePlaces} onSelectTrip={(id) => navigate(`/trips/${id}`)} />
+          <PlaceLayer
+            places={visiblePlaces}
+            hoveredTripId={hoveredTripId}
+            onHoverTrip={onHoverTrip}
+            onSelectTrip={(id) => navigate(`/trips/${id}`)}
+          />
         </Map>
       </APIProvider>
       {noPlaces ? (
@@ -176,16 +205,12 @@ export function WorldMap({ trips }: WorldMapProps) {
   )
 }
 
-interface WorldMapProps {
-  trips: TripIndexEntry[]
-}
-
-function FilterRow({
-  filter,
+function StatusFilterRow({
+  status,
   onChange,
 }: {
-  filter: StatusFilter
-  onChange: (filter: StatusFilter) => void
+  status: StatusFilter
+  onChange: (status: StatusFilter) => void
 }) {
   const segments: { value: StatusFilter; label: string }[] = [
     { value: 'all', label: 'All' },
@@ -200,7 +225,7 @@ function FilterRow({
           key={segment.value}
           type="button"
           className={`world-map__filter-segment${
-            filter === segment.value ? ' world-map__filter-segment--active' : ''
+            status === segment.value ? ' world-map__filter-segment--active' : ''
           }`}
           onClick={() => onChange(segment.value)}
         >
@@ -212,7 +237,7 @@ function FilterRow({
 }
 
 function yearOf(day: number): number {
-  return new Date(day * MS_PER_DAY).getFullYear()
+  return new Date(day * 86_400_000).getFullYear()
 }
 
 function DateRangeControl({
@@ -265,6 +290,8 @@ function EmptyOverlay({ heading, detail }: { heading: string; detail?: string })
 
 interface PlaceLayerProps {
   places: Place[]
+  hoveredTripId: string | null
+  onHoverTrip: (tripId: string | null) => void
   onSelectTrip: (tripId: string) => void
 }
 
@@ -274,7 +301,7 @@ interface PlaceLayerProps {
     afterward (a filter change), never on a re-render that leaves it the
     same. Mirrors the pre-#79 `WorldRouteLayer`'s own fit-once-per-change
     stance. */
-function PlaceLayer({ places, onSelectTrip }: PlaceLayerProps) {
+function PlaceLayer({ places, hoveredTripId, onHoverTrip, onSelectTrip }: PlaceLayerProps) {
   const map = useMap()
   const [zoom, setZoom] = useState<number>(() => map?.getZoom() ?? INITIAL_ZOOM)
   const isFirstFit = useRef(true)
@@ -331,7 +358,15 @@ function PlaceLayer({ places, onSelectTrip }: PlaceLayerProps) {
       {clusters.map((cluster) => {
         if (cluster.members.length === 1) {
           const place = cluster.members[0].place
-          return <PlaceDot key={place.tripId} place={place} onSelect={() => onSelectTrip(place.tripId)} />
+          return (
+            <PlaceDot
+              key={place.tripId}
+              place={place}
+              emphasized={hoveredTripId === place.tripId}
+              onHover={onHoverTrip}
+              onSelect={() => onSelectTrip(place.tripId)}
+            />
+          )
         }
         const key = cluster.members
           .map((member) => member.place.tripId)
@@ -343,14 +378,34 @@ function PlaceLayer({ places, onSelectTrip }: PlaceLayerProps) {
   )
 }
 
-function PlaceDot({ place, onSelect }: { place: Place; onSelect: () => void }) {
+function PlaceDot({
+  place,
+  emphasized,
+  onHover,
+  onSelect,
+}: {
+  place: Place
+  /** #80: forced into the hover-visual state because the trips panel's
+      matching row is hovered, not because the pointer is over this dot —
+      the same 1.35 scale and name chip either way (design doc: "Row and
+      dot are one object"). */
+  emphasized: boolean
+  onHover: (tripId: string | null) => void
+  onSelect: () => void
+}) {
   return (
     <AdvancedMarker position={{ lat: place.lat, lng: place.lng }} zIndex={0} onClick={onSelect}>
-      <div className="world-map__dot-hit">
+      <div
+        className={`world-map__dot-hit${emphasized ? ' world-map__dot-hit--emphasized' : ''}`}
+        onMouseEnter={() => onHover(place.tripId)}
+        onMouseLeave={() => onHover(null)}
+      >
         <button
           type="button"
           className={`world-map__dot world-map__dot--${place.status}`}
           aria-label={place.name}
+          onFocus={() => onHover(place.tripId)}
+          onBlur={() => onHover(null)}
         />
         <span className="world-map__dot-label">{place.name}</span>
       </div>

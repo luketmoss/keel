@@ -1,0 +1,186 @@
+.account-bubble {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  z-index: 2;
+}
+
+.account-bubble__signin {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--hit-target);
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur));
+  box-shadow: var(--shadow-lifted);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.account-bubble__signin:hover {
+  background: var(--surface-lift);
+}
+
+.account-bubble__signin:active {
+  background: var(--pressed);
+}
+
+.account-bubble__signin:disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.account-bubble__status {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur));
+  box-shadow: var(--shadow-lifted);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.account-bubble__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-1);
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur));
+  box-shadow: var(--shadow-lifted);
+  cursor: pointer;
+}
+
+.account-bubble__trigger:hover {
+  background: var(--surface-lift);
+}
+
+.account-bubble__trigger:active {
+  background: var(--pressed);
+}
+
+.account-bubble__avatar {
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  border-radius: var(--radius-full);
+  object-fit: cover;
+}
+
+.account-bubble__avatar--fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-lift);
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.account-bubble__popover {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  min-width: 220px;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur));
+  box-shadow: var(--shadow-lifted);
+  animation: account-bubble-popover-in var(--motion-fast) var(--ease);
+}
+
+@keyframes account-bubble-popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .account-bubble__popover {
+    animation: none;
+  }
+}
+
+.account-bubble__name {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--text-base);
+}
+
+.account-bubble__email {
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-bubble__divider {
+  margin: var(--space-2) 0;
+  border-top: 1px solid var(--border);
+}
+
+.account-bubble__error {
+  margin: var(--space-2) 0 0;
+  color: var(--danger);
+  font-size: var(--text-xs);
+}
+
+.account-bubble__action {
+  display: inline-flex;
+  align-items: center;
+  margin-top: var(--space-2);
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.account-bubble__action:hover {
+  color: var(--text);
+}
+
+.account-bubble__action:disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.account-bubble__signout {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: var(--row-touch);
+  padding: 0 var(--space-2);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.account-bubble__signout:hover {
+  background: var(--hover);
+}
+
+.account-bubble__signout:active {
+  background: var(--pressed);
+}

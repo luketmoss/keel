@@ -36,89 +36,20 @@ afterEach(() => {
   vi.unstubAllEnvs()
 })
 
-function fileDataTransfer(names: string[] = ['a.kml']): DataTransfer {
-  return {
-    types: ['Files'],
-    files: names.map((name) => new File(['x'], name)) as unknown as FileList,
-  } as unknown as DataTransfer
-}
-
-function textDataTransfer(): DataTransfer {
-  return { types: ['text/plain'], files: [] as unknown as FileList } as unknown as DataTransfer
-}
-
-describe('App drag-and-drop', () => {
-  it('shows no overlay before a drag starts', async () => {
-    await renderApp()
-    expect(screen.queryByTestId('drop-overlay')).toBeNull()
-  })
-
-  it('shows the overlay while a file drag is over the window', async () => {
-    await renderApp()
-    const app = screen.getByTestId('map').closest('.app') as HTMLElement
-
-    fireEvent.dragEnter(app, { dataTransfer: fileDataTransfer() })
-
-    expect(screen.getByTestId('drop-overlay')).toBeDefined()
-  })
-
-  it('does not show the overlay for a drag that carries no files', async () => {
-    await renderApp()
-    const app = screen.getByTestId('map').closest('.app') as HTMLElement
-
-    fireEvent.dragEnter(app, { dataTransfer: textDataTransfer() })
-
-    expect(screen.queryByTestId('drop-overlay')).toBeNull()
-  })
-
-  it('clears the overlay once the drag leaves every nested element', async () => {
-    await renderApp()
-    const app = screen.getByTestId('map').closest('.app') as HTMLElement
-    const sidebar = screen
-      .getByRole('button', { name: 'Import tracks' })
-      .closest('.sidebar') as HTMLElement
-
-    /* Entering the sidebar (nested inside .app) fires its own enter; leaving
-       just the sidebar must not clear the overlay while still over .app. */
-    fireEvent.dragEnter(app, { dataTransfer: fileDataTransfer() })
-    fireEvent.dragEnter(sidebar, { dataTransfer: fileDataTransfer() })
-    fireEvent.dragLeave(sidebar, { dataTransfer: fileDataTransfer() })
-    expect(screen.getByTestId('drop-overlay')).toBeDefined()
-
-    fireEvent.dragLeave(app, { dataTransfer: fileDataTransfer() })
-    expect(screen.queryByTestId('drop-overlay')).toBeNull()
-  })
-
-  it('imports dropped files and clears the overlay', async () => {
-    await renderApp()
-    const app = screen.getByTestId('map').closest('.app') as HTMLElement
-
-    fireEvent.dragEnter(app, { dataTransfer: fileDataTransfer() })
-    await act(async () => {
-      fireEvent.drop(app, { dataTransfer: fileDataTransfer(['trip.kml']) })
-    })
-
-    expect(screen.queryByTestId('drop-overlay')).toBeNull()
-    await screen.findByText('trip.kml', { exact: false })
-  })
-})
-
-describe('App account row', () => {
+describe('App account bubble', () => {
   it('renders no sign-in control when VITE_GOOGLE_CLIENT_ID is unset, and the rest of the app works', async () => {
     await renderApp('/')
-    expect(screen.queryByRole('button', { name: 'Sign in with Google' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Sign in' })).toBeNull()
     expect(screen.getByTestId('map')).toBeDefined()
-    expect(screen.getByRole('button', { name: 'Import tracks' })).toBeDefined()
   })
 
   it('shows a sign-in control when a client id is configured, and the rest of the app still works', async () => {
     await renderApp('/', { googleClientId: 'a-client-id' })
-    expect(screen.getByRole('button', { name: 'Sign in with Google' })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeDefined()
     expect(screen.getByTestId('map')).toBeDefined()
-    expect(screen.getByRole('button', { name: 'Import tracks' })).toBeDefined()
   })
 
-  it('signing out leaves tracks already loaded in the session untouched', async () => {
+  it('signing out returns the bubble to signed-out', async () => {
     ;(window as unknown as { google?: unknown }).google = {
       accounts: {
         oauth2: {
@@ -141,21 +72,16 @@ describe('App account row', () => {
     })
 
     await renderApp('/', { googleClientId: 'a-client-id' })
-    const app = screen.getByTestId('map').closest('.app') as HTMLElement
-    await act(async () => {
-      fireEvent.drop(app, { dataTransfer: fileDataTransfer(['trip.kml']) })
-    })
-    await screen.findByText('trip.kml', { exact: false })
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Sign in with Google' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
     })
-    await screen.findByText('jane@gmail.com')
+    await screen.findByRole('button', { name: /Account: jane@gmail.com/ })
 
+    fireEvent.click(screen.getByRole('button', { name: /Account: jane@gmail.com/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
 
-    expect(screen.getByText('trip.kml', { exact: false })).toBeDefined()
-    expect(screen.getByRole('button', { name: 'Sign in with Google' })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeDefined()
 
     fetchSpy.mockRestore()
     delete (window as unknown as { google?: unknown }).google
@@ -163,34 +89,43 @@ describe('App account row', () => {
 })
 
 describe('App routing', () => {
-  it('renders the map and sidebar at /', async () => {
+  it('renders the map and top bar at /', async () => {
     await renderApp('/')
     expect(screen.getByTestId('map')).toBeDefined()
-    expect(screen.getByRole('link', { name: 'Map' })).toBeDefined()
+    expect(screen.getByRole('link', { name: 'World' })).toBeDefined()
     expect(screen.getByRole('link', { name: 'Trips' })).toBeDefined()
-    expect(screen.getByRole('button', { name: 'Import tracks' })).toBeDefined()
   })
 
-  it('keeps the sidebar and shows the trip list at /trips', async () => {
+  it('shows the trip list at /trips, with no map', async () => {
     await renderApp('/trips')
     expect(screen.queryByTestId('map')).toBeNull()
     expect(screen.getByRole('heading', { name: 'Trips' })).toBeDefined()
     expect(screen.getByPlaceholderText('Trip name')).toBeDefined()
     expect(screen.getByText('No trips yet')).toBeDefined()
-    expect(screen.getByRole('button', { name: 'Import tracks' })).toBeDefined()
   })
 
-  it('shows a not-found state at /trips/:id when no trip matches the id', async () => {
-    await renderApp('/trips/abc')
-    expect(screen.getByRole('link', { name: 'Back to trips' })).toBeDefined()
-    expect(screen.getByText('Trip not found')).toBeDefined()
-    expect(screen.queryByRole('button', { name: 'Import tracks' })).toBeNull()
+  it('redirects /map to /', async () => {
+    await renderApp('/map')
+    expect(screen.getByTestId('map')).toBeDefined()
+    expect(window.location.pathname).toBe('/')
+  })
+
+  it('redirects /world to /', async () => {
+    await renderApp('/world')
+    expect(screen.getByTestId('map')).toBeDefined()
+    expect(window.location.pathname).toBe('/')
   })
 
   it('redirects an unrecognized path to /', async () => {
     await renderApp('/nonsense')
     expect(screen.getByTestId('map')).toBeDefined()
     expect(window.location.pathname).toBe('/')
+  })
+
+  it('shows a not-found state at /trips/:id when no trip matches the id', async () => {
+    await renderApp('/trips/abc')
+    expect(screen.getByRole('button', { name: 'Back' })).toBeDefined()
+    expect(screen.getByText('Trip not found')).toBeDefined()
   })
 
   it('renders trip metadata for an existing trip at /trips/:id, read-only while signed out (#73)', async () => {
@@ -236,31 +171,31 @@ describe('App routing', () => {
     }
   })
 
-  it('marks "Map" active only at / and "Trips" active at /trips', async () => {
+  it('marks "World" active only at / and "Trips" active at /trips', async () => {
     const first = await renderApp('/')
-    expect(screen.getByRole('link', { name: 'Map' }).className).toContain('--active')
+    expect(screen.getByRole('link', { name: 'World' }).className).toContain('--active')
     expect(screen.getByRole('link', { name: 'Trips' }).className).not.toContain('--active')
     first.unmount()
 
     const second = await renderApp('/trips')
-    expect(screen.getByRole('link', { name: 'Map' }).className).not.toContain('--active')
+    expect(screen.getByRole('link', { name: 'World' }).className).not.toContain('--active')
     expect(screen.getByRole('link', { name: 'Trips' }).className).toContain('--active')
     second.unmount()
 
-    // /trips/:id replaces the nav with a back arrow — see TripDetail.
+    // /trips/:id replaces the nav with a back control — see TripDetail.
     await renderApp('/trips/abc')
-    expect(screen.queryByRole('link', { name: 'Map' })).toBeNull()
-    expect(screen.getByRole('link', { name: 'Back to trips' })).toBeDefined()
+    expect(screen.queryByRole('link', { name: 'World' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Back' })).toBeDefined()
   })
 
-  it('navigates via the sidebar links and supports back/forward', async () => {
+  it('navigates via the top bar links and supports back/forward', async () => {
     await renderApp('/')
 
     fireEvent.click(screen.getByRole('link', { name: 'Trips' }))
     expect(await screen.findByRole('heading', { name: 'Trips' })).toBeDefined()
     expect(window.location.pathname).toBe('/trips')
 
-    fireEvent.click(screen.getByRole('link', { name: 'Map' }))
+    fireEvent.click(screen.getByRole('link', { name: 'World' }))
     expect(await screen.findByTestId('map')).toBeDefined()
     expect(window.location.pathname).toBe('/')
 
@@ -273,5 +208,63 @@ describe('App routing', () => {
       window.history.forward()
     })
     expect(await screen.findByTestId('map')).toBeDefined()
+  })
+
+  function seedTrip(tripId: string) {
+    window.localStorage.setItem(
+      'cairn.trips.index',
+      JSON.stringify([
+        { id: tripId, name: 'Hokkaido', status: 'planned', startDate: null, endDate: null, createdAt: '2026-01-01T00:00:00.000Z' },
+      ]),
+    )
+    window.localStorage.setItem(
+      `cairn.trips.trip.${tripId}`,
+      JSON.stringify({
+        id: tripId,
+        name: 'Hokkaido',
+        status: 'planned',
+        startDate: null,
+        endDate: null,
+        notes: '',
+        createdAt: '2026-01-01T00:00:00.000Z',
+      }),
+    )
+  }
+
+  function clearSeededTrip(tripId: string) {
+    window.localStorage.removeItem('cairn.trips.index')
+    window.localStorage.removeItem(`cairn.trips.trip.${tripId}`)
+  }
+
+  it('the back control returns to /trips when the trip was opened from a row there', async () => {
+    const tripId = 'trip-from-trips'
+    seedTrip(tripId)
+
+    try {
+      await renderApp('/trips')
+      fireEvent.click(screen.getByText('Hokkaido'))
+      expect(await screen.findByRole('button', { name: 'Back' })).toBeDefined()
+      expect(window.location.pathname).toBe(`/trips/${tripId}`)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+      expect(await screen.findByRole('heading', { name: 'Trips' })).toBeDefined()
+      expect(window.location.pathname).toBe('/trips')
+    } finally {
+      clearSeededTrip(tripId)
+    }
+  })
+
+  it('the back control goes to / when the trip was opened by a typed URL', async () => {
+    const tripId = 'trip-typed-url'
+    seedTrip(tripId)
+
+    try {
+      await renderApp(`/trips/${tripId}`)
+      fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+      expect(await screen.findByTestId('map')).toBeDefined()
+      expect(window.location.pathname).toBe('/')
+    } finally {
+      clearSeededTrip(tripId)
+    }
   })
 })

@@ -22,6 +22,11 @@
 }
 
 .trip-not-found__link {
+  border: none;
+  background: none;
+  padding: 0;
   color: var(--accent);
+  font: inherit;
   text-decoration: none;
+  cursor: pointer;
 }

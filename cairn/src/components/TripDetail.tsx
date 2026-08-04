@@ -8,8 +8,7 @@ import {
   type DragEvent,
   type ReactNode,
 } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { Sidebar } from './Sidebar'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { MapView } from './MapView'
 import { TrackList } from './TrackList'
 import { PhotoList } from './PhotoList'
@@ -106,26 +105,28 @@ interface TripDetailProps {
   tripStore: TripStore
   accessToken: string | null
   cairnFolderId: string | null
-  accountRow: ReactNode
+  accountBubble: ReactNode
   /** Wired to #32's re-authentication flow — passed through to
       `TripImportPanel` for its "signed out mid-upload" failures. */
   onReconnect?: () => void
 }
 
-/** The `/trips/:id` page: same map-shell layout as `/`, but with its own
-    sidebar header and its own Drive-backed import — reusing `TrackList` and
-    `MapView` unmodified. Mounted instead of the v1 shell (never alongside
-    it — see `App.tsx`), so its drag-and-drop never has to fight the
-    window-wide v1 handlers for the same drop. */
+/** The `/trips/:id` page: its own panel + map layout, with its own
+    Drive-backed import — reusing `TrackList` and `MapView` unmodified.
+    Mounted instead of the default shell (never alongside it — see
+    `App.tsx`), so its drag-and-drop never has to fight a window-wide
+    handler for the same drop. */
 export function TripDetail({
   tripStore,
   accessToken,
   cairnFolderId,
-  accountRow,
+  accountBubble,
   onReconnect,
 }: TripDetailProps) {
   const { id } = useParams()
   const tripId = id ?? ''
+  const navigate = useNavigate()
+  const location = useLocation()
   const trip = useSyncExternalStore(tripStore.subscribe, () => tripStore.getTrip(tripId))
   const tripImport = useTripImport(tripId, accessToken, cairnFolderId)
   const photoImport = usePhotoImport(tripId, accessToken, cairnFolderId)
@@ -319,28 +320,36 @@ export function TripDetail({
     void importFiles(dropped)
   }
 
-  // A broken detail view should never trap the user — the back link works
-  // regardless of load state, including when the trip doesn't exist at all.
-  const backLink = (
-    <Link to="/trips" className="trip-detail-header__back" aria-label="Back to trips">
+  // A broken detail view should never trap the user — the back control
+  // works regardless of load state, including when the trip doesn't exist
+  // at all. Destination is conditional (#78's Back navigation): an in-app
+  // entry (opened from a dot on the world map, or a row in the trips
+  // list) goes back one step, landing wherever it was opened from; a typed
+  // URL or a reload has no such entry and goes home instead.
+  const canGoBack = location.key !== 'default'
+  function handleBack() {
+    if (canGoBack) navigate(-1)
+    else navigate('/')
+  }
+  const backButton = (
+    <button type="button" className="trip-detail-header__back" aria-label="Back" onClick={handleBack}>
       ←
-    </Link>
+    </button>
   )
 
   if (!trip) {
     return (
       <div className="app">
-        <Sidebar header={<div className="trip-detail-header">{backLink}</div>} accountRow={accountRow}>
-          <div />
-        </Sidebar>
+        <aside className="trip-detail-panel">
+          <div className="trip-detail-header">{backButton}</div>
+        </aside>
         <div className="app__map">
-          <TripNotFound />
+          <TripNotFound onBack={handleBack} />
         </div>
+        {accountBubble}
       </div>
     )
   }
-
-  const header = <div className="trip-detail-header">{backLink}</div>
 
   // Fetching — nothing has arrived yet. File list shows nothing beyond the
   // placeholder text; the map shows its own loading treatment via MapView.
@@ -354,99 +363,102 @@ export function TripDetail({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <Sidebar header={header} accountRow={accountRow}>
-        <TripMetadataHeader
-          trip={trip}
-          onUpdate={(patch) => tripStore.updateTrip(trip.id, patch)}
-          disabled={!signedIn}
-        />
-        <TripImportPanel
-          signedIn={signedIn}
-          progress={combinedProgress}
-          failures={combinedFailures}
-          importFiles={importFiles}
-          retryFailure={retryFailure}
-          dismissFailures={dismissFailures}
-          onReconnect={onReconnect}
-        />
-        {fetching ? (
-          <p className="trip-detail__loading">Loading tracks…</p>
-        ) : tripImport.tracks.length === 0 && tripImport.missingFiles.length === 0 ? (
-          // Empty trip — #6's empty state, with #75's copy fix: it used to
-          // point at "Import tracks", a control this page has never had
-          // (it's read "Import files" since #51).
-          <TrackList
-            files={tripImport.tracks}
-            onToggleVisibility={tripImport.toggleVisibility}
-            onRemove={tripImport.removeFile}
+      <aside className="trip-detail-panel">
+        <div className="trip-detail-header">{backButton}</div>
+        <div className="trip-detail-panel__body">
+          <TripMetadataHeader
+            trip={trip}
+            onUpdate={(patch) => tripStore.updateTrip(trip.id, patch)}
+            disabled={!signedIn}
+          />
+          <TripImportPanel
+            signedIn={signedIn}
+            progress={combinedProgress}
+            failures={combinedFailures}
+            importFiles={importFiles}
+            retryFailure={retryFailure}
+            dismissFailures={dismissFailures}
+            onReconnect={onReconnect}
+          />
+          {fetching ? (
+            <p className="trip-detail__loading">Loading tracks…</p>
+          ) : tripImport.tracks.length === 0 && tripImport.missingFiles.length === 0 ? (
+            // Empty trip — #6's empty state, with #75's copy fix: it used to
+            // point at "Import tracks", a control this page has never had
+            // (it's read "Import files" since #51).
+            <TrackList
+              files={tripImport.tracks}
+              onToggleVisibility={tripImport.toggleVisibility}
+              onRemove={tripImport.removeFile}
+              confirmingId={removeConfirm.confirmingId}
+              onStartConfirm={removeConfirm.onStartConfirm}
+              onCancelConfirm={removeConfirm.onCancelConfirm}
+              confirmingRowRef={removeConfirm.confirmingRowRef}
+              removingIds={tripImport.removingTrackIds}
+              removeErrors={tripImport.trackRemoveErrors}
+              disableRemove={!signedIn}
+              onHoverFile={setHoveredFileId}
+              onRename={tripImport.renameTrack}
+              onRecolor={tripImport.recolorTrack}
+              onReorder={tripImport.reorderTracks}
+              canReorder={!tripImport.loading}
+              emptyDetail="Drop tracks or photos anywhere, or use Import files above."
+            />
+          ) : (
+            <>
+              {tripImport.tracks.length > 0 && (
+                <TrackList
+                  files={tripImport.tracks}
+                  onToggleVisibility={tripImport.toggleVisibility}
+                  onRemove={tripImport.removeFile}
+                  confirmingId={removeConfirm.confirmingId}
+                  onStartConfirm={removeConfirm.onStartConfirm}
+                  onCancelConfirm={removeConfirm.onCancelConfirm}
+                  confirmingRowRef={removeConfirm.confirmingRowRef}
+                  removingIds={tripImport.removingTrackIds}
+                  removeErrors={tripImport.trackRemoveErrors}
+                  disableRemove={!signedIn}
+                  onHoverFile={setHoveredFileId}
+                  onRename={tripImport.renameTrack}
+                  onRecolor={tripImport.recolorTrack}
+                  onReorder={tripImport.reorderTracks}
+                  canReorder={!tripImport.loading}
+                  disabled={!signedIn}
+                />
+              )}
+              {tripImport.missingFiles.length > 0 && (
+                // Every file missing renders no extra banner — the rows
+                // already say it (#35 edge case).
+                <ul className="track-list track-list--missing">
+                  {tripImport.missingFiles.map((file) => (
+                    <MissingFileRow key={file.id} file={file} />
+                  ))}
+                </ul>
+              )}
+            </>
+          )}
+          {/* Renders even for a trip with tracks and no photos — the way to
+              add photos has to be discoverable from a trip that has none
+              (design doc edge case, deliberately not repeating #35's
+              mistake with tracks). */}
+          <PhotoList
+            items={photoListItems}
+            totalCount={photoImport.photos.length}
+            selectedPhotoId={selectedPhotoId}
+            accessToken={accessToken}
+            tripOffsetHours={tripOffsetHours}
+            onOpenRow={openPhoto}
+            onRemove={photoImport.removePhoto}
             confirmingId={removeConfirm.confirmingId}
             onStartConfirm={removeConfirm.onStartConfirm}
             onCancelConfirm={removeConfirm.onCancelConfirm}
             confirmingRowRef={removeConfirm.confirmingRowRef}
-            removingIds={tripImport.removingTrackIds}
-            removeErrors={tripImport.trackRemoveErrors}
+            removingIds={photoImport.removingPhotoIds}
+            removeErrors={photoImport.photoRemoveErrors}
             disableRemove={!signedIn}
-            onHoverFile={setHoveredFileId}
-            onRename={tripImport.renameTrack}
-            onRecolor={tripImport.recolorTrack}
-            onReorder={tripImport.reorderTracks}
-            canReorder={!tripImport.loading}
-            emptyDetail="Drop tracks or photos anywhere, or use Import files above."
           />
-        ) : (
-          <>
-            {tripImport.tracks.length > 0 && (
-              <TrackList
-                files={tripImport.tracks}
-                onToggleVisibility={tripImport.toggleVisibility}
-                onRemove={tripImport.removeFile}
-                confirmingId={removeConfirm.confirmingId}
-                onStartConfirm={removeConfirm.onStartConfirm}
-                onCancelConfirm={removeConfirm.onCancelConfirm}
-                confirmingRowRef={removeConfirm.confirmingRowRef}
-                removingIds={tripImport.removingTrackIds}
-                removeErrors={tripImport.trackRemoveErrors}
-                disableRemove={!signedIn}
-                onHoverFile={setHoveredFileId}
-                onRename={tripImport.renameTrack}
-                onRecolor={tripImport.recolorTrack}
-                onReorder={tripImport.reorderTracks}
-                canReorder={!tripImport.loading}
-                disabled={!signedIn}
-              />
-            )}
-            {tripImport.missingFiles.length > 0 && (
-              // Every file missing renders no extra banner — the rows
-              // already say it (#35 edge case).
-              <ul className="track-list track-list--missing">
-                {tripImport.missingFiles.map((file) => (
-                  <MissingFileRow key={file.id} file={file} />
-                ))}
-              </ul>
-            )}
-          </>
-        )}
-        {/* Renders even for a trip with tracks and no photos — the way to
-            add photos has to be discoverable from a trip that has none
-            (design doc edge case, deliberately not repeating #35's
-            mistake with tracks). */}
-        <PhotoList
-          items={photoListItems}
-          totalCount={photoImport.photos.length}
-          selectedPhotoId={selectedPhotoId}
-          accessToken={accessToken}
-          tripOffsetHours={tripOffsetHours}
-          onOpenRow={openPhoto}
-          onRemove={photoImport.removePhoto}
-          confirmingId={removeConfirm.confirmingId}
-          onStartConfirm={removeConfirm.onStartConfirm}
-          onCancelConfirm={removeConfirm.onCancelConfirm}
-          confirmingRowRef={removeConfirm.confirmingRowRef}
-          removingIds={photoImport.removingPhotoIds}
-          removeErrors={photoImport.photoRemoveErrors}
-          disableRemove={!signedIn}
-        />
-      </Sidebar>
+        </div>
+      </aside>
       <div className="app__map">
         <MapView
           files={tripImport.tracks}
@@ -458,6 +470,7 @@ export function TripDetail({
           onOpenPhoto={openPhoto}
         />
       </div>
+      {accountBubble}
       {dragActive && <DropOverlay label="Drop tracks or photos" />}
       {openPhotoRow && (
         <Lightbox

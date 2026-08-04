@@ -16,7 +16,14 @@ export type AccountState =
       cairn/docs/design/72-drive-session-lifecycle.md, "Restoring". */
   | { status: 'restoring' }
   | { status: 'setting-up-folder' }
-  | { status: 'signed-in'; email: string; accessToken: string; folderId: string }
+  | {
+      status: 'signed-in'
+      email: string
+      accessToken: string
+      folderId: string
+      name?: string
+      pictureUrl?: string
+    }
   | { status: 'folder-error'; email?: string; accessToken: string }
   /** `reconnecting` is set while the `Reconnect` popup is open — the row
       keeps showing the expiry message and a disabled, relabelled button
@@ -42,7 +49,14 @@ async function setUpAccount(accessToken: string): Promise<AccountState> {
       getDriveAccount(accessToken),
       findOrCreateCairnFolder(accessToken),
     ])
-    return { status: 'signed-in', email: account.email, accessToken, folderId }
+    return {
+      status: 'signed-in',
+      email: account.email,
+      accessToken,
+      folderId,
+      name: account.name,
+      pictureUrl: account.pictureUrl,
+    }
   } catch (error) {
     if (error instanceof DriveAuthError) {
       // A token that expires before setup even finishes has no email to

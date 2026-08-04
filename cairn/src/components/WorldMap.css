@@ -6,10 +6,12 @@
 
 /* Same treatment as Google's own default controls — translucent, floating
    above the tiles — rather than a fixed header, since the map is the
-   content here, not a document. */
+   content here, not a document. Sits below the nav panel now that World is
+   the homepage (#78); #79 repositions this properly as status pills under
+   the nav. */
 .world-map__filter {
   position: absolute;
-  top: var(--space-4);
+  top: calc(var(--space-4) + 72px + var(--space-2));
   left: var(--space-4);
   z-index: 1;
   display: flex;

@@ -103,7 +103,7 @@ function renderTrip(options: { signedIn?: boolean } = {}) {
               tripStore={store}
               accessToken={signedIn ? 'token' : null}
               cairnFolderId={signedIn ? 'cairn-folder-id' : null}
-              accountRow={null}
+              accountBubble={null}
             />
           }
         />
@@ -301,7 +301,7 @@ describe('TripDetail — #73 disconnected is read-only', () => {
         <Routes>
           <Route
             path="/trips/:id"
-            element={<TripDetail tripStore={store} accessToken={null} cairnFolderId={null} accountRow={null} />}
+            element={<TripDetail tripStore={store} accessToken={null} cairnFolderId={null} accountBubble={null} />}
           />
         </Routes>
       </MemoryRouter>,
@@ -321,7 +321,7 @@ describe('TripDetail — #73 disconnected is read-only', () => {
                 tripStore={store}
                 accessToken="token"
                 cairnFolderId="cairn-folder-id"
-                accountRow={null}
+                accountBubble={null}
               />
             }
           />
@@ -479,7 +479,7 @@ describe('TripDetail — #77 removing tracks and photos', () => {
                 tripStore={store}
                 accessToken="token"
                 cairnFolderId="cairn-folder-id"
-                accountRow={null}
+                accountBubble={null}
               />
             }
           />

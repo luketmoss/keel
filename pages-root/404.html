@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Redirecting…</title>
+    <script type="text/javascript">
+      // Single Page Apps for GitHub Pages
+      // https://github.com/rafgraph/spa-github-pages
+      //
+      // This is the ONE 404.html GitHub Pages serves for the whole site
+      // (github.com/luketmoss/keel -> https://luketmoss.github.io/keel/).
+      // It rewrites the path into a query string and redirects, so the
+      // project's own index.html (see the matching restore snippet there)
+      // can turn it back into a real route before its router sees it.
+      //
+      // pathSegmentsToKeep is 2 because every project lives at
+      // /keel/<project>/... — this file only ever needs to preserve
+      // "keel" and whichever project segment follows it, never a specific
+      // project name. A second project opts into this same fallback by
+      // adding the restore snippet to its own index.html; this file does
+      // not change.
+      var pathSegmentsToKeep = 2;
+
+      var l = window.location;
+      l.replace(
+        l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
+        l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') + '/?/' +
+        l.pathname.slice(1).split('/').slice(pathSegmentsToKeep).join('/').replace(/&/g, '~and~') +
+        (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
+        l.hash
+      );
+    </script>
+  </head>
+  <body>
+  </body>
+</html>

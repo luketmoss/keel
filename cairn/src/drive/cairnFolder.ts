@@ -3,7 +3,7 @@
    and a files list/create pair scoped to a folder named `Cairn` at Drive's
    root. Plain `fetch` against the REST API rather than the `gapi` client
    library — one dependency fewer, and every call is a plain request a test
-   can mock the same way `useTrackImport`'s network test does. */
+   can mock directly. */
 
 import { reportDriveAuthError } from './authEvents'
 

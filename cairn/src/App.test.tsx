@@ -1,5 +1,32 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const { findOrCreateTripFolder } = vi.hoisted(() => ({ findOrCreateTripFolder: vi.fn() }))
+vi.mock('./drive/tripFolder', () => ({ findOrCreateTripFolder }))
+
+const { startResumableUpload, uploadFileContent } = vi.hoisted(() => ({
+  startResumableUpload: vi.fn(),
+  uploadFileContent: vi.fn(),
+}))
+// A full passthrough except the two functions above — `imageCache.ts` and
+// `usePhotoImport.ts` (exercised by `TripDetail`, rendered by other tests
+// in this file) import `DriveAuthError`/`DriveRequestError` from this same
+// module, which a narrower mock would silently replace with `undefined`.
+vi.mock('./drive/trackFiles', async () => {
+  const actual = await vi.importActual<typeof import('./drive/trackFiles')>('./drive/trackFiles')
+  return { ...actual, startResumableUpload, uploadFileContent }
+})
+
+function loadKmlFixture(name: string, as = name): File {
+  const buffer = readFileSync(join(__dirname, 'kml/fixtures', name))
+  return new File([buffer], as)
+}
+
+function fileDataTransfer(files: File[]): DataTransfer {
+  return { types: ['Files'], files: files as unknown as FileList } as unknown as DataTransfer
+}
 
 /* Unmocked, APIProvider injects Google's script tag and the suite makes a
    network call from CI. The stub renders just enough to tell "the map
@@ -30,6 +57,10 @@ async function renderApp(path = '/', { googleClientId }: { googleClientId?: stri
 
 beforeEach(() => {
   window.history.pushState({}, '', '/')
+  // #72's session persistence writes here on sign-in — cleared so one
+  // test's signed-in session doesn't read back as a stored session (and a
+  // "Reconnecting…" restore) in the next.
+  window.sessionStorage.clear()
 })
 
 afterEach(() => {
@@ -355,5 +386,156 @@ describe('App routing', () => {
       window.localStorage.removeItem('cairn.trips.index')
       window.localStorage.removeItem(`cairn.trips.trip.${tripId}`)
     }
+  })
+})
+
+describe('App drop-to-draft (#81)', () => {
+  beforeEach(() => {
+    findOrCreateTripFolder.mockReset().mockResolvedValue('folder-1')
+    startResumableUpload.mockReset().mockResolvedValue('session-uri')
+    uploadFileContent.mockReset().mockResolvedValue({ id: 'drive-file-1' })
+  })
+
+  it('dropping a KML outside a trip opens the draft panel, seeded from the filename', async () => {
+    await renderApp('/')
+    const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
+
+    fireEvent.drop(shell, { dataTransfer: fileDataTransfer([loadKmlFixture('linestring.kml', 'day1.kml')]) })
+
+    expect(await screen.findByText('NOT SAVED')).toBeDefined()
+    expect(screen.getByText('day1')).toBeDefined()
+    expect(screen.getByText('day1.kml · 1 track')).toBeDefined()
+  })
+
+  it('dropping a file with the wrong extension shows a toast and opens no draft', async () => {
+    await renderApp('/')
+    const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
+
+    fireEvent.drop(shell, { dataTransfer: fileDataTransfer([new File(['x'], 'notes.txt')]) })
+
+    expect(await screen.findByText('Only .kml and .kmz files can be imported.')).toBeDefined()
+    expect(screen.queryByText('NOT SAVED')).toBeNull()
+  })
+
+  it('dropping while the trips panel is open closes it and opens the draft instead', async () => {
+    await renderApp('/trips')
+    expect(screen.getByRole('heading', { name: 'Trips' })).toBeDefined()
+    const shell = screen.getByRole('heading', { name: 'Trips' }).closest('.shell') as HTMLElement
+
+    fireEvent.drop(shell, { dataTransfer: fileDataTransfer([loadKmlFixture('linestring.kml', 'day1.kml')]) })
+
+    expect(await screen.findByText('NOT SAVED')).toBeDefined()
+    expect(screen.queryByRole('heading', { name: 'Trips' })).toBeNull()
+    expect(window.location.pathname).toBe('/')
+  })
+
+  it('cancel discards the draft — no trip appears in the panel', async () => {
+    await renderApp('/')
+    const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
+    fireEvent.drop(shell, { dataTransfer: fileDataTransfer([loadKmlFixture('linestring.kml', 'day1.kml')]) })
+    await screen.findByText('NOT SAVED')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.queryByText('NOT SAVED')).toBeNull()
+    fireEvent.click(screen.getByRole('link', { name: 'Trips' }))
+    expect(await screen.findByText('No trips yet')).toBeDefined()
+  })
+
+  it('while signed out, Save is replaced by a sign-in prompt, and the draft stays after signing in', async () => {
+    ;(window as unknown as { google?: unknown }).google = {
+      accounts: {
+        oauth2: {
+          initTokenClient: (config: { callback: (r: { access_token: string }) => void }) => ({
+            requestAccessToken: () => config.callback({ access_token: 'tok' }),
+          }),
+        },
+      },
+    }
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      const href = String(url)
+      if (href.includes('/about')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ user: { emailAddress: 'jane@gmail.com' } }),
+        } as Response
+      }
+      return { ok: true, status: 200, json: async () => ({ files: [] }) } as Response
+    })
+
+    await renderApp('/', { googleClientId: 'a-client-id' })
+    const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
+    fireEvent.drop(shell, { dataTransfer: fileDataTransfer([loadKmlFixture('linestring.kml', 'day1.kml')]) })
+    await screen.findByText('NOT SAVED')
+
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Sign in to save' })).toBeDefined()
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    })
+    await screen.findByRole('button', { name: /Account: jane@gmail.com/ })
+
+    expect(screen.getByText('NOT SAVED')).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDefined()
+
+    fetchSpy.mockRestore()
+    delete (window as unknown as { google?: unknown }).google
+  })
+
+  it('Save creates the trip, uploads the file, and replaces the draft with a normal trips list', async () => {
+    ;(window as unknown as { google?: unknown }).google = {
+      accounts: {
+        oauth2: {
+          initTokenClient: (config: { callback: (r: { access_token: string }) => void }) => ({
+            requestAccessToken: () => config.callback({ access_token: 'tok' }),
+          }),
+        },
+      },
+    }
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      const href = String(url)
+      if (href.includes('/about')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ user: { emailAddress: 'jane@gmail.com' } }),
+        } as Response
+      }
+      // The `/Cairn/` folder lookup/creation `findOrCreateCairnFolder` runs
+      // during sign-in (separately from `findOrCreateTripFolder`, mocked
+      // above for the trip's own folder) — it needs a real `id` here or
+      // `cairnFolderId` ends up `undefined`, which would make `save()`
+      // bail out as if signed out.
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ id: 'cairn-folder-id', createdTime: '2024-01-01T00:00:00.000Z', files: [] }),
+      } as Response
+    })
+
+    await renderApp('/', { googleClientId: 'a-client-id' })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    })
+    await screen.findByRole('button', { name: /Account:/ })
+
+    const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
+    fireEvent.drop(shell, { dataTransfer: fileDataTransfer([loadKmlFixture('linestring.kml', 'Hokkaido.kml')]) })
+    await screen.findByText('NOT SAVED')
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    })
+
+    expect(screen.queryByText('NOT SAVED')).toBeNull()
+    expect(startResumableUpload).toHaveBeenCalledWith('tok', 'folder-1', 'Hokkaido.kml')
+
+    fireEvent.click(screen.getByRole('link', { name: 'Trips' }))
+    expect(await screen.findByText('Hokkaido')).toBeDefined()
+
+    fetchSpy.mockRestore()
+    delete (window as unknown as { google?: unknown }).google
   })
 })

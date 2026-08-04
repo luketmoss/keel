@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { APIProvider, AdvancedMarker, Map, useMap } from '@vis.gl/react-google-maps'
+import { APIProvider, AdvancedMarker, Map, Polyline, useMap } from '@vis.gl/react-google-maps'
 import { googleMapsApiKey } from '../env'
 import { MapUnavailable } from './MapUnavailable'
 import type { TripIndexEntry, TripStatus } from '../store/tripStore'
+import type { Track } from '../kml/parse'
 import {
   matchesTripFilters,
   tripDayIndex,
@@ -13,6 +14,10 @@ import {
 import { fitTracksToBounds, zoomToFitCluster } from '../map/fitBounds'
 import { clusterMarkers, type MarkerCluster } from '../map/cluster'
 import './WorldMap.css'
+
+/* --text from index.css, transcribed — Google Maps' Polyline options take
+   real colour values, not CSS custom properties. */
+const DRAFT_ROUTE_COLOR = '#f1f3fa'
 
 /* Same "nothing imported yet" default as before there's anything to fit to. */
 const INITIAL_CENTER = { lat: 20, lng: 0 }
@@ -68,6 +73,12 @@ interface WorldMapProps {
   hideStatusPills?: boolean
   hoveredTripId: string | null
   onHoverTrip: (tripId: string | null) => void
+  /** #81: the tracks of a drop-to-draft trip that hasn't been saved yet —
+      drawn as a route (the rule: "a dot means it is a trip, a route means
+      it is not saved yet"). The camera fits to it deliberately, on every
+      addition, unlike the once-per-change stance `PlaceLayer` takes for
+      saved trips: a drop is an explicit "look at this". */
+  draftTracks?: Track[]
 }
 
 /** `/` (#78 makes it the homepage; #79 replaces what it draws): every trip
@@ -83,7 +94,9 @@ export function WorldMap({
   hideStatusPills,
   hoveredTripId,
   onHoverTrip,
+  draftTracks,
 }: WorldMapProps) {
+  const hasDraft = Boolean(draftTracks && draftTracks.length > 0)
   const [keyRejected, setKeyRejected] = useState(false)
   const navigate = useNavigate()
 
@@ -159,13 +172,16 @@ export function WorldMap({
 
   return (
     <div className="world-map">
-      {!noPlaces && !hideStatusPills && (
+      {/* #81: the status pills and date range are hidden while a draft is
+          open — filtering the saved set isn't what the user is doing, and
+          the controls would compete with the decision in front of them. */}
+      {!noPlaces && !hideStatusPills && !hasDraft && (
         <StatusFilterRow
           status={filters.status}
           onChange={(status) => onFiltersChange({ ...filters, status })}
         />
       )}
-      {!noPlaces && dateSpan && dateSpan.min !== dateSpan.max && filters.range && (
+      {!noPlaces && !hasDraft && dateSpan && dateSpan.min !== dateSpan.max && filters.range && (
         <DateRangeControl
           min={dateSpan.min}
           max={dateSpan.max}
@@ -189,18 +205,20 @@ export function WorldMap({
             onHoverTrip={onHoverTrip}
             onSelectTrip={(id) => navigate(`/trips/${id}`)}
           />
+          {draftTracks && <DraftRouteLayer tracks={draftTracks} />}
         </Map>
       </APIProvider>
-      {noPlaces ? (
-        <EmptyOverlay
-          heading="No places yet"
-          detail="Drop a KML anywhere to start your first trip."
-        />
-      ) : (
-        filteredEmpty && (
-          <EmptyOverlay heading="Nothing in this range" detail="Widen the filters to see your trips." />
-        )
-      )}
+      {!hasDraft &&
+        (noPlaces ? (
+          <EmptyOverlay
+            heading="No places yet"
+            detail="Drop a KML anywhere to start your first trip."
+          />
+        ) : (
+          filteredEmpty && (
+            <EmptyOverlay heading="Nothing in this range" detail="Widen the filters to see your trips." />
+          )
+        ))}
     </div>
   )
 }
@@ -440,5 +458,40 @@ function PlaceCluster({
         {cluster.members.length}
       </button>
     </AdvancedMarker>
+  )
+}
+
+/** #81: draws a not-yet-saved draft's tracks as routes — one `Polyline` per
+    track, the same shape `TrackLayer` uses for a trip's own map, rather
+    than one path spanning every track (which would draw a false line
+    connecting them). Fits the camera to the union on every addition,
+    unconditionally: a drop is an explicit "look at this", unlike
+    `PlaceLayer`'s once-per-change stance for the already-saved set. */
+function DraftRouteLayer({ tracks }: { tracks: Track[] }) {
+  const map = useMap()
+  const previousKey = useRef('')
+
+  const paths = useMemo(
+    () => tracks.map((track) => track.points.map((point) => ({ lat: point.lat, lng: point.lon }))),
+    [tracks],
+  )
+  const allPoints = useMemo(() => paths.flat(), [paths])
+
+  useEffect(() => {
+    if (!map || allPoints.length === 0) return
+    const key = `${tracks.length}-${allPoints.length}`
+    if (key === previousKey.current) return
+    previousKey.current = key
+    fitTracksToBounds(map, allPoints)
+  }, [map, tracks.length, allPoints])
+
+  if (!map) return null
+
+  return (
+    <>
+      {paths.map((path, index) => (
+        <Polyline key={index} path={path} strokeColor={DRAFT_ROUTE_COLOR} strokeWeight={3} clickable={false} />
+      ))}
+    </>
   )
 }

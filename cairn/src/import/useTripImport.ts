@@ -134,9 +134,9 @@ export interface UseTripImport {
   reorderTracks: (orderedIds: string[]) => Promise<boolean>
 }
 
-/* Drive-aware sibling of `useTrackImport`: upload then parse instead of
-   just parse, bounded concurrency instead of one-at-a-time, and a read-back
-   on mount since a trip's tracks live in Drive rather than only in memory. */
+/* Uploads then parses each file, with bounded concurrency, and reads back
+   whatever's already in the trip's Drive folder on mount, since a trip's
+   tracks live there rather than only in memory. */
 export function useTripImport(
   tripId: string,
   accessToken: string | null,

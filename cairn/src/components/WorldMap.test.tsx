@@ -9,7 +9,11 @@ const { fitTracksToBounds, zoomToFitCluster } = vi.hoisted(() => ({
 }))
 vi.mock('../map/fitBounds', () => ({ fitTracksToBounds, zoomToFitCluster }))
 
-const fakeMap = { id: 'fake-map', getZoom: () => 2, getCenter: () => undefined }
+const fakeMap = {
+  id: 'fake-map',
+  getZoom: () => 2,
+  getCenter: () => ({ toJSON: () => ({ lat: 12, lng: 34 }) }),
+}
 vi.mock('@vis.gl/react-google-maps', () => ({
   APIProvider: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
   Map: ({ children }: { children?: React.ReactNode }) => <div data-testid="map">{children}</div>,
@@ -29,10 +33,18 @@ vi.mock('@vis.gl/react-google-maps', () => ({
   useMap: () => fakeMap,
 }))
 
+// Captures every 'idle' listener PlaceLayer registers, so a test can fire one
+// by hand to simulate the map settling — the real trigger for #79's camera
+// snapshot, which nothing here drives through a genuine Google Maps instance.
+let idleListeners: (() => void)[] = []
+
 ;(globalThis as unknown as { google: unknown }).google = {
   maps: {
     event: {
-      addListener: () => ({ remove: () => {} }),
+      addListener: (_target: unknown, eventName: string, callback: () => void) => {
+        if (eventName === 'idle') idleListeners.push(callback)
+        return { remove: () => {} }
+      },
       addListenerOnce: () => {},
     },
   },
@@ -78,6 +90,7 @@ afterEach(() => {
   vi.unstubAllEnvs()
   fitTracksToBounds.mockClear()
   zoomToFitCluster.mockClear()
+  idleListeners = []
 })
 
 describe('WorldMap', () => {
@@ -121,6 +134,40 @@ describe('WorldMap', () => {
         expect.objectContaining({ lat: -33, lng: 151 }),
       ]),
     )
+  })
+
+  it('does not re-fit on remount once the camera has settled, restoring it instead (#79 camera persistence)', async () => {
+    vi.stubEnv('VITE_GOOGLE_MAPS_API_KEY', 'a-browser-key')
+    vi.resetModules()
+    const { WorldMap } = await import('./WorldMap')
+    const trips = [tripEntry({ id: 'a', origin: { lat: 37, lng: -122 } })]
+
+    function renderAt() {
+      return render(
+        <MemoryRouter initialEntries={['/']}>
+          <Routes>
+            <Route path="/" element={<WorldMap trips={trips} />} />
+          </Routes>
+        </MemoryRouter>,
+      )
+    }
+
+    const first = renderAt()
+    expect(fitTracksToBounds).toHaveBeenCalledTimes(1)
+
+    // The map settling (a pan, a zoom, or simply the initial fit finishing)
+    // is what records the camera — simulated here since nothing drives a
+    // real Google Maps 'idle' event through the mock.
+    idleListeners.forEach((listener) => listener())
+    first.unmount()
+    fitTracksToBounds.mockClear()
+
+    // A second mount of the *same* module — i.e. navigating back to `/`
+    // within the same session, not a fresh page load — restores the
+    // recorded camera via `defaultCenter`/`defaultZoom` instead of fitting
+    // again.
+    renderAt()
+    expect(fitTracksToBounds).not.toHaveBeenCalled()
   })
 
   it('hovering a dot shows the trip name as a label', async () => {

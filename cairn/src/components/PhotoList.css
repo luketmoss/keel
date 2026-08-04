@@ -52,8 +52,21 @@
   border-bottom: 1px solid var(--border);
 }
 
+/* #77 — the row's own remove control sits beside the open button rather
+   than inside it, same split TrackList's row already uses between its name
+   and its icon buttons. */
+.photo-row__main {
+  display: flex;
+  align-items: center;
+}
+
+.photo-row--removing {
+  opacity: 0.4;
+}
+
 .photo-row__button {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   min-height: var(--row-touch);
   display: flex;
   align-items: center;
@@ -126,4 +139,108 @@
 
 .photo-row--selected .photo-row__name {
   color: inherit;
+}
+
+/* #77 — remove control, confirm, and failure line. Mirrors
+   `TrackList.css`'s `.track-row__remove`/`.track-row__confirm*` exactly —
+   same hit-target sizing, same non-growing negative-margin technique — kept
+   as a separate declaration rather than a shared class because the two
+   rows' surrounding layout differs enough (flex row vs. block) that sharing
+   a class would couple them for no benefit. */
+.photo-row__remove {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  margin-right: var(--space-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: var(--text-base);
+  padding: 0;
+}
+
+.photo-row__remove:hover {
+  color: var(--danger);
+  background: var(--hover);
+}
+
+.photo-row__remove:active {
+  background: var(--pressed);
+}
+
+.photo-row__remove:disabled {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+
+.photo-row__removing {
+  flex: none;
+  margin-right: var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.photo-row__confirm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  min-height: var(--row-touch);
+}
+
+.photo-row__confirm-text {
+  font-size: var(--text-base);
+  color: var(--text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.photo-row__confirm-actions {
+  flex: none;
+  display: flex;
+  gap: var(--space-2);
+}
+
+.photo-row__confirm-remove,
+.photo-row__confirm-cancel {
+  font-size: var(--text-sm);
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+  margin: calc(var(--space-1) * -1) 0;
+}
+
+.photo-row__confirm-remove {
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.photo-row__confirm-cancel {
+  color: var(--text-muted);
+}
+
+.photo-row__confirm-cancel:hover {
+  color: var(--text);
+}
+
+.photo-row__confirm-remove:active,
+.photo-row__confirm-cancel:active {
+  background: var(--pressed);
+}
+
+.photo-row__error {
+  margin: 0 var(--space-4) var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--danger);
 }

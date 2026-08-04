@@ -20,6 +20,33 @@ function row(overrides: Partial<PhotoListRow> = {}): PhotoListRow {
   }
 }
 
+/* #77's remove control shares its confirm slot with `TrackList` — owned by
+   `TripDetail`, not `PhotoList` itself — so every render needs these props
+   supplied. Kept as a spreadable default object rather than repeating six
+   props on every call site, and overridable per test for the removal
+   suite below. */
+function removeProps(overrides: Partial<{
+  onRemove: ReturnType<typeof vi.fn>
+  confirmingId: string | null
+  onStartConfirm: ReturnType<typeof vi.fn>
+  onCancelConfirm: ReturnType<typeof vi.fn>
+  removingIds: Set<string>
+  removeErrors: Record<string, string>
+  disableRemove: boolean
+}> = {}) {
+  return {
+    onRemove: vi.fn(),
+    confirmingId: null,
+    onStartConfirm: vi.fn(),
+    onCancelConfirm: vi.fn(),
+    confirmingRowRef: { current: null },
+    removingIds: new Set<string>(),
+    removeErrors: {},
+    disableRemove: false,
+    ...overrides,
+  }
+}
+
 describe('PhotoList', () => {
   it('shows the empty state pointing at the import control when the trip has no photos (criterion 13)', () => {
     render(
@@ -30,6 +57,7 @@ describe('PhotoList', () => {
         accessToken="token"
         tripOffsetHours={0}
         onOpenRow={vi.fn()}
+        {...removeProps()}
       />,
     )
 
@@ -51,11 +79,13 @@ describe('PhotoList', () => {
         accessToken="token"
         tripOffsetHours={0}
         onOpenRow={vi.fn()}
+        {...removeProps()}
       />,
     )
 
     expect(screen.getByText('2')).toBeDefined()
-    expect(screen.getAllByRole('button')).toHaveLength(2)
+    // Two open buttons plus two remove buttons, one pair per row.
+    expect(screen.getAllByRole('button')).toHaveLength(4)
   })
 
   it('renders a No date divider for an undated photo and never drops it (criterion 3)', () => {
@@ -70,6 +100,7 @@ describe('PhotoList', () => {
         accessToken="token"
         tripOffsetHours={0}
         onOpenRow={vi.fn()}
+        {...removeProps()}
       />,
     )
 
@@ -90,6 +121,7 @@ describe('PhotoList', () => {
         accessToken="token"
         tripOffsetHours={0}
         onOpenRow={vi.fn()}
+        {...removeProps()}
       />,
     )
 
@@ -110,6 +142,7 @@ describe('PhotoList', () => {
         accessToken="token"
         tripOffsetHours={0}
         onOpenRow={onOpenRow}
+        {...removeProps()}
       />,
     )
 
@@ -129,6 +162,7 @@ describe('PhotoList', () => {
         accessToken="token"
         tripOffsetHours={0}
         onOpenRow={vi.fn()}
+        {...removeProps()}
       />,
     )
 
@@ -151,6 +185,7 @@ describe('PhotoList', () => {
         accessToken="token"
         tripOffsetHours={0}
         onOpenRow={vi.fn()}
+        {...removeProps()}
       />,
     )
     expect(scrollIntoView).not.toHaveBeenCalled()
@@ -163,6 +198,7 @@ describe('PhotoList', () => {
         accessToken="token"
         tripOffsetHours={0}
         onOpenRow={vi.fn()}
+        {...removeProps()}
       />,
     )
 
@@ -184,10 +220,136 @@ describe('PhotoList', () => {
         accessToken="token"
         tripOffsetHours={0}
         onOpenRow={vi.fn()}
+        {...removeProps()}
       />,
     )
 
     expect(screen.getByText('⟂ estimated')).toBeDefined()
     expect(screen.queryAllByText('⟂ estimated')).toHaveLength(1)
+  })
+
+  describe('#77 removal', () => {
+    it('starts the confirm rather than removing on a single activation of the remove control', () => {
+      const items = orderPhotoListItems([row({ id: 'a', captureInstantMs: 100 })])
+      const onStartConfirm = vi.fn()
+      const onRemove = vi.fn()
+
+      render(
+        <PhotoList
+          items={items}
+          totalCount={1}
+          selectedPhotoId={null}
+          accessToken="token"
+          tripOffsetHours={0}
+          onOpenRow={vi.fn()}
+          {...removeProps({ onStartConfirm, onRemove })}
+        />,
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'Remove a.jpg' }))
+      expect(onStartConfirm).toHaveBeenCalledWith('a')
+      expect(onRemove).not.toHaveBeenCalled()
+    })
+
+    it('renders the confirm for the confirming row and calls onRemove only from its Remove action', () => {
+      const items = orderPhotoListItems([row({ id: 'a', captureInstantMs: 100 })])
+      const onRemove = vi.fn()
+      const onCancelConfirm = vi.fn()
+
+      render(
+        <PhotoList
+          items={items}
+          totalCount={1}
+          selectedPhotoId={null}
+          accessToken="token"
+          tripOffsetHours={0}
+          onOpenRow={vi.fn()}
+          {...removeProps({ confirmingId: 'a', onRemove, onCancelConfirm })}
+        />,
+      )
+
+      expect(screen.getByText('Remove "a.jpg"?')).toBeDefined()
+      fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
+      expect(onRemove).toHaveBeenCalledWith('a')
+      expect(onCancelConfirm).toHaveBeenCalled()
+    })
+
+    it('cancelling the confirm removes nothing', () => {
+      const items = orderPhotoListItems([row({ id: 'a', captureInstantMs: 100 })])
+      const onRemove = vi.fn()
+      const onCancelConfirm = vi.fn()
+
+      render(
+        <PhotoList
+          items={items}
+          totalCount={1}
+          selectedPhotoId={null}
+          accessToken="token"
+          tripOffsetHours={0}
+          onOpenRow={vi.fn()}
+          {...removeProps({ confirmingId: 'a', onRemove, onCancelConfirm })}
+        />,
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+      expect(onRemove).not.toHaveBeenCalled()
+      expect(onCancelConfirm).toHaveBeenCalled()
+    })
+
+    it('shows Removing… and hides the remove control while a row is mid-removal', () => {
+      const items = orderPhotoListItems([row({ id: 'a', captureInstantMs: 100 })])
+
+      render(
+        <PhotoList
+          items={items}
+          totalCount={1}
+          selectedPhotoId={null}
+          accessToken="token"
+          tripOffsetHours={0}
+          onOpenRow={vi.fn()}
+          {...removeProps({ removingIds: new Set(['a']) })}
+        />,
+      )
+
+      expect(screen.getByText('Removing…')).toBeDefined()
+      expect(screen.queryByRole('button', { name: 'Remove a.jpg' })).toBeNull()
+    })
+
+    it('shows a failure line beneath a row whose removal failed, without removing it', () => {
+      const items = orderPhotoListItems([row({ id: 'a', captureInstantMs: 100 })])
+
+      render(
+        <PhotoList
+          items={items}
+          totalCount={1}
+          selectedPhotoId={null}
+          accessToken="token"
+          tripOffsetHours={0}
+          onOpenRow={vi.fn()}
+          {...removeProps({ removeErrors: { a: "Couldn't remove a.jpg — try again." } })}
+        />,
+      )
+
+      expect(screen.getByText("Couldn't remove a.jpg — try again.")).toBeDefined()
+      expect(screen.getByText('a.jpg')).toBeDefined()
+    })
+
+    it('disables the remove control while disconnected', () => {
+      const items = orderPhotoListItems([row({ id: 'a', captureInstantMs: 100 })])
+
+      render(
+        <PhotoList
+          items={items}
+          totalCount={1}
+          selectedPhotoId={null}
+          accessToken="token"
+          tripOffsetHours={0}
+          onOpenRow={vi.fn()}
+          {...removeProps({ disableRemove: true })}
+        />,
+      )
+
+      expect(screen.getByRole('button', { name: 'Remove a.jpg' })).toHaveProperty('disabled', true)
+    })
   })
 })

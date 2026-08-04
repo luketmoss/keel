@@ -4,6 +4,7 @@ import {
   DriveAuthError,
   DriveQuotaError,
   startResumableUpload,
+  trashFile,
   uploadFileContent,
 } from '../drive/trackFiles'
 import { findOrCreateTripFolder } from '../drive/tripFolder'
@@ -74,6 +75,14 @@ export interface UsePhotoImport {
   importFiles: (incoming: File[]) => Promise<void>
   retryFailure: (id: string) => Promise<void>
   dismissFailures: () => void
+  /** #77: trashes both the original and the thumbnail, then rewrites
+      `photos.json` without the record — only then does the row disappear.
+      Drive first, local state after, same stance as `useTripImport.removeFile`. */
+  removePhoto: (id: string) => Promise<void>
+  /** Photo ids currently mid-removal. */
+  removingPhotoIds: Set<string>
+  /** Photo id -> the failure copy to show beneath that row. */
+  photoRemoveErrors: Record<string, string>
 }
 
 export function usePhotoImport(
@@ -86,6 +95,8 @@ export function usePhotoImport(
   const [progressMap, setProgressMap] = useState<Map<string, PhotoImportProgress>>(new Map())
   const [failures, setFailures] = useState<PhotoImportFailure[]>([])
   const failuresRef = useRef<PhotoImportFailure[]>(failures)
+  const [removingPhotoIds, setRemovingPhotoIds] = useState<Set<string>>(new Set())
+  const [photoRemoveErrors, setPhotoRemoveErrors] = useState<Record<string, string>>({})
   // The full settled set, kept outside React state so a batch's final
   // `photos.json` write can see photos from *this* batch plus whatever a
   // prior batch (or the initial read-back) already landed, without racing
@@ -326,6 +337,49 @@ export function usePhotoImport(
 
   const dismissFailures = useCallback(() => setFailures([]), [])
 
+  // #77 — trashes both Drive files, then rewrites `photos.json` with the
+  // record dropped. Either step failing leaves `photosRef`/`photos`
+  // untouched and reports the failure; a retry re-attempts both trashes,
+  // which is safe since trashing an already-trashed file is a no-op.
+  const removePhoto = useCallback(
+    async (id: string) => {
+      const record = photosRef.current.find((p) => p.id === id)
+      if (!record) return
+
+      setPhotoRemoveErrors((prev) => {
+        if (!(id in prev)) return prev
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
+
+      if (!accessToken || !cairnFolderId) {
+        setPhotoRemoveErrors((prev) => ({ ...prev, [id]: `Couldn't remove ${record.name} — try again.` }))
+        return
+      }
+
+      setRemovingPhotoIds((prev) => new Set(prev).add(id))
+      try {
+        await trashFile(accessToken, record.originalDriveFileId)
+        await trashFile(accessToken, record.thumbnailDriveFileId)
+        const folderId = await findOrCreateTripFolder(accessToken, cairnFolderId, tripId)
+        const remaining = photosRef.current.filter((p) => p.id !== id)
+        await writePhotoIndex(accessToken, folderId, remaining.map(stripId))
+        photosRef.current = remaining
+        setPhotos(remaining)
+      } catch {
+        setPhotoRemoveErrors((prev) => ({ ...prev, [id]: `Couldn't remove ${record.name} — try again.` }))
+      } finally {
+        setRemovingPhotoIds((prev) => {
+          const next = new Set(prev)
+          next.delete(id)
+          return next
+        })
+      }
+    },
+    [accessToken, cairnFolderId, tripId],
+  )
+
   const progress = Array.from(progressMap.values()).sort((a, b) => a.index - b.index)
 
   return {
@@ -336,6 +390,9 @@ export function usePhotoImport(
     importFiles,
     retryFailure,
     dismissFailures,
+    removePhoto,
+    removingPhotoIds,
+    photoRemoveErrors,
   }
 }
 

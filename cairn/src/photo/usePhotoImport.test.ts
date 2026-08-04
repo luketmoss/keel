@@ -6,13 +6,14 @@ import { DriveAuthError, DriveQuotaError } from '../drive/trackFiles'
 const { findOrCreateTripFolder } = vi.hoisted(() => ({ findOrCreateTripFolder: vi.fn() }))
 vi.mock('../drive/tripFolder', () => ({ findOrCreateTripFolder }))
 
-const { startResumableUpload, uploadFileContent } = vi.hoisted(() => ({
+const { startResumableUpload, uploadFileContent, trashFile } = vi.hoisted(() => ({
   startResumableUpload: vi.fn(),
   uploadFileContent: vi.fn(),
+  trashFile: vi.fn(),
 }))
 vi.mock('../drive/trackFiles', async () => {
   const actual = await vi.importActual<typeof import('../drive/trackFiles')>('../drive/trackFiles')
-  return { ...actual, startResumableUpload, uploadFileContent }
+  return { ...actual, startResumableUpload, uploadFileContent, trashFile }
 })
 
 const { readPhotoExif } = vi.hoisted(() => ({ readPhotoExif: vi.fn() }))
@@ -53,6 +54,7 @@ beforeEach(() => {
   generateThumbnail.mockReset().mockResolvedValue(okThumbnail())
   readPhotoIndex.mockReset().mockResolvedValue([])
   writePhotoIndex.mockReset().mockResolvedValue(undefined)
+  trashFile.mockReset().mockResolvedValue(undefined)
 })
 
 describe('usePhotoImport', () => {
@@ -286,5 +288,64 @@ describe('usePhotoImport — #75 refuses a photo already in the trip', () => {
     expect(result.current.failures).toHaveLength(1)
     expect(result.current.failures[0].name).toBe('IMG_1.jpg')
     expect(result.current.failures[0].message).toBe('already in this trip')
+  })
+})
+
+describe('usePhotoImport — #77 removing a photo', () => {
+  it('trashes both the original and the thumbnail, rewrites the index, and removes the row', async () => {
+    readPhotoIndex.mockResolvedValue([
+      { id: 'x', name: 'a.jpg', originalDriveFileId: 'orig-1', thumbnailDriveFileId: 'thumb-1' },
+    ])
+
+    const { result } = renderHook(() => usePhotoImport('trip-1', 'token', 'cairn-folder-id'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    const id = result.current.photos[0].id
+
+    await act(() => result.current.removePhoto(id))
+
+    expect(trashFile).toHaveBeenCalledWith('token', 'orig-1')
+    expect(trashFile).toHaveBeenCalledWith('token', 'thumb-1')
+    expect(writePhotoIndex).toHaveBeenCalledWith('token', 'folder-id', [])
+    expect(result.current.photos).toHaveLength(0)
+    expect(result.current.removingPhotoIds.size).toBe(0)
+  })
+
+  it('leaves the row in place and reports a failure when trashing the original fails', async () => {
+    readPhotoIndex.mockResolvedValue([
+      { id: 'x', name: 'a.jpg', originalDriveFileId: 'orig-1', thumbnailDriveFileId: 'thumb-1' },
+    ])
+    trashFile.mockRejectedValueOnce(new Error('network error'))
+
+    const { result } = renderHook(() => usePhotoImport('trip-1', 'token', 'cairn-folder-id'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    const id = result.current.photos[0].id
+
+    await act(() => result.current.removePhoto(id))
+
+    expect(writePhotoIndex).not.toHaveBeenCalled()
+    expect(result.current.photos).toHaveLength(1)
+    expect(result.current.removingPhotoIds.size).toBe(0)
+    expect(result.current.photoRemoveErrors[id]).toBe("Couldn't remove a.jpg — try again.")
+  })
+
+  it('leaves other photos, and their positions, untouched when one is removed', async () => {
+    readPhotoIndex.mockResolvedValue([
+      { id: 'x', name: 'a.jpg', originalDriveFileId: 'orig-a', thumbnailDriveFileId: 'thumb-a' },
+      { id: 'y', name: 'b.jpg', originalDriveFileId: 'orig-b', thumbnailDriveFileId: 'thumb-b' },
+    ])
+
+    const { result } = renderHook(() => usePhotoImport('trip-1', 'token', 'cairn-folder-id'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    const [first] = result.current.photos
+
+    await act(() => result.current.removePhoto(first.id))
+
+    expect(result.current.photos).toHaveLength(1)
+    expect(result.current.photos[0].name).toBe('b.jpg')
+    expect(writePhotoIndex).toHaveBeenCalledWith(
+      'token',
+      'folder-id',
+      expect.arrayContaining([expect.objectContaining({ name: 'b.jpg' })]),
+    )
   })
 })

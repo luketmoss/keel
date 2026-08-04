@@ -61,6 +61,47 @@ interface LocalFailure {
   message: string
 }
 
+/** #77 — the single remove-confirm slot, shared between `TrackList` and
+    `PhotoList` (design doc: "tracks and photos sharing one slot" — they're
+    one list to the user even though they're two components). Escape or a
+    pointerdown anywhere outside whichever row is currently confirming
+    reverts it without removing anything, same mechanism `TripList` already
+    uses for its own single-row confirm. */
+function useRemoveConfirm() {
+  const [confirmingId, setConfirmingId] = useState<string | null>(null)
+  const confirmingRowRef = useRef<HTMLElement | null>(null)
+
+  useEffect(() => {
+    if (confirmingId === null) return
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setConfirmingId(null)
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      if (confirmingRowRef.current && !confirmingRowRef.current.contains(event.target as Node)) {
+        setConfirmingId(null)
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('pointerdown', handlePointerDown)
+    }
+  }, [confirmingId])
+
+  return {
+    confirmingId,
+    confirmingRowRef,
+    // Starting a second confirm anywhere (track or photo) replaces
+    // whichever row was already confirming — there's only ever one slot.
+    onStartConfirm: (id: string) => setConfirmingId(id),
+    onCancelConfirm: () => setConfirmingId(null),
+  }
+}
+
 interface TripDetailProps {
   tripStore: TripStore
   accessToken: string | null
@@ -100,6 +141,7 @@ export function TripDetail({
   // from each hook's own `failures` because these never touched a hook.
   const [localFailures, setLocalFailures] = useState<LocalFailure[]>([])
   const nextLocalFailureId = useRef(0)
+  const removeConfirm = useRemoveConfirm()
   const [dragActive, setDragActive] = useState(false)
   const dragDepth = useRef(0)
   const [hoveredFileId, setHoveredFileId] = useState<string | null>(null)
@@ -167,6 +209,23 @@ export function TripDetail({
     nextLocalFailureId.current += 1
     setLocalFailures((prev) => [...prev, { id: `local-failure-${nextLocalFailureId.current}`, name, message }])
   }, [])
+
+  // #77 — a photo that's been removed can no longer be selected or open in
+  // the lightbox. `Lightbox` already returns focus on unmount (#55's
+  // contract), so clearing `openPhotoId` here is enough to close it
+  // correctly; a selected id naming nothing is how a stale marker
+  // highlight would otherwise survive (design doc edge case).
+  useEffect(() => {
+    if (selectedPhotoId && !photoImport.photos.some((photo) => photo.id === selectedPhotoId)) {
+      setSelectedPhotoId(null)
+    }
+  }, [photoImport.photos, selectedPhotoId])
+
+  useEffect(() => {
+    if (openPhotoId && !photoImport.photos.some((photo) => photo.id === openPhotoId)) {
+      setOpenPhotoId(null)
+    }
+  }, [photoImport.photos, openPhotoId])
 
   // One control, one drop target, two pipelines (design doc: "One import
   // control, not two"). Files are partitioned into three buckets — tracks,
@@ -323,6 +382,13 @@ export function TripDetail({
             files={tripImport.tracks}
             onToggleVisibility={tripImport.toggleVisibility}
             onRemove={tripImport.removeFile}
+            confirmingId={removeConfirm.confirmingId}
+            onStartConfirm={removeConfirm.onStartConfirm}
+            onCancelConfirm={removeConfirm.onCancelConfirm}
+            confirmingRowRef={removeConfirm.confirmingRowRef}
+            removingIds={tripImport.removingTrackIds}
+            removeErrors={tripImport.trackRemoveErrors}
+            disableRemove={!signedIn}
             onHoverFile={setHoveredFileId}
             onRename={tripImport.renameTrack}
             onRecolor={tripImport.recolorTrack}
@@ -337,6 +403,13 @@ export function TripDetail({
                 files={tripImport.tracks}
                 onToggleVisibility={tripImport.toggleVisibility}
                 onRemove={tripImport.removeFile}
+                confirmingId={removeConfirm.confirmingId}
+                onStartConfirm={removeConfirm.onStartConfirm}
+                onCancelConfirm={removeConfirm.onCancelConfirm}
+                confirmingRowRef={removeConfirm.confirmingRowRef}
+                removingIds={tripImport.removingTrackIds}
+                removeErrors={tripImport.trackRemoveErrors}
+                disableRemove={!signedIn}
                 onHoverFile={setHoveredFileId}
                 onRename={tripImport.renameTrack}
                 onRecolor={tripImport.recolorTrack}
@@ -367,6 +440,14 @@ export function TripDetail({
           accessToken={accessToken}
           tripOffsetHours={tripOffsetHours}
           onOpenRow={openPhoto}
+          onRemove={photoImport.removePhoto}
+          confirmingId={removeConfirm.confirmingId}
+          onStartConfirm={removeConfirm.onStartConfirm}
+          onCancelConfirm={removeConfirm.onCancelConfirm}
+          confirmingRowRef={removeConfirm.confirmingRowRef}
+          removingIds={photoImport.removingPhotoIds}
+          removeErrors={photoImport.photoRemoveErrors}
+          disableRemove={!signedIn}
         />
       </Sidebar>
       <div className="app__map">

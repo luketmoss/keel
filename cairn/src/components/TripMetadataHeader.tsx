@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { TripRecord, TripStatus, TripUpdate } from '../store/tripStore'
+import { formatTripDateRange } from '../format/dates'
 import './TripMetadataHeader.css'
 
 type Field = 'name' | 'status' | 'dates' | 'notes'
@@ -7,19 +8,6 @@ type Field = 'name' | 'status' | 'dates' | 'notes'
 interface TripMetadataHeaderProps {
   trip: TripRecord
   onUpdate: (patch: TripUpdate) => Promise<TripRecord | null>
-}
-
-function formatDateRange(startDate: string | null, endDate: string | null): string {
-  if (!startDate && !endDate) return 'Planned — no dates set'
-  const start = startDate ? formatDate(startDate) : '?'
-  const end = endDate ? formatDate(endDate) : '?'
-  return `${start} – ${end}`
-}
-
-function formatDate(iso: string): string {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return iso
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
 /** The editable trip header above the file list — name, status, dates, and
@@ -117,7 +105,7 @@ export function TripMetadataHeader({ trip, onUpdate }: TripMetadataHeaderProps) 
             }`}
             onClick={() => startEditing('dates')}
           >
-            {formatDateRange(trip.startDate, trip.endDate)}
+            {formatTripDateRange(trip.startDate, trip.endDate)}
           </span>
         )}
       </div>
@@ -273,12 +261,45 @@ function NotesDisplay({
 }) {
   const trimmed = notes.trim()
   const [expanded, setExpanded] = useState(false)
+  const [clamped, setClamped] = useState(false)
+  const paragraphRef = useRef<HTMLParagraphElement>(null)
+
+  // A committed edit may be a different length entirely, so the note goes
+  // back to its clamped state and re-measures against the new text rather
+  // than staying expanded against content the user hasn't seen clamped.
+  useEffect(() => {
+    setExpanded(false)
+  }, [notes])
+
+  // "Show more" reflects actual overflow, not a guess from length — measured
+  // against the clamped paragraph and re-measured on resize, since the
+  // sidebar's width isn't fixed. While expanded there's no clamp applied, so
+  // measuring would only ever say "not clamped"; the collapse path
+  // re-measures instead.
+  useLayoutEffect(() => {
+    const element = paragraphRef.current
+    if (!element || trimmed.length === 0 || expanded) return
+
+    function measure() {
+      if (!element) return
+      setClamped(element.scrollHeight > element.clientHeight)
+    }
+
+    measure()
+
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [trimmed, expanded])
+
   if (trimmed.length === 0) {
     return <p className="trip-metadata__notes trip-metadata__notes--empty" onClick={onClick} />
   }
   return (
     <div className="trip-metadata__notes-wrap">
       <p
+        ref={paragraphRef}
         className={`trip-metadata__notes${expanded ? '' : ' trip-metadata__notes--clamped'}${
           saved ? ' trip-metadata__field--saved' : ''
         }`}
@@ -286,16 +307,16 @@ function NotesDisplay({
       >
         {trimmed}
       </p>
-      {!expanded && trimmed.length > 0 && (
+      {clamped && (
         <button
           type="button"
           className="trip-metadata__show-more"
           onClick={(event) => {
             event.stopPropagation()
-            setExpanded(true)
+            setExpanded((value) => !value)
           }}
         >
-          Show more
+          {expanded ? 'Show less' : 'Show more'}
         </button>
       )}
     </div>

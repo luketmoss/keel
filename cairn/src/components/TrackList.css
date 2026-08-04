@@ -107,6 +107,12 @@
   color: var(--danger);
 }
 
+.track-row__remove:disabled {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+
 /* #46 — drag handle. 40px hit target absorbed into the row's own vertical
    padding via negative margin, same technique as the eye/remove pair above,
    so the row doesn't grow. */
@@ -279,6 +285,78 @@
 
 .track-list__error {
   margin: var(--space-2) var(--space-4) 0;
+  font-size: var(--text-xs);
+  color: var(--danger);
+}
+
+/* #77 — remove confirm, in-flight and failure states. Same shape as the
+   trips list's own confirm (TripList.css's `.trip-row__confirm*`), scoped
+   to the track row's own padding rather than duplicating its layout rules
+   verbatim, since a track row already carries horizontal padding a trip
+   row doesn't. */
+.track-row__confirm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.track-row__confirm-text {
+  font-size: var(--text-base);
+  color: var(--text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.track-row__confirm-actions {
+  flex: none;
+  display: flex;
+  gap: var(--space-2);
+}
+
+.track-row__confirm-remove,
+.track-row__confirm-cancel {
+  font-size: var(--text-sm);
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+  margin: calc(var(--space-1) * -1) 0;
+}
+
+.track-row__confirm-remove {
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.track-row__confirm-cancel {
+  color: var(--text-muted);
+}
+
+.track-row__confirm-cancel:hover {
+  color: var(--text);
+}
+
+.track-row__confirm-remove:active,
+.track-row__confirm-cancel:active {
+  background: var(--pressed);
+}
+
+.track-row--removing {
+  opacity: 0.4;
+}
+
+.track-row__removing {
+  flex: none;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.track-row__error {
+  margin: var(--space-1) 0 0 var(--space-5);
   font-size: var(--text-xs);
   color: var(--danger);
 }

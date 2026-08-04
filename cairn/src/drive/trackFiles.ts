@@ -105,6 +105,35 @@ export async function downloadTrackFile(
   return new File([blob], name)
 }
 
+/** Trashes a single file in place — the file-level sibling of
+    `tripMetadata.ts`'s `trashFolder`, used by #77's track/photo removal
+    instead of that one because a track or photo is one file inside a trip
+    folder, not the folder itself. Trash rather than permanent delete, same
+    reasoning as `trashFolder`: recoverable from Drive's own trash. Trashing
+    an already-trashed file succeeds idempotently, which is what lets a
+    retry after a partial failure (original trashed, thumbnail not) re-run
+    both without treating the first as an error. */
+export async function trashFile(accessToken: string, fileId: string): Promise<void> {
+  let response: Response
+  try {
+    response = await fetch(`${DRIVE_FILES_URL}/${fileId}`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ trashed: true }),
+    })
+  } catch (error) {
+    throw new DriveRequestError(error instanceof Error ? error.message : 'Network error')
+  }
+
+  if (response.status === 401) throw new DriveAuthError()
+  if (!response.ok) {
+    throw new DriveRequestError(`Drive request failed with status ${response.status}`)
+  }
+}
+
 /** Opens a resumable upload session and returns its session URI (the
     `Location` response header) — the target for the following
     `uploadFileContent` call(s), possibly more than one if the transfer

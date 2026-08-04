@@ -29,19 +29,20 @@ function fakeStorage(): Storage {
 const { findOrCreateTripFolder } = vi.hoisted(() => ({ findOrCreateTripFolder: vi.fn() }))
 vi.mock('../drive/tripFolder', () => ({ findOrCreateTripFolder }))
 
-const { listTrackFiles, downloadTrackFile, startResumableUpload, uploadFileContent } = vi.hoisted(
-  () => ({
+const { listTrackFiles, downloadTrackFile, startResumableUpload, uploadFileContent, trashFile } =
+  vi.hoisted(() => ({
     listTrackFiles: vi.fn(),
     downloadTrackFile: vi.fn(),
     startResumableUpload: vi.fn(),
     uploadFileContent: vi.fn(),
-  }),
-)
+    trashFile: vi.fn(),
+  }))
 vi.mock('../drive/trackFiles', () => ({
   listTrackFiles,
   downloadTrackFile,
   startResumableUpload,
   uploadFileContent,
+  trashFile,
 }))
 
 const { parseKmlOrKmz } = vi.hoisted(() => ({ parseKmlOrKmz: vi.fn() }))
@@ -70,6 +71,7 @@ beforeEach(() => {
   downloadTrackFile.mockReset()
   startResumableUpload.mockReset().mockResolvedValue('session-uri')
   uploadFileContent.mockReset().mockResolvedValue({ id: 'drive-file-id' })
+  trashFile.mockReset().mockResolvedValue(undefined)
   parseKmlOrKmz.mockReset()
   computeTrackStats.mockClear()
 })
@@ -403,5 +405,105 @@ describe('useTripImport — #46 track overrides', () => {
       ok = await result.current.renameTrack('no-such-id', 'New name')
     })
     expect(ok).toBe(false)
+  })
+})
+
+describe('useTripImport — #77 removing a track', () => {
+  it('trashes the Drive file and removes the row only once that succeeds', async () => {
+    listTrackFiles.mockResolvedValue([{ id: 'drive-1', name: 'day-1.kml' }])
+    downloadTrackFile.mockResolvedValue(file('day-1.kml'))
+    parseKmlOrKmz.mockResolvedValue(track('Day 1'))
+
+    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.tracks).toHaveLength(1)
+
+    await act(() => result.current.removeFile(result.current.tracks[0].id))
+
+    expect(trashFile).toHaveBeenCalledWith('token', 'drive-1')
+    expect(result.current.tracks).toHaveLength(0)
+    expect(result.current.removingTrackIds.size).toBe(0)
+  })
+
+  it('leaves the row in place and reports a failure when the Drive trash call fails', async () => {
+    listTrackFiles.mockResolvedValue([{ id: 'drive-1', name: 'day-1.kml' }])
+    downloadTrackFile.mockResolvedValue(file('day-1.kml'))
+    parseKmlOrKmz.mockResolvedValue(track('Day 1'))
+    trashFile.mockRejectedValue(new Error('network error'))
+
+    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    const id = result.current.tracks[0].id
+
+    await act(() => result.current.removeFile(id))
+
+    expect(result.current.tracks).toHaveLength(1)
+    expect(result.current.removingTrackIds.size).toBe(0)
+    expect(result.current.trackRemoveErrors[id]).toBe("Couldn't remove day-1.kml — try again.")
+  })
+
+  it("prunes the removed track's override and keeps the remaining tracks' relative order", async () => {
+    const store = new LocalTrackOverridesStore(fakeStorage())
+    listTrackFiles.mockResolvedValue([
+      { id: 'drive-1', name: 'a.kml' },
+      { id: 'drive-2', name: 'b.kml' },
+      { id: 'drive-3', name: 'c.kml' },
+    ])
+    downloadTrackFile
+      .mockResolvedValueOnce(file('a.kml'))
+      .mockResolvedValueOnce(file('b.kml'))
+      .mockResolvedValueOnce(file('c.kml'))
+    parseKmlOrKmz.mockResolvedValue(track('Day'))
+
+    const { result } = renderHook(() =>
+      useTripImport('trip-1', 'token', 'cairn-folder-id', store),
+    )
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.tracks.map((t) => t.name)).toEqual(['a.kml', 'b.kml', 'c.kml'])
+
+    const middle = result.current.tracks[1]
+    await act(() => result.current.removeFile(middle.id))
+
+    // Removing the second of three keeps "a" before "c" — the first and
+    // third don't swap or renumber out of order.
+    expect(result.current.tracks.map((t) => t.name)).toEqual(['a.kml', 'c.kml'])
+    expect(store.getOverrides('trip-1')['drive-2']).toBeUndefined()
+
+    // The reload's `listTrackFiles` reflects what Drive actually has once
+    // the trashed file drops out of its `trashed=false` listing — the mock's
+    // job here, since `trashFile` itself is mocked and doesn't affect it.
+    listTrackFiles.mockResolvedValue([
+      { id: 'drive-1', name: 'a.kml' },
+      { id: 'drive-3', name: 'c.kml' },
+    ])
+    downloadTrackFile.mockReset().mockResolvedValueOnce(file('a.kml')).mockResolvedValueOnce(file('c.kml'))
+    const { result: reloaded } = renderHook(() =>
+      useTripImport('trip-1', 'token', 'cairn-folder-id', store),
+    )
+    await waitFor(() => expect(reloaded.current.loading).toBe(false))
+    expect(reloaded.current.tracks.map((t) => t.name)).toEqual(['a.kml', 'c.kml'])
+  })
+
+  it('reports a failure and leaves the row in place when there is no Drive connection', async () => {
+    listTrackFiles.mockResolvedValue([{ id: 'drive-1', name: 'day-1.kml' }])
+    downloadTrackFile.mockResolvedValue(file('day-1.kml'))
+    parseKmlOrKmz.mockResolvedValue(track('Day 1'))
+
+    const { result, rerender } = renderHook(
+      ({ token }: { token: string | null }) => useTripImport('trip-1', token, 'cairn-folder-id'),
+      { initialProps: { token: 'token' as string | null } },
+    )
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    const id = result.current.tracks[0].id
+
+    // Mirrors a token expiring after the trip already loaded — the row is
+    // still on screen, but there's nothing left to trash against.
+    rerender({ token: null })
+
+    await act(() => result.current.removeFile(id))
+
+    expect(trashFile).not.toHaveBeenCalled()
+    expect(result.current.tracks).toHaveLength(1)
+    expect(result.current.trackRemoveErrors[id]).toBe("Couldn't remove day-1.kml — try again.")
   })
 })

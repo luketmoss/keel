@@ -57,6 +57,8 @@ function baseTripImport(overrides: Partial<ReturnType<typeof useTripImport>> = {
     dismissFailures: vi.fn(),
     toggleVisibility: vi.fn(),
     removeFile: vi.fn(),
+    removingTrackIds: new Set<string>(),
+    trackRemoveErrors: {},
     renameTrack: vi.fn(),
     recolorTrack: vi.fn(),
     reorderTracks: vi.fn(),
@@ -73,6 +75,9 @@ function basePhotoImport(overrides: Partial<ReturnType<typeof usePhotoImport>> =
     importFiles: vi.fn().mockResolvedValue(undefined),
     retryFailure: vi.fn().mockResolvedValue(undefined),
     dismissFailures: vi.fn(),
+    removePhoto: vi.fn(),
+    removingPhotoIds: new Set<string>(),
+    photoRemoveErrors: {},
     ...overrides,
   }
 }
@@ -88,7 +93,7 @@ function renderTrip(options: { signedIn?: boolean } = {}) {
   const { signedIn = true } = options
   const store = new LocalTripStore(fakeStorage())
   const entry = store.createTrip('Hokkaido')
-  return render(
+  const view = render(
     <MemoryRouter initialEntries={[`/trips/${entry.id}`]}>
       <Routes>
         <Route
@@ -105,6 +110,7 @@ function renderTrip(options: { signedIn?: boolean } = {}) {
       </Routes>
     </MemoryRouter>,
   )
+  return { ...view, store, entry }
 }
 
 beforeEach(() => {
@@ -323,5 +329,91 @@ describe('TripDetail — #75 empty-state copy naming the actual control', () => 
     expect(
       screen.getByText('Drop tracks or photos anywhere, or use Import files above.'),
     ).toBeDefined()
+  })
+})
+
+describe('TripDetail — #77 removing tracks and photos', () => {
+  const trackFile = {
+    id: 'f1',
+    name: 'a.kml',
+    driveFileId: 'drive-a',
+    colorIndex: 0,
+    visible: true,
+    tracks: [{ name: 'A', points: [{ lat: 1, lon: 2 }] }],
+    trackStats: [{ distanceMeters: 0, durationSeconds: undefined, elevationGainMeters: undefined }],
+  }
+
+  it('requires the confirm before removing a track, and calls removeFile only from it', () => {
+    const removeFile = vi.fn()
+    useTripImport.mockReturnValue(baseTripImport({ tracks: [trackFile], removeFile }))
+
+    renderTrip()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove a.kml' }))
+    expect(removeFile).not.toHaveBeenCalled()
+    expect(screen.getByText('Remove "a.kml"?')).toBeDefined()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
+    expect(removeFile).toHaveBeenCalledWith('f1')
+  })
+
+  it('dismissing the confirm with Escape removes nothing', () => {
+    const removeFile = vi.fn()
+    useTripImport.mockReturnValue(baseTripImport({ tracks: [trackFile], removeFile }))
+
+    renderTrip()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove a.kml' }))
+    expect(screen.getByText('Remove "a.kml"?')).toBeDefined()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(screen.queryByText('Remove "a.kml"?')).toBeNull()
+    expect(removeFile).not.toHaveBeenCalled()
+  })
+
+  it('shares one confirm slot between tracks and photos — starting a photo confirm cancels a track confirm', () => {
+    useTripImport.mockReturnValue(baseTripImport({ tracks: [trackFile] }))
+    usePhotoImport.mockReturnValue(
+      basePhotoImport({
+        photos: [{ id: 'p1', name: 'photo.jpg', originalDriveFileId: 'o1', thumbnailDriveFileId: 't1' }],
+      }),
+    )
+
+    renderTrip()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove a.kml' }))
+    expect(screen.getByText('Remove "a.kml"?')).toBeDefined()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove photo.jpg' }))
+    expect(screen.queryByText('Remove "a.kml"?')).toBeNull()
+    expect(screen.getByText('Remove "photo.jpg"?')).toBeDefined()
+  })
+
+  it('regenerates the trip overview from the remaining tracks once a track is removed', () => {
+    useTripImport.mockReturnValue(baseTripImport({ tracks: [trackFile] }))
+    const { store, rerender, entry } = renderTrip()
+    const saveOverview = vi.spyOn(store, 'saveOverview')
+
+    useTripImport.mockReturnValue(baseTripImport({ tracks: [] }))
+    rerender(
+      <MemoryRouter initialEntries={[`/trips/${entry.id}`]}>
+        <Routes>
+          <Route
+            path="/trips/:id"
+            element={
+              <TripDetail
+                tripStore={store}
+                accessToken="token"
+                cairnFolderId="cairn-folder-id"
+                accountRow={null}
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(saveOverview).toHaveBeenCalledWith(entry.id, [])
   })
 })

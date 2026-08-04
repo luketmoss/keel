@@ -59,6 +59,8 @@ function baseTripImport(overrides: Record<string, unknown> = {}) {
     dismissFailures: vi.fn(),
     toggleVisibility: vi.fn(),
     removeFile: vi.fn(),
+    removingTrackIds: new Set<string>(),
+    trackRemoveErrors: {},
     renameTrack: vi.fn(),
     recolorTrack: vi.fn(),
     reorderTracks: vi.fn(),
@@ -86,6 +88,9 @@ function basePhotoImport(overrides: Record<string, unknown> = {}) {
     importFiles: vi.fn().mockResolvedValue(undefined),
     retryFailure: vi.fn().mockResolvedValue(undefined),
     dismissFailures: vi.fn(),
+    removePhoto: vi.fn(),
+    removingPhotoIds: new Set<string>(),
+    photoRemoveErrors: {},
     ...overrides,
   }
 }
@@ -93,7 +98,7 @@ function basePhotoImport(overrides: Record<string, unknown> = {}) {
 function renderTrip() {
   const store = new LocalTripStore(fakeStorage())
   const entry = store.createTrip('Hokkaido')
-  return render(
+  const view = render(
     <MemoryRouter initialEntries={[`/trips/${entry.id}`]}>
       <Routes>
         <Route
@@ -105,6 +110,7 @@ function renderTrip() {
       </Routes>
     </MemoryRouter>,
   )
+  return { ...view, store, entry }
 }
 
 beforeEach(() => {
@@ -154,5 +160,48 @@ describe('TripDetail — #55 photo list and lightbox', () => {
     fireEvent.click(screen.getByText('sapporo.jpg'))
 
     await waitFor(() => expect(acquire).toHaveBeenCalledWith('token', 'orig-1'))
+  })
+
+  describe('#77 removing a photo', () => {
+    it('requires the confirm before removing, and calls removePhoto only from it', () => {
+      const removePhoto = vi.fn()
+      usePhotoImport.mockReturnValue(basePhotoImport({ removePhoto }))
+
+      renderTrip()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Remove sapporo.jpg' }))
+      expect(removePhoto).not.toHaveBeenCalled()
+      expect(screen.getByText('Remove "sapporo.jpg"?')).toBeDefined()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
+      expect(removePhoto).toHaveBeenCalledWith('p1')
+    })
+
+    it('closes the lightbox and returns focus when the open photo is removed', async () => {
+      const { rerender, store, entry } = renderTrip()
+
+      const rowButton = screen.getByText('sapporo.jpg').closest('button') as HTMLButtonElement
+      rowButton.focus()
+      fireEvent.click(rowButton)
+      await waitFor(() => expect(screen.getByRole('dialog')).toBeDefined())
+
+      // Simulates the removal landing while the lightbox is still open
+      // (design doc edge case) — the photo drops out of the settled list.
+      usePhotoImport.mockReturnValue(basePhotoImport({ photos: [] }))
+      rerender(
+        <MemoryRouter initialEntries={[`/trips/${entry.id}`]}>
+          <Routes>
+            <Route
+              path="/trips/:id"
+              element={
+                <TripDetail tripStore={store} accessToken="token" cairnFolderId="cairn-folder-id" accountRow={null} />
+              }
+            />
+          </Routes>
+        </MemoryRouter>,
+      )
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    })
   })
 })

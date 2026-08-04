@@ -4,6 +4,7 @@ import {
   DriveQuotaError,
   DriveRequestError,
   startResumableUpload,
+  trashFile,
   uploadFileContent,
 } from './trackFiles'
 
@@ -142,5 +143,34 @@ describe('uploadFileContent', () => {
     const failure = uploadFileContent('https://upload.example/session-1', file('hello'), 'token')
     await expect(failure).rejects.toBeInstanceOf(DriveRequestError)
     await expect(failure).rejects.not.toBeInstanceOf(DriveQuotaError)
+  })
+})
+
+describe('trashFile', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('PATCHes trashed:true against the file', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(response({}))
+
+    await trashFile('token', 'file-1')
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://www.googleapis.com/drive/v3/files/file-1',
+      expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ trashed: true }) }),
+    )
+  })
+
+  it('throws DriveAuthError on a 401', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(response({}, { status: 401 }))
+
+    await expect(trashFile('expired', 'file-1')).rejects.toBeInstanceOf(DriveAuthError)
+  })
+
+  it('throws DriveRequestError on any other failure status', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(response({}, { status: 500 }))
+
+    await expect(trashFile('token', 'file-1')).rejects.toBeInstanceOf(DriveRequestError)
   })
 })

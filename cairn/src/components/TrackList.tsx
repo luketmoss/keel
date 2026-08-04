@@ -1,4 +1,4 @@
-import { useState, type DragEvent } from 'react'
+import { useState, type DragEvent, type RefObject } from 'react'
 import type { ImportedFile } from '../import/types'
 import { TRACK_COLOR_NAMES, TRACK_COLORS, trackColor } from '../map/palette'
 import { formatStatsLine } from '../format/units'
@@ -7,7 +7,30 @@ import './TrackList.css'
 interface TrackListProps {
   files: ImportedFile[]
   onToggleVisibility: (id: string) => void
+  /** #77: performs the actual removal (trash + prune) once the row's
+      confirm has been accepted — the `×` control itself only starts the
+      confirm, via `onStartConfirm` below. */
   onRemove: (id: string) => void
+  /** #77 — the single confirm slot, shared with `PhotoList` by the parent
+      (design doc: "tracks and photos sharing one slot"). `null` when no row
+      anywhere in the trip is confirming. Omitted entirely on v1's non-trip
+      list (`App.tsx`), which has no Drive file behind a removal to confirm
+      and keeps its old instant-remove behaviour — `onRemove` fires directly
+      from the `×` control whenever `onStartConfirm` isn't supplied. */
+  confirmingId?: string | null
+  onStartConfirm?: (id: string) => void
+  onCancelConfirm?: () => void
+  /** Attached to whichever row is currently confirming, so the shared
+      pointerdown-outside listener (owned by the parent) knows what counts
+      as "inside". */
+  confirmingRowRef?: RefObject<HTMLElement | null>
+  /** Track ids whose removal is in flight — row renders muted and inert. */
+  removingIds?: Set<string>
+  /** Track id -> failure copy to show beneath that row. */
+  removeErrors?: Record<string, string>
+  /** True while there's no Drive connection to remove against — same
+      `signedIn` gate `TripImportPanel` already applies to import. */
+  disableRemove?: boolean
   /** Reports which file's row the pointer is over (#49) — drives the
       map's hover glow. Omitted entirely on `TripDetail`'s reuse of this
       component, which has no glow-capable map beside it. */
@@ -47,6 +70,13 @@ export function TrackList({
   files,
   onToggleVisibility,
   onRemove,
+  confirmingId = null,
+  onStartConfirm,
+  onCancelConfirm = () => {},
+  confirmingRowRef,
+  removingIds = new Set<string>(),
+  removeErrors = {},
+  disableRemove = false,
   onHoverFile,
   onRename,
   onRecolor,
@@ -109,6 +139,13 @@ export function TrackList({
               file={file}
               onToggleVisibility={onToggleVisibility}
               onRemove={onRemove}
+              confirming={Boolean(onStartConfirm) && confirmingId === file.id}
+              confirmingRowRef={confirmingId === file.id ? confirmingRowRef : undefined}
+              onStartConfirm={() => (onStartConfirm ? onStartConfirm(file.id) : onRemove(file.id))}
+              onCancelConfirm={onCancelConfirm}
+              removing={removingIds.has(file.id)}
+              removeError={removeErrors[file.id]}
+              disableRemove={disableRemove}
               onHoverFile={onHoverFile}
               onRename={onRename}
               onRecolor={onRecolor}
@@ -135,6 +172,13 @@ function TrackRow({
   file,
   onToggleVisibility,
   onRemove,
+  confirming,
+  confirmingRowRef,
+  onStartConfirm,
+  onCancelConfirm,
+  removing,
+  removeError,
+  disableRemove,
   onHoverFile,
   onRename,
   onRecolor,
@@ -152,6 +196,13 @@ function TrackRow({
   file: ImportedFile
   onToggleVisibility: (id: string) => void
   onRemove: (id: string) => void
+  confirming: boolean
+  confirmingRowRef?: RefObject<HTMLElement | null>
+  onStartConfirm: () => void
+  onCancelConfirm: () => void
+  removing: boolean
+  removeError?: string
+  disableRemove: boolean
   onHoverFile?: (id: string | null) => void
   onRename?: (id: string, displayName: string) => Promise<boolean>
   onRecolor?: (id: string, color: number) => Promise<boolean>
@@ -212,9 +263,42 @@ function TrackRow({
     file.visible ? '' : 'track-row--hidden',
     dragging ? 'track-row--dragging' : '',
     dropIndicator ? `track-row--drop-${dropIndicator}` : '',
+    removing ? 'track-row--removing' : '',
   ]
     .filter(Boolean)
     .join(' ')
+
+  // #77 — the confirm replaces the row's contents in place, same shape as
+  // the trips list's (design doc: "no dialog, no overlay, no layout shift").
+  if (confirming) {
+    return (
+      <li
+        className={rowClassName}
+        ref={(el) => {
+          if (confirmingRowRef) confirmingRowRef.current = el
+        }}
+      >
+        <div className="track-row__confirm">
+          <span className="track-row__confirm-text">Remove &quot;{file.name}&quot;?</span>
+          <div className="track-row__confirm-actions">
+            <button
+              type="button"
+              className="track-row__confirm-remove"
+              onClick={() => {
+                onCancelConfirm()
+                onRemove(file.id)
+              }}
+            >
+              Remove
+            </button>
+            <button type="button" className="track-row__confirm-cancel" onClick={onCancelConfirm}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      </li>
+    )
+  }
 
   return (
     <li
@@ -283,20 +367,27 @@ function TrackRow({
           type="button"
           className="track-row__visibility"
           aria-label={file.visible ? `Hide ${file.name}` : `Show ${file.name}`}
+          disabled={removing}
           onClick={() => onToggleVisibility(file.id)}
         >
           {file.visible ? '👁' : '🚫'}
         </button>
-        <button
-          type="button"
-          className="track-row__remove"
-          aria-label={`Remove ${file.name}`}
-          onClick={() => onRemove(file.id)}
-        >
-          ×
-        </button>
+        {removing ? (
+          <span className="track-row__removing">Removing…</span>
+        ) : (
+          <button
+            type="button"
+            className="track-row__remove"
+            aria-label={`Remove ${file.name}`}
+            disabled={disableRemove}
+            onClick={onStartConfirm}
+          >
+            ×
+          </button>
+        )}
       </div>
       {statsLine && <p className="track-row__stats">{statsLine}</p>}
+      {removeError && <p className="track-row__error">{removeError}</p>}
     </li>
   )
 }

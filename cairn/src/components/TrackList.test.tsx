@@ -352,6 +352,105 @@ describe('TrackList', () => {
     expect(onReorder).toHaveBeenCalledWith(['b', 'a'])
   })
 
+  describe('#77 removal', () => {
+    it('starts the confirm rather than removing on a single activation, when the parent supplies onStartConfirm', () => {
+      const onStartConfirm = vi.fn()
+      const onRemove = vi.fn()
+      render(
+        <TrackList
+          files={[importedFile()]}
+          onToggleVisibility={vi.fn()}
+          onRemove={onRemove}
+          onStartConfirm={onStartConfirm}
+        />,
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'Remove trip.kml' }))
+      expect(onStartConfirm).toHaveBeenCalledWith('f1')
+      expect(onRemove).not.toHaveBeenCalled()
+    })
+
+    it('renders the confirm for the confirming row and calls onRemove only from its Remove action', () => {
+      const onRemove = vi.fn()
+      const onCancelConfirm = vi.fn()
+      render(
+        <TrackList
+          files={[importedFile()]}
+          onToggleVisibility={vi.fn()}
+          onRemove={onRemove}
+          onStartConfirm={vi.fn()}
+          onCancelConfirm={onCancelConfirm}
+          confirmingId="f1"
+        />,
+      )
+
+      expect(screen.getByText('Remove "trip.kml"?')).toBeDefined()
+      fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
+      expect(onRemove).toHaveBeenCalledWith('f1')
+      expect(onCancelConfirm).toHaveBeenCalled()
+    })
+
+    it('cancelling the confirm removes nothing', () => {
+      const onRemove = vi.fn()
+      const onCancelConfirm = vi.fn()
+      render(
+        <TrackList
+          files={[importedFile()]}
+          onToggleVisibility={vi.fn()}
+          onRemove={onRemove}
+          onStartConfirm={vi.fn()}
+          onCancelConfirm={onCancelConfirm}
+          confirmingId="f1"
+        />,
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+      expect(onRemove).not.toHaveBeenCalled()
+      expect(onCancelConfirm).toHaveBeenCalled()
+    })
+
+    it('shows Removing… and hides the remove control while a row is mid-removal', () => {
+      render(
+        <TrackList
+          files={[importedFile()]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          removingIds={new Set(['f1'])}
+        />,
+      )
+
+      expect(screen.getByText('Removing…')).toBeDefined()
+      expect(screen.queryByRole('button', { name: 'Remove trip.kml' })).toBeNull()
+    })
+
+    it('shows a failure line beneath a row whose removal failed, without removing it', () => {
+      render(
+        <TrackList
+          files={[importedFile()]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          removeErrors={{ f1: "Couldn't remove trip.kml — try again." }}
+        />,
+      )
+
+      expect(screen.getByText("Couldn't remove trip.kml — try again.")).toBeDefined()
+      expect(screen.getByTitle('trip.kml')).toBeDefined()
+    })
+
+    it('disables the remove control while disconnected', () => {
+      render(
+        <TrackList
+          files={[importedFile()]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          disableRemove
+        />,
+      )
+
+      expect(screen.getByRole('button', { name: 'Remove trip.kml' })).toHaveProperty('disabled', true)
+    })
+  })
+
   it('does not attach a drag handler when canReorder is false (#46)', () => {
     const onReorder = vi.fn()
     render(

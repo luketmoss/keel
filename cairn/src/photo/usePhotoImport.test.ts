@@ -252,3 +252,39 @@ describe('usePhotoImport', () => {
     expect(result.current.photos).toHaveLength(0)
   })
 })
+
+describe('usePhotoImport — #75 refuses a photo already in the trip', () => {
+  it('reports "already in this trip" and uploads nothing for a name that matches an existing photo, case-insensitively', async () => {
+    readPhotoIndex.mockResolvedValue([
+      { id: 'x', name: 'IMG_1.jpg', originalDriveFileId: 'o1', thumbnailDriveFileId: 't1' },
+    ])
+
+    const { result } = renderHook(() => usePhotoImport('trip-1', 'token', 'cairn-folder-id'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.photos).toHaveLength(1)
+
+    await act(() => result.current.importFiles([file('img_1.JPG')]))
+
+    expect(startResumableUpload).not.toHaveBeenCalled()
+    expect(result.current.photos).toHaveLength(1)
+    expect(result.current.failures).toHaveLength(1)
+    expect(result.current.failures[0].message).toBe('already in this trip')
+    expect(result.current.failures[0].retryFile).toBeUndefined()
+  })
+
+  it('lets a second file with a different name import normally alongside a duplicate rejection', async () => {
+    readPhotoIndex.mockResolvedValue([
+      { id: 'x', name: 'IMG_1.jpg', originalDriveFileId: 'o1', thumbnailDriveFileId: 't1' },
+    ])
+
+    const { result } = renderHook(() => usePhotoImport('trip-1', 'token', 'cairn-folder-id'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    await act(() => result.current.importFiles([file('IMG_1.jpg'), file('IMG_2.jpg')]))
+
+    expect(result.current.photos.map((p) => p.name).sort()).toEqual(['IMG_1.jpg', 'IMG_2.jpg'])
+    expect(result.current.failures).toHaveLength(1)
+    expect(result.current.failures[0].name).toBe('IMG_1.jpg')
+    expect(result.current.failures[0].message).toBe('already in this trip')
+  })
+})

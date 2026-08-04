@@ -27,6 +27,11 @@ const UPLOAD_CONCURRENCY = 4
 
 const THUMBNAIL_SUFFIX = '.thumb.jpg'
 
+/* #75: same stance as `useTripImport`'s `ALREADY_IN_TRIP_MESSAGE` — a photo
+   whose name already names one in this trip is refused before upload,
+   matched on filename alone, case-insensitively. */
+export const ALREADY_IN_TRIP_MESSAGE = 'already in this trip'
+
 let nextId = 0
 function generateId(prefix: string): string {
   nextId += 1
@@ -40,6 +45,9 @@ function stripId(record: PhotoRecord): Omit<PhotoRecord, 'id'> {
 }
 
 export interface PhotoImportProgress {
+  /** Unique per progress entry — see `TripImportProgress.id` for why
+      `index`+`name` alone isn't safe to key rows on (#75). */
+  id: string
   name: string
   /** The file's fixed position in the *import batch*, 1-based — stable
       regardless of which concurrency slot finishes first, matching
@@ -181,8 +189,18 @@ export function usePhotoImport(
         return undefined
       }
 
+      // Checked against `photosRef`, which is updated synchronously as
+      // each photo lands — so a duplicate that finished earlier in the same
+      // batch is caught for photos that start after it (design doc's "same
+      // name in one batch" edge case).
+      const lowerName = file.name.toLowerCase()
+      if (photosRef.current.some((existing) => existing.name.toLowerCase() === lowerName)) {
+        addFailure(file.name, ALREADY_IN_TRIP_MESSAGE)
+        return undefined
+      }
+
       const key = generateId('progress')
-      setProgressEntry(key, { name: file.name, index: index + 1, total })
+      setProgressEntry(key, { id: key, name: file.name, index: index + 1, total })
 
       try {
         const exifResult = await readPhotoExif(file)

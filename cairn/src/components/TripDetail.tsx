@@ -29,18 +29,36 @@ import type { TripStore } from '../store/tripStore'
 import './TripDetail.css'
 
 const TRACK_EXTENSIONS = ['.kml', '.kmz']
+// #75: includes HEIC/HEIF — they're photos as far as partitioning goes, and
+// `usePhotoImport`'s own `validateImageFile` is what gives them their
+// specific "iPhone HEIC photos aren't supported" copy. Anything not in
+// either list is a third, "neither" bucket, rejected here by name before
+// either pipeline sees it (design doc: "A file the app cannot identify").
+const PHOTO_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif']
 
-/** True for the two file extensions the existing #34 track pipeline
-    accepts. Everything else — every image extension `usePhotoImport`
-    knows about, HEIC/HEIF (rejected there with its own named copy), and
-    any other extension entirely — goes down the photo path instead, which
-    already produces the right rejection copy for "not actually a
-    photo" (design doc: "Files are partitioned by extension. Tracks take
-    the existing #34 path; images enter this one. Anything else is
-    rejected by name."). */
+const UNRECOGNISED_TYPE_MESSAGE = 'trips take .kml or .kmz tracks and JPEG, PNG or WebP photos'
+const SIGNED_OUT_DROP_MESSAGE = 'sign in to add files to this trip'
+
 function isTrackFile(name: string): boolean {
   const lower = name.toLowerCase()
   return TRACK_EXTENSIONS.some((ext) => lower.endsWith(ext))
+}
+
+function isPhotoFile(name: string): boolean {
+  const lower = name.toLowerCase()
+  return PHOTO_EXTENSIONS.some((ext) => lower.endsWith(ext))
+}
+
+/** A failure row this component produces itself, rather than one that came
+    back from `useTripImport`/`usePhotoImport` — a file rejected before
+    either pipeline saw it (unrecognised type), or a whole dropped batch
+    refused for being signed out. No `retryFile`: neither case has anything
+    useful to retry (design doc: the signed-out row "does nothing on its
+    own"; an unrecognised file needs a different file, not a repeat). */
+interface LocalFailure {
+  id: string
+  name: string
+  message: string
 }
 
 interface TripDetailProps {
@@ -64,9 +82,15 @@ export function TripDetail({ tripStore, accessToken, cairnFolderId, accountRow, 
   const trip = useSyncExternalStore(tripStore.subscribe, () => tripStore.getTrip(tripId))
   const tripImport = useTripImport(tripId, accessToken, cairnFolderId)
   const photoImport = usePhotoImport(tripId, accessToken, cairnFolderId)
+  // #75: files rejected before either pipeline runs — an unrecognised
+  // type, or a whole batch refused because nobody's signed in. Separate
+  // from each hook's own `failures` because these never touched a hook.
+  const [localFailures, setLocalFailures] = useState<LocalFailure[]>([])
+  const nextLocalFailureId = useRef(0)
   const [dragActive, setDragActive] = useState(false)
   const dragDepth = useRef(0)
   const [hoveredFileId, setHoveredFileId] = useState<string | null>(null)
+  const signedIn = accessToken !== null && cairnFolderId !== null
   // Shared with #55's list, not a separate selection (design doc's
   // Selection section) — #54 only has to expose it, not build the list.
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null)
@@ -126,24 +150,34 @@ export function TripDetail({ tripStore, accessToken, cairnFolderId, accountRow, 
 
   const closeLightbox = useCallback(() => setOpenPhotoId(null), [])
 
+  const addLocalFailure = useCallback((name: string, message: string) => {
+    nextLocalFailureId.current += 1
+    setLocalFailures((prev) => [...prev, { id: `local-failure-${nextLocalFailureId.current}`, name, message }])
+  }, [])
+
   // One control, one drop target, two pipelines (design doc: "One import
-  // control, not two"). Files are partitioned by extension before either
-  // pipeline sees them, so a folder containing both tracks and photos
-  // imports both without the user having to sort them first.
+  // control, not two"). Files are partitioned into three buckets — tracks,
+  // photos, and neither — before either pipeline sees them, so a folder
+  // containing both tracks and photos imports both without the user having
+  // to sort them first, and a file that's neither is rejected by name
+  // rather than handed to the photo pipeline just because it isn't a track
+  // (design doc: "A file the app cannot identify").
   const importFiles = useCallback(
     (incoming: File[]) => {
       const tracks = incoming.filter((file) => isTrackFile(file.name))
-      const photos = incoming.filter((file) => !isTrackFile(file.name))
+      const photos = incoming.filter((file) => isPhotoFile(file.name))
+      const neither = incoming.filter((file) => !isTrackFile(file.name) && !isPhotoFile(file.name))
+      for (const file of neither) addLocalFailure(file.name, UNRECOGNISED_TYPE_MESSAGE)
       const tasks: Promise<void>[] = []
       if (tracks.length > 0) tasks.push(tripImport.importFiles(tracks))
       if (photos.length > 0) tasks.push(photoImport.importFiles(photos))
       return Promise.all(tasks).then(() => undefined)
     },
-    [tripImport, photoImport],
+    [tripImport, photoImport, addLocalFailure],
   )
 
   const combinedProgress = [...tripImport.progress, ...photoImport.progress]
-  const combinedFailures = [...tripImport.failures, ...photoImport.failures]
+  const combinedFailures = [...tripImport.failures, ...photoImport.failures, ...localFailures]
 
   // Failure ids are prefixed distinctly by their owning hook
   // (`failure-`/`photo-failure-`), which is what lets one `Retry` action on
@@ -159,6 +193,7 @@ export function TripDetail({ tripStore, accessToken, cairnFolderId, accountRow, 
   const dismissFailures = useCallback(() => {
     tripImport.dismissFailures()
     photoImport.dismissFailures()
+    setLocalFailures([])
   }, [tripImport, photoImport])
 
   // Keeps the trip's precomputed overview (#36, read by `/world`, #37) in
@@ -178,7 +213,12 @@ export function TripDetail({ tripStore, accessToken, cairnFolderId, accountRow, 
     if (!dataTransferHasFiles(event.dataTransfer)) return
     event.preventDefault()
     dragDepth.current += 1
-    setDragActive(true)
+    // #75: the overlay is the app's promise that a drop will be handled —
+    // while signed out it does not appear at all, same as the disabled
+    // Import button (design doc: "A drop the app cannot accept"). The
+    // depth counter still increments so a later dragleave/drop on this
+    // same drag doesn't see stale state.
+    if (signedIn) setDragActive(true)
   }
 
   function handleDragOver(event: DragEvent<HTMLDivElement>) {
@@ -198,7 +238,16 @@ export function TripDetail({ tripStore, accessToken, cairnFolderId, accountRow, 
     dragDepth.current = 0
     setDragActive(false)
     const dropped = filesFromDataTransfer(event.dataTransfer)
-    if (dropped.length > 0) void importFiles(dropped)
+    if (dropped.length === 0) return
+    // #75: a drop that lands anyway while signed out — the pointer entered
+    // before the session lapsed, or the overlay was suppressed mid-drag —
+    // is not swallowed. One failure row for the whole batch, not one per
+    // file (design doc: "A drop the app cannot accept").
+    if (!signedIn) {
+      addLocalFailure(`${dropped.length} file${dropped.length === 1 ? '' : 's'}`, SIGNED_OUT_DROP_MESSAGE)
+      return
+    }
+    void importFiles(dropped)
   }
 
   // A broken detail view should never trap the user — the back link works
@@ -239,7 +288,7 @@ export function TripDetail({ tripStore, accessToken, cairnFolderId, accountRow, 
       <Sidebar header={header} accountRow={accountRow}>
         <TripMetadataHeader trip={trip} onUpdate={(patch) => tripStore.updateTrip(trip.id, patch)} />
         <TripImportPanel
-          signedIn={accessToken !== null && cairnFolderId !== null}
+          signedIn={signedIn}
           progress={combinedProgress}
           failures={combinedFailures}
           importFiles={importFiles}
@@ -250,8 +299,9 @@ export function TripDetail({ tripStore, accessToken, cairnFolderId, accountRow, 
         {fetching ? (
           <p className="trip-detail__loading">Loading tracks…</p>
         ) : tripImport.tracks.length === 0 && tripImport.missingFiles.length === 0 ? (
-          // Empty trip — the existing #6 empty state, unmodified: it
-          // already describes the way to get files into a trip today.
+          // Empty trip — #6's empty state, with #75's copy fix: it used to
+          // point at "Import tracks", a control this page has never had
+          // (it's read "Import files" since #51).
           <TrackList
             files={tripImport.tracks}
             onToggleVisibility={tripImport.toggleVisibility}
@@ -261,6 +311,7 @@ export function TripDetail({ tripStore, accessToken, cairnFolderId, accountRow, 
             onRecolor={tripImport.recolorTrack}
             onReorder={tripImport.reorderTracks}
             canReorder={!tripImport.loading}
+            emptyDetail="Drop tracks or photos anywhere, or use Import files above."
           />
         ) : (
           <>

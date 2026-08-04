@@ -84,7 +84,8 @@ function fileDataTransfer(names: string[]): DataTransfer {
   } as unknown as DataTransfer
 }
 
-function renderTrip() {
+function renderTrip(options: { signedIn?: boolean } = {}) {
+  const { signedIn = true } = options
   const store = new LocalTripStore(fakeStorage())
   const entry = store.createTrip('Hokkaido')
   return render(
@@ -95,8 +96,8 @@ function renderTrip() {
           element={
             <TripDetail
               tripStore={store}
-              accessToken="token"
-              cairnFolderId="cairn-folder-id"
+              accessToken={signedIn ? 'token' : null}
+              cairnFolderId={signedIn ? 'cairn-folder-id' : null}
               accountRow={null}
             />
           }
@@ -169,7 +170,9 @@ describe('TripDetail — #51 partitioning a mixed drop between tracks and photos
 
   it('merges progress and failures from both pipelines under the one control', () => {
     useTripImport.mockReturnValue(
-      baseTripImport({ progress: [{ name: 'day-1.kml', index: 1, total: 2, phase: 'uploading' }] }),
+      baseTripImport({
+        progress: [{ id: 'progress-1', name: 'day-1.kml', index: 1, total: 2, phase: 'uploading' }],
+      }),
     )
     usePhotoImport.mockReturnValue(
       basePhotoImport({ failures: [{ id: 'photo-failure-1', name: 'IMG_1.heic', message: 'heic message' }] }),
@@ -206,5 +209,119 @@ describe('TripDetail — #51 partitioning a mixed drop between tracks and photos
 
     fireEvent.click(screen.getByText('a.jpg').closest('button') as HTMLButtonElement)
     expect(photoRetry).toHaveBeenCalledWith('photo-failure-1')
+  })
+})
+
+describe('TripDetail — #75 signed-out drop', () => {
+  it('reports a batch failure naming sign-in, rather than doing nothing, when files land while signed out', async () => {
+    const tripImportFiles = vi.fn().mockResolvedValue(undefined)
+    const photoImportFiles = vi.fn().mockResolvedValue(undefined)
+    useTripImport.mockReturnValue(baseTripImport({ importFiles: tripImportFiles }))
+    usePhotoImport.mockReturnValue(basePhotoImport({ importFiles: photoImportFiles }))
+
+    renderTrip({ signedIn: false })
+    const app = document.querySelector('.app') as HTMLElement
+
+    await act(async () => {
+      fireEvent.drop(app, { dataTransfer: fileDataTransfer(['a.kml', 'b.jpg']) })
+    })
+
+    expect(screen.getByText('2 files')).toBeDefined()
+    expect(screen.getByText(/sign in to add files to this trip/)).toBeDefined()
+    expect(tripImportFiles).not.toHaveBeenCalled()
+    expect(photoImportFiles).not.toHaveBeenCalled()
+  })
+
+  it('does not show the drop overlay while signed out', () => {
+    renderTrip({ signedIn: false })
+    const app = document.querySelector('.app') as HTMLElement
+
+    fireEvent.dragEnter(app, { dataTransfer: fileDataTransfer(['a.jpg']) })
+
+    expect(screen.queryByTestId('drop-overlay')).toBeNull()
+  })
+
+  it('shows the drop overlay while signed in', () => {
+    renderTrip({ signedIn: true })
+    const app = document.querySelector('.app') as HTMLElement
+
+    fireEvent.dragEnter(app, { dataTransfer: fileDataTransfer(['a.jpg']) })
+
+    expect(screen.queryByTestId('drop-overlay')).not.toBeNull()
+  })
+
+  it('disables the Import files control and states the reason while signed out', () => {
+    renderTrip({ signedIn: false })
+
+    expect(screen.getByText('Sign in to add tracks and photos to this trip.')).toBeDefined()
+    const button = screen.getByRole('button', { name: 'Import files' }) as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+  })
+})
+
+describe('TripDetail — #75 a file the app cannot identify', () => {
+  it('rejects a .gpx naming the formats trips take, not the photo pipeline\'s message', async () => {
+    const tripImportFiles = vi.fn().mockResolvedValue(undefined)
+    const photoImportFiles = vi.fn().mockResolvedValue(undefined)
+    useTripImport.mockReturnValue(baseTripImport({ importFiles: tripImportFiles }))
+    usePhotoImport.mockReturnValue(basePhotoImport({ importFiles: photoImportFiles }))
+
+    renderTrip()
+    const app = document.querySelector('.app') as HTMLElement
+
+    await act(async () => {
+      fireEvent.drop(app, { dataTransfer: fileDataTransfer(['route.gpx']) })
+    })
+
+    expect(screen.getByText('route.gpx')).toBeDefined()
+    expect(
+      screen.getByText(/trips take \.kml or \.kmz tracks and JPEG, PNG or WebP photos/),
+    ).toBeDefined()
+    expect(tripImportFiles).not.toHaveBeenCalled()
+    expect(photoImportFiles).not.toHaveBeenCalled()
+  })
+
+  it('a mixed batch of one .kml, one .jpg and one .gpx imports the first two and reports only the third', async () => {
+    const tripImportFiles = vi.fn().mockResolvedValue(undefined)
+    const photoImportFiles = vi.fn().mockResolvedValue(undefined)
+    useTripImport.mockReturnValue(baseTripImport({ importFiles: tripImportFiles }))
+    usePhotoImport.mockReturnValue(basePhotoImport({ importFiles: photoImportFiles }))
+
+    renderTrip()
+    const app = document.querySelector('.app') as HTMLElement
+
+    await act(async () => {
+      fireEvent.drop(app, { dataTransfer: fileDataTransfer(['day.kml', 'IMG_1.jpg', 'route.gpx']) })
+    })
+
+    expect(tripImportFiles.mock.calls[0][0].map((f: File) => f.name)).toEqual(['day.kml'])
+    expect(photoImportFiles.mock.calls[0][0].map((f: File) => f.name)).toEqual(['IMG_1.jpg'])
+    expect(screen.getByText('route.gpx')).toBeDefined()
+    expect(screen.getAllByText(/trips take .kml or .kmz tracks/)).toHaveLength(1)
+  })
+
+  it('sends a .heic to the photo pipeline rather than the unrecognised-type bucket', async () => {
+    const photoImportFiles = vi.fn().mockResolvedValue(undefined)
+    usePhotoImport.mockReturnValue(basePhotoImport({ importFiles: photoImportFiles }))
+
+    renderTrip()
+    const app = document.querySelector('.app') as HTMLElement
+
+    await act(async () => {
+      fireEvent.drop(app, { dataTransfer: fileDataTransfer(['IMG_4021.HEIC']) })
+    })
+
+    expect(photoImportFiles.mock.calls[0][0].map((f: File) => f.name)).toEqual(['IMG_4021.HEIC'])
+    expect(screen.queryByText('trips take .kml or .kmz tracks and JPEG, PNG or WebP photos')).toBeNull()
+  })
+})
+
+describe('TripDetail — #75 empty-state copy naming the actual control', () => {
+  it('points the empty track list at "Import files", not the nonexistent "Import tracks"', () => {
+    renderTrip()
+
+    expect(
+      screen.getByText('Drop tracks or photos anywhere, or use Import files above.'),
+    ).toBeDefined()
   })
 })

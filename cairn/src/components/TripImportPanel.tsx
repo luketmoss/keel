@@ -83,12 +83,12 @@ export function TripImportPanel({
 
       {!signedIn && (
         <p className="trip-import-panel__signed-out">
-          Sign in to attach tracks to this trip.
+          Sign in to add tracks and photos to this trip.
         </p>
       )}
 
       {progress.map((entry) => (
-        <p key={`${entry.index}-${entry.name}`} className="trip-import-panel__progress">
+        <p key={entry.id} className="trip-import-panel__progress">
           {entry.name} — {entry.index} of {entry.total}
         </p>
       ))}

@@ -19,6 +19,13 @@ const ACCEPTED_EXTENSIONS = ['.kml', '.kmz']
    not open dozens of resumable sessions at once. */
 const UPLOAD_CONCURRENCY = 3
 
+/* #75: a file whose name already names a track in this trip is refused
+   before it's uploaded, rather than doubling the trip's contents. Matching
+   is deliberately on filename alone, case-insensitively — see the design
+   doc's "A file the trip already has" for why this is chosen over content
+   hashing. */
+export const ALREADY_IN_TRIP_MESSAGE = 'already in this trip'
+
 function hasAcceptedExtension(name: string): boolean {
   const lower = name.toLowerCase()
   return ACCEPTED_EXTENSIONS.some((ext) => lower.endsWith(ext))
@@ -45,6 +52,12 @@ const defaultOverridesStore = new DriveTrackOverridesStore()
 export type ImportPhase = 'uploading' | 'parsing'
 
 export interface TripImportProgress {
+  /** Unique per progress entry, independent of `index`/`name` — what the
+      panel keys its rows on. `index`+`name` collides when two files share a
+      name (#75: a retry always reports position 0, and two same-named files
+      in one batch can both land on the same position across a re-render),
+      so neither is safe as a React key on its own. */
+  id: string
   name: string
   /** The file's fixed position in the *import batch*, 1-based — stable
       regardless of which concurrency slot finishes first (design doc point
@@ -128,10 +141,19 @@ export function useTripImport(
   /* Read inside async callbacks (retryFailure) where a closure over the
      `failures` state at render time would go stale. */
   const failuresRef = useRef<TripImportFailure[]>(failures)
+  /* Same reason as `failuresRef` — `importOne` needs the *current* track
+     list at the moment it starts a given file's upload, not the one
+     captured when the batch began, so a duplicate that lands earlier in the
+     same batch (#75) is caught for files that start after it settles. */
+  const tracksRef = useRef<ImportedFile[]>(tracks)
 
   useEffect(() => {
     failuresRef.current = failures
   }, [failures])
+
+  useEffect(() => {
+    tracksRef.current = tracks
+  }, [tracks])
 
   useEffect(() => {
     setOverrides(overridesStore.getOverrides(tripId))
@@ -265,14 +287,24 @@ export function useTripImport(
         return
       }
 
+      // Checked at the moment this file's own upload is about to start
+      // (against a ref, not the `tracks` closed over at batch-start) so a
+      // duplicate that lands earlier in the same batch is still caught —
+      // see the design doc's "same name in one batch" edge case.
+      const lowerName = file.name.toLowerCase()
+      if (tracksRef.current.some((existing) => existing.name.toLowerCase() === lowerName)) {
+        addFailure(file.name, ALREADY_IN_TRIP_MESSAGE)
+        return
+      }
+
       const key = generateId('progress')
-      setProgressEntry(key, { name: file.name, index: index + 1, total, phase: 'uploading' })
+      setProgressEntry(key, { id: key, name: file.name, index: index + 1, total, phase: 'uploading' })
 
       try {
         const sessionUri = await startResumableUpload(token, folderId, file.name)
         const uploaded = await uploadFileContent(sessionUri, file, token)
 
-        setProgressEntry(key, { name: file.name, index: index + 1, total, phase: 'parsing' })
+        setProgressEntry(key, { id: key, name: file.name, index: index + 1, total, phase: 'parsing' })
 
         const result = await parseKmlOrKmz(file)
         if (!result.ok) {

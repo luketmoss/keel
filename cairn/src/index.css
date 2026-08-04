@@ -59,6 +59,9 @@
   --dot-size: 14px;
   --dot-ring: 2px;
 
+  /* Trips panel — cairn/docs/design/80-trips-panel.md, "New tokens" */
+  --panel-width: 360px;
+
   /* Photo list & lightbox — cairn/docs/design/55-photo-list-lightbox.md, "New tokens" */
   --photo-thumb: 32px;
   --row-touch: 44px;

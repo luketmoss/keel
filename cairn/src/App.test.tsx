@@ -96,12 +96,58 @@ describe('App routing', () => {
     expect(screen.getByRole('link', { name: 'Trips' })).toBeDefined()
   })
 
-  it('shows the trip list at /trips, with no map', async () => {
+  it('moves the status pills from the map to the trips panel when the panel is open (#80)', async () => {
+    const tripId = 'trip-with-a-place'
+    window.localStorage.setItem(
+      'cairn.trips.index',
+      JSON.stringify([
+        {
+          id: tripId,
+          name: 'Hokkaido',
+          status: 'planned',
+          startDate: null,
+          endDate: null,
+          createdAt: '2026-01-01T00:00:00.000Z',
+          origin: { lat: 37, lng: -122 },
+        },
+      ]),
+    )
+
+    try {
+      await renderApp('/')
+      // The map draws its own pills when nothing else owns them.
+      expect(screen.getAllByRole('button', { name: 'Planned' })).toHaveLength(1)
+
+      fireEvent.click(screen.getByRole('link', { name: 'Trips' }))
+      await screen.findByRole('heading', { name: 'Trips' })
+
+      // Still exactly one — the panel's copy, not a second one alongside
+      // the map's, which would let the two disagree.
+      expect(screen.getAllByRole('button', { name: 'Planned' })).toHaveLength(1)
+    } finally {
+      window.localStorage.removeItem('cairn.trips.index')
+    }
+  })
+
+  it('shows the trips panel at /trips, with the map still mounted behind it (#80)', async () => {
     await renderApp('/trips')
-    expect(screen.queryByTestId('map')).toBeNull()
+    expect(screen.getByTestId('map')).toBeDefined()
     expect(screen.getByRole('heading', { name: 'Trips' })).toBeDefined()
     expect(screen.getByPlaceholderText('Trip name')).toBeDefined()
     expect(screen.getByText('No trips yet')).toBeDefined()
+  })
+
+  it('closing the trips panel returns to / without unmounting the map', async () => {
+    await renderApp('/trips')
+    const mapNode = screen.getByTestId('map')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close trips' }))
+
+    expect(window.location.pathname).toBe('/')
+    expect(screen.queryByRole('heading', { name: 'Trips' })).toBeNull()
+    // Same DOM node, not a fresh one — the map was never unmounted by the
+    // panel closing, only the panel itself was.
+    expect(screen.getByTestId('map')).toBe(mapNode)
   })
 
   it('redirects /map to /', async () => {

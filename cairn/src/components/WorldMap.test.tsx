@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TripIndexEntry } from '../store/tripStore'
+import { DEFAULT_TRIP_FILTERS, type TripFilters } from '../store/tripFilters'
 
 const { fitTracksToBounds, zoomToFitCluster } = vi.hoisted(() => ({
   fitTracksToBounds: vi.fn(),
@@ -68,14 +70,60 @@ function TripDetailStub() {
   return <div>Trip detail for {id}</div>
 }
 
-async function renderWorldMap(trips: TripIndexEntry[], key: string) {
+type WorldMapComponent = typeof import('./WorldMap').WorldMap
+
+/** `WorldMap` is a controlled component (#80) — filters and the hovered
+    trip id live in whatever mounts it (`App.tsx`, in production). This
+    harness plays that role for the suite: real `useState`, not a stub, so
+    a click actually round-trips through `onFiltersChange`/`onHoverTrip`
+    the same way the real parent does. */
+function TestWorldMap({
+  WorldMapComponent,
+  trips,
+  hideStatusPills,
+  initialHoveredTripId = null,
+}: {
+  WorldMapComponent: WorldMapComponent
+  trips: TripIndexEntry[]
+  hideStatusPills?: boolean
+  initialHoveredTripId?: string | null
+}) {
+  const [filters, setFilters] = useState<TripFilters>(DEFAULT_TRIP_FILTERS)
+  const [hoveredTripId, setHoveredTripId] = useState<string | null>(initialHoveredTripId)
+  return (
+    <WorldMapComponent
+      trips={trips}
+      filters={filters}
+      onFiltersChange={setFilters}
+      hideStatusPills={hideStatusPills}
+      hoveredTripId={hoveredTripId}
+      onHoverTrip={setHoveredTripId}
+    />
+  )
+}
+
+async function renderWorldMap(
+  trips: TripIndexEntry[],
+  key: string,
+  options: { hideStatusPills?: boolean; initialHoveredTripId?: string | null } = {},
+) {
   vi.stubEnv('VITE_GOOGLE_MAPS_API_KEY', key)
   vi.resetModules()
   const { WorldMap } = await import('./WorldMap')
   return render(
     <MemoryRouter initialEntries={['/']}>
       <Routes>
-        <Route path="/" element={<WorldMap trips={trips} />} />
+        <Route
+          path="/"
+          element={
+            <TestWorldMap
+              WorldMapComponent={WorldMap}
+              trips={trips}
+              hideStatusPills={options.hideStatusPills}
+              initialHoveredTripId={options.initialHoveredTripId}
+            />
+          }
+        />
         <Route path="/trips/:id" element={<TripDetailStub />} />
       </Routes>
     </MemoryRouter>,
@@ -146,7 +194,7 @@ describe('WorldMap', () => {
       return render(
         <MemoryRouter initialEntries={['/']}>
           <Routes>
-            <Route path="/" element={<WorldMap trips={trips} />} />
+            <Route path="/" element={<TestWorldMap WorldMapComponent={WorldMap} trips={trips} />} />
           </Routes>
         </MemoryRouter>,
       )
@@ -229,6 +277,50 @@ describe('WorldMap', () => {
     expect(dots(container)).toHaveLength(1)
     expect(container.querySelector('.world-map__dot--planned')).not.toBeNull()
     expect(fitTracksToBounds).toHaveBeenCalledTimes(1)
+  })
+
+  describe('#80 status pills hidden while the trips panel owns them', () => {
+    it('does not render its own status pills when hideStatusPills is set', async () => {
+      const trips = [tripEntry({ id: 'a', origin: { lat: 37, lng: -122 } })]
+
+      const { container } = await renderWorldMap(trips, 'a-browser-key', { hideStatusPills: true })
+
+      expect(container.querySelector('.world-map__filter')).toBeNull()
+    })
+
+    it('still renders the date-range control when status pills are hidden', async () => {
+      const trips = [
+        tripEntry({ id: 'a', startDate: '2020-01-01', origin: { lat: 37, lng: -122 } }),
+        tripEntry({ id: 'b', startDate: '2026-01-01', origin: { lat: -33, lng: 151 } }),
+      ]
+
+      const { container } = await renderWorldMap(trips, 'a-browser-key', { hideStatusPills: true })
+
+      expect(container.querySelector('.world-map__date-range')).not.toBeNull()
+    })
+  })
+
+  describe('#80 row/dot hover emphasis', () => {
+    it('applies the emphasized state to the dot matching hoveredTripId, without a pointer hovering it', async () => {
+      const trips = [tripEntry({ id: 'a', origin: { lat: 37, lng: -122 } })]
+
+      const { container } = await renderWorldMap(trips, 'a-browser-key', { initialHoveredTripId: 'a' })
+
+      expect(container.querySelector('.world-map__dot-hit--emphasized')).not.toBeNull()
+    })
+
+    it('hovering a dot reports its trip id back through onHoverTrip', async () => {
+      const trips = [tripEntry({ id: 'a', origin: { lat: 37, lng: -122 } })]
+
+      const { container } = await renderWorldMap(trips, 'a-browser-key')
+      const hit = container.querySelector('.world-map__dot-hit') as HTMLElement
+
+      fireEvent.mouseEnter(hit)
+      expect(container.querySelector('.world-map__dot-hit--emphasized')).not.toBeNull()
+
+      fireEvent.mouseLeave(hit)
+      expect(container.querySelector('.world-map__dot-hit--emphasized')).toBeNull()
+    })
   })
 
   describe('date range filtering', () => {

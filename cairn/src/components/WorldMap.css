@@ -79,3 +79,163 @@
   max-width: 46ch;
   color: var(--text-muted);
 }
+
+/* cairn/docs/design/79-world-map-dots.md — "The dot" */
+
+.world-map__dot-hit {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--hit-target);
+  height: var(--hit-target);
+  /* AdvancedMarker anchors bottom-centre by default (a pin's tip); a dot
+     has no tip, so it's shifted down by half its own height to sit *on*
+     its coordinate instead of hovering above it. */
+  transform: translateY(50%);
+}
+
+.world-map__dot {
+  width: var(--dot-size);
+  height: var(--dot-size);
+  padding: 0;
+  border-radius: var(--radius-full);
+  border-style: solid;
+  border-width: var(--dot-ring);
+  cursor: pointer;
+  transition: transform var(--motion-fast) var(--ease);
+}
+
+.world-map__dot--completed {
+  background: var(--accent);
+  border-color: color-mix(in srgb, var(--text) 90%, transparent);
+}
+
+.world-map__dot--planned {
+  background: color-mix(in srgb, var(--ground) 70%, transparent);
+  border-color: color-mix(in srgb, var(--text) 85%, transparent);
+}
+
+.world-map__dot-hit:hover .world-map__dot,
+.world-map__dot-hit:focus-within .world-map__dot {
+  transform: scale(1.35);
+}
+
+.world-map__dot-label {
+  position: absolute;
+  left: calc(100% + var(--space-1));
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur));
+  box-shadow: var(--shadow-lifted);
+  color: var(--text);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.world-map__dot-hit:hover .world-map__dot-label,
+.world-map__dot-hit:focus-within .world-map__dot-label {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .world-map__dot {
+    transition: none;
+  }
+}
+
+.world-map__cluster {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--marker-size);
+  height: var(--marker-size);
+  padding: 0;
+  border-style: solid;
+  border-width: var(--dot-ring);
+  border-color: color-mix(in srgb, var(--text) 85%, transparent);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  /* Same bottom-anchor correction as a single dot. */
+  transform: translateY(50%);
+}
+
+/* cairn/docs/design/79-world-map-dots.md — "Filters", date range */
+
+.world-map__date-range {
+  position: absolute;
+  bottom: var(--space-6);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur));
+  box-shadow: var(--shadow-lifted);
+}
+
+.world-map__date-range-year {
+  flex: none;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.world-map__date-range-track {
+  position: relative;
+  width: 220px;
+  height: var(--hit-target);
+}
+
+.world-map__date-range-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  margin: 0;
+  background: transparent;
+  appearance: none;
+  pointer-events: none;
+}
+
+.world-map__date-range-input::-webkit-slider-runnable-track {
+  height: 2px;
+  background: var(--border);
+}
+
+.world-map__date-range-input::-moz-range-track {
+  height: 2px;
+  background: var(--border);
+}
+
+.world-map__date-range-input::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -7px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.world-map__date-range-input::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  cursor: pointer;
+  pointer-events: auto;
+}

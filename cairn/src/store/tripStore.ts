@@ -1,6 +1,7 @@
 import type { FeatureCollection, LineString } from 'geojson'
 import type { Track } from '../kml/parse'
-import { buildOverviewGeoJSON } from '../geo/overview'
+import { buildOverviewGeoJSON, computeTripOrigin } from '../geo/overview'
+import type { LatLng } from '../map/geo'
 
 export type TripStatus = 'planned' | 'completed'
 
@@ -16,6 +17,12 @@ export interface TripRecord {
   endDate: string | null
   notes: string
   createdAt: string
+  /** The world map's dot position (#79) — the first coordinate of the
+      first track in the trip's order, written whenever `saveOverview` runs
+      rather than derived on read, so the dot survives an overview that
+      fails to load or hasn't been fetched yet. `null` before a trip's
+      first track set is saved, or once its tracks produce no geometry. */
+  origin: LatLng | null
 }
 
 /** The fields #35's metadata header can edit. `id` and `createdAt` are
@@ -38,6 +45,9 @@ export interface TripIndexEntry {
   startDate: string | null
   endDate: string | null
   createdAt: string
+  /** See `TripRecord.origin` — carried on the index too since the world
+      map (#79) reads the list of trips, not each trip's full record. */
+  origin: LatLng | null
 }
 
 /* The seam a future Drive-backed store's async reads/writes hook into:
@@ -162,6 +172,7 @@ export class LocalTripStore implements TripStore {
       endDate: null,
       notes: '',
       createdAt: new Date().toISOString(),
+      origin: null,
     }
     const entry: TripIndexEntry = {
       id: record.id,
@@ -170,6 +181,7 @@ export class LocalTripStore implements TripStore {
       startDate: record.startDate,
       endDate: record.endDate,
       createdAt: record.createdAt,
+      origin: record.origin,
     }
     this.records.set(record.id, record)
     this.writeRecord(record)
@@ -220,6 +232,21 @@ export class LocalTripStore implements TripStore {
     return next
   }
 
+  /** #79: recomputes and persists the trip's dot position alongside its
+      overview — same "whenever the track set changes" trigger, since the
+      origin is derived from the same tracks. A trip whose tracks produce
+      no origin (empty, or none yet) clears any previously stored one,
+      matching the overview's own "no geometry" stance. */
+  private updateOrigin(id: string, origin: LatLng | null): void {
+    const current = this.getTrip(id)
+    if (!current || (current.origin?.lat === origin?.lat && current.origin?.lng === origin?.lng)) return
+    const next: TripRecord = { ...current, origin }
+    this.records.set(id, next)
+    this.writeRecord(next)
+    this.index = this.index.map((entry) => (entry.id === id ? { ...entry, origin } : entry))
+    this.writeIndex()
+  }
+
   /** Seeds (or overwrites) the local cache with a record read from Drive,
       under its own id rather than a freshly generated one — used only by a
       Drive-backed implementation's hydration pass. Inserts into the index
@@ -236,6 +263,7 @@ export class LocalTripStore implements TripStore {
       startDate: record.startDate,
       endDate: record.endDate,
       createdAt: record.createdAt,
+      origin: record.origin,
     }
     const withoutExisting = this.index.filter((e) => e.id !== record.id)
     this.index = [...withoutExisting, entry].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
@@ -275,6 +303,7 @@ export class LocalTripStore implements TripStore {
   saveOverview = (id: string, tracks: Track[]): void => {
     const overview = buildOverviewGeoJSON(tracks)
     this.storage.setItem(overviewKey(id), JSON.stringify(overview))
+    this.updateOrigin(id, computeTripOrigin(tracks))
     this.notify()
   }
 

@@ -132,6 +132,12 @@ export class DriveTripStore implements TripStore {
 
   saveOverview = (id: string, tracks: Track[]): void => {
     this.local.saveOverview(id, tracks)
+    // #79: saveOverview also recomputes and persists the trip's origin (its
+    // world-map dot), which lives on `trip.json` — flushed alongside the
+    // overview rather than folded into `updateTrip`, since nothing calls
+    // that here and origin only ever changes as a side effect of the
+    // tracks themselves changing.
+    void this.enqueue(id, () => this.flushTrip(id))
     void this.enqueue(id, () => this.flushOverview(id))
   }
 

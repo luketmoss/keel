@@ -1,39 +1,53 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { FeatureCollection, LineString } from 'geojson'
-import type { TripIndexEntry, TripRecord, TripStore } from '../store/tripStore'
+import type { TripIndexEntry } from '../store/tripStore'
 
-const { fitTracksToBounds } = vi.hoisted(() => ({ fitTracksToBounds: vi.fn() }))
-vi.mock('../map/fitBounds', () => ({ fitTracksToBounds }))
+const { fitTracksToBounds, zoomToFitCluster } = vi.hoisted(() => ({
+  fitTracksToBounds: vi.fn(),
+  zoomToFitCluster: vi.fn(),
+}))
+vi.mock('../map/fitBounds', () => ({ fitTracksToBounds, zoomToFitCluster }))
 
-const fakeMap = { id: 'fake-map' }
+const fakeMap = {
+  id: 'fake-map',
+  getZoom: () => 2,
+  getCenter: () => ({ toJSON: () => ({ lat: 12, lng: 34 }) }),
+}
 vi.mock('@vis.gl/react-google-maps', () => ({
   APIProvider: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
   Map: ({ children }: { children?: React.ReactNode }) => <div data-testid="map">{children}</div>,
-  Polyline: (props: {
-    strokeColor?: string
-    strokeOpacity?: number
-    clickable?: boolean
+  AdvancedMarker: ({
+    position,
+    onClick,
+    children,
+  }: {
+    position: { lat: number; lng: number }
     onClick?: () => void
+    children?: React.ReactNode
   }) => (
-    <button
-      type="button"
-      data-testid="polyline"
-      data-color={props.strokeColor}
-      data-dashed={props.strokeOpacity === 0}
-      data-clickable={props.clickable === true}
-      onClick={props.onClick}
-    />
+    <div data-testid="advanced-marker" data-lat={position.lat} data-lng={position.lng} onClick={onClick}>
+      {children}
+    </div>
   ),
   useMap: () => fakeMap,
 }))
 
-function line(coords: [number, number][]): FeatureCollection<LineString> {
-  return {
-    type: 'FeatureCollection',
-    features: [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords } }],
-  }
+// Captures every 'idle' listener PlaceLayer registers, so a test can fire one
+// by hand to simulate the map settling — the real trigger for #79's camera
+// snapshot, which nothing here drives through a genuine Google Maps instance.
+let idleListeners: (() => void)[] = []
+
+;(globalThis as unknown as { google: unknown }).google = {
+  maps: {
+    event: {
+      addListener: (_target: unknown, eventName: string, callback: () => void) => {
+        if (eventName === 'idle') idleListeners.push(callback)
+        return { remove: () => {} }
+      },
+      addListenerOnce: () => {},
+    },
+  },
 }
 
 function tripEntry(overrides: Partial<TripIndexEntry> = {}): TripIndexEntry {
@@ -44,20 +58,8 @@ function tripEntry(overrides: Partial<TripIndexEntry> = {}): TripIndexEntry {
     startDate: null,
     endDate: null,
     createdAt: '2024-01-01T00:00:00.000Z',
+    origin: { lat: 37, lng: -122 },
     ...overrides,
-  }
-}
-
-function fakeTripStore(overviews: Record<string, FeatureCollection<LineString> | null>): TripStore {
-  return {
-    getTrips: () => [],
-    getTrip: (): TripRecord | null => null,
-    createTrip: () => tripEntry(),
-    updateTrip: async (): Promise<TripRecord | null> => null,
-    deleteTrip: () => {},
-    getOverview: (id: string) => overviews[id] ?? null,
-    saveOverview: () => {},
-    subscribe: () => () => {},
   }
 }
 
@@ -66,143 +68,220 @@ function TripDetailStub() {
   return <div>Trip detail for {id}</div>
 }
 
-async function renderWorldMap(trips: TripIndexEntry[], tripStore: TripStore, key: string) {
+async function renderWorldMap(trips: TripIndexEntry[], key: string) {
   vi.stubEnv('VITE_GOOGLE_MAPS_API_KEY', key)
   vi.resetModules()
   const { WorldMap } = await import('./WorldMap')
   return render(
-    <MemoryRouter initialEntries={['/world']}>
+    <MemoryRouter initialEntries={['/']}>
       <Routes>
-        <Route path="/world" element={<WorldMap trips={trips} tripStore={tripStore} />} />
+        <Route path="/" element={<WorldMap trips={trips} />} />
         <Route path="/trips/:id" element={<TripDetailStub />} />
       </Routes>
     </MemoryRouter>,
   )
 }
 
+function dots(container: HTMLElement): Element[] {
+  return Array.from(container.querySelectorAll('.world-map__dot'))
+}
+
 afterEach(() => {
   vi.unstubAllEnvs()
   fitTracksToBounds.mockClear()
+  zoomToFitCluster.mockClear()
+  idleListeners = []
 })
 
-/** Each route draws as an invisible, wide, clickable casing plus a visible
-    line on top of it (the click-target-padding treatment `TrackLayer`
-    gives its own tracks) — so counting "routes on screen" means counting
-    the non-clickable, visible ones, not every `Polyline` element. */
-function visibleLines(container: HTMLElement): Element[] {
-  return Array.from(container.querySelectorAll('[data-testid="polyline"]')).filter(
-    (el) => el.getAttribute('data-clickable') !== 'true',
-  )
-}
-
 describe('WorldMap', () => {
-  it('renders one visible polyline per route, styled by status, each with its own wider clickable casing', async () => {
+  it('renders one dot per trip with an origin, filled for completed and hollow for planned', async () => {
     const trips = [
-      tripEntry({ id: 'a', status: 'completed' }),
-      tripEntry({ id: 'b', status: 'planned' }),
+      tripEntry({ id: 'a', status: 'completed', origin: { lat: 37, lng: -122 } }),
+      tripEntry({ id: 'b', status: 'planned', origin: { lat: 60, lng: 100 } }),
     ]
-    const store = fakeTripStore({
-      a: line([[-122, 37], [-121, 38]]),
-      b: line([[-100, 40], [-99, 41]]),
-    })
 
-    const { container } = await renderWorldMap(trips, store, 'a-browser-key')
+    const { container } = await renderWorldMap(trips, 'a-browser-key')
 
-    const visible = visibleLines(container)
-    expect(visible).toHaveLength(2)
-    expect(visible.map((el) => el.getAttribute('data-dashed'))).toEqual(['false', 'true'])
-
-    const clickable = container.querySelectorAll('[data-testid="polyline"][data-clickable="true"]')
-    expect(clickable).toHaveLength(2)
+    expect(dots(container)).toHaveLength(2)
+    expect(container.querySelector('.world-map__dot--completed')).not.toBeNull()
+    expect(container.querySelector('.world-map__dot--planned')).not.toBeNull()
   })
 
-  it('fits bounds once on load to the union of all routes', async () => {
-    const trips = [tripEntry({ id: 'a' }), tripEntry({ id: 'b', status: 'planned' })]
-    const store = fakeTripStore({
-      a: line([[-122, 37], [-121, 38]]),
-      b: line([[-100, 40], [-99, 41]]),
-    })
+  it('excludes a trip with no origin from the map without blocking the others', async () => {
+    const trips = [
+      tripEntry({ id: 'a', origin: { lat: 37, lng: -122 } }),
+      tripEntry({ id: 'b', name: 'No geometry yet', origin: null }),
+    ]
 
-    await renderWorldMap(trips, store, 'a-browser-key')
+    const { container } = await renderWorldMap(trips, 'a-browser-key')
+
+    expect(dots(container)).toHaveLength(1)
+  })
+
+  it('fits bounds once on load to the union of all places', async () => {
+    const trips = [
+      tripEntry({ id: 'a', origin: { lat: 37, lng: -122 } }),
+      tripEntry({ id: 'b', status: 'planned', origin: { lat: -33, lng: 151 } }),
+    ]
+
+    await renderWorldMap(trips, 'a-browser-key')
 
     expect(fitTracksToBounds).toHaveBeenCalledTimes(1)
     expect(fitTracksToBounds).toHaveBeenCalledWith(
       fakeMap,
       expect.arrayContaining([
-        { lat: 37, lng: -122 },
-        { lat: 41, lng: -99 },
+        expect.objectContaining({ lat: 37, lng: -122 }),
+        expect.objectContaining({ lat: -33, lng: 151 }),
       ]),
     )
   })
 
-  it('filters routes by status and re-fits bounds on the new visible set', async () => {
-    const trips = [
-      tripEntry({ id: 'a', status: 'completed' }),
-      tripEntry({ id: 'b', status: 'planned' }),
-    ]
-    const store = fakeTripStore({
-      a: line([[-122, 37], [-121, 38]]),
-      b: line([[-100, 40], [-99, 41]]),
-    })
+  it('does not re-fit on remount once the camera has settled, restoring it instead (#79 camera persistence)', async () => {
+    vi.stubEnv('VITE_GOOGLE_MAPS_API_KEY', 'a-browser-key')
+    vi.resetModules()
+    const { WorldMap } = await import('./WorldMap')
+    const trips = [tripEntry({ id: 'a', origin: { lat: 37, lng: -122 } })]
 
-    const { container } = await renderWorldMap(trips, store, 'a-browser-key')
+    function renderAt() {
+      return render(
+        <MemoryRouter initialEntries={['/']}>
+          <Routes>
+            <Route path="/" element={<WorldMap trips={trips} />} />
+          </Routes>
+        </MemoryRouter>,
+      )
+    }
+
+    const first = renderAt()
+    expect(fitTracksToBounds).toHaveBeenCalledTimes(1)
+
+    // The map settling (a pan, a zoom, or simply the initial fit finishing)
+    // is what records the camera — simulated here since nothing drives a
+    // real Google Maps 'idle' event through the mock.
+    idleListeners.forEach((listener) => listener())
+    first.unmount()
     fitTracksToBounds.mockClear()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Planned' }))
-
-    expect(visibleLines(container)).toHaveLength(1)
-    expect(fitTracksToBounds).toHaveBeenCalledTimes(1)
+    // A second mount of the *same* module — i.e. navigating back to `/`
+    // within the same session, not a fresh page load — restores the
+    // recorded camera via `defaultCenter`/`defaultZoom` instead of fitting
+    // again.
+    renderAt()
+    expect(fitTracksToBounds).not.toHaveBeenCalled()
   })
 
-  it('navigates to the trip detail page when a route is clicked', async () => {
-    const trips = [tripEntry({ id: 'a' })]
-    const store = fakeTripStore({ a: line([[-122, 37], [-121, 38]]) })
+  it('hovering a dot shows the trip name as a label', async () => {
+    const trips = [tripEntry({ id: 'a', name: 'Kepler Track', origin: { lat: 37, lng: -122 } })]
 
-    const { container } = await renderWorldMap(trips, store, 'a-browser-key')
-    fireEvent.click(container.querySelector('[data-testid="polyline"]')!)
+    await renderWorldMap(trips, 'a-browser-key')
+
+    expect(screen.getByText('Kepler Track')).toBeDefined()
+  })
+
+  it('activating a dot opens that trip detail view', async () => {
+    const trips = [tripEntry({ id: 'a', origin: { lat: 37, lng: -122 } })]
+
+    const { container } = await renderWorldMap(trips, 'a-browser-key')
+    fireEvent.click(container.querySelector('.world-map__dot')!)
 
     expect(await screen.findByText('Trip detail for a')).toBeDefined()
   })
 
-  it('excludes a trip with no overview from the map without blocking the others', async () => {
-    const trips = [tripEntry({ id: 'a' }), tripEntry({ id: 'b', name: 'No overview yet' })]
-    const store = fakeTripStore({ a: line([[-122, 37], [-121, 38]]) })
+  it('clusters dots whose footprints overlap, showing the member count', async () => {
+    // Same coordinate, world zoom (2) — well within the clustering
+    // footprint regardless of exact pixel math.
+    const trips = [
+      tripEntry({ id: 'a', origin: { lat: 10, lng: 10 } }),
+      tripEntry({ id: 'b', origin: { lat: 10.0001, lng: 10.0001 } }),
+    ]
 
-    const { container } = await renderWorldMap(trips, store, 'a-browser-key')
+    const { container } = await renderWorldMap(trips, 'a-browser-key')
 
-    expect(visibleLines(container)).toHaveLength(1)
+    expect(dots(container)).toHaveLength(0)
+    const cluster = container.querySelector('.world-map__cluster')
+    expect(cluster).not.toBeNull()
+    expect(cluster?.textContent).toBe('2')
   })
 
-  it('excludes a trip whose overview has no features, same as a missing one', async () => {
-    const trips = [tripEntry({ id: 'a' })]
-    const store = fakeTripStore({ a: { type: 'FeatureCollection', features: [] } })
+  it('activating a cluster zooms the map to fit its members', async () => {
+    const trips = [
+      tripEntry({ id: 'a', origin: { lat: 10, lng: 10 } }),
+      tripEntry({ id: 'b', origin: { lat: 10.0001, lng: 10.0001 } }),
+    ]
 
-    const { container } = await renderWorldMap(trips, store, 'a-browser-key')
+    const { container } = await renderWorldMap(trips, 'a-browser-key')
+    fireEvent.click(container.querySelector('.world-map__cluster')!)
 
-    expect(visibleLines(container)).toHaveLength(0)
-    expect(screen.getByText('No trips yet')).toBeDefined()
+    expect(zoomToFitCluster).toHaveBeenCalledTimes(1)
   })
 
-  it('shows the "no trips yet" empty state, without a filter row, when there are no trips', async () => {
-    const { container } = await renderWorldMap([], fakeTripStore({}), 'a-browser-key')
+  it('filters dots by status and re-fits on the new visible set', async () => {
+    const trips = [
+      tripEntry({ id: 'a', status: 'completed', origin: { lat: 37, lng: -122 } }),
+      tripEntry({ id: 'b', status: 'planned', origin: { lat: -33, lng: 151 } }),
+    ]
 
-    expect(screen.getByText('No trips yet')).toBeDefined()
-    expect(container.querySelector('.world-map__filter')).toBeNull()
-  })
+    const { container } = await renderWorldMap(trips, 'a-browser-key')
+    fitTracksToBounds.mockClear()
 
-  it('shows the filtered empty state, with the filter row still visible, when a filter excludes everything', async () => {
-    const trips = [tripEntry({ id: 'a', status: 'completed' })]
-    const store = fakeTripStore({ a: line([[-122, 37], [-121, 38]]) })
-
-    await renderWorldMap(trips, store, 'a-browser-key')
     fireEvent.click(screen.getByRole('button', { name: 'Planned' }))
 
-    expect(screen.getByText('No planned trips')).toBeDefined()
-    expect(screen.getByRole('button', { name: 'All' })).toBeDefined()
+    expect(dots(container)).toHaveLength(1)
+    expect(container.querySelector('.world-map__dot--planned')).not.toBeNull()
+    expect(fitTracksToBounds).toHaveBeenCalledTimes(1)
+  })
+
+  describe('date range filtering', () => {
+    it('excludes a dated trip outside the selected range, and keeps an undated one visible regardless', async () => {
+      const trips = [
+        tripEntry({ id: 'early', startDate: '2020-01-01', origin: { lat: 10, lng: 10 } }),
+        tripEntry({ id: 'late', startDate: '2026-01-01', origin: { lat: 20, lng: 20 } }),
+        tripEntry({ id: 'undated', startDate: null, createdAt: '2023-06-01T00:00:00.000Z', origin: { lat: 30, lng: 30 } }),
+      ]
+
+      const { container } = await renderWorldMap(trips, 'a-browser-key')
+      expect(dots(container)).toHaveLength(3)
+
+      const startHandle = screen.getByRole('slider', { name: 'Range start' }) as HTMLInputElement
+      // Narrow the range to exclude "early" — moving the start handle
+      // forward past its date.
+      fireEvent.change(startHandle, { target: { value: String(Number(startHandle.max) - 1) } })
+
+      expect(dots(container)).toHaveLength(2)
+      expect(container.querySelector('[data-lat="10"]')).toBeNull()
+      expect(container.querySelector('[data-lat="30"]')).not.toBeNull()
+    })
+  })
+
+  describe('empty states', () => {
+    it('shows "No places yet", with no filter controls, when there are no trips', async () => {
+      const { container } = await renderWorldMap([], 'a-browser-key')
+
+      expect(screen.getByText('No places yet')).toBeDefined()
+      expect(container.querySelector('.world-map__filter')).toBeNull()
+    })
+
+    it('shows the same empty state when trips exist but none have geometry', async () => {
+      const trips = [tripEntry({ origin: null })]
+      const { container } = await renderWorldMap(trips, 'a-browser-key')
+
+      expect(screen.getByText('No places yet')).toBeDefined()
+      expect(container.querySelector('.world-map__filter')).toBeNull()
+    })
+
+    it('shows the filtered-empty state, with the filter row still visible, when a filter excludes everything', async () => {
+      const trips = [tripEntry({ id: 'a', status: 'completed', origin: { lat: 37, lng: -122 } })]
+
+      await renderWorldMap(trips, 'a-browser-key')
+      fireEvent.click(screen.getByRole('button', { name: 'Planned' }))
+
+      expect(screen.getByText('Nothing in this range')).toBeDefined()
+      expect(screen.getByRole('button', { name: 'All' })).toBeDefined()
+    })
   })
 
   it('renders the setup panel when no key is configured', async () => {
-    await renderWorldMap([], fakeTripStore({}), '')
+    await renderWorldMap([], '')
 
     expect(screen.getByText('Map unavailable')).toBeDefined()
     expect(screen.queryByTestId('map')).toBeNull()

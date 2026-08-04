@@ -1,5 +1,6 @@
 import type { Feature, FeatureCollection, LineString } from 'geojson'
 import type { Track, TrackPoint } from '../kml/parse'
+import type { LatLng } from '../map/geo'
 
 /* Mirrors kml/stats.ts: mean Earth radius, error under 0.5% at any realistic
    track scale — plenty for a decision about whether a point matters at world
@@ -114,6 +115,21 @@ function toLineStringFeature(track: Track, toleranceMeters: number): Feature<Lin
  * from anywhere yet; wiring it into an actual save lands with the storage
  * interface (#31) and trip storage shape (#33).
  */
+/**
+ * A trip's place on the world map (#79): the first coordinate of the first
+ * non-empty track in the trip's order — the same order `tracks` is always
+ * assembled in elsewhere (a file's own track order, then file order, #46's
+ * reorder acting on the latter). `null` when no track has a point, same as
+ * "no geometry" everywhere else in this module.
+ */
+export function computeTripOrigin(tracks: Track[]): LatLng | null {
+  for (const track of tracks) {
+    const [first] = track.points
+    if (first) return { lat: first.lat, lng: first.lon }
+  }
+  return null
+}
+
 export function buildOverviewGeoJSON(
   tracks: Track[],
   toleranceMeters: number = DEFAULT_TOLERANCE_METERS,

@@ -1,60 +1,82 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { APIProvider, Map, Polyline, useMap } from '@vis.gl/react-google-maps'
+import { APIProvider, AdvancedMarker, Map, useMap } from '@vis.gl/react-google-maps'
 import { googleMapsApiKey } from '../env'
 import { MapUnavailable } from './MapUnavailable'
-import type { TripIndexEntry, TripStatus, TripStore } from '../store/tripStore'
-import { dropInvalidLatitudes, normalizeAntimeridian, type LatLng } from '../map/geo'
-import { fitTracksToBounds } from '../map/fitBounds'
+import type { TripIndexEntry, TripStatus } from '../store/tripStore'
+import { fitTracksToBounds, zoomToFitCluster } from '../map/fitBounds'
+import { clusterMarkers, type MarkerCluster } from '../map/cluster'
 import './WorldMap.css'
 
-/* Same "nothing imported yet" default MapView uses — there's no better
-   answer before any route has drawn. */
+/* Same "nothing imported yet" default as before there's anything to fit to. */
 const INITIAL_CENTER = { lat: 20, lng: 0 }
 const INITIAL_ZOOM = 2
 
-/* --accent / --text-muted from index.css. Google Maps' Polyline options take
-   real colour values, not CSS custom properties, so the design doc's colour
-   pairing is transcribed here rather than referenced live. */
-const COMPLETED_COLOR = '#4c9aff'
-const PLANNED_COLOR = '#9aa3ab'
+const MS_PER_DAY = 86_400_000
+
+/* --marker-size from index.css, transcribed for the same reason PhotoLayer's
+   own copy is — clustering's projection math wants real pixels, not a CSS
+   var. Keep in step with index.css by hand. */
+const MARKER_FOOTPRINT_PX = 28
+
+/** The map's centre and zoom survive a trip visit and return, for the
+    session — #79's point, and what makes the map browsable at all now
+    that a trip visit unmounts it (#78 doesn't yet make it survive
+    navigation to /trips; #80 does). Module-level rather than component
+    state so it isn't wiped by `WorldMap` itself remounting, and never
+    persisted anywhere, so a reload starts fresh — the better opening frame
+    per the design note. */
+let lastCamera: { center: google.maps.LatLngLiteral; zoom: number } | null = null
 
 type StatusFilter = 'all' | TripStatus
 
-interface WorldRoute {
-  key: string
+interface Place {
   tripId: string
+  name: string
   status: TripStatus
-  points: LatLng[]
+  lat: number
+  lng: number
+  /** `startDate` if the trip has one, `createdAt` otherwise — the "date a
+      trip never chose" the design note's Notes section describes. Used to
+      place the trip on the range slider's span; `dated` is what decides
+      whether the slider can ever exclude it. */
+  timestamp: number
+  dated: boolean
 }
 
-/** One route per non-empty `LineString` feature in a trip's overview — a
-    trip can carry more than one track (#36), and each draws as its own
-    polyline, same as `TrackLayer` does for `/`. */
-function routesForTrip(trip: TripIndexEntry, tripStore: TripStore): WorldRoute[] {
-  const overview = tripStore.getOverview(trip.id)
-  if (!overview) return []
-
-  return overview.features
-    .map((feature, index): WorldRoute | null => {
-      const points = normalizeAntimeridian(
-        dropInvalidLatitudes(feature.geometry.coordinates.map(([lon, lat]) => ({ lat, lon }))),
-      )
-      if (points.length < 2) return null
-      return { key: `${trip.id}-${index}`, tripId: trip.id, status: trip.status, points }
+function placesForTrips(trips: TripIndexEntry[]): Place[] {
+  return trips
+    // A trip written before #79 has no `origin` field at all rather than
+    // an explicit `null` — the storage layer's existing "corrupted/missing
+    // is absent, not thrown" stance (see tripStore.ts's validators) means
+    // this has to tolerate `undefined` too, not just `null`.
+    .filter((trip): trip is TripIndexEntry & { origin: NonNullable<TripIndexEntry['origin']> } =>
+      Boolean(trip.origin),
+    )
+    .map((trip) => {
+      const dated = trip.startDate !== null
+      const timestamp = new Date(trip.startDate ?? trip.createdAt).getTime()
+      return {
+        tripId: trip.id,
+        name: trip.name,
+        status: trip.status,
+        lat: trip.origin.lat,
+        lng: trip.origin.lng,
+        timestamp,
+        dated,
+      }
     })
-    .filter((route): route is WorldRoute => route !== null)
+    .filter((place) => Number.isFinite(place.timestamp))
 }
 
-interface WorldMapProps {
-  trips: TripIndexEntry[]
-  tripStore: TripStore
+function dayIndex(timestampMs: number): number {
+  return Math.floor(timestampMs / MS_PER_DAY)
 }
 
-/** `/world` (#37): every trip's route at once, drawn from each trip's
-    precomputed `overview.geojson` (#36) — never a source KML/KMZ. Additive
-    alongside `/` and `/trips`; nothing here touches either. */
-export function WorldMap({ trips, tripStore }: WorldMapProps) {
+/** `/` (#78 makes it the homepage; #79 replaces what it draws): every trip
+    with a place draws as one dot rather than its full route — a route
+    means the import is not saved yet (#81), and a dot means it is. */
+export function WorldMap({ trips }: WorldMapProps) {
   const [filter, setFilter] = useState<StatusFilter>('all')
   const [keyRejected, setKeyRejected] = useState(false)
   const navigate = useNavigate()
@@ -66,18 +88,39 @@ export function WorldMap({ trips, tripStore }: WorldMapProps) {
     }
   }, [])
 
-  // Reads are synchronous (local storage today), but a trip whose overview
-  // is missing or empty is silently absent — same "partial failure" and
-  // "empty overview" handling the design doc specifies for a slower,
-  // Drive-backed read.
-  const routes = useMemo(
-    () => trips.flatMap((trip) => routesForTrip(trip, tripStore)),
-    [trips, tripStore],
+  const places = useMemo(() => placesForTrips(trips), [trips])
+
+  const dateSpan = useMemo(() => {
+    if (places.length === 0) return null
+    const days = places.map((place) => dayIndex(place.timestamp))
+    return { min: Math.min(...days), max: Math.max(...days) }
+  }, [places])
+
+  const [range, setRange] = useState<[number, number] | null>(() =>
+    dateSpan ? [dateSpan.min, dateSpan.max] : null,
   )
-  const visibleRoutes = useMemo(
-    () => (filter === 'all' ? routes : routes.filter((route) => route.status === filter)),
-    [routes, filter],
-  )
+  // The slider's range resets to the full span whenever the span itself
+  // changes shape (a trip gaining or losing a date) rather than every
+  // render — narrowing it back to `[min, max]` on every trip update would
+  // make a filter the user just set snap back the moment anything else
+  // about the trip list changed.
+  const spanKey = dateSpan ? `${dateSpan.min}-${dateSpan.max}` : ''
+  const previousSpanKey = useRef(spanKey)
+  if (previousSpanKey.current !== spanKey) {
+    previousSpanKey.current = spanKey
+    setRange(dateSpan ? [dateSpan.min, dateSpan.max] : null)
+  }
+
+  const visiblePlaces = useMemo(() => {
+    return places.filter((place) => {
+      if (filter !== 'all' && place.status !== filter) return false
+      if (place.dated && range) {
+        const day = dayIndex(place.timestamp)
+        if (day < range[0] || day > range[1]) return false
+      }
+      return true
+    })
+  }, [places, filter, range])
 
   if (!googleMapsApiKey) {
     return (
@@ -97,34 +140,44 @@ export function WorldMap({ trips, tripStore }: WorldMapProps) {
     )
   }
 
+  const noPlaces = places.length === 0
+  const filteredEmpty = !noPlaces && visiblePlaces.length === 0
+
   return (
     <div className="world-map">
-      {trips.length > 0 && <FilterRow filter={filter} onChange={setFilter} />}
+      {!noPlaces && <FilterRow filter={filter} onChange={setFilter} />}
+      {!noPlaces && dateSpan && dateSpan.min !== dateSpan.max && range && (
+        <DateRangeControl min={dateSpan.min} max={dateSpan.max} value={range} onChange={setRange} />
+      )}
       <APIProvider apiKey={googleMapsApiKey} onError={() => setKeyRejected(true)}>
         <Map
           className="map"
-          defaultCenter={INITIAL_CENTER}
-          defaultZoom={INITIAL_ZOOM}
+          defaultCenter={lastCamera?.center ?? INITIAL_CENTER}
+          defaultZoom={lastCamera?.zoom ?? INITIAL_ZOOM}
           mapTypeId="satellite"
           gestureHandling="greedy"
           disableDefaultUI
           zoomControl
         >
-          <WorldRouteLayer routes={visibleRoutes} onSelectTrip={(id) => navigate(`/trips/${id}`)} />
+          <PlaceLayer places={visiblePlaces} onSelectTrip={(id) => navigate(`/trips/${id}`)} />
         </Map>
       </APIProvider>
-      {/* `all` never excludes anything, so an empty visible set under `all`
-          means there were no trips to draw in the first place — reads
-          identically to "no trips exist" rather than as its own state, per
-          the design doc, since neither is actionable and the user can't
-          tell the difference. */}
-      {trips.length === 0 || (filter === 'all' && visibleRoutes.length === 0) ? (
-        <EmptyOverlay heading="No trips yet" detail="Create one from Trips to see it here." />
+      {noPlaces ? (
+        <EmptyOverlay
+          heading="No places yet"
+          detail="Drop a KML anywhere to start your first trip."
+        />
       ) : (
-        visibleRoutes.length === 0 && <EmptyOverlay heading={`No ${filter} trips`} />
+        filteredEmpty && (
+          <EmptyOverlay heading="Nothing in this range" detail="Widen the filters to see your trips." />
+        )
       )}
     </div>
   )
+}
+
+interface WorldMapProps {
+  trips: TripIndexEntry[]
 }
 
 function FilterRow({
@@ -158,6 +211,49 @@ function FilterRow({
   )
 }
 
+function yearOf(day: number): number {
+  return new Date(day * MS_PER_DAY).getFullYear()
+}
+
+function DateRangeControl({
+  min,
+  max,
+  value,
+  onChange,
+}: {
+  min: number
+  max: number
+  value: [number, number]
+  onChange: (value: [number, number]) => void
+}) {
+  return (
+    <div className="world-map__date-range">
+      <span className="world-map__date-range-year">{yearOf(value[0])}</span>
+      <div className="world-map__date-range-track">
+        <input
+          type="range"
+          className="world-map__date-range-input"
+          aria-label="Range start"
+          min={min}
+          max={max}
+          value={value[0]}
+          onChange={(event) => onChange([Math.min(Number(event.target.value), value[1]), value[1]])}
+        />
+        <input
+          type="range"
+          className="world-map__date-range-input"
+          aria-label="Range end"
+          min={min}
+          max={max}
+          value={value[1]}
+          onChange={(event) => onChange([value[0], Math.max(Number(event.target.value), value[0])])}
+        />
+      </div>
+      <span className="world-map__date-range-year">{yearOf(value[1])}</span>
+    </div>
+  )
+}
+
 function EmptyOverlay({ heading, detail }: { heading: string; detail?: string }) {
   return (
     <div className="world-map__empty">
@@ -167,99 +263,127 @@ function EmptyOverlay({ heading, detail }: { heading: string; detail?: string })
   )
 }
 
-interface WorldRouteLayerProps {
-  routes: WorldRoute[]
+interface PlaceLayerProps {
+  places: Place[]
   onSelectTrip: (tripId: string) => void
 }
 
-function routeSetKey(routes: WorldRoute[]): string {
-  return routes
-    .map((route) => route.key)
-    .sort()
-    .join(',')
-}
-
-/** Draws every visible route and fits the map to their union once the
-    current batch has settled — one fit per filter change or load, not one
-    per route, matching `TrackLayer`'s stance that a camera lurching route by
-    route is worse than a slightly loose fit. */
-function WorldRouteLayer({ routes, onSelectTrip }: WorldRouteLayerProps) {
+/** Fits to the union of visible places once, on first mount only when there
+    is no persisted camera to restore instead (#79's Camera persistence) —
+    and again whenever the *set* of visible places actually changes
+    afterward (a filter change), never on a re-render that leaves it the
+    same. Mirrors the pre-#79 `WorldRouteLayer`'s own fit-once-per-change
+    stance. */
+function PlaceLayer({ places, onSelectTrip }: PlaceLayerProps) {
   const map = useMap()
+  const [zoom, setZoom] = useState<number>(() => map?.getZoom() ?? INITIAL_ZOOM)
+  const isFirstFit = useRef(true)
   const previousKey = useRef('')
 
   useEffect(() => {
     if (!map) return
-    const currentKey = routeSetKey(routes)
+    setZoom(map.getZoom() ?? INITIAL_ZOOM)
+    const zoomListener = google.maps.event.addListener(map, 'zoom_changed', () => {
+      setZoom(map.getZoom() ?? INITIAL_ZOOM)
+    })
+    const idleListener = google.maps.event.addListener(map, 'idle', () => {
+      const center = map.getCenter()
+      const currentZoom = map.getZoom()
+      if (center && currentZoom !== undefined) {
+        lastCamera = { center: center.toJSON(), zoom: currentZoom }
+      }
+    })
+    return () => {
+      zoomListener.remove()
+      idleListener.remove()
+    }
+  }, [map])
+
+  useEffect(() => {
+    if (!map) return
+    const currentKey = places
+      .map((place) => place.tripId)
+      .sort()
+      .join(',')
+
+    if (isFirstFit.current) {
+      isFirstFit.current = false
+      previousKey.current = currentKey
+      if (!lastCamera) fitTracksToBounds(map, places)
+      return
+    }
+
     if (currentKey === previousKey.current) return
     previousKey.current = currentKey
+    fitTracksToBounds(map, places)
+  }, [map, places])
 
-    const allPoints = routes.flatMap((route) => route.points)
-    fitTracksToBounds(map, allPoints)
-  }, [map, routes])
+  const clusterable = useMemo(() => places.map((place) => ({ lat: place.lat, lng: place.lng, place })), [places])
+  const clusters = useMemo(
+    () => clusterMarkers(clusterable, zoom, MARKER_FOOTPRINT_PX),
+    [clusterable, zoom],
+  )
+
+  if (!map) return null
 
   return (
     <>
-      {routes.map((route) => (
-        <WorldRoutePolyline key={route.key} route={route} onSelect={() => onSelectTrip(route.tripId)} />
-      ))}
+      {clusters.map((cluster) => {
+        if (cluster.members.length === 1) {
+          const place = cluster.members[0].place
+          return <PlaceDot key={place.tripId} place={place} onSelect={() => onSelectTrip(place.tripId)} />
+        }
+        const key = cluster.members
+          .map((member) => member.place.tripId)
+          .sort()
+          .join(',')
+        return <PlaceCluster key={key} cluster={cluster} map={map} />
+      })}
     </>
   )
 }
 
-/** Padding, in pixels, added either side of the visible stroke for the
-    actual click target — same "wider hit area than the visible line"
-    treatment `TrackLayer`'s casing polyline gives `/`'s own tracks. */
-const CLICK_TARGET_WIDTH = 16
+function PlaceDot({ place, onSelect }: { place: Place; onSelect: () => void }) {
+  return (
+    <AdvancedMarker position={{ lat: place.lat, lng: place.lng }} zIndex={0} onClick={onSelect}>
+      <div className="world-map__dot-hit">
+        <button
+          type="button"
+          className={`world-map__dot world-map__dot--${place.status}`}
+          aria-label={place.name}
+        />
+        <span className="world-map__dot-label">{place.name}</span>
+      </div>
+    </AdvancedMarker>
+  )
+}
 
-function WorldRoutePolyline({ route, onSelect }: { route: WorldRoute; onSelect: () => void }) {
-  const [hovered, setHovered] = useState(false)
-  const color = route.status === 'completed' ? COMPLETED_COLOR : PLANNED_COLOR
-  const strokeWeight = hovered ? 5 : 3
-  const hoverHandlers = {
-    onMouseOver: () => setHovered(true),
-    onMouseOut: () => setHovered(false),
-  }
+function PlaceCluster({
+  cluster,
+  map,
+}: {
+  cluster: MarkerCluster<{ lat: number; lng: number; place: Place }>
+  map: google.maps.Map
+}) {
+  const names = cluster.members.map((member) => member.place.name).join(', ')
 
   return (
-    <>
-      {/* Invisible and wider than what's drawn — carries the click target
-          and the hover state, so a route is easy to hit without the visible
-          line itself having to be that fat. The visible line underneath it
-          is never clickable itself; a click always lands here first. */}
-      <Polyline
-        path={route.points}
-        strokeOpacity={0}
-        strokeWeight={CLICK_TARGET_WIDTH}
-        clickable
-        onClick={onSelect}
-        {...hoverHandlers}
-      />
-      {route.status === 'planned' ? (
-        // Google Maps' `Polyline` has no dashed-stroke option of its own —
-        // a dashed line is a solid one made invisible and replaced with a
-        // small line symbol repeated along the path, the documented way to
-        // fake it.
-        <Polyline
-          path={route.points}
-          strokeOpacity={0}
-          strokeWeight={strokeWeight}
-          clickable={false}
-          icons={[
-            {
-              icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, strokeColor: color, scale: strokeWeight },
-              offset: '0',
-              repeat: '16px',
-            },
-          ]}
-        />
-      ) : (
-        <Polyline
-          path={route.points}
-          strokeColor={color}
-          strokeWeight={strokeWeight}
-          clickable={false}
-        />
-      )}
-    </>
+    <AdvancedMarker
+      position={{ lat: cluster.lat, lng: cluster.lng }}
+      onClick={() =>
+        zoomToFitCluster(
+          map,
+          cluster.members.map((member) => ({ lat: member.lat, lng: member.lng })),
+        )
+      }
+    >
+      <button
+        type="button"
+        className="world-map__cluster"
+        aria-label={`${cluster.members.length} trips: ${names}`}
+      >
+        {cluster.members.length}
+      </button>
+    </AdvancedMarker>
   )
 }

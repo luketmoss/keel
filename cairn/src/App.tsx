@@ -5,7 +5,7 @@ import { TripList } from './components/TripList'
 import { TripDetail } from './components/TripDetail'
 import { WorldMap } from './components/WorldMap'
 import { DriveTripStore } from './store/driveTripStore'
-import type { TripIndexEntry, TripStore } from './store/tripStore'
+import type { TripIndexEntry } from './store/tripStore'
 import { useGoogleAccount, type GoogleAccount } from './auth/useGoogleAccount'
 import { AccountBubble } from './auth/AccountBubble'
 import { defaultOverridesStore } from './import/useTripImport'
@@ -87,7 +87,6 @@ function AppShell() {
           <DefaultShell
             account={account}
             trips={trips}
-            tripStore={tripStore}
             createTrip={createTrip}
             deleteTrip={deleteTrip}
             disconnected={disconnected}
@@ -101,7 +100,6 @@ function AppShell() {
 interface DefaultShellProps {
   account: GoogleAccount
   trips: TripIndexEntry[]
-  tripStore: TripStore
   createTrip: (name: string) => void
   deleteTrip: (id: string) => void
   /** #73: no usable token — creating or deleting a trip goes to the
@@ -114,14 +112,14 @@ interface DefaultShellProps {
     nav and account chrome floating above as their own L2 panels (#78).
     Nothing here reserves layout width or height from the main pane the way
     the old sidebar did. */
-function DefaultShell({ account, trips, tripStore, createTrip, deleteTrip, disconnected }: DefaultShellProps) {
+function DefaultShell({ account, trips, createTrip, deleteTrip, disconnected }: DefaultShellProps) {
   return (
     <div className="shell">
       <TopBar />
       <AccountBubble account={account} />
       <div className="shell__main">
         <Routes>
-          <Route path="/" element={<WorldMap trips={trips} tripStore={tripStore} />} />
+          <Route path="/" element={<WorldMap trips={trips} />} />
           <Route
             path="/trips"
             element={

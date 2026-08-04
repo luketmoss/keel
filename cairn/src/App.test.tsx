@@ -313,4 +313,47 @@ describe('App routing', () => {
       clearSeededTrip(tripId)
     }
   })
+
+  it('a name filter set on the panel survives a visit to a trip and back (#80)', async () => {
+    const tripId = 'trip-from-trips-2'
+    window.localStorage.setItem(
+      'cairn.trips.index',
+      JSON.stringify([
+        { id: tripId, name: 'Hokkaido', status: 'planned', startDate: null, endDate: null, createdAt: '2026-01-01T00:00:00.000Z' },
+        { id: 'trip-other', name: 'Alta Via 1', status: 'planned', startDate: null, endDate: null, createdAt: '2026-01-01T00:00:00.000Z' },
+      ]),
+    )
+    window.localStorage.setItem(
+      `cairn.trips.trip.${tripId}`,
+      JSON.stringify({
+        id: tripId,
+        name: 'Hokkaido',
+        status: 'planned',
+        startDate: null,
+        endDate: null,
+        notes: '',
+        createdAt: '2026-01-01T00:00:00.000Z',
+      }),
+    )
+
+    try {
+      await renderApp('/trips')
+      fireEvent.change(screen.getByPlaceholderText('Filter trips'), { target: { value: 'hokkaido' } })
+      expect(screen.getByText('Hokkaido')).toBeDefined()
+      expect(screen.queryByText('Alta Via 1')).toBeNull()
+
+      fireEvent.click(screen.getByText('Hokkaido'))
+      expect(await screen.findByRole('button', { name: 'Back' })).toBeDefined()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+      await screen.findByRole('heading', { name: 'Trips' })
+
+      expect(screen.getByPlaceholderText('Filter trips')).toHaveProperty('value', 'hokkaido')
+      expect(screen.getByText('Hokkaido')).toBeDefined()
+      expect(screen.queryByText('Alta Via 1')).toBeNull()
+    } finally {
+      window.localStorage.removeItem('cairn.trips.index')
+      window.localStorage.removeItem(`cairn.trips.trip.${tripId}`)
+    }
+  })
 })

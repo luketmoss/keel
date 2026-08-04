@@ -117,4 +117,27 @@ describe('AccountRow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }))
     expect(reconnect).toHaveBeenCalledTimes(1)
   })
+
+  it('shows a disabled, relabelled Reconnect button while a reconnect is in flight, keeping the expiry message', () => {
+    render(
+      <AccountRow
+        account={makeAccount({
+          status: 'token-expired',
+          email: 'jane@gmail.com',
+          reconnecting: true,
+        })}
+      />,
+    )
+    expect(
+      screen.getByText('Your Drive session expired — reconnect to keep using Drive'),
+    ).toBeDefined()
+    const button = screen.getByRole('button', { name: 'Reconnecting…' })
+    expect(button).toHaveProperty('disabled', true)
+  })
+
+  it('shows the Reconnecting… status while restoring a stored session, with no button', () => {
+    render(<AccountRow account={makeAccount({ status: 'restoring' })} />)
+    expect(screen.getByText('Reconnecting…')).toBeDefined()
+    expect(screen.queryByRole('button')).toBeNull()
+  })
 })

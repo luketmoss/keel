@@ -182,4 +182,15 @@ describe('TripMetadataHeader', () => {
       expect(screen.getByText('Show more')).toBeDefined()
     })
   })
+
+  it('does not start editing while disabled (#72), and renders the Disabled treatment', () => {
+    const onUpdate = vi.fn()
+    const { container } = render(<TripMetadataHeader trip={trip()} onUpdate={onUpdate} disabled />)
+
+    fireEvent.click(screen.getByText('Hokkaido'))
+
+    expect(screen.queryByDisplayValue('Hokkaido')).toBeNull()
+    expect(onUpdate).not.toHaveBeenCalled()
+    expect(container.querySelector('.trip-metadata--disabled')).not.toBeNull()
+  })
 })

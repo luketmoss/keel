@@ -3,6 +3,7 @@ import { requestDriveFileToken } from './googleIdentity'
 
 interface TokenResponse {
   access_token?: string
+  expires_in?: number
   error?: string
 }
 interface TokenClientErrorDetail {
@@ -55,14 +56,36 @@ describe('requestDriveFileToken', () => {
     expect(capturedScope).toBe('https://www.googleapis.com/auth/drive.file')
   })
 
-  it('resolves with the access token on success', async () => {
+  it('resolves with the access token and its absolute expiry on success', async () => {
+    vi.setSystemTime(1_700_000_000_000)
+    stubGoogleIdentity((config) => ({
+      requestAccessToken: () => config.callback({ access_token: 'abc-123', expires_in: 3599 }),
+    }))
+
+    const outcome = await requestDriveFileToken('client-id')
+
+    expect(outcome).toEqual({
+      kind: 'success',
+      accessToken: 'abc-123',
+      expiresAt: 1_700_000_000_000 + 3599 * 1000,
+    })
+    vi.useRealTimers()
+  })
+
+  it('defaults to a one-hour expiry when the response omits expires_in', async () => {
+    vi.setSystemTime(1_700_000_000_000)
     stubGoogleIdentity((config) => ({
       requestAccessToken: () => config.callback({ access_token: 'abc-123' }),
     }))
 
     const outcome = await requestDriveFileToken('client-id')
 
-    expect(outcome).toEqual({ kind: 'success', accessToken: 'abc-123' })
+    expect(outcome).toEqual({
+      kind: 'success',
+      accessToken: 'abc-123',
+      expiresAt: 1_700_000_000_000 + 3600 * 1000,
+    })
+    vi.useRealTimers()
   })
 
   it('resolves cancelled when the user closes the popup', async () => {

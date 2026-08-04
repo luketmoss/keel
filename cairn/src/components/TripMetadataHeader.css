@@ -3,6 +3,16 @@
   border-bottom: 1px solid var(--border);
 }
 
+/* #72's Disabled treatment while the account is token-expired — see
+   design-language.md: opacity 0.4, no hover response, cursor default.
+   `pointer-events: none` covers "no hover response" for free and backs up
+   the `disabled`-gated handlers above (belt and suspenders, not either/or —
+   the handlers are what keep a keyboard-triggered edit from starting). */
+.trip-metadata--disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
 .trip-metadata__name {
   margin: 0 0 var(--space-2);
   font-size: var(--text-lg);

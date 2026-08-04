@@ -146,6 +146,13 @@ export function useDraftTrip(
     setDraft((prev) => (prev ? { ...prev, saving: true, saveError: null } : prev))
 
     try {
+      // Judgment call: `createTrip` runs before the uploads below, so a
+      // failed upload leaves the trip record (and its overview/dot)
+      // behind rather than nothing existing at all — `TripStore` has no
+      // way to stage a trip under a caller-chosen id and commit it only
+      // once every file has landed, and building one is a bigger change
+      // than this issue asks for. The failure is still reported and the
+      // draft still stays open (below) so the source files aren't lost.
       const entry = tripStore.createTrip(draft.name)
       await tripStore.updateTrip(entry.id, {
         status: draft.status,

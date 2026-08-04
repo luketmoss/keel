@@ -284,4 +284,74 @@ describe('LocalTripStore', () => {
       expect(store.getOverview(trip.id)).toBeNull()
     })
   })
+
+  describe('origin (#79)', () => {
+    it('is null on a freshly created trip, before any overview is saved', () => {
+      const store = new LocalTripStore(fakeStorage())
+      const trip = store.createTrip('Hokkaido')
+
+      expect(trip.origin).toBeNull()
+      expect(store.getTrip(trip.id)?.origin).toBeNull()
+    })
+
+    it('saveOverview writes the first coordinate of the first track to both the record and the index', () => {
+      const store = new LocalTripStore(fakeStorage())
+      const trip = store.createTrip('Hokkaido')
+
+      store.saveOverview(trip.id, [
+        { name: 'Day 1', points: [{ lat: 37, lon: -122 }, { lat: 38, lon: -121 }] },
+      ])
+
+      expect(store.getTrip(trip.id)?.origin).toEqual({ lat: 37, lng: -122 })
+      expect(store.getTrips().find((entry) => entry.id === trip.id)?.origin).toEqual({
+        lat: 37,
+        lng: -122,
+      })
+    })
+
+    it('moves the origin to the new first track after a reorder', () => {
+      const store = new LocalTripStore(fakeStorage())
+      const trip = store.createTrip('Hokkaido')
+
+      store.saveOverview(trip.id, [
+        { name: 'Day 1', points: [{ lat: 37, lon: -122 }] },
+        { name: 'Day 2', points: [{ lat: 51, lon: 0 }] },
+      ])
+      expect(store.getTrip(trip.id)?.origin).toEqual({ lat: 37, lng: -122 })
+
+      // Reordering surfaces here as the flattened `tracks` argument arriving
+      // in the new order — this store doesn't know about file order itself.
+      store.saveOverview(trip.id, [
+        { name: 'Day 2', points: [{ lat: 51, lon: 0 }] },
+        { name: 'Day 1', points: [{ lat: 37, lon: -122 }] },
+      ])
+      expect(store.getTrip(trip.id)?.origin).toEqual({ lat: 51, lng: 0 })
+    })
+
+    it('clears the origin when a later save produces no geometry', () => {
+      const store = new LocalTripStore(fakeStorage())
+      const trip = store.createTrip('Hokkaido')
+
+      store.saveOverview(trip.id, [{ name: 'Day 1', points: [{ lat: 37, lon: -122 }] }])
+      expect(store.getTrip(trip.id)?.origin).not.toBeNull()
+
+      store.saveOverview(trip.id, [])
+      expect(store.getTrip(trip.id)?.origin).toBeNull()
+    })
+
+    it('persists the origin across a reload of a new store over the same storage', () => {
+      const storage = fakeStorage()
+      const first = new LocalTripStore(storage)
+      const trip = first.createTrip('Hokkaido')
+      first.saveOverview(trip.id, [{ name: 'Day 1', points: [{ lat: 37, lon: -122 }] }])
+
+      const second = new LocalTripStore(storage)
+
+      expect(second.getTrip(trip.id)?.origin).toEqual({ lat: 37, lng: -122 })
+      expect(second.getTrips().find((entry) => entry.id === trip.id)?.origin).toEqual({
+        lat: 37,
+        lng: -122,
+      })
+    })
+  })
 })

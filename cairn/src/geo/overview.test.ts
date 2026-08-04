@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildOverviewGeoJSON, simplifyTrack } from './overview'
+import { buildOverviewGeoJSON, computeTripOrigin, simplifyTrack } from './overview'
 import type { Track, TrackPoint } from '../kml/parse'
 
 /* A gentle curve with small zig-zag noise added to every interior point —
@@ -136,5 +136,40 @@ describe('buildOverviewGeoJSON', () => {
     expect(atDefault.features[0].geometry.coordinates.length).toBeLessThan(
       atZero.features[0].geometry.coordinates.length,
     )
+  })
+})
+
+describe('computeTripOrigin', () => {
+  it('returns the first coordinate of the first track, converting lon/lat to lng/lat', () => {
+    const tracks: Track[] = [
+      { name: 'Day 1', points: [{ lat: 37, lon: -122 }, { lat: 38, lon: -121 }] },
+      { name: 'Day 2', points: [{ lat: 10, lon: 10 }] },
+    ]
+
+    expect(computeTripOrigin(tracks)).toEqual({ lat: 37, lng: -122 })
+  })
+
+  it('skips a leading empty track and uses the first point of the next non-empty one', () => {
+    const tracks: Track[] = [
+      { name: 'Flight (no points recorded)', points: [] },
+      { name: 'Day 1', points: [{ lat: 37, lon: -122 }] },
+    ]
+
+    expect(computeTripOrigin(tracks)).toEqual({ lat: 37, lng: -122 })
+  })
+
+  it('returns null when there are no tracks, or every track is empty', () => {
+    expect(computeTripOrigin([])).toBeNull()
+    expect(computeTripOrigin([{ name: 'Empty', points: [] }])).toBeNull()
+  })
+
+  it('moves with reordering — the caller passes tracks in trip order, so a new first track wins', () => {
+    const tracks: Track[] = [
+      { name: 'Day 1', points: [{ lat: 37, lon: -122 }] },
+      { name: 'Day 2', points: [{ lat: 51, lon: 0 }] },
+    ]
+
+    expect(computeTripOrigin(tracks)).toEqual({ lat: 37, lng: -122 })
+    expect(computeTripOrigin([...tracks].reverse())).toEqual({ lat: 51, lng: 0 })
   })
 })

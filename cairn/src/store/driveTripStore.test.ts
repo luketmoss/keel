@@ -329,4 +329,27 @@ describe('DriveTripStore', () => {
       null,
     )
   })
+
+  it('also flushes trip.json on saveOverview, carrying the recomputed origin (#79)', async () => {
+    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', version: '1' })
+    const store = new DriveTripStore(fakeStorage())
+    const entry = store.createTrip('Hokkaido')
+    await store.connect('token', 'cairn-folder-id')
+    await flush()
+    writeJsonFile.mockClear()
+    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', version: '2' })
+
+    store.saveOverview(entry.id, [
+      { name: 'Day 1', points: [{ lat: 37, lon: -122 }, { lat: 38, lon: -121 }] },
+    ])
+    await flush()
+
+    expect(writeJsonFile).toHaveBeenCalledWith(
+      'token',
+      'folder-1',
+      'trip.json',
+      expect.objectContaining({ origin: { lat: 37, lng: -122 } }),
+      expect.anything(),
+    )
+  })
 })

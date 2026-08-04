@@ -55,6 +55,10 @@
   /* Full-screen shell — cairn/docs/design/78-full-screen-shell.md, "New tokens" */
   --avatar-size: 32px;
 
+  /* World map dots — cairn/docs/design/79-world-map-dots.md, "New tokens" */
+  --dot-size: 14px;
+  --dot-ring: 2px;
+
   /* Photo list & lightbox — cairn/docs/design/55-photo-list-lightbox.md, "New tokens" */
   --photo-thumb: 32px;
   --row-touch: 44px;

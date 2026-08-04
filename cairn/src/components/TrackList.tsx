@@ -24,6 +24,13 @@ interface TrackListProps {
       settling underneath the cursor produces a result nobody intended.
       Ignored when `onReorder` is omitted. */
   canReorder?: boolean
+  /** #75: `TrackList` renders on two surfaces with two different import
+      controls beside it, so the empty-state detail string belongs to the
+      surface, not to this component. Defaults to `/`'s copy — the only
+      surface where this component is reused unmodified; `TripDetail`
+      passes its own, naming the widened "Import files" control and both
+      file kinds it accepts. */
+  emptyDetail?: string
 }
 
 interface DragState {
@@ -41,6 +48,7 @@ export function TrackList({
   onRecolor,
   onReorder,
   canReorder = true,
+  emptyDetail = 'Drop a KML or KMZ file anywhere, or use Import tracks above.',
 }: TrackListProps) {
   const [dragState, setDragState] = useState<DragState | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -49,9 +57,7 @@ export function TrackList({
     return (
       <div className="track-list track-list--empty">
         <p className="track-list__empty-title">No tracks yet</p>
-        <p className="track-list__empty-detail">
-          Drop a KML or KMZ file anywhere, or use Import tracks above.
-        </p>
+        <p className="track-list__empty-detail">{emptyDetail}</p>
       </div>
     )
   }

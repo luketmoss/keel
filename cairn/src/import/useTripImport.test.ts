@@ -232,6 +232,53 @@ describe('useTripImport', () => {
   })
 })
 
+describe('useTripImport — #75 refuses a file already in the trip', () => {
+  it('reports "already in this trip" and uploads nothing for a name that matches an existing track, case-insensitively', async () => {
+    listTrackFiles.mockResolvedValue([{ id: 'drive-1', name: 'Holy Cross Day 1.kml' }])
+    downloadTrackFile.mockResolvedValue(file('Holy Cross Day 1.kml'))
+    parseKmlOrKmz.mockResolvedValue(track('Day 1'))
+
+    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.tracks).toHaveLength(1)
+
+    await act(() => result.current.importFiles([file('holy cross day 1.KML')]))
+
+    expect(startResumableUpload).not.toHaveBeenCalled()
+    expect(result.current.tracks).toHaveLength(1)
+    expect(result.current.failures).toHaveLength(1)
+    expect(result.current.failures[0].message).toBe('already in this trip')
+    expect(result.current.failures[0].retryFile).toBeUndefined()
+  })
+
+  it('imports normally a name that only matches a file which previously failed to upload', async () => {
+    parseKmlOrKmz.mockResolvedValueOnce(track('Day'))
+    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    await act(() => result.current.importFiles([file('retry-me.kml')]))
+
+    expect(result.current.tracks).toHaveLength(1)
+    expect(result.current.tracks[0].name).toBe('retry-me.kml')
+  })
+
+  it('lets a second file with a different name import normally alongside a duplicate rejection', async () => {
+    listTrackFiles.mockResolvedValue([{ id: 'drive-1', name: 'day-1.kml' }])
+    downloadTrackFile.mockResolvedValue(file('day-1.kml'))
+    parseKmlOrKmz.mockResolvedValue(track('Day 1'))
+
+    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    await act(() => result.current.importFiles([file('day-1.kml'), file('day-2.kml')]))
+
+    expect(result.current.tracks.map((t) => t.name).sort()).toEqual(['day-1.kml', 'day-2.kml'])
+    expect(result.current.failures).toHaveLength(1)
+    expect(result.current.failures[0].name).toBe('day-1.kml')
+    expect(result.current.failures[0].message).toBe('already in this trip')
+  })
+})
+
 describe('useTripImport — #46 track overrides', () => {
   it('renames a track without touching its Drive-listing name on reload', async () => {
     const store = new LocalTrackOverridesStore(fakeStorage())

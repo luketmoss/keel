@@ -57,13 +57,28 @@ describe('TripImportPanel', () => {
   it('disables the button while either pipeline has anything in progress', () => {
     render(
       <TripImportPanel
-        {...baseProps({ progress: [{ name: 'IMG_1.jpg', index: 2, total: 5 }] })}
+        {...baseProps({ progress: [{ id: 'progress-1', name: 'IMG_1.jpg', index: 2, total: 5 }] })}
       />,
     )
 
     const button = screen.getByRole('button', { name: 'Importing…' }) as HTMLButtonElement
     expect(button.disabled).toBe(true)
     expect(screen.getByText('IMG_1.jpg — 2 of 5')).toBeDefined()
+  })
+
+  it('#75: renders two progress rows for two files sharing a name, keyed on a unique id', () => {
+    render(
+      <TripImportPanel
+        {...baseProps({
+          progress: [
+            { id: 'progress-1', name: 'photo.jpg', index: 1, total: 2 },
+            { id: 'progress-2', name: 'photo.jpg', index: 1, total: 2 },
+          ],
+        })}
+      />,
+    )
+
+    expect(screen.getAllByText('photo.jpg — 1 of 2')).toHaveLength(2)
   })
 
   it('renders failures from either pipeline and clears them together via Dismiss', () => {
@@ -92,5 +107,11 @@ describe('TripImportPanel', () => {
 
     const button = screen.getByRole('button', { name: 'Import files' }) as HTMLButtonElement
     expect(button.disabled).toBe(true)
+  })
+
+  it('#75: names both tracks and photos in the signed-out line, not tracks alone', () => {
+    render(<TripImportPanel {...baseProps({ signedIn: false })} />)
+
+    expect(screen.getByText('Sign in to add tracks and photos to this trip.')).toBeDefined()
   })
 })

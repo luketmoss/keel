@@ -19,6 +19,7 @@ import { TripNotFound } from './TripNotFound'
 import { MissingFileRow } from './MissingFileRow'
 import { DropOverlay } from './DropOverlay'
 import { dataTransferHasFiles, filesFromDataTransfer } from '../import/dataTransfer'
+import { isPhotoFile, isTrackFile } from '../import/fileKinds'
 import { useTripImport } from '../import/useTripImport'
 import { usePhotoImport } from '../photo/usePhotoImport'
 import { positionPhotos } from '../photo/positionPhotos'
@@ -27,26 +28,8 @@ import { tripUtcOffsetHours } from '../photo/interpolate'
 import type { TripStore } from '../store/tripStore'
 import './TripDetail.css'
 
-const TRACK_EXTENSIONS = ['.kml', '.kmz']
-// #75: includes HEIC/HEIF — they're photos as far as partitioning goes, and
-// `usePhotoImport`'s own `validateImageFile` is what gives them their
-// specific "iPhone HEIC photos aren't supported" copy. Anything not in
-// either list is a third, "neither" bucket, rejected here by name before
-// either pipeline sees it (design doc: "A file the app cannot identify").
-const PHOTO_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif']
-
 const UNRECOGNISED_TYPE_MESSAGE = 'trips take .kml or .kmz tracks and JPEG, PNG or WebP photos'
 const SIGNED_OUT_DROP_MESSAGE = 'sign in to add files to this trip'
-
-function isTrackFile(name: string): boolean {
-  const lower = name.toLowerCase()
-  return TRACK_EXTENSIONS.some((ext) => lower.endsWith(ext))
-}
-
-function isPhotoFile(name: string): boolean {
-  const lower = name.toLowerCase()
-  return PHOTO_EXTENSIONS.some((ext) => lower.endsWith(ext))
-}
 
 /** A failure row this component produces itself, rather than one that came
     back from `useTripImport`/`usePhotoImport` — a file rejected before

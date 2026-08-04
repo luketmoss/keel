@@ -1,0 +1,109 @@
+/* cairn/docs/design/81-drop-to-draft.md */
+
+.draft-panel {
+  position: absolute;
+  top: calc(var(--space-4) + 72px + var(--space-2));
+  right: var(--space-4);
+  bottom: var(--space-4);
+  z-index: 2;
+  width: var(--panel-width);
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur));
+  box-shadow: var(--shadow-lifted);
+  overflow-y: auto;
+}
+
+.draft-panel__eyebrow {
+  flex: none;
+  color: var(--text);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.draft-panel__summary {
+  flex: none;
+  margin: var(--space-1) 0 var(--space-4);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.draft-panel__body {
+  flex: 1;
+  min-height: 0;
+}
+
+.draft-panel__error {
+  flex: none;
+  margin: var(--space-2) 0 0;
+  color: var(--danger);
+  font-size: var(--text-sm);
+}
+
+.draft-panel__actions {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.draft-panel__cancel {
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  font-size: var(--text-base);
+  cursor: pointer;
+}
+
+.draft-panel__cancel:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.draft-panel__cancel:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.draft-panel__save {
+  padding: var(--space-2) var(--space-4);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: var(--text-base);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.draft-panel__save:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.draft-panel__save:active:not(:disabled) {
+  filter: brightness(0.95);
+}
+
+.draft-panel__save:disabled {
+  opacity: 0.4;
+  cursor: default;
+  filter: none;
+}
+
+@media (max-width: 639px) {
+  .draft-panel {
+    top: 0;
+    right: 0;
+    left: 0;
+    bottom: 0;
+    width: auto;
+    border-radius: 0;
+  }
+}

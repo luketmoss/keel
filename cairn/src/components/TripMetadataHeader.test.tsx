@@ -183,7 +183,7 @@ describe('TripMetadataHeader', () => {
     })
   })
 
-  it('does not start editing while disabled (#72), and renders the Disabled treatment', () => {
+  it('does not start editing while disabled, and renders the Disabled treatment', () => {
     const onUpdate = vi.fn()
     const { container } = render(<TripMetadataHeader trip={trip()} onUpdate={onUpdate} disabled />)
 
@@ -191,6 +191,17 @@ describe('TripMetadataHeader', () => {
 
     expect(screen.queryByDisplayValue('Hokkaido')).toBeNull()
     expect(onUpdate).not.toHaveBeenCalled()
-    expect(container.querySelector('.trip-metadata--disabled')).not.toBeNull()
+    expect(container.querySelector('.trip-metadata__fields--disabled')).not.toBeNull()
+  })
+
+  it('#73: states why editing is unavailable while disabled, and says nothing when not', () => {
+    const onUpdate = vi.fn()
+    const { rerender } = render(<TripMetadataHeader trip={trip()} onUpdate={onUpdate} disabled />)
+
+    expect(screen.getByText('Sign in to edit this trip.')).toBeDefined()
+
+    rerender(<TripMetadataHeader trip={trip()} onUpdate={onUpdate} />)
+
+    expect(screen.queryByText('Sign in to edit this trip.')).toBeNull()
   })
 })

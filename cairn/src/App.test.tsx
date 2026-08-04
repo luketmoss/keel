@@ -193,7 +193,7 @@ describe('App routing', () => {
     expect(window.location.pathname).toBe('/')
   })
 
-  it('renders and edits trip metadata for an existing trip at /trips/:id', async () => {
+  it('renders trip metadata for an existing trip at /trips/:id, read-only while signed out (#73)', async () => {
     const tripId = 'trip-existing-1'
     window.localStorage.setItem(
       'cairn.trips.index',
@@ -221,12 +221,14 @@ describe('App routing', () => {
       expect(screen.getByText('planned')).toBeDefined()
       expect(screen.queryByText('Trip not found')).toBeNull()
 
+      // #73: no usable token — nothing is signed in in this render — so
+      // the status field doesn't even offer editing (no select on click)
+      // and the surface states why, same as a live sign-out would.
       fireEvent.click(screen.getByText('planned'))
-      fireEvent.change(screen.getByRole('combobox'), { target: { value: 'completed' } })
-
-      expect(await screen.findByText('completed')).toBeDefined()
+      expect(screen.queryByRole('combobox')).toBeNull()
+      expect(screen.getByText('Sign in to edit this trip.')).toBeDefined()
       expect(JSON.parse(window.localStorage.getItem(`cairn.trips.trip.${tripId}`) ?? '{}').status).toBe(
-        'completed',
+        'planned',
       )
     } finally {
       window.localStorage.removeItem('cairn.trips.index')

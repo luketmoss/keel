@@ -90,6 +90,12 @@ export class DriveTripStore implements TripStore {
   }
 
   updateTrip = async (id: string, patch: TripUpdate): Promise<TripRecord | null> => {
+    // #73: disconnected is read-only. Refused up front rather than applied
+    // optimistically and left to "succeed" locally — that asymmetry (a
+    // never-signed-in edit sticking while a live-session edit reverts on a
+    // dead token) is the bug this issue exists to close.
+    if (!this.credentials) return null
+
     const previous = this.local.getTrip(id)
     const next = await this.local.updateTrip(id, patch)
     if (!next) return null
@@ -106,11 +112,17 @@ export class DriveTripStore implements TripStore {
   }
 
   deleteTrip = (id: string): void => {
+    // #73: refused outright while disconnected, not just locally applied —
+    // a delete that can't reach Drive would otherwise resurrect the trip
+    // the next time hydration runs (the trash call either never fires, or
+    // fires against a dead token and 401s).
+    if (!this.credentials) return
+
     const ref = this.refs.get(id)
     this.local.deleteTrip(id)
     this.refs.delete(id)
     this.queues.delete(id)
-    if (this.credentials && ref?.folderId) {
+    if (ref?.folderId) {
       const { accessToken } = this.credentials
       // Best-effort: an orphaned Drive folder costs negligible space and
       // nothing reads it again, so a failure here isn't worth a retry queue.
@@ -121,6 +133,21 @@ export class DriveTripStore implements TripStore {
   saveOverview = (id: string, tracks: Track[]): void => {
     this.local.saveOverview(id, tracks)
     void this.enqueue(id, () => this.flushOverview(id))
+  }
+
+  /** #73: drops credentials and every trip's Drive file refs, so a
+      mutation attempted afterward can't reach Drive and reflects the
+      account state truthfully instead of racing a dead token. Reading is
+      untouched — the local cache (and whatever's cached under `this.local`)
+      stays exactly as it was; disconnected is read-only, not offline, and
+      clearing the cache here would destroy a trip that never made it to
+      Drive with no way to recover it (see the design note's "Why not clear
+      the cache on sign-out"). Any task already queued in `this.queues`
+      keeps running against the credentials it captured when it started —
+      only a *subsequent* call sees `credentials` as `null`. */
+  disconnect = (): void => {
+    this.credentials = null
+    this.refs.clear()
   }
 
   connect = async (accessToken: string, cairnFolderId: string): Promise<void> => {

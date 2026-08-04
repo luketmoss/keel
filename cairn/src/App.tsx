@@ -15,6 +15,7 @@ import { DriveTripStore } from './store/driveTripStore'
 import type { TripIndexEntry, TripStore } from './store/tripStore'
 import { useGoogleAccount, type GoogleAccount } from './auth/useGoogleAccount'
 import { AccountRow } from './auth/AccountRow'
+import { defaultOverridesStore } from './import/useTripImport'
 import './App.css'
 
 export function App() {
@@ -43,13 +44,13 @@ function AppShell() {
 
   const accessToken = account.state.status === 'signed-in' ? account.state.accessToken : null
   const cairnFolderId = account.state.status === 'signed-in' ? account.state.folderId : null
-  // #72: every Drive-dependent control goes to the Disabled treatment while
-  // the token is expired, rather than staying live and failing on use
-  // (design doc step 4). `accessToken` already goes `null` the instant the
-  // account leaves `signed-in`, which is what disables the import button;
-  // this covers the controls that don't key off `accessToken` directly —
-  // the trip metadata editors and a track row's rename/recolour/reorder.
-  const driveExpired = account.state.status === 'token-expired'
+  // #73: "disconnected" covers every state that leaves `accessToken` null —
+  // never signed in this session, signed out, or #72's token-expired — and
+  // all three get the same read-only treatment (design note: "One state,
+  // one rule, stated once"). Superseded #72's narrower `driveExpired`,
+  // which only covered the last of the three and left the other two
+  // silently mutating a store with no way to reach Drive.
+  const disconnected = accessToken === null
 
   // Hydrates every trip's index/overview from Drive and migrates any
   // local-only trip up, per #59's design note. Re-runs whenever the token
@@ -60,6 +61,18 @@ function AppShell() {
     if (!accessToken || !cairnFolderId) return
     void tripStore.connect(accessToken, cairnFolderId)
   }, [tripStore, accessToken, cairnFolderId])
+
+  // #73: the mirror image of the effect above — every store holding Drive
+  // credentials drops them the moment the account has no usable token, so a
+  // mutation attempted afterward can't reach Drive and the read-only rule
+  // has something to check. Runs on mount too (a no-op — neither store has
+  // connected yet), and again on every transition into a disconnected
+  // state, never on transitions between two disconnected states.
+  useEffect(() => {
+    if (!disconnected) return
+    tripStore.disconnect?.()
+    defaultOverridesStore.disconnect?.()
+  }, [tripStore, disconnected])
 
   return (
     <Routes>
@@ -76,7 +89,6 @@ function AppShell() {
             tripStore={tripStore}
             accessToken={accessToken}
             cairnFolderId={cairnFolderId}
-            driveExpired={driveExpired}
             accountRow={<AccountRow account={account} />}
             onReconnect={() => void account.reconnect()}
           />
@@ -93,6 +105,7 @@ function AppShell() {
             tripStore={tripStore}
             createTrip={createTrip}
             deleteTrip={deleteTrip}
+            disconnected={disconnected}
           />
         }
       />
@@ -108,6 +121,10 @@ interface DefaultShellProps {
   tripStore: TripStore
   createTrip: (name: string) => void
   deleteTrip: (id: string) => void
+  /** #73: no usable token — creating or deleting a trip goes to the
+      language's Disabled treatment rather than staying live against a
+      store that will refuse the write. */
+  disconnected: boolean
 }
 
 /** The map (`/`), trips list (`/trips`), and world map (`/world`, #37) —
@@ -121,6 +138,7 @@ function DefaultShell({
   tripStore,
   createTrip,
   deleteTrip,
+  disconnected,
 }: DefaultShellProps) {
   const [dragActive, setDragActive] = useState(false)
   /* Nested elements each fire their own enter/leave as the pointer crosses
@@ -186,7 +204,14 @@ function DefaultShell({
           <Route path="/" element={<MapView files={files} hoveredFileId={hoveredFileId} />} />
           <Route
             path="/trips"
-            element={<TripList trips={trips} onCreate={createTrip} onDelete={deleteTrip} />}
+            element={
+              <TripList
+                trips={trips}
+                onCreate={createTrip}
+                onDelete={deleteTrip}
+                disabled={disconnected}
+              />
+            }
           />
           <Route path="/world" element={<WorldMap trips={trips} tripStore={tripStore} />} />
           <Route path="*" element={<Navigate to="/" replace />} />

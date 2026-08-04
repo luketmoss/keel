@@ -53,10 +53,12 @@ export interface TripStore {
   createTrip(name: string): TripIndexEntry
   /** Applies a partial edit and returns the resulting record, or `null` if
       `id` no longer names a trip (deleted out from under an open detail
-      view) **or** the write failed after already applying locally — a
+      view), the write failed after already applying locally — a
       Drive-backed implementation reverts its local copy before resolving
       `null`, so a caller never has to distinguish "not found" from "save
-      failed" to know it should show the revert. Async because a real
+      failed" to know it should show the revert — **or** (#73) the store is
+      disconnected, in which case the edit is refused up front and never
+      applied locally at all. Async because a real
       implementation is a network write, not a `localStorage.setItem`; the
       local (optimistic) value is visible through `getTrip`/`subscribe`
       immediately, before this promise settles — see #35's "shows read-mode
@@ -65,6 +67,11 @@ export interface TripStore {
       until the next mutation, so `useSyncExternalStore` doesn't see a
       change that isn't there. */
   updateTrip(id: string, patch: TripUpdate): Promise<TripRecord | null>
+  /** Deletes the trip locally and, once connected, trashes its Drive
+      folder. (#73) A Drive-backed implementation refuses this outright
+      while disconnected rather than removing only the local copy — a
+      delete that can't reach Drive would otherwise resurrect the trip the
+      next time hydration runs. */
   deleteTrip(id: string): void
   /** The trip's precomputed overview geometry (#36's `buildOverviewGeoJSON`
       output) — what `/world` (#37) reads, never a trip's source tracks.
@@ -89,6 +96,13 @@ export interface TripStore {
       connect to and simply doesn't implement this — callers that always
       have a `TripStore` rather than a concrete class use `store.connect?.()`. */
   connect?(accessToken: string, cairnFolderId: string): Promise<void>
+  /** Only meaningful for a Drive-backed implementation: drops credentials
+      and every trip's Drive file refs, so a mutation attempted afterward
+      cannot reach Drive. Pairs with `connect` but isn't just its opposite —
+      reading is unaffected, since #73's rule is "disconnected is
+      read-only", not "disconnected is offline". `LocalTripStore` has no
+      credentials to drop and simply doesn't implement this. */
+  disconnect?(): void
 }
 
 const INDEX_KEY = 'cairn.trips.index'

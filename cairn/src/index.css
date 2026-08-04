@@ -45,13 +45,15 @@
   --ease: cubic-bezier(0.2, 0, 0, 1);
 
   --sidebar-width: 320px;
-  --sidebar-height-mobile: 45vh;
 
   /* Markers — cairn/docs/design/54-photo-markers.md, "New tokens" */
   --marker-size: 28px;
   --marker-ring: 2px;
   --marker-ring-selected: 3px;
   --hit-target: 40px;
+
+  /* Full-screen shell — cairn/docs/design/78-full-screen-shell.md, "New tokens" */
+  --avatar-size: 32px;
 
   /* Photo list & lightbox — cairn/docs/design/55-photo-list-lightbox.md, "New tokens" */
   --photo-thumb: 32px;

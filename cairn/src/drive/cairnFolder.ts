@@ -33,6 +33,10 @@ export class DriveRequestError extends Error {
 
 export interface DriveAccount {
   email: string
+  /** Absent only if Drive's `about.get` omits it — the request never asks
+      for a broader scope to guarantee one. */
+  name?: string
+  pictureUrl?: string
 }
 
 interface DriveFile {
@@ -73,13 +77,13 @@ async function driveFetch(
     broader scope just to learn who the user is. */
 export async function getDriveAccount(accessToken: string): Promise<DriveAccount> {
   const body = (await driveFetch(
-    `${DRIVE_ABOUT_URL}?fields=user(emailAddress)`,
+    `${DRIVE_ABOUT_URL}?fields=user(emailAddress,displayName,photoLink)`,
     accessToken,
-  )) as { user?: { emailAddress?: string } }
+  )) as { user?: { emailAddress?: string; displayName?: string; photoLink?: string } }
 
   const email = body.user?.emailAddress
   if (!email) throw new DriveRequestError('Drive did not return an account email')
-  return { email }
+  return { email, name: body.user?.displayName, pictureUrl: body.user?.photoLink }
 }
 
 async function listCairnFolders(accessToken: string): Promise<DriveFile[]> {

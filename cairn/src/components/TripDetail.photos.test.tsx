@@ -104,7 +104,7 @@ function renderTrip() {
         <Route
           path="/trips/:id"
           element={
-            <TripDetail tripStore={store} accessToken="token" cairnFolderId="cairn-folder-id" accountRow={null} />
+            <TripDetail tripStore={store} accessToken="token" cairnFolderId="cairn-folder-id" accountBubble={null} />
           }
         />
       </Routes>
@@ -194,7 +194,7 @@ describe('TripDetail — #55 photo list and lightbox', () => {
             <Route
               path="/trips/:id"
               element={
-                <TripDetail tripStore={store} accessToken="token" cairnFolderId="cairn-folder-id" accountRow={null} />
+                <TripDetail tripStore={store} accessToken="token" cairnFolderId="cairn-folder-id" accountBubble={null} />
               }
             />
           </Routes>

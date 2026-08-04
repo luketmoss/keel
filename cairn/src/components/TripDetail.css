@@ -1,8 +1,26 @@
+.trip-detail-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 var(--sidebar-width);
+  width: var(--sidebar-width);
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur));
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.trip-detail-panel__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
 .trip-detail-header {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-4) var(--space-4);
+  flex: none;
 }
 
 .trip-detail-header__back {
@@ -14,10 +32,14 @@
   height: 40px;
   /* Absorbs into the header row's own padding rather than growing it. */
   margin: calc(var(--space-2) * -1) 0;
+  border: none;
   border-radius: var(--radius-sm);
+  background: none;
   color: var(--text-muted);
-  text-decoration: none;
+  font: inherit;
   font-size: var(--text-lg);
+  text-decoration: none;
+  cursor: pointer;
 }
 
 .trip-detail-header__back:hover {

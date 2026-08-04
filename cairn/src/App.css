@@ -1,4 +1,16 @@
+.shell {
+  position: relative;
+  height: 100%;
+  width: 100%;
+}
+
+.shell__main {
+  height: 100%;
+  width: 100%;
+}
+
 .app {
+  position: relative;
   display: flex;
   height: 100%;
   width: 100%;
@@ -13,8 +25,8 @@
   background: var(--ground);
 }
 
-/* Below the breakpoint the sidebar docks to the bottom instead. Source order
-   keeps the sidebar first for reading order; column-reverse moves it visually. */
+/* Below the breakpoint the panel docks to the bottom instead. Source order
+   keeps the panel first for reading order; column-reverse moves it visually. */
 @media (max-width: 719px) {
   .app {
     flex-direction: column-reverse;

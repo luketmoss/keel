@@ -1,20 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type DragEvent } from 'react'
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { Sidebar } from './components/Sidebar'
-import { MapView } from './components/MapView'
-import { ImportPanel } from './components/ImportPanel'
-import { TrackList } from './components/TrackList'
+import { TopBar } from './components/TopBar'
 import { TripList } from './components/TripList'
 import { TripDetail } from './components/TripDetail'
 import { WorldMap } from './components/WorldMap'
-import { DropOverlay } from './components/DropOverlay'
-import { useTrackImport } from './import/useTrackImport'
-import { dataTransferHasFiles, filesFromDataTransfer } from './import/dataTransfer'
-import { InMemoryTrackStore } from './store/trackStore'
 import { DriveTripStore } from './store/driveTripStore'
 import type { TripIndexEntry, TripStore } from './store/tripStore'
 import { useGoogleAccount, type GoogleAccount } from './auth/useGoogleAccount'
-import { AccountRow } from './auth/AccountRow'
+import { AccountBubble } from './auth/AccountBubble'
 import { defaultOverridesStore } from './import/useTripImport'
 import './App.css'
 
@@ -27,16 +20,9 @@ export function App() {
 }
 
 function AppShell() {
-  /* Constructed once per app instance; this is the one module allowed to
-     import InMemoryTrackStore directly — everything else depends on the
-     TrackStore interface. */
-  const store = useMemo(() => new InMemoryTrackStore(), [])
-  const files = useSyncExternalStore(store.subscribe, store.getFiles)
-  const trackImport = useTrackImport(store)
   const account = useGoogleAccount()
-  /* Same rule as InMemoryTrackStore above: this is the one module allowed
-     to import DriveTripStore directly — everything else depends on the
-     TripStore interface. */
+  /* The one module allowed to import DriveTripStore directly — everything
+     else depends on the TripStore interface. */
   const tripStore = useMemo(() => new DriveTripStore(), [])
   const trips = useSyncExternalStore(tripStore.subscribe, tripStore.getTrips)
   const createTrip = useCallback((name: string) => tripStore.createTrip(name), [tripStore])
@@ -76,12 +62,13 @@ function AppShell() {
 
   return (
     <Routes>
-      {/* The trip detail page owns its own full shell (sidebar + map) —
-          see TripDetail — rather than slotting into the v1 sidebar below,
-          since its header and import panel differ from v1's. Matched
-          first and exclusively: it is never mounted alongside the v1
-          shell, which is what lets its drag-and-drop target this trip
-          without fighting a window-wide v1 handler for the same drop. */}
+      {/* The trip detail page owns its own full shell (panel + map) —
+          see TripDetail — rather than slotting into the default shell
+          below, since its header and import panel differ from the
+          default shell's. Matched first and exclusively: it is never
+          mounted alongside the default shell, which is what lets its
+          drag-and-drop target this trip without fighting a window-wide
+          handler for the same drop. */}
       <Route
         path="/trips/:id"
         element={
@@ -89,7 +76,7 @@ function AppShell() {
             tripStore={tripStore}
             accessToken={accessToken}
             cairnFolderId={cairnFolderId}
-            accountRow={<AccountRow account={account} />}
+            accountBubble={<AccountBubble account={account} />}
             onReconnect={() => void account.reconnect()}
           />
         }
@@ -98,8 +85,6 @@ function AppShell() {
         path="*"
         element={
           <DefaultShell
-            files={files}
-            trackImport={trackImport}
             account={account}
             trips={trips}
             tripStore={tripStore}
@@ -114,8 +99,6 @@ function AppShell() {
 }
 
 interface DefaultShellProps {
-  files: ReturnType<InMemoryTrackStore['getFiles']>
-  trackImport: ReturnType<typeof useTrackImport>
   account: GoogleAccount
   trips: TripIndexEntry[]
   tripStore: TripStore
@@ -127,81 +110,18 @@ interface DefaultShellProps {
   disconnected: boolean
 }
 
-/** The map (`/`), trips list (`/trips`), and world map (`/world`, #37) —
-    v1's shell, unchanged from before #34 except for living in its own
-    component so the trip detail page can bypass it entirely. */
-function DefaultShell({
-  files,
-  trackImport,
-  account,
-  trips,
-  tripStore,
-  createTrip,
-  deleteTrip,
-  disconnected,
-}: DefaultShellProps) {
-  const [dragActive, setDragActive] = useState(false)
-  /* Nested elements each fire their own enter/leave as the pointer crosses
-     them, so a plain boolean flickers the overlay off mid-drag — a depth
-     counter only clears it once the drag has actually left the window. */
-  const dragDepth = useRef(0)
-  /* Lifted here rather than held by either TrackList or MapView (#49) —
-     they're siblings, and the hover originates in the sidebar's track row
-     but the glow it drives is drawn on the map. */
-  const [hoveredFileId, setHoveredFileId] = useState<string | null>(null)
-
-  function handleDragEnter(event: DragEvent<HTMLDivElement>) {
-    if (!dataTransferHasFiles(event.dataTransfer)) return
-    event.preventDefault()
-    dragDepth.current += 1
-    setDragActive(true)
-  }
-
-  function handleDragOver(event: DragEvent<HTMLDivElement>) {
-    if (!dataTransferHasFiles(event.dataTransfer)) return
-    event.preventDefault()
-  }
-
-  function handleDragLeave(event: DragEvent<HTMLDivElement>) {
-    if (!dataTransferHasFiles(event.dataTransfer)) return
-    dragDepth.current = Math.max(0, dragDepth.current - 1)
-    if (dragDepth.current === 0) setDragActive(false)
-  }
-
-  function handleDrop(event: DragEvent<HTMLDivElement>) {
-    if (!dataTransferHasFiles(event.dataTransfer)) return
-    event.preventDefault()
-    dragDepth.current = 0
-    setDragActive(false)
-    const files = filesFromDataTransfer(event.dataTransfer)
-    if (files.length > 0) void trackImport.importFiles(files)
-  }
-
+/** The world map (`/`) and the trips list (`/trips`) — full-bleed, with the
+    nav and account chrome floating above as their own L2 panels (#78).
+    Nothing here reserves layout width or height from the main pane the way
+    the old sidebar did. */
+function DefaultShell({ account, trips, tripStore, createTrip, deleteTrip, disconnected }: DefaultShellProps) {
   return (
-    <div
-      className="app"
-      onDragEnter={handleDragEnter}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-    >
-      <Sidebar accountRow={<AccountRow account={account} />}>
-        <ImportPanel
-          failures={trackImport.failures}
-          progress={trackImport.progress}
-          importFiles={trackImport.importFiles}
-          dismissFailures={trackImport.dismissFailures}
-        />
-        <TrackList
-          files={files}
-          onToggleVisibility={trackImport.toggleVisibility}
-          onRemove={trackImport.removeFile}
-          onHoverFile={setHoveredFileId}
-        />
-      </Sidebar>
-      <div className="app__map">
+    <div className="shell">
+      <TopBar />
+      <AccountBubble account={account} />
+      <div className="shell__main">
         <Routes>
-          <Route path="/" element={<MapView files={files} hoveredFileId={hoveredFileId} />} />
+          <Route path="/" element={<WorldMap trips={trips} tripStore={tripStore} />} />
           <Route
             path="/trips"
             element={
@@ -213,11 +133,13 @@ function DefaultShell({
               />
             }
           />
-          <Route path="/world" element={<WorldMap trips={trips} tripStore={tripStore} />} />
+          {/* v1's ephemeral scratch map, retired by #78 now that World is
+              the homepage. Both old addresses land on the new one. */}
+          <Route path="/map" element={<Navigate to="/" replace />} />
+          <Route path="/world" element={<Navigate to="/" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
-      {dragActive && <DropOverlay />}
     </div>
   )
 }

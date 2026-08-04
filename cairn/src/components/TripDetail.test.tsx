@@ -265,6 +265,79 @@ describe('TripDetail — #75 signed-out drop', () => {
   })
 })
 
+describe('TripDetail — #73 disconnected is read-only', () => {
+  function fileWithOneTrack() {
+    return {
+      id: 'file-1',
+      name: 'Day 1',
+      driveFileId: 'drive-1',
+      tracks: [{ name: 'Day 1', points: [] }],
+      trackStats: [{ distanceMeters: 0, durationSeconds: undefined, elevationGainMeters: undefined }],
+      colorIndex: 0,
+      visible: true,
+    }
+  }
+
+  it('does not offer track rename, matching the trip metadata rule, while signed out', () => {
+    useTripImport.mockReturnValue(baseTripImport({ tracks: [fileWithOneTrack()] }))
+
+    renderTrip({ signedIn: false })
+
+    // The metadata header states the same reason — one explanation per
+    // surface, covering both the header fields and the track list below it.
+    expect(screen.getByText('Sign in to edit this trip.')).toBeDefined()
+
+    fireEvent.click(screen.getByText('Day 1'))
+    expect(screen.queryByDisplayValue('Day 1')).toBeNull()
+  })
+
+  it('restores editing for both trip metadata and tracks once signed in, without a reload', () => {
+    useTripImport.mockReturnValue(baseTripImport({ tracks: [fileWithOneTrack()] }))
+    const store = new LocalTripStore(fakeStorage())
+    const entry = store.createTrip('Hokkaido')
+
+    const { rerender } = render(
+      <MemoryRouter initialEntries={[`/trips/${entry.id}`]}>
+        <Routes>
+          <Route
+            path="/trips/:id"
+            element={<TripDetail tripStore={store} accessToken={null} cairnFolderId={null} accountRow={null} />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByText('Sign in to edit this trip.')).toBeDefined()
+    fireEvent.click(screen.getByText('Day 1'))
+    expect(screen.queryByDisplayValue('Day 1')).toBeNull()
+
+    rerender(
+      <MemoryRouter initialEntries={[`/trips/${entry.id}`]}>
+        <Routes>
+          <Route
+            path="/trips/:id"
+            element={
+              <TripDetail
+                tripStore={store}
+                accessToken="token"
+                cairnFolderId="cairn-folder-id"
+                accountRow={null}
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(screen.queryByText('Sign in to edit this trip.')).toBeNull()
+    fireEvent.click(screen.getByText('Hokkaido'))
+    expect(screen.getByDisplayValue('Hokkaido')).toBeDefined()
+
+    fireEvent.click(screen.getByText('Day 1'))
+    expect(screen.getByDisplayValue('Day 1')).toBeDefined()
+  })
+})
+
 describe('TripDetail — #75 a file the app cannot identify', () => {
   it('rejects a .gpx naming the formats trips take, not the photo pipeline\'s message', async () => {
     const tripImportFiles = vi.fn().mockResolvedValue(undefined)

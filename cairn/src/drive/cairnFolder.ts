@@ -83,12 +83,14 @@ export async function getDriveAccount(accessToken: string): Promise<DriveAccount
 }
 
 async function listCairnFolders(accessToken: string): Promise<DriveFile[]> {
-  const query = [
-    `name='${FOLDER_NAME}'`,
-    `mimeType='${FOLDER_MIME_TYPE}'`,
-    "'root' in parents",
-    'trashed=false',
-  ].join(' and ')
+  // #73: no `'root' in parents` constraint — under `drive.file` this query
+  // already only ever returns folders the app itself created, so the
+  // parent filter never distinguished anything. It only cost something: a
+  // `/Cairn/` folder the user tidied out of Drive root became invisible,
+  // and the next sign-in created a duplicate at root instead of finding it.
+  const query = [`name='${FOLDER_NAME}'`, `mimeType='${FOLDER_MIME_TYPE}'`, 'trashed=false'].join(
+    ' and ',
+  )
 
   const url = `${DRIVE_FILES_URL}?q=${encodeURIComponent(query)}&fields=files(id,createdTime)`
   const body = (await driveFetch(url, accessToken)) as { files?: DriveFile[] }

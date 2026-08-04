@@ -106,12 +106,6 @@ interface TripDetailProps {
   tripStore: TripStore
   accessToken: string | null
   cairnFolderId: string | null
-  /** #72: the account has moved to `token-expired`. The metadata editors
-      and a track row's rename/recolour/reorder affordances go to the
-      language's Disabled treatment rather than staying live and failing on
-      use — the import button already disables for free since `accessToken`
-      goes `null` the moment the account leaves `signed-in`. */
-  driveExpired?: boolean
   accountRow: ReactNode
   /** Wired to #32's re-authentication flow — passed through to
       `TripImportPanel` for its "signed out mid-upload" failures. */
@@ -127,7 +121,6 @@ export function TripDetail({
   tripStore,
   accessToken,
   cairnFolderId,
-  driveExpired = false,
   accountRow,
   onReconnect,
 }: TripDetailProps) {
@@ -145,6 +138,10 @@ export function TripDetail({
   const [dragActive, setDragActive] = useState(false)
   const dragDepth = useRef(0)
   const [hoveredFileId, setHoveredFileId] = useState<string | null>(null)
+  // #73: also what drives the metadata header's and track list's Disabled
+  // treatment below (`!signedIn`) — "disconnected" is exactly "no usable
+  // token", the same condition this already existed to check, whether that's
+  // never having signed in, a sign-out, or #72's token-expired.
   const signedIn = accessToken !== null && cairnFolderId !== null
   // Shared with #55's list, not a separate selection (design doc's
   // Selection section) — #54 only has to expose it, not build the list.
@@ -361,7 +358,7 @@ export function TripDetail({
         <TripMetadataHeader
           trip={trip}
           onUpdate={(patch) => tripStore.updateTrip(trip.id, patch)}
-          disabled={driveExpired}
+          disabled={!signedIn}
         />
         <TripImportPanel
           signedIn={signedIn}
@@ -415,7 +412,7 @@ export function TripDetail({
                 onRecolor={tripImport.recolorTrack}
                 onReorder={tripImport.reorderTracks}
                 canReorder={!tripImport.loading}
-                disabled={driveExpired}
+                disabled={!signedIn}
               />
             )}
             {tripImport.missingFiles.length > 0 && (

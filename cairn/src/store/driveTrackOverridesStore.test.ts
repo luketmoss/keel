@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { DriveTrackOverridesStore } from './driveTrackOverridesStore'
+import { LocalTrackOverridesStore } from './trackOverridesStore'
 
 /** Same in-memory `Storage` helper `trackOverridesStore.test.ts` uses. */
 function fakeStorage(): Storage {
@@ -47,13 +48,31 @@ beforeEach(() => {
 })
 
 describe('DriveTrackOverridesStore', () => {
-  it('writes locally and resolves true when never connected this session', async () => {
+  // #73: disconnected is read-only, same rule as `DriveTripStore.updateTrip`
+  // — a never-connected store refuses the write up front rather than
+  // applying it locally and reporting success with nothing to sync it once
+  // a connection exists.
+  it('#73: refuses a write when never connected this session', async () => {
     const store = new DriveTrackOverridesStore(fakeStorage())
 
     const ok = await store.setOverride('trip-1', 'drive-1', { displayName: 'Day 3' }, ['drive-1'])
 
-    expect(ok).toBe(true)
-    expect(store.getOverrides('trip-1')).toEqual({ 'drive-1': { displayName: 'Day 3' } })
+    expect(ok).toBe(false)
+    expect(store.getOverrides('trip-1')).toEqual({})
+  })
+
+  it('#73: disconnect() clears the token so a subsequent write is refused and makes no Drive request', async () => {
+    findJsonFile.mockResolvedValue(null)
+    writeJsonFile.mockResolvedValue({ fileId: 'overrides-file', version: '1' })
+    const store = new DriveTrackOverridesStore(fakeStorage())
+    await store.connect('trip-1', 'token', 'cairn-folder-id')
+    writeJsonFile.mockClear()
+
+    store.disconnect()
+    const ok = await store.setOverride('trip-1', 'drive-1', { displayName: 'Day 3' }, ['drive-1'])
+
+    expect(ok).toBe(false)
+    expect(writeJsonFile).not.toHaveBeenCalled()
   })
 
   it('connect() hydrates from an existing overrides.json, Drive winning over local', async () => {
@@ -73,8 +92,20 @@ describe('DriveTrackOverridesStore', () => {
     findJsonFile.mockResolvedValue(null)
     writeJsonFile.mockResolvedValue({ fileId: 'overrides-file', version: '1' })
 
-    const store = new DriveTrackOverridesStore(fakeStorage())
-    await store.setOverride('trip-1', 'drive-1', { displayName: 'Day 3' }, ['drive-1'])
+    // #73: setOverride refuses to write while disconnected, so a
+    // local-only pre-seed (representing overrides an earlier, connected
+    // session already wrote to localStorage) goes through the plain local
+    // store sharing the same backing storage — not through this session's
+    // still-disconnected `DriveTrackOverridesStore`.
+    const storage = fakeStorage()
+    await new LocalTrackOverridesStore(storage).setOverride(
+      'trip-1',
+      'drive-1',
+      { displayName: 'Day 3' },
+      ['drive-1'],
+    )
+
+    const store = new DriveTrackOverridesStore(storage)
     await store.connect('trip-1', 'token', 'cairn-folder-id')
 
     expect(writeJsonFile).toHaveBeenCalledWith(
@@ -106,10 +137,17 @@ describe('DriveTrackOverridesStore', () => {
     // `overrides.json` files instead of one.
     findJsonFile.mockResolvedValue(null) // no overrides.json yet -> migration path
     writeJsonFile.mockResolvedValue({ fileId: 'overrides-file', version: '1' })
-    const store = new DriveTrackOverridesStore(fakeStorage())
-    // Local-only pre-seed, before any connection — `connect` below is what
-    // discovers it needs migrating.
-    await store.setOverride('trip-1', 'drive-1', { displayName: 'Day 3' }, ['drive-1'])
+    // #73: same reasoning as the migration test above — pre-seed through
+    // the plain local store sharing the same storage, since `setOverride`
+    // on a disconnected `DriveTrackOverridesStore` now refuses to write.
+    const storage = fakeStorage()
+    await new LocalTrackOverridesStore(storage).setOverride(
+      'trip-1',
+      'drive-1',
+      { displayName: 'Day 3' },
+      ['drive-1'],
+    )
+    const store = new DriveTrackOverridesStore(storage)
 
     const connectPromise = store.connect('trip-1', 'token', 'cairn-folder-id') // queues the migration write
     // No await here — the edit queues right behind it while it's still in

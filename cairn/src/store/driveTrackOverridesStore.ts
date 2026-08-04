@@ -61,6 +61,11 @@ export class DriveTrackOverridesStore implements TrackOverridesStore {
     patch: TrackOverride,
     validDriveFileIds: string[],
   ): Promise<boolean> => {
+    // #73: disconnected is read-only, same rule as `DriveTripStore.updateTrip`
+    // — refused up front rather than applied locally and left to "succeed"
+    // with nothing to sync it once a connection exists again.
+    if (!this.accessToken) return false
+
     const previous = this.local.getOverrides(tripId)
     const ok = await this.local.setOverride(tripId, driveFileId, patch, validDriveFileIds)
     if (!ok) return false
@@ -72,6 +77,8 @@ export class DriveTrackOverridesStore implements TrackOverridesStore {
     orderedDriveFileIds: string[],
     validDriveFileIds: string[],
   ): Promise<boolean> => {
+    if (!this.accessToken) return false
+
     const previous = this.local.getOverrides(tripId)
     const ok = await this.local.setOrder(tripId, orderedDriveFileIds, validDriveFileIds)
     if (!ok) return false
@@ -88,6 +95,16 @@ export class DriveTrackOverridesStore implements TrackOverridesStore {
   connect = (tripId: string, accessToken: string, folderId: string): Promise<void> => {
     this.accessToken = accessToken
     return this.enqueue(tripId, () => this.connectTrip(tripId, accessToken, folderId))
+  }
+
+  /** #73: drops the shared access token and every trip's Drive file refs —
+      same reasoning as `DriveTripStore.disconnect`. Reading is untouched;
+      only a *subsequent* `setOverride`/`setOrder` call sees `accessToken`
+      as `null`, so a write already queued when this runs still completes
+      against the token it captured. */
+  disconnect = (): void => {
+    this.accessToken = null
+    this.refs.clear()
   }
 
   private async connectTrip(tripId: string, accessToken: string, folderId: string): Promise<void> {

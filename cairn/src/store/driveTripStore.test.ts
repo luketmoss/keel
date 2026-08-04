@@ -69,16 +69,76 @@ function flush(): Promise<void> {
 }
 
 describe('DriveTripStore', () => {
-  it('reads and writes locally without a Drive session — create/update/delete all work offline', async () => {
+  it('creates a trip locally without a Drive session', () => {
     const store = new DriveTripStore(fakeStorage())
 
     const entry = store.createTrip('Hokkaido')
+
     expect(store.getTrips()).toHaveLength(1)
+    expect(store.getTrip(entry.id)?.name).toBe('Hokkaido')
+  })
+
+  // #73: disconnected is read-only — a never-signed-in store refuses an
+  // edit or a delete rather than applying it locally and leaving it
+  // stranded with nothing to sync it once a connection exists. Covers "a
+  // user who has never signed in sees the same read-only treatment as one
+  // who has signed out" (never-connected and disconnected are the same
+  // `credentials === null` state to this store).
+  it('#73: refuses to edit or delete a trip without a Drive session', async () => {
+    const store = new DriveTripStore(fakeStorage())
+    const entry = store.createTrip('Hokkaido')
 
     const updated = await store.updateTrip(entry.id, { notes: 'Great trip' })
-    expect(updated?.notes).toBe('Great trip')
+    expect(updated).toBeNull()
+    expect(store.getTrip(entry.id)?.notes).toBe('')
 
     store.deleteTrip(entry.id)
+    expect(store.getTrips()).toHaveLength(1)
+  })
+
+  it('#73: disconnect() clears credentials so a subsequent edit is refused and makes no Drive request', async () => {
+    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', version: '1' })
+    const store = new DriveTripStore(fakeStorage())
+    const entry = store.createTrip('Hokkaido')
+    await store.connect('token', 'cairn-folder-id')
+    await flush()
+    writeJsonFile.mockClear()
+
+    store.disconnect()
+    const updated = await store.updateTrip(entry.id, { notes: 'Great trip' })
+
+    expect(updated).toBeNull()
+    expect(writeJsonFile).not.toHaveBeenCalled()
+  })
+
+  it('#73: disconnect() also refuses a delete, so a trip cannot be removed only locally', async () => {
+    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', version: '1' })
+    const store = new DriveTripStore(fakeStorage())
+    const entry = store.createTrip('Hokkaido')
+    await store.connect('token', 'cairn-folder-id')
+    await flush()
+
+    store.disconnect()
+    store.deleteTrip(entry.id)
+
+    expect(store.getTrips()).toHaveLength(1)
+    expect(trashFolder).not.toHaveBeenCalled()
+  })
+
+  it('#73: a trip deleted while connected does not reappear after disconnect and reconnect', async () => {
+    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', version: '1' })
+    const store = new DriveTripStore(fakeStorage())
+    const entry = store.createTrip('Hokkaido')
+    await store.connect('token', 'cairn-folder-id')
+    await flush()
+
+    store.deleteTrip(entry.id)
+    await flush()
+    store.disconnect()
+
+    listSubfolders.mockResolvedValue([]) // the folder was trashed — nothing to hydrate
+    await store.connect('token', 'cairn-folder-id')
+
     expect(store.getTrips()).toHaveLength(0)
   })
 

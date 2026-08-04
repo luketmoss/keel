@@ -110,4 +110,21 @@ describe('findOrCreateCairnFolder', () => {
 
     await expect(findOrCreateCairnFolder('expired')).rejects.toBeInstanceOf(DriveAuthError)
   })
+
+  // #73: the lookup used to require `'root' in parents`, so a `/Cairn/`
+  // folder the user moved out of Drive root became invisible and the next
+  // sign-in created a duplicate. Under `drive.file` the query already only
+  // ever returns folders this app created, so the constraint never
+  // distinguished anything — dropped here.
+  it('#73: finds an existing folder without constraining the search to Drive root', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(jsonResponse({ files: [{ id: 'moved-id', createdTime: '2025-06-01' }] }))
+
+    const folderId = await findOrCreateCairnFolder('token')
+
+    expect(folderId).toBe('moved-id')
+    const [lookupUrl] = fetchSpy.mock.calls[0]
+    expect(decodeURIComponent(String(lookupUrl))).not.toContain("'root' in parents")
+  })
 })

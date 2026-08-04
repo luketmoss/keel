@@ -18,11 +18,13 @@ export interface TrackOverridesStore {
   /** Merges `patch` into the override for `driveFileId`, pruning any entry
       not present in `validDriveFileIds` first. Resolves `false` if the
       write failed (e.g. `localStorage` quota exceeded, or a Drive write
-      rejected/conflicted) — the caller reverts its optimistic UI update on
-      `false`. Async for the same reason `TripStore.updateTrip` is: a
-      Drive-backed implementation's write is a network call, and the
-      optimistic value is visible through `getOverrides` immediately,
-      before this promise settles. */
+      rejected/conflicted) **or** (#73) the store is disconnected, in which
+      case the edit is refused up front and never applied locally — the
+      caller reverts its optimistic UI update on `false` either way. Async
+      for the same reason `TripStore.updateTrip` is: a Drive-backed
+      implementation's write is a network call, and the optimistic value is
+      visible through `getOverrides` immediately, before this promise
+      settles. */
   setOverride(
     tripId: string,
     driveFileId: string,
@@ -39,6 +41,14 @@ export interface TrackOverridesStore {
       `LocalTrackOverridesStore` has nothing to connect to and doesn't
       implement this. */
   connect?(tripId: string, accessToken: string, folderId: string): Promise<void>
+  /** Only meaningful for a Drive-backed implementation: drops the shared
+      access token and every trip's Drive file refs, so a write attempted
+      afterward cannot reach Drive. Whole-store rather than per-trip, unlike
+      `connect` — the token itself is shared across every trip in a
+      session, same as `DriveTripStore`'s single `credentials` field.
+      `LocalTrackOverridesStore` has no credentials to drop and doesn't
+      implement this. */
+  disconnect?(): void
 }
 
 const overridesKey = (tripId: string): string => `cairn.trips.trackOverrides.${tripId}`

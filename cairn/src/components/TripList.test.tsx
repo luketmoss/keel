@@ -195,4 +195,42 @@ describe('TripList', () => {
     const link = screen.getByText('Hokkaido').closest('a')
     expect(link?.getAttribute('href')).toBe('/trips/abc')
   })
+
+  describe('#73: disabled (no Drive connection)', () => {
+    it('disables the create form and states why, even for a non-empty name', () => {
+      renderList({ disabled: true })
+
+      fireEvent.change(screen.getByPlaceholderText('Trip name'), { target: { value: 'Hokkaido' } })
+
+      expect((screen.getByPlaceholderText('Trip name') as HTMLInputElement).disabled).toBe(true)
+      expect((screen.getByRole('button', { name: 'Create' }) as HTMLButtonElement).disabled).toBe(true)
+      expect(screen.getByText('Sign in to add or remove trips.')).toBeDefined()
+    })
+
+    it('blocks a direct form submission while disabled', () => {
+      const onCreate = vi.fn()
+      renderList({ disabled: true, onCreate })
+
+      fireEvent.change(screen.getByPlaceholderText('Trip name'), { target: { value: 'Hokkaido' } })
+      fireEvent.submit(screen.getByRole('button', { name: 'Create' }).closest('form')!)
+
+      expect(onCreate).not.toHaveBeenCalled()
+    })
+
+    it('disables each row\'s delete control and does not open the confirmation', () => {
+      renderList({ trips: [tripEntry({ name: 'Hokkaido' })], disabled: true })
+
+      const removeButton = screen.getByRole('button', { name: 'Delete Hokkaido' }) as HTMLButtonElement
+      expect(removeButton.disabled).toBe(true)
+
+      fireEvent.click(removeButton)
+      expect(screen.queryByText('Delete "Hokkaido"?')).toBeNull()
+    })
+
+    it('says nothing about signing in when not disabled', () => {
+      renderList()
+
+      expect(screen.queryByText('Sign in to add or remove trips.')).toBeNull()
+    })
+  })
 })

@@ -44,6 +44,20 @@
   border-color: var(--danger);
 }
 
+/* #73's Disabled treatment (design-language.md): opacity 0.4, no hover
+   response, cursor default. `:disabled` covers the input and submit button
+   for free; `.trip-row__remove:disabled` below matches it for the row's ×. */
+.trip-create__input:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.trip-create__disabled-hint {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
 .trip-create__submit {
   flex: none;
   padding: var(--space-2) var(--space-4);
@@ -194,6 +208,16 @@
 
 .trip-row__remove:active {
   background: var(--pressed);
+}
+
+.trip-row__remove:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.trip-row__remove:disabled:hover {
+  color: var(--text-muted);
+  background: none;
 }
 
 .trip-row__confirm {

@@ -47,8 +47,11 @@ function generateColorIndex(): number {
 
 // Shared across every `useTripImport` instance that doesn't get its own
 // (tests inject a fake-storage-backed one) — #46's overrides record,
-// Drive-backed as of #59, `connect`-ed per trip below.
-const defaultOverridesStore = new DriveTrackOverridesStore()
+// Drive-backed as of #59, `connect`-ed per trip below. Exported so `App.tsx`
+// — the only place that hears about the account leaving `signed-in` — can
+// call `disconnect()` on it (#73); nothing else outside this module should
+// reach into it directly.
+export const defaultOverridesStore = new DriveTrackOverridesStore()
 
 export type ImportPhase = 'uploading' | 'parsing'
 

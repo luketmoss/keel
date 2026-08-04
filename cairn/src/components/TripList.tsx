@@ -8,9 +8,14 @@ interface TripListProps {
   trips: TripIndexEntry[]
   onCreate: (name: string) => void
   onDelete: (id: string) => void
+  /** #73: no usable token — creating and deleting a trip go to the
+      language's Disabled treatment rather than staying live against a
+      store that will refuse the write. Reading (opening a trip) is
+      unaffected. */
+  disabled?: boolean
 }
 
-export function TripList({ trips, onCreate, onDelete }: TripListProps) {
+export function TripList({ trips, onCreate, onDelete, disabled = false }: TripListProps) {
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
   // Only one row's delete confirmation is open at a time.
@@ -50,6 +55,10 @@ export function TripList({ trips, onCreate, onDelete }: TripListProps) {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    // #73: disconnected is read-only — refused even if the form somehow
+    // submits (e.g. Enter in the input) while the disabled controls should
+    // have prevented it. Belt and suspenders, same as the metadata header.
+    if (disabled) return
     const trimmed = name.trim()
     if (trimmed.length === 0) {
       setError('A trip needs a name.')
@@ -70,17 +79,23 @@ export function TripList({ trips, onCreate, onDelete }: TripListProps) {
             className={`trip-create__input${error ? ' trip-create__input--invalid' : ''}`}
             placeholder="Trip name"
             value={name}
+            disabled={disabled}
             onChange={(event) => handleNameChange(event.target.value)}
           />
           <button
             type="submit"
             className="trip-create__submit"
-            disabled={name.trim().length === 0}
+            disabled={disabled || name.trim().length === 0}
           >
             Create
           </button>
         </div>
         {error && <p className="trip-create__error">{error}</p>}
+        {/* #73: one explanation for the whole surface — covers both the
+            create form above and every row's delete × below, rather than a
+            tooltip on each (design doc: "One explanation, once per
+            surface"). */}
+        {disabled && <p className="trip-create__disabled-hint">Sign in to add or remove trips.</p>}
       </form>
 
       {trips.length === 0 ? (
@@ -96,6 +111,7 @@ export function TripList({ trips, onCreate, onDelete }: TripListProps) {
             <TripRow
               key={trip.id}
               trip={trip}
+              disabled={disabled}
               confirming={confirmingId === trip.id}
               confirmingRowRef={confirmingId === trip.id ? confirmingRowRef : undefined}
               onStartConfirm={() => setConfirmingId(trip.id)}
@@ -114,6 +130,7 @@ export function TripList({ trips, onCreate, onDelete }: TripListProps) {
 
 function TripRow({
   trip,
+  disabled,
   confirming,
   confirmingRowRef,
   onStartConfirm,
@@ -121,6 +138,10 @@ function TripRow({
   onDelete,
 }: {
   trip: TripIndexEntry
+  /** #73: no usable token — delete goes to the Disabled treatment.
+      Opening the trip (the `Link` below) stays live; reading is never
+      affected. */
+  disabled: boolean
   confirming: boolean
   confirmingRowRef?: RefObject<HTMLLIElement | null>
   onStartConfirm: () => void
@@ -162,9 +183,14 @@ function TripRow({
         type="button"
         className="trip-row__remove"
         aria-label={`Delete ${trip.name}`}
+        disabled={disabled}
         onClick={(event) => {
           event.stopPropagation()
           event.preventDefault()
+          // #73: belt and suspenders alongside the `disabled` attribute —
+          // deleting is refused rather than offered when there's no usable
+          // token to reach Drive with.
+          if (disabled) return
           onStartConfirm()
         }}
       >

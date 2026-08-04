@@ -8,10 +8,12 @@ type Field = 'name' | 'status' | 'dates' | 'notes'
 interface TripMetadataHeaderProps {
   trip: TripRecord
   onUpdate: (patch: TripUpdate) => Promise<TripRecord | null>
-  /** #72: true while the account is `token-expired` — every field goes to
-      the language's Disabled treatment (`opacity: 0.4`, no hover response)
-      instead of staying editable and failing (or silently not syncing)
-      against a dead token. */
+  /** #73: true while the store holds no usable token — never signed in
+      this session, signed out, or #72's token-expired, all treated
+      identically. Every field goes to the language's Disabled treatment
+      (`opacity: 0.4`, no hover response) instead of staying editable and
+      either failing against a dead token or silently "succeeding" locally
+      with nothing to sync it once a connection exists. */
   disabled?: boolean
 }
 
@@ -48,9 +50,9 @@ export function TripMetadataHeader({ trip, onUpdate, disabled = false }: TripMet
   }
 
   function startEditing(field: Field) {
-    // A token-expired account can't flush an edit, so editing doesn't even
-    // start — same "control that would fail if used" rule as the import
-    // button.
+    // #73: disconnected is read-only — editing doesn't even start, rather
+    // than opening an input over a store that will refuse the write. Same
+    // "control that would fail if used" rule as the import button.
     if (disabled) return
     // Starting a second edit commits/discards the first rather than
     // stacking two inputs open at once.
@@ -58,82 +60,92 @@ export function TripMetadataHeader({ trip, onUpdate, disabled = false }: TripMet
   }
 
   return (
-    <div className={`trip-metadata${disabled ? ' trip-metadata--disabled' : ''}`}>
-      {editing === 'name' ? (
-        <NameEditor
-          initial={trip.name}
-          onCommit={(name) => {
-            if (name.trim().length === 0) {
-              setEditing(null)
-              return
-            }
-            commit('name', { name })
-          }}
-          onCancel={() => setEditing(null)}
-        />
-      ) : (
-        <h1
-          className="trip-metadata__name"
-          title={trip.name}
-          onClick={() => startEditing('name')}
-        >
-          {trip.name}
-        </h1>
-      )}
-
-      <div className="trip-metadata__row">
-        {editing === 'status' ? (
-          <StatusEditor
-            initial={trip.status}
-            onCommit={(status) => commit('status', { status })}
+    <div className="trip-metadata">
+      {/* #73: the Disabled treatment (opacity/pointer-events) lives on this
+          inner wrapper rather than the outer container, so the hint below
+          — the explanation the user actually needs to read while
+          disabled — isn't dimmed along with the fields it explains. */}
+      <div className={`trip-metadata__fields${disabled ? ' trip-metadata__fields--disabled' : ''}`}>
+        {editing === 'name' ? (
+          <NameEditor
+            initial={trip.name}
+            onCommit={(name) => {
+              if (name.trim().length === 0) {
+                setEditing(null)
+                return
+              }
+              commit('name', { name })
+            }}
             onCancel={() => setEditing(null)}
           />
         ) : (
-          <button
-            type="button"
-            className={`trip-metadata__status trip-metadata__status--${trip.status}${
-              savedField === 'status' ? ' trip-metadata__field--saved' : ''
-            }`}
-            onClick={() => startEditing('status')}
+          <h1
+            className="trip-metadata__name"
+            title={trip.name}
+            onClick={() => startEditing('name')}
           >
-            {trip.status}
-          </button>
+            {trip.name}
+          </h1>
         )}
 
-        {editing === 'dates' ? (
-          <DatesEditor
-            initialStart={trip.startDate}
-            initialEnd={trip.endDate}
-            onCommit={(startDate, endDate) => commit('dates', { startDate, endDate })}
+        <div className="trip-metadata__row">
+          {editing === 'status' ? (
+            <StatusEditor
+              initial={trip.status}
+              onCommit={(status) => commit('status', { status })}
+              onCancel={() => setEditing(null)}
+            />
+          ) : (
+            <button
+              type="button"
+              className={`trip-metadata__status trip-metadata__status--${trip.status}${
+                savedField === 'status' ? ' trip-metadata__field--saved' : ''
+              }`}
+              onClick={() => startEditing('status')}
+            >
+              {trip.status}
+            </button>
+          )}
+
+          {editing === 'dates' ? (
+            <DatesEditor
+              initialStart={trip.startDate}
+              initialEnd={trip.endDate}
+              onCommit={(startDate, endDate) => commit('dates', { startDate, endDate })}
+              onCancel={() => setEditing(null)}
+            />
+          ) : (
+            <span
+              className={`trip-metadata__dates${
+                savedField === 'dates' ? ' trip-metadata__field--saved' : ''
+              }`}
+              onClick={() => startEditing('dates')}
+            >
+              {formatTripDateRange(trip.startDate, trip.endDate)}
+            </span>
+          )}
+        </div>
+
+        {editing === 'notes' ? (
+          <NotesEditor
+            initial={trip.notes}
+            onCommit={(notes) => commit('notes', { notes })}
             onCancel={() => setEditing(null)}
           />
         ) : (
-          <span
-            className={`trip-metadata__dates${
-              savedField === 'dates' ? ' trip-metadata__field--saved' : ''
-            }`}
-            onClick={() => startEditing('dates')}
-          >
-            {formatTripDateRange(trip.startDate, trip.endDate)}
-          </span>
+          <NotesDisplay
+            notes={trip.notes}
+            saved={savedField === 'notes'}
+            onClick={() => startEditing('notes')}
+          />
         )}
+
+        {error && <p className="trip-metadata__error">{error}</p>}
       </div>
-
-      {editing === 'notes' ? (
-        <NotesEditor
-          initial={trip.notes}
-          onCommit={(notes) => commit('notes', { notes })}
-          onCancel={() => setEditing(null)}
-        />
-      ) : (
-        <NotesDisplay
-          notes={trip.notes}
-          saved={savedField === 'notes'}
-          onClick={() => startEditing('notes')}
-        />
-      )}
-
-      {error && <p className="trip-metadata__error">{error}</p>}
+      {/* #73: one explanation for the whole surface, not a tooltip per
+          disabled field (design doc: "The language's Disabled treatment is
+          the signal; one sentence per surface is the explanation"). */}
+      {disabled && <p className="trip-metadata__disabled-hint">Sign in to edit this trip.</p>}
     </div>
   )
 }

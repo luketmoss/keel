@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react'
 import { Link } from 'react-router-dom'
 import type { TripIndexEntry } from '../store/tripStore'
+import { formatTripDateRange } from '../format/dates'
 import './TripList.css'
 
 interface TripListProps {
@@ -155,7 +156,7 @@ function TripRow({
             {trip.status}
           </span>
         </div>
-        <span className="trip-row__dates">No dates set</span>
+        <span className="trip-row__dates">{formatTripDateRange(trip.startDate, trip.endDate)}</span>
       </Link>
       <button
         type="button"

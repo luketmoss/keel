@@ -46,6 +46,13 @@ describe('TripList', () => {
     expect(screen.getByText('No dates set')).toBeDefined()
   })
 
+  it('renders the stored date range instead of the no-dates placeholder', () => {
+    renderList({ trips: [tripEntry({ startDate: '2026-08-01', endDate: '2026-08-05' })] })
+
+    expect(screen.getByText('Aug 1 – 5')).toBeDefined()
+    expect(screen.queryByText('No dates set')).toBeNull()
+  })
+
   it('creates a trip from the form on submit', () => {
     const onCreate = vi.fn()
     renderList({ onCreate })

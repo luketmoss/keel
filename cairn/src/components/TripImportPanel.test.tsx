@@ -114,4 +114,56 @@ describe('TripImportPanel', () => {
 
     expect(screen.getByText('Sign in to add tracks and photos to this trip.')).toBeDefined()
   })
+
+  it('routes "tap to reconnect" through onReconnect rather than retrying directly (#72)', () => {
+    const onReconnect = vi.fn()
+    const retryFailure = vi.fn()
+    const retryFile = new File(['a'], 'day.kml')
+    render(
+      <TripImportPanel
+        {...baseProps({
+          retryFailure,
+          failures: [
+            {
+              id: 'f1',
+              name: 'day.kml',
+              message: 'signed out before this finished uploading, tap to reconnect',
+              retryFile,
+              reconnect: true,
+            },
+          ],
+        })}
+        onReconnect={onReconnect}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /day\.kml/ }))
+
+    expect(onReconnect).toHaveBeenCalledTimes(1)
+    expect(retryFailure).not.toHaveBeenCalled()
+  })
+
+  it('does nothing when a reconnect-flagged failure is tapped and no onReconnect is wired', () => {
+    const retryFailure = vi.fn()
+    const retryFile = new File(['a'], 'day.kml')
+    render(
+      <TripImportPanel
+        {...baseProps({
+          retryFailure,
+          failures: [
+            {
+              id: 'f1',
+              name: 'day.kml',
+              message: 'signed out before this finished uploading, tap to reconnect',
+              retryFile,
+              reconnect: true,
+            },
+          ],
+        })}
+      />,
+    )
+
+    expect(() => fireEvent.click(screen.getByRole('button', { name: /day\.kml/ }))).not.toThrow()
+    expect(retryFailure).not.toHaveBeenCalled()
+  })
 })

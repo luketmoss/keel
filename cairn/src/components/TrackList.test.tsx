@@ -369,4 +369,44 @@ describe('TrackList', () => {
     fireEvent.dragStart(handle)
     expect(onReorder).not.toHaveBeenCalled()
   })
+
+  it('disables rename, recolour, and reorder while disabled (#72), leaving visibility and remove live', () => {
+    const onRename = vi.fn()
+    const onRecolor = vi.fn()
+    const onReorder = vi.fn()
+    const onToggleVisibility = vi.fn()
+    const onRemove = vi.fn()
+    render(
+      <TrackList
+        files={[importedFile()]}
+        onToggleVisibility={onToggleVisibility}
+        onRemove={onRemove}
+        onRename={onRename}
+        onRecolor={onRecolor}
+        onReorder={onReorder}
+        disabled
+      />,
+    )
+
+    // Rename doesn't even start editing.
+    fireEvent.click(screen.getByText('trip.kml', { exact: false }))
+    expect(screen.queryByDisplayValue('trip.kml')).toBeNull()
+    expect(onRename).not.toHaveBeenCalled()
+
+    // Recolour button is disabled.
+    const swatchButton = screen.getByRole('button', { name: 'Change colour for trip.kml' })
+    expect(swatchButton).toHaveProperty('disabled', true)
+
+    // Drag handle renders in its existing disabled treatment.
+    const handle = screen.getByLabelText('Reorder trip.kml')
+    expect(handle.className).toContain('track-row__handle--disabled')
+    fireEvent.dragStart(handle)
+    expect(onReorder).not.toHaveBeenCalled()
+
+    // Visibility and remove are untouched — neither is Drive-backed.
+    fireEvent.click(screen.getByRole('button', { name: 'Hide trip.kml' }))
+    expect(onToggleVisibility).toHaveBeenCalledWith('f1')
+    fireEvent.click(screen.getByRole('button', { name: 'Remove trip.kml' }))
+    expect(onRemove).toHaveBeenCalledWith('f1')
+  })
 })

@@ -65,6 +65,12 @@ interface TripDetailProps {
   tripStore: TripStore
   accessToken: string | null
   cairnFolderId: string | null
+  /** #72: the account has moved to `token-expired`. The metadata editors
+      and a track row's rename/recolour/reorder affordances go to the
+      language's Disabled treatment rather than staying live and failing on
+      use — the import button already disables for free since `accessToken`
+      goes `null` the moment the account leaves `signed-in`. */
+  driveExpired?: boolean
   accountRow: ReactNode
   /** Wired to #32's re-authentication flow — passed through to
       `TripImportPanel` for its "signed out mid-upload" failures. */
@@ -76,7 +82,14 @@ interface TripDetailProps {
     `MapView` unmodified. Mounted instead of the v1 shell (never alongside
     it — see `App.tsx`), so its drag-and-drop never has to fight the
     window-wide v1 handlers for the same drop. */
-export function TripDetail({ tripStore, accessToken, cairnFolderId, accountRow, onReconnect }: TripDetailProps) {
+export function TripDetail({
+  tripStore,
+  accessToken,
+  cairnFolderId,
+  driveExpired = false,
+  accountRow,
+  onReconnect,
+}: TripDetailProps) {
   const { id } = useParams()
   const tripId = id ?? ''
   const trip = useSyncExternalStore(tripStore.subscribe, () => tripStore.getTrip(tripId))
@@ -286,7 +299,11 @@ export function TripDetail({ tripStore, accessToken, cairnFolderId, accountRow, 
       onDrop={handleDrop}
     >
       <Sidebar header={header} accountRow={accountRow}>
-        <TripMetadataHeader trip={trip} onUpdate={(patch) => tripStore.updateTrip(trip.id, patch)} />
+        <TripMetadataHeader
+          trip={trip}
+          onUpdate={(patch) => tripStore.updateTrip(trip.id, patch)}
+          disabled={driveExpired}
+        />
         <TripImportPanel
           signedIn={signedIn}
           progress={combinedProgress}
@@ -325,6 +342,7 @@ export function TripDetail({ tripStore, accessToken, cairnFolderId, accountRow, 
                 onRecolor={tripImport.recolorTrack}
                 onReorder={tripImport.reorderTracks}
                 canReorder={!tripImport.loading}
+                disabled={driveExpired}
               />
             )}
             {tripImport.missingFiles.length > 0 && (

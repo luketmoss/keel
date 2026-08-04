@@ -67,6 +67,18 @@
   text-decoration: underline;
 }
 
+/* #72 — the Reconnect action while a reconnect attempt is already in
+   flight (design-language.md's Disabled treatment). */
+.account-row__link:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.account-row__link:disabled:hover {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
 .account-row__close {
   font-size: 15px;
 }

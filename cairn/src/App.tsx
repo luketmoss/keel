@@ -43,6 +43,13 @@ function AppShell() {
 
   const accessToken = account.state.status === 'signed-in' ? account.state.accessToken : null
   const cairnFolderId = account.state.status === 'signed-in' ? account.state.folderId : null
+  // #72: every Drive-dependent control goes to the Disabled treatment while
+  // the token is expired, rather than staying live and failing on use
+  // (design doc step 4). `accessToken` already goes `null` the instant the
+  // account leaves `signed-in`, which is what disables the import button;
+  // this covers the controls that don't key off `accessToken` directly —
+  // the trip metadata editors and a track row's rename/recolour/reorder.
+  const driveExpired = account.state.status === 'token-expired'
 
   // Hydrates every trip's index/overview from Drive and migrates any
   // local-only trip up, per #59's design note. Re-runs whenever the token
@@ -69,6 +76,7 @@ function AppShell() {
             tripStore={tripStore}
             accessToken={accessToken}
             cairnFolderId={cairnFolderId}
+            driveExpired={driveExpired}
             accountRow={<AccountRow account={account} />}
             onReconnect={() => void account.reconnect()}
           />

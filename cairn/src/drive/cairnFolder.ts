@@ -5,6 +5,8 @@
    library — one dependency fewer, and every call is a plain request a test
    can mock the same way `useTrackImport`'s network test does. */
 
+import { reportDriveAuthError } from './authEvents'
+
 const DRIVE_FILES_URL = 'https://www.googleapis.com/drive/v3/files'
 const DRIVE_ABOUT_URL = 'https://www.googleapis.com/drive/v3/about'
 const FOLDER_NAME = 'Cairn'
@@ -56,7 +58,10 @@ async function driveFetch(
     throw new DriveRequestError(error instanceof Error ? error.message : 'Network error')
   }
 
-  if (response.status === 401) throw new DriveAuthError()
+  if (response.status === 401) {
+    reportDriveAuthError(accessToken)
+    throw new DriveAuthError()
+  }
   if (!response.ok) {
     throw new DriveRequestError(`Drive request failed with status ${response.status}`)
   }

@@ -37,6 +37,14 @@ export function AccountRow({ account }: { account: GoogleAccount }) {
     )
   }
 
+  if (state.status === 'restoring') {
+    return (
+      <div className="account-row">
+        <p className="account-row__status">Reconnecting…</p>
+      </div>
+    )
+  }
+
   if (state.status === 'setting-up-folder') {
     return (
       <div className="account-row">
@@ -95,8 +103,9 @@ export function AccountRow({ account }: { account: GoogleAccount }) {
           type="button"
           className="account-row__link"
           onClick={() => void reconnect()}
+          disabled={state.reconnecting}
         >
-          Reconnect
+          {state.reconnecting ? 'Reconnecting…' : 'Reconnect'}
         </button>
       </div>
       <p className="account-row__error">

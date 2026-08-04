@@ -5,6 +5,7 @@
    `cairnFolder.ts` — every call is a request a test can mock. */
 
 import { DriveAuthError, DriveRequestError } from './cairnFolder'
+import { reportDriveAuthError } from './authEvents'
 
 export { DriveAuthError, DriveRequestError }
 
@@ -64,7 +65,10 @@ export async function listTrackFiles(
     throw new DriveRequestError(error instanceof Error ? error.message : 'Network error')
   }
 
-  if (response.status === 401) throw new DriveAuthError()
+  if (response.status === 401) {
+    reportDriveAuthError(accessToken)
+    throw new DriveAuthError()
+  }
   if (!response.ok) {
     throw new DriveRequestError(`Drive request failed with status ${response.status}`)
   }
@@ -90,7 +94,10 @@ export async function downloadTrackFile(
     throw new DriveRequestError(error instanceof Error ? error.message : 'Network error')
   }
 
-  if (response.status === 401) throw new DriveAuthError()
+  if (response.status === 401) {
+    reportDriveAuthError(accessToken)
+    throw new DriveAuthError()
+  }
   if (!response.ok) {
     throw new DriveRequestError(`Drive request failed with status ${response.status}`)
   }
@@ -121,7 +128,10 @@ export async function startResumableUpload(
     throw new DriveRequestError(error instanceof Error ? error.message : 'Network error')
   }
 
-  if (response.status === 401) throw new DriveAuthError()
+  if (response.status === 401) {
+    reportDriveAuthError(accessToken)
+    throw new DriveAuthError()
+  }
   if (!response.ok) {
     throw await uploadRequestError(response, `Drive upload session failed with status ${response.status}`)
   }
@@ -156,7 +166,10 @@ async function queryReceivedBytes(
     throw new DriveRequestError(error instanceof Error ? error.message : 'Network error')
   }
 
-  if (response.status === 401) throw new DriveAuthError()
+  if (response.status === 401) {
+    reportDriveAuthError(accessToken)
+    throw new DriveAuthError()
+  }
   if (response.status === 308) {
     const range = response.headers.get('Range')
     const match = range ? /bytes=0-(\d+)/.exec(range) : null
@@ -194,7 +207,10 @@ export async function uploadFileContent(
         body: chunk,
       })
 
-      if (response.status === 401) throw new DriveAuthError()
+      if (response.status === 401) {
+        reportDriveAuthError(accessToken)
+        throw new DriveAuthError()
+      }
       if (response.ok) {
         return (await response.json()) as { id: string }
       }

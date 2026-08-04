@@ -190,6 +190,22 @@
   cursor: text;
 }
 
+/* #72 — Disabled treatment (design-language.md) while the account is
+   token-expired, same rule as `.track-row__handle--disabled` above. */
+.track-row__name--disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.track-row__swatch-wrap--disabled {
+  opacity: 0.4;
+}
+
+.track-row__swatch-wrap--disabled .track-row__swatch-button {
+  cursor: default;
+  pointer-events: none;
+}
+
 .track-row__name-input {
   flex: 1;
   min-width: 0;

@@ -19,6 +19,7 @@
    elsewhere in the app also catches this module's auth failures. */
 
 import { DriveAuthError, DriveRequestError } from '../drive/trackFiles'
+import { reportDriveAuthError } from '../drive/authEvents'
 
 export { DriveAuthError, DriveRequestError }
 
@@ -52,7 +53,10 @@ async function fetchPhotoBlob(
     throw new DriveRequestError(error instanceof Error ? error.message : 'Network error')
   }
 
-  if (response.status === 401) throw new DriveAuthError()
+  if (response.status === 401) {
+    reportDriveAuthError(accessToken)
+    throw new DriveAuthError()
+  }
   if (response.status === 404) throw new PhotoNotFoundError(fileId)
   if (!response.ok) {
     throw new DriveRequestError(`Drive request failed with status ${response.status}`)

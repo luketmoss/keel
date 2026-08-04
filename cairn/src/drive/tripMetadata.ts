@@ -6,6 +6,7 @@
    `src/drive/*` module. */
 
 import { DriveAuthError, DriveRequestError } from './cairnFolder'
+import { reportDriveAuthError } from './authEvents'
 
 export { DriveAuthError, DriveRequestError }
 
@@ -40,7 +41,10 @@ async function driveFetch(url: string, accessToken: string, init?: RequestInit):
   } catch (error) {
     throw new DriveRequestError(error instanceof Error ? error.message : 'Network error')
   }
-  if (response.status === 401) throw new DriveAuthError()
+  if (response.status === 401) {
+    reportDriveAuthError(accessToken)
+    throw new DriveAuthError()
+  }
   return response
 }
 

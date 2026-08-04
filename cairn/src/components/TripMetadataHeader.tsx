@@ -8,6 +8,11 @@ type Field = 'name' | 'status' | 'dates' | 'notes'
 interface TripMetadataHeaderProps {
   trip: TripRecord
   onUpdate: (patch: TripUpdate) => Promise<TripRecord | null>
+  /** #72: true while the account is `token-expired` — every field goes to
+      the language's Disabled treatment (`opacity: 0.4`, no hover response)
+      instead of staying editable and failing (or silently not syncing)
+      against a dead token. */
+  disabled?: boolean
 }
 
 /** The editable trip header above the file list — name, status, dates, and
@@ -15,7 +20,7 @@ interface TripMetadataHeaderProps {
     writes through the `TripStore` interface, whatever backs it — see
     cairn's `CLAUDE.md` on storage sitting behind one interface even while
     the only implementation is local. */
-export function TripMetadataHeader({ trip, onUpdate }: TripMetadataHeaderProps) {
+export function TripMetadataHeader({ trip, onUpdate, disabled = false }: TripMetadataHeaderProps) {
   const [editing, setEditing] = useState<Field | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [savedField, setSavedField] = useState<Field | null>(null)
@@ -43,13 +48,17 @@ export function TripMetadataHeader({ trip, onUpdate }: TripMetadataHeaderProps) 
   }
 
   function startEditing(field: Field) {
+    // A token-expired account can't flush an edit, so editing doesn't even
+    // start — same "control that would fail if used" rule as the import
+    // button.
+    if (disabled) return
     // Starting a second edit commits/discards the first rather than
     // stacking two inputs open at once.
     setEditing(field)
   }
 
   return (
-    <div className="trip-metadata">
+    <div className={`trip-metadata${disabled ? ' trip-metadata--disabled' : ''}`}>
       {editing === 'name' ? (
         <NameEditor
           initial={trip.name}

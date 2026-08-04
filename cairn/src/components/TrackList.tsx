@@ -31,6 +31,10 @@ interface TrackListProps {
       passes its own, naming the widened "Import files" control and both
       file kinds it accepts. */
   emptyDetail?: string
+  /** #72: true while the account is `token-expired`. Rename, recolour, and
+      reorder go to the Disabled treatment — visibility toggling and remove
+      stay live since neither touches Drive. */
+  disabled?: boolean
 }
 
 interface DragState {
@@ -49,6 +53,7 @@ export function TrackList({
   onReorder,
   canReorder = true,
   emptyDetail = 'Drop a KML or KMZ file anywhere, or use Import tracks above.',
+  disabled = false,
 }: TrackListProps) {
   const [dragState, setDragState] = useState<DragState | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -108,8 +113,9 @@ export function TrackList({
               onRename={onRename}
               onRecolor={onRecolor}
               onSaveError={setError}
+              disabled={disabled}
               showHandle={Boolean(onReorder)}
-              draggable={Boolean(onReorder) && canReorder}
+              draggable={Boolean(onReorder) && canReorder && !disabled}
               dragging={dragState?.draggedId === file.id}
               dropIndicator={dropIndicator}
               onDragStart={() => handleDragStart(file.id)}
@@ -133,6 +139,7 @@ function TrackRow({
   onRename,
   onRecolor,
   onSaveError,
+  disabled,
   showHandle,
   draggable,
   dragging,
@@ -149,6 +156,7 @@ function TrackRow({
   onRename?: (id: string, displayName: string) => Promise<boolean>
   onRecolor?: (id: string, color: number) => Promise<boolean>
   onSaveError: (message: string | null) => void
+  disabled: boolean
   showHandle: boolean
   draggable: boolean
   dragging: boolean
@@ -230,11 +238,14 @@ function TrackRow({
         ) : null}
 
         {onRecolor ? (
-          <span className="track-row__swatch-wrap">
+          <span
+            className={`track-row__swatch-wrap${disabled ? ' track-row__swatch-wrap--disabled' : ''}`}
+          >
             <button
               type="button"
               className={`track-row__swatch-button${savedField === 'color' ? ' track-row__field--saved' : ''}`}
               aria-label={`Change colour for ${file.name}`}
+              disabled={disabled}
               onClick={() => setColorPickerOpen((open) => !open)}
             >
               <span className="track-row__swatch" style={{ backgroundColor: color }} />
@@ -256,11 +267,11 @@ function TrackRow({
           <NameInput initial={file.name} onCommit={commitName} onCancel={() => setEditingName(false)} />
         ) : (
           <span
-            className={`track-row__name${onRename ? ' track-row__name--editable' : ''}${
+            className={`track-row__name${onRename && !disabled ? ' track-row__name--editable' : ''}${
               savedField === 'name' ? ' track-row__field--saved' : ''
-            }`}
+            }${disabled && onRename ? ' track-row__name--disabled' : ''}`}
             title={file.name}
-            onClick={onRename ? () => setEditingName(true) : undefined}
+            onClick={onRename && !disabled ? () => setEditingName(true) : undefined}
           >
             {file.name}
             {file.tracks.length > 1 && (

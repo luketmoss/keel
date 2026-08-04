@@ -5,7 +5,7 @@
    directly, which is what makes it mockable in tests. */
 
 export type TokenOutcome =
-  | { kind: 'success'; accessToken: string }
+  | { kind: 'success'; accessToken: string; expiresAt: number }
   /** The user closed Google's popup without completing consent. Not an
       error — the caller returns to the signed-out state silently. */
   | { kind: 'cancelled' }
@@ -14,8 +14,18 @@ export type TokenOutcome =
 
 interface TokenResponse {
   access_token?: string
+  /** Seconds until expiry, relative to when GIS issued the token — not
+      carried anywhere itself, so `requestDriveFileToken` converts it to an
+      absolute timestamp immediately (see `expiresAt` on the success
+      outcome) rather than passing a relative duration around. */
+  expires_in?: number
   error?: string
 }
+
+/** GIS access tokens last about an hour (cairn/CLAUDE.md); used only if a
+    response omits `expires_in`, which the API does not document doing but
+    costs nothing to guard against. */
+const DEFAULT_EXPIRY_SECONDS = 3600
 
 interface TokenClientErrorDetail {
   type?: string
@@ -90,7 +100,12 @@ export async function requestDriveFileToken(clientId: string): Promise<TokenOutc
           resolve({ kind: 'error' })
           return
         }
-        resolve({ kind: 'success', accessToken: response.access_token })
+        const expiresInSeconds = response.expires_in ?? DEFAULT_EXPIRY_SECONDS
+        resolve({
+          kind: 'success',
+          accessToken: response.access_token,
+          expiresAt: Date.now() + expiresInSeconds * 1000,
+        })
       },
       error_callback: (error) => {
         if (error.type === 'popup_closed') {

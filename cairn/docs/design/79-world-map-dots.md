@@ -120,14 +120,18 @@ render but affect nothing yet.
 
 **Populated** — dots drawn, camera fit.
 
-**No trips** — centred on `--ground`, no filter controls:
+**No trips** — the map itself stays visible; the message sits on `--scrim`
+over it rather than the opaque `--ground` this doc originally specified (#94:
+World is the homepage now, and the map is its backdrop even with nothing on
+it — an opaque cover defeated that). No filter controls:
 
 > **No places yet**
 > Drop a KML anywhere to start your first trip.
 
 Copy points at #81's drop-anywhere import, which is how a first trip is now made.
 
-**Filtered to nothing** — filter controls stay visible so the user can get back:
+**Filtered to nothing** — same `--scrim` treatment. Filter controls stay
+visible so the user can get back:
 
 > **Nothing in this range**
 > Widen the filters to see your trips.

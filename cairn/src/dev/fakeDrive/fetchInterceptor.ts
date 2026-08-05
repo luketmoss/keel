@@ -239,9 +239,18 @@ export function installFetchInterceptor(store: FakeDriveStore): void {
         return await handleFilesPatch(store, fileMatch[1], body)
       }
     } catch (error) {
+      // Acceptance criterion 8: real callers only ever check
+      // `response.ok`, never the error body, so a message on the `Response`
+      // alone would never actually reach anyone. `console.error` is what
+      // makes an unhandled query loud rather than silently indistinguishable
+      // from "no matching files".
+      // eslint-disable-next-line no-console
+      console.error(error instanceof Error ? error.message : 'fake Drive error', { url })
       return errorResponse(400, error instanceof Error ? error.message : 'fake Drive error')
     }
 
+    // eslint-disable-next-line no-console
+    console.error(`fake Drive: unhandled request ${method} ${url}`)
     return errorResponse(404, `fake Drive: unhandled request ${method} ${url}`)
   }
 }

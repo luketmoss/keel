@@ -53,6 +53,10 @@
   background: color-mix(in srgb, var(--ground) 80%, var(--text) 12%);
 }
 
+/* #94: `--scrim`, not `--ground` — the map stays visible underneath. An
+   opaque background here (#37/#79's original choice) made sense before #78
+   made World the homepage; now the map is the backdrop at all times,
+   including with nothing on it, and a solid cover defeats that. */
 .world-map__empty {
   position: absolute;
   inset: 0;
@@ -63,7 +67,7 @@
   justify-content: center;
   gap: var(--space-2);
   padding: var(--space-6);
-  background: var(--ground);
+  background: var(--scrim);
   text-align: center;
   pointer-events: none;
 }

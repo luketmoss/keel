@@ -55,6 +55,41 @@ async function renderApp(path = '/', { googleClientId }: { googleClientId?: stri
   return render(<App />)
 }
 
+/** #95: several routing tests below assert on trips seeded straight into
+    `localStorage`, which used to render while signed out — the whole point
+    of #95 is that it no longer does. Stubs `window.google` and `fetch`
+    enough to reach `signed-in` (same shape the account-bubble "signing out"
+    test above already relies on), so those tests can render their seeded
+    data through a real sign-in rather than losing coverage of what they
+    actually test (routing, filters, the back control). Caller renders with
+    `{ googleClientId: 'a-client-id' }` first, calls `signIn()`, and restores
+    the returned spy (and deletes `window.google`) when done. */
+function mockGoogleSignIn(email = 'jane@gmail.com') {
+  ;(window as unknown as { google?: unknown }).google = {
+    accounts: {
+      oauth2: {
+        initTokenClient: (config: { callback: (r: { access_token: string }) => void }) => ({
+          requestAccessToken: () => config.callback({ access_token: 'tok' }),
+        }),
+      },
+    },
+  }
+  return vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+    const href = String(url)
+    if (href.includes('/about')) {
+      return { ok: true, status: 200, json: async () => ({ user: { emailAddress: email } }) } as Response
+    }
+    return { ok: true, status: 200, json: async () => ({ files: [] }) } as Response
+  })
+}
+
+async function signIn(email = 'jane@gmail.com') {
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+  })
+  await screen.findByRole('button', { name: new RegExp(`Account: ${email}`) })
+}
+
 beforeEach(() => {
   window.history.pushState({}, '', '/')
   // #72's session persistence writes here on sign-in — cleared so one
@@ -81,33 +116,10 @@ describe('App account bubble', () => {
   })
 
   it('signing out returns the bubble to signed-out', async () => {
-    ;(window as unknown as { google?: unknown }).google = {
-      accounts: {
-        oauth2: {
-          initTokenClient: (config: { callback: (r: { access_token: string }) => void }) => ({
-            requestAccessToken: () => config.callback({ access_token: 'tok' }),
-          }),
-        },
-      },
-    }
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
-      const href = String(url)
-      if (href.includes('/about')) {
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({ user: { emailAddress: 'jane@gmail.com' } }),
-        } as Response
-      }
-      return { ok: true, status: 200, json: async () => ({ files: [] }) } as Response
-    })
+    const fetchSpy = mockGoogleSignIn()
 
     await renderApp('/', { googleClientId: 'a-client-id' })
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
-    })
-    await screen.findByRole('button', { name: /Account: jane@gmail.com/ })
+    await signIn()
 
     fireEvent.click(screen.getByRole('button', { name: /Account: jane@gmail.com/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
@@ -144,8 +156,12 @@ describe('App routing', () => {
       ]),
     )
 
+    // #95: the seeded trip only draws a pill while signed in — disconnected
+    // hides it, which is what this issue exists to do.
+    const fetchSpy = mockGoogleSignIn()
     try {
-      await renderApp('/')
+      await renderApp('/', { googleClientId: 'a-client-id' })
+      await signIn()
       // The map draws its own pills when nothing else owns them.
       expect(screen.getAllByRole('button', { name: 'Planned' })).toHaveLength(1)
 
@@ -157,6 +173,46 @@ describe('App routing', () => {
       expect(screen.getAllByRole('button', { name: 'Planned' })).toHaveLength(1)
     } finally {
       window.localStorage.removeItem('cairn.trips.index')
+      fetchSpy.mockRestore()
+      delete (window as unknown as { google?: unknown }).google
+    }
+  })
+
+  it('hides a locally-cached trip while disconnected and reveals it again on sign-in (#95)', async () => {
+    const tripId = 'trip-local-only'
+    window.localStorage.setItem(
+      'cairn.trips.index',
+      JSON.stringify([
+        {
+          id: tripId,
+          name: 'Kepler Track',
+          status: 'planned',
+          startDate: null,
+          endDate: null,
+          createdAt: '2026-01-01T00:00:00.000Z',
+          origin: { lat: -45, lng: 167 },
+        },
+      ]),
+    )
+
+    const fetchSpy = mockGoogleSignIn()
+    try {
+      await renderApp('/trips', { googleClientId: 'a-client-id' })
+
+      // Disconnected: the cached trip is still in localStorage, but neither
+      // the panel nor the map shows it.
+      expect(screen.queryByText('Kepler Track')).toBeNull()
+      expect(screen.getAllByText('Sign in to see your trips.')).toHaveLength(2)
+
+      // Signing in reveals it — no reload, same subscription that already
+      // drives the list.
+      await signIn()
+      expect(await screen.findByText('Kepler Track')).toBeDefined()
+      expect(screen.queryByText('Sign in to see your trips.')).toBeNull()
+    } finally {
+      window.localStorage.removeItem('cairn.trips.index')
+      fetchSpy.mockRestore()
+      delete (window as unknown as { google?: unknown }).google
     }
   })
 
@@ -165,7 +221,11 @@ describe('App routing', () => {
     expect(screen.getByTestId('map')).toBeDefined()
     expect(screen.getByRole('heading', { name: 'Trips' })).toBeDefined()
     expect(screen.getByPlaceholderText('Trip name')).toBeDefined()
-    expect(screen.getByText('No trips yet')).toBeDefined()
+    // #95: no client id configured leaves `accessToken` null, same as
+    // signed-out — the panel is empty because it's withheld, not because
+    // there's nothing there. Two matches, not one: the map underneath (#80
+    // keeps it mounted) shows the identical message in its own overlay.
+    expect(screen.getAllByText('Sign in to see your trips.')).toHaveLength(2)
   })
 
   it('closing the trips panel returns to / without unmounting the map', async () => {
@@ -316,9 +376,12 @@ describe('App routing', () => {
   it('the back control returns to /trips when the trip was opened from a row there', async () => {
     const tripId = 'trip-from-trips'
     seedTrip(tripId)
+    // #95: the row only renders in the panel while signed in.
+    const fetchSpy = mockGoogleSignIn()
 
     try {
-      await renderApp('/trips')
+      await renderApp('/trips', { googleClientId: 'a-client-id' })
+      await signIn()
       fireEvent.click(screen.getByText('Hokkaido'))
       expect(await screen.findByRole('button', { name: 'Back' })).toBeDefined()
       expect(window.location.pathname).toBe(`/trips/${tripId}`)
@@ -328,6 +391,8 @@ describe('App routing', () => {
       expect(window.location.pathname).toBe('/trips')
     } finally {
       clearSeededTrip(tripId)
+      fetchSpy.mockRestore()
+      delete (window as unknown as { google?: unknown }).google
     }
   })
 
@@ -367,8 +432,12 @@ describe('App routing', () => {
       }),
     )
 
+    // #95: the list — and its filter input, which only renders when there's
+    // something to filter — are both withheld until signed in.
+    const fetchSpy = mockGoogleSignIn()
     try {
-      await renderApp('/trips')
+      await renderApp('/trips', { googleClientId: 'a-client-id' })
+      await signIn()
       fireEvent.change(screen.getByPlaceholderText('Filter trips'), { target: { value: 'hokkaido' } })
       expect(screen.getByText('Hokkaido')).toBeDefined()
       expect(screen.queryByText('Alta Via 1')).toBeNull()
@@ -385,6 +454,8 @@ describe('App routing', () => {
     } finally {
       window.localStorage.removeItem('cairn.trips.index')
       window.localStorage.removeItem(`cairn.trips.trip.${tripId}`)
+      fetchSpy.mockRestore()
+      delete (window as unknown as { google?: unknown }).google
     }
   })
 })
@@ -439,7 +510,10 @@ describe('App drop-to-draft (#81)', () => {
 
     expect(screen.queryByText('NOT SAVED')).toBeNull()
     fireEvent.click(screen.getByRole('link', { name: 'Trips' }))
-    expect(await screen.findByText('No trips yet')).toBeDefined()
+    // #95: disconnected (no client id configured in this test) — the panel
+    // reads "sign in", not "no trips", regardless of the discarded draft.
+    // Two matches: the map underneath (#80) shows the same overlay text.
+    expect(await screen.findAllByText('Sign in to see your trips.')).toHaveLength(2)
   })
 
   it('while signed out, Save is replaced by a sign-in prompt, and the draft stays after signing in', async () => {

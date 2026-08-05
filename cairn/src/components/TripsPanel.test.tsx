@@ -85,6 +85,18 @@ describe('TripsPanel', () => {
     expect(screen.getByText('Sign in to add or remove trips.')).toBeDefined()
   })
 
+  // #95: `disabled` only ever accompanies an empty `trips` array in
+  // production (App.tsx withholds it), so this exercises exactly that
+  // combination — the empty-list message has to say why it's empty, not
+  // repeat the ordinary "No trips yet" that's wrong when trips exist but
+  // are hidden.
+  it('shows a sign-in prompt instead of "No trips yet" when the empty list is caused by being disconnected', () => {
+    renderPanel({ trips: [], disabled: true })
+
+    expect(screen.getByText('Sign in to see your trips.')).toBeDefined()
+    expect(screen.queryByText('No trips yet')).toBeNull()
+  })
+
   it('lists every trip, showing its name, date range and status', () => {
     renderPanel({
       trips: [tripEntry({ name: 'Kepler Track', status: 'completed', startDate: '2024-03-01', endDate: '2024-03-05' })],

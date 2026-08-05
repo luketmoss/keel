@@ -239,7 +239,13 @@ export class DriveTripStore implements TripStore {
 
     try {
       const folderId = await findOrCreateTripFolder(accessToken, cairnFolderId, id)
-      const trip = await writeJsonFile(accessToken, folderId, 'trip.json', record, null)
+      // #102: the folder can already hold a `trip.json` this session hasn't
+      // hydrated yet — an edit racing `connect()`'s hydration pass ahead of
+      // this migration, or another device having migrated the same trip.
+      // Writing straight to `null` in that case creates a second file next
+      // to the real one; checking first is what makes this an overwrite.
+      const existingTrip = await findJsonFile(accessToken, folderId, 'trip.json')
+      const trip = await writeJsonFile(accessToken, folderId, 'trip.json', record, existingTrip)
       const ref: TripDriveRef = { folderId, trip }
 
       const overview = this.local.getOverview(id)
@@ -262,7 +268,14 @@ export class DriveTripStore implements TripStore {
 
     try {
       const ref = this.refs.get(id) ?? { folderId: await findOrCreateTripFolder(accessToken, cairnFolderId, id) }
-      const written = await writeJsonFile(accessToken, ref.folderId, 'trip.json', record, ref.trip ?? null)
+      // #102: no cached `ref.trip` only means *this session* hasn't written
+      // or hydrated the file yet — not that Drive has no `trip.json`. An
+      // edit can reach here before `connect()`'s hydration pass gets to this
+      // trip; without checking, that races a create against the file
+      // hydration would otherwise have found, leaving two `trip.json`s in
+      // the folder and a 50/50 chance the rename survives the next read.
+      const existingTrip = ref.trip ?? (await findJsonFile(accessToken, ref.folderId, 'trip.json'))
+      const written = await writeJsonFile(accessToken, ref.folderId, 'trip.json', record, existingTrip)
       this.refs.set(id, { ...ref, trip: written })
       return 'ok'
     } catch (error) {

@@ -20,6 +20,11 @@ declare global {
 const INITIAL_CENTER = { lat: 20, lng: 0 }
 const INITIAL_ZOOM = 2
 
+/* Without this, zooming out past a single world lets Maps tile the basemap
+   side by side — Google's documented fix for "restrict the map to a single
+   copy of the world" is a world-covering `restriction` with `strictBounds`. */
+const WORLD_BOUNDS: google.maps.LatLngBoundsLiteral = { north: 85, south: -85, west: -180, east: 180 }
+
 interface MapViewProps {
   files: ImportedFile[]
   /** Passed straight through to `TrackLayer` — see its own doc for what this
@@ -102,6 +107,7 @@ export function MapView({
         gestureHandling="greedy"
         disableDefaultUI
         zoomControl
+        restriction={{ latLngBounds: WORLD_BOUNDS, strictBounds: true }}
       >
         <TrackLayer files={files} hoveredFileId={hoveredFileId} />
         {googleMapsMapId && photos.length > 0 && (

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { APIProvider, AdvancedMarker, Map, Polyline, useMap } from '@vis.gl/react-google-maps'
-import { googleMapsApiKey } from '../env'
+import { googleMapsApiKey, googleMapsMapId } from '../env'
 import { MapUnavailable } from './MapUnavailable'
 import type { TripIndexEntry, TripStatus } from '../store/tripStore'
 import type { Track } from '../kml/parse'
@@ -22,6 +22,11 @@ const DRAFT_ROUTE_COLOR = '#f1f3fa'
 /* Same "nothing imported yet" default as before there's anything to fit to. */
 const INITIAL_CENTER = { lat: 20, lng: 0 }
 const INITIAL_ZOOM = 2
+
+/* Without this, zooming out past a single world lets Maps tile the basemap
+   side by side — Google's documented fix for "restrict the map to a single
+   copy of the world" is a world-covering `restriction` with `strictBounds`. */
+const WORLD_BOUNDS: google.maps.LatLngBoundsLiteral = { north: 85, south: -85, west: -180, east: 180 }
 
 /* --marker-size from index.css, transcribed for the same reason PhotoLayer's
    own copy is — clustering's projection math wants real pixels, not a CSS
@@ -200,10 +205,12 @@ export function WorldMap({
           className="map"
           defaultCenter={lastCamera?.center ?? INITIAL_CENTER}
           defaultZoom={lastCamera?.zoom ?? INITIAL_ZOOM}
+          mapId={googleMapsMapId ?? undefined}
           mapTypeId="satellite"
           gestureHandling="greedy"
           disableDefaultUI
           zoomControl
+          restriction={{ latLngBounds: WORLD_BOUNDS, strictBounds: true }}
         >
           <PlaceLayer
             places={visiblePlaces}

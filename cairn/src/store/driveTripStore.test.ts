@@ -228,6 +228,51 @@ describe('DriveTripStore', () => {
     expect(store.getTrip('trip-a')?.notes).toBe('Written from another tab')
   })
 
+  it('#102: a rename to a trip already synced from Drive survives a reload', async () => {
+    // A tiny in-memory "Drive" for just this test — the shared mocks are
+    // otherwise stateless, and this criterion is specifically about a
+    // second `connect()` (a reload) seeing what the first one actually
+    // wrote, not a canned response.
+    let drive = {
+      version: '1',
+      data: {
+        id: 'trip-a',
+        name: 'Hokkaido',
+        status: 'planned' as const,
+        startDate: null,
+        endDate: null,
+        notes: '',
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
+    }
+    listSubfolders.mockResolvedValue([{ id: 'folder-a', name: 'trip-a' }])
+    findJsonFile.mockImplementation(async (_token: string, _folderId: string, name: string) =>
+      name === 'trip.json' ? { fileId: 'trip-file', version: drive.version } : null,
+    )
+    readJsonFile.mockImplementation(async () => ({ data: drive.data, version: drive.version }))
+    writeJsonFile.mockImplementation(
+      async (_token: string, _folderId: string, _name: string, data: typeof drive.data) => {
+        drive = { version: String(Number(drive.version) + 1), data }
+        return { fileId: 'trip-file', version: drive.version }
+      },
+    )
+
+    const storage = fakeStorage()
+    const session1 = new DriveTripStore(storage)
+    await session1.connect('token', 'cairn-folder-id')
+    expect(session1.getTrip('trip-a')?.name).toBe('Hokkaido')
+
+    const updated = await session1.updateTrip('trip-a', { name: 'Renamed Trip' })
+    expect(updated?.name).toBe('Renamed Trip')
+
+    // Reload: a fresh store (empty in-memory refs), same persisted storage,
+    // same underlying Drive state.
+    const session2 = new DriveTripStore(storage)
+    await session2.connect('token', 'cairn-folder-id')
+
+    expect(session2.getTrip('trip-a')?.name).toBe('Renamed Trip')
+  })
+
   it('connect() hydrates trips and overviews from Drive folders it finds', async () => {
     listSubfolders.mockResolvedValue([{ id: 'folder-a', name: 'trip-a' }])
     findJsonFile.mockImplementation(async (_token: string, _folderId: string, name: string) =>

@@ -173,7 +173,14 @@ export function useDraftTrip(
 
       setDraft(null)
       return true
-    } catch {
+    } catch (error) {
+      // #96: the user-facing message stays generic (there's no per-cause
+      // copy worth writing for a first-time save failure), but the real
+      // error used to vanish here entirely — nothing else in this path
+      // reports it, so a failure with a real cause other than the (now
+      // fixed) silent token expiry has nowhere else to surface.
+      // eslint-disable-next-line no-console
+      console.error('cairn: trip save failed', error)
       setDraft((prev) =>
         prev
           ? {

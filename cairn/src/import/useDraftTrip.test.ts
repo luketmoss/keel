@@ -243,6 +243,27 @@ describe('useDraftTrip', () => {
       )
     })
 
+    // #96: the real cause used to vanish entirely into the generic banner
+    // above, with nothing in the console — the only way anyone could ever
+    // diagnose a save failure was an investigation like this issue's.
+    it('logs the real error to the console on a failed save', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const failure = new Error('token expired mid-save')
+      uploadFileContent.mockRejectedValue(failure)
+      const store = new LocalTripStore(fakeStorage())
+      const { result } = renderHook(() => useDraftTrip(store, 'token', 'cairn-folder'))
+
+      await act(async () => {
+        await result.current.addFiles([loadFixture('linestring.kml', 'day1.kml')])
+      })
+      await act(async () => {
+        await result.current.save()
+      })
+
+      expect(consoleSpy).toHaveBeenCalledWith('cairn: trip save failed', failure)
+      consoleSpy.mockRestore()
+    })
+
     it('does nothing while signed out — the caller is responsible for not calling it then', async () => {
       const store = new LocalTripStore(fakeStorage())
       const { result } = renderHook(() => useDraftTrip(store, null, null))

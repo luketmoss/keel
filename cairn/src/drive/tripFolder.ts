@@ -5,6 +5,7 @@
    `parents` filter instead of `'root'`. */
 
 import { DriveAuthError, DriveRequestError } from './cairnFolder'
+import { reportDriveAuthError } from './authEvents'
 
 export { DriveAuthError, DriveRequestError }
 
@@ -34,7 +35,15 @@ async function driveFetch(
     throw new DriveRequestError(error instanceof Error ? error.message : 'Network error')
   }
 
-  if (response.status === 401) throw new DriveAuthError()
+  if (response.status === 401) {
+    // #96: this was the one `drive/*.ts` module that threw `DriveAuthError`
+    // without reporting it — every caller (`useDraftTrip.save()` directly,
+    // `DriveTripStore`'s flush/migrate internally) saw a bare thrown error
+    // with no way to learn the token had actually expired, and the account
+    // never transitioned to `token-expired`/`Reconnect`.
+    reportDriveAuthError(accessToken)
+    throw new DriveAuthError()
+  }
   if (!response.ok) {
     throw new DriveRequestError(`Drive request failed with status ${response.status}`)
   }

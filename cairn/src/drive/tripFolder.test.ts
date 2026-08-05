@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DriveAuthError, findOrCreateTripFolder } from './tripFolder'
+import { onDriveAuthError } from './authEvents'
 
 function jsonResponse(body: unknown, status = 200): Response {
   return {
@@ -68,5 +69,27 @@ describe('findOrCreateTripFolder', () => {
     await expect(
       findOrCreateTripFolder('expired', 'cairn-folder-id', 'trip-abc'),
     ).rejects.toBeInstanceOf(DriveAuthError)
+  })
+
+  // #96: `driveFetch` threw `DriveAuthError` on a 401 already — what it
+  // didn't do, unlike every sibling in `drive/*.ts`, was report the failed
+  // token through `authEvents`, so `useGoogleAccount` never learned a save
+  // had actually failed because the token expired and never offered
+  // Reconnect. This is the behaviour the other three modules already have
+  // and this module was missing.
+  it('reports the expired token through authEvents on a 401', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({}, 401))
+    const listener = vi.fn()
+    const unsubscribe = onDriveAuthError(listener)
+
+    try {
+      await expect(
+        findOrCreateTripFolder('expired-token', 'cairn-folder-id', 'trip-abc'),
+      ).rejects.toBeInstanceOf(DriveAuthError)
+
+      expect(listener).toHaveBeenCalledWith('expired-token')
+    } finally {
+      unsubscribe()
+    }
   })
 })

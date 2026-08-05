@@ -79,6 +79,11 @@ interface WorldMapProps {
       addition, unlike the once-per-change stance `PlaceLayer` takes for
       saved trips: a drop is an explicit "look at this". */
   draftTracks?: Track[]
+  /** #95: `trips` is already empty whenever this is true — the caller
+      withholds it rather than this component filtering it out — so this
+      exists only to pick the right empty-state copy. A cached-but-hidden
+      account reads "sign in to see your trips", not "no places yet". */
+  disconnected?: boolean
 }
 
 /** `/` (#78 makes it the homepage; #79 replaces what it draws): every trip
@@ -95,6 +100,7 @@ export function WorldMap({
   hoveredTripId,
   onHoverTrip,
   draftTracks,
+  disconnected,
 }: WorldMapProps) {
   const hasDraft = Boolean(draftTracks && draftTracks.length > 0)
   const [keyRejected, setKeyRejected] = useState(false)
@@ -210,10 +216,17 @@ export function WorldMap({
       </APIProvider>
       {!hasDraft &&
         (noPlaces ? (
-          <EmptyOverlay
-            heading="No places yet"
-            detail="Drop a KML anywhere to start your first trip."
-          />
+          disconnected ? (
+            // #95: `trips` is empty because it's withheld, not because
+            // there's nothing there — "No places yet" would be wrong for an
+            // account with real cached trips.
+            <EmptyOverlay heading="Sign in to see your trips." />
+          ) : (
+            <EmptyOverlay
+              heading="No places yet"
+              detail="Drop a KML anywhere to start your first trip."
+            />
+          )
         ) : (
           filteredEmpty && (
             <EmptyOverlay heading="Nothing in this range" detail="Widen the filters to see your trips." />

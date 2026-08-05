@@ -82,11 +82,13 @@ function TestWorldMap({
   trips,
   hideStatusPills,
   initialHoveredTripId = null,
+  disconnected,
 }: {
   WorldMapComponent: WorldMapComponent
   trips: TripIndexEntry[]
   hideStatusPills?: boolean
   initialHoveredTripId?: string | null
+  disconnected?: boolean
 }) {
   const [filters, setFilters] = useState<TripFilters>(DEFAULT_TRIP_FILTERS)
   const [hoveredTripId, setHoveredTripId] = useState<string | null>(initialHoveredTripId)
@@ -98,6 +100,7 @@ function TestWorldMap({
       hideStatusPills={hideStatusPills}
       hoveredTripId={hoveredTripId}
       onHoverTrip={setHoveredTripId}
+      disconnected={disconnected}
     />
   )
 }
@@ -105,7 +108,7 @@ function TestWorldMap({
 async function renderWorldMap(
   trips: TripIndexEntry[],
   key: string,
-  options: { hideStatusPills?: boolean; initialHoveredTripId?: string | null } = {},
+  options: { hideStatusPills?: boolean; initialHoveredTripId?: string | null; disconnected?: boolean } = {},
 ) {
   vi.stubEnv('VITE_GOOGLE_MAPS_API_KEY', key)
   vi.resetModules()
@@ -121,6 +124,7 @@ async function renderWorldMap(
               trips={trips}
               hideStatusPills={options.hideStatusPills}
               initialHoveredTripId={options.initialHoveredTripId}
+              disconnected={options.disconnected}
             />
           }
         />
@@ -359,6 +363,16 @@ describe('WorldMap', () => {
 
       expect(screen.getByText('No places yet')).toBeDefined()
       expect(container.querySelector('.world-map__filter')).toBeNull()
+    })
+
+    // #95: `disconnected` only ever accompanies an empty `trips` array in
+    // production (the caller withholds it), so this exercises exactly that
+    // combination rather than one the real app never produces.
+    it('shows a sign-in prompt instead of "No places yet" while disconnected', async () => {
+      await renderWorldMap([], 'a-browser-key', { disconnected: true })
+
+      expect(screen.getByText('Sign in to see your trips.')).toBeDefined()
+      expect(screen.queryByText('No places yet')).toBeNull()
     })
 
     it('shows the filtered-empty state, with the filter row still visible, when a filter excludes everything', async () => {

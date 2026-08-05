@@ -172,8 +172,18 @@ export function TripsPanel({
 
       {trips.length === 0 ? (
         <div className="trips-panel__empty">
-          <p className="trips-panel__empty-title">No trips yet</p>
-          <p className="trips-panel__empty-detail">Drop a KML anywhere to start one.</p>
+          {disabled ? (
+            // #95: `trips` is always empty while disconnected (App.tsx
+            // withholds it, not just this panel) — "No trips yet" would be
+            // a lie for an account that actually has some, just hidden
+            // until sign-in.
+            <p className="trips-panel__empty-title">Sign in to see your trips.</p>
+          ) : (
+            <>
+              <p className="trips-panel__empty-title">No trips yet</p>
+              <p className="trips-panel__empty-detail">Drop a KML anywhere to start one.</p>
+            </>
+          )}
         </div>
       ) : filteredEmpty ? (
         <div className="trips-panel__empty">

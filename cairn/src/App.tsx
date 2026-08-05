@@ -178,6 +178,12 @@ function DefaultShell({
   const dragDepth = useRef(0)
   const [toasts, setToasts] = useState<ToastMessage[]>([])
 
+  // #95: disconnected is read-only *and* invisible now, not just read-only —
+  // the cache underneath (`tripStore`/`localStorage`) is never touched, only
+  // what's rendered. A trip that exists only locally survives a sign-out
+  // exactly as before; it just doesn't draw until the next sign-in.
+  const visibleTrips = disconnected ? [] : trips
+
   function addToasts(rejections: { name: string; message: string }[]) {
     if (rejections.length === 0) return
     setToasts((prev) => [...prev, ...rejections.map((r) => ({ id: generateToastId(), text: r.message }))])
@@ -231,17 +237,18 @@ function DefaultShell({
       <AccountBubble account={account} />
       <div className="shell__main">
         <WorldMap
-          trips={trips}
+          trips={visibleTrips}
           filters={filters}
           onFiltersChange={onFiltersChange}
           hideStatusPills={tripsPanelOpen}
           hoveredTripId={hoveredTripId}
           onHoverTrip={onHoverTrip}
           draftTracks={draftTrip.draft?.files.flatMap((file) => file.tracks)}
+          disconnected={disconnected}
         />
         {tripsPanelOpen && (
           <TripsPanel
-            trips={trips}
+            trips={visibleTrips}
             filters={filters}
             onFiltersChange={onFiltersChange}
             hoveredTripId={hoveredTripId}

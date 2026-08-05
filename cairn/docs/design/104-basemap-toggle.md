@@ -10,14 +10,19 @@ A four-segment control, visually the same pattern as `WorldMap`'s
 built as its own component, `BaseMapControl`, so both `MapView` and
 `WorldMap` can mount it without one importing internals from the other.
 
-**Position: top-right on both surfaces**, docked directly below
-`AccountBubble` rather than stacking on top of it — `AccountBubble` already
-occupies top-right (`--space-4` from each edge) on both routes, 40px tall in
-both its signed-out and signed-in states. `top: calc(var(--space-4) + 40px +
-var(--space-2))`, same offset pattern `StatusFilterRow` already uses below
-`TopBar`. `StatusFilterRow` and `DateRangeControl` sit top-left/bottom-center
-on the world map and the zoom control docks bottom-right by default, so this
-is the one open lane on both maps once `AccountBubble` is accounted for.
+**Position: top-right on both surfaces**, docked below both `AccountBubble`
+(top-right, `--space-4` from each edge, 40px tall in both its signed-out and
+signed-in states — present on both routes) and `TopBar` (top-left, 72px
+tall, world map only). `top: calc(var(--space-4) + 72px + var(--space-2))`
+— the taller of the two, and the same offset `StatusFilterRow` already uses
+below `TopBar`. Clearing only `AccountBubble`'s 40px was tried first and
+looked right at desktop width, but at narrow viewports `TopBar` is wide
+enough to reach under this control's left edge, producing a real overlap in
+the vertical band between 40px and 72px — caught by measuring
+`getBoundingClientRect()` at 320px and 375px widths, not by eye. `TopBar`
+isn't rendered on the trip detail route, so this is extra clearance there
+rather than a second case to handle. `DateRangeControl` sits bottom-center
+and the zoom control docks bottom-right by default, so neither is affected.
 
 Segments, left to right, each a single glyph-free text label (icons would
 need a fifth thing decided — a set to draw from — for four items that don't
@@ -33,7 +38,7 @@ share a family):
 ```
 .basemap-control {
   position: absolute;
-  top: var(--space-4);
+  top: calc(var(--space-4) + 72px + var(--space-2));
   right: var(--space-4);
   z-index: 1;
   display: flex;

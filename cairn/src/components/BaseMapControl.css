@@ -1,9 +1,13 @@
 /* Sits below AccountBubble (top-right, --space-4 from each edge, 40px tall
    in both its signed-out and signed-in states) rather than stacking on top
-   of it. */
+   of it. The 72px offset matches `StatusFilterRow`'s own clearance below
+   `TopBar` (world map only, top-left, also 72px tall) rather than
+   AccountBubble's shorter 40px — at narrow viewports TopBar is wide enough
+   to reach under this control's left edge, so clearing only AccountBubble's
+   height left a real overlap band between the two. */
 .basemap-control {
   position: absolute;
-  top: calc(var(--space-4) + 40px + var(--space-2));
+  top: calc(var(--space-4) + 72px + var(--space-2));
   right: var(--space-4);
   z-index: 1;
   display: flex;

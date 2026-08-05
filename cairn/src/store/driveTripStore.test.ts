@@ -52,7 +52,7 @@ vi.mock('../drive/tripMetadata', () => ({
 
 beforeEach(() => {
   findOrCreateTripFolder.mockReset().mockResolvedValue('folder-1')
-  findJsonFile.mockReset()
+  findJsonFile.mockReset().mockResolvedValue(null)
   readJsonFile.mockReset()
   writeJsonFile.mockReset()
   listSubfolders.mockReset().mockResolvedValue([])
@@ -228,6 +228,51 @@ describe('DriveTripStore', () => {
     expect(store.getTrip('trip-a')?.notes).toBe('Written from another tab')
   })
 
+  it('#102: a rename to a trip already synced from Drive survives a reload', async () => {
+    // A tiny in-memory "Drive" for just this test — the shared mocks are
+    // otherwise stateless, and this criterion is specifically about a
+    // second `connect()` (a reload) seeing what the first one actually
+    // wrote, not a canned response.
+    let drive = {
+      version: '1',
+      data: {
+        id: 'trip-a',
+        name: 'Hokkaido',
+        status: 'planned' as const,
+        startDate: null,
+        endDate: null,
+        notes: '',
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
+    }
+    listSubfolders.mockResolvedValue([{ id: 'folder-a', name: 'trip-a' }])
+    findJsonFile.mockImplementation(async (_token: string, _folderId: string, name: string) =>
+      name === 'trip.json' ? { fileId: 'trip-file', version: drive.version } : null,
+    )
+    readJsonFile.mockImplementation(async () => ({ data: drive.data, version: drive.version }))
+    writeJsonFile.mockImplementation(
+      async (_token: string, _folderId: string, _name: string, data: typeof drive.data) => {
+        drive = { version: String(Number(drive.version) + 1), data }
+        return { fileId: 'trip-file', version: drive.version }
+      },
+    )
+
+    const storage = fakeStorage()
+    const session1 = new DriveTripStore(storage)
+    await session1.connect('token', 'cairn-folder-id')
+    expect(session1.getTrip('trip-a')?.name).toBe('Hokkaido')
+
+    const updated = await session1.updateTrip('trip-a', { name: 'Renamed Trip' })
+    expect(updated?.name).toBe('Renamed Trip')
+
+    // Reload: a fresh store (empty in-memory refs), same persisted storage,
+    // same underlying Drive state.
+    const session2 = new DriveTripStore(storage)
+    await session2.connect('token', 'cairn-folder-id')
+
+    expect(session2.getTrip('trip-a')?.name).toBe('Renamed Trip')
+  })
+
   it('connect() hydrates trips and overviews from Drive folders it finds', async () => {
     listSubfolders.mockResolvedValue([{ id: 'folder-a', name: 'trip-a' }])
     findJsonFile.mockImplementation(async (_token: string, _folderId: string, name: string) =>
@@ -292,6 +337,62 @@ describe('DriveTripStore', () => {
     expect(tripWrites).toHaveLength(2)
     expect(tripWrites[0][4]).toBeNull() // migrateTrip's create
     expect(tripWrites[1][4]).not.toBeNull() // the edit's overwrite, using migrateTrip's ref — not a second create
+  })
+
+  it('#102: renaming a trip still ahead of connect() in the hydration queue overwrites its existing trip.json rather than duplicating it', async () => {
+    // Two trips already synced from a prior session (seeded into the shared
+    // storage, then read back by a fresh store — a reload). `connect()`
+    // hydrates trip folders one at a time, awaiting each in turn, so while
+    // trip-a's hydration is still in flight, trip-b's hasn't been queued yet
+    // at all — the exact window a rename can land in with no cached ref.
+    const storage = fakeStorage()
+    const seedStore = new DriveTripStore(storage)
+    const tripA = seedStore.createTrip('Trip A')
+    const tripB = seedStore.createTrip('Trip B')
+
+    listSubfolders.mockResolvedValue([
+      { id: 'folder-a', name: tripA.id },
+      { id: 'folder-b', name: tripB.id },
+    ])
+    findOrCreateTripFolder.mockImplementation(async (_token: string, _cairnFolderId: string, tripId: string) =>
+      tripId === tripA.id ? 'folder-a' : 'folder-b',
+    )
+    let releaseA: () => void = () => {}
+    const aGate = new Promise<void>((resolve) => {
+      releaseA = resolve
+    })
+    findJsonFile.mockImplementation(async (_token: string, folderId: string, name: string) => {
+      if (name !== 'trip.json') return null
+      if (folderId === 'folder-a') await aGate // trip-a's hydration stays pending until released
+      return { fileId: `${folderId}-trip-file`, version: '1' }
+    })
+    readJsonFile.mockResolvedValue({
+      data: {
+        id: tripA.id,
+        name: 'Trip A',
+        status: 'planned',
+        startDate: null,
+        endDate: null,
+        notes: '',
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
+      version: '1',
+    })
+    writeJsonFile.mockResolvedValue({ fileId: 'folder-b-trip-file', version: '2' })
+
+    const store = new DriveTripStore(storage)
+    const connectPromise = store.connect('token', 'cairn-folder-id')
+    await flush() // connect() is now stuck awaiting trip-a's gated hydration
+
+    const updated = await store.updateTrip(tripB.id, { name: 'Renamed' })
+
+    releaseA()
+    await connectPromise
+
+    expect(updated?.name).toBe('Renamed')
+    const tripBWrites = writeJsonFile.mock.calls.filter((call) => call[1] === 'folder-b' && call[2] === 'trip.json')
+    expect(tripBWrites).toHaveLength(1) // not a duplicate create alongside a later hydrate/overwrite
+    expect(tripBWrites[0][4]).not.toBeNull() // overwrite of the file findJsonFile found, not a create
   })
 
   it('trashes the Drive folder on delete once a ref is known', async () => {

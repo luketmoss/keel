@@ -19,9 +19,9 @@ through Gate 1 — stop and say so rather than refining it yourself on the way
 past. The gate exists because the user wants to see the spec before it's built.
 
 Read, in order: the issue body, the project's `CLAUDE.md`, its stack skill, the
-**standing documents** under `<project>/docs/design/` — every file there whose
-name does not start with an issue number, as defined under the UX stage in
-`CONVENTIONS.md` — and then the issue's own design note if one exists.
+**standing documents** under `<project>/docs/design/` — `CONVENTIONS.md` defines
+which files those are, under the UX stage — and then the issue's own design note
+if one exists.
 
 The standing documents are not optional context. A note says what this issue
 does; they say what everything looks like, and building to the note alone is how

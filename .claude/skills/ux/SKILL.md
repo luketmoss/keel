@@ -23,10 +23,9 @@ Read the project's `CLAUDE.md` and stack skill. Read any existing files under
 `<project>/docs/design/` — consistency with what's already been decided matters
 more than any individual choice here.
 
-Read the **standing documents** first — every file in that folder whose name
-does not start with an issue number, as defined under the UX stage in
-`CONVENTIONS.md`. There may be more than one, and they outrank any single issue
-note.
+Read the folder's **standing documents** first — `CONVENTIONS.md` defines which
+files those are, under the UX stage. There may be more than one, and they
+outrank any single issue note.
 
 ## Specify
 
@@ -63,7 +62,7 @@ explicitly: name the proposed token, its value, and what it is for, under a
 decision rather than a side effect, and it is the only place a raw value
 belongs.
 
-A project with no `design-language.md` yet is not a licence to invent freely.
+A project with no design language yet is not a licence to invent freely.
 Match the values already in use, and if the issue is the third to reach for
 something the system doesn't have, say that the project needs one.
 

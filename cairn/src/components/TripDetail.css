@@ -1,66 +1,19 @@
-.trip-detail-panel {
-  display: flex;
-  flex-direction: column;
-  flex: 0 0 var(--sidebar-width);
-  width: var(--sidebar-width);
-  background: var(--surface);
-  backdrop-filter: blur(var(--blur));
-  border-right: 1px solid var(--border);
-  overflow: hidden;
-}
+/* The trip face of the panel. No longer a docked sidebar with its own
+   header — `ShellColumn` owns the surface, and the search card carries Back
+   and the trip's name. */
 
-.trip-detail-panel__body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-.trip-detail-header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-4) var(--space-4);
-  flex: none;
-}
-
-.trip-detail-header__back {
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  /* Absorbs into the header row's own padding rather than growing it. */
-  margin: calc(var(--space-2) * -1) 0;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: none;
-  color: var(--text-muted);
-  font: inherit;
-  font-size: var(--text-lg);
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.trip-detail-header__back:hover {
-  color: var(--text);
-  background: var(--hover);
-}
-
-.trip-detail-header__back:active {
-  background: var(--pressed);
-}
-
-.trip-detail-header__name {
-  margin: 0;
+.trip-detail {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--text-lg);
-  font-weight: 600;
-  color: var(--text);
+  display: flex;
+  flex-direction: column;
+}
+
+.trip-detail__body {
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-4);
+  overflow-y: auto;
 }
 
 .trip-detail__loading {

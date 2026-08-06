@@ -1,13 +1,5 @@
-.map-view {
-  position: relative;
-  width: 100%;
-  height: 100%;
-}
-
-.map {
-  width: 100%;
-  height: 100%;
-}
+/* Was in MapView.css until the shell rebuild folded that component into
+   MapCanvas — this panel outlives it, so it owns its own stylesheet now. */
 
 .map-unavailable {
   display: flex;

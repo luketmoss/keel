@@ -1,0 +1,146 @@
+/* Bottom left of the map. While the column is open this clears it; when the
+   column collapses it slides to the map's own left edge over --motion-base,
+   the same duration and curve the column itself moves with, so the two read
+   as one movement rather than two. */
+.layers-control {
+  position: absolute;
+  bottom: var(--space-4);
+  left: calc(var(--space-4) + var(--panel-width) + var(--space-4));
+  z-index: 2;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  transition: left var(--motion-base) var(--ease);
+}
+
+.layers-control--clear {
+  left: var(--space-4);
+}
+
+.layers-control__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--hit-target);
+  padding: var(--space-1) var(--space-3) var(--space-1) var(--space-1);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur));
+  box-shadow: var(--shadow-lifted);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--ease);
+}
+
+.layers-control__trigger:hover {
+  color: var(--text);
+}
+
+.layers-control__trigger:active {
+  background: var(--pressed);
+}
+
+.layers-control__strip {
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur));
+  box-shadow: var(--shadow-lifted);
+}
+
+.layers-control__option {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: var(--hit-target);
+  min-height: var(--hit-target);
+  padding: var(--space-1);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease);
+}
+
+.layers-control__option:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.layers-control__option:active {
+  background: var(--pressed);
+}
+
+.layers-control__option--active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* Stand-ins for the real basemap thumbnails: the choice is visual, so each
+   option carries a swatch that reads as terrain, imagery, or a drawn map
+   rather than a word alone. Gradients rather than tiles because a tile
+   request per option would cost four map loads to render a control. */
+.layers-control__swatch {
+  display: block;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.layers-control__swatch--roadmap {
+  background: linear-gradient(135deg, #3c4160 0%, #575d80 100%);
+}
+
+.layers-control__swatch--satellite {
+  background: linear-gradient(135deg, #1f3a2a 0%, #6b5b3a 60%, #8a8f7a 100%);
+}
+
+.layers-control__swatch--hybrid {
+  background: linear-gradient(135deg, #1f3a2a 0%, #6b5b3a 60%, #8a8f7a 100%);
+  position: relative;
+}
+
+.layers-control__swatch--hybrid::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    45deg,
+    transparent 45%,
+    rgba(255, 255, 255, 0.55) 47%,
+    rgba(255, 255, 255, 0.55) 53%,
+    transparent 55%
+  );
+}
+
+.layers-control__swatch--terrain {
+  background: linear-gradient(135deg, #4a5a3e 0%, #7c7a52 55%, #b7ac8b 100%);
+}
+
+/* The trigger's word is what makes the control findable the first time; the
+   swatch is what makes it recognisable afterwards. At phone width the word
+   goes and the swatch stays. */
+@media (max-width: 719px) {
+  .layers-control {
+    left: var(--space-4);
+    bottom: var(--space-2);
+  }
+
+  .layers-control__trigger-label,
+  .layers-control__option-label {
+    display: none;
+  }
+
+  .layers-control__trigger {
+    padding: var(--space-1);
+  }
+}

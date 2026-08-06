@@ -11,7 +11,7 @@ const { startResumableUpload, uploadFileContent } = vi.hoisted(() => ({
   uploadFileContent: vi.fn(),
 }))
 // A full passthrough except the two functions above — `imageCache.ts` and
-// `usePhotoImport.ts` (exercised by `TripDetail`, rendered by other tests
+// `usePhotoImport.ts` (exercised by the trip face, rendered by other tests
 // in this file) import `DriveAuthError`/`DriveRequestError` from this same
 // module, which a narrower mock would silently replace with `undefined`.
 vi.mock('./drive/trackFiles', async () => {
@@ -35,17 +35,15 @@ vi.mock('@vis.gl/react-google-maps', () => ({
   APIProvider: ({ children }: { children?: React.ReactNode }) => (
     <div data-testid="api-provider">{children}</div>
   ),
-  Map: ({ children }: { children?: React.ReactNode }) => (
-    <div data-testid="map">{children}</div>
-  ),
+  Map: ({ children }: { children?: React.ReactNode }) => <div data-testid="map">{children}</div>,
   Marker: () => null,
+  AdvancedMarker: () => null,
   Polyline: () => null,
   useMap: () => null,
 }))
 
-/* `env.ts` reads `import.meta.env` once at module evaluation, mirroring
-   MapView.test.tsx — the key has to be stubbed and modules reset before App
-   (which pulls in MapView) is imported. */
+/* `env.ts` reads `import.meta.env` once at module evaluation — the key has
+   to be stubbed and modules reset before App is imported. */
 async function renderApp(path = '/', { googleClientId }: { googleClientId?: string } = {}) {
   window.history.pushState({}, '', path)
   vi.stubEnv('VITE_GOOGLE_MAPS_API_KEY', 'a-browser-key')
@@ -55,15 +53,10 @@ async function renderApp(path = '/', { googleClientId }: { googleClientId?: stri
   return render(<App />)
 }
 
-/** #95: several routing tests below assert on trips seeded straight into
-    `localStorage`, which used to render while signed out — the whole point
-    of #95 is that it no longer does. Stubs `window.google` and `fetch`
-    enough to reach `signed-in` (same shape the account-bubble "signing out"
-    test above already relies on), so those tests can render their seeded
-    data through a real sign-in rather than losing coverage of what they
-    actually test (routing, filters, the back control). Caller renders with
-    `{ googleClientId: 'a-client-id' }` first, calls `signIn()`, and restores
-    the returned spy (and deletes `window.google`) when done. */
+/** #95: several tests below assert on trips seeded straight into
+    `localStorage`, which no longer render while signed out. Stubs
+    `window.google` and `fetch` enough to reach `signed-in`, so those tests
+    can render their seeded data through a real sign-in. */
 function mockGoogleSignIn(email = 'jane@gmail.com') {
   ;(window as unknown as { google?: unknown }).google = {
     accounts: {
@@ -90,16 +83,36 @@ async function signIn(email = 'jane@gmail.com') {
   await screen.findByRole('button', { name: new RegExp(`Account: ${email}`) })
 }
 
+function seedTrip(tripId: string, name = 'Hokkaido', extra: Record<string, unknown> = {}) {
+  const entry = {
+    id: tripId,
+    name,
+    status: 'planned',
+    startDate: null,
+    endDate: null,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    ...extra,
+  }
+  const existing = JSON.parse(window.localStorage.getItem('cairn.trips.index') ?? '[]')
+  window.localStorage.setItem('cairn.trips.index', JSON.stringify([...existing, entry]))
+  window.localStorage.setItem(
+    `cairn.trips.trip.${tripId}`,
+    JSON.stringify({ ...entry, notes: '' }),
+  )
+}
+
 beforeEach(() => {
   window.history.pushState({}, '', '/')
   // #72's session persistence writes here on sign-in — cleared so one
-  // test's signed-in session doesn't read back as a stored session (and a
-  // "Reconnecting…" restore) in the next.
+  // test's signed-in session doesn't read back as a stored session.
   window.sessionStorage.clear()
+  window.localStorage.clear()
 })
 
 afterEach(() => {
   vi.unstubAllEnvs()
+  window.localStorage.clear()
+  delete (window as unknown as { google?: unknown }).google
 })
 
 describe('App account bubble', () => {
@@ -125,338 +138,309 @@ describe('App account bubble', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
 
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeDefined()
-
     fetchSpy.mockRestore()
-    delete (window as unknown as { google?: unknown }).google
+  })
+
+  it('mounts the account inside the search card rather than as its own floating element', async () => {
+    const { container } = await renderApp('/', { googleClientId: 'a-client-id' })
+
+    const card = container.querySelector('.search-card')
+    expect(card).not.toBeNull()
+    expect(card?.querySelector('.search-card__account .account-bubble')).not.toBeNull()
+    // Nothing renders an account bubble outside the card.
+    expect(container.querySelectorAll('.account-bubble')).toHaveLength(1)
   })
 })
 
-describe('App routing', () => {
-  it('renders the map and top bar at /', async () => {
+describe('App shell (#109)', () => {
+  it('renders no navigation bar and no World/Trips links', async () => {
+    const { container } = await renderApp('/')
+
+    expect(container.querySelector('.top-bar')).toBeNull()
+    expect(screen.queryByRole('link', { name: 'World' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Trips' })).toBeNull()
+    expect(screen.queryByRole('navigation')).toBeNull()
+  })
+
+  it('renders the search card with its three slots', async () => {
+    const { container } = await renderApp('/', { googleClientId: 'a-client-id' })
+
+    const card = container.querySelector('.search-card') as HTMLElement
+    expect(card.querySelector('.search-card__mark')).not.toBeNull()
+    expect(screen.getByPlaceholderText('Search trips, tracks and photos')).toBeDefined()
+    expect(card.querySelector('.search-card__account')).not.toBeNull()
+  })
+
+  it('opens with the panel showing the list', async () => {
+    const { container } = await renderApp('/')
+
+    expect(screen.getByRole('heading', { name: 'Everything' })).toBeDefined()
+    expect(container.querySelector('.shell-column--collapsed')).toBeNull()
+  })
+
+  it('renders the filter chips below the search card, and drives the list from them', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedTrip('t-planned', 'Kepler Track', { status: 'planned' })
+    seedTrip('t-done', 'Larapinta', { status: 'completed' })
+
+    await renderApp('/', { googleClientId: 'a-client-id' })
+    await signIn()
+
+    await screen.findByText('Kepler Track')
+    expect(screen.getByText('Larapinta')).toBeDefined()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Planned' }))
+
+    expect(screen.getByText('Kepler Track')).toBeDefined()
+    expect(screen.queryByText('Larapinta')).toBeNull()
+    fetchSpy.mockRestore()
+  })
+
+  it('collapses the column via its edge tab and slides the layers control to the map edge', async () => {
+    const { container } = await renderApp('/')
+
+    expect(container.querySelector('.layers-control--clear')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse panel' }))
+
+    expect(container.querySelector('.shell-column--collapsed')).not.toBeNull()
+    expect(container.querySelector('.layers-control--clear')).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'Show panel' })).toBeDefined()
+  })
+
+  it('puts the layers control in the map corner, expanding to the four basemaps', async () => {
     await renderApp('/')
-    expect(screen.getByTestId('map')).toBeDefined()
-    expect(screen.getByRole('link', { name: 'World' })).toBeDefined()
-    expect(screen.getByRole('link', { name: 'Trips' })).toBeDefined()
-  })
 
-  it('moves the status pills from the map to the trips panel when the panel is open (#80)', async () => {
-    const tripId = 'trip-with-a-place'
-    window.localStorage.setItem(
-      'cairn.trips.index',
-      JSON.stringify([
-        {
-          id: tripId,
-          name: 'Hokkaido',
-          status: 'planned',
-          startDate: null,
-          endDate: null,
-          createdAt: '2026-01-01T00:00:00.000Z',
-          origin: { lat: 37, lng: -122 },
-        },
-      ]),
-    )
+    const trigger = screen.getByRole('button', { name: 'Layers' })
+    expect(trigger.getAttribute('aria-expanded')).toBe('false')
 
-    // #95: the seeded trip only draws a pill while signed in — disconnected
-    // hides it, which is what this issue exists to do.
-    const fetchSpy = mockGoogleSignIn()
-    try {
-      await renderApp('/', { googleClientId: 'a-client-id' })
-      await signIn()
-      // The map draws its own pills when nothing else owns them.
-      expect(screen.getAllByRole('button', { name: 'Planned' })).toHaveLength(1)
+    fireEvent.click(trigger)
 
-      fireEvent.click(screen.getByRole('link', { name: 'Trips' }))
-      await screen.findByRole('heading', { name: 'Trips' })
-
-      // Still exactly one — the panel's copy, not a second one alongside
-      // the map's, which would let the two disagree.
-      expect(screen.getAllByRole('button', { name: 'Planned' })).toHaveLength(1)
-    } finally {
-      window.localStorage.removeItem('cairn.trips.index')
-      fetchSpy.mockRestore()
-      delete (window as unknown as { google?: unknown }).google
+    for (const label of ['Map', 'Satellite', 'Hybrid', 'Terrain']) {
+      expect(screen.getByRole('button', { name: label })).toBeDefined()
     }
+
+    fireEvent.click(screen.getByRole('button', { name: 'Terrain' }))
+
+    // Selecting collapses the strip and records the choice.
+    expect(screen.queryByRole('button', { name: 'Hybrid' })).toBeNull()
+    expect(window.localStorage.getItem('cairn.baseMapType')).toBe('terrain')
   })
 
-  it('hides a locally-cached trip while disconnected and reveals it again on sign-in (#95)', async () => {
-    const tripId = 'trip-local-only'
-    window.localStorage.setItem(
-      'cairn.trips.index',
-      JSON.stringify([
-        {
-          id: tripId,
-          name: 'Kepler Track',
-          status: 'planned',
-          startDate: null,
-          endDate: null,
-          createdAt: '2026-01-01T00:00:00.000Z',
-          origin: { lat: -45, lng: 167 },
-        },
-      ]),
-    )
+  it('renders zoom and fit-to-everything in the map corner', async () => {
+    await renderApp('/')
 
+    expect(screen.getByRole('button', { name: 'Zoom in' })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Zoom out' })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Fit to everything' })).toBeDefined()
+  })
+
+  it('renders the year range in the list header and nothing floating at bottom-centre', async () => {
     const fetchSpy = mockGoogleSignIn()
-    try {
-      await renderApp('/trips', { googleClientId: 'a-client-id' })
+    seedTrip('t-early', 'Early', { startDate: '2020-01-01' })
+    seedTrip('t-late', 'Late', { startDate: '2026-01-01' })
 
-      // Disconnected: the cached trip is still in localStorage, but neither
-      // the panel nor the map shows it.
-      expect(screen.queryByText('Kepler Track')).toBeNull()
-      expect(screen.getAllByText('Sign in to see your trips.')).toHaveLength(2)
+    const { container } = await renderApp('/', { googleClientId: 'a-client-id' })
+    await signIn()
 
-      // Signing in reveals it — no reload, same subscription that already
-      // drives the list.
-      await signIn()
-      expect(await screen.findByText('Kepler Track')).toBeDefined()
-      expect(screen.queryByText('Sign in to see your trips.')).toBeNull()
-    } finally {
-      window.localStorage.removeItem('cairn.trips.index')
-      fetchSpy.mockRestore()
-      delete (window as unknown as { google?: unknown }).google
+    const range = await screen.findByLabelText('Range start')
+    expect(range.closest('.trips-panel__header')).not.toBeNull()
+    expect(container.querySelector('.world-map__date-range')).toBeNull()
+    fetchSpy.mockRestore()
+  })
+})
+
+describe('App routing (#109)', () => {
+  it('redirects /map, /world, /trips and an unrecognised path to /', async () => {
+    for (const path of ['/map', '/world', '/trips', '/nonsense']) {
+      const view = await renderApp(path)
+      expect(screen.getByTestId('map')).toBeDefined()
+      expect(window.location.pathname).toBe('/')
+      view.unmount()
     }
-  })
-
-  it('shows the trips panel at /trips, with the map still mounted behind it (#80)', async () => {
-    await renderApp('/trips')
-    expect(screen.getByTestId('map')).toBeDefined()
-    expect(screen.getByRole('heading', { name: 'Trips' })).toBeDefined()
-    expect(screen.getByPlaceholderText('Trip name')).toBeDefined()
-    // #95: no client id configured leaves `accessToken` null, same as
-    // signed-out — the panel is empty because it's withheld, not because
-    // there's nothing there. Two matches, not one: the map underneath (#80
-    // keeps it mounted) shows the identical message in its own overlay.
-    expect(screen.getAllByText('Sign in to see your trips.')).toHaveLength(2)
-  })
-
-  it('closing the trips panel returns to / without unmounting the map', async () => {
-    await renderApp('/trips')
-    const mapNode = screen.getByTestId('map')
-
-    fireEvent.click(screen.getByRole('button', { name: 'Close trips' }))
-
-    expect(window.location.pathname).toBe('/')
-    expect(screen.queryByRole('heading', { name: 'Trips' })).toBeNull()
-    // Same DOM node, not a fresh one — the map was never unmounted by the
-    // panel closing, only the panel itself was.
-    expect(screen.getByTestId('map')).toBe(mapNode)
-  })
-
-  it('redirects /map to /', async () => {
-    await renderApp('/map')
-    expect(screen.getByTestId('map')).toBeDefined()
-    expect(window.location.pathname).toBe('/')
-  })
-
-  it('redirects /world to /', async () => {
-    await renderApp('/world')
-    expect(screen.getByTestId('map')).toBeDefined()
-    expect(window.location.pathname).toBe('/')
-  })
-
-  it('redirects an unrecognized path to /', async () => {
-    await renderApp('/nonsense')
-    expect(screen.getByTestId('map')).toBeDefined()
-    expect(window.location.pathname).toBe('/')
   })
 
   it('shows a not-found state at /trips/:id when no trip matches the id', async () => {
     await renderApp('/trips/abc')
-    expect(screen.getByRole('button', { name: 'Back' })).toBeDefined()
     expect(screen.getByText('Trip not found')).toBeDefined()
   })
 
-  it('renders trip metadata for an existing trip at /trips/:id, read-only while signed out (#73)', async () => {
-    const tripId = 'trip-existing-1'
-    window.localStorage.setItem(
-      'cairn.trips.index',
-      JSON.stringify([
-        { id: tripId, name: 'Hokkaido', status: 'planned', startDate: null, endDate: null, createdAt: '2026-01-01T00:00:00.000Z' },
-      ]),
-    )
-    window.localStorage.setItem(
-      `cairn.trips.trip.${tripId}`,
-      JSON.stringify({
-        id: tripId,
-        name: 'Hokkaido',
-        status: 'planned',
-        startDate: null,
-        endDate: null,
-        notes: '',
-        createdAt: '2026-01-01T00:00:00.000Z',
-      }),
-    )
+  it('keeps the same map node mounted across a list to trip round trip', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedTrip('trip-round-trip')
 
-    try {
-      await renderApp(`/trips/${tripId}`)
+    await renderApp('/', { googleClientId: 'a-client-id' })
+    await signIn()
+    const mapNode = screen.getByTestId('map')
 
-      expect(screen.getByText('Hokkaido')).toBeDefined()
-      expect(screen.getByText('planned')).toBeDefined()
-      expect(screen.queryByText('Trip not found')).toBeNull()
+    fireEvent.click(await screen.findByText('Hokkaido'))
+    await screen.findByRole('button', { name: 'Back to the list' })
+    // The identical DOM node, not a fresh one — nothing unmounted the map.
+    expect(screen.getByTestId('map')).toBe(mapNode)
 
-      // #73: no usable token — nothing is signed in in this render — so
-      // the status field doesn't even offer editing (no select on click)
-      // and the surface states why, same as a live sign-out would.
-      fireEvent.click(screen.getByText('planned'))
-      expect(screen.queryByRole('combobox')).toBeNull()
-      expect(screen.getByText('Sign in to edit this trip.')).toBeDefined()
-      expect(JSON.parse(window.localStorage.getItem(`cairn.trips.trip.${tripId}`) ?? '{}').status).toBe(
-        'planned',
-      )
-    } finally {
-      window.localStorage.removeItem('cairn.trips.index')
-      window.localStorage.removeItem(`cairn.trips.trip.${tripId}`)
-    }
+    fireEvent.click(screen.getByRole('button', { name: 'Back to the list' }))
+    await screen.findByRole('heading', { name: 'Everything' })
+    expect(screen.getByTestId('map')).toBe(mapNode)
+    fetchSpy.mockRestore()
   })
 
-  it('marks "World" active only at / and "Trips" active at /trips', async () => {
-    const first = await renderApp('/')
-    expect(screen.getByRole('link', { name: 'World' }).className).toContain('--active')
-    expect(screen.getByRole('link', { name: 'Trips' }).className).not.toContain('--active')
-    first.unmount()
+  it('leaves the search card, the account, the layers control and zoom in place while a trip is open', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedTrip('trip-chrome')
 
-    const second = await renderApp('/trips')
-    expect(screen.getByRole('link', { name: 'World' }).className).not.toContain('--active')
-    expect(screen.getByRole('link', { name: 'Trips' }).className).toContain('--active')
-    second.unmount()
+    const { container } = await renderApp('/', { googleClientId: 'a-client-id' })
+    await signIn()
+    fireEvent.click(await screen.findByText('Hokkaido'))
+    await screen.findByRole('button', { name: 'Back to the list' })
 
-    // /trips/:id replaces the nav with a back control — see TripDetail.
-    await renderApp('/trips/abc')
-    expect(screen.queryByRole('link', { name: 'World' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Back' })).toBeDefined()
+    expect(container.querySelector('.search-card')).not.toBeNull()
+    expect(container.querySelector('.search-card__account .account-bubble')).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'Layers' })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Zoom in' })).toBeDefined()
+    fetchSpy.mockRestore()
   })
 
-  it('navigates via the top bar links and supports back/forward', async () => {
+  it('swaps the card to Back plus the trip name and kind, and hides the chips', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedTrip('trip-card')
+
+    const { container } = await renderApp('/', { googleClientId: 'a-client-id' })
+    await signIn()
+    expect(container.querySelector('.filter-chips')).not.toBeNull()
+
+    fireEvent.click(await screen.findByText('Hokkaido'))
+    await screen.findByRole('button', { name: 'Back to the list' })
+
+    expect(container.querySelector('.search-card__mark')).toBeNull()
+    expect(screen.queryByPlaceholderText('Search trips, tracks and photos')).toBeNull()
+    expect(container.querySelector('.search-card__name')?.textContent).toBe('Hokkaido')
+    expect(container.querySelector('.search-card__kind')?.textContent).toBe('trip')
+    expect(container.querySelector('.filter-chips')).toBeNull()
+    fetchSpy.mockRestore()
+  })
+
+  it('back returns to the list even when the trip was opened by a typed URL', async () => {
+    seedTrip('trip-typed-url')
+
+    await renderApp('/trips/trip-typed-url')
+    fireEvent.click(screen.getByRole('button', { name: 'Back to the list' }))
+
+    expect(await screen.findByRole('heading', { name: 'Everything' })).toBeDefined()
+    expect(window.location.pathname).toBe('/')
+  })
+
+  it('a search term survives a visit to a trip and back', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedTrip('trip-filter', 'Hokkaido')
+    seedTrip('trip-other', 'Alta Via 1')
+
+    await renderApp('/', { googleClientId: 'a-client-id' })
+    await signIn()
+    await screen.findByText('Hokkaido')
+
+    const field = screen.getByPlaceholderText('Search trips, tracks and photos')
+    fireEvent.change(field, { target: { value: 'hokkaido' } })
+    expect(screen.queryByText('Alta Via 1')).toBeNull()
+
+    fireEvent.click(screen.getByText('Hokkaido'))
+    await screen.findByRole('button', { name: 'Back to the list' })
+    fireEvent.click(screen.getByRole('button', { name: 'Back to the list' }))
+    await screen.findByRole('heading', { name: 'Everything' })
+
+    expect(screen.getByPlaceholderText('Search trips, tracks and photos')).toHaveProperty(
+      'value',
+      'hokkaido',
+    )
+    expect(screen.queryByText('Alta Via 1')).toBeNull()
+    fetchSpy.mockRestore()
+  })
+
+  it('renders trip metadata for an existing trip, read-only while signed out (#73)', async () => {
+    seedTrip('trip-existing-1')
+
+    await renderApp('/trips/trip-existing-1')
+
+    expect(screen.getAllByText('Hokkaido').length).toBeGreaterThan(0)
+    expect(screen.getByText('planned')).toBeDefined()
+    expect(screen.queryByText('Trip not found')).toBeNull()
+
+    // #73: no usable token — the status field doesn't offer editing and the
+    // surface states why.
+    fireEvent.click(screen.getByText('planned'))
+    expect(screen.queryByRole('combobox')).toBeNull()
+    expect(screen.getByText('Sign in to edit this trip.')).toBeDefined()
+  })
+
+  it('hides a locally-cached trip while disconnected and reveals it again on sign-in (#95)', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedTrip('trip-local-only', 'Kepler Track', { origin: { lat: -45, lng: 167 } })
+
+    await renderApp('/', { googleClientId: 'a-client-id' })
+
+    expect(screen.queryByText('Kepler Track')).toBeNull()
+    // Both the panel and the map underneath say the same thing.
+    expect(screen.getAllByText('Sign in to see your map.')).toHaveLength(2)
+
+    await signIn()
+    expect(await screen.findByText('Kepler Track')).toBeDefined()
+    expect(screen.queryByText('Sign in to see your map.')).toBeNull()
+    fetchSpy.mockRestore()
+  })
+})
+
+describe('App row actions (#109)', () => {
+  it('replaces the row × with a ⋮ carrying named actions', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedTrip('trip-menu')
+
+    const { container } = await renderApp('/', { googleClientId: 'a-client-id' })
+    await signIn()
+    await screen.findByText('Hokkaido')
+
+    expect(container.querySelector('.trips-panel__row-remove')).toBeNull()
+    const trigger = screen.getByRole('button', { name: 'Actions for Hokkaido' })
+    fireEvent.click(trigger)
+
+    expect(screen.getByRole('menuitem', { name: 'Mark as completed' })).toBeDefined()
+    const destructive = screen.getByRole('menuitem', { name: 'Delete trip…' })
+    expect(destructive.className).toContain('--danger')
+    fetchSpy.mockRestore()
+  })
+
+  /* Whether the confirm's Delete actually removes the trip is
+     `TripsPanel.test.tsx`'s (it asserts `onDelete` fires with the id) and
+     `driveTripStore.test.ts`'s. What this level owns is that the menu's
+     destructive item opens the confirm instead of destroying anything, and
+     that backing out leaves the row alone. */
+  it('the destructive action opens the existing inline confirm rather than deleting outright', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedTrip('trip-confirm')
+
+    await renderApp('/', { googleClientId: 'a-client-id' })
+    await signIn()
+    await screen.findByText('Hokkaido')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Hokkaido' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete trip…' }))
+
+    expect(screen.getByText('Delete "Hokkaido"?')).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeDefined()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.queryByText('Delete "Hokkaido"?')).toBeNull()
+    expect(screen.getByText('Hokkaido')).toBeDefined()
+    fetchSpy.mockRestore()
+  })
+
+  it('#73: mutating controls are disabled while disconnected', async () => {
+    seedTrip('trip-disabled')
+    // Disconnected hides trips entirely (#95), so this checks the control
+    // that stays visible: creating a trip.
     await renderApp('/')
 
-    fireEvent.click(screen.getByRole('link', { name: 'Trips' }))
-    expect(await screen.findByRole('heading', { name: 'Trips' })).toBeDefined()
-    expect(window.location.pathname).toBe('/trips')
-
-    fireEvent.click(screen.getByRole('link', { name: 'World' }))
-    expect(await screen.findByTestId('map')).toBeDefined()
-    expect(window.location.pathname).toBe('/')
-
-    await act(async () => {
-      window.history.back()
-    })
-    expect(await screen.findByRole('heading', { name: 'Trips' })).toBeDefined()
-
-    await act(async () => {
-      window.history.forward()
-    })
-    expect(await screen.findByTestId('map')).toBeDefined()
-  })
-
-  function seedTrip(tripId: string) {
-    window.localStorage.setItem(
-      'cairn.trips.index',
-      JSON.stringify([
-        { id: tripId, name: 'Hokkaido', status: 'planned', startDate: null, endDate: null, createdAt: '2026-01-01T00:00:00.000Z' },
-      ]),
-    )
-    window.localStorage.setItem(
-      `cairn.trips.trip.${tripId}`,
-      JSON.stringify({
-        id: tripId,
-        name: 'Hokkaido',
-        status: 'planned',
-        startDate: null,
-        endDate: null,
-        notes: '',
-        createdAt: '2026-01-01T00:00:00.000Z',
-      }),
-    )
-  }
-
-  function clearSeededTrip(tripId: string) {
-    window.localStorage.removeItem('cairn.trips.index')
-    window.localStorage.removeItem(`cairn.trips.trip.${tripId}`)
-  }
-
-  it('the back control returns to /trips when the trip was opened from a row there', async () => {
-    const tripId = 'trip-from-trips'
-    seedTrip(tripId)
-    // #95: the row only renders in the panel while signed in.
-    const fetchSpy = mockGoogleSignIn()
-
-    try {
-      await renderApp('/trips', { googleClientId: 'a-client-id' })
-      await signIn()
-      fireEvent.click(screen.getByText('Hokkaido'))
-      expect(await screen.findByRole('button', { name: 'Back' })).toBeDefined()
-      expect(window.location.pathname).toBe(`/trips/${tripId}`)
-
-      fireEvent.click(screen.getByRole('button', { name: 'Back' }))
-      expect(await screen.findByRole('heading', { name: 'Trips' })).toBeDefined()
-      expect(window.location.pathname).toBe('/trips')
-    } finally {
-      clearSeededTrip(tripId)
-      fetchSpy.mockRestore()
-      delete (window as unknown as { google?: unknown }).google
-    }
-  })
-
-  it('the back control goes to / when the trip was opened by a typed URL', async () => {
-    const tripId = 'trip-typed-url'
-    seedTrip(tripId)
-
-    try {
-      await renderApp(`/trips/${tripId}`)
-      fireEvent.click(screen.getByRole('button', { name: 'Back' }))
-      expect(await screen.findByTestId('map')).toBeDefined()
-      expect(window.location.pathname).toBe('/')
-    } finally {
-      clearSeededTrip(tripId)
-    }
-  })
-
-  it('a name filter set on the panel survives a visit to a trip and back (#80)', async () => {
-    const tripId = 'trip-from-trips-2'
-    window.localStorage.setItem(
-      'cairn.trips.index',
-      JSON.stringify([
-        { id: tripId, name: 'Hokkaido', status: 'planned', startDate: null, endDate: null, createdAt: '2026-01-01T00:00:00.000Z' },
-        { id: 'trip-other', name: 'Alta Via 1', status: 'planned', startDate: null, endDate: null, createdAt: '2026-01-01T00:00:00.000Z' },
-      ]),
-    )
-    window.localStorage.setItem(
-      `cairn.trips.trip.${tripId}`,
-      JSON.stringify({
-        id: tripId,
-        name: 'Hokkaido',
-        status: 'planned',
-        startDate: null,
-        endDate: null,
-        notes: '',
-        createdAt: '2026-01-01T00:00:00.000Z',
-      }),
-    )
-
-    // #95: the list — and its filter input, which only renders when there's
-    // something to filter — are both withheld until signed in.
-    const fetchSpy = mockGoogleSignIn()
-    try {
-      await renderApp('/trips', { googleClientId: 'a-client-id' })
-      await signIn()
-      fireEvent.change(screen.getByPlaceholderText('Filter trips'), { target: { value: 'hokkaido' } })
-      expect(screen.getByText('Hokkaido')).toBeDefined()
-      expect(screen.queryByText('Alta Via 1')).toBeNull()
-
-      fireEvent.click(screen.getByText('Hokkaido'))
-      expect(await screen.findByRole('button', { name: 'Back' })).toBeDefined()
-
-      fireEvent.click(screen.getByRole('button', { name: 'Back' }))
-      await screen.findByRole('heading', { name: 'Trips' })
-
-      expect(screen.getByPlaceholderText('Filter trips')).toHaveProperty('value', 'hokkaido')
-      expect(screen.getByText('Hokkaido')).toBeDefined()
-      expect(screen.queryByText('Alta Via 1')).toBeNull()
-    } finally {
-      window.localStorage.removeItem('cairn.trips.index')
-      window.localStorage.removeItem(`cairn.trips.trip.${tripId}`)
-      fetchSpy.mockRestore()
-      delete (window as unknown as { google?: unknown }).google
-    }
+    expect(screen.getByRole('button', { name: 'New trip' })).toHaveProperty('disabled', true)
+    expect(screen.getByText('Sign in to add or remove trips.')).toBeDefined()
   })
 })
 
@@ -471,11 +455,35 @@ describe('App drop-to-draft (#81)', () => {
     await renderApp('/')
     const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
 
-    fireEvent.drop(shell, { dataTransfer: fileDataTransfer([loadKmlFixture('linestring.kml', 'day1.kml')]) })
+    fireEvent.drop(shell, {
+      dataTransfer: fileDataTransfer([loadKmlFixture('linestring.kml', 'day1.kml')]),
+    })
 
     expect(await screen.findByText('NOT SAVED')).toBeDefined()
     expect(screen.getByText('day1')).toBeDefined()
     expect(screen.getByText('day1.kml · 1 track')).toBeDefined()
+  })
+
+  // #75's rule, now that the shell owns the overlay rather than the trip
+  // page: it is the app's promise that a drop will be handled, so inside a
+  // trip while signed out it does not appear at all.
+  it('shows the drop overlay outside a trip even while signed out', async () => {
+    await renderApp('/')
+    const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
+
+    fireEvent.dragEnter(shell, { dataTransfer: fileDataTransfer([new File(['x'], 'a.jpg')]) })
+
+    expect(screen.queryByTestId('drop-overlay')).not.toBeNull()
+  })
+
+  it('does not show the drop overlay inside a trip while signed out', async () => {
+    seedTrip('trip-overlay')
+    await renderApp('/trips/trip-overlay')
+    const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
+
+    fireEvent.dragEnter(shell, { dataTransfer: fileDataTransfer([new File(['x'], 'a.jpg')]) })
+
+    expect(screen.queryByTestId('drop-overlay')).toBeNull()
   })
 
   it('dropping a file with the wrong extension shows a toast and opens no draft', async () => {
@@ -488,77 +496,57 @@ describe('App drop-to-draft (#81)', () => {
     expect(screen.queryByText('NOT SAVED')).toBeNull()
   })
 
-  it('dropping while the trips panel is open closes it and opens the draft instead', async () => {
-    await renderApp('/trips')
-    expect(screen.getByRole('heading', { name: 'Trips' })).toBeDefined()
-    const shell = screen.getByRole('heading', { name: 'Trips' }).closest('.shell') as HTMLElement
+  it('a draft replaces the list in the panel and hides the chips', async () => {
+    const { container } = await renderApp('/')
+    const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
 
-    fireEvent.drop(shell, { dataTransfer: fileDataTransfer([loadKmlFixture('linestring.kml', 'day1.kml')]) })
+    fireEvent.drop(shell, {
+      dataTransfer: fileDataTransfer([loadKmlFixture('linestring.kml', 'day1.kml')]),
+    })
 
     expect(await screen.findByText('NOT SAVED')).toBeDefined()
-    expect(screen.queryByRole('heading', { name: 'Trips' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Everything' })).toBeNull()
+    expect(container.querySelector('.filter-chips')).toBeNull()
     expect(window.location.pathname).toBe('/')
   })
 
-  it('cancel discards the draft — no trip appears in the panel', async () => {
+  it('cancel discards the draft and returns the list', async () => {
     await renderApp('/')
     const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
-    fireEvent.drop(shell, { dataTransfer: fileDataTransfer([loadKmlFixture('linestring.kml', 'day1.kml')]) })
+    fireEvent.drop(shell, {
+      dataTransfer: fileDataTransfer([loadKmlFixture('linestring.kml', 'day1.kml')]),
+    })
     await screen.findByText('NOT SAVED')
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
 
     expect(screen.queryByText('NOT SAVED')).toBeNull()
-    fireEvent.click(screen.getByRole('link', { name: 'Trips' }))
-    // #95: disconnected (no client id configured in this test) — the panel
-    // reads "sign in", not "no trips", regardless of the discarded draft.
-    // Two matches: the map underneath (#80) shows the same overlay text.
-    expect(await screen.findAllByText('Sign in to see your trips.')).toHaveLength(2)
+    // #95: disconnected — the panel reads "sign in", not "nothing here".
+    // Two matches: the map underneath shows the same overlay text.
+    expect(await screen.findAllByText('Sign in to see your map.')).toHaveLength(2)
   })
 
   it('while signed out, Save is replaced by a sign-in prompt, and the draft stays after signing in', async () => {
-    ;(window as unknown as { google?: unknown }).google = {
-      accounts: {
-        oauth2: {
-          initTokenClient: (config: { callback: (r: { access_token: string }) => void }) => ({
-            requestAccessToken: () => config.callback({ access_token: 'tok' }),
-          }),
-        },
-      },
-    }
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
-      const href = String(url)
-      if (href.includes('/about')) {
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({ user: { emailAddress: 'jane@gmail.com' } }),
-        } as Response
-      }
-      return { ok: true, status: 200, json: async () => ({ files: [] }) } as Response
-    })
+    const fetchSpy = mockGoogleSignIn()
 
     await renderApp('/', { googleClientId: 'a-client-id' })
     const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
-    fireEvent.drop(shell, { dataTransfer: fileDataTransfer([loadKmlFixture('linestring.kml', 'day1.kml')]) })
+    fireEvent.drop(shell, {
+      dataTransfer: fileDataTransfer([loadKmlFixture('linestring.kml', 'day1.kml')]),
+    })
     await screen.findByText('NOT SAVED')
 
     expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Sign in to save' })).toBeDefined()
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
-    })
-    await screen.findByRole('button', { name: /Account: jane@gmail.com/ })
+    await signIn()
 
     expect(screen.getByText('NOT SAVED')).toBeDefined()
     expect(screen.getByRole('button', { name: 'Save' })).toBeDefined()
-
     fetchSpy.mockRestore()
-    delete (window as unknown as { google?: unknown }).google
   })
 
-  it('Save creates the trip, uploads the file, and replaces the draft with a normal trips list', async () => {
+  it('Save creates the trip, uploads the file, and replaces the draft with the list', async () => {
     ;(window as unknown as { google?: unknown }).google = {
       accounts: {
         oauth2: {
@@ -577,26 +565,27 @@ describe('App drop-to-draft (#81)', () => {
           json: async () => ({ user: { emailAddress: 'jane@gmail.com' } }),
         } as Response
       }
-      // The `/Cairn/` folder lookup/creation `findOrCreateCairnFolder` runs
-      // during sign-in (separately from `findOrCreateTripFolder`, mocked
-      // above for the trip's own folder) — it needs a real `id` here or
-      // `cairnFolderId` ends up `undefined`, which would make `save()`
-      // bail out as if signed out.
+      // The `/Cairn/` folder lookup runs during sign-in and needs a real
+      // `id`, or `cairnFolderId` ends up undefined and `save()` bails out
+      // as if signed out.
       return {
         ok: true,
         status: 200,
-        json: async () => ({ id: 'cairn-folder-id', createdTime: '2024-01-01T00:00:00.000Z', files: [] }),
+        json: async () => ({
+          id: 'cairn-folder-id',
+          createdTime: '2024-01-01T00:00:00.000Z',
+          files: [],
+        }),
       } as Response
     })
 
     await renderApp('/', { googleClientId: 'a-client-id' })
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
-    })
-    await screen.findByRole('button', { name: /Account:/ })
+    await signIn()
 
     const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
-    fireEvent.drop(shell, { dataTransfer: fileDataTransfer([loadKmlFixture('linestring.kml', 'Hokkaido.kml')]) })
+    fireEvent.drop(shell, {
+      dataTransfer: fileDataTransfer([loadKmlFixture('linestring.kml', 'Hokkaido.kml')]),
+    })
     await screen.findByText('NOT SAVED')
 
     await act(async () => {
@@ -604,12 +593,8 @@ describe('App drop-to-draft (#81)', () => {
     })
 
     expect(screen.queryByText('NOT SAVED')).toBeNull()
-    expect(startResumableUpload).toHaveBeenCalledWith('tok', 'folder-1', 'Hokkaido.kml')
-
-    fireEvent.click(screen.getByRole('link', { name: 'Trips' }))
-    expect(await screen.findByText('Hokkaido')).toBeDefined()
-
+    expect(await screen.findByRole('heading', { name: 'Everything' })).toBeDefined()
+    expect(uploadFileContent).toHaveBeenCalled()
     fetchSpy.mockRestore()
-    delete (window as unknown as { google?: unknown }).google
   })
 })

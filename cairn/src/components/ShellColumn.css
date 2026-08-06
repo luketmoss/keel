@@ -1,0 +1,100 @@
+.shell-column {
+  position: absolute;
+  top: var(--space-4);
+  left: var(--space-4);
+  bottom: var(--space-4);
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  /* The column itself must not eat pointer events between its parts — the
+     map shows through the gaps and has to stay draggable there. */
+  pointer-events: none;
+  transition: transform var(--motion-base) var(--ease);
+}
+
+.shell-column__stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: var(--panel-width);
+  height: 100%;
+  min-height: 0;
+  /* The stack spans the column's full height, so it must stay transparent
+     to the pointer too — only the three surfaces inside it take events, and
+     the map stays draggable through the gaps between them. */
+  pointer-events: none;
+}
+
+.shell-column__stack > *,
+.shell-column__tab {
+  pointer-events: auto;
+}
+
+.shell-column__panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur));
+  box-shadow: var(--shadow-lifted);
+  overflow: hidden;
+}
+
+/* Transform, never width — the panel's contents would relayout on every
+   frame of a width transition, and the map behind does not need to reflow
+   at all. The tab rides along and stays on screen because it sits outside
+   the stack, at the column's right edge. */
+.shell-column--collapsed {
+  transform: translateX(calc(-1 * (var(--panel-width) + var(--space-4))));
+}
+
+.shell-column__tab {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  min-height: var(--hit-target);
+  padding: 0;
+  border: none;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur));
+  box-shadow: var(--shadow-lifted);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: 1;
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease);
+}
+
+.shell-column__tab:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.shell-column__tab:active {
+  background: var(--pressed);
+}
+
+/* Interim phone treatment: the column goes full-bleed, exactly as the trips
+   panel did before this issue. #112 replaces this whole block with the
+   bottom sheet — deliberately not attempted here. */
+@media (max-width: 719px) {
+  .shell-column {
+    top: var(--space-2);
+    left: var(--space-2);
+    right: var(--space-2);
+    bottom: var(--space-2);
+  }
+
+  .shell-column__stack {
+    width: 100%;
+  }
+
+  .shell-column--collapsed {
+    transform: translateX(calc(-100% - var(--space-2)));
+  }
+}

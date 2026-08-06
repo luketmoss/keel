@@ -1,0 +1,104 @@
+.search-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--search-height);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur));
+  box-shadow: var(--shadow-lifted);
+}
+
+/* The two outer slots hold their width whatever is in them, so the centre
+   never shifts sideways when the left slot swaps between the mark and Back. */
+.search-card__slot {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--hit-target);
+  min-height: var(--hit-target);
+}
+
+.search-card__mark {
+  color: var(--accent);
+  font-size: var(--text-lg);
+  line-height: 1;
+}
+
+.search-card__back {
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--text-lg);
+  line-height: 1;
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease);
+}
+
+.search-card__back:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.search-card__back:active {
+  background: var(--pressed);
+}
+
+.search-card__field {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--text-sm);
+}
+
+.search-card__field::placeholder {
+  color: var(--text-muted);
+}
+
+.search-card__field:focus {
+  outline: none;
+}
+
+/* The card takes the focus ring on the field's behalf — a 2px outline around
+   a transparent borderless input inside a card reads as a stray rectangle. */
+.search-card:has(.search-card__field:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.search-card__field::-webkit-search-cancel-button {
+  filter: grayscale(1) opacity(0.6);
+}
+
+.search-card__title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.search-card__name {
+  /* One line, ellipsised. The trip face's own heading is where a long name
+     gets the room to wrap — this is a crumb. */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.search-card__kind {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}

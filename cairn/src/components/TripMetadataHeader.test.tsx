@@ -23,7 +23,7 @@ describe('TripMetadataHeader', () => {
 
     expect(screen.getByText('Hokkaido')).toBeDefined()
     expect(screen.getByText('planned')).toBeDefined()
-    expect(screen.getByText('No dates set')).toBeDefined()
+    expect(screen.getByText('Add dates')).toBeDefined()
   })
 
   it('saves a name edit on blur', async () => {
@@ -102,8 +102,11 @@ describe('TripMetadataHeader', () => {
     render(<TripMetadataHeader trip={trip({ status: 'completed' })} onUpdate={vi.fn()} />)
 
     expect(screen.getByText('completed')).toBeDefined()
-    const dates = screen.getByText('No dates set')
+    const dates = screen.getByText('Add dates')
     expect(dates.textContent).not.toMatch(/planned|completed/i)
+    // The list rows still read "No dates set" through `formatTripDateRange`
+    // — only this line, whose one job is to be clicked, invites instead.
+    expect(screen.queryByText('No dates set')).toBeNull()
   })
 
   it('renders the real stored date range instead of a placeholder', () => {

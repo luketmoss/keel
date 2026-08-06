@@ -89,9 +89,12 @@
   cursor: text;
 }
 
-.trip-metadata__dates-input {
-  display: inline-flex;
-  gap: var(--space-1);
+/* An empty date line used to render as nothing but its formatter's "No
+   dates set". It now says what it is for, and reads as an action rather
+   than a description. */
+.trip-metadata__dates--empty {
+  color: var(--accent);
+  cursor: pointer;
 }
 
 .trip-metadata__notes {

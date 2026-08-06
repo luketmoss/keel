@@ -8,7 +8,7 @@ const RANGE_DASH = ' – '
     midnight and renders a day early at every negative UTC offset. Returns
     `null` for anything that isn't a real calendar date, so a hand-edited
     `trip.json` degrades to "show the raw string" rather than throwing. */
-function parseLocalDate(iso: string): Date | null {
+export function parseLocalDate(iso: string): Date | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
   if (!match) return null
 
@@ -24,6 +24,16 @@ function parseLocalDate(iso: string): Date | null {
   }
 
   return date
+}
+
+/** The inverse of `parseLocalDate` — a local calendar date back to
+    `YYYY-MM-DD`. Built from the local fields rather than `toISOString()`,
+    which converts to UTC first and lands on the previous day for anything
+    east of Greenwich. */
+export function toIsoDate(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${date.getFullYear()}-${month}-${day}`
 }
 
 function monthDay(date: Date): string {

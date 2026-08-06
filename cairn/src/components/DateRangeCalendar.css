@@ -1,0 +1,172 @@
+/* cairn/docs/design/111-trip-date-range-picker.md
+
+   Nothing in here has a width in pixels. The grid is what sizes the cells,
+   so the calendar always fits --panel-width minus its padding — which is
+   the entire reason the control exists. */
+
+.date-range {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-lift);
+}
+
+.date-range__readout {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+
+.date-range__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.date-range__nav-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--hit-target);
+  min-height: var(--hit-target);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--text-lg);
+  line-height: 1;
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease);
+}
+
+.date-range__nav-button:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.date-range__nav-button:active {
+  background: var(--pressed);
+}
+
+.date-range__month {
+  flex: 1;
+  text-align: center;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.date-range__weekdays,
+.date-range__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.date-range__weekday {
+  text-align: center;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.date-range__day {
+  /* Square cells that follow the column's width rather than setting it. */
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--ease);
+}
+
+.date-range__day:hover {
+  background: var(--hover);
+}
+
+.date-range__day:active {
+  background: var(--pressed);
+}
+
+/* Greying a day the user can still click is a hint about the grid, not a
+   restriction — neighbouring months stay selectable. */
+.date-range__day--outside {
+  color: var(--text-muted);
+  opacity: 0.45;
+}
+
+.date-range__day--in-range {
+  background: var(--accent-soft);
+}
+
+.date-range__day--end {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+  opacity: 1;
+}
+
+.date-range__day--end:hover {
+  background: var(--accent);
+}
+
+.date-range__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.date-range__clear,
+.date-range__done {
+  min-height: var(--hit-target);
+  padding: 0 var(--space-4);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.date-range__clear {
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.date-range__clear:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.date-range__done {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.date-range__done:hover {
+  filter: brightness(1.1);
+}
+
+.date-range__done:active {
+  filter: brightness(0.95);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .date-range__day,
+  .date-range__nav-button {
+    transition: none;
+  }
+}

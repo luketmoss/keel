@@ -21,9 +21,12 @@ gh issue view <issue> --repo luketmoss/keel --json title,body
 
 Read the project's `CLAUDE.md` and stack skill. Read any existing files under
 `<project>/docs/design/` — consistency with what's already been decided matters
-more than any individual choice here. If the project has a
-`docs/design/design-language.md`, read it first; it is standing and outranks any
-single issue note.
+more than any individual choice here.
+
+Read the **standing documents** first — every file in that folder whose name
+does not start with an issue number, as defined under the UX stage in
+`CONVENTIONS.md`. There may be more than one, and they outrank any single issue
+note.
 
 ## Specify
 

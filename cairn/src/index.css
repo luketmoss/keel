@@ -44,8 +44,6 @@
   --motion-slow: 280ms;
   --ease: cubic-bezier(0.2, 0, 0, 1);
 
-  --sidebar-width: 320px;
-
   /* Markers — cairn/docs/design/54-photo-markers.md, "New tokens" */
   --marker-size: 28px;
   --marker-ring: 2px;
@@ -59,8 +57,23 @@
   --dot-size: 14px;
   --dot-ring: 2px;
 
-  /* Trips panel — cairn/docs/design/80-trips-panel.md, "New tokens" */
-  --panel-width: 360px;
+  /* Trips panel — cairn/docs/design/80-trips-panel.md, "New tokens".
+     Widened from 360px by the shell rebuild: the column carries detail as
+     well as a list now, and a track's stats row is cramped at 360. */
+  --panel-width: 380px;
+
+  /* Shell column — cairn/docs/design/shell-and-content-model.md,
+     "New tokens". The sheet detents are declared here rather than with the
+     sheet itself (#112) for the reason the standing document gives:
+     splitting one token table across three issues is how this file ends up
+     disagreeing with the document that defines it. `--marker-track` is
+     likewise #110's to use. */
+  --search-height: 56px;
+  --chip-height: 34px;
+  --marker-track: 22px;
+  --sheet-peek: 140px;
+  --sheet-half: 52vh;
+  --sheet-full: 92vh;
 
   /* Photo list & lightbox — cairn/docs/design/55-photo-list-lightbox.md, "New tokens" */
   --photo-thumb: 32px;

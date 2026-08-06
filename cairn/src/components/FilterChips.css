@@ -1,0 +1,47 @@
+.filter-chips {
+  display: flex;
+  gap: var(--space-2);
+  /* The row itself is not a surface — each chip is its own L2 pill, so the
+     map shows between them and stays draggable there. */
+  flex-wrap: wrap;
+  pointer-events: none;
+}
+
+.filter-chips__chip {
+  pointer-events: auto;
+}
+
+.filter-chips__chip {
+  display: inline-flex;
+  align-items: center;
+  height: var(--chip-height);
+  padding: 0 var(--space-3);
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur));
+  box-shadow: var(--shadow-lifted);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease);
+}
+
+.filter-chips__chip:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.filter-chips__chip:active {
+  background: var(--pressed);
+}
+
+.filter-chips__chip--selected {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.filter-chips__chip--selected:active {
+  background: color-mix(in srgb, var(--accent-soft) 80%, var(--accent) 12%);
+}

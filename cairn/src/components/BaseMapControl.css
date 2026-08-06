@@ -1,0 +1,50 @@
+/* Sits below AccountBubble (top-right, --space-4 from each edge, 40px tall
+   in both its signed-out and signed-in states) rather than stacking on top
+   of it. The 72px offset matches `StatusFilterRow`'s own clearance below
+   `TopBar` (world map only, top-left, also 72px tall) rather than
+   AccountBubble's shorter 40px — at narrow viewports TopBar is wide enough
+   to reach under this control's left edge, so clearing only AccountBubble's
+   height left a real overlap band between the two. */
+.basemap-control {
+  position: absolute;
+  top: calc(var(--space-4) + 72px + var(--space-2));
+  right: var(--space-4);
+  z-index: 1;
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur));
+  box-shadow: var(--shadow-lifted);
+}
+
+.basemap-control__segment {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0 var(--space-2);
+  font-size: var(--text-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.basemap-control__segment:hover {
+  color: var(--text);
+}
+
+.basemap-control__segment:active {
+  background: var(--pressed);
+}
+
+.basemap-control__segment--active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.basemap-control__segment--active:active {
+  background: color-mix(in srgb, var(--accent-soft) 80%, var(--accent) 12%);
+}

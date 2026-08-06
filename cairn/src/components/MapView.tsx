@@ -4,6 +4,8 @@ import { googleMapsApiKey, googleMapsMapId } from '../env'
 import { TrackLayer } from './TrackLayer'
 import { PhotoLayer } from './PhotoLayer'
 import { MapUnavailable } from './MapUnavailable'
+import { BaseMapControl } from './BaseMapControl'
+import { useBaseMapType } from '../map/useBaseMapType'
 import type { ImportedFile } from '../import/types'
 import type { PositionedPhoto } from '../photo/positionPhotos'
 import './MapView.css'
@@ -59,6 +61,7 @@ export function MapView({
   /* Google validates the key asynchronously, after the provider has mounted,
      so a bad key cannot be caught by the check below. */
   const [keyRejected, setKeyRejected] = useState(false)
+  const [baseMapType, setBaseMapType] = useBaseMapType()
 
   /* An auth rejection happens after the script has loaded successfully, so
      APIProvider's onError never sees it — that fires for load failures. Left
@@ -90,36 +93,39 @@ export function MapView({
   }
 
   return (
-    <APIProvider apiKey={googleMapsApiKey} onError={() => setKeyRejected(true)}>
-      <Map
-        className="map"
-        defaultCenter={INITIAL_CENTER}
-        defaultZoom={INITIAL_ZOOM}
-        mapTypeId="satellite"
-        /* Advanced Markers (photo markers, #54) require a Map ID or Google
-           refuses to render them at all. Left unset (a fresh clone, same as
-           the two keys above), `mapId` is simply omitted — tracks render
-           exactly as before, and PhotoLayer below is skipped rather than
-           mounted against a map with no Map ID. */
-        mapId={googleMapsMapId ?? undefined}
-        /* The map is the whole app, so a one-finger drag and a plain scroll
-           should move it rather than the page behind it. */
-        gestureHandling="greedy"
-        disableDefaultUI
-        zoomControl
-        restriction={{ latLngBounds: WORLD_BOUNDS, strictBounds: true }}
-      >
-        <TrackLayer files={files} hoveredFileId={hoveredFileId} />
-        {googleMapsMapId && photos.length > 0 && (
-          <PhotoLayer
-            photos={photos}
-            accessToken={accessToken}
-            selectedPhotoId={selectedPhotoId}
-            onSelectPhoto={onSelectPhoto ?? (() => {})}
-            onOpenPhoto={onOpenPhoto}
-          />
-        )}
-      </Map>
-    </APIProvider>
+    <div className="map-view">
+      <APIProvider apiKey={googleMapsApiKey} onError={() => setKeyRejected(true)}>
+        <Map
+          className="map"
+          defaultCenter={INITIAL_CENTER}
+          defaultZoom={INITIAL_ZOOM}
+          mapTypeId={baseMapType}
+          /* Advanced Markers (photo markers, #54) require a Map ID or Google
+             refuses to render them at all. Left unset (a fresh clone, same as
+             the two keys above), `mapId` is simply omitted — tracks render
+             exactly as before, and PhotoLayer below is skipped rather than
+             mounted against a map with no Map ID. */
+          mapId={googleMapsMapId ?? undefined}
+          /* The map is the whole app, so a one-finger drag and a plain scroll
+             should move it rather than the page behind it. */
+          gestureHandling="greedy"
+          disableDefaultUI
+          zoomControl
+          restriction={{ latLngBounds: WORLD_BOUNDS, strictBounds: true }}
+        >
+          <TrackLayer files={files} hoveredFileId={hoveredFileId} />
+          {googleMapsMapId && photos.length > 0 && (
+            <PhotoLayer
+              photos={photos}
+              accessToken={accessToken}
+              selectedPhotoId={selectedPhotoId}
+              onSelectPhoto={onSelectPhoto ?? (() => {})}
+              onOpenPhoto={onOpenPhoto}
+            />
+          )}
+        </Map>
+      </APIProvider>
+      <BaseMapControl value={baseMapType} onChange={setBaseMapType} />
+    </div>
   )
 }

@@ -1,5 +1,5 @@
-import { act, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { act, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /* Unmocked, APIProvider injects Google's script tag and the suite makes a
    network call from CI. The stubs render just enough to tell "the map mounted"
@@ -8,8 +8,10 @@ vi.mock('@vis.gl/react-google-maps', () => ({
   APIProvider: ({ children }: { children?: React.ReactNode }) => (
     <div data-testid="api-provider">{children}</div>
   ),
-  Map: ({ children }: { children?: React.ReactNode }) => (
-    <div data-testid="map">{children}</div>
+  Map: ({ children, mapTypeId }: { children?: React.ReactNode; mapTypeId?: string }) => (
+    <div data-testid="map" data-map-type-id={mapTypeId}>
+      {children}
+    </div>
   ),
   Marker: () => null,
   Polyline: () => null,
@@ -25,6 +27,10 @@ async function renderMapView(key?: string) {
   const { MapView } = await import('./MapView')
   return render(<MapView files={[]} />)
 }
+
+beforeEach(() => {
+  window.localStorage.clear()
+})
 
 afterEach(() => {
   vi.unstubAllEnvs()
@@ -79,5 +85,15 @@ describe('MapView', () => {
     unmount()
 
     expect(window.gm_authFailure).toBeUndefined()
+  })
+
+  it('defaults to satellite and switches the rendered base layer on selection (#104)', async () => {
+    await renderMapView('a-browser-key')
+
+    expect(screen.getByTestId('map').dataset.mapTypeId).toBe('satellite')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hybrid' }))
+
+    expect(screen.getByTestId('map').dataset.mapTypeId).toBe('hybrid')
   })
 })

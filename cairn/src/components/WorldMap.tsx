@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { APIProvider, AdvancedMarker, Map, Polyline, useMap } from '@vis.gl/react-google-maps'
 import { googleMapsApiKey, googleMapsMapId } from '../env'
 import { MapUnavailable } from './MapUnavailable'
+import { BaseMapControl } from './BaseMapControl'
+import { useBaseMapType } from '../map/useBaseMapType'
 import type { TripIndexEntry, TripStatus } from '../store/tripStore'
 import type { Track } from '../kml/parse'
 import {
@@ -109,6 +111,7 @@ export function WorldMap({
 }: WorldMapProps) {
   const hasDraft = Boolean(draftTracks && draftTracks.length > 0)
   const [keyRejected, setKeyRejected] = useState(false)
+  const [baseMapType, setBaseMapType] = useBaseMapType()
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -200,13 +203,14 @@ export function WorldMap({
           onChange={(range) => onFiltersChange({ ...filters, range })}
         />
       )}
+      <BaseMapControl value={baseMapType} onChange={setBaseMapType} />
       <APIProvider apiKey={googleMapsApiKey} onError={() => setKeyRejected(true)}>
         <Map
           className="map"
           defaultCenter={lastCamera?.center ?? INITIAL_CENTER}
           defaultZoom={lastCamera?.zoom ?? INITIAL_ZOOM}
           mapId={googleMapsMapId ?? undefined}
-          mapTypeId="satellite"
+          mapTypeId={baseMapType}
           gestureHandling="greedy"
           disableDefaultUI
           zoomControl

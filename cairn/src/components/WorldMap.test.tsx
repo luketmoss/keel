@@ -18,7 +18,11 @@ const fakeMap = {
 }
 vi.mock('@vis.gl/react-google-maps', () => ({
   APIProvider: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
-  Map: ({ children }: { children?: React.ReactNode }) => <div data-testid="map">{children}</div>,
+  Map: ({ children, mapTypeId }: { children?: React.ReactNode; mapTypeId?: string }) => (
+    <div data-testid="map" data-map-type-id={mapTypeId}>
+      {children}
+    </div>
+  ),
   AdvancedMarker: ({
     position,
     onClick,
@@ -143,6 +147,7 @@ afterEach(() => {
   fitTracksToBounds.mockClear()
   zoomToFitCluster.mockClear()
   idleListeners = []
+  window.localStorage.clear()
 })
 
 describe('WorldMap', () => {
@@ -391,5 +396,23 @@ describe('WorldMap', () => {
 
     expect(screen.getByText('Map unavailable')).toBeDefined()
     expect(screen.queryByTestId('map')).toBeNull()
+  })
+
+  it('defaults to satellite and switches the rendered base layer on selection (#104)', async () => {
+    await renderWorldMap([], 'a-browser-key')
+
+    expect(screen.getByTestId('map').dataset.mapTypeId).toBe('satellite')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Map' }))
+
+    expect(screen.getByTestId('map').dataset.mapTypeId).toBe('roadmap')
+  })
+
+  it('picks up a base map preference already stored by the other map surface (#104)', async () => {
+    window.localStorage.setItem('cairn.baseMapType', 'terrain')
+
+    await renderWorldMap([], 'a-browser-key')
+
+    expect(screen.getByTestId('map').dataset.mapTypeId).toBe('terrain')
   })
 })

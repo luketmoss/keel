@@ -98,12 +98,28 @@ async function handleFilesCreate(store: FakeDriveStore, body: string): Promise<R
   return jsonResponse(fileMetadata(file))
 }
 
-async function handleFilesPatch(store: FakeDriveStore, id: string, body: string): Promise<Response> {
+/** `files.update`, which this app uses for two unrelated things: trashing
+    (a `{trashed:true}` JSON body, no query params) and #120's move between
+    folders (`addParents`/`removeParents` in the query string and **no body
+    at all**, which is why the body is only parsed when there is one —
+    `JSON.parse('')` throws, and a move used to come back as a 400). */
+async function handleFilesPatch(
+  store: FakeDriveStore,
+  id: string,
+  url: URL,
+  body: string,
+): Promise<Response> {
   const file = store.get(id)
   if (!file) return errorResponse(404, `fake Drive: no file ${id}`)
-  const parsed = JSON.parse(body) as { trashed?: boolean }
-  await store.patch(id, { trashed: parsed.trashed ?? file.trashed })
-  return jsonResponse({})
+
+  const parsed = body ? (JSON.parse(body) as { trashed?: boolean }) : {}
+  const add = url.searchParams.get('addParents')
+  const remove = url.searchParams.get('removeParents')
+
+  const parents = add || remove ? [...file.parents.filter((p) => p !== remove), ...(add ? [add] : [])] : file.parents
+
+  await store.patch(id, { trashed: parsed.trashed ?? file.trashed, parents })
+  return jsonResponse({ id })
 }
 
 /** Reverses exactly the multipart body `tripMetadata.ts#create` builds:
@@ -236,7 +252,7 @@ export function installFetchInterceptor(store: FakeDriveStore): void {
         return handleFilesGet(store, fileMatch[1], parsed)
       }
       if (fileMatch && method === 'PATCH') {
-        return await handleFilesPatch(store, fileMatch[1], body)
+        return await handleFilesPatch(store, fileMatch[1], parsed, body)
       }
     } catch (error) {
       // Acceptance criterion 8: real callers only ever check

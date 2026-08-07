@@ -85,6 +85,7 @@ function looseTrack(overrides: Partial<Extract<LooseRecord, { kind: 'track' }>> 
     colorIndex: 0,
     position: { lat: -37, lng: 142 },
     driveFileId: null,
+    uploadState: 'ok',
     ...overrides,
   }
 }
@@ -97,7 +98,9 @@ function loosePhoto(overrides: Partial<Extract<LooseRecord, { kind: 'photo' }>> 
     createdAt: '2026-01-01T00:00:00.000Z',
     takenAt: '2024-11-03T00:00:00.000Z',
     position: { lat: 43, lng: 141 },
-    driveFileId: null,
+    originalDriveFileId: null,
+    thumbnailDriveFileId: null,
+    uploadState: 'ok',
     ...overrides,
   }
 }
@@ -405,6 +408,41 @@ describe('TripsPanel', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
       expect(onDeleteLoose).toHaveBeenCalledWith('track-1')
+    })
+
+    // #120 — the row is honest about where its file is.
+    it('says a row is uploading, and holds Add to a trip until the file lands', () => {
+      renderPanel({ trips: [], looseItems: [looseTrack({ uploadState: 'uploading' })] })
+
+      expect(screen.getByText('uploading…')).toBeDefined()
+      expect(screen.queryByText(new RegExp(formatDistance(14200)))).toBeNull()
+
+      openRowMenu('Mount Rosea')
+      // A move is a file move, and there is nothing there yet to move.
+      expect(screen.getByRole('menuitem', { name: 'Add to a trip…' })).toHaveProperty(
+        'disabled',
+        true,
+      )
+      // Deleting stays available: an item that failed to upload is exactly
+      // the one a user most wants rid of.
+      expect(screen.getByRole('menuitem', { name: 'Delete…' })).toHaveProperty('disabled', false)
+    })
+
+    it('says a row never reached Drive, in --danger, and disables its move', () => {
+      const { container } = renderPanel({
+        trips: [],
+        looseItems: [looseTrack({ uploadState: 'failed' })],
+      })
+
+      const meta = screen.getByText('not on Drive')
+      expect(meta.className).toContain('--unplaced')
+      expect(container.querySelector('.trips-panel__row-detail--unplaced')).not.toBeNull()
+
+      openRowMenu('Mount Rosea')
+      expect(screen.getByRole('menuitem', { name: 'Add to a trip…' })).toHaveProperty(
+        'disabled',
+        true,
+      )
     })
   })
 

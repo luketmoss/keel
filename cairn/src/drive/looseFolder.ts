@@ -105,6 +105,20 @@ export async function findOrCreateLooseFolder(
   return findOrCreateChild(accessToken, looseId, KIND_FOLDER[kind])
 }
 
+/** `/Cairn/loose/<tracks|photos>/<item-id>/` — one folder per loose item,
+    standing to a loose item as a trip's folder does to a trip, and named by
+    its id for the same reason: hydration reads the folder name back as the
+    id rather than needing a separate index file. */
+export async function findOrCreateLooseItemFolder(
+  accessToken: string,
+  cairnFolderId: string,
+  kind: LooseKind,
+  itemId: string,
+): Promise<string> {
+  const kindFolderId = await findOrCreateLooseFolder(accessToken, cairnFolderId, kind)
+  return findOrCreateChild(accessToken, kindFolderId, itemId)
+}
+
 /** Moves a file between folders.
  *
  * Drive does this in **one** request — `addParents` and `removeParents` on

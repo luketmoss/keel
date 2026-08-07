@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import type { TripIndexEntry } from '../store/tripStore'
 import { matchesTripFilters, type TripFilters } from '../store/tripFilters'
 import { formatTripDateRange } from '../format/dates'
-import { looseMetaLine, type LooseRecord } from '../store/looseStore'
+import { canChangeOwner, looseMetaLine, type LooseRecord } from '../store/looseStore'
 import { LIST_HEADINGS, type KindFilter } from './FilterChips'
 import { RowMenu } from './RowMenu'
 import { trackColor } from '../map/palette'
@@ -424,7 +424,12 @@ function LooseRow({
     )
   }
 
-  const unplaced = item.position === null
+  /* The meta line takes `--danger` for the two things it can be alarming
+     about: a photo that cannot be placed (#110), and a file that is not on
+     Drive (#120). An item still uploading is neither — it says so plainly
+     and in `--text-muted`, because nothing has gone wrong yet. */
+  const uploading = item.uploadState === 'uploading'
+  const unplaced = !uploading && (item.uploadState === 'failed' || item.position === null)
   const href = item.kind === 'track' ? `/tracks/${item.id}` : `/photos/${item.id}`
 
   return (
@@ -463,7 +468,12 @@ function LooseRow({
       <RowMenu
         label={`Actions for ${item.name}`}
         actions={[
-          { label: 'Add to a trip…', disabled, onSelect: onAddToTrip },
+          {
+            // #120: nothing to move until the file is on Drive.
+            label: 'Add to a trip…',
+            disabled: disabled || !canChangeOwner(item),
+            onSelect: onAddToTrip,
+          },
           { label: 'Delete…', danger: true, disabled, onSelect: onStartConfirm },
         ]}
       />

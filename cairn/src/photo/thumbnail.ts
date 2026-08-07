@@ -15,6 +15,12 @@
 export const THUMBNAIL_MAX_EDGE = 512
 export const THUMBNAIL_JPEG_QUALITY = 0.82
 
+/** Appended to the original's filename to name its thumbnail beside it.
+    Lives here rather than in the trip's import hook because a loose photo
+    is uploaded by a store, not by that hook, and both have to agree on the
+    name or a moved photo's thumbnail stops being findable. */
+export const THUMBNAIL_SUFFIX = '.thumb.jpg'
+
 const ACCEPTED_TYPES = ['.jpg', '.jpeg', '.png', '.webp']
 const HEIC_TYPES = ['.heic', '.heif']
 

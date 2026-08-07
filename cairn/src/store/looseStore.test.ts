@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { LocalLooseStore, looseMetaLine, moveLooseIntoTrip } from './looseStore'
+import { canChangeOwner, LocalLooseStore, looseMetaLine, moveLooseIntoTrip } from './looseStore'
 import { LocalTripStore } from './tripStore'
 import type { Track } from '../kml/parse'
 import { formatDistance, formatElevationGain } from '../format/units'
@@ -130,7 +130,7 @@ describe('LocalLooseStore', () => {
 })
 
 describe('moveLooseIntoTrip', () => {
-  it('takes the item out of the loose store and its geometry into the trip', () => {
+  it('takes the item out of the loose store and its geometry into the trip', async () => {
     const trips = new LocalTripStore(fakeStorage())
     const trip = trips.createTrip('Larapinta')
     const record = store.addTrack(NEW_TRACK, [
@@ -140,7 +140,7 @@ describe('moveLooseIntoTrip', () => {
       ]),
     ])
 
-    const moved = moveLooseIntoTrip(store, trips, record.id, trip.id)
+    const moved = await moveLooseIntoTrip(store, trips, record.id, trip.id)
 
     expect(moved).toBe(true)
     // It leaves the top-level list and map...
@@ -149,7 +149,7 @@ describe('moveLooseIntoTrip', () => {
     expect(trips.getOverview(trip.id)?.features.length).toBeGreaterThan(0)
   })
 
-  it('adds to what the trip already has rather than replacing it', () => {
+  it('adds to what the trip already has rather than replacing it', async () => {
     const trips = new LocalTripStore(fakeStorage())
     const trip = trips.createTrip('Larapinta')
     trips.saveOverview(trip.id, [
@@ -166,12 +166,12 @@ describe('moveLooseIntoTrip', () => {
         [11, 21],
       ]),
     ])
-    moveLooseIntoTrip(store, trips, record.id, trip.id)
+    await moveLooseIntoTrip(store, trips, record.id, trip.id)
 
     expect(trips.getOverview(trip.id)?.features.length).toBe(before + 1)
   })
 
-  it('gives the trip a dot once it holds geometry', () => {
+  it('gives the trip a dot once it holds geometry', async () => {
     const trips = new LocalTripStore(fakeStorage())
     const trip = trips.createTrip('Larapinta')
     expect(trips.getTrip(trip.id)?.origin).toBeNull()
@@ -182,27 +182,27 @@ describe('moveLooseIntoTrip', () => {
         [11, 21],
       ]),
     ])
-    moveLooseIntoTrip(store, trips, record.id, trip.id)
+    await moveLooseIntoTrip(store, trips, record.id, trip.id)
 
     expect(trips.getTrip(trip.id)?.origin).toEqual({ lat: 10, lng: 20 })
   })
 
-  it('moves a photo without touching the trip geometry', () => {
+  it('moves a photo without touching the trip geometry', async () => {
     const trips = new LocalTripStore(fakeStorage())
     const trip = trips.createTrip('Larapinta')
     const photo = store.addPhoto({ name: 'a.jpg', takenAt: null, position: { lat: 1, lng: 2 } })
 
-    expect(moveLooseIntoTrip(store, trips, photo.id, trip.id)).toBe(true)
+    expect(await moveLooseIntoTrip(store, trips, photo.id, trip.id)).toBe(true)
     expect(store.getItems()).toHaveLength(0)
     expect(trips.getOverview(trip.id)).toBeNull()
   })
 
-  it('leaves everything alone when the id names nothing', () => {
+  it('leaves everything alone when the id names nothing', async () => {
     const trips = new LocalTripStore(fakeStorage())
     const trip = trips.createTrip('Larapinta')
     store.addTrack(NEW_TRACK, [track([[1, 2]])])
 
-    expect(moveLooseIntoTrip(store, trips, 'no-such-id', trip.id)).toBe(false)
+    expect(await moveLooseIntoTrip(store, trips, 'no-such-id', trip.id)).toBe(false)
     expect(store.getItems()).toHaveLength(1)
   })
 })
@@ -239,5 +239,30 @@ describe('looseMetaLine', () => {
   it('says so rather than inventing a date for an undated item', () => {
     const record = store.addTrack({ ...NEW_TRACK, date: null }, [track([[1, 2]])])
     expect(looseMetaLine(store.getItem(record.id)!, asIs)).toContain('undated')
+  })
+
+  // #120 — the row is honest about where its file is, and those two states
+  // replace the line rather than crowding into it. A track's distance does
+  // not help a user whose track is not backed up.
+  it('says it is uploading, and says when it never arrived', () => {
+    const record = store.addTrack(NEW_TRACK, [track([[1, 2]])])
+    const item = store.getItem(record.id)!
+
+    expect(looseMetaLine({ ...item, uploadState: 'uploading' }, asIs)).toBe('uploading…')
+    expect(looseMetaLine({ ...item, uploadState: 'failed' }, asIs)).toBe('not on Drive')
+    // Nothing has been attempted for a record written before this issue —
+    // it is not uploading and has not failed, so it reads as itself.
+    expect(looseMetaLine({ ...item, uploadState: 'pending' }, asIs)).toContain('2024-03-09')
+  })
+})
+
+describe('canChangeOwner', () => {
+  it('refuses a move while there is nothing in Drive to move', () => {
+    const record = store.addTrack(NEW_TRACK, [track([[1, 2]])])
+    const item = store.getItem(record.id)!
+
+    expect(canChangeOwner({ ...item, uploadState: 'uploading' })).toBe(false)
+    expect(canChangeOwner({ ...item, uploadState: 'failed' })).toBe(false)
+    expect(canChangeOwner({ ...item, uploadState: 'ok' })).toBe(true)
   })
 })

@@ -140,9 +140,11 @@ export class DriveLooseStore implements LooseStore {
       const item = this.local.getItem(id)
       if (!item) return false
 
+      let tripFolderId: string
+      let looseFolderId: string
       try {
-        const tripFolderId = await findOrCreateTripFolder(accessToken, cairnFolderId, tripId)
-        const looseFolderId = await findOrCreateLooseItemFolder(accessToken, cairnFolderId, item.kind, id)
+        tripFolderId = await findOrCreateTripFolder(accessToken, cairnFolderId, tripId)
+        looseFolderId = await findOrCreateLooseItemFolder(accessToken, cairnFolderId, item.kind, id)
 
         if (item.kind === 'photo') {
           // A photo is its pixels. An item with no file in Drive — one
@@ -152,17 +154,6 @@ export class DriveLooseStore implements LooseStore {
           // which surfaces as "still on the map".
           if (!item.originalDriveFileId || !item.thumbnailDriveFileId) return false
           await moveDriveFile(accessToken, item.originalDriveFileId, looseFolderId, tripFolderId)
-          await moveDriveFile(accessToken, item.thumbnailDriveFileId, looseFolderId, tripFolderId)
-          await appendPhotoToIndex(accessToken, tripFolderId, {
-            name: item.name,
-            originalDriveFileId: item.originalDriveFileId,
-            thumbnailDriveFileId: item.thumbnailDriveFileId,
-            ...(item.position ? { latitude: item.position.lat, longitude: item.position.lng } : {}),
-            ...(item.gpsTimestamp !== undefined ? { gpsTimestamp: item.gpsTimestamp } : {}),
-            ...(item.dateTimeOriginal !== undefined
-              ? { dateTimeOriginal: item.dateTimeOriginal }
-              : {}),
-          })
         } else if (item.driveFileId) {
           // Once the KML is in the trip's folder the trip's track list
           // reads it like any other — `useTripImport` lists the folder, so
@@ -172,14 +163,44 @@ export class DriveLooseStore implements LooseStore {
         // else: a track whose source was never kept. Its geometry still
         // reaches the trip through the caller's overview merge, which is
         // exactly what shipped in #110 — no better, and no worse.
-
-        // The derived files stay behind, so the loose folder goes.
-        await trashFolder(accessToken, looseFolderId)
-        this.refs.delete(id)
-        return true
       } catch {
+        // Nothing has moved, so nothing has changed: the item is still
+        // loose and its files are still in its own folder.
         return false
       }
+
+      /* Past this line the item's first file has left the loose folder, and
+         **the move must be reported as done.** Drive moves one file in one
+         call but cannot move two files and rewrite a third in one, so each
+         step below can fail on its own; what must not happen is this
+         resolving `false` afterwards, which would keep the loose row alive
+         beside files a trip now holds — one item owned twice, and exactly
+         the duplicate this issue exists to stop. The design note's accepted
+         failure is the other one: gone from the top level and not yet
+         wholly arrived, retried by the next `connect()`. */
+      if (item.kind === 'photo' && item.originalDriveFileId && item.thumbnailDriveFileId) {
+        await moveDriveFile(
+          accessToken,
+          item.thumbnailDriveFileId,
+          looseFolderId,
+          tripFolderId,
+        ).catch(() => {})
+        await appendPhotoToIndex(accessToken, tripFolderId, {
+          name: item.name,
+          originalDriveFileId: item.originalDriveFileId,
+          thumbnailDriveFileId: item.thumbnailDriveFileId,
+          ...(item.position ? { latitude: item.position.lat, longitude: item.position.lng } : {}),
+          ...(item.gpsTimestamp !== undefined ? { gpsTimestamp: item.gpsTimestamp } : {}),
+          ...(item.dateTimeOriginal !== undefined ? { dateTimeOriginal: item.dateTimeOriginal } : {}),
+        }).catch(() => {})
+      }
+
+      // The derived files stay behind, so the loose folder goes. Cleanup,
+      // not part of the move — an orphaned folder is untidy, and failing the
+      // move over it would be the duplicate described above.
+      await trashFolder(accessToken, looseFolderId).catch(() => {})
+      this.refs.delete(id)
+      return true
     })
   }
 

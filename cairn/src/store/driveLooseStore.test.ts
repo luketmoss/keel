@@ -446,6 +446,34 @@ describe('moving into a trip', () => {
     expect(store.getItems()).toHaveLength(1)
     expect(trashFolder).not.toHaveBeenCalled()
   })
+
+  /* Once the first file has left the loose folder the item belongs to the
+     trip, and saying otherwise would keep the loose row alive beside files
+     the trip now holds — one item owned twice. Cleanup and the index write
+     come after that line and must not undo it. */
+  it('still reports the move when only the tidy-up afterwards fails', async () => {
+    store = await connected()
+    const record = store.addTrack(NEW_TRACK, GEOMETRY, new File(['<kml/>'], 'rosea.kml'))
+    await settle()
+    trashFolder.mockRejectedValue(new Error('offline'))
+
+    expect(await store.moveIntoTrip(record.id, 'trip-1')).toBe(true)
+    expect(moveDriveFile).toHaveBeenCalled()
+  })
+
+  it("still reports the move when a photo's index write fails", async () => {
+    store = await connected()
+    uploadFileContent
+      .mockResolvedValueOnce({ id: 'original-1' })
+      .mockResolvedValueOnce({ id: 'thumb-1' })
+    const record = store.addPhoto(NEW_PHOTO, new File(['jpeg'], 'sapporo.jpg'))
+    await settle()
+    appendPhotoToIndex.mockRejectedValue(new Error('offline'))
+
+    // The design note's accepted failure: gone from the top level, and not
+    // yet wholly arrived. Retried on the next connect.
+    expect(await store.moveIntoTrip(record.id, 'trip-1')).toBe(true)
+  })
 })
 
 describe('claiming back out of a trip', () => {

@@ -129,6 +129,35 @@ describe('DriveTrackOverridesStore', () => {
     expect(store.getOverrides('trip-1')).toEqual({})
   })
 
+  it('#124: retries once after a transient (non-conflict) write failure, and succeeds', async () => {
+    findJsonFile.mockResolvedValue(null)
+    const store = new DriveTrackOverridesStore(fakeStorage())
+    await store.connect('trip-1', 'token', 'cairn-folder-id')
+
+    writeJsonFile
+      .mockRejectedValueOnce(new Error('network error'))
+      .mockResolvedValueOnce({ fileId: 'overrides-file', version: '2' })
+
+    const ok = await store.setOverride('trip-1', 'drive-1', { displayName: 'Day 3' }, ['drive-1'])
+
+    expect(ok).toBe(true)
+    expect(store.getOverrides('trip-1')).toEqual({ 'drive-1': { displayName: 'Day 3' } })
+    expect(writeJsonFile).toHaveBeenCalledTimes(2)
+  })
+
+  it('#124: gives up and reverts if the retry after a transient failure also fails', async () => {
+    findJsonFile.mockResolvedValue(null)
+    const store = new DriveTrackOverridesStore(fakeStorage())
+    await store.connect('trip-1', 'token', 'cairn-folder-id')
+
+    writeJsonFile.mockRejectedValue(new Error('network error'))
+    const ok = await store.setOverride('trip-1', 'drive-1', { displayName: 'Day 3' }, ['drive-1'])
+
+    expect(ok).toBe(false)
+    expect(store.getOverrides('trip-1')).toEqual({})
+    expect(writeJsonFile).toHaveBeenCalledTimes(2)
+  })
+
   it('serializes connect (migration) and an immediately-following edit so the edit overwrites rather than duplicating the create', async () => {
     // Reproduces the race a trip's overrides are most exposed to: an edit
     // fired the instant a detail view mounts, before `connect`'s own

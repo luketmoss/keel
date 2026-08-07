@@ -190,6 +190,71 @@ describe('DriveTripStore', () => {
     expect(store.getTrip(entry.id)?.notes).toBe('')
   })
 
+  it('#125: retries once after a transient (non-conflict) flush failure, and succeeds', async () => {
+    // Hydrated from Drive on connect, same setup as the conflict test below
+    // — avoids `createTrip`'s fire-and-forget migration write landing at an
+    // unpredictable point and throwing off the call-count assertions here.
+    listSubfolders.mockResolvedValue([{ id: 'folder-1', name: 'trip-a' }])
+    findJsonFile.mockImplementation(async (_token: string, _folderId: string, name: string) =>
+      name === 'trip.json' ? { fileId: 'trip-file', version: '1' } : null,
+    )
+    readJsonFile.mockResolvedValueOnce({
+      data: {
+        id: 'trip-a',
+        name: 'Hokkaido',
+        status: 'planned',
+        startDate: null,
+        endDate: null,
+        notes: '',
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
+      version: '1',
+    })
+
+    const store = new DriveTripStore(fakeStorage())
+    await store.connect('token', 'cairn-folder-id')
+    writeJsonFile.mockClear()
+    writeJsonFile
+      .mockRejectedValueOnce(new Error('network error'))
+      .mockResolvedValueOnce({ fileId: 'trip-file', version: '2' })
+
+    const result = await store.updateTrip('trip-a', { notes: 'Great trip' })
+
+    expect(result?.notes).toBe('Great trip')
+    expect(store.getTrip('trip-a')?.notes).toBe('Great trip')
+    expect(writeJsonFile).toHaveBeenCalledTimes(2)
+  })
+
+  it('#125: gives up and reverts if the retry after a transient flush failure also fails', async () => {
+    listSubfolders.mockResolvedValue([{ id: 'folder-1', name: 'trip-a' }])
+    findJsonFile.mockImplementation(async (_token: string, _folderId: string, name: string) =>
+      name === 'trip.json' ? { fileId: 'trip-file', version: '1' } : null,
+    )
+    readJsonFile.mockResolvedValueOnce({
+      data: {
+        id: 'trip-a',
+        name: 'Hokkaido',
+        status: 'planned',
+        startDate: null,
+        endDate: null,
+        notes: '',
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
+      version: '1',
+    })
+
+    const store = new DriveTripStore(fakeStorage())
+    await store.connect('token', 'cairn-folder-id')
+    writeJsonFile.mockClear()
+    writeJsonFile.mockRejectedValue(new Error('network error'))
+
+    const result = await store.updateTrip('trip-a', { notes: 'Great trip' })
+
+    expect(result).toBeNull()
+    expect(store.getTrip('trip-a')?.notes).toBe('')
+    expect(writeJsonFile).toHaveBeenCalledTimes(2)
+  })
+
   it('on a conflict, re-hydrates from Drive rather than reverting to the pre-edit value', async () => {
     // Hydrated from Drive on connect (rather than created-then-migrated)
     // so this test only ever has one Drive ref in play, not a migration

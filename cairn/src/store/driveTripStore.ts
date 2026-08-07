@@ -279,24 +279,44 @@ export class DriveTripStore implements TripStore {
     const record = this.local.getTrip(id)
     if (!record) return 'ok'
 
+    let ref: TripDriveRef
+    let existingTrip: DriveFileRef | null
     try {
-      const ref = this.refs.get(id) ?? { folderId: await findOrCreateTripFolder(accessToken, cairnFolderId, id) }
+      ref = this.refs.get(id) ?? { folderId: await findOrCreateTripFolder(accessToken, cairnFolderId, id) }
       // #102: no cached `ref.trip` only means *this session* hasn't written
       // or hydrated the file yet — not that Drive has no `trip.json`. An
       // edit can reach here before `connect()`'s hydration pass gets to this
       // trip; without checking, that races a create against the file
       // hydration would otherwise have found, leaving two `trip.json`s in
       // the folder and a 50/50 chance the rename survives the next read.
-      const existingTrip = ref.trip ?? (await findJsonFile(accessToken, ref.folderId, 'trip.json'))
-      const written = await writeJsonFile(accessToken, ref.folderId, 'trip.json', record, existingTrip)
-      this.refs.set(id, { ...ref, trip: written })
+      existingTrip = ref.trip ?? (await findJsonFile(accessToken, ref.folderId, 'trip.json'))
+    } catch {
+      return 'error'
+    }
+
+    const write = () => writeJsonFile(accessToken, ref.folderId, 'trip.json', record, existingTrip)
+
+    try {
+      this.refs.set(id, { ...ref, trip: await write() })
       return 'ok'
     } catch (error) {
       if (error instanceof DriveConflictError) {
+        // A real version conflict means Drive's file changed under us —
+        // retrying with our own stale intent risks clobbering whatever
+        // wrote it (see #124's identical reasoning for track overrides), so
+        // this keeps the existing "defer to Drive's truth" behavior.
         await this.resolveConflict(id, accessToken)
         return 'conflict'
       }
-      return 'error'
+      // #125: any other failure (network blip, transient 5xx, rate limit)
+      // carries no such risk — retried once against the same target before
+      // giving up.
+      try {
+        this.refs.set(id, { ...ref, trip: await write() })
+        return 'ok'
+      } catch {
+        return 'error'
+      }
     }
   }
 

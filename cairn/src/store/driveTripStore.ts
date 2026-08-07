@@ -141,6 +141,19 @@ export class DriveTripStore implements TripStore {
     void this.enqueue(id, () => this.flushOverview(id))
   }
 
+  /** #121: the count lives on `trip.json`, so it flushes exactly the way
+      `origin` does — through `flushTrip`, not `updateTrip`. Fire-and-forget
+      for the same reason `saveOverview`'s flush is: no failure UI is
+      defined for a derived value, and the next read of the trip's photo
+      index writes it again. `local.savePhotoCount` is a no-op when the
+      count is unchanged, so an unchanged count costs no Drive write. */
+  savePhotoCount = (id: string, count: number): void => {
+    const before = this.local.getTrip(id)?.photoCount
+    this.local.savePhotoCount(id, count)
+    if (before === count) return
+    void this.enqueue(id, () => this.flushTrip(id))
+  }
+
   /** #73: drops credentials and every trip's Drive file refs, so a
       mutation attempted afterward can't reach Drive and reflects the
       account state truthfully instead of racing a dead token. Reading is

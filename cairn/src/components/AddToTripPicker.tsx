@@ -7,7 +7,24 @@ export interface TripChoice {
   /** A trip's contents are what make it the right or wrong destination, so
       the picker counts them rather than listing names alone. */
   trackCount: number
-  photoCount: number
+  /** `null` when nobody has counted this trip's photos yet (#121) — a
+      different fact from `0`, and the picker says so by showing no photo
+      count at all rather than a confident zero. */
+  photoCount: number | null
+}
+
+const plural = (count: number, noun: string): string =>
+  `${count} ${noun}${count === 1 ? '' : 's'}`
+
+/** What the counts say out loud. `4T · 128P` is decorative shorthand whose
+    meaning is not recoverable when read aloud, so each option's accessible
+    name spells it out instead. */
+export function tripChoiceLabel(choice: TripChoice): string {
+  const parts = [choice.entry.name, plural(choice.trackCount, 'track')]
+  if (choice.photoCount !== null) {
+    parts.push(choice.photoCount === 0 ? 'no photos' : plural(choice.photoCount, 'photo'))
+  }
+  return parts.join(', ')
 }
 
 /** Choose an existing trip, or make one.
@@ -104,21 +121,28 @@ export function AddToTripPicker({
               <span aria-hidden="true">＋</span> New trip…
             </button>
           </li>
-          {trips.map(({ entry, trackCount, photoCount }) => (
-            <li key={entry.id}>
+          {trips.map((choice) => (
+            <li key={choice.entry.id}>
               <button
                 type="button"
                 className="add-to-trip__option"
                 disabled={busy}
-                onClick={() => onChoose(entry.id)}
+                aria-label={tripChoiceLabel(choice)}
+                onClick={() => onChoose(choice.entry.id)}
               >
                 <span
-                  className={`add-to-trip__dot add-to-trip__dot--${entry.status}`}
+                  className={`add-to-trip__dot add-to-trip__dot--${choice.entry.status}`}
                   aria-hidden="true"
                 />
-                <span className="add-to-trip__name">{entry.name}</span>
+                <span className="add-to-trip__name">{choice.entry.name}</span>
+                {/* The photo half is omitted, not filled with a placeholder.
+                    `0P` is the bug; `—P` and `?P` both spend a glyph telling
+                    the user about the app's bookkeeping, which is neither
+                    something they asked about nor something they can act on.
+                    It stops being shorter the first time the trip is opened. */}
                 <span className="add-to-trip__counts">
-                  {trackCount}T · {photoCount}P
+                  {choice.trackCount}T
+                  {choice.photoCount !== null && ` · ${choice.photoCount}P`}
                 </span>
               </button>
             </li>

@@ -120,6 +120,21 @@ export function TripDetail({
   // #73: "disconnected" is exactly "no usable token", whether that's never
   // having signed in, a sign-out, or #72's token-expired.
   const signedIn = accessToken !== null && cairnFolderId !== null
+
+  /* #121 — this is the one place in the app that knows how many photos a
+     trip holds, because `usePhotoImport` reads `photos.json` on mount and
+     rewrites it on every import and every removal. Caching it here covers
+     all three moments with one effect, and backfills the count for every
+     trip that predates the field the first time the user opens one — no
+     migration pass, and no Drive read the app was not already making.
+
+     Gated on `loading`: before the read-back lands, `photos` is the empty
+     array it was initialised with, and writing `0` from that would clobber
+     a real count with a wrong one on every single open. */
+  useEffect(() => {
+    if (photoImport.loading) return
+    tripStore.savePhotoCount(tripId, photoImport.photos.length)
+  }, [tripStore, tripId, photoImport.loading, photoImport.photos.length])
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null)
   // Deliberately separate from `selectedPhotoId` rather than derived from
   // it — a selected marker does not open the lightbox by itself, only an

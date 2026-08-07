@@ -54,6 +54,8 @@ export function DraftPanel({
   // the type.
   const syntheticTrip: TripRecord = {
     id: 'draft',
+    // A draft holds no photos and has no `photos.json` to have counted.
+    photoCount: null,
     name: draft.name,
     status: draft.status,
     startDate: draft.startDate,

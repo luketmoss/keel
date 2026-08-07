@@ -88,6 +88,7 @@ export function buildFixtureFiles(): FakeFile[] {
 
     const record: TripRecord = {
       id: trip.id,
+      photoCount: null,
       name: trip.name,
       status: trip.status,
       startDate: trip.startDate,

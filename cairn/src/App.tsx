@@ -203,7 +203,11 @@ function AppShell() {
       visibleTrips.map((entry) => ({
         entry,
         trackCount: tripStore.getOverview(entry.id)?.features.length ?? 0,
-        photoCount: 0,
+        // #121: cached on the index when the trip's photo index was last
+        // read, and `null` until something has read it. The picker shows
+        // no photo count in that case rather than a zero it cannot stand
+        // behind.
+        photoCount: entry.photoCount,
       })),
     [visibleTrips, tripStore],
   )

@@ -73,7 +73,15 @@ function mockGoogleSignIn(email = 'jane@gmail.com') {
     if (href.includes('/about')) {
       return { ok: true, status: 200, json: async () => ({ user: { emailAddress: email } }) } as Response
     }
-    return { ok: true, status: 200, json: async () => ({ files: [] }) } as Response
+    // The `/Cairn/` folder lookup runs during sign-in and needs a real
+    // `id`, or `cairnFolderId` ends up undefined and every Drive-backed
+    // store stays disconnected — which since #120 includes the loose store,
+    // so a move or a delete would be refused rather than performed.
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ id: 'cairn-folder-id', createdTime: '2024-01-01T00:00:00.000Z', files: [] }),
+    } as Response
   })
 }
 
@@ -727,7 +735,11 @@ describe('App loose tracks and photos (#110)', () => {
     await signIn()
 
     fireEvent.click(await screen.findByRole('button', { name: 'Add to a trip' }))
-    fireEvent.click(screen.getByRole('button', { name: /Larapinta/ }))
+    // #120: the move is Drive file work now — the picker stays open until it
+    // settles, and the navigation happens after.
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Larapinta/ }))
+    })
 
     // Landing on the destination is the confirmation.
     expect(window.location.pathname).toBe('/trips/t-2')
@@ -749,7 +761,9 @@ describe('App loose tracks and photos (#110)', () => {
     fireEvent.change(screen.getByPlaceholderText('Name the new trip'), {
       target: { value: 'Grampians' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+    })
 
     expect(window.location.pathname).toMatch(/^\/trips\//)
     const trips = JSON.parse(window.localStorage.getItem('cairn.trips.index') ?? '[]')
@@ -805,5 +819,55 @@ describe('App loose tracks and photos (#110)', () => {
 
     expect(screen.queryByRole('button', { name: 'Add to a trip' })).toBeNull()
     fetchSpy.mockRestore()
+  })
+})
+
+describe('App loose items in Drive (#120)', () => {
+  it('refuses a loose photo dropped while signed out, and writes nothing', async () => {
+    await renderApp('/')
+    const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
+
+    await act(async () => {
+      fireEvent.drop(shell, {
+        dataTransfer: fileDataTransfer([new File(['jpeg'], 'a.jpg'), new File(['jpeg'], 'b.jpg')]),
+      })
+    })
+
+    // One toast for the batch, not one per file — the reason is the same
+    // for all of them.
+    expect(screen.getAllByText('Sign in to keep tracks and photos.')).toHaveLength(1)
+    expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(0)
+  })
+
+  it('still opens the draft for a track dropped while signed out', async () => {
+    await renderApp('/')
+    const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
+
+    fireEvent.drop(shell, {
+      dataTransfer: fileDataTransfer([loadKmlFixture('linestring.kml', 'day1.kml')]),
+    })
+
+    // #81 designed this to work signed out, and #120 does not take it
+    // away — the draft is visible, and it survives signing in.
+    expect(await screen.findByText('NOT SAVED')).toBeDefined()
+    expect(screen.queryByText('Sign in to keep tracks and photos.')).toBeNull()
+  })
+
+  it('refuses Keep loose while signed out and leaves the draft open', async () => {
+    await renderApp('/')
+    const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
+    fireEvent.drop(shell, {
+      dataTransfer: fileDataTransfer([loadKmlFixture('linestring.kml', 'day1.kml')]),
+    })
+    await screen.findByText('NOT SAVED')
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Keep loose' }))
+    })
+
+    expect(screen.getByText('Sign in to keep tracks and photos.')).toBeDefined()
+    // Nothing is lost — the files are still there to keep once signed in.
+    expect(screen.getByText('NOT SAVED')).toBeDefined()
+    expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(0)
   })
 })

@@ -113,6 +113,10 @@ export interface UseTripImport {
       one that never went. A failure leaves the row in place; see
       `removingTrackIds`/`trackRemoveErrors`. */
   removeFile: (id: string) => Promise<void>
+  /** #120 — lets go of a track whose file has moved out of this trip's
+      folder, without trashing it. What `Remove from trip` uses, as against
+      `removeFile`'s `Delete permanently…`. */
+  forgetFile: (id: string) => Promise<void>
   /** Track ids currently mid-removal — the confirm has been accepted and
       the Drive trash call is in flight. */
   removingTrackIds: Set<string>
@@ -443,6 +447,53 @@ export function useTripImport(
     )
   }, [])
 
+  /** Drops a track from this trip's local state and prunes its override,
+      renumbering the remaining tracks' `order` from their current effective
+      order — which is what keeps their relative order stable (design doc)
+      rather than just closing the gap left by whichever `order` value the
+      departing track happened to hold.
+   *
+   * Says nothing about the file itself. `removeFile` calls it after
+   * trashing; `forgetFile` calls it after the file has moved somewhere
+   * else, which is the whole difference between deleting a track and
+   * removing it from a trip. */
+  const dropTrack = useCallback(
+    async (id: string) => {
+      const remaining = tracksRef.current.filter((f) => f.id !== id)
+      const currentOverrides = overridesRef.current
+      const orderedDriveFileIds = [...remaining]
+        .sort((a, b) => {
+          const orderA = currentOverrides[a.driveFileId]?.order
+          const orderB = currentOverrides[b.driveFileId]?.order
+          if (orderA === undefined && orderB === undefined) return 0
+          if (orderA === undefined) return 1
+          if (orderB === undefined) return -1
+          return orderA - orderB
+        })
+        .map((f) => f.driveFileId)
+      await overridesStore.setOrder(
+        tripId,
+        orderedDriveFileIds,
+        tracksRef.current.map((f) => f.driveFileId),
+      )
+      setOverrides(overridesStore.getOverrides(tripId))
+      setTracks((prev) => prev.filter((f) => f.id !== id))
+    },
+    [tripId, overridesStore],
+  )
+
+  /** #120 — the track's file has moved into the loose folder, so this trip
+      lets go of it without trashing anything. Trashing here is what the old
+      `Remove from trip` did by reusing `removeFile`, which destroyed the
+      user's KML and rebuilt a loose record from parsed data; the file is
+      the thing that moves now. */
+  const forgetFile = useCallback(
+    async (id: string) => {
+      await dropTrack(id)
+    },
+    [dropTrack],
+  )
+
   // #77 — trashes the Drive file first; only on success does local state
   // (the row, its override) move. A failure leaves the row exactly where it
   // was, reported via `trackRemoveErrors` rather than removed optimistically
@@ -477,38 +528,15 @@ export function useTripImport(
         return
       }
 
-      // Drive trash landed — prune this track's override and renumber the
-      // remaining tracks' `order` from their current effective order, which
-      // is what keeps their relative order stable (design doc) rather than
-      // just closing the gap left by whichever `order` value the removed
-      // track happened to hold.
-      const remaining = tracksRef.current.filter((f) => f.id !== id)
-      const currentOverrides = overridesRef.current
-      const orderedDriveFileIds = [...remaining]
-        .sort((a, b) => {
-          const orderA = currentOverrides[a.driveFileId]?.order
-          const orderB = currentOverrides[b.driveFileId]?.order
-          if (orderA === undefined && orderB === undefined) return 0
-          if (orderA === undefined) return 1
-          if (orderB === undefined) return -1
-          return orderA - orderB
-        })
-        .map((f) => f.driveFileId)
-      await overridesStore.setOrder(
-        tripId,
-        orderedDriveFileIds,
-        tracksRef.current.map((f) => f.driveFileId),
-      )
-      setOverrides(overridesStore.getOverrides(tripId))
-
-      setTracks((prev) => prev.filter((f) => f.id !== id))
+      // Drive trash landed — the row and its override go now.
+      await dropTrack(id)
       setRemovingTrackIds((prev) => {
         const next = new Set(prev)
         next.delete(id)
         return next
       })
     },
-    [accessToken, tripId, overridesStore],
+    [accessToken, dropTrack],
   )
 
   const renameTrack = useCallback(
@@ -598,6 +626,7 @@ export function useTripImport(
     dismissFailures,
     toggleVisibility,
     removeFile,
+    forgetFile,
     removingTrackIds,
     trackRemoveErrors,
     renameTrack,

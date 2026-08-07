@@ -108,6 +108,26 @@ export async function writePhotoIndex(
   await uploadFileContent(sessionUri, file, accessToken)
 }
 
+/** Adds one photo to a trip's `photos.json`, keeping everything already
+    there.
+ *
+ * #120's `Add to a trip`: a loose photo's files move into the trip's folder,
+ * and this is what makes the trip aware of them — a photo Drive holds but
+ * `photos.json` does not name is a photo the Photos tab will never show.
+ * Read-modify-write against the current file, which is the narrowest thing
+ * that works; whether a second *import* merges or replaces is a wider
+ * question `writePhotoIndex` deliberately leaves open, and moving one photo
+ * does not settle it. */
+export async function appendPhotoToIndex(
+  accessToken: string,
+  folderId: string,
+  record: Omit<PhotoRecord, 'id'>,
+): Promise<void> {
+  const existing = await readPhotoIndex(accessToken, folderId)
+  const stripped = existing.map(({ id: _id, ...rest }) => rest)
+  await writePhotoIndex(accessToken, folderId, [...stripped, record])
+}
+
 /** Reads back the most recently written `photos.json` from a trip folder,
     or an empty list if none exists yet or it can't be read — same "missing
     is not an error" stance as `LocalTripStore`'s corrupted-index handling.

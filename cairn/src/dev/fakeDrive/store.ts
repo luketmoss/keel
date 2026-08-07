@@ -164,12 +164,22 @@ export class FakeDriveStore {
     return next
   }
 
-  async patch(id: string, patch: Partial<Pick<FakeFile, 'trashed'>>): Promise<FakeFile> {
+  async patch(id: string, patch: Partial<Pick<FakeFile, 'trashed' | 'parents'>>): Promise<FakeFile> {
     const existing = this.files.get(id)
     if (!existing) throw new Error(`fake Drive: patch of unknown file ${id}`)
     const next: FakeFile = { ...existing, ...patch, version: existing.version + 1 }
     this.files.set(id, next)
     await this.persist(next)
+    // Real Drive trashes a folder's contents with it, and both `trashFolder`
+    // callers rely on that — a trip's files, and #120's loose item folder.
+    // Without the cascade the harness reports a folder as empty-and-trashed
+    // while its children are still listable, which is the one thing anyone
+    // inspecting it would want to be true.
+    if (patch.trashed) {
+      for (const child of [...this.files.values()]) {
+        if (child.parents.includes(id) && !child.trashed) await this.patch(child.id, { trashed: true })
+      }
+    }
     return next
   }
 }

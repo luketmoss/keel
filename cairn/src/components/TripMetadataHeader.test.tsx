@@ -94,9 +94,19 @@ describe('TripMetadataHeader', () => {
     render(<TripMetadataHeader trip={trip()} onUpdate={onUpdate} />)
 
     fireEvent.click(screen.getByText('planned'))
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'completed' } })
+    fireEvent.click(screen.getByText('completed'))
 
     expect(onUpdate).toHaveBeenCalledWith({ status: 'completed' })
+  })
+
+  it('clicking the already-selected status segment is a no-op', () => {
+    const onUpdate = vi.fn()
+    render(<TripMetadataHeader trip={trip()} onUpdate={onUpdate} />)
+
+    fireEvent.click(screen.getByText('planned'))
+    fireEvent.click(screen.getByText('planned'))
+
+    expect(onUpdate).not.toHaveBeenCalled()
   })
 
   it('renders the same no-dates string for a completed trip as a planned one, naming no status', () => {

@@ -185,6 +185,8 @@ function NameEditor({
   )
 }
 
+const STATUS_OPTIONS: TripStatus[] = ['planned', 'completed']
+
 function StatusEditor({
   initial,
   onCommit,
@@ -195,18 +197,31 @@ function StatusEditor({
   onCancel: () => void
 }) {
   return (
-    <select
-      autoFocus
-      className="trip-metadata__status-input"
-      defaultValue={initial}
-      onChange={(event) => onCommit(event.target.value as TripStatus)}
+    <div
+      className="trip-metadata__status-toggle"
       onKeyDown={(event) => {
         if (event.key === 'Escape') onCancel()
       }}
     >
-      <option value="planned">planned</option>
-      <option value="completed">completed</option>
-    </select>
+      {STATUS_OPTIONS.map((status) => (
+        <button
+          key={status}
+          type="button"
+          autoFocus={status === initial}
+          className={`trip-metadata__status-segment${
+            status === initial ? ' trip-metadata__status-segment--selected' : ''
+          }`}
+          // The already-selected segment is a no-op click — there's nothing
+          // to commit, and re-committing the same value would still fire a
+          // needless flush.
+          onClick={() => {
+            if (status !== initial) onCommit(status)
+          }}
+        >
+          {status}
+        </button>
+      ))}
+    </div>
   )
 }
 

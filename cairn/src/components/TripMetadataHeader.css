@@ -79,8 +79,37 @@
   color: var(--text-muted);
 }
 
-.trip-metadata__status-input {
+.trip-metadata__status-toggle {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-full);
+  background: var(--surface-lift);
+  padding: 2px;
+}
+
+.trip-metadata__status-segment {
+  border: none;
+  border-radius: var(--radius-full);
+  padding: var(--space-1) var(--space-2);
   font-size: var(--text-xs);
+  cursor: pointer;
+  background: none;
+  color: var(--text-muted);
+  transition: color var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease);
+}
+
+.trip-metadata__status-segment:hover {
+  background: var(--hover);
+}
+
+.trip-metadata__status-segment:active {
+  background: var(--pressed);
+}
+
+.trip-metadata__status-segment--selected,
+.trip-metadata__status-segment--selected:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .trip-metadata__dates {

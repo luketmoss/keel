@@ -99,6 +99,18 @@ describe('TripMetadataHeader', () => {
     expect(onUpdate).toHaveBeenCalledWith({ status: 'completed' })
   })
 
+  it('closes the status toggle on Escape without changing status', () => {
+    const onUpdate = vi.fn()
+    render(<TripMetadataHeader trip={trip()} onUpdate={onUpdate} />)
+
+    fireEvent.click(screen.getByText('planned'))
+    fireEvent.keyDown(screen.getByText('completed'), { key: 'Escape' })
+
+    expect(onUpdate).not.toHaveBeenCalled()
+    expect(screen.getByText('planned')).toBeDefined()
+    expect(screen.queryByText('completed')).toBeNull()
+  })
+
   it('clicking the already-selected status segment is a no-op', () => {
     const onUpdate = vi.fn()
     render(<TripMetadataHeader trip={trip()} onUpdate={onUpdate} />)

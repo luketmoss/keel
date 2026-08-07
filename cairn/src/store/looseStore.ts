@@ -385,6 +385,12 @@ export async function moveLooseIntoTrip(
   tripSide: {
     getOverview(id: string): FeatureCollection<LineString> | null
     saveOverview(id: string, tracks: Track[]): void
+    /** #130: the destination trip may not be open, so nothing is calling
+        `usePhotoImport` there to notice its photo count changed. Read here
+        and written here, the same "side effect of the data changing"
+        pattern `saveOverview`/`updateOrigin` already establish for `origin`. */
+    getTrip(id: string): { photoCount: number | null } | null
+    savePhotoCount(id: string, count: number): void
   },
   itemId: string,
   tripId: string,
@@ -412,6 +418,17 @@ export async function moveLooseIntoTrip(
       ...overviewToTracks(looseStore.getOverview(itemId), item.name),
     ]
     tripSide.saveOverview(tripId, merged)
+  } else {
+    // #130: incremented, not recounted — re-reading `photos.json` for an
+    // authoritative length would put a Drive round trip on the one path
+    // #121 exists to keep off the network. `null` stays `null`: nobody has
+    // counted this trip's photos, and moving one more into it doesn't
+    // change that. Opening the trip afterwards still recomputes the real
+    // count and overwrites this, per #121's "it heals by being used".
+    const destination = tripSide.getTrip(tripId)
+    if (destination && destination.photoCount !== null) {
+      tripSide.savePhotoCount(tripId, destination.photoCount + 1)
+    }
   }
 
   looseStore.forget(itemId)

@@ -141,18 +141,32 @@ export class DriveTrackOverridesStore implements TrackOverridesStore {
     if (!ref || !this.accessToken) return true
     const accessToken = this.accessToken
 
+    const write = () =>
+      writeJsonFile(accessToken, ref.folderId, 'overrides.json', this.local.getOverrides(tripId), ref.file ?? null)
+
     try {
-      const current = this.local.getOverrides(tripId)
-      const written = await writeJsonFile(accessToken, ref.folderId, 'overrides.json', current, ref.file ?? null)
-      this.refs.set(tripId, { ...ref, file: written })
+      this.refs.set(tripId, { ...ref, file: await write() })
       return true
     } catch (error) {
       if (error instanceof DriveConflictError) {
+        // A real version conflict means Drive's file changed under us —
+        // retrying with our own stale intent risks clobbering whatever
+        // wrote it, so this keeps the existing "defer to Drive's truth"
+        // behavior rather than retrying.
         await this.resolveConflict(tripId, ref, accessToken)
         return false
       }
-      this.local.replaceAll(tripId, previous)
-      return false
+      // #124: any other failure (network blip, transient 5xx, rate limit)
+      // carries no such risk — the retry targets the exact same expected
+      // version, so it can only succeed if nothing else wrote in between.
+      // One retry before giving up and reverting.
+      try {
+        this.refs.set(tripId, { ...ref, file: await write() })
+        return true
+      } catch {
+        this.local.replaceAll(tripId, previous)
+        return false
+      }
     }
   }
 

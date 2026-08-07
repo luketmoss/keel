@@ -234,32 +234,26 @@ first real case:
 
 ## Navigation
 
-Alpenglow assumes the sheet is the navigation. Three changes, in the order they
-are worth doing. Each is a change in behaviour, so each needs its own issue and
-its own note — what follows is the target, not a specification.
+Alpenglow assumes the sheet is the navigation, and this section used to sketch
+what that meant. **It no longer specifies anything.**
+[shell-and-content-model.md](shell-and-content-model.md) is the standing
+reference for layout, navigation, and the mobile sheet, and it supersedes what
+stood here: one live map for the session, the column and its faces, and the
+peek / half / full detents this language's radii and targets were always sized
+for.
 
-**1. The map is never unmounted.** Today `/trips` replaces the map with a
-full-bleed solid panel, so moving between routes destroys and rebuilds the
-Google Maps instance and throws away camera state. Every map app worth copying
-keeps one canvas alive for the session and changes only what floats above it.
-Nothing else in this section is possible until this lands.
+That file decides what cairn *contains* and *where it goes*. This one decides
+what it is *made of*. A change that needs both says so.
 
-**2. A bottom sheet with detents.** The fixed 45vh panel with a collapse toggle
-was scoped as "the whole mobile story for v1" in #2. The replacement is three
-detents — peek, half, full — draggable, snapping under `--motion-base`. This is
-the largest of the three and the one this language most obviously wants: the
-generous radii, the 40px targets, and the L2 shadow all exist to make a sheet
-work.
+Two ideas are not covered there and belong to nobody yet:
 
-**3. View transitions between routes.** React Router 7 supports the View
-Transitions API directly via `<Link viewTransition>`, so a cross-fade costs one
-prop. The version worth the effort is a shared element: a trip's name carries a
-`view-transition-name` on the world map, the trips list, and the detail header,
-so selecting a trip visibly moves that title into place instead of repainting
-the panel. It degrades to a cut where unsupported.
-
-Deliberately not adopted: a command palette. It earns its place at a few dozen
-trips, and cairn has a handful.
+- **A shared-element view transition.** React Router 7 exposes the View
+  Transitions API through `<Link viewTransition>`, so a trip's name could carry
+  a `view-transition-name` and visibly move into the detail header rather than
+  the panel repainting. Not adopted with the shell rebuild and not scheduled —
+  it needs its own issue before it means anything.
+- **A command palette**, deliberately not adopted. It earns its place at a few
+  dozen trips, and cairn has a handful.
 
 ## Applying this
 

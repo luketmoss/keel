@@ -43,6 +43,14 @@ by accident.
   over dumping a folder into Google Earth.
 - **A trip is one entity with a `planned | completed` status**, not two types.
   Planning KMLs stay alongside the actual tracks after the trip happens.
+- **Tracks and photos can exist without a trip.** A day hike's track and a
+  single good photo are things at a coordinate; neither needs a trip invented
+  around it. Loose ones live under `/Cairn/loose/`, and adding one to a trip is
+  a move between folders rather than a copy or a promotion.
+- **A trip is a bundle, not the unit of storage.** It holds tracks and photos
+  and gives them a name, a status and a date range — but the map shows trips,
+  loose tracks and loose photos side by side, and deleting a trip deletes what
+  it holds. See `docs/design/shell-and-content-model.md`.
 - **OAuth stays in Testing mode.** Single user for now, so tokens expiring every
   seven days is the accepted cost of skipping brand verification.
 
@@ -51,6 +59,11 @@ by accident.
 The all-trips overview map reads precomputed simplified geometry
 (`overview.geojson` per trip), never the source KMLs. Loading full-resolution
 tracks for the world view does not scale past a handful of trips.
+
+**This covers loose tracks too.** A track that belongs to no trip gets its own
+`overview.geojson`, generated the same way and at the same time as a trip's. A
+loose track costs the world view exactly what a trip costs; the rule does not
+get to have an exception the moment a track stops being owned.
 
 Storage access sits behind one interface even while the only implementation is
 local — swapping in Drive should touch that module and nothing else.

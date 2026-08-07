@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import { BottomSheet } from './BottomSheet'
+import { useIsPhone } from '../map/useIsPhone'
 import './ShellColumn.css'
 
 interface ShellColumnProps {
@@ -6,7 +8,8 @@ interface ShellColumnProps {
   onToggleCollapsed: () => void
   /** The edge tab is a property of the list, so it is not rendered on a
       detail — #109's design note: "Collapsing while a detail is open. Not
-      possible." */
+      possible." On phone this is also what tells the sheet to hold full:
+      a detail and a draft both suspend the detents. */
   collapsible: boolean
   searchCard: ReactNode
   /** Hidden while a detail is open and while a draft is open; the caller
@@ -15,12 +18,14 @@ interface ShellColumnProps {
   children: ReactNode
 }
 
-/** The one column: search card, chips, panel, `--space-4` from the top,
-    left and bottom edges. Everything else on screen belongs to the map.
+/** The shell's one column — or, below the phone breakpoint, its sheet.
+    Everything inside is identical either way: same search card, same chips,
+    same rows, same faces. Only the container changes, which is why the two
+    are one component rather than two layouts to keep in step.
 
-    Collapsing moves it with a transform rather than animating its width —
-    a width transition relayouts the panel's contents on every frame, and
-    the map behind it does not need to reflow at all. */
+    On desktop, collapsing moves the column with a transform rather than
+    animating its width — a width transition relayouts the panel's contents
+    on every frame, and the map behind it does not need to reflow at all. */
 export function ShellColumn({
   collapsed,
   onToggleCollapsed,
@@ -29,6 +34,16 @@ export function ShellColumn({
   chips,
   children,
 }: ShellColumnProps) {
+  const isPhone = useIsPhone()
+
+  if (isPhone) {
+    return (
+      <BottomSheet forceFull={!collapsible} searchCard={searchCard} chips={chips}>
+        {children}
+      </BottomSheet>
+    )
+  }
+
   return (
     <div className={`shell-column${collapsed ? ' shell-column--collapsed' : ''}`}>
       <div className="shell-column__stack">

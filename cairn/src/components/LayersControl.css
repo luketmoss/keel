@@ -132,7 +132,8 @@
 @media (max-width: 719px) {
   .layers-control {
     left: var(--space-4);
-    bottom: var(--space-2);
+    bottom: calc(var(--sheet-current, var(--sheet-half)) + var(--space-2));
+    transition: bottom var(--motion-base) var(--ease);
   }
 
   .layers-control__trigger-label,

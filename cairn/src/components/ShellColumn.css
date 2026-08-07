@@ -79,22 +79,7 @@
   background: var(--pressed);
 }
 
-/* Interim phone treatment: the column goes full-bleed, exactly as the trips
-   panel did before this issue. #112 replaces this whole block with the
-   bottom sheet — deliberately not attempted here. */
-@media (max-width: 719px) {
-  .shell-column {
-    top: var(--space-2);
-    left: var(--space-2);
-    right: var(--space-2);
-    bottom: var(--space-2);
-  }
-
-  .shell-column__stack {
-    width: 100%;
-  }
-
-  .shell-column--collapsed {
-    transform: translateX(calc(-100% - var(--space-2)));
-  }
-}
+/* No phone block. Below the breakpoint this component renders `BottomSheet`
+   instead, which brings its own — a media query hiding a column that is not
+   in the DOM would be a second, silent answer to which layout is on
+   screen. `useIsPhone` is the only answer. */

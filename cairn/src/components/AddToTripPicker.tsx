@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { TripIndexEntry } from '../store/tripStore'
+import { pluralize } from '../format/dates'
 import './AddToTripPicker.css'
 
 export interface TripChoice {
@@ -13,16 +14,13 @@ export interface TripChoice {
   photoCount: number | null
 }
 
-const plural = (count: number, noun: string): string =>
-  `${count} ${noun}${count === 1 ? '' : 's'}`
-
 /** What the counts say out loud. `4T · 128P` is decorative shorthand whose
     meaning is not recoverable when read aloud, so each option's accessible
     name spells it out instead. */
 export function tripChoiceLabel(choice: TripChoice): string {
-  const parts = [choice.entry.name, plural(choice.trackCount, 'track')]
+  const parts = [choice.entry.name, pluralize(choice.trackCount, 'track')]
   if (choice.photoCount !== null) {
-    parts.push(choice.photoCount === 0 ? 'no photos' : plural(choice.photoCount, 'photo'))
+    parts.push(choice.photoCount === 0 ? 'no photos' : pluralize(choice.photoCount, 'photo'))
   }
   return parts.join(', ')
 }

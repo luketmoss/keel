@@ -210,6 +210,19 @@ function AppShell() {
   const draftOpen = Boolean(draftTrip.draft)
   const detailOpen = Boolean(openTripId) || Boolean(openLooseId)
 
+  /** Every visible trip's track count, keyed by id — read from the
+      precomputed overview every trip already hydrates on `connect()`, never
+      by opening a trip's folder. #131's row and the picker below both read
+      counts, and this is the one place either costs a call to
+      `getOverview`. */
+  const trackCounts = useMemo(
+    () =>
+      new Map(
+        visibleTrips.map((entry) => [entry.id, tripStore.getOverview(entry.id)?.features.length ?? 0]),
+      ),
+    [visibleTrips, tripStore],
+  )
+
   /** What the picker shows beside each trip. Counts come from the index the
       list already reads rather than opening every trip's folder to count
       its files — a picker that costs one Drive round trip per trip would
@@ -218,14 +231,14 @@ function AppShell() {
     () =>
       visibleTrips.map((entry) => ({
         entry,
-        trackCount: tripStore.getOverview(entry.id)?.features.length ?? 0,
+        trackCount: trackCounts.get(entry.id) ?? 0,
         // #121: cached on the index when the trip's photo index was last
         // read, and `null` until something has read it. The picker shows
         // no photo count in that case rather than a zero it cannot stand
         // behind.
         photoCount: entry.photoCount,
       })),
-    [visibleTrips, tripStore],
+    [visibleTrips, trackCounts],
   )
 
   /** Moves a loose item into a trip and opens that trip, so the result is
@@ -545,6 +558,7 @@ function AppShell() {
           ) : (
             <TripsPanel
               trips={visibleTrips}
+              trackCounts={trackCounts}
               looseItems={visibleLoose}
               kind={kind}
               filters={filters}

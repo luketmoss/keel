@@ -199,3 +199,46 @@ describe('TripDetail — #55 photo list and lightbox', () => {
     })
   })
 })
+
+describe('TripDetail — #121 caching the photo count', () => {
+  it('caches the count for the picker to read, without a second Drive read', () => {
+    usePhotoImport.mockReturnValue(
+      basePhotoImport({ photos: [photoRecord({ id: 'a' }), photoRecord({ id: 'b' })] }),
+    )
+    const { store, entry } = renderTrip()
+
+    // Backfilled by the trip simply being opened — no migration pass, and
+    // `usePhotoImport` was reading `photos.json` on mount anyway.
+    expect(store.getTrips().find((t) => t.id === entry.id)?.photoCount).toBe(2)
+  })
+
+  it('records a genuine zero once the index has been read', () => {
+    usePhotoImport.mockReturnValue(basePhotoImport({ photos: [] }))
+    const { store, entry } = renderTrip()
+
+    expect(store.getTrip(entry.id)?.photoCount).toBe(0)
+  })
+
+  /* Before the read-back lands, `photos` is the empty array the hook was
+     initialised with. Writing `0` from that would clobber a real count with
+     a wrong one on every open, which is the same lie in a new place. */
+  it('writes nothing while the photo index is still loading', () => {
+    usePhotoImport.mockReturnValue(basePhotoImport({ photos: [], loading: true }))
+    const { store, entry } = renderTrip()
+
+    expect(store.getTrip(entry.id)?.photoCount).toBeNull()
+  })
+
+  it('follows the count down when a photo is removed', () => {
+    usePhotoImport.mockReturnValue(
+      basePhotoImport({ photos: [photoRecord({ id: 'a' }), photoRecord({ id: 'b' })] }),
+    )
+    const { store, entry, rerender } = renderTrip()
+    expect(store.getTrip(entry.id)?.photoCount).toBe(2)
+
+    usePhotoImport.mockReturnValue(basePhotoImport({ photos: [photoRecord({ id: 'a' })] }))
+    rerender(tripFace(store, entry.id))
+
+    expect(store.getTrip(entry.id)?.photoCount).toBe(1)
+  })
+})

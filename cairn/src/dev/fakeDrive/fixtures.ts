@@ -95,6 +95,9 @@ export function buildFixtureFiles(): FakeFile[] {
       notes: trip.notes,
       createdAt: trip.createdAt,
       origin: computeTripOrigin(trip.tracks),
+      // Seeded as never-counted, the way a real trip is until something
+      // reads its `photos.json` — which is what the picker is meant to show.
+      photoCount: null,
     }
     files.push(jsonFile(`${trip.id}-trip-json`, 'trip.json', [tripFolderId], record, trip.createdAt))
     files.push(

@@ -453,4 +453,44 @@ describe('DriveTripStore', () => {
       expect.anything(),
     )
   })
+
+  /* #121 — the count rides on `trip.json` exactly as `origin` does, and for
+     the same reason: it is derived, so it flushes through `flushTrip`
+     rather than `updateTrip`, which #73 refuses while disconnected and #35
+     scopes to fields a user edits. */
+  it('flushes a cached photo count to trip.json', async () => {
+    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', version: '1' })
+    const store = new DriveTripStore(fakeStorage())
+    const entry = store.createTrip('Hokkaido')
+    await store.connect('token', 'cairn-folder-id')
+    await flush()
+    writeJsonFile.mockClear()
+
+    store.savePhotoCount(entry.id, 128)
+    await flush()
+
+    expect(writeJsonFile).toHaveBeenCalledWith(
+      'token',
+      'folder-1',
+      'trip.json',
+      expect.objectContaining({ photoCount: 128 }),
+      expect.anything(),
+    )
+  })
+
+  it('writes nothing when the count is unchanged', async () => {
+    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', version: '1' })
+    const store = new DriveTripStore(fakeStorage())
+    const entry = store.createTrip('Hokkaido')
+    await store.connect('token', 'cairn-folder-id')
+    store.savePhotoCount(entry.id, 4)
+    await flush()
+    writeJsonFile.mockClear()
+
+    // The caller is an effect handing over the same number on every render.
+    store.savePhotoCount(entry.id, 4)
+    await flush()
+
+    expect(writeJsonFile).not.toHaveBeenCalled()
+  })
 })

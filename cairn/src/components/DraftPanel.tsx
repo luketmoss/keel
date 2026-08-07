@@ -61,6 +61,8 @@ export function DraftPanel({
     notes: draft.notes,
     createdAt: new Date().toISOString(),
     origin: null,
+    // A draft has no `photos.json` for anyone to have counted.
+    photoCount: null,
   }
 
   async function handleUpdate(patch: TripUpdate): Promise<TripRecord | null> {

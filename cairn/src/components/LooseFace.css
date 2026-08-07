@@ -35,6 +35,12 @@
   color: var(--text);
 }
 
+.loose-face__edit-error {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--danger);
+}
+
 .loose-face__kind {
   margin: 0;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -97,6 +103,32 @@
   font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
   color: var(--text);
+}
+
+/* #133 — the swatch becomes a button, wrapped in its own positioned
+   context so `ColorPopover` can anchor beneath it. */
+.loose-face__swatch-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.loose-face__swatch-button {
+  display: inline-flex;
+  border: none;
+  background: none;
+  padding: var(--space-1);
+  margin: calc(var(--space-1) * -1);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.loose-face__swatch-button:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.loose-face__swatch-button:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .loose-face__swatch {

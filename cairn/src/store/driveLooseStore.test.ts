@@ -31,19 +31,25 @@ vi.mock('../drive/looseFolder', () => ({
 const { findOrCreateTripFolder } = vi.hoisted(() => ({ findOrCreateTripFolder: vi.fn() }))
 vi.mock('../drive/tripFolder', () => ({ findOrCreateTripFolder }))
 
-const { findJsonFile, readJsonFile, writeJsonFile, listSubfolders, trashFolder } = vi.hoisted(() => ({
-  findJsonFile: vi.fn(),
-  readJsonFile: vi.fn(),
-  writeJsonFile: vi.fn(),
-  listSubfolders: vi.fn(),
-  trashFolder: vi.fn(),
-}))
+const { findJsonFile, readJsonFile, writeJsonFile, listSubfolders, trashFolder, DriveConflictError } =
+  vi.hoisted(() => {
+    class DriveConflictError extends Error {}
+    return {
+      findJsonFile: vi.fn(),
+      readJsonFile: vi.fn(),
+      writeJsonFile: vi.fn(),
+      listSubfolders: vi.fn(),
+      trashFolder: vi.fn(),
+      DriveConflictError,
+    }
+  })
 vi.mock('../drive/tripMetadata', () => ({
   findJsonFile,
   readJsonFile,
   writeJsonFile,
   listSubfolders,
   trashFolder,
+  DriveConflictError,
 }))
 
 const { startResumableUpload, uploadFileContent } = vi.hoisted(() => ({
@@ -496,5 +502,115 @@ describe('claiming back out of a trip', () => {
     moveDriveFile.mockRejectedValue(new Error('offline'))
 
     expect(await store.claimFromTrip(record.id, 'trip-1')).toBe(false)
+  })
+})
+
+describe('update (#133)', () => {
+  it('renames a track, flushing its record file', async () => {
+    store = await connected()
+    const record = store.addTrack(NEW_TRACK, GEOMETRY)
+
+    expect(await store.update(record.id, { name: 'Mount Rosea East' })).toBe(true)
+
+    expect(store.getItem(record.id)?.name).toBe('Mount Rosea East')
+    await settle()
+    expect(writeJsonFile.mock.calls.some((call) => call[2] === 'track.json')).toBe(true)
+  })
+
+  it('recolours a track', async () => {
+    store = await connected()
+    const record = store.addTrack(NEW_TRACK, GEOMETRY)
+
+    expect(await store.update(record.id, { colorIndex: 4 })).toBe(true)
+
+    expect((store.getItem(record.id) as { colorIndex: number }).colorIndex).toBe(4)
+  })
+
+  it('resolves false when the id names nothing', async () => {
+    store = await connected()
+    expect(await store.update('no-such-id', { name: 'x' })).toBe(false)
+  })
+
+  it('refuses while disconnected, leaving the local value untouched', async () => {
+    store = new DriveLooseStore(fakeStorage())
+    const record = store.addTrack(NEW_TRACK, GEOMETRY)
+
+    expect(await store.update(record.id, { name: 'Renamed' })).toBe(false)
+    expect(store.getItem(record.id)?.name).toBe(NEW_TRACK.name)
+  })
+
+  it('writes nothing when the value already matches', async () => {
+    store = await connected()
+    const record = store.addTrack(NEW_TRACK, GEOMETRY)
+    writeJsonFile.mockClear()
+
+    expect(await store.update(record.id, { name: NEW_TRACK.name })).toBe(true)
+    await settle()
+
+    expect(writeJsonFile).not.toHaveBeenCalled()
+  })
+
+  it('cancels an empty rename rather than saving it', async () => {
+    store = await connected()
+    const record = store.addTrack(NEW_TRACK, GEOMETRY)
+
+    expect(await store.update(record.id, { name: '   ' })).toBe(true)
+
+    expect(store.getItem(record.id)?.name).toBe(NEW_TRACK.name)
+  })
+
+  it('reverts to the previous value after a non-conflict write failure', async () => {
+    store = await connected()
+    const record = store.addTrack(NEW_TRACK, GEOMETRY)
+    writeJsonFile.mockRejectedValue(new Error('offline'))
+
+    expect(await store.update(record.id, { name: 'Renamed' })).toBe(false)
+
+    expect(store.getItem(record.id)?.name).toBe(NEW_TRACK.name)
+  })
+
+  it('on a conflict, re-hydrates from Drive rather than reverting to the pre-edit value', async () => {
+    // Hydrated from Drive on connect, so there is a cached record ref to
+    // re-read against — the same setup driveTripStore.test.ts's identical
+    // test uses, for the same reason.
+    listSubfolders.mockImplementation(async (_token: string, folderId: string) =>
+      folderId === 'kind-folder' ? [{ id: 'item-folder', name: 'track-a' }] : [],
+    )
+    findJsonFile.mockImplementation(async (_token: string, _folderId: string, name: string) =>
+      name === 'track.json' ? { fileId: 'record-file', version: '1' } : null,
+    )
+    readJsonFile.mockResolvedValueOnce({
+      data: {
+        kind: 'track',
+        id: 'track-a',
+        name: NEW_TRACK.name,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        uploadState: 'ok',
+        date: NEW_TRACK.date,
+        distanceMeters: NEW_TRACK.distanceMeters,
+        ascentMeters: NEW_TRACK.ascentMeters,
+        pointCount: NEW_TRACK.pointCount,
+        sourceName: NEW_TRACK.sourceName,
+        colorIndex: NEW_TRACK.colorIndex,
+        position: NEW_TRACK.position,
+        driveFileId: null,
+      },
+      version: '1',
+    })
+
+    store = new DriveLooseStore(fakeStorage())
+    await store.connect('tok', 'cairn-folder')
+    expect(store.getItem('track-a')?.name).toBe(NEW_TRACK.name)
+
+    writeJsonFile.mockRejectedValueOnce(new DriveConflictError())
+    readJsonFile.mockResolvedValueOnce({
+      data: { ...store.getItem('track-a'), name: 'Renamed elsewhere' },
+      version: '2',
+    })
+
+    const result = await store.update('track-a', { name: 'My edit' })
+
+    expect(result).toBe(false)
+    expect(store.getItem('track-a')?.name).toBe('Renamed elsewhere')
   })
 })

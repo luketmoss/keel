@@ -94,6 +94,14 @@ export interface NewLooseTrack {
   driveFileId?: string | null
 }
 
+/** #133: the fields a loose item's `⋮` can edit. `colorIndex` is
+    meaningful for a track only — a photo's marker is its thumbnail, not a
+    palette entry — and is simply ignored if ever sent for one. */
+export interface LooseUpdate {
+  name?: string
+  colorIndex?: number
+}
+
 export interface NewLoosePhoto {
   name: string
   takenAt: string | null
@@ -141,6 +149,17 @@ export interface LooseStore {
       and moves it into the loose folder of the item already created for it
       under `id`. Resolves `false` on failure, leaving the file in the trip. */
   claimFromTrip(id: string, tripId: string): Promise<boolean>
+  /** #133: renames or recolours a loose item. Applied to the local cache
+      immediately — visible through `getItem`/`subscribe` before this
+      promise settles — and resolves `false` if `id` names nothing, the
+      write failed, or (#73) the store is disconnected, in which case the
+      edit is refused up front and never applied locally. A Drive-backed
+      implementation reverts its local copy before resolving `false`, so a
+      caller never has to distinguish "not found" from "save failed" to
+      know it should show the revert. An empty or whitespace-only `name`
+      is treated as no rename — the same rule `TripStore.updateTrip`
+      already applies. */
+  update(id: string, patch: LooseUpdate): Promise<boolean>
   /** The loose track's precomputed simplified geometry. cairn's `CLAUDE.md`
       performance rule covers loose tracks too: the map reads this, never a
       source KML. */
@@ -255,6 +274,27 @@ export class LocalLooseStore implements LooseStore {
   moveIntoTrip = async (): Promise<boolean> => true
 
   claimFromTrip = async (): Promise<boolean> => true
+
+  /** `localStorage` writes are synchronous; the `Promise` wrapper exists
+      only to satisfy `LooseStore`'s async signature, needed for the
+      Drive-backed implementation. */
+  update = async (id: string, patch: LooseUpdate): Promise<boolean> => {
+    const current = this.index.find((item) => item.id === id)
+    if (!current) return false
+
+    // Empty commits nothing — the same rule `LocalTripStore.updateTripSync`
+    // already applies to a trip's name: an aborted edit, not a saved one.
+    const name = patch.name !== undefined ? patch.name.trim() || current.name : current.name
+    const next: LooseRecord =
+      patch.colorIndex !== undefined && current.kind === 'track'
+        ? { ...current, name, colorIndex: patch.colorIndex }
+        : { ...current, name }
+
+    this.index = this.index.map((item) => (item.id === id ? next : item))
+    this.writeIndex()
+    this.notify()
+    return true
+  }
 
   getOverview = (id: string): FeatureCollection<LineString> | null => {
     const raw = this.storage.getItem(overviewKey(id))

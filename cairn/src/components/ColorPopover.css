@@ -1,0 +1,65 @@
+/* #46 — colour popover. L2 elevation: floats over the list, touches no
+   edge, same shared blur/shadow tokens as the world map's filter row.
+   Mirrors TrackList.css's original `.track-row__color-*` rules exactly. */
+.color-popover {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 2;
+  margin-top: var(--space-1);
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur));
+  box-shadow: var(--shadow-lifted);
+}
+
+.color-popover--right {
+  left: auto;
+  right: 0;
+}
+
+.color-popover__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+}
+
+/* 40px hit target wrapping a 20px visible swatch — the swatch itself never
+   grows, same non-growing principle as a row's own icon buttons, just
+   applied via an inner element instead of padding, since the swatch's own
+   background carries the palette colour and can't also carry a hover fill
+   on the same box. */
+.color-popover__option {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.color-popover__option:hover {
+  background: var(--hover);
+}
+
+.color-popover__option:active {
+  background: var(--pressed);
+}
+
+.color-popover__swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+}
+
+.color-popover__swatch--selected {
+  box-shadow: 0 0 0 2px var(--accent);
+}

@@ -309,6 +309,25 @@
   text-decoration: none;
 }
 
+/* #133 — the row's `⋮` and, when open, its colour popover — a positioned
+   wrapper of their own so the popover can anchor under the trigger without
+   reaching into `RowMenu`'s own internals. */
+.trips-panel__row-actions {
+  position: relative;
+  flex: none;
+  display: flex;
+}
+
+/* #133 — a failed rename or recolour, one line for the whole list rather
+   than a second line per row that would have to fight the row's flex
+   layout for space. */
+.trips-panel__edit-error {
+  margin: var(--space-1) 0 0;
+  padding: 0 var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--danger);
+}
+
 .trips-panel__row-name {
   display: -webkit-box;
   -webkit-box-orient: vertical;

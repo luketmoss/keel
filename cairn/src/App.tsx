@@ -528,6 +528,8 @@ function AppShell() {
                 error={moveError}
                 onAddToTrip={(tripId) => void moveLooseToTrip(openLooseId, tripId)}
                 onCreateTripWith={(name) => void createTripWithLoose(openLooseId, name)}
+                onRename={(id, name) => looseStore.update(id, { name })}
+                onRecolor={(id, color) => looseStore.update(id, { colorIndex: color })}
                 onDelete={() => {
                   // Trashes the Drive folder as well now. Best-effort and
                   // not awaited: the row is gone either way, and a failed
@@ -558,6 +560,8 @@ function AppShell() {
                 tripStore.updateTrip(tripId, { status })
               }
               onDeleteLoose={(id) => looseStore.remove(id)}
+              onRenameLoose={(id, name) => looseStore.update(id, { name })}
+              onRecolorLoose={(id, color) => looseStore.update(id, { colorIndex: color })}
               onAddLooseToTrip={(id) =>
                 navigate(
                   looseStore.getItem(id)?.kind === 'track' ? `/tracks/${id}` : `/photos/${id}`,

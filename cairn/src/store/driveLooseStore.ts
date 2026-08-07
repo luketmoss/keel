@@ -8,6 +8,7 @@ import {
   type LooseRecord,
   type LooseStore,
   type LooseTrackRecord,
+  type LooseUpdate,
   type NewLoosePhoto,
   type NewLooseTrack,
 } from './looseStore'
@@ -15,6 +16,7 @@ import { isFeatureCollection } from './tripStore'
 import { findOrCreateLooseFolder, findOrCreateLooseItemFolder, moveDriveFile } from '../drive/looseFolder'
 import { findOrCreateTripFolder } from '../drive/tripFolder'
 import {
+  DriveConflictError,
   findJsonFile,
   listSubfolders,
   readJsonFile,
@@ -223,6 +225,107 @@ export class DriveLooseStore implements LooseStore {
         return false
       }
     })
+  }
+
+  /** #133: renames or recolours a loose item, applied locally first (the
+      field changes on screen immediately) and flushed to Drive behind
+      that — the same optimistic-write shape `DriveTripStore.updateTrip`
+      already uses, right down to per-id serialization so a stale-version
+      conflict can't race an in-flight write for the same item. */
+  update = async (id: string, patch: LooseUpdate): Promise<boolean> => {
+    if (!this.credentials) return false
+    const { accessToken, cairnFolderId } = this.credentials
+
+    const previous = this.local.getItem(id)
+    if (!previous) return false
+
+    // No-op when nothing actually changes — a caller re-sending the value
+    // it already holds costs no write, the same stance
+    // `DriveTripStore.savePhotoCount` takes for a derived field.
+    const nameChanged = patch.name !== undefined && patch.name.trim() !== '' && patch.name.trim() !== previous.name
+    const colorChanged =
+      patch.colorIndex !== undefined &&
+      previous.kind === 'track' &&
+      patch.colorIndex !== previous.colorIndex
+    if (!nameChanged && !colorChanged) return true
+
+    if (!(await this.local.update(id, patch))) return false
+
+    const result = await this.enqueue(id, () => this.flushRecordUpdate(id, accessToken, cairnFolderId))
+    if (result === 'ok') return true
+    // A conflict already re-hydrates the local copy to Drive's current
+    // value inside flushRecordUpdate — reverting to `previous` here would
+    // overwrite that with data that's now stale twice over, not once.
+    if (result === 'conflict') return false
+
+    this.local.hydrate(previous)
+    return false
+  }
+
+  private async flushRecordUpdate(
+    id: string,
+    accessToken: string,
+    cairnFolderId: string,
+  ): Promise<'ok' | 'conflict' | 'error'> {
+    const record = this.local.getItem(id)
+    if (!record) return 'ok'
+
+    let ref: LooseDriveRef
+    let existing: DriveFileRef | null
+    try {
+      ref =
+        this.refs.get(id) ??
+        { folderId: await findOrCreateLooseItemFolder(accessToken, cairnFolderId, record.kind, id) }
+      // No cached ref only means this session hasn't written or hydrated
+      // the file yet, not that Drive has none — same #102 reasoning
+      // `writeRecordFiles` and `DriveTripStore.flushTrip` both apply.
+      existing = ref.record ?? (await findJsonFile(accessToken, ref.folderId, RECORD_FILE[record.kind]))
+    } catch {
+      return 'error'
+    }
+
+    const write = () =>
+      writeJsonFile(accessToken, ref.folderId, RECORD_FILE[record.kind], { ...record, uploadState: 'ok' }, existing)
+
+    try {
+      this.refs.set(id, { ...ref, record: await write() })
+      return 'ok'
+    } catch (error) {
+      if (error instanceof DriveConflictError) {
+        // Drive's file changed under us — retrying our own stale intent
+        // risks clobbering whatever wrote it, so this defers to Drive's
+        // truth instead, the same call `DriveTripStore.flushTrip` makes.
+        await this.resolveRecordConflict(id, ref, accessToken)
+        return 'conflict'
+      }
+      // Any other failure (network blip, transient 5xx) carries no such
+      // risk — retried once against the same target before giving up.
+      try {
+        this.refs.set(id, { ...ref, record: await write() })
+        return 'ok'
+      } catch {
+        return 'error'
+      }
+    }
+  }
+
+  /** After a rejected write, pulls whatever Drive actually has now into
+      the local cache — so the field the user just tried to edit shows the
+      current truth, and the *next* edit starts from real data instead of
+      retrying against a copy that's already known to be stale. Mirrors
+      `DriveTripStore.resolveConflict` exactly. */
+  private async resolveRecordConflict(id: string, ref: LooseDriveRef, accessToken: string): Promise<void> {
+    if (!ref.record) return
+    try {
+      const stored = await readJsonFile<LooseRecord>(accessToken, ref.record.fileId)
+      if (isLooseRecord(stored.data)) {
+        this.local.hydrate({ ...stored.data, uploadState: 'ok' })
+        this.refs.set(id, { ...ref, record: { fileId: ref.record.fileId, version: stored.version } })
+      }
+    } catch {
+      // The re-read itself failed — the caller already treats this as a
+      // failed save either way.
+    }
   }
 
   /** #73: drops credentials and every item's file refs, so a mutation

@@ -54,8 +54,6 @@ export function DraftPanel({
   // the type.
   const syntheticTrip: TripRecord = {
     id: 'draft',
-    // A draft holds no photos and has no `photos.json` to have counted.
-    photoCount: null,
     name: draft.name,
     status: draft.status,
     startDate: draft.startDate,
@@ -63,6 +61,8 @@ export function DraftPanel({
     notes: draft.notes,
     createdAt: new Date().toISOString(),
     origin: null,
+    // A draft has no `photos.json` for anyone to have counted.
+    photoCount: null,
   }
 
   async function handleUpdate(patch: TripUpdate): Promise<TripRecord | null> {

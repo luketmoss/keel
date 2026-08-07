@@ -3,11 +3,17 @@ import { AdvancedMarker, Polyline, useMap } from '@vis.gl/react-google-maps'
 import type { FeatureCollection, LineString } from 'geojson'
 import { trackColor } from '../map/palette'
 import type { LooseRecord, LooseStore } from '../store/looseStore'
+import { usePhotoImage } from '../photo/usePhotoImage'
 import './LooseLayer.css'
 
 interface LooseLayerProps {
   items: LooseRecord[]
   store: LooseStore
+  /** #134: Drive access token for a loose photo's thumbnail, through the
+      same caching loader `PhotoLayer` uses — `null` renders every marker
+      with its `--surface-lift` fallback fill, same as a thumbnail that
+      hasn't arrived yet. */
+  accessToken: string | null
   hoveredId: string | null
   onHover: (id: string | null) => void
   onSelect: (item: LooseRecord) => void
@@ -25,6 +31,7 @@ interface LooseLayerProps {
 export function LooseLayer({
   items,
   store,
+  accessToken,
   hoveredId,
   onHover,
   onSelect,
@@ -50,6 +57,7 @@ export function LooseLayer({
           <PhotoDot
             key={item.id}
             item={item}
+            accessToken={accessToken}
             emphasized={emphasized}
             onHover={onHover}
             onSelect={() => onSelect(item)}
@@ -100,16 +108,23 @@ function TrackTile({
 
 function PhotoDot({
   item,
+  accessToken,
   emphasized,
   onHover,
   onSelect,
 }: {
   item: Extract<LooseRecord, { kind: 'photo' }>
+  accessToken: string | null
   emphasized: boolean
   onHover: (id: string | null) => void
   onSelect: () => void
 }) {
   const position = item.position as { lat: number; lng: number }
+  // #134: the same fallback the standing document already specifies for a
+  // photo without one — a photo whose thumbnail is missing or fails to
+  // load keeps drawing at the same size and ring, in the `--surface-lift`
+  // fill, rather than disappearing from the map.
+  const thumbnailUrl = usePhotoImage(accessToken, item.thumbnailDriveFileId ?? undefined).url
   return (
     <AdvancedMarker position={position} zIndex={0} onClick={onSelect}>
       <div
@@ -123,7 +138,9 @@ function PhotoDot({
           aria-label={item.name}
           onFocus={() => onHover(item.id)}
           onBlur={() => onHover(null)}
-        />
+        >
+          {thumbnailUrl && <img src={thumbnailUrl} alt="" />}
+        </button>
         <span className="loose-marker__label">{item.name}</span>
       </div>
     </AdvancedMarker>

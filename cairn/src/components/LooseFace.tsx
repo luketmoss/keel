@@ -6,11 +6,16 @@ import { ColorPopover } from './ColorPopover'
 import { formatDistance } from '../format/units'
 import { trackColor, TRACK_COLORS } from '../map/palette'
 import { canChangeOwner, type LooseRecord } from '../store/looseStore'
+import { usePhotoImage } from '../photo/usePhotoImage'
 import './LooseFace.css'
 
 interface LooseFaceProps {
   item: LooseRecord
   trips: TripChoice[]
+  /** #134: resolves a photo's thumbnail through #53's caching loader —
+      `null` renders the box's existing `--surface-lift` fill, same as a
+      thumbnail that hasn't arrived yet. Unused for a track. */
+  accessToken: string | null
   onAddToTrip: (tripId: string) => void
   onCreateTripWith: (name: string) => void
   onDelete: () => void
@@ -34,6 +39,7 @@ interface LooseFaceProps {
 export function LooseFace({
   item,
   trips,
+  accessToken,
   onAddToTrip,
   onCreateTripWith,
   onDelete,
@@ -168,7 +174,7 @@ export function LooseFace({
             disabled={disabled}
           />
         ) : (
-          <PhotoBody item={item} />
+          <PhotoBody item={item} accessToken={accessToken} />
         )}
       </div>
     </div>
@@ -240,10 +246,22 @@ function TrackBody({
   )
 }
 
-function PhotoBody({ item }: { item: Extract<LooseRecord, { kind: 'photo' }> }) {
+function PhotoBody({
+  item,
+  accessToken,
+}: {
+  item: Extract<LooseRecord, { kind: 'photo' }>
+  accessToken: string | null
+}) {
+  // #134: loading and failed both render the same `--surface-lift`
+  // fallback fill — `usePhotoImage` already collapses those two into one
+  // `undefined` for exactly this reason, matching `PhotoList`'s own stance.
+  const thumbnailUrl = usePhotoImage(accessToken, item.thumbnailDriveFileId ?? undefined).url
   return (
     <>
-      <div className="loose-face__image" role="img" aria-label={item.name} />
+      <div className="loose-face__image" role="img" aria-label={item.name}>
+        {thumbnailUrl && <img src={thumbnailUrl} alt="" />}
+      </div>
       {item.position ? (
         <dl className="loose-face__stats">
           <div className="loose-face__stat">

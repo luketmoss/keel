@@ -162,6 +162,17 @@ straight to Refined; it is not a question you get asked.
 from the issue.
 **Exit:** the behavior is specified precisely enough to build without inventing.
 
+#### Standing documents
+
+A file in `<project>/docs/design/` whose name does **not** begin with an issue
+number is standing: it covers every issue rather than one, and it outranks any
+individual note. `design-language.md` is the usual first one, but there is no
+fixed list and a project may have several.
+
+Both `/ux` and `/develop` read all of them. Naming is the whole mechanism —
+`shell-and-content-model.md` is standing, `109-shell-column.md` is not — so a
+standing document never gets an issue number, even when one issue introduced it.
+
 ### 4. Refined
 
 The ready queue. Anything here satisfies the Definition of Ready and could be

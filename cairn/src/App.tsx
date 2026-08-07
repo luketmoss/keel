@@ -38,6 +38,7 @@ import { useDraftTrip } from './import/useDraftTrip'
 import { useGoogleAccount } from './auth/useGoogleAccount'
 import { AccountBubble } from './auth/AccountBubble'
 import { defaultOverridesStore } from './import/useTripImport'
+import type { PhotoRecord } from './photo/photoIndex'
 import './App.css'
 
 export function App() {
@@ -273,6 +274,21 @@ function AppShell() {
     if (!record) return false
     if (!(await looseStore.claimFromTrip(record.id, tripId))) {
       looseStore.forget(record.id)
+      return false
+    }
+    setToasts((prev) => [...prev, { id: generateToastId(), text: 'Moved back to the map.' }])
+    return true
+  }
+
+  /** #132's `Remove from trip` for a photo — the photo mirror of
+      `removeTrackFromTrip`, and the same failure order for the same
+      reason: the loose record is created first, around the files that
+      already exist in the trip's folder, and a failed claim un-creates it
+      rather than leaving a loose row beside files the trip still owns. */
+  async function removePhotoFromTrip(record: PhotoRecord, tripId: string): Promise<boolean> {
+    const loose = looseImport.addPhotoFromTrip(record)
+    if (!(await looseStore.claimFromTrip(loose.id, tripId))) {
+      looseStore.forget(loose.id)
       return false
     }
     setToasts((prev) => [...prev, { id: generateToastId(), text: 'Moved back to the map.' }])
@@ -516,6 +532,7 @@ function AppShell() {
               // Reversible by adding it back, which is why it needs no
               // confirm — `Delete permanently` is the neighbouring one.
               onRemoveFromTrip={(file) => removeTrackFromTrip(file, openTripId)}
+              onRemovePhotoFromTrip={(record) => removePhotoFromTrip(record, openTripId)}
             />
           ) : openLooseId ? (
             openLoose ? (

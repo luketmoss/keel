@@ -24,7 +24,7 @@ import {
 } from '../drive/tripMetadata'
 import { startResumableUpload, uploadFileContent } from '../drive/trackFiles'
 import { generateThumbnail, THUMBNAIL_SUFFIX } from '../photo/thumbnail'
-import { appendPhotoToIndex } from '../photo/photoIndex'
+import { appendPhotoToIndex, removePhotoFromIndex } from '../photo/photoIndex'
 
 interface LooseDriveRef {
   folderId: string
@@ -204,24 +204,61 @@ export class DriveLooseStore implements LooseStore {
     })
   }
 
+  /** The reverse of `moveIntoTrip`, and photo-aware since #132: `Remove
+      from trip` needs the same two-file-plus-index handling on the way out
+      that adding one needs on the way in. The caller creates the loose
+      record first — this only ever relocates files for an id that already
+      exists, exactly as `moveIntoTrip` does for the trip side. */
   claimFromTrip = async (id: string, tripId: string): Promise<boolean> => {
     if (!this.credentials) return false
     const { accessToken, cairnFolderId } = this.credentials
 
     return this.enqueue(id, async () => {
       const item = this.local.getItem(id)
-      if (!item || item.kind !== 'track' || !item.driveFileId) return false
+      if (!item) return false
 
+      let tripFolderId: string
+      let looseFolderId: string
       try {
-        const tripFolderId = await findOrCreateTripFolder(accessToken, cairnFolderId, tripId)
-        const looseFolderId = await findOrCreateLooseItemFolder(accessToken, cairnFolderId, 'track', id)
-        await moveDriveFile(accessToken, item.driveFileId, tripFolderId, looseFolderId)
-        await this.writeRecordFiles(id, looseFolderId)
-        this.local.setUploadState(id, 'ok')
-        return true
+        tripFolderId = await findOrCreateTripFolder(accessToken, cairnFolderId, tripId)
+        looseFolderId = await findOrCreateLooseItemFolder(accessToken, cairnFolderId, item.kind, id)
+
+        if (item.kind === 'track') {
+          if (!item.driveFileId) return false
+          await moveDriveFile(accessToken, item.driveFileId, tripFolderId, looseFolderId)
+        } else {
+          // A photo with no file in Drive on either end — nothing to
+          // relocate, and refusing is the same answer `moveIntoTrip` gives
+          // the mirror case.
+          if (!item.originalDriveFileId || !item.thumbnailDriveFileId) return false
+          await moveDriveFile(accessToken, item.originalDriveFileId, tripFolderId, looseFolderId)
+        }
       } catch {
+        // Nothing has moved: the item is still in the trip and its files
+        // are still in the trip's folder.
         return false
       }
+
+      /* Past this line the item's first file has left the trip folder, and
+         **the claim must be reported as done** — the same stance
+         `moveIntoTrip` takes on the way in, for the same reason: resolving
+         `false` from here on would leave the photo named in the trip's
+         `photos.json` beside files the loose store now holds, which is the
+         duplicate #120 exists to stop. What can still fail is best-effort
+         and retried by the next `connect()`. */
+      if (item.kind === 'photo' && item.thumbnailDriveFileId && item.originalDriveFileId) {
+        await moveDriveFile(
+          accessToken,
+          item.thumbnailDriveFileId,
+          tripFolderId,
+          looseFolderId,
+        ).catch(() => {})
+        await removePhotoFromIndex(accessToken, tripFolderId, item.originalDriveFileId).catch(() => {})
+      }
+
+      await this.writeRecordFiles(id, looseFolderId).catch(() => {})
+      this.local.setUploadState(id, 'ok')
+      return true
     })
   }
 

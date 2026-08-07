@@ -246,7 +246,7 @@ describe('PhotoList', () => {
         />,
       )
 
-      fireEvent.click(screen.getByRole('button', { name: 'Remove a.jpg' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Delete a.jpg permanently' }))
       expect(onStartConfirm).toHaveBeenCalledWith('a')
       expect(onRemove).not.toHaveBeenCalled()
     })
@@ -312,7 +312,7 @@ describe('PhotoList', () => {
       )
 
       expect(screen.getByText('Removing…')).toBeDefined()
-      expect(screen.queryByRole('button', { name: 'Remove a.jpg' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Delete a.jpg permanently' })).toBeNull()
     })
 
     it('shows a failure line beneath a row whose removal failed, without removing it', () => {
@@ -349,7 +349,121 @@ describe('PhotoList', () => {
         />,
       )
 
-      expect(screen.getByRole('button', { name: 'Remove a.jpg' })).toHaveProperty('disabled', true)
+      expect(screen.getByRole('button', { name: 'Delete a.jpg permanently' })).toHaveProperty('disabled', true)
+    })
+  })
+
+  describe('#132 remove from trip, beside delete', () => {
+    it('offers no unlink control when the caller has nowhere to put a detached photo', () => {
+      const items = orderPhotoListItems([row({ id: 'a', captureInstantMs: 100 })])
+
+      render(
+        <PhotoList
+          items={items}
+          totalCount={1}
+          selectedPhotoId={null}
+          accessToken="token"
+          tripOffsetHours={0}
+          onOpenRow={vi.fn()}
+          {...removeProps()}
+        />,
+      )
+
+      expect(screen.queryByRole('button', { name: /from trip/ })).toBeNull()
+    })
+
+    it('returns the photo to the top level without a confirm', () => {
+      const items = orderPhotoListItems([row({ id: 'a', captureInstantMs: 100 })])
+      const onRemoveFromTrip = vi.fn()
+      const onRemove = vi.fn()
+
+      render(
+        <PhotoList
+          items={items}
+          totalCount={1}
+          selectedPhotoId={null}
+          accessToken="token"
+          tripOffsetHours={0}
+          onOpenRow={vi.fn()}
+          onRemoveFromTrip={onRemoveFromTrip}
+          {...removeProps({ onRemove })}
+        />,
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'Remove a.jpg from trip' }))
+
+      // No ellipsis, no confirm — reversible by adding it back, which is
+      // exactly what makes it the other exit.
+      expect(onRemoveFromTrip).toHaveBeenCalledWith('a')
+      expect(onRemove).not.toHaveBeenCalled()
+      expect(screen.queryByText('Remove "a.jpg"?')).toBeNull()
+    })
+
+    it('keeps deleting one click away, as its own named control', () => {
+      const items = orderPhotoListItems([row({ id: 'a', captureInstantMs: 100 })])
+
+      render(
+        <PhotoList
+          items={items}
+          totalCount={1}
+          selectedPhotoId={null}
+          accessToken="token"
+          tripOffsetHours={0}
+          onOpenRow={vi.fn()}
+          onRemoveFromTrip={vi.fn()}
+          {...removeProps()}
+        />,
+      )
+
+      // Two exits, never one action with a second step.
+      expect(screen.getByRole('button', { name: 'Delete a.jpg permanently' })).toBeDefined()
+      expect(screen.getByRole('button', { name: 'Remove a.jpg from trip' })).toBeDefined()
+    })
+
+    it('disables both exits while disconnected', () => {
+      const items = orderPhotoListItems([row({ id: 'a', captureInstantMs: 100 })])
+
+      render(
+        <PhotoList
+          items={items}
+          totalCount={1}
+          selectedPhotoId={null}
+          accessToken="token"
+          tripOffsetHours={0}
+          onOpenRow={vi.fn()}
+          onRemoveFromTrip={vi.fn()}
+          {...removeProps({ disableRemove: true })}
+        />,
+      )
+
+      expect(screen.getByRole('button', { name: 'Remove a.jpg from trip' })).toHaveProperty(
+        'disabled',
+        true,
+      )
+      expect(screen.getByRole('button', { name: 'Delete a.jpg permanently' })).toHaveProperty(
+        'disabled',
+        true,
+      )
+    })
+
+    it('hides the unlink control alongside the delete control while a row is mid-removal', () => {
+      const items = orderPhotoListItems([row({ id: 'a', captureInstantMs: 100 })])
+
+      render(
+        <PhotoList
+          items={items}
+          totalCount={1}
+          selectedPhotoId={null}
+          accessToken="token"
+          tripOffsetHours={0}
+          onOpenRow={vi.fn()}
+          onRemoveFromTrip={vi.fn()}
+          {...removeProps({ removingIds: new Set(['a']) })}
+        />,
+      )
+
+      expect(screen.getByText('Removing…')).toBeDefined()
+      expect(screen.queryByRole('button', { name: 'Remove a.jpg from trip' })).toBeNull()
     })
   })
 })

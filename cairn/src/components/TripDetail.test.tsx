@@ -458,7 +458,7 @@ describe('TripDetail — #77 removing tracks and photos', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete a.kml permanently' }))
     expect(screen.getByText('Delete "a.kml"?')).toBeDefined()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove photo.jpg' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete photo.jpg permanently' }))
     expect(screen.queryByText('Delete "a.kml"?')).toBeNull()
     expect(screen.getByText('Remove "photo.jpg"?')).toBeDefined()
   })

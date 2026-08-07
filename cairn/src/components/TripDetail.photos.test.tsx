@@ -89,13 +89,18 @@ function basePhotoImport(overrides: Record<string, unknown> = {}) {
     retryFailure: vi.fn().mockResolvedValue(undefined),
     dismissFailures: vi.fn(),
     removePhoto: vi.fn(),
+    forgetPhoto: vi.fn(),
     removingPhotoIds: new Set<string>(),
     photoRemoveErrors: {},
     ...overrides,
   }
 }
 
-function tripFace(store: LocalTripStore, tripId: string) {
+function tripFace(
+  store: LocalTripStore,
+  tripId: string,
+  options: { onRemovePhotoFromTrip?: (record: PhotoRecord) => Promise<boolean> } = {},
+) {
   return (
     <MemoryRouter initialEntries={[`/trips/${tripId}`]}>
       <TripDetail
@@ -106,15 +111,16 @@ function tripFace(store: LocalTripStore, tripId: string) {
         onBack={() => {}}
         onDropTargetChange={() => {}}
         onGeometryChange={() => {}}
+        onRemovePhotoFromTrip={options.onRemovePhotoFromTrip}
       />
     </MemoryRouter>
   )
 }
 
-function renderTrip() {
+function renderTrip(options: { onRemovePhotoFromTrip?: (record: PhotoRecord) => Promise<boolean> } = {}) {
   const store = new LocalTripStore(fakeStorage())
   const entry = store.createTrip('Hokkaido')
-  const view = render(tripFace(store, entry.id))
+  const view = render(tripFace(store, entry.id, options))
   return { ...view, store, entry }
 }
 
@@ -174,7 +180,7 @@ describe('TripDetail — #55 photo list and lightbox', () => {
 
       renderTrip()
 
-      fireEvent.click(screen.getByRole('button', { name: 'Remove sapporo.jpg' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Delete sapporo.jpg permanently' }))
       expect(removePhoto).not.toHaveBeenCalled()
       expect(screen.getByText('Remove "sapporo.jpg"?')).toBeDefined()
 
@@ -196,6 +202,43 @@ describe('TripDetail — #55 photo list and lightbox', () => {
       rerender(tripFace(store, entry.id))
 
       await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    })
+  })
+
+  describe('#132 removing a photo from a trip', () => {
+    it('calls onRemovePhotoFromTrip with the photo record and forgets it on success', async () => {
+      const forgetPhoto = vi.fn()
+      usePhotoImport.mockReturnValue(basePhotoImport({ forgetPhoto }))
+      const onRemovePhotoFromTrip = vi.fn().mockResolvedValue(true)
+
+      renderTrip({ onRemovePhotoFromTrip })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Remove sapporo.jpg from trip' }))
+
+      await waitFor(() => expect(onRemovePhotoFromTrip).toHaveBeenCalledWith(photoRecord()))
+      expect(forgetPhoto).toHaveBeenCalledWith('p1')
+      // No confirm and no delete — reversible by adding it back.
+      expect(screen.queryByText('Remove "sapporo.jpg"?')).toBeNull()
+    })
+
+    it('shows the move-failed message and keeps the row when the move fails', async () => {
+      const forgetPhoto = vi.fn()
+      usePhotoImport.mockReturnValue(basePhotoImport({ forgetPhoto }))
+      const onRemovePhotoFromTrip = vi.fn().mockResolvedValue(false)
+
+      renderTrip({ onRemovePhotoFromTrip })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Remove sapporo.jpg from trip' }))
+
+      await waitFor(() => expect(screen.getByText("Couldn't move — still on the map.")).toBeDefined())
+      expect(forgetPhoto).not.toHaveBeenCalled()
+      expect(screen.getByText('sapporo.jpg')).toBeDefined()
+    })
+
+    it('offers no unlink control when the shell has no handler for it', () => {
+      renderTrip()
+
+      expect(screen.queryByRole('button', { name: /from trip/ })).toBeNull()
     })
   })
 })

@@ -4,7 +4,8 @@ import { computeTrackStats } from '../kml/stats'
 import { readPhotoExif } from '../photo/exif'
 import { isPhotoFile, isTrackFile } from '../import/fileKinds'
 import { TRACK_COLORS } from '../map/palette'
-import type { LooseRecord, LooseStore, LooseTrackRecord } from '../store/looseStore'
+import type { LooseRecord, LoosePhotoRecord, LooseStore, LooseTrackRecord } from '../store/looseStore'
+import type { PhotoRecord } from '../photo/photoIndex'
 
 export interface ImportRejection {
   name: string
@@ -167,7 +168,37 @@ export function useLooseImport(store: LooseStore) {
     [store],
   )
 
-  return { importFiles, addParsedTracks }
+  /** A trip's `PhotoRecord`, rebuilt as a loose record for `Remove from
+      trip`. The bytes are already in Drive, in the trip's folder — the two
+      drive file ids carry straight across, since #120 gave `PhotoRecord`
+      and `LoosePhotoRecord` the same EXIF fields — and `claimFromTrip` is
+      what relocates them, the photo mirror of `addParsedTracks` passing
+      `driveFileId` for a track.
+   *
+   * #132: an interpolated position is not carried across. `photos.json`
+      only ever stores EXIF GPS, so a photo positioned inside the trip by
+      #52's interpolation has no recorded coordinate to bring with it — it
+      lists as unplaced once it leaves, exactly as a photo with no GPS
+      always has. */
+  const addPhotoFromTrip = useCallback(
+    (record: PhotoRecord): LoosePhotoRecord => {
+      return store.addPhoto({
+        name: record.name,
+        takenAt: record.gpsTimestamp ?? record.dateTimeOriginal ?? null,
+        ...(record.gpsTimestamp !== undefined ? { gpsTimestamp: record.gpsTimestamp } : {}),
+        ...(record.dateTimeOriginal !== undefined ? { dateTimeOriginal: record.dateTimeOriginal } : {}),
+        position:
+          record.latitude !== undefined && record.longitude !== undefined
+            ? { lat: record.latitude, lng: record.longitude }
+            : null,
+        originalDriveFileId: record.originalDriveFileId,
+        thumbnailDriveFileId: record.thumbnailDriveFileId,
+      })
+    },
+    [store],
+  )
+
+  return { importFiles, addParsedTracks, addPhotoFromTrip }
 }
 
 /** Loose items that have a position, in the shape the map's layers want. */

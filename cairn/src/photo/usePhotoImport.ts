@@ -77,6 +77,10 @@ export interface UsePhotoImport {
       `photos.json` without the record — only then does the row disappear.
       Drive first, local state after, same stance as `useTripImport.removeFile`. */
   removePhoto: (id: string) => Promise<void>
+  /** #132: drops the id from local state — no Drive call of its own — once
+      the loose store has already relocated the photo's files and rewritten
+      `photos.json`. What `Remove from trip` uses instead of `removePhoto`. */
+  forgetPhoto: (id: string) => void
   /** Photo ids currently mid-removal. */
   removingPhotoIds: Set<string>
   /** Photo id -> the failure copy to show beneath that row. */
@@ -378,6 +382,16 @@ export function usePhotoImport(
     [accessToken, cairnFolderId, tripId],
   )
 
+  /** #132: lets go of a photo whose files have moved out of this trip's
+      folder, without trashing them or rewriting `photos.json` — the loose
+      store's `claimFromTrip` already did both. What `Remove from trip`
+      uses, as against `removePhoto`'s `Delete permanently…`. The photo
+      mirror of `useTripImport.forgetFile`. */
+  const forgetPhoto = useCallback((id: string) => {
+    photosRef.current = photosRef.current.filter((p) => p.id !== id)
+    setPhotos(photosRef.current)
+  }, [])
+
   const progress = Array.from(progressMap.values()).sort((a, b) => a.index - b.index)
 
   return {
@@ -389,6 +403,7 @@ export function usePhotoImport(
     retryFailure,
     dismissFailures,
     removePhoto,
+    forgetPhoto,
     removingPhotoIds,
     photoRemoveErrors,
   }

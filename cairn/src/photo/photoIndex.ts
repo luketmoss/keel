@@ -128,6 +128,23 @@ export async function appendPhotoToIndex(
   await writePhotoIndex(accessToken, folderId, [...stripped, record])
 }
 
+/** Drops one photo from a trip's `photos.json`, keeping everything else.
+ *
+ * #132's `Remove from trip`: the mirror of `appendPhotoToIndex`, matched on
+ * `originalDriveFileId` rather than the read-back `id`, which is
+ * regenerated fresh on every read and never stable across calls. */
+export async function removePhotoFromIndex(
+  accessToken: string,
+  folderId: string,
+  originalDriveFileId: string,
+): Promise<void> {
+  const existing = await readPhotoIndex(accessToken, folderId)
+  const remaining = existing
+    .filter((record) => record.originalDriveFileId !== originalDriveFileId)
+    .map(({ id: _id, ...rest }) => rest)
+  await writePhotoIndex(accessToken, folderId, remaining)
+}
+
 /** Reads back the most recently written `photos.json` from a trip folder,
     or an empty list if none exists yet or it can't be read — same "missing
     is not an error" stance as `LocalTripStore`'s corrupted-index handling.

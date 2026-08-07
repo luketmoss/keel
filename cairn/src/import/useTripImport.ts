@@ -549,13 +549,19 @@ export function useTripImport(
     async (id: string, displayName: string): Promise<boolean> => {
       const file = tracks.find((f) => f.id === id)
       if (!file) return false
-      const ok = await overridesStore.setOverride(
+      const pending = overridesStore.setOverride(
         tripId,
         file.driveFileId,
         { displayName },
         tracks.map((f) => f.driveFileId),
       )
+      // #123: `setOverride`'s optimistic local write is visible through
+      // `getOverrides` immediately, per its own doc — read it back now
+      // rather than waiting on the Drive flush behind the returned promise,
+      // so the rename shows up right away instead of after the round trip.
       setOverrides(overridesStore.getOverrides(tripId))
+      const ok = await pending
+      if (!ok) setOverrides(overridesStore.getOverrides(tripId))
       return ok
     },
     [tracks, tripId, overridesStore],

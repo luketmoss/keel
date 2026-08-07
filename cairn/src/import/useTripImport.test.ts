@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useTripImport } from './useTripImport'
 import type { ParseResult } from '../kml/parse'
 import { DriveAuthError } from '../drive/cairnFolder'
-import { LocalTrackOverridesStore } from '../store/trackOverridesStore'
+import { LocalTrackOverridesStore, type TrackOverridesStore } from '../store/trackOverridesStore'
 
 /** A minimal in-memory `Storage`, same helper `tripStore.test.ts` and
     `trackOverridesStore.test.ts` use — isolates each test's overrides from
@@ -334,6 +334,96 @@ describe('useTripImport — #46 track overrides', () => {
     )
     await waitFor(() => expect(reloaded.current.loading).toBe(false))
     expect(reloaded.current.tracks[0].name).toBe('Ridge day')
+  })
+
+  it("reflects a rename immediately, without waiting for the store's Drive flush to settle", async () => {
+    listTrackFiles.mockResolvedValue([{ id: 'drive-1', name: 'day-1.kml' }])
+    downloadTrackFile.mockResolvedValue(file('day-1.kml'))
+    parseKmlOrKmz.mockResolvedValue(track('Day 1'))
+
+    // A store whose local write is synchronous (like the real
+    // `DriveTrackOverridesStore`) but whose returned promise only settles
+    // once `resolveFlush` is called — standing in for a slow Drive round
+    // trip, the ~5s the real bug was.
+    const overridesById = new Map<string, { displayName?: string }>()
+    let resolveFlush: (() => void) | undefined
+    const slowStore: TrackOverridesStore = {
+      getOverrides: () => Object.fromEntries(overridesById),
+      setOverride: (_tripId, driveFileId, patch) => {
+        overridesById.set(driveFileId, { ...overridesById.get(driveFileId), ...patch })
+        return new Promise((resolve) => {
+          resolveFlush = () => resolve(true)
+        })
+      },
+      setOrder: async () => true,
+    }
+
+    const { result } = renderHook(() =>
+      useTripImport('trip-1', 'token', 'cairn-folder-id', slowStore),
+    )
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    let renamePromise: Promise<boolean> = Promise.resolve(false)
+    act(() => {
+      renamePromise = result.current.renameTrack(result.current.tracks[0].id, 'Ridge day')
+    })
+
+    // The Drive flush hasn't resolved yet — but the rename is already
+    // visible, rather than waiting on the network round trip.
+    expect(result.current.tracks[0].name).toBe('Ridge day')
+
+    await act(async () => {
+      resolveFlush?.()
+      await renamePromise
+    })
+    expect(result.current.tracks[0].name).toBe('Ridge day')
+  })
+
+  it('reverts the optimistic rename once the Drive flush rejects it', async () => {
+    listTrackFiles.mockResolvedValue([{ id: 'drive-1', name: 'day-1.kml' }])
+    downloadTrackFile.mockResolvedValue(file('day-1.kml'))
+    parseKmlOrKmz.mockResolvedValue(track('Day 1'))
+
+    // Mirrors `DriveTrackOverridesStore.flush`'s real failure path: the
+    // optimistic local write lands immediately, then a later-failing flush
+    // rolls the local copy back to what it held before the edit.
+    const overridesById = new Map<string, { displayName?: string }>()
+    let rejectFlush: (() => void) | undefined
+    const flakyStore: TrackOverridesStore = {
+      getOverrides: () => Object.fromEntries(overridesById),
+      setOverride: (_tripId, driveFileId, patch) => {
+        const previous = overridesById.get(driveFileId)
+        overridesById.set(driveFileId, { ...previous, ...patch })
+        return new Promise((resolve) => {
+          rejectFlush = () => {
+            if (previous) overridesById.set(driveFileId, previous)
+            else overridesById.delete(driveFileId)
+            resolve(false)
+          }
+        })
+      },
+      setOrder: async () => true,
+    }
+
+    const { result } = renderHook(() =>
+      useTripImport('trip-1', 'token', 'cairn-folder-id', flakyStore),
+    )
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    let renamePromise: Promise<boolean> = Promise.resolve(true)
+    let ok = true
+    act(() => {
+      renamePromise = result.current.renameTrack(result.current.tracks[0].id, 'Ridge day')
+    })
+    expect(result.current.tracks[0].name).toBe('Ridge day')
+
+    await act(async () => {
+      rejectFlush?.()
+      ok = await renamePromise
+    })
+
+    expect(ok).toBe(false)
+    expect(result.current.tracks[0].name).toBe('day-1.kml')
   })
 
   it('recolours a track, overriding its auto-assigned colour index', async () => {

@@ -141,6 +141,29 @@ describe('useTripImport', () => {
     expect(result.current.tracks).toHaveLength(2)
   })
 
+  it('downloads tracks concurrently, bounded to 4 at once', async () => {
+    listTrackFiles.mockResolvedValue(
+      Array.from({ length: 8 }, (_, i) => ({ id: `drive-${i}`, name: `f${i}.kml` })),
+    )
+    let active = 0
+    let maxActive = 0
+    downloadTrackFile.mockImplementation(async (_token: string, _id: string, name: string) => {
+      active += 1
+      maxActive = Math.max(maxActive, active)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      active -= 1
+      return file(name)
+    })
+    parseKmlOrKmz.mockResolvedValue(track('Day'))
+
+    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    expect(result.current.tracks).toHaveLength(8)
+    expect(maxActive).toBeGreaterThan(1)
+    expect(maxActive).toBeLessThanOrEqual(4)
+  })
+
   it('is not loading and does not attempt a read when signed out', async () => {
     const { result } = renderHook(() => useTripImport('trip-1', null, null))
 

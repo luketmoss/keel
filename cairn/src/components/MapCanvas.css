@@ -1,0 +1,86 @@
+.map-canvas {
+  position: absolute;
+  inset: 0;
+  /* Shows through until the first tiles arrive, so the load reads as dark
+     chrome rather than as a broken white rectangle. */
+  background: var(--ground);
+}
+
+.map-canvas .map {
+  height: 100%;
+  width: 100%;
+}
+
+/* Bottom right — zoom and fit. Stacked with the fit control above the zoom
+   pair, so the two most-used buttons sit closest to the thumb. */
+.map-controls {
+  position: absolute;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+
+.map-controls__zoom {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur));
+  box-shadow: var(--shadow-lifted);
+  overflow: hidden;
+}
+
+.map-controls__zoom .map-controls__button {
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.map-controls__zoom .map-controls__button + .map-controls__button {
+  border-top: 1px solid var(--border);
+}
+
+.map-controls__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--hit-target);
+  min-height: var(--hit-target);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur));
+  box-shadow: var(--shadow-lifted);
+  color: var(--text-muted);
+  font-size: var(--text-lg);
+  line-height: 1;
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease);
+}
+
+.map-controls__button:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.map-controls__button:active:not(:disabled) {
+  background: var(--pressed);
+}
+
+.map-controls__button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+@media (max-width: 719px) {
+  /* The panel is still full-bleed below the breakpoint until #112 replaces
+     it with the sheet, so the map's own corners are only reachable while it
+     is closed. Nothing to offset — the controls simply sit under it. */
+  .map-controls {
+    bottom: var(--space-2);
+  }
+}

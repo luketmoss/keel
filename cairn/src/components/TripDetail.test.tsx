@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { act, fireEvent, render, screen } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TripDetail } from './TripDetail'
 import { LocalTripStore } from '../store/tripStore'
@@ -26,6 +27,18 @@ vi.mock('../import/useTripImport', () => ({ useTripImport }))
 
 const { usePhotoImport } = vi.hoisted(() => ({ usePhotoImport: vi.fn() }))
 vi.mock('../photo/usePhotoImport', () => ({ usePhotoImport }))
+
+/* The trip face renders `TrackLayer` itself now, rather than through a
+   `MapView` that short-circuited to "map unavailable" whenever no API key
+   was configured. `TrackLayer` reaches for `google.maps.SymbolPath` while
+   building its point markers, so the suite has to provide the global the
+   old short-circuit was accidentally hiding. */
+;(globalThis as unknown as { google: unknown }).google = {
+  maps: {
+    SymbolPath: { CIRCLE: 0 },
+    event: { addListener: () => ({ remove: () => {} }), addListenerOnce: () => {} },
+  },
+}
 
 function fakeStorage(): Storage {
   const data = new Map<string, string>()
@@ -89,25 +102,48 @@ function fileDataTransfer(names: string[]): DataTransfer {
   } as unknown as DataTransfer
 }
 
+/** The trip face no longer owns the page, so it no longer catches the drop
+    itself — it registers a handler and the shell routes drops to it. This
+    stands in for the shell, wired exactly the way `App.tsx` wires it, so
+    the drop tests below still exercise the real path. */
+function TripHarness({
+  store,
+  tripId,
+  signedIn,
+}: {
+  store: LocalTripStore
+  tripId: string
+  signedIn: boolean
+}) {
+  const [dropTarget, setDropTarget] = useState<((files: File[]) => void) | null>(null)
+  return (
+    <div
+      className="app"
+      onDrop={(event) => {
+        event.preventDefault()
+        dropTarget?.(Array.from(event.dataTransfer.files))
+      }}
+    >
+      <TripDetail
+        tripId={tripId}
+        tripStore={store}
+        accessToken={signedIn ? 'token' : null}
+        cairnFolderId={signedIn ? 'cairn-folder-id' : null}
+        onBack={() => {}}
+        onDropTargetChange={(handler) => setDropTarget(() => handler)}
+        onGeometryChange={() => {}}
+      />
+    </div>
+  )
+}
+
 function renderTrip(options: { signedIn?: boolean } = {}) {
   const { signedIn = true } = options
   const store = new LocalTripStore(fakeStorage())
   const entry = store.createTrip('Hokkaido')
   const view = render(
     <MemoryRouter initialEntries={[`/trips/${entry.id}`]}>
-      <Routes>
-        <Route
-          path="/trips/:id"
-          element={
-            <TripDetail
-              tripStore={store}
-              accessToken={signedIn ? 'token' : null}
-              cairnFolderId={signedIn ? 'cairn-folder-id' : null}
-              accountBubble={null}
-            />
-          }
-        />
-      </Routes>
+      <TripHarness store={store} tripId={entry.id} signedIn={signedIn} />
     </MemoryRouter>,
   )
   return { ...view, store, entry }
@@ -165,14 +201,9 @@ describe('TripDetail — #51 partitioning a mixed drop between tracks and photos
     expect(input.accept).toBe('.kml,.kmz,.jpg,.jpeg,.png,.webp')
   })
 
-  it('shows the widened drop-overlay copy while dragging over an open trip', () => {
-    renderTrip()
-    const app = document.querySelector('.app') as HTMLElement
-
-    fireEvent.dragEnter(app, { dataTransfer: fileDataTransfer(['a.jpg']) })
-
-    expect(screen.getByText('Drop tracks or photos')).toBeDefined()
-  })
+  /* The widened drop-overlay copy is asserted in App.test.tsx now — the
+     shell renders the overlay, and the trip face only registers the
+     handler that tells it a trip is open. */
 
   it('merges progress and failures from both pipelines under the one control', () => {
     useTripImport.mockReturnValue(
@@ -238,23 +269,9 @@ describe('TripDetail — #75 signed-out drop', () => {
     expect(photoImportFiles).not.toHaveBeenCalled()
   })
 
-  it('does not show the drop overlay while signed out', () => {
-    renderTrip({ signedIn: false })
-    const app = document.querySelector('.app') as HTMLElement
-
-    fireEvent.dragEnter(app, { dataTransfer: fileDataTransfer(['a.jpg']) })
-
-    expect(screen.queryByTestId('drop-overlay')).toBeNull()
-  })
-
-  it('shows the drop overlay while signed in', () => {
-    renderTrip({ signedIn: true })
-    const app = document.querySelector('.app') as HTMLElement
-
-    fireEvent.dragEnter(app, { dataTransfer: fileDataTransfer(['a.jpg']) })
-
-    expect(screen.queryByTestId('drop-overlay')).not.toBeNull()
-  })
+  /* The drop overlay moved to the shell with the rest of the chrome — its
+     "not while signed out" rule is asserted in App.test.tsx now, against
+     the component that actually renders it. */
 
   it('disables the Import files control and states the reason while signed out', () => {
     renderTrip({ signedIn: false })
@@ -298,12 +315,7 @@ describe('TripDetail — #73 disconnected is read-only', () => {
 
     const { rerender } = render(
       <MemoryRouter initialEntries={[`/trips/${entry.id}`]}>
-        <Routes>
-          <Route
-            path="/trips/:id"
-            element={<TripDetail tripStore={store} accessToken={null} cairnFolderId={null} accountBubble={null} />}
-          />
-        </Routes>
+        <TripHarness store={store} tripId={entry.id} signedIn={false} />
       </MemoryRouter>,
     )
 
@@ -313,19 +325,7 @@ describe('TripDetail — #73 disconnected is read-only', () => {
 
     rerender(
       <MemoryRouter initialEntries={[`/trips/${entry.id}`]}>
-        <Routes>
-          <Route
-            path="/trips/:id"
-            element={
-              <TripDetail
-                tripStore={store}
-                accessToken="token"
-                cairnFolderId="cairn-folder-id"
-                accountBubble={null}
-              />
-            }
-          />
-        </Routes>
+        <TripHarness store={store} tripId={entry.id} signedIn />
       </MemoryRouter>,
     )
 
@@ -471,19 +471,7 @@ describe('TripDetail — #77 removing tracks and photos', () => {
     useTripImport.mockReturnValue(baseTripImport({ tracks: [] }))
     rerender(
       <MemoryRouter initialEntries={[`/trips/${entry.id}`]}>
-        <Routes>
-          <Route
-            path="/trips/:id"
-            element={
-              <TripDetail
-                tripStore={store}
-                accessToken="token"
-                cairnFolderId="cairn-folder-id"
-                accountBubble={null}
-              />
-            }
-          />
-        </Routes>
+        <TripHarness store={store} tripId={entry.id} signedIn />
       </MemoryRouter>,
     )
 

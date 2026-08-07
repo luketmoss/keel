@@ -1,19 +1,12 @@
-/* cairn/docs/design/80-trips-panel.md */
+/* cairn/docs/design/80-trips-panel.md, restructured by
+   docs/design/shell-and-content-model.md — the panel is no longer positioned
+   or elevated here: `ShellColumn` owns the surface, and this fills it. */
 
 .trips-panel {
-  position: absolute;
-  top: calc(var(--space-4) + 72px + var(--space-2));
-  left: var(--space-4);
-  bottom: var(--space-4);
-  z-index: 2;
-  width: var(--panel-width);
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  backdrop-filter: blur(var(--blur));
-  box-shadow: var(--shadow-lifted);
-  overflow: hidden;
 }
 
 .trips-panel__header {
@@ -25,8 +18,7 @@
 .trips-panel__title-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-2);
+  gap: var(--space-2);
 }
 
 .trips-panel__heading {
@@ -36,43 +28,60 @@
   font-weight: 600;
 }
 
-.trips-panel__close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  margin: calc(var(--space-2) * -1) calc(var(--space-2) * -1) 0 0;
+.trips-panel__count {
+  flex: 1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.trips-panel__new {
+  flex: none;
+  min-height: var(--hit-target);
+  padding: 0 var(--space-3);
   border: none;
   border-radius: var(--radius-sm);
-  background: none;
-  color: var(--text-muted);
-  font-size: var(--text-lg);
+  background: transparent;
+  color: var(--accent);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
   cursor: pointer;
 }
 
-.trips-panel__close:hover {
-  color: var(--text);
+.trips-panel__new:hover:not(:disabled) {
   background: var(--hover);
 }
 
-.trips-panel__close:active {
+.trips-panel__new:active:not(:disabled) {
   background: var(--pressed);
 }
 
-.trips-panel__create {
-  margin-bottom: var(--space-2);
+.trips-panel__new:disabled {
+  opacity: 0.4;
+  color: var(--text-muted);
+  cursor: default;
 }
 
-.trips-panel__create-row {
+.trips-panel__hint {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.trips-panel__create {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
+  margin-top: var(--space-2);
 }
 
 .trips-panel__create-input {
   flex: 1;
   min-width: 0;
   padding: var(--space-2) var(--space-3);
+  font-family: inherit;
   font-size: var(--text-base);
   color: var(--text);
   background: var(--surface-lift);
@@ -84,20 +93,10 @@
   border-color: var(--danger);
 }
 
-.trips-panel__create-input:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.trips-panel__create-disabled-hint {
-  margin: var(--space-2) 0 0;
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-}
-
 .trips-panel__create-submit {
   flex: none;
   padding: var(--space-2) var(--space-4);
+  font-family: inherit;
   font-size: var(--text-base);
   font-weight: 600;
   color: var(--on-accent);
@@ -107,97 +106,89 @@
   cursor: pointer;
 }
 
-.trips-panel__create-submit:hover:not(:disabled) {
+.trips-panel__create-submit:hover {
   filter: brightness(1.1);
 }
 
-.trips-panel__create-submit:active:not(:disabled) {
+.trips-panel__create-submit:active {
   filter: brightness(0.95);
 }
 
-.trips-panel__create-submit:disabled {
-  opacity: 0.4;
-  cursor: default;
-  filter: none;
-}
-
 .trips-panel__create-error {
-  margin: var(--space-2) 0 0;
+  flex-basis: 100%;
+  margin: 0;
   font-size: var(--text-xs);
   color: var(--danger);
 }
 
-.trips-panel__filter-name {
-  position: relative;
+/* #79's two-thumb range, rehoused in the list header. */
+
+.trips-panel__years {
   display: flex;
   align-items: center;
-  margin-bottom: var(--space-2);
+  gap: var(--space-2);
+  margin-top: var(--space-2);
 }
 
-.trips-panel__filter-name-glyph {
-  position: absolute;
-  left: var(--space-3);
+.trips-panel__years-label {
+  flex: none;
+  font-size: var(--text-xs);
   color: var(--text-muted);
+}
+
+.trips-panel__years-year {
+  flex: none;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.trips-panel__years-track {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: var(--hit-target);
+}
+
+.trips-panel__years-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  margin: 0;
+  background: transparent;
+  appearance: none;
   pointer-events: none;
 }
 
-.trips-panel__filter-name-input {
-  width: 100%;
-  padding: var(--space-2) var(--space-8) var(--space-2) calc(var(--space-3) + var(--space-4));
-  font-size: var(--text-base);
-  color: var(--text);
-  background: var(--surface-lift);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+.trips-panel__years-input::-webkit-slider-runnable-track {
+  height: 2px;
+  background: var(--border);
 }
 
-.trips-panel__filter-name-clear {
-  position: absolute;
-  right: var(--space-1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: none;
-  color: var(--text-muted);
+.trips-panel__years-input::-moz-range-track {
+  height: 2px;
+  background: var(--border);
+}
+
+.trips-panel__years-input::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -7px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
   cursor: pointer;
+  pointer-events: auto;
 }
 
-.trips-panel__filter-name-clear:hover {
-  color: var(--text);
-  background: var(--hover);
-}
-
-.trips-panel__status-pills {
-  display: flex;
-  gap: var(--space-1);
-}
-
-.trips-panel__status-pill {
-  flex: 1;
+.trips-panel__years-input::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
   border: none;
-  border-radius: var(--radius-sm);
-  padding: var(--space-2);
-  font-size: var(--text-sm);
-  background: var(--surface-lift);
-  color: var(--text-muted);
+  border-radius: var(--radius-full);
+  background: var(--accent);
   cursor: pointer;
-}
-
-.trips-panel__status-pill:hover {
-  color: var(--text);
-}
-
-.trips-panel__status-pill:active {
-  background: var(--pressed);
-}
-
-.trips-panel__status-pill--active {
-  background: var(--accent-soft);
-  color: var(--text);
+  pointer-events: auto;
 }
 
 .trips-panel__empty {
@@ -229,6 +220,7 @@
   background: none;
   padding: var(--space-1) var(--space-2);
   color: var(--accent);
+  font-family: inherit;
   font-size: var(--text-sm);
   font-weight: 600;
   cursor: pointer;
@@ -245,24 +237,51 @@
 
 .trips-panel__row {
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   min-height: var(--row-touch);
-  padding: var(--space-3) 0;
+  padding: var(--space-2) 0;
   border-bottom: 1px solid var(--border);
 }
 
+/* Hovering the row is what reveals its `⋮` — the trigger reads this
+   variable, so no descendant selector has to reach into RowMenu's own
+   stylesheet. */
 .trips-panel__row:hover,
 .trips-panel__row--emphasized {
   background: var(--hover);
+  --row-menu-visibility: visible;
 }
 
-.trips-panel__row:active {
-  background: var(--pressed);
+.trips-panel__row:focus-within {
+  --row-menu-visibility: visible;
+}
+
+.trips-panel__row-dot {
+  flex: none;
+  width: var(--dot-size);
+  height: var(--dot-size);
+  border-radius: var(--radius-full);
+  border-style: solid;
+  border-width: var(--dot-ring);
+}
+
+.trips-panel__row-dot--completed {
+  background: var(--accent);
+  border-color: color-mix(in srgb, var(--text) 90%, transparent);
+}
+
+.trips-panel__row-dot--planned {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--text) 85%, transparent);
 }
 
 .trips-panel__row-link {
+  flex: 1;
+  min-width: 0;
   display: block;
   text-decoration: none;
-  padding-right: calc(40px + var(--space-1));
 }
 
 .trips-panel__row-name {
@@ -281,44 +300,8 @@
   color: var(--text-muted);
 }
 
-.trips-panel__row-remove {
-  position: absolute;
-  top: calc(var(--space-3) - var(--space-2));
-  right: 0;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: var(--text-base);
-  padding: 0;
-}
-
-.trips-panel__row-remove:hover {
-  color: var(--danger);
-  background: var(--hover);
-}
-
-.trips-panel__row-remove:active {
-  background: var(--pressed);
-}
-
-.trips-panel__row-remove:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.trips-panel__row-remove:disabled:hover {
-  color: var(--text-muted);
-  background: none;
-}
-
 .trips-panel__row-confirm {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -347,6 +330,7 @@
   padding: var(--space-1) var(--space-2);
   margin: calc(var(--space-1) * -1) 0;
   border-radius: var(--radius-sm);
+  font-family: inherit;
   font-size: var(--text-sm);
   cursor: pointer;
 }
@@ -367,24 +351,4 @@
 .trips-panel__row-confirm-delete:active,
 .trips-panel__row-confirm-cancel:active {
   background: var(--pressed);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .trips-panel {
-    animation: none;
-  }
-}
-
-/* Design doc's edge case: narrow viewport goes full-width/full-height,
-   covering the map — the interim before the bottom-sheet treatment
-   design-language.md wants here (its own issue). */
-@media (max-width: 639px) {
-  .trips-panel {
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    width: auto;
-    border-radius: 0;
-  }
 }

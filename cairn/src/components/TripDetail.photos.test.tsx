@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TripDetail } from './TripDetail'
 import { LocalTripStore } from '../store/tripStore'
@@ -95,21 +95,26 @@ function basePhotoImport(overrides: Record<string, unknown> = {}) {
   }
 }
 
+function tripFace(store: LocalTripStore, tripId: string) {
+  return (
+    <MemoryRouter initialEntries={[`/trips/${tripId}`]}>
+      <TripDetail
+        tripId={tripId}
+        tripStore={store}
+        accessToken="token"
+        cairnFolderId="cairn-folder-id"
+        onBack={() => {}}
+        onDropTargetChange={() => {}}
+        onGeometryChange={() => {}}
+      />
+    </MemoryRouter>
+  )
+}
+
 function renderTrip() {
   const store = new LocalTripStore(fakeStorage())
   const entry = store.createTrip('Hokkaido')
-  const view = render(
-    <MemoryRouter initialEntries={[`/trips/${entry.id}`]}>
-      <Routes>
-        <Route
-          path="/trips/:id"
-          element={
-            <TripDetail tripStore={store} accessToken="token" cairnFolderId="cairn-folder-id" accountBubble={null} />
-          }
-        />
-      </Routes>
-    </MemoryRouter>,
-  )
+  const view = render(tripFace(store, entry.id))
   return { ...view, store, entry }
 }
 
@@ -188,18 +193,7 @@ describe('TripDetail — #55 photo list and lightbox', () => {
       // Simulates the removal landing while the lightbox is still open
       // (design doc edge case) — the photo drops out of the settled list.
       usePhotoImport.mockReturnValue(basePhotoImport({ photos: [] }))
-      rerender(
-        <MemoryRouter initialEntries={[`/trips/${entry.id}`]}>
-          <Routes>
-            <Route
-              path="/trips/:id"
-              element={
-                <TripDetail tripStore={store} accessToken="token" cairnFolderId="cairn-folder-id" accountBubble={null} />
-              }
-            />
-          </Routes>
-        </MemoryRouter>,
-      )
+      rerender(tripFace(store, entry.id))
 
       await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     })

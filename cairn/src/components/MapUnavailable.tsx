@@ -1,10 +1,9 @@
 import type { ReactNode } from 'react'
-import './MapView.css'
+import './MapUnavailable.css'
 
-/** Shared "the map can't render" panel — no API key, or Google rejected the
-    one given. Used by both `MapView` (`/`, `/trips/:id`) and `WorldMap`
-    (`/world`, #37) so the two routes read identically when a key problem is
-    the reason nothing is on screen. */
+/** "The map can't render" — no API key, or Google rejected the one given.
+    Rendered by `MapProvider` in place of the whole app, since there is one
+    map for the session and nothing below it works without one. */
 export function MapUnavailable({ children }: { children: ReactNode }) {
   return (
     <div className="map-unavailable">

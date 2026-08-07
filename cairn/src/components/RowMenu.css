@@ -1,0 +1,92 @@
+.row-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+/* Hidden at rest, revealed by hovering the row or focusing the trigger.
+   `visibility` rather than `display` so the trigger stays focusable and the
+   row's layout does not shift when it appears. The row sets
+   `--row-menu-visibility` on hover; the trigger overrides it on focus. */
+.row-menu__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--hit-target);
+  min-height: var(--hit-target);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--text-lg);
+  line-height: 1;
+  cursor: pointer;
+  visibility: var(--row-menu-visibility, hidden);
+  transition: color var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease);
+}
+
+.row-menu__trigger:focus-visible,
+.row-menu--open .row-menu__trigger {
+  visibility: visible;
+}
+
+.row-menu__trigger:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.row-menu__trigger:active {
+  background: var(--pressed);
+}
+
+.row-menu__menu {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--surface-lift);
+  box-shadow: var(--shadow-lifted);
+}
+
+.row-menu__item {
+  display: block;
+  width: 100%;
+  min-height: var(--hit-target);
+  padding: 0 var(--space-3);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.row-menu__item:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.row-menu__item:active:not(:disabled) {
+  background: var(--pressed);
+}
+
+.row-menu__item--danger {
+  color: var(--danger);
+}
+
+.row-menu__item:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Touch has no hover to reveal it, so the trigger is always visible there. */
+@media (hover: none) {
+  .row-menu__trigger {
+    visibility: visible;
+  }
+}

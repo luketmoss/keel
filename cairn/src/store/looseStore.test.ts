@@ -217,6 +217,10 @@ describe('moveLooseIntoTrip', () => {
     await moveLooseIntoTrip(store, trips, photo.id, trip.id)
 
     expect(trips.getTrip(trip.id)?.photoCount).toBe(5)
+    // The index entry, not just the full record — this is what App's
+    // `tripChoices` reads to build the picker's `TripChoice[]`, so this is
+    // what actually makes the picker show the raised count.
+    expect(trips.getTrips().find((entry) => entry.id === trip.id)?.photoCount).toBe(5)
   })
 
   it('leaves an uncounted trip uncounted rather than treating null as zero', async () => {

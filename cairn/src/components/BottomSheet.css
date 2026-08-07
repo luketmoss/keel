@@ -1,0 +1,118 @@
+/* cairn/docs/design/112-phone-bottom-sheet.md
+
+   The column's phone form. Everything below the search card lives in a
+   sheet anchored to the bottom; the map stays visible above it at every
+   detent, which is the one thing a map app has to do. */
+
+.bottom-sheet-root {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  /* The map shows between the card and the sheet and stays draggable
+     there — only the two surfaces take pointer events. */
+  pointer-events: none;
+}
+
+.bottom-sheet__top {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  right: var(--space-2);
+  pointer-events: auto;
+}
+
+.bottom-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  /* Radius on the top corners only — the sheet is attached to the bottom
+     edge, not floating over it. */
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur));
+  box-shadow: var(--shadow-lifted);
+  pointer-events: auto;
+  transition: height var(--motion-base) var(--ease);
+}
+
+/* Direct manipulation, not animation: while the pointer is down the sheet
+   tracks it exactly, and only the settle is a transition. */
+.bottom-sheet--dragging {
+  transition: none;
+}
+
+.bottom-sheet__grabber {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: var(--hit-target);
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: grab;
+  /* Without this the browser claims the vertical drag for scrolling before
+     the pointer handlers ever see it. */
+  touch-action: none;
+}
+
+.bottom-sheet__grabber:active {
+  cursor: grabbing;
+}
+
+.bottom-sheet__grabber-bar {
+  width: 36px;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--text-muted);
+  opacity: 0.5;
+}
+
+.bottom-sheet__grabber:hover .bottom-sheet__grabber-bar {
+  opacity: 0.8;
+}
+
+/* Announced, not shown — the sheet's position is already visible. */
+.bottom-sheet__detent {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.bottom-sheet__chips {
+  flex: none;
+  padding: 0 var(--space-4) var(--space-2);
+}
+
+.bottom-sheet__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  /* The sheet's content scrolls internally at every detent; the page itself
+     never scrolls. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* The panel's faces fill the sheet exactly as they fill the column, so
+   nothing inside has to know which container it is in. */
+.bottom-sheet__body > * {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bottom-sheet {
+    transition: none;
+  }
+}

@@ -76,11 +76,20 @@
   cursor: default;
 }
 
+/* Below the breakpoint the controls stack above the sheet's top edge and
+   move with it. `--sheet-current` is published by the sheet itself on the
+   root element; the fallback keeps them placed for the frame before the
+   first measurement lands. Same duration and easing as the sheet, or they
+   visibly lag the edge they are supposed to be attached to. */
 @media (max-width: 719px) {
-  /* The panel is still full-bleed below the breakpoint until #112 replaces
-     it with the sheet, so the map's own corners are only reachable while it
-     is closed. Nothing to offset — the controls simply sit under it. */
   .map-controls {
-    bottom: var(--space-2);
+    bottom: calc(var(--sheet-current, var(--sheet-half)) + var(--space-2));
+    transition: bottom var(--motion-base) var(--ease);
+  }
+}
+
+@media (max-width: 719px) and (prefers-reduced-motion: reduce) {
+  .map-controls {
+    transition: none;
   }
 }

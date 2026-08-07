@@ -19,6 +19,10 @@ const ACCEPTED_EXTENSIONS = ['.kml', '.kmz']
 /* Matches #4's stance for v1: bounded, not unlimited, so a large batch does
    not open dozens of resumable sessions at once. */
 const UPLOAD_CONCURRENCY = 3
+/* #122: same reasoning as `UPLOAD_CONCURRENCY` — bounded so a trip with many
+   tracks doesn't open dozens of simultaneous Drive reads, unbounded so a
+   trip with a couple of tracks doesn't wait one file for another. */
+const LOAD_CONCURRENCY = 4
 
 /* #75: a file whose name already names a track in this trip is refused
    before it's uploaded, rather than doubling the trip's contents. Matching
@@ -240,15 +244,17 @@ export function useTripImport(
         const folderId = await findOrCreateTripFolder(token, cairnId, tripId)
         const driveFiles = await listTrackFiles(token, folderId)
 
-        // Sequential, not batched: each file lands in `tracks` (or
-        // `missingFiles`) as soon as its own read settles, rather than
-        // waiting for the whole trip — see #35's "partially loaded" state.
-        for (const driveFile of driveFiles) {
+        // #122: concurrent, not sequential — each file still lands in
+        // `tracks` (or `missingFiles`) as soon as its own read settles,
+        // rather than waiting for the whole trip (#35's "partially loaded"
+        // state), but a bounded number of downloads now run at once instead
+        // of one at a time.
+        await runWithConcurrency(driveFiles, LOAD_CONCURRENCY, async (driveFile) => {
           if (cancelled) return
           try {
             const file = await downloadTrackFile(token, driveFile.id, driveFile.name)
             const result = await parseKmlOrKmz(file)
-            if (!result.ok || result.tracks.length === 0) continue
+            if (!result.ok || result.tracks.length === 0) return
             if (cancelled) return
             setTracks((prev) => [
               ...prev,
@@ -270,7 +276,7 @@ export function useTripImport(
             if (cancelled) return
             setMissingFiles((prev) => [...prev, { id: generateId('missing'), name: driveFile.name }])
           }
-        }
+        })
       } catch {
         // Whole read failed (folder lookup or list) — leave whatever was
         // already rendered in place.

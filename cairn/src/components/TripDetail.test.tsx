@@ -422,11 +422,11 @@ describe('TripDetail — #77 removing tracks and photos', () => {
 
     renderTrip()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove a.kml' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete a.kml permanently' }))
     expect(removeFile).not.toHaveBeenCalled()
-    expect(screen.getByText('Remove "a.kml"?')).toBeDefined()
+    expect(screen.getByText('Delete "a.kml"?')).toBeDefined()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
     expect(removeFile).toHaveBeenCalledWith('f1')
   })
 
@@ -436,12 +436,12 @@ describe('TripDetail — #77 removing tracks and photos', () => {
 
     renderTrip()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove a.kml' }))
-    expect(screen.getByText('Remove "a.kml"?')).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete a.kml permanently' }))
+    expect(screen.getByText('Delete "a.kml"?')).toBeDefined()
 
     fireEvent.keyDown(document, { key: 'Escape' })
 
-    expect(screen.queryByText('Remove "a.kml"?')).toBeNull()
+    expect(screen.queryByText('Delete "a.kml"?')).toBeNull()
     expect(removeFile).not.toHaveBeenCalled()
   })
 
@@ -455,11 +455,11 @@ describe('TripDetail — #77 removing tracks and photos', () => {
 
     renderTrip()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove a.kml' }))
-    expect(screen.getByText('Remove "a.kml"?')).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete a.kml permanently' }))
+    expect(screen.getByText('Delete "a.kml"?')).toBeDefined()
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove photo.jpg' }))
-    expect(screen.queryByText('Remove "a.kml"?')).toBeNull()
+    expect(screen.queryByText('Delete "a.kml"?')).toBeNull()
     expect(screen.getByText('Remove "photo.jpg"?')).toBeDefined()
   })
 

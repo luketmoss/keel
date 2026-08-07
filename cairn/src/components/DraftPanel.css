@@ -107,3 +107,26 @@
     border-radius: 0;
   }
 }
+
+/* #110: neither the primary action nor the discard — a third, quieter exit
+   that keeps the files without wrapping them in a trip. */
+.draft-panel__keep-loose {
+  min-height: var(--hit-target);
+  padding: 0 var(--space-3);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--surface-lift);
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.draft-panel__keep-loose:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.draft-panel__keep-loose:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

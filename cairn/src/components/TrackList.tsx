@@ -1,4 +1,4 @@
-import { useState, type DragEvent, type RefObject } from 'react'
+import { useEffect, useRef, useState, type DragEvent, type RefObject } from 'react'
 import type { ImportedFile } from '../import/types'
 import { TRACK_COLOR_NAMES, TRACK_COLORS, trackColor } from '../map/palette'
 import { formatStatsLine } from '../format/units'
@@ -11,6 +11,11 @@ interface TrackListProps {
       confirm has been accepted — the `×` control itself only starts the
       confirm, via `onStartConfirm` below. */
   onRemove: (id: string) => void
+  /** #110's second exit: returns the track to the top level with its data
+      intact, rather than destroying it. Two named items, never one action
+      with a second step — getting rid of something must stay one click
+      away from everywhere it appears. Absent outside a trip. */
+  onRemoveFromTrip?: (id: string) => void
   /** #77 — the single confirm slot, shared with `PhotoList` by the parent
       (design doc: "tracks and photos sharing one slot"). `null` when no row
       anywhere in the trip is confirming. Omitted entirely on v1's non-trip
@@ -70,6 +75,7 @@ export function TrackList({
   files,
   onToggleVisibility,
   onRemove,
+  onRemoveFromTrip,
   confirmingId = null,
   onStartConfirm,
   onCancelConfirm = () => {},
@@ -139,6 +145,7 @@ export function TrackList({
               file={file}
               onToggleVisibility={onToggleVisibility}
               onRemove={onRemove}
+              onRemoveFromTrip={onRemoveFromTrip}
               confirming={Boolean(onStartConfirm) && confirmingId === file.id}
               confirmingRowRef={confirmingId === file.id ? confirmingRowRef : undefined}
               onStartConfirm={() => (onStartConfirm ? onStartConfirm(file.id) : onRemove(file.id))}
@@ -172,6 +179,7 @@ function TrackRow({
   file,
   onToggleVisibility,
   onRemove,
+  onRemoveFromTrip,
   confirming,
   confirmingRowRef,
   onStartConfirm,
@@ -196,6 +204,7 @@ function TrackRow({
   file: ImportedFile
   onToggleVisibility: (id: string) => void
   onRemove: (id: string) => void
+  onRemoveFromTrip?: (id: string) => void
   confirming: boolean
   confirmingRowRef?: RefObject<HTMLElement | null>
   onStartConfirm: () => void
@@ -227,9 +236,18 @@ function TrackRow({
      describe unambiguously. */
   const statsLine = file.tracks.length === 1 ? formatStatsLine(file.trackStats[0]) : null
 
+  /* Held and cleared on unmount, the way `TripMetadataHeader` already does
+     with its own saved flash. Left dangling, the timer fires against an
+     unmounted row — harmless in a browser, and an unhandled
+     "window is not defined" once the test environment has been torn down
+     underneath it. */
+  const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  useEffect(() => () => clearTimeout(savedTimeoutRef.current), [])
+
   function flashSaved(field: 'name' | 'color') {
     setSavedField(field)
-    setTimeout(() => setSavedField(null), 180)
+    clearTimeout(savedTimeoutRef.current)
+    savedTimeoutRef.current = setTimeout(() => setSavedField(null), 180)
   }
 
   async function commitName(value: string) {
@@ -279,7 +297,7 @@ function TrackRow({
         }}
       >
         <div className="track-row__confirm">
-          <span className="track-row__confirm-text">Remove &quot;{file.name}&quot;?</span>
+          <span className="track-row__confirm-text">Delete &quot;{file.name}&quot;?</span>
           <div className="track-row__confirm-actions">
             <button
               type="button"
@@ -289,7 +307,7 @@ function TrackRow({
                 onRemove(file.id)
               }}
             >
-              Remove
+              Delete
             </button>
             <button type="button" className="track-row__confirm-cancel" onClick={onCancelConfirm}>
               Cancel
@@ -375,15 +393,30 @@ function TrackRow({
         {removing ? (
           <span className="track-row__removing">Removing…</span>
         ) : (
-          <button
-            type="button"
-            className="track-row__remove"
-            aria-label={`Remove ${file.name}`}
-            disabled={disableRemove}
-            onClick={onStartConfirm}
-          >
-            ×
-          </button>
+          <>
+            {onRemoveFromTrip && (
+              /* No ellipsis and no confirm: it is reversible by adding it
+                 back, which is exactly what makes it the other exit. */
+              <button
+                type="button"
+                className="track-row__unlink"
+                aria-label={`Remove ${file.name} from trip`}
+                disabled={disableRemove}
+                onClick={() => onRemoveFromTrip(file.id)}
+              >
+                ⤴
+              </button>
+            )}
+            <button
+              type="button"
+              className="track-row__remove"
+              aria-label={`Delete ${file.name} permanently`}
+              disabled={disableRemove}
+              onClick={onStartConfirm}
+            >
+              ×
+            </button>
+          </>
         )}
       </div>
       {statsLine && <p className="track-row__stats">{statsLine}</p>}

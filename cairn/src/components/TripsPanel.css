@@ -277,6 +277,31 @@
   border-color: color-mix(in srgb, var(--text) 85%, transparent);
 }
 
+/* The two loose glyphs — the same shapes their markers use, drawn smaller.
+   A rounded tile in the track's own colour, a circle for a photo. */
+.trips-panel__row-tile {
+  flex: none;
+  width: var(--dot-size);
+  height: var(--dot-size);
+  border-radius: 3px;
+  border: var(--dot-ring) solid color-mix(in srgb, var(--text) 85%, transparent);
+}
+
+.trips-panel__row-photo {
+  flex: none;
+  width: var(--dot-size);
+  height: var(--dot-size);
+  border-radius: var(--radius-full);
+  border: var(--dot-ring) solid color-mix(in srgb, var(--text) 85%, transparent);
+  background-image: linear-gradient(135deg, var(--accent-soft), var(--muted-soft));
+}
+
+/* A photo that cannot be placed says so where its date and kind go — in
+   --danger, with the words carrying it, not the colour alone. */
+.trips-panel__row-detail--unplaced {
+  color: var(--danger);
+}
+
 .trips-panel__row-link {
   flex: 1;
   min-width: 0;

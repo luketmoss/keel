@@ -360,3 +360,31 @@
   font-size: var(--text-xs);
   color: var(--danger);
 }
+
+/* #110: the reversible exit, beside the destructive one. Same size as the
+   remove control so the pair reads as two options rather than a control and
+   an afterthought. */
+.track-row__unlink {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--hit-target);
+  height: var(--hit-target);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  font-size: var(--text-base);
+  cursor: pointer;
+}
+
+.track-row__unlink:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.track-row__unlink:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

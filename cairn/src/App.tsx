@@ -11,17 +11,22 @@ import { BrowserRouter, Navigate, Route, Routes, useMatch, useNavigate } from 'r
 import { MapCanvas, MapProvider } from './components/MapCanvas'
 import { ShellColumn } from './components/ShellColumn'
 import { SearchCard } from './components/SearchCard'
-import { FilterChips } from './components/FilterChips'
+import { FilterChips, type KindFilter } from './components/FilterChips'
 import { TripsPanel } from './components/TripsPanel'
 import { TripDetail } from './components/TripDetail'
+import { LooseFace } from './components/LooseFace'
+import { LooseLayer } from './components/LooseLayer'
 import { MapEmptyOverlay, WorldLayer, placesForTrips, visibleTripsFor } from './components/WorldMap'
 import { DraftPanel } from './components/DraftPanel'
 import { DropOverlay } from './components/DropOverlay'
 import { ToastStack, type ToastMessage } from './components/ToastStack'
 import { DriveTripStore } from './store/driveTripStore'
+import { LocalLooseStore, moveLooseIntoTrip, type LooseRecord } from './store/looseStore'
 import type { TripIndexEntry } from './store/tripStore'
 import { DEFAULT_TRIP_FILTERS, tripDayIndex, type TripFilters } from './store/tripFilters'
 import { dataTransferHasFiles, filesFromDataTransfer } from './import/dataTransfer'
+import { isPhotoFile } from './import/fileKinds'
+import { useLooseImport } from './import/useLooseImport'
 import { useDraftTrip } from './import/useDraftTrip'
 import { useGoogleAccount } from './auth/useGoogleAccount'
 import { AccountBubble } from './auth/AccountBubble'
@@ -48,11 +53,30 @@ export function App() {
             `useMatch`. */}
         <Route path="/" element={<AppShell />}>
           <Route path="trips/:id" element={null} />
+          <Route path="tracks/:id" element={null} />
+          <Route path="photos/:id" element={null} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   )
+}
+
+/** What the search card's centre slot shows on a detail: the item's name,
+    and beneath it what kind of thing it is. A loose item says so — "not in
+    a trip" is the distinction the whole model turns on. */
+function detailForCard(
+  trip: TripIndexEntry | undefined,
+  loose: LooseRecord | null,
+): { name: string; kind: string } | null {
+  if (trip) return { name: trip.name, kind: 'trip' }
+  if (loose) {
+    return {
+      name: loose.name,
+      kind: loose.kind === 'track' ? 'track · not in a trip' : 'photo · not in a trip',
+    }
+  }
+  return null
 }
 
 let nextToastId = 0
@@ -70,15 +94,26 @@ function generateToastId(): string {
     scroll snapshot are both gone. */
 function AppShell() {
   const openTripId = useMatch('/trips/:id')?.params.id
+  const openTrackId = useMatch('/tracks/:id')?.params.id
+  const openPhotoId = useMatch('/photos/:id')?.params.id
+  const openLooseId = openTrackId ?? openPhotoId
   const navigate = useNavigate()
   const account = useGoogleAccount()
   /* The one module allowed to import DriveTripStore directly — everything
      else depends on the TripStore interface. */
   const tripStore = useMemo(() => new DriveTripStore(), [])
   const trips = useSyncExternalStore(tripStore.subscribe, tripStore.getTrips)
+  /* The tracks and photos no trip owns. A separate store rather than a
+     `tripId` on each record: ownership is *where the file lives*, so an
+     owned item is not in this store at all. */
+  const looseStore = useMemo(() => new LocalLooseStore(), [])
+  const looseItems = useSyncExternalStore(looseStore.subscribe, looseStore.getItems)
+  const looseImport = useLooseImport(looseStore)
 
   const [filters, setFilters] = useState<TripFilters>(DEFAULT_TRIP_FILTERS)
+  const [kind, setKind] = useState<KindFilter>('all')
   const [hoveredTripId, setHoveredTripId] = useState<string | null>(null)
+  const [moveError, setMoveError] = useState<string | null>(null)
   const [collapsed, setCollapsed] = useState(false)
   const [dragActive, setDragActive] = useState(false)
   const dragDepth = useRef(0)
@@ -145,9 +180,55 @@ function AppShell() {
     }))
   }, [spanKey, dateSpan, filters.range])
 
+  // #95 again: loose items are withheld while disconnected for the same
+  // reason trips are — the cache underneath is untouched.
+  const visibleLoose = disconnected ? [] : looseItems
+  // Read from the *visible* set, not the raw one: #95's rule is that a
+  // disconnected account shows nothing rather than a cache, and a typed URL
+  // must not be the one way around that.
+  const openLoose = openLooseId
+    ? (visibleLoose.find((item) => item.id === openLooseId) ?? null)
+    : null
+
   const openTrip = openTripId ? trips.find((trip) => trip.id === openTripId) : undefined
   const draftOpen = Boolean(draftTrip.draft)
-  const detailOpen = Boolean(openTripId)
+  const detailOpen = Boolean(openTripId) || Boolean(openLooseId)
+
+  /** What the picker shows beside each trip. Counts come from the index the
+      list already reads rather than opening every trip's folder to count
+      its files — a picker that costs one Drive round trip per trip would
+      take longer to open than the move it starts. */
+  const tripChoices = useMemo(
+    () =>
+      visibleTrips.map((entry) => ({
+        entry,
+        trackCount: tripStore.getOverview(entry.id)?.features.length ?? 0,
+        photoCount: 0,
+      })),
+    [visibleTrips, tripStore],
+  )
+
+  /** Moves a loose item into a trip and opens that trip, so the result is
+      visible rather than asserted. The record only leaves the loose store
+      once the move has settled — a half-moved item that belongs to nothing
+      is worse than a move that visibly did not happen. */
+  function moveLooseToTrip(itemId: string, tripId: string) {
+    setMoveError(null)
+    if (!moveLooseIntoTrip(looseStore, tripStore, itemId, tripId)) {
+      setMoveError("Couldn't move — still on the map.")
+      return
+    }
+    // Landing on the destination is the confirmation — no toast.
+    navigate(`/trips/${tripId}`)
+  }
+
+  function createTripWithLoose(itemId: string, name: string) {
+    // Created with `planned` status and no dates, and the item moves into
+    // it in one step — creating an empty trip is not a state the user
+    // passes through.
+    const entry = tripStore.createTrip(name)
+    moveLooseToTrip(itemId, entry.id)
+  }
 
   function addToasts(rejections: { name: string; message: string }[]) {
     if (rejections.length === 0) return
@@ -194,7 +275,25 @@ function AppShell() {
       tripDropRef.current(files)
       return
     }
-    void draftTrip.addFiles(files).then(addToasts)
+    // Outside any trip: tracks still open #81's draft, because a drop the
+    // user wants to become a trip is exactly what that flow is for. What
+    // changed is that *not* becoming one is now a valid outcome — the
+    // draft's `Keep loose` takes that exit. Photos have no draft to open,
+    // so they import loose directly.
+    const photos = files.filter((file) => isPhotoFile(file.name))
+    const rest = files.filter((file) => !isPhotoFile(file.name))
+    if (photos.length > 0) void looseImport.importFiles(photos).then(addToasts)
+    if (rest.length > 0) void draftTrip.addFiles(rest).then(addToasts)
+  }
+
+  /** The draft's third exit: keep the files, don't make a trip of them. */
+  function keepDraftLoose() {
+    const draft = draftTrip.draft
+    if (!draft) return
+    for (const file of draft.files) {
+      looseImport.addParsedTracks(file.name, file.tracks)
+    }
+    draftTrip.cancel()
   }
 
   const handleDropTargetChange = useCallback((handler: ((files: File[]) => void) | null) => {
@@ -234,16 +333,38 @@ function AppShell() {
           getFitPoints={() => (detailOpen ? tripGeometryRef.current : listPlaces)}
         />
         {/* The world's markers are hidden while a trip is open — its own
-            tracks and photos are what the map shows then. */}
-        {!detailOpen && (
-          <WorldLayer
-            trips={visibleTrips}
-            filters={filters}
-            hoveredTripId={hoveredTripId}
-            onHoverTrip={setHoveredTripId}
-            onSelectTrip={(tripId) => navigate(`/trips/${tripId}`)}
-            draftTracks={draftTrip.draft?.files.flatMap((file) => file.tracks)}
-          />
+            tracks and photos are what the map shows then. A loose detail
+            keeps them: the item is still one of the things on this map, and
+            hiding everything around it would lose the context that makes
+            its position mean anything. */}
+        {!openTripId && (
+          <>
+            {(kind === 'all' || kind === 'trips') && (
+              <WorldLayer
+                trips={visibleTrips}
+                filters={filters}
+                hoveredTripId={hoveredTripId}
+                onHoverTrip={setHoveredTripId}
+                onSelectTrip={(tripId) => navigate(`/trips/${tripId}`)}
+                draftTracks={draftTrip.draft?.files.flatMap((file) => file.tracks)}
+              />
+            )}
+            <LooseLayer
+              items={visibleLoose.filter(
+                (item) =>
+                  kind === 'all' ||
+                  (kind === 'tracks' && item.kind === 'track') ||
+                  (kind === 'photos' && item.kind === 'photo'),
+              )}
+              store={looseStore}
+              hoveredId={hoveredTripId}
+              onHover={setHoveredTripId}
+              selectedId={openLooseId ?? null}
+              onSelect={(item) =>
+                navigate(item.kind === 'track' ? `/tracks/${item.id}` : `/photos/${item.id}`)
+              }
+            />
+          </>
         )}
         {!detailOpen &&
           !draftOpen &&
@@ -271,7 +392,7 @@ function AppShell() {
           collapsible={!detailOpen && !draftOpen}
           searchCard={
             <SearchCard
-              detail={openTrip ? { name: openTrip.name, kind: 'trip' } : null}
+              detail={detailForCard(openTrip, openLoose)}
               onBack={() => navigate('/')}
               query={filters.name}
               onQueryChange={(name) => setFilters((current) => ({ ...current, name }))}
@@ -283,10 +404,7 @@ function AppShell() {
             // looking at is noise — and while a draft is open, for the
             // reason #81 already gives.
             detailOpen || draftOpen ? null : (
-              <FilterChips
-                status={filters.status}
-                onChange={(status) => setFilters((current) => ({ ...current, status }))}
-              />
+              <FilterChips kind={kind} onChange={setKind} />
             )
           }
         >
@@ -299,6 +417,7 @@ function AppShell() {
               updateNotes={draftTrip.updateNotes}
               onSave={() => void draftTrip.save()}
               onCancel={draftTrip.cancel}
+              onKeepLoose={keepDraftLoose}
               signedIn={!disconnected}
               onSignIn={() => void account.signIn()}
             />
@@ -313,26 +432,65 @@ function AppShell() {
               onReconnect={() => void account.reconnect()}
               onDropTargetChange={handleDropTargetChange}
               onGeometryChange={handleGeometryChange}
+              onRemoveFromTrip={(file) => {
+                // Back to the top level, with everything about it intact.
+                // Reversible by adding it back, which is why it needs no
+                // confirm — `Delete permanently` is the neighbouring one.
+                looseImport.addParsedTracks(file.name, file.tracks)
+                setToasts((prev) => [
+                  ...prev,
+                  { id: generateToastId(), text: 'Moved back to the map.' },
+                ])
+              }}
             />
+          ) : openLooseId ? (
+            openLoose ? (
+              <LooseFace
+                key={openLooseId}
+                item={openLoose}
+                trips={tripChoices}
+                disabled={disconnected}
+                error={moveError}
+                onAddToTrip={(tripId) => moveLooseToTrip(openLooseId, tripId)}
+                onCreateTripWith={(name) => createTripWithLoose(openLooseId, name)}
+                onDelete={() => {
+                  looseStore.remove(openLooseId)
+                  navigate('/')
+                }}
+              />
+            ) : (
+              <div className="trips-panel__empty">
+                <p className="trips-panel__empty-title">Not found</p>
+                <p className="trips-panel__empty-detail">It may have been deleted.</p>
+              </div>
+            )
           ) : (
             <TripsPanel
               trips={visibleTrips}
+              looseItems={visibleLoose}
+              kind={kind}
               filters={filters}
               onFiltersChange={setFilters}
               dateSpan={dateSpan}
-              hoveredTripId={hoveredTripId}
-              onHoverTrip={setHoveredTripId}
+              hoveredId={hoveredTripId}
+              onHover={setHoveredTripId}
               onCreate={(name) => tripStore.createTrip(name)}
               onDelete={(tripId) => tripStore.deleteTrip(tripId)}
               onSetStatus={(tripId, status: TripIndexEntry['status']) =>
                 tripStore.updateTrip(tripId, { status })
+              }
+              onDeleteLoose={(id) => looseStore.remove(id)}
+              onAddLooseToTrip={(id) =>
+                navigate(
+                  looseStore.getItem(id)?.kind === 'track' ? `/tracks/${id}` : `/photos/${id}`,
+                )
               }
               disabled={disconnected}
             />
           )}
         </ShellColumn>
 
-        {dragActive && <DropOverlay label={detailOpen ? 'Drop tracks or photos' : undefined} />}
+        {dragActive && <DropOverlay label="Drop tracks or photos" />}
         <ToastStack toasts={toasts} onDismiss={dismissToast} />
       </div>
     </MapProvider>

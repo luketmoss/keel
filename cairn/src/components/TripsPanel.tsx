@@ -3,47 +3,59 @@ import { Link } from 'react-router-dom'
 import type { TripIndexEntry } from '../store/tripStore'
 import { matchesTripFilters, type TripFilters } from '../store/tripFilters'
 import { formatTripDateRange } from '../format/dates'
+import { looseMetaLine, type LooseRecord } from '../store/looseStore'
+import { LIST_HEADINGS, type KindFilter } from './FilterChips'
 import { RowMenu } from './RowMenu'
+import { trackColor } from '../map/palette'
 import './TripsPanel.css'
+
+function shortDate(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return iso
+  return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+}
 
 interface TripsPanelProps {
   trips: TripIndexEntry[]
+  /** Tracks and photos that no trip owns. Owned ones are not here — they
+      appear when their trip is open. */
+  looseItems: LooseRecord[]
+  kind: KindFilter
   filters: TripFilters
   onFiltersChange: (filters: TripFilters) => void
-  /** The span every trip falls inside, or `null` when there is nothing to
-      range over. Computed by the shell rather than here so the filter stays
-      coherent while a detail face is showing and this component is not
-      mounted at all. */
   dateSpan: { min: number; max: number } | null
-  hoveredTripId: string | null
-  onHoverTrip: (tripId: string | null) => void
+  hoveredId: string | null
+  onHover: (id: string | null) => void
   onCreate: (name: string) => void
   onDelete: (id: string) => void
   onSetStatus: (id: string, status: TripIndexEntry['status']) => void
-  /** #73: no usable token — creating or deleting a trip goes to the
-      language's Disabled treatment. Reading (opening a trip) is
-      unaffected. */
+  onDeleteLoose: (id: string) => void
+  onAddLooseToTrip: (id: string) => void
+  /** #73: no usable token — creating, moving or deleting go to the
+      language's Disabled treatment. Reading is unaffected. */
   disabled: boolean
 }
 
-/** The panel's list face. Scroll position and filters survive opening a trip
-    because this component is swapped for the trip face inside one mounted
-    panel — `/trips/:id` is no longer a top-level route that unmounts
-    everything above it, so #80's module-level scroll snapshot is gone. */
+/** The panel's list face: trips, loose tracks and loose photos in one list,
+    narrowed by the chip row above it. */
 export function TripsPanel({
   trips,
+  looseItems,
+  kind,
   filters,
   onFiltersChange,
   dateSpan,
-  hoveredTripId,
-  onHoverTrip,
+  hoveredId,
+  onHover,
   onCreate,
   onDelete,
   onSetStatus,
+  onDeleteLoose,
+  onAddLooseToTrip,
   disabled,
 }: TripsPanelProps) {
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
-  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
   const confirmingRowRef = useRef<HTMLLIElement | null>(null)
 
   useEffect(() => {
@@ -67,12 +79,22 @@ export function TripsPanel({
     }
   }, [confirmingId])
 
-  const visibleTrips = trips.filter((trip) => matchesTripFilters(trip, filters))
-  const filteredEmpty = trips.length > 0 && visibleTrips.length === 0
+  const search = filters.name.trim().toLowerCase()
+  const visibleTrips =
+    kind === 'all' || kind === 'trips'
+      ? trips.filter((trip) => matchesTripFilters(trip, filters))
+      : []
+  const visibleLoose = looseItems.filter((item) => {
+    if (kind === 'trips') return false
+    if (kind === 'tracks' && item.kind !== 'track') return false
+    if (kind === 'photos' && item.kind !== 'photo') return false
+    return search.length === 0 || item.name.toLowerCase().includes(search)
+  })
 
-  // Resets name, status and date at once (design doc: "the alternative is
-  // hunting three controls to find which one did it"). `range: null` asks
-  // the shell to refill it back to the full span.
+  const total = visibleTrips.length + visibleLoose.length
+  const nothingAtAll = trips.length === 0 && looseItems.length === 0
+  const filteredEmpty = !nothingAtAll && total === 0
+
   function clearFilters() {
     onFiltersChange({ ...filters, status: 'all', name: '', range: null })
   }
@@ -81,32 +103,27 @@ export function TripsPanel({
     <div className="trips-panel">
       <div className="trips-panel__header">
         <div className="trips-panel__title-row">
-          {/* The header always names what you are looking at — one title
-              today, one per chip once #110 gives the chips kinds. */}
-          <h2 className="trips-panel__heading">Everything</h2>
-          <span className="trips-panel__count">{visibleTrips.length}</span>
+          <h2 className="trips-panel__heading">{LIST_HEADINGS[kind]}</h2>
+          <span className="trips-panel__count">{total}</span>
           <button
             type="button"
             className="trips-panel__new"
             disabled={disabled}
-            onClick={() => setRenamingId('new')}
+            onClick={() => setCreating(true)}
           >
             New trip
           </button>
         </div>
-        {renamingId === 'new' && (
+        {creating && (
           <NewTripField
-            onCancel={() => setRenamingId(null)}
+            onCancel={() => setCreating(false)}
             onCreate={(name) => {
               onCreate(name)
-              setRenamingId(null)
+              setCreating(false)
             }}
           />
         )}
         {disabled && <p className="trips-panel__hint">Sign in to add or remove trips.</p>}
-        {/* The year range lives here now, under the header: it is a property
-            of the list, not of the map. #79's floating bottom-centre bar is
-            gone. */}
         {dateSpan && dateSpan.min !== dateSpan.max && filters.range && (
           <YearRange
             min={dateSpan.min}
@@ -117,15 +134,9 @@ export function TripsPanel({
         )}
       </div>
 
-      {trips.length === 0 ? (
+      {nothingAtAll ? (
         <div className="trips-panel__empty">
           {disabled ? (
-            // #95: `trips` is always empty while disconnected (App.tsx
-            // withholds it, not just this panel) — "Nothing here yet" would
-            // be a lie for an account that actually has some, just hidden
-            // until sign-in. The wording is "your map" rather than "your
-            // trips" because the panel stops being only trips in #110, and
-            // changing the string twice is worse than changing it once.
             <p className="trips-panel__empty-title">Sign in to see your map.</p>
           ) : (
             <>
@@ -148,8 +159,8 @@ export function TripsPanel({
               key={trip.id}
               trip={trip}
               disabled={disabled}
-              emphasized={hoveredTripId === trip.id}
-              onHover={onHoverTrip}
+              emphasized={hoveredId === trip.id}
+              onHover={onHover}
               confirming={confirmingId === trip.id}
               confirmingRowRef={confirmingId === trip.id ? confirmingRowRef : undefined}
               onStartConfirm={() => setConfirmingId(trip.id)}
@@ -158,6 +169,24 @@ export function TripsPanel({
               onDelete={() => {
                 setConfirmingId(null)
                 onDelete(trip.id)
+              }}
+            />
+          ))}
+          {visibleLoose.map((item) => (
+            <LooseRow
+              key={item.id}
+              item={item}
+              disabled={disabled}
+              emphasized={hoveredId === item.id}
+              onHover={onHover}
+              confirming={confirmingId === item.id}
+              confirmingRowRef={confirmingId === item.id ? confirmingRowRef : undefined}
+              onStartConfirm={() => setConfirmingId(item.id)}
+              onCancelConfirm={() => setConfirmingId(null)}
+              onAddToTrip={() => onAddLooseToTrip(item.id)}
+              onDelete={() => {
+                setConfirmingId(null)
+                onDeleteLoose(item.id)
               }}
             />
           ))}
@@ -221,9 +250,7 @@ function yearOf(day: number): number {
   return new Date(day * 86_400_000).getFullYear()
 }
 
-/** #79's two-thumb range, moved out of the floating bottom-centre bar and
-    into the list header where it belongs. Same inputs, same semantics; only
-    its home and its label changed. */
+/** #79's two-thumb range, in the list header where it belongs. */
 function YearRange({
   min,
   max,
@@ -264,6 +291,34 @@ function YearRange({
   )
 }
 
+function RowConfirm({
+  name,
+  rowRef,
+  onDelete,
+  onCancel,
+}: {
+  name: string
+  rowRef?: RefObject<HTMLLIElement | null>
+  onDelete: () => void
+  onCancel: () => void
+}) {
+  return (
+    <li className="trips-panel__row" ref={rowRef}>
+      <div className="trips-panel__row-confirm">
+        <span className="trips-panel__row-confirm-text">Delete &quot;{name}&quot;?</span>
+        <div className="trips-panel__row-confirm-actions">
+          <button type="button" className="trips-panel__row-confirm-delete" onClick={onDelete}>
+            Delete
+          </button>
+          <button type="button" className="trips-panel__row-confirm-cancel" onClick={onCancel}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </li>
+  )
+}
+
 function TripRow({
   trip,
   disabled,
@@ -279,7 +334,7 @@ function TripRow({
   trip: TripIndexEntry
   disabled: boolean
   emphasized: boolean
-  onHover: (tripId: string | null) => void
+  onHover: (id: string | null) => void
   confirming: boolean
   confirmingRowRef?: RefObject<HTMLLIElement | null>
   onStartConfirm: () => void
@@ -289,19 +344,12 @@ function TripRow({
 }) {
   if (confirming) {
     return (
-      <li className="trips-panel__row" ref={confirmingRowRef}>
-        <div className="trips-panel__row-confirm">
-          <span className="trips-panel__row-confirm-text">Delete &quot;{trip.name}&quot;?</span>
-          <div className="trips-panel__row-confirm-actions">
-            <button type="button" className="trips-panel__row-confirm-delete" onClick={onDelete}>
-              Delete
-            </button>
-            <button type="button" className="trips-panel__row-confirm-cancel" onClick={onCancelConfirm}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      </li>
+      <RowConfirm
+        name={trip.name}
+        rowRef={confirmingRowRef}
+        onDelete={onDelete}
+        onCancel={onCancelConfirm}
+      />
     )
   }
 
@@ -313,8 +361,6 @@ function TripRow({
       onMouseEnter={() => onHover(trip.id)}
       onMouseLeave={() => onHover(null)}
     >
-      {/* The row's glyph is the marker, drawn smaller — a thing spotted on
-          the map and the same thing in the list have to read as one object. */}
       <span className={`trips-panel__row-dot trips-panel__row-dot--${trip.status}`} aria-hidden="true" />
       <Link
         to={`/trips/${trip.id}`}
@@ -338,6 +384,87 @@ function TripRow({
             onSelect: () => onSetStatus(nextStatus),
           },
           { label: 'Delete trip…', danger: true, disabled, onSelect: onStartConfirm },
+        ]}
+      />
+    </li>
+  )
+}
+
+function LooseRow({
+  item,
+  disabled,
+  emphasized,
+  onHover,
+  confirming,
+  confirmingRowRef,
+  onStartConfirm,
+  onCancelConfirm,
+  onAddToTrip,
+  onDelete,
+}: {
+  item: LooseRecord
+  disabled: boolean
+  emphasized: boolean
+  onHover: (id: string | null) => void
+  confirming: boolean
+  confirmingRowRef?: RefObject<HTMLLIElement | null>
+  onStartConfirm: () => void
+  onCancelConfirm: () => void
+  onAddToTrip: () => void
+  onDelete: () => void
+}) {
+  if (confirming) {
+    return (
+      <RowConfirm
+        name={item.name}
+        rowRef={confirmingRowRef}
+        onDelete={onDelete}
+        onCancel={onCancelConfirm}
+      />
+    )
+  }
+
+  const unplaced = item.position === null
+  const href = item.kind === 'track' ? `/tracks/${item.id}` : `/photos/${item.id}`
+
+  return (
+    <li
+      className={`trips-panel__row${emphasized ? ' trips-panel__row--emphasized' : ''}`}
+      onMouseEnter={() => onHover(item.id)}
+      onMouseLeave={() => onHover(null)}
+    >
+      {/* The row's glyph is the marker, drawn smaller — a thing spotted on
+          the map and the same thing in the list have to read as one
+          object, so the shape and colour match exactly. */}
+      {item.kind === 'track' ? (
+        <span
+          className="trips-panel__row-tile"
+          style={{ background: trackColor(item.colorIndex) }}
+          aria-hidden="true"
+        />
+      ) : (
+        <span className="trips-panel__row-photo" aria-hidden="true" />
+      )}
+      <Link
+        to={href}
+        className="trips-panel__row-link"
+        onFocus={() => onHover(item.id)}
+        onBlur={() => onHover(null)}
+      >
+        <span className="trips-panel__row-name" title={item.name}>
+          {item.name}
+        </span>
+        <span
+          className={`trips-panel__row-detail${unplaced ? ' trips-panel__row-detail--unplaced' : ''}`}
+        >
+          {looseMetaLine(item, shortDate)}
+        </span>
+      </Link>
+      <RowMenu
+        label={`Actions for ${item.name}`}
+        actions={[
+          { label: 'Add to a trip…', disabled, onSelect: onAddToTrip },
+          { label: 'Delete…', danger: true, disabled, onSelect: onStartConfirm },
         ]}
       />
     </li>

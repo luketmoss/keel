@@ -1,0 +1,180 @@
+.loose-face {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.loose-face__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  overflow-y: auto;
+}
+
+.loose-face__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  /* The `⋮` on a detail is always visible — there is no row to hover. */
+  --row-menu-visibility: visible;
+}
+
+.loose-face__name {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  /* The name is what the user came for, so it wraps rather than truncating.
+     The crumb in the search card is where it ellipsises. */
+  text-wrap: balance;
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--text);
+}
+
+.loose-face__kind {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.loose-face__primary {
+  align-self: flex-start;
+  min-height: var(--hit-target);
+  padding: 0 var(--space-4);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.loose-face__primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.loose-face__primary:active:not(:disabled) {
+  filter: brightness(0.95);
+}
+
+.loose-face__primary:disabled {
+  opacity: 0.4;
+  cursor: default;
+  filter: none;
+}
+
+.loose-face__stats {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+}
+
+.loose-face__stat {
+  display: contents;
+}
+
+.loose-face__stat dt {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.loose-face__stat dd {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.loose-face__swatch {
+  display: inline-block;
+  width: var(--marker-track);
+  height: var(--marker-track);
+  border-radius: var(--radius-sm);
+}
+
+.loose-face__image {
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-sm);
+  background: var(--surface-lift);
+  background-image: linear-gradient(135deg, var(--accent-soft), var(--muted-soft));
+}
+
+.loose-face__unplaced {
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-lift);
+}
+
+.loose-face__unplaced-title {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  /* Named in --danger where its coordinates would be, per the design note —
+     with the words carrying the meaning, not the colour alone. */
+  color: var(--danger);
+}
+
+.loose-face__unplaced-detail {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.loose-face__confirm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-lift);
+}
+
+.loose-face__confirm-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+
+.loose-face__confirm-actions {
+  flex: none;
+  display: flex;
+  gap: var(--space-2);
+}
+
+.loose-face__confirm-delete,
+.loose-face__confirm-cancel {
+  border: none;
+  background: none;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.loose-face__confirm-delete {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.loose-face__confirm-cancel {
+  color: var(--text-muted);
+}

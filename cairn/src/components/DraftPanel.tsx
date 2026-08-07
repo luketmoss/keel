@@ -11,6 +11,10 @@ interface DraftPanelProps {
   updateNotes: (notes: string) => void
   onSave: () => void
   onCancel: () => void
+  /** #110: imports the draft's files as loose tracks instead of creating a
+      trip to hold them. Discards nothing — `Cancel` is still the one that
+      does that. */
+  onKeepLoose: () => void
   /** #81's "Signed out" state: the route and form still work, but `Save`
       is replaced by a control that opens the same sign-in flow the
       account bubble does — a drop must never be silently swallowed just
@@ -40,6 +44,7 @@ export function DraftPanel({
   updateNotes,
   onSave,
   onCancel,
+  onKeepLoose,
   signedIn,
   onSignIn,
 }: DraftPanelProps) {
@@ -89,6 +94,17 @@ export function DraftPanel({
           disabled={draft.saving}
         >
           Cancel
+        </button>
+        {/* #110: not becoming a trip is now a valid outcome. The tracks
+            land on the map on their own instead, and `Add to a trip` on any
+            of them — which offers a new one — is the way back to here. */}
+        <button
+          type="button"
+          className="draft-panel__keep-loose"
+          onClick={onKeepLoose}
+          disabled={draft.saving}
+        >
+          Keep loose
         </button>
         {signedIn ? (
           <button

@@ -28,6 +28,7 @@ function baseProps(overrides: Partial<Parameters<typeof DraftPanel>[0]> = {}) {
     updateNotes: vi.fn(),
     onSave: vi.fn(),
     onCancel: vi.fn(),
+    onKeepLoose: vi.fn(),
     signedIn: true,
     onSignIn: vi.fn(),
     ...overrides,

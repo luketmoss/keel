@@ -4,6 +4,9 @@ import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import { TripsPanel } from './TripsPanel'
 import type { TripIndexEntry } from '../store/tripStore'
+import type { LooseRecord } from '../store/looseStore'
+import type { KindFilter } from './FilterChips'
+import { formatDistance, formatElevationGain } from '../format/units'
 import { DEFAULT_TRIP_FILTERS, type TripFilters } from '../store/tripFilters'
 
 function tripEntry(overrides: Partial<TripIndexEntry> = {}): TripIndexEntry {
@@ -23,37 +26,80 @@ function tripEntry(overrides: Partial<TripIndexEntry> = {}): TripIndexEntry {
     and hover changes round-trip exactly as they do under the real shell. */
 function TestTripsPanel({
   trips,
+  looseItems = [],
+  kind = 'all',
   onCreate = vi.fn(),
   onDelete = vi.fn(),
   onSetStatus = vi.fn(),
+  onDeleteLoose = vi.fn(),
+  onAddLooseToTrip = vi.fn(),
   disabled = false,
   initialFilters = DEFAULT_TRIP_FILTERS,
   dateSpan = null,
 }: {
   trips: TripIndexEntry[]
+  looseItems?: LooseRecord[]
+  kind?: KindFilter
   onCreate?: (name: string) => void
   onDelete?: (id: string) => void
   onSetStatus?: (id: string, status: TripIndexEntry['status']) => void
+  onDeleteLoose?: (id: string) => void
+  onAddLooseToTrip?: (id: string) => void
   disabled?: boolean
   initialFilters?: TripFilters
   dateSpan?: { min: number; max: number } | null
 }) {
   const [filters, setFilters] = useState<TripFilters>(initialFilters)
-  const [hoveredTripId, setHoveredTripId] = useState<string | null>(null)
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
   return (
     <TripsPanel
       trips={trips}
+      looseItems={looseItems}
+      kind={kind}
       filters={filters}
       onFiltersChange={setFilters}
       dateSpan={dateSpan}
-      hoveredTripId={hoveredTripId}
-      onHoverTrip={setHoveredTripId}
+      hoveredId={hoveredId}
+      onHover={setHoveredId}
       onCreate={onCreate}
       onDelete={onDelete}
       onSetStatus={onSetStatus}
+      onDeleteLoose={onDeleteLoose}
+      onAddLooseToTrip={onAddLooseToTrip}
       disabled={disabled}
     />
   )
+}
+
+function looseTrack(overrides: Partial<Extract<LooseRecord, { kind: 'track' }>> = {}): LooseRecord {
+  return {
+    kind: 'track',
+    id: 'track-1',
+    name: 'Mount Rosea',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    date: '2024-03-09T00:00:00.000Z',
+    distanceMeters: 14200,
+    ascentMeters: 690,
+    pointCount: 512,
+    sourceName: 'rosea.kml',
+    colorIndex: 0,
+    position: { lat: -37, lng: 142 },
+    driveFileId: null,
+    ...overrides,
+  }
+}
+
+function loosePhoto(overrides: Partial<Extract<LooseRecord, { kind: 'photo' }>> = {}): LooseRecord {
+  return {
+    kind: 'photo',
+    id: 'photo-1',
+    name: 'sapporo.jpg',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    takenAt: '2024-11-03T00:00:00.000Z',
+    position: { lat: 43, lng: 141 },
+    driveFileId: null,
+    ...overrides,
+  }
 }
 
 function renderPanel(
@@ -64,6 +110,12 @@ function renderPanel(
       <TestTripsPanel {...props} />
     </MemoryRouter>,
   )
+}
+
+/** Distances and ascents are formatted for the run's locale, so the tests
+    match on whatever `format/units` produced rather than on a unit. */
+function escapeRe(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 function openRowMenu(name: string) {
@@ -284,6 +336,115 @@ describe('TripsPanel', () => {
       })
 
       expect(screen.queryByLabelText('Range start')).toBeNull()
+    })
+  })
+
+  describe('loose tracks and photos (#110)', () => {
+    it('lists them alongside trips, each with its own glyph', () => {
+      const { container } = renderPanel({
+        trips: [tripEntry({ id: 'a', name: 'Larapinta', status: 'completed' })],
+        looseItems: [looseTrack(), loosePhoto()],
+      })
+
+      expect(screen.getByText('Larapinta')).toBeDefined()
+      expect(screen.getByText('Mount Rosea')).toBeDefined()
+      expect(screen.getByText('sapporo.jpg')).toBeDefined()
+      expect(container.querySelector('.trips-panel__row-dot--completed')).not.toBeNull()
+      expect(container.querySelector('.trips-panel__row-tile')).not.toBeNull()
+      expect(container.querySelector('.trips-panel__row-photo')).not.toBeNull()
+    })
+
+    it('gives a loose track its stats and a loose photo its kind', () => {
+      renderPanel({ trips: [], looseItems: [looseTrack(), loosePhoto()] })
+
+      expect(screen.getByText(new RegExp(escapeRe(formatDistance(14200))))).toBeDefined()
+      expect(screen.getByText(new RegExp(escapeRe(formatElevationGain(690)!)))).toBeDefined()
+      expect(screen.getByText(/· photo/)).toBeDefined()
+    })
+
+    it('marks a photo with no position as having none, in --danger', () => {
+      const { container } = renderPanel({
+        trips: [],
+        looseItems: [loosePhoto({ position: null })],
+      })
+
+      expect(screen.getByText(/no location/)).toBeDefined()
+      expect(container.querySelector('.trips-panel__row-detail--unplaced')).not.toBeNull()
+    })
+
+    it('links a track and a photo to their own faces', () => {
+      renderPanel({ trips: [], looseItems: [looseTrack(), loosePhoto()] })
+
+      expect(screen.getByText('Mount Rosea').closest('a')?.getAttribute('href')).toBe(
+        '/tracks/track-1',
+      )
+      expect(screen.getByText('sapporo.jpg').closest('a')?.getAttribute('href')).toBe(
+        '/photos/photo-1',
+      )
+    })
+
+    it('offers Add to a trip and a separate Delete on a loose row', () => {
+      const onAddLooseToTrip = vi.fn()
+      renderPanel({ trips: [], looseItems: [looseTrack()], onAddLooseToTrip })
+
+      openRowMenu('Mount Rosea')
+      expect(screen.getByRole('menuitem', { name: 'Delete…' }).className).toContain('--danger')
+
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Add to a trip…' }))
+      expect(onAddLooseToTrip).toHaveBeenCalledWith('track-1')
+    })
+
+    it('requires the inline confirm before deleting a loose item', () => {
+      const onDeleteLoose = vi.fn()
+      renderPanel({ trips: [], looseItems: [looseTrack()], onDeleteLoose })
+
+      openRowMenu('Mount Rosea')
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Delete…' }))
+      expect(onDeleteLoose).not.toHaveBeenCalled()
+      expect(screen.getByText('Delete "Mount Rosea"?')).toBeDefined()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+      expect(onDeleteLoose).toHaveBeenCalledWith('track-1')
+    })
+  })
+
+  describe('the kind chips (#110)', () => {
+    const everything = {
+      trips: [tripEntry({ id: 'a', name: 'Larapinta' })],
+      looseItems: [looseTrack(), loosePhoto()],
+    }
+
+    it('All shows every kind, under "Everything"', () => {
+      renderPanel({ ...everything, kind: 'all' })
+
+      expect(screen.getByRole('heading', { name: 'Everything' })).toBeDefined()
+      expect(screen.getByText('3')).toBeDefined()
+    })
+
+    it('Trips shows only trips', () => {
+      renderPanel({ ...everything, kind: 'trips' })
+
+      expect(screen.getByRole('heading', { name: 'Trips' })).toBeDefined()
+      expect(screen.getByText('Larapinta')).toBeDefined()
+      expect(screen.queryByText('Mount Rosea')).toBeNull()
+      expect(screen.queryByText('sapporo.jpg')).toBeNull()
+    })
+
+    it('Tracks shows only loose tracks, and says "loose" in the heading', () => {
+      renderPanel({ ...everything, kind: 'tracks' })
+
+      expect(screen.getByRole('heading', { name: 'Loose tracks' })).toBeDefined()
+      expect(screen.getByText('Mount Rosea')).toBeDefined()
+      expect(screen.queryByText('Larapinta')).toBeNull()
+      expect(screen.queryByText('sapporo.jpg')).toBeNull()
+    })
+
+    it('Photos shows only loose photos', () => {
+      renderPanel({ ...everything, kind: 'photos' })
+
+      expect(screen.getByRole('heading', { name: 'Loose photos' })).toBeDefined()
+      expect(screen.getByText('sapporo.jpg')).toBeDefined()
+      expect(screen.queryByText('Mount Rosea')).toBeNull()
     })
   })
 

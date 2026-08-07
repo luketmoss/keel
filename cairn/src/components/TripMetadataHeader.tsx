@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { TripRecord, TripStatus, TripUpdate } from '../store/tripStore'
 import { formatTripDateRange } from '../format/dates'
+import { DateRangeCalendar } from './DateRangeCalendar'
 import './TripMetadataHeader.css'
 
 type Field = 'name' | 'status' | 'dates' | 'notes'
@@ -107,24 +108,33 @@ export function TripMetadataHeader({ trip, onUpdate, disabled = false }: TripMet
             </button>
           )}
 
-          {editing === 'dates' ? (
-            <DatesEditor
-              initialStart={trip.startDate}
-              initialEnd={trip.endDate}
-              onCommit={(startDate, endDate) => commit('dates', { startDate, endDate })}
-              onCancel={() => setEditing(null)}
-            />
-          ) : (
-            <span
-              className={`trip-metadata__dates${
-                savedField === 'dates' ? ' trip-metadata__field--saved' : ''
-              }`}
-              onClick={() => startEditing('dates')}
-            >
-              {formatTripDateRange(trip.startDate, trip.endDate)}
-            </span>
-          )}
+          <span
+            className={`trip-metadata__dates${
+              savedField === 'dates' ? ' trip-metadata__field--saved' : ''
+            }${!trip.startDate && !trip.endDate ? ' trip-metadata__dates--empty' : ''}`}
+            onClick={() => startEditing('dates')}
+          >
+            {/* A trip with no dates gets a control that says what it is
+                for. The shared range formatter is what the list rows read,
+                and "No dates set" is right there — but on a line whose only
+                job is to be clicked, it describes rather than invites. */}
+            {trip.startDate || trip.endDate
+              ? formatTripDateRange(trip.startDate, trip.endDate)
+              : 'Add dates'}
+          </span>
         </div>
+
+        {/* Below the row rather than inside it: the calendar is as wide as
+            the panel, and a row that also holds the status pill has nowhere
+            to put it. */}
+        {editing === 'dates' && (
+          <DateRangeCalendar
+            start={trip.startDate}
+            end={trip.endDate}
+            onCommit={(startDate, endDate) => commit('dates', { startDate, endDate })}
+            onCancel={() => setEditing(null)}
+          />
+        )}
 
         {editing === 'notes' ? (
           <NotesEditor
@@ -197,51 +207,6 @@ function StatusEditor({
       <option value="planned">planned</option>
       <option value="completed">completed</option>
     </select>
-  )
-}
-
-function DatesEditor({
-  initialStart,
-  initialEnd,
-  onCommit,
-  onCancel,
-}: {
-  initialStart: string | null
-  initialEnd: string | null
-  onCommit: (startDate: string | null, endDate: string | null) => void
-  onCancel: () => void
-}) {
-  const [start, setStart] = useState(initialStart ?? '')
-  const [end, setEnd] = useState(initialEnd ?? '')
-
-  function commit() {
-    onCommit(start || null, end || null)
-  }
-
-  return (
-    <span className="trip-metadata__dates-input">
-      <input
-        autoFocus
-        type="date"
-        value={start}
-        onChange={(event) => setStart(event.target.value)}
-        onBlur={commit}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') commit()
-          if (event.key === 'Escape') onCancel()
-        }}
-      />
-      <input
-        type="date"
-        value={end}
-        onChange={(event) => setEnd(event.target.value)}
-        onBlur={commit}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') commit()
-          if (event.key === 'Escape') onCancel()
-        }}
-      />
-    </span>
   )
 }
 

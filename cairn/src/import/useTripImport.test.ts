@@ -356,6 +356,53 @@ describe('useTripImport — #46 track overrides', () => {
     expect(result.current.tracks[0].name).toBe('Ridge day')
   })
 
+  it('reverts the optimistic rename once the Drive flush rejects it', async () => {
+    listTrackFiles.mockResolvedValue([{ id: 'drive-1', name: 'day-1.kml' }])
+    downloadTrackFile.mockResolvedValue(file('day-1.kml'))
+    parseKmlOrKmz.mockResolvedValue(track('Day 1'))
+
+    // Mirrors `DriveTrackOverridesStore.flush`'s real failure path: the
+    // optimistic local write lands immediately, then a later-failing flush
+    // rolls the local copy back to what it held before the edit.
+    const overridesById = new Map<string, { displayName?: string }>()
+    let rejectFlush: (() => void) | undefined
+    const flakyStore: TrackOverridesStore = {
+      getOverrides: () => Object.fromEntries(overridesById),
+      setOverride: (_tripId, driveFileId, patch) => {
+        const previous = overridesById.get(driveFileId)
+        overridesById.set(driveFileId, { ...previous, ...patch })
+        return new Promise((resolve) => {
+          rejectFlush = () => {
+            if (previous) overridesById.set(driveFileId, previous)
+            else overridesById.delete(driveFileId)
+            resolve(false)
+          }
+        })
+      },
+      setOrder: async () => true,
+    }
+
+    const { result } = renderHook(() =>
+      useTripImport('trip-1', 'token', 'cairn-folder-id', flakyStore),
+    )
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    let renamePromise: Promise<boolean> = Promise.resolve(true)
+    let ok = true
+    act(() => {
+      renamePromise = result.current.renameTrack(result.current.tracks[0].id, 'Ridge day')
+    })
+    expect(result.current.tracks[0].name).toBe('Ridge day')
+
+    await act(async () => {
+      rejectFlush?.()
+      ok = await renamePromise
+    })
+
+    expect(ok).toBe(false)
+    expect(result.current.tracks[0].name).toBe('day-1.kml')
+  })
+
   it('recolours a track, overriding its auto-assigned colour index', async () => {
     const store = new LocalTrackOverridesStore(fakeStorage())
     listTrackFiles.mockResolvedValue([{ id: 'drive-1', name: 'day-1.kml' }])

@@ -1,0 +1,79 @@
+/* Markers for the two kinds no trip owns. Same hit target and the same
+   1.35 emphasis as a trip dot — one treatment, three kinds — with the shape
+   carrying the difference. */
+
+.loose-marker {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--hit-target);
+  height: var(--hit-target);
+  /* AdvancedMarker anchors bottom-centre; these sit *on* their coordinate. */
+  transform: translateY(50%);
+}
+
+.loose-marker__tile,
+.loose-marker__photo {
+  padding: 0;
+  border-style: solid;
+  border-width: var(--dot-ring);
+  border-color: color-mix(in srgb, var(--text) 85%, transparent);
+  cursor: pointer;
+  transition: transform var(--motion-fast) var(--ease);
+}
+
+/* A rounded tile, in the track's own colour — the shape that says "a route
+   lives here" without drawing the route. */
+.loose-marker__tile {
+  width: var(--marker-track);
+  height: var(--marker-track);
+  border-radius: var(--radius-sm);
+}
+
+/* #54's circular photo marker. The thumbnail itself is that issue's; this
+   is the same shape and ring at the same size. */
+.loose-marker__photo {
+  width: var(--marker-size);
+  height: var(--marker-size);
+  border-radius: var(--radius-full);
+  background: var(--surface-lift);
+  background-image: linear-gradient(135deg, var(--accent-soft), var(--muted-soft));
+}
+
+.loose-marker:hover .loose-marker__tile,
+.loose-marker:focus-within .loose-marker__tile,
+.loose-marker--emphasized .loose-marker__tile,
+.loose-marker:hover .loose-marker__photo,
+.loose-marker:focus-within .loose-marker__photo,
+.loose-marker--emphasized .loose-marker__photo {
+  transform: scale(1.35);
+}
+
+.loose-marker__label {
+  position: absolute;
+  left: calc(100% + var(--space-1));
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur));
+  box-shadow: var(--shadow-lifted);
+  color: var(--text);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.loose-marker:hover .loose-marker__label,
+.loose-marker:focus-within .loose-marker__label,
+.loose-marker--emphasized .loose-marker__label {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loose-marker__tile,
+  .loose-marker__photo {
+    transition: none;
+  }
+}

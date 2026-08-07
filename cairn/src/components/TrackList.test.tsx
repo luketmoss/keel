@@ -178,7 +178,7 @@ describe('TrackList', () => {
       <TrackList files={[importedFile()]} onToggleVisibility={vi.fn()} onRemove={onRemove} />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove trip.kml' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete trip.kml permanently' }))
     expect(onRemove).toHaveBeenCalledWith('f1')
   })
 
@@ -365,7 +365,7 @@ describe('TrackList', () => {
         />,
       )
 
-      fireEvent.click(screen.getByRole('button', { name: 'Remove trip.kml' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Delete trip.kml permanently' }))
       expect(onStartConfirm).toHaveBeenCalledWith('f1')
       expect(onRemove).not.toHaveBeenCalled()
     })
@@ -384,8 +384,8 @@ describe('TrackList', () => {
         />,
       )
 
-      expect(screen.getByText('Remove "trip.kml"?')).toBeDefined()
-      fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
+      expect(screen.getByText('Delete "trip.kml"?')).toBeDefined()
+      fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
       expect(onRemove).toHaveBeenCalledWith('f1')
       expect(onCancelConfirm).toHaveBeenCalled()
     })
@@ -420,7 +420,7 @@ describe('TrackList', () => {
       )
 
       expect(screen.getByText('Removing…')).toBeDefined()
-      expect(screen.queryByRole('button', { name: 'Remove trip.kml' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Delete trip.kml permanently' })).toBeNull()
     })
 
     it('shows a failure line beneath a row whose removal failed, without removing it', () => {
@@ -447,7 +447,7 @@ describe('TrackList', () => {
         />,
       )
 
-      expect(screen.getByRole('button', { name: 'Remove trip.kml' })).toHaveProperty('disabled', true)
+      expect(screen.getByRole('button', { name: 'Delete trip.kml permanently' })).toHaveProperty('disabled', true)
     })
   })
 
@@ -505,7 +505,72 @@ describe('TrackList', () => {
     // Visibility and remove are untouched — neither is Drive-backed.
     fireEvent.click(screen.getByRole('button', { name: 'Hide trip.kml' }))
     expect(onToggleVisibility).toHaveBeenCalledWith('f1')
-    fireEvent.click(screen.getByRole('button', { name: 'Remove trip.kml' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete trip.kml permanently' }))
     expect(onRemove).toHaveBeenCalledWith('f1')
+  })
+
+  describe('#110 remove from trip, beside delete', () => {
+    it('offers no unlink control when the list is not inside a trip', () => {
+      render(<TrackList files={[importedFile()]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />)
+
+      expect(screen.queryByRole('button', { name: /from trip/ })).toBeNull()
+    })
+
+    it('returns the track to the top level without a confirm', () => {
+      const onRemoveFromTrip = vi.fn()
+      const onRemove = vi.fn()
+      render(
+        <TrackList
+          files={[importedFile()]}
+          onToggleVisibility={vi.fn()}
+          onRemove={onRemove}
+          onRemoveFromTrip={onRemoveFromTrip}
+        />,
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'Remove trip.kml from trip' }))
+
+      // No ellipsis, no confirm — it is reversible by adding it back, which
+      // is exactly what makes it the other exit.
+      expect(onRemoveFromTrip).toHaveBeenCalledWith('f1')
+      expect(onRemove).not.toHaveBeenCalled()
+      expect(screen.queryByText('Delete "trip.kml"?')).toBeNull()
+    })
+
+    it('keeps deleting one click away, as its own named control', () => {
+      render(
+        <TrackList
+          files={[importedFile()]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          onRemoveFromTrip={vi.fn()}
+        />,
+      )
+
+      // Two exits, never one action with a second step.
+      expect(screen.getByRole('button', { name: 'Delete trip.kml permanently' })).toBeDefined()
+      expect(screen.getByRole('button', { name: 'Remove trip.kml from trip' })).toBeDefined()
+    })
+
+    it('disables both exits while disconnected', () => {
+      render(
+        <TrackList
+          files={[importedFile()]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          onRemoveFromTrip={vi.fn()}
+          disableRemove
+        />,
+      )
+
+      expect(screen.getByRole('button', { name: 'Remove trip.kml from trip' })).toHaveProperty(
+        'disabled',
+        true,
+      )
+      expect(screen.getByRole('button', { name: 'Delete trip.kml permanently' })).toHaveProperty(
+        'disabled',
+        true,
+      )
+    })
   })
 })

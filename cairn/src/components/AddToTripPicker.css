@@ -1,0 +1,173 @@
+/* Bounded by the panel it opens in — nothing here has a width, so it fits
+   whatever --panel-width is, and it can never leave the column. */
+
+.add-to-trip {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-lift);
+}
+
+.add-to-trip__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.add-to-trip__heading {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text);
+}
+
+.add-to-trip__cancel {
+  min-height: var(--hit-target);
+  padding: 0 var(--space-2);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.add-to-trip__cancel:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.add-to-trip__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  /* Long lists scroll inside the picker rather than growing the panel. */
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.add-to-trip__option,
+.add-to-trip__new {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--row-touch);
+  padding: 0 var(--space-2);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.add-to-trip__new {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.add-to-trip__option:hover:not(:disabled),
+.add-to-trip__new:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.add-to-trip__option:active:not(:disabled),
+.add-to-trip__new:active:not(:disabled) {
+  background: var(--pressed);
+}
+
+.add-to-trip__option:disabled,
+.add-to-trip__new:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.add-to-trip__dot {
+  flex: none;
+  width: var(--dot-size);
+  height: var(--dot-size);
+  border-radius: var(--radius-full);
+  border-style: solid;
+  border-width: var(--dot-ring);
+}
+
+.add-to-trip__dot--completed {
+  background: var(--accent);
+  border-color: color-mix(in srgb, var(--text) 90%, transparent);
+}
+
+.add-to-trip__dot--planned {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--text) 85%, transparent);
+}
+
+.add-to-trip__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.add-to-trip__counts {
+  flex: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.add-to-trip__create {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.add-to-trip__input {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--text-base);
+}
+
+.add-to-trip__input--invalid {
+  border-color: var(--danger);
+}
+
+.add-to-trip__confirm {
+  flex: none;
+  min-height: var(--hit-target);
+  padding: 0 var(--space-4);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.add-to-trip__confirm:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.add-to-trip__error {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--danger);
+}

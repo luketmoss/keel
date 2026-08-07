@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { formatDistance } from './format/units'
 
 const { findOrCreateTripFolder } = vi.hoisted(() => ({ findOrCreateTripFolder: vi.fn() }))
 vi.mock('./drive/tripFolder', () => ({ findOrCreateTripFolder }))
@@ -101,6 +102,31 @@ function seedTrip(tripId: string, name = 'Hokkaido', extra: Record<string, unkno
   )
 }
 
+function seedLooseTrack(id: string, name: string, extra: Record<string, unknown> = {}) {
+  const existing = JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')
+  window.localStorage.setItem(
+    'cairn.loose.index',
+    JSON.stringify([
+      ...existing,
+      {
+        kind: 'track',
+        id,
+        name,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        date: '2024-03-09T00:00:00.000Z',
+        distanceMeters: 14200,
+        ascentMeters: 690,
+        pointCount: 512,
+        sourceName: `${name}.kml`,
+        colorIndex: 0,
+        position: { lat: -37, lng: 142 },
+        driveFileId: null,
+        ...extra,
+      },
+    ]),
+  )
+}
+
 beforeEach(() => {
   window.history.pushState({}, '', '/')
   // #72's session persistence writes here on sign-in — cleared so one
@@ -178,21 +204,32 @@ describe('App shell (#109)', () => {
     expect(container.querySelector('.shell-column--collapsed')).toBeNull()
   })
 
-  it('renders the filter chips below the search card, and drives the list from them', async () => {
+  it('renders the four kind chips below the search card, and drives the list from them', async () => {
     const fetchSpy = mockGoogleSignIn()
     seedTrip('t-planned', 'Kepler Track', { status: 'planned' })
-    seedTrip('t-done', 'Larapinta', { status: 'completed' })
+    seedLooseTrack('lt-1', 'Mount Rosea')
 
     await renderApp('/', { googleClientId: 'a-client-id' })
     await signIn()
 
+    for (const label of ['All', 'Trips', 'Tracks', 'Photos']) {
+      expect(screen.getByRole('button', { name: label })).toBeDefined()
+    }
+
     await screen.findByText('Kepler Track')
-    expect(screen.getByText('Larapinta')).toBeDefined()
+    expect(screen.getByText('Mount Rosea')).toBeDefined()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Planned' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Tracks' }))
 
+    expect(screen.getByRole('heading', { name: 'Loose tracks' })).toBeDefined()
+    expect(screen.getByText('Mount Rosea')).toBeDefined()
+    expect(screen.queryByText('Kepler Track')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Trips' }))
+
+    expect(screen.getByRole('heading', { name: 'Trips' })).toBeDefined()
     expect(screen.getByText('Kepler Track')).toBeDefined()
-    expect(screen.queryByText('Larapinta')).toBeNull()
+    expect(screen.queryByText('Mount Rosea')).toBeNull()
     fetchSpy.mockRestore()
   })
 
@@ -508,6 +545,9 @@ describe('App drop-to-draft (#81)', () => {
     expect(screen.queryByRole('heading', { name: 'Everything' })).toBeNull()
     expect(container.querySelector('.filter-chips')).toBeNull()
     expect(window.location.pathname).toBe('/')
+    // #110: the draft gains a third exit — keep the files without making a
+    // trip of them.
+    expect(screen.getByRole('button', { name: 'Keep loose' })).toBeDefined()
   })
 
   it('cancel discards the draft and returns the list', async () => {
@@ -595,6 +635,175 @@ describe('App drop-to-draft (#81)', () => {
     expect(screen.queryByText('NOT SAVED')).toBeNull()
     expect(await screen.findByRole('heading', { name: 'Everything' })).toBeDefined()
     expect(uploadFileContent).toHaveBeenCalled()
+    fetchSpy.mockRestore()
+  })
+})
+
+describe('App loose tracks and photos (#110)', () => {
+  function seedLoosePhoto(id: string, name: string, position: unknown) {
+    const existing = JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')
+    window.localStorage.setItem(
+      'cairn.loose.index',
+      JSON.stringify([
+        ...existing,
+        {
+          kind: 'photo',
+          id,
+          name,
+          createdAt: '2026-01-01T00:00:00.000Z',
+          takenAt: '2024-11-03T00:00:00.000Z',
+          position,
+          driveFileId: null,
+        },
+      ]),
+    )
+  }
+
+  it('opens a loose track on its own face, with its stats and source', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedLooseTrack('lt-1', 'Mount Rosea')
+
+    const { container } = await renderApp('/tracks/lt-1', { googleClientId: 'a-client-id' })
+    await signIn()
+
+    expect(await screen.findByText(formatDistance(14200))).toBeDefined()
+    expect(screen.getByText('690 m')).toBeDefined()
+    expect(screen.getByText('512')).toBeDefined()
+    expect(screen.getByText('Mount Rosea.kml')).toBeDefined()
+    // The card says what it is, and that no trip owns it.
+    expect(container.querySelector('.search-card__kind')?.textContent).toBe(
+      'track · not in a trip',
+    )
+    fetchSpy.mockRestore()
+  })
+
+  it('explains an unplaced photo rather than erroring', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedLoosePhoto('lp-1', 'no-gps.jpg', null)
+
+    await renderApp('/photos/lp-1', { googleClientId: 'a-client-id' })
+    await signIn()
+
+    expect(await screen.findByText('No location')).toBeDefined()
+    expect(screen.getByText(/Adding it to a trip whose tracks cover its timestamp/)).toBeDefined()
+    fetchSpy.mockRestore()
+  })
+
+  it('shows a placed photo its position and where that came from', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedLoosePhoto('lp-2', 'sapporo.jpg', { lat: 43.06, lng: 141.35 })
+
+    await renderApp('/photos/lp-2', { googleClientId: 'a-client-id' })
+    await signIn()
+
+    expect(await screen.findByText('EXIF GPS')).toBeDefined()
+    expect(screen.getByText(/43\.06000, 141\.35000/)).toBeDefined()
+    expect(screen.queryByText('No location')).toBeNull()
+    fetchSpy.mockRestore()
+  })
+
+  it('the picker lists existing trips with counts, plus New trip', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedTrip('t-1', 'Larapinta')
+    seedLooseTrack('lt-2', 'Mount Rosea')
+
+    await renderApp('/tracks/lt-2', { googleClientId: 'a-client-id' })
+    await signIn()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Add to a trip' }))
+
+    expect(screen.getByRole('heading', { name: 'Add to a trip' })).toBeDefined()
+    expect(screen.getByRole('button', { name: /New trip/ })).toBeDefined()
+    expect(screen.getByRole('button', { name: /Larapinta/ })).toBeDefined()
+    fetchSpy.mockRestore()
+  })
+
+  it('choosing a trip moves the item into it and opens that trip', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedTrip('t-2', 'Larapinta')
+    seedLooseTrack('lt-3', 'Mount Rosea')
+
+    await renderApp('/tracks/lt-3', { googleClientId: 'a-client-id' })
+    await signIn()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Add to a trip' }))
+    fireEvent.click(screen.getByRole('button', { name: /Larapinta/ }))
+
+    // Landing on the destination is the confirmation.
+    expect(window.location.pathname).toBe('/trips/t-2')
+    // It has left the top-level list.
+    const looseIndex = JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')
+    expect(looseIndex).toHaveLength(0)
+    fetchSpy.mockRestore()
+  })
+
+  it('New trip takes a name, creates it, and moves the item in one step', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedLooseTrack('lt-4', 'Mount Rosea')
+
+    await renderApp('/tracks/lt-4', { googleClientId: 'a-client-id' })
+    await signIn()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Add to a trip' }))
+    fireEvent.click(screen.getByRole('button', { name: /New trip/ }))
+    fireEvent.change(screen.getByPlaceholderText('Name the new trip'), {
+      target: { value: 'Grampians' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+
+    expect(window.location.pathname).toMatch(/^\/trips\//)
+    const trips = JSON.parse(window.localStorage.getItem('cairn.trips.index') ?? '[]')
+    expect(trips.map((t: { name: string }) => t.name)).toContain('Grampians')
+    // Creating an empty trip is not a state the user passes through.
+    expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(0)
+    fetchSpy.mockRestore()
+  })
+
+  it('deleting a loose item is a separate named action behind the confirm', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedLooseTrack('lt-5', 'Mount Rosea')
+
+    await renderApp('/tracks/lt-5', { googleClientId: 'a-client-id' })
+    await signIn()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Mount Rosea' }))
+    // Two exits, never one: getting rid of it is one click from here.
+    expect(screen.getByRole('menuitem', { name: 'Add to a trip…' })).toBeDefined()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete…' }))
+
+    expect(screen.getByText('Delete "Mount Rosea"?')).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+
+    expect(window.location.pathname).toBe('/')
+    expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(0)
+    fetchSpy.mockRestore()
+  })
+
+  it('#95: a loose item is withheld while disconnected, typed URL included', async () => {
+    seedLooseTrack('lt-6', 'Mount Rosea')
+
+    await renderApp('/tracks/lt-6')
+
+    // Withheld exactly as trips are — and a typed URL is not the way
+    // around that.
+    expect(screen.queryByText('Mount Rosea')).toBeNull()
+    expect(screen.getByText('Not found')).toBeDefined()
+  })
+
+  it('#73: the loose face refuses to move or delete while disconnected', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedLooseTrack('lt-7', 'Mount Rosea')
+
+    await renderApp('/tracks/lt-7', { googleClientId: 'a-client-id' })
+    await signIn()
+    await screen.findByRole('button', { name: 'Add to a trip' })
+
+    // Signed out again: the primary action and the menu both go to the
+    // Disabled treatment rather than failing against a dead token.
+    fireEvent.click(screen.getByRole('button', { name: /Account: jane@gmail.com/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
+
+    expect(screen.queryByRole('button', { name: 'Add to a trip' })).toBeNull()
     fetchSpy.mockRestore()
   })
 })

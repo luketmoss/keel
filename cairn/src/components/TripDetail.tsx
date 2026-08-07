@@ -16,6 +16,7 @@ import { positionPhotos } from '../photo/positionPhotos'
 import { buildPhotoListRows, flattenPhotoListRows, orderPhotoListItems } from '../photo/photoListGroups'
 import { tripUtcOffsetHours } from '../photo/interpolate'
 import type { TripStore } from '../store/tripStore'
+import type { ImportedFile } from '../import/types'
 import './TripDetail.css'
 
 const UNRECOGNISED_TYPE_MESSAGE = 'trips take .kml or .kmz tracks and JPEG, PNG or WebP photos'
@@ -84,6 +85,10 @@ interface TripDetailProps {
   onDropTargetChange: (handler: ((files: File[]) => void) | null) => void
   /** Reported up so "fit to everything" means this trip while it is open. */
   onGeometryChange: (points: { lat: number; lng: number }[]) => void
+  /** #110: returns a track to the top level with its data intact. The shell
+      owns the loose store, so the trip face hands the track's parsed data
+      up rather than reaching for a second store of its own. */
+  onRemoveFromTrip?: (file: ImportedFile) => void
 }
 
 /** The panel's trip face, and the trip's own map layers.
@@ -103,6 +108,7 @@ export function TripDetail({
   onReconnect,
   onDropTargetChange,
   onGeometryChange,
+  onRemoveFromTrip,
 }: TripDetailProps) {
   const trip = useSyncExternalStore(tripStore.subscribe, () => tripStore.getTrip(tripId))
   const tripImport = useTripImport(tripId, accessToken, cairnFolderId)
@@ -252,6 +258,17 @@ export function TripDetail({
       files={tripImport.tracks}
       onToggleVisibility={tripImport.toggleVisibility}
       onRemove={tripImport.removeFile}
+      onRemoveFromTrip={
+        onRemoveFromTrip &&
+        ((id) => {
+          const file = tripImport.tracks.find((candidate) => candidate.id === id)
+          if (!file) return
+          // The loose copy is created first: the track exists in both
+          // places for an instant rather than in neither.
+          onRemoveFromTrip(file)
+          tripImport.removeFile(id)
+        })
+      }
       confirmingId={removeConfirm.confirmingId}
       onStartConfirm={removeConfirm.onStartConfirm}
       onCancelConfirm={removeConfirm.onCancelConfirm}

@@ -3,7 +3,7 @@ import { AddToTripPicker, type TripChoice } from './AddToTripPicker'
 import { RowMenu } from './RowMenu'
 import { formatDistance } from '../format/units'
 import { trackColor } from '../map/palette'
-import type { LooseRecord } from '../store/looseStore'
+import { canChangeOwner, type LooseRecord } from '../store/looseStore'
 import './LooseFace.css'
 
 interface LooseFaceProps {
@@ -36,6 +36,13 @@ export function LooseFace({
 }: LooseFaceProps) {
   const [picking, setPicking] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  /* #120: `Add to a trip` is a file move, so an item whose file is still
+     uploading — or never arrived — has nothing to move. No tooltip: the
+     meta line on its row already says which, which is #73's one-sentence-
+     per-surface rule rather than a tooltip per control. `Delete…` stays
+     enabled in both states; an item that failed to upload is exactly the
+     one a user most wants rid of. */
+  const canMove = canChangeOwner(item)
 
   return (
     <div className="loose-face">
@@ -47,7 +54,7 @@ export function LooseFace({
           <RowMenu
             label={`Actions for ${item.name}`}
             actions={[
-              { label: 'Add to a trip…', disabled, onSelect: () => setPicking(true) },
+              { label: 'Add to a trip…', disabled: disabled || !canMove, onSelect: () => setPicking(true) },
               { label: 'Delete…', danger: true, disabled, onSelect: () => setConfirming(true) },
             ]}
           />
@@ -60,7 +67,7 @@ export function LooseFace({
           <button
             type="button"
             className="loose-face__primary"
-            disabled={disabled}
+            disabled={disabled || !canMove}
             onClick={() => setPicking(true)}
           >
             Add to a trip

@@ -21,10 +21,17 @@ import { DraftPanel } from './components/DraftPanel'
 import { DropOverlay } from './components/DropOverlay'
 import { ToastStack, type ToastMessage } from './components/ToastStack'
 import { DriveTripStore } from './store/driveTripStore'
-import { LocalLooseStore, moveLooseIntoTrip, type LooseRecord } from './store/looseStore'
+import {
+  MOVE_FAILED_MESSAGE,
+  SIGNED_OUT_DROP_MESSAGE,
+  moveLooseIntoTrip,
+  type LooseRecord,
+} from './store/looseStore'
+import { DriveLooseStore } from './store/driveLooseStore'
 import type { TripIndexEntry } from './store/tripStore'
 import { DEFAULT_TRIP_FILTERS, tripDayIndex, type TripFilters } from './store/tripFilters'
 import { dataTransferHasFiles, filesFromDataTransfer } from './import/dataTransfer'
+import type { ImportedFile } from './import/types'
 import { isPhotoFile } from './import/fileKinds'
 import { useLooseImport } from './import/useLooseImport'
 import { useDraftTrip } from './import/useDraftTrip'
@@ -105,8 +112,9 @@ function AppShell() {
   const trips = useSyncExternalStore(tripStore.subscribe, tripStore.getTrips)
   /* The tracks and photos no trip owns. A separate store rather than a
      `tripId` on each record: ownership is *where the file lives*, so an
-     owned item is not in this store at all. */
-  const looseStore = useMemo(() => new LocalLooseStore(), [])
+     owned item is not in this store at all — and since #120 that sentence
+     is literal, because the file is in Drive. */
+  const looseStore = useMemo(() => new DriveLooseStore(), [])
   const looseItems = useSyncExternalStore(looseStore.subscribe, looseStore.getItems)
   const looseImport = useLooseImport(looseStore)
 
@@ -114,6 +122,10 @@ function AppShell() {
   const [kind, setKind] = useState<KindFilter>('all')
   const [hoveredTripId, setHoveredTripId] = useState<string | null>(null)
   const [moveError, setMoveError] = useState<string | null>(null)
+  /** #120: a move is a Drive round trip, so the picker has something to
+      wait on. Disables its options rather than closing over the top of an
+      operation that has not happened yet. */
+  const [moving, setMoving] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const [dragActive, setDragActive] = useState(false)
   const dragDepth = useRef(0)
@@ -141,15 +153,19 @@ function AppShell() {
   useEffect(() => {
     if (!accessToken || !cairnFolderId) return
     void tripStore.connect(accessToken, cairnFolderId)
-  }, [tripStore, accessToken, cairnFolderId])
+    // #120: loose items hydrate from `/Cairn/loose/` the same way, and any
+    // that exist only locally migrate up behind it.
+    void looseStore.connect(accessToken, cairnFolderId)
+  }, [tripStore, looseStore, accessToken, cairnFolderId])
 
   // #73: the mirror image of the effect above — every store holding Drive
   // credentials drops them the moment the account has no usable token.
   useEffect(() => {
     if (!disconnected) return
     tripStore.disconnect?.()
+    looseStore.disconnect?.()
     defaultOverridesStore.disconnect?.()
-  }, [tripStore, disconnected])
+  }, [tripStore, looseStore, disconnected])
 
   // #95: disconnected is read-only *and* invisible now, not just read-only —
   // the cache underneath is never touched, only what's rendered.
@@ -215,23 +231,52 @@ function AppShell() {
   /** Moves a loose item into a trip and opens that trip, so the result is
       visible rather than asserted. The record only leaves the loose store
       once the move has settled — a half-moved item that belongs to nothing
-      is worse than a move that visibly did not happen. */
-  function moveLooseToTrip(itemId: string, tripId: string) {
+      is worse than a move that visibly did not happen.
+   *
+   * #120: the move is Drive file work now, so the picker stays open with
+   * its options disabled until it settles and the navigation happens after.
+   * Landing inside a trip that does not hold the item yet, and being thrown
+   * back out of it on a failure, is worse than waiting a moment. */
+  async function moveLooseToTrip(itemId: string, tripId: string) {
     setMoveError(null)
-    if (!moveLooseIntoTrip(looseStore, tripStore, itemId, tripId)) {
-      setMoveError("Couldn't move — still on the map.")
-      return
+    setMoving(true)
+    try {
+      if (!(await moveLooseIntoTrip(looseStore, tripStore, itemId, tripId))) {
+        setMoveError(MOVE_FAILED_MESSAGE)
+        return
+      }
+    } finally {
+      setMoving(false)
     }
     // Landing on the destination is the confirmation — no toast.
     navigate(`/trips/${tripId}`)
   }
 
-  function createTripWithLoose(itemId: string, name: string) {
+  async function createTripWithLoose(itemId: string, name: string) {
     // Created with `planned` status and no dates, and the item moves into
     // it in one step — creating an empty trip is not a state the user
     // passes through.
     const entry = tripStore.createTrip(name)
-    moveLooseToTrip(itemId, entry.id)
+    await moveLooseToTrip(itemId, entry.id)
+  }
+
+  /** `Remove from trip`: the reverse move. The loose record is created
+      first, around the file that already exists in the trip's folder, and
+      the file relocates into that record's own loose folder. A failure
+      un-creates the record — the track never left the trip, and a loose row
+      pointing at a file still owned by a trip is exactly the duplicate this
+      issue exists to stop. */
+  async function removeTrackFromTrip(file: ImportedFile, tripId: string): Promise<boolean> {
+    const record = looseImport.addParsedTracks(file.name, file.tracks, {
+      driveFileId: file.driveFileId,
+    })
+    if (!record) return false
+    if (!(await looseStore.claimFromTrip(record.id, tripId))) {
+      looseStore.forget(record.id)
+      return false
+    }
+    setToasts((prev) => [...prev, { id: generateToastId(), text: 'Moved back to the map.' }])
+    return true
   }
 
   function addToasts(rejections: { name: string; message: string }[]) {
@@ -251,7 +296,12 @@ function AppShell() {
     event.preventDefault()
     dragDepth.current += 1
     // #75: the overlay is the app's promise that a drop will be handled —
-    // inside a trip while signed out it does not appear at all.
+    // inside a trip while signed out it does not appear at all. It still
+    // appears at the top level while signed out, and #120 does not change
+    // that: a dropped track opens #81's draft, which is a real outcome with
+    // its own sign-in prompt. Only the *loose* half of a top-level drop has
+    // nowhere to go, and that is refused per file below rather than by
+    // withdrawing the promise for the whole batch.
     if (!detailOpen || !disconnected) setDragActive(true)
   }
 
@@ -286,16 +336,42 @@ function AppShell() {
     // so they import loose directly.
     const photos = files.filter((file) => isPhotoFile(file.name))
     const rest = files.filter((file) => !isPhotoFile(file.name))
-    if (photos.length > 0) void looseImport.importFiles(photos).then(addToasts)
+    // #120: the draft is unaffected by being signed out — it is visible,
+    // it survives a sign-in, and #81 designed it that way. The loose path
+    // has no such holding pen: it used to write to `localStorage` and let
+    // #95 hide the result, which is a file going somewhere the user cannot
+    // see. One toast for the batch rather than one per file, because the
+    // reason is the same for all of them (#75).
+    if (photos.length > 0) {
+      if (disconnected) refuseLooseImport()
+      else void looseImport.importFiles(photos).then(addToasts)
+    }
     if (rest.length > 0) void draftTrip.addFiles(rest).then(addToasts)
+  }
+
+  /** #120: a loose import needs somewhere to put the file, and while
+      disconnected there is nowhere. Says so once rather than accepting the
+      files into a store that cannot keep them. */
+  function refuseLooseImport() {
+    setToasts((prev) => [...prev, { id: generateToastId(), text: SIGNED_OUT_DROP_MESSAGE }])
   }
 
   /** The draft's third exit: keep the files, don't make a trip of them. */
   function keepDraftLoose() {
     const draft = draftTrip.draft
     if (!draft) return
+    // The same refusal as a photo dropped while signed out — `Keep loose`
+    // is a loose import, and the draft stays open so nothing is lost. Its
+    // `Save` is already a sign-in prompt in this state, so the panel is
+    // consistent about what signing in is for.
+    if (disconnected) {
+      refuseLooseImport()
+      return
+    }
     for (const file of draft.files) {
-      looseImport.addParsedTracks(file.name, file.tracks)
+      // The draft still holds the dropped `File`, so the loose store gets
+      // the bytes here exactly as it would have on a direct import.
+      looseImport.addParsedTracks(file.name, file.tracks, { source: file.file })
     }
     draftTrip.cancel()
   }
@@ -436,16 +512,10 @@ function AppShell() {
               onReconnect={() => void account.reconnect()}
               onDropTargetChange={handleDropTargetChange}
               onGeometryChange={handleGeometryChange}
-              onRemoveFromTrip={(file) => {
-                // Back to the top level, with everything about it intact.
-                // Reversible by adding it back, which is why it needs no
-                // confirm — `Delete permanently` is the neighbouring one.
-                looseImport.addParsedTracks(file.name, file.tracks)
-                setToasts((prev) => [
-                  ...prev,
-                  { id: generateToastId(), text: 'Moved back to the map.' },
-                ])
-              }}
+              // Back to the top level, with everything about it intact.
+              // Reversible by adding it back, which is why it needs no
+              // confirm — `Delete permanently` is the neighbouring one.
+              onRemoveFromTrip={(file) => removeTrackFromTrip(file, openTripId)}
             />
           ) : openLooseId ? (
             openLoose ? (
@@ -454,11 +524,15 @@ function AppShell() {
                 item={openLoose}
                 trips={tripChoices}
                 disabled={disconnected}
+                busy={moving}
                 error={moveError}
-                onAddToTrip={(tripId) => moveLooseToTrip(openLooseId, tripId)}
-                onCreateTripWith={(name) => createTripWithLoose(openLooseId, name)}
+                onAddToTrip={(tripId) => void moveLooseToTrip(openLooseId, tripId)}
+                onCreateTripWith={(name) => void createTripWithLoose(openLooseId, name)}
                 onDelete={() => {
-                  looseStore.remove(openLooseId)
+                  // Trashes the Drive folder as well now. Best-effort and
+                  // not awaited: the row is gone either way, and a failed
+                  // trash leaves a folder nothing reads again.
+                  void looseStore.remove(openLooseId)
                   navigate('/')
                 }}
               />

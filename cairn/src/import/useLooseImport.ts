@@ -4,7 +4,7 @@ import { computeTrackStats } from '../kml/stats'
 import { readPhotoExif } from '../photo/exif'
 import { isPhotoFile, isTrackFile } from '../import/fileKinds'
 import { TRACK_COLORS } from '../map/palette'
-import type { LooseRecord, LooseStore } from '../store/looseStore'
+import type { LooseRecord, LooseStore, LooseTrackRecord } from '../store/looseStore'
 
 export interface ImportRejection {
   name: string
@@ -75,6 +75,11 @@ export function useLooseImport(store: LooseStore) {
               position: firstPoint(parsed.tracks),
             },
             parsed.tracks,
+            // #120: the dropped file itself, not just what parsing made of
+            // it. A Drive-backed store has nothing to upload without it,
+            // and "add to a trip is a move between folders" has nothing to
+            // move.
+            file,
           )
           continue
         }
@@ -85,14 +90,31 @@ export function useLooseImport(store: LooseStore) {
             exif.ok && exif.exif.latitude !== undefined && exif.exif.longitude !== undefined
               ? { lat: exif.exif.latitude, lng: exif.exif.longitude }
               : null
-          store.addPhoto({
-            name: file.name,
-            takenAt: exif.ok ? (exif.exif.gpsTimestamp ?? exif.exif.dateTimeOriginal ?? null) : null,
-            // A photo with no GPS is imported anyway, without a position.
-            // It lists, it does not draw, and its detail explains the way
-            // out — losing it would be worse than not placing it.
-            position: gps,
-          })
+          store.addPhoto(
+            {
+              name: file.name,
+              takenAt: exif.ok
+                ? (exif.exif.gpsTimestamp ?? exif.exif.dateTimeOriginal ?? null)
+                : null,
+              // Kept apart as well as collapsed into `takenAt` above: #50's
+              // reason for distinguishing them does not stop applying while
+              // a photo is loose, and a move into a trip carries both.
+              ...(exif.ok && exif.exif.gpsTimestamp !== undefined
+                ? { gpsTimestamp: exif.exif.gpsTimestamp }
+                : {}),
+              ...(exif.ok && exif.exif.dateTimeOriginal !== undefined
+                ? { dateTimeOriginal: exif.exif.dateTimeOriginal }
+                : {}),
+              ...(exif.ok && exif.exif.orientation !== undefined
+                ? { orientation: exif.exif.orientation }
+                : {}),
+              // A photo with no GPS is imported anyway, without a position.
+              // It lists, it does not draw, and its detail explains the way
+              // out — losing it would be worse than not placing it.
+              position: gps,
+            },
+            file,
+          )
           continue
         }
 
@@ -106,15 +128,26 @@ export function useLooseImport(store: LooseStore) {
 
   /** Already-parsed tracks — #81's draft has done the parsing, and
       re-reading the same `File` to reach the same result would be work for
-      nothing. Used by the draft's `Keep loose`. */
+      nothing.
+   *
+   * Two callers, and they differ only in where the bytes are. The draft's
+   * `Keep loose` still holds the dropped `File` and passes it, so the store
+   * uploads it like any other import. `Remove from trip` has no `File` —
+   * the bytes are already in Drive, in the trip's folder — and passes
+   * `driveFileId` instead, for the caller to relocate with
+   * `claimFromTrip`. Returns the record so that caller can. */
   const addParsedTracks = useCallback(
-    (sourceName: string, tracks: Track[]) => {
-      if (tracks.length === 0) return
+    (
+      sourceName: string,
+      tracks: Track[],
+      options?: { source?: File; driveFileId?: string },
+    ): LooseTrackRecord | null => {
+      if (tracks.length === 0) return null
       const stats = tracks.map(computeTrackStats)
       const gains = stats
         .map((s) => s.elevationGainMeters)
         .filter((gain): gain is number => gain !== undefined)
-      store.addTrack(
+      return store.addTrack(
         {
           name: tracks[0].name || sourceName.replace(/\.[^.]+$/, ''),
           date: trackDate(tracks),
@@ -125,8 +158,10 @@ export function useLooseImport(store: LooseStore) {
           colorIndex:
             store.getItems().filter((item) => item.kind === 'track').length % TRACK_COLORS.length,
           position: firstPoint(tracks),
+          driveFileId: options?.driveFileId ?? null,
         },
         tracks,
+        options?.source,
       )
     },
     [store],

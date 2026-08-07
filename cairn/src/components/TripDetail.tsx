@@ -16,6 +16,7 @@ import { positionPhotos } from '../photo/positionPhotos'
 import { buildPhotoListRows, flattenPhotoListRows, orderPhotoListItems } from '../photo/photoListGroups'
 import { tripUtcOffsetHours } from '../photo/interpolate'
 import type { TripStore } from '../store/tripStore'
+import { MOVE_FAILED_MESSAGE } from '../store/looseStore'
 import type { ImportedFile } from '../import/types'
 import './TripDetail.css'
 
@@ -87,8 +88,12 @@ interface TripDetailProps {
   onGeometryChange: (points: { lat: number; lng: number }[]) => void
   /** #110: returns a track to the top level with its data intact. The shell
       owns the loose store, so the trip face hands the track's parsed data
-      up rather than reaching for a second store of its own. */
-  onRemoveFromTrip?: (file: ImportedFile) => void
+      up rather than reaching for a second store of its own.
+   *
+   * #120: resolves whether the move actually happened. It is a Drive file
+      move now, not a local write, so it can fail — and this trip only lets
+      go of the track once the loose side has hold of it. */
+  onRemoveFromTrip?: (file: ImportedFile) => Promise<boolean>
 }
 
 /** The panel's trip face, and the trip's own map layers.
@@ -117,6 +122,10 @@ export function TripDetail({
   const nextLocalFailureId = useRef(0)
   const removeConfirm = useRemoveConfirm()
   const [hoveredFileId, setHoveredFileId] = useState<string | null>(null)
+  /** #120 — a failed `Remove from trip`, keyed by track id. Separate from
+      the hook's `trackRemoveErrors` because the hook owns deleting and this
+      is the other exit; merged into one map where the list reads them. */
+  const [detachErrors, setDetachErrors] = useState<Record<string, string>>({})
   // #73: "disconnected" is exactly "no usable token", whether that's never
   // having signed in, a sign-out, or #72's token-expired.
   const signedIn = accessToken !== null && cairnFolderId !== null
@@ -275,13 +284,25 @@ export function TripDetail({
       onRemove={tripImport.removeFile}
       onRemoveFromTrip={
         onRemoveFromTrip &&
-        ((id) => {
+        (async (id) => {
           const file = tripImport.tracks.find((candidate) => candidate.id === id)
           if (!file) return
-          // The loose copy is created first: the track exists in both
-          // places for an instant rather than in neither.
-          onRemoveFromTrip(file)
-          tripImport.removeFile(id)
+          setDetachErrors((prev) => {
+            if (!(id in prev)) return prev
+            const next = { ...prev }
+            delete next[id]
+            return next
+          })
+          // The loose side takes hold first: the track exists in both
+          // places for an instant rather than in neither. Only once the
+          // file has actually moved does this trip forget it — and it is
+          // forgotten, not trashed, because the file is now somewhere else
+          // rather than gone.
+          if (!(await onRemoveFromTrip(file))) {
+            setDetachErrors((prev) => ({ ...prev, [id]: MOVE_FAILED_MESSAGE }))
+            return
+          }
+          await tripImport.forgetFile(id)
         })
       }
       confirmingId={removeConfirm.confirmingId}
@@ -289,7 +310,7 @@ export function TripDetail({
       onCancelConfirm={removeConfirm.onCancelConfirm}
       confirmingRowRef={removeConfirm.confirmingRowRef}
       removingIds={tripImport.removingTrackIds}
-      removeErrors={tripImport.trackRemoveErrors}
+      removeErrors={{ ...tripImport.trackRemoveErrors, ...detachErrors }}
       disableRemove={!signedIn}
       onHoverFile={setHoveredFileId}
       onRename={tripImport.renameTrack}

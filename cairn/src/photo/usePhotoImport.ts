@@ -9,7 +9,7 @@ import {
 } from '../drive/trackFiles'
 import { findOrCreateTripFolder } from '../drive/tripFolder'
 import { readPhotoExif } from './exif'
-import { generateThumbnail, validateImageFile } from './thumbnail'
+import { generateThumbnail, THUMBNAIL_SUFFIX, validateImageFile } from './thumbnail'
 import { PHOTOS_INDEX_NAME, readPhotoIndex, writePhotoIndex, type PhotoRecord } from './photoIndex'
 
 /* Drive-aware sibling of `useTripImport` (#34/#35), same upload-then-index
@@ -25,8 +25,6 @@ import { PHOTOS_INDEX_NAME, readPhotoIndex, writePhotoIndex, type PhotoRecord } 
    both at once, so "4 workers" and "4 uploads in flight" stay the same
    number. */
 const UPLOAD_CONCURRENCY = 4
-
-const THUMBNAIL_SUFFIX = '.thumb.jpg'
 
 /* #75: same stance as `useTripImport`'s `ALREADY_IN_TRIP_MESSAGE` — a photo
    whose name already names one in this trip is refused before upload,

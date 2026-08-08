@@ -11,6 +11,7 @@ import {
 } from './tripStore'
 import { findOrCreateTripFolder } from '../drive/tripFolder'
 import {
+  DriveAuthError,
   DriveConflictError,
   findJsonFile,
   listSubfolders,
@@ -279,19 +280,40 @@ export class DriveTripStore implements TripStore {
     const record = this.local.getTrip(id)
     if (!record) return 'ok'
 
-    let ref: TripDriveRef
-    let existingTrip: DriveFileRef | null
-    try {
-      ref = this.refs.get(id) ?? { folderId: await findOrCreateTripFolder(accessToken, cairnFolderId, id) }
+    const lookup = async (): Promise<{ ref: TripDriveRef; existingTrip: DriveFileRef | null }> => {
+      const ref = this.refs.get(id) ?? { folderId: await findOrCreateTripFolder(accessToken, cairnFolderId, id) }
       // #102: no cached `ref.trip` only means *this session* hasn't written
       // or hydrated the file yet — not that Drive has no `trip.json`. An
       // edit can reach here before `connect()`'s hydration pass gets to this
       // trip; without checking, that races a create against the file
       // hydration would otherwise have found, leaving two `trip.json`s in
       // the folder and a 50/50 chance the rename survives the next read.
-      existingTrip = ref.trip ?? (await findJsonFile(accessToken, ref.folderId, 'trip.json'))
-    } catch {
-      return 'error'
+      const existingTrip = ref.trip ?? (await findJsonFile(accessToken, ref.folderId, 'trip.json'))
+      return { ref, existingTrip }
+    }
+
+    let ref: TripDriveRef
+    let existingTrip: DriveFileRef | null
+    try {
+      ;({ ref, existingTrip } = await lookup())
+    } catch (error) {
+      // #143: a token expiry here has its own recovery path (the 401 handler
+      // inside `findJsonFile`/`findOrCreateTripFolder` already reports it) —
+      // retrying against a dead token wastes a round trip on a failure that
+      // will not change. Every other failure (a trip freshly migrated
+      // seconds ago, Drive still settling from a bulk import, a network
+      // blip) gets the same one retry #125 already gives the write below.
+      if (error instanceof DriveAuthError) {
+        console.error(`[cairn] trip ${id}: flush lookup failed (auth, not retried)`, error)
+        return 'error'
+      }
+      console.error(`[cairn] trip ${id}: flush lookup failed, retrying`, error)
+      try {
+        ;({ ref, existingTrip } = await lookup())
+      } catch (retryError) {
+        console.error(`[cairn] trip ${id}: flush lookup failed on retry, giving up`, retryError)
+        return 'error'
+      }
     }
 
     const write = () => writeJsonFile(accessToken, ref.folderId, 'trip.json', record, existingTrip)
@@ -305,16 +327,19 @@ export class DriveTripStore implements TripStore {
         // retrying with our own stale intent risks clobbering whatever
         // wrote it (see #124's identical reasoning for track overrides), so
         // this keeps the existing "defer to Drive's truth" behavior.
+        console.error(`[cairn] trip ${id}: flush write conflicted`, error)
         await this.resolveConflict(id, accessToken)
         return 'conflict'
       }
       // #125: any other failure (network blip, transient 5xx, rate limit)
       // carries no such risk — retried once against the same target before
       // giving up.
+      console.error(`[cairn] trip ${id}: flush write failed, retrying`, error)
       try {
         this.refs.set(id, { ...ref, trip: await write() })
         return 'ok'
-      } catch {
+      } catch (retryError) {
+        console.error(`[cairn] trip ${id}: flush write failed on retry, giving up`, retryError)
         return 'error'
       }
     }

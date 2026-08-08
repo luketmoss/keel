@@ -35,12 +35,19 @@ its original filename; the app is handing back the file it was given, and
 row shows it today).
 
 **Photo.** Fetches the original by `originalDriveFileId`, never
-`thumbnailDriveFileId`, and downloads it under the record's `name` with the
-original file's extension preserved (the fetch is by id; the extension comes
-from the Drive file's `name` metadata, read alongside the bytes). The
-thumbnail is a downscaled copy `PhotoImageCache` already holds a cached URL
-for — reusing it would be faster and would also be wrong, handing back a
-worse file than the one imported.
+`thumbnailDriveFileId`, and downloads it under the record's `name` —
+straight through, the same as a track's `sourceName`, with no separate Drive
+metadata read. A photo has no `sourceName` field the way a track does:
+`name` *is* the original filename, extension included, because import sets
+it from `file.name` directly. The one place this comes apart is a photo
+renamed since import (#133) — it downloads under the edited name, extension
+and all, because nothing preserves the original filename for a photo the
+way `sourceName` does for a track. Accepted rather than added to this
+issue's scope: the same simplification `sourceName` itself doesn't need,
+narrower than a general problem worth solving on its own. The thumbnail is a
+downscaled copy `PhotoImageCache` already holds a cached URL for — reusing it
+would be faster and would also be wrong, handing back a worse file than the
+one imported.
 
 **No loading state.** `Rename`/`Change colour` set the precedent: no spinner
 for something that finishes in about a second. Unlike those, Export is not

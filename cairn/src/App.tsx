@@ -340,7 +340,11 @@ function AppShell() {
       document.body.appendChild(link)
       link.click()
       link.remove()
-      URL.revokeObjectURL(url)
+      // Not revoked in this same tick: the click starts the download
+      // asynchronously, and some browsers (Firefox in particular) can lose
+      // the file if the blob URL dies before they've actually read it. The
+      // delay costs a few milliseconds of memory, not correctness.
+      setTimeout(() => URL.revokeObjectURL(url), 0)
     } catch {
       setToasts((prev) => [
         ...prev,

@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { canChangeOwner, LocalLooseStore, looseMetaLine, moveLooseIntoTrip } from './looseStore'
+import {
+  canChangeOwner,
+  LocalLooseStore,
+  looseMetaLine,
+  moveLooseIntoTrip,
+  showExport,
+} from './looseStore'
 import { LocalTripStore } from './tripStore'
 import type { Track } from '../kml/parse'
 import { formatDistance, formatElevationGain } from '../format/units'
@@ -403,5 +409,51 @@ describe('canChangeOwner', () => {
     expect(canChangeOwner({ ...item, uploadState: 'uploading' })).toBe(false)
     expect(canChangeOwner({ ...item, uploadState: 'failed' })).toBe(false)
     expect(canChangeOwner({ ...item, uploadState: 'ok' })).toBe(true)
+  })
+})
+
+describe('showExport (#140)', () => {
+  it('shows Export, disabled, while uploading or failed — even with no file id yet', () => {
+    const record = store.addTrack(NEW_TRACK, [track([[1, 2]])])
+
+    expect(showExport({ ...record, uploadState: 'uploading', driveFileId: null })).toBe(true)
+    expect(showExport({ ...record, uploadState: 'failed', driveFileId: null })).toBe(true)
+  })
+
+  it('omits Export for an ok track with no source file — the pre-#120 migration case', () => {
+    const record = store.addTrack(NEW_TRACK, [track([[1, 2]])])
+
+    expect(showExport({ ...record, uploadState: 'ok', driveFileId: null })).toBe(false)
+  })
+
+  it('shows Export for an ok track once its source file is on Drive', () => {
+    const record = store.addTrack(NEW_TRACK, [track([[1, 2]])])
+
+    expect(showExport({ ...record, uploadState: 'ok', driveFileId: 'file-1' })).toBe(true)
+  })
+
+  it('gates a photo on originalDriveFileId, not thumbnailDriveFileId', () => {
+    const record = store.addPhoto({
+      name: 'sapporo.jpg',
+      takenAt: '2024-11-03T00:00:00.000Z',
+      position: { lat: 43, lng: 141 },
+    })
+
+    expect(
+      showExport({
+        ...record,
+        uploadState: 'ok',
+        originalDriveFileId: null,
+        thumbnailDriveFileId: 'thumb-1',
+      }),
+    ).toBe(false)
+    expect(
+      showExport({
+        ...record,
+        uploadState: 'ok',
+        originalDriveFileId: 'orig-1',
+        thumbnailDriveFileId: null,
+      }),
+    ).toBe(true)
   })
 })

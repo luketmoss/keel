@@ -921,6 +921,90 @@ describe('App loose tracks and photos (#110)', () => {
       fetchSpy.mockRestore()
     })
   })
+
+  describe('#140 exporting a loose item', () => {
+    /* jsdom has no `URL.createObjectURL` at all (verified against the
+       pinned jsdom — see `imageCache.ts`'s own note on the same gap), so
+       this stubs just enough of it for a download to run, scoped to this
+       block rather than the whole suite. */
+    beforeEach(() => {
+      Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:fake-url'), revokeObjectURL: vi.fn() })
+    })
+    afterEach(() => {
+      Reflect.deleteProperty(URL, 'createObjectURL')
+      Reflect.deleteProperty(URL, 'revokeObjectURL')
+    })
+
+    it('downloads a track by its driveFileId, under its sourceName', async () => {
+      const fetchSpy = mockGoogleSignIn()
+      seedLooseTrack('lt-export', 'Mount Rosea', { driveFileId: 'file-1' })
+
+      await renderApp('/tracks/lt-export', { googleClientId: 'a-client-id' })
+      await signIn()
+
+      fetchSpy.mockImplementation(async (url) => {
+        const href = String(url)
+        if (href.includes('/files/file-1') && href.includes('alt=media')) {
+          return { ok: true, status: 200, blob: async () => new Blob(['<kml/>']) } as Response
+        }
+        return { ok: true, status: 200, json: async () => ({ id: 'x', files: [] }) } as Response
+      })
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Actions for Mount Rosea' }))
+      await act(async () => {
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Export' }))
+      })
+
+      await waitFor(() =>
+        expect(fetchSpy).toHaveBeenCalledWith(
+          expect.stringContaining('/files/file-1?alt=media'),
+          expect.objectContaining({ headers: { Authorization: 'Bearer tok' } }),
+        ),
+      )
+      expect(URL.createObjectURL).toHaveBeenCalled()
+      // No failure toast — the download itself is the confirmation, #110's
+      // stance on `Add to a trip` reused here.
+      expect(screen.queryByText(/Couldn't export/)).toBeNull()
+      fetchSpy.mockRestore()
+    })
+
+    it('omits Export for a loose track with no source file to download', async () => {
+      const fetchSpy = mockGoogleSignIn()
+      seedLooseTrack('lt-no-export', 'Mount Rosea', { driveFileId: null, uploadState: 'ok' })
+
+      await renderApp('/tracks/lt-no-export', { googleClientId: 'a-client-id' })
+      await signIn()
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Actions for Mount Rosea' }))
+      expect(screen.queryByRole('menuitem', { name: 'Export' })).toBeNull()
+      fetchSpy.mockRestore()
+    })
+
+    it('shows a toast when the download fails, and names the item', async () => {
+      const fetchSpy = mockGoogleSignIn()
+      seedLooseTrack('lt-export-fail', 'Mount Rosea', { driveFileId: 'file-1' })
+
+      await renderApp('/tracks/lt-export-fail', { googleClientId: 'a-client-id' })
+      await signIn()
+
+      fetchSpy.mockImplementation(async (url) => {
+        const href = String(url)
+        if (href.includes('/files/file-1') && href.includes('alt=media')) {
+          return { ok: false, status: 500 } as Response
+        }
+        return { ok: true, status: 200, json: async () => ({ id: 'x', files: [] }) } as Response
+      })
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Actions for Mount Rosea' }))
+      await act(async () => {
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Export' }))
+      })
+
+      expect(await screen.findByText("Couldn't export Mount Rosea — try again.")).toBeDefined()
+      expect(URL.createObjectURL).not.toHaveBeenCalled()
+      fetchSpy.mockRestore()
+    })
+  })
 })
 
 describe('App loose items in Drive (#120)', () => {

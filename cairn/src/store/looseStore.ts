@@ -519,3 +519,21 @@ export function looseMetaLine(record: LooseRecord, formatDate: (iso: string) => 
 export function canChangeOwner(record: LooseRecord): boolean {
   return record.uploadState !== 'uploading' && record.uploadState !== 'failed'
 }
+
+/** The Drive file `Export` downloads, or `null` if there isn't one. */
+function exportFileId(record: LooseRecord): string | null {
+  return record.kind === 'track' ? record.driveFileId : record.originalDriveFileId
+}
+
+/** #140: whether a loose item's `⋮` shows `Export` at all.
+ *
+ * `uploading`/`failed` show it in the Disabled treatment, same as every
+ * other action `canChangeOwner` already gates — the file is on its way, or
+ * a retry might still bring it. An `ok` item with no file id is a different
+ * fact: a track or photo migrated before #120 kept its record but never its
+ * bytes, and no retry ever fixes that. `Export` is omitted for those
+ * entirely, the same treatment `Change colour` already gets for a photo —
+ * an action that does not apply, not one that is temporarily unavailable. */
+export function showExport(record: LooseRecord): boolean {
+  return !canChangeOwner(record) || exportFileId(record) !== null
+}

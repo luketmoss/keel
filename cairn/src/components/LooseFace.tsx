@@ -5,7 +5,7 @@ import { NameInput } from './NameInput'
 import { ColorPopover } from './ColorPopover'
 import { formatDistance } from '../format/units'
 import { trackColor, TRACK_COLORS } from '../map/palette'
-import { canChangeOwner, type LooseRecord } from '../store/looseStore'
+import { canChangeOwner, showExport, type LooseRecord } from '../store/looseStore'
 import { usePhotoImage } from '../photo/usePhotoImage'
 import './LooseFace.css'
 
@@ -23,6 +23,13 @@ interface LooseFaceProps {
       failure, which the face reverts from. */
   onRename: (id: string, name: string) => Promise<boolean>
   onRecolor: (id: string, color: number) => Promise<boolean>
+  /** #140: downloads the item's source file. Fire-and-forget from here —
+      the face has nothing further to show while it runs; failure is a
+      toast, owned by `App`. */
+  onExport: (id: string) => void
+  /** #140: this item's export is already in flight, so `Export` goes to
+      the Disabled treatment rather than starting a second download. */
+  exporting?: boolean
   /** #73: no usable token — moving, deleting, renaming and recolouring all
       go to the Disabled treatment rather than failing against a store that
       will refuse. */
@@ -45,6 +52,8 @@ export function LooseFace({
   onDelete,
   onRename,
   onRecolor,
+  onExport,
+  exporting,
   disabled,
   busy,
   error,
@@ -105,6 +114,15 @@ export function LooseFace({
                       label: 'Change colour',
                       disabled: disabled || !canMove,
                       onSelect: () => setColorPickerOpen(true),
+                    },
+                  ]
+                : []),
+              ...(showExport(item)
+                ? [
+                    {
+                      label: 'Export',
+                      disabled: disabled || !canMove || exporting,
+                      onSelect: () => onExport(item.id),
                     },
                   ]
                 : []),

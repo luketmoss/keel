@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import type { TripIndexEntry } from '../store/tripStore'
 import { matchesTripFilters, type TripFilters } from '../store/tripFilters'
 import { formatTripMetaLine, tripRowAccessibleName } from '../format/dates'
-import { canChangeOwner, looseMetaLine, type LooseRecord } from '../store/looseStore'
+import { canChangeOwner, looseMetaLine, showExport, type LooseRecord } from '../store/looseStore'
 import { LIST_HEADINGS, type KindFilter } from './FilterChips'
 import { RowMenu } from './RowMenu'
 import { NameInput } from './NameInput'
@@ -41,6 +41,13 @@ interface TripsPanelProps {
       failure, which the row reverts from — never touches the file itself. */
   onRenameLoose: (id: string, name: string) => Promise<boolean>
   onRecolorLoose: (id: string, color: number) => Promise<boolean>
+  /** #140: downloads a loose item's source file. Failure is a toast, owned
+      by `App`, not this panel. */
+  onExportLoose: (id: string) => void
+  /** #140: ids with an export currently in flight — `Export` goes to the
+      Disabled treatment for those rows rather than starting a second
+      download. */
+  exportingIds: ReadonlySet<string>
   /** #73: no usable token — creating, moving or deleting go to the
       language's Disabled treatment. Reading is unaffected. */
   disabled: boolean
@@ -65,6 +72,8 @@ export function TripsPanel({
   onAddLooseToTrip,
   onRenameLoose,
   onRecolorLoose,
+  onExportLoose,
+  exportingIds,
   disabled,
 }: TripsPanelProps) {
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
@@ -209,6 +218,8 @@ export function TripsPanel({
               onRename={onRenameLoose}
               onRecolor={onRecolorLoose}
               onSaveError={setEditError}
+              onExport={() => onExportLoose(item.id)}
+              exporting={exportingIds.has(item.id)}
             />
           ))}
         </ul>
@@ -438,6 +449,8 @@ function LooseRow({
   onRename,
   onRecolor,
   onSaveError,
+  onExport,
+  exporting,
 }: {
   item: LooseRecord
   disabled: boolean
@@ -452,6 +465,8 @@ function LooseRow({
   onRename: (id: string, name: string) => Promise<boolean>
   onRecolor: (id: string, color: number) => Promise<boolean>
   onSaveError: (message: string | null) => void
+  onExport: () => void
+  exporting: boolean
 }) {
   const [editingName, setEditingName] = useState(false)
   const [colorPickerOpen, setColorPickerOpen] = useState(false)
@@ -568,6 +583,15 @@ function LooseRow({
                     label: 'Change colour',
                     disabled: disabled || !canEdit,
                     onSelect: () => setColorPickerOpen(true),
+                  },
+                ]
+              : []),
+            ...(showExport(item)
+              ? [
+                  {
+                    label: 'Export',
+                    disabled: disabled || !canEdit || exporting,
+                    onSelect: onExport,
                   },
                 ]
               : []),

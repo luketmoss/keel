@@ -30,8 +30,10 @@ const {
   listSubfolders,
   trashFolder,
   DriveConflictError,
+  DriveAuthError,
 } = vi.hoisted(() => {
   class DriveConflictError extends Error {}
+  class DriveAuthError extends Error {}
   return {
     findJsonFile: vi.fn(),
     readJsonFile: vi.fn(),
@@ -39,6 +41,7 @@ const {
     listSubfolders: vi.fn(),
     trashFolder: vi.fn(),
     DriveConflictError,
+    DriveAuthError,
   }
 })
 vi.mock('../drive/tripMetadata', () => ({
@@ -48,6 +51,7 @@ vi.mock('../drive/tripMetadata', () => ({
   listSubfolders,
   trashFolder,
   DriveConflictError,
+  DriveAuthError,
 }))
 
 beforeEach(() => {
@@ -253,6 +257,66 @@ describe('DriveTripStore', () => {
     expect(result).toBeNull()
     expect(store.getTrip('trip-a')?.notes).toBe('')
     expect(writeJsonFile).toHaveBeenCalledTimes(2)
+  })
+
+  it('#143: retries the flush lookup (findOrCreateTripFolder/findJsonFile) once and succeeds', async () => {
+    // migrateTrip's own folder lookup is left to fail and is swallowed
+    // silently (its documented behavior) — so no ref is ever cached for
+    // this trip, and every subsequent flush must redo the lookup itself.
+    // That's the exact gap #125 left open: its retry only ever covered the
+    // write, not the lookup that precedes it.
+    findOrCreateTripFolder.mockRejectedValueOnce(new Error('migration lookup failed'))
+    const store = new DriveTripStore(fakeStorage())
+    await store.connect('token', 'cairn-folder-id')
+    const entry = store.createTrip('Hokkaido')
+    await flush() // let the doomed migration attempt settle
+
+    findOrCreateTripFolder.mockRejectedValueOnce(new Error('network error')).mockResolvedValueOnce('folder-1')
+    findJsonFile.mockResolvedValue(null)
+    writeJsonFile.mockResolvedValueOnce({ fileId: 'trip-file', version: '1' })
+
+    const result = await store.updateTrip(entry.id, { notes: 'Great trip' })
+
+    expect(result?.notes).toBe('Great trip')
+    expect(store.getTrip(entry.id)?.notes).toBe('Great trip')
+    // 1 for the failed migration + 2 for the flush's own failed-then-retried lookup.
+    expect(findOrCreateTripFolder).toHaveBeenCalledTimes(3)
+    expect(writeJsonFile).toHaveBeenCalledTimes(1)
+  })
+
+  it('#143: gives up and reverts if the retry after a transient flush lookup failure also fails', async () => {
+    findOrCreateTripFolder.mockRejectedValueOnce(new Error('migration lookup failed'))
+    const store = new DriveTripStore(fakeStorage())
+    await store.connect('token', 'cairn-folder-id')
+    const entry = store.createTrip('Hokkaido')
+    await flush()
+
+    findOrCreateTripFolder.mockRejectedValue(new Error('network error'))
+
+    const result = await store.updateTrip(entry.id, { notes: 'Great trip' })
+
+    expect(result).toBeNull()
+    expect(store.getTrip(entry.id)?.notes).toBe('')
+    expect(findOrCreateTripFolder).toHaveBeenCalledTimes(3)
+    expect(writeJsonFile).not.toHaveBeenCalled()
+  })
+
+  it('#143: does not retry a flush lookup that fails with DriveAuthError', async () => {
+    findOrCreateTripFolder.mockRejectedValueOnce(new Error('migration lookup failed'))
+    const store = new DriveTripStore(fakeStorage())
+    await store.connect('token', 'cairn-folder-id')
+    const entry = store.createTrip('Hokkaido')
+    await flush()
+
+    findOrCreateTripFolder.mockRejectedValueOnce(new DriveAuthError())
+
+    const result = await store.updateTrip(entry.id, { notes: 'Great trip' })
+
+    expect(result).toBeNull()
+    expect(store.getTrip(entry.id)?.notes).toBe('')
+    // 1 for the failed migration + exactly 1 for the flush's own attempt — no retry.
+    expect(findOrCreateTripFolder).toHaveBeenCalledTimes(2)
+    expect(writeJsonFile).not.toHaveBeenCalled()
   })
 
   it('on a conflict, re-hydrates from Drive rather than reverting to the pre-edit value', async () => {

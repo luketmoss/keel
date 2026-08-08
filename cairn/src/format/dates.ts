@@ -52,6 +52,20 @@ function singleDate(date: Date): string {
   return date.getFullYear() === new Date().getFullYear() ? monthDay(date) : monthDayYear(date)
 }
 
+/** `4 tracks`, `1 track`. Exported so the trips list row and the "Add to a
+    trip" picker (`AddToTripPicker.tripChoiceLabel`) count the same way
+    instead of carrying two copies of the same rule. */
+export function pluralize(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? '' : 's'}`
+}
+
+/** Exported for `TripsPanel.test.tsx`, which builds the expected accessible
+    name from the same pieces `tripRowAccessibleName` composes it from,
+    rather than duplicating the lowercasing rule as a second literal. */
+export function lowercaseFirst(value: string): string {
+  return value.length === 0 ? value : value[0].toLowerCase() + value.slice(1)
+}
+
 /** Formats a trip's date range for display. The one place both the trip
     header and the trips-list row read from, so the two can no longer
     disagree about what a stored date means. */
@@ -90,4 +104,46 @@ export function formatTripDateRange(startDate: string | null, endDate: string | 
     : `${monthDay(start)}${RANGE_DASH}${monthDay(end)}`
 
   return start.getFullYear() === currentYear ? base : `${base}, ${start.getFullYear()}`
+}
+
+/** A trip row's meta line (#131): date range, track count, then photo count
+    if it's known. The photo half — and its separator — is omitted rather
+    than shown as `0 photos`, the same rule #121 already applies to the
+    picker: a trip whose photos have never been counted says nothing about
+    them rather than showing a zero it can't stand behind. */
+export function formatTripMetaLine(
+  startDate: string | null,
+  endDate: string | null,
+  trackCount: number,
+  photoCount: number | null,
+): string {
+  const parts = [formatTripDateRange(startDate, endDate), pluralize(trackCount, 'track')]
+  if (photoCount !== null) parts.push(pluralize(photoCount, 'photo'))
+  return parts.join(' · ')
+}
+
+/** The trip row's accessible name (#131). The row's dot carries status
+    visually and is `aria-hidden`, so dropping the word `planned`/`completed`
+    from the visible meta line would drop it for a screen reader entirely —
+    this restates it in words, the same way `AddToTripPicker.tripChoiceLabel`
+    spells out `4T · 128P` for the picker. Commas rather than the meta
+    line's middots, since a middot read aloud is noise. */
+export function tripRowAccessibleName(
+  name: string,
+  status: 'planned' | 'completed',
+  startDate: string | null,
+  endDate: string | null,
+  trackCount: number,
+  photoCount: number | null,
+): string {
+  const parts = [
+    name,
+    status,
+    lowercaseFirst(formatTripDateRange(startDate, endDate)),
+    pluralize(trackCount, 'track'),
+  ]
+  if (photoCount !== null) {
+    parts.push(photoCount === 0 ? 'no photos' : pluralize(photoCount, 'photo'))
+  }
+  return parts.join(', ')
 }

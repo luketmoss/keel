@@ -433,6 +433,46 @@ describe('App routing (#109)', () => {
   })
 })
 
+describe('App trip row counts (#131)', () => {
+  // The row's track count is read fresh on every render rather than
+  // memoized on the trip index: `saveOverview` only changes the index's
+  // own array reference when a trip's `origin` moves with it, so a track
+  // added to a trip whose origin doesn't change would show a stale count
+  // on return to the list under the old memoized computation. Reproduced
+  // here by writing the trip's overview directly to storage — standing in
+  // for what a real import's `saveOverview` effect persists — without
+  // going through anything that would touch the trip index, so a
+  // memoization bug and a correct fresh read are distinguishable.
+  it("shows a trip's raised track count after returning from it, even when the trip's origin did not change", async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedTrip('trip-track-count', 'Kepler Track')
+
+    await renderApp('/', { googleClientId: 'a-client-id' })
+    await signIn()
+
+    expect(await screen.findByText(/0 tracks/)).toBeDefined()
+
+    fireEvent.click(screen.getByText('Kepler Track'))
+    await screen.findByRole('button', { name: 'Back to the list' })
+    // Settles the trip's own effect, which writes its overview to match
+    // the (empty, per the fetch mock) file list Drive actually reports —
+    // origin stays `null`, exactly as it was.
+    await screen.findByText('No tracks yet')
+
+    window.localStorage.setItem(
+      'cairn.trips.overview.trip-track-count',
+      JSON.stringify({ type: 'FeatureCollection', features: [{}, {}] }),
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back to the list' }))
+    await screen.findByRole('heading', { name: 'Everything' })
+
+    expect(await screen.findByText(/2 tracks/)).toBeDefined()
+    expect(screen.queryByText(/0 tracks/)).toBeNull()
+    fetchSpy.mockRestore()
+  })
+})
+
 describe('App row actions (#109)', () => {
   it('replaces the row × with a ⋮ carrying named actions', async () => {
     const fetchSpy = mockGoogleSignIn()

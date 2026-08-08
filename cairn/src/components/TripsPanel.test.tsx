@@ -7,6 +7,7 @@ import type { TripIndexEntry } from '../store/tripStore'
 import type { LooseRecord } from '../store/looseStore'
 import type { KindFilter } from './FilterChips'
 import { formatDistance, formatElevationGain } from '../format/units'
+import { formatTripDateRange, lowercaseFirst } from '../format/dates'
 import { DEFAULT_TRIP_FILTERS, type TripFilters } from '../store/tripFilters'
 
 function tripEntry(overrides: Partial<TripIndexEntry> = {}): TripIndexEntry {
@@ -27,6 +28,7 @@ function tripEntry(overrides: Partial<TripIndexEntry> = {}): TripIndexEntry {
     and hover changes round-trip exactly as they do under the real shell. */
 function TestTripsPanel({
   trips,
+  trackCounts = new Map(),
   looseItems = [],
   kind = 'all',
   onCreate = vi.fn(),
@@ -39,6 +41,7 @@ function TestTripsPanel({
   dateSpan = null,
 }: {
   trips: TripIndexEntry[]
+  trackCounts?: ReadonlyMap<string, number>
   looseItems?: LooseRecord[]
   kind?: KindFilter
   onCreate?: (name: string) => void
@@ -55,6 +58,7 @@ function TestTripsPanel({
   return (
     <TripsPanel
       trips={trips}
+      trackCounts={trackCounts}
       looseItems={looseItems}
       kind={kind}
       filters={filters}
@@ -169,20 +173,82 @@ describe('TripsPanel', () => {
     expect(screen.queryByText('Nothing here yet')).toBeNull()
   })
 
-  it('lists every trip, showing its name, date range and status', () => {
+  it('lists every trip, showing its name, date range and both counts', () => {
     renderPanel({
       trips: [
         tripEntry({
+          id: 't1',
           name: 'Kepler Track',
           status: 'completed',
           startDate: '2024-03-01',
           endDate: '2024-03-05',
+          photoCount: 128,
         }),
       ],
+      trackCounts: new Map([['t1', 4]]),
     })
 
     expect(screen.getByText('Kepler Track')).toBeDefined()
-    expect(screen.getByText(/completed/)).toBeDefined()
+    expect(screen.getByText(new RegExp(`${escapeRe(formatTripDateRange('2024-03-01', '2024-03-05'))} · 4 tracks · 128 photos`))).toBeDefined()
+  })
+
+  // #131: the row's glyph carries status visually and is `aria-hidden`, so
+  // the word moved into the row link's accessible name rather than being
+  // dropped for a screen reader along with the visible text.
+  it('leaves status out of the visible meta line but keeps it in the accessible name', () => {
+    renderPanel({
+      trips: [
+        tripEntry({
+          id: 't1',
+          name: 'Kepler Track',
+          status: 'completed',
+          startDate: '2024-03-01',
+          endDate: '2024-03-05',
+          photoCount: 128,
+        }),
+      ],
+      trackCounts: new Map([['t1', 4]]),
+    })
+
+    expect(screen.queryByText(/completed/)).toBeNull()
+    const link = screen.getByText('Kepler Track').closest('a')
+    expect(link?.getAttribute('aria-label')).toBe(
+      `Kepler Track, completed, ${lowercaseFirst(formatTripDateRange('2024-03-01', '2024-03-05'))}, 4 tracks, 128 photos`,
+    )
+  })
+
+  it('omits the photo count from the meta line when it has never been counted', () => {
+    renderPanel({
+      trips: [tripEntry({ id: 't1', name: 'Kepler Track', photoCount: null })],
+      trackCounts: new Map([['t1', 4]]),
+    })
+
+    expect(screen.getByText(/4 tracks$/)).toBeDefined()
+    expect(screen.queryByText(/photos/)).toBeNull()
+  })
+
+  it('shows a genuine zero photo count rather than omitting it', () => {
+    renderPanel({
+      trips: [tripEntry({ id: 't1', name: 'Kepler Track', photoCount: 0 })],
+      trackCounts: new Map([['t1', 4]]),
+    })
+
+    expect(screen.getByText(/4 tracks · 0 photos$/)).toBeDefined()
+  })
+
+  it('keeps counts singular at one', () => {
+    renderPanel({
+      trips: [tripEntry({ id: 't1', name: 'Kepler Track', photoCount: 1 })],
+      trackCounts: new Map([['t1', 1]]),
+    })
+
+    expect(screen.getByText(/1 track · 1 photo$/)).toBeDefined()
+  })
+
+  it('falls back to 0 tracks when the track count map has no entry for the trip', () => {
+    renderPanel({ trips: [tripEntry({ id: 't1', name: 'Kepler Track' })] })
+
+    expect(screen.getByText(/0 tracks$/)).toBeDefined()
   })
 
   it('gives each row the marker as its glyph', () => {

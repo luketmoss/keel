@@ -210,23 +210,36 @@ function AppShell() {
   const draftOpen = Boolean(draftTrip.draft)
   const detailOpen = Boolean(openTripId) || Boolean(openLooseId)
 
+  /** Every visible trip's track count, keyed by id — read from the
+      precomputed overview every trip already hydrates on `connect()`, never
+      by opening a trip's folder. #131's row and the picker below both read
+      counts, and this is the one place either costs a call to
+      `getOverview`.
+   *
+   * Computed on every render rather than memoized on `visibleTrips`:
+   * `saveOverview` notifies subscribers but only changes the trip index's
+   * own array reference when a trip's `origin` moves with it, so a track
+   * added to a trip whose first point doesn't change would leave a memo
+   * keyed on `visibleTrips` showing a stale count after the user returns
+   * to the list. Cheap at cairn's scale — a handful of trips, each one
+   * `localStorage` read. */
+  const trackCounts = new Map(
+    visibleTrips.map((entry) => [entry.id, tripStore.getOverview(entry.id)?.features.length ?? 0]),
+  )
+
   /** What the picker shows beside each trip. Counts come from the index the
       list already reads rather than opening every trip's folder to count
       its files — a picker that costs one Drive round trip per trip would
       take longer to open than the move it starts. */
-  const tripChoices = useMemo(
-    () =>
-      visibleTrips.map((entry) => ({
-        entry,
-        trackCount: tripStore.getOverview(entry.id)?.features.length ?? 0,
-        // #121: cached on the index when the trip's photo index was last
-        // read, and `null` until something has read it. The picker shows
-        // no photo count in that case rather than a zero it cannot stand
-        // behind.
-        photoCount: entry.photoCount,
-      })),
-    [visibleTrips, tripStore],
-  )
+  const tripChoices = visibleTrips.map((entry) => ({
+    entry,
+    trackCount: trackCounts.get(entry.id) ?? 0,
+    // #121: cached on the index when the trip's photo index was last
+    // read, and `null` until something has read it. The picker shows
+    // no photo count in that case rather than a zero it cannot stand
+    // behind.
+    photoCount: entry.photoCount,
+  }))
 
   /** Moves a loose item into a trip and opens that trip, so the result is
       visible rather than asserted. The record only leaves the loose store
@@ -545,6 +558,7 @@ function AppShell() {
           ) : (
             <TripsPanel
               trips={visibleTrips}
+              trackCounts={trackCounts}
               looseItems={visibleLoose}
               kind={kind}
               filters={filters}

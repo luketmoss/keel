@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type RefObject } from 'react'
 import { Link } from 'react-router-dom'
 import type { TripIndexEntry } from '../store/tripStore'
 import { matchesTripFilters, type TripFilters } from '../store/tripFilters'
-import { formatTripDateRange } from '../format/dates'
+import { formatTripMetaLine, tripRowAccessibleName } from '../format/dates'
 import { canChangeOwner, looseMetaLine, type LooseRecord } from '../store/looseStore'
 import { LIST_HEADINGS, type KindFilter } from './FilterChips'
 import { RowMenu } from './RowMenu'
@@ -17,6 +17,10 @@ function shortDate(iso: string): string {
 
 interface TripsPanelProps {
   trips: TripIndexEntry[]
+  /** #131: a trip's track count, keyed by id — the same number the "Add to
+      a trip" picker already reads off `tripStore.getOverview`, computed
+      once in `App` rather than per row. */
+  trackCounts: ReadonlyMap<string, number>
   /** Tracks and photos that no trip owns. Owned ones are not here — they
       appear when their trip is open. */
   looseItems: LooseRecord[]
@@ -40,6 +44,7 @@ interface TripsPanelProps {
     narrowed by the chip row above it. */
 export function TripsPanel({
   trips,
+  trackCounts,
   looseItems,
   kind,
   filters,
@@ -158,6 +163,7 @@ export function TripsPanel({
             <TripRow
               key={trip.id}
               trip={trip}
+              trackCount={trackCounts.get(trip.id) ?? 0}
               disabled={disabled}
               emphasized={hoveredId === trip.id}
               onHover={onHover}
@@ -321,6 +327,7 @@ function RowConfirm({
 
 function TripRow({
   trip,
+  trackCount,
   disabled,
   emphasized,
   onHover,
@@ -332,6 +339,7 @@ function TripRow({
   onDelete,
 }: {
   trip: TripIndexEntry
+  trackCount: number
   disabled: boolean
   emphasized: boolean
   onHover: (id: string | null) => void
@@ -361,10 +369,20 @@ function TripRow({
       onMouseEnter={() => onHover(trip.id)}
       onMouseLeave={() => onHover(null)}
     >
+      {/* The dot's fill/hollow treatment carries status visually, so the
+          meta line below no longer spells it out — see #131. */}
       <span className={`trips-panel__row-dot trips-panel__row-dot--${trip.status}`} aria-hidden="true" />
       <Link
         to={`/trips/${trip.id}`}
         className="trips-panel__row-link"
+        aria-label={tripRowAccessibleName(
+          trip.name,
+          trip.status,
+          trip.startDate,
+          trip.endDate,
+          trackCount,
+          trip.photoCount,
+        )}
         onFocus={() => onHover(trip.id)}
         onBlur={() => onHover(null)}
       >
@@ -372,7 +390,7 @@ function TripRow({
           {trip.name}
         </span>
         <span className="trips-panel__row-detail">
-          {formatTripDateRange(trip.startDate, trip.endDate)} · {trip.status}
+          {formatTripMetaLine(trip.startDate, trip.endDate, trackCount, trip.photoCount)}
         </span>
       </Link>
       <RowMenu

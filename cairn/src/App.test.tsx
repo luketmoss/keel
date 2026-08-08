@@ -937,7 +937,7 @@ describe('App loose tracks and photos (#110)', () => {
 
     it('downloads a track by its driveFileId, under its sourceName', async () => {
       const fetchSpy = mockGoogleSignIn()
-      seedLooseTrack('lt-export', 'Mount Rosea', { driveFileId: 'file-1' })
+      seedLooseTrack('lt-export', 'Mount Rosea', { driveFileId: 'file-1', sourceName: 'rosea-day-1.kml' })
 
       await renderApp('/tracks/lt-export', { googleClientId: 'a-client-id' })
       await signIn()
@@ -949,6 +949,15 @@ describe('App loose tracks and photos (#110)', () => {
         }
         return { ok: true, status: 200, json: async () => ({ id: 'x', files: [] }) } as Response
       })
+      // The synthetic anchor's `download` attribute is the one place the
+      // filename this test is about actually shows up — `downloadTrackFile`
+      // never puts it on the wire.
+      const clickedDownloadNames: (string | null)[] = []
+      const clickSpy = vi
+        .spyOn(HTMLAnchorElement.prototype, 'click')
+        .mockImplementation(function (this: HTMLAnchorElement) {
+          clickedDownloadNames.push(this.download)
+        })
 
       fireEvent.click(await screen.findByRole('button', { name: 'Actions for Mount Rosea' }))
       await act(async () => {
@@ -961,10 +970,12 @@ describe('App loose tracks and photos (#110)', () => {
           expect.objectContaining({ headers: { Authorization: 'Bearer tok' } }),
         ),
       )
+      expect(clickedDownloadNames).toEqual(['rosea-day-1.kml'])
       expect(URL.createObjectURL).toHaveBeenCalled()
       // No failure toast — the download itself is the confirmation, #110's
       // stance on `Add to a trip` reused here.
       expect(screen.queryByText(/Couldn't export/)).toBeNull()
+      clickSpy.mockRestore()
       fetchSpy.mockRestore()
     })
 

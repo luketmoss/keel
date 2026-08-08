@@ -18,6 +18,12 @@ interface PhotoListProps {
       once the row's confirm has been accepted — the `×` control itself
       only starts the confirm, via `onStartConfirm` below. */
   onRemove: (id: string) => void
+  /** #132: the reversible exit, beside `onRemove`'s destructive one — no
+      confirm, since it's undone by adding the photo back. `undefined` when
+      the caller has nowhere to put a detached photo (there always is one
+      today; the type stays optional to match `TrackList.onRemoveFromTrip`'s
+      shape). */
+  onRemoveFromTrip?: (id: string) => void
   /** #77 — the single confirm slot, shared with `TrackList` by the parent
       (design doc: "tracks and photos sharing one slot"). `null` when no row
       anywhere in the trip is confirming. */
@@ -51,6 +57,7 @@ export function PhotoList({
   tripOffsetHours,
   onOpenRow,
   onRemove,
+  onRemoveFromTrip,
   confirmingId,
   onStartConfirm,
   onCancelConfirm,
@@ -106,6 +113,7 @@ export function PhotoList({
                 tripOffsetHours={tripOffsetHours}
                 onOpen={onOpenRow}
                 onRemove={onRemove}
+                onRemoveFromTrip={onRemoveFromTrip}
                 confirming={confirmingId === item.row.id}
                 confirmingRowRef={confirmingId === item.row.id ? confirmingRowRef : undefined}
                 onStartConfirm={() => onStartConfirm(item.row.id)}
@@ -133,6 +141,7 @@ function PhotoRow({
   tripOffsetHours,
   onOpen,
   onRemove,
+  onRemoveFromTrip,
   confirming,
   confirmingRowRef,
   onStartConfirm,
@@ -148,6 +157,7 @@ function PhotoRow({
   tripOffsetHours: number
   onOpen: (photoId: string) => void
   onRemove: (id: string) => void
+  onRemoveFromTrip?: (id: string) => void
   confirming: boolean
   confirmingRowRef?: RefObject<HTMLElement | null>
   onStartConfirm: () => void
@@ -217,15 +227,30 @@ function PhotoRow({
         {removing ? (
           <span className="photo-row__removing">Removing…</span>
         ) : (
-          <button
-            type="button"
-            className="photo-row__remove"
-            aria-label={`Remove ${row.name}`}
-            disabled={disableRemove}
-            onClick={onStartConfirm}
-          >
-            ×
-          </button>
+          <>
+            {onRemoveFromTrip && (
+              /* #132: no ellipsis and no confirm — reversible by adding it
+                 back, which is exactly what makes it the other exit. */
+              <button
+                type="button"
+                className="photo-row__unlink"
+                aria-label={`Remove ${row.name} from trip`}
+                disabled={disableRemove}
+                onClick={() => onRemoveFromTrip(row.id)}
+              >
+                ⤴
+              </button>
+            )}
+            <button
+              type="button"
+              className="photo-row__remove"
+              aria-label={`Delete ${row.name} permanently`}
+              disabled={disableRemove}
+              onClick={onStartConfirm}
+            >
+              ×
+            </button>
+          </>
         )}
       </div>
       {removeError && <p className="photo-row__error">{removeError}</p>}

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { PHOTOS_INDEX_NAME, readPhotoIndex, writePhotoIndex } from './photoIndex'
+import { PHOTOS_INDEX_NAME, readPhotoIndex, removePhotoFromIndex, writePhotoIndex } from './photoIndex'
 
 const { listTrackFiles, downloadTrackFile, startResumableUpload, uploadFileContent } = vi.hoisted(() => ({
   listTrackFiles: vi.fn(),
@@ -11,6 +11,20 @@ vi.mock('../drive/trackFiles', () => ({ listTrackFiles, downloadTrackFile, start
 
 function indexFile(content: unknown, name = PHOTOS_INDEX_NAME): File {
   return new File([JSON.stringify(content)], name, { type: 'application/json' })
+}
+
+/** Reads back whatever the most recent `uploadFileContent` call actually
+    wrote, as parsed JSON — what `writePhotoIndex`'s callers (including
+    `removePhotoFromIndex`) are checked against, since the mock only
+    records the `File` it was handed. */
+async function readUploadedIndex(): Promise<{ version: number; photos: unknown[] }> {
+  const uploadedFile = uploadFileContent.mock.calls.at(-1)?.[1] as File
+  const text = await new Promise<string>((resolve) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.readAsText(uploadedFile)
+  })
+  return JSON.parse(text)
 }
 
 beforeEach(() => {
@@ -105,5 +119,48 @@ describe('readPhotoIndex', () => {
     listTrackFiles.mockRejectedValue(new Error('network error'))
 
     await expect(readPhotoIndex('token', 'folder-id')).resolves.toEqual([])
+  })
+})
+
+describe('removePhotoFromIndex', () => {
+  it('drops the matched photo and writes back everything else (#132)', async () => {
+    listTrackFiles.mockResolvedValue([{ id: 'index-1', name: PHOTOS_INDEX_NAME }])
+    downloadTrackFile.mockResolvedValue(
+      indexFile({
+        version: 1,
+        photos: [
+          { name: 'a.jpg', originalDriveFileId: 'orig-a', thumbnailDriveFileId: 'thumb-a' },
+          { name: 'b.jpg', originalDriveFileId: 'orig-b', thumbnailDriveFileId: 'thumb-b' },
+        ],
+      }),
+    )
+    startResumableUpload.mockResolvedValue('session-uri')
+    uploadFileContent.mockResolvedValue({ id: 'index-file-id' })
+
+    await removePhotoFromIndex('token', 'folder-id', 'orig-a')
+
+    const written = await readUploadedIndex()
+    expect(written.photos).toEqual([
+      { name: 'b.jpg', originalDriveFileId: 'orig-b', thumbnailDriveFileId: 'thumb-b' },
+    ])
+  })
+
+  it('leaves every entry in place when the id names nothing in the index', async () => {
+    listTrackFiles.mockResolvedValue([{ id: 'index-1', name: PHOTOS_INDEX_NAME }])
+    downloadTrackFile.mockResolvedValue(
+      indexFile({
+        version: 1,
+        photos: [{ name: 'a.jpg', originalDriveFileId: 'orig-a', thumbnailDriveFileId: 'thumb-a' }],
+      }),
+    )
+    startResumableUpload.mockResolvedValue('session-uri')
+    uploadFileContent.mockResolvedValue({ id: 'index-file-id' })
+
+    await removePhotoFromIndex('token', 'folder-id', 'no-such-id')
+
+    const written = await readUploadedIndex()
+    expect(written.photos).toEqual([
+      { name: 'a.jpg', originalDriveFileId: 'orig-a', thumbnailDriveFileId: 'thumb-a' },
+    ])
   })
 })

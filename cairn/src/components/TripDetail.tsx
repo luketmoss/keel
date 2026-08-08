@@ -18,6 +18,7 @@ import { tripUtcOffsetHours } from '../photo/interpolate'
 import type { TripStore } from '../store/tripStore'
 import { MOVE_FAILED_MESSAGE } from '../store/looseStore'
 import type { ImportedFile } from '../import/types'
+import type { PhotoRecord } from '../photo/photoIndex'
 import './TripDetail.css'
 
 const UNRECOGNISED_TYPE_MESSAGE = 'trips take .kml or .kmz tracks and JPEG, PNG or WebP photos'
@@ -94,6 +95,10 @@ interface TripDetailProps {
       move now, not a local write, so it can fail — and this trip only lets
       go of the track once the loose side has hold of it. */
   onRemoveFromTrip?: (file: ImportedFile) => Promise<boolean>
+  /** #132: the same contract as `onRemoveFromTrip`, for a photo — returns a
+      trip's `PhotoRecord` to the top level with its data intact, resolving
+      whether the move actually happened. */
+  onRemovePhotoFromTrip?: (record: PhotoRecord) => Promise<boolean>
 }
 
 /** The panel's trip face, and the trip's own map layers.
@@ -114,6 +119,7 @@ export function TripDetail({
   onDropTargetChange,
   onGeometryChange,
   onRemoveFromTrip,
+  onRemovePhotoFromTrip,
 }: TripDetailProps) {
   const trip = useSyncExternalStore(tripStore.subscribe, () => tripStore.getTrip(tripId))
   const tripImport = useTripImport(tripId, accessToken, cairnFolderId)
@@ -126,6 +132,8 @@ export function TripDetail({
       the hook's `trackRemoveErrors` because the hook owns deleting and this
       is the other exit; merged into one map where the list reads them. */
   const [detachErrors, setDetachErrors] = useState<Record<string, string>>({})
+  /** #132 — the photo mirror of `detachErrors`, keyed by photo id. */
+  const [photoDetachErrors, setPhotoDetachErrors] = useState<Record<string, string>>({})
   // #73: "disconnected" is exactly "no usable token", whether that's never
   // having signed in, a sign-out, or #72's token-expired.
   const signedIn = accessToken !== null && cairnFolderId !== null
@@ -385,12 +393,35 @@ export function TripDetail({
           tripOffsetHours={tripOffsetHours}
           onOpenRow={openPhoto}
           onRemove={photoImport.removePhoto}
+          onRemoveFromTrip={
+            onRemovePhotoFromTrip &&
+            (async (id) => {
+              const record = photoImport.photos.find((candidate) => candidate.id === id)
+              if (!record) return
+              setPhotoDetachErrors((prev) => {
+                if (!(id in prev)) return prev
+                const next = { ...prev }
+                delete next[id]
+                return next
+              })
+              // The loose side takes hold first: the photo exists in both
+              // places for an instant rather than in neither. Only once the
+              // files have actually moved does this trip forget it — and it
+              // is forgotten, not trashed, because it's now somewhere else
+              // rather than gone.
+              if (!(await onRemovePhotoFromTrip(record))) {
+                setPhotoDetachErrors((prev) => ({ ...prev, [id]: MOVE_FAILED_MESSAGE }))
+                return
+              }
+              photoImport.forgetPhoto(id)
+            })
+          }
           confirmingId={removeConfirm.confirmingId}
           onStartConfirm={removeConfirm.onStartConfirm}
           onCancelConfirm={removeConfirm.onCancelConfirm}
           confirmingRowRef={removeConfirm.confirmingRowRef}
           removingIds={photoImport.removingPhotoIds}
-          removeErrors={photoImport.photoRemoveErrors}
+          removeErrors={{ ...photoImport.photoRemoveErrors, ...photoDetachErrors }}
           disableRemove={!signedIn}
         />
       </div>

@@ -4,6 +4,7 @@ import { renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useLooseImport } from './useLooseImport'
 import { LocalLooseStore } from '../store/looseStore'
+import type { PhotoRecord } from '../photo/photoIndex'
 
 function fakeStorage(): Storage {
   const map = new Map<string, string>()
@@ -137,5 +138,49 @@ describe('useLooseImport', () => {
   it('ignores a Keep loose with nothing parsed', () => {
     importer().addParsedTracks('empty.kml', [])
     expect(store.getItems()).toHaveLength(0)
+  })
+
+  describe('addPhotoFromTrip (#132)', () => {
+    function tripPhoto(overrides: Partial<PhotoRecord> = {}): PhotoRecord {
+      return {
+        id: 'ignored-on-the-way-in',
+        name: 'sapporo.jpg',
+        originalDriveFileId: 'trip-orig-1',
+        thumbnailDriveFileId: 'trip-thumb-1',
+        gpsTimestamp: '2024-11-03T00:00:00.000Z',
+        dateTimeOriginal: '2024-11-03T09:00:00',
+        latitude: 43,
+        longitude: 141,
+        ...overrides,
+      }
+    }
+
+    it("carries a trip photo's ids and EXIF fields into a loose record, for Remove from trip", () => {
+      const record = importer().addPhotoFromTrip(tripPhoto())
+
+      expect(record).toMatchObject({
+        kind: 'photo',
+        name: 'sapporo.jpg',
+        originalDriveFileId: 'trip-orig-1',
+        thumbnailDriveFileId: 'trip-thumb-1',
+        // #50's two timestamps survive the move rather than being
+        // collapsed, exactly as they do going the other direction.
+        gpsTimestamp: '2024-11-03T00:00:00.000Z',
+        dateTimeOriginal: '2024-11-03T09:00:00',
+        position: { lat: 43, lng: 141 },
+      })
+      expect(store.getItems()).toHaveLength(1)
+    })
+
+    // photos.json only ever stores EXIF GPS, so a photo positioned inside
+    // the trip by #52's interpolation has no recorded coordinate to bring
+    // with it — it lists as unplaced once it leaves.
+    it('leaves a photo unplaced when its trip position came from interpolation rather than EXIF', () => {
+      const record = importer().addPhotoFromTrip(
+        tripPhoto({ latitude: undefined, longitude: undefined }),
+      )
+
+      expect(record.position).toBeNull()
+    })
   })
 })

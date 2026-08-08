@@ -179,6 +179,42 @@
   pointer-events: none;
 }
 
+/* #132: the reversible exit, beside the destructive one — mirrors
+   `TrackList.css`'s `.track-row__unlink` exactly, same reasoning as the
+   remove control above for why it's a separate declaration rather than a
+   shared class. */
+.photo-row__unlink {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  margin-right: var(--space-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: var(--text-base);
+  padding: 0;
+}
+
+.photo-row__unlink:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.photo-row__unlink:active {
+  background: var(--pressed);
+}
+
+.photo-row__unlink:disabled {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+
 .photo-row__removing {
   flex: none;
   margin-right: var(--space-4);

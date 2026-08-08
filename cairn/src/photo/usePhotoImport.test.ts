@@ -349,3 +349,37 @@ describe('usePhotoImport — #77 removing a photo', () => {
     )
   })
 })
+
+describe('usePhotoImport — #132 forgetPhoto', () => {
+  it('drops the photo from local state without trashing it or touching photos.json', async () => {
+    readPhotoIndex.mockResolvedValue([
+      { id: 'x', name: 'a.jpg', originalDriveFileId: 'orig-1', thumbnailDriveFileId: 'thumb-1' },
+    ])
+
+    const { result } = renderHook(() => usePhotoImport('trip-1', 'token', 'cairn-folder-id'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    const id = result.current.photos[0].id
+
+    act(() => result.current.forgetPhoto(id))
+
+    expect(result.current.photos).toHaveLength(0)
+    expect(trashFile).not.toHaveBeenCalled()
+    expect(writePhotoIndex).not.toHaveBeenCalled()
+  })
+
+  it('leaves other photos untouched', async () => {
+    readPhotoIndex.mockResolvedValue([
+      { id: 'x', name: 'a.jpg', originalDriveFileId: 'orig-a', thumbnailDriveFileId: 'thumb-a' },
+      { id: 'y', name: 'b.jpg', originalDriveFileId: 'orig-b', thumbnailDriveFileId: 'thumb-b' },
+    ])
+
+    const { result } = renderHook(() => usePhotoImport('trip-1', 'token', 'cairn-folder-id'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    const [first] = result.current.photos
+
+    act(() => result.current.forgetPhoto(first.id))
+
+    expect(result.current.photos).toHaveLength(1)
+    expect(result.current.photos[0].name).toBe('b.jpg')
+  })
+})

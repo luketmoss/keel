@@ -58,8 +58,11 @@ vi.mock('../photo/thumbnail', async () => {
   return { ...actual, generateThumbnail }
 })
 
-const { appendPhotoToIndex } = vi.hoisted(() => ({ appendPhotoToIndex: vi.fn() }))
-vi.mock('../photo/photoIndex', () => ({ appendPhotoToIndex }))
+const { appendPhotoToIndex, removePhotoFromIndex } = vi.hoisted(() => ({
+  appendPhotoToIndex: vi.fn(),
+  removePhotoFromIndex: vi.fn(),
+}))
+vi.mock('../photo/photoIndex', () => ({ appendPhotoToIndex, removePhotoFromIndex }))
 
 function track(points: [number, number][]): Track {
   return { name: 'day', points: points.map(([lat, lon]) => ({ lat, lon })) }
@@ -122,6 +125,7 @@ beforeEach(() => {
   uploadFileContent.mockReset().mockResolvedValue({ id: 'drive-file-1' })
   generateThumbnail.mockReset().mockResolvedValue({ ok: true, blob: new Blob(['thumb']) })
   appendPhotoToIndex.mockReset().mockResolvedValue(undefined)
+  removePhotoFromIndex.mockReset().mockResolvedValue(undefined)
   store = new DriveLooseStore(fakeStorage())
 })
 
@@ -496,5 +500,66 @@ describe('claiming back out of a trip', () => {
     moveDriveFile.mockRejectedValue(new Error('offline'))
 
     expect(await store.claimFromTrip(record.id, 'trip-1')).toBe(false)
+  })
+
+  // #132: a photo's claim mirrors a track's, plus the second file and the
+  // trip's photos.json entry `moveIntoTrip` had to handle on the way in.
+  it("moves both of a photo's files into the loose folder and drops it from the trip's photos.json", async () => {
+    store = await connected()
+    const record = store.addPhoto({
+      ...NEW_PHOTO,
+      originalDriveFileId: 'trip-orig-1',
+      thumbnailDriveFileId: 'trip-thumb-1',
+    })
+
+    expect(await store.claimFromTrip(record.id, 'trip-1')).toBe(true)
+
+    expect(moveDriveFile.mock.calls.map((call) => [call[1], call[2], call[3]])).toEqual([
+      ['trip-orig-1', 'trip-folder', 'item-folder'],
+      ['trip-thumb-1', 'trip-folder', 'item-folder'],
+    ])
+    expect(removePhotoFromIndex).toHaveBeenCalledWith('tok', 'trip-folder', 'trip-orig-1')
+    expect(store.getItem(record.id)?.uploadState).toBe('ok')
+  })
+
+  it('refuses to claim a photo that has no files in Drive', async () => {
+    store = await connected()
+    const record = store.addPhoto(NEW_PHOTO)
+
+    expect(await store.claimFromTrip(record.id, 'trip-1')).toBe(false)
+    expect(moveDriveFile).not.toHaveBeenCalled()
+    expect(removePhotoFromIndex).not.toHaveBeenCalled()
+  })
+
+  it("leaves the photo in the trip when the original's move fails", async () => {
+    store = await connected()
+    const record = store.addPhoto({
+      ...NEW_PHOTO,
+      originalDriveFileId: 'trip-orig-1',
+      thumbnailDriveFileId: 'trip-thumb-1',
+    })
+    moveDriveFile.mockRejectedValue(new Error('offline'))
+
+    expect(await store.claimFromTrip(record.id, 'trip-1')).toBe(false)
+    expect(removePhotoFromIndex).not.toHaveBeenCalled()
+  })
+
+  /* Once the original has left the trip folder the photo belongs to the
+     loose store, and reporting otherwise would leave it named in the
+     trip's photos.json beside files the loose store now holds — one item
+     owned twice. The thumbnail move and the index write come after that
+     line and must not undo it, the mirror of moveIntoTrip's own stance. */
+  it('still reports the claim when only the thumbnail move or the index removal fails', async () => {
+    store = await connected()
+    const record = store.addPhoto({
+      ...NEW_PHOTO,
+      originalDriveFileId: 'trip-orig-1',
+      thumbnailDriveFileId: 'trip-thumb-1',
+    })
+    moveDriveFile.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('offline'))
+    removePhotoFromIndex.mockRejectedValue(new Error('offline'))
+
+    expect(await store.claimFromTrip(record.id, 'trip-1')).toBe(true)
+    expect(moveDriveFile).toHaveBeenCalledTimes(2)
   })
 })

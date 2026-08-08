@@ -205,6 +205,69 @@ describe('moveLooseIntoTrip', () => {
     expect(await moveLooseIntoTrip(store, trips, 'no-such-id', trip.id)).toBe(false)
     expect(store.getItems()).toHaveLength(1)
   })
+
+  // #130: a photo moved into a trip that is not open has nothing else
+  // reading its photos.json to notice the count changed.
+  it('raises the destination trip photo count by one when it is already known', async () => {
+    const trips = new LocalTripStore(fakeStorage())
+    const trip = trips.createTrip('Larapinta')
+    trips.savePhotoCount(trip.id, 4)
+    const photo = store.addPhoto({ name: 'a.jpg', takenAt: null, position: { lat: 1, lng: 2 } })
+
+    await moveLooseIntoTrip(store, trips, photo.id, trip.id)
+
+    expect(trips.getTrip(trip.id)?.photoCount).toBe(5)
+    // The index entry, not just the full record — this is what App's
+    // `tripChoices` reads to build the picker's `TripChoice[]`, so this is
+    // what actually makes the picker show the raised count.
+    expect(trips.getTrips().find((entry) => entry.id === trip.id)?.photoCount).toBe(5)
+  })
+
+  it('leaves an uncounted trip uncounted rather than treating null as zero', async () => {
+    const trips = new LocalTripStore(fakeStorage())
+    const trip = trips.createTrip('Larapinta')
+    expect(trips.getTrip(trip.id)?.photoCount).toBeNull()
+    const photo = store.addPhoto({ name: 'a.jpg', takenAt: null, position: { lat: 1, lng: 2 } })
+
+    await moveLooseIntoTrip(store, trips, photo.id, trip.id)
+
+    expect(trips.getTrip(trip.id)?.photoCount).toBeNull()
+  })
+
+  it('leaves the photo count untouched when a track moves', async () => {
+    const trips = new LocalTripStore(fakeStorage())
+    const trip = trips.createTrip('Larapinta')
+    trips.savePhotoCount(trip.id, 4)
+    const record = store.addTrack(NEW_TRACK, [track([[1, 2]])])
+
+    await moveLooseIntoTrip(store, trips, record.id, trip.id)
+
+    expect(trips.getTrip(trip.id)?.photoCount).toBe(4)
+  })
+
+  it('leaves the destination photo count untouched when the move fails', async () => {
+    const trips = new LocalTripStore(fakeStorage())
+    const trip = trips.createTrip('Larapinta')
+    trips.savePhotoCount(trip.id, 4)
+    const photo = store.addPhoto({ name: 'a.jpg', takenAt: null, position: { lat: 1, lng: 2 } })
+    const failing = { ...store, moveIntoTrip: async () => false }
+
+    expect(await moveLooseIntoTrip(failing, trips, photo.id, trip.id)).toBe(false)
+    expect(trips.getTrip(trip.id)?.photoCount).toBe(4)
+  })
+
+  it('leaves a different trip photo count untouched', async () => {
+    const trips = new LocalTripStore(fakeStorage())
+    const trip = trips.createTrip('Larapinta')
+    const other = trips.createTrip('Overland Track')
+    trips.savePhotoCount(trip.id, 4)
+    trips.savePhotoCount(other.id, 9)
+    const photo = store.addPhoto({ name: 'a.jpg', takenAt: null, position: { lat: 1, lng: 2 } })
+
+    await moveLooseIntoTrip(store, trips, photo.id, trip.id)
+
+    expect(trips.getTrip(other.id)?.photoCount).toBe(9)
+  })
 })
 
 describe('looseMetaLine', () => {

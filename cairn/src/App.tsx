@@ -466,6 +466,7 @@ function AppShell() {
                   (kind === 'photos' && item.kind === 'photo'),
               )}
               store={looseStore}
+              accessToken={accessToken}
               hoveredId={hoveredTripId}
               onHover={setHoveredTripId}
               selectedId={openLooseId ?? null}
@@ -553,6 +554,7 @@ function AppShell() {
                 key={openLooseId}
                 item={openLoose}
                 trips={tripChoices}
+                accessToken={accessToken}
                 disabled={disconnected}
                 busy={moving}
                 error={moveError}

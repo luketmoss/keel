@@ -141,8 +141,19 @@
 .loose-face__image {
   aspect-ratio: 4 / 3;
   border-radius: var(--radius-sm);
+  overflow: hidden;
   background: var(--surface-lift);
   background-image: linear-gradient(135deg, var(--accent-soft), var(--muted-soft));
+}
+
+/* #134 — the photo, once it arrives. `cover` crops to the fixed 4/3 box
+   rather than resizing it, so the layout never shifts when the image
+   lands (or per photo — different photos have different aspect ratios). */
+.loose-face__image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .loose-face__unplaced {

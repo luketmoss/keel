@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AdvancedMarker, Polyline, useMap } from '@vis.gl/react-google-maps'
-import type { TripIndexEntry, TripStatus } from '../store/tripStore'
+import { deriveTripStatus, type TripIndexEntry, type TripStatus } from '../store/tripStore'
 import type { Track } from '../kml/parse'
 import { matchesTripFilters, type TripFilters } from '../store/tripFilters'
 import { fitTracksToBounds, zoomToFitCluster } from '../map/fitBounds'
@@ -38,7 +38,7 @@ export function placesForTrips(trips: TripIndexEntry[]): Place[] {
     .map((trip) => ({
       tripId: trip.id,
       name: trip.name,
-      status: trip.status,
+      status: deriveTripStatus(trip.startDate, trip.endDate),
       lat: trip.origin.lat,
       lng: trip.origin.lng,
     }))

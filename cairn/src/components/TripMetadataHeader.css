@@ -53,22 +53,15 @@
   margin-bottom: var(--space-2);
 }
 
+/* #147: a label, not a control — derived from the trip's dates rather than
+   set here. No cursor, no hover/pressed state; the shape (radius, padding,
+   size) is unchanged from when it was clickable, so the row doesn't shift. */
 .trip-metadata__status {
-  border: none;
   border-radius: var(--radius-full);
   padding: var(--space-1) var(--space-2);
   font-size: var(--text-xs);
-  cursor: pointer;
   background: var(--muted-soft);
   color: var(--text-muted);
-}
-
-.trip-metadata__status:hover {
-  background: var(--hover);
-}
-
-.trip-metadata__status:active {
-  background: var(--pressed);
 }
 
 .trip-metadata__status--planned {
@@ -77,39 +70,6 @@
 
 .trip-metadata__status--completed {
   color: var(--text-muted);
-}
-
-.trip-metadata__status-toggle {
-  display: inline-flex;
-  align-items: center;
-  border-radius: var(--radius-full);
-  background: var(--surface-lift);
-  padding: 2px;
-}
-
-.trip-metadata__status-segment {
-  border: none;
-  border-radius: var(--radius-full);
-  padding: var(--space-1) var(--space-2);
-  font-size: var(--text-xs);
-  cursor: pointer;
-  background: none;
-  color: var(--text-muted);
-  transition: color var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease);
-}
-
-.trip-metadata__status-segment:hover {
-  background: var(--hover);
-}
-
-.trip-metadata__status-segment:active {
-  background: var(--pressed);
-}
-
-.trip-metadata__status-segment--selected,
-.trip-metadata__status-segment--selected:hover {
-  background: var(--accent-soft);
-  color: var(--accent);
 }
 
 .trip-metadata__dates {
@@ -141,9 +101,26 @@
   overflow: hidden;
 }
 
+/* Same treatment the empty date line gets: it names the field instead of
+   being a blank strip, and reads as an action rather than a description.
+   No `min-height` any more — there's real text holding the line open. */
 .trip-metadata__notes--empty {
-  min-height: 1em;
-  cursor: text;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.trip-metadata__notes-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* Blur saves and Escape discards (#35), which is invisible from inside an
+   open textarea — this is the line that says so. */
+.trip-metadata__notes-hint {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
 }
 
 .trip-metadata__notes-input {

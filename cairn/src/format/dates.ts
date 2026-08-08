@@ -1,3 +1,5 @@
+import { deriveTripStatus } from '../store/tripStore'
+
 /* Hair space + en dash + hair space, matching the header's existing range
    separator. A plain hyphen ("Aug 1 - 5") reads as a subtraction in the
    tabular numerals the design language mandates. */
@@ -127,10 +129,12 @@ export function formatTripMetaLine(
     from the visible meta line would drop it for a screen reader entirely —
     this restates it in words, the same way `AddToTripPicker.tripChoiceLabel`
     spells out `4T · 128P` for the picker. Commas rather than the meta
-    line's middots, since a middot read aloud is noise. */
+    line's middots, since a middot read aloud is noise.
+    Status is derived from the same `startDate`/`endDate` this already takes
+    (#147) rather than passed in separately, so there is no way for this and
+    the row's dot to compute it from different inputs. */
 export function tripRowAccessibleName(
   name: string,
-  status: 'planned' | 'completed',
   startDate: string | null,
   endDate: string | null,
   trackCount: number,
@@ -138,7 +142,7 @@ export function tripRowAccessibleName(
 ): string {
   const parts = [
     name,
-    status,
+    deriveTripStatus(startDate, endDate),
     lowercaseFirst(formatTripDateRange(startDate, endDate)),
     pluralize(trackCount, 'track'),
   ]

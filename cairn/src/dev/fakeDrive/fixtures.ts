@@ -34,7 +34,6 @@ function track(name: string, points: [number, number][]): Track {
 interface FixtureTripDef {
   id: string
   name: string
-  status: 'planned' | 'completed'
   startDate: string | null
   endDate: string | null
   notes: string
@@ -42,11 +41,14 @@ interface FixtureTripDef {
   tracks: Track[]
 }
 
+// #147: status is derived from dates, not stored — Pacific Coast Run's dates
+// are in the past and Dolomites Loop's are in the future, which is what
+// keeps this fixture set covering one of each per #93's acceptance
+// criterion 3, with nothing here to say so explicitly any more.
 const FIXTURE_TRIPS: FixtureTripDef[] = [
   {
     id: 'trip-fake-pacific-coast',
     name: 'Pacific Coast Run',
-    status: 'completed',
     startDate: '2025-06-02',
     endDate: '2025-06-09',
     notes: 'Fixture trip seeded by the fake Drive (#93) — Highway 1 from the Bay to Big Sur.',
@@ -63,7 +65,6 @@ const FIXTURE_TRIPS: FixtureTripDef[] = [
   {
     id: 'trip-fake-dolomites',
     name: 'Dolomites Loop',
-    status: 'planned',
     startDate: '2026-09-01',
     endDate: '2026-09-10',
     notes: 'Fixture trip seeded by the fake Drive (#93) — a planned loop through the Dolomites.',
@@ -89,7 +90,6 @@ export function buildFixtureFiles(): FakeFile[] {
     const record: TripRecord = {
       id: trip.id,
       name: trip.name,
-      status: trip.status,
       startDate: trip.startDate,
       endDate: trip.endDate,
       notes: trip.notes,

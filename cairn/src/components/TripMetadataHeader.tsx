@@ -1,10 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { TripRecord, TripStatus, TripUpdate } from '../store/tripStore'
+import { deriveTripStatus, type TripRecord, type TripUpdate } from '../store/tripStore'
 import { formatTripDateRange } from '../format/dates'
 import { DateRangeCalendar } from './DateRangeCalendar'
 import './TripMetadataHeader.css'
 
-type Field = 'name' | 'status' | 'dates' | 'notes'
+type Field = 'name' | 'dates' | 'notes'
 
 interface TripMetadataHeaderProps {
   trip: TripRecord
@@ -18,8 +18,9 @@ interface TripMetadataHeaderProps {
   disabled?: boolean
 }
 
-/** The editable trip header above the file list — name, status, dates, and
-    notes, each independently click-to-edit. Local-only for now: `onUpdate`
+/** The editable trip header above the file list — name, dates, and notes,
+    each independently click-to-edit, plus a status pill that isn't (#147:
+    derived from the dates, not stored). Local-only for now: `onUpdate`
     writes through the `TripStore` interface, whatever backs it — see
     cairn's `CLAUDE.md` on storage sitting behind one interface even while
     the only implementation is local. */
@@ -60,6 +61,8 @@ export function TripMetadataHeader({ trip, onUpdate, disabled = false }: TripMet
     setEditing(field)
   }
 
+  const status = deriveTripStatus(trip.startDate, trip.endDate)
+
   return (
     <div className="trip-metadata">
       {/* #73: the Disabled treatment (opacity/pointer-events) lives on this
@@ -90,23 +93,12 @@ export function TripMetadataHeader({ trip, onUpdate, disabled = false }: TripMet
         )}
 
         <div className="trip-metadata__row">
-          {editing === 'status' ? (
-            <StatusEditor
-              initial={trip.status}
-              onCommit={(status) => commit('status', { status })}
-              onCancel={() => setEditing(null)}
-            />
-          ) : (
-            <button
-              type="button"
-              className={`trip-metadata__status trip-metadata__status--${trip.status}${
-                savedField === 'status' ? ' trip-metadata__field--saved' : ''
-              }`}
-              onClick={() => startEditing('status')}
-            >
-              {trip.status}
-            </button>
-          )}
+          {/* #147: derived from the dates, not editable — see
+              `deriveTripStatus`. A label, not a control: no click handler,
+              no hover or pressed state. */}
+          <span className={`trip-metadata__status trip-metadata__status--${status}`} title="Set by the trip's dates">
+            {status}
+          </span>
 
           <span
             className={`trip-metadata__dates${
@@ -185,46 +177,6 @@ function NameEditor({
   )
 }
 
-const STATUS_OPTIONS: TripStatus[] = ['planned', 'completed']
-
-function StatusEditor({
-  initial,
-  onCommit,
-  onCancel,
-}: {
-  initial: TripStatus
-  onCommit: (value: TripStatus) => void
-  onCancel: () => void
-}) {
-  return (
-    <div
-      className="trip-metadata__status-toggle"
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') onCancel()
-      }}
-    >
-      {STATUS_OPTIONS.map((status) => (
-        <button
-          key={status}
-          type="button"
-          autoFocus={status === initial}
-          className={`trip-metadata__status-segment${
-            status === initial ? ' trip-metadata__status-segment--selected' : ''
-          }`}
-          // The already-selected segment is a no-op click — there's nothing
-          // to commit, and re-committing the same value would still fire a
-          // needless flush.
-          onClick={() => {
-            if (status !== initial) onCommit(status)
-          }}
-        >
-          {status}
-        </button>
-      ))}
-    </div>
-  )
-}
-
 function NotesEditor({
   initial,
   onCommit,
@@ -236,18 +188,31 @@ function NotesEditor({
 }) {
   const [value, setValue] = useState(initial)
   return (
-    <textarea
-      autoFocus
-      className="trip-metadata__notes-input"
-      value={value}
-      onChange={(event) => setValue(event.target.value)}
-      onBlur={() => onCommit(value)}
-      onKeyDown={(event) => {
-        // Enter is a real newline in notes — only Escape has a shortcut
-        // meaning here.
-        if (event.key === 'Escape') onCancel()
-      }}
-    />
+    <div className="trip-metadata__notes-editor">
+      <textarea
+        autoFocus
+        className="trip-metadata__notes-input"
+        placeholder="Add notes"
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
+        onBlur={() => onCommit(value)}
+        onKeyDown={(event) => {
+          // Enter is a real newline in notes (#35), so it can't be the
+          // commit key it is in the name field. Ctrl/Cmd+Enter is the one
+          // that saves without leaving the keyboard — and the hint below
+          // is what tells anyone that, since a textarea whose only exits
+          // are "click away" (saves) and Escape (discards) reads as a
+          // field that doesn't save at all when you take the wrong one.
+          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+            event.preventDefault()
+            onCommit(value)
+            return
+          }
+          if (event.key === 'Escape') onCancel()
+        }}
+      />
+      <p className="trip-metadata__notes-hint">Click away or Ctrl/⌘ + Enter to save · Esc to discard</p>
+    </div>
   )
 }
 
@@ -295,7 +260,15 @@ function NotesDisplay({
   }, [trimmed, expanded])
 
   if (trimmed.length === 0) {
-    return <p className="trip-metadata__notes trip-metadata__notes--empty" onClick={onClick} />
+    // A trip with no notes used to render an empty paragraph with nothing
+    // but a min-height in it — the field existed, but the only way to find
+    // it was to click the blank gap under the dates. It now says what it
+    // is for, exactly the way the empty date line does a few lines up.
+    return (
+      <p className="trip-metadata__notes trip-metadata__notes--empty" onClick={onClick}>
+        Add notes
+      </p>
+    )
   }
   return (
     <div className="trip-metadata__notes-wrap">

@@ -522,7 +522,6 @@ function AppShell() {
             <DraftPanel
               draft={draftTrip.draft}
               updateName={draftTrip.updateName}
-              updateStatus={draftTrip.updateStatus}
               updateDates={draftTrip.updateDates}
               updateNotes={draftTrip.updateNotes}
               onSave={() => void draftTrip.save()}
@@ -589,9 +588,6 @@ function AppShell() {
               onHover={setHoveredTripId}
               onCreate={(name) => tripStore.createTrip(name)}
               onDelete={(tripId) => tripStore.deleteTrip(tripId)}
-              onSetStatus={(tripId, status: TripIndexEntry['status']) =>
-                tripStore.updateTrip(tripId, { status })
-              }
               onDeleteLoose={(id) => looseStore.remove(id)}
               onRenameLoose={(id, name) => looseStore.update(id, { name })}
               onRecolorLoose={(id, color) => looseStore.update(id, { colorIndex: color })}

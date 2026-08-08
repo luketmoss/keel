@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useDraftTrip } from './useDraftTrip'
-import { LocalTripStore } from '../store/tripStore'
+import { deriveTripStatus, LocalTripStore } from '../store/tripStore'
 
 const { findOrCreateTripFolder } = vi.hoisted(() => ({ findOrCreateTripFolder: vi.fn() }))
 vi.mock('../drive/tripFolder', () => ({ findOrCreateTripFolder }))
@@ -62,7 +62,6 @@ describe('useDraftTrip', () => {
     expect(rejections).toEqual([])
     expect(result.current.draft).not.toBeNull()
     expect(result.current.draft?.name).toBe('day1')
-    expect(result.current.draft?.status).toBe('completed')
     expect(result.current.draft?.files).toHaveLength(1)
   })
 
@@ -178,13 +177,11 @@ describe('useDraftTrip', () => {
     })
 
     act(() => result.current.updateName('Hokkaido'))
-    act(() => result.current.updateStatus('planned'))
     act(() => result.current.updateDates('2024-03-01', '2024-03-05'))
     act(() => result.current.updateNotes('Great trip'))
 
     expect(result.current.draft).toMatchObject({
       name: 'Hokkaido',
-      status: 'planned',
       startDate: '2024-03-01',
       endDate: '2024-03-05',
       notes: 'Great trip',
@@ -213,7 +210,9 @@ describe('useDraftTrip', () => {
       const trips = store.getTrips()
       expect(trips).toHaveLength(1)
       expect(trips[0].name).toBe('Hokkaido')
-      expect(trips[0].status).toBe('completed')
+      // #147: no longer a stored default — a freshly saved draft has no
+      // dates yet, which derives to planned.
+      expect(deriveTripStatus(trips[0].startDate, trips[0].endDate)).toBe('planned')
       expect(trips[0].origin).not.toBeNull()
       expect(store.getOverview(trips[0].id)?.features).toHaveLength(1)
       expect(findOrCreateTripFolder).toHaveBeenCalledWith('token', 'cairn-folder', trips[0].id)

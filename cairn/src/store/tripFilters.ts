@@ -1,4 +1,4 @@
-import type { TripIndexEntry, TripStatus } from './tripStore'
+import { deriveTripStatus, type TripIndexEntry, type TripStatus } from './tripStore'
 
 /* #80: the one predicate the world map's dots and the trips panel's rows
    both apply — the guarantee that they can never disagree is that they
@@ -38,7 +38,7 @@ export function tripIsDated(trip: Pick<TripIndexEntry, 'startDate'>): boolean {
 }
 
 export function matchesTripFilters(trip: TripIndexEntry, filters: TripFilters): boolean {
-  if (filters.status !== 'all' && trip.status !== filters.status) return false
+  if (filters.status !== 'all' && deriveTripStatus(trip.startDate, trip.endDate) !== filters.status) return false
 
   const name = filters.name.trim().toLowerCase()
   if (name && !trip.name.toLowerCase().includes(name)) return false

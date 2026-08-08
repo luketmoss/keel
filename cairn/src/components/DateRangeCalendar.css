@@ -76,6 +76,7 @@
 .date-range__day {
   /* Square cells that follow the column's width rather than setting it. */
   aspect-ratio: 1;
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -90,6 +91,21 @@
   font-variant-numeric: tabular-nums;
   cursor: pointer;
   transition: background var(--motion-fast) var(--ease);
+}
+
+/* #147: today's cell, marked with a dot rather than a ring (which would
+   collide with the global focus outline) or bold weight (already the
+   end-of-range treatment). `currentColor` means it inherits whatever
+   contrast guarantee the numeral above it already has — end, in-range,
+   outside-month, or plain — with no colour of its own to keep in step. */
+.date-range__day--today::after {
+  content: '';
+  position: absolute;
+  bottom: var(--space-1);
+  width: 4px;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: currentColor;
 }
 
 .date-range__day:hover {

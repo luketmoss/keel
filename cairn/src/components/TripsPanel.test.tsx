@@ -14,7 +14,6 @@ function tripEntry(overrides: Partial<TripIndexEntry> = {}): TripIndexEntry {
   return {
     id: 't1',
     name: 'Hokkaido',
-    status: 'planned',
     startDate: null,
     endDate: null,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -33,7 +32,6 @@ function TestTripsPanel({
   kind = 'all',
   onCreate = vi.fn(),
   onDelete = vi.fn(),
-  onSetStatus = vi.fn(),
   onDeleteLoose = vi.fn(),
   onAddLooseToTrip = vi.fn(),
   onRenameLoose = vi.fn().mockResolvedValue(true),
@@ -48,7 +46,6 @@ function TestTripsPanel({
   kind?: KindFilter
   onCreate?: (name: string) => void
   onDelete?: (id: string) => void
-  onSetStatus?: (id: string, status: TripIndexEntry['status']) => void
   onDeleteLoose?: (id: string) => void
   onAddLooseToTrip?: (id: string) => void
   onRenameLoose?: (id: string, name: string) => Promise<boolean>
@@ -72,7 +69,6 @@ function TestTripsPanel({
       onHover={setHoveredId}
       onCreate={onCreate}
       onDelete={onDelete}
-      onSetStatus={onSetStatus}
       onDeleteLoose={onDeleteLoose}
       onAddLooseToTrip={onAddLooseToTrip}
       onRenameLoose={onRenameLoose}
@@ -185,7 +181,6 @@ describe('TripsPanel', () => {
         tripEntry({
           id: 't1',
           name: 'Kepler Track',
-          status: 'completed',
           startDate: '2024-03-01',
           endDate: '2024-03-05',
           photoCount: 128,
@@ -207,7 +202,6 @@ describe('TripsPanel', () => {
         tripEntry({
           id: 't1',
           name: 'Kepler Track',
-          status: 'completed',
           startDate: '2024-03-01',
           endDate: '2024-03-05',
           photoCount: 128,
@@ -260,8 +254,8 @@ describe('TripsPanel', () => {
   it('gives each row the marker as its glyph', () => {
     const { container } = renderPanel({
       trips: [
-        tripEntry({ id: 'a', status: 'completed' }),
-        tripEntry({ id: 'b', name: 'Alta Via 1', status: 'planned' }),
+        tripEntry({ id: 'a', startDate: '2020-01-01', endDate: '2020-01-05' }),
+        tripEntry({ id: 'b', name: 'Alta Via 1' }),
       ],
     })
 
@@ -283,8 +277,19 @@ describe('TripsPanel', () => {
       expect(container.querySelector('.trips-panel__row-remove')).toBeNull()
       openRowMenu('Kepler Track')
 
-      expect(screen.getByRole('menuitem', { name: 'Mark as completed' })).toBeDefined()
       expect(screen.getByRole('menuitem', { name: 'Delete trip…' })).toBeDefined()
+    })
+
+    // #147: status is derived from dates, so the menu that used to toggle it
+    // holds only Delete — a one-item menu is the guard a destructive action
+    // needs to stay two deliberate steps away, not an oversight to promote
+    // onto the row.
+    it('holds only Delete trip… now that status is not a control', () => {
+      renderPanel({ trips: [tripEntry({ id: 'abc', name: 'Kepler Track' })] })
+      openRowMenu('Kepler Track')
+
+      expect(screen.getAllByRole('menuitem')).toHaveLength(1)
+      expect(screen.queryByRole('menuitem', { name: /mark as/i })).toBeNull()
     })
 
     it('marks the destructive item with --danger as well as the word', () => {
@@ -292,18 +297,6 @@ describe('TripsPanel', () => {
       openRowMenu('Kepler Track')
 
       expect(screen.getByRole('menuitem', { name: 'Delete trip…' }).className).toContain('--danger')
-    })
-
-    it('toggles the trip status through the menu', () => {
-      const onSetStatus = vi.fn()
-      renderPanel({
-        trips: [tripEntry({ id: 'abc', name: 'Kepler Track', status: 'completed' })],
-        onSetStatus,
-      })
-      openRowMenu('Kepler Track')
-
-      fireEvent.click(screen.getByRole('menuitem', { name: 'Mark as planned' }))
-      expect(onSetStatus).toHaveBeenCalledWith('abc', 'planned')
     })
 
     it('closes on Escape', () => {
@@ -369,7 +362,7 @@ describe('TripsPanel', () => {
 
     it('shows "Nothing in this range" with a way to clear filters', () => {
       renderPanel({
-        trips: [tripEntry({ name: 'Kepler Track', status: 'completed' })],
+        trips: [tripEntry({ name: 'Kepler Track', startDate: '2020-01-01', endDate: '2020-01-05' })],
         initialFilters: { ...DEFAULT_TRIP_FILTERS, status: 'planned' },
       })
 
@@ -381,7 +374,7 @@ describe('TripsPanel', () => {
 
     it('clearing filters also clears the date range, for the shell to refill', () => {
       renderPanel({
-        trips: [tripEntry({ name: 'Kepler Track', status: 'completed' })],
+        trips: [tripEntry({ name: 'Kepler Track', startDate: '2020-01-01', endDate: '2020-01-05' })],
         initialFilters: { status: 'planned', name: 'x', range: [10, 20] },
       })
 
@@ -418,7 +411,7 @@ describe('TripsPanel', () => {
   describe('loose tracks and photos (#110)', () => {
     it('lists them alongside trips, each with its own glyph', () => {
       const { container } = renderPanel({
-        trips: [tripEntry({ id: 'a', name: 'Larapinta', status: 'completed' })],
+        trips: [tripEntry({ id: 'a', name: 'Larapinta', startDate: '2020-01-01', endDate: '2020-01-05' })],
         looseItems: [looseTrack(), loosePhoto()],
       })
 

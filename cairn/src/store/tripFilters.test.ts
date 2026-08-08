@@ -6,7 +6,6 @@ function tripEntry(overrides: Partial<TripIndexEntry> = {}): TripIndexEntry {
   return {
     id: 't1',
     name: 'Kepler Track',
-    status: 'planned',
     startDate: null,
     endDate: null,
     createdAt: '2024-01-01T00:00:00.000Z',
@@ -42,7 +41,7 @@ describe('matchesTripFilters', () => {
   })
 
   it('filters by status', () => {
-    const completed = tripEntry({ status: 'completed' })
+    const completed = tripEntry({ startDate: '2020-01-01', endDate: '2020-01-05' })
     expect(matchesTripFilters(completed, baseFilters({ status: 'planned' }))).toBe(false)
     expect(matchesTripFilters(completed, baseFilters({ status: 'completed' }))).toBe(true)
     expect(matchesTripFilters(completed, baseFilters({ status: 'all' }))).toBe(true)
@@ -72,7 +71,7 @@ describe('matchesTripFilters', () => {
   })
 
   it('composes status, name and range — all must pass', () => {
-    const trip = tripEntry({ name: 'Kepler Track', status: 'completed', startDate: '2024-03-01' })
+    const trip = tripEntry({ name: 'Kepler Track', startDate: '2024-03-01' })
     const day = tripDayIndex(trip)
     const passingRange = baseFilters({ status: 'completed', name: 'kepler', range: [day, day] })
     expect(matchesTripFilters(trip, passingRange)).toBe(true)

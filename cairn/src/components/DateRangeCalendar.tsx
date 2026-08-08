@@ -155,6 +155,11 @@ export function DateRangeCalendar({ start, end, onCommit, onCancel }: DateRangeC
   }
 
   const days = daysFor(view)
+  // #147: recomputed per render rather than held in state — today never
+  // changes mid-session in a way this component needs to react to, and a
+  // session left open across midnight catches up the next time it renders,
+  // same as `deriveTripStatus`'s own stance on the same question.
+  const todayIso = toIsoDate(new Date())
 
   return (
     <div className="date-range" ref={rootRef}>
@@ -198,14 +203,22 @@ export function DateRangeCalendar({ start, end, onCommit, onCancel }: DateRangeC
           const inRange =
             pendingStart !== null && pendingEnd !== null && iso > pendingStart && iso < pendingEnd
           const isFocused = iso === focused
+          const isToday = iso === todayIso
           const classes = [
             'date-range__day',
             outside ? 'date-range__day--outside' : '',
             isStart || isEnd ? 'date-range__day--end' : '',
             inRange ? 'date-range__day--in-range' : '',
+            isToday ? 'date-range__day--today' : '',
           ]
             .filter(Boolean)
             .join(' ')
+          const label = day.toLocaleDateString(undefined, {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          })
 
           return (
             <button
@@ -221,12 +234,7 @@ export function DateRangeCalendar({ start, end, onCommit, onCancel }: DateRangeC
               // Roving tabindex — one stop for the whole grid, then arrows.
               tabIndex={isFocused ? 0 : -1}
               aria-selected={isStart || isEnd || inRange}
-              aria-label={day.toLocaleDateString(undefined, {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
-              })}
+              aria-label={isToday ? `${label}, today` : label}
               onClick={() => {
                 setFocused(iso)
                 choose(iso)

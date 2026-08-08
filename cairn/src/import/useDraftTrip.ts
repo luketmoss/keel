@@ -3,7 +3,7 @@ import { parseKmlOrKmz, type Track } from '../kml/parse'
 import { isPhotoFile, isTrackFile } from './fileKinds'
 import { findOrCreateTripFolder } from '../drive/tripFolder'
 import { startResumableUpload, uploadFileContent } from '../drive/trackFiles'
-import type { TripStatus, TripStore } from '../store/tripStore'
+import type { TripStore } from '../store/tripStore'
 
 export interface DraftFile {
   id: string
@@ -15,7 +15,6 @@ export interface DraftFile {
 export interface DraftState {
   files: DraftFile[]
   name: string
-  status: TripStatus
   startDate: string | null
   endDate: string | null
   notes: string
@@ -48,7 +47,6 @@ export interface UseDraftTrip {
       a file this can't parse is a rejection, not an exception. */
   addFiles: (files: File[]) => Promise<DraftRejection[]>
   updateName: (name: string) => void
-  updateStatus: (status: TripStatus) => void
   updateDates: (startDate: string | null, endDate: string | null) => void
   updateNotes: (notes: string) => void
   /** Creates the trip, its overview, and uploads every dropped file to its
@@ -107,7 +105,6 @@ export function useDraftTrip(
         return {
           files: accepted,
           name: nameFromFileName(accepted[0].name),
-          status: 'completed',
           startDate: null,
           endDate: null,
           notes: '',
@@ -122,10 +119,6 @@ export function useDraftTrip(
 
   const updateName = useCallback((name: string) => {
     setDraft((prev) => (prev ? { ...prev, name } : prev))
-  }, [])
-
-  const updateStatus = useCallback((status: TripStatus) => {
-    setDraft((prev) => (prev ? { ...prev, status } : prev))
   }, [])
 
   const updateDates = useCallback((startDate: string | null, endDate: string | null) => {
@@ -155,7 +148,6 @@ export function useDraftTrip(
       // draft still stays open (below) so the source files aren't lost.
       const entry = tripStore.createTrip(draft.name)
       await tripStore.updateTrip(entry.id, {
-        status: draft.status,
         startDate: draft.startDate,
         endDate: draft.endDate,
         notes: draft.notes,
@@ -194,5 +186,5 @@ export function useDraftTrip(
     }
   }, [draft, accessToken, cairnFolderId, tripStore])
 
-  return { draft, addFiles, updateName, updateStatus, updateDates, updateNotes, save, cancel }
+  return { draft, addFiles, updateName, updateDates, updateNotes, save, cancel }
 }

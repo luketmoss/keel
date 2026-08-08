@@ -5,14 +5,42 @@ import type { LatLng } from '../map/geo'
 
 export type TripStatus = 'planned' | 'completed'
 
-/** The full record for one trip. Rename, status changes, and notes editing
-    are #35's job — this issue only ever writes `name`, `status` and
-    `createdAt`, but the shape includes the fields #35 will need so the swap
-    to a Drive-backed implementation doesn't reshape data written today. */
+/** A trip's status, derived from its dates rather than stored (#147). Its
+    last day is `endDate`, or `startDate` when it has no `endDate` — a trip
+    that started Monday and ends Friday is not completed on Tuesday, so "in
+    the past" means the range is over, not that it began. `null` (no dates,
+    or a last day that isn't strictly before today) reads `planned`, the
+    same as a trip whose range spans or ends today.
+    Exported beside `TripRecord` for the reason `tripFilters.ts` already
+    records about its own predicate: every surface that shows a trip's
+    status — the header pill, the trips-panel dot, the world map dot, the
+    add-to-trip picker's dot, the planned/completed filter — calls this
+    function, so they cannot disagree about what one means.
+    Computed at call time, not cached: a session left open across midnight
+    can show yesterday's answer until something re-renders, which is the
+    accepted cost of not running a timer for a personal app. */
+export function deriveTripStatus(startDate: string | null, endDate: string | null): TripStatus {
+  const lastDay = endDate ?? startDate
+  return lastDay !== null && lastDay < todayIso() ? 'completed' : 'planned'
+}
+
+// A local `YYYY-MM-DD` for "today", built the same way `format/dates.ts`'s
+// `toIsoDate` is rather than imported from it — `format/dates.ts` needs
+// `deriveTripStatus` above (`tripRowAccessibleName`), and importing the
+// other way round would make the two modules depend on each other.
+function todayIso(): string {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
+/** The full record for one trip. Rename and notes editing are #35's job —
+    this issue only ever writes `name` and `createdAt`, but the shape
+    includes the fields #35 will need so the swap to a Drive-backed
+    implementation doesn't reshape data written today. Status is not a
+    field here — see `deriveTripStatus` above. */
 export interface TripRecord {
   id: string
   name: string
-  status: TripStatus
   startDate: string | null
   endDate: string | null
   notes: string
@@ -38,10 +66,10 @@ export interface TripRecord {
 }
 
 /** The fields #35's metadata header can edit. `id` and `createdAt` are
-    immutable once a trip exists. */
+    immutable once a trip exists. Status is not editable — see
+    `deriveTripStatus`. */
 export interface TripUpdate {
   name?: string
-  status?: TripStatus
   startDate?: string | null
   endDate?: string | null
   notes?: string
@@ -53,7 +81,6 @@ export interface TripUpdate {
 export interface TripIndexEntry {
   id: string
   name: string
-  status: TripStatus
   startDate: string | null
   endDate: string | null
   createdAt: string
@@ -196,7 +223,6 @@ export class LocalTripStore implements TripStore {
     const record: TripRecord = {
       id: generateId(),
       name: trimmed,
-      status: 'planned',
       startDate: null,
       endDate: null,
       notes: '',
@@ -210,7 +236,6 @@ export class LocalTripStore implements TripStore {
     const entry: TripIndexEntry = {
       id: record.id,
       name: record.name,
-      status: record.status,
       startDate: record.startDate,
       endDate: record.endDate,
       createdAt: record.createdAt,
@@ -255,7 +280,6 @@ export class LocalTripStore implements TripStore {
         ? {
             ...entry,
             name: next.name,
-            status: next.status,
             startDate: next.startDate,
             endDate: next.endDate,
           }
@@ -298,7 +322,6 @@ export class LocalTripStore implements TripStore {
     const entry: TripIndexEntry = {
       id: record.id,
       name: record.name,
-      status: record.status,
       startDate: record.startDate,
       endDate: record.endDate,
       createdAt: record.createdAt,
@@ -401,14 +424,14 @@ export class LocalTripStore implements TripStore {
   }
 }
 
+// #147: does not check `status` — a record written before this change still
+// carries the key, and one written after does not. Neither should fail this
+// guard; `deriveTripStatus` is the only thing that reads it now, and it
+// reads the dates, not this field.
 function isTripIndexEntry(value: unknown): value is TripIndexEntry {
   if (typeof value !== 'object' || value === null) return false
   const entry = value as Record<string, unknown>
-  return (
-    typeof entry.id === 'string' &&
-    typeof entry.name === 'string' &&
-    (entry.status === 'planned' || entry.status === 'completed')
-  )
+  return typeof entry.id === 'string' && typeof entry.name === 'string'
 }
 
 // Same "corrupted is missing, not thrown" stance as the index/record guards
@@ -425,14 +448,14 @@ export function isFeatureCollection(value: unknown): value is FeatureCollection<
 // A record written by an older shape, or corrupted by hand, is treated as
 // missing rather than thrown — same stance as the index above. Exported for
 // `DriveTripStore`, which applies the same guard to a `trip.json` read back
-// from Drive.
+// from Drive. #147: does not require `status` — see `isTripIndexEntry`
+// above for why a record from either side of that change must pass.
 export function isTripRecord(value: unknown): value is TripRecord {
   if (typeof value !== 'object' || value === null) return false
   const record = value as Record<string, unknown>
   return (
     typeof record.id === 'string' &&
     typeof record.name === 'string' &&
-    (record.status === 'planned' || record.status === 'completed') &&
     (record.startDate === null || typeof record.startDate === 'string') &&
     (record.endDate === null || typeof record.endDate === 'string') &&
     typeof record.notes === 'string' &&

@@ -53,7 +53,6 @@ function tripEntry(overrides: Partial<TripIndexEntry> = {}): TripIndexEntry {
   return {
     id: 'trip-1',
     name: 'Hokkaido',
-    status: 'completed',
     startDate: null,
     endDate: null,
     createdAt: '2024-01-01T00:00:00.000Z',
@@ -112,8 +111,13 @@ describe('WorldLayer', () => {
   it('renders one dot per trip with an origin, filled for completed and hollow for planned', () => {
     const { container } = renderLayer({
       trips: [
-        tripEntry({ id: 'a', status: 'completed', origin: { lat: 37, lng: -122 } }),
-        tripEntry({ id: 'b', status: 'planned', origin: { lat: 60, lng: 100 } }),
+        tripEntry({
+          id: 'a',
+          startDate: '2020-01-01',
+          endDate: '2020-01-05',
+          origin: { lat: 37, lng: -122 },
+        }),
+        tripEntry({ id: 'b', origin: { lat: 60, lng: 100 } }),
       ],
     })
 
@@ -137,7 +141,7 @@ describe('WorldLayer', () => {
     renderLayer({
       trips: [
         tripEntry({ id: 'a', origin: { lat: 37, lng: -122 } }),
-        tripEntry({ id: 'b', status: 'planned', origin: { lat: -33, lng: 151 } }),
+        tripEntry({ id: 'b', origin: { lat: -33, lng: 151 } }),
       ],
     })
 
@@ -195,8 +199,13 @@ describe('WorldLayer', () => {
   it('draws only the trips the shell filters admit', () => {
     const { container } = renderLayer({
       trips: [
-        tripEntry({ id: 'a', status: 'completed', origin: { lat: 37, lng: -122 } }),
-        tripEntry({ id: 'b', status: 'planned', origin: { lat: -33, lng: 151 } }),
+        tripEntry({
+          id: 'a',
+          startDate: '2020-01-01',
+          endDate: '2020-01-05',
+          origin: { lat: 37, lng: -122 },
+        }),
+        tripEntry({ id: 'b', origin: { lat: -33, lng: 151 } }),
       ],
       initialFilters: { ...DEFAULT_TRIP_FILTERS, status: 'planned' },
     })

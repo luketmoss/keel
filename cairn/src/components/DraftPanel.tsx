@@ -1,4 +1,4 @@
-import type { TripRecord, TripStatus, TripUpdate } from '../store/tripStore'
+import type { TripRecord, TripUpdate } from '../store/tripStore'
 import type { DraftState } from '../import/useDraftTrip'
 import { TripMetadataHeader } from './TripMetadataHeader'
 import './DraftPanel.css'
@@ -6,7 +6,6 @@ import './DraftPanel.css'
 interface DraftPanelProps {
   draft: DraftState
   updateName: (name: string) => void
-  updateStatus: (status: TripStatus) => void
   updateDates: (startDate: string | null, endDate: string | null) => void
   updateNotes: (notes: string) => void
   onSave: () => void
@@ -39,7 +38,6 @@ function fileSummary(draft: DraftState): string {
 export function DraftPanel({
   draft,
   updateName,
-  updateStatus,
   updateDates,
   updateNotes,
   onSave,
@@ -55,7 +53,6 @@ export function DraftPanel({
   const syntheticTrip: TripRecord = {
     id: 'draft',
     name: draft.name,
-    status: draft.status,
     startDate: draft.startDate,
     endDate: draft.endDate,
     notes: draft.notes,
@@ -67,7 +64,6 @@ export function DraftPanel({
 
   async function handleUpdate(patch: TripUpdate): Promise<TripRecord | null> {
     if (patch.name !== undefined) updateName(patch.name)
-    if (patch.status !== undefined) updateStatus(patch.status)
     if (patch.startDate !== undefined || patch.endDate !== undefined) {
       updateDates(
         patch.startDate !== undefined ? patch.startDate : draft.startDate,

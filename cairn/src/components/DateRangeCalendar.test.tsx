@@ -236,4 +236,66 @@ describe('DateRangeCalendar', () => {
 
     expect(container.querySelector('input[type="date"]')).toBeNull()
   })
+
+  // #147: today's cell is visually distinct — a dot, not a ring (which
+  // would collide with the global focus outline) or bold (already the
+  // end-of-range treatment) — and stays marked through every combination
+  // the grid can put it in.
+  describe('today (#147)', () => {
+    it('marks today, and only today, unselected', () => {
+      const { container } = renderCalendar()
+
+      expect(day('2026-07-15').className).toContain('date-range__day--today')
+      expect(day('2026-07-14').className).not.toContain('date-range__day--today')
+      expect(container.querySelectorAll('.date-range__day--today')).toHaveLength(1)
+    })
+
+    it('names today in the cell’s accessible label', () => {
+      renderCalendar()
+
+      expect(day('2026-07-15').getAttribute('aria-label')).toMatch(/, today$/)
+      expect(day('2026-07-14').getAttribute('aria-label')).not.toMatch(/today/)
+    })
+
+    it('stays marked when today is a range end', () => {
+      renderCalendar({ start: '2026-07-10', end: '2026-07-15' })
+
+      const cell = day('2026-07-15')
+      expect(cell.className).toContain('date-range__day--today')
+      expect(cell.className).toContain('date-range__day--end')
+    })
+
+    it('stays marked when today falls inside a range', () => {
+      renderCalendar({ start: '2026-07-10', end: '2026-07-20' })
+
+      const cell = day('2026-07-15')
+      expect(cell.className).toContain('date-range__day--today')
+      expect(cell.className).toContain('date-range__day--in-range')
+    })
+
+    it('stays marked while focused', () => {
+      const { container } = renderCalendar({ start: '2026-07-14', end: null })
+
+      fireEvent.keyDown(grid(), { key: 'ArrowRight' })
+
+      const tabbable = container.querySelector('.date-range__day[tabindex="0"]')
+      expect(tabbable?.getAttribute('data-date')).toBe('2026-07-15')
+      expect(tabbable?.className).toContain('date-range__day--today')
+    })
+
+    it('stays marked, and dims with the rest of the cell, when today lands in a neighbouring month', () => {
+      // A boundary date rather than the file's frozen mid-month TODAY:
+      // August 2026 opens on a Saturday, so its grid's leading week spills
+      // back into the last days of July — the one shape that puts "today"
+      // in a neighbouring month's page after a single navigation.
+      vi.setSystemTime(new Date(2026, 6, 29)) // 29 Jul 2026
+      renderCalendar()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Next month' }))
+
+      const cell = day('2026-07-29')
+      expect(cell.className).toContain('date-range__day--today')
+      expect(cell.className).toContain('date-range__day--outside')
+    })
+  })
 })

@@ -30,7 +30,6 @@ interface TripDriveRef {
 function toPatch(record: TripRecord): TripUpdate {
   return {
     name: record.name,
-    status: record.status,
     startDate: record.startDate,
     endDate: record.endDate,
     notes: record.notes,

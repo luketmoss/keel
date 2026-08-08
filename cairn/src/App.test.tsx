@@ -486,7 +486,6 @@ describe('App row actions (#109)', () => {
     const trigger = screen.getByRole('button', { name: 'Actions for Hokkaido' })
     fireEvent.click(trigger)
 
-    expect(screen.getByRole('menuitem', { name: 'Mark as completed' })).toBeDefined()
     const destructive = screen.getByRole('menuitem', { name: 'Delete trip…' })
     expect(destructive.className).toContain('--danger')
     fetchSpy.mockRestore()

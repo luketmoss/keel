@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { Link } from 'react-router-dom'
-import type { TripIndexEntry } from '../store/tripStore'
+import { deriveTripStatus, type TripIndexEntry } from '../store/tripStore'
 import { matchesTripFilters, type TripFilters } from '../store/tripFilters'
 import { formatTripMetaLine, tripRowAccessibleName } from '../format/dates'
 import { canChangeOwner, looseMetaLine, type LooseRecord } from '../store/looseStore'
@@ -34,7 +34,6 @@ interface TripsPanelProps {
   onHover: (id: string | null) => void
   onCreate: (name: string) => void
   onDelete: (id: string) => void
-  onSetStatus: (id: string, status: TripIndexEntry['status']) => void
   onDeleteLoose: (id: string) => void
   onAddLooseToTrip: (id: string) => void
   /** #133: renames or recolours a loose item. Resolves `false` on a save
@@ -60,7 +59,6 @@ export function TripsPanel({
   onHover,
   onCreate,
   onDelete,
-  onSetStatus,
   onDeleteLoose,
   onAddLooseToTrip,
   onRenameLoose,
@@ -183,7 +181,6 @@ export function TripsPanel({
               confirmingRowRef={confirmingId === trip.id ? confirmingRowRef : undefined}
               onStartConfirm={() => setConfirmingId(trip.id)}
               onCancelConfirm={() => setConfirmingId(null)}
-              onSetStatus={(status) => onSetStatus(trip.id, status)}
               onDelete={() => {
                 setConfirmingId(null)
                 onDelete(trip.id)
@@ -351,7 +348,6 @@ function TripRow({
   confirmingRowRef,
   onStartConfirm,
   onCancelConfirm,
-  onSetStatus,
   onDelete,
 }: {
   trip: TripIndexEntry
@@ -363,7 +359,6 @@ function TripRow({
   confirmingRowRef?: RefObject<HTMLLIElement | null>
   onStartConfirm: () => void
   onCancelConfirm: () => void
-  onSetStatus: (status: TripIndexEntry['status']) => void
   onDelete: () => void
 }) {
   if (confirming) {
@@ -377,7 +372,8 @@ function TripRow({
     )
   }
 
-  const nextStatus = trip.status === 'completed' ? 'planned' : 'completed'
+  // #147: derived from the dates, not stored — see `deriveTripStatus`.
+  const status = deriveTripStatus(trip.startDate, trip.endDate)
 
   return (
     <li
@@ -387,18 +383,11 @@ function TripRow({
     >
       {/* The dot's fill/hollow treatment carries status visually, so the
           meta line below no longer spells it out — see #131. */}
-      <span className={`trips-panel__row-dot trips-panel__row-dot--${trip.status}`} aria-hidden="true" />
+      <span className={`trips-panel__row-dot trips-panel__row-dot--${status}`} aria-hidden="true" />
       <Link
         to={`/trips/${trip.id}`}
         className="trips-panel__row-link"
-        aria-label={tripRowAccessibleName(
-          trip.name,
-          trip.status,
-          trip.startDate,
-          trip.endDate,
-          trackCount,
-          trip.photoCount,
-        )}
+        aria-label={tripRowAccessibleName(trip.name, trip.startDate, trip.endDate, trackCount, trip.photoCount)}
         onFocus={() => onHover(trip.id)}
         onBlur={() => onHover(null)}
       >
@@ -411,14 +400,7 @@ function TripRow({
       </Link>
       <RowMenu
         label={`Actions for ${trip.name}`}
-        actions={[
-          {
-            label: nextStatus === 'completed' ? 'Mark as completed' : 'Mark as planned',
-            disabled,
-            onSelect: () => onSetStatus(nextStatus),
-          },
-          { label: 'Delete trip…', danger: true, disabled, onSelect: onStartConfirm },
-        ]}
+        actions={[{ label: 'Delete trip…', danger: true, disabled, onSelect: onStartConfirm }]}
       />
     </li>
   )

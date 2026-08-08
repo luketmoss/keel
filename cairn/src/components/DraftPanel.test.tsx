@@ -9,7 +9,6 @@ function draftState(overrides: Partial<DraftState> = {}): DraftState {
       { id: 'f1', name: 'day1.kml', file: new File(['x'], 'day1.kml'), tracks: [{ name: 'Day 1', points: [] }] },
     ],
     name: 'day1',
-    status: 'completed',
     startDate: null,
     endDate: null,
     notes: '',
@@ -23,7 +22,6 @@ function baseProps(overrides: Partial<Parameters<typeof DraftPanel>[0]> = {}) {
   return {
     draft: draftState(),
     updateName: vi.fn(),
-    updateStatus: vi.fn(),
     updateDates: vi.fn(),
     updateNotes: vi.fn(),
     onSave: vi.fn(),

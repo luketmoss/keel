@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
-import { LocalTripStore } from './tripStore'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { deriveTripStatus, LocalTripStore } from './tripStore'
 
 /** A minimal in-memory `Storage` so tests don't depend on jsdom's
     `localStorage` persisting (or not) across test files. */
@@ -21,13 +21,54 @@ function fakeStorage(): Storage {
   }
 }
 
+describe('deriveTripStatus (#147)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 7, 8)) // 8 Aug 2026
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('reads completed when the last day is strictly before today', () => {
+    expect(deriveTripStatus('2026-08-03', '2026-08-07')).toBe('completed')
+  })
+
+  it('reads planned when the range ends today', () => {
+    expect(deriveTripStatus('2026-08-03', '2026-08-08')).toBe('planned')
+  })
+
+  it('reads planned when the range spans today', () => {
+    expect(deriveTripStatus('2026-08-05', '2026-08-12')).toBe('planned')
+  })
+
+  it('reads planned when the range is entirely in the future', () => {
+    expect(deriveTripStatus('2026-08-14', '2026-08-16')).toBe('planned')
+  })
+
+  it('reads planned when there are no dates at all', () => {
+    expect(deriveTripStatus(null, null)).toBe('planned')
+  })
+
+  it('uses startDate as the last day when there is no endDate', () => {
+    expect(deriveTripStatus('2026-08-01', null)).toBe('completed')
+    expect(deriveTripStatus('2026-08-14', null)).toBe('planned')
+  })
+
+  it('uses endDate as the last day when there is no startDate (not reachable through the picker, but possible in storage)', () => {
+    expect(deriveTripStatus(null, '2026-08-01')).toBe('completed')
+    expect(deriveTripStatus(null, '2026-08-14')).toBe('planned')
+  })
+})
+
 describe('LocalTripStore', () => {
   it('starts empty', () => {
     const store = new LocalTripStore(fakeStorage())
     expect(store.getTrips()).toEqual([])
   })
 
-  it('creates a trip, starting it in planned status, and notifies subscribers', () => {
+  it('creates a trip, with no dates, and notifies subscribers', () => {
     const store = new LocalTripStore(fakeStorage())
     const listener = vi.fn()
     store.subscribe(listener)
@@ -35,7 +76,8 @@ describe('LocalTripStore', () => {
     const trip = store.createTrip('Hokkaido')
 
     expect(trip.name).toBe('Hokkaido')
-    expect(trip.status).toBe('planned')
+    expect(trip.startDate).toBeNull()
+    expect(trip.endDate).toBeNull()
     expect(store.getTrips()).toHaveLength(1)
     expect(listener).toHaveBeenCalledTimes(1)
   })
@@ -141,7 +183,6 @@ describe('LocalTripStore', () => {
     expect(store.getTrip(trip.id)).toMatchObject({
       id: trip.id,
       name: 'Hokkaido',
-      status: 'planned',
       notes: '',
     })
   })
@@ -152,11 +193,11 @@ describe('LocalTripStore', () => {
     const listener = vi.fn()
     store.subscribe(listener)
 
-    const updated = await store.updateTrip(trip.id, { status: 'completed', notes: 'Great trip' })
+    const updated = await store.updateTrip(trip.id, { startDate: '2026-01-01', notes: 'Great trip' })
 
-    expect(updated).toMatchObject({ status: 'completed', notes: 'Great trip', name: 'Hokkaido' })
-    expect(store.getTrip(trip.id)).toMatchObject({ status: 'completed', notes: 'Great trip' })
-    expect(store.getTrips()[0]).toMatchObject({ status: 'completed' })
+    expect(updated).toMatchObject({ startDate: '2026-01-01', notes: 'Great trip', name: 'Hokkaido' })
+    expect(store.getTrip(trip.id)).toMatchObject({ startDate: '2026-01-01', notes: 'Great trip' })
+    expect(store.getTrips()[0]).toMatchObject({ startDate: '2026-01-01' })
     expect(listener).toHaveBeenCalledTimes(1)
   })
 
@@ -191,6 +232,36 @@ describe('LocalTripStore', () => {
     const trip = store.createTrip('Hokkaido')
 
     expect(store.getTrip(trip.id)).toBe(store.getTrip(trip.id))
+  })
+
+  it('#147: still loads a record written before status was derived, ignoring its stale stored value', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 7, 8)) // 8 Aug 2026
+    try {
+      const storage = fakeStorage()
+      const store = new LocalTripStore(storage)
+      const trip = store.createTrip('Hokkaido')
+
+      // A pre-#147 `trip.json`/index entry: `status: 'completed'`, sitting
+      // next to dates that are now in the future.
+      const legacyRecord = JSON.parse(storage.getItem(`cairn.trips.trip.${trip.id}`) as string)
+      legacyRecord.status = 'completed'
+      legacyRecord.startDate = '2026-08-14'
+      legacyRecord.endDate = '2026-08-16'
+      storage.setItem(`cairn.trips.trip.${trip.id}`, JSON.stringify(legacyRecord))
+      const legacyIndex = JSON.parse(storage.getItem('cairn.trips.index') as string)
+      legacyIndex[0].status = 'completed'
+      legacyIndex[0].startDate = '2026-08-14'
+      legacyIndex[0].endDate = '2026-08-16'
+      storage.setItem('cairn.trips.index', JSON.stringify(legacyIndex))
+
+      const reloaded = new LocalTripStore(storage)
+      const record = reloaded.getTrip(trip.id)
+      expect(record).not.toBeNull()
+      expect(deriveTripStatus(record?.startDate ?? null, record?.endDate ?? null)).toBe('planned')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   describe('overview', () => {

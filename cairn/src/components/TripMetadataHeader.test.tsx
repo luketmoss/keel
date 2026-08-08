@@ -7,7 +7,6 @@ function trip(overrides: Partial<TripRecord> = {}): TripRecord {
   return {
     id: 'trip-1',
     name: 'Hokkaido',
-    status: 'planned',
     startDate: null,
     endDate: null,
     notes: '',
@@ -89,50 +88,75 @@ describe('TripMetadataHeader', () => {
     expect(onUpdate).toHaveBeenCalledWith({ notes: 'Great trip' })
   })
 
-  it('changes status via the selector', () => {
-    const onUpdate = vi.fn().mockResolvedValue(trip({ status: 'completed' }))
-    render(<TripMetadataHeader trip={trip()} onUpdate={onUpdate} />)
+  it('names the notes field when it is empty, instead of rendering a blank strip', () => {
+    render(<TripMetadataHeader trip={trip({ notes: '' })} onUpdate={vi.fn()} />)
 
-    fireEvent.click(screen.getByText('planned'))
-    fireEvent.click(screen.getByText('completed'))
+    fireEvent.click(screen.getByText('Add notes'))
 
-    expect(onUpdate).toHaveBeenCalledWith({ status: 'completed' })
+    expect(screen.getByPlaceholderText('Add notes')).toBeDefined()
   })
 
-  it('closes the status toggle on Escape without changing status', () => {
+  it('treats whitespace-only notes as empty', () => {
+    render(<TripMetadataHeader trip={trip({ notes: '   \n  ' })} onUpdate={vi.fn()} />)
+
+    expect(screen.getByText('Add notes')).toBeDefined()
+  })
+
+  it('saves a notes edit on Ctrl/Cmd+Enter, since plain Enter is a newline there', async () => {
+    const onUpdate = vi.fn().mockResolvedValue(trip({ notes: 'Great trip' }))
+    render(<TripMetadataHeader trip={trip({ notes: 'Draft notes' })} onUpdate={onUpdate} />)
+
+    fireEvent.click(screen.getByText('Draft notes'))
+    const textarea = screen.getByDisplayValue('Draft notes')
+    fireEvent.change(textarea, { target: { value: 'Great trip' } })
+
+    fireEvent.keyDown(textarea, { key: 'Enter' })
+    expect(onUpdate).not.toHaveBeenCalled()
+
+    fireEvent.keyDown(textarea, { key: 'Enter', ctrlKey: true })
+    expect(onUpdate).toHaveBeenCalledWith({ notes: 'Great trip' })
+  })
+
+  it('tells the reader how an open notes editor commits and discards', () => {
+    render(<TripMetadataHeader trip={trip({ notes: 'Draft notes' })} onUpdate={vi.fn()} />)
+
+    fireEvent.click(screen.getByText('Draft notes'))
+
+    expect(screen.getByText(/Ctrl\/⌘ \+ Enter to save/)).toBeDefined()
+    expect(screen.getByText(/Esc to discard/)).toBeDefined()
+  })
+
+  // #147: status is derived from the trip's dates and the pill is a label,
+  // not a control — clicking it does nothing, and there is no editor to
+  // close or no-op against.
+  it('#147: the status pill is not clickable and opens no editor', () => {
     const onUpdate = vi.fn()
     render(<TripMetadataHeader trip={trip()} onUpdate={onUpdate} />)
 
     fireEvent.click(screen.getByText('planned'))
-    fireEvent.keyDown(screen.getByText('completed'), { key: 'Escape' })
 
     expect(onUpdate).not.toHaveBeenCalled()
-    expect(screen.getByText('planned')).toBeDefined()
+    expect(screen.queryByRole('button', { name: 'planned' })).toBeNull()
     expect(screen.queryByText('completed')).toBeNull()
   })
 
-  it('clicking the already-selected status segment is a no-op', () => {
-    const onUpdate = vi.fn()
-    render(<TripMetadataHeader trip={trip()} onUpdate={onUpdate} />)
+  it('#147: status follows a date edit immediately, with no separate action', async () => {
+    const onUpdate = vi.fn().mockResolvedValue(trip({ startDate: '2020-01-01', endDate: '2020-01-05' }))
+    const { rerender } = render(<TripMetadataHeader trip={trip()} onUpdate={onUpdate} />)
+    expect(screen.getByText('planned')).toBeDefined()
 
-    fireEvent.click(screen.getByText('planned'))
-    fireEvent.click(screen.getByText('planned'))
-
-    expect(onUpdate).not.toHaveBeenCalled()
-  })
-
-  it('renders the same no-dates string for a completed trip as a planned one, naming no status', () => {
-    render(<TripMetadataHeader trip={trip({ status: 'completed' })} onUpdate={vi.fn()} />)
+    // The store applies the edit and the component re-renders with the
+    // trip it returns — same flow `onUpdate` already models for every
+    // other field in this file.
+    rerender(
+      <TripMetadataHeader trip={trip({ startDate: '2020-01-01', endDate: '2020-01-05' })} onUpdate={onUpdate} />,
+    )
 
     expect(screen.getByText('completed')).toBeDefined()
-    const dates = screen.getByText('Add dates')
-    expect(dates.textContent).not.toMatch(/planned|completed/i)
-    // The list rows still read "No dates set" through `formatTripDateRange`
-    // — only this line, whose one job is to be clicked, invites instead.
-    expect(screen.queryByText('No dates set')).toBeNull()
+    expect(screen.queryByText('planned')).toBeNull()
   })
 
-  it('renders the real stored date range instead of a placeholder', () => {
+  it('renders the real stored date range instead of a placeholder, naming no status in the date line itself', () => {
     render(
       <TripMetadataHeader
         trip={trip({ startDate: '2026-08-01', endDate: '2026-08-05' })}
@@ -140,7 +164,8 @@ describe('TripMetadataHeader', () => {
       />,
     )
 
-    expect(screen.getByText('Aug 1 – 5')).toBeDefined()
+    const dates = screen.getByText('Aug 1 – 5')
+    expect(dates.textContent).not.toMatch(/planned|completed/i)
   })
 
   describe('notes clamping', () => {

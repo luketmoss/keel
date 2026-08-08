@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { TripIndexEntry } from '../store/tripStore'
+import { deriveTripStatus, type TripIndexEntry } from '../store/tripStore'
 import { pluralize } from '../format/dates'
 import './AddToTripPicker.css'
 
@@ -129,7 +129,7 @@ export function AddToTripPicker({
                 onClick={() => onChoose(choice.entry.id)}
               >
                 <span
-                  className={`add-to-trip__dot add-to-trip__dot--${choice.entry.status}`}
+                  className={`add-to-trip__dot add-to-trip__dot--${deriveTripStatus(choice.entry.startDate, choice.entry.endDate)}`}
                   aria-hidden="true"
                 />
                 <span className="add-to-trip__name">{choice.entry.name}</span>

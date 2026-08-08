@@ -1,0 +1,24 @@
+.name-input {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-base);
+  color: var(--text);
+  background: none;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1);
+}
+
+/* The face's heading is larger and bolder than a row's name — same border
+   and fill treatment, sized to match what it replaces. */
+.name-input--heading {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--text);
+  background: none;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1);
+}

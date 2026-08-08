@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { formatDistance } from './format/units'
 
@@ -859,6 +859,67 @@ describe('App loose tracks and photos (#110)', () => {
 
     expect(screen.queryByRole('button', { name: 'Add to a trip' })).toBeNull()
     fetchSpy.mockRestore()
+  })
+
+  describe('#133 renaming and recolouring a loose item', () => {
+    it('renames a loose track from its face, and it survives a reload', async () => {
+      const fetchSpy = mockGoogleSignIn()
+      seedLooseTrack('lt-rename', 'Mount Rosea')
+
+      await renderApp('/tracks/lt-rename', { googleClientId: 'a-client-id' })
+      await signIn()
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Actions for Mount Rosea' }))
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }))
+
+      const input = screen.getByDisplayValue('Mount Rosea')
+      fireEvent.change(input, { target: { value: 'Rosea East' } })
+      await act(async () => {
+        fireEvent.keyDown(input, { key: 'Enter' })
+      })
+
+      // Both the face heading and the search card's crumb show the new name.
+      expect((await screen.findAllByText('Rosea East')).length).toBeGreaterThan(0)
+      const looseIndex = JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')
+      expect(looseIndex[0].name).toBe('Rosea East')
+      fetchSpy.mockRestore()
+    })
+
+    it('recolours a loose track from its face', async () => {
+      const fetchSpy = mockGoogleSignIn()
+      seedLooseTrack('lt-recolor', 'Mount Rosea', { colorIndex: 0 })
+
+      await renderApp('/tracks/lt-recolor', { googleClientId: 'a-client-id' })
+      await signIn()
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Change colour for Mount Rosea' }))
+      const options = screen
+        .getAllByRole('button')
+        .filter((el) => el.className.includes('color-popover__option'))
+
+      await act(async () => {
+        fireEvent.click(options[3])
+      })
+
+      await waitFor(() => {
+        const looseIndex = JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')
+        expect(looseIndex[0].colorIndex).toBe(3)
+      })
+      fetchSpy.mockRestore()
+    })
+
+    it('offers no Change colour item for a loose photo', async () => {
+      const fetchSpy = mockGoogleSignIn()
+      seedLoosePhoto('lp-rename', 'sapporo.jpg', { lat: 43.06, lng: 141.35 })
+
+      await renderApp('/photos/lp-rename', { googleClientId: 'a-client-id' })
+      await signIn()
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Actions for sapporo.jpg' }))
+      expect(screen.getByRole('menuitem', { name: 'Rename' })).toBeDefined()
+      expect(screen.queryByRole('menuitem', { name: 'Change colour' })).toBeNull()
+      fetchSpy.mockRestore()
+    })
   })
 })
 

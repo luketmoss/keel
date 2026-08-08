@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import { TripsPanel } from './TripsPanel'
@@ -36,6 +36,8 @@ function TestTripsPanel({
   onSetStatus = vi.fn(),
   onDeleteLoose = vi.fn(),
   onAddLooseToTrip = vi.fn(),
+  onRenameLoose = vi.fn().mockResolvedValue(true),
+  onRecolorLoose = vi.fn().mockResolvedValue(true),
   disabled = false,
   initialFilters = DEFAULT_TRIP_FILTERS,
   dateSpan = null,
@@ -49,6 +51,8 @@ function TestTripsPanel({
   onSetStatus?: (id: string, status: TripIndexEntry['status']) => void
   onDeleteLoose?: (id: string) => void
   onAddLooseToTrip?: (id: string) => void
+  onRenameLoose?: (id: string, name: string) => Promise<boolean>
+  onRecolorLoose?: (id: string, color: number) => Promise<boolean>
   disabled?: boolean
   initialFilters?: TripFilters
   dateSpan?: { min: number; max: number } | null
@@ -71,6 +75,8 @@ function TestTripsPanel({
       onSetStatus={onSetStatus}
       onDeleteLoose={onDeleteLoose}
       onAddLooseToTrip={onAddLooseToTrip}
+      onRenameLoose={onRenameLoose}
+      onRecolorLoose={onRecolorLoose}
       disabled={disabled}
     />
   )
@@ -510,6 +516,119 @@ describe('TripsPanel', () => {
         'disabled',
         true,
       )
+    })
+  })
+
+  describe('rename and recolour a loose item (#133)', () => {
+    it('offers Rename and Change colour on a loose track', () => {
+      renderPanel({ trips: [], looseItems: [looseTrack()] })
+
+      openRowMenu('Mount Rosea')
+      expect(screen.getByRole('menuitem', { name: 'Rename' })).toBeDefined()
+      expect(screen.getByRole('menuitem', { name: 'Change colour' })).toBeDefined()
+    })
+
+    // A photo's marker is its thumbnail, not a palette entry — there is
+    // nothing for "Change colour" to change.
+    it('offers Rename but not Change colour on a loose photo', () => {
+      renderPanel({ trips: [], looseItems: [loosePhoto()] })
+
+      openRowMenu('sapporo.jpg')
+      expect(screen.getByRole('menuitem', { name: 'Rename' })).toBeDefined()
+      expect(screen.queryByRole('menuitem', { name: 'Change colour' })).toBeNull()
+    })
+
+    it('renames on Enter, calling onRenameLoose with the trimmed value', async () => {
+      const onRenameLoose = vi.fn().mockResolvedValue(true)
+      renderPanel({ trips: [], looseItems: [looseTrack()], onRenameLoose })
+
+      openRowMenu('Mount Rosea')
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }))
+
+      const input = screen.getByDisplayValue('Mount Rosea')
+      fireEvent.change(input, { target: { value: '  Rosea East  ' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+
+      await waitFor(() => expect(onRenameLoose).toHaveBeenCalledWith('track-1', 'Rosea East'))
+    })
+
+    it('cancels on Escape without renaming', () => {
+      const onRenameLoose = vi.fn()
+      renderPanel({ trips: [], looseItems: [looseTrack()], onRenameLoose })
+
+      openRowMenu('Mount Rosea')
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }))
+
+      const input = screen.getByDisplayValue('Mount Rosea')
+      fireEvent.change(input, { target: { value: 'Something else' } })
+      fireEvent.keyDown(input, { key: 'Escape' })
+
+      expect(onRenameLoose).not.toHaveBeenCalled()
+      expect(screen.getByText('Mount Rosea')).toBeDefined()
+    })
+
+    it('cancels an empty commit rather than saving it', () => {
+      const onRenameLoose = vi.fn()
+      renderPanel({ trips: [], looseItems: [looseTrack()], onRenameLoose })
+
+      openRowMenu('Mount Rosea')
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }))
+
+      const input = screen.getByDisplayValue('Mount Rosea')
+      fireEvent.change(input, { target: { value: '   ' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+
+      expect(onRenameLoose).not.toHaveBeenCalled()
+    })
+
+    it('shows a failure line beneath the list when a rename fails, without losing the row', async () => {
+      const onRenameLoose = vi.fn().mockResolvedValue(false)
+      renderPanel({ trips: [], looseItems: [looseTrack()], onRenameLoose })
+
+      openRowMenu('Mount Rosea')
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }))
+      const input = screen.getByDisplayValue('Mount Rosea')
+      fireEvent.change(input, { target: { value: 'New name' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+
+      await waitFor(() =>
+        expect(screen.getByText("Couldn't rename Mount Rosea — try again.")).toBeDefined(),
+      )
+      expect(screen.getByText('Mount Rosea')).toBeDefined()
+    })
+
+    it('opens the colour popover from Change colour and recolours on selection', async () => {
+      const onRecolorLoose = vi.fn().mockResolvedValue(true)
+      renderPanel({ trips: [], looseItems: [looseTrack({ colorIndex: 0 })], onRecolorLoose })
+
+      openRowMenu('Mount Rosea')
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Change colour' }))
+
+      expect(screen.getByRole('group', { name: 'Colours for Mount Rosea' })).toBeDefined()
+      const options = screen.getAllByRole('button', { name: /./ }).filter((el) =>
+        el.className.includes('color-popover__option'),
+      )
+      fireEvent.click(options[2])
+
+      await waitFor(() => expect(onRecolorLoose).toHaveBeenCalledWith('track-1', 2))
+    })
+
+    it('disables Rename and Change colour while the file is still uploading', () => {
+      renderPanel({ trips: [], looseItems: [looseTrack({ uploadState: 'uploading' })] })
+
+      openRowMenu('Mount Rosea')
+      expect(screen.getByRole('menuitem', { name: 'Rename' })).toHaveProperty('disabled', true)
+      expect(screen.getByRole('menuitem', { name: 'Change colour' })).toHaveProperty(
+        'disabled',
+        true,
+      )
+    })
+
+    it('disables Rename while disconnected', () => {
+      renderPanel({ trips: [], looseItems: [looseTrack()], disabled: true })
+
+      openRowMenu('Mount Rosea')
+      expect(screen.getByRole('menuitem', { name: 'Rename' })).toHaveProperty('disabled', true)
     })
   })
 

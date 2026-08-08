@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { AddToTripPicker, type TripChoice } from './AddToTripPicker'
 import { RowMenu } from './RowMenu'
+import { NameInput } from './NameInput'
+import { ColorPopover } from './ColorPopover'
 import { formatDistance } from '../format/units'
-import { trackColor } from '../map/palette'
+import { trackColor, TRACK_COLORS } from '../map/palette'
 import { canChangeOwner, type LooseRecord } from '../store/looseStore'
 import './LooseFace.css'
 
@@ -12,8 +14,13 @@ interface LooseFaceProps {
   onAddToTrip: (tripId: string) => void
   onCreateTripWith: (name: string) => void
   onDelete: () => void
-  /** #73: no usable token — moving and deleting both go to the Disabled
-      treatment rather than failing against a store that will refuse. */
+  /** #133: renames or recolours the item. Resolves `false` on a save
+      failure, which the face reverts from. */
+  onRename: (id: string, name: string) => Promise<boolean>
+  onRecolor: (id: string, color: number) => Promise<boolean>
+  /** #73: no usable token — moving, deleting, renaming and recolouring all
+      go to the Disabled treatment rather than failing against a store that
+      will refuse. */
   disabled: boolean
   busy?: boolean
   error?: string | null
@@ -30,31 +37,71 @@ export function LooseFace({
   onAddToTrip,
   onCreateTripWith,
   onDelete,
+  onRename,
+  onRecolor,
   disabled,
   busy,
   error,
 }: LooseFaceProps) {
   const [picking, setPicking] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const [editingName, setEditingName] = useState(false)
+  const [colorPickerOpen, setColorPickerOpen] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
   /* #120: `Add to a trip` is a file move, so an item whose file is still
      uploading — or never arrived — has nothing to move. No tooltip: the
      meta line on its row already says which, which is #73's one-sentence-
      per-surface rule rather than a tooltip per control. `Delete…` stays
      enabled in both states; an item that failed to upload is exactly the
-     one a user most wants rid of. */
+     one a user most wants rid of. #133's rename/recolour share the same
+     gate — there is no record file in Drive yet to rewrite. */
   const canMove = canChangeOwner(item)
+
+  async function commitName(value: string) {
+    setEditingName(false)
+    const trimmed = value.trim()
+    // Empty commit is an aborted edit, not a saved one.
+    if (trimmed.length === 0) return
+    if (await onRename(item.id, trimmed)) setEditError(null)
+    else setEditError(`Couldn't rename ${item.name} — try again.`)
+  }
+
+  async function selectColor(index: number) {
+    setColorPickerOpen(false)
+    if (await onRecolor(item.id, index)) setEditError(null)
+    else setEditError("Couldn't save the colour — try again.")
+  }
 
   return (
     <div className="loose-face">
       <div className="loose-face__body">
         <div className="loose-face__head">
-          <h1 className="loose-face__name" title={item.name}>
-            {item.name}
-          </h1>
+          {editingName ? (
+            <NameInput
+              initial={item.name}
+              onCommit={commitName}
+              onCancel={() => setEditingName(false)}
+              className="name-input--heading"
+            />
+          ) : (
+            <h1 className="loose-face__name" title={item.name}>
+              {item.name}
+            </h1>
+          )}
           <RowMenu
             label={`Actions for ${item.name}`}
             actions={[
               { label: 'Add to a trip…', disabled: disabled || !canMove, onSelect: () => setPicking(true) },
+              { label: 'Rename', disabled: disabled || !canMove, onSelect: () => setEditingName(true) },
+              ...(item.kind === 'track'
+                ? [
+                    {
+                      label: 'Change colour',
+                      disabled: disabled || !canMove,
+                      onSelect: () => setColorPickerOpen(true),
+                    },
+                  ]
+                : []),
               { label: 'Delete…', danger: true, disabled, onSelect: () => setConfirming(true) },
             ]}
           />
@@ -62,6 +109,7 @@ export function LooseFace({
         <p className="loose-face__kind">
           {item.kind === 'track' ? 'track · not in a trip' : 'photo · not in a trip'}
         </p>
+        {editError && <p className="loose-face__edit-error">{editError}</p>}
 
         {!picking && (
           <button
@@ -110,13 +158,38 @@ export function LooseFace({
           </div>
         )}
 
-        {item.kind === 'track' ? <TrackBody item={item} /> : <PhotoBody item={item} />}
+        {item.kind === 'track' ? (
+          <TrackBody
+            item={item}
+            colorPickerOpen={colorPickerOpen}
+            onOpenColorPicker={() => setColorPickerOpen(true)}
+            onCloseColorPicker={() => setColorPickerOpen(false)}
+            onSelectColor={selectColor}
+            disabled={disabled}
+          />
+        ) : (
+          <PhotoBody item={item} />
+        )}
       </div>
     </div>
   )
 }
 
-function TrackBody({ item }: { item: Extract<LooseRecord, { kind: 'track' }> }) {
+function TrackBody({
+  item,
+  colorPickerOpen,
+  onOpenColorPicker,
+  onCloseColorPicker,
+  onSelectColor,
+  disabled,
+}: {
+  item: Extract<LooseRecord, { kind: 'track' }>
+  colorPickerOpen: boolean
+  onOpenColorPicker: () => void
+  onCloseColorPicker: () => void
+  onSelectColor: (index: number) => void
+  disabled: boolean
+}) {
   return (
     <dl className="loose-face__stats">
       <div className="loose-face__stat">
@@ -138,11 +211,29 @@ function TrackBody({ item }: { item: Extract<LooseRecord, { kind: 'track' }> }) 
       <div className="loose-face__stat">
         <dt>Colour</dt>
         <dd>
-          <span
-            className="loose-face__swatch"
-            style={{ background: trackColor(item.colorIndex) }}
-            aria-hidden="true"
-          />
+          <span className="loose-face__swatch-wrap">
+            <button
+              type="button"
+              className="loose-face__swatch-button"
+              aria-label={`Change colour for ${item.name}`}
+              disabled={disabled}
+              onClick={onOpenColorPicker}
+            >
+              <span
+                className="loose-face__swatch"
+                style={{ background: trackColor(item.colorIndex) }}
+                aria-hidden="true"
+              />
+            </button>
+            {colorPickerOpen && (
+              <ColorPopover
+                name={item.name}
+                currentColorIndex={item.colorIndex % TRACK_COLORS.length}
+                onSelect={onSelectColor}
+                onClose={onCloseColorPicker}
+              />
+            )}
+          </span>
         </dd>
       </div>
     </dl>

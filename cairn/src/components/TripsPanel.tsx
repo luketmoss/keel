@@ -6,7 +6,9 @@ import { formatTripMetaLine, tripRowAccessibleName } from '../format/dates'
 import { canChangeOwner, looseMetaLine, type LooseRecord } from '../store/looseStore'
 import { LIST_HEADINGS, type KindFilter } from './FilterChips'
 import { RowMenu } from './RowMenu'
-import { trackColor } from '../map/palette'
+import { NameInput } from './NameInput'
+import { ColorPopover } from './ColorPopover'
+import { trackColor, TRACK_COLORS } from '../map/palette'
 import './TripsPanel.css'
 
 function shortDate(iso: string): string {
@@ -35,6 +37,10 @@ interface TripsPanelProps {
   onSetStatus: (id: string, status: TripIndexEntry['status']) => void
   onDeleteLoose: (id: string) => void
   onAddLooseToTrip: (id: string) => void
+  /** #133: renames or recolours a loose item. Resolves `false` on a save
+      failure, which the row reverts from — never touches the file itself. */
+  onRenameLoose: (id: string, name: string) => Promise<boolean>
+  onRecolorLoose: (id: string, color: number) => Promise<boolean>
   /** #73: no usable token — creating, moving or deleting go to the
       language's Disabled treatment. Reading is unaffected. */
   disabled: boolean
@@ -57,10 +63,16 @@ export function TripsPanel({
   onSetStatus,
   onDeleteLoose,
   onAddLooseToTrip,
+  onRenameLoose,
+  onRecolorLoose,
   disabled,
 }: TripsPanelProps) {
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  // #133 — one shared line for a failed rename or recolour, the same shape
+  // TrackList's own list-level error already takes, rather than a second
+  // line per row that would have to fight the row's flex layout for space.
+  const [editError, setEditError] = useState<string | null>(null)
   const confirmingRowRef = useRef<HTMLLIElement | null>(null)
 
   useEffect(() => {
@@ -194,10 +206,14 @@ export function TripsPanel({
                 setConfirmingId(null)
                 onDeleteLoose(item.id)
               }}
+              onRename={onRenameLoose}
+              onRecolor={onRecolorLoose}
+              onSaveError={setEditError}
             />
           ))}
         </ul>
       )}
+      {editError && <p className="trips-panel__edit-error">{editError}</p>}
     </div>
   )
 }
@@ -419,6 +435,9 @@ function LooseRow({
   onCancelConfirm,
   onAddToTrip,
   onDelete,
+  onRename,
+  onRecolor,
+  onSaveError,
 }: {
   item: LooseRecord
   disabled: boolean
@@ -430,7 +449,28 @@ function LooseRow({
   onCancelConfirm: () => void
   onAddToTrip: () => void
   onDelete: () => void
+  onRename: (id: string, name: string) => Promise<boolean>
+  onRecolor: (id: string, color: number) => Promise<boolean>
+  onSaveError: (message: string | null) => void
 }) {
+  const [editingName, setEditingName] = useState(false)
+  const [colorPickerOpen, setColorPickerOpen] = useState(false)
+
+  async function commitName(value: string) {
+    setEditingName(false)
+    const trimmed = value.trim()
+    // Empty commit is an aborted edit, not a saved one.
+    if (trimmed.length === 0) return
+    if (await onRename(item.id, trimmed)) onSaveError(null)
+    else onSaveError(`Couldn't rename ${item.name} — try again.`)
+  }
+
+  async function selectColor(index: number) {
+    setColorPickerOpen(false)
+    if (await onRecolor(item.id, index)) onSaveError(null)
+    else onSaveError("Couldn't save the colour — try again.")
+  }
+
   if (confirming) {
     return (
       <RowConfirm
@@ -439,6 +479,27 @@ function LooseRow({
         onDelete={onDelete}
         onCancel={onCancelConfirm}
       />
+    )
+  }
+
+  const canEdit = canChangeOwner(item)
+
+  // #133 — replaces the row's contents in place, the same shape the
+  // confirm above already takes: no dialog, no second surface.
+  if (editingName) {
+    return (
+      <li className="trips-panel__row">
+        {item.kind === 'track' ? (
+          <span
+            className="trips-panel__row-tile"
+            style={{ background: trackColor(item.colorIndex) }}
+            aria-hidden="true"
+          />
+        ) : (
+          <span className="trips-panel__row-photo" aria-hidden="true" />
+        )}
+        <NameInput initial={item.name} onCommit={commitName} onCancel={() => setEditingName(false)} />
+      </li>
     )
   }
 
@@ -483,18 +544,46 @@ function LooseRow({
           {looseMetaLine(item, shortDate)}
         </span>
       </Link>
-      <RowMenu
-        label={`Actions for ${item.name}`}
-        actions={[
-          {
-            // #120: nothing to move until the file is on Drive.
-            label: 'Add to a trip…',
-            disabled: disabled || !canChangeOwner(item),
-            onSelect: onAddToTrip,
-          },
-          { label: 'Delete…', danger: true, disabled, onSelect: onStartConfirm },
-        ]}
-      />
+      {/* #133 — its own positioned wrapper so the colour popover can anchor
+          under the `⋮`, the way `AddToTripPicker` anchors inside the panel
+          rather than floating free. */}
+      <span className="trips-panel__row-actions">
+        <RowMenu
+          label={`Actions for ${item.name}`}
+          actions={[
+            {
+              // #120: nothing to move until the file is on Drive.
+              label: 'Add to a trip…',
+              disabled: disabled || !canEdit,
+              onSelect: onAddToTrip,
+            },
+            {
+              label: 'Rename',
+              disabled: disabled || !canEdit,
+              onSelect: () => setEditingName(true),
+            },
+            ...(item.kind === 'track'
+              ? [
+                  {
+                    label: 'Change colour',
+                    disabled: disabled || !canEdit,
+                    onSelect: () => setColorPickerOpen(true),
+                  },
+                ]
+              : []),
+            { label: 'Delete…', danger: true, disabled, onSelect: onStartConfirm },
+          ]}
+        />
+        {colorPickerOpen && item.kind === 'track' && (
+          <ColorPopover
+            name={item.name}
+            currentColorIndex={item.colorIndex % TRACK_COLORS.length}
+            align="right"
+            onSelect={selectColor}
+            onClose={() => setColorPickerOpen(false)}
+          />
+        )}
+      </span>
     </li>
   )
 }

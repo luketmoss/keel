@@ -127,6 +127,82 @@ describe('LocalLooseStore', () => {
 
     expect(new LocalLooseStore(storage).getItems()).toEqual([])
   })
+
+  describe('update (#133)', () => {
+    it('renames a track', async () => {
+      const record = store.addTrack(NEW_TRACK, [track([[1, 2]])])
+
+      expect(await store.update(record.id, { name: 'Mount Rosea East' })).toBe(true)
+
+      expect(store.getItem(record.id)?.name).toBe('Mount Rosea East')
+    })
+
+    it('recolours a track', async () => {
+      const record = store.addTrack(NEW_TRACK, [track([[1, 2]])])
+
+      expect(await store.update(record.id, { colorIndex: 3 })).toBe(true)
+
+      expect((store.getItem(record.id) as { colorIndex: number }).colorIndex).toBe(3)
+    })
+
+    it('renames a photo', async () => {
+      const photo = store.addPhoto({ name: 'a.jpg', takenAt: null, position: null })
+
+      expect(await store.update(photo.id, { name: 'sapporo.jpg' })).toBe(true)
+
+      expect(store.getItem(photo.id)?.name).toBe('sapporo.jpg')
+    })
+
+    // A photo has no colour to change — the field is simply ignored rather
+    // than producing an error, since the UI never offers the control for
+    // one in the first place.
+    it('ignores a colour patch sent for a photo', async () => {
+      const photo = store.addPhoto({ name: 'a.jpg', takenAt: null, position: null })
+
+      expect(await store.update(photo.id, { colorIndex: 3 })).toBe(true)
+
+      expect(store.getItem(photo.id)).not.toHaveProperty('colorIndex')
+    })
+
+    it('cancels an empty or whitespace-only rename rather than saving it', async () => {
+      const record = store.addTrack(NEW_TRACK, [track([[1, 2]])])
+
+      expect(await store.update(record.id, { name: '   ' })).toBe(true)
+
+      expect(store.getItem(record.id)?.name).toBe(NEW_TRACK.name)
+    })
+
+    it('trims a rename', async () => {
+      const record = store.addTrack(NEW_TRACK, [track([[1, 2]])])
+
+      await store.update(record.id, { name: '  Rosea  ' })
+
+      expect(store.getItem(record.id)?.name).toBe('Rosea')
+    })
+
+    it('resolves false when the id names nothing', async () => {
+      expect(await store.update('no-such-id', { name: 'x' })).toBe(false)
+    })
+
+    it('leaves every other item untouched', async () => {
+      const a = store.addTrack({ ...NEW_TRACK, name: 'A' }, [track([[1, 2]])])
+      const b = store.addTrack({ ...NEW_TRACK, name: 'B' }, [track([[3, 4]])])
+
+      await store.update(a.id, { name: 'A renamed' })
+
+      expect(store.getItem(b.id)?.name).toBe('B')
+    })
+
+    it('notifies subscribers', async () => {
+      const record = store.addTrack(NEW_TRACK, [track([[1, 2]])])
+      const listener = vi.fn()
+      store.subscribe(listener)
+
+      await store.update(record.id, { name: 'Renamed' })
+
+      expect(listener).toHaveBeenCalled()
+    })
+  })
 })
 
 describe('moveLooseIntoTrip', () => {

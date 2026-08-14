@@ -22,6 +22,10 @@ human-gated for this stack**, and that changes how this skill ends.
 Take the acceptance criteria in order. For each one, establish whether it passes
 and record how you know. Run the tests, run the thing, read the output.
 
+**The full suite and the build are yours.** `/develop` self-tests with targeted
+runs only, so this is the first place everything runs together, and nothing
+reaches Code Review without it.
+
 Three outcomes per criterion:
 
 - **Passes** — with the evidence. "Test `valve_timing` passes" or "ran it, valve

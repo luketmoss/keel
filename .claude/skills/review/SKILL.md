@@ -13,8 +13,17 @@ user's inbox — without passing through here.
 ```bash
 python .keel/board.py set <issue> --status "Code Review"
 gh pr view <pr> --repo luketmoss/keel --json number,title,statusCheckRollup,isDraft
+```
+
+Then the diff — **but only if you don't already have it**:
+
+```bash
 gh pr diff <pr> --repo luketmoss/keel
 ```
+
+Standalone, handed a PR number by the user, you do: fetching it is the whole
+start of the job. As `/finish`'s third step you wrote every line of it in this
+session, and `gh pr diff` returns what you just typed.
 
 ## Verify the build
 
@@ -39,7 +48,10 @@ advance to Ready to Ship on a check that never reported.
 Read it against the acceptance criteria and the project's stack skill. Look for:
 
 - **Correctness** — does it do what the criteria say, in the cases the criteria
-  describe and the ones they imply
+  describe and the ones they imply. When `/test` has just walked the criteria
+  one at a time, don't walk them again — it verified them deliberately and,
+  on an automated stack, proved each test can fail. Standalone, nothing has,
+  and this is where that happens
 - **Scope** — anything here that Out of Scope said wouldn't be
 - **Fit** — does it read like the code around it, or like a transplant
 - **Stack conventions** — the specific ones in the stack skill, which exist

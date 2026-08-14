@@ -32,51 +32,9 @@ an issue's criteria are of that kind the run continues to Ready to Ship.
 - Theme values come from a theme module, never inline hex
 - `AsyncStorage` for anything that must survive a force-close
 
-## Scaffold
+## Scaffold and CI
 
-```
-<slug>/
-├── package.json
-├── app.json
-├── App.js
-├── src/
-│   ├── screens/
-│   ├── components/
-│   ├── hooks/
-│   └── theme/
-└── .gitignore        # node_modules/, .expo/, *.apk, *.ipa
-```
-
-## CI workflow
-
-Lint and test only. Builds go through EAS, which is not worth wiring into CI
-until there is something to distribute.
-
-```yaml
-name: <slug>
-on:
-  pull_request:
-    paths: ['<slug>/**', '.github/workflows/<slug>.yml']
-  push:
-    branches: [main]
-    paths: ['<slug>/**', '.github/workflows/<slug>.yml']
-concurrency:
-  group: <slug>-${{ github.ref }}
-  cancel-in-progress: true
-jobs:
-  check:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: <slug>
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: '20'
-          cache: npm
-          cache-dependency-path: <slug>/package-lock.json
-      - run: npm ci
-      - run: npx expo lint
-      - run: npm test --if-present
-```
+The project scaffold and the CI workflow template are in
+[scaffold.md](scaffold.md), beside this file. `/new-project` reads it when a
+project is created; nothing in the issue lifecycle does, which is why it is
+not here.

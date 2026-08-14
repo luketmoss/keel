@@ -30,17 +30,22 @@ Then confirm the slug is free: the folder must not exist and
 
 ## 2. Load the stack skill
 
-Read `.claude/skills/stack-<stack>/SKILL.md`. It owns the scaffold, the CI
-workflow, and whether Testing is human-gated. Do not invent any of that here.
+Read `.claude/skills/stack-<stack>/scaffold.md` for the scaffold and the CI
+workflow, and `.claude/skills/stack-<stack>/SKILL.md` for whether Testing is
+human-gated. Do not invent any of that here.
+
+Two files because only this skill needs the first one: every lifecycle command
+reads `SKILL.md`, and the scaffold sat inside it being read on every issue and
+acted on by none of them.
 
 ## 3. Create
 
 In order:
 
-1. `<slug>/` with the scaffold from the stack skill
+1. `<slug>/` with the scaffold from `scaffold.md`
 2. `<slug>/CLAUDE.md` — see below
 3. `<slug>/docs/design/.gitkeep`
-4. `.github/workflows/<slug>.yml` from the stack skill's template, with the
+4. `.github/workflows/<slug>.yml` from `scaffold.md`'s template, with the
    slug substituted into the path filter, concurrency group, cache keys, and
    `working-directory`
 5. `python .keel/board.py add-project <slug>`

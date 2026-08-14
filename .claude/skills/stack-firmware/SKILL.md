@@ -31,53 +31,9 @@ explicitly. It does not advance to Code Review on its own.
 - Related functionality in paired `.h`/`.cpp` files, not one growing main.cpp
 - Every configurable parameter has a documented valid range, validated on input
 
-## Scaffold
+## Scaffold and CI
 
-```
-<slug>/
-├── platformio.ini
-├── src/main.cpp
-├── include/
-├── lib/
-├── test/
-└── .gitignore        # .pio/, .vscode/, *.bin, *.elf
-```
-
-`platformio.ini` starts minimal — one environment, board and framework filled in
-during the interview if the user knows them, otherwise left as a marked TODO
-rather than guessed.
-
-## CI workflow
-
-Build only. There is no meaningful test job without hardware, and pretending
-otherwise is worse than having none.
-
-```yaml
-name: <slug>
-on:
-  pull_request:
-    paths: ['<slug>/**', '.github/workflows/<slug>.yml']
-  push:
-    branches: [main]
-    paths: ['<slug>/**', '.github/workflows/<slug>.yml']
-concurrency:
-  group: <slug>-${{ github.ref }}
-  cancel-in-progress: true
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: <slug>
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.x'
-      - uses: actions/cache@v4
-        with:
-          path: ~/.platformio
-          key: <slug>-pio-${{ hashFiles('<slug>/platformio.ini') }}
-      - run: pip install platformio
-      - run: pio run
-```
+The project scaffold and the CI workflow template are in
+[scaffold.md](scaffold.md), beside this file. `/new-project` reads it when a
+project is created; nothing in the issue lifecycle does, which is why it is
+not here.

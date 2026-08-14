@@ -1,12 +1,11 @@
 ---
 name: finish
-description: Run a refined Keel issue through the full delivery chain - development, testing, code review - stopping at Ready to Ship. Use when the user says to finish, build out, or deliver an issue.
+description: Run a refined Keel issue through the full delivery chain - development, testing, code review, merge. Use when the user says to finish, build out, ship, or deliver an issue.
 ---
 
 # /finish
 
-The delivery run. Takes an issue from Refined to Ready to Ship without stopping,
-then hands to the user at Gate 2.
+The delivery run. Takes an issue from Refined to Done without stopping.
 
 ## Precondition
 
@@ -19,13 +18,16 @@ back skips the only review of the spec, which is the point of having two runs.
 1. **`/develop`** — branch, code, draft PR
 2. **`/test`** — verify against acceptance criteria, take the PR out of draft
 3. **`/review`** — review the diff, confirm the build
-4. Stop. The issue is in **Ready to Ship**.
+4. **`/ship`** — Results, merge, delete the branch
 
 Each step is the real skill. Read and follow `.claude/skills/<step>/SKILL.md` at
 each stage rather than approximating it.
 
-**Do not run `/ship`.** The run ends at Gate 2. Merging is the user's call, and
-this chain being unattended is only safe because it cannot reach main.
+**Step 4 is `/ship` itself, not a merge written out again here.** `/review`
+leaves the issue in Ready to Ship, which is the state `/ship` already requires,
+so it runs against exactly what it expects — with its refusal conditions, its
+Results section and its board-workflow diagnosis intact. The only irreversible
+operation in the system is written down once.
 
 ## Halting
 
@@ -37,17 +39,20 @@ The run stops early if:
 - the stack gates Testing — firmware always, mobile for device-dependent
   criteria. The run stops in Testing with the unverifiable criteria listed
 - `/review` finds something blocking — the issue returns to In Development
+- `/ship` refuses — a draft PR, checks failing or absent, a conflict. The issue
+  **stays in Ready to Ship**, which is what that column now means: not a queue
+  of things to rubber-stamp, but the ones that could not finish on their own
 
 Report where it stopped and why. Do not work around a gate.
 
 ## Report
 
-When the run reaches Ready to Ship:
+When the run merges:
 
-- issue and PR, with URLs
+- issue and PR, with URLs, and the commit on `main`
 - what changed, in a few lines
 - which acceptance criteria were verified and how
 - anything `/review` noted that didn't block
 - any judgment call that could reasonably have gone the other way
 
-Then say plainly that nothing has merged and `/ship` is theirs to run.
+When it stopped instead, say where and why, and that nothing merged.

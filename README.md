@@ -11,35 +11,40 @@ Starting a project means adding a folder — not provisioning infrastructure.
 
 ## How work moves
 
-Issues travel through nine stages in two unattended runs, each ending at a gate
-where work waits for a human.
+Issues travel through nine stages in two unattended runs, with one gate between
+them where work waits for a human.
 
 ```
-/idea → PM Refining → UX → [ Refined ] → In Development → Testing → Code Review → [ Ready to Ship ] → Done
-        └─── refinement run ───┘           └─────────── delivery run ───────────┘                /ship
-                               gate 1                                                gate 2
+/idea → PM Refining → UX → [ Refined ] → In Development → Testing → Code Review → Ready to Ship → Done
+        └─── refinement run ───┘           └──────────────── delivery run ────────────────────────┘
+                               the gate                                          parks here if it can't merge
 ```
 
-**Gate 1 — Refined.** Do you agree with the solution?
-**Gate 2 — Ready to Ship.** Do you agree with the implementation? This column is
-the inbox — everything in it is reviewed, green, and waiting only on you.
+**The gate — Refined.** Do you agree with the solution? It is the one place a
+run waits for a person, and the one that decides what gets built.
 
-Both runs are fully unattended because neither can reach `main`. `/ship` is the
-only irreversible action, and the only one triggered by hand.
+**The delivery run reaches `main`.** Nothing merges on a judgment call: the
+build is green, the review found nothing blocking, and every failure path parks
+the issue in Ready to Ship instead of merging. The cost is that a bad run is a
+commit to revert rather than a PR to close.
+
+**Ready to Ship is where a run parks, not where it ends.** What rests there
+could not finish on its own — a draft PR, a check that failed or never ran, a
+conflict — and that is what makes it the inbox worth looking at.
 
 ## Commands
 
 | Command | Does |
 |---|---|
-| `/refine` | Runs the refinement chain to Refined (gate 1) |
-| `/finish` | Runs the delivery chain to Ready to Ship (gate 2) |
+| `/refine` | Runs the refinement chain to Refined (the gate) |
+| `/finish` | Runs the delivery chain through to merged |
 | `/idea` | Captures a thought as a well-formed issue |
 | `/pm` | Problem statement, acceptance criteria, scope |
 | `/ux` | Behavior, states, edge cases → `docs/design/` |
 | `/develop` | Cuts the branch, writes the code, opens a draft PR |
 | `/test` | Verifies acceptance criteria, takes the PR out of draft |
 | `/review` | Reviews the diff, posts comments, checks CI |
-| `/ship` | Merges — the only irreversible action, never part of a run |
+| `/ship` | Merges — the only irreversible action; `/finish` runs it |
 | `/new-project` | Adds a project folder, CLAUDE.md, board option, CI workflow |
 
 ## Documentation

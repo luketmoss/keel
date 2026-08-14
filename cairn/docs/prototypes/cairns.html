@@ -1,0 +1,2030 @@
+<title>cairn — everything on the map is a cairn</title>
+
+<style>
+  :root {
+    /* cairn design-language.md, verbatim. This prototype adds no colour. */
+    --ground: #121523;
+    --surface: #1B1F33;
+    --surface-lift: #262B42;
+    --text: #F1F3FA;
+    --text-muted: #8D93B0;
+    --border: rgba(255, 255, 255, .07);
+    --accent: #FF7A4D;
+    --on-accent: #1B0C05;
+    --danger: #FF4E6A;
+
+    --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
+    --muted-soft: color-mix(in srgb, var(--text-muted) 18%, transparent);
+    --hover: color-mix(in srgb, var(--text) 6%, transparent);
+    --pressed: color-mix(in srgb, var(--text) 12%, transparent);
+
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 18px;
+    --space-6: 24px;
+
+    --radius-sm: 10px;
+    --radius-md: 18px;
+    --radius-full: 999px;
+
+    --text-xs: 12px;
+    --text-sm: 14px;
+    --text-base: 15px;
+    --text-lg: 18px;
+
+    --panel-width: 380px;
+    --search-height: 56px;
+    --chip-height: 34px;
+    --hit-target: 40px;
+    --row-touch: 44px;
+    --avatar-size: 32px;
+    --dot-size: 14px;
+    --dot-ring: 2px;
+    --marker-size: 34px;
+    --marker-ring: 2px;
+    --marker-track: 22px;
+
+    --motion-fast: 120ms;
+    --motion-base: 180ms;
+    --motion-slow: 280ms;
+    --ease: cubic-bezier(.2, 0, 0, 1);
+
+    --lift: 0 10px 30px rgba(6, 8, 18, .55);
+
+    --ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--text);
+    font: 400 var(--text-base)/1.45 var(--ui);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  button {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: 0;
+    cursor: pointer;
+  }
+
+  /* ── the stage ─────────────────────────────────────────────── */
+
+  .stage {
+    position: relative;
+    width: 100%;
+    height: 760px;
+    max-height: 88vh;
+    min-height: 560px;
+    overflow: hidden;
+    border-radius: var(--radius-md);
+    background: var(--ground);
+    isolation: isolate;
+  }
+
+  #terrain {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: grab;
+    touch-action: none;
+  }
+  #terrain.dragging { cursor: grabbing; }
+
+  .markers {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  /* ── markers ───────────────────────────────────────────────── */
+
+  .mk {
+    position: absolute;
+    width: var(--hit-target);
+    height: var(--hit-target);
+    margin: calc(var(--hit-target) / -2) 0 0 calc(var(--hit-target) / -2);
+    display: grid;
+    place-items: center;
+    pointer-events: auto;
+    padding: 0;
+    transition: transform var(--motion-fast) var(--ease);
+    transform-origin: center bottom;
+  }
+  .mk:hover, .mk.sel { transform: scale(1.35); z-index: 5; }
+  .mk.dim { opacity: .35; }
+  .mk.draggable { cursor: grab; }
+  .mk.grabbing { cursor: grabbing; transform: scale(1.35); }
+
+  .mk-thumb {
+    width: var(--marker-size);
+    height: var(--marker-size);
+    border-radius: var(--radius-full);
+    border: var(--marker-ring) solid var(--text);
+    object-fit: cover;
+    box-shadow: var(--lift);
+    display: block;
+  }
+  .mk.sel .mk-thumb { border-color: var(--accent); }
+
+  .mk-pin { display: block; filter: drop-shadow(0 6px 14px rgba(6, 8, 18, .7)); }
+  .mk-pin .body { fill: var(--surface); stroke: rgba(255, 255, 255, .55); stroke-width: 1.5; }
+  .mk-pin .glyph { stroke: var(--text); fill: none; stroke-width: 1.9; stroke-linejoin: round; stroke-linecap: round; }
+  .mk-pin .glyph-fill { fill: var(--text); stroke: none; }
+  .mk-pin text { fill: var(--text); font: 700 11px var(--ui); }
+  .mk.sel .mk-pin .body { fill: var(--accent); stroke: var(--accent); }
+  .mk.sel .mk-pin .glyph { stroke: var(--on-accent); }
+  .mk.sel .mk-pin .glyph-fill { fill: var(--on-accent); }
+  .mk.sel .mk-pin text { fill: var(--on-accent); }
+
+  .mk-badge {
+    position: absolute;
+    right: 2px;
+    top: 1px;
+    width: 12px;
+    height: 12px;
+    border-radius: var(--radius-full);
+    background: var(--text);
+    border: 1.5px solid var(--surface);
+    display: grid;
+    place-items: center;
+  }
+  .mk-badge svg { width: 7px; height: 7px; fill: var(--surface); }
+
+  .mk-trip {
+    width: var(--dot-size);
+    height: var(--dot-size);
+    border-radius: var(--radius-full);
+    background: var(--accent);
+    border: var(--dot-ring) solid var(--ground);
+    box-shadow: var(--lift);
+  }
+  .mk-track {
+    width: var(--marker-track);
+    height: var(--marker-track);
+    border-radius: var(--radius-sm);
+    border: var(--dot-ring) solid var(--ground);
+    box-shadow: var(--lift);
+  }
+
+  .mk-name {
+    position: absolute;
+    bottom: calc(100% - 2px);
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full);
+    padding: 3px var(--space-2);
+    font-size: var(--text-xs);
+    box-shadow: var(--lift);
+    opacity: 0;
+    transition: opacity var(--motion-fast) var(--ease);
+    pointer-events: none;
+  }
+  .mk:hover .mk-name, .mk.sel .mk-name { opacity: 1; }
+
+  /* ── the column ────────────────────────────────────────────── */
+
+  .column {
+    position: absolute;
+    top: var(--space-4);
+    left: var(--space-4);
+    bottom: var(--space-4);
+    width: var(--panel-width);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    z-index: 20;
+  }
+
+  .card {
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: var(--radius-md);
+    box-shadow: var(--lift);
+  }
+
+  .search {
+    height: var(--search-height);
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 0 var(--space-3) 0 var(--space-2);
+  }
+  .search-mark {
+    width: var(--hit-target);
+    height: var(--hit-target);
+    display: grid;
+    place-items: center;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    transition: color var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease);
+  }
+  .search-mark:hover { color: var(--text); background: var(--hover); }
+  .search-mark svg { width: 20px; height: 20px; }
+  .search-centre { flex: 1 1 auto; min-width: 0; }
+  .search-centre input {
+    width: 100%;
+    background: none;
+    border: 0;
+    color: var(--text);
+    font: 400 var(--text-base) var(--ui);
+    padding: 0;
+  }
+  .search-centre input::placeholder { color: var(--text-muted); }
+  .search-title {
+    font: 700 var(--text-base)/1.2 var(--ui);
+    letter-spacing: -.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .search-kind {
+    font: 400 var(--text-xs)/1.4 var(--mono);
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: .04em;
+  }
+  .avatar {
+    width: var(--avatar-size);
+    height: var(--avatar-size);
+    flex: 0 0 auto;
+    border-radius: var(--radius-full);
+    background: var(--surface-lift);
+    display: grid;
+    place-items: center;
+    font: 700 var(--text-xs) var(--ui);
+    color: var(--text-muted);
+  }
+
+  .chips {
+    flex: 0 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+  .chip {
+    height: var(--chip-height);
+    padding: 0 var(--space-4);
+    border-radius: var(--radius-full);
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: var(--lift);
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    transition: color var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease);
+  }
+  .chip:hover { color: var(--text); }
+  .chip[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+  .chip svg { width: 14px; height: 14px; }
+  .chip .glyph { stroke: currentColor; fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .chip .glyph-fill { fill: currentColor; stroke: none; }
+  .chip text { fill: currentColor; font: 700 11px var(--ui); }
+
+  .chips-sub {
+    margin-top: calc(var(--space-1) * -1);
+    padding-left: var(--space-2);
+  }
+  .chips-sub .chip { height: 28px; padding: 0 var(--space-3); font-size: var(--text-xs); }
+
+  .panel {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .panel-head {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    padding: var(--space-5) var(--space-5) var(--space-3);
+  }
+  .panel-head h2 {
+    margin: 0;
+    font: 700 var(--text-lg)/1.2 var(--ui);
+    letter-spacing: -.01em;
+  }
+  .panel-count {
+    font: 400 var(--text-xs) var(--mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+  }
+  .panel-action {
+    margin-left: auto;
+    font-size: var(--text-sm);
+    color: var(--accent);
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm);
+  }
+  .panel-action:hover { background: var(--hover); }
+
+  .rows {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 0 var(--space-2) var(--space-3);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: var(--marker-size) 1fr;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: var(--row-touch);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-sm);
+    text-align: left;
+    transition: background var(--motion-fast) var(--ease);
+  }
+  .row:hover { background: var(--hover); }
+  .row.sel { background: var(--accent-soft); }
+  .row-glyph { display: grid; place-items: center; height: var(--marker-size); }
+  .row-glyph img {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-full);
+    border: 1.5px solid var(--text);
+    object-fit: cover;
+  }
+  .row-glyph svg { display: block; }
+  .row-glyph .body { fill: var(--surface-lift); stroke: var(--text-muted); stroke-width: 1.5; }
+  .row-glyph .glyph { stroke: var(--text); fill: none; stroke-width: 1.9; stroke-linejoin: round; stroke-linecap: round; }
+  .row-glyph .glyph-fill { fill: var(--text); stroke: none; }
+  .row-glyph text { fill: var(--text); font: 700 11px var(--ui); }
+  .row-dot {
+    width: var(--dot-size);
+    height: var(--dot-size);
+    border-radius: var(--radius-full);
+    background: var(--accent);
+  }
+  .row-tile { width: 18px; height: 18px; border-radius: 6px; }
+  .row-name { font-size: var(--text-base); }
+  .row-meta {
+    font: 400 var(--text-xs) var(--mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+  }
+  .row-meta .no-loc { color: var(--danger); }
+
+  .rows-empty {
+    padding: var(--space-6) var(--space-5);
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+  }
+
+  /* ── detail face ───────────────────────────────────────────── */
+
+  .detail {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: var(--space-5);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  .detail h2 {
+    margin: 0;
+    font: 700 var(--text-lg)/1.25 var(--ui);
+    letter-spacing: -.01em;
+    text-wrap: balance;
+  }
+  .detail-meta {
+    font: 400 var(--text-xs) var(--mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  .detail-image {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    display: block;
+  }
+  .detail-desc { font-size: var(--text-sm); color: var(--text); margin: 0; }
+  .detail-desc.empty { color: var(--text-muted); font-style: italic; }
+
+  .btn-primary {
+    height: var(--hit-target);
+    border-radius: var(--radius-sm);
+    background: var(--accent);
+    color: var(--on-accent);
+    font-size: var(--text-base);
+    font-weight: 700;
+    padding: 0 var(--space-4);
+    transition: filter var(--motion-fast) var(--ease);
+  }
+  .btn-primary:hover { filter: brightness(1.08); }
+  .btn-ghost {
+    height: var(--hit-target);
+    border-radius: var(--radius-sm);
+    padding: 0 var(--space-4);
+    font-size: var(--text-base);
+    color: var(--text-muted);
+    transition: background var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease);
+  }
+  .btn-ghost:hover { background: var(--hover); color: var(--text); }
+
+  .field { display: flex; flex-direction: column; gap: var(--space-2); }
+  .field > label {
+    font: 400 var(--text-xs) var(--mono);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--text-muted);
+  }
+  .field input[type="text"],
+  .field input[type="date"],
+  .field textarea {
+    background: var(--surface-lift);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font: 400 var(--text-base) var(--ui);
+    padding: var(--space-3);
+    width: 100%;
+    resize: vertical;
+  }
+  .field input[type="date"] { font-family: var(--mono); color-scheme: dark; }
+
+  .icon-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: var(--space-2);
+  }
+  .icon-pick {
+    height: var(--hit-target);
+    border-radius: var(--radius-sm);
+    background: var(--surface-lift);
+    display: grid;
+    place-items: center;
+    color: var(--text-muted);
+    transition: background var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease);
+  }
+  .icon-pick:hover { background: var(--pressed); color: var(--text); }
+  .icon-pick[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+  .icon-pick svg { width: 20px; height: 20px; }
+  .icon-pick .glyph { stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linejoin: round; stroke-linecap: round; }
+  .icon-pick .glyph-fill { fill: currentColor; stroke: none; }
+  .icon-pick text { fill: currentColor; font: 700 11px var(--ui); }
+  .icon-none { font: 400 var(--text-xs) var(--mono); }
+
+  .record {
+    background: var(--ground);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: var(--space-3);
+    font: 400 var(--text-xs)/1.7 var(--mono);
+    color: var(--text-muted);
+    overflow-x: auto;
+  }
+  .record b { color: var(--text); font-weight: 400; }
+  .record .lock { color: var(--accent); }
+
+  .note {
+    border-left: 2px solid var(--accent);
+    padding-left: var(--space-3);
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+  }
+  .note.warn { border-color: var(--danger); }
+
+  /* ── map corner controls ───────────────────────────────────── */
+
+  .corner {
+    position: absolute;
+    z-index: 15;
+    display: flex;
+    gap: var(--space-2);
+  }
+  .corner.br { right: var(--space-4); bottom: var(--space-4); flex-direction: column; }
+  .zoom {
+    width: var(--hit-target);
+    height: var(--hit-target);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: var(--lift);
+    color: var(--text-muted);
+    display: grid;
+    place-items: center;
+    font-size: var(--text-lg);
+    transition: color var(--motion-fast) var(--ease);
+  }
+  .zoom:hover { color: var(--text); }
+
+  .hint {
+    position: absolute;
+    left: 50%;
+    bottom: var(--space-4);
+    transform: translateX(-50%);
+    z-index: 15;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-full);
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: var(--lift);
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    transition: opacity var(--motion-base) var(--ease);
+  }
+  .hint kbd {
+    font: 400 var(--text-xs) var(--mono);
+    background: var(--surface-lift);
+    border-radius: 6px;
+    padding: 2px 6px;
+    color: var(--text);
+  }
+  .hint[hidden] { display: none; }
+
+  /* ── import ────────────────────────────────────────────────── */
+
+  .drop-overlay {
+    position: absolute;
+    inset: var(--space-4);
+    z-index: 40;
+    border-radius: var(--radius-md);
+    border: 2px dashed var(--accent);
+    background: color-mix(in srgb, var(--ground) 72%, transparent);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: grid;
+    place-items: center;
+    font-size: var(--text-lg);
+    font-weight: 700;
+    color: var(--accent);
+    pointer-events: none;
+  }
+  .drop-overlay[hidden] { display: none; }
+
+  .unsaved {
+    font: 400 var(--text-xs) var(--mono);
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--accent);
+  }
+
+  .queue-bar {
+    display: flex;
+    gap: 3px;
+  }
+  .queue-bar span {
+    flex: 1 1 0;
+    height: 4px;
+    border-radius: var(--radius-full);
+    background: var(--surface-lift);
+  }
+  .queue-bar span.done { background: var(--accent); }
+  .queue-bar span.now { background: var(--text); }
+
+  .import-summary {
+    font: 400 var(--text-xs)/1.7 var(--mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+  }
+  .import-summary b { color: var(--text); font-weight: 400; }
+  .import-summary .need { color: var(--accent); }
+
+  .placing-photo {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    display: block;
+    border: 2px solid var(--accent);
+  }
+
+  .ghost {
+    position: absolute;
+    width: var(--hit-target);
+    height: var(--hit-target);
+    margin: calc(var(--hit-target) / -2) 0 0 calc(var(--hit-target) / -2);
+    display: grid;
+    place-items: center;
+    pointer-events: auto;
+    padding: 0;
+    z-index: 6;
+  }
+  .ghost-ring {
+    width: var(--marker-size);
+    height: var(--marker-size);
+    border-radius: var(--radius-full);
+    border: 2px dashed var(--accent);
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
+    animation: pulse 1.8s var(--ease) infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: .85; }
+    50% { transform: scale(1.18); opacity: 1; }
+  }
+  .ghost .mk-name { opacity: 1; }
+
+  #terrain.placing { cursor: crosshair; }
+
+  .place-pop {
+    position: absolute;
+    z-index: 25;
+    transform: translate(-50%, calc(-100% - 10px));
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-full);
+    background: var(--accent);
+    color: var(--on-accent);
+    font-size: var(--text-sm);
+    font-weight: 700;
+    box-shadow: var(--lift);
+    white-space: nowrap;
+  }
+
+  /* ── the lab (prototype scaffolding, not cairn chrome) ─────── */
+
+  .lab {
+    position: absolute;
+    top: var(--space-4);
+    right: var(--space-4);
+    z-index: 20;
+    width: 268px;
+    padding: var(--space-4);
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--ground) 90%, transparent);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px dashed color-mix(in srgb, var(--text-muted) 45%, transparent);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  .lab-title {
+    font: 400 var(--text-xs) var(--mono);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--text-muted);
+  }
+  .lab-q { display: flex; flex-direction: column; gap: var(--space-2); }
+  .lab-q > p {
+    margin: 0;
+    font-size: var(--text-sm);
+    color: var(--text);
+  }
+  .seg {
+    display: flex;
+    background: var(--surface-lift);
+    border-radius: var(--radius-sm);
+    padding: 3px;
+    gap: 3px;
+  }
+  .seg button {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: var(--space-2) var(--space-1);
+    border-radius: 7px;
+    font: 400 var(--text-xs) var(--mono);
+    color: var(--text-muted);
+    transition: background var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease);
+  }
+  .seg button:hover { color: var(--text); }
+  .seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+  .lab-read {
+    font: 400 var(--text-xs)/1.7 var(--mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+    border-top: 1px solid var(--border);
+    padding-top: var(--space-3);
+  }
+  .lab-read b { color: var(--text); font-weight: 400; }
+
+  /* ── the page around the prototype ─────────────────────────── */
+
+  .page {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: var(--space-6) var(--space-5) 72px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .masthead { display: flex; flex-direction: column; gap: var(--space-2); max-width: 62ch; }
+  .eyebrow {
+    font: 400 var(--text-xs) var(--mono);
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--accent);
+  }
+  .masthead h1 {
+    margin: 0;
+    font: 700 30px/1.15 var(--ui);
+    letter-spacing: -.02em;
+    text-wrap: balance;
+  }
+  .masthead p { margin: 0; color: var(--text-muted); font-size: var(--text-base); }
+
+  .findings {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--space-4);
+  }
+  .finding {
+    background: var(--surface);
+    border-radius: var(--radius-md);
+    padding: var(--space-5);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+  .finding h3 {
+    margin: 0;
+    font: 700 var(--text-base)/1.35 var(--ui);
+    letter-spacing: -.01em;
+  }
+  .finding p { margin: 0; font-size: var(--text-sm); color: var(--text-muted); }
+  .finding p em { color: var(--text); font-style: normal; }
+  .finding .verdict {
+    font: 400 var(--text-xs) var(--mono);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--accent);
+    border-top: 1px solid var(--border);
+    padding-top: var(--space-3);
+    margin-top: auto;
+  }
+  .finding .verdict.open { color: var(--text-muted); }
+
+  .quadrant-wrap { overflow-x: auto; }
+  table.quadrant {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 520px;
+    font-size: var(--text-sm);
+  }
+  table.quadrant th, table.quadrant td {
+    text-align: left;
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  table.quadrant thead th {
+    font: 400 var(--text-xs) var(--mono);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--text-muted);
+    font-weight: 400;
+  }
+  table.quadrant tbody th { font-weight: 700; font-size: var(--text-sm); white-space: nowrap; }
+  table.quadrant td span { display: block; color: var(--text-muted); font-size: var(--text-xs); font-family: var(--mono); margin-top: 2px; }
+  table.quadrant td.gap { color: var(--accent); }
+  table.quadrant td.gap span { color: color-mix(in srgb, var(--accent) 70%, var(--text-muted)); }
+
+  .section-label {
+    font: 400 var(--text-xs) var(--mono);
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--text-muted);
+    padding-bottom: var(--space-1);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .scope { display: flex; flex-direction: column; gap: var(--space-2); max-width: 68ch; }
+  .scope li { font-size: var(--text-sm); color: var(--text-muted); }
+  .scope ul { margin: 0; padding-left: var(--space-5); display: flex; flex-direction: column; gap: var(--space-2); }
+  .scope strong { color: var(--text); font-weight: 400; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition-duration: 1ms !important; animation-duration: 1ms !important; }
+  }
+
+  @media (max-width: 1080px) {
+    .lab { position: static; width: auto; margin: var(--space-4) 0 0; }
+    .stage { height: 620px; }
+  }
+</style>
+
+<div class="page">
+
+<div class="masthead">
+  <span class="eyebrow">cairn · content model</span>
+  <h1>A photo and a campsite are the same thing: a cairn</h1>
+  <p>Today a photo lands where its EXIF says. A campsite lands where you clicked. Everything else about them — a name, a date, a description, a position, belonging to a trip or not — is identical. This prototype collapses them into one kind &mdash; a <strong>cairn</strong>, the marker you leave on your own map &mdash; and lets two independent attributes carry the difference: <em>does it have an image</em>, and <em>where did its position come from</em>.</p>
+  <p>The second is provenance, not ownership. A photo's EXIF <em>seeds</em> its cairn's location and can always be overridden — and a photo whose location cannot be worked out never becomes a cairn at all.</p>
+</div>
+
+<div class="quadrant-wrap">
+  <table class="quadrant">
+    <thead>
+      <tr>
+        <th scope="col"></th>
+        <th scope="col">Position derived — EXIF or interpolated</th>
+        <th scope="col">Position authored — you clicked</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th scope="row">Has an image</th>
+        <td>today's photo <span>Razorback ridge, Wallaby Gap</span></td>
+        <td class="gap">not representable today <span>Counts Point, Ellery Creek camp</span></td>
+      </tr>
+      <tr>
+        <th scope="row">No image</th>
+        <td>nothing meaningful <span>—</span></td>
+        <td>a place <span>Serpentine Chalet hut, water tank</span></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="stage" id="stage">
+  <canvas id="terrain"></canvas>
+  <div class="markers" id="markers"></div>
+
+  <div class="column">
+    <div class="card search" id="search"></div>
+    <div id="chipbar"></div>
+    <div class="card panel" id="panel"></div>
+  </div>
+
+  <div class="corner br">
+    <button class="zoom" id="zin" aria-label="Zoom in">+</button>
+    <button class="zoom" id="zout" aria-label="Zoom out">−</button>
+  </div>
+
+  <div class="drop-overlay" id="drop" hidden>Drop photos to import them as cairns</div>
+
+  <div class="hint" id="hint">
+    <span>Right-click the map to place a cairn</span>
+    <kbd>long-press on touch</kbd>
+  </div>
+
+  <div class="lab">
+    <div class="lab-title">Prototype controls</div>
+
+    <div class="lab-q">
+      <p>Marker when a cairn has <em>both</em> an icon and an image</p>
+      <div class="seg" id="seg-marker">
+        <button data-v="icon" aria-pressed="true">icon wins</button>
+        <button data-v="image" aria-pressed="false">image wins</button>
+      </div>
+    </div>
+
+    <div class="lab-q">
+      <p>Filter chips, now that photos aren't a kind</p>
+      <div class="seg" id="seg-chips">
+        <button data-v="one" aria-pressed="true">cairns</button>
+        <button data-v="split" aria-pressed="false">split</button>
+        <button data-v="sub" aria-pressed="false">+icons</button>
+      </div>
+    </div>
+
+    <div class="lab-q">
+      <p>Importing a photo with no GPS</p>
+      <button class="btn-primary" id="sim-drop" style="width:100%;font-size:var(--text-sm)">Drop 5 photos</button>
+      <span style="font:400 var(--text-xs)/1.6 var(--mono);color:var(--text-muted)">2 have GPS · 1 interpolates · 2 need you. Real image files can be dropped on the map too.</span>
+    </div>
+
+    <div class="lab-read" id="readout"></div>
+  </div>
+</div>
+
+<div class="section-label">What the prototype settles</div>
+
+<div class="findings">
+  <div class="finding">
+    <h3>A photo is not a peer of a campsite</h3>
+    <p>Campsite, water, hut, viewpoint and summit answer <em>what is this place</em>. A photo answers <em>what do I have of it</em>. In one enum you cannot have a photo <em>of</em> a campsite — and three of the cairns on this map are exactly that.</p>
+    <div class="verdict">two attributes, not one type</div>
+  </div>
+
+  <div class="finding">
+    <h3>The icon wins the marker</h3>
+    <p>Flip the toggle to <em>image wins</em> and watch Ellery Creek camp, Counts Point and Mount Sonder collapse into identical circles. The map stops telling you where you can camp. Choosing an icon is an authored act, the same as placing the pin; the image is content, not identity.</p>
+    <div class="verdict">a corner badge carries "there's a photo here"</div>
+  </div>
+
+  <div class="finding">
+    <h3>Location belongs to the cairn, not to the photo</h3>
+    <p>EXIF seeds the position; it does not own it. Every cairn drags, including one that came in with GPS — phone GPS drifts, and a photo taken from a lookout is <em>of</em> something across the valley. Moving a cairn sets its source to <em>placed</em>, and that override is permanent.</p>
+    <div class="verdict">interpolation may only move what is still interpolated</div>
+  </div>
+
+  <div class="finding">
+    <h3>A photo with no GPS is never orphaned, and never rejected</h3>
+    <p>Import resolves EXIF first, then #52's interpolation against an open trip's tracks. What is left does not become a cairn at all — it waits in the draft, where #81's rule already says nothing has been written anywhere. <em>Placing it is what makes it a cairn.</em></p>
+    <div class="verdict">no coordinate, no record — so no orphan</div>
+  </div>
+
+  <div class="finding">
+    <h3>Two ways to make a cairn, differing only in whether a file came with it</h3>
+    <p>Drop a photo, or right-click the map. Both produce the same record. In both, the gesture's context decides ownership — a trip open means it lands in the trip, nothing open means loose. Right-click stays undiscoverable and needs a real affordance the prototype fakes with a hint.</p>
+    <div class="verdict open">open — the create affordance is unresolved</div>
+  </div>
+
+  <div class="finding">
+    <h3>The batch does not wait on the stragglers</h3>
+    <p>Drop five, three resolve and save immediately, two queue. Skip cycles the queue, discard drops only what is still unplaced. A blocking dialog per photo would make a forty-photo import unusable, and making all forty wait on two would be worse.</p>
+    <div class="verdict">a suggestion beats a blank map: nearest route cairn by time</div>
+  </div>
+
+  <div class="finding">
+    <h3>The chip row is the real cost</h3>
+    <p>Try all three. <em>Cairns</em> is honest but loses "show me just my photos". <em>Split</em> keeps that filter but files a photographed campsite under Photos, where you won't look for it. <em>+icons</em> is the most expressive and the most chrome.</p>
+    <div class="verdict open">open — split reads best at this data size</div>
+  </div>
+
+  <div class="finding">
+    <h3>Retyping is free, and that is the tell</h3>
+    <p>Open any photo and pick an icon. Wallaby Gap becomes a campsite without touching its image, its date or its position. Under a type enum that operation has to ask what happens to the photo; under two attributes there is nothing to ask.</p>
+    <div class="verdict">the model change, made tangible</div>
+  </div>
+</div>
+
+<div class="section-label">What this deliberately does not cover</div>
+
+<div class="scope">
+  <ul>
+    <li><strong>The migration itself.</strong> Every existing loose photo record, every trip's <code>photos.json</code>, <code>photoCount</code>, <code>PhotoLayer</code>, <code>PhotoList</code>, <code>positionPhotos</code> and the <code>/photos/:id</code> route all move. That is the bulk of the work and none of it is visible here.</li>
+    <li><strong>Adding a photo to a cairn that already exists.</strong> Dropping on the map makes a new cairn; dropping onto an <em>open</em> cairn should attach to it instead. Not built.</li>
+    <li><strong>Photos already in Drive with no position.</strong> The draft rule covers new imports, but records that already exist cannot be un-imported. They need the same placement queue, run once at migration — the one place a saved cairn may legitimately be unplaced.</li>
+    <li><strong>The suggestion is faked.</strong> It interpolates the route by date. The real one reads <code>timedPointPool</code> for the nearest point in time, including across the ten-minute gap #52 refuses to cross automatically.</li>
+    <li><strong>What <code>photoCount</code> becomes.</strong> The add-to-trip picker's <code>4T · 128P</code> has to mean "cairns carrying an image", which needs a definition it never needed before.</li>
+    <li><strong>Export.</strong> A cairn with an icon is a KML <code>Placemark</code> and should round-trip to Google Earth, which is cheaper than it is for any other kind.</li>
+    <li><strong>Mobile.</strong> Long-press is wired but the bottom sheet is not; the column here is the desktop form only.</li>
+  </ul>
+</div>
+
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  /* ─── icons ──────────────────────────────────────────────────
+     A fixed set. Anything larger becomes an emoji picker, and a
+     marker you can't read at a glance has no reason to carry a
+     glyph at all. */
+
+  const ICONS = {
+    campsite: { label: 'Campsite', d: 'M3.5 19 12 4.5 20.5 19Z M12 4.5V19' },
+    water:    { label: 'Water',    d: 'M12 3.2c0 0-6.6 7.6-6.6 11.4a6.6 6.6 0 0 0 13.2 0c0-3.8-6.6-11.4-6.6-11.4Z' },
+    hut:      { label: 'Hut',      d: 'M3.6 11.2 12 4.2l8.4 7M5.6 9.6V19.6h12.8V9.6' },
+    viewpoint:{ label: 'Viewpoint',d: 'M2.2 12s3.9-5.8 9.8-5.8S21.8 12 21.8 12s-3.9 5.8-9.8 5.8S2.2 12 2.2 12Z M12 9.4a2.6 2.6 0 1 0 0 5.2 2.6 2.6 0 0 0 0-5.2Z' },
+    summit:   { label: 'Summit',   d: 'M2 19.2 9 6.6l3.7 6.2 2.6-3.6L22 19.2Z' },
+    hazard:   { label: 'Hazard',   d: 'M12 3.4 22 19.6H2Z M12 10v3.8', dot: [12, 16.8] },
+    parking:  { label: 'Parking',  text: 'P' },
+    junction: { label: 'Junction', d: 'M12 20.2v-6.6M12 13.6 6 6.6M12 13.6 18 6.6' }
+  };
+  const ICON_KEYS = Object.keys(ICONS);
+
+  function glyphSvg(key, size) {
+    const ic = ICONS[key];
+    if (!ic) return '';
+    if (ic.text) {
+      return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true">` +
+        `<text x="12" y="17" text-anchor="middle" style="font-size:15px">${ic.text}</text></svg>`;
+    }
+    const dot = ic.dot ? `<circle class="glyph-fill" cx="${ic.dot[0]}" cy="${ic.dot[1]}" r="1.15"/>` : '';
+    return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true">` +
+      `<path class="glyph" d="${ic.d}"/>${dot}</svg>`;
+  }
+
+  /* A pin: the one marker shape cairn hasn't spent. In every map app it
+     already means someone put this here — which is exactly what an
+     authored position is. */
+  function pinSvg(key, w) {
+    const h = Math.round(w * 1.26);
+    const ic = ICONS[key];
+    const body = 'M15 1.4c-7.1 0-12.9 5.6-12.9 12.5 0 8.9 11.4 20 12.4 20.9a.75.75 0 0 0 1 0c1-.9 12.4-12 12.4-20.9C27.9 7 22.1 1.4 15 1.4Z';
+    let inner;
+    if (ic && ic.text) {
+      inner = `<text x="15" y="19" text-anchor="middle">${ic.text}</text>`;
+    } else if (ic) {
+      const dot = ic.dot ? `<circle class="glyph-fill" cx="${ic.dot[0]}" cy="${ic.dot[1]}" r="1.15"/>` : '';
+      inner = `<g transform="translate(3.2 2.2) scale(0.98)"><path class="glyph" d="${ic.d}"/>${dot}</g>`;
+    } else {
+      inner = '<circle class="glyph-fill" cx="15" cy="14" r="3.4"/>';
+    }
+    return `<svg class="mk-pin" viewBox="0 0 30 36" width="${w}" height="${h}" aria-hidden="true">` +
+      `<path class="body" d="${body}"/>${inner}</svg>`;
+  }
+
+  const CAMERA_BADGE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h4l2-2h4l2 2h4v12H4Z"/><circle cx="12" cy="13" r="3.6" fill="#1B1F33"/></svg>';
+
+  /* ─── procedural thumbnails ──────────────────────────────────
+     Stand-ins for real photographs. Ridgelines under a graded sky —
+     enough to judge whether a 34px circle reads as an image at a
+     glance, which is the only question they're here to answer. */
+
+  function makeThumb(seed, warm) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 160;
+    const x = c.getContext('2d');
+    const sky = x.createLinearGradient(0, 0, 0, 160);
+    if (warm) { sky.addColorStop(0, '#3B2A46'); sky.addColorStop(.55, '#C9663E'); sky.addColorStop(1, '#F0A25E'); }
+    else { sky.addColorStop(0, '#1E3350'); sky.addColorStop(.6, '#4E7392'); sky.addColorStop(1, '#9FBBC9'); }
+    x.fillStyle = sky; x.fillRect(0, 0, 160, 160);
+
+    let s = seed;
+    const rnd = () => (s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+    const bands = ['rgba(20,18,34,.35)', 'rgba(18,16,32,.6)', 'rgba(14,13,26,.88)'];
+    for (let b = 0; b < 3; b++) {
+      const base = 70 + b * 26;
+      x.beginPath();
+      x.moveTo(0, 160);
+      let y = base + rnd() * 14;
+      x.lineTo(0, y);
+      for (let px = 8; px <= 160; px += 8) {
+        y += (rnd() - .5) * (26 - b * 6);
+        y = Math.max(base - 26, Math.min(base + 22, y));
+        x.lineTo(px, y);
+      }
+      x.lineTo(160, 160);
+      x.closePath();
+      x.fillStyle = bands[b];
+      x.fill();
+    }
+    return c.toDataURL('image/jpeg', .82);
+  }
+
+  /* ─── terrain ────────────────────────────────────────────────
+     Value noise + marching squares. Contour lines are the vernacular
+     of the thing this app is for, so the basemap is drawn in them. */
+
+  const perm = new Uint8Array(512);
+  (() => {
+    let s = 9871;
+    const p = Array.from({ length: 256 }, (_, i) => i);
+    for (let i = 255; i > 0; i--) {
+      s = (s * 1103515245 + 12345) & 0x7fffffff;
+      const j = s % (i + 1);
+      [p[i], p[j]] = [p[j], p[i]];
+    }
+    for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
+  })();
+
+  const fade = (t) => t * t * (3 - 2 * t);
+  function vnoise(x, y) {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    const xf = x - xi, yf = y - yi;
+    const h = (a, b) => perm[(perm[a & 255] + (b & 255)) & 511] / 255;
+    const u = fade(xf), v = fade(yf);
+    return (h(xi, yi) * (1 - u) + h(xi + 1, yi) * u) * (1 - v)
+         + (h(xi, yi + 1) * (1 - u) + h(xi + 1, yi + 1) * u) * v;
+  }
+  function height(wx, wy) {
+    let a = 1, f = 1 / 190, sum = 0, norm = 0;
+    for (let o = 0; o < 4; o++) { sum += vnoise(wx * f, wy * f) * a; norm += a; a *= .5; f *= 2.1; }
+    return sum / norm;
+  }
+
+  /* ─── data ───────────────────────────────────────────────────
+     One Larapinta-shaped trip, plus two loose things. Every cairn
+     below sits in one of the four quadrants of the model. */
+
+  const ROUTE = [[120,565],[178,522],[241,534],[302,481],[363,470],[421,412],[472,424],[531,362],[592,341],[651,299],[703,321],[762,262],[821,241],[882,201]];
+  const LOOSE_TRACK = [[196,206],[248,172],[301,193],[341,151],[389,166]];
+
+  const TRACK_COLOURS = ['#FF7A4D', '#4DC9FF', '#7DE08D', '#FFD24D'];
+
+  let uid = 0;
+  const P = (o) => Object.assign({ id: `pt-${++uid}`, kind: 'cairn', icon: null, image: null, description: '', trip: 'trip-1' }, o);
+
+  const cairns = [
+    P({ name: 'Trailhead, Alice Springs', x: 118, y: 572, positionSource: 'placed', icon: 'parking',
+        date: '2023-06-12', description: 'Left the car in the long stay bay behind the telegraph station.' }),
+    P({ name: 'Wallaby Gap', x: 244, y: 528, positionSource: 'exif', date: '2023-06-12', image: 1,
+        description: '' }),
+    P({ name: 'Simpsons Gap water tank', x: 300, y: 487, positionSource: 'placed', icon: 'water',
+        date: '2023-06-13', description: 'Tank was two thirds full. Tap on the eastern side, not the one facing the track.' }),
+    P({ name: 'Ellery Creek camp', x: 366, y: 466, positionSource: 'placed', icon: 'campsite', image: 2,
+        date: '2023-06-13', description: 'Flat ground for three tents behind the second stand of ghost gums. Cold air pools here after dark.' }),
+    P({ name: 'Section 4 washout', x: 424, y: 407, positionSource: 'placed', icon: 'hazard',
+        date: '2023-06-14', description: 'Track edge has gone into the creek for about 40 m. Passable high on the bank.' }),
+    P({ name: 'Counts Point', x: 474, y: 428, positionSource: 'placed', icon: 'viewpoint', image: 3,
+        date: '2023-06-14', description: 'Pinned at the cairn, not where I stood to shoot it.' }),
+    P({ name: 'Serpentine Chalet hut', x: 534, y: 357, positionSource: 'placed', icon: 'hut',
+        date: '2023-06-15', description: 'Two bunks, roof intact, no water.' }),
+    P({ name: 'Brinkley Bluff', x: 596, y: 346, positionSource: 'interpolated', image: 4,
+        date: '2023-06-15', description: '' }),
+    P({ name: 'Hugh Gorge junction', x: 654, y: 295, positionSource: 'placed', icon: 'junction',
+        date: '2023-06-16', description: 'Unsigned. Left fork is the pound, right climbs out.' }),
+    P({ name: 'Razorback ridge', x: 766, y: 258, positionSource: 'exif', image: 5, date: '2023-06-16', description: '' }),
+    P({ name: 'Mount Sonder summit', x: 878, y: 205, positionSource: 'placed', icon: 'summit', image: 6,
+        date: '2023-06-17', description: 'Sunrise. Placed on the trig, the photo was taken twenty metres below it.' }),
+    P({ name: 'Ormiston Gorge', x: 300, y: 236, positionSource: 'exif', image: 7, date: '2024-03-09', trip: null,
+        description: '' })
+  ];
+
+  /* The batch a simulated drop produces. Three resolve themselves, two do
+     not — which is the case the whole import flow exists for. */
+  const DROP_BATCH = [
+    { name: 'IMG_4417.jpg', image: 1, date: '2023-06-16', gps: [742, 274] },
+    { name: 'IMG_4418.jpg', image: 5, date: '2023-06-16', gps: [788, 249] },
+    { name: 'IMG_4419.jpg', image: 3, date: '2023-06-16', gps: null, instant: .62 },
+    { name: 'scan_kokoda_1998.jpg', image: 8, date: '1998-07-04', gps: null, instant: null },
+    { name: 'IMG_4423.jpg', image: 6, date: '2023-06-17', gps: null, instant: null }
+  ];
+
+  const trips = [{ id: 'trip-1', kind: 'trip', name: 'Larapinta Trail', start: '2023-06-12', end: '2023-06-17', x: 120, y: 565 }];
+  const tracks = [{ id: 'tk-1', kind: 'track', name: 'Ormiston pound loop', x: 196, y: 206, colour: TRACK_COLOURS[1], date: '2024-03-09', dist: '14.2 km', gain: '690 m' }];
+
+  const THUMBS = {};
+  [1, 2, 3, 4, 5, 6, 7, 8].forEach((n) => { THUMBS[n] = makeThumb(n * 7919 + 13, n % 3 === 0); });
+
+  /* ─── view ───────────────────────────────────────────────────── */
+
+  const state = {
+    markerRule: 'icon',      // 'icon' | 'image'
+    chipMode: 'one',         // 'one' | 'split' | 'sub'
+    filter: 'all',
+    iconFilter: null,
+    selected: null,
+    face: 'list',            // 'list' | 'detail' | 'create' | 'import'
+    draft: null,
+    batch: null,
+    cam: { cx: 500, cy: 385, scale: 1 }
+  };
+
+  const stage = document.getElementById('stage');
+  const canvas = document.getElementById('terrain');
+  const ctx = canvas.getContext('2d');
+  const markersEl = document.getElementById('markers');
+  const hintEl = document.getElementById('hint');
+
+  let W = 0, H = 0;
+
+  function project(wx, wy) {
+    return {
+      x: (wx - state.cam.cx) * state.cam.scale + W / 2,
+      y: (wy - state.cam.cy) * state.cam.scale + H / 2
+    };
+  }
+  function unproject(sx, sy) {
+    return {
+      x: (sx - W / 2) / state.cam.scale + state.cam.cx,
+      y: (sy - H / 2) / state.cam.scale + state.cam.cy
+    };
+  }
+
+  function drawTerrain() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    ctx.fillStyle = '#121523';
+    ctx.fillRect(0, 0, W, H);
+
+    // Sample the height field in world space so panning reveals terrain
+    // that stays put, then trace contours through the samples.
+    const step = 14;
+    const cols = Math.ceil(W / step) + 2;
+    const rows = Math.ceil(H / step) + 2;
+    const tl = unproject(-step, -step);
+    const wstep = step / state.cam.scale;
+
+    const grid = new Float32Array(cols * rows);
+    for (let j = 0; j < rows; j++) {
+      for (let i = 0; i < cols; i++) {
+        grid[j * cols + i] = height(tl.x + i * wstep, tl.y + j * wstep);
+      }
+    }
+
+    const levels = 15;
+    for (let l = 1; l < levels; l++) {
+      const v = l / levels;
+      const major = l % 5 === 0;
+      ctx.beginPath();
+      for (let j = 0; j < rows - 1; j++) {
+        for (let i = 0; i < cols - 1; i++) {
+          const a = grid[j * cols + i], b = grid[j * cols + i + 1];
+          const c = grid[(j + 1) * cols + i + 1], d = grid[(j + 1) * cols + i];
+          const idx = (a > v ? 8 : 0) | (b > v ? 4 : 0) | (c > v ? 2 : 0) | (d > v ? 1 : 0);
+          if (idx === 0 || idx === 15) continue;
+          const x0 = i * step - step, y0 = j * step - step;
+          const T = () => [x0 + step * ((v - a) / (b - a)), y0];
+          const R = () => [x0 + step, y0 + step * ((v - b) / (c - b))];
+          const B = () => [x0 + step * ((v - d) / (c - d)), y0 + step];
+          const L = () => [x0, y0 + step * ((v - a) / (d - a))];
+          const seg = (p, q) => { ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); };
+          switch (idx) {
+            case 1: case 14: seg(L(), B()); break;
+            case 2: case 13: seg(B(), R()); break;
+            case 3: case 12: seg(L(), R()); break;
+            case 4: case 11: seg(T(), R()); break;
+            case 6: case 9:  seg(T(), B()); break;
+            case 7: case 8:  seg(L(), T()); break;
+            case 5: seg(L(), T()); seg(B(), R()); break;
+            case 10: seg(T(), R()); seg(L(), B()); break;
+          }
+        }
+      }
+      ctx.strokeStyle = major ? 'rgba(141,147,176,.52)' : 'rgba(141,147,176,.24)';
+      ctx.lineWidth = major ? 1.3 : .85;
+      ctx.stroke();
+    }
+
+    drawRoute(ROUTE, 'rgba(255,122,77,.85)', 3);
+    drawRoute(LOOSE_TRACK, 'rgba(77,201,255,.85)', 3);
+  }
+
+  function drawRoute(pts, colour, width) {
+    ctx.beginPath();
+    pts.forEach(([wx, wy], i) => {
+      const p = project(wx, wy);
+      i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y);
+    });
+    ctx.strokeStyle = colour;
+    ctx.lineWidth = width;
+    ctx.lineJoin = ctx.lineCap = 'round';
+    ctx.stroke();
+  }
+
+  /* ─── the rule this prototype exists to test ─────────────────
+     A cairn can carry an icon and an image at once. Which one is
+     the marker? "Icon wins" says identity beats content: choosing
+     an icon is an authored act, the same as placing the pin.  */
+
+  function marksAsImage(pt) {
+    if (!pt.image) return false;
+    if (!pt.icon) return true;
+    return state.markerRule === 'image';
+  }
+
+  function visiblePoints() {
+    return cairns.filter((p) => p.x !== null);
+  }
+
+  function matchesFilter(item) {
+    if (state.filter === 'all') return true;
+    if (state.filter === 'trips') return item.kind === 'trip';
+    if (state.filter === 'tracks') return item.kind === 'track';
+    if (state.filter === 'cairns') {
+      if (item.kind !== 'cairn') return false;
+      return !state.iconFilter
+        || (state.iconFilter === 'image' ? !!item.image : item.icon === state.iconFilter);
+    }
+    // The chips read the same predicate the marker does, so "Photos" is
+    // exactly the set drawn as thumbnails and "Places" exactly the set drawn
+    // as pins. A photographed campsite files under Places because it *is* a
+    // campsite — one rule, not two that can disagree.
+    if (state.filter === 'photos') return item.kind === 'cairn' && marksAsImage(item);
+    if (state.filter === 'places') return item.kind === 'cairn' && !marksAsImage(item);
+    return true;
+  }
+
+  /* Owned things don't draw at the top level — a trip's contents appear
+     when the trip is open. The trip here is open, so its cairns draw.
+     One filter drives the list and the map together: a chip that hid rows
+     but left markers would be two truths about the same question. */
+  function markerItems() {
+    const open = state.selected && state.selected.kind === 'cairn' && state.selected.trip;
+    const list = [];
+    list.push(...tracks.filter(matchesFilter));
+    list.push(...visiblePoints().filter(matchesFilter));
+    if (!open) list.push(...trips.filter(matchesFilter));
+    return list;
+  }
+
+  function listItems() {
+    const all = [...trips, ...tracks, ...cairns];
+    return all.filter(matchesFilter);
+  }
+
+  /* ─── rendering ──────────────────────────────────────────────── */
+
+  function renderMarkers() {
+    const frag = document.createDocumentFragment();
+    const sel = state.selected;
+
+    markerItems().forEach((item) => {
+      const p = project(item.x, item.y);
+      if (p.x < -60 || p.x > W + 60 || p.y < -60 || p.y > H + 60) return;
+
+      const el = document.createElement('button');
+      el.className = 'mk';
+      el.style.left = p.x + 'px';
+      el.style.top = p.y + 'px';
+      el.dataset.id = item.id;
+      if (sel && sel.id === item.id) el.classList.add('sel');
+      else if (sel) el.classList.add('dim');
+
+      if (item.kind === 'trip') {
+        el.innerHTML = `<span class="mk-trip"></span>`;
+        el.setAttribute('aria-label', `${item.name}, trip`);
+      } else if (item.kind === 'track') {
+        el.innerHTML = `<span class="mk-track" style="background:${item.colour}"></span>`;
+        el.setAttribute('aria-label', `${item.name}, track`);
+      } else if (marksAsImage(item)) {
+        el.innerHTML = `<img class="mk-thumb" src="${thumbOf(item)}" alt="">`;
+        el.setAttribute('aria-label', item.name);
+      } else {
+        el.innerHTML = pinSvg(item.icon, 30) +
+          (item.image ? `<span class="mk-badge">${CAMERA_BADGE}</span>` : '');
+        el.setAttribute('aria-label', item.name);
+        el.style.transformOrigin = 'center bottom';
+      }
+      // Every cairn can be moved. The photo supplies a default position, it
+      // does not own one — so EXIF is a starting value, not a verdict.
+      if (item.kind === 'cairn') el.classList.add('draggable');
+
+      const name = document.createElement('span');
+      name.className = 'mk-name';
+      name.textContent = item.name;
+      el.appendChild(name);
+
+      frag.appendChild(el);
+    });
+
+    markersEl.replaceChildren(frag);
+  }
+
+  const fmtDate = (iso) => {
+    if (!iso) return 'undated';
+    const [y, m, d] = iso.split('-').map(Number);
+    return `${d} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m - 1]} ${y}`;
+  };
+
+  /* The meta line is the two-attribute model made visible: icon and
+     image are separate clauses, so a campsite you photographed reads
+     as one thing rather than forcing a choice between two types. */
+  function metaLine(item) {
+    if (item.kind === 'trip') return `${fmtDate(item.start)} – ${fmtDate(item.end)} · 11 cairns`;
+    if (item.kind === 'track') return `${fmtDate(item.date)} · ${item.dist} · ${item.gain}`;
+    const bits = [fmtDate(item.date)];
+    if (item.icon) bits.push(ICONS[item.icon].label.toLowerCase());
+    if (item.image) bits.push('photo');
+    if (item.x === null) return `${bits.join(' · ')} · <span class="no-loc">no location</span>`;
+    if (!item.icon && !item.image) bits.push('cairn');
+    return bits.join(' · ');
+  }
+
+  function rowGlyph(item) {
+    if (item.kind === 'trip') return '<span class="row-dot"></span>';
+    if (item.kind === 'track') return `<span class="row-tile" style="background:${item.colour}"></span>`;
+    if (marksAsImage(item)) return `<img src="${thumbOf(item)}" alt="">`;
+    return pinSvg(item.icon, 22);
+  }
+
+  function renderSearch() {
+    const el = document.getElementById('search');
+    if (state.face === 'list') {
+      el.innerHTML = `
+        <button class="search-mark" aria-label="Menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
+            <path d="M12 3.5 20 20H4Z"/><path d="M12 10.5 15.6 20H8.4Z"/>
+          </svg>
+        </button>
+        <div class="search-centre"><input type="text" placeholder="Search trips, tracks and cairns"></div>
+        <span class="avatar">LM</span>`;
+    } else {
+      const importing = state.face === 'import';
+      const s = importing ? state.batch.pending[0]
+        : state.face === 'create' ? state.draft : state.selected;
+      const kind = importing ? 'needs a location'
+        : state.face === 'create' ? 'new cairn'
+        : s.kind === 'trip' ? 'trip'
+        : s.kind === 'track' ? 'track · not in a trip'
+        : s.trip ? 'cairn' : 'cairn · not in a trip';
+      const title = importing ? 'Place this photo' : (s.name || 'New cairn');
+      el.innerHTML = `
+        <button class="search-mark" id="back" aria-label="Back to the list">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 5 8 12l7 7"/>
+          </svg>
+        </button>
+        <div class="search-centre">
+          <div class="search-title">${escapeHtml(title)}</div>
+          <div class="search-kind">${kind}</div>
+        </div>
+        <span class="avatar">LM</span>`;
+      el.querySelector('#back').addEventListener('click', () => {
+        state.face = 'list'; state.selected = null; state.draft = null; state.batch = null;
+        renderAll();
+      });
+    }
+  }
+
+  const CHIP_SETS = {
+    one:   [['all', 'All'], ['trips', 'Trips'], ['tracks', 'Tracks'], ['cairns', 'Cairns']],
+    split: [['all', 'All'], ['trips', 'Trips'], ['tracks', 'Tracks'], ['photos', 'Photos'], ['places', 'Places']],
+    sub:   [['all', 'All'], ['trips', 'Trips'], ['tracks', 'Tracks'], ['cairns', 'Cairns']]
+  };
+
+  function renderChips() {
+    const bar = document.getElementById('chipbar');
+    if (state.face !== 'list') { bar.innerHTML = ''; return; }
+
+    const main = CHIP_SETS[state.chipMode].map(([v, label]) =>
+      `<button class="chip" data-f="${v}" aria-pressed="${state.filter === v}">${label}</button>`).join('');
+
+    let sub = '';
+    if (state.chipMode === 'sub' && state.filter === 'cairns') {
+      const one = (v, label, svg) =>
+        `<button class="chip" data-sub="${v}" aria-pressed="${state.iconFilter === v}">${svg}<span>${label}</span></button>`;
+      sub = `<div class="chips chips-sub">
+        ${one('', 'Any', '')}
+        ${one('image', 'Photo', CAMERA_BADGE.replace('<svg', '<svg class="glyph-cam" fill="currentColor"'))}
+        ${ICON_KEYS.map((k) => one(k, ICONS[k].label, glyphSvg(k, 14))).join('')}
+      </div>`;
+    }
+
+    bar.innerHTML = `<div class="chips">${main}</div>${sub}`;
+
+    bar.querySelectorAll('[data-f]').forEach((b) => b.addEventListener('click', () => {
+      state.filter = b.dataset.f;
+      state.iconFilter = null;
+      renderAll();
+    }));
+    bar.querySelectorAll('[data-sub]').forEach((b) => b.addEventListener('click', () => {
+      state.iconFilter = b.dataset.sub || null;
+      renderAll();
+    }));
+  }
+
+  const TITLES = { all: 'Everything', trips: 'Trips', tracks: 'Loose tracks', cairns: 'Cairns', photos: 'Photos', places: 'Places' };
+
+  function renderPanel() {
+    const el = document.getElementById('panel');
+    if (state.face === 'import') return renderImport(el);
+    if (state.face === 'create') return renderCreate(el);
+    if (state.face === 'detail') return renderDetail(el);
+
+    const items = listItems();
+    const rows = items.length
+      ? items.map((item) => `
+          <button class="row ${state.selected && state.selected.id === item.id ? 'sel' : ''}" data-id="${item.id}">
+            <span class="row-glyph">${rowGlyph(item)}</span>
+            <span>
+              <span class="row-name">${escapeHtml(item.name)}</span><br>
+              <span class="row-meta">${metaLine(item)}</span>
+            </span>
+          </button>`).join('')
+      : `<div class="rows-empty">Nothing in this filter.</div>`;
+
+    el.innerHTML = `
+      <div class="panel-head">
+        <h2>${TITLES[state.filter]}</h2>
+        <span class="panel-count">${items.length}</span>
+        <button class="panel-action">New trip</button>
+      </div>
+      <div class="rows">${rows}</div>`;
+
+    el.querySelectorAll('.row').forEach((r) => r.addEventListener('click', () => select(r.dataset.id)));
+  }
+
+  function renderDetail(el) {
+    const s = state.selected;
+
+    if (s.kind !== 'cairn') {
+      el.innerHTML = `
+        <div class="detail">
+          <div>
+            <h2>${escapeHtml(s.name)}</h2>
+            <div class="detail-meta">${metaLine(s)}</div>
+          </div>
+          <div class="note">${s.kind === 'trip'
+            ? 'A trip is unchanged by this proposal — it still bundles tracks and cairns, and its date range is still authored.'
+            : 'A track is unchanged too. Its position still comes from its geometry, and it is still the only kind with a route.'}</div>
+        </div>`;
+      return;
+    }
+
+    const src = s.positionSource;
+    const placed = src === 'placed';
+    const iconRow = ICON_KEYS.map((k) =>
+      `<button class="icon-pick" data-icon="${k}" aria-pressed="${s.icon === k}" title="${ICONS[k].label}" aria-label="${ICONS[k].label}">${glyphSvg(k, 20)}</button>`).join('');
+
+    const posNote = {
+      placed: 'You put this here. Interpolation will never move it again.',
+      exif: 'Position came from the photo\'s EXIF GPS — a starting value, not a verdict. Drag its marker to correct it and this becomes placed.',
+      interpolated: 'No GPS, so it was positioned by timestamp against this trip\'s tracks. Drag its marker to correct it and this becomes placed.'
+    }[src];
+
+    el.innerHTML = `
+      <div class="detail">
+        <div>
+          <h2>${escapeHtml(s.name)}</h2>
+          <div class="detail-meta">${metaLine(s)}</div>
+        </div>
+
+        ${s.image ? `<img class="detail-image" src="${thumbOf(s)}" alt="">` : ''}
+
+        <p class="detail-desc ${s.description ? '' : 'empty'}">${s.description ? escapeHtml(s.description) : 'No description.'}</p>
+
+        <div class="field">
+          <label>What is this place</label>
+          <div class="icon-grid">
+            ${iconRow}
+            <button class="icon-pick icon-none" data-icon="" aria-pressed="${!s.icon}" aria-label="No icon">none</button>
+          </div>
+        </div>
+
+        <div class="record">
+          positionSource <b class="${placed ? 'lock' : ''}">${src}</b><br>
+          icon <b>${s.icon || 'null'}</b><br>
+          image <b>${s.image ? '{ original, thumbnail }' : 'null'}</b><br>
+          trip <b>${s.trip || 'null'}</b>
+        </div>
+
+        <div class="note ${src === 'none' ? 'warn' : ''}">${posNote}</div>
+
+        <button class="btn-primary" style="align-self:flex-start">${s.trip ? 'Remove from trip' : 'Add to a trip'}</button>
+      </div>`;
+
+    el.querySelectorAll('[data-icon]').forEach((b) => b.addEventListener('click', () => {
+      s.icon = b.dataset.icon || null;
+      renderAll();
+    }));
+  }
+
+  function renderCreate(el) {
+    const d = state.draft;
+    const iconRow = ICON_KEYS.map((k) =>
+      `<button class="icon-pick" data-icon="${k}" aria-pressed="${d.icon === k}" title="${ICONS[k].label}" aria-label="${ICONS[k].label}">${glyphSvg(k, 20)}</button>`).join('');
+
+    el.innerHTML = `
+      <div class="detail">
+        <div class="field">
+          <label>Name</label>
+          <input type="text" id="d-name" value="${escapeHtml(d.name)}" placeholder="Ellery Creek camp">
+        </div>
+        <div class="field">
+          <label>What is this place</label>
+          <div class="icon-grid">
+            ${iconRow}
+            <button class="icon-pick icon-none" data-icon="" aria-pressed="${!d.icon}" aria-label="No icon">none</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Description</label>
+          <textarea id="d-desc" rows="3" placeholder="Flat ground behind the ghost gums.">${escapeHtml(d.description)}</textarea>
+        </div>
+        <div class="field">
+          <label>Date</label>
+          <input type="date" id="d-date" value="${d.date}">
+        </div>
+
+        <div class="record">
+          positionSource <b class="lock">placed</b><br>
+          trip <b>${d.trip || 'null'}</b> &nbsp;<span style="opacity:.7">${d.trip ? '(a trip was open when you clicked)' : '(nothing was open — this will be loose)'}</span>
+        </div>
+
+        <div style="display:flex;gap:var(--space-2)">
+          <button class="btn-primary" id="d-create">Create</button>
+          <button class="btn-ghost" id="d-cancel">Cancel</button>
+        </div>
+      </div>`;
+
+    const name = el.querySelector('#d-name');
+    name.addEventListener('input', () => { d.name = name.value; renderSearch(); });
+    el.querySelector('#d-desc').addEventListener('input', (e) => { d.description = e.target.value; });
+    el.querySelector('#d-date').addEventListener('input', (e) => { d.date = e.target.value; });
+    el.querySelectorAll('[data-icon]').forEach((b) => b.addEventListener('click', () => {
+      d.icon = b.dataset.icon || null;
+      renderCreate(el);
+      renderMarkers();
+    }));
+    el.querySelector('#d-cancel').addEventListener('click', () => {
+      cairns.splice(cairns.indexOf(d), 1);
+      state.draft = null; state.face = 'list'; state.selected = null;
+      renderAll();
+    });
+    el.querySelector('#d-create').addEventListener('click', () => {
+      if (!d.name.trim()) d.name = ICONS[d.icon] ? ICONS[d.icon].label : 'Cairn';
+      state.draft = null; state.face = 'detail'; state.selected = d;
+      renderAll();
+    });
+    name.focus();
+  }
+
+  /* ─── import ─────────────────────────────────────────────────
+     A dropped photo becomes a Cairn, and its EXIF seeds that Cairn's
+     position rather than owning it. What resolves is saved at once;
+     what cannot resolve is NOT saved — it waits in the draft, because
+     #81's rule is that a draft has not been written anywhere. A photo
+     that never becomes a Cairn cannot be an orphaned one. */
+
+  function beginImport(files) {
+    if (!files.length) return;
+
+    /* Dropped onto an open cairn: the photo joins that cairn. No new record,
+       no placement question — the cairn already has a location, and the
+       image is the attribute being filled in. */
+    if (state.face === 'detail' && state.selected && state.selected.kind === 'cairn') {
+      const f = files[0];
+      state.selected.image = f.image || 'file';
+      if (f.thumbSrc) state.selected.thumbSrc = f.thumbSrc;
+      if (!state.selected.date && f.date) state.selected.date = f.date;
+      renderAll();
+      return;
+    }
+
+    const items = files.map((f, i) => {
+      const item = {
+        id: `imp-${i}-${Date.now()}`,
+        name: f.name,
+        image: f.image,
+        thumbSrc: f.thumbSrc || THUMBS[f.image],
+        date: f.date,
+        x: null, y: null,
+        resolved: null
+      };
+      if (f.gps) {
+        item.x = f.gps[0]; item.y = f.gps[1]; item.resolved = 'exif';
+      } else if (f.instant !== null && f.instant !== undefined) {
+        // #52: no GPS, but the open trip's tracks bracket its timestamp.
+        const at = f.instant * (ROUTE.length - 1);
+        const i0 = Math.floor(at), t = at - i0;
+        const a = ROUTE[i0], b = ROUTE[Math.min(i0 + 1, ROUTE.length - 1)];
+        item.x = a[0] + (b[0] - a[0]) * t;
+        item.y = a[1] + (b[1] - a[1]) * t;
+        item.resolved = 'interpolated';
+      }
+      return item;
+    });
+
+    // Everything that resolved is committed immediately — a batch does not
+    // wait on the files that need you.
+    items.filter((it) => it.resolved).forEach((it) => {
+      cairns.push(P({ name: it.name, x: it.x, y: it.y, positionSource: it.resolved,
+                      image: it.image, thumbSrc: it.thumbSrc, date: it.date, trip: 'trip-1' }));
+    });
+
+    const pending = items.filter((it) => !it.resolved);
+    state.batch = { total: items.length, saved: items.length - pending.length, pending, done: 0 };
+
+    if (pending.length === 0) { state.face = 'list'; state.selected = null; renderAll(); return; }
+    state.face = 'import';
+    state.selected = null;
+    hintEl.hidden = true;
+    renderAll();
+  }
+
+  /* The suggestion: the cairn on the trip's route closest in time to the
+     photo. #52 refuses to place automatically across a gap wider than ten
+     minutes — but as a starting guess for a manual placement it is far
+     better than dropping the user on a blank map. */
+  function suggestionFor(item) {
+    if (!item.date || !item.date.startsWith('2023-06')) return null;
+    const day = Number(item.date.slice(8, 10));
+    const t = Math.max(0, Math.min(1, (day - 12) / 5));
+    const at = t * (ROUTE.length - 1);
+    const i0 = Math.floor(at), f = at - i0;
+    const a = ROUTE[i0], b = ROUTE[Math.min(i0 + 1, ROUTE.length - 1)];
+    return { x: a[0] + (b[0] - a[0]) * f, y: a[1] + (b[1] - a[1]) * f };
+  }
+
+  function renderImport(el) {
+    const b = state.batch;
+    const item = b.pending[0];
+    const sug = suggestionFor(item);
+
+    el.innerHTML = `
+      <div class="detail">
+        <span class="unsaved">Not saved</span>
+
+        <div class="queue-bar">
+          ${Array.from({ length: b.total }, (_, i) =>
+            `<span class="${i < b.saved + b.done ? 'done' : i === b.saved + b.done ? 'now' : ''}"></span>`).join('')}
+        </div>
+
+        <div class="import-summary">
+          <b>${b.total}</b> photos · <b>${b.saved + b.done}</b> placed ·
+          <span class="need"><b>${b.pending.length}</b> ${b.pending.length === 1 ? 'needs' : 'need'} a location</span>
+        </div>
+
+        <img class="placing-photo" src="${item.thumbSrc}" alt="">
+        <div class="detail-meta">${escapeHtml(item.name)} · ${fmtDate(item.date)}</div>
+
+        <div class="note">${sug
+          ? 'Click the map to place it, or click the pulsing ring — the nearest point on your route by time.'
+          : 'No GPS, and no track covers its timestamp. Click the map to place it.'}</div>
+
+        <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
+          <button class="btn-ghost" id="i-skip">Skip this one</button>
+          <button class="btn-ghost" id="i-cancel" style="color:var(--danger)">Discard ${b.pending.length}</button>
+        </div>
+
+        <div class="record">
+          These <b>${b.pending.length}</b> are not in your library and nothing has been
+          written to Drive. Placing one is what makes it a cairn; discarding means they were
+          never imported.
+        </div>
+      </div>`;
+
+    el.querySelector('#i-skip').addEventListener('click', () => {
+      b.pending.push(b.pending.shift());
+      renderAll();
+    });
+    el.querySelector('#i-cancel').addEventListener('click', () => {
+      state.batch = null; state.face = 'list';
+      renderAll();
+    });
+  }
+
+  function placePending(wx, wy) {
+    const b = state.batch;
+    if (!b || !b.pending.length) return;
+    const item = b.pending.shift();
+    const pt = P({ name: item.name, x: wx, y: wy, positionSource: 'placed',
+                   image: item.image, thumbSrc: item.thumbSrc, date: item.date, trip: 'trip-1' });
+    cairns.push(pt);
+    b.done += 1;
+
+    if (b.pending.length === 0) {
+      state.batch = null;
+      state.face = 'detail';
+      state.selected = pt;
+    }
+    renderAll();
+  }
+
+  function renderGhost() {
+    const old = document.getElementById('ghost');
+    if (old) old.remove();
+    if (state.face !== 'import' || !state.batch || !state.batch.pending.length) return;
+    const sug = suggestionFor(state.batch.pending[0]);
+    if (!sug) return;
+    const p = project(sug.x, sug.y);
+    const g = document.createElement('button');
+    g.className = 'ghost';
+    g.id = 'ghost';
+    g.style.left = p.x + 'px';
+    g.style.top = p.y + 'px';
+    g.setAttribute('aria-label', 'Place it at the suggested location');
+    g.innerHTML = `<span class="ghost-ring"></span><span class="mk-name">nearest by time</span>`;
+    g.addEventListener('click', (e) => { e.stopPropagation(); placePending(sug.x, sug.y); });
+    markersEl.appendChild(g);
+  }
+
+  function renderReadout() {
+    const placed = cairns.filter((p) => p.positionSource === 'placed').length;
+    const withImage = cairns.filter((p) => p.image).length;
+    const both = cairns.filter((p) => p.image && p.icon).length;
+    document.getElementById('readout').innerHTML =
+      `<b>${cairns.length}</b> cairns · <b>${withImage}</b> with a photo<br>` +
+      `<b>${placed}</b> placed by hand · <b>${both}</b> carry both`;
+  }
+
+  function renderAll() {
+    renderSearch();
+    renderChips();
+    renderPanel();
+    renderMarkers();
+    renderGhost();
+    renderReadout();
+    canvas.classList.toggle('placing', state.face === 'import');
+  }
+
+  /** A cairn imported from a real dropped file carries its own data URI;
+      the seeded ones share the procedural set. */
+  const thumbOf = (item) => item.thumbSrc || THUMBS[item.image];
+
+  function select(id) {
+    const item = [...trips, ...tracks, ...cairns].find((i) => i.id === id);
+    if (!item) return;
+    state.selected = item;
+    state.face = 'detail';
+    renderAll();
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  /* ─── interaction ────────────────────────────────────────────── */
+
+  markersEl.addEventListener('click', (e) => {
+    const mk = e.target.closest('.mk');
+    if (mk && !mk.dataset.moved) select(mk.dataset.id);
+    if (mk) delete mk.dataset.moved;
+  });
+
+  // Drag a placed cairn. Position is authored, so it is also editable —
+  // the one kind of position in cairn that is. The element itself is moved
+  // during the drag rather than re-rendering the marker layer: a re-render
+  // destroys the node the pointer is captured by, and the drag dies with it.
+  let dragging = null;
+
+  function onDragMove(e) {
+    if (!dragging) return;
+    const r = stage.getBoundingClientRect();
+    const w = unproject(e.clientX - r.left, e.clientY - r.top);
+    dragging.item.x = w.x;
+    dragging.item.y = w.y;
+    dragging.moved = true;
+    dragging.mk.style.left = (e.clientX - r.left) + 'px';
+    dragging.mk.style.top = (e.clientY - r.top) + 'px';
+  }
+
+  function onDragEnd() {
+    if (!dragging) return;
+    dragging.mk.classList.remove('grabbing');
+    if (dragging.moved) {
+      dragging.mk.dataset.moved = '1';
+      // The override is sticky. Once you have put a cairn somewhere,
+      // interpolation must never move it again — which is the whole job
+      // this field now does.
+      dragging.item.positionSource = 'placed';
+    }
+    dragging = null;
+    justDragged = true;
+    window.removeEventListener('pointermove', onDragMove);
+    window.removeEventListener('pointerup', onDragEnd);
+    window.removeEventListener('pointercancel', onDragEnd);
+    renderAll();
+    setTimeout(() => { justDragged = false; }, 0);
+  }
+
+  let justDragged = false;
+
+  markersEl.addEventListener('pointerdown', (e) => {
+    const mk = e.target.closest('.mk.draggable');
+    if (!mk) return;
+    const item = cairns.find((p) => p.id === mk.dataset.id);
+    if (!item) return;
+    e.preventDefault();
+    e.stopPropagation();
+    mk.classList.add('grabbing');
+    dragging = { mk, item, moved: false };
+    window.addEventListener('pointermove', onDragMove);
+    window.addEventListener('pointerup', onDragEnd);
+    window.addEventListener('pointercancel', onDragEnd);
+  });
+
+  // Pan.
+  let pan = null;
+  canvas.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    canvas.setPointerCapture(e.pointerId);
+    canvas.classList.add('dragging');
+    pan = { x: e.clientX, y: e.clientY, moved: false };
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!pan) return;
+    const dx = (e.clientX - pan.x) / state.cam.scale;
+    const dy = (e.clientY - pan.y) / state.cam.scale;
+    if (Math.abs(dx) + Math.abs(dy) > 2) pan.moved = true;
+    state.cam.cx -= dx;
+    state.cam.cy -= dy;
+    pan.x = e.clientX; pan.y = e.clientY;
+    drawTerrain();
+    renderMarkers();
+  });
+  canvas.addEventListener('pointerup', (e) => {
+    canvas.classList.remove('dragging');
+    const wasPan = pan && pan.moved;
+    pan = null;
+    if (longPress) { clearTimeout(longPress); longPress = null; }
+    if (wasPan || dragging || justDragged) return;
+
+    // Placing a queued photo is what makes it a cairn. Until this click,
+    // it is not in the library and nothing has been written to Drive.
+    if (state.face === 'import') {
+      const r = stage.getBoundingClientRect();
+      const w = unproject(e.clientX - r.left, e.clientY - r.top);
+      placePending(w.x, w.y);
+      return;
+    }
+    // A marker drag that ended over the map is not a click on the map.
+    if (state.face === 'detail') { state.face = 'list'; state.selected = null; renderAll(); }
+  });
+
+  // Place a cairn: right-click on desktop, long-press on touch. The
+  // gesture's context decides ownership — a trip open means the cairn
+  // lands in it, nothing open means it lands loose.
+  canvas.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    const r = stage.getBoundingClientRect();
+    startDraft(e.clientX - r.left, e.clientY - r.top);
+  });
+
+  let longPress = null;
+  canvas.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'touch') return;
+    const r = stage.getBoundingClientRect();
+    const sx = e.clientX - r.left, sy = e.clientY - r.top;
+    longPress = setTimeout(() => { longPress = null; startDraft(sx, sy); }, 480);
+  });
+  canvas.addEventListener('pointermove', () => { if (longPress) { clearTimeout(longPress); longPress = null; } });
+
+  function startDraft(sx, sy) {
+    const w = unproject(sx, sy);
+    const openTrip = state.selected && state.selected.kind === 'cairn' ? state.selected.trip : null;
+    const d = P({ name: '', x: w.x, y: w.y, positionSource: 'placed', icon: 'campsite',
+                  date: new Date().toISOString().slice(0, 10), trip: openTrip });
+    cairns.push(d);
+    state.draft = d;
+    state.selected = d;
+    state.face = 'create';
+    hintEl.hidden = true;
+    renderAll();
+
+    const pop = document.createElement('div');
+    pop.className = 'place-pop';
+    pop.textContent = 'Placed here';
+    pop.style.left = sx + 'px';
+    pop.style.top = sy + 'px';
+    stage.appendChild(pop);
+    setTimeout(() => pop.remove(), 1100);
+  }
+
+  /* Drop real image files, or use the lab's simulated batch — a real drop
+     carries no EXIF this prototype can read, so every real file lands in
+     the queue, which is the state worth feeling. */
+  const dropEl = document.getElementById('drop');
+  let dragDepth = 0;
+
+  stage.addEventListener('dragenter', (e) => {
+    if (![...e.dataTransfer.types].includes('Files')) return;
+    e.preventDefault();
+    dragDepth += 1;
+    dropEl.hidden = false;
+  });
+  stage.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+  stage.addEventListener('dragleave', () => {
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (dragDepth === 0) dropEl.hidden = true;
+  });
+  stage.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dragDepth = 0;
+    dropEl.hidden = true;
+    const files = [...(e.dataTransfer.files || [])].filter((f) => f.type.startsWith('image/'));
+    if (!files.length) return;
+    Promise.all(files.map((f) => new Promise((res) => {
+      const r = new FileReader();
+      // `image` is the has-an-image flag the marker rule reads; `thumbSrc`
+      // is the pixels. A real drop has both.
+      r.onload = () => res({ name: f.name, image: 'file', thumbSrc: r.result, date: null, gps: null, instant: null });
+      r.onerror = () => res(null);
+      r.readAsDataURL(f);
+    }))).then((loaded) => beginImport(loaded.filter(Boolean)));
+  });
+
+  document.getElementById('sim-drop').addEventListener('click', () => beginImport(DROP_BATCH));
+
+  document.getElementById('zin').addEventListener('click', () => zoom(1.35));
+  document.getElementById('zout').addEventListener('click', () => zoom(1 / 1.35));
+  function zoom(f) {
+    state.cam.scale = Math.max(.45, Math.min(3, state.cam.scale * f));
+    drawTerrain();
+    renderMarkers();
+  }
+
+  document.getElementById('seg-marker').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    state.markerRule = b.dataset.v;
+    document.querySelectorAll('#seg-marker button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    renderAll();
+  });
+  document.getElementById('seg-chips').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    state.chipMode = b.dataset.v;
+    state.filter = 'all';
+    state.iconFilter = null;
+    document.querySelectorAll('#seg-chips button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    renderAll();
+  });
+
+  function resize() {
+    const r = stage.getBoundingClientRect();
+    W = r.width; H = r.height;
+    drawTerrain();
+    renderMarkers();
+  }
+  window.addEventListener('resize', resize);
+
+  resize();
+  renderAll();
+  setTimeout(() => { if (!state.draft) hintEl.hidden = false; }, 900);
+})();
+</script>

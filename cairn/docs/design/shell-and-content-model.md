@@ -15,6 +15,14 @@ against each other. This file is what they were missing.
 
 It also restates a rule from #81 that the content model breaks. See *Routes*.
 
+> **Superseded in part by [cairns.md](cairns.md) (#155).** *Three kinds* below
+> is now two — trip and track — plus **cairn**, which replaces *photo* and
+> absorbs points of interest with it. The *Position, and the photo that has
+> none* section no longer describes a reachable state: a cairn always has a
+> position. `cairns.md` is standing and wins wherever the two disagree.
+> Everything else here — the column, the panel, ownership moves, routes,
+> mobile — is unchanged and still authoritative.
+
 ## The two ideas
 
 **Everything is on the map.** A trip, a day hike's track, and one good photo are

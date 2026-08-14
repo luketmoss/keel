@@ -25,6 +25,13 @@ cairn/
 These were settled before the project existed. Revisit them deliberately, not
 by accident.
 
+> **In flight (#155): "photo" stops being a kind.** Photos and points of
+> interest become one **cairn** — something at a coordinate, carrying an
+> optional image and an optional icon. Every mention of photos as a kind of
+> their own below is superseded by
+> [`docs/design/cairns.md`](docs/design/cairns.md), which is standing and
+> authoritative. #155 deletes this note once it lands.
+
 - **Map engine is the Google Maps JS API**, via `@vis.gl/react-google-maps`.
   Chosen for satellite imagery quality and because Drive already puts the user
   through Google OAuth — one vendor, one consent screen. `Map3DElement` is the

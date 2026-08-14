@@ -42,6 +42,7 @@ function renderFace(item: LooseRecord, accessToken: string | null = 'token') {
       onDelete={vi.fn()}
       onRename={vi.fn().mockResolvedValue(true)}
       onRecolor={vi.fn().mockResolvedValue(true)}
+      onExport={vi.fn()}
       disabled={false}
     />,
   )

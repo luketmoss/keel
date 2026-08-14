@@ -36,6 +36,8 @@ function TestTripsPanel({
   onAddLooseToTrip = vi.fn(),
   onRenameLoose = vi.fn().mockResolvedValue(true),
   onRecolorLoose = vi.fn().mockResolvedValue(true),
+  onExportLoose = vi.fn(),
+  exportingIds = new Set(),
   disabled = false,
   initialFilters = DEFAULT_TRIP_FILTERS,
   dateSpan = null,
@@ -50,6 +52,8 @@ function TestTripsPanel({
   onAddLooseToTrip?: (id: string) => void
   onRenameLoose?: (id: string, name: string) => Promise<boolean>
   onRecolorLoose?: (id: string, color: number) => Promise<boolean>
+  onExportLoose?: (id: string) => void
+  exportingIds?: ReadonlySet<string>
   disabled?: boolean
   initialFilters?: TripFilters
   dateSpan?: { min: number; max: number } | null
@@ -73,6 +77,8 @@ function TestTripsPanel({
       onAddLooseToTrip={onAddLooseToTrip}
       onRenameLoose={onRenameLoose}
       onRecolorLoose={onRecolorLoose}
+      onExportLoose={onExportLoose}
+      exportingIds={exportingIds}
       disabled={disabled}
     />
   )
@@ -509,6 +515,61 @@ describe('TripsPanel', () => {
         'disabled',
         true,
       )
+    })
+  })
+
+  describe('export a loose item (#140)', () => {
+    it('offers Export for a track on Drive, and calls back with its id', () => {
+      const onExportLoose = vi.fn()
+      renderPanel({
+        trips: [],
+        looseItems: [looseTrack({ driveFileId: 'file-1' })],
+        onExportLoose,
+      })
+
+      openRowMenu('Mount Rosea')
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Export' }))
+      expect(onExportLoose).toHaveBeenCalledWith('track-1')
+    })
+
+    it('omits Export for an item whose source file was never kept', () => {
+      renderPanel({ trips: [], looseItems: [looseTrack({ driveFileId: null })] })
+
+      openRowMenu('Mount Rosea')
+      expect(screen.queryByRole('menuitem', { name: 'Export' })).toBeNull()
+    })
+
+    it('shows Export, disabled, while uploading, even with no file id yet', () => {
+      renderPanel({
+        trips: [],
+        looseItems: [looseTrack({ uploadState: 'uploading', driveFileId: null })],
+      })
+
+      openRowMenu('Mount Rosea')
+      expect(screen.getByRole('menuitem', { name: 'Export' })).toHaveProperty('disabled', true)
+    })
+
+    it('disables Export while this item is already exporting', () => {
+      renderPanel({
+        trips: [],
+        looseItems: [looseTrack({ driveFileId: 'file-1' })],
+        exportingIds: new Set(['track-1']),
+      })
+
+      openRowMenu('Mount Rosea')
+      expect(screen.getByRole('menuitem', { name: 'Export' })).toHaveProperty('disabled', true)
+    })
+
+    it('gates a photo export on its original file, not its thumbnail', () => {
+      renderPanel({
+        trips: [],
+        looseItems: [
+          loosePhoto({ originalDriveFileId: null, thumbnailDriveFileId: 'thumb-1' }),
+        ],
+      })
+
+      openRowMenu('sapporo.jpg')
+      expect(screen.queryByRole('menuitem', { name: 'Export' })).toBeNull()
     })
   })
 

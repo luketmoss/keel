@@ -27,6 +27,7 @@ import {
   moveLooseIntoTrip,
   type LooseRecord,
 } from './store/looseStore'
+import { downloadTrackFile } from './drive/trackFiles'
 import { DriveLooseStore } from './store/driveLooseStore'
 import type { TripIndexEntry } from './store/tripStore'
 import { DEFAULT_TRIP_FILTERS, tripDayIndex, type TripFilters } from './store/tripFilters'
@@ -131,6 +132,10 @@ function AppShell() {
   const [dragActive, setDragActive] = useState(false)
   const dragDepth = useRef(0)
   const [toasts, setToasts] = useState<ToastMessage[]>([])
+  /** #140: ids with an export currently in flight, so a second click on the
+      same item's `Export` is a no-op rather than a second download — other
+      items are unaffected, which is why this is a set and not a flag. */
+  const [exportingIds, setExportingIds] = useState<ReadonlySet<string>>(new Set())
   /* Registered by the trip face while one is open, so a drop anywhere still
      imports into that trip rather than starting a draft. Refs, not state:
      the import hooks return a fresh object on every render, so storing what
@@ -306,6 +311,52 @@ function AppShell() {
     }
     setToasts((prev) => [...prev, { id: generateToastId(), text: 'Moved back to the map.' }])
     return true
+  }
+
+  /** #140: downloads a loose item's source file exactly as Drive holds it —
+      a track's KML under its `sourceName`, a photo's original under its
+      `name`, never the thumbnail `imageCache.ts` already has a URL for.
+      Client-side only: fetch the bytes, hand them to the browser via an
+      Object URL and a synthetic anchor click, and let the browser's own
+      download UI be the confirmation — the same "the result is on screen"
+      reasoning #110 gives `Add to a trip`. */
+  async function handleExport(id: string) {
+    if (!accessToken || exportingIds.has(id)) return
+    const item = looseStore.getItem(id)
+    if (!item) return
+    const fileId = item.kind === 'track' ? item.driveFileId : item.originalDriveFileId
+    if (!fileId) return
+    const filename = item.kind === 'track' ? item.sourceName : item.name
+
+    setExportingIds((prev) => new Set(prev).add(id))
+    try {
+      const file = await downloadTrackFile(accessToken, fileId, filename)
+      const url = URL.createObjectURL(file)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      // Firefox only fires a download from a click on an anchor that's
+      // actually in the document — attached, clicked, removed, in one tick.
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      // Not revoked in this same tick: the click starts the download
+      // asynchronously, and some browsers (Firefox in particular) can lose
+      // the file if the blob URL dies before they've actually read it. The
+      // delay costs a few milliseconds of memory, not correctness.
+      setTimeout(() => URL.revokeObjectURL(url), 0)
+    } catch {
+      setToasts((prev) => [
+        ...prev,
+        { id: generateToastId(), text: `Couldn't export ${item.name} — try again.` },
+      ])
+    } finally {
+      setExportingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+    }
   }
 
   function addToasts(rejections: { name: string; message: string }[]) {
@@ -561,6 +612,8 @@ function AppShell() {
                 onCreateTripWith={(name) => void createTripWithLoose(openLooseId, name)}
                 onRename={(id, name) => looseStore.update(id, { name })}
                 onRecolor={(id, color) => looseStore.update(id, { colorIndex: color })}
+                onExport={(id) => void handleExport(id)}
+                exporting={exportingIds.has(openLooseId)}
                 onDelete={() => {
                   // Trashes the Drive folder as well now. Best-effort and
                   // not awaited: the row is gone either way, and a failed
@@ -591,6 +644,8 @@ function AppShell() {
               onDeleteLoose={(id) => looseStore.remove(id)}
               onRenameLoose={(id, name) => looseStore.update(id, { name })}
               onRecolorLoose={(id, color) => looseStore.update(id, { colorIndex: color })}
+              onExportLoose={(id) => void handleExport(id)}
+              exportingIds={exportingIds}
               onAddLooseToTrip={(id) =>
                 navigate(
                   looseStore.getItem(id)?.kind === 'track' ? `/tracks/${id}` : `/photos/${id}`,

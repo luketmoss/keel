@@ -212,6 +212,18 @@ describe('LocalLooseStore', () => {
 })
 
 describe('moveLooseIntoTrip', () => {
+  /* #150: the trip-overrides side of the move. The real one writes a
+     display-name override onto the destination trip; here it only records
+     what it was asked to carry, which is what these tests are about. */
+  let carried: { tripId: string; driveFileId: string; name: string }[]
+  const carryName = async (tripId: string, driveFileId: string, name: string) => {
+    carried.push({ tripId, driveFileId, name })
+  }
+
+  beforeEach(() => {
+    carried = []
+  })
+
   it('takes the item out of the loose store and its geometry into the trip', async () => {
     const trips = new LocalTripStore(fakeStorage())
     const trip = trips.createTrip('Larapinta')
@@ -222,7 +234,7 @@ describe('moveLooseIntoTrip', () => {
       ]),
     ])
 
-    const moved = await moveLooseIntoTrip(store, trips, record.id, trip.id)
+    const moved = await moveLooseIntoTrip(store, trips, record.id, trip.id, carryName)
 
     expect(moved).toBe(true)
     // It leaves the top-level list and map...
@@ -248,7 +260,7 @@ describe('moveLooseIntoTrip', () => {
         [11, 21],
       ]),
     ])
-    await moveLooseIntoTrip(store, trips, record.id, trip.id)
+    await moveLooseIntoTrip(store, trips, record.id, trip.id, carryName)
 
     expect(trips.getOverview(trip.id)?.features.length).toBe(before + 1)
   })
@@ -264,7 +276,7 @@ describe('moveLooseIntoTrip', () => {
         [11, 21],
       ]),
     ])
-    await moveLooseIntoTrip(store, trips, record.id, trip.id)
+    await moveLooseIntoTrip(store, trips, record.id, trip.id, carryName)
 
     expect(trips.getTrip(trip.id)?.origin).toEqual({ lat: 10, lng: 20 })
   })
@@ -274,7 +286,7 @@ describe('moveLooseIntoTrip', () => {
     const trip = trips.createTrip('Larapinta')
     const photo = store.addPhoto({ name: 'a.jpg', takenAt: null, position: { lat: 1, lng: 2 } })
 
-    expect(await moveLooseIntoTrip(store, trips, photo.id, trip.id)).toBe(true)
+    expect(await moveLooseIntoTrip(store, trips, photo.id, trip.id, carryName)).toBe(true)
     expect(store.getItems()).toHaveLength(0)
     expect(trips.getOverview(trip.id)).toBeNull()
   })
@@ -284,7 +296,7 @@ describe('moveLooseIntoTrip', () => {
     const trip = trips.createTrip('Larapinta')
     store.addTrack(NEW_TRACK, [track([[1, 2]])])
 
-    expect(await moveLooseIntoTrip(store, trips, 'no-such-id', trip.id)).toBe(false)
+    expect(await moveLooseIntoTrip(store, trips, 'no-such-id', trip.id, carryName)).toBe(false)
     expect(store.getItems()).toHaveLength(1)
   })
 
@@ -296,7 +308,7 @@ describe('moveLooseIntoTrip', () => {
     trips.savePhotoCount(trip.id, 4)
     const photo = store.addPhoto({ name: 'a.jpg', takenAt: null, position: { lat: 1, lng: 2 } })
 
-    await moveLooseIntoTrip(store, trips, photo.id, trip.id)
+    await moveLooseIntoTrip(store, trips, photo.id, trip.id, carryName)
 
     expect(trips.getTrip(trip.id)?.photoCount).toBe(5)
     // The index entry, not just the full record — this is what App's
@@ -311,7 +323,7 @@ describe('moveLooseIntoTrip', () => {
     expect(trips.getTrip(trip.id)?.photoCount).toBeNull()
     const photo = store.addPhoto({ name: 'a.jpg', takenAt: null, position: { lat: 1, lng: 2 } })
 
-    await moveLooseIntoTrip(store, trips, photo.id, trip.id)
+    await moveLooseIntoTrip(store, trips, photo.id, trip.id, carryName)
 
     expect(trips.getTrip(trip.id)?.photoCount).toBeNull()
   })
@@ -322,7 +334,7 @@ describe('moveLooseIntoTrip', () => {
     trips.savePhotoCount(trip.id, 4)
     const record = store.addTrack(NEW_TRACK, [track([[1, 2]])])
 
-    await moveLooseIntoTrip(store, trips, record.id, trip.id)
+    await moveLooseIntoTrip(store, trips, record.id, trip.id, carryName)
 
     expect(trips.getTrip(trip.id)?.photoCount).toBe(4)
   })
@@ -334,8 +346,74 @@ describe('moveLooseIntoTrip', () => {
     const photo = store.addPhoto({ name: 'a.jpg', takenAt: null, position: { lat: 1, lng: 2 } })
     const failing = { ...store, moveIntoTrip: async () => false }
 
-    expect(await moveLooseIntoTrip(failing, trips, photo.id, trip.id)).toBe(false)
+    expect(await moveLooseIntoTrip(failing, trips, photo.id, trip.id, carryName)).toBe(false)
     expect(trips.getTrip(trip.id)?.photoCount).toBe(4)
+  })
+
+  // #150: a track's name is stored by whichever trip owns it, so the move
+  // has to hand it over or the track arrives showing its filename.
+  it('carries the track name into the destination trip', async () => {
+    const trips = new LocalTripStore(fakeStorage())
+    const trip = trips.createTrip('Larapinta')
+    const record = store.addTrack(
+      { ...NEW_TRACK, name: 'Snowdon ridge', driveFileId: 'drive-1' },
+      [track([[1, 2]])],
+    )
+
+    await moveLooseIntoTrip(store, trips, record.id, trip.id, carryName)
+
+    expect(carried).toEqual([
+      { tripId: trip.id, driveFileId: 'drive-1', name: 'Snowdon ridge' },
+    ])
+  })
+
+  it('carries nothing for a track whose source was never kept', async () => {
+    const trips = new LocalTripStore(fakeStorage())
+    const trip = trips.createTrip('Larapinta')
+    // No `driveFileId`: there is no file in the trip's folder to key a name
+    // against, and the geometry still arrives through the overview merge.
+    const record = store.addTrack(NEW_TRACK, [track([[1, 2]])])
+
+    await moveLooseIntoTrip(store, trips, record.id, trip.id, carryName)
+
+    expect(carried).toEqual([])
+  })
+
+  it('carries nothing for a photo, whose name travels in photos.json', async () => {
+    const trips = new LocalTripStore(fakeStorage())
+    const trip = trips.createTrip('Larapinta')
+    const photo = store.addPhoto({ name: 'a.jpg', takenAt: null, position: { lat: 1, lng: 2 } })
+
+    await moveLooseIntoTrip(store, trips, photo.id, trip.id, carryName)
+
+    expect(carried).toEqual([])
+  })
+
+  it('carries nothing when the move itself failed', async () => {
+    const trips = new LocalTripStore(fakeStorage())
+    const trip = trips.createTrip('Larapinta')
+    const record = store.addTrack({ ...NEW_TRACK, driveFileId: 'drive-1' }, [track([[1, 2]])])
+    const failing = { ...store, moveIntoTrip: async () => false }
+
+    expect(await moveLooseIntoTrip(failing, trips, record.id, trip.id, carryName)).toBe(false)
+
+    expect(carried).toEqual([])
+  })
+
+  // The file has already moved by the time the name is written, so a failure
+  // here cannot un-move it. Reporting the move as failed would describe a
+  // move that plainly did happen.
+  it('still reports the move as done when carrying the name fails', async () => {
+    const trips = new LocalTripStore(fakeStorage())
+    const trip = trips.createTrip('Larapinta')
+    const record = store.addTrack({ ...NEW_TRACK, driveFileId: 'drive-1' }, [track([[1, 2]])])
+
+    const moved = await moveLooseIntoTrip(store, trips, record.id, trip.id, async () => {
+      throw new Error('Drive said no')
+    })
+
+    expect(moved).toBe(true)
+    expect(store.getItems()).toHaveLength(0)
   })
 
   it('leaves a different trip photo count untouched', async () => {
@@ -346,7 +424,7 @@ describe('moveLooseIntoTrip', () => {
     trips.savePhotoCount(other.id, 9)
     const photo = store.addPhoto({ name: 'a.jpg', takenAt: null, position: { lat: 1, lng: 2 } })
 
-    await moveLooseIntoTrip(store, trips, photo.id, trip.id)
+    await moveLooseIntoTrip(store, trips, photo.id, trip.id, carryName)
 
     expect(trips.getTrip(other.id)?.photoCount).toBe(9)
   })

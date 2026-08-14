@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { LocalTrackOverridesStore } from './trackOverridesStore'
+import { LocalTrackOverridesStore, carryDisplayNameIntoTrip } from './trackOverridesStore'
 
 /** A minimal in-memory `Storage` so tests don't depend on jsdom's
     `localStorage` persisting (or not) across test files — same helper
@@ -102,5 +102,112 @@ describe('LocalTrackOverridesStore', () => {
     store.replaceAll('trip-1', { 'drive-2': { displayName: 'Restored' } })
 
     expect(store.getOverrides('trip-1')).toEqual({ 'drive-2': { displayName: 'Restored' } })
+  })
+})
+
+describe('carryDisplayNameIntoTrip', () => {
+  it('gives the arriving track its name in the destination trip', async () => {
+    const store = new LocalTrackOverridesStore(fakeStorage())
+
+    expect(
+      await carryDisplayNameIntoTrip(store, 'trip-1', 'drive-1', 'Snowdon ridge', null),
+    ).toBe(true)
+
+    expect(store.getOverrides('trip-1')).toEqual({
+      'drive-1': { displayName: 'Snowdon ridge' },
+    })
+  })
+
+  // The hazard `setOverride`'s prune argument creates: a move knows about one
+  // track, and handing that one id over as the valid list would delete every
+  // other name and colour the trip is holding.
+  it('leaves every other track in the trip untouched', async () => {
+    const store = new LocalTrackOverridesStore(fakeStorage())
+    await store.setOverride('trip-1', 'drive-9', { displayName: 'Day 1', color: 3, order: 0 }, [
+      'drive-9',
+    ])
+
+    await carryDisplayNameIntoTrip(store, 'trip-1', 'drive-1', 'Snowdon ridge', null)
+
+    expect(store.getOverrides('trip-1')).toEqual({
+      'drive-9': { displayName: 'Day 1', color: 3, order: 0 },
+      'drive-1': { displayName: 'Snowdon ridge' },
+    })
+  })
+
+  it('leaves a track arriving with a name it already had alone', async () => {
+    const store = new LocalTrackOverridesStore(fakeStorage())
+    await store.setOverride('trip-1', 'drive-1', { displayName: 'Snowdon ridge', color: 2 }, [
+      'drive-1',
+    ])
+
+    await carryDisplayNameIntoTrip(store, 'trip-1', 'drive-1', 'Snowdon ridge', null)
+
+    // Merged, not replaced — a name arriving does not cost the track its colour.
+    expect(store.getOverrides('trip-1')).toEqual({
+      'drive-1': { displayName: 'Snowdon ridge', color: 2 },
+    })
+  })
+
+  // The silent one: a Drive-backed store writes to `localStorage` only until
+  // the destination trip is connected, and that trip's next `connect`
+  // hydrates Drive's copy over the top — taking the new name with it.
+  it('connects the destination trip before writing, so the name reaches Drive', async () => {
+    const store = new LocalTrackOverridesStore(fakeStorage())
+    const calls: string[] = []
+    const connecting = {
+      getOverrides: store.getOverrides,
+      setOverride: async (...args: Parameters<LocalTrackOverridesStore['setOverride']>) => {
+        calls.push('setOverride')
+        return store.setOverride(...args)
+      },
+      connect: async (tripId: string, accessToken: string, folderId: string) => {
+        calls.push(`connect:${tripId}:${accessToken}:${folderId}`)
+      },
+      setOrder: store.setOrder,
+    }
+
+    await carryDisplayNameIntoTrip(connecting, 'trip-1', 'drive-1', 'Snowdon ridge', {
+      accessToken: 'token-1',
+      folderId: 'cairn-folder',
+    })
+
+    expect(calls).toEqual(['connect:trip-1:token-1:cairn-folder', 'setOverride'])
+  })
+
+  it('writes anyway when connecting fails, so the name is not lost outright', async () => {
+    const store = new LocalTrackOverridesStore(fakeStorage())
+    const connecting = {
+      getOverrides: store.getOverrides,
+      setOverride: store.setOverride,
+      setOrder: store.setOrder,
+      connect: async () => {
+        throw new Error('Drive unreachable')
+      },
+    }
+
+    expect(
+      await carryDisplayNameIntoTrip(connecting, 'trip-1', 'drive-1', 'Snowdon ridge', {
+        accessToken: 'token-1',
+        folderId: 'cairn-folder',
+      }),
+    ).toBe(true)
+
+    expect(store.getOverrides('trip-1')).toEqual({
+      'drive-1': { displayName: 'Snowdon ridge' },
+    })
+  })
+
+  it('reports a refused write rather than swallowing it', async () => {
+    const store = new LocalTrackOverridesStore(fakeStorage())
+    const refusing = {
+      getOverrides: store.getOverrides,
+      setOverride: async () => false,
+      setOrder: store.setOrder,
+    }
+
+    expect(
+      await carryDisplayNameIntoTrip(refusing, 'trip-1', 'drive-1', 'Snowdon ridge', null),
+    ).toBe(false)
   })
 })

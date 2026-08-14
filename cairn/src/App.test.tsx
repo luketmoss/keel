@@ -860,6 +860,82 @@ describe('App loose tracks and photos (#110)', () => {
     fetchSpy.mockRestore()
   })
 
+  /* #150: a track's name is stored by whichever trip owns it, so a move has
+     to write one into the destination — or the track arrives showing its
+     filename and the name the user gave it is gone. */
+  describe('#150 a name survives the move into a trip', () => {
+    const overridesFor = (tripId: string) =>
+      JSON.parse(window.localStorage.getItem(`cairn.trips.trackOverrides.${tripId}`) ?? '{}')
+
+    it('gives the destination trip the name the track was already showing', async () => {
+      const fetchSpy = mockGoogleSignIn()
+      seedTrip('t-150', 'Larapinta')
+      seedLooseTrack('lt-150', 'Snowdon ridge', { driveFileId: 'drive-150' })
+
+      await renderApp('/tracks/lt-150', { googleClientId: 'a-client-id' })
+      await signIn()
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Add to a trip' }))
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Larapinta/ }))
+      })
+
+      expect(window.location.pathname).toBe('/trips/t-150')
+      expect(overridesFor('t-150')).toEqual({
+        'drive-150': { displayName: 'Snowdon ridge' },
+      })
+      fetchSpy.mockRestore()
+    })
+
+    it('leaves the names the destination trip already held alone', async () => {
+      const fetchSpy = mockGoogleSignIn()
+      seedTrip('t-151', 'Larapinta')
+      // A track already in that trip, with a name and a colour of its own.
+      window.localStorage.setItem(
+        'cairn.trips.trackOverrides.t-151',
+        JSON.stringify({ 'drive-existing': { displayName: 'Day one', color: 3 } }),
+      )
+      seedLooseTrack('lt-151', 'Snowdon ridge', { driveFileId: 'drive-151' })
+
+      await renderApp('/tracks/lt-151', { googleClientId: 'a-client-id' })
+      await signIn()
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Add to a trip' }))
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Larapinta/ }))
+      })
+
+      expect(overridesFor('t-151')).toEqual({
+        'drive-existing': { displayName: 'Day one', color: 3 },
+        'drive-151': { displayName: 'Snowdon ridge' },
+      })
+      fetchSpy.mockRestore()
+    })
+
+    it('carries the name into a brand new trip too', async () => {
+      const fetchSpy = mockGoogleSignIn()
+      seedLooseTrack('lt-152', 'Snowdon ridge', { driveFileId: 'drive-152' })
+
+      await renderApp('/tracks/lt-152', { googleClientId: 'a-client-id' })
+      await signIn()
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Add to a trip' }))
+      fireEvent.click(screen.getByRole('button', { name: /New trip/ }))
+      fireEvent.change(screen.getByPlaceholderText('Name the new trip'), {
+        target: { value: 'Snowdonia' },
+      })
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+      })
+
+      const tripId = window.location.pathname.replace('/trips/', '')
+      expect(overridesFor(tripId)).toEqual({
+        'drive-152': { displayName: 'Snowdon ridge' },
+      })
+      fetchSpy.mockRestore()
+    })
+  })
+
   describe('#133 renaming and recolouring a loose item', () => {
     it('renames a loose track from its face, and it survives a reload', async () => {
       const fetchSpy = mockGoogleSignIn()

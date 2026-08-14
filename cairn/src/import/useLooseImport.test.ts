@@ -140,6 +140,41 @@ describe('useLooseImport', () => {
     expect(store.getItems()).toHaveLength(0)
   })
 
+  /* #150: `Remove from trip` passes the name the user gave the track inside
+     its trip. The KML's own track name is a derivation and loses to it —
+     that derivation winning is what dropped the name on the way out. */
+  describe('a name the user chose (#150)', () => {
+    const tracks = [{ name: 'Day one', points: [{ lat: 1, lon: 2 }] }]
+
+    it('takes the given name over the one in the KML', () => {
+      importer().addParsedTracks('day1.kml', tracks, { name: 'Snowdon ridge' })
+
+      expect(store.getItems()).toMatchObject([
+        { kind: 'track', name: 'Snowdon ridge', sourceName: 'day1.kml' },
+      ])
+    })
+
+    it('derives the name as before when none is given', () => {
+      importer().addParsedTracks('day1.kml', tracks)
+
+      expect(store.getItems()[0].name).toBe('Day one')
+    })
+
+    it('falls back to the filename when neither is available', () => {
+      importer().addParsedTracks('day1.kml', [{ name: '', points: [{ lat: 1, lon: 2 }] }])
+
+      expect(store.getItems()[0].name).toBe('day1')
+    })
+
+    // Same rule the stores apply to a rename: an empty value is an aborted
+    // edit, not a saved one, so it must not become the track's name.
+    it('ignores a blank name and derives instead', () => {
+      importer().addParsedTracks('day1.kml', tracks, { name: '   ' })
+
+      expect(store.getItems()[0].name).toBe('Day one')
+    })
+  })
+
   describe('addPhotoFromTrip (#132)', () => {
     function tripPhoto(overrides: Partial<PhotoRecord> = {}): PhotoRecord {
       return {

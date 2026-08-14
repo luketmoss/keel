@@ -434,6 +434,14 @@ export async function moveLooseIntoTrip(
   },
   itemId: string,
   tripId: string,
+  /** #150: hands the arriving track's name to whoever stores names for the
+      trip that now owns it. A third collaborator rather than a method on
+      `tripSide`, for the reason given above: a track's name lives in the
+      trip's overrides, which is neither of the two stores this function
+      already drives, and the loose store must not learn about a third.
+      Required rather than optional — a caller that forgets it silently
+      reintroduces the bug this exists to fix. */
+  carryName: (tripId: string, driveFileId: string, name: string) => Promise<unknown>,
 ): Promise<boolean> {
   const item = looseStore.getItem(itemId)
   if (!item) return false
@@ -458,6 +466,20 @@ export async function moveLooseIntoTrip(
       ...overviewToTracks(looseStore.getOverview(itemId), item.name),
     ]
     tripSide.saveOverview(tripId, merged)
+
+    // #150: the name comes with it. Written unconditionally rather than only
+    // for a name the user typed — the two sides derive a default name from
+    // different things (a loose track from the KML's own track name, an owned
+    // one from its filename), so saying nothing here is what made a track
+    // change its name by being moved.
+    //
+    // Best-effort, like the photo bookkeeping below and for the same reason:
+    // the file has already moved, so failing the whole move over the name
+    // would report a move that plainly did happen as not having happened. The
+    // cost of it failing is the old behaviour, not a worse one.
+    if (item.driveFileId) {
+      await carryName(tripId, item.driveFileId, item.name).catch(() => {})
+    }
   } else {
     // #130: incremented, not recounted — re-reading `photos.json` for an
     // authoritative length would put a Drive round trip on the one path

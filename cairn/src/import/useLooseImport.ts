@@ -136,12 +136,18 @@ export function useLooseImport(store: LooseStore) {
    * uploads it like any other import. `Remove from trip` has no `File` —
    * the bytes are already in Drive, in the trip's folder — and passes
    * `driveFileId` instead, for the caller to relocate with
-   * `claimFromTrip`. Returns the record so that caller can. */
+   * `claimFromTrip`. Returns the record so that caller can.
+   *
+   * #150: `name` is the name the *user* gave the track, and it wins over
+   * every derivation below. Only `Remove from trip` has one, and only when
+   * the track carried a display-name override inside its trip — a name the
+   * app derived is left to be derived again here, so a track nobody renamed
+   * still becomes `hike` rather than `hike.kml`. */
   const addParsedTracks = useCallback(
     (
       sourceName: string,
       tracks: Track[],
-      options?: { source?: File; driveFileId?: string },
+      options?: { source?: File; driveFileId?: string; name?: string },
     ): LooseTrackRecord | null => {
       if (tracks.length === 0) return null
       const stats = tracks.map(computeTrackStats)
@@ -150,7 +156,7 @@ export function useLooseImport(store: LooseStore) {
         .filter((gain): gain is number => gain !== undefined)
       return store.addTrack(
         {
-          name: tracks[0].name || sourceName.replace(/\.[^.]+$/, ''),
+          name: options?.name?.trim() || tracks[0].name || sourceName.replace(/\.[^.]+$/, ''),
           date: trackDate(tracks),
           distanceMeters: stats.reduce((total, s) => total + s.distanceMeters, 0),
           ascentMeters: gains.length > 0 ? gains.reduce((a, b) => a + b, 0) : null,

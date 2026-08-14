@@ -51,10 +51,11 @@ function generateColorIndex(): number {
 
 // Shared across every `useTripImport` instance that doesn't get its own
 // (tests inject a fake-storage-backed one) — #46's overrides record,
-// Drive-backed as of #59, `connect`-ed per trip below. Exported so `App.tsx`
-// — the only place that hears about the account leaving `signed-in` — can
-// call `disconnect()` on it (#73); nothing else outside this module should
-// reach into it directly.
+// Drive-backed as of #59, `connect`-ed per trip below. Exported for the two
+// things only `App.tsx` can do: `disconnect()` when the account leaves
+// `signed-in` (#73), and #150's display-name carry, which happens during a
+// move rather than inside any trip's mounted detail view. Nothing else
+// outside this module should reach into it directly.
 export const defaultOverridesStore = new DriveTrackOverridesStore()
 
 export type ImportPhase = 'uploading' | 'parsing'
@@ -613,6 +614,10 @@ export function useTripImport(
         ...file,
         name: override.displayName ?? file.name,
         colorIndex: override.color ?? file.colorIndex,
+        // #150: carried alongside the name it produced, so `Remove from
+        // trip` can tell a name the user typed from the filename it would
+        // otherwise be showing. Only the override — never the fallback.
+        ...(override.displayName !== undefined ? { displayName: override.displayName } : {}),
       }
     })
     return [...withOverrides].sort((a, b) => {

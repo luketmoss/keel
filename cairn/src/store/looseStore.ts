@@ -36,8 +36,8 @@ export type CairnIcon =
   | 'parking'
   | 'junction'
 
-/** Both Drive ids, or neither — never exactly one of the two. The rule
-    `LoosePhotoRecord` already applied to its Drive files, unchanged. */
+/** Both Drive ids, or neither — never exactly one of the two. The rule the
+    old photo record already applied to its Drive files, unchanged. */
 export interface CairnImage {
   originalDriveFileId: string
   thumbnailDriveFileId: string

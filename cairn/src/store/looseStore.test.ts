@@ -155,6 +155,33 @@ describe('LocalLooseStore', () => {
     expect(new LocalLooseStore(storage).getItems()).toHaveLength(1)
   })
 
+  it('carries every cairn field through a reload, unchanged', () => {
+    const storage = fakeStorage()
+    const first = new LocalLooseStore(storage)
+    const record = first.addCairn({
+      name: 'sapporo.jpg',
+      date: '2024-11-03T00:00:00.000Z',
+      position: { lat: 43, lng: 141 },
+      positionSource: 'placed',
+      icon: 'campsite',
+      image: { originalDriveFileId: 'orig-1', thumbnailDriveFileId: 'thumb-1' },
+      description: 'A good spot.',
+    })
+
+    const reloaded = new LocalLooseStore(storage).getItem(record.id)
+
+    expect(reloaded).toMatchObject({
+      id: record.id,
+      name: 'sapporo.jpg',
+      position: { lat: 43, lng: 141 },
+      positionSource: 'placed',
+      icon: 'campsite',
+      image: { originalDriveFileId: 'orig-1', thumbnailDriveFileId: 'thumb-1' },
+      description: 'A good spot.',
+      date: '2024-11-03T00:00:00.000Z',
+    })
+  })
+
   it('treats a corrupted index as empty rather than throwing', () => {
     const storage = fakeStorage()
     storage.setItem('cairn.loose.index', 'not json')

@@ -213,8 +213,8 @@ describe('useLooseImport', () => {
       expect(store.getItems()).toHaveLength(1)
     })
 
-    // Unlike the old `photos.json`, a cairn's position is never lost by
-    // leaving a trip — it is stored on the record itself, whatever its
+    // Unlike the old per-trip photo index, a cairn's position is never lost
+    // by leaving a trip — it is stored on the record itself, whatever its
     // source, and `claimFromTrip` relocates the folder without touching it.
     it('carries an interpolated position across unchanged, as itself', () => {
       const record = importer().addCairnFromTrip(tripCairn({ positionSource: 'interpolated' }))

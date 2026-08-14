@@ -17,7 +17,7 @@ import type { CairnIcon, CairnImage, PositionSource } from '../store/looseStore'
 /* Trip-scoped cairn import — the trip-owned half of `cairns.md`'s model.
    Each cairn is a folder, `trips/<trip-id>/cairns/<cairn-id>/cairn.json`
    plus its image (if any), read back by listing that folder rather than
-   through a `photos.json` index — the storage layer #155 replaced it with.
+   through a per-trip photo index file — the storage layer #155 replaced it with.
 
    Resolution at import time covers the first two of `cairns.md`'s three
    routes: EXIF GPS, then interpolation against this trip's tracks (via

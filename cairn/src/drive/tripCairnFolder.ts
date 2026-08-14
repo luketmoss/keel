@@ -5,7 +5,7 @@
    the trip's own folder instead of under `loose/`. That symmetry is what
    lets `Add to a trip`/`Remove from trip` be a single-call folder move
    (`moveDriveFile` on the item's own folder id) rather than the
-   per-file-plus-index bookkeeping the old `photos.json` needed. */
+   per-file-plus-index bookkeeping the old per-trip photo index file needed. */
 
 import { findOrCreateChild } from './looseFolder'
 import { findOrCreateTripFolder } from './tripFolder'

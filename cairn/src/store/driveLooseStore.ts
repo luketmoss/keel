@@ -3,18 +3,19 @@ import type { Track } from '../kml/parse'
 import {
   LocalLooseStore,
   isLooseRecord,
+  type LooseCairnRecord,
   type LooseKind,
-  type LoosePhotoRecord,
   type LooseRecord,
   type LooseStore,
   type LooseTrackRecord,
   type LooseUpdate,
-  type NewLoosePhoto,
+  type NewLooseCairn,
   type NewLooseTrack,
 } from './looseStore'
 import { isFeatureCollection } from './tripStore'
 import { findOrCreateLooseFolder, findOrCreateLooseItemFolder, moveDriveFile } from '../drive/looseFolder'
 import { findOrCreateTripFolder } from '../drive/tripFolder'
+import { findOrCreateTripCairnItemFolder, findOrCreateTripCairnsFolder } from '../drive/tripCairnFolder'
 import {
   DriveConflictError,
   findJsonFile,
@@ -26,7 +27,6 @@ import {
 } from '../drive/tripMetadata'
 import { startResumableUpload, uploadFileContent } from '../drive/trackFiles'
 import { generateThumbnail, THUMBNAIL_SUFFIX } from '../photo/thumbnail'
-import { appendPhotoToIndex, removePhotoFromIndex } from '../photo/photoIndex'
 
 interface LooseDriveRef {
   folderId: string
@@ -37,10 +37,10 @@ interface LooseDriveRef {
 /** The record file's name, per kind. Fixed here rather than derived from
     the kind for the same reason `looseFolder.ts` fixes its folder names: a
     rename of the type must never silently relocate a user's data. */
-const RECORD_FILE: Record<LooseKind, string> = { track: 'track.json', photo: 'photo.json' }
+const RECORD_FILE: Record<LooseKind, string> = { track: 'track.json', cairn: 'cairn.json' }
 const OVERVIEW_FILE = 'overview.geojson'
 
-const KINDS: LooseKind[] = ['track', 'photo']
+const KINDS: LooseKind[] = ['track', 'cairn']
 
 /** Drive-backed `LooseStore`: reads are synchronous, served from a composed
     `LocalLooseStore` exactly as `DriveTripStore` serves them from a
@@ -53,7 +53,12 @@ const KINDS: LooseKind[] = ['track', 'photo']
  * *file*, not just a record. #110 kept the record and discarded the bytes;
  * everything below exists to keep them, and the two ownership moves are the
  * reason it matters — `Add to a trip` is a move between folders, and there
- * has to be something to move. */
+ * has to be something to move.
+ *
+ * A cairn's folder move is one Drive call (`moveDriveFile` on the item's
+ * own folder), not the per-file-plus-index dance a photo used to need — see
+ * `cairns.md`'s "Storage": a cairn is a folder, the same shape a loose track
+ * already lived in, on both sides of the move. */
 export class DriveLooseStore implements LooseStore {
   private readonly local: LocalLooseStore
   private readonly refs = new Map<string, LooseDriveRef>()
@@ -89,11 +94,11 @@ export class DriveLooseStore implements LooseStore {
     return record
   }
 
-  addPhoto = (input: NewLoosePhoto, source?: File): LoosePhotoRecord => {
-    const record = this.local.addPhoto(input)
+  addCairn = (input: NewLooseCairn, source?: File): LooseCairnRecord => {
+    const record = this.local.addCairn(input)
     if (!this.credentials || !source) return record
     this.local.setUploadState(record.id, 'uploading')
-    void this.enqueue(record.id, () => this.uploadPhoto(record.id, source, input.orientation))
+    void this.enqueue(record.id, () => this.uploadCairn(record.id, source, input.orientation))
     return record
   }
 
@@ -142,21 +147,39 @@ export class DriveLooseStore implements LooseStore {
       const item = this.local.getItem(id)
       if (!item) return false
 
+      if (item.kind === 'cairn') {
+        let itemFolderId: string
+        let looseBucketId: string
+        let tripBucketId: string
+        try {
+          itemFolderId =
+            this.refs.get(id)?.folderId ?? (await findOrCreateLooseItemFolder(accessToken, cairnFolderId, 'cairn', id))
+          looseBucketId = await findOrCreateLooseFolder(accessToken, cairnFolderId, 'cairn')
+          tripBucketId = await findOrCreateTripCairnsFolder(accessToken, cairnFolderId, tripId)
+          // A cairn is a folder — one Drive call re-parents it, image and
+          // record together, rather than the per-file-plus-index move a
+          // photo used to need.
+          await moveDriveFile(accessToken, itemFolderId, looseBucketId, tripBucketId)
+        } catch {
+          return false
+        }
+
+        // The folder's own Drive id is unchanged by being re-parented, so
+        // this still targets the right place — and writing it now covers a
+        // `pending` cairn (never uploaded) that had no `cairn.json` to move
+        // in the first place.
+        await this.writeRecordFiles(id, itemFolderId).catch(() => {})
+        this.refs.set(id, { folderId: itemFolderId })
+        return true
+      }
+
       let tripFolderId: string
       let looseFolderId: string
       try {
         tripFolderId = await findOrCreateTripFolder(accessToken, cairnFolderId, tripId)
         looseFolderId = await findOrCreateLooseItemFolder(accessToken, cairnFolderId, item.kind, id)
 
-        if (item.kind === 'photo') {
-          // A photo is its pixels. An item with no file in Drive — one
-          // imported before this issue, whose bytes were never kept
-          // anywhere — has nothing that could arrive in the trip, and
-          // moving it would delete the last trace of it. Refused instead,
-          // which surfaces as "still on the map".
-          if (!item.originalDriveFileId || !item.thumbnailDriveFileId) return false
-          await moveDriveFile(accessToken, item.originalDriveFileId, looseFolderId, tripFolderId)
-        } else if (item.driveFileId) {
+        if (item.driveFileId) {
           // Once the KML is in the trip's folder the trip's track list
           // reads it like any other — `useTripImport` lists the folder, so
           // the row appears with no further work.
@@ -171,46 +194,21 @@ export class DriveLooseStore implements LooseStore {
         return false
       }
 
-      /* Past this line the item's first file has left the loose folder, and
-         **the move must be reported as done.** Drive moves one file in one
-         call but cannot move two files and rewrite a third in one, so each
-         step below can fail on its own; what must not happen is this
-         resolving `false` afterwards, which would keep the loose row alive
-         beside files a trip now holds — one item owned twice, and exactly
-         the duplicate this issue exists to stop. The design note's accepted
-         failure is the other one: gone from the top level and not yet
-         wholly arrived, retried by the next `connect()`. */
-      if (item.kind === 'photo' && item.originalDriveFileId && item.thumbnailDriveFileId) {
-        await moveDriveFile(
-          accessToken,
-          item.thumbnailDriveFileId,
-          looseFolderId,
-          tripFolderId,
-        ).catch(() => {})
-        await appendPhotoToIndex(accessToken, tripFolderId, {
-          name: item.name,
-          originalDriveFileId: item.originalDriveFileId,
-          thumbnailDriveFileId: item.thumbnailDriveFileId,
-          ...(item.position ? { latitude: item.position.lat, longitude: item.position.lng } : {}),
-          ...(item.gpsTimestamp !== undefined ? { gpsTimestamp: item.gpsTimestamp } : {}),
-          ...(item.dateTimeOriginal !== undefined ? { dateTimeOriginal: item.dateTimeOriginal } : {}),
-        }).catch(() => {})
-      }
-
       // The derived files stay behind, so the loose folder goes. Cleanup,
       // not part of the move — an orphaned folder is untidy, and failing the
-      // move over it would be the duplicate described above.
+      // move over it would be the duplicate a half-moved item would be.
       await trashFolder(accessToken, looseFolderId).catch(() => {})
       this.refs.delete(id)
       return true
     })
   }
 
-  /** The reverse of `moveIntoTrip`, and photo-aware since #132: `Remove
-      from trip` needs the same two-file-plus-index handling on the way out
-      that adding one needs on the way in. The caller creates the loose
-      record first — this only ever relocates files for an id that already
-      exists, exactly as `moveIntoTrip` does for the trip side. */
+  /** The reverse of `moveIntoTrip`. The caller creates the loose record
+      first — this only ever relocates a folder for an id that already
+      exists, exactly as `moveIntoTrip` does for the trip side. For a cairn,
+      the id is the trip-side cairn's own id (see `NewLooseCairn.id`), which
+      is what makes the trip's `trips/<trip-id>/cairns/<id>/` folder
+      findable by name with no file id to carry across. */
   claimFromTrip = async (id: string, tripId: string): Promise<boolean> => {
     if (!this.credentials) return false
     const { accessToken, cairnFolderId } = this.credentials
@@ -219,43 +217,36 @@ export class DriveLooseStore implements LooseStore {
       const item = this.local.getItem(id)
       if (!item) return false
 
+      if (item.kind === 'cairn') {
+        let itemFolderId: string
+        let looseBucketId: string
+        let tripBucketId: string
+        try {
+          itemFolderId = await findOrCreateTripCairnItemFolder(accessToken, cairnFolderId, tripId, id)
+          tripBucketId = await findOrCreateTripCairnsFolder(accessToken, cairnFolderId, tripId)
+          looseBucketId = await findOrCreateLooseFolder(accessToken, cairnFolderId, 'cairn')
+          await moveDriveFile(accessToken, itemFolderId, tripBucketId, looseBucketId)
+        } catch {
+          return false
+        }
+
+        await this.writeRecordFiles(id, itemFolderId).catch(() => {})
+        this.refs.set(id, { folderId: itemFolderId })
+        this.local.setUploadState(id, 'ok')
+        return true
+      }
+
       let tripFolderId: string
       let looseFolderId: string
       try {
         tripFolderId = await findOrCreateTripFolder(accessToken, cairnFolderId, tripId)
         looseFolderId = await findOrCreateLooseItemFolder(accessToken, cairnFolderId, item.kind, id)
-
-        if (item.kind === 'track') {
-          if (!item.driveFileId) return false
-          await moveDriveFile(accessToken, item.driveFileId, tripFolderId, looseFolderId)
-        } else {
-          // A photo with no file in Drive on either end — nothing to
-          // relocate, and refusing is the same answer `moveIntoTrip` gives
-          // the mirror case.
-          if (!item.originalDriveFileId || !item.thumbnailDriveFileId) return false
-          await moveDriveFile(accessToken, item.originalDriveFileId, tripFolderId, looseFolderId)
-        }
+        if (!item.driveFileId) return false
+        await moveDriveFile(accessToken, item.driveFileId, tripFolderId, looseFolderId)
       } catch {
         // Nothing has moved: the item is still in the trip and its files
         // are still in the trip's folder.
         return false
-      }
-
-      /* Past this line the item's first file has left the trip folder, and
-         **the claim must be reported as done** — the same stance
-         `moveIntoTrip` takes on the way in, for the same reason: resolving
-         `false` from here on would leave the photo named in the trip's
-         `photos.json` beside files the loose store now holds, which is the
-         duplicate #120 exists to stop. What can still fail is best-effort
-         and retried by the next `connect()`. */
-      if (item.kind === 'photo' && item.thumbnailDriveFileId && item.originalDriveFileId) {
-        await moveDriveFile(
-          accessToken,
-          item.thumbnailDriveFileId,
-          tripFolderId,
-          looseFolderId,
-        ).catch(() => {})
-        await removePhotoFromIndex(accessToken, tripFolderId, item.originalDriveFileId).catch(() => {})
       }
 
       await this.writeRecordFiles(id, looseFolderId).catch(() => {})
@@ -465,9 +456,10 @@ export class DriveLooseStore implements LooseStore {
       recoverable here** — #110 discarded it, so an item imported before
       this issue can only ever have its record and its geometry backed up.
       For a track that is enough to survive a cleared browser and draw on
-      the map; for a photo it is a name and a coordinate, which is all that
-      was ever kept. Items imported from now on carry their bytes up at
-      import time and never come through here. */
+      the map; for a cairn with an image, the image itself is gone and only
+      the record (including whichever Drive ids it already carried) can be
+      written. Items imported from now on carry their bytes up at import
+      time and never come through here. */
   private async migrateItem(id: string): Promise<void> {
     if (!this.credentials) return
     const { accessToken, cairnFolderId } = this.credentials
@@ -498,7 +490,7 @@ export class DriveLooseStore implements LooseStore {
     }
   }
 
-  private async uploadPhoto(id: string, source: File, orientation?: number): Promise<void> {
+  private async uploadCairn(id: string, source: File, orientation?: number): Promise<void> {
     if (!this.credentials) return
     const { accessToken, cairnFolderId } = this.credentials
 
@@ -508,7 +500,7 @@ export class DriveLooseStore implements LooseStore {
         this.local.setUploadState(id, 'failed')
         return
       }
-      const folderId = await findOrCreateLooseItemFolder(accessToken, cairnFolderId, 'photo', id)
+      const folderId = await findOrCreateLooseItemFolder(accessToken, cairnFolderId, 'cairn', id)
 
       const originalSession = await startResumableUpload(accessToken, folderId, source.name)
       const original = await uploadFileContent(originalSession, source, accessToken)
@@ -518,11 +510,10 @@ export class DriveLooseStore implements LooseStore {
       const thumbnailSession = await startResumableUpload(accessToken, folderId, thumbnailName)
       const uploadedThumbnail = await uploadFileContent(thumbnailSession, thumbnailFile, accessToken)
 
-      // Both ids land together — a photo whose original arrived and whose
-      // thumbnail did not stays `failed`, per the design note.
+      // Both ids land together — a cairn whose original arrived and whose
+      // thumbnail did not stays `failed`, per the "both, or neither" rule.
       this.local.setUploadState(id, 'ok', {
-        originalDriveFileId: original.id,
-        thumbnailDriveFileId: uploadedThumbnail.id,
+        image: { originalDriveFileId: original.id, thumbnailDriveFileId: uploadedThumbnail.id },
       })
       await this.writeRecordFiles(id, folderId)
     } catch {

@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useTripImport } from './useTripImport'
 import type { ParseResult } from '../kml/parse'
-import { DriveAuthError } from '../drive/cairnFolder'
+import { DriveAuthError } from '../drive/rootFolder'
 import { LocalTrackOverridesStore, type TrackOverridesStore } from '../store/trackOverridesStore'
 
 /** A minimal in-memory `Storage`, same helper `tripStore.test.ts` and

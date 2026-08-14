@@ -21,12 +21,12 @@ vi.mock('@vis.gl/react-google-maps', () => ({
    sends to which pipeline, and that the two pipelines' progress/failures
    render together under the one widened control. The pipelines
    themselves (Drive calls, EXIF, thumbnails) are `useTripImport`'s and
-   `usePhotoImport`'s own suites' job, so both hooks are mocked here. */
+   `useCairnImport`'s own suites' job, so both hooks are mocked here. */
 const { useTripImport } = vi.hoisted(() => ({ useTripImport: vi.fn() }))
 vi.mock('../import/useTripImport', () => ({ useTripImport }))
 
-const { usePhotoImport } = vi.hoisted(() => ({ usePhotoImport: vi.fn() }))
-vi.mock('../photo/usePhotoImport', () => ({ usePhotoImport }))
+const { useCairnImport } = vi.hoisted(() => ({ useCairnImport: vi.fn() }))
+vi.mock('../photo/useCairnImport', () => ({ useCairnImport }))
 
 /* The trip face renders `TrackLayer` itself now, rather than through a
    `MapView` that short-circuited to "map unavailable" whenever no API key
@@ -79,18 +79,19 @@ function baseTripImport(overrides: Partial<ReturnType<typeof useTripImport>> = {
   }
 }
 
-function basePhotoImport(overrides: Partial<ReturnType<typeof usePhotoImport>> = {}) {
+function baseCairnImport(overrides: Partial<ReturnType<typeof useCairnImport>> = {}) {
   return {
-    photos: [],
+    cairns: [],
     loading: false,
     progress: [],
     failures: [],
     importFiles: vi.fn().mockResolvedValue(undefined),
     retryFailure: vi.fn().mockResolvedValue(undefined),
     dismissFailures: vi.fn(),
-    removePhoto: vi.fn(),
-    removingPhotoIds: new Set<string>(),
-    photoRemoveErrors: {},
+    removeCairn: vi.fn(),
+    forgetCairn: vi.fn(),
+    removingCairnIds: new Set<string>(),
+    cairnRemoveErrors: {},
     ...overrides,
   }
 }
@@ -151,15 +152,15 @@ function renderTrip(options: { signedIn?: boolean } = {}) {
 
 beforeEach(() => {
   useTripImport.mockReset().mockReturnValue(baseTripImport())
-  usePhotoImport.mockReset().mockReturnValue(basePhotoImport())
+  useCairnImport.mockReset().mockReturnValue(baseCairnImport())
 })
 
 describe('TripDetail — #51 partitioning a mixed drop between tracks and photos', () => {
-  it('sends .kml/.kmz files to useTripImport and images to usePhotoImport from a single drop', async () => {
+  it('sends .kml/.kmz files to useTripImport and images to useCairnImport from a single drop', async () => {
     const tripImportFiles = vi.fn().mockResolvedValue(undefined)
-    const photoImportFiles = vi.fn().mockResolvedValue(undefined)
+    const cairnImportFiles = vi.fn().mockResolvedValue(undefined)
     useTripImport.mockReturnValue(baseTripImport({ importFiles: tripImportFiles }))
-    usePhotoImport.mockReturnValue(basePhotoImport({ importFiles: photoImportFiles }))
+    useCairnImport.mockReturnValue(baseCairnImport({ importFiles: cairnImportFiles }))
 
     renderTrip()
     const app = document.querySelector('.app') as HTMLElement
@@ -173,15 +174,15 @@ describe('TripDetail — #51 partitioning a mixed drop between tracks and photos
     expect(tripImportFiles).toHaveBeenCalledTimes(1)
     expect(tripImportFiles.mock.calls[0][0].map((f: File) => f.name)).toEqual(['day-1.kml', 'day-2.kmz'])
 
-    expect(photoImportFiles).toHaveBeenCalledTimes(1)
-    expect(photoImportFiles.mock.calls[0][0].map((f: File) => f.name)).toEqual(['IMG_1.jpg', 'IMG_2.png'])
+    expect(cairnImportFiles).toHaveBeenCalledTimes(1)
+    expect(cairnImportFiles.mock.calls[0][0].map((f: File) => f.name)).toEqual(['IMG_1.jpg', 'IMG_2.png'])
   })
 
-  it('sends every file to usePhotoImport (never useTripImport) from a picker selection with images only', () => {
+  it('sends every file to useCairnImport (never useTripImport) from a picker selection with images only', () => {
     const tripImportFiles = vi.fn().mockResolvedValue(undefined)
-    const photoImportFiles = vi.fn().mockResolvedValue(undefined)
+    const cairnImportFiles = vi.fn().mockResolvedValue(undefined)
     useTripImport.mockReturnValue(baseTripImport({ importFiles: tripImportFiles }))
-    usePhotoImport.mockReturnValue(basePhotoImport({ importFiles: photoImportFiles }))
+    useCairnImport.mockReturnValue(baseCairnImport({ importFiles: cairnImportFiles }))
 
     renderTrip()
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
@@ -189,7 +190,7 @@ describe('TripDetail — #51 partitioning a mixed drop between tracks and photos
 
     fireEvent.change(input, { target: { files: photos } })
 
-    expect(photoImportFiles).toHaveBeenCalledWith(photos)
+    expect(cairnImportFiles).toHaveBeenCalledWith(photos)
     expect(tripImportFiles).not.toHaveBeenCalled()
   })
 
@@ -211,8 +212,8 @@ describe('TripDetail — #51 partitioning a mixed drop between tracks and photos
         progress: [{ id: 'progress-1', name: 'day-1.kml', index: 1, total: 2, phase: 'uploading' }],
       }),
     )
-    usePhotoImport.mockReturnValue(
-      basePhotoImport({ failures: [{ id: 'photo-failure-1', name: 'IMG_1.heic', message: 'heic message' }] }),
+    useCairnImport.mockReturnValue(
+      baseCairnImport({ failures: [{ id: 'photo-failure-1', name: 'IMG_1.heic', message: 'heic message' }] }),
     )
 
     renderTrip()
@@ -231,8 +232,8 @@ describe('TripDetail — #51 partitioning a mixed drop between tracks and photos
         retryFailure: tripRetry,
       }),
     )
-    usePhotoImport.mockReturnValue(
-      basePhotoImport({
+    useCairnImport.mockReturnValue(
+      baseCairnImport({
         failures: [{ id: 'photo-failure-1', name: 'a.jpg', message: 'upload failed', retryFile: new File(['x'], 'a.jpg') }],
         retryFailure: photoRetry,
       }),
@@ -252,9 +253,9 @@ describe('TripDetail — #51 partitioning a mixed drop between tracks and photos
 describe('TripDetail — #75 signed-out drop', () => {
   it('reports a batch failure naming sign-in, rather than doing nothing, when files land while signed out', async () => {
     const tripImportFiles = vi.fn().mockResolvedValue(undefined)
-    const photoImportFiles = vi.fn().mockResolvedValue(undefined)
+    const cairnImportFiles = vi.fn().mockResolvedValue(undefined)
     useTripImport.mockReturnValue(baseTripImport({ importFiles: tripImportFiles }))
-    usePhotoImport.mockReturnValue(basePhotoImport({ importFiles: photoImportFiles }))
+    useCairnImport.mockReturnValue(baseCairnImport({ importFiles: cairnImportFiles }))
 
     renderTrip({ signedIn: false })
     const app = document.querySelector('.app') as HTMLElement
@@ -266,7 +267,7 @@ describe('TripDetail — #75 signed-out drop', () => {
     expect(screen.getByText('2 files')).toBeDefined()
     expect(screen.getByText(/sign in to add files to this trip/)).toBeDefined()
     expect(tripImportFiles).not.toHaveBeenCalled()
-    expect(photoImportFiles).not.toHaveBeenCalled()
+    expect(cairnImportFiles).not.toHaveBeenCalled()
   })
 
   /* The drop overlay moved to the shell with the rest of the chrome — its
@@ -341,9 +342,9 @@ describe('TripDetail — #73 disconnected is read-only', () => {
 describe('TripDetail — #75 a file the app cannot identify', () => {
   it('rejects a .gpx naming the formats trips take, not the photo pipeline\'s message', async () => {
     const tripImportFiles = vi.fn().mockResolvedValue(undefined)
-    const photoImportFiles = vi.fn().mockResolvedValue(undefined)
+    const cairnImportFiles = vi.fn().mockResolvedValue(undefined)
     useTripImport.mockReturnValue(baseTripImport({ importFiles: tripImportFiles }))
-    usePhotoImport.mockReturnValue(basePhotoImport({ importFiles: photoImportFiles }))
+    useCairnImport.mockReturnValue(baseCairnImport({ importFiles: cairnImportFiles }))
 
     renderTrip()
     const app = document.querySelector('.app') as HTMLElement
@@ -357,14 +358,14 @@ describe('TripDetail — #75 a file the app cannot identify', () => {
       screen.getByText(/trips take \.kml or \.kmz tracks and JPEG, PNG or WebP photos/),
     ).toBeDefined()
     expect(tripImportFiles).not.toHaveBeenCalled()
-    expect(photoImportFiles).not.toHaveBeenCalled()
+    expect(cairnImportFiles).not.toHaveBeenCalled()
   })
 
   it('a mixed batch of one .kml, one .jpg and one .gpx imports the first two and reports only the third', async () => {
     const tripImportFiles = vi.fn().mockResolvedValue(undefined)
-    const photoImportFiles = vi.fn().mockResolvedValue(undefined)
+    const cairnImportFiles = vi.fn().mockResolvedValue(undefined)
     useTripImport.mockReturnValue(baseTripImport({ importFiles: tripImportFiles }))
-    usePhotoImport.mockReturnValue(basePhotoImport({ importFiles: photoImportFiles }))
+    useCairnImport.mockReturnValue(baseCairnImport({ importFiles: cairnImportFiles }))
 
     renderTrip()
     const app = document.querySelector('.app') as HTMLElement
@@ -374,14 +375,14 @@ describe('TripDetail — #75 a file the app cannot identify', () => {
     })
 
     expect(tripImportFiles.mock.calls[0][0].map((f: File) => f.name)).toEqual(['day.kml'])
-    expect(photoImportFiles.mock.calls[0][0].map((f: File) => f.name)).toEqual(['IMG_1.jpg'])
+    expect(cairnImportFiles.mock.calls[0][0].map((f: File) => f.name)).toEqual(['IMG_1.jpg'])
     expect(screen.getByText('route.gpx')).toBeDefined()
     expect(screen.getAllByText(/trips take .kml or .kmz tracks/)).toHaveLength(1)
   })
 
   it('sends a .heic to the photo pipeline rather than the unrecognised-type bucket', async () => {
-    const photoImportFiles = vi.fn().mockResolvedValue(undefined)
-    usePhotoImport.mockReturnValue(basePhotoImport({ importFiles: photoImportFiles }))
+    const cairnImportFiles = vi.fn().mockResolvedValue(undefined)
+    useCairnImport.mockReturnValue(baseCairnImport({ importFiles: cairnImportFiles }))
 
     renderTrip()
     const app = document.querySelector('.app') as HTMLElement
@@ -390,7 +391,7 @@ describe('TripDetail — #75 a file the app cannot identify', () => {
       fireEvent.drop(app, { dataTransfer: fileDataTransfer(['IMG_4021.HEIC']) })
     })
 
-    expect(photoImportFiles.mock.calls[0][0].map((f: File) => f.name)).toEqual(['IMG_4021.HEIC'])
+    expect(cairnImportFiles.mock.calls[0][0].map((f: File) => f.name)).toEqual(['IMG_4021.HEIC'])
     expect(screen.queryByText('trips take .kml or .kmz tracks and JPEG, PNG or WebP photos')).toBeNull()
   })
 })
@@ -447,9 +448,20 @@ describe('TripDetail — #77 removing tracks and photos', () => {
 
   it('shares one confirm slot between tracks and photos — starting a photo confirm cancels a track confirm', () => {
     useTripImport.mockReturnValue(baseTripImport({ tracks: [trackFile] }))
-    usePhotoImport.mockReturnValue(
-      basePhotoImport({
-        photos: [{ id: 'p1', name: 'photo.jpg', originalDriveFileId: 'o1', thumbnailDriveFileId: 't1' }],
+    useCairnImport.mockReturnValue(
+      baseCairnImport({
+        cairns: [
+          {
+            id: 'p1',
+            name: 'photo.jpg',
+            position: { lat: 1, lng: 2 },
+            positionSource: 'exif',
+            icon: null,
+            image: { originalDriveFileId: 'o1', thumbnailDriveFileId: 't1' },
+            description: '',
+            date: null,
+          },
+        ],
       }),
     )
 

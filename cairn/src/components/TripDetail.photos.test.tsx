@@ -3,13 +3,13 @@ import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TripDetail } from './TripDetail'
 import { LocalTripStore } from '../store/tripStore'
-import type { PhotoRecord } from '../photo/photoIndex'
+import type { CairnRecord } from '../photo/useCairnImport'
 
 /* #55's TripDetail integration — row click opens the lightbox, Escape
-   closes it and returns focus, and photo images resolve only through the
+   closes it and returns focus, and cairn images resolve only through the
    caching loader (never a bare Drive URL). Separate file from
    TripDetail.test.tsx (#51's mixed-drop partitioning suite) so this one
-   can supply real photo records without disturbing that suite's fixtures. */
+   can supply real cairn records without disturbing that suite's fixtures. */
 vi.mock('@vis.gl/react-google-maps', () => ({
   APIProvider: ({ children }: { children?: React.ReactNode }) => (
     <div data-testid="api-provider">{children}</div>
@@ -23,8 +23,8 @@ vi.mock('@vis.gl/react-google-maps', () => ({
 const { useTripImport } = vi.hoisted(() => ({ useTripImport: vi.fn() }))
 vi.mock('../import/useTripImport', () => ({ useTripImport }))
 
-const { usePhotoImport } = vi.hoisted(() => ({ usePhotoImport: vi.fn() }))
-vi.mock('../photo/usePhotoImport', () => ({ usePhotoImport }))
+const { useCairnImport } = vi.hoisted(() => ({ useCairnImport: vi.fn() }))
+vi.mock('../photo/useCairnImport', () => ({ useCairnImport }))
 
 const { acquire } = vi.hoisted(() => ({ acquire: vi.fn() }))
 vi.mock('../photo/imageCache', () => ({ photoImageCache: { acquire } }))
@@ -68,30 +68,34 @@ function baseTripImport(overrides: Record<string, unknown> = {}) {
   }
 }
 
-function photoRecord(overrides: Partial<PhotoRecord> = {}): PhotoRecord {
+function cairnRecord(overrides: Partial<CairnRecord> = {}): CairnRecord {
   return {
     id: 'p1',
     name: 'sapporo.jpg',
-    originalDriveFileId: 'orig-1',
-    thumbnailDriveFileId: 'thumb-1',
+    position: { lat: 43, lng: 141 },
+    positionSource: 'exif',
+    icon: null,
+    image: { originalDriveFileId: 'orig-1', thumbnailDriveFileId: 'thumb-1' },
+    description: '',
+    date: '2024-06-01T09:14:00Z',
     gpsTimestamp: '2024-06-01T09:14:00Z',
     ...overrides,
   }
 }
 
-function basePhotoImport(overrides: Record<string, unknown> = {}) {
+function baseCairnImport(overrides: Record<string, unknown> = {}) {
   return {
-    photos: [photoRecord()],
+    cairns: [cairnRecord()],
     loading: false,
     progress: [],
     failures: [],
     importFiles: vi.fn().mockResolvedValue(undefined),
     retryFailure: vi.fn().mockResolvedValue(undefined),
     dismissFailures: vi.fn(),
-    removePhoto: vi.fn(),
-    forgetPhoto: vi.fn(),
-    removingPhotoIds: new Set<string>(),
-    photoRemoveErrors: {},
+    removeCairn: vi.fn(),
+    forgetCairn: vi.fn(),
+    removingCairnIds: new Set<string>(),
+    cairnRemoveErrors: {},
     ...overrides,
   }
 }
@@ -99,7 +103,7 @@ function basePhotoImport(overrides: Record<string, unknown> = {}) {
 function tripFace(
   store: LocalTripStore,
   tripId: string,
-  options: { onRemovePhotoFromTrip?: (record: PhotoRecord) => Promise<boolean> } = {},
+  options: { onRemovePhotoFromTrip?: (record: CairnRecord) => Promise<boolean> } = {},
 ) {
   return (
     <MemoryRouter initialEntries={[`/trips/${tripId}`]}>
@@ -117,7 +121,7 @@ function tripFace(
   )
 }
 
-function renderTrip(options: { onRemovePhotoFromTrip?: (record: PhotoRecord) => Promise<boolean> } = {}) {
+function renderTrip(options: { onRemovePhotoFromTrip?: (record: CairnRecord) => Promise<boolean> } = {}) {
   const store = new LocalTripStore(fakeStorage())
   const entry = store.createTrip('Hokkaido')
   const view = render(tripFace(store, entry.id, options))
@@ -126,13 +130,13 @@ function renderTrip(options: { onRemovePhotoFromTrip?: (record: PhotoRecord) => 
 
 beforeEach(() => {
   useTripImport.mockReset().mockReturnValue(baseTripImport())
-  usePhotoImport.mockReset().mockReturnValue(basePhotoImport())
+  useCairnImport.mockReset().mockReturnValue(baseCairnImport())
   acquire.mockReset().mockResolvedValue({ url: 'blob:fake', release: vi.fn() })
 })
 
 describe('TripDetail — #55 photo list and lightbox', () => {
-  it('shows the photo section empty state pointing at the import control when the trip has no photos (criterion 13)', () => {
-    usePhotoImport.mockReturnValue(basePhotoImport({ photos: [] }))
+  it('shows the photo section empty state pointing at the import control when the trip has no cairns (criterion 13)', () => {
+    useCairnImport.mockReturnValue(baseCairnImport({ cairns: [] }))
 
     renderTrip()
 
@@ -174,18 +178,18 @@ describe('TripDetail — #55 photo list and lightbox', () => {
   })
 
   describe('#77 removing a photo', () => {
-    it('requires the confirm before removing, and calls removePhoto only from it', () => {
-      const removePhoto = vi.fn()
-      usePhotoImport.mockReturnValue(basePhotoImport({ removePhoto }))
+    it('requires the confirm before removing, and calls removeCairn only from it', () => {
+      const removeCairn = vi.fn()
+      useCairnImport.mockReturnValue(baseCairnImport({ removeCairn }))
 
       renderTrip()
 
       fireEvent.click(screen.getByRole('button', { name: 'Delete sapporo.jpg permanently' }))
-      expect(removePhoto).not.toHaveBeenCalled()
+      expect(removeCairn).not.toHaveBeenCalled()
       expect(screen.getByText('Remove "sapporo.jpg"?')).toBeDefined()
 
       fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
-      expect(removePhoto).toHaveBeenCalledWith('p1')
+      expect(removeCairn).toHaveBeenCalledWith('p1')
     })
 
     it('closes the lightbox and returns focus when the open photo is removed', async () => {
@@ -197,8 +201,8 @@ describe('TripDetail — #55 photo list and lightbox', () => {
       await waitFor(() => expect(screen.getByRole('dialog')).toBeDefined())
 
       // Simulates the removal landing while the lightbox is still open
-      // (design doc edge case) — the photo drops out of the settled list.
-      usePhotoImport.mockReturnValue(basePhotoImport({ photos: [] }))
+      // (design doc edge case) — the cairn drops out of the settled list.
+      useCairnImport.mockReturnValue(baseCairnImport({ cairns: [] }))
       rerender(tripFace(store, entry.id))
 
       await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
@@ -206,24 +210,24 @@ describe('TripDetail — #55 photo list and lightbox', () => {
   })
 
   describe('#132 removing a photo from a trip', () => {
-    it('calls onRemovePhotoFromTrip with the photo record and forgets it on success', async () => {
-      const forgetPhoto = vi.fn()
-      usePhotoImport.mockReturnValue(basePhotoImport({ forgetPhoto }))
+    it('calls onRemovePhotoFromTrip with the cairn record and forgets it on success', async () => {
+      const forgetCairn = vi.fn()
+      useCairnImport.mockReturnValue(baseCairnImport({ forgetCairn }))
       const onRemovePhotoFromTrip = vi.fn().mockResolvedValue(true)
 
       renderTrip({ onRemovePhotoFromTrip })
 
       fireEvent.click(screen.getByRole('button', { name: 'Remove sapporo.jpg from trip' }))
 
-      await waitFor(() => expect(onRemovePhotoFromTrip).toHaveBeenCalledWith(photoRecord()))
-      expect(forgetPhoto).toHaveBeenCalledWith('p1')
+      await waitFor(() => expect(onRemovePhotoFromTrip).toHaveBeenCalledWith(cairnRecord()))
+      expect(forgetCairn).toHaveBeenCalledWith('p1')
       // No confirm and no delete — reversible by adding it back.
       expect(screen.queryByText('Remove "sapporo.jpg"?')).toBeNull()
     })
 
     it('shows the move-failed message and keeps the row when the move fails', async () => {
-      const forgetPhoto = vi.fn()
-      usePhotoImport.mockReturnValue(basePhotoImport({ forgetPhoto }))
+      const forgetCairn = vi.fn()
+      useCairnImport.mockReturnValue(baseCairnImport({ forgetCairn }))
       const onRemovePhotoFromTrip = vi.fn().mockResolvedValue(false)
 
       renderTrip({ onRemovePhotoFromTrip })
@@ -231,7 +235,7 @@ describe('TripDetail — #55 photo list and lightbox', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Remove sapporo.jpg from trip' }))
 
       await waitFor(() => expect(screen.getByText("Couldn't move — still on the map.")).toBeDefined())
-      expect(forgetPhoto).not.toHaveBeenCalled()
+      expect(forgetCairn).not.toHaveBeenCalled()
       expect(screen.getByText('sapporo.jpg')).toBeDefined()
     })
 
@@ -243,45 +247,45 @@ describe('TripDetail — #55 photo list and lightbox', () => {
   })
 })
 
-describe('TripDetail — #121 caching the photo count', () => {
+describe('TripDetail — #121 caching the cairn count', () => {
   it('caches the count for the picker to read, without a second Drive read', () => {
-    usePhotoImport.mockReturnValue(
-      basePhotoImport({ photos: [photoRecord({ id: 'a' }), photoRecord({ id: 'b' })] }),
+    useCairnImport.mockReturnValue(
+      baseCairnImport({ cairns: [cairnRecord({ id: 'a' }), cairnRecord({ id: 'b' })] }),
     )
     const { store, entry } = renderTrip()
 
     // Backfilled by the trip simply being opened — no migration pass, and
-    // `usePhotoImport` was reading `photos.json` on mount anyway.
-    expect(store.getTrips().find((t) => t.id === entry.id)?.photoCount).toBe(2)
+    // `useCairnImport` was listing `trips/<id>/cairns/` on mount anyway.
+    expect(store.getTrips().find((t) => t.id === entry.id)?.cairnCount).toBe(2)
   })
 
   it('records a genuine zero once the index has been read', () => {
-    usePhotoImport.mockReturnValue(basePhotoImport({ photos: [] }))
+    useCairnImport.mockReturnValue(baseCairnImport({ cairns: [] }))
     const { store, entry } = renderTrip()
 
-    expect(store.getTrip(entry.id)?.photoCount).toBe(0)
+    expect(store.getTrip(entry.id)?.cairnCount).toBe(0)
   })
 
-  /* Before the read-back lands, `photos` is the empty array the hook was
+  /* Before the read-back lands, `cairns` is the empty array the hook was
      initialised with. Writing `0` from that would clobber a real count with
      a wrong one on every open, which is the same lie in a new place. */
-  it('writes nothing while the photo index is still loading', () => {
-    usePhotoImport.mockReturnValue(basePhotoImport({ photos: [], loading: true }))
+  it('writes nothing while the cairn list is still loading', () => {
+    useCairnImport.mockReturnValue(baseCairnImport({ cairns: [], loading: true }))
     const { store, entry } = renderTrip()
 
-    expect(store.getTrip(entry.id)?.photoCount).toBeNull()
+    expect(store.getTrip(entry.id)?.cairnCount).toBeNull()
   })
 
-  it('follows the count down when a photo is removed', () => {
-    usePhotoImport.mockReturnValue(
-      basePhotoImport({ photos: [photoRecord({ id: 'a' }), photoRecord({ id: 'b' })] }),
+  it('follows the count down when a cairn is removed', () => {
+    useCairnImport.mockReturnValue(
+      baseCairnImport({ cairns: [cairnRecord({ id: 'a' }), cairnRecord({ id: 'b' })] }),
     )
     const { store, entry, rerender } = renderTrip()
-    expect(store.getTrip(entry.id)?.photoCount).toBe(2)
+    expect(store.getTrip(entry.id)?.cairnCount).toBe(2)
 
-    usePhotoImport.mockReturnValue(basePhotoImport({ photos: [photoRecord({ id: 'a' })] }))
+    useCairnImport.mockReturnValue(baseCairnImport({ cairns: [cairnRecord({ id: 'a' })] }))
     rerender(tripFace(store, entry.id))
 
-    expect(store.getTrip(entry.id)?.photoCount).toBe(1)
+    expect(store.getTrip(entry.id)?.cairnCount).toBe(1)
   })
 })

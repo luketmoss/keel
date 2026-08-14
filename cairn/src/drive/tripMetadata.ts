@@ -5,7 +5,7 @@
    few kilobytes of JSON. Plain `fetch`, same reasoning as every other
    `src/drive/*` module. */
 
-import { DriveAuthError, DriveRequestError } from './cairnFolder'
+import { DriveAuthError, DriveRequestError } from './rootFolder'
 import { reportDriveAuthError } from './authEvents'
 
 export { DriveAuthError, DriveRequestError }

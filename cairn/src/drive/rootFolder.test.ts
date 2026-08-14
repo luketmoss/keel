@@ -2,9 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   DriveAuthError,
   DriveRequestError,
-  findOrCreateCairnFolder,
+  findOrCreateRootFolder,
   getDriveAccount,
-} from './cairnFolder'
+} from './rootFolder'
 
 function jsonResponse(body: unknown, status = 200): Response {
   return {
@@ -59,7 +59,7 @@ describe('getDriveAccount', () => {
   })
 })
 
-describe('findOrCreateCairnFolder', () => {
+describe('findOrCreateRootFolder', () => {
   afterEach(() => {
     vi.restoreAllMocks()
   })
@@ -70,7 +70,7 @@ describe('findOrCreateCairnFolder', () => {
       .mockResolvedValueOnce(jsonResponse({ files: [] }))
       .mockResolvedValueOnce(jsonResponse({ id: 'new-folder-id', createdTime: '2026-01-01' }))
 
-    const folderId = await findOrCreateCairnFolder('token')
+    const folderId = await findOrCreateRootFolder('token')
 
     expect(folderId).toBe('new-folder-id')
     expect(fetchSpy).toHaveBeenCalledTimes(2)
@@ -84,7 +84,7 @@ describe('findOrCreateCairnFolder', () => {
       jsonResponse({ files: [{ id: 'existing-id', createdTime: '2025-06-01' }] }),
     )
 
-    const folderId = await findOrCreateCairnFolder('token')
+    const folderId = await findOrCreateRootFolder('token')
 
     expect(folderId).toBe('existing-id')
     expect(fetchSpy).toHaveBeenCalledTimes(1)
@@ -100,7 +100,7 @@ describe('findOrCreateCairnFolder', () => {
       }),
     )
 
-    const folderId = await findOrCreateCairnFolder('token')
+    const folderId = await findOrCreateRootFolder('token')
 
     expect(folderId).toBe('older')
   })
@@ -108,7 +108,7 @@ describe('findOrCreateCairnFolder', () => {
   it('propagates DriveAuthError from the lookup call', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({}, 401))
 
-    await expect(findOrCreateCairnFolder('expired')).rejects.toBeInstanceOf(DriveAuthError)
+    await expect(findOrCreateRootFolder('expired')).rejects.toBeInstanceOf(DriveAuthError)
   })
 
   // #73: the lookup used to require `'root' in parents`, so a `/Cairn/`
@@ -121,7 +121,7 @@ describe('findOrCreateCairnFolder', () => {
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(jsonResponse({ files: [{ id: 'moved-id', createdTime: '2025-06-01' }] }))
 
-    const folderId = await findOrCreateCairnFolder('token')
+    const folderId = await findOrCreateRootFolder('token')
 
     expect(folderId).toBe('moved-id')
     const [lookupUrl] = fetchSpy.mock.calls[0]

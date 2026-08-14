@@ -5,7 +5,7 @@ import { NameInput } from './NameInput'
 import { ColorPopover } from './ColorPopover'
 import { formatDistance } from '../format/units'
 import { trackColor, TRACK_COLORS } from '../map/palette'
-import { canChangeOwner, showExport, type LooseRecord } from '../store/looseStore'
+import { canChangeOwner, showExport, type LooseCairnRecord, type LooseRecord } from '../store/looseStore'
 import { usePhotoImage } from '../photo/usePhotoImage'
 import './LooseFace.css'
 
@@ -131,7 +131,7 @@ export function LooseFace({
           />
         </div>
         <p className="loose-face__kind">
-          {item.kind === 'track' ? 'track · not in a trip' : 'photo · not in a trip'}
+          {item.kind === 'track' ? 'track · not in a trip' : 'cairn · not in a trip'}
         </p>
         {editError && <p className="loose-face__edit-error">{editError}</p>}
 
@@ -192,7 +192,7 @@ export function LooseFace({
             disabled={disabled}
           />
         ) : (
-          <PhotoBody item={item} accessToken={accessToken} />
+          <CairnBody item={item} accessToken={accessToken} />
         )}
       </div>
     </div>
@@ -264,50 +264,55 @@ function TrackBody({
   )
 }
 
-function PhotoBody({
+/** `cairns.md`'s position-source sentence, verbatim — the one place this
+    copy lives, so a later surface (the marker/list rework's detail face)
+    can read it from here rather than re-authoring it. */
+export function positionSourceSentence(source: LooseCairnRecord['positionSource']): string {
+  switch (source) {
+    case 'placed':
+      return 'You put this here. Interpolation will never move it again.'
+    case 'interpolated':
+      return 'No GPS, so it was positioned by timestamp against this trip’s tracks. Drag its marker to correct it and this becomes placed.'
+    case 'exif':
+    default:
+      return 'Position came from the photo’s EXIF GPS — a starting value, not a verdict. Drag its marker to correct it and this becomes placed.'
+  }
+}
+
+function CairnBody({
   item,
   accessToken,
 }: {
-  item: Extract<LooseRecord, { kind: 'photo' }>
+  item: Extract<LooseRecord, { kind: 'cairn' }>
   accessToken: string | null
 }) {
   // #134: loading and failed both render the same `--surface-lift`
   // fallback fill — `usePhotoImage` already collapses those two into one
   // `undefined` for exactly this reason, matching `PhotoList`'s own stance.
-  const thumbnailUrl = usePhotoImage(accessToken, item.thumbnailDriveFileId ?? undefined).url
+  const thumbnailUrl = usePhotoImage(accessToken, item.image?.thumbnailDriveFileId).url
   return (
     <>
-      <div className="loose-face__image" role="img" aria-label={item.name}>
-        {thumbnailUrl && <img src={thumbnailUrl} alt="" />}
-      </div>
-      {item.position ? (
-        <dl className="loose-face__stats">
-          <div className="loose-face__stat">
-            <dt>Position</dt>
-            <dd>
-              {item.position.lat.toFixed(5)}, {item.position.lng.toFixed(5)}
-            </dd>
-          </div>
-          <div className="loose-face__stat">
-            <dt>From</dt>
-            <dd>EXIF GPS</dd>
-          </div>
-          <div className="loose-face__stat">
-            <dt>Taken</dt>
-            <dd>{item.takenAt ?? '—'}</dd>
-          </div>
-        </dl>
-      ) : (
-        /* The one genuinely awkward state in the model, and it gets words
-           rather than an error. */
-        <div className="loose-face__unplaced">
-          <p className="loose-face__unplaced-title">No location</p>
-          <p className="loose-face__unplaced-detail">
-            It has no GPS and no trip to interpolate against, so it is in your list but not on the
-            map. Adding it to a trip whose tracks cover its timestamp will place it.
-          </p>
+      {item.image && (
+        <div className="loose-face__image" role="img" aria-label={item.name}>
+          {thumbnailUrl && <img src={thumbnailUrl} alt="" />}
         </div>
       )}
+      {/* A cairn always has a position (`cairns.md`) — there is no
+          "no location" state left to render here. */}
+      <dl className="loose-face__stats">
+        <div className="loose-face__stat">
+          <dt>Position</dt>
+          <dd>
+            {item.position.lat.toFixed(5)}, {item.position.lng.toFixed(5)}
+          </dd>
+        </div>
+        <div className="loose-face__stat">
+          <dt>Taken</dt>
+          <dd>{item.date ?? '—'}</dd>
+        </div>
+      </dl>
+      <p className="loose-face__position-source">{positionSourceSentence(item.positionSource)}</p>
+      {item.description && <p className="loose-face__description">{item.description}</p>}
     </>
   )
 }

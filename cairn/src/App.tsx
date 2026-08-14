@@ -40,7 +40,7 @@ import { useGoogleAccount } from './auth/useGoogleAccount'
 import { AccountBubble } from './auth/AccountBubble'
 import { defaultOverridesStore } from './import/useTripImport'
 import { carryDisplayNameIntoTrip } from './store/trackOverridesStore'
-import type { PhotoRecord } from './photo/photoIndex'
+import type { CairnRecord } from './photo/useCairnImport'
 import './App.css'
 
 export function App() {
@@ -241,11 +241,10 @@ function AppShell() {
   const tripChoices = visibleTrips.map((entry) => ({
     entry,
     trackCount: trackCounts.get(entry.id) ?? 0,
-    // #121: cached on the index when the trip's photo index was last
-    // read, and `null` until something has read it. The picker shows
-    // no photo count in that case rather than a zero it cannot stand
-    // behind.
-    photoCount: entry.photoCount,
+    // #121: cached on the index when the trip's cairns were last read, and
+    // `null` until something has read them. The picker shows no cairn
+    // count in that case rather than a zero it cannot stand behind.
+    cairnCount: entry.cairnCount,
   }))
 
   /** #150: a track's name is stored by whichever trip owns it, so a move has
@@ -325,13 +324,16 @@ function AppShell() {
     return true
   }
 
-  /** #132's `Remove from trip` for a photo — the photo mirror of
+  /** #132's `Remove from trip` for a cairn — the cairn mirror of
       `removeTrackFromTrip`, and the same failure order for the same
-      reason: the loose record is created first, around the files that
-      already exist in the trip's folder, and a failed claim un-creates it
-      rather than leaving a loose row beside files the trip still owns. */
-  async function removePhotoFromTrip(record: PhotoRecord, tripId: string): Promise<boolean> {
-    const loose = looseImport.addPhotoFromTrip(record)
+      reason: the loose record is created first, around the folder that
+      already exists under the trip, and a failed claim un-creates it
+      rather than leaving a loose row beside files the trip still owns.
+      `record.id` is carried straight across (see `NewLooseCairn.id`), which
+      is what lets `claimFromTrip` find `trips/<tripId>/cairns/<id>/` by
+      name alone. */
+  async function removeCairnFromTrip(record: CairnRecord, tripId: string): Promise<boolean> {
+    const loose = looseImport.addCairnFromTrip(record)
     if (!(await looseStore.claimFromTrip(loose.id, tripId))) {
       looseStore.forget(loose.id)
       return false
@@ -341,7 +343,7 @@ function AppShell() {
   }
 
   /** #140: downloads a loose item's source file exactly as Drive holds it —
-      a track's KML under its `sourceName`, a photo's original under its
+      a track's KML under its `sourceName`, a cairn's image under its
       `name`, never the thumbnail `imageCache.ts` already has a URL for.
       Client-side only: fetch the bytes, hand them to the browser via an
       Object URL and a synthetic anchor click, and let the browser's own
@@ -351,7 +353,7 @@ function AppShell() {
     if (!accessToken || exportingIds.has(id)) return
     const item = looseStore.getItem(id)
     if (!item) return
-    const fileId = item.kind === 'track' ? item.driveFileId : item.originalDriveFileId
+    const fileId = item.kind === 'track' ? item.driveFileId : (item.image?.originalDriveFileId ?? null)
     if (!fileId) return
     const filename = item.kind === 'track' ? item.sourceName : item.name
 
@@ -541,7 +543,7 @@ function AppShell() {
                 (item) =>
                   kind === 'all' ||
                   (kind === 'tracks' && item.kind === 'track') ||
-                  (kind === 'photos' && item.kind === 'photo'),
+                  (kind === 'photos' && item.kind === 'cairn'),
               )}
               store={looseStore}
               accessToken={accessToken}
@@ -623,7 +625,7 @@ function AppShell() {
               // Reversible by adding it back, which is why it needs no
               // confirm — `Delete permanently` is the neighbouring one.
               onRemoveFromTrip={(file) => removeTrackFromTrip(file, openTripId)}
-              onRemovePhotoFromTrip={(record) => removePhotoFromTrip(record, openTripId)}
+              onRemovePhotoFromTrip={(record) => removeCairnFromTrip(record, openTripId)}
             />
           ) : openLooseId ? (
             openLoose ? (

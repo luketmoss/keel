@@ -108,19 +108,24 @@ export function formatTripDateRange(startDate: string | null, endDate: string | 
   return start.getFullYear() === currentYear ? base : `${base}, ${start.getFullYear()}`
 }
 
-/** A trip row's meta line (#131): date range, track count, then photo count
-    if it's known. The photo half — and its separator — is omitted rather
+/** A trip row's meta line (#131): date range, track count, then cairn count
+    if it's known. The cairn half — and its separator — is omitted rather
     than shown as `0 photos`, the same rule #121 already applies to the
-    picker: a trip whose photos have never been counted says nothing about
-    them rather than showing a zero it can't stand behind. */
+    picker: a trip whose cairns have never been counted says nothing about
+    them rather than showing a zero it can't stand behind.
+ *
+ * The visible word stays `photos` for now — cairns replace photos at the
+    model and storage layer here; the copy itself is the map/list/detail
+    issue's to redo (`cairn: cairn markers, list and detail replace photo
+    UI`). */
 export function formatTripMetaLine(
   startDate: string | null,
   endDate: string | null,
   trackCount: number,
-  photoCount: number | null,
+  cairnCount: number | null,
 ): string {
   const parts = [formatTripDateRange(startDate, endDate), pluralize(trackCount, 'track')]
-  if (photoCount !== null) parts.push(pluralize(photoCount, 'photo'))
+  if (cairnCount !== null) parts.push(pluralize(cairnCount, 'photo'))
   return parts.join(' · ')
 }
 
@@ -138,7 +143,7 @@ export function tripRowAccessibleName(
   startDate: string | null,
   endDate: string | null,
   trackCount: number,
-  photoCount: number | null,
+  cairnCount: number | null,
 ): string {
   const parts = [
     name,
@@ -146,8 +151,8 @@ export function tripRowAccessibleName(
     lowercaseFirst(formatTripDateRange(startDate, endDate)),
     pluralize(trackCount, 'track'),
   ]
-  if (photoCount !== null) {
-    parts.push(photoCount === 0 ? 'no photos' : pluralize(photoCount, 'photo'))
+  if (cairnCount !== null) {
+    parts.push(cairnCount === 0 ? 'no photos' : pluralize(cairnCount, 'photo'))
   }
   return parts.join(', ')
 }

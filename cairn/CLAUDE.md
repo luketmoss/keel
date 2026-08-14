@@ -25,13 +25,12 @@ cairn/
 These were settled before the project existed. Revisit them deliberately, not
 by accident.
 
-> **In flight (#155): "photo" stops being a kind.** Photos and points of
-> interest become one **cairn** — something at a coordinate, carrying an
-> optional image and an optional icon. Every mention of photos as a kind of
-> their own below is superseded by
-> [`docs/design/cairns.md`](docs/design/cairns.md), which is standing and
-> authoritative. #155 deletes this note once it lands.
-
+- **"photo" is not a kind.** Photos and points of interest are one **cairn** —
+  something at a coordinate, carrying an optional image and an optional icon.
+  A photo is a cairn with an image and no icon; a campsite is a cairn with an
+  icon and no image; both together is legal and useful. Normative in
+  [`docs/design/cairns.md`](docs/design/cairns.md), which is standing and
+  authoritative for every issue that touches a cairn.
 - **Map engine is the Google Maps JS API**, via `@vis.gl/react-google-maps`.
   Chosen for satellite imagery quality and because Drive already puts the user
   through Google OAuth — one vendor, one consent screen. `Map3DElement` is the
@@ -50,13 +49,13 @@ by accident.
   over dumping a folder into Google Earth.
 - **A trip is one entity with a `planned | completed` status**, not two types.
   Planning KMLs stay alongside the actual tracks after the trip happens.
-- **Tracks and photos can exist without a trip.** A day hike's track and a
+- **Tracks and cairns can exist without a trip.** A day hike's track and a
   single good photo are things at a coordinate; neither needs a trip invented
   around it. Loose ones live under `/Cairn/loose/`, and adding one to a trip is
   a move between folders rather than a copy or a promotion.
-- **A trip is a bundle, not the unit of storage.** It holds tracks and photos
+- **A trip is a bundle, not the unit of storage.** It holds tracks and cairns
   and gives them a name, a status and a date range — but the map shows trips,
-  loose tracks and loose photos side by side, and deleting a trip deletes what
+  loose tracks and loose cairns side by side, and deleting a trip deletes what
   it holds. See `docs/design/shell-and-content-model.md`.
 - **OAuth stays in Testing mode.** Single user for now, so tokens expiring every
   seven days is the accepted cost of skipping brand verification.

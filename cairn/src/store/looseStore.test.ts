@@ -55,23 +55,51 @@ describe('LocalLooseStore', () => {
     expect(store.getItems().every((item) => item.kind === 'track')).toBe(true)
   })
 
-  it('keeps a photo with its EXIF position', () => {
-    const photo = store.addPhoto({
+  it('keeps a cairn with its EXIF position', () => {
+    const cairn = store.addCairn({
       name: 'sapporo.jpg',
-      takenAt: '2024-11-03T00:00:00.000Z',
+      date: '2024-11-03T00:00:00.000Z',
       position: { lat: 43, lng: 141 },
+      positionSource: 'exif',
     })
 
-    expect(store.getItem(photo.id)).toMatchObject({ kind: 'photo', position: { lat: 43, lng: 141 } })
+    expect(store.getItem(cairn.id)).toMatchObject({ kind: 'cairn', position: { lat: 43, lng: 141 } })
   })
 
-  it('keeps a photo that has no GPS, without a position', () => {
-    const photo = store.addPhoto({ name: 'no-gps.jpg', takenAt: null, position: null })
+  it('a cairn always carries a position — there is no unplaced state', () => {
+    const cairn = store.addCairn({
+      name: 'placed.jpg',
+      date: null,
+      position: { lat: 1, lng: 2 },
+      positionSource: 'placed',
+    })
 
-    // It lists, it just does not draw. Losing it would be worse than not
-    // placing it.
-    expect(store.getItems()).toHaveLength(1)
-    expect(store.getItem(photo.id)?.position).toBeNull()
+    expect(store.getItem(cairn.id)?.position).toEqual({ lat: 1, lng: 2 })
+  })
+
+  it('image is both Drive ids, or neither, never one of the two', () => {
+    const withImage = store.addCairn({
+      name: 'a.jpg',
+      date: null,
+      position: { lat: 1, lng: 2 },
+      positionSource: 'exif',
+      image: { originalDriveFileId: 'orig', thumbnailDriveFileId: 'thumb' },
+    })
+    const iconOnly = store.addCairn({
+      name: 'campsite',
+      date: null,
+      position: { lat: 1, lng: 2 },
+      positionSource: 'placed',
+      icon: 'campsite',
+    })
+
+    const readImage = store.getItem(withImage.id)
+    expect(readImage?.kind === 'cairn' ? readImage.image : undefined).toEqual({
+      originalDriveFileId: 'orig',
+      thumbnailDriveFileId: 'thumb',
+    })
+    const readIconOnly = store.getItem(iconOnly.id)
+    expect(readIconOnly?.kind === 'cairn' ? readIconOnly.image : undefined).toBeNull()
   })
 
   it('writes a loose track its own overview, so the map never reads a source KML', () => {
@@ -151,23 +179,23 @@ describe('LocalLooseStore', () => {
       expect((store.getItem(record.id) as { colorIndex: number }).colorIndex).toBe(3)
     })
 
-    it('renames a photo', async () => {
-      const photo = store.addPhoto({ name: 'a.jpg', takenAt: null, position: null })
+    it('renames a cairn', async () => {
+      const cairn = store.addCairn({ name: 'a.jpg', date: null, position: { lat: 1, lng: 2 }, positionSource: 'exif' })
 
-      expect(await store.update(photo.id, { name: 'sapporo.jpg' })).toBe(true)
+      expect(await store.update(cairn.id, { name: 'sapporo.jpg' })).toBe(true)
 
-      expect(store.getItem(photo.id)?.name).toBe('sapporo.jpg')
+      expect(store.getItem(cairn.id)?.name).toBe('sapporo.jpg')
     })
 
-    // A photo has no colour to change — the field is simply ignored rather
+    // A cairn has no colour to change — the field is simply ignored rather
     // than producing an error, since the UI never offers the control for
     // one in the first place.
-    it('ignores a colour patch sent for a photo', async () => {
-      const photo = store.addPhoto({ name: 'a.jpg', takenAt: null, position: null })
+    it('ignores a colour patch sent for a cairn', async () => {
+      const cairn = store.addCairn({ name: 'a.jpg', date: null, position: { lat: 1, lng: 2 }, positionSource: 'exif' })
 
-      expect(await store.update(photo.id, { colorIndex: 3 })).toBe(true)
+      expect(await store.update(cairn.id, { colorIndex: 3 })).toBe(true)
 
-      expect(store.getItem(photo.id)).not.toHaveProperty('colorIndex')
+      expect(store.getItem(cairn.id)).not.toHaveProperty('colorIndex')
     })
 
     it('cancels an empty or whitespace-only rename rather than saving it', async () => {
@@ -281,12 +309,22 @@ describe('moveLooseIntoTrip', () => {
     expect(trips.getTrip(trip.id)?.origin).toEqual({ lat: 10, lng: 20 })
   })
 
-  it('moves a photo without touching the trip geometry', async () => {
+  function looseCairn(overrides: Partial<Parameters<LocalLooseStore['addCairn']>[0]> = {}) {
+    return store.addCairn({
+      name: 'a.jpg',
+      date: null,
+      position: { lat: 1, lng: 2 },
+      positionSource: 'exif',
+      ...overrides,
+    })
+  }
+
+  it('moves a cairn without touching the trip geometry', async () => {
     const trips = new LocalTripStore(fakeStorage())
     const trip = trips.createTrip('Larapinta')
-    const photo = store.addPhoto({ name: 'a.jpg', takenAt: null, position: { lat: 1, lng: 2 } })
+    const cairn = looseCairn()
 
-    expect(await moveLooseIntoTrip(store, trips, photo.id, trip.id, carryName)).toBe(true)
+    expect(await moveLooseIntoTrip(store, trips, cairn.id, trip.id, carryName)).toBe(true)
     expect(store.getItems()).toHaveLength(0)
     expect(trips.getOverview(trip.id)).toBeNull()
   })
@@ -300,54 +338,54 @@ describe('moveLooseIntoTrip', () => {
     expect(store.getItems()).toHaveLength(1)
   })
 
-  // #130: a photo moved into a trip that is not open has nothing else
-  // reading its photos.json to notice the count changed.
-  it('raises the destination trip photo count by one when it is already known', async () => {
+  // #130: a cairn moved into a trip that is not open has nothing else
+  // listing `trips/<id>/cairns/` to notice the count changed.
+  it('raises the destination trip cairn count by one when it is already known', async () => {
     const trips = new LocalTripStore(fakeStorage())
     const trip = trips.createTrip('Larapinta')
-    trips.savePhotoCount(trip.id, 4)
-    const photo = store.addPhoto({ name: 'a.jpg', takenAt: null, position: { lat: 1, lng: 2 } })
+    trips.saveCairnCount(trip.id, 4)
+    const cairn = looseCairn()
 
-    await moveLooseIntoTrip(store, trips, photo.id, trip.id, carryName)
+    await moveLooseIntoTrip(store, trips, cairn.id, trip.id, carryName)
 
-    expect(trips.getTrip(trip.id)?.photoCount).toBe(5)
+    expect(trips.getTrip(trip.id)?.cairnCount).toBe(5)
     // The index entry, not just the full record — this is what App's
     // `tripChoices` reads to build the picker's `TripChoice[]`, so this is
     // what actually makes the picker show the raised count.
-    expect(trips.getTrips().find((entry) => entry.id === trip.id)?.photoCount).toBe(5)
+    expect(trips.getTrips().find((entry) => entry.id === trip.id)?.cairnCount).toBe(5)
   })
 
   it('leaves an uncounted trip uncounted rather than treating null as zero', async () => {
     const trips = new LocalTripStore(fakeStorage())
     const trip = trips.createTrip('Larapinta')
-    expect(trips.getTrip(trip.id)?.photoCount).toBeNull()
-    const photo = store.addPhoto({ name: 'a.jpg', takenAt: null, position: { lat: 1, lng: 2 } })
+    expect(trips.getTrip(trip.id)?.cairnCount).toBeNull()
+    const cairn = looseCairn()
 
-    await moveLooseIntoTrip(store, trips, photo.id, trip.id, carryName)
+    await moveLooseIntoTrip(store, trips, cairn.id, trip.id, carryName)
 
-    expect(trips.getTrip(trip.id)?.photoCount).toBeNull()
+    expect(trips.getTrip(trip.id)?.cairnCount).toBeNull()
   })
 
-  it('leaves the photo count untouched when a track moves', async () => {
+  it('leaves the cairn count untouched when a track moves', async () => {
     const trips = new LocalTripStore(fakeStorage())
     const trip = trips.createTrip('Larapinta')
-    trips.savePhotoCount(trip.id, 4)
+    trips.saveCairnCount(trip.id, 4)
     const record = store.addTrack(NEW_TRACK, [track([[1, 2]])])
 
     await moveLooseIntoTrip(store, trips, record.id, trip.id, carryName)
 
-    expect(trips.getTrip(trip.id)?.photoCount).toBe(4)
+    expect(trips.getTrip(trip.id)?.cairnCount).toBe(4)
   })
 
-  it('leaves the destination photo count untouched when the move fails', async () => {
+  it('leaves the destination cairn count untouched when the move fails', async () => {
     const trips = new LocalTripStore(fakeStorage())
     const trip = trips.createTrip('Larapinta')
-    trips.savePhotoCount(trip.id, 4)
-    const photo = store.addPhoto({ name: 'a.jpg', takenAt: null, position: { lat: 1, lng: 2 } })
+    trips.saveCairnCount(trip.id, 4)
+    const cairn = looseCairn()
     const failing = { ...store, moveIntoTrip: async () => false }
 
-    expect(await moveLooseIntoTrip(failing, trips, photo.id, trip.id, carryName)).toBe(false)
-    expect(trips.getTrip(trip.id)?.photoCount).toBe(4)
+    expect(await moveLooseIntoTrip(failing, trips, cairn.id, trip.id, carryName)).toBe(false)
+    expect(trips.getTrip(trip.id)?.cairnCount).toBe(4)
   })
 
   // #150: a track's name is stored by whichever trip owns it, so the move
@@ -379,12 +417,12 @@ describe('moveLooseIntoTrip', () => {
     expect(carried).toEqual([])
   })
 
-  it('carries nothing for a photo, whose name travels in photos.json', async () => {
+  it('carries nothing for a cairn, whose name travels inside its own folder', async () => {
     const trips = new LocalTripStore(fakeStorage())
     const trip = trips.createTrip('Larapinta')
-    const photo = store.addPhoto({ name: 'a.jpg', takenAt: null, position: { lat: 1, lng: 2 } })
+    const cairn = looseCairn()
 
-    await moveLooseIntoTrip(store, trips, photo.id, trip.id, carryName)
+    await moveLooseIntoTrip(store, trips, cairn.id, trip.id, carryName)
 
     expect(carried).toEqual([])
   })
@@ -416,17 +454,17 @@ describe('moveLooseIntoTrip', () => {
     expect(store.getItems()).toHaveLength(0)
   })
 
-  it('leaves a different trip photo count untouched', async () => {
+  it('leaves a different trip cairn count untouched', async () => {
     const trips = new LocalTripStore(fakeStorage())
     const trip = trips.createTrip('Larapinta')
     const other = trips.createTrip('Overland Track')
-    trips.savePhotoCount(trip.id, 4)
-    trips.savePhotoCount(other.id, 9)
-    const photo = store.addPhoto({ name: 'a.jpg', takenAt: null, position: { lat: 1, lng: 2 } })
+    trips.saveCairnCount(trip.id, 4)
+    trips.saveCairnCount(other.id, 9)
+    const cairn = looseCairn()
 
-    await moveLooseIntoTrip(store, trips, photo.id, trip.id, carryName)
+    await moveLooseIntoTrip(store, trips, cairn.id, trip.id, carryName)
 
-    expect(trips.getTrip(other.id)?.photoCount).toBe(9)
+    expect(trips.getTrip(other.id)?.cairnCount).toBe(9)
   })
 })
 
@@ -447,16 +485,40 @@ describe('looseMetaLine', () => {
     )
   })
 
-  it('names a placed photo by kind and an unplaced one by what it lacks', () => {
-    const placed = store.addPhoto({
+  it('names a photo-only cairn by "photo", and an icon one by its label', () => {
+    const photo = store.addCairn({
       name: 'a.jpg',
-      takenAt: '2024-11-03T00:00:00.000Z',
+      date: '2024-11-03T00:00:00.000Z',
       position: { lat: 1, lng: 2 },
+      positionSource: 'exif',
+      image: { originalDriveFileId: 'o', thumbnailDriveFileId: 't' },
     })
-    const unplaced = store.addPhoto({ name: 'b.jpg', takenAt: '1998-01-01T00:00:00.000Z', position: null })
+    const campsite = store.addCairn({
+      name: 'Camp',
+      date: '2023-06-13T00:00:00.000Z',
+      position: { lat: 1, lng: 2 },
+      positionSource: 'placed',
+      icon: 'campsite',
+    })
+    const both = store.addCairn({
+      name: 'Camp with a view',
+      date: '2023-06-13T00:00:00.000Z',
+      position: { lat: 1, lng: 2 },
+      positionSource: 'placed',
+      icon: 'campsite',
+      image: { originalDriveFileId: 'o', thumbnailDriveFileId: 't' },
+    })
+    const neither = store.addCairn({
+      name: 'Junction',
+      date: null,
+      position: { lat: 1, lng: 2 },
+      positionSource: 'placed',
+    })
 
-    expect(looseMetaLine(placed, asIs)).toBe('2024-11-03 · photo')
-    expect(looseMetaLine(unplaced, asIs)).toBe('1998-01-01 · no location')
+    expect(looseMetaLine(photo, asIs)).toBe('2024-11-03 · photo')
+    expect(looseMetaLine(campsite, asIs)).toBe('2023-06-13 · campsite')
+    expect(looseMetaLine(both, asIs)).toBe('2023-06-13 · campsite · photo')
+    expect(looseMetaLine(neither, asIs)).toBe('undated · cairn')
   })
 
   it('says so rather than inventing a date for an undated item', () => {
@@ -510,28 +572,21 @@ describe('showExport (#140)', () => {
     expect(showExport({ ...record, uploadState: 'ok', driveFileId: 'file-1' })).toBe(true)
   })
 
-  it('gates a photo on originalDriveFileId, not thumbnailDriveFileId', () => {
-    const record = store.addPhoto({
+  it('gates a cairn on its image, and omits it for an icon-only cairn', () => {
+    const record = store.addCairn({
       name: 'sapporo.jpg',
-      takenAt: '2024-11-03T00:00:00.000Z',
+      date: '2024-11-03T00:00:00.000Z',
       position: { lat: 43, lng: 141 },
+      positionSource: 'exif',
     })
 
     expect(
       showExport({
         ...record,
         uploadState: 'ok',
-        originalDriveFileId: null,
-        thumbnailDriveFileId: 'thumb-1',
-      }),
-    ).toBe(false)
-    expect(
-      showExport({
-        ...record,
-        uploadState: 'ok',
-        originalDriveFileId: 'orig-1',
-        thumbnailDriveFileId: null,
+        image: { originalDriveFileId: 'orig-1', thumbnailDriveFileId: 'thumb-1' },
       }),
     ).toBe(true)
+    expect(showExport({ ...record, uploadState: 'ok', image: null })).toBe(false)
   })
 })

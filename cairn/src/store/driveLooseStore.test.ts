@@ -31,6 +31,15 @@ vi.mock('../drive/looseFolder', () => ({
 const { findOrCreateTripFolder } = vi.hoisted(() => ({ findOrCreateTripFolder: vi.fn() }))
 vi.mock('../drive/tripFolder', () => ({ findOrCreateTripFolder }))
 
+const { findOrCreateTripCairnsFolder, findOrCreateTripCairnItemFolder } = vi.hoisted(() => ({
+  findOrCreateTripCairnsFolder: vi.fn(),
+  findOrCreateTripCairnItemFolder: vi.fn(),
+}))
+vi.mock('../drive/tripCairnFolder', () => ({
+  findOrCreateTripCairnsFolder,
+  findOrCreateTripCairnItemFolder,
+}))
+
 const { findJsonFile, readJsonFile, writeJsonFile, listSubfolders, trashFolder, DriveConflictError } =
   vi.hoisted(() => {
     class DriveConflictError extends Error {}
@@ -64,12 +73,6 @@ vi.mock('../photo/thumbnail', async () => {
   return { ...actual, generateThumbnail }
 })
 
-const { appendPhotoToIndex, removePhotoFromIndex } = vi.hoisted(() => ({
-  appendPhotoToIndex: vi.fn(),
-  removePhotoFromIndex: vi.fn(),
-}))
-vi.mock('../photo/photoIndex', () => ({ appendPhotoToIndex, removePhotoFromIndex }))
-
 function track(points: [number, number][]): Track {
   return { name: 'day', points: points.map(([lat, lon]) => ({ lat, lon })) }
 }
@@ -85,12 +88,13 @@ const NEW_TRACK = {
   position: { lat: -37, lng: 142 },
 }
 
-const NEW_PHOTO = {
+const NEW_CAIRN = {
   name: 'sapporo.jpg',
-  takenAt: '2024-11-03T00:00:00.000Z',
+  date: '2024-11-03T00:00:00.000Z',
   gpsTimestamp: '2024-11-03T00:00:00.000Z',
   dateTimeOriginal: '2024-11-03T09:00:00',
   position: { lat: 43, lng: 141 },
+  positionSource: 'exif' as const,
 }
 
 const GEOMETRY = [
@@ -122,6 +126,8 @@ beforeEach(() => {
   findOrCreateLooseItemFolder.mockReset().mockResolvedValue('item-folder')
   moveDriveFile.mockReset().mockResolvedValue(undefined)
   findOrCreateTripFolder.mockReset().mockResolvedValue('trip-folder')
+  findOrCreateTripCairnsFolder.mockReset().mockResolvedValue('trip-cairns-folder')
+  findOrCreateTripCairnItemFolder.mockReset().mockResolvedValue('trip-item-folder')
   findJsonFile.mockReset().mockResolvedValue(null)
   readJsonFile.mockReset()
   writeJsonFile.mockReset().mockResolvedValue({ fileId: 'written', headRevisionId: 'rev-1' })
@@ -130,8 +136,6 @@ beforeEach(() => {
   startResumableUpload.mockReset().mockResolvedValue('session-uri')
   uploadFileContent.mockReset().mockResolvedValue({ id: 'drive-file-1' })
   generateThumbnail.mockReset().mockResolvedValue({ ok: true, blob: new Blob(['thumb']) })
-  appendPhotoToIndex.mockReset().mockResolvedValue(undefined)
-  removePhotoFromIndex.mockReset().mockResolvedValue(undefined)
   store = new DriveLooseStore(fakeStorage())
 })
 
@@ -184,15 +188,15 @@ describe('importing a loose track', () => {
   })
 })
 
-describe('importing a loose photo', () => {
-  it('uploads the original and a thumbnail alongside photo.json', async () => {
+describe('importing a loose cairn', () => {
+  it('uploads the original and a thumbnail alongside cairn.json', async () => {
     store = await connected()
     const source = new File(['jpeg'], 'sapporo.jpg')
     uploadFileContent
       .mockResolvedValueOnce({ id: 'original-1' })
       .mockResolvedValueOnce({ id: 'thumb-1' })
 
-    const record = store.addPhoto({ ...NEW_PHOTO, orientation: 6 }, source)
+    const record = store.addCairn({ ...NEW_CAIRN, orientation: 6 }, source)
     await settle()
 
     expect(generateThumbnail).toHaveBeenCalledWith(source, 6)
@@ -200,23 +204,19 @@ describe('importing a loose photo', () => {
       'sapporo.jpg',
       'sapporo.jpg.thumb.jpg',
     ])
-    expect(writeJsonFile.mock.calls.map((call) => call[2])).toContain('photo.json')
-    const stored = store.getItem(record.id) as {
-      originalDriveFileId?: string | null
-      thumbnailDriveFileId?: string | null
-    }
-    expect(stored.originalDriveFileId).toBe('original-1')
-    expect(stored.thumbnailDriveFileId).toBe('thumb-1')
+    expect(writeJsonFile.mock.calls.map((call) => call[2])).toContain('cairn.json')
+    const stored = store.getItem(record.id) as { image?: { originalDriveFileId: string; thumbnailDriveFileId: string } | null }
+    expect(stored.image).toEqual({ originalDriveFileId: 'original-1', thumbnailDriveFileId: 'thumb-1' })
   })
 
   it('is not-on-Drive when the thumbnail lands and the original does not', async () => {
     store = await connected()
     uploadFileContent.mockRejectedValueOnce(new Error('offline'))
 
-    const record = store.addPhoto(NEW_PHOTO, new File(['jpeg'], 'sapporo.jpg'))
+    const record = store.addCairn(NEW_CAIRN, new File(['jpeg'], 'sapporo.jpg'))
     await settle()
 
-    // Both files or neither — the same answer #110 gave the half-moved item.
+    // Both files or neither — the "both, or neither" rule, unchanged from #110.
     expect(store.getItem(record.id)?.uploadState).toBe('failed')
   })
 })
@@ -347,22 +347,24 @@ describe('migrating items that predate this issue', () => {
       'cairn.loose.index',
       JSON.stringify([
         {
-          kind: 'photo',
-          id: 'photo-1',
+          kind: 'cairn',
+          id: 'cairn-1',
           name: 'a.jpg',
           createdAt: '2026-01-01T00:00:00.000Z',
           uploadState: 'uploading',
-          takenAt: null,
-          position: null,
-          originalDriveFileId: null,
-          thumbnailDriveFileId: null,
+          position: { lat: 1, lng: 2 },
+          positionSource: 'exif',
+          icon: null,
+          image: null,
+          description: '',
+          date: null,
         },
       ]),
     )
 
     // The session that was doing the uploading is gone; nothing is in
     // flight, so the row must not claim otherwise forever.
-    expect(new DriveLooseStore(storage).getItem('photo-1')?.uploadState).toBe('failed')
+    expect(new DriveLooseStore(storage).getItem('cairn-1')?.uploadState).toBe('failed')
   })
 })
 
@@ -409,40 +411,24 @@ describe('moving into a trip', () => {
     expect(trashFolder).toHaveBeenCalledWith('tok', 'item-folder')
   })
 
-  it("moves a photo's two files and records it in the trip's photos.json", async () => {
+  // A cairn is a folder, the same shape a loose track's is (`cairns.md`'s
+  // "Storage") — its own per-item folder just moves parent, image and
+  // `cairn.json` together, in one call.
+  it("re-parents a cairn's whole folder from the loose bucket into the trip's cairns bucket", async () => {
     store = await connected()
     uploadFileContent
       .mockResolvedValueOnce({ id: 'original-1' })
       .mockResolvedValueOnce({ id: 'thumb-1' })
-    const record = store.addPhoto(NEW_PHOTO, new File(['jpeg'], 'sapporo.jpg'))
+    const record = store.addCairn(NEW_CAIRN, new File(['jpeg'], 'sapporo.jpg'))
     await settle()
+    trashFolder.mockClear()
 
     expect(await store.moveIntoTrip(record.id, 'trip-1')).toBe(true)
 
-    expect(moveDriveFile.mock.calls.map((call) => call[1])).toEqual(['original-1', 'thumb-1'])
-    // A photo Drive holds but `photos.json` does not name is a photo the
-    // Photos tab will never show.
-    expect(appendPhotoToIndex).toHaveBeenCalledWith('tok', 'trip-folder', {
-      name: 'sapporo.jpg',
-      originalDriveFileId: 'original-1',
-      thumbnailDriveFileId: 'thumb-1',
-      latitude: 43,
-      longitude: 141,
-      // #50's two timestamps survive the move rather than being collapsed.
-      gpsTimestamp: '2024-11-03T00:00:00.000Z',
-      dateTimeOriginal: '2024-11-03T09:00:00',
-    })
-  })
-
-  it('refuses to move a photo that has no file in Drive', async () => {
-    store = await connected()
-    uploadFileContent.mockRejectedValue(new Error('offline'))
-    const record = store.addPhoto(NEW_PHOTO, new File(['jpeg'], 'sapporo.jpg'))
-    await settle()
-
-    // Moving it would delete the last trace of it.
-    expect(await store.moveIntoTrip(record.id, 'trip-1')).toBe(false)
+    expect(moveDriveFile).toHaveBeenCalledWith('tok', 'item-folder', 'kind-folder', 'trip-cairns-folder')
+    // No per-file move-then-trash: the folder itself relocated.
     expect(trashFolder).not.toHaveBeenCalled()
+    expect(writeJsonFile.mock.calls.map((call) => call[2])).toContain('cairn.json')
   })
 
   it('leaves the item where it was when the move fails', async () => {
@@ -455,6 +441,16 @@ describe('moving into a trip', () => {
     expect(await store.moveIntoTrip(record.id, 'trip-1')).toBe(false)
     expect(store.getItems()).toHaveLength(1)
     expect(trashFolder).not.toHaveBeenCalled()
+  })
+
+  it('leaves a cairn where it was when its folder move fails', async () => {
+    store = await connected()
+    const record = store.addCairn(NEW_CAIRN, new File(['jpeg'], 'sapporo.jpg'))
+    await settle()
+    moveDriveFile.mockRejectedValue(new Error('offline'))
+
+    expect(await store.moveIntoTrip(record.id, 'trip-1')).toBe(false)
+    expect(store.getItems()).toHaveLength(1)
   })
 
   /* Once the first file has left the loose folder the item belongs to the
@@ -471,17 +467,15 @@ describe('moving into a trip', () => {
     expect(moveDriveFile).toHaveBeenCalled()
   })
 
-  it("still reports the move when a photo's index write fails", async () => {
+  it("still reports the move when a cairn's record write afterwards fails", async () => {
     store = await connected()
-    uploadFileContent
-      .mockResolvedValueOnce({ id: 'original-1' })
-      .mockResolvedValueOnce({ id: 'thumb-1' })
-    const record = store.addPhoto(NEW_PHOTO, new File(['jpeg'], 'sapporo.jpg'))
+    const record = store.addCairn(NEW_CAIRN, new File(['jpeg'], 'sapporo.jpg'))
     await settle()
-    appendPhotoToIndex.mockRejectedValue(new Error('offline'))
+    writeJsonFile.mockRejectedValue(new Error('offline'))
 
-    // The design note's accepted failure: gone from the top level, and not
-    // yet wholly arrived. Retried on the next connect.
+    // The folder itself has already relocated by the time the record write
+    // runs — reporting failure here would describe a move that plainly did
+    // happen as not having happened.
     expect(await store.moveIntoTrip(record.id, 'trip-1')).toBe(true)
   })
 })
@@ -508,65 +502,31 @@ describe('claiming back out of a trip', () => {
     expect(await store.claimFromTrip(record.id, 'trip-1')).toBe(false)
   })
 
-  // #132: a photo's claim mirrors a track's, plus the second file and the
-  // trip's photos.json entry `moveIntoTrip` had to handle on the way in.
-  it("moves both of a photo's files into the loose folder and drops it from the trip's photos.json", async () => {
+  // #132: a cairn's claim finds the trip-side folder by id alone — see
+  // `NewLooseCairn.id` — and moves that whole folder back, rather than the
+  // old two-file-plus-index dance a photo needed.
+  it("moves the cairn's whole folder from the trip's cairns bucket back into the loose bucket", async () => {
     store = await connected()
-    const record = store.addPhoto({
-      ...NEW_PHOTO,
-      originalDriveFileId: 'trip-orig-1',
-      thumbnailDriveFileId: 'trip-thumb-1',
+    const record = store.addCairn({
+      ...NEW_CAIRN,
+      id: 'trip-cairn-1',
+      image: { originalDriveFileId: 'trip-orig-1', thumbnailDriveFileId: 'trip-thumb-1' },
     })
 
     expect(await store.claimFromTrip(record.id, 'trip-1')).toBe(true)
 
-    expect(moveDriveFile.mock.calls.map((call) => [call[1], call[2], call[3]])).toEqual([
-      ['trip-orig-1', 'trip-folder', 'item-folder'],
-      ['trip-thumb-1', 'trip-folder', 'item-folder'],
-    ])
-    expect(removePhotoFromIndex).toHaveBeenCalledWith('tok', 'trip-folder', 'trip-orig-1')
+    expect(findOrCreateTripCairnItemFolder).toHaveBeenCalledWith('tok', 'cairn-folder', 'trip-1', 'trip-cairn-1')
+    expect(moveDriveFile).toHaveBeenCalledWith('tok', 'trip-item-folder', 'trip-cairns-folder', 'kind-folder')
     expect(store.getItem(record.id)?.uploadState).toBe('ok')
+    expect(writeJsonFile.mock.calls.map((call) => call[2])).toContain('cairn.json')
   })
 
-  it('refuses to claim a photo that has no files in Drive', async () => {
+  it("leaves the cairn in the trip when its folder move fails", async () => {
     store = await connected()
-    const record = store.addPhoto(NEW_PHOTO)
-
-    expect(await store.claimFromTrip(record.id, 'trip-1')).toBe(false)
-    expect(moveDriveFile).not.toHaveBeenCalled()
-    expect(removePhotoFromIndex).not.toHaveBeenCalled()
-  })
-
-  it("leaves the photo in the trip when the original's move fails", async () => {
-    store = await connected()
-    const record = store.addPhoto({
-      ...NEW_PHOTO,
-      originalDriveFileId: 'trip-orig-1',
-      thumbnailDriveFileId: 'trip-thumb-1',
-    })
+    const record = store.addCairn({ ...NEW_CAIRN, id: 'trip-cairn-1' })
     moveDriveFile.mockRejectedValue(new Error('offline'))
 
     expect(await store.claimFromTrip(record.id, 'trip-1')).toBe(false)
-    expect(removePhotoFromIndex).not.toHaveBeenCalled()
-  })
-
-  /* Once the original has left the trip folder the photo belongs to the
-     loose store, and reporting otherwise would leave it named in the
-     trip's photos.json beside files the loose store now holds — one item
-     owned twice. The thumbnail move and the index write come after that
-     line and must not undo it, the mirror of moveIntoTrip's own stance. */
-  it('still reports the claim when only the thumbnail move or the index removal fails', async () => {
-    store = await connected()
-    const record = store.addPhoto({
-      ...NEW_PHOTO,
-      originalDriveFileId: 'trip-orig-1',
-      thumbnailDriveFileId: 'trip-thumb-1',
-    })
-    moveDriveFile.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('offline'))
-    removePhotoFromIndex.mockRejectedValue(new Error('offline'))
-
-    expect(await store.claimFromTrip(record.id, 'trip-1')).toBe(true)
-    expect(moveDriveFile).toHaveBeenCalledTimes(2)
   })
 })
 

@@ -4,7 +4,7 @@
    starting over. Plain `fetch` throughout, same reasoning as
    `cairnFolder.ts` — every call is a request a test can mock. */
 
-import { DriveAuthError, DriveRequestError } from './cairnFolder'
+import { DriveAuthError, DriveRequestError } from './rootFolder'
 import { reportDriveAuthError } from './authEvents'
 
 export { DriveAuthError, DriveRequestError }

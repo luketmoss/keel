@@ -1,12 +1,12 @@
-/* `/Cairn/loose/tracks/` and `/Cairn/loose/photos/` — where a track or a
-   photo lives when no trip owns it. Same list/create pattern as
+/* `/Cairn/loose/tracks/` and `/Cairn/loose/cairns/` — where a track or a
+   cairn lives when no trip owns it. Same list/create pattern as
    `tripFolder.ts`, one level deeper, plus the one call that moves a file
    between folders.
 
    The storage layout is normative in
    `cairn/docs/design/shell-and-content-model.md`. */
 
-import { DriveAuthError, DriveRequestError } from './cairnFolder'
+import { DriveAuthError, DriveRequestError } from './rootFolder'
 import { reportDriveAuthError } from './authEvents'
 
 export { DriveAuthError, DriveRequestError }
@@ -15,12 +15,12 @@ const DRIVE_FILES_URL = 'https://www.googleapis.com/drive/v3/files'
 const FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder'
 const LOOSE_FOLDER_NAME = 'loose'
 
-export type LooseKind = 'track' | 'photo'
+export type LooseKind = 'track' | 'cairn'
 
 /** The folder name each kind lives in. Plural, because the folder holds
     many — and fixed here rather than derived from the kind so a rename of
     the type never silently relocates a user's files. */
-const KIND_FOLDER: Record<LooseKind, string> = { track: 'tracks', photo: 'photos' }
+const KIND_FOLDER: Record<LooseKind, string> = { track: 'tracks', cairn: 'cairns' }
 
 interface DriveFile {
   id: string
@@ -80,7 +80,12 @@ async function createChildFolder(
   })) as DriveFile
 }
 
-async function findOrCreateChild(
+/** Exported for `tripCairnFolder.ts`, which needs the same generic
+    find-or-create-a-named-child-folder primitive one level up: a trip-owned
+    cairn's folder is `trips/<id>/cairns/<cairn-id>/`, and duplicating this
+    function there would be a second copy of the same race-tiebreak logic to
+    keep in step. */
+export async function findOrCreateChild(
   accessToken: string,
   parentId: string,
   name: string,
@@ -88,13 +93,13 @@ async function findOrCreateChild(
   const existing = await listChildFolders(accessToken, parentId, name)
   if (existing.length > 0) {
     // Oldest by `createdTime` wins a race between two tabs, same tie-break
-    // as `findOrCreateCairnFolder` and `findOrCreateTripFolder`.
+    // as `findOrCreateRootFolder` and `findOrCreateTripFolder`.
     return [...existing].sort((a, b) => a.createdTime.localeCompare(b.createdTime))[0].id
   }
   return (await createChildFolder(accessToken, parentId, name)).id
 }
 
-/** `/Cairn/loose/<tracks|photos>/`, creating either level if it is missing.
+/** `/Cairn/loose/<tracks|cairns>/`, creating either level if it is missing.
     Sequential rather than parallel: the second call needs the first's id. */
 export async function findOrCreateLooseFolder(
   accessToken: string,
@@ -105,7 +110,7 @@ export async function findOrCreateLooseFolder(
   return findOrCreateChild(accessToken, looseId, KIND_FOLDER[kind])
 }
 
-/** `/Cairn/loose/<tracks|photos>/<item-id>/` — one folder per loose item,
+/** `/Cairn/loose/<tracks|cairns>/<item-id>/` — one folder per loose item,
     standing to a loose item as a trip's folder does to a trip, and named by
     its id for the same reason: hydration reads the folder name back as the
     id rather than needing a separate index file. */

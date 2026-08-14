@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { TrackLayer } from './TrackLayer'
-import { PhotoLayer } from './PhotoLayer'
+import { PhotoLayer, type PositionedPhoto } from './PhotoLayer'
 import { TrackList } from './TrackList'
 import { PhotoList } from './PhotoList'
 import { Lightbox } from './Lightbox'
@@ -11,14 +11,12 @@ import { MissingFileRow } from './MissingFileRow'
 import { googleMapsMapId } from '../env'
 import { isPhotoFile, isTrackFile } from '../import/fileKinds'
 import { useTripImport } from '../import/useTripImport'
-import { usePhotoImport } from '../photo/usePhotoImport'
-import { positionPhotos } from '../photo/positionPhotos'
+import { useCairnImport, type CairnRecord } from '../photo/useCairnImport'
 import { buildPhotoListRows, flattenPhotoListRows, orderPhotoListItems } from '../photo/photoListGroups'
 import { tripUtcOffsetHours } from '../photo/interpolate'
 import type { TripStore } from '../store/tripStore'
 import { MOVE_FAILED_MESSAGE } from '../store/looseStore'
 import type { ImportedFile } from '../import/types'
-import type { PhotoRecord } from '../photo/photoIndex'
 import './TripDetail.css'
 
 const UNRECOGNISED_TYPE_MESSAGE = 'trips take .kml or .kmz tracks and JPEG, PNG or WebP photos'
@@ -95,10 +93,10 @@ interface TripDetailProps {
       move now, not a local write, so it can fail — and this trip only lets
       go of the track once the loose side has hold of it. */
   onRemoveFromTrip?: (file: ImportedFile) => Promise<boolean>
-  /** #132: the same contract as `onRemoveFromTrip`, for a photo — returns a
-      trip's `PhotoRecord` to the top level with its data intact, resolving
+  /** #132: the same contract as `onRemoveFromTrip`, for a cairn — returns a
+      trip's `CairnRecord` to the top level with its data intact, resolving
       whether the move actually happened. */
-  onRemovePhotoFromTrip?: (record: PhotoRecord) => Promise<boolean>
+  onRemovePhotoFromTrip?: (record: CairnRecord) => Promise<boolean>
 }
 
 /** The panel's trip face, and the trip's own map layers.
@@ -123,7 +121,12 @@ export function TripDetail({
 }: TripDetailProps) {
   const trip = useSyncExternalStore(tripStore.subscribe, () => tripStore.getTrip(tripId))
   const tripImport = useTripImport(tripId, accessToken, cairnFolderId)
-  const photoImport = usePhotoImport(tripId, accessToken, cairnFolderId)
+  const allTracks = useMemo(() => tripImport.tracks.flatMap((file) => file.tracks), [tripImport.tracks])
+  // Position resolution (EXIF, then interpolation against these same
+  // tracks) happens once, at import time, inside the hook — a cairn's
+  // `position` is already final by the time it reaches `cairns` below,
+  // unlike the old pipeline's render-time `positionPhotos` pass.
+  const cairnImport = useCairnImport(tripId, accessToken, cairnFolderId, allTracks)
   const [localFailures, setLocalFailures] = useState<LocalFailure[]>([])
   const nextLocalFailureId = useRef(0)
   const removeConfirm = useRemoveConfirm()
@@ -132,26 +135,27 @@ export function TripDetail({
       the hook's `trackRemoveErrors` because the hook owns deleting and this
       is the other exit; merged into one map where the list reads them. */
   const [detachErrors, setDetachErrors] = useState<Record<string, string>>({})
-  /** #132 — the photo mirror of `detachErrors`, keyed by photo id. */
+  /** #132 — the cairn mirror of `detachErrors`, keyed by cairn id. */
   const [photoDetachErrors, setPhotoDetachErrors] = useState<Record<string, string>>({})
   // #73: "disconnected" is exactly "no usable token", whether that's never
   // having signed in, a sign-out, or #72's token-expired.
   const signedIn = accessToken !== null && cairnFolderId !== null
 
-  /* #121 — this is the one place in the app that knows how many photos a
-     trip holds, because `usePhotoImport` reads `photos.json` on mount and
-     rewrites it on every import and every removal. Caching it here covers
-     all three moments with one effect, and backfills the count for every
-     trip that predates the field the first time the user opens one — no
-     migration pass, and no Drive read the app was not already making.
+  /* #121 — this is the one place in the app that knows how many cairns a
+     trip holds, because `useCairnImport` lists `trips/<id>/cairns/` on
+     mount and this component's own import/remove calls change it from
+     there. Caching it here covers all three moments with one effect, and
+     backfills the count for every trip that predates the field the first
+     time the user opens one — no migration pass, and no Drive read the app
+     was not already making.
 
-     Gated on `loading`: before the read-back lands, `photos` is the empty
+     Gated on `loading`: before the read-back lands, `cairns` is the empty
      array it was initialised with, and writing `0` from that would clobber
      a real count with a wrong one on every single open. */
   useEffect(() => {
-    if (photoImport.loading) return
-    tripStore.savePhotoCount(tripId, photoImport.photos.length)
-  }, [tripStore, tripId, photoImport.loading, photoImport.photos.length])
+    if (cairnImport.loading) return
+    tripStore.saveCairnCount(tripId, cairnImport.cairns.length)
+  }, [tripStore, tripId, cairnImport.loading, cairnImport.cairns.length])
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null)
   // Deliberately separate from `selectedPhotoId` rather than derived from
   // it — a selected marker does not open the lightbox by itself, only an
@@ -159,15 +163,28 @@ export function TripDetail({
   const [openPhotoId, setOpenPhotoId] = useState<string | null>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
 
-  const allTracks = useMemo(() => tripImport.tracks.flatMap((file) => file.tracks), [tripImport.tracks])
-  const positionedPhotos = useMemo(
-    () => positionPhotos(photoImport.photos, allTracks),
-    [photoImport.photos, allTracks],
+  // The subset `PhotoLayer` (still the old photo-marker treatment — the
+  // marker/list rework is the issue that redraws this as a pin-or-thumbnail
+  // predicate) can draw: a cairn carrying an image. A cairn with no image
+  // is not rendered by this layer at all yet.
+  const positionedPhotos: PositionedPhoto[] = useMemo(
+    () =>
+      cairnImport.cairns
+        .filter((cairn): cairn is CairnRecord & { image: NonNullable<CairnRecord['image']> } => cairn.image !== null)
+        .map((cairn) => ({
+          id: cairn.id,
+          name: cairn.name,
+          thumbnailDriveFileId: cairn.image.thumbnailDriveFileId,
+          latitude: cairn.position.lat,
+          longitude: cairn.position.lng,
+          source: cairn.positionSource,
+        })),
+    [cairnImport.cairns],
   )
 
   const photoListRows = useMemo(
-    () => buildPhotoListRows(photoImport.photos, positionedPhotos, allTracks),
-    [photoImport.photos, positionedPhotos, allTracks],
+    () => buildPhotoListRows(cairnImport.cairns, allTracks),
+    [cairnImport.cairns, allTracks],
   )
   const photoListItems = useMemo(() => orderPhotoListItems(photoListRows), [photoListRows])
   const flatPhotoRows = useMemo(() => flattenPhotoListRows(photoListItems), [photoListItems])
@@ -195,16 +212,16 @@ export function TripDetail({
   // #77 — a photo that's been removed can no longer be selected or open in
   // the lightbox.
   useEffect(() => {
-    if (selectedPhotoId && !photoImport.photos.some((photo) => photo.id === selectedPhotoId)) {
+    if (selectedPhotoId && !cairnImport.cairns.some((photo) => photo.id === selectedPhotoId)) {
       setSelectedPhotoId(null)
     }
-  }, [photoImport.photos, selectedPhotoId])
+  }, [cairnImport.cairns, selectedPhotoId])
 
   useEffect(() => {
-    if (openPhotoId && !photoImport.photos.some((photo) => photo.id === openPhotoId)) {
+    if (openPhotoId && !cairnImport.cairns.some((photo) => photo.id === openPhotoId)) {
       setOpenPhotoId(null)
     }
-  }, [photoImport.photos, openPhotoId])
+  }, [cairnImport.cairns, openPhotoId])
 
   // One control, one drop target, two pipelines. Files are partitioned into
   // three buckets — tracks, photos, and neither — before either pipeline
@@ -219,14 +236,14 @@ export function TripDetail({
       for (const file of neither) addLocalFailure(file.name, UNRECOGNISED_TYPE_MESSAGE)
       const tasks: Promise<void>[] = []
       if (tracks.length > 0) tasks.push(tripImport.importFiles(tracks))
-      if (photos.length > 0) tasks.push(photoImport.importFiles(photos))
+      if (photos.length > 0) tasks.push(cairnImport.importFiles(photos))
       return Promise.all(tasks).then(() => undefined)
     },
     // The individual callbacks, not the hook results — `useTripImport` and
     // `usePhotoImport` both return a fresh object literal on every render,
     // so depending on the objects would make this a new function every
     // render, and everything downstream of it churn with it.
-    [tripImport.importFiles, photoImport.importFiles, addLocalFailure],
+    [tripImport.importFiles, cairnImport.importFiles, addLocalFailure],
   )
 
   // #75: a drop that lands while signed out is not swallowed — one failure
@@ -352,17 +369,17 @@ export function TripDetail({
         />
         <TripImportPanel
           signedIn={signedIn}
-          progress={[...tripImport.progress, ...photoImport.progress]}
-          failures={[...tripImport.failures, ...photoImport.failures, ...localFailures]}
+          progress={[...tripImport.progress, ...cairnImport.progress]}
+          failures={[...tripImport.failures, ...cairnImport.failures, ...localFailures]}
           importFiles={importFiles}
           retryFailure={(id) =>
             tripImport.failures.some((f) => f.id === id)
               ? tripImport.retryFailure(id)
-              : photoImport.retryFailure(id)
+              : cairnImport.retryFailure(id)
           }
           dismissFailures={() => {
             tripImport.dismissFailures()
-            photoImport.dismissFailures()
+            cairnImport.dismissFailures()
             setLocalFailures([])
           }}
           onReconnect={onReconnect}
@@ -387,16 +404,16 @@ export function TripDetail({
             add photos has to be discoverable from a trip that has none. */}
         <PhotoList
           items={photoListItems}
-          totalCount={photoImport.photos.length}
+          totalCount={cairnImport.cairns.length}
           selectedPhotoId={selectedPhotoId}
           accessToken={accessToken}
           tripOffsetHours={tripOffsetHours}
           onOpenRow={openPhoto}
-          onRemove={photoImport.removePhoto}
+          onRemove={cairnImport.removeCairn}
           onRemoveFromTrip={
             onRemovePhotoFromTrip &&
             (async (id) => {
-              const record = photoImport.photos.find((candidate) => candidate.id === id)
+              const record = cairnImport.cairns.find((candidate) => candidate.id === id)
               if (!record) return
               setPhotoDetachErrors((prev) => {
                 if (!(id in prev)) return prev
@@ -413,15 +430,15 @@ export function TripDetail({
                 setPhotoDetachErrors((prev) => ({ ...prev, [id]: MOVE_FAILED_MESSAGE }))
                 return
               }
-              photoImport.forgetPhoto(id)
+              cairnImport.forgetCairn(id)
             })
           }
           confirmingId={removeConfirm.confirmingId}
           onStartConfirm={removeConfirm.onStartConfirm}
           onCancelConfirm={removeConfirm.onCancelConfirm}
           confirmingRowRef={removeConfirm.confirmingRowRef}
-          removingIds={photoImport.removingPhotoIds}
-          removeErrors={{ ...photoImport.photoRemoveErrors, ...photoDetachErrors }}
+          removingIds={cairnImport.removingCairnIds}
+          removeErrors={{ ...cairnImport.cairnRemoveErrors, ...photoDetachErrors }}
           disableRemove={!signedIn}
         />
       </div>

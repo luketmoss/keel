@@ -1,21 +1,21 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { requestDriveFileToken } from './googleIdentity'
-import { DriveAuthError, findOrCreateCairnFolder, getDriveAccount } from '../drive/cairnFolder'
+import { DriveAuthError, findOrCreateRootFolder, getDriveAccount } from '../drive/rootFolder'
 import { readStoredSession, writeStoredSession } from './driveSession'
 
 vi.mock('./googleIdentity', () => ({
   requestDriveFileToken: vi.fn(),
 }))
 
-vi.mock('../drive/cairnFolder', async () => {
-  const actual = await vi.importActual<typeof import('../drive/cairnFolder')>(
-    '../drive/cairnFolder',
+vi.mock('../drive/rootFolder', async () => {
+  const actual = await vi.importActual<typeof import('../drive/rootFolder')>(
+    '../drive/rootFolder',
   )
   return {
     ...actual,
     getDriveAccount: vi.fn(),
-    findOrCreateCairnFolder: vi.fn(),
+    findOrCreateRootFolder: vi.fn(),
   }
 })
 
@@ -66,7 +66,7 @@ describe('useGoogleAccount', () => {
       expiresAt: 1_700_003_600_000,
     })
     vi.mocked(getDriveAccount).mockResolvedValue({ email: 'jane@gmail.com' })
-    vi.mocked(findOrCreateCairnFolder).mockResolvedValue('folder-1')
+    vi.mocked(findOrCreateRootFolder).mockResolvedValue('folder-1')
 
     const { useGoogleAccount } = await loadHook()
     const { result } = renderHook(() => useGoogleAccount())
@@ -111,7 +111,7 @@ describe('useGoogleAccount', () => {
       expiresAt: 1_700_003_600_000,
     })
     vi.mocked(getDriveAccount).mockResolvedValue({ email: 'jane@gmail.com' })
-    vi.mocked(findOrCreateCairnFolder).mockRejectedValue(new Error('network error'))
+    vi.mocked(findOrCreateRootFolder).mockRejectedValue(new Error('network error'))
 
     const { useGoogleAccount } = await loadHook()
     const { result } = renderHook(() => useGoogleAccount())
@@ -130,7 +130,7 @@ describe('useGoogleAccount', () => {
       expiresAt: 1_700_003_600_000,
     })
     vi.mocked(getDriveAccount).mockResolvedValue({ email: 'jane@gmail.com' })
-    vi.mocked(findOrCreateCairnFolder)
+    vi.mocked(findOrCreateRootFolder)
       .mockRejectedValueOnce(new Error('network error'))
       .mockResolvedValueOnce('folder-1')
 
@@ -159,7 +159,7 @@ describe('useGoogleAccount', () => {
       expiresAt: 1_700_003_600_000,
     })
     vi.mocked(getDriveAccount).mockResolvedValue({ email: 'jane@gmail.com' })
-    vi.mocked(findOrCreateCairnFolder).mockResolvedValue('folder-1')
+    vi.mocked(findOrCreateRootFolder).mockResolvedValue('folder-1')
 
     const { useGoogleAccount } = await loadHook()
     const { result } = renderHook(() => useGoogleAccount())
@@ -181,7 +181,7 @@ describe('useGoogleAccount', () => {
       expiresAt: 1_700_003_600_000,
     })
     vi.mocked(getDriveAccount).mockResolvedValue({ email: 'jane@gmail.com' })
-    vi.mocked(findOrCreateCairnFolder)
+    vi.mocked(findOrCreateRootFolder)
       .mockRejectedValueOnce(new Error('network error'))
       .mockRejectedValueOnce(new DriveAuthError())
 
@@ -200,7 +200,7 @@ describe('useGoogleAccount', () => {
     it('restores into setting-up-folder/signed-in without a popup when a valid session is stored', async () => {
       writeStoredSession({ accessToken: 'stored-tok', expiresAt: Date.now() + 60_000 })
       vi.mocked(getDriveAccount).mockResolvedValue({ email: 'jane@gmail.com' })
-      vi.mocked(findOrCreateCairnFolder).mockResolvedValue('folder-1')
+      vi.mocked(findOrCreateRootFolder).mockResolvedValue('folder-1')
 
       const { useGoogleAccount } = await loadHook()
       const { result } = renderHook(() => useGoogleAccount())
@@ -236,7 +236,7 @@ describe('useGoogleAccount', () => {
     it('falls into folder-error on a restore whose folder lookup fails for a non-auth reason', async () => {
       writeStoredSession({ accessToken: 'stored-tok', expiresAt: Date.now() + 60_000 })
       vi.mocked(getDriveAccount).mockResolvedValue({ email: 'jane@gmail.com' })
-      vi.mocked(findOrCreateCairnFolder).mockRejectedValue(new Error('network error'))
+      vi.mocked(findOrCreateRootFolder).mockRejectedValue(new Error('network error'))
 
       const { useGoogleAccount } = await loadHook()
       const { result } = renderHook(() => useGoogleAccount())
@@ -251,7 +251,7 @@ describe('useGoogleAccount', () => {
     it('drops to signed-out, silently, when the stored token is rejected outright', async () => {
       writeStoredSession({ accessToken: 'stored-tok', expiresAt: Date.now() + 60_000 })
       vi.mocked(getDriveAccount).mockRejectedValue(new DriveAuthError())
-      vi.mocked(findOrCreateCairnFolder).mockResolvedValue('folder-1')
+      vi.mocked(findOrCreateRootFolder).mockResolvedValue('folder-1')
 
       const { useGoogleAccount } = await loadHook()
       const { result } = renderHook(() => useGoogleAccount())
@@ -273,7 +273,7 @@ describe('useGoogleAccount', () => {
         expiresAt: 1_700_003_600_000,
       })
       vi.mocked(getDriveAccount).mockResolvedValue({ email: 'jane@gmail.com' })
-      vi.mocked(findOrCreateCairnFolder).mockResolvedValue('folder-1')
+      vi.mocked(findOrCreateRootFolder).mockResolvedValue('folder-1')
 
       const { useGoogleAccount, reportDriveAuthError } = await loadHook()
       const { result } = renderHook(() => useGoogleAccount())
@@ -294,7 +294,7 @@ describe('useGoogleAccount', () => {
         expiresAt: 1_700_003_600_000,
       })
       vi.mocked(getDriveAccount).mockResolvedValue({ email: 'jane@gmail.com' })
-      vi.mocked(findOrCreateCairnFolder).mockResolvedValue('folder-1')
+      vi.mocked(findOrCreateRootFolder).mockResolvedValue('folder-1')
 
       const { useGoogleAccount, reportDriveAuthError } = await loadHook()
       const { result } = renderHook(() => useGoogleAccount())
@@ -339,7 +339,7 @@ describe('useGoogleAccount', () => {
         expiresAt: 1_700_003_600_000,
       })
       vi.mocked(getDriveAccount).mockResolvedValue({ email: 'jane@gmail.com' })
-      vi.mocked(findOrCreateCairnFolder).mockResolvedValue('folder-1')
+      vi.mocked(findOrCreateRootFolder).mockResolvedValue('folder-1')
 
       const { useGoogleAccount, reportDriveAuthError } = await loadHook()
       const { result, rerender } = renderHook(() => useGoogleAccount())
@@ -368,7 +368,7 @@ describe('useGoogleAccount', () => {
 
     it('returns to token-expired silently when the reconnect popup is cancelled', async () => {
       vi.mocked(getDriveAccount).mockResolvedValue({ email: 'jane@gmail.com' })
-      vi.mocked(findOrCreateCairnFolder).mockResolvedValue('folder-1')
+      vi.mocked(findOrCreateRootFolder).mockResolvedValue('folder-1')
 
       const { useGoogleAccount, reportDriveAuthError } = await loadHook()
       const { result, rerender } = renderHook(() => useGoogleAccount())

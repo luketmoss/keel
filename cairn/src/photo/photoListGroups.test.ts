@@ -6,27 +6,18 @@ import {
   orderPhotoListItems,
   type PhotoListRow,
 } from './photoListGroups'
-import type { PhotoRecord } from './photoIndex'
-import type { PositionedPhoto } from './positionPhotos'
+import type { CairnRecord } from './useCairnImport'
 
-function photoRecord(overrides: Partial<PhotoRecord> = {}): PhotoRecord {
+function cairnWithImage(overrides: Partial<CairnRecord> = {}): CairnRecord {
   return {
     id: 'p1',
     name: 'a.jpg',
-    originalDriveFileId: 'orig-1',
-    thumbnailDriveFileId: 'thumb-1',
-    ...overrides,
-  }
-}
-
-function positioned(overrides: Partial<PositionedPhoto> = {}): PositionedPhoto {
-  return {
-    id: 'p1',
-    name: 'a.jpg',
-    thumbnailDriveFileId: 'thumb-1',
-    latitude: 1,
-    longitude: 1,
-    source: 'exif',
+    position: { lat: 1, lng: 1 },
+    positionSource: 'exif',
+    icon: null,
+    image: { originalDriveFileId: 'orig-1', thumbnailDriveFileId: 'thumb-1' },
+    description: '',
+    date: null,
     ...overrides,
   }
 }
@@ -37,50 +28,43 @@ function row(overrides: Partial<PhotoListRow> = {}): PhotoListRow {
     name: 'a.jpg',
     thumbnailDriveFileId: 'thumb-1',
     originalDriveFileId: 'orig-1',
-    located: true,
+    source: 'exif',
     ...overrides,
   }
 }
 
 describe('buildPhotoListRows', () => {
-  it('marks a photo present in positionedPhotos as located, carrying its source (criterion 4 setup)', () => {
-    const rows = buildPhotoListRows(
-      [photoRecord({ id: 'p1' })],
-      [positioned({ id: 'p1', source: 'interpolated' })],
-      [],
-    )
+  it('carries a cairn present with an image, and its position source', () => {
+    const rows = buildPhotoListRows([cairnWithImage({ id: 'p1', positionSource: 'interpolated' })], [])
 
     expect(rows).toHaveLength(1)
-    expect(rows[0].located).toBe(true)
     expect(rows[0].source).toBe('interpolated')
   })
 
-  it('marks a photo absent from positionedPhotos as unlocated, reachable despite no marker (criterion 4)', () => {
-    const rows = buildPhotoListRows([photoRecord({ id: 'p1' })], [], [])
+  it('omits a cairn with no image — nothing for this list to show', () => {
+    const rows = buildPhotoListRows([cairnWithImage({ id: 'p1', image: null })], [])
 
-    expect(rows[0].located).toBe(false)
-    expect(rows[0].source).toBeUndefined()
+    expect(rows).toHaveLength(0)
   })
 
   it('resolves capture time via gpsTimestamp directly, needing no track offset (criterion 2)', () => {
     const rows = buildPhotoListRows(
-      [photoRecord({ id: 'p1', gpsTimestamp: '2024-06-01T09:14:00Z' })],
-      [positioned({ id: 'p1' })],
+      [cairnWithImage({ id: 'p1', gpsTimestamp: '2024-06-01T09:14:00Z' })],
       [],
     )
 
     expect(rows[0].captureInstantMs).toBe(Date.parse('2024-06-01T09:14:00Z'))
   })
 
-  it('leaves captureInstantMs undefined for a photo with neither timestamp field (criterion 3)', () => {
-    const rows = buildPhotoListRows([photoRecord({ id: 'p1' })], [positioned({ id: 'p1' })], [])
+  it('leaves captureInstantMs undefined for a cairn with neither timestamp field (criterion 3)', () => {
+    const rows = buildPhotoListRows([cairnWithImage({ id: 'p1' })], [])
 
     expect(rows[0].captureInstantMs).toBeUndefined()
   })
 })
 
 describe('orderPhotoListItems', () => {
-  it('orders located, dated rows by capture time ascending (criterion 2)', () => {
+  it('orders dated rows by capture time ascending (criterion 2)', () => {
     const rows = [
       row({ id: 'late', captureInstantMs: 200 }),
       row({ id: 'early', captureInstantMs: 100 }),
@@ -108,33 +92,7 @@ describe('orderPhotoListItems', () => {
     ])
   })
 
-  it('sorts unlocated photos under a No location divider, at the very end (criterion 4)', () => {
-    const rows = [
-      row({ id: 'located', captureInstantMs: 100, located: true }),
-      row({ id: 'unlocated', captureInstantMs: 50, located: false }),
-    ]
-
-    const items = orderPhotoListItems(rows)
-
-    expect(items.map((item) => (item.type === 'row' ? item.row.id : item.divider))).toEqual([
-      'located',
-      'no-location',
-      'unlocated',
-    ])
-  })
-
-  it('files an undated-and-unlocated photo only under No location, not also No date (No location wins as outer grouping)', () => {
-    const rows = [row({ id: 'both', located: false, captureInstantMs: undefined })]
-
-    const items = orderPhotoListItems(rows)
-
-    expect(items.map((item) => (item.type === 'row' ? item.row.id : item.divider))).toEqual([
-      'no-location',
-      'both',
-    ])
-  })
-
-  it('emits no dividers at all when every photo is located and dated', () => {
+  it('emits no dividers at all when every photo is dated', () => {
     const rows = [row({ id: 'a', captureInstantMs: 1 })]
 
     const items = orderPhotoListItems(rows)
@@ -145,7 +103,7 @@ describe('orderPhotoListItems', () => {
 
 describe('flattenPhotoListRows', () => {
   it('drops the dividers and keeps rows in displayed order (lightbox arrow-key order)', () => {
-    const rows = [row({ id: 'a', captureInstantMs: 1 }), row({ id: 'b', located: false })]
+    const rows = [row({ id: 'a', captureInstantMs: 1 }), row({ id: 'b' })]
     const items = orderPhotoListItems(rows)
 
     expect(flattenPhotoListRows(items).map((r) => r.id)).toEqual(['a', 'b'])

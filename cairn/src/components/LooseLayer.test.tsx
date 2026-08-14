@@ -37,16 +37,18 @@ beforeEach(() => {
   acquire.mockReset()
 })
 
-function loosePhoto(overrides: Partial<Extract<LooseRecord, { kind: 'photo' }>> = {}): LooseRecord {
+function looseCairn(overrides: Partial<Extract<LooseRecord, { kind: 'cairn' }>> = {}): LooseRecord {
   return {
-    kind: 'photo',
-    id: 'photo-1',
+    kind: 'cairn',
+    id: 'cairn-1',
     name: 'sapporo.jpg',
     createdAt: '2026-01-01T00:00:00.000Z',
-    takenAt: '2024-11-03T00:00:00.000Z',
+    date: '2024-11-03T00:00:00.000Z',
     position: { lat: 43, lng: 141 },
-    originalDriveFileId: 'orig-1',
-    thumbnailDriveFileId: 'thumb-1',
+    positionSource: 'exif',
+    icon: null,
+    image: { originalDriveFileId: 'orig-1', thumbnailDriveFileId: 'thumb-1' },
+    description: '',
     uploadState: 'ok',
     ...overrides,
   }
@@ -75,7 +77,7 @@ function renderLayer(items: LooseRecord[], accessToken: string | null = 'token')
 describe('LooseLayer — #134 the photo marker', () => {
   it("draws the photo's thumbnail once the caching loader resolves it", async () => {
     acquire.mockResolvedValue({ url: 'blob:fake-thumb', release: vi.fn() })
-    const { container } = renderLayer([loosePhoto()])
+    const { container } = renderLayer([looseCairn()])
 
     await waitFor(() => expect(acquire).toHaveBeenCalledWith('token', 'thumb-1'))
     await waitFor(() => expect(container.querySelector('.loose-marker__photo img')).not.toBeNull())
@@ -87,7 +89,7 @@ describe('LooseLayer — #134 the photo marker', () => {
 
   it('keeps drawing the plain circle marker when the thumbnail fails to load', async () => {
     acquire.mockRejectedValue(new Error('network error'))
-    const { container } = renderLayer([loosePhoto()])
+    const { container } = renderLayer([looseCairn()])
 
     await waitFor(() => expect(acquire).toHaveBeenCalled())
 
@@ -96,8 +98,8 @@ describe('LooseLayer — #134 the photo marker', () => {
     expect(container.querySelector('.loose-marker__photo')).not.toBeNull()
   })
 
-  it('keeps drawing the plain circle marker for a photo with no thumbnail id', () => {
-    const { container } = renderLayer([loosePhoto({ thumbnailDriveFileId: null })])
+  it('keeps drawing the plain circle marker for an icon-only cairn', () => {
+    const { container } = renderLayer([looseCairn({ image: null, icon: 'campsite' })])
 
     expect(acquire).not.toHaveBeenCalled()
     expect(container.querySelector('.loose-marker__photo img')).toBeNull()
@@ -105,7 +107,7 @@ describe('LooseLayer — #134 the photo marker', () => {
   })
 
   it('fetches nothing while signed out', () => {
-    renderLayer([loosePhoto()], null)
+    renderLayer([looseCairn()], null)
 
     expect(acquire).not.toHaveBeenCalled()
   })

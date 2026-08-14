@@ -18,7 +18,7 @@ function tripEntry(overrides: Partial<TripIndexEntry> = {}): TripIndexEntry {
     endDate: null,
     createdAt: '2026-01-01T00:00:00.000Z',
     origin: null,
-    photoCount: null,
+    cairnCount: null,
     ...overrides,
   }
 }
@@ -103,16 +103,18 @@ function looseTrack(overrides: Partial<Extract<LooseRecord, { kind: 'track' }>> 
   }
 }
 
-function loosePhoto(overrides: Partial<Extract<LooseRecord, { kind: 'photo' }>> = {}): LooseRecord {
+function looseCairn(overrides: Partial<Extract<LooseRecord, { kind: 'cairn' }>> = {}): LooseRecord {
   return {
-    kind: 'photo',
-    id: 'photo-1',
+    kind: 'cairn',
+    id: 'cairn-1',
     name: 'sapporo.jpg',
     createdAt: '2026-01-01T00:00:00.000Z',
-    takenAt: '2024-11-03T00:00:00.000Z',
+    date: '2024-11-03T00:00:00.000Z',
     position: { lat: 43, lng: 141 },
-    originalDriveFileId: null,
-    thumbnailDriveFileId: null,
+    positionSource: 'exif',
+    icon: null,
+    image: { originalDriveFileId: 'orig-1', thumbnailDriveFileId: 'thumb-1' },
+    description: '',
     uploadState: 'ok',
     ...overrides,
   }
@@ -189,7 +191,7 @@ describe('TripsPanel', () => {
           name: 'Kepler Track',
           startDate: '2024-03-01',
           endDate: '2024-03-05',
-          photoCount: 128,
+          cairnCount: 128,
         }),
       ],
       trackCounts: new Map([['t1', 4]]),
@@ -210,7 +212,7 @@ describe('TripsPanel', () => {
           name: 'Kepler Track',
           startDate: '2024-03-01',
           endDate: '2024-03-05',
-          photoCount: 128,
+          cairnCount: 128,
         }),
       ],
       trackCounts: new Map([['t1', 4]]),
@@ -225,7 +227,7 @@ describe('TripsPanel', () => {
 
   it('omits the photo count from the meta line when it has never been counted', () => {
     renderPanel({
-      trips: [tripEntry({ id: 't1', name: 'Kepler Track', photoCount: null })],
+      trips: [tripEntry({ id: 't1', name: 'Kepler Track', cairnCount: null })],
       trackCounts: new Map([['t1', 4]]),
     })
 
@@ -235,7 +237,7 @@ describe('TripsPanel', () => {
 
   it('shows a genuine zero photo count rather than omitting it', () => {
     renderPanel({
-      trips: [tripEntry({ id: 't1', name: 'Kepler Track', photoCount: 0 })],
+      trips: [tripEntry({ id: 't1', name: 'Kepler Track', cairnCount: 0 })],
       trackCounts: new Map([['t1', 4]]),
     })
 
@@ -244,7 +246,7 @@ describe('TripsPanel', () => {
 
   it('keeps counts singular at one', () => {
     renderPanel({
-      trips: [tripEntry({ id: 't1', name: 'Kepler Track', photoCount: 1 })],
+      trips: [tripEntry({ id: 't1', name: 'Kepler Track', cairnCount: 1 })],
       trackCounts: new Map([['t1', 1]]),
     })
 
@@ -418,7 +420,7 @@ describe('TripsPanel', () => {
     it('lists them alongside trips, each with its own glyph', () => {
       const { container } = renderPanel({
         trips: [tripEntry({ id: 'a', name: 'Larapinta', startDate: '2020-01-01', endDate: '2020-01-05' })],
-        looseItems: [looseTrack(), loosePhoto()],
+        looseItems: [looseTrack(), looseCairn()],
       })
 
       expect(screen.getByText('Larapinta')).toBeDefined()
@@ -430,31 +432,31 @@ describe('TripsPanel', () => {
     })
 
     it('gives a loose track its stats and a loose photo its kind', () => {
-      renderPanel({ trips: [], looseItems: [looseTrack(), loosePhoto()] })
+      renderPanel({ trips: [], looseItems: [looseTrack(), looseCairn()] })
 
       expect(screen.getByText(new RegExp(escapeRe(formatDistance(14200))))).toBeDefined()
       expect(screen.getByText(new RegExp(escapeRe(formatElevationGain(690)!)))).toBeDefined()
       expect(screen.getByText(/· photo/)).toBeDefined()
     })
 
-    it('marks a photo with no position as having none, in --danger', () => {
+    it('marks a cairn that never made it to Drive as not on Drive, in --danger', () => {
       const { container } = renderPanel({
         trips: [],
-        looseItems: [loosePhoto({ position: null })],
+        looseItems: [looseCairn({ uploadState: 'failed' })],
       })
 
-      expect(screen.getByText(/no location/)).toBeDefined()
+      expect(screen.getByText(/not on Drive/)).toBeDefined()
       expect(container.querySelector('.trips-panel__row-detail--unplaced')).not.toBeNull()
     })
 
     it('links a track and a photo to their own faces', () => {
-      renderPanel({ trips: [], looseItems: [looseTrack(), loosePhoto()] })
+      renderPanel({ trips: [], looseItems: [looseTrack(), looseCairn()] })
 
       expect(screen.getByText('Mount Rosea').closest('a')?.getAttribute('href')).toBe(
         '/tracks/track-1',
       )
       expect(screen.getByText('sapporo.jpg').closest('a')?.getAttribute('href')).toBe(
-        '/photos/photo-1',
+        '/photos/cairn-1',
       )
     })
 
@@ -560,12 +562,10 @@ describe('TripsPanel', () => {
       expect(screen.getByRole('menuitem', { name: 'Export' })).toHaveProperty('disabled', true)
     })
 
-    it('gates a photo export on its original file, not its thumbnail', () => {
+    it('omits Export for an icon-only cairn — there is no image to download', () => {
       renderPanel({
         trips: [],
-        looseItems: [
-          loosePhoto({ originalDriveFileId: null, thumbnailDriveFileId: 'thumb-1' }),
-        ],
+        looseItems: [looseCairn({ image: null, icon: 'campsite' })],
       })
 
       openRowMenu('sapporo.jpg')
@@ -585,7 +585,7 @@ describe('TripsPanel', () => {
     // A photo's marker is its thumbnail, not a palette entry — there is
     // nothing for "Change colour" to change.
     it('offers Rename but not Change colour on a loose photo', () => {
-      renderPanel({ trips: [], looseItems: [loosePhoto()] })
+      renderPanel({ trips: [], looseItems: [looseCairn()] })
 
       openRowMenu('sapporo.jpg')
       expect(screen.getByRole('menuitem', { name: 'Rename' })).toBeDefined()
@@ -689,7 +689,7 @@ describe('TripsPanel', () => {
   describe('the kind chips (#110)', () => {
     const everything = {
       trips: [tripEntry({ id: 'a', name: 'Larapinta' })],
-      looseItems: [looseTrack(), loosePhoto()],
+      looseItems: [looseTrack(), looseCairn()],
     }
 
     it('All shows every kind, under "Everything"', () => {

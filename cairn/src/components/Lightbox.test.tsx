@@ -15,7 +15,7 @@ function row(overrides: Partial<PhotoListRow> = {}): PhotoListRow {
     name: 'a.jpg',
     thumbnailDriveFileId: 'thumb-1',
     originalDriveFileId: 'orig-1',
-    located: true,
+    source: 'exif',
     ...overrides,
   }
 }

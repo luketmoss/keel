@@ -113,7 +113,7 @@ async function createCairnFolder(accessToken: string): Promise<DriveFile> {
     more than one exists — created by hand outside the app — the oldest by
     `createdTime` wins; picking deterministically matters more than which
     one. */
-export async function findOrCreateCairnFolder(accessToken: string): Promise<string> {
+export async function findOrCreateRootFolder(accessToken: string): Promise<string> {
   const existing = await listCairnFolders(accessToken)
   if (existing.length > 0) {
     const oldest = [...existing].sort((a, b) => a.createdTime.localeCompare(b.createdTime))[0]

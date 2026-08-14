@@ -10,7 +10,7 @@ function tripEntry(overrides: Partial<TripIndexEntry> = {}): TripIndexEntry {
     endDate: null,
     createdAt: '2024-01-01T00:00:00.000Z',
     origin: null,
-    photoCount: null,
+    cairnCount: null,
     ...overrides,
   }
 }

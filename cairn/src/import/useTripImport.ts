@@ -11,7 +11,7 @@ import {
   uploadFileContent,
 } from '../drive/trackFiles'
 import { findOrCreateTripFolder } from '../drive/tripFolder'
-import { DriveAuthError } from '../drive/cairnFolder'
+import { DriveAuthError } from '../drive/rootFolder'
 import type { TrackOverridesStore } from '../store/trackOverridesStore'
 import { DriveTrackOverridesStore } from '../store/driveTrackOverridesStore'
 

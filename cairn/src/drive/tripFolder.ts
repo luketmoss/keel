@@ -4,7 +4,7 @@
    Mirrors `cairnFolder.ts`'s list/create pattern exactly, scoped to a
    `parents` filter instead of `'root'`. */
 
-import { DriveAuthError, DriveRequestError } from './cairnFolder'
+import { DriveAuthError, DriveRequestError } from './rootFolder'
 import { reportDriveAuthError } from './authEvents'
 
 export { DriveAuthError, DriveRequestError }
@@ -85,7 +85,7 @@ async function createTripFolder(
 
 /** Reuses an existing per-trip folder rather than creating a duplicate. If
     more than one exists — e.g. a race between two tabs — the oldest by
-    `createdTime` wins, same tie-break as `findOrCreateCairnFolder`. */
+    `createdTime` wins, same tie-break as `findOrCreateRootFolder`. */
 export async function findOrCreateTripFolder(
   accessToken: string,
   cairnFolderId: string,

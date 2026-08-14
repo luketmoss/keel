@@ -98,7 +98,7 @@ Adding a fourth check means adding a function to `CHECKS` in `check.py`. Do not
 add one to the workflow — a check CI enforces that the local run doesn't is a
 check that fails for the first time in a pull request.
 
-## CI workflow
+## CI
 
 keel's workflow, and the two deviations from `CONVENTIONS.md` that its folder
 being the repository root forces, are in [scaffold.md](scaffold.md) beside this

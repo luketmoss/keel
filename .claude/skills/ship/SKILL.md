@@ -5,17 +5,20 @@ description: Merge a reviewed Keel PR, closing its issue and triggering the buil
 
 # /ship
 
-Merges. **The only irreversible action in the system, and the only one the user
-triggers by hand.**
+Merges. **The only irreversible action in the system.**
 
-## Never run this as part of a chain
+## Two ways in
 
-`/finish` stops at Ready to Ship. If you arrived here from another skill rather
-than from the user asking, stop — that is a bug in the calling skill, not a
-judgment call to make.
+`/finish` runs this as its fourth step, so the delivery run merges rather than
+parking. Standalone is for the issues that *didn't* — the ones sitting in Ready
+to Ship because a check was red, a PR had a conflict, or a review found
+something — once whatever stopped them is fixed.
 
-Merging to main triggers the build, which means merged is deployed. The user
-gets to decide that.
+Merging to main triggers the build, which means merged is deployed and there is
+no one else between here and `main`. The refusals below are what stands in for
+the person who used to. None of them is a judgment call: every one is a fact
+about the PR, and every one leaves the issue in Ready to Ship for a human rather
+than proceeding.
 
 ## Preconditions
 
@@ -28,10 +31,13 @@ Refuse, and say why, if:
 
 - the issue is not in **Ready to Ship** — it hasn't been reviewed
 - the PR is still a draft
-- checks are failing or pending
+- checks are failing, pending, or absent — a check that never ran is not a check
+  that passed, and `/review` treats an empty rollup the same way
 - the PR has conflicts
 
-Don't work around any of these. Report and stop.
+Don't work around any of these. Report and stop, leaving the issue in Ready to
+Ship: inside `/finish` that is the run parking rather than merging, and the
+column exists to be looked at.
 
 `mergeable` often comes back `UNKNOWN` immediately after checks finish — GitHub
 computes it asynchronously. That is not a conflict; wait a few seconds and

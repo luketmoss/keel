@@ -80,7 +80,9 @@ Clean review, green build:
 python .keel/board.py set <issue> --status "Ready to Ship"
 ```
 
-The issue is now at Gate 2. Tell the user what's waiting: issue, PR, what
-changed, what you checked, and anything you noted that didn't block.
+Report what you found: issue, PR, what changed, what you checked, and anything
+you noted that didn't block.
 
-**Do not merge.** `/ship` is the user's to run.
+**Do not merge here.** `/ship` does that, and inside `/finish` it runs next —
+which is exactly why this skill's build check is not a formality. Standalone,
+the issue rests in Ready to Ship until someone runs `/ship`.

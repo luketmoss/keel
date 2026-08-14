@@ -99,29 +99,36 @@ issue is not ready to be worked, it's an epic wearing a disguise.
 ## How work flows
 
 Stages are granular; the way you actually work is not. Issues move in two
-unattended runs, each ending at a gate where they wait for you.
+unattended runs, and there is one gate between them.
 
 **The refinement run** — `/idea` → PM Refining → UX → stops at **Refined**.
 Invoked as "new idea for X and get it refined", or `/idea` alone to capture
 without advancing.
 
-**Gate 1 — Refined.** Do you agree with the *solution*? An issue you disagree
-with goes back to PM Refining; it does not get fixed in flight.
+**The gate — Refined.** Do you agree with the *solution*? An issue you disagree
+with goes back to PM Refining; it does not get fixed in flight. This is the one
+place a run waits for a person, and it is the one that decides what gets built.
 
-**The delivery run** — In Development → Testing → Code Review → stops at
-**Ready to Ship**. Invoked as "finish up issue X".
+**The delivery run** — In Development → Testing → Code Review → **merge**.
+Invoked as "finish up issue X", and it ends on Done.
 
-**Gate 2 — Ready to Ship.** Do you agree with the *implementation*? The PR is
-open, reviewed, and green; nothing has touched main. This column is your inbox —
-everything in it is waiting on you and nothing else is.
+**The delivery run reaches main.** What makes that acceptable is that nothing
+merges on a judgment call: the build is green, `/review` found nothing blocking,
+and every failure path parks the issue in Ready to Ship instead of merging. What
+it costs is real and worth saying plainly — a bad run is now a commit to revert
+rather than a PR to close.
 
-**The merge** — `/ship`. The only irreversible action in the system, and the
-only one you trigger by hand. Nothing merges to main without you asking for it.
+**Ready to Ship is where a run parks, not where it ends.** Transient on the
+happy path, the way Code Review is. An issue resting there could not finish on
+its own — a draft PR, a check that failed or never ran, a conflict — and every
+one of those needs a person. That is what makes the column an inbox worth
+looking at: everything in it is waiting on you, and on the happy path nothing
+is.
 
-Both runs are fully unattended precisely because neither can reach main. Every
-atomic transition also exists as its own command, for when a run stalls or a
-stage needs re-running. The runs are the interface; the atomic skills are the
-mechanism.
+Every atomic transition also exists as its own command, for when a run stalls or
+a stage needs re-running — `/ship` on its own is how something that parked gets
+merged once its problem is fixed. The runs are the interface; the atomic skills
+are the mechanism.
 
 ## The pipeline
 
@@ -228,19 +235,20 @@ back to In Development, not forward with a caveat.
 ### 8. Ready to Ship
 
 Reviewed clean, CI green, PR out of draft, main untouched. Everything is done
-except the merge.
+except the merge — which, on the happy path, `/finish` does next. The stage is
+transient there, the way Code Review is.
 
-**This column is the inbox.** Its whole job is to answer "what is waiting on
-me?" at a glance — a question nothing else can answer, because GitHub does not
-permit approving your own PR and so records no approval event on a solo repo.
-Without this column, an item in Code Review might be un-reviewed, mid-CI, or
-ready, and the card looks identical in all three cases.
-
-It is also what lets the delivery run be fully unattended: the run stops here,
-so the worst case of a bad run is a PR you close, not a commit you revert.
+**What rests here is the inbox.** An issue that stays is one the run could not
+merge: a draft PR, a check that failed or never reported, a conflict. Every one
+of those needs a person, none of them is something a run should decide, and this
+column is how you find them at a glance. Nothing else can answer that question —
+GitHub does not permit approving your own PR, so a solo repo records no approval
+event, and a card in Code Review looks identical whether it is un-reviewed,
+mid-CI, or ready.
 
 **Command:** `/ship` — merges, which closes the issue and triggers the build.
-The only irreversible action in the system, and never part of a run.
+The only irreversible action in the system. `/finish` runs it; running it by
+hand is for an issue that parked here and has since been fixed.
 **Exit:** merged.
 
 ### 9. Done

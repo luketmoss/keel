@@ -4,7 +4,10 @@ Keel is a workspace: several software projects in one repo, one shared board,
 and the skills that move work through it.
 
 **[CONVENTIONS.md](CONVENTIONS.md) is authoritative.** Read it before running any
-lifecycle command. If a skill contradicts it, the skill is wrong.
+lifecycle command. If a skill contradicts it, the skill is wrong. This file is
+what a session knows *before* it has read anything else — the layout, which
+stack skill applies, and where the board is. The rules themselves live there,
+and are deliberately not restated here.
 
 ## Layout
 
@@ -57,41 +60,10 @@ Project #6, `https://github.com/users/luketmoss/projects/6`. IDs live in
 | Ready to Ship | `/ship` | **agree with the implementation?** |
 | Done | — | |
 
-Two unattended runs, each ending at a gate: **`/refine`** (`/idea` → `/pm` →
-`/ux` → Refined) and **`/finish`** (`/develop` → `/test` → `/review` → Ready to
-Ship). `/ship` merges and is the only irreversible action; never invoke it as
-part of a run.
+An index, not the rules. What each stage means, what the two gates are for, and
+how the runs chain are in [CONVENTIONS.md](CONVENTIONS.md).
 
 All board writes go through `python .keel/board.py` — never hand-write GraphQL
-against the project.
-
-Ready to Ship is the inbox: everything in it is waiting on you. Code Review is
-transient and nothing should rest there.
-
-## Adding a project option to the board
-
-`updateProjectV2Field` **replaces the entire option list.** Existing options
-must be written back with their IDs, or every item assigned to them is orphaned.
-Read the current options first, append, then write. Never construct the list
-from scratch.
-
-## Naming
-
-| Thing | Form | Example |
-|---|---|---|
-| Project slug | lowercase, hyphenated | `drop-tracker` |
-| Branch | `<slug>/<issue>-<desc>` | `drop-tracker/42-add-purge` |
-| Tag | `<slug>-v<semver>` | `drop-tracker-v1.2.0` |
-| Workflow | `.github/workflows/<slug>.yml` | |
-
-Branches, tags, and issue numbers are one pool shared across every project. The
-prefixes are what keep them readable, and they are not optional.
-
-## CI
-
-Every workflow is path-filtered to its project folder, sets
-`defaults.run.working-directory`, and prefixes its concurrency group and cache
-keys with the project slug. Generated from stack skills — do not hand-write.
-
-**Required status checks stay off.** A path-filtered check that never runs
-blocks its PR forever. `/review` verifies the run instead.
+against the project. This is the one board rule stated here rather than in
+`CONVENTIONS.md`, because it binds every session and `CONVENTIONS.md` gives it
+only in the narrower case of adding a project option.

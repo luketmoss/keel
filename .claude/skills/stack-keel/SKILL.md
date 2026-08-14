@@ -73,8 +73,8 @@ moved it to — which is precisely the drift the board exists to prevent.
   a single step with nothing to install.
 - Match `board.py`: a module docstring carrying the usage, `.format()` over
   f-strings, `# --- section ---` rules between groups of functions.
-- Every board write goes through `board.py`. Hand-written GraphQL against the
-  project is how `updateProjectV2Field` orphans every item on a field.
+- Every board write goes through `board.py`, per the root `CLAUDE.md`. The
+  hazard that makes it a rule is in `CONVENTIONS.md` §Board fields.
 
 **Issues**
 

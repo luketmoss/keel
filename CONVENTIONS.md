@@ -333,3 +333,11 @@ Sections may be empty in To Do. By Refined, everything above Results is filled.
   and the board is the one that will be believed.
 - **The refinement run stops rather than guesses.** A halted chain with an open
   question in the issue body is the correct outcome, not a failure.
+- **A gate is where the session ends.** The refinement run, the delivery run and
+  `/ship` are each their own session, because a session that spans all three
+  carries every file the earlier stages read into the later ones and pays for
+  them again on every turn. The cost is re-reading this file and the project's,
+  and it doubles as the check: a run that cannot start cold from the issue and
+  the board means the issue is underspecified, which is what Gate 1 is for.
+  This is about the seams *between* runs — each run is still unattended
+  end to end.

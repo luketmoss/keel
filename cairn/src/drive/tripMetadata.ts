@@ -18,8 +18,8 @@ const DRIVE_UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files'
     `If-Match`/conditional-write support on `files.update` (that's a v2
     concept the REST API never carried forward), so this is an
     application-level check rather than a server-guaranteed one: read the
-    file's current `version` immediately before writing and compare it to
-    the version this store last saw. It closes the common case — a stale
+    file's current `headRevisionId` immediately before writing and compare
+    it to the one this store last saw. It closes the common case — a stale
     write from a session that hasn't refreshed — without claiming true
     atomicity; a write landing in the gap between the check and the PUT
     would still win. Acceptable for cairn's actual concurrency (one person,
@@ -50,9 +50,23 @@ async function driveFetch(url: string, accessToken: string, init?: RequestInit):
 
 export interface DriveFileRef {
   fileId: string
-  /** Drive's `version` field — a monotonically increasing per-file counter,
-      not a hash. Used only as a staleness check, see `DriveConflictError`. */
-  version: string
+  /** Drive's `headRevisionId` — the id of the file's current content
+      revision. Used only as a staleness check, see `DriveConflictError`.
+ *
+ * **Not `version`, deliberately (#149).** `version` is a counter that, per
+ * Drive's own documentation, "reflects every change made to the file on
+ * the server, even those not visible to the user" — including changes
+ * Drive makes to a file of its own accord just after an upload. That makes
+ * the value echoed back by a write already stale by the time the next edit
+ * checks it, so every second edit was rejected against a file nobody else
+ * had touched. A revision id moves only when content is actually
+ * uploaded, which is the question this field exists to answer.
+ *
+ * `null` when Drive reported none. Only files with binary content carry a
+ * revision id, and while every file cairn writes through here is one, a
+ * missing id means *no information* rather than *unchanged* — see
+ * `overwrite` for what that does. */
+  headRevisionId: string | null
 }
 
 /** Looks up a file by exact name within one folder — Drive addresses files
@@ -64,39 +78,42 @@ export async function findJsonFile(
   fileName: string,
 ): Promise<DriveFileRef | null> {
   const query = [`name='${fileName}'`, `'${folderId}' in parents`, 'trashed=false'].join(' and ')
-  const url = `${DRIVE_FILES_URL}?q=${encodeURIComponent(query)}&fields=files(id,version)`
+  const url = `${DRIVE_FILES_URL}?q=${encodeURIComponent(query)}&fields=files(id,headRevisionId)`
   const response = await driveFetch(url, accessToken)
   if (!response.ok) {
     throw new DriveRequestError(`Drive request failed with status ${response.status}`)
   }
-  const body = (await response.json()) as { files?: { id: string; version: string }[] }
+  const body = (await response.json()) as { files?: { id: string; headRevisionId?: string }[] }
   const file = body.files?.[0]
-  return file ? { fileId: file.id, version: file.version } : null
+  return file ? { fileId: file.id, headRevisionId: file.headRevisionId ?? null } : null
 }
 
-async function currentVersion(accessToken: string, fileId: string): Promise<string> {
-  const response = await driveFetch(`${DRIVE_FILES_URL}/${fileId}?fields=version`, accessToken)
+async function currentHeadRevisionId(accessToken: string, fileId: string): Promise<string | null> {
+  const response = await driveFetch(`${DRIVE_FILES_URL}/${fileId}?fields=headRevisionId`, accessToken)
   if (!response.ok) {
     throw new DriveRequestError(`Drive request failed with status ${response.status}`)
   }
-  const body = (await response.json()) as { version: string }
-  return body.version
+  const body = (await response.json()) as { headRevisionId?: string }
+  return body.headRevisionId ?? null
 }
 
-/** Reads a JSON file's content and current `version` together — two
+/** Reads a JSON file's content and current `headRevisionId` together — two
     requests (content has no metadata fields alongside `alt=media`), but
     these files are read rarely (hydration, or after losing a conflict)
     next to how often they're written. */
-export async function readJsonFile<T>(accessToken: string, fileId: string): Promise<{ data: T; version: string }> {
-  const [contentResponse, version] = await Promise.all([
+export async function readJsonFile<T>(
+  accessToken: string,
+  fileId: string,
+): Promise<{ data: T; headRevisionId: string | null }> {
+  const [contentResponse, headRevisionId] = await Promise.all([
     driveFetch(`${DRIVE_FILES_URL}/${fileId}?alt=media`, accessToken),
-    currentVersion(accessToken, fileId),
+    currentHeadRevisionId(accessToken, fileId),
   ])
   if (!contentResponse.ok) {
     throw new DriveRequestError(`Drive request failed with status ${contentResponse.status}`)
   }
   const data = (await contentResponse.json()) as T
-  return { data, version }
+  return { data, headRevisionId }
 }
 
 /** Creates `fileName` fresh in `folderId` — the multipart body is Drive's
@@ -121,7 +138,7 @@ async function create(
     `${content}\r\n` +
     `--${boundary}--`
 
-  const response = await driveFetch(`${DRIVE_UPLOAD_URL}?uploadType=multipart&fields=id,version`, accessToken, {
+  const response = await driveFetch(`${DRIVE_UPLOAD_URL}?uploadType=multipart&fields=id,headRevisionId`, accessToken, {
     method: 'POST',
     headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
     body,
@@ -129,23 +146,33 @@ async function create(
   if (!response.ok) {
     throw new DriveRequestError(`Drive upload failed with status ${response.status}`)
   }
-  const file = (await response.json()) as { id: string; version: string }
-  return { fileId: file.id, version: file.version }
+  const file = (await response.json()) as { id: string; headRevisionId?: string }
+  return { fileId: file.id, headRevisionId: file.headRevisionId ?? null }
 }
 
-/** Replaces `fileId`'s content in place, after confirming its `version`
-    still matches `expectedVersion` — see `DriveConflictError`. */
+/** Replaces `fileId`'s content in place, after confirming its
+    `headRevisionId` still matches `expectedHeadRevisionId` — see
+    `DriveConflictError`.
+
+    The check refuses **only when both ids are present and differ**. A
+    missing id on either side is no information, not evidence of a change,
+    and failing closed on it would block every edit of a file Drive reports
+    no revision for — which is #149's bug rewritten rather than fixed.
+    Proceeding degrades to last-write-wins, the risk this module already
+    documents accepting. */
 async function overwrite(
   accessToken: string,
   fileId: string,
-  expectedVersion: string,
+  expectedHeadRevisionId: string | null,
   data: unknown,
 ): Promise<DriveFileRef> {
-  const latest = await currentVersion(accessToken, fileId)
-  if (latest !== expectedVersion) throw new DriveConflictError()
+  const latest = await currentHeadRevisionId(accessToken, fileId)
+  if (expectedHeadRevisionId !== null && latest !== null && latest !== expectedHeadRevisionId) {
+    throw new DriveConflictError()
+  }
 
   const response = await driveFetch(
-    `${DRIVE_UPLOAD_URL}/${fileId}?uploadType=media&fields=id,version`,
+    `${DRIVE_UPLOAD_URL}/${fileId}?uploadType=media&fields=id,headRevisionId`,
     accessToken,
     {
       method: 'PATCH',
@@ -156,8 +183,8 @@ async function overwrite(
   if (!response.ok) {
     throw new DriveRequestError(`Drive upload failed with status ${response.status}`)
   }
-  const file = (await response.json()) as { id: string; version: string }
-  return { fileId: file.id, version: file.version }
+  const file = (await response.json()) as { id: string; headRevisionId?: string }
+  return { fileId: file.id, headRevisionId: file.headRevisionId ?? null }
 }
 
 /** Writes `data` as `fileName` in `folderId`: creates it if `existing` is
@@ -171,7 +198,7 @@ export async function writeJsonFile(
   existing: DriveFileRef | null,
 ): Promise<DriveFileRef> {
   return existing
-    ? overwrite(accessToken, existing.fileId, existing.version, data)
+    ? overwrite(accessToken, existing.fileId, existing.headRevisionId, data)
     : create(accessToken, folderId, fileName, data)
 }
 

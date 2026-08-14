@@ -19,12 +19,25 @@ export const CAIRN_FOLDER_ID = 'fake-cairn-folder'
 
 const FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder'
 
+// No `headRevisionId` — real Drive reports one only for files with binary
+// content, and a folder has none. Nothing reads a folder's, and inventing
+// one here would make the emulator lie about the one field #149 turns on.
 function folder(id: string, name: string, parents: string[], createdTime: string): FakeFile {
   return { id, name, mimeType: FOLDER_MIME_TYPE, parents, trashed: false, version: 1, createdTime, content: null }
 }
 
 function jsonFile(id: string, name: string, parents: string[], content: unknown, createdTime: string): FakeFile {
-  return { id, name, mimeType: 'application/json', parents, trashed: false, version: 1, createdTime, content }
+  return {
+    id,
+    name,
+    mimeType: 'application/json',
+    parents,
+    trashed: false,
+    version: 1,
+    headRevisionId: `fake-rev-${id}`,
+    createdTime,
+    content,
+  }
 }
 
 function track(name: string, points: [number, number][]): Track {

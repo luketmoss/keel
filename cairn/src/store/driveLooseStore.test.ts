@@ -124,7 +124,7 @@ beforeEach(() => {
   findOrCreateTripFolder.mockReset().mockResolvedValue('trip-folder')
   findJsonFile.mockReset().mockResolvedValue(null)
   readJsonFile.mockReset()
-  writeJsonFile.mockReset().mockResolvedValue({ fileId: 'written', version: '1' })
+  writeJsonFile.mockReset().mockResolvedValue({ fileId: 'written', headRevisionId: 'rev-1' })
   listSubfolders.mockReset().mockResolvedValue([])
   trashFolder.mockReset().mockResolvedValue(undefined)
   startResumableUpload.mockReset().mockResolvedValue('session-uri')
@@ -226,7 +226,7 @@ describe('hydrating from Drive', () => {
     listSubfolders.mockImplementation(async () => [{ id: 'folder-a', name: 'track-a' }])
     findJsonFile.mockImplementation(async (_token: string, _folder: string, name: string) => ({
       fileId: `${name}-id`,
-      version: '1',
+      headRevisionId: 'rev-1',
     }))
     readJsonFile.mockImplementation(async (_token: string, fileId: string) => {
       if (fileId === 'track.json-id') {
@@ -246,12 +246,12 @@ describe('hydrating from Drive', () => {
             position: { lat: -37, lng: 142 },
             driveFileId: 'drive-file-1',
           },
-          version: '1',
+          headRevisionId: 'rev-1',
         }
       }
       return {
         data: { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: null, properties: {} }] },
-        version: '1',
+        headRevisionId: 'rev-1',
       }
     })
 
@@ -313,7 +313,7 @@ describe('migrating items that predate this issue', () => {
     // Drive now knows it, so a second connect hydrates rather than
     // re-uploading.
     listSubfolders.mockResolvedValue([{ id: 'folder-a', name: 'legacy-1' }])
-    findJsonFile.mockResolvedValue({ fileId: 'record-id', version: '1' })
+    findJsonFile.mockResolvedValue({ fileId: 'record-id', headRevisionId: 'rev-1' })
     readJsonFile.mockResolvedValue({
       data: {
         kind: 'track',
@@ -330,7 +330,7 @@ describe('migrating items that predate this issue', () => {
         position: { lat: 1, lng: 2 },
         driveFileId: null,
       },
-      version: '1',
+      headRevisionId: 'rev-1',
     })
     writeJsonFile.mockClear()
 
@@ -642,7 +642,7 @@ describe('update (#133)', () => {
       folderId === 'kind-folder' ? [{ id: 'item-folder', name: 'track-a' }] : [],
     )
     findJsonFile.mockImplementation(async (_token: string, _folderId: string, name: string) =>
-      name === 'track.json' ? { fileId: 'record-file', version: '1' } : null,
+      name === 'track.json' ? { fileId: 'record-file', headRevisionId: 'rev-1' } : null,
     )
     readJsonFile.mockResolvedValueOnce({
       data: {
@@ -660,7 +660,7 @@ describe('update (#133)', () => {
         position: NEW_TRACK.position,
         driveFileId: null,
       },
-      version: '1',
+      headRevisionId: 'rev-1',
     })
 
     store = new DriveLooseStore(fakeStorage())
@@ -670,7 +670,7 @@ describe('update (#133)', () => {
     writeJsonFile.mockRejectedValueOnce(new DriveConflictError())
     readJsonFile.mockResolvedValueOnce({
       data: { ...store.getItem('track-a'), name: 'Renamed elsewhere' },
-      version: '2',
+      headRevisionId: 'rev-2',
     })
 
     const result = await store.update('track-a', { name: 'My edit' })

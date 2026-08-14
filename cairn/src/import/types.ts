@@ -1,8 +1,10 @@
 import type { Track } from '../kml/parse'
 import type { TrackStats } from '../kml/stats'
 
-/** A trip's own imported track file (`useTripImport`) — every field always
-    populated, since a track only ever gets here by belonging to a trip. */
+/** A trip's own imported track file (`useTripImport`) — every field
+    populated, since a track only ever gets here by belonging to a trip. The
+    exception is `displayName`, which records a choice the user may not have
+    made; see its own note below. */
 export interface ImportedFile {
   id: string
   name: string

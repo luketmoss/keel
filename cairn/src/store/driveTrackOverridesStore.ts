@@ -112,10 +112,10 @@ export class DriveTrackOverridesStore implements TrackOverridesStore {
     const file = await findJsonFile(accessToken, tripFolderId, 'overrides.json')
 
     if (file) {
-      const { data, version } = await readJsonFile<TrackOverrides>(accessToken, file.fileId)
+      const { data, headRevisionId } = await readJsonFile<TrackOverrides>(accessToken, file.fileId)
       if (isTrackOverrides(data)) {
         this.local.replaceAll(tripId, data)
-        this.refs.set(tripId, { folderId: tripFolderId, file: { fileId: file.fileId, version } })
+        this.refs.set(tripId, { folderId: tripFolderId, file: { fileId: file.fileId, headRevisionId } })
       }
       return
     }
@@ -149,21 +149,27 @@ export class DriveTrackOverridesStore implements TrackOverridesStore {
       return true
     } catch (error) {
       if (error instanceof DriveConflictError) {
-        // A real version conflict means Drive's file changed under us —
-        // retrying with our own stale intent risks clobbering whatever
-        // wrote it, so this keeps the existing "defer to Drive's truth"
-        // behavior rather than retrying.
+        // A real conflict means Drive's file changed under us — retrying
+        // with our own stale intent risks clobbering whatever wrote it, so
+        // this keeps the existing "defer to Drive's truth" behavior rather
+        // than retrying.
+        // #149: logged, like `DriveTripStore.flushTrip` already logs its
+        // own. Without this a track edit failed with nothing but the row's
+        // banner to show for it, and the reason it failed was invisible.
+        console.error(`[cairn] trip ${tripId}: overrides flush conflicted`, error)
         await this.resolveConflict(tripId, ref, accessToken)
         return false
       }
       // #124: any other failure (network blip, transient 5xx, rate limit)
       // carries no such risk — the retry targets the exact same expected
-      // version, so it can only succeed if nothing else wrote in between.
+      // revision, so it can only succeed if nothing else wrote in between.
       // One retry before giving up and reverting.
+      console.error(`[cairn] trip ${tripId}: overrides flush failed, retrying`, error)
       try {
         this.refs.set(tripId, { ...ref, file: await write() })
         return true
-      } catch {
+      } catch (retryError) {
+        console.error(`[cairn] trip ${tripId}: overrides flush failed on retry, giving up`, retryError)
         this.local.replaceAll(tripId, previous)
         return false
       }
@@ -178,10 +184,10 @@ export class DriveTrackOverridesStore implements TrackOverridesStore {
   private async resolveConflict(tripId: string, ref: OverridesDriveRef, accessToken: string): Promise<void> {
     if (!ref.file) return
     try {
-      const { data, version } = await readJsonFile<TrackOverrides>(accessToken, ref.file.fileId)
+      const { data, headRevisionId } = await readJsonFile<TrackOverrides>(accessToken, ref.file.fileId)
       if (isTrackOverrides(data)) {
         this.local.replaceAll(tripId, data)
-        this.refs.set(tripId, { ...ref, file: { fileId: ref.file.fileId, version } })
+        this.refs.set(tripId, { ...ref, file: { fileId: ref.file.fileId, headRevisionId } })
       }
     } catch {
       // The re-read itself failed — the caller already treats this as a

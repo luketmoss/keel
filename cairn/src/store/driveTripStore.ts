@@ -213,7 +213,7 @@ export class DriveTripStore implements TripStore {
   private async hydrateTrip(folderId: string, tripId: string): Promise<boolean> {
     if (!this.credentials) return false
     const { accessToken } = this.credentials
-    let trip: { data: TripRecord; version: string }
+    let trip: { data: TripRecord; headRevisionId: string | null }
     try {
       const tripFile = await findJsonFile(accessToken, folderId, 'trip.json')
       if (!tripFile) return false
@@ -221,7 +221,10 @@ export class DriveTripStore implements TripStore {
       if (!isTripRecord(trip.data)) return false
 
       this.local.hydrate(trip.data)
-      this.refs.set(tripId, { folderId, trip: { fileId: tripFile.fileId, version: trip.version } })
+      this.refs.set(tripId, {
+        folderId,
+        trip: { fileId: tripFile.fileId, headRevisionId: trip.headRevisionId },
+      })
     } catch {
       return false
     }
@@ -233,7 +236,12 @@ export class DriveTripStore implements TripStore {
         if (isFeatureCollection(overview.data)) {
           this.local.hydrateOverview(trip.data.id, overview.data)
           const ref = this.refs.get(tripId)
-          if (ref) this.refs.set(tripId, { ...ref, overview: { fileId: overviewFile.fileId, version: overview.version } })
+          if (ref) {
+            this.refs.set(tripId, {
+              ...ref,
+              overview: { fileId: overviewFile.fileId, headRevisionId: overview.headRevisionId },
+            })
+          }
         }
       }
     } catch {
@@ -322,7 +330,7 @@ export class DriveTripStore implements TripStore {
       return 'ok'
     } catch (error) {
       if (error instanceof DriveConflictError) {
-        // A real version conflict means Drive's file changed under us —
+        // A real conflict means Drive's file changed under us —
         // retrying with our own stale intent risks clobbering whatever
         // wrote it (see #124's identical reasoning for track overrides), so
         // this keeps the existing "defer to Drive's truth" behavior.
@@ -355,7 +363,10 @@ export class DriveTripStore implements TripStore {
       const trip = await readJsonFile<TripRecord>(accessToken, ref.trip.fileId)
       if (isTripRecord(trip.data)) {
         this.local.hydrate(trip.data)
-        this.refs.set(id, { ...ref, trip: { fileId: ref.trip.fileId, version: trip.version } })
+        this.refs.set(id, {
+          ...ref,
+          trip: { fileId: ref.trip.fileId, headRevisionId: trip.headRevisionId },
+        })
       }
     } catch {
       // The re-read itself failed — the caller already treats this as a
@@ -378,7 +389,7 @@ export class DriveTripStore implements TripStore {
         // The overview is derived, not user-authored, and there's always
         // another `saveOverview` coming the next time the track set
         // changes — drop the stale ref so that write starts a fresh create
-        // rather than retrying against a version Drive has already rejected.
+        // rather than retrying against a revision Drive has already rejected.
         const ref = this.refs.get(id)
         if (ref) this.refs.set(id, { ...ref, overview: undefined })
       }

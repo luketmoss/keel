@@ -54,13 +54,19 @@ function errorResponse(status: number, message: string): Response {
   return jsonResponse({ error: { message, errors: [] } }, status)
 }
 
-function fileMetadata(file: FakeFile) {
+/** `reportedVersion` exists for one caller: a media overwrite, which tells
+    the client a `version` that real Drive has already moved past by the
+    time anyone reads the file again — see `FakeDriveStore.overwrite`.
+    `headRevisionId` is omitted rather than sent as `null` when the file has
+    none, which is how real Drive answers for a folder. */
+function fileMetadata(file: FakeFile, reportedVersion = file.version) {
   return {
     id: file.id,
     name: file.name,
     mimeType: file.mimeType,
     createdTime: file.createdTime,
-    version: String(file.version),
+    version: String(reportedVersion),
+    ...(file.headRevisionId ? { headRevisionId: file.headRevisionId } : {}),
   }
 }
 
@@ -153,8 +159,8 @@ async function handleUploadMultipartCreate(store: FakeDriveStore, body: string, 
 async function handleUploadMediaOverwrite(store: FakeDriveStore, id: string, body: string): Promise<Response> {
   if (!store.get(id)) return errorResponse(404, `fake Drive: no file ${id}`)
   const content = JSON.parse(body) as unknown
-  const file = await store.overwrite(id, content)
-  return jsonResponse(fileMetadata(file))
+  const { file, reportedVersion } = await store.overwrite(id, content)
+  return jsonResponse(fileMetadata(file, reportedVersion))
 }
 
 function handleResumableInit(body: string): Response {

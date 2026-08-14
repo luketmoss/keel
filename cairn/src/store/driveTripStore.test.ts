@@ -101,7 +101,7 @@ describe('DriveTripStore', () => {
   })
 
   it('#73: disconnect() clears credentials so a subsequent edit is refused and makes no Drive request', async () => {
-    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', version: '1' })
+    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', headRevisionId: 'rev-1' })
     const store = new DriveTripStore(fakeStorage())
     const entry = store.createTrip('Hokkaido')
     await store.connect('token', 'cairn-folder-id')
@@ -116,7 +116,7 @@ describe('DriveTripStore', () => {
   })
 
   it('#73: disconnect() also refuses a delete, so a trip cannot be removed only locally', async () => {
-    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', version: '1' })
+    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', headRevisionId: 'rev-1' })
     const store = new DriveTripStore(fakeStorage())
     const entry = store.createTrip('Hokkaido')
     await store.connect('token', 'cairn-folder-id')
@@ -130,7 +130,7 @@ describe('DriveTripStore', () => {
   })
 
   it('#73: a trip deleted while connected does not reappear after disconnect and reconnect', async () => {
-    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', version: '1' })
+    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', headRevisionId: 'rev-1' })
     const store = new DriveTripStore(fakeStorage())
     const entry = store.createTrip('Hokkaido')
     await store.connect('token', 'cairn-folder-id')
@@ -147,7 +147,7 @@ describe('DriveTripStore', () => {
   })
 
   it('flushes a create to Drive once connected', async () => {
-    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', version: '1' })
+    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', headRevisionId: 'rev-1' })
     const store = new DriveTripStore(fakeStorage())
     await store.connect('token', 'cairn-folder-id')
 
@@ -164,7 +164,7 @@ describe('DriveTripStore', () => {
   })
 
   it('awaits the Drive flush on updateTrip and resolves the updated record on success', async () => {
-    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', version: '2' })
+    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', headRevisionId: 'rev-2' })
     const store = new DriveTripStore(fakeStorage())
     const entry = store.createTrip('Hokkaido')
     await store.connect('token', 'cairn-folder-id')
@@ -200,7 +200,7 @@ describe('DriveTripStore', () => {
     // unpredictable point and throwing off the call-count assertions here.
     listSubfolders.mockResolvedValue([{ id: 'folder-1', name: 'trip-a' }])
     findJsonFile.mockImplementation(async (_token: string, _folderId: string, name: string) =>
-      name === 'trip.json' ? { fileId: 'trip-file', version: '1' } : null,
+      name === 'trip.json' ? { fileId: 'trip-file', headRevisionId: 'rev-1' } : null,
     )
     readJsonFile.mockResolvedValueOnce({
       data: {
@@ -212,7 +212,7 @@ describe('DriveTripStore', () => {
         notes: '',
         createdAt: '2026-01-01T00:00:00.000Z',
       },
-      version: '1',
+      headRevisionId: 'rev-1',
     })
 
     const store = new DriveTripStore(fakeStorage())
@@ -220,7 +220,7 @@ describe('DriveTripStore', () => {
     writeJsonFile.mockClear()
     writeJsonFile
       .mockRejectedValueOnce(new Error('network error'))
-      .mockResolvedValueOnce({ fileId: 'trip-file', version: '2' })
+      .mockResolvedValueOnce({ fileId: 'trip-file', headRevisionId: 'rev-2' })
 
     const result = await store.updateTrip('trip-a', { notes: 'Great trip' })
 
@@ -232,7 +232,7 @@ describe('DriveTripStore', () => {
   it('#125: gives up and reverts if the retry after a transient flush failure also fails', async () => {
     listSubfolders.mockResolvedValue([{ id: 'folder-1', name: 'trip-a' }])
     findJsonFile.mockImplementation(async (_token: string, _folderId: string, name: string) =>
-      name === 'trip.json' ? { fileId: 'trip-file', version: '1' } : null,
+      name === 'trip.json' ? { fileId: 'trip-file', headRevisionId: 'rev-1' } : null,
     )
     readJsonFile.mockResolvedValueOnce({
       data: {
@@ -244,7 +244,7 @@ describe('DriveTripStore', () => {
         notes: '',
         createdAt: '2026-01-01T00:00:00.000Z',
       },
-      version: '1',
+      headRevisionId: 'rev-1',
     })
 
     const store = new DriveTripStore(fakeStorage())
@@ -273,7 +273,7 @@ describe('DriveTripStore', () => {
 
     findOrCreateTripFolder.mockRejectedValueOnce(new Error('network error')).mockResolvedValueOnce('folder-1')
     findJsonFile.mockResolvedValue(null)
-    writeJsonFile.mockResolvedValueOnce({ fileId: 'trip-file', version: '1' })
+    writeJsonFile.mockResolvedValueOnce({ fileId: 'trip-file', headRevisionId: 'rev-1' })
 
     const result = await store.updateTrip(entry.id, { notes: 'Great trip' })
 
@@ -325,7 +325,7 @@ describe('DriveTripStore', () => {
     // attempt racing an edit — that race is its own test below.
     listSubfolders.mockResolvedValue([{ id: 'folder-1', name: 'trip-a' }])
     findJsonFile.mockImplementation(async (_token: string, _folderId: string, name: string) =>
-      name === 'trip.json' ? { fileId: 'trip-file', version: '1' } : null,
+      name === 'trip.json' ? { fileId: 'trip-file', headRevisionId: 'rev-1' } : null,
     )
     readJsonFile.mockResolvedValueOnce({
       data: {
@@ -337,7 +337,7 @@ describe('DriveTripStore', () => {
         notes: '',
         createdAt: '2026-01-01T00:00:00.000Z',
       },
-      version: '1',
+      headRevisionId: 'rev-1',
     })
 
     const store = new DriveTripStore(fakeStorage())
@@ -348,7 +348,7 @@ describe('DriveTripStore', () => {
     writeJsonFile.mockRejectedValueOnce(new DriveConflictError())
     readJsonFile.mockResolvedValueOnce({
       data: { ...store.getTrip('trip-a'), notes: 'Written from another tab' },
-      version: '2',
+      headRevisionId: 'rev-2',
     })
 
     const result = await store.updateTrip('trip-a', { notes: 'Second edit' })
@@ -363,7 +363,7 @@ describe('DriveTripStore', () => {
     // second `connect()` (a reload) seeing what the first one actually
     // wrote, not a canned response.
     let drive = {
-      version: '1',
+      headRevisionId: 'rev-1',
       data: {
         id: 'trip-a',
         name: 'Hokkaido',
@@ -374,15 +374,20 @@ describe('DriveTripStore', () => {
         createdAt: '2026-01-01T00:00:00.000Z',
       },
     }
+    let revisionCounter = 1
     listSubfolders.mockResolvedValue([{ id: 'folder-a', name: 'trip-a' }])
     findJsonFile.mockImplementation(async (_token: string, _folderId: string, name: string) =>
-      name === 'trip.json' ? { fileId: 'trip-file', version: drive.version } : null,
+      name === 'trip.json' ? { fileId: 'trip-file', headRevisionId: drive.headRevisionId } : null,
     )
-    readJsonFile.mockImplementation(async () => ({ data: drive.data, version: drive.version }))
+    readJsonFile.mockImplementation(async () => ({
+      data: drive.data,
+      headRevisionId: drive.headRevisionId,
+    }))
     writeJsonFile.mockImplementation(
       async (_token: string, _folderId: string, _name: string, data: typeof drive.data) => {
-        drive = { version: String(Number(drive.version) + 1), data }
-        return { fileId: 'trip-file', version: drive.version }
+        revisionCounter += 1
+        drive = { headRevisionId: `rev-${revisionCounter}`, data }
+        return { fileId: 'trip-file', headRevisionId: drive.headRevisionId }
       },
     )
 
@@ -405,7 +410,7 @@ describe('DriveTripStore', () => {
   it('connect() hydrates trips and overviews from Drive folders it finds', async () => {
     listSubfolders.mockResolvedValue([{ id: 'folder-a', name: 'trip-a' }])
     findJsonFile.mockImplementation(async (_token: string, _folderId: string, name: string) =>
-      name === 'trip.json' ? { fileId: 'trip-file', version: '1' } : null,
+      name === 'trip.json' ? { fileId: 'trip-file', headRevisionId: 'rev-1' } : null,
     )
     readJsonFile.mockResolvedValue({
       data: {
@@ -417,7 +422,7 @@ describe('DriveTripStore', () => {
         notes: '',
         createdAt: '2026-01-01T00:00:00.000Z',
       },
-      version: '1',
+      headRevisionId: 'rev-1',
     })
 
     const store = new DriveTripStore(fakeStorage())
@@ -429,7 +434,7 @@ describe('DriveTripStore', () => {
 
   it('migrates a local-only trip (no Drive folder found for it) up to Drive on connect', async () => {
     listSubfolders.mockResolvedValue([]) // nothing on Drive yet
-    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', version: '1' })
+    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', headRevisionId: 'rev-1' })
 
     const store = new DriveTripStore(fakeStorage())
     const entry = store.createTrip('Hokkaido') // local-only, created before any connection
@@ -451,7 +456,7 @@ describe('DriveTripStore', () => {
     // edit fired before migrateTrip's own Drive round trip has resolved.
     // Unserialized, both would see no ref yet and both call `writeJsonFile`
     // with `existing: null`, creating two `trip.json` files instead of one.
-    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', version: '1' })
+    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', headRevisionId: 'rev-1' })
     const store = new DriveTripStore(fakeStorage())
     await store.connect('token', 'cairn-folder-id')
 
@@ -493,7 +498,7 @@ describe('DriveTripStore', () => {
     findJsonFile.mockImplementation(async (_token: string, folderId: string, name: string) => {
       if (name !== 'trip.json') return null
       if (folderId === 'folder-a') await aGate // trip-a's hydration stays pending until released
-      return { fileId: `${folderId}-trip-file`, version: '1' }
+      return { fileId: `${folderId}-trip-file`, headRevisionId: 'rev-1' }
     })
     readJsonFile.mockResolvedValue({
       data: {
@@ -505,9 +510,9 @@ describe('DriveTripStore', () => {
         notes: '',
         createdAt: '2026-01-01T00:00:00.000Z',
       },
-      version: '1',
+      headRevisionId: 'rev-1',
     })
-    writeJsonFile.mockResolvedValue({ fileId: 'folder-b-trip-file', version: '2' })
+    writeJsonFile.mockResolvedValue({ fileId: 'folder-b-trip-file', headRevisionId: 'rev-2' })
 
     const store = new DriveTripStore(storage)
     const connectPromise = store.connect('token', 'cairn-folder-id')
@@ -525,7 +530,7 @@ describe('DriveTripStore', () => {
   })
 
   it('trashes the Drive folder on delete once a ref is known', async () => {
-    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', version: '1' })
+    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', headRevisionId: 'rev-1' })
     const store = new DriveTripStore(fakeStorage())
     const entry = store.createTrip('Hokkaido')
     await store.connect('token', 'cairn-folder-id')
@@ -538,13 +543,13 @@ describe('DriveTripStore', () => {
   })
 
   it('flushes a recomputed overview to Drive once connected', async () => {
-    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', version: '1' })
+    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', headRevisionId: 'rev-1' })
     const store = new DriveTripStore(fakeStorage())
     const entry = store.createTrip('Hokkaido')
     await store.connect('token', 'cairn-folder-id')
     await flush()
     writeJsonFile.mockClear()
-    writeJsonFile.mockResolvedValue({ fileId: 'overview-file', version: '1' })
+    writeJsonFile.mockResolvedValue({ fileId: 'overview-file', headRevisionId: 'rev-1' })
 
     store.saveOverview(entry.id, [
       { name: 'Day 1', points: [{ lat: 37, lon: -122 }, { lat: 38, lon: -121 }] },
@@ -561,13 +566,13 @@ describe('DriveTripStore', () => {
   })
 
   it('also flushes trip.json on saveOverview, carrying the recomputed origin (#79)', async () => {
-    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', version: '1' })
+    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', headRevisionId: 'rev-1' })
     const store = new DriveTripStore(fakeStorage())
     const entry = store.createTrip('Hokkaido')
     await store.connect('token', 'cairn-folder-id')
     await flush()
     writeJsonFile.mockClear()
-    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', version: '2' })
+    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', headRevisionId: 'rev-2' })
 
     store.saveOverview(entry.id, [
       { name: 'Day 1', points: [{ lat: 37, lon: -122 }, { lat: 38, lon: -121 }] },
@@ -588,7 +593,7 @@ describe('DriveTripStore', () => {
      rather than `updateTrip`, which #73 refuses while disconnected and #35
      scopes to fields a user edits. */
   it('flushes a cached photo count to trip.json', async () => {
-    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', version: '1' })
+    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', headRevisionId: 'rev-1' })
     const store = new DriveTripStore(fakeStorage())
     const entry = store.createTrip('Hokkaido')
     await store.connect('token', 'cairn-folder-id')
@@ -608,7 +613,7 @@ describe('DriveTripStore', () => {
   })
 
   it('writes nothing when the count is unchanged', async () => {
-    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', version: '1' })
+    writeJsonFile.mockResolvedValue({ fileId: 'trip-file', headRevisionId: 'rev-1' })
     const store = new DriveTripStore(fakeStorage())
     const entry = store.createTrip('Hokkaido')
     await store.connect('token', 'cairn-folder-id')

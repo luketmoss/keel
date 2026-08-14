@@ -267,7 +267,7 @@ export class DriveLooseStore implements LooseStore {
   /** #133: renames or recolours a loose item, applied locally first (the
       field changes on screen immediately) and flushed to Drive behind
       that — the same optimistic-write shape `DriveTripStore.updateTrip`
-      already uses, right down to per-id serialization so a stale-version
+      already uses, right down to per-id serialization so a stale-revision
       conflict can't race an in-flight write for the same item. */
   update = async (id: string, patch: LooseUpdate): Promise<boolean> => {
     if (!this.credentials) return false
@@ -357,7 +357,10 @@ export class DriveLooseStore implements LooseStore {
       const stored = await readJsonFile<LooseRecord>(accessToken, ref.record.fileId)
       if (isLooseRecord(stored.data)) {
         this.local.hydrate({ ...stored.data, uploadState: 'ok' })
-        this.refs.set(id, { ...ref, record: { fileId: ref.record.fileId, version: stored.version } })
+        this.refs.set(id, {
+          ...ref,
+          record: { fileId: ref.record.fileId, headRevisionId: stored.headRevisionId },
+        })
       }
     } catch {
       // The re-read itself failed — the caller already treats this as a
@@ -423,7 +426,10 @@ export class DriveLooseStore implements LooseStore {
       // It came from Drive, so that is where it is — whatever the record
       // said when it was written.
       this.local.hydrate({ ...stored.data, uploadState: 'ok' })
-      this.refs.set(id, { folderId, record: { fileId: recordFile.fileId, version: stored.version } })
+      this.refs.set(id, {
+        folderId,
+        record: { fileId: recordFile.fileId, headRevisionId: stored.headRevisionId },
+      })
     } catch {
       return false
     }
@@ -442,7 +448,7 @@ export class DriveLooseStore implements LooseStore {
             if (ref) {
               this.refs.set(id, {
                 ...ref,
-                overview: { fileId: overviewFile.fileId, version: overview.version },
+                overview: { fileId: overviewFile.fileId, headRevisionId: overview.headRevisionId },
               })
             }
           }

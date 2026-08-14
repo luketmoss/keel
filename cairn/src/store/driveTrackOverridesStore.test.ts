@@ -63,7 +63,7 @@ describe('DriveTrackOverridesStore', () => {
 
   it('#73: disconnect() clears the token so a subsequent write is refused and makes no Drive request', async () => {
     findJsonFile.mockResolvedValue(null)
-    writeJsonFile.mockResolvedValue({ fileId: 'overrides-file', version: '1' })
+    writeJsonFile.mockResolvedValue({ fileId: 'overrides-file', headRevisionId: 'rev-1' })
     const store = new DriveTrackOverridesStore(fakeStorage())
     await store.connect('trip-1', 'token', 'cairn-folder-id')
     writeJsonFile.mockClear()
@@ -76,10 +76,10 @@ describe('DriveTrackOverridesStore', () => {
   })
 
   it('connect() hydrates from an existing overrides.json, Drive winning over local', async () => {
-    findJsonFile.mockResolvedValue({ fileId: 'overrides-file', version: '1' })
+    findJsonFile.mockResolvedValue({ fileId: 'overrides-file', headRevisionId: 'rev-1' })
     readJsonFile.mockResolvedValue({
       data: { 'drive-1': { displayName: 'From Drive' } },
-      version: '1',
+      headRevisionId: 'rev-1',
     })
 
     const store = new DriveTrackOverridesStore(fakeStorage())
@@ -90,7 +90,7 @@ describe('DriveTrackOverridesStore', () => {
 
   it('migrates local-only overrides up to Drive when no overrides.json exists yet', async () => {
     findJsonFile.mockResolvedValue(null)
-    writeJsonFile.mockResolvedValue({ fileId: 'overrides-file', version: '1' })
+    writeJsonFile.mockResolvedValue({ fileId: 'overrides-file', headRevisionId: 'rev-1' })
 
     // #73: setOverride refuses to write while disconnected, so a
     // local-only pre-seed (representing overrides an earlier, connected
@@ -136,7 +136,7 @@ describe('DriveTrackOverridesStore', () => {
 
     writeJsonFile
       .mockRejectedValueOnce(new Error('network error'))
-      .mockResolvedValueOnce({ fileId: 'overrides-file', version: '2' })
+      .mockResolvedValueOnce({ fileId: 'overrides-file', headRevisionId: 'rev-2' })
 
     const ok = await store.setOverride('trip-1', 'drive-1', { displayName: 'Day 3' }, ['drive-1'])
 
@@ -165,7 +165,7 @@ describe('DriveTrackOverridesStore', () => {
     // and both call `writeJsonFile` with `existing: null`, creating two
     // `overrides.json` files instead of one.
     findJsonFile.mockResolvedValue(null) // no overrides.json yet -> migration path
-    writeJsonFile.mockResolvedValue({ fileId: 'overrides-file', version: '1' })
+    writeJsonFile.mockResolvedValue({ fileId: 'overrides-file', headRevisionId: 'rev-1' })
     // #73: same reasoning as the migration test above — pre-seed through
     // the plain local store sharing the same storage, since `setOverride`
     // on a disconnected `DriveTrackOverridesStore` now refuses to write.
@@ -196,13 +196,13 @@ describe('DriveTrackOverridesStore', () => {
     const store = new DriveTrackOverridesStore(fakeStorage())
     await store.connect('trip-1', 'token', 'cairn-folder-id')
 
-    writeJsonFile.mockResolvedValueOnce({ fileId: 'overrides-file', version: '1' })
+    writeJsonFile.mockResolvedValueOnce({ fileId: 'overrides-file', headRevisionId: 'rev-1' })
     await store.setOverride('trip-1', 'drive-1', { displayName: 'First edit' }, ['drive-1'])
 
     writeJsonFile.mockRejectedValueOnce(new DriveConflictError())
     readJsonFile.mockResolvedValueOnce({
       data: { 'drive-1': { displayName: 'Written from another tab' } },
-      version: '2',
+      headRevisionId: 'rev-2',
     })
 
     const ok = await store.setOverride('trip-1', 'drive-1', { displayName: 'Second edit' }, [
@@ -213,5 +213,29 @@ describe('DriveTrackOverridesStore', () => {
     expect(store.getOverrides('trip-1')).toEqual({
       'drive-1': { displayName: 'Written from another tab' },
     })
+  })
+
+  /* #149 — a track edit used to fail with nothing but the row's banner to
+     show for it, while its `DriveTripStore` sibling logged every flush
+     outcome. The reason a save failed should be findable in the console. */
+  it('logs a conflict, naming the trip', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    findJsonFile.mockResolvedValue(null)
+    const store = new DriveTrackOverridesStore(fakeStorage())
+    await store.connect('trip-1', 'token', 'cairn-folder-id')
+
+    writeJsonFile.mockResolvedValueOnce({ fileId: 'overrides-file', headRevisionId: 'rev-1' })
+    await store.setOverride('trip-1', 'drive-1', { displayName: 'First edit' }, ['drive-1'])
+
+    writeJsonFile.mockRejectedValueOnce(new DriveConflictError())
+    readJsonFile.mockResolvedValueOnce({ data: {}, headRevisionId: 'rev-2' })
+    await store.setOverride('trip-1', 'drive-1', { displayName: 'Second edit' }, ['drive-1'])
+
+    expect(errors).toHaveBeenCalledWith(
+      expect.stringContaining('trip-1'),
+      expect.any(DriveConflictError),
+    )
+    expect(errors.mock.calls[0][0]).toContain('conflict')
+    errors.mockRestore()
   })
 })

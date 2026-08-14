@@ -12,6 +12,13 @@ export interface FakeFile {
   parents: string[]
   trashed: boolean
   version: number
+  /** Drive's `headRevisionId` — cairn's concurrency token since #149. A new
+      one on every content overwrite, untouched by a metadata patch, which
+      is the whole distinction from `version` above. Optional because a file
+      persisted by a dev session from before #149 has none; the real
+      `overwrite` treats a missing id as "no information" and writes anyway,
+      so such a file heals on its next write rather than jamming. */
+  headRevisionId?: string
   createdTime: string
   /** JSON files (`trip.json`, `overview.geojson`) store their parsed
       value; binary files (uploaded KML/KMZ, photos) store a `Blob`. The
@@ -28,6 +35,12 @@ let nextIdCounter = 0
 export function generateFakeFileId(): string {
   nextIdCounter += 1
   return `fake-file-${Date.now().toString(36)}-${nextIdCounter}`
+}
+
+let nextRevisionCounter = 0
+export function generateFakeRevisionId(): string {
+  nextRevisionCounter += 1
+  return `fake-rev-${Date.now().toString(36)}-${nextRevisionCounter}`
 }
 
 /** Everything reads and writes through this class, never `indexedDB`
@@ -147,6 +160,7 @@ export class FakeDriveStore {
       parents: input.parents,
       trashed: false,
       version: 1,
+      headRevisionId: generateFakeRevisionId(),
       createdTime: new Date().toISOString(),
       content: input.content,
     }
@@ -155,15 +169,33 @@ export class FakeDriveStore {
     return file
   }
 
-  async overwrite(id: string, content: unknown): Promise<FakeFile> {
+  /** New content, so a new revision — and `version` moving **twice** while
+      the caller is told about only the first (`reportedVersion`).
+ *
+ * That gap is real Drive's, not an invention: `version` "reflects every
+ * change made to the file on the server, even those not visible to the
+ * user", so a file's counter keeps moving after the upload response is
+ * written. Modelling it is what makes #149 — every second edit rejected
+ * against a file nobody else touched — reproducible in dev instead of
+ * only against a real account. */
+  async overwrite(id: string, content: unknown): Promise<{ file: FakeFile; reportedVersion: number }> {
     const existing = this.files.get(id)
     if (!existing) throw new Error(`fake Drive: overwrite of unknown file ${id}`)
-    const next: FakeFile = { ...existing, content, version: existing.version + 1 }
+    const next: FakeFile = {
+      ...existing,
+      content,
+      version: existing.version + 2,
+      headRevisionId: generateFakeRevisionId(),
+    }
     this.files.set(id, next)
     await this.persist(next)
-    return next
+    return { file: next, reportedVersion: existing.version + 1 }
   }
 
+  /** Metadata only — trashing, or #120's move between folders. `version`
+      moves, `headRevisionId` does not: no new content, so no new revision.
+      This is exactly the case that made `version` unusable as a
+      concurrency token (#149). */
   async patch(id: string, patch: Partial<Pick<FakeFile, 'trashed' | 'parents'>>): Promise<FakeFile> {
     const existing = this.files.get(id)
     if (!existing) throw new Error(`fake Drive: patch of unknown file ${id}`)

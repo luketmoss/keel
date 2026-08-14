@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { DriveTrackOverridesStore } from './driveTrackOverridesStore'
-import { LocalTrackOverridesStore } from './trackOverridesStore'
+import { LocalTrackOverridesStore, carryDisplayNameIntoTrip } from './trackOverridesStore'
 
 /** Same in-memory `Storage` helper `trackOverridesStore.test.ts` uses. */
 function fakeStorage(): Storage {
@@ -213,6 +213,41 @@ describe('DriveTrackOverridesStore', () => {
     expect(store.getOverrides('trip-1')).toEqual({
       'drive-1': { displayName: 'Written from another tab' },
     })
+  })
+
+  /* #150 — the failure that made this worth a helper: a name written for a
+     trip nobody has opened this session reaches `localStorage` and stops
+     there, and that trip's next `connect` hydrates Drive's copy over the top
+     of it. Against the real Drive-backed store, so what is proved is that
+     the name lands in Drive rather than only in the local cache. */
+  it('puts a carried display name in Drive for a trip never opened this session', async () => {
+    findJsonFile.mockResolvedValue({ fileId: 'overrides-file', headRevisionId: 'rev-1' })
+    readJsonFile.mockResolvedValue({
+      data: { 'drive-existing': { displayName: 'Day one', color: 3 } },
+      headRevisionId: 'rev-1',
+    })
+    writeJsonFile.mockResolvedValue({ fileId: 'overrides-file', headRevisionId: 'rev-2' })
+    // Never connected: exactly the state a destination trip is in when a
+    // loose track is added to it from the top level.
+    const store = new DriveTrackOverridesStore(fakeStorage())
+
+    const ok = await carryDisplayNameIntoTrip(store, 'trip-1', 'drive-1', 'Snowdon ridge', {
+      accessToken: 'token',
+      folderId: 'cairn-folder-id',
+    })
+
+    expect(ok).toBe(true)
+    // The name went to Drive, alongside what the trip already held there.
+    expect(writeJsonFile).toHaveBeenCalledWith(
+      'token',
+      'trip-folder-1',
+      'overrides.json',
+      {
+        'drive-existing': { displayName: 'Day one', color: 3 },
+        'drive-1': { displayName: 'Snowdon ridge' },
+      },
+      { fileId: 'overrides-file', headRevisionId: 'rev-1' },
+    )
   })
 
   /* #149 — a track edit used to fail with nothing but the row's banner to

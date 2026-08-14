@@ -912,6 +912,34 @@ describe('App loose tracks and photos (#110)', () => {
       fetchSpy.mockRestore()
     })
 
+    // The name #133's `Rename` gives a loose track is the same name, and it
+    // travels the same way — renamed here rather than seeded, so the two
+    // features are shown joined up rather than assumed to be.
+    it('carries a name given by #133 Rename into the trip', async () => {
+      const fetchSpy = mockGoogleSignIn()
+      seedTrip('t-153', 'Larapinta')
+      seedLooseTrack('lt-153', 'Mount Rosea', { driveFileId: 'drive-153' })
+
+      await renderApp('/tracks/lt-153', { googleClientId: 'a-client-id' })
+      await signIn()
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Actions for Mount Rosea' }))
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }))
+      const input = screen.getByDisplayValue('Mount Rosea')
+      fireEvent.change(input, { target: { value: 'Rosea East' } })
+      await act(async () => {
+        fireEvent.keyDown(input, { key: 'Enter' })
+      })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Add to a trip' }))
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Larapinta/ }))
+      })
+
+      expect(overridesFor('t-153')).toEqual({ 'drive-153': { displayName: 'Rosea East' } })
+      fetchSpy.mockRestore()
+    })
+
     it('carries the name into a brand new trip too', async () => {
       const fetchSpy = mockGoogleSignIn()
       seedLooseTrack('lt-152', 'Snowdon ridge', { driveFileId: 'drive-152' })

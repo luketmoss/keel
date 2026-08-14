@@ -25,52 +25,9 @@ to Ship without stopping. This is the only stack with no human-gated cases.
   that calls `sys.exit` is unusable from anything else
 - `pytest`, with tests mirroring the source layout under `tests/`
 
-## Scaffold
+## Scaffold and CI
 
-```
-<slug>/
-├── pyproject.toml
-├── src/<module>/
-│   ├── __init__.py
-│   ├── cli.py
-│   └── py.typed
-├── tests/
-└── .gitignore        # .venv/, __pycache__/, dist/, .pytest_cache/
-```
-
-Console entry point declared in `pyproject.toml` under
-`[project.scripts]` — not a shebang script.
-
-## CI workflow
-
-```yaml
-name: <slug>
-on:
-  pull_request:
-    paths: ['<slug>/**', '.github/workflows/<slug>.yml']
-  push:
-    branches: [main]
-    paths: ['<slug>/**', '.github/workflows/<slug>.yml']
-concurrency:
-  group: <slug>-${{ github.ref }}
-  cancel-in-progress: true
-jobs:
-  check:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: <slug>
-    steps:
-      - uses: actions/checkout@v5
-      - uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-          cache-suffix: <slug>
-      - run: uv sync --all-extras --dev
-      - run: uv run ruff check .
-      - run: uv run mypy src
-      - run: uv run pytest
-```
-
-`cache-suffix` keeps this project's uv cache separate from the others in the
-workspace.
+The project scaffold and the CI workflow template are in
+[scaffold.md](scaffold.md), beside this file. `/new-project` reads it when a
+project is created; nothing in the issue lifecycle does, which is why it is
+not here.

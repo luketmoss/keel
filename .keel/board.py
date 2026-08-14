@@ -10,8 +10,14 @@ an option to a single-select field - silently destroys data if done naively.
   board.py sync <issue>
   board.py set <issue> [--status S] [--project P] [--priority P] [--size S] [--type T]
   board.py list --status <stage> [--project <slug>]
+  board.py holds-branch [--project <slug>]
+  board.py next --status <stage> [--project <slug>]
   board.py projects
   board.py add-project <slug>
+
+`holds-branch` and `next` exit non-zero to mean "something holds a branch" and
+"nothing to pick" - they are read-only, and written to be called by a schedule
+that has no one to read its output.
 """
 
 import argparse
@@ -244,7 +250,13 @@ def cmd_set(args):
         print("#{} {} -> {}".format(args.issue, field_name, value))
 
 
-def cmd_list(args):
+def board_rows(status=None, project=None):
+    """Every issue on the board, optionally narrowed to one stage or project.
+
+    The only place the project-items query lives. `list`, `holds-branch` and
+    `next` all read through here - three copies of a paginated GraphQL query
+    is three places for a field name to go stale.
+    """
     cursor = "null"
     rows = []
     while True:
@@ -281,9 +293,9 @@ def cmd_list(args):
             for node in item["fieldValues"]["nodes"]:
                 if node and node.get("field"):
                     values[node["field"]["name"]] = node.get("name")
-            if args.status and values.get("Status") != args.status:
+            if status and values.get("Status") != status:
                 continue
-            if args.project and values.get("Project") != args.project:
+            if project and values.get("Project") != project:
                 continue
             rows.append(
                 {
@@ -299,7 +311,62 @@ def cmd_list(args):
         if not items["pageInfo"]["hasNextPage"]:
             break
         cursor = q(items["pageInfo"]["endCursor"])
+    return rows
+
+
+def cmd_list(args):
+    print(json.dumps(board_rows(args.status, args.project), indent=2))
+
+
+# The stages that own an open branch. Ready to Ship is one of them: #170 made
+# it where a delivery run *parks* rather than where it ends, and an issue
+# resting there still has its pull request open.
+BRANCH_STAGES = ["In Development", "Testing", "Code Review", "Ready to Ship"]
+
+# Highest first. An issue with no priority set sorts last rather than being
+# skipped - unprioritised is still work, it is just not the work to pick while
+# anything else is waiting.
+PRIORITY_ORDER = ["P0", "P1", "P2"]
+
+
+def cmd_holds_branch(args):
+    """What is mid-flight, and a non-zero exit if anything is.
+
+    The guard a scheduled run checks before cutting a branch. There is one
+    working tree, so a second `git checkout -b` while another issue holds a
+    branch either refuses or drags that issue's uncommitted work onto the new
+    branch. Exiting non-zero is what makes this usable from a shell without
+    parsing anything.
+    """
+    rows = [row for row in board_rows(project=args.project) if row["status"] in BRANCH_STAGES]
     print(json.dumps(rows, indent=2))
+    if rows:
+        sys.exit(1)
+
+
+def pick_order(row):
+    """Sort key for `next`: priority first, then the lowest issue number.
+
+    Named rather than inlined so it can be checked against rows that are not
+    on the board - the live board is usually one priority, which proves the
+    tie-break and nothing about the ordering above it.
+    """
+    priority = row.get("priority")
+    rank = PRIORITY_ORDER.index(priority) if priority in PRIORITY_ORDER else len(PRIORITY_ORDER)
+    return (rank, row["number"])
+
+
+def cmd_next(args):
+    """The one issue a run should take out of `--status`, or a non-zero exit.
+
+    Priority first, then the lowest issue number - oldest wins a tie, so a
+    queue drains in the order it was filled rather than by whatever the board
+    happens to return.
+    """
+    rows = board_rows(args.status, args.project)
+    if not rows:
+        sys.exit(1)
+    print(json.dumps(min(rows, key=pick_order), indent=2))
 
 
 def cmd_projects(args):
@@ -370,6 +437,15 @@ def main():
     p.add_argument("--status")
     p.add_argument("--project")
     p.set_defaults(func=cmd_list)
+
+    p = sub.add_parser("holds-branch", help="issues holding an open branch; non-zero if any")
+    p.add_argument("--project")
+    p.set_defaults(func=cmd_holds_branch)
+
+    p = sub.add_parser("next", help="the one issue to pick from a stage; non-zero if none")
+    p.add_argument("--status", required=True)
+    p.add_argument("--project")
+    p.set_defaults(func=cmd_next)
 
     p = sub.add_parser("projects", help="list project options")
     p.set_defaults(func=cmd_projects)

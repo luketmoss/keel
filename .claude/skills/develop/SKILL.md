@@ -52,8 +52,15 @@ Match the surrounding code — its naming, its comment density, its idioms. A
 change that reads as foreign is a change that will be rewritten.
 
 **Self-test before you claim completion.** Not "the code is written" — run it,
-and confirm it does the thing. Where the stack can't be run locally, say exactly
-what you could and couldn't verify.
+and confirm it does the thing.
+
+Targeted: the tests covering what you changed, not the whole suite and not a
+production build. `/test` runs the full suite minutes later and CI runs it
+again, so a third pass here proves nothing the other two don't — and the
+standard is unchanged, because "it compiles" was never the bar.
+
+Where the stack can't be run locally, say exactly what you could and couldn't
+verify.
 
 If the issue turns out to be underspecified in a way that matters, stop, leave
 the branch in place, and say what's missing. Do not invent the answer and bury

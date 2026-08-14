@@ -51,6 +51,46 @@ export interface TrackOverridesStore {
   disconnect?(): void
 }
 
+/** #150: gives a track that has just moved into `tripId` the name it was
+    already carrying, as a display-name override on its new owner.
+ *
+ * A track's name is the trip's to store — `TrackOverrides` above, keyed by
+ * Drive file id — so an ownership move has to write one, or the track
+ * arrives showing whatever its file happens to be called and the name the
+ * user gave it is gone.
+ *
+ * Two things here are easy to get wrong and both are silent:
+ *
+ * **Connect first.** `DriveTrackOverridesStore` connects per trip, when that
+ * trip's detail view mounts, and the destination of a move usually has not
+ * been open this session. Writing without connecting lands in `localStorage`
+ * only, and the trip's next `connect` hydrates Drive's copy straight over the
+ * top of it — Drive wins, by design — taking the new name with it.
+ *
+ * **Prune nothing.** `setOverride` prunes every entry outside the valid list
+ * it is handed, and a move knows about exactly one track. The valid list is
+ * therefore what the trip already holds *plus* the arriving track: pruning
+ * belongs to the operations that can see the trip's whole track list, and
+ * doing it from here would drop every other track's name and colour. */
+export async function carryDisplayNameIntoTrip(
+  store: TrackOverridesStore,
+  tripId: string,
+  driveFileId: string,
+  displayName: string,
+  credentials: { accessToken: string; folderId: string } | null,
+): Promise<boolean> {
+  if (credentials) {
+    try {
+      await store.connect?.(tripId, credentials.accessToken, credentials.folderId)
+    } catch {
+      // The write below still runs: it reaches `localStorage` either way,
+      // and a name that syncs on the trip's next `connect` beats no name.
+    }
+  }
+  const held = Object.keys(store.getOverrides(tripId))
+  return store.setOverride(tripId, driveFileId, { displayName }, [...held, driveFileId])
+}
+
 const overridesKey = (tripId: string): string => `cairn.trips.trackOverrides.${tripId}`
 
 function prune(overrides: TrackOverrides, validDriveFileIds: string[]): TrackOverrides {

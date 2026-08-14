@@ -336,6 +336,59 @@ describe('useTripImport — #46 track overrides', () => {
     expect(reloaded.current.tracks[0].name).toBe('Ridge day')
   })
 
+  /* #150: `Remove from trip` has to tell a name the user typed from the
+     filename the track would otherwise be showing, and `name` alone cannot
+     say which it is. */
+  it('marks a renamed track with the display name behind it, and an untouched one with none', async () => {
+    const store = new LocalTrackOverridesStore(fakeStorage())
+    listTrackFiles.mockResolvedValue([
+      { id: 'drive-1', name: 'day-1.kml' },
+      { id: 'drive-2', name: 'day-2.kml' },
+    ])
+    downloadTrackFile.mockImplementation(async (_token: string, _id: string, name: string) =>
+      file(name),
+    )
+    parseKmlOrKmz.mockResolvedValue(track('Day 1'))
+
+    const { result } = renderHook(() =>
+      useTripImport('trip-1', 'token', 'cairn-folder-id', store),
+    )
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    await waitFor(() => expect(result.current.tracks).toHaveLength(2))
+
+    const renamed = result.current.tracks.find((t) => t.driveFileId === 'drive-1')
+    await act(async () => {
+      await result.current.renameTrack(renamed!.id, 'Ridge day')
+    })
+
+    const byDriveId = Object.fromEntries(result.current.tracks.map((t) => [t.driveFileId, t]))
+    expect(byDriveId['drive-1'].displayName).toBe('Ridge day')
+    // Never renamed: its name is the filename, and nothing claims the user
+    // chose it.
+    expect(byDriveId['drive-2'].name).toBe('day-2.kml')
+    expect(byDriveId['drive-2'].displayName).toBeUndefined()
+  })
+
+  it('claims no display name for a track carrying only a colour override', async () => {
+    const store = new LocalTrackOverridesStore(fakeStorage())
+    listTrackFiles.mockResolvedValue([{ id: 'drive-1', name: 'day-1.kml' }])
+    downloadTrackFile.mockResolvedValue(file('day-1.kml'))
+    parseKmlOrKmz.mockResolvedValue(track('Day 1'))
+
+    const { result } = renderHook(() =>
+      useTripImport('trip-1', 'token', 'cairn-folder-id', store),
+    )
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    await act(async () => {
+      await result.current.recolorTrack(result.current.tracks[0].id, 4)
+    })
+
+    expect(result.current.tracks[0].colorIndex).toBe(4)
+    expect(result.current.tracks[0].name).toBe('day-1.kml')
+    expect(result.current.tracks[0].displayName).toBeUndefined()
+  })
+
   it("reflects a rename immediately, without waiting for the store's Drive flush to settle", async () => {
     listTrackFiles.mockResolvedValue([{ id: 'drive-1', name: 'day-1.kml' }])
     downloadTrackFile.mockResolvedValue(file('day-1.kml'))

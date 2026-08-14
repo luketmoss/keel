@@ -39,6 +39,7 @@ import { useDraftTrip } from './import/useDraftTrip'
 import { useGoogleAccount } from './auth/useGoogleAccount'
 import { AccountBubble } from './auth/AccountBubble'
 import { defaultOverridesStore } from './import/useTripImport'
+import { carryDisplayNameIntoTrip } from './store/trackOverridesStore'
 import type { PhotoRecord } from './photo/photoIndex'
 import './App.css'
 
@@ -247,6 +248,25 @@ function AppShell() {
     photoCount: entry.photoCount,
   }))
 
+  /** #150: a track's name is stored by whichever trip owns it, so a move has
+      to write one — otherwise the track arrives showing its filename and the
+      name the user gave it is gone. This is the trip-overrides half of the
+      move, handed to `moveLooseIntoTrip`; the loose half is
+      `removeTrackFromTrip` below. Both live here for the same reason every
+      other ownership bookkeeping does: a move needs stores that must not
+      know about each other. */
+  const carryTrackName = useCallback(
+    (tripId: string, driveFileId: string, name: string) =>
+      carryDisplayNameIntoTrip(
+        defaultOverridesStore,
+        tripId,
+        driveFileId,
+        name,
+        accessToken && cairnFolderId ? { accessToken, folderId: cairnFolderId } : null,
+      ),
+    [accessToken, cairnFolderId],
+  )
+
   /** Moves a loose item into a trip and opens that trip, so the result is
       visible rather than asserted. The record only leaves the loose store
       once the move has settled — a half-moved item that belongs to nothing
@@ -260,7 +280,7 @@ function AppShell() {
     setMoveError(null)
     setMoving(true)
     try {
-      if (!(await moveLooseIntoTrip(looseStore, tripStore, itemId, tripId))) {
+      if (!(await moveLooseIntoTrip(looseStore, tripStore, itemId, tripId, carryTrackName))) {
         setMoveError(MOVE_FAILED_MESSAGE)
         return
       }
@@ -284,10 +304,17 @@ function AppShell() {
       the file relocates into that record's own loose folder. A failure
       un-creates the record — the track never left the trip, and a loose row
       pointing at a file still owned by a trip is exactly the duplicate this
-      issue exists to stop. */
+      issue exists to stop.
+   *
+   * #150: a name the user typed comes out with the track. `displayName` is
+   * present only when the trip held an override, which is exactly the case
+   * where the name would otherwise be left behind in `overrides.json` — a
+   * track nobody renamed passes `undefined` and keeps the derivation it has
+   * always had. */
   async function removeTrackFromTrip(file: ImportedFile, tripId: string): Promise<boolean> {
     const record = looseImport.addParsedTracks(file.name, file.tracks, {
       driveFileId: file.driveFileId,
+      ...(file.displayName !== undefined ? { name: file.displayName } : {}),
     })
     if (!record) return false
     if (!(await looseStore.claimFromTrip(record.id, tripId))) {

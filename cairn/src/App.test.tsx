@@ -1351,6 +1351,62 @@ describe('App placement queue (#168)', () => {
     Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:fake-url'), revokeObjectURL: vi.fn() })
   })
 
+  /** The fixture that carries real EXIF GPS — the point of #188 is that a
+      zip is lossless, so this must place exactly as the loose file does. */
+  function gpsPhoto(as: string): File {
+    const buffer = readFileSync(join(__dirname, 'photo/fixtures/gps-and-timestamps.jpg'))
+    return new File([buffer], as, { type: 'image/jpeg' })
+  }
+
+  it('a zipped photo keeps its EXIF GPS and places exactly as the loose file does (#188)', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    await renderApp('/', { googleClientId: 'a-client-id' })
+    await signIn()
+    const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
+
+    // What the loose file resolves to, for comparison.
+    await act(async () => {
+      fireEvent.drop(shell, { dataTransfer: fileDataTransfer([gpsPhoto('loose.jpg')]) })
+    })
+    await waitFor(() => {
+      expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(1)
+    })
+    const [loose] = JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')
+
+    const zip = new JSZip()
+    zip.file('trip/day one/zipped.jpg', readFileSync(join(__dirname, 'photo/fixtures/gps-and-timestamps.jpg')))
+    // Every macOS zip carries these; neither may become a cairn.
+    zip.file('__MACOSX/._zipped.jpg', 'applesauce')
+    zip.file('.DS_Store', 'junk')
+    const archive = new File([await zip.generateAsync({ type: 'blob' })], 'photos.zip')
+
+    await act(async () => {
+      fireEvent.drop(shell, { dataTransfer: fileDataTransfer([archive]) })
+    })
+
+    await waitFor(() => {
+      expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(2)
+    })
+    const index = JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')
+    const zipped = index.find((item: { name: string }) => item.name === 'zipped.jpg')
+
+    // Same coordinate, same provenance — the archive changed nothing.
+    expect(zipped.positionSource).toBe('exif')
+    expect(zipped.positionSource).toBe(loose.positionSource)
+    expect(zipped.position).toEqual(loose.position)
+    // Folders flattened: `trip/day one/zipped.jpg` arrived as `zipped.jpg`.
+    expect(index.map((item: { name: string }) => item.name).sort()).toEqual([
+      'loose.jpg',
+      'zipped.jpg',
+    ])
+    // The junk entries are in this archive on purpose, but what proves they
+    // are *skipped* rather than merely failing later is
+    // `archive.test.ts`'s "skips junk silently" — from here a fork that got
+    // through would fail EXIF and go to the placement queue, which this
+    // assertion cannot tell apart from it never arriving.
+    fetchSpy.mockRestore()
+  })
+
   it('replaces the list with the placement queue when a dropped photo resolves neither by EXIF nor interpolation', async () => {
     const fetchSpy = mockGoogleSignIn()
     await renderApp('/', { googleClientId: 'a-client-id' })

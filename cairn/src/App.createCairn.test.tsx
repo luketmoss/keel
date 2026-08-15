@@ -146,6 +146,21 @@ describe('#156 — right-clicking the map opens the create face', () => {
     expect(screen.getByText('new cairn')).toBeDefined()
   })
 
+  it('defaults the date to today, in local time rather than UTC', async () => {
+    mockGoogleSignIn()
+    await renderApp()
+    await signIn()
+
+    await rightClickMap()
+
+    /* Derived a different way from the implementation's, on purpose: `en-CA`
+       formats as `yyyy-mm-dd` in the *local* zone, so this disagrees with a
+       UTC-based default on every machine where the two dates differ — and
+       disagrees with a wrong format everywhere. */
+    const today = new Date().toLocaleDateString('en-CA')
+    expect((screen.getByLabelText('Date') as HTMLInputElement).value).toBe(today)
+  })
+
   it('hides the filter chips while the face is open', async () => {
     mockGoogleSignIn()
     await renderApp()

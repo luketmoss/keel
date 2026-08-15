@@ -1,4 +1,4 @@
-import { render, waitFor } from '@testing-library/react'
+import { fireEvent, render, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LooseFace } from './LooseFace'
 import type { LooseRecord } from '../store/looseStore'
@@ -34,21 +34,25 @@ function looseCairn(overrides: Partial<Extract<LooseRecord, { kind: 'cairn' }>> 
 }
 
 function renderFace(item: LooseRecord, accessToken: string | null = 'token') {
-  return render(
-    <LooseFace
-      item={item}
-      trips={[]}
-      accessToken={accessToken}
-      onAddToTrip={vi.fn()}
-      onCreateTripWith={vi.fn()}
-      onDelete={vi.fn()}
-      onRename={vi.fn().mockResolvedValue(true)}
-      onRecolor={vi.fn().mockResolvedValue(true)}
-      onSetIcon={vi.fn().mockResolvedValue(true)}
-      onExport={vi.fn()}
-      disabled={false}
-    />,
-  )
+  const onSetIcon = vi.fn().mockResolvedValue(true)
+  return {
+    ...render(
+      <LooseFace
+        item={item}
+        trips={[]}
+        accessToken={accessToken}
+        onAddToTrip={vi.fn()}
+        onCreateTripWith={vi.fn()}
+        onDelete={vi.fn()}
+        onRename={vi.fn().mockResolvedValue(true)}
+        onRecolor={vi.fn().mockResolvedValue(true)}
+        onSetIcon={onSetIcon}
+        onExport={vi.fn()}
+        disabled={false}
+      />,
+    ),
+    onSetIcon,
+  }
 }
 
 describe('LooseFace — #134 the cairn image', () => {
@@ -131,5 +135,28 @@ describe('LooseFace — #156 the detail face offers the icon picker', () => {
     const { getByRole } = renderFace(looseCairn({ icon: null, image: null }))
 
     expect(getByRole('button', { name: 'none' }).getAttribute('aria-pressed')).toBe('true')
+  })
+
+  /* The retype that matters: a photo becomes a campsite, and the patch that
+     goes to the store carries `icon` and nothing else — which is what makes
+     the marker stop being a thumbnail without the image going anywhere. */
+  it('retypes a photographed cairn, sending only the icon', () => {
+    acquire.mockResolvedValue({ url: 'blob:fake-thumb', release: vi.fn() })
+    const cairn = looseCairn({ icon: null })
+    const { getByRole, onSetIcon } = renderFace(cairn)
+
+    fireEvent.click(getByRole('button', { name: 'campsite' }))
+
+    expect(onSetIcon).toHaveBeenCalledWith(cairn.id, 'campsite')
+  })
+
+  it('returns a cairn to a thumbnail by choosing none', () => {
+    acquire.mockResolvedValue({ url: 'blob:fake-thumb', release: vi.fn() })
+    const cairn = looseCairn({ icon: 'campsite' })
+    const { getByRole, onSetIcon } = renderFace(cairn)
+
+    fireEvent.click(getByRole('button', { name: 'none' }))
+
+    expect(onSetIcon).toHaveBeenCalledWith(cairn.id, null)
   })
 })

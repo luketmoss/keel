@@ -227,6 +227,34 @@ describe('#156 — the gesture’s context decides ownership', () => {
     // store, whatever happens next.
     expect(storedLooseItems()).toHaveLength(0)
   })
+
+  /* The trip face holds the writer that owns the trip's `cairns/` folder,
+     so it has to survive the create face being open. Replacing it instead
+     of hiding it unmounts that writer — and Create then has nothing to call
+     and fails on every trip-scoped cairn. */
+  it('keeps the trip face mounted underneath, so Create has a writer to call', async () => {
+    mockGoogleSignIn()
+    seedTrip('trip-7')
+    await renderApp('/trips/trip-7')
+    await signIn()
+    await waitFor(() => expect(document.querySelector('.trip-detail')).not.toBeNull())
+
+    await rightClickMap()
+
+    // Still mounted, just not shown.
+    const tripFace = document.querySelector('.trip-detail')
+    expect(tripFace).not.toBeNull()
+    expect(tripFace?.closest('[hidden]')).not.toBeNull()
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+    })
+
+    // A missing writer reports itself; its absence is the whole assertion.
+    expect(screen.queryByText("Couldn't save this cairn — try again.")).toBeNull()
+    // And the face closed, which only happens on a write that landed.
+    expect(screen.queryByLabelText('Name')).toBeNull()
+  })
 })
 
 describe('#156 — Create', () => {

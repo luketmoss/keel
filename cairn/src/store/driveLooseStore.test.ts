@@ -221,6 +221,57 @@ describe('importing a loose cairn', () => {
   })
 })
 
+/* #156 — a cairn placed by hand has no image, so nothing uploads. What it
+   still has is a folder and a `cairn.json`, and skipping those would leave
+   the record in `localStorage` and nowhere else: invisible from another
+   device, and unmovable into a trip, since the folder a move relocates was
+   never created. */
+describe('creating a cairn with no image (#156)', () => {
+  it('writes its folder and cairn.json, and marks it on-Drive', async () => {
+    store = await connected()
+
+    const record = store.addCairn({
+      ...NEW_CAIRN,
+      image: null,
+      icon: 'campsite',
+      positionSource: 'placed',
+    })
+    await settle()
+
+    expect(findOrCreateLooseItemFolder).toHaveBeenCalledWith('tok', 'cairn-folder', 'cairn', record.id)
+    expect(writeJsonFile.mock.calls.map((call) => call[2])).toContain('cairn.json')
+    expect(store.getItem(record.id)?.uploadState).toBe('ok')
+  })
+
+  it('uploads nothing — there are no bytes to upload', async () => {
+    store = await connected()
+
+    store.addCairn({ ...NEW_CAIRN, image: null, positionSource: 'placed' })
+    await settle()
+
+    expect(startResumableUpload).not.toHaveBeenCalled()
+    expect(generateThumbnail).not.toHaveBeenCalled()
+  })
+
+  it('is not-on-Drive when the write fails, rather than silently pending', async () => {
+    store = await connected()
+    writeJsonFile.mockRejectedValueOnce(new Error('offline'))
+
+    const record = store.addCairn({ ...NEW_CAIRN, image: null, positionSource: 'placed' })
+    await settle()
+
+    expect(store.getItem(record.id)?.uploadState).toBe('failed')
+  })
+
+  it('keeps the record local-only while disconnected, with nothing attempted', async () => {
+    const record = store.addCairn({ ...NEW_CAIRN, image: null, positionSource: 'placed' })
+    await settle()
+
+    expect(writeJsonFile).not.toHaveBeenCalled()
+    expect(store.getItem(record.id)?.uploadState).toBe('pending')
+  })
+})
+
 describe('hydrating from Drive', () => {
   it('reads every loose item back, with its geometry, and marks it on-Drive', async () => {
     listSubfolders.mockImplementation(async () => [{ id: 'folder-a', name: 'track-a' }])

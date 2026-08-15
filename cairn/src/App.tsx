@@ -718,6 +718,22 @@ function AppShell() {
   const filteredEmpty = !noPlaces && listPlaces.length === 0
 
   const createOpen = cairnDraft !== null
+
+  /* Held as an element rather than inlined because it appears in two
+     branches of the panel's face chain: on its own when nothing is open,
+     and beside the hidden trip face when one is. */
+  const createFace = cairnDraft && (
+    <CairnCreatePanel
+      fields={cairnDraft.fields}
+      onChange={(fields) => setCairnDraft((current) => (current ? { ...current, fields } : current))}
+      tripId={cairnDraft.tripId}
+      onCreate={() => void commitCairnDraft()}
+      onCancel={cancelCairnDraft}
+      disabled={disconnected}
+      busy={creating}
+      error={createError}
+    />
+  )
   /* The queue already owns the map click and two placement intents at once
      has no sensible reading, so the create gesture stands down for it. It
      stays live while the create face itself is open — that is the re-place
@@ -857,11 +873,10 @@ function AppShell() {
             )
           }
         >
-          {/* #156's create face replaces the list face, and outranks a
-              trip's own face while it is open — the panel is showing the
-              thing being placed, whatever was underneath it. The placement
-              queue still comes first: it is the one flow the create gesture
-              stands down for entirely. */}
+          {/* #156's create face replaces whatever face was showing — except
+              that a trip's face is *hidden* rather than replaced, below.
+              The placement queue still comes first: it is the one flow the
+              create gesture stands down for entirely. */}
           {queueOpen ? (
             <PlacementQueuePanel
               queue={queue}
@@ -869,17 +884,8 @@ function AppShell() {
               onSkip={() => setQueue(skipCurrent)}
               onDiscard={() => setQueue(discardRemaining)}
             />
-          ) : cairnDraft ? (
-            <CairnCreatePanel
-              fields={cairnDraft.fields}
-              onChange={(fields) => setCairnDraft((current) => (current ? { ...current, fields } : current))}
-              tripId={cairnDraft.tripId}
-              onCreate={() => void commitCairnDraft()}
-              onCancel={cancelCairnDraft}
-              disabled={disconnected}
-              busy={creating}
-              error={createError}
-            />
+          ) : cairnDraft && !openTripId ? (
+            createFace
           ) : draftTrip.draft ? (
             <DraftPanel
               draft={draftTrip.draft}
@@ -893,24 +899,36 @@ function AppShell() {
               onSignIn={() => void account.signIn()}
             />
           ) : openTripId ? (
-            <TripDetail
-              key={openTripId}
-              tripId={openTripId}
-              tripStore={tripStore}
-              accessToken={accessToken}
-              cairnFolderId={cairnFolderId}
-              onBack={() => navigate('/')}
-              onReconnect={() => void account.reconnect()}
-              onDropTargetChange={handleDropTargetChange}
-              onGeometryChange={handleGeometryChange}
-              // Back to the top level, with everything about it intact.
-              // Reversible by adding it back, which is why it needs no
-              // confirm — `Delete permanently` is the neighbouring one.
-              onRemoveFromTrip={(file) => removeTrackFromTrip(file, openTripId)}
-              onRemovePhotoFromTrip={(record) => removeCairnFromTrip(record, openTripId)}
-              onNeedsPlacement={enqueueNeedsPlacement}
-              onCreateTargetChange={handleCreateTargetChange}
-            />
+            /* The trip face is hidden while the create face is up, never
+               unmounted. Unmounting it would take with it both the writer
+               that owns this trip's `cairns/` folder — the thing Create is
+               about to call — and the trip's own track and cairn layers,
+               which are exactly what the new pin is being placed relative
+               to. `hidden` on a flex child is `display: none`, so the panel
+               lays out around whichever of the two is showing. */
+            <>
+              {cairnDraft && createFace}
+              <div className="shell-column__hidden-face" hidden={createOpen}>
+                <TripDetail
+                  key={openTripId}
+                  tripId={openTripId}
+                  tripStore={tripStore}
+                  accessToken={accessToken}
+                  cairnFolderId={cairnFolderId}
+                  onBack={() => navigate('/')}
+                  onReconnect={() => void account.reconnect()}
+                  onDropTargetChange={handleDropTargetChange}
+                  onGeometryChange={handleGeometryChange}
+                  // Back to the top level, with everything about it intact.
+                  // Reversible by adding it back, which is why it needs no
+                  // confirm — `Delete permanently` is the neighbouring one.
+                  onRemoveFromTrip={(file) => removeTrackFromTrip(file, openTripId)}
+                  onRemovePhotoFromTrip={(record) => removeCairnFromTrip(record, openTripId)}
+                  onNeedsPlacement={enqueueNeedsPlacement}
+                  onCreateTargetChange={handleCreateTargetChange}
+                />
+              </div>
+            </>
           ) : openLooseId ? (
             openLoose ? (
               <LooseFace

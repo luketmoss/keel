@@ -96,9 +96,18 @@ export class DriveLooseStore implements LooseStore {
 
   addCairn = (input: NewLooseCairn, source?: File): LooseCairnRecord => {
     const record = this.local.addCairn(input)
-    if (!this.credentials || !source) return record
+    if (!this.credentials) return record
     this.local.setUploadState(record.id, 'uploading')
-    void this.enqueue(record.id, () => this.uploadCairn(record.id, source, input.orientation))
+    /* #156: a cairn placed by hand has no bytes to upload, but it still has
+       a `cairn.json` to write — and a record that only exists in
+       `localStorage` is a cairn the user cannot see from anywhere else and
+       cannot move into a trip, since the folder a move relocates was never
+       created. `writeRecordOnly` is exactly that folder-plus-record write,
+       which is why the image-less path goes through it rather than through
+       an upload with nothing to upload. */
+    void this.enqueue(record.id, () =>
+      source ? this.uploadCairn(record.id, source, input.orientation) : this.writeRecordOnly(record.id),
+    )
     return record
   }
 
@@ -403,7 +412,7 @@ export class DriveLooseStore implements LooseStore {
     // `not on Drive` is a fact about their data, not about who wrote it.
     for (const item of this.local.getItems()) {
       if (known.has(item.id)) continue
-      void this.enqueue(item.id, () => this.migrateItem(item.id))
+      void this.enqueue(item.id, () => this.writeRecordOnly(item.id))
     }
   }
 
@@ -457,15 +466,21 @@ export class DriveLooseStore implements LooseStore {
     return true
   }
 
-  /** Uploads an item that exists only locally. **The source file is not
-      recoverable here** — #110 discarded it, so an item imported before
-      this issue can only ever have its record and its geometry backed up.
-      For a track that is enough to survive a cleared browser and draw on
-      the map; for a cairn with an image, the image itself is gone and only
-      the record (including whichever Drive ids it already carried) can be
-      written. Items imported from now on carry their bytes up at import
-      time and never come through here. */
-  private async migrateItem(id: string): Promise<void> {
+  /** Writes an item's folder and its record files, and nothing else. Two
+      callers, and they arrive here for opposite reasons.
+   *
+   * **A migration**, from `connect`. The source file is not recoverable —
+   * #110 discarded it — so an item imported before that issue can only ever
+   * have its record and its geometry backed up. For a track that is enough
+   * to survive a cleared browser and draw on the map; for a cairn with an
+   * image, the image itself is gone and only the record (including
+   * whichever Drive ids it already carried) can be written.
+   *
+   * **A cairn placed by hand** (#156), from `addCairn`. Here there is no
+   * file by design rather than by loss: an icon-only cairn *is* a folder
+   * and a `cairn.json`, so this is not a reduced write, it is the whole
+   * one. */
+  private async writeRecordOnly(id: string): Promise<void> {
     if (!this.credentials) return
     const { accessToken, cairnFolderId } = this.credentials
     const item = this.local.getItem(id)

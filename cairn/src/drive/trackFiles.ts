@@ -11,6 +11,7 @@ export { DriveAuthError, DriveRequestError }
 
 const DRIVE_FILES_URL = 'https://www.googleapis.com/drive/v3/files'
 const DRIVE_UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable'
+const FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder'
 const MAX_UPLOAD_ATTEMPTS = 3
 
 /** A `DriveRequestError` specifically for a full Drive — `storageQuotaExceeded`
@@ -51,11 +52,22 @@ export interface DriveTrackFile {
   name: string
 }
 
+/** #191: folders are excluded in the query rather than filtered out of the
+    results, so a subfolder never has to be enumerated here to stay out. A
+    trip folder holds `cairns/` since `cairns.md` gave every cairn a folder
+    of its own, and without this the caller downloads it as a track file,
+    fails (a folder has no media), and renders it as #35's missing-file row
+    — a permanent "your data is damaged" warning on every trip holding a
+    cairn. */
 export async function listTrackFiles(
   accessToken: string,
   folderId: string,
 ): Promise<DriveTrackFile[]> {
-  const query = [`'${folderId}' in parents`, 'trashed=false'].join(' and ')
+  const query = [
+    `'${folderId}' in parents`,
+    `mimeType!='${FOLDER_MIME_TYPE}'`,
+    'trashed=false',
+  ].join(' and ')
   const url = `${DRIVE_FILES_URL}?q=${encodeURIComponent(query)}&fields=files(id,name)`
 
   let response: Response

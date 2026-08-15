@@ -68,11 +68,15 @@ const { startResumableUpload, uploadFileContent, trashFile } = vi.hoisted(() => 
 }))
 vi.mock('../drive/trackFiles', () => ({ startResumableUpload, uploadFileContent, trashFile }))
 
-const { generateThumbnail } = vi.hoisted(() => ({ generateThumbnail: vi.fn() }))
+const { generateImagePair } = vi.hoisted(() => ({ generateImagePair: vi.fn() }))
 vi.mock('../photo/thumbnail', async () => {
   const actual = await vi.importActual<typeof import('../photo/thumbnail')>('../photo/thumbnail')
-  return { ...actual, generateThumbnail }
+  return { ...actual, generateImagePair }
 })
+
+/** Distinct sizes so a test can tell which render's bytes were uploaded. */
+const DISPLAY_BLOB = new Blob(['downscaled-display'])
+const THUMBNAIL_BLOB = new Blob(['thumb'])
 
 const { readPhotoExif } = vi.hoisted(() => ({ readPhotoExif: vi.fn() }))
 vi.mock('../photo/exif', () => ({ readPhotoExif }))
@@ -139,7 +143,9 @@ beforeEach(() => {
   trashFolder.mockReset().mockResolvedValue(undefined)
   startResumableUpload.mockReset().mockResolvedValue('session-uri')
   uploadFileContent.mockReset().mockResolvedValue({ id: 'drive-file-1' })
-  generateThumbnail.mockReset().mockResolvedValue({ ok: true, blob: new Blob(['thumb']) })
+  generateImagePair
+    .mockReset()
+    .mockResolvedValue({ ok: true, display: DISPLAY_BLOB, thumbnail: THUMBNAIL_BLOB })
   trashFile.mockReset().mockResolvedValue(undefined)
   readPhotoExif.mockReset().mockResolvedValue({ ok: true, exif: {} })
   store = new DriveLooseStore(fakeStorage())
@@ -205,7 +211,7 @@ describe('importing a loose cairn', () => {
     const record = store.addCairn({ ...NEW_CAIRN, orientation: 6 }, source)
     await settle()
 
-    expect(generateThumbnail).toHaveBeenCalledWith(source, 6)
+    expect(generateImagePair).toHaveBeenCalledWith(source, 6)
     expect(startResumableUpload.mock.calls.map((call) => call[2])).toEqual([
       'sapporo.jpg',
       'sapporo.jpg.thumb.jpg',
@@ -213,6 +219,27 @@ describe('importing a loose cairn', () => {
     expect(writeJsonFile.mock.calls.map((call) => call[2])).toContain('cairn.json')
     const stored = store.getItem(record.id) as { image?: { originalDriveFileId: string; thumbnailDriveFileId: string } | null }
     expect(stored.image).toEqual({ originalDriveFileId: 'original-1', thumbnailDriveFileId: 'thumb-1' })
+  })
+
+  it('uploads the downscaled image rather than the camera file (#187)', async () => {
+    store = await connected()
+    const source = new File(['the whole 8MB camera original'], 'sapporo.png')
+    uploadFileContent
+      .mockResolvedValueOnce({ id: 'original-1' })
+      .mockResolvedValueOnce({ id: 'thumb-1' })
+
+    store.addCairn({ ...NEW_CAIRN, orientation: 1 }, source)
+    await settle()
+
+    const uploaded = uploadFileContent.mock.calls[0][1] as File
+    expect(uploaded).not.toBe(source)
+    expect(uploaded.size).toBe(DISPLAY_BLOB.size)
+    expect(uploaded.size).not.toBe(source.size)
+    // Canvas encoding is always JPEG, so the stored name follows the bytes
+    // even though the source was a PNG.
+    expect(uploaded.name).toBe('sapporo.jpg')
+    expect(uploaded.type).toBe('image/jpeg')
+    expect(startResumableUpload.mock.calls[0][2]).toBe('sapporo.jpg')
   })
 
   it('is not-on-Drive when the thumbnail lands and the original does not', async () => {
@@ -256,7 +283,7 @@ describe('creating a cairn with no image (#156)', () => {
     await settle()
 
     expect(startResumableUpload).not.toHaveBeenCalled()
-    expect(generateThumbnail).not.toHaveBeenCalled()
+    expect(generateImagePair).not.toHaveBeenCalled()
   })
 
   it('is not-on-Drive when the write fails, rather than silently pending', async () => {
@@ -294,6 +321,23 @@ describe('attaching a photo to an existing cairn (#157)', () => {
     expect(startResumableUpload.mock.calls.map((call) => call[2])).toContain('sunset.jpg.thumb.jpg')
     const stored = store.getItem(record.id) as { image: { originalDriveFileId: string; thumbnailDriveFileId: string } }
     expect(stored.image).toEqual({ originalDriveFileId: 'original-1', thumbnailDriveFileId: 'thumb-1' })
+  })
+
+  it('attaches the downscaled image rather than the camera file (#187)', async () => {
+    store = await connected()
+    const record = store.addCairn({ ...NEW_CAIRN, image: null, positionSource: 'placed' })
+    await settle()
+    uploadFileContent
+      .mockResolvedValueOnce({ id: 'original-1' })
+      .mockResolvedValueOnce({ id: 'thumb-1' })
+
+    const source = new File(['the whole 8MB camera original'], 'sunset.jpg')
+    await store.attachImage(record.id, source)
+
+    const uploaded = uploadFileContent.mock.calls[0][1] as File
+    expect(uploaded).not.toBe(source)
+    expect(uploaded.size).toBe(DISPLAY_BLOB.size)
+    expect(uploaded.size).not.toBe(source.size)
   })
 
   it('fills date only when the cairn had none', async () => {

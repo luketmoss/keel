@@ -102,7 +102,10 @@ export async function downloadTrackFile(
     throw new DriveRequestError(`Drive request failed with status ${response.status}`)
   }
   const blob = await response.blob()
-  return new File([blob], name)
+  // The served MIME type is carried through so a caller can name the file
+  // after its actual bytes (#187) — a cairn's image is a JPEG since the
+  // downscale landed and whatever the camera produced before that.
+  return new File([blob], name, { type: blob.type })
 }
 
 /** Trashes a single file in place — the file-level sibling of

@@ -64,6 +64,7 @@ import {
   type PlacementQueueState,
 } from './import/placementQueue'
 import { nearestPointByTime } from './photo/interpolate'
+import { exportImageName } from './photo/thumbnail'
 import { cairnMatchesFacet, type CairnFacet } from './store/cairnRules'
 import type { LatLng } from './map/geo'
 import './App.css'
@@ -508,10 +509,17 @@ function AppShell() {
     setExportingIds((prev) => new Set(prev).add(id))
     try {
       const file = await downloadTrackFile(accessToken, fileId, filename)
+      // #187: a cairn's stored image is a downscaled JPEG, so a `sunset.png`
+      // cairn would otherwise download JPEG bytes under a `.png` name. Named
+      // from what Drive served rather than from the record, which is also
+      // what leaves a cairn imported before the downscale exporting under
+      // its own original extension.
+      const downloadName =
+        item.kind === 'track' ? filename : exportImageName(filename, file.type)
       const url = URL.createObjectURL(file)
       const link = document.createElement('a')
       link.href = url
-      link.download = filename
+      link.download = downloadName
       // Firefox only fires a download from a click on an anchor that's
       // actually in the document — attached, clicked, removed, in one tick.
       document.body.appendChild(link)

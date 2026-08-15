@@ -15,6 +15,14 @@
 export const THUMBNAIL_MAX_EDGE = 512
 export const THUMBNAIL_JPEG_QUALITY = 0.82
 
+/** #187: what a cairn stores in place of the camera file. The lightbox is
+    the only consumer of the full-size image and it renders into a browser
+    window, so the pixels above this were quota spent on nothing. Quality
+    sits above the thumbnail's because this is the one a person looks at
+    full-screen. */
+export const DISPLAY_MAX_EDGE = 2048
+export const DISPLAY_JPEG_QUALITY = 0.85
+
 /** Appended to the original's filename to name its thumbnail beside it.
     Lives here rather than in the trip's import hook because a loose photo
     is uploaded by a store, not by that hook, and both have to agree on the
@@ -58,6 +66,42 @@ export function validateImageFile(name: string): string | undefined {
   if (HEIC_TYPES.includes(extension)) return HEIC_ERROR
   if (!ACCEPTED_TYPES.includes(extension)) return UNSUPPORTED_TYPE_ERROR
   return undefined
+}
+
+/** The name the downscaled image is stored under in Drive. Canvas encoding
+    always produces JPEG, so a `sunset.png` would otherwise be stored as
+    JPEG bytes under a `.png` name. The cairn's own `name` — the row label —
+    is deliberately not put through this: it is something the user edits,
+    not a filename. */
+export function displayImageName(sourceName: string): string {
+  const dot = sourceName.lastIndexOf('.')
+  const base = dot === -1 ? sourceName : sourceName.slice(0, dot)
+  return `${base}.jpg`
+}
+
+const MIME_EXTENSIONS: Record<string, string> = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+}
+
+/** Names an exported image after the bytes Drive actually served rather
+    than after the record. A cairn stored before #187 still holds its camera
+    file and exports under its own extension; one stored after holds a JPEG.
+    Reading the served MIME type is what lets both be right without a
+    migration or a flag on the record. An unrecognised type leaves the name
+    alone — a wrong extension is worse than none. */
+export function exportImageName(name: string, mimeType: string): string {
+  const extension = MIME_EXTENSIONS[mimeType]
+  if (!extension) return name
+  const current = extensionOf(name)
+  if (current === extension) return name
+  // `.jpeg` is already correct for JPEG bytes; rewriting it to `.jpg` would
+  // rename the user's file for no reason.
+  if (extension === '.jpg' && current === '.jpeg') return name
+  const dot = name.lastIndexOf('.')
+  const base = dot === -1 ? name : name.slice(0, dot)
+  return `${base}${extension}`
 }
 
 /** Scales `width`x`height` proportionally so its longest edge is at most
@@ -236,4 +280,43 @@ export async function generateThumbnail(
   if (!blob) return { ok: false, error: UNREADABLE_IMAGE_ERROR }
 
   return { ok: true, blob, width: scaledDisplay.width, height: scaledDisplay.height }
+}
+
+export interface ImagePairSuccess {
+  ok: true
+  /** What gets stored where the camera file used to go. */
+  display: Blob
+  thumbnail: Blob
+}
+
+export type ImagePairResult = ImagePairSuccess | ThumbnailFailure
+
+/** Both renders a cairn needs, from one source file (#187). Every upload
+    path wants exactly this pair and each was doing the same dance, so it
+    lives here once.
+ *
+ * The thumbnail is derived from the display image rather than from `file`,
+ * which saves decoding a 12MP JPEG a second time — worth having when a
+ * batch import is a hundred of them. That means orientation must *not* be
+ * passed to the second call: it was already baked into the display image's
+ * pixels, and applying it again would rotate an upright photo. */
+export async function generateImagePair(
+  file: File,
+  orientation: number | undefined,
+  deps: ThumbnailDependencies = realDependencies,
+): Promise<ImagePairResult> {
+  const display = await generateThumbnail(
+    file,
+    orientation,
+    deps,
+    DISPLAY_MAX_EDGE,
+    DISPLAY_JPEG_QUALITY,
+  )
+  if (!display.ok) return display
+
+  const displayFile = new File([display.blob], displayImageName(file.name), { type: 'image/jpeg' })
+  const thumbnail = await generateThumbnail(displayFile, undefined, deps)
+  if (!thumbnail.ok) return thumbnail
+
+  return { ok: true, display: display.blob, thumbnail: thumbnail.blob }
 }

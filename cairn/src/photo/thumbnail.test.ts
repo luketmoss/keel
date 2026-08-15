@@ -1,10 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  DISPLAY_MAX_EDGE,
   HEIC_ERROR,
   THUMBNAIL_MAX_EDGE,
   UNREADABLE_IMAGE_ERROR,
   UNSUPPORTED_TYPE_ERROR,
   computeScaledDimensions,
+  displayImageName,
+  exportImageName,
+  generateImagePair,
   generateThumbnail,
   orientationMatrix,
   orientationSwapsDimensions,
@@ -236,5 +240,158 @@ describe('generateThumbnail — wiring (decode -> scale -> orient -> encode)', (
     if (result.ok) return
     expect(result.error).toBe(UNREADABLE_IMAGE_ERROR)
     expect(calls.transform).toBeDefined() // it did get as far as drawing
+  })
+})
+
+describe('displayImageName', () => {
+  it('gives the stored image a .jpg name, because the encode is always JPEG', () => {
+    expect(displayImageName('sunset.png')).toBe('sunset.jpg')
+    expect(displayImageName('shot.webp')).toBe('shot.jpg')
+    expect(displayImageName('IMG_0001.JPEG')).toBe('IMG_0001.jpg')
+  })
+
+  it('leaves a name that is already .jpg alone', () => {
+    expect(displayImageName('IMG_0001.jpg')).toBe('IMG_0001.jpg')
+  })
+
+  it('appends rather than replaces when there is no extension', () => {
+    expect(displayImageName('photo')).toBe('photo.jpg')
+  })
+
+  it('only replaces the final extension', () => {
+    expect(displayImageName('2026.08.15.png')).toBe('2026.08.15.jpg')
+  })
+})
+
+describe('exportImageName', () => {
+  it('renames to match the bytes Drive served', () => {
+    expect(exportImageName('sunset.png', 'image/jpeg')).toBe('sunset.jpg')
+  })
+
+  it('leaves a cairn stored before the downscale under its own extension', () => {
+    // The record still names `sunset.png` and Drive still holds the PNG —
+    // criterion 11's "nothing re-reads or rewrites them", seen from export.
+    expect(exportImageName('sunset.png', 'image/png')).toBe('sunset.png')
+    expect(exportImageName('shot.webp', 'image/webp')).toBe('shot.webp')
+  })
+
+  it('does not rewrite .jpeg to .jpg — both are right for JPEG bytes', () => {
+    expect(exportImageName('IMG_0001.jpeg', 'image/jpeg')).toBe('IMG_0001.jpeg')
+  })
+
+  it('leaves the name alone when the served type is unrecognised', () => {
+    // A wrong extension is worse than none.
+    expect(exportImageName('sunset.png', '')).toBe('sunset.png')
+    expect(exportImageName('sunset.png', 'application/octet-stream')).toBe('sunset.png')
+  })
+})
+
+describe('generateImagePair', () => {
+  /** Records every canvas the two passes create, so the display render and
+      the thumbnail render can be told apart by their dimensions. */
+  function recordingDeps(decoded: { width: number; height: number }[]) {
+    const canvasSizes: { width: number; height: number }[] = []
+    const transforms: number[][] = []
+    let decodeCall = 0
+
+    const dependencies: ThumbnailDependencies = {
+      decode: vi.fn().mockImplementation(() => {
+        const size = decoded[Math.min(decodeCall, decoded.length - 1)]
+        decodeCall += 1
+        return Promise.resolve({
+          naturalWidth: size.width,
+          naturalHeight: size.height,
+          source: {} as CanvasImageSource,
+        })
+      }),
+      createCanvas: (width, height) => {
+        canvasSizes.push({ width, height })
+        return {
+          width,
+          height,
+          getContext: () => ({
+            transform: (a, b, c, d, e, f) => {
+              transforms.push([a, b, c, d, e, f])
+            },
+            drawImage: () => {},
+          }),
+          toBlob: (callback, type) => callback(new Blob(['fake'], { type })),
+        }
+      },
+    }
+
+    return { dependencies, canvasSizes, transforms }
+  }
+
+  it('stores 2048 on the longest edge and a 512 thumbnail beside it', async () => {
+    const { dependencies, canvasSizes } = recordingDeps([
+      { width: 4032, height: 3024 },
+      { width: 2048, height: 1536 },
+    ])
+    const file = new File(['x'], 'IMG_1.jpg', { type: 'image/jpeg' })
+
+    const result = await generateImagePair(file, undefined, dependencies)
+
+    expect(result.ok).toBe(true)
+    expect(canvasSizes).toEqual([
+      { width: DISPLAY_MAX_EDGE, height: 1536 },
+      { width: THUMBNAIL_MAX_EDGE, height: 384 },
+    ])
+  })
+
+  it('never upscales an image already inside the display size', async () => {
+    const { dependencies, canvasSizes } = recordingDeps([
+      { width: 1600, height: 1200 },
+      { width: 1600, height: 1200 },
+    ])
+    const file = new File(['x'], 'small.jpg', { type: 'image/jpeg' })
+
+    await generateImagePair(file, undefined, dependencies)
+
+    expect(canvasSizes[0]).toEqual({ width: 1600, height: 1200 })
+  })
+
+  it('applies EXIF orientation to the display image and not again to the thumbnail', async () => {
+    // Orientation 6 on a landscape sensor: the display render rotates it
+    // upright, so the thumbnail render — which reads that output — must be
+    // handed no orientation at all or the photo comes out sideways.
+    const { dependencies, transforms } = recordingDeps([
+      { width: 4032, height: 3024 },
+      { width: 1536, height: 2048 },
+    ])
+    const file = new File(['x'], 'IMG_1.jpg', { type: 'image/jpeg' })
+
+    await generateImagePair(file, 6, dependencies)
+
+    expect(transforms[0]).toEqual(orientationMatrix(6, DISPLAY_MAX_EDGE, 1536))
+    expect(transforms[1]).toEqual(orientationMatrix(undefined, 384, 512))
+  })
+
+  it('derives the thumbnail from the display image rather than decoding the source twice', async () => {
+    const { dependencies } = recordingDeps([
+      { width: 4032, height: 3024 },
+      { width: 2048, height: 1536 },
+    ])
+    const file = new File(['x'], 'IMG_1.jpg', { type: 'image/jpeg' })
+
+    await generateImagePair(file, undefined, dependencies)
+
+    const decode = dependencies.decode as ReturnType<typeof vi.fn>
+    expect(decode).toHaveBeenCalledTimes(2)
+    expect(decode.mock.calls[0][0]).toBe(file)
+    expect(decode.mock.calls[1][0]).not.toBe(file)
+    expect((decode.mock.calls[1][0] as File).name).toBe('IMG_1.jpg')
+  })
+
+  it('fails with the decode error when the source cannot be read', async () => {
+    const { dependencies } = recordingDeps([{ width: 100, height: 100 }])
+    dependencies.decode = vi.fn().mockRejectedValue(new Error('nope'))
+    const file = new File(['x'], 'broken.jpg', { type: 'image/jpeg' })
+
+    const result = await generateImagePair(file, undefined, dependencies)
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error).toBe(UNREADABLE_IMAGE_ERROR)
   })
 })

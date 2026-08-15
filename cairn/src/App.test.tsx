@@ -23,11 +23,16 @@ vi.mock('./drive/trackFiles', async () => {
 // jsdom has no `createImageBitmap` — every existing test that drops a photo
 // only ever asserts on the local, synchronous half of an import (the row
 // exists), never on `uploadState`/`image` actually landing `ok`, so a real
-// `generateThumbnail` failing silently has never mattered before. #157's
+// `generateImagePair` failing silently has never mattered before. #157's
 // attach tests do check the resulting `image`, so they need it to succeed.
 vi.mock('./photo/thumbnail', async () => {
   const actual = await vi.importActual<typeof import('./photo/thumbnail')>('./photo/thumbnail')
-  return { ...actual, generateThumbnail: vi.fn().mockResolvedValue({ ok: true, blob: new Blob(['thumb']) }) }
+  return {
+    ...actual,
+    generateImagePair: vi
+      .fn()
+      .mockResolvedValue({ ok: true, display: new Blob(['display']), thumbnail: new Blob(['thumb']) }),
+  }
 })
 
 function loadKmlFixture(name: string, as = name): File {
@@ -697,7 +702,13 @@ describe('App drop-to-draft (#81)', () => {
 })
 
 describe('App loose tracks and photos (#110)', () => {
-  function seedLooseCairn(id: string, name: string, position: { lat: number; lng: number }, positionSource = 'exif') {
+  function seedLooseCairn(
+    id: string,
+    name: string,
+    position: { lat: number; lng: number },
+    positionSource = 'exif',
+    overrides: Record<string, unknown> = {},
+  ) {
     const existing = JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')
     window.localStorage.setItem(
       'cairn.loose.index',
@@ -714,6 +725,7 @@ describe('App loose tracks and photos (#110)', () => {
           icon: null,
           image: null,
           description: '',
+          ...overrides,
         },
       ]),
     )
@@ -1118,6 +1130,45 @@ describe('App loose tracks and photos (#110)', () => {
 
       expect(await screen.findByText("Couldn't export Mount Rosea — try again.")).toBeDefined()
       expect(URL.createObjectURL).not.toHaveBeenCalled()
+      fetchSpy.mockRestore()
+    })
+
+    it('names a cairn export after the bytes Drive served, not after the record (#187)', async () => {
+      const fetchSpy = mockGoogleSignIn()
+      // A cairn imported from a PNG: the downscale stores JPEG bytes, so the
+      // record still says `sunset.png` while Drive holds a `.jpg`.
+      seedLooseCairn('lp-export', 'sunset.png', { lat: 43.06, lng: 141.35 }, 'exif', {
+        image: { originalDriveFileId: 'img-1', thumbnailDriveFileId: 'thumb-1' },
+      })
+
+      await renderApp('/cairns/lp-export', { googleClientId: 'a-client-id' })
+      await signIn()
+
+      fetchSpy.mockImplementation(async (url) => {
+        const href = String(url)
+        if (href.includes('alt=media')) {
+          return {
+            ok: true,
+            status: 200,
+            blob: async () => new Blob(['jpeg'], { type: 'image/jpeg' }),
+          } as Response
+        }
+        return { ok: true, status: 200, json: async () => ({ id: 'x', files: [] }) } as Response
+      })
+      const clickedDownloadNames: (string | null)[] = []
+      const clickSpy = vi
+        .spyOn(HTMLAnchorElement.prototype, 'click')
+        .mockImplementation(function (this: HTMLAnchorElement) {
+          clickedDownloadNames.push(this.download)
+        })
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Actions for sunset.png' }))
+      await act(async () => {
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Export' }))
+      })
+
+      await waitFor(() => expect(clickedDownloadNames).toEqual(['sunset.jpg']))
+      clickSpy.mockRestore()
       fetchSpy.mockRestore()
     })
   })

@@ -6,6 +6,7 @@ import { TripsPanel } from './TripsPanel'
 import type { TripIndexEntry } from '../store/tripStore'
 import type { LooseRecord } from '../store/looseStore'
 import type { KindFilter } from './FilterChips'
+import type { CairnFacet } from '../store/cairnRules'
 import { formatDistance, formatElevationGain } from '../format/units'
 import { formatTripDateRange, lowercaseFirst } from '../format/dates'
 import { DEFAULT_TRIP_FILTERS, type TripFilters } from '../store/tripFilters'
@@ -30,6 +31,7 @@ function TestTripsPanel({
   trackCounts = new Map(),
   looseItems = [],
   kind = 'all',
+  initialFacet = 'any',
   onCreate = vi.fn(),
   onDelete = vi.fn(),
   onDeleteLoose = vi.fn(),
@@ -46,6 +48,7 @@ function TestTripsPanel({
   trackCounts?: ReadonlyMap<string, number>
   looseItems?: LooseRecord[]
   kind?: KindFilter
+  initialFacet?: CairnFacet
   onCreate?: (name: string) => void
   onDelete?: (id: string) => void
   onDeleteLoose?: (id: string) => void
@@ -60,12 +63,15 @@ function TestTripsPanel({
 }) {
   const [filters, setFilters] = useState<TripFilters>(initialFilters)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const [facet, setFacet] = useState<CairnFacet>(initialFacet)
   return (
     <TripsPanel
       trips={trips}
       trackCounts={trackCounts}
       looseItems={looseItems}
       kind={kind}
+      facet={facet}
+      onFacetChange={setFacet}
       filters={filters}
       onFiltersChange={setFilters}
       dateSpan={dateSpan}
@@ -723,6 +729,56 @@ describe('TripsPanel', () => {
       expect(screen.getByRole('heading', { name: 'Cairns' })).toBeDefined()
       expect(screen.getByText('sapporo.jpg')).toBeDefined()
       expect(screen.queryByText('Mount Rosea')).toBeNull()
+    })
+  })
+
+  describe('the cairn facet chips (#159)', () => {
+    const campsitePhoto = looseCairn({ id: 'a', name: 'Ellery Creek camp', icon: 'campsite' })
+    const plainPhoto = looseCairn({ id: 'b', name: 'sapporo.jpg', icon: null })
+    const waterNoPhoto = looseCairn({ id: 'c', name: 'Spring', icon: 'water', image: null })
+    const facetItems = { trips: [], looseItems: [campsitePhoto, plainPhoto, waterNoPhoto] }
+
+    it('Any shows every cairn by default', () => {
+      renderPanel({ ...facetItems, kind: 'cairns' })
+
+      expect(screen.getByText('Ellery Creek camp')).toBeDefined()
+      expect(screen.getByText('sapporo.jpg')).toBeDefined()
+      expect(screen.getByText('Spring')).toBeDefined()
+      expect(screen.getByText('3')).toBeDefined()
+    })
+
+    it('Photo shows every cairn carrying an image, whatever its icon', () => {
+      renderPanel({ ...facetItems, kind: 'cairns', initialFacet: 'photo' })
+
+      expect(screen.getByText('Ellery Creek camp')).toBeDefined()
+      expect(screen.getByText('sapporo.jpg')).toBeDefined()
+      expect(screen.queryByText('Spring')).toBeNull()
+    })
+
+    it('a place icon shows every cairn carrying that icon, whether or not it also has an image', () => {
+      renderPanel({ ...facetItems, kind: 'cairns', initialFacet: 'campsite' })
+
+      expect(screen.getByText('Ellery Creek camp')).toBeDefined()
+      expect(screen.queryByText('sapporo.jpg')).toBeNull()
+      expect(screen.queryByText('Spring')).toBeNull()
+    })
+
+    it('the title stays Cairns under a facet, and the count reflects it', () => {
+      renderPanel({ ...facetItems, kind: 'cairns', initialFacet: 'water' })
+
+      expect(screen.getByRole('heading', { name: 'Cairns' })).toBeDefined()
+      expect(screen.getByText('1')).toBeDefined()
+    })
+
+    it('a facet matching nothing reads "Nothing in this filter", and Clear filters resets it', () => {
+      renderPanel({ ...facetItems, kind: 'cairns', initialFacet: 'hut' })
+
+      expect(screen.getByText('Nothing in this filter')).toBeDefined()
+      fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }))
+
+      expect(screen.getByText('Ellery Creek camp')).toBeDefined()
+      expect(screen.getByText('sapporo.jpg')).toBeDefined()
+      expect(screen.getByText('Spring')).toBeDefined()
     })
   })
 

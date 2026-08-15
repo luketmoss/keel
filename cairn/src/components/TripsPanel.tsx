@@ -4,6 +4,7 @@ import { deriveTripStatus, type TripIndexEntry } from '../store/tripStore'
 import { matchesTripFilters, type TripFilters } from '../store/tripFilters'
 import { formatShortDate, formatTripMetaLine, tripRowAccessibleName } from '../format/dates'
 import { canChangeOwner, looseMetaLine, showExport, type LooseRecord } from '../store/looseStore'
+import { cairnMatchesFacet, type CairnFacet } from '../store/cairnRules'
 import { LIST_HEADINGS, type KindFilter } from './FilterChips'
 import { RowMenu } from './RowMenu'
 import { NameInput } from './NameInput'
@@ -22,6 +23,10 @@ interface TripsPanelProps {
       appear when their trip is open. */
   looseItems: LooseRecord[]
   kind: KindFilter
+  /** #159: narrows `kind === 'cairns'` further, by image or by icon.
+      Meaningless for any other chip and ignored then. */
+  facet: CairnFacet
+  onFacetChange: (facet: CairnFacet) => void
   filters: TripFilters
   onFiltersChange: (filters: TripFilters) => void
   dateSpan: { min: number; max: number } | null
@@ -54,6 +59,8 @@ export function TripsPanel({
   trackCounts,
   looseItems,
   kind,
+  facet,
+  onFacetChange,
   filters,
   onFiltersChange,
   dateSpan,
@@ -107,6 +114,8 @@ export function TripsPanel({
     if (kind === 'trips') return false
     if (kind === 'tracks' && item.kind !== 'track') return false
     if (kind === 'cairns' && item.kind !== 'cairn') return false
+    // #159: a facet only ever narrows the cairns chip further.
+    if (kind === 'cairns' && item.kind === 'cairn' && !cairnMatchesFacet(item, facet)) return false
     return search.length === 0 || item.name.toLowerCase().includes(search)
   })
 
@@ -116,6 +125,9 @@ export function TripsPanel({
 
   function clearFilters() {
     onFiltersChange({ ...filters, status: 'all', name: '', range: null })
+    // #159: the facet is a filter too — "Clear filters" clears all of them,
+    // not just the ones this component already owned.
+    if (kind === 'cairns') onFacetChange('any')
   }
 
   return (
@@ -166,7 +178,12 @@ export function TripsPanel({
         </div>
       ) : filteredEmpty ? (
         <div className="trips-panel__empty">
-          <p className="trips-panel__empty-title">Nothing in this range</p>
+          {/* #159: a facet with no members is still selectable — see the
+              design note's edge case — and lands here, under its own
+              copy rather than the date-range one. */}
+          <p className="trips-panel__empty-title">
+            {kind === 'cairns' ? 'Nothing in this filter' : 'Nothing in this range'}
+          </p>
           <button type="button" className="trips-panel__clear-filters" onClick={clearFilters}>
             Clear filters
           </button>

@@ -13,7 +13,7 @@
    full import pipeline did. */
 
 import type { LatLng } from '../map/geo'
-import type { CairnImage, LooseCairnRecord } from './looseStore'
+import type { CairnIcon, CairnImage, LooseCairnRecord } from './looseStore'
 
 /** Rule 1 (`cairns.md`, "positionSource"): every cairn can be moved,
     whatever its source. Rule 2: moving one sets `positionSource` to
@@ -41,6 +41,23 @@ export function interpolateCairn(record: LooseCairnRecord, position: LatLng): Lo
     content, not identity. */
 export function cairnDrawsAsThumbnail(record: Pick<LooseCairnRecord, 'image' | 'icon'>): boolean {
   return record.image !== null && record.icon === null
+}
+
+/** #159's facet: `any` shows every cairn, `photo` filters on the image
+    attribute (whatever the icon), and a `CairnIcon` filters on that icon
+    (whatever the image) — the same two independent attributes `cairns.md`
+    opens with, read one at a time rather than combined. */
+export type CairnFacet = 'any' | 'photo' | CairnIcon
+
+/** A facet answers *which of these do I want*, not *what is this* — so it
+    reads `image`/`icon` directly rather than through `cairnDrawsAsThumbnail`,
+    which answers a different question (how does this draw). A photographed
+    campsite matches both `photo` and `campsite`, and neither answer is a lie
+    about what it is. */
+export function cairnMatchesFacet(record: Pick<LooseCairnRecord, 'icon' | 'image'>, facet: CairnFacet): boolean {
+  if (facet === 'any') return true
+  if (facet === 'photo') return record.image !== null
+  return record.icon === facet
 }
 
 /** `image` is both Drive ids, or neither — never exactly one of the two

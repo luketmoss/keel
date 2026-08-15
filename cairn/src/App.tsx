@@ -12,6 +12,7 @@ import { MapCanvas, MapProvider } from './components/MapCanvas'
 import { ShellColumn } from './components/ShellColumn'
 import { SearchCard } from './components/SearchCard'
 import { FilterChips, type KindFilter } from './components/FilterChips'
+import { CairnFacetChips } from './components/CairnFacetChips'
 import { TripsPanel } from './components/TripsPanel'
 import { TripDetail } from './components/TripDetail'
 import { LooseFace } from './components/LooseFace'
@@ -63,6 +64,7 @@ import {
   type PlacementQueueState,
 } from './import/placementQueue'
 import { nearestPointByTime } from './photo/interpolate'
+import { cairnMatchesFacet, type CairnFacet } from './store/cairnRules'
 import type { LatLng } from './map/geo'
 import './App.css'
 
@@ -177,6 +179,15 @@ function AppShell() {
 
   const [filters, setFilters] = useState<TripFilters>(DEFAULT_TRIP_FILTERS)
   const [kind, setKind] = useState<KindFilter>('all')
+  /** #159: which cairns the `Cairns` chip's facet row narrows to — only
+      meaningful while `kind === 'cairns'`. Reset to `any` on every
+      top-level chip change (`handleKindChange` below), never persisted:
+      "the facet resets rather than being remembered." */
+  const [cairnFacet, setCairnFacet] = useState<CairnFacet>('any')
+  const handleKindChange = useCallback((next: KindFilter) => {
+    setKind(next)
+    setCairnFacet('any')
+  }, [])
   const [hoveredTripId, setHoveredTripId] = useState<string | null>(null)
   const [moveError, setMoveError] = useState<string | null>(null)
   /** #120: a move is a Drive round trip, so the picker has something to
@@ -895,7 +906,9 @@ function AppShell() {
                 (item) =>
                   kind === 'all' ||
                   (kind === 'tracks' && item.kind === 'track') ||
-                  (kind === 'cairns' && item.kind === 'cairn'),
+                  (kind === 'cairns' &&
+                    item.kind === 'cairn' &&
+                    cairnMatchesFacet(item, cairnFacet)),
               )}
               store={looseStore}
               accessToken={accessToken}
@@ -972,7 +985,14 @@ function AppShell() {
             // #156 adds the create face to that list, for the same reason:
             // it is a draft, and nothing it shows is a filterable list.
             detailOpen || draftOpen || queueOpen || createOpen ? null : (
-              <FilterChips kind={kind} onChange={setKind} />
+              <>
+                <FilterChips kind={kind} onChange={handleKindChange} />
+                {/* #159: the facet row, subordinate to the main row and
+                    shown only while its own chip is active. */}
+                {kind === 'cairns' && (
+                  <CairnFacetChips facet={cairnFacet} onChange={setCairnFacet} />
+                )}
+              </>
             )
           }
         >
@@ -1076,6 +1096,8 @@ function AppShell() {
               trackCounts={trackCounts}
               looseItems={visibleLoose}
               kind={kind}
+              facet={cairnFacet}
+              onFacetChange={setCairnFacet}
               filters={filters}
               onFiltersChange={setFilters}
               dateSpan={dateSpan}

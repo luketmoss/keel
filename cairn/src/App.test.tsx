@@ -1389,3 +1389,86 @@ describe('App attach a photo to an existing cairn (#157)', () => {
     fetchSpy.mockRestore()
   })
 })
+
+describe('App cairn facets (#159)', () => {
+  function seedLooseCairn(id: string, name: string, overrides: Record<string, unknown> = {}) {
+    const existing = JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')
+    window.localStorage.setItem(
+      'cairn.loose.index',
+      JSON.stringify([
+        ...existing,
+        {
+          kind: 'cairn',
+          id,
+          name,
+          createdAt: '2026-01-01T00:00:00.000Z',
+          date: null,
+          position: { lat: 43, lng: 141 },
+          positionSource: 'placed',
+          icon: 'campsite',
+          image: null,
+          description: '',
+          uploadState: 'ok',
+          ...overrides,
+        },
+      ]),
+    )
+  }
+
+  it('shows the facet row only while Cairns is the active chip', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedLooseCairn('c-1', 'Ellery Creek camp')
+    await renderApp('/', { googleClientId: 'a-client-id' })
+    await signIn()
+
+    expect(screen.queryByRole('group', { name: 'Filter cairns' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cairns' }))
+    expect(screen.getByRole('group', { name: 'Filter cairns' })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Any' }).getAttribute('aria-pressed')).toBe('true')
+
+    fireEvent.click(screen.getByRole('button', { name: 'All' }))
+    expect(screen.queryByRole('group', { name: 'Filter cairns' })).toBeNull()
+
+    fetchSpy.mockRestore()
+  })
+
+  it('resets the facet to Any when the top-level chip leaves Cairns and returns', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedLooseCairn('c-1', 'Ellery Creek camp', { icon: 'campsite' })
+    seedLooseCairn('c-2', 'Spring', { icon: 'water' })
+    await renderApp('/', { googleClientId: 'a-client-id' })
+    await signIn()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cairns' }))
+    fireEvent.click(screen.getByRole('button', { name: 'water' }))
+    expect(screen.queryByText('Ellery Creek camp')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'All' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cairns' }))
+
+    expect(screen.getByRole('button', { name: 'Any' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByText('Ellery Creek camp')).toBeDefined()
+    expect(screen.getByText('Spring')).toBeDefined()
+
+    fetchSpy.mockRestore()
+  })
+
+  it('hides the facet row on a detail face, and never applies it to a loose track', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedLooseCairn('c-1', 'Ellery Creek camp')
+    seedLooseTrack('lt-1', 'Mount Rosea')
+    await renderApp('/', { googleClientId: 'a-client-id' })
+    await signIn()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cairns' }))
+    expect(screen.getByRole('group', { name: 'Filter cairns' })).toBeDefined()
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Ellery Creek camp'))
+    })
+    expect(screen.queryByRole('group', { name: 'Filter cairns' })).toBeNull()
+
+    fetchSpy.mockRestore()
+  })
+})

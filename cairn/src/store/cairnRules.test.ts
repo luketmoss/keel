@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cairnDrawsAsThumbnail, interpolateCairn, isValidCairnImage, placeCairn } from './cairnRules'
+import { cairnDrawsAsThumbnail, cairnMatchesFacet, interpolateCairn, isValidCairnImage, placeCairn } from './cairnRules'
 import type { LooseCairnRecord } from './looseStore'
 import { positionPhoto } from '../photo/interpolate'
 import type { Track } from '../kml/parse'
@@ -60,6 +60,31 @@ describe('interpolateCairn', () => {
     const next = interpolateCairn(cairn, { lat: 5, lng: 6 })
     expect(next).toBe(cairn)
     expect(next.position).toEqual({ lat: 0, lng: 0 })
+  })
+})
+
+describe('cairnMatchesFacet (#159)', () => {
+  it('any matches every cairn', () => {
+    expect(cairnMatchesFacet(makeCairn({ icon: null, image: null }), 'any')).toBe(true)
+    expect(cairnMatchesFacet(makeCairn({ icon: 'campsite', image: { originalDriveFileId: 'o', thumbnailDriveFileId: 't' } }), 'any')).toBe(true)
+  })
+
+  it('photo matches a cairn carrying an image, whatever its icon', () => {
+    const withImage = { originalDriveFileId: 'o', thumbnailDriveFileId: 't' }
+    expect(cairnMatchesFacet(makeCairn({ icon: null, image: withImage }), 'photo')).toBe(true)
+    expect(cairnMatchesFacet(makeCairn({ icon: 'campsite', image: withImage }), 'photo')).toBe(true)
+  })
+
+  it('photo does not match a cairn with no image', () => {
+    expect(cairnMatchesFacet(makeCairn({ icon: 'campsite', image: null }), 'photo')).toBe(false)
+  })
+
+  it('an icon facet matches only that icon, whether or not there is an image', () => {
+    const withImage = { originalDriveFileId: 'o', thumbnailDriveFileId: 't' }
+    expect(cairnMatchesFacet(makeCairn({ icon: 'campsite', image: null }), 'campsite')).toBe(true)
+    expect(cairnMatchesFacet(makeCairn({ icon: 'campsite', image: withImage }), 'campsite')).toBe(true)
+    expect(cairnMatchesFacet(makeCairn({ icon: 'water', image: null }), 'campsite')).toBe(false)
+    expect(cairnMatchesFacet(makeCairn({ icon: null, image: null }), 'campsite')).toBe(false)
   })
 })
 

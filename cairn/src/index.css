@@ -84,6 +84,11 @@
   --row-touch: 44px;
   --scrim: color-mix(in srgb, var(--ground) 70%, transparent);
 
+  /* Cairn facets — cairn/docs/design/159-cairn-facets.md, "New tokens".
+     --chip-height (34px) stays the main row's; the facet row's chips are
+     smaller so a second row costs less of the panel's scarcest resource. */
+  --chip-height-sub: 28px;
+
   color-scheme: dark;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   font-size: var(--text-base);

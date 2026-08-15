@@ -15,7 +15,7 @@ function row(overrides: Partial<PhotoListRow> = {}): PhotoListRow {
     name: 'a.jpg',
     thumbnailDriveFileId: 'thumb-1',
     originalDriveFileId: 'orig-1',
-    located: true,
+    source: 'exif',
     ...overrides,
   }
 }
@@ -107,26 +107,6 @@ describe('PhotoList', () => {
     expect(screen.getByText('No date')).toBeDefined()
     expect(screen.getByText('a.jpg')).toBeDefined()
     expect(screen.getByText('—')).toBeDefined()
-  })
-
-  it('renders a No location divider for an unlocated photo, reachable despite no marker (criterion 4)', () => {
-    const rows = [row({ id: 'located', captureInstantMs: 100 }), row({ id: 'unlocated', located: false, name: 'no-gps.jpg' })]
-    const items = orderPhotoListItems(rows)
-
-    render(
-      <PhotoList
-        items={items}
-        totalCount={2}
-        selectedPhotoId={null}
-        accessToken="token"
-        tripOffsetHours={0}
-        onOpenRow={vi.fn()}
-        {...removeProps()}
-      />,
-    )
-
-    expect(screen.getByText('No location')).toBeDefined()
-    expect(screen.getByText('no-gps.jpg')).toBeDefined()
   })
 
   it('calls onOpenRow when a row is clicked (selection + open in one action)', () => {

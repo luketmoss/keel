@@ -111,7 +111,7 @@ export function TripsPanel({
   const visibleLoose = looseItems.filter((item) => {
     if (kind === 'trips') return false
     if (kind === 'tracks' && item.kind !== 'track') return false
-    if (kind === 'photos' && item.kind !== 'photo') return false
+    if (kind === 'photos' && item.kind !== 'cairn') return false
     return search.length === 0 || item.name.toLowerCase().includes(search)
   })
 
@@ -398,7 +398,7 @@ function TripRow({
       <Link
         to={`/trips/${trip.id}`}
         className="trips-panel__row-link"
-        aria-label={tripRowAccessibleName(trip.name, trip.startDate, trip.endDate, trackCount, trip.photoCount)}
+        aria-label={tripRowAccessibleName(trip.name, trip.startDate, trip.endDate, trackCount, trip.cairnCount)}
         onFocus={() => onHover(trip.id)}
         onBlur={() => onHover(null)}
       >
@@ -406,7 +406,7 @@ function TripRow({
           {trip.name}
         </span>
         <span className="trips-panel__row-detail">
-          {formatTripMetaLine(trip.startDate, trip.endDate, trackCount, trip.photoCount)}
+          {formatTripMetaLine(trip.startDate, trip.endDate, trackCount, trip.cairnCount)}
         </span>
       </Link>
       <RowMenu

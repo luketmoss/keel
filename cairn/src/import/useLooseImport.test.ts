@@ -4,7 +4,7 @@ import { renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useLooseImport } from './useLooseImport'
 import { LocalLooseStore } from '../store/looseStore'
-import type { PhotoRecord } from '../photo/photoIndex'
+import type { CairnRecord } from '../photo/useCairnImport'
 
 function fakeStorage(): Storage {
   const map = new Map<string, string>()
@@ -81,23 +81,27 @@ describe('useLooseImport', () => {
     expect(new Set(colours).size).toBe(2)
   })
 
-  it('imports a photo with GPS as a placed loose photo', async () => {
+  it('imports a photo with GPS as a cairn with positionSource exif', async () => {
     await importer().importFiles([photoFixture('gps-and-timestamps.jpg')])
 
     const items = store.getItems()
     expect(items).toHaveLength(1)
-    expect(items[0].kind).toBe('photo')
+    expect(items[0].kind).toBe('cairn')
     expect(items[0].position).not.toBeNull()
+    expect((items[0] as { positionSource: string }).positionSource).toBe('exif')
   })
 
-  it('keeps a photo with no GPS, unplaced rather than rejected', async () => {
-    await importer().importFiles([photoFixture('gps-stripped.jpg')])
+  // `cairns.md`: a cairn always has a position, and there is no unplaced
+  // state — a loose drop (no trip open, so nothing to interpolate against)
+  // that resolves by neither route is rejected rather than written half-done.
+  // The placement queue that lets the user place it by hand is the next
+  // issue in this split's build.
+  it('rejects a photo with no GPS rather than creating an unplaced record', async () => {
+    const rejections = await importer().importFiles([photoFixture('gps-stripped.jpg')])
 
-    const items = store.getItems()
-    expect(items).toHaveLength(1)
-    // It lists, it does not draw. Losing it would be worse than not
-    // placing it.
-    expect(items[0].position).toBeNull()
+    expect(store.getItems()).toHaveLength(0)
+    expect(rejections).toHaveLength(1)
+    expect(rejections[0].message).toContain('needs a location')
   })
 
   it('rejects a file it cannot identify, by name, importing nothing for it', async () => {
@@ -175,29 +179,31 @@ describe('useLooseImport', () => {
     })
   })
 
-  describe('addPhotoFromTrip (#132)', () => {
-    function tripPhoto(overrides: Partial<PhotoRecord> = {}): PhotoRecord {
+  describe('addCairnFromTrip (#132)', () => {
+    function tripCairn(overrides: Partial<CairnRecord> = {}): CairnRecord {
       return {
-        id: 'ignored-on-the-way-in',
+        id: 'trip-cairn-1',
         name: 'sapporo.jpg',
-        originalDriveFileId: 'trip-orig-1',
-        thumbnailDriveFileId: 'trip-thumb-1',
+        position: { lat: 43, lng: 141 },
+        positionSource: 'exif',
+        icon: null,
+        image: { originalDriveFileId: 'trip-orig-1', thumbnailDriveFileId: 'trip-thumb-1' },
+        description: '',
+        date: '2024-11-03T00:00:00.000Z',
         gpsTimestamp: '2024-11-03T00:00:00.000Z',
         dateTimeOriginal: '2024-11-03T09:00:00',
-        latitude: 43,
-        longitude: 141,
         ...overrides,
       }
     }
 
-    it("carries a trip photo's ids and EXIF fields into a loose record, for Remove from trip", () => {
-      const record = importer().addPhotoFromTrip(tripPhoto())
+    it("carries a trip cairn's id, image and position into a loose record, for Remove from trip", () => {
+      const record = importer().addCairnFromTrip(tripCairn())
 
       expect(record).toMatchObject({
-        kind: 'photo',
+        kind: 'cairn',
+        id: 'trip-cairn-1',
         name: 'sapporo.jpg',
-        originalDriveFileId: 'trip-orig-1',
-        thumbnailDriveFileId: 'trip-thumb-1',
+        image: { originalDriveFileId: 'trip-orig-1', thumbnailDriveFileId: 'trip-thumb-1' },
         // #50's two timestamps survive the move rather than being
         // collapsed, exactly as they do going the other direction.
         gpsTimestamp: '2024-11-03T00:00:00.000Z',
@@ -207,15 +213,20 @@ describe('useLooseImport', () => {
       expect(store.getItems()).toHaveLength(1)
     })
 
-    // photos.json only ever stores EXIF GPS, so a photo positioned inside
-    // the trip by #52's interpolation has no recorded coordinate to bring
-    // with it — it lists as unplaced once it leaves.
-    it('leaves a photo unplaced when its trip position came from interpolation rather than EXIF', () => {
-      const record = importer().addPhotoFromTrip(
-        tripPhoto({ latitude: undefined, longitude: undefined }),
-      )
+    // Unlike the old per-trip photo index, a cairn's position is never lost
+    // by leaving a trip — it is stored on the record itself, whatever its
+    // source, and `claimFromTrip` relocates the folder without touching it.
+    it('carries an interpolated position across unchanged, as itself', () => {
+      const record = importer().addCairnFromTrip(tripCairn({ positionSource: 'interpolated' }))
 
-      expect(record.position).toBeNull()
+      expect(record.position).toEqual({ lat: 43, lng: 141 })
+      expect(record.positionSource).toBe('interpolated')
+    })
+
+    it('preserves the trip-side id, which is what makes claimFromTrip find the folder by name', () => {
+      const record = importer().addCairnFromTrip(tripCairn({ id: 'a-specific-cairn-id' }))
+
+      expect(record.id).toBe('a-specific-cairn-id')
     })
   })
 })

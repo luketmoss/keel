@@ -102,7 +102,7 @@ export function PhotoList({
           {items.map((item, index) =>
             item.type === 'divider' ? (
               <li key={`divider-${index}`} className="photo-list__divider">
-                {item.divider === 'no-date' ? 'No date' : 'No location'}
+                No date
               </li>
             ) : (
               <PhotoRow

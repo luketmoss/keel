@@ -15,13 +15,14 @@ against each other. This file is what they were missing.
 
 It also restates a rule from #81 that the content model breaks. See *Routes*.
 
-> **Superseded in part by [cairns.md](cairns.md) (#155).** *Three kinds* below
-> is now two — trip and track — plus **cairn**, which replaces *photo* and
-> absorbs points of interest with it. The *Position, and the photo that has
-> none* section no longer describes a reachable state: a cairn always has a
-> position. `cairns.md` is standing and wins wherever the two disagree.
-> Everything else here — the column, the panel, ownership moves, routes,
-> mobile — is unchanged and still authoritative.
+**[cairns.md](cairns.md) is standing and wins wherever the two disagree.** It
+replaced *photo* as a kind of its own with **cairn** — something at a
+coordinate, carrying an optional image and an optional icon, absorbing points
+of interest with it — and superseded the *Three kinds* table below and the
+*Position, and the photo that has none* section, which no longer describes a
+reachable state: a cairn always has a position. Everything else here — the
+column, the panel, ownership moves, routes, mobile — is unchanged and still
+authoritative.
 
 ## The two ideas
 
@@ -45,21 +46,25 @@ here changes a colour, a radius, or a typeface.
 
 # Part one — the content model
 
-## Three kinds
+## Two kinds, plus cairn
 
 | Kind | What it is | Marker | Position comes from |
 |---|---|---|---|
 | **Trip** | A named bundle with `planned \| completed` and a date range | Dot: filled `--accent` when completed, hollow when planned | Its existing `origin` |
 | **Track** | One route, usually a day hike | Rounded tile at `--radius-sm` carrying the track's own colour | First point of its geometry |
-| **Photo** | One image | Circular thumbnail — the marker #54 already specifies | EXIF GPS, or nothing |
 
-A track or photo is **loose** when no trip owns it, and **owned** when one does.
-That is the only distinction; a loose track is not a different type from an
-owned one, and no field other than ownership changes when it moves.
+A cairn — something at a coordinate, carrying an optional image and an
+optional icon — is the third thing this column and this map show. Its own
+shape, its marker and its position sources are [cairns.md](cairns.md)'s, not
+restated here.
 
-**Owned things do not draw at the top level.** A trip's tracks and photos appear
-when the trip is open, not as separate markers beside its dot — otherwise a trip
-with 200 photos buries every other thing on the map.
+A track or cairn is **loose** when no trip owns it, and **owned** when one
+does. That is the only distinction; a loose track is not a different type from
+an owned one, and no field other than ownership changes when it moves.
+
+**Owned things do not draw at the top level.** A trip's tracks and cairns
+appear when the trip is open, not as separate markers beside its dot —
+otherwise a trip with 200 cairns buries every other thing on the map.
 
 ## Ownership moves
 
@@ -110,7 +115,7 @@ Loose things need a home outside any trip folder:
 ├── trips/<trip-id>/          # as today
 └── loose/
     ├── tracks/<track-id>/
-    └── photos/<photo-id>/
+    └── cairns/<cairn-id>/
 ```
 
 **"Add to a trip" is a move between folders**, and "remove from trip" is the
@@ -119,27 +124,6 @@ same move reversed. Neither is a copy, and neither is a delete.
 This is a real change to the decision recorded in cairn's `CLAUDE.md` that a
 trip is where things live. The decision that **a trip is one entity with a
 `planned | completed` status** is untouched.
-
-## Position, and the photo that has none
-
-A track always has geometry, so it always has a position. A trip has an origin.
-A photo has EXIF GPS or it does not.
-
-**A loose photo with no GPS cannot be placed.** Timestamp interpolation (#52)
-needs tracks to interpolate against, and a loose photo has none. It is not
-discarded and not hidden:
-
-- it appears in the list, with `no location` in `--danger` where its coordinates
-  would be
-- it draws no marker
-- its detail shows the explanation and the way out, not an error
-
-> **No location**
-> It has no GPS and no trip to interpolate against, so it is in your list but not
-> on the map. Adding it to a trip whose tracks cover its timestamp will place it.
-
-Adding it to a trip runs #52's interpolation as normal. If the trip's tracks do
-not cover its timestamp, it stays unplaced and the same sentence applies.
 
 ## The index and the performance rule
 

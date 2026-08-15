@@ -5,16 +5,43 @@ import { isFeatureCollection } from './tripStore'
 import { formatDistance, formatElevationGain } from '../format/units'
 import type { LatLng } from '../map/geo'
 
-/* A track or a photo that no trip owns.
+/* A track or a cairn that no trip owns.
  *
- * The model is normative in `cairn/docs/design/shell-and-content-model.md`:
- * a track or photo is **loose** when no trip owns it and **owned** when one
+ * The model is normative in `cairn/docs/design/cairns.md` for what a cairn
+ * is, and in `cairn/docs/design/shell-and-content-model.md` for ownership:
+ * a track or cairn is **loose** when no trip owns it and **owned** when one
  * does, and that is the only distinction — no field other than ownership
  * changes when it moves. Which is why there is no `tripId` here: an owned
  * item is not a loose record with a trip attached, it is simply not in this
  * store. Ownership is where the file lives. */
 
-export type LooseKind = 'track' | 'photo'
+export type LooseKind = 'track' | 'cairn'
+
+/** Where a cairn's coordinate came from — provenance, and nothing else. It
+    is not a permission and does not decide what the user may do: every
+    cairn can be moved, whatever its source, and moving one always sets this
+    to `placed`, permanently. See `cairns.md`'s "positionSource" section. */
+export type PositionSource = 'exif' | 'interpolated' | 'placed'
+
+/** Fixed and exactly these eight, plus `null` (no icon). Not extensible —
+    an open set is an emoji picker, and a marker nobody can read at a glance
+    has no reason to carry a glyph. */
+export type CairnIcon =
+  | 'campsite'
+  | 'water'
+  | 'hut'
+  | 'viewpoint'
+  | 'summit'
+  | 'hazard'
+  | 'parking'
+  | 'junction'
+
+/** Both Drive ids, or neither — never exactly one of the two. The rule the
+    old photo record already applied to its Drive files, unchanged. */
+export interface CairnImage {
+  originalDriveFileId: string
+  thumbnailDriveFileId: string
+}
 
 /** Where the item's file actually is, per #120's design note.
  *
@@ -58,29 +85,30 @@ export interface LooseTrackRecord extends LooseRecordBase {
   driveFileId: string | null
 }
 
-export interface LoosePhotoRecord extends LooseRecordBase {
-  kind: 'photo'
-  /** What the row shows: GPS time when there is one, capture time
-      otherwise. Derived on import from the two fields below, which are kept
-      alongside it rather than replaced by it — #50 keeps them distinct, and
-      a photo does not stop being subject to that because it spent a week
-      outside a trip. A move into a trip carries both through. */
-  takenAt: string | null
+/** `cairns.md`'s record. **Always has a position** — there is no unplaced
+    state and no nullable position "for safety": a cairn that cannot be
+    given a coordinate is never written (see the import issue that builds on
+    this one). `image` and `positionSource` are the two independent
+    attributes that make a photo and a point of interest the same thing. */
+export interface LooseCairnRecord extends LooseRecordBase {
+  kind: 'cairn'
+  position: LatLng
+  positionSource: PositionSource
+  /** What kind of place this is, or `null` if unsaid. */
+  icon: CairnIcon | null
+  /** What there is to see of it, or `null`. */
+  image: CairnImage | null
+  /** Free text. Empty string, never null — matches `TripRecord.notes`. */
+  description: string
+  /** What the row shows. Seeded from EXIF on import, authored otherwise. */
+  date: string | null
+  /** #50 keeps these distinct — present only for a cairn that came from a
+      photo carrying EXIF time fields. */
   gpsTimestamp?: string
   dateTimeOriginal?: string
-  /** EXIF GPS, or `null`. **A loose photo with no GPS cannot be placed** —
-      #52's interpolation needs tracks to interpolate against and a loose
-      photo has none. It lists, it does not draw, and its detail says how to
-      fix that. */
-  position: LatLng | null
-  /** Both, or neither. A photo whose original uploaded and whose thumbnail
-      did not is `failed`, not half-present — the same answer #110 gave the
-      half-moved item. */
-  originalDriveFileId: string | null
-  thumbnailDriveFileId: string | null
 }
 
-export type LooseRecord = LooseTrackRecord | LoosePhotoRecord
+export type LooseRecord = LooseTrackRecord | LooseCairnRecord
 
 export interface NewLooseTrack {
   name: string
@@ -95,26 +123,37 @@ export interface NewLooseTrack {
 }
 
 /** #133: the fields a loose item's `⋮` can edit. `colorIndex` is
-    meaningful for a track only — a photo's marker is its thumbnail, not a
-    palette entry — and is simply ignored if ever sent for one. */
+    meaningful for a track only — a cairn's marker is its icon or its
+    thumbnail, not a palette entry — and is simply ignored if ever sent for
+    one. */
 export interface LooseUpdate {
   name?: string
   colorIndex?: number
 }
 
-export interface NewLoosePhoto {
+export interface NewLooseCairn {
   name: string
-  takenAt: string | null
+  position: LatLng
+  positionSource: PositionSource
+  icon?: CairnIcon | null
+  image?: CairnImage | null
+  description?: string
+  date: string | null
   gpsTimestamp?: string
   dateTimeOriginal?: string
-  position: LatLng | null
-  originalDriveFileId?: string | null
-  thumbnailDriveFileId?: string | null
-  /** EXIF orientation, for the thumbnail a Drive-backed store generates.
-      Import-time information rather than a property of the photo, so it is
-      an input here and never reaches the record — the same relationship
-      `tracks` has to a track. */
+  /** EXIF orientation, for the thumbnail a Drive-backed store generates
+      from `source`. Import-time information rather than a property of the
+      cairn, so it is an input here and never reaches the record. */
   orientation?: number
+  /** `Remove from trip`'s reconstruction, and only that caller, supplies
+      this: a cairn's Drive folder is named by its own id at every level
+      (`loose/cairns/<id>/`, `trips/<trip-id>/cairns/<id>/`), the same way a
+      loose track's is — so preserving the trip-side id here is what lets
+      `claimFromTrip` find the folder to move by name alone, with no file id
+      to carry across the way a photo's `originalDriveFileId` used to be
+      the thing that made the reverse move findable. Omitted on every other
+      path, which generates a fresh one. */
+  id?: string
 }
 
 /* The same interface seam `TripStore` provides, for the same reason:
@@ -130,7 +169,10 @@ export interface LooseStore {
       is the one place this seam was missing an argument — #110 kept the
       record and discarded the bytes. */
   addTrack(input: NewLooseTrack, tracks: Track[], source?: File): LooseTrackRecord
-  addPhoto(input: NewLoosePhoto, source?: File): LoosePhotoRecord
+  /** `source` is present only when the cairn carries an image — an
+      icon-only cairn has nothing to upload and `image` on the input is
+      `null` or omitted. */
+  addCairn(input: NewLooseCairn, source?: File): LooseCairnRecord
   /** Destroys it, in Drive as well as here. `Remove from trip` is the
       *other* direction and does not come through here — an owned item is
       not in this store to begin with. */
@@ -139,11 +181,12 @@ export interface LooseStore {
       once the files have relocated: the item is no longer loose, and its
       files are somewhere this store must not trash. */
   forget(id: string): void
-  /** Relocates the item's file(s) into `tripId`'s folder and, for a photo,
-      records it in that trip's `photos.json`. Resolves `false` if the move
-      could not be completed, in which case nothing has changed — the item
-      is still loose and its files are still where they were. A local-only
-      store has no files to move and resolves `true`. */
+  /** Relocates the item's file(s) into `tripId`'s folder and, for a cairn,
+      into that trip's `cairns/` folder — a folder move, never a copy.
+      Resolves `false` if the move could not be completed, in which case
+      nothing has changed — the item is still loose and its files are still
+      where they were. A local-only store has no files to move and resolves
+      `true`. */
   moveIntoTrip(id: string, tripId: string): Promise<boolean>
   /** The reverse: takes a file that is currently inside `tripId`'s folder
       and moves it into the loose folder of the item already created for it
@@ -186,7 +229,7 @@ export const MOVE_FAILED_MESSAGE = "Couldn't move — still on the map."
 /** #120's copy for a drop the app will not take because there is nowhere to
     put it. One toast for the batch, not one per file — the reason is the
     same for all of them, per #75. */
-export const SIGNED_OUT_DROP_MESSAGE = 'Sign in to keep tracks and photos.'
+export const SIGNED_OUT_DROP_MESSAGE = 'Sign in to keep tracks and cairns.'
 
 const INDEX_KEY = 'cairn.loose.index'
 const overviewKey = (id: string): string => `cairn.loose.overview.${id}`
@@ -235,19 +278,21 @@ export class LocalLooseStore implements LooseStore {
     return record
   }
 
-  addPhoto = (input: NewLoosePhoto): LoosePhotoRecord => {
-    const record: LoosePhotoRecord = {
-      kind: 'photo',
-      id: generateId('photo'),
+  addCairn = (input: NewLooseCairn): LooseCairnRecord => {
+    const record: LooseCairnRecord = {
+      kind: 'cairn',
+      id: input.id ?? generateId('cairn'),
       createdAt: new Date().toISOString(),
       uploadState: 'pending',
-      originalDriveFileId: input.originalDriveFileId ?? null,
-      thumbnailDriveFileId: input.thumbnailDriveFileId ?? null,
       name: input.name,
-      takenAt: input.takenAt,
+      position: input.position,
+      positionSource: input.positionSource,
+      icon: input.icon ?? null,
+      image: input.image ?? null,
+      description: input.description ?? '',
+      date: input.date,
       ...(input.gpsTimestamp !== undefined ? { gpsTimestamp: input.gpsTimestamp } : {}),
       ...(input.dateTimeOriginal !== undefined ? { dateTimeOriginal: input.dateTimeOriginal } : {}),
-      position: input.position,
     }
     this.insert(record)
     this.notify()
@@ -406,7 +451,7 @@ export function isLooseRecord(value: unknown): value is LooseRecord {
   const record = value as Record<string, unknown>
   if (typeof record.id !== 'string' || typeof record.name !== 'string') return false
   if (typeof record.createdAt !== 'string') return false
-  return record.kind === 'track' || record.kind === 'photo'
+  return record.kind === 'track' || record.kind === 'cairn'
 }
 
 /** Moves a loose item into a trip.
@@ -426,11 +471,11 @@ export async function moveLooseIntoTrip(
     getOverview(id: string): FeatureCollection<LineString> | null
     saveOverview(id: string, tracks: Track[]): void
     /** #130: the destination trip may not be open, so nothing is calling
-        `usePhotoImport` there to notice its photo count changed. Read here
+        `useCairnImport` there to notice its cairn count changed. Read here
         and written here, the same "side effect of the data changing"
         pattern `saveOverview`/`updateOrigin` already establish for `origin`. */
-    getTrip(id: string): { photoCount: number | null } | null
-    savePhotoCount(id: string, count: number): void
+    getTrip(id: string): { cairnCount: number | null } | null
+    saveCairnCount(id: string, count: number): void
   },
   itemId: string,
   tripId: string,
@@ -473,23 +518,23 @@ export async function moveLooseIntoTrip(
     // one from its filename), so saying nothing here is what made a track
     // change its name by being moved.
     //
-    // Best-effort, like the photo bookkeeping below and for the same reason:
-    // the file has already moved, so failing the whole move over the name
-    // would report a move that plainly did happen as not having happened. The
-    // cost of it failing is the old behaviour, not a worse one.
+    // Best-effort, like the cairn count bookkeeping below and for the same
+    // reason: the file has already moved, so failing the whole move over the
+    // name would report a move that plainly did happen as not having
+    // happened. The cost of it failing is the old behaviour, not a worse one.
     if (item.driveFileId) {
       await carryName(tripId, item.driveFileId, item.name).catch(() => {})
     }
   } else {
-    // #130: incremented, not recounted — re-reading `photos.json` for an
+    // #130: incremented, not recounted — re-reading the trip's cairns for an
     // authoritative length would put a Drive round trip on the one path
     // #121 exists to keep off the network. `null` stays `null`: nobody has
-    // counted this trip's photos, and moving one more into it doesn't
+    // counted this trip's cairns, and moving one more into it doesn't
     // change that. Opening the trip afterwards still recomputes the real
     // count and overwrites this, per #121's "it heals by being used".
     const destination = tripSide.getTrip(tripId)
-    if (destination && destination.photoCount !== null) {
-      tripSide.savePhotoCount(tripId, destination.photoCount + 1)
+    if (destination && destination.cairnCount !== null) {
+      tripSide.saveCairnCount(tripId, destination.cairnCount + 1)
     }
   }
 
@@ -510,6 +555,28 @@ function overviewToTracks(
     }))
 }
 
+/** What a cairn's meta line says, per `cairns.md`'s "The row" section: the
+    date, then its icon and `photo` as separate clauses — never a type,
+    because a photographed campsite is both at once. */
+export function cairnMetaClauses(record: LooseCairnRecord): string[] {
+  const clauses: string[] = []
+  if (record.icon) clauses.push(CAIRN_ICON_LABEL[record.icon])
+  if (record.image) clauses.push('photo')
+  if (clauses.length === 0) clauses.push('cairn')
+  return clauses
+}
+
+export const CAIRN_ICON_LABEL: Record<CairnIcon, string> = {
+  campsite: 'campsite',
+  water: 'water',
+  hut: 'hut',
+  viewpoint: 'viewpoint',
+  summit: 'summit',
+  hazard: 'hazard',
+  parking: 'parking',
+  junction: 'junction',
+}
+
 /** What a row shows under the name. The list is one list, so the meta line
     is derived here rather than in three places that could drift.
  *
@@ -524,9 +591,9 @@ function overviewToTracks(
 export function looseMetaLine(record: LooseRecord, formatDate: (iso: string) => string): string {
   if (record.uploadState === 'uploading') return 'uploading…'
   if (record.uploadState === 'failed') return 'not on Drive'
-  if (record.kind === 'photo') {
-    const when = record.takenAt ? formatDate(record.takenAt) : 'undated'
-    return record.position ? `${when} · photo` : `${when} · no location`
+  if (record.kind === 'cairn') {
+    const when = record.date ? formatDate(record.date) : 'undated'
+    return [when, ...cairnMetaClauses(record)].join(' · ')
   }
   const when = record.date ? formatDate(record.date) : 'undated'
   const distance = formatDistance(record.distanceMeters)
@@ -544,7 +611,7 @@ export function canChangeOwner(record: LooseRecord): boolean {
 
 /** The Drive file `Export` downloads, or `null` if there isn't one. */
 function exportFileId(record: LooseRecord): string | null {
-  return record.kind === 'track' ? record.driveFileId : record.originalDriveFileId
+  return record.kind === 'track' ? record.driveFileId : (record.image?.originalDriveFileId ?? null)
 }
 
 /** #140: whether a loose item's `⋮` shows `Export` at all.
@@ -552,10 +619,11 @@ function exportFileId(record: LooseRecord): string | null {
  * `uploading`/`failed` show it in the Disabled treatment, same as every
  * other action `canChangeOwner` already gates — the file is on its way, or
  * a retry might still bring it. An `ok` item with no file id is a different
- * fact: a track or photo migrated before #120 kept its record but never its
- * bytes, and no retry ever fixes that. `Export` is omitted for those
- * entirely, the same treatment `Change colour` already gets for a photo —
- * an action that does not apply, not one that is temporarily unavailable. */
+ * fact: a track or cairn migrated before #120 kept its record but never its
+ * bytes (or a cairn that never carried an image), and no retry ever fixes
+ * that. `Export` is omitted for those entirely, the same treatment
+ * `Change colour` already gets for a cairn — an action that does not apply,
+ * not one that is temporarily unavailable. */
 export function showExport(record: LooseRecord): boolean {
   return !canChangeOwner(record) || exportFileId(record) !== null
 }

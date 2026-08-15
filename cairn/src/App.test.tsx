@@ -687,20 +687,23 @@ describe('App drop-to-draft (#81)', () => {
 })
 
 describe('App loose tracks and photos (#110)', () => {
-  function seedLoosePhoto(id: string, name: string, position: unknown) {
+  function seedLooseCairn(id: string, name: string, position: { lat: number; lng: number }, positionSource = 'exif') {
     const existing = JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')
     window.localStorage.setItem(
       'cairn.loose.index',
       JSON.stringify([
         ...existing,
         {
-          kind: 'photo',
+          kind: 'cairn',
           id,
           name,
           createdAt: '2026-01-01T00:00:00.000Z',
-          takenAt: '2024-11-03T00:00:00.000Z',
+          date: '2024-11-03T00:00:00.000Z',
           position,
-          driveFileId: null,
+          positionSource,
+          icon: null,
+          image: null,
+          description: '',
         },
       ]),
     )
@@ -724,28 +727,17 @@ describe('App loose tracks and photos (#110)', () => {
     fetchSpy.mockRestore()
   })
 
-  it('explains an unplaced photo rather than erroring', async () => {
-    const fetchSpy = mockGoogleSignIn()
-    seedLoosePhoto('lp-1', 'no-gps.jpg', null)
-
-    await renderApp('/photos/lp-1', { googleClientId: 'a-client-id' })
-    await signIn()
-
-    expect(await screen.findByText('No location')).toBeDefined()
-    expect(screen.getByText(/Adding it to a trip whose tracks cover its timestamp/)).toBeDefined()
-    fetchSpy.mockRestore()
-  })
-
+  // `cairns.md`: a cairn always has a position — there is no more unplaced
+  // state for the detail face to explain.
   it('shows a placed photo its position and where that came from', async () => {
     const fetchSpy = mockGoogleSignIn()
-    seedLoosePhoto('lp-2', 'sapporo.jpg', { lat: 43.06, lng: 141.35 })
+    seedLooseCairn('lp-2', 'sapporo.jpg', { lat: 43.06, lng: 141.35 })
 
     await renderApp('/photos/lp-2', { googleClientId: 'a-client-id' })
     await signIn()
 
-    expect(await screen.findByText('EXIF GPS')).toBeDefined()
-    expect(screen.getByText(/43\.06000, 141\.35000/)).toBeDefined()
-    expect(screen.queryByText('No location')).toBeNull()
+    expect(await screen.findByText(/43\.06000, 141\.35000/)).toBeDefined()
+    expect(screen.getByText(/Position came from the photo/)).toBeDefined()
     fetchSpy.mockRestore()
   })
 
@@ -1013,7 +1005,7 @@ describe('App loose tracks and photos (#110)', () => {
 
     it('offers no Change colour item for a loose photo', async () => {
       const fetchSpy = mockGoogleSignIn()
-      seedLoosePhoto('lp-rename', 'sapporo.jpg', { lat: 43.06, lng: 141.35 })
+      seedLooseCairn('lp-rename', 'sapporo.jpg', { lat: 43.06, lng: 141.35 })
 
       await renderApp('/photos/lp-rename', { googleClientId: 'a-client-id' })
       await signIn()
@@ -1134,7 +1126,7 @@ describe('App loose items in Drive (#120)', () => {
 
     // One toast for the batch, not one per file — the reason is the same
     // for all of them.
-    expect(screen.getAllByText('Sign in to keep tracks and photos.')).toHaveLength(1)
+    expect(screen.getAllByText('Sign in to keep tracks and cairns.')).toHaveLength(1)
     expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(0)
   })
 
@@ -1149,7 +1141,7 @@ describe('App loose items in Drive (#120)', () => {
     // #81 designed this to work signed out, and #120 does not take it
     // away — the draft is visible, and it survives signing in.
     expect(await screen.findByText('NOT SAVED')).toBeDefined()
-    expect(screen.queryByText('Sign in to keep tracks and photos.')).toBeNull()
+    expect(screen.queryByText('Sign in to keep tracks and cairns.')).toBeNull()
   })
 
   it('refuses Keep loose while signed out and leaves the draft open', async () => {
@@ -1164,7 +1156,7 @@ describe('App loose items in Drive (#120)', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Keep loose' }))
     })
 
-    expect(screen.getByText('Sign in to keep tracks and photos.')).toBeDefined()
+    expect(screen.getByText('Sign in to keep tracks and cairns.')).toBeDefined()
     // Nothing is lost — the files are still there to keep once signed in.
     expect(screen.getByText('NOT SAVED')).toBeDefined()
     expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(0)

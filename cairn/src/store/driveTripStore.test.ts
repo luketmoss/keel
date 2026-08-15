@@ -600,14 +600,14 @@ describe('DriveTripStore', () => {
     await flush()
     writeJsonFile.mockClear()
 
-    store.savePhotoCount(entry.id, 128)
+    store.saveCairnCount(entry.id, 128)
     await flush()
 
     expect(writeJsonFile).toHaveBeenCalledWith(
       'token',
       'folder-1',
       'trip.json',
-      expect.objectContaining({ photoCount: 128 }),
+      expect.objectContaining({ cairnCount: 128 }),
       expect.anything(),
     )
   })
@@ -617,12 +617,12 @@ describe('DriveTripStore', () => {
     const store = new DriveTripStore(fakeStorage())
     const entry = store.createTrip('Hokkaido')
     await store.connect('token', 'cairn-folder-id')
-    store.savePhotoCount(entry.id, 4)
+    store.saveCairnCount(entry.id, 4)
     await flush()
     writeJsonFile.mockClear()
 
     // The caller is an effect handing over the same number on every render.
-    store.savePhotoCount(entry.id, 4)
+    store.saveCairnCount(entry.id, 4)
     await flush()
 
     expect(writeJsonFile).not.toHaveBeenCalled()

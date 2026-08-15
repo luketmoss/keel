@@ -11,7 +11,7 @@ export interface TripChoice {
   /** `null` when nobody has counted this trip's photos yet (#121) — a
       different fact from `0`, and the picker says so by showing no photo
       count at all rather than a confident zero. */
-  photoCount: number | null
+  cairnCount: number | null
 }
 
 /** What the counts say out loud. `4T · 128P` is decorative shorthand whose
@@ -19,8 +19,8 @@ export interface TripChoice {
     name spells it out instead. */
 export function tripChoiceLabel(choice: TripChoice): string {
   const parts = [choice.entry.name, pluralize(choice.trackCount, 'track')]
-  if (choice.photoCount !== null) {
-    parts.push(choice.photoCount === 0 ? 'no photos' : pluralize(choice.photoCount, 'photo'))
+  if (choice.cairnCount !== null) {
+    parts.push(choice.cairnCount === 0 ? 'no photos' : pluralize(choice.cairnCount, 'photo'))
   }
   return parts.join(', ')
 }
@@ -140,7 +140,7 @@ export function AddToTripPicker({
                     It stops being shorter the first time the trip is opened. */}
                 <span className="add-to-trip__counts">
                   {choice.trackCount}T
-                  {choice.photoCount !== null && ` · ${choice.photoCount}P`}
+                  {choice.cairnCount !== null && ` · ${choice.cairnCount}P`}
                 </span>
               </button>
             </li>

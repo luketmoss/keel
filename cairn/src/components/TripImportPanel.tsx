@@ -1,13 +1,13 @@
 import { useRef, type ChangeEvent } from 'react'
 import type { TripImportFailure, TripImportProgress } from '../import/useTripImport'
-import type { PhotoImportFailure, PhotoImportProgress } from '../photo/usePhotoImport'
+import type { CairnImportFailure, CairnImportProgress } from '../photo/useCairnImport'
 import './TripImportPanel.css'
 
 /* Either pipeline's progress/failure row renders identically here — the
    panel doesn't care which pipeline a row came from, only that it has a
    name, a position, and (for failures) a message and optional retry. */
-type AnyProgress = TripImportProgress | PhotoImportProgress
-type AnyFailure = TripImportFailure | PhotoImportFailure
+type AnyProgress = TripImportProgress | CairnImportProgress
+type AnyFailure = TripImportFailure | CairnImportFailure
 
 interface TripImportPanelProps {
   signedIn: boolean

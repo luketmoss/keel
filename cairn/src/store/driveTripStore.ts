@@ -144,12 +144,12 @@ export class DriveTripStore implements TripStore {
   /** #121: the count lives on `trip.json`, so it flushes exactly the way
       `origin` does — through `flushTrip`, not `updateTrip`. Fire-and-forget
       for the same reason `saveOverview`'s flush is: no failure UI is
-      defined for a derived value, and the next read of the trip's photo
-      index writes it again. `local.savePhotoCount` is a no-op when the
-      count is unchanged, so an unchanged count costs no Drive write. */
-  savePhotoCount = (id: string, count: number): void => {
-    const before = this.local.getTrip(id)?.photoCount
-    this.local.savePhotoCount(id, count)
+      defined for a derived value, and the next open of the trip recomputes
+      it again. `local.saveCairnCount` is a no-op when the count is
+      unchanged, so an unchanged count costs no Drive write. */
+  saveCairnCount = (id: string, count: number): void => {
+    const before = this.local.getTrip(id)?.cairnCount
+    this.local.saveCairnCount(id, count)
     if (before === count) return
     void this.enqueue(id, () => this.flushTrip(id))
   }

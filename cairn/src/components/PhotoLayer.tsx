@@ -1,11 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AdvancedMarker, useMap } from '@vis.gl/react-google-maps'
-import type { PositionedPhoto } from '../photo/positionPhotos'
 import { clusterMarkers, type MarkerCluster } from '../map/cluster'
 import { zoomToFitCluster } from '../map/fitBounds'
 import { clusterAriaLabel, clusterProvenance, markerAriaLabel, ringStyleForPhoto } from '../photo/provenance'
 import { usePhotoImage } from '../photo/usePhotoImage'
+import type { PositionSource } from '../store/looseStore'
 import './PhotoLayer.css'
+
+/** A cairn with an image, flattened to what this layer draws — every cairn
+    on this map has a position (`cairns.md`), so there is no "unlocated"
+    case to filter out any more. Not the model's own `CairnRecord`: this
+    layer only draws the image-thumbnail marker (`cairns.md`'s pin-vs-
+    thumbnail predicate is the marker/list rework's to build), so its input
+    stays the narrower shape a photo marker actually needs. */
+export interface PositionedPhoto {
+  id: string
+  name: string
+  thumbnailDriveFileId: string
+  latitude: number
+  longitude: number
+  source: PositionSource
+}
 
 /* --marker-size from index.css, transcribed — AdvancedMarker content takes
    real pixels for clustering's projection math, not a CSS var (same

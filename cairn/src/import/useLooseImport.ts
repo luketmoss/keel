@@ -2,10 +2,11 @@ import { useCallback } from 'react'
 import { parseKmlOrKmz, type Track } from '../kml/parse'
 import { computeTrackStats } from '../kml/stats'
 import { readPhotoExif } from '../photo/exif'
+import { positionPhoto } from '../photo/interpolate'
 import { isPhotoFile, isTrackFile } from '../import/fileKinds'
 import { TRACK_COLORS } from '../map/palette'
-import type { LooseRecord, LoosePhotoRecord, LooseStore, LooseTrackRecord } from '../store/looseStore'
-import type { PhotoRecord } from '../photo/photoIndex'
+import type { LooseCairnRecord, LooseRecord, LooseStore, LooseTrackRecord } from '../store/looseStore'
+import type { CairnRecord } from '../photo/useCairnImport'
 
 export interface ImportRejection {
   name: string
@@ -87,32 +88,36 @@ export function useLooseImport(store: LooseStore) {
 
         if (isPhotoFile(file.name)) {
           const exif = await readPhotoExif(file)
-          const gps =
-            exif.ok && exif.exif.latitude !== undefined && exif.exif.longitude !== undefined
-              ? { lat: exif.exif.latitude, lng: exif.exif.longitude }
-              : null
-          store.addPhoto(
+          const fields = exif.ok ? exif.exif : {}
+          // A loose drop has no trip open, so there are no tracks to
+          // interpolate against — `positionPhoto([], …)` only ever resolves
+          // via EXIF here, which is exactly `cairns.md`'s first resolution
+          // route. A file that resolves by neither route needs the
+          // placement queue this issue does not build — rejected here
+          // rather than written without a position, which `cairns.md`
+          // forbids outright ("no unplaced state").
+          const resolved = positionPhoto(fields, [])
+          if (!resolved) {
+            rejections.push({
+              name: file.name,
+              message: `${file.name} — needs a location to become a cairn`,
+            })
+            continue
+          }
+          store.addCairn(
             {
               name: file.name,
-              takenAt: exif.ok
-                ? (exif.exif.gpsTimestamp ?? exif.exif.dateTimeOriginal ?? null)
-                : null,
-              // Kept apart as well as collapsed into `takenAt` above: #50's
+              position: { lat: resolved.latitude, lng: resolved.longitude },
+              positionSource: resolved.source,
+              date: fields.gpsTimestamp ?? fields.dateTimeOriginal ?? null,
+              // Kept apart as well as collapsed into `date` above: #50's
               // reason for distinguishing them does not stop applying while
-              // a photo is loose, and a move into a trip carries both.
-              ...(exif.ok && exif.exif.gpsTimestamp !== undefined
-                ? { gpsTimestamp: exif.exif.gpsTimestamp }
+              // a cairn is loose, and a move into a trip carries both.
+              ...(fields.gpsTimestamp !== undefined ? { gpsTimestamp: fields.gpsTimestamp } : {}),
+              ...(fields.dateTimeOriginal !== undefined
+                ? { dateTimeOriginal: fields.dateTimeOriginal }
                 : {}),
-              ...(exif.ok && exif.exif.dateTimeOriginal !== undefined
-                ? { dateTimeOriginal: exif.exif.dateTimeOriginal }
-                : {}),
-              ...(exif.ok && exif.exif.orientation !== undefined
-                ? { orientation: exif.exif.orientation }
-                : {}),
-              // A photo with no GPS is imported anyway, without a position.
-              // It lists, it does not draw, and its detail explains the way
-              // out — losing it would be worse than not placing it.
-              position: gps,
+              ...(fields.orientation !== undefined ? { orientation: fields.orientation } : {}),
             },
             file,
           )
@@ -174,40 +179,42 @@ export function useLooseImport(store: LooseStore) {
     [store],
   )
 
-  /** A trip's `PhotoRecord`, rebuilt as a loose record for `Remove from
-      trip`. The bytes are already in Drive, in the trip's folder — the two
-      drive file ids carry straight across, since #120 gave `PhotoRecord`
-      and `LoosePhotoRecord` the same EXIF fields — and `claimFromTrip` is
-      what relocates them, the photo mirror of `addParsedTracks` passing
+  /** A trip's `CairnRecord`, rebuilt as a loose record for `Remove from
+      trip`. Every field carries straight across unchanged — position,
+      source and image included, since a cairn's position is never
+      recomputed by leaving a trip the way an old photo's derived-from-
+      interpolation one used to be lost. `claimFromTrip` is what relocates
+      the folder, the cairn mirror of `addParsedTracks` passing
       `driveFileId` for a track.
    *
-   * #132: an interpolated position is not carried across. `photos.json`
-      only ever stores EXIF GPS, so a photo positioned inside the trip by
-      #52's interpolation has no recorded coordinate to bring with it — it
-      lists as unplaced once it leaves, exactly as a photo with no GPS
-      always has. */
-  const addPhotoFromTrip = useCallback(
-    (record: PhotoRecord): LoosePhotoRecord => {
-      return store.addPhoto({
+   * `id: record.id` is what makes the relocation findable: the trip-side
+      folder is `trips/<trip-id>/cairns/<record.id>/`, and preserving the
+      same id here is the only thing that lets `claimFromTrip` find it by
+      name with no file id to carry across (see `NewLooseCairn.id`). */
+  const addCairnFromTrip = useCallback(
+    (record: CairnRecord): LooseCairnRecord => {
+      return store.addCairn({
+        id: record.id,
         name: record.name,
-        takenAt: record.gpsTimestamp ?? record.dateTimeOriginal ?? null,
+        position: record.position,
+        positionSource: record.positionSource,
+        icon: record.icon,
+        image: record.image,
+        description: record.description,
+        date: record.date,
         ...(record.gpsTimestamp !== undefined ? { gpsTimestamp: record.gpsTimestamp } : {}),
         ...(record.dateTimeOriginal !== undefined ? { dateTimeOriginal: record.dateTimeOriginal } : {}),
-        position:
-          record.latitude !== undefined && record.longitude !== undefined
-            ? { lat: record.latitude, lng: record.longitude }
-            : null,
-        originalDriveFileId: record.originalDriveFileId,
-        thumbnailDriveFileId: record.thumbnailDriveFileId,
       })
     },
     [store],
   )
 
-  return { importFiles, addParsedTracks, addPhotoFromTrip }
+  return { importFiles, addParsedTracks, addCairnFromTrip }
 }
 
-/** Loose items that have a position, in the shape the map's layers want. */
+/** Loose items that have a position, in the shape the map's layers want. A
+    cairn always has one (`cairns.md`); only a track's can still be `null`
+    (its geometry failed to parse). */
 export function placedLooseItems(items: LooseRecord[]): LooseRecord[] {
   return items.filter((item) => item.position !== null)
 }

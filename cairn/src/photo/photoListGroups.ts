@@ -1,19 +1,17 @@
-/* Builds the sidebar photo list's rows and grouping/ordering from #55's
-   design doc — pure, no React, no DOM, mirroring `positionPhotos.ts` and
-   `provenance.ts`'s "logic lives outside the component" convention so the
-   ordering/grouping rules are testable without mounting anything.
+/* Builds the sidebar cairn list's rows and grouping/ordering from #55's
+   design doc — pure, no React, no DOM, mirroring `provenance.ts`'s "logic
+   lives outside the component" convention so the ordering/grouping rules
+   are testable without mounting anything.
 
-   `photoImport.photos` (every imported photo, located or not) is the data
-   source; `positionedPhotos` (already computed by `positionPhotos()`,
-   unlocated ones filtered out) is cross-referenced only to know which
-   photos have a marker and their `source`. Capture time is resolved with
-   `resolvePhotoInstant`/`tripUtcOffsetHours` (interpolate.ts) directly —
-   never reimplemented here. */
+   A cairn always has a position now (`cairns.md`) — there is no more
+   "unlocated" group; every cairn draws on the map and lists here. What's
+   left of the old three-way split is dated vs. undated, since a cairn's
+   `date` is still optional. */
 
+import { resolvePhotoInstant, tripUtcOffsetHours } from './interpolate'
+import type { CairnRecord } from './useCairnImport'
 import type { Track } from '../kml/parse'
-import { resolvePhotoInstant, tripUtcOffsetHours, type PhotoPositionSource } from './interpolate'
-import type { PhotoRecord } from './photoIndex'
-import type { PositionedPhoto } from './positionPhotos'
+import type { PositionSource } from '../store/looseStore'
 
 export interface PhotoListRow {
   id: string
@@ -23,86 +21,53 @@ export interface PhotoListRow {
   /** Epoch ms in UTC, from `resolvePhotoInstant` — `undefined` is the "no
       capture time" case (criterion 3, design doc's "No date" divider). */
   captureInstantMs?: number
-  /** `undefined` for an unlocated photo — it never reached `positionPhotos`
-      (design doc's Marker form section). */
-  source?: PhotoPositionSource
-  located: boolean
+  source: PositionSource
 }
 
-export type PhotoListDivider = 'no-date' | 'no-location'
+export type PhotoListDivider = 'no-date'
 
 export type PhotoListItem = { type: 'row'; row: PhotoListRow } | { type: 'divider'; divider: PhotoListDivider }
 
-/** One row per photo in the trip, in no particular order yet —
-    `orderPhotoListItems` below does the grouping/ordering. */
-export function buildPhotoListRows(
-  photos: PhotoRecord[],
-  positioned: PositionedPhoto[],
-  tracks: Track[],
-): PhotoListRow[] {
+/** One row per cairn carrying an image, in no particular order yet —
+    `orderPhotoListItems` below does the grouping/ordering. A cairn with no
+    image has nothing for this list (the photo sidebar) to show; #169's
+    unified cairn list is what will fold icon-only cairns in. */
+export function buildPhotoListRows(cairns: CairnRecord[], tracks: Track[]): PhotoListRow[] {
   const offsetHours = tripUtcOffsetHours(tracks)
-  const positionedById = new Map(positioned.map((photo) => [photo.id, photo]))
 
-  return photos.map((photo) => {
-    const position = positionedById.get(photo.id)
-    return {
-      id: photo.id,
-      name: photo.name,
-      thumbnailDriveFileId: photo.thumbnailDriveFileId,
-      originalDriveFileId: photo.originalDriveFileId,
-      captureInstantMs: resolvePhotoInstant(photo, offsetHours),
-      source: position?.source,
-      located: position !== undefined,
-    }
-  })
+  return cairns
+    .filter((cairn): cairn is CairnRecord & { image: NonNullable<CairnRecord['image']> } => cairn.image !== null)
+    .map((cairn) => ({
+      id: cairn.id,
+      name: cairn.name,
+      thumbnailDriveFileId: cairn.image.thumbnailDriveFileId,
+      originalDriveFileId: cairn.image.originalDriveFileId,
+      captureInstantMs: resolvePhotoInstant(
+        { gpsTimestamp: cairn.gpsTimestamp, dateTimeOriginal: cairn.dateTimeOriginal },
+        offsetHours,
+      ),
+      source: cairn.positionSource,
+    }))
 }
 
 function byName(a: PhotoListRow, b: PhotoListRow): number {
   return a.name.localeCompare(b.name)
 }
 
-/** Dated-first-then-filename ordering, shared by the main chronological
-    group and the "No location" group (design doc: a photo can be both
-    undated and unlocated, and "No location" wins as the outer grouping —
-    but within that group, dated photos still read chronologically rather
-    than being scattered by filename). */
-function byTimeThenName(a: PhotoListRow, b: PhotoListRow): number {
-  if (a.captureInstantMs !== undefined && b.captureInstantMs !== undefined) {
-    return a.captureInstantMs - b.captureInstantMs
-  }
-  if (a.captureInstantMs !== undefined) return -1
-  if (b.captureInstantMs !== undefined) return 1
-  return byName(a, b)
-}
-
-/** Groups and orders rows per the design doc's "The list" section:
-    1. Located, dated photos — capture time ascending.
-    2. Located, undated photos — under "No date", by filename.
-    3. Unlocated photos (dated or not) — under "No location", at the end,
-       dated-then-filename internally.
-    A divider is only emitted when its group is non-empty. */
+/** Dated-first-then-filename ordering (design doc: "No date" group by
+    filename). */
 export function orderPhotoListItems(rows: PhotoListRow[]): PhotoListItem[] {
-  const located = rows.filter((row) => row.located)
-  const unlocated = rows.filter((row) => !row.located)
-
-  const dated = located.filter((row) => row.captureInstantMs !== undefined)
+  const dated = rows.filter((row) => row.captureInstantMs !== undefined)
   dated.sort((a, b) => (a.captureInstantMs as number) - (b.captureInstantMs as number))
 
-  const undated = located.filter((row) => row.captureInstantMs === undefined)
+  const undated = rows.filter((row) => row.captureInstantMs === undefined)
   undated.sort(byName)
-
-  const unlocatedSorted = [...unlocated].sort(byTimeThenName)
 
   const items: PhotoListItem[] = dated.map((row) => ({ type: 'row', row }))
 
   if (undated.length > 0) {
     items.push({ type: 'divider', divider: 'no-date' })
     for (const row of undated) items.push({ type: 'row', row })
-  }
-
-  if (unlocatedSorted.length > 0) {
-    items.push({ type: 'divider', divider: 'no-location' })
-    for (const row of unlocatedSorted) items.push({ type: 'row', row })
   }
 
   return items

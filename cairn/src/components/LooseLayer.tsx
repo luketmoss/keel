@@ -54,7 +54,7 @@ export function LooseLayer({
             onSelect={() => onSelect(item)}
           />
         ) : (
-          <PhotoDot
+          <CairnDot
             key={item.id}
             item={item}
             accessToken={accessToken}
@@ -106,27 +106,28 @@ function TrackTile({
   )
 }
 
-function PhotoDot({
+function CairnDot({
   item,
   accessToken,
   emphasized,
   onHover,
   onSelect,
 }: {
-  item: Extract<LooseRecord, { kind: 'photo' }>
+  item: Extract<LooseRecord, { kind: 'cairn' }>
   accessToken: string | null
   emphasized: boolean
   onHover: (id: string | null) => void
   onSelect: () => void
 }) {
-  const position = item.position as { lat: number; lng: number }
   // #134: the same fallback the standing document already specifies for a
-  // photo without one — a photo whose thumbnail is missing or fails to
+  // cairn without one — a cairn whose thumbnail is missing or fails to
   // load keeps drawing at the same size and ring, in the `--surface-lift`
-  // fill, rather than disappearing from the map.
-  const thumbnailUrl = usePhotoImage(accessToken, item.thumbnailDriveFileId ?? undefined).url
+  // fill, rather than disappearing from the map. A cairn with no image at
+  // all (icon-only) draws the same empty circle for now — the pin-vs-
+  // thumbnail predicate is the marker/list rework's to build.
+  const thumbnailUrl = usePhotoImage(accessToken, item.image?.thumbnailDriveFileId).url
   return (
-    <AdvancedMarker position={position} zIndex={0} onClick={onSelect}>
+    <AdvancedMarker position={item.position} zIndex={0} onClick={onSelect}>
       <div
         className={`loose-marker${emphasized ? ' loose-marker--emphasized' : ''}`}
         onMouseEnter={() => onHover(item.id)}

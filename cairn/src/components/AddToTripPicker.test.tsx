@@ -11,13 +11,13 @@ function entry(overrides: Partial<TripIndexEntry> = {}): TripIndexEntry {
     endDate: null,
     createdAt: '2026-01-01T00:00:00.000Z',
     origin: null,
-    photoCount: null,
+    cairnCount: null,
     ...overrides,
   }
 }
 
 function choice(overrides: Partial<TripChoice> = {}): TripChoice {
-  return { entry: entry(), trackCount: 4, photoCount: 128, ...overrides }
+  return { entry: entry(), trackCount: 4, cairnCount: 128, ...overrides }
 }
 
 function renderPicker(trips: TripChoice[]) {
@@ -39,7 +39,7 @@ describe('AddToTripPicker counts (#121)', () => {
   })
 
   it('shows a real zero for a trip counted and found to hold no photos', () => {
-    renderPicker([choice({ trackCount: 3, photoCount: 0 })])
+    renderPicker([choice({ trackCount: 3, cairnCount: 0 })])
 
     expect(screen.getByText(/3T · 0P/)).toBeDefined()
   })
@@ -48,7 +48,7 @@ describe('AddToTripPicker counts (#121)', () => {
      that a trip had no photos when it might have had hundreds. Omitting the
      half is the honest alternative, applied per trip. */
   it('shows the track count alone when nobody has counted the photos', () => {
-    const { container } = renderPicker([choice({ trackCount: 1, photoCount: null })])
+    const { container } = renderPicker([choice({ trackCount: 1, cairnCount: null })])
 
     const counts = container.querySelector('.add-to-trip__counts')
     expect(counts?.textContent).toBe('1T')
@@ -58,8 +58,8 @@ describe('AddToTripPicker counts (#121)', () => {
   it('spells the counts out for a screen reader rather than reading 4T · 128P aloud', () => {
     renderPicker([
       choice(),
-      choice({ entry: entry({ id: 't2', name: 'Overland Track' }), trackCount: 3, photoCount: 0 }),
-      choice({ entry: entry({ id: 't3', name: 'Kokoda Track' }), trackCount: 1, photoCount: null }),
+      choice({ entry: entry({ id: 't2', name: 'Overland Track' }), trackCount: 3, cairnCount: 0 }),
+      choice({ entry: entry({ id: 't3', name: 'Kokoda Track' }), trackCount: 1, cairnCount: null }),
     ])
 
     expect(screen.getByRole('button', { name: 'Larapinta Trail, 4 tracks, 128 photos' })).toBeDefined()
@@ -69,7 +69,7 @@ describe('AddToTripPicker counts (#121)', () => {
   })
 
   it('uses singulars at one', () => {
-    renderPicker([choice({ trackCount: 1, photoCount: 1 })])
+    renderPicker([choice({ trackCount: 1, cairnCount: 1 })])
 
     expect(screen.getByRole('button', { name: 'Larapinta Trail, 1 track, 1 photo' })).toBeDefined()
   })

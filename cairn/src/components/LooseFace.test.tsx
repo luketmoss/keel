@@ -16,16 +16,18 @@ beforeEach(() => {
   acquire.mockReset()
 })
 
-function loosePhoto(overrides: Partial<Extract<LooseRecord, { kind: 'photo' }>> = {}): LooseRecord {
+function looseCairn(overrides: Partial<Extract<LooseRecord, { kind: 'cairn' }>> = {}): LooseRecord {
   return {
-    kind: 'photo',
-    id: 'photo-1',
+    kind: 'cairn',
+    id: 'cairn-1',
     name: 'sapporo.jpg',
     createdAt: '2026-01-01T00:00:00.000Z',
-    takenAt: '2024-11-03T00:00:00.000Z',
+    date: '2024-11-03T00:00:00.000Z',
     position: { lat: 43, lng: 141 },
-    originalDriveFileId: 'orig-1',
-    thumbnailDriveFileId: 'thumb-1',
+    positionSource: 'exif',
+    icon: null,
+    image: { originalDriveFileId: 'orig-1', thumbnailDriveFileId: 'thumb-1' },
+    description: '',
     uploadState: 'ok',
     ...overrides,
   }
@@ -48,10 +50,10 @@ function renderFace(item: LooseRecord, accessToken: string | null = 'token') {
   )
 }
 
-describe('LooseFace — #134 the photo image', () => {
-  it("shows the photo once the caching loader resolves the thumbnail's url", async () => {
+describe('LooseFace — #134 the cairn image', () => {
+  it("shows the image once the caching loader resolves the thumbnail's url", async () => {
     acquire.mockResolvedValue({ url: 'blob:fake-thumb', release: vi.fn() })
-    const { container } = renderFace(loosePhoto())
+    const { container } = renderFace(looseCairn())
 
     await waitFor(() => expect(acquire).toHaveBeenCalledWith('token', 'thumb-1'))
     await waitFor(() =>
@@ -64,7 +66,7 @@ describe('LooseFace — #134 the photo image', () => {
 
   it('shows only the fallback fill — no broken-image glyph — while loading', () => {
     acquire.mockReturnValue(new Promise(() => {})) // never resolves
-    const { container } = renderFace(loosePhoto())
+    const { container } = renderFace(looseCairn())
 
     expect(container.querySelector('.loose-face__image img')).toBeNull()
     expect(container.querySelector('.loose-face__image')).not.toBeNull()
@@ -72,21 +74,21 @@ describe('LooseFace — #134 the photo image', () => {
 
   it('shows only the fallback fill when the load fails', async () => {
     acquire.mockRejectedValue(new Error('network error'))
-    const { container } = renderFace(loosePhoto())
+    const { container } = renderFace(looseCairn())
 
     await waitFor(() => expect(acquire).toHaveBeenCalled())
     expect(container.querySelector('.loose-face__image img')).toBeNull()
   })
 
-  it('shows only the fallback fill for a photo with no thumbnail id, and never calls acquire', () => {
-    const { container } = renderFace(loosePhoto({ thumbnailDriveFileId: null }))
+  it('shows no image box at all for an icon-only cairn, and never calls acquire', () => {
+    const { container } = renderFace(looseCairn({ image: null, icon: 'campsite' }))
 
     expect(acquire).not.toHaveBeenCalled()
-    expect(container.querySelector('.loose-face__image img')).toBeNull()
+    expect(container.querySelector('.loose-face__image')).toBeNull()
   })
 
   it('fetches nothing while signed out', () => {
-    renderFace(loosePhoto(), null)
+    renderFace(looseCairn(), null)
 
     expect(acquire).not.toHaveBeenCalled()
   })

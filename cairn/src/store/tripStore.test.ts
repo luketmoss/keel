@@ -426,44 +426,44 @@ describe('LocalTripStore', () => {
     })
   })
 
-  describe('photoCount (#121)', () => {
+  describe('cairnCount (#121)', () => {
     it('is null on a fresh trip — never counted, which is not zero', () => {
       const store = new LocalTripStore(fakeStorage())
       const trip = store.createTrip('Hokkaido')
 
-      expect(trip.photoCount).toBeNull()
-      expect(store.getTrip(trip.id)?.photoCount).toBeNull()
+      expect(trip.cairnCount).toBeNull()
+      expect(store.getTrip(trip.id)?.cairnCount).toBeNull()
     })
 
     it('writes the count to both the record and the index', () => {
       const store = new LocalTripStore(fakeStorage())
       const trip = store.createTrip('Hokkaido')
 
-      store.savePhotoCount(trip.id, 128)
+      store.saveCairnCount(trip.id, 128)
 
-      expect(store.getTrip(trip.id)?.photoCount).toBe(128)
-      expect(store.getTrips().find((entry) => entry.id === trip.id)?.photoCount).toBe(128)
+      expect(store.getTrip(trip.id)?.cairnCount).toBe(128)
+      expect(store.getTrips().find((entry) => entry.id === trip.id)?.cairnCount).toBe(128)
     })
 
     it('records a real zero, distinct from never having counted', () => {
       const store = new LocalTripStore(fakeStorage())
       const trip = store.createTrip('Hokkaido')
 
-      store.savePhotoCount(trip.id, 0)
+      store.saveCairnCount(trip.id, 0)
 
-      expect(store.getTrip(trip.id)?.photoCount).toBe(0)
+      expect(store.getTrip(trip.id)?.cairnCount).toBe(0)
     })
 
     it('notifies nobody when the count has not changed', () => {
       const store = new LocalTripStore(fakeStorage())
       const trip = store.createTrip('Hokkaido')
-      store.savePhotoCount(trip.id, 4)
+      store.saveCairnCount(trip.id, 4)
       const listener = vi.fn()
       store.subscribe(listener)
 
       // The caller is an effect on the trip face, handing over the same
       // number on every render — it must not churn the index.
-      store.savePhotoCount(trip.id, 4)
+      store.saveCairnCount(trip.id, 4)
 
       expect(listener).not.toHaveBeenCalled()
     })
@@ -472,21 +472,21 @@ describe('LocalTripStore', () => {
       const storage = fakeStorage()
       const store = new LocalTripStore(storage)
       const trip = store.createTrip('Hokkaido')
-      store.savePhotoCount(trip.id, 12)
+      store.saveCairnCount(trip.id, 12)
 
-      expect(new LocalTripStore(storage).getTrip(trip.id)?.photoCount).toBe(12)
+      expect(new LocalTripStore(storage).getTrip(trip.id)?.cairnCount).toBe(12)
 
       // A `trip.json`/index entry from before #121 carries no count at all.
       const legacy = JSON.parse(storage.getItem(`cairn.trips.trip.${trip.id}`) as string)
-      delete legacy.photoCount
+      delete legacy.cairnCount
       storage.setItem(`cairn.trips.trip.${trip.id}`, JSON.stringify(legacy))
       const index = JSON.parse(storage.getItem('cairn.trips.index') as string)
-      delete index[0].photoCount
+      delete index[0].cairnCount
       storage.setItem('cairn.trips.index', JSON.stringify(index))
 
       const reloaded = new LocalTripStore(storage)
-      expect(reloaded.getTrip(trip.id)?.photoCount).toBeNull()
-      expect(reloaded.getTrips()[0].photoCount).toBeNull()
+      expect(reloaded.getTrip(trip.id)?.cairnCount).toBeNull()
+      expect(reloaded.getTrips()[0].cairnCount).toBeNull()
     })
   })
 })

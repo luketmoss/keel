@@ -51,18 +51,19 @@ export interface TripRecord {
       fails to load or hasn't been fetched yet. `null` before a trip's
       first track set is saved, or once its tracks produce no geometry. */
   origin: LatLng | null
-  /** How many photos this trip holds, cached (#121) so the "Add to a trip"
+  /** How many cairns this trip holds, cached (#121) so the "Add to a trip"
       picker can show it without opening every trip's Drive folder — a
       picker costing one round trip per row takes longer to open than the
       move it starts.
    *
-   * **`null` means never counted, and that is not `0`.** A trip's photos
-      live in its `photos.json`, so the count is only known once something
-      has read that file; until then the picker shows no photo count at all
-      rather than a confident zero, which is the bug this field exists to
-      fix. Written whenever the photo index is read or rewritten, the way
-      `origin` is written whenever the track set changes. */
-  photoCount: number | null
+   * **`null` means never counted, and that is not `0`.** A trip's cairns
+      live one folder per record under `trips/<id>/cairns/`, so the count is
+      only known once something has listed that folder; until then the
+      picker shows no cairn count at all rather than a confident zero, which
+      is the bug this field exists to fix. Written whenever a trip's cairns
+      are read or a cairn moves in or out, the way `origin` is written
+      whenever the track set changes. */
+  cairnCount: number | null
 }
 
 /** The fields #35's metadata header can edit. `id` and `createdAt` are
@@ -87,10 +88,10 @@ export interface TripIndexEntry {
   /** See `TripRecord.origin` — carried on the index too since the world
       map (#79) reads the list of trips, not each trip's full record. */
   origin: LatLng | null
-  /** See `TripRecord.photoCount` — carried on the index for the same
+  /** See `TripRecord.cairnCount` — carried on the index for the same
       reason `origin` is: the picker (#121) reads the list of trips, and
       the whole point of the cache is that it costs no extra read. */
-  photoCount: number | null
+  cairnCount: number | null
 }
 
 /* The seam a future Drive-backed store's async reads/writes hook into:
@@ -139,7 +140,7 @@ export interface TripStore {
       whatever owns a trip's track set, whenever that set changes. Pure
       w.r.t. the tracks given — same tracks in, same stored geometry out. */
   saveOverview(id: string, tracks: Track[]): void
-  /** Caches how many photos a trip holds (#121), for the picker to read.
+  /** Caches how many cairns a trip holds (#121), for the picker to read.
    *
    * Deliberately not part of `TripUpdate`: that is scoped to the fields
       #35's metadata header can edit, and a Drive-backed implementation
@@ -148,7 +149,7 @@ export interface TripStore {
       exactly, written as a side effect of the underlying data changing.
       A no-op when the count already matches, so the caller can hand it the
       same number on every render without churning the index. */
-  savePhotoCount(id: string, count: number): void
+  saveCairnCount(id: string, count: number): void
   /** Notified after any mutation. Returns an unsubscribe function — the
       shape `useSyncExternalStore` expects directly. */
   subscribe(listener: () => void): () => void
@@ -210,7 +211,7 @@ export class LocalTripStore implements TripStore {
       if (!isTripRecord(parsed)) return null
       // Same normalisation as `hydrate`: a record written before #121 has
       // no count, which is never-counted and not zero.
-      const record: TripRecord = { ...parsed, photoCount: parsed.photoCount ?? null }
+      const record: TripRecord = { ...parsed, cairnCount: parsed.cairnCount ?? null }
       this.records.set(id, record)
       return record
     } catch {
@@ -228,10 +229,10 @@ export class LocalTripStore implements TripStore {
       notes: '',
       createdAt: new Date().toISOString(),
       origin: null,
-      // Never counted rather than "no photos" — a trip created this second
-      // has none, but nothing has read a `photos.json` to say so, and the
-      // picker's whole job is to tell those two apart.
-      photoCount: null,
+      // Never counted rather than "no cairns" — a trip created this second
+      // has none, but nothing has listed its `cairns/` folder to say so,
+      // and the picker's whole job is to tell those two apart.
+      cairnCount: null,
     }
     const entry: TripIndexEntry = {
       id: record.id,
@@ -240,7 +241,7 @@ export class LocalTripStore implements TripStore {
       endDate: record.endDate,
       createdAt: record.createdAt,
       origin: record.origin,
-      photoCount: record.photoCount,
+      cairnCount: record.cairnCount,
     }
     this.records.set(record.id, record)
     this.writeRecord(record)
@@ -312,11 +313,11 @@ export class LocalTripStore implements TripStore {
       newest-`createdAt`-first afterward, since hydration can arrive in
       whatever order Drive listed the trip folders in. */
   hydrate(record: TripRecord): void {
-    // A `trip.json` written before #121 has no `photoCount` at all, which
+    // A `trip.json` written before #121 has no `cairnCount` at all, which
     // reads back as never-counted rather than as zero — the distinction the
     // picker turns on, so it is normalised here at the one door every
     // Drive-read record comes through.
-    record = { ...record, photoCount: record.photoCount ?? null }
+    record = { ...record, cairnCount: record.cairnCount ?? null }
     this.records.set(record.id, record)
     this.writeRecord(record)
     const entry: TripIndexEntry = {
@@ -326,7 +327,7 @@ export class LocalTripStore implements TripStore {
       endDate: record.endDate,
       createdAt: record.createdAt,
       origin: record.origin,
-      photoCount: record.photoCount,
+      cairnCount: record.cairnCount,
     }
     const withoutExisting = this.index.filter((e) => e.id !== record.id)
     this.index = [...withoutExisting, entry].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
@@ -375,13 +376,13 @@ export class LocalTripStore implements TripStore {
       changed rather than computed on demand by whoever needs it. Bails out
       when nothing changed so the caller (an effect that fires on every
       render of the trip face) does not notify subscribers into a loop. */
-  savePhotoCount = (id: string, count: number): void => {
+  saveCairnCount = (id: string, count: number): void => {
     const current = this.getTrip(id)
-    if (!current || current.photoCount === count) return
-    const next: TripRecord = { ...current, photoCount: count }
+    if (!current || current.cairnCount === count) return
+    const next: TripRecord = { ...current, cairnCount: count }
     this.records.set(id, next)
     this.writeRecord(next)
-    this.index = this.index.map((entry) => (entry.id === id ? { ...entry, photoCount: count } : entry))
+    this.index = this.index.map((entry) => (entry.id === id ? { ...entry, cairnCount: count } : entry))
     this.writeIndex()
     this.notify()
   }
@@ -417,7 +418,7 @@ export class LocalTripStore implements TripStore {
       if (!Array.isArray(parsed)) return []
       return parsed
         .filter(isTripIndexEntry)
-        .map((entry) => ({ ...entry, photoCount: entry.photoCount ?? null }))
+        .map((entry) => ({ ...entry, cairnCount: entry.cairnCount ?? null }))
     } catch {
       return []
     }

@@ -2,12 +2,12 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { TripImportPanel } from './TripImportPanel'
 import type { TripImportFailure, TripImportProgress } from '../import/useTripImport'
-import type { PhotoImportFailure, PhotoImportProgress } from '../photo/usePhotoImport'
+import type { CairnImportFailure, CairnImportProgress } from '../photo/useCairnImport'
 
 interface BaseProps {
   signedIn: boolean
-  progress: (TripImportProgress | PhotoImportProgress)[]
-  failures: (TripImportFailure | PhotoImportFailure)[]
+  progress: (TripImportProgress | CairnImportProgress)[]
+  failures: (TripImportFailure | CairnImportFailure)[]
   importFiles: (incoming: File[]) => Promise<void>
   retryFailure: (id: string) => Promise<void>
   dismissFailures: () => void

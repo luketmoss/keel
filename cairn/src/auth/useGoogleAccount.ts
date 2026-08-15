@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { googleClientId } from '../env'
 import { requestDriveFileToken } from './googleIdentity'
-import { DriveAuthError, findOrCreateCairnFolder, getDriveAccount } from '../drive/cairnFolder'
+import { DriveAuthError, findOrCreateRootFolder, getDriveAccount } from '../drive/rootFolder'
 import { onDriveAuthError } from '../drive/authEvents'
 import { clearStoredSession, readStoredSession, writeStoredSession } from './driveSession'
 
@@ -47,7 +47,7 @@ async function setUpAccount(accessToken: string): Promise<AccountState> {
   try {
     const [account, folderId] = await Promise.all([
       getDriveAccount(accessToken),
-      findOrCreateCairnFolder(accessToken),
+      findOrCreateRootFolder(accessToken),
     ])
     return {
       status: 'signed-in',

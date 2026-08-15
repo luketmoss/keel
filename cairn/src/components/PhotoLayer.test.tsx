@@ -1,7 +1,6 @@
 import { render, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { PhotoLayer } from './PhotoLayer'
-import type { PositionedPhoto } from '../photo/positionPhotos'
+import { PhotoLayer, type PositionedPhoto } from './PhotoLayer'
 
 /* Same stubbing strategy as TrackLayer.test.tsx — AdvancedMarker renders its
    children directly into a positioned div so assertions read the DOM rather

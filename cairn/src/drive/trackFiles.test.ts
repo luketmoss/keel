@@ -3,6 +3,7 @@ import {
   DriveAuthError,
   DriveQuotaError,
   DriveRequestError,
+  listTrackFiles,
   startResumableUpload,
   trashFile,
   uploadFileContent,
@@ -143,6 +144,58 @@ describe('uploadFileContent', () => {
     const failure = uploadFileContent('https://upload.example/session-1', file('hello'), 'token')
     await expect(failure).rejects.toBeInstanceOf(DriveRequestError)
     await expect(failure).rejects.not.toBeInstanceOf(DriveQuotaError)
+  })
+})
+
+describe('listTrackFiles', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  /* #191 — the trip folder holds `cairns/` alongside its track files, and
+     Drive is what has to leave it out: the caller downloads whatever comes
+     back, and a folder has no media to download. Asserting on the query
+     rather than on a filtered result is deliberate — a result-side filter
+     would pass a test written against the returned list and still make the
+     request that pages the folder in. */
+  it('excludes folders in the query', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(response({ files: [] }))
+
+    await listTrackFiles('token', 'folder-id')
+
+    const url = fetchSpy.mock.calls[0][0] as string
+    const query = decodeURIComponent(new URL(url).searchParams.get('q') ?? '')
+    expect(query).toContain("mimeType!='application/vnd.google-apps.folder'")
+    expect(query).toContain("'folder-id' in parents")
+    expect(query).toContain('trashed=false')
+  })
+
+  it('returns the files Drive reports', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      response({ files: [{ id: 'drive-1', name: 'day-1.kml' }] }),
+    )
+
+    await expect(listTrackFiles('token', 'folder-id')).resolves.toEqual([
+      { id: 'drive-1', name: 'day-1.kml' },
+    ])
+  })
+
+  it('returns an empty list when Drive reports no files', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(response({}))
+
+    await expect(listTrackFiles('token', 'folder-id')).resolves.toEqual([])
+  })
+
+  it('throws DriveAuthError on a 401', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(response({}, { status: 401 }))
+
+    await expect(listTrackFiles('expired', 'folder-id')).rejects.toBeInstanceOf(DriveAuthError)
+  })
+
+  it('throws DriveRequestError on any other failure status', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(response({}, { status: 500 }))
+
+    await expect(listTrackFiles('token', 'folder-id')).rejects.toBeInstanceOf(DriveRequestError)
   })
 })
 

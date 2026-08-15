@@ -144,6 +144,39 @@ describe('#156 — right-clicking the map opens the create face', () => {
     // The search card's centre slot: the typed name over `new cairn`.
     expect(screen.getByText('New cairn')).toBeDefined()
     expect(screen.getByText('new cairn')).toBeDefined()
+    // The pin is already down, drawn selected — a draft that showed a form
+    // but no marker would not say where the cairn is going.
+    const pin = document.querySelector('.cairn-draft-marker .cairn-marker--pin')
+    expect(pin).not.toBeNull()
+    expect(pin?.classList.contains('cairn-marker--selected')).toBe(true)
+  })
+
+  it('takes the pin away again on Cancel', async () => {
+    mockGoogleSignIn()
+    await renderApp()
+    await signIn()
+
+    await rightClickMap()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    })
+
+    expect(document.querySelector('.cairn-draft-marker')).toBeNull()
+  })
+
+  it('follows the icon picker live, so the pin shows what it will become', async () => {
+    mockGoogleSignIn()
+    await renderApp()
+    await signIn()
+
+    await rightClickMap()
+    expect(document.querySelector('.cairn-draft-marker .cairn-marker__pin-dot')).not.toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'campsite' }))
+
+    // The unmarked dot gives way to the chosen glyph.
+    expect(document.querySelector('.cairn-draft-marker .cairn-marker__pin-dot')).toBeNull()
+    expect(document.querySelector('.cairn-draft-marker .cairn-icon-glyph')).not.toBeNull()
   })
 
   it('defaults the date to today, in local time rather than UTC', async () => {

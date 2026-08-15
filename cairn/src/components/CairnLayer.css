@@ -45,7 +45,13 @@
 /* The line home. Drawn from the marker's centre outward and rotated to
    point back at the anchor, so its length is the fan's own radius and no
    second geometry has to agree with the first. Never a click target — the
-   marker it belongs to is. */
+   marker it belongs to is.
+
+   Ordered under the marker by coming first in the DOM rather than by a
+   negative z-index: the only overlap is the disc the marker itself covers,
+   and a negative z-index escapes its parent whenever that parent has no
+   stacking context — which is exactly what `prefers-reduced-motion`
+   removing the fan-in animation would do. */
 .cairn-layer__leader {
   position: absolute;
   left: 50%;
@@ -55,7 +61,6 @@
   background: var(--text-muted);
   opacity: 0.5;
   pointer-events: none;
-  z-index: -1;
 }
 
 @keyframes cairn-layer-fan-in {

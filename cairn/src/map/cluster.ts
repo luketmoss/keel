@@ -26,7 +26,11 @@ export interface MarkerCluster<T extends ClusterableMarker> {
   members: T[]
 }
 
-function project(lat: number, lng: number, zoom: number): { x: number; y: number } {
+/** Exported for `fanOut.ts`, which places an expanded cluster's members a
+    fixed number of *pixels* from their anchor and therefore needs the same
+    projection this file already defines. Exporting it keeps one Web
+    Mercator implementation rather than a second one that drifts. */
+export function project(lat: number, lng: number, zoom: number): { x: number; y: number } {
   const worldSize = 256 * 2 ** zoom
   const x = ((lng + 180) / 360) * worldSize
   // Clamp away from the poles — sin(lat) approaches ±1 there and the
@@ -36,6 +40,18 @@ function project(lat: number, lng: number, zoom: number): { x: number; y: number
   const sinLat = Math.sin((clampedLat * Math.PI) / 180)
   const y = (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * worldSize
   return { x, y }
+}
+
+/** The inverse of `project`, for turning a pixel offset from an anchor back
+    into a coordinate an `AdvancedMarker` can be placed at. `atan(sinh(…))`
+    is the standard inverse of the Mercator latitude above; longitude is
+    linear in x and inverts directly. */
+export function unproject(x: number, y: number, zoom: number): { lat: number; lng: number } {
+  const worldSize = 256 * 2 ** zoom
+  const lng = (x / worldSize) * 360 - 180
+  const mercatorY = Math.PI * (1 - (2 * y) / worldSize)
+  const lat = (180 / Math.PI) * Math.atan(Math.sinh(mercatorY))
+  return { lat, lng }
 }
 
 /** Union-find over pairwise pixel distance, so clustering is transitive: if

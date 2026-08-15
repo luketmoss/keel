@@ -1,5 +1,5 @@
-import { render, waitFor } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { act, render, waitFor } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CairnLayer, type PositionedCairn } from './CairnLayer'
 
 /* Same stubbing strategy as TrackLayer.test.tsx — AdvancedMarker renders its
@@ -7,10 +7,25 @@ import { CairnLayer, type PositionedCairn } from './CairnLayer'
    than trusting the mock library actually mounted a marker. */
 let currentZoom = 10
 
+/* #194 — one map object for the whole file rather than a fresh literal per
+   `useMap()` call, so a test can assert on `fitBounds` and so the collapse
+   listeners registered against it are the ones the tests fire. */
+const mapListeners = new Map<string, Set<() => void>>()
+const fitBounds = vi.fn()
+const mapStub = {
+  getZoom: () => currentZoom,
+  fitBounds,
+  setCenter: vi.fn(),
+  setZoom: vi.fn(),
+}
+
+/** Fires a Google Maps event on the stub map, the way the real map would. */
+function fireMapEvent(name: string) {
+  for (const handler of mapListeners.get(name) ?? []) handler()
+}
+
 vi.mock('@vis.gl/react-google-maps', () => ({
-  useMap: () => ({
-    getZoom: () => currentZoom,
-  }),
+  useMap: () => mapStub,
   AdvancedMarker: ({
     position,
     onClick,
@@ -61,11 +76,14 @@ function fireDrag(element: Element, lat: number, lng: number) {
 ;(globalThis as unknown as { google: unknown }).google = {
   maps: {
     event: {
-      addListener: () => {
-        // No test here drives a live zoom change through the global, so a
-        // no-op listener registration is enough — `currentZoom` is set
-        // directly by tests instead.
-        return { remove: () => {} }
+      // `zoom_changed` is never driven through here — `currentZoom` is set
+      // directly by tests — but #194's collapse listeners are, so
+      // registrations are recorded rather than discarded.
+      addListener: (_target: unknown, name: string, handler: () => void) => {
+        const handlers = mapListeners.get(name) ?? new Set<() => void>()
+        handlers.add(handler)
+        mapListeners.set(name, handlers)
+        return { remove: () => handlers.delete(handler) }
       },
       addListenerOnce: () => {},
     },
@@ -254,6 +272,10 @@ describe('CairnLayer', () => {
     expect(container.querySelectorAll('[data-testid="cairn-cluster"]')).toHaveLength(1)
 
     currentZoom = 21
+    // Through the map's own `zoom_changed`, the way a real camera move
+    // reaches the layer — the stub map is one stable object, so a
+    // re-render alone no longer re-reads the zoom.
+    act(() => fireMapEvent('zoom_changed'))
     rerender(
       <CairnLayer cairns={cairns} accessToken="token" selectedCairnId={null} onSelectCairn={() => {}} />,
     )
@@ -261,7 +283,7 @@ describe('CairnLayer', () => {
     expect(container.querySelectorAll('[data-testid="cairn-marker"]')).toHaveLength(2)
   })
 
-  it('clicking an already-selected marker opens the lightbox instead of reselecting (#55 wiring)', () => {
+  it('clicking an already-selected marker keeps it selected and opens it (#194 criterion 3)', () => {
     const onSelectCairn = vi.fn()
     const onOpenCairn = vi.fn()
     const { container } = render(
@@ -279,10 +301,10 @@ describe('CairnLayer', () => {
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
 
     expect(onOpenCairn).toHaveBeenCalledWith('a')
-    expect(onSelectCairn).not.toHaveBeenCalled()
+    expect(onSelectCairn).toHaveBeenCalledWith('a')
   })
 
-  it('clicking a not-yet-selected marker only selects it, never opens (#55 wiring)', () => {
+  it('clicking an unselected marker selects and opens it in one click (#194 criterion 1)', () => {
     const onSelectCairn = vi.fn()
     const onOpenCairn = vi.fn()
     const { container } = render(
@@ -300,7 +322,45 @@ describe('CairnLayer', () => {
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
 
     expect(onSelectCairn).toHaveBeenCalledWith('a')
-    expect(onOpenCairn).not.toHaveBeenCalled()
+    expect(onOpenCairn).toHaveBeenCalledWith('a')
+  })
+
+  it('an icon-only cairn opens on one click just as a photo cairn does (#194 criterion 2)', () => {
+    const onOpenCairn = vi.fn()
+    const { container } = render(
+      <CairnLayer
+        cairns={[positionedCairn({ id: 'a', icon: 'campsite', thumbnailDriveFileId: null })]}
+        accessToken="token"
+        selectedCairnId={null}
+        onSelectCairn={() => {}}
+        onOpenCairn={onOpenCairn}
+      />,
+    )
+
+    expect(container.querySelector('.cairn-marker--pin')).not.toBeNull()
+    container
+      .querySelector('[data-testid="advanced-marker"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+
+    expect(onOpenCairn).toHaveBeenCalledWith('a')
+  })
+
+  it('a marker still only selects when the caller wires no detail face', () => {
+    const onSelectCairn = vi.fn()
+    const { container } = render(
+      <CairnLayer
+        cairns={[positionedCairn({ id: 'a' })]}
+        accessToken="token"
+        selectedCairnId={null}
+        onSelectCairn={onSelectCairn}
+      />,
+    )
+
+    container
+      .querySelector('[data-testid="advanced-marker"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+
+    expect(onSelectCairn).toHaveBeenCalledWith('a')
   })
 
   it('resolves a thumbnail through the image cache and renders it once ready', async () => {
@@ -316,6 +376,175 @@ describe('CairnLayer', () => {
     await waitFor(() => {
       expect(container.querySelector('img')?.getAttribute('src')).toBe('blob:fake-thumb')
     })
+  })
+})
+
+describe('CairnLayer cluster expansion (#194)', () => {
+  /** Two cairns close enough to cluster at the zoom under test. `apart`
+      picks whether they still separate at the cap zoom-to-fit stops at. */
+  function pair(apart: 'separates' | 'never') {
+    const delta = apart === 'separates' ? 0.001 : 0.00001
+    return [
+      positionedCairn({ id: 'a', latitude: 10, longitude: 20 }),
+      positionedCairn({ id: 'b', latitude: 10 + delta, longitude: 20 + delta }),
+    ]
+  }
+
+  function fanned(container: HTMLElement) {
+    return container.querySelectorAll('[data-testid="cairn-marker"][data-fanned="true"]')
+  }
+
+  /** Clicks a marker's own `AdvancedMarker`. Wrapped in `act` because,
+      unlike the click tests above, what is asserted afterwards is the
+      re-render rather than a spy. */
+  function clickMarker(element: Element | null | undefined) {
+    act(() => {
+      element?.closest('[data-testid="advanced-marker"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+  }
+
+  function clickCluster(container: HTMLElement, index = 0) {
+    clickMarker(container.querySelectorAll('[data-testid="cairn-cluster"]')[index])
+  }
+
+  beforeEach(() => {
+    currentZoom = 10
+    fitBounds.mockClear()
+  })
+
+  it('still zooms to fit a cluster whose members separate at the cap (criterion 5)', () => {
+    const { container } = render(
+      <CairnLayer cairns={pair('separates')} accessToken="token" selectedCairnId={null} onSelectCairn={() => {}} />,
+    )
+
+    clickCluster(container)
+
+    expect(fitBounds).toHaveBeenCalled()
+    expect(fanned(container)).toHaveLength(0)
+  })
+
+  it('expands a cluster whose members never separate, instead of doing nothing (criterion 6)', () => {
+    const { container } = render(
+      <CairnLayer cairns={pair('never')} accessToken="token" selectedCairnId={null} onSelectCairn={() => {}} />,
+    )
+
+    clickCluster(container)
+
+    expect(fitBounds).not.toHaveBeenCalled()
+    expect(fanned(container)).toHaveLength(2)
+  })
+
+  it('makes two cairns at byte-identical coordinates individually clickable (criterion 7)', () => {
+    const cairns = [
+      positionedCairn({ id: 'a', latitude: 10, longitude: 20 }),
+      positionedCairn({ id: 'b', latitude: 10, longitude: 20 }),
+    ]
+    const { container } = render(
+      <CairnLayer cairns={cairns} accessToken="token" selectedCairnId={null} onSelectCairn={() => {}} />,
+    )
+
+    clickCluster(container)
+
+    const markers = fanned(container)
+    expect(markers).toHaveLength(2)
+    const positions = Array.from(markers).map((marker) => {
+      const advanced = marker.closest('[data-testid="advanced-marker"]') as HTMLElement
+      return `${advanced.getAttribute('data-lat')},${advanced.getAttribute('data-lng')}`
+    })
+    // Fanned apart on screen, so each has its own hit target rather than
+    // two markers stacked on one coordinate.
+    expect(new Set(positions).size).toBe(2)
+    expect(container.querySelector('[data-cairn-id="a"]')).not.toBeNull()
+    expect(container.querySelector('[data-cairn-id="b"]')).not.toBeNull()
+  })
+
+  it('clicking an expanded marker selects and opens its cairn (criterion 8)', () => {
+    const onSelectCairn = vi.fn()
+    const onOpenCairn = vi.fn()
+    const { container } = render(
+      <CairnLayer
+        cairns={pair('never')}
+        accessToken="token"
+        selectedCairnId={null}
+        onSelectCairn={onSelectCairn}
+        onOpenCairn={onOpenCairn}
+      />,
+    )
+
+    clickCluster(container)
+    clickMarker(container.querySelector('[data-cairn-id="b"]'))
+
+    expect(onSelectCairn).toHaveBeenCalledWith('b')
+    expect(onOpenCairn).toHaveBeenCalledWith('b')
+  })
+
+  it.each([
+    ['Escape', () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))],
+    ['a click elsewhere on the map', () => fireMapEvent('click')],
+    ['a camera move', () => fireMapEvent('bounds_changed')],
+  ])('collapses the expansion on %s (criterion 9)', (_name, dismiss) => {
+    const { container } = render(
+      <CairnLayer cairns={pair('never')} accessToken="token" selectedCairnId={null} onSelectCairn={() => {}} />,
+    )
+
+    clickCluster(container)
+    expect(fanned(container)).toHaveLength(2)
+
+    act(() => dismiss())
+
+    expect(fanned(container)).toHaveLength(0)
+    expect(container.querySelector('[data-testid="cairn-cluster"]')).not.toBeNull()
+  })
+
+  it('expands only one cluster at a time (criterion 10)', () => {
+    const cairns = [
+      ...pair('never'),
+      positionedCairn({ id: 'c', latitude: 40, longitude: 50 }),
+      positionedCairn({ id: 'd', latitude: 40.00001, longitude: 50.00001 }),
+    ]
+    const { container } = render(
+      <CairnLayer cairns={cairns} accessToken="token" selectedCairnId={null} onSelectCairn={() => {}} />,
+    )
+
+    expect(container.querySelectorAll('[data-testid="cairn-cluster"]')).toHaveLength(2)
+    clickCluster(container, 0)
+    expect(fanned(container)).toHaveLength(2)
+
+    clickMarker(container.querySelector('[data-testid="cairn-cluster"]:not([data-expanded])'))
+
+    expect(fanned(container)).toHaveLength(2)
+    expect(container.querySelectorAll('[data-testid="cairn-cluster"][data-expanded="true"]')).toHaveLength(1)
+  })
+
+  it('an expanded marker is not draggable — it is not standing on its own coordinate', () => {
+    const { container } = render(
+      <CairnLayer
+        cairns={pair('never')}
+        accessToken="token"
+        selectedCairnId={null}
+        onSelectCairn={() => {}}
+        draggable={true}
+        onMoveCairn={vi.fn().mockResolvedValue(true)}
+      />,
+    )
+
+    clickCluster(container)
+
+    const markers = Array.from(fanned(container))
+    expect(markers).toHaveLength(2)
+    expect(markers.map((marker) => marker.getAttribute('data-draggable'))).toEqual(['false', 'false'])
+  })
+
+  it('clicking the anchor badge collapses its own expansion', () => {
+    const { container } = render(
+      <CairnLayer cairns={pair('never')} accessToken="token" selectedCairnId={null} onSelectCairn={() => {}} />,
+    )
+
+    clickCluster(container)
+    expect(fanned(container)).toHaveLength(2)
+
+    clickCluster(container)
+    expect(fanned(container)).toHaveLength(0)
   })
 })
 

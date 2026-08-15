@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AdvancedMarker, useMap } from '@vis.gl/react-google-maps'
 import { clusterMarkers, type MarkerCluster } from '../map/cluster'
-import { zoomToFitCluster } from '../map/fitBounds'
+import { clusterSeparatesAtZoom, fanOutPositions, type FannedPlacement } from '../map/fanOut'
+import { CLUSTER_MAX_ZOOM, zoomToFitCluster } from '../map/fitBounds'
 import { clusterAriaLabel, clusterProvenance, ringStyleForPhoto } from '../photo/provenance'
 import { usePhotoImage } from '../photo/usePhotoImage'
 import { useDraggableCairn } from '../map/useDraggableCairn'
@@ -38,12 +39,15 @@ interface CairnLayerProps {
   accessToken: string | null
   selectedCairnId: string | null
   onSelectCairn: (cairnId: string) => void
-  /** #55: clicking an *already-selected* marker opens the lightbox rather
-      than reselecting (design doc's "Opening a photo" section — clicking
-      its row, or its already-selected marker). Clicking a marker that
-      isn't yet selected still only selects it, via `onSelectCairn` above —
-      the two are never both called for the same click. Optional so a
-      future caller with no lightbox can omit it. */
+  /** #194: clicking *any* marker selects the cairn and opens its detail
+      face, in one click, which is what a list row has always done
+      (`CairnList.onOpenRow`). #55's two-step — select, then click again to
+      open — made the same object behave differently depending on which of
+      its two representations you clicked, and the map's half was the one
+      nobody expected. Both this and `onSelectCairn` are called for the
+      click, in that order; `TripDetail.openCairn` does both itself, so the
+      pair is idempotent there. Optional so a caller with no detail face
+      falls back to selecting alone. */
   onOpenCairn?: (cairnId: string) => void
   /** #158: false disables dragging for every marker this layer draws —
       disconnected (#73) or the #155 placement queue owns the map. `undefined`
@@ -80,6 +84,13 @@ export function CairnLayer({
 }: CairnLayerProps) {
   const map = useMap()
   const [zoom, setZoom] = useState<number>(() => map?.getZoom() ?? 2)
+  /* #194 — the one expanded cluster, held by its member-id key. One piece
+     of state rather than a set is what makes "only one cluster is expanded
+     at a time" true by construction. A key that no longer matches any
+     cluster (the cairns changed under it) simply matches nothing and the
+     fan disappears, so there is no stale state to clean up. */
+  const [expandedKey, setExpandedKey] = useState<string | null>(null)
+  const collapse = useCallback(() => setExpandedKey(null), [])
 
   useEffect(() => {
     if (!map) return
@@ -89,6 +100,32 @@ export function CairnLayer({
     })
     return () => listener.remove()
   }, [map])
+
+  /* #194 — everything that dismisses a fan. Registered only while one is
+     open, so an idle map carries no listeners it doesn't need.
+
+     `bounds_changed` is the camera: it covers a pan, a zoom and a window
+     resize alike, and the fan's coordinates are only correct at the zoom
+     and centre they were computed for. Nothing here moves the camera
+     itself, so this cannot fire on the expansion that just happened.
+
+     A click on a marker does not reach the map's own `click` — Google's
+     `AdvancedMarker` sits in a separate pane and consumes it — so
+     "elsewhere on the map" is exactly what this listener means. */
+  useEffect(() => {
+    if (!map || expandedKey === null) return
+    const clickListener = google.maps.event.addListener(map, 'click', collapse)
+    const cameraListener = google.maps.event.addListener(map, 'bounds_changed', collapse)
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') collapse()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      clickListener.remove()
+      cameraListener.remove()
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [map, expandedKey, collapse])
 
   const clusterable = useMemo(
     () => cairns.map((cairn) => ({ lat: cairn.latitude, lng: cairn.longitude, cairn })),
@@ -123,7 +160,28 @@ export function CairnLayer({
           .map((member) => member.cairn.id)
           .sort()
           .join(',')
-        return <ClusterMarker key={key} cluster={cluster} map={map} />
+        if (key === expandedKey) {
+          return (
+            <ExpandedCluster
+              key={key}
+              cluster={cluster}
+              zoom={zoom}
+              accessToken={accessToken}
+              selectedCairnId={selectedCairnId}
+              onSelect={onSelectCairn}
+              onOpen={onOpenCairn}
+              onCollapse={collapse}
+            />
+          )
+        }
+        return (
+          <ClusterMarker
+            key={key}
+            cluster={cluster}
+            map={map}
+            onExpand={() => setExpandedKey(key)}
+          />
+        )
       })}
     </>
   )
@@ -137,6 +195,7 @@ function SingleCairnMarker({
   onOpen,
   draggable,
   onMove,
+  fan,
 }: {
   cairn: PositionedCairn
   accessToken: string | null
@@ -145,6 +204,10 @@ function SingleCairnMarker({
   onOpen?: (cairnId: string) => void
   draggable: boolean
   onMove?: (cairnId: string, position: LatLng) => Promise<boolean>
+  /** #194: set only while this marker is one of an expanded cluster's
+      members, in which case it is drawn at a fanned-out coordinate rather
+      than the cairn's own, and carries a leader line back to the anchor. */
+  fan?: FannedPlacement
 }) {
   const thumbnailUrl = usePhotoImage(accessToken, cairn.thumbnailDriveFileId ?? undefined).url
   // `tabIndex={-1}`: focusable via `.focus()` below (so #55's lightbox can
@@ -153,27 +216,34 @@ function SingleCairnMarker({
   // making it so is out of this issue's scope.
   const hitRef = useRef<HTMLDivElement>(null)
 
+  /* #194: a fanned marker is not standing on its cairn's coordinate, so
+     dragging it would write the fan's own offset into the record. Dragging
+     is refused for the duration of the expansion; collapsing the fan gives
+     it straight back. */
+  const dragAllowed = draggable && fan === undefined
+
   const drag = useDraggableCairn({
-    position: { lat: cairn.latitude, lng: cairn.longitude },
-    draggable,
+    position: fan ?? { lat: cairn.latitude, lng: cairn.longitude },
+    draggable: dragAllowed,
     onMove: (position) => onMove?.(cairn.id, position) ?? Promise.resolve(false),
   })
 
+  /* #194: select *and* open, in that order, for every click — a marker and
+     a list row are two representations of one cairn and now behave the
+     same. An already-selected marker takes the same path, so a click never
+     deselects or closes. */
   function handleClick() {
     if (drag.consumeDragClick()) return
     hitRef.current?.focus()
-    if (selected) {
-      onOpen?.(cairn.id)
-    } else {
-      onSelect(cairn.id)
-    }
+    onSelect(cairn.id)
+    onOpen?.(cairn.id)
   }
 
   return (
     <AdvancedMarker
       position={drag.position}
-      zIndex={selected ? 1 : 0}
-      draggable={draggable}
+      zIndex={fan ? 2 : selected ? 1 : 0}
+      draggable={dragAllowed}
       onDragStart={drag.onDragStart}
       onDrag={drag.onDrag}
       onDragEnd={drag.onDragEnd}
@@ -182,7 +252,7 @@ function SingleCairnMarker({
       <div
         ref={hitRef}
         tabIndex={-1}
-        className={`cairn-layer__hit${draggable ? ' cairn-layer__hit--draggable' : ''}${drag.dragging ? ' cairn-layer__hit--dragging' : ''}`}
+        className={`cairn-layer__hit${dragAllowed ? ' cairn-layer__hit--draggable' : ''}${drag.dragging ? ' cairn-layer__hit--dragging' : ''}${fan ? ' cairn-layer__hit--fanned' : ''}`}
         role="button"
         aria-label={cairn.name}
         aria-pressed={selected}
@@ -190,9 +260,24 @@ function SingleCairnMarker({
         data-cairn-id={cairn.id}
         data-source={cairn.source}
         data-selected={selected}
-        data-draggable={draggable}
+        data-draggable={dragAllowed}
         data-dragging={drag.dragging}
+        data-fanned={fan !== undefined}
       >
+        {fan && (
+          /* Drawn from the marker back to the anchor: a hairline of the
+             fan's own radius, rotated to point the opposite way to the
+             angle the marker sits at. Doing it here rather than as a
+             `Polyline` keeps it exact at any projection and keeps it out
+             of the way of clicks. */
+          <span
+            className="cairn-layer__leader"
+            style={{
+              width: `${fan.radiusPx}px`,
+              transform: `rotate(${fan.angleDeg + 90}deg)`,
+            }}
+          />
+        )}
         <CairnMarker
           icon={cairn.icon}
           thumbnailUrl={thumbnailUrl}
@@ -205,27 +290,38 @@ function SingleCairnMarker({
   )
 }
 
+type CairnCluster = MarkerCluster<{ lat: number; lng: number; cairn: PositionedCairn }>
+
 function ClusterMarker({
   cluster,
   map,
+  onExpand,
 }: {
-  cluster: MarkerCluster<{ lat: number; lng: number; cairn: PositionedCairn }>
+  cluster: CairnCluster
   map: google.maps.Map
+  /** #194: called instead of zooming, when zooming would achieve nothing. */
+  onExpand: () => void
 }) {
   const provenance = clusterProvenance(cluster.members.map((member) => member.cairn))
   const ring = ringStyleForPhoto(provenance, false)
   const label = clusterAriaLabel(cluster.members.length)
 
+  /* #194: zoom-to-fit where zoom-to-fit works, expand in place where it
+     does not — and which it is, is computed from the members themselves
+     rather than guessed. Anything that would still be one cluster at the
+     cap that `zoomToFitCluster` stops at can never be separated by moving
+     the camera, and clicking it used to do nothing at all. */
+  function handleClick() {
+    const points = cluster.members.map((member) => ({ lat: member.lat, lng: member.lng }))
+    if (clusterSeparatesAtZoom(points, CLUSTER_MAX_ZOOM, MARKER_FOOTPRINT_PX)) {
+      zoomToFitCluster(map, points)
+      return
+    }
+    onExpand()
+  }
+
   return (
-    <AdvancedMarker
-      position={{ lat: cluster.lat, lng: cluster.lng }}
-      onClick={() =>
-        zoomToFitCluster(
-          map,
-          cluster.members.map((member) => ({ lat: member.lat, lng: member.lng })),
-        )
-      }
-    >
+    <AdvancedMarker position={{ lat: cluster.lat, lng: cluster.lng }} onClick={handleClick}>
       <div
         className="cairn-layer__hit"
         role="button"
@@ -246,5 +342,78 @@ function ClusterMarker({
         </div>
       </div>
     </AdvancedMarker>
+  )
+}
+
+/** #194 — a cluster whose members cannot be separated by any camera move,
+    drawn open: the badge stays where it was as the fan's anchor, and every
+    member is spread around it as an ordinary marker with a leader line
+    home. Each behaves exactly as it would unclustered — one click selects
+    the cairn and opens its detail face — which is what makes "every cairn
+    is reachable from the map alone" true at any zoom.
+
+    The badge itself collapses the fan when clicked, so the gesture that
+    opened it undoes it too. */
+function ExpandedCluster({
+  cluster,
+  zoom,
+  accessToken,
+  selectedCairnId,
+  onSelect,
+  onOpen,
+  onCollapse,
+}: {
+  cluster: CairnCluster
+  zoom: number
+  accessToken: string | null
+  selectedCairnId: string | null
+  onSelect: (cairnId: string) => void
+  onOpen?: (cairnId: string) => void
+  onCollapse: () => void
+}) {
+  const provenance = clusterProvenance(cluster.members.map((member) => member.cairn))
+  const ring = ringStyleForPhoto(provenance, false)
+  const placements = useMemo(
+    () => fanOutPositions(cluster, cluster.members.length, zoom, MARKER_FOOTPRINT_PX),
+    [cluster, zoom],
+  )
+
+  return (
+    <>
+      <AdvancedMarker position={{ lat: cluster.lat, lng: cluster.lng }} onClick={onCollapse}>
+        <div
+          className="cairn-layer__hit"
+          role="button"
+          aria-label={clusterAriaLabel(cluster.members.length)}
+          data-testid="cairn-cluster"
+          data-count={cluster.members.length}
+          data-source={provenance}
+          data-expanded="true"
+        >
+          <div
+            className="cairn-layer__cluster cairn-layer__cluster--anchor"
+            style={{
+              borderStyle: ring.borderStyle,
+              borderWidth: `var(${ring.widthVar})`,
+              borderColor: `var(${ring.colorVar})`,
+            }}
+          >
+            {cluster.members.length}
+          </div>
+        </div>
+      </AdvancedMarker>
+      {cluster.members.map((member, index) => (
+        <SingleCairnMarker
+          key={member.cairn.id}
+          cairn={member.cairn}
+          accessToken={accessToken}
+          selected={selectedCairnId === member.cairn.id}
+          onSelect={onSelect}
+          onOpen={onOpen}
+          draggable={false}
+          fan={placements[index]}
+        />
+      ))}
+    </>
   )
 }

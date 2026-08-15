@@ -17,6 +17,21 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* #192 — the facet row inside the Cairns section, between its header and
+   its rows. `--space-4` horizontal to line up with `.cairn-list__header`,
+   `--space-2` above and below. The chips themselves are
+   `CairnFacetChips.css`'s and unchanged; only its two margins are
+   neutralised here, because those position it as a sub-row floating under
+   the map's chip row and this wrapper owns the spacing instead. */
+.cairn-list__facets {
+  padding: var(--space-2) var(--space-4);
+}
+
+.cairn-list__facets .cairn-facet-chips {
+  margin-top: 0;
+  margin-left: 0;
+}
+
 .cairn-list--empty {
   padding: var(--space-6) var(--space-4);
   text-align: center;

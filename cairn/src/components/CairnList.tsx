@@ -3,11 +3,31 @@ import { prefersReducedMotion } from '../map/motion'
 import { usePhotoImage } from '../photo/usePhotoImage'
 import { cairnRowMetaLine, type CairnListItem, type CairnListRow } from '../photo/cairnListGroups'
 import { CairnMarker } from './CairnMarker'
+import { CairnFacetChips } from './CairnFacetChips'
+import type { CairnFacet } from '../store/cairnRules'
 import './CairnList.css'
 
+/** #192's matched-nothing detail line. Naming the total answers *is
+    anything here at all* in the same breath as offering the way back —
+    which is the whole difference between this state and a trip that holds
+    no cairns. One reads `all 17`, one `the 1`. */
+export function clearFilterDetail(totalCount: number): string {
+  return totalCount === 1 ? 'Clear the filter to see the 1.' : `Clear the filter to see all ${totalCount}.`
+}
+
 interface CairnListProps {
+  /** Already filtered by `facet` — one filter drives this list and the
+      map together (`cairns.md`), so the narrowing happens once in the
+      parent rather than here and again in `CairnLayer`. */
   items: CairnListItem[]
+  /** Every cairn the trip holds, facet or no facet. Distinguishes *nothing
+      here* from *nothing like that here*, and feeds the way back. */
   totalCount: number
+  /** #192: the facet row now sits inside this section, between its header
+      and its rows — a filter belongs to the list it filters, and the
+      section header is already the thing that says *these are the cairns*. */
+  facet: CairnFacet
+  onFacetChange: (facet: CairnFacet) => void
   selectedCairnId: string | null
   accessToken: string | null
   /** Clicking a row selects it *and*, when the cairn has an image, opens
@@ -54,6 +74,8 @@ interface CairnListProps {
 export function CairnList({
   items,
   totalCount,
+  facet,
+  onFacetChange,
   selectedCairnId,
   accessToken,
   onOpenRow,
@@ -87,16 +109,36 @@ export function CairnList({
     el.scrollIntoView?.({ block: 'nearest', behavior: prefersReducedMotion() ? 'auto' : 'smooth' })
   }, [selectedCairnId])
 
+  // What is showing, never `12 of 17` — a fraction implies the list is
+  // truncated; it is filtered, and the chip already says by what. `0` is
+  // shown rather than hidden, because that is precisely the number the
+  // user needs to see when a facet matched nothing.
+  const matchedCount = items.reduce((count, item) => (item.type === 'row' ? count + 1 : count), 0)
+
   return (
     <div className="cairn-list">
       <div className="cairn-list__header">
         <span>Cairns</span>
-        {totalCount > 0 && <span className="cairn-list__count">{totalCount}</span>}
+        {totalCount > 0 && <span className="cairn-list__count">{matchedCount}</span>}
       </div>
+      {/* Hidden only when the trip holds no cairns at all. It stays up in
+          the matched-nothing state on purpose: hiding the control that
+          caused an empty list is the one thing that makes it
+          unrecoverable. */}
+      {totalCount > 0 && (
+        <div className="cairn-list__facets">
+          <CairnFacetChips facet={facet} onChange={onFacetChange} />
+        </div>
+      )}
       {totalCount === 0 ? (
         <div className="cairn-list cairn-list--empty">
           <p className="cairn-list__empty-title">No cairns yet</p>
           <p className="cairn-list__empty-detail">Drop photos onto this trip to see them here.</p>
+        </div>
+      ) : matchedCount === 0 ? (
+        <div className="cairn-list cairn-list--empty">
+          <p className="cairn-list__empty-title">No cairns like that</p>
+          <p className="cairn-list__empty-detail">{clearFilterDetail(totalCount)}</p>
         </div>
       ) : (
         <ul className="cairn-list__rows">

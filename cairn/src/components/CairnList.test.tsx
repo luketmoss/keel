@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { CairnList } from './CairnList'
 import { orderCairnListItems, type CairnListRow } from '../photo/cairnListGroups'
+import type { CairnFacet } from '../store/cairnRules'
 
 vi.mock('../photo/imageCache', () => ({
   photoImageCache: {
@@ -22,12 +23,12 @@ function row(overrides: Partial<CairnListRow> = {}): CairnListRow {
   }
 }
 
-/* #77's remove control shares its confirm slot with `TrackList` — owned by
-   `TripDetail`, not `CairnList` itself — so every render needs these props
-   supplied. Kept as a spreadable default object rather than repeating six
-   props on every call site, and overridable per test for the removal
-   suite below. */
-function removeProps(overrides: Partial<{
+/* State this list does not own, supplied on every render: #77's remove
+   control shares its confirm slot with `TrackList`, and #192's facet is
+   the trip's, not the list's — both live in `TripDetail`. Kept as one
+   spreadable default object rather than repeating eight props on every
+   call site, and overridable per test. */
+function ownedProps(overrides: Partial<{
   onRemove: ReturnType<typeof vi.fn>
   confirmingId: string | null
   onStartConfirm: ReturnType<typeof vi.fn>
@@ -35,6 +36,8 @@ function removeProps(overrides: Partial<{
   removingIds: Set<string>
   removeErrors: Record<string, string>
   disableRemove: boolean
+  facet: CairnFacet
+  onFacetChange: ReturnType<typeof vi.fn>
 }> = {}) {
   return {
     onRemove: vi.fn(),
@@ -45,6 +48,8 @@ function removeProps(overrides: Partial<{
     removingIds: new Set<string>(),
     removeErrors: {},
     disableRemove: false,
+    facet: 'any' as CairnFacet,
+    onFacetChange: vi.fn(),
     ...overrides,
   }
 }
@@ -58,7 +63,7 @@ describe('CairnList', () => {
         selectedCairnId={null}
         accessToken="token"
         onOpenRow={vi.fn()}
-        {...removeProps()}
+        {...ownedProps()}
       />,
     )
 
@@ -72,20 +77,21 @@ describe('CairnList', () => {
     const rows = [row({ id: 'a', date: '2023-06-01' }), row({ id: 'b', date: '2023-06-02' })]
     const items = orderCairnListItems(rows)
 
-    render(
+    const { container } = render(
       <CairnList
         items={items}
         totalCount={2}
         selectedCairnId={null}
         accessToken="token"
         onOpenRow={vi.fn()}
-        {...removeProps()}
+        {...ownedProps()}
       />,
     )
 
     expect(screen.getByText('2')).toBeDefined()
-    // Two open buttons plus two remove buttons, one pair per row.
-    expect(screen.getAllByRole('button')).toHaveLength(4)
+    // Two open buttons plus two remove buttons, one pair per row. Scoped
+    // to the rows: #192's facet row is buttons too, and it is not a row.
+    expect(container.querySelectorAll('.cairn-list__rows button')).toHaveLength(4)
   })
 
   it('#169: includes an icon-only cairn (no image) in the same list', () => {
@@ -99,7 +105,7 @@ describe('CairnList', () => {
         selectedCairnId={null}
         accessToken="token"
         onOpenRow={vi.fn()}
-        {...removeProps()}
+        {...ownedProps()}
       />,
     )
 
@@ -117,7 +123,7 @@ describe('CairnList', () => {
         selectedCairnId={null}
         accessToken="token"
         onOpenRow={vi.fn()}
-        {...removeProps()}
+        {...ownedProps()}
       />,
     )
 
@@ -135,7 +141,7 @@ describe('CairnList', () => {
         selectedCairnId={null}
         accessToken="token"
         onOpenRow={vi.fn()}
-        {...removeProps()}
+        {...ownedProps()}
       />,
     )
 
@@ -154,7 +160,7 @@ describe('CairnList', () => {
         selectedCairnId={null}
         accessToken="token"
         onOpenRow={onOpenRow}
-        {...removeProps()}
+        {...ownedProps()}
       />,
     )
 
@@ -173,7 +179,7 @@ describe('CairnList', () => {
         selectedCairnId="b"
         accessToken="token"
         onOpenRow={vi.fn()}
-        {...removeProps()}
+        {...ownedProps()}
       />,
     )
 
@@ -195,7 +201,7 @@ describe('CairnList', () => {
         selectedCairnId={null}
         accessToken="token"
         onOpenRow={vi.fn()}
-        {...removeProps()}
+        {...ownedProps()}
       />,
     )
     expect(scrollIntoView).not.toHaveBeenCalled()
@@ -207,7 +213,7 @@ describe('CairnList', () => {
         selectedCairnId="b"
         accessToken="token"
         onOpenRow={vi.fn()}
-        {...removeProps()}
+        {...ownedProps()}
       />,
     )
 
@@ -227,7 +233,7 @@ describe('CairnList', () => {
           selectedCairnId={null}
           accessToken="token"
           onOpenRow={vi.fn()}
-          {...removeProps({ onStartConfirm, onRemove })}
+          {...ownedProps({ onStartConfirm, onRemove })}
         />,
       )
 
@@ -248,7 +254,7 @@ describe('CairnList', () => {
           selectedCairnId={null}
           accessToken="token"
           onOpenRow={vi.fn()}
-          {...removeProps({ confirmingId: 'a', onRemove, onCancelConfirm })}
+          {...ownedProps({ confirmingId: 'a', onRemove, onCancelConfirm })}
         />,
       )
 
@@ -270,7 +276,7 @@ describe('CairnList', () => {
           selectedCairnId={null}
           accessToken="token"
           onOpenRow={vi.fn()}
-          {...removeProps({ confirmingId: 'a', onRemove, onCancelConfirm })}
+          {...ownedProps({ confirmingId: 'a', onRemove, onCancelConfirm })}
         />,
       )
 
@@ -289,7 +295,7 @@ describe('CairnList', () => {
           selectedCairnId={null}
           accessToken="token"
           onOpenRow={vi.fn()}
-          {...removeProps({ removingIds: new Set(['a']) })}
+          {...ownedProps({ removingIds: new Set(['a']) })}
         />,
       )
 
@@ -307,7 +313,7 @@ describe('CairnList', () => {
           selectedCairnId={null}
           accessToken="token"
           onOpenRow={vi.fn()}
-          {...removeProps({ removeErrors: { a: "Couldn't remove a.jpg — try again." } })}
+          {...ownedProps({ removeErrors: { a: "Couldn't remove a.jpg — try again." } })}
         />,
       )
 
@@ -325,7 +331,7 @@ describe('CairnList', () => {
           selectedCairnId={null}
           accessToken="token"
           onOpenRow={vi.fn()}
-          {...removeProps({ disableRemove: true })}
+          {...ownedProps({ disableRemove: true })}
         />,
       )
 
@@ -344,7 +350,7 @@ describe('CairnList', () => {
           selectedCairnId={null}
           accessToken="token"
           onOpenRow={vi.fn()}
-          {...removeProps()}
+          {...ownedProps()}
         />,
       )
 
@@ -364,7 +370,7 @@ describe('CairnList', () => {
           accessToken="token"
           onOpenRow={vi.fn()}
           onRemoveFromTrip={onRemoveFromTrip}
-          {...removeProps({ onRemove })}
+          {...ownedProps({ onRemove })}
         />,
       )
 
@@ -388,7 +394,7 @@ describe('CairnList', () => {
           accessToken="token"
           onOpenRow={vi.fn()}
           onRemoveFromTrip={vi.fn()}
-          {...removeProps()}
+          {...ownedProps()}
         />,
       )
 
@@ -408,7 +414,7 @@ describe('CairnList', () => {
           accessToken="token"
           onOpenRow={vi.fn()}
           onRemoveFromTrip={vi.fn()}
-          {...removeProps({ disableRemove: true })}
+          {...ownedProps({ disableRemove: true })}
         />,
       )
 
@@ -433,7 +439,7 @@ describe('CairnList', () => {
           accessToken="token"
           onOpenRow={vi.fn()}
           onRemoveFromTrip={vi.fn()}
-          {...removeProps({ removingIds: new Set(['a']) })}
+          {...ownedProps({ removingIds: new Set(['a']) })}
         />,
       )
 

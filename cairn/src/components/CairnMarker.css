@@ -1,0 +1,107 @@
+/* cairn/docs/design/cairns.md — "Markers, rows and chips", "Markers" */
+
+.cairn-marker {
+  display: block;
+  position: relative;
+}
+
+/* The thumbnail shape — unchanged from the old photo marker. Border style,
+   width and colour come from `CairnMarker`'s inline style, driven by
+   #54's `ringStyleForPhoto` — the provenance ring still applies here
+   (`cairns.md` reuses `--marker-ring` for "Cairn, as image"). */
+.cairn-marker--thumb {
+  width: var(--marker-size);
+  height: var(--marker-size);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  box-shadow: var(--shadow-lifted);
+  background: var(--surface-lift);
+  box-sizing: border-box;
+}
+
+.cairn-marker--thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* The pin — the one marker shape cairn hadn't spent yet. Transform origin
+   at its tip's opposite end (bottom) so hover/selection scaling grows it
+   upward from the coordinate rather than sliding the tip off it. */
+.cairn-marker--pin {
+  width: var(--marker-poi);
+  height: calc(var(--marker-poi) * 1.26);
+  transform-origin: center bottom;
+  filter: drop-shadow(0 6px 14px rgba(6, 8, 18, 0.7));
+}
+
+.cairn-marker__pin-body {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.cairn-marker__pin-body path {
+  fill: var(--surface);
+  stroke: rgba(255, 255, 255, 0.55);
+  stroke-width: 1.5;
+}
+
+.cairn-marker--selected .cairn-marker__pin-body path {
+  fill: var(--accent);
+  stroke: var(--accent);
+}
+
+.cairn-marker__pin-glyph {
+  position: absolute;
+  left: 18%;
+  top: 8%;
+  width: 64%;
+  height: 64%;
+  color: var(--text);
+}
+
+.cairn-marker--selected .cairn-marker__pin-glyph {
+  color: var(--on-accent);
+}
+
+.cairn-marker__pin-dot {
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  width: 22%;
+  height: 22%;
+  border-radius: var(--radius-full);
+  background: currentColor;
+  transform: translate(-50%, -50%);
+}
+
+.cairn-marker__badge {
+  position: absolute;
+  right: 2px;
+  top: 1px;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-full);
+  background: var(--text);
+  border: 1.5px solid var(--surface);
+}
+
+/* The row's glyph — the marker drawn smaller, at the loose-list's
+   `--dot-size`, matching the track tile it sits beside. */
+.cairn-marker--small.cairn-marker--thumb {
+  width: var(--dot-size);
+  height: var(--dot-size);
+}
+
+.cairn-marker--small.cairn-marker--pin {
+  width: var(--dot-size);
+  height: calc(var(--dot-size) * 1.26);
+}
+
+.cairn-marker--small .cairn-marker__badge {
+  width: 7px;
+  height: 7px;
+  border-width: 1px;
+}

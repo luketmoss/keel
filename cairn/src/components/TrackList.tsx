@@ -16,7 +16,7 @@ interface TrackListProps {
       with a second step — getting rid of something must stay one click
       away from everywhere it appears. Absent outside a trip. */
   onRemoveFromTrip?: (id: string) => void
-  /** #77 — the single confirm slot, shared with `PhotoList` by the parent
+  /** #77 — the single confirm slot, shared with `CairnList` by the parent
       (design doc: "tracks and photos sharing one slot"). `null` when no row
       anywhere in the trip is confirming. Omitted entirely on v1's non-trip
       list (`App.tsx`), which has no Drive file behind a removal to confirm

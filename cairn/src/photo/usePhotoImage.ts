@@ -9,7 +9,7 @@
    "still loading" apart from "failed" (design doc's "Original failed in
    the lightbox" state, criterion 11). Rather than duplicate the lifecycle
    logic in a second hook, this one now returns both `url` and `failed` and
-   every caller (`PhotoLayer`, `PhotoList`, `Lightbox`) reads `.url`;
+   every caller (`CairnLayer`, `CairnList`, `Lightbox`) reads `.url`;
    `Lightbox` is the only one that also reads `.failed`. */
 
 import { useEffect, useState } from 'react'
@@ -19,7 +19,7 @@ export interface PhotoImageState {
   /** `undefined` while loading or on failure. */
   url?: string
   /** `true` once the acquire has settled and failed — distinct from
-      "still loading", which `PhotoLayer`/`PhotoList` don't need to tell
+      "still loading", which `CairnLayer`/`CairnList` don't need to tell
       apart (both render the same `--surface-lift` fallback) but the
       lightbox does (criterion 11). */
   failed: boolean

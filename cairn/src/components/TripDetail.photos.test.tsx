@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TripDetail } from './TripDetail'
@@ -141,7 +141,7 @@ describe('TripDetail — #55 photo list and lightbox', () => {
 
     renderTrip()
 
-    expect(screen.getByText('No photos yet')).toBeDefined()
+    expect(screen.getByText('No cairns yet')).toBeDefined()
     expect(screen.getByText('Drop photos onto this trip to see them here.')).toBeDefined()
   })
 
@@ -176,6 +176,56 @@ describe('TripDetail — #55 photo list and lightbox', () => {
     fireEvent.click(screen.getByText('sapporo.jpg'))
 
     await waitFor(() => expect(acquire).toHaveBeenCalledWith('token', 'orig-1'))
+  })
+
+  describe('#169 — the detail face folded into the lightbox', () => {
+    it('shows the description and the position-source sentence when a cairn opens', () => {
+      useCairnImport.mockReturnValue(
+        baseCairnImport({ cairns: [cairnRecord({ description: 'A good ramen spot.' })] }),
+      )
+
+      renderTrip()
+      fireEvent.click(screen.getByText('sapporo.jpg'))
+
+      expect(screen.getByText('A good ramen spot.')).toBeDefined()
+      expect(screen.getByText(/Position came from the photo’s EXIF GPS/)).toBeDefined()
+    })
+
+    it('shows the icon and photo clauses in the meta line', () => {
+      useCairnImport.mockReturnValue(
+        baseCairnImport({ cairns: [cairnRecord({ icon: 'campsite' })] }),
+      )
+
+      renderTrip()
+      fireEvent.click(screen.getByText('sapporo.jpg'))
+
+      const dialog = screen.getByRole('dialog')
+      expect(within(dialog).getByText(/campsite · photo/)).toBeDefined()
+    })
+
+    it('Remove from trip in the lightbox calls onRemovePhotoFromTrip and closes it', async () => {
+      const onRemovePhotoFromTrip = vi.fn().mockResolvedValue(true)
+      renderTrip({ onRemovePhotoFromTrip })
+
+      fireEvent.click(screen.getByText('sapporo.jpg'))
+      await waitFor(() => expect(screen.getByRole('dialog')).toBeDefined())
+
+      fireEvent.click(screen.getByRole('button', { name: 'Remove from trip' }))
+
+      expect(onRemovePhotoFromTrip).toHaveBeenCalledWith(cairnRecord())
+      expect(screen.queryByRole('dialog')).toBeNull()
+    })
+
+    it('an icon-only cairn (no image) selects on row click but opens no lightbox', () => {
+      useCairnImport.mockReturnValue(
+        baseCairnImport({ cairns: [cairnRecord({ icon: 'campsite', image: null })] }),
+      )
+
+      renderTrip()
+      fireEvent.click(screen.getByText('sapporo.jpg'))
+
+      expect(screen.queryByRole('dialog')).toBeNull()
+    })
   })
 
   describe('#77 removing a photo', () => {

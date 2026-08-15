@@ -27,7 +27,7 @@ const WORLD_BOUNDS: google.maps.LatLngBoundsLiteral = { north: 85, south: -85, w
     the map. That is the point: `useMap()` with no id resolves to the
     default `<Map>` from anywhere beneath this provider, so a layer can be
     rendered by whatever owns its data — the trip face renders its own
-    `TrackLayer` and `PhotoLayer` from inside the panel — and still draw on
+    `TrackLayer` and `CairnLayer` from inside the panel — and still draw on
     the one map instance. Nothing has to lift geometry into a shared parent,
     and nothing unmounts the map to change what is on it. */
 /** Why the map cannot draw, or `null` when it can. Held in context rather

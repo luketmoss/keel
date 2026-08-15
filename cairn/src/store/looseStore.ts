@@ -558,7 +558,7 @@ function overviewToTracks(
 /** What a cairn's meta line says, per `cairns.md`'s "The row" section: the
     date, then its icon and `photo` as separate clauses — never a type,
     because a photographed campsite is both at once. */
-export function cairnMetaClauses(record: LooseCairnRecord): string[] {
+export function cairnMetaClauses(record: Pick<LooseCairnRecord, 'icon' | 'image'>): string[] {
   const clauses: string[] = []
   if (record.icon) clauses.push(CAIRN_ICON_LABEL[record.icon])
   if (record.image) clauses.push('photo')
@@ -575,6 +575,22 @@ export const CAIRN_ICON_LABEL: Record<CairnIcon, string> = {
   hazard: 'hazard',
   parking: 'parking',
   junction: 'junction',
+}
+
+/** `cairns.md`'s position-source sentence, verbatim — the one place this
+    copy lives, so any surface showing a cairn's detail (`LooseFace`, and
+    #169's lightbox for a trip-owned one) reads it from here rather than
+    re-authoring it. */
+export function positionSourceSentence(source: PositionSource): string {
+  switch (source) {
+    case 'placed':
+      return 'You put this here. Interpolation will never move it again.'
+    case 'interpolated':
+      return 'No GPS, so it was positioned by timestamp against this trip’s tracks. Drag its marker to correct it and this becomes placed.'
+    case 'exif':
+    default:
+      return 'Position came from the photo’s EXIF GPS — a starting value, not a verdict. Drag its marker to correct it and this becomes placed.'
+  }
 }
 
 /** What a row shows under the name. The list is one list, so the meta line

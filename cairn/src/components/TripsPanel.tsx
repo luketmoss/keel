@@ -8,6 +8,7 @@ import { LIST_HEADINGS, type KindFilter } from './FilterChips'
 import { RowMenu } from './RowMenu'
 import { NameInput } from './NameInput'
 import { ColorPopover } from './ColorPopover'
+import { CairnMarker } from './CairnMarker'
 import { trackColor, TRACK_COLORS } from '../map/palette'
 import './TripsPanel.css'
 
@@ -105,7 +106,7 @@ export function TripsPanel({
   const visibleLoose = looseItems.filter((item) => {
     if (kind === 'trips') return false
     if (kind === 'tracks' && item.kind !== 'track') return false
-    if (kind === 'photos' && item.kind !== 'cairn') return false
+    if (kind === 'cairns' && item.kind !== 'cairn') return false
     return search.length === 0 || item.name.toLowerCase().includes(search)
   })
 
@@ -487,7 +488,9 @@ function LooseRow({
             aria-hidden="true"
           />
         ) : (
-          <span className="trips-panel__row-photo" aria-hidden="true" />
+          <span className="trips-panel__row-photo" aria-hidden="true">
+            <CairnMarker icon={item.icon} hasImage={item.image !== null} selected={false} small />
+          </span>
         )}
         <NameInput initial={item.name} onCommit={commitName} onCancel={() => setEditingName(false)} />
       </li>
@@ -500,7 +503,7 @@ function LooseRow({
      and in `--text-muted`, because nothing has gone wrong yet. */
   const uploading = item.uploadState === 'uploading'
   const unplaced = !uploading && (item.uploadState === 'failed' || item.position === null)
-  const href = item.kind === 'track' ? `/tracks/${item.id}` : `/photos/${item.id}`
+  const href = item.kind === 'track' ? `/tracks/${item.id}` : `/cairns/${item.id}`
 
   return (
     <li
@@ -510,7 +513,11 @@ function LooseRow({
     >
       {/* The row's glyph is the marker, drawn smaller — a thing spotted on
           the map and the same thing in the list have to read as one
-          object, so the shape and colour match exactly. */}
+          object, so the shape and colour match exactly. `CairnMarker`
+          draws the same pin-vs-thumbnail predicate the map itself reads
+          (#169), so a campsite here draws as the same pin it is there —
+          without a thumbnail fetch, at this size, the same fallback
+          `--surface-lift` circle a loading image already gets. */}
       {item.kind === 'track' ? (
         <span
           className="trips-panel__row-tile"
@@ -518,7 +525,9 @@ function LooseRow({
           aria-hidden="true"
         />
       ) : (
-        <span className="trips-panel__row-photo" aria-hidden="true" />
+        <span className="trips-panel__row-photo" aria-hidden="true">
+          <CairnMarker icon={item.icon} hasImage={item.image !== null} source={item.positionSource} selected={emphasized} small />
+        </span>
       )}
       <Link
         to={href}

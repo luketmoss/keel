@@ -71,6 +71,10 @@
   --search-height: 56px;
   --chip-height: 34px;
   --marker-track: 22px;
+
+  /* Cairn markers — cairn/docs/design/cairns.md, "New tokens". The pin's
+     width; its height is 1.26× that. */
+  --marker-poi: 30px;
   --sheet-peek: 140px;
   --sheet-half: 52vh;
   --sheet-full: 92vh;

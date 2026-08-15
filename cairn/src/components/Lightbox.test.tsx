@@ -2,19 +2,21 @@ import { createRef } from 'react'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Lightbox } from './Lightbox'
-import type { PhotoListRow } from '../photo/photoListGroups'
+import type { CairnListRow } from '../photo/cairnListGroups'
 
 const { acquire } = vi.hoisted(() => ({ acquire: vi.fn() }))
 vi.mock('../photo/imageCache', () => ({
   photoImageCache: { acquire },
 }))
 
-function row(overrides: Partial<PhotoListRow> = {}): PhotoListRow {
+function row(overrides: Partial<CairnListRow> = {}): CairnListRow {
   return {
     id: 'p1',
     name: 'a.jpg',
+    icon: null,
     thumbnailDriveFileId: 'thumb-1',
     originalDriveFileId: 'orig-1',
+    date: '2023-06-16',
     source: 'exif',
     ...overrides,
   }
@@ -31,7 +33,7 @@ describe('Lightbox', () => {
       <Lightbox
         row={row()}
         rows={[row()]}
-        tripOffsetHours={0}
+        description=""
         accessToken="token"
         onClose={vi.fn()}
         onNavigate={vi.fn()}
@@ -55,7 +57,7 @@ describe('Lightbox', () => {
       <Lightbox
         row={row()}
         rows={[row()]}
-        tripOffsetHours={0}
+        description=""
         accessToken="token"
         onClose={vi.fn()}
         onNavigate={vi.fn()}
@@ -78,7 +80,7 @@ describe('Lightbox', () => {
       <Lightbox
         row={row()}
         rows={[row()]}
-        tripOffsetHours={0}
+        description=""
         accessToken="token"
         onClose={onClose}
         onNavigate={vi.fn()}
@@ -98,7 +100,7 @@ describe('Lightbox', () => {
       <Lightbox
         row={rows[1]}
         rows={rows}
-        tripOffsetHours={0}
+        description=""
         accessToken="token"
         onClose={vi.fn()}
         onNavigate={onNavigate}
@@ -121,7 +123,7 @@ describe('Lightbox', () => {
       <Lightbox
         row={rows[0]}
         rows={rows}
-        tripOffsetHours={0}
+        description=""
         accessToken="token"
         onClose={vi.fn()}
         onNavigate={onNavigate}
@@ -149,7 +151,7 @@ describe('Lightbox', () => {
       <Lightbox
         row={row()}
         rows={[row()]}
-        tripOffsetHours={0}
+        description=""
         accessToken="token"
         onClose={vi.fn()}
         onNavigate={vi.fn()}
@@ -162,19 +164,106 @@ describe('Lightbox', () => {
     expect(screen.getByRole('dialog')).toBeDefined()
   })
 
-  it('shows the capture time and, for a derived photo, the estimated-position line', () => {
-    render(
-      <Lightbox
-        row={row({ captureInstantMs: Date.parse('2024-06-01T09:14:00Z'), source: 'interpolated' })}
-        rows={[row()]}
-        tripOffsetHours={0}
-        accessToken="token"
-        onClose={vi.fn()}
-        onNavigate={vi.fn()}
-        returnFocusRef={createRef<HTMLElement>()}
-      />,
-    )
+  describe('#169 — the detail face folded in', () => {
+    it('shows the meta line, naming the icon and photo as separate clauses', () => {
+      render(
+        <Lightbox
+          row={row({ icon: 'campsite' })}
+          rows={[row()]}
+          description=""
+          accessToken="token"
+          onClose={vi.fn()}
+          onNavigate={vi.fn()}
+          returnFocusRef={createRef<HTMLElement>()}
+        />,
+      )
 
-    expect(screen.getByText('09:14 · Position estimated from track')).toBeDefined()
+      expect(screen.getByText(/campsite · photo/)).toBeDefined()
+    })
+
+    it('shows the description when present', () => {
+      render(
+        <Lightbox
+          row={row()}
+          rows={[row()]}
+          description="A good spot to camp."
+          accessToken="token"
+          onClose={vi.fn()}
+          onNavigate={vi.fn()}
+          returnFocusRef={createRef<HTMLElement>()}
+        />,
+      )
+
+      expect(screen.getByText('A good spot to camp.')).toBeDefined()
+    })
+
+    it('shows "No description." when empty', () => {
+      render(
+        <Lightbox
+          row={row()}
+          rows={[row()]}
+          description=""
+          accessToken="token"
+          onClose={vi.fn()}
+          onNavigate={vi.fn()}
+          returnFocusRef={createRef<HTMLElement>()}
+        />,
+      )
+
+      expect(screen.getByText('No description.')).toBeDefined()
+    })
+
+    it("shows the position-source sentence, matching the cairn's actual source", () => {
+      render(
+        <Lightbox
+          row={row({ source: 'interpolated' })}
+          rows={[row()]}
+          description=""
+          accessToken="token"
+          onClose={vi.fn()}
+          onNavigate={vi.fn()}
+          returnFocusRef={createRef<HTMLElement>()}
+        />,
+      )
+
+      expect(
+        screen.getByText(/positioned by timestamp against this trip’s tracks/),
+      ).toBeDefined()
+    })
+
+    it('offers Remove from trip when the caller supplies it, and calls it on click', () => {
+      const onRemoveFromTrip = vi.fn()
+      render(
+        <Lightbox
+          row={row()}
+          rows={[row()]}
+          description=""
+          accessToken="token"
+          onClose={vi.fn()}
+          onNavigate={vi.fn()}
+          onRemoveFromTrip={onRemoveFromTrip}
+          returnFocusRef={createRef<HTMLElement>()}
+        />,
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'Remove from trip' }))
+      expect(onRemoveFromTrip).toHaveBeenCalled()
+    })
+
+    it('offers no Remove from trip control when the caller has nowhere to put a detached cairn', () => {
+      render(
+        <Lightbox
+          row={row()}
+          rows={[row()]}
+          description=""
+          accessToken="token"
+          onClose={vi.fn()}
+          onNavigate={vi.fn()}
+          returnFocusRef={createRef<HTMLElement>()}
+        />,
+      )
+
+      expect(screen.queryByRole('button', { name: 'Remove from trip' })).toBeNull()
+    })
   })
 })

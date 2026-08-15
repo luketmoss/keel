@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { PhotoList } from './PhotoList'
-import { orderPhotoListItems, type PhotoListRow } from '../photo/photoListGroups'
+import { CairnList } from './CairnList'
+import { orderCairnListItems, type CairnListRow } from '../photo/cairnListGroups'
 
 vi.mock('../photo/imageCache', () => ({
   photoImageCache: {
@@ -9,19 +9,21 @@ vi.mock('../photo/imageCache', () => ({
   },
 }))
 
-function row(overrides: Partial<PhotoListRow> = {}): PhotoListRow {
+function row(overrides: Partial<CairnListRow> = {}): CairnListRow {
   return {
     id: 'p1',
     name: 'a.jpg',
+    icon: null,
     thumbnailDriveFileId: 'thumb-1',
     originalDriveFileId: 'orig-1',
+    date: '2023-06-16',
     source: 'exif',
     ...overrides,
   }
 }
 
 /* #77's remove control shares its confirm slot with `TrackList` — owned by
-   `TripDetail`, not `PhotoList` itself — so every render needs these props
+   `TripDetail`, not `CairnList` itself — so every render needs these props
    supplied. Kept as a spreadable default object rather than repeating six
    props on every call site, and overridable per test for the removal
    suite below. */
@@ -47,37 +49,35 @@ function removeProps(overrides: Partial<{
   }
 }
 
-describe('PhotoList', () => {
-  it('shows the empty state pointing at the import control when the trip has no photos (criterion 13)', () => {
+describe('CairnList', () => {
+  it('shows the empty state pointing at the import control when the trip has no cairns', () => {
     render(
-      <PhotoList
+      <CairnList
         items={[]}
         totalCount={0}
-        selectedPhotoId={null}
+        selectedCairnId={null}
         accessToken="token"
-        tripOffsetHours={0}
         onOpenRow={vi.fn()}
         {...removeProps()}
       />,
     )
 
-    expect(screen.getByText('No photos yet')).toBeDefined()
+    expect(screen.getByText('No cairns yet')).toBeDefined()
     expect(screen.getByText('Drop photos onto this trip to see them here.')).toBeDefined()
-    // No count shown next to the header when there are no photos.
+    // No count shown next to the header when there are no cairns.
     expect(screen.queryByText('0')).toBeNull()
   })
 
-  it('renders one row per photo and the header count (criterion 1)', () => {
-    const rows = [row({ id: 'a', captureInstantMs: 100 }), row({ id: 'b', captureInstantMs: 200 })]
-    const items = orderPhotoListItems(rows)
+  it('renders one row per cairn and the header count', () => {
+    const rows = [row({ id: 'a', date: '2023-06-01' }), row({ id: 'b', date: '2023-06-02' })]
+    const items = orderCairnListItems(rows)
 
     render(
-      <PhotoList
+      <CairnList
         items={items}
         totalCount={2}
-        selectedPhotoId={null}
+        selectedCairnId={null}
         accessToken="token"
-        tripOffsetHours={0}
         onOpenRow={vi.fn()}
         {...removeProps()}
       />,
@@ -88,17 +88,34 @@ describe('PhotoList', () => {
     expect(screen.getAllByRole('button')).toHaveLength(4)
   })
 
-  it('renders a No date divider for an undated photo and never drops it (criterion 3)', () => {
-    const rows = [row({ id: 'dated', name: 'z.jpg', captureInstantMs: 100 }), row({ id: 'undated', name: 'a.jpg' })]
-    const items = orderPhotoListItems(rows)
+  it('#169: includes an icon-only cairn (no image) in the same list', () => {
+    const rows = [row({ id: 'a', icon: 'campsite', thumbnailDriveFileId: null })]
+    const items = orderCairnListItems(rows)
 
     render(
-      <PhotoList
+      <CairnList
+        items={items}
+        totalCount={1}
+        selectedCairnId={null}
+        accessToken="token"
+        onOpenRow={vi.fn()}
+        {...removeProps()}
+      />,
+    )
+
+    expect(screen.getByText('a.jpg')).toBeDefined()
+  })
+
+  it('renders a No date divider for an undated cairn and never drops it', () => {
+    const rows = [row({ id: 'dated', name: 'z.jpg', date: '2023-06-01' }), row({ id: 'undated', name: 'a.jpg', date: null })]
+    const items = orderCairnListItems(rows)
+
+    render(
+      <CairnList
         items={items}
         totalCount={2}
-        selectedPhotoId={null}
+        selectedCairnId={null}
         accessToken="token"
-        tripOffsetHours={0}
         onOpenRow={vi.fn()}
         {...removeProps()}
       />,
@@ -106,21 +123,36 @@ describe('PhotoList', () => {
 
     expect(screen.getByText('No date')).toBeDefined()
     expect(screen.getByText('a.jpg')).toBeDefined()
-    expect(screen.getByText('—')).toBeDefined()
+  })
+
+  it('the meta line reads clauses for icon and photo (cairns.md "The row")', () => {
+    const items = orderCairnListItems([row({ id: 'a', icon: 'campsite', thumbnailDriveFileId: 'thumb-1' })])
+
+    render(
+      <CairnList
+        items={items}
+        totalCount={1}
+        selectedCairnId={null}
+        accessToken="token"
+        onOpenRow={vi.fn()}
+        {...removeProps()}
+      />,
+    )
+
+    expect(screen.getByText(/campsite · photo/)).toBeDefined()
   })
 
   it('calls onOpenRow when a row is clicked (selection + open in one action)', () => {
     const onOpenRow = vi.fn()
-    const rows = [row({ id: 'a', name: 'a.jpg', captureInstantMs: 100 })]
-    const items = orderPhotoListItems(rows)
+    const rows = [row({ id: 'a', name: 'a.jpg' })]
+    const items = orderCairnListItems(rows)
 
     render(
-      <PhotoList
+      <CairnList
         items={items}
         totalCount={1}
-        selectedPhotoId={null}
+        selectedCairnId={null}
         accessToken="token"
-        tripOffsetHours={0}
         onOpenRow={onOpenRow}
         {...removeProps()}
       />,
@@ -131,39 +163,37 @@ describe('PhotoList', () => {
   })
 
   it('marks the selected row distinctly (design language selected state)', () => {
-    const rows = [row({ id: 'a', captureInstantMs: 100 }), row({ id: 'b', captureInstantMs: 200 })]
-    const items = orderPhotoListItems(rows)
+    const rows = [row({ id: 'a' }), row({ id: 'b' })]
+    const items = orderCairnListItems(rows)
 
     const { container } = render(
-      <PhotoList
+      <CairnList
         items={items}
         totalCount={2}
-        selectedPhotoId="b"
+        selectedCairnId="b"
         accessToken="token"
-        tripOffsetHours={0}
         onOpenRow={vi.fn()}
         {...removeProps()}
       />,
     )
 
-    const listItems = container.querySelectorAll('.photo-row')
-    expect(listItems[0].className).not.toContain('photo-row--selected')
-    expect(listItems[1].className).toContain('photo-row--selected')
+    const listItems = container.querySelectorAll('.cairn-row')
+    expect(listItems[0].className).not.toContain('cairn-row--selected')
+    expect(listItems[1].className).toContain('cairn-row--selected')
   })
 
-  it('scrolls the selected row into view with block: nearest when selection changes (criterion 6)', () => {
+  it('scrolls the selected row into view with block: nearest when selection changes', () => {
     const scrollIntoView = vi.fn()
     Element.prototype.scrollIntoView = scrollIntoView
-    const rows = [row({ id: 'a', captureInstantMs: 100 }), row({ id: 'b', captureInstantMs: 200 })]
-    const items = orderPhotoListItems(rows)
+    const rows = [row({ id: 'a' }), row({ id: 'b' })]
+    const items = orderCairnListItems(rows)
 
     const { rerender } = render(
-      <PhotoList
+      <CairnList
         items={items}
         totalCount={2}
-        selectedPhotoId={null}
+        selectedCairnId={null}
         accessToken="token"
-        tripOffsetHours={0}
         onOpenRow={vi.fn()}
         {...removeProps()}
       />,
@@ -171,12 +201,11 @@ describe('PhotoList', () => {
     expect(scrollIntoView).not.toHaveBeenCalled()
 
     rerender(
-      <PhotoList
+      <CairnList
         items={items}
         totalCount={2}
-        selectedPhotoId="b"
+        selectedCairnId="b"
         accessToken="token"
-        tripOffsetHours={0}
         onOpenRow={vi.fn()}
         {...removeProps()}
       />,
@@ -185,42 +214,18 @@ describe('PhotoList', () => {
     expect(scrollIntoView).toHaveBeenCalledWith(expect.objectContaining({ block: 'nearest' }))
   })
 
-  it('carries a derived caveat on an interpolated row but not on a recorded one', () => {
-    const rows = [
-      row({ id: 'recorded', source: 'exif', captureInstantMs: 100 }),
-      row({ id: 'derived', source: 'interpolated', captureInstantMs: 200 }),
-    ]
-    const items = orderPhotoListItems(rows)
-
-    render(
-      <PhotoList
-        items={items}
-        totalCount={2}
-        selectedPhotoId={null}
-        accessToken="token"
-        tripOffsetHours={0}
-        onOpenRow={vi.fn()}
-        {...removeProps()}
-      />,
-    )
-
-    expect(screen.getByText('⟂ estimated')).toBeDefined()
-    expect(screen.queryAllByText('⟂ estimated')).toHaveLength(1)
-  })
-
   describe('#77 removal', () => {
     it('starts the confirm rather than removing on a single activation of the remove control', () => {
-      const items = orderPhotoListItems([row({ id: 'a', captureInstantMs: 100 })])
+      const items = orderCairnListItems([row({ id: 'a' })])
       const onStartConfirm = vi.fn()
       const onRemove = vi.fn()
 
       render(
-        <PhotoList
+        <CairnList
           items={items}
           totalCount={1}
-          selectedPhotoId={null}
+          selectedCairnId={null}
           accessToken="token"
-          tripOffsetHours={0}
           onOpenRow={vi.fn()}
           {...removeProps({ onStartConfirm, onRemove })}
         />,
@@ -232,17 +237,16 @@ describe('PhotoList', () => {
     })
 
     it('renders the confirm for the confirming row and calls onRemove only from its Remove action', () => {
-      const items = orderPhotoListItems([row({ id: 'a', captureInstantMs: 100 })])
+      const items = orderCairnListItems([row({ id: 'a' })])
       const onRemove = vi.fn()
       const onCancelConfirm = vi.fn()
 
       render(
-        <PhotoList
+        <CairnList
           items={items}
           totalCount={1}
-          selectedPhotoId={null}
+          selectedCairnId={null}
           accessToken="token"
-          tripOffsetHours={0}
           onOpenRow={vi.fn()}
           {...removeProps({ confirmingId: 'a', onRemove, onCancelConfirm })}
         />,
@@ -255,17 +259,16 @@ describe('PhotoList', () => {
     })
 
     it('cancelling the confirm removes nothing', () => {
-      const items = orderPhotoListItems([row({ id: 'a', captureInstantMs: 100 })])
+      const items = orderCairnListItems([row({ id: 'a' })])
       const onRemove = vi.fn()
       const onCancelConfirm = vi.fn()
 
       render(
-        <PhotoList
+        <CairnList
           items={items}
           totalCount={1}
-          selectedPhotoId={null}
+          selectedCairnId={null}
           accessToken="token"
-          tripOffsetHours={0}
           onOpenRow={vi.fn()}
           {...removeProps({ confirmingId: 'a', onRemove, onCancelConfirm })}
         />,
@@ -277,15 +280,14 @@ describe('PhotoList', () => {
     })
 
     it('shows Removing… and hides the remove control while a row is mid-removal', () => {
-      const items = orderPhotoListItems([row({ id: 'a', captureInstantMs: 100 })])
+      const items = orderCairnListItems([row({ id: 'a' })])
 
       render(
-        <PhotoList
+        <CairnList
           items={items}
           totalCount={1}
-          selectedPhotoId={null}
+          selectedCairnId={null}
           accessToken="token"
-          tripOffsetHours={0}
           onOpenRow={vi.fn()}
           {...removeProps({ removingIds: new Set(['a']) })}
         />,
@@ -296,15 +298,14 @@ describe('PhotoList', () => {
     })
 
     it('shows a failure line beneath a row whose removal failed, without removing it', () => {
-      const items = orderPhotoListItems([row({ id: 'a', captureInstantMs: 100 })])
+      const items = orderCairnListItems([row({ id: 'a' })])
 
       render(
-        <PhotoList
+        <CairnList
           items={items}
           totalCount={1}
-          selectedPhotoId={null}
+          selectedCairnId={null}
           accessToken="token"
-          tripOffsetHours={0}
           onOpenRow={vi.fn()}
           {...removeProps({ removeErrors: { a: "Couldn't remove a.jpg — try again." } })}
         />,
@@ -315,15 +316,14 @@ describe('PhotoList', () => {
     })
 
     it('disables the remove control while disconnected', () => {
-      const items = orderPhotoListItems([row({ id: 'a', captureInstantMs: 100 })])
+      const items = orderCairnListItems([row({ id: 'a' })])
 
       render(
-        <PhotoList
+        <CairnList
           items={items}
           totalCount={1}
-          selectedPhotoId={null}
+          selectedCairnId={null}
           accessToken="token"
-          tripOffsetHours={0}
           onOpenRow={vi.fn()}
           {...removeProps({ disableRemove: true })}
         />,
@@ -335,15 +335,14 @@ describe('PhotoList', () => {
 
   describe('#132 remove from trip, beside delete', () => {
     it('offers no unlink control when the caller has nowhere to put a detached photo', () => {
-      const items = orderPhotoListItems([row({ id: 'a', captureInstantMs: 100 })])
+      const items = orderCairnListItems([row({ id: 'a' })])
 
       render(
-        <PhotoList
+        <CairnList
           items={items}
           totalCount={1}
-          selectedPhotoId={null}
+          selectedCairnId={null}
           accessToken="token"
-          tripOffsetHours={0}
           onOpenRow={vi.fn()}
           {...removeProps()}
         />,
@@ -352,18 +351,17 @@ describe('PhotoList', () => {
       expect(screen.queryByRole('button', { name: /from trip/ })).toBeNull()
     })
 
-    it('returns the photo to the top level without a confirm', () => {
-      const items = orderPhotoListItems([row({ id: 'a', captureInstantMs: 100 })])
+    it('returns the cairn to the top level without a confirm', () => {
+      const items = orderCairnListItems([row({ id: 'a' })])
       const onRemoveFromTrip = vi.fn()
       const onRemove = vi.fn()
 
       render(
-        <PhotoList
+        <CairnList
           items={items}
           totalCount={1}
-          selectedPhotoId={null}
+          selectedCairnId={null}
           accessToken="token"
-          tripOffsetHours={0}
           onOpenRow={vi.fn()}
           onRemoveFromTrip={onRemoveFromTrip}
           {...removeProps({ onRemove })}
@@ -380,15 +378,14 @@ describe('PhotoList', () => {
     })
 
     it('keeps deleting one click away, as its own named control', () => {
-      const items = orderPhotoListItems([row({ id: 'a', captureInstantMs: 100 })])
+      const items = orderCairnListItems([row({ id: 'a' })])
 
       render(
-        <PhotoList
+        <CairnList
           items={items}
           totalCount={1}
-          selectedPhotoId={null}
+          selectedCairnId={null}
           accessToken="token"
-          tripOffsetHours={0}
           onOpenRow={vi.fn()}
           onRemoveFromTrip={vi.fn()}
           {...removeProps()}
@@ -401,15 +398,14 @@ describe('PhotoList', () => {
     })
 
     it('disables both exits while disconnected', () => {
-      const items = orderPhotoListItems([row({ id: 'a', captureInstantMs: 100 })])
+      const items = orderCairnListItems([row({ id: 'a' })])
 
       render(
-        <PhotoList
+        <CairnList
           items={items}
           totalCount={1}
-          selectedPhotoId={null}
+          selectedCairnId={null}
           accessToken="token"
-          tripOffsetHours={0}
           onOpenRow={vi.fn()}
           onRemoveFromTrip={vi.fn()}
           {...removeProps({ disableRemove: true })}
@@ -427,15 +423,14 @@ describe('PhotoList', () => {
     })
 
     it('hides the unlink control alongside the delete control while a row is mid-removal', () => {
-      const items = orderPhotoListItems([row({ id: 'a', captureInstantMs: 100 })])
+      const items = orderCairnListItems([row({ id: 'a' })])
 
       render(
-        <PhotoList
+        <CairnList
           items={items}
           totalCount={1}
-          selectedPhotoId={null}
+          selectedCairnId={null}
           accessToken="token"
-          tripOffsetHours={0}
           onOpenRow={vi.fn()}
           onRemoveFromTrip={vi.fn()}
           {...removeProps({ removingIds: new Set(['a']) })}

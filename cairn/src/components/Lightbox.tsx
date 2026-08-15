@@ -1,22 +1,32 @@
 import { useEffect, useRef } from 'react'
-import { formatCaptureTime, type PhotoListRow } from '../photo/photoListGroups'
+import { cairnRowMetaLine, type CairnListRow } from '../photo/cairnListGroups'
+import { positionSourceSentence } from '../store/looseStore'
 import { usePhotoImage } from '../photo/usePhotoImage'
 import './Lightbox.css'
 
 interface LightboxProps {
-  row: PhotoListRow
+  row: CairnListRow
   /** The list's full displayed order (design doc: "← and → move through
       the list in its displayed order") — used to find prev/next and
       whether either end is a boundary. */
-  rows: PhotoListRow[]
-  tripOffsetHours: number
+  rows: CairnListRow[]
+  /** Free text, and the sentence explaining where its position came from
+      (`cairns.md`'s "positionSource" table) — the parts of the detail
+      face (`155-cairns-replace-photos.md`) this issue folds into the
+      lightbox rather than a separate non-modal surface, since a trip's
+      panel body has nowhere else to put one. */
+  description: string
   accessToken: string | null
   onClose: () => void
-  /** Selects and opens `photoId` in one step — arrow keys are the only way
-      to change photo while the lightbox is open (design doc edge case:
+  /** Selects and opens `cairnId` in one step — arrow keys are the only way
+      to change cairn while the lightbox is open (design doc edge case:
       "Selecting a row while the lightbox is open" can't happen from the
       list because the lightbox traps focus). */
-  onNavigate: (photoId: string) => void
+  onNavigate: (cairnId: string) => void
+  /** #132's `Remove from trip`, the detail face's primary action when the
+      cairn is owned (`cairns.md`'s detail-face table). `undefined` when
+      the caller has nowhere to put a detached cairn. */
+  onRemoveFromTrip?: () => void
   /** The element focus returns to on close — the row's button or the
       marker's hit-target div, whichever opened this (criterion 9). Read
       once on mount; TripDetail captures it at open time via
@@ -29,8 +39,23 @@ interface LightboxProps {
     `--shadow-lifted`, no border) over a `--scrim` backdrop, following
     `DropOverlay`'s precedent for this app's other full-viewport overlay.
     Not full-bleed — the map stays visible at the margins (design doc's
-    "The lightbox" section). */
-export function Lightbox({ row, rows, tripOffsetHours, accessToken, onClose, onNavigate, returnFocusRef }: LightboxProps) {
+    "The lightbox" section).
+
+    #169 extends this into the trip-scoped cairn's detail face — its meta
+    line, description and position-source sentence, alongside the image it
+    already showed — rather than building a second, non-modal surface a
+    trip's panel body has no slot for. A loose cairn's detail face stays
+    `LooseFace`'s, unchanged. */
+export function Lightbox({
+  row,
+  rows,
+  description,
+  accessToken,
+  onClose,
+  onNavigate,
+  onRemoveFromTrip,
+  returnFocusRef,
+}: LightboxProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
 
@@ -41,8 +66,8 @@ export function Lightbox({ row, rows, tripOffsetHours, accessToken, onClose, onN
   // The thumbnail is already cached from the list (design doc's Loading
   // section) — shown scaled up and blurred as the frame's immediate
   // content, so the frame never resizes once the original lands.
-  const thumbnail = usePhotoImage(accessToken, row.thumbnailDriveFileId)
-  const original = usePhotoImage(accessToken, row.originalDriveFileId)
+  const thumbnail = usePhotoImage(accessToken, row.thumbnailDriveFileId ?? undefined)
+  const original = usePhotoImage(accessToken, row.originalDriveFileId ?? undefined)
 
   // Criterion 10 / focus trap: Escape closes regardless of load state
   // (edge case: "Esc while the original is still loading closes
@@ -100,10 +125,6 @@ export function Lightbox({ row, rows, tripOffsetHours, accessToken, onClose, onN
     }
   }
 
-  const captionParts: string[] = []
-  if (row.captureInstantMs !== undefined) captionParts.push(formatCaptureTime(row.captureInstantMs, tripOffsetHours))
-  if (row.source === 'interpolated') captionParts.push('Position estimated from track')
-
   return (
     <div className="lightbox" data-testid="lightbox">
       <div
@@ -145,7 +166,17 @@ export function Lightbox({ row, rows, tripOffsetHours, accessToken, onClose, onN
             </>
           )}
         </div>
-        {captionParts.length > 0 && <p className="lightbox__caption">{captionParts.join(' · ')}</p>}
+        <h2 className="lightbox__name" title={row.name}>
+          {row.name}
+        </h2>
+        <p className="lightbox__meta">{cairnRowMetaLine(row)}</p>
+        <p className="lightbox__description">{description || 'No description.'}</p>
+        <p className="lightbox__position">{positionSourceSentence(row.source)}</p>
+        {onRemoveFromTrip && (
+          <button type="button" className="lightbox__remove-from-trip" onClick={onRemoveFromTrip}>
+            Remove from trip
+          </button>
+        )}
       </div>
     </div>
   )

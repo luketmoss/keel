@@ -43,7 +43,7 @@ function project(lat: number, lng: number, zoom: number): { x: number; y: number
     and C alone would not overlap — the same "chain" behaviour a real
     on-screen circle-packing would produce. O(n²) pairwise comparisons, which
     is fine at the 200-photo scale acceptance criterion 11 names; this is
-    also memoized by its caller (PhotoLayer) on zoom, not recomputed per
+    also memoized by its caller (CairnLayer) on zoom, not recomputed per
     render. */
 export function clusterMarkers<T extends ClusterableMarker>(
   markers: T[],

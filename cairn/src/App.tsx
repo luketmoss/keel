@@ -78,7 +78,8 @@ export function App() {
         <Route path="/" element={<AppShell />}>
           <Route path="trips/:id" element={null} />
           <Route path="tracks/:id" element={null} />
-          <Route path="photos/:id" element={null} />
+          {/* #169: "photos" is no longer a kind — a cairn's own route. */}
+          <Route path="cairns/:id" element={null} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
@@ -97,7 +98,7 @@ function detailForCard(
   if (loose) {
     return {
       name: loose.name,
-      kind: loose.kind === 'track' ? 'track · not in a trip' : 'photo · not in a trip',
+      kind: loose.kind === 'track' ? 'track · not in a trip' : 'cairn · not in a trip',
     }
   }
   return null
@@ -119,8 +120,8 @@ function generateToastId(): string {
 function AppShell() {
   const openTripId = useMatch('/trips/:id')?.params.id
   const openTrackId = useMatch('/tracks/:id')?.params.id
-  const openPhotoId = useMatch('/photos/:id')?.params.id
-  const openLooseId = openTrackId ?? openPhotoId
+  const openCairnId = useMatch('/cairns/:id')?.params.id
+  const openLooseId = openTrackId ?? openCairnId
   const navigate = useNavigate()
   const account = useGoogleAccount()
   /* The one module allowed to import DriveTripStore directly — everything
@@ -549,8 +550,9 @@ function AppShell() {
     setQueue((current) => placeCurrent(current))
     // "Queue empties. Face closes, last placed cairn's detail face opens."
     // Only the loose route has a detail of its own to open here — a
-    // trip-scoped cairn's detail face is the marker/list issue's to build.
-    if (wasLast && !openTripId) navigate(`/photos/${result}`)
+    // trip-scoped cairn's detail face opens inline within TripDetail
+    // instead (#169).
+    if (wasLast && !openTripId) navigate(`/cairns/${result}`)
   }
 
   const handleGeometryChange = useCallback((points: { lat: number; lng: number }[]) => {
@@ -618,7 +620,7 @@ function AppShell() {
                 (item) =>
                   kind === 'all' ||
                   (kind === 'tracks' && item.kind === 'track') ||
-                  (kind === 'photos' && item.kind === 'cairn'),
+                  (kind === 'cairns' && item.kind === 'cairn'),
               )}
               store={looseStore}
               accessToken={accessToken}
@@ -626,7 +628,7 @@ function AppShell() {
               onHover={setHoveredTripId}
               selectedId={openLooseId ?? null}
               onSelect={(item) =>
-                navigate(item.kind === 'track' ? `/tracks/${item.id}` : `/photos/${item.id}`)
+                navigate(item.kind === 'track' ? `/tracks/${item.id}` : `/cairns/${item.id}`)
               }
             />
           </>
@@ -767,7 +769,7 @@ function AppShell() {
               exportingIds={exportingIds}
               onAddLooseToTrip={(id) =>
                 navigate(
-                  looseStore.getItem(id)?.kind === 'track' ? `/tracks/${id}` : `/photos/${id}`,
+                  looseStore.getItem(id)?.kind === 'track' ? `/tracks/${id}` : `/cairns/${id}`,
                 )
               }
               disabled={disconnected}

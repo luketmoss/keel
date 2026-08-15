@@ -287,13 +287,12 @@
   border: var(--dot-ring) solid color-mix(in srgb, var(--text) 85%, transparent);
 }
 
+/* #169: the shape — thumbnail or pin — is `CairnMarker`'s own to draw, per
+   the one marker predicate; this wrapper stays unstyled so a pin's
+   teardrop silhouette isn't clipped by a circular parent. */
 .trips-panel__row-photo {
   flex: none;
-  width: var(--dot-size);
-  height: var(--dot-size);
-  border-radius: var(--radius-full);
-  border: var(--dot-ring) solid color-mix(in srgb, var(--text) 85%, transparent);
-  background-image: linear-gradient(135deg, var(--accent-soft), var(--muted-soft));
+  display: block;
 }
 
 /* A photo that cannot be placed says so where its date and kind go — in

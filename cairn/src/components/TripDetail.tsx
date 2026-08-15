@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { TrackLayer } from './TrackLayer'
-import { PhotoLayer, type PositionedPhoto } from './PhotoLayer'
+import { CairnLayer, type PositionedCairn } from './CairnLayer'
 import { TrackList } from './TrackList'
-import { PhotoList } from './PhotoList'
+import { CairnList } from './CairnList'
 import { Lightbox } from './Lightbox'
 import { TripImportPanel } from './TripImportPanel'
 import { TripMetadataHeader } from './TripMetadataHeader'
@@ -12,8 +12,7 @@ import { googleMapsMapId } from '../env'
 import { isPhotoFile, isTrackFile } from '../import/fileKinds'
 import { useTripImport } from '../import/useTripImport'
 import { useCairnImport, type CairnRecord } from '../photo/useCairnImport'
-import { buildPhotoListRows, flattenPhotoListRows, orderPhotoListItems } from '../photo/photoListGroups'
-import { tripUtcOffsetHours } from '../photo/interpolate'
+import { buildCairnListRows, flattenCairnListRows, orderCairnListItems } from '../photo/cairnListGroups'
 import type { TripStore } from '../store/tripStore'
 import { MOVE_FAILED_MESSAGE } from '../store/looseStore'
 import type { ImportedFile } from '../import/types'
@@ -34,7 +33,7 @@ interface LocalFailure {
 }
 
 /** #77 — the single remove-confirm slot, shared between `TrackList` and
-    `PhotoList`. Escape or a pointerdown anywhere outside whichever row is
+    `CairnList`. Escape or a pointerdown anywhere outside whichever row is
     currently confirming reverts it without removing anything. */
 function useRemoveConfirm() {
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
@@ -109,7 +108,7 @@ interface TripDetailProps {
 
 /** The panel's trip face, and the trip's own map layers.
 
-    `TrackLayer` and `PhotoLayer` are rendered from here even though they
+    `TrackLayer` and `CairnLayer` are rendered from here even though they
     draw on the map, not in the panel: both attach to the shell's single map
     through `useMap()` and render either nothing or a portal into the map's
     own marker container, so they cost this subtree no DOM. That is what
@@ -165,72 +164,75 @@ export function TripDetail({
     if (cairnImport.loading) return
     tripStore.saveCairnCount(tripId, cairnImport.cairns.length)
   }, [tripStore, tripId, cairnImport.loading, cairnImport.cairns.length])
-  const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null)
-  // Deliberately separate from `selectedPhotoId` rather than derived from
+  const [selectedCairnId, setSelectedCairnId] = useState<string | null>(null)
+  // Deliberately separate from `selectedCairnId` rather than derived from
   // it — a selected marker does not open the lightbox by itself, only an
   // *already-selected* one does.
-  const [openPhotoId, setOpenPhotoId] = useState<string | null>(null)
+  const [openCairnId, setOpenCairnId] = useState<string | null>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
 
-  // The subset `PhotoLayer` (still the old photo-marker treatment — the
-  // marker/list rework is the issue that redraws this as a pin-or-thumbnail
-  // predicate) can draw: a cairn carrying an image. A cairn with no image
-  // is not rendered by this layer at all yet.
-  const positionedPhotos: PositionedPhoto[] = useMemo(
+  // Every cairn the trip owns, not just the ones carrying an image (#169 —
+  // `CairnLayer` draws the pin-vs-thumbnail predicate itself, so an
+  // icon-only cairn belongs here too).
+  const positionedCairns: PositionedCairn[] = useMemo(
     () =>
-      cairnImport.cairns
-        .filter((cairn): cairn is CairnRecord & { image: NonNullable<CairnRecord['image']> } => cairn.image !== null)
-        .map((cairn) => ({
-          id: cairn.id,
-          name: cairn.name,
-          thumbnailDriveFileId: cairn.image.thumbnailDriveFileId,
-          latitude: cairn.position.lat,
-          longitude: cairn.position.lng,
-          source: cairn.positionSource,
-        })),
+      cairnImport.cairns.map((cairn) => ({
+        id: cairn.id,
+        name: cairn.name,
+        thumbnailDriveFileId: cairn.image?.thumbnailDriveFileId ?? null,
+        icon: cairn.icon,
+        latitude: cairn.position.lat,
+        longitude: cairn.position.lng,
+        source: cairn.positionSource,
+      })),
     [cairnImport.cairns],
   )
 
-  const photoListRows = useMemo(
-    () => buildPhotoListRows(cairnImport.cairns, allTracks),
+  const cairnListRows = useMemo(
+    () => buildCairnListRows(cairnImport.cairns, allTracks),
     [cairnImport.cairns, allTracks],
   )
-  const photoListItems = useMemo(() => orderPhotoListItems(photoListRows), [photoListRows])
-  const flatPhotoRows = useMemo(() => flattenPhotoListRows(photoListItems), [photoListItems])
-  const tripOffsetHours = useMemo(() => tripUtcOffsetHours(allTracks), [allTracks])
-  const openPhotoRow = openPhotoId ? flatPhotoRows.find((row) => row.id === openPhotoId) : undefined
+  const cairnListItems = useMemo(() => orderCairnListItems(cairnListRows), [cairnListRows])
+  const flatCairnRows = useMemo(() => flattenCairnListRows(cairnListItems), [cairnListItems])
+  const openCairnRow = openCairnId ? flatCairnRows.find((row) => row.id === openCairnId) : undefined
+  // The lightbox is a photo viewer first (`cairns.md`'s "Adding a photo…"
+  // note: the image is what opens it) — an icon-only cairn has nothing for
+  // it to show, so opening one only selects it. `openCairnRow` still
+  // resolves for either case; only the *render* below is gated on having
+  // an image to view.
+  const openCairnRecord = openCairnId ? cairnImport.cairns.find((cairn) => cairn.id === openCairnId) : undefined
 
-  const openPhoto = useCallback((photoId: string) => {
+  const openCairn = useCallback((cairnId: string) => {
     returnFocusRef.current = document.activeElement as HTMLElement | null
-    setSelectedPhotoId(photoId)
-    setOpenPhotoId(photoId)
+    setSelectedCairnId(cairnId)
+    setOpenCairnId(cairnId)
   }, [])
 
-  const navigatePhoto = useCallback((photoId: string) => {
-    setSelectedPhotoId(photoId)
-    setOpenPhotoId(photoId)
+  const navigateCairn = useCallback((cairnId: string) => {
+    setSelectedCairnId(cairnId)
+    setOpenCairnId(cairnId)
   }, [])
 
-  const closeLightbox = useCallback(() => setOpenPhotoId(null), [])
+  const closeLightbox = useCallback(() => setOpenCairnId(null), [])
 
   const addLocalFailure = useCallback((name: string, message: string) => {
     nextLocalFailureId.current += 1
     setLocalFailures((prev) => [...prev, { id: `local-failure-${nextLocalFailureId.current}`, name, message }])
   }, [])
 
-  // #77 — a photo that's been removed can no longer be selected or open in
+  // #77 — a cairn that's been removed can no longer be selected or open in
   // the lightbox.
   useEffect(() => {
-    if (selectedPhotoId && !cairnImport.cairns.some((photo) => photo.id === selectedPhotoId)) {
-      setSelectedPhotoId(null)
+    if (selectedCairnId && !cairnImport.cairns.some((cairn) => cairn.id === selectedCairnId)) {
+      setSelectedCairnId(null)
     }
-  }, [cairnImport.cairns, selectedPhotoId])
+  }, [cairnImport.cairns, selectedCairnId])
 
   useEffect(() => {
-    if (openPhotoId && !cairnImport.cairns.some((photo) => photo.id === openPhotoId)) {
-      setOpenPhotoId(null)
+    if (openCairnId && !cairnImport.cairns.some((cairn) => cairn.id === openCairnId)) {
+      setOpenCairnId(null)
     }
-  }, [cairnImport.cairns, openPhotoId])
+  }, [cairnImport.cairns, openCairnId])
 
   // One control, one drop target, two pipelines. Files are partitioned into
   // three buckets — tracks, photos, and neither — before either pipeline
@@ -370,13 +372,13 @@ export function TripDetail({
     <div className="trip-detail">
       {/* Drawn on the shell's map, not here — see the component doc. */}
       <TrackLayer files={tripImport.tracks} hoveredFileId={hoveredFileId} />
-      {googleMapsMapId && positionedPhotos.length > 0 && (
-        <PhotoLayer
-          photos={positionedPhotos}
+      {googleMapsMapId && positionedCairns.length > 0 && (
+        <CairnLayer
+          cairns={positionedCairns}
           accessToken={accessToken}
-          selectedPhotoId={selectedPhotoId}
-          onSelectPhoto={setSelectedPhotoId}
-          onOpenPhoto={openPhoto}
+          selectedCairnId={selectedCairnId}
+          onSelectCairn={setSelectedCairnId}
+          onOpenCairn={openCairn}
         />
       )}
 
@@ -419,15 +421,14 @@ export function TripDetail({
             )}
           </>
         )}
-        {/* Renders even for a trip with tracks and no photos — the way to
-            add photos has to be discoverable from a trip that has none. */}
-        <PhotoList
-          items={photoListItems}
+        {/* Renders even for a trip with tracks and no cairns — the way to
+            add cairns has to be discoverable from a trip that has none. */}
+        <CairnList
+          items={cairnListItems}
           totalCount={cairnImport.cairns.length}
-          selectedPhotoId={selectedPhotoId}
+          selectedCairnId={selectedCairnId}
           accessToken={accessToken}
-          tripOffsetHours={tripOffsetHours}
-          onOpenRow={openPhoto}
+          onOpenRow={openCairn}
           onRemove={cairnImport.removeCairn}
           onRemoveFromTrip={
             onRemovePhotoFromTrip &&
@@ -462,14 +463,39 @@ export function TripDetail({
         />
       </div>
 
-      {openPhotoRow && (
+      {/* The lightbox is a photo viewer first (`cairns.md`'s "Adding a
+          photo…" note names the image as what opens it) — an icon-only
+          cairn has nothing for it to show, so opening one only selects
+          it, on the map and in the list, same as any other row. */}
+      {openCairnRow && openCairnRow.thumbnailDriveFileId !== null && (
         <Lightbox
-          row={openPhotoRow}
-          rows={flatPhotoRows}
-          tripOffsetHours={tripOffsetHours}
+          row={openCairnRow}
+          rows={flatCairnRows}
+          description={openCairnRecord?.description ?? ''}
           accessToken={accessToken}
           onClose={closeLightbox}
-          onNavigate={navigatePhoto}
+          onNavigate={navigateCairn}
+          onRemoveFromTrip={
+            signedIn && onRemovePhotoFromTrip && openCairnRecord
+              ? () => {
+                  const record = openCairnRecord
+                  closeLightbox()
+                  setPhotoDetachErrors((prev) => {
+                    if (!(record.id in prev)) return prev
+                    const next = { ...prev }
+                    delete next[record.id]
+                    return next
+                  })
+                  void onRemovePhotoFromTrip(record).then((moved) => {
+                    if (moved) {
+                      cairnImport.forgetCairn(record.id)
+                    } else {
+                      setPhotoDetachErrors((prev) => ({ ...prev, [record.id]: MOVE_FAILED_MESSAGE }))
+                    }
+                  })
+                }
+              : undefined
+          }
           returnFocusRef={returnFocusRef}
         />
       )}

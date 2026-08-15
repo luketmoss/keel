@@ -456,7 +456,7 @@ describe('TripsPanel', () => {
         '/tracks/track-1',
       )
       expect(screen.getByText('sapporo.jpg').closest('a')?.getAttribute('href')).toBe(
-        '/photos/cairn-1',
+        '/cairns/cairn-1',
       )
     })
 
@@ -717,10 +717,10 @@ describe('TripsPanel', () => {
       expect(screen.queryByText('sapporo.jpg')).toBeNull()
     })
 
-    it('Photos shows only loose photos', () => {
-      renderPanel({ ...everything, kind: 'photos' })
+    it('Cairns shows only loose cairns', () => {
+      renderPanel({ ...everything, kind: 'cairns' })
 
-      expect(screen.getByRole('heading', { name: 'Loose photos' })).toBeDefined()
+      expect(screen.getByRole('heading', { name: 'Cairns' })).toBeDefined()
       expect(screen.getByText('sapporo.jpg')).toBeDefined()
       expect(screen.queryByText('Mount Rosea')).toBeNull()
     })

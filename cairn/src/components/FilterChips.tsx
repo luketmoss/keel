@@ -3,23 +3,27 @@ import './FilterChips.css'
 /** What the list and the map are showing. One filter drives both — a chip
     that hid rows but left markers would be two truths about the same
     question. */
-export type KindFilter = 'all' | 'trips' | 'tracks' | 'photos'
+export type KindFilter = 'all' | 'trips' | 'tracks' | 'cairns'
 
 const CHIPS: { value: KindFilter; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'trips', label: 'Trips' },
   { value: 'tracks', label: 'Tracks' },
-  { value: 'photos', label: 'Photos' },
+  { value: 'cairns', label: 'Cairns' },
 ]
 
 /** The header the list shows for each chip. It always names what you are
     looking at, and "loose" is said out loud rather than left implied — a
-    list headed "Tracks" that excluded a trip's tracks would be lying. */
+    list headed "Tracks" that excluded a trip's tracks would be lying.
+
+    `cairns.md`'s "Panel titles" keeps the active-chip title plain
+    (`Cairns`, not "Loose cairns") — the facet row that would need "loose"
+    said out loud for a mixed icon/photo filter is #159's, not this one's. */
 export const LIST_HEADINGS: Record<KindFilter, string> = {
   all: 'Everything',
   trips: 'Trips',
   tracks: 'Loose tracks',
-  photos: 'Loose photos',
+  cairns: 'Cairns',
 }
 
 /** The chip row, between the search card and the panel. */

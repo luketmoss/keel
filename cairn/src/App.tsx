@@ -28,6 +28,7 @@ import {
   MOVE_WRITE_FAILED_MESSAGE,
   ONLY_ONE_PHOTO_MESSAGE,
   SIGNED_OUT_DROP_MESSAGE,
+  extraPhotosMessage,
   SIGNED_OUT_PHOTO_MESSAGE,
   cairnDefaultName,
   moveLooseIntoTrip,
@@ -40,6 +41,7 @@ import { DEFAULT_TRIP_FILTERS, tripDayIndex, type TripFilters } from './store/tr
 import { dataTransferHasFiles, filesFromDataTransfer } from './import/dataTransfer'
 import type { ImportedFile } from './import/types'
 import { isPhotoFile } from './import/fileKinds'
+import { expandArchives, isArchiveFile } from './import/archive'
 import { useLooseImport } from './import/useLooseImport'
 import { useDraftTrip } from './import/useDraftTrip'
 import { useGoogleAccount } from './auth/useGoogleAccount'
@@ -199,6 +201,12 @@ function AppShell() {
   const [dragActive, setDragActive] = useState(false)
   const dragDepth = useRef(0)
   const [toasts, setToasts] = useState<ToastMessage[]>([])
+  /* #188: what a large archive shows while it is being unpacked. Without
+     it a zip of two hundred photos is a drop that appears to have been
+     ignored — nothing exists to show a row for until the files are out. */
+  const [archiveProgress, setArchiveProgress] = useState<
+    { name: string; index: number; total: number } | null
+  >(null)
   /** #157: which trip-owned cairn's lightbox is open, reported up by
       `TripDetail` — `null` while none is, or while no trip is open at all.
       Read together with a loose cairn's own `openLoose` below to decide
@@ -613,6 +621,25 @@ function AppShell() {
     // changed is that *not* becoming one is now a valid outcome — the
     // draft's `Keep loose` takes that exit. Photos have no draft to open,
     // so they import loose directly.
+    void importDroppedLoose(files)
+  }
+
+  /** #188: the loose doorway. A `.zip` becomes the files it holds before
+      the photo/track split, so a zip of tracks opens the draft and a zip of
+      photos imports loose, exactly as their contents would have. */
+  async function importDroppedLoose(dropped: File[]) {
+    const expansion = await expandArchives(dropped, (name, index, total) =>
+      setArchiveProgress({ name, index, total }),
+    )
+    setArchiveProgress(null)
+    addToasts(expansion.rejections)
+    const files = expansion.files
+    if (files.length === 0) return
+    // Unlike the trip path, this one opens the archive before checking the
+    // connection — it has to. #81/#120 keep the draft working while signed
+    // out, so a zip of tracks still opens one; only the photo half below
+    // needs somewhere to write, and only that half is refused.
+
     const photos = files.filter((file) => isPhotoFile(file.name))
     const rest = files.filter((file) => !isPhotoFile(file.name))
     // #120: the draft is unaffected by being signed out — it is visible,
@@ -629,7 +656,7 @@ function AppShell() {
           enqueueNeedsPlacement(result.resolvedCount, result.needsPlacement)
         })
     }
-    if (rest.length > 0) void draftTrip.addFiles(rest).then(addToasts)
+    if (rest.length > 0) await draftTrip.addFiles(rest).then(addToasts)
   }
 
   /** #120: a loose import needs somewhere to put the file, and while
@@ -648,12 +675,24 @@ function AppShell() {
       setToasts((prev) => [...prev, { id: generateToastId(), text: SIGNED_OUT_PHOTO_MESSAGE }])
       return
     }
-    const [first, ...rest] = files
+    // #188: expanded only once there is somewhere to put the result — the
+    // signed-out refusal above returns before an archive is ever opened.
+    const expansion = await expandArchives(files, (name, index, total) =>
+      setArchiveProgress({ name, index, total }),
+    )
+    setArchiveProgress(null)
+    addToasts(expansion.rejections)
+
+    const [first, ...rest] = expansion.files
+    // An archive holding nothing importable has already said so.
+    if (!first) return
+    const archive = files.find((file) => isArchiveFile(file.name))
     if (rest.length > 0) {
-      setToasts((prev) => [
-        ...prev,
-        ...rest.map(() => ({ id: generateToastId(), text: ONLY_ONE_PHOTO_MESSAGE })),
-      ])
+      const texts =
+        archive !== undefined
+          ? [extraPhotosMessage(rest.length)]
+          : rest.map(() => ONLY_ONE_PHOTO_MESSAGE)
+      setToasts((prev) => [...prev, ...texts.map((text) => ({ id: generateToastId(), text }))])
     }
     setAttachingLooseId(id)
     setAttachLooseError(null)
@@ -1134,6 +1173,11 @@ function AppShell() {
         <CreateHintChip visible={createGestureActive && !createOpen && !hasPlaced} />
 
         {dragActive && <DropOverlay label={dropOverlayLabel} />}
+        {archiveProgress && (
+          <p className="archive-progress" role="status">
+            {archiveProgress.name} — {archiveProgress.index} of {archiveProgress.total}
+          </p>
+        )}
         <ToastStack toasts={toasts} onDismiss={dismissToast} />
       </div>
     </MapProvider>

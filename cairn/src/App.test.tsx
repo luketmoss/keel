@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import JSZip from 'jszip'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { formatDistance } from './format/units'
@@ -36,9 +37,30 @@ vi.mock('./photo/thumbnail', async () => {
 })
 
 function loadKmlFixture(name: string, as = name): File {
-  const buffer = readFileSync(join(__dirname, 'kml/fixtures', name))
-  return new File([buffer], as)
+  return new File([kmlFixtureText(name)], as)
 }
+
+/** The fixture's bytes, for building a zip around. `File#text()` is not
+    implemented by jsdom, so this reads from disk rather than off the
+    `File` — the same gap `kml/parse.ts` works around with a `FileReader`. */
+function kmlFixtureText(name: string): string {
+  return readFileSync(join(__dirname, 'kml/fixtures', name), 'utf8')
+}
+
+/* #188: expansion runs for real in every test but one. That one needs to
+   observe the UI *during* unpacking, which means holding the doorway open —
+   so the override slot below stands in only when it is set. */
+const { archiveOverride } = vi.hoisted(() => ({
+  archiveOverride: { expandArchives: null as null | ((...args: never[]) => unknown) },
+}))
+vi.mock('./import/archive', async () => {
+  const actual = await vi.importActual<typeof import('./import/archive')>('./import/archive')
+  return {
+    ...actual,
+    expandArchives: (...args: never[]) =>
+      (archiveOverride.expandArchives ?? (actual.expandArchives as never))(...args),
+  }
+})
 
 function fileDataTransfer(files: File[]): DataTransfer {
   return { types: ['Files'], files: files as unknown as FileList } as unknown as DataTransfer
@@ -1191,6 +1213,92 @@ describe('App loose items in Drive (#120)', () => {
     expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(0)
   })
 
+  // #188 — a zip is a bag of files, and dropping the bag means dropping the
+  // files. These go through the real JSZip, so what is under test is the
+  // doorway and not a fake of it.
+  it('a dropped zip of tracks opens the draft exactly as the loose files would', async () => {
+    await renderApp('/')
+    const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
+    const zip = new JSZip()
+    zip.file('trip/day1.kml', kmlFixtureText('linestring.kml'))
+    const archive = new File([await zip.generateAsync({ type: 'blob' })], 'trip.zip')
+
+    await act(async () => {
+      fireEvent.drop(shell, { dataTransfer: fileDataTransfer([archive]) })
+    })
+
+    // Same outcome as dropping day1.kml itself — nothing downstream knows
+    // an archive was involved.
+    expect(await screen.findByText('NOT SAVED')).toBeDefined()
+  })
+
+  it('a dropped .kmz is still a track and is never flattened into its inner KML', async () => {
+    await renderApp('/')
+    const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
+    const zip = new JSZip()
+    zip.file('doc.kml', kmlFixtureText('linestring.kml'))
+    const kmz = new File([await zip.generateAsync({ type: 'blob' })], 'rosea.kmz')
+
+    await act(async () => {
+      fireEvent.drop(shell, { dataTransfer: fileDataTransfer([kmz]) })
+    })
+
+    // Seeded from the KMZ's own name. If it had been expanded as a generic
+    // archive the draft would say `doc` instead, so this is what proves the
+    // KMZ reached its own parser.
+    expect(await screen.findByText('NOT SAVED')).toBeDefined()
+    expect(screen.getByText('rosea')).toBeDefined()
+    expect(screen.getByText('rosea.kmz · 1 track')).toBeDefined()
+  })
+
+  it('names an unreadable archive and lets the rest of the drop through', async () => {
+    await renderApp('/')
+    const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
+    const kml = loadKmlFixture('linestring.kml', 'day1.kml')
+
+    await act(async () => {
+      fireEvent.drop(shell, {
+        dataTransfer: fileDataTransfer([new File(['not a zip'], 'broken.zip'), kml]),
+      })
+    })
+
+    expect(await screen.findByText('could not be read as a zip archive')).toBeDefined()
+    // The track in the same drop still opened its draft.
+    expect(screen.getByText('NOT SAVED')).toBeDefined()
+  })
+
+  it('says an archive is being unpacked rather than looking like an ignored drop', async () => {
+    await renderApp('/')
+    const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
+
+    let release!: () => void
+    const held = new Promise<void>((resolve) => (release = resolve))
+    archiveOverride.expandArchives = ((
+      _files: File[],
+      onProgress?: (name: string, index: number, total: number) => void,
+    ) => {
+      onProgress?.('photos.zip', 12, 30)
+      return held.then(() => ({ files: [], rejections: [] }))
+    }) as never
+
+    await act(async () => {
+      fireEvent.drop(shell, {
+        dataTransfer: fileDataTransfer([new File(['PK'], 'photos.zip')]),
+      })
+    })
+
+    // Same form as an import progress row, carrying the archive's name so
+    // it reads differently from the per-photo rows that follow it.
+    expect((await screen.findByRole('status')).textContent).toBe('photos.zip — 12 of 30')
+
+    await act(async () => {
+      release()
+      await held
+    })
+    expect(screen.queryByRole('status')).toBeNull()
+    archiveOverride.expandArchives = null
+  })
+
   it('still opens the draft for a track dropped while signed out', async () => {
     await renderApp('/')
     const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
@@ -1241,6 +1349,67 @@ describe('App placement queue (#168)', () => {
     startResumableUpload.mockReset().mockResolvedValue('session-uri')
     uploadFileContent.mockReset().mockResolvedValue({ id: 'drive-file-1' })
     Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:fake-url'), revokeObjectURL: vi.fn() })
+  })
+
+  /** The fixture that carries real EXIF GPS — the point of #188 is that a
+      zip is lossless, so this must place exactly as the loose file does. */
+  function gpsPhoto(as: string): File {
+    const buffer = readFileSync(join(__dirname, 'photo/fixtures/gps-and-timestamps.jpg'))
+    return new File([buffer], as, { type: 'image/jpeg' })
+  }
+
+  it('a zipped photo keeps its EXIF GPS and places exactly as the loose file does (#188)', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    await renderApp('/', { googleClientId: 'a-client-id' })
+    await signIn()
+    const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
+
+    // What the loose file resolves to, for comparison.
+    await act(async () => {
+      fireEvent.drop(shell, { dataTransfer: fileDataTransfer([gpsPhoto('loose.jpg')]) })
+    })
+    await waitFor(() => {
+      expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(1)
+    })
+    const [loose] = JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')
+
+    const zip = new JSZip()
+    const gpsBytes = readFileSync(join(__dirname, 'photo/fixtures/gps-and-timestamps.jpg'))
+    zip.file('trip/day one/zipped.jpg', gpsBytes)
+    // A second entry, so this also shows every expanded entry reaching the
+    // pipeline rather than the archive counting as one item (criterion 11).
+    zip.file('trip/day two/zipped-2.jpg', gpsBytes)
+    // Every macOS zip carries these; neither may become a cairn.
+    zip.file('__MACOSX/._zipped.jpg', 'applesauce')
+    zip.file('.DS_Store', 'junk')
+    const archive = new File([await zip.generateAsync({ type: 'blob' })], 'photos.zip')
+
+    await act(async () => {
+      fireEvent.drop(shell, { dataTransfer: fileDataTransfer([archive]) })
+    })
+
+    await waitFor(() => {
+      expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(3)
+    })
+    const index = JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')
+    const zipped = index.find((item: { name: string }) => item.name === 'zipped.jpg')
+
+    // Same coordinate, same provenance — the archive changed nothing.
+    expect(zipped.positionSource).toBe('exif')
+    expect(zipped.positionSource).toBe(loose.positionSource)
+    expect(zipped.position).toEqual(loose.position)
+    // Folders flattened: `trip/day one/zipped.jpg` arrived as `zipped.jpg`.
+    expect(index.map((item: { name: string }) => item.name).sort()).toEqual([
+      'loose.jpg',
+      'zipped-2.jpg',
+      'zipped.jpg',
+    ])
+    // The junk entries are in this archive on purpose, but what proves they
+    // are *skipped* rather than merely failing later is
+    // `archive.test.ts`'s "skips junk silently" — from here a fork that got
+    // through would fail EXIF and go to the placement queue, which this
+    // assertion cannot tell apart from it never arriving.
+    fetchSpy.mockRestore()
   })
 
   it('replaces the list with the placement queue when a dropped photo resolves neither by EXIF nor interpolation', async () => {

@@ -7,3 +7,24 @@
   width: 100%;
   overflow: hidden;
 }
+
+/* #188: the unpacking row. Sits where a toast would, in the same surface
+   and type as one, because it is the same kind of thing — a line saying
+   what the app is doing with what you just dropped. It is not a toast
+   proper: it is not dismissable and it goes when the work does. */
+.archive-progress {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-6);
+  transform: translateX(-50%);
+  z-index: 3;
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur));
+  box-shadow: var(--shadow-lifted);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}

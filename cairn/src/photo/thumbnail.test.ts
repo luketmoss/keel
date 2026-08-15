@@ -284,6 +284,27 @@ describe('exportImageName', () => {
     expect(exportImageName('sunset.png', '')).toBe('sunset.png')
     expect(exportImageName('sunset.png', 'application/octet-stream')).toBe('sunset.png')
   })
+
+  // What this is handed is the cairn's `name` — free text a person types and
+  // edits (#133), not a filename. Treating everything after the last dot as
+  // an extension eats most of the name.
+  it('appends to a renamed cairn rather than truncating at the last dot', () => {
+    expect(exportImageName('Camp 1. Windy morning', 'image/jpeg')).toBe(
+      'Camp 1. Windy morning.jpg',
+    )
+    expect(exportImageName('Rosea v1.2 summit', 'image/jpeg')).toBe('Rosea v1.2 summit.jpg')
+  })
+
+  it('appends when the name has no extension at all', () => {
+    expect(exportImageName('Sunset over the ridge', 'image/jpeg')).toBe(
+      'Sunset over the ridge.jpg',
+    )
+  })
+
+  it('still replaces a real image extension', () => {
+    expect(exportImageName('IMG_0001.heic', 'image/jpeg')).toBe('IMG_0001.jpg')
+    expect(exportImageName('shot.webp', 'image/jpeg')).toBe('shot.jpg')
+  })
 })
 
 describe('generateImagePair', () => {

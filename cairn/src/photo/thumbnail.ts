@@ -70,9 +70,13 @@ export function validateImageFile(name: string): string | undefined {
 
 /** The name the downscaled image is stored under in Drive. Canvas encoding
     always produces JPEG, so a `sunset.png` would otherwise be stored as
-    JPEG bytes under a `.png` name. The cairn's own `name` — the row label —
-    is deliberately not put through this: it is something the user edits,
-    not a filename. */
+    JPEG bytes under a `.png` name.
+ *
+ * Safe to swap the trailing segment outright because this only ever sees a
+ * `File.name` that `validateImageFile` has already accepted, so what
+ * follows the last dot is always one of the four image extensions. The
+ * cairn's own `name` — free text the user edits — must not come through
+ * here; `exportImageName` is the one that copes with that. */
 export function displayImageName(sourceName: string): string {
   const dot = sourceName.lastIndexOf('.')
   const base = dot === -1 ? sourceName : sourceName.slice(0, dot)
@@ -84,6 +88,9 @@ const MIME_EXTENSIONS: Record<string, string> = {
   'image/png': '.png',
   'image/webp': '.webp',
 }
+
+/** Every extension that may be *replaced* rather than appended to. */
+const IMAGE_EXTENSIONS = [...ACCEPTED_TYPES, ...HEIC_TYPES]
 
 /** Names an exported image after the bytes Drive actually served rather
     than after the record. A cairn stored before #187 still holds its camera
@@ -99,9 +106,13 @@ export function exportImageName(name: string, mimeType: string): string {
   // `.jpeg` is already correct for JPEG bytes; rewriting it to `.jpg` would
   // rename the user's file for no reason.
   if (extension === '.jpg' && current === '.jpeg') return name
+  // What this is handed is a cairn's `name`, which is free text a person
+  // types and edits — not a filename. Only a real image extension is
+  // replaced; anything else is appended to, or "Camp 1. Windy morning"
+  // exports as "Camp 1.jpg" and most of the name is gone.
+  if (!IMAGE_EXTENSIONS.includes(current)) return `${name}${extension}`
   const dot = name.lastIndexOf('.')
-  const base = dot === -1 ? name : name.slice(0, dot)
-  return `${base}${extension}`
+  return `${name.slice(0, dot)}${extension}`
 }
 
 /** Scales `width`x`height` proportionally so its longest edge is at most

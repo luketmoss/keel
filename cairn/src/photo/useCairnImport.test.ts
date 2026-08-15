@@ -338,11 +338,41 @@ describe('useCairnImport', () => {
   })
 
   describe('attachImage (#157)', () => {
-    async function withOneCairn(overrides: Partial<{ date: string | null }> = {}) {
+    // Seeded via `createCairn` — icon-only, no image, `positionSource:
+    // 'placed'`. `writeJsonFile`/`startResumableUpload`/`uploadFileContent`
+    // are cleared afterward so each test's own assertions on them start
+    // from zero, unpolluted by the seed's own write.
+    async function withOneCairn(overrides: Partial<{ date: string | null; icon: 'campsite' | null }> = {}) {
+      const { result } = renderHook(() => useCairnImport('trip-1', 'token', 'cairn-folder-id', []))
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      await act(() =>
+        result.current.createCairn({
+          name: 'Campsite',
+          position: { lat: 1, lng: 2 },
+          icon: overrides.icon ?? null,
+          description: '',
+          date: overrides.date ?? null,
+        }),
+      )
+      writeJsonFile.mockClear()
+      startResumableUpload.mockClear()
+      uploadFileContent.mockClear()
+      return result
+    }
+
+    // `createCairn` always writes `positionSource: 'placed'`, which would
+    // make a mutation that drops the "unchanged" guarantee invisible (the
+    // field would already hold 'placed' either way) — so this one test
+    // seeds through `importFiles` instead, whose EXIF-resolved cairn starts
+    // at `positionSource: 'exif'`. Its cairn also starts with an image
+    // (a photo import always uploads one), which only matters to this test
+    // since it never asserts on `image`.
+    async function withImagedExifCairn() {
       readPhotoExif.mockResolvedValue(okExif({ latitude: 1, longitude: 2 }))
       const { result } = renderHook(() => useCairnImport('trip-1', 'token', 'cairn-folder-id', []))
       await waitFor(() => expect(result.current.loading).toBe(false))
-      await act(() => result.current.createCairn({ name: 'Campsite', position: { lat: 1, lng: 2 }, icon: null, description: '', date: overrides.date ?? null }))
+      await act(() => result.current.importFiles([file('campsite.jpg')]))
+      await act(() => result.current.setCairnIcon(result.current.cairns[0].id, 'campsite'))
       return result
     }
 
@@ -350,7 +380,6 @@ describe('useCairnImport', () => {
       const result = await withOneCairn()
       const id = result.current.cairns[0].id
       readPhotoExif.mockResolvedValue(okExif({ gpsTimestamp: '2024-06-01T09:14:00Z' }))
-      writeJsonFile.mockClear()
 
       let outcome!: Awaited<ReturnType<typeof result.current.attachImage>>
       await act(async () => {
@@ -374,17 +403,19 @@ describe('useCairnImport', () => {
     })
 
     it("does not touch position, positionSource, or icon", async () => {
-      const result = await withOneCairn()
+      const result = await withImagedExifCairn()
       const id = result.current.cairns[0].id
       const before = result.current.cairns[0]
+      expect(before.positionSource).toBe('exif')
+      expect(before.icon).toBe('campsite')
 
       await act(async () => {
         await result.current.attachImage(id, file('sunset.jpg'))
       })
 
       expect(result.current.cairns[0].position).toEqual(before.position)
-      expect(result.current.cairns[0].positionSource).toBe(before.positionSource)
-      expect(result.current.cairns[0].icon).toBe(before.icon)
+      expect(result.current.cairns[0].positionSource).toBe('exif')
+      expect(result.current.cairns[0].icon).toBe('campsite')
     })
 
     it('fills date from EXIF only when the cairn had none', async () => {

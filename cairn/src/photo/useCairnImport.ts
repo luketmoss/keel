@@ -9,29 +9,29 @@ import {
 } from '../drive/trackFiles'
 import { findOrCreateTripCairnItemFolder, findOrCreateTripCairnsFolder } from '../drive/tripCairnFolder'
 import { listSubfolders, writeJsonFile, findJsonFile, readJsonFile, trashFolder } from '../drive/tripMetadata'
-import { readPhotoExif } from './exif'
+import { readPhotoExif, type PhotoExif } from './exif'
 import { generateThumbnail, THUMBNAIL_SUFFIX, validateImageFile } from './thumbnail'
 import { positionPhoto } from './interpolate'
+import { formatShortDate } from '../format/dates'
 import type { CairnIcon, CairnImage, PositionSource } from '../store/looseStore'
+import type { PlacementQueueItem } from '../import/placementQueue'
+import type { LatLng } from '../map/geo'
 
 /* Trip-scoped cairn import — the trip-owned half of `cairns.md`'s model.
    Each cairn is a folder, `trips/<trip-id>/cairns/<cairn-id>/cairn.json`
    plus its image (if any), read back by listing that folder rather than
    through a per-trip photo index file — the storage layer #155 replaced it with.
 
-   Resolution at import time covers the first two of `cairns.md`'s three
-   routes: EXIF GPS, then interpolation against this trip's tracks (via
-   `photo/interpolate.ts`, unchanged). A file that resolves by neither
-   route is rejected here as an import failure — there is no placement
-   queue yet for it to wait in; that is the import-pipeline issue's build
-   on top of this one. A cairn's `position` is never null once it exists
-   (`cairns.md`), so there is nothing softer this hook could do with such a
-   file than refuse it. */
+   Resolution at import time covers all three of `cairns.md`'s routes: EXIF
+   GPS, then interpolation against this trip's tracks (via
+   `photo/interpolate.ts`, unchanged), then — since #168 — the placement
+   queue for a file that resolves by neither. A cairn's `position` is never
+   null once it exists (`cairns.md`), so nothing here ever writes one
+   without a position; a file that can't get one waits instead. */
 
 const UPLOAD_CONCURRENCY = 4
 
 export const ALREADY_IN_TRIP_MESSAGE = 'already in this trip'
-export const NO_LOCATION_MESSAGE = 'no GPS, and no track here to place it against yet'
 
 let nextId = 0
 function generateId(prefix: string): string {
@@ -81,12 +81,22 @@ export interface CairnImportFailure {
   reconnect?: boolean
 }
 
+export interface CairnImportResult {
+  /** How many dropped images saved immediately (EXIF or interpolation) —
+      the placement queue's batch summary needs this alongside
+      `needsPlacement` to read the whole drop, not just its stragglers. */
+  resolvedCount: number
+  /** Images that resolved by neither route — waiting to be placed by hand
+      rather than rejected, per `cairns.md`'s "no unplaced state". */
+  needsPlacement: PlacementQueueItem[]
+}
+
 export interface UseCairnImport {
   cairns: CairnRecord[]
   loading: boolean
   progress: CairnImportProgress[]
   failures: CairnImportFailure[]
-  importFiles: (incoming: File[]) => Promise<void>
+  importFiles: (incoming: File[]) => Promise<CairnImportResult>
   retryFailure: (id: string) => Promise<void>
   dismissFailures: () => void
   /** Trashes the cairn's whole folder — image and `cairn.json` together —
@@ -211,28 +221,80 @@ export function useCairnImport(
     return { message: 'upload failed', retryFile: file }
   }
 
+  /* The upload half, shared by a file that resolved its own position and a
+     placement-queue item a person just clicked the map for: generate a
+     thumbnail, upload original + thumbnail, write `cairn.json`, and land
+     the record in state. */
+  const uploadAndSave = useCallback(
+    async (
+      file: File,
+      position: LatLng,
+      positionSource: PositionSource,
+      exif: PhotoExif,
+      token: string,
+    ): Promise<CairnRecord | undefined> => {
+      const thumbnail = await generateThumbnail(file, exif.orientation)
+      if (!thumbnail.ok) {
+        addFailure(file.name, thumbnail.error)
+        return undefined
+      }
+
+      const id = generateId('cairn')
+      const folderId = await findOrCreateTripCairnItemFolder(token, cairnFolderId as string, tripId, id)
+
+      const originalSession = await startResumableUpload(token, folderId, file.name)
+      const uploadedOriginal = await uploadFileContent(originalSession, file, token)
+
+      const thumbnailName = `${file.name}${THUMBNAIL_SUFFIX}`
+      const thumbnailFile = new File([thumbnail.blob], thumbnailName, { type: 'image/jpeg' })
+      const thumbnailSession = await startResumableUpload(token, folderId, thumbnailName)
+      const uploadedThumbnail = await uploadFileContent(thumbnailSession, thumbnailFile, token)
+
+      const record: CairnRecord = {
+        id,
+        name: file.name,
+        position,
+        positionSource,
+        icon: null,
+        image: { originalDriveFileId: uploadedOriginal.id, thumbnailDriveFileId: uploadedThumbnail.id },
+        description: '',
+        date: exif.gpsTimestamp ?? exif.dateTimeOriginal ?? null,
+        ...(exif.gpsTimestamp !== undefined ? { gpsTimestamp: exif.gpsTimestamp } : {}),
+        ...(exif.dateTimeOriginal !== undefined ? { dateTimeOriginal: exif.dateTimeOriginal } : {}),
+      }
+
+      await writeJsonFile(token, folderId, 'cairn.json', record, null)
+
+      cairnsRef.current = [...cairnsRef.current, record]
+      setCairns(cairnsRef.current)
+      return record
+    },
+    [cairnFolderId, tripId, addFailure],
+  )
+
   /* One file's full pipeline: validate, read EXIF, resolve a position (EXIF
-     then interpolation — `cairns.md`'s first two resolution routes),
-     refuse outright if neither resolves, then generate a thumbnail and
-     upload original + thumbnail + `cairn.json` into the cairn's own
-     folder. */
+     then interpolation — `cairns.md`'s first two resolution routes). A file
+     that resolves either way uploads immediately; one that resolves by
+     neither becomes a placement-queue item instead of a failure — see
+     `uploadAndSave` above for what its `save` closure runs once a person
+     supplies the position by hand. */
   const importOne = useCallback(
     async (
       file: File,
       index: number,
       total: number,
       token: string,
-    ): Promise<CairnRecord | undefined> => {
+    ): Promise<{ record?: CairnRecord; needsPlacement?: PlacementQueueItem }> => {
       const typeError = validateImageFile(file.name)
       if (typeError) {
         addFailure(file.name, typeError)
-        return undefined
+        return {}
       }
 
       const lowerName = file.name.toLowerCase()
       if (cairnsRef.current.some((existing) => existing.name.toLowerCase() === lowerName)) {
         addFailure(file.name, ALREADY_IN_TRIP_MESSAGE)
-        return undefined
+        return {}
       }
 
       const key = generateId('progress')
@@ -242,62 +304,53 @@ export function useCairnImport(
         const exifResult = await readPhotoExif(file)
         const exif = exifResult.ok ? exifResult.exif : {}
 
-        const resolved = positionPhoto(exif, tracksRef.current)
-        if (!resolved) {
-          addFailure(file.name, NO_LOCATION_MESSAGE)
-          return undefined
+        const tracksAtDropTime = tracksRef.current
+        const resolved = positionPhoto(exif, tracksAtDropTime)
+        if (resolved) {
+          const record = await uploadAndSave(
+            file,
+            { lat: resolved.latitude, lng: resolved.longitude },
+            resolved.source,
+            exif,
+            token,
+          )
+          return { record }
         }
 
-        const thumbnail = await generateThumbnail(file, exif.orientation)
-        if (!thumbnail.ok) {
-          addFailure(file.name, thumbnail.error)
-          return undefined
-        }
-
-        const id = generateId('cairn')
-        const folderId = await findOrCreateTripCairnItemFolder(token, cairnFolderId as string, tripId, id)
-
-        const originalSession = await startResumableUpload(token, folderId, file.name)
-        const uploadedOriginal = await uploadFileContent(originalSession, file, token)
-
-        const thumbnailName = `${file.name}${THUMBNAIL_SUFFIX}`
-        const thumbnailFile = new File([thumbnail.blob], thumbnailName, { type: 'image/jpeg' })
-        const thumbnailSession = await startResumableUpload(token, folderId, thumbnailName)
-        const uploadedThumbnail = await uploadFileContent(thumbnailSession, thumbnailFile, token)
-
-        const record: CairnRecord = {
-          id,
+        // Neither route resolved — waits in the placement queue rather than
+        // being written without a position.
+        const captureDate = exif.gpsTimestamp ?? exif.dateTimeOriginal
+        const captureInstantMs =
+          exif.gpsTimestamp !== undefined ? Date.parse(exif.gpsTimestamp) : undefined
+        const item: PlacementQueueItem = {
+          id: generateId('queue-trip'),
           name: file.name,
-          position: { lat: resolved.latitude, lng: resolved.longitude },
-          positionSource: resolved.source,
-          icon: null,
-          image: { originalDriveFileId: uploadedOriginal.id, thumbnailDriveFileId: uploadedThumbnail.id },
-          description: '',
-          date: exif.gpsTimestamp ?? exif.dateTimeOriginal ?? null,
-          ...(exif.gpsTimestamp !== undefined ? { gpsTimestamp: exif.gpsTimestamp } : {}),
-          ...(exif.dateTimeOriginal !== undefined ? { dateTimeOriginal: exif.dateTimeOriginal } : {}),
+          file,
+          captureLabel: captureDate ? formatShortDate(captureDate) : null,
+          captureInstantMs,
+          tracks: tracksAtDropTime,
+          save: async (position) => {
+            const record = await uploadAndSave(file, position, 'placed', exif, token)
+            return record?.id ?? false
+          },
         }
-
-        await writeJsonFile(token, folderId, 'cairn.json', record, null)
-
-        cairnsRef.current = [...cairnsRef.current, record]
-        setCairns(cairnsRef.current)
-        return record
+        return { needsPlacement: item }
       } catch (error) {
         const extra = uploadFailureExtra(file, error)
         addFailure(file.name, extra.message, { retryFile: extra.retryFile, reconnect: extra.reconnect })
-        return undefined
+        return {}
       } finally {
         clearProgressEntry(key)
       }
     },
-    [addFailure, setProgressEntry, clearProgressEntry, cairnFolderId, tripId],
+    [addFailure, setProgressEntry, clearProgressEntry, uploadAndSave],
   )
 
   const importFiles = useCallback(
-    async (incoming: File[]) => {
-      if (incoming.length === 0) return
-      if (!accessToken || !cairnFolderId) return
+    async (incoming: File[]): Promise<CairnImportResult> => {
+      const empty: CairnImportResult = { resolvedCount: 0, needsPlacement: [] }
+      if (incoming.length === 0) return empty
+      if (!accessToken || !cairnFolderId) return empty
 
       setFailures([])
       const total = incoming.length
@@ -316,13 +369,19 @@ export function useCairnImport(
             isAuthError ? { retryFile: file, reconnect: true } : { retryFile: file },
           )
         }
-        return
+        return empty
       }
 
+      let resolvedCount = 0
+      const needsPlacement: PlacementQueueItem[] = []
       const items = incoming.map((file, index) => ({ file, index }))
-      await runWithConcurrency(items, UPLOAD_CONCURRENCY, ({ file, index }) =>
-        importOne(file, index, total, accessToken).then(() => undefined),
-      )
+      await runWithConcurrency(items, UPLOAD_CONCURRENCY, async ({ file, index }) => {
+        const result = await importOne(file, index, total, accessToken)
+        if (result.record) resolvedCount += 1
+        if (result.needsPlacement) needsPlacement.push(result.needsPlacement)
+      })
+
+      return { resolvedCount, needsPlacement }
     },
     [accessToken, cairnFolderId, tripId, importOne, addFailure],
   )
@@ -334,6 +393,10 @@ export function useCairnImport(
 
       setFailures((prev) => prev.filter((f) => f.id !== id))
       try {
+        // A retry's file already resolved a position the first time round
+        // (only the upload half can fail, per `importOne`'s split above),
+        // so a `needsPlacement` result here can't actually happen — nothing
+        // to forward it to even if it did.
         await importOne(failure.retryFile, 0, 1, accessToken)
       } catch (error) {
         const extra = uploadFailureExtra(failure.retryFile, error)

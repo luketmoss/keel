@@ -3,14 +3,29 @@ import { parseKmlOrKmz, type Track } from '../kml/parse'
 import { computeTrackStats } from '../kml/stats'
 import { readPhotoExif } from '../photo/exif'
 import { positionPhoto } from '../photo/interpolate'
+import { formatShortDate } from '../format/dates'
 import { isPhotoFile, isTrackFile } from '../import/fileKinds'
 import { TRACK_COLORS } from '../map/palette'
 import type { LooseCairnRecord, LooseRecord, LooseStore, LooseTrackRecord } from '../store/looseStore'
 import type { CairnRecord } from '../photo/useCairnImport'
+import type { PlacementQueueItem } from './placementQueue'
 
 export interface ImportRejection {
   name: string
   message: string
+}
+
+export interface LooseImportResult {
+  rejections: ImportRejection[]
+  /** How many dropped images saved immediately (EXIF, since a loose drop
+      has no trip open to interpolate against) — the placement queue's
+      batch summary needs this alongside `needsPlacement` to read the whole
+      drop, not just its stragglers. */
+  resolvedCount: number
+  /** Images that resolved by neither route — `cairns.md` forbids writing
+      these without a position, so they wait here instead of being rejected.
+      Empty for a batch of tracks only. */
+  needsPlacement: PlacementQueueItem[]
 }
 
 const UNRECOGNISED = 'cairn takes .kml or .kmz tracks and JPEG, PNG or WebP photos'
@@ -41,10 +56,18 @@ function firstPoint(tracks: Track[]): { lat: number; lng: number } | null {
  * dropped file is one row: a KML with three placemarks is one day out, not
  * three things to keep separate. That matches what a trip's own import does
  * with a multi-placemark file. */
+let nextQueueItemId = 0
+function generateQueueItemId(): string {
+  nextQueueItemId += 1
+  return `queue-loose-${nextQueueItemId}`
+}
+
 export function useLooseImport(store: LooseStore) {
   const importFiles = useCallback(
-    async (files: File[]): Promise<ImportRejection[]> => {
+    async (files: File[]): Promise<LooseImportResult> => {
       const rejections: ImportRejection[] = []
+      const needsPlacement: PlacementQueueItem[] = []
+      let resolvedCount = 0
 
       for (const file of files) {
         if (isTrackFile(file.name)) {
@@ -92,42 +115,68 @@ export function useLooseImport(store: LooseStore) {
           // A loose drop has no trip open, so there are no tracks to
           // interpolate against — `positionPhoto([], …)` only ever resolves
           // via EXIF here, which is exactly `cairns.md`'s first resolution
-          // route. A file that resolves by neither route needs the
-          // placement queue this issue does not build — rejected here
-          // rather than written without a position, which `cairns.md`
-          // forbids outright ("no unplaced state").
+          // route.
           const resolved = positionPhoto(fields, [])
-          if (!resolved) {
-            rejections.push({
-              name: file.name,
-              message: `${file.name} — needs a location to become a cairn`,
-            })
+          if (resolved) {
+            store.addCairn(
+              {
+                name: file.name,
+                position: { lat: resolved.latitude, lng: resolved.longitude },
+                positionSource: resolved.source,
+                date: fields.gpsTimestamp ?? fields.dateTimeOriginal ?? null,
+                // Kept apart as well as collapsed into `date` above: #50's
+                // reason for distinguishing them does not stop applying while
+                // a cairn is loose, and a move into a trip carries both.
+                ...(fields.gpsTimestamp !== undefined ? { gpsTimestamp: fields.gpsTimestamp } : {}),
+                ...(fields.dateTimeOriginal !== undefined
+                  ? { dateTimeOriginal: fields.dateTimeOriginal }
+                  : {}),
+                ...(fields.orientation !== undefined ? { orientation: fields.orientation } : {}),
+              },
+              file,
+            )
+            resolvedCount += 1
             continue
           }
-          store.addCairn(
-            {
-              name: file.name,
-              position: { lat: resolved.latitude, lng: resolved.longitude },
-              positionSource: resolved.source,
-              date: fields.gpsTimestamp ?? fields.dateTimeOriginal ?? null,
-              // Kept apart as well as collapsed into `date` above: #50's
-              // reason for distinguishing them does not stop applying while
-              // a cairn is loose, and a move into a trip carries both.
-              ...(fields.gpsTimestamp !== undefined ? { gpsTimestamp: fields.gpsTimestamp } : {}),
-              ...(fields.dateTimeOriginal !== undefined
-                ? { dateTimeOriginal: fields.dateTimeOriginal }
-                : {}),
-              ...(fields.orientation !== undefined ? { orientation: fields.orientation } : {}),
-            },
+
+          // Neither route resolved. `cairns.md` forbids writing a cairn with
+          // no position, so this waits in the placement queue instead of
+          // being rejected — nothing is written until it's placed by hand.
+          const captureDate = fields.gpsTimestamp ?? fields.dateTimeOriginal
+          needsPlacement.push({
+            id: generateQueueItemId(),
+            name: file.name,
             file,
-          )
+            captureLabel: captureDate ? formatShortDate(captureDate) : null,
+            captureInstantMs: undefined,
+            // No trip is open on a loose drop, so there is nothing to
+            // suggest against — the suggestion ring is absent by construction.
+            tracks: [],
+            save: async (position) => {
+              const record = store.addCairn(
+                {
+                  name: file.name,
+                  position,
+                  positionSource: 'placed',
+                  date: captureDate ?? null,
+                  ...(fields.gpsTimestamp !== undefined ? { gpsTimestamp: fields.gpsTimestamp } : {}),
+                  ...(fields.dateTimeOriginal !== undefined
+                    ? { dateTimeOriginal: fields.dateTimeOriginal }
+                    : {}),
+                  ...(fields.orientation !== undefined ? { orientation: fields.orientation } : {}),
+                },
+                file,
+              )
+              return record.id
+            },
+          })
           continue
         }
 
         rejections.push({ name: file.name, message: `${file.name} — ${UNRECOGNISED}` })
       }
 
-      return rejections
+      return { rejections, resolvedCount, needsPlacement }
     },
     [store],
   )

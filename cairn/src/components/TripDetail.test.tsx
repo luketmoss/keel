@@ -133,6 +133,7 @@ function TripHarness({
         onBack={() => {}}
         onDropTargetChange={(handler) => setDropTarget(() => handler)}
         onGeometryChange={() => {}}
+        onNeedsPlacement={() => {}}
       />
     </div>
   )

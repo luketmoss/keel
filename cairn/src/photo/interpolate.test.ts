@@ -3,6 +3,7 @@ import type { Track } from '../kml/parse'
 import {
   MAX_INTERPOLATION_GAP_MS,
   interpolatePosition,
+  nearestPointByTime,
   needsInterpolation,
   positionPhoto,
   resolvePhotoInstant,
@@ -201,5 +202,45 @@ describe('positionPhoto (end-to-end)', () => {
 describe('MAX_INTERPOLATION_GAP_MS', () => {
   it('is exactly 10 minutes', () => {
     expect(MAX_INTERPOLATION_GAP_MS).toBe(10 * 60 * 1000)
+  })
+})
+
+describe('nearestPointByTime — the suggestion ring (#168)', () => {
+  it('finds the single nearest point by time, not the bracketing pair', () => {
+    const instantMs = Date.parse('2021-06-15T10:09:00.000Z')
+
+    const nearest = nearestPointByTime(instantMs, [trackNearIndochina])
+
+    expect(nearest).toEqual({ lat: 10.1, lng: 105.1 })
+  })
+
+  it('crosses a gap wider than MAX_INTERPOLATION_GAP_MS — good enough to offer, not to apply', () => {
+    const farApart: Track = {
+      name: 'Day 1',
+      points: [
+        { lat: 1, lon: 1, time: '2021-06-15T10:00:00.000Z' },
+        { lat: 2, lon: 2, time: '2021-06-15T12:00:00.000Z' },
+      ],
+    }
+    // 10 minutes after the first point, 1h50 before the second — well past
+    // the 10-minute gap `interpolatePosition` refuses to cross.
+    const instantMs = Date.parse('2021-06-15T10:10:00.000Z')
+
+    expect(interpolatePosition(instantMs, [farApart])).toBeUndefined()
+    expect(nearestPointByTime(instantMs, [farApart])).toEqual({ lat: 1, lng: 1 })
+  })
+
+  it('returns undefined when the trip has no timed points at all', () => {
+    const untimed: Track = { name: 'Day 1', points: [{ lat: 1, lon: 1 }] }
+
+    expect(nearestPointByTime(Date.now(), [untimed])).toBeUndefined()
+  })
+
+  it('picks the nearest point across multiple tracks, not per-track', () => {
+    const trackA: Track = { name: 'A', points: [{ lat: 1, lon: 1, time: '2021-06-15T10:00:00.000Z' }] }
+    const trackB: Track = { name: 'B', points: [{ lat: 2, lon: 2, time: '2021-06-15T10:00:05.000Z' }] }
+    const instantMs = Date.parse('2021-06-15T10:00:04.000Z')
+
+    expect(nearestPointByTime(instantMs, [trackA, trackB])).toEqual({ lat: 2, lng: 2 })
   })
 })

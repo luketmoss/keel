@@ -17,6 +17,7 @@ import { tripUtcOffsetHours } from '../photo/interpolate'
 import type { TripStore } from '../store/tripStore'
 import { MOVE_FAILED_MESSAGE } from '../store/looseStore'
 import type { ImportedFile } from '../import/types'
+import type { PlacementQueueItem } from '../import/placementQueue'
 import './TripDetail.css'
 
 const UNRECOGNISED_TYPE_MESSAGE = 'trips take .kml or .kmz tracks and JPEG, PNG or WebP photos'
@@ -97,6 +98,13 @@ interface TripDetailProps {
       trip's `CairnRecord` to the top level with its data intact, resolving
       whether the move actually happened. */
   onRemovePhotoFromTrip?: (record: CairnRecord) => Promise<boolean>
+  /** #168: an import that resolved some files and left others needing a
+      location — the shell owns the map the placement queue draws on, so
+      this trip only reports what needs placing rather than holding a queue
+      of its own. `resolvedCount` is how many of *this* drop saved
+      immediately, folded into the queue's running batch total alongside
+      whatever a previous drop (loose or trip-scoped) already contributed. */
+  onNeedsPlacement: (resolvedCount: number, items: PlacementQueueItem[]) => void
 }
 
 /** The panel's trip face, and the trip's own map layers.
@@ -118,6 +126,7 @@ export function TripDetail({
   onGeometryChange,
   onRemoveFromTrip,
   onRemovePhotoFromTrip,
+  onNeedsPlacement,
 }: TripDetailProps) {
   const trip = useSyncExternalStore(tripStore.subscribe, () => tripStore.getTrip(tripId))
   const tripImport = useTripImport(tripId, accessToken, cairnFolderId)
@@ -236,14 +245,24 @@ export function TripDetail({
       for (const file of neither) addLocalFailure(file.name, UNRECOGNISED_TYPE_MESSAGE)
       const tasks: Promise<void>[] = []
       if (tracks.length > 0) tasks.push(tripImport.importFiles(tracks))
-      if (photos.length > 0) tasks.push(cairnImport.importFiles(photos))
+      if (photos.length > 0) {
+        tasks.push(
+          cairnImport.importFiles(photos).then((result) => {
+            // #168: a file that resolved neither by EXIF nor by
+            // interpolation waits in the shell's placement queue rather
+            // than being rejected — reported up the same way a drop target
+            // and the trip's geometry already are.
+            onNeedsPlacement(result.resolvedCount, result.needsPlacement)
+          }),
+        )
+      }
       return Promise.all(tasks).then(() => undefined)
     },
     // The individual callbacks, not the hook results — `useTripImport` and
-    // `usePhotoImport` both return a fresh object literal on every render,
+    // `useCairnImport` both return a fresh object literal on every render,
     // so depending on the objects would make this a new function every
     // render, and everything downstream of it churn with it.
-    [tripImport.importFiles, cairnImport.importFiles, addLocalFailure],
+    [tripImport.importFiles, cairnImport.importFiles, addLocalFailure, onNeedsPlacement],
   )
 
   // #75: a drop that lands while signed out is not swallowed — one failure

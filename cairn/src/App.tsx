@@ -41,6 +41,20 @@ import { AccountBubble } from './auth/AccountBubble'
 import { defaultOverridesStore } from './import/useTripImport'
 import { carryDisplayNameIntoTrip } from './store/trackOverridesStore'
 import type { CairnRecord } from './photo/useCairnImport'
+import { PlacementQueuePanel } from './components/PlacementQueuePanel'
+import { PlacementClickCatcher } from './components/PlacementClickCatcher'
+import { SuggestionRing } from './components/SuggestionRing'
+import {
+  EMPTY_PLACEMENT_QUEUE,
+  discardRemaining,
+  enqueuePlacement,
+  placeCurrent,
+  skipCurrent,
+  type PlacementQueueItem,
+  type PlacementQueueState,
+} from './import/placementQueue'
+import { nearestPointByTime } from './photo/interpolate'
+import type { LatLng } from './map/geo'
 import './App.css'
 
 export function App() {
@@ -137,6 +151,13 @@ function AppShell() {
       same item's `Export` is a no-op rather than a second download — other
       items are unaffected, which is why this is a set and not a flag. */
   const [exportingIds, setExportingIds] = useState<ReadonlySet<string>>(new Set())
+  /** #168: images that resolved neither by EXIF nor by interpolation, fed
+      by whichever import path they were dropped through (top-level loose,
+      or a trip's own drop) — the shell owns this rather than either import
+      hook because the placement queue's map interaction (crosshair,
+      click-to-place, the suggestion ring) belongs to the one map instance,
+      not to a hook scoped to a trip that might not even be open. */
+  const [queue, setQueue] = useState<PlacementQueueState>(EMPTY_PLACEMENT_QUEUE)
   /* Registered by the trip face while one is open, so a drop anywhere still
      imports into that trip rather than starting a draft. Refs, not state:
      the import hooks return a fresh object on every render, so storing what
@@ -216,6 +237,17 @@ function AppShell() {
   const openTrip = openTripId ? trips.find((trip) => trip.id === openTripId) : undefined
   const draftOpen = Boolean(draftTrip.draft)
   const detailOpen = Boolean(openTripId) || Boolean(openLooseId)
+
+  // #168: the placement queue replaces the panel's list face for as long as
+  // anything is waiting to be placed — `cairns.md`'s "Replaces the panel's
+  // list face for the duration", regardless of whether a trip happened to
+  // be open when the drop landed.
+  const currentQueueItem: PlacementQueueItem | null = queue.items[0] ?? null
+  const queueOpen = currentQueueItem !== null
+  const suggestionPosition: LatLng | undefined =
+    currentQueueItem && currentQueueItem.captureInstantMs !== undefined
+      ? nearestPointByTime(currentQueueItem.captureInstantMs, currentQueueItem.tracks)
+      : undefined
 
   /** Every visible trip's track count, keyed by id — read from the
       precomputed overview every trip already hydrates on `connect()`, never
@@ -453,7 +485,11 @@ function AppShell() {
     // reason is the same for all of them (#75).
     if (photos.length > 0) {
       if (disconnected) refuseLooseImport()
-      else void looseImport.importFiles(photos).then(addToasts)
+      else
+        void looseImport.importFiles(photos).then((result) => {
+          addToasts(result.rejections)
+          enqueueNeedsPlacement(result.resolvedCount, result.needsPlacement)
+        })
     }
     if (rest.length > 0) void draftTrip.addFiles(rest).then(addToasts)
   }
@@ -489,6 +525,34 @@ function AppShell() {
     tripDropRef.current = handler
   }, [])
 
+  /** #168: folds one drop's resolved/unresolved split into the shared
+      queue — the loose path and a trip's own drop both call this, so
+      "rapid repeat drops" (`155-cairns-replace-photos.md`'s edge case)
+      append to whatever is already open rather than replacing it. */
+  const enqueueNeedsPlacement = useCallback((resolvedCount: number, items: PlacementQueueItem[]) => {
+    setQueue((current) => enqueuePlacement(current, resolvedCount, items))
+  }, [])
+
+  /** Clicking the map, or the suggestion ring, places the queue's current
+      file. A failed save leaves the item at the front of the queue — the
+      same "still on the map" stance a failed ownership move already
+      takes — and reports it with a toast rather than losing the file. */
+  async function placeCurrentQueueItem(position: LatLng) {
+    const item = currentQueueItem
+    if (!item) return
+    const result = await item.save(position)
+    if (result === false) {
+      setToasts((prev) => [...prev, { id: generateToastId(), text: `Couldn't save ${item.name} — try again.` }])
+      return
+    }
+    const wasLast = queue.items.length === 1
+    setQueue((current) => placeCurrent(current))
+    // "Queue empties. Face closes, last placed cairn's detail face opens."
+    // Only the loose route has a detail of its own to open here — a
+    // trip-scoped cairn's detail face is the marker/list issue's to build.
+    if (wasLast && !openTripId) navigate(`/photos/${result}`)
+  }
+
   const handleGeometryChange = useCallback((points: { lat: number; lng: number }[]) => {
     tripGeometryRef.current = points
     // Only the count reaches state, and only when it actually changes —
@@ -521,6 +585,17 @@ function AppShell() {
           canFit={detailOpen ? tripPointCount > 0 : listPlaces.length > 0}
           getFitPoints={() => (detailOpen ? tripGeometryRef.current : listPlaces)}
         />
+        {/* #168: the map itself is the placement queue's input — a
+            crosshair cursor and a click-to-place listener while anything is
+            waiting, plus a pulsing suggestion ring when the current file's
+            capture time falls near the open trip's own tracks. */}
+        <PlacementClickCatcher active={queueOpen} onPlace={(position) => void placeCurrentQueueItem(position)} />
+        {queueOpen && suggestionPosition && (
+          <SuggestionRing
+            position={suggestionPosition}
+            onClick={() => void placeCurrentQueueItem(suggestionPosition)}
+          />
+        )}
         {/* The world's markers are hidden while a trip is open — its own
             tracks and photos are what the map shows then. A loose detail
             keeps them: the item is still one of the things on this map, and
@@ -558,6 +633,7 @@ function AppShell() {
         )}
         {!detailOpen &&
           !draftOpen &&
+          !queueOpen &&
           (noPlaces ? (
             disconnected ? (
               <MapEmptyOverlay heading="Sign in to see your map." />
@@ -579,11 +655,17 @@ function AppShell() {
         <ShellColumn
           collapsed={collapsed}
           onToggleCollapsed={() => setCollapsed((wasCollapsed) => !wasCollapsed)}
-          collapsible={!detailOpen && !draftOpen}
+          collapsible={!detailOpen && !draftOpen && !queueOpen}
           searchCard={
             <SearchCard
-              detail={detailForCard(openTrip, openLoose)}
-              onBack={() => navigate('/')}
+              // #168: "Place this photo" over "needs a location" — the same
+              // name/kind slots a detail already uses, so `SearchCard`
+              // itself needs no placement-specific case.
+              detail={queueOpen ? { name: 'Place this photo', kind: 'needs a location' } : detailForCard(openTrip, openLoose)}
+              // "Back, in the search card, discards the remaining queue —
+              // it is the same action as Discard n, reached from the other
+              // end. It does not silently save them."
+              onBack={() => (queueOpen ? setQueue(discardRemaining) : navigate('/'))}
               query={filters.name}
               onQueryChange={(name) => setFilters((current) => ({ ...current, name }))}
               accountBubble={<AccountBubble account={account} />}
@@ -591,14 +673,21 @@ function AppShell() {
           }
           chips={
             // Hidden on a detail — filtering a list you are no longer
-            // looking at is noise — and while a draft is open, for the
-            // reason #81 already gives.
-            detailOpen || draftOpen ? null : (
+            // looking at is noise — and while a draft or the placement
+            // queue is open, for the reason #81 already gives.
+            detailOpen || draftOpen || queueOpen ? null : (
               <FilterChips kind={kind} onChange={setKind} />
             )
           }
         >
-          {draftTrip.draft ? (
+          {queueOpen ? (
+            <PlacementQueuePanel
+              queue={queue}
+              hasSuggestion={suggestionPosition !== undefined}
+              onSkip={() => setQueue(skipCurrent)}
+              onDiscard={() => setQueue(discardRemaining)}
+            />
+          ) : draftTrip.draft ? (
             <DraftPanel
               draft={draftTrip.draft}
               updateName={draftTrip.updateName}
@@ -626,6 +715,7 @@ function AppShell() {
               // confirm — `Delete permanently` is the neighbouring one.
               onRemoveFromTrip={(file) => removeTrackFromTrip(file, openTripId)}
               onRemovePhotoFromTrip={(record) => removeCairnFromTrip(record, openTripId)}
+              onNeedsPlacement={enqueueNeedsPlacement}
             />
           ) : openLooseId ? (
             openLoose ? (

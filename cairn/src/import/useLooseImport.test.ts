@@ -41,7 +41,7 @@ function importer() {
 
 describe('useLooseImport', () => {
   it('imports a dropped KML as one loose track, with its stats', async () => {
-    const rejections = await importer().importFiles([kmlFixture('linestring.kml', 'day1.kml')])
+    const { rejections } = await importer().importFiles([kmlFixture('linestring.kml', 'day1.kml')])
 
     expect(rejections).toEqual([])
     const items = store.getItems()
@@ -93,19 +93,40 @@ describe('useLooseImport', () => {
 
   // `cairns.md`: a cairn always has a position, and there is no unplaced
   // state — a loose drop (no trip open, so nothing to interpolate against)
-  // that resolves by neither route is rejected rather than written half-done.
-  // The placement queue that lets the user place it by hand is the next
-  // issue in this split's build.
-  it('rejects a photo with no GPS rather than creating an unplaced record', async () => {
-    const rejections = await importer().importFiles([photoFixture('gps-stripped.jpg')])
+  // that resolves by neither route waits in the placement queue (#168)
+  // rather than being written half-done or rejected outright.
+  it('queues a photo with no GPS for placement, rather than creating an unplaced record', async () => {
+    const { rejections, needsPlacement, resolvedCount } = await importer().importFiles([
+      photoFixture('gps-stripped.jpg'),
+    ])
 
     expect(store.getItems()).toHaveLength(0)
-    expect(rejections).toHaveLength(1)
-    expect(rejections[0].message).toContain('needs a location')
+    expect(rejections).toEqual([])
+    expect(resolvedCount).toBe(0)
+    expect(needsPlacement).toHaveLength(1)
+    expect(needsPlacement[0].name).toBe('gps-stripped.jpg')
+    // No trip was open on this loose drop, so there is nothing to suggest
+    // against — the item carries no tracks for the suggestion ring to read.
+    expect(needsPlacement[0].tracks).toEqual([])
+  })
+
+  it("a queued item's save() writes the cairn once a position is supplied by hand", async () => {
+    const { needsPlacement } = await importer().importFiles([photoFixture('gps-stripped.jpg')])
+
+    const result = await needsPlacement[0].save({ lat: 12, lng: 34 })
+
+    expect(result).not.toBe(false)
+    const items = store.getItems()
+    expect(items).toHaveLength(1)
+    expect(items[0]).toMatchObject({
+      kind: 'cairn',
+      position: { lat: 12, lng: 34 },
+      positionSource: 'placed',
+    })
   })
 
   it('rejects a file it cannot identify, by name, importing nothing for it', async () => {
-    const rejections = await importer().importFiles([new File(['x'], 'notes.txt')])
+    const { rejections } = await importer().importFiles([new File(['x'], 'notes.txt')])
 
     expect(rejections).toHaveLength(1)
     expect(rejections[0].message).toContain('notes.txt')
@@ -113,7 +134,7 @@ describe('useLooseImport', () => {
   })
 
   it('rejects a KML with no track without blocking the rest of the drop', async () => {
-    const rejections = await importer().importFiles([
+    const { rejections } = await importer().importFiles([
       kmlFixture('no-track.kml'),
       kmlFixture('linestring.kml', 'good.kml'),
     ])

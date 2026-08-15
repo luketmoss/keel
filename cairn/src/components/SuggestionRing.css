@@ -1,0 +1,37 @@
+/* cairn/docs/design/155-cairns-replace-photos.md "The suggestion ring" */
+
+.suggestion-ring {
+  position: relative;
+  width: var(--marker-size);
+  height: var(--marker-size);
+  padding: 0;
+  border: 2px dashed var(--accent);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  cursor: pointer;
+  animation: suggestion-ring-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes suggestion-ring-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.18);
+  }
+}
+
+.suggestion-ring__chip {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 4px;
+  padding: 2px 6px;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}

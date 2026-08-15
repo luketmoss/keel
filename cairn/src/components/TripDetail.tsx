@@ -10,6 +10,7 @@ import { TripNotFound } from './TripNotFound'
 import { MissingFileRow } from './MissingFileRow'
 import { googleMapsMapId } from '../env'
 import { isPhotoFile, isTrackFile } from '../import/fileKinds'
+import { expandArchives, isArchiveFile } from '../import/archive'
 import { useTripImport } from '../import/useTripImport'
 import { useCairnImport, type CairnRecord, type NewTripCairn } from '../photo/useCairnImport'
 import { buildCairnListRows, flattenCairnListRows, orderCairnListItems } from '../photo/cairnListGroups'
@@ -20,13 +21,15 @@ import {
   MOVE_WRITE_FAILED_MESSAGE,
   ONLY_ONE_PHOTO_MESSAGE,
   SIGNED_OUT_PHOTO_MESSAGE,
+  extraPhotosMessage,
 } from '../store/looseStore'
 import type { ImportedFile } from '../import/types'
 import type { PlacementQueueItem } from '../import/placementQueue'
 import type { LatLng } from '../map/geo'
 import './TripDetail.css'
 
-const UNRECOGNISED_TYPE_MESSAGE = 'trips take .kml or .kmz tracks and JPEG, PNG or WebP photos'
+const UNRECOGNISED_TYPE_MESSAGE =
+  'trips take .kml or .kmz tracks, JPEG, PNG or WebP photos, and .zip archives'
 const SIGNED_OUT_DROP_MESSAGE = 'sign in to add files to this trip'
 
 /** A failure row this component produces itself, rather than one that came
@@ -162,6 +165,12 @@ export function TripDetail({
   // unlike the old pipeline's render-time `positionPhotos` pass.
   const cairnImport = useCairnImport(tripId, accessToken, cairnFolderId, allTracks)
   const [localFailures, setLocalFailures] = useState<LocalFailure[]>([])
+  /* #188: the unpacking row, in the same shape the import progress rows
+     use so it renders through `TripImportPanel` with no new markup. One
+     slot rather than a list — a drop is unpacked one archive at a time. */
+  const [archiveProgress, setArchiveProgress] = useState<
+    { id: string; name: string; index: number; total: number } | null
+  >(null)
   const nextLocalFailureId = useRef(0)
   const removeConfirm = useRemoveConfirm()
   const [hoveredFileId, setHoveredFileId] = useState<string | null>(null)
@@ -299,7 +308,19 @@ export function TripDetail({
   // neither is rejected by name rather than handed to the photo pipeline
   // just because it isn't a track.
   const importFiles = useCallback(
-    (incoming: File[]) => {
+    async (dropped: File[]) => {
+      // #188: the doorway. A `.zip` is replaced by the files it holds
+      // before anything else looks at what arrived, so everything below
+      // runs exactly as it would have for the unzipped folder.
+      const expansion = await expandArchives(dropped, (name, index, total) =>
+        setArchiveProgress({ id: 'archive', name, index, total }),
+      )
+      setArchiveProgress(null)
+      for (const rejection of expansion.rejections) {
+        addLocalFailure(rejection.name, rejection.message)
+      }
+      const incoming = expansion.files
+
       const tracks = incoming.filter((file) => isTrackFile(file.name))
       const photos = incoming.filter((file) => isPhotoFile(file.name))
       const neither = incoming.filter((file) => !isTrackFile(file.name) && !isPhotoFile(file.name))
@@ -332,8 +353,23 @@ export function TripDetail({
      them as new cairns) is worse than refusing them. */
   const attachPhotoToCairn = useCallback(
     async (cairnId: string, dropped: File[]) => {
-      const [first, ...rest] = dropped
-      for (const file of rest) addLocalFailure(file.name, ONLY_ONE_PHOTO_MESSAGE)
+      const expansion = await expandArchives(dropped, (name, index, total) =>
+        setArchiveProgress({ id: 'archive', name, index, total }),
+      )
+      setArchiveProgress(null)
+      for (const rejection of expansion.rejections) {
+        addLocalFailure(rejection.name, rejection.message)
+      }
+
+      const [first, ...rest] = expansion.files
+      // An archive holding nothing importable has already been reported.
+      if (!first) return
+      const archive = dropped.find((file) => isArchiveFile(file.name))
+      if (archive && rest.length > 0) {
+        addLocalFailure(archive.name, extraPhotosMessage(rest.length))
+      } else {
+        for (const file of rest) addLocalFailure(file.name, ONLY_ONE_PHOTO_MESSAGE)
+      }
 
       setAttachingCairnId(cairnId)
       setAttachCairnError(null)
@@ -499,7 +535,11 @@ export function TripDetail({
         />
         <TripImportPanel
           signedIn={signedIn}
-          progress={[...tripImport.progress, ...cairnImport.progress]}
+          progress={[
+            ...(archiveProgress ? [archiveProgress] : []),
+            ...tripImport.progress,
+            ...cairnImport.progress,
+          ]}
           failures={[...tripImport.failures, ...cairnImport.failures, ...localFailures]}
           importFiles={importFiles}
           retryFailure={(id) =>

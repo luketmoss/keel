@@ -75,7 +75,7 @@ export function TripImportPanel({
       <input
         ref={inputRef}
         type="file"
-        accept=".kml,.kmz,.jpg,.jpeg,.png,.webp"
+        accept=".kml,.kmz,.jpg,.jpeg,.png,.webp,.zip"
         multiple
         className="trip-import-panel__input"
         onChange={handleChange}

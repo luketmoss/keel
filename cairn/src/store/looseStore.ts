@@ -281,6 +281,14 @@ export const ATTACH_IMAGE_FAILED_MESSAGE = "Couldn't add the photo — try again
     file is its own dropped thing being turned away. */
 export const ONLY_ONE_PHOTO_MESSAGE = 'only one photo per cairn'
 
+/** #188: an archive dropped onto a cairn is one gesture, so its extras get
+    one row rather than one `ONLY_ONE_PHOTO_MESSAGE` per photo — thirty
+    identical toasts from a single drop is not feedback, it is noise. */
+export function extraPhotosMessage(count: number): string {
+  const verb = count === 1 ? "wasn't" : "weren't"
+  return `a cairn takes one photo; the other ${count} ${verb} added`
+}
+
 /** #157's outcome for attaching a photo to a cairn that already exists.
     `error` is set only when `ok` is `false` — either `validateImageFile`'s
     own message for a rejected file, or `ATTACH_IMAGE_FAILED_MESSAGE` for

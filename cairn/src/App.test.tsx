@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import JSZip from 'jszip'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { formatDistance } from './format/units'
@@ -36,9 +37,30 @@ vi.mock('./photo/thumbnail', async () => {
 })
 
 function loadKmlFixture(name: string, as = name): File {
-  const buffer = readFileSync(join(__dirname, 'kml/fixtures', name))
-  return new File([buffer], as)
+  return new File([kmlFixtureText(name)], as)
 }
+
+/** The fixture's bytes, for building a zip around. `File#text()` is not
+    implemented by jsdom, so this reads from disk rather than off the
+    `File` — the same gap `kml/parse.ts` works around with a `FileReader`. */
+function kmlFixtureText(name: string): string {
+  return readFileSync(join(__dirname, 'kml/fixtures', name), 'utf8')
+}
+
+/* #188: expansion runs for real in every test but one. That one needs to
+   observe the UI *during* unpacking, which means holding the doorway open —
+   so the override slot below stands in only when it is set. */
+const { archiveOverride } = vi.hoisted(() => ({
+  archiveOverride: { expandArchives: null as null | ((...args: never[]) => unknown) },
+}))
+vi.mock('./import/archive', async () => {
+  const actual = await vi.importActual<typeof import('./import/archive')>('./import/archive')
+  return {
+    ...actual,
+    expandArchives: (...args: never[]) =>
+      (archiveOverride.expandArchives ?? (actual.expandArchives as never))(...args),
+  }
+})
 
 function fileDataTransfer(files: File[]): DataTransfer {
   return { types: ['Files'], files: files as unknown as FileList } as unknown as DataTransfer
@@ -1189,6 +1211,92 @@ describe('App loose items in Drive (#120)', () => {
     // for all of them.
     expect(screen.getAllByText('Sign in to keep tracks and cairns.')).toHaveLength(1)
     expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(0)
+  })
+
+  // #188 — a zip is a bag of files, and dropping the bag means dropping the
+  // files. These go through the real JSZip, so what is under test is the
+  // doorway and not a fake of it.
+  it('a dropped zip of tracks opens the draft exactly as the loose files would', async () => {
+    await renderApp('/')
+    const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
+    const zip = new JSZip()
+    zip.file('trip/day1.kml', kmlFixtureText('linestring.kml'))
+    const archive = new File([await zip.generateAsync({ type: 'blob' })], 'trip.zip')
+
+    await act(async () => {
+      fireEvent.drop(shell, { dataTransfer: fileDataTransfer([archive]) })
+    })
+
+    // Same outcome as dropping day1.kml itself — nothing downstream knows
+    // an archive was involved.
+    expect(await screen.findByText('NOT SAVED')).toBeDefined()
+  })
+
+  it('a dropped .kmz is still a track and is never flattened into its inner KML', async () => {
+    await renderApp('/')
+    const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
+    const zip = new JSZip()
+    zip.file('doc.kml', kmlFixtureText('linestring.kml'))
+    const kmz = new File([await zip.generateAsync({ type: 'blob' })], 'rosea.kmz')
+
+    await act(async () => {
+      fireEvent.drop(shell, { dataTransfer: fileDataTransfer([kmz]) })
+    })
+
+    // Seeded from the KMZ's own name. If it had been expanded as a generic
+    // archive the draft would say `doc` instead, so this is what proves the
+    // KMZ reached its own parser.
+    expect(await screen.findByText('NOT SAVED')).toBeDefined()
+    expect(screen.getByText('rosea')).toBeDefined()
+    expect(screen.getByText('rosea.kmz · 1 track')).toBeDefined()
+  })
+
+  it('names an unreadable archive and lets the rest of the drop through', async () => {
+    await renderApp('/')
+    const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
+    const kml = loadKmlFixture('linestring.kml', 'day1.kml')
+
+    await act(async () => {
+      fireEvent.drop(shell, {
+        dataTransfer: fileDataTransfer([new File(['not a zip'], 'broken.zip'), kml]),
+      })
+    })
+
+    expect(await screen.findByText('could not be read as a zip archive')).toBeDefined()
+    // The track in the same drop still opened its draft.
+    expect(screen.getByText('NOT SAVED')).toBeDefined()
+  })
+
+  it('says an archive is being unpacked rather than looking like an ignored drop', async () => {
+    await renderApp('/')
+    const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
+
+    let release!: () => void
+    const held = new Promise<void>((resolve) => (release = resolve))
+    archiveOverride.expandArchives = ((
+      _files: File[],
+      onProgress?: (name: string, index: number, total: number) => void,
+    ) => {
+      onProgress?.('photos.zip', 12, 30)
+      return held.then(() => ({ files: [], rejections: [] }))
+    }) as never
+
+    await act(async () => {
+      fireEvent.drop(shell, {
+        dataTransfer: fileDataTransfer([new File(['PK'], 'photos.zip')]),
+      })
+    })
+
+    // Same form as an import progress row, carrying the archive's name so
+    // it reads differently from the per-photo rows that follow it.
+    expect((await screen.findByRole('status')).textContent).toBe('photos.zip — 12 of 30')
+
+    await act(async () => {
+      release()
+      await held
+    })
+    expect(screen.queryByRole('status')).toBeNull()
+    archiveOverride.expandArchives = null
   })
 
   it('still opens the draft for a track dropped while signed out', async () => {

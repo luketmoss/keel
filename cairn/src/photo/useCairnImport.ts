@@ -11,7 +11,7 @@ import {
 import { findOrCreateTripCairnItemFolder, findOrCreateTripCairnsFolder } from '../drive/tripCairnFolder'
 import { listSubfolders, writeJsonFile, findJsonFile, readJsonFile, trashFolder } from '../drive/tripMetadata'
 import { readPhotoExif, type PhotoExif } from './exif'
-import { generateThumbnail, THUMBNAIL_SUFFIX, validateImageFile } from './thumbnail'
+import { displayImageName, generateImagePair, THUMBNAIL_SUFFIX, validateImageFile } from './thumbnail'
 import { positionPhoto } from './interpolate'
 import { formatShortDate } from '../format/dates'
 import {
@@ -273,20 +273,22 @@ export function useCairnImport(
       exif: PhotoExif,
       token: string,
     ): Promise<CairnRecord | undefined> => {
-      const thumbnail = await generateThumbnail(file, exif.orientation)
-      if (!thumbnail.ok) {
-        addFailure(file.name, thumbnail.error)
+      const images = await generateImagePair(file, exif.orientation)
+      if (!images.ok) {
+        addFailure(file.name, images.error)
         return undefined
       }
 
       const id = generateId('cairn')
       const folderId = await findOrCreateTripCairnItemFolder(token, cairnFolderId as string, tripId, id)
 
-      const originalSession = await startResumableUpload(token, folderId, file.name)
-      const uploadedOriginal = await uploadFileContent(originalSession, file, token)
+      const displayName = displayImageName(file.name)
+      const displayFile = new File([images.display], displayName, { type: 'image/jpeg' })
+      const originalSession = await startResumableUpload(token, folderId, displayName)
+      const uploadedOriginal = await uploadFileContent(originalSession, displayFile, token)
 
       const thumbnailName = `${file.name}${THUMBNAIL_SUFFIX}`
-      const thumbnailFile = new File([thumbnail.blob], thumbnailName, { type: 'image/jpeg' })
+      const thumbnailFile = new File([images.thumbnail], thumbnailName, { type: 'image/jpeg' })
       const thumbnailSession = await startResumableUpload(token, folderId, thumbnailName)
       const uploadedThumbnail = await uploadFileContent(thumbnailSession, thumbnailFile, token)
 
@@ -544,17 +546,19 @@ export function useCairnImport(
       const exifResult = await readPhotoExif(file)
       const exif = exifResult.ok ? exifResult.exif : {}
 
-      const thumbnail = await generateThumbnail(file, exif.orientation)
-      if (!thumbnail.ok) return { ok: false, error: thumbnail.error }
+      const images = await generateImagePair(file, exif.orientation)
+      if (!images.ok) return { ok: false, error: images.error }
 
       try {
         const folderId = await findOrCreateTripCairnItemFolder(accessToken, cairnFolderId, tripId, id)
 
-        const originalSession = await startResumableUpload(accessToken, folderId, file.name)
-        const uploadedOriginal = await uploadFileContent(originalSession, file, accessToken)
+        const displayName = displayImageName(file.name)
+        const displayFile = new File([images.display], displayName, { type: 'image/jpeg' })
+        const originalSession = await startResumableUpload(accessToken, folderId, displayName)
+        const uploadedOriginal = await uploadFileContent(originalSession, displayFile, accessToken)
 
         const thumbnailName = `${file.name}${THUMBNAIL_SUFFIX}`
-        const thumbnailFile = new File([thumbnail.blob], thumbnailName, { type: 'image/jpeg' })
+        const thumbnailFile = new File([images.thumbnail], thumbnailName, { type: 'image/jpeg' })
         const thumbnailSession = await startResumableUpload(accessToken, folderId, thumbnailName)
         const uploadedThumbnail = await uploadFileContent(thumbnailSession, thumbnailFile, accessToken)
 

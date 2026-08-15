@@ -41,10 +41,10 @@ vi.mock('../drive/trackFiles', async () => {
 const { readPhotoExif } = vi.hoisted(() => ({ readPhotoExif: vi.fn() }))
 vi.mock('./exif', () => ({ readPhotoExif }))
 
-const { generateThumbnail } = vi.hoisted(() => ({ generateThumbnail: vi.fn() }))
+const { generateImagePair } = vi.hoisted(() => ({ generateImagePair: vi.fn() }))
 vi.mock('./thumbnail', async () => {
   const actual = await vi.importActual<typeof import('./thumbnail')>('./thumbnail')
-  return { ...actual, generateThumbnail }
+  return { ...actual, generateImagePair }
 })
 
 function file(name: string): File {
@@ -55,8 +55,13 @@ function okExif(overrides: Partial<{ latitude: number; longitude: number; gpsTim
   return { ok: true as const, exif: overrides }
 }
 
-function okThumbnail() {
-  return { ok: true as const, blob: new Blob(['thumb']), width: 100, height: 100 }
+/** Distinct sizes so a test can tell which render's bytes were uploaded —
+    the source `file()` below is 7 bytes, and neither of these is. */
+const DISPLAY_BLOB = new Blob(['downscaled-display'])
+const THUMBNAIL_BLOB = new Blob(['thumb'])
+
+function okImagePair() {
+  return { ok: true as const, display: DISPLAY_BLOB, thumbnail: THUMBNAIL_BLOB }
 }
 
 // Points within MAX_INTERPOLATION_GAP_MS (10 minutes) of each other —
@@ -81,7 +86,7 @@ beforeEach(() => {
   uploadFileContent.mockReset().mockResolvedValue({ id: 'drive-file-id' })
   trashFile.mockReset().mockResolvedValue(undefined)
   readPhotoExif.mockReset().mockResolvedValue(okExif({ latitude: 43, longitude: 141 }))
-  generateThumbnail.mockReset().mockResolvedValue(okThumbnail())
+  generateImagePair.mockReset().mockResolvedValue(okImagePair())
 })
 
 describe('useCairnImport', () => {
@@ -165,6 +170,27 @@ describe('useCairnImport', () => {
       expect.objectContaining({ positionSource: 'exif' }),
       null,
     )
+  })
+
+  it('uploads the downscaled image rather than the camera file, keeping EXIF placement (#187)', async () => {
+    readPhotoExif.mockResolvedValue(okExif({ latitude: 37.7749, longitude: -122.4194 }))
+
+    const { result } = renderHook(() => useCairnImport('trip-1', 'token', 'cairn-folder-id', []))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    const source = file('IMG_1.jpg')
+    await act(() => result.current.importFiles([source]))
+
+    // EXIF is read off the source before the downscale, so the coordinate is
+    // the camera's and not lost with the metadata the re-encode strips.
+    expect(result.current.cairns[0]).toMatchObject({
+      positionSource: 'exif',
+      position: { lat: 37.7749, lng: -122.4194 },
+    })
+    const uploaded = uploadFileContent.mock.calls[0][1] as File
+    expect(uploaded).not.toBe(source)
+    expect(uploaded.size).toBe(DISPLAY_BLOB.size)
+    expect(uploaded.size).not.toBe(source.size)
   })
 
   it('creates a cairn with positionSource interpolated when the trip open has no GPS but a track covers its capture time', async () => {
@@ -389,6 +415,8 @@ describe('useCairnImport', () => {
       expect(outcome.ok).toBe(true)
       expect(startResumableUpload).toHaveBeenCalledWith('token', 'item-folder-id', 'sunset.jpg')
       expect(startResumableUpload).toHaveBeenCalledWith('token', 'item-folder-id', 'sunset.jpg.thumb.jpg')
+      // #187: the bytes that went up are the downscale's, not the source's.
+      expect((uploadFileContent.mock.calls[0][1] as File).size).toBe(DISPLAY_BLOB.size)
       expect(result.current.cairns[0].image).toEqual({
         originalDriveFileId: 'drive-file-id',
         thumbnailDriveFileId: 'drive-file-id',

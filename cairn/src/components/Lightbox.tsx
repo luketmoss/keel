@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { cairnRowMetaLine, type CairnListRow } from '../photo/cairnListGroups'
-import { positionSourceSentence } from '../store/looseStore'
+import { positionSourceSentence, type CairnIcon } from '../store/looseStore'
 import { usePhotoImage } from '../photo/usePhotoImage'
+import { IconPicker } from './IconPicker'
 import './Lightbox.css'
 
 interface LightboxProps {
@@ -27,6 +28,11 @@ interface LightboxProps {
       cairn is owned (`cairns.md`'s detail-face table). `undefined` when
       the caller has nowhere to put a detached cairn. */
   onRemoveFromTrip?: () => void
+  /** #156's retype, on the surface #169 made this cairn's detail face.
+      Writes `icon` and nothing else. `undefined` while there is no
+      connection to write through, which takes the grid to Disabled rather
+      than hiding it. */
+  onSetIcon?: (icon: CairnIcon | null) => void
   /** The element focus returns to on close — the row's button or the
       marker's hit-target div, whichever opened this (criterion 9). Read
       once on mount; TripDetail captures it at open time via
@@ -54,6 +60,7 @@ export function Lightbox({
   onClose,
   onNavigate,
   onRemoveFromTrip,
+  onSetIcon,
   returnFocusRef,
 }: LightboxProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
@@ -172,6 +179,17 @@ export function Lightbox({
         <p className="lightbox__meta">{cairnRowMetaLine(row)}</p>
         <p className="lightbox__description">{description || 'No description.'}</p>
         <p className="lightbox__position">{positionSourceSentence(row.source)}</p>
+        {/* #156 — the same grid the loose face and the create face show,
+            under the same label. Retyping a photo as a campsite is the case
+            this exists for: the marker stops being a thumbnail and becomes
+            a pin with a camera badge, and the row's glyph follows it. */}
+        <span className="lightbox__field-label">What is this place</span>
+        <IconPicker
+          label="What is this place"
+          value={row.icon}
+          onChange={(icon) => onSetIcon?.(icon)}
+          disabled={!onSetIcon}
+        />
         {onRemoveFromTrip && (
           <button type="button" className="lightbox__remove-from-trip" onClick={onRemoveFromTrip}>
             Remove from trip

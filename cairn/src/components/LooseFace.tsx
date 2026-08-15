@@ -6,14 +6,14 @@ import { ColorPopover } from './ColorPopover'
 import { formatDistance } from '../format/units'
 import { trackColor, TRACK_COLORS } from '../map/palette'
 import {
-  CAIRN_ICON_LABEL,
   canChangeOwner,
   positionSourceSentence,
   showExport,
+  type CairnIcon,
   type LooseRecord,
 } from '../store/looseStore'
 import { usePhotoImage } from '../photo/usePhotoImage'
-import { CairnIconGlyph } from './CairnIcon'
+import { IconPicker } from './IconPicker'
 import './LooseFace.css'
 
 interface LooseFaceProps {
@@ -30,6 +30,11 @@ interface LooseFaceProps {
       failure, which the face reverts from. */
   onRename: (id: string, name: string) => Promise<boolean>
   onRecolor: (id: string, color: number) => Promise<boolean>
+  /** #156: retypes the cairn. Writes `icon` and nothing else — its image,
+      position, `positionSource` and date are untouched, which is what lets
+      a photo become a campsite without becoming a different record.
+      Resolves `false` on a save failure, which the face reports. */
+  onSetIcon: (id: string, icon: CairnIcon | null) => Promise<boolean>
   /** #140: downloads the item's source file. Fire-and-forget from here —
       the face has nothing further to show while it runs; failure is a
       toast, owned by `App`. */
@@ -59,6 +64,7 @@ export function LooseFace({
   onDelete,
   onRename,
   onRecolor,
+  onSetIcon,
   onExport,
   exporting,
   disabled,
@@ -92,6 +98,11 @@ export function LooseFace({
     setColorPickerOpen(false)
     if (await onRecolor(item.id, index)) setEditError(null)
     else setEditError("Couldn't save the colour — try again.")
+  }
+
+  async function selectIcon(icon: CairnIcon | null) {
+    if (await onSetIcon(item.id, icon)) setEditError(null)
+    else setEditError("Couldn't save the icon — try again.")
   }
 
   return (
@@ -199,7 +210,12 @@ export function LooseFace({
             disabled={disabled}
           />
         ) : (
-          <CairnBody item={item} accessToken={accessToken} />
+          <CairnBody
+            item={item}
+            accessToken={accessToken}
+            onSelectIcon={selectIcon}
+            disabled={disabled || !canMove}
+          />
         )}
       </div>
     </div>
@@ -274,9 +290,13 @@ function TrackBody({
 function CairnBody({
   item,
   accessToken,
+  onSelectIcon,
+  disabled,
 }: {
   item: Extract<LooseRecord, { kind: 'cairn' }>
   accessToken: string | null
+  onSelectIcon: (icon: CairnIcon | null) => void
+  disabled: boolean
 }) {
   // #134: loading and failed both render the same `--surface-lift`
   // fallback fill — `usePhotoImage` already collapses those two into one
@@ -302,20 +322,19 @@ function CairnBody({
           <dt>Taken</dt>
           <dd>{item.date ?? '—'}</dd>
         </div>
-        {/* #169: the detail face renders the current icon and nothing
-            more — choosing one is #156's. */}
-        {item.icon && (
-          <div className="loose-face__stat">
-            <dt>Icon</dt>
-            <dd className="loose-face__icon">
-              <span className="loose-face__icon-glyph">
-                <CairnIconGlyph icon={item.icon} />
-              </span>
-              {CAIRN_ICON_LABEL[item.icon]}
-            </dd>
-          </div>
-        )}
       </dl>
+      {/* #156: the same grid the create face shows, under the same label.
+          Choosing one writes `icon` and nothing else — and the visible
+          consequence is the point of the change: a photo with an icon
+          stops drawing as a thumbnail and starts drawing as a pin with a
+          camera badge, in the map and in its row together. */}
+      <span className="loose-face__field-label">What is this place</span>
+      <IconPicker
+        label="What is this place"
+        value={item.icon}
+        onChange={onSelectIcon}
+        disabled={disabled}
+      />
       <p className="loose-face__position-source">{positionSourceSentence(item.positionSource)}</p>
       {item.description && <p className="loose-face__description">{item.description}</p>}
     </>

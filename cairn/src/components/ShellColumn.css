@@ -42,6 +42,20 @@
   overflow: hidden;
 }
 
+/* #156 — a face kept mounted underneath another one. It is an ordinary flex
+   child of the panel while showing, and `hidden` takes it out entirely
+   while not; the wrapper exists so the face inside still sees the flex
+   parent it was written for. */
+.shell-column__hidden-face {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+
+.shell-column__hidden-face[hidden] {
+  display: none;
+}
+
 /* Transform, never width — the panel's contents would relayout on every
    frame of a width transition, and the map behind does not need to reflow
    at all. The tab rides along and stays on screen because it sits outside

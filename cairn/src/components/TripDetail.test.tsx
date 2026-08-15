@@ -134,6 +134,7 @@ function TripHarness({
         onDropTargetChange={(handler) => setDropTarget(() => handler)}
         onGeometryChange={() => {}}
         onNeedsPlacement={() => {}}
+        onCreateTargetChange={() => {}}
       />
     </div>
   )

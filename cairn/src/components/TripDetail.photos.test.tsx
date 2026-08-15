@@ -116,6 +116,7 @@ function tripFace(
         onDropTargetChange={() => {}}
         onGeometryChange={() => {}}
         onNeedsPlacement={() => {}}
+        onCreateTargetChange={() => {}}
         onRemovePhotoFromTrip={options.onRemovePhotoFromTrip}
       />
     </MemoryRouter>

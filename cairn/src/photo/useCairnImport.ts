@@ -91,12 +91,33 @@ export interface CairnImportResult {
   needsPlacement: PlacementQueueItem[]
 }
 
+/** #156's create-by-gesture, for a cairn the open trip will own. Every
+    field is authored rather than read off a file — there is no image and
+    therefore no EXIF, which is why this has nothing in common with
+    `importFiles` beyond the folder it writes into. */
+export interface NewTripCairn {
+  name: string
+  position: LatLng
+  icon: CairnIcon | null
+  description: string
+  date: string | null
+}
+
 export interface UseCairnImport {
   cairns: CairnRecord[]
   loading: boolean
   progress: CairnImportProgress[]
   failures: CairnImportFailure[]
   importFiles: (incoming: File[]) => Promise<CairnImportResult>
+  /** Writes an image-less cairn into this trip. Resolves the new record, or
+      `null` if there was no connection to write through or the write
+      failed — the create face keeps its typed values and says so rather
+      than closing over a cairn that does not exist. */
+  createCairn: (input: NewTripCairn) => Promise<CairnRecord | null>
+  /** #156's retype: rewrites `cairn.json` with a new `icon` and every other
+      field carried across untouched. Resolves `false` on failure, having
+      left local state as it was. */
+  setCairnIcon: (id: string, icon: CairnIcon | null) => Promise<boolean>
   retryFailure: (id: string) => Promise<void>
   dismissFailures: () => void
   /** Trashes the cairn's whole folder — image and `cairn.json` together —
@@ -386,6 +407,74 @@ export function useCairnImport(
     [accessToken, cairnFolderId, tripId, importOne, addFailure],
   )
 
+  /* #156 — a cairn placed by hand. Nothing is uploaded, because there is
+     nothing to upload: one folder, one `cairn.json`, `image: null`. The
+     record lands in local state only after the write returns, unlike the
+     optimistic path `DriveLooseStore.update` takes for an edit — a create
+     that failed has nothing to revert *to*, and a row for a cairn that was
+     never written is exactly the orphan `cairns.md` builds the whole
+     placement model to avoid. */
+  const createCairn = useCallback(
+    async (input: NewTripCairn): Promise<CairnRecord | null> => {
+      if (!accessToken || !cairnFolderId) return null
+
+      const id = generateId('cairn')
+      const record: CairnRecord = {
+        id,
+        name: input.name,
+        position: input.position,
+        // A person put it here. Rule 2 of `cairns.md`'s positionSource:
+        // interpolation will never move it again.
+        positionSource: 'placed',
+        icon: input.icon,
+        image: null,
+        description: input.description,
+        date: input.date,
+      }
+
+      try {
+        const folderId = await findOrCreateTripCairnItemFolder(accessToken, cairnFolderId, tripId, id)
+        await writeJsonFile(accessToken, folderId, 'cairn.json', record, null)
+      } catch {
+        return null
+      }
+
+      cairnsRef.current = [...cairnsRef.current, record]
+      setCairns(cairnsRef.current)
+      return record
+    },
+    [accessToken, cairnFolderId, tripId],
+  )
+
+  /* #156's retype. `icon` is the only field that changes; every other one
+     is spread across from the record already held, which is what makes
+     "changes only `icon`" true by construction rather than by review.
+     Written to Drive first and applied locally after, matching `createCairn`
+     above: a `cairn.json` that still says `null` while the marker says
+     campsite is the disagreement this ordering avoids. */
+  const setCairnIcon = useCallback(
+    async (id: string, icon: CairnIcon | null): Promise<boolean> => {
+      const current = cairnsRef.current.find((cairn) => cairn.id === id)
+      if (!current) return false
+      if (current.icon === icon) return true
+      if (!accessToken || !cairnFolderId) return false
+
+      const next: CairnRecord = { ...current, icon }
+      try {
+        const folderId = await findOrCreateTripCairnItemFolder(accessToken, cairnFolderId, tripId, id)
+        const existing = await findJsonFile(accessToken, folderId, 'cairn.json')
+        await writeJsonFile(accessToken, folderId, 'cairn.json', next, existing)
+      } catch {
+        return false
+      }
+
+      cairnsRef.current = cairnsRef.current.map((cairn) => (cairn.id === id ? next : cairn))
+      setCairns(cairnsRef.current)
+      return true
+    },
+    [accessToken, cairnFolderId, tripId],
+  )
+
   const retryFailure = useCallback(
     async (id: string) => {
       const failure = failuresRef.current.find((f) => f.id === id)
@@ -463,6 +552,8 @@ export function useCairnImport(
     progress,
     failures,
     importFiles,
+    createCairn,
+    setCairnIcon,
     retryFailure,
     dismissFailures,
     removeCairn,

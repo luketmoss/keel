@@ -125,10 +125,18 @@ export interface NewLooseTrack {
 /** #133: the fields a loose item's `⋮` can edit. `colorIndex` is
     meaningful for a track only — a cairn's marker is its icon or its
     thumbnail, not a palette entry — and is simply ignored if ever sent for
-    one. */
+    one. `icon` is the mirror of that: meaningful for a cairn only.
+ *
+ * #156: `icon` is how a cairn is retyped, and `null` is a value it can be
+ * set *to* rather than an absent field — choosing `none` on a photographed
+ * campsite is what returns it to a thumbnail. That is why the type is
+ * `CairnIcon | null` under an optional key and not `CairnIcon | undefined`:
+ * "clear the icon" and "leave the icon alone" are different requests and
+ * this field has to be able to say both. */
 export interface LooseUpdate {
   name?: string
   colorIndex?: number
+  icon?: CairnIcon | null
 }
 
 export interface NewLooseCairn {
@@ -333,7 +341,13 @@ export class LocalLooseStore implements LooseStore {
     const next: LooseRecord =
       patch.colorIndex !== undefined && current.kind === 'track'
         ? { ...current, name, colorIndex: patch.colorIndex }
-        : { ...current, name }
+        : // #156: retyping writes `icon` and nothing else — the image, the
+          // position, the `positionSource` and the date all carry straight
+          // across in the spread, which is the whole guarantee the detail
+          // face's picker makes.
+          patch.icon !== undefined && current.kind === 'cairn'
+          ? { ...current, name, icon: patch.icon }
+          : { ...current, name }
 
     this.index = this.index.map((item) => (item.id === id ? next : item))
     this.writeIndex()
@@ -564,6 +578,23 @@ export function cairnMetaClauses(record: Pick<LooseCairnRecord, 'icon' | 'image'
   if (record.image) clauses.push('photo')
   if (clauses.length === 0) clauses.push('cairn')
   return clauses
+}
+
+/** What a cairn committed with an empty name is called.
+ *
+ * `cairns.md`: "An empty name commits the icon's label (`Campsite`), or
+ * `Cairn` with no icon — the same 'empty is an aborted edit' rule
+ * `LocalTripStore.updateTripSync` applies to a trip's name." Capitalised,
+ * because this is a name rather than the lowercase clause
+ * `cairnMetaClauses` builds from the same labels.
+ *
+ * Lives beside the labels rather than in the create face because it is a
+ * rule of the model, not of one panel — and because it is exactly the sort
+ * of thing that gets re-derived slightly differently the second time
+ * something needs it. */
+export function cairnDefaultName(icon: CairnIcon | null): string {
+  const label = icon ? CAIRN_ICON_LABEL[icon] : 'cairn'
+  return label.charAt(0).toUpperCase() + label.slice(1)
 }
 
 export const CAIRN_ICON_LABEL: Record<CairnIcon, string> = {

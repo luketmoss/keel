@@ -11,7 +11,7 @@ import { MissingFileRow } from './MissingFileRow'
 import { googleMapsMapId } from '../env'
 import { isPhotoFile, isTrackFile } from '../import/fileKinds'
 import { useTripImport } from '../import/useTripImport'
-import { useCairnImport, type CairnRecord } from '../photo/useCairnImport'
+import { useCairnImport, type CairnRecord, type NewTripCairn } from '../photo/useCairnImport'
 import { buildCairnListRows, flattenCairnListRows, orderCairnListItems } from '../photo/cairnListGroups'
 import type { TripStore } from '../store/tripStore'
 import { MOVE_FAILED_MESSAGE } from '../store/looseStore'
@@ -104,6 +104,14 @@ interface TripDetailProps {
       immediately, folded into the queue's running batch total alongside
       whatever a previous drop (loose or trip-scoped) already contributed. */
   onNeedsPlacement: (resolvedCount: number, items: PlacementQueueItem[]) => void
+  /** #156: registers this trip's "create a cairn here" with the shell, the
+      same shape and for the same reason `onDropTargetChange` already
+      registers its drop handler — the gesture happens on the shell's map,
+      but a cairn placed while a trip is open belongs to that trip, and the
+      hook that can write into its folder lives here. `null` on unmount, so
+      the gesture falls back to creating a loose cairn the moment the trip
+      face closes. */
+  onCreateTargetChange: (handler: ((input: NewTripCairn) => Promise<boolean>) | null) => void
 }
 
 /** The panel's trip face, and the trip's own map layers.
@@ -126,6 +134,7 @@ export function TripDetail({
   onRemoveFromTrip,
   onRemovePhotoFromTrip,
   onNeedsPlacement,
+  onCreateTargetChange,
 }: TripDetailProps) {
   const trip = useSyncExternalStore(tripStore.subscribe, () => tripStore.getTrip(tripId))
   const tripImport = useTripImport(tripId, accessToken, cairnFolderId)
@@ -289,6 +298,23 @@ export function TripDetail({
     onDropTargetChange(handleDroppedFiles)
     return () => onDropTargetChange(null)
   }, [onDropTargetChange, handleDroppedFiles])
+
+  /* #156 — "a trip open gives a cairn in that trip". The gesture's context
+     decides ownership, and this is what makes the open trip *be* that
+     context: while this face is mounted, a cairn placed on the map is
+     written into this trip's folder rather than the loose one. */
+  const createCairnHere = useCallback(
+    async (input: NewTripCairn): Promise<boolean> => {
+      if (!signedIn) return false
+      return (await cairnImport.createCairn(input)) !== null
+    },
+    [signedIn, cairnImport.createCairn],
+  )
+
+  useEffect(() => {
+    onCreateTargetChange(createCairnHere)
+    return () => onCreateTargetChange(null)
+  }, [onCreateTargetChange, createCairnHere])
 
   const geometry = useMemo(
     () => allTracks.flatMap((track) => track.points.map((point) => ({ lat: point.lat, lng: point.lon }))),
@@ -494,6 +520,15 @@ export function TripDetail({
                     }
                   })
                 }
+              : undefined
+          }
+          /* #156: retypes this cairn. Fire-and-forget — the grid reflects
+             `cairns` state, which only changes once the write has landed,
+             so a failure simply leaves the selection where it was rather
+             than needing an error slot the dialog has nowhere to put. */
+          onSetIcon={
+            signedIn && openCairnRecord
+              ? (icon) => void cairnImport.setCairnIcon(openCairnRecord.id, icon)
               : undefined
           }
           returnFocusRef={returnFocusRef}

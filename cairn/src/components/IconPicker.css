@@ -1,0 +1,56 @@
+/* cairn/docs/design/156-creating-a-cairn.md "The create face" — the icon
+   grid, five across at --hit-target each. New tokens: none. */
+
+.icon-picker {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--space-2);
+}
+
+.icon-picker__cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--hit-target);
+  height: var(--hit-target);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-lift);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--ease),
+    color var(--motion-fast) var(--ease);
+}
+
+/* The glyph draws in `currentColor` and is stroked by CairnIcon.css — only
+   its size is this surface's to decide. */
+.icon-picker__cell .cairn-icon-glyph {
+  width: 22px;
+  height: 22px;
+}
+
+.icon-picker__cell:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.icon-picker__cell:active:not(:disabled) {
+  background: var(--pressed);
+}
+
+/* The language's Selected state, unchanged: --accent-soft fill, --accent
+   text. The glyph inherits it through currentColor. */
+.icon-picker__cell--selected {
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent);
+}
+
+.icon-picker__cell:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

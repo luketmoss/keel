@@ -1,4 +1,4 @@
-import { render, waitFor } from '@testing-library/react'
+import { fireEvent, render, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LooseFace } from './LooseFace'
 import type { LooseRecord } from '../store/looseStore'
@@ -34,20 +34,25 @@ function looseCairn(overrides: Partial<Extract<LooseRecord, { kind: 'cairn' }>> 
 }
 
 function renderFace(item: LooseRecord, accessToken: string | null = 'token') {
-  return render(
-    <LooseFace
-      item={item}
-      trips={[]}
-      accessToken={accessToken}
-      onAddToTrip={vi.fn()}
-      onCreateTripWith={vi.fn()}
-      onDelete={vi.fn()}
-      onRename={vi.fn().mockResolvedValue(true)}
-      onRecolor={vi.fn().mockResolvedValue(true)}
-      onExport={vi.fn()}
-      disabled={false}
-    />,
-  )
+  const onSetIcon = vi.fn().mockResolvedValue(true)
+  return {
+    ...render(
+      <LooseFace
+        item={item}
+        trips={[]}
+        accessToken={accessToken}
+        onAddToTrip={vi.fn()}
+        onCreateTripWith={vi.fn()}
+        onDelete={vi.fn()}
+        onRename={vi.fn().mockResolvedValue(true)}
+        onRecolor={vi.fn().mockResolvedValue(true)}
+        onSetIcon={onSetIcon}
+        onExport={vi.fn()}
+        disabled={false}
+      />,
+    ),
+    onSetIcon,
+  }
 }
 
 describe('LooseFace — #134 the cairn image', () => {
@@ -114,17 +119,44 @@ describe('LooseFace — #134 the cairn image', () => {
   })
 })
 
-describe('LooseFace — #169 the detail face renders the current icon', () => {
-  it('shows the icon and its label when the cairn carries one', () => {
-    const { container, getByText } = renderFace(looseCairn({ icon: 'campsite', image: null }))
+/* #169 rendered the current icon read-only and left choosing one to #156.
+   The picker replaces that display rather than sitting beside it: the
+   selected cell *is* the current icon, so a separate row saying the same
+   thing would be a second place for it to be wrong. */
+describe('LooseFace — #156 the detail face offers the icon picker', () => {
+  it('marks the cairn’s current icon as the selected cell', () => {
+    const { getByRole } = renderFace(looseCairn({ icon: 'campsite', image: null }))
 
-    expect(getByText('campsite')).toBeDefined()
-    expect(container.querySelector('.loose-face__icon-glyph')).not.toBeNull()
+    expect(getByRole('button', { name: 'campsite' }).getAttribute('aria-pressed')).toBe('true')
+    expect(getByRole('button', { name: 'none' }).getAttribute('aria-pressed')).toBe('false')
   })
 
-  it('shows no icon row at all when the cairn has none', () => {
-    const { container } = renderFace(looseCairn({ icon: null, image: null }))
+  it('marks `none` as selected when the cairn has no icon', () => {
+    const { getByRole } = renderFace(looseCairn({ icon: null, image: null }))
 
-    expect(container.querySelector('.loose-face__icon')).toBeNull()
+    expect(getByRole('button', { name: 'none' }).getAttribute('aria-pressed')).toBe('true')
+  })
+
+  /* The retype that matters: a photo becomes a campsite, and the patch that
+     goes to the store carries `icon` and nothing else — which is what makes
+     the marker stop being a thumbnail without the image going anywhere. */
+  it('retypes a photographed cairn, sending only the icon', () => {
+    acquire.mockResolvedValue({ url: 'blob:fake-thumb', release: vi.fn() })
+    const cairn = looseCairn({ icon: null })
+    const { getByRole, onSetIcon } = renderFace(cairn)
+
+    fireEvent.click(getByRole('button', { name: 'campsite' }))
+
+    expect(onSetIcon).toHaveBeenCalledWith(cairn.id, 'campsite')
+  })
+
+  it('returns a cairn to a thumbnail by choosing none', () => {
+    acquire.mockResolvedValue({ url: 'blob:fake-thumb', release: vi.fn() })
+    const cairn = looseCairn({ icon: 'campsite' })
+    const { getByRole, onSetIcon } = renderFace(cairn)
+
+    fireEvent.click(getByRole('button', { name: 'none' }))
+
+    expect(onSetIcon).toHaveBeenCalledWith(cairn.id, null)
   })
 })

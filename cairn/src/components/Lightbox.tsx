@@ -33,6 +33,10 @@ interface LightboxProps {
       connection to write through, which takes the grid to Disabled rather
       than hiding it. */
   onSetIcon?: (icon: CairnIcon | null) => void
+  /** #157: true while a dropped photo is uploading onto this cairn. */
+  attaching?: boolean
+  /** #157: the image slot's failure line, or `null`. */
+  attachError?: string | null
   /** The element focus returns to on close — the row's button or the
       marker's hit-target div, whichever opened this (criterion 9). Read
       once on mount; TripDetail captures it at open time via
@@ -61,6 +65,8 @@ export function Lightbox({
   onNavigate,
   onRemoveFromTrip,
   onSetIcon,
+  attaching,
+  attachError,
   returnFocusRef,
 }: LightboxProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
@@ -164,7 +170,18 @@ export function Lightbox({
           ›
         </button>
         <div className="lightbox__frame">
-          {original.url ? (
+          {attaching ? (
+            <div className="lightbox__uploading" aria-busy="true">
+              {(original.url ?? thumbnail.url) && (
+                <img
+                  className="lightbox__image lightbox__image--replacing"
+                  src={(original.url ?? thumbnail.url) as string}
+                  alt={row.name}
+                />
+              )}
+              <span className="lightbox__uploading-label">uploading…</span>
+            </div>
+          ) : original.url ? (
             <img className="lightbox__image" src={original.url} alt={row.name} />
           ) : (
             <>
@@ -173,6 +190,15 @@ export function Lightbox({
             </>
           )}
         </div>
+        {/* #157 — the failure line for a photo dropped onto this cairn.
+            `aria-live="polite"` is the only announcement a drop's outcome
+            gets: no toast, per the design note's "the marker changes, and
+            that is the confirmation" stance. */}
+        {attachError && (
+          <p className="lightbox__attach-error" aria-live="polite">
+            {attachError}
+          </p>
+        )}
         <h2 className="lightbox__name" title={row.name}>
           {row.name}
         </h2>

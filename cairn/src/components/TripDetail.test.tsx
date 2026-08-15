@@ -135,6 +135,7 @@ function TripHarness({
         onGeometryChange={() => {}}
         onNeedsPlacement={() => {}}
         onCreateTargetChange={() => {}}
+        onCairnDetailChange={() => {}}
       />
     </div>
   )

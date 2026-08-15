@@ -5,6 +5,7 @@ import {
   DriveAuthError,
   DriveQuotaError,
   startResumableUpload,
+  trashFile,
   uploadFileContent,
 } from '../drive/trackFiles'
 import { findOrCreateTripCairnItemFolder, findOrCreateTripCairnsFolder } from '../drive/tripCairnFolder'
@@ -13,7 +14,13 @@ import { readPhotoExif, type PhotoExif } from './exif'
 import { generateThumbnail, THUMBNAIL_SUFFIX, validateImageFile } from './thumbnail'
 import { positionPhoto } from './interpolate'
 import { formatShortDate } from '../format/dates'
-import type { CairnIcon, CairnImage, PositionSource } from '../store/looseStore'
+import {
+  ATTACH_IMAGE_FAILED_MESSAGE,
+  type AttachImageOutcome,
+  type CairnIcon,
+  type CairnImage,
+  type PositionSource,
+} from '../store/looseStore'
 import type { PlacementQueueItem } from '../import/placementQueue'
 import type { LatLng } from '../map/geo'
 
@@ -118,6 +125,12 @@ export interface UseCairnImport {
       field carried across untouched. Resolves `false` on failure, having
       left local state as it was. */
   setCairnIcon: (id: string, icon: CairnIcon | null) => Promise<boolean>
+  /** #157: uploads `file` onto an existing cairn, replacing its `image` and
+      filling `date` only if it had none. Resolves `{ ok: false }` (with a
+      message unless the cairn vanished mid-upload) leaving the cairn exactly
+      as it was — the "both, or neither" rule #110 already applies to a
+      cairn's image. */
+  attachImage: (id: string, file: File) => Promise<AttachImageOutcome>
   retryFailure: (id: string) => Promise<void>
   dismissFailures: () => void
   /** Trashes the cairn's whole folder — image and `cairn.json` together —
@@ -475,6 +488,85 @@ export function useCairnImport(
     [accessToken, cairnFolderId, tripId],
   )
 
+  /* #157: attaches a photo to a cairn this trip already owns. Validated up
+     front the same way a new import is, then uploaded into the cairn's own
+     folder — the same folder `createCairn`/`setCairnIcon` already write
+     `cairn.json` into, since a trip-owned cairn's folder is named by its id
+     regardless of whether it has ever carried an image. */
+  const attachImage = useCallback(
+    async (id: string, file: File): Promise<AttachImageOutcome> => {
+      const current = cairnsRef.current.find((cairn) => cairn.id === id)
+      if (!current || !accessToken || !cairnFolderId) {
+        return { ok: false, error: ATTACH_IMAGE_FAILED_MESSAGE }
+      }
+
+      const typeError = validateImageFile(file.name)
+      if (typeError) return { ok: false, error: typeError }
+
+      const exifResult = await readPhotoExif(file)
+      const exif = exifResult.ok ? exifResult.exif : {}
+
+      const thumbnail = await generateThumbnail(file, exif.orientation)
+      if (!thumbnail.ok) return { ok: false, error: thumbnail.error }
+
+      try {
+        const folderId = await findOrCreateTripCairnItemFolder(accessToken, cairnFolderId, tripId, id)
+
+        const originalSession = await startResumableUpload(accessToken, folderId, file.name)
+        const uploadedOriginal = await uploadFileContent(originalSession, file, accessToken)
+
+        const thumbnailName = `${file.name}${THUMBNAIL_SUFFIX}`
+        const thumbnailFile = new File([thumbnail.blob], thumbnailName, { type: 'image/jpeg' })
+        const thumbnailSession = await startResumableUpload(accessToken, folderId, thumbnailName)
+        const uploadedThumbnail = await uploadFileContent(thumbnailSession, thumbnailFile, accessToken)
+
+        // The cairn may have been removed (from another surface) while the
+        // upload was in flight — nothing left to write into, so the two new
+        // files are trashed rather than left orphaned in Drive.
+        const latest = cairnsRef.current.find((cairn) => cairn.id === id)
+        if (!latest) {
+          await Promise.all([
+            trashFile(accessToken, uploadedOriginal.id).catch(() => {}),
+            trashFile(accessToken, uploadedThumbnail.id).catch(() => {}),
+          ])
+          return { ok: false }
+        }
+
+        const previousImage = latest.image
+        const next: CairnRecord = {
+          ...latest,
+          image: { originalDriveFileId: uploadedOriginal.id, thumbnailDriveFileId: uploadedThumbnail.id },
+          // Filled only if the cairn had none — an authored or already-EXIF
+          // date is never overwritten by a later attach.
+          date: latest.date ?? exif.gpsTimestamp ?? exif.dateTimeOriginal ?? null,
+          ...(exif.gpsTimestamp !== undefined ? { gpsTimestamp: exif.gpsTimestamp } : {}),
+          ...(exif.dateTimeOriginal !== undefined ? { dateTimeOriginal: exif.dateTimeOriginal } : {}),
+        }
+
+        const existing = await findJsonFile(accessToken, folderId, 'cairn.json')
+        await writeJsonFile(accessToken, folderId, 'cairn.json', next, existing)
+
+        // Trashed only now that the replacement fully landed — a failed
+        // replace must not destroy what was there.
+        if (previousImage) {
+          await Promise.all([
+            trashFile(accessToken, previousImage.originalDriveFileId).catch(() => {}),
+            trashFile(accessToken, previousImage.thumbnailDriveFileId).catch(() => {}),
+          ])
+        }
+
+        cairnsRef.current = cairnsRef.current.map((cairn) => (cairn.id === id ? next : cairn))
+        setCairns(cairnsRef.current)
+        return { ok: true }
+      } catch {
+        // Nothing local was mutated on this path — the cairn is exactly as
+        // it was, per the "both, or neither" rule.
+        return { ok: false, error: ATTACH_IMAGE_FAILED_MESSAGE }
+      }
+    },
+    [accessToken, cairnFolderId, tripId],
+  )
+
   const retryFailure = useCallback(
     async (id: string) => {
       const failure = failuresRef.current.find((f) => f.id === id)
@@ -554,6 +646,7 @@ export function useCairnImport(
     importFiles,
     createCairn,
     setCairnIcon,
+    attachImage,
     retryFailure,
     dismissFailures,
     removeCairn,

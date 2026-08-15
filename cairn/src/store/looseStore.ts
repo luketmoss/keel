@@ -211,6 +211,15 @@ export interface LooseStore {
       is treated as no rename — the same rule `TripStore.updateTrip`
       already applies. */
   update(id: string, patch: LooseUpdate): Promise<boolean>
+  /** #157: uploads `file` as the original and its generated thumbnail, and
+      writes both ids into `id`'s `image` — replacing whatever was there, and
+      trashing the previous pair only once the new one has fully landed. A
+      failure of any kind leaves the record exactly as it was: nothing partial
+      is ever visible, per the "both, or neither" rule #110 already applies to
+      a cairn's image. `LocalLooseStore` has no Drive to upload to and always
+      resolves `{ ok: false }` — the same reasoning `addCairn`'s discarded
+      `source` already gives for a local-only cairn's bytes. */
+  attachImage(id: string, file: File): Promise<AttachImageOutcome>
   /** The loose track's precomputed simplified geometry. cairn's `CLAUDE.md`
       performance rule covers loose tracks too: the map reads this, never a
       source KML. */
@@ -238,6 +247,31 @@ export const MOVE_FAILED_MESSAGE = "Couldn't move — still on the map."
     put it. One toast for the batch, not one per file — the reason is the
     same for all of them, per #75. */
 export const SIGNED_OUT_DROP_MESSAGE = 'Sign in to keep tracks and cairns.'
+
+/** #157's copy for the same refusal, scoped to a cairn's own detail face —
+    "tracks and cairns" would be wrong there, since a detail can only ever
+    take a photo. */
+export const SIGNED_OUT_PHOTO_MESSAGE = 'Sign in to keep photos.'
+
+/** #157: shown beneath a cairn detail's image slot when an attach fails for
+    any reason `validateImageFile` didn't already name — a bad upload, a
+    write that never landed, or the cairn being removed mid-upload. */
+export const ATTACH_IMAGE_FAILED_MESSAGE = "Couldn't add the photo — try again."
+
+/** #157: more than one file dropped onto an open cairn's detail — only the
+    first attaches, and every other file gets this as its refusal reason,
+    one row/toast per file rather than one for the whole batch, since each
+    file is its own dropped thing being turned away. */
+export const ONLY_ONE_PHOTO_MESSAGE = 'only one photo per cairn'
+
+/** #157's outcome for attaching a photo to a cairn that already exists.
+    `error` is set only when `ok` is `false` — either `validateImageFile`'s
+    own message for a rejected file, or `ATTACH_IMAGE_FAILED_MESSAGE` for
+    everything else. */
+export interface AttachImageOutcome {
+  ok: boolean
+  error?: string
+}
 
 const INDEX_KEY = 'cairn.loose.index'
 const overviewKey = (id: string): string => `cairn.loose.overview.${id}`
@@ -353,6 +387,12 @@ export class LocalLooseStore implements LooseStore {
     this.writeIndex()
     this.notify()
     return true
+  }
+
+  /** No Drive to upload to — a local-only cairn's image bytes have nowhere
+      to go, the same fact `addCairn`'s ignored `source` already reflects. */
+  attachImage = async (): Promise<AttachImageOutcome> => {
+    return { ok: false, error: ATTACH_IMAGE_FAILED_MESSAGE }
   }
 
   getOverview = (id: string): FeatureCollection<LineString> | null => {

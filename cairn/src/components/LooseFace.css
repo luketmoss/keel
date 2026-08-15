@@ -150,11 +150,36 @@
 }
 
 .loose-face__image {
+  position: relative;
   aspect-ratio: 4 / 3;
   border-radius: var(--radius-sm);
   overflow: hidden;
   background: var(--surface-lift);
   background-image: linear-gradient(135deg, var(--accent-soft), var(--muted-soft));
+}
+
+/* #157 — the existing image stays visible while a replacement uploads over
+   it, dimmed rather than hidden so a failed replace has something to revert
+   to on screen. */
+.loose-face__image--replacing {
+  opacity: 0.4;
+}
+
+.loose-face__image-uploading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.loose-face__attach-error {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--danger);
 }
 
 /* #134 — the photo, once it arrives. `cover` crops to the fixed 4/3 box

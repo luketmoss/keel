@@ -14,7 +14,7 @@ import { useTripImport } from '../import/useTripImport'
 import { useCairnImport, type CairnRecord, type NewTripCairn } from '../photo/useCairnImport'
 import { buildCairnListRows, flattenCairnListRows, orderCairnListItems } from '../photo/cairnListGroups'
 import type { TripStore } from '../store/tripStore'
-import { MOVE_FAILED_MESSAGE } from '../store/looseStore'
+import { ATTACH_IMAGE_FAILED_MESSAGE, MOVE_FAILED_MESSAGE, ONLY_ONE_PHOTO_MESSAGE, SIGNED_OUT_PHOTO_MESSAGE } from '../store/looseStore'
 import type { ImportedFile } from '../import/types'
 import type { PlacementQueueItem } from '../import/placementQueue'
 import './TripDetail.css'
@@ -112,6 +112,11 @@ interface TripDetailProps {
       the gesture falls back to creating a loose cairn the moment the trip
       face closes. */
   onCreateTargetChange: (handler: ((input: NewTripCairn) => Promise<boolean>) | null) => void
+  /** #157: reports which cairn's detail (the lightbox) is currently open, so
+      the shell's drop overlay can name it — `null` while none is. The shell
+      owns the overlay because it owns the one drop target the whole map is;
+      this only tells it what to say. */
+  onCairnDetailChange: (detail: { name: string; hasImage: boolean } | null) => void
 }
 
 /** The panel's trip face, and the trip's own map layers.
@@ -135,6 +140,7 @@ export function TripDetail({
   onRemovePhotoFromTrip,
   onNeedsPlacement,
   onCreateTargetChange,
+  onCairnDetailChange,
 }: TripDetailProps) {
   const trip = useSyncExternalStore(tripStore.subscribe, () => tripStore.getTrip(tripId))
   const tripImport = useTripImport(tripId, accessToken, cairnFolderId)
@@ -210,6 +216,22 @@ export function TripDetail({
   // resolves for either case; only the *render* below is gated on having
   // an image to view.
   const openCairnRecord = openCairnId ? cairnImport.cairns.find((cairn) => cairn.id === openCairnId) : undefined
+  /** #157: this cairn's own attach state — one at a time, since only one
+      lightbox can be open. Cleared whenever the open cairn changes so a
+      stale error from a previous cairn never bleeds into the next one. */
+  const [attachingCairnId, setAttachingCairnId] = useState<string | null>(null)
+  const [attachCairnError, setAttachCairnError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setAttachCairnError(null)
+  }, [openCairnId])
+
+  useEffect(() => {
+    onCairnDetailChange(
+      openCairnRecord ? { name: openCairnRecord.name, hasImage: openCairnRecord.image !== null } : null,
+    )
+    return () => onCairnDetailChange(null)
+  }, [onCairnDetailChange, openCairnRecord])
 
   const openCairn = useCallback((cairnId: string) => {
     returnFocusRef.current = document.activeElement as HTMLElement | null
@@ -276,22 +298,53 @@ export function TripDetail({
     [tripImport.importFiles, cairnImport.importFiles, addLocalFailure, onNeedsPlacement],
   )
 
+  /* #157: attaches the first file to whichever cairn's lightbox is open,
+     and reports every other dropped file as refused — the gesture was aimed
+     at one cairn, and quietly doing something else with the rest (importing
+     them as new cairns) is worse than refusing them. */
+  const attachPhotoToCairn = useCallback(
+    async (cairnId: string, dropped: File[]) => {
+      const [first, ...rest] = dropped
+      for (const file of rest) addLocalFailure(file.name, ONLY_ONE_PHOTO_MESSAGE)
+
+      setAttachingCairnId(cairnId)
+      setAttachCairnError(null)
+      const result = await cairnImport.attachImage(cairnId, first)
+      setAttachingCairnId(null)
+      if (!result.ok) setAttachCairnError(result.error ?? ATTACH_IMAGE_FAILED_MESSAGE)
+    },
+    [cairnImport.attachImage, addLocalFailure],
+  )
+
   // #75: a drop that lands while signed out is not swallowed — one failure
   // row for the whole batch, not one per file. Unchanged behaviour; only
   // the component that catches the drop moved.
+  //
+  // #157: while a cairn's lightbox is open, the drop is aimed at that cairn
+  // rather than at the trip — attaching takes over entirely rather than
+  // falling back to `importFiles`, which is what "still imports as new
+  // cairns" is reserved for the list face's own drops.
   const handleDroppedFiles = useCallback(
     (dropped: File[]) => {
       if (dropped.length === 0) return
       if (!signedIn) {
-        addLocalFailure(
-          `${dropped.length} file${dropped.length === 1 ? '' : 's'}`,
-          SIGNED_OUT_DROP_MESSAGE,
-        )
+        if (openCairnId) {
+          setAttachCairnError(SIGNED_OUT_PHOTO_MESSAGE)
+        } else {
+          addLocalFailure(
+            `${dropped.length} file${dropped.length === 1 ? '' : 's'}`,
+            SIGNED_OUT_DROP_MESSAGE,
+          )
+        }
+        return
+      }
+      if (openCairnId) {
+        void attachPhotoToCairn(openCairnId, dropped)
         return
       }
       void importFiles(dropped)
     },
-    [signedIn, importFiles, addLocalFailure],
+    [signedIn, importFiles, addLocalFailure, openCairnId, attachPhotoToCairn],
   )
 
   useEffect(() => {
@@ -489,11 +542,11 @@ export function TripDetail({
         />
       </div>
 
-      {/* The lightbox is a photo viewer first (`cairns.md`'s "Adding a
-          photo…" note names the image as what opens it) — an icon-only
-          cairn has nothing for it to show, so opening one only selects
-          it, on the map and in the list, same as any other row. */}
-      {openCairnRow && openCairnRow.thumbnailDriveFileId !== null && (
+      {/* #157: the lightbox is now this cairn's whole detail face, open
+          whenever a cairn is — not only once it has an image to show, since
+          an icon-only cairn is exactly the case a photo gets dropped onto
+          to gain one. */}
+      {openCairnRow && (
         <Lightbox
           row={openCairnRow}
           rows={flatCairnRows}
@@ -501,6 +554,8 @@ export function TripDetail({
           accessToken={accessToken}
           onClose={closeLightbox}
           onNavigate={navigateCairn}
+          attaching={attachingCairnId === openCairnRow.id}
+          attachError={openCairnRow.id === openCairnId ? attachCairnError : null}
           onRemoveFromTrip={
             signedIn && onRemovePhotoFromTrip && openCairnRecord
               ? () => {

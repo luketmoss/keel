@@ -48,6 +48,11 @@ interface LooseFaceProps {
   disabled: boolean
   busy?: boolean
   error?: string | null
+  /** #157: true while a dropped photo is uploading onto this cairn. Unused
+      for a track. */
+  attaching?: boolean
+  /** #157: the image slot's failure line, or `null`. Unused for a track. */
+  attachError?: string | null
 }
 
 /** The panel's face for a track or a photo that belongs to no trip.
@@ -70,6 +75,8 @@ export function LooseFace({
   disabled,
   busy,
   error,
+  attaching,
+  attachError,
 }: LooseFaceProps) {
   const [picking, setPicking] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -215,6 +222,8 @@ export function LooseFace({
             accessToken={accessToken}
             onSelectIcon={selectIcon}
             disabled={disabled || !canMove}
+            attaching={attaching}
+            attachError={attachError}
           />
         )}
       </div>
@@ -292,22 +301,38 @@ function CairnBody({
   accessToken,
   onSelectIcon,
   disabled,
+  attaching,
+  attachError,
 }: {
   item: Extract<LooseRecord, { kind: 'cairn' }>
   accessToken: string | null
   onSelectIcon: (icon: CairnIcon | null) => void
   disabled: boolean
+  attaching?: boolean
+  attachError?: string | null
 }) {
   // #134: loading and failed both render the same `--surface-lift`
   // fallback fill — `usePhotoImage` already collapses those two into one
   // `undefined` for exactly this reason, matching `CairnList`'s own stance.
   const thumbnailUrl = usePhotoImage(accessToken, item.image?.thumbnailDriveFileId).url
+  // #157: the slot appears the moment an upload starts, even for a cairn
+  // that has never carried an image — and disappears again if that attach
+  // fails, since there is then nothing to show.
+  const showImageSlot = item.image !== null || attaching
   return (
     <>
-      {item.image && (
-        <div className="loose-face__image" role="img" aria-label={item.name}>
-          {thumbnailUrl && <img src={thumbnailUrl} alt="" />}
+      {showImageSlot && (
+        <div className="loose-face__image" role="img" aria-label={item.name} aria-busy={attaching || undefined}>
+          {thumbnailUrl && (
+            <img src={thumbnailUrl} alt="" className={attaching ? 'loose-face__image--replacing' : undefined} />
+          )}
+          {attaching && <span className="loose-face__image-uploading">uploading…</span>}
         </div>
+      )}
+      {attachError && (
+        <p className="loose-face__attach-error" aria-live="polite">
+          {attachError}
+        </p>
       )}
       {/* A cairn always has a position (`cairns.md`) — there is no
           "no location" state left to render here. */}

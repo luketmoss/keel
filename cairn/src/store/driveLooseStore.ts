@@ -1,8 +1,10 @@
 import type { FeatureCollection, LineString } from 'geojson'
 import type { Track } from '../kml/parse'
 import {
+  ATTACH_IMAGE_FAILED_MESSAGE,
   LocalLooseStore,
   isLooseRecord,
+  type AttachImageOutcome,
   type LooseCairnRecord,
   type LooseKind,
   type LooseRecord,
@@ -25,8 +27,9 @@ import {
   writeJsonFile,
   type DriveFileRef,
 } from '../drive/tripMetadata'
-import { startResumableUpload, uploadFileContent } from '../drive/trackFiles'
-import { generateThumbnail, THUMBNAIL_SUFFIX } from '../photo/thumbnail'
+import { startResumableUpload, trashFile, uploadFileContent } from '../drive/trackFiles'
+import { generateThumbnail, THUMBNAIL_SUFFIX, validateImageFile } from '../photo/thumbnail'
+import { readPhotoExif } from '../photo/exif'
 
 interface LooseDriveRef {
   folderId: string
@@ -371,6 +374,85 @@ export class DriveLooseStore implements LooseStore {
       // The re-read itself failed — the caller already treats this as a
       // failed save either way.
     }
+  }
+
+  /** #157: uploads `file` onto an existing cairn, replacing its `image`.
+      Validated before anything is attempted, exactly as `importOne` already
+      does for a new one. Serialized through the same per-id queue as every
+      other write, so an attach can't race a rename or a move for the same
+      cairn. */
+  attachImage = async (id: string, file: File): Promise<AttachImageOutcome> => {
+    if (!this.credentials) return { ok: false, error: ATTACH_IMAGE_FAILED_MESSAGE }
+    const { accessToken, cairnFolderId } = this.credentials
+
+    const current = this.local.getItem(id)
+    if (!current || current.kind !== 'cairn') return { ok: false, error: ATTACH_IMAGE_FAILED_MESSAGE }
+
+    const typeError = validateImageFile(file.name)
+    if (typeError) return { ok: false, error: typeError }
+
+    return this.enqueue(id, async () => {
+      const exifResult = await readPhotoExif(file)
+      const exif = exifResult.ok ? exifResult.exif : {}
+
+      const thumbnail = await generateThumbnail(file, exif.orientation)
+      if (!thumbnail.ok) return { ok: false, error: thumbnail.error }
+
+      try {
+        const folderId =
+          this.refs.get(id)?.folderId ??
+          (await findOrCreateLooseItemFolder(accessToken, cairnFolderId, 'cairn', id))
+
+        const originalSession = await startResumableUpload(accessToken, folderId, file.name)
+        const uploadedOriginal = await uploadFileContent(originalSession, file, accessToken)
+
+        const thumbnailName = `${file.name}${THUMBNAIL_SUFFIX}`
+        const thumbnailFile = new File([thumbnail.blob], thumbnailName, { type: 'image/jpeg' })
+        const thumbnailSession = await startResumableUpload(accessToken, folderId, thumbnailName)
+        const uploadedThumbnail = await uploadFileContent(thumbnailSession, thumbnailFile, accessToken)
+
+        // The cairn may have been deleted (from another surface) while the
+        // upload was in flight — nothing to write into and no local record
+        // for the badge to update, so the two new files are trashed rather
+        // than left orphaned.
+        const latest = this.local.getItem(id)
+        if (!latest || latest.kind !== 'cairn') {
+          await Promise.all([
+            trashFile(accessToken, uploadedOriginal.id).catch(() => {}),
+            trashFile(accessToken, uploadedThumbnail.id).catch(() => {}),
+          ])
+          return { ok: false }
+        }
+
+        const previousImage = latest.image
+        const patch: Partial<LooseCairnRecord> = {
+          image: { originalDriveFileId: uploadedOriginal.id, thumbnailDriveFileId: uploadedThumbnail.id },
+          // Filled only if the cairn had none — an authored or already-EXIF
+          // date is never overwritten by a later attach.
+          date: latest.date ?? exif.gpsTimestamp ?? exif.dateTimeOriginal ?? null,
+          ...(exif.gpsTimestamp !== undefined ? { gpsTimestamp: exif.gpsTimestamp } : {}),
+          ...(exif.dateTimeOriginal !== undefined ? { dateTimeOriginal: exif.dateTimeOriginal } : {}),
+        }
+
+        this.local.setUploadState(id, 'ok', patch)
+        await this.writeRecordFiles(id, folderId)
+
+        // Trashed only now that the replacement fully landed — a failed
+        // replace must not destroy what was there.
+        if (previousImage) {
+          await Promise.all([
+            trashFile(accessToken, previousImage.originalDriveFileId).catch(() => {}),
+            trashFile(accessToken, previousImage.thumbnailDriveFileId).catch(() => {}),
+          ])
+        }
+
+        return { ok: true }
+      } catch {
+        // Nothing local was ever mutated on this path — the cairn is exactly
+        // as it was, per the "both, or neither" rule.
+        return { ok: false, error: ATTACH_IMAGE_FAILED_MESSAGE }
+      }
+    })
   }
 
   /** #73: drops credentials and every item's file refs, so a mutation

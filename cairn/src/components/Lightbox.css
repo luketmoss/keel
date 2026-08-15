@@ -204,26 +204,47 @@
   background: var(--pressed);
 }
 
+/* #195 — the controls paint over the image, not behind it. `.lightbox__frame`
+   is positioned (so `.lightbox__error` can anchor to it) and is later in DOM
+   order, so without a z-index here the photo wins the paint order at every
+   size and the close control is invisible on anything wide enough to reach
+   the corner. Raise the controls rather than the frame: the frame is
+   positioned for an anchor, not for a layer.
+
+   The scrim is the control's own ground. Over an arbitrary photograph there
+   is nothing to borrow contrast from — `--text` on a snow field is not there
+   — so each control carries a --radius-full disc of --control-scrim. A
+   circle reads as a control belonging to the viewer where a rounded square
+   reads as a crop artefact of the image beneath it. No shadow: under a 40px
+   disc it would show as the outline design-language.md warns about, and the
+   scrim is already doing the separating. */
 .lightbox__control {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   width: var(--hit-target);
   height: var(--hit-target);
   border: none;
-  border-radius: var(--radius-sm);
-  background: none;
+  border-radius: var(--radius-full);
+  background: var(--control-scrim);
   color: var(--text);
   font-size: var(--text-xl);
   cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease);
 }
 
 .lightbox__control:hover {
-  background: var(--hover);
+  background: var(--control-scrim-hover);
 }
 
+/* Composited over the rest fill rather than replacing it, per the language's
+   Pressed state — a bare --pressed here would drop the ground the glyph is
+   legible against for as long as the press lasts. */
 .lightbox__control:active {
-  background: var(--pressed);
+  background-color: var(--control-scrim);
+  background-image: linear-gradient(var(--pressed), var(--pressed));
 }
 
 /* Rendered disabled rather than hidden so the frame doesn't reflow when a

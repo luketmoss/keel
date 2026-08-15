@@ -34,6 +34,47 @@
   transform: scale(1.35);
 }
 
+/* #194 — a member of an expanded cluster. It stands away from its own
+   coordinate for as long as the fan is open, so `position: relative` here
+   is only to hang the leader line off; the marker itself is unchanged. */
+.cairn-layer__hit--fanned {
+  position: relative;
+  animation: cairn-layer-fan-in var(--motion-base) var(--ease) both;
+}
+
+/* The line home. Drawn from the marker's centre outward and rotated to
+   point back at the anchor, so its length is the fan's own radius and no
+   second geometry has to agree with the first. Never a click target — the
+   marker it belongs to is. */
+.cairn-layer__leader {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  height: 1px;
+  transform-origin: 0 50%;
+  background: var(--text-muted);
+  opacity: 0.5;
+  pointer-events: none;
+  z-index: -1;
+}
+
+@keyframes cairn-layer-fan-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cairn-layer__hit--fanned {
+    animation: none;
+  }
+}
+
 .cairn-layer__cluster {
   width: var(--marker-size);
   height: var(--marker-size);
@@ -47,4 +88,12 @@
   color: var(--text);
   font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
+}
+
+/* #194 — the badge while its cluster is open. It stays put and keeps its
+   count and its ring, because it is what the leader lines point at, but it
+   recedes so the members it just gave up are what the eye lands on. */
+.cairn-layer__cluster--anchor {
+  opacity: 0.55;
+  box-shadow: none;
 }

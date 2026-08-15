@@ -28,15 +28,19 @@ export function fitTracksToBounds(map: google.maps.Map, points: LatLng[]): void 
 /** Higher cap than `fitTracksToBounds` — a cluster is photos at one
     viewpoint, not a whole track, so zooming in close is the point (design
     doc, Selection section: "Clicking a cluster zooms to fit its members"). */
-const CLUSTER_MAX_ZOOM = 20
+export const CLUSTER_MAX_ZOOM = 20
 
 /** Clicking a cluster zooms to fit its members rather than selecting one —
     design doc's Selection section. Two photos at identical coordinates (the
     doc's own edge case) produce a degenerate, zero-size bounds that
-    `fitBounds` cannot zoom into further, so that case is a deliberate no-op
-    here rather than an arbitrary max-zoom jump: "the only way to reach
-    either is the list or the cluster's zoom-to-fit, and both work" only
-    holds if zoom-to-fit doesn't pretend to separate what can't separate. */
+    `fitBounds` cannot zoom into further, so that case stays a deliberate
+    no-op here rather than an arbitrary max-zoom jump: this function does
+    not pretend to separate what cannot separate.
+
+    #194: the caller no longer *reaches* this function for a cluster that
+    cannot separate. `clusterSeparatesAtZoom` asks that question first and
+    expands the cluster in place instead, so the no-op above is now a
+    guard rather than the user's experience. */
 export function zoomToFitCluster(map: google.maps.Map, points: LatLng[]): void {
   if (points.length === 0) return
 

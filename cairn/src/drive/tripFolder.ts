@@ -83,10 +83,7 @@ async function createTripFolder(
   })) as DriveFile
 }
 
-/** Reuses an existing per-trip folder rather than creating a duplicate. If
-    more than one exists — e.g. a race between two tabs — the oldest by
-    `createdTime` wins, same tie-break as `findOrCreateRootFolder`. */
-export async function findOrCreateTripFolder(
+async function resolveTripFolder(
   accessToken: string,
   cairnFolderId: string,
   tripId: string,
@@ -98,4 +95,36 @@ export async function findOrCreateTripFolder(
   }
   const created = await createTripFolder(accessToken, cairnFolderId, tripId)
   return created.id
+}
+
+/** Keyed by `cairnFolderId:tripId`, holding the in-flight lookup for a trip
+    folder that hasn't resolved yet. `DriveTripStore`, `DriveLooseStore`,
+    `useDraftTrip` and `useTripImport` all resolve the same trip's folder
+    independently rather than through one shared queue — the list-then-create
+    below is only race-safe against a *sequential* second caller, and two of
+    those calls landing in the same tick (creating a trip and immediately
+    uploading a track to it, say) each see the folder doesn't exist yet
+    before either's create request lands, so both create one. Sharing the
+    pending promise here closes that: every concurrent caller for the same
+    id awaits the one lookup/create in flight instead of racing it. */
+const pending = new Map<string, Promise<string>>()
+
+/** Reuses an existing per-trip folder rather than creating a duplicate. If
+    more than one exists — e.g. a race between two tabs, which this
+    in-process cache can't cover — the oldest by `createdTime` wins, same
+    tie-break as `findOrCreateRootFolder`. */
+export async function findOrCreateTripFolder(
+  accessToken: string,
+  cairnFolderId: string,
+  tripId: string,
+): Promise<string> {
+  const key = `${cairnFolderId}:${tripId}`
+  const existing = pending.get(key)
+  if (existing) return existing
+
+  const promise = resolveTripFolder(accessToken, cairnFolderId, tripId).finally(() => {
+    pending.delete(key)
+  })
+  pending.set(key, promise)
+  return promise
 }

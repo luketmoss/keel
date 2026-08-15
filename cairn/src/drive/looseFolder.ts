@@ -80,6 +80,25 @@ async function createChildFolder(
   })) as DriveFile
 }
 
+async function resolveChild(accessToken: string, parentId: string, name: string): Promise<string> {
+  const existing = await listChildFolders(accessToken, parentId, name)
+  if (existing.length > 0) {
+    // Oldest by `createdTime` wins a race between two tabs, same tie-break
+    // as `findOrCreateRootFolder` and `findOrCreateTripFolder`.
+    return [...existing].sort((a, b) => a.createdTime.localeCompare(b.createdTime))[0].id
+  }
+  return (await createChildFolder(accessToken, parentId, name)).id
+}
+
+/** Keyed by `parentId:name`, same reasoning and same fix as `tripFolder.ts`'s
+    `pending`: two loose items dropped together (or a loose upload racing a
+    trip-cairn write) each resolve `loose/`, `tracks/`, `cairns/` or a shared
+    parent independently, and the list-then-create above only guards a
+    sequential second caller. Concurrent callers for the same parent/name
+    share this one in-flight lookup instead of each creating their own
+    folder. */
+const pending = new Map<string, Promise<string>>()
+
 /** Exported for `tripCairnFolder.ts`, which needs the same generic
     find-or-create-a-named-child-folder primitive one level up: a trip-owned
     cairn's folder is `trips/<id>/cairns/<cairn-id>/`, and duplicating this
@@ -90,13 +109,15 @@ export async function findOrCreateChild(
   parentId: string,
   name: string,
 ): Promise<string> {
-  const existing = await listChildFolders(accessToken, parentId, name)
-  if (existing.length > 0) {
-    // Oldest by `createdTime` wins a race between two tabs, same tie-break
-    // as `findOrCreateRootFolder` and `findOrCreateTripFolder`.
-    return [...existing].sort((a, b) => a.createdTime.localeCompare(b.createdTime))[0].id
-  }
-  return (await createChildFolder(accessToken, parentId, name)).id
+  const key = `${parentId}:${name}`
+  const existing = pending.get(key)
+  if (existing) return existing
+
+  const promise = resolveChild(accessToken, parentId, name).finally(() => {
+    pending.delete(key)
+  })
+  pending.set(key, promise)
+  return promise
 }
 
 /** `/Cairn/loose/<tracks|cairns>/`, creating either level if it is missing.

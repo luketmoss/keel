@@ -71,6 +71,34 @@ describe('findOrCreateTripFolder', () => {
     ).rejects.toBeInstanceOf(DriveAuthError)
   })
 
+  // Regression: `useDraftTrip.save()` calls `findOrCreateTripFolder` directly
+  // right after `createTrip()` fires `DriveTripStore.migrateTrip` (queued,
+  // unawaited) for the same trip id — two independent callers resolving the
+  // same folder in the same tick. Before the in-flight cache, both saw the
+  // list come back empty and both created a folder, leaving two folders
+  // with the same name and a track/photo split across them depending on
+  // which caller's folder id each write happened to use.
+  it('shares one lookup/create between concurrent calls for the same trip', async () => {
+    let resolveList: (value: Response) => void
+    const listPromise = new Promise<Response>((resolve) => {
+      resolveList = resolve
+    })
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(() => listPromise)
+      .mockResolvedValueOnce(jsonResponse({ id: 'trip-folder-id', createdTime: '2026-01-01' }))
+
+    const first = findOrCreateTripFolder('token', 'cairn-folder-id', 'trip-abc')
+    const second = findOrCreateTripFolder('token', 'cairn-folder-id', 'trip-abc')
+
+    resolveList!(jsonResponse({ files: [] }))
+    const [firstId, secondId] = await Promise.all([first, second])
+
+    expect(firstId).toBe('trip-folder-id')
+    expect(secondId).toBe('trip-folder-id')
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+  })
+
   // #96: `driveFetch` threw `DriveAuthError` on a 401 already — what it
   // didn't do, unlike every sibling in `drive/*.ts`, was report the failed
   // token through `authEvents`, so `useGoogleAccount` never learned a save

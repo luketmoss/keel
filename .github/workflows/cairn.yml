@@ -23,14 +23,5 @@ jobs:
           cache-dependency-path: cairn/package-lock.json
       - run: npm ci
       - run: npm run typecheck
-      # vitest's worker pool accumulates memory across a large, component-
-      # heavy run and OOMs on a single `vitest run` well before the
-      # runner's actual memory limit; sharding into separate processes
-      # keeps each invocation's exposure small enough to finish cleanly.
-      - run: npx vitest run --shard=1/6
-      - run: npx vitest run --shard=2/6
-      - run: npx vitest run --shard=3/6
-      - run: npx vitest run --shard=4/6
-      - run: npx vitest run --shard=5/6
-      - run: npx vitest run --shard=6/6
+      - run: npm test
       - run: npm run build

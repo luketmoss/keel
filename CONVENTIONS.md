@@ -7,19 +7,8 @@ document, this document is right and the command is a bug.
 
 A single repository holding multiple software projects, one shared GitHub
 Projects board, and the skills that move work through it. Starting a project
-means adding a folder — not provisioning infrastructure.
-
-```
-keel/
-├── CONVENTIONS.md          # this file
-├── CLAUDE.md               # monorepo rules, loaded in every session
-├── .claude/skills/         # lifecycle + stack skills
-├── .keel/                  # board.json, board.py, check.py
-├── docs/design/            # keel's own UX artifacts
-└── <project-slug>/         # one folder per project
-    ├── CLAUDE.md           # names the stack, pins its stack skill
-    └── docs/design/        # UX artifacts, one file per issue
-```
+means adding a folder — not provisioning infrastructure. The layout is in
+[CLAUDE.md](CLAUDE.md), which every session loads before this file.
 
 A session opened in `keel/my-app/` loads both the root `CLAUDE.md` and the
 project's own. The project file is what tells Claude which stack skill is
@@ -147,8 +136,7 @@ never earns that stays here, which is fine and expected.
 ### 2. PM Refining
 
 What problem, for whom, why now, and what is explicitly *not* included. Produces
-a problem statement and acceptance criteria. This is where an idea becomes a
-specification.
+a problem statement and acceptance criteria.
 
 **Command:** `/pm`
 **Exit:** acceptance criteria are written and testable, scope is bounded, and no
@@ -196,8 +184,6 @@ started cold without asking a question.
 
 ### 5. In Development
 
-Branch cut, code being written.
-
 **Command:** `/develop` — moves the issue here, cuts the branch, and ends by
 pushing and opening a **draft** PR linked to the issue.
 **Exit:** implementation complete and self-tested, with a draft PR open. Not
@@ -205,9 +191,7 @@ pushing and opening a **draft** PR linked to the issue.
 
 ### 6. Testing
 
-Verified against the acceptance criteria, deliberately and one at a time. For
-firmware this means hardware in the loop; there is no substitute and a passing
-build is not evidence.
+Verified against the acceptance criteria, deliberately and one at a time.
 
 **Command:** `/test`
 **Exit:** every acceptance criterion passes and the PR comes out of draft. A
@@ -220,31 +204,24 @@ is not evidence that a solenoid fired at the right microsecond.
 
 ### 7. Code Review
 
-The PR is open and out of draft, and is being reviewed or is waiting on CI.
-Transient — nothing should rest here. Review comments live on the PR, where they
-belong; the board records only that the issue is in review.
+The PR is out of draft and is being reviewed or is waiting on CI. Transient —
+nothing should rest here. Review comments live on the PR; the board records only
+that the issue is in review.
 
 **Command:** `/review` — reviews the diff against the acceptance criteria, posts
-comments on the PR, and confirms the workflow run passed. Because required
-status checks are deliberately not used (see below), that confirmation is the
-only thing standing between a red build and a PR that looks ready.
-
+comments on the PR, and confirms the workflow run passed. Since required status
+checks are deliberately not used (see `## Continuous integration`), that
+confirmation is the only thing between a red build and a PR that looks ready.
 **Exit:** review found nothing blocking and CI is green. Findings send the issue
 back to In Development, not forward with a caveat.
 
 ### 8. Ready to Ship
 
 Reviewed clean, CI green, PR out of draft, main untouched. Everything is done
-except the merge — which, on the happy path, `/finish` does next. The stage is
-transient there, the way Code Review is.
-
-**What rests here is the inbox.** An issue that stays is one the run could not
-merge: a draft PR, a check that failed or never reported, a conflict. Every one
-of those needs a person, none of them is something a run should decide, and this
-column is how you find them at a glance. Nothing else can answer that question —
-GitHub does not permit approving your own PR, so a solo repo records no approval
-event, and a card in Code Review looks identical whether it is un-reviewed,
-mid-CI, or ready.
+except the merge. What rests here is the inbox, per `## How work flows` — and
+nothing else can answer that question, because GitHub does not permit approving
+your own PR, so a solo repo records no approval event and a card in Code Review
+looks identical whether it is un-reviewed, mid-CI, or ready.
 
 **Command:** `/ship` — merges, which closes the issue and triggers the build.
 The only irreversible action in the system. `/finish` runs it; running it by
@@ -276,21 +253,8 @@ interfering with each other:
   another project's in-flight run.
 - **Cache keys prefixed with the slug**, or projects evict each other's caches.
 
-```yaml
-name: drop-tracker
-on:
-  pull_request:
-    paths: ['drop-tracker/**', '.github/workflows/drop-tracker.yml']
-concurrency:
-  group: drop-tracker-${{ github.ref }}
-  cancel-in-progress: true
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: drop-tracker
-```
+The template is in each stack skill's `scaffold.md`, filled in for that stack.
+Copy it from there rather than reconstructing one from these bullets.
 
 **Required status checks are not used.** A required check that is path-filtered
 out never reports, and GitHub blocks the PR forever waiting for a run that will

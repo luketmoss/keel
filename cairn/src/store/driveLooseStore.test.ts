@@ -764,3 +764,44 @@ describe('update (#133)', () => {
     expect(store.getItem('track-a')?.name).toBe('Renamed elsewhere')
   })
 })
+
+describe('update — dragging a cairn (#158)', () => {
+  function placedFromExif() {
+    return store.addCairn({ ...NEW_CAIRN, positionSource: 'exif', icon: 'campsite', image: null })
+  }
+
+  it('writes the new coordinate and sets positionSource to placed', async () => {
+    store = await connected()
+    const record = placedFromExif()
+
+    expect(await store.update(record.id, { position: { lat: 1, lng: 2 } })).toBe(true)
+
+    const stored = store.getItem(record.id) as { position: { lat: number; lng: number }; positionSource: string }
+    expect(stored.position).toEqual({ lat: 1, lng: 2 })
+    expect(stored.positionSource).toBe('placed')
+  })
+
+  it('writes nothing when the coordinate already matches', async () => {
+    store = await connected()
+    const record = placedFromExif()
+    await settle()
+    writeJsonFile.mockClear()
+
+    expect(await store.update(record.id, { position: record.position })).toBe(true)
+    await settle()
+
+    expect(writeJsonFile).not.toHaveBeenCalled()
+  })
+
+  it('reverts to the previous coordinate and source after a write failure', async () => {
+    store = await connected()
+    const record = placedFromExif()
+    writeJsonFile.mockRejectedValue(new Error('offline'))
+
+    expect(await store.update(record.id, { position: { lat: 1, lng: 2 } })).toBe(false)
+
+    const stored = store.getItem(record.id) as { position: { lat: number; lng: number }; positionSource: string }
+    expect(stored.position).toEqual(record.position)
+    expect(stored.positionSource).toBe('exif')
+  })
+})

@@ -24,6 +24,7 @@ import { DriveTripStore } from './store/driveTripStore'
 import {
   ATTACH_IMAGE_FAILED_MESSAGE,
   MOVE_FAILED_MESSAGE,
+  MOVE_WRITE_FAILED_MESSAGE,
   ONLY_ONE_PHOTO_MESSAGE,
   SIGNED_OUT_DROP_MESSAGE,
   SIGNED_OUT_PHOTO_MESSAGE,
@@ -201,6 +202,10 @@ function AppShell() {
       rather than from one that owns an upload hook of its own. */
   const [attachingLooseId, setAttachingLooseId] = useState<string | null>(null)
   const [attachLooseError, setAttachLooseError] = useState<string | null>(null)
+  /** #158: a loose cairn's own drag-write failure — the mirror of
+      `TripDetail`'s `moveCairnError`, for the same reason `attachLooseError`
+      already is one. */
+  const [moveLooseError, setMoveLooseError] = useState<string | null>(null)
   /** #140: ids with an export currently in flight, so a second click on the
       same item's `Export` is a no-op rather than a second download — other
       items are unaffected, which is why this is a set and not a flag. */
@@ -325,6 +330,7 @@ function AppShell() {
 
   useEffect(() => {
     setAttachLooseError(null)
+    setMoveLooseError(null)
   }, [openLooseId])
 
   const openTrip = openTripId ? trips.find((trip) => trip.id === openTripId) : undefined
@@ -337,6 +343,12 @@ function AppShell() {
   // be open when the drop landed.
   const currentQueueItem: PlacementQueueItem | null = queue.items[0] ?? null
   const queueOpen = currentQueueItem !== null
+
+  // #158: disconnected (#73), or the placement queue owns the map — either
+  // one refuses the gesture entirely, the same read-only treatment every
+  // other mutating control on a cairn already takes.
+  const cairnsDraggable = !disconnected && !queueOpen
+
   const suggestionPosition: LatLng | undefined =
     currentQueueItem && currentQueueItem.captureInstantMs !== undefined
       ? nearestPointByTime(currentQueueItem.captureInstantMs, currentQueueItem.tracks)
@@ -631,6 +643,16 @@ function AppShell() {
     if (!result.ok) setAttachLooseError(result.error ?? ATTACH_IMAGE_FAILED_MESSAGE)
   }
 
+  /** #158: writes a dragged loose cairn's new position. `openLooseId`'s own
+      face is the only place a failure has anywhere to show — a cairn that
+      isn't open has no error slot, and the marker's own animated revert is
+      the only signal for that case. */
+  async function handleMoveLooseCairn(id: string, position: LatLng): Promise<boolean> {
+    const ok = await looseStore.update(id, { position })
+    if (id === openLooseId) setMoveLooseError(ok ? null : MOVE_WRITE_FAILED_MESSAGE)
+    return ok
+  }
+
   /** The draft's third exit: keep the files, don't make a trip of them. */
   function keepDraftLoose() {
     const draft = draftTrip.draft
@@ -883,6 +905,8 @@ function AppShell() {
               onSelect={(item) =>
                 navigate(item.kind === 'track' ? `/tracks/${item.id}` : `/cairns/${item.id}`)
               }
+              draggable={cairnsDraggable}
+              onMoveCairn={handleMoveLooseCairn}
             />
           </>
         )}
@@ -1006,6 +1030,7 @@ function AppShell() {
                   onNeedsPlacement={enqueueNeedsPlacement}
                   onCreateTargetChange={handleCreateTargetChange}
                   onCairnDetailChange={handleCairnDetailChange}
+                  cairnsDraggable={cairnsDraggable}
                 />
               </div>
             </>
@@ -1030,6 +1055,7 @@ function AppShell() {
                 exporting={exportingIds.has(openLooseId)}
                 attaching={attachingLooseId === openLooseId}
                 attachError={attachLooseError}
+                moveWriteError={moveLooseError}
                 onDelete={() => {
                   // Trashes the Drive folder as well now. Best-effort and
                   // not awaited: the row is gone either way, and a failed

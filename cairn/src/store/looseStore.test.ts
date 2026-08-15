@@ -321,6 +321,48 @@ describe('LocalLooseStore', () => {
       expect(store.getItem(record.id)).not.toHaveProperty('icon')
     })
   })
+
+  describe('update — dragging a cairn (#158)', () => {
+    function placedFromExif() {
+      return store.addCairn({
+        name: 'sapporo.jpg',
+        date: '2024-11-03T00:00:00.000Z',
+        position: { lat: 43, lng: 141 },
+        positionSource: 'exif',
+        icon: 'campsite',
+      })
+    }
+
+    it('writes the new coordinate and sets positionSource to placed, whatever the previous source was', async () => {
+      const cairn = placedFromExif()
+
+      expect(await store.update(cairn.id, { position: { lat: 1, lng: 2 } })).toBe(true)
+
+      const stored = store.getItem(cairn.id) as { position: { lat: number; lng: number }; positionSource: string }
+      expect(stored.position).toEqual({ lat: 1, lng: 2 })
+      expect(stored.positionSource).toBe('placed')
+    })
+
+    it('changes only position and positionSource — icon, image and date survive', async () => {
+      const cairn = placedFromExif()
+
+      await store.update(cairn.id, { position: { lat: 1, lng: 2 } })
+
+      expect(store.getItem(cairn.id)).toEqual({
+        ...cairn,
+        position: { lat: 1, lng: 2 },
+        positionSource: 'placed',
+      })
+    })
+
+    it('ignores a position patch sent for a track', async () => {
+      const record = store.addTrack(NEW_TRACK, [track([[1, 2]])])
+
+      expect(await store.update(record.id, { position: { lat: 9, lng: 9 } })).toBe(true)
+
+      expect((store.getItem(record.id) as { position: unknown }).position).not.toEqual({ lat: 9, lng: 9 })
+    })
+  })
 })
 
 /* `cairns.md`: "An empty name commits the icon's label (`Campsite`), or

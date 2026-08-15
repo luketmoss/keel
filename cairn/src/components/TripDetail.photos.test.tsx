@@ -122,6 +122,7 @@ function tripFace(
         onNeedsPlacement={() => {}}
         onCreateTargetChange={() => {}}
         onCairnDetailChange={() => {}}
+        cairnsDraggable={true}
         onRemovePhotoFromTrip={options.onRemovePhotoFromTrip}
       />
     </MemoryRouter>

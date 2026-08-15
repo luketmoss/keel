@@ -160,3 +160,55 @@ describe('LooseFace — #156 the detail face offers the icon picker', () => {
     expect(onSetIcon).toHaveBeenCalledWith(cairn.id, null)
   })
 })
+
+describe('LooseFace — #158 dragging a cairn', () => {
+  it('shows the disconnected sentence while signed out', () => {
+    acquire.mockResolvedValue({ url: undefined, release: vi.fn() })
+    const { getByText } = render(
+      <LooseFace
+        item={looseCairn()}
+        trips={[]}
+        accessToken={null}
+        onAddToTrip={vi.fn()}
+        onCreateTripWith={vi.fn()}
+        onDelete={vi.fn()}
+        onRename={vi.fn().mockResolvedValue(true)}
+        onRecolor={vi.fn().mockResolvedValue(true)}
+        onSetIcon={vi.fn().mockResolvedValue(true)}
+        onExport={vi.fn()}
+        disabled={true}
+      />,
+    )
+
+    expect(getByText('Sign in to move cairns.')).toBeDefined()
+  })
+
+  it('does not show the disconnected sentence while signed in', () => {
+    acquire.mockResolvedValue({ url: undefined, release: vi.fn() })
+    const { queryByText } = renderFace(looseCairn())
+
+    expect(queryByText('Sign in to move cairns.')).toBeNull()
+  })
+
+  it('shows the move-write failure line', () => {
+    acquire.mockResolvedValue({ url: undefined, release: vi.fn() })
+    const { getByText } = render(
+      <LooseFace
+        item={looseCairn()}
+        trips={[]}
+        accessToken="token"
+        onAddToTrip={vi.fn()}
+        onCreateTripWith={vi.fn()}
+        onDelete={vi.fn()}
+        onRename={vi.fn().mockResolvedValue(true)}
+        onRecolor={vi.fn().mockResolvedValue(true)}
+        onSetIcon={vi.fn().mockResolvedValue(true)}
+        onExport={vi.fn()}
+        disabled={false}
+        moveWriteError="Couldn't move it — put back where it was."
+      />,
+    )
+
+    expect(getByText("Couldn't move it — put back where it was.")).toBeDefined()
+  })
+})

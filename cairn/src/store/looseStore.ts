@@ -4,6 +4,7 @@ import { buildOverviewGeoJSON, computeTripOrigin } from '../geo/overview'
 import { isFeatureCollection } from './tripStore'
 import { formatDistance, formatElevationGain } from '../format/units'
 import type { LatLng } from '../map/geo'
+import { placeCairn } from './cairnRules'
 
 /* A track or a cairn that no trip owns.
  *
@@ -137,6 +138,12 @@ export interface LooseUpdate {
   name?: string
   colorIndex?: number
   icon?: CairnIcon | null
+  /** #158: relocates a cairn — dragging its marker, whatever its current
+      `positionSource`. Always sets `positionSource` to `placed`, per
+      `cairnRules.placeCairn`'s rule 2, so a caller never sends the two
+      separately. Meaningless for a track, whose position is derived from
+      its geometry rather than authored, and ignored if ever sent for one. */
+  position?: LatLng
 }
 
 export interface NewLooseCairn {
@@ -252,6 +259,16 @@ export const SIGNED_OUT_DROP_MESSAGE = 'Sign in to keep tracks and cairns.'
     "tracks and cairns" would be wrong there, since a detail can only ever
     take a photo. */
 export const SIGNED_OUT_PHOTO_MESSAGE = 'Sign in to keep photos.'
+
+/** #158's copy for a drag's write that failed — the marker has already
+    reverted to its previous coordinate by the time this shows, so the
+    sentence describes what happened rather than asking for a retry the
+    gesture itself already offers (drag it again). */
+export const MOVE_WRITE_FAILED_MESSAGE = "Couldn't move it — put back where it was."
+
+/** #158's disconnected copy for the same surface a drag would write
+    through — shown once per open detail face, per #73, not per marker. */
+export const SIGNED_OUT_MOVE_MESSAGE = 'Sign in to move cairns.'
 
 /** #157: shown beneath a cairn detail's image slot when an attach fails for
     any reason `validateImageFile` didn't already name — a bad upload, a
@@ -375,13 +392,18 @@ export class LocalLooseStore implements LooseStore {
     const next: LooseRecord =
       patch.colorIndex !== undefined && current.kind === 'track'
         ? { ...current, name, colorIndex: patch.colorIndex }
-        : // #156: retyping writes `icon` and nothing else — the image, the
-          // position, the `positionSource` and the date all carry straight
-          // across in the spread, which is the whole guarantee the detail
-          // face's picker makes.
-          patch.icon !== undefined && current.kind === 'cairn'
-          ? { ...current, name, icon: patch.icon }
-          : { ...current, name }
+        : // #158: dragging writes `position` and `positionSource` and
+          // nothing else — `placeCairn` is the one place rule 2 (moving
+          // sets it to `placed`, permanently) is spelled out.
+          patch.position !== undefined && current.kind === 'cairn'
+          ? placeCairn({ ...current, name }, patch.position)
+          : // #156: retyping writes `icon` and nothing else — the image, the
+            // position, the `positionSource` and the date all carry straight
+            // across in the spread, which is the whole guarantee the detail
+            // face's picker makes.
+            patch.icon !== undefined && current.kind === 'cairn'
+            ? { ...current, name, icon: patch.icon }
+            : { ...current, name }
 
     this.index = this.index.map((item) => (item.id === id ? next : item))
     this.writeIndex()

@@ -14,22 +14,49 @@ vi.mock('@vis.gl/react-google-maps', () => ({
   AdvancedMarker: ({
     position,
     onClick,
+    draggable,
+    onDragStart,
+    onDrag,
+    onDragEnd,
     children,
   }: {
     position: { lat: number; lng: number }
     onClick?: () => void
+    draggable?: boolean
+    onDragStart?: () => void
+    onDrag?: () => void
+    onDragEnd?: (e: google.maps.MapMouseEvent) => void
     children?: React.ReactNode
   }) => (
     <div
       data-testid="advanced-marker"
       data-lat={position.lat}
       data-lng={position.lng}
+      data-draggable={draggable}
       onClick={onClick}
+      // Real drag events are DOM CustomEvents this mock can't reproduce —
+      // tests instead call these directly, the way `CairnLayer.tsx` itself
+      // does through `useDraggableCairn`'s returned handlers.
+      ref={(node) => {
+        if (node) Object.assign(node, { __onDragStart: onDragStart, __onDrag: onDrag, __onDragEnd: onDragEnd })
+      }}
     >
       {children}
     </div>
   ),
 }))
+
+/** Drives a marker's drag lifecycle straight through the handlers the mock
+    above stashed on its DOM node — `element` is the `[data-testid="advanced-
+    marker"]` div itself. */
+function fireDrag(element: Element, lat: number, lng: number) {
+  const node = element as unknown as {
+    __onDragStart?: () => void
+    __onDragEnd?: (e: google.maps.MapMouseEvent) => void
+  }
+  node.__onDragStart?.()
+  node.__onDragEnd?.({ latLng: { lat: () => lat, lng: () => lng } } as unknown as google.maps.MapMouseEvent)
+}
 
 ;(globalThis as unknown as { google: unknown }).google = {
   maps: {
@@ -289,5 +316,81 @@ describe('CairnLayer', () => {
     await waitFor(() => {
       expect(container.querySelector('img')?.getAttribute('src')).toBe('blob:fake-thumb')
     })
+  })
+})
+
+describe('CairnLayer dragging (#158)', () => {
+  it('marks the marker draggable when the layer is, and not otherwise (default)', () => {
+    const { container } = render(
+      <CairnLayer cairns={[positionedCairn()]} accessToken="token" selectedCairnId={null} onSelectCairn={() => {}} />,
+    )
+    expect(container.querySelector('[data-testid="advanced-marker"]')?.getAttribute('data-draggable')).toBe('false')
+  })
+
+  it('a real move calls onMoveCairn with the cairn id and the dropped coordinate', async () => {
+    const onMoveCairn = vi.fn().mockResolvedValue(true)
+    const { container } = render(
+      <CairnLayer
+        cairns={[positionedCairn({ id: 'a' })]}
+        accessToken="token"
+        selectedCairnId={null}
+        onSelectCairn={() => {}}
+        draggable={true}
+        onMoveCairn={onMoveCairn}
+      />,
+    )
+
+    const marker = container.querySelector('[data-testid="advanced-marker"]') as Element
+    expect(marker.getAttribute('data-draggable')).toBe('true')
+    fireDrag(marker, 9, 10)
+
+    expect(onMoveCairn).toHaveBeenCalledWith('a', { lat: 9, lng: 10 })
+  })
+
+  it('a real drag does not open or select — the click that follows is swallowed', async () => {
+    const onSelectCairn = vi.fn()
+    const onOpenCairn = vi.fn()
+    const onMoveCairn = vi.fn().mockResolvedValue(true)
+    const { container } = render(
+      <CairnLayer
+        cairns={[positionedCairn({ id: 'a' })]}
+        accessToken="token"
+        selectedCairnId={null}
+        onSelectCairn={onSelectCairn}
+        onOpenCairn={onOpenCairn}
+        draggable={true}
+        onMoveCairn={onMoveCairn}
+      />,
+    )
+
+    const marker = container.querySelector('[data-testid="advanced-marker"]') as Element
+    fireDrag(marker, 9, 10)
+    marker.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+
+    expect(onSelectCairn).not.toHaveBeenCalled()
+    expect(onOpenCairn).not.toHaveBeenCalled()
+  })
+
+  it('a zero-distance drag still selects on the click that follows (criterion 3)', () => {
+    const onSelectCairn = vi.fn()
+    const onMoveCairn = vi.fn().mockResolvedValue(true)
+    const cairn = positionedCairn({ id: 'a', latitude: 10, longitude: 20 })
+    const { container } = render(
+      <CairnLayer
+        cairns={[cairn]}
+        accessToken="token"
+        selectedCairnId={null}
+        onSelectCairn={onSelectCairn}
+        draggable={true}
+        onMoveCairn={onMoveCairn}
+      />,
+    )
+
+    const marker = container.querySelector('[data-testid="advanced-marker"]') as Element
+    fireDrag(marker, cairn.latitude, cairn.longitude)
+    marker.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+
+    expect(onMoveCairn).not.toHaveBeenCalled()
+    expect(onSelectCairn).toHaveBeenCalledWith('a')
   })
 })

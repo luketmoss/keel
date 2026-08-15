@@ -6,6 +6,7 @@ import { ColorPopover } from './ColorPopover'
 import { formatDistance } from '../format/units'
 import { trackColor, TRACK_COLORS } from '../map/palette'
 import {
+  SIGNED_OUT_MOVE_MESSAGE,
   canChangeOwner,
   positionSourceSentence,
   showExport,
@@ -53,6 +54,10 @@ interface LooseFaceProps {
   attaching?: boolean
   /** #157: the image slot's failure line, or `null`. Unused for a track. */
   attachError?: string | null
+  /** #158: a drag's write failure, or `null`. The marker has already
+      reverted by the time this shows. Unused for a track — trip and track
+      markers do not drag. */
+  moveWriteError?: string | null
 }
 
 /** The panel's face for a track or a photo that belongs to no trip.
@@ -77,6 +82,7 @@ export function LooseFace({
   error,
   attaching,
   attachError,
+  moveWriteError,
 }: LooseFaceProps) {
   const [picking, setPicking] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -224,6 +230,8 @@ export function LooseFace({
             disabled={disabled || !canMove}
             attaching={attaching}
             attachError={attachError}
+            moveWriteError={moveWriteError}
+            signedOut={disabled}
           />
         )}
       </div>
@@ -303,6 +311,8 @@ function CairnBody({
   disabled,
   attaching,
   attachError,
+  moveWriteError,
+  signedOut,
 }: {
   item: Extract<LooseRecord, { kind: 'cairn' }>
   accessToken: string | null
@@ -310,6 +320,8 @@ function CairnBody({
   disabled: boolean
   attaching?: boolean
   attachError?: string | null
+  moveWriteError?: string | null
+  signedOut?: boolean
 }) {
   // #134: loading and failed both render the same `--surface-lift`
   // fallback fill — `usePhotoImage` already collapses those two into one
@@ -361,6 +373,13 @@ function CairnBody({
         disabled={disabled}
       />
       <p className="loose-face__position-source">{positionSourceSentence(item.positionSource)}</p>
+      {/* #158 — one sentence per surface (#73), not a tooltip per marker. */}
+      {signedOut && <p className="loose-face__signed-out">{SIGNED_OUT_MOVE_MESSAGE}</p>}
+      {moveWriteError && (
+        <p className="loose-face__move-error" aria-live="polite">
+          {moveWriteError}
+        </p>
+      )}
       {item.description && <p className="loose-face__description">{item.description}</p>}
     </>
   )

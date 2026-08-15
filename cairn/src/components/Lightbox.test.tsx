@@ -266,4 +266,57 @@ describe('Lightbox', () => {
       expect(screen.queryByRole('button', { name: 'Remove from trip' })).toBeNull()
     })
   })
+
+  describe('#158 dragging a cairn', () => {
+    it('shows the disconnected sentence', () => {
+      render(
+        <Lightbox
+          row={row()}
+          rows={[row()]}
+          description=""
+          accessToken="token"
+          onClose={vi.fn()}
+          onNavigate={vi.fn()}
+          signedOut={true}
+          returnFocusRef={createRef<HTMLElement>()}
+        />,
+      )
+
+      expect(screen.getByText('Sign in to move cairns.')).toBeDefined()
+    })
+
+    it('shows the move-write failure line', () => {
+      render(
+        <Lightbox
+          row={row()}
+          rows={[row()]}
+          description=""
+          accessToken="token"
+          onClose={vi.fn()}
+          onNavigate={vi.fn()}
+          moveError="Couldn't move it — put back where it was."
+          returnFocusRef={createRef<HTMLElement>()}
+        />,
+      )
+
+      expect(screen.getByText("Couldn't move it — put back where it was.")).toBeDefined()
+    })
+
+    it('shows neither line by default', () => {
+      render(
+        <Lightbox
+          row={row()}
+          rows={[row()]}
+          description=""
+          accessToken="token"
+          onClose={vi.fn()}
+          onNavigate={vi.fn()}
+          returnFocusRef={createRef<HTMLElement>()}
+        />,
+      )
+
+      expect(screen.queryByText('Sign in to move cairns.')).toBeNull()
+      expect(screen.queryByText("Couldn't move it — put back where it was.")).toBeNull()
+    })
+  })
 })

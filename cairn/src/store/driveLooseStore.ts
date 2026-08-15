@@ -292,7 +292,15 @@ export class DriveLooseStore implements LooseStore {
     // rather than testing the patch for truthiness.
     const iconChanged =
       patch.icon !== undefined && previous.kind === 'cairn' && patch.icon !== previous.icon
-    if (!nameChanged && !colorChanged && !iconChanged) return true
+    // #158: a drag of zero distance never reaches here at all (the caller
+    // doesn't call `update` for one), but this guard is what makes that
+    // true by construction rather than by every caller remembering it —
+    // sending the coordinate a cairn already holds is a no-op, not a write.
+    const positionChanged =
+      patch.position !== undefined &&
+      previous.kind === 'cairn' &&
+      (patch.position.lat !== previous.position.lat || patch.position.lng !== previous.position.lng)
+    if (!nameChanged && !colorChanged && !iconChanged && !positionChanged) return true
 
     if (!(await this.local.update(id, patch))) return false
 

@@ -500,6 +500,79 @@ describe('useCairnImport', () => {
     })
   })
 
+  describe('setCairnPosition (#158)', () => {
+    async function withOneCairn() {
+      const { result } = renderHook(() => useCairnImport('trip-1', 'token', 'cairn-folder-id', []))
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      await act(() =>
+        result.current.createCairn({
+          name: 'Campsite',
+          position: { lat: 1, lng: 2 },
+          icon: 'campsite',
+          description: '',
+          date: null,
+        }),
+      )
+      writeJsonFile.mockClear()
+      return result
+    }
+
+    it('writes the new coordinate and sets positionSource to placed', async () => {
+      const result = await withOneCairn()
+      const id = result.current.cairns[0].id
+
+      let ok = false
+      await act(async () => {
+        ok = await result.current.setCairnPosition(id, { lat: 9, lng: 10 })
+      })
+
+      expect(ok).toBe(true)
+      expect(result.current.cairns[0].position).toEqual({ lat: 9, lng: 10 })
+      expect(result.current.cairns[0].positionSource).toBe('placed')
+      expect(writeJsonFile).toHaveBeenCalledWith(
+        'token',
+        'item-folder-id',
+        'cairn.json',
+        expect.objectContaining({ id, position: { lat: 9, lng: 10 }, positionSource: 'placed' }),
+        null,
+      )
+    })
+
+    it('changes only position and positionSource — icon and description survive', async () => {
+      const result = await withOneCairn()
+      const id = result.current.cairns[0].id
+      const before = result.current.cairns[0]
+
+      await act(async () => {
+        await result.current.setCairnPosition(id, { lat: 9, lng: 10 })
+      })
+
+      expect(result.current.cairns[0]).toEqual({ ...before, position: { lat: 9, lng: 10 }, positionSource: 'placed' })
+    })
+
+    it('resolves true and writes nothing for a zero-distance drop', async () => {
+      const result = await withOneCairn()
+      const id = result.current.cairns[0].id
+
+      const ok = await result.current.setCairnPosition(id, { lat: 1, lng: 2 })
+
+      expect(ok).toBe(true)
+      expect(writeJsonFile).not.toHaveBeenCalled()
+    })
+
+    it('leaves the cairn exactly as it was when the write fails', async () => {
+      const result = await withOneCairn()
+      const id = result.current.cairns[0].id
+      const before = result.current.cairns[0]
+      writeJsonFile.mockRejectedValueOnce(new Error('offline'))
+
+      const ok = await result.current.setCairnPosition(id, { lat: 9, lng: 10 })
+
+      expect(ok).toBe(false)
+      expect(result.current.cairns[0]).toEqual(before)
+    })
+  })
+
   describe('forgetCairn (#132)', () => {
     it('drops the cairn from state with no Drive call of its own', async () => {
       readPhotoExif.mockResolvedValue(okExif({ latitude: 1, longitude: 2 }))

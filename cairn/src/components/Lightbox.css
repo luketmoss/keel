@@ -88,6 +88,20 @@
   color: var(--text-muted);
 }
 
+.lightbox__move-error {
+  margin: var(--space-2) 0 0;
+  max-width: 480px;
+  font-size: var(--text-sm);
+  color: var(--danger);
+}
+
+.lightbox__signed-out {
+  margin: var(--space-2) 0 0;
+  max-width: 480px;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
 .lightbox__attach-error {
   margin: var(--space-2) 0 0;
   max-width: 480px;

@@ -14,9 +14,16 @@ import { useTripImport } from '../import/useTripImport'
 import { useCairnImport, type CairnRecord, type NewTripCairn } from '../photo/useCairnImport'
 import { buildCairnListRows, flattenCairnListRows, orderCairnListItems } from '../photo/cairnListGroups'
 import type { TripStore } from '../store/tripStore'
-import { ATTACH_IMAGE_FAILED_MESSAGE, MOVE_FAILED_MESSAGE, ONLY_ONE_PHOTO_MESSAGE, SIGNED_OUT_PHOTO_MESSAGE } from '../store/looseStore'
+import {
+  ATTACH_IMAGE_FAILED_MESSAGE,
+  MOVE_FAILED_MESSAGE,
+  MOVE_WRITE_FAILED_MESSAGE,
+  ONLY_ONE_PHOTO_MESSAGE,
+  SIGNED_OUT_PHOTO_MESSAGE,
+} from '../store/looseStore'
 import type { ImportedFile } from '../import/types'
 import type { PlacementQueueItem } from '../import/placementQueue'
+import type { LatLng } from '../map/geo'
 import './TripDetail.css'
 
 const UNRECOGNISED_TYPE_MESSAGE = 'trips take .kml or .kmz tracks and JPEG, PNG or WebP photos'
@@ -117,6 +124,9 @@ interface TripDetailProps {
       owns the overlay because it owns the one drop target the whole map is;
       this only tells it what to say. */
   onCairnDetailChange: (detail: { name: string; hasImage: boolean } | null) => void
+  /** #158: false while dragging is refused for reasons the shell owns —
+      disconnected, or the #155 placement queue owns the map. */
+  cairnsDraggable: boolean
 }
 
 /** The panel's trip face, and the trip's own map layers.
@@ -141,6 +151,7 @@ export function TripDetail({
   onNeedsPlacement,
   onCreateTargetChange,
   onCairnDetailChange,
+  cairnsDraggable,
 }: TripDetailProps) {
   const trip = useSyncExternalStore(tripStore.subscribe, () => tripStore.getTrip(tripId))
   const tripImport = useTripImport(tripId, accessToken, cairnFolderId)
@@ -221,10 +232,27 @@ export function TripDetail({
       stale error from a previous cairn never bleeds into the next one. */
   const [attachingCairnId, setAttachingCairnId] = useState<string | null>(null)
   const [attachCairnError, setAttachCairnError] = useState<string | null>(null)
+  /** #158: the open cairn's own drag-write failure, cleared the same way
+      `attachCairnError` is — a stale error from whatever was open before
+      must not bleed into the next one. A failure for a cairn that isn't
+      open has nowhere to show it (design note: the detail face carries the
+      failure line) — the marker's own animated revert is the only signal
+      for that case. */
+  const [moveCairnError, setMoveCairnError] = useState<string | null>(null)
 
   useEffect(() => {
     setAttachCairnError(null)
+    setMoveCairnError(null)
   }, [openCairnId])
+
+  const handleMoveCairn = useCallback(
+    async (cairnId: string, position: LatLng): Promise<boolean> => {
+      const ok = await cairnImport.setCairnPosition(cairnId, position)
+      if (cairnId === openCairnId) setMoveCairnError(ok ? null : MOVE_WRITE_FAILED_MESSAGE)
+      return ok
+    },
+    [cairnImport.setCairnPosition, openCairnId],
+  )
 
   useEffect(() => {
     onCairnDetailChange(
@@ -458,6 +486,8 @@ export function TripDetail({
           selectedCairnId={selectedCairnId}
           onSelectCairn={setSelectedCairnId}
           onOpenCairn={openCairn}
+          draggable={cairnsDraggable}
+          onMoveCairn={handleMoveCairn}
         />
       )}
 
@@ -556,6 +586,8 @@ export function TripDetail({
           onNavigate={navigateCairn}
           attaching={attachingCairnId === openCairnRow.id}
           attachError={openCairnRow.id === openCairnId ? attachCairnError : null}
+          moveError={openCairnRow.id === openCairnId ? moveCairnError : null}
+          signedOut={!signedIn}
           onRemoveFromTrip={
             signedIn && onRemovePhotoFromTrip && openCairnRecord
               ? () => {

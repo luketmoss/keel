@@ -2,8 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AdvancedMarker, Polyline, useMap } from '@vis.gl/react-google-maps'
 import type { FeatureCollection, LineString } from 'geojson'
 import { trackColor } from '../map/palette'
-import type { LooseRecord, LooseStore } from '../store/looseStore'
+import { canChangeOwner, type LooseRecord, type LooseStore } from '../store/looseStore'
 import { usePhotoImage } from '../photo/usePhotoImage'
+import { useDraggableCairn } from '../map/useDraggableCairn'
+import type { LatLng } from '../map/geo'
 import { CairnMarker } from './CairnMarker'
 import './LooseLayer.css'
 
@@ -22,6 +24,13 @@ interface LooseLayerProps {
       hover and on selection, never at rest — that keeps the world readable
       at six things or six hundred, and keeps the performance rule honest. */
   selectedId: string | null
+  /** #158: false disables dragging for every cairn this layer draws —
+      disconnected (#73) or the #155 placement queue owns the map. A cairn
+      still mid-upload (`canChangeOwner`) is refused per-item regardless. */
+  draggable?: boolean
+  /** #158: called once, on drop, only when a marker actually moved.
+      Resolves whether the write landed — `false` reverts it. */
+  onMoveCairn?: (id: string, position: LatLng) => Promise<boolean>
 }
 
 /** Loose tracks and photos on the shell's map.
@@ -37,6 +46,8 @@ export function LooseLayer({
   onHover,
   onSelect,
   selectedId,
+  draggable = false,
+  onMoveCairn,
 }: LooseLayerProps) {
   const map = useMap()
   if (!map) return null
@@ -62,6 +73,8 @@ export function LooseLayer({
             emphasized={emphasized}
             onHover={onHover}
             onSelect={() => onSelect(item)}
+            draggable={draggable && canChangeOwner(item)}
+            onMove={onMoveCairn}
           />
         )
       })}
@@ -113,12 +126,16 @@ function CairnDot({
   emphasized,
   onHover,
   onSelect,
+  draggable,
+  onMove,
 }: {
   item: Extract<LooseRecord, { kind: 'cairn' }>
   accessToken: string | null
   emphasized: boolean
   onHover: (id: string | null) => void
   onSelect: () => void
+  draggable: boolean
+  onMove?: (id: string, position: LatLng) => Promise<boolean>
 }) {
   // #134: the same fallback the standing document already specifies for a
   // cairn without one — a cairn whose thumbnail is missing or fails to
@@ -128,16 +145,36 @@ function CairnDot({
   // draws its pin here exactly as it does everywhere else the predicate
   // is read.
   const thumbnailUrl = usePhotoImage(accessToken, item.image?.thumbnailDriveFileId).url
+
+  const drag = useDraggableCairn({
+    position: item.position,
+    draggable,
+    onMove: (position) => onMove?.(item.id, position) ?? Promise.resolve(false),
+  })
+
+  function handleClick() {
+    if (drag.consumeDragClick()) return
+    onSelect()
+  }
+
   return (
-    <AdvancedMarker position={item.position} zIndex={0} onClick={onSelect}>
+    <AdvancedMarker
+      position={drag.position}
+      zIndex={0}
+      draggable={draggable}
+      onDragStart={drag.onDragStart}
+      onDrag={drag.onDrag}
+      onDragEnd={drag.onDragEnd}
+      onClick={handleClick}
+    >
       <div
-        className={`loose-marker${emphasized ? ' loose-marker--emphasized' : ''}`}
+        className={`loose-marker${emphasized ? ' loose-marker--emphasized' : ''}${drag.dragging ? ' loose-marker--dragging' : ''}`}
         onMouseEnter={() => onHover(item.id)}
         onMouseLeave={() => onHover(null)}
       >
         <button
           type="button"
-          className="loose-marker__photo"
+          className={`loose-marker__photo${draggable ? ' loose-marker__photo--draggable' : ''}`}
           aria-label={item.name}
           onFocus={() => onHover(item.id)}
           onBlur={() => onHover(null)}

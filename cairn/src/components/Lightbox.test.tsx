@@ -141,6 +141,53 @@ describe('Lightbox', () => {
     expect(next.disabled).toBe(true)
   })
 
+  /* #195 — the controls were painted behind the image, so on a photo wide
+     enough to reach the corner there was nothing to click and Escape was the
+     only way out. Whether they are *visible* is a CSS question jsdom cannot
+     answer; that they respond to a click is this half of it, and it had no
+     coverage at all — every existing test drove the viewer by keyboard. */
+  it('closes on a click of the close control, not only on Escape (#195)', () => {
+    const onClose = vi.fn()
+
+    render(
+      <Lightbox
+        row={row()}
+        rows={[row()]}
+        description=""
+        accessToken="token"
+        onClose={onClose}
+        onNavigate={vi.fn()}
+        returnFocusRef={createRef<HTMLElement>()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close photo' }))
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('navigates on a click of the previous and next controls (#195)', () => {
+    const onNavigate = vi.fn()
+    const rows = [row({ id: 'a' }), row({ id: 'b' }), row({ id: 'c' })]
+
+    render(
+      <Lightbox
+        row={rows[1]}
+        rows={rows}
+        description=""
+        accessToken="token"
+        onClose={vi.fn()}
+        onNavigate={onNavigate}
+        returnFocusRef={createRef<HTMLElement>()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next photo' }))
+    expect(onNavigate).toHaveBeenLastCalledWith('c')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Previous photo' }))
+    expect(onNavigate).toHaveBeenLastCalledWith('a')
+  })
+
   it('shows a distinct error line when the original fails to load, keeping the viewer open (criterion 11)', async () => {
     acquire.mockImplementation((_token: string, fileId: string) => {
       if (fileId === 'orig-1') return Promise.reject(new Error('gone'))

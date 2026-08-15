@@ -84,6 +84,14 @@
   --row-touch: 44px;
   --scrim: color-mix(in srgb, var(--ground) 70%, transparent);
 
+  /* Lightbox controls over image content — cairn/docs/design/195-lightbox-controls.md,
+     "New tokens". Distinct from --scrim: that one is tuned to leave the map
+     readable behind it, and a control the photo shows through is the bug.
+     72% over a pure-white photo composites to ~#545661, which --text clears
+     at 6.5:1; re-check that if --ground or --text moves. */
+  --control-scrim: color-mix(in srgb, var(--ground) 72%, transparent);
+  --control-scrim-hover: color-mix(in srgb, var(--ground) 88%, transparent);
+
   /* Cairn facets — cairn/docs/design/159-cairn-facets.md, "New tokens".
      --chip-height (34px) stays the main row's; the facet row's chips are
      smaller so a second row costs less of the panel's scarcest resource. */

@@ -20,7 +20,7 @@
   align-items: flex-start;
   gap: var(--space-2);
   /* The `⋮` on a detail is always visible — there is no row to hover. */
-  --row-menu-visibility: visible;
+  --row-menu-opacity: 1;
 }
 
 .loose-face__name {

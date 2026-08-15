@@ -31,6 +31,28 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  min-height: var(--row-touch);
+}
+
+/* Hovering the row is what reveals its `⋮` — the trigger reads this
+   variable, so no descendant selector has to reach into RowMenu's own
+   stylesheet. Same mechanism `TripsPanel` already uses. */
+.track-row:hover,
+.track-row:focus-within {
+  --row-menu-opacity: 1;
+}
+
+.track-row:hover {
+  background: var(--hover);
+}
+
+/* #193 — the name and the meta line, one block hanging off the glyph. The
+   name gets the width two icon buttons used to take. */
+.track-row__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .track-row__swatch {
@@ -44,8 +66,10 @@
   opacity: 0.4;
 }
 
+/* One line, ellipsised, never wrapped — a wrapping name makes rows
+   different heights and destroys the scannability the two-line anatomy is
+   for. The full name stays in the `title`. */
 .track-row__name {
-  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -64,15 +88,15 @@
 }
 
 /* Full contrast even when the row is hidden — hiding a track on the map
-   does not make its numbers less true. */
+   does not make its numbers less true. #193 moved it inside the text
+   column, so it is indented by the glyph rather than by a margin. */
 .track-row__stats {
-  margin: var(--space-1) 0 0 var(--space-5);
+  margin: var(--space-1) 0 0;
   font-size: var(--text-xs);
   color: var(--text-muted);
 }
 
-.track-row__visibility,
-.track-row__remove {
+.track-row__visibility {
   flex: none;
   width: 40px;
   height: 40px;
@@ -92,25 +116,13 @@
   padding: 0;
 }
 
-.track-row__visibility:hover,
-.track-row__remove:hover {
+.track-row__visibility:hover {
   color: var(--text);
   background: var(--hover);
 }
 
-.track-row__visibility:active,
-.track-row__remove:active {
+.track-row__visibility:active {
   background: var(--pressed);
-}
-
-.track-row__remove:hover {
-  color: var(--danger);
-}
-
-.track-row__remove:disabled {
-  opacity: 0.4;
-  cursor: default;
-  pointer-events: none;
 }
 
 /* #46 — drag handle. 40px hit target absorbed into the row's own vertical
@@ -213,7 +225,7 @@
 }
 
 .track-row__name-input {
-  flex: 1;
+  width: 100%;
   min-width: 0;
   font-size: var(--text-base);
   color: var(--text);
@@ -359,32 +371,4 @@
   margin: var(--space-1) 0 0 var(--space-5);
   font-size: var(--text-xs);
   color: var(--danger);
-}
-
-/* #110: the reversible exit, beside the destructive one. Same size as the
-   remove control so the pair reads as two options rather than a control and
-   an afterthought. */
-.track-row__unlink {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--hit-target);
-  height: var(--hit-target);
-  padding: 0;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: none;
-  color: var(--text-muted);
-  font-size: var(--text-base);
-  cursor: pointer;
-}
-
-.track-row__unlink:hover:not(:disabled) {
-  color: var(--text);
-  background: var(--hover);
-}
-
-.track-row__unlink:disabled {
-  opacity: 0.4;
-  cursor: default;
 }

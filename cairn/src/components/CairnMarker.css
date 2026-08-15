@@ -88,16 +88,18 @@
   border: 1.5px solid var(--surface);
 }
 
-/* The row's glyph — the marker drawn smaller, at the loose-list's
-   `--dot-size`, matching the track tile it sits beside. */
+/* The row's glyph — the marker drawn smaller, at `--glyph-size` (#193).
+   It was `--dot-size` (14px), which is a trip's dot rather than a cairn's
+   marker: small enough that a campsite pin and a hazard pin were the same
+   grey smudge. */
 .cairn-marker--small.cairn-marker--thumb {
-  width: var(--dot-size);
-  height: var(--dot-size);
+  width: var(--glyph-size);
+  height: var(--glyph-size);
 }
 
 .cairn-marker--small.cairn-marker--pin {
-  width: var(--dot-size);
-  height: calc(var(--dot-size) * 1.26);
+  width: var(--glyph-size);
+  height: calc(var(--glyph-size) * 1.26);
 }
 
 .cairn-marker--small .cairn-marker__badge {

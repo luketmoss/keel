@@ -75,6 +75,13 @@
   /* Cairn markers — cairn/docs/design/cairns.md, "New tokens". The pin's
      width; its height is 1.26× that. */
   --marker-poi: 30px;
+
+  /* The row's glyph — cairn/docs/design/193-trip-row-anatomy.md, "New
+     tokens". A marker drawn at list-row size: large enough that the eight
+     place icons are distinguishable at a glance, small enough to sit inside
+     a two-line row without setting its height. `--dot-size` is a trip's
+     dot, not a cairn's marker, and 14px made every pin the same smudge. */
+  --glyph-size: 24px;
   --sheet-peek: 140px;
   --sheet-half: 52vh;
   --sheet-full: 92vh;

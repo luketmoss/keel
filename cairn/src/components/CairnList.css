@@ -67,12 +67,21 @@
   border-bottom: 1px solid var(--border);
 }
 
-/* #77 — the row's own remove control sits beside the open button rather
-   than inside it, same split TrackList's row already uses between its name
-   and its icon buttons. */
+/* #77 — the row's own actions sit beside the open button rather than
+   inside it, same split TrackList's row already uses between its name and
+   its icon buttons. */
 .cairn-row__main {
   display: flex;
   align-items: center;
+  padding-right: var(--space-2);
+}
+
+/* Hovering the row is what reveals its `⋮` — the trigger reads this
+   variable, so no descendant selector has to reach into RowMenu's own
+   stylesheet. Same mechanism `TripsPanel` already uses. */
+.cairn-row:hover,
+.cairn-row:focus-within {
+  --row-menu-opacity: 1;
 }
 
 .cairn-row--removing {
@@ -111,15 +120,30 @@
 }
 
 /* The row's glyph is its own marker drawn smaller (`cairns.md`, "The
-   row") — `CairnMarker`'s `small` variant, sized at `--dot-size` like
-   every other loose-list glyph. */
+   row") — `CairnMarker`'s `small` variant, at `--glyph-size` since #193.
+   `align-self: start` so a pin's teardrop hangs from the name's line
+   rather than centring against a two-line block. */
 .cairn-row__glyph {
   flex: none;
   display: block;
+  align-self: flex-start;
 }
 
+/* #193 — the name and the meta line, one block hanging off the glyph. */
+.cairn-row__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* On its own line the uppercase monospace treatment costs nothing, and it
+   is what makes the meta line read as data rather than a second sentence. */
 .cairn-row__meta {
-  flex: none;
+  margin-top: var(--space-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: var(--text-xs);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   text-transform: uppercase;
@@ -130,97 +154,25 @@
   color: inherit;
 }
 
+/* Full contrast since #193 — the name was the more muted of the two while
+   the date beside it carried the same weight. One line, ellipsised, never
+   wrapped; the full name stays in the `title`. */
 .cairn-row__name {
-  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: var(--text-base);
-  color: var(--text-muted);
+  color: var(--text);
 }
 
 .cairn-row--selected .cairn-row__name {
   color: inherit;
 }
 
-/* #77 — remove control, confirm, and failure line. Mirrors
-   `TrackList.css`'s `.track-row__remove`/`.track-row__confirm*` exactly —
-   same hit-target sizing, same non-growing negative-margin technique — kept
-   as a separate declaration rather than a shared class because the two
-   rows' surrounding layout differs enough (flex row vs. block) that sharing
-   a class would couple them for no benefit. */
-.cairn-row__remove {
-  flex: none;
-  width: 40px;
-  height: 40px;
-  margin-right: var(--space-2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: var(--text-base);
-  padding: 0;
-}
-
-.cairn-row__remove:hover {
-  color: var(--danger);
-  background: var(--hover);
-}
-
-.cairn-row__remove:active {
-  background: var(--pressed);
-}
-
-.cairn-row__remove:disabled {
-  opacity: 0.4;
-  cursor: default;
-  pointer-events: none;
-}
-
-/* #132: the reversible exit, beside the destructive one — mirrors
-   `TrackList.css`'s `.track-row__unlink` exactly, same reasoning as the
-   remove control above for why it's a separate declaration rather than a
-   shared class. */
-.cairn-row__unlink {
-  flex: none;
-  width: 40px;
-  height: 40px;
-  margin-right: var(--space-2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: var(--text-base);
-  padding: 0;
-}
-
-.cairn-row__unlink:hover {
-  color: var(--text);
-  background: var(--hover);
-}
-
-.cairn-row__unlink:active {
-  background: var(--pressed);
-}
-
-.cairn-row__unlink:disabled {
-  opacity: 0.4;
-  cursor: default;
-  pointer-events: none;
-}
-
 .cairn-row__removing {
   flex: none;
-  margin-right: var(--space-4);
+  margin-right: var(--space-2);
   font-size: var(--text-xs);
   color: var(--text-muted);
 }

@@ -16,6 +16,24 @@
   padding: 0;
 }
 
+/* #158 — cursor states, per the design note's own table. The base `pointer`
+   above still applies when not draggable: the marker stays clickable (#73
+   is read-only, not fully disabled) even where dragging is refused. */
+.cairn-layer__hit--draggable {
+  cursor: grab;
+}
+
+.cairn-layer__hit--dragging {
+  cursor: grabbing;
+}
+
+/* Holds the same 1.35 emphasis scale the rest of the app's markers hover
+   to, for the duration of the drag — so the marker stays visible under the
+   pointer rather than shrinking back the moment the cursor "leaves" it. */
+.cairn-layer__hit--dragging .cairn-marker {
+  transform: scale(1.35);
+}
+
 .cairn-layer__cluster {
   width: var(--marker-size);
   height: var(--marker-size);

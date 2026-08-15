@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { cairnRowMetaLine, type CairnListRow } from '../photo/cairnListGroups'
-import { positionSourceSentence, type CairnIcon } from '../store/looseStore'
+import { SIGNED_OUT_MOVE_MESSAGE, positionSourceSentence, type CairnIcon } from '../store/looseStore'
 import { usePhotoImage } from '../photo/usePhotoImage'
 import { IconPicker } from './IconPicker'
 import './Lightbox.css'
@@ -37,6 +37,14 @@ interface LightboxProps {
   attaching?: boolean
   /** #157: the image slot's failure line, or `null`. */
   attachError?: string | null
+  /** #158: a drag's write failure, or `null`. The marker has already
+      reverted by the time this shows — the line explains what happened
+      rather than offering a retry the gesture (drag it again) already is. */
+  moveError?: string | null
+  /** #158: true while disconnected — shows the one-sentence-per-surface
+      copy #73 already establishes elsewhere, rather than a tooltip on
+      every marker on the map. */
+  signedOut?: boolean
   /** The element focus returns to on close — the row's button or the
       marker's hit-target div, whichever opened this (criterion 9). Read
       once on mount; TripDetail captures it at open time via
@@ -67,6 +75,8 @@ export function Lightbox({
   onSetIcon,
   attaching,
   attachError,
+  moveError,
+  signedOut,
   returnFocusRef,
 }: LightboxProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
@@ -205,6 +215,15 @@ export function Lightbox({
         <p className="lightbox__meta">{cairnRowMetaLine(row)}</p>
         <p className="lightbox__description">{description || 'No description.'}</p>
         <p className="lightbox__position">{positionSourceSentence(row.source)}</p>
+        {/* #158 — the drag's failure line, `aria-live="polite"` for the same
+            reason #157's attach failure already is: a drop's outcome is
+            otherwise announced by nothing. */}
+        {moveError && (
+          <p className="lightbox__move-error" aria-live="polite">
+            {moveError}
+          </p>
+        )}
+        {signedOut && <p className="lightbox__signed-out">{SIGNED_OUT_MOVE_MESSAGE}</p>}
         {/* #156 — the same grid the loose face and the create face show,
             under the same label. Retyping a photo as a campsite is the case
             this exists for: the marker stops being a thumbnail and becomes

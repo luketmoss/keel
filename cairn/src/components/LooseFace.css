@@ -182,6 +182,18 @@
   color: var(--danger);
 }
 
+.loose-face__move-error {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--danger);
+}
+
+.loose-face__signed-out {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
 /* #134 — the photo, once it arrives. `cover` crops to the fixed 4/3 box
    rather than resizing it, so the layout never shifts when the image
    lands (or per photo — different photos have different aspect ratios). */

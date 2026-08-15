@@ -136,6 +136,7 @@ function TripHarness({
         onNeedsPlacement={() => {}}
         onCreateTargetChange={() => {}}
         onCairnDetailChange={() => {}}
+        cairnsDraggable={true}
       />
     </div>
   )

@@ -125,6 +125,12 @@ export interface UseCairnImport {
       field carried across untouched. Resolves `false` on failure, having
       left local state as it was. */
   setCairnIcon: (id: string, icon: CairnIcon | null) => Promise<boolean>
+  /** #158: writes a dragged marker's new coordinate and sets
+      `positionSource` to `placed`, permanently. Resolves `true` trivially
+      for a zero-distance drop (the position is already what it holds), and
+      `false` on any failure, having left local state untouched — the
+      marker's own drag hook is what turns that into a visible revert. */
+  setCairnPosition: (id: string, position: LatLng) => Promise<boolean>
   /** #157: uploads `file` onto an existing cairn, replacing its `image` and
       filling `date` only if it had none. Resolves `{ ok: false }` (with a
       message unless the cairn vanished mid-upload) leaving the cairn exactly
@@ -488,6 +494,38 @@ export function useCairnImport(
     [accessToken, cairnFolderId, tripId],
   )
 
+  /* #158: dragging a cairn's marker. Writes `position` and sets
+     `positionSource` to `placed` — rule 2 of `cairns.md`'s "positionSource"
+     section, permanently, whatever the cairn's source was. Written to Drive
+     first and applied locally after, matching `setCairnIcon` exactly: a
+     `cairn.json` that still says the old coordinate while the marker says
+     the new one is the disagreement this ordering avoids. The marker's own
+     drag hook (`useDraggableCairn`) is what makes a failed write here look
+     like a revert rather than a stuck-and-wrong pin — it holds the dropped
+     position locally until this resolves, then animates back if it didn't. */
+  const setCairnPosition = useCallback(
+    async (id: string, position: LatLng): Promise<boolean> => {
+      const current = cairnsRef.current.find((cairn) => cairn.id === id)
+      if (!current) return false
+      if (current.position.lat === position.lat && current.position.lng === position.lng) return true
+      if (!accessToken || !cairnFolderId) return false
+
+      const next: CairnRecord = { ...current, position, positionSource: 'placed' }
+      try {
+        const folderId = await findOrCreateTripCairnItemFolder(accessToken, cairnFolderId, tripId, id)
+        const existing = await findJsonFile(accessToken, folderId, 'cairn.json')
+        await writeJsonFile(accessToken, folderId, 'cairn.json', next, existing)
+      } catch {
+        return false
+      }
+
+      cairnsRef.current = cairnsRef.current.map((cairn) => (cairn.id === id ? next : cairn))
+      setCairns(cairnsRef.current)
+      return true
+    },
+    [accessToken, cairnFolderId, tripId],
+  )
+
   /* #157: attaches a photo to a cairn this trip already owns. Validated up
      front the same way a new import is, then uploaded into the cairn's own
      folder — the same folder `createCairn`/`setCairnIcon` already write
@@ -646,6 +684,7 @@ export function useCairnImport(
     importFiles,
     createCairn,
     setCairnIcon,
+    setCairnPosition,
     attachImage,
     retryFailure,
     dismissFailures,

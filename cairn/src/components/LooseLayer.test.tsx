@@ -12,18 +12,46 @@ vi.mock('@vis.gl/react-google-maps', () => ({
   AdvancedMarker: ({
     position,
     onClick,
+    draggable,
+    onDragStart,
+    onDrag,
+    onDragEnd,
     children,
   }: {
     position: { lat: number; lng: number }
     onClick?: () => void
+    draggable?: boolean
+    onDragStart?: () => void
+    onDrag?: () => void
+    onDragEnd?: (e: google.maps.MapMouseEvent) => void
     children?: React.ReactNode
   }) => (
-    <div data-testid="advanced-marker" data-lat={position.lat} data-lng={position.lng} onClick={onClick}>
+    <div
+      data-testid="advanced-marker"
+      data-lat={position.lat}
+      data-lng={position.lng}
+      data-draggable={draggable}
+      onClick={onClick}
+      ref={(node) => {
+        if (node) Object.assign(node, { __onDragStart: onDragStart, __onDrag: onDrag, __onDragEnd: onDragEnd })
+      }}
+    >
       {children}
     </div>
   ),
   Polyline: () => null,
 }))
+
+/** Drives a marker's drag lifecycle straight through the handlers the mock
+    above stashed on its DOM node, the same as `CairnLayer.test.tsx`'s. */
+function fireDrag(element: Element, lat: number, lng: number) {
+  const node = element as unknown as {
+    __onDragStart?: () => void
+    __onDragEnd?: (e: google.maps.MapMouseEvent) => void
+  }
+  node.__onDragStart?.()
+  node.__onDragEnd?.({ latLng: { lat: () => lat, lng: () => lng } } as unknown as google.maps.MapMouseEvent)
+}
 
 /* #134 — the photo marker's thumbnail resolves through #53's caching
    loader, mocked at the module boundary exactly as `CairnLayer.test.tsx`
@@ -133,5 +161,115 @@ describe('LooseLayer — #134 the photo marker', () => {
     ])
 
     expect(acquire).not.toHaveBeenCalled()
+  })
+})
+
+describe('LooseLayer dragging a cairn (#158)', () => {
+  beforeEach(() => {
+    acquire.mockResolvedValue({ url: 'blob:fake-thumb', release: vi.fn() })
+  })
+
+  it('marks a cairn draggable when the layer is and the item can change owner', () => {
+    const { container } = render(
+      <LooseLayer
+        items={[looseCairn()]}
+        store={noopStore}
+        accessToken="token"
+        hoveredId={null}
+        onHover={vi.fn()}
+        onSelect={vi.fn()}
+        selectedId={null}
+        draggable={true}
+      />,
+    )
+    expect(container.querySelector('[data-testid="advanced-marker"]')?.getAttribute('data-draggable')).toBe('true')
+  })
+
+  it('refuses to drag a cairn still mid-upload, even when the layer allows it (canChangeOwner)', () => {
+    const { container } = render(
+      <LooseLayer
+        items={[looseCairn({ uploadState: 'uploading' })]}
+        store={noopStore}
+        accessToken="token"
+        hoveredId={null}
+        onHover={vi.fn()}
+        onSelect={vi.fn()}
+        selectedId={null}
+        draggable={true}
+      />,
+    )
+    expect(container.querySelector('[data-testid="advanced-marker"]')?.getAttribute('data-draggable')).toBe('false')
+  })
+
+  it('a real move calls onMoveCairn with the item id and the dropped coordinate', () => {
+    const onMoveCairn = vi.fn().mockResolvedValue(true)
+    const { container } = render(
+      <LooseLayer
+        items={[looseCairn({ id: 'c-1' })]}
+        store={noopStore}
+        accessToken="token"
+        hoveredId={null}
+        onHover={vi.fn()}
+        onSelect={vi.fn()}
+        selectedId={null}
+        draggable={true}
+        onMoveCairn={onMoveCairn}
+      />,
+    )
+
+    const marker = container.querySelector('[data-testid="advanced-marker"]') as Element
+    fireDrag(marker, 9, 10)
+
+    expect(onMoveCairn).toHaveBeenCalledWith('c-1', { lat: 9, lng: 10 })
+  })
+
+  it('a real drag swallows the click that follows — no navigation', () => {
+    const onSelect = vi.fn()
+    const onMoveCairn = vi.fn().mockResolvedValue(true)
+    const { container } = render(
+      <LooseLayer
+        items={[looseCairn({ id: 'c-1' })]}
+        store={noopStore}
+        accessToken="token"
+        hoveredId={null}
+        onHover={vi.fn()}
+        onSelect={onSelect}
+        selectedId={null}
+        draggable={true}
+        onMoveCairn={onMoveCairn}
+      />,
+    )
+
+    const marker = container.querySelector('[data-testid="advanced-marker"]') as Element
+    fireDrag(marker, 9, 10)
+    marker.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it('a zero-distance drag still selects on the click that follows', () => {
+    const onSelect = vi.fn()
+    const onMoveCairn = vi.fn().mockResolvedValue(true)
+    const cairn = looseCairn({ id: 'c-1', position: { lat: 43, lng: 141 } })
+    const { container } = render(
+      <LooseLayer
+        items={[cairn]}
+        store={noopStore}
+        accessToken="token"
+        hoveredId={null}
+        onHover={vi.fn()}
+        onSelect={onSelect}
+        selectedId={null}
+        draggable={true}
+        onMoveCairn={onMoveCairn}
+      />,
+    )
+
+    const marker = container.querySelector('[data-testid="advanced-marker"]') as Element
+    fireDrag(marker, 43, 141)
+    marker.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+
+    expect(onMoveCairn).not.toHaveBeenCalled()
+    expect(onSelect).toHaveBeenCalledWith(cairn)
   })
 })

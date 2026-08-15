@@ -4,6 +4,8 @@ import { clusterMarkers, type MarkerCluster } from '../map/cluster'
 import { zoomToFitCluster } from '../map/fitBounds'
 import { clusterAriaLabel, clusterProvenance, ringStyleForPhoto } from '../photo/provenance'
 import { usePhotoImage } from '../photo/usePhotoImage'
+import { useDraggableCairn } from '../map/useDraggableCairn'
+import type { LatLng } from '../map/geo'
 import { CairnMarker } from './CairnMarker'
 import type { CairnIcon, PositionSource } from '../store/looseStore'
 import './CairnLayer.css'
@@ -43,6 +45,14 @@ interface CairnLayerProps {
       the two are never both called for the same click. Optional so a
       future caller with no lightbox can omit it. */
   onOpenCairn?: (cairnId: string) => void
+  /** #158: false disables dragging for every marker this layer draws —
+      disconnected (#73) or the #155 placement queue owns the map. `undefined`
+      is treated as `false`: a caller that hasn't been updated for this issue
+      gets the old, non-draggable behaviour rather than an accidental opt-in. */
+  draggable?: boolean
+  /** #158: called once, on drop, only when a marker actually moved.
+      Resolves whether the write landed — `false` reverts it. */
+  onMoveCairn?: (cairnId: string, position: LatLng) => Promise<boolean>
 }
 
 /** Renders positioned cairns as clustered `AdvancedMarker`s above the
@@ -59,7 +69,15 @@ interface CairnLayerProps {
     cluster of several cairns keeps the pre-#169 provenance-ring treatment
     (`#54`'s design), unchanged: redrawing clustering for a mix of pins and
     thumbnails is not this issue's to solve. */
-export function CairnLayer({ cairns, accessToken, selectedCairnId, onSelectCairn, onOpenCairn }: CairnLayerProps) {
+export function CairnLayer({
+  cairns,
+  accessToken,
+  selectedCairnId,
+  onSelectCairn,
+  onOpenCairn,
+  draggable = false,
+  onMoveCairn,
+}: CairnLayerProps) {
   const map = useMap()
   const [zoom, setZoom] = useState<number>(() => map?.getZoom() ?? 2)
 
@@ -96,6 +114,8 @@ export function CairnLayer({ cairns, accessToken, selectedCairnId, onSelectCairn
               selected={selectedCairnId === cairn.id}
               onSelect={onSelectCairn}
               onOpen={onOpenCairn}
+              draggable={draggable}
+              onMove={onMoveCairn}
             />
           )
         }
@@ -115,12 +135,16 @@ function SingleCairnMarker({
   selected,
   onSelect,
   onOpen,
+  draggable,
+  onMove,
 }: {
   cairn: PositionedCairn
   accessToken: string | null
   selected: boolean
   onSelect: (cairnId: string) => void
   onOpen?: (cairnId: string) => void
+  draggable: boolean
+  onMove?: (cairnId: string, position: LatLng) => Promise<boolean>
 }) {
   const thumbnailUrl = usePhotoImage(accessToken, cairn.thumbnailDriveFileId ?? undefined).url
   // `tabIndex={-1}`: focusable via `.focus()` below (so #55's lightbox can
@@ -129,7 +153,14 @@ function SingleCairnMarker({
   // making it so is out of this issue's scope.
   const hitRef = useRef<HTMLDivElement>(null)
 
+  const drag = useDraggableCairn({
+    position: { lat: cairn.latitude, lng: cairn.longitude },
+    draggable,
+    onMove: (position) => onMove?.(cairn.id, position) ?? Promise.resolve(false),
+  })
+
   function handleClick() {
+    if (drag.consumeDragClick()) return
     hitRef.current?.focus()
     if (selected) {
       onOpen?.(cairn.id)
@@ -140,14 +171,18 @@ function SingleCairnMarker({
 
   return (
     <AdvancedMarker
-      position={{ lat: cairn.latitude, lng: cairn.longitude }}
+      position={drag.position}
       zIndex={selected ? 1 : 0}
+      draggable={draggable}
+      onDragStart={drag.onDragStart}
+      onDrag={drag.onDrag}
+      onDragEnd={drag.onDragEnd}
       onClick={handleClick}
     >
       <div
         ref={hitRef}
         tabIndex={-1}
-        className="cairn-layer__hit"
+        className={`cairn-layer__hit${draggable ? ' cairn-layer__hit--draggable' : ''}${drag.dragging ? ' cairn-layer__hit--dragging' : ''}`}
         role="button"
         aria-label={cairn.name}
         aria-pressed={selected}
@@ -155,6 +190,8 @@ function SingleCairnMarker({
         data-cairn-id={cairn.id}
         data-source={cairn.source}
         data-selected={selected}
+        data-draggable={draggable}
+        data-dragging={drag.dragging}
       >
         <CairnMarker
           icon={cairn.icon}

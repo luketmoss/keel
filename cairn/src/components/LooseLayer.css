@@ -43,8 +43,18 @@
 .loose-marker--emphasized .loose-marker__tile,
 .loose-marker:hover .loose-marker__photo,
 .loose-marker:focus-within .loose-marker__photo,
-.loose-marker--emphasized .loose-marker__photo {
+.loose-marker--emphasized .loose-marker__photo,
+.loose-marker--dragging .loose-marker__photo {
   transform: scale(1.35);
+}
+
+/* #158 — cursor states, per the design note's own table. */
+.loose-marker__photo--draggable {
+  cursor: grab;
+}
+
+.loose-marker--dragging .loose-marker__photo {
+  cursor: grabbing;
 }
 
 .loose-marker__label {

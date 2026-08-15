@@ -54,6 +54,47 @@
   transform: scale(1.05);
 }
 
+/* #157 — the image slot while a dropped photo is uploading onto this
+   cairn. A fixed 4:3 block so a cairn with no image yet still gets a slot
+   to show progress in, exactly as the design note's states table specifies. */
+.lightbox__uploading {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 240px;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--surface-lift);
+}
+
+/* The existing image stays visible under the uploading treatment during a
+   replace, dimmed rather than hidden — a failed replace has something to
+   revert to on screen. */
+.lightbox__image--replacing {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0.4;
+}
+
+.lightbox__uploading-label {
+  position: relative;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.lightbox__attach-error {
+  margin: var(--space-2) 0 0;
+  max-width: 480px;
+  font-size: var(--text-sm);
+  color: var(--danger);
+}
+
 .lightbox__error {
   position: absolute;
   bottom: var(--space-3);

@@ -22,8 +22,11 @@ import { DropOverlay } from './components/DropOverlay'
 import { ToastStack, type ToastMessage } from './components/ToastStack'
 import { DriveTripStore } from './store/driveTripStore'
 import {
+  ATTACH_IMAGE_FAILED_MESSAGE,
   MOVE_FAILED_MESSAGE,
+  ONLY_ONE_PHOTO_MESSAGE,
   SIGNED_OUT_DROP_MESSAGE,
+  SIGNED_OUT_PHOTO_MESSAGE,
   cairnDefaultName,
   moveLooseIntoTrip,
   type LooseRecord,
@@ -183,6 +186,21 @@ function AppShell() {
   const [dragActive, setDragActive] = useState(false)
   const dragDepth = useRef(0)
   const [toasts, setToasts] = useState<ToastMessage[]>([])
+  /** #157: which trip-owned cairn's lightbox is open, reported up by
+      `TripDetail` — `null` while none is, or while no trip is open at all.
+      Read together with a loose cairn's own `openLoose` below to decide
+      whether a drop attaches rather than imports. */
+  const [tripCairnDetail, setTripCairnDetail] = useState<{ name: string; hasImage: boolean } | null>(null)
+  const handleCairnDetailChange = useCallback(
+    (detail: { name: string; hasImage: boolean } | null) => setTripCairnDetail(detail),
+    [],
+  )
+  /** #157: a loose cairn's own attach state — the mirror of `TripDetail`'s
+      `attachingCairnId`/`attachCairnError`, held here because a loose
+      cairn's detail face (`LooseFace`) is rendered from this component
+      rather than from one that owns an upload hook of its own. */
+  const [attachingLooseId, setAttachingLooseId] = useState<string | null>(null)
+  const [attachLooseError, setAttachLooseError] = useState<string | null>(null)
   /** #140: ids with an export currently in flight, so a second click on the
       same item's `Export` is a no-op rather than a second download — other
       items are unaffected, which is why this is a set and not a flag. */
@@ -284,6 +302,30 @@ function AppShell() {
   const openLoose = openLooseId
     ? (visibleLoose.find((item) => item.id === openLooseId) ?? null)
     : null
+  const openLooseCairn = openLoose && openLoose.kind === 'cairn' ? openLoose : null
+
+  // #157: whichever cairn's detail is open right now, loose or trip-owned —
+  // the one piece of context the drop overlay's copy and `handleDrop`'s
+  // routing both need. `null` means a drop should import, not attach.
+  const cairnDropDetail = openLooseCairn
+    ? { name: openLooseCairn.name, hasImage: openLooseCairn.image !== null }
+    : tripCairnDetail
+
+  // #157: the overlay names its target rather than describing the gesture —
+  // "import five photos" and "attach one photo" produce very different
+  // results from an identical drop. Truncation to one line is CSS
+  // (`DropOverlay`'s own `text-overflow: ellipsis`), not done here.
+  const dropOverlayLabel = cairnDropDetail
+    ? disconnected
+      ? SIGNED_OUT_PHOTO_MESSAGE
+      : cairnDropDetail.hasImage
+        ? `Replace the photo on ${cairnDropDetail.name}`
+        : `Add a photo to ${cairnDropDetail.name}`
+    : 'Drop tracks or photos'
+
+  useEffect(() => {
+    setAttachLooseError(null)
+  }, [openLooseId])
 
   const openTrip = openTripId ? trips.find((trip) => trip.id === openTripId) : undefined
   const draftOpen = Boolean(draftTrip.draft)
@@ -494,7 +536,12 @@ function AppShell() {
     // its own sign-in prompt. Only the *loose* half of a top-level drop has
     // nowhere to go, and that is refused per file below rather than by
     // withdrawing the promise for the whole batch.
-    if (!detailOpen || !disconnected) setDragActive(true)
+    //
+    // #157: a cairn's own detail is the one exception — disconnected still
+    // gets the overlay there, naming the reason ("Sign in to keep photos.")
+    // rather than staying silent, since the whole promise of that face is
+    // "drop a photo here" and disappearing without a word breaks it.
+    if (cairnDropDetail || !detailOpen || !disconnected) setDragActive(true)
   }
 
   function handleDragOver(event: DragEvent<HTMLDivElement>) {
@@ -515,6 +562,15 @@ function AppShell() {
     setDragActive(false)
     const files = filesFromDataTransfer(event.dataTransfer)
     if (files.length === 0) return
+    // #157: a loose cairn's detail is open — the drop is aimed at it, not
+    // at the top-level list, so it attaches rather than importing. A trip-
+    // owned cairn's equivalent lives inside `TripDetail`'s own drop handler,
+    // reached through `tripDropRef` below, since that's the component that
+    // holds the hook that can write into it.
+    if (openLooseCairn) {
+      void attachPhotoToLooseCairn(openLooseCairn.id, files)
+      return
+    }
     // A trip is open: the drop belongs to it, exactly as it did when the
     // trip owned the whole page.
     if (tripDropRef.current) {
@@ -550,6 +606,29 @@ function AppShell() {
       files into a store that cannot keep them. */
   function refuseLooseImport() {
     setToasts((prev) => [...prev, { id: generateToastId(), text: SIGNED_OUT_DROP_MESSAGE }])
+  }
+
+  /** #157: attaches the first dropped file to a loose cairn's own detail,
+      and refuses everything else — one toast per refused file, since a
+      loose face has no failure-row list of its own the way a trip's import
+      panel does. */
+  async function attachPhotoToLooseCairn(id: string, files: File[]) {
+    if (disconnected) {
+      setToasts((prev) => [...prev, { id: generateToastId(), text: SIGNED_OUT_PHOTO_MESSAGE }])
+      return
+    }
+    const [first, ...rest] = files
+    if (rest.length > 0) {
+      setToasts((prev) => [
+        ...prev,
+        ...rest.map(() => ({ id: generateToastId(), text: ONLY_ONE_PHOTO_MESSAGE })),
+      ])
+    }
+    setAttachingLooseId(id)
+    setAttachLooseError(null)
+    const result = await looseStore.attachImage(id, first)
+    setAttachingLooseId(null)
+    if (!result.ok) setAttachLooseError(result.error ?? ATTACH_IMAGE_FAILED_MESSAGE)
   }
 
   /** The draft's third exit: keep the files, don't make a trip of them. */
@@ -926,6 +1005,7 @@ function AppShell() {
                   onRemovePhotoFromTrip={(record) => removeCairnFromTrip(record, openTripId)}
                   onNeedsPlacement={enqueueNeedsPlacement}
                   onCreateTargetChange={handleCreateTargetChange}
+                  onCairnDetailChange={handleCairnDetailChange}
                 />
               </div>
             </>
@@ -948,6 +1028,8 @@ function AppShell() {
                 onSetIcon={(id, icon) => looseStore.update(id, { icon })}
                 onExport={(id) => void handleExport(id)}
                 exporting={exportingIds.has(openLooseId)}
+                attaching={attachingLooseId === openLooseId}
+                attachError={attachLooseError}
                 onDelete={() => {
                   // Trashes the Drive folder as well now. Best-effort and
                   // not awaited: the row is gone either way, and a failed
@@ -995,7 +1077,7 @@ function AppShell() {
             another flow owns the map. */}
         <CreateHintChip visible={createGestureActive && !createOpen && !hasPlaced} />
 
-        {dragActive && <DropOverlay label="Drop tracks or photos" />}
+        {dragActive && <DropOverlay label={dropOverlayLabel} />}
         <ToastStack toasts={toasts} onDismiss={dismissToast} />
       </div>
     </MapProvider>

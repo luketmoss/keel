@@ -28,13 +28,14 @@ vi.mock('../drive/tripMetadata', () => ({
   trashFolder,
 }))
 
-const { startResumableUpload, uploadFileContent } = vi.hoisted(() => ({
+const { startResumableUpload, uploadFileContent, trashFile } = vi.hoisted(() => ({
   startResumableUpload: vi.fn(),
   uploadFileContent: vi.fn(),
+  trashFile: vi.fn(),
 }))
 vi.mock('../drive/trackFiles', async () => {
   const actual = await vi.importActual<typeof import('../drive/trackFiles')>('../drive/trackFiles')
-  return { ...actual, startResumableUpload, uploadFileContent }
+  return { ...actual, startResumableUpload, uploadFileContent, trashFile }
 })
 
 const { readPhotoExif } = vi.hoisted(() => ({ readPhotoExif: vi.fn() }))
@@ -78,6 +79,7 @@ beforeEach(() => {
   trashFolder.mockReset().mockResolvedValue(undefined)
   startResumableUpload.mockReset().mockResolvedValue('session-uri')
   uploadFileContent.mockReset().mockResolvedValue({ id: 'drive-file-id' })
+  trashFile.mockReset().mockResolvedValue(undefined)
   readPhotoExif.mockReset().mockResolvedValue(okExif({ latitude: 43, longitude: 141 }))
   generateThumbnail.mockReset().mockResolvedValue(okThumbnail())
 })
@@ -332,6 +334,138 @@ describe('useCairnImport', () => {
 
       expect(result.current.cairns).toHaveLength(1)
       expect(result.current.cairnRemoveErrors[id]).toContain("Couldn't remove")
+    })
+  })
+
+  describe('attachImage (#157)', () => {
+    async function withOneCairn(overrides: Partial<{ date: string | null }> = {}) {
+      readPhotoExif.mockResolvedValue(okExif({ latitude: 1, longitude: 2 }))
+      const { result } = renderHook(() => useCairnImport('trip-1', 'token', 'cairn-folder-id', []))
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      await act(() => result.current.createCairn({ name: 'Campsite', position: { lat: 1, lng: 2 }, icon: null, description: '', date: overrides.date ?? null }))
+      return result
+    }
+
+    it('uploads an original and a thumbnail and writes both ids into image', async () => {
+      const result = await withOneCairn()
+      const id = result.current.cairns[0].id
+      readPhotoExif.mockResolvedValue(okExif({ gpsTimestamp: '2024-06-01T09:14:00Z' }))
+      writeJsonFile.mockClear()
+
+      let outcome!: Awaited<ReturnType<typeof result.current.attachImage>>
+      await act(async () => {
+        outcome = await result.current.attachImage(id, file('sunset.jpg'))
+      })
+
+      expect(outcome.ok).toBe(true)
+      expect(startResumableUpload).toHaveBeenCalledWith('token', 'item-folder-id', 'sunset.jpg')
+      expect(startResumableUpload).toHaveBeenCalledWith('token', 'item-folder-id', 'sunset.jpg.thumb.jpg')
+      expect(result.current.cairns[0].image).toEqual({
+        originalDriveFileId: 'drive-file-id',
+        thumbnailDriveFileId: 'drive-file-id',
+      })
+      expect(writeJsonFile).toHaveBeenCalledWith(
+        'token',
+        'item-folder-id',
+        'cairn.json',
+        expect.objectContaining({ id, image: expect.any(Object) }),
+        null,
+      )
+    })
+
+    it("does not touch position, positionSource, or icon", async () => {
+      const result = await withOneCairn()
+      const id = result.current.cairns[0].id
+      const before = result.current.cairns[0]
+
+      await act(async () => {
+        await result.current.attachImage(id, file('sunset.jpg'))
+      })
+
+      expect(result.current.cairns[0].position).toEqual(before.position)
+      expect(result.current.cairns[0].positionSource).toBe(before.positionSource)
+      expect(result.current.cairns[0].icon).toBe(before.icon)
+    })
+
+    it('fills date from EXIF only when the cairn had none', async () => {
+      const result = await withOneCairn({ date: '2024-01-01' })
+      const id = result.current.cairns[0].id
+      readPhotoExif.mockResolvedValue(okExif({ gpsTimestamp: '2024-06-01T09:14:00Z' }))
+
+      await act(async () => {
+        await result.current.attachImage(id, file('sunset.jpg'))
+      })
+
+      // The cairn already had a date — the photo's is recorded but does not
+      // overwrite it.
+      expect(result.current.cairns[0].date).toBe('2024-01-01')
+      expect(result.current.cairns[0].gpsTimestamp).toBe('2024-06-01T09:14:00Z')
+    })
+
+    it('fills the date when the cairn had none', async () => {
+      const result = await withOneCairn({ date: null })
+      const id = result.current.cairns[0].id
+      readPhotoExif.mockResolvedValue(okExif({ gpsTimestamp: '2024-06-01T09:14:00Z' }))
+
+      await act(async () => {
+        await result.current.attachImage(id, file('sunset.jpg'))
+      })
+
+      expect(result.current.cairns[0].date).toBe('2024-06-01T09:14:00Z')
+    })
+
+    it('replacing an image trashes the previous original and thumbnail only after the new ones land', async () => {
+      const result = await withOneCairn()
+      const id = result.current.cairns[0].id
+      uploadFileContent
+        .mockResolvedValueOnce({ id: 'orig-1' })
+        .mockResolvedValueOnce({ id: 'thumb-1' })
+      await act(async () => {
+        await result.current.attachImage(id, file('first.jpg'))
+      })
+      expect(trashFile).not.toHaveBeenCalled()
+
+      uploadFileContent
+        .mockResolvedValueOnce({ id: 'orig-2' })
+        .mockResolvedValueOnce({ id: 'thumb-2' })
+      await act(async () => {
+        await result.current.attachImage(id, file('second.jpg'))
+      })
+
+      expect(trashFile).toHaveBeenCalledWith('token', 'orig-1')
+      expect(trashFile).toHaveBeenCalledWith('token', 'thumb-1')
+      expect(result.current.cairns[0].image).toEqual({
+        originalDriveFileId: 'orig-2',
+        thumbnailDriveFileId: 'thumb-2',
+      })
+    })
+
+    it('rejects a non-image file up front, with no upload attempted', async () => {
+      const result = await withOneCairn()
+      const id = result.current.cairns[0].id
+
+      let outcome!: Awaited<ReturnType<typeof result.current.attachImage>>
+      await act(async () => {
+        outcome = await result.current.attachImage(id, file('notes.txt'))
+      })
+
+      expect(outcome.ok).toBe(false)
+      expect(startResumableUpload).not.toHaveBeenCalled()
+      expect(result.current.cairns[0].image).toBeNull()
+    })
+
+    it('a failed upload leaves the cairn exactly as it was, with no partial image', async () => {
+      const result = await withOneCairn()
+      const id = result.current.cairns[0].id
+      uploadFileContent.mockResolvedValueOnce({ id: 'orig-1' }).mockRejectedValueOnce(new Error('network'))
+
+      let outcome!: Awaited<ReturnType<typeof result.current.attachImage>>
+      await act(async () => {
+        outcome = await result.current.attachImage(id, file('sunset.jpg'))
+      })
+
+      expect(outcome.ok).toBe(false)
+      expect(result.current.cairns[0].image).toBeNull()
     })
   })
 

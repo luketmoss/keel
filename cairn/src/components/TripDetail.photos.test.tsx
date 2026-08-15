@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TripDetail } from './TripDetail'
@@ -103,27 +103,38 @@ function baseCairnImport(overrides: Record<string, unknown> = {}) {
 function tripFace(
   store: LocalTripStore,
   tripId: string,
-  options: { onRemovePhotoFromTrip?: (record: CairnRecord) => Promise<boolean> } = {},
+  options: {
+    onRemovePhotoFromTrip?: (record: CairnRecord) => Promise<boolean>
+    onDropTargetChange?: (handler: ((files: File[]) => void) | null) => void
+    accessToken?: string | null
+  } = {},
 ) {
   return (
     <MemoryRouter initialEntries={[`/trips/${tripId}`]}>
       <TripDetail
         tripId={tripId}
         tripStore={store}
-        accessToken="token"
+        accessToken={'accessToken' in options ? (options.accessToken ?? null) : 'token'}
         cairnFolderId="cairn-folder-id"
         onBack={() => {}}
-        onDropTargetChange={() => {}}
+        onDropTargetChange={options.onDropTargetChange ?? (() => {})}
         onGeometryChange={() => {}}
         onNeedsPlacement={() => {}}
         onCreateTargetChange={() => {}}
+        onCairnDetailChange={() => {}}
         onRemovePhotoFromTrip={options.onRemovePhotoFromTrip}
       />
     </MemoryRouter>
   )
 }
 
-function renderTrip(options: { onRemovePhotoFromTrip?: (record: CairnRecord) => Promise<boolean> } = {}) {
+function renderTrip(
+  options: {
+    onRemovePhotoFromTrip?: (record: CairnRecord) => Promise<boolean>
+    onDropTargetChange?: (handler: ((files: File[]) => void) | null) => void
+    accessToken?: string | null
+  } = {},
+) {
   const store = new LocalTripStore(fakeStorage())
   const entry = store.createTrip('Hokkaido')
   const view = render(tripFace(store, entry.id, options))
@@ -217,7 +228,10 @@ describe('TripDetail — #55 photo list and lightbox', () => {
       expect(screen.queryByRole('dialog')).toBeNull()
     })
 
-    it('an icon-only cairn (no image) selects on row click but opens no lightbox', () => {
+    it('an icon-only cairn (no image) opens its lightbox as a detail face with no photo to show', () => {
+      // #157: the lightbox is a cairn's whole detail face now, not only a
+      // photo viewer — an icon-only cairn opens one same as any other, so a
+      // photo dropped while it's open has somewhere to land.
       useCairnImport.mockReturnValue(
         baseCairnImport({ cairns: [cairnRecord({ icon: 'campsite', image: null })] }),
       )
@@ -225,7 +239,9 @@ describe('TripDetail — #55 photo list and lightbox', () => {
       renderTrip()
       fireEvent.click(screen.getByText('sapporo.jpg'))
 
-      expect(screen.queryByRole('dialog')).toBeNull()
+      const dialog = screen.getByRole('dialog')
+      expect(within(dialog).getByText(/campsite/)).toBeDefined()
+      expect(within(dialog).queryByRole('img', { name: 'sapporo.jpg' })).toBeNull()
     })
   })
 
@@ -339,5 +355,71 @@ describe('TripDetail — #121 caching the cairn count', () => {
     rerender(tripFace(store, entry.id))
 
     expect(store.getTrip(entry.id)?.cairnCount).toBe(1)
+  })
+})
+
+describe('TripDetail — attaching a photo while a cairn is open (#157)', () => {
+  function capture() {
+    let handler: ((files: File[]) => void) | null = null
+    return {
+      onDropTargetChange: (h: ((files: File[]) => void) | null) => {
+        handler = h
+      },
+      drop: (files: File[]) => handler?.(files),
+    }
+  }
+
+  it('routes a drop to attachImage rather than importFiles while a cairn is open, and refuses the rest', async () => {
+    const attachImage = vi.fn().mockResolvedValue({ ok: true })
+    const importFiles = vi.fn().mockResolvedValue(undefined)
+    useCairnImport.mockReturnValue(
+      baseCairnImport({ cairns: [cairnRecord({ id: 'a', image: null, icon: 'campsite' })], attachImage, importFiles }),
+    )
+    const { onDropTargetChange, drop } = capture()
+    renderTrip({ onDropTargetChange })
+
+    fireEvent.click(screen.getByText('sapporo.jpg'))
+    await screen.findByRole('dialog')
+
+    await act(async () => {
+      drop([new File(['a'], 'first.jpg'), new File(['b'], 'second.jpg')])
+    })
+
+    expect(attachImage).toHaveBeenCalledWith('a', expect.objectContaining({ name: 'first.jpg' }))
+    expect(importFiles).not.toHaveBeenCalled()
+    expect(await screen.findByText(/second\.jpg/)).toBeDefined()
+    expect(screen.getByText(/only one photo per cairn/)).toBeDefined()
+  })
+
+  it('still imports as new cairns when the drop lands with no cairn open', async () => {
+    const attachImage = vi.fn().mockResolvedValue({ ok: true })
+    const importFiles = vi.fn().mockResolvedValue({ resolvedCount: 0, needsPlacement: [] })
+    useCairnImport.mockReturnValue(baseCairnImport({ cairns: [cairnRecord({ id: 'a' })], attachImage, importFiles }))
+    const { onDropTargetChange, drop } = capture()
+    renderTrip({ onDropTargetChange })
+
+    await act(async () => {
+      drop([new File(['a'], 'new.jpg')])
+    })
+
+    expect(importFiles).toHaveBeenCalled()
+    expect(attachImage).not.toHaveBeenCalled()
+  })
+
+  it('reports "Sign in to keep photos." rather than the generic drop message while a cairn is open and disconnected', async () => {
+    useCairnImport.mockReturnValue(
+      baseCairnImport({ cairns: [cairnRecord({ id: 'a', image: null, icon: 'campsite' })] }),
+    )
+    const { onDropTargetChange, drop } = capture()
+    renderTrip({ onDropTargetChange, accessToken: null })
+
+    fireEvent.click(screen.getByText('sapporo.jpg'))
+    await screen.findByRole('dialog')
+
+    await act(async () => {
+      drop([new File(['a'], 'first.jpg')])
+    })
+
+    expect(await screen.findByText('Sign in to keep photos.')).toBeDefined()
   })
 })

@@ -61,17 +61,21 @@ vi.mock('../drive/tripMetadata', () => ({
   DriveConflictError,
 }))
 
-const { startResumableUpload, uploadFileContent } = vi.hoisted(() => ({
+const { startResumableUpload, uploadFileContent, trashFile } = vi.hoisted(() => ({
   startResumableUpload: vi.fn(),
   uploadFileContent: vi.fn(),
+  trashFile: vi.fn(),
 }))
-vi.mock('../drive/trackFiles', () => ({ startResumableUpload, uploadFileContent }))
+vi.mock('../drive/trackFiles', () => ({ startResumableUpload, uploadFileContent, trashFile }))
 
 const { generateThumbnail } = vi.hoisted(() => ({ generateThumbnail: vi.fn() }))
 vi.mock('../photo/thumbnail', async () => {
   const actual = await vi.importActual<typeof import('../photo/thumbnail')>('../photo/thumbnail')
   return { ...actual, generateThumbnail }
 })
+
+const { readPhotoExif } = vi.hoisted(() => ({ readPhotoExif: vi.fn() }))
+vi.mock('../photo/exif', () => ({ readPhotoExif }))
 
 function track(points: [number, number][]): Track {
   return { name: 'day', points: points.map(([lat, lon]) => ({ lat, lon })) }
@@ -136,6 +140,8 @@ beforeEach(() => {
   startResumableUpload.mockReset().mockResolvedValue('session-uri')
   uploadFileContent.mockReset().mockResolvedValue({ id: 'drive-file-1' })
   generateThumbnail.mockReset().mockResolvedValue({ ok: true, blob: new Blob(['thumb']) })
+  trashFile.mockReset().mockResolvedValue(undefined)
+  readPhotoExif.mockReset().mockResolvedValue({ ok: true, exif: {} })
   store = new DriveLooseStore(fakeStorage())
 })
 
@@ -269,6 +275,74 @@ describe('creating a cairn with no image (#156)', () => {
 
     expect(writeJsonFile).not.toHaveBeenCalled()
     expect(store.getItem(record.id)?.uploadState).toBe('pending')
+  })
+})
+
+describe('attaching a photo to an existing cairn (#157)', () => {
+  it('uploads an original and a thumbnail and writes both ids into image', async () => {
+    store = await connected()
+    const record = store.addCairn({ ...NEW_CAIRN, image: null, positionSource: 'placed' })
+    await settle()
+    uploadFileContent
+      .mockResolvedValueOnce({ id: 'original-1' })
+      .mockResolvedValueOnce({ id: 'thumb-1' })
+
+    const outcome = await store.attachImage(record.id, new File(['jpeg'], 'sunset.jpg'))
+
+    expect(outcome.ok).toBe(true)
+    expect(startResumableUpload.mock.calls.map((call) => call[2])).toContain('sunset.jpg')
+    expect(startResumableUpload.mock.calls.map((call) => call[2])).toContain('sunset.jpg.thumb.jpg')
+    const stored = store.getItem(record.id) as { image: { originalDriveFileId: string; thumbnailDriveFileId: string } }
+    expect(stored.image).toEqual({ originalDriveFileId: 'original-1', thumbnailDriveFileId: 'thumb-1' })
+  })
+
+  it('fills date only when the cairn had none', async () => {
+    store = await connected()
+    readPhotoExif.mockResolvedValue({ ok: true, exif: { gpsTimestamp: '2024-06-01T09:14:00Z' } })
+    const withDate = store.addCairn({ ...NEW_CAIRN, image: null, positionSource: 'placed', date: '2024-01-01' })
+    await settle()
+
+    await store.attachImage(withDate.id, new File(['jpeg'], 'sunset.jpg'))
+
+    expect(store.getItem(withDate.id)?.date).toBe('2024-01-01')
+  })
+
+  it('replacing an image trashes the previous original and thumbnail only after the new ones land', async () => {
+    store = await connected()
+    const record = store.addCairn({ ...NEW_CAIRN, image: null, positionSource: 'placed' })
+    await settle()
+    uploadFileContent.mockResolvedValueOnce({ id: 'orig-1' }).mockResolvedValueOnce({ id: 'thumb-1' })
+    await store.attachImage(record.id, new File(['jpeg'], 'first.jpg'))
+    expect(trashFile).not.toHaveBeenCalled()
+
+    uploadFileContent.mockResolvedValueOnce({ id: 'orig-2' }).mockResolvedValueOnce({ id: 'thumb-2' })
+    await store.attachImage(record.id, new File(['jpeg'], 'second.jpg'))
+
+    expect(trashFile).toHaveBeenCalledWith('tok', 'orig-1')
+    expect(trashFile).toHaveBeenCalledWith('tok', 'thumb-1')
+  })
+
+  it('rejects a non-image file up front, with no upload attempted', async () => {
+    store = await connected()
+    const record = store.addCairn({ ...NEW_CAIRN, image: null, positionSource: 'placed' })
+    await settle()
+
+    const outcome = await store.attachImage(record.id, new File(['x'], 'notes.txt'))
+
+    expect(outcome.ok).toBe(false)
+    expect(startResumableUpload).not.toHaveBeenCalled()
+  })
+
+  it('a failed upload leaves the cairn exactly as it was', async () => {
+    store = await connected()
+    const record = store.addCairn({ ...NEW_CAIRN, image: null, positionSource: 'placed' })
+    await settle()
+    uploadFileContent.mockResolvedValueOnce({ id: 'orig-1' }).mockRejectedValueOnce(new Error('offline'))
+
+    const outcome = await store.attachImage(record.id, new File(['jpeg'], 'sunset.jpg'))
+
+    expect(outcome.ok).toBe(false)
+    expect((store.getItem(record.id) as { image: unknown }).image).toBeNull()
   })
 })
 

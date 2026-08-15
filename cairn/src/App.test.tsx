@@ -20,6 +20,16 @@ vi.mock('./drive/trackFiles', async () => {
   return { ...actual, startResumableUpload, uploadFileContent }
 })
 
+// jsdom has no `createImageBitmap` — every existing test that drops a photo
+// only ever asserts on the local, synchronous half of an import (the row
+// exists), never on `uploadState`/`image` actually landing `ok`, so a real
+// `generateThumbnail` failing silently has never mattered before. #157's
+// attach tests do check the resulting `image`, so they need it to succeed.
+vi.mock('./photo/thumbnail', async () => {
+  const actual = await vi.importActual<typeof import('./photo/thumbnail')>('./photo/thumbnail')
+  return { ...actual, generateThumbnail: vi.fn().mockResolvedValue({ ok: true, blob: new Blob(['thumb']) }) }
+})
+
 function loadKmlFixture(name: string, as = name): File {
   const buffer = readFileSync(join(__dirname, 'kml/fixtures', name))
   return new File([buffer], as)
@@ -1256,6 +1266,126 @@ describe('App placement queue (#168)', () => {
     expect(await screen.findByText('2 photos · 1 placed · 1 needs a location')).toBeDefined()
     // The resolved file saved on its own, without waiting on the straggler.
     expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(1)
+    fetchSpy.mockRestore()
+  })
+})
+
+describe('App attach a photo to an existing cairn (#157)', () => {
+  function seedLooseCairn(id: string, name: string, overrides: Record<string, unknown> = {}) {
+    const existing = JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')
+    window.localStorage.setItem(
+      'cairn.loose.index',
+      JSON.stringify([
+        ...existing,
+        {
+          kind: 'cairn',
+          id,
+          name,
+          createdAt: '2026-01-01T00:00:00.000Z',
+          date: null,
+          position: { lat: 43, lng: 141 },
+          positionSource: 'placed',
+          icon: 'campsite',
+          image: null,
+          description: '',
+          uploadState: 'ok',
+          ...overrides,
+        },
+      ]),
+    )
+  }
+
+  beforeEach(() => {
+    startResumableUpload.mockReset().mockResolvedValue('session-uri')
+    uploadFileContent.mockReset().mockResolvedValue({ id: 'drive-file-1' })
+  })
+
+  // #95: a loose item — cairn included — is withheld entirely while
+  // disconnected (its route shows "Not found" rather than its face), so
+  // "drop refused, signed out" for a *loose* cairn's own detail can't
+  // actually happen — there is no detail open to drop onto. The disconnected
+  // refusal this design note describes is reachable for a trip-owned cairn's
+  // lightbox instead, which stays mounted while signed out; see
+  // `TripDetail`'s own coverage.
+
+  it("the overlay names the cairn while its detail is open, and imports as new cairns from the list", async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedLooseCairn('c-2', 'Ellery Creek camp')
+    await renderApp('/cairns/c-2', { googleClientId: 'a-client-id' })
+    await signIn()
+    const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
+
+    fireEvent.dragEnter(shell, { dataTransfer: fileDataTransfer([new File(['jpeg'], 'a.jpg')]) })
+    expect(await screen.findByText('Add a photo to Ellery Creek camp')).toBeDefined()
+
+    fetchSpy.mockRestore()
+  })
+
+  it('drops one image onto an open cairn and attaches it, updating image with no new cairn created', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedLooseCairn('c-3', 'Ellery Creek camp')
+    uploadFileContent
+      .mockResolvedValueOnce({ id: 'original-1' })
+      .mockResolvedValueOnce({ id: 'thumb-1' })
+    await renderApp('/cairns/c-3', { googleClientId: 'a-client-id' })
+    await signIn()
+    const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
+
+    await act(async () => {
+      fireEvent.drop(shell, { dataTransfer: fileDataTransfer([new File(['jpeg'], 'a.jpg')]) })
+    })
+
+    await waitFor(() => {
+      const stored = JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')
+      expect(stored).toHaveLength(1)
+      expect(stored[0].image).toEqual({ originalDriveFileId: 'original-1', thumbnailDriveFileId: 'thumb-1' })
+    })
+    fetchSpy.mockRestore()
+  })
+
+  it('drops two images onto an open cairn: the first attaches, the second is refused', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedLooseCairn('c-4', 'Ellery Creek camp')
+    uploadFileContent
+      .mockResolvedValueOnce({ id: 'original-1' })
+      .mockResolvedValueOnce({ id: 'thumb-1' })
+    await renderApp('/cairns/c-4', { googleClientId: 'a-client-id' })
+    await signIn()
+    const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
+
+    await act(async () => {
+      fireEvent.drop(shell, {
+        dataTransfer: fileDataTransfer([new File(['jpeg'], 'a.jpg'), new File(['jpeg'], 'b.jpg')]),
+      })
+    })
+
+    expect(await screen.findByText('only one photo per cairn')).toBeDefined()
+    await waitFor(() => {
+      const stored = JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')
+      expect(stored[0].image).not.toBeNull()
+    })
+    fetchSpy.mockRestore()
+  })
+
+  it('dropping while the list face is open still imports as new cairns (#155)', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    uploadFileContent
+      .mockResolvedValueOnce({ id: 'original-1' })
+      .mockResolvedValueOnce({ id: 'thumb-1' })
+    await renderApp('/', { googleClientId: 'a-client-id' })
+    await signIn()
+    const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
+    const gpsBuffer = readFileSync(join(__dirname, 'photo/fixtures/gps-and-timestamps.jpg'))
+
+    await act(async () => {
+      fireEvent.drop(shell, {
+        dataTransfer: fileDataTransfer([new File([gpsBuffer], 'sapporo.jpg', { type: 'image/jpeg' })]),
+      })
+    })
+
+    await waitFor(() => {
+      expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(1)
+    })
     fetchSpy.mockRestore()
   })
 })

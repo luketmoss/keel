@@ -28,7 +28,7 @@ export interface LooseImportResult {
   needsPlacement: PlacementQueueItem[]
 }
 
-const UNRECOGNISED =
+export const UNRECOGNISED =
   'cairn takes .kml or .kmz tracks, JPEG, PNG or WebP photos, and .zip archives'
 
 /** The date a track happened, from its first timestamped point. A KML with

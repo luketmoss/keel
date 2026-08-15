@@ -1374,7 +1374,11 @@ describe('App placement queue (#168)', () => {
     const [loose] = JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')
 
     const zip = new JSZip()
-    zip.file('trip/day one/zipped.jpg', readFileSync(join(__dirname, 'photo/fixtures/gps-and-timestamps.jpg')))
+    const gpsBytes = readFileSync(join(__dirname, 'photo/fixtures/gps-and-timestamps.jpg'))
+    zip.file('trip/day one/zipped.jpg', gpsBytes)
+    // A second entry, so this also shows every expanded entry reaching the
+    // pipeline rather than the archive counting as one item (criterion 11).
+    zip.file('trip/day two/zipped-2.jpg', gpsBytes)
     // Every macOS zip carries these; neither may become a cairn.
     zip.file('__MACOSX/._zipped.jpg', 'applesauce')
     zip.file('.DS_Store', 'junk')
@@ -1385,7 +1389,7 @@ describe('App placement queue (#168)', () => {
     })
 
     await waitFor(() => {
-      expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(2)
+      expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(3)
     })
     const index = JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')
     const zipped = index.find((item: { name: string }) => item.name === 'zipped.jpg')
@@ -1397,6 +1401,7 @@ describe('App placement queue (#168)', () => {
     // Folders flattened: `trip/day one/zipped.jpg` arrived as `zipped.jpg`.
     expect(index.map((item: { name: string }) => item.name).sort()).toEqual([
       'loose.jpg',
+      'zipped-2.jpg',
       'zipped.jpg',
     ])
     // The junk entries are in this archive on purpose, but what proves they

@@ -28,7 +28,7 @@ import type { PlacementQueueItem } from '../import/placementQueue'
 import type { LatLng } from '../map/geo'
 import './TripDetail.css'
 
-const UNRECOGNISED_TYPE_MESSAGE =
+export const UNRECOGNISED_TYPE_MESSAGE =
   'trips take .kml or .kmz tracks, JPEG, PNG or WebP photos, and .zip archives'
 const SIGNED_OUT_DROP_MESSAGE = 'sign in to add files to this trip'
 

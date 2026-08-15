@@ -2,21 +2,21 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AdvancedMarker, useMap } from '@vis.gl/react-google-maps'
 import { clusterMarkers, type MarkerCluster } from '../map/cluster'
 import { zoomToFitCluster } from '../map/fitBounds'
-import { clusterAriaLabel, clusterProvenance, markerAriaLabel, ringStyleForPhoto } from '../photo/provenance'
+import { clusterAriaLabel, clusterProvenance, ringStyleForPhoto } from '../photo/provenance'
 import { usePhotoImage } from '../photo/usePhotoImage'
-import type { PositionSource } from '../store/looseStore'
-import './PhotoLayer.css'
+import { CairnMarker } from './CairnMarker'
+import type { CairnIcon, PositionSource } from '../store/looseStore'
+import './CairnLayer.css'
 
-/** A cairn with an image, flattened to what this layer draws — every cairn
-    on this map has a position (`cairns.md`), so there is no "unlocated"
-    case to filter out any more. Not the model's own `CairnRecord`: this
-    layer only draws the image-thumbnail marker (`cairns.md`'s pin-vs-
-    thumbnail predicate is the marker/list rework's to build), so its input
-    stays the narrower shape a photo marker actually needs. */
-export interface PositionedPhoto {
+/** A cairn flattened to what this layer draws — every cairn on this map
+    has a position (`cairns.md`), so there is no "unlocated" case to filter
+    out any more. Not the model's own `CairnRecord`: this layer only needs
+    the fields a marker draws from. */
+export interface PositionedCairn {
   id: string
   name: string
-  thumbnailDriveFileId: string
+  thumbnailDriveFileId: string | null
+  icon: CairnIcon | null
   latitude: number
   longitude: number
   source: PositionSource
@@ -28,31 +28,38 @@ export interface PositionedPhoto {
    values). Keep this in step with index.css's --marker-size by hand. */
 const MARKER_FOOTPRINT_PX = 28
 
-interface PhotoLayerProps {
-  photos: PositionedPhoto[]
+interface CairnLayerProps {
+  cairns: PositionedCairn[]
   /** Drive access token for thumbnail fetches through #53's cache — `null`
-      renders every marker with its `--surface-lift` fallback fill, same as
-      a thumbnail that hasn't arrived yet. */
+      renders every thumbnail marker with its `--surface-lift` fallback
+      fill, same as a thumbnail that hasn't arrived yet. */
   accessToken: string | null
-  selectedPhotoId: string | null
-  onSelectPhoto: (photoId: string) => void
+  selectedCairnId: string | null
+  onSelectCairn: (cairnId: string) => void
   /** #55: clicking an *already-selected* marker opens the lightbox rather
       than reselecting (design doc's "Opening a photo" section — clicking
       its row, or its already-selected marker). Clicking a marker that
-      isn't yet selected still only selects it, via `onSelectPhoto` above —
+      isn't yet selected still only selects it, via `onSelectCairn` above —
       the two are never both called for the same click. Optional so a
       future caller with no lightbox can omit it. */
-  onOpenPhoto?: (photoId: string) => void
+  onOpenCairn?: (cairnId: string) => void
 }
 
-/** Renders positioned photos as clustered `AdvancedMarker`s above the
+/** Renders positioned cairns as clustered `AdvancedMarker`s above the
     track polylines drawn by `TrackLayer` — mounted as a sibling of it in
-    `MapView`, later in JSX order, which is what keeps it on top (design
+    `TripDetail`, later in JSX order, which is what keeps it on top (design
     doc's Layering section) since `AdvancedMarker`'s pane
     (`overlayMouseTarget`) already sits above `Polyline`'s
     (`overlayLayer`) regardless of mount order; sibling-after just keeps
-    DOM order legible for anyone reading the tree. */
-export function PhotoLayer({ photos, accessToken, selectedPhotoId, onSelectPhoto, onOpenPhoto }: PhotoLayerProps) {
+    DOM order legible for anyone reading the tree.
+
+    Each single marker draws via `CairnMarker`'s one predicate (`cairns.md`,
+    "Markers, rows and chips") — a thumbnail circle or a pin, chosen the
+    same way the list row and the world map's loose markers choose it. A
+    cluster of several cairns keeps the pre-#169 provenance-ring treatment
+    (`#54`'s design), unchanged: redrawing clustering for a mix of pins and
+    thumbnails is not this issue's to solve. */
+export function CairnLayer({ cairns, accessToken, selectedCairnId, onSelectCairn, onOpenCairn }: CairnLayerProps) {
   const map = useMap()
   const [zoom, setZoom] = useState<number>(() => map?.getZoom() ?? 2)
 
@@ -65,13 +72,9 @@ export function PhotoLayer({ photos, accessToken, selectedPhotoId, onSelectPhoto
     return () => listener.remove()
   }, [map])
 
-  // `clusterMarkers` clusters on a `{lat, lng}` shape; `PositionedPhoto`
-  // carries `latitude`/`longitude` (matching #52's `PhotoPosition`), so each
-  // photo is wrapped with the coordinate pair clustering needs while keeping
-  // the original record reachable as `.photo`.
   const clusterable = useMemo(
-    () => photos.map((photo) => ({ lat: photo.latitude, lng: photo.longitude, photo })),
-    [photos],
+    () => cairns.map((cairn) => ({ lat: cairn.latitude, lng: cairn.longitude, cairn })),
+    [cairns],
   )
   const clusters = useMemo(
     () => clusterMarkers(clusterable, zoom, MARKER_FOOTPRINT_PX),
@@ -84,20 +87,20 @@ export function PhotoLayer({ photos, accessToken, selectedPhotoId, onSelectPhoto
     <>
       {clusters.map((cluster) => {
         if (cluster.members.length === 1) {
-          const photo = cluster.members[0].photo
+          const cairn = cluster.members[0].cairn
           return (
-            <PhotoMarker
-              key={photo.id}
-              photo={photo}
+            <SingleCairnMarker
+              key={cairn.id}
+              cairn={cairn}
               accessToken={accessToken}
-              selected={selectedPhotoId === photo.id}
-              onSelect={onSelectPhoto}
-              onOpen={onOpenPhoto}
+              selected={selectedCairnId === cairn.id}
+              onSelect={onSelectCairn}
+              onOpen={onOpenCairn}
             />
           )
         }
         const key = cluster.members
-          .map((member) => member.photo.id)
+          .map((member) => member.cairn.id)
           .sort()
           .join(',')
         return <ClusterMarker key={key} cluster={cluster} map={map} />
@@ -106,22 +109,20 @@ export function PhotoLayer({ photos, accessToken, selectedPhotoId, onSelectPhoto
   )
 }
 
-function PhotoMarker({
-  photo,
+function SingleCairnMarker({
+  cairn,
   accessToken,
   selected,
   onSelect,
   onOpen,
 }: {
-  photo: PositionedPhoto
+  cairn: PositionedCairn
   accessToken: string | null
   selected: boolean
-  onSelect: (photoId: string) => void
-  onOpen?: (photoId: string) => void
+  onSelect: (cairnId: string) => void
+  onOpen?: (cairnId: string) => void
 }) {
-  const thumbnailUrl = usePhotoImage(accessToken, photo.thumbnailDriveFileId).url
-  const ring = ringStyleForPhoto(photo.source, selected)
-  const label = markerAriaLabel(photo.source, undefined)
+  const thumbnailUrl = usePhotoImage(accessToken, cairn.thumbnailDriveFileId ?? undefined).url
   // `tabIndex={-1}`: focusable via `.focus()` below (so #55's lightbox can
   // return focus here on close, per its design doc) without joining the
   // tab order — this element was never keyboard-reachable before #55 and
@@ -131,41 +132,37 @@ function PhotoMarker({
   function handleClick() {
     hitRef.current?.focus()
     if (selected) {
-      onOpen?.(photo.id)
+      onOpen?.(cairn.id)
     } else {
-      onSelect(photo.id)
+      onSelect(cairn.id)
     }
   }
 
   return (
     <AdvancedMarker
-      position={{ lat: photo.latitude, lng: photo.longitude }}
+      position={{ lat: cairn.latitude, lng: cairn.longitude }}
       zIndex={selected ? 1 : 0}
       onClick={handleClick}
     >
       <div
         ref={hitRef}
         tabIndex={-1}
-        className="photo-marker-hit"
+        className="cairn-layer__hit"
         role="button"
-        aria-label={label}
+        aria-label={cairn.name}
         aria-pressed={selected}
-        data-testid="photo-marker"
-        data-photo-id={photo.id}
-        data-source={photo.source}
+        data-testid="cairn-marker"
+        data-cairn-id={cairn.id}
+        data-source={cairn.source}
         data-selected={selected}
       >
-        <div
-          className="photo-marker"
-          style={{
-            borderStyle: ring.borderStyle,
-            borderWidth: `var(${ring.widthVar})`,
-            borderColor: `var(${ring.colorVar})`,
-            filter: ring.glow ? 'drop-shadow(0 0 7px var(--accent))' : undefined,
-          }}
-        >
-          {thumbnailUrl && <img src={thumbnailUrl} alt="" />}
-        </div>
+        <CairnMarker
+          icon={cairn.icon}
+          thumbnailUrl={thumbnailUrl}
+          hasImage={cairn.thumbnailDriveFileId !== null}
+          source={cairn.source}
+          selected={selected}
+        />
       </div>
     </AdvancedMarker>
   )
@@ -175,10 +172,10 @@ function ClusterMarker({
   cluster,
   map,
 }: {
-  cluster: MarkerCluster<{ lat: number; lng: number; photo: PositionedPhoto }>
+  cluster: MarkerCluster<{ lat: number; lng: number; cairn: PositionedCairn }>
   map: google.maps.Map
 }) {
-  const provenance = clusterProvenance(cluster.members.map((member) => member.photo))
+  const provenance = clusterProvenance(cluster.members.map((member) => member.cairn))
   const ring = ringStyleForPhoto(provenance, false)
   const label = clusterAriaLabel(cluster.members.length)
 
@@ -193,15 +190,15 @@ function ClusterMarker({
       }
     >
       <div
-        className="photo-marker-hit"
+        className="cairn-layer__hit"
         role="button"
         aria-label={label}
-        data-testid="photo-cluster"
+        data-testid="cairn-cluster"
         data-count={cluster.members.length}
         data-source={provenance}
       >
         <div
-          className="photo-marker photo-marker--cluster"
+          className="cairn-layer__cluster"
           style={{
             borderStyle: ring.borderStyle,
             borderWidth: `var(${ring.widthVar})`,

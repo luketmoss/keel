@@ -1,6 +1,8 @@
-/* cairn/docs/design/54-photo-markers.md — Marker form, Clustering, Selection */
+/* cairn/docs/design/54-photo-markers.md — Marker form, Clustering, Selection.
+   The single-marker shape itself is CairnMarker.css's job now; this file
+   only covers the click-target wrapper and the cluster badge. */
 
-.photo-marker-hit {
+.cairn-layer__hit {
   width: var(--hit-target);
   height: var(--hit-target);
   display: flex;
@@ -8,30 +10,18 @@
   justify-content: center;
   cursor: pointer;
   /* Transparent padding expands the click target without growing the
-     visible circle — #48's technique, reused per the design doc. */
+     visible marker — #48's technique, reused per the design doc. */
   background: transparent;
   border: none;
   padding: 0;
 }
 
-.photo-marker {
+.cairn-layer__cluster {
   width: var(--marker-size);
   height: var(--marker-size);
   border-radius: var(--radius-full);
-  overflow: hidden;
   box-shadow: var(--shadow-lifted);
-  background: var(--surface-lift);
   box-sizing: border-box;
-}
-
-.photo-marker img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.photo-marker--cluster {
   display: flex;
   align-items: center;
   justify-content: center;

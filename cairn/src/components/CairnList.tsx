@@ -1,19 +1,21 @@
 import { useEffect, useRef, type RefObject } from 'react'
 import { prefersReducedMotion } from '../map/motion'
 import { usePhotoImage } from '../photo/usePhotoImage'
-import { formatCaptureTime, type PhotoListItem, type PhotoListRow } from '../photo/photoListGroups'
-import './PhotoList.css'
+import { cairnRowMetaLine, type CairnListItem, type CairnListRow } from '../photo/cairnListGroups'
+import { CairnMarker } from './CairnMarker'
+import './CairnList.css'
 
-interface PhotoListProps {
-  items: PhotoListItem[]
+interface CairnListProps {
+  items: CairnListItem[]
   totalCount: number
-  selectedPhotoId: string | null
+  selectedCairnId: string | null
   accessToken: string | null
-  tripOffsetHours: number
-  /** Clicking a row selects it *and* opens the lightbox in one action
-      (design doc's Selection and "The lightbox" sections both name this
-      the same click). */
-  onOpenRow: (photoId: string) => void
+  /** Clicking a row selects it *and*, when the cairn has an image, opens
+      the lightbox in one action (design doc's Selection and "The
+      lightbox" sections both name this the same click). An icon-only
+      cairn has nothing for the lightbox to show, so its row only
+      selects. */
+  onOpenRow: (cairnId: string) => void
   /** #77: performs the actual removal (trash originals + rewrite the index)
       once the row's confirm has been accepted — the `×` control itself
       only starts the confirm, via `onStartConfirm` below. */
@@ -34,27 +36,26 @@ interface PhotoListProps {
       pointerdown-outside listener (owned by the parent) knows what counts
       as "inside". */
   confirmingRowRef: RefObject<HTMLElement | null>
-  /** Photo ids whose removal is in flight — row renders muted and inert. */
+  /** Cairn ids whose removal is in flight — row renders muted and inert. */
   removingIds: Set<string>
-  /** Photo id -> failure copy to show beneath that row. */
+  /** Cairn id -> failure copy to show beneath that row. */
   removeErrors: Record<string, string>
   /** True while there's no Drive connection to remove against — same
       `signedIn` gate `TripImportPanel` already applies to import. */
   disableRemove?: boolean
 }
 
-/** The trip sidebar's photo section (#55) — beneath `TrackList`, sourced
-    from every imported photo (`photoImport.photos` via `TripDetail`'s
-    `buildPhotoListRows`/`orderPhotoListItems`), not just the positioned
-    subset the map draws. Follows `TrackList`'s row-anatomy and empty-state
-    conventions (BEM-ish class names, colocated CSS) without extending it —
-    a photo row's shape doesn't overlap a track row's. */
-export function PhotoList({
+/** The trip sidebar's cairn list (#55, unified to every cairn in the trip
+    by #169) — beneath `TrackList`, sourced from every cairn the trip owns,
+    not just the ones carrying an image. Follows `TrackList`'s row-anatomy
+    and empty-state conventions (BEM-ish class names, colocated CSS)
+    without extending it — a cairn row's shape doesn't overlap a track
+    row's. */
+export function CairnList({
   items,
   totalCount,
-  selectedPhotoId,
+  selectedCairnId,
   accessToken,
-  tripOffsetHours,
   onOpenRow,
   onRemove,
   onRemoveFromTrip,
@@ -65,7 +66,7 @@ export function PhotoList({
   removingIds,
   removeErrors,
   disableRemove = false,
-}: PhotoListProps) {
+}: CairnListProps) {
   const rowRefs = useRef(new Map<string, HTMLLIElement>())
 
   // #54 selects a marker on the map; this is the list's half of "one
@@ -77,40 +78,39 @@ export function PhotoList({
   // nor transition, so index.css's global reduced-motion rule can't catch
   // it (design doc edge case).
   useEffect(() => {
-    if (!selectedPhotoId) return
-    const el = rowRefs.current.get(selectedPhotoId)
+    if (!selectedCairnId) return
+    const el = rowRefs.current.get(selectedCairnId)
     if (!el) return
     // jsdom (this suite's test environment) doesn't implement
     // `scrollIntoView` at all — same defensive-optional-call pattern as
     // `prefersReducedMotion`'s own `matchMedia` guard.
     el.scrollIntoView?.({ block: 'nearest', behavior: prefersReducedMotion() ? 'auto' : 'smooth' })
-  }, [selectedPhotoId])
+  }, [selectedCairnId])
 
   return (
-    <div className="photo-list">
-      <div className="photo-list__header">
-        <span>Photos</span>
-        {totalCount > 0 && <span className="photo-list__count">{totalCount}</span>}
+    <div className="cairn-list">
+      <div className="cairn-list__header">
+        <span>Cairns</span>
+        {totalCount > 0 && <span className="cairn-list__count">{totalCount}</span>}
       </div>
       {totalCount === 0 ? (
-        <div className="photo-list photo-list--empty">
-          <p className="photo-list__empty-title">No photos yet</p>
-          <p className="photo-list__empty-detail">Drop photos onto this trip to see them here.</p>
+        <div className="cairn-list cairn-list--empty">
+          <p className="cairn-list__empty-title">No cairns yet</p>
+          <p className="cairn-list__empty-detail">Drop photos onto this trip to see them here.</p>
         </div>
       ) : (
-        <ul className="photo-list__rows">
+        <ul className="cairn-list__rows">
           {items.map((item, index) =>
             item.type === 'divider' ? (
-              <li key={`divider-${index}`} className="photo-list__divider">
+              <li key={`divider-${index}`} className="cairn-list__divider">
                 No date
               </li>
             ) : (
-              <PhotoRow
+              <CairnRow
                 key={item.row.id}
                 row={item.row}
-                selected={item.row.id === selectedPhotoId}
+                selected={item.row.id === selectedCairnId}
                 accessToken={accessToken}
-                tripOffsetHours={tripOffsetHours}
                 onOpen={onOpenRow}
                 onRemove={onRemove}
                 onRemoveFromTrip={onRemoveFromTrip}
@@ -134,11 +134,10 @@ export function PhotoList({
   )
 }
 
-function PhotoRow({
+function CairnRow({
   row,
   selected,
   accessToken,
-  tripOffsetHours,
   onOpen,
   onRemove,
   onRemoveFromTrip,
@@ -151,11 +150,10 @@ function PhotoRow({
   disableRemove,
   registerRef,
 }: {
-  row: PhotoListRow
+  row: CairnListRow
   selected: boolean
   accessToken: string | null
-  tripOffsetHours: number
-  onOpen: (photoId: string) => void
+  onOpen: (cairnId: string) => void
   onRemove: (id: string) => void
   onRemoveFromTrip?: (id: string) => void
   confirming: boolean
@@ -171,8 +169,7 @@ function PhotoRow({
   // fallback fill (design doc's "Photos loading" / "Thumbnail failed to
   // load" states) — `usePhotoImage` already collapses those two into one
   // `undefined` for exactly this reason.
-  const thumbnailUrl = usePhotoImage(accessToken, row.thumbnailDriveFileId).url
-  const timeLabel = row.captureInstantMs !== undefined ? formatCaptureTime(row.captureInstantMs, tripOffsetHours) : '—'
+  const thumbnailUrl = usePhotoImage(accessToken, row.thumbnailDriveFileId ?? undefined).url
 
   // #77 — the confirm replaces the row's contents in place, same shape as
   // TrackList's and the trips list's.
@@ -183,14 +180,14 @@ function PhotoRow({
           registerRef(el)
           if (confirmingRowRef) confirmingRowRef.current = el
         }}
-        className={`photo-row${selected ? ' photo-row--selected' : ''}`}
+        className={`cairn-row${selected ? ' cairn-row--selected' : ''}`}
       >
-        <div className="photo-row__confirm">
-          <span className="photo-row__confirm-text">Remove &quot;{row.name}&quot;?</span>
-          <div className="photo-row__confirm-actions">
+        <div className="cairn-row__confirm">
+          <span className="cairn-row__confirm-text">Remove &quot;{row.name}&quot;?</span>
+          <div className="cairn-row__confirm-actions">
             <button
               type="button"
-              className="photo-row__confirm-remove"
+              className="cairn-row__confirm-remove"
               onClick={() => {
                 onCancelConfirm()
                 onRemove(row.id)
@@ -198,7 +195,7 @@ function PhotoRow({
             >
               Remove
             </button>
-            <button type="button" className="photo-row__confirm-cancel" onClick={onCancelConfirm}>
+            <button type="button" className="cairn-row__confirm-cancel" onClick={onCancelConfirm}>
               Cancel
             </button>
           </div>
@@ -210,22 +207,27 @@ function PhotoRow({
   return (
     <li
       ref={registerRef}
-      className={`photo-row${selected ? ' photo-row--selected' : ''}${removing ? ' photo-row--removing' : ''}`}
+      className={`cairn-row${selected ? ' cairn-row--selected' : ''}${removing ? ' cairn-row--removing' : ''}`}
     >
-      <div className="photo-row__main">
-        <button type="button" className="photo-row__button" onClick={() => onOpen(row.id)}>
-          <span className="photo-row__thumb">{thumbnailUrl && <img src={thumbnailUrl} alt="" />}</span>
-          <span className="photo-row__time">{timeLabel}</span>
-          {/* Derived rows carry a small muted marker after the time; recorded
-              rows carry nothing — absence of a caveat is the signal (design
-              doc). */}
-          {row.source === 'interpolated' && <span className="photo-row__derived">⟂ estimated</span>}
-          <span className="photo-row__name" title={row.name}>
+      <div className="cairn-row__main">
+        <button type="button" className="cairn-row__button" onClick={() => onOpen(row.id)}>
+          <span className="cairn-row__glyph">
+            <CairnMarker
+              icon={row.icon}
+              thumbnailUrl={thumbnailUrl}
+              hasImage={row.thumbnailDriveFileId !== null}
+              source={row.source}
+              selected={selected}
+              small
+            />
+          </span>
+          <span className="cairn-row__meta">{cairnRowMetaLine(row)}</span>
+          <span className="cairn-row__name" title={row.name}>
             {row.name}
           </span>
         </button>
         {removing ? (
-          <span className="photo-row__removing">Removing…</span>
+          <span className="cairn-row__removing">Removing…</span>
         ) : (
           <>
             {onRemoveFromTrip && (
@@ -233,7 +235,7 @@ function PhotoRow({
                  back, which is exactly what makes it the other exit. */
               <button
                 type="button"
-                className="photo-row__unlink"
+                className="cairn-row__unlink"
                 aria-label={`Remove ${row.name} from trip`}
                 disabled={disableRemove}
                 onClick={() => onRemoveFromTrip(row.id)}
@@ -243,7 +245,7 @@ function PhotoRow({
             )}
             <button
               type="button"
-              className="photo-row__remove"
+              className="cairn-row__remove"
               aria-label={`Delete ${row.name} permanently`}
               disabled={disableRemove}
               onClick={onStartConfirm}
@@ -253,7 +255,7 @@ function PhotoRow({
           </>
         )}
       </div>
-      {removeError && <p className="photo-row__error">{removeError}</p>}
+      {removeError && <p className="cairn-row__error">{removeError}</p>}
     </li>
   )
 }

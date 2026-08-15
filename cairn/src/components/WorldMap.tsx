@@ -13,7 +13,7 @@ const DRAFT_ROUTE_COLOR = '#f1f3fa'
 
 const INITIAL_ZOOM = 2
 
-/* --marker-size from index.css, transcribed for the same reason PhotoLayer's
+/* --marker-size from index.css, transcribed for the same reason CairnLayer's
    own copy is — clustering's projection math wants real pixels, not a CSS
    var. Keep in step with index.css by hand. */
 const MARKER_FOOTPRINT_PX = 28

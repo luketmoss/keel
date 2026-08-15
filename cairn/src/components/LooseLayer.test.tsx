@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LooseLayer } from './LooseLayer'
 import type { LooseRecord, LooseStore } from '../store/looseStore'
 
-/* Same stubbing strategy as PhotoLayer.test.tsx — AdvancedMarker renders
+/* Same stubbing strategy as CairnLayer.test.tsx — AdvancedMarker renders
    its children directly so assertions read the DOM. LooseLayer also draws
    a Polyline for a hovered/selected track's route, which none of these
    tests trigger, so a no-op stub is enough. */
@@ -26,7 +26,7 @@ vi.mock('@vis.gl/react-google-maps', () => ({
 }))
 
 /* #134 — the photo marker's thumbnail resolves through #53's caching
-   loader, mocked at the module boundary exactly as `PhotoLayer.test.tsx`
+   loader, mocked at the module boundary exactly as `CairnLayer.test.tsx`
    and `LooseFace.test.tsx` both do. */
 const { acquire } = vi.hoisted(() => ({ acquire: vi.fn() }))
 vi.mock('../photo/imageCache', () => ({
@@ -98,12 +98,13 @@ describe('LooseLayer — #134 the photo marker', () => {
     expect(container.querySelector('.loose-marker__photo')).not.toBeNull()
   })
 
-  it('keeps drawing the plain circle marker for an icon-only cairn', () => {
+  it('#169: draws an icon-only cairn as a pin carrying its icon, not the thumbnail circle', () => {
     const { container } = renderLayer([looseCairn({ image: null, icon: 'campsite' })])
 
     expect(acquire).not.toHaveBeenCalled()
     expect(container.querySelector('.loose-marker__photo img')).toBeNull()
-    expect(container.querySelector('.loose-marker__photo')).not.toBeNull()
+    expect(container.querySelector('.cairn-marker--pin')).not.toBeNull()
+    expect(container.querySelector('.cairn-marker--thumb')).toBeNull()
   })
 
   it('fetches nothing while signed out', () => {

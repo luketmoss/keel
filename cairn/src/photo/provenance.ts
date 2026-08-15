@@ -1,7 +1,7 @@
 /* Ring styling and copy for a photo-carrying cairn marker's provenance —
    pure, no React — per cairn/docs/design/54-photo-markers.md's "Marker
    form", "Selection" and "Copy" sections, extended to `cairns.md`'s third
-   `positionSource`. Kept separate from PhotoLayer.tsx so the ring/label
+   `positionSource`. Kept separate from CairnLayer.tsx so the ring/label
    rules are testable without mounting a map.
 
    `placed` (a person put it here) takes the same solid-ring treatment as
@@ -45,19 +45,6 @@ export function ringStyleForPhoto(source: PositionSource, selected: boolean): Ri
     so this has no selected branch. */
 export function clusterProvenance(members: { source: PositionSource }[]): PositionSource {
   return members.some((member) => member.source === 'interpolated') ? 'interpolated' : 'exif'
-}
-
-/** `aria-label` copy — icon-only controls, unusable without one (design
-    doc's Copy section). `captureTime` is whatever the caller already
-    resolved from the photo's EXIF fields (gpsTimestamp/dateTimeOriginal);
-    `undefined` falls back to a label that still names what's estimated,
-    since a photo can be derived-positioned without a readable capture time
-    at all. */
-export function markerAriaLabel(source: PositionSource, captureTime: string | undefined): string {
-  if (source === 'interpolated') {
-    return 'Photo, position estimated from track'
-  }
-  return captureTime ? `Photo taken ${captureTime}` : 'Photo taken'
 }
 
 export function clusterAriaLabel(count: number): string {

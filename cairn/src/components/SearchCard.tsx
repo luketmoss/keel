@@ -50,9 +50,12 @@ export function SearchCard({ detail, onBack, query, onQueryChange, accountBubble
           type="search"
           className="search-card__field"
           /* Worded for what it becomes in #110 rather than renamed twice —
-             it narrows the loaded list by name today. */
-          placeholder="Search trips, tracks and photos"
-          aria-label="Search trips, tracks and photos"
+             it narrows the loaded list by name today. `cairns.md`'s
+             "Search placeholder becomes 'Search trips, tracks and
+             cairns'" — #169's rename, since "photos" is no longer a
+             kind. */
+          placeholder="Search trips, tracks and cairns"
+          aria-label="Search trips, tracks and cairns"
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
         />

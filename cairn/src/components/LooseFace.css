@@ -105,6 +105,21 @@
   color: var(--text);
 }
 
+.loose-face__icon {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+
+.loose-face__icon-glyph {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--text);
+}
+
 /* #133 — the swatch becomes a button, wrapped in its own positioned
    context so `ColorPopover` can anchor beneath it. */
 .loose-face__swatch-wrap {

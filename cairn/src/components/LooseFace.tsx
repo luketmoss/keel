@@ -5,8 +5,15 @@ import { NameInput } from './NameInput'
 import { ColorPopover } from './ColorPopover'
 import { formatDistance } from '../format/units'
 import { trackColor, TRACK_COLORS } from '../map/palette'
-import { canChangeOwner, showExport, type LooseCairnRecord, type LooseRecord } from '../store/looseStore'
+import {
+  CAIRN_ICON_LABEL,
+  canChangeOwner,
+  positionSourceSentence,
+  showExport,
+  type LooseRecord,
+} from '../store/looseStore'
 import { usePhotoImage } from '../photo/usePhotoImage'
+import { CairnIconGlyph } from './CairnIcon'
 import './LooseFace.css'
 
 interface LooseFaceProps {
@@ -264,21 +271,6 @@ function TrackBody({
   )
 }
 
-/** `cairns.md`'s position-source sentence, verbatim — the one place this
-    copy lives, so a later surface (the marker/list rework's detail face)
-    can read it from here rather than re-authoring it. */
-export function positionSourceSentence(source: LooseCairnRecord['positionSource']): string {
-  switch (source) {
-    case 'placed':
-      return 'You put this here. Interpolation will never move it again.'
-    case 'interpolated':
-      return 'No GPS, so it was positioned by timestamp against this trip’s tracks. Drag its marker to correct it and this becomes placed.'
-    case 'exif':
-    default:
-      return 'Position came from the photo’s EXIF GPS — a starting value, not a verdict. Drag its marker to correct it and this becomes placed.'
-  }
-}
-
 function CairnBody({
   item,
   accessToken,
@@ -288,7 +280,7 @@ function CairnBody({
 }) {
   // #134: loading and failed both render the same `--surface-lift`
   // fallback fill — `usePhotoImage` already collapses those two into one
-  // `undefined` for exactly this reason, matching `PhotoList`'s own stance.
+  // `undefined` for exactly this reason, matching `CairnList`'s own stance.
   const thumbnailUrl = usePhotoImage(accessToken, item.image?.thumbnailDriveFileId).url
   return (
     <>
@@ -310,6 +302,19 @@ function CairnBody({
           <dt>Taken</dt>
           <dd>{item.date ?? '—'}</dd>
         </div>
+        {/* #169: the detail face renders the current icon and nothing
+            more — choosing one is #156's. */}
+        {item.icon && (
+          <div className="loose-face__stat">
+            <dt>Icon</dt>
+            <dd className="loose-face__icon">
+              <span className="loose-face__icon-glyph">
+                <CairnIconGlyph icon={item.icon} />
+              </span>
+              {CAIRN_ICON_LABEL[item.icon]}
+            </dd>
+          </div>
+        )}
       </dl>
       <p className="loose-face__position-source">{positionSourceSentence(item.positionSource)}</p>
       {item.description && <p className="loose-face__description">{item.description}</p>}

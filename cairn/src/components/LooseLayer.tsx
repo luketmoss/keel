@@ -4,13 +4,14 @@ import type { FeatureCollection, LineString } from 'geojson'
 import { trackColor } from '../map/palette'
 import type { LooseRecord, LooseStore } from '../store/looseStore'
 import { usePhotoImage } from '../photo/usePhotoImage'
+import { CairnMarker } from './CairnMarker'
 import './LooseLayer.css'
 
 interface LooseLayerProps {
   items: LooseRecord[]
   store: LooseStore
   /** #134: Drive access token for a loose photo's thumbnail, through the
-      same caching loader `PhotoLayer` uses — `null` renders every marker
+      same caching loader `CairnLayer` uses — `null` renders every marker
       with its `--surface-lift` fallback fill, same as a thumbnail that
       hasn't arrived yet. */
   accessToken: string | null
@@ -122,9 +123,10 @@ function CairnDot({
   // #134: the same fallback the standing document already specifies for a
   // cairn without one — a cairn whose thumbnail is missing or fails to
   // load keeps drawing at the same size and ring, in the `--surface-lift`
-  // fill, rather than disappearing from the map. A cairn with no image at
-  // all (icon-only) draws the same empty circle for now — the pin-vs-
-  // thumbnail predicate is the marker/list rework's to build.
+  // fill, rather than disappearing from the map. `CairnMarker` (#169)
+  // draws the pin-vs-thumbnail predicate itself, so an icon-only cairn
+  // draws its pin here exactly as it does everywhere else the predicate
+  // is read.
   const thumbnailUrl = usePhotoImage(accessToken, item.image?.thumbnailDriveFileId).url
   return (
     <AdvancedMarker position={item.position} zIndex={0} onClick={onSelect}>
@@ -140,7 +142,13 @@ function CairnDot({
           onFocus={() => onHover(item.id)}
           onBlur={() => onHover(null)}
         >
-          {thumbnailUrl && <img src={thumbnailUrl} alt="" />}
+          <CairnMarker
+            icon={item.icon}
+            thumbnailUrl={thumbnailUrl}
+            hasImage={item.image !== null}
+            source={item.positionSource}
+            selected={emphasized}
+          />
         </button>
         <span className="loose-marker__label">{item.name}</span>
       </div>

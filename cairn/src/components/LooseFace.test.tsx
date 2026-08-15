@@ -4,7 +4,7 @@ import { LooseFace } from './LooseFace'
 import type { LooseRecord } from '../store/looseStore'
 
 /* #134 — the detail face's image resolves through #53's caching loader,
-   mocked here the same way `PhotoList.test.tsx` mocks it: at the module
+   mocked here the same way `CairnList.test.tsx` mocks it: at the module
    boundary, not the hook, since `usePhotoImage` (the hook in between) is
    already exhaustively covered by its own test file. */
 const { acquire } = vi.hoisted(() => ({ acquire: vi.fn() }))
@@ -111,5 +111,20 @@ describe('LooseFace — #134 the cairn image', () => {
     })
 
     expect(acquire).not.toHaveBeenCalled()
+  })
+})
+
+describe('LooseFace — #169 the detail face renders the current icon', () => {
+  it('shows the icon and its label when the cairn carries one', () => {
+    const { container, getByText } = renderFace(looseCairn({ icon: 'campsite', image: null }))
+
+    expect(getByText('campsite')).toBeDefined()
+    expect(container.querySelector('.loose-face__icon-glyph')).not.toBeNull()
+  })
+
+  it('shows no icon row at all when the cairn has none', () => {
+    const { container } = renderFace(looseCairn({ icon: null, image: null }))
+
+    expect(container.querySelector('.loose-face__icon')).toBeNull()
   })
 })

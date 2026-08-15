@@ -141,7 +141,7 @@ describe('TripDetail — #55 photo list and lightbox', () => {
 
     renderTrip()
 
-    expect(screen.getByText('No photos yet')).toBeDefined()
+    expect(screen.getByText('No cairns yet')).toBeDefined()
     expect(screen.getByText('Drop photos onto this trip to see them here.')).toBeDefined()
   })
 

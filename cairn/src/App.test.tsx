@@ -201,7 +201,7 @@ describe('App shell (#109)', () => {
 
     const card = container.querySelector('.search-card') as HTMLElement
     expect(card.querySelector('.search-card__mark')).not.toBeNull()
-    expect(screen.getByPlaceholderText('Search trips, tracks and photos')).toBeDefined()
+    expect(screen.getByPlaceholderText('Search trips, tracks and cairns')).toBeDefined()
     expect(card.querySelector('.search-card__account')).not.toBeNull()
   })
 
@@ -220,7 +220,7 @@ describe('App shell (#109)', () => {
     await renderApp('/', { googleClientId: 'a-client-id' })
     await signIn()
 
-    for (const label of ['All', 'Trips', 'Tracks', 'Photos']) {
+    for (const label of ['All', 'Trips', 'Tracks', 'Cairns']) {
       expect(screen.getByRole('button', { name: label })).toBeDefined()
     }
 
@@ -357,7 +357,7 @@ describe('App routing (#109)', () => {
     await screen.findByRole('button', { name: 'Back to the list' })
 
     expect(container.querySelector('.search-card__mark')).toBeNull()
-    expect(screen.queryByPlaceholderText('Search trips, tracks and photos')).toBeNull()
+    expect(screen.queryByPlaceholderText('Search trips, tracks and cairns')).toBeNull()
     expect(container.querySelector('.search-card__name')?.textContent).toBe('Hokkaido')
     expect(container.querySelector('.search-card__kind')?.textContent).toBe('trip')
     expect(container.querySelector('.filter-chips')).toBeNull()
@@ -383,7 +383,7 @@ describe('App routing (#109)', () => {
     await signIn()
     await screen.findByText('Hokkaido')
 
-    const field = screen.getByPlaceholderText('Search trips, tracks and photos')
+    const field = screen.getByPlaceholderText('Search trips, tracks and cairns')
     fireEvent.change(field, { target: { value: 'hokkaido' } })
     expect(screen.queryByText('Alta Via 1')).toBeNull()
 
@@ -392,7 +392,7 @@ describe('App routing (#109)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Back to the list' }))
     await screen.findByRole('heading', { name: 'Everything' })
 
-    expect(screen.getByPlaceholderText('Search trips, tracks and photos')).toHaveProperty(
+    expect(screen.getByPlaceholderText('Search trips, tracks and cairns')).toHaveProperty(
       'value',
       'hokkaido',
     )
@@ -733,7 +733,7 @@ describe('App loose tracks and photos (#110)', () => {
     const fetchSpy = mockGoogleSignIn()
     seedLooseCairn('lp-2', 'sapporo.jpg', { lat: 43.06, lng: 141.35 })
 
-    await renderApp('/photos/lp-2', { googleClientId: 'a-client-id' })
+    await renderApp('/cairns/lp-2', { googleClientId: 'a-client-id' })
     await signIn()
 
     expect(await screen.findByText(/43\.06000, 141\.35000/)).toBeDefined()
@@ -1007,7 +1007,7 @@ describe('App loose tracks and photos (#110)', () => {
       const fetchSpy = mockGoogleSignIn()
       seedLooseCairn('lp-rename', 'sapporo.jpg', { lat: 43.06, lng: 141.35 })
 
-      await renderApp('/photos/lp-rename', { googleClientId: 'a-client-id' })
+      await renderApp('/cairns/lp-rename', { googleClientId: 'a-client-id' })
       await signIn()
 
       fireEvent.click(await screen.findByRole('button', { name: 'Actions for sapporo.jpg' }))

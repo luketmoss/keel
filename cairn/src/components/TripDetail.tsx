@@ -15,6 +15,7 @@ import { useTripImport } from '../import/useTripImport'
 import { useCairnImport, type CairnRecord, type NewTripCairn } from '../photo/useCairnImport'
 import { buildCairnListRows, flattenCairnListRows, orderCairnListItems } from '../photo/cairnListGroups'
 import type { TripStore } from '../store/tripStore'
+import { cairnMatchesFacet, type CairnFacet } from '../store/cairnRules'
 import {
   ATTACH_IMAGE_FAILED_MESSAGE,
   MOVE_FAILED_MESSAGE,
@@ -206,12 +207,28 @@ export function TripDetail({
   const [openCairnId, setOpenCairnId] = useState<string | null>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
 
+  /* #192 — the trip's own facet, `useState` here and nowhere else: it dies
+     with the component, so leaving the trip and coming back gives `Any`.
+     The main map's facet is independent state and neither reads the other.
+     A filter you cannot see the cause of, restored on arrival, is
+     indistinguishable from missing data. */
+  const [cairnFacet, setCairnFacet] = useState<CairnFacet>('any')
+
+  /* One filter, two views. Narrowing the *records* — upstream of both the
+     markers below and the list rows — is what makes "the list and the map
+     never disagree" true by construction rather than by a second rule that
+     has to be kept in step. */
+  const visibleCairns = useMemo(
+    () => cairnImport.cairns.filter((cairn) => cairnMatchesFacet(cairn, cairnFacet)),
+    [cairnImport.cairns, cairnFacet],
+  )
+
   // Every cairn the trip owns, not just the ones carrying an image (#169 —
   // `CairnLayer` draws the pin-vs-thumbnail predicate itself, so an
   // icon-only cairn belongs here too).
   const positionedCairns: PositionedCairn[] = useMemo(
     () =>
-      cairnImport.cairns.map((cairn) => ({
+      visibleCairns.map((cairn) => ({
         id: cairn.id,
         name: cairn.name,
         thumbnailDriveFileId: cairn.image?.thumbnailDriveFileId ?? null,
@@ -220,16 +237,22 @@ export function TripDetail({
         longitude: cairn.position.lng,
         source: cairn.positionSource,
       })),
-    [cairnImport.cairns],
+    [visibleCairns],
   )
 
-  const cairnListRows = useMemo(
+  const cairnListRows = useMemo(() => buildCairnListRows(visibleCairns, allTracks), [visibleCairns, allTracks])
+  const cairnListItems = useMemo(() => orderCairnListItems(cairnListRows), [cairnListRows])
+  const flatCairnRows = useMemo(() => flattenCairnListRows(cairnListItems), [cairnListItems])
+  /* Resolved against every cairn the trip owns, not the filtered set:
+     retyping a photo as a campsite from inside the lightbox (#156) can
+     filter the open cairn out from under itself, and the lightbox stays
+     open on the cairn the user is looking at. The `rows` it navigates by
+     are still the filtered ones — arrows walk what is showing. */
+  const allCairnRows = useMemo(
     () => buildCairnListRows(cairnImport.cairns, allTracks),
     [cairnImport.cairns, allTracks],
   )
-  const cairnListItems = useMemo(() => orderCairnListItems(cairnListRows), [cairnListRows])
-  const flatCairnRows = useMemo(() => flattenCairnListRows(cairnListItems), [cairnListItems])
-  const openCairnRow = openCairnId ? flatCairnRows.find((row) => row.id === openCairnId) : undefined
+  const openCairnRow = openCairnId ? allCairnRows.find((row) => row.id === openCairnId) : undefined
   // The lightbox is a photo viewer first (`cairns.md`'s "Adding a photo…"
   // note: the image is what opens it) — an icon-only cairn has nothing for
   // it to show, so opening one only selects it. `openCairnRow` still
@@ -290,11 +313,16 @@ export function TripDetail({
 
   // #77 — a cairn that's been removed can no longer be selected or open in
   // the lightbox.
+  //
+  // #192 widens the selection half from removed to *not showing*: a
+  // selection whose row is gone and whose marker is gone is a state with
+  // no way to see or undo it. Restoring the facet to `Any` deliberately
+  // does not restore it — the user picked a filter, not a navigation.
   useEffect(() => {
-    if (selectedCairnId && !cairnImport.cairns.some((cairn) => cairn.id === selectedCairnId)) {
+    if (selectedCairnId && !visibleCairns.some((cairn) => cairn.id === selectedCairnId)) {
       setSelectedCairnId(null)
     }
-  }, [cairnImport.cairns, selectedCairnId])
+  }, [visibleCairns, selectedCairnId])
 
   useEffect(() => {
     if (openCairnId && !cairnImport.cairns.some((cairn) => cairn.id === openCairnId)) {
@@ -575,6 +603,8 @@ export function TripDetail({
         <CairnList
           items={cairnListItems}
           totalCount={cairnImport.cairns.length}
+          facet={cairnFacet}
+          onFacetChange={setCairnFacet}
           selectedCairnId={selectedCairnId}
           accessToken={accessToken}
           onOpenRow={openCairn}

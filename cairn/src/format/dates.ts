@@ -38,6 +38,17 @@ export function toIsoDate(date: Date): string {
   return `${date.getFullYear()}-${month}-${day}`
 }
 
+/** `17 Jun 2023` — any ISO instant or date string, day-month-year, always
+    with the year (unlike `formatTripDateRange`'s current-year omission,
+    which doesn't apply to a single date standing alone). A string that
+    doesn't parse is returned unchanged rather than thrown — the same
+    "hand-edited data degrades to itself" stance `parseLocalDate` takes. */
+export function formatShortDate(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return iso
+  return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
 function monthDay(date: Date): string {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }

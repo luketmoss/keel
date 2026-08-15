@@ -11,6 +11,7 @@
 
 import type { PhotoExif } from './exif'
 import type { Track, TrackPoint } from '../kml/parse'
+import type { LatLng } from '../map/geo'
 
 /** A track point bracketing search treats every track's points as one flat, time-sorted pool —
     points with no `time` are excluded outright, since there is nothing to bracket against. */
@@ -120,8 +121,11 @@ interface ResolvedTrackPoint extends TimedTrackPoint {
     tracks" as a whole, not track-by-track. Points with no `time` (or an unparseable one) are
     dropped: a trip whose tracks carry no timestamps at all yields an empty pool here, which is
     what makes acceptance criterion 10 (no timestamps anywhere → interpolates nothing, no error)
-    fall out for free. */
-function timedPointPool(tracks: Track[]): ResolvedTrackPoint[] {
+    fall out for free.
+
+    Exported for `cairns.md`'s suggestion ring (#168): the placement queue's "nearest by time"
+    offer reads this same pool directly, rather than duplicating the flatten-and-sort. */
+export function timedPointPool(tracks: Track[]): ResolvedTrackPoint[] {
   const resolved: ResolvedTrackPoint[] = []
   for (const track of tracks) {
     for (const point of track.points) {
@@ -186,4 +190,26 @@ export function positionPhoto(photo: InterpolatablePhoto, tracks: Track[]): Phot
   if (instantMs === undefined) return undefined
 
   return interpolatePosition(instantMs, tracks)
+}
+
+/** `cairns.md`'s suggestion ring: the single nearest timed track point to
+    `instantMs`, with no gap limit and no interpolated blend — "good enough
+    to offer; not good enough to apply" is exactly what separates this from
+    `interpolatePosition` above. `undefined` when the trip has no timed
+    points at all, which is what makes "no suggestion" fall out for free
+    rather than needing its own check at every call site. */
+export function nearestPointByTime(instantMs: number, tracks: Track[]): LatLng | undefined {
+  const points = timedPointPool(tracks)
+  if (points.length === 0) return undefined
+
+  let nearest = points[0]
+  let nearestGap = Math.abs(points[0].timeMs - instantMs)
+  for (const point of points.slice(1)) {
+    const gap = Math.abs(point.timeMs - instantMs)
+    if (gap < nearestGap) {
+      nearest = point
+      nearestGap = gap
+    }
+  }
+  return { lat: nearest.lat, lng: nearest.lon }
 }

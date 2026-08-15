@@ -1162,3 +1162,100 @@ describe('App loose items in Drive (#120)', () => {
     expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(0)
   })
 })
+
+describe('App placement queue (#168)', () => {
+  function noGpsPhoto(as = 'no-gps.jpg'): File {
+    const buffer = readFileSync(join(__dirname, 'photo/fixtures/gps-stripped.jpg'))
+    return new File([buffer], as, { type: 'image/jpeg' })
+  }
+
+  // jsdom has no `URL.createObjectURL` — the placement queue panel's own
+  // local preview needs it. Stubbed once, module-level, rather than torn
+  // down per test: `PlacementQueuePanel.test.tsx` hit the same ordering
+  // hazard `#140`'s describe-scoped teardown risks — an `afterEach` nested
+  // inside a `describe` runs *before* `test-setup.ts`'s root-level
+  // `afterEach(cleanup)`, so deleting the stub here would race the unmount
+  // that actually calls `revokeObjectURL`.
+  beforeEach(() => {
+    startResumableUpload.mockReset().mockResolvedValue('session-uri')
+    uploadFileContent.mockReset().mockResolvedValue({ id: 'drive-file-1' })
+    Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:fake-url'), revokeObjectURL: vi.fn() })
+  })
+
+  it('replaces the list with the placement queue when a dropped photo resolves neither by EXIF nor interpolation', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    await renderApp('/', { googleClientId: 'a-client-id' })
+    await signIn()
+    const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
+
+    await act(async () => {
+      fireEvent.drop(shell, { dataTransfer: fileDataTransfer([noGpsPhoto()]) })
+    })
+
+    expect(await screen.findByText('Not saved')).toBeDefined()
+    expect(screen.getByText('1 photo · 0 placed · 1 needs a location')).toBeDefined()
+    // The chips and the "needs a location" search-card title are the same
+    // "replaces the list face" treatment a draft already gets.
+    expect(screen.queryByRole('group', { name: 'Filter' })).toBeNull()
+    expect(screen.getByText('needs a location')).toBeDefined()
+    // Nothing has been written — it waits in the queue, not the store.
+    expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(0)
+    fetchSpy.mockRestore()
+  })
+
+  it('Back in the search card discards the queue, the same as Discard n', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    await renderApp('/', { googleClientId: 'a-client-id' })
+    await signIn()
+    const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
+
+    await act(async () => {
+      fireEvent.drop(shell, { dataTransfer: fileDataTransfer([noGpsPhoto()]) })
+    })
+    await screen.findByText('Not saved')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back to the list' }))
+
+    expect(screen.queryByText('Not saved')).toBeNull()
+    expect(await screen.findByRole('group', { name: 'Filter' })).toBeDefined()
+    expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(0)
+    fetchSpy.mockRestore()
+  })
+
+  it('Discard n on the placement queue panel returns to the list, saving nothing', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    await renderApp('/', { googleClientId: 'a-client-id' })
+    await signIn()
+    const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
+
+    await act(async () => {
+      fireEvent.drop(shell, { dataTransfer: fileDataTransfer([noGpsPhoto()]) })
+    })
+    await screen.findByText('Not saved')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Discard 1' }))
+
+    expect(screen.queryByText('Not saved')).toBeNull()
+    expect(await screen.findByRole('group', { name: 'Filter' })).toBeDefined()
+    expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(0)
+    fetchSpy.mockRestore()
+  })
+
+  it('a resolved photo in the same drop saves immediately and counts toward the batch total', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    const gpsBuffer = readFileSync(join(__dirname, 'photo/fixtures/gps-and-timestamps.jpg'))
+    const gpsPhoto = new File([gpsBuffer], 'sapporo.jpg', { type: 'image/jpeg' })
+    await renderApp('/', { googleClientId: 'a-client-id' })
+    await signIn()
+    const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
+
+    await act(async () => {
+      fireEvent.drop(shell, { dataTransfer: fileDataTransfer([gpsPhoto, noGpsPhoto()]) })
+    })
+
+    expect(await screen.findByText('2 photos · 1 placed · 1 needs a location')).toBeDefined()
+    // The resolved file saved on its own, without waiting on the straggler.
+    expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(1)
+    fetchSpy.mockRestore()
+  })
+})

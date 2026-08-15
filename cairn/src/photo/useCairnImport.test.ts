@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { useCairnImport, ALREADY_IN_TRIP_MESSAGE, NO_LOCATION_MESSAGE } from './useCairnImport'
+import { useCairnImport, ALREADY_IN_TRIP_MESSAGE } from './useCairnImport'
 import { DriveAuthError, DriveQuotaError } from '../drive/trackFiles'
 import type { Track } from '../kml/parse'
 
@@ -181,18 +181,51 @@ describe('useCairnImport', () => {
     expect(result.current.cairns[0].position.lng).toBeCloseTo(20.5)
   })
 
-  it('rejects a photo with no GPS and no track to interpolate against, uploading nothing', async () => {
+  // #168: a photo that resolves neither by EXIF nor by interpolation waits
+  // in the placement queue rather than being rejected — nothing uploads
+  // until a position is supplied by hand.
+  it('queues a photo with no GPS and no track to interpolate against, uploading nothing yet', async () => {
     readPhotoExif.mockResolvedValue(okExif())
 
     const { result } = renderHook(() => useCairnImport('trip-1', 'token', 'cairn-folder-id', []))
     await waitFor(() => expect(result.current.loading).toBe(false))
 
-    await act(() => result.current.importFiles([file('no-gps.jpg')]))
+    let importResult!: Awaited<ReturnType<typeof result.current.importFiles>>
+    await act(async () => {
+      importResult = await result.current.importFiles([file('no-gps.jpg')])
+    })
 
     expect(result.current.cairns).toHaveLength(0)
-    expect(result.current.failures).toHaveLength(1)
-    expect(result.current.failures[0]).toMatchObject({ name: 'no-gps.jpg', message: NO_LOCATION_MESSAGE })
+    expect(result.current.failures).toHaveLength(0)
+    expect(importResult.resolvedCount).toBe(0)
+    expect(importResult.needsPlacement).toHaveLength(1)
+    expect(importResult.needsPlacement[0].name).toBe('no-gps.jpg')
     expect(startResumableUpload).not.toHaveBeenCalled()
+  })
+
+  it("a queued item's save() uploads and writes the cairn once a position is supplied by hand", async () => {
+    readPhotoExif.mockResolvedValue(okExif())
+    const { result } = renderHook(() => useCairnImport('trip-1', 'token', 'cairn-folder-id', []))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    let importResult!: Awaited<ReturnType<typeof result.current.importFiles>>
+    await act(async () => {
+      importResult = await result.current.importFiles([file('no-gps.jpg')])
+    })
+
+    let saveResult: string | false = false
+    await act(async () => {
+      saveResult = await importResult.needsPlacement[0].save({ lat: 12, lng: 34 })
+    })
+
+    expect(saveResult).not.toBe(false)
+    expect(result.current.cairns).toHaveLength(1)
+    expect(result.current.cairns[0]).toMatchObject({
+      name: 'no-gps.jpg',
+      position: { lat: 12, lng: 34 },
+      positionSource: 'placed',
+    })
+    expect(startResumableUpload).toHaveBeenCalledWith('token', 'item-folder-id', 'no-gps.jpg')
   })
 
   it('rejects a duplicate name within the same trip, matched case-insensitively', async () => {

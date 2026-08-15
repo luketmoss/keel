@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type RefObject } from 'react'
 import { Link } from 'react-router-dom'
 import { deriveTripStatus, type TripIndexEntry } from '../store/tripStore'
 import { matchesTripFilters, type TripFilters } from '../store/tripFilters'
-import { formatTripMetaLine, tripRowAccessibleName } from '../format/dates'
+import { formatShortDate, formatTripMetaLine, tripRowAccessibleName } from '../format/dates'
 import { canChangeOwner, looseMetaLine, showExport, type LooseRecord } from '../store/looseStore'
 import { LIST_HEADINGS, type KindFilter } from './FilterChips'
 import { RowMenu } from './RowMenu'
@@ -10,12 +10,6 @@ import { NameInput } from './NameInput'
 import { ColorPopover } from './ColorPopover'
 import { trackColor, TRACK_COLORS } from '../map/palette'
 import './TripsPanel.css'
-
-function shortDate(iso: string): string {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return iso
-  return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
-}
 
 interface TripsPanelProps {
   trips: TripIndexEntry[]
@@ -538,7 +532,7 @@ function LooseRow({
         <span
           className={`trips-panel__row-detail${unplaced ? ' trips-panel__row-detail--unplaced' : ''}`}
         >
-          {looseMetaLine(item, shortDate)}
+          {looseMetaLine(item, formatShortDate)}
         </span>
       </Link>
       {/* #133 — its own positioned wrapper so the colour popover can anchor

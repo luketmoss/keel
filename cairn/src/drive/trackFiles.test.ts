@@ -170,6 +170,33 @@ describe('listTrackFiles', () => {
     expect(query).toContain('trashed=false')
   })
 
+  /* The criterion's own case: a trip folder holding track files *and* the
+     `cairns/` subfolder, with only the track files coming back. The mock
+     honours `q` rather than ignoring it, because the exclusion is Drive's
+     to apply — a mock that returned the folder regardless would be
+     asserting a result-side filter this deliberately does not have. */
+  it('returns only the track files from a folder that also holds a subfolder', async () => {
+    const children = [
+      { id: 'drive-1', name: 'day-1.kml', mimeType: 'application/vnd.google-earth.kml+xml' },
+      { id: 'drive-2', name: 'cairns', mimeType: 'application/vnd.google-apps.folder' },
+      { id: 'drive-3', name: 'day-2.kml', mimeType: 'application/vnd.google-earth.kml+xml' },
+    ]
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const query = decodeURIComponent(new URL(input as string).searchParams.get('q') ?? '')
+      const excludeFolders = query.includes(`mimeType!='application/vnd.google-apps.folder'`)
+      const matched = children.filter(
+        (child) => !excludeFolders || child.mimeType !== 'application/vnd.google-apps.folder',
+      )
+      return response({ files: matched.map(({ id, name }) => ({ id, name })) })
+    })
+
+    await expect(listTrackFiles('token', 'folder-id')).resolves.toEqual([
+      { id: 'drive-1', name: 'day-1.kml' },
+      { id: 'drive-3', name: 'day-2.kml' },
+    ])
+  })
+
   it('returns the files Drive reports', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       response({ files: [{ id: 'drive-1', name: 'day-1.kml' }] }),

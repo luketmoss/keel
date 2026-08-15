@@ -530,9 +530,9 @@ describe('CairnLayer cluster expansion (#194)', () => {
 
     clickCluster(container)
 
-    for (const marker of fanned(container)) {
-      expect(marker.getAttribute('data-draggable')).toBe('false')
-    }
+    const markers = Array.from(fanned(container))
+    expect(markers).toHaveLength(2)
+    expect(markers.map((marker) => marker.getAttribute('data-draggable'))).toEqual(['false', 'false'])
   })
 
   it('clicking the anchor badge collapses its own expansion', () => {

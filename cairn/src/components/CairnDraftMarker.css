@@ -1,0 +1,8 @@
+/* cairn/docs/design/156-creating-a-cairn.md — "Pin dropped and selected in
+   --accent". The pin's own selected fill is `CairnMarker`'s; this only
+   keeps the draft inert to the pointer, so a click meant for the map (a
+   re-place) is not swallowed by the pin sitting where you clicked. */
+
+.cairn-draft-marker {
+  pointer-events: none;
+}

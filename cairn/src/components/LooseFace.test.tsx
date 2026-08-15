@@ -44,6 +44,7 @@ function renderFace(item: LooseRecord, accessToken: string | null = 'token') {
       onDelete={vi.fn()}
       onRename={vi.fn().mockResolvedValue(true)}
       onRecolor={vi.fn().mockResolvedValue(true)}
+      onSetIcon={vi.fn().mockResolvedValue(true)}
       onExport={vi.fn()}
       disabled={false}
     />,
@@ -114,17 +115,21 @@ describe('LooseFace — #134 the cairn image', () => {
   })
 })
 
-describe('LooseFace — #169 the detail face renders the current icon', () => {
-  it('shows the icon and its label when the cairn carries one', () => {
-    const { container, getByText } = renderFace(looseCairn({ icon: 'campsite', image: null }))
+/* #169 rendered the current icon read-only and left choosing one to #156.
+   The picker replaces that display rather than sitting beside it: the
+   selected cell *is* the current icon, so a separate row saying the same
+   thing would be a second place for it to be wrong. */
+describe('LooseFace — #156 the detail face offers the icon picker', () => {
+  it('marks the cairn’s current icon as the selected cell', () => {
+    const { getByRole } = renderFace(looseCairn({ icon: 'campsite', image: null }))
 
-    expect(getByText('campsite')).toBeDefined()
-    expect(container.querySelector('.loose-face__icon-glyph')).not.toBeNull()
+    expect(getByRole('button', { name: 'campsite' }).getAttribute('aria-pressed')).toBe('true')
+    expect(getByRole('button', { name: 'none' }).getAttribute('aria-pressed')).toBe('false')
   })
 
-  it('shows no icon row at all when the cairn has none', () => {
-    const { container } = renderFace(looseCairn({ icon: null, image: null }))
+  it('marks `none` as selected when the cairn has no icon', () => {
+    const { getByRole } = renderFace(looseCairn({ icon: null, image: null }))
 
-    expect(container.querySelector('.loose-face__icon')).toBeNull()
+    expect(getByRole('button', { name: 'none' }).getAttribute('aria-pressed')).toBe('true')
   })
 })

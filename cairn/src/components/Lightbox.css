@@ -112,6 +112,24 @@
   color: var(--text-muted);
 }
 
+/* #156 — the icon grid, bounded rather than stretched across the dialog:
+   the cells are --hit-target and five across, the same shape they take in
+   the panel, so the control reads as one control wherever it appears. */
+.lightbox__field-label {
+  margin-top: var(--space-3);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.lightbox .icon-picker {
+  margin-top: var(--space-2);
+  width: 100%;
+  max-width: 280px;
+}
+
 .lightbox__remove-from-trip {
   margin-top: var(--space-3);
   padding: var(--space-2) var(--space-4);

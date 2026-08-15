@@ -275,7 +275,12 @@ export class DriveLooseStore implements LooseStore {
       patch.colorIndex !== undefined &&
       previous.kind === 'track' &&
       patch.colorIndex !== previous.colorIndex
-    if (!nameChanged && !colorChanged) return true
+    // #156: `null` is a real value here — clearing a cairn's icon is a
+    // change, so this compares against `undefined` (the field was not sent)
+    // rather than testing the patch for truthiness.
+    const iconChanged =
+      patch.icon !== undefined && previous.kind === 'cairn' && patch.icon !== previous.icon
+    if (!nameChanged && !colorChanged && !iconChanged) return true
 
     if (!(await this.local.update(id, patch))) return false
 

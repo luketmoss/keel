@@ -5,6 +5,11 @@
    module owns only the drawing. */
 
 import type { CairnIcon } from '../store/looseStore'
+/* The glyph's own stroke/fill rules. Colocated with the component that
+   draws it rather than duplicated into each surface's stylesheet — a pin,
+   a row glyph and the icon picker all render the same `<svg>` and must
+   recolour identically. */
+import './CairnIcon.css'
 
 interface GlyphShape {
   /** An SVG path's `d`, in a 24×24 viewBox — most icons. */

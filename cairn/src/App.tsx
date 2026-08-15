@@ -24,6 +24,7 @@ import { DriveTripStore } from './store/driveTripStore'
 import {
   MOVE_FAILED_MESSAGE,
   SIGNED_OUT_DROP_MESSAGE,
+  cairnDefaultName,
   moveLooseIntoTrip,
   type LooseRecord,
 } from './store/looseStore'
@@ -40,10 +41,14 @@ import { useGoogleAccount } from './auth/useGoogleAccount'
 import { AccountBubble } from './auth/AccountBubble'
 import { defaultOverridesStore } from './import/useTripImport'
 import { carryDisplayNameIntoTrip } from './store/trackOverridesStore'
-import type { CairnRecord } from './photo/useCairnImport'
+import type { CairnRecord, NewTripCairn } from './photo/useCairnImport'
 import { PlacementQueuePanel } from './components/PlacementQueuePanel'
 import { PlacementClickCatcher } from './components/PlacementClickCatcher'
 import { SuggestionRing } from './components/SuggestionRing'
+import { CairnCreateGesture } from './components/CairnCreateGesture'
+import { CairnCreatePanel, type CairnDraftFields } from './components/CairnCreatePanel'
+import { CairnDraftMarker } from './components/CairnDraftMarker'
+import { CreateHintChip } from './components/CreateHintChip'
 import {
   EMPTY_PLACEMENT_QUEUE,
   discardRemaining,
@@ -110,6 +115,36 @@ function generateToastId(): string {
   return `toast-${nextToastId}`
 }
 
+/** A cairn being placed by hand: where the gesture landed, which trip the
+    gesture's context chose, and what has been typed so far.
+ *
+ * The position and the fields are separate because re-placing swaps one and
+ * keeps the other — "the existing draft is replaced by a pin at the new
+ * coordinate; typed values are kept". `tripId` is captured at gesture time
+ * rather than read at save time for the same reason the readout exists:
+ * what the face said the ownership would be is what it commits. */
+interface CairnDraft {
+  position: LatLng
+  tripId: string | null
+  fields: CairnDraftFields
+}
+
+/** `156-creating-a-cairn.md`: "a date defaulting to today", in the
+    `yyyy-mm-dd` a native date input takes. Local date, not UTC — a cairn
+    placed at 9pm in Melbourne is dated today, not tomorrow. */
+function todayAsDateValue(): string {
+  const now = new Date()
+  const month = `${now.getMonth() + 1}`.padStart(2, '0')
+  const day = `${now.getDate()}`.padStart(2, '0')
+  return `${now.getFullYear()}-${month}-${day}`
+}
+
+function emptyDraftFields(): CairnDraftFields {
+  // Icons default to none: pre-selecting `campsite` would put a tent on
+  // every cairn made by someone who did not look at the grid.
+  return { name: '', icon: null, description: '', date: todayAsDateValue() }
+}
+
 /** The whole app: one map that is never unmounted, one column over it.
 
     Everything that used to be lifted above a route split — filters, the
@@ -159,12 +194,27 @@ function AppShell() {
       click-to-place, the suggestion ring) belongs to the one map instance,
       not to a hook scoped to a trip that might not even be open. */
   const [queue, setQueue] = useState<PlacementQueueState>(EMPTY_PLACEMENT_QUEUE)
+  /** #156: the cairn being placed by hand, or `null`. The shell owns this
+      rather than either store because the gesture, the pin and the
+      ownership decision are all the map's, and the map is the shell's —
+      the same reasoning `queue` above is held here for. */
+  const [cairnDraft, setCairnDraft] = useState<CairnDraft | null>(null)
+  const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
+  /** The hint chip "hides on the first successful placement" — for the
+      session, not forever; a persisted flag is a preference nobody set. */
+  const [hasPlaced, setHasPlaced] = useState(false)
   /* Registered by the trip face while one is open, so a drop anywhere still
      imports into that trip rather than starting a draft. Refs, not state:
      the import hooks return a fresh object on every render, so storing what
      they hand up in state would re-render this component from an effect
      that then re-runs — a loop. Nothing here is read during render. */
   const tripDropRef = useRef<((files: File[]) => void) | null>(null)
+  /** #156's sibling of `tripDropRef`, registered by the trip face for the
+      same reason: a cairn placed while a trip is open belongs to that trip,
+      and only the trip face holds the hook that can write into its
+      folder. */
+  const tripCreateRef = useRef<((input: NewTripCairn) => Promise<boolean>) | null>(null)
   const tripGeometryRef = useRef<{ lat: number; lng: number }[]>([])
   const [tripPointCount, setTripPointCount] = useState(0)
 
@@ -555,6 +605,100 @@ function AppShell() {
     if (wasLast && !openTripId) navigate(`/cairns/${result}`)
   }
 
+  const handleCreateTargetChange = useCallback(
+    (handler: ((input: NewTripCairn) => Promise<boolean>) | null) => {
+      tripCreateRef.current = handler
+    },
+    [],
+  )
+
+  /** The gesture landed. Opens the create face with the pin already dropped
+      and selected — there is no armed mode to enter, because the gesture
+      carried its own coordinate.
+   *
+   * A second gesture while the face is open replaces the coordinate and
+   * keeps everything typed: a mis-click during placement is far more likely
+   * than a deliberate second cairn, and re-typing the name to fix a
+   * coordinate would be the wrong tax. The trip is re-read too — the face
+   * cannot have been navigated away from without being cancelled, so this
+   * only ever confirms what it already said. */
+  const beginCairnDraft = useCallback(
+    (position: LatLng) => {
+      setCreateError(null)
+      setCairnDraft((current) => ({
+        position,
+        tripId: openTripId ?? null,
+        fields: current?.fields ?? emptyDraftFields(),
+      }))
+    },
+    [openTripId],
+  )
+
+  /** Cancel, Back and Escape are one action: the pin goes and nothing was
+      ever written — no record and no Drive file, because nothing has been
+      attempted until `Create`. */
+  const cancelCairnDraft = useCallback(() => {
+    setCairnDraft(null)
+    setCreateError(null)
+  }, [])
+
+  /** Commits the draft. The gesture's context decided ownership when the
+      pin dropped, so this only follows it: a trip was open, so the trip
+      face's registered writer takes it; nothing was, so it becomes a loose
+      cairn.
+   *
+   * An empty name commits the icon's label, or `Cairn` — the "empty is an
+   * aborted edit" rule the model owns, read from `cairnDefaultName` rather
+   * than spelled out here. */
+  async function commitCairnDraft() {
+    const draft = cairnDraft
+    if (!draft || creating) return
+    setCreateError(null)
+    setCreating(true)
+    try {
+      const input: NewTripCairn = {
+        name: draft.fields.name.trim() || cairnDefaultName(draft.fields.icon),
+        position: draft.position,
+        icon: draft.fields.icon,
+        description: draft.fields.description,
+        // An emptied date field is a cairn with no date, which the row
+        // already knows how to say — it is not a reason to invent today a
+        // second time.
+        date: draft.fields.date || null,
+      }
+
+      if (draft.tripId) {
+        const write = tripCreateRef.current
+        if (!write || !(await write(input))) {
+          setCreateError("Couldn't save this cairn — try again.")
+          return
+        }
+        // The trip face is already showing; its list and its layer pick the
+        // new cairn up from the hook that just wrote it.
+        setCairnDraft(null)
+        setHasPlaced(true)
+        return
+      }
+
+      const record = looseStore.addCairn({
+        name: input.name,
+        position: input.position,
+        // A person put it here. Interpolation will never move it again.
+        positionSource: 'placed',
+        icon: input.icon,
+        description: input.description,
+        date: input.date,
+      })
+      setCairnDraft(null)
+      setHasPlaced(true)
+      // Landing on the new cairn's own face is the confirmation, the same
+      // stance the placement queue takes when it empties.
+      navigate(`/cairns/${record.id}`)
+    } finally {
+      setCreating(false)
+    }
+  }
+
   const handleGeometryChange = useCallback((points: { lat: number; lng: number }[]) => {
     tripGeometryRef.current = points
     // Only the count reaches state, and only when it actually changes —
@@ -572,6 +716,13 @@ function AppShell() {
 
   const noPlaces = allPlaces.length === 0
   const filteredEmpty = !noPlaces && listPlaces.length === 0
+
+  const createOpen = cairnDraft !== null
+  /* The queue already owns the map click and two placement intents at once
+     has no sensible reading, so the create gesture stands down for it. It
+     stays live while the create face itself is open — that is the re-place
+     the design note calls for. */
+  const createGestureActive = !queueOpen && !draftOpen
 
   return (
     <MapProvider>
@@ -592,6 +743,13 @@ function AppShell() {
             waiting, plus a pulsing suggestion ring when the current file's
             capture time falls near the open trip's own tracks. */}
         <PlacementClickCatcher active={queueOpen} onPlace={(position) => void placeCurrentQueueItem(position)} />
+        {/* #156: right-click, or long-press on touch, places a cairn where
+            you clicked. No armed mode — the gesture carries its own
+            coordinate, so there is nothing to enter and nothing to leave. */}
+        <CairnCreateGesture active={createGestureActive} onPlace={beginCairnDraft} />
+        {cairnDraft && (
+          <CairnDraftMarker position={cairnDraft.position} icon={cairnDraft.fields.icon} />
+        )}
         {queueOpen && suggestionPosition && (
           <SuggestionRing
             position={suggestionPosition}
@@ -636,6 +794,7 @@ function AppShell() {
         {!detailOpen &&
           !draftOpen &&
           !queueOpen &&
+          !createOpen &&
           (noPlaces ? (
             disconnected ? (
               <MapEmptyOverlay heading="Sign in to see your map." />
@@ -657,17 +816,31 @@ function AppShell() {
         <ShellColumn
           collapsed={collapsed}
           onToggleCollapsed={() => setCollapsed((wasCollapsed) => !wasCollapsed)}
-          collapsible={!detailOpen && !draftOpen && !queueOpen}
+          collapsible={!detailOpen && !draftOpen && !queueOpen && !createOpen}
           searchCard={
             <SearchCard
               // #168: "Place this photo" over "needs a location" — the same
               // name/kind slots a detail already uses, so `SearchCard`
-              // itself needs no placement-specific case.
-              detail={queueOpen ? { name: 'Place this photo', kind: 'needs a location' } : detailForCard(openTrip, openLoose)}
+              // itself needs no placement-specific case. #156's create face
+              // uses them the same way: the typed name over `new cairn`.
+              detail={
+                cairnDraft
+                  ? { name: cairnDraft.fields.name || 'New cairn', kind: 'new cairn' }
+                  : queueOpen
+                    ? { name: 'Place this photo', kind: 'needs a location' }
+                    : detailForCard(openTrip, openLoose)
+              }
               // "Back, in the search card, discards the remaining queue —
               // it is the same action as Discard n, reached from the other
-              // end. It does not silently save them."
-              onBack={() => (queueOpen ? setQueue(discardRemaining) : navigate('/'))}
+              // end. It does not silently save them." #156's Back is
+              // likewise identical to its Cancel.
+              onBack={() =>
+                createOpen
+                  ? cancelCairnDraft()
+                  : queueOpen
+                    ? setQueue(discardRemaining)
+                    : navigate('/')
+              }
               query={filters.name}
               onQueryChange={(name) => setFilters((current) => ({ ...current, name }))}
               accountBubble={<AccountBubble account={account} />}
@@ -677,17 +850,35 @@ function AppShell() {
             // Hidden on a detail — filtering a list you are no longer
             // looking at is noise — and while a draft or the placement
             // queue is open, for the reason #81 already gives.
-            detailOpen || draftOpen || queueOpen ? null : (
+            // #156 adds the create face to that list, for the same reason:
+            // it is a draft, and nothing it shows is a filterable list.
+            detailOpen || draftOpen || queueOpen || createOpen ? null : (
               <FilterChips kind={kind} onChange={setKind} />
             )
           }
         >
+          {/* #156's create face replaces the list face, and outranks a
+              trip's own face while it is open — the panel is showing the
+              thing being placed, whatever was underneath it. The placement
+              queue still comes first: it is the one flow the create gesture
+              stands down for entirely. */}
           {queueOpen ? (
             <PlacementQueuePanel
               queue={queue}
               hasSuggestion={suggestionPosition !== undefined}
               onSkip={() => setQueue(skipCurrent)}
               onDiscard={() => setQueue(discardRemaining)}
+            />
+          ) : cairnDraft ? (
+            <CairnCreatePanel
+              fields={cairnDraft.fields}
+              onChange={(fields) => setCairnDraft((current) => (current ? { ...current, fields } : current))}
+              tripId={cairnDraft.tripId}
+              onCreate={() => void commitCairnDraft()}
+              onCancel={cancelCairnDraft}
+              disabled={disconnected}
+              busy={creating}
+              error={createError}
             />
           ) : draftTrip.draft ? (
             <DraftPanel
@@ -718,6 +909,7 @@ function AppShell() {
               onRemoveFromTrip={(file) => removeTrackFromTrip(file, openTripId)}
               onRemovePhotoFromTrip={(record) => removeCairnFromTrip(record, openTripId)}
               onNeedsPlacement={enqueueNeedsPlacement}
+              onCreateTargetChange={handleCreateTargetChange}
             />
           ) : openLooseId ? (
             openLoose ? (
@@ -733,6 +925,9 @@ function AppShell() {
                 onCreateTripWith={(name) => void createTripWithLoose(openLooseId, name)}
                 onRename={(id, name) => looseStore.update(id, { name })}
                 onRecolor={(id, color) => looseStore.update(id, { colorIndex: color })}
+                // #156: retyping writes `icon` and nothing else — the
+                // store's patch shape is what makes that literal.
+                onSetIcon={(id, icon) => looseStore.update(id, { icon })}
                 onExport={(id) => void handleExport(id)}
                 exporting={exportingIds.has(openLooseId)}
                 onDelete={() => {
@@ -776,6 +971,11 @@ function AppShell() {
             />
           )}
         </ShellColumn>
+
+        {/* #156's placeholder for a real affordance, recorded as such: it
+            hides once a cairn has been placed, and never appears while
+            another flow owns the map. */}
+        <CreateHintChip visible={createGestureActive && !createOpen && !hasPlaced} />
 
         {dragActive && <DropOverlay label="Drop tracks or photos" />}
         <ToastStack toasts={toasts} onDismiss={dismissToast} />

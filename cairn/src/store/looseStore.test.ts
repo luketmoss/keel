@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  CAIRN_ICON_LABEL,
+  cairnDefaultName,
   canChangeOwner,
   LocalLooseStore,
   looseMetaLine,
   moveLooseIntoTrip,
   showExport,
+  type CairnIcon,
 } from './looseStore'
 import { LocalTripStore } from './tripStore'
 import type { Track } from '../kml/parse'
@@ -263,6 +266,80 @@ describe('LocalLooseStore', () => {
 
       expect(listener).toHaveBeenCalled()
     })
+  })
+
+  /* #156's retype. The guarantee under test is not that `icon` changes —
+     that much is obvious — but that nothing else does: the whole point of
+     retyping a photo as a campsite is that it keeps its image, its
+     position and its date while doing so. */
+  describe('update — retyping a cairn (#156)', () => {
+    function photoCairn() {
+      return store.addCairn({
+        name: 'sapporo.jpg',
+        date: '2024-11-03T00:00:00.000Z',
+        position: { lat: 43, lng: 141 },
+        positionSource: 'exif',
+        image: { originalDriveFileId: 'orig-1', thumbnailDriveFileId: 'thumb-1' },
+      })
+    }
+
+    it('sets a cairn’s icon', async () => {
+      const cairn = photoCairn()
+
+      expect(await store.update(cairn.id, { icon: 'campsite' })).toBe(true)
+
+      expect((store.getItem(cairn.id) as { icon: string | null }).icon).toBe('campsite')
+    })
+
+    it('changes only the icon — image, position, source and date survive', async () => {
+      const cairn = photoCairn()
+
+      await store.update(cairn.id, { icon: 'campsite' })
+
+      expect(store.getItem(cairn.id)).toEqual({ ...cairn, icon: 'campsite' })
+    })
+
+    it('clears an icon back to none, which is a change and not an absent field', async () => {
+      const cairn = store.addCairn({
+        name: 'camp',
+        date: null,
+        position: { lat: 1, lng: 2 },
+        positionSource: 'placed',
+        icon: 'campsite',
+      })
+
+      expect(await store.update(cairn.id, { icon: null })).toBe(true)
+
+      expect((store.getItem(cairn.id) as { icon: string | null }).icon).toBeNull()
+    })
+
+    it('ignores an icon patch sent for a track', async () => {
+      const record = store.addTrack(NEW_TRACK, [track([[1, 2]])])
+
+      expect(await store.update(record.id, { icon: 'campsite' })).toBe(true)
+
+      expect(store.getItem(record.id)).not.toHaveProperty('icon')
+    })
+  })
+})
+
+/* `cairns.md`: "An empty name commits the icon's label (`Campsite`), or
+   `Cairn` with no icon". */
+describe('cairnDefaultName (#156)', () => {
+  it('names an icon-less cairn Cairn', () => {
+    expect(cairnDefaultName(null)).toBe('Cairn')
+  })
+
+  it('names a cairn after its icon, capitalised', () => {
+    expect(cairnDefaultName('campsite')).toBe('Campsite')
+    expect(cairnDefaultName('water')).toBe('Water')
+    expect(cairnDefaultName('junction')).toBe('Junction')
+  })
+
+  it('has a name for every icon in the set', () => {
+    for (const icon of Object.keys(CAIRN_ICON_LABEL) as CairnIcon[]) {
+      expect(cairnDefaultName(icon)).toMatch(/^[A-Z]/)
+    }
   })
 })
 

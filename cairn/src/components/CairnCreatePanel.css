@@ -1,0 +1,153 @@
+/* cairn/docs/design/156-creating-a-cairn.md "The create face". New tokens:
+   none — built from --hit-target, --radius-sm, --surface-lift,
+   --accent-soft and the existing type steps. */
+
+.cairn-create {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.cairn-create__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  overflow-y: auto;
+}
+
+.cairn-create__label {
+  flex: none;
+  margin-top: var(--space-2);
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.cairn-create__body > .cairn-create__label:first-child {
+  margin-top: 0;
+}
+
+.cairn-create__input {
+  flex: none;
+  min-height: var(--hit-target);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-lift);
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--text-base);
+}
+
+.cairn-create__input::placeholder {
+  color: var(--text-muted);
+}
+
+.cairn-create__textarea {
+  padding: var(--space-3);
+  resize: vertical;
+  line-height: 1.45;
+}
+
+/* The stated ownership, in the monospace face the rest of the app uses for
+   values that are literally what is stored. */
+.cairn-create__readout {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: var(--space-4) 0 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--ground);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--text-xs);
+}
+
+.cairn-create__readout-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.cairn-create__readout-row dt {
+  color: var(--text-muted);
+}
+
+.cairn-create__readout-row dd {
+  margin: 0;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cairn-create__ownership {
+  flex: none;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.cairn-create__signed-out,
+.cairn-create__error {
+  flex: none;
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+}
+
+.cairn-create__signed-out {
+  color: var(--text-muted);
+}
+
+.cairn-create__error {
+  color: var(--danger);
+}
+
+.cairn-create__actions {
+  flex: none;
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.cairn-create__create,
+.cairn-create__cancel {
+  min-height: var(--hit-target);
+  padding: 0 var(--space-4);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: var(--text-base);
+  cursor: pointer;
+}
+
+.cairn-create__create {
+  flex: 1;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+}
+
+.cairn-create__create:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 88%, var(--text));
+}
+
+.cairn-create__create:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.cairn-create__cancel {
+  background: var(--surface-lift);
+  color: var(--text);
+}
+
+.cairn-create__cancel:hover {
+  background: var(--hover);
+}

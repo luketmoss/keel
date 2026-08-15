@@ -105,19 +105,15 @@
   color: var(--text);
 }
 
-.loose-face__icon {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  white-space: nowrap;
-  text-transform: capitalize;
-}
-
-.loose-face__icon-glyph {
-  flex: none;
-  width: 16px;
-  height: 16px;
-  color: var(--text);
+/* #156 — the icon grid's label, matching the create face's field labels so
+   the same control reads the same way on both surfaces. */
+.loose-face__field-label {
+  /* No margin — the body is a flex column with its own gap. */
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 /* #133 — the swatch becomes a button, wrapped in its own positioned

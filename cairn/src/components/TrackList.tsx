@@ -557,8 +557,17 @@ function ColorPopover({
   return (
     <>
       {/* Closes the popover on an outside click without a document-level
-          listener — a full-viewport layer beneath the popover itself. */}
-      <div className="track-row__color-backdrop" onClick={onClose} />
+          listener — a full-viewport layer beneath the popover itself.
+          Stops propagation: it's a DOM descendant of the row despite
+          covering the whole viewport, so an unstopped click would also
+          reach the row's own click-to-open handler (#219). */}
+      <div
+        className="track-row__color-backdrop"
+        onClick={(event) => {
+          event.stopPropagation()
+          onClose()
+        }}
+      />
       <div
         className="track-row__color-popover"
         role="group"

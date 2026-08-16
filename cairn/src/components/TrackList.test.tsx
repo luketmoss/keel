@@ -860,6 +860,22 @@ describe('TrackList', () => {
       expect(screen.getByRole('button', { name: 'trip.kml' })).toHaveProperty('ariaExpanded', 'true')
     })
 
+    it('does not open the detail when dismissing the colour popover via its backdrop', () => {
+      render(
+        <TrackList
+          files={[importedFile(elevatedTrack())]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          onRecolor={vi.fn().mockResolvedValue(true)}
+        />,
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'Change colour for trip.kml' }))
+      fireEvent.click(document.querySelector('.track-row__color-backdrop')!)
+
+      expect(screen.getByRole('button', { name: 'trip.kml' })).toHaveProperty('ariaExpanded', 'false')
+    })
+
     it('does not open or close from the swatch, the eye, the handle, or the ⋮', () => {
       render(
         <TrackList

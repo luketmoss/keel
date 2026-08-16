@@ -493,6 +493,45 @@ describe('Lightbox', () => {
       expect(screen.getByText('a.jpg')).toBeDefined()
     })
 
+    /* The detail column is `display: none` in full bleed but its controls
+       stay in the DOM, so the trap has to exclude them by hand — left in,
+       they take the `last` slot and focus walks out of an `aria-modal`
+       dialog in both directions. */
+    describe('the focus trap', () => {
+      it('wraps within the controls still on screen in full bleed', () => {
+        renderBox({ onRemoveFromTrip: vi.fn() });
+        fireEvent.click(photo());
+
+        const dialog = screen.getByRole('dialog');
+        const close = screen.getByRole('button', { name: 'Close photo' });
+        const removeFromTrip = screen.getByRole('button', { name: 'Remove from trip' });
+
+        // Forward off the last on-screen control lands back on the first.
+        photo().focus();
+        fireEvent.keyDown(dialog, { key: 'Tab' });
+        expect(document.activeElement).toBe(close);
+
+        // Backwards off the first lands on the photo, never on the hidden
+        // `Remove from trip` that closes the DOM order.
+        close.focus();
+        fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true });
+        expect(document.activeElement).toBe(photo());
+        expect(document.activeElement).not.toBe(removeFromTrip);
+      });
+
+      it('still includes the detail column on the detail face', () => {
+        renderBox({ onRemoveFromTrip: vi.fn() });
+
+        const dialog = screen.getByRole('dialog');
+        const close = screen.getByRole('button', { name: 'Close photo' });
+        const removeFromTrip = screen.getByRole('button', { name: 'Remove from trip' });
+
+        close.focus();
+        fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true });
+        expect(document.activeElement).toBe(removeFromTrip);
+      });
+    });
+
     it('keeps the detail face reachable while a photo uploads onto a cairn with none', () => {
       const blank = row({ thumbnailDriveFileId: null, originalDriveFileId: null })
       const { container } = renderBox({ row: blank, rows: [blank], attaching: true })

@@ -198,10 +198,23 @@ export function Lightbox({
     if (event.key !== 'Tab') return
     // #196: the name input and the description textarea join the trap's
     // set. Without them, Tab out of a field mid-edit escapes the dialog.
-    const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
+    const all = dialogRef.current?.querySelectorAll<HTMLElement>(
       'button:not(:disabled), input, textarea',
     )
-    if (!focusable || focusable.length === 0) return
+    if (!all || all.length === 0) return
+    /* #197: in full bleed the detail column is `display: none`, but its
+       controls are still in the DOM and still match the selector above.
+       Left in the set they take the `last` slot, and a `display: none`
+       element cannot be focused — so Shift+Tab off the first control goes
+       nowhere and Tab off the last *visible* one never matches `last`,
+       which walks focus straight out of an `aria-modal` dialog. Excluded
+       by container rather than by measuring visibility, because
+       `getClientRects()` is empty for everything under jsdom and would
+       disable the trap in the suite instead of testing it. */
+    const focusable = fullBleed
+      ? [...all].filter((element) => !element.closest('.lightbox__detail'))
+      : [...all]
+    if (focusable.length === 0) return
     const first = focusable[0]
     const last = focusable[focusable.length - 1]
     if (event.shiftKey && document.activeElement === first) {
@@ -263,7 +276,9 @@ export function Lightbox({
               onClick={() => setFullBleed((wasFullBleed) => !wasFullBleed)}
             >
               {attaching ? (
-                <div className="lightbox__uploading" aria-busy="true">
+                /* `span`, not `div`: this sits inside the frame's button
+                   now, and a button's content model is phrasing content. */
+                <span className="lightbox__uploading" aria-busy="true">
                   {(original.url ?? thumbnail.url) && (
                     <img
                       className="lightbox__image lightbox__image--replacing"
@@ -272,7 +287,7 @@ export function Lightbox({
                     />
                   )}
                   <span className="lightbox__uploading-label">uploading…</span>
-                </div>
+                </span>
               ) : original.url ? (
                 <img className="lightbox__image" src={original.url} alt={row.name} />
               ) : (
@@ -280,7 +295,9 @@ export function Lightbox({
                   {thumbnail.url && (
                     <img className="lightbox__placeholder" src={thumbnail.url} alt="" />
                   )}
-                  {original.failed && <p className="lightbox__error">Couldn't load this photo.</p>}
+                  {original.failed && (
+                    <span className="lightbox__error">Couldn&apos;t load this photo.</span>
+                  )}
                 </>
               )}
             </button>

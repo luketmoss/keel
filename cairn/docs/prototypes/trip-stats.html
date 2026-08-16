@@ -590,12 +590,25 @@
   <h3>KML carries four of the five, conditionally</h3>
   <p>
     Coordinates are <code>lon,lat,alt</code>; altitude is the optional third
-    component. <code>&lt;gx:Track&gt;</code> — what Garmin, Gaia and CalTopo
-    export — carries altitude and <code>&lt;when&gt;</code> timestamps, and
-    togeojson already flattens it into the LineString that
-    <code>parse.ts</code> reads. Distance is always computable. Ascent, descent,
-    high point and low point exist only when that third component genuinely
-    does.
+    component. Whether it's there is a property of the <b>export format</b>,
+    not the vendor that produced it. Gaia and CalTopo's KML exports use
+    <code>&lt;gx:Track&gt;</code>, which carries altitude and
+    <code>&lt;when&gt;</code> timestamps, and togeojson already flattens it into
+    the LineString that <code>parse.ts</code> reads. Distance is always
+    computable. Ascent, descent, high point and low point exist only when that
+    third component genuinely does.
+  </p>
+  <p>
+    Garmin Connect's own KML ("Export to Google Earth") is the counter-example
+    worth knowing by name: every one of its 358 points in a 5.19-mile hike was
+    a plain 2-component <code>lon,lat</code> tuple, no <code>&lt;gx:Track&gt;</code>,
+    no <code>&lt;when&gt;</code>, and <code>&lt;altitudeMode&gt;clampToGround&lt;/altitudeMode&gt;</code>
+    set at the document level. The only elevation figures in the file are HTML
+    text inside lap descriptions (<code>Elevation Gain : 1952 Feet</code>),
+    which the app does not parse — see Out of Scope in #222. For a file shaped
+    like this, distance-only is the correct read, not a defect: Garmin's own
+    GPX and TCX exports do carry elevation, so the fix is picking a different
+    export from the same watch, not a bug in this app.
   </p>
 
   <h3>All-identical altitudes mean unavailable, not flat</h3>

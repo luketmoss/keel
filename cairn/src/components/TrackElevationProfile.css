@@ -1,0 +1,36 @@
+.track-elevation-profile {
+  position: relative;
+  width: 100%;
+  height: var(--profile-height);
+}
+
+.track-elevation-profile__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.track-elevation-profile__baseline {
+  stroke: var(--border);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+}
+
+.track-elevation-profile__fill {
+  stroke: none;
+}
+
+.track-elevation-profile__line {
+  fill: none;
+  stroke-width: 1.5px;
+  vector-effect: non-scaling-stroke;
+}
+
+.track-elevation-profile__mark {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transform: translate(-50%, -50%);
+}

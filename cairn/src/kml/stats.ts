@@ -157,3 +157,41 @@ export function computeTrackStats(track: Track): TrackStats {
     ...computeElevationStats(track.points),
   }
 }
+
+export interface ElevationProfilePoint {
+  /** Cumulative distance along the track, not point index — a track sampled
+      densely on one leg is not stretched along it (#219). */
+  distanceMeters: number
+  /** Median-filtered, same series and window `computeElevationStats` uses,
+      so a single-sample spike does not appear as a peak. */
+  elevationMeters: number
+}
+
+/* #219's profile — same unavailability rule as `computeElevationStats`
+   (fewer than two elevation samples, or a series that is entirely one
+   value), computed over the same filtered series, but distance-aligned
+   rather than reduced to a summary. Points lacking elevation are skipped
+   rather than treated as gaps, matching #7's rule for gain. */
+export function computeElevationProfile(points: Track['points']): ElevationProfilePoint[] | undefined {
+  const withElevation = points
+    .map((point, index) => ({ index, elevation: point.elevation }))
+    .filter((point): point is { index: number; elevation: number } => point.elevation !== undefined)
+
+  if (withElevation.length < 2) return undefined
+  if (withElevation.every((point) => point.elevation === withElevation[0].elevation)) return undefined
+
+  const cumulativeDistance = [0]
+  for (let i = 1; i < points.length; i++) {
+    cumulativeDistance.push(cumulativeDistance[i - 1] + haversineMeters(points[i - 1], points[i]))
+  }
+
+  const filtered = medianFilter(
+    withElevation.map((point) => point.elevation),
+    ELEVATION_MEDIAN_WINDOW,
+  )
+
+  return withElevation.map((point, i) => ({
+    distanceMeters: cumulativeDistance[point.index],
+    elevationMeters: filtered[i],
+  }))
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeTrackStats } from './stats'
+import { computeElevationProfile, computeTrackStats } from './stats'
 import type { Track } from './parse'
 
 /* Flat padding at both ends keeps the median filter's clamped boundary
@@ -225,5 +225,58 @@ describe('computeTrackStats', () => {
       expect(b.highPointMeters).toBe(a.highPointMeters)
       expect(b.lowPointMeters).toBe(a.lowPointMeters)
     })
+  })
+})
+
+describe('computeElevationProfile', () => {
+  it('is undefined under the same conditions computeTrackStats reports elevation as unavailable', () => {
+    expect(computeElevationProfile(trackFromElevations([0, 0, 0, 0, 0]).points)).toBeUndefined()
+    expect(computeElevationProfile(trackFromElevations([1500, 1500, 1500]).points)).toBeUndefined()
+    expect(
+      computeElevationProfile([
+        { lat: 37, lon: -122, elevation: 1000 },
+        { lat: 37.1, lon: -122.1 },
+      ]),
+    ).toBeUndefined()
+  })
+
+  it('carries one entry per elevation-bearing point, distance-aligned and median-filtered', () => {
+    const elevations = [
+      1000, 1000, 1000, 1010, 1020, 1035, 1050, 1050, 1050, 1045, 1030, 1010, 1000, 1000, 1000,
+    ]
+    const track = trackFromElevations(elevations)
+
+    const profile = computeElevationProfile(track.points)
+
+    expect(profile).toBeDefined()
+    expect(profile).toHaveLength(elevations.length)
+    // Cumulative distance is non-decreasing along the series.
+    for (let i = 1; i < profile!.length; i++) {
+      expect(profile![i].distanceMeters).toBeGreaterThanOrEqual(profile![i - 1].distanceMeters)
+    }
+    // Rejects the same single-sample spike computeTrackStats does — the
+    // series is the same median-filtered one.
+    const stats = computeTrackStats(track)
+    expect(Math.max(...profile!.map((point) => point.elevationMeters))).toBe(stats.highPointMeters)
+    expect(Math.min(...profile!.map((point) => point.elevationMeters))).toBe(stats.lowPointMeters)
+  })
+
+  it('skips points without elevation but still aligns the remaining ones to their own cumulative distance', () => {
+    const track: Track = {
+      name: 'Gappy',
+      points: [
+        { lat: 37, lon: -122, elevation: 1000 },
+        { lat: 37.001, lon: -122 }, // no elevation — a real gap in the path
+        { lat: 37.002, lon: -122, elevation: 1010 },
+      ],
+    }
+
+    const profile = computeElevationProfile(track.points)
+
+    expect(profile).toBeDefined()
+    expect(profile).toHaveLength(2)
+    // The second point's distance covers both legs, not just the one to
+    // the previous elevation-bearing point.
+    expect(profile![1].distanceMeters).toBeGreaterThan(0)
   })
 })

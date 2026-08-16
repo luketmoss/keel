@@ -27,9 +27,15 @@
   border-bottom: 1px solid var(--border);
 }
 
+/* #219 — flex-start rather than center: the text column now carries the
+   opened detail as well as the name and meta line, so its height is no
+   longer close to the icon buttons' own 40px. Centering against a tall,
+   variable-height sibling would float the icons in the middle of the block
+   instead of pinning them to the name line, per the shape the design note
+   draws. */
 .track-row__main {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-2);
   min-height: var(--row-touch);
 }
@@ -94,6 +100,40 @@
   margin: var(--space-1) 0 0;
   font-size: var(--text-xs);
   color: var(--text-muted);
+}
+
+/* #219 — expand/collapse over --motion-base using grid-template-rows:
+   0fr -> 1fr on a wrapper, which animates to content height without
+   measuring anything. `visibility` is transitioned with a delay rather
+   than toggled by a `display` change: instant on open (delay 0), so the
+   detail is visible for the whole opening animation; delayed to match
+   `--motion-base` on close, so it stays visible (and in the tab order)
+   until the collapse animation actually finishes, rather than vanishing
+   mid-transition. Collapses to an instant cut under `prefers-reduced-motion`
+   via the global block in index.css, which already zeroes every transition
+   duration. */
+.track-row__detail-wrapper {
+  display: grid;
+  grid-template-rows: 0fr;
+  visibility: hidden;
+  transition:
+    grid-template-rows var(--motion-base) var(--ease),
+    visibility 0s var(--motion-base);
+}
+
+.track-row__detail-wrapper--open {
+  grid-template-rows: 1fr;
+  visibility: visible;
+  transition: grid-template-rows var(--motion-base) var(--ease);
+}
+
+.track-row__detail-inner {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
 }
 
 .track-row__visibility {
@@ -204,15 +244,18 @@
   transition: box-shadow var(--motion-base) var(--ease);
 }
 
-.track-row__name--editable {
-  cursor: text;
-}
-
-/* #72 — Disabled treatment (design-language.md) while the account is
-   token-expired, same rule as `.track-row__handle--disabled` above. */
-.track-row__name--disabled {
-  opacity: 0.4;
-  cursor: default;
+/* #219 — the name is the keyboard/AT path to the detail, free now that
+   rename moved to the `⋮`. A `<button>` reset to read exactly like the
+   `.track-row__name` span it replaces, plus the row's own left alignment
+   and cursor. */
+.track-row__name--button {
+  display: block;
+  border: none;
+  background: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
 }
 
 .track-row__swatch-wrap--disabled {

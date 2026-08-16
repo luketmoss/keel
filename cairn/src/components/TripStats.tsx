@@ -1,5 +1,6 @@
 import type { TrackStats } from '../kml/stats'
 import { formatDistance, formatElevation, formatElevationGain, formatElevationLoss } from '../format/units'
+import { StatGrid } from './StatGrid'
 import './TripStats.css'
 
 export interface TripStatsProps {
@@ -9,8 +10,6 @@ export interface TripStatsProps {
       would then be wrong for every other panel in the app). */
   trackStats: TrackStats[]
 }
-
-const EM_DASH = '—'
 
 interface Totals {
   distanceMeters: number
@@ -76,26 +75,17 @@ export function TripStats({ trackStats }: TripStatsProps) {
 
   return (
     <div className="trip-stats">
-      <div className="stat-grid">
-        <Stat label="Distance" value={trackCount === 0 ? undefined : formatDistance(totals.distanceMeters)} />
-        <Stat label="Ascent" value={formatElevationGain(totals.elevationGainMeters)} />
-        <Stat label="Descent" value={formatElevationLoss(totals.elevationLossMeters)} />
-        <Stat label="High point" value={formatElevation(totals.highPointMeters)} />
-        <Stat label="Low point" value={formatElevation(totals.lowPointMeters)} />
-        <Stat label="Tracks" value={String(trackCount)} />
-      </div>
+      <StatGrid
+        items={[
+          { label: 'Distance', value: trackCount === 0 ? undefined : formatDistance(totals.distanceMeters) },
+          { label: 'Ascent', value: formatElevationGain(totals.elevationGainMeters) },
+          { label: 'Descent', value: formatElevationLoss(totals.elevationLossMeters) },
+          { label: 'High point', value: formatElevation(totals.highPointMeters) },
+          { label: 'Low point', value: formatElevation(totals.lowPointMeters) },
+          { label: 'Tracks', value: String(trackCount) },
+        ]}
+      />
       {note && <p className="trip-stats__note">{note}</p>}
-    </div>
-  )
-}
-
-function Stat({ label, value }: { label: string; value: string | undefined }) {
-  return (
-    <div className="stat">
-      <span className="stat__label">{label}</span>
-      <span className={`stat__value${value === undefined ? ' stat__value--muted' : ''}`}>
-        {value ?? EM_DASH}
-      </span>
     </div>
   )
 }

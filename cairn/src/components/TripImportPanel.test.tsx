@@ -39,7 +39,7 @@ describe('TripImportPanel', () => {
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
     // #188: `.zip` is here as well as in the rejection copy, because the
     // picker is where someone finds out an archive is allowed.
-    expect(input.accept).toBe('.kml,.kmz,.jpg,.jpeg,.png,.webp,.zip')
+    expect(input.accept).toBe('.kml,.kmz,.gpx,.jpg,.jpeg,.png,.webp,.zip')
     expect(input.multiple).toBe(true)
   })
 

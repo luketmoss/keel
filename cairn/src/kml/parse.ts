@@ -1,4 +1,4 @@
-import { kml } from '@tmcw/togeojson'
+import { gpx, kml } from '@tmcw/togeojson'
 import JSZip from 'jszip'
 import type { Feature, FeatureCollection, Geometry } from 'geojson'
 
@@ -66,33 +66,60 @@ async function extractKmlText(buffer: ArrayBuffer): Promise<string> {
   return kmlEntry.async('text')
 }
 
-function parseXml(text: string): Document | ParseFailure {
+function parseXmlDocument(
+  text: string,
+  rootTag: string,
+  wrongTypeError: string,
+): Document | ParseFailure {
   const doc = new DOMParser().parseFromString(text, 'text/xml')
   if (doc.getElementsByTagName('parsererror').length > 0) {
     return { ok: false, error: 'File is not well-formed XML' }
   }
-  if (doc.documentElement?.tagName !== 'kml') {
-    return { ok: false, error: 'File is not a KML document' }
+  if (doc.documentElement?.tagName !== rootTag) {
+    return { ok: false, error: wrongTypeError }
   }
   return doc
 }
 
 /* togeojson collapses a two-point LineString/gx:Track into a Point geometry,
-   losing the line — only LineString survives here, which is a documented
-   limitation rather than a bug in this module. */
+   losing the line — only LineString and MultiLineString survive here, which
+   is a documented limitation rather than a bug in this module.
+
+   A GPX with multiple <trkseg> comes through as MultiLineString — each
+   segment its own line — and #223 treats a segment break as a recording
+   pause rather than a separate walk, so every segment is flattened into one
+   track here rather than becoming several. */
 function extractTrack(feature: Feature<Geometry | null>): Track | null {
-  if (feature.geometry?.type !== 'LineString') return null
+  const geometry = feature.geometry
+  let segments: number[][][]
+  if (geometry?.type === 'LineString') {
+    segments = [geometry.coordinates]
+  } else if (geometry?.type === 'MultiLineString') {
+    segments = geometry.coordinates
+  } else {
+    return null
+  }
 
   const times = feature.properties?.coordinateProperties?.times as
     | string[]
+    | string[][]
     | undefined
+  const multiSegment = Array.isArray(times) && Array.isArray(times[0])
 
-  const points: TrackPoint[] = feature.geometry.coordinates.map((coord, i) => {
-    const [lon, lat, elevation] = coord
-    const point: TrackPoint = { lat, lon }
-    if (elevation !== undefined) point.elevation = elevation
-    if (times?.[i] !== undefined) point.time = times[i]
-    return point
+  const points: TrackPoint[] = []
+  segments.forEach((segment, segIndex) => {
+    const segmentTimes = multiSegment
+      ? (times as string[][])[segIndex]
+      : segIndex === 0
+        ? (times as string[] | undefined)
+        : undefined
+    segment.forEach((coord, i) => {
+      const [lon, lat, elevation] = coord
+      const point: TrackPoint = { lat, lon }
+      if (elevation !== undefined) point.elevation = elevation
+      if (segmentTimes?.[i] !== undefined) point.time = segmentTimes[i]
+      points.push(point)
+    })
   })
 
   const name = typeof feature.properties?.name === 'string' ? feature.properties.name : ''
@@ -116,7 +143,7 @@ export async function parseKmlOrKmz(file: File): Promise<ParseResult> {
     return { ok: false, error: err instanceof Error ? err.message : 'Failed to read file' }
   }
 
-  const doc = parseXml(kmlText)
+  const doc = parseXmlDocument(kmlText, 'kml', 'File is not a KML document')
   if ('ok' in doc) return doc
 
   try {
@@ -124,4 +151,31 @@ export async function parseKmlOrKmz(file: File): Promise<ParseResult> {
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Failed to parse KML' }
   }
+}
+
+/* GPX is never zipped, unlike KML/KMZ, so this skips `extractKmlText`'s
+   zip-detection branch and decodes the bytes directly. */
+export async function parseGpx(file: File): Promise<ParseResult> {
+  let gpxText: string
+  try {
+    const bytes = new Uint8Array(await readAsArrayBuffer(file))
+    gpxText = new TextDecoder('utf-8').decode(bytes)
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Failed to read file' }
+  }
+
+  const doc = parseXmlDocument(gpxText, 'gpx', 'File is not a GPX document')
+  if ('ok' in doc) return doc
+
+  try {
+    return { ok: true, tracks: extractTracks(gpx(doc)) }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Failed to parse GPX' }
+  }
+}
+
+/** Dispatches on extension so every call site takes any accepted track
+    file without knowing which parser a given extension needs. */
+export function parseTrack(file: File): Promise<ParseResult> {
+  return file.name.toLowerCase().endsWith('.gpx') ? parseGpx(file) : parseKmlOrKmz(file)
 }

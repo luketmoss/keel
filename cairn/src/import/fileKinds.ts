@@ -3,7 +3,7 @@
    the outside-a-trip path additionally needs to tell "wrong extension" and
    "a photo, but not inside a trip" apart for its rejection copy. */
 
-export const TRACK_EXTENSIONS = ['.kml', '.kmz']
+export const TRACK_EXTENSIONS = ['.kml', '.kmz', '.gpx']
 export const PHOTO_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif']
 
 export function isTrackFile(name: string): boolean {

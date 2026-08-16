@@ -58,6 +58,18 @@ describe('useLooseImport', () => {
     expect(store.getItems()).toHaveLength(1)
   })
 
+  it('imports a dropped GPX as one loose track, with elevation and duration', async () => {
+    const { rejections } = await importer().importFiles([kmlFixture('track.gpx')])
+
+    expect(rejections).toEqual([])
+    const items = store.getItems()
+    expect(items).toHaveLength(1)
+    expect(items[0]).toMatchObject({ kind: 'track', sourceName: 'track.gpx' })
+    const track = items[0] as { ascentMeters: number | null; durationSeconds: number | null }
+    expect(track.ascentMeters).not.toBeNull()
+    expect(track.durationSeconds).not.toBeNull()
+  })
+
   it('gives the loose track its own overview, so the map never reads the KML', async () => {
     await importer().importFiles([kmlFixture('linestring.kml')])
 

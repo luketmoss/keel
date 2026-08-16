@@ -9,13 +9,13 @@ import { UNRECOGNISED_TYPE_MESSAGE } from '../components/TripDetail'
 describe('unrecognised-file copy', () => {
   it('names archives alongside tracks and photos, loose', () => {
     expect(UNRECOGNISED).toBe(
-      'cairn takes .kml or .kmz tracks, JPEG, PNG or WebP photos, and .zip archives',
+      'cairn takes .kml, .kmz or .gpx tracks, JPEG, PNG or WebP photos, and .zip archives',
     )
   })
 
   it('names archives alongside tracks and photos, in a trip', () => {
     expect(UNRECOGNISED_TYPE_MESSAGE).toBe(
-      'trips take .kml or .kmz tracks, JPEG, PNG or WebP photos, and .zip archives',
+      'trips take .kml, .kmz or .gpx tracks, JPEG, PNG or WebP photos, and .zip archives',
     )
   })
 })

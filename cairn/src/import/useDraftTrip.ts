@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { parseKmlOrKmz, type Track } from '../kml/parse'
+import { parseTrack, type Track } from '../kml/parse'
 import { isPhotoFile, isTrackFile } from './fileKinds'
 import { findOrCreateTripFolder } from '../drive/tripFolder'
 import { startResumableUpload, uploadFileContent } from '../drive/trackFiles'
@@ -81,14 +81,14 @@ export function useDraftTrip(
           name: file.name,
           message: isPhotoFile(file.name)
             ? 'Photos belong to a trip — open one first.'
-            : 'Only .kml and .kmz files can be imported.',
+            : 'Only .kml, .kmz and .gpx files can be imported.',
         })
         continue
       }
 
-      const result = await parseKmlOrKmz(file)
+      const result = await parseTrack(file)
       if (!result.ok) {
-        rejections.push({ name: file.name, message: `${file.name} is not a valid KML file.` })
+        rejections.push({ name: file.name, message: `${file.name} is not a valid track file.` })
         continue
       }
       if (result.tracks.every((track) => track.points.length === 0)) {

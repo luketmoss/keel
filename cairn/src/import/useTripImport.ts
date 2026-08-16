@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { parseKmlOrKmz, type Track } from '../kml/parse'
+import { parseTrack, type Track } from '../kml/parse'
 import { computeTrackStats, hasUsableElevation, overlaySampledElevation, type StoredTrackElevation } from '../kml/stats'
 import { createGoogleElevationSampler, sampleTrackElevation, trackKey } from '../geo/elevation'
 import { readSampledElevation } from '../geo/tripTotals'
@@ -18,7 +18,7 @@ import type { TrackOverridesStore } from '../store/trackOverridesStore'
 import { DriveTrackOverridesStore } from '../store/driveTrackOverridesStore'
 import type { TripStore } from '../store/tripStore'
 
-const ACCEPTED_EXTENSIONS = ['.kml', '.kmz']
+const ACCEPTED_EXTENSIONS = ['.kml', '.kmz', '.gpx']
 /* Matches #4's stance for v1: bounded, not unlimited, so a large batch does
    not open dozens of resumable sessions at once. */
 const UPLOAD_CONCURRENCY = 3
@@ -281,7 +281,7 @@ export function useTripImport(
           if (cancelled) return
           try {
             const file = await downloadTrackFile(token, driveFile.id, driveFile.name)
-            const result = await parseKmlOrKmz(file)
+            const result = await parseTrack(file)
             if (!result.ok || result.tracks.length === 0) return
             if (cancelled) return
             // #224: a stable key per track, so the sampled-elevation cache
@@ -414,7 +414,7 @@ export function useTripImport(
   const importOne = useCallback(
     async (file: File, index: number, total: number, folderId: string, token: string) => {
       if (!hasAcceptedExtension(file.name)) {
-        addFailure(file.name, 'only .kml and .kmz files can be imported')
+        addFailure(file.name, 'only .kml, .kmz and .gpx files can be imported')
         return
       }
 
@@ -437,7 +437,7 @@ export function useTripImport(
 
         setProgressEntry(key, { id: key, name: file.name, index: index + 1, total, phase: 'parsing' })
 
-        const result = await parseKmlOrKmz(file)
+        const result = await parseTrack(file)
         if (!result.ok) {
           addFailure(file.name, result.error)
           return

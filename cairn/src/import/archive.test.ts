@@ -61,6 +61,7 @@ describe('isImportableEntry', () => {
     expect(isImportableEntry('trip/day one/IMG_1234.jpg')).toBe(true)
     expect(isImportableEntry('trip/rosea.kml')).toBe(true)
     expect(isImportableEntry('trip/rosea.kmz')).toBe(true)
+    expect(isImportableEntry('trip/rosea.gpx')).toBe(true)
   })
 
   it('leaves anything else', () => {
@@ -88,6 +89,16 @@ describe('expandArchive', () => {
     const result = await expandArchive(archive)
 
     expect(result.files.map((file) => file.name).sort()).toEqual(['IMG_1.jpg', 'rosea.kml'])
+  })
+
+  // #223 criterion 3: a .gpx inside a dropped .zip is extracted like any
+  // other track, with no archive-specific handling.
+  it('carries a .gpx through as well', async () => {
+    const archive = await zipOf({ 'route.gpx': '<gpx/>', 'IMG_1.jpg': 'a' })
+
+    const result = await expandArchive(archive)
+
+    expect(result.files.map((file) => file.name).sort()).toEqual(['IMG_1.jpg', 'route.gpx'])
   })
 
   it('skips junk silently rather than reporting it', async () => {

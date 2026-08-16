@@ -56,15 +56,43 @@
   list-style: none;
 }
 
+/* #198 — the heading is now a row with a control in it, so it lays out as
+   one rather than as centred text. */
 .cairn-list__divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   padding: var(--space-2) var(--space-4);
   font-size: var(--text-xs);
   color: var(--text-muted);
-  text-align: center;
+}
+
+.cairn-list__divider-label {
+  flex: 1;
+}
+
+.cairn-list__divider-visibility {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-size: var(--text-xs);
+  line-height: 1;
 }
 
 .cairn-row {
   border-bottom: 1px solid var(--border);
+}
+
+/* #198 — hidden from the map, still in the list and still clickable. The
+   same muting `track-row--hidden` applies to a hidden track's row, so the
+   two lists inside a trip read the same. */
+.cairn-row--hidden .cairn-row__glyph {
+  opacity: 0.4;
+}
+
+.cairn-row--hidden .cairn-row__name {
+  color: var(--text-muted);
 }
 
 /* #77 — the row's own actions sit beside the open button rather than

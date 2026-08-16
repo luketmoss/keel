@@ -29,7 +29,12 @@ export interface CairnListRow {
   source: PositionSource
 }
 
-export type CairnListDivider = 'no-date'
+/** #198 replaced the old `no-date` divider with this one. Undated cairns
+    are unattached by definition — no date matches no track's days — so the
+    group they used to have on their own is a strict subset of this one,
+    and two headings would have split the same idea in half. Unlike the old
+    divider, this one carries a control: the group's own eye. */
+export type CairnListDivider = 'unattached'
 
 export type CairnListItem = { type: 'row'; row: CairnListRow } | { type: 'divider'; divider: CairnListDivider }
 
@@ -57,21 +62,39 @@ function byName(a: CairnListRow, b: CairnListRow): number {
   return a.name.localeCompare(b.name)
 }
 
-/** Dated-first-then-filename ordering (design doc: "No date" group by
-    filename) — dated by `date`, the field the row itself displays, not by
-    the finer-grained `captureInstantMs` the old photo-only list sorted on. */
-export function orderCairnListItems(rows: CairnListRow[]): CairnListItem[] {
+/** Dated-first-then-filename ordering — dated by `date`, the field the row
+    itself displays, not by the finer-grained `captureInstantMs` the old
+    photo-only list sorted on. */
+function orderWithinGroup(rows: CairnListRow[]): CairnListRow[] {
   const dated = rows.filter((row) => row.date !== null)
   dated.sort((a, b) => new Date(a.date as string).getTime() - new Date(b.date as string).getTime() || byName(a, b))
 
   const undated = rows.filter((row) => row.date === null)
   undated.sort(byName)
 
-  const items: CairnListItem[] = dated.map((row) => ({ type: 'row', row }))
+  return [...dated, ...undated]
+}
 
-  if (undated.length > 0) {
-    items.push({ type: 'divider', divider: 'no-date' })
-    for (const row of undated) items.push({ type: 'row', row })
+/** The list's two groups: everything attached to a track, then #198's
+    unattached group under its own heading.
+
+    `unattachedIds` comes from `cairnAttachment.ts` and is the only thing
+    that decides the split — the list does not re-derive the rule, so the
+    heading, the map and the group's eye can never disagree about which
+    cairns the eye owns. Passing an empty set gives one flat, ordered list,
+    which is what a trip whose tracks cover every cairn's day looks like. */
+export function orderCairnListItems(
+  rows: CairnListRow[],
+  unattachedIds: ReadonlySet<string> = new Set(),
+): CairnListItem[] {
+  const attached = orderWithinGroup(rows.filter((row) => !unattachedIds.has(row.id)))
+  const unattached = orderWithinGroup(rows.filter((row) => unattachedIds.has(row.id)))
+
+  const items: CairnListItem[] = attached.map((row) => ({ type: 'row', row }))
+
+  if (unattached.length > 0) {
+    items.push({ type: 'divider', divider: 'unattached' })
+    for (const row of unattached) items.push({ type: 'row', row })
   }
 
   return items

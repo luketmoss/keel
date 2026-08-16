@@ -90,27 +90,42 @@ describe('orderCairnListItems', () => {
     expect(items.map((item) => (item.type === 'row' ? item.row.id : item.divider))).toEqual(['early', 'late'])
   })
 
-  it('sorts undated cairns under a No date divider, last, by filename, and never drops them', () => {
+  it('#198: sorts unattached cairns under their own divider, last, and never drops them', () => {
     const rows = [
-      row({ id: 'dated', name: 'z.jpg', date: '2024-06-01' }),
+      row({ id: 'attached', name: 'z.jpg', date: '2024-06-01' }),
       row({ id: 'undated-b', name: 'b.jpg' }),
       row({ id: 'undated-a', name: 'a.jpg' }),
     ]
 
-    const items = orderCairnListItems(rows)
+    const items = orderCairnListItems(rows, new Set(['undated-a', 'undated-b']))
 
     expect(items).toEqual([
       { type: 'row', row: rows[0] },
-      { type: 'divider', divider: 'no-date' },
+      { type: 'divider', divider: 'unattached' },
       { type: 'row', row: rows[2] },
       { type: 'row', row: rows[1] },
     ])
   })
 
-  it('emits no dividers at all when every cairn is dated', () => {
-    const rows = [row({ id: 'a', date: '2024-06-01' })]
+  it('#198: a dated cairn no track covers joins the unattached group, not the dated run', () => {
+    const rows = [
+      row({ id: 'attached', name: 'a.jpg', date: '2024-06-01' }),
+      row({ id: 'orphan', name: 'b.jpg', date: '2024-06-09' }),
+    ]
 
-    const items = orderCairnListItems(rows)
+    const items = orderCairnListItems(rows, new Set(['orphan']))
+
+    expect(items.map((item) => (item.type === 'row' ? item.row.id : item.divider))).toEqual([
+      'attached',
+      'unattached',
+      'orphan',
+    ])
+  })
+
+  it('emits no dividers at all when every cairn is attached', () => {
+    const rows = [row({ id: 'a', date: '2024-06-01' }), row({ id: 'b', date: '2024-06-02' })]
+
+    const items = orderCairnListItems(rows, new Set())
 
     expect(items.every((item) => item.type === 'row')).toBe(true)
   })

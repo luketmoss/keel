@@ -62,6 +62,20 @@ describe('fileDayCoverage', () => {
     expect([...days]).toEqual(['2024-06-02'])
   })
 
+  it('handles a track with more points than a spread call can take', () => {
+    // A 1 Hz logger over two days. `Math.min(...instants)` on this throws
+    // `RangeError: Maximum call stack size exceeded` — the reason the
+    // min/max are reduced in the walk instead.
+    const start = Date.parse('2024-06-01T00:00:00Z')
+    const times = Array.from({ length: 172_800 }, (_, i) =>
+      new Date(start + i * 1000).toISOString(),
+    )
+
+    const days = fileDayCoverage([track(times)], 0)
+
+    expect([...days].sort()).toEqual(['2024-06-01', '2024-06-02'])
+  })
+
   it('unions the days of every track in the file', () => {
     const days = fileDayCoverage(
       [track(['2024-06-01T08:00:00Z']), track(['2024-06-05T08:00:00Z'])],

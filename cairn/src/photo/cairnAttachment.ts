@@ -79,20 +79,27 @@ export function localDay(date: string | null, offsetHours: number): string | nul
     crossed. Empty for a file whose tracks carry no timed points at all,
     which is the whole of "attaches nothing". */
 export function fileDayCoverage(tracks: Track[], offsetHours: number): Set<string> {
-  const instants: number[] = []
+  /* Reduced in the walk rather than collected and spread into
+     `Math.min(...)`: a 1 Hz logger puts 86,400 points in a day, and
+     spreading an array that size past V8's argument limit throws
+     `RangeError` instead of returning a number. `timedPointPool` and
+     `tripUtcOffsetHours` iterate for the same reason. */
+  let earliest = Number.POSITIVE_INFINITY
+  let latest = Number.NEGATIVE_INFINITY
   for (const track of tracks) {
     for (const point of track.points) {
       if (point.time === undefined) continue
       const ms = Date.parse(point.time)
       if (Number.isNaN(ms)) continue
-      instants.push(ms)
+      if (ms < earliest) earliest = ms
+      if (ms > latest) latest = ms
     }
   }
-  if (instants.length === 0) return new Set()
+  if (earliest === Number.POSITIVE_INFINITY) return new Set()
 
   const shift = offsetHours * 60 * 60 * 1000
-  const first = Math.min(...instants) + shift
-  const last = Math.max(...instants) + shift
+  const first = earliest + shift
+  const last = latest + shift
   // Walk whole days from the first local midnight, so the span is filled
   // rather than only its endpoints.
   const startDay = Math.floor(first / MS_PER_DAY) * MS_PER_DAY

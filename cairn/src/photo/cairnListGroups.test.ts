@@ -122,6 +122,24 @@ describe('orderCairnListItems', () => {
     ])
   })
 
+  it('keeps a trackless trip in date order — every cairn is unattached, and chronology still matters', () => {
+    const rows = [
+      row({ id: 'later', name: 'a.jpg', date: '2024-06-03' }),
+      row({ id: 'earlier', name: 'z.jpg', date: '2024-06-01' }),
+    ]
+
+    // Every row unattached, as a trip with no tracks produces. Sorting the
+    // group by name outright would put `a.jpg` first and lose the trip's
+    // chronology entirely.
+    const items = orderCairnListItems(rows, new Set(['later', 'earlier']))
+
+    expect(items.map((item) => (item.type === 'row' ? item.row.id : item.divider))).toEqual([
+      'unattached',
+      'earlier',
+      'later',
+    ])
+  })
+
   it('emits no dividers at all when every cairn is attached', () => {
     const rows = [row({ id: 'a', date: '2024-06-01' }), row({ id: 'b', date: '2024-06-02' })]
 

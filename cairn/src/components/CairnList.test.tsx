@@ -118,7 +118,7 @@ describe('CairnList', () => {
     expect(screen.getByText('a.jpg')).toBeDefined()
   })
 
-  it('#198: renders an Unattached divider for a cairn no track covers and never drops it', () => {
+  it('#198: renders a Not on a track divider for a cairn no track covers and never drops it', () => {
     const rows = [row({ id: 'dated', name: 'z.jpg', date: '2023-06-01' }), row({ id: 'undated', name: 'a.jpg', date: null })]
     const items = orderCairnListItems(rows, new Set(['undated']))
 
@@ -133,8 +133,32 @@ describe('CairnList', () => {
       />,
     )
 
-    expect(screen.getByText('Unattached')).toBeDefined()
+    expect(screen.getByText('Not on a track')).toBeDefined()
     expect(screen.getByText('a.jpg')).toBeDefined()
+  })
+
+  it('#198: the group heading carries its own count of the rows beneath it', () => {
+    const rows = [
+      row({ id: 'attached', name: 'z.jpg', date: '2023-06-01' }),
+      row({ id: 'u1', name: 'a.jpg', date: null }),
+      row({ id: 'u2', name: 'b.jpg', date: null }),
+    ]
+    const items = orderCairnListItems(rows, new Set(['u1', 'u2']))
+
+    const { container } = render(
+      <CairnList
+        items={items}
+        totalCount={3}
+        selectedCairnId={null}
+        accessToken="token"
+        onOpenRow={vi.fn()}
+        {...ownedProps()}
+      />,
+    )
+
+    // 2 beneath the heading, while the section header still says 3.
+    expect((container.querySelector('.cairn-list__divider-count') as HTMLElement).textContent).toBe('2')
+    expect((container.querySelector('.cairn-list__count') as HTMLElement).textContent).toBe('3')
   })
 
   it('the meta line reads clauses for icon and photo (cairns.md "The row")', () => {
@@ -578,8 +602,8 @@ describe('CairnList', () => {
       )
 
       expectTooltipMatchesLabel(
-        screen.getByRole('button', { name: 'Hide unattached cairns' }),
-        'Hide unattached cairns',
+        screen.getByRole('button', { name: 'Hide cairns not on a track' }),
+        'Hide cairns not on a track',
       )
 
       rerender(
@@ -596,8 +620,8 @@ describe('CairnList', () => {
       )
 
       expectTooltipMatchesLabel(
-        screen.getByRole('button', { name: 'Show unattached cairns' }),
-        'Show unattached cairns',
+        screen.getByRole('button', { name: 'Show cairns not on a track' }),
+        'Show cairns not on a track',
       )
     })
   })

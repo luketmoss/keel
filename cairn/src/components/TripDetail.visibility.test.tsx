@@ -292,7 +292,7 @@ describe('TripDetail — #198 cairns follow the track of their day', () => {
     mockCairnImport([ON_DAY_ONE, OFF_TRIP, UNDATED])
     renderTrip()
 
-    expect(within(cairnSection()).getByText('Unattached')).toBeDefined()
+    expect(within(cairnSection()).getByText('Not on a track')).toBeDefined()
     // The attached one first, then the heading, then both unattached.
     expect(listedNames()).toEqual(['day one.jpg', 'off trip.jpg', 'undated.jpg'])
   })
@@ -302,10 +302,10 @@ describe('TripDetail — #198 cairns follow the track of their day', () => {
     mockCairnImport([ON_DAY_ONE, OFF_TRIP, UNDATED])
     renderTrip()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Hide unattached cairns' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Hide cairns not on a track' }))
     expect(drawnNames()).toEqual(['day one.jpg'])
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show unattached cairns' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show cairns not on a track' }))
     expect(drawnNames()).toEqual(['day one.jpg', 'off trip.jpg', 'undated.jpg'])
   })
 
@@ -347,7 +347,7 @@ describe('TripDetail — #198 cairns follow the track of their day', () => {
     const { unmount } = renderTrip()
 
     hideTrack('Day one')
-    fireEvent.click(screen.getByRole('button', { name: 'Hide unattached cairns' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Hide cairns not on a track' }))
     expect(drawnNames()).toEqual(['day two.jpg'])
     unmount()
 

@@ -71,6 +71,13 @@
   flex: 1;
 }
 
+/* The group's own count, beside its heading the way the section header
+   carries the list's. */
+.cairn-list__divider-count {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .cairn-list__divider-visibility {
   background: none;
   border: none;

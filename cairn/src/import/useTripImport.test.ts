@@ -1,9 +1,10 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useTripImport } from './useTripImport'
 import type { ParseResult } from '../kml/parse'
 import { DriveAuthError } from '../drive/rootFolder'
 import { LocalTrackOverridesStore, type TrackOverridesStore } from '../store/trackOverridesStore'
+import { SIDECAR_VERSION, type StoredOverview } from '../geo/tripTotals'
 import type { TripStore } from '../store/tripStore'
 
 /** A minimal in-memory `Storage`, same helper `tripStore.test.ts` and
@@ -83,6 +84,60 @@ function fakeTripStore(): TripStore {
 
 function track(name: string): ParseResult {
   return { ok: true, tracks: [{ name, points: [{ lat: 0, lon: 0 }] }] }
+}
+
+/** #224 — a track with real coordinates but no elevation, the shape
+    `hasUsableElevation` (real, not mocked — see the `kml/stats` mock
+    above) has to see as sampling-eligible. */
+function trackWithoutElevation(name: string, pointCount = 5): ParseResult {
+  return {
+    ok: true,
+    tracks: [
+      {
+        name,
+        points: Array.from({ length: pointCount }, (_, i) => ({ lat: 37 + i * 0.001, lon: -122 })),
+      },
+    ],
+  }
+}
+
+/** #224 — a track carrying real, varying elevation — `hasUsableElevation`
+    reads this as already-recorded, so the sampling effect must never touch
+    it, independent of the `computeTrackStats` mock above (which always
+    reports elevation unavailable, since `useTripImport`'s sampling
+    eligibility reads the track's own points, not the mocked stats). */
+function trackWithElevation(name: string): ParseResult {
+  const elevations = [1000, 1000, 1000, 1010, 1020, 1035, 1050, 1050, 1050, 1045, 1030, 1010, 1000]
+  return {
+    ok: true,
+    tracks: [{ name, points: elevations.map((elevation, i) => ({ lat: 37 + i * 0.001, lon: -122, elevation })) }],
+  }
+}
+
+/** #224 — installs a fake `google.maps.ElevationService`, the same
+    pattern `geo/elevation.test.ts` uses for the module in isolation, here
+    exercised through the real `useTripImport` wiring end to end. */
+function mockGoogleElevation(
+  handler: () => { results: { location: { lat: () => number; lng: () => number }; elevation: number }[] | null; status: string },
+) {
+  const getElevationAlongPath = vi.fn((_request: unknown, callback: (results: unknown, status: string) => void) => {
+    const { results, status } = handler()
+    callback(results, status)
+  })
+  ;(globalThis as { google?: unknown }).google = {
+    maps: {
+      ElevationService: vi.fn().mockImplementation(() => ({ getElevationAlongPath })),
+      ElevationStatus: { OK: 'OK' },
+    },
+  }
+  return getElevationAlongPath
+}
+
+function climbingSamples(pointCount: number) {
+  return Array.from({ length: pointCount }, (_, i) => ({
+    location: { lat: () => 37 + i * 0.001, lng: () => -122 },
+    elevation: 1000 + i * 20,
+  }))
 }
 
 function file(name: string): File {
@@ -695,5 +750,136 @@ describe('useTripImport — #77 removing a track', () => {
     expect(trashFile).not.toHaveBeenCalled()
     expect(result.current.tracks).toHaveLength(1)
     expect(result.current.trackRemoveErrors[id]).toBe("Couldn't remove day-1.kml — try again.")
+  })
+
+  // #224
+  describe('elevation sampling', () => {
+    afterEach(() => {
+      delete (globalThis as { google?: unknown }).google
+    })
+
+    it('samples a track with no usable elevation, marking it sampled — exactly one API call', async () => {
+      listTrackFiles.mockResolvedValue([{ id: 'drive-1', name: 'flat.kml' }])
+      downloadTrackFile.mockResolvedValue(file('flat.kml'))
+      parseKmlOrKmz.mockResolvedValueOnce(trackWithoutElevation('Flat', 10))
+      const getElevationAlongPath = mockGoogleElevation(() => ({ results: climbingSamples(10), status: 'OK' }))
+
+      const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
+      await waitFor(() => expect(result.current.loading).toBe(false))
+
+      await waitFor(() => expect(result.current.tracks[0].trackStats[0].elevationSource).toBe('sampled'))
+      expect(getElevationAlongPath).toHaveBeenCalledTimes(1)
+      expect(result.current.sampledElevation['drive-1']).toBeDefined()
+    })
+
+    it('never samples a track that already carries its own elevation', async () => {
+      listTrackFiles.mockResolvedValue([{ id: 'drive-1', name: 'climb.kml' }])
+      downloadTrackFile.mockResolvedValue(file('climb.kml'))
+      parseKmlOrKmz.mockResolvedValueOnce(trackWithElevation('Climb'))
+      const getElevationAlongPath = mockGoogleElevation(() => ({ results: [], status: 'OK' }))
+
+      const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      // Nothing async left to settle beyond the read itself — a following
+      // tick is enough to prove the effect declined to fire, without a
+      // fixed sleep race.
+      await act(async () => {})
+
+      expect(getElevationAlongPath).not.toHaveBeenCalled()
+    })
+
+    it('skips sampling for a track with fewer than two points', async () => {
+      listTrackFiles.mockResolvedValue([{ id: 'drive-1', name: 'point.kml' }])
+      downloadTrackFile.mockResolvedValue(file('point.kml'))
+      parseKmlOrKmz.mockResolvedValueOnce(track('Point')) // one point, no elevation
+      const getElevationAlongPath = mockGoogleElevation(() => ({ results: [], status: 'OK' }))
+
+      const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      await act(async () => {})
+
+      expect(getElevationAlongPath).not.toHaveBeenCalled()
+    })
+
+    it('reads a previously sampled result back from the trip store, making no API call', async () => {
+      listTrackFiles.mockResolvedValue([{ id: 'drive-1', name: 'flat.kml' }])
+      downloadTrackFile.mockResolvedValue(file('flat.kml'))
+      parseKmlOrKmz.mockResolvedValueOnce(trackWithoutElevation('Flat', 10))
+      const getElevationAlongPath = mockGoogleElevation(() => ({ results: climbingSamples(10), status: 'OK' }))
+
+      const cached: StoredOverview = {
+        type: 'FeatureCollection',
+        features: [],
+        version: SIDECAR_VERSION,
+        sampledElevation: {
+          'drive-1': {
+            elevationGainMeters: 300,
+            elevationLossMeters: 50,
+            highPointMeters: 400,
+            lowPointMeters: 100,
+            profile: [],
+          },
+        },
+      }
+      const cachedStore: TripStore = { getOverview: () => cached } as unknown as TripStore
+
+      const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', cachedStore))
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      await waitFor(() => expect(result.current.tracks[0].trackStats[0].elevationSource).toBe('sampled'))
+
+      expect(result.current.tracks[0].trackStats[0].elevationGainMeters).toBe(300)
+      expect(getElevationAlongPath).not.toHaveBeenCalled()
+    })
+
+    it('reports one failure line for the whole batch, not one per track, and leaves both tracks unavailable', async () => {
+      listTrackFiles.mockResolvedValue([
+        { id: 'drive-1', name: 'a.kml' },
+        { id: 'drive-2', name: 'b.kml' },
+      ])
+      downloadTrackFile.mockResolvedValueOnce(file('a.kml')).mockResolvedValueOnce(file('b.kml'))
+      parseKmlOrKmz
+        .mockResolvedValueOnce(trackWithoutElevation('A', 5))
+        .mockResolvedValueOnce(trackWithoutElevation('B', 5))
+      mockGoogleElevation(() => ({ results: null, status: 'OVER_QUERY_LIMIT' }))
+
+      const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      await waitFor(() => expect(result.current.tracks).toHaveLength(2))
+
+      await waitFor(() =>
+        expect(result.current.failures.some((f) => f.message.includes("2 tracks"))).toBe(true),
+      )
+      expect(result.current.failures.filter((f) => f.name === 'Elevation')).toHaveLength(1)
+      expect(result.current.tracks.every((t) => t.trackStats[0].elevationSource === undefined)).toBe(true)
+    })
+
+    it('samples nothing while offline', async () => {
+      const original = Object.getOwnPropertyDescriptor(navigator, 'onLine')
+      Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+      try {
+        listTrackFiles.mockResolvedValue([{ id: 'drive-1', name: 'flat.kml' }])
+        downloadTrackFile.mockResolvedValue(file('flat.kml'))
+        parseKmlOrKmz.mockResolvedValueOnce(trackWithoutElevation('Flat', 10))
+        const getElevationAlongPath = mockGoogleElevation(() => ({ results: climbingSamples(10), status: 'OK' }))
+
+        const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
+        await waitFor(() => expect(result.current.loading).toBe(false))
+        await act(async () => {})
+
+        expect(getElevationAlongPath).not.toHaveBeenCalled()
+      } finally {
+        if (original) Object.defineProperty(navigator, 'onLine', original)
+      }
+    })
+
+    it('samples nothing while signed out', async () => {
+      const getElevationAlongPath = mockGoogleElevation(() => ({ results: climbingSamples(10), status: 'OK' }))
+
+      const { result } = renderHook(() => useTripImport('trip-1', null, null, fakeTripStore()))
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      await act(async () => {})
+
+      expect(getElevationAlongPath).not.toHaveBeenCalled()
+    })
   })
 })

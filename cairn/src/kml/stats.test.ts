@@ -348,8 +348,11 @@ describe('overlaySampledElevation', () => {
     expect(result.highPointMeters).toBe(400)
     expect(result.lowPointMeters).toBe(100)
     expect(result.elevationSource).toBe('sampled')
-    // Distance and duration are untouched — sampling never infers either.
+    // Distance and duration are untouched — sampling never infers either
+    // (the issue's acceptance criterion: a track with no timestamps still
+    // reports duration unavailable, even once its elevation is sampled).
     expect(result.distanceMeters).toBe(unavailable.distanceMeters)
+    expect(result.durationSeconds).toBe(unavailable.durationSeconds)
   })
 
   it('never overwrites a track that already carries its own elevation', () => {

@@ -259,18 +259,21 @@ describe('TrackList', () => {
     expect(() => fireEvent.mouseEnter(row)).not.toThrow()
   })
 
-  it('does not render a drag handle, editable name, or colour button when their handlers are omitted (#46)', () => {
+  it('does not render a drag handle or colour button when their handlers are omitted (#46)', () => {
     render(<TrackList files={[importedFile()]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />)
 
     expect(screen.queryByLabelText('Reorder trip.kml')).toBeNull()
     expect(screen.queryByLabelText('Change colour for trip.kml')).toBeNull()
-    expect(screen.getByText('trip.kml', { exact: false })).not.toHaveProperty(
-      'onclick',
-      expect.anything(),
-    )
   })
 
-  it('renames a track via click-to-edit and calls onRename with the trimmed value (#46)', () => {
+  it('offers no Rename action when onRename is omitted (#219)', () => {
+    render(<TrackList files={[importedFile()]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />)
+
+    openRowMenu('trip.kml')
+    expect(screen.queryByRole('menuitem', { name: 'Rename' })).toBeNull()
+  })
+
+  it('renames a track via the row menu and calls onRename with the trimmed value (#46, #219)', () => {
     const onRename = vi.fn().mockResolvedValue(true)
     render(
       <TrackList
@@ -281,7 +284,8 @@ describe('TrackList', () => {
       />,
     )
 
-    fireEvent.click(screen.getByText('trip.kml', { exact: false }))
+    openRowMenu('trip.kml')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }))
     const input = screen.getByDisplayValue('trip.kml')
     fireEvent.change(input, { target: { value: '  Ridge day  ' } })
     fireEvent.keyDown(input, { key: 'Enter' })
@@ -300,7 +304,8 @@ describe('TrackList', () => {
       />,
     )
 
-    fireEvent.click(screen.getByText('trip.kml', { exact: false }))
+    openRowMenu('trip.kml')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }))
     const input = screen.getByDisplayValue('trip.kml')
     fireEvent.change(input, { target: { value: '   ' } })
     fireEvent.keyDown(input, { key: 'Enter' })
@@ -320,7 +325,8 @@ describe('TrackList', () => {
       />,
     )
 
-    fireEvent.click(screen.getByText('trip.kml', { exact: false }))
+    openRowMenu('trip.kml')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }))
     const input = screen.getByDisplayValue('trip.kml')
     fireEvent.change(input, { target: { value: 'Something else' } })
     fireEvent.keyDown(input, { key: 'Escape' })
@@ -340,7 +346,8 @@ describe('TrackList', () => {
       />,
     )
 
-    fireEvent.click(screen.getByText('trip.kml', { exact: false }))
+    openRowMenu('trip.kml')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }))
     fireEvent.change(screen.getByDisplayValue('trip.kml'), { target: { value: 'New name' } })
     fireEvent.keyDown(screen.getByDisplayValue('New name'), { key: 'Enter' })
 
@@ -533,10 +540,12 @@ describe('TrackList', () => {
       />,
     )
 
-    // Rename doesn't even start editing.
-    fireEvent.click(screen.getByText('trip.kml', { exact: false }))
-    expect(screen.queryByDisplayValue('trip.kml')).toBeNull()
-    expect(onRename).not.toHaveBeenCalled()
+    // #219: the name button opens the detail regardless of `disabled` —
+    // opening touches no Drive-backed state. Rename itself is the row
+    // menu's own disabled item, per #73's Disabled treatment.
+    openRowMenu('trip.kml')
+    expect(screen.getByRole('menuitem', { name: 'Rename' })).toHaveProperty('disabled', true)
+    openRowMenu('trip.kml') // closes it again, for the Delete click below
 
     // Recolour button is disabled.
     const swatchButton = screen.getByRole('button', { name: 'Change colour for trip.kml' })
@@ -737,6 +746,340 @@ describe('TrackList', () => {
       )
 
       expectTooltipMatchesLabel(screen.getByRole('button', { name: 'Show trip.kml' }), 'Show trip.kml')
+    })
+  })
+
+  /* #219 — the row click opens a detail beneath it, holding the five #218
+     stats plus duration and an elevation profile. */
+  describe('#219 opened track detail', () => {
+    function elevatedTrack(): { tracks: ImportedFile['tracks']; trackStats: ImportedFile['trackStats'] } {
+      const elevations = [1000, 1000, 1000, 1010, 1020, 1035, 1050, 1050, 1050, 1045, 1030, 1010, 1000]
+      return {
+        tracks: [
+          {
+            name: 'Track',
+            points: elevations.map((elevation, i) => ({ lat: 37 + i * 0.001, lon: -122, elevation })),
+          },
+        ],
+        trackStats: [
+          {
+            distanceMeters: 10_300,
+            durationSeconds: 19_200,
+            elevationGainMeters: 50,
+            elevationLossMeters: 50,
+            highPointMeters: 1050,
+            lowPointMeters: 1000,
+          },
+        ],
+      }
+    }
+
+    it('opens a detail showing distance, ascent, descent, high point, low point and duration on a row click', () => {
+      render(
+        <TrackList files={[importedFile(elevatedTrack())]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />,
+      )
+
+      const nameButton = screen.getByRole('button', { name: 'trip.kml' })
+      fireEvent.click(nameButton)
+
+      // The detail's markup is always in the DOM (per the design note: not
+      // `display: none` when closed, so it never leaves the tab order
+      // mid-animation) — the wrapper's open class is the real signal that
+      // this click expanded it rather than the content merely existing.
+      expect(nameButton).toHaveProperty('ariaExpanded', 'true')
+      expect(document.querySelector('.track-row__detail-wrapper--open')).not.toBeNull()
+      expect(screen.getByText('Distance')).toBeDefined()
+      expect(screen.getByText('Ascent')).toBeDefined()
+      expect(screen.getByText('Descent')).toBeDefined()
+      expect(screen.getByText('High point')).toBeDefined()
+      expect(screen.getByText('Low point')).toBeDefined()
+      expect(screen.getByText('Duration')).toBeDefined()
+    })
+
+    it('closes on a second click of the same row', () => {
+      render(
+        <TrackList files={[importedFile(elevatedTrack())]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />,
+      )
+
+      const nameButton = screen.getByRole('button', { name: 'trip.kml' })
+      fireEvent.click(nameButton)
+      expect(nameButton).toHaveProperty('ariaExpanded', 'true')
+
+      fireEvent.click(nameButton)
+      expect(nameButton).toHaveProperty('ariaExpanded', 'false')
+    })
+
+    it('opening one track closes another that was open', () => {
+      render(
+        <TrackList
+          files={[
+            importedFile({ id: 'a', name: 'a.kml', ...elevatedTrack() }),
+            importedFile({ id: 'b', name: 'b.kml', ...elevatedTrack() }),
+          ]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+        />,
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'a.kml' }))
+      expect(screen.getByRole('button', { name: 'a.kml' })).toHaveProperty('ariaExpanded', 'true')
+
+      fireEvent.click(screen.getByRole('button', { name: 'b.kml' }))
+      expect(screen.getByRole('button', { name: 'a.kml' })).toHaveProperty('ariaExpanded', 'false')
+      expect(screen.getByRole('button', { name: 'b.kml' })).toHaveProperty('ariaExpanded', 'true')
+    })
+
+    it('does not open, and shows no affordance, for a multi-track file', () => {
+      render(
+        <TrackList
+          files={[
+            importedFile({
+              tracks: [
+                { name: 'a', points: [] },
+                { name: 'b', points: [] },
+              ],
+            }),
+          ]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+        />,
+      )
+
+      expect(screen.queryByRole('button', { name: 'trip.kml' })).toBeNull()
+      expect(screen.queryByText('Distance')).toBeNull()
+    })
+
+    it('opens on a click of the meta line, not only the name', () => {
+      render(
+        <TrackList files={[importedFile(elevatedTrack())]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />,
+      )
+
+      const statsLine = document.querySelector('.track-row__stats') as HTMLElement
+      fireEvent.click(statsLine)
+
+      expect(screen.getByRole('button', { name: 'trip.kml' })).toHaveProperty('ariaExpanded', 'true')
+    })
+
+    it('does not open the detail when dismissing the colour popover via its backdrop', () => {
+      render(
+        <TrackList
+          files={[importedFile(elevatedTrack())]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          onRecolor={vi.fn().mockResolvedValue(true)}
+        />,
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'Change colour for trip.kml' }))
+      fireEvent.click(document.querySelector('.track-row__color-backdrop')!)
+
+      expect(screen.getByRole('button', { name: 'trip.kml' })).toHaveProperty('ariaExpanded', 'false')
+    })
+
+    it('does not open or close from the swatch, the eye, the handle, or the ⋮', () => {
+      render(
+        <TrackList
+          files={[importedFile(elevatedTrack())]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          onRecolor={vi.fn().mockResolvedValue(true)}
+          onReorder={vi.fn().mockResolvedValue(true)}
+          onRemoveFromTrip={vi.fn()}
+        />,
+      )
+
+      const nameButton = screen.getByRole('button', { name: 'trip.kml' })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Change colour for trip.kml' }))
+      expect(nameButton).toHaveProperty('ariaExpanded', 'false')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Hide trip.kml' }))
+      expect(nameButton).toHaveProperty('ariaExpanded', 'false')
+
+      fireEvent.click(screen.getByLabelText('Reorder trip.kml'))
+      expect(nameButton).toHaveProperty('ariaExpanded', 'false')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Row actions for trip.kml' }))
+      expect(nameButton).toHaveProperty('ariaExpanded', 'false')
+    })
+
+    it('clicking the name opens the detail rather than starting a rename', () => {
+      const onRename = vi.fn()
+      render(
+        <TrackList
+          files={[importedFile(elevatedTrack())]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          onRename={onRename}
+        />,
+      )
+
+      const nameButton = screen.getByRole('button', { name: 'trip.kml' })
+      fireEvent.click(nameButton)
+
+      expect(onRename).not.toHaveBeenCalled()
+      expect(screen.queryByDisplayValue('trip.kml')).toBeNull()
+      expect(nameButton).toHaveProperty('ariaExpanded', 'true')
+    })
+
+    it('shows the grid with em dashes and no profile when elevation is unavailable', () => {
+      render(
+        <TrackList
+          files={[
+            importedFile({
+              trackStats: [
+                {
+                  distanceMeters: 1000,
+                  durationSeconds: 60,
+                  elevationGainMeters: undefined,
+                  elevationLossMeters: undefined,
+                  highPointMeters: undefined,
+                  lowPointMeters: undefined,
+                },
+              ],
+            }),
+          ]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+        />,
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'trip.kml' }))
+
+      expect(screen.getByText('High point')).toBeDefined()
+      expect(document.querySelector('.track-elevation-profile')).toBeNull()
+      expect(document.querySelectorAll('.stat__value--muted').length).toBe(4)
+    })
+
+    it('draws a profile, in the track colour, with an aria-label naming the endpoints and distance', () => {
+      render(
+        <TrackList files={[importedFile(elevatedTrack())]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />,
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'trip.kml' }))
+
+      const profile = screen.getByRole('img', {
+        name: 'Elevation profile: 3,281 ft to 3,445 ft over 6.4 mi',
+      })
+      expect(profile).toBeDefined()
+      const line = profile.querySelector('.track-elevation-profile__line') as SVGPathElement
+      expect(line.style.stroke).toBe('#FF3B30') // colorIndex 0
+    })
+
+    it('restyles the profile immediately when the row colour changes', () => {
+      const { rerender } = render(
+        <TrackList files={[importedFile(elevatedTrack())]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />,
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'trip.kml' }))
+      rerender(
+        <TrackList
+          files={[importedFile({ ...elevatedTrack(), colorIndex: 1 })]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+        />,
+      )
+
+      const line = document.querySelector('.track-elevation-profile__line') as SVGPathElement
+      expect(line.style.stroke).toBe('#00D4FF') // colorIndex 1
+      expect(screen.getByRole('button', { name: 'trip.kml' })).toHaveProperty('ariaExpanded', 'true')
+    })
+
+    it('keeps the detail open across a visibility toggle on its own row', () => {
+      const { rerender } = render(
+        <TrackList files={[importedFile(elevatedTrack())]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />,
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'trip.kml' }))
+      rerender(
+        <TrackList
+          files={[importedFile({ ...elevatedTrack(), visible: false })]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+        />,
+      )
+
+      expect(screen.getByRole('button', { name: 'trip.kml' })).toHaveProperty('ariaExpanded', 'true')
+    })
+
+    it('keeps the detail open across a rename commit on its own row', async () => {
+      const onRename = vi.fn().mockResolvedValue(true)
+      render(
+        <TrackList
+          files={[importedFile(elevatedTrack())]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          onRename={onRename}
+        />,
+      )
+
+      const nameButton = screen.getByRole('button', { name: 'trip.kml' })
+      fireEvent.click(nameButton)
+      expect(nameButton).toHaveProperty('ariaExpanded', 'true')
+
+      openRowMenu('trip.kml')
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }))
+      const input = screen.getByDisplayValue('trip.kml')
+      fireEvent.change(input, { target: { value: 'Ridge day' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+
+      expect(onRename).toHaveBeenCalledWith('f1', 'Ridge day')
+      expect(screen.getByRole('button', { name: 'trip.kml' })).toHaveProperty('ariaExpanded', 'true')
+    })
+
+    it('closes without error when the open track is removed from the list', () => {
+      const { rerender } = render(
+        <TrackList files={[importedFile(elevatedTrack())]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />,
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'trip.kml' }))
+      expect(() => rerender(<TrackList files={[]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />)).not.toThrow()
+    })
+
+    it('collapses the detail when the open row starts dragging', () => {
+      render(
+        <TrackList
+          files={[importedFile(elevatedTrack())]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          onReorder={vi.fn().mockResolvedValue(true)}
+        />,
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'trip.kml' }))
+      fireEvent.dragStart(screen.getByLabelText('Reorder trip.kml'))
+
+      expect(screen.getByRole('button', { name: 'trip.kml' })).toHaveProperty('ariaExpanded', 'false')
+    })
+
+    it('closes the detail when the row starts confirming removal', () => {
+      const onStartConfirm = vi.fn()
+      render(
+        <TrackList
+          files={[importedFile(elevatedTrack())]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          onStartConfirm={onStartConfirm}
+        />,
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'trip.kml' }))
+      openRowMenu('trip.kml')
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Delete permanently…' }))
+
+      expect(onStartConfirm).toHaveBeenCalledWith('f1')
+      expect(screen.getByRole('button', { name: 'trip.kml' })).toHaveProperty('ariaExpanded', 'false')
+    })
+
+    it('carries aria-expanded and aria-controls pointing at the detail', () => {
+      render(
+        <TrackList files={[importedFile(elevatedTrack())]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />,
+      )
+
+      const nameButton = screen.getByRole('button', { name: 'trip.kml' })
+      const controlsId = nameButton.getAttribute('aria-controls')
+      expect(controlsId).toBeTruthy()
+      expect(document.getElementById(controlsId!)).not.toBeNull()
     })
   })
 })

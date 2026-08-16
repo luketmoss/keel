@@ -111,6 +111,12 @@
      smaller so a second row costs less of the panel's scarcest resource. */
   --chip-height-sub: 28px;
 
+  /* Opened track detail — cairn/docs/design/219-opened-track-detail.md, "New
+     tokens". On the 4px grid: tall enough that a rolling traverse reads as
+     distinguishable from a single climb, short enough that an open row
+     stays inside one screen of the column alongside its grid. */
+  --profile-height: 56px;
+
   color-scheme: dark;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   font-size: var(--text-base);

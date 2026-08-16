@@ -33,6 +33,19 @@ describe('computeTripTotals', () => {
     const totals = computeTripTotals([flat])
     expect(totals).toEqual({ distanceMeters: expect.any(Number), elevationGainMeters: undefined })
   })
+
+  // #225's acceptance criteria: reordering a track (an `overrides.json`
+  // concern, per the design note) must not change the displayed totals —
+  // only the track *set* changing is a real edit. `formatDistance` and
+  // `formatElevationGain` round to one decimal mile / whole feet, so this
+  // compares at that resolution rather than the raw float, the same
+  // precision a reader would actually notice a change at.
+  it('is order-invariant, so a reorder produces the same displayed total', () => {
+    const forward = computeTripTotals([flat, climbing])!
+    const reversed = computeTripTotals([climbing, flat])!
+    expect(Math.round(forward.distanceMeters)).toBe(Math.round(reversed.distanceMeters))
+    expect(Math.round(forward.elevationGainMeters!)).toBe(Math.round(reversed.elevationGainMeters!))
+  })
 })
 
 describe('readTripTotals', () => {

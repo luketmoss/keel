@@ -82,7 +82,16 @@ function orderWithinGroup(rows: CairnListRow[]): CairnListRow[] {
     that decides the split — the list does not re-derive the rule, so the
     heading, the map and the group's eye can never disagree about which
     cairns the eye owns. Passing an empty set gives one flat, ordered list,
-    which is what a trip whose tracks cover every cairn's day looks like. */
+    which is what a trip whose tracks cover every cairn's day looks like.
+
+    Both groups order dated-by-date then undated-by-name. #198's design note
+    asks for the unattached group to be sorted by name outright, "exactly as
+    it sorts the undated group today" — but that rule predates the group
+    gaining dated members, and applying it literally costs more than it
+    buys: a trip with no tracks has *every* cairn unattached, so its whole
+    list would fall to alphabetical and a photo trip would lose chronology
+    entirely. The note's own States table contemplates that trip; its sort
+    line did not. Dated rows sort by date wherever they appear. */
 export function orderCairnListItems(
   rows: CairnListRow[],
   unattachedIds: ReadonlySet<string> = new Set(),

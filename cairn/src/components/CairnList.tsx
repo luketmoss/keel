@@ -132,6 +132,13 @@ export function CairnList({
   // user needs to see when a facet matched nothing.
   const matchedCount = items.reduce((count, item) => (item.type === 'row' ? count + 1 : count), 0)
 
+  /* #198's group heading carries its own count, the way the section header
+     above carries the list's. Counted from the items after the divider
+     rather than passed in, so it can only ever describe the rows actually
+     rendered beneath it. */
+  const dividerIndex = items.findIndex((item) => item.type === 'divider')
+  const unattachedCount = dividerIndex === -1 ? 0 : items.length - dividerIndex - 1
+
   return (
     <div className="cairn-list">
       <div className="cairn-list__header">
@@ -166,12 +173,19 @@ export function CairnList({
                  reach it; this is the eye that can, and it owns exactly
                  this group. */
               <li key={`divider-${index}`} className="cairn-list__divider">
-                <span className="cairn-list__divider-label">Unattached</span>
+                {/* `Not on a track`, never `Unattached` or `Other` (design
+                    note's Copy table). It says the thing that is true and,
+                    by saying it, explains why the track toggles do nothing
+                    to the rows beneath it — which a jargon word cannot. */}
+                <span className="cairn-list__divider-label">Not on a track</span>
+                <span className="cairn-list__divider-count">{unattachedCount}</span>
                 {onToggleUnattached && (
                   <button
                     type="button"
                     className="cairn-list__divider-visibility"
-                    {...iconLabel(unattachedVisible ? 'Hide unattached cairns' : 'Show unattached cairns')}
+                    {...iconLabel(
+                      unattachedVisible ? 'Hide cairns not on a track' : 'Show cairns not on a track',
+                    )}
                     onClick={onToggleUnattached}
                   >
                     {unattachedVisible ? '👁' : '🚫'}

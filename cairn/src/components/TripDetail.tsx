@@ -14,6 +14,7 @@ import { expandArchives, isArchiveFile } from '../import/archive'
 import { useTripImport } from '../import/useTripImport'
 import { useCairnImport, type CairnRecord, type NewTripCairn } from '../photo/useCairnImport'
 import { buildCairnListRows, flattenCairnListRows, orderCairnListItems } from '../photo/cairnListGroups'
+import { unattachedCairnIds, visibleCairnIds } from '../photo/cairnAttachment'
 import type { TripStore } from '../store/tripStore'
 import { cairnMatchesFacet, type CairnFacet } from '../store/cairnRules'
 import {
@@ -214,13 +215,51 @@ export function TripDetail({
      indistinguishable from missing data. */
   const [cairnFacet, setCairnFacet] = useState<CairnFacet>('any')
 
+  /* #198 — the unattached group's own eye. `useState` here for the same
+     reason the facet above is: visibility is deliberately not persisted,
+     so leaving the trip and coming back shows everything, which is exactly
+     how track visibility already behaves. */
+  const [unattachedVisible, setUnattachedVisible] = useState(true)
+
   /* One filter, two views. Narrowing the *records* — upstream of both the
      markers below and the list rows — is what makes "the list and the map
      never disagree" true by construction rather than by a second rule that
      has to be kept in step. */
-  const visibleCairns = useMemo(
+  const facetedCairns = useMemo(
     () => cairnImport.cairns.filter((cairn) => cairnMatchesFacet(cairn, cairnFacet)),
     [cairnImport.cairns, cairnFacet],
+  )
+
+  /* #198 — the second narrowing, and the one that is *not* symmetric
+     between the list and the map. A facet takes a row out of the list
+     entirely; hiding a track only mutes it. So this set is applied to the
+     markers below and, as a treatment rather than a filter, to the rows —
+     which is why it is computed here once and consumed twice.
+
+     Derived from every cairn the trip owns rather than from `facetedCairns`
+     so that the two narrowings stay independent: whether a cairn's day is
+     showing has nothing to do with whether it is a campsite. */
+  const showingCairnIds = useMemo(
+    () => visibleCairnIds(cairnImport.cairns, tripImport.tracks, unattachedVisible),
+    [cairnImport.cairns, tripImport.tracks, unattachedVisible],
+  )
+  const unattachedIds = useMemo(
+    () => unattachedCairnIds(cairnImport.cairns, tripImport.tracks),
+    [cairnImport.cairns, tripImport.tracks],
+  )
+  /* The list's own hidden set: what the facet already keeps is narrowed by
+     what the tracks hide. `CairnList` renders these muted, never absent. */
+  const hiddenCairnIds = useMemo(
+    () => new Set(facetedCairns.filter((cairn) => !showingCairnIds.has(cairn.id)).map((c) => c.id)),
+    [facetedCairns, showingCairnIds],
+  )
+
+  /* What the map draws — both narrowings applied. Clustering recomputes
+     over exactly this array, so a hidden cairn cannot leave a phantom
+     behind in a cluster's count. */
+  const mappedCairns = useMemo(
+    () => facetedCairns.filter((cairn) => showingCairnIds.has(cairn.id)),
+    [facetedCairns, showingCairnIds],
   )
 
   // Every cairn the trip owns, not just the ones carrying an image (#169 —
@@ -228,7 +267,7 @@ export function TripDetail({
   // icon-only cairn belongs here too).
   const positionedCairns: PositionedCairn[] = useMemo(
     () =>
-      visibleCairns.map((cairn) => ({
+      mappedCairns.map((cairn) => ({
         id: cairn.id,
         name: cairn.name,
         thumbnailDriveFileId: cairn.image?.thumbnailDriveFileId ?? null,
@@ -237,11 +276,14 @@ export function TripDetail({
         longitude: cairn.position.lng,
         source: cairn.positionSource,
       })),
-    [visibleCairns],
+    [mappedCairns],
   )
 
-  const cairnListRows = useMemo(() => buildCairnListRows(visibleCairns, allTracks), [visibleCairns, allTracks])
-  const cairnListItems = useMemo(() => orderCairnListItems(cairnListRows), [cairnListRows])
+  const cairnListRows = useMemo(() => buildCairnListRows(facetedCairns, allTracks), [facetedCairns, allTracks])
+  const cairnListItems = useMemo(
+    () => orderCairnListItems(cairnListRows, unattachedIds),
+    [cairnListRows, unattachedIds],
+  )
   const flatCairnRows = useMemo(() => flattenCairnListRows(cairnListItems), [cairnListItems])
   /* Resolved against every cairn the trip owns, not the filtered set:
      retyping a photo as a campsite from inside the lightbox (#156) can
@@ -318,11 +360,16 @@ export function TripDetail({
   // selection whose row is gone and whose marker is gone is a state with
   // no way to see or undo it. Restoring the facet to `Any` deliberately
   // does not restore it — the user picked a filter, not a navigation.
+  //
+  // #198 deliberately does *not* extend this to a track-hidden cairn. Its
+  // row is still there and still clickable, so the selection is still
+  // visible and still undoable — the condition this guard exists for never
+  // arises, and clearing it would drop a selection the user can still see.
   useEffect(() => {
-    if (selectedCairnId && !visibleCairns.some((cairn) => cairn.id === selectedCairnId)) {
+    if (selectedCairnId && !facetedCairns.some((cairn) => cairn.id === selectedCairnId)) {
       setSelectedCairnId(null)
     }
-  }, [visibleCairns, selectedCairnId])
+  }, [facetedCairns, selectedCairnId])
 
   useEffect(() => {
     if (openCairnId && !cairnImport.cairns.some((cairn) => cairn.id === openCairnId)) {
@@ -639,6 +686,9 @@ export function TripDetail({
           removingIds={cairnImport.removingCairnIds}
           removeErrors={{ ...cairnImport.cairnRemoveErrors, ...photoDetachErrors }}
           disableRemove={!signedIn}
+          hiddenCairnIds={hiddenCairnIds}
+          unattachedVisible={unattachedVisible}
+          onToggleUnattached={() => setUnattachedVisible((visible) => !visible)}
         />
       </div>
 

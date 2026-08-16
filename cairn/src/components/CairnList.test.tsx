@@ -118,9 +118,9 @@ describe('CairnList', () => {
     expect(screen.getByText('a.jpg')).toBeDefined()
   })
 
-  it('renders a No date divider for an undated cairn and never drops it', () => {
+  it('#198: renders an Unattached divider for a cairn no track covers and never drops it', () => {
     const rows = [row({ id: 'dated', name: 'z.jpg', date: '2023-06-01' }), row({ id: 'undated', name: 'a.jpg', date: null })]
-    const items = orderCairnListItems(rows)
+    const items = orderCairnListItems(rows, new Set(['undated']))
 
     render(
       <CairnList
@@ -133,7 +133,7 @@ describe('CairnList', () => {
       />,
     )
 
-    expect(screen.getByText('No date')).toBeDefined()
+    expect(screen.getByText('Unattached')).toBeDefined()
     expect(screen.getByText('a.jpg')).toBeDefined()
   })
 

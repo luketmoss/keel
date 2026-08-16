@@ -64,6 +64,18 @@ interface CairnListProps {
   /** True while there's no Drive connection to remove against — same
       `signedIn` gate `TripImportPanel` already applies to import. */
   disableRemove?: boolean
+  /** #198: the cairns currently hidden from the map, because every track
+      covering their day is hidden. Their rows **stay** — rendered in the
+      hidden treatment and still clickable, exactly as a hidden track's row
+      stays in `TrackList`. An eye has never removed anything from a list,
+      and making cairns the exception would reintroduce #194's problem from
+      the other direction. Empty when nothing is hidden. */
+  hiddenCairnIds?: ReadonlySet<string>
+  /** #198: the unattached group's own eye. `onToggleUnattached` is omitted
+      on surfaces with no track visibility to derive from, in which case the
+      group heading renders without a control. */
+  unattachedVisible?: boolean
+  onToggleUnattached?: () => void
 }
 
 /** The trip sidebar's cairn list (#55, unified to every cairn in the trip
@@ -89,6 +101,9 @@ export function CairnList({
   removingIds,
   removeErrors,
   disableRemove = false,
+  hiddenCairnIds = new Set<string>(),
+  unattachedVisible = true,
+  onToggleUnattached,
 }: CairnListProps) {
   const rowRefs = useRef(new Map<string, HTMLLIElement>())
 
@@ -145,8 +160,22 @@ export function CairnList({
         <ul className="cairn-list__rows">
           {items.map((item, index) =>
             item.type === 'divider' ? (
+              /* #198 — the one heading that carries a control. Everything
+                 beneath it belongs to no track, so no track's eye can
+                 reach it; this is the eye that can, and it owns exactly
+                 this group. */
               <li key={`divider-${index}`} className="cairn-list__divider">
-                No date
+                <span className="cairn-list__divider-label">Unattached</span>
+                {onToggleUnattached && (
+                  <button
+                    type="button"
+                    className="cairn-list__divider-visibility"
+                    aria-label={unattachedVisible ? 'Hide unattached cairns' : 'Show unattached cairns'}
+                    onClick={onToggleUnattached}
+                  >
+                    {unattachedVisible ? '👁' : '🚫'}
+                  </button>
+                )}
               </li>
             ) : (
               <CairnRow
@@ -164,6 +193,7 @@ export function CairnList({
                 removing={removingIds.has(item.row.id)}
                 removeError={removeErrors[item.row.id]}
                 disableRemove={disableRemove}
+                hidden={hiddenCairnIds.has(item.row.id)}
                 registerRef={(el) => {
                   if (el) rowRefs.current.set(item.row.id, el)
                   else rowRefs.current.delete(item.row.id)
@@ -191,6 +221,7 @@ function CairnRow({
   removing,
   removeError,
   disableRemove,
+  hidden,
   registerRef,
 }: {
   row: CairnListRow
@@ -206,6 +237,9 @@ function CairnRow({
   removing: boolean
   removeError?: string
   disableRemove: boolean
+  /** #198: hidden from the map. Changes the row's treatment and nothing
+      else — it stays, and it stays clickable. */
+  hidden: boolean
   registerRef: (el: HTMLLIElement | null) => void
 }) {
   // Loading and thumbnail-failed both render the same `--surface-lift`
@@ -250,7 +284,8 @@ function CairnRow({
   return (
     <li
       ref={registerRef}
-      className={`cairn-row${selected ? ' cairn-row--selected' : ''}${removing ? ' cairn-row--removing' : ''}`}
+      className={`cairn-row${selected ? ' cairn-row--selected' : ''}${removing ? ' cairn-row--removing' : ''}${hidden ? ' cairn-row--hidden' : ''}`}
+      data-hidden={hidden}
     >
       <div className="cairn-row__main">
         <button type="button" className="cairn-row__button" onClick={() => onOpen(row.id)}>

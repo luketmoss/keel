@@ -15,19 +15,34 @@ export function NameInput({
   onCommit,
   onCancel,
   className = 'name-input',
+  ariaLabel,
+  selectOnFocus = false,
 }: {
   initial: string
   onCommit: (value: string) => void
   onCancel: () => void
   className?: string
+  /** #196: the cairn detail face's name has no visible label beside it —
+      it *is* the heading — so it carries its own. Omitted elsewhere, where
+      the surrounding row already names what is being renamed. */
+  ariaLabel?: string
+  /** #196: select the contents on focus, so the first keystroke replaces
+      the name rather than appending to it. Opt-in rather than the default
+      because #133's rename from a `⋮` action is as often a small
+      correction as a replacement, and this would make that a retype. */
+  selectOnFocus?: boolean
 }) {
   const [value, setValue] = useState(initial)
   return (
     <input
       autoFocus
       className={className}
+      aria-label={ariaLabel}
       value={value}
       onChange={(event) => setValue(event.target.value)}
+      onFocus={(event) => {
+        if (selectOnFocus) event.target.select()
+      }}
       onBlur={() => onCommit(value)}
       onKeyDown={(event) => {
         if (event.key === 'Enter') onCommit(value)

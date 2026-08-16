@@ -1,9 +1,29 @@
 import { useEffect, useRef } from 'react'
 import { cairnRowMetaLine, type CairnListRow } from '../photo/cairnListGroups'
-import { SIGNED_OUT_MOVE_MESSAGE, positionSourceSentence, type CairnIcon } from '../store/looseStore'
+import {
+  ADD_DESCRIPTION_PLACEHOLDER,
+  SIGNED_OUT_MOVE_MESSAGE,
+  positionSourceSentence,
+  type CairnIcon,
+} from '../store/looseStore'
 import { usePhotoImage } from '../photo/usePhotoImage'
 import { IconPicker } from './IconPicker'
+import { NameInput } from './NameInput'
+import { DescriptionInput } from './DescriptionInput'
+import { useEditableCairnText } from './useEditableCairnText'
 import './Lightbox.css'
+
+/** #196: true for an event aimed at a text field, which is what the
+    dialog's document-level shortcuts have to stand down for — `←`/`→` must
+    move the caret, and Escape must revert the field rather than close the
+    whole dialog. The one real hazard in the issue, and the reason the
+    design note writes it down rather than leaving it to the
+    implementation. */
+function isTextFieldTarget(target: EventTarget | null): boolean {
+  const element = target as HTMLElement | null
+  const tag = element?.tagName
+  return tag === 'INPUT' || tag === 'TEXTAREA'
+}
 
 interface LightboxProps {
   row: CairnListRow
@@ -33,6 +53,12 @@ interface LightboxProps {
       connection to write through, which takes the grid to Disabled rather
       than hiding it. */
   onSetIcon?: (icon: CairnIcon | null) => void
+  /** #196: commits an edited name or description. Resolves `false` on a
+      failed write, which this face turns into the revert and the failure
+      line beneath the field. `undefined` while disconnected — both fields
+      then take the Disabled treatment and clicking does not start an edit,
+      the same gate `onSetIcon` above already applies to the grid. */
+  onSaveText?: (patch: { name?: string; description?: string }) => Promise<boolean>
   /** #157: true while a dropped photo is uploading onto this cairn. */
   attaching?: boolean
   /** #157: the image slot's failure line, or `null`. */
@@ -73,6 +99,7 @@ export function Lightbox({
   onNavigate,
   onRemoveFromTrip,
   onSetIcon,
+  onSaveText,
   attaching,
   attachError,
   moveError,
@@ -81,6 +108,7 @@ export function Lightbox({
 }: LightboxProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const text = useEditableCairnText(onSaveText)
 
   const index = rows.findIndex((candidate) => candidate.id === row.id)
   const prevRow = index > 0 ? rows[index - 1] : undefined
@@ -100,6 +128,11 @@ export function Lightbox({
   // somewhere unexpected inside the dialog.
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
+      /* #196: while a field is being edited, these keys belong to it —
+         the arrows move the caret and Escape reverts the edit. Standing
+         down entirely (rather than only for the arrows) is what makes
+         "one Escape, one effect, innermost first" true. */
+      if (isTextFieldTarget(event.target)) return
       if (event.key === 'Escape') {
         event.preventDefault()
         onClose()
@@ -135,7 +168,11 @@ export function Lightbox({
   // here.
   function handleTabTrap(event: React.KeyboardEvent<HTMLDivElement>) {
     if (event.key !== 'Tab') return
-    const focusable = dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled)')
+    // #196: the name input and the description textarea join the trap's
+    // set. Without them, Tab out of a field mid-edit escapes the dialog.
+    const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
+      'button:not(:disabled), input, textarea',
+    )
     if (!focusable || focusable.length === 0) return
     const first = focusable[0]
     const last = focusable[focusable.length - 1]
@@ -209,11 +246,61 @@ export function Lightbox({
             {attachError}
           </p>
         )}
-        <h2 className="lightbox__name" title={row.name}>
-          {row.name}
-        </h2>
+        {/* #196 — the name and the description become click-to-edit,
+            copying `TripMetadataHeader`'s pattern rather than inventing a
+            second one. The meta line between them stays static: it is
+            derived, and each part of it has its own owner — the icon grid
+            below, the image by dropping a photo, the date by nothing yet. */}
+        {text.editing === 'name' ? (
+          <NameInput
+            initial={row.name}
+            className="lightbox__name-input"
+            ariaLabel="Cairn name"
+            selectOnFocus
+            onCommit={(name) => {
+              // An empty commit is an aborted edit — a cairn always has a
+              // name, so there is no state for an empty one to mean.
+              if (name.trim().length === 0) {
+                text.cancelEditing()
+                return
+              }
+              void text.commit('name', { name })
+            }}
+            onCancel={text.cancelEditing}
+          />
+        ) : (
+          <h2
+            className={`lightbox__name${text.editable ? ' lightbox__name--editable' : ''}${
+              text.savedField === 'name' ? ' lightbox__field--saved' : ''
+            }`}
+            title={row.name}
+            onClick={() => text.startEditing('name')}
+          >
+            {row.name}
+          </h2>
+        )}
+        {text.errorFor('name') && <p className="lightbox__field-error">{text.errorFor('name')}</p>}
         <p className="lightbox__meta">{cairnRowMetaLine(row)}</p>
-        <p className="lightbox__description">{description || 'No description.'}</p>
+        {text.editing === 'description' ? (
+          <DescriptionInput
+            initial={description}
+            className="description-input lightbox__description-input"
+            onCommit={(value) => void text.commit('description', { description: value })}
+            onCancel={text.cancelEditing}
+          />
+        ) : (
+          <p
+            className={`lightbox__description${description ? '' : ' lightbox__description--empty'}${
+              text.editable ? ' lightbox__description--editable' : ''
+            }${text.savedField === 'description' ? ' lightbox__field--saved' : ''}`}
+            onClick={() => text.startEditing('description')}
+          >
+            {description || ADD_DESCRIPTION_PLACEHOLDER}
+          </p>
+        )}
+        {text.errorFor('description') && (
+          <p className="lightbox__field-error">{text.errorFor('description')}</p>
+        )}
         <p className="lightbox__position">{positionSourceSentence(row.source)}</p>
         {/* #158 — the drag's failure line, `aria-live="polite"` for the same
             reason #157's attach failure already is: a drop's outcome is

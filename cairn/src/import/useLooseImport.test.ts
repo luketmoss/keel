@@ -249,5 +249,20 @@ describe('useLooseImport', () => {
 
       expect(record.id).toBe('a-specific-cairn-id')
     })
+
+    /* #196: leaving a trip must change neither the name nor the
+       description. The other direction is a Drive folder move — the
+       `cairn.json` relocates whole, so nothing can be dropped there — but
+       this direction rebuilds the record field by field, which is exactly
+       where a field gets forgotten. */
+    it('carries the name and description out of a trip untouched', () => {
+      const description = ['Loose slab.', 'Crossed high on the left.'].join('\n')
+      const record = importer().addCairnFromTrip(
+        tripCairn({ name: 'Notch Mountain hazard', description }),
+      )
+
+      expect(record.name).toBe('Notch Mountain hazard')
+      expect(record).toMatchObject({ description })
+    })
   })
 })

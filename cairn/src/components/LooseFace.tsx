@@ -6,6 +6,7 @@ import { ColorPopover } from './ColorPopover'
 import { formatDistance } from '../format/units'
 import { trackColor, TRACK_COLORS } from '../map/palette'
 import {
+  ADD_DESCRIPTION_PLACEHOLDER,
   SIGNED_OUT_MOVE_MESSAGE,
   canChangeOwner,
   positionSourceSentence,
@@ -15,6 +16,8 @@ import {
 } from '../store/looseStore'
 import { usePhotoImage } from '../photo/usePhotoImage'
 import { IconPicker } from './IconPicker'
+import { DescriptionInput } from './DescriptionInput'
+import { useEditableCairnText } from './useEditableCairnText'
 import './LooseFace.css'
 
 interface LooseFaceProps {
@@ -36,6 +39,13 @@ interface LooseFaceProps {
       a photo become a campsite without becoming a different record.
       Resolves `false` on a save failure, which the face reports. */
   onSetIcon: (id: string, icon: CairnIcon | null) => Promise<boolean>
+  /** #196: writes a cairn's description. Here rather than only on the trip
+      face because `shell-and-content-model.md` is explicit that adding a
+      cairn to a trip is a move and not a promotion — a capability that
+      appears or disappears with ownership breaks that in both directions.
+      Resolves `false` on a failed write, which the face reverts from.
+      Unused for a track. */
+  onSetDescription?: (id: string, description: string) => Promise<boolean>
   /** #140: downloads the item's source file. Fire-and-forget from here —
       the face has nothing further to show while it runs; failure is a
       toast, owned by `App`. */
@@ -75,6 +85,7 @@ export function LooseFace({
   onRename,
   onRecolor,
   onSetIcon,
+  onSetDescription,
   onExport,
   exporting,
   disabled,
@@ -227,6 +238,15 @@ export function LooseFace({
             item={item}
             accessToken={accessToken}
             onSelectIcon={selectIcon}
+            /* #196: `undefined` takes the description to the Disabled
+               treatment, the same gate the icon grid beside it already
+               uses — disconnected, or a cairn whose files have not landed
+               yet and so has no record in Drive to rewrite. */
+            onSaveDescription={
+              onSetDescription && !disabled && canMove
+                ? (description) => onSetDescription(item.id, description)
+                : undefined
+            }
             disabled={disabled || !canMove}
             attaching={attaching}
             attachError={attachError}
@@ -308,6 +328,7 @@ function CairnBody({
   item,
   accessToken,
   onSelectIcon,
+  onSaveDescription,
   disabled,
   attaching,
   attachError,
@@ -317,12 +338,20 @@ function CairnBody({
   item: Extract<LooseRecord, { kind: 'cairn' }>
   accessToken: string | null
   onSelectIcon: (icon: CairnIcon | null) => void
+  onSaveDescription?: (description: string) => Promise<boolean>
   disabled: boolean
   attaching?: boolean
   attachError?: string | null
   moveWriteError?: string | null
   signedOut?: boolean
 }) {
+  /* #196 — the same state machine the lightbox uses, so the two surfaces
+     cannot drift on the saved flash or the failure line. Only the
+     description half is used here: a loose cairn's name has been editable
+     since #133, through the `⋮`'s Rename, and that is untouched. */
+  const text = useEditableCairnText(
+    onSaveDescription && ((patch) => onSaveDescription(patch.description ?? '')),
+  )
   // #134: loading and failed both render the same `--surface-lift`
   // fallback fill — `usePhotoImage` already collapses those two into one
   // `undefined` for exactly this reason, matching `CairnList`'s own stance.
@@ -380,7 +409,30 @@ function CairnBody({
           {moveWriteError}
         </p>
       )}
-      {item.description && <p className="loose-face__description">{item.description}</p>}
+      {/* #196 — click-to-edit, under identical rules and identical copy to
+          the trip face's. An empty description now shows the placeholder
+          rather than nothing: the field was previously undiscoverable when
+          empty, which is exactly when it most needs finding. */}
+      {text.editing === 'description' ? (
+        <DescriptionInput
+          initial={item.description}
+          className="description-input loose-face__description-input"
+          onCommit={(value) => void text.commit('description', { description: value })}
+          onCancel={text.cancelEditing}
+        />
+      ) : (
+        <p
+          className={`loose-face__description${item.description ? '' : ' loose-face__description--empty'}${
+            text.editable ? ' loose-face__description--editable' : ''
+          }${text.savedField === 'description' ? ' loose-face__field--saved' : ''}`}
+          onClick={() => text.startEditing('description')}
+        >
+          {item.description || ADD_DESCRIPTION_PLACEHOLDER}
+        </p>
+      )}
+      {text.errorFor('description') && (
+        <p className="loose-face__edit-error">{text.errorFor('description')}</p>
+      )}
     </>
   )
 }

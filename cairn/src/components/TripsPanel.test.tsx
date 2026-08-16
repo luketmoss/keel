@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import { TripsPanel } from './TripsPanel'
 import type { TripIndexEntry } from '../store/tripStore'
+import type { TripTotals } from '../geo/tripTotals'
 import type { LooseRecord } from '../store/looseStore'
 import type { KindFilter } from './FilterChips'
 import type { CairnFacet } from '../store/cairnRules'
@@ -29,6 +30,7 @@ function tripEntry(overrides: Partial<TripIndexEntry> = {}): TripIndexEntry {
 function TestTripsPanel({
   trips,
   trackCounts = new Map(),
+  tripTotals = new Map(),
   looseItems = [],
   kind = 'all',
   initialFacet = 'any',
@@ -46,6 +48,7 @@ function TestTripsPanel({
 }: {
   trips: TripIndexEntry[]
   trackCounts?: ReadonlyMap<string, number>
+  tripTotals?: ReadonlyMap<string, TripTotals | null>
   looseItems?: LooseRecord[]
   kind?: KindFilter
   initialFacet?: CairnFacet
@@ -68,6 +71,7 @@ function TestTripsPanel({
     <TripsPanel
       trips={trips}
       trackCounts={trackCounts}
+      tripTotals={tripTotals}
       looseItems={looseItems}
       kind={kind}
       facet={facet}
@@ -262,6 +266,59 @@ describe('TripsPanel', () => {
     })
 
     expect(screen.getByText(/1 track · 1 photo$/)).toBeDefined()
+  })
+
+  // #225
+  describe('trip totals', () => {
+    it('appends distance and ascent to the meta line when totals are known', () => {
+      renderPanel({
+        trips: [tripEntry({ id: 't1', name: 'Kepler Track', startDate: '2024-03-01', endDate: '2024-03-05' })],
+        trackCounts: new Map([['t1', 4]]),
+        tripTotals: new Map([['t1', { distanceMeters: 42_806, elevationGainMeters: 2_121 }]]),
+      })
+
+      expect(
+        screen.getByText(
+          new RegExp(
+            `4 tracks · ${escapeRe(formatDistance(42_806))} · ${escapeRe(formatElevationGain(2_121)!)}$`,
+          ),
+        ),
+      ).toBeDefined()
+    })
+
+    it('shows distance without ascent when no track in the trip carries elevation', () => {
+      renderPanel({
+        trips: [tripEntry({ id: 't1', name: 'Kepler Track' })],
+        trackCounts: new Map([['t1', 2]]),
+        tripTotals: new Map([['t1', { distanceMeters: 18_300, elevationGainMeters: undefined }]]),
+      })
+
+      const detail = screen.getByText(new RegExp(`2 tracks · ${escapeRe(formatDistance(18_300))}$`))
+      expect(detail).toBeDefined()
+      expect(detail.textContent).not.toMatch(/ft ↑/)
+    })
+
+    it('adds no distance or ascent segment for a trip with no totals', () => {
+      renderPanel({
+        trips: [tripEntry({ id: 't1', name: 'Kepler Track' })],
+        trackCounts: new Map([['t1', 0]]),
+        tripTotals: new Map([['t1', null]]),
+      })
+
+      expect(screen.getByText(/0 tracks$/)).toBeDefined()
+    })
+
+    it('adds no distance or ascent segment when the trip has no entry in the totals map at all', () => {
+      // The same state a missing/unreadable/stale sidecar produces upstream
+      // in `readTripTotals` — the row never sees the difference.
+      renderPanel({
+        trips: [tripEntry({ id: 't1', name: 'Kepler Track' })],
+        trackCounts: new Map([['t1', 3]]),
+        tripTotals: new Map(),
+      })
+
+      expect(screen.getByText(/3 tracks$/)).toBeDefined()
+    })
   })
 
   it('falls back to 0 tracks when the track count map has no entry for the trip', () => {

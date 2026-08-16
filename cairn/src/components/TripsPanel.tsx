@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type RefObject } from 'react'
 import { Link } from 'react-router-dom'
 import { deriveTripStatus, type TripIndexEntry } from '../store/tripStore'
 import { matchesTripFilters, type TripFilters } from '../store/tripFilters'
+import type { TripTotals } from '../geo/tripTotals'
 import { formatShortDate, formatTripMetaLine, tripRowAccessibleName } from '../format/dates'
 import { canChangeOwner, looseMetaLine, showExport, type LooseRecord } from '../store/looseStore'
 import { cairnMatchesFacet, type CairnFacet } from '../store/cairnRules'
@@ -19,6 +20,10 @@ interface TripsPanelProps {
       a trip" picker already reads off `tripStore.getOverview`, computed
       once in `App` rather than per row. */
   trackCounts: ReadonlyMap<string, number>
+  /** #225: a trip's persisted distance and ascent, keyed by id — read from
+      `overview.geojson` alongside `trackCounts` above, `null` for a trip
+      with no tracks or whose sidecar has nothing usable yet. */
+  tripTotals: ReadonlyMap<string, TripTotals | null>
   /** Tracks and photos that no trip owns. Owned ones are not here — they
       appear when their trip is open. */
   looseItems: LooseRecord[]
@@ -57,6 +62,7 @@ interface TripsPanelProps {
 export function TripsPanel({
   trips,
   trackCounts,
+  tripTotals,
   looseItems,
   kind,
   facet,
@@ -195,6 +201,7 @@ export function TripsPanel({
               key={trip.id}
               trip={trip}
               trackCount={trackCounts.get(trip.id) ?? 0}
+              totals={tripTotals.get(trip.id) ?? null}
               disabled={disabled}
               emphasized={hoveredId === trip.id}
               onHover={onHover}
@@ -364,6 +371,7 @@ function RowConfirm({
 function TripRow({
   trip,
   trackCount,
+  totals,
   disabled,
   emphasized,
   onHover,
@@ -375,6 +383,7 @@ function TripRow({
 }: {
   trip: TripIndexEntry
   trackCount: number
+  totals: TripTotals | null
   disabled: boolean
   emphasized: boolean
   onHover: (id: string | null) => void
@@ -418,7 +427,7 @@ function TripRow({
           {trip.name}
         </span>
         <span className="trips-panel__row-detail">
-          {formatTripMetaLine(trip.startDate, trip.endDate, trackCount, trip.cairnCount)}
+          {formatTripMetaLine(trip.startDate, trip.endDate, trackCount, trip.cairnCount, totals)}
         </span>
       </Link>
       <RowMenu

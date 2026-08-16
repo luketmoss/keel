@@ -138,6 +138,13 @@ export interface LooseUpdate {
   name?: string
   colorIndex?: number
   icon?: CairnIcon | null
+  /** #196: a cairn's free text. Unlike `name`, **empty is a valid value** —
+      `CairnRecord.description` is `''`, never `null`, and clearing one is a
+      thing a person means to do, where clearing a name would leave the
+      record unidentifiable. Trailing whitespace is trimmed and internal
+      newlines are preserved. Meaningless for a track, and ignored if ever
+      sent for one. */
+  description?: string
   /** #158: relocates a cairn — dragging its marker, whatever its current
       `positionSource`. Always sets `positionSource` to `placed`, per
       `cairnRules.placeCairn`'s rule 2, so a caller never sends the two
@@ -244,6 +251,28 @@ export interface LooseStore {
    either would give one store a reference to the other. What the store does
    own is the half only it can do: relocating the files it uploaded.
    `moveLooseIntoTrip` below drives both sides explicitly. */
+
+/** #196: the failure line under whichever field could not be written.
+    Matches `TripMetadataHeader`'s `Couldn't save — ${field} reverted.` word
+    for word, and lives here rather than on either face because both faces
+    show it — two phrasings for one failure is how an app ends up sounding
+    like two apps. */
+export function fieldRevertedMessage(field: 'name' | 'description'): string {
+  return `Couldn't save — ${field} reverted.`
+}
+
+/** #196: the description's empty placeholder. An invitation rather than a
+    statement — `No description.` said something true and useless, which is
+    why an empty description read as a field that does not exist. */
+export const ADD_DESCRIPTION_PLACEHOLDER = 'Add a description'
+
+/** #196: trailing whitespace off a description, internal newlines intact —
+    a two-paragraph description is a thing someone means, a trailing blank
+    line never is. Not `trim()`, which would eat leading indentation the
+    author typed on purpose. */
+export function trimTrailing(value: string): string {
+  return value.replace(/\s+$/, '')
+}
 
 /** #110's copy for a move that did not happen, in either direction. One
     constant because both ends show it and a second spelling of the same
@@ -413,7 +442,16 @@ export class LocalLooseStore implements LooseStore {
             ? { ...current, name, icon: patch.icon }
             : { ...current, name }
 
-    this.index = this.index.map((item) => (item.id === id ? next : item))
+    /* #196: applied after the chain above rather than as another branch in
+       it, because the description is the one field that can legitimately
+       arrive alongside another — and unlike `name`, an empty string here is
+       a save, not an aborted edit. */
+    const withDescription =
+      patch.description !== undefined && next.kind === 'cairn'
+        ? { ...next, description: trimTrailing(patch.description) }
+        : next
+
+    this.index = this.index.map((item) => (item.id === id ? withDescription : item))
     this.writeIndex()
     this.notify()
     return true

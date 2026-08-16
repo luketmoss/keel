@@ -1118,6 +1118,11 @@ function AppShell() {
                 // #156: retyping writes `icon` and nothing else — the
                 // store's patch shape is what makes that literal.
                 onSetIcon={(id, icon) => looseStore.update(id, { icon })}
+                // #196: the same one-field patch, for the free text. The
+                // store is already optimistic — local first, Drive after,
+                // revert on failure — so the face gets its outcome without
+                // the user waiting on a round trip to see their own typing.
+                onSetDescription={(id, description) => looseStore.update(id, { description })}
                 onExport={(id) => void handleExport(id)}
                 exporting={exportingIds.has(openLooseId)}
                 attaching={attachingLooseId === openLooseId}

@@ -269,3 +269,45 @@
 .loose-face__confirm-cancel {
   color: var(--text-muted);
 }
+
+/* #196 — the description, click-to-edit under the same rules as the trip
+   face's. It had no styles of its own before this: the paragraph only
+   rendered when non-empty, and an empty description was invisible. */
+
+.loose-face__description {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
+.loose-face__description--editable {
+  cursor: text;
+  border-radius: var(--radius-sm);
+  padding: var(--space-1);
+  margin-left: calc(var(--space-1) * -1);
+  margin-right: calc(var(--space-1) * -1);
+  /* A tap target even when empty (design note's Touch case). */
+  min-height: var(--row-touch);
+  box-sizing: border-box;
+}
+
+.loose-face__description--editable:hover {
+  background: var(--hover);
+}
+
+.loose-face__description--empty {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.loose-face__description-input {
+  margin-top: var(--space-3);
+}
+
+/* The design language's saved flash, same value as `TripMetadataHeader`'s
+   and the lightbox's. */
+.loose-face__field--saved {
+  box-shadow: inset 0 -2px 0 0 var(--accent);
+  transition: box-shadow 300ms ease-out;
+}

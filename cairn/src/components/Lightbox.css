@@ -156,6 +156,10 @@
   max-width: 480px;
   font-size: var(--text-sm);
   color: var(--text);
+  /* #196: internal newlines are preserved on commit, so they have to
+     render — a two-paragraph description was previously collapsed to one
+     line by HTML whitespace folding. */
+  white-space: pre-wrap;
 }
 
 .lightbox__position {
@@ -273,4 +277,73 @@
   right: var(--space-2);
   top: 50%;
   transform: translateY(-50%);
+}
+
+/* #196 — click-to-edit on the name and the description. The rest states
+   gain a hover affordance and a text cursor; the editing states are
+   `NameInput.css` and `DescriptionInput.css`, sized here to what they
+   replace so the dialog does not resize when a field opens. */
+
+.lightbox__name--editable,
+.lightbox__description--editable {
+  cursor: text;
+  border-radius: var(--radius-sm);
+  /* The hover fill needs somewhere to be — without this the box is exactly
+     the glyphs, and an empty description has no clickable area at all. */
+  padding: var(--space-1);
+  margin-left: calc(var(--space-1) * -1);
+  margin-right: calc(var(--space-1) * -1);
+  /* A tap target exists even for an empty description (design note's
+     Touch case). */
+  min-height: var(--row-touch);
+  box-sizing: border-box;
+}
+
+.lightbox__name--editable:hover,
+.lightbox__description--editable:hover {
+  background: var(--hover);
+}
+
+/* An empty description invites rather than states — `No description.` said
+   something true and useless. */
+.lightbox__description--empty {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.lightbox__name-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: var(--space-3);
+  font-family: inherit;
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  background: var(--surface-lift);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1);
+}
+
+.lightbox__description-input {
+  margin-top: var(--space-2);
+  max-width: 480px;
+}
+
+/* The saved flash, shared with `TripMetadataHeader` and `TrackList` —
+   `inset 0 -2px 0 0 var(--accent)`, fading over 300ms. Transcribed rather
+   than imported because each surface owns its own stylesheet; the value is
+   the design language's, not this file's. */
+.lightbox__field--saved {
+  box-shadow: inset 0 -2px 0 0 var(--accent);
+  transition: box-shadow 300ms ease-out;
+}
+
+.lightbox__field-error {
+  margin: var(--space-1) 0 0;
+  max-width: 480px;
+  font-size: var(--text-xs);
+  color: var(--danger);
 }

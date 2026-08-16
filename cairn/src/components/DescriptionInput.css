@@ -1,0 +1,23 @@
+/* #196 — the description's editing state, on both surfaces. Matches
+   `NameInput.css`'s border and radius so the two fields of one detail face
+   read as one control at two sizes, and `--surface-lift` fill per the
+   design note. */
+
+.description-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--surface-lift);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1);
+  /* Three rows at rest, growing to eight before it scrolls — a 4000
+     character description scrolls rather than pushing the dialog's
+     controls off the bottom. `rows={3}` supplies the floor. */
+  max-height: calc(8 * 1.5em + var(--space-2));
+  resize: vertical;
+}

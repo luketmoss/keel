@@ -688,6 +688,15 @@ export function TripDetail({
               ? (icon) => void cairnImport.setCairnIcon(openCairnRecord.id, icon)
               : undefined
           }
+          /* #196: unlike the retype above, this one is not
+             fire-and-forget — the face needs the outcome to decide between
+             the saved flash and the failure line, and `setCairnText` has
+             already put the record back by the time it resolves `false`. */
+          onSaveText={
+            signedIn && openCairnRecord
+              ? (patch) => cairnImport.setCairnText(openCairnRecord.id, patch)
+              : undefined
+          }
           returnFocusRef={returnFocusRef}
         />
       )}

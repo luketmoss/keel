@@ -16,6 +16,7 @@ import { positionPhoto } from './interpolate'
 import { formatShortDate } from '../format/dates'
 import {
   ATTACH_IMAGE_FAILED_MESSAGE,
+  trimTrailing,
   type AttachImageOutcome,
   type CairnIcon,
   type CairnImage,
@@ -125,6 +126,16 @@ export interface UseCairnImport {
       field carried across untouched. Resolves `false` on failure, having
       left local state as it was. */
   setCairnIcon: (id: string, icon: CairnIcon | null) => Promise<boolean>
+  /** #196: writes a cairn's name, its description, or both. Optimistic —
+      the value is applied locally first and reverted if Drive refuses, so
+      the user never waits on a round trip to see their own typing.
+      Resolves `false` on a refused or failed write, having put the record
+      back exactly as it was; `true` for a patch that changes nothing.
+   *
+   * An empty or whitespace-only `name` is dropped (a cairn always has one,
+      so an empty commit is an aborted edit, per `cairns.md`); an empty
+      `description` is a real value and is saved. */
+  setCairnText: (id: string, patch: { name?: string; description?: string }) => Promise<boolean>
   /** #158: writes a dragged marker's new coordinate and sets
       `positionSource` to `placed`, permanently. Resolves `true` trivially
       for a zero-distance drop (the position is already what it holds), and
@@ -496,6 +507,54 @@ export function useCairnImport(
     [accessToken, cairnFolderId, tripId],
   )
 
+  /* #196: the two free-text fields, behind one mutator because they are
+     one write — `cairn.json` is rewritten whole either way, and a face
+     committing both at once should not cost two round trips.
+
+     Optimistic, unlike `setCairnIcon` and `setCairnPosition` above, which
+     write first and apply after. The design note asks for it: an icon is
+     chosen from a grid and the grid can simply not move until the write
+     lands, but a person typing a sentence must see their own keystrokes
+     survive the input closing. The revert on failure is what pays for it. */
+  const setCairnText = useCallback(
+    async (id: string, patch: { name?: string; description?: string }): Promise<boolean> => {
+      const current = cairnsRef.current.find((cairn) => cairn.id === id)
+      if (!current) return false
+
+      // An empty name is an aborted edit, not a save (`cairns.md`); an
+      // empty description is a save. That asymmetry is the whole of this
+      // issue's one interesting rule.
+      const name = patch.name !== undefined ? patch.name.trim() || current.name : current.name
+      const description =
+        patch.description !== undefined ? trimTrailing(patch.description) : current.description
+      if (name === current.name && description === current.description) return true
+      if (!accessToken || !cairnFolderId) return false
+
+      const next: CairnRecord = { ...current, name, description }
+      const apply = (record: CairnRecord) => {
+        cairnsRef.current = cairnsRef.current.map((cairn) => (cairn.id === id ? record : cairn))
+        setCairns(cairnsRef.current)
+      }
+
+      apply(next)
+      try {
+        const folderId = await findOrCreateTripCairnItemFolder(accessToken, cairnFolderId, tripId, id)
+        const existing = await findJsonFile(accessToken, folderId, 'cairn.json')
+        await writeJsonFile(accessToken, folderId, 'cairn.json', next, existing)
+      } catch {
+        // Revert against whatever the record is *now*, not against the
+        // `current` captured above: a photo may have been attached to this
+        // cairn while the write was in flight, and restoring the old
+        // snapshot wholesale would silently undo it.
+        const live = cairnsRef.current.find((cairn) => cairn.id === id)
+        if (live) apply({ ...live, name: current.name, description: current.description })
+        return false
+      }
+      return true
+    },
+    [accessToken, cairnFolderId, tripId],
+  )
+
   /* #158: dragging a cairn's marker. Writes `position` and sets
      `positionSource` to `placed` — rule 2 of `cairns.md`'s "positionSource"
      section, permanently, whatever the cairn's source was. Written to Drive
@@ -688,6 +747,7 @@ export function useCairnImport(
     importFiles,
     createCairn,
     setCairnIcon,
+    setCairnText,
     setCairnPosition,
     attachImage,
     retryFailure,

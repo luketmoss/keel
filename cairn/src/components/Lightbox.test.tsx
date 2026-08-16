@@ -244,7 +244,10 @@ describe('Lightbox', () => {
       expect(screen.getByText('A good spot to camp.')).toBeDefined()
     })
 
-    it('shows "No description." when empty', () => {
+    // #196 replaced `No description.` — a statement rather than an
+    // invitation, which is why an empty description read as a field that
+    // does not exist.
+    it('shows the "Add a description" placeholder when empty', () => {
       render(
         <Lightbox
           row={row()}
@@ -257,7 +260,8 @@ describe('Lightbox', () => {
         />,
       )
 
-      expect(screen.getByText('No description.')).toBeDefined()
+      expect(screen.getByText('Add a description')).toBeDefined()
+      expect(screen.queryByText('No description.')).toBeNull()
     })
 
     it("shows the position-source sentence, matching the cairn's actual source", () => {

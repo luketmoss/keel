@@ -212,3 +212,103 @@ describe('LooseFace — #158 dragging a cairn', () => {
     expect(getByText("Couldn't move it — put back where it was.")).toBeDefined()
   })
 })
+
+/* #196 — loose parity. `shell-and-content-model.md` is explicit that
+   adding a cairn to a trip is a move and not a promotion, so the
+   description is editable here under the same rules and the same copy as
+   on the trip face. The name half is #133's and is untouched. */
+describe('LooseFace — #196 editing the description', () => {
+  function renderCairn(
+    options: { description?: string; onSetDescription?: ReturnType<typeof vi.fn>; disabled?: boolean } = {},
+  ) {
+    // The suite's `beforeEach` resets `acquire` with no default, and this
+    // cairn carries an image — `usePhotoImage` would call `.then` on
+    // `undefined` without one.
+    acquire.mockResolvedValue({ url: 'blob:fake-thumb', release: vi.fn() })
+    const onSetDescription = options.onSetDescription ?? vi.fn().mockResolvedValue(true)
+    const view = render(
+      <LooseFace
+        item={looseCairn({ description: options.description ?? '' })}
+        trips={[]}
+        accessToken="token"
+        onAddToTrip={vi.fn()}
+        onCreateTripWith={vi.fn()}
+        onDelete={vi.fn()}
+        onRename={vi.fn().mockResolvedValue(true)}
+        onRecolor={vi.fn().mockResolvedValue(true)}
+        onSetIcon={vi.fn().mockResolvedValue(true)}
+        onSetDescription={onSetDescription}
+        onExport={vi.fn()}
+        disabled={options.disabled ?? false}
+      />,
+    )
+    return { ...view, onSetDescription }
+  }
+
+  function field(): HTMLElement {
+    return document.querySelector('.loose-face__description') as HTMLElement
+  }
+
+  function input(): HTMLTextAreaElement {
+    return document.querySelector('.loose-face__description-input') as HTMLTextAreaElement
+  }
+
+  it('shows the same placeholder as the trip face when empty, rather than nothing', () => {
+    renderCairn({ description: '' })
+
+    expect(field().textContent).toBe('Add a description')
+  })
+
+  it('opens a textarea on click and commits on Enter', async () => {
+    const { onSetDescription } = renderCairn()
+
+    fireEvent.click(field())
+    fireEvent.change(input(), { target: { value: 'Sheltered from the wind.' } })
+    fireEvent.keyDown(input(), { key: 'Enter' })
+
+    await waitFor(() => expect(onSetDescription).toHaveBeenCalledWith('cairn-1', 'Sheltered from the wind.'))
+  })
+
+  it('reverts on Escape without writing', () => {
+    const { onSetDescription } = renderCairn({ description: 'Original.' })
+
+    fireEvent.click(field())
+    fireEvent.change(input(), { target: { value: 'Discarded.' } })
+    fireEvent.keyDown(input(), { key: 'Escape' })
+
+    expect(onSetDescription).not.toHaveBeenCalled()
+    expect(field().textContent).toBe('Original.')
+  })
+
+  it('saves an empty description, matching the trip face', async () => {
+    const { onSetDescription } = renderCairn({ description: 'To be cleared.' })
+
+    fireEvent.click(field())
+    fireEvent.change(input(), { target: { value: '' } })
+    fireEvent.keyDown(input(), { key: 'Enter' })
+
+    await waitFor(() => expect(onSetDescription).toHaveBeenCalledWith('cairn-1', ''))
+  })
+
+  it('shows the same failure copy as the trip face on a failed write', async () => {
+    const onSetDescription = vi.fn().mockResolvedValue(false)
+    renderCairn({ onSetDescription })
+
+    fireEvent.click(field())
+    fireEvent.change(input(), { target: { value: 'Doomed.' } })
+    fireEvent.keyDown(input(), { key: 'Enter' })
+
+    await waitFor(() =>
+      expect(document.body.textContent).toContain("Couldn't save — description reverted."),
+    )
+  })
+
+  it('takes the field to Disabled while disconnected, and clicking does not start an edit', () => {
+    renderCairn({ description: 'A good spot.', disabled: true })
+
+    fireEvent.click(field())
+
+    expect(input()).toBeNull()
+    expect(field().className).not.toContain('loose-face__description--editable')
+  })
+})

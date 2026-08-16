@@ -4,6 +4,7 @@ import {
   ATTACH_IMAGE_FAILED_MESSAGE,
   LocalLooseStore,
   isLooseRecord,
+  trimTrailing,
   type AttachImageOutcome,
   type LooseCairnRecord,
   type LooseKind,
@@ -305,7 +306,17 @@ export class DriveLooseStore implements LooseStore {
       patch.position !== undefined &&
       previous.kind === 'cairn' &&
       (patch.position.lat !== previous.position.lat || patch.position.lng !== previous.position.lng)
-    if (!nameChanged && !colorChanged && !iconChanged && !positionChanged) return true
+    // #196: `''` is a real value — clearing a description is a change, so
+    // this compares against `undefined` (the field was not sent) rather
+    // than testing the patch for truthiness, the same way `iconChanged`
+    // above has to for `null`. Compared post-trim, so committing a value
+    // that differs from the stored one only in trailing whitespace costs
+    // no write.
+    const descriptionChanged =
+      patch.description !== undefined &&
+      previous.kind === 'cairn' &&
+      trimTrailing(patch.description) !== previous.description
+    if (!nameChanged && !colorChanged && !iconChanged && !positionChanged && !descriptionChanged) return true
 
     if (!(await this.local.update(id, patch))) return false
 

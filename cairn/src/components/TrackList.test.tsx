@@ -966,6 +966,7 @@ describe('TrackList', () => {
 
       const line = document.querySelector('.track-elevation-profile__line') as SVGPathElement
       expect(line.style.stroke).toBe('#00D4FF') // colorIndex 1
+      expect(screen.getByRole('button', { name: 'trip.kml' })).toHaveProperty('ariaExpanded', 'true')
     })
 
     it('keeps the detail open across a visibility toggle on its own row', () => {

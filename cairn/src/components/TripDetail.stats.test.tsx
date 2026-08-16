@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react'
+import { useState } from 'react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TripDetail } from './TripDetail'
@@ -173,5 +174,56 @@ describe('TripDetail — #218 trip totals', () => {
     expect(
       screen.getByText('Elevation from 1 of 2 tracks. Distance covers them all.'),
     ).toBeDefined()
+  })
+
+  it('updates the block when a track is added to, then removed from, the trip', () => {
+    // A real hook as a stateful mock, the way TripDetail.visibility.test.tsx
+    // does for `toggleVisibility` — a frozen `vi.fn()` return can't express
+    // a track arriving or leaving mid-test.
+    useTripImport.mockImplementation(() => {
+      const [tracks, setTracks] = useState<ImportedFile[]>([trackFile('a', 8_000, 500)])
+      return {
+        ...baseTripImport(),
+        tracks,
+        toggleVisibility: (id: string) =>
+          setTracks((prev) => prev.map((f) => (f.id === id ? { ...f, visible: !f.visible } : f))),
+        removeFile: async (id: string) => {
+          setTracks((prev) => prev.filter((f) => f.id !== id))
+        },
+      }
+    })
+
+    renderTrip()
+
+    expect(screen.getByText('1')).toBeDefined() // Tracks cell
+
+    fireEvent.click(screen.getByRole('button', { name: 'Row actions for a.kml' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete permanently…' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+
+    expect(document.querySelector('.trip-stats__note')?.textContent).toBe('Add a track to see totals.')
+  })
+
+  it('does not change any total when a track is hidden', () => {
+    useTripImport.mockImplementation(() => {
+      const [tracks, setTracks] = useState<ImportedFile[]>([
+        trackFile('a', 8_000, 500),
+        trackFile('b', 2_000, 300),
+      ])
+      return {
+        ...baseTripImport(),
+        tracks,
+        toggleVisibility: (id: string) =>
+          setTracks((prev) => prev.map((f) => (f.id === id ? { ...f, visible: !f.visible } : f))),
+      }
+    })
+
+    renderTrip()
+
+    const before = document.querySelector('.trip-stats')?.textContent
+    fireEvent.click(screen.getByRole('button', { name: 'Hide a.kml' }))
+    const after = document.querySelector('.trip-stats')?.textContent
+
+    expect(after).toBe(before)
   })
 })

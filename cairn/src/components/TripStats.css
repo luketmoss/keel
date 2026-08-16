@@ -1,0 +1,59 @@
+/* #218 — an inset region inside the panel, not a card on top of it. The
+   design note reads this deliberately against design-language.md's
+   Elevation section, which lists "the trip totals card" as L2: the panel
+   itself is now the L2 surface (shell-and-content-model.md), and a shadow
+   inside a shadowed panel is the mistake that document warns about. */
+.trip-stats {
+  background: var(--surface-lift);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+/* design-language.md drops 10px from the type scale — the label is
+   --text-xs, uppercase, in the monospace face, the same treatment
+   shell-and-content-model.md already uses for a meta label. */
+.stat__label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* "All numerals are tabular-nums in a monospace face" — design-language.md,
+   Type. A grid of six figures is the case that rule exists for. */
+.stat__value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.stat__value--muted {
+  color: var(--text-muted);
+}
+
+.trip-stats__note {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin: 0;
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--border);
+}

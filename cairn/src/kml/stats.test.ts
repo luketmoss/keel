@@ -254,11 +254,24 @@ describe('computeElevationProfile', () => {
     for (let i = 1; i < profile!.length; i++) {
       expect(profile![i].distanceMeters).toBeGreaterThanOrEqual(profile![i - 1].distanceMeters)
     }
-    // Rejects the same single-sample spike computeTrackStats does — the
-    // series is the same median-filtered one.
+    // Agrees with computeTrackStats, which uses the same filtered series.
     const stats = computeTrackStats(track)
     expect(Math.max(...profile!.map((point) => point.elevationMeters))).toBe(stats.highPointMeters)
     expect(Math.min(...profile!.map((point) => point.elevationMeters))).toBe(stats.lowPointMeters)
+  })
+
+  it('rejects a single-sample spike, the same as computeTrackStats — the profile is drawn from the filtered series', () => {
+    const track = trackFromElevations([1000, 1002, 1001, 1200, 1003, 1000, 1002, 1001, 1000])
+
+    const profile = computeElevationProfile(track.points)
+
+    expect(profile).toBeDefined()
+    // The raw spike sits 200m above its neighbours; a filtered high point
+    // that reflected it would be implausible for a series hovering
+    // around 1000-1003.
+    expect(Math.max(...profile!.map((point) => point.elevationMeters))).toBeLessThan(1100)
+    // And it isn't just clamped — the raw value is still in the input.
+    expect(track.points.some((point) => point.elevation === 1200)).toBe(true)
   })
 
   it('skips points without elevation but still aligns the remaining ones to their own cumulative distance', () => {

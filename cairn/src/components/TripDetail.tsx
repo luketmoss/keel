@@ -36,7 +36,7 @@ import type { LatLng } from '../map/geo'
 import './TripDetail.css'
 
 export const UNRECOGNISED_TYPE_MESSAGE =
-  'trips take .kml or .kmz tracks, JPEG, PNG or WebP photos, and .zip archives'
+  'trips take .kml, .kmz or .gpx tracks, JPEG, PNG or WebP photos, and .zip archives'
 const SIGNED_OUT_DROP_MESSAGE = 'sign in to add files to this trip'
 
 /** A failure row this component produces itself, rather than one that came

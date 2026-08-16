@@ -65,6 +65,20 @@ describe('useDraftTrip', () => {
     expect(result.current.draft?.files).toHaveLength(1)
   })
 
+  it('opens a draft from a valid GPX just as it would a KML', async () => {
+    const store = new LocalTripStore(fakeStorage())
+    const { result } = renderHook(() => useDraftTrip(store, 'token', 'cairn-folder'))
+
+    let rejections: unknown[] = []
+    await act(async () => {
+      rejections = await result.current.addFiles([loadFixture('track.gpx')])
+    })
+
+    expect(rejections).toEqual([])
+    expect(result.current.draft).not.toBeNull()
+    expect(result.current.draft?.files).toHaveLength(1)
+  })
+
   it('rejects a file with the wrong extension, without opening a draft', async () => {
     const store = new LocalTripStore(fakeStorage())
     const { result } = renderHook(() => useDraftTrip(store, 'token', 'cairn-folder'))
@@ -75,7 +89,7 @@ describe('useDraftTrip', () => {
     })
 
     expect(rejections).toEqual([
-      { name: 'notes.txt', message: 'Only .kml and .kmz files can be imported.' },
+      { name: 'notes.txt', message: 'Only .kml, .kmz and .gpx files can be imported.' },
     ])
     expect(result.current.draft).toBeNull()
   })
@@ -102,7 +116,7 @@ describe('useDraftTrip', () => {
       rejections = await result.current.addFiles([loadFixture('invalid.kml')])
     })
 
-    expect(rejections).toEqual([{ name: 'invalid.kml', message: 'invalid.kml is not a valid KML file.' }])
+    expect(rejections).toEqual([{ name: 'invalid.kml', message: 'invalid.kml is not a valid track file.' }])
     expect(result.current.draft).toBeNull()
   })
 
@@ -149,7 +163,7 @@ describe('useDraftTrip', () => {
       ])
     })
 
-    expect(rejections).toEqual([{ name: 'notes.txt', message: 'Only .kml and .kmz files can be imported.' }])
+    expect(rejections).toEqual([{ name: 'notes.txt', message: 'Only .kml, .kmz and .gpx files can be imported.' }])
     expect(result.current.draft?.files).toHaveLength(1)
   })
 

@@ -1035,7 +1035,7 @@ function AppShell() {
             ) : (
               <MapEmptyOverlay
                 heading="Nothing here yet"
-                detail="Drop a KML or a photo anywhere to start."
+                detail="Drop a KML, GPX or a photo anywhere to start."
               />
             )
           ) : (

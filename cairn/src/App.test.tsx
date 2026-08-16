@@ -613,7 +613,7 @@ describe('App drop-to-draft (#81)', () => {
 
     fireEvent.drop(shell, { dataTransfer: fileDataTransfer([new File(['x'], 'notes.txt')]) })
 
-    expect(await screen.findByText('Only .kml and .kmz files can be imported.')).toBeDefined()
+    expect(await screen.findByText('Only .kml, .kmz and .gpx files can be imported.')).toBeDefined()
     expect(screen.queryByText('NOT SAVED')).toBeNull()
   })
 

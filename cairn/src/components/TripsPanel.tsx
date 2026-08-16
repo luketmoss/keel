@@ -178,7 +178,7 @@ export function TripsPanel({
           ) : (
             <>
               <p className="trips-panel__empty-title">Nothing here yet</p>
-              <p className="trips-panel__empty-detail">Drop a KML or a photo anywhere to start.</p>
+              <p className="trips-panel__empty-detail">Drop a KML, GPX or a photo anywhere to start.</p>
             </>
           )}
         </div>

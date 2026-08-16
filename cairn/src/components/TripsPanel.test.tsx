@@ -167,7 +167,7 @@ describe('TripsPanel', () => {
     renderPanel({ trips: [] })
 
     expect(screen.getByText('Nothing here yet')).toBeDefined()
-    expect(screen.getByText('Drop a KML or a photo anywhere to start.')).toBeDefined()
+    expect(screen.getByText('Drop a KML, GPX or a photo anywhere to start.')).toBeDefined()
   })
 
   it('creates a trip from the New trip action', () => {

@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { parseKmlOrKmz, type Track } from '../kml/parse'
+import { parseTrack, type Track } from '../kml/parse'
 import { aggregateElevationProfile, aggregateTrackStats } from '../kml/stats'
 import { readPhotoExif } from '../photo/exif'
 import { positionPhoto } from '../photo/interpolate'
@@ -29,7 +29,7 @@ export interface LooseImportResult {
 }
 
 export const UNRECOGNISED =
-  'cairn takes .kml or .kmz tracks, JPEG, PNG or WebP photos, and .zip archives'
+  'cairn takes .kml, .kmz or .gpx tracks, JPEG, PNG or WebP photos, and .zip archives'
 
 /** The date a track happened, from its first timestamped point. A KML with
     no times has none, and the row says so rather than inventing today. */
@@ -72,7 +72,7 @@ export function useLooseImport(store: LooseStore) {
 
       for (const file of files) {
         if (isTrackFile(file.name)) {
-          const parsed = await parseKmlOrKmz(file)
+          const parsed = await parseTrack(file)
           if (!parsed.ok) {
             rejections.push({ name: file.name, message: `${file.name} — ${parsed.error}` })
             continue

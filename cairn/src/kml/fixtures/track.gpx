@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx xmlns="http://www.topografix.com/GPX/1/1" version="1.1" creator="cairn-test">
+  <trk>
+    <name>Ridge Trail</name>
+    <trkseg>
+      <trkpt lat="37.0" lon="-122.0">
+        <ele>100</ele>
+        <time>2020-06-01T08:00:00Z</time>
+      </trkpt>
+      <trkpt lat="37.1" lon="-122.1">
+        <ele>150</ele>
+        <time>2020-06-01T08:05:00Z</time>
+      </trkpt>
+      <trkpt lat="37.2" lon="-122.2">
+        <ele>200</ele>
+        <time>2020-06-01T08:10:00Z</time>
+      </trkpt>
+    </trkseg>
+  </trk>
+</gpx>

@@ -2,6 +2,7 @@ import type { FeatureCollection, LineString } from 'geojson'
 import type { Track } from '../kml/parse'
 import { buildOverviewGeoJSON, computeTripOrigin } from '../geo/overview'
 import { computeTripTotals, SIDECAR_VERSION, type StoredOverview } from '../geo/tripTotals'
+import type { StoredTrackElevation } from '../kml/stats'
 import type { LatLng } from '../map/geo'
 
 export type TripStatus = 'planned' | 'completed'
@@ -139,8 +140,15 @@ export interface TripStore {
   /** Recomputes and persists a trip's overview from its current tracks.
       The regeneration contract `geo/overview.ts` describes: called by
       whatever owns a trip's track set, whenever that set changes. Pure
-      w.r.t. the tracks given — same tracks in, same stored geometry out. */
-  saveOverview(id: string, tracks: Track[]): void
+      w.r.t. the tracks given — same tracks in, same stored geometry out.
+   *
+   * `sampledElevation` (#224) is the trip's full current sampled-elevation
+      cache — whatever `useTripImport` has read back plus whatever it has
+      sampled since — folded into the persisted totals and carried forward
+      unchanged in the sidecar. Omitted (rather than passed as `{}`) by any
+      caller that has no sampling concept, which leaves a previously stored
+      cache exactly as it was rather than erasing it. */
+  saveOverview(id: string, tracks: Track[], sampledElevation?: Record<string, StoredTrackElevation>): void
   /** Caches how many cairns a trip holds (#121), for the picker to read.
    *
    * Deliberately not part of `TripUpdate`: that is scoped to the fields
@@ -365,11 +373,19 @@ export class LocalTripStore implements TripStore {
     }
   }
 
-  saveOverview = (id: string, tracks: Track[]): void => {
+  saveOverview = (id: string, tracks: Track[], sampledElevation?: Record<string, StoredTrackElevation>): void => {
+    // #224: a caller that doesn't pass `sampledElevation` (nothing new
+    // sampled this pass) carries forward whatever the sidecar already had,
+    // rather than a `saveOverview` call for an unrelated reason (a rename,
+    // a track added) silently erasing a previously sampled trip's cache.
+    const existing = this.getOverview(id) as StoredOverview | null
+    const preserved =
+      sampledElevation ?? (existing?.version === SIDECAR_VERSION ? existing.sampledElevation : undefined)
     const overview: StoredOverview = {
       ...buildOverviewGeoJSON(tracks),
       version: SIDECAR_VERSION,
-      totals: computeTripTotals(tracks),
+      totals: computeTripTotals(tracks, preserved),
+      ...(preserved ? { sampledElevation: preserved } : {}),
     }
     this.storage.setItem(overviewKey(id), JSON.stringify(overview))
     this.updateOrigin(id, computeTripOrigin(tracks))

@@ -19,6 +19,7 @@ import { useTripImport } from '../import/useTripImport'
 import { useCairnImport, type CairnRecord, type NewTripCairn } from '../photo/useCairnImport'
 import { buildCairnListRows, flattenCairnListRows, orderCairnListItems } from '../photo/cairnListGroups'
 import { unattachedCairnIds, visibleCairnIds } from '../photo/cairnAttachment'
+import { effectiveElevationProfile } from '../kml/stats'
 import type { TripStore } from '../store/tripStore'
 import { cairnMatchesFacet, type CairnFacet } from '../store/cairnRules'
 import {
@@ -178,7 +179,7 @@ export function TripDetail({
 }: TripDetailProps) {
   const navigate = useNavigate()
   const trip = useSyncExternalStore(tripStore.subscribe, () => tripStore.getTrip(tripId))
-  const tripImport = useTripImport(tripId, accessToken, cairnFolderId)
+  const tripImport = useTripImport(tripId, accessToken, cairnFolderId, tripStore)
   const allTracks = useMemo(() => tripImport.tracks.flatMap((file) => file.tracks), [tripImport.tracks])
   /* #218 — every track's stats, independent of visibility. Flattened
      alongside `allTracks` rather than derived from it: `trackStats` is
@@ -607,8 +608,14 @@ export function TripDetail({
     tripStore.saveOverview(
       trip.id,
       tripImport.tracks.flatMap((file) => file.tracks),
+      // #224: the trip's full current sampled-elevation cache, so a
+      // recompute triggered by an unrelated track-set change (a track
+      // added or removed) never drops what's already been sampled, and so
+      // a track sampled this session gets written into the sidecar the
+      // same pass its stats first show a `~`.
+      tripImport.sampledElevation,
     )
-  }, [tripStore, trip, tripImport.loading, tripImport.tracks])
+  }, [tripStore, trip, tripImport.loading, tripImport.tracks, tripImport.sampledElevation])
 
   if (!trip) {
     return (
@@ -675,6 +682,10 @@ export function TripDetail({
           sourceName={openTrackFile.sourceName}
           track={openTrackFile.tracks[0]}
           stats={openTrackFile.trackStats[0]}
+          profile={effectiveElevationProfile(
+            openTrackFile.tracks[0],
+            openTrackFile.tracks[0].key ? tripImport.sampledElevation[openTrackFile.tracks[0].key] : undefined,
+          )}
           color={trackColor(openTrackFile.colorIndex)}
           disabled={!signedIn}
           onRename={(name) => tripImport.renameTrack(openTrackFile.id, name)}

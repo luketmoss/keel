@@ -319,6 +319,21 @@ describe('TripsPanel', () => {
 
       expect(screen.getByText(/3 tracks$/)).toBeDefined()
     })
+
+    // #224
+    it('marks the ascent with ~ when the total includes sampled elevation', () => {
+      renderPanel({
+        trips: [tripEntry({ id: 't1', name: 'Kepler Track' })],
+        trackCounts: new Map([['t1', 2]]),
+        tripTotals: new Map([
+          ['t1', { distanceMeters: 18_300, elevationGainMeters: 2_121, elevationSource: 'sampled' }],
+        ]),
+      })
+
+      expect(
+        screen.getByText(new RegExp(`~${escapeRe(formatElevationGain(2_121)!)}$`)),
+      ).toBeDefined()
+    })
   })
 
   it('falls back to 0 tracks when the track count map has no entry for the trip', () => {

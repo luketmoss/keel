@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatDistance, formatDuration, formatElevationGain, formatStatsLine } from './units'
+import { formatDistance, formatDuration, formatElevationGain, formatStatsLine, markSampled } from './units'
 
 describe('formatDistance', () => {
   it('shows one decimal of miles at or above a tenth of a mile', () => {
@@ -70,5 +70,31 @@ describe('formatStatsLine', () => {
     })
     expect(line).toBe('8.1 mi')
     expect(line).not.toContain('—')
+  })
+
+  // #224
+  it('marks a sampled gain with ~, travelling with the figure on the row', () => {
+    const line = formatStatsLine({
+      distanceMeters: 8.1 * 1609.344,
+      durationSeconds: 47 * 60,
+      elevationGainMeters: 1850 * 0.3048,
+      elevationSource: 'sampled',
+    })
+    expect(line).toBe('8.1 mi · 47m · ~1,850 ft ↑')
+  })
+})
+
+// #224
+describe('markSampled', () => {
+  it('prefixes a present value with ~ when sampled', () => {
+    expect(markSampled('1,850 ft ↑', true)).toBe('~1,850 ft ↑')
+  })
+
+  it('leaves a recorded value untouched', () => {
+    expect(markSampled('1,850 ft ↑', false)).toBe('1,850 ft ↑')
+  })
+
+  it('leaves an unavailable value undefined — no mark on a dash', () => {
+    expect(markSampled(undefined, true)).toBeUndefined()
   })
 })

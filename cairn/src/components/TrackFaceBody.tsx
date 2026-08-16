@@ -5,6 +5,7 @@ import {
   formatElevation,
   formatElevationGain,
   formatElevationLoss,
+  markSampled,
 } from '../format/units'
 import { StatGrid } from './StatGrid'
 import { TrackElevationProfile } from './TrackElevationProfile'
@@ -38,22 +39,34 @@ export function TrackFaceBody({
   sourceName: string
   color: string
 }) {
+  const sampled = stats.elevationSource === 'sampled'
+
   return (
     <>
       {/* No profile rather than an empty frame when elevation is
           unavailable — a flat line across the box would assert a flat
           walk. */}
-      {profile && <TrackElevationProfile points={profile} color={color} distanceMeters={stats.distanceMeters} />}
+      {profile && (
+        <TrackElevationProfile
+          points={profile}
+          color={color}
+          distanceMeters={stats.distanceMeters}
+          sampled={sampled}
+        />
+      )}
       <StatGrid
         items={[
           { label: 'Distance', value: formatDistance(stats.distanceMeters) },
-          { label: 'Ascent', value: formatElevationGain(stats.elevationGainMeters) },
-          { label: 'Descent', value: formatElevationLoss(stats.elevationLossMeters) },
-          { label: 'High point', value: formatElevation(stats.highPointMeters) },
-          { label: 'Low point', value: formatElevation(stats.lowPointMeters) },
+          { label: 'Ascent', value: markSampled(formatElevationGain(stats.elevationGainMeters), sampled) },
+          { label: 'Descent', value: markSampled(formatElevationLoss(stats.elevationLossMeters), sampled) },
+          { label: 'High point', value: markSampled(formatElevation(stats.highPointMeters), sampled) },
+          { label: 'Low point', value: markSampled(formatElevation(stats.lowPointMeters), sampled) },
           { label: 'Duration', value: formatDuration(stats.durationSeconds) },
         ]}
       />
+      {/* #224: its own line above the points/source footnote — provenance
+          of the numbers themselves, not of the file they came from. */}
+      {sampled && <p className="track-face-body__footnote">Elevation estimated from terrain data.</p>}
       {/* Points and source file share the footnote line — provenance
           rather than measurement, so they sit beneath the `--border` rule
           rather than in stat cells that would imply they are comparable

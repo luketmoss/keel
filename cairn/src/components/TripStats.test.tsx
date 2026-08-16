@@ -92,4 +92,34 @@ describe('TripStats', () => {
     expect(screen.getByText('984 ft ↑')).toBeDefined()
     expect(screen.getByText('787 ft ↓')).toBeDefined()
   })
+
+  // #224
+  it('marks every elevation figure with ~ and names the source when every track is sampled', () => {
+    render(<TripStats trackStats={[withElevation({ elevationSource: 'sampled' })]} />)
+
+    expect(screen.getByText('~1,640 ft ↑')).toBeDefined()
+    expect(screen.getByText('~1,312 ft ↓')).toBeDefined()
+    expect(screen.getByText('~6,562 ft')).toBeDefined()
+    expect(screen.getByText('~4,921 ft')).toBeDefined()
+    expect(screen.getByText('Elevation estimated from terrain data.')).toBeDefined()
+  })
+
+  it('names the count when only some tracks are sampled', () => {
+    render(
+      <TripStats
+        trackStats={[withElevation({ elevationSource: 'sampled' }), withElevation(), withoutElevation()]}
+      />,
+    )
+
+    expect(
+      screen.getByText('Elevation estimated from terrain data for 1 of 3 tracks.'),
+    ).toBeDefined()
+  })
+
+  it('marks a total mixing recorded and sampled tracks with ~ — the weaker claim governs', () => {
+    render(<TripStats trackStats={[withElevation({ elevationSource: 'sampled' }), withElevation()]} />)
+
+    // 500m + 500m = 1000m ascent, summed over both tracks.
+    expect(screen.getByText('~3,281 ft ↑')).toBeDefined()
+  })
 })

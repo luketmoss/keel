@@ -2,6 +2,21 @@ import { describe, expect, it } from 'vitest'
 import { computeTrackStats } from './stats'
 import type { Track } from './parse'
 
+/* Flat padding at both ends keeps the median filter's clamped boundary
+   windows equal to the padded value, so the filtered series' first and
+   last points match the raw ones exactly — which is what makes the
+   closed-loop test below checkable by hand rather than asserted blind. */
+function trackFromElevations(elevations: number[]): Track {
+  return {
+    name: 'Fixture',
+    points: elevations.map((elevation, i) => ({
+      lat: 37 + i * 0.001,
+      lon: -122 + i * 0.001,
+      elevation,
+    })),
+  }
+}
+
 describe('computeTrackStats', () => {
   it('computes distance within 0.5% of a fixture of known length', () => {
     /* One arc-minute of latitude is, by definition, one nautical mile —
@@ -71,59 +86,6 @@ describe('computeTrackStats', () => {
     expect(computeTrackStats(track).durationSeconds).toBe(30 * 60)
   })
 
-  it('shows elevation gain for a track carrying per-point elevations', () => {
-    const track: Track = {
-      name: 'Climbing',
-      points: [
-        { lat: 37, lon: -122, elevation: 100 },
-        { lat: 37.01, lon: -122.01, elevation: 150 },
-        { lat: 37.02, lon: -122.02, elevation: 200 },
-      ],
-    }
-
-    expect(computeTrackStats(track).elevationGainMeters).toBe(100)
-  })
-
-  it('leaves elevation gain undefined, not zero, for a track without elevations', () => {
-    const track: Track = {
-      name: 'Flatlander',
-      points: [
-        { lat: 37, lon: -122 },
-        { lat: 37.1, lon: -122.1 },
-      ],
-    }
-
-    expect(computeTrackStats(track).elevationGainMeters).toBeUndefined()
-  })
-
-  it('sums only positive deltas, so a descent-only track reads zero gain', () => {
-    const track: Track = {
-      name: 'Descent',
-      points: [
-        { lat: 37, lon: -122, elevation: 300 },
-        { lat: 37.01, lon: -122.01, elevation: 200 },
-        { lat: 37.02, lon: -122.02, elevation: 100 },
-      ],
-    }
-
-    expect(computeTrackStats(track).elevationGainMeters).toBe(0)
-  })
-
-  it('skips gaps rather than treating a missing elevation as zero', () => {
-    const track: Track = {
-      name: 'Gappy',
-      points: [
-        { lat: 37, lon: -122, elevation: 100 },
-        { lat: 37.01, lon: -122.01 }, // no elevation
-        { lat: 37.02, lon: -122.02, elevation: 150 },
-      ],
-    }
-
-    // Gain is measured between the two elevation-bearing points (100 -> 150 = 50),
-    // not treated as a cliff down to 0 and back up.
-    expect(computeTrackStats(track).elevationGainMeters).toBe(50)
-  })
-
   it('reads zero distance for a single-point track and does not throw', () => {
     const track: Track = { name: 'Point', points: [{ lat: 37, lon: -122 }] }
 
@@ -132,5 +94,136 @@ describe('computeTrackStats', () => {
     expect(stats.distanceMeters).toBe(0)
     expect(stats.durationSeconds).toBeUndefined()
     expect(stats.elevationGainMeters).toBeUndefined()
+  })
+
+  describe('elevation', () => {
+    it('leaves ascent, descent, high and low point undefined for a track without elevation', () => {
+      const track: Track = {
+        name: 'Flatlander',
+        points: [
+          { lat: 37, lon: -122 },
+          { lat: 37.1, lon: -122.1 },
+        ],
+      }
+
+      const stats = computeTrackStats(track)
+      expect(stats.elevationGainMeters).toBeUndefined()
+      expect(stats.elevationLossMeters).toBeUndefined()
+      expect(stats.highPointMeters).toBeUndefined()
+      expect(stats.lowPointMeters).toBeUndefined()
+    })
+
+    it('leaves all four undefined for fewer than two points carrying elevation', () => {
+      const track: Track = {
+        name: 'One elevation',
+        points: [
+          { lat: 37, lon: -122, elevation: 1000 },
+          { lat: 37.1, lon: -122.1 },
+        ],
+      }
+
+      const stats = computeTrackStats(track)
+      expect(stats.elevationGainMeters).toBeUndefined()
+      expect(stats.elevationLossMeters).toBeUndefined()
+      expect(stats.highPointMeters).toBeUndefined()
+      expect(stats.lowPointMeters).toBeUndefined()
+    })
+
+    it('reports unavailable, not zero, for a track whose every altitude is 0 (clampToGround)', () => {
+      const track = trackFromElevations([0, 0, 0, 0, 0])
+
+      const stats = computeTrackStats(track)
+      expect(stats.elevationGainMeters).toBeUndefined()
+      expect(stats.elevationLossMeters).toBeUndefined()
+      expect(stats.highPointMeters).toBeUndefined()
+      expect(stats.lowPointMeters).toBeUndefined()
+    })
+
+    it('reports unavailable for a track whose every altitude is some other single identical value', () => {
+      const track = trackFromElevations([1500, 1500, 1500, 1500])
+
+      const stats = computeTrackStats(track)
+      expect(stats.elevationGainMeters).toBeUndefined()
+      expect(stats.elevationLossMeters).toBeUndefined()
+      expect(stats.highPointMeters).toBeUndefined()
+      expect(stats.lowPointMeters).toBeUndefined()
+    })
+
+    it('computes ascent, descent, high and low point from the median-filtered, hysteresis-thresholded series', () => {
+      // Flat padding front and back, a climb from 1000 to 1060, then a
+      // descent back to 1000 — a closed loop by construction.
+      const track = trackFromElevations([
+        1000, 1000, 1000, 1010, 1020, 1035, 1050, 1050, 1050, 1045, 1030, 1010, 1000, 1000, 1000,
+      ])
+
+      const stats = computeTrackStats(track)
+      expect(stats.elevationGainMeters).toBe(50)
+      expect(stats.elevationLossMeters).toBe(50)
+      expect(stats.highPointMeters).toBe(1050)
+      expect(stats.lowPointMeters).toBe(1000)
+    })
+
+    it('closes a loop: ascent minus descent equals the last elevation minus the first, within 1m', () => {
+      const track = trackFromElevations([
+        1000, 1000, 1000, 1010, 1020, 1035, 1050, 1050, 1050, 1045, 1030, 1010, 1000, 1000, 1000,
+      ])
+
+      const stats = computeTrackStats(track)
+      const ascent = stats.elevationGainMeters ?? 0
+      const descent = stats.elevationLossMeters ?? 0
+      const firstElevation = track.points[0].elevation ?? 0
+      const lastElevation = track.points[track.points.length - 1].elevation ?? 0
+
+      expect(Math.abs(ascent - descent - (lastElevation - firstElevation))).toBeLessThan(1)
+    })
+
+    it('rejects a single-sample spike: the high point does not reflect it', () => {
+      const track = trackFromElevations([1000, 1002, 1001, 1200, 1003, 1000, 1002, 1001, 1000])
+
+      const stats = computeTrackStats(track)
+      // The spike sits 200m above its neighbours — a real high point close
+      // to it would be implausible for a track whose other samples hover
+      // around 1000-1003.
+      expect(stats.highPointMeters).toBeLessThan(1100)
+    })
+
+    it('reports zero ascent and descent — not unavailable — for a track that varies by less than the threshold', () => {
+      const track = trackFromElevations([1000, 1001, 1000.5, 1001.5, 1000, 1001, 1000.8])
+
+      const stats = computeTrackStats(track)
+      expect(stats.elevationGainMeters).toBe(0)
+      expect(stats.elevationLossMeters).toBe(0)
+      expect(stats.highPointMeters).not.toBeUndefined()
+      expect(stats.lowPointMeters).not.toBeUndefined()
+    })
+
+    it('reads zero ascent and real descent for a descent-only track', () => {
+      const track = trackFromElevations([1000, 1000, 1000, 990, 980, 965, 950, 940, 940, 940])
+
+      const stats = computeTrackStats(track)
+      expect(stats.elevationGainMeters).toBe(0)
+      expect(stats.elevationLossMeters).toBe(60)
+    })
+
+    it('skips points without elevation entirely, rather than treating a gap as zero', () => {
+      const elevations = [
+        1000, 1000, 1000, 1010, 1020, 1035, 1050, 1050, 1050, 1045, 1030, 1010, 1000, 1000, 1000,
+      ]
+      const withoutGaps = trackFromElevations(elevations)
+      const withGaps: Track = {
+        name: 'Gappy',
+        points: elevations.flatMap((elevation, i) => [
+          { lat: 37 + i * 0.002, lon: -122, elevation },
+          { lat: 37 + i * 0.002 + 0.0005, lon: -122 }, // no elevation
+        ]),
+      }
+
+      const a = computeTrackStats(withoutGaps)
+      const b = computeTrackStats(withGaps)
+      expect(b.elevationGainMeters).toBe(a.elevationGainMeters)
+      expect(b.elevationLossMeters).toBe(a.elevationLossMeters)
+      expect(b.highPointMeters).toBe(a.highPointMeters)
+      expect(b.lowPointMeters).toBe(a.lowPointMeters)
+    })
   })
 })

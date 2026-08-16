@@ -78,7 +78,16 @@ function trackFile(id: string, name: string, times: string[]): ImportedFile {
     name,
     driveFileId: `drive-${id}`,
     tracks: [{ name, points: times.map((time) => ({ lat: 0, lon: 0, time })) }],
-    trackStats: [{ distanceMeters: 0, durationSeconds: undefined, elevationGainMeters: undefined }],
+    trackStats: [
+      {
+        distanceMeters: 0,
+        durationSeconds: undefined,
+        elevationGainMeters: undefined,
+        elevationLossMeters: undefined,
+        highPointMeters: undefined,
+        lowPointMeters: undefined,
+      },
+    ],
     colorIndex: 0,
     visible: true,
   }

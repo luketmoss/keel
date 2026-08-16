@@ -45,7 +45,16 @@ function importedFile(overrides: Partial<ImportedFile> = {}): ImportedFile {
     colorIndex: 0,
     visible: true,
     tracks: [{ name: 'Track', points: [{ lat: 37, lon: -122 }, { lat: 37.1, lon: -122.1 }] }],
-    trackStats: [{ distanceMeters: 0, durationSeconds: undefined, elevationGainMeters: undefined }],
+    trackStats: [
+      {
+        distanceMeters: 0,
+        durationSeconds: undefined,
+        elevationGainMeters: undefined,
+        elevationLossMeters: undefined,
+        highPointMeters: undefined,
+        lowPointMeters: undefined,
+      },
+    ],
     ...overrides,
   }
 }

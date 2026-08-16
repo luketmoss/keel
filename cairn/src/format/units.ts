@@ -46,11 +46,43 @@ export function formatElevationGain(meters: number | undefined): string | undefi
   return `${Math.round(meters).toLocaleString('en-US')} m ↑`
 }
 
+/* The trailing ↓ marks loss specifically, the mirror of gain's ↑. */
+export function formatElevationLoss(meters: number | undefined): string | undefined {
+  if (meters === undefined) return undefined
+
+  if (SYSTEM === 'imperial') {
+    const feet = Math.round(meters / METERS_PER_FOOT)
+    return `${feet.toLocaleString('en-US')} ft ↓`
+  }
+
+  return `${Math.round(meters).toLocaleString('en-US')} m ↓`
+}
+
+/* No arrow — this is a bare elevation, not a change. #218: the arrow on
+   gain and loss exists because a bare foot value beside a distance
+   otherwise reads as altitude; here it *is* altitude, so the arrow would be
+   the lie instead of the fix. Unlike the other formatters, a negative value
+   (below sea level) is legitimate and renders as computed, per #7's rule
+   that a wrong number the user can see is debuggable and a silently
+   clamped one is not. */
+export function formatElevation(meters: number | undefined): string | undefined {
+  if (meters === undefined) return undefined
+
+  if (SYSTEM === 'imperial') {
+    const feet = Math.round(meters / METERS_PER_FOOT)
+    return `${feet.toLocaleString('en-US')} ft`
+  }
+
+  return `${Math.round(meters).toLocaleString('en-US')} m`
+}
+
 /* Two unavailable values carry no information the user can act on and make
    the row look broken, so only distance shows. One dash among present
    values is informative — it says this track came from a file that did not
    record it — so the mixed case keeps it. */
-export function formatStatsLine(stats: TrackStats): string {
+export function formatStatsLine(
+  stats: Pick<TrackStats, 'distanceMeters' | 'durationSeconds' | 'elevationGainMeters'>,
+): string {
   const distance = formatDistance(stats.distanceMeters)
   const duration = formatDuration(stats.durationSeconds)
   const elevationGain = formatElevationGain(stats.elevationGainMeters)

@@ -4,12 +4,27 @@ export interface TrackStats {
   distanceMeters: number
   durationSeconds: number | undefined
   elevationGainMeters: number | undefined
+  elevationLossMeters: number | undefined
+  highPointMeters: number | undefined
+  lowPointMeters: number | undefined
 }
 
 /* Mean Earth radius. Error against a true geodesic is under 0.5% at any
    realistic track scale — well inside the acceptance criterion and far
    inside consumer GPS error. */
 const EARTH_RADIUS_METERS = 6_371_008.8
+
+/* #218 — filter first, then accumulate. A single spike sample otherwise
+   *sets* the high point outright, and a mean would smear a real summit down
+   instead of rejecting the spike; a median rejects it. The threshold is
+   hysteresis against a reference elevation rather than a sum of every
+   positive delta: consumer GPS vertical error runs 5-15m and barometric
+   1-3m, and KML does not say which you got, so 3m is the conservative
+   floor — it also disposes of a device recording at 1Hz through a lunch
+   stop, hundreds of deltas and zero distance, none of which leave the
+   band. */
+const ELEVATION_MEDIAN_WINDOW = 5
+const ELEVATION_THRESHOLD_METERS = 3
 
 function toRadians(degrees: number): number {
   return (degrees * Math.PI) / 180
@@ -52,28 +67,93 @@ function computeDurationSeconds(points: Track['points']): number | undefined {
   return (Math.max(...timestamps) - Math.min(...timestamps)) / 1000
 }
 
-/* Sums only positive deltas between points that carry elevation, skipping
-   gaps rather than treating a missing value as zero — which would invent a
-   cliff at every gap. Undefined when fewer than two points carry elevation. */
-function computeElevationGainMeters(points: Track['points']): number | undefined {
+/* Centered window, clamped at the ends rather than padded — a shorter
+   window at the boundary is still a median of real samples, where padding
+   would invent one. */
+function medianFilter(values: number[], window: number): number[] {
+  const half = Math.floor(window / 2)
+  return values.map((_, i) => {
+    const start = Math.max(0, i - half)
+    const end = Math.min(values.length, i + half + 1)
+    const slice = values.slice(start, end).slice().sort((a, b) => a - b)
+    const mid = Math.floor(slice.length / 2)
+    return slice.length % 2 === 0 ? (slice[mid - 1] + slice[mid]) / 2 : slice[mid]
+  })
+}
+
+/* Hysteresis against a reference elevation: a change only commits — and
+   only then moves the reference — once the series leaves the ±threshold
+   band. Everything inside the band is noise the reference absorbs rather
+   than a climb or a descent. */
+function computeAscentDescentMeters(
+  filtered: number[],
+  thresholdMeters: number,
+): { ascentMeters: number; descentMeters: number } {
+  let reference = filtered[0]
+  let ascentMeters = 0
+  let descentMeters = 0
+
+  for (let i = 1; i < filtered.length; i++) {
+    const delta = filtered[i] - reference
+    if (delta >= thresholdMeters) {
+      ascentMeters += delta
+      reference = filtered[i]
+    } else if (delta <= -thresholdMeters) {
+      descentMeters += -delta
+      reference = filtered[i]
+    }
+  }
+
+  return { ascentMeters, descentMeters }
+}
+
+interface ElevationStats {
+  elevationGainMeters: number | undefined
+  elevationLossMeters: number | undefined
+  highPointMeters: number | undefined
+  lowPointMeters: number | undefined
+}
+
+const UNAVAILABLE_ELEVATION: ElevationStats = {
+  elevationGainMeters: undefined,
+  elevationLossMeters: undefined,
+  highPointMeters: undefined,
+  lowPointMeters: undefined,
+}
+
+/* KML's default altitudeMode is clampToGround, and exporters that intend
+   clamping (Google My Maps) write 0 for every point rather than omitting
+   the component — altitudeMode itself is discarded by togeojson before the
+   parser sees it, so it cannot be inspected directly. The rule that works
+   on the geometry actually available: a real GPS track, even a dead-flat
+   one, never produces identical consecutive values, so a series that is
+   entirely one value — 0 or otherwise — is unavailable rather than flat. */
+function computeElevationStats(points: Track['points']): ElevationStats {
   const elevations = points
     .map((point) => point.elevation)
     .filter((elevation): elevation is number => elevation !== undefined)
 
-  if (elevations.length < 2) return undefined
+  if (elevations.length < 2) return UNAVAILABLE_ELEVATION
+  if (elevations.every((elevation) => elevation === elevations[0])) return UNAVAILABLE_ELEVATION
 
-  let gain = 0
-  for (let i = 1; i < elevations.length; i++) {
-    const delta = elevations[i] - elevations[i - 1]
-    if (delta > 0) gain += delta
+  const filtered = medianFilter(elevations, ELEVATION_MEDIAN_WINDOW)
+  const { ascentMeters, descentMeters } = computeAscentDescentMeters(
+    filtered,
+    ELEVATION_THRESHOLD_METERS,
+  )
+
+  return {
+    elevationGainMeters: ascentMeters,
+    elevationLossMeters: descentMeters,
+    highPointMeters: Math.max(...filtered),
+    lowPointMeters: Math.min(...filtered),
   }
-  return gain
 }
 
 export function computeTrackStats(track: Track): TrackStats {
   return {
     distanceMeters: computeDistanceMeters(track.points),
     durationSeconds: computeDurationSeconds(track.points),
-    elevationGainMeters: computeElevationGainMeters(track.points),
+    ...computeElevationStats(track.points),
   }
 }

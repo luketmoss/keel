@@ -6,6 +6,7 @@ import { CairnList } from './CairnList'
 import { Lightbox } from './Lightbox'
 import { TripImportPanel } from './TripImportPanel'
 import { TripMetadataHeader } from './TripMetadataHeader'
+import { TripStats } from './TripStats'
 import { TripNotFound } from './TripNotFound'
 import { MissingFileRow } from './MissingFileRow'
 import { googleMapsMapId } from '../env'
@@ -161,6 +162,15 @@ export function TripDetail({
   const trip = useSyncExternalStore(tripStore.subscribe, () => tripStore.getTrip(tripId))
   const tripImport = useTripImport(tripId, accessToken, cairnFolderId)
   const allTracks = useMemo(() => tripImport.tracks.flatMap((file) => file.tracks), [tripImport.tracks])
+  /* #218 — every track's stats, independent of visibility. Flattened
+     alongside `allTracks` rather than derived from it: `trackStats` is
+     computed once at import (see `ImportedFile`), and recomputing it here
+     from `allTracks` would mean walking each track's points again on every
+     render just to throw the result away. */
+  const allTrackStats = useMemo(
+    () => tripImport.tracks.flatMap((file) => file.trackStats),
+    [tripImport.tracks],
+  )
   // Position resolution (EXIF, then interpolation against these same
   // tracks) happens once, at import time, inside the hook — a cairn's
   // `position` is already final by the time it reaches `cairns` below,
@@ -608,6 +618,11 @@ export function TripDetail({
           onUpdate={(patch) => tripStore.updateTrip(trip.id, patch)}
           disabled={!signedIn}
         />
+        {/* #218: not rendered while fetching — `TripDetail` already shows
+            "Loading tracks…" in its place below, and a totals block full of
+            em dashes next to that message would read as a second,
+            contradictory loading state. */}
+        {!fetching && <TripStats trackStats={allTrackStats} />}
         <TripImportPanel
           signedIn={signedIn}
           progress={[

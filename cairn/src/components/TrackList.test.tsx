@@ -16,6 +16,9 @@ function importedFile(overrides: Partial<ImportedFile> = {}): ImportedFile {
       distanceMeters: 0,
       durationSeconds: undefined,
       elevationGainMeters: undefined,
+      elevationLossMeters: undefined,
+      highPointMeters: undefined,
+      lowPointMeters: undefined,
     })),
     ...overrides,
   }
@@ -76,7 +79,14 @@ describe('TrackList', () => {
         files={[
           importedFile({
             trackStats: [
-              { distanceMeters: 8.1 * 1609.344, durationSeconds: 47 * 60, elevationGainMeters: 0 },
+              {
+                distanceMeters: 8.1 * 1609.344,
+                durationSeconds: 47 * 60,
+                elevationGainMeters: 0,
+                elevationLossMeters: 0,
+                highPointMeters: 100,
+                lowPointMeters: 100,
+              },
             ],
           }),
         ]}
@@ -98,8 +108,22 @@ describe('TrackList', () => {
               { name: 'b', points: [] },
             ],
             trackStats: [
-              { distanceMeters: 1000, durationSeconds: 60, elevationGainMeters: 10 },
-              { distanceMeters: 2000, durationSeconds: 120, elevationGainMeters: 20 },
+              {
+                distanceMeters: 1000,
+                durationSeconds: 60,
+                elevationGainMeters: 10,
+                elevationLossMeters: 5,
+                highPointMeters: 110,
+                lowPointMeters: 100,
+              },
+              {
+                distanceMeters: 2000,
+                durationSeconds: 120,
+                elevationGainMeters: 20,
+                elevationLossMeters: 15,
+                highPointMeters: 120,
+                lowPointMeters: 100,
+              },
             ],
           }),
         ]}
@@ -117,7 +141,16 @@ describe('TrackList', () => {
         files={[
           importedFile({
             visible: false,
-            trackStats: [{ distanceMeters: 1609.344, durationSeconds: 60, elevationGainMeters: 5 }],
+            trackStats: [
+              {
+                distanceMeters: 1609.344,
+                durationSeconds: 60,
+                elevationGainMeters: 5,
+                elevationLossMeters: 0,
+                highPointMeters: 105,
+                lowPointMeters: 100,
+              },
+            ],
           }),
         ]}
         onToggleVisibility={vi.fn()}
@@ -602,7 +635,14 @@ describe('TrackList', () => {
           files={[
             importedFile({
               trackStats: [
-                { distanceMeters: 14200, durationSeconds: undefined, elevationGainMeters: 690 },
+                {
+                  distanceMeters: 14200,
+                  durationSeconds: undefined,
+                  elevationGainMeters: 690,
+                  elevationLossMeters: 620,
+                  highPointMeters: 2100,
+                  lowPointMeters: 1500,
+                },
               ],
             }),
           ]}

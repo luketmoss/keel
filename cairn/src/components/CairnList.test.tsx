@@ -54,6 +54,12 @@ function ownedProps(overrides: Partial<{
   }
 }
 
+/* #193 — both exits live behind the row's `⋮` now, so reaching either one
+   is two steps. Same helper shape `TripsPanel.test.tsx` already uses. */
+function openRowMenu(name: string) {
+  fireEvent.click(screen.getByRole('button', { name: `Row actions for ${name}` }))
+}
+
 describe('CairnList', () => {
   it('shows the empty state pointing at the import control when the trip has no cairns', () => {
     render(
@@ -221,7 +227,7 @@ describe('CairnList', () => {
   })
 
   describe('#77 removal', () => {
-    it('starts the confirm rather than removing on a single activation of the remove control', () => {
+    it('starts the confirm rather than removing on a single activation of Delete permanently…', () => {
       const items = orderCairnListItems([row({ id: 'a' })])
       const onStartConfirm = vi.fn()
       const onRemove = vi.fn()
@@ -237,7 +243,8 @@ describe('CairnList', () => {
         />,
       )
 
-      fireEvent.click(screen.getByRole('button', { name: 'Delete a.jpg permanently' }))
+      openRowMenu('a.jpg')
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Delete permanently…' }))
       expect(onStartConfirm).toHaveBeenCalledWith('a')
       expect(onRemove).not.toHaveBeenCalled()
     })
@@ -300,7 +307,7 @@ describe('CairnList', () => {
       )
 
       expect(screen.getByText('Removing…')).toBeDefined()
-      expect(screen.queryByRole('button', { name: 'Delete a.jpg permanently' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Row actions for a.jpg' })).toBeNull()
     })
 
     it('shows a failure line beneath a row whose removal failed, without removing it', () => {
@@ -335,12 +342,17 @@ describe('CairnList', () => {
         />,
       )
 
-      expect(screen.getByRole('button', { name: 'Delete a.jpg permanently' })).toHaveProperty('disabled', true)
+      // #73's Disabled treatment on the menu item, not a hidden trigger.
+      openRowMenu('a.jpg')
+      expect(screen.getByRole('menuitem', { name: 'Delete permanently…' })).toHaveProperty(
+        'disabled',
+        true,
+      )
     })
   })
 
   describe('#132 remove from trip, beside delete', () => {
-    it('offers no unlink control when the caller has nowhere to put a detached photo', () => {
+    it('offers no unlink action when the caller has nowhere to put a detached photo', () => {
       const items = orderCairnListItems([row({ id: 'a' })])
 
       render(
@@ -354,7 +366,8 @@ describe('CairnList', () => {
         />,
       )
 
-      expect(screen.queryByRole('button', { name: /from trip/ })).toBeNull()
+      openRowMenu('a.jpg')
+      expect(screen.queryByRole('menuitem', { name: /from trip/ })).toBeNull()
     })
 
     it('returns the cairn to the top level without a confirm', () => {
@@ -374,7 +387,8 @@ describe('CairnList', () => {
         />,
       )
 
-      fireEvent.click(screen.getByRole('button', { name: 'Remove a.jpg from trip' }))
+      openRowMenu('a.jpg')
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Remove from trip' }))
 
       // No ellipsis, no confirm — reversible by adding it back, which is
       // exactly what makes it the other exit.
@@ -383,7 +397,7 @@ describe('CairnList', () => {
       expect(screen.queryByText('Remove "a.jpg"?')).toBeNull()
     })
 
-    it('keeps deleting one click away, as its own named control', () => {
+    it('keeps deleting one click away, as its own named action', () => {
       const items = orderCairnListItems([row({ id: 'a' })])
 
       render(
@@ -399,8 +413,9 @@ describe('CairnList', () => {
       )
 
       // Two exits, never one action with a second step.
-      expect(screen.getByRole('button', { name: 'Delete a.jpg permanently' })).toBeDefined()
-      expect(screen.getByRole('button', { name: 'Remove a.jpg from trip' })).toBeDefined()
+      openRowMenu('a.jpg')
+      expect(screen.getByRole('menuitem', { name: 'Delete permanently…' })).toBeDefined()
+      expect(screen.getByRole('menuitem', { name: 'Remove from trip' })).toBeDefined()
     })
 
     it('disables both exits while disconnected', () => {
@@ -418,17 +433,19 @@ describe('CairnList', () => {
         />,
       )
 
-      expect(screen.getByRole('button', { name: 'Remove a.jpg from trip' })).toHaveProperty(
+      // Disabled items, not a hidden trigger — #73's Disabled treatment.
+      openRowMenu('a.jpg')
+      expect(screen.getByRole('menuitem', { name: 'Remove from trip' })).toHaveProperty(
         'disabled',
         true,
       )
-      expect(screen.getByRole('button', { name: 'Delete a.jpg permanently' })).toHaveProperty(
+      expect(screen.getByRole('menuitem', { name: 'Delete permanently…' })).toHaveProperty(
         'disabled',
         true,
       )
     })
 
-    it('hides the unlink control alongside the delete control while a row is mid-removal', () => {
+    it('hides both exits along with the row menu while a row is mid-removal', () => {
       const items = orderCairnListItems([row({ id: 'a' })])
 
       render(
@@ -444,7 +461,75 @@ describe('CairnList', () => {
       )
 
       expect(screen.getByText('Removing…')).toBeDefined()
-      expect(screen.queryByRole('button', { name: 'Remove a.jpg from trip' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Row actions for a.jpg' })).toBeNull()
+    })
+  })
+
+  /* #193 — the anatomy itself: the name first and at full contrast, the
+     meta line beneath it, and no `⤴`/`×` left on the row. */
+  describe('#193 row anatomy', () => {
+    it('renders the name above the meta line, in that order', () => {
+      const items = orderCairnListItems([row({ id: 'a' })])
+      const { container } = render(
+        <CairnList
+          items={items}
+          totalCount={1}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={vi.fn()}
+          {...ownedProps()}
+        />,
+      )
+
+      const text = container.querySelector('.cairn-row__text')
+      expect(text).not.toBeNull()
+      const [first, second] = Array.from(text!.children)
+      expect(first.className).toContain('cairn-row__name')
+      expect(first.textContent).toBe('a.jpg')
+      expect(second.className).toContain('cairn-row__meta')
+    })
+
+    it('leaves the meta line exactly what cairns.md specifies', () => {
+      const items = orderCairnListItems([
+        row({ id: 'a', icon: 'campsite', date: '2023-06-13' }),
+        row({ id: 'b', icon: null, date: null, thumbnailDriveFileId: null, originalDriveFileId: null }),
+      ])
+      render(
+        <CairnList
+          items={items}
+          totalCount={2}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={vi.fn()}
+          {...ownedProps()}
+        />,
+      )
+
+      // The date itself is `formatShortDate`'s and therefore locale-driven,
+      // so this pins the clauses either side of it: a date-or-`undated`
+      // first, then exactly what `cairns.md` lists and nothing more — no
+      // time clause, which is Out of Scope and stays that way.
+      expect(screen.getByText(/^.+ · campsite · photo$/)).toBeDefined()
+      expect(screen.getByText('undated · cairn')).toBeDefined()
+    })
+
+    it('leaves no ⤴ or × anywhere on the row', () => {
+      const items = orderCairnListItems([row({ id: 'a' })])
+      render(
+        <CairnList
+          items={items}
+          totalCount={1}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={vi.fn()}
+          onRemoveFromTrip={vi.fn()}
+          {...ownedProps()}
+        />,
+      )
+
+      expect(screen.queryByText('⤴')).toBeNull()
+      expect(screen.queryByText('×')).toBeNull()
+      expect(screen.getByRole('button', { name: 'Row actions for a.jpg' })).toBeDefined()
     })
   })
 })

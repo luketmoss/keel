@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type DragEvent, type RefObject } from 'rea
 import type { ImportedFile } from '../import/types'
 import { TRACK_COLOR_NAMES, TRACK_COLORS, trackColor } from '../map/palette'
 import { formatStatsLine } from '../format/units'
+import { RowMenu } from './RowMenu'
 import './TrackList.css'
 
 interface TrackListProps {
@@ -14,7 +15,8 @@ interface TrackListProps {
   /** #110's second exit: returns the track to the top level with its data
       intact, rather than destroying it. Two named items, never one action
       with a second step — getting rid of something must stay one click
-      away from everywhere it appears. Absent outside a trip. */
+      away from everywhere it appears. Absent outside a trip. #193 moved
+      both items into the row's `⋮`. */
   onRemoveFromTrip?: (id: string) => void
   /** #77 — the single confirm slot, shared with `CairnList` by the parent
       (design doc: "tracks and photos sharing one slot"). `null` when no row
@@ -365,22 +367,32 @@ function TrackRow({
           <span className="track-row__swatch" style={{ backgroundColor: color }} />
         )}
 
-        {editingName ? (
-          <NameInput initial={file.name} onCommit={commitName} onCancel={() => setEditingName(false)} />
-        ) : (
-          <span
-            className={`track-row__name${onRename && !disabled ? ' track-row__name--editable' : ''}${
-              savedField === 'name' ? ' track-row__field--saved' : ''
-            }${disabled && onRename ? ' track-row__name--disabled' : ''}`}
-            title={file.name}
-            onClick={onRename && !disabled ? () => setEditingName(true) : undefined}
-          >
-            {file.name}
-            {file.tracks.length > 1 && (
-              <span className="track-row__count"> {file.tracks.length} tracks</span>
-            )}
-          </span>
-        )}
+        {/* #193 — the name on its own line with the stats line beneath it,
+            the anatomy `shell-and-content-model.md` specifies and the two
+            lists inside a trip were the last surfaces not to use. The
+            controls that flanked the name cost it all but ~68px of a
+            380px column; the meta line now gets the row's own width. */}
+        <div className="track-row__text">
+          {editingName ? (
+            <NameInput initial={file.name} onCommit={commitName} onCancel={() => setEditingName(false)} />
+          ) : (
+            <span
+              className={`track-row__name${onRename && !disabled ? ' track-row__name--editable' : ''}${
+                savedField === 'name' ? ' track-row__field--saved' : ''
+              }${disabled && onRename ? ' track-row__name--disabled' : ''}`}
+              title={file.name}
+              onClick={onRename && !disabled ? () => setEditingName(true) : undefined}
+            >
+              {file.name}
+              {file.tracks.length > 1 && (
+                <span className="track-row__count"> {file.tracks.length} tracks</span>
+              )}
+            </span>
+          )}
+          {/* A multi-track file has no unambiguous stats line, and no empty
+              second line is drawn to keep row heights equal. */}
+          {statsLine && <p className="track-row__stats">{statsLine}</p>}
+        </div>
         <button
           type="button"
           className="track-row__visibility"
@@ -393,33 +405,32 @@ function TrackRow({
         {removing ? (
           <span className="track-row__removing">Removing…</span>
         ) : (
-          <>
-            {onRemoveFromTrip && (
-              /* No ellipsis and no confirm: it is reversible by adding it
-                 back, which is exactly what makes it the other exit. */
-              <button
-                type="button"
-                className="track-row__unlink"
-                aria-label={`Remove ${file.name} from trip`}
-                disabled={disableRemove}
-                onClick={() => onRemoveFromTrip(file.id)}
-              >
-                ⤴
-              </button>
-            )}
-            <button
-              type="button"
-              className="track-row__remove"
-              aria-label={`Delete ${file.name} permanently`}
-              disabled={disableRemove}
-              onClick={onStartConfirm}
-            >
-              ×
-            </button>
-          </>
+          /* #193 — the `⤴` and `×` become named items behind the one `⋮`.
+             `Remove from trip` is reversible by adding it back, which is
+             what makes it the other exit; `Delete permanently…` keeps
+             #77's inline confirm, and the ellipsis is what says so. */
+          <RowMenu
+            label={`Row actions for ${file.name}`}
+            actions={[
+              ...(onRemoveFromTrip
+                ? [
+                    {
+                      label: 'Remove from trip',
+                      disabled: disableRemove,
+                      onSelect: () => onRemoveFromTrip(file.id),
+                    },
+                  ]
+                : []),
+              {
+                label: 'Delete permanently…',
+                danger: true,
+                disabled: disableRemove,
+                onSelect: onStartConfirm,
+              },
+            ]}
+          />
         )}
       </div>
-      {statsLine && <p className="track-row__stats">{statsLine}</p>}
       {removeError && <p className="track-row__error">{removeError}</p>}
     </li>
   )

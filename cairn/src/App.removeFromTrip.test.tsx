@@ -148,6 +148,12 @@ afterEach(() => {
   delete (window as unknown as { google?: unknown }).google
 })
 
+/* #193 — the exit lives behind the row's `⋮` now, so reaching it is two
+   steps. Same helper shape `TripsPanel.test.tsx` already uses. */
+function openRowMenu(name: string) {
+  fireEvent.click(screen.getByRole('button', { name: `Row actions for ${name}` }))
+}
+
 describe('App — Remove from trip carries the name out (#150)', () => {
   it('gives the loose track the name the user typed, not the one inside the KML', async () => {
     const fetchSpy = mockGoogleSignIn()
@@ -157,8 +163,12 @@ describe('App — Remove from trip carries the name out (#150)', () => {
     )
 
     await renderTripFace('t-1')
+    // Opened outside the `act` below: nested inside it, the menu's own
+    // state update would not flush until the callback returned, so the
+    // item would not exist yet to be clicked.
+    openRowMenu('Snowdon ridge')
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Remove Snowdon ridge from trip' }))
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Remove from trip' }))
     })
 
     expect(looseIndex()).toMatchObject([
@@ -175,8 +185,12 @@ describe('App — Remove from trip carries the name out (#150)', () => {
     useTripImport.mockReturnValue(baseTripImport({ tracks: [tripTrack()] }))
 
     await renderTripFace('t-2')
+    // Opened outside the `act` below: nested inside it, the menu's own
+    // state update would not flush until the callback returned, so the
+    // item would not exist yet to be clicked.
+    openRowMenu('day-1.kml')
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Remove day-1.kml from trip' }))
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Remove from trip' }))
     })
 
     expect(looseIndex()).toMatchObject([{ kind: 'track', name: 'Day one' }])
@@ -193,8 +207,12 @@ describe('App — Remove from trip carries the name out (#150)', () => {
     )
 
     await renderTripFace('t-3')
+    // Opened outside the `act` below: nested inside it, the menu's own
+    // state update would not flush until the callback returned, so the
+    // item would not exist yet to be clicked.
+    openRowMenu('day-1.kml')
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Remove day-1.kml from trip' }))
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Remove from trip' }))
     })
 
     expect(looseIndex()).toMatchObject([{ kind: 'track', name: 'day-1' }])

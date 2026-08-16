@@ -4,9 +4,11 @@
 }
 
 /* Hidden at rest, revealed by hovering the row or focusing the trigger.
-   `visibility` rather than `display` so the trigger stays focusable and the
-   row's layout does not shift when it appears. The row sets
-   `--row-menu-visibility` on hover; the trigger overrides it on focus. */
+   `opacity` rather than `visibility` or `display` (#193): all three reserve
+   the trigger's space, but the latter two take it out of the tab order, so
+   the focus rule below could never fire and a keyboard user could not reach
+   the menu at all. The row sets `--row-menu-opacity` on hover; the trigger
+   overrides it on focus. */
 .row-menu__trigger {
   display: inline-flex;
   align-items: center;
@@ -20,13 +22,16 @@
   font-size: var(--text-lg);
   line-height: 1;
   cursor: pointer;
-  visibility: var(--row-menu-visibility, hidden);
-  transition: color var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease);
+  opacity: var(--row-menu-opacity, 0);
+  transition:
+    opacity var(--motion-fast) var(--ease),
+    color var(--motion-fast) var(--ease),
+    background var(--motion-fast) var(--ease);
 }
 
 .row-menu__trigger:focus-visible,
 .row-menu--open .row-menu__trigger {
-  visibility: visible;
+  opacity: 1;
 }
 
 .row-menu__trigger:hover {
@@ -84,9 +89,10 @@
   cursor: default;
 }
 
-/* Touch has no hover to reveal it, so the trigger is always visible there. */
+/* Touch has no hover to reveal it, so the trigger is always visible there.
+   A control revealed by a gesture the device cannot make is not a control. */
 @media (hover: none) {
   .row-menu__trigger {
-    visibility: visible;
+    opacity: 1;
   }
 }

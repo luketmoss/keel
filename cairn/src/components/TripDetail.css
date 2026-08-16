@@ -9,10 +9,16 @@
   flex-direction: column;
 }
 
+/* #193 — vertical padding only. Every child already carries its own
+   `--space-4` horizontally, so the face was paying it twice and the two
+   lists inside a trip were 32px narrower than the arithmetic the row
+   anatomy was sized against. With one of the two removed, a row's content
+   sits `--space-4` from the panel edge, exactly where `TripsPanel`'s rows
+   already sit, and the track name gets back the width it was costed. */
 .trip-detail__body {
   flex: 1;
   min-height: 0;
-  padding: var(--space-4);
+  padding: var(--space-4) 0;
   overflow-y: auto;
 }
 

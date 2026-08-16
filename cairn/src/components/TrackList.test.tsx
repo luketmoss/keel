@@ -21,6 +21,12 @@ function importedFile(overrides: Partial<ImportedFile> = {}): ImportedFile {
   }
 }
 
+/* #193 — both exits live behind the row's `⋮` now, so reaching either one
+   is two steps. Same helper shape `TripsPanel.test.tsx` already uses. */
+function openRowMenu(name: string) {
+  fireEvent.click(screen.getByRole('button', { name: `Row actions for ${name}` }))
+}
+
 describe('TrackList', () => {
   it('shows an empty state pointing at the import control when nothing is imported', () => {
     render(<TrackList files={[]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />)
@@ -172,13 +178,14 @@ describe('TrackList', () => {
     expect(screen.getByRole('button', { name: 'Show trip.kml' })).toBeDefined()
   })
 
-  it('removes a file via an accessible button', () => {
+  it('removes a file via a named action in the row menu', () => {
     const onRemove = vi.fn()
     render(
       <TrackList files={[importedFile()]} onToggleVisibility={vi.fn()} onRemove={onRemove} />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete trip.kml permanently' }))
+    openRowMenu('trip.kml')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete permanently…' }))
     expect(onRemove).toHaveBeenCalledWith('f1')
   })
 
@@ -365,7 +372,8 @@ describe('TrackList', () => {
         />,
       )
 
-      fireEvent.click(screen.getByRole('button', { name: 'Delete trip.kml permanently' }))
+      openRowMenu('trip.kml')
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Delete permanently…' }))
       expect(onStartConfirm).toHaveBeenCalledWith('f1')
       expect(onRemove).not.toHaveBeenCalled()
     })
@@ -420,7 +428,7 @@ describe('TrackList', () => {
       )
 
       expect(screen.getByText('Removing…')).toBeDefined()
-      expect(screen.queryByRole('button', { name: 'Delete trip.kml permanently' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Row actions for trip.kml' })).toBeNull()
     })
 
     it('shows a failure line beneath a row whose removal failed, without removing it', () => {
@@ -447,7 +455,12 @@ describe('TrackList', () => {
         />,
       )
 
-      expect(screen.getByRole('button', { name: 'Delete trip.kml permanently' })).toHaveProperty('disabled', true)
+      // #73's Disabled treatment on the menu item, not a hidden trigger.
+      openRowMenu('trip.kml')
+      expect(screen.getByRole('menuitem', { name: 'Delete permanently…' })).toHaveProperty(
+        'disabled',
+        true,
+      )
     })
   })
 
@@ -505,15 +518,17 @@ describe('TrackList', () => {
     // Visibility and remove are untouched — neither is Drive-backed.
     fireEvent.click(screen.getByRole('button', { name: 'Hide trip.kml' }))
     expect(onToggleVisibility).toHaveBeenCalledWith('f1')
-    fireEvent.click(screen.getByRole('button', { name: 'Delete trip.kml permanently' }))
+    openRowMenu('trip.kml')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete permanently…' }))
     expect(onRemove).toHaveBeenCalledWith('f1')
   })
 
   describe('#110 remove from trip, beside delete', () => {
-    it('offers no unlink control when the list is not inside a trip', () => {
+    it('offers no unlink action when the list is not inside a trip', () => {
       render(<TrackList files={[importedFile()]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />)
 
-      expect(screen.queryByRole('button', { name: /from trip/ })).toBeNull()
+      openRowMenu('trip.kml')
+      expect(screen.queryByRole('menuitem', { name: /from trip/ })).toBeNull()
     })
 
     it('returns the track to the top level without a confirm', () => {
@@ -528,7 +543,8 @@ describe('TrackList', () => {
         />,
       )
 
-      fireEvent.click(screen.getByRole('button', { name: 'Remove trip.kml from trip' }))
+      openRowMenu('trip.kml')
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Remove from trip' }))
 
       // No ellipsis, no confirm — it is reversible by adding it back, which
       // is exactly what makes it the other exit.
@@ -537,7 +553,7 @@ describe('TrackList', () => {
       expect(screen.queryByText('Delete "trip.kml"?')).toBeNull()
     })
 
-    it('keeps deleting one click away, as its own named control', () => {
+    it('keeps deleting one click away, as its own named action', () => {
       render(
         <TrackList
           files={[importedFile()]}
@@ -548,8 +564,9 @@ describe('TrackList', () => {
       )
 
       // Two exits, never one action with a second step.
-      expect(screen.getByRole('button', { name: 'Delete trip.kml permanently' })).toBeDefined()
-      expect(screen.getByRole('button', { name: 'Remove trip.kml from trip' })).toBeDefined()
+      openRowMenu('trip.kml')
+      expect(screen.getByRole('menuitem', { name: 'Delete permanently…' })).toBeDefined()
+      expect(screen.getByRole('menuitem', { name: 'Remove from trip' })).toBeDefined()
     })
 
     it('disables both exits while disconnected', () => {
@@ -563,14 +580,72 @@ describe('TrackList', () => {
         />,
       )
 
-      expect(screen.getByRole('button', { name: 'Remove trip.kml from trip' })).toHaveProperty(
+      // Disabled items, not a hidden trigger — #73's Disabled treatment.
+      openRowMenu('trip.kml')
+      expect(screen.getByRole('menuitem', { name: 'Remove from trip' })).toHaveProperty(
         'disabled',
         true,
       )
-      expect(screen.getByRole('button', { name: 'Delete trip.kml permanently' })).toHaveProperty(
+      expect(screen.getByRole('menuitem', { name: 'Delete permanently…' })).toHaveProperty(
         'disabled',
         true,
       )
+    })
+  })
+
+  /* #193 — the anatomy itself: the name on its own line at full contrast,
+     the meta line beneath it, and no `⤴`/`×` left on the row. */
+  describe('#193 row anatomy', () => {
+    it('renders the name and the stats line as one block, name first', () => {
+      const { container } = render(
+        <TrackList
+          files={[
+            importedFile({
+              trackStats: [
+                { distanceMeters: 14200, durationSeconds: undefined, elevationGainMeters: 690 },
+              ],
+            }),
+          ]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+        />,
+      )
+
+      const text = container.querySelector('.track-row__text')
+      expect(text).not.toBeNull()
+      const [first, second] = Array.from(text!.children)
+      expect(first.className).toContain('track-row__name')
+      expect(second.className).toContain('track-row__stats')
+    })
+
+    it('leaves no ⤴ or × anywhere on the row', () => {
+      render(
+        <TrackList
+          files={[importedFile()]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          onRemoveFromTrip={vi.fn()}
+        />,
+      )
+
+      expect(screen.queryByText('⤴')).toBeNull()
+      expect(screen.queryByText('×')).toBeNull()
+      expect(screen.getByRole('button', { name: 'Row actions for trip.kml' })).toBeDefined()
+    })
+
+    it('keeps the visibility control on the row rather than in the menu', () => {
+      const onToggleVisibility = vi.fn()
+      render(
+        <TrackList
+          files={[importedFile()]}
+          onToggleVisibility={onToggleVisibility}
+          onRemove={vi.fn()}
+          onRemoveFromTrip={vi.fn()}
+        />,
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'Hide trip.kml' }))
+      expect(onToggleVisibility).toHaveBeenCalledWith('f1')
     })
   })
 })

@@ -5,6 +5,7 @@ import { cairnRowMetaLine, type CairnListItem, type CairnListRow } from '../phot
 import { CairnMarker } from './CairnMarker'
 import { CairnFacetChips } from './CairnFacetChips'
 import type { CairnFacet } from '../store/cairnRules'
+import { RowMenu } from './RowMenu'
 import './CairnList.css'
 
 /** #192's matched-nothing detail line. Naming the total answers *is
@@ -37,14 +38,14 @@ interface CairnListProps {
       selects. */
   onOpenRow: (cairnId: string) => void
   /** #77: performs the actual removal (trash originals + rewrite the index)
-      once the row's confirm has been accepted — the `×` control itself
-      only starts the confirm, via `onStartConfirm` below. */
+      once the row's confirm has been accepted — `Delete permanently…` in
+      the row's `⋮` only starts the confirm, via `onStartConfirm` below. */
   onRemove: (id: string) => void
   /** #132: the reversible exit, beside `onRemove`'s destructive one — no
       confirm, since it's undone by adding the photo back. `undefined` when
       the caller has nowhere to put a detached photo (there always is one
       today; the type stays optional to match `TrackList.onRemoveFromTrip`'s
-      shape). */
+      shape). #193 moved both items into the row's `⋮`. */
   onRemoveFromTrip?: (id: string) => void
   /** #77 — the single confirm slot, shared with `TrackList` by the parent
       (design doc: "tracks and photos sharing one slot"). `null` when no row
@@ -263,38 +264,45 @@ function CairnRow({
               small
             />
           </span>
-          <span className="cairn-row__meta">{cairnRowMetaLine(row)}</span>
-          <span className="cairn-row__name" title={row.name}>
-            {row.name}
+          {/* #193 — the name first and in full contrast, the meta line
+              beneath it. It used to render inline *before* the name, so the
+              eye reached the date before a name already cut off at eight
+              characters. `cairnRowMetaLine` is unchanged: `cairns.md` pins
+              its clauses and this issue only moves where it draws. */}
+          <span className="cairn-row__text">
+            <span className="cairn-row__name" title={row.name}>
+              {row.name}
+            </span>
+            <span className="cairn-row__meta">{cairnRowMetaLine(row)}</span>
           </span>
         </button>
         {removing ? (
           <span className="cairn-row__removing">Removing…</span>
         ) : (
-          <>
-            {onRemoveFromTrip && (
-              /* #132: no ellipsis and no confirm — reversible by adding it
-                 back, which is exactly what makes it the other exit. */
-              <button
-                type="button"
-                className="cairn-row__unlink"
-                aria-label={`Remove ${row.name} from trip`}
-                disabled={disableRemove}
-                onClick={() => onRemoveFromTrip(row.id)}
-              >
-                ⤴
-              </button>
-            )}
-            <button
-              type="button"
-              className="cairn-row__remove"
-              aria-label={`Delete ${row.name} permanently`}
-              disabled={disableRemove}
-              onClick={onStartConfirm}
-            >
-              ×
-            </button>
-          </>
+          /* #193 — the `⤴` and `×` become named items behind the one `⋮`.
+             `Remove from trip` is reversible by adding it back, which is
+             what makes it the other exit; `Delete permanently…` keeps
+             #77's inline confirm, and the ellipsis is what says so. */
+          <RowMenu
+            label={`Row actions for ${row.name}`}
+            actions={[
+              ...(onRemoveFromTrip
+                ? [
+                    {
+                      label: 'Remove from trip',
+                      disabled: disableRemove,
+                      onSelect: () => onRemoveFromTrip(row.id),
+                    },
+                  ]
+                : []),
+              {
+                label: 'Delete permanently…',
+                danger: true,
+                disabled: disableRemove,
+                onSelect: onStartConfirm,
+              },
+            ]}
+          />
         )}
       </div>
       {removeError && <p className="cairn-row__error">{removeError}</p>}

@@ -148,6 +148,13 @@ beforeEach(() => {
   acquire.mockReset().mockResolvedValue({ url: 'blob:fake', release: vi.fn() })
 })
 
+/* #193 — a cairn row's exits live behind its `⋮` now, so reaching either
+   one is two steps. The lightbox's own `Remove from trip` is a real button
+   and is unaffected: menu items carry role `menuitem`, not `button`. */
+function openRowMenu(name: string) {
+  fireEvent.click(screen.getByRole('button', { name: `Row actions for ${name}` }))
+}
+
 describe('TripDetail — #55 photo list and lightbox', () => {
   it('shows the photo section empty state pointing at the import control when the trip has no cairns (criterion 13)', () => {
     useCairnImport.mockReturnValue(baseCairnImport({ cairns: [] }))
@@ -253,7 +260,8 @@ describe('TripDetail — #55 photo list and lightbox', () => {
 
       renderTrip()
 
-      fireEvent.click(screen.getByRole('button', { name: 'Delete sapporo.jpg permanently' }))
+      openRowMenu('sapporo.jpg')
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Delete permanently…' }))
       expect(removeCairn).not.toHaveBeenCalled()
       expect(screen.getByText('Remove "sapporo.jpg"?')).toBeDefined()
 
@@ -286,7 +294,8 @@ describe('TripDetail — #55 photo list and lightbox', () => {
 
       renderTrip({ onRemovePhotoFromTrip })
 
-      fireEvent.click(screen.getByRole('button', { name: 'Remove sapporo.jpg from trip' }))
+      openRowMenu('sapporo.jpg')
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Remove from trip' }))
 
       await waitFor(() => expect(onRemovePhotoFromTrip).toHaveBeenCalledWith(cairnRecord()))
       expect(forgetCairn).toHaveBeenCalledWith('p1')
@@ -301,17 +310,19 @@ describe('TripDetail — #55 photo list and lightbox', () => {
 
       renderTrip({ onRemovePhotoFromTrip })
 
-      fireEvent.click(screen.getByRole('button', { name: 'Remove sapporo.jpg from trip' }))
+      openRowMenu('sapporo.jpg')
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Remove from trip' }))
 
       await waitFor(() => expect(screen.getByText("Couldn't move — still on the map.")).toBeDefined())
       expect(forgetCairn).not.toHaveBeenCalled()
       expect(screen.getByText('sapporo.jpg')).toBeDefined()
     })
 
-    it('offers no unlink control when the shell has no handler for it', () => {
+    it('offers no unlink action when the shell has no handler for it', () => {
       renderTrip()
 
-      expect(screen.queryByRole('button', { name: /from trip/ })).toBeNull()
+      openRowMenu('sapporo.jpg')
+      expect(screen.queryByRole('menuitem', { name: /from trip/ })).toBeNull()
     })
   })
 })

@@ -532,4 +532,73 @@ describe('CairnList', () => {
       expect(screen.getByRole('button', { name: 'Row actions for a.jpg' })).toBeDefined()
     })
   })
+
+  /* #199 — the cairn row's own icon-only controls. Same assertion as
+     `TrackList`'s: the tooltip is the accessible name, character for
+     character, so the two cannot drift apart. */
+  describe('#199 — icon-only controls carry a tooltip matching their label', () => {
+    function expectTooltipMatchesLabel(el: HTMLElement, expected: string) {
+      expect(el.getAttribute('aria-label')).toBe(expected)
+      expect(el.getAttribute('title')).toBe(el.getAttribute('aria-label'))
+    }
+
+    it("names the cairn on the row's ⋮", () => {
+      const items = orderCairnListItems([row({ id: 'a', name: 'Notch Mountain' })])
+      render(
+        <CairnList
+          items={items}
+          totalCount={1}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={vi.fn()}
+          onRemoveFromTrip={vi.fn()}
+          {...ownedProps()}
+        />,
+      )
+
+      expectTooltipMatchesLabel(
+        screen.getByRole('button', { name: 'Row actions for Notch Mountain' }),
+        'Row actions for Notch Mountain',
+      )
+    })
+
+    it("the unattached group's eye names its action and follows its state", () => {
+      const items = orderCairnListItems([row({ id: 'a' })], new Set(['a']))
+      const { rerender } = render(
+        <CairnList
+          items={items}
+          totalCount={1}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={vi.fn()}
+          unattachedVisible
+          onToggleUnattached={vi.fn()}
+          {...ownedProps()}
+        />,
+      )
+
+      expectTooltipMatchesLabel(
+        screen.getByRole('button', { name: 'Hide unattached cairns' }),
+        'Hide unattached cairns',
+      )
+
+      rerender(
+        <CairnList
+          items={items}
+          totalCount={1}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={vi.fn()}
+          unattachedVisible={false}
+          onToggleUnattached={vi.fn()}
+          {...ownedProps()}
+        />,
+      )
+
+      expectTooltipMatchesLabel(
+        screen.getByRole('button', { name: 'Show unattached cairns' }),
+        'Show unattached cairns',
+      )
+    })
+  })
 })

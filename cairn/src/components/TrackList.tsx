@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type DragEvent, type RefObject } from 'rea
 import type { ImportedFile } from '../import/types'
 import { TRACK_COLOR_NAMES, TRACK_COLORS, trackColor } from '../map/palette'
 import { formatStatsLine } from '../format/units'
+import { iconLabel } from './iconLabel'
 import { RowMenu } from './RowMenu'
 import './TrackList.css'
 
@@ -335,7 +336,7 @@ function TrackRow({
             draggable={draggable}
             onDragStart={draggable ? onDragStart : undefined}
             onDragEnd={onDragEnd}
-            aria-label={`Reorder ${file.name}`}
+            {...iconLabel(`Reorder ${file.name}`)}
           >
             ⠿
           </span>
@@ -348,7 +349,7 @@ function TrackRow({
             <button
               type="button"
               className={`track-row__swatch-button${savedField === 'color' ? ' track-row__field--saved' : ''}`}
-              aria-label={`Change colour for ${file.name}`}
+              {...iconLabel(`Change colour for ${file.name}`)}
               disabled={disabled}
               onClick={() => setColorPickerOpen((open) => !open)}
             >
@@ -396,7 +397,7 @@ function TrackRow({
         <button
           type="button"
           className="track-row__visibility"
-          aria-label={file.visible ? `Hide ${file.name}` : `Show ${file.name}`}
+          {...iconLabel(file.visible ? `Hide ${file.name}` : `Show ${file.name}`)}
           disabled={removing}
           onClick={() => onToggleVisibility(file.id)}
         >

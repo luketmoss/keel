@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { iconLabel } from './iconLabel'
 import './RowMenu.css'
 
 export interface RowMenuAction {
@@ -53,7 +54,7 @@ export function RowMenu({ label, actions }: { label: string; actions: RowMenuAct
         type="button"
         ref={triggerRef}
         className="row-menu__trigger"
-        aria-label={label}
+        {...iconLabel(label)}
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={(event) => {

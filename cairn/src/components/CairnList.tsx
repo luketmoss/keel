@@ -5,6 +5,7 @@ import { cairnRowMetaLine, type CairnListItem, type CairnListRow } from '../phot
 import { CairnMarker } from './CairnMarker'
 import { CairnFacetChips } from './CairnFacetChips'
 import type { CairnFacet } from '../store/cairnRules'
+import { iconLabel } from './iconLabel'
 import { RowMenu } from './RowMenu'
 import './CairnList.css'
 
@@ -170,7 +171,7 @@ export function CairnList({
                   <button
                     type="button"
                     className="cairn-list__divider-visibility"
-                    aria-label={unattachedVisible ? 'Hide unattached cairns' : 'Show unattached cairns'}
+                    {...iconLabel(unattachedVisible ? 'Hide unattached cairns' : 'Show unattached cairns')}
                     onClick={onToggleUnattached}
                   >
                     {unattachedVisible ? '👁' : '🚫'}

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { cairnRowMetaLine, type CairnListRow } from '../photo/cairnListGroups'
 import {
   ADD_DESCRIPTION_PLACEHOLDER,
@@ -110,6 +110,30 @@ export function Lightbox({
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const text = useEditableCairnText(onSaveText)
 
+  /* #197 — full bleed is a mode of this component, not a fourth surface: it
+     shows the same cairn, keeps the same arrow navigation, and returns to
+     the face it came from. Keeping it a class on the same dialog is also
+     what makes the `<img>` the same node in both, so entering the mode
+     never re-fetches the original or reflows around it. */
+  const [fullBleed, setFullBleed] = useState(false)
+
+  /* Only a cairn with an image has the mode. An icon-only cairn's slot is
+     not a button and cannot be entered by any means. */
+  const hasImage = row.originalDriveFileId !== null
+
+  /* Two ways the mode becomes unreachable while it is open, both of them
+     states rather than events, so they are reconciled here rather than
+     patched into each caller:
+
+     - arrowing to a cairn with no image — a mode whose whole content is
+       absent is not a state to sit in, and the list mixes photo cairns
+       with icon-only ones, so this is reachable rather than theoretical;
+     - a photo dropped onto this cairn — the upload's progress belongs on
+       the detail face, where #157 put it. */
+  useEffect(() => {
+    if (fullBleed && (!hasImage || attaching)) setFullBleed(false)
+  }, [fullBleed, hasImage, attaching])
+
   const index = rows.findIndex((candidate) => candidate.id === row.id)
   const prevRow = index > 0 ? rows[index - 1] : undefined
   const nextRow = index >= 0 && index < rows.length - 1 ? rows[index + 1] : undefined
@@ -135,7 +159,11 @@ export function Lightbox({
       if (isTextFieldTarget(event.target)) return
       if (event.key === 'Escape') {
         event.preventDefault()
-        onClose()
+        /* #197 — innermost first. In full bleed Escape returns to the
+           detail face; on the detail face it closes. Two Escapes from full
+           bleed close everything, and neither one skips a level. */
+        if (fullBleed) setFullBleed(false)
+        else onClose()
       } else if (event.key === 'ArrowLeft') {
         if (prevRow) onNavigate(prevRow.id)
       } else if (event.key === 'ArrowRight') {
@@ -144,7 +172,7 @@ export function Lightbox({
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [onClose, onNavigate, prevRow, nextRow])
+  }, [onClose, onNavigate, prevRow, nextRow, fullBleed])
 
   // Move focus in on open (criterion 9's other half) — the close button,
   // per the design doc's focus-management note.
@@ -170,10 +198,23 @@ export function Lightbox({
     if (event.key !== 'Tab') return
     // #196: the name input and the description textarea join the trap's
     // set. Without them, Tab out of a field mid-edit escapes the dialog.
-    const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
+    const all = dialogRef.current?.querySelectorAll<HTMLElement>(
       'button:not(:disabled), input, textarea',
     )
-    if (!focusable || focusable.length === 0) return
+    if (!all || all.length === 0) return
+    /* #197: in full bleed the detail column is `display: none`, but its
+       controls are still in the DOM and still match the selector above.
+       Left in the set they take the `last` slot, and a `display: none`
+       element cannot be focused — so Shift+Tab off the first control goes
+       nowhere and Tab off the last *visible* one never matches `last`,
+       which walks focus straight out of an `aria-modal` dialog. Excluded
+       by container rather than by measuring visibility, because
+       `getClientRects()` is empty for everything under jsdom and would
+       disable the trap in the suite instead of testing it. */
+    const focusable = fullBleed
+      ? [...all].filter((element) => !element.closest('.lightbox__detail'))
+      : [...all]
+    if (focusable.length === 0) return
     const first = focusable[0]
     const last = focusable[focusable.length - 1]
     if (event.shiftKey && document.activeElement === first) {
@@ -189,7 +230,7 @@ export function Lightbox({
     <div className="lightbox" data-testid="lightbox">
       <div
         ref={dialogRef}
-        className="lightbox__dialog"
+        className={`lightbox__dialog${fullBleed ? ' lightbox__dialog--full-bleed' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-label={row.name}
@@ -216,117 +257,149 @@ export function Lightbox({
         >
           ›
         </button>
-        <div className="lightbox__frame">
-          {attaching ? (
-            <div className="lightbox__uploading" aria-busy="true">
-              {(original.url ?? thumbnail.url) && (
-                <img
-                  className="lightbox__image lightbox__image--replacing"
-                  src={(original.url ?? thumbnail.url) as string}
-                  alt={row.name}
-                />
+        {/* #197 — the image column. Absent entirely for an icon-only cairn,
+            which leaves the detail column taking the dialog at
+            `--panel-width`; still present while a photo uploads onto a
+            cairn that has none yet, since #157's slot is what shows the
+            progress. */}
+        {(hasImage || attaching) && (
+          <div className="lightbox__media">
+            {/* The photo is a button only when there is a photo: it is what
+                enters and leaves full bleed. `cursor: zoom-in`/`zoom-out`
+                is the affordance — a `View full size` button beside a
+                photograph is a caption by another name. */}
+            <button
+              type="button"
+              className="lightbox__frame"
+              aria-label={fullBleed ? 'Exit full size' : 'View full size'}
+              disabled={!hasImage || attaching}
+              onClick={() => setFullBleed((wasFullBleed) => !wasFullBleed)}
+            >
+              {attaching ? (
+                /* `span`, not `div`: this sits inside the frame's button
+                   now, and a button's content model is phrasing content. */
+                <span className="lightbox__uploading" aria-busy="true">
+                  {(original.url ?? thumbnail.url) && (
+                    <img
+                      className="lightbox__image lightbox__image--replacing"
+                      src={(original.url ?? thumbnail.url) as string}
+                      alt={row.name}
+                    />
+                  )}
+                  <span className="lightbox__uploading-label">uploading…</span>
+                </span>
+              ) : original.url ? (
+                <img className="lightbox__image" src={original.url} alt={row.name} />
+              ) : (
+                <>
+                  {thumbnail.url && (
+                    <img className="lightbox__placeholder" src={thumbnail.url} alt="" />
+                  )}
+                  {original.failed && (
+                    <span className="lightbox__error">Couldn&apos;t load this photo.</span>
+                  )}
+                </>
               )}
-              <span className="lightbox__uploading-label">uploading…</span>
-            </div>
-          ) : original.url ? (
-            <img className="lightbox__image" src={original.url} alt={row.name} />
+            </button>
+          </div>
+        )}
+        {/* #197 — everything that is not the photograph. In full bleed this
+            is hidden: no name, no meta, no description. They are one Escape
+            away, and a caption over a photograph is the thing that mode
+            exists to get rid of. The dialog's `aria-label` still carries the
+            cairn's name, so the mode is not anonymous to a screen reader. */}
+        <div className="lightbox__detail">
+          {/* #157 — the failure line for a photo dropped onto this cairn.
+              `aria-live="polite"` is the only announcement a drop's outcome
+              gets: no toast, per the design note's "the marker changes, and
+              that is the confirmation" stance. */}
+          {attachError && (
+            <p className="lightbox__attach-error" aria-live="polite">
+              {attachError}
+            </p>
+          )}
+          {/* #196 — the name and the description become click-to-edit,
+              copying `TripMetadataHeader`'s pattern rather than inventing a
+              second one. The meta line between them stays static: it is
+              derived, and each part of it has its own owner — the icon grid
+              below, the image by dropping a photo, the date by nothing yet. */}
+          {text.editing === 'name' ? (
+            <NameInput
+              initial={row.name}
+              className="lightbox__name-input"
+              ariaLabel="Cairn name"
+              selectOnFocus
+              onCommit={(name) => {
+                // An empty commit is an aborted edit — a cairn always has a
+                // name, so there is no state for an empty one to mean.
+                if (name.trim().length === 0) {
+                  text.cancelEditing()
+                  return
+                }
+                void text.commit('name', { name })
+              }}
+              onCancel={text.cancelEditing}
+            />
           ) : (
-            <>
-              {thumbnail.url && <img className="lightbox__placeholder" src={thumbnail.url} alt="" />}
-              {original.failed && <p className="lightbox__error">Couldn't load this photo.</p>}
-            </>
+            <h2
+              className={`lightbox__name${text.editable ? ' lightbox__name--editable' : ''}${
+                text.savedField === 'name' ? ' lightbox__field--saved' : ''
+              }`}
+              title={row.name}
+              onClick={() => text.startEditing('name')}
+            >
+              {row.name}
+            </h2>
+          )}
+          {text.errorFor('name') && <p className="lightbox__field-error">{text.errorFor('name')}</p>}
+          <p className="lightbox__meta">{cairnRowMetaLine(row)}</p>
+          {text.editing === 'description' ? (
+            <DescriptionInput
+              initial={description}
+              className="description-input lightbox__description-input"
+              onCommit={(value) => void text.commit('description', { description: value })}
+              onCancel={text.cancelEditing}
+            />
+          ) : (
+            <p
+              className={`lightbox__description${description ? '' : ' lightbox__description--empty'}${
+                text.editable ? ' lightbox__description--editable' : ''
+              }${text.savedField === 'description' ? ' lightbox__field--saved' : ''}`}
+              onClick={() => text.startEditing('description')}
+            >
+              {description || ADD_DESCRIPTION_PLACEHOLDER}
+            </p>
+          )}
+          {text.errorFor('description') && (
+            <p className="lightbox__field-error">{text.errorFor('description')}</p>
+          )}
+          <p className="lightbox__position">{positionSourceSentence(row.source)}</p>
+          {/* #158 — the drag's failure line, `aria-live="polite"` for the same
+              reason #157's attach failure already is: a drop's outcome is
+              otherwise announced by nothing. */}
+          {moveError && (
+            <p className="lightbox__move-error" aria-live="polite">
+              {moveError}
+            </p>
+          )}
+          {signedOut && <p className="lightbox__signed-out">{SIGNED_OUT_MOVE_MESSAGE}</p>}
+          {/* #156 — the same grid the loose face and the create face show,
+              under the same label. Retyping a photo as a campsite is the case
+              this exists for: the marker stops being a thumbnail and becomes
+              a pin with a camera badge, and the row's glyph follows it. */}
+          <span className="lightbox__field-label">What is this place</span>
+          <IconPicker
+            label="What is this place"
+            value={row.icon}
+            onChange={(icon) => onSetIcon?.(icon)}
+            disabled={!onSetIcon}
+          />
+          {onRemoveFromTrip && (
+            <button type="button" className="lightbox__remove-from-trip" onClick={onRemoveFromTrip}>
+              Remove from trip
+            </button>
           )}
         </div>
-        {/* #157 — the failure line for a photo dropped onto this cairn.
-            `aria-live="polite"` is the only announcement a drop's outcome
-            gets: no toast, per the design note's "the marker changes, and
-            that is the confirmation" stance. */}
-        {attachError && (
-          <p className="lightbox__attach-error" aria-live="polite">
-            {attachError}
-          </p>
-        )}
-        {/* #196 — the name and the description become click-to-edit,
-            copying `TripMetadataHeader`'s pattern rather than inventing a
-            second one. The meta line between them stays static: it is
-            derived, and each part of it has its own owner — the icon grid
-            below, the image by dropping a photo, the date by nothing yet. */}
-        {text.editing === 'name' ? (
-          <NameInput
-            initial={row.name}
-            className="lightbox__name-input"
-            ariaLabel="Cairn name"
-            selectOnFocus
-            onCommit={(name) => {
-              // An empty commit is an aborted edit — a cairn always has a
-              // name, so there is no state for an empty one to mean.
-              if (name.trim().length === 0) {
-                text.cancelEditing()
-                return
-              }
-              void text.commit('name', { name })
-            }}
-            onCancel={text.cancelEditing}
-          />
-        ) : (
-          <h2
-            className={`lightbox__name${text.editable ? ' lightbox__name--editable' : ''}${
-              text.savedField === 'name' ? ' lightbox__field--saved' : ''
-            }`}
-            title={row.name}
-            onClick={() => text.startEditing('name')}
-          >
-            {row.name}
-          </h2>
-        )}
-        {text.errorFor('name') && <p className="lightbox__field-error">{text.errorFor('name')}</p>}
-        <p className="lightbox__meta">{cairnRowMetaLine(row)}</p>
-        {text.editing === 'description' ? (
-          <DescriptionInput
-            initial={description}
-            className="description-input lightbox__description-input"
-            onCommit={(value) => void text.commit('description', { description: value })}
-            onCancel={text.cancelEditing}
-          />
-        ) : (
-          <p
-            className={`lightbox__description${description ? '' : ' lightbox__description--empty'}${
-              text.editable ? ' lightbox__description--editable' : ''
-            }${text.savedField === 'description' ? ' lightbox__field--saved' : ''}`}
-            onClick={() => text.startEditing('description')}
-          >
-            {description || ADD_DESCRIPTION_PLACEHOLDER}
-          </p>
-        )}
-        {text.errorFor('description') && (
-          <p className="lightbox__field-error">{text.errorFor('description')}</p>
-        )}
-        <p className="lightbox__position">{positionSourceSentence(row.source)}</p>
-        {/* #158 — the drag's failure line, `aria-live="polite"` for the same
-            reason #157's attach failure already is: a drop's outcome is
-            otherwise announced by nothing. */}
-        {moveError && (
-          <p className="lightbox__move-error" aria-live="polite">
-            {moveError}
-          </p>
-        )}
-        {signedOut && <p className="lightbox__signed-out">{SIGNED_OUT_MOVE_MESSAGE}</p>}
-        {/* #156 — the same grid the loose face and the create face show,
-            under the same label. Retyping a photo as a campsite is the case
-            this exists for: the marker stops being a thumbnail and becomes
-            a pin with a camera badge, and the row's glyph follows it. */}
-        <span className="lightbox__field-label">What is this place</span>
-        <IconPicker
-          label="What is this place"
-          value={row.icon}
-          onChange={(icon) => onSetIcon?.(icon)}
-          disabled={!onSetIcon}
-        />
-        {onRemoveFromTrip && (
-          <button type="button" className="lightbox__remove-from-trip" onClick={onRemoveFromTrip}>
-            Remove from trip
-          </button>
-        )}
       </div>
     </div>
   )

@@ -92,6 +92,13 @@
   --control-scrim: color-mix(in srgb, var(--ground) 72%, transparent);
   --control-scrim-hover: color-mix(in srgb, var(--ground) 88%, transparent);
 
+  /* Seeing the photo — cairn/docs/design/197-seeing-the-photo.md, "New
+     tokens". The viewport width at or above which a cairn's detail face is
+     two columns. Below 900px, --panel-width (380) plus --space-6 plus the
+     dialog's own margins and padding leaves the photo no more room
+     side-by-side than stacked, so the split stops earning its complexity. */
+  --photo-split: 900px;
+
   /* Cairn facets — cairn/docs/design/159-cairn-facets.md, "New tokens".
      --chip-height (34px) stays the main row's; the facet row's chips are
      smaller so a second row costs less of the panel's scarcest resource. */

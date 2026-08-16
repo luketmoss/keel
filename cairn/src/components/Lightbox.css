@@ -29,20 +29,37 @@
   box-shadow: var(--shadow-lifted);
 }
 
+/* #197 — the photo is a button now: it is what enters and leaves full
+   bleed. Stripped of the button chrome so it reads as the photograph it
+   contains, and `zoom-in` is the whole affordance. */
 .lightbox__frame {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   max-width: 100%;
-  max-height: 70vh;
+  /* #197 — down from 70vh. On a narrow viewport the name and meta line
+     matter more than the last tenth of the image, and full bleed is one tap
+     away. The wide layout below drops the cap entirely. */
+  max-height: 60vh;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: zoom-in;
+}
+
+.lightbox__frame:disabled {
+  cursor: default;
 }
 
 .lightbox__image,
 .lightbox__placeholder {
   max-width: 100%;
-  max-height: 70vh;
-  /* Never upscaled beyond natural size (design doc's Contents section). */
+  max-height: 60vh;
+  /* Never upscaled beyond natural size (design doc's Contents section) —
+     what stops a small original looking like a rendering fault. */
   width: auto;
   height: auto;
   object-fit: contain;
@@ -206,6 +223,134 @@
 
 .lightbox__remove-from-trip:active {
   background: var(--pressed);
+}
+
+/* ---- #197: two columns on a wide viewport, and full bleed ---------------
+
+   The detail face is one component with one responsive layout. Below
+   `--photo-split` it is the single column that shipped before this issue;
+   at or above it, the photo takes the whole left side and everything else
+   moves into a fixed column on the right.
+
+   `--panel-width` is reused for that column rather than inventing a width:
+   it is the column this content was designed against, and it means a
+   cairn's detail reads the same width here as it does in the sidebar. */
+
+.lightbox__detail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 100%;
+}
+
+/* The literal repeats `--photo-split` because a media query cannot read a
+   custom property — the token is still declared in `index.css` so the value
+   has one documented home and the design note has something to point at.
+   Change both together. */
+@media (min-width: 900px) {
+  .lightbox__dialog {
+    flex-direction: row;
+    align-items: stretch;
+    gap: var(--space-6);
+  }
+
+  /* Takes everything the detail column does not. `min-width: 0` so a wide
+     photo cannot push the detail column off the dialog. */
+  .lightbox__media {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* The cap becomes the dialog rather than a fraction of the viewport:
+     with nothing stacked beneath it there is nothing left for 60vh to
+     protect.
+
+     Stated as the dialog's own inner height rather than `100%`, because a
+     percentage height has to chain through the media column and the frame
+     to resolve, and a flex item's automatic minimum size stops it part way
+     — the photo then overflows instead of fitting. This is the same number
+     the dialog is capped at: viewport, less its margins, less its padding. */
+  .lightbox__frame,
+  .lightbox__image,
+  .lightbox__placeholder {
+    max-height: calc(100vh - var(--space-8) * 2 - var(--space-6) * 2);
+  }
+
+  /* The detail column scrolls, never the dialog — the photo must not scroll
+     out of view on the surface whose job is showing it. */
+  .lightbox__detail {
+    flex: none;
+    width: var(--panel-width);
+    align-items: flex-start;
+    overflow-y: auto;
+  }
+}
+
+/* Full bleed. No dialog, no --surface, no radius, no shadow: the photo is
+   the surface, over the scrim the lightbox already paints. The controls are
+   #195's and are the only other thing drawn. */
+.lightbox__dialog--full-bleed {
+  margin: 0;
+  padding: var(--space-4);
+  /* `border-box` so the breathing room comes out of the viewport rather
+     than being added to it — without it the dialog is 100vh *plus* its
+     padding and the photo is cropped by exactly that much. */
+  box-sizing: border-box;
+  max-width: 100vw;
+  max-height: 100vh;
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+  background: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  gap: 0;
+}
+
+.lightbox__dialog--full-bleed .lightbox__detail {
+  display: none;
+}
+
+.lightbox__dialog--full-bleed .lightbox__media {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Fit to the viewport with `--space-4` of breathing room, stated against
+   the viewport for the same reason the wide layout is: a percentage height
+   cannot chain through the flex column without the photo overflowing. */
+.lightbox__dialog--full-bleed .lightbox__frame,
+.lightbox__dialog--full-bleed .lightbox__image,
+.lightbox__dialog--full-bleed .lightbox__placeholder {
+  max-width: calc(100vw - var(--space-4) * 2);
+  max-height: calc(100vh - var(--space-4) * 2);
+}
+
+.lightbox__dialog--full-bleed .lightbox__frame {
+  cursor: zoom-out;
+}
+
+/* The mode change is a geometry change, so the properties that can actually
+   animate are the dialog's own material and the detail column's opacity.
+   Both collapse under the global reduced-motion block in `index.css`. */
+.lightbox__dialog {
+  transition:
+    padding var(--motion-base) var(--ease),
+    background-color var(--motion-base) var(--ease),
+    border-radius var(--motion-base) var(--ease);
+}
+
+.lightbox__detail {
+  transition: opacity var(--motion-fast) var(--ease);
 }
 
 /* #195 — the controls paint over the image, not behind it. `.lightbox__frame`

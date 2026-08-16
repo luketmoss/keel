@@ -648,4 +648,55 @@ describe('TrackList', () => {
       expect(onToggleVisibility).toHaveBeenCalledWith('f1')
     })
   })
+
+  /* #199 — every icon-only control names its action *and its row*. The
+     assertion is always `title === aria-label`: the criterion is that the
+     tooltip and the accessible name cannot disagree, not that either one
+     has some particular wording. */
+  describe('#199 — icon-only controls carry a tooltip matching their label', () => {
+    function expectTooltipMatchesLabel(el: HTMLElement, expected: string) {
+      expect(el.getAttribute('aria-label')).toBe(expected)
+      expect(el.getAttribute('title')).toBe(el.getAttribute('aria-label'))
+    }
+
+    it('names the track on the reorder handle, the swatch, and the ⋮', () => {
+      const { container } = render(
+        <TrackList
+          files={[importedFile()]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          onRemoveFromTrip={vi.fn()}
+          onRecolor={vi.fn().mockResolvedValue(true)}
+          onReorder={vi.fn().mockResolvedValue(true)}
+        />,
+      )
+
+      expectTooltipMatchesLabel(
+        container.querySelector('.track-row__handle') as HTMLElement,
+        'Reorder trip.kml',
+      )
+      expectTooltipMatchesLabel(
+        screen.getByRole('button', { name: 'Change colour for trip.kml' }),
+        'Change colour for trip.kml',
+      )
+      expectTooltipMatchesLabel(
+        screen.getByRole('button', { name: 'Row actions for trip.kml' }),
+        'Row actions for trip.kml',
+      )
+    })
+
+    it("the visibility control's tooltip follows its current state", () => {
+      const { rerender } = render(
+        <TrackList files={[importedFile({ visible: true })]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />,
+      )
+
+      expectTooltipMatchesLabel(screen.getByRole('button', { name: 'Hide trip.kml' }), 'Hide trip.kml')
+
+      rerender(
+        <TrackList files={[importedFile({ visible: false })]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />,
+      )
+
+      expectTooltipMatchesLabel(screen.getByRole('button', { name: 'Show trip.kml' }), 'Show trip.kml')
+    })
+  })
 })

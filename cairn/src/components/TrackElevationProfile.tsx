@@ -22,13 +22,19 @@ export interface TrackElevationProfileProps {
       last point's cumulative distance, which only covers the elevation-
       bearing points. */
   distanceMeters: number
+  /** #224: true when `points` came from the Elevation API rather than the
+      track's own points. A sighted reader gets the `~` on the grid figures
+      directly beneath this; a screen reader user meets the profile itself
+      only here, so the `aria-label` is the one place that has to name the
+      source in words. */
+  sampled?: boolean
 }
 
 /** #219's inline elevation profile: an SVG line and fill for sighted users,
     a text alternative naming the two endpoints and the distance for
     everyone else. The x axis is cumulative distance, not point index, and
     the y axis spans the track's own low and high rather than sea level. */
-export function TrackElevationProfile({ points, color, distanceMeters }: TrackElevationProfileProps) {
+export function TrackElevationProfile({ points, color, distanceMeters, sampled }: TrackElevationProfileProps) {
   const low = points.reduce((min, point) => (point.elevationMeters < min.elevationMeters ? point : min))
   const high = points.reduce((max, point) => (point.elevationMeters > max.elevationMeters ? point : max))
   const span = high.elevationMeters - low.elevationMeters || 1
@@ -42,9 +48,13 @@ export function TrackElevationProfile({ points, color, distanceMeters }: TrackEl
     .join(' ')
   const fillPath = `${linePath} L${VIEW_WIDTH},${VIEW_HEIGHT} L0,${VIEW_HEIGHT} Z`
 
-  const label = `Elevation profile: ${formatElevation(low.elevationMeters)} to ${formatElevation(
-    high.elevationMeters,
-  )} over ${formatDistance(distanceMeters)}`
+  const label = sampled
+    ? `Elevation profile, estimated from terrain data: ${formatElevation(low.elevationMeters)} to ${formatElevation(
+        high.elevationMeters,
+      )} over ${formatDistance(distanceMeters)}`
+    : `Elevation profile: ${formatElevation(low.elevationMeters)} to ${formatElevation(
+        high.elevationMeters,
+      )} over ${formatDistance(distanceMeters)}`
 
   return (
     <div className="track-elevation-profile" role="img" aria-label={label}>

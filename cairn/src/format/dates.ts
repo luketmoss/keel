@@ -1,5 +1,5 @@
 import { deriveTripStatus } from '../store/tripStore'
-import { formatDistance, formatElevationGain } from './units'
+import { formatDistance, formatElevationGain, markSampled } from './units'
 import type { TripTotals } from '../geo/tripTotals'
 
 /* Hair space + en dash + hair space, matching the header's existing range
@@ -148,7 +148,7 @@ export function formatTripMetaLine(
   if (cairnCount !== null) parts.push(pluralize(cairnCount, 'photo'))
   if (totals) {
     parts.push(formatDistance(totals.distanceMeters))
-    const ascent = formatElevationGain(totals.elevationGainMeters)
+    const ascent = markSampled(formatElevationGain(totals.elevationGainMeters), totals.elevationSource === 'sampled')
     if (ascent !== undefined) parts.push(ascent)
   }
   return parts.join(' · ')

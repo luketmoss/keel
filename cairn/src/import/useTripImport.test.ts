@@ -4,6 +4,7 @@ import { useTripImport } from './useTripImport'
 import type { ParseResult } from '../kml/parse'
 import { DriveAuthError } from '../drive/rootFolder'
 import { LocalTrackOverridesStore, type TrackOverridesStore } from '../store/trackOverridesStore'
+import type { TripStore } from '../store/tripStore'
 
 /** A minimal in-memory `Storage`, same helper `tripStore.test.ts` and
     `trackOverridesStore.test.ts` use — isolates each test's overrides from
@@ -55,7 +56,30 @@ const { computeTrackStats } = vi.hoisted(() => ({
     elevationGainMeters: undefined,
   })),
 }))
-vi.mock('../kml/stats', () => ({ computeTrackStats }))
+vi.mock('../kml/stats', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../kml/stats')>()
+  // #224's `overlaySampledElevation`/`hasUsableElevation` are left real —
+  // pure functions with nothing to fake — only `computeTrackStats` is
+  // stubbed, matching every test fixture's minimal single-point tracks.
+  return { ...actual, computeTrackStats }
+})
+
+/** #224: `useTripImport` reads a trip's sampled-elevation cache back
+    through `TripStore.getOverview` on mount — the rest of the interface is
+    never called from inside the hook (`saveOverview` is `TripDetail`'s
+    job), so a fake only needs `getOverview` to return something readable
+    for every test that doesn't care about sampling.
+ *
+ * A single shared instance, not a fresh object per call: `renderHook`'s
+    callback re-invokes `useTripImport(...)` on every render, so a
+    `fakeTripStore()` call inline in that callback would hand the hook a
+    new object identity each render — which its cache-read effect
+    (dependent on `tripStore`) would read as "the store changed", firing
+    forever. */
+const sharedFakeTripStore: TripStore = { getOverview: () => null } as unknown as TripStore
+function fakeTripStore(): TripStore {
+  return sharedFakeTripStore
+}
 
 function track(name: string): ParseResult {
   return { ok: true, tracks: [{ name, points: [{ lat: 0, lon: 0 }] }] }
@@ -82,7 +106,7 @@ describe('useTripImport', () => {
     downloadTrackFile.mockResolvedValue(file('day-1.kml'))
     parseKmlOrKmz.mockResolvedValueOnce(track('Day 1'))
 
-    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id'))
+    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
 
     expect(result.current.loading).toBe(true)
 
@@ -103,7 +127,7 @@ describe('useTripImport', () => {
       .mockResolvedValueOnce(file('day-2.kml'))
     parseKmlOrKmz.mockResolvedValueOnce(track('Day 2'))
 
-    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id'))
+    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
     await waitFor(() => expect(result.current.loading).toBe(false))
 
     expect(result.current.tracks).toHaveLength(1)
@@ -126,7 +150,7 @@ describe('useTripImport', () => {
     )
     parseKmlOrKmz.mockResolvedValue(track('Day'))
 
-    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id'))
+    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
 
     // The first file lands while the second is still in flight — the trip
     // is not waiting for the whole batch before showing anything.
@@ -156,7 +180,7 @@ describe('useTripImport', () => {
     })
     parseKmlOrKmz.mockResolvedValue(track('Day'))
 
-    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id'))
+    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
     await waitFor(() => expect(result.current.loading).toBe(false))
 
     expect(result.current.tracks).toHaveLength(8)
@@ -165,7 +189,7 @@ describe('useTripImport', () => {
   })
 
   it('is not loading and does not attempt a read when signed out', async () => {
-    const { result } = renderHook(() => useTripImport('trip-1', null, null))
+    const { result } = renderHook(() => useTripImport('trip-1', null, null, fakeTripStore()))
 
     await waitFor(() => expect(result.current.loading).toBe(false))
 
@@ -175,7 +199,7 @@ describe('useTripImport', () => {
 
   it('uploads then parses an imported file, adding it to the track list', async () => {
     parseKmlOrKmz.mockResolvedValueOnce(track('Ridge Trail'))
-    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id'))
+    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
     await waitFor(() => expect(result.current.loading).toBe(false))
 
     await act(() => result.current.importFiles([file('a.kml')]))
@@ -199,7 +223,7 @@ describe('useTripImport', () => {
       return { id: 'drive-file-id' }
     })
 
-    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id'))
+    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
     await waitFor(() => expect(result.current.loading).toBe(false))
 
     const files = Array.from({ length: 8 }, (_, i) => file(`f${i}.kml`))
@@ -216,7 +240,7 @@ describe('useTripImport', () => {
       .mockResolvedValueOnce({ id: 'ok-1' })
       .mockResolvedValueOnce({ id: 'ok-2' })
 
-    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id'))
+    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
     await waitFor(() => expect(result.current.loading).toBe(false))
 
     await act(() =>
@@ -234,7 +258,7 @@ describe('useTripImport', () => {
     parseKmlOrKmz.mockResolvedValue(track('Day'))
     uploadFileContent.mockRejectedValueOnce(new DriveAuthError())
 
-    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id'))
+    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
     await waitFor(() => expect(result.current.loading).toBe(false))
 
     await act(() => result.current.importFiles([file('a.kml')]))
@@ -247,7 +271,7 @@ describe('useTripImport', () => {
   })
 
   it('is a no-op when signed out', async () => {
-    const { result } = renderHook(() => useTripImport('trip-1', null, null))
+    const { result } = renderHook(() => useTripImport('trip-1', null, null, fakeTripStore()))
     await waitFor(() => expect(result.current.loading).toBe(false))
 
     await act(() => result.current.importFiles([file('a.kml')]))
@@ -263,7 +287,7 @@ describe('useTripImport — #75 refuses a file already in the trip', () => {
     downloadTrackFile.mockResolvedValue(file('Holy Cross Day 1.kml'))
     parseKmlOrKmz.mockResolvedValue(track('Day 1'))
 
-    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id'))
+    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(result.current.tracks).toHaveLength(1)
 
@@ -278,7 +302,7 @@ describe('useTripImport — #75 refuses a file already in the trip', () => {
 
   it('imports normally a name that only matches a file which previously failed to upload', async () => {
     parseKmlOrKmz.mockResolvedValueOnce(track('Day'))
-    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id'))
+    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
     await waitFor(() => expect(result.current.loading).toBe(false))
 
     await act(() => result.current.importFiles([file('retry-me.kml')]))
@@ -292,7 +316,7 @@ describe('useTripImport — #75 refuses a file already in the trip', () => {
     downloadTrackFile.mockResolvedValue(file('day-1.kml'))
     parseKmlOrKmz.mockResolvedValue(track('Day 1'))
 
-    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id'))
+    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
     await waitFor(() => expect(result.current.loading).toBe(false))
 
     await act(() => result.current.importFiles([file('day-1.kml'), file('day-2.kml')]))
@@ -312,7 +336,7 @@ describe('useTripImport — #46 track overrides', () => {
     parseKmlOrKmz.mockResolvedValue(track('Day 1'))
 
     const { result } = renderHook(() =>
-      useTripImport('trip-1', 'token', 'cairn-folder-id', store),
+      useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore(), store),
     )
     await waitFor(() => expect(result.current.loading).toBe(false))
 
@@ -330,7 +354,7 @@ describe('useTripImport — #46 track overrides', () => {
     // A fresh mount for the same trip (simulating a reload) reads the
     // override back rather than starting over from the raw Drive filename.
     const { result: reloaded } = renderHook(() =>
-      useTripImport('trip-1', 'token', 'cairn-folder-id', store),
+      useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore(), store),
     )
     await waitFor(() => expect(reloaded.current.loading).toBe(false))
     expect(reloaded.current.tracks[0].name).toBe('Ridge day')
@@ -351,7 +375,7 @@ describe('useTripImport — #46 track overrides', () => {
     parseKmlOrKmz.mockResolvedValue(track('Day 1'))
 
     const { result } = renderHook(() =>
-      useTripImport('trip-1', 'token', 'cairn-folder-id', store),
+      useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore(), store),
     )
     await waitFor(() => expect(result.current.loading).toBe(false))
     await waitFor(() => expect(result.current.tracks).toHaveLength(2))
@@ -376,7 +400,7 @@ describe('useTripImport — #46 track overrides', () => {
     parseKmlOrKmz.mockResolvedValue(track('Day 1'))
 
     const { result } = renderHook(() =>
-      useTripImport('trip-1', 'token', 'cairn-folder-id', store),
+      useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore(), store),
     )
     await waitFor(() => expect(result.current.loading).toBe(false))
 
@@ -412,7 +436,7 @@ describe('useTripImport — #46 track overrides', () => {
     }
 
     const { result } = renderHook(() =>
-      useTripImport('trip-1', 'token', 'cairn-folder-id', slowStore),
+      useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore(), slowStore),
     )
     await waitFor(() => expect(result.current.loading).toBe(false))
 
@@ -459,7 +483,7 @@ describe('useTripImport — #46 track overrides', () => {
     }
 
     const { result } = renderHook(() =>
-      useTripImport('trip-1', 'token', 'cairn-folder-id', flakyStore),
+      useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore(), flakyStore),
     )
     await waitFor(() => expect(result.current.loading).toBe(false))
 
@@ -486,7 +510,7 @@ describe('useTripImport — #46 track overrides', () => {
     parseKmlOrKmz.mockResolvedValue(track('Day 1'))
 
     const { result } = renderHook(() =>
-      useTripImport('trip-1', 'token', 'cairn-folder-id', store),
+      useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore(), store),
     )
     await waitFor(() => expect(result.current.loading).toBe(false))
     const autoColorIndex = result.current.tracks[0].colorIndex
@@ -508,7 +532,7 @@ describe('useTripImport — #46 track overrides', () => {
     parseKmlOrKmz.mockResolvedValue(track('Day'))
 
     const { result } = renderHook(() =>
-      useTripImport('trip-1', 'token', 'cairn-folder-id', store),
+      useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore(), store),
     )
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(result.current.tracks.map((t) => t.name)).toEqual(['a.kml', 'b.kml'])
@@ -520,7 +544,7 @@ describe('useTripImport — #46 track overrides', () => {
     expect(result.current.tracks.map((t) => t.name)).toEqual(['b.kml', 'a.kml'])
 
     const { result: reloaded } = renderHook(() =>
-      useTripImport('trip-1', 'token', 'cairn-folder-id', store),
+      useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore(), store),
     )
     await waitFor(() => expect(reloaded.current.loading).toBe(false))
     expect(reloaded.current.tracks.map((t) => t.name)).toEqual(['b.kml', 'a.kml'])
@@ -533,7 +557,7 @@ describe('useTripImport — #46 track overrides', () => {
     parseKmlOrKmz.mockResolvedValue(track('Untouched'))
 
     const { result } = renderHook(() =>
-      useTripImport('trip-1', 'token', 'cairn-folder-id', store),
+      useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore(), store),
     )
     await waitFor(() => expect(result.current.loading).toBe(false))
 
@@ -551,7 +575,7 @@ describe('useTripImport — #46 track overrides', () => {
     parseKmlOrKmz.mockResolvedValue(track('Day 1'))
 
     const { result } = renderHook(() =>
-      useTripImport('trip-1', 'token', 'cairn-folder-id', store),
+      useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore(), store),
     )
 
     await expect(waitFor(() => expect(result.current.loading).toBe(false))).resolves.not.toThrow()
@@ -562,7 +586,7 @@ describe('useTripImport — #46 track overrides', () => {
   it('returns false and leaves state unchanged when the id has no matching track', async () => {
     const store = new LocalTrackOverridesStore(fakeStorage())
     const { result } = renderHook(() =>
-      useTripImport('trip-1', 'token', 'cairn-folder-id', store),
+      useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore(), store),
     )
     await waitFor(() => expect(result.current.loading).toBe(false))
 
@@ -580,7 +604,7 @@ describe('useTripImport — #77 removing a track', () => {
     downloadTrackFile.mockResolvedValue(file('day-1.kml'))
     parseKmlOrKmz.mockResolvedValue(track('Day 1'))
 
-    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id'))
+    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(result.current.tracks).toHaveLength(1)
 
@@ -597,7 +621,7 @@ describe('useTripImport — #77 removing a track', () => {
     parseKmlOrKmz.mockResolvedValue(track('Day 1'))
     trashFile.mockRejectedValue(new Error('network error'))
 
-    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id'))
+    const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
     await waitFor(() => expect(result.current.loading).toBe(false))
     const id = result.current.tracks[0].id
 
@@ -622,7 +646,7 @@ describe('useTripImport — #77 removing a track', () => {
     parseKmlOrKmz.mockResolvedValue(track('Day'))
 
     const { result } = renderHook(() =>
-      useTripImport('trip-1', 'token', 'cairn-folder-id', store),
+      useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore(), store),
     )
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(result.current.tracks.map((t) => t.name)).toEqual(['a.kml', 'b.kml', 'c.kml'])
@@ -644,7 +668,7 @@ describe('useTripImport — #77 removing a track', () => {
     ])
     downloadTrackFile.mockReset().mockResolvedValueOnce(file('a.kml')).mockResolvedValueOnce(file('c.kml'))
     const { result: reloaded } = renderHook(() =>
-      useTripImport('trip-1', 'token', 'cairn-folder-id', store),
+      useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore(), store),
     )
     await waitFor(() => expect(reloaded.current.loading).toBe(false))
     expect(reloaded.current.tracks.map((t) => t.name)).toEqual(['a.kml', 'c.kml'])
@@ -656,7 +680,7 @@ describe('useTripImport — #77 removing a track', () => {
     parseKmlOrKmz.mockResolvedValue(track('Day 1'))
 
     const { result, rerender } = renderHook(
-      ({ token }: { token: string | null }) => useTripImport('trip-1', token, 'cairn-folder-id'),
+      ({ token }: { token: string | null }) => useTripImport('trip-1', token, 'cairn-folder-id', fakeTripStore()),
       { initialProps: { token: 'token' as string | null } },
     )
     await waitFor(() => expect(result.current.loading).toBe(false))

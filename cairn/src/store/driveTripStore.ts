@@ -1,5 +1,6 @@
 import type { FeatureCollection, LineString } from 'geojson'
 import type { Track } from '../kml/parse'
+import type { StoredTrackElevation } from '../kml/stats'
 import {
   LocalTripStore,
   isFeatureCollection,
@@ -130,8 +131,8 @@ export class DriveTripStore implements TripStore {
     }
   }
 
-  saveOverview = (id: string, tracks: Track[]): void => {
-    this.local.saveOverview(id, tracks)
+  saveOverview = (id: string, tracks: Track[], sampledElevation?: Record<string, StoredTrackElevation>): void => {
+    this.local.saveOverview(id, tracks, sampledElevation)
     // #79: saveOverview also recomputes and persists the trip's origin (its
     // world-map dot), which lives on `trip.json` — flushed alongside the
     // overview rather than folded into `updateTrip`, since nothing calls

@@ -12,6 +12,13 @@ export interface TrackPoint {
 export interface Track {
   name: string
   points: TrackPoint[]
+  /** #224 — a stable id for this track within its trip (the owning file's
+      `driveFileId`, or `driveFileId#index` for a multi-track file), set by
+      `useTripImport` once a track is attached to a trip. What the sampled-
+      elevation cache is keyed by. `undefined` for a loose track or a track
+      not yet attached to a trip — sampling is trip-scoped only (design
+      note's Out of scope), and a keyless track is simply never looked up. */
+  key?: string
 }
 
 export interface ParseSuccess {

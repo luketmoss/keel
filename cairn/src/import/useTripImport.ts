@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { parseKmlOrKmz } from '../kml/parse'
-import { computeTrackStats } from '../kml/stats'
+import { parseKmlOrKmz, type Track } from '../kml/parse'
+import { computeTrackStats, hasUsableElevation, overlaySampledElevation, type StoredTrackElevation } from '../kml/stats'
+import { createGoogleElevationSampler, sampleTrackElevation, trackKey } from '../geo/elevation'
+import { readSampledElevation } from '../geo/tripTotals'
 import { runWithConcurrency } from './concurrency'
 import type { ImportedFile } from './types'
 import {
@@ -14,6 +16,7 @@ import { findOrCreateTripFolder } from '../drive/tripFolder'
 import { DriveAuthError } from '../drive/rootFolder'
 import type { TrackOverridesStore } from '../store/trackOverridesStore'
 import { DriveTrackOverridesStore } from '../store/driveTrackOverridesStore'
+import type { TripStore } from '../store/tripStore'
 
 const ACCEPTED_EXTENSIONS = ['.kml', '.kmz']
 /* Matches #4's stance for v1: bounded, not unlimited, so a large batch does
@@ -23,6 +26,10 @@ const UPLOAD_CONCURRENCY = 3
    tracks doesn't open dozens of simultaneous Drive reads, unbounded so a
    trip with a couple of tracks doesn't wait one file for another. */
 const LOAD_CONCURRENCY = 4
+/* #224: bounded the same way uploads and downloads are — a trip with many
+   elevation-less tracks doesn't open dozens of simultaneous Elevation API
+   calls at once. */
+const SAMPLE_CONCURRENCY = 3
 
 /* #75: a file whose name already names a track in this trip is refused
    before it's uploaded, rather than doubling the trip's contents. Matching
@@ -141,6 +148,11 @@ export interface UseTripImport {
       of `id`s (not Drive file ids) in their new order. Resolves `false` on
       a save failure. */
   reorderTracks: (orderedIds: string[]) => Promise<boolean>
+  /** #224 — this trip's full sampled-elevation cache (previously stored,
+      plus anything sampled this session), keyed the way `tracks[].tracks[].key`
+      is. What a caller passes to `TripStore.saveOverview`'s third argument,
+      and what a track detail face reads to draw a sampled profile. */
+  sampledElevation: Record<string, StoredTrackElevation>
 }
 
 /* Uploads then parses each file, with bounded concurrency, and reads back
@@ -150,9 +162,17 @@ export function useTripImport(
   tripId: string,
   accessToken: string | null,
   cairnFolderId: string | null,
+  tripStore: TripStore,
   overridesStore: TrackOverridesStore = defaultOverridesStore,
 ): UseTripImport {
   const [tracks, setTracks] = useState<ImportedFile[]>([])
+  // #224: this trip's sampled-elevation cache — read back from the
+  // sidecar on mount (see the effect below), grown as new tracks get
+  // sampled. `cacheRead` gates the sampling effect so it never fires
+  // against the empty initial state and re-samples a track the sidecar
+  // already had an answer for.
+  const [sampledElevation, setSampledElevation] = useState<Record<string, StoredTrackElevation>>({})
+  const [cacheRead, setCacheRead] = useState(false)
   const [missingFiles, setMissingFiles] = useState<MissingTripFile[]>([])
   const [loading, setLoading] = useState(true)
   const [progressMap, setProgressMap] = useState<Map<string, TripImportProgress>>(new Map())
@@ -195,6 +215,13 @@ export function useTripImport(
   useEffect(() => {
     setOverrides(overridesStore.getOverrides(tripId))
   }, [tripId, overridesStore])
+
+  // #224: this trip's sampled-elevation cache, read back once per trip —
+  // whatever a previous session already sampled, so it's never re-sampled.
+  useEffect(() => {
+    setSampledElevation(readSampledElevation(tripStore.getOverview(tripId)))
+    setCacheRead(true)
+  }, [tripId, tripStore])
 
   // Hydrates (or migrates) this trip's overrides against Drive, per #59 —
   // independent of the track-listing effect below since overrides live in
@@ -257,6 +284,12 @@ export function useTripImport(
             const result = await parseKmlOrKmz(file)
             if (!result.ok || result.tracks.length === 0) return
             if (cancelled) return
+            // #224: a stable key per track, so the sampled-elevation cache
+            // (keyed by it) survives a re-parse of the same file.
+            const keyedTracks = result.tracks.map((track, i) => ({
+              ...track,
+              key: trackKey(driveFile.id, i, result.tracks.length),
+            }))
             setTracks((prev) => [
               ...prev,
               {
@@ -264,8 +297,8 @@ export function useTripImport(
                 name: driveFile.name,
                 sourceName: driveFile.name,
                 driveFileId: driveFile.id,
-                tracks: result.tracks,
-                trackStats: result.tracks.map(computeTrackStats),
+                tracks: keyedTracks,
+                trackStats: keyedTracks.map(computeTrackStats),
                 colorIndex: generateColorIndex(),
                 visible: true,
               },
@@ -317,6 +350,64 @@ export function useTripImport(
     [],
   )
 
+  /** #224 — samples elevation for every track this trip currently holds
+      that has none of its own and isn't already in the cache. Runs
+      whenever the track set or the cache changes; each run's own
+      candidates settle to nothing once their results land in
+      `sampledElevation`, which is what keeps this from looping.
+   *
+   * Offline, signed out, or no Elevation API available (no key, or the
+      Maps script hasn't loaded yet) is a silent no-op — the design note's
+      "nothing attempted" state, indistinguishable from a track that was
+      never going to be sampled this session. Reported failure is one line
+      per settled batch, not per track — a reader who imported eight tracks
+      does not need eight apologies. */
+  useEffect(() => {
+    if (!cacheRead || !accessToken || !cairnFolderId) return
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return
+    const sampler = createGoogleElevationSampler()
+    if (!sampler) return
+
+    const candidates = tracks
+      .flatMap((file) => file.tracks)
+      .filter(
+        (track): track is Track & { key: string } =>
+          track.key !== undefined &&
+          sampledElevation[track.key] === undefined &&
+          track.points.length >= 2 &&
+          !hasUsableElevation(track.points),
+      )
+    if (candidates.length === 0) return
+
+    let cancelled = false
+
+    void (async () => {
+      const newEntries: Record<string, StoredTrackElevation> = {}
+      let failureCount = 0
+
+      await runWithConcurrency(candidates, SAMPLE_CONCURRENCY, async (track) => {
+        const result = await sampleTrackElevation(track.points, sampler)
+        if (result) newEntries[track.key] = result
+        else failureCount += 1
+      })
+
+      if (cancelled) return
+      if (Object.keys(newEntries).length > 0) {
+        setSampledElevation((prev) => ({ ...prev, ...newEntries }))
+      }
+      if (failureCount > 0) {
+        addFailure(
+          'Elevation',
+          `Couldn't estimate elevation for ${failureCount} track${failureCount === 1 ? '' : 's'}.`,
+        )
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [cacheRead, tracks, sampledElevation, accessToken, cairnFolderId, addFailure])
+
   /* One file's full pipeline: upload (original bytes, original filename)
      then parse, landing in `tracks` as soon as its own work is done —
      never waiting on the rest of the batch (design doc point 6). */
@@ -356,6 +447,10 @@ export function useTripImport(
           return
         }
 
+        const keyedTracks = result.tracks.map((track, i) => ({
+          ...track,
+          key: trackKey(uploaded.id, i, result.tracks.length),
+        }))
         setTracks((prev) => [
           ...prev,
           {
@@ -363,8 +458,8 @@ export function useTripImport(
             name: file.name,
             sourceName: file.name,
             driveFileId: uploaded.id,
-            tracks: result.tracks,
-            trackStats: result.tracks.map(computeTrackStats),
+            tracks: keyedTracks,
+            trackStats: keyedTracks.map(computeTrackStats),
             colorIndex: generateColorIndex(),
             visible: true,
           },
@@ -611,9 +706,18 @@ export function useTripImport(
   const effectiveTracks = useMemo(() => {
     const withOverrides = tracks.map((file) => {
       const override = overrides[file.driveFileId]
-      if (!override) return file
+      // #224: folds the sampled-elevation cache into each track's already-
+      // computed stats — a no-op (`overlaySampledElevation` returns them
+      // unchanged) for every track that already carries its own elevation
+      // or has nothing cached for it yet.
+      const trackStats = file.trackStats.map((stats, i) => {
+        const track = file.tracks[i]
+        return overlaySampledElevation(stats, track?.key ? sampledElevation[track.key] : undefined)
+      })
+      if (!override) return { ...file, trackStats }
       return {
         ...file,
+        trackStats,
         name: override.displayName ?? file.name,
         colorIndex: override.color ?? file.colorIndex,
         // #150: carried alongside the name it produced, so `Remove from
@@ -630,7 +734,7 @@ export function useTripImport(
       if (orderB === undefined) return -1
       return orderA - orderB
     })
-  }, [tracks, overrides])
+  }, [tracks, overrides, sampledElevation])
 
   const progress = Array.from(progressMap.values()).sort((a, b) => a.index - b.index)
 
@@ -651,5 +755,6 @@ export function useTripImport(
     renameTrack,
     recolorTrack,
     reorderTracks,
+    sampledElevation,
   }
 }

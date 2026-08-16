@@ -7,6 +7,12 @@ export interface TrackStats {
   elevationLossMeters: number | undefined
   highPointMeters: number | undefined
   lowPointMeters: number | undefined
+  /** #224 — set to `'sampled'` when the four elevation fields above came
+      from the Elevation API rather than the track's own points. Absent
+      (not `'recorded'`) for the common case, so every existing caller that
+      built a `TrackStats` before this field existed is still a valid one —
+      the mark is additive, not a new required choice. */
+  elevationSource?: 'sampled'
 }
 
 /* Mean Earth radius. Error against a true geodesic is under 0.5% at any
@@ -107,7 +113,7 @@ function computeAscentDescentMeters(
   return { ascentMeters, descentMeters }
 }
 
-interface ElevationStats {
+export interface ElevationStats {
   elevationGainMeters: number | undefined
   elevationLossMeters: number | undefined
   highPointMeters: number | undefined
@@ -128,7 +134,7 @@ const UNAVAILABLE_ELEVATION: ElevationStats = {
    on the geometry actually available: a real GPS track, even a dead-flat
    one, never produces identical consecutive values, so a series that is
    entirely one value — 0 or otherwise — is unavailable rather than flat. */
-function computeElevationStats(points: Track['points']): ElevationStats {
+export function computeElevationStats(points: Track['points']): ElevationStats {
   const elevations = points
     .map((point) => point.elevation)
     .filter((elevation): elevation is number => elevation !== undefined)
@@ -155,6 +161,117 @@ export function computeTrackStats(track: Track): TrackStats {
     distanceMeters: computeDistanceMeters(track.points),
     durationSeconds: computeDurationSeconds(track.points),
     ...computeElevationStats(track.points),
+  }
+}
+
+/** #224 — the same test `computeElevationStats` uses to decide "nothing to
+    show", exposed so the sampling pipeline can decide "nothing to sample"
+    with the identical rule. A track sampling would call unavailable and a
+    track the grid renders as unavailable must always agree, or the two
+    surfaces disagree about what an em dash means. */
+export function hasUsableElevation(points: Track['points']): boolean {
+  return computeElevationStats(points).elevationGainMeters !== undefined
+}
+
+/** #224's persisted shape for one track's sampled elevation: the four
+    stats plus the profile series, computed once from the sampled points and
+    stored so a reload never re-samples. Deliberately not a `Track` or a
+    `TrackStats` — neither carries a profile, and this needs one alongside
+    the stats it was computed from. */
+export interface StoredTrackElevation {
+  elevationGainMeters: number
+  elevationLossMeters: number
+  highPointMeters: number
+  lowPointMeters: number
+  profile: ElevationProfilePoint[]
+}
+
+/** #224 — folds sampled elevation into an already-computed `TrackStats`
+    when it has none of its own. Sampling never overwrites a track that
+    carries its own elevation (`own.elevationGainMeters` already
+    non-`undefined`), so the overlay only ever applies where #218's grid
+    would otherwise be four em dashes. `sampled` is the trip's current
+    cache entry for this track's key, or `undefined` when nothing has been
+    sampled (or sampling failed) for it.
+ *
+ * Takes the stats rather than the `Track` itself so a caller that already
+    has them (every UI surface — `useTripImport` computes `TrackStats` once
+    at parse time) never recomputes distance and duration just to reach the
+    elevation fields. `effectiveTrackStats` below is the `Track`-taking
+    convenience for the one caller (`geo/tripTotals.ts`) that doesn't have
+    them cached. */
+export function overlaySampledElevation(own: TrackStats, sampled: StoredTrackElevation | undefined): TrackStats {
+  if (own.elevationGainMeters !== undefined || !sampled) return own
+  return {
+    ...own,
+    elevationGainMeters: sampled.elevationGainMeters,
+    elevationLossMeters: sampled.elevationLossMeters,
+    highPointMeters: sampled.highPointMeters,
+    lowPointMeters: sampled.lowPointMeters,
+    elevationSource: 'sampled',
+  }
+}
+
+/** #224 — `overlaySampledElevation`, computing `own` from the track first.
+    For `geo/tripTotals.ts`, which works from raw `Track[]` and has no
+    precomputed `TrackStats` to reuse. */
+export function effectiveTrackStats(track: Track, sampled: StoredTrackElevation | undefined): TrackStats {
+  return overlaySampledElevation(computeTrackStats(track), sampled)
+}
+
+/** #224 — the sampled counterpart to `computeElevationProfile`, for a track
+    whose own points carry no elevation. `undefined` when nothing has been
+    sampled for this track (or sampling failed), matching the "no profile"
+    treatment `TrackFaceBody` already gives an unavailable one. */
+export function effectiveElevationProfile(
+  track: Track,
+  sampled: StoredTrackElevation | undefined,
+): ElevationProfilePoint[] | undefined {
+  const own = computeElevationProfile(track.points)
+  if (own || !sampled) return own
+  return sampled.profile
+}
+
+export interface ElevationSummary {
+  elevationGainMeters: number | undefined
+  elevationLossMeters: number | undefined
+  highPointMeters: number | undefined
+  lowPointMeters: number | undefined
+  elevationTrackCount: number
+  /** #224 — set when at least one of the tracks summed into this total
+      carries sampled rather than recorded elevation. The weaker claim
+      governs a mixed total, the same way a partial-coverage total already
+      gets a footnote rather than a silent sum. */
+  elevationSource?: 'sampled'
+}
+
+/** #218's totals-block arithmetic (ascent/descent/high/low summed, or
+    maxed/minned, over only the tracks that carry elevation) plus #224's
+    mixed-source rule, shared by the trip totals block and the persisted
+    trip totals so the two cannot compute a different number — or a
+    different `~` — for the same trip. */
+export function summarizeElevation(
+  stats: Pick<TrackStats, 'elevationGainMeters' | 'elevationLossMeters' | 'highPointMeters' | 'lowPointMeters' | 'elevationSource'>[],
+): ElevationSummary {
+  const withElevation = stats.filter((s) => s.elevationGainMeters !== undefined)
+
+  if (withElevation.length === 0) {
+    return {
+      elevationGainMeters: undefined,
+      elevationLossMeters: undefined,
+      highPointMeters: undefined,
+      lowPointMeters: undefined,
+      elevationTrackCount: 0,
+    }
+  }
+
+  return {
+    elevationGainMeters: withElevation.reduce((sum, s) => sum + (s.elevationGainMeters ?? 0), 0),
+    elevationLossMeters: withElevation.reduce((sum, s) => sum + (s.elevationLossMeters ?? 0), 0),
+    highPointMeters: Math.max(...withElevation.map((s) => s.highPointMeters ?? -Infinity)),
+    lowPointMeters: Math.min(...withElevation.map((s) => s.lowPointMeters ?? Infinity)),
+    elevationTrackCount: withElevation.length,
+    ...(withElevation.some((s) => s.elevationSource === 'sampled') ? { elevationSource: 'sampled' as const } : {}),
   }
 }
 

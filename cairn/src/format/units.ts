@@ -76,16 +76,29 @@ export function formatElevation(meters: number | undefined): string | undefined 
   return `${Math.round(meters).toLocaleString('en-US')} m`
 }
 
+/** #224 — the `~` every sampled figure carries, applied at the one point
+    every formatted elevation value passes through before it reaches a
+    screen, rather than duplicated at each call site. `undefined` stays
+    `undefined` — a sampled track that still has nothing to show (sampling
+    failed) is unavailable, not a mark on a dash. */
+export function markSampled(value: string | undefined, sampled: boolean): string | undefined {
+  if (value === undefined || !sampled) return value
+  return `~${value}`
+}
+
 /* Two unavailable values carry no information the user can act on and make
    the row look broken, so only distance shows. One dash among present
    values is informative — it says this track came from a file that did not
    record it — so the mixed case keeps it. */
 export function formatStatsLine(
-  stats: Pick<TrackStats, 'distanceMeters' | 'durationSeconds' | 'elevationGainMeters'>,
+  stats: Pick<TrackStats, 'distanceMeters' | 'durationSeconds' | 'elevationGainMeters' | 'elevationSource'>,
 ): string {
   const distance = formatDistance(stats.distanceMeters)
   const duration = formatDuration(stats.durationSeconds)
-  const elevationGain = formatElevationGain(stats.elevationGainMeters)
+  const elevationGain = markSampled(
+    formatElevationGain(stats.elevationGainMeters),
+    stats.elevationSource === 'sampled',
+  )
 
   if (duration === undefined && elevationGain === undefined) {
     return distance

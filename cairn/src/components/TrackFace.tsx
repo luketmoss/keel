@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { RowMenu } from './RowMenu'
 import { NameInput } from './NameInput'
 import { TrackFaceBody } from './TrackFaceBody'
-import { computeElevationProfile, type TrackStats } from '../kml/stats'
+import type { ElevationProfilePoint, TrackStats } from '../kml/stats'
 import type { Track } from '../kml/parse'
 import './LooseFace.css'
 
@@ -14,6 +14,12 @@ interface TrackFaceProps {
   sourceName: string
   track: Track
   stats: TrackStats
+  /** The median-filtered, distance-aligned series — recorded
+      (`computeElevationProfile(track.points)`) or, when the track has none
+      of its own, sampled (#224). `undefined` when neither exists; the
+      caller decides which, this component only decides whether to draw
+      it, matching `TrackFaceBody`'s own contract. */
+  profile: ElevationProfilePoint[] | undefined
   color: string
   /** #73: disconnected disables the `⋮`'s items and nothing else — the
       numbers below are derived from a track already in memory, not a
@@ -40,6 +46,7 @@ export function TrackFace({
   sourceName,
   track,
   stats,
+  profile,
   color,
   disabled,
   onRename,
@@ -59,8 +66,6 @@ export function TrackFace({
     if (await onRename(trimmed)) setEditError(null)
     else setEditError(`Couldn't rename ${name} — try again.`)
   }
-
-  const profile = useMemo(() => computeElevationProfile(track.points), [track])
 
   return (
     <div className="loose-face">

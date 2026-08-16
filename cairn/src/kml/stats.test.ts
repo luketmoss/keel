@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { computeElevationProfile, computeTrackStats } from './stats'
+import {
+  computeElevationProfile,
+  computeTrackStats,
+  effectiveElevationProfile,
+  effectiveTrackStats,
+  hasUsableElevation,
+  overlaySampledElevation,
+  summarizeElevation,
+  type StoredTrackElevation,
+  type TrackStats,
+} from './stats'
 import type { Track } from './parse'
 
 /* Flat padding at both ends keeps the median filter's clamped boundary
@@ -291,5 +301,157 @@ describe('computeElevationProfile', () => {
     // The second point's distance covers both legs, not just the one to
     // the previous elevation-bearing point.
     expect(profile![1].distanceMeters).toBeGreaterThan(0)
+  })
+})
+
+// #224
+describe('hasUsableElevation', () => {
+  it('agrees with computeTrackStats about what counts as unavailable', () => {
+    expect(hasUsableElevation(trackFromElevations([0, 0, 0, 0, 0]).points)).toBe(false)
+    expect(hasUsableElevation([{ lat: 37, lon: -122, elevation: 1000 }])).toBe(false)
+    expect(
+      hasUsableElevation(trackFromElevations([1000, 1000, 1000, 1010, 1020, 1035, 1050]).points),
+    ).toBe(true)
+  })
+})
+
+describe('overlaySampledElevation', () => {
+  const sampled: StoredTrackElevation = {
+    elevationGainMeters: 300,
+    elevationLossMeters: 50,
+    highPointMeters: 400,
+    lowPointMeters: 100,
+    profile: [],
+  }
+
+  const unavailable: TrackStats = {
+    distanceMeters: 5000,
+    durationSeconds: undefined,
+    elevationGainMeters: undefined,
+    elevationLossMeters: undefined,
+    highPointMeters: undefined,
+    lowPointMeters: undefined,
+  }
+
+  const recorded: TrackStats = {
+    ...unavailable,
+    elevationGainMeters: 900,
+    elevationLossMeters: 800,
+    highPointMeters: 2000,
+    lowPointMeters: 1500,
+  }
+
+  it('folds sampled elevation into a track with none, marking the source', () => {
+    const result = overlaySampledElevation(unavailable, sampled)
+    expect(result.elevationGainMeters).toBe(300)
+    expect(result.elevationLossMeters).toBe(50)
+    expect(result.highPointMeters).toBe(400)
+    expect(result.lowPointMeters).toBe(100)
+    expect(result.elevationSource).toBe('sampled')
+    // Distance and duration are untouched — sampling never infers either.
+    expect(result.distanceMeters).toBe(unavailable.distanceMeters)
+  })
+
+  it('never overwrites a track that already carries its own elevation', () => {
+    expect(overlaySampledElevation(recorded, sampled)).toEqual(recorded)
+  })
+
+  it('leaves an unavailable track unavailable when nothing has been sampled for it', () => {
+    expect(overlaySampledElevation(unavailable, undefined)).toEqual(unavailable)
+  })
+})
+
+describe('effectiveTrackStats', () => {
+  it('is overlaySampledElevation composed with computeTrackStats', () => {
+    const track = trackFromElevations([0, 0, 0, 0, 0])
+    const sampled: StoredTrackElevation = {
+      elevationGainMeters: 300,
+      elevationLossMeters: 50,
+      highPointMeters: 400,
+      lowPointMeters: 100,
+      profile: [],
+    }
+    const result = effectiveTrackStats(track, sampled)
+    expect(result.elevationGainMeters).toBe(300)
+    expect(result.elevationSource).toBe('sampled')
+    expect(result.distanceMeters).toBe(computeTrackStats(track).distanceMeters)
+  })
+})
+
+describe('effectiveElevationProfile', () => {
+  const sampledProfile = [
+    { distanceMeters: 0, elevationMeters: 100 },
+    { distanceMeters: 500, elevationMeters: 400 },
+  ]
+  const sampled: StoredTrackElevation = {
+    elevationGainMeters: 300,
+    elevationLossMeters: 0,
+    highPointMeters: 400,
+    lowPointMeters: 100,
+    profile: sampledProfile,
+  }
+
+  it('draws the sampled profile when the track has none of its own', () => {
+    const track = trackFromElevations([0, 0, 0, 0, 0])
+    expect(effectiveElevationProfile(track, sampled)).toBe(sampledProfile)
+  })
+
+  it('never overwrites a track that already draws its own profile', () => {
+    const track = trackFromElevations([1000, 1000, 1000, 1010, 1020, 1035, 1050])
+    const own = computeElevationProfile(track.points)
+    expect(effectiveElevationProfile(track, sampled)).toEqual(own)
+  })
+
+  it('is undefined when the track has no elevation and nothing was sampled', () => {
+    const track = trackFromElevations([0, 0, 0, 0, 0])
+    expect(effectiveElevationProfile(track, undefined)).toBeUndefined()
+  })
+})
+
+describe('summarizeElevation', () => {
+  it('sums only the stats that carry elevation, matching the trip totals block', () => {
+    const withElevation: TrackStats = {
+      distanceMeters: 1000,
+      durationSeconds: undefined,
+      elevationGainMeters: 300,
+      elevationLossMeters: 100,
+      highPointMeters: 900,
+      lowPointMeters: 600,
+    }
+    const withoutElevation: TrackStats = { ...withElevation, elevationGainMeters: undefined, elevationLossMeters: undefined, highPointMeters: undefined, lowPointMeters: undefined }
+
+    const summary = summarizeElevation([withElevation, withoutElevation])
+    expect(summary.elevationGainMeters).toBe(300)
+    expect(summary.elevationTrackCount).toBe(1)
+    expect(summary.elevationSource).toBeUndefined()
+  })
+
+  it('marks the summary sampled when any contributing track is sampled — the weaker claim governs', () => {
+    const recorded: TrackStats = {
+      distanceMeters: 1000,
+      durationSeconds: undefined,
+      elevationGainMeters: 300,
+      elevationLossMeters: 100,
+      highPointMeters: 900,
+      lowPointMeters: 600,
+    }
+    const sampled: TrackStats = { ...recorded, elevationSource: 'sampled' }
+
+    expect(summarizeElevation([recorded, sampled]).elevationSource).toBe('sampled')
+    expect(summarizeElevation([recorded]).elevationSource).toBeUndefined()
+  })
+
+  it('leaves everything undefined when no track carries elevation', () => {
+    const none: TrackStats = {
+      distanceMeters: 1000,
+      durationSeconds: undefined,
+      elevationGainMeters: undefined,
+      elevationLossMeters: undefined,
+      highPointMeters: undefined,
+      lowPointMeters: undefined,
+    }
+    const summary = summarizeElevation([none])
+    expect(summary.elevationGainMeters).toBeUndefined()
+    expect(summary.elevationTrackCount).toBe(0)
   })
 })

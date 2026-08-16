@@ -1,10 +1,9 @@
-import { useEffect, useRef, useState, type DragEvent, type MouseEvent, type RefObject } from 'react'
+import { useEffect, useRef, useState, type DragEvent, type RefObject } from 'react'
 import type { ImportedFile } from '../import/types'
 import { TRACK_COLOR_NAMES, TRACK_COLORS, trackColor } from '../map/palette'
 import { formatStatsLine } from '../format/units'
 import { iconLabel } from './iconLabel'
 import { RowMenu } from './RowMenu'
-import { TrackRowDetail } from './TrackRowDetail'
 import './TrackList.css'
 
 interface TrackListProps {
@@ -51,6 +50,11 @@ interface TrackListProps {
   onRecolor?: (id: string, color: number) => Promise<boolean>
   /** Called with every row's `id` in its new order once a drag completes. */
   onReorder?: (orderedIds: string[]) => Promise<boolean>
+  /** #226: `More details` in the row's `⋮` navigates here with the file's
+      id — the row itself does nothing on click any more (#219's disclosure
+      is gone; see the design note). Omitted only in tests; every real
+      mount has a router to navigate. */
+  onOpenTrack?: (id: string) => void
   /** Drag handles render disabled while the trip is still gaining rows
       during #35's Partially loaded state — reordering a list that's still
       settling underneath the cursor produces a result nobody intended.
@@ -91,28 +95,13 @@ export function TrackList({
   onRename,
   onRecolor,
   onReorder,
+  onOpenTrack,
   canReorder = true,
   emptyDetail = 'Drop a KML or KMZ file anywhere, or use Import tracks above.',
   disabled = false,
 }: TrackListProps) {
   const [dragState, setDragState] = useState<DragState | null>(null)
   const [error, setError] = useState<string | null>(null)
-  /* #219 — one open track at a time, tracked here so opening one closes any
-     other: the column's height is the scarce resource, and two open details
-     push the list around under the reader's hands. */
-  const [openTrackId, setOpenTrackId] = useState<string | null>(null)
-
-  // A track removed from the trip while its detail is open closes it
-  // without error — the row unmounts and takes the detail with it.
-  useEffect(() => {
-    if (openTrackId && !files.some((file) => file.id === openTrackId)) setOpenTrackId(null)
-  }, [files, openTrackId])
-
-  // #77's Removing/Confirming treatment replaces the row's contents in
-  // place, and the detail closes rather than surviving underneath it.
-  useEffect(() => {
-    if (openTrackId && removingIds.has(openTrackId)) setOpenTrackId(null)
-  }, [removingIds, openTrackId])
 
   if (files.length === 0) {
     return (
@@ -125,10 +114,6 @@ export function TrackList({
 
   function handleDragStart(id: string) {
     if (!onReorder || !canReorder) return
-    // The open row dragged: reordering collapses it first — dragging a row
-    // three times its normal height past its neighbours makes the drop
-    // indicator unreadable.
-    if (openTrackId === id) setOpenTrackId(null)
     setDragState({ draggedId: id, overId: null, before: true })
   }
 
@@ -173,13 +158,11 @@ export function TrackList({
               confirming={Boolean(onStartConfirm) && confirmingId === file.id}
               confirmingRowRef={confirmingId === file.id ? confirmingRowRef : undefined}
               onStartConfirm={() => {
-                if (openTrackId === file.id) setOpenTrackId(null)
                 if (onStartConfirm) onStartConfirm(file.id)
                 else onRemove(file.id)
               }}
               onCancelConfirm={onCancelConfirm}
-              open={openTrackId === file.id}
-              onToggleOpen={() => setOpenTrackId((current) => (current === file.id ? null : file.id))}
+              onOpenTrack={onOpenTrack}
               removing={removingIds.has(file.id)}
               removeError={removeErrors[file.id]}
               disableRemove={disableRemove}
@@ -230,8 +213,7 @@ function TrackRow({
   onDragOverRow,
   onDrop,
   onDragEnd,
-  open,
-  onToggleOpen,
+  onOpenTrack,
 }: {
   file: ImportedFile
   onToggleVisibility: (id: string) => void
@@ -257,10 +239,7 @@ function TrackRow({
   onDragOverRow: (event: DragEvent<HTMLLIElement>) => void
   onDrop: () => void
   onDragEnd: () => void
-  /** #219 — whether this row's detail is expanded. Absent any meaning for a
-      multi-track file, which never opens (see `canOpen` below). */
-  open: boolean
-  onToggleOpen: () => void
+  onOpenTrack?: (id: string) => void
 }) {
   const [editingName, setEditingName] = useState(false)
   const [colorPickerOpen, setColorPickerOpen] = useState(false)
@@ -271,22 +250,11 @@ function TrackRow({
      with trips) — the line only appears when there is exactly one track to
      describe unambiguously. */
   const statsLine = file.tracks.length === 1 ? formatStatsLine(file.trackStats[0]) : null
-  /* #219 — a multi-track file has no unambiguous single set of numbers (#6,
-     #7), so there is nothing for a detail to show: no name button, no
-     `aria-expanded`, no pointer affordance. Its `⋮` still carries Rename. */
-  const canOpen = file.tracks.length === 1
-  const detailId = `track-row-detail-${file.id}`
-
-  // The row's remaining non-interactive area also toggles, for pointer
-  // users who aim at the meta line or the whitespace — implemented by
-  // ignoring any click whose target sits inside an interactive descendant,
-  // rather than stopping propagation in five different handlers.
-  function handleRowClick(event: MouseEvent<HTMLDivElement>) {
-    if (!canOpen) return
-    const target = event.target as HTMLElement
-    if (target.closest('button, a, input, [draggable="true"]')) return
-    onToggleOpen()
-  }
+  /* #226 (was #219's `canOpen`) — a multi-track file has no unambiguous
+     single set of numbers (#6, #7), so there is nothing for a face to
+     show: no `More details`, per the design note's menu table. Its `⋮`
+     still carries Rename. */
+  const canOpenDetail = file.tracks.length === 1
 
   /* Held and cleared on unmount, the way `TripMetadataHeader` already does
      with its own saved flash. Left dangling, the timer fires against an
@@ -378,7 +346,11 @@ function TrackRow({
       onDragOver={onDragOverRow}
       onDrop={onDrop}
     >
-      <div className="track-row__main" onClick={handleRowClick}>
+      {/* #226 — the row's click does nothing. Every control on it is
+          already a control (`⠿`, the swatch, `👁`, `⋮`); adding a click
+          meaning to the whitespace between them makes the other five
+          ambiguous, which is what #219 did. `More details` is the `⋮`'s. */}
+      <div className="track-row__main">
         {showHandle ? (
           <span
             className={`track-row__handle${draggable ? '' : ' track-row__handle--disabled'}`}
@@ -425,22 +397,10 @@ function TrackRow({
         <div className="track-row__text">
           {editingName ? (
             <NameInput initial={file.name} onCommit={commitName} onCancel={() => setEditingName(false)} />
-          ) : canOpen ? (
-            /* #219 — the name is the keyboard and assistive-technology path
-               to the detail, free now that rename has moved to the `⋮`. */
-            <button
-              type="button"
-              className={`track-row__name track-row__name--button${
-                savedField === 'name' ? ' track-row__field--saved' : ''
-              }`}
-              title={file.name}
-              aria-expanded={open}
-              aria-controls={detailId}
-              onClick={onToggleOpen}
-            >
-              {file.name}
-            </button>
           ) : (
+            /* #226 — back to a plain span with its `title`: #219's
+               name-as-button existed only to open the row's own detail,
+               which is gone. */
             <span className={`track-row__name${savedField === 'name' ? ' track-row__field--saved' : ''}`} title={file.name}>
               {file.name}
               {file.tracks.length > 1 && (
@@ -451,16 +411,6 @@ function TrackRow({
           {/* A multi-track file has no unambiguous stats line, and no empty
               second line is drawn to keep row heights equal. */}
           {statsLine && <p className="track-row__stats">{statsLine}</p>}
-          {canOpen && (
-            <div
-              id={detailId}
-              className={`track-row__detail-wrapper${open ? ' track-row__detail-wrapper--open' : ''}`}
-            >
-              <div className="track-row__detail-inner">
-                <TrackRowDetail track={file.tracks[0]} stats={file.trackStats[0]} color={color} />
-              </div>
-            </div>
-          )}
         </div>
         <button
           type="button"
@@ -481,10 +431,19 @@ function TrackRow({
           <RowMenu
             label={`Row actions for ${file.name}`}
             actions={[
-              /* #219 — rename moved off the name click, which now opens
-                 the detail; first in the menu because it's the only
-                 non-removing item and #193's order runs safe to
-                 destructive. */
+              /* #226 — `More details` opens the track's face; absent for a
+                 multi-track file, which has no unambiguous numbers for a
+                 face to show (`canOpenDetail`). No ellipsis: opening a face
+                 asks nothing, per the design note. First in the menu,
+                 #193's safe-to-destructive order. */
+              ...(canOpenDetail && onOpenTrack
+                ? [
+                    {
+                      label: 'More details',
+                      onSelect: () => onOpenTrack(file.id),
+                    },
+                  ]
+                : []),
               ...(onRename
                 ? [
                     {
@@ -559,8 +518,9 @@ function ColorPopover({
       {/* Closes the popover on an outside click without a document-level
           listener — a full-viewport layer beneath the popover itself.
           Stops propagation: it's a DOM descendant of the row despite
-          covering the whole viewport, so an unstopped click would also
-          reach the row's own click-to-open handler (#219). */}
+          covering the whole viewport, and the row's own click now does
+          nothing (#226), so this only prevents the click from reaching
+          whatever the row happens to sit inside of. */}
       <div
         className="track-row__color-backdrop"
         onClick={(event) => {

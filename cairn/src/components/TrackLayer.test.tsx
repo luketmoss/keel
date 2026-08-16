@@ -41,6 +41,7 @@ function importedFile(overrides: Partial<ImportedFile> = {}): ImportedFile {
   return {
     id: 'f1',
     name: 'trip.kml',
+    sourceName: 'trip.kml',
     driveFileId: 'drive-f1',
     colorIndex: 0,
     visible: true,

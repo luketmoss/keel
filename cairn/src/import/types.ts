@@ -8,6 +8,12 @@ import type { TrackStats } from '../kml/stats'
 export interface ImportedFile {
   id: string
   name: string
+  /** #226 — the Drive file's own name, untouched by a #150 rename override.
+      `name` above already reflects a rename; this is what the track face's
+      footnote line shows instead, since the two files a re-imported and a
+      renamed trip track once shared under one name (#150's whole reason for
+      existing) diverge again the moment a person types something else. */
+  sourceName: string
   /** The file's id in Drive — stable across reloads, unlike `id` above,
       which `useTripImport` regenerates every mount. What #46's per-track
       overrides (rename/reorder/recolour) are keyed by. */

@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import { parseKmlOrKmz, type Track } from '../kml/parse'
-import { computeTrackStats } from '../kml/stats'
+import { aggregateElevationProfile, aggregateTrackStats } from '../kml/stats'
 import { readPhotoExif } from '../photo/exif'
 import { positionPhoto } from '../photo/interpolate'
 import { formatShortDate } from '../format/dates'
@@ -81,17 +81,22 @@ export function useLooseImport(store: LooseStore) {
             rejections.push({ name: file.name, message: `${file.name} has no track to import.` })
             continue
           }
-          const stats = parsed.tracks.map(computeTrackStats)
-          const distanceMeters = stats.reduce((total, s) => total + s.distanceMeters, 0)
-          const gains = stats
-            .map((s) => s.elevationGainMeters)
-            .filter((gain): gain is number => gain !== undefined)
+          // #226 — one `TrackStats` for the whole file (`aggregateTrackStats`),
+          // since a loose row is one row per file and the face needs all six
+          // of #218's numbers, not just the ascent this used to compute alone.
+          const aggregate = aggregateTrackStats(parsed.tracks)
+          const profile = aggregateElevationProfile(parsed.tracks)
           store.addTrack(
             {
               name: parsed.tracks[0].name || file.name.replace(/\.[^.]+$/, ''),
               date: trackDate(parsed.tracks),
-              distanceMeters,
-              ascentMeters: gains.length > 0 ? gains.reduce((a, b) => a + b, 0) : null,
+              distanceMeters: aggregate.distanceMeters,
+              ascentMeters: aggregate.elevationGainMeters ?? null,
+              elevationLossMeters: aggregate.elevationLossMeters ?? null,
+              highPointMeters: aggregate.highPointMeters ?? null,
+              lowPointMeters: aggregate.lowPointMeters ?? null,
+              durationSeconds: aggregate.durationSeconds ?? null,
+              elevationProfile: profile ?? null,
               pointCount: parsed.tracks.reduce((total, t) => total + t.points.length, 0),
               sourceName: file.name,
               // Cycles the palette by how many loose tracks already exist,
@@ -205,16 +210,23 @@ export function useLooseImport(store: LooseStore) {
       options?: { source?: File; driveFileId?: string; name?: string },
     ): LooseTrackRecord | null => {
       if (tracks.length === 0) return null
-      const stats = tracks.map(computeTrackStats)
-      const gains = stats
-        .map((s) => s.elevationGainMeters)
-        .filter((gain): gain is number => gain !== undefined)
+      // #226 — same whole-file aggregate `importFiles` computes above; this
+      // path (`Remove from trip`) has the trip's own already-parsed tracks
+      // rather than a dropped `File`, but the numbers are derived the same
+      // way regardless of where the `Track[]` came from.
+      const aggregate = aggregateTrackStats(tracks)
+      const profile = aggregateElevationProfile(tracks)
       return store.addTrack(
         {
           name: options?.name?.trim() || tracks[0].name || sourceName.replace(/\.[^.]+$/, ''),
           date: trackDate(tracks),
-          distanceMeters: stats.reduce((total, s) => total + s.distanceMeters, 0),
-          ascentMeters: gains.length > 0 ? gains.reduce((a, b) => a + b, 0) : null,
+          distanceMeters: aggregate.distanceMeters,
+          ascentMeters: aggregate.elevationGainMeters ?? null,
+          elevationLossMeters: aggregate.elevationLossMeters ?? null,
+          highPointMeters: aggregate.highPointMeters ?? null,
+          lowPointMeters: aggregate.lowPointMeters ?? null,
+          durationSeconds: aggregate.durationSeconds ?? null,
+          elevationProfile: profile ?? null,
           pointCount: tracks.reduce((total, t) => total + t.points.length, 0),
           sourceName,
           colorIndex:

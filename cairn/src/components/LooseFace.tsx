@@ -3,7 +3,7 @@ import { AddToTripPicker, type TripChoice } from './AddToTripPicker'
 import { RowMenu } from './RowMenu'
 import { NameInput } from './NameInput'
 import { ColorPopover } from './ColorPopover'
-import { formatDistance } from '../format/units'
+import { TrackFaceBody } from './TrackFaceBody'
 import { trackColor, TRACK_COLORS } from '../map/palette'
 import {
   ADD_DESCRIPTION_PLACEHOLDER,
@@ -171,6 +171,20 @@ export function LooseFace({
               { label: 'Delete…', danger: true, disabled, onSelect: () => setConfirming(true) },
             ]}
           />
+          {/* #226 — the inline swatch (and its own popover) moved off
+              `TrackBody`, which no longer draws a colour cell the design
+              note's face diagram doesn't show; `Change colour` in the `⋮`
+              above is the one remaining affordance, and this is what it
+              opens, anchored to the head it sits in. */}
+          {item.kind === 'track' && colorPickerOpen && (
+            <ColorPopover
+              name={item.name}
+              currentColorIndex={item.colorIndex % TRACK_COLORS.length}
+              onSelect={selectColor}
+              onClose={() => setColorPickerOpen(false)}
+              align="right"
+            />
+          )}
         </div>
         <p className="loose-face__kind">
           {item.kind === 'track' ? 'track · not in a trip' : 'cairn · not in a trip'}
@@ -225,14 +239,7 @@ export function LooseFace({
         )}
 
         {item.kind === 'track' ? (
-          <TrackBody
-            item={item}
-            colorPickerOpen={colorPickerOpen}
-            onOpenColorPicker={() => setColorPickerOpen(true)}
-            onCloseColorPicker={() => setColorPickerOpen(false)}
-            onSelectColor={selectColor}
-            disabled={disabled}
-          />
+          <TrackBody item={item} />
         ) : (
           <CairnBody
             item={item}
@@ -259,68 +266,29 @@ export function LooseFace({
   )
 }
 
-function TrackBody({
-  item,
-  colorPickerOpen,
-  onOpenColorPicker,
-  onCloseColorPicker,
-  onSelectColor,
-  disabled,
-}: {
-  item: Extract<LooseRecord, { kind: 'track' }>
-  colorPickerOpen: boolean
-  onOpenColorPicker: () => void
-  onCloseColorPicker: () => void
-  onSelectColor: (index: number) => void
-  disabled: boolean
-}) {
+/** #226 — the loose half of the unified track face body. The loose store
+    keeps no raw `Track` points around to compute stats or a profile from
+    (the performance rule forbids loading full-resolution geometry for
+    anything the map draws), so this reads the numbers `kml/stats.ts`'s
+    `aggregateTrackStats`/`aggregateElevationProfile` already computed once,
+    at import, and stored on the record — `TrackFace`'s trip-owned sibling
+    computes the same shape from a `Track` it already holds in memory. */
+function TrackBody({ item }: { item: Extract<LooseRecord, { kind: 'track' }> }) {
   return (
-    <dl className="loose-face__stats">
-      <div className="loose-face__stat">
-        <dt>Distance</dt>
-        <dd>{formatDistance(item.distanceMeters)}</dd>
-      </div>
-      <div className="loose-face__stat">
-        <dt>Ascent</dt>
-        <dd>{item.ascentMeters === null ? '—' : `${Math.round(item.ascentMeters)} m`}</dd>
-      </div>
-      <div className="loose-face__stat">
-        <dt>Points</dt>
-        <dd>{item.pointCount}</dd>
-      </div>
-      <div className="loose-face__stat">
-        <dt>Source</dt>
-        <dd title={item.sourceName}>{item.sourceName}</dd>
-      </div>
-      <div className="loose-face__stat">
-        <dt>Colour</dt>
-        <dd>
-          <span className="loose-face__swatch-wrap">
-            <button
-              type="button"
-              className="loose-face__swatch-button"
-              aria-label={`Change colour for ${item.name}`}
-              disabled={disabled}
-              onClick={onOpenColorPicker}
-            >
-              <span
-                className="loose-face__swatch"
-                style={{ background: trackColor(item.colorIndex) }}
-                aria-hidden="true"
-              />
-            </button>
-            {colorPickerOpen && (
-              <ColorPopover
-                name={item.name}
-                currentColorIndex={item.colorIndex % TRACK_COLORS.length}
-                onSelect={onSelectColor}
-                onClose={onCloseColorPicker}
-              />
-            )}
-          </span>
-        </dd>
-      </div>
-    </dl>
+    <TrackFaceBody
+      stats={{
+        distanceMeters: item.distanceMeters,
+        durationSeconds: item.durationSeconds ?? undefined,
+        elevationGainMeters: item.ascentMeters ?? undefined,
+        elevationLossMeters: item.elevationLossMeters ?? undefined,
+        highPointMeters: item.highPointMeters ?? undefined,
+        lowPointMeters: item.lowPointMeters ?? undefined,
+      }}
+      profile={item.elevationProfile ?? undefined}
+      pointCount={item.pointCount}
+      sourceName={item.sourceName}
+      color={trackColor(item.colorIndex)}
+    />
   )
 }
 

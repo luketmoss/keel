@@ -33,6 +33,7 @@ function tripTrack(overrides: Record<string, unknown> = {}) {
   return {
     id: 'f1',
     name: 'day-1.kml',
+    sourceName: 'day-1.kml',
     driveFileId: 'drive-1',
     tracks: [{ name: 'Day one', points: [{ lat: 1, lon: 2 }] }],
     trackStats: [{ distanceMeters: 14200, pointCount: 2 }],

@@ -162,7 +162,12 @@ function emptyDraftFields(): CairnDraftFields {
     for the same reason, which is why #79's module-level snapshot and #80's
     scroll snapshot are both gone. */
 function AppShell() {
-  const openTripId = useMatch('/trips/:id')?.params.id
+  /* #226 — the id `/trips/:id` itself names, before any track-face
+     fallback below widens what counts as "a trip is open". Kept apart
+     from `openTripId` so the sticky-context effect can tell "the URL
+     really is a trip" from "a trip is open because a track face inside
+     one needs it to stay mounted". */
+  const routeTripId = useMatch('/trips/:id')?.params.id
   const openTrackId = useMatch('/tracks/:id')?.params.id
   const openCairnId = useMatch('/cairns/:id')?.params.id
   const openLooseId = openTrackId ?? openCairnId
@@ -214,6 +219,15 @@ function AppShell() {
   const [tripCairnDetail, setTripCairnDetail] = useState<{ name: string; hasImage: boolean } | null>(null)
   const handleCairnDetailChange = useCallback(
     (detail: { name: string; hasImage: boolean } | null) => setTripCairnDetail(detail),
+    [],
+  )
+  /** #226 — the mirror of `tripCairnDetail`, for a trip-owned track's face:
+      reported up so the search card shows the track's own name rather than
+      the trip's, and so its Back button knows to return to the trip
+      instead of `/`. */
+  const [tripTrackDetail, setTripTrackDetail] = useState<{ name: string } | null>(null)
+  const handleTrackDetailChange = useCallback(
+    (detail: { name: string } | null) => setTripTrackDetail(detail),
     [],
   )
   /** #157: a loose cairn's own attach state — the mirror of `TripDetail`'s
@@ -352,6 +366,35 @@ function AppShell() {
     setAttachLooseError(null)
     setMoveLooseError(null)
   }, [openLooseId])
+
+  /* #226 — a trip-owned track has no id of its own in the URL (`/tracks/:id`
+     carries only the track's id, the same address a loose track uses), so
+     reaching it from a bare `/tracks/:id` needs to remember which trip was
+     open when `More details` was clicked. Cleared the moment the URL points
+     at neither a trip nor an unresolved track id — actually leaving. Left
+     alone on a bare `/tracks/:id` that *did* resolve as loose, or on one
+     that resolves against neither store (see `TripDetail`'s own "removed
+     while open" effect, which is what corrects a stale sticky id). */
+  const trackIsLoose = Boolean(openTrackId) && visibleLoose.some((item) => item.id === openTrackId)
+  const [stickyTripId, setStickyTripId] = useState<string | null>(null)
+  useEffect(() => {
+    if (routeTripId) {
+      setStickyTripId(routeTripId)
+      return
+    }
+    if (!openTrackId || trackIsLoose) setStickyTripId(null)
+  }, [routeTripId, openTrackId, trackIsLoose])
+
+  // The trip actually rendered below: the URL's own trip id, or — while a
+  // bare `/tracks/:id` names a track that isn't loose — whichever trip was
+  // open when that track's face was reached, so `TripDetail` stays mounted
+  // (map layers, scroll position) across the navigation instead of losing
+  // both and rebuilding them the moment the face closes again.
+  const openTripId = routeTripId ?? (openTrackId && !trackIsLoose ? (stickyTripId ?? undefined) : undefined)
+  /** #226 — `undefined` while no such track is open, or while the open one
+      turned out to be loose. Passed to `TripDetail`, which resolves it (or
+      corrects a stale one) against its own `tripImport.tracks`. */
+  const openTripTrackId = openTripId && openTrackId && !trackIsLoose ? openTrackId : undefined
 
   const openTrip = openTripId ? trips.find((trip) => trip.id === openTripId) : undefined
   const draftOpen = Boolean(draftTrip.draft)
@@ -1007,18 +1050,27 @@ function AppShell() {
                   ? { name: cairnDraft.fields.name || 'New cairn', kind: 'new cairn' }
                   : queueOpen
                     ? { name: 'Place this photo', kind: 'needs a location' }
-                    : detailForCard(openTrip, openLoose)
+                    : tripTrackDetail
+                      ? { name: tripTrackDetail.name, kind: 'track · in a trip' }
+                      : detailForCard(openTrip, openLoose)
               }
               // "Back, in the search card, discards the remaining queue —
               // it is the same action as Discard n, reached from the other
               // end. It does not silently save them." #156's Back is
               // likewise identical to its Cancel.
+              //
+              // #226: a trip-owned track's face returns to the trip it came
+              // from, not to `/` — "leaving returns to where it was opened
+              // from", the same stance a loose track's own Back (unchanged,
+              // below) already takes by landing on the top-level list.
               onBack={() =>
                 createOpen
                   ? cancelCairnDraft()
                   : queueOpen
                     ? setQueue(discardRemaining)
-                    : navigate('/')
+                    : tripTrackDetail && openTripId
+                      ? navigate(`/trips/${openTripId}`)
+                      : navigate('/')
               }
               query={filters.name}
               onQueryChange={(name) => setFilters((current) => ({ ...current, name }))}
@@ -1098,6 +1150,8 @@ function AppShell() {
                   onCreateTargetChange={handleCreateTargetChange}
                   onCairnDetailChange={handleCairnDetailChange}
                   cairnsDraggable={cairnsDraggable}
+                  openTrackId={openTripTrackId}
+                  onTrackDetailChange={handleTrackDetailChange}
                 />
               </div>
             </>

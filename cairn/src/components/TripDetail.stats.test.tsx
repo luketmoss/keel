@@ -46,6 +46,7 @@ function trackFile(id: string, distanceMeters: number, elevationGainMeters?: num
   return {
     id,
     name: `${id}.kml`,
+    sourceName: `${id}.kml`,
     driveFileId: `drive-${id}`,
     tracks: [{ name: id, points: [] }],
     trackStats: [

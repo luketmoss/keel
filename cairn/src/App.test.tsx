@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import JSZip from 'jszip'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { formatDistance } from './format/units'
+import { formatDistance, formatElevationGain } from './format/units'
 
 const { findOrCreateTripFolder } = vi.hoisted(() => ({ findOrCreateTripFolder: vi.fn() }))
 vi.mock('./drive/tripFolder', () => ({ findOrCreateTripFolder }))
@@ -761,9 +761,10 @@ describe('App loose tracks and photos (#110)', () => {
     await signIn()
 
     expect(await screen.findByText(formatDistance(14200))).toBeDefined()
-    expect(screen.getByText('690 m')).toBeDefined()
-    expect(screen.getByText('512')).toBeDefined()
-    expect(screen.getByText('Mount Rosea.kml')).toBeDefined()
+    // #226: through the shared formatter, respecting the app's imperial
+    // `SYSTEM` — the bug this issue fixes rendered `690 m` here regardless.
+    expect(screen.getByText(formatElevationGain(690)!)).toBeDefined()
+    expect(screen.getByText('512 points · Mount Rosea.kml')).toBeDefined()
     // The card says what it is, and that no trip owns it.
     expect(container.querySelector('.search-card__kind')?.textContent).toBe(
       'track · not in a trip',
@@ -1031,7 +1032,10 @@ describe('App loose tracks and photos (#110)', () => {
       await renderApp('/tracks/lt-recolor', { googleClientId: 'a-client-id' })
       await signIn()
 
-      fireEvent.click(await screen.findByRole('button', { name: 'Change colour for Mount Rosea' }))
+      // #226: the inline swatch button moved off the body — `Change colour`
+      // in the `⋮` is the one remaining way to reach the popover.
+      fireEvent.click(await screen.findByRole('button', { name: 'Actions for Mount Rosea' }))
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Change colour' }))
       const options = screen
         .getAllByRole('button')
         .filter((el) => el.className.includes('color-popover__option'))

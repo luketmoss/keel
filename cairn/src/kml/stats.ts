@@ -158,6 +158,35 @@ export function computeTrackStats(track: Track): TrackStats {
   }
 }
 
+/** #226 — a loose item is one row per dropped *file*, and a file can hold
+    more than one placemark (`useLooseImport`'s "one dropped file is one
+    row" stance). The loose store has nowhere to keep per-track numbers, so
+    its face needs one `TrackStats` for the whole file: distance and the two
+    elevation extremes are summed/maxed/minned across every track's own
+    stats (avoiding a false climb at the seam between two placemarks, which
+    concatenating raw points before filtering would introduce), while
+    duration spans every timestamped point in the file, not just one
+    track's. */
+export function aggregateTrackStats(tracks: Track[]): TrackStats {
+  const perTrack = tracks.map(computeTrackStats)
+  const distanceMeters = perTrack.reduce((total, s) => total + s.distanceMeters, 0)
+  const durationSeconds = computeDurationSeconds(tracks.flatMap((track) => track.points))
+
+  const gains = perTrack.map((s) => s.elevationGainMeters).filter((v): v is number => v !== undefined)
+  const losses = perTrack.map((s) => s.elevationLossMeters).filter((v): v is number => v !== undefined)
+  const highs = perTrack.map((s) => s.highPointMeters).filter((v): v is number => v !== undefined)
+  const lows = perTrack.map((s) => s.lowPointMeters).filter((v): v is number => v !== undefined)
+
+  return {
+    distanceMeters,
+    durationSeconds,
+    elevationGainMeters: gains.length > 0 ? gains.reduce((a, b) => a + b, 0) : undefined,
+    elevationLossMeters: losses.length > 0 ? losses.reduce((a, b) => a + b, 0) : undefined,
+    highPointMeters: highs.length > 0 ? Math.max(...highs) : undefined,
+    lowPointMeters: lows.length > 0 ? Math.min(...lows) : undefined,
+  }
+}
+
 export interface ElevationProfilePoint {
   /** Cumulative distance along the track, not point index — a track sampled
       densely on one leg is not stretched along it (#219). */
@@ -194,4 +223,25 @@ export function computeElevationProfile(points: Track['points']): ElevationProfi
     distanceMeters: cumulativeDistance[point.index],
     elevationMeters: filtered[i],
   }))
+}
+
+/** #226 — the loose face's mirror of `aggregateTrackStats`: one profile for
+    a whole file, each track's own profile appended after the last, offset
+    by that track's total distance so the x axis still reads left-to-right
+    across the file rather than resetting to zero at every placemark.
+    `undefined` when nothing in the file has usable elevation, matching
+    `computeElevationProfile`'s own unavailability rule. */
+export function aggregateElevationProfile(tracks: Track[]): ElevationProfilePoint[] | undefined {
+  let offsetMeters = 0
+  const combined: ElevationProfilePoint[] = []
+  for (const track of tracks) {
+    const profile = computeElevationProfile(track.points)
+    if (profile) {
+      for (const point of profile) {
+        combined.push({ distanceMeters: point.distanceMeters + offsetMeters, elevationMeters: point.elevationMeters })
+      }
+    }
+    offsetMeters += computeDistanceMeters(track.points)
+  }
+  return combined.length >= 2 ? combined : undefined
 }

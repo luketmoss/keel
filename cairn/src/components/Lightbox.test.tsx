@@ -370,4 +370,137 @@ describe('Lightbox', () => {
       expect(screen.queryByText("Couldn't move it — put back where it was.")).toBeNull()
     })
   })
+  /* #197 — the photo gets the space that exists, and a mode for when even
+     that is not enough. The two-column split itself is CSS-only and is
+     verified in the browser; what is behavioural is the mode. */
+  describe('#197 full bleed', () => {
+    function renderBox(props: Partial<Parameters<typeof Lightbox>[0]> = {}) {
+      const merged = {
+        row: row(),
+        rows: [row()],
+        description: '',
+        accessToken: 'token',
+        onClose: vi.fn(),
+        onNavigate: vi.fn(),
+        returnFocusRef: createRef<HTMLElement>(),
+        ...props,
+      }
+      return { ...render(<Lightbox {...merged} />), props: merged }
+    }
+
+    const photo = () => screen.getByRole('button', { name: /full size$/ })
+
+    it('clicking the photo enters full bleed, and clicking it again returns', () => {
+      renderBox()
+
+      expect(screen.getByRole('button', { name: 'View full size' })).toBeDefined()
+      fireEvent.click(photo())
+
+      // Nothing but the photo and its controls: no name, no meta, no
+      // description.
+      expect(screen.getByRole('button', { name: 'Exit full size' })).toBeDefined()
+      expect(screen.getByRole('dialog').className).toContain('lightbox__dialog--full-bleed')
+
+      fireEvent.click(photo())
+      expect(screen.getByRole('button', { name: 'View full size' })).toBeDefined()
+      expect(screen.getByRole('dialog').className).not.toContain('lightbox__dialog--full-bleed')
+    })
+
+    it('Escape leaves full bleed first and closes only on the second press', () => {
+      const onClose = vi.fn()
+      renderBox({ onClose })
+
+      fireEvent.click(photo())
+      fireEvent.keyDown(document, { key: 'Escape' })
+
+      // Innermost first — the detail face is back and nothing closed.
+      expect(onClose).not.toHaveBeenCalled()
+      expect(screen.getByRole('button', { name: 'View full size' })).toBeDefined()
+
+      fireEvent.keyDown(document, { key: 'Escape' })
+      expect(onClose).toHaveBeenCalled()
+    })
+
+    it('arrows navigate from inside full bleed and stay in it', () => {
+      const onNavigate = vi.fn()
+      const rows = [row({ id: 'a' }), row({ id: 'b' })]
+      renderBox({ row: rows[0], rows, onNavigate })
+
+      fireEvent.click(photo())
+      fireEvent.keyDown(document, { key: 'ArrowRight' })
+
+      expect(onNavigate).toHaveBeenCalledWith('b')
+      expect(screen.getByRole('dialog').className).toContain('lightbox__dialog--full-bleed')
+    })
+
+    it('leaves full bleed when the cairn arrowed to has no image', () => {
+      const withImage = row({ id: 'a' })
+      const iconOnly = row({ id: 'b', icon: 'campsite', thumbnailDriveFileId: null, originalDriveFileId: null })
+      const rows = [withImage, iconOnly]
+      const { rerender } = renderBox({ row: withImage, rows })
+
+      fireEvent.click(photo())
+      expect(screen.getByRole('dialog').className).toContain('lightbox__dialog--full-bleed')
+
+      // The list mixes photo cairns and icon-only ones, so this is
+      // reachable rather than theoretical.
+      rerender(
+        <Lightbox
+          row={iconOnly}
+          rows={rows}
+          description=""
+          accessToken="token"
+          onClose={vi.fn()}
+          onNavigate={vi.fn()}
+          returnFocusRef={createRef<HTMLElement>()}
+        />,
+      )
+
+      expect(screen.getByRole('dialog').className).not.toContain('lightbox__dialog--full-bleed')
+    })
+
+    it('leaves full bleed when a photo is dropped onto the cairn', () => {
+      const only = row()
+      const { rerender } = renderBox()
+
+      fireEvent.click(photo())
+      expect(screen.getByRole('dialog').className).toContain('lightbox__dialog--full-bleed')
+
+      rerender(
+        <Lightbox
+          row={only}
+          rows={[only]}
+          description=""
+          accessToken="token"
+          onClose={vi.fn()}
+          onNavigate={vi.fn()}
+          returnFocusRef={createRef<HTMLElement>()}
+          attaching
+        />,
+      )
+
+      // The upload's progress belongs on the detail face, where #157 put it.
+      expect(screen.getByRole('dialog').className).not.toContain('lightbox__dialog--full-bleed')
+    })
+
+    it('gives an icon-only cairn no image slot and no way into the mode', () => {
+      const iconOnly = row({ icon: 'campsite', thumbnailDriveFileId: null, originalDriveFileId: null })
+      const { container } = renderBox({ row: iconOnly, rows: [iconOnly] })
+
+      expect(screen.queryByRole('button', { name: /full size$/ })).toBeNull()
+      expect(container.querySelector('.lightbox__media')).toBeNull()
+      // The detail face is otherwise unaffected.
+      expect(screen.getByText('a.jpg')).toBeDefined()
+    })
+
+    it('keeps the detail face reachable while a photo uploads onto a cairn with none', () => {
+      const blank = row({ thumbnailDriveFileId: null, originalDriveFileId: null })
+      const { container } = renderBox({ row: blank, rows: [blank], attaching: true })
+
+      // #157's slot still needs somewhere to show progress.
+      expect(container.querySelector('.lightbox__media')).not.toBeNull()
+      expect(screen.getByText('uploading…')).toBeDefined()
+      expect(photo()).toHaveProperty('disabled', true)
+    })
+  })
 })

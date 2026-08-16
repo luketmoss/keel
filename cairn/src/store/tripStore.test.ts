@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { deriveTripStatus, LocalTripStore } from './tripStore'
+import { SIDECAR_VERSION, type StoredOverview } from '../geo/tripTotals'
 
 /** A minimal in-memory `Storage` so tests don't depend on jsdom's
     `localStorage` persisting (or not) across test files. */
@@ -295,7 +296,34 @@ describe('LocalTripStore', () => {
 
       store.saveOverview(trip.id, [])
 
-      expect(store.getOverview(trip.id)).toEqual({ type: 'FeatureCollection', features: [] })
+      const overview = store.getOverview(trip.id)
+      expect(overview?.type).toBe('FeatureCollection')
+      expect(overview?.features).toEqual([])
+    })
+
+    it('persists totals and the sidecar version stamp alongside the geometry (#225)', () => {
+      const store = new LocalTripStore(fakeStorage())
+      const trip = store.createTrip('Hokkaido')
+
+      store.saveOverview(trip.id, [
+        { name: 'Day 1', points: [{ lat: 37, lon: -122 }, { lat: 38, lon: -121, elevation: 100 }] },
+      ])
+
+      const overview = store.getOverview(trip.id) as StoredOverview
+      expect(overview.version).toBe(SIDECAR_VERSION)
+      expect(overview.totals).not.toBeNull()
+      expect(overview.totals?.distanceMeters).toBeGreaterThan(0)
+    })
+
+    it('persists null totals for a trip with no tracks, distinct from never having saved', () => {
+      const store = new LocalTripStore(fakeStorage())
+      const trip = store.createTrip('Hokkaido')
+
+      store.saveOverview(trip.id, [])
+
+      const overview = store.getOverview(trip.id) as StoredOverview
+      expect(overview.version).toBe(SIDECAR_VERSION)
+      expect(overview.totals).toBeNull()
     })
 
     it('overwrites a previously saved overview on a later save', () => {

@@ -1,6 +1,7 @@
 import type { FeatureCollection, LineString } from 'geojson'
 import type { Track } from '../kml/parse'
 import { buildOverviewGeoJSON, computeTripOrigin } from '../geo/overview'
+import { computeTripTotals, SIDECAR_VERSION, type StoredOverview } from '../geo/tripTotals'
 import type { LatLng } from '../map/geo'
 
 export type TripStatus = 'planned' | 'completed'
@@ -365,7 +366,11 @@ export class LocalTripStore implements TripStore {
   }
 
   saveOverview = (id: string, tracks: Track[]): void => {
-    const overview = buildOverviewGeoJSON(tracks)
+    const overview: StoredOverview = {
+      ...buildOverviewGeoJSON(tracks),
+      version: SIDECAR_VERSION,
+      totals: computeTripTotals(tracks),
+    }
     this.storage.setItem(overviewKey(id), JSON.stringify(overview))
     this.updateOrigin(id, computeTripOrigin(tracks))
     this.notify()

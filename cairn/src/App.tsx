@@ -38,6 +38,7 @@ import { downloadTrackFile } from './drive/trackFiles'
 import { DriveLooseStore } from './store/driveLooseStore'
 import type { TripIndexEntry } from './store/tripStore'
 import { DEFAULT_TRIP_FILTERS, tripDayIndex, type TripFilters } from './store/tripFilters'
+import { readTripTotals } from './geo/tripTotals'
 import { dataTransferHasFiles, filesFromDataTransfer } from './import/dataTransfer'
 import type { ImportedFile } from './import/types'
 import { isPhotoFile } from './import/fileKinds'
@@ -432,6 +433,17 @@ function AppShell() {
    * `localStorage` read. */
   const trackCounts = new Map(
     visibleTrips.map((entry) => [entry.id, tripStore.getOverview(entry.id)?.features.length ?? 0]),
+  )
+
+  /** Every visible trip's totals (#225), read from the same sidecar and for
+      the same reason `trackCounts` above is: never by opening a trip's
+      folder or parsing a KML, just the precomputed `overview.geojson`
+      every trip already hydrates on `connect()`. `null` for a trip with no
+      tracks, an unreadable sidecar, or one stamped under an older
+      `SIDECAR_VERSION` — `readTripTotals` collapses all three to the same
+      "nothing to show" case the row already handles. */
+  const tripTotals = new Map(
+    visibleTrips.map((entry) => [entry.id, readTripTotals(tripStore.getOverview(entry.id))]),
   )
 
   /** What the picker shows beside each trip. Counts come from the index the
@@ -1200,6 +1212,7 @@ function AppShell() {
             <TripsPanel
               trips={visibleTrips}
               trackCounts={trackCounts}
+              tripTotals={tripTotals}
               looseItems={visibleLoose}
               kind={kind}
               facet={cairnFacet}

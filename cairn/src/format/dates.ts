@@ -1,4 +1,6 @@
 import { deriveTripStatus } from '../store/tripStore'
+import { formatDistance, formatElevationGain } from './units'
+import type { TripTotals } from '../geo/tripTotals'
 
 /* Hair space + en dash + hair space, matching the header's existing range
    separator. A plain hyphen ("Aug 1 - 5") reads as a subtraction in the
@@ -119,11 +121,17 @@ export function formatTripDateRange(startDate: string | null, endDate: string | 
   return start.getFullYear() === currentYear ? base : `${base}, ${start.getFullYear()}`
 }
 
-/** A trip row's meta line (#131): date range, track count, then cairn count
-    if it's known. The cairn half — and its separator — is omitted rather
+/** A trip row's meta line (#131, extended by #225): date range, track
+    count, cairn count if it's known, then the trip's distance and ascent if
+    they're known. The cairn half — and its separator — is omitted rather
     than shown as `0 photos`, the same rule #121 already applies to the
     picker: a trip whose cairns have never been counted says nothing about
-    them rather than showing a zero it can't stand behind.
+    them rather than showing a zero it can't stand behind. Distance and
+    ascent are appended the same way: present when `totals` is non-`null`,
+    absent (both, together) otherwise — a missing, unreadable or stale
+    sidecar reads exactly like a trip whose totals were never computed.
+    Ascent alone drops further, per #7's unavailable rule, when the trip's
+    tracks carry no elevation.
  *
  * The visible word stays `photos` for now — cairns replace photos at the
     model and storage layer here; the copy itself is the map/list/detail
@@ -134,9 +142,15 @@ export function formatTripMetaLine(
   endDate: string | null,
   trackCount: number,
   cairnCount: number | null,
+  totals: TripTotals | null,
 ): string {
   const parts = [formatTripDateRange(startDate, endDate), pluralize(trackCount, 'track')]
   if (cairnCount !== null) parts.push(pluralize(cairnCount, 'photo'))
+  if (totals) {
+    parts.push(formatDistance(totals.distanceMeters))
+    const ascent = formatElevationGain(totals.elevationGainMeters)
+    if (ascent !== undefined) parts.push(ascent)
+  }
   return parts.join(' · ')
 }
 

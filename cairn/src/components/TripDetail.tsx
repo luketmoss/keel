@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { TrackLayer } from './TrackLayer'
 import { CairnLayer, type PositionedCairn } from './CairnLayer'
 import { TrackList } from './TrackList'
 import { CairnList } from './CairnList'
 import { Lightbox } from './Lightbox'
+import { TrackFace } from './TrackFace'
+import { trackColor } from '../map/palette'
 import { TripImportPanel } from './TripImportPanel'
 import { TripMetadataHeader } from './TripMetadataHeader'
 import { TripStats } from './TripStats'
@@ -133,6 +136,18 @@ interface TripDetailProps {
   /** #158: false while dragging is refused for reasons the shell owns —
       disconnected, or the #155 placement queue owns the map. */
   cairnsDraggable: boolean
+  /** #226: the id from a `/tracks/:id` match the shell couldn't resolve
+      against the loose store — a candidate for one of *this* trip's own
+      tracks. `undefined` whenever no such id is in the URL. Looked up
+      against `tripImport.tracks` rather than passed a resolved file,
+      since only this component has that list. */
+  openTrackId?: string
+  /** #226: reports the open track's name up, the same way
+      `onCairnDetailChange` already reports a cairn's — so the shell's
+      search card can show it instead of the trip's own name, and so its
+      Back button knows to return here rather than to `/`. `null` while no
+      track from this trip is open. */
+  onTrackDetailChange?: (detail: { name: string } | null) => void
 }
 
 /** The panel's trip face, and the trip's own map layers.
@@ -158,7 +173,10 @@ export function TripDetail({
   onCreateTargetChange,
   onCairnDetailChange,
   cairnsDraggable,
+  openTrackId,
+  onTrackDetailChange,
 }: TripDetailProps) {
+  const navigate = useNavigate()
   const trip = useSyncExternalStore(tripStore.subscribe, () => tripStore.getTrip(tripId))
   const tripImport = useTripImport(tripId, accessToken, cairnFolderId)
   const allTracks = useMemo(() => tripImport.tracks.flatMap((file) => file.tracks), [tripImport.tracks])
@@ -171,6 +189,33 @@ export function TripDetail({
     () => tripImport.tracks.flatMap((file) => file.trackStats),
     [tripImport.tracks],
   )
+
+  /* #226 — the track face's own lookup. Single-track only, matching the
+     row's `More details` gating (`TrackList`'s `canOpenDetail`): a
+     multi-track file has no unambiguous numbers for a face to show, so an
+     id naming one is treated exactly like an id naming nothing. */
+  const openTrackFile = openTrackId
+    ? tripImport.tracks.find((file) => file.id === openTrackId && file.tracks.length === 1)
+    : undefined
+
+  // Reports the open track's name up, the same shape `onCairnDetailChange`
+  // already reports a cairn's — the search card reads it instead of the
+  // trip's own name, and knows to send Back here rather than to `/`.
+  useEffect(() => {
+    onTrackDetailChange?.(openTrackFile ? { name: openTrackFile.name } : null)
+    return () => onTrackDetailChange?.(null)
+  }, [onTrackDetailChange, openTrackFile])
+
+  // #226 — a track removed (or renamed out of existence — it can't be,
+  // but a multi-track file's numbers becoming ambiguous the same way)
+  // while its face is open returns to this trip rather than erroring.
+  // Guarded on `loading` so the very first render, before anything has
+  // arrived, doesn't bounce straight back out.
+  useEffect(() => {
+    if (!openTrackId || tripImport.loading || openTrackFile) return
+    navigate(`/trips/${tripId}`)
+  }, [openTrackId, openTrackFile, tripImport.loading, tripId, navigate])
+
   // Position resolution (EXIF, then interpolation against these same
   // tracks) happens once, at import time, inside the hook — a cairn's
   // `position` is already final by the time it reaches `cairns` below,
@@ -195,6 +240,32 @@ export function TripDetail({
   // #73: "disconnected" is exactly "no usable token", whether that's never
   // having signed in, a sign-out, or #72's token-expired.
   const signedIn = accessToken !== null && cairnFolderId !== null
+
+  /** #226 — the trip-owned half of `Remove from trip`, shared by the row's
+      own `⋮` (via `TrackList`) and the face's primary action so the two
+      surfaces can't drift on what the move actually does. */
+  const handleRemoveFromTripId = useCallback(
+    async (id: string) => {
+      if (!onRemoveFromTrip) return
+      const file = tripImport.tracks.find((candidate) => candidate.id === id)
+      if (!file) return
+      setDetachErrors((prev) => {
+        if (!(id in prev)) return prev
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
+      // The loose side takes hold first: the track exists in both places
+      // for an instant rather than in neither. Only once the file has
+      // actually moved does this trip forget it.
+      if (!(await onRemoveFromTrip(file))) {
+        setDetachErrors((prev) => ({ ...prev, [id]: MOVE_FAILED_MESSAGE }))
+        return
+      }
+      await tripImport.forgetFile(id)
+    },
+    [onRemoveFromTrip, tripImport],
+  )
 
   /* #121 — this is the one place in the app that knows how many cairns a
      trip holds, because `useCairnImport` lists `trips/<id>/cairns/` on
@@ -556,29 +627,7 @@ export function TripDetail({
       files={tripImport.tracks}
       onToggleVisibility={tripImport.toggleVisibility}
       onRemove={tripImport.removeFile}
-      onRemoveFromTrip={
-        onRemoveFromTrip &&
-        (async (id) => {
-          const file = tripImport.tracks.find((candidate) => candidate.id === id)
-          if (!file) return
-          setDetachErrors((prev) => {
-            if (!(id in prev)) return prev
-            const next = { ...prev }
-            delete next[id]
-            return next
-          })
-          // The loose side takes hold first: the track exists in both
-          // places for an instant rather than in neither. Only once the
-          // file has actually moved does this trip forget it — and it is
-          // forgotten, not trashed, because the file is now somewhere else
-          // rather than gone.
-          if (!(await onRemoveFromTrip(file))) {
-            setDetachErrors((prev) => ({ ...prev, [id]: MOVE_FAILED_MESSAGE }))
-            return
-          }
-          await tripImport.forgetFile(id)
-        })
-      }
+      onRemoveFromTrip={onRemoveFromTrip && handleRemoveFromTripId}
       confirmingId={removeConfirm.confirmingId}
       onStartConfirm={removeConfirm.onStartConfirm}
       onCancelConfirm={removeConfirm.onCancelConfirm}
@@ -590,6 +639,7 @@ export function TripDetail({
       onRename={tripImport.renameTrack}
       onRecolor={tripImport.recolorTrack}
       onReorder={tripImport.reorderTracks}
+      onOpenTrack={(id) => navigate(`/tracks/${id}`)}
       canReorder={!tripImport.loading}
       disabled={!signedIn}
       emptyDetail="Drop tracks or photos anywhere, or use Import files above."
@@ -612,7 +662,30 @@ export function TripDetail({
         />
       )}
 
-      <div className="trip-detail__body">
+      {/* #226 — the face for a track this trip owns. Sits beside the
+          trip's own body rather than replacing it in the tree: hiding
+          (not unmounting) the body is what keeps its scroll position, and
+          the map layers above are unaffected either way, matching
+          "leaving the face returns to where it was, list scrolled as it
+          was" and "the map is never unmounted". */}
+      {openTrackFile && (
+        <TrackFace
+          key={openTrackFile.id}
+          name={openTrackFile.name}
+          sourceName={openTrackFile.sourceName}
+          track={openTrackFile.tracks[0]}
+          stats={openTrackFile.trackStats[0]}
+          color={trackColor(openTrackFile.colorIndex)}
+          disabled={!signedIn}
+          onRename={(name) => tripImport.renameTrack(openTrackFile.id, name)}
+          onRemoveFromTrip={() => void handleRemoveFromTripId(openTrackFile.id)}
+          onDelete={() => {
+            void tripImport.removeFile(openTrackFile.id)
+            navigate(`/trips/${tripId}`)
+          }}
+        />
+      )}
+      <div className="trip-detail__body" hidden={Boolean(openTrackFile)}>
         <TripMetadataHeader
           trip={trip}
           onUpdate={(patch) => tripStore.updateTrip(trip.id, patch)}

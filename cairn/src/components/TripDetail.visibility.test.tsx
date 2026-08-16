@@ -76,6 +76,7 @@ function trackFile(id: string, name: string, times: string[]): ImportedFile {
   return {
     id,
     name,
+    sourceName: name,
     driveFileId: `drive-${id}`,
     tracks: [{ name, points: times.map((time) => ({ lat: 0, lon: 0, time })) }],
     trackStats: [

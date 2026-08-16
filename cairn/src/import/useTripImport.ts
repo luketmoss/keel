@@ -262,6 +262,7 @@ export function useTripImport(
               {
                 id: generateId('file'),
                 name: driveFile.name,
+                sourceName: driveFile.name,
                 driveFileId: driveFile.id,
                 tracks: result.tracks,
                 trackStats: result.tracks.map(computeTrackStats),
@@ -360,6 +361,7 @@ export function useTripImport(
           {
             id: generateId('file'),
             name: file.name,
+            sourceName: file.name,
             driveFileId: uploaded.id,
             tracks: result.tracks,
             trackStats: result.tracks.map(computeTrackStats),

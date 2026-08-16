@@ -16,6 +16,7 @@
 }
 
 .loose-face__head {
+  position: relative;
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
@@ -114,39 +115,6 @@
   font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-}
-
-/* #133 — the swatch becomes a button, wrapped in its own positioned
-   context so `ColorPopover` can anchor beneath it. */
-.loose-face__swatch-wrap {
-  position: relative;
-  display: inline-flex;
-}
-
-.loose-face__swatch-button {
-  display: inline-flex;
-  border: none;
-  background: none;
-  padding: var(--space-1);
-  margin: calc(var(--space-1) * -1);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-
-.loose-face__swatch-button:hover:not(:disabled) {
-  background: var(--hover);
-}
-
-.loose-face__swatch-button:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.loose-face__swatch {
-  display: inline-block;
-  width: var(--marker-track);
-  height: var(--marker-track);
-  border-radius: var(--radius-sm);
 }
 
 .loose-face__image {

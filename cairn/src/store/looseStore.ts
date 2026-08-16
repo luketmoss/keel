@@ -1,5 +1,6 @@
 import type { FeatureCollection, LineString } from 'geojson'
 import type { Track } from '../kml/parse'
+import type { ElevationProfilePoint } from '../kml/stats'
 import { buildOverviewGeoJSON, computeTripOrigin } from '../geo/overview'
 import { isFeatureCollection } from './tripStore'
 import { formatDistance, formatElevationGain } from '../format/units'
@@ -71,6 +72,23 @@ export interface LooseTrackRecord extends LooseRecordBase {
   /** `null` when the source has no elevation data at all, which is not the
       same as a flat track. */
   ascentMeters: number | null
+  /** #226 — the rest of #218's six numbers, absent from this record before
+      the track face needed to show all six for a loose track too. Computed
+      once at import (`aggregateTrackStats`/`aggregateElevationProfile` in
+      `kml/stats.ts`) from the same `Track[]` `addTrack` already receives,
+      rather than kept as raw points the performance rule forbids loading
+      for the map. A record written before this issue simply lacks these
+      fields, which reads back as `undefined` — the same "unavailable, not
+      zero" state a track that genuinely has none renders as, healed the
+      next time the item is actually re-imported. */
+  elevationLossMeters: number | null
+  highPointMeters: number | null
+  lowPointMeters: number | null
+  durationSeconds: number | null
+  /** The median-filtered, distance-aligned series the face's
+      `TrackElevationProfile` draws — `null` when nothing in the file has
+      usable elevation. */
+  elevationProfile: ElevationProfilePoint[] | null
   pointCount: number
   sourceName: string
   /** Index into `map/palette` — a loose track carries its own colour, and
@@ -116,6 +134,14 @@ export interface NewLooseTrack {
   date: string | null
   distanceMeters: number
   ascentMeters: number | null
+  /** #226 — see `LooseTrackRecord`'s own doc: the caller computes these
+      alongside `ascentMeters` (both from the same `Track[]` passed below)
+      and the store just carries them through. */
+  elevationLossMeters: number | null
+  highPointMeters: number | null
+  lowPointMeters: number | null
+  durationSeconds: number | null
+  elevationProfile: ElevationProfilePoint[] | null
   pointCount: number
   sourceName: string
   colorIndex: number
@@ -360,6 +386,11 @@ export class LocalLooseStore implements LooseStore {
       date: input.date,
       distanceMeters: input.distanceMeters,
       ascentMeters: input.ascentMeters,
+      elevationLossMeters: input.elevationLossMeters,
+      highPointMeters: input.highPointMeters,
+      lowPointMeters: input.lowPointMeters,
+      durationSeconds: input.durationSeconds,
+      elevationProfile: input.elevationProfile,
       pointCount: input.pointCount,
       sourceName: input.sourceName,
       colorIndex: input.colorIndex,

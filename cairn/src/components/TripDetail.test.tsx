@@ -295,6 +295,7 @@ describe.skip('TripDetail — #73 disconnected is read-only', () => {
     return {
       id: 'file-1',
       name: 'Day 1',
+      sourceName: 'Day 1',
       driveFileId: 'drive-1',
       tracks: [{ name: 'Day 1', points: [] }],
       trackStats: [{ distanceMeters: 0, durationSeconds: undefined, elevationGainMeters: undefined }],
@@ -417,6 +418,7 @@ describe.skip('TripDetail — #77 removing tracks and photos', () => {
   const trackFile = {
     id: 'f1',
     name: 'a.kml',
+    sourceName: 'a.kml',
     driveFileId: 'drive-a',
     colorIndex: 0,
     visible: true,

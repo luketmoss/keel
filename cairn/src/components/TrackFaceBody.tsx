@@ -1,0 +1,66 @@
+import type { TrackStats, ElevationProfilePoint } from '../kml/stats'
+import {
+  formatDistance,
+  formatDuration,
+  formatElevation,
+  formatElevationGain,
+  formatElevationLoss,
+} from '../format/units'
+import { StatGrid } from './StatGrid'
+import { TrackElevationProfile } from './TrackElevationProfile'
+import './TrackFaceBody.css'
+
+/** #226 — the track detail face's body: the profile, then the same
+    six-cell grid shape #218's trip totals use, with duration in the cell
+    that holds `Tracks` at trip level (the per-track number with no
+    sensible trip-level sum). This is #219's `TrackRowDetail`, moved here
+    from the row's disclosure (now deleted) and reused by both halves of
+    the unified face — `TrackFace` (a trip-owned track, reading its `Track`
+    and `TrackStats` directly) and `LooseFace` (a loose one, reading the
+    precomputed numbers `kml/stats.ts`'s aggregate helpers left on the
+    record, since the loose store keeps no raw points around to recompute
+    from). Neither caller passes raw points — the profile is computed once,
+    by whichever caller has the geometry to compute it from, and handed
+    down already filtered. */
+export function TrackFaceBody({
+  stats,
+  profile,
+  pointCount,
+  sourceName,
+  color,
+}: {
+  stats: TrackStats
+  /** The median-filtered, distance-aligned series, or `undefined` when
+      nothing in the track has usable elevation — the caller decides
+      that, this component only decides whether to draw it. */
+  profile: ElevationProfilePoint[] | undefined
+  pointCount: number
+  sourceName: string
+  color: string
+}) {
+  return (
+    <>
+      {/* No profile rather than an empty frame when elevation is
+          unavailable — a flat line across the box would assert a flat
+          walk. */}
+      {profile && <TrackElevationProfile points={profile} color={color} distanceMeters={stats.distanceMeters} />}
+      <StatGrid
+        items={[
+          { label: 'Distance', value: formatDistance(stats.distanceMeters) },
+          { label: 'Ascent', value: formatElevationGain(stats.elevationGainMeters) },
+          { label: 'Descent', value: formatElevationLoss(stats.elevationLossMeters) },
+          { label: 'High point', value: formatElevation(stats.highPointMeters) },
+          { label: 'Low point', value: formatElevation(stats.lowPointMeters) },
+          { label: 'Duration', value: formatDuration(stats.durationSeconds) },
+        ]}
+      />
+      {/* Points and source file share the footnote line — provenance
+          rather than measurement, so they sit beneath the `--border` rule
+          rather than in stat cells that would imply they are comparable
+          between tracks the way the six above are. */}
+      <p className="track-face-body__footnote">
+        {pointCount.toLocaleString()} points · {sourceName}
+      </p>
+    </>
+  )
+}

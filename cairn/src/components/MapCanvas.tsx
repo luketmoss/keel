@@ -78,7 +78,16 @@ export function MapProvider({ children }: { children: ReactNode }) {
      null and each renders nothing, which is what they already do before the
      map instance exists. */
   const body = googleMapsApiKey ? (
-    <APIProvider apiKey={googleMapsApiKey} onError={() => setKeyRejected(true)}>
+    <APIProvider
+      apiKey={googleMapsApiKey}
+      /* #232: without this, the bootstrap script only ever requests
+         `libraries=core,maps` — `google.maps.ElevationService` and
+         `google.maps.ElevationStatus` belong to `elevation`, which is
+         otherwise never loaded, so #224's sampler was reaching for symbols
+         that didn't exist. */
+      libraries={['elevation']}
+      onError={() => setKeyRejected(true)}
+    >
       {children}
     </APIProvider>
   ) : (

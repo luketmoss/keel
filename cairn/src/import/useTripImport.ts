@@ -384,11 +384,19 @@ export function useTripImport(
     void (async () => {
       const newEntries: Record<string, StoredTrackElevation> = {}
       let failureCount = 0
+      // #232: the reader never sees this — #224's copy below is unchanged —
+      // but it's what tells a developer misconfiguration from quota
+      // exhaustion from a genuine blank, which `resolve(null)` used to erase.
+      const failureReasons = new Set<string>()
 
       await runWithConcurrency(candidates, SAMPLE_CONCURRENCY, async (track) => {
-        const result = await sampleTrackElevation(track.points, sampler)
-        if (result) newEntries[track.key] = result
-        else failureCount += 1
+        const outcome = await sampleTrackElevation(track.points, sampler)
+        if (outcome.ok) {
+          newEntries[track.key] = outcome.elevation
+        } else {
+          failureCount += 1
+          failureReasons.add(outcome.reason)
+        }
       })
 
       if (cancelled) return
@@ -396,6 +404,9 @@ export function useTripImport(
         setSampledElevation((prev) => ({ ...prev, ...newEntries }))
       }
       if (failureCount > 0) {
+        console.warn(
+          `[elevation] ${failureCount} track${failureCount === 1 ? '' : 's'} failed to sample: ${[...failureReasons].join(', ')}`,
+        )
         addFailure(
           'Elevation',
           `Couldn't estimate elevation for ${failureCount} track${failureCount === 1 ? '' : 's'}.`,

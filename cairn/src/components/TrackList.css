@@ -114,8 +114,10 @@
   background: none;
   color: var(--text-muted);
   cursor: pointer;
-  font-size: var(--text-base);
   padding: 0;
+  transition:
+    color var(--motion-fast) var(--ease),
+    background var(--motion-fast) var(--ease);
 }
 
 .track-row__visibility:hover {
@@ -125,6 +127,12 @@
 
 .track-row__visibility:active {
   background: var(--pressed);
+}
+
+.track-row__visibility:disabled {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
 }
 
 /* #46 — drag handle. 40px hit target absorbed into the row's own vertical

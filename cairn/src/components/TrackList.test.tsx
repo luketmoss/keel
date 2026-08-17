@@ -212,6 +212,29 @@ describe('TrackList', () => {
     expect(screen.getByRole('button', { name: 'Show trip.kml' })).toBeDefined()
   })
 
+  // #235 — the emoji it replaced ('👁'/'🚫') is gone from the accessible
+  // tree; the icon is a decorative SVG carrying no text a screen reader
+  // would read, and the hidden state adds a second path (the slash) rather
+  // than swapping to a different glyph.
+  it('draws the show/hide control as an aria-hidden SVG, struck through only when hidden', () => {
+    const { rerender } = render(
+      <TrackList files={[importedFile({ visible: true })]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />,
+    )
+
+    const visibleButton = screen.getByRole('button', { name: 'Hide trip.kml' })
+    expect(visibleButton.textContent).toBe('')
+    const svg = visibleButton.querySelector('svg')
+    expect(svg?.getAttribute('aria-hidden')).toBe('true')
+    expect(svg?.querySelectorAll('path')).toHaveLength(1)
+
+    rerender(
+      <TrackList files={[importedFile({ visible: false })]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />,
+    )
+
+    const hiddenButton = screen.getByRole('button', { name: 'Show trip.kml' })
+    expect(hiddenButton.querySelector('svg')?.querySelectorAll('path')).toHaveLength(2)
+  })
+
   it('removes a file via a named action in the row menu', () => {
     const onRemove = vi.fn()
     render(

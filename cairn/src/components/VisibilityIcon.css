@@ -1,0 +1,18 @@
+/* cairn/docs/design/235-visibility-icon.md — drawn exactly the way
+   `CairnIcon.css` draws the fixed icon set: stroke: currentColor, no fill,
+   round caps and joins, so the button that contains it can colour it like
+   any other muted icon control. */
+
+.visibility-icon {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  display: block;
+}
+
+.visibility-icon__glyph {
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.9;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}

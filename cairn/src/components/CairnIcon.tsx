@@ -21,13 +21,18 @@ interface GlyphShape {
   text?: string
 }
 
+/** The almond and the pupil — cairn/docs/design/235-visibility-icon.md: "the
+    app has one eye." Shared with `VisibilityIcon` (`TrackList`'s and
+    `CairnList`'s show/hide control) rather than each holding its own copy,
+    so the two can never drift into a near-match. */
+export const EYE_PATH =
+  'M2.2 12s3.9-5.8 9.8-5.8S21.8 12 21.8 12s-3.9 5.8-9.8 5.8S2.2 12 2.2 12Z M12 9.4a2.6 2.6 0 1 0 0 5.2 2.6 2.6 0 0 0 0-5.2Z'
+
 export const CAIRN_ICON_GLYPHS: Record<CairnIcon, GlyphShape> = {
   campsite: { d: 'M3.5 19 12 4.5 20.5 19Z M12 4.5V19' },
   water: { d: 'M12 3.2c0 0-6.6 7.6-6.6 11.4a6.6 6.6 0 0 0 13.2 0c0-3.8-6.6-11.4-6.6-11.4Z' },
   hut: { d: 'M3.6 11.2 12 4.2l8.4 7M5.6 9.6V19.6h12.8V9.6' },
-  viewpoint: {
-    d: 'M2.2 12s3.9-5.8 9.8-5.8S21.8 12 21.8 12s-3.9 5.8-9.8 5.8S2.2 12 2.2 12Z M12 9.4a2.6 2.6 0 1 0 0 5.2 2.6 2.6 0 0 0 0-5.2Z',
-  },
+  viewpoint: { d: EYE_PATH },
   summit: { d: 'M2 19.2 9 6.6l3.7 6.2 2.6-3.6L22 19.2Z' },
   hazard: { d: 'M12 3.4 22 19.6H2Z M12 10v3.8', dot: [12, 16.8] },
   parking: { text: 'P' },

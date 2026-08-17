@@ -7,6 +7,7 @@ import { CairnFacetChips } from './CairnFacetChips'
 import type { CairnFacet } from '../store/cairnRules'
 import { iconLabel } from './iconLabel'
 import { RowMenu } from './RowMenu'
+import { VisibilityIcon } from './VisibilityIcon'
 import './CairnList.css'
 
 /** #192's matched-nothing detail line. Naming the total answers *is
@@ -188,7 +189,7 @@ export function CairnList({
                     )}
                     onClick={onToggleUnattached}
                   >
-                    {unattachedVisible ? '👁' : '🚫'}
+                    <VisibilityIcon visible={unattachedVisible} />
                   </button>
                 )}
               </li>

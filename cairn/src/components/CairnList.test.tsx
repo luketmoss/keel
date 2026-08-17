@@ -624,5 +624,45 @@ describe('CairnList', () => {
         'Show cairns not on a track',
       )
     })
+
+    // #235 — the same mark and states as the track row's toggle: an
+    // aria-hidden SVG, one path when visible, a second (the slash) when not.
+    it("draws the unattached group's toggle as the same eye the track row uses", () => {
+      const items = orderCairnListItems([row({ id: 'a' })], new Set(['a']))
+      const { rerender } = render(
+        <CairnList
+          items={items}
+          totalCount={1}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={vi.fn()}
+          unattachedVisible
+          onToggleUnattached={vi.fn()}
+          {...ownedProps()}
+        />,
+      )
+
+      const visibleButton = screen.getByRole('button', { name: 'Hide cairns not on a track' })
+      expect(visibleButton.textContent).toBe('')
+      const svg = visibleButton.querySelector('svg')
+      expect(svg?.getAttribute('aria-hidden')).toBe('true')
+      expect(svg?.querySelectorAll('path')).toHaveLength(1)
+
+      rerender(
+        <CairnList
+          items={items}
+          totalCount={1}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={vi.fn()}
+          unattachedVisible={false}
+          onToggleUnattached={vi.fn()}
+          {...ownedProps()}
+        />,
+      )
+
+      const hiddenButton = screen.getByRole('button', { name: 'Show cairns not on a track' })
+      expect(hiddenButton.querySelector('svg')?.querySelectorAll('path')).toHaveLength(2)
+    })
   })
 })

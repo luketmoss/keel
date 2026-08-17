@@ -4,6 +4,7 @@ import { TRACK_COLOR_NAMES, TRACK_COLORS, trackColor } from '../map/palette'
 import { formatStatsLine } from '../format/units'
 import { iconLabel } from './iconLabel'
 import { RowMenu } from './RowMenu'
+import { VisibilityIcon } from './VisibilityIcon'
 import './TrackList.css'
 
 interface TrackListProps {
@@ -419,7 +420,7 @@ function TrackRow({
           disabled={removing}
           onClick={() => onToggleVisibility(file.id)}
         >
-          {file.visible ? '👁' : '🚫'}
+          <VisibilityIcon visible={file.visible} />
         </button>
         {removing ? (
           <span className="track-row__removing">Removing…</span>

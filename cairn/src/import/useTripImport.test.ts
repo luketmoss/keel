@@ -883,7 +883,15 @@ describe('useTripImport — #77 removing a track', () => {
     })
 
     it('samples nothing while offline', async () => {
-      const original = Object.getOwnPropertyDescriptor(navigator, 'onLine')
+      // #233: `navigator.onLine` is an accessor on `Navigator.prototype` in
+      // jsdom, not an own property of `navigator` — so
+      // `getOwnPropertyDescriptor(navigator, 'onLine')` returns `undefined`
+      // and the old `if (original) …` restore never ran, leaving the
+      // `defineProperty` below's `false` permanently shadowing the
+      // prototype for every test that ran afterward in the same file.
+      // `delete` removes the shadow outright, which restores the inherited
+      // getter regardless of whether it was ever an own property to begin
+      // with.
       Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
       try {
         listTrackFiles.mockResolvedValue([{ id: 'drive-1', name: 'flat.kml' }])
@@ -897,7 +905,7 @@ describe('useTripImport — #77 removing a track', () => {
 
         expect(getElevationAlongPath).not.toHaveBeenCalled()
       } finally {
-        if (original) Object.defineProperty(navigator, 'onLine', original)
+        delete (navigator as { onLine?: boolean }).onLine
       }
     })
 
@@ -909,6 +917,156 @@ describe('useTripImport — #77 removing a track', () => {
       await act(async () => {})
 
       expect(getElevationAlongPath).not.toHaveBeenCalled()
+    })
+
+    // #233 — the repeated-failure storm: a track whose sampling already
+    // failed this session must not be re-tried, or re-reported, just
+    // because something unrelated re-rendered the trip.
+    describe('a track already attempted this session', () => {
+      async function renderWithOneFailedTrack() {
+        listTrackFiles.mockResolvedValue([{ id: 'drive-1', name: 'flat.kml' }])
+        downloadTrackFile.mockResolvedValue(file('flat.kml'))
+        parseTrack.mockResolvedValueOnce(trackWithoutElevation('Flat', 5))
+        const getElevationAlongPath = mockGoogleElevation(() => ({ results: null, status: 'OVER_QUERY_LIMIT' }))
+
+        const rendered = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
+        await waitFor(() => expect(rendered.result.current.loading).toBe(false))
+        await waitFor(() => expect(rendered.result.current.tracks).toHaveLength(1))
+        await waitFor(() =>
+          expect(rendered.result.current.failures.some((f) => f.name === 'Elevation')).toBe(true),
+        )
+        getElevationAlongPath.mockClear()
+        return { ...rendered, getElevationAlongPath }
+      }
+
+      it('adds no new failure line when the track is shown or hidden again', async () => {
+        const { result, getElevationAlongPath } = await renderWithOneFailedTrack()
+        const failureCountBefore = result.current.failures.filter((f) => f.name === 'Elevation').length
+
+        act(() => result.current.toggleVisibility(result.current.tracks[0].id))
+        await act(async () => {})
+        act(() => result.current.toggleVisibility(result.current.tracks[0].id))
+        await act(async () => {})
+
+        expect(getElevationAlongPath).not.toHaveBeenCalled()
+        expect(result.current.failures.filter((f) => f.name === 'Elevation')).toHaveLength(failureCountBefore)
+      })
+
+      it('adds no new failure line when the track is renamed, recoloured or reordered', async () => {
+        const store = new LocalTrackOverridesStore(fakeStorage())
+        listTrackFiles.mockResolvedValue([{ id: 'drive-1', name: 'flat.kml' }])
+        downloadTrackFile.mockResolvedValue(file('flat.kml'))
+        parseTrack.mockResolvedValueOnce(trackWithoutElevation('Flat', 5))
+        const getElevationAlongPath = mockGoogleElevation(() => ({ results: null, status: 'OVER_QUERY_LIMIT' }))
+
+        const { result } = renderHook(() =>
+          useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore(), store),
+        )
+        await waitFor(() => expect(result.current.loading).toBe(false))
+        await waitFor(() => expect(result.current.tracks).toHaveLength(1))
+        await waitFor(() => expect(result.current.failures.some((f) => f.name === 'Elevation')).toBe(true))
+        getElevationAlongPath.mockClear()
+        const failureCountBefore = result.current.failures.filter((f) => f.name === 'Elevation').length
+
+        await act(async () => {
+          await result.current.renameTrack(result.current.tracks[0].id, 'Renamed')
+        })
+        await act(async () => {
+          await result.current.recolorTrack(result.current.tracks[0].id, 3)
+        })
+        await act(async () => {
+          await result.current.reorderTracks([result.current.tracks[0].id])
+        })
+
+        expect(getElevationAlongPath).not.toHaveBeenCalled()
+        expect(result.current.failures.filter((f) => f.name === 'Elevation')).toHaveLength(failureCountBefore)
+      })
+
+      it('makes no further API call for it at all, whether it failed or succeeded', async () => {
+        listTrackFiles.mockResolvedValue([
+          { id: 'drive-1', name: 'failed.kml' },
+          { id: 'drive-2', name: 'succeeded.kml' },
+        ])
+        downloadTrackFile.mockResolvedValueOnce(file('failed.kml')).mockResolvedValueOnce(file('succeeded.kml'))
+        parseTrack
+          .mockResolvedValueOnce(trackWithoutElevation('Failed', 5))
+          .mockResolvedValueOnce(trackWithoutElevation('Succeeded', 10))
+        let call = 0
+        const getElevationAlongPath = mockGoogleElevation(() => {
+          call += 1
+          return call === 1
+            ? { results: null, status: 'OVER_QUERY_LIMIT' }
+            : { results: climbingSamples(10), status: 'OK' }
+        })
+
+        const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
+        await waitFor(() => expect(result.current.loading).toBe(false))
+        await waitFor(() => expect(result.current.tracks).toHaveLength(2))
+        await waitFor(() =>
+          expect(result.current.tracks.some((t) => t.trackStats[0].elevationSource === 'sampled')).toBe(true),
+        )
+        await waitFor(() => expect(result.current.failures.some((f) => f.name === 'Elevation')).toBe(true))
+        expect(getElevationAlongPath).toHaveBeenCalledTimes(2)
+        getElevationAlongPath.mockClear()
+
+        act(() => result.current.toggleVisibility(result.current.tracks[0].id))
+        await act(async () => {})
+        act(() => result.current.toggleVisibility(result.current.tracks[1].id))
+        await act(async () => {})
+
+        expect(getElevationAlongPath).not.toHaveBeenCalled()
+      })
+
+      it('still samples a further track imported into the same trip, reporting one new line', async () => {
+        const { result, getElevationAlongPath } = await renderWithOneFailedTrack()
+
+        uploadFileContent.mockResolvedValueOnce({ id: 'drive-2' })
+        parseTrack.mockResolvedValueOnce(trackWithoutElevation('Also flat', 5))
+
+        // `importFiles` clears `failures` itself at the start of every
+        // batch (pre-existing, unrelated to #233) — so what's left after it
+        // settles is entirely this new track's own attempt, not the earlier
+        // one restated.
+        await act(async () => {
+          await result.current.importFiles([file('also-flat.kml')])
+        })
+        await waitFor(() => expect(result.current.tracks).toHaveLength(2))
+        await waitFor(() =>
+          expect(result.current.failures.filter((f) => f.name === 'Elevation')).toHaveLength(1),
+        )
+
+        const newFailure = result.current.failures.find((f) => f.name === 'Elevation')
+        expect(newFailure?.message).toBe("Couldn't estimate elevation for 1 track.")
+        expect(getElevationAlongPath).toHaveBeenCalledTimes(1)
+      })
+
+      it('re-attempts a previously failed track once, after leaving and returning to the trip', async () => {
+        const { unmount, getElevationAlongPath: firstAttempt } = await renderWithOneFailedTrack()
+        expect(firstAttempt).not.toHaveBeenCalled() // cleared by the helper before returning
+        unmount()
+
+        listTrackFiles.mockResolvedValue([{ id: 'drive-1', name: 'flat.kml' }])
+        downloadTrackFile.mockResolvedValue(file('flat.kml'))
+        parseTrack.mockResolvedValueOnce(trackWithoutElevation('Flat', 5))
+        const secondAttempt = mockGoogleElevation(() => ({ results: null, status: 'OVER_QUERY_LIMIT' }))
+
+        const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
+        await waitFor(() => expect(result.current.loading).toBe(false))
+        await waitFor(() => expect(secondAttempt).toHaveBeenCalledTimes(1))
+      })
+
+      it('leaves the failure area empty after dismissal, and it does not repopulate on the next re-render', async () => {
+        const { result } = await renderWithOneFailedTrack()
+        expect(result.current.failures.some((f) => f.name === 'Elevation')).toBe(true)
+
+        act(() => result.current.dismissFailures())
+        expect(result.current.failures).toHaveLength(0)
+
+        act(() => result.current.toggleVisibility(result.current.tracks[0].id))
+        await act(async () => {})
+
+        expect(result.current.failures).toHaveLength(0)
+      })
     })
   })
 })

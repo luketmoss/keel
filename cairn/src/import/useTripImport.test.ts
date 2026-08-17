@@ -853,6 +853,35 @@ describe('useTripImport — #77 removing a track', () => {
       expect(result.current.tracks.every((t) => t.trackStats[0].elevationSource === undefined)).toBe(true)
     })
 
+    // #232 — the reader's copy names only a count, never the reason. The
+    // reason still has to go somewhere a developer can find it, or a bad
+    // key and a genuine data gap are indistinguishable again.
+    it('logs the API status once per settled batch, without putting it in front of the reader', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      try {
+        listTrackFiles.mockResolvedValue([
+          { id: 'drive-1', name: 'a.kml' },
+          { id: 'drive-2', name: 'b.kml' },
+        ])
+        downloadTrackFile.mockResolvedValueOnce(file('a.kml')).mockResolvedValueOnce(file('b.kml'))
+        parseTrack
+          .mockResolvedValueOnce(trackWithoutElevation('A', 5))
+          .mockResolvedValueOnce(trackWithoutElevation('B', 5))
+        mockGoogleElevation(() => ({ results: null, status: 'OVER_QUERY_LIMIT' }))
+
+        const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
+        await waitFor(() => expect(result.current.loading).toBe(false))
+        await waitFor(() => expect(result.current.tracks).toHaveLength(2))
+        await waitFor(() => expect(warn).toHaveBeenCalledTimes(1))
+
+        expect(warn.mock.calls[0][0]).toContain('OVER_QUERY_LIMIT')
+        const failure = result.current.failures.find((f) => f.name === 'Elevation')
+        expect(failure?.message).not.toContain('OVER_QUERY_LIMIT')
+      } finally {
+        warn.mockRestore()
+      }
+    })
+
     it('samples nothing while offline', async () => {
       const original = Object.getOwnPropertyDescriptor(navigator, 'onLine')
       Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })

@@ -78,12 +78,14 @@ export function DraftPanel({
 
   return (
     <div className="draft-panel">
-      <div className="draft-panel__eyebrow">NOT SAVED</div>
-      <p className="draft-panel__summary">{fileSummary(draft)}</p>
-      <div className="draft-panel__body">
-        <TripMetadataHeader trip={syntheticTrip} onUpdate={handleUpdate} />
+      <div className="draft-panel__scroll">
+        <div className="draft-panel__eyebrow">NOT SAVED</div>
+        <p className="draft-panel__summary">{fileSummary(draft)}</p>
+        <div className="draft-panel__body">
+          <TripMetadataHeader trip={syntheticTrip} onUpdate={handleUpdate} />
+        </div>
+        {draft.saveError && <p className="draft-panel__error">{draft.saveError}</p>}
       </div>
-      {draft.saveError && <p className="draft-panel__error">{draft.saveError}</p>}
       <div className="draft-panel__actions">
         <button
           type="button"

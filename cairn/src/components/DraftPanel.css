@@ -1,19 +1,23 @@
-/* cairn/docs/design/81-drop-to-draft.md */
+/* cairn/docs/design/81-drop-to-draft.md, cairn/docs/design/234-*.md — #234:
+   written for #81, before #109 gave every face's surface, blur, radius and
+   elevation to `.shell-column__panel` and made a face a plain flex child of
+   it. This kept its own `position: absolute` sized to `--panel-width`, which
+   pinned it to `.shell-column` (the nearest positioned ancestor) instead of
+   the viewport — hanging `--space-4` past the column's own right edge. */
 
 .draft-panel {
-  position: absolute;
-  top: calc(var(--space-4) + 72px + var(--space-2));
-  right: var(--space-4);
-  bottom: var(--space-4);
-  z-index: 2;
-  width: var(--panel-width);
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  padding: var(--space-4);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  backdrop-filter: blur(var(--blur));
-  box-shadow: var(--shadow-lifted);
+}
+
+/* The scrollable region — the actions row below stays outside it, and so
+   pinned, once the header content is tall enough to need scrolling. */
+.draft-panel__scroll {
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-4) var(--space-4) 0;
   overflow-y: auto;
 }
 
@@ -34,8 +38,7 @@
 }
 
 .draft-panel__body {
-  flex: 1;
-  min-height: 0;
+  flex: none;
 }
 
 .draft-panel__error {
@@ -50,6 +53,7 @@
   display: flex;
   justify-content: flex-end;
   gap: var(--space-2);
+  padding: 0 var(--space-4) var(--space-4);
   margin-top: var(--space-4);
 }
 
@@ -95,17 +99,6 @@
   opacity: 0.4;
   cursor: default;
   filter: none;
-}
-
-@media (max-width: 639px) {
-  .draft-panel {
-    top: 0;
-    right: 0;
-    left: 0;
-    bottom: 0;
-    width: auto;
-    border-radius: 0;
-  }
 }
 
 /* #110: neither the primary action nor the discard — a third, quieter exit

@@ -199,6 +199,13 @@ export function useTripImport(
      read inside `removeFile` (#77), which needs the latest `tracks` without
      re-creating its callback identity on every track change. */
   const tracksRef = useRef<ImportedFile[]>(tracks)
+  /* #233 — every track key the elevation-sampling effect below has already
+     tried this mount, whatever the attempt produced. Session-scoped by
+     construction: a plain `useRef`, reset for free when `TripDetail`
+     unmounts and remounts on `key={openTripId}` (leaving the trip and
+     returning). A `Set`, not state — adding to it must never itself
+     trigger the effect, or every batch would immediately requeue itself. */
+  const attemptedElevationKeysRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     failuresRef.current = failures
@@ -352,9 +359,12 @@ export function useTripImport(
 
   /** #224 — samples elevation for every track this trip currently holds
       that has none of its own and isn't already in the cache. Runs
-      whenever the track set or the cache changes; each run's own
-      candidates settle to nothing once their results land in
-      `sampledElevation`, which is what keeps this from looping.
+      whenever the track set or the cache changes — a visibility toggle, a
+      rename, a reorder all replace `tracks` — so #233 excludes anything in
+      `attemptedElevationKeysRef` alongside `sampledElevation`: a track
+      whose sampling already *failed* is not a success sitting in the
+      cache, and without that second exclusion it would stay a candidate on
+      every one of those re-renders, forever.
    *
    * Offline, signed out, or no Elevation API available (no key, or the
       Maps script hasn't loaded yet) is a silent no-op — the design note's
@@ -374,10 +384,17 @@ export function useTripImport(
         (track): track is Track & { key: string } =>
           track.key !== undefined &&
           sampledElevation[track.key] === undefined &&
+          !attemptedElevationKeysRef.current.has(track.key) &&
           track.points.length >= 2 &&
           !hasUsableElevation(track.points),
       )
     if (candidates.length === 0) return
+
+    // #233 — marked before the batch starts, not after it settles: this is
+    // what makes the attempt (not the result) the thing that's recorded, so
+    // a track this batch fails is still excluded from the *next* candidate
+    // list even though it never lands in `sampledElevation`.
+    for (const track of candidates) attemptedElevationKeysRef.current.add(track.key)
 
     let cancelled = false
 

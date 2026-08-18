@@ -4,8 +4,11 @@ import {
   DriveConflictError,
   DriveRequestError,
   findJsonFile,
+  findJsonFilesByFolders,
+  JSON_FILE_BATCH_SIZE,
   listSubfolders,
   readJsonFile,
+  readJsonFileContent,
   trashFolder,
   writeJsonFile,
 } from './tripMetadata'
@@ -72,6 +75,124 @@ describe('readJsonFile', () => {
     const result = await readJsonFile<{ name: string }>('token', 'file-1')
 
     expect(result).toEqual({ data: { name: 'Hokkaido' }, headRevisionId: 'rev-5' })
+  })
+})
+
+describe('findJsonFilesByFolders', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('maps each found file back to the folder it came from, via parents', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      jsonResponse({
+        files: [
+          { id: 'file-a', parents: ['folder-a'] },
+          { id: 'file-b', parents: ['folder-b'] },
+        ],
+      }),
+    )
+
+    const found = await findJsonFilesByFolders('token', ['folder-a', 'folder-b', 'folder-c'], 'cairn.json')
+
+    expect(found).toEqual(
+      new Map([
+        ['folder-a', 'file-a'],
+        ['folder-b', 'file-b'],
+      ]),
+    )
+  })
+
+  it('omits a folder with no matching file, without failing the batch', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({ files: [] }))
+
+    const found = await findJsonFilesByFolders('token', ['folder-a'], 'cairn.json')
+
+    expect(found.size).toBe(0)
+  })
+
+  it('costs one request for a batch at the size limit', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({ files: [] }))
+    const folderIds = Array.from({ length: JSON_FILE_BATCH_SIZE }, (_, i) => `folder-${i}`)
+
+    await findJsonFilesByFolders('token', folderIds, 'cairn.json')
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('refuses a batch larger than the size limit rather than silently truncating it', async () => {
+    const folderIds = Array.from({ length: JSON_FILE_BATCH_SIZE + 1 }, (_, i) => `folder-${i}`)
+
+    await expect(findJsonFilesByFolders('token', folderIds, 'cairn.json')).rejects.toThrow()
+  })
+
+  it('never requests headRevisionId', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({ files: [] }))
+
+    await findJsonFilesByFolders('token', ['folder-a'], 'cairn.json')
+
+    const url = new URL(String(fetchSpy.mock.calls[0][0]))
+    expect(url.searchParams.get('fields')).not.toContain('headRevisionId')
+  })
+
+  it('follows nextPageToken so a result is not dropped by paging', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        jsonResponse({ files: [{ id: 'file-a', parents: ['folder-a'] }], nextPageToken: 'token-2' }),
+      )
+      .mockResolvedValueOnce(jsonResponse({ files: [{ id: 'file-b', parents: ['folder-b'] }] }))
+
+    const found = await findJsonFilesByFolders('token', ['folder-a', 'folder-b'], 'cairn.json')
+
+    expect(found).toEqual(
+      new Map([
+        ['folder-a', 'file-a'],
+        ['folder-b', 'file-b'],
+      ]),
+    )
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    const secondUrl = new URL(String(fetchSpy.mock.calls[1][0]))
+    expect(secondUrl.searchParams.get('pageToken')).toBe('token-2')
+  })
+
+  it('returns an empty map without a request for an empty folder list', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+
+    const found = await findJsonFilesByFolders('token', [], 'cairn.json')
+
+    expect(found.size).toBe(0)
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('throws DriveAuthError on a 401', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({}, 401))
+
+    await expect(
+      findJsonFilesByFolders('expired', ['folder-a'], 'cairn.json'),
+    ).rejects.toBeInstanceOf(DriveAuthError)
+  })
+})
+
+describe('readJsonFileContent', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('reads content with a single request, no headRevisionId lookup', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({ name: 'Hokkaido' }))
+
+    const data = await readJsonFileContent<{ name: string }>('token', 'file-1')
+
+    expect(data).toEqual({ name: 'Hokkaido' })
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(String(fetchSpy.mock.calls[0][0])).toContain('alt=media')
+  })
+
+  it('throws DriveAuthError on a 401', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({}, 401))
+
+    await expect(readJsonFileContent('expired', 'file-1')).rejects.toBeInstanceOf(DriveAuthError)
   })
 })
 

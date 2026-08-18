@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { useCairnImport, ALREADY_IN_TRIP_MESSAGE } from './useCairnImport'
+import { useCairnImport, ALREADY_IN_TRIP_MESSAGE, type CairnRecord } from './useCairnImport'
 import { DriveAuthError, DriveQuotaError } from '../drive/trackFiles'
 import type { Track } from '../kml/parse'
 
@@ -13,20 +13,27 @@ vi.mock('../drive/tripCairnFolder', () => ({
   findOrCreateTripCairnItemFolder,
 }))
 
-const { listSubfolders, writeJsonFile, findJsonFile, readJsonFile, trashFolder } = vi.hoisted(() => ({
-  listSubfolders: vi.fn(),
-  writeJsonFile: vi.fn(),
-  findJsonFile: vi.fn(),
-  readJsonFile: vi.fn(),
-  trashFolder: vi.fn(),
-}))
-vi.mock('../drive/tripMetadata', () => ({
-  listSubfolders,
-  writeJsonFile,
-  findJsonFile,
-  readJsonFile,
-  trashFolder,
-}))
+const { listSubfolders, writeJsonFile, findJsonFile, findJsonFilesByFolders, readJsonFileContent, trashFolder } =
+  vi.hoisted(() => ({
+    listSubfolders: vi.fn(),
+    writeJsonFile: vi.fn(),
+    findJsonFile: vi.fn(),
+    findJsonFilesByFolders: vi.fn(),
+    readJsonFileContent: vi.fn(),
+    trashFolder: vi.fn(),
+  }))
+vi.mock('../drive/tripMetadata', async () => {
+  const actual = await vi.importActual<typeof import('../drive/tripMetadata')>('../drive/tripMetadata')
+  return {
+    JSON_FILE_BATCH_SIZE: actual.JSON_FILE_BATCH_SIZE,
+    listSubfolders,
+    writeJsonFile,
+    findJsonFile,
+    findJsonFilesByFolders,
+    readJsonFileContent,
+    trashFolder,
+  }
+})
 
 const { startResumableUpload, uploadFileContent, trashFile } = vi.hoisted(() => ({
   startResumableUpload: vi.fn(),
@@ -80,7 +87,8 @@ beforeEach(() => {
   listSubfolders.mockReset().mockResolvedValue([])
   writeJsonFile.mockReset().mockResolvedValue(undefined)
   findJsonFile.mockReset().mockResolvedValue(null)
-  readJsonFile.mockReset()
+  findJsonFilesByFolders.mockReset().mockResolvedValue(new Map())
+  readJsonFileContent.mockReset()
   trashFolder.mockReset().mockResolvedValue(undefined)
   startResumableUpload.mockReset().mockResolvedValue('session-uri')
   uploadFileContent.mockReset().mockResolvedValue({ id: 'drive-file-id' })
@@ -90,30 +98,50 @@ beforeEach(() => {
 })
 
 describe('useCairnImport', () => {
-  it('lists trips/<id>/cairns/ and reads each cairn.json back on mount', async () => {
+  function cairnRecord(overrides: Partial<CairnRecord> = {}): CairnRecord {
+    return {
+      id: 'cairn-a',
+      name: 'a.jpg',
+      position: { lat: 1, lng: 2 },
+      positionSource: 'exif',
+      icon: null,
+      image: { originalDriveFileId: 'o1', thumbnailDriveFileId: 't1' },
+      description: '',
+      date: null,
+      ...overrides,
+    }
+  }
+
+  it('lists trips/<id>/cairns/ and reads each cairn.json back on mount (#242)', async () => {
     listSubfolders.mockResolvedValue([{ id: 'folder-a', name: 'cairn-a' }])
-    findJsonFile.mockResolvedValue({ fileId: 'file-a', headRevisionId: 'rev-1' })
-    readJsonFile.mockResolvedValue({
-      data: {
-        id: 'cairn-a',
-        name: 'a.jpg',
-        position: { lat: 1, lng: 2 },
-        positionSource: 'exif',
-        icon: null,
-        image: { originalDriveFileId: 'o1', thumbnailDriveFileId: 't1' },
-        description: '',
-        date: null,
-      },
-      headRevisionId: 'rev-1',
-    })
+    findJsonFilesByFolders.mockResolvedValue(new Map([['folder-a', 'file-a']]))
+    readJsonFileContent.mockResolvedValue(cairnRecord({ name: 'a.jpg' }))
 
     const { result } = renderHook(() => useCairnImport('trip-1', 'token', 'cairn-folder-id', []))
     expect(result.current.loading).toBe(true)
 
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(findOrCreateTripCairnsFolder).toHaveBeenCalledWith('token', 'cairn-folder-id', 'trip-1')
+    expect(findJsonFilesByFolders).toHaveBeenCalledWith('token', ['folder-a'], 'cairn.json')
+    expect(readJsonFileContent).toHaveBeenCalledWith('token', 'file-a')
     expect(result.current.cairns).toHaveLength(1)
     expect(result.current.cairns[0].name).toBe('a.jpg')
+  })
+
+  it('skips a cairn folder holding no cairn.json, without sinking the rest', async () => {
+    listSubfolders.mockResolvedValue([
+      { id: 'folder-a', name: 'cairn-a' },
+      { id: 'folder-b', name: 'cairn-b' },
+    ])
+    // folder-a is absent from the map — no cairn.json in it.
+    findJsonFilesByFolders.mockResolvedValue(new Map([['folder-b', 'file-b']]))
+    readJsonFileContent.mockResolvedValue(cairnRecord({ id: 'cairn-b', name: 'b.jpg', image: null }))
+
+    const { result } = renderHook(() => useCairnImport('trip-1', 'token', 'cairn-folder-id', []))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    expect(result.current.cairns).toHaveLength(1)
+    expect(result.current.cairns[0].id).toBe('cairn-b')
   })
 
   it('skips a cairn folder whose cairn.json fails to read, without sinking the rest', async () => {
@@ -121,28 +149,107 @@ describe('useCairnImport', () => {
       { id: 'folder-a', name: 'cairn-a' },
       { id: 'folder-b', name: 'cairn-b' },
     ])
-    findJsonFile.mockImplementation(async (_token: string, folderId: string) =>
-      folderId === 'folder-a' ? null : { fileId: 'file-b', headRevisionId: 'rev-1' },
+    findJsonFilesByFolders.mockResolvedValue(
+      new Map([
+        ['folder-a', 'file-a'],
+        ['folder-b', 'file-b'],
+      ]),
     )
-    readJsonFile.mockResolvedValue({
-      data: {
-        id: 'cairn-b',
-        name: 'b.jpg',
-        position: { lat: 1, lng: 2 },
-        positionSource: 'exif',
-        icon: null,
-        image: null,
-        description: '',
-        date: null,
-      },
-      headRevisionId: 'rev-1',
-    })
+    readJsonFileContent.mockImplementation(async (_token: string, fileId: string) =>
+      fileId === 'file-a' ? Promise.reject(new Error('boom')) : cairnRecord({ id: 'cairn-b', name: 'b.jpg' }),
+    )
 
     const { result } = renderHook(() => useCairnImport('trip-1', 'token', 'cairn-folder-id', []))
     await waitFor(() => expect(result.current.loading).toBe(false))
 
     expect(result.current.cairns).toHaveLength(1)
     expect(result.current.cairns[0].id).toBe('cairn-b')
+  })
+
+  it('skips a cairn.json that fails isCairnRecord, without sinking the rest', async () => {
+    listSubfolders.mockResolvedValue([
+      { id: 'folder-a', name: 'cairn-a' },
+      { id: 'folder-b', name: 'cairn-b' },
+    ])
+    findJsonFilesByFolders.mockResolvedValue(
+      new Map([
+        ['folder-a', 'file-a'],
+        ['folder-b', 'file-b'],
+      ]),
+    )
+    readJsonFileContent.mockImplementation(async (_token: string, fileId: string) =>
+      fileId === 'file-a' ? { not: 'a cairn' } : cairnRecord({ id: 'cairn-b', name: 'b.jpg' }),
+    )
+
+    const { result } = renderHook(() => useCairnImport('trip-1', 'token', 'cairn-folder-id', []))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    expect(result.current.cairns).toHaveLength(1)
+    expect(result.current.cairns[0].id).toBe('cairn-b')
+  })
+
+  it('batches the name lookup at JSON_FILE_BATCH_SIZE folders per query (#242)', async () => {
+    const folders = Array.from({ length: 30 }, (_, i) => ({ id: `folder-${i}`, name: `cairn-${i}` }))
+    listSubfolders.mockResolvedValue(folders)
+    findJsonFilesByFolders.mockResolvedValue(new Map())
+
+    const { result } = renderHook(() => useCairnImport('trip-1', 'token', 'cairn-folder-id', []))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    expect(findJsonFilesByFolders).toHaveBeenCalledTimes(2)
+    expect(findJsonFilesByFolders.mock.calls[0][1]).toHaveLength(25)
+    expect(findJsonFilesByFolders.mock.calls[1][1]).toHaveLength(5)
+  })
+
+  it("one batch's name-lookup query failing does not sink cairns in other batches", async () => {
+    const folders = Array.from({ length: 30 }, (_, i) => ({ id: `folder-${i}`, name: `cairn-${i}` }))
+    listSubfolders.mockResolvedValue(folders)
+    findJsonFilesByFolders.mockImplementation(async (_token: string, folderIds: string[]) => {
+      if (folderIds.includes('folder-0')) throw new Error('batch failed')
+      return new Map(folderIds.map((id) => [id, `file-${id}`]))
+    })
+    readJsonFileContent.mockImplementation(async (_token: string, fileId: string) =>
+      cairnRecord({ id: fileId, name: fileId }),
+    )
+
+    const { result } = renderHook(() => useCairnImport('trip-1', 'token', 'cairn-folder-id', []))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    // The first 25 folders (batch 1) failed entirely; the remaining 5 (batch 2) loaded.
+    expect(result.current.cairns).toHaveLength(5)
+  })
+
+  it('reads cairn.json content concurrently, bounded to a fixed limit', async () => {
+    const folders = Array.from({ length: 20 }, (_, i) => ({ id: `folder-${i}`, name: `cairn-${i}` }))
+    listSubfolders.mockResolvedValue(folders)
+    findJsonFilesByFolders.mockResolvedValue(new Map(folders.map((f) => [f.id, `file-${f.id}`])))
+    let active = 0
+    let maxActive = 0
+    readJsonFileContent.mockImplementation(async (_token: string, fileId: string) => {
+      active += 1
+      maxActive = Math.max(maxActive, active)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      active -= 1
+      return cairnRecord({ id: fileId, name: fileId })
+    })
+
+    const { result } = renderHook(() => useCairnImport('trip-1', 'token', 'cairn-folder-id', []))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    expect(result.current.cairns).toHaveLength(20)
+    expect(maxActive).toBeGreaterThan(1)
+    expect(maxActive).toBeLessThanOrEqual(8)
+  })
+
+  it('does not request headRevisionId for any hydration read', async () => {
+    listSubfolders.mockResolvedValue([{ id: 'folder-a', name: 'cairn-a' }])
+    findJsonFilesByFolders.mockResolvedValue(new Map([['folder-a', 'file-a']]))
+    readJsonFileContent.mockResolvedValue(cairnRecord())
+
+    const { result } = renderHook(() => useCairnImport('trip-1', 'token', 'cairn-folder-id', []))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    expect(findJsonFile).not.toHaveBeenCalled()
   })
 
   it('creates a cairn with positionSource exif when the photo carries its own GPS', async () => {

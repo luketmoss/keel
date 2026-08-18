@@ -9,7 +9,15 @@ import {
   uploadFileContent,
 } from '../drive/trackFiles'
 import { findOrCreateTripCairnItemFolder, findOrCreateTripCairnsFolder } from '../drive/tripCairnFolder'
-import { listSubfolders, writeJsonFile, findJsonFile, readJsonFile, trashFolder } from '../drive/tripMetadata'
+import {
+  listSubfolders,
+  writeJsonFile,
+  findJsonFile,
+  findJsonFilesByFolders,
+  readJsonFileContent,
+  trashFolder,
+  JSON_FILE_BATCH_SIZE,
+} from '../drive/tripMetadata'
 import { readPhotoExif, type PhotoExif } from './exif'
 import { displayImageName, generateImagePair, THUMBNAIL_SUFFIX, validateImageFile } from './thumbnail'
 import { positionPhoto } from './interpolate'
@@ -38,6 +46,10 @@ import type { LatLng } from '../map/geo'
    without a position; a file that can't get one waits instead. */
 
 const UPLOAD_CONCURRENCY = 4
+// #242: how many cairn.json reads run at once during hydration — the same
+// bounded-concurrency shape the upload path already uses above, applied to
+// the read side of a trip's cairns instead of a batch of incoming files.
+const HYDRATE_READ_CONCURRENCY = 8
 
 export const ALREADY_IN_TRIP_MESSAGE = 'already in this trip'
 
@@ -202,19 +214,43 @@ export function useCairnImport(
       try {
         const cairnsFolderId = await findOrCreateTripCairnsFolder(token, cairnId, tripId)
         const folders = await listSubfolders(token, cairnsFolderId)
-        const records: CairnRecord[] = []
-        for (const folder of folders) {
+
+        // Batched name lookup, `JSON_FILE_BATCH_SIZE` folders per query
+        // instead of one query per folder (#242). Chunked here rather than
+        // inside `findJsonFilesByFolders` so one chunk's query failing costs
+        // only that chunk's cairns, not the whole trip.
+        const fileIdByFolder = new Map<string, string>()
+        for (let i = 0; i < folders.length; i += JSON_FILE_BATCH_SIZE) {
+          const chunk = folders.slice(i, i + JSON_FILE_BATCH_SIZE)
           try {
-            const file = await findJsonFile(token, folder.id, 'cairn.json')
-            if (!file) continue
-            const stored = await readJsonFile<CairnRecord>(token, file.fileId)
-            if (isCairnRecord(stored.data)) records.push(stored.data)
+            const found = await findJsonFilesByFolders(
+              token,
+              chunk.map((folder) => folder.id),
+              'cairn.json',
+            )
+            for (const [folderId, fileId] of found) fileIdByFolder.set(folderId, fileId)
           } catch {
-            // One cairn's folder failing to read does not sink the rest —
-            // same "a file's own failure never sinks the batch" stance
-            // `runWithConcurrency` documents for import.
+            // One batch's query failing does not sink cairns in other
+            // batches — same "one folder's failure doesn't sink the rest"
+            // stance as the per-cairn read below, now at the batch level.
           }
         }
+
+        const records: CairnRecord[] = []
+        await runWithConcurrency(
+          Array.from(fileIdByFolder.values()),
+          HYDRATE_READ_CONCURRENCY,
+          async (fileId) => {
+            try {
+              const data = await readJsonFileContent<CairnRecord>(token, fileId)
+              if (isCairnRecord(data)) records.push(data)
+            } catch {
+              // One cairn's folder failing to read does not sink the rest —
+              // same "a file's own failure never sinks the batch" stance
+              // `runWithConcurrency` documents for import.
+            }
+          },
+        )
         if (cancelled) return
         cairnsRef.current = records
         setCairns(records)

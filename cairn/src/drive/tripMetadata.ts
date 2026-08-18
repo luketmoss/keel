@@ -88,6 +88,67 @@ export async function findJsonFile(
   return file ? { fileId: file.id, headRevisionId: file.headRevisionId ?? null } : null
 }
 
+/** Folders per `findJsonFilesByFolders` query — keeps the `q` parameter
+    around 1.4KB (well inside Drive's limit) and each response below the
+    default page size cairn hydration used to trip over (#248's sibling bug,
+    the reason listSubfolders now pages explicitly). Exported so a caller
+    with more folders than this chunks consistently with what one query can
+    actually carry. */
+export const JSON_FILE_BATCH_SIZE = 25
+
+/** Looks up `fileName` across up to `JSON_FILE_BATCH_SIZE` folders in one
+    query instead of one query per folder — replaces `findJsonFile` called in
+    a loop for cairn hydration (#242), where a `cairn.json`-per-folder lookup
+    is most of what makes opening a 50-cairn trip cost ~150 requests.
+
+    Callers with more folders than the batch size chunk and call this once
+    per chunk rather than this function batching internally — a single
+    chunk's query failing must only cost that chunk's folders, per #242's
+    acceptance criteria, and folding chunking in here would let one chunk's
+    failure take the whole call down with it.
+
+    Returns a map of folder id to file id. `parents` is what Drive returns
+    to attribute each found file back to the folder it came from — the query
+    itself returns a flat list of files, not one already keyed by folder. A
+    folder with no `cairn.json` is simply absent from the map. */
+export async function findJsonFilesByFolders(
+  accessToken: string,
+  folderIds: string[],
+  fileName: string,
+): Promise<Map<string, string>> {
+  if (folderIds.length === 0) return new Map()
+  if (folderIds.length > JSON_FILE_BATCH_SIZE) {
+    throw new Error(
+      `findJsonFilesByFolders: batch of ${folderIds.length} exceeds the ${JSON_FILE_BATCH_SIZE} limit`,
+    )
+  }
+
+  const parentsClause = folderIds.map((id) => `'${id}' in parents`).join(' or ')
+  const query = [`(${parentsClause})`, `name='${fileName}'`, 'trashed=false'].join(' and ')
+
+  const result = new Map<string, string>()
+  let pageToken: string | undefined
+  do {
+    const params = new URLSearchParams({ q: query, fields: 'nextPageToken,files(id,parents)' })
+    if (pageToken) params.set('pageToken', pageToken)
+    const response = await driveFetch(`${DRIVE_FILES_URL}?${params}`, accessToken)
+    if (!response.ok) {
+      throw new DriveRequestError(`Drive request failed with status ${response.status}`)
+    }
+    const body = (await response.json()) as {
+      files?: { id: string; parents?: string[] }[]
+      nextPageToken?: string
+    }
+    for (const found of body.files ?? []) {
+      const parent = found.parents?.[0]
+      if (parent) result.set(parent, found.id)
+    }
+    pageToken = body.nextPageToken
+  } while (pageToken)
+
+  return result
+}
+
 async function currentHeadRevisionId(accessToken: string, fileId: string): Promise<string | null> {
   const response = await driveFetch(`${DRIVE_FILES_URL}/${fileId}?fields=headRevisionId`, accessToken)
   if (!response.ok) {
@@ -114,6 +175,22 @@ export async function readJsonFile<T>(
   }
   const data = (await contentResponse.json()) as T
   return { data, headRevisionId }
+}
+
+/** Reads a JSON file's content only — one `alt=media` request, no
+    `headRevisionId` round trip alongside it. For a reader with nowhere to
+    use a revision id, such as cairn hydration (#242): the write path
+    re-reads the file fresh via `findJsonFile` before writing, and
+    `overwrite` re-checks the revision immediately before its own PATCH, so
+    nothing downstream depends on a read here having fetched one.
+    `readJsonFile` stays as it is — unchanged, revision id and all — for the
+    callers that do rely on it for `writeJsonFile`'s staleness check. */
+export async function readJsonFileContent<T>(accessToken: string, fileId: string): Promise<T> {
+  const response = await driveFetch(`${DRIVE_FILES_URL}/${fileId}?alt=media`, accessToken)
+  if (!response.ok) {
+    throw new DriveRequestError(`Drive request failed with status ${response.status}`)
+  }
+  return (await response.json()) as T
 }
 
 /** Creates `fileName` fresh in `folderId` — the multipart body is Drive's

@@ -205,7 +205,15 @@ export async function writeJsonFile(
 /** Every direct child folder of `parentFolderId` — used to enumerate trip
     folders under `/Cairn/` without knowing their trip ids up front, which
     is what lets the trip index be derived from Drive rather than kept as
-    its own file (see #59's design note). */
+    its own file (see #59's design note).
+
+    Pages through `nextPageToken` rather than trusting Drive's default page
+    size (100): past a hundred results a single-request read silently drops
+    the rest, and nothing about the response distinguishes a truncated list
+    from a complete one (#248). `pageSize=1000` (Drive's maximum) keeps this
+    one request in every case this app will realistically see. A failure on
+    a later page throws instead of returning what was accumulated so far —
+    a caller must not mistake a partial list for a complete one. */
 export async function listSubfolders(
   accessToken: string,
   parentFolderId: string,
@@ -215,13 +223,29 @@ export async function listSubfolders(
     `'${parentFolderId}' in parents`,
     'trashed=false',
   ].join(' and ')
-  const url = `${DRIVE_FILES_URL}?q=${encodeURIComponent(query)}&fields=files(id,name)`
-  const response = await driveFetch(url, accessToken)
-  if (!response.ok) {
-    throw new DriveRequestError(`Drive request failed with status ${response.status}`)
-  }
-  const body = (await response.json()) as { files?: { id: string; name: string }[] }
-  return body.files ?? []
+
+  const files: { id: string; name: string }[] = []
+  let pageToken: string | undefined
+  do {
+    const params = new URLSearchParams({
+      q: query,
+      fields: 'nextPageToken,files(id,name)',
+      pageSize: '1000',
+    })
+    if (pageToken) params.set('pageToken', pageToken)
+    const response = await driveFetch(`${DRIVE_FILES_URL}?${params}`, accessToken)
+    if (!response.ok) {
+      throw new DriveRequestError(`Drive request failed with status ${response.status}`)
+    }
+    const body = (await response.json()) as {
+      files?: { id: string; name: string }[]
+      nextPageToken?: string
+    }
+    files.push(...(body.files ?? []))
+    pageToken = body.nextPageToken
+  } while (pageToken)
+
+  return files
 }
 
 /** Trashes a folder (and everything in it) — used to remove a deleted

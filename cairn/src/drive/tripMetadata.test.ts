@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   DriveAuthError,
   DriveConflictError,
+  DriveRequestError,
   findJsonFile,
   listSubfolders,
   readJsonFile,
@@ -205,6 +206,87 @@ describe('listSubfolders', () => {
     const folders = await listSubfolders('token', 'cairn-folder-id')
 
     expect(folders).toEqual([{ id: 'a', name: 'trip-a' }, { id: 'b', name: 'trip-b' }])
+  })
+
+  it('pages through 250 results across three requests', async () => {
+    const page = (start: number, count: number, nextPageToken?: string) => ({
+      files: Array.from({ length: count }, (_, i) => ({ id: `f${start + i}`, name: `folder-${start + i}` })),
+      ...(nextPageToken ? { nextPageToken } : {}),
+    })
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(jsonResponse(page(0, 100, 'token-2')))
+      .mockResolvedValueOnce(jsonResponse(page(100, 100, 'token-3')))
+      .mockResolvedValueOnce(jsonResponse(page(200, 50)))
+
+    const folders = await listSubfolders('token', 'cairn-folder-id')
+
+    expect(folders).toHaveLength(250)
+    expect(folders[0]).toEqual({ id: 'f0', name: 'folder-0' })
+    expect(folders[249]).toEqual({ id: 'f249', name: 'folder-249' })
+    expect(fetchSpy).toHaveBeenCalledTimes(3)
+  })
+
+  it('carries the prior response\'s pageToken on each subsequent request', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(jsonResponse({ files: [{ id: 'a', name: 'a' }], nextPageToken: 'token-2' }))
+      .mockResolvedValueOnce(jsonResponse({ files: [{ id: 'b', name: 'b' }] }))
+
+    await listSubfolders('token', 'cairn-folder-id')
+
+    const firstUrl = new URL(String(fetchSpy.mock.calls[0][0]))
+    expect(firstUrl.searchParams.has('pageToken')).toBe(false)
+    const secondUrl = new URL(String(fetchSpy.mock.calls[1][0]))
+    expect(secondUrl.searchParams.get('pageToken')).toBe('token-2')
+  })
+
+  it('requests pageSize=1000 on every page', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(jsonResponse({ files: [{ id: 'a', name: 'a' }], nextPageToken: 'token-2' }))
+      .mockResolvedValueOnce(jsonResponse({ files: [{ id: 'b', name: 'b' }] }))
+
+    await listSubfolders('token', 'cairn-folder-id')
+
+    for (const call of fetchSpy.mock.calls) {
+      expect(new URL(String(call[0])).searchParams.get('pageSize')).toBe('1000')
+    }
+  })
+
+  it('costs exactly one request for 100 or fewer subfolders', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      jsonResponse({ files: [{ id: 'a', name: 'trip-a' }] }),
+    )
+
+    await listSubfolders('token', 'cairn-folder-id')
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns [] in one request for an empty folder, without looping', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({ files: [] }))
+
+    const folders = await listSubfolders('token', 'cairn-folder-id')
+
+    expect(folders).toEqual([])
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('throws rather than returning a partial list when a later page fails', async () => {
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(jsonResponse({ files: [{ id: 'a', name: 'a' }], nextPageToken: 'token-2' }))
+      .mockResolvedValueOnce(jsonResponse({}, 500))
+
+    await expect(listSubfolders('token', 'cairn-folder-id')).rejects.toBeInstanceOf(DriveRequestError)
+  })
+
+  it('propagates DriveAuthError from a later page', async () => {
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(jsonResponse({ files: [{ id: 'a', name: 'a' }], nextPageToken: 'token-2' }))
+      .mockResolvedValueOnce(jsonResponse({}, 401))
+
+    await expect(listSubfolders('expired', 'cairn-folder-id')).rejects.toBeInstanceOf(DriveAuthError)
   })
 })
 

@@ -534,10 +534,11 @@ describe('Lightbox', () => {
 
     it('keeps the detail face reachable while a photo uploads onto a cairn with none', () => {
       const blank = row({ thumbnailDriveFileId: null, originalDriveFileId: null })
-      const { container } = renderBox({ row: blank, rows: [blank], attaching: true })
+      renderBox({ row: blank, rows: [blank], attaching: true })
 
-      // #157's slot still needs somewhere to show progress.
-      expect(container.querySelector('.lightbox__media')).not.toBeNull()
+      // #157's slot still needs somewhere to show progress. #241 — the
+      // dialog is portaled to `document.body`, not RTL's `container`.
+      expect(document.querySelector('.lightbox__media')).not.toBeNull()
       expect(screen.getByText('uploading…')).toBeDefined()
       expect(photo()).toHaveProperty('disabled', true)
     })

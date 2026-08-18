@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { cairnRowMetaLine, type CairnListRow } from '../photo/cairnListGroups'
 import {
   ADD_DESCRIPTION_PLACEHOLDER,
@@ -226,7 +227,15 @@ export function Lightbox({
     }
   }
 
-  return (
+  /* #241 — portaled to `document.body` rather than rendered where
+     `TripDetail` mounts it. `.shell-column__panel` (and, on phone,
+     `.bottom-sheet`) carries `backdrop-filter`, which establishes a
+     containing block for this dialog's `position: fixed` exactly as
+     `transform` would — so left in place, "fixed to the viewport" actually
+     meant "fixed to the sidebar panel", and the panel's `overflow: hidden`
+     clipped it there. A portal only moves the DOM node; the React tree
+     (context, event bubbling, the props below) is unaffected. */
+  return createPortal(
     <div className="lightbox" data-testid="lightbox">
       <div
         ref={dialogRef}
@@ -401,6 +410,7 @@ export function Lightbox({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

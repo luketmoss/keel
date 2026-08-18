@@ -28,6 +28,34 @@ beforeEach(() => {
 })
 
 describe('Lightbox', () => {
+  it('#241 — portals out from under whatever renders it, landing directly on document.body', async () => {
+    // Simulates `.shell-column__panel`: an ancestor with `overflow: hidden`
+    // that a naive `position: fixed` would be clipped by, if this component
+    // weren't escaping it via `createPortal`.
+    const clipper = document.createElement('div')
+    document.body.appendChild(clipper)
+
+    const { container } = render(
+      <Lightbox
+        row={row()}
+        rows={[row()]}
+        description=""
+        accessToken="token"
+        onClose={vi.fn()}
+        onNavigate={vi.fn()}
+        returnFocusRef={createRef<HTMLElement>()}
+      />,
+      { container: clipper },
+    )
+
+    const dialog = screen.getByRole('dialog')
+    expect(clipper.contains(dialog)).toBe(false)
+    expect(container.contains(dialog)).toBe(false)
+    expect(dialog.closest('[data-testid="lightbox"]')?.parentElement).toBe(document.body)
+
+    document.body.removeChild(clipper)
+  })
+
   it('renders as a modal dialog with an aria-label naming the photo (criterion 7)', async () => {
     render(
       <Lightbox
@@ -534,10 +562,11 @@ describe('Lightbox', () => {
 
     it('keeps the detail face reachable while a photo uploads onto a cairn with none', () => {
       const blank = row({ thumbnailDriveFileId: null, originalDriveFileId: null })
-      const { container } = renderBox({ row: blank, rows: [blank], attaching: true })
+      renderBox({ row: blank, rows: [blank], attaching: true })
 
-      // #157's slot still needs somewhere to show progress.
-      expect(container.querySelector('.lightbox__media')).not.toBeNull()
+      // #157's slot still needs somewhere to show progress. #241 — the
+      // dialog is portaled to `document.body`, not RTL's `container`.
+      expect(document.querySelector('.lightbox__media')).not.toBeNull()
       expect(screen.getByText('uploading…')).toBeDefined()
       expect(photo()).toHaveProperty('disabled', true)
     })

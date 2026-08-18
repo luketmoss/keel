@@ -299,11 +299,13 @@ describe('Lightbox — #196 editing a cairn', () => {
   })
 
   it('keeps the inputs inside the focus trap', () => {
-    const { container } = renderLightbox()
+    // #241 — the dialog is portaled to `document.body`, so it's a sibling of
+    // RTL's own `container` rather than inside it; query the document.
+    renderLightbox()
 
     fireEvent.click(descriptionField())
 
-    const trapped = container.querySelectorAll('.lightbox__dialog button:not(:disabled), .lightbox__dialog input, .lightbox__dialog textarea')
+    const trapped = document.querySelectorAll('.lightbox__dialog button:not(:disabled), .lightbox__dialog input, .lightbox__dialog textarea')
     expect(Array.from(trapped)).toContain(descriptionInput())
   })
 })

@@ -571,4 +571,47 @@ describe('Lightbox', () => {
       expect(photo()).toHaveProperty('disabled', true)
     })
   })
+
+  /* #240 — a click on the scrim closes the lightbox, alongside `×` and
+     `Esc`. `240-click-outside-lightbox.md`'s boundary test:
+     `target === currentTarget` on `.lightbox` itself. */
+  describe('#240 clicking the scrim', () => {
+    it('closes on a click that lands directly on the scrim', () => {
+      const onClose = vi.fn()
+      render(
+        <Lightbox
+          row={row()}
+          rows={[row()]}
+          description=""
+          accessToken="token"
+          onClose={onClose}
+          onNavigate={vi.fn()}
+          returnFocusRef={createRef<HTMLElement>()}
+        />,
+      )
+
+      fireEvent.click(screen.getByTestId('lightbox'))
+      expect(onClose).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not close on a click that lands inside the dialog', () => {
+      const onClose = vi.fn()
+      render(
+        <Lightbox
+          row={row()}
+          rows={[row()]}
+          description=""
+          accessToken="token"
+          onClose={onClose}
+          onNavigate={vi.fn()}
+          returnFocusRef={createRef<HTMLElement>()}
+        />,
+      )
+
+      fireEvent.click(screen.getByRole('dialog'))
+      fireEvent.click(screen.getByRole('heading', { level: 2 }))
+      fireEvent.click(screen.getByLabelText('What is this place'))
+      expect(onClose).not.toHaveBeenCalled()
+    })
+  })
 })

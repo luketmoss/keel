@@ -308,4 +308,21 @@ describe('Lightbox — #196 editing a cairn', () => {
     const trapped = document.querySelectorAll('.lightbox__dialog button:not(:disabled), .lightbox__dialog input, .lightbox__dialog textarea')
     expect(Array.from(trapped)).toContain(descriptionInput())
   })
+
+  /* #240 — a scrim click blurs whatever is focused before the click event
+     itself reaches `.lightbox`, exactly as clicking `×` already does per
+     `240-click-outside-lightbox.md`'s "Blur caused by closing" parity —
+     that's a fact about browsers moving focus on `mousedown`, so the test
+     drives it the same way: a `blur` on the field, then the scrim `click`. */
+  it('commits an in-progress edit before closing, on a scrim click — the same order a blur-then-click already commits in', async () => {
+    const { onSaveText, onClose } = renderLightbox()
+
+    fireEvent.click(nameField())
+    fireEvent.change(nameInput(), { target: { value: 'Renamed via scrim' } })
+    fireEvent.blur(nameInput())
+    fireEvent.click(screen.getByTestId('lightbox'))
+
+    await waitFor(() => expect(onSaveText).toHaveBeenCalledWith({ name: 'Renamed via scrim' }))
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
 })

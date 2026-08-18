@@ -235,8 +235,18 @@ export function Lightbox({
      meant "fixed to the sidebar panel", and the panel's `overflow: hidden`
      clipped it there. A portal only moves the DOM node; the React tree
      (context, event bubbling, the props below) is unaffected. */
+  /* #240 — a click on the scrim closes the lightbox, the same as `×` or
+     `Esc`. Testing `target === currentTarget` rather than `stopPropagation`
+     on every control inside the dialog: any click that started on something
+     the dialog rendered has already bubbled past that thing's own handler by
+     the time it reaches here, so only a click whose *target* is this element
+     itself — the scrim — ever matches. */
+  function handleScrimClick(event: React.MouseEvent<HTMLDivElement>) {
+    if (event.target === event.currentTarget) onClose()
+  }
+
   return createPortal(
-    <div className="lightbox" data-testid="lightbox">
+    <div className="lightbox" data-testid="lightbox" onClick={handleScrimClick}>
       <div
         ref={dialogRef}
         className={`lightbox__dialog${fullBleed ? ' lightbox__dialog--full-bleed' : ''}`}

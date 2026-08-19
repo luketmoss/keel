@@ -50,6 +50,11 @@ async function uploadRequestError(response: Response, message: string): Promise<
 export interface DriveTrackFile {
   id: string
   name: string
+  /** #244: the cache invalidation marker — a file whose `modifiedTime`
+      differs from what `trackFileCache` has stored is treated as a miss and
+      re-downloaded. Costs nothing extra on this request; Drive already
+      returns it for any file field query. */
+  modifiedTime: string
 }
 
 /** #191: folders are excluded in the query rather than filtered out of the
@@ -68,7 +73,7 @@ export async function listTrackFiles(
     `mimeType!='${FOLDER_MIME_TYPE}'`,
     'trashed=false',
   ].join(' and ')
-  const url = `${DRIVE_FILES_URL}?q=${encodeURIComponent(query)}&fields=files(id,name)`
+  const url = `${DRIVE_FILES_URL}?q=${encodeURIComponent(query)}&fields=files(id,name,modifiedTime)`
 
   let response: Response
   try {

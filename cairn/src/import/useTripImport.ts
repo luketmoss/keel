@@ -6,12 +6,12 @@ import { readSampledElevation } from '../geo/tripTotals'
 import { runWithConcurrency } from './concurrency'
 import type { ImportedFile } from './types'
 import {
-  downloadTrackFile,
   listTrackFiles,
   startResumableUpload,
   trashFile,
   uploadFileContent,
 } from '../drive/trackFiles'
+import { defaultTrackFileCache, type TrackFileCache } from '../drive/trackFileCache'
 import { findOrCreateTripFolder } from '../drive/tripFolder'
 import { DriveAuthError } from '../drive/rootFolder'
 import type { TrackOverridesStore } from '../store/trackOverridesStore'
@@ -164,6 +164,7 @@ export function useTripImport(
   cairnFolderId: string | null,
   tripStore: TripStore,
   overridesStore: TrackOverridesStore = defaultOverridesStore,
+  trackFileCache: TrackFileCache = defaultTrackFileCache,
 ): UseTripImport {
   const [tracks, setTracks] = useState<ImportedFile[]>([])
   // #224: this trip's sampled-elevation cache — read back from the
@@ -287,7 +288,12 @@ export function useTripImport(
         await runWithConcurrency(driveFiles, LOAD_CONCURRENCY, async (driveFile) => {
           if (cancelled) return
           try {
-            const file = await downloadTrackFile(token, driveFile.id, driveFile.name)
+            const file = await trackFileCache.getFile(
+              token,
+              driveFile.id,
+              driveFile.name,
+              driveFile.modifiedTime,
+            )
             const result = await parseTrack(file)
             if (!result.ok || result.tracks.length === 0) return
             if (cancelled) return

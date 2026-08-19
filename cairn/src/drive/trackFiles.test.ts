@@ -207,6 +207,21 @@ describe('listTrackFiles', () => {
     ])
   })
 
+  // #244: `modifiedTime` is what `trackFileCache` keys invalidation on —
+  // requested here and passed through unchanged.
+  it('requests modifiedTime and passes it through on each file', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      response({ files: [{ id: 'drive-1', name: 'day-1.kml', modifiedTime: '2024-01-01T00:00:00Z' }] }),
+    )
+
+    await expect(listTrackFiles('token', 'folder-id')).resolves.toEqual([
+      { id: 'drive-1', name: 'day-1.kml', modifiedTime: '2024-01-01T00:00:00Z' },
+    ])
+
+    const url = fetchSpy.mock.calls[0][0] as string
+    expect(new URL(url).searchParams.get('fields')).toBe('files(id,name,modifiedTime)')
+  })
+
   it('returns an empty list when Drive reports no files', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(response({}))
 

@@ -276,13 +276,17 @@ export function TripDetail({
      time the user opens one — no migration pass, and no Drive read the app
      was not already making.
 
-     Gated on `loading`: before the read-back lands, `cairns` is the empty
-     array it was initialised with, and writing `0` from that would clobber
-     a real count with a wrong one on every single open. */
+     Gated on `hydrated` rather than `!loading` (#243): before the read-back
+     lands, `cairns` is either the empty array it was initialised with or a
+     set restored from cache, and writing a count from either would clobber
+     a real one with a number Drive has not confirmed. `loading` stopped
+     answering that question the moment cairns gained a cache — a cached
+     trip is not loading and its count is still not yet known. A failed
+     Drive read never sets `hydrated`, so it never writes a count either. */
   useEffect(() => {
-    if (cairnImport.loading) return
+    if (!cairnImport.hydrated) return
     tripStore.saveCairnCount(tripId, cairnImport.cairns.length)
-  }, [tripStore, tripId, cairnImport.loading, cairnImport.cairns.length])
+  }, [tripStore, tripId, cairnImport.hydrated, cairnImport.cairns.length])
   const [selectedCairnId, setSelectedCairnId] = useState<string | null>(null)
   // Deliberately separate from `selectedCairnId` rather than derived from
   // it — a selected marker does not open the lightbox by itself, only an

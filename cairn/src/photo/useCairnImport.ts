@@ -30,6 +30,7 @@ import {
   type CairnImage,
   type PositionSource,
 } from '../store/looseStore'
+import { isCairnRecord, readCachedCairns, writeCachedCairns } from '../store/cairnCache'
 import type { PlacementQueueItem } from '../import/placementQueue'
 import type { LatLng } from '../map/geo'
 
@@ -72,20 +73,6 @@ export interface CairnRecord {
   dateTimeOriginal?: string
 }
 
-function isCairnRecord(value: unknown): value is CairnRecord {
-  if (typeof value !== 'object' || value === null) return false
-  const record = value as Record<string, unknown>
-  if (typeof record.id !== 'string' || typeof record.name !== 'string') return false
-  if (typeof record.position !== 'object' || record.position === null) return false
-  const position = record.position as Record<string, unknown>
-  if (typeof position.lat !== 'number' || typeof position.lng !== 'number') return false
-  return (
-    record.positionSource === 'exif' ||
-    record.positionSource === 'interpolated' ||
-    record.positionSource === 'placed'
-  )
-}
-
 export interface CairnImportProgress {
   id: string
   name: string
@@ -125,7 +112,17 @@ export interface NewTripCairn {
 
 export interface UseCairnImport {
   cairns: CairnRecord[]
+  /** #243: "there is nothing to show yet", not "Drive has not answered". A
+      trip with cached cairns is never loading — it has records, and the
+      revalidation behind them has no appearance
+      (`docs/design/243-cached-cairns.md`). */
   loading: boolean
+  /** #243: the Drive read has settled successfully this mount. Distinct from
+      `!loading`, and the two stopped being the same thing the moment a cache
+      existed — anything deriving a fact about the trip from `cairns` (the
+      trip's cairn count, #121) has to wait for this, or it writes a number
+      read off a cache that Drive is about to disagree with. */
+  hydrated: boolean
   progress: CairnImportProgress[]
   failures: CairnImportFailure[]
   importFiles: (incoming: File[]) => Promise<CairnImportResult>
@@ -180,14 +177,26 @@ export function useCairnImport(
   cairnFolderId: string | null,
   tracks: Track[],
 ): UseCairnImport {
-  const [cairns, setCairns] = useState<CairnRecord[]>([])
-  const [loading, setLoading] = useState(true)
+  /* #243: read synchronously at mount rather than in an effect — an effect
+     renders one empty frame first, and the absence of that frame is the
+     whole feature. `null` is a miss (absent, unparseable, invalid) and is
+     deliberately distinct from a cached empty array, which is a real fact
+     about the trip and renders the empty state immediately. */
+  const [cachedOnMount] = useState<CairnRecord[] | null>(() => readCachedCairns(tripId))
+  const [cairns, setCairns] = useState<CairnRecord[]>(cachedOnMount ?? [])
+  const [loading, setLoading] = useState(cachedOnMount === null)
+  const [hydrated, setHydrated] = useState(false)
   const [progressMap, setProgressMap] = useState<Map<string, CairnImportProgress>>(new Map())
   const [failures, setFailures] = useState<CairnImportFailure[]>([])
   const failuresRef = useRef<CairnImportFailure[]>(failures)
   const [removingCairnIds, setRemovingCairnIds] = useState<Set<string>>(new Set())
   const [cairnRemoveErrors, setCairnRemoveErrors] = useState<Record<string, string>>({})
-  const cairnsRef = useRef<CairnRecord[]>([])
+  const cairnsRef = useRef<CairnRecord[]>(cachedOnMount ?? [])
+  // Which trip the state above belongs to. `TripDetail` is keyed on the open
+  // trip id, so in practice a different trip is a different hook instance —
+  // this is what makes that a convenience rather than a load-bearing
+  // assumption, and it is why trip A can never render trip B's cairns.
+  const cachedTripRef = useRef<string>(tripId)
   // A cairn's position depends on this trip's tracks, which arrive from a
   // sibling hook and can change shape between renders — a ref keeps
   // `importOne` (a stable `useCallback`) reading the current tracks rather
@@ -201,7 +210,28 @@ export function useCairnImport(
     failuresRef.current = failures
   }, [failures])
 
+  /* Every write to the trip's cairns goes through here: local state, the
+     ref the callbacks read, and the cache, in one place. A mutation that
+     updated state without the cache would be undone by the next remount
+     reading a cache that predates it. */
+  const commit = useCallback(
+    (next: CairnRecord[]) => {
+      cairnsRef.current = next
+      setCairns(next)
+      writeCachedCairns(tripId, next)
+    },
+    [tripId],
+  )
+
   useEffect(() => {
+    if (cachedTripRef.current !== tripId) {
+      cachedTripRef.current = tripId
+      const cached = readCachedCairns(tripId)
+      cairnsRef.current = cached ?? []
+      setCairns(cached ?? [])
+      setLoading(cached === null)
+    }
+    setHydrated(false)
     if (!accessToken || !cairnFolderId) {
       setLoading(false)
       return
@@ -252,8 +282,11 @@ export function useCairnImport(
           },
         )
         if (cancelled) return
-        cairnsRef.current = records
-        setCairns(records)
+        // Drive is the source of truth: its result replaces the trip's
+        // cached set wholesale, so a cairn added, edited or deleted on
+        // another device converges here (#243).
+        commit(records)
+        setHydrated(true)
       } catch {
         // Whole read failed — leave whatever was already rendered in place.
       } finally {
@@ -265,7 +298,7 @@ export function useCairnImport(
     return () => {
       cancelled = true
     }
-  }, [accessToken, cairnFolderId, tripId])
+  }, [accessToken, cairnFolderId, commit, tripId])
 
   const setProgressEntry = useCallback((key: string, value: CairnImportProgress) => {
     setProgressMap((prev) => {
@@ -354,11 +387,10 @@ export function useCairnImport(
 
       await writeJsonFile(token, folderId, 'cairn.json', record, null)
 
-      cairnsRef.current = [...cairnsRef.current, record]
-      setCairns(cairnsRef.current)
+      commit([...cairnsRef.current, record])
       return record
     },
-    [cairnFolderId, tripId, addFailure],
+    [cairnFolderId, tripId, addFailure, commit],
   )
 
   /* One file's full pipeline: validate, read EXIF, resolve a position (EXIF
@@ -507,11 +539,10 @@ export function useCairnImport(
         return null
       }
 
-      cairnsRef.current = [...cairnsRef.current, record]
-      setCairns(cairnsRef.current)
+      commit([...cairnsRef.current, record])
       return record
     },
-    [accessToken, cairnFolderId, tripId],
+    [accessToken, cairnFolderId, tripId, commit],
   )
 
   /* #156's retype. `icon` is the only field that changes; every other one
@@ -536,11 +567,10 @@ export function useCairnImport(
         return false
       }
 
-      cairnsRef.current = cairnsRef.current.map((cairn) => (cairn.id === id ? next : cairn))
-      setCairns(cairnsRef.current)
+      commit(cairnsRef.current.map((cairn) => (cairn.id === id ? next : cairn)))
       return true
     },
-    [accessToken, cairnFolderId, tripId],
+    [accessToken, cairnFolderId, tripId, commit],
   )
 
   /* #196: the two free-text fields, behind one mutator because they are
@@ -568,8 +598,7 @@ export function useCairnImport(
 
       const next: CairnRecord = { ...current, name, description }
       const apply = (record: CairnRecord) => {
-        cairnsRef.current = cairnsRef.current.map((cairn) => (cairn.id === id ? record : cairn))
-        setCairns(cairnsRef.current)
+        commit(cairnsRef.current.map((cairn) => (cairn.id === id ? record : cairn)))
       }
 
       apply(next)
@@ -588,7 +617,7 @@ export function useCairnImport(
       }
       return true
     },
-    [accessToken, cairnFolderId, tripId],
+    [accessToken, cairnFolderId, tripId, commit],
   )
 
   /* #158: dragging a cairn's marker. Writes `position` and sets
@@ -616,11 +645,10 @@ export function useCairnImport(
         return false
       }
 
-      cairnsRef.current = cairnsRef.current.map((cairn) => (cairn.id === id ? next : cairn))
-      setCairns(cairnsRef.current)
+      commit(cairnsRef.current.map((cairn) => (cairn.id === id ? next : cairn)))
       return true
     },
-    [accessToken, cairnFolderId, tripId],
+    [accessToken, cairnFolderId, tripId, commit],
   )
 
   /* #157: attaches a photo to a cairn this trip already owns. Validated up
@@ -692,8 +720,7 @@ export function useCairnImport(
           ])
         }
 
-        cairnsRef.current = cairnsRef.current.map((cairn) => (cairn.id === id ? next : cairn))
-        setCairns(cairnsRef.current)
+        commit(cairnsRef.current.map((cairn) => (cairn.id === id ? next : cairn)))
         return { ok: true }
       } catch {
         // Nothing local was mutated on this path — the cairn is exactly as
@@ -701,7 +728,7 @@ export function useCairnImport(
         return { ok: false, error: ATTACH_IMAGE_FAILED_MESSAGE }
       }
     },
-    [accessToken, cairnFolderId, tripId],
+    [accessToken, cairnFolderId, tripId, commit],
   )
 
   const retryFailure = useCallback(
@@ -752,9 +779,7 @@ export function useCairnImport(
       try {
         const folderId = await findOrCreateTripCairnItemFolder(accessToken, cairnFolderId, tripId, id)
         await trashFolder(accessToken, folderId)
-        const remaining = cairnsRef.current.filter((c) => c.id !== id)
-        cairnsRef.current = remaining
-        setCairns(remaining)
+        commit(cairnsRef.current.filter((c) => c.id !== id))
       } catch {
         setCairnRemoveErrors((prev) => ({ ...prev, [id]: `Couldn't remove ${record.name} — try again.` }))
       } finally {
@@ -765,19 +790,22 @@ export function useCairnImport(
         })
       }
     },
-    [accessToken, cairnFolderId, tripId],
+    [accessToken, cairnFolderId, tripId, commit],
   )
 
-  const forgetCairn = useCallback((id: string) => {
-    cairnsRef.current = cairnsRef.current.filter((c) => c.id !== id)
-    setCairns(cairnsRef.current)
-  }, [])
+  const forgetCairn = useCallback(
+    (id: string) => {
+      commit(cairnsRef.current.filter((c) => c.id !== id))
+    },
+    [commit],
+  )
 
   const progress = Array.from(progressMap.values()).sort((a, b) => a.index - b.index)
 
   return {
     cairns,
     loading,
+    hydrated,
     progress,
     failures,
     importFiles,

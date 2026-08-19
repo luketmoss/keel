@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useCairnImport, ALREADY_IN_TRIP_MESSAGE, type CairnRecord } from './useCairnImport'
+import { readCachedCairns, writeCachedCairns } from '../store/cairnCache'
 import { DriveAuthError, DriveQuotaError } from '../drive/trackFiles'
 import type { Track } from '../kml/parse'
 
@@ -82,6 +83,9 @@ const bracketingTrack: Track = {
 }
 
 beforeEach(() => {
+  // #243 gave cairns a `localStorage` cache, so a trip hydrated by one test
+  // would arrive already populated in the next.
+  window.localStorage.clear()
   findOrCreateTripCairnsFolder.mockReset().mockResolvedValue('cairns-folder-id')
   findOrCreateTripCairnItemFolder.mockReset().mockResolvedValue('item-folder-id')
   listSubfolders.mockReset().mockResolvedValue([])
@@ -827,6 +831,176 @@ describe('useCairnImport', () => {
       expect(writeJsonFile).toHaveBeenCalledTimes(1)
       expect(result.current.cairns[0].name).toBe('Camp two')
       expect(result.current.cairns[0].description).toBe('Sheltered.')
+    })
+  })
+
+  /* #243 — every mutation writes the cache as well as state, so a remount
+     straight afterwards shows the change without waiting on Drive. The
+     failure this guards against is silent and delayed: state and Drive
+     agree, the cache does not, and the trip reopens showing the edit undone
+     until the revalidation lands. */
+  describe('the cache follows every mutation (#243)', () => {
+    async function mounted() {
+      const result = renderHook(() => useCairnImport('trip-1', 'token', 'cairn-folder-id', [])).result
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      return result
+    }
+
+    it('caches an imported cairn', async () => {
+      readPhotoExif.mockResolvedValue(okExif({ latitude: 1, longitude: 2 }))
+      const result = await mounted()
+
+      await act(() => result.current.importFiles([file('a.jpg')]))
+
+      expect(readCachedCairns('trip-1')?.map((cairn) => cairn.name)).toEqual(['a.jpg'])
+    })
+
+    it('caches a cairn created by hand', async () => {
+      const result = await mounted()
+
+      await act(() =>
+        result.current.createCairn({
+          name: 'Campsite',
+          position: { lat: 1, lng: 2 },
+          icon: 'campsite',
+          description: '',
+          date: null,
+        }),
+      )
+
+      expect(readCachedCairns('trip-1')?.map((cairn) => cairn.name)).toEqual(['Campsite'])
+    })
+
+    it('caches an edited name and a retyped icon', async () => {
+      const result = await mounted()
+      await act(() =>
+        result.current.createCairn({
+          name: 'Campsite',
+          position: { lat: 1, lng: 2 },
+          icon: 'campsite',
+          description: '',
+          date: null,
+        }),
+      )
+      const id = result.current.cairns[0].id
+
+      await act(async () => {
+        await result.current.setCairnText(id, { name: 'Camp two' })
+      })
+      await act(async () => {
+        await result.current.setCairnIcon(id, 'hut')
+      })
+
+      expect(readCachedCairns('trip-1')?.[0]).toMatchObject({ name: 'Camp two', icon: 'hut' })
+    })
+
+    it('caches a moved cairn', async () => {
+      const result = await mounted()
+      await act(() =>
+        result.current.createCairn({
+          name: 'Campsite',
+          position: { lat: 1, lng: 2 },
+          icon: 'campsite',
+          description: '',
+          date: null,
+        }),
+      )
+      const id = result.current.cairns[0].id
+
+      await act(async () => {
+        await result.current.setCairnPosition(id, { lat: 5, lng: 6 })
+      })
+
+      expect(readCachedCairns('trip-1')?.[0]).toMatchObject({
+        position: { lat: 5, lng: 6 },
+        positionSource: 'placed',
+      })
+    })
+
+    it('drops a deleted cairn from the cache', async () => {
+      readPhotoExif.mockResolvedValue(okExif({ latitude: 1, longitude: 2 }))
+      const result = await mounted()
+      await act(() => result.current.importFiles([file('a.jpg')]))
+      const id = result.current.cairns[0].id
+
+      await act(() => result.current.removeCairn(id))
+
+      expect(readCachedCairns('trip-1')).toEqual([])
+    })
+
+    it('drops a cairn moved out of the trip from the cache', async () => {
+      readPhotoExif.mockResolvedValue(okExif({ latitude: 1, longitude: 2 }))
+      const result = await mounted()
+      await act(() => result.current.importFiles([file('a.jpg')]))
+      const id = result.current.cairns[0].id
+
+      act(() => result.current.forgetCairn(id))
+
+      expect(readCachedCairns('trip-1')).toEqual([])
+    })
+
+    it('leaves the cache alone when an optimistic edit is reverted', async () => {
+      const result = await mounted()
+      await act(() =>
+        result.current.createCairn({
+          name: 'Campsite',
+          position: { lat: 1, lng: 2 },
+          icon: 'campsite',
+          description: '',
+          date: null,
+        }),
+      )
+      const id = result.current.cairns[0].id
+      writeJsonFile.mockRejectedValue(new Error('offline'))
+
+      await act(async () => {
+        await result.current.setCairnText(id, { name: 'Camp two' })
+      })
+
+      expect(readCachedCairns('trip-1')?.[0]).toMatchObject({ name: 'Campsite' })
+    })
+
+    it('degrades to no caching when the storage write throws', async () => {
+      const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new DOMException('quota', 'QuotaExceededError')
+      })
+      readPhotoExif.mockResolvedValue(okExif({ latitude: 1, longitude: 2 }))
+      const result = await mounted()
+
+      await act(() => result.current.importFiles([file('a.jpg')]))
+
+      // The import itself is untouched — a full disk costs speed, not data.
+      expect(result.current.cairns).toHaveLength(1)
+      expect(result.current.failures).toHaveLength(0)
+      setItem.mockRestore()
+    })
+
+    it('replaces a stale cached set wholesale on the next hydration', async () => {
+      writeCachedCairns('trip-1', [
+        {
+          id: 'gone',
+          name: 'deleted-elsewhere.jpg',
+          position: { lat: 1, lng: 2 },
+          positionSource: 'exif',
+          icon: null,
+          image: null,
+          description: '',
+          date: null,
+        },
+      ])
+      listSubfolders.mockResolvedValue([{ id: 'folder-a', name: 'cairn-a' }])
+      findJsonFilesByFolders.mockResolvedValue(new Map([['folder-a', 'file-a']]))
+      readJsonFileContent.mockResolvedValue(cairnRecord({ id: 'cairn-a', name: 'from-drive.jpg' }))
+
+      const { result } = renderHook(() => useCairnImport('trip-1', 'token', 'cairn-folder-id', []))
+      // Cached, so nothing is loading — the record on screen is the stale one.
+      expect(result.current.loading).toBe(false)
+      expect(result.current.cairns.map((cairn) => cairn.id)).toEqual(['gone'])
+
+      await waitFor(() => expect(result.current.hydrated).toBe(true))
+
+      expect(result.current.cairns.map((cairn) => cairn.id)).toEqual(['cairn-a'])
+      expect(readCachedCairns('trip-1')?.map((cairn) => cairn.id)).toEqual(['cairn-a'])
     })
   })
 

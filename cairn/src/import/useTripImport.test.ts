@@ -583,7 +583,14 @@ describe('useTripImport — #46 track overrides', () => {
       { id: 'drive-1', name: 'a.kml' },
       { id: 'drive-2', name: 'b.kml' },
     ])
-    downloadTrackFile.mockResolvedValueOnce(file('a.kml')).mockResolvedValueOnce(file('b.kml'))
+    // #244: `useTripImport` now reads track bytes through `trackFileCache`,
+    // which re-downloads on every mount here (jsdom has no IndexedDB, so the
+    // default cache always misses) — this reload calls `downloadTrackFile`
+    // a second time for each file, not just once, so the mock needs an
+    // implementation that survives more than two calls.
+    downloadTrackFile.mockImplementation((_token: string, _id: string, name: string) =>
+      Promise.resolve(file(name)),
+    )
     parseTrack.mockResolvedValue(track('Day'))
 
     const { result } = renderHook(() =>

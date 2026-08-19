@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { deriveTripStatus, LocalTripStore } from './tripStore'
 import { SIDECAR_VERSION, type StoredOverview } from '../geo/tripTotals'
+import { cairnCacheKey } from './cairnCache'
 
 /** A minimal in-memory `Storage` so tests don't depend on jsdom's
     `localStorage` persisting (or not) across test files. */
@@ -132,6 +133,20 @@ describe('LocalTripStore', () => {
     store.deleteTrip(trip.id)
 
     expect(storage.getItem(`cairn.trips.trip.${trip.id}`)).toBeNull()
+  })
+
+  /* #243: the trip's cached cairns go with the trip, so a later trip
+     reusing the id cannot inherit them. Both delete paths funnel through
+     here — `DriveTripStore.deleteTrip` delegates. */
+  it('drops the trip’s cached cairns along with it', () => {
+    const storage = fakeStorage()
+    const store = new LocalTripStore(storage)
+    const trip = store.createTrip('Hokkaido')
+    storage.setItem(cairnCacheKey(trip.id), JSON.stringify([]))
+
+    store.deleteTrip(trip.id)
+
+    expect(storage.getItem(cairnCacheKey(trip.id))).toBeNull()
   })
 
   it('lets a listener unsubscribe', () => {

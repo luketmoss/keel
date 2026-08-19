@@ -4,6 +4,7 @@ import { buildOverviewGeoJSON, computeTripOrigin } from '../geo/overview'
 import { computeTripTotals, SIDECAR_VERSION, type StoredOverview } from '../geo/tripTotals'
 import type { StoredTrackElevation } from '../kml/stats'
 import type { LatLng } from '../map/geo'
+import { cairnCacheKey } from './cairnCache'
 
 export type TripStatus = 'planned' | 'completed'
 
@@ -357,6 +358,10 @@ export class LocalTripStore implements TripStore {
     this.writeIndex()
     this.storage.removeItem(recordKey(id))
     this.storage.removeItem(overviewKey(id))
+    // #243: the trip's cached cairns go with the trip. Both delete paths
+    // funnel through here (`DriveTripStore.deleteTrip` delegates), so a
+    // later trip cannot inherit a stale entry under a reused id.
+    this.storage.removeItem(cairnCacheKey(id))
     this.records.delete(id)
     this.notify()
   }

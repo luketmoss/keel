@@ -87,6 +87,9 @@ function baseCairnImport(overrides: Record<string, unknown> = {}) {
   return {
     cairns: [cairnRecord()],
     loading: false,
+    // #243: "the Drive read settled successfully", distinct from `!loading`
+    // now that a cached trip renders before any read has.
+    hydrated: true,
     progress: [],
     failures: [],
     importFiles: vi.fn().mockResolvedValue(undefined),
@@ -350,10 +353,43 @@ describe('TripDetail — #121 caching the cairn count', () => {
      initialised with. Writing `0` from that would clobber a real count with
      a wrong one on every open, which is the same lie in a new place. */
   it('writes nothing while the cairn list is still loading', () => {
-    useCairnImport.mockReturnValue(baseCairnImport({ cairns: [], loading: true }))
+    useCairnImport.mockReturnValue(baseCairnImport({ cairns: [], loading: true, hydrated: false }))
     const { store, entry } = renderTrip()
 
     expect(store.getTrip(entry.id)?.cairnCount).toBeNull()
+  })
+
+  /* #243 splits the two halves of the old `loading`. A trip rendering from
+     cache is not loading and its count is still not known — Drive has not
+     answered, and a count written from a cache that is one deletion out of
+     date is #121's bug wearing a new hat. */
+  it('writes nothing from cached cairns alone, before the Drive read settles', () => {
+    useCairnImport.mockReturnValue(
+      baseCairnImport({
+        cairns: [cairnRecord({ id: 'a' }), cairnRecord({ id: 'b' })],
+        loading: false,
+        hydrated: false,
+      }),
+    )
+    const { store, entry } = renderTrip()
+
+    expect(store.getTrip(entry.id)?.cairnCount).toBeNull()
+  })
+
+  it('writes nothing after a failed Drive read, cached cairns still on screen', () => {
+    useCairnImport.mockReturnValue(
+      baseCairnImport({ cairns: [cairnRecord({ id: 'a' })], loading: false, hydrated: false }),
+    )
+    const { store, entry, rerender } = renderTrip()
+    expect(store.getTrip(entry.id)?.cairnCount).toBeNull()
+
+    // The read settles — successfully this time — and the count lands.
+    useCairnImport.mockReturnValue(
+      baseCairnImport({ cairns: [cairnRecord({ id: 'a' })], loading: false, hydrated: true }),
+    )
+    rerender(tripFace(store, entry.id))
+
+    expect(store.getTrip(entry.id)?.cairnCount).toBe(1)
   })
 
   it('follows the count down when a cairn is removed', () => {

@@ -3,6 +3,14 @@
 .cairn-marker {
   display: block;
   position: relative;
+  /* #251 — the hover scale (`CairnLayer.css`'s `.cairn-layer__hit--hovered`)
+     and the ring colour it drives through `ringStyleForPhoto` both move
+     over `--motion-fast`, the same duration `LooseLayer.css`'s existing
+     marker hover already uses. Collapses under index.css's global
+     reduced-motion block like every other transition in the app. */
+  transition:
+    transform var(--motion-fast) var(--ease),
+    border-color var(--motion-fast) var(--ease);
 }
 
 /* The thumbnail shape — unchanged from the old photo marker. Border style,

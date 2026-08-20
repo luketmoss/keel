@@ -27,10 +27,22 @@ export interface RingStyle {
 
 /** Selection always wins over provenance — "the ring is spent on selection"
     (design doc, Selection section): a selected marker shows the accent ring
-    and glow regardless of whether the photo was recorded or derived. */
-export function ringStyleForPhoto(source: PositionSource, selected: boolean): RingStyle {
+    and glow regardless of whether the photo was recorded or derived.
+
+    #251: `hovered` sits between the two — the orange moves, at the
+    *thinner* `--marker-ring` width, and carries no glow, so a hovered
+    marker reads apart from a selected one at a glance even side by side
+    (251-linked-hover.md's "The marker, hovered" table). Selected still
+    wins over hovered, the same way it already wins over provenance: a
+    selected marker that also happens to be hovered keeps its selected ring
+    and glow in full — hover only ever adds the scale, which lives outside
+    this ring computation, in the caller's own CSS class. */
+export function ringStyleForPhoto(source: PositionSource, selected: boolean, hovered = false): RingStyle {
   if (selected) {
     return { borderStyle: 'solid', colorVar: '--accent', widthVar: '--marker-ring-selected', glow: true }
+  }
+  if (hovered) {
+    return { borderStyle: 'solid', colorVar: '--accent', widthVar: '--marker-ring', glow: false }
   }
   return source === 'interpolated'
     ? { borderStyle: 'dashed', colorVar: '--text-muted', widthVar: '--marker-ring', glow: false }

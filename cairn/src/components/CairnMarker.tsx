@@ -26,6 +26,15 @@ export interface CairnMarkerProps {
       thumbnail (none exist yet today) has nothing to pass. */
   source?: PositionSource
   selected: boolean
+  /** #251: this cairn's id is in `hoveredCairnIds`. Only read in the
+      thumbnail branch, same as `source` — a hovered thumbnail takes the
+      accent ring at the thinner `--marker-ring` width (never the glow,
+      which stays the selected marker's alone), via `ringStyleForPhoto`.
+      A pin has no ring to move (its fill inverts on selection instead), so
+      hover changes nothing about a pin beyond the scale its caller's CSS
+      class already applies — see `CairnLayer.css`'s
+      `.cairn-layer__hit--hovered`. */
+  hovered?: boolean
   /** Renders at `--dot-size` instead of `--marker-size`/`--marker-poi` —
       the row's glyph is the marker "drawn smaller" (`cairns.md`), not a
       second shape. */
@@ -37,14 +46,14 @@ export interface CairnMarkerProps {
     it has neither an icon nor an image — the loose-cairn placeholder
     `LooseLayer` used before this issue, kept as the fallback for that
     case). A pin that also carries an image gets a small camera badge. */
-export function CairnMarker({ icon, thumbnailUrl, hasImage, source, selected, small }: CairnMarkerProps) {
+export function CairnMarker({ icon, thumbnailUrl, hasImage, source, selected, hovered, small }: CairnMarkerProps) {
   const asThumbnail = cairnDrawsAsThumbnail({
     icon,
     image: hasImage ? { originalDriveFileId: '', thumbnailDriveFileId: '' } : null,
   })
 
   if (asThumbnail) {
-    const ring = ringStyleForPhoto(source ?? 'exif', selected)
+    const ring = ringStyleForPhoto(source ?? 'exif', selected, hovered)
     return (
       <span
         className={`cairn-marker cairn-marker--thumb${small ? ' cairn-marker--small' : ''}`}

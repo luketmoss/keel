@@ -158,6 +158,14 @@ function openRowMenu(name: string) {
   fireEvent.click(screen.getByRole('button', { name: `Row actions for ${name}` }))
 }
 
+/** #250 — a row with an image expands on click now, rather than opening the
+    lightbox directly; the inline preview is what opens it. Every test below
+    that wants the lightbox open does both steps through this. */
+async function openLightbox(name: string) {
+  fireEvent.click(screen.getByText(name))
+  fireEvent.click(await screen.findByRole('button', { name: `View ${name} larger` }))
+}
+
 describe('TripDetail — #55 photo list and lightbox', () => {
   it('shows the photo section empty state pointing at the import control when the trip has no cairns (criterion 13)', () => {
     useCairnImport.mockReturnValue(baseCairnImport({ cairns: [] }))
@@ -168,27 +176,32 @@ describe('TripDetail — #55 photo list and lightbox', () => {
     expect(screen.getByText('Drop photos onto this trip to see them here.')).toBeDefined()
   })
 
-  it('opens the lightbox on a row click, showing the photo full size over the map (criterion 7)', () => {
+  it('expands the row on a first click rather than opening the lightbox, and opens it from the inline preview (#250, revises criterion 7)', async () => {
     renderTrip()
 
     fireEvent.click(screen.getByText('sapporo.jpg'))
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    const preview = await screen.findByRole('button', { name: 'View sapporo.jpg larger' })
+    fireEvent.click(preview)
 
     expect(screen.getByRole('dialog', { name: 'sapporo.jpg' })).toBeDefined()
   })
 
-  it('closes on Escape and returns focus to the row that opened it (criterion 9)', async () => {
+  it('closes on Escape and returns focus to the preview that opened it (#250, revises criterion 9)', async () => {
     renderTrip()
 
-    const rowButton = screen.getByText('sapporo.jpg').closest('button') as HTMLButtonElement
-    rowButton.focus()
-    fireEvent.click(rowButton)
+    fireEvent.click(screen.getByText('sapporo.jpg'))
+    const preview = await screen.findByRole('button', { name: 'View sapporo.jpg larger' })
+    preview.focus()
+    fireEvent.click(preview)
 
     await waitFor(() => expect(screen.getByRole('dialog')).toBeDefined())
 
     fireEvent.keyDown(document, { key: 'Escape' })
 
     expect(screen.queryByRole('dialog')).toBeNull()
-    expect(document.activeElement).toBe(rowButton)
+    expect(document.activeElement).toBe(preview)
   })
 
   it('requests photo images through the caching loader, never a bare Drive URL (criterion 12)', async () => {
@@ -202,25 +215,25 @@ describe('TripDetail — #55 photo list and lightbox', () => {
   })
 
   describe('#169 — the detail face folded into the lightbox', () => {
-    it('shows the description and the position-source sentence when a cairn opens', () => {
+    it('shows the description and the position-source sentence when a cairn opens', async () => {
       useCairnImport.mockReturnValue(
         baseCairnImport({ cairns: [cairnRecord({ description: 'A good ramen spot.' })] }),
       )
 
       renderTrip()
-      fireEvent.click(screen.getByText('sapporo.jpg'))
+      await openLightbox('sapporo.jpg')
 
       expect(screen.getByText('A good ramen spot.')).toBeDefined()
       expect(screen.getByText(/Position came from the photo’s EXIF GPS/)).toBeDefined()
     })
 
-    it('shows the icon and photo clauses in the meta line', () => {
+    it('shows the icon and photo clauses in the meta line', async () => {
       useCairnImport.mockReturnValue(
         baseCairnImport({ cairns: [cairnRecord({ icon: 'campsite' })] }),
       )
 
       renderTrip()
-      fireEvent.click(screen.getByText('sapporo.jpg'))
+      await openLightbox('sapporo.jpg')
 
       const dialog = screen.getByRole('dialog')
       expect(within(dialog).getByText(/campsite · photo/)).toBeDefined()
@@ -230,7 +243,7 @@ describe('TripDetail — #55 photo list and lightbox', () => {
       const onRemovePhotoFromTrip = vi.fn().mockResolvedValue(true)
       renderTrip({ onRemovePhotoFromTrip })
 
-      fireEvent.click(screen.getByText('sapporo.jpg'))
+      await openLightbox('sapporo.jpg')
       await waitFor(() => expect(screen.getByRole('dialog')).toBeDefined())
 
       fireEvent.click(screen.getByRole('button', { name: 'Remove from trip' }))
@@ -275,9 +288,10 @@ describe('TripDetail — #55 photo list and lightbox', () => {
     it('closes the lightbox and returns focus when the open photo is removed', async () => {
       const { rerender, store, entry } = renderTrip()
 
-      const rowButton = screen.getByText('sapporo.jpg').closest('button') as HTMLButtonElement
-      rowButton.focus()
-      fireEvent.click(rowButton)
+      fireEvent.click(screen.getByText('sapporo.jpg'))
+      const preview = await screen.findByRole('button', { name: 'View sapporo.jpg larger' })
+      preview.focus()
+      fireEvent.click(preview)
       await waitFor(() => expect(screen.getByRole('dialog')).toBeDefined())
 
       // Simulates the removal landing while the lightbox is still open

@@ -292,13 +292,14 @@ describe('TripDetail — #192 the facet row inside a trip', () => {
     expect(listedNames()).toHaveLength(3)
   })
 
-  it('walks only the cairns the facet leaves showing with the lightbox arrows', () => {
+  it('walks only the cairns the facet leaves showing with the lightbox arrows', async () => {
     renderTrip()
 
     fireEvent.click(facetChip('Photo'))
     // `photo.jpg` (1 Jun) then `Camp two` (3 Jun) — the hazard sits
     // between them by date and must be skipped, not stepped onto.
     fireEvent.click(screen.getByText('photo.jpg'))
+    fireEvent.click(await screen.findByRole('button', { name: 'View photo.jpg larger' }))
     const dialog = screen.getByRole('dialog')
     expect(dialog.getAttribute('aria-label')).toBe('photo.jpg')
 

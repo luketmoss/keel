@@ -155,11 +155,19 @@ beforeEach(() => {
   useCairnImport.mockReset()
 })
 
+/** #250 — a row with an image now expands on click rather than opening the
+    lightbox directly; its own preview button is what opens it. Every test
+    below still wants the lightbox open, so this does both steps. */
+async function openLightbox(name: string) {
+  fireEvent.click(screen.getByText(name))
+  fireEvent.click(await screen.findByRole('button', { name: `View ${name} larger` }))
+}
+
 describe('TripDetail — #196 a committed name reaches every surface', () => {
   it('updates the detail face, the sidebar row and the marker without a reload', async () => {
     renderTrip()
 
-    fireEvent.click(screen.getByText('PXL_20260812_181245.jpg'))
+    await openLightbox('PXL_20260812_181245.jpg')
     const heading = screen.getByRole('heading', { level: 2 })
     fireEvent.click(heading)
 
@@ -180,7 +188,7 @@ describe('TripDetail — #196 a committed name reaches every surface', () => {
   it('leaves all three showing the old name when the write fails, and says so', async () => {
     renderTrip(false)
 
-    fireEvent.click(screen.getByText('PXL_20260812_181245.jpg'))
+    await openLightbox('PXL_20260812_181245.jpg')
     fireEvent.click(screen.getByRole('heading', { level: 2 }))
 
     const input = screen.getByRole('textbox', { name: 'Cairn name' })
@@ -198,7 +206,7 @@ describe('TripDetail — #196 a committed name reaches every surface', () => {
   it('shows a committed description on the detail face straight away', async () => {
     renderTrip()
 
-    fireEvent.click(screen.getByText('PXL_20260812_181245.jpg'))
+    await openLightbox('PXL_20260812_181245.jpg')
     fireEvent.click(document.querySelector('.lightbox__description') as HTMLElement)
 
     const input = screen.getByRole('textbox', { name: 'Description' })

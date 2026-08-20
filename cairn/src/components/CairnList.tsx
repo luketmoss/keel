@@ -32,13 +32,25 @@ interface CairnListProps {
   facet: CairnFacet
   onFacetChange: (facet: CairnFacet) => void
   selectedCairnId: string | null
+  /** #250 — the one row expanded in place, or `null`. Its own state,
+      separate from `selectedCairnId` (design note's "Only one row is
+      expanded at a time" — deriving it from selection would make the
+      header's second click deselect in order to collapse). */
+  expandedCairnId: string | null
   accessToken: string | null
-  /** Clicking a row selects it *and*, when the cairn has an image, opens
-      the lightbox in one action (design doc's Selection and "The
-      lightbox" sections both name this the same click). An icon-only
-      cairn has nothing for the lightbox to show, so its row only
-      selects. */
+  /** #250 revises this: a click on a row whose cairn carries an image now
+      selects it and expands the row in place, toggling closed on a second
+      click — the lightbox does not open. An icon-only cairn has nothing to
+      preview, so its row keeps the old single click straight to the
+      lightbox. `TripDetail.selectCairn` is the one function this and
+      `CairnLayer.onOpenCairn` both call, so the row and the marker cannot
+      disagree on which. */
   onOpenRow: (cairnId: string) => void
+  /** #250 — the expanded row's own preview button, which is what actually
+      opens the lightbox now. Separate from `onOpenRow` because the two
+      controls do different things: the header toggles expansion, the photo
+      opens the detail face. */
+  onOpenPreview: (cairnId: string) => void
   /** #77: performs the actual removal (trash originals + rewrite the index)
       once the row's confirm has been accepted — `Delete permanently…` in
       the row's `⋮` only starts the confirm, via `onStartConfirm` below. */
@@ -92,8 +104,10 @@ export function CairnList({
   facet,
   onFacetChange,
   selectedCairnId,
+  expandedCairnId,
   accessToken,
   onOpenRow,
+  onOpenPreview,
   onRemove,
   onRemoveFromTrip,
   confirmingId,
@@ -198,8 +212,10 @@ export function CairnList({
                 key={item.row.id}
                 row={item.row}
                 selected={item.row.id === selectedCairnId}
+                expanded={item.row.id === expandedCairnId}
                 accessToken={accessToken}
                 onOpen={onOpenRow}
+                onOpenPreview={onOpenPreview}
                 onRemove={onRemove}
                 onRemoveFromTrip={onRemoveFromTrip}
                 confirming={confirmingId === item.row.id}
@@ -226,8 +242,10 @@ export function CairnList({
 function CairnRow({
   row,
   selected,
+  expanded,
   accessToken,
   onOpen,
+  onOpenPreview,
   onRemove,
   onRemoveFromTrip,
   confirming,
@@ -242,8 +260,14 @@ function CairnRow({
 }: {
   row: CairnListRow
   selected: boolean
+  /** #250 — whether *this* row is the one `TripDetail.expandedCairnId`
+      names. Ignored below while `removing` or `confirming`: an inert or a
+      about-to-be-destroyed row has no preview to show (design doc's States
+      table). */
+  expanded: boolean
   accessToken: string | null
   onOpen: (cairnId: string) => void
+  onOpenPreview: (cairnId: string) => void
   onRemove: (id: string) => void
   onRemoveFromTrip?: (id: string) => void
   confirming: boolean
@@ -261,8 +285,16 @@ function CairnRow({
   // Loading and thumbnail-failed both render the same `--surface-lift`
   // fallback fill (design doc's "Photos loading" / "Thumbnail failed to
   // load" states) — `usePhotoImage` already collapses those two into one
-  // `undefined` for exactly this reason.
-  const thumbnailUrl = usePhotoImage(accessToken, row.thumbnailDriveFileId ?? undefined).url
+  // `undefined` for exactly this reason. #250's preview reuses this same
+  // acquire — it's the glyph's own thumbnail, already in hand, not a
+  // second fetch — and also reads `.failed` for its own "thumbnail failed
+  // too" state, which the glyph never needed to tell apart from loading.
+  const thumbnail = usePhotoImage(accessToken, row.thumbnailDriveFileId ?? undefined)
+  const hasImage = row.thumbnailDriveFileId !== null
+  // #250: removing is inert already (design doc) and cannot be expanded;
+  // confirming never reaches this render at all (its branch returns below),
+  // so this only has removing left to guard against.
+  const previewOpen = expanded && hasImage && !removing
 
   // #77 — the confirm replaces the row's contents in place, same shape as
   // TrackList's and the trips list's.
@@ -304,12 +336,21 @@ function CairnRow({
       data-hidden={hidden}
     >
       <div className="cairn-row__main">
-        <button type="button" className="cairn-row__button" onClick={() => onOpen(row.id)}>
+        <button
+          type="button"
+          className="cairn-row__button"
+          onClick={() => onOpen(row.id)}
+          // #250: only a cairn with an image is an expandable thing — the
+          // design doc is explicit that an icon-only cairn's row must not
+          // claim to be one, so the attribute is omitted entirely rather
+          // than fixed at `false`.
+          {...(hasImage ? { 'aria-expanded': previewOpen } : {})}
+        >
           <span className="cairn-row__glyph">
             <CairnMarker
               icon={row.icon}
-              thumbnailUrl={thumbnailUrl}
-              hasImage={row.thumbnailDriveFileId !== null}
+              thumbnailUrl={thumbnail.url}
+              hasImage={hasImage}
               source={row.source}
               selected={selected}
               small
@@ -357,6 +398,60 @@ function CairnRow({
         )}
       </div>
       {removeError && <p className="cairn-row__error">{removeError}</p>}
+      {/* #250 — the second block inside the same `<li>`, so the row grows
+          rather than the list gaining an element. Mounted only while
+          actually expanded: `CairnRowPreview` acquires the display-size
+          original through `usePhotoImage`, and fetching that for every row
+          up front is exactly what #55's placeholder-then-original pattern
+          exists to avoid — collapsing releases it again. */}
+      {previewOpen && (
+        <div className="cairn-row__preview-wrap">
+          <CairnRowPreview row={row} accessToken={accessToken} thumbnail={thumbnail} onOpen={onOpenPreview} />
+        </div>
+      )}
     </li>
+  )
+}
+
+/** #250 — the inline preview itself, mounted only inside the expanded
+    row's wrapper. Its own component (rather than a branch inside
+    `CairnRow`) so `usePhotoImage` for the display-size original is only
+    ever acquired while a row is actually expanded — fetching every row's
+    original up front is the thing #55's placeholder-then-original pattern
+    exists to avoid. */
+function CairnRowPreview({
+  row,
+  accessToken,
+  thumbnail,
+  onOpen,
+}: {
+  row: CairnListRow
+  accessToken: string | null
+  thumbnail: { url?: string; failed: boolean }
+  onOpen: (cairnId: string) => void
+}) {
+  // The thumbnail is already in hand from the glyph — drawn immediately,
+  // no spinner. The original swaps in, in place, once it lands; there is
+  // no cross-fade between the two (design doc's Motion section) because a
+  // cross-fade between two versions of one photograph reads as a
+  // rendering fault, not a decision.
+  const original = usePhotoImage(accessToken, row.originalDriveFileId ?? undefined)
+  const imageUrl = original.url ?? thumbnail.url
+
+  return (
+    <button
+      type="button"
+      className="cairn-row__preview"
+      aria-label={`View ${row.name} larger`}
+      onClick={() => onOpen(row.id)}
+    >
+      {imageUrl ? (
+        <img className="cairn-row__preview-image" src={imageUrl} alt="" />
+      ) : thumbnail.failed ? (
+        <span className="cairn-row__preview-failed">Couldn&apos;t load this photo.</span>
+      ) : (
+        <span className="cairn-row__preview-loading" aria-hidden="true" />
+      )}
+    </button>
   )
 }

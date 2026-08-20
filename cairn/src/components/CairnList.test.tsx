@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { CairnList } from './CairnList'
 import { orderCairnListItems, type CairnListRow } from '../photo/cairnListGroups'
@@ -38,6 +38,8 @@ function ownedProps(overrides: Partial<{
   disableRemove: boolean
   facet: CairnFacet
   onFacetChange: ReturnType<typeof vi.fn>
+  expandedCairnId: string | null
+  onOpenPreview: ReturnType<typeof vi.fn>
 }> = {}) {
   return {
     onRemove: vi.fn(),
@@ -50,6 +52,11 @@ function ownedProps(overrides: Partial<{
     disableRemove: false,
     facet: 'any' as CairnFacet,
     onFacetChange: vi.fn(),
+    // #250 — defaulted here the same way every other owned prop is, so the
+    // 25+ existing call sites above don't each need updating for a state
+    // this suite's older tests don't exercise.
+    expandedCairnId: null,
+    onOpenPreview: vi.fn(),
     ...overrides,
   }
 }
@@ -178,7 +185,7 @@ describe('CairnList', () => {
     expect(screen.getByText(/campsite · photo/)).toBeDefined()
   })
 
-  it('calls onOpenRow when a row is clicked (selection + open in one action)', () => {
+  it('calls onOpenRow when a row is clicked (#250: selection and expand/open live in the caller now)', () => {
     const onOpenRow = vi.fn()
     const rows = [row({ id: 'a', name: 'a.jpg' })]
     const items = orderCairnListItems(rows)
@@ -663,6 +670,122 @@ describe('CairnList', () => {
 
       const hiddenButton = screen.getByRole('button', { name: 'Show cairns not on a track' })
       expect(hiddenButton.querySelector('svg')?.querySelectorAll('path')).toHaveLength(2)
+    })
+  })
+
+  /* #250 — the expanded row's inline preview. `expandedCairnId` is a plain
+     prop here: the toggle/single-expanded-at-a-time rules live in
+     `cairnExpansion.ts` and `TripDetail`, and this suite only checks that
+     the row renders what the prop says. */
+  describe('#250 expanded row preview', () => {
+    it('draws the inline preview only for the row named by expandedCairnId', async () => {
+      const rows = [row({ id: 'a', name: 'a.jpg' }), row({ id: 'b', name: 'b.jpg' })]
+      const items = orderCairnListItems(rows)
+
+      render(
+        <CairnList
+          items={items}
+          totalCount={2}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={vi.fn()}
+          {...ownedProps({ expandedCairnId: 'a' })}
+        />,
+      )
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'View a.jpg larger' })).toBeDefined()
+      })
+      expect(screen.queryByRole('button', { name: 'View b.jpg larger' })).toBeNull()
+    })
+
+    it('carries aria-expanded on the header of a cairn with an image, true or false', () => {
+      const items = orderCairnListItems([row({ id: 'a', name: 'a.jpg' })])
+
+      const { rerender } = render(
+        <CairnList
+          items={items}
+          totalCount={1}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={vi.fn()}
+          {...ownedProps({ expandedCairnId: null })}
+        />,
+      )
+      expect(screen.getByText('a.jpg').closest('button')?.getAttribute('aria-expanded')).toBe('false')
+
+      rerender(
+        <CairnList
+          items={items}
+          totalCount={1}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={vi.fn()}
+          {...ownedProps({ expandedCairnId: 'a' })}
+        />,
+      )
+      expect(screen.getByText('a.jpg').closest('button')?.getAttribute('aria-expanded')).toBe('true')
+    })
+
+    it('omits aria-expanded entirely on an icon-only cairn — it is not an expandable thing', () => {
+      const items = orderCairnListItems([
+        row({ id: 'a', name: 'a.jpg', icon: 'campsite', thumbnailDriveFileId: null, originalDriveFileId: null }),
+      ])
+
+      render(
+        <CairnList
+          items={items}
+          totalCount={1}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={vi.fn()}
+          {...ownedProps({ expandedCairnId: 'a' })}
+        />,
+      )
+
+      expect(screen.getByText('a.jpg').closest('button')?.hasAttribute('aria-expanded')).toBe(false)
+      // Nothing to expand — no preview button either.
+      expect(screen.queryByRole('button', { name: 'View a.jpg larger' })).toBeNull()
+    })
+
+    it('clicking the preview calls onOpenPreview, not onOpenRow', async () => {
+      const items = orderCairnListItems([row({ id: 'a', name: 'a.jpg' })])
+      const onOpenRow = vi.fn()
+      const onOpenPreview = vi.fn()
+
+      render(
+        <CairnList
+          items={items}
+          totalCount={1}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={onOpenRow}
+          {...ownedProps({ expandedCairnId: 'a', onOpenPreview })}
+        />,
+      )
+
+      const preview = await waitFor(() => screen.getByRole('button', { name: 'View a.jpg larger' }))
+      fireEvent.click(preview)
+
+      expect(onOpenPreview).toHaveBeenCalledWith('a')
+      expect(onOpenRow).not.toHaveBeenCalled()
+    })
+
+    it('never draws a preview for a removing row, even when it names expandedCairnId', () => {
+      const items = orderCairnListItems([row({ id: 'a', name: 'a.jpg' })])
+
+      render(
+        <CairnList
+          items={items}
+          totalCount={1}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={vi.fn()}
+          {...ownedProps({ expandedCairnId: 'a', removingIds: new Set(['a']) })}
+        />,
+      )
+
+      expect(screen.queryByRole('button', { name: 'View a.jpg larger' })).toBeNull()
     })
   })
 })

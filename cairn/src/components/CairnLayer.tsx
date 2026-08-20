@@ -39,15 +39,17 @@ interface CairnLayerProps {
   accessToken: string | null
   selectedCairnId: string | null
   onSelectCairn: (cairnId: string) => void
-  /** #194: clicking *any* marker selects the cairn and opens its detail
-      face, in one click, which is what a list row has always done
-      (`CairnList.onOpenRow`). #55's two-step — select, then click again to
-      open — made the same object behave differently depending on which of
-      its two representations you clicked, and the map's half was the one
-      nobody expected. Both this and `onSelectCairn` are called for the
-      click, in that order; `TripDetail.openCairn` does both itself, so the
-      pair is idempotent there. Optional so a caller with no detail face
-      falls back to selecting alone. */
+  /** #194 made clicking *any* marker select the cairn and open its detail
+      face in one click, matching what a list row did. #250 revises that:
+      the row's click now expands the row in place for a cairn with an
+      image rather than opening the lightbox, and this marker click follows
+      it exactly — `TripDetail.selectCairn` is the one function both this
+      and `CairnList.onOpenRow` call, so the two surfaces cannot drift on
+      which. An icon-only cairn still opens straight to its detail face,
+      unchanged. Both this and `onSelectCairn` are called for the click, in
+      that order; `selectCairn` sets the selection itself too, so the pair
+      is idempotent there. Optional so a caller with no detail face falls
+      back to selecting alone. */
   onOpenCairn?: (cairnId: string) => void
   /** #158: false disables dragging for every marker this layer draws —
       disconnected (#73) or the #155 placement queue owns the map. `undefined`
@@ -228,10 +230,11 @@ function SingleCairnMarker({
     onMove: (position) => onMove?.(cairn.id, position) ?? Promise.resolve(false),
   })
 
-  /* #194: select *and* open, in that order, for every click — a marker and
-     a list row are two representations of one cairn and now behave the
-     same. An already-selected marker takes the same path, so a click never
-     deselects or closes. */
+  /* #194, revised by #250: select *and* open, in that order, for every
+     click — a marker and a list row are two representations of one cairn
+     and behave the same, whether "open" means the lightbox (icon-only) or
+     the row's own expansion (an image). An already-selected marker takes
+     the same path, so a click never deselects or closes. */
   function handleClick() {
     if (drag.consumeDragClick()) return
     hitRef.current?.focus()
@@ -348,9 +351,10 @@ function ClusterMarker({
 /** #194 — a cluster whose members cannot be separated by any camera move,
     drawn open: the badge stays where it was as the fan's anchor, and every
     member is spread around it as an ordinary marker with a leader line
-    home. Each behaves exactly as it would unclustered — one click selects
-    the cairn and opens its detail face — which is what makes "every cairn
-    is reachable from the map alone" true at any zoom.
+    home. Each behaves exactly as it would unclustered — one click follows
+    the same select/expand/open rule #250 gives every marker — which is
+    what makes "every cairn is reachable from the map alone" true at any
+    zoom.
 
     The badge itself collapses the fan when clicked, so the gesture that
     opened it undoes it too. */

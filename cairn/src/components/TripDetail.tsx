@@ -18,6 +18,7 @@ import { expandArchives, isArchiveFile } from '../import/archive'
 import { useTripImport } from '../import/useTripImport'
 import { useCairnImport, type CairnRecord, type NewTripCairn } from '../photo/useCairnImport'
 import { buildCairnListRows, flattenCairnListRows, orderCairnListItems } from '../photo/cairnListGroups'
+import { cairnClickOutcome, expandedIdAfterNavigate } from '../photo/cairnExpansion'
 import { unattachedCairnIds, visibleCairnIds } from '../photo/cairnAttachment'
 import { effectiveElevationProfile } from '../kml/stats'
 import type { TripStore } from '../store/tripStore'
@@ -292,6 +293,14 @@ export function TripDetail({
   // it — a selected marker does not open the lightbox by itself, only an
   // *already-selected* one does.
   const [openCairnId, setOpenCairnId] = useState<string | null>(null)
+  /** #250 — the one row expanded in place, separate from both of the above
+      (design doc's "Only one row is expanded at a time" — deriving it from
+      selection would make the header's second click deselect in order to
+      collapse, and losing the marker's highlight is not what closing a
+      preview means). `null` means no row is expanded; setting it to a new
+      cairn implicitly collapses whichever was expanded before, since it's
+      the single next value of one piece of state. */
+  const [expandedCairnId, setExpandedCairnId] = useState<string | null>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
 
   /* #192 — the trip's own facet, `useState` here and nowhere else: it dies
@@ -421,16 +430,60 @@ export function TripDetail({
     return () => onCairnDetailChange(null)
   }, [onCairnDetailChange, openCairnRecord])
 
-  const openCairn = useCallback((cairnId: string) => {
+  /** #250 — the one function a row's header click and a marker's click both
+      call (`CairnList.onOpenRow` and `CairnLayer.onOpenCairn`), so the two
+      surfaces cannot drift on what a click does — the design note's
+      revision of #194, upheld by construction rather than by keeping two
+      branches in step by hand. Replaces the old `openCairn`, which always
+      opened the lightbox; that behaviour survives only for an icon-only
+      cairn, which still has nothing for a row to preview.
+
+      #157: a cairn mid-attach is a special case ahead of the branch above —
+      its row must not expand while the upload's progress belongs on the
+      detail face that's already open for it (design doc's States table). */
+  const selectCairn = useCallback(
+    (cairnId: string) => {
+      setSelectedCairnId(cairnId)
+      if (cairnId === attachingCairnId) {
+        returnFocusRef.current = document.activeElement as HTMLElement | null
+        setOpenCairnId(cairnId)
+        return
+      }
+      const cairn = cairnImport.cairns.find((candidate) => candidate.id === cairnId)
+      const outcome = cairnClickOutcome(cairnId, cairn !== undefined && cairn.image !== null, expandedCairnId)
+      if (outcome.openCairnId !== undefined) {
+        returnFocusRef.current = document.activeElement as HTMLElement | null
+        setOpenCairnId(outcome.openCairnId)
+      }
+      if (outcome.expandedCairnId !== undefined) {
+        setExpandedCairnId(outcome.expandedCairnId)
+      }
+    },
+    [cairnImport.cairns, expandedCairnId, attachingCairnId],
+  )
+
+  /** #250 — the expanded row's own preview button, and the only thing that
+      still opens the lightbox from a cairn with an image. Leaves
+      `expandedCairnId` untouched (design doc's table: "The inline photo |
+      unchanged | stays expanded | opens"). */
+  const openPreview = useCallback((cairnId: string) => {
     returnFocusRef.current = document.activeElement as HTMLElement | null
-    setSelectedCairnId(cairnId)
     setOpenCairnId(cairnId)
   }, [])
 
-  const navigateCairn = useCallback((cairnId: string) => {
-    setSelectedCairnId(cairnId)
-    setOpenCairnId(cairnId)
-  }, [])
+  const navigateCairn = useCallback(
+    (cairnId: string) => {
+      setSelectedCairnId(cairnId)
+      setOpenCairnId(cairnId)
+      // #250 — the expansion follows the lightbox's own arrow navigation,
+      // so closing it lands on an expanded row for the cairn arrived at.
+      // An icon-only cairn's row cannot expand, so arrowing onto one
+      // expands nothing rather than leaving a stale row open.
+      const cairn = cairnImport.cairns.find((candidate) => candidate.id === cairnId)
+      setExpandedCairnId(expandedIdAfterNavigate(cairnId, cairn !== undefined && cairn.image !== null))
+    },
+    [cairnImport.cairns],
+  )
 
   const closeLightbox = useCallback(() => setOpenCairnId(null), [])
 
@@ -457,11 +510,30 @@ export function TripDetail({
     }
   }, [facetedCairns, selectedCairnId])
 
+  // #250 — the same guard as the selection's above, extended to the
+  // expansion: a facet change that filters the expanded cairn out clears it
+  // along with the selection, and a facet change that keeps the row leaves
+  // it expanded (design doc's edge case).
+  useEffect(() => {
+    if (expandedCairnId && !facetedCairns.some((cairn) => cairn.id === expandedCairnId)) {
+      setExpandedCairnId(null)
+    }
+  }, [facetedCairns, expandedCairnId])
+
   useEffect(() => {
     if (openCairnId && !cairnImport.cairns.some((cairn) => cairn.id === openCairnId)) {
       setOpenCairnId(null)
     }
   }, [cairnImport.cairns, openCairnId])
+
+  // #250 — mirrors `openCairnId`'s own clearing above: a cairn deleted or
+  // removed from the trip while its row is expanded leaves the expansion
+  // with nothing to draw.
+  useEffect(() => {
+    if (expandedCairnId && !cairnImport.cairns.some((cairn) => cairn.id === expandedCairnId)) {
+      setExpandedCairnId(null)
+    }
+  }, [cairnImport.cairns, expandedCairnId])
 
   // One control, one drop target, two pipelines. Files are partitioned into
   // three buckets — tracks, photos, and neither — before either pipeline
@@ -667,7 +739,7 @@ export function TripDetail({
           accessToken={accessToken}
           selectedCairnId={selectedCairnId}
           onSelectCairn={setSelectedCairnId}
-          onOpenCairn={openCairn}
+          onOpenCairn={selectCairn}
           draggable={cairnsDraggable}
           onMoveCairn={handleMoveCairn}
         />
@@ -756,8 +828,10 @@ export function TripDetail({
           facet={cairnFacet}
           onFacetChange={setCairnFacet}
           selectedCairnId={selectedCairnId}
+          expandedCairnId={expandedCairnId}
           accessToken={accessToken}
-          onOpenRow={openCairn}
+          onOpenRow={selectCairn}
+          onOpenPreview={openPreview}
           onRemove={cairnImport.removeCairn}
           onRemoveFromTrip={
             onRemovePhotoFromTrip &&

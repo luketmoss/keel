@@ -124,6 +124,14 @@
      produced this issue. */
   --icon-sm: 18px;
 
+  /* The expanded row's inline preview — cairn/docs/design/250-expanding-a-
+     cairn-row.md, "New tokens". The tallest an inline preview draws, so a
+     portrait photo cannot take the whole panel. A little under half of
+     --sheet-half, leaving roughly two more rows visible beneath an expanded
+     portrait; a 3:2 landscape at the column's content width never reaches
+     it. */
+  --cairn-preview-max: 320px;
+
   color-scheme: dark;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   font-size: var(--text-base);

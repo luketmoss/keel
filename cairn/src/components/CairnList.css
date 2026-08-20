@@ -285,3 +285,71 @@
   font-size: var(--text-xs);
   color: var(--danger);
 }
+
+/* #250 — the expanded row's inline preview, beneath the header inside the
+   same `<li>`. `--space-4` horizontal to line up with `.cairn-row__button`'s
+   own padding — the preview is "the row's content width" (design doc), not
+   the full row including its own extra margin. */
+.cairn-row__preview-wrap {
+  padding: 0 var(--space-4) var(--space-3);
+  /* The fade-in on first paint (design doc's Motion section) — never a
+     cross-fade between the thumbnail and the original, which swap in place
+     with no transition of their own. Collapses under the global
+     reduced-motion block in index.css like everything else here. */
+  animation: cairn-row-preview-in var(--motion-fast) var(--ease);
+}
+
+@keyframes cairn-row-preview-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.cairn-row__preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  /* The ground behind the image, so a portrait photo's margins read as
+     frame rather than as a gap — the row already sits on --surface and an
+     image needs a seam (design doc's "The expanded row" table). */
+  background: var(--surface-lift);
+  cursor: zoom-in;
+  overflow: hidden;
+}
+
+.cairn-row__preview-image {
+  display: block;
+  max-width: 100%;
+  max-height: var(--cairn-preview-max);
+  /* Natural size, never upscaled past it (design doc, and #55's rule this
+     repeats) — `width`/`height: auto` is what stops a small original being
+     stretched to fill the box. */
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+.cairn-row__preview-loading,
+.cairn-row__preview-failed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  /* Matching the row glyph's own loading treatment (design doc): a 3:2 box,
+     no spinner, while there's no thumbnail yet to draw. */
+  aspect-ratio: 3 / 2;
+}
+
+.cairn-row__preview-failed {
+  padding: var(--space-2);
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}

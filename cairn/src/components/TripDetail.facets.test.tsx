@@ -292,13 +292,14 @@ describe('TripDetail — #192 the facet row inside a trip', () => {
     expect(listedNames()).toHaveLength(3)
   })
 
-  it('walks only the cairns the facet leaves showing with the lightbox arrows', () => {
+  it('walks only the cairns the facet leaves showing with the lightbox arrows', async () => {
     renderTrip()
 
     fireEvent.click(facetChip('Photo'))
     // `photo.jpg` (1 Jun) then `Camp two` (3 Jun) — the hazard sits
     // between them by date and must be skipped, not stepped onto.
     fireEvent.click(screen.getByText('photo.jpg'))
+    fireEvent.click(await screen.findByRole('button', { name: 'View photo.jpg larger' }))
     const dialog = screen.getByRole('dialog')
     expect(dialog.getAttribute('aria-label')).toBe('photo.jpg')
 
@@ -324,6 +325,21 @@ describe('TripDetail — #192 the facet row inside a trip', () => {
     // The user picked a filter, not a navigation — a clean slate beats
     // silently re-selecting something they lost the trail to.
     expect(cairnSection().querySelector('.cairn-row--selected')).toBeNull()
+  })
+
+  it('clears an expanded row the facet filters out, and leaves one still showing expanded', () => {
+    renderTrip()
+
+    fireEvent.click(screen.getByText('photo.jpg'))
+    expect(screen.getByText('photo.jpg').closest('button')?.getAttribute('aria-expanded')).toBe('true')
+
+    fireEvent.click(facetChip('hazard'))
+    // `hazard` shows only the icon-only cairn — `photo.jpg` is filtered out
+    // entirely, so its expansion cannot survive it.
+    expect(screen.queryByText('photo.jpg')).toBeNull()
+
+    fireEvent.click(facetChip('Any'))
+    expect(screen.getByText('photo.jpg').closest('button')?.getAttribute('aria-expanded')).toBe('false')
   })
 
   it('leaves the track list untouched by the facet', () => {

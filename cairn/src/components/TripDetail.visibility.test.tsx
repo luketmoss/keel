@@ -319,7 +319,7 @@ describe('TripDetail — #198 cairns follow the track of their day', () => {
     expect(drawnNames()).toEqual(['day one.jpg', 'off trip.jpg', 'undated.jpg'])
   })
 
-  it("a hidden cairn's row stays, in the hidden treatment, and still opens its detail face", () => {
+  it("a hidden cairn's row stays, in the hidden treatment, and still expands and opens its detail face", async () => {
     mockTripImport([DAY_ONE, DAY_TWO])
     mockCairnImport([ON_DAY_ONE, ON_DAY_TWO])
     renderTrip()
@@ -331,10 +331,13 @@ describe('TripDetail — #198 cairns follow the track of their day', () => {
     const row = cairnSection().querySelector('[data-hidden="true"]') as HTMLElement
     expect(within(row).getByText('day one.jpg')).toBeDefined()
 
-    // Still clickable — the lightbox opens on the cairn the map is no
-    // longer drawing. The row's own open button, not the `⋮` beside it,
-    // whose label carries the same name.
+    // Still clickable — expands normally, keeping the row's hidden
+    // treatment (design doc's States table: "An eye has never removed
+    // anything from a list and does not start here"). The row's own open
+    // button, not the `⋮` beside it, whose label carries the same name.
     fireEvent.click(row.querySelector('.cairn-row__button') as HTMLElement)
+    const preview = await within(row).findByRole('button', { name: 'View day one.jpg larger' })
+    fireEvent.click(preview)
     expect(screen.getByRole('dialog')).toBeDefined()
   })
 

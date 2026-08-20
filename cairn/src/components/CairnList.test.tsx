@@ -673,6 +673,142 @@ describe('CairnList', () => {
     })
   })
 
+  /* #251 — the list's half of "hover lights the marker and the row lights
+     back" (251-linked-hover.md). `hoveredCairnIds`/`onHoverCairn` are plain
+     props here, same as `expandedCairnId` above: the set itself, and which
+     ids resolve to which markers, live in `TripDetail`/`CairnLayer`, and
+     this suite only checks that a row reads and writes its own half. */
+  describe('#251 linked hover', () => {
+    it('applies the hovered class to the row named by hoveredCairnIds, and no other', () => {
+      const items = orderCairnListItems([row({ id: 'a' }), row({ id: 'b' })])
+      const { container } = render(
+        <CairnList
+          items={items}
+          totalCount={2}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={vi.fn()}
+          hoveredCairnIds={new Set(['b'])}
+          {...ownedProps()}
+        />,
+      )
+
+      const rows = container.querySelectorAll('.cairn-row')
+      expect(rows[0].className).not.toContain('cairn-row--hovered')
+      expect(rows[1].className).toContain('cairn-row--hovered')
+    })
+
+    it('calls onHoverCairn with the id on mouseenter and null on mouseleave', () => {
+      const onHoverCairn = vi.fn()
+      const items = orderCairnListItems([row({ id: 'a', name: 'a.jpg' })])
+      const { container } = render(
+        <CairnList
+          items={items}
+          totalCount={1}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={vi.fn()}
+          onHoverCairn={onHoverCairn}
+          {...ownedProps()}
+        />,
+      )
+
+      const li = container.querySelector('.cairn-row') as HTMLElement
+      fireEvent.mouseEnter(li)
+      expect(onHoverCairn).toHaveBeenLastCalledWith('a')
+      fireEvent.mouseLeave(li)
+      expect(onHoverCairn).toHaveBeenLastCalledWith(null)
+    })
+
+    it('focus and blur on the row header drive the identical write as mouseenter/mouseleave', () => {
+      const onHoverCairn = vi.fn()
+      const items = orderCairnListItems([row({ id: 'a', name: 'a.jpg' })])
+      render(
+        <CairnList
+          items={items}
+          totalCount={1}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={vi.fn()}
+          onHoverCairn={onHoverCairn}
+          {...ownedProps()}
+        />,
+      )
+
+      const button = screen.getByText('a.jpg').closest('button') as HTMLElement
+      fireEvent.focus(button)
+      expect(onHoverCairn).toHaveBeenLastCalledWith('a')
+      fireEvent.blur(button)
+      expect(onHoverCairn).toHaveBeenLastCalledWith(null)
+    })
+
+    it('a hidden row still takes the hovered class and forwards hover, keeping its hidden treatment (#198)', () => {
+      const items = orderCairnListItems([row({ id: 'a', name: 'a.jpg' })])
+      const onHoverCairn = vi.fn()
+      const { container } = render(
+        <CairnList
+          items={items}
+          totalCount={1}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={vi.fn()}
+          onHoverCairn={onHoverCairn}
+          hoveredCairnIds={new Set(['a'])}
+          hiddenCairnIds={new Set(['a'])}
+          {...ownedProps()}
+        />,
+      )
+
+      const li = container.querySelector('.cairn-row') as HTMLElement
+      expect(li.className).toContain('cairn-row--hidden')
+      expect(li.className).toContain('cairn-row--hovered')
+      fireEvent.mouseEnter(li)
+      expect(onHoverCairn).toHaveBeenLastCalledWith('a')
+    })
+
+    it('a selected row keeps its selected class alongside the hovered one — hover never replaces selection', () => {
+      const items = orderCairnListItems([row({ id: 'a' })])
+      const { container } = render(
+        <CairnList
+          items={items}
+          totalCount={1}
+          selectedCairnId="a"
+          accessToken="token"
+          onOpenRow={vi.fn()}
+          hoveredCairnIds={new Set(['a'])}
+          {...ownedProps()}
+        />,
+      )
+
+      const li = container.querySelector('.cairn-row') as HTMLElement
+      expect(li.className).toContain('cairn-row--selected')
+      expect(li.className).toContain('cairn-row--hovered')
+    })
+
+    it('hovering a row never changes the selection, the expansion, or scrolls the list', () => {
+      const scrollIntoView = vi.fn()
+      Element.prototype.scrollIntoView = scrollIntoView
+      const items = orderCairnListItems([row({ id: 'a', name: 'a.jpg' })])
+      const onOpenRow = vi.fn()
+      const { container } = render(
+        <CairnList
+          items={items}
+          totalCount={1}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={onOpenRow}
+          {...ownedProps()}
+        />,
+      )
+
+      fireEvent.mouseEnter(container.querySelector('.cairn-row') as HTMLElement)
+      fireEvent.focus(screen.getByText('a.jpg').closest('button') as HTMLElement)
+
+      expect(onOpenRow).not.toHaveBeenCalled()
+      expect(scrollIntoView).not.toHaveBeenCalled()
+    })
+  })
+
   /* #250 — the expanded row's inline preview. `expandedCairnId` is a plain
      prop here: the toggle/single-expanded-at-a-time rules live in
      `cairnExpansion.ts` and `TripDetail`, and this suite only checks that

@@ -1,4 +1,4 @@
-import { act, render, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CairnLayer, type PositionedCairn } from './CairnLayer'
 
@@ -376,6 +376,183 @@ describe('CairnLayer', () => {
     await waitFor(() => {
       expect(container.querySelector('img')?.getAttribute('src')).toBe('blob:fake-thumb')
     })
+  })
+})
+
+/* #251 — the map's half of "the list and the map light together in both
+   directions" (251-linked-hover.md). `hoveredCairnIds`/`onHoverCairn` are
+   read/written the same way `selectedCairnId`/`onSelectCairn` already are;
+   this suite checks the marker and the cluster read and write sides, and
+   that a fanned member (#194's expanded cluster) is excluded, per the
+   design note's "Out of scope". */
+describe('CairnLayer linked hover (#251)', () => {
+  it('calls onHoverCairn with a one-id set on mouseenter and the empty set on mouseleave', () => {
+    const onHoverCairn = vi.fn()
+    const { container } = render(
+      <CairnLayer
+        cairns={[positionedCairn({ id: 'a' })]}
+        accessToken="token"
+        selectedCairnId={null}
+        onSelectCairn={() => {}}
+        onHoverCairn={onHoverCairn}
+      />,
+    )
+
+    const hit = container.querySelector('[data-testid="cairn-marker"]') as HTMLElement
+    fireEvent.mouseEnter(hit)
+    expect(onHoverCairn).toHaveBeenLastCalledWith(new Set(['a']))
+    fireEvent.mouseLeave(hit)
+    expect(onHoverCairn).toHaveBeenLastCalledWith(new Set())
+  })
+
+  it('focus and blur on the marker drive the identical write as mouseenter/mouseleave', () => {
+    const onHoverCairn = vi.fn()
+    const { container } = render(
+      <CairnLayer
+        cairns={[positionedCairn({ id: 'a' })]}
+        accessToken="token"
+        selectedCairnId={null}
+        onSelectCairn={() => {}}
+        onHoverCairn={onHoverCairn}
+      />,
+    )
+
+    const hit = container.querySelector('[data-testid="cairn-marker"]') as HTMLElement
+    fireEvent.focus(hit)
+    expect(onHoverCairn).toHaveBeenLastCalledWith(new Set(['a']))
+    fireEvent.blur(hit)
+    expect(onHoverCairn).toHaveBeenLastCalledWith(new Set())
+  })
+
+  it('applies the hover scale/ring class to the marker named by hoveredCairnIds, and no other', () => {
+    const { container } = render(
+      <CairnLayer
+        cairns={[positionedCairn({ id: 'a', latitude: 1, longitude: 1 }), positionedCairn({ id: 'b', latitude: 40, longitude: 40 })]}
+        accessToken="token"
+        selectedCairnId={null}
+        onSelectCairn={() => {}}
+        hoveredCairnIds={new Set(['b'])}
+      />,
+    )
+
+    const a = container.querySelector('[data-cairn-id="a"]') as HTMLElement
+    const b = container.querySelector('[data-cairn-id="b"]') as HTMLElement
+    expect(a.className).not.toContain('cairn-layer__hit--hovered')
+    expect(b.className).toContain('cairn-layer__hit--hovered')
+  })
+
+  it('a hovered marker that is also selected keeps the selected ring width and glow, and gains the hover class', () => {
+    const { container } = render(
+      <CairnLayer
+        cairns={[positionedCairn({ id: 'a' })]}
+        accessToken="token"
+        selectedCairnId="a"
+        onSelectCairn={() => {}}
+        hoveredCairnIds={new Set(['a'])}
+      />,
+    )
+
+    const hit = container.querySelector('[data-cairn-id="a"]') as HTMLElement
+    expect(hit.className).toContain('cairn-layer__hit--hovered')
+    const ring = hit.querySelector('.cairn-marker--thumb') as HTMLElement
+    // #54's selected ring, not the hover ring — selection is not degraded
+    // by pointing at it (design note).
+    expect(ring.style.borderWidth).toBe('var(--marker-ring-selected)')
+  })
+
+  it('a hovered, unselected marker takes the accent ring at the thinner width, with no glow', () => {
+    const { container } = render(
+      <CairnLayer
+        cairns={[positionedCairn({ id: 'a', source: 'interpolated' })]}
+        accessToken="token"
+        selectedCairnId={null}
+        onSelectCairn={() => {}}
+        hoveredCairnIds={new Set(['a'])}
+      />,
+    )
+
+    const ring = container.querySelector('.cairn-marker--thumb') as HTMLElement
+    expect(ring.style.borderColor).toBe('var(--accent)')
+    expect(ring.style.borderWidth).toBe('var(--marker-ring)')
+    expect(ring.style.filter).toBeFalsy()
+  })
+
+  it('hovering a row for a cairn inside a collapsed cluster lights the cluster, not an individual marker', () => {
+    currentZoom = 3
+    const { container } = render(
+      <CairnLayer
+        cairns={[
+          positionedCairn({ id: 'a', latitude: 10, longitude: 20 }),
+          positionedCairn({ id: 'b', latitude: 10.0001, longitude: 20.0001 }),
+        ]}
+        accessToken="token"
+        selectedCairnId={null}
+        onSelectCairn={() => {}}
+        // Simulates the write `CairnList`'s row already performs — just this
+        // one cairn's own id, with no knowledge of clustering.
+        hoveredCairnIds={new Set(['a'])}
+      />,
+    )
+
+    const cluster = container.querySelector('[data-testid="cairn-cluster"]') as HTMLElement
+    expect(cluster.className).toContain('cairn-layer__hit--hovered')
+  })
+
+  it('hovering a cluster marker writes every member id at once, and clears them all on leave', () => {
+    currentZoom = 3
+    const onHoverCairn = vi.fn()
+    const { container } = render(
+      <CairnLayer
+        cairns={[
+          positionedCairn({ id: 'a', latitude: 10, longitude: 20 }),
+          positionedCairn({ id: 'b', latitude: 10.0001, longitude: 20.0001 }),
+        ]}
+        accessToken="token"
+        selectedCairnId={null}
+        onSelectCairn={() => {}}
+        onHoverCairn={onHoverCairn}
+      />,
+    )
+
+    const cluster = container.querySelector('[data-testid="cairn-cluster"]') as HTMLElement
+    fireEvent.mouseEnter(cluster)
+    expect(onHoverCairn).toHaveBeenLastCalledWith(new Set(['a', 'b']))
+    fireEvent.mouseLeave(cluster)
+    expect(onHoverCairn).toHaveBeenLastCalledWith(new Set())
+  })
+
+  it('does not wire hover on a fanned member of an expanded cluster (out of scope)', () => {
+    currentZoom = 10
+    const onHoverCairn = vi.fn()
+    const { container } = render(
+      <CairnLayer
+        cairns={[
+          positionedCairn({ id: 'a', latitude: 10, longitude: 20 }),
+          positionedCairn({ id: 'b', latitude: 10.00001, longitude: 20.00001 }),
+        ]}
+        accessToken="token"
+        selectedCairnId={null}
+        onSelectCairn={() => {}}
+        onHoverCairn={onHoverCairn}
+        hoveredCairnIds={new Set(['a'])}
+      />,
+    )
+
+    act(() => {
+      container
+        .querySelector('[data-testid="cairn-cluster"]')
+        ?.closest('[data-testid="advanced-marker"]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    // Fanned open now — its members are ordinary `[data-fanned="true"]`
+    // markers, but hover on them is explicitly out of scope, so neither the
+    // set (which still names 'a', one of this fan's own members) nor a
+    // fresh mouseenter should affect them.
+    const fannedA = container.querySelector('[data-cairn-id="a"][data-fanned="true"]') as HTMLElement
+    expect(fannedA.className).not.toContain('cairn-layer__hit--hovered')
+    fireEvent.mouseEnter(fannedA)
+    expect(onHoverCairn).not.toHaveBeenCalled()
   })
 })
 

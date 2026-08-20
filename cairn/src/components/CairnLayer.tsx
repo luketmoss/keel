@@ -31,6 +31,12 @@ export interface PositionedCairn {
    values). Keep this in step with index.css's --marker-size by hand. */
 const MARKER_FOOTPRINT_PX = 28
 
+/** #251: the rest value of `hoveredCairnIds`, and every caller's default —
+    one shared empty set rather than a fresh `new Set()` per render for
+    every marker that reads it, the same reasoning `EMPTY_PLACEMENT_QUEUE`
+    already gives its own rest value. Never mutated. */
+const EMPTY_HOVERED_CAIRN_IDS: ReadonlySet<string> = new Set()
+
 interface CairnLayerProps {
   cairns: PositionedCairn[]
   /** Drive access token for thumbnail fetches through #53's cache — `null`
@@ -59,6 +65,18 @@ interface CairnLayerProps {
   /** #158: called once, on drop, only when a marker actually moved.
       Resolves whether the write landed — `false` reverts it. */
   onMoveCairn?: (cairnId: string, position: LatLng) => Promise<boolean>
+  /** #251: the trip's one hovered-cairn set, held by `TripDetail` and read
+      here the same way `selectedCairnId` already is. Holds exactly one id
+      for an ordinary marker, or every id a hovered cluster holds — see
+      `251-linked-hover.md`'s "The state". Defaults to the shared empty set
+      so every existing call site (and every test in `CairnLayer.test.tsx`
+      written before this issue) keeps working unchanged. */
+  hoveredCairnIds?: ReadonlySet<string>
+  /** #251: writes `hoveredCairnIds` back up. A single marker calls this
+      with its own id alone; a cluster calls it with every member id at
+      once; either clears with the empty set on leave/blur. Optional for
+      the same backward-compatibility reason `hoveredCairnIds` is. */
+  onHoverCairn?: (cairnIds: ReadonlySet<string>) => void
 }
 
 /** Renders positioned cairns as clustered `AdvancedMarker`s above the
@@ -83,6 +101,8 @@ export function CairnLayer({
   onOpenCairn,
   draggable = false,
   onMoveCairn,
+  hoveredCairnIds = EMPTY_HOVERED_CAIRN_IDS,
+  onHoverCairn = () => {},
 }: CairnLayerProps) {
   const map = useMap()
   const [zoom, setZoom] = useState<number>(() => map?.getZoom() ?? 2)
@@ -155,6 +175,8 @@ export function CairnLayer({
               onOpen={onOpenCairn}
               draggable={draggable}
               onMove={onMoveCairn}
+              hovered={hoveredCairnIds.has(cairn.id)}
+              onHoverChange={(hovered) => onHoverCairn(hovered ? new Set([cairn.id]) : EMPTY_HOVERED_CAIRN_IDS)}
             />
           )
         }
@@ -162,6 +184,16 @@ export function CairnLayer({
           .map((member) => member.cairn.id)
           .sort()
           .join(',')
+        /* #251: whether *this* cluster is the one `hoveredCairnIds` names —
+           by intersection, per the design note's read rule. A row-hover for
+           a clustered cairn writes only that cairn's own id (`CairnList`
+           doesn't know about clustering, and per the design note it doesn't
+           need to), and that id is one of this cluster's own member ids, so
+           "hovering a row whose cairn is inside a collapsed cluster
+           emphasises the cluster" falls out of this test for free rather
+           than needing a second, cluster-aware write path. */
+        const hovered = cluster.members.some((member) => hoveredCairnIds.has(member.cairn.id))
+        const hoverMemberIds = () => new Set(cluster.members.map((member) => member.cairn.id))
         if (key === expandedKey) {
           return (
             <ExpandedCluster
@@ -173,6 +205,8 @@ export function CairnLayer({
               onSelect={onSelectCairn}
               onOpen={onOpenCairn}
               onCollapse={collapse}
+              hovered={hovered}
+              onHoverChange={(next) => onHoverCairn(next ? hoverMemberIds() : EMPTY_HOVERED_CAIRN_IDS)}
             />
           )
         }
@@ -182,6 +216,8 @@ export function CairnLayer({
             cluster={cluster}
             map={map}
             onExpand={() => setExpandedKey(key)}
+            hovered={hovered}
+            onHoverChange={(next) => onHoverCairn(next ? hoverMemberIds() : EMPTY_HOVERED_CAIRN_IDS)}
           />
         )
       })}
@@ -198,6 +234,8 @@ function SingleCairnMarker({
   draggable,
   onMove,
   fan,
+  hovered = false,
+  onHoverChange,
 }: {
   cairn: PositionedCairn
   accessToken: string | null
@@ -210,6 +248,16 @@ function SingleCairnMarker({
       members, in which case it is drawn at a fanned-out coordinate rather
       than the cairn's own, and carries a leader line back to the anchor. */
   fan?: FannedPlacement
+  /** #251: this cairn's id is in `hoveredCairnIds`. Defaults `false` and is
+      never read from the shared set for a fanned member — `ExpandedCluster`
+      below passes neither prop to its own members, on purpose: the fan's
+      individual markers are out of scope for hover
+      (251-linked-hover.md's "Out of scope"). */
+  hovered?: boolean
+  /** #251: writes `hoveredCairnIds` on mouseenter/leave/focus/blur.
+      `undefined` for a fanned member, which wires no hover handlers at all
+      for the same out-of-scope reason `hovered` above gives. */
+  onHoverChange?: (hovered: boolean) => void
 }) {
   const thumbnailUrl = usePhotoImage(accessToken, cairn.thumbnailDriveFileId ?? undefined).url
   // `tabIndex={-1}`: focusable via `.focus()` below (so #55's lightbox can
@@ -255,7 +303,7 @@ function SingleCairnMarker({
       <div
         ref={hitRef}
         tabIndex={-1}
-        className={`cairn-layer__hit${dragAllowed ? ' cairn-layer__hit--draggable' : ''}${drag.dragging ? ' cairn-layer__hit--dragging' : ''}${fan ? ' cairn-layer__hit--fanned' : ''}`}
+        className={`cairn-layer__hit${dragAllowed ? ' cairn-layer__hit--draggable' : ''}${drag.dragging ? ' cairn-layer__hit--dragging' : ''}${fan ? ' cairn-layer__hit--fanned' : ''}${hovered ? ' cairn-layer__hit--hovered' : ''}`}
         role="button"
         aria-label={cairn.name}
         aria-pressed={selected}
@@ -266,6 +314,16 @@ function SingleCairnMarker({
         data-draggable={dragAllowed}
         data-dragging={drag.dragging}
         data-fanned={fan !== undefined}
+        /* #251: mouseenter/leave and focus/blur write the same
+           `hoveredCairnIds` a list row does — "one treatment, three
+           sources" (shell-and-content-model.md, quoted in the design
+           note). `onHoverChange` is `undefined` for a fanned member, so
+           these become no-ops rather than throwing — see the prop doc
+           above for why the fan is excluded on purpose. */
+        onMouseEnter={() => onHoverChange?.(true)}
+        onMouseLeave={() => onHoverChange?.(false)}
+        onFocus={() => onHoverChange?.(true)}
+        onBlur={() => onHoverChange?.(false)}
       >
         {fan && (
           /* Drawn from the marker back to the anchor: a hairline of the
@@ -287,6 +345,7 @@ function SingleCairnMarker({
           hasImage={cairn.thumbnailDriveFileId !== null}
           source={cairn.source}
           selected={selected}
+          hovered={hovered}
         />
       </div>
     </AdvancedMarker>
@@ -299,14 +358,25 @@ function ClusterMarker({
   cluster,
   map,
   onExpand,
+  hovered,
+  onHoverChange,
 }: {
   cluster: CairnCluster
   map: google.maps.Map
   /** #194: called instead of zooming, when zooming would achieve nothing. */
   onExpand: () => void
+  /** #251: true when any member's id is in `hoveredCairnIds` — either
+      because this cluster marker itself is hovered (in which case it is
+      every member's id), or because a row for one of its members is
+      hovered instead (in which case it's that one id, which is still one
+      of this cluster's own members — see the call site's comment). */
+  hovered: boolean
+  /** #251: writes every member id at once — "hovering a cluster marker
+      lights every row it holds" — and clears with the empty set on leave. */
+  onHoverChange: (hovered: boolean) => void
 }) {
   const provenance = clusterProvenance(cluster.members.map((member) => member.cairn))
-  const ring = ringStyleForPhoto(provenance, false)
+  const ring = ringStyleForPhoto(provenance, false, hovered)
   const label = clusterAriaLabel(cluster.members.length)
 
   /* #194: zoom-to-fit where zoom-to-fit works, expand in place where it
@@ -326,12 +396,14 @@ function ClusterMarker({
   return (
     <AdvancedMarker position={{ lat: cluster.lat, lng: cluster.lng }} onClick={handleClick}>
       <div
-        className="cairn-layer__hit"
+        className={`cairn-layer__hit${hovered ? ' cairn-layer__hit--hovered' : ''}`}
         role="button"
         aria-label={label}
         data-testid="cairn-cluster"
         data-count={cluster.members.length}
         data-source={provenance}
+        onMouseEnter={() => onHoverChange(true)}
+        onMouseLeave={() => onHoverChange(false)}
       >
         <div
           className="cairn-layer__cluster"
@@ -366,6 +438,8 @@ function ExpandedCluster({
   onSelect,
   onOpen,
   onCollapse,
+  hovered,
+  onHoverChange,
 }: {
   cluster: CairnCluster
   zoom: number
@@ -374,9 +448,16 @@ function ExpandedCluster({
   onSelect: (cairnId: string) => void
   onOpen?: (cairnId: string) => void
   onCollapse: () => void
+  /** #251: same test as `ClusterMarker`'s own — the anchor badge still
+      stands for the cluster while it's fanned open, so it keeps the same
+      hover read/write the collapsed badge has. The fan's individual
+      members do not — see `SingleCairnMarker` below, called with neither
+      `hovered` nor `onHoverChange`. */
+  hovered: boolean
+  onHoverChange: (hovered: boolean) => void
 }) {
   const provenance = clusterProvenance(cluster.members.map((member) => member.cairn))
-  const ring = ringStyleForPhoto(provenance, false)
+  const ring = ringStyleForPhoto(provenance, false, hovered)
   const placements = useMemo(
     () => fanOutPositions(cluster, cluster.members.length, zoom, MARKER_FOOTPRINT_PX),
     [cluster, zoom],
@@ -386,13 +467,15 @@ function ExpandedCluster({
     <>
       <AdvancedMarker position={{ lat: cluster.lat, lng: cluster.lng }} onClick={onCollapse}>
         <div
-          className="cairn-layer__hit"
+          className={`cairn-layer__hit${hovered ? ' cairn-layer__hit--hovered' : ''}`}
           role="button"
           aria-label={clusterAriaLabel(cluster.members.length)}
           data-testid="cairn-cluster"
           data-count={cluster.members.length}
           data-source={provenance}
           data-expanded="true"
+          onMouseEnter={() => onHoverChange(true)}
+          onMouseLeave={() => onHoverChange(false)}
         >
           <div
             className="cairn-layer__cluster cairn-layer__cluster--anchor"

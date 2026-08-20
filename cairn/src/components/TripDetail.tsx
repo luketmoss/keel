@@ -303,6 +303,31 @@ export function TripDetail({
   const [expandedCairnId, setExpandedCairnId] = useState<string | null>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
 
+  /* #251 — one hovered-cairn set, written by both `CairnList` and
+     `CairnLayer` and read by both, exactly the shape `App.tsx` already
+     uses for `hoveredTripId` and `TripsPanel`/`LooseLayer`. Widened to a
+     set rather than a single id (design note's "The state") for the one
+     case that needs more than one: a hovered cluster marker lights every
+     row it holds. Empty at rest, and never derives anything else —
+     `selectedCairnId`/`expandedCairnId`/`openCairnId`, the scroll-into-view
+     effect above and the map camera all stay untouched by it. */
+  const [hoveredCairnIds, setHoveredCairnIds] = useState<ReadonlySet<string>>(() => new Set())
+
+  /** #251 — `CairnList`'s half of the write: a row's `mouseenter`/`focus`
+      set the hovered set to exactly that one id, and `mouseleave`/`blur`
+      empty it. */
+  const hoverCairn = useCallback((cairnId: string | null) => {
+    setHoveredCairnIds(cairnId ? new Set([cairnId]) : new Set())
+  }, [])
+
+  /** #251 — `CairnLayer`'s half: a single marker's hover set already
+      arrives as a one-id set, and a cluster marker's arrives as every id it
+      holds — `CairnLayer` itself decides which, this only stores whichever
+      it sends (including the empty set on leave/blur). */
+  const hoverCairns = useCallback((cairnIds: ReadonlySet<string>) => {
+    setHoveredCairnIds(cairnIds)
+  }, [])
+
   /* #192 — the trip's own facet, `useState` here and nowhere else: it dies
      with the component, so leaving the trip and coming back gives `Any`.
      The main map's facet is independent state and neither reads the other.
@@ -742,6 +767,8 @@ export function TripDetail({
           onOpenCairn={selectCairn}
           draggable={cairnsDraggable}
           onMoveCairn={handleMoveCairn}
+          hoveredCairnIds={hoveredCairnIds}
+          onHoverCairn={hoverCairns}
         />
       )}
 
@@ -829,6 +856,8 @@ export function TripDetail({
           onFacetChange={setCairnFacet}
           selectedCairnId={selectedCairnId}
           expandedCairnId={expandedCairnId}
+          hoveredCairnIds={hoveredCairnIds}
+          onHoverCairn={hoverCairn}
           accessToken={accessToken}
           onOpenRow={selectCairn}
           onOpenPreview={openPreview}

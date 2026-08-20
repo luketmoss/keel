@@ -18,6 +18,11 @@ export function clearFilterDetail(totalCount: number): string {
   return totalCount === 1 ? 'Clear the filter to see the 1.' : `Clear the filter to see all ${totalCount}.`
 }
 
+/** #251: the rest value of `hoveredCairnIds`, and its default — one shared
+    empty set rather than a fresh one per render, the same reasoning
+    `CairnLayer`'s own `EMPTY_HOVERED_CAIRN_IDS` gives. Never mutated. */
+const EMPTY_HOVERED_CAIRN_IDS: ReadonlySet<string> = new Set()
+
 interface CairnListProps {
   /** Already filtered by `facet` — one filter drives this list and the
       map together (`cairns.md`), so the narrowing happens once in the
@@ -37,6 +42,19 @@ interface CairnListProps {
       expanded at a time" — deriving it from selection would make the
       header's second click deselect in order to collapse). */
   expandedCairnId: string | null
+  /** #251: `TripDetail`'s one hovered-cairn set — read here to decide which
+      row(s) take the `cairn-row--hovered` class. Usually holds at most this
+      list's own written id, but a hovered cluster marker on the map can
+      hold several at once (251-linked-hover.md's "Clusters" — "every row it
+      holds"), which is why this list only ever tests membership rather than
+      equality against a single id. Defaults to an empty set so every call
+      site written before this issue keeps working unchanged. */
+  hoveredCairnIds?: ReadonlySet<string>
+  /** #251: writes `hoveredCairnIds` on a row's mouseenter/mouseleave and its
+      button's focus/blur — `cairnId` on enter/focus, `null` on leave/blur,
+      the same shape `TripsPanel.onHover` already uses (widened to a set one
+      level up, in `TripDetail`, for the cluster case above). */
+  onHoverCairn?: (cairnId: string | null) => void
   accessToken: string | null
   /** #250 revises this: a click on a row whose cairn carries an image now
       selects it and expands the row in place, toggling closed on a second
@@ -105,6 +123,8 @@ export function CairnList({
   onFacetChange,
   selectedCairnId,
   expandedCairnId,
+  hoveredCairnIds = EMPTY_HOVERED_CAIRN_IDS,
+  onHoverCairn = () => {},
   accessToken,
   onOpenRow,
   onOpenPreview,
@@ -213,6 +233,8 @@ export function CairnList({
                 row={item.row}
                 selected={item.row.id === selectedCairnId}
                 expanded={item.row.id === expandedCairnId}
+                hovered={hoveredCairnIds.has(item.row.id)}
+                onHoverChange={(hovered) => onHoverCairn(hovered ? item.row.id : null)}
                 accessToken={accessToken}
                 onOpen={onOpenRow}
                 onOpenPreview={onOpenPreview}
@@ -243,6 +265,8 @@ function CairnRow({
   row,
   selected,
   expanded,
+  hovered,
+  onHoverChange,
   accessToken,
   onOpen,
   onOpenPreview,
@@ -265,6 +289,16 @@ function CairnRow({
       about-to-be-destroyed row has no preview to show (design doc's States
       table). */
   expanded: boolean
+  /** #251 — whether this row's id is in `hoveredCairnIds`. Applied as a
+      class rather than read through `:hover`, because a marker-hover event
+      on the map has to produce the identical row treatment programmatically
+      — the design note's "the same pixels" requirement. Still lit while
+      `hidden` (below): the row stays fully hoverable in the hidden
+      treatment, in both directions. */
+  hovered: boolean
+  /** #251 — writes `hoveredCairnIds` on mouseenter/mouseleave (the `<li>`)
+      and focus/blur (the header button), mirroring `TripsPanel`'s row. */
+  onHoverChange: (hovered: boolean) => void
   accessToken: string | null
   onOpen: (cairnId: string) => void
   onOpenPreview: (cairnId: string) => void
@@ -332,14 +366,22 @@ function CairnRow({
   return (
     <li
       ref={registerRef}
-      className={`cairn-row${selected ? ' cairn-row--selected' : ''}${removing ? ' cairn-row--removing' : ''}${hidden ? ' cairn-row--hidden' : ''}`}
+      className={`cairn-row${selected ? ' cairn-row--selected' : ''}${removing ? ' cairn-row--removing' : ''}${hidden ? ' cairn-row--hidden' : ''}${hovered ? ' cairn-row--hovered' : ''}`}
       data-hidden={hidden}
+      // #251: the row's half of the write — the same `mouseenter`/
+      // `mouseleave` pair `TripsPanel`'s own row already uses.
+      onMouseEnter={() => onHoverChange(true)}
+      onMouseLeave={() => onHoverChange(false)}
     >
       <div className="cairn-row__main">
         <button
           type="button"
           className="cairn-row__button"
           onClick={() => onOpen(row.id)}
+          // #251: focus/blur drive the identical write mouseenter/leave
+          // does — "not a mouse-only feature" (design note).
+          onFocus={() => onHoverChange(true)}
+          onBlur={() => onHoverChange(false)}
           // #250: only a cairn with an image is an expandable thing — the
           // design doc is explicit that an icon-only cairn's row must not
           // claim to be one, so the attribute is omitted entirely rather

@@ -162,6 +162,18 @@
   background: var(--pressed);
 }
 
+/* #251 — the row's hover treatment, driven by a class rather than
+   `:hover` so a marker-hover event on the map can trigger the identical
+   pixels programmatically (design note: "a pointer over the row and a
+   pointer over its marker have to produce the same pixels"). Placed before
+   `.cairn-row--selected` below so a row that is both selected and hovered
+   shows the selected fill, not this one — "a selected row keeps
+   `cairn-row--selected` layered on top of the hover class" (design note),
+   which cascade order is what makes true here. */
+.cairn-row--hovered .cairn-row__button {
+  background: var(--hover);
+}
+
 /* Selected state per the design language: --accent-soft fill, --accent
    text, no border, no transform. */
 .cairn-row--selected .cairn-row__button {

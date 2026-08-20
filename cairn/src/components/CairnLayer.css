@@ -34,6 +34,19 @@
   transform: scale(1.35);
 }
 
+/* #251 — the marker's own hover treatment, unchanged from the one
+   `LooseLayer.css` already implements for the world map: 1.35 scale, over
+   `--motion-fast` (the transition itself lives on `.cairn-marker` so it
+   applies whether hover starts or ends). The ring colour and width move
+   through `CairnMarker`'s own `hovered` prop and `ringStyleForPhoto`
+   instead of here — this rule is scale only. Covers `.cairn-layer__cluster`
+   too: a cluster badge has no `CairnMarker` to hover, but the design note
+   gives it "the scale and the `--accent` ring, same as a single marker's". */
+.cairn-layer__hit--hovered .cairn-marker,
+.cairn-layer__hit--hovered .cairn-layer__cluster {
+  transform: scale(1.35);
+}
+
 /* #194 — a member of an expanded cluster. It stands away from its own
    coordinate for as long as the fan is open, so `position: relative` here
    is only to hang the leader line off; the marker itself is unchanged. */
@@ -93,6 +106,11 @@
   color: var(--text);
   font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
+  /* #251 — the cluster badge's own hover scale and ring-colour move over
+     the same duration `.cairn-marker` already transitions on. */
+  transition:
+    transform var(--motion-fast) var(--ease),
+    border-color var(--motion-fast) var(--ease);
 }
 
 /* #194 — the badge while its cluster is open. It stays put and keeps its

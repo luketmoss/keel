@@ -771,6 +771,68 @@ describe('CairnList', () => {
       expect(onOpenRow).not.toHaveBeenCalled()
     })
 
+    it('draws the preview immediately from the glyph thumbnail already in hand, with no blank frame before the original lands', async () => {
+      const items = orderCairnListItems([row({ id: 'a', name: 'a.jpg' })])
+
+      const { rerender } = render(
+        <CairnList
+          items={items}
+          totalCount={1}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={vi.fn()}
+          {...ownedProps({ expandedCairnId: null })}
+        />,
+      )
+
+      // Let the glyph's own thumbnail request land, as it already will have
+      // for a row that's been sitting in the list a while before it's
+      // clicked — that's the "already loaded" half of the criterion.
+      await waitFor(() => {
+        expect(document.querySelector('.cairn-row__glyph img')).not.toBeNull()
+      })
+
+      // Expanding now must not pass through the loading placeholder: the
+      // preview's own `usePhotoImage` for the display-size original hasn't
+      // resolved yet at this point (it starts fetching only once mounted),
+      // so an immediate blank frame here would mean the design doc's rule
+      // — draw the thumbnail already in hand, swap to the original later —
+      // was not honoured.
+      rerender(
+        <CairnList
+          items={items}
+          totalCount={1}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={vi.fn()}
+          {...ownedProps({ expandedCairnId: 'a' })}
+        />,
+      )
+
+      const preview = screen.getByRole('button', { name: 'View a.jpg larger' })
+      expect(preview.querySelector('.cairn-row__preview-image')).not.toBeNull()
+      expect(preview.querySelector('.cairn-row__preview-loading')).toBeNull()
+    })
+
+    it('renders the row header and the preview as native buttons, so Enter and Space activate both for free', async () => {
+      const items = orderCairnListItems([row({ id: 'a', name: 'a.jpg' })])
+
+      render(
+        <CairnList
+          items={items}
+          totalCount={1}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={vi.fn()}
+          {...ownedProps({ expandedCairnId: 'a' })}
+        />,
+      )
+
+      expect(screen.getByText('a.jpg').closest('button')?.tagName).toBe('BUTTON')
+      const preview = await waitFor(() => screen.getByRole('button', { name: 'View a.jpg larger' }))
+      expect(preview.tagName).toBe('BUTTON')
+    })
+
     it('never draws a preview for a removing row, even when it names expandedCairnId', () => {
       const items = orderCairnListItems([row({ id: 'a', name: 'a.jpg' })])
 

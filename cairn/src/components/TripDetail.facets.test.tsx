@@ -327,6 +327,21 @@ describe('TripDetail — #192 the facet row inside a trip', () => {
     expect(cairnSection().querySelector('.cairn-row--selected')).toBeNull()
   })
 
+  it('clears an expanded row the facet filters out, and leaves one still showing expanded', () => {
+    renderTrip()
+
+    fireEvent.click(screen.getByText('photo.jpg'))
+    expect(screen.getByText('photo.jpg').closest('button')?.getAttribute('aria-expanded')).toBe('true')
+
+    fireEvent.click(facetChip('hazard'))
+    // `hazard` shows only the icon-only cairn — `photo.jpg` is filtered out
+    // entirely, so its expansion cannot survive it.
+    expect(screen.queryByText('photo.jpg')).toBeNull()
+
+    fireEvent.click(facetChip('Any'))
+    expect(screen.getByText('photo.jpg').closest('button')?.getAttribute('aria-expanded')).toBe('false')
+  })
+
   it('leaves the track list untouched by the facet', () => {
     renderTrip()
 

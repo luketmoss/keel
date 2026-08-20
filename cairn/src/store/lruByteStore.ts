@@ -161,6 +161,12 @@ export class LruByteStore<T> {
         existingRequest.onsuccess = () => {
           const existing = existingRequest.result as StoredEntry<T> | undefined
           const existingSize = existing?.size ?? 0
+          // Overwriting an existing key: remove its old record up front so
+          // the eviction cursor below can't land on it and double-subtract
+          // a size already accounted for in `existingSize` — it would
+          // otherwise be a live candidate, being (if old enough) exactly
+          // what an LRU sweep looks for.
+          if (existing) store.delete(key)
 
           const totalRequest = meta.get(TOTAL_KEY)
           totalRequest.onsuccess = () => {

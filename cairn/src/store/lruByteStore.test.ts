@@ -106,6 +106,31 @@ describe('LruByteStore', () => {
     await expect(store.put('a', 'value-a', 10)).resolves.toBeUndefined()
   })
 
+  // Criterion 7 edge case: overwriting an existing key with a bigger value
+  // that pushes the store over budget must not let that key's own
+  // about-to-be-replaced entry be double-counted by the eviction cursor —
+  // 'a' is both the write target and (being the oldest use) the first
+  // eviction candidate.
+  it('accounts correctly when overwriting an existing key requires eviction', async () => {
+    const store = makeStore(100)
+    await store.put('a', 'value-a', 50)
+    await store.put('b', 'value-b', 50)
+
+    // Growing 'a' from 50 to 60 bytes makes the true total 110 (60 + the
+    // untouched 'b's 50) — over the 100 budget by 10, so 'b' must go.
+    await store.put('a', 'value-a-bigger', 60)
+
+    await expect(store.get('a')).resolves.toBe('value-a-bigger')
+    await expect(store.get('b')).resolves.toBeUndefined()
+
+    // A third write should account for exactly 'a's 60 bytes, not a
+    // corrupted lower total — 40 more bytes should be exactly at budget,
+    // evicting nothing.
+    await store.put('c', 'value-c', 40)
+    await expect(store.get('a')).resolves.toBe('value-a-bigger')
+    await expect(store.get('c')).resolves.toBe('value-c')
+  })
+
   // Criterion 9: bumping the store's schema version discards whatever the
   // previous version held, without erroring.
   it('discards pre-existing entries when opened at a newer version', async () => {

@@ -12,12 +12,16 @@
    to parse, not a URL to render, so there is nothing to release. */
 
 import { downloadTrackFile, DriveAuthError, DriveRequestError } from './trackFiles'
+import { LruByteStore } from '../store/lruByteStore'
 
 export { DriveAuthError, DriveRequestError }
 
 const DB_NAME = 'cairn-track-cache'
-const DB_VERSION = 1
+const DB_VERSION = 2
 const STORE_NAME = 'tracks'
+// #245's Proposal: generous against a typical mobile origin quota, not
+// measured — revisit if a real device says otherwise.
+const BUDGET_BYTES = 25 * 1024 * 1024
 
 interface CachedTrackFile {
   modifiedTime: string
@@ -32,9 +36,8 @@ export interface TrackFileCacheDeps {
 }
 
 export class TrackFileCache {
-  private readonly indexedDBFactory: IDBFactory
+  private readonly store: LruByteStore<CachedTrackFile>
 
-  private dbPromise?: Promise<IDBDatabase>
   // In-flight "get this file" operations (IndexedDB read, and the network
   // download + IndexedDB write behind a miss), keyed by Drive file id. Two
   // concurrent requests for the same uncached file id share one entry here
@@ -42,7 +45,9 @@ export class TrackFileCache {
   private readonly inFlight = new Map<string, Promise<File>>()
 
   constructor(deps: TrackFileCacheDeps = {}) {
-    this.indexedDBFactory = deps.indexedDBFactory ?? (globalThis as { indexedDB?: IDBFactory }).indexedDB!
+    this.store = new LruByteStore<CachedTrackFile>(DB_NAME, DB_VERSION, STORE_NAME, BUDGET_BYTES, {
+      indexedDBFactory: deps.indexedDBFactory,
+    })
   }
 
   /** Resolves to a `File` for `fileId`, from cache if `modifiedTime` matches
@@ -82,55 +87,23 @@ export class TrackFileCache {
     // `File` — IndexedDB structured-clones a `Blob` reliably; a `File`
     // (carrying a name/lastModified beyond what this store needs) is a
     // needless risk to put through the same path.
-    await this.writeToDB(fileId, { modifiedTime, blob: file.slice(), type: file.type })
+    const blob = file.slice()
+    await this.writeToDB(fileId, { modifiedTime, blob, type: file.type })
     return file
-  }
-
-  private openDB(): Promise<IDBDatabase> {
-    if (!this.dbPromise) {
-      this.dbPromise = new Promise((resolve, reject) => {
-        const request = this.indexedDBFactory.open(DB_NAME, DB_VERSION)
-        request.onupgradeneeded = () => {
-          request.result.createObjectStore(STORE_NAME)
-        }
-        request.onsuccess = () => resolve(request.result)
-        request.onerror = () => reject(request.error ?? new Error('Failed to open track cache database'))
-      })
-    }
-    return this.dbPromise
   }
 
   /** A read failure is a miss (criterion 6) — same stance as
       `imageCache.readFromDB`. The download path still runs; it just won't
       be memoized this time. */
-  private async readFromDB(fileId: string): Promise<CachedTrackFile | undefined> {
-    try {
-      const db = await this.openDB()
-      return await new Promise<CachedTrackFile | undefined>((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readonly')
-        const request = tx.objectStore(STORE_NAME).get(fileId)
-        request.onsuccess = () => resolve((request.result as CachedTrackFile | undefined) ?? undefined)
-        request.onerror = () => reject(request.error ?? new Error('Failed to read track cache'))
-      })
-    } catch {
-      return undefined
-    }
+  private readFromDB(fileId: string): Promise<CachedTrackFile | undefined> {
+    return this.store.get(fileId)
   }
 
-  /** Best-effort (criterion 7) — a full or unavailable IndexedDB is not a
-      reason to fail a load that already has its bytes in hand. */
-  private async writeToDB(fileId: string, entry: CachedTrackFile): Promise<void> {
-    try {
-      const db = await this.openDB()
-      await new Promise<void>((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readwrite')
-        tx.objectStore(STORE_NAME).put(entry, fileId)
-        tx.oncomplete = () => resolve()
-        tx.onerror = () => reject(tx.error ?? new Error('Failed to write track cache'))
-      })
-    } catch {
-      // Swallowed — see doc comment.
-    }
+  /** Best-effort (criterion 7), and may evict other entries to make room
+      (#245) — a full or unavailable IndexedDB is not a reason to fail a
+      load that already has its bytes in hand. */
+  private writeToDB(fileId: string, entry: CachedTrackFile): Promise<void> {
+    return this.store.put(fileId, entry, entry.blob.size)
   }
 }
 

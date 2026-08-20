@@ -63,8 +63,8 @@ describe('TrackFileCache', () => {
     const cache = new TrackFileCache({ indexedDBFactory: db })
     const fresh = await cache.getFile('token', 'file-1', 'a.kml', 'rev-1')
 
-    const written = await new Promise<{ modifiedTime: string; type: string }>((resolve, reject) => {
-      const req = db.open('cairn-track-cache', 1)
+    const written = await new Promise<{ value: { modifiedTime: string; type: string } }>((resolve, reject) => {
+      const req = db.open('cairn-track-cache', 2)
       req.onsuccess = () => {
         const tx = req.result.transaction('tracks', 'readonly')
         const get = tx.objectStore('tracks').get('file-1')
@@ -73,8 +73,8 @@ describe('TrackFileCache', () => {
       }
     })
 
-    expect(written.modifiedTime).toBe('rev-1')
-    expect(written.type).toBe(fresh.type)
+    expect(written.value.modifiedTime).toBe('rev-1')
+    expect(written.value.type).toBe(fresh.type)
   })
 
   // Criterion 3: a changed modifiedTime is a miss, and replaces the entry.

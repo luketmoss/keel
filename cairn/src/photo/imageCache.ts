@@ -20,13 +20,17 @@
 
 import { DriveAuthError, DriveRequestError } from '../drive/trackFiles'
 import { reportDriveAuthError } from '../drive/authEvents'
+import { LruByteStore } from '../store/lruByteStore'
 
 export { DriveAuthError, DriveRequestError }
 
 const DRIVE_FILES_URL = 'https://www.googleapis.com/drive/v3/files'
 const DB_NAME = 'cairn-photo-cache'
-const DB_VERSION = 1
+const DB_VERSION = 2
 const STORE_NAME = 'images'
+// #245's Proposal: generous against a typical mobile origin quota, not
+// measured — revisit if a real device says otherwise.
+const BUDGET_BYTES = 250 * 1024 * 1024
 
 /** The file existed in Drive's listing but its bytes are gone — deleted
     behind the app's back. Distinct from `DriveRequestError` (criterion 6)
@@ -108,11 +112,10 @@ interface LiveUrl {
 }
 
 export class PhotoImageCache {
-  private readonly indexedDBFactory: IDBFactory
   private readonly objectUrls: ObjectUrlFactory
   private readonly fetchImpl: typeof fetch
+  private readonly store: LruByteStore<Blob>
 
-  private dbPromise?: Promise<IDBDatabase>
   // Object URLs currently minted, keyed by Drive file id. Absence here does
   // NOT mean "not cached" — only "no live Object URL right now" — the
   // IndexedDB read in `loadBlob` is what actually answers "is this cached".
@@ -124,16 +127,11 @@ export class PhotoImageCache {
   private readonly inFlightBlobs = new Map<string, Promise<Blob>>()
 
   constructor(deps: ImageCacheDeps = {}) {
-    // `globalThis.indexedDB` rather than the bare `indexedDB` global: jsdom
-    // (this suite's test environment) doesn't declare the identifier at
-    // all, so referencing it directly throws a ReferenceError even before
-    // reaching the `??` — property access on `globalThis` just reads
-    // `undefined` instead. Production code always passes through the real
-    // browser implementation; only tests (which always inject a fake) rely
-    // on this fallback not throwing.
-    this.indexedDBFactory = deps.indexedDBFactory ?? (globalThis as { indexedDB?: IDBFactory }).indexedDB!
     this.objectUrls = deps.objectUrls ?? browserObjectUrls
     this.fetchImpl = deps.fetchImpl ?? fetch
+    this.store = new LruByteStore<Blob>(DB_NAME, DB_VERSION, STORE_NAME, BUDGET_BYTES, {
+      indexedDBFactory: deps.indexedDBFactory,
+    })
   }
 
   /** Resolves to a URL for `fileId`, fetching from Drive only if it isn't
@@ -218,54 +216,21 @@ export class PhotoImageCache {
     return blob
   }
 
-  private openDB(): Promise<IDBDatabase> {
-    if (!this.dbPromise) {
-      this.dbPromise = new Promise((resolve, reject) => {
-        const request = this.indexedDBFactory.open(DB_NAME, DB_VERSION)
-        request.onupgradeneeded = () => {
-          request.result.createObjectStore(STORE_NAME)
-        }
-        request.onsuccess = () => resolve(request.result)
-        request.onerror = () => reject(request.error ?? new Error('Failed to open photo cache database'))
-      })
-    }
-    return this.dbPromise
-  }
-
-  /** A read failure — IndexedDB unavailable, the open call rejecting,
-      anything — is treated as a cache miss rather than propagated. The
-      network fetch path below still works; it just won't be memoized this
-      time. Same "storage failure degrades gracefully" stance as
+  /** A read failure — IndexedDB unavailable, eviction, anything — is
+      treated as a cache miss rather than propagated. The network fetch
+      path below still works; it just won't be memoized this time. Same
+      "storage failure degrades gracefully" stance as
       `LocalTrackOverridesStore`. */
-  private async readFromDB(fileId: string): Promise<Blob | undefined> {
-    try {
-      const db = await this.openDB()
-      return await new Promise<Blob | undefined>((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readonly')
-        const request = tx.objectStore(STORE_NAME).get(fileId)
-        request.onsuccess = () => resolve((request.result as Blob | undefined) ?? undefined)
-        request.onerror = () => reject(request.error ?? new Error('Failed to read photo cache'))
-      })
-    } catch {
-      return undefined
-    }
+  private readFromDB(fileId: string): Promise<Blob | undefined> {
+    return this.store.get(fileId)
   }
 
-  /** Best-effort. A full or unavailable IndexedDB just means this blob
-      isn't memoized past this session's live Object URL — not a reason to
-      fail the request that already has its bytes in hand. */
-  private async writeToDB(fileId: string, blob: Blob): Promise<void> {
-    try {
-      const db = await this.openDB()
-      await new Promise<void>((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readwrite')
-        tx.objectStore(STORE_NAME).put(blob, fileId)
-        tx.oncomplete = () => resolve()
-        tx.onerror = () => reject(tx.error ?? new Error('Failed to write photo cache'))
-      })
-    } catch {
-      // Swallowed — see doc comment.
-    }
+  /** Best-effort, and may evict other entries to make room (#245). A full
+      or unavailable IndexedDB just means this blob isn't memoized past
+      this session's live Object URL — not a reason to fail the request
+      that already has its bytes in hand. */
+  private writeToDB(fileId: string, blob: Blob): Promise<void> {
+    return this.store.put(fileId, blob, blob.size)
   }
 }
 

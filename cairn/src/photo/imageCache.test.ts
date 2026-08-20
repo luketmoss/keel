@@ -178,6 +178,45 @@ describe('PhotoImageCache', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2)
   })
 
+  // Criterion 10 (#245): an IndexedDB eviction never invalidates a live
+  // Object URL — eviction only ever removes the IndexedDB entry, and a
+  // held handle keeps working until every holder releases it.
+  it('keeps a live Object URL usable after its IndexedDB entry is evicted out from under it', async () => {
+    const db = new IDBFactory()
+    // file-2's fetch reports a size just under the module's 250MB budget
+    // on its own — small enough to be written, but pushing the total past
+    // budget alongside file-1's small entry, which must be evicted to fit
+    // it. A fake `size` avoids actually allocating a quarter-gigabyte
+    // buffer just to exercise the byte-counting logic.
+    const big = { size: 250 * 1024 * 1024 - 2 } as unknown as Blob
+    const fetchImpl = vi.fn().mockImplementation(async (url: string) =>
+      url.includes('file-2') ? response('', { blob: big }) : response('bytes'),
+    )
+    const cache = new PhotoImageCache({ indexedDBFactory: db, objectUrls: fakeObjectUrls(), fetchImpl })
+
+    const handle = await cache.acquire('token', 'file-1')
+
+    // A second cache instance sharing the same database stands in for LRU
+    // pressure from elsewhere in the app — it never touches `cache`'s
+    // in-memory live-URL bookkeeping, only the shared IndexedDB entries.
+    const evictor = new PhotoImageCache({ indexedDBFactory: db, objectUrls: fakeObjectUrls(), fetchImpl })
+    await evictor.acquire('token', 'file-2')
+
+    // Still holding the original handle — a second acquire for the same
+    // file id reuses the live URL without touching IndexedDB at all.
+    const second = await cache.acquire('token', 'file-1')
+    expect(second.url).toBe(handle.url)
+    expect(fetchImpl).toHaveBeenCalledTimes(2) // file-1 once, file-2 once — no re-fetch of file-1
+
+    handle.release()
+    second.release()
+
+    // Only once every holder has released does the eviction become
+    // visible — a fresh acquire now has to hit the network again.
+    await cache.acquire('token', 'file-1')
+    expect(fetchImpl).toHaveBeenCalledTimes(3)
+  })
+
   // Criterion 9: Object URLs are released when no longer referenced.
   describe('release()', () => {
     it('revokes the Object URL once the sole holder releases it', async () => {

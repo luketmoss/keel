@@ -261,7 +261,7 @@ all. `Clear` sets no dates; `Done` commits.
 
 | Corner | What lives there |
 |---|---|
-| Bottom left | **Layers** — a thumbnail that expands to Map / Satellite / Hybrid / Terrain |
+| Bottom left | **Layers** — a thumbnail that expands to Map / Satellite / Terrain, and a Labels switch |
 | Bottom right | Fit-to-everything, then zoom in / out |
 | Top left | The column |
 | Top right | *Nothing.* The account moved into the search card |

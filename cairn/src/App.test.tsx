@@ -290,7 +290,7 @@ describe('App shell (#109)', () => {
     expect(screen.getByRole('button', { name: 'Show panel' })).toBeDefined()
   })
 
-  it('puts the layers control in the map corner, expanding to the four basemaps', async () => {
+  it('puts the layers control in the map corner, expanding to the three basemaps', async () => {
     await renderApp('/')
 
     const trigger = screen.getByRole('button', { name: 'Layers' })
@@ -298,15 +298,28 @@ describe('App shell (#109)', () => {
 
     fireEvent.click(trigger)
 
-    for (const label of ['Map', 'Satellite', 'Hybrid', 'Terrain']) {
+    for (const label of ['Map', 'Satellite', 'Terrain']) {
       expect(screen.getByRole('button', { name: label })).toBeDefined()
     }
 
     fireEvent.click(screen.getByRole('button', { name: 'Terrain' }))
 
     // Selecting collapses the strip and records the choice.
-    expect(screen.queryByRole('button', { name: 'Hybrid' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Satellite' })).toBeNull()
     expect(window.localStorage.getItem('cairn.baseMapType')).toBe('terrain')
+  })
+
+  // #263: the labels switch is the other half of what used to be the Hybrid
+  // tile, and it persists on its own rather than as a fourth basemap.
+  it('persists the labels switch and shares it with the tile preference', async () => {
+    await renderApp('/')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Layers' }))
+    fireEvent.click(screen.getByRole('switch', { name: /Labels/ }))
+
+    expect(window.localStorage.getItem('cairn.baseMapLabels')).toBe('true')
+    // The panel is still open, so the switch can be flipped back to compare.
+    expect(screen.getByRole('switch', { name: /Labels/ }).getAttribute('aria-checked')).toBe('true')
   })
 
   it('renders zoom and fit-to-everything in the map corner', async () => {

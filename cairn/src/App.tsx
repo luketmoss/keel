@@ -56,7 +56,6 @@ import { SuggestionRing } from './components/SuggestionRing'
 import { CairnCreateGesture } from './components/CairnCreateGesture'
 import { CairnCreatePanel, type CairnDraftFields } from './components/CairnCreatePanel'
 import { CairnDraftMarker } from './components/CairnDraftMarker'
-import { CreateHintChip } from './components/CreateHintChip'
 import {
   EMPTY_PLACEMENT_QUEUE,
   discardRemaining,
@@ -259,9 +258,6 @@ function AppShell() {
   const [cairnDraft, setCairnDraft] = useState<CairnDraft | null>(null)
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
-  /** The hint chip "hides on the first successful placement" — for the
-      session, not forever; a persisted flag is a preference nobody set. */
-  const [hasPlaced, setHasPlaced] = useState(false)
   /* Registered by the trip face while one is open, so a drop anywhere still
      imports into that trip rather than starting a draft. Refs, not state:
      the import hooks return a fresh object on every render, so storing what
@@ -890,7 +886,6 @@ function AppShell() {
         // The trip face is already showing; its list and its layer pick the
         // new cairn up from the hook that just wrote it.
         setCairnDraft(null)
-        setHasPlaced(true)
         return
       }
 
@@ -904,7 +899,6 @@ function AppShell() {
         date: input.date,
       })
       setCairnDraft(null)
-      setHasPlaced(true)
       // Landing on the new cairn's own face is the confirmation, the same
       // stance the placement queue takes when it empties.
       navigate(`/cairns/${record.id}`)
@@ -1243,11 +1237,6 @@ function AppShell() {
             />
           )}
         </ShellColumn>
-
-        {/* #156's placeholder for a real affordance, recorded as such: it
-            hides once a cairn has been placed, and never appears while
-            another flow owns the map. */}
-        <CreateHintChip visible={createGestureActive && !createOpen && !hasPlaced} />
 
         {dragActive && <DropOverlay label={dropOverlayLabel} />}
         {archiveProgress && (

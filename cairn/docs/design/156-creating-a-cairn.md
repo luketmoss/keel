@@ -31,6 +31,20 @@ candidates not taken here: a `+` control in the map's bottom-right stack (a
 mode, rejected above), and an item in the panel header's `New trip` row (far
 from the map, and the gesture is about a coordinate).
 
+**Removed by [261](https://github.com/luketmoss/keel/issues/261).** The chip
+shipped and the follow-up that owed a real control never came, so the
+placeholder was the answer for as long as the feature existed. It sat at
+`z-index: 2` over the bottom sheet, covering the last rows of a trip's list to
+explain a gesture for the map it was on top of, and its "hides on the first
+successful placement" was session state — it returned 900ms after every load,
+however many cairns had been placed.
+
+**The gap is still open, and is now unmitigated.** Right-click and long-press
+remain undiscoverable to anyone who has not been told. The two candidates above
+are still the ones on the table and still rejected for the reasons given; a
+third answer, or a reasoned acceptance that this app has one user who knows the
+gesture, is what closes this section.
+
 ## The create face
 
 Replaces the panel's list face. The search card's left slot becomes Back, its

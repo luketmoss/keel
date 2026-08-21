@@ -293,6 +293,10 @@ describe('BottomSheet', () => {
       // Full is 736px here; dragging down 620 lands at 116, nearest peek.
       drag(100, 720)
       expect(sheetHeight()).toBeCloseTo(PEEK, 0)
+
+      // Enter wraps through the detents, same as on the list.
+      fireEvent.keyDown(grabber(), { key: 'Enter' })
+      expect(sheetHeight()).toBeCloseTo((HALF_VH / 100) * 800, 0)
     })
 
     it('reports full through aria-expanded while it is open', () => {

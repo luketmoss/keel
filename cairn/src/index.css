@@ -50,6 +50,15 @@
   --marker-ring-selected: 3px;
   --hit-target: 40px;
 
+  /* Base map labels switch — cairn/docs/design/263-labels-toggle.md,
+     "New tokens". The radius is its own token rather than --radius-sm
+     because 10px on an 18px box clamps to a circle, and a circular
+     checkbox reads as a radio button — a wrong affordance costs more than
+     an off-scale radius. 6px keeps the proportion --radius-sm has on the
+     larger controls it was written for. */
+  --checkbox-size: 18px;
+  --checkbox-radius: 6px;
+
   /* Full-screen shell — cairn/docs/design/78-full-screen-shell.md, "New tokens" */
   --avatar-size: 32px;
 

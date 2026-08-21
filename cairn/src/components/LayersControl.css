@@ -42,14 +42,95 @@
   background: var(--pressed);
 }
 
-.layers-control__strip {
+/* The panel carries the L2 material the strip used to carry on its own —
+   #263 put a second row underneath the tiles, and the surface, blur, radius
+   and shadow belong to the thing that contains both. */
+.layers-control__panel {
   display: flex;
+  flex-direction: column;
   gap: var(--space-1);
   padding: var(--space-1);
   border-radius: var(--radius-md);
   background: var(--surface);
   backdrop-filter: blur(var(--blur));
   box-shadow: var(--shadow-lifted);
+}
+
+.layers-control__strip {
+  display: flex;
+  gap: var(--space-1);
+}
+
+/* Pulled out past the panel's padding so the seam runs its full width. A
+   hairline that stops short reads as a mistake. The wrapper is what carries
+   the `title`, because `title` on a `disabled` button never reaches the
+   pointer — #199's `.track-row__swatch-wrap` fix. */
+.layers-control__labels-wrap {
+  display: block;
+  width: calc(100% + var(--space-1) * 2);
+  margin: 0 calc(var(--space-1) * -1) calc(var(--space-1) * -1);
+}
+
+.layers-control__labels {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--hit-target);
+  padding: var(--space-1) var(--space-2);
+  border: none;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease);
+}
+
+.layers-control__labels:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.layers-control__labels:active:not(:disabled) {
+  background: var(--pressed);
+}
+
+/* Checked on `roadmap` and `terrain`, because they really do carry Google's
+   labels and really cannot be made to drop them. Disabled rather than
+   hidden: a control that vanishes between tiles teaches nothing. */
+.layers-control__labels:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.layers-control__labels[aria-checked='true'] {
+  color: var(--accent);
+}
+
+/* Not the language's Selected fill on the whole row: that treatment is for
+   a chosen-among-others state, and an on-switch shouting louder than the
+   selected tile above it would rank the panel's two rows backwards. */
+.layers-control__checkbox {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--checkbox-size);
+  height: var(--checkbox-size);
+  border-radius: var(--checkbox-radius);
+  box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--on-accent);
+  font-size: var(--text-xs);
+  line-height: 1;
+  transition: background var(--motion-fast) var(--ease), box-shadow var(--motion-fast) var(--ease);
+}
+
+.layers-control__checkbox--on {
+  background: var(--accent);
+  box-shadow: none;
 }
 
 .layers-control__option {
@@ -103,12 +184,15 @@
   background: linear-gradient(135deg, #1f3a2a 0%, #6b5b3a 60%, #8a8f7a 100%);
 }
 
-.layers-control__swatch--hybrid {
-  background: linear-gradient(135deg, #1f3a2a 0%, #6b5b3a 60%, #8a8f7a 100%);
+/* #263 retired the Hybrid tile, but not its mark. The diagonal that read as
+   "imagery with a road drawn on it" now rides on the trigger's swatch when
+   labels are on, so the status readout still tells the two satellite
+   pictures apart even though the tile row no longer does. */
+.layers-control__swatch--labelled {
   position: relative;
 }
 
-.layers-control__swatch--hybrid::after {
+.layers-control__swatch--labelled::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -136,6 +220,9 @@
     transition: bottom var(--motion-base) var(--ease);
   }
 
+  /* The switch keeps its word. A caption under a swatch is a gloss on a
+     picture; `Labels` is the only thing identifying its row, and a lone box
+     in a panel is a puzzle. */
   .layers-control__trigger-label,
   .layers-control__option-label {
     display: none;

@@ -118,7 +118,7 @@ interface MapCanvasProps {
     as the provider's default instance and every `useMap()` beneath
     `MapProvider` finds it. */
 export function MapCanvas({ panelCollapsed, canFit, getFitPoints }: MapCanvasProps) {
-  const [baseMapType, setBaseMapType] = useBaseMapType()
+  const baseMap = useBaseMapType()
   const unavailable = useContext(MapUnavailableContext)
 
   /* The map's own corner controls go with it — there is nothing for them to
@@ -135,14 +135,22 @@ export function MapCanvas({ panelCollapsed, canFit, getFitPoints }: MapCanvasPro
            at all. Left unset, `mapId` is simply omitted and marker layers
            skip themselves rather than mounting against a map with none. */
         mapId={googleMapsMapId ?? undefined}
-        mapTypeId={baseMapType}
+        /* The tile and the labels switch resolve to one id here —
+           Satellite with labels on is Google's `hybrid`. */
+        mapTypeId={baseMap.mapTypeId}
         /* The map is the whole app, so a one-finger drag and a plain scroll
            should move it rather than the page behind it. */
         gestureHandling="greedy"
         disableDefaultUI
         restriction={{ latLngBounds: WORLD_BOUNDS, strictBounds: true }}
       />
-      <LayersControl value={baseMapType} onChange={setBaseMapType} panelCollapsed={panelCollapsed} />
+      <LayersControl
+        value={baseMap.type}
+        labels={baseMap.labels}
+        onChange={baseMap.setType}
+        onLabelsChange={baseMap.setLabels}
+        panelCollapsed={panelCollapsed}
+      />
       <ZoomControls canFit={canFit} getFitPoints={getFitPoints} />
     </div>
   )

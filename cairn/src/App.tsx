@@ -1051,6 +1051,11 @@ function AppShell() {
           collapsed={collapsed}
           onToggleCollapsed={() => setCollapsed((wasCollapsed) => !wasCollapsed)}
           collapsible={!detailOpen && !draftOpen && !queueOpen && !createOpen}
+          // #258: the sheet's detents are suspended by decisions and by
+          // nothing else. A detail is a place — it keeps its grabber, and
+          // the map behind it stays reachable.
+          suspended={draftOpen || queueOpen || createOpen}
+          detailOpen={detailOpen}
           searchCard={
             <SearchCard
               // #168: "Place this photo" over "needs a location" — the same

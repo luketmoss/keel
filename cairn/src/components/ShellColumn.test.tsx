@@ -34,6 +34,8 @@ function renderShell(props: Partial<React.ComponentProps<typeof ShellColumn>> = 
       collapsed={props.collapsed ?? false}
       onToggleCollapsed={props.onToggleCollapsed ?? (() => {})}
       collapsible={props.collapsible ?? true}
+      suspended={props.suspended ?? false}
+      detailOpen={props.detailOpen ?? false}
       searchCard={props.searchCard ?? <div data-testid="card">card</div>}
       chips={props.chips ?? <div data-testid="chips">chips</div>}
     >
@@ -78,12 +80,24 @@ describe('ShellColumn', () => {
     expect(screen.getByTestId('face')).toBeDefined()
   })
 
-  it('a detail suspends the sheet at full rather than offering a collapse', () => {
+  it('a decision suspends the sheet at full rather than offering a collapse', () => {
     stubMatchMedia(true)
-    renderShell({ collapsible: false })
+    renderShell({ collapsible: false, suspended: true })
 
     expect(screen.getByRole('button', { name: 'Resize sheet' }).getAttribute('aria-expanded')).toBe(
       'true',
+    )
+  })
+
+  /* #258: the sheet used to read `collapsible`, so a detail — which turns
+     the desktop edge tab off for its own reason (#109) — pinned the phone
+     sheet at full as a side effect and buried the map. */
+  it('a detail leaves the sheet where it was, tab or no tab', () => {
+    stubMatchMedia(true)
+    renderShell({ collapsible: false, suspended: false, detailOpen: true })
+
+    expect(screen.getByRole('button', { name: 'Resize sheet' }).getAttribute('aria-expanded')).toBe(
+      'false',
     )
   })
 

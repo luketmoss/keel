@@ -8,9 +8,17 @@ interface ShellColumnProps {
   onToggleCollapsed: () => void
   /** The edge tab is a property of the list, so it is not rendered on a
       detail — #109's design note: "Collapsing while a detail is open. Not
-      possible." On phone this is also what tells the sheet to hold full:
-      a detail and a draft both suspend the detents. */
+      possible." Desktop only: the sheet used to read this too, which is
+      what made a trip detail unlowerable on a phone (#258). The two
+      questions are now asked separately. */
   collapsible: boolean
+  /** Phone only. A decision is open — a draft, the placement queue, the
+      create panel — so the sheet holds full and its detents are suspended.
+      A detail face is not one of these. */
+  suspended: boolean
+  /** Phone only. A detail face is showing, which promotes peek to half and
+      changes nothing else. */
+  detailOpen: boolean
   searchCard: ReactNode
   /** Hidden while a detail is open and while a draft is open; the caller
       passes `null` rather than this component deciding. */
@@ -30,6 +38,8 @@ export function ShellColumn({
   collapsed,
   onToggleCollapsed,
   collapsible,
+  suspended,
+  detailOpen,
   searchCard,
   chips,
   children,
@@ -38,7 +48,12 @@ export function ShellColumn({
 
   if (isPhone) {
     return (
-      <BottomSheet forceFull={!collapsible} searchCard={searchCard} chips={chips}>
+      <BottomSheet
+        suspended={suspended}
+        detailOpen={detailOpen}
+        searchCard={searchCard}
+        chips={chips}
+      >
         {children}
       </BottomSheet>
     )

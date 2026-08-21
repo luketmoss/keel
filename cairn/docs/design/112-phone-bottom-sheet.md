@@ -10,9 +10,14 @@ gesture, the conflicts it creates, and the states.
 2. It opens at half: map above, list below, both usable.
 3. Dragging the grabber moves the sheet with the pointer; releasing settles it
    on the nearest detent.
-4. Activating a row takes the sheet to full and swaps to that detail face.
+4. Activating a row swaps to that detail face at the detent the sheet is
+   already at, promoting peek to half. (**Revised by
+   [258](258-detail-keeps-its-detents.md)** — it used to take the sheet to
+   full, which buried the map on exactly the trips worth opening.)
 5. Back returns to the list face **at the detent the sheet was at before the
-   detail opened**, not at full.
+   detail opened**, not at full — which, after 258, means it undoes the peek
+   promotion and nothing else. A drag the user made *inside* the detail is
+   theirs and is never undone.
 
 That last rule is the one that makes the sheet feel like a place rather than a
 sequence of screens. Returning to full every time buries the map the user was
@@ -45,7 +50,8 @@ No fling.
 | Peek | `--sheet-peek`. Header, chips and the first row visible |
 | Half | `--sheet-half`. The default |
 | Full | `--sheet-full`. Map still visible above it — never 100% |
-| Detail open | Full |
+| Detail open | Unchanged, or half if it was at peek |
+| Draft, queue or create open | Full, detents suspended |
 | Dragging | Follows the pointer, no transition |
 | Signed out | Half, with `Sign in to see your map.` |
 

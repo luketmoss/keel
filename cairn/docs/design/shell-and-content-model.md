@@ -338,7 +338,11 @@ means designing the transition twice.**
 | Half | `--sheet-half` |
 | Full | `--sheet-full` |
 
-Draggable, snapping under `--motion-base`. Opening anything goes to full.
+Draggable, snapping under `--motion-base`. Opening a **decision** — an import
+draft, the placement queue, the cairn-create panel — goes to full and suspends
+the detents until it closes. Opening a **place** — a trip, a loose item, a
+track face — changes the face and leaves the detent alone, except that peek is
+promoted to half so the face is not a sliver.
 
 The search card floats above the sheet at the top of the screen. The chips move
 into the sheet, directly under the grabber. Map controls stack above the sheet's

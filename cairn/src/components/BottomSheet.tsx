@@ -38,10 +38,19 @@ function measureHeights(): Heights {
 }
 
 interface BottomSheetProps {
-  /** Forces and holds full — a detail face, or #81's draft, where the
-      detents are suspended because a draft is a decision, not something to
-      peek at. */
-  forceFull: boolean
+  /** A **decision** is open — #81's import draft, the placement queue, or
+      #156's create panel. The sheet holds full and the detents are
+      suspended, because a decision is not something to peek at.
+
+      A detail face is deliberately not in this list: #258 — a trip is a
+      place, and a place you cannot lower is a place that has taken the map
+      away. */
+  suspended: boolean
+  /** A **place** is open — a trip, a loose item, a track face. The detents
+      stay live; the only thing this changes is that peek is promoted to
+      half, since a detail at peek shows nothing actionable and reads as
+      the tap having failed. */
+  detailOpen: boolean
   /** Rendered above the sheet, fixed to the top of the screen. It does not
       move with the sheet. */
   searchCard: ReactNode
@@ -59,7 +68,13 @@ interface BottomSheetProps {
     enough to feel broken. Here **the grabber owns the sheet and the list
     owns its scroll**, at every detent. A grabber that always works is worth
     more than a gesture that usually does. */
-export function BottomSheet({ forceFull, searchCard, chips, children }: BottomSheetProps) {
+export function BottomSheet({
+  suspended,
+  detailOpen,
+  searchCard,
+  chips,
+  children,
+}: BottomSheetProps) {
   const [heights, setHeights] = useState<Heights>(() =>
     typeof window === 'undefined'
       ? { peek: 0, half: 0, full: 0, detents: ['half', 'full'] }
@@ -70,9 +85,12 @@ export function BottomSheet({ forceFull, searchCard, chips, children }: BottomSh
       pointer with no transition, then settles. */
   const [dragHeight, setDragHeight] = useState<number | null>(null)
   const dragStartRef = useRef<{ y: number; height: number } | null>(null)
-  /** Where to return to when a detail closes. Returning to full every time
-      buries the map the user was just looking at. */
-  const restoreRef = useRef<Detent>('half')
+  /** The detent something moved the sheet off against the user's intent —
+      a decision opening, or peek promoting because a detail did. Restored
+      when that thing closes, and cleared the moment the user moves the
+      sheet themselves, because restoring after that would undo their drag
+      rather than ours. */
+  const restoreRef = useRef<Detent | null>(null)
   const sheetRef = useRef<HTMLDivElement | null>(null)
 
   useLayoutEffect(() => {
@@ -95,16 +113,42 @@ export function BottomSheet({ forceFull, searchCard, chips, children }: BottomSh
     if (!heights.detents.includes(detent)) setDetent(heights.detents[0])
   }, [heights.detents, detent])
 
+  const restore = useCallback(() => {
+    const previous = restoreRef.current
+    if (previous === null) return
+    restoreRef.current = null
+    setDetent(previous)
+  }, [])
+
   useEffect(() => {
-    if (forceFull) {
+    if (suspended) {
       setDetent((current) => {
-        if (current !== 'full') restoreRef.current = current
+        if (current === 'full') return current
+        // A promotion has already recorded where the user was. Overwriting
+        // it here would replace that with the height the promotion left
+        // behind, and the peek they chose would be unrecoverable.
+        if (restoreRef.current === null) restoreRef.current = current
         return 'full'
       })
       return
     }
-    setDetent(restoreRef.current)
-  }, [forceFull])
+    restore()
+  }, [suspended, restore])
+
+  // Opening a place leaves the detent alone. Peek is the one exception,
+  // and it is the only move this makes — a detail is not a navigation to
+  // full, which is what #112's original rule made it.
+  useEffect(() => {
+    if (detailOpen) {
+      setDetent((current) => {
+        if (current !== 'peek') return current
+        restoreRef.current = 'peek'
+        return 'half'
+      })
+      return
+    }
+    restore()
+  }, [detailOpen, restore])
 
   const height = dragHeight ?? heights[detent]
 
@@ -135,6 +179,7 @@ export function BottomSheet({ forceFull, searchCard, chips, children }: BottomSh
       // gap commits to the next one" means once both neighbours are
       // considered. No fling: velocity would make the same gesture do
       // different things on different days.
+      restoreRef.current = null
       setDetent(best)
       setDragHeight(null)
     },
@@ -142,7 +187,7 @@ export function BottomSheet({ forceFull, searchCard, chips, children }: BottomSh
   )
 
   function handlePointerDown(event: React.PointerEvent<HTMLButtonElement>) {
-    if (forceFull) return
+    if (suspended) return
     // Capture keeps the drag alive when the pointer leaves the grabber,
     // which it does immediately — the grabber moves with the sheet. It
     // throws for a pointer id that is not currently active, which the drag
@@ -182,6 +227,7 @@ export function BottomSheet({ forceFull, searchCard, chips, children }: BottomSh
      presses inside one tick would otherwise both step from the same
      starting point and the second would do nothing. */
   function cycle(direction: 1 | -1) {
+    restoreRef.current = null
     setDetent((current) => {
       const candidates = heights.detents
       const index = candidates.indexOf(current)
@@ -190,7 +236,7 @@ export function BottomSheet({ forceFull, searchCard, chips, children }: BottomSh
   }
 
   function handleGrabberKeyDown(event: React.KeyboardEvent<HTMLButtonElement>) {
-    if (forceFull) return
+    if (suspended) return
     if (event.key === 'ArrowUp') {
       event.preventDefault()
       cycle(1)
@@ -201,6 +247,7 @@ export function BottomSheet({ forceFull, searchCard, chips, children }: BottomSh
     }
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
+      restoreRef.current = null
       // Wraps, so one repeated key reaches every detent.
       setDetent((current) => {
         const candidates = heights.detents

@@ -38,7 +38,8 @@ afterEach(() => {
 function renderSheet(props: Partial<React.ComponentProps<typeof BottomSheet>> = {}) {
   return render(
     <BottomSheet
-      forceFull={props.forceFull ?? false}
+      suspended={props.suspended ?? false}
+      detailOpen={props.detailOpen ?? false}
       searchCard={props.searchCard ?? <div data-testid="card">card</div>}
       chips={props.chips ?? <div data-testid="chips">chips</div>}
     >
@@ -197,14 +198,125 @@ describe('BottomSheet', () => {
     })
   })
 
-  describe('a detail or a draft', () => {
+  describe('a detail face', () => {
+    it('leaves the detent alone — the map behind it stays where the user put it', () => {
+      const view = renderSheet()
+      const half = (HALF_VH / 100) * 800
+      expect(sheetHeight()).toBeCloseTo(half, 0)
+
+      view.rerender(
+        <BottomSheet suspended={false} detailOpen searchCard={<div />} chips={null}>
+          <div data-testid="face">detail</div>
+        </BottomSheet>,
+      )
+
+      expect(sheetHeight()).toBeCloseTo(half, 0)
+    })
+
+    it('keeps a deliberate full at full', () => {
+      const view = renderSheet()
+      fireEvent.keyDown(grabber(), { key: 'ArrowUp' })
+      const full = (FULL_VH / 100) * 800
+      expect(sheetHeight()).toBeCloseTo(full, 0)
+
+      view.rerender(
+        <BottomSheet suspended={false} detailOpen searchCard={<div />} chips={null}>
+          <div>detail</div>
+        </BottomSheet>,
+      )
+
+      expect(sheetHeight()).toBeCloseTo(full, 0)
+    })
+
+    it('promotes peek to half, because a detail at peek reads as a failed tap', () => {
+      const view = renderSheet()
+      fireEvent.keyDown(grabber(), { key: 'ArrowDown' })
+      expect(sheetHeight()).toBeCloseTo(PEEK, 0)
+
+      view.rerender(
+        <BottomSheet suspended={false} detailOpen searchCard={<div />} chips={null}>
+          <div>detail</div>
+        </BottomSheet>,
+      )
+
+      expect(sheetHeight()).toBeCloseTo((HALF_VH / 100) * 800, 0)
+    })
+
+    it('undoes that promotion on Back, so the map the user uncovered comes back', () => {
+      const view = renderSheet()
+      fireEvent.keyDown(grabber(), { key: 'ArrowDown' })
+
+      view.rerender(
+        <BottomSheet suspended={false} detailOpen searchCard={<div />} chips={null}>
+          <div>detail</div>
+        </BottomSheet>,
+      )
+      view.rerender(
+        <BottomSheet suspended={false} detailOpen={false} searchCard={<div />} chips={<div />}>
+          <div>list</div>
+        </BottomSheet>,
+      )
+
+      expect(sheetHeight()).toBeCloseTo(PEEK, 0)
+    })
+
+    it('never undoes a drag the user made inside the detail', () => {
+      const view = renderSheet()
+      fireEvent.keyDown(grabber(), { key: 'ArrowDown' })
+
+      view.rerender(
+        <BottomSheet suspended={false} detailOpen searchCard={<div />} chips={null}>
+          <div>detail</div>
+        </BottomSheet>,
+      )
+      // Promoted to half on open; the user then puts it back at peek
+      // themselves, which disowns the restore.
+      fireEvent.keyDown(grabber(), { key: 'ArrowDown' })
+      expect(sheetHeight()).toBeCloseTo(PEEK, 0)
+
+      view.rerender(
+        <BottomSheet suspended={false} detailOpen={false} searchCard={<div />} chips={<div />}>
+          <div>list</div>
+        </BottomSheet>,
+      )
+
+      expect(sheetHeight()).toBeCloseTo(PEEK, 0)
+    })
+
+    it('keeps the detents live — #258, the bug this replaced', () => {
+      renderSheet({ detailOpen: true })
+      const full = (FULL_VH / 100) * 800
+
+      fireEvent.keyDown(grabber(), { key: 'ArrowUp' })
+      expect(sheetHeight()).toBeCloseTo(full, 0)
+
+      // Full is 736px here; dragging down 620 lands at 116, nearest peek.
+      drag(100, 720)
+      expect(sheetHeight()).toBeCloseTo(PEEK, 0)
+
+      // Enter wraps through the detents, same as on the list.
+      fireEvent.keyDown(grabber(), { key: 'Enter' })
+      expect(sheetHeight()).toBeCloseTo((HALF_VH / 100) * 800, 0)
+    })
+
+    it('reports full through aria-expanded while it is open', () => {
+      renderSheet({ detailOpen: true })
+      expect(grabber().getAttribute('aria-expanded')).toBe('false')
+
+      fireEvent.keyDown(grabber(), { key: 'ArrowUp' })
+      expect(grabber().getAttribute('aria-expanded')).toBe('true')
+      expect(document.querySelector('.bottom-sheet__detent')?.textContent).toBe('Full')
+    })
+  })
+
+  describe('a decision — a draft, the placement queue, the create panel', () => {
     it('takes the sheet to full', () => {
       const view = renderSheet()
       expect(sheetHeight()).toBeCloseTo((HALF_VH / 100) * 800, 0)
 
       view.rerender(
-        <BottomSheet forceFull searchCard={<div />} chips={null}>
-          <div data-testid="face">detail</div>
+        <BottomSheet suspended detailOpen={false} searchCard={<div />} chips={null}>
+          <div data-testid="face">draft</div>
         </BottomSheet>,
       )
 
@@ -217,14 +329,14 @@ describe('BottomSheet', () => {
       expect(sheetHeight()).toBeCloseTo(PEEK, 0)
 
       view.rerender(
-        <BottomSheet forceFull searchCard={<div />} chips={null}>
-          <div>detail</div>
+        <BottomSheet suspended detailOpen={false} searchCard={<div />} chips={null}>
+          <div>draft</div>
         </BottomSheet>,
       )
       expect(sheetHeight()).toBeCloseTo((FULL_VH / 100) * 800, 0)
 
       view.rerender(
-        <BottomSheet forceFull={false} searchCard={<div />} chips={<div />}>
+        <BottomSheet suspended={false} detailOpen={false} searchCard={<div />} chips={<div />}>
           <div>list</div>
         </BottomSheet>,
       )
@@ -233,13 +345,34 @@ describe('BottomSheet', () => {
     })
 
     it('suspends the detents while it is open', () => {
-      renderSheet({ forceFull: true })
+      renderSheet({ suspended: true })
       const full = (FULL_VH / 100) * 800
 
       fireEvent.keyDown(grabber(), { key: 'ArrowDown' })
       drag(400, 600)
 
       expect(sheetHeight()).toBeCloseTo(full, 0)
+    })
+
+    it('opening over a detail that was dragged to peek returns to peek', () => {
+      const view = renderSheet({ detailOpen: true })
+      fireEvent.keyDown(grabber(), { key: 'ArrowDown' })
+      expect(sheetHeight()).toBeCloseTo(PEEK, 0)
+
+      view.rerender(
+        <BottomSheet suspended detailOpen searchCard={<div />} chips={null}>
+          <div>create</div>
+        </BottomSheet>,
+      )
+      expect(sheetHeight()).toBeCloseTo((FULL_VH / 100) * 800, 0)
+
+      view.rerender(
+        <BottomSheet suspended={false} detailOpen searchCard={<div />} chips={null}>
+          <div>detail</div>
+        </BottomSheet>,
+      )
+
+      expect(sheetHeight()).toBeCloseTo(PEEK, 0)
     })
   })
 

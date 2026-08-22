@@ -24,7 +24,8 @@ its design notes go in `docs/design/` rather than under a project folder.
 
 There is no `keel/` directory. The rule is location, never inference, and keel's
 location is everything no project folder claims — which is also why its workflow
-lists its paths explicitly instead of globbing a folder.
+cannot glob a folder the way every other project's does, and ends up triggering
+on all of them instead. See §Continuous integration.
 
 ### Naming
 
@@ -246,7 +247,11 @@ project's stack skill — never hand-written. Four rules keep projects from
 interfering with each other:
 
 - **Path-filtered triggers**, including the workflow's own file, so editing CI
-  tests CI.
+  tests CI. **keel's own workflow is the one exception** — `check.py` validates
+  the whole repository, including every project's design notes and markdown
+  links, so a filter would leave its trigger narrower than its scope. The
+  reasoning is in `stack-keel/scaffold.md`, with the other two deviations keel's
+  folder being the root forces.
 - **`defaults.run.working-directory`** set to the project folder, so steps read
   the same as they would in a single-project repo.
 - **Concurrency group prefixed with the slug**, or a push to one project cancels

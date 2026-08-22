@@ -10,6 +10,7 @@ by reading:
   - .keel/*.py compiles
   - every skill's frontmatter parses, and its name matches its directory
   - every relative link in a tracked .md file resolves
+  - every design note cited by filename is committed
 
 Run it locally exactly as CI runs it:
 
@@ -36,6 +37,21 @@ LINK = re.compile(r"!?\[[^\]]*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
 
 FENCE = re.compile(r"^\s*(```|~~~)")
 
+# A design note is cited by its filename - the NNN-slug.md form - from a source
+# comment, from prose, or from another note. A bare #NNN is not a citation:
+# most issues have no note at all, so the filename is the only form that can be
+# checked without guessing.
+#
+# Deliberately written without a real note's name. An example here would be a
+# citation like any other, and this check would then require that one note to
+# exist forever.
+NOTE_REF = re.compile(r"\b(\d+-[a-z0-9-]+\.md)\b")
+
+# Everything a citation has ever appeared in. Extensions rather than a
+# blocklist, so a binary added later is never read as text.
+CITING_SUFFIXES = (".md", ".py", ".ts", ".tsx", ".js", ".jsx", ".css",
+                   ".yml", ".yaml")
+
 
 def rel(path):
     """Repo-relative path with forward slashes, so output reads the same on
@@ -43,16 +59,22 @@ def rel(path):
     return os.path.relpath(path, ROOT).replace(os.sep, "/")
 
 
-def tracked(pattern):
+def tracked(pattern, others=True):
     """Files git knows about, plus new ones that aren't ignored.
 
     --others is what makes a local run match CI: a file added but not yet
     committed is exactly the file most likely to be broken, and skipping it
     would mean the first run that checks it is the one in the pull request.
+
+    others=False asks the opposite question - what is actually committed -
+    and only check_design_notes wants it, because an uncommitted note is the
+    failure it exists to find rather than a file to check.
     """
+    argv = ["git", "-C", ROOT, "ls-files", "--cached"]
+    if others:
+        argv += ["--others", "--exclude-standard"]
     result = subprocess.run(
-        ["git", "-C", ROOT, "ls-files", "--cached", "--others",
-         "--exclude-standard", pattern],
+        argv + [pattern],
         capture_output=True,
         text=True,
     )
@@ -186,7 +208,51 @@ def check_links():
             problems)
 
 
-CHECKS = [check_python, check_frontmatter, check_links]
+def check_design_notes():
+    """Every design note cited by filename is committed.
+
+    /ux writes the note and /develop commits it - except when it doesn't.
+    #250 and #251 reached Done with theirs untracked, leaving comments in
+    cairn's source pointing at reasoning no clone of main could read.
+
+    Notes resolve by basename against every project's docs/design/, not
+    against the citing file's own project: CONVENTIONS.md cites
+    109-shell-column.md from the repository root while the file lives under
+    cairn/, and a check whose first act is to make the conventions illegal is
+    a check nobody keeps.
+
+    Committed, not merely present - the note this exists to catch is sitting
+    untracked in a working tree, and --others would hide exactly that.
+    """
+    notes = set()
+    for path in tracked("*.md", others=False):
+        where = rel(path)
+        # keel's own notes live at docs/design/ - its project folder is the
+        # repository root - so the prefix has to be matched as well as the
+        # segment, or the one project that owns this check is the one it
+        # would not cover.
+        if where.startswith("docs/design/") or "/docs/design/" in where:
+            notes.add(os.path.basename(path))
+    files = sorted(
+        path for path in tracked("*")
+        if os.path.splitext(path)[1] in CITING_SUFFIXES
+    )
+    problems = []
+    count = 0
+    for path in files:
+        for number, line in enumerate(read(path).splitlines(), start=1):
+            for name in NOTE_REF.findall(line):
+                count += 1
+                if name not in notes:
+                    problems.append(
+                        "{}:{}: {} is cited but not committed".format(
+                            rel(path), number, name))
+    return ("design notes",
+            "{} notes, {} references".format(len(notes), count),
+            problems)
+
+
+CHECKS = [check_python, check_frontmatter, check_links, check_design_notes]
 
 
 def main():

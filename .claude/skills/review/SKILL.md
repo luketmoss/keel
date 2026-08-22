@@ -47,6 +47,12 @@ advance to Ready to Ship on a check that never reported.
 
 Read it against the acceptance criteria and the project's stack skill. Look for:
 
+- **The design note exists** — if the issue body has a `## Design` section,
+  resolve the path it links and confirm the file is on the branch. A missing
+  one blocks: the code cites reasoning the repository does not contain, and
+  this is the only gate that can catch a note nothing in the source names.
+  `check.py` catches the ones that are cited by filename; it cannot catch a
+  note referred to only as `#NNN`, which is what #250 was.
 - **Correctness** — does it do what the criteria say, in the cases the criteria
   describe and the ones they imply. When `/test` has just walked the criteria
   one at a time, don't walk them again — it verified them deliberately and,

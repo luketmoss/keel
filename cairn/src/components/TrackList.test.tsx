@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { TrackList } from './TrackList'
@@ -970,6 +971,54 @@ describe('TrackList', () => {
       fireEvent.click(screen.getByText('trip.kml', { exact: false }))
       expect(onToggleExpand).not.toHaveBeenCalled()
       expect(document.querySelector('.track-row__detail-wrapper')).toBeNull()
+    })
+
+    /* `expandedTrackId`/`onToggleExpand` are controlled from `TripDetail`
+       (the same shape `expandedCairnId` already uses) — this wrapper plays
+       that parent's own toggle rule, `current === id ? null : id`, so the
+       full open/close/one-at-a-time round trip is exercised the same way a
+       real mount would drive it, without pulling in `TripDetail` itself. */
+    function Controlled({ files }: { files: ImportedFile[] }) {
+      const [expandedTrackId, setExpandedTrackId] = useState<string | null>(null)
+      return (
+        <TrackList
+          files={files}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          expandedTrackId={expandedTrackId}
+          onToggleExpand={(id) => setExpandedTrackId((current) => (current === id ? null : id))}
+        />
+      )
+    }
+
+    it('a second click on the header collapses the row it opened', () => {
+      render(<Controlled files={[trackWithProfile()]} />)
+
+      const header = screen.getByText('trip.kml', { exact: false }).closest('button')!
+      fireEvent.click(header)
+      expect(header.getAttribute('aria-expanded')).toBe('true')
+
+      fireEvent.click(header)
+      expect(header.getAttribute('aria-expanded')).toBe('false')
+    })
+
+    it('expanding one row collapses whichever other row was expanded', () => {
+      render(
+        <Controlled
+          files={[trackWithProfile({ id: 'a', name: 'a.kml' }), trackWithProfile({ id: 'b', name: 'b.kml' })]}
+        />,
+      )
+
+      const headerA = screen.getByText('a.kml', { exact: false }).closest('button')!
+      const headerB = screen.getByText('b.kml', { exact: false }).closest('button')!
+
+      fireEvent.click(headerA)
+      expect(headerA.getAttribute('aria-expanded')).toBe('true')
+      expect(headerB.getAttribute('aria-expanded')).toBe('false')
+
+      fireEvent.click(headerB)
+      expect(headerA.getAttribute('aria-expanded')).toBe('false')
+      expect(headerB.getAttribute('aria-expanded')).toBe('true')
     })
 
     it('offers no More details item in the row menu', () => {

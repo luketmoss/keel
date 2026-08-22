@@ -197,37 +197,6 @@ describe('LayersControl 3D switch (#271)', () => {
     expect(screen.getByRole('group', { name: 'Basemap' })).not.toBeNull()
   })
 
-  it('shows the "cairns don\'t draw yet" line only while on', () => {
-    const { rerender } = render(
-      <LayersControl
-        value="satellite"
-        labels={false}
-        onChange={vi.fn()}
-        onLabelsChange={vi.fn()}
-        panelCollapsed={false}
-        is3DOn={false}
-        onChange3D={vi.fn()}
-        maps3DSupport="available"
-      />,
-    )
-    fireEvent.click(screen.getByRole('button', { name: 'Layers' }))
-    expect(screen.queryByText("Cairns don't show in 3D yet.")).toBeNull()
-
-    rerender(
-      <LayersControl
-        value="satellite"
-        labels={false}
-        onChange={vi.fn()}
-        onLabelsChange={vi.fn()}
-        panelCollapsed={false}
-        is3DOn
-        onChange3D={vi.fn()}
-        maps3DSupport="available"
-      />,
-    )
-    expect(screen.getByText("Cairns don't show in 3D yet.")).not.toBeNull()
-  })
-
   it('goes disabled with its own sentence when the browser cannot draw 3D', () => {
     open({ maps3DSupport: 'unavailable' })
 

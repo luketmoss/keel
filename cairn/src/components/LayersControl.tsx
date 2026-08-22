@@ -27,7 +27,6 @@ const LABELS_TITLE = {
     error panel. */
 const THREE_D_CAPTION = 'Satellite only'
 const THREE_D_UNAVAILABLE = "This browser can't draw 3D. Check that hardware acceleration is on."
-const CAIRNS_NOT_IN_3D = "Cairns don't show in 3D yet."
 
 /** Bottom left, in the map's own corner rather than top-right under the
     account bubble — the standing document's "A map control belongs in the
@@ -188,11 +187,6 @@ export function LayersControl({
               Labels
             </button>
           </span>
-          {/* #271 — a trip's photos silently vanishing when the switch is
-              flipped reads as a bug and gets reported as one; one line
-              while 3D is on removes that entirely. #273 deletes this along
-              with the limitation. */}
-          {is3DOn && <p className="layers-control__caption">{CAIRNS_NOT_IN_3D}</p>}
         </div>
       )}
       <button

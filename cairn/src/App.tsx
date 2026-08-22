@@ -18,6 +18,8 @@ import { TripDetail } from './components/TripDetail'
 import { LooseFace } from './components/LooseFace'
 import { LooseLayer } from './components/LooseLayer'
 import { Track3DLayer } from './components/Track3DLayer'
+import { Cairn3DLayer } from './components/Cairn3DLayer'
+import type { PositionedCairn } from './components/CairnLayer'
 import { worldTrackGeometry } from './geo/world3DRoutes'
 import { MapEmptyOverlay, WorldLayer, placesForTrips, visibleTripsFor } from './components/WorldMap'
 import { DraftPanel } from './components/DraftPanel'
@@ -343,6 +345,24 @@ function AppShell() {
       kind === 'all' ||
       (kind === 'tracks' && item.kind === 'track') ||
       (kind === 'cairns' && item.kind === 'cairn' && cairnMatchesFacet(item, cairnFacet)),
+  )
+  /* #273 — the same set, flattened to what `Cairn3DLayer` draws. Parity with
+     the world view's 2D `LooseLayer`: no trip's own cairns here, only loose
+     ones, from the same one filter. */
+  const worldCairns: PositionedCairn[] = useMemo(
+    () =>
+      visibleLooseForKind
+        .filter((item): item is Extract<LooseRecord, { kind: 'cairn' }> => item.kind === 'cairn')
+        .map((item) => ({
+          id: item.id,
+          name: item.name,
+          thumbnailDriveFileId: item.image?.thumbnailDriveFileId ?? null,
+          icon: item.icon,
+          latitude: item.position.lat,
+          longitude: item.position.lng,
+          source: item.positionSource,
+        })),
+    [visibleLooseForKind],
   )
   // Read from the *visible* set, not the raw one: #95's rule is that a
   // disconnected account shows nothing rather than a cache, and a typed URL
@@ -1043,6 +1063,19 @@ function AppShell() {
                 ),
                 looseStore,
               )}
+            />
+            {/* #273 — the world view's loose cairns in 3D, at parity with
+                `LooseLayer` above: no trip's own cairns here (design note's
+                "Which cairns draw, on which face"), no dragging, and hover
+                shares the same single hovered-id state a loose track and a
+                trip dot already write. */}
+            <Cairn3DLayer
+              cairns={worldCairns}
+              accessToken={accessToken}
+              selectedCairnId={openLooseId ?? null}
+              onSelectCairn={(id) => navigate(`/cairns/${id}`)}
+              hoveredCairnIds={hoveredTripId ? new Set([hoveredTripId]) : undefined}
+              onHoverCairn={(ids) => setHoveredTripId(ids.size > 0 ? [...ids][0] : null)}
             />
           </>
         )}

@@ -68,6 +68,18 @@ it.
 
 ## Exit
 
+**Nothing under `docs/design/` may be uncommitted.** Before pushing:
+
+```bash
+git status --porcelain
+```
+
+If any line names a path inside a `docs/design/` directory — untracked or
+modified — stop. Commit it, then push. `/ux` writes the note and this skill is
+what puts it in the repository; #250 and #251 both reached Done with theirs
+sitting in a working tree, and nothing downstream could see it, because a file
+that was never added does not appear in a diff.
+
 ```bash
 git push -u origin <branch>
 gh pr create --draft --repo luketmoss/keel \

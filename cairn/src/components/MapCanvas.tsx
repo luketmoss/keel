@@ -1,9 +1,11 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { APIProvider, Map, useMap } from '@vis.gl/react-google-maps'
+import { APIProvider, Map, MapMode, useMap } from '@vis.gl/react-google-maps'
 import { googleMapsApiKey, googleMapsMapId } from '../env'
 import { MapUnavailable } from './MapUnavailable'
 import { LayersControl } from './LayersControl'
-import { useBaseMapType } from '../map/useBaseMapType'
+import { Map3DSurface } from './Map3D'
+import { useBaseMapType, type BaseMapType } from '../map/useBaseMapType'
+import { use3DSupport } from '../map/use3DSupport'
 import { fitTracksToBounds } from '../map/fitBounds'
 import './MapCanvas.css'
 
@@ -84,8 +86,14 @@ export function MapProvider({ children }: { children: ReactNode }) {
          `libraries=core,maps` — `google.maps.ElevationService` and
          `google.maps.ElevationStatus` belong to `elevation`, which is
          otherwise never loaded, so #224's sampler was reaching for symbols
-         that didn't exist. */
-      libraries={['elevation']}
+         that didn't exist. #271 adds `maps3d`, only ever on the `beta`
+         channel — `Map3DElement` doesn't exist on the stable one, and per
+         the design note's own prototype the alpha channel is only needed
+         for autofit and path-following flight, neither of which this
+         issue uses. Adding `loading=async` here is the documented trap:
+         it leaves `google.maps.importLibrary` undefined. */
+      libraries={['elevation', 'maps3d']}
+      version="beta"
       onError={() => setKeyRejected(true)}
     >
       {children}
@@ -120,6 +128,34 @@ interface MapCanvasProps {
 export function MapCanvas({ panelCollapsed, canFit, getFitPoints }: MapCanvasProps) {
   const baseMap = useBaseMapType()
   const unavailable = useContext(MapUnavailableContext)
+  const maps3D = use3DSupport()
+  /* #271 — an in-memory switch, not a stored preference like the tile and
+     Labels: the design note never says 3D is "remembered", only that
+     Labels is remembered across a 2D/3D swap. Defaults off every session. */
+  const [is3DOn, setIs3DOn] = useState(false)
+
+  /* "3D failed after starting" — the states table's own row. Support can
+     only regress from `available` after the surface already mounted (a
+     context loss, hardware acceleration toggled mid-session); when it
+     does, the map falls back to 2D at the same place because turning the
+     switch off is exactly what `Map3DSurface` already does for a normal
+     flip. */
+  useEffect(() => {
+    if (maps3D.support === 'unavailable' && is3DOn) setIs3DOn(false)
+  }, [maps3D.support, is3DOn])
+
+  /* #271's "The switch and the tiles" table, both directions. Neither is a
+     blocked action and neither asks a question — the consequence happens
+     one row from the control that was touched. */
+  function handleBaseMapChange(next: BaseMapType) {
+    baseMap.setType(next)
+    if (next !== 'satellite' && is3DOn) setIs3DOn(false)
+  }
+
+  function handle3DChange(next: boolean) {
+    if (next && baseMap.type !== 'satellite') baseMap.setType('satellite')
+    setIs3DOn(next)
+  }
 
   /* The map's own corner controls go with it — there is nothing for them to
      act on — but the column above stays exactly where it is. */
@@ -144,12 +180,16 @@ export function MapCanvas({ panelCollapsed, canFit, getFitPoints }: MapCanvasPro
         disableDefaultUI
         restriction={{ latLngBounds: WORLD_BOUNDS, strictBounds: true }}
       />
+      <Map3DSurface on={is3DOn} mode={baseMap.labels ? MapMode.HYBRID : MapMode.SATELLITE} />
       <LayersControl
         value={baseMap.type}
         labels={baseMap.labels}
-        onChange={baseMap.setType}
+        onChange={handleBaseMapChange}
         onLabelsChange={baseMap.setLabels}
         panelCollapsed={panelCollapsed}
+        is3DOn={is3DOn}
+        onChange3D={handle3DChange}
+        maps3DSupport={maps3D.support}
       />
       <ZoomControls canFit={canFit} getFitPoints={getFitPoints} />
     </div>

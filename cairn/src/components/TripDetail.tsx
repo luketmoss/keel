@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMap } from '@vis.gl/react-google-maps'
-import { TrackLayer } from './TrackLayer'
+import { TrackLayer, computeRenderedTracks } from './TrackLayer'
+import { Track3DLayer } from './Track3DLayer'
 import { CairnLayer, type PositionedCairn } from './CairnLayer'
 import { columnInset, revealPoints } from '../map/reveal'
 import { dropInvalidLatitudes, normalizeAntimeridian } from '../map/geo'
@@ -872,6 +873,10 @@ export function TripDetail({
         onSelectRoute={handleSelectRoute}
         hitLinesEnabled={!revealSuspended}
       />
+      {/* #271 — the same tracks in 3D: no bands, no hover/selection
+          treatment (this issue adds no selection concept to that surface),
+          just every track this trip draws, always. */}
+      <Track3DLayer tracks={computeRenderedTracks(tripImport.tracks)} />
       {googleMapsMapId && positionedCairns.length > 0 && (
         <CairnLayer
           cairns={positionedCairns}

@@ -65,13 +65,15 @@
    hairline that stops short reads as a mistake. The wrapper is what carries
    the `title`, because `title` on a `disabled` button never reaches the
    pointer — #199's `.track-row__swatch-wrap` fix. */
-.layers-control__labels-wrap {
+.layers-control__labels-wrap,
+.layers-control__3d-wrap {
   display: block;
   width: calc(100% + var(--space-1) * 2);
   margin: 0 calc(var(--space-1) * -1) calc(var(--space-1) * -1);
 }
 
-.layers-control__labels {
+.layers-control__labels,
+.layers-control__3d {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -89,25 +91,56 @@
   transition: color var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease);
 }
 
-.layers-control__labels:hover:not(:disabled) {
+.layers-control__labels:hover:not(:disabled),
+.layers-control__3d:hover:not(:disabled) {
   color: var(--text);
   background: var(--hover);
 }
 
-.layers-control__labels:active:not(:disabled) {
+.layers-control__labels:active:not(:disabled),
+.layers-control__3d:active:not(:disabled) {
   background: var(--pressed);
 }
 
 /* Checked on `roadmap` and `terrain`, because they really do carry Google's
    labels and really cannot be made to drop them. Disabled rather than
-   hidden: a control that vanishes between tiles teaches nothing. */
-.layers-control__labels:disabled {
+   hidden: a control that vanishes between tiles teaches nothing. #271's 3D
+   switch takes the same treatment when the browser can't draw 3D. */
+.layers-control__labels:disabled,
+.layers-control__3d:disabled {
   opacity: 0.4;
   cursor: default;
 }
 
-.layers-control__labels[aria-checked='true'] {
+.layers-control__labels[aria-checked='true'],
+.layers-control__3d[aria-checked='true'] {
   color: var(--accent);
+}
+
+/* #271 — the 3D switch's own row keeps the panel's square corner (it isn't
+   the last row any more), and its caption sits flush beneath it rather than
+   carrying the row's own padding twice. */
+.layers-control__3d {
+  border-radius: 0;
+}
+
+.layers-control__caption {
+  margin: calc(var(--space-1) * -1) 0 0;
+  padding: 0 var(--space-2) var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+/* The only way the collapsed control can say which surface you're on — the
+   language's Selected treatment on a control that is currently doing
+   something. */
+.layers-control__badge {
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--text-xs);
+  line-height: 1.6;
 }
 
 /* Not the language's Selected fill on the whole row: that treatment is for

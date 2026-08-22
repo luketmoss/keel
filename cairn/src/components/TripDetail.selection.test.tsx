@@ -19,10 +19,17 @@ vi.mock('@vis.gl/react-google-maps', () => ({
   Marker: () => null,
   Polyline: () => null,
   useMap: () => null,
+  useMap3D: () => null,
+  useMapsLibrary: () => null,
+  useApiIsLoaded: () => true,
+  MapMode: { HYBRID: 'HYBRID', SATELLITE: 'SATELLITE' },
+  GestureHandling: { GREEDY: 'GREEDY' },
+  Map3D: () => null,
 }))
 
 const { lastSelectedFileId } = vi.hoisted(() => ({ lastSelectedFileId: { current: null as string | null } }))
 vi.mock('./TrackLayer', () => ({
+  computeRenderedTracks: () => [],
   TrackLayer: ({ selectedFileId }: { selectedFileId: string | null }) => {
     lastSelectedFileId.current = selectedFileId
     useEffect(

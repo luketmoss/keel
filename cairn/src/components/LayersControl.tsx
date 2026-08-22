@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { BASE_MAP_TYPES, type BaseMapType } from '../map/useBaseMapType'
+import type { Maps3DSupport } from '../map/use3DSupport'
 import './LayersControl.css'
 
 const LABELS: Record<BaseMapType, string> = {
@@ -18,6 +19,16 @@ const LABELS_TITLE = {
   off: 'Show place labels on the imagery',
 }
 
+/** #271 — the caption beneath the 3D switch, present always rather than
+    only when it becomes relevant: the honest one-line version of a vendor
+    constraint (there is no 3D road map or 3D terrain map on the beta
+    channel). Replaced by the disabled sentence when the browser itself
+    can't draw 3D — one sentence per surface, #73's rule, never Google's own
+    error panel. */
+const THREE_D_CAPTION = 'Satellite only'
+const THREE_D_UNAVAILABLE = "This browser can't draw 3D. Check that hardware acceleration is on."
+const CAIRNS_NOT_IN_3D = "Cairns don't show in 3D yet."
+
 /** Bottom left, in the map's own corner rather than top-right under the
     account bubble — the standing document's "A map control belongs in the
     map's corners". It is a thumbnail because the choice is visual: a panel
@@ -31,6 +42,9 @@ export function LayersControl({
   onChange,
   onLabelsChange,
   panelCollapsed,
+  is3DOn,
+  onChange3D,
+  maps3DSupport,
 }: {
   value: BaseMapType
   /** The stored preference. Only meaningful on Satellite — see
@@ -42,6 +56,14 @@ export function LayersControl({
       when it is not. Transform-free — `left` is what moves, over
       `--motion-base`, the same duration the column animates with. */
   panelCollapsed: boolean
+  /** #271 — the switch's own state, an in-memory mode rather than a stored
+      preference. */
+  is3DOn: boolean
+  onChange3D: (next: boolean) => void
+  /** Whether this browser can draw 3D at all — `'checking'` before the
+      library has resolved, which renders exactly like `'available'` so the
+      switch doesn't flash disabled-then-enabled on every load. */
+  maps3DSupport: Maps3DSupport
 }) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -80,6 +102,12 @@ export function LayersControl({
       ? LABELS_TITLE.on
       : LABELS_TITLE.off
 
+  /* `'checking'` reads as enabled — the library resolves fast enough that
+     flashing disabled-then-enabled on every load would be worse than the
+     rare click that lands half a beat before the answer is in. */
+  const threeDAvailable = maps3DSupport !== 'unavailable'
+  const threeDCaption = maps3DSupport === 'unavailable' ? THREE_D_UNAVAILABLE : THREE_D_CAPTION
+
   return (
     <div
       className={`layers-control${panelCollapsed ? ' layers-control--clear' : ''}`}
@@ -110,6 +138,30 @@ export function LayersControl({
               </button>
             ))}
           </div>
+          {/* #271 — 3D sits above Labels: it decides what kind of surface
+              you are looking at, Labels decides what is written on it, and
+              reading top to bottom the panel goes from most to least
+              consequential. Same wrapper-carries-the-title fix as Labels,
+              since this switch goes disabled too. */}
+          <span className="layers-control__3d-wrap" title={!threeDAvailable ? threeDCaption : undefined}>
+            <button
+              type="button"
+              className="layers-control__3d"
+              role="switch"
+              aria-checked={is3DOn}
+              disabled={!threeDAvailable}
+              onClick={() => onChange3D(!is3DOn)}
+            >
+              <span
+                className={`layers-control__checkbox${is3DOn ? ' layers-control__checkbox--on' : ''}`}
+                aria-hidden="true"
+              >
+                {is3DOn ? '✓' : ''}
+              </span>
+              3D
+            </button>
+          </span>
+          <p className="layers-control__caption">{threeDCaption}</p>
           {/* `title` on a `disabled` button does not reach the pointer in
               every browser, so it goes on the wrapper — the same fix
               `.track-row__swatch-wrap` already carries for #199. */}
@@ -136,6 +188,11 @@ export function LayersControl({
               Labels
             </button>
           </span>
+          {/* #271 — a trip's photos silently vanishing when the switch is
+              flipped reads as a bug and gets reported as one; one line
+              while 3D is on removes that entirely. #273 deletes this along
+              with the limitation. */}
+          {is3DOn && <p className="layers-control__caption">{CAIRNS_NOT_IN_3D}</p>}
         </div>
       )}
       <button
@@ -155,6 +212,14 @@ export function LayersControl({
           aria-hidden="true"
         />
         <span className="layers-control__trigger-label">Layers</span>
+        {/* The only way the collapsed control can say which surface you're
+            on — the language's Selected treatment on a control that is
+            currently doing something. */}
+        {is3DOn && (
+          <span className="layers-control__badge" aria-hidden="true">
+            3D
+          </span>
+        )}
       </button>
     </div>
   )

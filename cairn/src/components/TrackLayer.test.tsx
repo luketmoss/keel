@@ -25,11 +25,28 @@ vi.mock('../map/fitBounds', () => ({ fitTracksToBounds }))
 const fakeMap = { id: 'fake-map' }
 vi.mock('@vis.gl/react-google-maps', () => ({
   useMap: () => fakeMap,
-  Marker: (props: { position: { lat: number; lng: number }; icon: { fillColor: string } }) => (
-    <div data-testid="marker" data-color={props.icon.fillColor} data-lat={props.position.lat} />
+  Marker: (props: { position: { lat: number; lng: number }; icon: { fillColor: string; scale: number }; zIndex: number }) => (
+    <div
+      data-testid="marker"
+      data-color={props.icon.fillColor}
+      data-lat={props.position.lat}
+      data-scale={props.icon.scale}
+      data-zindex={props.zIndex}
+    />
   ),
-  Polyline: (props: { path: { lat: number; lng: number }[]; strokeColor: string }) => (
-    <div data-testid="polyline" data-color={props.strokeColor} data-points={props.path.length} />
+  Polyline: (props: {
+    path: { lat: number; lng: number }[]
+    strokeColor: string
+    strokeWeight: number
+    zIndex: number
+  }) => (
+    <div
+      data-testid="polyline"
+      data-color={props.strokeColor}
+      data-points={props.path.length}
+      data-weight={props.strokeWeight}
+      data-zindex={props.zIndex}
+    />
   ),
 }))
 
@@ -236,26 +253,121 @@ describe('TrackLayer', () => {
     })
   })
 
-  describe('hover glow (#49)', () => {
-    it('renders an extra low-opacity polyline for the hovered file, and none when nothing is hovered', () => {
+  describe('#269 hover and selection', () => {
+    it('does not draw a halo for a hovered file, only a thicker casing and stroke', () => {
       const { container, rerender } = render(
         <TrackLayer files={[importedFile({ id: 'a' })]} hoveredFileId={null} />,
       )
       expect(container.querySelectorAll('[data-testid="polyline"]')).toHaveLength(2)
 
       rerender(<TrackLayer files={[importedFile({ id: 'a' })]} hoveredFileId="a" />)
-      expect(container.querySelectorAll('[data-testid="polyline"]')).toHaveLength(3)
+      const polylines = Array.from(container.querySelectorAll('[data-testid="polyline"]'))
+      expect(polylines).toHaveLength(2)
+      const casing = polylines.find((el) => el.getAttribute('data-color') === '#00000059')!
+      const stroke = polylines.find((el) => el.getAttribute('data-color') === '#FF3B30')!
+      expect(casing.getAttribute('data-weight')).toBe('7')
+      expect(stroke.getAttribute('data-weight')).toBe('4')
     })
 
-    it('does not glow a file other than the one hovered', () => {
+    it('draws a wide low-opacity halo beneath the casing for a selected file, moved off hover', () => {
+      const { container } = render(
+        <TrackLayer files={[importedFile({ id: 'a' })]} selectedFileId="a" />,
+      )
+      const polylines = Array.from(container.querySelectorAll('[data-testid="polyline"]'))
+      expect(polylines).toHaveLength(3)
+      const halo = polylines.find((el) => el.getAttribute('data-weight') === '17')!
+      expect(halo.getAttribute('data-color')).toBe('#FF3B30')
+      const casing = polylines.find((el) => el.getAttribute('data-color') === '#00000059')!
+      const stroke = polylines.find((el) => el.getAttribute('data-weight') === '5')!
+      expect(casing.getAttribute('data-weight')).toBe('9')
+      expect(stroke.getAttribute('data-color')).toBe('#FF3B30')
+    })
+
+    it('does not select or hover a file other than the one named', () => {
+      const { container } = render(
+        <TrackLayer
+          files={[importedFile({ id: 'a' }), importedFile({ id: 'b', colorIndex: 1 })]}
+          selectedFileId="b"
+        />,
+      )
+      // 2 tracks × 2 polylines each, plus exactly one halo for 'b'.
+      expect(container.querySelectorAll('[data-testid="polyline"]')).toHaveLength(5)
+    })
+
+    it('keeps the selected treatment, with no halo lost, when the selected file is also hovered', () => {
+      const { container } = render(
+        <TrackLayer files={[importedFile({ id: 'a' })]} hoveredFileId="a" selectedFileId="a" />,
+      )
+      const polylines = Array.from(container.querySelectorAll('[data-testid="polyline"]'))
+      expect(polylines).toHaveLength(3)
+      const casing = polylines.find((el) => el.getAttribute('data-color') === '#00000059')!
+      expect(casing.getAttribute('data-weight')).toBe('9')
+    })
+
+    it('scales a single-point track up when hovered or selected', () => {
+      const singlePoint = importedFile({ tracks: [{ name: 'Point', points: [{ lat: 10, lon: 20 }] }] })
+      const { container, rerender } = render(<TrackLayer files={[singlePoint]} />)
+      expect(container.querySelector('[data-testid="marker"]')?.getAttribute('data-scale')).toBe('5')
+
+      rerender(<TrackLayer files={[singlePoint]} hoveredFileId="f1" />)
+      expect(container.querySelector('[data-testid="marker"]')?.getAttribute('data-scale')).toBe('7')
+
+      rerender(<TrackLayer files={[singlePoint]} selectedFileId="f1" />)
+      expect(container.querySelector('[data-testid="marker"]')?.getAttribute('data-scale')).toBe('7')
+    })
+  })
+
+  describe('#269 stacking order', () => {
+    it('draws a hovered or selected track above every resting track, whatever the trip order', () => {
+      const { container } = render(
+        <TrackLayer
+          files={[
+            importedFile({ id: 'a' }),
+            importedFile({ id: 'b', colorIndex: 1 }),
+            importedFile({ id: 'c', colorIndex: 2 }),
+          ]}
+          selectedFileId="a"
+        />,
+      )
+      const polylines = Array.from(container.querySelectorAll('[data-testid="polyline"]'))
+      const zIndices = (color: string) =>
+        polylines.filter((el) => el.getAttribute('data-color') === color).map((el) => Number(el.getAttribute('data-zindex')))
+
+      const selectedZ = Math.max(...zIndices('#FF3B30'))
+      const restZ = Math.max(...zIndices('#00D4FF'), ...zIndices('#FFCC00'))
+      expect(selectedZ).toBeGreaterThan(restZ)
+    })
+
+    it('draws a selected track above a hovered one', () => {
       const { container } = render(
         <TrackLayer
           files={[importedFile({ id: 'a' }), importedFile({ id: 'b', colorIndex: 1 })]}
           hoveredFileId="b"
+          selectedFileId="a"
         />,
       )
-      // 2 tracks × 2 polylines each, plus exactly one glow polyline for 'b'.
-      expect(container.querySelectorAll('[data-testid="polyline"]')).toHaveLength(5)
+      const polylines = Array.from(container.querySelectorAll('[data-testid="polyline"]'))
+      const maxZ = (color: string) =>
+        Math.max(
+          ...polylines
+            .filter((el) => el.getAttribute('data-color') === color)
+            .map((el) => Number(el.getAttribute('data-zindex'))),
+        )
+
+      expect(maxZ('#FF3B30')).toBeGreaterThan(maxZ('#00D4FF'))
+    })
+
+    it('keeps resting tracks in their existing order relative to one another', () => {
+      const { container } = render(
+        <TrackLayer
+          files={[importedFile({ id: 'a' }), importedFile({ id: 'b', colorIndex: 1 })]}
+        />,
+      )
+      const polylines = Array.from(container.querySelectorAll('[data-testid="polyline"]'))
+      const strokeZ = (color: string) =>
+        Number(polylines.find((el) => el.getAttribute('data-color') === color && el.getAttribute('data-weight') === '3')!.getAttribute('data-zindex'))
+
+      expect(strokeZ('#FF3B30')).toBeLessThan(strokeZ('#00D4FF'))
     })
   })
 })

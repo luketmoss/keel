@@ -66,6 +66,17 @@ interface TrackListProps {
       expanded. The header button and the row's own non-interactive area
       both call this with the same file id. */
   onToggleExpand?: (id: string) => void
+  /** #269 — the one row selected, or `null`. Held apart from
+      `expandedTrackId` in `TripDetail` for the reason #250 gives for the
+      cairn pair: collapsing a row must not be able to lose the map's
+      highlight. Defaults to `null` so a caller that never wires selection
+      keeps working unchanged. */
+  selectedTrackId?: string | null
+  /** #269 — a row's click (name, meta line, or its whitespace) reports its
+      own file id here, whether or not the row can also expand — a
+      multi-track file's click has no expansion to toggle but still
+      selects. */
+  onSelectTrack?: (id: string) => void
   /** #268: the trip's current sampled-elevation cache (#224), keyed by
       `Track.key` — threaded through so the expanded row's profile can fall
       back to a sampled series exactly as `TrackFace`'s does. Empty object
@@ -114,6 +125,8 @@ export function TrackList({
   onReorder,
   expandedTrackId = null,
   onToggleExpand = () => {},
+  selectedTrackId = null,
+  onSelectTrack = () => {},
   sampledElevation = {},
   canReorder = true,
   emptyDetail = 'Drop a KML or KMZ file anywhere, or use Import tracks above.',
@@ -187,6 +200,8 @@ export function TrackList({
               onCancelConfirm={onCancelConfirm}
               expanded={expandedTrackId === file.id}
               onToggleExpand={() => onToggleExpand(file.id)}
+              selected={selectedTrackId === file.id}
+              onSelectTrack={() => onSelectTrack(file.id)}
               sampledElevation={sampledElevation}
               removing={removingIds.has(file.id)}
               removeError={removeErrors[file.id]}
@@ -240,6 +255,8 @@ function TrackRow({
   onDragEnd,
   expanded,
   onToggleExpand,
+  selected,
+  onSelectTrack,
   sampledElevation,
 }: {
   file: ImportedFile
@@ -271,6 +288,10 @@ function TrackRow({
       (`canOpenDetail` below). */
   expanded: boolean
   onToggleExpand: () => void
+  /** #269 — whether this row is the one `TripDetail.selectedTrackId`
+      names. Unlike `expanded`, meaningful for a multi-track file too. */
+  selected: boolean
+  onSelectTrack: () => void
   sampledElevation: Record<string, StoredTrackElevation>
 }) {
   const [editingName, setEditingName] = useState(false)
@@ -318,11 +339,16 @@ function TrackRow({
   // the name/meta button itself — implemented by ignoring any click whose
   // target sits inside an interactive descendant, in one place, rather than
   // `stopPropagation` in five handlers (#219's mechanism, restored).
+  //
+  // #269 — the same click also selects, whether or not the row can expand:
+  // a multi-track file's whitespace has no expansion to toggle but still
+  // has a row to select, since it's the click's other meaning from here on.
   function handleRowClick(event: MouseEvent<HTMLDivElement>) {
-    if (!canOpenDetail || editingName) return
+    if (editingName) return
     const target = event.target as HTMLElement
     if (target.closest('button, a, input, [draggable="true"]')) return
-    onToggleExpand()
+    onSelectTrack()
+    if (canOpenDetail) onToggleExpand()
   }
 
   // #268: scrolls the row into view once the expanded block has laid out —
@@ -381,6 +407,7 @@ function TrackRow({
   const rowClassName = [
     'track-row',
     file.visible ? '' : 'track-row--hidden',
+    selected ? 'track-row--selected' : '',
     dragging ? 'track-row--dragging' : '',
     dropIndicator ? `track-row--drop-${dropIndicator}` : '',
     removing ? 'track-row--removing' : '',
@@ -497,7 +524,10 @@ function TrackRow({
             className="track-row__text track-row__text--button"
             aria-expanded={expandedOpen}
             aria-controls={detailId}
-            onClick={onToggleExpand}
+            onClick={() => {
+              onSelectTrack()
+              onToggleExpand()
+            }}
           >
             <span className={`track-row__name${savedField === 'name' ? ' track-row__field--saved' : ''}`} title={file.name}>
               {file.name}

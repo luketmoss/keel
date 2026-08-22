@@ -308,6 +308,15 @@ export function TripDetail({
       whichever was expanded before, being the single next value of one
       piece of state. */
   const [expandedTrackId, setExpandedTrackId] = useState<string | null>(null)
+  /** #269 — the one selected track (really: the one selected row, since a
+      multi-track file selects as a unit), held apart from
+      `expandedTrackId` above for the reason #250 gives for the cairn pair:
+      deriving it would make collapsing a row have to deselect too, and
+      losing the map's highlight is not what closing a row means. `null`
+      means no track is selected. Nothing deselects except selecting
+      another track, or the guard below — no click on the map clears it,
+      matching #194's "there is no click that deselects" for cairns. */
+  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
 
   /** #268 — the header button and the row's own whitespace both call this
@@ -325,6 +334,16 @@ export function TripDetail({
       setExpandedTrackId(null)
     }
   }, [tripImport.tracks, expandedTrackId])
+
+  // #269 — a track that is removed, or removed from the trip, while
+  // selected clears the selection rather than leaving a highlight with
+  // nothing behind it — the same self-cleaning guard `expandedTrackId` has
+  // above.
+  useEffect(() => {
+    if (selectedTrackId && !tripImport.tracks.some((file) => file.id === selectedTrackId)) {
+      setSelectedTrackId(null)
+    }
+  }, [tripImport.tracks, selectedTrackId])
 
   /* #251 — one hovered-cairn set, written by both `CairnList` and
      `CairnLayer` and read by both, exactly the shape `App.tsx` already
@@ -772,6 +791,8 @@ export function TripDetail({
       onReorder={tripImport.reorderTracks}
       expandedTrackId={expandedTrackId}
       onToggleExpand={toggleTrackExpand}
+      selectedTrackId={selectedTrackId}
+      onSelectTrack={setSelectedTrackId}
       sampledElevation={tripImport.sampledElevation}
       canReorder={!tripImport.loading}
       disabled={!signedIn}
@@ -782,7 +803,7 @@ export function TripDetail({
   return (
     <div className="trip-detail">
       {/* Drawn on the shell's map, not here — see the component doc. */}
-      <TrackLayer files={tripImport.tracks} hoveredFileId={hoveredFileId} />
+      <TrackLayer files={tripImport.tracks} hoveredFileId={hoveredFileId} selectedFileId={selectedTrackId} />
       {googleMapsMapId && positionedCairns.length > 0 && (
         <CairnLayer
           cairns={positionedCairns}

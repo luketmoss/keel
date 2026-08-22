@@ -48,6 +48,20 @@
   background: var(--hover);
 }
 
+/* #269 — selected state per the design language: --accent-soft fill,
+   --accent text. The doubled class matches `.track-row:hover`'s own
+   specificity so a selected row that is also hovered keeps the selected
+   fill, source order (this comes after) breaking the tie. `__name` sets its
+   own colour explicitly, so it needs its own override to inherit here. */
+.track-row.track-row--selected {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.track-row--selected .track-row__name {
+  color: inherit;
+}
+
 /* #193 — the name and the meta line, one block hanging off the glyph. The
    name gets the width two icon buttons used to take. */
 .track-row__text {

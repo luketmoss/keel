@@ -630,6 +630,8 @@ function TrackRow({
                 pointCount={file.tracks[0].points.length}
                 sourceName={file.sourceName}
                 color={color}
+                name={file.name}
+                flyoverPoints={file.tracks[0].points.map((point) => ({ lat: point.lat, lng: point.lon }))}
               />
             )}
           </div>

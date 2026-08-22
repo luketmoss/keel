@@ -4,6 +4,8 @@ import { useIsPhone } from '../map/useIsPhone'
 import './ShellColumn.css'
 
 interface ShellColumnProps {
+  /** #274 — forwarded straight to `BottomSheet`; desktop ignores it. */
+  flyoverToken?: number
   collapsed: boolean
   onToggleCollapsed: () => void
   /** The edge tab is a property of the list, so it is not rendered on a
@@ -35,6 +37,7 @@ interface ShellColumnProps {
     animating its width — a width transition relayouts the panel's contents
     on every frame, and the map behind it does not need to reflow at all. */
 export function ShellColumn({
+  flyoverToken,
   collapsed,
   onToggleCollapsed,
   collapsible,
@@ -49,6 +52,7 @@ export function ShellColumn({
   if (isPhone) {
     return (
       <BottomSheet
+        flyoverToken={flyoverToken}
         suspended={suspended}
         detailOpen={detailOpen}
         searchCard={searchCard}

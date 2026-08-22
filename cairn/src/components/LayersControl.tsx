@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { BASE_MAP_TYPES, type BaseMapType } from '../map/useBaseMapType'
-import type { Maps3DSupport } from '../map/use3DSupport'
+import { MAPS_3D_UNAVAILABLE_SENTENCE, type Maps3DSupport } from '../map/use3DSupport'
 import './LayersControl.css'
 
 const LABELS: Record<BaseMapType, string> = {
@@ -26,7 +26,7 @@ const LABELS_TITLE = {
     can't draw 3D — one sentence per surface, #73's rule, never Google's own
     error panel. */
 const THREE_D_CAPTION = 'Satellite only'
-const THREE_D_UNAVAILABLE = "This browser can't draw 3D. Check that hardware acceleration is on."
+const THREE_D_UNAVAILABLE = MAPS_3D_UNAVAILABLE_SENTENCE
 
 /** Bottom left, in the map's own corner rather than top-right under the
     account bubble — the standing document's "A map control belongs in the

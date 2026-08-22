@@ -9,6 +9,8 @@ import {
 } from '../format/units'
 import { StatGrid } from './StatGrid'
 import { TrackElevationProfile } from './TrackElevationProfile'
+import { FlyoverButton } from './FlyoverButton'
+import type { LatLng } from '../map/geo'
 import './TrackFaceBody.css'
 
 /** #226 — the track detail face's body: the profile, then the same
@@ -29,6 +31,8 @@ export function TrackFaceBody({
   pointCount,
   sourceName,
   color,
+  name,
+  flyoverPoints,
 }: {
   stats: TrackStats
   /** The median-filtered, distance-aligned series, or `undefined` when
@@ -38,6 +42,13 @@ export function TrackFaceBody({
   pointCount: number
   sourceName: string
   color: string
+  /** #274 — the track's own name, for `FlyoverButton`'s accessible name. */
+  name: string
+  /** #274 — the track's own geometry, flattened. A trip-owned track already
+      holds its full points in memory; a loose one has none but its own
+      precomputed `overview.geojson` — either caller flattens whichever it
+      has, since neither passes raw points for anything else here. */
+  flyoverPoints: LatLng[]
 }) {
   const sampled = stats.elevationSource === 'sampled'
 
@@ -74,6 +85,7 @@ export function TrackFaceBody({
       <p className="track-face-body__footnote">
         {pointCount.toLocaleString()} points · {sourceName}
       </p>
+      <FlyoverButton label={name} points={flyoverPoints} />
     </>
   )
 }

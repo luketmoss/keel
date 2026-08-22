@@ -132,6 +132,8 @@ export function TrackFace({
           pointCount={track.points.length}
           sourceName={sourceName}
           color={color}
+          name={name}
+          flyoverPoints={track.points.map((point) => ({ lat: point.lat, lng: point.lon }))}
         />
       </div>
     </div>

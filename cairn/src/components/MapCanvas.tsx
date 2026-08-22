@@ -5,7 +5,7 @@ import { MapUnavailable } from './MapUnavailable'
 import { LayersControl } from './LayersControl'
 import { Map3DSurface } from './Map3D'
 import { useBaseMapType, type BaseMapType } from '../map/useBaseMapType'
-import { use3DSupport } from '../map/use3DSupport'
+import { Map3DControlProvider, useMap3DControl } from '../map/Map3DControl'
 import { fitTracksToBounds } from '../map/fitBounds'
 import './MapCanvas.css'
 
@@ -96,7 +96,11 @@ export function MapProvider({ children }: { children: ReactNode }) {
       version="beta"
       onError={() => setKeyRejected(true)}
     >
-      {children}
+      {/* #274 — one piece of state shared between this component's own
+          `MapCanvas` (owns the switch and the actual `Map3DElement`) and
+          every face's own `FlyoverButton`, which sits inside the column
+          rather than beneath this provider's sibling. */}
+      <Map3DControlProvider>{children}</Map3DControlProvider>
     </APIProvider>
   ) : (
     children
@@ -128,21 +132,14 @@ interface MapCanvasProps {
 export function MapCanvas({ panelCollapsed, canFit, getFitPoints }: MapCanvasProps) {
   const baseMap = useBaseMapType()
   const unavailable = useContext(MapUnavailableContext)
-  const maps3D = use3DSupport()
   /* #271 — an in-memory switch, not a stored preference like the tile and
      Labels: the design note never says 3D is "remembered", only that
-     Labels is remembered across a 2D/3D swap. Defaults off every session. */
-  const [is3DOn, setIs3DOn] = useState(false)
-
-  /* "3D failed after starting" — the states table's own row. Support can
-     only regress from `available` after the surface already mounted (a
-     context loss, hardware acceleration toggled mid-session); when it
-     does, the map falls back to 2D at the same place because turning the
-     switch off is exactly what `Map3DSurface` already does for a normal
-     flip. */
-  useEffect(() => {
-    if (maps3D.support === 'unavailable' && is3DOn) setIs3DOn(false)
-  }, [maps3D.support, is3DOn])
+     Labels is remembered across a 2D/3D swap. Defaults off every session.
+     #274 — shared with every face's own `FlyoverButton` via context, since
+     `Fly over` turns this on from deep inside the column; the "3D failed
+     after starting" regression and the flyover-cancels-on-off wiring both
+     live in `Map3DControlProvider` now, alongside this same state. */
+  const { on: is3DOn, setOn: setIs3DOn, support: maps3DSupport, flyover } = useMap3DControl()
 
   /* #271's "The switch and the tiles" table, both directions. Neither is a
      blocked action and neither asks a question — the consequence happens
@@ -180,7 +177,7 @@ export function MapCanvas({ panelCollapsed, canFit, getFitPoints }: MapCanvasPro
         disableDefaultUI
         restriction={{ latLngBounds: WORLD_BOUNDS, strictBounds: true }}
       />
-      <Map3DSurface on={is3DOn} mode={baseMap.labels ? MapMode.HYBRID : MapMode.SATELLITE} />
+      <Map3DSurface on={is3DOn} mode={baseMap.labels ? MapMode.HYBRID : MapMode.SATELLITE} flyover={flyover} />
       <LayersControl
         value={baseMap.type}
         labels={baseMap.labels}
@@ -189,7 +186,7 @@ export function MapCanvas({ panelCollapsed, canFit, getFitPoints }: MapCanvasPro
         panelCollapsed={panelCollapsed}
         is3DOn={is3DOn}
         onChange3D={handle3DChange}
-        maps3DSupport={maps3D.support}
+        maps3DSupport={maps3DSupport}
       />
       <ZoomControls canFit={canFit} getFitPoints={getFitPoints} />
     </div>

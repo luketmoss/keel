@@ -1,6 +1,8 @@
 import { summarizeElevation, type TrackStats } from '../kml/stats'
 import { formatDistance, formatElevation, formatElevationGain, formatElevationLoss, markSampled } from '../format/units'
 import { StatGrid } from './StatGrid'
+import { FlyoverButton } from './FlyoverButton'
+import type { LatLng } from '../map/geo'
 import './TripStats.css'
 
 export interface TripStatsProps {
@@ -9,6 +11,13 @@ export interface TripStatsProps {
       total that moved when you toggled an eye would read as filtered, which
       would then be wrong for every other panel in the app). */
   trackStats: TrackStats[]
+  /** #274 — the trip's name, for `FlyoverButton`'s accessible name. */
+  tripName: string
+  /** #274 — the trip's own geometry, flattened from its precomputed
+      `overview.geojson` (the performance rule's own reasoning: a bounding
+      box does not need full resolution). Empty for a trip with no tracks,
+      which is what leaves the button unrendered rather than disabled. */
+  flyoverPoints: LatLng[]
 }
 
 interface Totals {
@@ -66,7 +75,7 @@ function footnote(trackCount: number, elevationTrackCount: number, sampledTrackC
     the surface was never built, and only one of those is true (#7's
     unavailable-versus-zero rule, applied to the container as well as the
     value). */
-export function TripStats({ trackStats }: TripStatsProps) {
+export function TripStats({ trackStats, tripName, flyoverPoints }: TripStatsProps) {
   const trackCount = trackStats.length
   const totals = computeTotals(trackStats)
   const note = footnote(trackCount, totals.elevationTrackCount, totals.sampledTrackCount)
@@ -75,18 +84,24 @@ export function TripStats({ trackStats }: TripStatsProps) {
   const sampled = totals.sampledTrackCount > 0
 
   return (
-    <div className="trip-stats">
-      <StatGrid
-        items={[
-          { label: 'Distance', value: trackCount === 0 ? undefined : formatDistance(totals.distanceMeters) },
-          { label: 'Ascent', value: markSampled(formatElevationGain(totals.elevationGainMeters), sampled) },
-          { label: 'Descent', value: markSampled(formatElevationLoss(totals.elevationLossMeters), sampled) },
-          { label: 'High point', value: markSampled(formatElevation(totals.highPointMeters), sampled) },
-          { label: 'Low point', value: markSampled(formatElevation(totals.lowPointMeters), sampled) },
-          { label: 'Tracks', value: String(trackCount) },
-        ]}
-      />
-      {note && <p className="trip-stats__note">{note}</p>}
-    </div>
+    <>
+      <div className="trip-stats">
+        <StatGrid
+          items={[
+            { label: 'Distance', value: trackCount === 0 ? undefined : formatDistance(totals.distanceMeters) },
+            { label: 'Ascent', value: markSampled(formatElevationGain(totals.elevationGainMeters), sampled) },
+            { label: 'Descent', value: markSampled(formatElevationLoss(totals.elevationLossMeters), sampled) },
+            { label: 'High point', value: markSampled(formatElevation(totals.highPointMeters), sampled) },
+            { label: 'Low point', value: markSampled(formatElevation(totals.lowPointMeters), sampled) },
+            { label: 'Tracks', value: String(trackCount) },
+          ]}
+        />
+        {note && <p className="trip-stats__note">{note}</p>}
+      </div>
+      {/* #274 — beneath the stat grid, not inside its own `--surface-lift`
+          tint: a second surface-lift fill nested in the first would read
+          as the same block rather than its own control. */}
+      <FlyoverButton label={tripName} points={flyoverPoints} />
+    </>
   )
 }

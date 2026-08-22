@@ -28,7 +28,7 @@ function withoutElevation(distanceMeters = 5_000): TrackStats {
 
 describe('TripStats', () => {
   it('shows six values and no footnote when every track carries elevation', () => {
-    render(<TripStats trackStats={[withElevation(), withElevation({ distanceMeters: 5_000 })]} />)
+    render(<TripStats tripName="Test Trip" flyoverPoints={[]} trackStats={[withElevation(), withElevation({ distanceMeters: 5_000 })]} />)
 
     expect(screen.getByText('Distance')).toBeDefined()
     expect(screen.getByText('9.3 mi')).toBeDefined() // 15,000m
@@ -46,13 +46,13 @@ describe('TripStats', () => {
   })
 
   it('sums distance over every track, including ones carrying no elevation', () => {
-    render(<TripStats trackStats={[withElevation({ distanceMeters: 10_000 }), withoutElevation(5_000)]} />)
+    render(<TripStats tripName="Test Trip" flyoverPoints={[]} trackStats={[withElevation({ distanceMeters: 10_000 }), withoutElevation(5_000)]} />)
 
     expect(screen.getByText('9.3 mi')).toBeDefined() // 15,000m total
   })
 
   it('names partial coverage in the footnote, and says distance covers them all', () => {
-    render(<TripStats trackStats={[withElevation(), withElevation(), withoutElevation(), withoutElevation()]} />)
+    render(<TripStats tripName="Test Trip" flyoverPoints={[]} trackStats={[withElevation(), withElevation(), withoutElevation(), withoutElevation()]} />)
 
     expect(
       screen.getByText('Elevation from 2 of 4 tracks. Distance covers them all.'),
@@ -60,7 +60,7 @@ describe('TripStats', () => {
   })
 
   it('shows em dashes for the four elevation cells and a naming footnote when no track carries elevation', () => {
-    render(<TripStats trackStats={[withoutElevation(), withoutElevation()]} />)
+    render(<TripStats tripName="Test Trip" flyoverPoints={[]} trackStats={[withoutElevation(), withoutElevation()]} />)
 
     expect(screen.getByText('No track in this trip carries elevation.')).toBeDefined()
     const values = document.querySelectorAll('.stat__value--muted')
@@ -69,7 +69,7 @@ describe('TripStats', () => {
   })
 
   it('shows an em dash in every stat cell and 0 tracks for a trip with no tracks at all', () => {
-    render(<TripStats trackStats={[]} />)
+    render(<TripStats tripName="Test Trip" flyoverPoints={[]} trackStats={[]} />)
 
     expect(screen.getByText('Add a track to see totals.')).toBeDefined()
     // Distance, ascent, descent, high point, low point — five dashes, not the track count.
@@ -79,7 +79,7 @@ describe('TripStats', () => {
 
   it('aggregates ascent and descent only over tracks carrying elevation, not a subset silently', () => {
     render(
-      <TripStats
+      <TripStats tripName="Test Trip" flyoverPoints={[]}
         trackStats={[
           withElevation({ elevationGainMeters: 100, elevationLossMeters: 90 }),
           withElevation({ elevationGainMeters: 200, elevationLossMeters: 150 }),
@@ -95,7 +95,7 @@ describe('TripStats', () => {
 
   // #224
   it('marks every elevation figure with ~ and names the source when every track is sampled', () => {
-    render(<TripStats trackStats={[withElevation({ elevationSource: 'sampled' })]} />)
+    render(<TripStats tripName="Test Trip" flyoverPoints={[]} trackStats={[withElevation({ elevationSource: 'sampled' })]} />)
 
     expect(screen.getByText('~1,640 ft ↑')).toBeDefined()
     expect(screen.getByText('~1,312 ft ↓')).toBeDefined()
@@ -106,7 +106,7 @@ describe('TripStats', () => {
 
   it('names the count when only some tracks are sampled', () => {
     render(
-      <TripStats
+      <TripStats tripName="Test Trip" flyoverPoints={[]}
         trackStats={[withElevation({ elevationSource: 'sampled' }), withElevation(), withoutElevation()]}
       />,
     )
@@ -117,7 +117,7 @@ describe('TripStats', () => {
   })
 
   it('marks a total mixing recorded and sampled tracks with ~ — the weaker claim governs', () => {
-    render(<TripStats trackStats={[withElevation({ elevationSource: 'sampled' }), withElevation()]} />)
+    render(<TripStats tripName="Test Trip" flyoverPoints={[]} trackStats={[withElevation({ elevationSource: 'sampled' }), withElevation()]} />)
 
     // 500m + 500m = 1000m ascent, summed over both tracks.
     expect(screen.getByText('~3,281 ft ↑')).toBeDefined()

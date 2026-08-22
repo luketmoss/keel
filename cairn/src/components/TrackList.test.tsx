@@ -773,30 +773,180 @@ describe('TrackList', () => {
     })
   })
 
-  /* #226 — #219's row disclosure is gone; `More details` in the `⋮` is the
-     only path to a track's face now, and a row click does nothing. */
-  describe('#226 More details', () => {
-    it('appears first in the menu and calls onOpenTrack with the file id', () => {
-      const onOpenTrack = vi.fn()
+  /* #268 — the track detail is back inline, at the row's own content
+     width, and `More details` is gone from the `⋮`. TrackList no longer
+     owns the open/closed state itself (#219 did) — it's controlled from
+     outside via `expandedTrackId`/`onToggleExpand`, the same shape
+     `CairnList`'s `expandedCairnId` already uses, so #270 can move it
+     later without collapsing the row. */
+  describe('#268 expanding a track row', () => {
+    function trackWithProfile(overrides: Partial<ImportedFile> = {}) {
+      return importedFile({
+        tracks: [
+          {
+            name: 'a',
+            points: [
+              { lat: 40, lon: -105, elevation: 1500 },
+              { lat: 40.01, lon: -105.01, elevation: 1600 },
+              { lat: 40.02, lon: -105.02, elevation: 1550 },
+            ],
+          },
+        ],
+        trackStats: [
+          {
+            distanceMeters: 1200,
+            durationSeconds: 600,
+            elevationGainMeters: 100,
+            elevationLossMeters: 50,
+            highPointMeters: 1600,
+            lowPointMeters: 1500,
+          },
+        ],
+        ...overrides,
+      })
+    }
+
+    it('calls onToggleExpand with the file id when the header is clicked', () => {
+      const onToggleExpand = vi.fn()
+      render(
+        <TrackList
+          files={[trackWithProfile()]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          onToggleExpand={onToggleExpand}
+        />,
+      )
+
+      fireEvent.click(screen.getByText('trip.kml', { exact: false }))
+      expect(onToggleExpand).toHaveBeenCalledWith('f1')
+    })
+
+    it('also toggles on the header row whitespace, outside the name and meta line', () => {
+      const onToggleExpand = vi.fn()
+      render(
+        <TrackList
+          files={[trackWithProfile()]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          onToggleExpand={onToggleExpand}
+        />,
+      )
+
+      const main = document.querySelector('.track-row__main') as HTMLElement
+      fireEvent.click(main)
+      expect(onToggleExpand).toHaveBeenCalledWith('f1')
+    })
+
+    it('does not toggle from a click on the handle, swatch, visibility control, or ⋮', () => {
+      const onToggleExpand = vi.fn()
+      render(
+        <TrackList
+          files={[trackWithProfile()]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          onToggleExpand={onToggleExpand}
+          onRecolor={vi.fn()}
+          onReorder={vi.fn()}
+        />,
+      )
+
+      fireEvent.click(screen.getByLabelText('Reorder trip.kml'))
+      fireEvent.click(screen.getByRole('button', { name: 'Change colour for trip.kml' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Hide trip.kml' }))
+      openRowMenu('trip.kml')
+
+      expect(onToggleExpand).not.toHaveBeenCalled()
+    })
+
+    it('does not toggle while renaming, even from a click beside the input', () => {
+      const onToggleExpand = vi.fn()
+      const onRename = vi.fn()
+      render(
+        <TrackList
+          files={[trackWithProfile()]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          onToggleExpand={onToggleExpand}
+          onRename={onRename}
+        />,
+      )
+
+      openRowMenu('trip.kml')
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }))
+      fireEvent.click(document.querySelector('.track-row__main') as HTMLElement)
+
+      expect(onToggleExpand).not.toHaveBeenCalled()
+    })
+
+    it('shows the profile, six stat cells, and the points/source footnote for the row named by expandedTrackId', () => {
+      render(
+        <TrackList
+          files={[trackWithProfile()]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          expandedTrackId="f1"
+        />,
+      )
+
+      expect(document.querySelector('.track-elevation-profile')).not.toBeNull()
+      expect(screen.getByText('Distance')).toBeDefined()
+      expect(screen.getByText('Ascent')).toBeDefined()
+      expect(screen.getByText('Descent')).toBeDefined()
+      expect(screen.getByText('High point')).toBeDefined()
+      expect(screen.getByText('Low point')).toBeDefined()
+      expect(screen.getByText('Duration')).toBeDefined()
+      expect(screen.getByText('3 points · trip.kml')).toBeDefined()
+    })
+
+    it('draws the detail flush inside the row, not nested in the text column', () => {
+      const { container } = render(
+        <TrackList
+          files={[trackWithProfile()]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          expandedTrackId="f1"
+        />,
+      )
+
+      const li = container.querySelector('li.track-row')!
+      const wrap = li.querySelector('.track-row__detail-wrapper')
+      expect(wrap).not.toBeNull()
+      // A sibling of `.track-row__main`, not inside `.track-row__text`.
+      expect(wrap!.parentElement).toBe(li)
+    })
+
+    it('marks the open row with aria-expanded and points aria-controls at the detail block', () => {
+      render(
+        <TrackList
+          files={[trackWithProfile()]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          expandedTrackId="f1"
+        />,
+      )
+
+      const header = document.querySelector('.track-row__text--button')!
+      expect(header.getAttribute('aria-expanded')).toBe('true')
+      const controlsId = header.getAttribute('aria-controls')!
+      expect(document.getElementById(controlsId)).not.toBeNull()
+    })
+
+    it('shows the stat grid with em-dash elevation cells and no profile when elevation is unusable', () => {
       render(
         <TrackList
           files={[importedFile()]}
           onToggleVisibility={vi.fn()}
           onRemove={vi.fn()}
-          onOpenTrack={onOpenTrack}
+          expandedTrackId="f1"
         />,
       )
 
-      openRowMenu('trip.kml')
-      const items = screen.getAllByRole('menuitem')
-      expect(items[0]).toHaveProperty('textContent', 'More details')
-
-      fireEvent.click(items[0])
-      expect(onOpenTrack).toHaveBeenCalledWith('f1')
+      expect(document.querySelector('.track-elevation-profile')).toBeNull()
+      expect(screen.getAllByText('—').length).toBeGreaterThan(0)
     })
 
-    it('is absent for a multi-track file', () => {
-      const onOpenTrack = vi.fn()
+    it('does not expand a multi-track file, carries no aria-expanded, and offers no detail block', () => {
+      const onToggleExpand = vi.fn()
       render(
         <TrackList
           files={[
@@ -809,50 +959,39 @@ describe('TrackList', () => {
           ]}
           onToggleVisibility={vi.fn()}
           onRemove={vi.fn()}
-          onOpenTrack={onOpenTrack}
+          onToggleExpand={onToggleExpand}
+          expandedTrackId="f1"
         />,
       )
 
+      // No button at all — the name stays a plain span for a file with no
+      // unambiguous numbers to show.
+      expect(document.querySelector('.track-row__text--button')).toBeNull()
+      fireEvent.click(screen.getByText('trip.kml', { exact: false }))
+      expect(onToggleExpand).not.toHaveBeenCalled()
+      expect(document.querySelector('.track-row__detail-wrapper')).toBeNull()
+    })
+
+    it('offers no More details item in the row menu', () => {
+      render(<TrackList files={[trackWithProfile()]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />)
+
       openRowMenu('trip.kml')
       expect(screen.queryByRole('menuitem', { name: 'More details' })).toBeNull()
     })
 
-    it('is absent when onOpenTrack is omitted', () => {
-      render(<TrackList files={[importedFile()]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />)
-
-      openRowMenu('trip.kml')
-      expect(screen.queryByRole('menuitem', { name: 'More details' })).toBeNull()
-    })
-
-    it('a row click does nothing — no expansion, no navigation', () => {
-      const onOpenTrack = vi.fn()
-      const onRename = vi.fn()
+    it('collapses a removing row even when it names expandedTrackId, and leaves it inert', () => {
       render(
         <TrackList
-          files={[importedFile()]}
+          files={[trackWithProfile()]}
           onToggleVisibility={vi.fn()}
           onRemove={vi.fn()}
-          onOpenTrack={onOpenTrack}
-          onRename={onRename}
+          expandedTrackId="f1"
+          removingIds={new Set(['f1'])}
         />,
       )
 
-      const row = screen.getByText('trip.kml', { exact: false }).closest('li')!
-      fireEvent.click(row)
-
-      expect(onOpenTrack).not.toHaveBeenCalled()
-      expect(onRename).not.toHaveBeenCalled()
-      // The name is a plain span, not a button — #219's name-as-button is
-      // gone along with the disclosure it opened.
-      expect(screen.queryByRole('button', { name: 'trip.kml' })).toBeNull()
-    })
-
-    it('renders no inline stat grid or profile inside the row', () => {
-      render(<TrackList files={[importedFile()]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />)
-
-      expect(document.querySelector('.stat-grid')).toBeNull()
-      expect(document.querySelector('.track-elevation-profile')).toBeNull()
+      const wrap = document.querySelector('.track-row__detail-wrapper')
+      expect(wrap?.className).not.toContain('track-row__detail-wrapper--open')
     })
   })
-
 })

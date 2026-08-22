@@ -122,4 +122,25 @@ describe('TripStats', () => {
     // 500m + 500m = 1000m ascent, summed over both tracks.
     expect(screen.getByText('~3,281 ft ↑')).toBeDefined()
   })
+
+  // #274
+  describe('the Fly over control', () => {
+    it('carries the trip name and beneath the grid, given a subject with geometry', () => {
+      render(
+        <TripStats
+          trackStats={[withElevation()]}
+          tripName="Ridge Traverse"
+          flyoverPoints={[{ lat: 1, lng: 2 }]}
+        />,
+      )
+
+      expect(screen.getByRole('button', { name: 'Fly over Ridge Traverse' })).not.toBeNull()
+    })
+
+    it('does not render at all for a trip with no tracks — "no usable geometry", not disabled', () => {
+      render(<TripStats trackStats={[]} tripName="Empty Trip" flyoverPoints={[]} />)
+
+      expect(screen.queryByRole('button', { name: /Fly over/ })).toBeNull()
+    })
+  })
 })

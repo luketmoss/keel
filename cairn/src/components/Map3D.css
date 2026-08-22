@@ -1,0 +1,24 @@
+/* #271 — sits above the 2D map and fades its own opacity in and out. The 2D
+   map underneath needs no styling of its own: an opaque 3D surface fading
+   to full opacity over an opaque 2D one reads as the same dissolve a true
+   crossfade would, and the 2D map stays interactive (pointer-events: none
+   here) until this surface is the one actually showing. */
+.map3d-surface {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-base) var(--ease);
+}
+
+.map3d-surface--visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.map3d-surface gmp-map-3d {
+  display: block;
+  width: 100%;
+  height: 100%;
+}

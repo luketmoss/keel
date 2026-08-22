@@ -17,6 +17,8 @@ import { TripsPanel } from './components/TripsPanel'
 import { TripDetail } from './components/TripDetail'
 import { LooseFace } from './components/LooseFace'
 import { LooseLayer } from './components/LooseLayer'
+import { Track3DLayer } from './components/Track3DLayer'
+import { worldTrackGeometry } from './geo/world3DRoutes'
 import { MapEmptyOverlay, WorldLayer, placesForTrips, visibleTripsFor } from './components/WorldMap'
 import { DraftPanel } from './components/DraftPanel'
 import { DropOverlay } from './components/DropOverlay'
@@ -332,6 +334,16 @@ function AppShell() {
   // #95 again: loose items are withheld while disconnected for the same
   // reason trips are — the cache underneath is untouched.
   const visibleLoose = disconnected ? [] : looseItems
+  // What the list face and the map actually draw for the current kind
+  // filter — pulled out once so #271's 3D world view reads the same
+  // filtered set `LooseLayer` does, rather than a second copy that could
+  // drift from it.
+  const visibleLooseForKind = visibleLoose.filter(
+    (item) =>
+      kind === 'all' ||
+      (kind === 'tracks' && item.kind === 'track') ||
+      (kind === 'cairns' && item.kind === 'cairn' && cairnMatchesFacet(item, cairnFacet)),
+  )
   // Read from the *visible* set, not the raw one: #95's rule is that a
   // disconnected account shows nothing rather than a cache, and a typed URL
   // must not be the one way around that.
@@ -1004,14 +1016,7 @@ function AppShell() {
               />
             )}
             <LooseLayer
-              items={visibleLoose.filter(
-                (item) =>
-                  kind === 'all' ||
-                  (kind === 'tracks' && item.kind === 'track') ||
-                  (kind === 'cairns' &&
-                    item.kind === 'cairn' &&
-                    cairnMatchesFacet(item, cairnFacet)),
-              )}
+              items={visibleLooseForKind}
               store={looseStore}
               accessToken={accessToken}
               hoveredId={hoveredTripId}
@@ -1023,6 +1028,21 @@ function AppShell() {
               draggable={cairnsDraggable}
               onMoveCairn={handleMoveLooseCairn}
               revealSuspended={mapDecisionActive}
+            />
+            {/* #271 — the world view in 3D: every visible trip's and loose
+                track's route at rest, since there are no markers on that
+                surface. `Track3DLayer` no-ops until the 3D surface actually
+                mounts, so this costs nothing while 3D has never been
+                turned on. */}
+            <Track3DLayer
+              tracks={worldTrackGeometry(
+                kind === 'all' || kind === 'trips' ? visibleTripsFor(visibleTrips, filters) : [],
+                tripStore,
+                visibleLooseForKind.filter(
+                  (item): item is Extract<LooseRecord, { kind: 'track' }> => item.kind === 'track',
+                ),
+                looseStore,
+              )}
             />
           </>
         )}

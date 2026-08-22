@@ -102,6 +102,24 @@ function visibleFilesKey(files: ImportedFile[]): string {
     .join(',')
 }
 
+/** The geometry a set of files draws — visible tracks only, each carrying
+    its own file's colour. Exported so #271's `Track3DLayer` draws exactly
+    what this layer draws for the same `files`, rather than a second
+    computation that could drift from it. */
+export function computeRenderedTracks(files: ImportedFile[]): RenderedTrack[] {
+  return files
+    .filter((file) => file.visible)
+    .flatMap((file) =>
+      file.tracks.map((track, trackIndex) => ({
+        key: `${file.id}-${trackIndex}`,
+        fileId: file.id,
+        color: trackColor(file.colorIndex),
+        points: normalizeAntimeridian(dropInvalidLatitudes(track.points)),
+      })),
+    )
+    .map((track, index) => ({ ...track, index }))
+}
+
 export function TrackLayer({
   files,
   hoveredFileId,
@@ -120,24 +138,9 @@ export function TrackLayer({
      state, precisely because remounting is what would otherwise reset it. */
   const animatedKeys = useRef<Set<string>>(new Set())
 
-  const visibleFiles = useMemo(() => files.filter((file) => file.visible), [files])
-
   /* Hidden tracks are excluded here, at the source — they never reach either
      the map or the bounds calculation below. */
-  const renderedTracks = useMemo<RenderedTrack[]>(
-    () =>
-      visibleFiles
-        .flatMap((file) =>
-          file.tracks.map((track, trackIndex) => ({
-            key: `${file.id}-${trackIndex}`,
-            fileId: file.id,
-            color: trackColor(file.colorIndex),
-            points: normalizeAntimeridian(dropInvalidLatitudes(track.points)),
-          })),
-        )
-        .map((track, index) => ({ ...track, index })),
-    [visibleFiles],
-  )
+  const renderedTracks = useMemo<RenderedTrack[]>(() => computeRenderedTracks(files), [files])
 
   /* Re-fits on import (the file count growing) and on a visibility toggle,
      never on removal — a viewport lurching because something was deleted is

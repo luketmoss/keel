@@ -6,6 +6,7 @@ import { canChangeOwner, type LooseRecord, type LooseStore } from '../store/loos
 import { usePhotoImage } from '../photo/usePhotoImage'
 import { useDraggableCairn } from '../map/useDraggableCairn'
 import type { LatLng } from '../map/geo'
+import { linesFromOverview } from '../geo/overviewLines'
 import { columnInset, revealPoints } from '../map/reveal'
 import { useIsPhone } from '../map/useIsPhone'
 import { CairnMarker } from './CairnMarker'
@@ -78,12 +79,7 @@ export function LooseLayer({
       revealPoints(map, [item.position as LatLng], columnInset(isPhone))
       return
     }
-    const overview = store.getOverview(item.id)
-    const points = overview
-      ? overview.features
-          .filter((feature) => feature.geometry?.type === 'LineString')
-          .flatMap((feature) => (feature.geometry as LineString).coordinates.map(([lng, lat]) => ({ lat, lng })))
-      : []
+    const points = linesFromOverview(store.getOverview(item.id)).flat()
     revealPoints(map, points, columnInset(isPhone))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId])
@@ -252,14 +248,7 @@ function LooseRoute({
     setOverview(store.getOverview(id))
   }, [id, store])
 
-  const paths = useMemo(() => {
-    if (!overview) return []
-    return overview.features
-      .filter((feature) => feature.geometry?.type === 'LineString')
-      .map((feature) =>
-        (feature.geometry as LineString).coordinates.map(([lng, lat]) => ({ lat, lng })),
-      )
-  }, [overview])
+  const paths = useMemo(() => linesFromOverview(overview), [overview])
 
   if (!map) return null
 

@@ -5,6 +5,7 @@ import { LayersControl } from './LayersControl'
 function open(props: Partial<Parameters<typeof LayersControl>[0]> = {}) {
   const onChange = vi.fn()
   const onLabelsChange = vi.fn()
+  const onChange3D = vi.fn()
   render(
     <LayersControl
       value="satellite"
@@ -12,11 +13,14 @@ function open(props: Partial<Parameters<typeof LayersControl>[0]> = {}) {
       onChange={onChange}
       onLabelsChange={onLabelsChange}
       panelCollapsed={false}
+      is3DOn={false}
+      onChange3D={onChange3D}
+      maps3DSupport="available"
       {...props}
     />,
   )
   fireEvent.click(screen.getByRole('button', { name: 'Layers' }))
-  return { onChange, onLabelsChange }
+  return { onChange, onLabelsChange, onChange3D }
 }
 
 describe('LayersControl (#263)', () => {
@@ -82,6 +86,9 @@ describe('LayersControl (#263)', () => {
         onChange={vi.fn()}
         onLabelsChange={vi.fn()}
         panelCollapsed={false}
+        is3DOn={false}
+        onChange3D={vi.fn()}
+        maps3DSupport="available"
       />,
     )
     fireEvent.click(screen.getByRole('button', { name: 'Layers' }))
@@ -99,6 +106,9 @@ describe('LayersControl (#263)', () => {
         onChange={vi.fn()}
         onLabelsChange={vi.fn()}
         panelCollapsed={false}
+        is3DOn={false}
+        onChange3D={vi.fn()}
+        maps3DSupport="available"
       />,
     )
     fireEvent.click(screen.getByRole('button', { name: 'Layers' }))
@@ -113,6 +123,9 @@ describe('LayersControl (#263)', () => {
         onChange={vi.fn()}
         onLabelsChange={vi.fn()}
         panelCollapsed={false}
+        is3DOn={false}
+        onChange3D={vi.fn()}
+        maps3DSupport="available"
       />,
     )
     expect(wrap()).toBe('Hide place labels on the imagery')
@@ -126,6 +139,9 @@ describe('LayersControl (#263)', () => {
         onChange={vi.fn()}
         onLabelsChange={vi.fn()}
         panelCollapsed={false}
+        is3DOn={false}
+        onChange3D={vi.fn()}
+        maps3DSupport="available"
       />,
     )
     const swatch = () => container.querySelector('.layers-control__trigger .layers-control__swatch')
@@ -139,6 +155,9 @@ describe('LayersControl (#263)', () => {
         onChange={vi.fn()}
         onLabelsChange={vi.fn()}
         panelCollapsed={false}
+        is3DOn={false}
+        onChange3D={vi.fn()}
+        maps3DSupport="available"
       />,
     )
     expect(swatch()?.className).not.toContain('layers-control__swatch--labelled')
@@ -150,8 +169,105 @@ describe('LayersControl (#263)', () => {
         onChange={vi.fn()}
         onLabelsChange={vi.fn()}
         panelCollapsed={false}
+        is3DOn={false}
+        onChange3D={vi.fn()}
+        maps3DSupport="available"
       />,
     )
     expect(swatch()?.className).not.toContain('layers-control__swatch--labelled')
+  })
+})
+
+describe('LayersControl 3D switch (#271)', () => {
+  it('offers the switch off, enabled, with its caption', () => {
+    open()
+
+    const swtch = screen.getByRole('switch', { name: /3D/ })
+    expect(swtch.getAttribute('aria-checked')).toBe('false')
+    expect(swtch.hasAttribute('disabled')).toBe(false)
+    expect(screen.getByText('Satellite only')).not.toBeNull()
+  })
+
+  it('flips on click, and leaves the panel open', () => {
+    const { onChange3D } = open()
+
+    fireEvent.click(screen.getByRole('switch', { name: /3D/ }))
+
+    expect(onChange3D).toHaveBeenCalledWith(true)
+    expect(screen.getByRole('group', { name: 'Basemap' })).not.toBeNull()
+  })
+
+  it('shows the "cairns don\'t draw yet" line only while on', () => {
+    const { rerender } = render(
+      <LayersControl
+        value="satellite"
+        labels={false}
+        onChange={vi.fn()}
+        onLabelsChange={vi.fn()}
+        panelCollapsed={false}
+        is3DOn={false}
+        onChange3D={vi.fn()}
+        maps3DSupport="available"
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Layers' }))
+    expect(screen.queryByText("Cairns don't show in 3D yet.")).toBeNull()
+
+    rerender(
+      <LayersControl
+        value="satellite"
+        labels={false}
+        onChange={vi.fn()}
+        onLabelsChange={vi.fn()}
+        panelCollapsed={false}
+        is3DOn
+        onChange3D={vi.fn()}
+        maps3DSupport="available"
+      />,
+    )
+    expect(screen.getByText("Cairns don't show in 3D yet.")).not.toBeNull()
+  })
+
+  it('goes disabled with its own sentence when the browser cannot draw 3D', () => {
+    open({ maps3DSupport: 'unavailable' })
+
+    const swtch = screen.getByRole('switch', { name: /3D/ })
+    expect(swtch.hasAttribute('disabled')).toBe(true)
+    expect(screen.getByText("This browser can't draw 3D. Check that hardware acceleration is on.")).not.toBeNull()
+  })
+
+  it('reads as enabled while support is still being checked', () => {
+    open({ maps3DSupport: 'checking' })
+    expect(screen.getByRole('switch', { name: /3D/ }).hasAttribute('disabled')).toBe(false)
+  })
+
+  it('badges the trigger while on, and only then', () => {
+    const { container, rerender } = render(
+      <LayersControl
+        value="satellite"
+        labels={false}
+        onChange={vi.fn()}
+        onLabelsChange={vi.fn()}
+        panelCollapsed={false}
+        is3DOn={false}
+        onChange3D={vi.fn()}
+        maps3DSupport="available"
+      />,
+    )
+    expect(container.querySelector('.layers-control__badge')).toBeNull()
+
+    rerender(
+      <LayersControl
+        value="satellite"
+        labels={false}
+        onChange={vi.fn()}
+        onLabelsChange={vi.fn()}
+        panelCollapsed={false}
+        is3DOn
+        onChange3D={vi.fn()}
+        maps3DSupport="available"
+      />,
+    )
+    expect(container.querySelector('.layers-control__badge')).not.toBeNull()
   })
 })

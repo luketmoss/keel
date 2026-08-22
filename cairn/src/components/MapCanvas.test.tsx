@@ -11,12 +11,33 @@ const { setZoom, getZoom, fakeMap } = vi.hoisted(() => {
 })
 
 /* `useMap` is what decides whether the corner controls can act at all, so
-   it's the one thing worth swapping per test. */
+   it's the one thing worth swapping per test. #271's 3D surface stays
+   unmounted in every test here — `use3DSupport` (mocked below) reports
+   `'unavailable'` by default, same as a browser that can't draw 3D, which
+   this file has no reason to exercise beyond MapCanvas's own coupling
+   logic (covered directly, without the surface). */
 const { useMapResult } = vi.hoisted(() => ({ useMapResult: { current: null as unknown } }))
 vi.mock('@vis.gl/react-google-maps', () => ({
   APIProvider: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
   Map: () => <div data-testid="map" />,
+  MapMode: { HYBRID: 'HYBRID', SATELLITE: 'SATELLITE' },
   useMap: () => useMapResult.current,
+}))
+
+const { use3DSupportResult } = vi.hoisted(() => ({
+  use3DSupportResult: {
+    current: { support: 'unavailable', library: null } as {
+      support: 'checking' | 'available' | 'unavailable'
+      library: null
+    },
+  },
+}))
+vi.mock('../map/use3DSupport', () => ({
+  use3DSupport: () => use3DSupportResult.current,
+}))
+
+vi.mock('./Map3D', () => ({
+  Map3DSurface: () => null,
 }))
 
 import { MapCanvas } from './MapCanvas'
@@ -103,5 +124,44 @@ describe('MapCanvas corner controls (#109)', () => {
 
     const collapsed = renderCanvas({ panelCollapsed: true })
     expect(collapsed.container.querySelector('.layers-control--clear')).not.toBeNull()
+  })
+})
+
+describe('MapCanvas 3D/basemap coupling (#271)', () => {
+  afterEach(() => {
+    use3DSupportResult.current = { support: 'unavailable', library: null }
+  })
+
+  it('disables the 3D switch when the browser cannot draw 3D', () => {
+    renderCanvas()
+    fireEvent.click(screen.getByRole('button', { name: 'Layers' }))
+
+    expect(screen.getByRole('switch', { name: /3D/ }).hasAttribute('disabled')).toBe(true)
+  })
+
+  it('turning 3D on while Map or Terrain is selected selects Satellite', () => {
+    use3DSupportResult.current = { support: 'available', library: null }
+    renderCanvas()
+    fireEvent.click(screen.getByRole('button', { name: 'Layers' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Terrain' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Layers' }))
+
+    fireEvent.click(screen.getByRole('switch', { name: /3D/ }))
+
+    expect(screen.getByRole('button', { name: 'Satellite' }).className).toContain('--active')
+    expect(screen.getByRole('switch', { name: /3D/ }).getAttribute('aria-checked')).toBe('true')
+  })
+
+  it('selecting Map or Terrain while 3D is on turns 3D off', () => {
+    use3DSupportResult.current = { support: 'available', library: null }
+    renderCanvas()
+    fireEvent.click(screen.getByRole('button', { name: 'Layers' }))
+    fireEvent.click(screen.getByRole('switch', { name: /3D/ }))
+    expect(screen.getByRole('switch', { name: /3D/ }).getAttribute('aria-checked')).toBe('true')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Map' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Layers' }))
+    expect(screen.getByRole('switch', { name: /3D/ }).getAttribute('aria-checked')).toBe('false')
   })
 })

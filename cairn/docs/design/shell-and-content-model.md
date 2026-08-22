@@ -274,6 +274,10 @@ there. Layers is a thumbnail because the choice is visual.
 When the panel is open, Layers clears the column; when the panel is collapsed it
 slides to the map's own left edge, over `--motion-base`.
 
+The Layers panel also carries the **3D** switch. While 3D is on the trigger
+is badged, and the tile selection is Satellite — there is no 3D form of Map
+or Terrain.
+
 ## Navigation
 
 **The map is never unmounted.** One Google Maps instance for the session. Camera
@@ -315,6 +319,10 @@ kinds as one pool.
 **A track's route draws on hover and on selection, never at rest.** At rest
 every kind is a marker. This keeps the world readable at six things or six
 hundred, and keeps the performance rule honest.
+
+**On the 2D map.** In 3D there are no marker glyphs, so routes draw at rest
+and the world view is a set of routes on terrain. Both surfaces read the same
+`overview.geojson`; the performance rule is unchanged.
 
 #81 established *a dot means it is a trip, a route means it is not saved yet*.
 Loose tracks draw real routes, so that rule no longer holds as written and

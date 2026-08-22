@@ -34,6 +34,7 @@ const { use3DSupportResult } = vi.hoisted(() => ({
 }))
 vi.mock('../map/use3DSupport', () => ({
   use3DSupport: () => use3DSupportResult.current,
+  MAPS_3D_UNAVAILABLE_SENTENCE: "This browser can't draw 3D. Check that hardware acceleration is on.",
 }))
 
 vi.mock('./Map3D', () => ({
@@ -41,6 +42,7 @@ vi.mock('./Map3D', () => ({
 }))
 
 import { MapCanvas } from './MapCanvas'
+import { Map3DControlProvider } from '../map/Map3DControl'
 
 function renderCanvas(
   options: {
@@ -54,11 +56,9 @@ function renderCanvas(
     options
   useMapResult.current = mapReady ? fakeMap : null
   return render(
-    <MapCanvas
-      panelCollapsed={panelCollapsed}
-      canFit={canFit}
-      getFitPoints={() => points}
-    />,
+    <Map3DControlProvider>
+      <MapCanvas panelCollapsed={panelCollapsed} canFit={canFit} getFitPoints={() => points} />
+    </Map3DControlProvider>,
   )
 }
 

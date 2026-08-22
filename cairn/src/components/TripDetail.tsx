@@ -16,6 +16,7 @@ import { trackColor } from '../map/palette'
 import { TripImportPanel } from './TripImportPanel'
 import { TripMetadataHeader } from './TripMetadataHeader'
 import { TripStats } from './TripStats'
+import { linesFromOverview } from '../geo/overviewLines'
 import { TripNotFound } from './TripNotFound'
 import { MissingFileRow } from './MissingFileRow'
 import { googleMapsMapId } from '../env'
@@ -941,7 +942,16 @@ export function TripDetail({
             "Loading tracks…" in its place below, and a totals block full of
             em dashes next to that message would read as a second,
             contradictory loading state. */}
-        {!fetching && <TripStats trackStats={allTrackStats} />}
+        {!fetching && (
+          <TripStats
+            trackStats={allTrackStats}
+            tripName={trip.name}
+            /* #274 — the trip's own precomputed overview, the same
+               performance-rule-honouring geometry `Track3DLayer`'s world
+               composition already reads, flattened across every line. */
+            flyoverPoints={linesFromOverview(tripStore.getOverview(trip.id)).flat()}
+          />
+        )}
         <TripImportPanel
           signedIn={signedIn}
           progress={[

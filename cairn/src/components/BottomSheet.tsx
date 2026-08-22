@@ -38,6 +38,13 @@ function measureHeights(): Heights {
 }
 
 interface BottomSheetProps {
+  /** #274 — increments once per `Fly over` press. A flyover behind a full
+      or half sheet is a control that visibly does nothing, so pressing it
+      drops the sheet to its smallest detent — a deliberate, argued
+      exception to the rule below (design note's "Mobile"). Decoupled from
+      knowing what a flyover even is: any number that changes does this,
+      which is what keeps this component map-agnostic. */
+  flyoverToken?: number
   /** A **decision** is open — #81's import draft, the placement queue, or
       #156's create panel. The sheet holds full and the detents are
       suspended, because a decision is not something to peek at.
@@ -69,6 +76,7 @@ interface BottomSheetProps {
     owns its scroll**, at every detent. A grabber that always works is worth
     more than a gesture that usually does. */
 export function BottomSheet({
+  flyoverToken,
   suspended,
   detailOpen,
   searchCard,
@@ -149,6 +157,20 @@ export function BottomSheet({
     }
     restore()
   }, [detailOpen, restore])
+
+  /** #274 — `Fly over` pressed: drops to the smallest available detent, a
+      one-gesture exception (design note's "Mobile") rather than a restore
+      candidate — the user drags straight back up, they do not get it back
+      by whatever closed. Guarded so mounting with a non-zero token already
+      set (a face that opened after a flyover had already started once
+      elsewhere) does not drop the sheet on arrival. */
+  const seenFlyoverToken = useRef(flyoverToken)
+  useEffect(() => {
+    if (flyoverToken === undefined || flyoverToken === seenFlyoverToken.current) return
+    seenFlyoverToken.current = flyoverToken
+    restoreRef.current = null
+    setDetent(heights.detents[0])
+  }, [flyoverToken, heights.detents])
 
   const height = dragHeight ?? heights[detent]
 

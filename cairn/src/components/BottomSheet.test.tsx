@@ -38,6 +38,7 @@ afterEach(() => {
 function renderSheet(props: Partial<React.ComponentProps<typeof BottomSheet>> = {}) {
   return render(
     <BottomSheet
+      flyoverToken={props.flyoverToken}
       suspended={props.suspended ?? false}
       detailOpen={props.detailOpen ?? false}
       searchCard={props.searchCard ?? <div data-testid="card">card</div>}
@@ -384,6 +385,67 @@ describe('BottomSheet', () => {
 
     fireEvent.keyDown(grabber(), { key: 'ArrowDown' })
     expect(parseFloat(document.documentElement.style.getPropertyValue('--sheet-current'))).toBe(PEEK)
+  })
+
+  describe('a flyover (#274)', () => {
+    it('drops to the smallest detent when the token changes', () => {
+      const view = renderSheet({ flyoverToken: 1 })
+      expect(sheetHeight()).toBeCloseTo((HALF_VH / 100) * 800, 0)
+
+      view.rerender(
+        <BottomSheet
+          flyoverToken={2}
+          suspended={false}
+          detailOpen={false}
+          searchCard={<div />}
+          chips={<div />}
+        >
+          <div>trip</div>
+        </BottomSheet>,
+      )
+
+      expect(sheetHeight()).toBeCloseTo(PEEK, 0)
+    })
+
+    it('the drop is a one-gesture exception, not a restore candidate — dragging back up sticks', () => {
+      const view = renderSheet({ flyoverToken: 1 })
+      view.rerender(
+        <BottomSheet
+          flyoverToken={2}
+          suspended={false}
+          detailOpen={false}
+          searchCard={<div />}
+          chips={<div />}
+        >
+          <div>trip</div>
+        </BottomSheet>,
+      )
+      expect(sheetHeight()).toBeCloseTo(PEEK, 0)
+
+      fireEvent.keyDown(grabber(), { key: 'ArrowUp' })
+
+      expect(sheetHeight()).toBeCloseTo((HALF_VH / 100) * 800, 0)
+    })
+
+    it('does not drop the sheet on mount just because a token is already set', () => {
+      renderSheet({ flyoverToken: 1 })
+      expect(sheetHeight()).toBeCloseTo((HALF_VH / 100) * 800, 0)
+    })
+
+    it('a caller that never passes a token never touches the detent', () => {
+      const view = renderSheet()
+      fireEvent.keyDown(grabber(), { key: 'ArrowUp' })
+      const full = (FULL_VH / 100) * 800
+      expect(sheetHeight()).toBeCloseTo(full, 0)
+
+      view.rerender(
+        <BottomSheet suspended={false} detailOpen={false} searchCard={<div />} chips={<div />}>
+          <div>list</div>
+        </BottomSheet>,
+      )
+
+      expect(sheetHeight()).toBeCloseTo(full, 0)
+    })
   })
 
   describe('rotation', () => {

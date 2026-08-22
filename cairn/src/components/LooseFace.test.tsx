@@ -1,7 +1,9 @@
 import { fireEvent, render, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LooseFace } from './LooseFace'
-import type { LooseRecord } from '../store/looseStore'
+import type { LooseRecord, LooseStore } from '../store/looseStore'
+
+const fakeStore = { getOverview: () => null } as unknown as LooseStore
 
 /* #134 — the detail face's image resolves through #53's caching loader,
    mocked here the same way `CairnList.test.tsx` mocks it: at the module
@@ -38,6 +40,7 @@ function renderFace(item: LooseRecord, accessToken: string | null = 'token') {
   return {
     ...render(
       <LooseFace
+        store={fakeStore}
         item={item}
         trips={[]}
         accessToken={accessToken}
@@ -171,6 +174,7 @@ describe('LooseFace — #158 dragging a cairn', () => {
     acquire.mockResolvedValue({ url: undefined, release: vi.fn() })
     const { getByText } = render(
       <LooseFace
+        store={fakeStore}
         item={looseCairn()}
         trips={[]}
         accessToken={null}
@@ -199,6 +203,7 @@ describe('LooseFace — #158 dragging a cairn', () => {
     acquire.mockResolvedValue({ url: undefined, release: vi.fn() })
     const { getByText } = render(
       <LooseFace
+        store={fakeStore}
         item={looseCairn()}
         trips={[]}
         accessToken="token"
@@ -233,6 +238,7 @@ describe('LooseFace — #196 editing the description', () => {
     const onSetDescription = options.onSetDescription ?? vi.fn().mockResolvedValue(true)
     const view = render(
       <LooseFace
+        store={fakeStore}
         item={looseCairn({ description: options.description ?? '' })}
         trips={[]}
         accessToken="token"

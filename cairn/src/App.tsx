@@ -20,6 +20,7 @@ import { LooseLayer } from './components/LooseLayer'
 import { Track3DLayer } from './components/Track3DLayer'
 import { Cairn3DLayer } from './components/Cairn3DLayer'
 import type { PositionedCairn } from './components/CairnLayer'
+import { useMap3DControl } from './map/Map3DControl'
 import { worldTrackGeometry } from './geo/world3DRoutes'
 import { MapEmptyOverlay, WorldLayer, placesForTrips, visibleTripsFor } from './components/WorldMap'
 import { DraftPanel } from './components/DraftPanel'
@@ -177,6 +178,10 @@ function AppShell() {
   const openLooseId = openTrackId ?? openCairnId
   const navigate = useNavigate()
   const account = useGoogleAccount()
+  /** #274 — read only for the phone sheet's own detent drop; `MapCanvas`
+      reads the rest of this same context for the actual 3D switch and
+      surface. */
+  const flyover = useMap3DControl()
   /* The one module allowed to import DriveTripStore directly — everything
      else depends on the TripStore interface. */
   const tripStore = useMemo(() => new DriveTripStore(), [])
@@ -1102,6 +1107,7 @@ function AppShell() {
           ))}
 
         <ShellColumn
+          flyoverToken={flyover.flyover?.token}
           collapsed={collapsed}
           onToggleCollapsed={() => setCollapsed((wasCollapsed) => !wasCollapsed)}
           collapsible={!detailOpen && !draftOpen && !queueOpen && !createOpen}
@@ -1232,6 +1238,7 @@ function AppShell() {
               <LooseFace
                 key={openLooseId}
                 item={openLoose}
+                store={looseStore}
                 trips={tripChoices}
                 accessToken={accessToken}
                 disabled={disconnected}

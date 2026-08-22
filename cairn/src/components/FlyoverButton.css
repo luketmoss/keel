@@ -1,0 +1,53 @@
+/* 274-a-flyover-of-a-trip.md's "The control" — a secondary button: the
+   same metrics `loose-face__primary` uses, without its accent fill. Hover
+   and pressed layer the design language's standard overlays on top of the
+   solid rest fill (the same technique `Lightbox.css`'s
+   `.lightbox__control:active` already uses for the same reason — a flat
+   `background: var(--hover)` would replace the fill rather than tint it). */
+.flyover-button-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.flyover-button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--hit-target);
+  padding: 0 var(--space-4);
+  border: none;
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-lift);
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease);
+}
+
+.flyover-button:hover:not(:disabled) {
+  background-image: linear-gradient(var(--hover), var(--hover));
+}
+
+.flyover-button:active:not(:disabled) {
+  background-image: linear-gradient(var(--pressed), var(--pressed));
+}
+
+.flyover-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.flyover-button__glyph {
+  font-size: var(--text-sm);
+}
+
+.flyover-button__caption {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}

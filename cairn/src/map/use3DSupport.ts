@@ -3,6 +3,12 @@ import { useApiIsLoaded } from '@vis.gl/react-google-maps'
 
 export type Maps3DSupport = 'checking' | 'available' | 'unavailable'
 
+/** #271's own disabled sentence, one place rather than a copy per control —
+    #274's `FlyoverButton` shows it verbatim too, per its design note's
+    "The disabled sentence is #271's, verbatim." */
+export const MAPS_3D_UNAVAILABLE_SENTENCE =
+  "This browser can't draw 3D. Check that hardware acceleration is on."
+
 interface Maps3DState {
   support: Maps3DSupport
   library: google.maps.Maps3DLibrary | null

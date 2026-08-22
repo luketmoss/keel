@@ -1,13 +1,20 @@
 import { render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { useMapResult, map3dEl, flyCameraTo } = vi.hoisted(() => {
+const { useMapResult, map3dEl, flyCameraTo, flyCameraAround, stopCameraAnimation } = vi.hoisted(() => {
   const flyCameraTo = vi.fn()
+  const flyCameraAround = vi.fn()
+  const stopCameraAnimation = vi.fn()
   const map3dEl = {
     center: { lat: 10, lng: 20 } as { lat: number; lng: number },
     range: 5000 as number | null,
     tilt: 0,
     heading: 0,
+    // #274's gesture-cancel listener registers directly on the element —
+    // the real `MarkerElement`/`Map3DElement` both extend `HTMLElement`, so
+    // this stub carries the same two methods rather than a full DOM node.
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
   }
   const fakeMap2d = {
     getCenter: () => ({ lat: () => 10, lng: () => 20 }),
@@ -16,7 +23,13 @@ const { useMapResult, map3dEl, flyCameraTo } = vi.hoisted(() => {
     setCenter: vi.fn(),
     setZoom: vi.fn(),
   }
-  return { useMapResult: { current: fakeMap2d as unknown }, map3dEl, flyCameraTo }
+  return {
+    useMapResult: { current: fakeMap2d as unknown },
+    map3dEl,
+    flyCameraTo,
+    flyCameraAround,
+    stopCameraAnimation,
+  }
 })
 
 vi.mock('@vis.gl/react-google-maps', async () => {
@@ -25,8 +38,8 @@ vi.mock('@vis.gl/react-google-maps', async () => {
     React.useImperativeHandle(ref, () => ({
       map3d: map3dEl,
       flyCameraTo,
-      flyCameraAround: vi.fn(),
-      stopCameraAnimation: vi.fn(),
+      flyCameraAround,
+      stopCameraAnimation,
     }))
     return React.createElement('div', { 'data-testid': 'map3d' })
   })
@@ -116,5 +129,105 @@ describe('Map3DSurface (#271)', () => {
 
     expect(container.querySelector('.map3d-surface--visible')).toBeNull()
     expect(flyCameraTo).not.toHaveBeenCalled()
+  })
+})
+
+describe('Map3DSurface flyover (#274)', () => {
+  const points = [
+    { lat: 10, lng: 20 },
+    { lat: 10.01, lng: 20.01 },
+  ]
+
+  beforeEach(() => {
+    flyCameraTo.mockClear()
+    flyCameraAround.mockClear()
+    stopCameraAnimation.mockClear()
+    reducedMotion.current = false
+    map3dEl.tilt = 0
+    map3dEl.heading = 0
+    map3dEl.addEventListener.mockClear()
+    map3dEl.removeEventListener.mockClear()
+    vi.useFakeTimers()
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      cb(0)
+      return 0
+    })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  it('turning on for a flyover skips #271\'s own tilt-in and flies to the framed geometry instead', () => {
+    render(<Map3DSurface on={true} mode={'SATELLITE' as never} flyover={{ token: 1, points }} />)
+
+    // Never the 55° tilt-in — only the flyover's own 65° fly-in.
+    expect(flyCameraTo).toHaveBeenCalledTimes(1)
+    expect(flyCameraTo.mock.calls[0][0].endCamera.tilt).toBe(65)
+  })
+
+  it('the orbit follows the fly-in without a pause, for one round', () => {
+    render(<Map3DSurface on={true} mode={'SATELLITE' as never} flyover={{ token: 1, points }} />)
+    expect(flyCameraAround).not.toHaveBeenCalled()
+
+    vi.advanceTimersByTime(2000 + 400)
+
+    expect(flyCameraAround).toHaveBeenCalledTimes(1)
+    expect(flyCameraAround.mock.calls[0][0].durationMillis).toBe(12000)
+    expect(flyCameraAround.mock.calls[0][0].rounds).toBe(1)
+  })
+
+  it('lands the camera on the framed target if the fly-in never visibly arrived — the compositor gotcha', () => {
+    render(<Map3DSurface on={true} mode={'SATELLITE' as never} flyover={{ token: 1, points }} />)
+    // A backgrounded tab: `flyCameraTo` never advances `tilt` at all.
+    map3dEl.tilt = 0
+
+    vi.advanceTimersByTime(2000 + 400)
+
+    expect(map3dEl.tilt).toBe(65)
+  })
+
+  it('under reduced motion, assigns the framed camera outright with no flight and no orbit', () => {
+    reducedMotion.current = true
+    render(<Map3DSurface on={true} mode={'SATELLITE' as never} flyover={{ token: 1, points }} />)
+
+    expect(map3dEl.tilt).toBe(65)
+    expect(flyCameraTo).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(20000)
+    expect(flyCameraAround).not.toHaveBeenCalled()
+  })
+
+  it('pressing Fly over again while one is running cancels it and starts fresh, rather than stacking', () => {
+    const { rerender } = render(<Map3DSurface on={true} mode={'SATELLITE' as never} flyover={{ token: 1, points }} />)
+    expect(flyCameraTo).toHaveBeenCalledTimes(1)
+
+    rerender(<Map3DSurface on={true} mode={'SATELLITE' as never} flyover={{ token: 2, points }} />)
+
+    expect(stopCameraAnimation).toHaveBeenCalled()
+    expect(flyCameraTo).toHaveBeenCalledTimes(2)
+  })
+
+  it('input on the 3D surface cancels the running flight', () => {
+    render(<Map3DSurface on={true} mode={'SATELLITE' as never} flyover={{ token: 1, points }} />)
+    expect(map3dEl.addEventListener).toHaveBeenCalledWith('pointerdown', expect.any(Function))
+
+    const [, handler] = map3dEl.addEventListener.mock.calls.find(([type]) => type === 'pointerdown')!
+    ;(handler as () => void)()
+
+    expect(stopCameraAnimation).toHaveBeenCalledTimes(1)
+
+    // The orbit never starts — the fly-in's own timer was cleared too.
+    vi.advanceTimersByTime(20000)
+    expect(flyCameraAround).not.toHaveBeenCalled()
+  })
+
+  it('turning 3D off mid-flight cancels it before reading the camera back into 2D', () => {
+    const { rerender } = render(<Map3DSurface on={true} mode={'SATELLITE' as never} flyover={{ token: 1, points }} />)
+    expect(flyCameraTo).toHaveBeenCalledTimes(1)
+
+    rerender(<Map3DSurface on={false} mode={'SATELLITE' as never} flyover={{ token: 1, points }} />)
+
+    expect(stopCameraAnimation).toHaveBeenCalled()
   })
 })

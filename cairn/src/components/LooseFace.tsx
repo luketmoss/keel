@@ -13,15 +13,22 @@ import {
   showExport,
   type CairnIcon,
   type LooseRecord,
+  type LooseStore,
 } from '../store/looseStore'
 import { usePhotoImage } from '../photo/usePhotoImage'
 import { IconPicker } from './IconPicker'
 import { DescriptionInput } from './DescriptionInput'
 import { useEditableCairnText } from './useEditableCairnText'
+import { linesFromOverview } from '../geo/overviewLines'
 import './LooseFace.css'
 
 interface LooseFaceProps {
   item: LooseRecord
+  /** #274 — reads a loose track's own precomputed `overview.geojson` for
+      `FlyoverButton`'s geometry; the loose store keeps no raw points
+      around at all (see `TrackBody`'s own comment), so this is the only
+      geometry available for one. Unused for a cairn. */
+  store: LooseStore
   trips: TripChoice[]
   /** #134: resolves a photo's thumbnail through #53's caching loader —
       `null` renders the box's existing `--surface-lift` fill, same as a
@@ -77,6 +84,7 @@ interface LooseFaceProps {
  * places to keep that shape in step. */
 export function LooseFace({
   item,
+  store,
   trips,
   accessToken,
   onAddToTrip,
@@ -239,7 +247,7 @@ export function LooseFace({
         )}
 
         {item.kind === 'track' ? (
-          <TrackBody item={item} />
+          <TrackBody item={item} store={store} />
         ) : (
           <CairnBody
             item={item}
@@ -273,7 +281,13 @@ export function LooseFace({
     `aggregateTrackStats`/`aggregateElevationProfile` already computed once,
     at import, and stored on the record — `TrackFace`'s trip-owned sibling
     computes the same shape from a `Track` it already holds in memory. */
-function TrackBody({ item }: { item: Extract<LooseRecord, { kind: 'track' }> }) {
+function TrackBody({
+  item,
+  store,
+}: {
+  item: Extract<LooseRecord, { kind: 'track' }>
+  store: LooseStore
+}) {
   return (
     <TrackFaceBody
       stats={{
@@ -288,6 +302,10 @@ function TrackBody({ item }: { item: Extract<LooseRecord, { kind: 'track' }> }) 
       pointCount={item.pointCount}
       sourceName={item.sourceName}
       color={trackColor(item.colorIndex)}
+      name={item.name}
+      /* #274 — the only geometry a loose track has at all: its own
+         precomputed overview, flattened across every line it holds. */
+      flyoverPoints={linesFromOverview(store.getOverview(item.id)).flat()}
     />
   )
 }

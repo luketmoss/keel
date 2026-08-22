@@ -98,6 +98,54 @@
   color: var(--text-muted);
 }
 
+/* #268 — the header button, restored (#219's). Reset to read exactly like
+   the `.track-row__text` div it replaces, plus the row's own left
+   alignment and cursor. */
+.track-row__text--button {
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+/* #268 — expand/collapse over --motion-base using grid-template-rows:
+   0fr -> 1fr on a wrapper, which animates to content height without
+   measuring anything (#219's mechanism, restored). `visibility` is
+   transitioned with a delay rather than toggled by a `display` change:
+   instant on open (delay 0), so the detail is visible for the whole
+   opening animation; delayed to match `--motion-base` on close, so it
+   stays visible (and in the tab order) until the collapse animation
+   actually finishes, rather than vanishing mid-transition. Collapses to an
+   instant cut under `prefers-reduced-motion` via the global block in
+   index.css, which already zeroes every transition duration. */
+.track-row__detail-wrapper {
+  display: grid;
+  grid-template-rows: 0fr;
+  visibility: hidden;
+  transition:
+    grid-template-rows var(--motion-base) var(--ease),
+    visibility 0s var(--motion-base);
+}
+
+.track-row__detail-wrapper--open {
+  grid-template-rows: 1fr;
+  visibility: visible;
+  transition: grid-template-rows var(--motion-base) var(--ease);
+}
+
+.track-row__detail-inner {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+}
+
 .track-row__visibility {
   flex: none;
   width: 40px;

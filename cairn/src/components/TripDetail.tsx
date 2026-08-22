@@ -301,7 +301,30 @@ export function TripDetail({
       cairn implicitly collapses whichever was expanded before, since it's
       the single next value of one piece of state. */
   const [expandedCairnId, setExpandedCairnId] = useState<string | null>(null)
+  /** #268 — the one track row expanded in place, beside `expandedCairnId`
+      above and for the same reason: not derived from anything, since #270
+      will need to move it without collapsing the row. `null` means no row
+      is expanded; setting it to a new track's id implicitly collapses
+      whichever was expanded before, being the single next value of one
+      piece of state. */
+  const [expandedTrackId, setExpandedTrackId] = useState<string | null>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
+
+  /** #268 — the header button and the row's own whitespace both call this
+      with the file's id: toggles closed if it's already the expanded one,
+      opens it (implicitly closing whatever else was open) otherwise. */
+  const toggleTrackExpand = useCallback((id: string) => {
+    setExpandedTrackId((current) => (current === id ? null : id))
+  }, [])
+
+  // #268 — mirrors `expandedCairnId`'s own cleanup: a track removed, or
+  // removed from the trip, while its row is expanded leaves the expansion
+  // with nothing to draw.
+  useEffect(() => {
+    if (expandedTrackId && !tripImport.tracks.some((file) => file.id === expandedTrackId)) {
+      setExpandedTrackId(null)
+    }
+  }, [tripImport.tracks, expandedTrackId])
 
   /* #251 — one hovered-cairn set, written by both `CairnList` and
      `CairnLayer` and read by both, exactly the shape `App.tsx` already
@@ -747,7 +770,9 @@ export function TripDetail({
       onRename={tripImport.renameTrack}
       onRecolor={tripImport.recolorTrack}
       onReorder={tripImport.reorderTracks}
-      onOpenTrack={(id) => navigate(`/tracks/${id}`)}
+      expandedTrackId={expandedTrackId}
+      onToggleExpand={toggleTrackExpand}
+      sampledElevation={tripImport.sampledElevation}
       canReorder={!tripImport.loading}
       disabled={!signedIn}
       emptyDetail="Drop tracks or photos anywhere, or use Import files above."

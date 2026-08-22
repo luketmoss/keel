@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState, type DragEvent, type RefObject } from 'react'
+import { useEffect, useRef, useState, type DragEvent, type MouseEvent, type RefObject } from 'react'
 import type { ImportedFile } from '../import/types'
 import { TRACK_COLOR_NAMES, TRACK_COLORS, trackColor } from '../map/palette'
 import { formatStatsLine } from '../format/units'
+import { effectiveElevationProfile, type StoredTrackElevation } from '../kml/stats'
+import { prefersReducedMotion } from '../map/motion'
 import { iconLabel } from './iconLabel'
 import { RowMenu } from './RowMenu'
+import { TrackFaceBody } from './TrackFaceBody'
 import { VisibilityIcon } from './VisibilityIcon'
 import './TrackList.css'
 
@@ -51,11 +54,24 @@ interface TrackListProps {
   onRecolor?: (id: string, color: number) => Promise<boolean>
   /** Called with every row's `id` in its new order once a drag completes. */
   onReorder?: (orderedIds: string[]) => Promise<boolean>
-  /** #226: `More details` in the row's `⋮` navigates here with the file's
-      id — the row itself does nothing on click any more (#219's disclosure
-      is gone; see the design note). Omitted only in tests; every real
-      mount has a router to navigate. */
-  onOpenTrack?: (id: string) => void
+  /** #268 — the one row expanded in place, or `null`. Lives in `TripDetail`
+      beside `expandedCairnId` rather than as state here: it is not derived
+      from anything, and #270 will need to move it without collapsing the
+      row (design note's "One at a time"). Defaults to `null` so a caller
+      that never wires expansion (most of this file's tests) keeps working
+      unchanged. */
+  expandedTrackId?: string | null
+  /** #268 — toggles `expandedTrackId`: this file's own id if some other row
+      (or none) is expanded, `null` if this file is already the one
+      expanded. The header button and the row's own non-interactive area
+      both call this with the same file id. */
+  onToggleExpand?: (id: string) => void
+  /** #268: the trip's current sampled-elevation cache (#224), keyed by
+      `Track.key` — threaded through so the expanded row's profile can fall
+      back to a sampled series exactly as `TrackFace`'s does. Empty object
+      when nothing has been sampled, matching `useTripImport`'s own rest
+      value. */
+  sampledElevation?: Record<string, StoredTrackElevation>
   /** Drag handles render disabled while the trip is still gaining rows
       during #35's Partially loaded state — reordering a list that's still
       settling underneath the cursor produces a result nobody intended.
@@ -96,7 +112,9 @@ export function TrackList({
   onRename,
   onRecolor,
   onReorder,
-  onOpenTrack,
+  expandedTrackId = null,
+  onToggleExpand = () => {},
+  sampledElevation = {},
   canReorder = true,
   emptyDetail = 'Drop a KML or KMZ file anywhere, or use Import tracks above.',
   disabled = false,
@@ -115,6 +133,10 @@ export function TrackList({
 
   function handleDragStart(id: string) {
     if (!onReorder || !canReorder) return
+    // #268: dragging the expanded row collapses it first — reordering a
+    // row three times its normal height past its neighbours makes the drop
+    // indicator unreadable.
+    if (expandedTrackId === id) onToggleExpand(id)
     setDragState({ draggedId: id, overId: null, before: true })
   }
 
@@ -163,7 +185,9 @@ export function TrackList({
                 else onRemove(file.id)
               }}
               onCancelConfirm={onCancelConfirm}
-              onOpenTrack={onOpenTrack}
+              expanded={expandedTrackId === file.id}
+              onToggleExpand={() => onToggleExpand(file.id)}
+              sampledElevation={sampledElevation}
               removing={removingIds.has(file.id)}
               removeError={removeErrors[file.id]}
               disableRemove={disableRemove}
@@ -214,7 +238,9 @@ function TrackRow({
   onDragOverRow,
   onDrop,
   onDragEnd,
-  onOpenTrack,
+  expanded,
+  onToggleExpand,
+  sampledElevation,
 }: {
   file: ImportedFile
   onToggleVisibility: (id: string) => void
@@ -240,22 +266,77 @@ function TrackRow({
   onDragOverRow: (event: DragEvent<HTMLLIElement>) => void
   onDrop: () => void
   onDragEnd: () => void
-  onOpenTrack?: (id: string) => void
+  /** #268 — whether *this* row is the one `TripDetail.expandedTrackId`
+      names. Meaningless for a multi-track file, which never opens
+      (`canOpenDetail` below). */
+  expanded: boolean
+  onToggleExpand: () => void
+  sampledElevation: Record<string, StoredTrackElevation>
 }) {
   const [editingName, setEditingName] = useState(false)
   const [colorPickerOpen, setColorPickerOpen] = useState(false)
   const [savedField, setSavedField] = useState<'name' | 'color' | null>(null)
+  const liRef = useRef<HTMLLIElement | null>(null)
 
   const color = trackColor(file.colorIndex)
   /* Aggregating statistics across a multi-track file is out of scope (v2,
      with trips) — the line only appears when there is exactly one track to
      describe unambiguously. */
   const statsLine = file.tracks.length === 1 ? formatStatsLine(file.trackStats[0]) : null
-  /* #226 (was #219's `canOpen`) — a multi-track file has no unambiguous
-     single set of numbers (#6, #7), so there is nothing for a face to
-     show: no `More details`, per the design note's menu table. Its `⋮`
-     still carries Rename. */
+  /* #268 (was #226's, was #219's `canOpen`) — a multi-track file has no
+     unambiguous single set of numbers (#6, #7), so there is nothing for a
+     detail to show: no expand affordance, no `aria-expanded`. Its `⋮` still
+     carries Rename. */
   const canOpenDetail = file.tracks.length === 1
+  const detailId = `track-row-detail-${file.id}`
+  // #268: inert while removing — the row is already about to be destroyed,
+  // matching `CairnList`'s own `previewOpen` guard.
+  const expandedOpen = canOpenDetail && expanded && !removing
+  // #219's mechanism needs the wrapper mounted through a collapse's own
+  // transition, so it can't unmount the moment `expandedOpen` goes false —
+  // but mounting `TrackFaceBody` for every never-opened row would put its
+  // stats labels and its "N points · <source>" footnote into a list that
+  // has never been touched (and, concretely, collide with `getByText`
+  // lookups on the file's own name). Once opened, its content stays
+  // mounted so a later collapse still has something to animate shut.
+  const [hasOpened, setHasOpened] = useState(expanded)
+  useEffect(() => {
+    if (expanded) setHasOpened(true)
+  }, [expanded])
+  // The median-filtered, distance-aligned series, or the sampled fallback
+  // (#224) — `TrackFace`'s own computation, reused here so the row and the
+  // face never disagree on what a track's profile is. Only computed once
+  // the row has actually opened, for the same reason its content mounts
+  // lazily above.
+  const profile =
+    canOpenDetail && hasOpened
+      ? effectiveElevationProfile(file.tracks[0], file.tracks[0].key ? sampledElevation[file.tracks[0].key] : undefined)
+      : undefined
+
+  // #268 — the row's remaining non-interactive area also toggles, for
+  // pointer users who aim at the whitespace around the header rather than
+  // the name/meta button itself — implemented by ignoring any click whose
+  // target sits inside an interactive descendant, in one place, rather than
+  // `stopPropagation` in five handlers (#219's mechanism, restored).
+  function handleRowClick(event: MouseEvent<HTMLDivElement>) {
+    if (!canOpenDetail || editingName) return
+    const target = event.target as HTMLElement
+    if (target.closest('button, a, input, [draggable="true"]')) return
+    onToggleExpand()
+  }
+
+  // #268: scrolls the row into view once the expanded block has laid out —
+  // `block: 'nearest'` on the `<li>` itself rather than the header, since a
+  // track row (unlike #250's cairn row) has no selection to hang the scroll
+  // on. One frame's delay lets the grid-template-rows transition start from
+  // its own layout rather than the collapsed one.
+  useEffect(() => {
+    if (!expandedOpen) return
+    const raf = requestAnimationFrame(() => {
+      liRef.current?.scrollIntoView?.({ block: 'nearest', behavior: prefersReducedMotion() ? 'auto' : 'smooth' })
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [expandedOpen])
 
   /* Held and cleared on unmount, the way `TripMetadataHeader` already does
      with its own saved flash. Left dangling, the timer fires against an
@@ -341,17 +422,20 @@ function TrackRow({
 
   return (
     <li
+      ref={liRef}
       className={rowClassName}
       onMouseEnter={() => onHoverFile?.(file.id)}
       onMouseLeave={() => onHoverFile?.(null)}
       onDragOver={onDragOverRow}
       onDrop={onDrop}
     >
-      {/* #226 — the row's click does nothing. Every control on it is
-          already a control (`⠿`, the swatch, `👁`, `⋮`); adding a click
-          meaning to the whitespace between them makes the other five
-          ambiguous, which is what #219 did. `More details` is the `⋮`'s. */}
-      <div className="track-row__main">
+      {/* #268 — restores #219's click, revised by #226 to do nothing: the
+          header's own whitespace toggles the row now that it has a detail
+          to toggle again. `⠿`, the swatch, `👁` and `⋮` are their own
+          controls and are excluded by `handleRowClick`'s interactive-
+          descendant check rather than by `stopPropagation` in each of
+          them. */}
+      <div className="track-row__main" onClick={handleRowClick}>
         {showHandle ? (
           <span
             className={`track-row__handle${draggable ? '' : ' track-row__handle--disabled'}`}
@@ -394,25 +478,43 @@ function TrackRow({
             the anatomy `shell-and-content-model.md` specifies and the two
             lists inside a trip were the last surfaces not to use. The
             controls that flanked the name cost it all but ~68px of a
-            380px column; the meta line now gets the row's own width. */}
-        <div className="track-row__text">
-          {editingName ? (
+            380px column; the meta line now gets the row's own width.
+
+            #268 — while it can open a detail, this becomes the header
+            button again (#219's, restored): it carries `aria-expanded`/
+            `aria-controls` and wraps the name and the meta line and
+            nothing else, so a control added to the row later never ends up
+            nested inside it. Renaming replaces it with a plain div, since
+            an `<input>` cannot sit inside a `<button>`. */}
+        {editingName ? (
+          <div className="track-row__text">
             <NameInput initial={file.name} onCommit={commitName} onCancel={() => setEditingName(false)} />
-          ) : (
-            /* #226 — back to a plain span with its `title`: #219's
-               name-as-button existed only to open the row's own detail,
-               which is gone. */
+            {statsLine && <p className="track-row__stats">{statsLine}</p>}
+          </div>
+        ) : canOpenDetail ? (
+          <button
+            type="button"
+            className="track-row__text track-row__text--button"
+            aria-expanded={expandedOpen}
+            aria-controls={detailId}
+            onClick={onToggleExpand}
+          >
             <span className={`track-row__name${savedField === 'name' ? ' track-row__field--saved' : ''}`} title={file.name}>
               {file.name}
-              {file.tracks.length > 1 && (
-                <span className="track-row__count"> {file.tracks.length} tracks</span>
-              )}
             </span>
-          )}
-          {/* A multi-track file has no unambiguous stats line, and no empty
-              second line is drawn to keep row heights equal. */}
-          {statsLine && <p className="track-row__stats">{statsLine}</p>}
-        </div>
+            {/* A multi-track file has no unambiguous stats line, and no
+                empty second line is drawn to keep row heights equal — moot
+                here since a multi-track file never reaches this branch. */}
+            {statsLine && <p className="track-row__stats">{statsLine}</p>}
+          </button>
+        ) : (
+          <div className="track-row__text">
+            <span className={`track-row__name${savedField === 'name' ? ' track-row__field--saved' : ''}`} title={file.name}>
+              {file.name}
+              <span className="track-row__count"> {file.tracks.length} tracks</span>
+            </span>
+          </div>
+        )}
         <button
           type="button"
           className="track-row__visibility"
@@ -432,19 +534,6 @@ function TrackRow({
           <RowMenu
             label={`Row actions for ${file.name}`}
             actions={[
-              /* #226 — `More details` opens the track's face; absent for a
-                 multi-track file, which has no unambiguous numbers for a
-                 face to show (`canOpenDetail`). No ellipsis: opening a face
-                 asks nothing, per the design note. First in the menu,
-                 #193's safe-to-destructive order. */
-              ...(canOpenDetail && onOpenTrack
-                ? [
-                    {
-                      label: 'More details',
-                      onSelect: () => onOpenTrack(file.id),
-                    },
-                  ]
-                : []),
               ...(onRename
                 ? [
                     {
@@ -474,6 +563,33 @@ function TrackRow({
         )}
       </div>
       {removeError && <p className="track-row__error">{removeError}</p>}
+      {/* #268 — beneath the header, flush at the row's own content width
+          rather than indented into the text column (#226's lesson, applied
+          with #250's measurement): a sibling of `.track-row__main` inside
+          this `<li>`, so it inherits the row's own padding instead of the
+          narrower text column's. Always mounted for a row that can open at
+          all — `grid-template-rows: 0fr -> 1fr` animates open/closed
+          without a `display` toggle, #219's mechanism, restored. Absent
+          entirely for a multi-track file, which has no `aria-controls`
+          pointing at it to begin with. */}
+      {canOpenDetail && (
+        <div
+          id={detailId}
+          className={`track-row__detail-wrapper${expandedOpen ? ' track-row__detail-wrapper--open' : ''}`}
+        >
+          <div className="track-row__detail-inner">
+            {hasOpened && (
+              <TrackFaceBody
+                stats={file.trackStats[0]}
+                profile={profile}
+                pointCount={file.tracks[0].points.length}
+                sourceName={file.sourceName}
+                color={color}
+              />
+            )}
+          </div>
+        </div>
+      )}
     </li>
   )
 }
@@ -519,9 +635,9 @@ function ColorPopover({
       {/* Closes the popover on an outside click without a document-level
           listener — a full-viewport layer beneath the popover itself.
           Stops propagation: it's a DOM descendant of the row despite
-          covering the whole viewport, and the row's own click now does
-          nothing (#226), so this only prevents the click from reaching
-          whatever the row happens to sit inside of. */}
+          covering the whole viewport, and #268 gave the row's own click a
+          meaning again — without this, closing the popover from anywhere
+          on screen would also toggle the row's expansion. */}
       <div
         className="track-row__color-backdrop"
         onClick={(event) => {

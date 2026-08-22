@@ -12,12 +12,50 @@ import { prefersReducedMotion } from '../map/motion'
    count rather than referenced live. */
 const DRAW_ON_DURATION_MS = 280
 
+/* #269 — the stacking order. A `zIndex` handed to the Maps API never reaches
+   a stylesheet, so these are module constants beside `DRAW_ON_DURATION_MS`
+   rather than CSS custom properties (`MARKER_FOOTPRINT_PX` in
+   `CairnLayer.tsx` is the other precedent). A track's own zIndex is
+   `band + index * 10 + layer`: the band keeps a hovered or selected track's
+   whole stack — halo, casing, stroke — above every resting track regardless
+   of import order, the index term preserves today's deterministic order
+   among tracks in the same band, and the layer term keeps the halo beneath
+   the casing beneath the stroke. 1,000 tracks fit under one band before two
+   could collide. */
+const TRACK_Z_REST = 0
+const TRACK_Z_HOVERED = 10000
+const TRACK_Z_SELECTED = 20000
+
+const TRACK_WEIGHT_REST: readonly [casing: number, stroke: number] = [5, 3]
+const TRACK_WEIGHT_HOVERED: readonly [casing: number, stroke: number] = [7, 4]
+const TRACK_WEIGHT_SELECTED: readonly [casing: number, stroke: number] = [9, 5]
+const TRACK_HALO_WEIGHT = 17
+const TRACK_HALO_OPACITY = 0.3
+
+type TrackBand = 'rest' | 'hovered' | 'selected'
+
+const BAND_Z: Record<TrackBand, number> = {
+  rest: TRACK_Z_REST,
+  hovered: TRACK_Z_HOVERED,
+  selected: TRACK_Z_SELECTED,
+}
+const BAND_WEIGHTS: Record<TrackBand, readonly [casing: number, stroke: number]> = {
+  rest: TRACK_WEIGHT_REST,
+  hovered: TRACK_WEIGHT_HOVERED,
+  selected: TRACK_WEIGHT_SELECTED,
+}
+
 interface TrackLayerProps {
   files: ImportedFile[]
-  /** The file whose row is currently hovered in the sidebar (#49) — draws an
-      extra, wider, low-opacity polyline beneath that file's own tracks. Not
-      a persisted selection; nothing to track once the pointer moves on. */
+  /** The file whose row is currently hovered in the sidebar (#49) — its
+      tracks draw in the hovered band, above every resting track. */
   hoveredFileId?: string | null
+  /** #269 — the file whose row is currently selected. Its tracks draw in
+      the selected band, above a hovered file's, and carry the halo the
+      language licenses for "explicit selection". A multi-track file's
+      tracks all take this together, since the id names the row, not one
+      track within it. */
+  selectedFileId?: string | null
 }
 
 interface RenderedTrack {
@@ -25,6 +63,11 @@ interface RenderedTrack {
   fileId: string
   color: string
   points: LatLng[]
+  /** Position in the trip's own track order, flattened across files —
+      the term the stacking order multiplies by 10 to keep resting tracks
+      in today's order within their band. Assigned from the list as it
+      stands, so a later arrival re-bands nothing already on the map. */
+  index: number
 }
 
 function visibleFilesKey(files: ImportedFile[]): string {
@@ -35,7 +78,7 @@ function visibleFilesKey(files: ImportedFile[]): string {
     .join(',')
 }
 
-export function TrackLayer({ files, hoveredFileId }: TrackLayerProps) {
+export function TrackLayer({ files, hoveredFileId, selectedFileId }: TrackLayerProps) {
   const map = useMap()
   const previousFileCount = useRef(0)
   const previousVisibleKey = useRef('')
@@ -52,14 +95,16 @@ export function TrackLayer({ files, hoveredFileId }: TrackLayerProps) {
      the map or the bounds calculation below. */
   const renderedTracks = useMemo<RenderedTrack[]>(
     () =>
-      visibleFiles.flatMap((file) =>
-        file.tracks.map((track, trackIndex) => ({
-          key: `${file.id}-${trackIndex}`,
-          fileId: file.id,
-          color: trackColor(file.colorIndex),
-          points: normalizeAntimeridian(dropInvalidLatitudes(track.points)),
-        })),
-      ),
+      visibleFiles
+        .flatMap((file) =>
+          file.tracks.map((track, trackIndex) => ({
+            key: `${file.id}-${trackIndex}`,
+            fileId: file.id,
+            color: trackColor(file.colorIndex),
+            points: normalizeAntimeridian(dropInvalidLatitudes(track.points)),
+          })),
+        )
+        .map((track, index) => ({ ...track, index })),
     [visibleFiles],
   )
 
@@ -85,17 +130,26 @@ export function TrackLayer({ files, hoveredFileId }: TrackLayerProps) {
 
   return (
     <>
-      {renderedTracks.map((track) => (
-        <Track
-          key={track.key}
-          trackKey={track.key}
-          points={track.points}
-          color={track.color}
-          glow={hoveredFileId != null && hoveredFileId === track.fileId}
-          alreadyAnimated={animatedKeys.current.has(track.key)}
-          onAnimated={() => animatedKeys.current.add(track.key)}
-        />
-      ))}
+      {renderedTracks.map((track) => {
+        const band: TrackBand =
+          selectedFileId != null && selectedFileId === track.fileId
+            ? 'selected'
+            : hoveredFileId != null && hoveredFileId === track.fileId
+              ? 'hovered'
+              : 'rest'
+        return (
+          <Track
+            key={track.key}
+            trackKey={track.key}
+            points={track.points}
+            color={track.color}
+            band={band}
+            index={track.index}
+            alreadyAnimated={animatedKeys.current.has(track.key)}
+            onAnimated={() => animatedKeys.current.add(track.key)}
+          />
+        )
+      })}
     </>
   )
 }
@@ -151,18 +205,21 @@ function Track({
   trackKey,
   points,
   color,
-  glow,
+  band,
+  index,
   alreadyAnimated,
   onAnimated,
 }: {
   trackKey: string
   points: LatLng[]
   color: string
-  glow: boolean
+  band: TrackBand
+  index: number
   alreadyAnimated: boolean
   onAnimated: () => void
 }) {
   const revealed = useRevealedPoints(trackKey, points, alreadyAnimated, onAnimated)
+  const zBase = BAND_Z[band] + index * 10
 
   if (points.length === 0) return null
 
@@ -171,9 +228,13 @@ function Track({
       <Marker
         position={points[0]}
         clickable={false}
+        zIndex={zBase}
         icon={{
           path: google.maps.SymbolPath.CIRCLE,
-          scale: 5,
+          // #269 — hovered and selected scale a single-point track the same
+          // way a hovered/selected marker elsewhere does; there's no line
+          // to wrap a halo around, so that's the whole treatment.
+          scale: band === 'rest' ? 5 : 7,
           fillColor: color,
           fillOpacity: 1,
           strokeWeight: 0,
@@ -182,17 +243,35 @@ function Track({
     )
   }
 
+  const [casingWeight, strokeWeight] = BAND_WEIGHTS[band]
+
   return (
     <>
-      {/* Wider, low-opacity, beneath everything else — an approximation of
-          the design doc's CSS glow, since Polyline exposes no filter of its
-          own to draw one for real. Only while this track's file is
-          hovered. */}
-      {glow && (
-        <Polyline path={points} strokeColor={color} strokeOpacity={0.35} strokeWeight={9} clickable={false} />
+      {/* #269 — the language's licensed glow, transcribed as a wider,
+          low-opacity stroke beneath the casing (`Polyline` exposes no
+          filter of its own). Moved from hover to selection: hover keeps a
+          real but weaker treatment (thicker casing and stroke, the raised
+          band) so the two read apart and hover cannot impersonate
+          selection. Drawn from `revealed` so a track selected mid-draw-on
+          takes the treatment as it draws, same as the casing and stroke. */}
+      {band === 'selected' && (
+        <Polyline
+          path={revealed}
+          strokeColor={color}
+          strokeOpacity={TRACK_HALO_OPACITY}
+          strokeWeight={TRACK_HALO_WEIGHT}
+          clickable={false}
+          zIndex={zBase}
+        />
       )}
-      <Polyline path={revealed} strokeColor="#00000059" strokeWeight={5} clickable={false} />
-      <Polyline path={revealed} strokeColor={color} strokeWeight={3} clickable={false} />
+      <Polyline
+        path={revealed}
+        strokeColor="#00000059"
+        strokeWeight={casingWeight}
+        clickable={false}
+        zIndex={zBase + 1}
+      />
+      <Polyline path={revealed} strokeColor={color} strokeWeight={strokeWeight} clickable={false} zIndex={zBase + 2} />
     </>
   )
 }

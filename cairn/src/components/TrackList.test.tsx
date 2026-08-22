@@ -1043,4 +1043,104 @@ describe('TrackList', () => {
       expect(wrap?.className).not.toContain('track-row__detail-wrapper--open')
     })
   })
+
+  /* #269 — clicking a row selects it, whether or not it can also expand:
+     "for every row, including a multi-track file's, which has no expanded
+     state (#268) and gains a meaning for its click here." */
+  describe('#269 selecting a track row', () => {
+    it('calls onSelectTrack with the file id when the header is clicked, alongside onToggleExpand', () => {
+      const onSelectTrack = vi.fn()
+      const onToggleExpand = vi.fn()
+      render(
+        <TrackList
+          files={[importedFile()]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          onToggleExpand={onToggleExpand}
+          onSelectTrack={onSelectTrack}
+        />,
+      )
+
+      fireEvent.click(screen.getByText('trip.kml', { exact: false }))
+      expect(onSelectTrack).toHaveBeenCalledWith('f1')
+      expect(onToggleExpand).toHaveBeenCalledWith('f1')
+    })
+
+    it('also selects from the header row whitespace', () => {
+      const onSelectTrack = vi.fn()
+      render(
+        <TrackList
+          files={[importedFile()]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          onSelectTrack={onSelectTrack}
+        />,
+      )
+
+      fireEvent.click(document.querySelector('.track-row__main') as HTMLElement)
+      expect(onSelectTrack).toHaveBeenCalledWith('f1')
+    })
+
+    it('selects a multi-track file on click, even though it cannot expand', () => {
+      const onSelectTrack = vi.fn()
+      const onToggleExpand = vi.fn()
+      render(
+        <TrackList
+          files={[
+            importedFile({
+              tracks: [
+                { name: 'a', points: [] },
+                { name: 'b', points: [] },
+              ],
+            }),
+          ]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          onToggleExpand={onToggleExpand}
+          onSelectTrack={onSelectTrack}
+        />,
+      )
+
+      fireEvent.click(screen.getByText('trip.kml', { exact: false }))
+      expect(onSelectTrack).toHaveBeenCalledWith('f1')
+      expect(onToggleExpand).not.toHaveBeenCalled()
+    })
+
+    it('does not select from a click on the handle, swatch, visibility control, or ⋮', () => {
+      const onSelectTrack = vi.fn()
+      render(
+        <TrackList
+          files={[importedFile()]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          onSelectTrack={onSelectTrack}
+          onRecolor={vi.fn()}
+          onReorder={vi.fn()}
+        />,
+      )
+
+      fireEvent.click(screen.getByLabelText('Reorder trip.kml'))
+      fireEvent.click(screen.getByRole('button', { name: 'Change colour for trip.kml' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Hide trip.kml' }))
+      openRowMenu('trip.kml')
+
+      expect(onSelectTrack).not.toHaveBeenCalled()
+    })
+
+    it('marks the row named by selectedTrackId with track-row--selected, and no other row', () => {
+      render(
+        <TrackList
+          files={[importedFile({ id: 'a', name: 'a.kml' }), importedFile({ id: 'b', name: 'b.kml' })]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          selectedTrackId="a"
+        />,
+      )
+
+      const rowA = screen.getByText('a.kml', { exact: false }).closest('li')!
+      const rowB = screen.getByText('b.kml', { exact: false }).closest('li')!
+      expect(rowA.className).toContain('track-row--selected')
+      expect(rowB.className).not.toContain('track-row--selected')
+    })
+  })
 })

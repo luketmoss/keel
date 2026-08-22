@@ -6,6 +6,8 @@ import { canChangeOwner, type LooseRecord, type LooseStore } from '../store/loos
 import { usePhotoImage } from '../photo/usePhotoImage'
 import { useDraggableCairn } from '../map/useDraggableCairn'
 import type { LatLng } from '../map/geo'
+import { columnInset, revealPoints } from '../map/reveal'
+import { useIsPhone } from '../map/useIsPhone'
 import { CairnMarker } from './CairnMarker'
 import './LooseLayer.css'
 
@@ -31,6 +33,11 @@ interface LooseLayerProps {
   /** #158: called once, on drop, only when a marker actually moved.
       Resolves whether the write landed — `false` reverts it. */
   onMoveCairn?: (id: string, position: LatLng) => Promise<boolean>
+  /** #270: true while a decision owns the map — the reveal helper does not
+      fire, same condition `TripDetail` reads for its own two call sites.
+      Defaults to `false` so a caller that hasn't been updated for this
+      issue keeps revealing unconditionally. */
+  revealSuspended?: boolean
 }
 
 /** Loose tracks and photos on the shell's map.
@@ -48,8 +55,39 @@ export function LooseLayer({
   selectedId,
   draggable = false,
   onMoveCairn,
+  revealSuspended = false,
 }: LooseLayerProps) {
   const map = useMap()
+  const isPhone = useIsPhone()
+
+  /** #270 — "selecting a loose track or cairn from the shell list moves the
+      world map to it under the same three-step rule". Keyed on `selectedId`
+      alone, never on the camera, matching `TripDetail`'s own two reveal
+      effects: `items`/`store` are read at fire time rather than listed as
+      dependencies, so a re-render that leaves the selection alone never
+      re-fires it. A loose track reveals its precomputed overview line
+      strings — never the source KML, per the performance rule, which is
+      what a loose track's overview already exists to satisfy — and a loose
+      cairn its own coordinate, which (being a point) always takes the pan
+      branch and never the fit one, the same as a trip's own cairns. */
+  useEffect(() => {
+    if (!map || revealSuspended || !selectedId) return
+    const item = items.find((candidate) => candidate.id === selectedId)
+    if (!item || item.position === null) return
+    if (item.kind === 'cairn') {
+      revealPoints(map, [item.position as LatLng], columnInset(isPhone))
+      return
+    }
+    const overview = store.getOverview(item.id)
+    const points = overview
+      ? overview.features
+          .filter((feature) => feature.geometry?.type === 'LineString')
+          .flatMap((feature) => (feature.geometry as LineString).coordinates.map(([lng, lat]) => ({ lat, lng })))
+      : []
+    revealPoints(map, points, columnInset(isPhone))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId])
+
   if (!map) return null
 
   return (

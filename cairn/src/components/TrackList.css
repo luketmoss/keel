@@ -48,6 +48,16 @@
   background: var(--hover);
 }
 
+/* #270 — the row's hover treatment, driven by a class rather than `:hover`
+   so a route's hit-line hover on the map can trigger the identical pixels
+   programmatically, the same mechanism `CairnList`'s own
+   `.cairn-row--hovered` already uses for a marker. Placed before
+   `.track-row--selected` below so a row that is both selected and hovered
+   shows the selected fill, source order breaking the tie. */
+.track-row.track-row--hovered {
+  background: var(--hover);
+}
+
 /* #269 — selected state per the design language: --accent-soft fill,
    --accent text. The doubled class matches `.track-row:hover`'s own
    specificity so a selected row that is also hovered keeps the selected

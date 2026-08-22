@@ -61,8 +61,20 @@ vi.mock('../photo/imageCache', () => ({
   photoImageCache: { acquire },
 }))
 
+/* #270 — `revealPoints`/`columnInset` are mocked so the reveal effect's own
+   camera geometry (`reveal.test.ts`'s job) stays out of these assertions;
+   what's proven here is only that `LooseLayer` calls it with the right
+   points for the right item. */
+const { revealPoints, columnInset } = vi.hoisted(() => ({
+  revealPoints: vi.fn(),
+  columnInset: vi.fn(() => ({ left: 0, right: 0, top: 0, bottom: 0 })),
+}))
+vi.mock('../map/reveal', () => ({ revealPoints, columnInset }))
+
 beforeEach(() => {
   acquire.mockReset()
+  revealPoints.mockClear()
+  columnInset.mockClear()
 })
 
 function looseCairn(overrides: Partial<Extract<LooseRecord, { kind: 'cairn' }>> = {}): LooseRecord {
@@ -276,5 +288,100 @@ describe('LooseLayer dragging a cairn (#158)', () => {
 
     expect(onMoveCairn).not.toHaveBeenCalled()
     expect(onSelect).toHaveBeenCalledWith(cairn)
+  })
+})
+
+describe('LooseLayer — #270 reveal', () => {
+  const fakeMap = {}
+
+  it('reveals a selected cairn at its own coordinate', () => {
+    render(
+      <LooseLayer
+        items={[looseCairn({ id: 'c-1', position: { lat: 43, lng: 141 }, image: null, icon: 'campsite' })]}
+        store={noopStore}
+        accessToken="token"
+        hoveredId={null}
+        onHover={vi.fn()}
+        onSelect={vi.fn()}
+        selectedId="c-1"
+      />,
+    )
+
+    expect(revealPoints).toHaveBeenCalledWith(fakeMap, [{ lat: 43, lng: 141 }], {
+      left: 0,
+      right: 0,
+      top: 0,
+      bottom: 0,
+    })
+  })
+
+  it("reveals a selected track's precomputed overview, never the source KML", () => {
+    const overview = {
+      type: 'FeatureCollection' as const,
+      features: [
+        {
+          type: 'Feature' as const,
+          properties: {},
+          geometry: { type: 'LineString' as const, coordinates: [[142, -37], [142.1, -37.1]] },
+        },
+      ],
+    }
+    const store = { getOverview: vi.fn(() => overview) } as unknown as LooseStore
+    render(
+      <LooseLayer
+        items={[
+          {
+            kind: 'track',
+            id: 't-1',
+            name: 'Mount Rosea',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            date: '2024-03-09T00:00:00.000Z',
+            distanceMeters: 14200,
+            ascentMeters: 690,
+            elevationLossMeters: 620,
+            highPointMeters: 2100,
+            lowPointMeters: 1500,
+            durationSeconds: 19_200,
+            elevationProfile: null,
+            pointCount: 512,
+            sourceName: 'rosea.kml',
+            colorIndex: 0,
+            position: { lat: -37, lng: 142 },
+            driveFileId: null,
+            uploadState: 'ok',
+          },
+        ]}
+        store={store}
+        accessToken="token"
+        hoveredId={null}
+        onHover={vi.fn()}
+        onSelect={vi.fn()}
+        selectedId="t-1"
+      />,
+    )
+
+    expect(store.getOverview).toHaveBeenCalledWith('t-1')
+    expect(revealPoints).toHaveBeenCalledWith(
+      fakeMap,
+      [{ lat: -37, lng: 142 }, { lat: -37.1, lng: 142.1 }],
+      { left: 0, right: 0, top: 0, bottom: 0 },
+    )
+  })
+
+  it('does not reveal while a decision owns the map', () => {
+    render(
+      <LooseLayer
+        items={[looseCairn({ id: 'c-1', image: null, icon: 'campsite' })]}
+        store={noopStore}
+        accessToken="token"
+        hoveredId={null}
+        onHover={vi.fn()}
+        onSelect={vi.fn()}
+        selectedId="c-1"
+        revealSuspended
+      />,
+    )
+
+    expect(revealPoints).not.toHaveBeenCalled()
   })
 })

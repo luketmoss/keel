@@ -32,6 +32,13 @@ const TRACK_WEIGHT_SELECTED: readonly [casing: number, stroke: number] = [9, 5]
 const TRACK_HALO_WEIGHT = 17
 const TRACK_HALO_OPACITY = 0.3
 
+/** #270 — the invisible click target on a route. Half of `--hit-target`
+    (40px), which puts 10px of tolerance either side of a 3px resting
+    stroke; also what makes a route tappable at all on touch. Drawn topmost
+    in every track's own band, above its halo/casing/stroke, so it wins a
+    click before the emphasis layers underneath it ever see one. */
+const TRACK_HIT_WEIGHT = 20
+
 type TrackBand = 'rest' | 'hovered' | 'selected'
 
 const BAND_Z: Record<TrackBand, number> = {
@@ -56,6 +63,23 @@ interface TrackLayerProps {
       tracks all take this together, since the id names the row, not one
       track within it. */
   selectedFileId?: string | null
+  /** #270 — writes `hoveredFileId` back up, the map-to-row direction #251
+      named and left open for tracks. Fired by the invisible hit line's own
+      `mouseover`/`mouseout`; never moves the camera and never scrolls the
+      list, matching hover's existing rules exactly. */
+  onHoverFile?: (id: string | null) => void
+  /** #270 — a route's hit line was clicked. Fired with the file's id;
+      `TripDetail` selects it and toggles its row's expansion, the same
+      pair its own row header click already performs, so a route click and
+      a row click can never drift on what they do. */
+  onSelectRoute?: (id: string) => void
+  /** #270 — false while a decision owns the map (an import draft, the
+      placement queue, the cairn-create gesture): the hit lines stop being
+      clickable so an invisible 20px-wide target over every route doesn't
+      eat the click the gesture exists to receive. Defaults to `true` so a
+      caller that hasn't been updated for this issue keeps its routes
+      clickable, unchanged. */
+  hitLinesEnabled?: boolean
 }
 
 interface RenderedTrack {
@@ -78,7 +102,14 @@ function visibleFilesKey(files: ImportedFile[]): string {
     .join(',')
 }
 
-export function TrackLayer({ files, hoveredFileId, selectedFileId }: TrackLayerProps) {
+export function TrackLayer({
+  files,
+  hoveredFileId,
+  selectedFileId,
+  onHoverFile,
+  onSelectRoute,
+  hitLinesEnabled = true,
+}: TrackLayerProps) {
   const map = useMap()
   const previousFileCount = useRef(0)
   const previousVisibleKey = useRef('')
@@ -147,6 +178,10 @@ export function TrackLayer({ files, hoveredFileId, selectedFileId }: TrackLayerP
             index={track.index}
             alreadyAnimated={animatedKeys.current.has(track.key)}
             onAnimated={() => animatedKeys.current.add(track.key)}
+            hitClickable={hitLinesEnabled}
+            onHitOver={() => onHoverFile?.(track.fileId)}
+            onHitOut={() => onHoverFile?.(null)}
+            onHitClick={() => onSelectRoute?.(track.fileId)}
           />
         )
       })}
@@ -209,6 +244,10 @@ function Track({
   index,
   alreadyAnimated,
   onAnimated,
+  hitClickable,
+  onHitOver,
+  onHitOut,
+  onHitClick,
 }: {
   trackKey: string
   points: LatLng[]
@@ -217,6 +256,13 @@ function Track({
   index: number
   alreadyAnimated: boolean
   onAnimated: () => void
+  /** #270 — false while a decision owns the map; the hit line still draws
+      (so hover would be free) but stops accepting clicks or reporting
+      hover, matching "reveal is suspended" for the map's other decisions. */
+  hitClickable: boolean
+  onHitOver: () => void
+  onHitOut: () => void
+  onHitClick: () => void
 }) {
   const revealed = useRevealedPoints(trackKey, points, alreadyAnimated, onAnimated)
   const zBase = BAND_Z[band] + index * 10
@@ -272,6 +318,20 @@ function Track({
         zIndex={zBase + 1}
       />
       <Polyline path={revealed} strokeColor={color} strokeWeight={strokeWeight} clickable={false} zIndex={zBase + 2} />
+      {/* #270 — the invisible click target, topmost in this track's own
+          band so the emphasised track wins a click where routes overlap,
+          the same ordering #269 draws by. `strokeOpacity: 0` changes
+          nothing about how the map looks. */}
+      <Polyline
+        path={revealed}
+        strokeOpacity={0}
+        strokeWeight={TRACK_HIT_WEIGHT}
+        clickable={hitClickable}
+        zIndex={zBase + 3}
+        onClick={onHitClick}
+        onMouseOver={onHitOver}
+        onMouseOut={onHitOut}
+      />
     </>
   )
 }

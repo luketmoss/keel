@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useMap } from '@vis.gl/react-google-maps'
 import { TrackLayer } from './TrackLayer'
 import { CairnLayer, type PositionedCairn } from './CairnLayer'
+import { columnInset, revealPoints } from '../map/reveal'
+import { dropInvalidLatitudes, normalizeAntimeridian } from '../map/geo'
+import { useIsPhone } from '../map/useIsPhone'
 import { TrackList } from './TrackList'
 import { CairnList } from './CairnList'
 import { Lightbox } from './Lightbox'
@@ -150,6 +154,12 @@ interface TripDetailProps {
       Back button knows to return here rather than to `/`. `null` while no
       track from this trip is open. */
   onTrackDetailChange?: (detail: { name: string } | null) => void
+  /** #270 — true while a decision owns the map (an import draft, the
+      placement queue, the cairn-create gesture): the reveal helper does not
+      fire and the map's route hit lines stop accepting clicks, matching
+      `BottomSheet`'s own `suspended` for the sheet's detents — the same
+      condition, read here for the map's version of the same sentence. */
+  revealSuspended?: boolean
 }
 
 /** The panel's trip face, and the trip's own map layers.
@@ -177,8 +187,11 @@ export function TripDetail({
   cairnsDraggable,
   openTrackId,
   onTrackDetailChange,
+  revealSuspended = false,
 }: TripDetailProps) {
   const navigate = useNavigate()
+  const map = useMap()
+  const isPhone = useIsPhone()
   const trip = useSyncExternalStore(tripStore.subscribe, () => tripStore.getTrip(tripId))
   const tripImport = useTripImport(tripId, accessToken, cairnFolderId, tripStore)
   const allTracks = useMemo(() => tripImport.tracks.flatMap((file) => file.tracks), [tripImport.tracks])
@@ -326,6 +339,20 @@ export function TripDetail({
     setExpandedTrackId((current) => (current === id ? null : id))
   }, [])
 
+  /** #270 — a route's hit line on the map calls this, the same pair the
+      row's own header click already performs (`TrackList`'s
+      `handleRowClick`): select, then toggle the row's expansion. Selecting
+      is idempotent, so clicking the selected track's route again only
+      toggles the row — "stays selected" falls out for free rather than
+      needing a branch that tells the first click from the second. */
+  const handleSelectRoute = useCallback(
+    (id: string) => {
+      setSelectedTrackId(id)
+      toggleTrackExpand(id)
+    },
+    [toggleTrackExpand],
+  )
+
   // #268 — mirrors `expandedCairnId`'s own cleanup: a track removed, or
   // removed from the trip, while its row is expanded leaves the expansion
   // with nothing to draw.
@@ -344,6 +371,23 @@ export function TripDetail({
       setSelectedTrackId(null)
     }
   }, [tripImport.tracks, selectedTrackId])
+
+  /** #270 — reveals the selected track. Keyed on `selectedTrackId` alone —
+      never on the camera, never on `tripImport.tracks` re-rendering with a
+      new array reference — which is what makes reveal fire only on the
+      selection changing, the design note's own most important line.
+      `tripImport.tracks` is read at fire time, not listed as a dependency,
+      for the same reason. A file with no usable geometry (or one already
+      removed, caught by the guard above before this runs) reveals nothing,
+      matching the design note's edge case. */
+  useEffect(() => {
+    if (!map || revealSuspended || !selectedTrackId) return
+    const file = tripImport.tracks.find((candidate) => candidate.id === selectedTrackId)
+    if (!file) return
+    const points = file.tracks.flatMap((track) => normalizeAntimeridian(dropInvalidLatitudes(track.points)))
+    revealPoints(map, points, columnInset(isPhone))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTrackId])
 
   /* #251 — one hovered-cairn set, written by both `CairnList` and
      `CairnLayer` and read by both, exactly the shape `App.tsx` already
@@ -577,6 +621,22 @@ export function TripDetail({
     }
   }, [facetedCairns, selectedCairnId])
 
+  /** #270 — reveals the selected cairn, at its own coordinate rather than a
+      cluster's anchor (design note's "The cluster"): a clustered cairn's
+      camera pan may itself pull the cluster apart, in which case the member
+      marker takes the selected treatment and the cluster stops having it,
+      by the same recompute #251's hover already relies on. A point's own
+      bounds are always zero-size, which is what keeps a cairn's reveal on
+      the pan branch and never the fit one. Keyed on `selectedCairnId` alone,
+      for the same reason the track reveal above is. */
+  useEffect(() => {
+    if (!map || revealSuspended || !selectedCairnId) return
+    const cairn = cairnImport.cairns.find((candidate) => candidate.id === selectedCairnId)
+    if (!cairn) return
+    revealPoints(map, [cairn.position], columnInset(isPhone))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCairnId])
+
   // #250 — the same guard as the selection's above, extended to the
   // expansion: a facet change that filters the expanded cairn out clears it
   // along with the selection, and a facet change that keeps the row leaves
@@ -786,6 +846,7 @@ export function TripDetail({
       removeErrors={{ ...tripImport.trackRemoveErrors, ...detachErrors }}
       disableRemove={!signedIn}
       onHoverFile={setHoveredFileId}
+      hoveredFileId={hoveredFileId}
       onRename={tripImport.renameTrack}
       onRecolor={tripImport.recolorTrack}
       onReorder={tripImport.reorderTracks}
@@ -803,7 +864,14 @@ export function TripDetail({
   return (
     <div className="trip-detail">
       {/* Drawn on the shell's map, not here — see the component doc. */}
-      <TrackLayer files={tripImport.tracks} hoveredFileId={hoveredFileId} selectedFileId={selectedTrackId} />
+      <TrackLayer
+        files={tripImport.tracks}
+        hoveredFileId={hoveredFileId}
+        selectedFileId={selectedTrackId}
+        onHoverFile={setHoveredFileId}
+        onSelectRoute={handleSelectRoute}
+        hitLinesEnabled={!revealSuspended}
+      />
       {googleMapsMapId && positionedCairns.length > 0 && (
         <CairnLayer
           cairns={positionedCairns}

@@ -3,9 +3,15 @@ import type { LatLng } from './geo'
 /** Without a cap, a 200m walk fills the screen at building level and the
     satellite context is lost. */
 const MAX_FIT_ZOOM = 16
-const FIT_PADDING = 48
+/** #270 exports this and reuses it as the reveal margin, rather than a
+    second number meaning the same thing — see `reveal.ts`. */
+export const FIT_PADDING = 48
 
-export function fitTracksToBounds(map: google.maps.Map, points: LatLng[]): void {
+export function fitTracksToBounds(
+  map: google.maps.Map,
+  points: LatLng[],
+  padding: number | google.maps.Padding = FIT_PADDING,
+): void {
   if (points.length === 0) return
 
   const bounds = new google.maps.LatLngBounds()
@@ -22,7 +28,7 @@ export function fitTracksToBounds(map: google.maps.Map, points: LatLng[]): void 
   google.maps.event.addListenerOnce(map, 'idle', () => {
     if ((map.getZoom() ?? 0) > MAX_FIT_ZOOM) map.setZoom(MAX_FIT_ZOOM)
   })
-  map.fitBounds(bounds, FIT_PADDING)
+  map.fitBounds(bounds, padding)
 }
 
 /** Higher cap than `fitTracksToBounds` — a cluster is photos at one

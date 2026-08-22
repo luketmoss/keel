@@ -320,9 +320,10 @@ kinds as one pool.
 every kind is a marker. This keeps the world readable at six things or six
 hundred, and keeps the performance rule honest.
 
-**On the 2D map.** In 3D there are no marker glyphs, so routes draw at rest
-and the world view is a set of routes on terrain. Both surfaces read the same
-`overview.geojson`; the performance rule is unchanged.
+**On the 2D map.** In 3D a trip has no dot and a track has no tile, so a
+track's route is the only thing that can stand for it and routes draw at rest.
+Cairns do draw their own markers in 3D (#273), unclustered; that is the one
+kind whose glyph exists on both surfaces.
 
 #81 established *a dot means it is a trip, a route means it is not saved yet*.
 Loose tracks draw real routes, so that rule no longer holds as written and

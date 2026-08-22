@@ -4,6 +4,7 @@ import { useMap } from '@vis.gl/react-google-maps'
 import { TrackLayer, computeRenderedTracks } from './TrackLayer'
 import { Track3DLayer } from './Track3DLayer'
 import { CairnLayer, type PositionedCairn } from './CairnLayer'
+import { Cairn3DLayer } from './Cairn3DLayer'
 import { columnInset, revealPoints } from '../map/reveal'
 import { dropInvalidLatitudes, normalizeAntimeridian } from '../map/geo'
 import { useIsPhone } from '../map/useIsPhone'
@@ -890,6 +891,18 @@ export function TripDetail({
           onHoverCairn={hoverCairns}
         />
       )}
+      {/* #273 — the same cairns in 3D, at parity with the 2D layer above:
+          no clustering, no dragging (Out of Scope), the same selection and
+          hover sets. */}
+      <Cairn3DLayer
+        cairns={positionedCairns}
+        accessToken={accessToken}
+        selectedCairnId={selectedCairnId}
+        onSelectCairn={setSelectedCairnId}
+        onOpenCairn={selectCairn}
+        hoveredCairnIds={hoveredCairnIds}
+        onHoverCairn={hoverCairns}
+      />
 
       {/* #226 — the face for a track this trip owns. Sits beside the
           trip's own body rather than replacing it in the tree: hiding

@@ -99,4 +99,22 @@ describe('Map3DSurface (#271)', () => {
     // Never destroyed and remounted — the edge case's own words.
     expect(container.querySelector('[data-testid="map3d"]')).not.toBeNull()
   })
+
+  it('a fast on-then-off, before the entering frame lands, does not resurrect the surface', () => {
+    const pendingFrame: { current: FrameRequestCallback | null } = { current: null }
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      pendingFrame.current = cb
+      return 0
+    })
+
+    const { rerender, container } = render(<Map3DSurface on={true} mode={'SATELLITE' as never} />)
+    // Turned off again before the deferred frame ("first tiles up") fires.
+    rerender(<Map3DSurface on={false} mode={'SATELLITE' as never} />)
+    flyCameraTo.mockClear()
+
+    pendingFrame.current?.(0)
+
+    expect(container.querySelector('.map3d-surface--visible')).toBeNull()
+    expect(flyCameraTo).not.toHaveBeenCalled()
+  })
 })

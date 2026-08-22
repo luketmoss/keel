@@ -66,6 +66,11 @@ export function Map3DSurface({ on, mode }: Map3DSurfaceProps) {
       map3d.heading = 0
 
       requestAnimationFrame(() => {
+        // A flip back to off before this frame landed makes this stale —
+        // "the switch is the source of truth and the last flip wins", and
+        // without this guard a fast on-then-off would resurrect the
+        // surface the user just turned off.
+        if (wasOn.current !== true) return
         setVisible(true)
         if (reduced) {
           map3d.tilt = TILT_ON

@@ -61,3 +61,29 @@ export function latLngFromContainerPoint(
 function wrapLongitude(lng: number): number {
   return ((((lng + 180) % 360) + 360) % 360) - 180
 }
+
+/** The exact inverse of `latLngFromContainerPoint` — where `point` falls
+    inside an element `width` × `height` showing `bounds`, in pixels from its
+    top-left corner. #270's reveal rule uses this to find a selected item's
+    own position on screen, against the same linear, sub-pixel-at-any-
+    reasonable-zoom approximation the note above already accepts for the
+    other direction — one projection, read both ways, rather than two that
+    could disagree. `null` for a zero-sized element, same as the pixel-to-
+    coordinate direction. */
+export function containerPointFromLatLng(
+  point: LatLng,
+  width: number,
+  height: number,
+  bounds: ViewportBounds,
+): { x: number; y: number } | null {
+  if (width <= 0 || height <= 0) return null
+
+  const lngSpan = bounds.east >= bounds.west ? bounds.east - bounds.west : bounds.east - bounds.west + 360
+  let lng = point.lng
+  if (lng < bounds.west) lng += 360
+
+  return {
+    x: ((lng - bounds.west) / lngSpan) * width,
+    y: ((bounds.north - point.lat) / (bounds.north - bounds.south)) * height,
+  }
+}

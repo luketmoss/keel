@@ -193,6 +193,10 @@ export function CairnLayer({
            emphasises the cluster" falls out of this test for free rather
            than needing a second, cluster-aware write path. */
         const hovered = cluster.members.some((member) => hoveredCairnIds.has(member.cairn.id))
+        /* #270 — "a selected cairn inside a collapsed cluster gives that
+           cluster the selected treatment", by the same member-id test
+           `hovered` above already uses (design note's "The cluster"). */
+        const selected = selectedCairnId !== null && cluster.members.some((member) => member.cairn.id === selectedCairnId)
         const hoverMemberIds = () => new Set(cluster.members.map((member) => member.cairn.id))
         if (key === expandedKey) {
           return (
@@ -206,6 +210,7 @@ export function CairnLayer({
               onOpen={onOpenCairn}
               onCollapse={collapse}
               hovered={hovered}
+              selected={selected}
               onHoverChange={(next) => onHoverCairn(next ? hoverMemberIds() : EMPTY_HOVERED_CAIRN_IDS)}
             />
           )
@@ -217,6 +222,7 @@ export function CairnLayer({
             map={map}
             onExpand={() => setExpandedKey(key)}
             hovered={hovered}
+            selected={selected}
             onHoverChange={(next) => onHoverCairn(next ? hoverMemberIds() : EMPTY_HOVERED_CAIRN_IDS)}
           />
         )
@@ -359,6 +365,7 @@ function ClusterMarker({
   map,
   onExpand,
   hovered,
+  selected,
   onHoverChange,
 }: {
   cluster: CairnCluster
@@ -371,12 +378,20 @@ function ClusterMarker({
       hovered instead (in which case it's that one id, which is still one
       of this cluster's own members — see the call site's comment). */
   hovered: boolean
+  /** #270: true when the selected cairn is one of this cluster's own
+      members — "a selected cairn inside a collapsed cluster gives that
+      cluster the selected treatment" (design note's "The cluster"). Wins
+      over `hovered` in `ringStyleForPhoto` the same way it already does for
+      a single marker; only the scale (from `hovered` alone, via
+      `.cairn-layer__hit--hovered`) tells a merely-selected cluster apart
+      from a hovered one. */
+  selected: boolean
   /** #251: writes every member id at once — "hovering a cluster marker
       lights every row it holds" — and clears with the empty set on leave. */
   onHoverChange: (hovered: boolean) => void
 }) {
   const provenance = clusterProvenance(cluster.members.map((member) => member.cairn))
-  const ring = ringStyleForPhoto(provenance, false, hovered)
+  const ring = ringStyleForPhoto(provenance, selected, hovered)
   const label = clusterAriaLabel(cluster.members.length)
 
   /* #194: zoom-to-fit where zoom-to-fit works, expand in place where it
@@ -402,6 +417,7 @@ function ClusterMarker({
         data-testid="cairn-cluster"
         data-count={cluster.members.length}
         data-source={provenance}
+        data-selected={selected}
         onMouseEnter={() => onHoverChange(true)}
         onMouseLeave={() => onHoverChange(false)}
       >
@@ -411,6 +427,7 @@ function ClusterMarker({
             borderStyle: ring.borderStyle,
             borderWidth: `var(${ring.widthVar})`,
             borderColor: `var(${ring.colorVar})`,
+            filter: ring.glow ? 'drop-shadow(0 0 7px var(--accent))' : undefined,
           }}
         >
           {cluster.members.length}
@@ -439,6 +456,7 @@ function ExpandedCluster({
   onOpen,
   onCollapse,
   hovered,
+  selected,
   onHoverChange,
 }: {
   cluster: CairnCluster
@@ -454,10 +472,12 @@ function ExpandedCluster({
       members do not — see `SingleCairnMarker` below, called with neither
       `hovered` nor `onHoverChange`. */
   hovered: boolean
+  /** #270: same test as `ClusterMarker`'s own — see its own doc. */
+  selected: boolean
   onHoverChange: (hovered: boolean) => void
 }) {
   const provenance = clusterProvenance(cluster.members.map((member) => member.cairn))
-  const ring = ringStyleForPhoto(provenance, false, hovered)
+  const ring = ringStyleForPhoto(provenance, selected, hovered)
   const placements = useMemo(
     () => fanOutPositions(cluster, cluster.members.length, zoom, MARKER_FOOTPRINT_PX),
     [cluster, zoom],
@@ -474,6 +494,7 @@ function ExpandedCluster({
           data-count={cluster.members.length}
           data-source={provenance}
           data-expanded="true"
+          data-selected={selected}
           onMouseEnter={() => onHoverChange(true)}
           onMouseLeave={() => onHoverChange(false)}
         >
@@ -483,6 +504,7 @@ function ExpandedCluster({
               borderStyle: ring.borderStyle,
               borderWidth: `var(${ring.widthVar})`,
               borderColor: `var(${ring.colorVar})`,
+              filter: ring.glow ? 'drop-shadow(0 0 7px var(--accent))' : undefined,
             }}
           >
             {cluster.members.length}

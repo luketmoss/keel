@@ -36,9 +36,14 @@ vi.mock('@vis.gl/react-google-maps', () => ({
   ),
   Polyline: (props: {
     path: { lat: number; lng: number }[]
-    strokeColor: string
+    strokeColor?: string
+    strokeOpacity?: number
     strokeWeight: number
     zIndex: number
+    clickable?: boolean
+    onClick?: () => void
+    onMouseOver?: () => void
+    onMouseOut?: () => void
   }) => (
     <div
       data-testid="polyline"
@@ -46,9 +51,24 @@ vi.mock('@vis.gl/react-google-maps', () => ({
       data-points={props.path.length}
       data-weight={props.strokeWeight}
       data-zindex={props.zIndex}
+      data-opacity={props.strokeOpacity}
+      data-clickable={props.clickable}
+      onClick={props.onClick}
+      onMouseOver={props.onMouseOver}
+      onMouseOut={props.onMouseOut}
     />
   ),
 }))
+
+/** #270 — every track now also draws one invisible hit line
+    (`strokeOpacity: 0`), which the assertions below that count or filter
+    the *visible* casing/stroke/halo polylines need excluded — the same way
+    they already exclude the casing by colour. */
+function visiblePolylines(container: HTMLElement): Element[] {
+  return Array.from(container.querySelectorAll('[data-testid="polyline"]')).filter(
+    (el) => el.getAttribute('data-opacity') !== '0',
+  )
+}
 
 ;(globalThis as unknown as { google: unknown }).google = {
   maps: { SymbolPath: { CIRCLE: 0 } },
@@ -81,7 +101,7 @@ describe('TrackLayer', () => {
   it('draws a track as a casing polyline plus a coloured polyline on top', () => {
     const { container } = render(<TrackLayer files={[importedFile()]} />)
 
-    const polylines = container.querySelectorAll('[data-testid="polyline"]')
+    const polylines = visiblePolylines(container)
     expect(polylines).toHaveLength(2)
     expect(polylines[0].getAttribute('data-color')).toBe('#00000059')
     expect(polylines[1].getAttribute('data-color')).toBe('#FF3B30')
@@ -106,7 +126,7 @@ describe('TrackLayer', () => {
       />,
     )
 
-    const colors = Array.from(container.querySelectorAll('[data-testid="polyline"]'))
+    const colors = visiblePolylines(container)
       .map((el) => el.getAttribute('data-color'))
       .filter((color) => color !== '#00000059')
     expect(colors).toEqual(['#FF3B30', '#FF00A8'])
@@ -163,7 +183,7 @@ describe('TrackLayer', () => {
       />,
     )
 
-    const colors = Array.from(container.querySelectorAll('[data-testid="polyline"]'))
+    const colors = visiblePolylines(container)
       .map((el) => el.getAttribute('data-color'))
       .filter((color) => color !== '#00000059')
     expect(colors).toEqual(['#FF3B30'])
@@ -258,10 +278,10 @@ describe('TrackLayer', () => {
       const { container, rerender } = render(
         <TrackLayer files={[importedFile({ id: 'a' })]} hoveredFileId={null} />,
       )
-      expect(container.querySelectorAll('[data-testid="polyline"]')).toHaveLength(2)
+      expect(visiblePolylines(container)).toHaveLength(2)
 
       rerender(<TrackLayer files={[importedFile({ id: 'a' })]} hoveredFileId="a" />)
-      const polylines = Array.from(container.querySelectorAll('[data-testid="polyline"]'))
+      const polylines = visiblePolylines(container)
       expect(polylines).toHaveLength(2)
       const casing = polylines.find((el) => el.getAttribute('data-color') === '#00000059')!
       const stroke = polylines.find((el) => el.getAttribute('data-color') === '#FF3B30')!
@@ -273,7 +293,7 @@ describe('TrackLayer', () => {
       const { container } = render(
         <TrackLayer files={[importedFile({ id: 'a' })]} selectedFileId="a" />,
       )
-      const polylines = Array.from(container.querySelectorAll('[data-testid="polyline"]'))
+      const polylines = visiblePolylines(container)
       expect(polylines).toHaveLength(3)
       const halo = polylines.find((el) => el.getAttribute('data-weight') === '17')!
       expect(halo.getAttribute('data-color')).toBe('#FF3B30')
@@ -291,14 +311,14 @@ describe('TrackLayer', () => {
         />,
       )
       // 2 tracks × 2 polylines each, plus exactly one halo for 'b'.
-      expect(container.querySelectorAll('[data-testid="polyline"]')).toHaveLength(5)
+      expect(visiblePolylines(container)).toHaveLength(5)
     })
 
     it('keeps the selected treatment, with no halo lost, when the selected file is also hovered', () => {
       const { container } = render(
         <TrackLayer files={[importedFile({ id: 'a' })]} hoveredFileId="a" selectedFileId="a" />,
       )
-      const polylines = Array.from(container.querySelectorAll('[data-testid="polyline"]'))
+      const polylines = visiblePolylines(container)
       expect(polylines).toHaveLength(3)
       const casing = polylines.find((el) => el.getAttribute('data-color') === '#00000059')!
       expect(casing.getAttribute('data-weight')).toBe('9')
@@ -368,6 +388,52 @@ describe('TrackLayer', () => {
         Number(polylines.find((el) => el.getAttribute('data-color') === color && el.getAttribute('data-weight') === '3')!.getAttribute('data-zindex'))
 
       expect(strokeZ('#FF3B30')).toBeLessThan(strokeZ('#00D4FF'))
+    })
+  })
+
+  describe('#270 route hit line', () => {
+    function hitLine(container: HTMLElement): Element {
+      return Array.from(container.querySelectorAll('[data-testid="polyline"]')).find(
+        (el) => el.getAttribute('data-opacity') === '0',
+      )!
+    }
+
+    it('clicking a route selects its file', () => {
+      const onSelectRoute = vi.fn()
+      const { container } = render(
+        <TrackLayer files={[importedFile({ id: 'a' })]} onSelectRoute={onSelectRoute} />,
+      )
+      hitLine(container).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      expect(onSelectRoute).toHaveBeenCalledWith('a')
+    })
+
+    it('hovering a route reports the file id, and leaving clears it', () => {
+      const onHoverFile = vi.fn()
+      const { container } = render(
+        <TrackLayer files={[importedFile({ id: 'a' })]} onHoverFile={onHoverFile} />,
+      )
+      hitLine(container).dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+      expect(onHoverFile).toHaveBeenCalledWith('a')
+
+      hitLine(container).dispatchEvent(new MouseEvent('mouseout', { bubbles: true }))
+      expect(onHoverFile).toHaveBeenCalledWith(null)
+    })
+
+    it('is clickable by default, and stops accepting clicks while a decision owns the map', () => {
+      const { container, rerender } = render(<TrackLayer files={[importedFile({ id: 'a' })]} />)
+      expect(hitLine(container).getAttribute('data-clickable')).toBe('true')
+
+      rerender(<TrackLayer files={[importedFile({ id: 'a' })]} hitLinesEnabled={false} />)
+      expect(hitLine(container).getAttribute('data-clickable')).toBe('false')
+    })
+
+    it('draws the hit line topmost in its own band', () => {
+      const { container } = render(
+        <TrackLayer files={[importedFile({ id: 'a' })]} selectedFileId="a" />,
+      )
+      const hitZ = Number(hitLine(container).getAttribute('data-zindex'))
+      const otherZ = visiblePolylines(container).map((el) => Number(el.getAttribute('data-zindex')))
+      expect(hitZ).toBeGreaterThan(Math.max(...otherZ))
     })
   })
 })

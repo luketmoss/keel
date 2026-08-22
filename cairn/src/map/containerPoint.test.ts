@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { latLngFromContainerPoint } from './containerPoint'
+import { containerPointFromLatLng, latLngFromContainerPoint } from './containerPoint'
 
 /* The long-press half of #156's gesture has no Maps event to read a
    coordinate off, so this conversion is the whole of it. Tested against the
@@ -48,5 +48,24 @@ describe('latLngFromContainerPoint', () => {
   it('returns null for an element with no size rather than dividing by it', () => {
     expect(latLngFromContainerPoint(0, 0, 0, 0, VIEWPORT)).toBeNull()
     expect(latLngFromContainerPoint(10, 10, 400, 0, VIEWPORT)).toBeNull()
+  })
+})
+
+describe('containerPointFromLatLng', () => {
+  it('is the exact inverse of latLngFromContainerPoint', () => {
+    for (const [x, y] of [[200, 100], [0, 0], [400, 200], [100, 50]]) {
+      const latLng = latLngFromContainerPoint(x, y, 400, 200, VIEWPORT)!
+      expect(containerPointFromLatLng(latLng, 400, 200, VIEWPORT)).toEqual({ x, y })
+    }
+  })
+
+  it('spans the short way across the antimeridian', () => {
+    const straddling = { north: 10, south: -10, west: 170, east: -170 }
+    expect(containerPointFromLatLng({ lat: 0, lng: 180 }, 100, 100, straddling)).toEqual({ x: 50, y: 50 })
+    expect(containerPointFromLatLng({ lat: 0, lng: -175 }, 100, 100, straddling)?.x).toBeCloseTo(75, 10)
+  })
+
+  it('returns null for an element with no size rather than dividing by it', () => {
+    expect(containerPointFromLatLng({ lat: 30, lng: 120 }, 0, 0, VIEWPORT)).toBeNull()
   })
 })

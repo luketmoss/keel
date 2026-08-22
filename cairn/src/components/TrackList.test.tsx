@@ -1143,4 +1143,22 @@ describe('TrackList', () => {
       expect(rowB.className).not.toContain('track-row--selected')
     })
   })
+
+  describe('#270 hoveredFileId — the map-to-row direction', () => {
+    it('marks the row named by hoveredFileId with track-row--hovered, and no other row', () => {
+      render(
+        <TrackList
+          files={[importedFile({ id: 'a', name: 'a.kml' }), importedFile({ id: 'b', name: 'b.kml' })]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          hoveredFileId="b"
+        />,
+      )
+
+      const rowA = screen.getByText('a.kml', { exact: false }).closest('li')!
+      const rowB = screen.getByText('b.kml', { exact: false }).closest('li')!
+      expect(rowA.className).not.toContain('track-row--hovered')
+      expect(rowB.className).toContain('track-row--hovered')
+    })
+  })
 })

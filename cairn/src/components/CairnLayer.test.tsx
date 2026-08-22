@@ -556,6 +556,97 @@ describe('CairnLayer linked hover (#251)', () => {
   })
 })
 
+describe('CairnLayer — #270 the selected cluster', () => {
+  it('gives a collapsed cluster the selected ring and glow when one of its members is selected', () => {
+    currentZoom = 3
+    const { container } = render(
+      <CairnLayer
+        cairns={[
+          positionedCairn({ id: 'a', latitude: 10, longitude: 20 }),
+          positionedCairn({ id: 'b', latitude: 10.0001, longitude: 20.0001 }),
+        ]}
+        accessToken="token"
+        selectedCairnId="a"
+        onSelectCairn={() => {}}
+      />,
+    )
+
+    const cluster = container.querySelector('[data-testid="cairn-cluster"]') as HTMLElement
+    expect(cluster.getAttribute('data-selected')).toBe('true')
+    expect(cluster.className).not.toContain('cairn-layer__hit--hovered')
+    const badge = cluster.querySelector('.cairn-layer__cluster') as HTMLElement
+    expect(badge.style.borderWidth).toBe('var(--marker-ring-selected)')
+    expect(badge.style.filter).toContain('drop-shadow')
+  })
+
+  it('leaves an unrelated cluster unselected', () => {
+    currentZoom = 3
+    const { container } = render(
+      <CairnLayer
+        cairns={[
+          positionedCairn({ id: 'a', latitude: 10, longitude: 20 }),
+          positionedCairn({ id: 'b', latitude: 10.0001, longitude: 20.0001 }),
+        ]}
+        accessToken="token"
+        selectedCairnId="somewhere-else"
+        onSelectCairn={() => {}}
+      />,
+    )
+
+    const cluster = container.querySelector('[data-testid="cairn-cluster"]') as HTMLElement
+    expect(cluster.getAttribute('data-selected')).toBe('false')
+    const badge = cluster.querySelector('.cairn-layer__cluster') as HTMLElement
+    expect(badge.style.filter).toBe('')
+  })
+
+  it('reads apart from a merely-hovered cluster — wider ring, glow, but no hover scale', () => {
+    currentZoom = 3
+    const { container } = render(
+      <CairnLayer
+        cairns={[
+          positionedCairn({ id: 'a', latitude: 10, longitude: 20 }),
+          positionedCairn({ id: 'b', latitude: 10.0001, longitude: 20.0001 }),
+        ]}
+        accessToken="token"
+        selectedCairnId={null}
+        onSelectCairn={() => {}}
+        hoveredCairnIds={new Set(['a'])}
+      />,
+    )
+
+    const cluster = container.querySelector('[data-testid="cairn-cluster"]') as HTMLElement
+    expect(cluster.className).toContain('cairn-layer__hit--hovered')
+    const badge = cluster.querySelector('.cairn-layer__cluster') as HTMLElement
+    expect(badge.style.borderWidth).toBe('var(--marker-ring)')
+    expect(badge.style.filter).toBe('')
+  })
+
+  it('keeps the selected treatment on the anchor badge while the cluster is fanned open (#194)', () => {
+    currentZoom = 10
+    const { container } = render(
+      <CairnLayer
+        cairns={[
+          positionedCairn({ id: 'a', latitude: 10, longitude: 20 }),
+          positionedCairn({ id: 'b', latitude: 10.00001, longitude: 20.00001 }),
+        ]}
+        accessToken="token"
+        selectedCairnId="a"
+        onSelectCairn={() => {}}
+      />,
+    )
+
+    act(() => {
+      container
+        .querySelector('[data-testid="cairn-cluster"]')
+        ?.closest('[data-testid="advanced-marker"]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    const anchor = container.querySelector('[data-testid="cairn-cluster"][data-expanded="true"]') as HTMLElement
+    expect(anchor.getAttribute('data-selected')).toBe('true')
+  })
+})
+
 describe('CairnLayer cluster expansion (#194)', () => {
   /** Two cairns close enough to cluster at the zoom under test. `apart`
       picks whether they still separate at the cap zoom-to-fit stops at. */

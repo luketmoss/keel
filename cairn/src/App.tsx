@@ -947,6 +947,12 @@ function AppShell() {
      stays live while the create face itself is open — that is the re-place
      the design note calls for. */
   const createGestureActive = !queueOpen && !draftOpen
+  // #270: "a decision owns the map" — an import draft, the placement queue,
+  // or the cairn-create gesture's own face — the same condition
+  // `ShellColumn`'s `suspended` already reads for the sheet's detents,
+  // reused here so the map's reveal and its route hit lines suspend for
+  // exactly the surfaces the sheet already does.
+  const mapDecisionActive = draftOpen || queueOpen || createOpen
 
   return (
     <MapProvider>
@@ -1016,6 +1022,7 @@ function AppShell() {
               }
               draggable={cairnsDraggable}
               onMoveCairn={handleMoveLooseCairn}
+              revealSuspended={mapDecisionActive}
             />
           </>
         )}
@@ -1163,6 +1170,7 @@ function AppShell() {
                   cairnsDraggable={cairnsDraggable}
                   openTrackId={openTripTrackId}
                   onTrackDetailChange={handleTrackDetailChange}
+                  revealSuspended={mapDecisionActive}
                 />
               </div>
             </>

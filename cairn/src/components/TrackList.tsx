@@ -47,6 +47,13 @@ interface TrackListProps {
       map's hover glow. Omitted entirely on `TripDetail`'s reuse of this
       component, which has no glow-capable map beside it. */
   onHoverFile?: (id: string | null) => void
+  /** #270 — the map-to-row direction #251 named and left open for tracks:
+      the id `TripDetail`'s `hoveredFileId` names, so a route's hit line on
+      the map can drive the identical row highlight a pointer over the row
+      itself already does — the same `--hovered` class `CairnList`'s own row
+      already takes for the same reason. `null`/omitted means nothing on the
+      map is hovered. */
+  hoveredFileId?: string | null
   /** #46: rename/reorder/recolour are trip-scoped — omitted on v1's
       non-trip list (`App.tsx`), which hides the corresponding controls
       entirely rather than rendering them disabled. */
@@ -120,6 +127,7 @@ export function TrackList({
   removeErrors = {},
   disableRemove = false,
   onHoverFile,
+  hoveredFileId = null,
   onRename,
   onRecolor,
   onReorder,
@@ -207,6 +215,7 @@ export function TrackList({
               removeError={removeErrors[file.id]}
               disableRemove={disableRemove}
               onHoverFile={onHoverFile}
+              hovered={hoveredFileId === file.id}
               onRename={onRename}
               onRecolor={onRecolor}
               onSaveError={setError}
@@ -241,6 +250,7 @@ function TrackRow({
   removeError,
   disableRemove,
   onHoverFile,
+  hovered,
   onRename,
   onRecolor,
   onSaveError,
@@ -271,6 +281,10 @@ function TrackRow({
   removeError?: string
   disableRemove: boolean
   onHoverFile?: (id: string | null) => void
+  /** #270 — whether this row is the one `TrackLayer`'s hit-line hover names,
+      driving the same pixels a pointer-over-the-row already does (mirrors
+      `CairnList`'s own `hovered`/`cairn-row--hovered`). */
+  hovered: boolean
   onRename?: (id: string, displayName: string) => Promise<boolean>
   onRecolor?: (id: string, color: number) => Promise<boolean>
   onSaveError: (message: string | null) => void
@@ -407,6 +421,7 @@ function TrackRow({
   const rowClassName = [
     'track-row',
     file.visible ? '' : 'track-row--hidden',
+    hovered ? 'track-row--hovered' : '',
     selected ? 'track-row--selected' : '',
     dragging ? 'track-row--dragging' : '',
     dropIndicator ? `track-row--drop-${dropIndicator}` : '',

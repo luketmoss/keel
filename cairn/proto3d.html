@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>cairn — #271 3D prototype</title>
+    <style>
+      :root {
+        --ground: #121523;
+        --surface: #1b1f33;
+        --surface-lift: #262b42;
+        --text: #f1f3fa;
+        --text-muted: #8d93b0;
+        --border: rgba(255, 255, 255, 0.07);
+        --accent: #ff7a4d;
+        --on-accent: #1b0c05;
+        --radius-sm: 10px;
+        --radius-md: 18px;
+        --space-1: 4px;
+        --space-2: 8px;
+        --space-3: 12px;
+        --space-4: 16px;
+        --space-5: 18px;
+        --shadow-lifted: 0 10px 30px rgba(6, 8, 18, 0.55);
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; }
+      body {
+        background: var(--ground);
+        color: var(--text);
+        font: 400 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+        overflow: hidden;
+      }
+      gmp-map-3d { display: block; width: 100vw; height: 100vh; }
+
+      .panel {
+        position: fixed;
+        top: var(--space-4);
+        right: var(--space-4);
+        width: 300px;
+        max-height: calc(100vh - var(--space-4) * 2);
+        overflow-y: auto;
+        padding: var(--space-5);
+        background: var(--surface);
+        backdrop-filter: blur(20px);
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-lifted);
+        z-index: 10;
+      }
+      .panel h1 {
+        margin: 0 0 var(--space-1);
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+      .panel .sub {
+        margin: 0 0 var(--space-4);
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+      fieldset {
+        border: 0;
+        border-top: 1px solid var(--border);
+        margin: var(--space-4) 0 0;
+        padding: var(--space-3) 0 0;
+      }
+      legend {
+        padding: 0;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--text-muted);
+      }
+      label { display: block; font-size: 14px; margin-top: var(--space-3); }
+      label .val {
+        float: right;
+        color: var(--text-muted);
+        font-variant-numeric: tabular-nums;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12px;
+      }
+      select, input[type="range"] { width: 100%; margin-top: var(--space-1); }
+      select {
+        padding: var(--space-2);
+        background: var(--surface-lift);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        font: inherit;
+      }
+      input[type="range"] { accent-color: var(--accent); }
+      .row { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
+      button {
+        flex: 1;
+        padding: var(--space-2) var(--space-3);
+        background: var(--surface-lift);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        font: inherit;
+        cursor: pointer;
+      }
+      button:hover { background: color-mix(in srgb, var(--text) 12%, var(--surface-lift)); }
+      button.accent { background: var(--accent); color: var(--on-accent); border-color: transparent; font-weight: 700; }
+      .check { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-3); font-size: 14px; }
+      .check input { accent-color: var(--accent); width: 16px; height: 16px; }
+      .readout {
+        margin-top: var(--space-3);
+        padding: var(--space-2) var(--space-3);
+        background: var(--surface-lift);
+        border-radius: var(--radius-sm);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12px;
+        font-variant-numeric: tabular-nums;
+        color: var(--text-muted);
+        white-space: pre;
+      }
+      .hint { margin-top: var(--space-3); font-size: 12px; color: var(--text-muted); }
+      .fatal {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-content: center;
+        gap: var(--space-2);
+        text-align: center;
+        padding: var(--space-8, 32px);
+        z-index: 20;
+        background: var(--ground);
+      }
+      .fatal p { margin: 0; max-width: 46ch; }
+      .fatal .t { font-size: 18px; font-weight: 700; }
+      .fatal .d { font-size: 14px; color: var(--text-muted); }
+      .drop {
+        position: fixed;
+        inset: 0;
+        z-index: 15;
+        display: none;
+        place-content: center;
+        background: rgba(18, 21, 35, 0.72);
+        backdrop-filter: blur(6px);
+        font-size: 18px;
+        font-weight: 700;
+      }
+      body.dragging .drop { display: grid; }
+    </style>
+  </head>
+  <body>
+    <div class="drop">Drop a .kml or .gpx to fly it</div>
+
+    <aside class="panel">
+      <h1>#271 — 3D terrain</h1>
+      <p class="sub">Throwaway prototype. Not cairn — just the map surface, so the decisions in the issue can be looked at rather than argued about.</p>
+
+      <label for="route">Route <span class="val" id="route-pts"></span></label>
+      <select id="route"></select>
+      <p class="hint" id="route-note"></p>
+
+      <fieldset>
+        <legend>Camera</legend>
+        <label for="tilt">Tilt <span class="val" id="tilt-val">65°</span></label>
+        <input type="range" id="tilt" min="0" max="89" value="65" />
+        <label for="margin">Fit margin <span class="val" id="margin-val">15%</span></label>
+        <input type="range" id="margin" min="0" max="120" value="15" />
+        <div class="check">
+          <input type="checkbox" id="flyin" checked />
+          <label for="flyin" style="margin:0">Animate the fly-in</label>
+        </div>
+        <div class="row">
+          <button id="refit" class="accent">Re-frame</button>
+          <button id="spin">Orbit once</button>
+        </div>
+        <div class="readout" id="cam">camera —</div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Surface</legend>
+        <label for="mode">Mode</label>
+        <select id="mode">
+          <option value="SATELLITE" selected>SATELLITE — no labels</option>
+          <option value="HYBRID">HYBRID — labels on the terrain</option>
+        </select>
+        <p class="hint">The issue pins this to SATELLITE and drops #263's Labels switch. Flip it and see if you agree.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>The track</legend>
+        <label for="width">Stroke width <span class="val" id="width-val">6</span></label>
+        <input type="range" id="width" min="1" max="20" value="6" />
+        <label for="alt">Altitude mode</label>
+        <select id="alt">
+          <option value="CLAMP_TO_GROUND" selected>Clamp to ground</option>
+          <option value="RELATIVE_TO_GROUND">Float 30 m above ground</option>
+        </select>
+        <div class="check">
+          <input type="checkbox" id="halo" />
+          <label for="halo" style="margin:0">Draw the 2D map's halo too</label>
+        </div>
+        <p class="hint">The issue drops the halo in 3D. Turn it on to check that call.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Your own track</legend>
+        <p class="hint" style="margin-top:0">Drop a .kml or .gpx anywhere on the page. That is the question this prototype exists to answer — the presets are sketched by hand, not surveyed.</p>
+      </fieldset>
+    </aside>
+
+    <script type="module">
+      const KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+
+      function fatal(title, detail) {
+        const el = document.createElement('div')
+        el.className = 'fatal'
+        el.innerHTML = `<p class="t"></p><p class="d"></p>`
+        el.querySelector('.t').textContent = title
+        el.querySelector('.d').textContent = detail
+        document.body.append(el)
+      }
+
+      if (!KEY) {
+        fatal('No API key', 'Set VITE_GOOGLE_MAPS_API_KEY in cairn/.env.local and restart the dev server.')
+        throw new Error('no key')
+      }
+
+      /* Hand-sketched waypoints over terrain that is unambiguously 3D. These are
+         eyeballed from the map, not GPS traces — good enough to answer "does a
+         line on this terrain read as a walk", which is the whole question. */
+      const ROUTES = {
+        halfdome: {
+          name: 'Half Dome, Yosemite',
+          note: 'Granite wall on one side, valley floor 1400 m below. The best case for this feature.',
+          pts: [
+            [37.7318, -119.5548], [37.7345, -119.5498], [37.7368, -119.5462],
+            [37.7391, -119.5432], [37.7412, -119.5401], [37.7431, -119.5372],
+            [37.7447, -119.5348], [37.7459, -119.5332],
+          ],
+        },
+        cradle: {
+          name: 'Cradle Mountain, Tasmania',
+          note: 'Dolerite ridgeline. Closer to what an actual Overland Track day looks like.',
+          pts: [
+            [-41.6386, 145.9500], [-41.6421, 145.9478], [-41.6470, 145.9455],
+            [-41.6519, 145.9441], [-41.6555, 145.9430], [-41.6602, 145.9438],
+            [-41.6655, 145.9462], [-41.6712, 145.9487], [-41.6790, 145.9502],
+            [-41.6845, 145.9510],
+          ],
+        },
+        canyon: {
+          name: 'Bright Angel, Grand Canyon',
+          note: 'Descent rather than a climb — checks whether looking *down* into terrain works as well as up at it.',
+          pts: [
+            [36.0570, -112.1435], [36.0616, -112.1408], [36.0668, -112.1372],
+            [36.0724, -112.1329], [36.0787, -112.1275], [36.0851, -112.1201],
+            [36.0921, -112.1102], [36.0996, -112.0975],
+          ],
+        },
+        flat: {
+          name: 'Kakadu floodplain (the dull case)',
+          note: 'Almost no relief. Here to prove the negative: on flat ground 3D buys nothing, and a view that is only sometimes worth opening is worth knowing about now.',
+          pts: [
+            [-12.6700, 132.8300], [-12.6760, 132.8420], [-12.6810, 132.8560],
+            [-12.6850, 132.8710], [-12.6880, 132.8880],
+          ],
+        },
+      }
+
+      /* Presets are a handful of waypoints; a real track is hundreds of points.
+         Interpolate so the drawn line behaves like a track rather than a
+         polygon of long straights. */
+      function densify(pts, per = 40) {
+        const out = []
+        for (let i = 0; i < pts.length - 1; i++) {
+          const [aLat, aLng] = pts[i]
+          const [bLat, bLng] = pts[i + 1]
+          for (let s = 0; s < per; s++) {
+            const t = s / per
+            out.push([aLat + (bLat - aLat) * t, aLng + (bLng - aLng) * t])
+          }
+        }
+        out.push(pts[pts.length - 1])
+        return out
+      }
+
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script')
+        s.src = `https://maps.googleapis.com/maps/api/js?key=${KEY}&v=beta&libraries=maps3d`
+        s.async = true
+        s.onload = resolve
+        s.onerror = () => reject(new Error('script'))
+        document.head.append(s)
+      }).catch(() => {
+        fatal('Maps script failed to load', 'Check the network, and that the key permits this origin.')
+        throw new Error('load')
+      })
+
+      window.gm_authFailure = () =>
+        fatal('Google rejected the key', 'Enable the Maps JavaScript API for this project and allow http://localhost:5173 as a referrer.')
+
+      let maps3d
+      try {
+        maps3d = await google.maps.importLibrary('maps3d')
+      } catch (e) {
+        fatal('The maps3d library would not load', String(e))
+        throw e
+      }
+
+      const { Map3DElement, Polyline3DElement, MapMode, AltitudeMode } = maps3d
+
+      /* No mapId on purpose. The issue lists a 3D-configured Map ID as a
+         prerequisite; if this renders without one, that prerequisite is only
+         about styling and the feature is not blocked on a console change. */
+      const map = new Map3DElement({ mode: MapMode.SATELLITE })
+      document.body.prepend(map)
+
+      if (!customElements.get('gmp-map-3d')) {
+        fatal('3D is not available in this browser', 'Check that hardware acceleration is enabled, then reload.')
+      }
+
+      let core, haloLine, mainLine
+      let points = densify(ROUTES.halfdome.pts)
+
+      function bounds(pts) {
+        let n = -90, s = 90, e = -180, w = 180
+        for (const [lat, lng] of pts) {
+          n = Math.max(n, lat); s = Math.min(s, lat)
+          e = Math.max(e, lng); w = Math.min(w, lng)
+        }
+        return { n, s, e, w }
+      }
+
+      /* Range is a distance from the target, not a zoom level, so it has to be
+         derived from the geometry's extent rather than read off a table. */
+      function frame(pts, marginPct) {
+        const { n, s, e, w } = bounds(pts)
+        const center = { lat: (n + s) / 2, lng: (e + w) / 2 }
+        const latM = (n - s) * 111320
+        const lngM = (e - w) * 111320 * Math.cos((center.lat * Math.PI) / 180)
+        const span = Math.max(latM, lngM, 1)
+        const range = Math.max(400, span * (1 + marginPct / 100) * 1.4)
+        return { center, range }
+      }
+
+      const $ = (id) => document.getElementById(id)
+
+      function marginPct() { return Number($('margin').value) }
+      function tilt() { return Number($('tilt').value) }
+
+      function fly({ animate }) {
+        const { center, range } = frame(points, marginPct())
+        const target = { center: { ...center, altitude: 0 }, range, tilt: tilt(), heading: map.heading ?? 0, roll: 0 }
+        if (animate && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          // The spec's fly-in: start flat and overhead, tilt down into place.
+          map.center = target.center
+          map.range = range
+          map.tilt = 0
+          map.heading = target.heading
+          const DUR = 2000
+          requestAnimationFrame(() => map.flyCameraTo({ endCamera: target, durationMillis: DUR }))
+          /* The animation is driven by the compositor, so a tab that is not
+             being painted never advances it. Land the camera anyway rather
+             than leaving the view flat and looking broken. */
+          setTimeout(() => {
+            if (Math.abs((map.tilt ?? 0) - target.tilt) > 1) Object.assign(map, target)
+          }, DUR + 400)
+        } else {
+          Object.assign(map, target)
+        }
+      }
+
+      function draw() {
+        for (const l of [haloLine, mainLine]) l?.remove()
+        const alt = AltitudeMode[$('alt').value]
+        const coords = points.map(([lat, lng]) => ({
+          lat, lng, altitude: $('alt').value === 'CLAMP_TO_GROUND' ? 0 : 30,
+        }))
+        const width = Number($('width').value)
+
+        if ($('halo').checked) {
+          haloLine = new Polyline3DElement({
+            path: coords,
+            strokeColor: 'rgba(255,122,77,0.35)',
+            strokeWidth: width * 3,
+            altitudeMode: alt,
+            drawsOccludedSegments: false,
+          })
+          map.append(haloLine)
+        } else {
+          haloLine = null
+        }
+
+        mainLine = new Polyline3DElement({
+          path: coords,
+          /* cairn's own track palette, first entry — this is data, not chrome. */
+          strokeColor: '#FF7A4D',
+          strokeWidth: width,
+          altitudeMode: alt,
+          drawsOccludedSegments: false,
+        })
+        map.append(mainLine)
+        $('route-pts').textContent = `${points.length} pts`
+      }
+
+      // --- controls -------------------------------------------------------
+      const sel = $('route')
+      for (const [k, r] of Object.entries(ROUTES)) {
+        const o = document.createElement('option')
+        o.value = k
+        o.textContent = r.name
+        sel.append(o)
+      }
+      $('route-note').textContent = ROUTES.halfdome.note
+
+      sel.addEventListener('change', () => {
+        const r = ROUTES[sel.value]
+        points = densify(r.pts)
+        $('route-note').textContent = r.note
+        draw()
+        fly({ animate: $('flyin').checked })
+      })
+
+      $('tilt').addEventListener('input', () => {
+        $('tilt-val').textContent = `${tilt()}°`
+        map.tilt = tilt()
+      })
+      $('margin').addEventListener('input', () => {
+        $('margin-val').textContent = `${marginPct()}%`
+      })
+      $('width').addEventListener('input', () => {
+        $('width-val').textContent = $('width').value
+        draw()
+      })
+      $('alt').addEventListener('change', draw)
+      $('halo').addEventListener('change', draw)
+      $('mode').addEventListener('change', () => {
+        map.mode = MapMode[$('mode').value]
+      })
+      $('refit').addEventListener('click', () => fly({ animate: $('flyin').checked }))
+      $('spin').addEventListener('click', () => {
+        map.flyCameraAround({
+          camera: { center: map.center, range: map.range, tilt: map.tilt, heading: map.heading, roll: 0 },
+          durationMillis: 12000,
+          rounds: 1,
+        })
+      })
+
+      map.addEventListener('gmp-centerchange', updateReadout)
+      map.addEventListener('gmp-rangechange', updateReadout)
+      map.addEventListener('gmp-headingchange', updateReadout)
+      map.addEventListener('gmp-tiltchange', updateReadout)
+      function updateReadout() {
+        const c = map.center
+        if (!c) return
+        $('cam').textContent =
+          `tilt    ${Math.round(map.tilt ?? 0)}°\n` +
+          `heading ${Math.round(map.heading ?? 0)}°\n` +
+          `range   ${Math.round(map.range ?? 0).toLocaleString()} m\n` +
+          `centre  ${c.lat.toFixed(4)}, ${c.lng.toFixed(4)}`
+      }
+
+      // --- drop your own track --------------------------------------------
+      function parseTrack(text) {
+        const doc = new DOMParser().parseFromString(text, 'application/xml')
+        const out = []
+        // GPX
+        for (const p of doc.querySelectorAll('trkpt, rtept')) {
+          out.push([Number(p.getAttribute('lat')), Number(p.getAttribute('lon'))])
+        }
+        if (out.length) return out
+        // KML gx:Track
+        for (const c of doc.getElementsByTagName('*')) {
+          if (c.localName !== 'coord') continue
+          const [lng, lat] = c.textContent.trim().split(/\s+/).map(Number)
+          out.push([lat, lng])
+        }
+        if (out.length) return out
+        // KML LineString
+        for (const c of doc.querySelectorAll('coordinates')) {
+          for (const tuple of c.textContent.trim().split(/\s+/)) {
+            const [lng, lat] = tuple.split(',').map(Number)
+            if (Number.isFinite(lat) && Number.isFinite(lng)) out.push([lat, lng])
+          }
+        }
+        return out
+      }
+
+      document.addEventListener('dragover', (e) => {
+        e.preventDefault()
+        document.body.classList.add('dragging')
+      })
+      document.addEventListener('dragleave', (e) => {
+        if (e.relatedTarget === null) document.body.classList.remove('dragging')
+      })
+      document.addEventListener('drop', async (e) => {
+        e.preventDefault()
+        document.body.classList.remove('dragging')
+        const file = e.dataTransfer?.files?.[0]
+        if (!file) return
+        const pts = parseTrack(await file.text())
+        if (pts.length < 2) {
+          $('route-note').textContent = `Couldn't find a track in ${file.name}.`
+          return
+        }
+        points = pts
+        sel.selectedIndex = -1
+        $('route-note').textContent = `${file.name} — your own track.`
+        draw()
+        fly({ animate: $('flyin').checked })
+      })
+
+      draw()
+      fly({ animate: true })
+      updateReadout()
+    </script>
+  </body>
+</html>

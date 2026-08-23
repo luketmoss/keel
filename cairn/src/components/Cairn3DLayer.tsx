@@ -1,8 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useMap3D, useMapsLibrary } from '@vis.gl/react-google-maps'
 import { MAP3D_ID } from '../map/track3D'
 import { usePhotoImage } from '../photo/usePhotoImage'
+import { createGoogleElevationSampler, type ElevationSampler } from '../geo/elevation'
+import { useCairnOcclusion } from '../map/useCairnOcclusion'
+import { forgetCairnOcclusion } from '../map/cairnOcclusion'
 import { CairnMarker } from './CairnMarker'
 import type { PositionedCairn } from './CairnLayer'
 import './CairnLayer.css'
@@ -59,6 +62,18 @@ export function Cairn3DLayer({
   const markersRef = useRef<Map<string, google.maps.maps3d.MarkerElement>>(new Map())
   const [, setRenderTick] = useState(0)
 
+  /* #285 — built once, lazily, the same pattern `Map3D.tsx` uses for its own
+     camera work: `google.maps.ElevationService` only exists after the Maps
+     script has resolved, which is later than this component's first
+     render. */
+  const samplerRef = useRef<ElevationSampler | null | undefined>(undefined)
+  const getElevationSampler = useCallback((): ElevationSampler | null => {
+    if (samplerRef.current === undefined) samplerRef.current = createGoogleElevationSampler()
+    return samplerRef.current
+  }, [])
+
+  const occludedCairnIds = useCairnOcclusion(map3d, cairns, selectedCairnId, getElevationSampler)
+
   useEffect(() => {
     if (!map3d || !maps3d) return
     const { MarkerElement, AltitudeMode } = maps3d
@@ -77,6 +92,8 @@ export function Cairn3DLayer({
       const position = { lat: cairn.latitude, lng: cairn.longitude, altitude: 0 }
       const existing = markers.get(cairn.id)
       if (existing) {
+        const moved = existing.position?.lat !== cairn.latitude || existing.position?.lng !== cairn.longitude
+        if (moved) forgetCairnOcclusion(cairn.id)
         existing.position = position
         existing.title = cairn.name
         continue
@@ -132,6 +149,7 @@ export function Cairn3DLayer({
               accessToken={accessToken}
               selected={selectedCairnId === id}
               hovered={hoveredCairnIds.has(id)}
+              occluded={occludedCairnIds.has(id)}
               onSelect={onSelectCairn}
               onOpen={onOpenCairn}
               onHoverChange={(hovered) =>
@@ -156,6 +174,7 @@ function Cairn3DMarkerContent({
   accessToken,
   selected,
   hovered,
+  occluded,
   onSelect,
   onOpen,
   onHoverChange,
@@ -164,6 +183,7 @@ function Cairn3DMarkerContent({
   accessToken: string | null
   selected: boolean
   hovered: boolean
+  occluded: boolean
   onSelect: (cairnId: string) => void
   onOpen?: (cairnId: string) => void
   onHoverChange: (hovered: boolean) => void
@@ -177,13 +197,15 @@ function Cairn3DMarkerContent({
 
   return (
     <div
-      className={`cairn-layer__hit${hovered ? ' cairn-layer__hit--hovered' : ''}`}
+      className={`cairn-layer__hit${hovered ? ' cairn-layer__hit--hovered' : ''}${occluded ? ' cairn-layer__hit--occluded' : ''}`}
       role="button"
       aria-label={cairn.name}
       aria-pressed={selected}
+      aria-hidden={occluded || undefined}
       data-testid="cairn-marker-3d"
       data-cairn-id={cairn.id}
       data-selected={selected}
+      data-occluded={occluded}
       onClick={handleClick}
       onPointerEnter={() => onHoverChange(true)}
       onPointerLeave={() => onHoverChange(false)}

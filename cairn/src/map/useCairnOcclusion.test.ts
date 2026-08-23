@@ -101,6 +101,28 @@ describe('useCairnOcclusion (#285)', () => {
     expect(result.current.has('far')).toBe(true)
   })
 
+  it('unhides a cairn immediately when it becomes selected, even with a stale occluded verdict', async () => {
+    const map3d = fakeMap3d({ lat: 0, lng: 0, altitude: 3000 })
+    const { result, rerender } = renderHook(
+      ({ selectedCairnId }: { selectedCairnId: string | null }) =>
+        useCairnOcclusion(map3d, CAIRNS, selectedCairnId, () => samplerAlwaysOccluding()),
+      { initialProps: { selectedCairnId: null as string | null } },
+    )
+
+    await act(async () => {
+      map3d.steady()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    expect(result.current.has('near')).toBe(true)
+
+    // 'near' is selected without a new settle — the stale verdict from
+    // before selection must not survive the switch.
+    rerender({ selectedCairnId: 'near' })
+
+    expect(result.current.has('near')).toBe(false)
+  })
+
   it('draws everything with no elevation sampler', async () => {
     const map3d = fakeMap3d({ lat: 0, lng: 0, altitude: 3000 })
     const { result } = renderHook(() => useCairnOcclusion(map3d, CAIRNS, null, () => null))

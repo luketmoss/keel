@@ -79,9 +79,10 @@ vi.mock('@vis.gl/react-google-maps', () => ({
   Map3D: () => null,
 }))
 
+const { is3DOnRef } = vi.hoisted(() => ({ is3DOnRef: { current: true } }))
 vi.mock('../map/Map3DControl', () => ({
   useMap3DControl: () => ({
-    on: true,
+    on: is3DOnRef.current,
     support: 'available',
     setOn: vi.fn(),
     flyover: null,
@@ -227,6 +228,7 @@ beforeEach(() => {
   fakeMap3d.range = null
   flyCameraTo.mockClear()
   removeSpy.mockClear()
+  is3DOnRef.current = true
   useTripImport.mockReset()
   useCairnImport.mockReset()
   mockCairnImport()
@@ -328,5 +330,35 @@ describe('TripDetail — #288 track selection in 3D', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Hide Belford-Oxford' }))
 
     expect(removeSpy).toHaveBeenCalledWith(line)
+  })
+
+  it('does not fly the camera when 3D is switched on with a track already selected — the switch is not a selection change', () => {
+    is3DOnRef.current = false
+    useTripImport.mockReturnValue(baseTripImport({ tracks: [trackFile()] }))
+    const { rerender, entry, store } = renderTrip()
+
+    fireEvent.click(screen.getByText('Belford-Oxford'))
+    expect(flyCameraTo).not.toHaveBeenCalled()
+
+    is3DOnRef.current = true
+    rerender(
+      <MemoryRouter initialEntries={[`/trips/${entry.id}`]}>
+        <TripDetail
+          tripId={entry.id}
+          tripStore={store}
+          accessToken="token"
+          cairnFolderId="cairn-folder-id"
+          onBack={() => {}}
+          onDropTargetChange={() => {}}
+          onGeometryChange={() => {}}
+          onNeedsPlacement={() => {}}
+          onCreateTargetChange={() => {}}
+          onCairnDetailChange={() => {}}
+          cairnsDraggable
+        />
+      </MemoryRouter>,
+    )
+
+    expect(flyCameraTo).not.toHaveBeenCalled()
   })
 })

@@ -2,15 +2,11 @@ import { useMemo } from 'react'
 import { useMap3D } from '@vis.gl/react-google-maps'
 import { useMap3DControl } from '../map/Map3DControl'
 import { useTrack3DFraming } from '../map/useTrack3DFraming'
-import { worldTrackGeometry } from '../geo/world3DRoutes'
+import { worldTrackGeometry, type OverviewSource } from '../geo/world3DRoutes'
 import { MAP3D_ID } from '../map/track3D'
 import type { LooseRecord } from '../store/looseStore'
 import type { TripIndexEntry } from '../store/tripStore'
 import type { PositionedCairn } from './CairnLayer'
-
-interface OverviewSource {
-  getOverview(id: string): import('geojson').FeatureCollection<import('geojson').LineString> | null
-}
 
 interface WorldTrack3DFramingProps {
   trips: TripIndexEntry[]

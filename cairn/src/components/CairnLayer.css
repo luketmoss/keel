@@ -14,6 +14,20 @@
   background: transparent;
   border: none;
   padding: 0;
+  /* #285 — opacity only, never applied by the 2D layer. Declared here so
+     the 3D occlusion fade below has a transition to run and a `1` to
+     return to. */
+  opacity: 1;
+  transition: opacity var(--motion-base) var(--ease);
+}
+
+/* #285 — a 3D marker whose line of sight to the camera is blocked by
+   terrain. Opacity rather than `display: none` or unmounting: the marker
+   element keeps its place in `Map3DElement`'s append order, which is the
+   only stacking control #273 has (see "Selection" there). */
+.cairn-layer__hit--occluded {
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* #158 — cursor states, per the design note's own table. The base `pointer`

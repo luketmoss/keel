@@ -1,6 +1,7 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PositionedCairn } from './CairnLayer'
+import { clearCairnOcclusionCache } from '../map/cairnOcclusion'
 
 /* Same imperative-lifecycle stubbing strategy as Track3DLayer.test.tsx, with
    one addition: a `MarkerElement` hosts arbitrary HTML (unlike
@@ -9,8 +10,10 @@ import type { PositionedCairn } from './CairnLayer'
    it — a constructor that returns an object override `this`, which is legal
    JS and lets `new MarkerElement(options)` yield an element `createPortal`
    can actually render into and tests can actually query. */
-const { map3dResult, maps3dLibResult, readyLib, removeSpy } = vi.hoisted(() => {
+const { map3dResult, maps3dLibResult, readyLib, removeSpy, steadyHandler, samplerResult } = vi.hoisted(() => {
   const removeSpy = vi.fn()
+  const steadyHandler: { current: ((event: Event) => void) | null } = { current: null }
+  const samplerResult: { current: unknown } = { current: null }
 
   class FakeMarkerElement {
     constructor(options: Record<string, unknown>) {
@@ -31,6 +34,15 @@ const { map3dResult, maps3dLibResult, readyLib, removeSpy } = vi.hoisted(() => {
       append: (marker: HTMLElement) => {
         document.body.appendChild(marker)
       },
+      cameraPosition: { lat: 0, lng: 0, altitude: 3000 },
+      // #285 — the occlusion hook listens for this. Captured so a test can
+      // fire it directly, the same way a real camera settling would.
+      addEventListener: (type: string, listener: (event: Event) => void) => {
+        if (type === 'gmp-steadychange') steadyHandler.current = listener
+      },
+      removeEventListener: (type: string) => {
+        if (type === 'gmp-steadychange') steadyHandler.current = null
+      },
     } as unknown,
   }
   const readyLib = {
@@ -39,12 +51,19 @@ const { map3dResult, maps3dLibResult, readyLib, removeSpy } = vi.hoisted(() => {
   }
   const maps3dLibResult = { current: readyLib as unknown }
 
-  return { map3dResult, maps3dLibResult, readyLib, removeSpy }
+  return { map3dResult, maps3dLibResult, readyLib, removeSpy, steadyHandler, samplerResult }
 })
 
 vi.mock('@vis.gl/react-google-maps', () => ({
   useMap3D: () => map3dResult.current,
   useMapsLibrary: () => maps3dLibResult.current,
+}))
+
+// #285 — the occlusion hook builds its own `ElevationSampler` lazily via
+// this factory. Stubbed per test so occlusion can be asserted without a
+// real `google.maps.ElevationService`.
+vi.mock('../geo/elevation', () => ({
+  createGoogleElevationSampler: () => samplerResult.current,
 }))
 
 import { Cairn3DLayer } from './Cairn3DLayer'
@@ -74,6 +93,9 @@ describe('Cairn3DLayer (#273)', () => {
     removeSpy.mockClear()
     document.body.innerHTML = ''
     maps3dLibResult.current = readyLib
+    steadyHandler.current = null
+    samplerResult.current = null
+    clearCairnOcclusionCache()
   })
 
   it('draws one MarkerElement per cairn, clamped to the ground, carrying its name', () => {
@@ -161,5 +183,82 @@ describe('Cairn3DLayer (#273)', () => {
     maps3dLibResult.current = null
     render(<Cairn3DLayer cairns={[PIN]} accessToken={null} selectedCairnId={null} onSelectCairn={vi.fn()} />)
     expect(document.body.querySelectorAll('[data-fake-marker]')).toHaveLength(0)
+  })
+})
+
+describe('Cairn3DLayer occlusion (#285)', () => {
+  beforeEach(() => {
+    removeSpy.mockClear()
+    document.body.innerHTML = ''
+    maps3dLibResult.current = readyLib
+    steadyHandler.current = null
+    samplerResult.current = null
+    clearCairnOcclusionCache()
+  })
+
+  it('draws every cairn before the camera has settled even once', () => {
+    samplerResult.current = {
+      sampleAlongPath: async () => ({ ok: true, samples: [{ lat: 0, lng: 0, elevationMeters: 0 }] }),
+    }
+    render(<Cairn3DLayer cairns={[PIN]} accessToken={null} selectedCairnId={null} onSelectCairn={vi.fn()} />)
+
+    expect(screen.getByTestId('cairn-marker-3d').className).not.toContain('cairn-layer__hit--occluded')
+  })
+
+  it('hides a cairn whose line of sight is blocked once the camera settles', async () => {
+    samplerResult.current = {
+      sampleAlongPath: async () => ({
+        ok: true,
+        samples: [
+          { lat: 0, lng: 0, elevationMeters: 0 },
+          { lat: 0, lng: 0, elevationMeters: 9000 },
+          { lat: 0, lng: 0, elevationMeters: 0 },
+        ],
+      }),
+    }
+    render(<Cairn3DLayer cairns={[PIN]} accessToken={null} selectedCairnId={null} onSelectCairn={vi.fn()} />)
+
+    await act(async () => {
+      steadyHandler.current?.({ isSteady: true } as unknown as Event)
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(screen.getByTestId('cairn-marker-3d').className).toContain('cairn-layer__hit--occluded')
+  })
+
+  it('never hides the selected cairn, even when terrain occludes it', async () => {
+    samplerResult.current = {
+      sampleAlongPath: async () => ({
+        ok: true,
+        samples: [
+          { lat: 0, lng: 0, elevationMeters: 0 },
+          { lat: 0, lng: 0, elevationMeters: 9000 },
+          { lat: 0, lng: 0, elevationMeters: 0 },
+        ],
+      }),
+    }
+    render(<Cairn3DLayer cairns={[PIN]} accessToken={null} selectedCairnId="cairn-1" onSelectCairn={vi.fn()} />)
+
+    await act(async () => {
+      steadyHandler.current?.({ isSteady: true } as unknown as Event)
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(screen.getByTestId('cairn-marker-3d').className).not.toContain('cairn-layer__hit--occluded')
+  })
+
+  it('does not test occlusion while the camera is moving', async () => {
+    const sampleAlongPath = vi.fn(async () => ({ ok: true, samples: [] }))
+    samplerResult.current = { sampleAlongPath }
+    render(<Cairn3DLayer cairns={[PIN]} accessToken={null} selectedCairnId={null} onSelectCairn={vi.fn()} />)
+
+    await act(async () => {
+      steadyHandler.current?.({ isSteady: false } as unknown as Event)
+      await Promise.resolve()
+    })
+
+    expect(sampleAlongPath).not.toHaveBeenCalled()
   })
 })

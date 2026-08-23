@@ -190,10 +190,11 @@ markers group does not.
   surface is mounted once for the session (#271). Markers are diffed by cairn id
   the way `Track3DLayer` diffs by track key, so nothing is duplicated and nothing
   is orphaned.
-- **A cairn behind a ridge.** `MarkerElement` has no `drawsWhenOccluded`, so this
-  is the platform's default and the app does not fight it. Either behaviour is
-  acceptable: a hidden marker is one camera nudge from visible, and the list row
-  is unaffected either way.
+- **A cairn behind a ridge.** **Superseded by #285** —
+  [285-cairns-behind-the-terrain.md](285-cairns-behind-the-terrain.md). On real
+  terrain at a real tilt this read as broken rather than as a neutral platform
+  default, so the app now computes occlusion itself with the Elevation API
+  rather than accepting `MarkerElement`'s lack of `drawsWhenOccluded`.
 - **Two cairns at the same coordinate.** Both draw, one on top of the other. The
   upper one takes the click. This is the accepted cost of *Clustering does not
   come to 3D*, and it is reachable by moving the camera.

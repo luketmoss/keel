@@ -1,21 +1,9 @@
-/* Bottom left of the map. While the column is open this clears it; when the
-   column collapses it slides to the map's own left edge over --motion-base,
-   the same duration and curve the column itself moves with, so the two read
-   as one movement rather than two. */
-.layers-control {
-  position: absolute;
-  bottom: var(--space-4);
-  left: calc(var(--space-4) + var(--panel-width) + var(--space-4));
-  z-index: 2;
-  display: flex;
-  align-items: flex-end;
-  gap: var(--space-2);
-  transition: left var(--motion-base) var(--ease);
-}
-
-.layers-control--clear {
-  left: var(--space-4);
-}
+/* #284 — this stylesheet no longer positions anything: the bottom-left
+   cluster in MapCanvas.css owns the corner, the clearing-the-column
+   behaviour and the slide to the map's own edge. What's left here is the
+   trigger and the panel as plain flex children, laid out from the
+   cluster's own `align-items: flex-end` so the panel still grows upward
+   from the same bottom edge the trigger sat on. */
 
 .layers-control__trigger {
   display: inline-flex;
@@ -44,7 +32,9 @@
 
 /* The panel carries the L2 material the strip used to carry on its own —
    #263 put a second row underneath the tiles, and the surface, blur, radius
-   and shadow belong to the thing that contains both. */
+   and shadow belong to the thing that contains both. #284 — this is now
+   the whole control while it's open, not a layer stacked above a trigger
+   that's still on screen. */
 .layers-control__panel {
   display: flex;
   flex-direction: column;
@@ -65,15 +55,13 @@
    hairline that stops short reads as a mistake. The wrapper is what carries
    the `title`, because `title` on a `disabled` button never reaches the
    pointer — #199's `.track-row__swatch-wrap` fix. */
-.layers-control__labels-wrap,
-.layers-control__3d-wrap {
+.layers-control__labels-wrap {
   display: block;
   width: calc(100% + var(--space-1) * 2);
   margin: 0 calc(var(--space-1) * -1) calc(var(--space-1) * -1);
 }
 
-.layers-control__labels,
-.layers-control__3d {
+.layers-control__labels {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -91,56 +79,25 @@
   transition: color var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease);
 }
 
-.layers-control__labels:hover:not(:disabled),
-.layers-control__3d:hover:not(:disabled) {
+.layers-control__labels:hover:not(:disabled) {
   color: var(--text);
   background: var(--hover);
 }
 
-.layers-control__labels:active:not(:disabled),
-.layers-control__3d:active:not(:disabled) {
+.layers-control__labels:active:not(:disabled) {
   background: var(--pressed);
 }
 
 /* Checked on `roadmap` and `terrain`, because they really do carry Google's
    labels and really cannot be made to drop them. Disabled rather than
-   hidden: a control that vanishes between tiles teaches nothing. #271's 3D
-   switch takes the same treatment when the browser can't draw 3D. */
-.layers-control__labels:disabled,
-.layers-control__3d:disabled {
+   hidden: a control that vanishes between tiles teaches nothing. */
+.layers-control__labels:disabled {
   opacity: 0.4;
   cursor: default;
 }
 
-.layers-control__labels[aria-checked='true'],
-.layers-control__3d[aria-checked='true'] {
+.layers-control__labels[aria-checked='true'] {
   color: var(--accent);
-}
-
-/* #271 — the 3D switch's own row keeps the panel's square corner (it isn't
-   the last row any more), and its caption sits flush beneath it rather than
-   carrying the row's own padding twice. */
-.layers-control__3d {
-  border-radius: 0;
-}
-
-.layers-control__caption {
-  margin: calc(var(--space-1) * -1) 0 0;
-  padding: 0 var(--space-2) var(--space-1);
-  color: var(--text-muted);
-  font-size: var(--text-xs);
-}
-
-/* The only way the collapsed control can say which surface you're on — the
-   language's Selected treatment on a control that is currently doing
-   something. */
-.layers-control__badge {
-  padding: 0 var(--space-1);
-  border-radius: var(--radius-full);
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: var(--text-xs);
-  line-height: 1.6;
 }
 
 /* Not the language's Selected fill on the whole row: that treatment is for
@@ -247,15 +204,6 @@
    swatch is what makes it recognisable afterwards. At phone width the word
    goes and the swatch stays. */
 @media (max-width: 719px) {
-  .layers-control {
-    left: var(--space-4);
-    bottom: calc(var(--sheet-current, var(--sheet-half)) + var(--space-2));
-    transition: bottom var(--motion-base) var(--ease);
-  }
-
-  /* The switch keeps its word. A caption under a swatch is a gloss on a
-     picture; `Labels` is the only thing identifying its row, and a lone box
-     in a panel is a puzzle. */
   .layers-control__trigger-label,
   .layers-control__option-label {
     display: none;

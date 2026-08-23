@@ -119,11 +119,27 @@ describe('MapCanvas corner controls (#109)', () => {
 
   it('clears the column while it is open and returns to the map edge when it collapses', () => {
     const open = renderCanvas({ panelCollapsed: false })
-    expect(open.container.querySelector('.layers-control--clear')).toBeNull()
+    expect(open.container.querySelector('.map-layers-cluster--clear')).toBeNull()
     open.unmount()
 
     const collapsed = renderCanvas({ panelCollapsed: true })
-    expect(collapsed.container.querySelector('.layers-control--clear')).not.toBeNull()
+    expect(collapsed.container.querySelector('.map-layers-cluster--clear')).not.toBeNull()
+  })
+})
+
+describe('MapCanvas layers/3D cluster (#284)', () => {
+  afterEach(() => {
+    use3DSupportResult.current = { support: 'unavailable', library: null }
+  })
+
+  it('shows the 3D toggle only on Satellite, the default basemap', () => {
+    renderCanvas()
+    expect(screen.getByRole('switch', { name: '3D' })).not.toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: /Layers:/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Terrain' }))
+
+    expect(screen.queryByRole('switch', { name: '3D' })).toBeNull()
   })
 })
 
@@ -134,34 +150,24 @@ describe('MapCanvas 3D/basemap coupling (#271)', () => {
 
   it('disables the 3D switch when the browser cannot draw 3D', () => {
     renderCanvas()
-    fireEvent.click(screen.getByRole('button', { name: 'Layers' }))
 
-    expect(screen.getByRole('switch', { name: /3D/ }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('switch', { name: '3D' }).hasAttribute('disabled')).toBe(true)
   })
 
-  it('turning 3D on while Map or Terrain is selected selects Satellite', () => {
-    use3DSupportResult.current = { support: 'available', library: null }
-    renderCanvas()
-    fireEvent.click(screen.getByRole('button', { name: 'Layers' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Terrain' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Layers' }))
-
-    fireEvent.click(screen.getByRole('switch', { name: /3D/ }))
-
-    expect(screen.getByRole('button', { name: 'Satellite' }).className).toContain('--active')
-    expect(screen.getByRole('switch', { name: /3D/ }).getAttribute('aria-checked')).toBe('true')
-  })
+  // #271's other direction — turning 3D on while Map or Terrain is selected
+  // — is unreachable through the UI now that #284 renders the 3D toggle
+  // only on Satellite, so it's dropped rather than kept as a case that can
+  // no longer happen.
 
   it('selecting Map or Terrain while 3D is on turns 3D off', () => {
     use3DSupportResult.current = { support: 'available', library: null }
     renderCanvas()
-    fireEvent.click(screen.getByRole('button', { name: 'Layers' }))
-    fireEvent.click(screen.getByRole('switch', { name: /3D/ }))
-    expect(screen.getByRole('switch', { name: /3D/ }).getAttribute('aria-checked')).toBe('true')
+    fireEvent.click(screen.getByRole('switch', { name: '3D' }))
+    expect(screen.getByRole('switch', { name: '3D' }).getAttribute('aria-checked')).toBe('true')
 
+    fireEvent.click(screen.getByRole('button', { name: /Layers:/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Map' }))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Layers' }))
-    expect(screen.getByRole('switch', { name: /3D/ }).getAttribute('aria-checked')).toBe('false')
+    expect(screen.queryByRole('switch', { name: '3D' })).toBeNull()
   })
 })

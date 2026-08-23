@@ -1,26 +1,42 @@
+import { useRef } from 'react'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { LayersControl } from './LayersControl'
 
-function open(props: Partial<Parameters<typeof LayersControl>[0]> = {}) {
-  const onChange = vi.fn()
-  const onLabelsChange = vi.fn()
-  const onChange3D = vi.fn()
-  render(
-    <LayersControl
-      value="satellite"
-      labels={false}
-      onChange={onChange}
-      onLabelsChange={onLabelsChange}
-      panelCollapsed={false}
-      is3DOn={false}
-      onChange3D={onChange3D}
-      maps3DSupport="available"
-      {...props}
-    />,
+function Harness({
+  withSibling = false,
+  ...props
+}: Partial<React.ComponentProps<typeof LayersControl>> & { withSibling?: boolean } = {}) {
+  const clusterRef = useRef<HTMLDivElement | null>(null)
+  return (
+    <div ref={clusterRef}>
+      <LayersControl
+        value="satellite"
+        labels={false}
+        onChange={vi.fn()}
+        onLabelsChange={vi.fn()}
+        clusterRef={clusterRef}
+        {...props}
+      />
+      {/* Stands in for `Map3DToggle`, the cluster's other member. */}
+      {withSibling && (
+        <button type="button" aria-label="3D">
+          3D
+        </button>
+      )}
+    </div>
   )
-  fireEvent.click(screen.getByRole('button', { name: 'Layers' }))
-  return { onChange, onLabelsChange, onChange3D }
+}
+
+function open(
+  props: Partial<React.ComponentProps<typeof LayersControl>> = {},
+  { withSibling = false }: { withSibling?: boolean } = {},
+) {
+  const onChange = props.onChange ?? vi.fn()
+  const onLabelsChange = props.onLabelsChange ?? vi.fn()
+  render(<Harness {...props} onChange={onChange} onLabelsChange={onLabelsChange} withSibling={withSibling} />)
+  fireEvent.click(screen.getByRole('button', { name: /Layers:/ }))
+  return { onChange, onLabelsChange }
 }
 
 describe('LayersControl (#263)', () => {
@@ -58,15 +74,6 @@ describe('LayersControl (#263)', () => {
     expect(screen.getByRole('group', { name: 'Basemap' })).not.toBeNull()
   })
 
-  it('collapses the panel when a tile is picked, as #109 specifies', () => {
-    const { onChange } = open()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Terrain' }))
-
-    expect(onChange).toHaveBeenCalledWith('terrain')
-    expect(screen.queryByRole('group', { name: 'Basemap' })).toBeNull()
-  })
-
   it.each(['roadmap', 'terrain'] as const)(
     'shows the switch checked and disabled on %s, whatever the preference says',
     (type) => {
@@ -79,19 +86,8 @@ describe('LayersControl (#263)', () => {
   )
 
   it('carries the rule as a tooltip on the wrapper, where a disabled button cannot', () => {
-    const { container } = render(
-      <LayersControl
-        value="roadmap"
-        labels={false}
-        onChange={vi.fn()}
-        onLabelsChange={vi.fn()}
-        panelCollapsed={false}
-        is3DOn={false}
-        onChange3D={vi.fn()}
-        maps3DSupport="available"
-      />,
-    )
-    fireEvent.click(screen.getByRole('button', { name: 'Layers' }))
+    const { container } = render(<Harness value="roadmap" labels={false} />)
+    fireEvent.click(screen.getByRole('button', { name: /Layers:/ }))
 
     expect(container.querySelector('.layers-control__labels-wrap')?.getAttribute('title')).toBe(
       'The map and terrain views always show labels',
@@ -99,144 +95,124 @@ describe('LayersControl (#263)', () => {
   })
 
   it('names the action in the tooltip while the switch is usable', () => {
-    const { container, rerender } = render(
-      <LayersControl
-        value="satellite"
-        labels={false}
-        onChange={vi.fn()}
-        onLabelsChange={vi.fn()}
-        panelCollapsed={false}
-        is3DOn={false}
-        onChange3D={vi.fn()}
-        maps3DSupport="available"
-      />,
-    )
-    fireEvent.click(screen.getByRole('button', { name: 'Layers' }))
+    const { container, rerender } = render(<Harness value="satellite" labels={false} />)
+    fireEvent.click(screen.getByRole('button', { name: /Layers:/ }))
     const wrap = () => container.querySelector('.layers-control__labels-wrap')?.getAttribute('title')
 
     expect(wrap()).toBe('Show place labels on the imagery')
 
-    rerender(
-      <LayersControl
-        value="satellite"
-        labels
-        onChange={vi.fn()}
-        onLabelsChange={vi.fn()}
-        panelCollapsed={false}
-        is3DOn={false}
-        onChange3D={vi.fn()}
-        maps3DSupport="available"
-      />,
-    )
+    rerender(<Harness value="satellite" labels />)
     expect(wrap()).toBe('Hide place labels on the imagery')
   })
 
   it("marks the trigger's swatch when satellite is carrying labels, and only then", () => {
-    const { container, rerender } = render(
-      <LayersControl
-        value="satellite"
-        labels
-        onChange={vi.fn()}
-        onLabelsChange={vi.fn()}
-        panelCollapsed={false}
-        is3DOn={false}
-        onChange3D={vi.fn()}
-        maps3DSupport="available"
-      />,
-    )
+    const { container, rerender } = render(<Harness value="satellite" labels />)
     const swatch = () => container.querySelector('.layers-control__trigger .layers-control__swatch')
 
     expect(swatch()?.className).toContain('layers-control__swatch--labelled')
 
-    rerender(
-      <LayersControl
-        value="satellite"
-        labels={false}
-        onChange={vi.fn()}
-        onLabelsChange={vi.fn()}
-        panelCollapsed={false}
-        is3DOn={false}
-        onChange3D={vi.fn()}
-        maps3DSupport="available"
-      />,
-    )
+    rerender(<Harness value="satellite" labels={false} />)
     expect(swatch()?.className).not.toContain('layers-control__swatch--labelled')
 
-    rerender(
-      <LayersControl
-        value="terrain"
-        labels
-        onChange={vi.fn()}
-        onLabelsChange={vi.fn()}
-        panelCollapsed={false}
-        is3DOn={false}
-        onChange3D={vi.fn()}
-        maps3DSupport="available"
-      />,
-    )
+    rerender(<Harness value="terrain" labels />)
     expect(swatch()?.className).not.toContain('layers-control__swatch--labelled')
   })
 })
 
-describe('LayersControl 3D switch (#271)', () => {
-  it('offers the switch off, enabled, with its caption', () => {
-    open()
+describe('LayersControl, one control (#284)', () => {
+  it('names the current basemap on the collapsed control, not "Layers"', () => {
+    render(<Harness value="terrain" />)
 
-    const swtch = screen.getByRole('switch', { name: /3D/ })
-    expect(swtch.getAttribute('aria-checked')).toBe('false')
-    expect(swtch.hasAttribute('disabled')).toBe(false)
-    expect(screen.getByText('Satellite only')).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'Layers: Terrain' })).not.toBeNull()
+    expect(screen.queryByText('Layers')).toBeNull()
   })
 
-  it('flips on click, and leaves the panel open', () => {
-    const { onChange3D } = open()
+  it('is either the trigger or the panel, never both', () => {
+    render(<Harness />)
 
-    fireEvent.click(screen.getByRole('switch', { name: /3D/ }))
+    expect(screen.queryByRole('group', { name: 'Basemap' })).toBeNull()
+    expect(screen.getByRole('button', { name: /Layers:/ })).not.toBeNull()
 
-    expect(onChange3D).toHaveBeenCalledWith(true)
+    fireEvent.click(screen.getByRole('button', { name: /Layers:/ }))
+
+    expect(screen.queryByRole('button', { name: /Layers:/ })).toBeNull()
     expect(screen.getByRole('group', { name: 'Basemap' })).not.toBeNull()
   })
 
-  it('goes disabled with its own sentence when the browser cannot draw 3D', () => {
-    open({ maps3DSupport: 'unavailable' })
-
-    const swtch = screen.getByRole('switch', { name: /3D/ })
-    expect(swtch.hasAttribute('disabled')).toBe(true)
-    expect(screen.getByText("This browser can't draw 3D. Check that hardware acceleration is on.")).not.toBeNull()
+  it('the word "Layers" never appears once the panel is open', () => {
+    open()
+    expect(screen.queryByText('Layers')).toBeNull()
   })
 
-  it('reads as enabled while support is still being checked', () => {
-    open({ maps3DSupport: 'checking' })
-    expect(screen.getByRole('switch', { name: /3D/ }).hasAttribute('disabled')).toBe(false)
+  it('stays open when a tile is picked', () => {
+    const { onChange } = open()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Terrain' }))
+
+    expect(onChange).toHaveBeenCalledWith('terrain')
+    expect(screen.getByRole('group', { name: 'Basemap' })).not.toBeNull()
   })
 
-  it('badges the trigger while on, and only then', () => {
-    const { container, rerender } = render(
-      <LayersControl
-        value="satellite"
-        labels={false}
-        onChange={vi.fn()}
-        onLabelsChange={vi.fn()}
-        panelCollapsed={false}
-        is3DOn={false}
-        onChange3D={vi.fn()}
-        maps3DSupport="available"
-      />,
-    )
-    expect(container.querySelector('.layers-control__badge')).toBeNull()
+  it('stays open across a second tile pick', () => {
+    const { onChange } = open()
 
-    rerender(
-      <LayersControl
-        value="satellite"
-        labels={false}
-        onChange={vi.fn()}
-        onLabelsChange={vi.fn()}
-        panelCollapsed={false}
-        is3DOn
-        onChange3D={vi.fn()}
-        maps3DSupport="available"
-      />,
-    )
-    expect(container.querySelector('.layers-control__badge')).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Terrain' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Map' }))
+
+    expect(onChange).toHaveBeenCalledTimes(2)
+    expect(screen.getByRole('group', { name: 'Basemap' })).not.toBeNull()
+  })
+
+  it('closes on Escape and returns focus to the collapsed control', () => {
+    open()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(screen.queryByRole('group', { name: 'Basemap' })).toBeNull()
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: /Layers:/ }))
+  })
+
+  it('closes on a pointer press outside the panel', () => {
+    open()
+
+    fireEvent.pointerDown(document.body)
+
+    expect(screen.queryByRole('group', { name: 'Basemap' })).toBeNull()
+  })
+
+  it('does not close on a press inside the panel', () => {
+    open()
+
+    fireEvent.pointerDown(screen.getByRole('group', { name: 'Basemap' }))
+
+    expect(screen.getByRole('group', { name: 'Basemap' })).not.toBeNull()
+  })
+
+  it('closes when focus moves outside the cluster', () => {
+    open()
+
+    const outside = document.createElement('button')
+    document.body.appendChild(outside)
+    fireEvent.focusIn(outside)
+
+    expect(screen.queryByRole('group', { name: 'Basemap' })).toBeNull()
+    document.body.removeChild(outside)
+  })
+
+  it('stays open when focus moves to another element inside the cluster', () => {
+    // The sibling stands in for `Map3DToggle` — #284's edge case that
+    // tabbing from the panel to the 3D toggle must not collapse the panel
+    // out from under a keyboard user.
+    open({}, { withSibling: true })
+
+    fireEvent.focusIn(screen.getByRole('button', { name: '3D' }))
+
+    expect(screen.getByRole('group', { name: 'Basemap' })).not.toBeNull()
+  })
+
+  it('has no close button in the panel', () => {
+    open()
+    expect(screen.queryByRole('button', { name: /close/i })).toBeNull()
+    expect(screen.queryByText('✕')).toBeNull()
   })
 })

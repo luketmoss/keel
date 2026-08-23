@@ -261,7 +261,7 @@ all. `Clear` sets no dates; `Done` commits.
 
 | Corner | What lives there |
 |---|---|
-| Bottom left | **Layers** — a thumbnail that expands to Map / Satellite / Terrain, and a Labels switch |
+| Bottom left | **The basemap** — a pill naming the current basemap, which expands in place to Map / Satellite / Terrain and a Labels switch, and a **3D** toggle beside it, present only on Satellite |
 | Bottom right | Fit-to-everything, then zoom in / out |
 | Top left | The column |
 | Top right | *Nothing.* The account moved into the search card |
@@ -269,7 +269,10 @@ all. `Clear` sets no dates; `Done` commits.
 **A map control belongs in the map's corners.** The basemap picker sat top-right
 under the account bubble, as far from every other filter as the screen allows,
 and needed arithmetic in its own stylesheet to dodge a control that was already
-there. Layers is a thumbnail because the choice is visual.
+there. Layers is a thumbnail because the choice is visual. The control names the
+basemap rather than itself: a trigger and a panel on screen at once are two
+controls for one question — see
+[284-one-layers-control.md](284-one-layers-control.md).
 
 When the panel is open, Layers clears the column; when the panel is collapsed it
 slides to the map's own left edge, over `--motion-base`.

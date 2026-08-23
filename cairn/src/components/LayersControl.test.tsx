@@ -5,8 +5,14 @@ import { LayersControl } from './LayersControl'
 
 function Harness({
   withSibling = false,
+  onSiblingClick,
+  siblingDisabled = false,
   ...props
-}: Partial<React.ComponentProps<typeof LayersControl>> & { withSibling?: boolean } = {}) {
+}: Partial<React.ComponentProps<typeof LayersControl>> & {
+  withSibling?: boolean
+  onSiblingClick?: () => void
+  siblingDisabled?: boolean
+} = {}) {
   const clusterRef = useRef<HTMLDivElement | null>(null)
   return (
     <div ref={clusterRef}>
@@ -18,9 +24,13 @@ function Harness({
         clusterRef={clusterRef}
         {...props}
       />
-      {/* Stands in for `Map3DToggle`, the cluster's other member. */}
+      {/* Stands in for `Map3DToggle`, the cluster's other member. Its own
+          `onClick` lets tests assert ordering — that the sibling's click
+          fires before the panel closes, which is exactly what #295's bug
+          was: the sibling's click getting swallowed by the panel closing
+          first. */}
       {withSibling && (
-        <button type="button" aria-label="3D">
+        <button type="button" aria-label="3D" disabled={siblingDisabled} onClick={onSiblingClick}>
           3D
         </button>
       )}
@@ -30,11 +40,24 @@ function Harness({
 
 function open(
   props: Partial<React.ComponentProps<typeof LayersControl>> = {},
-  { withSibling = false }: { withSibling?: boolean } = {},
+  { withSibling = false, onSiblingClick, siblingDisabled = false }: {
+    withSibling?: boolean
+    onSiblingClick?: () => void
+    siblingDisabled?: boolean
+  } = {},
 ) {
   const onChange = props.onChange ?? vi.fn()
   const onLabelsChange = props.onLabelsChange ?? vi.fn()
-  render(<Harness {...props} onChange={onChange} onLabelsChange={onLabelsChange} withSibling={withSibling} />)
+  render(
+    <Harness
+      {...props}
+      onChange={onChange}
+      onLabelsChange={onLabelsChange}
+      withSibling={withSibling}
+      onSiblingClick={onSiblingClick}
+      siblingDisabled={siblingDisabled}
+    />,
+  )
   fireEvent.click(screen.getByRole('button', { name: /Layers:/ }))
   return { onChange, onLabelsChange }
 }
@@ -172,7 +195,7 @@ describe('LayersControl, one control (#284)', () => {
     expect(document.activeElement).toBe(screen.getByRole('button', { name: /Layers:/ }))
   })
 
-  it('closes on a pointer press outside the panel', () => {
+  it('closes immediately on a pointer press truly outside the cluster', () => {
     open()
 
     fireEvent.pointerDown(document.body)
@@ -186,6 +209,18 @@ describe('LayersControl, one control (#284)', () => {
     fireEvent.pointerDown(screen.getByRole('group', { name: 'Basemap' }))
 
     expect(screen.getByRole('group', { name: 'Basemap' })).not.toBeNull()
+  })
+
+  it('closes on a drag that starts inside the panel and releases outside the cluster (#295)', () => {
+    // No `click` fires for a drag — only `pointerdown` sees it, and that
+    // path is unchanged for anything truly outside the cluster.
+    open()
+
+    fireEvent.pointerDown(screen.getByRole('group', { name: 'Basemap' }))
+    expect(screen.getByRole('group', { name: 'Basemap' })).not.toBeNull()
+
+    fireEvent.pointerDown(document.body)
+    expect(screen.queryByRole('group', { name: 'Basemap' })).toBeNull()
   })
 
   it('closes when focus moves outside the cluster', () => {
@@ -214,5 +249,70 @@ describe('LayersControl, one control (#284)', () => {
     open()
     expect(screen.queryByRole('button', { name: /close/i })).toBeNull()
     expect(screen.queryByText('✕')).toBeNull()
+  })
+})
+
+describe('LayersControl, dismissal through a cluster sibling (#295)', () => {
+  it('does not close immediately on pointerdown on the sibling', () => {
+    open({}, { withSibling: true })
+
+    fireEvent.pointerDown(screen.getByRole('button', { name: '3D' }))
+
+    expect(screen.getByRole('group', { name: 'Basemap' })).not.toBeNull()
+  })
+
+  it('closes on click on the sibling', () => {
+    open({}, { withSibling: true })
+
+    fireEvent.click(screen.getByRole('button', { name: '3D' }))
+
+    expect(screen.queryByRole('group', { name: 'Basemap' })).toBeNull()
+  })
+
+  it("fires the sibling's own onClick before the panel closes, for a tap (pointerdown + click)", () => {
+    const onSiblingClick = vi.fn(() => {
+      // At the moment the sibling's handler runs, the panel must still be
+      // mounted — this is the ordering #295 is about. A fix that closes the
+      // panel first would tear the sibling's own click handling out from
+      // under it, exactly like the bug.
+      expect(screen.getByRole('group', { name: 'Basemap' })).not.toBeNull()
+    })
+    open({}, { withSibling: true, onSiblingClick })
+
+    const sibling = screen.getByRole('button', { name: '3D' })
+    fireEvent.pointerDown(sibling)
+    fireEvent.click(sibling)
+
+    expect(onSiblingClick).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('group', { name: 'Basemap' })).toBeNull()
+  })
+
+  it('closes on the synthetic click a keyboard Enter/Space produces on the sibling', () => {
+    const onSiblingClick = vi.fn()
+    open({}, { withSibling: true, onSiblingClick })
+
+    // jsdom doesn't synthesize a click from a keydown the way a real browser
+    // does for a native <button>; asserting the same click listener handles
+    // it is the point, since #295's fix relies on `Enter`/`Space` already
+    // dispatching a real `click`.
+    fireEvent.click(screen.getByRole('button', { name: '3D' }))
+
+    expect(onSiblingClick).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('group', { name: 'Basemap' })).toBeNull()
+  })
+
+  it('does nothing when the sibling is disabled — no click, so nothing closes', () => {
+    const onSiblingClick = vi.fn()
+    open({}, { withSibling: true, onSiblingClick, siblingDisabled: true })
+
+    const sibling = screen.getByRole('button', { name: '3D' })
+    fireEvent.pointerDown(sibling)
+    // A disabled button dispatches no `click` at all in a real browser;
+    // jsdom's fireEvent.click still calls the handler regardless of
+    // `disabled`, so this asserts via pointerdown alone plus the fact that
+    // no real tap ever reaches a disabled element's click listener — the
+    // panel must not have closed from the pointerdown.
+    expect(screen.getByRole('group', { name: 'Basemap' })).not.toBeNull()
+    expect(onSiblingClick).not.toHaveBeenCalled()
   })
 })

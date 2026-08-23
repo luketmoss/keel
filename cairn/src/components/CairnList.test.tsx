@@ -896,6 +896,43 @@ describe('CairnList', () => {
       expect(screen.getByText('Flat bench above the creek.')).toBeDefined()
     })
 
+    it('#294: a photo attached to an expanded image-less cairn turns the summary into the photo preview without collapsing the row', async () => {
+      const rows = [row({ id: 'a', name: 'a.jpg', thumbnailDriveFileId: null, originalDriveFileId: null })]
+      const items = orderCairnListItems(rows)
+
+      const { rerender } = render(
+        <CairnList
+          items={items}
+          totalCount={1}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={vi.fn()}
+          {...ownedProps({ expandedCairnId: 'a' })}
+        />,
+      )
+
+      expect(screen.getByText('No description yet.')).toBeDefined()
+      expect(screen.queryByRole('button', { name: 'View a.jpg larger' })).toBeNull()
+
+      // The record gains an image while the row stays expanded — the same
+      // `expandedCairnId` prop, unchanged.
+      const withImage = [row({ id: 'a', name: 'a.jpg', thumbnailDriveFileId: 'thumb-1', originalDriveFileId: 'orig-1' })]
+      rerender(
+        <CairnList
+          items={orderCairnListItems(withImage)}
+          totalCount={1}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={vi.fn()}
+          {...ownedProps({ expandedCairnId: 'a' })}
+        />,
+      )
+
+      expect(await screen.findByRole('button', { name: 'View a.jpg larger' })).toBeDefined()
+      expect(screen.queryByText('No description yet.')).toBeNull()
+      expect(screen.getByText('a.jpg').closest('button')?.getAttribute('aria-expanded')).toBe('true')
+    })
+
     it('#294: shows No description yet. in place of an empty description', () => {
       const items = orderCairnListItems([
         row({ id: 'a', name: 'a.jpg', thumbnailDriveFileId: null, originalDriveFileId: null, description: '' }),

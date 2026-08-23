@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useMap } from '@vis.gl/react-google-maps'
+import { useMap, useMap3D } from '@vis.gl/react-google-maps'
 import { TrackLayer, computeRenderedTracks } from './TrackLayer'
 import { Track3DLayer } from './Track3DLayer'
 import { CairnLayer, type PositionedCairn } from './CairnLayer'
@@ -8,6 +8,10 @@ import { Cairn3DLayer } from './Cairn3DLayer'
 import { columnInset, revealPoints } from '../map/reveal'
 import { dropInvalidLatitudes, normalizeAntimeridian } from '../map/geo'
 import { useIsPhone } from '../map/useIsPhone'
+import { useMap3DControl } from '../map/Map3DControl'
+import { frameGeometry } from '../map/flyover'
+import { prefersReducedMotion } from '../map/motion'
+import { MAP3D_ID, TRACK3D_REVEAL_MS } from '../map/track3D'
 import { TrackList } from './TrackList'
 import { CairnList } from './CairnList'
 import { Lightbox } from './Lightbox'
@@ -193,6 +197,8 @@ export function TripDetail({
 }: TripDetailProps) {
   const navigate = useNavigate()
   const map = useMap()
+  const map3d = useMap3D(MAP3D_ID)
+  const { on: is3DOn } = useMap3DControl()
   const isPhone = useIsPhone()
   const trip = useSyncExternalStore(tripStore.subscribe, () => tripStore.getTrip(tripId))
   const tripImport = useTripImport(tripId, accessToken, cairnFolderId, tripStore)
@@ -388,6 +394,47 @@ export function TripDetail({
     if (!file) return
     const points = file.tracks.flatMap((track) => normalizeAntimeridian(dropInvalidLatitudes(track.points)))
     revealPoints(map, points, columnInset(isPhone))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTrackId])
+
+  /** #288 — the 3D surface's own reveal. `Map3DElement` has no way to
+      project a coordinate to a pixel (#273 hit the same wall over
+      clustering), so #270's "only when it has to" test cannot be
+      implemented here — the design note's own call: selecting a track in
+      3D frames it, every time, rather than silently degrading to that rule
+      under a name that no longer describes it.
+
+      Heading and tilt are read off the live camera and handed straight
+      back — a reveal that also re-oriented would undo the user's own
+      orbit, #270's "the zoom is the user's" one dimension over. Reduced
+      motion sets the camera directly, the same gate `Map3D.tsx`'s own
+      tilt-in uses, since the CSS global block cannot reach `flyCameraTo`. */
+  useEffect(() => {
+    if (!map3d || !is3DOn || revealSuspended || !selectedTrackId) return
+    const file = tripImport.tracks.find((candidate) => candidate.id === selectedTrackId)
+    if (!file) return
+    const points = file.tracks.flatMap((track) => normalizeAntimeridian(dropInvalidLatitudes(track.points)))
+    const framed = frameGeometry(points)
+    if (!framed) return
+    const center = { lat: framed.center.lat, lng: framed.center.lng, altitude: 0 }
+    if (prefersReducedMotion()) {
+      map3d.center = center
+      map3d.range = framed.range
+      return
+    }
+    map3d.flyCameraTo({
+      endCamera: {
+        center,
+        range: framed.range,
+        heading: map3d.heading ?? 0,
+        tilt: map3d.tilt ?? 0,
+      },
+      durationMillis: TRACK3D_REVEAL_MS,
+    })
+    // Keyed on `selectedTrackId` alone, exactly like the 2D effect above —
+    // `is3DOn` is read live rather than listed, so flipping the switch with
+    // a track already selected does not itself trigger a flight. The
+    // switch is not a selection change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTrackId])
 
@@ -874,10 +921,17 @@ export function TripDetail({
         onSelectRoute={handleSelectRoute}
         hitLinesEnabled={!revealSuspended}
       />
-      {/* #271 — the same tracks in 3D: no bands, no hover/selection
-          treatment (this issue adds no selection concept to that surface),
-          just every track this trip draws, always. */}
-      <Track3DLayer tracks={computeRenderedTracks(tripImport.tracks)} />
+      {/* #271 drew every 3D track the same way; #288 brings selection to
+          parity with the 2D layer above — same `selectedTrackId`, same
+          `handleSelectRoute`, same suspension while a decision owns the
+          map. There is still no hovered band here (design note's "Hover is
+          not part of this"). */}
+      <Track3DLayer
+        tracks={computeRenderedTracks(tripImport.tracks)}
+        selectedFileId={selectedTrackId}
+        onSelectRoute={handleSelectRoute}
+        hitLinesEnabled={!revealSuspended}
+      />
       {googleMapsMapId && positionedCairns.length > 0 && (
         <CairnLayer
           cairns={positionedCairns}

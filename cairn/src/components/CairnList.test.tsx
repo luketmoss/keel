@@ -19,6 +19,7 @@ function row(overrides: Partial<CairnListRow> = {}): CairnListRow {
     originalDriveFileId: 'orig-1',
     date: '2023-06-16',
     source: 'exif',
+    description: '',
     ...overrides,
   }
 }
@@ -863,9 +864,78 @@ describe('CairnList', () => {
       expect(screen.getByText('a.jpg').closest('button')?.getAttribute('aria-expanded')).toBe('true')
     })
 
-    it('omits aria-expanded entirely on an icon-only cairn — it is not an expandable thing', () => {
+    it('#294: carries aria-expanded on the header of an icon-only cairn too, and expands into the summary, not the lightbox', () => {
       const items = orderCairnListItems([
-        row({ id: 'a', name: 'a.jpg', icon: 'campsite', thumbnailDriveFileId: null, originalDriveFileId: null }),
+        row({
+          id: 'a',
+          name: 'a.jpg',
+          icon: 'campsite',
+          thumbnailDriveFileId: null,
+          originalDriveFileId: null,
+          description: 'Flat bench above the creek.',
+        }),
+      ])
+      const onOpenRow = vi.fn()
+
+      render(
+        <CairnList
+          items={items}
+          totalCount={1}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={onOpenRow}
+          {...ownedProps({ expandedCairnId: 'a' })}
+        />,
+      )
+
+      expect(screen.getByText('a.jpg').closest('button')?.getAttribute('aria-expanded')).toBe('true')
+      // No lightbox — the row expands, exactly as onOpenRow (`selectCairn`)
+      // was called to do; no photo preview is rendered for it.
+      expect(onOpenRow).not.toHaveBeenCalled()
+      expect(screen.queryByRole('button', { name: 'View a.jpg larger' })).toBeNull()
+      expect(screen.getByText('Flat bench above the creek.')).toBeDefined()
+    })
+
+    it('#294: a photo attached to an expanded image-less cairn turns the summary into the photo preview without collapsing the row', async () => {
+      const rows = [row({ id: 'a', name: 'a.jpg', thumbnailDriveFileId: null, originalDriveFileId: null })]
+      const items = orderCairnListItems(rows)
+
+      const { rerender } = render(
+        <CairnList
+          items={items}
+          totalCount={1}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={vi.fn()}
+          {...ownedProps({ expandedCairnId: 'a' })}
+        />,
+      )
+
+      expect(screen.getByText('No description yet.')).toBeDefined()
+      expect(screen.queryByRole('button', { name: 'View a.jpg larger' })).toBeNull()
+
+      // The record gains an image while the row stays expanded — the same
+      // `expandedCairnId` prop, unchanged.
+      const withImage = [row({ id: 'a', name: 'a.jpg', thumbnailDriveFileId: 'thumb-1', originalDriveFileId: 'orig-1' })]
+      rerender(
+        <CairnList
+          items={orderCairnListItems(withImage)}
+          totalCount={1}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={vi.fn()}
+          {...ownedProps({ expandedCairnId: 'a' })}
+        />,
+      )
+
+      expect(await screen.findByRole('button', { name: 'View a.jpg larger' })).toBeDefined()
+      expect(screen.queryByText('No description yet.')).toBeNull()
+      expect(screen.getByText('a.jpg').closest('button')?.getAttribute('aria-expanded')).toBe('true')
+    })
+
+    it('#294: shows No description yet. in place of an empty description', () => {
+      const items = orderCairnListItems([
+        row({ id: 'a', name: 'a.jpg', thumbnailDriveFileId: null, originalDriveFileId: null, description: '' }),
       ])
 
       render(
@@ -879,9 +949,112 @@ describe('CairnList', () => {
         />,
       )
 
-      expect(screen.getByText('a.jpg').closest('button')?.hasAttribute('aria-expanded')).toBe(false)
-      // Nothing to expand — no preview button either.
-      expect(screen.queryByRole('button', { name: 'View a.jpg larger' })).toBeNull()
+      expect(screen.getByText('No description yet.')).toBeDefined()
+    })
+
+    it('#294: shows the position-source sentence beneath the summary', () => {
+      const items = orderCairnListItems([
+        row({
+          id: 'a',
+          name: 'a.jpg',
+          thumbnailDriveFileId: null,
+          originalDriveFileId: null,
+          source: 'placed',
+        }),
+      ])
+
+      render(
+        <CairnList
+          items={items}
+          totalCount={1}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={vi.fn()}
+          {...ownedProps({ expandedCairnId: 'a' })}
+        />,
+      )
+
+      expect(screen.getByText('You put this here. Interpolation will never move it again.')).toBeDefined()
+    })
+
+    it('#294: clicking the summary calls onOpenPreview with the cairn id, and never onOpenRow', () => {
+      const items = orderCairnListItems([
+        row({ id: 'a', name: 'a.jpg', thumbnailDriveFileId: null, originalDriveFileId: null }),
+      ])
+      const onOpenRow = vi.fn()
+      const onOpenPreview = vi.fn()
+
+      render(
+        <CairnList
+          items={items}
+          totalCount={1}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={onOpenRow}
+          {...ownedProps({ expandedCairnId: 'a', onOpenPreview })}
+        />,
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'Open a.jpg' }))
+      expect(onOpenPreview).toHaveBeenCalledWith('a')
+      expect(onOpenRow).not.toHaveBeenCalled()
+    })
+
+    it('#294: renders the description in the clamp class the stylesheet applies -webkit-line-clamp: 4 to', () => {
+      const items = orderCairnListItems([
+        row({
+          id: 'a',
+          name: 'a.jpg',
+          thumbnailDriveFileId: null,
+          originalDriveFileId: null,
+          description: 'One. Two. Three. Four. Five. Six.',
+        }),
+      ])
+
+      const { container } = render(
+        <CairnList
+          items={items}
+          totalCount={1}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={vi.fn()}
+          {...ownedProps({ expandedCairnId: 'a' })}
+        />,
+      )
+
+      // The clamp itself is a CSS behaviour (`.cairn-row__summary-description`
+      // in CairnList.css) that jsdom does not render — this pins the class
+      // that rule targets so the two cannot drift apart silently.
+      const description = container.querySelector('.cairn-row__summary-description') as HTMLElement
+      expect(description).not.toBeNull()
+      expect(description.textContent).toBe('One. Two. Three. Four. Five. Six.')
+    })
+
+    it('#294: the summary is read-only — no input, textarea, or contenteditable element inside it', () => {
+      const items = orderCairnListItems([
+        row({
+          id: 'a',
+          name: 'a.jpg',
+          thumbnailDriveFileId: null,
+          originalDriveFileId: null,
+          description: 'A note.',
+        }),
+      ])
+
+      const { container } = render(
+        <CairnList
+          items={items}
+          totalCount={1}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={vi.fn()}
+          {...ownedProps({ expandedCairnId: 'a' })}
+        />,
+      )
+
+      const summary = screen.getByRole('button', { name: 'Open a.jpg' })
+      expect(summary.querySelectorAll('input, textarea, [contenteditable="true"]')).toHaveLength(0)
+      expect(container.querySelectorAll('input, textarea, [contenteditable="true"]')).toHaveLength(0)
     })
 
     it('clicking the preview calls onOpenPreview, not onOpenRow', async () => {

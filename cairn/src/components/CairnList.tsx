@@ -2,6 +2,7 @@ import { useEffect, useRef, type RefObject } from 'react'
 import { prefersReducedMotion } from '../map/motion'
 import { usePhotoImage } from '../photo/usePhotoImage'
 import { cairnRowMetaLine, type CairnListItem, type CairnListRow } from '../photo/cairnListGroups'
+import { positionSourceSentence } from '../store/looseStore'
 import { CairnMarker } from './CairnMarker'
 import { CairnFacetChips } from './CairnFacetChips'
 import type { CairnFacet } from '../store/cairnRules'
@@ -56,18 +57,20 @@ interface CairnListProps {
       level up, in `TripDetail`, for the cluster case above). */
   onHoverCairn?: (cairnId: string | null) => void
   accessToken: string | null
-  /** #250 revises this: a click on a row whose cairn carries an image now
-      selects it and expands the row in place, toggling closed on a second
-      click — the lightbox does not open. An icon-only cairn has nothing to
-      preview, so its row keeps the old single click straight to the
-      lightbox. `TripDetail.selectCairn` is the one function this and
+  /** #250 revises this: a click on a row selects its cairn and expands the
+      row in place, toggling closed on a second click — the lightbox does
+      not open. #294 drops the exception #250 carved out for an icon-only
+      cairn: every row expands now, into a photo preview or a read-only
+      summary depending on `cairns.md`'s image predicate.
+      `TripDetail.selectCairn` is the one function this and
       `CairnLayer.onOpenCairn` both call, so the row and the marker cannot
       disagree on which. */
   onOpenRow: (cairnId: string) => void
-  /** #250 — the expanded row's own preview button, which is what actually
+  /** #250 — the expanded row's own body button, which is what actually
       opens the lightbox now. Separate from `onOpenRow` because the two
-      controls do different things: the header toggles expansion, the photo
-      opens the detail face. */
+      controls do different things: the header toggles expansion, the body
+      opens the detail face. #294: shared by both the photo preview and the
+      summary block, image or not. */
   onOpenPreview: (cairnId: string) => void
   /** #77: performs the actual removal (trash originals + rewrite the index)
       once the row's confirm has been accepted — `Delete permanently…` in
@@ -325,10 +328,10 @@ function CairnRow({
   // too" state, which the glyph never needed to tell apart from loading.
   const thumbnail = usePhotoImage(accessToken, row.thumbnailDriveFileId ?? undefined)
   const hasImage = row.thumbnailDriveFileId !== null
-  // #250: removing is inert already (design doc) and cannot be expanded;
-  // confirming never reaches this render at all (its branch returns below),
-  // so this only has removing left to guard against.
-  const previewOpen = expanded && hasImage && !removing
+  // #294: every row can expand now, image or not — #250's guard against
+  // expanding a removing row applies to both bodies alike. Confirming
+  // never reaches this render at all (its branch returns above).
+  const bodyOpen = expanded && !removing
 
   // #77 — the confirm replaces the row's contents in place, same shape as
   // TrackList's and the trips list's.
@@ -382,11 +385,9 @@ function CairnRow({
           // does — "not a mouse-only feature" (design note).
           onFocus={() => onHoverChange(true)}
           onBlur={() => onHoverChange(false)}
-          // #250: only a cairn with an image is an expandable thing — the
-          // design doc is explicit that an icon-only cairn's row must not
-          // claim to be one, so the attribute is omitted entirely rather
-          // than fixed at `false`.
-          {...(hasImage ? { 'aria-expanded': previewOpen } : {})}
+          // #294: every row is expandable now, image or not, so this is no
+          // longer conditional on `hasImage` the way #250 left it.
+          aria-expanded={bodyOpen}
         >
           <span className="cairn-row__glyph">
             <CairnMarker
@@ -446,9 +447,13 @@ function CairnRow({
           original through `usePhotoImage`, and fetching that for every row
           up front is exactly what #55's placeholder-then-original pattern
           exists to avoid — collapsing releases it again. */}
-      {previewOpen && (
+      {bodyOpen && (
         <div className="cairn-row__preview-wrap">
-          <CairnRowPreview row={row} accessToken={accessToken} thumbnail={thumbnail} onOpen={onOpenPreview} />
+          {hasImage ? (
+            <CairnRowPreview row={row} accessToken={accessToken} thumbnail={thumbnail} onOpen={onOpenPreview} />
+          ) : (
+            <CairnRowSummary row={row} onOpen={onOpenPreview} />
+          )}
         </div>
       )}
     </li>
@@ -494,6 +499,29 @@ function CairnRowPreview({
       ) : (
         <span className="cairn-row__preview-loading" aria-hidden="true" />
       )}
+    </button>
+  )
+}
+
+/** #294 — the expanded row's body for an image-less cairn: a read-only
+    summary in place of the photo preview `CairnRowPreview` draws above.
+    Name, date and facet are already in the header and are not repeated
+    here (design doc's "Two lines of content, not a form"). A whitespace-
+    only description is treated as absent, the same as an empty one. */
+function CairnRowSummary({ row, onOpen }: { row: CairnListRow; onOpen: (cairnId: string) => void }) {
+  const description = row.description.trim()
+
+  return (
+    <button
+      type="button"
+      className="cairn-row__summary"
+      aria-label={`Open ${row.name}`}
+      onClick={() => onOpen(row.id)}
+    >
+      <p className={`cairn-row__summary-description${description ? '' : ' cairn-row__summary-description--empty'}`}>
+        {description || 'No description yet.'}
+      </p>
+      <p className="cairn-row__summary-position">{positionSourceSentence(row.source)}</p>
     </button>
   )
 }

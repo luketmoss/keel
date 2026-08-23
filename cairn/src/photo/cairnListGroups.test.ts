@@ -33,6 +33,7 @@ function row(overrides: Partial<CairnListRow> = {}): CairnListRow {
     originalDriveFileId: 'orig-1',
     date: null,
     source: 'exif',
+    description: '',
     ...overrides,
   }
 }

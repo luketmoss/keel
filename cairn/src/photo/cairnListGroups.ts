@@ -27,6 +27,10 @@ export interface CairnListRow {
       Ordering/grouping below reads `date`, not this. */
   captureInstantMs?: number
   source: PositionSource
+  /** #294 — the expanded row's summary body for an image-less cairn.
+      Never null (matches `CairnRecord.description`); an empty string is
+      what the summary's `No description yet.` copy renders on. */
+  description: string
 }
 
 /** #198 replaced the old `no-date` divider with this one. Undated cairns
@@ -55,6 +59,7 @@ export function buildCairnListRows(cairns: CairnRecord[], tracks: Track[]): Cair
       offsetHours,
     ),
     source: cairn.positionSource,
+    description: cairn.description,
   }))
 }
 

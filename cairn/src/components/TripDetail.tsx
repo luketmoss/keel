@@ -594,9 +594,9 @@ export function TripDetail({
       call (`CairnList.onOpenRow` and `CairnLayer.onOpenCairn`), so the two
       surfaces cannot drift on what a click does — the design note's
       revision of #194, upheld by construction rather than by keeping two
-      branches in step by hand. Replaces the old `openCairn`, which always
-      opened the lightbox; that behaviour survives only for an icon-only
-      cairn, which still has nothing for a row to preview.
+      branches in step by hand. #294: every cairn's row expands now, image
+      or not, so this never opens the lightbox itself any more — only the
+      expanded row's own body (the photo preview or the summary) does.
 
       #157: a cairn mid-attach is a special case ahead of the branch above —
       its row must not expand while the upload's progress belongs on the
@@ -609,17 +609,10 @@ export function TripDetail({
         setOpenCairnId(cairnId)
         return
       }
-      const cairn = cairnImport.cairns.find((candidate) => candidate.id === cairnId)
-      const outcome = cairnClickOutcome(cairnId, cairn !== undefined && cairn.image !== null, expandedCairnId)
-      if (outcome.openCairnId !== undefined) {
-        returnFocusRef.current = document.activeElement as HTMLElement | null
-        setOpenCairnId(outcome.openCairnId)
-      }
-      if (outcome.expandedCairnId !== undefined) {
-        setExpandedCairnId(outcome.expandedCairnId)
-      }
+      const outcome = cairnClickOutcome(cairnId, expandedCairnId)
+      setExpandedCairnId(outcome.expandedCairnId)
     },
-    [cairnImport.cairns, expandedCairnId, attachingCairnId],
+    [expandedCairnId, attachingCairnId],
   )
 
   /** #250 — the expanded row's own preview button, and the only thing that
@@ -631,19 +624,14 @@ export function TripDetail({
     setOpenCairnId(cairnId)
   }, [])
 
-  const navigateCairn = useCallback(
-    (cairnId: string) => {
-      setSelectedCairnId(cairnId)
-      setOpenCairnId(cairnId)
-      // #250 — the expansion follows the lightbox's own arrow navigation,
-      // so closing it lands on an expanded row for the cairn arrived at.
-      // An icon-only cairn's row cannot expand, so arrowing onto one
-      // expands nothing rather than leaving a stale row open.
-      const cairn = cairnImport.cairns.find((candidate) => candidate.id === cairnId)
-      setExpandedCairnId(expandedIdAfterNavigate(cairnId, cairn !== undefined && cairn.image !== null))
-    },
-    [cairnImport.cairns],
-  )
+  const navigateCairn = useCallback((cairnId: string) => {
+    setSelectedCairnId(cairnId)
+    setOpenCairnId(cairnId)
+    // #250 — the expansion follows the lightbox's own arrow navigation, so
+    // closing it lands on an expanded row for the cairn arrived at. #294:
+    // every cairn's row can expand now, so this always lands on one.
+    setExpandedCairnId(expandedIdAfterNavigate(cairnId))
+  }, [])
 
   const closeLightbox = useCallback(() => setOpenCairnId(null), [])
 

@@ -365,3 +365,43 @@
   font-size: var(--text-sm);
   color: var(--text-muted);
 }
+
+/* #294 — the expanded row's body for an image-less cairn, beside
+   `.cairn-row__preview` above. Same ground, radius and wrap (design doc's
+   "The expanded row" table: reuses the preview's `--surface-lift`,
+   `--radius-sm` and content width), with its own padding and type scale. */
+.cairn-row__summary {
+  display: block;
+  width: 100%;
+  padding: var(--space-3);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--surface-lift);
+  text-align: left;
+  /* It opens the detail face, it does not zoom (design doc) — never the
+     preview's `zoom-in`. */
+  cursor: pointer;
+}
+
+.cairn-row__summary-description {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text);
+  /* The four-line clamp (design doc: "what keeps this a summary"). A long
+     single word (a URL) still wraps rather than overflowing the block. */
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: break-word;
+}
+
+.cairn-row__summary-description--empty {
+  color: var(--text-muted);
+}
+
+.cairn-row__summary-position {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}

@@ -220,6 +220,38 @@ describe('TripDetail — #55 photo list and lightbox', () => {
     await waitFor(() => expect(acquire).toHaveBeenCalledWith('token', 'orig-1'))
   })
 
+  it('#294: closing the lightbox after arrow-navigating to an image-less cairn leaves that row expanded', async () => {
+    useCairnImport.mockReturnValue(
+      baseCairnImport({
+        cairns: [
+          cairnRecord({ id: 'a', name: 'sapporo.jpg', date: '2024-06-01' }),
+          cairnRecord({
+            id: 'b',
+            name: 'Camp 2',
+            icon: 'campsite',
+            image: null,
+            date: '2024-06-02',
+            description: 'Flat bench above the creek.',
+          }),
+        ],
+      }),
+    )
+    renderTrip()
+
+    fireEvent.click(screen.getByText('sapporo.jpg'))
+    fireEvent.click(await screen.findByRole('button', { name: 'View sapporo.jpg larger' }))
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeDefined())
+
+    fireEvent.keyDown(document, { key: 'ArrowRight' })
+    await waitFor(() => expect(screen.getByRole('dialog').getAttribute('aria-label')).toBe('Camp 2'))
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByText('Camp 2').closest('button')?.getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByText('Flat bench above the creek.')).toBeDefined()
+  })
+
   describe('#169 — the detail face folded into the lightbox', () => {
     it('shows the description and the position-source sentence when a cairn opens', async () => {
       useCairnImport.mockReturnValue(
@@ -258,20 +290,40 @@ describe('TripDetail — #55 photo list and lightbox', () => {
       expect(screen.queryByRole('dialog')).toBeNull()
     })
 
-    it('an icon-only cairn (no image) opens its lightbox as a detail face with no photo to show', () => {
+    it('an icon-only cairn (no image) opens its lightbox as a detail face with no photo to show, via its expanded summary (#294)', async () => {
       // #157: the lightbox is a cairn's whole detail face now, not only a
       // photo viewer — an icon-only cairn opens one same as any other, so a
-      // photo dropped while it's open has somewhere to land.
+      // photo dropped while it's open has somewhere to land. #294: the row
+      // click no longer opens the lightbox directly — it expands the row
+      // into a summary first, same as a photo cairn expands into its
+      // preview, and the summary's own click is what opens the lightbox.
       useCairnImport.mockReturnValue(
         baseCairnImport({ cairns: [cairnRecord({ icon: 'campsite', image: null })] }),
       )
 
       renderTrip()
       fireEvent.click(screen.getByText('sapporo.jpg'))
+      expect(screen.queryByRole('dialog')).toBeNull()
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Open sapporo.jpg' }))
 
       const dialog = screen.getByRole('dialog')
       expect(within(dialog).getByText(/campsite/)).toBeDefined()
       expect(within(dialog).queryByRole('img', { name: 'sapporo.jpg' })).toBeNull()
+    })
+
+    it('an icon-only cairn expands into its summary rather than opening the lightbox on the first click (#294)', async () => {
+      useCairnImport.mockReturnValue(
+        baseCairnImport({
+          cairns: [cairnRecord({ icon: 'campsite', image: null, description: 'Flat bench above the creek.' })],
+        }),
+      )
+
+      renderTrip()
+      fireEvent.click(screen.getByText('sapporo.jpg'))
+
+      expect(screen.queryByRole('dialog')).toBeNull()
+      expect(await screen.findByText('Flat bench above the creek.')).toBeDefined()
     })
   })
 
@@ -446,7 +498,10 @@ describe('TripDetail — attaching a photo while a cairn is open (#157)', () => 
     const { onDropTargetChange, drop } = capture()
     renderTrip({ onDropTargetChange })
 
+    // #294: the row click expands into the summary now, image or not — the
+    // summary's own click is what opens the lightbox.
     fireEvent.click(screen.getByText('sapporo.jpg'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Open sapporo.jpg' }))
     await screen.findByRole('dialog')
 
     await act(async () => {
@@ -481,7 +536,10 @@ describe('TripDetail — attaching a photo while a cairn is open (#157)', () => 
     const { onDropTargetChange, drop } = capture()
     renderTrip({ onDropTargetChange, accessToken: null })
 
+    // #294: the row click expands into the summary now, image or not — the
+    // summary's own click is what opens the lightbox.
     fireEvent.click(screen.getByText('sapporo.jpg'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Open sapporo.jpg' }))
     await screen.findByRole('dialog')
 
     await act(async () => {

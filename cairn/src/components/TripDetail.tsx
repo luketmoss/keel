@@ -16,7 +16,6 @@ import { trackColor } from '../map/palette'
 import { TripImportPanel } from './TripImportPanel'
 import { TripMetadataHeader } from './TripMetadataHeader'
 import { TripStats } from './TripStats'
-import { linesFromOverview } from '../geo/overviewLines'
 import { TripNotFound } from './TripNotFound'
 import { MissingFileRow } from './MissingFileRow'
 import { googleMapsMapId } from '../env'
@@ -946,10 +945,17 @@ export function TripDetail({
           <TripStats
             trackStats={allTrackStats}
             tripName={trip.name}
-            /* #274 — the trip's own precomputed overview, the same
-               performance-rule-honouring geometry `Track3DLayer`'s world
-               composition already reads, flattened across every line. */
-            flyoverPoints={linesFromOverview(tripStore.getOverview(trip.id)).flat()}
+            /* #274 — `geometry` below, not `tripStore.getOverview()`: the
+               overview is kept in step by a `saveOverview` effect that
+               only notifies `tripStore`'s subscribers, and `TripDetail`'s
+               own subscription (`useSyncExternalStore(… getTrip …)`) is
+               deliberately reference-stable across an overview-only write
+               (`TripStore.updateTrip`'s own doc comment) — so a value read
+               straight from the store here would render once, at import
+               time, and never update again as tracks actually finish
+               loading. `geometry` is already tracked through `allTracks`
+               via `useMemo`, so it is never stale the way that read was. */
+            flyoverPoints={geometry}
           />
         )}
         <TripImportPanel

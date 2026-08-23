@@ -1,9 +1,10 @@
-import { fireEvent, render, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LooseFace } from './LooseFace'
 import type { LooseRecord, LooseStore } from '../store/looseStore'
+import type { FeatureCollection, LineString } from 'geojson'
 
-const fakeStore = { getOverview: () => null } as unknown as LooseStore
+const fakeStore = { getOverview: () => null, subscribe: () => () => {} } as unknown as LooseStore
 
 /* #134 — the detail face's image resolves through #53's caching loader,
    mocked here the same way `CairnList.test.tsx` mocks it: at the module
@@ -321,5 +322,87 @@ describe('LooseFace — #196 editing the description', () => {
 
     expect(input()).toBeNull()
     expect(field().className).not.toContain('loose-face__description--editable')
+  })
+})
+
+function looseTrack(overrides: Partial<Extract<LooseRecord, { kind: 'track' }>> = {}): LooseRecord {
+  return {
+    kind: 'track',
+    id: 'track-1',
+    name: 'Mount Rosea',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    date: '2024-03-09T00:00:00.000Z',
+    distanceMeters: 14200,
+    ascentMeters: 690,
+    elevationLossMeters: 620,
+    highPointMeters: 2100,
+    lowPointMeters: 1500,
+    durationSeconds: 19_200,
+    elevationProfile: null,
+    pointCount: 512,
+    sourceName: 'rosea.kml',
+    colorIndex: 0,
+    position: { lat: -37, lng: 142 },
+    driveFileId: null,
+    uploadState: 'ok',
+    ...overrides,
+  }
+}
+
+/* #274 — `hydrateOverview` only ever writes the overview cache, never the
+   store's own `index`, so `useSyncExternalStore(store.subscribe,
+   store.getItems)` (what `App.tsx` already uses to drive `LooseFace`'s own
+   `item` prop) never re-renders from an overview-only hydration. Without
+   `TrackBody`'s own `useStoreVersion` subscription, a track's `Fly over`
+   button would render once against whatever `getOverview()` returned at
+   that moment — usually nothing yet — and never update again as the
+   overview actually finishes loading, which is indistinguishable from the
+   button just not working. */
+describe('LooseFace — the Fly over control keeps up with a hydrating overview (#274)', () => {
+  it('renders once nothing is hydrated yet, and picks up the button once the store notifies', () => {
+    let overview: FeatureCollection<LineString> | null = null
+    let notify: () => void = () => {}
+    const store = {
+      getOverview: () => overview,
+      subscribe: (listener: () => void) => {
+        notify = listener
+        return () => {}
+      },
+    } as unknown as LooseStore
+
+    render(
+      <LooseFace
+        store={store}
+        item={looseTrack()}
+        trips={[]}
+        accessToken={null}
+        onAddToTrip={vi.fn()}
+        onCreateTripWith={vi.fn()}
+        onDelete={vi.fn()}
+        onRename={vi.fn().mockResolvedValue(true)}
+        onRecolor={vi.fn().mockResolvedValue(true)}
+        onSetIcon={vi.fn().mockResolvedValue(true)}
+        onExport={vi.fn()}
+        disabled={false}
+      />,
+    )
+
+    expect(screen.queryByRole('button', { name: /Fly over/ })).toBeNull()
+
+    // The overview hydrates — the store notifies, but nothing about
+    // `item` or the list `store.getItems()` would return has changed.
+    overview = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: {},
+          geometry: { type: 'LineString', coordinates: [[142, -37], [142.01, -37.01]] },
+        },
+      ],
+    }
+    act(() => notify())
+
+    expect(screen.getByRole('button', { name: 'Fly over Mount Rosea' })).not.toBeNull()
   })
 })

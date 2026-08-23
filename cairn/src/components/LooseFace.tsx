@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useRef, useState, useSyncExternalStore } from 'react'
 import { AddToTripPicker, type TripChoice } from './AddToTripPicker'
 import { RowMenu } from './RowMenu'
 import { NameInput } from './NameInput'
@@ -281,6 +281,32 @@ export function LooseFace({
     `aggregateTrackStats`/`aggregateElevationProfile` already computed once,
     at import, and stored on the record — `TrackFace`'s trip-owned sibling
     computes the same shape from a `Track` it already holds in memory. */
+/** #274 — a loose track's overview hydrates asynchronously and
+    `hydrateOverview` only ever writes the overview cache, never
+    `this.index` — the same "same reference until an actual record
+    changes" contract `TripStore.updateTrip`'s own doc comment states for
+    `getTrip`. `useSyncExternalStore(store.subscribe, store.getItems)`
+    (what `LooseFace`'s own caller in `App.tsx` already uses) therefore
+    never re-renders from an overview-only hydration, and a `getOverview()`
+    read taken at some earlier render would go stale the moment the
+    overview actually lands. Reading it fresh on every store notification —
+    via a snapshot that is genuinely different each time (a counter this
+    hook itself owns, not the overview's own unstable parsed object) — is
+    what keeps it live without `useSyncExternalStore` ever seeing a
+    same-but-different snapshot and looping. */
+function useStoreVersion(subscribe: (listener: () => void) => () => void): number {
+  const version = useRef(0)
+  const subscribeAndBump = useCallback(
+    (onStoreChange: () => void) =>
+      subscribe(() => {
+        version.current += 1
+        onStoreChange()
+      }),
+    [subscribe],
+  )
+  return useSyncExternalStore(subscribeAndBump, () => version.current)
+}
+
 function TrackBody({
   item,
   store,
@@ -288,6 +314,10 @@ function TrackBody({
   item: Extract<LooseRecord, { kind: 'track' }>
   store: LooseStore
 }) {
+  // Read fresh on every render, including the one this hook's own bump
+  // forces — the return value itself is never used, only depended on.
+  useStoreVersion(store.subscribe)
+
   return (
     <TrackFaceBody
       stats={{

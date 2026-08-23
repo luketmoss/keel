@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react'
+import { act, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { useMapResult, map3dEl, flyCameraTo, flyCameraAround, stopCameraAnimation } = vi.hoisted(() => {
@@ -32,15 +32,39 @@ const { useMapResult, map3dEl, flyCameraTo, flyCameraAround, stopCameraAnimation
   }
 })
 
+/* Module-scoped so a test can simulate the real gap between React rendering
+   `<gmp-map-3d>` and the browser finishing that custom element's upgrade —
+   `map3dRef.current` exists throughout, but `.map3d` on it does not, until
+   `setMapUpgraded` flips it. Defaults ready, so every other test in this
+   file (none of which cares about the race) sees the element as available
+   on first render, same as before this existed. */
+const { mapUpgraded, setMapUpgraded } = vi.hoisted(() => {
+  let upgraded = true
+  let notify = () => {}
+  return {
+    mapUpgraded: {
+      subscribe: (cb: () => void) => {
+        notify = cb
+        return () => {}
+      },
+      getSnapshot: () => upgraded,
+    },
+    setMapUpgraded: (value: boolean) => {
+      upgraded = value
+      notify()
+    },
+  }
+})
+
 vi.mock('@vis.gl/react-google-maps', async () => {
   const React = await import('react')
   const Map3D = React.forwardRef(function FakeMap3D(_props: unknown, ref: React.Ref<unknown>) {
-    React.useImperativeHandle(ref, () => ({
-      map3d: map3dEl,
-      flyCameraTo,
-      flyCameraAround,
-      stopCameraAnimation,
-    }))
+    const upgraded = React.useSyncExternalStore(mapUpgraded.subscribe, mapUpgraded.getSnapshot)
+    React.useImperativeHandle(
+      ref,
+      () => (upgraded ? { map3d: map3dEl, flyCameraTo, flyCameraAround, stopCameraAnimation } : {}),
+      [upgraded],
+    )
     return React.createElement('div', { 'data-testid': 'map3d' })
   })
   return {
@@ -59,8 +83,11 @@ describe('Map3DSurface (#271)', () => {
   beforeEach(() => {
     flyCameraTo.mockClear()
     reducedMotion.current = false
+    setMapUpgraded(true)
     map3dEl.tilt = 0
     map3dEl.heading = 0
+    map3dEl.center = { lat: 10, lng: 20 }
+    map3dEl.range = 5000
     // jsdom's real rAF is throttled/async; the entry animation is gated on
     // one frame so the "framed flat and invisible" moment actually paints
     // before the fade starts — run it synchronously here so the assertions
@@ -130,6 +157,46 @@ describe('Map3DSurface (#271)', () => {
     expect(container.querySelector('.map3d-surface--visible')).toBeNull()
     expect(flyCameraTo).not.toHaveBeenCalled()
   })
+
+  it('retries until the custom element finishes upgrading, rather than silently giving up forever', () => {
+    setMapUpgraded(false)
+    const pendingFrames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      pendingFrames.push(cb)
+      return pendingFrames.length
+    })
+
+    render(<Map3DSurface on={true} mode={'SATELLITE' as never} />)
+
+    // React has rendered `<gmp-map-3d>` (mounted), but the browser hasn't
+    // finished upgrading it — `map3dRef.current.map3d` isn't there yet, so
+    // nothing has been framed and a retry has been queued instead of the
+    // transition being marked handled.
+    expect(map3dEl.center).toEqual({ lat: 10, lng: 20 })
+    expect(pendingFrames.length).toBeGreaterThan(0)
+
+    // Flushing the queued retry while still not upgraded must queue
+    // another one, not give up.
+    const firstRetry = pendingFrames.shift()!
+    firstRetry(0)
+    expect(pendingFrames.length).toBeGreaterThan(0)
+    expect(flyCameraTo).not.toHaveBeenCalled()
+
+    // The element finishes upgrading; the next queued retry finds it and
+    // proceeds exactly as the always-ready case does.
+    act(() => setMapUpgraded(true))
+    const secondRetry = pendingFrames.shift()!
+    secondRetry(0)
+
+    expect(map3dEl.center).toEqual({ lat: 10, lng: 20, altitude: 0 })
+    // `run()`'s own "framed flat, then fade in" rAF — a third, separate
+    // queued frame, unrelated to `whenReady`'s polling.
+    const enteringFrame = pendingFrames.shift()!
+    enteringFrame(0)
+
+    expect(flyCameraTo).toHaveBeenCalledTimes(1)
+    expect(flyCameraTo.mock.calls[0][0].endCamera.tilt).toBe(55)
+  })
 })
 
 describe('Map3DSurface flyover (#274)', () => {
@@ -143,6 +210,7 @@ describe('Map3DSurface flyover (#274)', () => {
     flyCameraAround.mockClear()
     stopCameraAnimation.mockClear()
     reducedMotion.current = false
+    setMapUpgraded(true)
     map3dEl.tilt = 0
     map3dEl.heading = 0
     map3dEl.addEventListener.mockClear()

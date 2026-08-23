@@ -4,7 +4,10 @@ import { trackColor } from '../map/palette'
 import type { Track3D } from '../map/track3D'
 import { linesFromOverview } from './overviewLines'
 
-interface OverviewSource {
+/** Exported so #292's `WorldTrack3DFraming` can type `tripStore`/`looseStore`
+    against the same shape this function reads, rather than a second,
+    locally-declared copy that could drift from it. */
+export interface OverviewSource {
   getOverview(id: string): import('geojson').FeatureCollection<import('geojson').LineString> | null
 }
 

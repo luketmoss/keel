@@ -94,7 +94,12 @@ interface RenderedTrack {
   index: number
 }
 
-function visibleFilesKey(files: ImportedFile[]): string {
+/** The visible subset's own ids, sorted and joined — #292's 3D framing
+    effect reuses this alongside `files.length` so `TripDetail`'s content
+    signal cannot drift from the 2D fit's: a file count that grows is an
+    import, an unchanged count whose key differs is a toggle. Exported for
+    that reuse rather than a second computation. */
+export function visibleFilesKey(files: ImportedFile[]): string {
   return files
     .filter((file) => file.visible)
     .map((file) => file.id)

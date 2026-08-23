@@ -48,6 +48,7 @@ const { lastTrackLayerProps } = vi.hoisted(() => ({
 }))
 vi.mock('./TrackLayer', () => ({
   computeRenderedTracks: () => [],
+  visibleFilesKey: () => '',
   TrackLayer: (props: {
     selectedFileId: string | null
     onSelectRoute?: (id: string) => void

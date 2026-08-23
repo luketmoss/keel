@@ -9,13 +9,19 @@ import type { ElevationSampler } from '../geo/elevation'
    simulates the camera coming to rest. */
 function fakeMap3d(camera: { lat: number; lng: number; altitude: number }) {
   let handler: ((event: Event) => void) | null = null
+  let position = camera
   return {
-    cameraPosition: camera,
+    get cameraPosition() {
+      return position
+    },
     addEventListener: (type: string, listener: (event: Event) => void) => {
       if (type === 'gmp-steadychange') handler = listener
     },
     removeEventListener: (type: string) => {
       if (type === 'gmp-steadychange') handler = null
+    },
+    moveTo(next: { lat: number; lng: number; altitude: number }) {
+      position = next
     },
     steady() {
       handler?.({ isSteady: true } as unknown as Event)
@@ -23,7 +29,11 @@ function fakeMap3d(camera: { lat: number; lng: number; altitude: number }) {
     moving() {
       handler?.({ isSteady: false } as unknown as Event)
     },
-  } as unknown as google.maps.maps3d.Map3DElement & { steady(): void; moving(): void }
+  } as unknown as google.maps.maps3d.Map3DElement & {
+    steady(): void
+    moving(): void
+    moveTo(next: { lat: number; lng: number; altitude: number }): void
+  }
 }
 
 function samplerAlwaysOccluding(): ElevationSampler {
@@ -101,6 +111,72 @@ describe('useCairnOcclusion (#285)', () => {
     expect(result.current.has('far')).toBe(true)
   })
 
+  it('reveals a hidden cairn once the camera moves and settles somewhere with a clear line of sight', async () => {
+    const map3d = fakeMap3d({ lat: 0, lng: 0, altitude: 3000 })
+    let occluding = true
+    const sampler: ElevationSampler = {
+      sampleAlongPath: async () => ({
+        ok: true as const,
+        samples: [
+          { lat: 0, lng: 0, elevationMeters: 0 },
+          { lat: 0, lng: 0, elevationMeters: occluding ? 9000 : 0 },
+          { lat: 0, lng: 0, elevationMeters: 0 },
+        ],
+      }),
+    }
+    const { result } = renderHook(() => useCairnOcclusion(map3d, CAIRNS, null, () => sampler))
+
+    await act(async () => {
+      map3d.steady()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    expect(result.current.has('near')).toBe(true)
+
+    occluding = false
+    await act(async () => {
+      map3d.moveTo({ lat: 10, lng: 10, altitude: 3000 })
+      map3d.steady()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(result.current.has('near')).toBe(false)
+  })
+
+  it('hides a cairn once the camera moves and settles somewhere terrain now blocks', async () => {
+    const map3d = fakeMap3d({ lat: 0, lng: 0, altitude: 3000 })
+    let occluding = false
+    const sampler: ElevationSampler = {
+      sampleAlongPath: async () => ({
+        ok: true as const,
+        samples: [
+          { lat: 0, lng: 0, elevationMeters: 0 },
+          { lat: 0, lng: 0, elevationMeters: occluding ? 9000 : 0 },
+          { lat: 0, lng: 0, elevationMeters: 0 },
+        ],
+      }),
+    }
+    const { result } = renderHook(() => useCairnOcclusion(map3d, CAIRNS, null, () => sampler))
+
+    await act(async () => {
+      map3d.steady()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    expect(result.current.has('near')).toBe(false)
+
+    occluding = true
+    await act(async () => {
+      map3d.moveTo({ lat: 10, lng: 10, altitude: 3000 })
+      map3d.steady()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(result.current.has('near')).toBe(true)
+  })
+
   it('unhides a cairn immediately when it becomes selected, even with a stale occluded verdict', async () => {
     const map3d = fakeMap3d({ lat: 0, lng: 0, altitude: 3000 })
     const { result, rerender } = renderHook(
@@ -121,6 +197,30 @@ describe('useCairnOcclusion (#285)', () => {
     rerender({ selectedCairnId: 'near' })
 
     expect(result.current.has('near')).toBe(false)
+  })
+
+  it('issues no new requests when the camera returns to an already-evaluated position', async () => {
+    const map3d = fakeMap3d({ lat: 0, lng: 0, altitude: 3000 })
+    const sampleAlongPath = vi.fn(samplerAlwaysOccluding().sampleAlongPath)
+    const { result } = renderHook(() =>
+      useCairnOcclusion(map3d, CAIRNS, null, () => ({ sampleAlongPath })),
+    )
+
+    await act(async () => {
+      map3d.steady()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    expect(result.current.size).toBe(2)
+    expect(sampleAlongPath).toHaveBeenCalledTimes(2)
+
+    await act(async () => {
+      map3d.steady()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(sampleAlongPath).toHaveBeenCalledTimes(2)
   })
 
   it('draws everything with no elevation sampler', async () => {

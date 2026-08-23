@@ -23,8 +23,15 @@ export const FLYOVER_COMPOSITOR_BUFFER_MS = 400
 const METERS_PER_DEGREE_LAT = 111_320
 
 /** Floors the range so a subject at a single point (or a track whose points
-    are nearly coincident) does not put the camera inside the terrain. */
-const MINIMUM_RANGE_METERS = 400
+    are nearly coincident) does not put the camera inside the terrain.
+
+    Raised from the prototype's 400 m: at 65° of tilt a camera only 400 m
+    from its look-at sits ~170 m above it, which is inside the hillside for
+    any route in mountains — and Google responds by collapsing `range`
+    entirely rather than rendering from underground. 2 km is the closest a
+    flyover can stand to a short subject and still clear the ground around
+    it. */
+const MINIMUM_RANGE_METERS = 2000
 
 export interface FramedCamera {
   center: LatLng

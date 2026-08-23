@@ -12,6 +12,9 @@ import {
   frameGeometry,
 } from '../map/flyover'
 import type { FlyoverRequest } from '../map/Map3DControl'
+import { sampleGroundAltitude } from '../map/groundAltitude'
+import { createGoogleElevationSampler, type ElevationSampler } from '../geo/elevation'
+import type { LatLng } from '../map/geo'
 import './Map3D.css'
 
 /* #271's camera choreography: "The camera tilts from 0° to 55° over
@@ -67,6 +70,82 @@ export function Map3DSurface({ on, mode, flyover = null }: Map3DSurfaceProps) {
     flightTimers.current = []
   }, [])
 
+  /* Built once, lazily — `google.maps.ElevationService` only exists after
+     the Maps script has resolved, which is later than this component's
+     first render. */
+  const samplerRef = useRef<ElevationSampler | null | undefined>(undefined)
+  const elevationSampler = useCallback((): ElevationSampler | null => {
+    if (samplerRef.current === undefined) samplerRef.current = createGoogleElevationSampler()
+    return samplerRef.current
+  }, [])
+
+  /** Puts the camera at `range`/`tilt` around `center`, with the look-at
+      resolved onto the terrain first.
+
+      Two things here are load-bearing and both were measured against the
+      live API rather than assumed:
+
+      1. **The look-at has to be on the ground.** See
+         `sampleGroundAltitude`'s own comment — a sea-level look-at returned
+         `range: 0`, which renders as a flat view indistinguishable from the
+         2D map. That was #282's "3D does nothing" and #274's "blue screen".
+
+      2. **`flyCameraTo` does not land on the range it is given.** Asked for
+         1315 m it settled at 457 (and at 0 with a sea-level look-at), while
+         a direct assignment of the same camera holds it exactly. So the
+         flight is the animation, and the camera is *asserted* when it ends
+         rather than trusted to have arrived — which also subsumes the
+         backgrounded-tab case the compositor buffer already existed for,
+         since a flight that never advanced and a flight that landed short
+         now get the same correction. */
+  const arriveAt = useCallback(
+    async (
+      center: LatLng,
+      range: number,
+      tilt: number,
+      durationMillis: number,
+      path: LatLng[],
+      onArrived?: (camera: { center: LatLng & { altitude: number }; range: number; tilt: number }) => void,
+    ) => {
+      const altitude = await sampleGroundAltitude(path, elevationSampler())
+      const map3d = map3dRef.current?.map3d
+      if (!map3d) return
+
+      const target = {
+        center: { ...center, altitude },
+        range,
+        tilt,
+        heading: 0,
+        roll: 0,
+      }
+
+      if (prefersReducedMotion()) {
+        Object.assign(map3d, target)
+        onArrived?.(target)
+        return
+      }
+
+      // Flat and overhead on the *ground* look-at before the tilt begins —
+      // at tilt 0 the camera sits a full `range` above it, so this is the
+      // one attitude that cannot collide with terrain.
+      map3d.center = target.center
+      map3d.range = range
+      map3d.tilt = 0
+      map3d.heading = 0
+
+      map3dRef.current?.flyCameraTo({ endCamera: target, durationMillis })
+
+      const settle = window.setTimeout(() => {
+        const live = map3dRef.current?.map3d
+        if (!live) return
+        Object.assign(live, target)
+        onArrived?.(target)
+      }, durationMillis + FLYOVER_COMPOSITOR_BUFFER_MS)
+      flightTimers.current.push(settle)
+    },
+    [elevationSampler],
+  )
+
   /** #274's "Cancelling": stops whatever flight is running, leaving the
       camera exactly where it was — `stopCameraAnimation` halts the native
       animation mid-flight rather than teleporting to its end. */
@@ -86,48 +165,35 @@ export function Map3DSurface({ on, mode, flyover = null }: Map3DSurfaceProps) {
 
       const framed = frameGeometry(request.points)
       if (!framed) return
-      const map3d = map3dRef.current?.map3d
-      if (!map3d) return
-
-      const target = {
-        center: { ...framed.center, altitude: 0 },
-        range: framed.range,
-        tilt: FLYOVER_TILT_DEGREES,
-        heading: 0,
-        roll: 0,
-      }
-
-      // Reduced motion: assigned outright, exactly #271's own stance —
-      // "the switch still works; it simply arrives."
-      if (prefersReducedMotion()) {
-        Object.assign(map3d, target)
-        return
-      }
+      if (!map3dRef.current?.map3d) return
 
       flying.current = true
-      // Flat and overhead at the frame first — the tilt-down on arrival is
-      // the whole point of the fly-in, not a move that follows it.
-      map3d.center = target.center
-      map3d.range = target.range
-      map3d.tilt = 0
-      map3d.heading = 0
 
-      requestAnimationFrame(() => {
-        if (handledFlyoverToken.current !== request.token) return
-        map3dRef.current?.flyCameraTo({ endCamera: target, durationMillis: FLYOVER_FLY_IN_MS })
-
-        const flyInTimer = window.setTimeout(() => {
+      /* The fly-in, then the orbit from wherever it actually landed. The
+         ground altitude is sampled from the subject's own route rather
+         than its centre alone — a flyover of a valley walk is framed from
+         above the ridge beside it, not from inside it. */
+      void arriveAt(
+        framed.center,
+        framed.range,
+        FLYOVER_TILT_DEGREES,
+        FLYOVER_FLY_IN_MS,
+        request.points,
+        (camera) => {
           if (handledFlyoverToken.current !== request.token) return
-          // The compositor gotcha: a backgrounded tab never advances
-          // `flyCameraTo`, so the camera is landed unconditionally rather
-          // than trusting the animation got there on its own.
-          if (Math.abs((map3d.tilt ?? 0) - target.tilt) > 1) Object.assign(map3d, target)
+          const map3d = map3dRef.current?.map3d
+          if (!map3d) return
+
+          if (prefersReducedMotion()) {
+            flying.current = false
+            return
+          }
 
           map3dRef.current?.flyCameraAround({
             camera: {
-              center: target.center,
-              range: target.range,
-              tilt: target.tilt,
+              center: camera.center,
+              range: camera.range,
+              tilt: camera.tilt,
               heading: map3d.heading ?? 0,
               roll: 0,
             },
@@ -139,11 +205,10 @@ export function Map3DSurface({ on, mode, flyover = null }: Map3DSurfaceProps) {
             if (handledFlyoverToken.current === request.token) flying.current = false
           }, FLYOVER_ORBIT_MS + FLYOVER_COMPOSITOR_BUFFER_MS)
           flightTimers.current.push(orbitTimer)
-        }, FLYOVER_FLY_IN_MS + FLYOVER_COMPOSITOR_BUFFER_MS)
-        flightTimers.current.push(flyInTimer)
-      })
+        },
+      )
     },
-    [stopFlight],
+    [stopFlight, arriveAt],
   )
 
   useEffect(() => {
@@ -177,14 +242,19 @@ export function Map3DSurface({ on, mode, flyover = null }: Map3DSurfaceProps) {
         // arrival, and #271's tilt-in does not also run.
         const flyoverPending = flyover !== null && flyover.token !== handledFlyoverToken.current
 
-        const center = map2dInstance.getCenter()
+        const center2d = map2dInstance.getCenter()
         const zoom = map2dInstance.getZoom()
-        if (!center || zoom === undefined) return
-        const range = zoomToRange(zoom, center.lat(), viewportHeight)
+        if (!center2d || zoom === undefined) return
+        const range = zoomToRange(zoom, center2d.lat(), viewportHeight)
+        const center: LatLng = { lat: center2d.lat(), lng: center2d.lng() }
 
         // Framed on the same place, flat and invisible, before anything
         // fades in — "the same centre, a comparable extent, north-up".
-        map3d.center = { lat: center.lat(), lng: center.lng(), altitude: 0 }
+        // Sea level is safe *here* and only here: at tilt 0 the camera sits
+        // a full `range` above the look-at, so it clears the ground even
+        // where the look-at is buried in it. The tilt-in below is what
+        // needs the real altitude, and resolves it first.
+        map3d.center = { ...center, altitude: 0 }
         map3d.range = range
         map3d.tilt = 0
         map3d.heading = 0
@@ -201,19 +271,10 @@ export function Map3DSurface({ on, mode, flyover = null }: Map3DSurfaceProps) {
             return
           }
           if (reduced) {
-            map3d.tilt = TILT_ON
+            void arriveAt(center, range, TILT_ON, 0, [center])
             return
           }
-          map3dRef.current?.flyCameraTo({
-            endCamera: {
-              center: { lat: center.lat(), lng: center.lng(), altitude: 0 },
-              range,
-              tilt: TILT_ON,
-              heading: 0,
-              roll: 0,
-            },
-            durationMillis: TILT_ANIMATION_MS,
-          })
+          void arriveAt(center, range, TILT_ON, TILT_ANIMATION_MS, [center])
         })
         return
       }
@@ -266,7 +327,7 @@ export function Map3DSurface({ on, mode, flyover = null }: Map3DSurfaceProps) {
     return () => {
       cancelled = true
     }
-  }, [on, mounted, map2d, flyover, runFlyover, stopFlight])
+  }, [on, mounted, map2d, flyover, runFlyover, stopFlight, arriveAt])
 
   // #274 — a flyover requested (or restarted, including while one is
   // already running) while the surface is already visible: `Fly over`
@@ -283,8 +344,16 @@ export function Map3DSurface({ on, mode, flyover = null }: Map3DSurfaceProps) {
   useEffect(() => {
     const surface = map3dRef.current?.map3d as unknown as HTMLElement | undefined
     if (!mounted || !surface) return
+    /* `stopCameraAnimation` is only for an actual flight — calling it on
+       every input would kill Google's *own* camera animations, which is
+       what keyboard panning is, and pans would die a fraction of the way
+       through. The pending end-of-flight assert is cleared either way
+       though: once the user has taken the camera, snapping it back to a
+       frame they have already moved away from is the same broken gesture,
+       and it applies to #271's tilt-in as much as to a flyover. */
     function cancel() {
       if (flying.current) stopFlight()
+      else clearFlightTimers()
     }
     surface.addEventListener('pointerdown', cancel)
     surface.addEventListener('wheel', cancel)
@@ -294,7 +363,7 @@ export function Map3DSurface({ on, mode, flyover = null }: Map3DSurfaceProps) {
       surface.removeEventListener('wheel', cancel)
       surface.removeEventListener('keydown', cancel)
     }
-  }, [mounted, stopFlight])
+  }, [mounted, stopFlight, clearFlightTimers])
 
   useEffect(() => clearFlightTimers, [clearFlightTimers])
 

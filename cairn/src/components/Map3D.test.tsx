@@ -6,7 +6,7 @@ const { useMapResult, map3dEl, flyCameraTo, flyCameraAround, stopCameraAnimation
   const flyCameraAround = vi.fn()
   const stopCameraAnimation = vi.fn()
   const map3dEl = {
-    center: { lat: 10, lng: 20 } as { lat: number; lng: number },
+    center: { lat: 10, lng: 20 } as { lat: number; lng: number; altitude?: number },
     range: 5000 as number | null,
     tilt: 0,
     heading: 0,
@@ -77,13 +77,38 @@ vi.mock('@vis.gl/react-google-maps', async () => {
 vi.mock('../map/motion', () => ({ prefersReducedMotion: () => reducedMotion.current }))
 const reducedMotion = { current: false }
 
+/* #282 — the camera's look-at is put on the terrain before it tilts, which
+   makes framing asynchronous. The altitude itself is what the real
+   Elevation API supplies; here it is a fixed number so the tests assert on
+   "the resolved ground was used", not on Google's data. */
+const GROUND_METERS = 1200
+vi.mock('../geo/elevation', () => ({
+  createGoogleElevationSampler: () => ({
+    sampleAlongPath: async () => ({
+      ok: true,
+      samples: [{ lat: 0, lng: 0, elevationMeters: GROUND_METERS }],
+    }),
+  }),
+}))
+
 import { Map3DSurface } from './Map3D'
+import { clearGroundAltitudeCache } from '../map/groundAltitude'
+
+/** Lets the awaited elevation sample settle. The framing that follows it is
+    what every assertion below is actually about. */
+async function settleFraming() {
+  await act(async () => {
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+}
 
 describe('Map3DSurface (#271)', () => {
   beforeEach(() => {
     flyCameraTo.mockClear()
     reducedMotion.current = false
     setMapUpgraded(true)
+    clearGroundAltitudeCache()
     map3dEl.tilt = 0
     map3dEl.heading = 0
     map3dEl.center = { lat: 10, lng: 20 }
@@ -107,20 +132,38 @@ describe('Map3DSurface (#271)', () => {
     expect(container.querySelector('[data-testid="map3d"]')).toBeNull()
   })
 
-  it('mounts and frames the 3D camera on the 2D map\'s own centre when turned on', () => {
+  it('mounts and frames the 3D camera on the 2D map\'s own centre when turned on', async () => {
     render(<Map3DSurface on={true} mode={'SATELLITE' as never} />)
 
+    // Flat and overhead first — safe at sea level, because at tilt 0 the
+    // camera sits a full `range` above the look-at.
     expect(map3dEl.center).toEqual({ lat: 10, lng: 20, altitude: 0 })
-    expect(map3dEl.tilt).toBe(0) // set flat first, then flown to 55 via flyCameraTo
+    expect(map3dEl.tilt).toBe(0)
+
+    await settleFraming()
+
     expect(flyCameraTo).toHaveBeenCalledTimes(1)
     expect(flyCameraTo.mock.calls[0][0].endCamera.tilt).toBe(55)
   })
 
-  it('jumps straight to the tilted camera under reduced motion, without flyCameraTo', () => {
+  /* #282's own bug, as an assertion: a sea-level look-at is what made
+     Google collapse `range` to 0 and render 3D as a flat map. The tilted
+     camera has to be aimed at the ground, not at sea level under it. */
+  it('puts the tilted look-at on the terrain, not at sea level', async () => {
+    render(<Map3DSurface on={true} mode={'SATELLITE' as never} />)
+    await settleFraming()
+
+    expect(flyCameraTo.mock.calls[0][0].endCamera.center.altitude).toBe(GROUND_METERS)
+    expect(map3dEl.center.altitude).toBe(GROUND_METERS)
+  })
+
+  it('jumps straight to the tilted camera under reduced motion, without flyCameraTo', async () => {
     reducedMotion.current = true
     render(<Map3DSurface on={true} mode={'SATELLITE' as never} />)
+    await settleFraming()
 
     expect(map3dEl.tilt).toBe(55)
+    expect(map3dEl.center.altitude).toBe(GROUND_METERS)
     expect(flyCameraTo).not.toHaveBeenCalled()
   })
 
@@ -158,7 +201,7 @@ describe('Map3DSurface (#271)', () => {
     expect(flyCameraTo).not.toHaveBeenCalled()
   })
 
-  it('retries until the custom element finishes upgrading, rather than silently giving up forever', () => {
+  it('retries until the custom element finishes upgrading, rather than silently giving up forever', async () => {
     setMapUpgraded(false)
     const pendingFrames: FrameRequestCallback[] = []
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
@@ -193,6 +236,7 @@ describe('Map3DSurface (#271)', () => {
     // queued frame, unrelated to `whenReady`'s polling.
     const enteringFrame = pendingFrames.shift()!
     enteringFrame(0)
+    await settleFraming()
 
     expect(flyCameraTo).toHaveBeenCalledTimes(1)
     expect(flyCameraTo.mock.calls[0][0].endCamera.tilt).toBe(55)
@@ -211,8 +255,11 @@ describe('Map3DSurface flyover (#274)', () => {
     stopCameraAnimation.mockClear()
     reducedMotion.current = false
     setMapUpgraded(true)
+    clearGroundAltitudeCache()
     map3dEl.tilt = 0
     map3dEl.heading = 0
+    map3dEl.center = { lat: 10, lng: 20 }
+    map3dEl.range = 5000
     map3dEl.addEventListener.mockClear()
     map3dEl.removeEventListener.mockClear()
     vi.useFakeTimers()
@@ -227,16 +274,28 @@ describe('Map3DSurface flyover (#274)', () => {
     vi.unstubAllGlobals()
   })
 
-  it('turning on for a flyover skips #271\'s own tilt-in and flies to the framed geometry instead', () => {
+  it('turning on for a flyover skips #271\'s own tilt-in and flies to the framed geometry instead', async () => {
     render(<Map3DSurface on={true} mode={'SATELLITE' as never} flyover={{ token: 1, points }} />)
+    await settleFraming()
 
     // Never the 55° tilt-in — only the flyover's own 65° fly-in.
     expect(flyCameraTo).toHaveBeenCalledTimes(1)
     expect(flyCameraTo.mock.calls[0][0].endCamera.tilt).toBe(65)
   })
 
-  it('the orbit follows the fly-in without a pause, for one round', () => {
+  /* #282 — the flyover's own version of the sea-level bug: framed at
+     altitude 0 the camera flew into the mountain and Google collapsed the
+     range, which is the "spinning around a blue screen" that was reported. */
+  it('aims the fly-in at the terrain under the route, not at sea level', async () => {
     render(<Map3DSurface on={true} mode={'SATELLITE' as never} flyover={{ token: 1, points }} />)
+    await settleFraming()
+
+    expect(flyCameraTo.mock.calls[0][0].endCamera.center.altitude).toBe(GROUND_METERS)
+  })
+
+  it('the orbit follows the fly-in without a pause, for one round', async () => {
+    render(<Map3DSurface on={true} mode={'SATELLITE' as never} flyover={{ token: 1, points }} />)
+    await settleFraming()
     expect(flyCameraAround).not.toHaveBeenCalled()
 
     vi.advanceTimersByTime(2000 + 400)
@@ -244,40 +303,55 @@ describe('Map3DSurface flyover (#274)', () => {
     expect(flyCameraAround).toHaveBeenCalledTimes(1)
     expect(flyCameraAround.mock.calls[0][0].durationMillis).toBe(12000)
     expect(flyCameraAround.mock.calls[0][0].rounds).toBe(1)
+    // And it orbits the same ground-anchored point the fly-in aimed at.
+    expect(flyCameraAround.mock.calls[0][0].camera.center.altitude).toBe(GROUND_METERS)
   })
 
-  it('lands the camera on the framed target if the fly-in never visibly arrived — the compositor gotcha', () => {
+  /* Now unconditional: `flyCameraTo` was measured landing short of the
+     range it was given even when it *did* animate, so the camera is
+     asserted at the end of every flight rather than only when a
+     backgrounded tab left the tilt untouched. */
+  it('asserts the framed camera when the fly-in ends, however the flight actually went', async () => {
     render(<Map3DSurface on={true} mode={'SATELLITE' as never} flyover={{ token: 1, points }} />)
-    // A backgrounded tab: `flyCameraTo` never advances `tilt` at all.
-    map3dEl.tilt = 0
+    await settleFraming()
+    // Whatever the flight left behind in the meantime — a backgrounded tab
+    // that never advanced, or a flight that landed short of its range.
+    map3dEl.tilt = 12
+    map3dEl.range = 37
 
     vi.advanceTimersByTime(2000 + 400)
 
     expect(map3dEl.tilt).toBe(65)
+    expect(map3dEl.range).toBeGreaterThan(37)
   })
 
-  it('under reduced motion, assigns the framed camera outright with no flight and no orbit', () => {
+  it('under reduced motion, assigns the framed camera outright with no flight and no orbit', async () => {
     reducedMotion.current = true
     render(<Map3DSurface on={true} mode={'SATELLITE' as never} flyover={{ token: 1, points }} />)
+    await settleFraming()
 
     expect(map3dEl.tilt).toBe(65)
+    expect(map3dEl.center.altitude).toBe(GROUND_METERS)
     expect(flyCameraTo).not.toHaveBeenCalled()
     vi.advanceTimersByTime(20000)
     expect(flyCameraAround).not.toHaveBeenCalled()
   })
 
-  it('pressing Fly over again while one is running cancels it and starts fresh, rather than stacking', () => {
+  it('pressing Fly over again while one is running cancels it and starts fresh, rather than stacking', async () => {
     const { rerender } = render(<Map3DSurface on={true} mode={'SATELLITE' as never} flyover={{ token: 1, points }} />)
+    await settleFraming()
     expect(flyCameraTo).toHaveBeenCalledTimes(1)
 
     rerender(<Map3DSurface on={true} mode={'SATELLITE' as never} flyover={{ token: 2, points }} />)
+    await settleFraming()
 
     expect(stopCameraAnimation).toHaveBeenCalled()
     expect(flyCameraTo).toHaveBeenCalledTimes(2)
   })
 
-  it('input on the 3D surface cancels the running flight', () => {
+  it('input on the 3D surface cancels the running flight', async () => {
     render(<Map3DSurface on={true} mode={'SATELLITE' as never} flyover={{ token: 1, points }} />)
+    await settleFraming()
     expect(map3dEl.addEventListener).toHaveBeenCalledWith('pointerdown', expect.any(Function))
 
     const [, handler] = map3dEl.addEventListener.mock.calls.find(([type]) => type === 'pointerdown')!
@@ -290,8 +364,43 @@ describe('Map3DSurface flyover (#274)', () => {
     expect(flyCameraAround).not.toHaveBeenCalled()
   })
 
-  it('turning 3D off mid-flight cancels it before reading the camera back into 2D', () => {
+  /* Grabbing the map after a flight has already finished must not call
+     `stopCameraAnimation` — that is Google's own keyboard/drag panning
+     being killed a fraction of the way through, which is what "panning
+     moves a tiny bit and stops" was. */
+  it('leaves the camera alone on input once the flight is over', async () => {
+    render(<Map3DSurface on={true} mode={'SATELLITE' as never} flyover={{ token: 1, points }} />)
+    await settleFraming()
+    // Fly-in settles, orbit runs, orbit ends.
+    vi.advanceTimersByTime(2000 + 400 + 12000 + 400)
+    stopCameraAnimation.mockClear()
+
+    const [, handler] = map3dEl.addEventListener.mock.calls.find(([type]) => type === 'keydown')!
+    ;(handler as () => void)()
+    ;(handler as () => void)()
+
+    expect(stopCameraAnimation).not.toHaveBeenCalled()
+  })
+
+  /* The other half: input *before* the flight's end-of-flight assert fires
+     must cancel that assert, or the camera snaps back to a frame the user
+     has already moved away from. */
+  it('cancels the pending end-of-flight assert once the user takes the camera', async () => {
+    render(<Map3DSurface on={true} mode={'SATELLITE' as never} flyover={{ token: 1, points }} />)
+    await settleFraming()
+
+    const [, handler] = map3dEl.addEventListener.mock.calls.find(([type]) => type === 'pointerdown')!
+    ;(handler as () => void)()
+    map3dEl.tilt = 12
+
+    vi.advanceTimersByTime(2000 + 400)
+
+    expect(map3dEl.tilt).toBe(12)
+  })
+
+  it('turning 3D off mid-flight cancels it before reading the camera back into 2D', async () => {
     const { rerender } = render(<Map3DSurface on={true} mode={'SATELLITE' as never} flyover={{ token: 1, points }} />)
+    await settleFraming()
     expect(flyCameraTo).toHaveBeenCalledTimes(1)
 
     rerender(<Map3DSurface on={false} mode={'SATELLITE' as never} flyover={{ token: 1, points }} />)

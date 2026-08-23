@@ -149,91 +149,123 @@ export function Map3DSurface({ on, mode, flyover = null }: Map3DSurfaceProps) {
   useEffect(() => {
     if (!mounted || !map2d) return
     if (on === wasOn.current) return
-    wasOn.current = on
+    // Narrowed once, here — `run` below closes over it, and TypeScript
+    // does not carry the guard above's narrowing across a function
+    // boundary.
+    const map2dInstance = map2d
 
-    const map3d = map3dRef.current?.map3d
-    if (!map3d) return
+    /* `<gmp-map-3d>` is a custom element — `mounted` flipping true only
+       means React has rendered the tag, not that the browser has finished
+       upgrading it, so `map3dRef.current?.map3d` can still be `undefined`
+       for a frame or two after. Committing `wasOn.current` before that is
+       ready would mark this transition "handled" with nothing actually
+       done, and since none of this effect's own dependencies change again
+       on their own, it would never retry — the switch would show on with
+       the surface silently never framed. Retry via `requestAnimationFrame`
+       until the element has actually upgraded. */
+    let cancelled = false
 
-    const reduced = prefersReducedMotion()
-    const viewportHeight = map2d.getDiv().clientHeight || window.innerHeight
+    function run() {
+      const map3d = map3dRef.current?.map3d
+      if (!map3d) return
 
-    if (on) {
-      // #274 — a flyover is what turned 3D on: its own fly-in is the
-      // arrival, and #271's tilt-in does not also run.
-      const flyoverPending = flyover !== null && flyover.token !== handledFlyoverToken.current
+      const reduced = prefersReducedMotion()
+      const viewportHeight = map2dInstance.getDiv().clientHeight || window.innerHeight
 
-      const center = map2d.getCenter()
-      const zoom = map2d.getZoom()
-      if (!center || zoom === undefined) return
-      const range = zoomToRange(zoom, center.lat(), viewportHeight)
+      if (on) {
+        // #274 — a flyover is what turned 3D on: its own fly-in is the
+        // arrival, and #271's tilt-in does not also run.
+        const flyoverPending = flyover !== null && flyover.token !== handledFlyoverToken.current
 
-      // Framed on the same place, flat and invisible, before anything
-      // fades in — "the same centre, a comparable extent, north-up".
-      map3d.center = { lat: center.lat(), lng: center.lng(), altitude: 0 }
-      map3d.range = range
-      map3d.tilt = 0
-      map3d.heading = 0
+        const center = map2dInstance.getCenter()
+        const zoom = map2dInstance.getZoom()
+        if (!center || zoom === undefined) return
+        const range = zoomToRange(zoom, center.lat(), viewportHeight)
 
-      requestAnimationFrame(() => {
-        // A flip back to off before this frame landed makes this stale —
-        // "the switch is the source of truth and the last flip wins", and
-        // without this guard a fast on-then-off would resurrect the
-        // surface the user just turned off.
-        if (wasOn.current !== true) return
-        setVisible(true)
-        if (flyoverPending) {
-          runFlyover(flyover)
-          return
-        }
-        if (reduced) {
-          map3d.tilt = TILT_ON
-          return
-        }
-        map3dRef.current?.flyCameraTo({
-          endCamera: {
-            center: { lat: center.lat(), lng: center.lng(), altitude: 0 },
-            range,
-            tilt: TILT_ON,
-            heading: 0,
-            roll: 0,
-          },
-          durationMillis: TILT_ANIMATION_MS,
+        // Framed on the same place, flat and invisible, before anything
+        // fades in — "the same centre, a comparable extent, north-up".
+        map3d.center = { lat: center.lat(), lng: center.lng(), altitude: 0 }
+        map3d.range = range
+        map3d.tilt = 0
+        map3d.heading = 0
+
+        requestAnimationFrame(() => {
+          // A flip back to off before this frame landed makes this stale —
+          // "the switch is the source of truth and the last flip wins", and
+          // without this guard a fast on-then-off would resurrect the
+          // surface the user just turned off.
+          if (wasOn.current !== true) return
+          setVisible(true)
+          if (flyoverPending) {
+            runFlyover(flyover)
+            return
+          }
+          if (reduced) {
+            map3d.tilt = TILT_ON
+            return
+          }
+          map3dRef.current?.flyCameraTo({
+            endCamera: {
+              center: { lat: center.lat(), lng: center.lng(), altitude: 0 },
+              range,
+              tilt: TILT_ON,
+              heading: 0,
+              roll: 0,
+            },
+            durationMillis: TILT_ANIMATION_MS,
+          })
         })
+        return
+      }
+
+      // Turning off cancels any flight first, so what's read below is
+      // wherever the flight (or the user) actually left the camera.
+      stopFlight()
+
+      // The 2D map lands where 3D got to, not where 3D started — read live
+      // off the element rather than anything cached, since the user may
+      // have navigated the whole time it was on.
+      const center3d = map3d.center
+      const range = map3d.range ?? zoomToRange(map2dInstance.getZoom() ?? 2, center3d?.lat ?? 0, viewportHeight)
+      if (center3d) {
+        const zoom = rangeToZoom(range, center3d.lat, viewportHeight)
+        map2dInstance.setCenter({ lat: center3d.lat, lng: center3d.lng })
+        map2dInstance.setZoom(zoom)
+      }
+
+      setVisible(false)
+      if (reduced) {
+        map3d.tilt = 0
+        map3d.heading = 0
+        return
+      }
+      map3dRef.current?.flyCameraTo({
+        endCamera: {
+          center: center3d ?? undefined,
+          range,
+          tilt: 0,
+          heading: 0,
+          roll: 0,
+        },
+        durationMillis: TILT_ANIMATION_MS,
       })
-      return
     }
 
-    // Turning off cancels any flight first, so what's read below is
-    // wherever the flight (or the user) actually left the camera.
-    stopFlight()
-
-    // The 2D map lands where 3D got to, not where 3D started — read live
-    // off the element rather than anything cached, since the user may have
-    // navigated the whole time it was on.
-    const center3d = map3d.center
-    const range = map3d.range ?? zoomToRange(map2d.getZoom() ?? 2, center3d?.lat ?? 0, viewportHeight)
-    if (center3d) {
-      const zoom = rangeToZoom(range, center3d.lat, viewportHeight)
-      map2d.setCenter({ lat: center3d.lat, lng: center3d.lng })
-      map2d.setZoom(zoom)
+    function whenReady() {
+      if (cancelled) return
+      if (!map3dRef.current?.map3d) {
+        requestAnimationFrame(whenReady)
+        return
+      }
+      if (cancelled || on === wasOn.current) return
+      wasOn.current = on
+      run()
     }
+    whenReady()
 
-    setVisible(false)
-    if (reduced) {
-      map3d.tilt = 0
-      map3d.heading = 0
-      return
+    return () => {
+      cancelled = true
     }
-    map3dRef.current?.flyCameraTo({
-      endCamera: {
-        center: center3d ?? undefined,
-        range,
-        tilt: 0,
-        heading: 0,
-        roll: 0,
-      },
-      durationMillis: TILT_ANIMATION_MS,
-    })
   }, [on, mounted, map2d, flyover, runFlyover, stopFlight])
 
   // #274 — a flyover requested (or restarted, including while one is

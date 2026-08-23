@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import { BASE_MAP_TYPES, type BaseMapType } from '../map/useBaseMapType'
-import { MAPS_3D_UNAVAILABLE_SENTENCE, type Maps3DSupport } from '../map/use3DSupport'
 import './LayersControl.css'
 
 const LABELS: Record<BaseMapType, string> = {
@@ -19,31 +18,23 @@ const LABELS_TITLE = {
   off: 'Show place labels on the imagery',
 }
 
-/** #271 — the caption beneath the 3D switch, present always rather than
-    only when it becomes relevant: the honest one-line version of a vendor
-    constraint (there is no 3D road map or 3D terrain map on the beta
-    channel). Replaced by the disabled sentence when the browser itself
-    can't draw 3D — one sentence per surface, #73's rule, never Google's own
-    error panel. */
-const THREE_D_CAPTION = 'Satellite only'
-const THREE_D_UNAVAILABLE = MAPS_3D_UNAVAILABLE_SENTENCE
-
 /** Bottom left, in the map's own corner rather than top-right under the
     account bubble — the standing document's "A map control belongs in the
-    map's corners". It is a thumbnail because the choice is visual: a panel
-    of previews expands from it, and picking one collapses the panel again.
+    map's corners".
 
-    Replaces #104's `BaseMapControl`, whose stylesheet did arithmetic to
-    dodge `TopBar`. There is no `TopBar` to dodge any more. */
+    #284 — **the control is the basemap**, not a button that opens one.
+    Collapsed, it names the basemap currently in effect; expanded, it *is*
+    the panel. The two are never both on screen: this renders one or the
+    other, never a trigger sitting beside its own panel. Choosing a tile no
+    longer closes it — comparing basemaps is the task, and collapsing under
+    the pointer between two picks is the interaction failing. 3D lives
+    beside this control now, in `Map3DToggle`, not inside it. */
 export function LayersControl({
   value,
   labels,
   onChange,
   onLabelsChange,
-  panelCollapsed,
-  is3DOn,
-  onChange3D,
-  maps3DSupport,
+  clusterRef,
 }: {
   value: BaseMapType
   /** The stored preference. Only meaningful on Satellite — see
@@ -51,41 +42,62 @@ export function LayersControl({
   labels: boolean
   onChange: (next: BaseMapType) => void
   onLabelsChange: (next: boolean) => void
-  /** Clears the column while it is open, slides to the map's own left edge
-      when it is not. Transform-free — `left` is what moves, over
-      `--motion-base`, the same duration the column animates with. */
-  panelCollapsed: boolean
-  /** #271 — the switch's own state, an in-memory mode rather than a stored
-      preference. */
-  is3DOn: boolean
-  onChange3D: (next: boolean) => void
-  /** Whether this browser can draw 3D at all — `'checking'` before the
-      library has resolved, which renders exactly like `'available'` so the
-      switch doesn't flash disabled-then-enabled on every load. */
-  maps3DSupport: Maps3DSupport
+  /** #284 — the bottom-left cluster this control shares with
+      `Map3DToggle`. Focus leaving the *cluster* dismisses the panel, not
+      focus leaving this control alone: tabbing from the Labels switch to
+      the 3D toggle stays inside the cluster and must not collapse the
+      panel out from under a keyboard user mid-tab. */
+  clusterRef: RefObject<HTMLDivElement | null>
 }) {
   const [open, setOpen] = useState(false)
-  const rootRef = useRef<HTMLDivElement | null>(null)
+  const panelRef = useRef<HTMLDivElement | null>(null)
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const returnFocusOnClose = useRef(false)
 
-  // Same dismissal mechanism as every other transient surface in the app
-  // (the row confirms, the row menu): Escape, or a pointerdown outside.
   useEffect(() => {
     if (!open) return
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') setOpen(false)
+      if (event.key !== 'Escape') return
+      returnFocusOnClose.current = true
+      setOpen(false)
     }
 
+    // A press anywhere outside the panel — including on the 3D toggle, a
+    // sibling in the cluster rather than a child of this control — closes
+    // it and still does its own job. The dismissal rule has no exception
+    // for a sibling: #284's edge case for pressing the 3D toggle while this
+    // is open is exactly this.
     function handlePointerDown(event: PointerEvent) {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false)
+      if (panelRef.current && !panelRef.current.contains(event.target as Node)) setOpen(false)
+    }
+
+    // Focus, unlike a pointer press, moves through the whole cluster as a
+    // matter of course while tabbing between the tiles, Labels and the 3D
+    // toggle — so this checks the cluster, not just the panel.
+    function handleFocusIn(event: FocusEvent) {
+      const cluster = clusterRef.current
+      if (cluster && !cluster.contains(event.target as Node)) setOpen(false)
     }
 
     document.addEventListener('keydown', handleKeyDown)
     document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('focusin', handleFocusIn)
     return () => {
       document.removeEventListener('keydown', handleKeyDown)
       document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('focusin', handleFocusIn)
     }
+  }, [open, clusterRef])
+
+  // Escape returns focus to the collapsed control, which has just replaced
+  // the panel in the same spot — otherwise focus is left on a node that no
+  // longer exists. Outside-press and focus-out don't get this: focus was
+  // already elsewhere when they fired.
+  useEffect(() => {
+    if (open || !returnFocusOnClose.current) return
+    returnFocusOnClose.current = false
+    triggerRef.current?.focus()
   }, [open])
 
   // Google discards the `styles` option whenever a `mapId` is present, and
@@ -101,120 +113,89 @@ export function LayersControl({
       ? LABELS_TITLE.on
       : LABELS_TITLE.off
 
-  /* `'checking'` reads as enabled — the library resolves fast enough that
-     flashing disabled-then-enabled on every load would be worse than the
-     rare click that lands half a beat before the answer is in. */
-  const threeDAvailable = maps3DSupport !== 'unavailable'
-  const threeDCaption = maps3DSupport === 'unavailable' ? THREE_D_UNAVAILABLE : THREE_D_CAPTION
+  if (open) {
+    return (
+      <div
+        className="layers-control__panel"
+        role="group"
+        aria-label="Layers"
+        ref={panelRef}
+      >
+        <div className="layers-control__strip" role="group" aria-label="Basemap">
+          {BASE_MAP_TYPES.map((type) => (
+            <button
+              key={type}
+              type="button"
+              className={`layers-control__option${
+                value === type ? ' layers-control__option--active' : ''
+              }`}
+              aria-pressed={value === type}
+              // #284 — picking a tile no longer collapses the panel. #109's
+              // "selecting collapses the strip" was about choosing a
+              // basemap being the end of the panel's job; this issue is
+              // exactly the finding that comparing basemaps isn't done in
+              // one pick.
+              onClick={() => {
+                if (type !== value) onChange(type)
+              }}
+            >
+              <span className={`layers-control__swatch layers-control__swatch--${type}`} aria-hidden="true" />
+              <span className="layers-control__option-label">{LABELS[type]}</span>
+            </button>
+          ))}
+        </div>
+        {/* `title` on a `disabled` button does not reach the pointer in
+            every browser, so it goes on the wrapper — the same fix
+            `.track-row__swatch-wrap` already carries for #199. */}
+        <span className="layers-control__labels-wrap" title={labelsTitle}>
+          <button
+            type="button"
+            className="layers-control__labels"
+            role="switch"
+            aria-checked={labelsShown}
+            disabled={!labelsAvailable}
+            /* Unlike a tile, the panel stays open: a switch is a thing you
+               might flip twice to compare, and collapsing between the two
+               flips is the interaction failing. */
+            onClick={() => onLabelsChange(!labels)}
+          >
+            <span
+              className={`layers-control__checkbox${
+                labelsShown ? ' layers-control__checkbox--on' : ''
+              }`}
+              aria-hidden="true"
+            >
+              {labelsShown ? '✓' : ''}
+            </span>
+            Labels
+          </button>
+        </span>
+      </div>
+    )
+  }
 
   return (
-    <div
-      className={`layers-control${panelCollapsed ? ' layers-control--clear' : ''}`}
-      ref={rootRef}
+    <button
+      type="button"
+      ref={triggerRef}
+      className="layers-control__trigger"
+      // #284 — the visible word is the basemap, which is the question the
+      // control answers at a glance; `Layers` survives only in the
+      // accessible name, so it's still reachable by that name from the
+      // keyboard or voice control.
+      aria-label={`Layers: ${LABELS[value]}`}
+      onClick={() => setOpen(true)}
     >
-      {open && (
-        <div className="layers-control__panel">
-          <div className="layers-control__strip" role="group" aria-label="Basemap">
-            {BASE_MAP_TYPES.map((type) => (
-              <button
-                key={type}
-                type="button"
-                className={`layers-control__option${
-                  value === type ? ' layers-control__option--active' : ''
-                }`}
-                aria-pressed={value === type}
-                onClick={() => {
-                  // Selecting the already-selected one collapses without a
-                  // redraw — #109's design note. `onChange` with the same
-                  // value is a no-op in the store either way, but not calling
-                  // it keeps that true here rather than one layer down.
-                  if (type !== value) onChange(type)
-                  setOpen(false)
-                }}
-              >
-                <span className={`layers-control__swatch layers-control__swatch--${type}`} aria-hidden="true" />
-                <span className="layers-control__option-label">{LABELS[type]}</span>
-              </button>
-            ))}
-          </div>
-          {/* #271 — 3D sits above Labels: it decides what kind of surface
-              you are looking at, Labels decides what is written on it, and
-              reading top to bottom the panel goes from most to least
-              consequential. Same wrapper-carries-the-title fix as Labels,
-              since this switch goes disabled too. */}
-          <span className="layers-control__3d-wrap" title={!threeDAvailable ? threeDCaption : undefined}>
-            <button
-              type="button"
-              className="layers-control__3d"
-              role="switch"
-              aria-checked={is3DOn}
-              disabled={!threeDAvailable}
-              onClick={() => onChange3D(!is3DOn)}
-            >
-              <span
-                className={`layers-control__checkbox${is3DOn ? ' layers-control__checkbox--on' : ''}`}
-                aria-hidden="true"
-              >
-                {is3DOn ? '✓' : ''}
-              </span>
-              3D
-            </button>
-          </span>
-          <p className="layers-control__caption">{threeDCaption}</p>
-          {/* `title` on a `disabled` button does not reach the pointer in
-              every browser, so it goes on the wrapper — the same fix
-              `.track-row__swatch-wrap` already carries for #199. */}
-          <span className="layers-control__labels-wrap" title={labelsTitle}>
-            <button
-              type="button"
-              className="layers-control__labels"
-              role="switch"
-              aria-checked={labelsShown}
-              disabled={!labelsAvailable}
-              /* Unlike a tile, the panel stays open: a switch is a thing you
-                 might flip twice to compare, and collapsing between the two
-                 flips is the interaction failing. */
-              onClick={() => onLabelsChange(!labels)}
-            >
-              <span
-                className={`layers-control__checkbox${
-                  labelsShown ? ' layers-control__checkbox--on' : ''
-                }`}
-                aria-hidden="true"
-              >
-                {labelsShown ? '✓' : ''}
-              </span>
-              Labels
-            </button>
-          </span>
-        </div>
-      )}
-      <button
-        type="button"
-        className="layers-control__trigger"
-        aria-label="Layers"
-        aria-expanded={open}
-        onClick={() => setOpen((wasOpen) => !wasOpen)}
-      >
-        {/* The trigger is a status readout, so it distinguishes the two
-            satellite pictures even though the tile row no longer does: the
-            diagonal that used to mark the Hybrid tile now marks labels-on. */}
-        <span
-          className={`layers-control__swatch layers-control__swatch--${value}${
-            value === 'satellite' && labels ? ' layers-control__swatch--labelled' : ''
-          }`}
-          aria-hidden="true"
-        />
-        <span className="layers-control__trigger-label">Layers</span>
-        {/* The only way the collapsed control can say which surface you're
-            on — the language's Selected treatment on a control that is
-            currently doing something. */}
-        {is3DOn && (
-          <span className="layers-control__badge" aria-hidden="true">
-            3D
-          </span>
-        )}
-      </button>
-    </div>
+      {/* The trigger is a status readout, so it distinguishes the two
+          satellite pictures even though the tile row no longer does: the
+          diagonal that used to mark the Hybrid tile now marks labels-on. */}
+      <span
+        className={`layers-control__swatch layers-control__swatch--${value}${
+          value === 'satellite' && labels ? ' layers-control__swatch--labelled' : ''
+        }`}
+        aria-hidden="true"
+      />
+      <span className="layers-control__trigger-label">{LABELS[value]}</span>
+    </button>
   )
 }

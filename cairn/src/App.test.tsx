@@ -284,23 +284,25 @@ describe('App shell (#109)', () => {
     fetchSpy.mockRestore()
   })
 
-  it('collapses the column via its edge tab and slides the layers control to the map edge', async () => {
+  it('collapses the column via its edge tab and slides the layers cluster to the map edge', async () => {
     const { container } = await renderApp('/')
 
-    expect(container.querySelector('.layers-control--clear')).toBeNull()
+    expect(container.querySelector('.map-layers-cluster--clear')).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'Collapse panel' }))
 
     expect(container.querySelector('.shell-column--collapsed')).not.toBeNull()
-    expect(container.querySelector('.layers-control--clear')).not.toBeNull()
+    expect(container.querySelector('.map-layers-cluster--clear')).not.toBeNull()
     expect(screen.getByRole('button', { name: 'Show panel' })).toBeDefined()
   })
 
-  it('puts the layers control in the map corner, expanding to the three basemaps', async () => {
+  // #284: the control is the basemap, not a "Layers" button that opens one —
+  // collapsed, it names the current basemap; expanded, it *is* the panel,
+  // and stays open across repeated picks rather than collapsing on choice.
+  it('puts the layers control in the map corner, naming the current basemap and staying open across picks', async () => {
     await renderApp('/')
 
-    const trigger = screen.getByRole('button', { name: 'Layers' })
-    expect(trigger.getAttribute('aria-expanded')).toBe('false')
+    const trigger = screen.getByRole('button', { name: 'Layers: Satellite' })
 
     fireEvent.click(trigger)
 
@@ -310,9 +312,15 @@ describe('App shell (#109)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Terrain' }))
 
-    // Selecting collapses the strip and records the choice.
-    expect(screen.queryByRole('button', { name: 'Satellite' })).toBeNull()
+    // The panel stays open — comparing basemaps is the task.
+    expect(screen.getByRole('button', { name: 'Satellite' })).toBeDefined()
     expect(window.localStorage.getItem('cairn.baseMapType')).toBe('terrain')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Satellite' }))
+    expect(window.localStorage.getItem('cairn.baseMapType')).toBe('satellite')
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.getByRole('button', { name: 'Layers: Satellite' })).toBeDefined()
   })
 
   // #263: the labels switch is the other half of what used to be the Hybrid
@@ -320,7 +328,7 @@ describe('App shell (#109)', () => {
   it('persists the labels switch and shares it with the tile preference', async () => {
     await renderApp('/')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Layers' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Layers: Satellite' }))
     fireEvent.click(screen.getByRole('switch', { name: /Labels/ }))
 
     expect(window.localStorage.getItem('cairn.baseMapLabels')).toBe('true')
@@ -396,7 +404,7 @@ describe('App routing (#109)', () => {
 
     expect(container.querySelector('.search-card')).not.toBeNull()
     expect(container.querySelector('.search-card__account .account-bubble')).not.toBeNull()
-    expect(screen.getByRole('button', { name: 'Layers' })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Layers: Satellite' })).toBeDefined()
     expect(screen.getByRole('button', { name: 'Zoom in' })).toBeDefined()
     fetchSpy.mockRestore()
   })

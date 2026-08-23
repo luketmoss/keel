@@ -1,8 +1,9 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { APIProvider, Map, MapMode, useMap } from '@vis.gl/react-google-maps'
 import { googleMapsApiKey, googleMapsMapId } from '../env'
 import { MapUnavailable } from './MapUnavailable'
 import { LayersControl } from './LayersControl'
+import { Map3DToggle } from './Map3DToggle'
 import { Map3DSurface } from './Map3D'
 import { useBaseMapType, type BaseMapType } from '../map/useBaseMapType'
 import { Map3DControlProvider, useMap3DControl } from '../map/Map3DControl'
@@ -140,6 +141,7 @@ export function MapCanvas({ panelCollapsed, canFit, getFitPoints }: MapCanvasPro
      after starting" regression and the flyover-cancels-on-off wiring both
      live in `Map3DControlProvider` now, alongside this same state. */
   const { on: is3DOn, setOn: setIs3DOn, support: maps3DSupport, flyover } = useMap3DControl()
+  const clusterRef = useRef<HTMLDivElement | null>(null)
 
   /* #271's "The switch and the tiles" table, both directions. Neither is a
      blocked action and neither asks a question — the consequence happens
@@ -178,16 +180,28 @@ export function MapCanvas({ panelCollapsed, canFit, getFitPoints }: MapCanvasPro
         restriction={{ latLngBounds: WORLD_BOUNDS, strictBounds: true }}
       />
       <Map3DSurface on={is3DOn} mode={baseMap.labels ? MapMode.HYBRID : MapMode.SATELLITE} flyover={flyover} />
-      <LayersControl
-        value={baseMap.type}
-        labels={baseMap.labels}
-        onChange={handleBaseMapChange}
-        onLabelsChange={baseMap.setLabels}
-        panelCollapsed={panelCollapsed}
-        is3DOn={is3DOn}
-        onChange3D={handle3DChange}
-        maps3DSupport={maps3DSupport}
-      />
+      {/* #284 — one cluster, two controls: the basemap picker and, only on
+          Satellite, the 3D toggle. The wrapper owns the corner — clearing
+          the column while a panel is open, sliding to the map's own edge
+          when it isn't — so neither control positions itself any more. */}
+      <div
+        className={`map-layers-cluster${panelCollapsed ? ' map-layers-cluster--clear' : ''}`}
+        ref={clusterRef}
+      >
+        <LayersControl
+          value={baseMap.type}
+          labels={baseMap.labels}
+          onChange={handleBaseMapChange}
+          onLabelsChange={baseMap.setLabels}
+          clusterRef={clusterRef}
+        />
+        <Map3DToggle
+          visible={baseMap.type === 'satellite'}
+          on={is3DOn}
+          onChange={handle3DChange}
+          support={maps3DSupport}
+        />
+      </div>
       <ZoomControls canFit={canFit} getFitPoints={getFitPoints} />
     </div>
   )

@@ -11,6 +11,36 @@
   width: 100%;
 }
 
+/* Bottom left — the basemap picker (`LayersControl`) and, only on
+   Satellite, the 3D toggle (`Map3DToggle`). #284's cluster: two controls
+   sharing one corner, clearing the column together and sliding to the
+   map's own edge together, the same offset and duration `.layers-control`
+   used to move alone with. `align-items: flex-end` is what lets the panel
+   grow upward from the same bottom edge the trigger sat on when it
+   replaces it. */
+.map-layers-cluster {
+  position: absolute;
+  bottom: var(--space-4);
+  left: calc(var(--space-4) + var(--panel-width) + var(--space-4));
+  z-index: 2;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  transition: left var(--motion-base) var(--ease);
+}
+
+.map-layers-cluster--clear {
+  left: var(--space-4);
+}
+
+@media (max-width: 719px) {
+  .map-layers-cluster {
+    left: var(--space-4);
+    bottom: calc(var(--sheet-current, var(--sheet-half)) + var(--space-2));
+    transition: bottom var(--motion-base) var(--ease);
+  }
+}
+
 /* Bottom right — zoom and fit. Stacked with the fit control above the zoom
    pair, so the two most-used buttons sit closest to the thumb. */
 .map-controls {

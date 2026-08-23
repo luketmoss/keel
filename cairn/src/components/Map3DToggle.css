@@ -1,0 +1,59 @@
+/* #284 — a sibling of `.layers-control__trigger` in the bottom-left
+   cluster, built from the same pill metrics so the two read as one
+   cluster, but its own file: this is a genuinely separate control now, not
+   a switch borrowed from LayersControl.css. */
+.map-3d-toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+}
+
+.map-3d-toggle__caption {
+  margin: 0;
+  max-width: 200px;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.map-3d-toggle__wrap {
+  display: block;
+}
+
+.map-3d-toggle__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--hit-target);
+  padding: 0 var(--space-3);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur));
+  box-shadow: var(--shadow-lifted);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease);
+}
+
+.map-3d-toggle__button:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.map-3d-toggle__button:active:not(:disabled) {
+  background: var(--pressed);
+}
+
+/* The language's Selected treatment — the same fill the chosen basemap
+   tile takes, and the same one the layers trigger's retired badge took. */
+.map-3d-toggle__button[aria-checked='true'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.map-3d-toggle__button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

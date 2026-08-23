@@ -19,6 +19,7 @@ import { LooseFace } from './components/LooseFace'
 import { LooseLayer } from './components/LooseLayer'
 import { Track3DLayer } from './components/Track3DLayer'
 import { Cairn3DLayer } from './components/Cairn3DLayer'
+import { WorldTrack3DFraming } from './components/WorldTrack3DFraming'
 import type { PositionedCairn } from './components/CairnLayer'
 import { useMap3DControl } from './map/Map3DControl'
 import { worldTrackGeometry } from './geo/world3DRoutes'
@@ -991,6 +992,15 @@ function AppShell() {
   // exactly the surfaces the sheet already does.
   const mapDecisionActive = draftOpen || queueOpen || createOpen
 
+  // #271/#292 — the world view's own 3D inputs, hoisted so `Track3DLayer`'s
+  // `tracks` prop and `WorldTrack3DFraming`'s framing effect read exactly
+  // the same trips and loose tracks rather than two computations that could
+  // drift from each other.
+  const worldTripsFor3D = kind === 'all' || kind === 'trips' ? visibleTripsFor(visibleTrips, filters) : []
+  const worldLooseTracksFor3D = visibleLooseForKind.filter(
+    (item): item is Extract<LooseRecord, { kind: 'track' }> => item.kind === 'track',
+  )
+
   return (
     <MapProvider>
       <div
@@ -1060,14 +1070,7 @@ function AppShell() {
                 mounts, so this costs nothing while 3D has never been
                 turned on. */}
             <Track3DLayer
-              tracks={worldTrackGeometry(
-                kind === 'all' || kind === 'trips' ? visibleTripsFor(visibleTrips, filters) : [],
-                tripStore,
-                visibleLooseForKind.filter(
-                  (item): item is Extract<LooseRecord, { kind: 'track' }> => item.kind === 'track',
-                ),
-                looseStore,
-              )}
+              tracks={worldTrackGeometry(worldTripsFor3D, tripStore, worldLooseTracksFor3D, looseStore)}
             />
             {/* #273 — the world view's loose cairns in 3D, at parity with
                 `LooseLayer` above: no trip's own cairns here (design note's
@@ -1081,6 +1084,20 @@ function AppShell() {
               onSelectCairn={(id) => navigate(`/cairns/${id}`)}
               hoveredCairnIds={hoveredTripId ? new Set([hoveredTripId]) : undefined}
               onHoverCairn={(ids) => setHoveredTripId(ids.size > 0 ? [...ids][0] : null)}
+            />
+            {/* #292 — the world view's own content framing: returning here
+                (or a filtered set changing while already here) flies the 3D
+                camera to frame it, falling back to `worldCairns` when there
+                is no track geometry. Its own component so the effect gets a
+                fresh start every time this block remounts — see its own
+                doc comment. */}
+            <WorldTrack3DFraming
+              trips={worldTripsFor3D}
+              tripStore={tripStore}
+              looseTracks={worldLooseTracksFor3D}
+              looseStore={looseStore}
+              cairns={worldCairns}
+              revealSuspended={mapDecisionActive}
             />
           </>
         )}

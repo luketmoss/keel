@@ -30,6 +30,7 @@ vi.mock('@vis.gl/react-google-maps', () => ({
 const { lastSelectedFileId } = vi.hoisted(() => ({ lastSelectedFileId: { current: null as string | null } }))
 vi.mock('./TrackLayer', () => ({
   computeRenderedTracks: () => [],
+  visibleFilesKey: () => '',
   TrackLayer: ({ selectedFileId }: { selectedFileId: string | null }) => {
     lastSelectedFileId.current = selectedFileId
     useEffect(

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMap, useMap3D } from '@vis.gl/react-google-maps'
-import { TrackLayer, computeRenderedTracks } from './TrackLayer'
+import { TrackLayer, computeRenderedTracks, visibleFilesKey } from './TrackLayer'
 import { Track3DLayer } from './Track3DLayer'
 import { CairnLayer, type PositionedCairn } from './CairnLayer'
 import { Cairn3DLayer } from './Cairn3DLayer'
@@ -12,6 +12,7 @@ import { useMap3DControl } from '../map/Map3DControl'
 import { frameGeometry } from '../map/flyover'
 import { prefersReducedMotion } from '../map/motion'
 import { MAP3D_ID, TRACK3D_REVEAL_MS } from '../map/track3D'
+import { useTrack3DFraming } from '../map/useTrack3DFraming'
 import { TrackList } from './TrackList'
 import { CairnList } from './CairnList'
 import { Lightbox } from './Lightbox'
@@ -534,6 +535,46 @@ export function TripDetail({
     [mappedCairns],
   )
 
+  /** #292 — the geometry `Track3DLayer` actually draws for this trip:
+      visible tracks, the same set its own `tracks` prop gets. Shared
+      between that prop and the framing effect below so neither can drift
+      from what the other draws. */
+  const renderedTracks3D = useMemo(() => computeRenderedTracks(tripImport.tracks), [tripImport.tracks])
+
+  /** #292 — what the framing effect below actually flies to: every point of
+      every track `Track3DLayer` draws (`points.length < 2` is skipped
+      there, and skipped here for the same reason — a single-point "track"
+      is never part of the drawn set). Falls back to the trip's own
+      positioned cairns when that set is empty, so a photos-only trip is
+      framed rather than left over whatever the camera was already showing
+      — the design note's "Falls back to the trip's positioned cairns when
+      it draws no track geometry". */
+  const track3DFramePoints = useMemo(() => {
+    const trackPoints = renderedTracks3D
+      .filter((track) => track.points.length >= 2)
+      .flatMap((track) => track.points)
+    if (trackPoints.length > 0) return trackPoints
+    return positionedCairns.map((cairn) => ({ lat: cairn.latitude, lng: cairn.longitude }))
+  }, [renderedTracks3D, positionedCairns])
+
+  /** #292 — `Track3DLayer`'s bounds fit, the 3D equivalent of
+      `TrackLayer`'s 2D `fitTracksToBounds` effect. Keyed on the same signal
+      that effect uses (`tripImport.tracks.length` growing is an import, an
+      unchanged count with a different `visibleFilesKey` is a toggle), so
+      the two surfaces cannot drift on what counts as "the content changed".
+      Cairns are deliberately not part of this signal — adding one to a
+      trip that already has tracks must not itself re-frame (design note's
+      "Decisions taken here"); `track3DFramePoints` only reads them as the
+      fallback when there is nothing else to frame. */
+  useTrack3DFraming({
+    map3d,
+    is3DOn,
+    revealSuspended,
+    totalCount: tripImport.tracks.length,
+    visibleKey: visibleFilesKey(tripImport.tracks),
+    points: track3DFramePoints,
+  })
+
   const cairnListRows = useMemo(() => buildCairnListRows(facetedCairns, allTracks), [facetedCairns, allTracks])
   const cairnListItems = useMemo(
     () => orderCairnListItems(cairnListRows, unattachedIds),
@@ -915,7 +956,7 @@ export function TripDetail({
           map. There is still no hovered band here (design note's "Hover is
           not part of this"). */}
       <Track3DLayer
-        tracks={computeRenderedTracks(tripImport.tracks)}
+        tracks={renderedTracks3D}
         selectedFileId={selectedTrackId}
         onSelectRoute={handleSelectRoute}
         hitLinesEnabled={!revealSuspended}

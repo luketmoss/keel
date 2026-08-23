@@ -63,13 +63,38 @@ export function LayersControl({
       setOpen(false)
     }
 
-    // A press anywhere outside the panel — including on the 3D toggle, a
-    // sibling in the cluster rather than a child of this control — closes
-    // it and still does its own job. The dismissal rule has no exception
-    // for a sibling: #284's edge case for pressing the 3D toggle while this
-    // is open is exactly this.
+    // #295 — a press truly outside the cluster (the map, the column,
+    // anywhere else) still closes on `pointerdown`: nothing there has an
+    // `onClick` competing for the same touch, and a drag that starts inside
+    // the panel and ends outside the cluster produces no `click` at all, so
+    // `pointerdown` is the only signal that sees it.
+    //
+    // A press inside the cluster but outside the panel — the 3D toggle, the
+    // only other cluster member — is handled by `handleClick` below instead.
+    // Closing synchronously here, inside `pointerdown`, mutated the DOM
+    // under the finger mid-touch and made mobile Safari/Chrome withhold the
+    // `click` a tap would otherwise produce, silently swallowing
+    // `Map3DToggle`'s own `onChange`.
     function handlePointerDown(event: PointerEvent) {
-      if (panelRef.current && !panelRef.current.contains(event.target as Node)) setOpen(false)
+      const cluster = clusterRef.current
+      const target = event.target as Node
+      if (cluster && !cluster.contains(target)) setOpen(false)
+    }
+
+    // #295 — the sibling case: a press inside the cluster but outside the
+    // panel. `click` fires in the bubble phase after the target's own
+    // listener has already run, so a sibling's `onClick` (e.g.
+    // `Map3DToggle`'s) fires first, on the still-mounted panel, and the
+    // panel then closes as the gesture's second effect. This also covers
+    // `Enter`/`Space` activation for free, since both dispatch a real
+    // `click`, and it fires nothing for a disabled sibling, since a
+    // disabled button dispatches no `click` at all.
+    function handleClick(event: MouseEvent) {
+      const cluster = clusterRef.current
+      const panel = panelRef.current
+      const target = event.target as Node
+      if (!cluster || !panel) return
+      if (cluster.contains(target) && !panel.contains(target)) setOpen(false)
     }
 
     // Focus, unlike a pointer press, moves through the whole cluster as a
@@ -82,10 +107,12 @@ export function LayersControl({
 
     document.addEventListener('keydown', handleKeyDown)
     document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('click', handleClick)
     document.addEventListener('focusin', handleFocusIn)
     return () => {
       document.removeEventListener('keydown', handleKeyDown)
       document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('click', handleClick)
       document.removeEventListener('focusin', handleFocusIn)
     }
   }, [open, clusterRef])

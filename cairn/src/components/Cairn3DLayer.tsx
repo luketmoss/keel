@@ -15,6 +15,17 @@ import './CairnLayer.css'
     nothing and this never allocates one per render. */
 const EMPTY_HOVERED_CAIRN_IDS: ReadonlySet<string> = new Set()
 
+/** #293 — `<gmp-map-3d>` runs its own gesture handling over the whole
+    surface (`GestureHandling.GREEDY`), and a `pointerdown` it claims for a
+    possible pan or orbit never resolves into a `click` on the marker the
+    gesture started on. So the tap is reconstructed from `pointerdown` /
+    `pointerup` instead of relying on `click` — this is the pointer travel,
+    in CSS pixels, that still counts as a tap rather than a drag. A module
+    constant rather than a CSS custom property: it is a threshold read in
+    JS and never reaches a stylesheet, the same reasoning #288 gave for its
+    own constants. */
+export const CAIRN3D_TAP_SLOP = 10
+
 interface Cairn3DLayerProps {
   cairns: PositionedCairn[]
   /** Drive access token for thumbnail fetches — `null` renders every
@@ -165,10 +176,12 @@ export function Cairn3DLayer({
   )
 }
 
-/** The portaled content for one marker. `pointerenter`/`pointerleave` and
-    `click` are ordinary DOM events on `MarkerElement`'s hosted children — no
-    `gmp-click` and no `Marker3DInteractiveElement` involved, per the design
-    note's discovery. */
+/** The portaled content for one marker. `pointerenter`/`pointerleave` are
+    ordinary DOM events on `MarkerElement`'s hosted children — no `gmp-click`
+    and no `Marker3DInteractiveElement` involved, per the design note's
+    discovery. The tap itself is *not* read off `click` — see #293 and
+    `CAIRN3D_TAP_SLOP` above — because `<gmp-map-3d>`'s own gesture handling
+    swallows it before a `click` ever fires. */
 function Cairn3DMarkerContent({
   cairn,
   accessToken,
@@ -190,14 +203,39 @@ function Cairn3DMarkerContent({
 }) {
   const thumbnailUrl = usePhotoImage(accessToken, cairn.thumbnailDriveFileId ?? undefined).url
 
-  function handleClick() {
+  /* #293 — the reconstructed tap. `pointerdown` claims the gesture for this
+     marker (recording where it started, and stopping propagation so
+     `<gmp-map-3d>`'s greedy handling does not also claim it for a pan or
+     orbit) and `pointerup` decides whether it was a tap or a drag. No
+     `setPointerCapture`: without it, `pointerup` only reaches this element
+     when the pointer is released back over it, which is what makes a press
+     that lands on the marker and lifts off it a no-op for free, on top of
+     the explicit slop check below. */
+  const pressRef = useRef<{ pointerId: number; x: number; y: number } | null>(null)
+
+  function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    pressRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY }
+    event.stopPropagation()
+  }
+
+  function handlePointerUp(event: React.PointerEvent<HTMLDivElement>) {
+    const press = pressRef.current
+    pressRef.current = null
+    if (!press || press.pointerId !== event.pointerId) return
+    const travelled = Math.hypot(event.clientX - press.x, event.clientY - press.y)
+    if (travelled > CAIRN3D_TAP_SLOP) return
     onSelect(cairn.id)
     onOpen?.(cairn.id)
   }
 
+  function handlePointerCancel(event: React.PointerEvent<HTMLDivElement>) {
+    const press = pressRef.current
+    if (press && press.pointerId === event.pointerId) pressRef.current = null
+  }
+
   return (
     <div
-      className={`cairn-layer__hit${hovered ? ' cairn-layer__hit--hovered' : ''}${occluded ? ' cairn-layer__hit--occluded' : ''}`}
+      className={`cairn-layer__hit cairn-layer__hit--3d${hovered ? ' cairn-layer__hit--hovered' : ''}${occluded ? ' cairn-layer__hit--occluded' : ''}`}
       role="button"
       aria-label={cairn.name}
       aria-pressed={selected}
@@ -206,7 +244,9 @@ function Cairn3DMarkerContent({
       data-cairn-id={cairn.id}
       data-selected={selected}
       data-occluded={occluded}
-      onClick={handleClick}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
       onPointerEnter={() => onHoverChange(true)}
       onPointerLeave={() => onHoverChange(false)}
     >

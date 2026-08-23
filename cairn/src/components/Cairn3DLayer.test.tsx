@@ -3,6 +3,41 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PositionedCairn } from './CairnLayer'
 import { clearCairnOcclusionCache } from '../map/cairnOcclusion'
 
+/* jsdom implements no `PointerEvent`, the same gap `BottomSheet.test.tsx`
+   and `CairnCreateGesture.test.tsx` already work around. */
+if (typeof window.PointerEvent === 'undefined') {
+  window.PointerEvent = MouseEvent as unknown as typeof PointerEvent
+}
+
+/** #293 — models the one piece of real `<gmp-map-3d>` behaviour this whole
+    bug turned on: `GestureHandling.GREEDY` runs its own listener over the
+    surface and, if a marker's `pointerdown` reaches it unstopped, claims
+    the pointer for a possible pan or orbit. A captured pointer's later
+    events are retargeted to the capturing element, not the child the
+    gesture started on — which is exactly why the marker's own `click`
+    never arrived. Modelled with real DOM propagation rather than a spy:
+    a bubble-phase listener on `document.body` (the marker's real parent,
+    since `map3d.append` below is `document.body.appendChild`) records
+    which pointer got past the marker unstopped, and a capture-phase
+    listener intercepts that pointer's `pointerup` before it can reach the
+    marker at all — reproducing "the surface captured it, so the marker
+    never sees the release" without a browser. A component that stops
+    propagation on `pointerdown`, as the fix must, never reaches the first
+    listener, and its own `pointerup` handler runs normally. */
+let surfaceCapturedPointerId: number | null = null
+document.body.addEventListener('pointerdown', (event) => {
+  surfaceCapturedPointerId = (event as PointerEvent).pointerId
+})
+document.body.addEventListener(
+  'pointerup',
+  (event) => {
+    if (surfaceCapturedPointerId !== null && (event as PointerEvent).pointerId === surfaceCapturedPointerId) {
+      event.stopPropagation()
+    }
+  },
+  true,
+)
+
 /* Same imperative-lifecycle stubbing strategy as Track3DLayer.test.tsx, with
    one addition: a `MarkerElement` hosts arbitrary HTML (unlike
    `Polyline3DElement`, which draws nothing React portals into), so the fake
@@ -95,6 +130,7 @@ describe('Cairn3DLayer (#273)', () => {
     maps3dLibResult.current = readyLib
     steadyHandler.current = null
     samplerResult.current = null
+    surfaceCapturedPointerId = null
     clearCairnOcclusionCache()
   })
 
@@ -120,7 +156,13 @@ describe('Cairn3DLayer (#273)', () => {
     expect(document.body.querySelectorAll('[data-fake-marker]')).toHaveLength(0)
   })
 
-  it('portals CairnMarker in, and a click selects then opens the cairn, in that order', () => {
+  /* #293 — the tap is reconstructed from `pointerdown`/`pointerup`, not
+     `click`: `<gmp-map-3d>` swallows the click before it ever fires. The
+     fake `MarkerElement`'s surface-capture simulation above is what makes
+     this test fail for the real reason if the reconstruction (in
+     particular `pointerdown`'s `stopPropagation`) is ever removed — see
+     that comment. */
+  it('portals CairnMarker in, and a tap selects then opens the cairn, in that order', () => {
     const onSelectCairn = vi.fn()
     const onOpenCairn = vi.fn()
     render(
@@ -132,14 +174,86 @@ describe('Cairn3DLayer (#273)', () => {
         onOpenCairn={onOpenCairn}
       />,
     )
+    const marker = screen.getByTestId('cairn-marker-3d')
 
-    fireEvent.click(screen.getByTestId('cairn-marker-3d'))
+    fireEvent.pointerDown(marker, { pointerId: 1, clientX: 100, clientY: 100 })
+    fireEvent.pointerUp(marker, { pointerId: 1, clientX: 100, clientY: 100 })
 
     expect(onSelectCairn).toHaveBeenCalledWith('cairn-1')
     expect(onOpenCairn).toHaveBeenCalledWith('cairn-1')
     const selectOrder = onSelectCairn.mock.invocationCallOrder[0]
     const openOrder = onOpenCairn.mock.invocationCallOrder[0]
     expect(selectOrder).toBeLessThan(openOrder)
+  })
+
+  it('does the same for pointerType: touch, the reported case', () => {
+    const onSelectCairn = vi.fn()
+    const onOpenCairn = vi.fn()
+    render(
+      <Cairn3DLayer
+        cairns={[PIN]}
+        accessToken={null}
+        selectedCairnId={null}
+        onSelectCairn={onSelectCairn}
+        onOpenCairn={onOpenCairn}
+      />,
+    )
+    const marker = screen.getByTestId('cairn-marker-3d')
+
+    fireEvent.pointerDown(marker, { pointerId: 1, pointerType: 'touch', clientX: 40, clientY: 40 })
+    fireEvent.pointerUp(marker, { pointerId: 1, pointerType: 'touch', clientX: 40, clientY: 40 })
+
+    expect(onSelectCairn).toHaveBeenCalledWith('cairn-1')
+    expect(onOpenCairn).toHaveBeenCalledWith('cairn-1')
+  })
+
+  it('does not select when the lift travels past CAIRN3D_TAP_SLOP — a drag, not a tap', () => {
+    const onSelectCairn = vi.fn()
+    const onOpenCairn = vi.fn()
+    render(
+      <Cairn3DLayer
+        cairns={[PIN]}
+        accessToken={null}
+        selectedCairnId={null}
+        onSelectCairn={onSelectCairn}
+        onOpenCairn={onOpenCairn}
+      />,
+    )
+    const marker = screen.getByTestId('cairn-marker-3d')
+
+    fireEvent.pointerDown(marker, { pointerId: 1, clientX: 0, clientY: 0 })
+    fireEvent.pointerUp(marker, { pointerId: 1, clientX: 30, clientY: 0 })
+
+    expect(onSelectCairn).not.toHaveBeenCalled()
+    expect(onOpenCairn).not.toHaveBeenCalled()
+  })
+
+  it('does not select on pointercancel, and the cancelled press does not linger', () => {
+    const onSelectCairn = vi.fn()
+    render(
+      <Cairn3DLayer cairns={[PIN]} accessToken={null} selectedCairnId={null} onSelectCairn={onSelectCairn} />,
+    )
+    const marker = screen.getByTestId('cairn-marker-3d')
+
+    fireEvent.pointerDown(marker, { pointerId: 1, clientX: 0, clientY: 0 })
+    fireEvent.pointerCancel(marker, { pointerId: 1 })
+    fireEvent.pointerUp(marker, { pointerId: 1, clientX: 0, clientY: 0 })
+
+    expect(onSelectCairn).not.toHaveBeenCalled()
+  })
+
+  it('does not select a press that lands on the marker and lifts elsewhere', () => {
+    const onSelectCairn = vi.fn()
+    render(
+      <Cairn3DLayer cairns={[PIN]} accessToken={null} selectedCairnId={null} onSelectCairn={onSelectCairn} />,
+    )
+    const marker = screen.getByTestId('cairn-marker-3d')
+
+    fireEvent.pointerDown(marker, { pointerId: 1, clientX: 0, clientY: 0 })
+    // Released off the marker entirely — the map surface, not the pin.
+    fireEvent.pointerUp(document.body, { pointerId: 1, clientX: 0, clientY: 0 })
+
+    expect(onSelectCairn).not.toHaveBeenCalled()
   })
 
   it('writes hoveredCairnIds on pointerenter/pointerleave', () => {
@@ -193,6 +307,7 @@ describe('Cairn3DLayer occlusion (#285)', () => {
     maps3dLibResult.current = readyLib
     steadyHandler.current = null
     samplerResult.current = null
+    surfaceCapturedPointerId = null
     clearCairnOcclusionCache()
   })
 

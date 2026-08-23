@@ -30,6 +30,15 @@
   pointer-events: none;
 }
 
+/* #293 — the 3D marker's hit wrapper only. Its tap is reconstructed from
+   `pointerdown`/`pointerup` rather than `click` (see Cairn3DLayer.tsx), and
+   without this the browser resolves the touch into a scroll or a
+   double-tap zoom before `pointerup` ever arrives. The 2D marker relies on
+   Maps' own click handling and is untouched. */
+.cairn-layer__hit--3d {
+  touch-action: none;
+}
+
 /* #158 — cursor states, per the design note's own table. The base `pointer`
    above still applies when not draggable: the marker stays clickable (#73
    is read-only, not fully disabled) even where dragging is refused. */

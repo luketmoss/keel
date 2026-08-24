@@ -212,6 +212,27 @@ describe('useLooseImport', () => {
     })
   })
 
+  /* #176: `Remove from trip` passes the track's effective in-trip colour,
+     override or auto-assigned. Unlike name, it always wins — there is no
+     "derive it again" to fall back to for a track leaving a trip. */
+  describe('a colour carried across a move (#176)', () => {
+    const tracks = [{ name: 'Day one', points: [{ lat: 1, lon: 2 }] }]
+
+    it('uses the given colour verbatim instead of the auto-cycle', () => {
+      importer().addParsedTracks('day1.kml', tracks, { colorIndex: 4 })
+
+      expect((store.getItems()[0] as { colorIndex: number }).colorIndex).toBe(4)
+    })
+
+    it('still auto-cycles the palette when no colour is given', () => {
+      importer().addParsedTracks('a.kml', tracks)
+      importer().addParsedTracks('b.kml', tracks)
+
+      const colours = store.getItems().map((item) => (item as { colorIndex: number }).colorIndex)
+      expect(new Set(colours).size).toBe(2)
+    })
+  })
+
   describe('addCairnFromTrip (#132)', () => {
     function tripCairn(overrides: Partial<CairnRecord> = {}): CairnRecord {
       return {

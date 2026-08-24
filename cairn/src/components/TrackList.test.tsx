@@ -34,7 +34,7 @@ function openRowMenu(name: string) {
 
 describe('TrackList', () => {
   it('shows an empty state pointing at the import control when nothing is imported', () => {
-    render(<TrackList files={[]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />)
+    render(<TrackList files={[]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} onStartConfirm={vi.fn()} />)
 
     expect(screen.getByText('No tracks yet')).toBeDefined()
     expect(screen.getByText(/Import tracks/)).toBeDefined()
@@ -46,6 +46,7 @@ describe('TrackList', () => {
         files={[importedFile({ id: 'a' }), importedFile({ id: 'b', name: 'other.kmz' })]}
         onToggleVisibility={vi.fn()}
         onRemove={vi.fn()}
+        onStartConfirm={vi.fn()}
       />,
     )
 
@@ -67,6 +68,7 @@ describe('TrackList', () => {
         ]}
         onToggleVisibility={vi.fn()}
         onRemove={vi.fn()}
+        onStartConfirm={vi.fn()}
       />,
     )
 
@@ -94,6 +96,7 @@ describe('TrackList', () => {
         ]}
         onToggleVisibility={vi.fn()}
         onRemove={vi.fn()}
+        onStartConfirm={vi.fn()}
       />,
     )
 
@@ -131,6 +134,7 @@ describe('TrackList', () => {
         ]}
         onToggleVisibility={vi.fn()}
         onRemove={vi.fn()}
+        onStartConfirm={vi.fn()}
       />,
     )
 
@@ -157,6 +161,7 @@ describe('TrackList', () => {
         ]}
         onToggleVisibility={vi.fn()}
         onRemove={vi.fn()}
+        onStartConfirm={vi.fn()}
       />,
     )
 
@@ -169,6 +174,7 @@ describe('TrackList', () => {
         files={[importedFile({ tracks: [{ name: 'a', points: [] }] })]}
         onToggleVisibility={vi.fn()}
         onRemove={vi.fn()}
+        onStartConfirm={vi.fn()}
       />,
     )
 
@@ -181,6 +187,7 @@ describe('TrackList', () => {
         files={[importedFile({ name: '2024-08-01T09-14-22Z-morning-run.kml' })]}
         onToggleVisibility={vi.fn()}
         onRemove={vi.fn()}
+        onStartConfirm={vi.fn()}
       />,
     )
 
@@ -195,6 +202,7 @@ describe('TrackList', () => {
         files={[importedFile({ visible: true })]}
         onToggleVisibility={onToggleVisibility}
         onRemove={vi.fn()}
+        onStartConfirm={vi.fn()}
       />,
     )
 
@@ -207,6 +215,7 @@ describe('TrackList', () => {
         files={[importedFile({ visible: false })]}
         onToggleVisibility={onToggleVisibility}
         onRemove={vi.fn()}
+        onStartConfirm={vi.fn()}
       />,
     )
 
@@ -219,7 +228,7 @@ describe('TrackList', () => {
   // than swapping to a different glyph.
   it('draws the show/hide control as an aria-hidden SVG, struck through only when hidden', () => {
     const { rerender } = render(
-      <TrackList files={[importedFile({ visible: true })]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />,
+      <TrackList files={[importedFile({ visible: true })]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} onStartConfirm={vi.fn()} />,
     )
 
     const visibleButton = screen.getByRole('button', { name: 'Hide trip.kml' })
@@ -229,31 +238,20 @@ describe('TrackList', () => {
     expect(svg?.querySelectorAll('path')).toHaveLength(1)
 
     rerender(
-      <TrackList files={[importedFile({ visible: false })]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />,
+      <TrackList files={[importedFile({ visible: false })]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} onStartConfirm={vi.fn()} />,
     )
 
     const hiddenButton = screen.getByRole('button', { name: 'Show trip.kml' })
     expect(hiddenButton.querySelector('svg')?.querySelectorAll('path')).toHaveLength(2)
   })
 
-  it('removes a file via a named action in the row menu', () => {
-    const onRemove = vi.fn()
-    render(
-      <TrackList files={[importedFile()]} onToggleVisibility={vi.fn()} onRemove={onRemove} />,
-    )
-
-    openRowMenu('trip.kml')
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete permanently…' }))
-    expect(onRemove).toHaveBeenCalledWith('f1')
-  })
-
   it('returns to the empty state after the last file is removed', () => {
     const { rerender } = render(
-      <TrackList files={[importedFile()]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />,
+      <TrackList files={[importedFile()]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} onStartConfirm={vi.fn()} />,
     )
     expect(screen.queryByText('No tracks yet')).toBeNull()
 
-    rerender(<TrackList files={[]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />)
+    rerender(<TrackList files={[]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} onStartConfirm={vi.fn()} />)
 
     expect(screen.getByText('No tracks yet')).toBeDefined()
   })
@@ -265,6 +263,7 @@ describe('TrackList', () => {
         files={[importedFile()]}
         onToggleVisibility={vi.fn()}
         onRemove={vi.fn()}
+        onStartConfirm={vi.fn()}
         onHoverFile={onHoverFile}
       />,
     )
@@ -278,21 +277,21 @@ describe('TrackList', () => {
   })
 
   it('does nothing on hover when onHoverFile is omitted', () => {
-    render(<TrackList files={[importedFile()]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />)
+    render(<TrackList files={[importedFile()]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} onStartConfirm={vi.fn()} />)
 
     const row = screen.getByText('trip.kml', { exact: false }).closest('li')!
     expect(() => fireEvent.mouseEnter(row)).not.toThrow()
   })
 
   it('does not render a drag handle or colour button when their handlers are omitted (#46)', () => {
-    render(<TrackList files={[importedFile()]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />)
+    render(<TrackList files={[importedFile()]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} onStartConfirm={vi.fn()} />)
 
     expect(screen.queryByLabelText('Reorder trip.kml')).toBeNull()
     expect(screen.queryByLabelText('Change colour for trip.kml')).toBeNull()
   })
 
   it('offers no Rename action when onRename is omitted (#219)', () => {
-    render(<TrackList files={[importedFile()]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />)
+    render(<TrackList files={[importedFile()]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} onStartConfirm={vi.fn()} />)
 
     openRowMenu('trip.kml')
     expect(screen.queryByRole('menuitem', { name: 'Rename' })).toBeNull()
@@ -305,6 +304,7 @@ describe('TrackList', () => {
         files={[importedFile()]}
         onToggleVisibility={vi.fn()}
         onRemove={vi.fn()}
+        onStartConfirm={vi.fn()}
         onRename={onRename}
       />,
     )
@@ -325,6 +325,7 @@ describe('TrackList', () => {
         files={[importedFile()]}
         onToggleVisibility={vi.fn()}
         onRemove={vi.fn()}
+        onStartConfirm={vi.fn()}
         onRename={onRename}
       />,
     )
@@ -346,6 +347,7 @@ describe('TrackList', () => {
         files={[importedFile()]}
         onToggleVisibility={vi.fn()}
         onRemove={vi.fn()}
+        onStartConfirm={vi.fn()}
         onRename={onRename}
       />,
     )
@@ -367,6 +369,7 @@ describe('TrackList', () => {
         files={[importedFile()]}
         onToggleVisibility={vi.fn()}
         onRemove={vi.fn()}
+        onStartConfirm={vi.fn()}
         onRename={onRename}
       />,
     )
@@ -387,6 +390,7 @@ describe('TrackList', () => {
         files={[importedFile()]}
         onToggleVisibility={vi.fn()}
         onRemove={vi.fn()}
+        onStartConfirm={vi.fn()}
         onRecolor={onRecolor}
       />,
     )
@@ -405,6 +409,7 @@ describe('TrackList', () => {
         files={[importedFile({ id: 'a', name: 'a.kml' }), importedFile({ id: 'b', name: 'b.kml' })]}
         onToggleVisibility={vi.fn()}
         onRemove={vi.fn()}
+        onStartConfirm={vi.fn()}
         onReorder={onReorder}
       />,
     )
@@ -488,6 +493,7 @@ describe('TrackList', () => {
           files={[importedFile()]}
           onToggleVisibility={vi.fn()}
           onRemove={vi.fn()}
+          onStartConfirm={vi.fn()}
           removingIds={new Set(['f1'])}
         />,
       )
@@ -502,6 +508,7 @@ describe('TrackList', () => {
           files={[importedFile()]}
           onToggleVisibility={vi.fn()}
           onRemove={vi.fn()}
+          onStartConfirm={vi.fn()}
           removeErrors={{ f1: "Couldn't remove trip.kml — try again." }}
         />,
       )
@@ -516,6 +523,7 @@ describe('TrackList', () => {
           files={[importedFile()]}
           onToggleVisibility={vi.fn()}
           onRemove={vi.fn()}
+          onStartConfirm={vi.fn()}
           disableRemove
         />,
       )
@@ -536,6 +544,7 @@ describe('TrackList', () => {
         files={[importedFile()]}
         onToggleVisibility={vi.fn()}
         onRemove={vi.fn()}
+        onStartConfirm={vi.fn()}
         onReorder={onReorder}
         canReorder={false}
       />,
@@ -553,11 +562,13 @@ describe('TrackList', () => {
     const onReorder = vi.fn()
     const onToggleVisibility = vi.fn()
     const onRemove = vi.fn()
+    const onStartConfirm = vi.fn()
     render(
       <TrackList
         files={[importedFile()]}
         onToggleVisibility={onToggleVisibility}
         onRemove={onRemove}
+        onStartConfirm={onStartConfirm}
         onRename={onRename}
         onRecolor={onRecolor}
         onReorder={onReorder}
@@ -587,12 +598,13 @@ describe('TrackList', () => {
     expect(onToggleVisibility).toHaveBeenCalledWith('f1')
     openRowMenu('trip.kml')
     fireEvent.click(screen.getByRole('menuitem', { name: 'Delete permanently…' }))
-    expect(onRemove).toHaveBeenCalledWith('f1')
+    expect(onStartConfirm).toHaveBeenCalledWith('f1')
+    expect(onRemove).not.toHaveBeenCalled()
   })
 
   describe('#110 remove from trip, beside delete', () => {
     it('offers no unlink action when the list is not inside a trip', () => {
-      render(<TrackList files={[importedFile()]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />)
+      render(<TrackList files={[importedFile()]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} onStartConfirm={vi.fn()} />)
 
       openRowMenu('trip.kml')
       expect(screen.queryByRole('menuitem', { name: /from trip/ })).toBeNull()
@@ -606,6 +618,7 @@ describe('TrackList', () => {
           files={[importedFile()]}
           onToggleVisibility={vi.fn()}
           onRemove={onRemove}
+          onStartConfirm={vi.fn()}
           onRemoveFromTrip={onRemoveFromTrip}
         />,
       )
@@ -626,6 +639,7 @@ describe('TrackList', () => {
           files={[importedFile()]}
           onToggleVisibility={vi.fn()}
           onRemove={vi.fn()}
+          onStartConfirm={vi.fn()}
           onRemoveFromTrip={vi.fn()}
         />,
       )
@@ -642,6 +656,7 @@ describe('TrackList', () => {
           files={[importedFile()]}
           onToggleVisibility={vi.fn()}
           onRemove={vi.fn()}
+          onStartConfirm={vi.fn()}
           onRemoveFromTrip={vi.fn()}
           disableRemove
         />,
@@ -682,6 +697,7 @@ describe('TrackList', () => {
           ]}
           onToggleVisibility={vi.fn()}
           onRemove={vi.fn()}
+          onStartConfirm={vi.fn()}
         />,
       )
 
@@ -698,6 +714,7 @@ describe('TrackList', () => {
           files={[importedFile()]}
           onToggleVisibility={vi.fn()}
           onRemove={vi.fn()}
+          onStartConfirm={vi.fn()}
           onRemoveFromTrip={vi.fn()}
         />,
       )
@@ -714,6 +731,7 @@ describe('TrackList', () => {
           files={[importedFile()]}
           onToggleVisibility={onToggleVisibility}
           onRemove={vi.fn()}
+          onStartConfirm={vi.fn()}
           onRemoveFromTrip={vi.fn()}
         />,
       )
@@ -739,6 +757,7 @@ describe('TrackList', () => {
           files={[importedFile()]}
           onToggleVisibility={vi.fn()}
           onRemove={vi.fn()}
+          onStartConfirm={vi.fn()}
           onRemoveFromTrip={vi.fn()}
           onRecolor={vi.fn().mockResolvedValue(true)}
           onReorder={vi.fn().mockResolvedValue(true)}
@@ -761,13 +780,13 @@ describe('TrackList', () => {
 
     it("the visibility control's tooltip follows its current state", () => {
       const { rerender } = render(
-        <TrackList files={[importedFile({ visible: true })]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />,
+        <TrackList files={[importedFile({ visible: true })]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} onStartConfirm={vi.fn()} />,
       )
 
       expectTooltipMatchesLabel(screen.getByRole('button', { name: 'Hide trip.kml' }), 'Hide trip.kml')
 
       rerender(
-        <TrackList files={[importedFile({ visible: false })]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />,
+        <TrackList files={[importedFile({ visible: false })]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} onStartConfirm={vi.fn()} />,
       )
 
       expectTooltipMatchesLabel(screen.getByRole('button', { name: 'Show trip.kml' }), 'Show trip.kml')
@@ -814,6 +833,7 @@ describe('TrackList', () => {
           files={[trackWithProfile()]}
           onToggleVisibility={vi.fn()}
           onRemove={vi.fn()}
+          onStartConfirm={vi.fn()}
           onToggleExpand={onToggleExpand}
         />,
       )
@@ -829,6 +849,7 @@ describe('TrackList', () => {
           files={[trackWithProfile()]}
           onToggleVisibility={vi.fn()}
           onRemove={vi.fn()}
+          onStartConfirm={vi.fn()}
           onToggleExpand={onToggleExpand}
         />,
       )
@@ -845,6 +866,7 @@ describe('TrackList', () => {
           files={[trackWithProfile()]}
           onToggleVisibility={vi.fn()}
           onRemove={vi.fn()}
+          onStartConfirm={vi.fn()}
           onToggleExpand={onToggleExpand}
           onRecolor={vi.fn()}
           onReorder={vi.fn()}
@@ -867,6 +889,7 @@ describe('TrackList', () => {
           files={[trackWithProfile()]}
           onToggleVisibility={vi.fn()}
           onRemove={vi.fn()}
+          onStartConfirm={vi.fn()}
           onToggleExpand={onToggleExpand}
           onRename={onRename}
         />,
@@ -885,6 +908,7 @@ describe('TrackList', () => {
           files={[trackWithProfile()]}
           onToggleVisibility={vi.fn()}
           onRemove={vi.fn()}
+          onStartConfirm={vi.fn()}
           expandedTrackId="f1"
         />,
       )
@@ -905,6 +929,7 @@ describe('TrackList', () => {
           files={[trackWithProfile()]}
           onToggleVisibility={vi.fn()}
           onRemove={vi.fn()}
+          onStartConfirm={vi.fn()}
           expandedTrackId="f1"
         />,
       )
@@ -922,6 +947,7 @@ describe('TrackList', () => {
           files={[trackWithProfile()]}
           onToggleVisibility={vi.fn()}
           onRemove={vi.fn()}
+          onStartConfirm={vi.fn()}
           expandedTrackId="f1"
         />,
       )
@@ -938,6 +964,7 @@ describe('TrackList', () => {
           files={[importedFile()]}
           onToggleVisibility={vi.fn()}
           onRemove={vi.fn()}
+          onStartConfirm={vi.fn()}
           expandedTrackId="f1"
         />,
       )
@@ -960,6 +987,7 @@ describe('TrackList', () => {
           ]}
           onToggleVisibility={vi.fn()}
           onRemove={vi.fn()}
+          onStartConfirm={vi.fn()}
           onToggleExpand={onToggleExpand}
           expandedTrackId="f1"
         />,
@@ -985,6 +1013,7 @@ describe('TrackList', () => {
           files={files}
           onToggleVisibility={vi.fn()}
           onRemove={vi.fn()}
+          onStartConfirm={vi.fn()}
           expandedTrackId={expandedTrackId}
           onToggleExpand={(id) => setExpandedTrackId((current) => (current === id ? null : id))}
         />
@@ -1022,7 +1051,7 @@ describe('TrackList', () => {
     })
 
     it('offers no More details item in the row menu', () => {
-      render(<TrackList files={[trackWithProfile()]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} />)
+      render(<TrackList files={[trackWithProfile()]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} onStartConfirm={vi.fn()} />)
 
       openRowMenu('trip.kml')
       expect(screen.queryByRole('menuitem', { name: 'More details' })).toBeNull()
@@ -1034,6 +1063,7 @@ describe('TrackList', () => {
           files={[trackWithProfile()]}
           onToggleVisibility={vi.fn()}
           onRemove={vi.fn()}
+          onStartConfirm={vi.fn()}
           expandedTrackId="f1"
           removingIds={new Set(['f1'])}
         />,
@@ -1056,6 +1086,7 @@ describe('TrackList', () => {
           files={[importedFile()]}
           onToggleVisibility={vi.fn()}
           onRemove={vi.fn()}
+          onStartConfirm={vi.fn()}
           onToggleExpand={onToggleExpand}
           onSelectTrack={onSelectTrack}
         />,
@@ -1073,6 +1104,7 @@ describe('TrackList', () => {
           files={[importedFile()]}
           onToggleVisibility={vi.fn()}
           onRemove={vi.fn()}
+          onStartConfirm={vi.fn()}
           onSelectTrack={onSelectTrack}
         />,
       )
@@ -1096,6 +1128,7 @@ describe('TrackList', () => {
           ]}
           onToggleVisibility={vi.fn()}
           onRemove={vi.fn()}
+          onStartConfirm={vi.fn()}
           onToggleExpand={onToggleExpand}
           onSelectTrack={onSelectTrack}
         />,
@@ -1113,6 +1146,7 @@ describe('TrackList', () => {
           files={[importedFile()]}
           onToggleVisibility={vi.fn()}
           onRemove={vi.fn()}
+          onStartConfirm={vi.fn()}
           onSelectTrack={onSelectTrack}
           onRecolor={vi.fn()}
           onReorder={vi.fn()}
@@ -1133,6 +1167,7 @@ describe('TrackList', () => {
           files={[importedFile({ id: 'a', name: 'a.kml' }), importedFile({ id: 'b', name: 'b.kml' })]}
           onToggleVisibility={vi.fn()}
           onRemove={vi.fn()}
+          onStartConfirm={vi.fn()}
           selectedTrackId="a"
         />,
       )
@@ -1151,6 +1186,7 @@ describe('TrackList', () => {
           files={[importedFile({ id: 'a', name: 'a.kml' }), importedFile({ id: 'b', name: 'b.kml' })]}
           onToggleVisibility={vi.fn()}
           onRemove={vi.fn()}
+          onStartConfirm={vi.fn()}
           hoveredFileId="b"
         />,
       )

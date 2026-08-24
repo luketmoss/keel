@@ -21,10 +21,9 @@
   min-height: var(--hit-target);
 }
 
-.search-card__mark {
-  color: var(--accent);
-  font-size: var(--text-lg);
-  line-height: 1;
+.search-card__mark img {
+  width: var(--mark-size);
+  height: var(--mark-size);
 }
 
 .search-card__back {

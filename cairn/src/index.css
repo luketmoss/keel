@@ -133,6 +133,11 @@
      produced this issue. */
   --icon-sm: 18px;
 
+  /* The search card's identity slot — cairn/docs/design/300-the-cairn-mark.md,
+     "New tokens". Deliberately larger than --icon-sm: this is the app's
+     identity, not a row control, inside the --hit-target left slot. */
+  --mark-size: 28px;
+
   /* The expanded row's inline preview — cairn/docs/design/250-expanding-a-
      cairn-row.md, "New tokens". The tallest an inline preview draws, so a
      portrait photo cannot take the whole panel. A little under half of

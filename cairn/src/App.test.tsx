@@ -243,7 +243,9 @@ describe('App shell (#109)', () => {
     const { container } = await renderApp('/', { googleClientId: 'a-client-id' })
 
     const card = container.querySelector('.search-card') as HTMLElement
-    expect(card.querySelector('.search-card__mark')).not.toBeNull()
+    const mark = card.querySelector('.search-card__mark') as HTMLElement
+    expect(mark).not.toBeNull()
+    expect(mark.querySelector('img[src$="cairn-mark.svg"]')).not.toBeNull()
     expect(screen.getByPlaceholderText('Search trips, tracks and cairns')).toBeDefined()
     expect(card.querySelector('.search-card__account')).not.toBeNull()
   })

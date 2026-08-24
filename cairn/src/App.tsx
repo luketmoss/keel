@@ -574,7 +574,7 @@ function AppShell() {
    * track nobody renamed passes `undefined` and keeps the derivation it has
    * always had. */
   async function removeTrackFromTrip(file: ImportedFile, tripId: string): Promise<boolean> {
-    const record = looseImport.addParsedTracks(file.name, file.tracks, {
+    const record = looseImport.addParsedTracks(file.sourceName, file.tracks, {
       driveFileId: file.driveFileId,
       ...(file.displayName !== undefined ? { name: file.displayName } : {}),
     })

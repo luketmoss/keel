@@ -157,7 +157,7 @@ function baseTripImport(overrides: Record<string, unknown> = {}) {
   }
 }
 
-function mockCairnImport(cairns: unknown[] = []) {
+function mockCairnImport(cairns: unknown[] = [], overrides: Record<string, unknown> = {}) {
   useCairnImport.mockReturnValue({
     cairns,
     loading: false,
@@ -170,10 +170,11 @@ function mockCairnImport(cairns: unknown[] = []) {
     forgetCairn: vi.fn(),
     removingCairnIds: new Set<string>(),
     cairnRemoveErrors: {},
+    ...overrides,
   })
 }
 
-function renderTrip() {
+function renderTrip(props: { onDropTargetChange?: (h: ((files: File[]) => void) | null) => void } = {}) {
   const store = new LocalTripStore(fakeStorage())
   const entry = store.createTrip('Larapinta')
   render(
@@ -184,7 +185,7 @@ function renderTrip() {
         accessToken="token"
         cairnFolderId="cairn-folder-id"
         onBack={() => {}}
-        onDropTargetChange={() => {}}
+        onDropTargetChange={props.onDropTargetChange ?? (() => {})}
         onGeometryChange={() => {}}
         onNeedsPlacement={() => {}}
         onCreateTargetChange={() => {}}
@@ -407,5 +408,76 @@ describe('TripDetail — #313/#276 sheet promotion', () => {
     tapCairnMarker('p1')
 
     expect(promote).toHaveBeenCalledTimes(1)
+  })
+
+  /* #269 — a multi-track file's row selects as a unit and has no detail to
+     open (`TrackList.canOpenDetail`). Nothing opened, so nothing is hidden by
+     the sheet, so the sheet does not move. */
+  it('does not promote from the whitespace of a row that cannot expand', () => {
+    useTripImport.mockReturnValue(
+      baseTripImport({
+        tracks: [
+          trackFile({
+            tracks: [
+              { name: 'Day one', points: [{ lat: 37, lon: -122 }, { lat: 37.01, lon: -122.01 }] },
+              { name: 'Day two', points: [{ lat: 38, lon: -123 }, { lat: 38.01, lon: -123.01 }] },
+            ],
+          }),
+        ],
+      }),
+    )
+    renderTrip()
+
+    fireEvent.click(document.querySelector('.track-row__main') as HTMLElement)
+
+    expect(promote).not.toHaveBeenCalled()
+  })
+
+  /* #276's States table: a cairn mid-attach (#157) opens its face instead of
+     expanding, and #258's `detailOpen` is what moves the sheet for it. The
+     promotion must not fire a second time from here. */
+  it('does not promote for a cairn mid-attach — that path opens a face, and #258 promotes for it', async () => {
+    useTripImport.mockReturnValue(baseTripImport())
+    let attachDone: ((result: { ok: boolean }) => void) | undefined
+    const attachImage = vi.fn(
+      () => new Promise<{ ok: boolean }>((resolve) => { attachDone = resolve }),
+    )
+    mockCairnImport(
+      [
+        {
+          id: 'p1',
+          name: 'sapporo.jpg',
+          position: { lat: 43, lng: 141 },
+          positionSource: 'exif',
+          icon: 'campsite',
+          image: null,
+          description: '',
+          date: '2024-06-01',
+        },
+      ],
+      { attachImage },
+    )
+    let drop: ((files: File[]) => void) | null = null
+    renderTrip({ onDropTargetChange: (handler) => { drop = handler } })
+
+    fireEvent.click(screen.getByText('sapporo.jpg'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Open sapporo.jpg' }))
+    await screen.findByRole('dialog')
+    await act(async () => {
+      drop?.([new File(['a'], 'first.jpg')])
+    })
+    expect(attachImage).toHaveBeenCalled()
+    promote.mockClear()
+
+    // The row for the cairn whose upload is still running: `selectCairn`
+    // returns down the #157 branch, before the promotion.
+    act(() => {
+      lastCairnLayerProps.current?.onOpenCairn?.('p1')
+    })
+
+    expect(promote).not.toHaveBeenCalled()
+    await act(async () => {
+      attachDone?.({ ok: true })
+    })
   })
 })

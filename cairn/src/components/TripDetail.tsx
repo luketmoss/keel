@@ -5,7 +5,7 @@ import { TrackLayer, computeRenderedTracks, visibleFilesKey } from './TrackLayer
 import { Track3DLayer } from './Track3DLayer'
 import { CairnLayer, type PositionedCairn } from './CairnLayer'
 import { Cairn3DLayer } from './Cairn3DLayer'
-import { columnInset, revealPoints } from '../map/reveal'
+import { columnInset, revealPoint, revealPoints } from '../map/reveal'
 import { dropInvalidLatitudes, normalizeAntimeridian } from '../map/geo'
 import { useIsPhone } from '../map/useIsPhone'
 import { useMap3DControl } from '../map/Map3DControl'
@@ -691,19 +691,20 @@ export function TripDetail({
     }
   }, [facetedCairns, selectedCairnId])
 
-  /** #270 — reveals the selected cairn, at its own coordinate rather than a
-      cluster's anchor (design note's "The cluster"): a clustered cairn's
-      camera pan may itself pull the cluster apart, in which case the member
-      marker takes the selected treatment and the cluster stops having it,
-      by the same recompute #251's hover already relies on. A point's own
-      bounds are always zero-size, which is what keeps a cairn's reveal on
-      the pan branch and never the fit one. Keyed on `selectedCairnId` alone,
-      for the same reason the track reveal above is. */
+  /** #270/#302 — reveals the selected cairn, at its own coordinate rather
+      than a cluster's anchor (design note's "The cluster"): a clustered
+      cairn's camera move may itself pull the cluster apart, in which case
+      the member marker takes the selected treatment and the cluster stops
+      having it, by the same recompute #251's hover already relies on. A
+      cairn's reveal is `revealPoint`, not `revealPoints` — #302's own move,
+      closing in to a close-up zoom rather than #270's pan-only rule for
+      something with real extent. Keyed on `selectedCairnId` alone, for the
+      same reason the track reveal above is. */
   useEffect(() => {
     if (!map || revealSuspended || !selectedCairnId) return
     const cairn = cairnImport.cairns.find((candidate) => candidate.id === selectedCairnId)
     if (!cairn) return
-    revealPoints(map, [cairn.position], columnInset(isPhone))
+    revealPoint(map, cairn.position, columnInset(isPhone))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCairnId])
 

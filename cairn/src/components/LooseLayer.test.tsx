@@ -65,15 +65,17 @@ vi.mock('../photo/imageCache', () => ({
    camera geometry (`reveal.test.ts`'s job) stays out of these assertions;
    what's proven here is only that `LooseLayer` calls it with the right
    points for the right item. */
-const { revealPoints, columnInset } = vi.hoisted(() => ({
+const { revealPoints, revealPoint, columnInset } = vi.hoisted(() => ({
   revealPoints: vi.fn(),
+  revealPoint: vi.fn(),
   columnInset: vi.fn(() => ({ left: 0, right: 0, top: 0, bottom: 0 })),
 }))
-vi.mock('../map/reveal', () => ({ revealPoints, columnInset }))
+vi.mock('../map/reveal', () => ({ revealPoints, revealPoint, columnInset }))
 
 beforeEach(() => {
   acquire.mockReset()
   revealPoints.mockClear()
+  revealPoint.mockClear()
   columnInset.mockClear()
 })
 
@@ -294,7 +296,7 @@ describe('LooseLayer dragging a cairn (#158)', () => {
 describe('LooseLayer — #270 reveal', () => {
   const fakeMap = {}
 
-  it('reveals a selected cairn at its own coordinate', () => {
+  it('reveals a selected cairn at its own coordinate via #302s close-up reveal', () => {
     render(
       <LooseLayer
         items={[looseCairn({ id: 'c-1', position: { lat: 43, lng: 141 }, image: null, icon: 'campsite' })]}
@@ -307,12 +309,13 @@ describe('LooseLayer — #270 reveal', () => {
       />,
     )
 
-    expect(revealPoints).toHaveBeenCalledWith(fakeMap, [{ lat: 43, lng: 141 }], {
+    expect(revealPoint).toHaveBeenCalledWith(fakeMap, { lat: 43, lng: 141 }, {
       left: 0,
       right: 0,
       top: 0,
       bottom: 0,
     })
+    expect(revealPoints).not.toHaveBeenCalled()
   })
 
   it("reveals a selected track's precomputed overview, never the source KML", () => {
@@ -383,5 +386,6 @@ describe('LooseLayer — #270 reveal', () => {
     )
 
     expect(revealPoints).not.toHaveBeenCalled()
+    expect(revealPoint).not.toHaveBeenCalled()
   })
 })

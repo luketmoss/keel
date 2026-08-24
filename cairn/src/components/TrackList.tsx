@@ -25,12 +25,12 @@ interface TrackListProps {
   onRemoveFromTrip?: (id: string) => void
   /** #77 — the single confirm slot, shared with `CairnList` by the parent
       (design doc: "tracks and photos sharing one slot"). `null` when no row
-      anywhere in the trip is confirming. Omitted entirely on v1's non-trip
-      list (`App.tsx`), which has no Drive file behind a removal to confirm
-      and keeps its old instant-remove behaviour — `onRemove` fires directly
-      from the `×` control whenever `onStartConfirm` isn't supplied. */
+      anywhere in the trip is confirming. Required: every caller now has a
+      Drive file behind a removal, so the row's `⋮` (labelled "Delete
+      permanently…") always routes through the confirm before `onRemove`
+      fires (#212 — the v1 no-confirm fallback this described is gone). */
   confirmingId?: string | null
-  onStartConfirm?: (id: string) => void
+  onStartConfirm: (id: string) => void
   onCancelConfirm?: () => void
   /** Attached to whichever row is currently confirming, so the shared
       pointerdown-outside listener (owned by the parent) knows what counts
@@ -199,12 +199,9 @@ export function TrackList({
               onToggleVisibility={onToggleVisibility}
               onRemove={onRemove}
               onRemoveFromTrip={onRemoveFromTrip}
-              confirming={Boolean(onStartConfirm) && confirmingId === file.id}
+              confirming={confirmingId === file.id}
               confirmingRowRef={confirmingId === file.id ? confirmingRowRef : undefined}
-              onStartConfirm={() => {
-                if (onStartConfirm) onStartConfirm(file.id)
-                else onRemove(file.id)
-              }}
+              onStartConfirm={() => onStartConfirm(file.id)}
               onCancelConfirm={onCancelConfirm}
               expanded={expandedTrackId === file.id}
               onToggleExpand={() => onToggleExpand(file.id)}

@@ -10,7 +10,12 @@ const { fitTracksToBounds, zoomToFitCluster } = vi.hoisted(() => ({
   fitTracksToBounds: vi.fn(),
   zoomToFitCluster: vi.fn(),
 }))
-vi.mock('../map/fitBounds', () => ({ fitTracksToBounds, zoomToFitCluster }))
+// #312 — `../map/reveal`'s `toPadding` reads the real `FIT_PADDING` from
+// this same mocked module, so it has to stay exported.
+vi.mock('../map/fitBounds', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../map/fitBounds')>()
+  return { ...actual, fitTracksToBounds, zoomToFitCluster }
+})
 
 const fakeMap = {
   id: 'fake-map',
@@ -152,6 +157,7 @@ describe('WorldLayer', () => {
         expect.objectContaining({ lat: 37, lng: -122 }),
         expect.objectContaining({ lat: -33, lng: 151 }),
       ]),
+      expect.anything(),
     )
   })
 

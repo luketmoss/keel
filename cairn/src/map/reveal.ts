@@ -37,7 +37,13 @@ export function columnInset(isPhone: boolean): Inset {
   const root = getComputedStyle(document.documentElement)
   if (isPhone) {
     const sheet = parseFloat(root.getPropertyValue('--sheet-current')) || 0
-    return { ...NO_INSET, bottom: sheet }
+    /* #312 — the search card floats over the map at the same edge a reveal
+       already has to avoid; without this the top of the visible band was
+       simply the viewport's own top, and the "dead space" the issue reports
+       was every camera move never having been told the card was there. */
+    const space2 = parseFloat(root.getPropertyValue('--space-2')) || 0
+    const searchHeight = parseFloat(root.getPropertyValue('--search-height')) || 0
+    return { ...NO_INSET, top: space2 + searchHeight, bottom: sheet }
   }
   const space4 = parseFloat(root.getPropertyValue('--space-4')) || 0
   const panelWidth = parseFloat(root.getPropertyValue('--panel-width')) || 0

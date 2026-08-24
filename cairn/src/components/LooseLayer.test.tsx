@@ -42,6 +42,22 @@ vi.mock('@vis.gl/react-google-maps', () => ({
   Polyline: () => null,
 }))
 
+/* #312 — the settle re-frame's `dragstart` listener (registered whenever
+   `map` is truthy, which the mock above always is) needs `google.maps.event`
+   to exist, the same minimal stub `CairnLayer.test.tsx` already carries for
+   its own always-on `zoom_changed` listener. Nothing here drives a drag
+   through it; the tests exercising `cameraDisownedRef` live in
+   `reveal.test.ts` and this file's own #270 suite reads `revealPoints`/
+   `revealPoint` at the module boundary instead. */
+;(globalThis as unknown as { google: unknown }).google = {
+  maps: {
+    event: {
+      addListener: () => ({ remove: () => {} }),
+      addListenerOnce: () => {},
+    },
+  },
+}
+
 /** Drives a marker's drag lifecycle straight through the handlers the mock
     above stashed on its DOM node, the same as `CairnLayer.test.tsx`'s. */
 function fireDrag(element: Element, lat: number, lng: number) {

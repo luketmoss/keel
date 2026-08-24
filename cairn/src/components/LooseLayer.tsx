@@ -39,6 +39,11 @@ interface LooseLayerProps {
       Defaults to `false` so a caller that hasn't been updated for this
       issue keeps revealing unconditionally. */
   revealSuspended?: boolean
+  /** #312 — bumped whenever the phone sheet settles at a new detent. The
+      selected loose item (its overview lines, or its coordinate) is
+      re-framed against the freshly sized band, unless the user has panned
+      or zoomed by hand since selecting it. */
+  settleToken?: number
 }
 
 /** Loose tracks and photos on the shell's map.
@@ -57,9 +62,24 @@ export function LooseLayer({
   draggable = false,
   onMoveCairn,
   revealSuspended = false,
+  settleToken,
 }: LooseLayerProps) {
   const map = useMap()
   const isPhone = useIsPhone()
+
+  /** #312 — same deference as `TripDetail`'s own: a hand pan or zoom
+      disowns the selected item until the selection changes again. */
+  const cameraDisownedRef = useRef(false)
+  useEffect(() => {
+    if (!map) return
+    const listener = google.maps.event.addListener(map, 'dragstart', () => {
+      cameraDisownedRef.current = true
+    })
+    return () => listener.remove()
+  }, [map])
+  useEffect(() => {
+    cameraDisownedRef.current = false
+  }, [selectedId])
 
   /** #270/#302 — "selecting a loose track or cairn from the shell list moves
       the world map to it". Keyed on `selectedId` alone, never on the camera,
@@ -83,6 +103,30 @@ export function LooseLayer({
     revealPoints(map, points, columnInset(isPhone))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId])
+
+  /** #312 — the settle re-frame, mirroring the effect above exactly except
+      for its trigger: the same subject (the selected item, recomputed),
+      thrown away by `cameraDisownedRef` the moment the user has taken the
+      camera back since selecting it. Skipped on mount, the same as
+      `TripDetail`'s own settle effect — `BottomSheet` never fires the
+      settle callback for the initial detent either. */
+  const settleMountedRef = useRef(false)
+  useEffect(() => {
+    if (!settleMountedRef.current) {
+      settleMountedRef.current = true
+      return
+    }
+    if (!map || revealSuspended || !selectedId || cameraDisownedRef.current) return
+    const item = items.find((candidate) => candidate.id === selectedId)
+    if (!item || item.position === null) return
+    if (item.kind === 'cairn') {
+      revealPoint(map, item.position as LatLng, columnInset(isPhone))
+      return
+    }
+    const points = linesFromOverview(store.getOverview(item.id)).flat()
+    revealPoints(map, points, columnInset(isPhone))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settleToken])
 
   if (!map) return null
 

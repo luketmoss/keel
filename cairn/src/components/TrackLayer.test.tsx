@@ -20,7 +20,13 @@ function stubReducedMotion(matches: boolean) {
 }
 
 const { fitTracksToBounds } = vi.hoisted(() => ({ fitTracksToBounds: vi.fn() }))
-vi.mock('../map/fitBounds', () => ({ fitTracksToBounds }))
+// #312 — `../map/reveal`'s `toPadding` reads the real `FIT_PADDING` from
+// this same mocked module, so it has to stay exported even though nothing
+// here asserts its value directly (that's `reveal.test.ts`'s job).
+vi.mock('../map/fitBounds', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../map/fitBounds')>()
+  return { ...actual, fitTracksToBounds }
+})
 
 const fakeMap = { id: 'fake-map' }
 vi.mock('@vis.gl/react-google-maps', () => ({
@@ -140,6 +146,7 @@ describe('TrackLayer', () => {
     expect(fitTracksToBounds).toHaveBeenCalledWith(
       fakeMap,
       expect.arrayContaining([{ lat: 37, lng: -122 }, { lat: 37.1, lng: -122.1 }]),
+      expect.anything(),
     )
   })
 
@@ -190,6 +197,7 @@ describe('TrackLayer', () => {
     expect(fitTracksToBounds).toHaveBeenCalledWith(
       fakeMap,
       expect.not.arrayContaining([{ lat: 50, lng: 50 }]),
+      expect.anything(),
     )
   })
 

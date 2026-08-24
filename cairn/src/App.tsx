@@ -214,6 +214,12 @@ function AppShell() {
       operation that has not happened yet. */
   const [moving, setMoving] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
+  /** #312 — bumped whenever `BottomSheet` settles at a new detent, for
+      whichever of `TripDetail`/`LooseLayer` is mounted to re-frame its own
+      subject against the fresh band. A counter, not a boolean, so a settle
+      that lands back on a detent already passed through this render still
+      fires the effects keyed on it. */
+  const [settleToken, setSettleToken] = useState(0)
   const [dragActive, setDragActive] = useState(false)
   const dragDepth = useRef(0)
   const [toasts, setToasts] = useState<ToastMessage[]>([])
@@ -1065,6 +1071,7 @@ function AppShell() {
               draggable={cairnsDraggable}
               onMoveCairn={handleMoveLooseCairn}
               revealSuspended={mapDecisionActive}
+              settleToken={settleToken}
             />
             {/* #271 — the world view in 3D: every visible trip's and loose
                 track's route at rest, since there are no markers on that
@@ -1135,6 +1142,7 @@ function AppShell() {
           // the map behind it stays reachable.
           suspended={draftOpen || queueOpen || createOpen}
           detailOpen={detailOpen}
+          onSettle={() => setSettleToken((token) => token + 1)}
           searchCard={
             <SearchCard
               // #168: "Place this photo" over "needs a location" — the same
@@ -1249,6 +1257,7 @@ function AppShell() {
                   openTrackId={openTripTrackId}
                   onTrackDetailChange={handleTrackDetailChange}
                   revealSuspended={mapDecisionActive}
+                  settleToken={settleToken}
                 />
               </div>
             </>

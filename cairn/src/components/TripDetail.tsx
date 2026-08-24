@@ -166,6 +166,11 @@ interface TripDetailProps {
       `BottomSheet`'s own `suspended` for the sheet's detents — the same
       condition, read here for the map's version of the same sentence. */
   revealSuspended?: boolean
+  /** #312 — bumped whenever the phone sheet settles at a new detent. Drives
+      a re-frame of whatever is currently the map's subject — the selected
+      cairn or track, or, with neither selected, the trip's own tracks and
+      cairns — against the freshly sized visible band. */
+  settleToken?: number
 }
 
 /** The panel's trip face, and the trip's own map layers.
@@ -194,6 +199,7 @@ export function TripDetail({
   openTrackId,
   onTrackDetailChange,
   revealSuspended = false,
+  settleToken,
 }: TripDetailProps) {
   const navigate = useNavigate()
   const map = useMap()
@@ -203,6 +209,21 @@ export function TripDetail({
   const trip = useSyncExternalStore(tripStore.subscribe, () => tripStore.getTrip(tripId))
   const tripImport = useTripImport(tripId, accessToken, cairnFolderId, tripStore)
   const allTracks = useMemo(() => tripImport.tracks.flatMap((file) => file.tracks), [tripImport.tracks])
+
+  /** #312 — a hand pan or zoom disowns whatever is currently framed, until
+      the selection changes again: the same deference #270 already gives a
+      manual pan against a reveal that hasn't been asked to fire again,
+      extended here to the settle-triggered re-frame below. `dragstart`
+      fires only for the user's own gesture on the underlying map, never for
+      the `panTo`/`fitBounds` this component issues itself. */
+  const cameraDisownedRef = useRef(false)
+  useEffect(() => {
+    if (!map) return
+    const listener = google.maps.event.addListener(map, 'dragstart', () => {
+      cameraDisownedRef.current = true
+    })
+    return () => listener.remove()
+  }, [map])
   /* #218 — every track's stats, independent of visibility. Flattened
      alongside `allTracks` rather than derived from it: `trackStats` is
      computed once at import (see `ImportedFile`), and recomputing it here
@@ -873,6 +894,48 @@ export function TripDetail({
     onGeometryChange(geometry)
     return () => onGeometryChange([])
   }, [onGeometryChange, geometry])
+
+  // #312 — a new selection (or the trip's own arrival) is a fresh subject:
+  // whatever the user did to the camera before it no longer disowns it.
+  useEffect(() => {
+    cameraDisownedRef.current = false
+  }, [selectedCairnId, selectedTrackId])
+
+  /** #312 — the settle re-frame. The subject is the most specific thing
+      currently framed (design note's "What the subject is"): the selected
+      cairn, else the selected track, else — with neither selected — the
+      trip's own tracks and cairns. Recomputing the subject from the current
+      selection at settle time, rather than remembering the exact points a
+      past reveal used, is safe here only because `cameraDisownedRef` already
+      throws the re-frame away the moment the user has taken the camera back
+      — without that guard this would be exactly the leash #270 rejects. */
+  const settleMountedRef = useRef(false)
+  useEffect(() => {
+    // Not fired on mount — `BottomSheet` never fires the settle it counts
+    // for the initial detent either, and the trip's own reveal-on-open/
+    // reveal-on-selection effects already ran once for it.
+    if (!settleMountedRef.current) {
+      settleMountedRef.current = true
+      return
+    }
+    if (!map || revealSuspended || cameraDisownedRef.current) return
+    if (selectedCairnId) {
+      const cairn = cairnImport.cairns.find((candidate) => candidate.id === selectedCairnId)
+      if (cairn) revealPoint(map, cairn.position, columnInset(isPhone))
+      return
+    }
+    if (selectedTrackId) {
+      const file = tripImport.tracks.find((candidate) => candidate.id === selectedTrackId)
+      if (file) {
+        const points = file.tracks.flatMap((track) => normalizeAntimeridian(dropInvalidLatitudes(track.points)))
+        revealPoints(map, points, columnInset(isPhone))
+      }
+      return
+    }
+    const subject = [...geometry, ...facetedCairns.map((cairn) => cairn.position)]
+    if (subject.length > 0) revealPoints(map, subject, columnInset(isPhone))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settleToken])
 
   // Keeps the trip's precomputed overview (#36) in step with its actual
   // tracks. Skipped while `tripImport` is still mid-batch so a trip with

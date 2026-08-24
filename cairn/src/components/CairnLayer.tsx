@@ -3,6 +3,8 @@ import { AdvancedMarker, useMap } from '@vis.gl/react-google-maps'
 import { clusterMarkers, type MarkerCluster } from '../map/cluster'
 import { clusterSeparatesAtZoom, fanOutPositions, type FannedPlacement } from '../map/fanOut'
 import { CLUSTER_MAX_ZOOM, zoomToFitCluster } from '../map/fitBounds'
+import { columnInset, toPadding } from '../map/reveal'
+import { useIsPhone } from '../map/useIsPhone'
 import { clusterAriaLabel, clusterProvenance, ringStyleForPhoto } from '../photo/provenance'
 import { usePhotoImage } from '../photo/usePhotoImage'
 import { useDraggableCairn } from '../map/useDraggableCairn'
@@ -105,6 +107,7 @@ export function CairnLayer({
   onHoverCairn = () => {},
 }: CairnLayerProps) {
   const map = useMap()
+  const isPhone = useIsPhone()
   const [zoom, setZoom] = useState<number>(() => map?.getZoom() ?? 2)
   /* #194 — the one expanded cluster, held by its member-id key. One piece
      of state rather than a set is what makes "only one cluster is expanded
@@ -220,6 +223,7 @@ export function CairnLayer({
             key={key}
             cluster={cluster}
             map={map}
+            padding={toPadding(columnInset(isPhone))}
             onExpand={() => setExpandedKey(key)}
             hovered={hovered}
             selected={selected}
@@ -363,6 +367,7 @@ type CairnCluster = MarkerCluster<{ lat: number; lng: number; cairn: PositionedC
 function ClusterMarker({
   cluster,
   map,
+  padding,
   onExpand,
   hovered,
   selected,
@@ -370,6 +375,10 @@ function ClusterMarker({
 }: {
   cluster: CairnCluster
   map: google.maps.Map
+  /** #312 — the same inset-aware padding every other fit on phone now
+      reads, so a cluster zoom lands the same rectangle centred in the
+      visible band rather than the raw viewport. */
+  padding: google.maps.Padding
   /** #194: called instead of zooming, when zooming would achieve nothing. */
   onExpand: () => void
   /** #251: true when any member's id is in `hoveredCairnIds` — either
@@ -402,7 +411,7 @@ function ClusterMarker({
   function handleClick() {
     const points = cluster.members.map((member) => ({ lat: member.lat, lng: member.lng }))
     if (clusterSeparatesAtZoom(points, CLUSTER_MAX_ZOOM, MARKER_FOOTPRINT_PX)) {
-      zoomToFitCluster(map, points)
+      zoomToFitCluster(map, points, padding)
       return
     }
     onExpand()

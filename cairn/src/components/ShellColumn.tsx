@@ -25,6 +25,9 @@ interface ShellColumnProps {
   /** Hidden while a detail is open and while a draft is open; the caller
       passes `null` rather than this component deciding. */
   chips: ReactNode
+  /** #312 — forwarded straight to `BottomSheet`; desktop never renders a
+      sheet to settle, so this is simply never called there. */
+  onSettle?: () => void
   children: ReactNode
 }
 
@@ -45,6 +48,7 @@ export function ShellColumn({
   detailOpen,
   searchCard,
   chips,
+  onSettle,
   children,
 }: ShellColumnProps) {
   const isPhone = useIsPhone()
@@ -57,6 +61,7 @@ export function ShellColumn({
         detailOpen={detailOpen}
         searchCard={searchCard}
         chips={chips}
+        onSettle={onSettle}
       >
         {children}
       </BottomSheet>

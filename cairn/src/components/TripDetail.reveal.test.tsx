@@ -30,6 +30,19 @@ vi.mock('@vis.gl/react-google-maps', () => ({
   Map3D: () => null,
 }))
 
+/* #312 — the settle re-frame's `dragstart` listener needs `google.maps.event`
+   to exist now that `map` (`fakeMap`, above) is truthy in this file — the
+   same minimal stub `CairnLayer.test.tsx`/`LooseLayer.test.tsx` carry for
+   their own always-on listeners. */
+;(globalThis as unknown as { google: unknown }).google = {
+  maps: {
+    event: {
+      addListener: () => ({ remove: () => {} }),
+      addListenerOnce: () => {},
+    },
+  },
+}
+
 const { revealPoints, revealPoint, columnInset } = vi.hoisted(() => ({
   revealPoints: vi.fn(),
   revealPoint: vi.fn(),

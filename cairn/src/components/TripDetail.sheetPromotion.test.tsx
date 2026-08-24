@@ -1,4 +1,4 @@
-import { act, render } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TripDetail } from './TripDetail'
@@ -67,13 +67,22 @@ vi.mock('./TrackLayer', () => ({
   },
 }))
 
+interface CairnLayerProps {
+  selectedCairnId: string | null
+  onSelectCairn?: (id: string) => void
+  /** #276 — the other half of the click `CairnLayer` fires, and now the half
+      that carries the promotion. */
+  onOpenCairn?: (id: string) => void
+}
 const { lastCairnLayerProps } = vi.hoisted(() => ({
-  lastCairnLayerProps: {
-    current: null as { selectedCairnId: string | null; onSelectCairn?: (id: string) => void } | null,
-  },
+  lastCairnLayerProps: { current: null as {
+    selectedCairnId: string | null
+    onSelectCairn?: (id: string) => void
+    onOpenCairn?: (id: string) => void
+  } | null },
 }))
 vi.mock('./CairnLayer', () => ({
-  CairnLayer: (props: { selectedCairnId: string | null; onSelectCairn?: (id: string) => void }) => {
+  CairnLayer: (props: CairnLayerProps) => {
     lastCairnLayerProps.current = props
     return null
   },
@@ -148,7 +157,7 @@ function baseTripImport(overrides: Record<string, unknown> = {}) {
   }
 }
 
-function mockCairnImport(cairns: unknown[] = []) {
+function mockCairnImport(cairns: unknown[] = [], overrides: Record<string, unknown> = {}) {
   useCairnImport.mockReturnValue({
     cairns,
     loading: false,
@@ -161,10 +170,11 @@ function mockCairnImport(cairns: unknown[] = []) {
     forgetCairn: vi.fn(),
     removingCairnIds: new Set<string>(),
     cairnRemoveErrors: {},
+    ...overrides,
   })
 }
 
-function renderTrip() {
+function renderTrip(props: { onDropTargetChange?: (h: ((files: File[]) => void) | null) => void } = {}) {
   const store = new LocalTripStore(fakeStorage())
   const entry = store.createTrip('Larapinta')
   render(
@@ -175,7 +185,7 @@ function renderTrip() {
         accessToken="token"
         cairnFolderId="cairn-folder-id"
         onBack={() => {}}
-        onDropTargetChange={() => {}}
+        onDropTargetChange={props.onDropTargetChange ?? (() => {})}
         onGeometryChange={() => {}}
         onNeedsPlacement={() => {}}
         onCreateTargetChange={() => {}}
@@ -196,7 +206,19 @@ beforeEach(() => {
   mockCairnImport()
 })
 
-describe('TripDetail — #313 sheet promotion', () => {
+/** #313's marker tap is the pair `CairnLayer`/`Cairn3DLayer` actually fire —
+    `onSelectCairn` then `onOpenCairn`, in that order. Driving only the first
+    used to be enough, because #313's guard lived in front of the pair; #276
+    moved it into `selectCairn`, which is what `onOpenCairn` calls, so a test
+    that fires half the gesture now measures half the behaviour. */
+function tapCairnMarker(id: string) {
+  act(() => {
+    lastCairnLayerProps.current?.onSelectCairn?.(id)
+    lastCairnLayerProps.current?.onOpenCairn?.(id)
+  })
+}
+
+describe('TripDetail — #313/#276 sheet promotion', () => {
   it('promotes when a cairn marker selects something new', () => {
     useTripImport.mockReturnValue(baseTripImport())
     mockCairnImport([
@@ -213,12 +235,12 @@ describe('TripDetail — #313 sheet promotion', () => {
     ])
     renderTrip()
 
-    act(() => lastCairnLayerProps.current?.onSelectCairn?.('p1'))
+    tapCairnMarker('p1')
 
     expect(promote).toHaveBeenCalledTimes(1)
   })
 
-  it('does not promote on a repeat tap of the already-selected cairn — #250s toggle, not a new selection', () => {
+  it('does not promote on a repeat tap of the already-expanded cairn — #250s toggle, not an opening', () => {
     useTripImport.mockReturnValue(baseTripImport())
     mockCairnImport([
       {
@@ -234,9 +256,9 @@ describe('TripDetail — #313 sheet promotion', () => {
     ])
     renderTrip()
 
-    act(() => lastCairnLayerProps.current?.onSelectCairn?.('p1'))
+    tapCairnMarker('p1')
     promote.mockClear()
-    act(() => lastCairnLayerProps.current?.onSelectCairn?.('p1'))
+    tapCairnMarker('p1')
 
     expect(promote).not.toHaveBeenCalled()
   })
@@ -272,5 +294,190 @@ describe('TripDetail — #313 sheet promotion', () => {
     act(() => lastTrackLayerProps.current?.onSelectRoute?.('file-b'))
 
     expect(promote).toHaveBeenCalledTimes(1)
+  })
+
+  /* #276 — the row half of the same promotion. #250 and #268 both specified
+     it in their own Edge Cases tables and neither wired it up; #313 built the
+     mechanism and left the list alone. These drive the real `CairnList` and
+     `TrackList` rows rather than a mocked prop, since the whole point is that
+     the row's own path reaches the sheet. */
+
+  it('promotes when a collapsed cairn row is tapped', () => {
+    useTripImport.mockReturnValue(baseTripImport())
+    mockCairnImport([
+      {
+        id: 'p1',
+        name: 'sapporo.jpg',
+        position: { lat: 43, lng: 141 },
+        positionSource: 'exif',
+        icon: null,
+        image: { originalDriveFileId: 'orig-1', thumbnailDriveFileId: 'thumb-1' },
+        description: '',
+        date: '2024-06-01',
+      },
+    ])
+    renderTrip()
+
+    fireEvent.click(screen.getByText('sapporo.jpg'))
+
+    expect(promote).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not promote when the tap collapses the cairn row it had already expanded', () => {
+    useTripImport.mockReturnValue(baseTripImport())
+    mockCairnImport([
+      {
+        id: 'p1',
+        name: 'sapporo.jpg',
+        position: { lat: 43, lng: 141 },
+        positionSource: 'exif',
+        icon: null,
+        image: { originalDriveFileId: 'orig-1', thumbnailDriveFileId: 'thumb-1' },
+        description: '',
+        date: '2024-06-01',
+      },
+    ])
+    renderTrip()
+
+    fireEvent.click(screen.getByText('sapporo.jpg'))
+    promote.mockClear()
+    fireEvent.click(screen.getByText('sapporo.jpg'))
+
+    expect(promote).not.toHaveBeenCalled()
+  })
+
+  it('promotes when a collapsed track row is tapped', () => {
+    useTripImport.mockReturnValue(baseTripImport({ tracks: [trackFile()] }))
+    renderTrip()
+
+    fireEvent.click(screen.getByText('Belford-Oxford', { exact: false }))
+
+    expect(promote).toHaveBeenCalledTimes(1)
+  })
+
+  it('promotes from the track row whitespace too, not only its header button', () => {
+    useTripImport.mockReturnValue(baseTripImport({ tracks: [trackFile()] }))
+    renderTrip()
+
+    fireEvent.click(document.querySelector('.track-row__main') as HTMLElement)
+
+    expect(promote).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not promote when the tap collapses the track row it had already expanded', () => {
+    useTripImport.mockReturnValue(baseTripImport({ tracks: [trackFile()] }))
+    renderTrip()
+
+    // The row's header, by its class rather than its name: an expanded track
+    // row prints the track's name a second time in its body, so `getByText`
+    // stops being unambiguous after the first click.
+    const header = document.querySelector('.track-row__main') as HTMLElement
+    fireEvent.click(header)
+    promote.mockClear()
+    fireEvent.click(header)
+
+    expect(promote).not.toHaveBeenCalled()
+  })
+
+  /* #276's one deliberate change to #313's shipped behaviour: the guard reads
+     the row's expansion, not the selection, so a marker tap on a cairn that is
+     still selected but whose row was collapsed promotes — it is opening a row
+     into a sliver, which is the complaint. #313's selection guard declined
+     here. */
+  it('promotes a marker tap that reopens the still-selected cairn whose row was collapsed', () => {
+    useTripImport.mockReturnValue(baseTripImport())
+    mockCairnImport([
+      {
+        id: 'p1',
+        name: 'sapporo.jpg',
+        position: { lat: 43, lng: 141 },
+        positionSource: 'exif',
+        icon: null,
+        image: { originalDriveFileId: 'orig-1', thumbnailDriveFileId: 'thumb-1' },
+        description: '',
+        date: '2024-06-01',
+      },
+    ])
+    renderTrip()
+
+    tapCairnMarker('p1')
+    tapCairnMarker('p1')
+    expect(lastCairnLayerProps.current?.selectedCairnId).toBe('p1')
+    promote.mockClear()
+
+    tapCairnMarker('p1')
+
+    expect(promote).toHaveBeenCalledTimes(1)
+  })
+
+  /* #269 — a multi-track file's row selects as a unit and has no detail to
+     open (`TrackList.canOpenDetail`). Nothing opened, so nothing is hidden by
+     the sheet, so the sheet does not move. */
+  it('does not promote from the whitespace of a row that cannot expand', () => {
+    useTripImport.mockReturnValue(
+      baseTripImport({
+        tracks: [
+          trackFile({
+            tracks: [
+              { name: 'Day one', points: [{ lat: 37, lon: -122 }, { lat: 37.01, lon: -122.01 }] },
+              { name: 'Day two', points: [{ lat: 38, lon: -123 }, { lat: 38.01, lon: -123.01 }] },
+            ],
+          }),
+        ],
+      }),
+    )
+    renderTrip()
+
+    fireEvent.click(document.querySelector('.track-row__main') as HTMLElement)
+
+    expect(promote).not.toHaveBeenCalled()
+  })
+
+  /* #276's States table: a cairn mid-attach (#157) opens its face instead of
+     expanding, and #258's `detailOpen` is what moves the sheet for it. The
+     promotion must not fire a second time from here. */
+  it('does not promote for a cairn mid-attach — that path opens a face, and #258 promotes for it', async () => {
+    useTripImport.mockReturnValue(baseTripImport())
+    let attachDone: ((result: { ok: boolean }) => void) | undefined
+    const attachImage = vi.fn(
+      () => new Promise<{ ok: boolean }>((resolve) => { attachDone = resolve }),
+    )
+    mockCairnImport(
+      [
+        {
+          id: 'p1',
+          name: 'sapporo.jpg',
+          position: { lat: 43, lng: 141 },
+          positionSource: 'exif',
+          icon: 'campsite',
+          image: null,
+          description: '',
+          date: '2024-06-01',
+        },
+      ],
+      { attachImage },
+    )
+    let drop: ((files: File[]) => void) | null = null
+    renderTrip({ onDropTargetChange: (handler) => { drop = handler } })
+
+    fireEvent.click(screen.getByText('sapporo.jpg'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Open sapporo.jpg' }))
+    await screen.findByRole('dialog')
+    await act(async () => {
+      drop?.([new File(['a'], 'first.jpg')])
+    })
+    expect(attachImage).toHaveBeenCalled()
+    promote.mockClear()
+
+    // The row for the cairn whose upload is still running: `selectCairn`
+    // returns down the #157 branch, before the promotion.
+    act(() => {
+      lastCairnLayerProps.current?.onOpenCairn?.('p1')
+    })
+
+    expect(promote).not.toHaveBeenCalled()
+    await act(async () => {
+      attachDone?.({ ok: true })
+    })
   })
 })

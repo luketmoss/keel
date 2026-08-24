@@ -365,10 +365,21 @@ export function TripDetail({
 
   /** #268 — the header button and the row's own whitespace both call this
       with the file's id: toggles closed if it's already the expanded one,
-      opens it (implicitly closing whatever else was open) otherwise. */
-  const toggleTrackExpand = useCallback((id: string) => {
-    setExpandedTrackId((current) => (current === id ? null : id))
-  }, [])
+      opens it (implicitly closing whatever else was open) otherwise.
+
+      #276 — and promotes the sheet whenever the toggle leaves a row open,
+      which is #268's own edge case ("expanding raises the sheet to
+      `--sheet-half`") finally wired up. Guarded on the toggle's outcome
+      rather than on its argument, so the second tap — the one that closes
+      the row — leaves the sheet where it is. */
+  const toggleTrackExpand = useCallback(
+    (id: string) => {
+      const next = expandedTrackId === id ? null : id
+      if (next !== null) promote()
+      setExpandedTrackId(next)
+    },
+    [expandedTrackId, promote],
+  )
 
   /** #270 — a route's hit line on the map calls this, the same pair the
       row's own header click already performs (`TrackList`'s
@@ -377,37 +388,17 @@ export function TripDetail({
       toggles the row — "stays selected" falls out for free rather than
       needing a branch that tells the first click from the second.
 
-      #313 — promotes the sheet, but only when the route tap actually
-      changes the selection: a second click on the already-selected track's
-      route is the same "no change" case a repeat marker tap is, and #313's
-      own table lists a route tap as a promoting gesture, not a toggle. */
+      #313 promoted the sheet here, guarded on the selection changing.
+      #276 moves that guard into `toggleTrackExpand` below, where it reads
+      the row's own outcome instead: the two agreed on every case #313
+      listed, and one guard on the shared toggle is what keeps a route tap
+      and a row tap from drifting. */
   const handleSelectRoute = useCallback(
     (id: string) => {
-      setSelectedTrackId((current) => {
-        if (current !== id) promote()
-        return id
-      })
+      setSelectedTrackId(id)
       toggleTrackExpand(id)
     },
-    [toggleTrackExpand, promote],
-  )
-
-  /** #313 — the map-only half of a cairn selection: `onSelectCairn` passed
-      to `CairnLayer`/`Cairn3DLayer` below, never to `CairnList`'s row (which
-      calls `selectCairn` directly, per #250's shared onOpenRow/onOpenCairn
-      contract — this wrapper sits in front of that pair, not inside it, so
-      a row click never promotes). Promotes only on an actual change of
-      selection, so tapping the already-selected (and already-expanded)
-      cairn's marker again — which only collapses its row — leaves the sheet
-      exactly where it is, including at peek. */
-  const handleSelectCairnFromMap = useCallback(
-    (cairnId: string) => {
-      setSelectedCairnId((current) => {
-        if (current !== cairnId) promote()
-        return cairnId
-      })
-    },
-    [promote],
+    [toggleTrackExpand],
   )
 
   // #268 — mirrors `expandedCairnId`'s own cleanup: a track removed, or
@@ -682,7 +673,16 @@ export function TripDetail({
 
       #157: a cairn mid-attach is a special case ahead of the branch above —
       its row must not expand while the upload's progress belongs on the
-      detail face that's already open for it (design doc's States table). */
+      detail face that's already open for it (design doc's States table).
+
+      #276: and the one place the sheet's promotion belongs, for the same
+      construction reason — #313 wrapped this function on the map side only,
+      which is exactly the drift #250 built the shared call to prevent.
+      Guarded on the click's outcome rather than on the selection changing:
+      a row (or a marker) that ends up expanded is a row that opened into a
+      sliver, and the second click, which collapses it, leaves the sheet
+      alone. The mid-attach branch above returns before this — that path
+      opens a face, and #258's `detailOpen` already promotes for it. */
   const selectCairn = useCallback(
     (cairnId: string) => {
       setSelectedCairnId(cairnId)
@@ -692,9 +692,10 @@ export function TripDetail({
         return
       }
       const outcome = cairnClickOutcome(cairnId, expandedCairnId)
+      if (outcome.expandedCairnId !== null) promote()
       setExpandedCairnId(outcome.expandedCairnId)
     },
-    [expandedCairnId, attachingCairnId],
+    [expandedCairnId, attachingCairnId, promote],
   )
 
   /** #250 — the expanded row's own preview button, and the only thing that
@@ -1050,7 +1051,7 @@ export function TripDetail({
           cairns={positionedCairns}
           accessToken={accessToken}
           selectedCairnId={selectedCairnId}
-          onSelectCairn={handleSelectCairnFromMap}
+          onSelectCairn={setSelectedCairnId}
           onOpenCairn={selectCairn}
           draggable={cairnsDraggable}
           onMoveCairn={handleMoveCairn}
@@ -1065,7 +1066,7 @@ export function TripDetail({
         cairns={positionedCairns}
         accessToken={accessToken}
         selectedCairnId={selectedCairnId}
-        onSelectCairn={handleSelectCairnFromMap}
+        onSelectCairn={setSelectedCairnId}
         onOpenCairn={selectCairn}
         hoveredCairnIds={hoveredCairnIds}
         onHoverCairn={hoverCairns}

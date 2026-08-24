@@ -89,14 +89,15 @@ moved it to — which is precisely the drift the board exists to prevent.
 python .keel/check.py
 ```
 
-Three things, all of which have a right answer that needs no judgment: `.keel/`
-compiles, every skill's frontmatter parses and matches its directory, and every
-relative link in a tracked `.md` file resolves. CI runs this and nothing else,
-so a green run here is a green run there.
+Four things, all of which have a right answer that needs no judgment: `.keel/`
+compiles, every skill's frontmatter parses and matches its directory, every
+relative link in a tracked `.md` file resolves, and every design note cited by
+filename is committed. CI runs this and nothing else, so a green run here is a
+green run there.
 
-Adding a fourth check means adding a function to `CHECKS` in `check.py`. Do not
-add one to the workflow — a check CI enforces that the local run doesn't is a
-check that fails for the first time in a pull request.
+Adding a check means adding a function to `CHECKS` in `check.py`. Do not add one
+to the workflow — a check CI enforces that the local run doesn't is a check that
+fails for the first time in a pull request.
 
 ## CI
 

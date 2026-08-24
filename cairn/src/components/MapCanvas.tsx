@@ -10,7 +10,8 @@ import { Map3DControlProvider, useMap3DControl } from '../map/Map3DControl'
 import { fitTracksToBounds } from '../map/fitBounds'
 import { columnInset, toPadding } from '../map/reveal'
 import { useIsPhone } from '../map/useIsPhone'
-import { HOME_BOUNDS, HOME_CORNERS } from '../map/homeView'
+import { HOME_BOUNDS } from '../map/homeView'
+import { useHomeReset } from '../map/useHomeReset'
 import './MapCanvas.css'
 
 declare global {
@@ -228,8 +229,6 @@ function ZoomControls({
   getFitPoints: () => { lat: number; lng: number }[]
 }) {
   const map = useMap()
-  const isPhone = useIsPhone()
-  const { on: is3DOn, requestReset } = useMap3DControl()
 
   function nudgeZoom(delta: number) {
     if (!map) return
@@ -242,15 +241,9 @@ function ZoomControls({
      owns the flight (through the shared token in `Map3DControl`); with it
      off, this fits the 2D map to the home extent the same inset-aware way
      the initial load does. Never disabled — unlike fit-to-everything, it
-     doesn't depend on there being anything loaded. */
-  function resetView() {
-    if (is3DOn) {
-      requestReset()
-      return
-    }
-    if (!map) return
-    fitTracksToBounds(map, HOME_CORNERS, toPadding(columnInset(isPhone)))
-  }
+     doesn't depend on there being anything loaded. #314 shares this same
+     reset with arriving back at `/` — see `useHomeReset`. */
+  const resetView = useHomeReset()
 
   return (
     <div className="map-controls">

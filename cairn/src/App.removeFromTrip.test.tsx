@@ -178,8 +178,11 @@ describe('App — Remove from trip carries the name out (#150)', () => {
       fireEvent.click(screen.getByRole('menuitem', { name: 'Remove from trip' }))
     })
 
+    // #177: the Source row is `sourceName`, not `name` — a rename must not
+    // carry the display name into the field the detail face reads as the
+    // file it came from.
     expect(looseIndex()).toMatchObject([
-      { kind: 'track', name: 'Snowdon ridge', driveFileId: 'drive-1' },
+      { kind: 'track', name: 'Snowdon ridge', sourceName: 'day-1.kml', driveFileId: 'drive-1' },
     ])
     fetchSpy.mockRestore()
   })
@@ -200,7 +203,11 @@ describe('App — Remove from trip carries the name out (#150)', () => {
       fireEvent.click(screen.getByRole('menuitem', { name: 'Remove from trip' }))
     })
 
-    expect(looseIndex()).toMatchObject([{ kind: 'track', name: 'Day one' }])
+    // #177: no regression on the untouched path — sourceName still matches
+    // the actual Drive filename.
+    expect(looseIndex()).toMatchObject([
+      { kind: 'track', name: 'Day one', sourceName: 'day-1.kml' },
+    ])
     fetchSpy.mockRestore()
   })
 

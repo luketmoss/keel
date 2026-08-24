@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TripDetail } from './TripDetail'
 import { LocalTripStore } from '../store/tripStore'
+import { clearGroundAltitudeCache } from '../map/groundAltitude'
 import type { ImportedFile } from '../import/types'
 
 /* #288 — the wiring `Track3DLayer.test.tsx` cannot see: that `TripDetail`
@@ -15,7 +16,24 @@ import type { ImportedFile } from '../import/types'
    so a click dispatched on the fake polyline exercises the real component,
    not a stub reporting its own props back. `TrackLayer` (2D) is still
    stubbed out, as every other `TripDetail.*.test.tsx` file does — this note
-   is the 3D half only. */
+   is the 3D half only.
+
+   #303 — the reveal now resolves the ground through `flyToFramedGround`
+   before it moves the camera, `Map3D.test.tsx`'s own harness: a fixed
+   elevation stands in for the real Elevation API, and `elevationFails`
+   flips the ground-unresolved fail-safe on for the one test that needs
+   it. */
+const GROUND_METERS = 1200
+const elevationFails = { current: false }
+vi.mock('../geo/elevation', () => ({
+  createGoogleElevationSampler: () => ({
+    sampleAlongPath: async () =>
+      elevationFails.current
+        ? { ok: false, reason: 'UNKNOWN_ERROR' }
+        : { ok: true, samples: [{ lat: 0, lng: 0, elevationMeters: GROUND_METERS }] },
+  }),
+}))
+
 const { fakeMap3d, PolylineCtor, flyCameraTo, removeSpy } = vi.hoisted(() => {
   const flyCameraTo = vi.fn()
   const removeSpy = vi.fn()
@@ -226,6 +244,16 @@ function renderTrip(overrides: { revealSuspended?: boolean } = {}) {
   return { ...view, store, entry }
 }
 
+/** Lets the awaited ground request settle — `Map3D.test.tsx`'s own helper,
+    since the reveal's flight now only fires once `flyToFramedGround`'s
+    `sampleGroundAltitude` call has resolved. */
+async function settleFraming() {
+  await act(async () => {
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+}
+
 beforeEach(() => {
   fakeMap3d.appended.length = 0
   fakeMap3d.center = null
@@ -233,6 +261,8 @@ beforeEach(() => {
   flyCameraTo.mockClear()
   removeSpy.mockClear()
   is3DOnRef.current = true
+  elevationFails.current = false
+  clearGroundAltitudeCache()
   useTripImport.mockReset()
   useCairnImport.mockReset()
   mockCairnImport()
@@ -301,14 +331,16 @@ describe('TripDetail — #288 track selection in 3D', () => {
     expect(fakeMap3d.appended[0].outerColor).toBe('#00000059')
   })
 
-  it('flies the 3D camera to frame the selected track, keeping heading and tilt', () => {
+  it('flies the 3D camera to frame the selected track, keeping heading and tilt, on the ground', async () => {
     useTripImport.mockReturnValue(baseTripImport({ tracks: [trackFile()] }))
     renderTrip()
+    await settleFraming()
     // #292's own content framing already flew once, on arrival — clear it
     // so this only asserts on the selection's own flight.
     flyCameraTo.mockClear()
 
     fireEvent.click(screen.getByText('Belford-Oxford'))
+    await settleFraming()
 
     expect(flyCameraTo).toHaveBeenCalledTimes(1)
     const call = flyCameraTo.mock.calls[0][0]
@@ -316,7 +348,28 @@ describe('TripDetail — #288 track selection in 3D', () => {
     expect(call.endCamera.tilt).toBe(47)
     expect(call.endCamera.center.lat).toBeCloseTo(37.005)
     expect(call.endCamera.center.lng).toBeCloseTo(-122.005)
+    expect(call.endCamera.center.altitude).toBe(GROUND_METERS)
     expect(call.endCamera.range).toBeGreaterThan(0)
+  })
+
+  /* #303 — the ground could not be resolved for the selected track: the
+     reveal still fires, but flattens to tilt 0 and sea level rather than
+     tilting the live camera down over a look-at that might be buried. */
+  it('flattens to tilt 0 when the ground cannot be resolved for the selected track', async () => {
+    elevationFails.current = true
+    useTripImport.mockReturnValue(baseTripImport({ tracks: [trackFile()] }))
+    renderTrip()
+    await settleFraming()
+    flyCameraTo.mockClear()
+
+    fireEvent.click(screen.getByText('Belford-Oxford'))
+    await settleFraming()
+
+    expect(flyCameraTo).toHaveBeenCalledTimes(1)
+    const call = flyCameraTo.mock.calls[0][0]
+    expect(call.endCamera.tilt).toBe(0)
+    expect(call.endCamera.center.altitude).toBe(0)
+    expect(call.endCamera.heading).toBe(12)
   })
 
   it('does not fly the camera, and disables the 3D hit lines, while a decision owns the map', () => {

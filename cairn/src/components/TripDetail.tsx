@@ -9,8 +9,7 @@ import { columnInset, revealPoints } from '../map/reveal'
 import { dropInvalidLatitudes, normalizeAntimeridian } from '../map/geo'
 import { useIsPhone } from '../map/useIsPhone'
 import { useMap3DControl } from '../map/Map3DControl'
-import { frameGeometry } from '../map/flyover'
-import { prefersReducedMotion } from '../map/motion'
+import { flyToFramedGround } from '../map/flyToFramedGround'
 import { MAP3D_ID, TRACK3D_REVEAL_MS } from '../map/track3D'
 import { useTrack3DFraming } from '../map/useTrack3DFraming'
 import { TrackList } from './TrackList'
@@ -415,27 +414,20 @@ export function TripDetail({
     const file = tripImport.tracks.find((candidate) => candidate.id === selectedTrackId)
     if (!file) return
     const points = file.tracks.flatMap((track) => normalizeAntimeridian(dropInvalidLatitudes(track.points)))
-    const framed = frameGeometry(points)
-    if (!framed) return
-    const center = { lat: framed.center.lat, lng: framed.center.lng, altitude: 0 }
-    if (prefersReducedMotion()) {
-      map3d.center = center
-      map3d.range = framed.range
-      return
-    }
-    map3d.flyCameraTo({
-      endCamera: {
-        center,
-        range: framed.range,
-        heading: map3d.heading ?? 0,
-        tilt: map3d.tilt ?? 0,
-      },
-      durationMillis: TRACK3D_REVEAL_MS,
-    })
+    // #303 — the ground along the track's own route is resolved before the
+    // camera moves, through the same helper #292's arrival fit calls.
+    // `cancelled` is the "later move replaces the earlier one" guard: a
+    // second track selected before this one's ground request has settled
+    // must not let the stale flight land after it.
+    let cancelled = false
+    void flyToFramedGround(map3d, points, TRACK3D_REVEAL_MS, undefined, () => !cancelled)
     // Keyed on `selectedTrackId` alone, exactly like the 2D effect above —
     // `is3DOn` is read live rather than listed, so flipping the switch with
     // a track already selected does not itself trigger a flight. The
     // switch is not a selection change.
+    return () => {
+      cancelled = true
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTrackId])
 

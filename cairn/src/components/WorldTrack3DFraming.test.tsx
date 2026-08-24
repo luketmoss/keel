@@ -1,7 +1,8 @@
 import type { FeatureCollection, LineString } from 'geojson'
-import { render } from '@testing-library/react'
+import { act, render } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { WorldTrack3DFraming } from './WorldTrack3DFraming'
+import { clearGroundAltitudeCache } from '../map/groundAltitude'
 import type { TripIndexEntry } from '../store/tripStore'
 import type { LooseRecord } from '../store/looseStore'
 import type { PositionedCairn } from './CairnLayer'
@@ -11,7 +12,13 @@ import type { PositionedCairn } from './CairnLayer'
    trips and loose tracks, falling back to the loose cairns beside them.
    `worldTrackGeometry` is left real; only the Maps API underneath it is
    faked, the same split `world3DRoutes.test.ts` and
-   `TripDetail.track3DFraming.test.tsx` both take. */
+   `TripDetail.track3DFraming.test.tsx` both take.
+
+   #303 — the fit now resolves the ground through `flyToFramedGround`
+   before it moves the camera, `Map3D.test.tsx`'s own harness: a fixed
+   elevation stands in for the real Elevation API so `flyCameraTo` still
+   only fires (and keeps the live tilt) once the awaited ground request
+   has settled. */
 const { fakeMap3d, flyCameraTo } = vi.hoisted(() => {
   const flyCameraTo = vi.fn()
   const fakeMap3d = {
@@ -26,6 +33,13 @@ const { fakeMap3d, flyCameraTo } = vi.hoisted(() => {
 
 vi.mock('@vis.gl/react-google-maps', () => ({
   useMap3D: () => fakeMap3d,
+}))
+
+const GROUND_METERS = 1200
+vi.mock('../geo/elevation', () => ({
+  createGoogleElevationSampler: () => ({
+    sampleAlongPath: async () => ({ ok: true, samples: [{ lat: 0, lng: 0, elevationMeters: GROUND_METERS }] }),
+  }),
 }))
 
 const { is3DOnRef } = vi.hoisted(() => ({ is3DOnRef: { current: true } }))
@@ -67,15 +81,26 @@ const TRIP_STORE_WITH_ROUTE = {
 }
 const EMPTY_STORE = { getOverview: () => null }
 
+/** Lets the awaited ground request settle — `Map3D.test.tsx`'s own helper,
+    since the fit's flight now only fires once `flyToFramedGround`'s
+    `sampleGroundAltitude` call has resolved. */
+async function settleFraming() {
+  await act(async () => {
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+}
+
 beforeEach(() => {
   flyCameraTo.mockClear()
   fakeMap3d.center = null
   fakeMap3d.range = null
   is3DOnRef.current = true
+  clearGroundAltitudeCache()
 })
 
 describe('WorldTrack3DFraming (#292)', () => {
-  it('frames the world’s visible trips and loose tracks on arrival', () => {
+  it('frames the world’s visible trips and loose tracks on arrival, on the ground', async () => {
     render(
       <WorldTrack3DFraming
         trips={[trip('t1')]}
@@ -86,6 +111,7 @@ describe('WorldTrack3DFraming (#292)', () => {
         revealSuspended={false}
       />,
     )
+    await settleFraming()
 
     expect(flyCameraTo).toHaveBeenCalledTimes(1)
     const call = flyCameraTo.mock.calls[0][0]
@@ -93,9 +119,10 @@ describe('WorldTrack3DFraming (#292)', () => {
     expect(call.endCamera.tilt).toBe(30)
     expect(call.endCamera.center.lat).toBeCloseTo(20.01)
     expect(call.endCamera.center.lng).toBeCloseTo(10.01)
+    expect(call.endCamera.center.altitude).toBe(GROUND_METERS)
   })
 
-  it('falls back to the loose cairns when there is no track geometry', () => {
+  it('falls back to the loose cairns when there is no track geometry', async () => {
     render(
       <WorldTrack3DFraming
         trips={[]}
@@ -106,6 +133,7 @@ describe('WorldTrack3DFraming (#292)', () => {
         revealSuspended={false}
       />,
     )
+    await settleFraming()
 
     expect(flyCameraTo).toHaveBeenCalledTimes(1)
     const call = flyCameraTo.mock.calls[0][0]
@@ -113,7 +141,7 @@ describe('WorldTrack3DFraming (#292)', () => {
     expect(call.endCamera.center.lng).toBeCloseTo(-70)
   })
 
-  it('leaves the camera alone with nothing to frame', () => {
+  it('leaves the camera alone with nothing to frame', async () => {
     render(
       <WorldTrack3DFraming
         trips={[]}
@@ -124,11 +152,12 @@ describe('WorldTrack3DFraming (#292)', () => {
         revealSuspended={false}
       />,
     )
+    await settleFraming()
 
     expect(flyCameraTo).not.toHaveBeenCalled()
   })
 
-  it('does not frame while a decision owns the map', () => {
+  it('does not frame while a decision owns the map', async () => {
     render(
       <WorldTrack3DFraming
         trips={[trip('t1')]}
@@ -139,11 +168,12 @@ describe('WorldTrack3DFraming (#292)', () => {
         revealSuspended
       />,
     )
+    await settleFraming()
 
     expect(flyCameraTo).not.toHaveBeenCalled()
   })
 
-  it('re-frames when a loose track is added, and not when the set only shrinks', () => {
+  it('re-frames when a loose track is added, and not when the set only shrinks', async () => {
     const { rerender } = render(
       <WorldTrack3DFraming
         trips={[]}
@@ -154,6 +184,7 @@ describe('WorldTrack3DFraming (#292)', () => {
         revealSuspended={false}
       />,
     )
+    await settleFraming()
     flyCameraTo.mockClear()
 
     rerender(
@@ -166,6 +197,7 @@ describe('WorldTrack3DFraming (#292)', () => {
         revealSuspended={false}
       />,
     )
+    await settleFraming()
     expect(flyCameraTo).toHaveBeenCalledTimes(1)
     flyCameraTo.mockClear()
 
@@ -179,10 +211,11 @@ describe('WorldTrack3DFraming (#292)', () => {
         revealSuspended={false}
       />,
     )
+    await settleFraming()
     expect(flyCameraTo).not.toHaveBeenCalled()
   })
 
-  it('frames again every time it remounts — returning to the world view', () => {
+  it('frames again every time it remounts — returning to the world view', async () => {
     const { unmount } = render(
       <WorldTrack3DFraming
         trips={[trip('t1')]}
@@ -193,6 +226,7 @@ describe('WorldTrack3DFraming (#292)', () => {
         revealSuspended={false}
       />,
     )
+    await settleFraming()
     expect(flyCameraTo).toHaveBeenCalledTimes(1)
     unmount()
     flyCameraTo.mockClear()
@@ -207,6 +241,7 @@ describe('WorldTrack3DFraming (#292)', () => {
         revealSuspended={false}
       />,
     )
+    await settleFraming()
     expect(flyCameraTo).toHaveBeenCalledTimes(1)
   })
 })

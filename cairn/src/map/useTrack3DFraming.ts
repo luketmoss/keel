@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { frameGeometry } from './flyover'
-import { prefersReducedMotion } from './motion'
+import { flyToFramedGround } from './flyToFramedGround'
 import { TRACK3D_REVEAL_MS } from './track3D'
 import type { LatLng } from './geo'
 
@@ -75,24 +74,16 @@ export function useTrack3DFraming({
     // #288 gives `is3DOn` in its own reveal effect.
     if (!map3d || !is3DOn || revealSuspended) return
 
-    const framed = frameGeometry(points)
-    if (!framed) return
-
-    const center = { lat: framed.center.lat, lng: framed.center.lng, altitude: 0 }
-    if (prefersReducedMotion()) {
-      map3d.center = center
-      map3d.range = framed.range
-      return
+    // #303 — the ground is resolved before the camera moves, through the
+    // one helper #288's reveal also calls. `cancelled` is this effect's own
+    // "the later move replaces the earlier one" guard: content arriving a
+    // second time before the first fit's ground request has settled must
+    // not let the stale one land after it.
+    let cancelled = false
+    void flyToFramedGround(map3d, points, TRACK3D_REVEAL_MS, undefined, () => !cancelled)
+    return () => {
+      cancelled = true
     }
-    map3d.flyCameraTo({
-      endCamera: {
-        center,
-        range: framed.range,
-        heading: map3d.heading ?? 0,
-        tilt: map3d.tilt ?? 0,
-      },
-      durationMillis: TRACK3D_REVEAL_MS,
-    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalCount, visibleKey])
 }

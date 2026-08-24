@@ -12,7 +12,7 @@
    it about where something sits on screen. */
 
 import { containerPointFromLatLng, latLngFromContainerPoint, type ViewportBounds } from './containerPoint'
-import { FIT_PADDING, fitTracksToBounds } from './fitBounds'
+import { CLUSTER_MAX_ZOOM, FIT_PADDING, fitTracksToBounds } from './fitBounds'
 import { prefersReducedMotion } from './motion'
 import type { LatLng } from './geo'
 
@@ -138,6 +138,63 @@ export function revealPoints(map: google.maps.Map, points: LatLng[], inset: Inse
     map.setCenter(targetCenter)
   } else {
     map.panTo(targetCenter)
+  }
+}
+
+/** cairn/docs/design/302-revealing-a-cairn-closes-in.md — a cairn's own
+    reveal, not a case of `revealPoints` above. A point's bounds are always
+    zero-size, so it can never fail `revealPoints`' "does it fit" test and its
+    zoom is never touched — right for a track, whose extent the user already
+    chose a zoom for, but wrong for a cairn, which has none: "as close as it
+    can get" for a point has to mean a zoom or it means nothing.
+
+    Always centres `point` in the visible area — unlike `revealPoints`, this
+    does not skip the pan when the point is merely already on screen,
+    because arrival *at* the cairn is the point (AC: selecting a cairn while
+    already zoomed in past the close-up zoom still moves the camera to it).
+    Zoom only ever closes in: `CLUSTER_MAX_ZOOM` (#194's cap for "zoomed to a
+    cluster of photos at one viewpoint" — a cairn is that subject at a count
+    of one, so this reuses the constant rather than inventing a second number
+    meaning the same thing) unless the map is already closer, in which case
+    the zoom the user chose is left alone. */
+export function revealPoint(map: google.maps.Map, point: LatLng, inset: Inset): void {
+  const div = map.getDiv()
+  const width = div.clientWidth
+  const height = div.clientHeight
+  const bounds = viewportBounds(map)
+  // No viewport yet, or the point doesn't project — nothing to reveal
+  // against, same guard `revealPoints` keeps.
+  if (!bounds || width === 0 || height === 0) return
+
+  const pixel = containerPointFromLatLng(point, width, height, bounds)
+  if (!pixel) return
+
+  const visibleLeft = inset.left + FIT_PADDING
+  const visibleTop = inset.top + FIT_PADDING
+  const visibleRight = width - inset.right - FIT_PADDING
+  const visibleBottom = height - inset.bottom - FIT_PADDING
+  const visibleCenter = { x: (visibleLeft + visibleRight) / 2, y: (visibleTop + visibleBottom) / 2 }
+  const mapCenterPixel = { x: width / 2, y: height / 2 }
+
+  const targetCenter = latLngFromContainerPoint(
+    mapCenterPixel.x + (pixel.x - visibleCenter.x),
+    mapCenterPixel.y + (pixel.y - visibleCenter.y),
+    width,
+    height,
+    bounds,
+  )
+  if (!targetCenter) return
+
+  // Never zooms out: only raises the zoom to the close-up cap, never lowers
+  // it toward one.
+  const targetZoom = Math.max(map.getZoom() ?? 0, CLUSTER_MAX_ZOOM)
+
+  if (prefersReducedMotion()) {
+    map.setCenter(targetCenter)
+    map.setZoom(targetZoom)
+  } else {
+    map.panTo(targetCenter)
+    map.setZoom(targetZoom)
   }
 }
 

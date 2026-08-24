@@ -7,7 +7,7 @@ import { usePhotoImage } from '../photo/usePhotoImage'
 import { useDraggableCairn } from '../map/useDraggableCairn'
 import type { LatLng } from '../map/geo'
 import { linesFromOverview } from '../geo/overviewLines'
-import { columnInset, revealPoints } from '../map/reveal'
+import { columnInset, revealPoint, revealPoints } from '../map/reveal'
 import { useIsPhone } from '../map/useIsPhone'
 import { CairnMarker } from './CairnMarker'
 import './LooseLayer.css'
@@ -61,22 +61,22 @@ export function LooseLayer({
   const map = useMap()
   const isPhone = useIsPhone()
 
-  /** #270 — "selecting a loose track or cairn from the shell list moves the
-      world map to it under the same three-step rule". Keyed on `selectedId`
-      alone, never on the camera, matching `TripDetail`'s own two reveal
-      effects: `items`/`store` are read at fire time rather than listed as
-      dependencies, so a re-render that leaves the selection alone never
-      re-fires it. A loose track reveals its precomputed overview line
-      strings — never the source KML, per the performance rule, which is
-      what a loose track's overview already exists to satisfy — and a loose
-      cairn its own coordinate, which (being a point) always takes the pan
-      branch and never the fit one, the same as a trip's own cairns. */
+  /** #270/#302 — "selecting a loose track or cairn from the shell list moves
+      the world map to it". Keyed on `selectedId` alone, never on the camera,
+      matching `TripDetail`'s own reveal effects: `items`/`store` are read at
+      fire time rather than listed as dependencies, so a re-render that
+      leaves the selection alone never re-fires it. A loose track reveals its
+      precomputed overview line strings — never the source KML, per the
+      performance rule, which is what a loose track's overview already
+      exists to satisfy — and a loose cairn its own coordinate through
+      `revealPoint`, #302's own close-up move, the same as a trip's own
+      cairns. */
   useEffect(() => {
     if (!map || revealSuspended || !selectedId) return
     const item = items.find((candidate) => candidate.id === selectedId)
     if (!item || item.position === null) return
     if (item.kind === 'cairn') {
-      revealPoints(map, [item.position as LatLng], columnInset(isPhone))
+      revealPoint(map, item.position as LatLng, columnInset(isPhone))
       return
     }
     const points = linesFromOverview(store.getOverview(item.id)).flat()

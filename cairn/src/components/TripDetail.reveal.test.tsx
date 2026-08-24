@@ -30,11 +30,12 @@ vi.mock('@vis.gl/react-google-maps', () => ({
   Map3D: () => null,
 }))
 
-const { revealPoints, columnInset } = vi.hoisted(() => ({
+const { revealPoints, revealPoint, columnInset } = vi.hoisted(() => ({
   revealPoints: vi.fn(),
+  revealPoint: vi.fn(),
   columnInset: vi.fn(() => ({ left: 0, right: 0, top: 0, bottom: 0 })),
 }))
-vi.mock('../map/reveal', () => ({ revealPoints, columnInset }))
+vi.mock('../map/reveal', () => ({ revealPoints, revealPoint, columnInset }))
 
 const { lastTrackLayerProps } = vi.hoisted(() => ({
   lastTrackLayerProps: {
@@ -174,6 +175,7 @@ beforeEach(() => {
   useTripImport.mockReset()
   useCairnImport.mockReset()
   revealPoints.mockClear()
+  revealPoint.mockClear()
   columnInset.mockClear()
   mockCairnImport()
 })
@@ -193,7 +195,7 @@ describe('TripDetail — #270 reveal', () => {
     )
   })
 
-  it('reveals the selected cairn at its own coordinate', () => {
+  it('reveals the selected cairn at its own coordinate via #302s close-up reveal', () => {
     useTripImport.mockReturnValue(baseTripImport({ tracks: [] }))
     mockCairnImport([
       {
@@ -211,12 +213,13 @@ describe('TripDetail — #270 reveal', () => {
     renderTrip()
     fireEvent.click(screen.getByText('sapporo.jpg'))
 
-    expect(revealPoints).toHaveBeenCalledWith(fakeMap, [{ lat: 43, lng: 141 }], {
+    expect(revealPoint).toHaveBeenCalledWith(fakeMap, { lat: 43, lng: 141 }, {
       left: 0,
       right: 0,
       top: 0,
       bottom: 0,
     })
+    expect(revealPoints).not.toHaveBeenCalled()
   })
 
   it('does not reveal, and disables the route hit lines, while a decision owns the map', () => {
@@ -227,6 +230,7 @@ describe('TripDetail — #270 reveal', () => {
 
     fireEvent.click(screen.getByText('Belford-Oxford'))
     expect(revealPoints).not.toHaveBeenCalled()
+    expect(revealPoint).not.toHaveBeenCalled()
   })
 
   it('a route click on the map selects the file and expands its row, matching the row header click', () => {

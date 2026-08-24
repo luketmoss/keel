@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { columnInset, revealPoints } from './reveal'
+import { CLUSTER_MAX_ZOOM } from './fitBounds'
+import { columnInset, revealPoint, revealPoints } from './reveal'
 
 /* cairn/docs/design/270-selecting-reveals-it-on-the-map.md — "The reveal
    rule". Tested against a fake map exposing exactly what `revealPoints`
@@ -31,7 +32,8 @@ function fakeMap({
   width = 1000,
   height = 1000,
   bounds = VIEWPORT,
-}: { width?: number; height?: number; bounds?: typeof VIEWPORT | null } = {}) {
+  zoom = 10,
+}: { width?: number; height?: number; bounds?: typeof VIEWPORT | null; zoom?: number } = {}) {
   return {
     getBounds: vi.fn(() =>
       bounds === null
@@ -42,8 +44,10 @@ function fakeMap({
           },
     ),
     getDiv: vi.fn(() => ({ clientWidth: width, clientHeight: height })),
+    getZoom: vi.fn(() => zoom),
     panTo: vi.fn(),
     setCenter: vi.fn(),
+    setZoom: vi.fn(),
   }
 }
 
@@ -145,5 +149,53 @@ describe('revealPoints', () => {
     const map = fakeMap({ width: 100, height: 100 })
     revealPoints(map as unknown as google.maps.Map, [{ lat: 0, lng: 0 }], { left: 60, right: 60, top: 0, bottom: 0 })
     expect(fitTracksToBounds).toHaveBeenCalledTimes(1)
+  })
+})
+
+/* cairn/docs/design/302-revealing-a-cairn-closes-in.md — a cairn's own
+   reveal: unlike `revealPoints`, it always centres the point and closes the
+   zoom in to `CLUSTER_MAX_ZOOM`, never past it and never back out. */
+describe('revealPoint', () => {
+  const NO_INSET = { left: 0, right: 0, top: 0, bottom: 0 }
+
+  afterEach(() => {
+    // @ts-expect-error -- removing the stub installed per-test
+    delete window.matchMedia
+  })
+
+  it('does nothing before the map has ever reported a viewport', () => {
+    const map = fakeMap({ bounds: null })
+    revealPoint(map as unknown as google.maps.Map, { lat: 0, lng: 0 }, NO_INSET)
+    expect(map.panTo).not.toHaveBeenCalled()
+    expect(map.setZoom).not.toHaveBeenCalled()
+  })
+
+  it('from a wide view, centres the cairn and closes in to the cluster cap', () => {
+    const map = fakeMap({ zoom: 4 })
+    revealPoint(map as unknown as google.maps.Map, { lat: 0, lng: 0 }, NO_INSET)
+    expect(map.panTo).toHaveBeenCalledTimes(1)
+    expect(map.setZoom).toHaveBeenCalledWith(CLUSTER_MAX_ZOOM)
+  })
+
+  it('moves the camera to the cairn even when it is already inside the visible area, because arrival is the point', () => {
+    const map = fakeMap({ zoom: 4 })
+    // Centre of the viewport at NO_INSET is already inside the visible area.
+    revealPoint(map as unknown as google.maps.Map, { lat: 0, lng: 0 }, NO_INSET)
+    expect(map.panTo).toHaveBeenCalledTimes(1)
+  })
+
+  it('never zooms back out when the map is already closer than the cluster cap', () => {
+    const map = fakeMap({ zoom: CLUSTER_MAX_ZOOM + 3 })
+    revealPoint(map as unknown as google.maps.Map, { lat: 0, lng: -8 }, { ...NO_INSET, left: 200 })
+    expect(map.setZoom).toHaveBeenCalledWith(CLUSTER_MAX_ZOOM + 3)
+  })
+
+  it('jumps instead of gliding under prefers-reduced-motion', () => {
+    stubReducedMotion(true)
+    const map = fakeMap({ zoom: 4 })
+    revealPoint(map as unknown as google.maps.Map, { lat: 0, lng: -8 }, { ...NO_INSET, left: 200 })
+    expect(map.setCenter).toHaveBeenCalledTimes(1)
+    expect(map.panTo).not.toHaveBeenCalled()
+    expect(map.setZoom).toHaveBeenCalledWith(CLUSTER_MAX_ZOOM)
   })
 })

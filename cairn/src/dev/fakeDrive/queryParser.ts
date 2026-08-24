@@ -11,6 +11,7 @@ export type FileFilter = (file: FakeFile) => boolean
 
 const NAME_CLAUSE = /^name='([^']*)'$/
 const MIME_CLAUSE = /^mimeType='([^']*)'$/
+const NOT_MIME_CLAUSE = /^mimeType!='([^']*)'$/
 const PARENTS_CLAUSE = /^'([^']*)' in parents$/
 const TRASHED_CLAUSE = /^trashed=(true|false)$/
 
@@ -29,6 +30,12 @@ export function parseDriveQuery(query: string): FileFilter {
     if (mimeMatch) {
       const mimeType = mimeMatch[1]
       predicates.push((file) => file.mimeType === mimeType)
+      continue
+    }
+    const notMimeMatch = NOT_MIME_CLAUSE.exec(clause)
+    if (notMimeMatch) {
+      const mimeType = notMimeMatch[1]
+      predicates.push((file) => file.mimeType !== mimeType)
       continue
     }
     const parentsMatch = PARENTS_CLAUSE.exec(clause)

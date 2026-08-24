@@ -34,7 +34,7 @@ export function SearchCard({ detail, onBack, query, onQueryChange, accountBubble
         </button>
       ) : (
         <span className="search-card__slot search-card__mark" aria-label="Menu" role="img">
-          <span aria-hidden="true">▲</span>
+          <img src={`${import.meta.env.BASE_URL}cairn-mark.svg`} alt="" aria-hidden="true" />
         </span>
       )}
 

@@ -55,7 +55,7 @@ import { useDraftTrip } from './import/useDraftTrip'
 import { useGoogleAccount } from './auth/useGoogleAccount'
 import { AccountBubble } from './auth/AccountBubble'
 import { defaultOverridesStore } from './import/useTripImport'
-import { carryDisplayNameIntoTrip } from './store/trackOverridesStore'
+import { carryTrackIntoTrip } from './store/trackOverridesStore'
 import type { CairnRecord, NewTripCairn } from './photo/useCairnImport'
 import { PlacementQueuePanel } from './components/PlacementQueuePanel'
 import { PlacementClickCatcher } from './components/PlacementClickCatcher'
@@ -510,20 +510,21 @@ function AppShell() {
     cairnCount: entry.cairnCount,
   }))
 
-  /** #150: a track's name is stored by whichever trip owns it, so a move has
-      to write one — otherwise the track arrives showing its filename and the
-      name the user gave it is gone. This is the trip-overrides half of the
-      move, handed to `moveLooseIntoTrip`; the loose half is
-      `removeTrackFromTrip` below. Both live here for the same reason every
-      other ownership bookkeeping does: a move needs stores that must not
-      know about each other. */
-  const carryTrackName = useCallback(
-    (tripId: string, driveFileId: string, name: string) =>
-      carryDisplayNameIntoTrip(
+  /** #150 (name) and #176 (colour): a track's name and colour are stored by
+      whichever trip owns it, so a move has to write both — otherwise the
+      track arrives showing its filename and the trip's next auto-assigned
+      colour, with the name and colour the user was looking at gone. This is
+      the trip-overrides half of the move, handed to `moveLooseIntoTrip`; the
+      loose half is `removeTrackFromTrip` below. Both live here for the same
+      reason every other ownership bookkeeping does: a move needs stores that
+      must not know about each other. */
+  const carryTrackDetails = useCallback(
+    (tripId: string, driveFileId: string, patch: { displayName: string; color: number }) =>
+      carryTrackIntoTrip(
         defaultOverridesStore,
         tripId,
         driveFileId,
-        name,
+        patch,
         accessToken && cairnFolderId ? { accessToken, folderId: cairnFolderId } : null,
       ),
     [accessToken, cairnFolderId],
@@ -542,7 +543,7 @@ function AppShell() {
     setMoveError(null)
     setMoving(true)
     try {
-      if (!(await moveLooseIntoTrip(looseStore, tripStore, itemId, tripId, carryTrackName))) {
+      if (!(await moveLooseIntoTrip(looseStore, tripStore, itemId, tripId, carryTrackDetails))) {
         setMoveError(MOVE_FAILED_MESSAGE)
         return
       }
@@ -572,10 +573,17 @@ function AppShell() {
    * present only when the trip held an override, which is exactly the case
    * where the name would otherwise be left behind in `overrides.json` — a
    * track nobody renamed passes `undefined` and keeps the derivation it has
-   * always had. */
+   * always had.
+   *
+   * #176: the track's colour comes out unconditionally, unlike its name —
+   * `file.colorIndex` is already the effective colour (`useTripImport`'s
+   * `effectiveTracks` resolves the override or the auto-assigned fallback
+   * before this ever sees it), and there is no "derive it again" for colour
+   * the way there is for name, so it always carries. */
   async function removeTrackFromTrip(file: ImportedFile, tripId: string): Promise<boolean> {
     const record = looseImport.addParsedTracks(file.sourceName, file.tracks, {
       driveFileId: file.driveFileId,
+      colorIndex: file.colorIndex,
       ...(file.displayName !== undefined ? { name: file.displayName } : {}),
     })
     if (!record) return false

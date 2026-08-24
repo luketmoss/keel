@@ -948,7 +948,7 @@ describe('App loose tracks and photos (#110)', () => {
 
       expect(window.location.pathname).toBe('/trips/t-150')
       expect(overridesFor('t-150')).toEqual({
-        'drive-150': { displayName: 'Snowdon ridge' },
+        'drive-150': { displayName: 'Snowdon ridge', color: 0 },
       })
       fetchSpy.mockRestore()
     })
@@ -973,7 +973,7 @@ describe('App loose tracks and photos (#110)', () => {
 
       expect(overridesFor('t-151')).toEqual({
         'drive-existing': { displayName: 'Day one', color: 3 },
-        'drive-151': { displayName: 'Snowdon ridge' },
+        'drive-151': { displayName: 'Snowdon ridge', color: 0 },
       })
       fetchSpy.mockRestore()
     })
@@ -1002,7 +1002,9 @@ describe('App loose tracks and photos (#110)', () => {
         fireEvent.click(screen.getByRole('button', { name: /Larapinta/ }))
       })
 
-      expect(overridesFor('t-153')).toEqual({ 'drive-153': { displayName: 'Rosea East' } })
+      expect(overridesFor('t-153')).toEqual({
+        'drive-153': { displayName: 'Rosea East', color: 0 },
+      })
       fetchSpy.mockRestore()
     })
 
@@ -1024,7 +1026,53 @@ describe('App loose tracks and photos (#110)', () => {
 
       const tripId = window.location.pathname.replace('/trips/', '')
       expect(overridesFor(tripId)).toEqual({
-        'drive-152': { displayName: 'Snowdon ridge' },
+        'drive-152': { displayName: 'Snowdon ridge', color: 0 },
+      })
+      fetchSpy.mockRestore()
+    })
+  })
+
+  // #176: the colour half of the same move, verified separately for a loose
+  // track that was never recoloured (still on its auto-assigned index) and
+  // one the user did recolour — both carry unconditionally.
+  describe('#176 a colour survives the move into a trip', () => {
+    const overridesFor = (tripId: string) =>
+      JSON.parse(window.localStorage.getItem(`cairn.trips.trackOverrides.${tripId}`) ?? '{}')
+
+    it('carries a never-recoloured track\'s auto-assigned colour', async () => {
+      const fetchSpy = mockGoogleSignIn()
+      seedTrip('t-154', 'Larapinta')
+      seedLooseTrack('lt-154', 'Snowdon ridge', { driveFileId: 'drive-154', colorIndex: 0 })
+
+      await renderApp('/tracks/lt-154', { googleClientId: 'a-client-id' })
+      await signIn()
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Add to a trip' }))
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Larapinta/ }))
+      })
+
+      expect(overridesFor('t-154')).toEqual({
+        'drive-154': { displayName: 'Snowdon ridge', color: 0 },
+      })
+      fetchSpy.mockRestore()
+    })
+
+    it('carries a user-recoloured track\'s chosen colour', async () => {
+      const fetchSpy = mockGoogleSignIn()
+      seedTrip('t-155', 'Larapinta')
+      seedLooseTrack('lt-155', 'Snowdon ridge', { driveFileId: 'drive-155', colorIndex: 4 })
+
+      await renderApp('/tracks/lt-155', { googleClientId: 'a-client-id' })
+      await signIn()
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Add to a trip' }))
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Larapinta/ }))
+      })
+
+      expect(overridesFor('t-155')).toEqual({
+        'drive-155': { displayName: 'Snowdon ridge', color: 4 },
       })
       fetchSpy.mockRestore()
     })

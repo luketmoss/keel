@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { DriveTrackOverridesStore } from './driveTrackOverridesStore'
-import { LocalTrackOverridesStore, carryDisplayNameIntoTrip } from './trackOverridesStore'
+import { LocalTrackOverridesStore, carryTrackIntoTrip } from './trackOverridesStore'
 
 /** Same in-memory `Storage` helper `trackOverridesStore.test.ts` uses. */
 function fakeStorage(): Storage {
@@ -220,7 +220,7 @@ describe('DriveTrackOverridesStore', () => {
      there, and that trip's next `connect` hydrates Drive's copy over the top
      of it. Against the real Drive-backed store, so what is proved is that
      the name lands in Drive rather than only in the local cache. */
-  it('puts a carried display name in Drive for a trip never opened this session', async () => {
+  it('puts a carried display name and colour in Drive for a trip never opened this session', async () => {
     findJsonFile.mockResolvedValue({ fileId: 'overrides-file', headRevisionId: 'rev-1' })
     readJsonFile.mockResolvedValue({
       data: { 'drive-existing': { displayName: 'Day one', color: 3 } },
@@ -231,20 +231,23 @@ describe('DriveTrackOverridesStore', () => {
     // loose track is added to it from the top level.
     const store = new DriveTrackOverridesStore(fakeStorage())
 
-    const ok = await carryDisplayNameIntoTrip(store, 'trip-1', 'drive-1', 'Snowdon ridge', {
-      accessToken: 'token',
-      folderId: 'cairn-folder-id',
-    })
+    const ok = await carryTrackIntoTrip(
+      store,
+      'trip-1',
+      'drive-1',
+      { displayName: 'Snowdon ridge', color: 4 },
+      { accessToken: 'token', folderId: 'cairn-folder-id' },
+    )
 
     expect(ok).toBe(true)
-    // The name went to Drive, alongside what the trip already held there.
+    // The name and colour went to Drive, alongside what the trip already held there.
     expect(writeJsonFile).toHaveBeenCalledWith(
       'token',
       'trip-folder-1',
       'overrides.json',
       {
         'drive-existing': { displayName: 'Day one', color: 3 },
-        'drive-1': { displayName: 'Snowdon ridge' },
+        'drive-1': { displayName: 'Snowdon ridge', color: 4 },
       },
       { fileId: 'overrides-file', headRevisionId: 'rev-1' },
     )

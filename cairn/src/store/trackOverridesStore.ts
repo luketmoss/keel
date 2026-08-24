@@ -51,13 +51,15 @@ export interface TrackOverridesStore {
   disconnect?(): void
 }
 
-/** #150: gives a track that has just moved into `tripId` the name it was
-    already carrying, as a display-name override on its new owner.
+/** #150 (name) and #176 (colour): gives a track that has just moved into
+    `tripId` the display name and colour it was already carrying, as a
+    `TrackOverride` on its new owner.
  *
- * A track's name is the trip's to store — `TrackOverrides` above, keyed by
- * Drive file id — so an ownership move has to write one, or the track
- * arrives showing whatever its file happens to be called and the name the
- * user gave it is gone.
+ * A track's name and colour are the trip's to store — `TrackOverrides` above,
+ * keyed by Drive file id — so an ownership move has to write both, or the
+ * track arrives showing whatever its file happens to be called and whatever
+ * colour the trip's insertion order assigns it, with the name and colour the
+ * user had lost.
  *
  * Two things here are easy to get wrong and both are silent:
  *
@@ -65,18 +67,18 @@ export interface TrackOverridesStore {
  * trip's detail view mounts, and the destination of a move usually has not
  * been open this session. Writing without connecting lands in `localStorage`
  * only, and the trip's next `connect` hydrates Drive's copy straight over the
- * top of it — Drive wins, by design — taking the new name with it.
+ * top of it — Drive wins, by design — taking the new values with it.
  *
  * **Prune nothing.** `setOverride` prunes every entry outside the valid list
  * it is handed, and a move knows about exactly one track. The valid list is
  * therefore what the trip already holds *plus* the arriving track: pruning
  * belongs to the operations that can see the trip's whole track list, and
  * doing it from here would drop every other track's name and colour. */
-export async function carryDisplayNameIntoTrip(
+export async function carryTrackIntoTrip(
   store: TrackOverridesStore,
   tripId: string,
   driveFileId: string,
-  displayName: string,
+  patch: { displayName: string; color: number },
   credentials: { accessToken: string; folderId: string } | null,
 ): Promise<boolean> {
   if (credentials) {
@@ -84,11 +86,11 @@ export async function carryDisplayNameIntoTrip(
       await store.connect?.(tripId, credentials.accessToken, credentials.folderId)
     } catch {
       // The write below still runs: it reaches `localStorage` either way,
-      // and a name that syncs on the trip's next `connect` beats no name.
+      // and values that sync on the trip's next `connect` beat none at all.
     }
   }
   const held = Object.keys(store.getOverrides(tripId))
-  return store.setOverride(tripId, driveFileId, { displayName }, [...held, driveFileId])
+  return store.setOverride(tripId, driveFileId, patch, [...held, driveFileId])
 }
 
 const overridesKey = (tripId: string): string => `cairn.trips.trackOverrides.${tripId}`

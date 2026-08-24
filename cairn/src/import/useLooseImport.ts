@@ -202,12 +202,18 @@ export function useLooseImport(store: LooseStore) {
    * every derivation below. Only `Remove from trip` has one, and only when
    * the track carried a display-name override inside its trip — a name the
    * app derived is left to be derived again here, so a track nobody renamed
-   * still becomes `hike` rather than `hike.kml`. */
+   * still becomes `hike` rather than `hike.kml`.
+   *
+   * #176: `colorIndex` is the opposite — when present it is used verbatim,
+   * never re-derived, because unlike name there is no meaningful "derive it
+   * again" for colour to fall back to. Only `Remove from trip` passes one,
+   * carrying the track's effective in-trip colour, so the auto-cycle below
+   * still runs for every other caller. */
   const addParsedTracks = useCallback(
     (
       sourceName: string,
       tracks: Track[],
-      options?: { source?: File; driveFileId?: string; name?: string },
+      options?: { source?: File; driveFileId?: string; name?: string; colorIndex?: number },
     ): LooseTrackRecord | null => {
       if (tracks.length === 0) return null
       // #226 — same whole-file aggregate `importFiles` computes above; this
@@ -230,6 +236,7 @@ export function useLooseImport(store: LooseStore) {
           pointCount: tracks.reduce((total, t) => total + t.points.length, 0),
           sourceName,
           colorIndex:
+            options?.colorIndex ??
             store.getItems().filter((item) => item.kind === 'track').length % TRACK_COLORS.length,
           position: firstPoint(tracks),
           driveFileId: options?.driveFileId ?? null,

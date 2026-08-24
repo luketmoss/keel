@@ -233,3 +233,20 @@ describe('App — Remove from trip carries the name out (#150)', () => {
     fetchSpy.mockRestore()
   })
 })
+
+describe('App — Remove from trip carries the colour out (#176)', () => {
+  it('gives the loose track its effective in-trip colour', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedTrip('t-4')
+    useTripImport.mockReturnValue(baseTripImport({ tracks: [tripTrack({ colorIndex: 3 })] }))
+
+    await renderTripFace('t-4')
+    openRowMenu('day-1.kml')
+    await act(async () => {
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Remove from trip' }))
+    })
+
+    expect(looseIndex()).toMatchObject([{ kind: 'track', colorIndex: 3 }])
+    fetchSpy.mockRestore()
+  })
+})

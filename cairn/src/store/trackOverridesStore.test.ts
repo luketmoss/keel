@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { LocalTrackOverridesStore, carryDisplayNameIntoTrip } from './trackOverridesStore'
+import { LocalTrackOverridesStore, carryTrackIntoTrip } from './trackOverridesStore'
 
 /** A minimal in-memory `Storage` so tests don't depend on jsdom's
     `localStorage` persisting (or not) across test files — same helper
@@ -105,16 +105,22 @@ describe('LocalTrackOverridesStore', () => {
   })
 })
 
-describe('carryDisplayNameIntoTrip', () => {
-  it('gives the arriving track its name in the destination trip', async () => {
+describe('carryTrackIntoTrip', () => {
+  it('gives the arriving track its name and colour in the destination trip', async () => {
     const store = new LocalTrackOverridesStore(fakeStorage())
 
     expect(
-      await carryDisplayNameIntoTrip(store, 'trip-1', 'drive-1', 'Snowdon ridge', null),
+      await carryTrackIntoTrip(
+        store,
+        'trip-1',
+        'drive-1',
+        { displayName: 'Snowdon ridge', color: 4 },
+        null,
+      ),
     ).toBe(true)
 
     expect(store.getOverrides('trip-1')).toEqual({
-      'drive-1': { displayName: 'Snowdon ridge' },
+      'drive-1': { displayName: 'Snowdon ridge', color: 4 },
     })
   })
 
@@ -127,23 +133,35 @@ describe('carryDisplayNameIntoTrip', () => {
       'drive-9',
     ])
 
-    await carryDisplayNameIntoTrip(store, 'trip-1', 'drive-1', 'Snowdon ridge', null)
+    await carryTrackIntoTrip(
+      store,
+      'trip-1',
+      'drive-1',
+      { displayName: 'Snowdon ridge', color: 4 },
+      null,
+    )
 
     expect(store.getOverrides('trip-1')).toEqual({
       'drive-9': { displayName: 'Day 1', color: 3, order: 0 },
-      'drive-1': { displayName: 'Snowdon ridge' },
+      'drive-1': { displayName: 'Snowdon ridge', color: 4 },
     })
   })
 
-  it('leaves a track arriving with a name it already had alone', async () => {
+  it('leaves a track arriving with a name and colour it already had alone', async () => {
     const store = new LocalTrackOverridesStore(fakeStorage())
     await store.setOverride('trip-1', 'drive-1', { displayName: 'Snowdon ridge', color: 2 }, [
       'drive-1',
     ])
 
-    await carryDisplayNameIntoTrip(store, 'trip-1', 'drive-1', 'Snowdon ridge', null)
+    await carryTrackIntoTrip(
+      store,
+      'trip-1',
+      'drive-1',
+      { displayName: 'Snowdon ridge', color: 2 },
+      null,
+    )
 
-    // Merged, not replaced — a name arriving does not cost the track its colour.
+    // Merged, not replaced — arriving does not cost the track its order.
     expect(store.getOverrides('trip-1')).toEqual({
       'drive-1': { displayName: 'Snowdon ridge', color: 2 },
     })
@@ -151,8 +169,8 @@ describe('carryDisplayNameIntoTrip', () => {
 
   // The silent one: a Drive-backed store writes to `localStorage` only until
   // the destination trip is connected, and that trip's next `connect`
-  // hydrates Drive's copy over the top — taking the new name with it.
-  it('connects the destination trip before writing, so the name reaches Drive', async () => {
+  // hydrates Drive's copy over the top — taking the new values with it.
+  it('connects the destination trip before writing, so the values reach Drive', async () => {
     const store = new LocalTrackOverridesStore(fakeStorage())
     const calls: string[] = []
     const connecting = {
@@ -167,15 +185,18 @@ describe('carryDisplayNameIntoTrip', () => {
       setOrder: store.setOrder,
     }
 
-    await carryDisplayNameIntoTrip(connecting, 'trip-1', 'drive-1', 'Snowdon ridge', {
-      accessToken: 'token-1',
-      folderId: 'cairn-folder',
-    })
+    await carryTrackIntoTrip(
+      connecting,
+      'trip-1',
+      'drive-1',
+      { displayName: 'Snowdon ridge', color: 4 },
+      { accessToken: 'token-1', folderId: 'cairn-folder' },
+    )
 
     expect(calls).toEqual(['connect:trip-1:token-1:cairn-folder', 'setOverride'])
   })
 
-  it('writes anyway when connecting fails, so the name is not lost outright', async () => {
+  it('writes anyway when connecting fails, so the values are not lost outright', async () => {
     const store = new LocalTrackOverridesStore(fakeStorage())
     const connecting = {
       getOverrides: store.getOverrides,
@@ -187,14 +208,17 @@ describe('carryDisplayNameIntoTrip', () => {
     }
 
     expect(
-      await carryDisplayNameIntoTrip(connecting, 'trip-1', 'drive-1', 'Snowdon ridge', {
-        accessToken: 'token-1',
-        folderId: 'cairn-folder',
-      }),
+      await carryTrackIntoTrip(
+        connecting,
+        'trip-1',
+        'drive-1',
+        { displayName: 'Snowdon ridge', color: 4 },
+        { accessToken: 'token-1', folderId: 'cairn-folder' },
+      ),
     ).toBe(true)
 
     expect(store.getOverrides('trip-1')).toEqual({
-      'drive-1': { displayName: 'Snowdon ridge' },
+      'drive-1': { displayName: 'Snowdon ridge', color: 4 },
     })
   })
 
@@ -207,7 +231,13 @@ describe('carryDisplayNameIntoTrip', () => {
     }
 
     expect(
-      await carryDisplayNameIntoTrip(refusing, 'trip-1', 'drive-1', 'Snowdon ridge', null),
+      await carryTrackIntoTrip(
+        refusing,
+        'trip-1',
+        'drive-1',
+        { displayName: 'Snowdon ridge', color: 4 },
+        null,
+      ),
     ).toBe(false)
   })
 })

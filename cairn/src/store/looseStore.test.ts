@@ -391,12 +391,17 @@ describe('cairnDefaultName (#156)', () => {
 })
 
 describe('moveLooseIntoTrip', () => {
-  /* #150: the trip-overrides side of the move. The real one writes a
-     display-name override onto the destination trip; here it only records
-     what it was asked to carry, which is what these tests are about. */
-  let carried: { tripId: string; driveFileId: string; name: string }[]
-  const carryName = async (tripId: string, driveFileId: string, name: string) => {
-    carried.push({ tripId, driveFileId, name })
+  /* #150 (name) and #176 (colour): the trip-overrides side of the move. The
+     real one writes a display-name and colour override onto the destination
+     trip; here it only records what it was asked to carry, which is what
+     these tests are about. */
+  let carried: { tripId: string; driveFileId: string; displayName: string; color: number }[]
+  const carryName = async (
+    tripId: string,
+    driveFileId: string,
+    patch: { displayName: string; color: number },
+  ) => {
+    carried.push({ tripId, driveFileId, ...patch })
   }
 
   beforeEach(() => {
@@ -552,7 +557,25 @@ describe('moveLooseIntoTrip', () => {
     await moveLooseIntoTrip(store, trips, record.id, trip.id, carryName)
 
     expect(carried).toEqual([
-      { tripId: trip.id, driveFileId: 'drive-1', name: 'Snowdon ridge' },
+      { tripId: trip.id, driveFileId: 'drive-1', displayName: 'Snowdon ridge', color: 0 },
+    ])
+  })
+
+  // #176: a track's colour is stored the same way its name is, so the move
+  // has to hand over the loose record's own `colorIndex` too — whether or
+  // not the user ever changed it from its auto-assigned value.
+  it('carries the track colour into the destination trip', async () => {
+    const trips = new LocalTripStore(fakeStorage())
+    const trip = trips.createTrip('Larapinta')
+    const record = store.addTrack(
+      { ...NEW_TRACK, driveFileId: 'drive-1', colorIndex: 3 },
+      [track([[1, 2]])],
+    )
+
+    await moveLooseIntoTrip(store, trips, record.id, trip.id, carryName)
+
+    expect(carried).toEqual([
+      { tripId: trip.id, driveFileId: 'drive-1', displayName: 'Mount Rosea', color: 3 },
     ])
   })
 

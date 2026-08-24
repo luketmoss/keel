@@ -96,6 +96,7 @@ vi.mock('../geo/elevation', () => ({
 
 import { Map3DSurface } from './Map3D'
 import { clearGroundAltitudeCache } from '../map/groundAltitude'
+import { HOME_CENTER, HOME_RANGE } from '../map/homeView'
 
 /** Lets the awaited elevation sample settle. The framing that follows it is
     what every assertion below is actually about. */
@@ -437,5 +438,135 @@ describe('Map3DSurface flyover (#274)', () => {
     rerender(<Map3DSurface on={false} mode={'SATELLITE' as never} flyover={{ token: 1, points }} />)
 
     expect(stopCameraAnimation).toHaveBeenCalled()
+  })
+})
+
+describe('Map3DSurface reset (#304)', () => {
+  beforeEach(() => {
+    flyCameraTo.mockClear()
+    stopCameraAnimation.mockClear()
+    reducedMotion.current = false
+    elevationFails.current = false
+    setMapUpgraded(true)
+    clearGroundAltitudeCache()
+    map3dEl.tilt = 65
+    map3dEl.heading = 270
+    map3dEl.center = { lat: 10, lng: 20 }
+    map3dEl.range = 5000
+    map3dEl.addEventListener.mockClear()
+    vi.useFakeTimers()
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      cb(0)
+      return 0
+    })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  /** A new `resetToken` while 3D is already on and settled — the surface
+      turning on with no reset requested (`resetToken={null}` on mount, same
+      as every other test in this file), then `Reset view` pressed. */
+  it('flies to the home extent, heading 0, at the standard tilt-in\'s own 55°', async () => {
+    const { rerender } = render(<Map3DSurface on={true} mode={'SATELLITE' as never} />)
+    await settleFraming()
+    flyCameraTo.mockClear()
+
+    rerender(<Map3DSurface on={true} mode={'SATELLITE' as never} resetToken={1} />)
+    await settleFraming()
+
+    expect(flyCameraTo).toHaveBeenCalledTimes(1)
+    const endCamera = flyCameraTo.mock.calls[0][0].endCamera
+    expect(endCamera.tilt).toBe(55)
+    expect(endCamera.heading).toBe(0)
+    expect(endCamera.center.lat).toBeCloseTo(HOME_CENTER.lat)
+    expect(endCamera.center.lng).toBeCloseTo(HOME_CENTER.lng)
+    expect(endCamera.range).toBe(HOME_RANGE)
+  })
+
+  // A reset resets orientation too — the camera was left facing an
+  // arbitrary heading (270° above) by a prior orbit/flyover, and the reset
+  // still lands north-up.
+  it('resets heading to 0 even though the camera was left facing elsewhere', async () => {
+    const { rerender } = render(<Map3DSurface on={true} mode={'SATELLITE' as never} />)
+    await settleFraming()
+    flyCameraTo.mockClear()
+    map3dEl.heading = 270
+
+    rerender(<Map3DSurface on={true} mode={'SATELLITE' as never} resetToken={1} />)
+    await settleFraming()
+
+    expect(flyCameraTo.mock.calls[0][0].endCamera.heading).toBe(0)
+  })
+
+  it('stays flat, at tilt 0, when the ground cannot be resolved', async () => {
+    elevationFails.current = true
+    const { rerender } = render(<Map3DSurface on={true} mode={'SATELLITE' as never} />)
+    await settleFraming()
+    flyCameraTo.mockClear()
+
+    rerender(<Map3DSurface on={true} mode={'SATELLITE' as never} resetToken={1} />)
+    await settleFraming()
+
+    expect(flyCameraTo.mock.calls[0][0].endCamera.tilt).toBe(0)
+  })
+
+  it('under reduced motion, sets the camera directly with no flight', async () => {
+    reducedMotion.current = true
+    const { rerender } = render(<Map3DSurface on={true} mode={'SATELLITE' as never} />)
+    await settleFraming()
+    flyCameraTo.mockClear()
+
+    rerender(<Map3DSurface on={true} mode={'SATELLITE' as never} resetToken={1} />)
+    await settleFraming()
+
+    expect(flyCameraTo).not.toHaveBeenCalled()
+    expect(map3dEl.tilt).toBe(55)
+    expect(map3dEl.heading).toBe(0)
+    expect(map3dEl.range).toBe(HOME_RANGE)
+  })
+
+  it('pressing Reset view again cancels the running flight and starts fresh, rather than stacking', async () => {
+    const { rerender } = render(<Map3DSurface on={true} mode={'SATELLITE' as never} />)
+    await settleFraming()
+    flyCameraTo.mockClear()
+
+    rerender(<Map3DSurface on={true} mode={'SATELLITE' as never} resetToken={1} />)
+    await settleFraming()
+    expect(flyCameraTo).toHaveBeenCalledTimes(1)
+
+    rerender(<Map3DSurface on={true} mode={'SATELLITE' as never} resetToken={2} />)
+    await settleFraming()
+
+    expect(stopCameraAnimation).toHaveBeenCalled()
+    expect(flyCameraTo).toHaveBeenCalledTimes(2)
+  })
+
+  // #274's own rule, unchanged for #304: a deliberate input on the surface
+  // cancels whatever flight is in progress, reset included.
+  it('input on the 3D surface cancels the running reset flight', async () => {
+    const { rerender } = render(<Map3DSurface on={true} mode={'SATELLITE' as never} />)
+    await settleFraming()
+
+    rerender(<Map3DSurface on={true} mode={'SATELLITE' as never} resetToken={1} />)
+    await settleFraming()
+
+    const [, handler] = map3dEl.addEventListener.mock.calls.find(([type]) => type === 'pointerdown')!
+    ;(handler as () => void)()
+
+    expect(stopCameraAnimation).toHaveBeenCalledTimes(1)
+  })
+
+  it('repeating the same token a second time is a no-op', async () => {
+    const { rerender } = render(<Map3DSurface on={true} mode={'SATELLITE' as never} resetToken={1} />)
+    await settleFraming()
+    flyCameraTo.mockClear()
+
+    rerender(<Map3DSurface on={true} mode={'SATELLITE' as never} resetToken={1} />)
+    await settleFraming()
+
+    expect(flyCameraTo).not.toHaveBeenCalled()
   })
 })

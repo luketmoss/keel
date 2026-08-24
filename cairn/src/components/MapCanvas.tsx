@@ -8,6 +8,9 @@ import { Map3DSurface } from './Map3D'
 import { useBaseMapType, type BaseMapType } from '../map/useBaseMapType'
 import { Map3DControlProvider, useMap3DControl } from '../map/Map3DControl'
 import { fitTracksToBounds } from '../map/fitBounds'
+import { columnInset, toPadding } from '../map/reveal'
+import { useIsPhone } from '../map/useIsPhone'
+import { HOME_BOUNDS, HOME_CORNERS } from '../map/homeView'
 import './MapCanvas.css'
 
 declare global {
@@ -16,10 +19,6 @@ declare global {
     gm_authFailure?: () => void
   }
 }
-
-/* Nothing is imported yet, so there is no better answer than the whole world. */
-const INITIAL_CENTER = { lat: 20, lng: 0 }
-const INITIAL_ZOOM = 2
 
 /* Without this, zooming out past a single world lets Maps tile the basemap
    side by side — Google's documented fix for "restrict the map to a single
@@ -140,8 +139,9 @@ export function MapCanvas({ panelCollapsed, canFit, getFitPoints }: MapCanvasPro
      `Fly over` turns this on from deep inside the column; the "3D failed
      after starting" regression and the flyover-cancels-on-off wiring both
      live in `Map3DControlProvider` now, alongside this same state. */
-  const { on: is3DOn, setOn: setIs3DOn, support: maps3DSupport, flyover } = useMap3DControl()
+  const { on: is3DOn, setOn: setIs3DOn, support: maps3DSupport, flyover, resetToken } = useMap3DControl()
   const clusterRef = useRef<HTMLDivElement | null>(null)
+  const isPhone = useIsPhone()
 
   /* #271's "The switch and the tiles" table, both directions. Neither is a
      blocked action and neither asks a question — the consequence happens
@@ -164,8 +164,13 @@ export function MapCanvas({ panelCollapsed, canFit, getFitPoints }: MapCanvasPro
     <div className="map-canvas">
       <Map
         className="map"
-        defaultCenter={INITIAL_CENTER}
-        defaultZoom={INITIAL_ZOOM}
+        /* #304 — the home view, not the whole world: a bounds-based default
+           rather than a centre and a zoom, so the same *place* (Colorado)
+           fills the screen on a phone as it does on a desktop. The padding
+           is the same inset every reveal already respects, computed once
+           here since `defaultBounds` — unlike `revealPoints`'s live reads —
+           is only ever applied at mount. */
+        defaultBounds={{ ...HOME_BOUNDS, padding: toPadding(columnInset(isPhone)) }}
         /* Advanced Markers require a Map ID or Google refuses to render them
            at all. Left unset, `mapId` is simply omitted and marker layers
            skip themselves rather than mounting against a map with none. */
@@ -179,7 +184,12 @@ export function MapCanvas({ panelCollapsed, canFit, getFitPoints }: MapCanvasPro
         disableDefaultUI
         restriction={{ latLngBounds: WORLD_BOUNDS, strictBounds: true }}
       />
-      <Map3DSurface on={is3DOn} mode={baseMap.labels ? MapMode.HYBRID : MapMode.SATELLITE} flyover={flyover} />
+      <Map3DSurface
+        on={is3DOn}
+        mode={baseMap.labels ? MapMode.HYBRID : MapMode.SATELLITE}
+        flyover={flyover}
+        resetToken={resetToken}
+      />
       {/* #284 — one cluster, two controls: the basemap picker and, only on
           Satellite, the 3D toggle. The wrapper owns the corner — clearing
           the column while a panel is open, sliding to the map's own edge
@@ -218,6 +228,8 @@ function ZoomControls({
   getFitPoints: () => { lat: number; lng: number }[]
 }) {
   const map = useMap()
+  const isPhone = useIsPhone()
+  const { on: is3DOn, requestReset } = useMap3DControl()
 
   function nudgeZoom(delta: number) {
     if (!map) return
@@ -226,8 +238,31 @@ function ZoomControls({
     map.setZoom(zoom + delta)
   }
 
+  /* #304 — camera-only, and always available: with 3D on, the 3D surface
+     owns the flight (through the shared token in `Map3DControl`); with it
+     off, this fits the 2D map to the home extent the same inset-aware way
+     the initial load does. Never disabled — unlike fit-to-everything, it
+     doesn't depend on there being anything loaded. */
+  function resetView() {
+    if (is3DOn) {
+      requestReset()
+      return
+    }
+    if (!map) return
+    fitTracksToBounds(map, HOME_CORNERS, toPadding(columnInset(isPhone)))
+  }
+
   return (
     <div className="map-controls">
+      <button
+        type="button"
+        className="map-controls__button"
+        aria-label="Reset view"
+        title="Reset view"
+        onClick={resetView}
+      >
+        <span aria-hidden="true">⌂</span>
+      </button>
       <button
         type="button"
         className="map-controls__button"

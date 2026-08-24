@@ -24,6 +24,14 @@ export interface Map3DControlValue {
       for fewer than one point, which is what makes "a subject with no
       usable geometry" safe to call this with. */
   requestFlyover: (points: LatLng[]) => void
+  /** #304 — non-null once `Reset view` has been pressed while 3D is on.
+      `Map3DSurface` reads this to fly its camera to the home extent — a
+      token, not a boolean, since a second press while the first move is
+      still in flight has to be told apart from the first (design note's
+      "the second press replaces the first move"). Camera-only: unlike
+      `requestFlyover`, this never touches `on`. */
+  resetToken: number | null
+  requestReset: () => void
 }
 
 const FALLBACK_VALUE: Map3DControlValue = {
@@ -32,6 +40,8 @@ const FALLBACK_VALUE: Map3DControlValue = {
   setOn: () => {},
   flyover: null,
   requestFlyover: () => {},
+  resetToken: null,
+  requestReset: () => {},
 }
 
 const Map3DControlContext = createContext<Map3DControlValue | null>(null)
@@ -55,6 +65,8 @@ export function Map3DControlProvider({ children }: { children: ReactNode }) {
   const [on, setOnState] = useState(false)
   const [flyover, setFlyover] = useState<FlyoverRequest | null>(null)
   const nextToken = useRef(0)
+  const [resetToken, setResetToken] = useState<number | null>(null)
+  const nextResetToken = useRef(0)
 
   /* #271's own guard, moved here from `MapCanvas`: support can only regress
      from `available` after the surface already mounted, and when it does,
@@ -83,9 +95,17 @@ export function Map3DControlProvider({ children }: { children: ReactNode }) {
     setOnState(true)
   }, [])
 
+  /** #304 — always requestable, on or off 3D, unlike `requestFlyover`: the
+      button that calls this only does so once it has already checked `on`
+      itself and decided the 3D form applies. */
+  const requestReset = useCallback(() => {
+    nextResetToken.current += 1
+    setResetToken(nextResetToken.current)
+  }, [])
+
   const value = useMemo<Map3DControlValue>(
-    () => ({ support, on, setOn, flyover, requestFlyover }),
-    [support, on, setOn, flyover, requestFlyover],
+    () => ({ support, on, setOn, flyover, requestFlyover, resetToken, requestReset }),
+    [support, on, setOn, flyover, requestFlyover, resetToken, requestReset],
   )
 
   return <Map3DControlContext.Provider value={value}>{children}</Map3DControlContext.Provider>

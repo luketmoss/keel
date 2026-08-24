@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const { fitTracksToBounds } = vi.hoisted(() => ({ fitTracksToBounds: vi.fn() }))
-vi.mock('../map/fitBounds', () => ({ fitTracksToBounds, zoomToFitCluster: vi.fn() }))
+vi.mock('../map/fitBounds', () => ({ fitTracksToBounds, zoomToFitCluster: vi.fn(), FIT_PADDING: 48 }))
 
 const { setZoom, getZoom, fakeMap } = vi.hoisted(() => {
   const setZoom = vi.fn()
@@ -16,10 +16,16 @@ const { setZoom, getZoom, fakeMap } = vi.hoisted(() => {
    `'unavailable'` by default, same as a browser that can't draw 3D, which
    this file has no reason to exercise beyond MapCanvas's own coupling
    logic (covered directly, without the surface). */
-const { useMapResult } = vi.hoisted(() => ({ useMapResult: { current: null as unknown } }))
+const { useMapResult, mapProps } = vi.hoisted(() => ({
+  useMapResult: { current: null as unknown },
+  mapProps: vi.fn(),
+}))
 vi.mock('@vis.gl/react-google-maps', () => ({
   APIProvider: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
-  Map: () => <div data-testid="map" />,
+  Map: (props: unknown) => {
+    mapProps(props)
+    return <div data-testid="map" />
+  },
   MapMode: { HYBRID: 'HYBRID', SATELLITE: 'SATELLITE' },
   useMap: () => useMapResult.current,
 }))
@@ -43,6 +49,7 @@ vi.mock('./Map3D', () => ({
 
 import { MapCanvas } from './MapCanvas'
 import { Map3DControlProvider } from '../map/Map3DControl'
+import { HOME_BOUNDS, HOME_CORNERS } from '../map/homeView'
 
 function renderCanvas(
   options: {
@@ -66,6 +73,7 @@ afterEach(() => {
   setZoom.mockClear()
   getZoom.mockClear()
   fitTracksToBounds.mockClear()
+  mapProps.mockClear()
   window.localStorage.clear()
 })
 
@@ -124,6 +132,52 @@ describe('MapCanvas corner controls (#109)', () => {
 
     const collapsed = renderCanvas({ panelCollapsed: true })
     expect(collapsed.container.querySelector('.map-layers-cluster--clear')).not.toBeNull()
+  })
+})
+
+describe('the home view (#304)', () => {
+  afterEach(() => {
+    use3DSupportResult.current = { support: 'unavailable', library: null }
+  })
+
+  it('opens the map on the Colorado extent, inset-aware, rather than the whole world', () => {
+    renderCanvas()
+
+    const props = mapProps.mock.calls[0][0] as { defaultBounds: unknown }
+    expect(props.defaultBounds).toEqual({
+      ...HOME_BOUNDS,
+      padding: { left: 48, right: 48, top: 48, bottom: 48 },
+    })
+  })
+
+  it('Reset view is never disabled, unlike fit-to-everything', () => {
+    renderCanvas({ canFit: false, mapReady: false })
+
+    expect(screen.getByRole('button', { name: 'Reset view' })).not.toHaveProperty('disabled', true)
+  })
+
+  it('Reset view fits the 2D map to the home extent, inset-aware, with 3D off', () => {
+    renderCanvas()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset view' }))
+
+    expect(fitTracksToBounds).toHaveBeenCalledWith(fakeMap, HOME_CORNERS, {
+      left: 48,
+      right: 48,
+      top: 48,
+      bottom: 48,
+    })
+  })
+
+  it('Reset view leaves the 2D map alone when 3D is on', () => {
+    use3DSupportResult.current = { support: 'available', library: null }
+    renderCanvas()
+    fireEvent.click(screen.getByRole('switch', { name: '3D' }))
+    fitTracksToBounds.mockClear()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset view' }))
+
+    expect(fitTracksToBounds).not.toHaveBeenCalled()
   })
 })
 

@@ -8,10 +8,10 @@ Standing documents: [design-language.md](design-language.md). Prior notes:
 phases, and its framing),
 [224-sampled-elevation.md](224-sampled-elevation.md) (the Elevation API and how
 this project asks it things),
-[303-a-3d-reveal-frames-the-ground.md](303-a-3d-reveal-frames-the-ground.md)
-(the same ground-resolution rule, for the reveal),
 [223-importing-gpx.md](223-importing-gpx.md) (where a 2,400-point track comes
-from).
+from). #303, not yet built, gives the 3D reveal the same ground-resolution
+rule this note gives the flyover — no link, since its own note has not
+landed yet.
 
 ## Why
 

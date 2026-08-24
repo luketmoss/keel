@@ -374,13 +374,11 @@ export function TripDetail({
       the row — leaves the sheet where it is. */
   const toggleTrackExpand = useCallback(
     (id: string) => {
-      setExpandedTrackId((current) => {
-        const next = current === id ? null : id
-        if (next !== null) promote()
-        return next
-      })
+      const next = expandedTrackId === id ? null : id
+      if (next !== null) promote()
+      setExpandedTrackId(next)
     },
-    [promote],
+    [expandedTrackId, promote],
   )
 
   /** #270 — a route's hit line on the map calls this, the same pair the

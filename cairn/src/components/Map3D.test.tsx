@@ -82,12 +82,15 @@ const reducedMotion = { current: false }
    Elevation API supplies; here it is a fixed number so the tests assert on
    "the resolved ground was used", not on Google's data. */
 const GROUND_METERS = 1200
+/* #306 — flippable per test so the "ground could not be resolved" path can
+   be exercised without a second mock module. */
+const elevationFails = { current: false }
 vi.mock('../geo/elevation', () => ({
   createGoogleElevationSampler: () => ({
-    sampleAlongPath: async () => ({
-      ok: true,
-      samples: [{ lat: 0, lng: 0, elevationMeters: GROUND_METERS }],
-    }),
+    sampleAlongPath: async () =>
+      elevationFails.current
+        ? { ok: false, reason: 'UNKNOWN_ERROR' }
+        : { ok: true, samples: [{ lat: 0, lng: 0, elevationMeters: GROUND_METERS }] },
   }),
 }))
 
@@ -107,6 +110,7 @@ describe('Map3DSurface (#271)', () => {
   beforeEach(() => {
     flyCameraTo.mockClear()
     reducedMotion.current = false
+    elevationFails.current = false
     setMapUpgraded(true)
     clearGroundAltitudeCache()
     map3dEl.tilt = 0
@@ -125,6 +129,19 @@ describe('Map3DSurface (#271)', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals()
+  })
+
+  /* #306 — the ground could not be resolved at all: the tilt-in stays flat
+     rather than tilting down over a look-at it cannot place, since sea
+     level combined with a real tilt is exactly the buried-camera failure
+     #282 fixed. */
+  it('stays flat and at sea level when the ground cannot be resolved', async () => {
+    elevationFails.current = true
+    render(<Map3DSurface on={true} mode={'SATELLITE' as never} />)
+    await settleFraming()
+
+    expect(flyCameraTo.mock.calls[0][0].endCamera.tilt).toBe(0)
+    expect(flyCameraTo.mock.calls[0][0].endCamera.center.altitude).toBe(0)
   })
 
   it('does not mount the 3D surface until first turned on', () => {
@@ -254,6 +271,7 @@ describe('Map3DSurface flyover (#274)', () => {
     flyCameraAround.mockClear()
     stopCameraAnimation.mockClear()
     reducedMotion.current = false
+    elevationFails.current = false
     setMapUpgraded(true)
     clearGroundAltitudeCache()
     map3dEl.tilt = 0
@@ -291,6 +309,19 @@ describe('Map3DSurface flyover (#274)', () => {
     await settleFraming()
 
     expect(flyCameraTo.mock.calls[0][0].endCamera.center.altitude).toBe(GROUND_METERS)
+  })
+
+  /* #306 — a long track's elevation request failing (or timing out) used
+     to leave the fly-in aimed at sea level, tilted to 65°: exactly the
+     "inside the earth, then a blue screen" the issue reported. The fix is
+     to stay flat rather than guess a ground that was never resolved. */
+  it('flies in flat and overhead, not tilted over sea level, when the ground cannot be resolved', async () => {
+    elevationFails.current = true
+    render(<Map3DSurface on={true} mode={'SATELLITE' as never} flyover={{ token: 1, points }} />)
+    await settleFraming()
+
+    expect(flyCameraTo.mock.calls[0][0].endCamera.tilt).toBe(0)
+    expect(flyCameraTo.mock.calls[0][0].endCamera.center.altitude).toBe(0)
   })
 
   it('the orbit follows the fly-in without a pause, for one round', async () => {

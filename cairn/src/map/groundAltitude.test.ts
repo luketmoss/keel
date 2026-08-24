@@ -34,27 +34,27 @@ describe('sampleGroundAltitude (#282)', () => {
     expect(await sampleGroundAltitude(PATH, sampler([600, 2400, 900]))).toBe(2400)
   })
 
-  it('falls back to sea level with no sampler at all', async () => {
-    expect(await sampleGroundAltitude(PATH, null)).toBe(0)
+  it('resolves to null, not sea level, with no sampler at all (#306)', async () => {
+    expect(await sampleGroundAltitude(PATH, null)).toBeNull()
   })
 
-  it('falls back to sea level for an empty path', async () => {
-    expect(await sampleGroundAltitude([], sampler([1000]))).toBe(0)
+  it('resolves to null for an empty path', async () => {
+    expect(await sampleGroundAltitude([], sampler([1000]))).toBeNull()
   })
 
-  it('falls back to sea level when the call fails', async () => {
+  it('resolves to null when the call fails, rather than sea level (#306)', async () => {
     const failing: ElevationSampler = {
       sampleAlongPath: async () => ({ ok: false as const, reason: 'OVER_QUERY_LIMIT' }),
     }
-    expect(await sampleGroundAltitude(PATH, failing)).toBe(0)
+    expect(await sampleGroundAltitude(PATH, failing)).toBeNull()
   })
 
-  it('falls back to sea level rather than hanging when the call never settles', async () => {
+  it('resolves to null rather than hanging when the call never settles', async () => {
     vi.useFakeTimers()
     const hanging: ElevationSampler = { sampleAlongPath: () => new Promise(() => {}) }
     const pending = sampleGroundAltitude(PATH, hanging, 500)
     await vi.advanceTimersByTimeAsync(600)
-    expect(await pending).toBe(0)
+    expect(await pending).toBeNull()
     vi.useRealTimers()
   })
 
@@ -90,8 +90,34 @@ describe('sampleGroundAltitude (#282)', () => {
           : { ok: false as const, reason: 'UNKNOWN_ERROR' },
     }
 
-    expect(await sampleGroundAltitude(PATH, flaky)).toBe(0)
+    expect(await sampleGroundAltitude(PATH, flaky)).toBeNull()
     ok = true
     expect(await sampleGroundAltitude(PATH, flaky)).toBe(3000)
+  })
+
+  it('reduces a long path to MAX_SAMPLES points before asking, keeping both ends (#306)', async () => {
+    const longPath = Array.from({ length: 4233 }, (_, i) => ({ lat: 40 + i * 0.00001, lng: -107 + i * 0.00001 }))
+    let seen: { lat: number; lng: number }[] = []
+    const spy: ElevationSampler = {
+      sampleAlongPath: async (path) => {
+        seen = path
+        return { ok: true as const, samples: [{ lat: 0, lng: 0, elevationMeters: 3500 }] }
+      },
+    }
+
+    expect(await sampleGroundAltitude(longPath, spy)).toBe(3500)
+    expect(seen.length).toBeLessThanOrEqual(16)
+    expect(seen[0]).toEqual(longPath[0])
+    expect(seen[seen.length - 1]).toEqual(longPath[longPath.length - 1])
+  })
+
+  it('costs one call for a long track and a short overview alike, when their endpoints agree (#306)', async () => {
+    const longPath = Array.from({ length: 4233 }, (_, i) => ({ lat: 40 + i * 0.00001, lng: -107 + i * 0.00001 }))
+    const stub = sampler([3200])
+
+    await sampleGroundAltitude(longPath, stub)
+    await sampleGroundAltitude(longPath, stub)
+
+    expect(stub.calls).toBe(1)
   })
 })

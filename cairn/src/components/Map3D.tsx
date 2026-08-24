@@ -107,14 +107,19 @@ export function Map3DSurface({ on, mode, flyover = null }: Map3DSurfaceProps) {
       path: LatLng[],
       onArrived?: (camera: { center: LatLng & { altitude: number }; range: number; tilt: number }) => void,
     ) => {
-      const altitude = await sampleGroundAltitude(path, elevationSampler())
+      const groundAltitude = await sampleGroundAltitude(path, elevationSampler())
       const map3d = map3dRef.current?.map3d
       if (!map3d) return
 
+      // #306 — the ground could not be resolved: sea level is the one
+      // altitude tilt 0 is guaranteed not to collide with, whatever the
+      // subject's real elevation, so the arrival stays flat and overhead
+      // rather than tilting down over a look-at that might be buried.
+      const resolved = groundAltitude !== null
       const target = {
-        center: { ...center, altitude },
+        center: { ...center, altitude: resolved ? groundAltitude : 0 },
         range,
-        tilt,
+        tilt: resolved ? tilt : 0,
         heading: 0,
         roll: 0,
       }

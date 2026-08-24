@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TripDetail } from './TripDetail'
 import { LocalTripStore } from '../store/tripStore'
+import { clearGroundAltitudeCache } from '../map/groundAltitude'
 import type { ImportedFile } from '../import/types'
 import type { CairnRecord } from '../photo/useCairnImport'
 
@@ -13,7 +14,24 @@ import type { CairnRecord } from '../photo/useCairnImport'
    geometry. The harness is `TripDetail.track3DSelection.test.tsx`'s own —
    a fake `Map3DElement` and a fake `Polyline3DInteractiveElement` stand in
    for the Maps API, so `Track3DLayer` and `Cairn3DLayer` both run for
-   real underneath this note's own effect. */
+   real underneath this note's own effect.
+
+   #303 — the fit now resolves the ground through `flyToFramedGround`
+   before it moves the camera, `Map3D.test.tsx`'s own harness: a fixed
+   elevation stands in for the real Elevation API, and `elevationFails`
+   flips the ground-unresolved fail-safe on for the one test that needs
+   it. */
+const GROUND_METERS = 1200
+const elevationFails = { current: false }
+vi.mock('../geo/elevation', () => ({
+  createGoogleElevationSampler: () => ({
+    sampleAlongPath: async () =>
+      elevationFails.current
+        ? { ok: false, reason: 'UNKNOWN_ERROR' }
+        : { ok: true, samples: [{ lat: 0, lng: 0, elevationMeters: GROUND_METERS }] },
+  }),
+}))
+
 const { fakeMap3d, PolylineCtor, MarkerCtor, flyCameraTo, removeSpy } = vi.hoisted(() => {
   const flyCameraTo = vi.fn()
   const removeSpy = vi.fn()
@@ -268,6 +286,16 @@ function renderTrip(overrides: { revealSuspended?: boolean } = {}) {
   return { ...view, store, entry }
 }
 
+/** Lets the awaited ground request settle — `Map3D.test.tsx`'s own helper,
+    since the fit's flight now only fires once `flyToFramedGround`'s
+    `sampleGroundAltitude` call has resolved. */
+async function settleFraming() {
+  await act(async () => {
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+}
+
 beforeEach(() => {
   fakeMap3d.appended.length = 0
   fakeMap3d.center = null
@@ -275,15 +303,18 @@ beforeEach(() => {
   flyCameraTo.mockClear()
   removeSpy.mockClear()
   is3DOnRef.current = true
+  elevationFails.current = false
+  clearGroundAltitudeCache()
   useTripImport.mockReset()
   useCairnImport.mockReset()
   mockCairnImport()
 })
 
 describe('TripDetail — #292 content framing in 3D', () => {
-  it('flies the 3D camera to frame the trip on open, keeping heading and tilt', () => {
+  it('flies the 3D camera to frame the trip on open, keeping heading and tilt, on the ground', async () => {
     useTripImport.mockReturnValue(baseTripImport({ tracks: [trackFile()] }))
     renderTrip()
+    await settleFraming()
 
     expect(flyCameraTo).toHaveBeenCalledTimes(1)
     const call = flyCameraTo.mock.calls[0][0]
@@ -291,13 +322,31 @@ describe('TripDetail — #292 content framing in 3D', () => {
     expect(call.endCamera.tilt).toBe(47)
     expect(call.endCamera.center.lat).toBeCloseTo(37.005)
     expect(call.endCamera.center.lng).toBeCloseTo(-122.005)
+    expect(call.endCamera.center.altitude).toBe(GROUND_METERS)
     expect(call.durationMillis).toBeGreaterThan(0)
   })
 
-  it('frames the trip’s cairns when it has no drawable track geometry', () => {
+  /* #303 — the ground could not be resolved: the fit still fires, but
+     flattens to tilt 0 and sea level rather than tilting the live camera
+     down over a look-at that might be buried. */
+  it('flattens to tilt 0 when the ground cannot be resolved', async () => {
+    elevationFails.current = true
+    useTripImport.mockReturnValue(baseTripImport({ tracks: [trackFile()] }))
+    renderTrip()
+    await settleFraming()
+
+    expect(flyCameraTo).toHaveBeenCalledTimes(1)
+    const call = flyCameraTo.mock.calls[0][0]
+    expect(call.endCamera.tilt).toBe(0)
+    expect(call.endCamera.center.altitude).toBe(0)
+    expect(call.endCamera.heading).toBe(12)
+  })
+
+  it('frames the trip’s cairns when it has no drawable track geometry', async () => {
     useTripImport.mockReturnValue(baseTripImport({ tracks: [] }))
     mockCairnImport([cairnRecord()])
     renderTrip()
+    await settleFraming()
 
     expect(flyCameraTo).toHaveBeenCalledTimes(1)
     const call = flyCameraTo.mock.calls[0][0]
@@ -305,10 +354,11 @@ describe('TripDetail — #292 content framing in 3D', () => {
     expect(call.endCamera.center.lng).toBeCloseTo(-120)
   })
 
-  it('leaves the camera alone when the trip has neither tracks nor cairns', () => {
+  it('leaves the camera alone when the trip has neither tracks nor cairns', async () => {
     useTripImport.mockReturnValue(baseTripImport({ tracks: [] }))
     mockCairnImport([])
     renderTrip()
+    await settleFraming()
 
     expect(flyCameraTo).not.toHaveBeenCalled()
   })
@@ -316,21 +366,25 @@ describe('TripDetail — #292 content framing in 3D', () => {
   it('re-frames when a track is imported into the open trip', async () => {
     mockTripImportStateful([trackFile()])
     renderTrip()
+    await settleFraming()
     flyCameraTo.mockClear()
 
     await act(async () => {
       tracksRef.current!((prev) => [...prev, trackFile({ id: 'file-b', name: 'Second' })])
     })
+    await settleFraming()
 
     expect(flyCameraTo).toHaveBeenCalledTimes(1)
   })
 
-  it('re-frames when a track’s visibility is toggled off', () => {
+  it('re-frames when a track’s visibility is toggled off', async () => {
     mockTripImportStateful([trackFile()])
     renderTrip()
+    await settleFraming()
     flyCameraTo.mockClear()
 
     fireEvent.click(screen.getByRole('button', { name: 'Hide Belford-Oxford' }))
+    await settleFraming()
 
     // The only track just left the drawn set — nothing to frame (no cairns
     // either), so the effect fires but lands on a no-op, not a flight.
@@ -340,27 +394,31 @@ describe('TripDetail — #292 content framing in 3D', () => {
   it('does not re-frame when a track is removed', async () => {
     mockTripImportStateful([trackFile(), trackFile({ id: 'file-b', name: 'Second' })])
     renderTrip()
+    await settleFraming()
     flyCameraTo.mockClear()
 
     await act(async () => {
       tracksRef.current!((prev) => prev.filter((file) => file.id !== 'file-b'))
     })
+    await settleFraming()
 
     expect(screen.queryByText('Second')).toBeNull()
     expect(flyCameraTo).not.toHaveBeenCalled()
   })
 
-  it('does not frame while a decision owns the map (revealSuspended)', () => {
+  it('does not frame while a decision owns the map (revealSuspended)', async () => {
     useTripImport.mockReturnValue(baseTripImport({ tracks: [trackFile()] }))
     renderTrip({ revealSuspended: true })
+    await settleFraming()
 
     expect(flyCameraTo).not.toHaveBeenCalled()
   })
 
-  it('does not additionally frame when 3D is switched on with the same trip already open', () => {
+  it('does not additionally frame when 3D is switched on with the same trip already open', async () => {
     is3DOnRef.current = false
     useTripImport.mockReturnValue(baseTripImport({ tracks: [trackFile()] }))
     const { rerender, entry, store } = renderTrip()
+    await settleFraming()
     expect(flyCameraTo).not.toHaveBeenCalled()
 
     is3DOnRef.current = true
@@ -381,6 +439,7 @@ describe('TripDetail — #292 content framing in 3D', () => {
         />
       </MemoryRouter>,
     )
+    await settleFraming()
 
     expect(flyCameraTo).not.toHaveBeenCalled()
   })

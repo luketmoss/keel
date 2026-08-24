@@ -23,7 +23,12 @@ const EMPTY_HOVERED_CAIRN_IDS: ReadonlySet<string> = new Set()
     in CSS pixels, that still counts as a tap rather than a drag. A module
     constant rather than a CSS custom property: it is a threshold read in
     JS and never reaches a stylesheet, the same reasoning #288 gave for its
-    own constants. */
+    own constants.
+
+    #305 — the reconstruction itself moved from the marker's own React
+    synthetic handlers to a native, capture-phase listener on `<gmp-map-3d>`
+    (below), but the slop stays what it was: what changed is *where* the
+    press is intercepted, not what counts as a tap. */
 export const CAIRN3D_TAP_SLOP = 10
 
 interface Cairn3DLayerProps {
@@ -84,6 +89,67 @@ export function Cairn3DLayer({
   }, [])
 
   const occludedCairnIds = useCairnOcclusion(map3d, cairns, selectedCairnId, getElevationSampler)
+
+  /* #305 — a press that starts on a marker must never reach `<gmp-map-3d>`'s
+     own gesture handling (`GestureHandling.GREEDY`), or the map latches onto
+     the pointer as a pan/orbit alongside the tap. Stopping propagation from
+     the marker's own React synthetic handler (#293's approach) never worked:
+     React dispatches synthetic events from a listener on the app root, an
+     *ancestor* of the map element, so the map has already seen the native
+     `pointerdown` and started its gesture by the time that handler runs.
+     The only place the stop can actually happen is a native, capture-phase
+     listener on `<gmp-map-3d>` itself — the outermost node in the event's
+     path this app owns, above everything in the element's own shadow tree.
+     An occluded marker's hit element carries `pointer-events: none`
+     (CairnLayer.css), so it is never the resolved target here and the press
+     falls through to the map, matching #285's "an occluded marker is not
+     pressable". */
+  const pressRef = useRef<{ pointerId: number; cairnId: string; x: number; y: number } | null>(null)
+
+  useEffect(() => {
+    if (!map3d) return
+    const surface = map3d as unknown as HTMLElement
+
+    function resolveHit(event: PointerEvent): HTMLElement | null {
+      return event.target instanceof Element ? event.target.closest<HTMLElement>('.cairn-layer__hit--3d') : null
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      const hit = resolveHit(event)
+      const cairnId = hit?.dataset.cairnId
+      if (!hit || !cairnId) return
+      // The stop that #293 tried and failed to make work, done where it can
+      // actually happen: the map never sees this press at all.
+      event.stopPropagation()
+      pressRef.current = { pointerId: event.pointerId, cairnId, x: event.clientX, y: event.clientY }
+    }
+
+    function handlePointerUp(event: PointerEvent) {
+      const press = pressRef.current
+      pressRef.current = null
+      if (!press || press.pointerId !== event.pointerId) return
+      const travelled = Math.hypot(event.clientX - press.x, event.clientY - press.y)
+      if (travelled > CAIRN3D_TAP_SLOP) return
+      const hit = resolveHit(event)
+      if (!hit || hit.dataset.cairnId !== press.cairnId) return
+      onSelectCairn(press.cairnId)
+      onOpenCairn?.(press.cairnId)
+    }
+
+    function handlePointerCancel(event: PointerEvent) {
+      const press = pressRef.current
+      if (press && press.pointerId === event.pointerId) pressRef.current = null
+    }
+
+    surface.addEventListener('pointerdown', handlePointerDown, true)
+    surface.addEventListener('pointerup', handlePointerUp, true)
+    surface.addEventListener('pointercancel', handlePointerCancel, true)
+    return () => {
+      surface.removeEventListener('pointerdown', handlePointerDown, true)
+      surface.removeEventListener('pointerup', handlePointerUp, true)
+      surface.removeEventListener('pointercancel', handlePointerCancel, true)
+    }
+  }, [map3d, onSelectCairn, onOpenCairn])
 
   useEffect(() => {
     if (!map3d || !maps3d) return
@@ -161,8 +227,6 @@ export function Cairn3DLayer({
               selected={selectedCairnId === id}
               hovered={hoveredCairnIds.has(id)}
               occluded={occludedCairnIds.has(id)}
-              onSelect={onSelectCairn}
-              onOpen={onOpenCairn}
               onHoverChange={(hovered) =>
                 onHoverCairn(hovered ? new Set([id]) : EMPTY_HOVERED_CAIRN_IDS)
               }
@@ -179,17 +243,18 @@ export function Cairn3DLayer({
 /** The portaled content for one marker. `pointerenter`/`pointerleave` are
     ordinary DOM events on `MarkerElement`'s hosted children — no `gmp-click`
     and no `Marker3DInteractiveElement` involved, per the design note's
-    discovery. The tap itself is *not* read off `click` — see #293 and
-    `CAIRN3D_TAP_SLOP` above — because `<gmp-map-3d>`'s own gesture handling
-    swallows it before a `click` ever fires. */
+    discovery. The tap itself is not read here at all as of #305: the layer's
+    own capture-phase listener on `<gmp-map-3d>` (above) owns the whole press,
+    start to finish, since only a listener on the map element itself can stop
+    the map's gesture handling from also claiming it. This element is that
+    listener's target — reachable by `data-cairn-id` and the
+    `cairn-layer__hit--3d` class it carries. */
 function Cairn3DMarkerContent({
   cairn,
   accessToken,
   selected,
   hovered,
   occluded,
-  onSelect,
-  onOpen,
   onHoverChange,
 }: {
   cairn: PositionedCairn
@@ -197,41 +262,9 @@ function Cairn3DMarkerContent({
   selected: boolean
   hovered: boolean
   occluded: boolean
-  onSelect: (cairnId: string) => void
-  onOpen?: (cairnId: string) => void
   onHoverChange: (hovered: boolean) => void
 }) {
   const thumbnailUrl = usePhotoImage(accessToken, cairn.thumbnailDriveFileId ?? undefined).url
-
-  /* #293 — the reconstructed tap. `pointerdown` claims the gesture for this
-     marker (recording where it started, and stopping propagation so
-     `<gmp-map-3d>`'s greedy handling does not also claim it for a pan or
-     orbit) and `pointerup` decides whether it was a tap or a drag. No
-     `setPointerCapture`: without it, `pointerup` only reaches this element
-     when the pointer is released back over it, which is what makes a press
-     that lands on the marker and lifts off it a no-op for free, on top of
-     the explicit slop check below. */
-  const pressRef = useRef<{ pointerId: number; x: number; y: number } | null>(null)
-
-  function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
-    pressRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY }
-    event.stopPropagation()
-  }
-
-  function handlePointerUp(event: React.PointerEvent<HTMLDivElement>) {
-    const press = pressRef.current
-    pressRef.current = null
-    if (!press || press.pointerId !== event.pointerId) return
-    const travelled = Math.hypot(event.clientX - press.x, event.clientY - press.y)
-    if (travelled > CAIRN3D_TAP_SLOP) return
-    onSelect(cairn.id)
-    onOpen?.(cairn.id)
-  }
-
-  function handlePointerCancel(event: React.PointerEvent<HTMLDivElement>) {
-    const press = pressRef.current
-    if (press && press.pointerId === event.pointerId) pressRef.current = null
-  }
 
   return (
     <div
@@ -244,9 +277,6 @@ function Cairn3DMarkerContent({
       data-cairn-id={cairn.id}
       data-selected={selected}
       data-occluded={occluded}
-      onPointerDown={handlePointerDown}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerCancel}
       onPointerEnter={() => onHoverChange(true)}
       onPointerLeave={() => onHoverChange(false)}
     >

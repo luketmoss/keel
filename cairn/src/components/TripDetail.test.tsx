@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useRef } from 'react'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -78,6 +78,9 @@ function baseTripImport(overrides: Partial<ReturnType<typeof useTripImport>> = {
     removeFile: vi.fn(),
     removingTrackIds: new Set<string>(),
     trackRemoveErrors: {},
+    // #224 — the hook always returns a record (empty until something is
+    // sampled), and `saveOverview` is handed it on every regeneration.
+    sampledElevation: {},
     renameTrack: vi.fn(),
     recolorTrack: vi.fn(),
     reorderTracks: vi.fn(),
@@ -89,9 +92,14 @@ function baseCairnImport(overrides: Partial<ReturnType<typeof useCairnImport>> =
   return {
     cairns: [],
     loading: false,
+    // #243: "the Drive read settled successfully", distinct from `!loading`
+    // now that a cached trip renders before any read has.
+    hydrated: true,
     progress: [],
     failures: [],
-    importFiles: vi.fn().mockResolvedValue(undefined),
+    // #168: resolves the drop's split, which the caller unpacks to report
+    // stragglers up — a bare `undefined` throws where it does that.
+    importFiles: vi.fn().mockResolvedValue({ resolvedCount: 0, needsPlacement: [] }),
     retryFailure: vi.fn().mockResolvedValue(undefined),
     dismissFailures: vi.fn(),
     removeCairn: vi.fn(),
@@ -109,10 +117,28 @@ function fileDataTransfer(names: string[]): DataTransfer {
   } as unknown as DataTransfer
 }
 
+/* The callbacks the trip face reports itself through are registered by
+   effects that keep the callback in their dependency array, so every one of
+   them has to be referentially stable across renders — a fresh arrow per
+   render re-runs the effect, and an effect whose cleanup/setup writes state
+   in the shell renders the shell again. Module-level, so they are the same
+   function for the whole suite. */
+const noop = () => {}
+
 /** The trip face no longer owns the page, so it no longer catches the drop
     itself — it registers a handler and the shell routes drops to it. This
     stands in for the shell, wired exactly the way `App.tsx` wires it, so
-    the drop tests below still exercise the real path. */
+    the drop tests below still exercise the real path.
+ *
+ *  The registered handler lives in a **ref**, matching `App.tsx`'s
+    `tripDropRef`/`handleDropTargetChange` pair, and the setter is
+    `useCallback`-stable. Holding it in state instead — which this harness
+    did until #180 — is an unbounded render loop, not a rendering quirk:
+    registering the handler renders the shell, which makes a new
+    `onDropTargetChange`, which re-runs the registration effect, whose
+    cleanup deregisters (another render) before setup registers again. It
+    never settles, and every pass allocates another render's worth of fibers,
+    which is what took this file past 2GB and hung it. */
 function TripHarness({
   store,
   tripId,
@@ -122,13 +148,16 @@ function TripHarness({
   tripId: string
   signedIn: boolean
 }) {
-  const [dropTarget, setDropTarget] = useState<((files: File[]) => void) | null>(null)
+  const dropTarget = useRef<((files: File[]) => void) | null>(null)
+  const handleDropTargetChange = useCallback((handler: ((files: File[]) => void) | null) => {
+    dropTarget.current = handler
+  }, [])
   return (
     <div
       className="app"
       onDrop={(event) => {
         event.preventDefault()
-        dropTarget?.(Array.from(event.dataTransfer.files))
+        dropTarget.current?.(Array.from(event.dataTransfer.files))
       }}
     >
       <TripDetail
@@ -136,12 +165,12 @@ function TripHarness({
         tripStore={store}
         accessToken={signedIn ? 'token' : null}
         cairnFolderId={signedIn ? 'cairn-folder-id' : null}
-        onBack={() => {}}
-        onDropTargetChange={(handler) => setDropTarget(() => handler)}
-        onGeometryChange={() => {}}
-        onNeedsPlacement={() => {}}
-        onCreateTargetChange={() => {}}
-        onCairnDetailChange={() => {}}
+        onBack={noop}
+        onDropTargetChange={handleDropTargetChange}
+        onGeometryChange={noop}
+        onNeedsPlacement={noop}
+        onCreateTargetChange={noop}
+        onCairnDetailChange={noop}
         cairnsDraggable={true}
       />
     </div>
@@ -165,13 +194,21 @@ beforeEach(() => {
   useCairnImport.mockReset().mockReturnValue(baseCairnImport())
 })
 
-// Skipped: this file leaks memory unboundedly under vitest, standalone —
-// not a combination effect with other files. Confirmed by bisection; root
-// cause not yet identified. See #180 before re-enabling.
-describe.skip('TripDetail — #51 partitioning a mixed drop between tracks and photos', () => {
+/* The photo pipeline resolves the drop's resolved/unresolved split (#168);
+   a test that swaps in its own spy has to keep that shape. */
+const cairnImportSpy = () => vi.fn().mockResolvedValue({ resolvedCount: 0, needsPlacement: [] })
+
+/* #193 — a row's exits live behind its `⋮` now, so reaching one is two
+   steps. Same helper shape `TrackList.test.tsx` and `CairnList.test.tsx`
+   already use. */
+function openRowMenu(name: string) {
+  fireEvent.click(screen.getByRole('button', { name: `Row actions for ${name}` }))
+}
+
+describe('TripDetail — #51 partitioning a mixed drop between tracks and photos', () => {
   it('sends .kml/.kmz files to useTripImport and images to useCairnImport from a single drop', async () => {
     const tripImportFiles = vi.fn().mockResolvedValue(undefined)
-    const cairnImportFiles = vi.fn().mockResolvedValue(undefined)
+    const cairnImportFiles = cairnImportSpy()
     useTripImport.mockReturnValue(baseTripImport({ importFiles: tripImportFiles }))
     useCairnImport.mockReturnValue(baseCairnImport({ importFiles: cairnImportFiles }))
 
@@ -191,9 +228,9 @@ describe.skip('TripDetail — #51 partitioning a mixed drop between tracks and p
     expect(cairnImportFiles.mock.calls[0][0].map((f: File) => f.name)).toEqual(['IMG_1.jpg', 'IMG_2.png'])
   })
 
-  it('sends every file to useCairnImport (never useTripImport) from a picker selection with images only', () => {
+  it('sends every file to useCairnImport (never useTripImport) from a picker selection with images only', async () => {
     const tripImportFiles = vi.fn().mockResolvedValue(undefined)
-    const cairnImportFiles = vi.fn().mockResolvedValue(undefined)
+    const cairnImportFiles = cairnImportSpy()
     useTripImport.mockReturnValue(baseTripImport({ importFiles: tripImportFiles }))
     useCairnImport.mockReturnValue(baseCairnImport({ importFiles: cairnImportFiles }))
 
@@ -201,7 +238,11 @@ describe.skip('TripDetail — #51 partitioning a mixed drop between tracks and p
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
     const photos = [new File(['a'], 'a.jpg'), new File(['b'], 'b.webp')]
 
-    fireEvent.change(input, { target: { files: photos } })
+    // Awaited since #188: every batch now goes through `expandArchives`
+    // first, so the partitioning happens a microtask after the change.
+    await act(async () => {
+      fireEvent.change(input, { target: { files: photos } })
+    })
 
     expect(cairnImportFiles).toHaveBeenCalledWith(photos)
     expect(tripImportFiles).not.toHaveBeenCalled()
@@ -212,7 +253,10 @@ describe.skip('TripDetail — #51 partitioning a mixed drop between tracks and p
 
     expect(screen.getByRole('button', { name: 'Import files' })).toBeDefined()
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
-    expect(input.accept).toBe('.kml,.kmz,.jpg,.jpeg,.png,.webp')
+    // `.gpx` joined the track formats and `.zip` the archive doorway (#188)
+    // after this suite was written; the assertion is still that one control
+    // accepts both pipelines' formats, not just tracks'.
+    expect(input.accept).toBe('.kml,.kmz,.gpx,.jpg,.jpeg,.png,.webp,.zip')
   })
 
   /* The widened drop-overlay copy is asserted in App.test.tsx now — the
@@ -263,10 +307,10 @@ describe.skip('TripDetail — #51 partitioning a mixed drop between tracks and p
   })
 })
 
-describe.skip('TripDetail — #75 signed-out drop', () => {
+describe('TripDetail — #75 signed-out drop', () => {
   it('reports a batch failure naming sign-in, rather than doing nothing, when files land while signed out', async () => {
     const tripImportFiles = vi.fn().mockResolvedValue(undefined)
-    const cairnImportFiles = vi.fn().mockResolvedValue(undefined)
+    const cairnImportFiles = cairnImportSpy()
     useTripImport.mockReturnValue(baseTripImport({ importFiles: tripImportFiles }))
     useCairnImport.mockReturnValue(baseCairnImport({ importFiles: cairnImportFiles }))
 
@@ -296,7 +340,7 @@ describe.skip('TripDetail — #75 signed-out drop', () => {
   })
 })
 
-describe.skip('TripDetail — #73 disconnected is read-only', () => {
+describe('TripDetail — #73 disconnected is read-only', () => {
   function fileWithOneTrack() {
     return {
       id: 'file-1',
@@ -319,8 +363,10 @@ describe.skip('TripDetail — #73 disconnected is read-only', () => {
     // surface, covering both the header fields and the track list below it.
     expect(screen.getByText('Sign in to edit this trip.')).toBeDefined()
 
-    fireEvent.click(screen.getByText('Day 1'))
-    expect(screen.queryByDisplayValue('Day 1')).toBeNull()
+    // #193: reaching rename is two steps now — open the row's `⋮`, then the
+    // Rename item itself is disabled rather than absent while signed out.
+    openRowMenu('Day 1')
+    expect((screen.getByText('Rename').closest('button') as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('restores editing for both trip metadata and tracks once signed in, without a reload', () => {
@@ -348,15 +394,23 @@ describe.skip('TripDetail — #73 disconnected is read-only', () => {
     fireEvent.click(screen.getByText('Hokkaido'))
     expect(screen.getByDisplayValue('Hokkaido')).toBeDefined()
 
-    fireEvent.click(screen.getByText('Day 1'))
+    // #193: track rename lives behind the row's `⋮` now, not a direct click
+    // on the name — unlike the trip title above, which still edits in place.
+    openRowMenu('Day 1')
+    fireEvent.click(screen.getByText('Rename'))
     expect(screen.getByDisplayValue('Day 1')).toBeDefined()
   })
 })
 
-describe.skip('TripDetail — #75 a file the app cannot identify', () => {
-  it('rejects a .gpx naming the formats trips take, not the photo pipeline\'s message', async () => {
+/* `.gpx` was this suite's stand-in for a file neither pipeline claims, and
+   it stopped being one when GPX joined `TRACK_EXTENSIONS`. The rule under
+   test is unchanged — an unclaimed file is refused by name, with the copy
+   that lists what a trip does take — so the stand-in is now `.rtf`, which
+   is in neither `fileKinds.ts` list nor the archive doorway. */
+describe('TripDetail — #75 a file the app cannot identify', () => {
+  it('rejects an unclaimed file naming the formats trips take, not the photo pipeline\'s message', async () => {
     const tripImportFiles = vi.fn().mockResolvedValue(undefined)
-    const cairnImportFiles = vi.fn().mockResolvedValue(undefined)
+    const cairnImportFiles = cairnImportSpy()
     useTripImport.mockReturnValue(baseTripImport({ importFiles: tripImportFiles }))
     useCairnImport.mockReturnValue(baseCairnImport({ importFiles: cairnImportFiles }))
 
@@ -364,20 +418,20 @@ describe.skip('TripDetail — #75 a file the app cannot identify', () => {
     const app = document.querySelector('.app') as HTMLElement
 
     await act(async () => {
-      fireEvent.drop(app, { dataTransfer: fileDataTransfer(['route.gpx']) })
+      fireEvent.drop(app, { dataTransfer: fileDataTransfer(['notes.rtf']) })
     })
 
-    expect(screen.getByText('route.gpx')).toBeDefined()
+    expect(screen.getByText('notes.rtf')).toBeDefined()
     expect(
-      screen.getByText(/trips take \.kml or \.kmz tracks and JPEG, PNG or WebP photos/),
+      screen.getByText(/trips take \.kml, \.kmz or \.gpx tracks, JPEG, PNG or WebP photos/),
     ).toBeDefined()
     expect(tripImportFiles).not.toHaveBeenCalled()
     expect(cairnImportFiles).not.toHaveBeenCalled()
   })
 
-  it('a mixed batch of one .kml, one .jpg and one .gpx imports the first two and reports only the third', async () => {
+  it('a mixed batch of one .kml, one .jpg and one unclaimed file imports the first two and reports only the third', async () => {
     const tripImportFiles = vi.fn().mockResolvedValue(undefined)
-    const cairnImportFiles = vi.fn().mockResolvedValue(undefined)
+    const cairnImportFiles = cairnImportSpy()
     useTripImport.mockReturnValue(baseTripImport({ importFiles: tripImportFiles }))
     useCairnImport.mockReturnValue(baseCairnImport({ importFiles: cairnImportFiles }))
 
@@ -385,17 +439,17 @@ describe.skip('TripDetail — #75 a file the app cannot identify', () => {
     const app = document.querySelector('.app') as HTMLElement
 
     await act(async () => {
-      fireEvent.drop(app, { dataTransfer: fileDataTransfer(['day.kml', 'IMG_1.jpg', 'route.gpx']) })
+      fireEvent.drop(app, { dataTransfer: fileDataTransfer(['day.kml', 'IMG_1.jpg', 'notes.rtf']) })
     })
 
     expect(tripImportFiles.mock.calls[0][0].map((f: File) => f.name)).toEqual(['day.kml'])
     expect(cairnImportFiles.mock.calls[0][0].map((f: File) => f.name)).toEqual(['IMG_1.jpg'])
-    expect(screen.getByText('route.gpx')).toBeDefined()
-    expect(screen.getAllByText(/trips take .kml or .kmz tracks/)).toHaveLength(1)
+    expect(screen.getByText('notes.rtf')).toBeDefined()
+    expect(screen.getAllByText(/trips take .kml, .kmz or .gpx tracks/)).toHaveLength(1)
   })
 
   it('sends a .heic to the photo pipeline rather than the unrecognised-type bucket', async () => {
-    const cairnImportFiles = vi.fn().mockResolvedValue(undefined)
+    const cairnImportFiles = cairnImportSpy()
     useCairnImport.mockReturnValue(baseCairnImport({ importFiles: cairnImportFiles }))
 
     renderTrip()
@@ -410,7 +464,7 @@ describe.skip('TripDetail — #75 a file the app cannot identify', () => {
   })
 })
 
-describe.skip('TripDetail — #75 empty-state copy naming the actual control', () => {
+describe('TripDetail — #75 empty-state copy naming the actual control', () => {
   it('points the empty track list at "Import files", not the nonexistent "Import tracks"', () => {
     renderTrip()
 
@@ -420,7 +474,7 @@ describe.skip('TripDetail — #75 empty-state copy naming the actual control', (
   })
 })
 
-describe.skip('TripDetail — #77 removing tracks and photos', () => {
+describe('TripDetail — #77 removing tracks and photos', () => {
   const trackFile = {
     id: 'f1',
     name: 'a.kml',
@@ -438,7 +492,8 @@ describe.skip('TripDetail — #77 removing tracks and photos', () => {
 
     renderTrip()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete a.kml permanently' }))
+    openRowMenu('a.kml')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete permanently…' }))
     expect(removeFile).not.toHaveBeenCalled()
     expect(screen.getByText('Delete "a.kml"?')).toBeDefined()
 
@@ -452,7 +507,8 @@ describe.skip('TripDetail — #77 removing tracks and photos', () => {
 
     renderTrip()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete a.kml permanently' }))
+    openRowMenu('a.kml')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete permanently…' }))
     expect(screen.getByText('Delete "a.kml"?')).toBeDefined()
 
     fireEvent.keyDown(document, { key: 'Escape' })
@@ -482,10 +538,12 @@ describe.skip('TripDetail — #77 removing tracks and photos', () => {
 
     renderTrip()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete a.kml permanently' }))
+    openRowMenu('a.kml')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete permanently…' }))
     expect(screen.getByText('Delete "a.kml"?')).toBeDefined()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete photo.jpg permanently' }))
+    openRowMenu('photo.jpg')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete permanently…' }))
     expect(screen.queryByText('Delete "a.kml"?')).toBeNull()
     expect(screen.getByText('Remove "photo.jpg"?')).toBeDefined()
   })
@@ -502,6 +560,9 @@ describe.skip('TripDetail — #77 removing tracks and photos', () => {
       </MemoryRouter>,
     )
 
-    expect(saveOverview).toHaveBeenCalledWith(entry.id, [])
+    // #224 added the sampled-elevation cache as a third argument, carried
+    // through unchanged — the regeneration contract this asserts is the
+    // first two.
+    expect(saveOverview).toHaveBeenCalledWith(entry.id, [], {})
   })
 })

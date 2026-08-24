@@ -606,5 +606,15 @@ describe('BottomSheet', () => {
 
       expect(onSettle).toHaveBeenCalledTimes(1)
     })
+
+    it('does nothing while a decision owns the map — the sheet is already pinned to full', () => {
+      const { onRegisterPromote, call } = registerPromote()
+      renderSheet({ onRegisterPromote, suspended: true })
+      expect(document.querySelector('.bottom-sheet__detent')?.textContent).toBe('Full')
+
+      call()
+
+      expect(document.querySelector('.bottom-sheet__detent')?.textContent).toBe('Full')
+    })
   })
 })

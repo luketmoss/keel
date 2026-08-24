@@ -9,6 +9,7 @@ import {
 } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useMatch, useNavigate } from 'react-router-dom'
 import { MapCanvas, MapProvider } from './components/MapCanvas'
+import { HomeResetOnNavigate } from './map/HomeResetOnNavigate'
 import { ShellColumn } from './components/ShellColumn'
 import { SearchCard } from './components/SearchCard'
 import { FilterChips, type KindFilter } from './components/FilterChips'
@@ -1015,6 +1016,7 @@ function AppShell() {
           canFit={detailOpen ? tripPointCount > 0 : listPlaces.length > 0}
           getFitPoints={() => (detailOpen ? tripGeometryRef.current : listPlaces)}
         />
+        <HomeResetOnNavigate />
         {/* #168: the map itself is the placement queue's input — a
             crosshair cursor and a click-to-place listener while anything is
             waiting, plus a pulsing suggestion ring when the current file's

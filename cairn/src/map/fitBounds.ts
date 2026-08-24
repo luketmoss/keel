@@ -47,7 +47,11 @@ export const CLUSTER_MAX_ZOOM = 20
     cannot separate. `clusterSeparatesAtZoom` asks that question first and
     expands the cluster in place instead, so the no-op above is now a
     guard rather than the user's experience. */
-export function zoomToFitCluster(map: google.maps.Map, points: LatLng[]): void {
+export function zoomToFitCluster(
+  map: google.maps.Map,
+  points: LatLng[],
+  padding: number | google.maps.Padding = FIT_PADDING,
+): void {
   if (points.length === 0) return
 
   const bounds = new google.maps.LatLngBounds()
@@ -58,5 +62,5 @@ export function zoomToFitCluster(map: google.maps.Map, points: LatLng[]): void {
   google.maps.event.addListenerOnce(map, 'idle', () => {
     if ((map.getZoom() ?? 0) > CLUSTER_MAX_ZOOM) map.setZoom(CLUSTER_MAX_ZOOM)
   })
-  map.fitBounds(bounds, FIT_PADDING)
+  map.fitBounds(bounds, padding)
 }

@@ -103,7 +103,7 @@ describe('MapCanvas corner controls (#109)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Fit to everything' }))
 
-    expect(fitTracksToBounds).toHaveBeenCalledWith(fakeMap, points)
+    expect(fitTracksToBounds).toHaveBeenCalledWith(fakeMap, points, expect.anything())
   })
 
   it('disables fit-to-everything when there is nothing to fit to', () => {

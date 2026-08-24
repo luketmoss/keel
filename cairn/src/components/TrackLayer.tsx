@@ -4,6 +4,8 @@ import type { ImportedFile } from '../import/types'
 import { trackColor } from '../map/palette'
 import { dropInvalidLatitudes, normalizeAntimeridian, type LatLng } from '../map/geo'
 import { fitTracksToBounds } from '../map/fitBounds'
+import { columnInset, toPadding } from '../map/reveal'
+import { useIsPhone } from '../map/useIsPhone'
 import { prefersReducedMotion } from '../map/motion'
 
 /* --motion-slow from index.css. Google Maps' Polyline animates by having its
@@ -134,6 +136,7 @@ export function TrackLayer({
   hitLinesEnabled = true,
 }: TrackLayerProps) {
   const map = useMap()
+  const isPhone = useIsPhone()
   const previousFileCount = useRef(0)
   const previousVisibleKey = useRef('')
   /* Keyed by track key, not by file id or array position — a track that has
@@ -164,7 +167,8 @@ export function TrackLayer({
     if (!imported && !toggled) return
 
     const allPoints = renderedTracks.flatMap((track) => track.points)
-    fitTracksToBounds(map, allPoints)
+    fitTracksToBounds(map, allPoints, toPadding(columnInset(isPhone)))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, files, renderedTracks])
 
   return (

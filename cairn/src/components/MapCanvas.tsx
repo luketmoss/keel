@@ -229,6 +229,7 @@ function ZoomControls({
   getFitPoints: () => { lat: number; lng: number }[]
 }) {
   const map = useMap()
+  const isPhone = useIsPhone()
 
   function nudgeZoom(delta: number) {
     if (!map) return
@@ -261,7 +262,7 @@ function ZoomControls({
         className="map-controls__button"
         aria-label="Fit to everything"
         disabled={!map || !canFit}
-        onClick={() => map && fitTracksToBounds(map, getFitPoints())}
+        onClick={() => map && fitTracksToBounds(map, getFitPoints(), toPadding(columnInset(isPhone)))}
       >
         <span aria-hidden="true">⛶</span>
       </button>

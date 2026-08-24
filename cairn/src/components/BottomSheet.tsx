@@ -63,6 +63,15 @@ interface BottomSheetProps {
   searchCard: ReactNode
   /** Inside the sheet, directly under the grabber. */
   chips: ReactNode
+  /** #312 — fired whenever `detent` actually changes value, after this
+      render's `--sheet-current` has already been republished (see the
+      effect ordering note below). Not fired on mount. Every cause of a
+      detent change fires it alike — a drag settling, the keyboard cycle, a
+      promotion, a restore, rotation dropping peek — because the design
+      note's rule is "the sheet settles at a new detent", not "the user
+      dragged it there"; the map-side reframe this drives is already a
+      three-step no-op whenever nothing needs to move. */
+  onSettle?: () => void
   children: ReactNode
 }
 
@@ -81,6 +90,7 @@ export function BottomSheet({
   detailOpen,
   searchCard,
   chips,
+  onSettle,
   children,
 }: BottomSheetProps) {
   const [heights, setHeights] = useState<Heights>(() =>
@@ -184,6 +194,23 @@ export function BottomSheet({
       document.documentElement.style.removeProperty('--sheet-current')
     }
   }, [height])
+
+  /** #312 — declared after the `--sheet-current` effect above on purpose:
+      effects belonging to the same component instance run in source order,
+      so by the time this fires, `--sheet-current` has already been
+      republished for the detent this settle is landing on. Not fired on
+      mount — there is nothing to reframe yet, and every subject-holding
+      caller's own reveal-on-selection effect already ran once for the
+      initial detent. */
+  const mountedRef = useRef(false)
+  useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true
+      return
+    }
+    onSettle?.()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detent])
 
   const settle = useCallback(
     (raw: number) => {

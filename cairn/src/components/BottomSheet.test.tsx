@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { BottomSheet } from './BottomSheet'
 
 /* jsdom loads no stylesheet, so the detent tokens have to be put on the
@@ -43,6 +43,7 @@ function renderSheet(props: Partial<React.ComponentProps<typeof BottomSheet>> = 
       detailOpen={props.detailOpen ?? false}
       searchCard={props.searchCard ?? <div data-testid="card">card</div>}
       chips={props.chips ?? <div data-testid="chips">chips</div>}
+      onSettle={props.onSettle}
     >
       {props.children ?? <div data-testid="face">list</div>}
     </BottomSheet>,
@@ -461,6 +462,57 @@ describe('BottomSheet', () => {
 
       expect(sheetHeight()).toBeCloseTo((HALF_VH / 100) * 260, 0)
       expect(document.querySelector('.bottom-sheet__detent')?.textContent).toBe('Half')
+    })
+  })
+
+  describe('settle (#312)', () => {
+    it('is not called on mount', () => {
+      const onSettle = vi.fn()
+      renderSheet({ onSettle })
+      expect(onSettle).not.toHaveBeenCalled()
+    })
+
+    it('is called once a drag settles on a new detent, not during the drag itself', () => {
+      const onSettle = vi.fn()
+      renderSheet({ onSettle })
+
+      const handle = grabber()
+      fireEvent.pointerDown(handle, { pointerId: 1, clientY: 400 })
+      fireEvent.pointerMove(handle, { pointerId: 1, clientY: 100 })
+      expect(onSettle).not.toHaveBeenCalled()
+
+      fireEvent.pointerUp(handle, { pointerId: 1, clientY: 100 })
+      expect(onSettle).toHaveBeenCalledTimes(1)
+    })
+
+    it('is called on a keyboard cycle', () => {
+      const onSettle = vi.fn()
+      renderSheet({ onSettle })
+
+      fireEvent.keyDown(grabber(), { key: 'ArrowUp' })
+
+      expect(onSettle).toHaveBeenCalledTimes(1)
+    })
+
+    it('is not called when a drag returns to the detent it started at', () => {
+      const onSettle = vi.fn()
+      renderSheet({ onSettle })
+
+      // A tiny drag, nowhere near the midpoint — settles back at half.
+      drag(400, 395)
+
+      expect(onSettle).not.toHaveBeenCalled()
+    })
+
+    it('fires once per detent actually crossed, not once per pointer event', () => {
+      const onSettle = vi.fn()
+      renderSheet({ onSettle })
+
+      fireEvent.keyDown(grabber(), { key: 'ArrowUp' }) // half -> full
+      fireEvent.keyDown(grabber(), { key: 'ArrowDown' }) // full -> half
+      fireEvent.keyDown(grabber(), { key: 'ArrowDown' }) // half -> peek
+
+      expect(onSettle).toHaveBeenCalledTimes(3)
     })
   })
 })

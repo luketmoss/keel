@@ -4,6 +4,8 @@ import { deriveTripStatus, type TripIndexEntry, type TripStatus } from '../store
 import type { Track } from '../kml/parse'
 import { matchesTripFilters, type TripFilters } from '../store/tripFilters'
 import { fitTracksToBounds, zoomToFitCluster } from '../map/fitBounds'
+import { columnInset, toPadding } from '../map/reveal'
+import { useIsPhone } from '../map/useIsPhone'
 import { clusterMarkers, type MarkerCluster } from '../map/cluster'
 import './WorldMap.css'
 
@@ -119,6 +121,7 @@ interface PlaceLayerProps {
     them, not because they were copied out first. */
 function PlaceLayer({ places, hoveredTripId, onHoverTrip, onSelectTrip }: PlaceLayerProps) {
   const map = useMap()
+  const isPhone = useIsPhone()
   const [zoom, setZoom] = useState<number>(() => map?.getZoom() ?? INITIAL_ZOOM)
   const isFirstFit = useRef(true)
   const previousKey = useRef('')
@@ -144,13 +147,14 @@ function PlaceLayer({ places, hoveredTripId, onHoverTrip, onSelectTrip }: PlaceL
     if (isFirstFit.current) {
       isFirstFit.current = false
       previousKey.current = currentKey
-      fitTracksToBounds(map, places)
+      fitTracksToBounds(map, places, toPadding(columnInset(isPhone)))
       return
     }
 
     if (currentKey === previousKey.current) return
     previousKey.current = currentKey
-    fitTracksToBounds(map, places)
+    fitTracksToBounds(map, places, toPadding(columnInset(isPhone)))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, places])
 
   const clusterable = useMemo(
@@ -230,6 +234,7 @@ function PlaceCluster({
   cluster: MarkerCluster<{ lat: number; lng: number; place: Place }>
   map: google.maps.Map
 }) {
+  const isPhone = useIsPhone()
   const names = cluster.members.map((member) => member.place.name).join(', ')
 
   return (
@@ -239,6 +244,7 @@ function PlaceCluster({
         zoomToFitCluster(
           map,
           cluster.members.map((member) => ({ lat: member.lat, lng: member.lng })),
+          toPadding(columnInset(isPhone)),
         )
       }
     >

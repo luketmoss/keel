@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { BottomSheet } from './BottomSheet'
 
@@ -44,6 +44,7 @@ function renderSheet(props: Partial<React.ComponentProps<typeof BottomSheet>> = 
       searchCard={props.searchCard ?? <div data-testid="card">card</div>}
       chips={props.chips ?? <div data-testid="chips">chips</div>}
       onSettle={props.onSettle}
+      onRegisterPromote={props.onRegisterPromote}
     >
       {props.children ?? <div data-testid="face">list</div>}
     </BottomSheet>,
@@ -513,6 +514,107 @@ describe('BottomSheet', () => {
       fireEvent.keyDown(grabber(), { key: 'ArrowDown' }) // half -> peek
 
       expect(onSettle).toHaveBeenCalledTimes(3)
+    })
+  })
+
+  describe('promotion (#313)', () => {
+    /* `call()` invokes the registered function directly, outside any DOM
+       event `fireEvent` would wrap for us — `act()` here is what makes the
+       resulting `setDetent` actually flush before the test's next
+       assertion, the same as every other test in this file gets for free
+       from `fireEvent`. */
+    function registerPromote() {
+      let promote: (() => void) | null = null
+      const onRegisterPromote = (fn: (() => void) | null) => {
+        promote = fn
+      }
+      return { onRegisterPromote, call: () => act(() => promote?.()) }
+    }
+
+    it('registers a promote function on mount', () => {
+      const { onRegisterPromote, call } = registerPromote()
+      renderSheet({ onRegisterPromote })
+
+      fireEvent.keyDown(grabber(), { key: 'ArrowDown' }) // half -> peek
+      expect(sheetHeight()).toBeCloseTo(PEEK, 0)
+
+      call()
+
+      expect(sheetHeight()).toBeCloseTo((HALF_VH / 100) * 800, 0)
+    })
+
+    it('de-registers on unmount', () => {
+      const { onRegisterPromote, call } = registerPromote()
+      const view = renderSheet({ onRegisterPromote })
+
+      view.unmount()
+
+      // Calling whatever was last registered — `null` — must not throw.
+      expect(() => call()).not.toThrow()
+    })
+
+    it('promotes peek to half, and nothing else', () => {
+      const { onRegisterPromote, call } = registerPromote()
+      renderSheet({ onRegisterPromote })
+      fireEvent.keyDown(grabber(), { key: 'ArrowDown' }) // half -> peek
+
+      call()
+
+      expect(document.querySelector('.bottom-sheet__detent')?.textContent).toBe('Half')
+    })
+
+    it('never lowers the sheet from half', () => {
+      const { onRegisterPromote, call } = registerPromote()
+      renderSheet({ onRegisterPromote }) // starts at half
+
+      call()
+
+      expect(document.querySelector('.bottom-sheet__detent')?.textContent).toBe('Half')
+    })
+
+    it('never lowers the sheet from full', () => {
+      const { onRegisterPromote, call } = registerPromote()
+      renderSheet({ onRegisterPromote })
+      fireEvent.keyDown(grabber(), { key: 'ArrowUp' }) // half -> full
+
+      call()
+
+      expect(document.querySelector('.bottom-sheet__detent')?.textContent).toBe('Full')
+    })
+
+    it('is not restored — dragging away and back leaves it wherever the user put it', () => {
+      const { onRegisterPromote, call } = registerPromote()
+      renderSheet({ onRegisterPromote })
+      fireEvent.keyDown(grabber(), { key: 'ArrowDown' }) // half -> peek
+
+      call() // peek -> half, promoted
+
+      // Nothing closes to restore from — dragging down again is the user's
+      // own move, not something #313's promotion has any say over.
+      fireEvent.keyDown(grabber(), { key: 'ArrowDown' }) // half -> peek
+      expect(document.querySelector('.bottom-sheet__detent')?.textContent).toBe('Peek')
+    })
+
+    it('fires the settle signal, same as any other detent change', () => {
+      const onSettle = vi.fn()
+      const { onRegisterPromote, call } = registerPromote()
+      renderSheet({ onSettle, onRegisterPromote })
+      fireEvent.keyDown(grabber(), { key: 'ArrowDown' }) // half -> peek
+      onSettle.mockClear()
+
+      call()
+
+      expect(onSettle).toHaveBeenCalledTimes(1)
+    })
+
+    it('does nothing while a decision owns the map — the sheet is already pinned to full', () => {
+      const { onRegisterPromote, call } = registerPromote()
+      renderSheet({ onRegisterPromote, suspended: true })
+      expect(document.querySelector('.bottom-sheet__detent')?.textContent).toBe('Full')
+
+      call()
+
+      expect(document.querySelector('.bottom-sheet__detent')?.textContent).toBe('Full')
     })
   })
 })

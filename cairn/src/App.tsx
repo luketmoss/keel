@@ -75,6 +75,7 @@ import {
 import { nearestPointByTime } from './photo/interpolate'
 import { exportImageName } from './photo/thumbnail'
 import { cairnMatchesFacet, type CairnFacet } from './store/cairnRules'
+import { SheetPromotionProvider } from './map/sheetPromotion'
 import type { LatLng } from './map/geo'
 import './App.css'
 
@@ -220,6 +221,15 @@ function AppShell() {
       that lands back on a detent already passed through this render still
       fires the effects keyed on it. */
   const [settleToken, setSettleToken] = useState(0)
+  /** #313 — `BottomSheet` registers its own "promote peek to half" here
+      (`onRegisterPromote`, below), and `promote` is the stable function
+      every map gesture that selects something calls. A ref rather than
+      state: calling it is an imperative "do this now", not a value anything
+      renders from, and a ref lets `promote` stay one stable function
+      identity for the whole session rather than changing every time the
+      sheet (re)registers. */
+  const promoteRef = useRef<() => void>(() => {})
+  const promote = useCallback(() => promoteRef.current(), [])
   const [dragActive, setDragActive] = useState(false)
   const dragDepth = useRef(0)
   const [toasts, setToasts] = useState<ToastMessage[]>([])
@@ -1009,339 +1019,357 @@ function AppShell() {
   )
 
   return (
-    <MapProvider>
-      <div
-        className="shell"
-        onDragEnter={handleDragEnter}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-      >
-        <MapCanvas
-          panelCollapsed={collapsed}
-          canFit={detailOpen ? tripPointCount > 0 : listPlaces.length > 0}
-          getFitPoints={() => (detailOpen ? tripGeometryRef.current : listPlaces)}
-        />
-        <HomeResetOnNavigate />
-        {/* #168: the map itself is the placement queue's input — a
-            crosshair cursor and a click-to-place listener while anything is
-            waiting, plus a pulsing suggestion ring when the current file's
-            capture time falls near the open trip's own tracks. */}
-        <PlacementClickCatcher active={queueOpen} onPlace={(position) => void placeCurrentQueueItem(position)} />
-        {/* #156: right-click, or long-press on touch, places a cairn where
-            you clicked. No armed mode — the gesture carries its own
-            coordinate, so there is nothing to enter and nothing to leave. */}
-        <CairnCreateGesture active={createGestureActive} onPlace={beginCairnDraft} />
-        {cairnDraft && (
-          <CairnDraftMarker position={cairnDraft.position} icon={cairnDraft.fields.icon} />
-        )}
-        {queueOpen && suggestionPosition && (
-          <SuggestionRing
-            position={suggestionPosition}
-            onClick={() => void placeCurrentQueueItem(suggestionPosition)}
-          />
-        )}
-        {/* The world's markers are hidden while a trip is open — its own
-            tracks and photos are what the map shows then. A loose detail
-            keeps them: the item is still one of the things on this map, and
-            hiding everything around it would lose the context that makes
-            its position mean anything. */}
-        {!openTripId && (
-          <>
-            {(kind === 'all' || kind === 'trips') && (
-              <WorldLayer
-                trips={visibleTrips}
-                filters={filters}
-                hoveredTripId={hoveredTripId}
-                onHoverTrip={setHoveredTripId}
-                onSelectTrip={(tripId) => navigate(`/trips/${tripId}`)}
-                draftTracks={draftTrip.draft?.files.flatMap((file) => file.tracks)}
-              />
-            )}
-            <LooseLayer
-              items={visibleLooseForKind}
-              store={looseStore}
-              accessToken={accessToken}
-              hoveredId={hoveredTripId}
-              onHover={setHoveredTripId}
-              selectedId={openLooseId ?? null}
-              onSelect={(item) =>
-                navigate(item.kind === 'track' ? `/tracks/${item.id}` : `/cairns/${item.id}`)
-              }
-              draggable={cairnsDraggable}
-              onMoveCairn={handleMoveLooseCairn}
-              revealSuspended={mapDecisionActive}
-              settleToken={settleToken}
-            />
-            {/* #271 — the world view in 3D: every visible trip's and loose
-                track's route at rest, since there are no markers on that
-                surface. `Track3DLayer` no-ops until the 3D surface actually
-                mounts, so this costs nothing while 3D has never been
-                turned on. */}
-            <Track3DLayer
-              tracks={worldTrackGeometry(worldTripsFor3D, tripStore, worldLooseTracksFor3D, looseStore)}
-            />
-            {/* #273 — the world view's loose cairns in 3D, at parity with
-                `LooseLayer` above: no trip's own cairns here (design note's
-                "Which cairns draw, on which face"), no dragging, and hover
-                shares the same single hovered-id state a loose track and a
-                trip dot already write. */}
-            <Cairn3DLayer
-              cairns={worldCairns}
-              accessToken={accessToken}
-              selectedCairnId={openLooseId ?? null}
-              onSelectCairn={(id) => navigate(`/cairns/${id}`)}
-              hoveredCairnIds={hoveredTripId ? new Set([hoveredTripId]) : undefined}
-              onHoverCairn={(ids) => setHoveredTripId(ids.size > 0 ? [...ids][0] : null)}
-            />
-            {/* #292 — the world view's own content framing: returning here
-                (or a filtered set changing while already here) flies the 3D
-                camera to frame it, falling back to `worldCairns` when there
-                is no track geometry. Its own component so the effect gets a
-                fresh start every time this block remounts — see its own
-                doc comment. */}
-            <WorldTrack3DFraming
-              trips={worldTripsFor3D}
-              tripStore={tripStore}
-              looseTracks={worldLooseTracksFor3D}
-              looseStore={looseStore}
-              cairns={worldCairns}
-              revealSuspended={mapDecisionActive}
-            />
-          </>
-        )}
-        {!detailOpen &&
-          !draftOpen &&
-          !queueOpen &&
-          !createOpen &&
-          (noPlaces ? (
-            disconnected ? (
-              <MapEmptyOverlay heading="Sign in to see your map." />
-            ) : (
-              <MapEmptyOverlay
-                heading="Nothing here yet"
-                detail="Drop a KML, GPX or a photo anywhere to start."
-              />
-            )
-          ) : (
-            filteredEmpty && (
-              <MapEmptyOverlay
-                heading="Nothing in this range"
-                detail="Widen the filters to see your trips."
-              />
-            )
-          ))}
-
-        <ShellColumn
-          flyoverToken={flyover.flyover?.token}
-          collapsed={collapsed}
-          onToggleCollapsed={() => setCollapsed((wasCollapsed) => !wasCollapsed)}
-          collapsible={!detailOpen && !draftOpen && !queueOpen && !createOpen}
-          // #258: the sheet's detents are suspended by decisions and by
-          // nothing else. A detail is a place — it keeps its grabber, and
-          // the map behind it stays reachable.
-          suspended={draftOpen || queueOpen || createOpen}
-          detailOpen={detailOpen}
-          onSettle={() => setSettleToken((token) => token + 1)}
-          searchCard={
-            <SearchCard
-              // #168: "Place this photo" over "needs a location" — the same
-              // name/kind slots a detail already uses, so `SearchCard`
-              // itself needs no placement-specific case. #156's create face
-              // uses them the same way: the typed name over `new cairn`.
-              detail={
-                cairnDraft
-                  ? { name: cairnDraft.fields.name || 'New cairn', kind: 'new cairn' }
-                  : queueOpen
-                    ? { name: 'Place this photo', kind: 'needs a location' }
-                    : tripTrackDetail
-                      ? { name: tripTrackDetail.name, kind: 'track · in a trip' }
-                      : detailForCard(openTrip, openLoose)
-              }
-              // "Back, in the search card, discards the remaining queue —
-              // it is the same action as Discard n, reached from the other
-              // end. It does not silently save them." #156's Back is
-              // likewise identical to its Cancel.
-              //
-              // #226: a trip-owned track's face returns to the trip it came
-              // from, not to `/` — "leaving returns to where it was opened
-              // from", the same stance a loose track's own Back (unchanged,
-              // below) already takes by landing on the top-level list.
-              onBack={() =>
-                createOpen
-                  ? cancelCairnDraft()
-                  : queueOpen
-                    ? setQueue(discardRemaining)
-                    : tripTrackDetail && openTripId
-                      ? navigate(`/trips/${openTripId}`)
-                      : navigate('/')
-              }
-              query={filters.name}
-              onQueryChange={(name) => setFilters((current) => ({ ...current, name }))}
-              accountBubble={<AccountBubble account={account} />}
-            />
-          }
-          chips={
-            // Hidden on a detail — filtering a list you are no longer
-            // looking at is noise — and while a draft or the placement
-            // queue is open, for the reason #81 already gives.
-            // #156 adds the create face to that list, for the same reason:
-            // it is a draft, and nothing it shows is a filterable list.
-            detailOpen || draftOpen || queueOpen || createOpen ? null : (
-              <>
-                <FilterChips kind={kind} onChange={handleKindChange} />
-                {/* #159: the facet row, subordinate to the main row and
-                    shown only while its own chip is active. */}
-                {kind === 'cairns' && (
-                  <CairnFacetChips facet={cairnFacet} onChange={setCairnFacet} />
-                )}
-              </>
-            )
-          }
+    // #313 — wraps everything: the map layers (siblings of `ShellColumn`
+    // below, not its descendants) need `promote` exactly as much as
+    // `TripDetail`'s own markers and routes do.
+    <SheetPromotionProvider value={promote}>
+      <MapProvider>
+        <div
+          className="shell"
+          onDragEnter={handleDragEnter}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
         >
-          {/* #156's create face replaces whatever face was showing — except
-              that a trip's face is *hidden* rather than replaced, below.
-              The placement queue still comes first: it is the one flow the
-              create gesture stands down for entirely. */}
-          {queueOpen ? (
-            <PlacementQueuePanel
-              queue={queue}
-              hasSuggestion={suggestionPosition !== undefined}
-              onSkip={() => setQueue(skipCurrent)}
-              onDiscard={() => setQueue(discardRemaining)}
-            />
-          ) : cairnDraft && !openTripId ? (
-            createFace
-          ) : draftTrip.draft ? (
-            <DraftPanel
-              draft={draftTrip.draft}
-              updateName={draftTrip.updateName}
-              updateDates={draftTrip.updateDates}
-              updateNotes={draftTrip.updateNotes}
-              onSave={() => void draftTrip.save()}
-              onCancel={draftTrip.cancel}
-              onKeepLoose={keepDraftLoose}
-              signedIn={!disconnected}
-              onSignIn={() => void account.signIn()}
-            />
-          ) : openTripId ? (
-            /* The trip face is hidden while the create face is up, never
-               unmounted. Unmounting it would take with it both the writer
-               that owns this trip's `cairns/` folder — the thing Create is
-               about to call — and the trip's own track and cairn layers,
-               which are exactly what the new pin is being placed relative
-               to. `hidden` on a flex child is `display: none`, so the panel
-               lays out around whichever of the two is showing. */
-            <>
-              {cairnDraft && createFace}
-              <div className="shell-column__hidden-face" hidden={createOpen}>
-                <TripDetail
-                  key={openTripId}
-                  tripId={openTripId}
-                  tripStore={tripStore}
-                  accessToken={accessToken}
-                  cairnFolderId={cairnFolderId}
-                  onBack={() => navigate('/')}
-                  onReconnect={() => void account.reconnect()}
-                  onDropTargetChange={handleDropTargetChange}
-                  onGeometryChange={handleGeometryChange}
-                  // Back to the top level, with everything about it intact.
-                  // Reversible by adding it back, which is why it needs no
-                  // confirm — `Delete permanently` is the neighbouring one.
-                  onRemoveFromTrip={(file) => removeTrackFromTrip(file, openTripId)}
-                  onRemovePhotoFromTrip={(record) => removeCairnFromTrip(record, openTripId)}
-                  onNeedsPlacement={enqueueNeedsPlacement}
-                  onCreateTargetChange={handleCreateTargetChange}
-                  onCairnDetailChange={handleCairnDetailChange}
-                  cairnsDraggable={cairnsDraggable}
-                  openTrackId={openTripTrackId}
-                  onTrackDetailChange={handleTrackDetailChange}
-                  revealSuspended={mapDecisionActive}
-                  settleToken={settleToken}
-                />
-              </div>
-            </>
-          ) : openLooseId ? (
-            openLoose ? (
-              <LooseFace
-                key={openLooseId}
-                item={openLoose}
-                store={looseStore}
-                trips={tripChoices}
-                accessToken={accessToken}
-                disabled={disconnected}
-                busy={moving}
-                error={moveError}
-                onAddToTrip={(tripId) => void moveLooseToTrip(openLooseId, tripId)}
-                onCreateTripWith={(name) => void createTripWithLoose(openLooseId, name)}
-                onRename={(id, name) => looseStore.update(id, { name })}
-                onRecolor={(id, color) => looseStore.update(id, { colorIndex: color })}
-                // #156: retyping writes `icon` and nothing else — the
-                // store's patch shape is what makes that literal.
-                onSetIcon={(id, icon) => looseStore.update(id, { icon })}
-                // #196: the same one-field patch, for the free text. The
-                // store is already optimistic — local first, Drive after,
-                // revert on failure — so the face gets its outcome without
-                // the user waiting on a round trip to see their own typing.
-                onSetDescription={(id, description) => looseStore.update(id, { description })}
-                onExport={(id) => void handleExport(id)}
-                exporting={exportingIds.has(openLooseId)}
-                attaching={attachingLooseId === openLooseId}
-                attachError={attachLooseError}
-                moveWriteError={moveLooseError}
-                onDelete={() => {
-                  // Trashes the Drive folder as well now. Best-effort and
-                  // not awaited: the row is gone either way, and a failed
-                  // trash leaves a folder nothing reads again.
-                  void looseStore.remove(openLooseId)
-                  navigate('/')
-                }}
-              />
-            ) : (
-              <div className="trips-panel__empty">
-                <p className="trips-panel__empty-title">Not found</p>
-                <p className="trips-panel__empty-detail">It may have been deleted.</p>
-              </div>
-            )
-          ) : (
-            <TripsPanel
-              trips={visibleTrips}
-              trackCounts={trackCounts}
-              tripTotals={tripTotals}
-              looseItems={visibleLoose}
-              kind={kind}
-              facet={cairnFacet}
-              onFacetChange={setCairnFacet}
-              filters={filters}
-              onFiltersChange={setFilters}
-              dateSpan={dateSpan}
-              hoveredId={hoveredTripId}
-              onHover={setHoveredTripId}
-              onCreate={(name) => tripStore.createTrip(name)}
-              onDelete={(tripId) => tripStore.deleteTrip(tripId)}
-              onDeleteLoose={(id) => looseStore.remove(id)}
-              onRenameLoose={(id, name) => looseStore.update(id, { name })}
-              onRecolorLoose={(id, color) => looseStore.update(id, { colorIndex: color })}
-              onExportLoose={(id) => void handleExport(id)}
-              exportingIds={exportingIds}
-              onAddLooseToTrip={(id) =>
-                navigate(
-                  looseStore.getItem(id)?.kind === 'track' ? `/tracks/${id}` : `/cairns/${id}`,
-                )
-              }
-              disabled={disconnected}
+          <MapCanvas
+            panelCollapsed={collapsed}
+            canFit={detailOpen ? tripPointCount > 0 : listPlaces.length > 0}
+            getFitPoints={() => (detailOpen ? tripGeometryRef.current : listPlaces)}
+          />
+          <HomeResetOnNavigate />
+          {/* #168: the map itself is the placement queue's input — a
+              crosshair cursor and a click-to-place listener while anything is
+              waiting, plus a pulsing suggestion ring when the current file's
+              capture time falls near the open trip's own tracks. */}
+          <PlacementClickCatcher active={queueOpen} onPlace={(position) => void placeCurrentQueueItem(position)} />
+          {/* #156: right-click, or long-press on touch, places a cairn where
+              you clicked. No armed mode — the gesture carries its own
+              coordinate, so there is nothing to enter and nothing to leave. */}
+          <CairnCreateGesture active={createGestureActive} onPlace={beginCairnDraft} />
+          {cairnDraft && (
+            <CairnDraftMarker position={cairnDraft.position} icon={cairnDraft.fields.icon} />
+          )}
+          {queueOpen && suggestionPosition && (
+            <SuggestionRing
+              position={suggestionPosition}
+              onClick={() => void placeCurrentQueueItem(suggestionPosition)}
             />
           )}
-        </ShellColumn>
-
-        {dragActive && <DropOverlay label={dropOverlayLabel} />}
-        {archiveProgress && (
-          <p className="archive-progress" role="status">
-            {archiveProgress.name} — {archiveProgress.index} of {archiveProgress.total}
-          </p>
-        )}
-        <ToastStack toasts={toasts} onDismiss={dismissToast} />
-      </div>
-    </MapProvider>
+          {/* The world's markers are hidden while a trip is open — its own
+              tracks and photos are what the map shows then. A loose detail
+              keeps them: the item is still one of the things on this map, and
+              hiding everything around it would lose the context that makes
+              its position mean anything. */}
+          {!openTripId && (
+            <>
+              {(kind === 'all' || kind === 'trips') && (
+                <WorldLayer
+                  trips={visibleTrips}
+                  filters={filters}
+                  hoveredTripId={hoveredTripId}
+                  onHoverTrip={setHoveredTripId}
+                  onSelectTrip={(tripId) => navigate(`/trips/${tripId}`)}
+                  draftTracks={draftTrip.draft?.files.flatMap((file) => file.tracks)}
+                />
+              )}
+              <LooseLayer
+                items={visibleLooseForKind}
+                store={looseStore}
+                accessToken={accessToken}
+                hoveredId={hoveredTripId}
+                onHover={setHoveredTripId}
+                selectedId={openLooseId ?? null}
+                onSelect={(item) => {
+                  // #313 — only when a face is already open: opening one
+                  // fresh already promotes through #258's own `detailOpen`
+                  // transition (and records the restore this must not
+                  // duplicate); selecting a different item without closing
+                  // the one already open is the gap #258 never covered.
+                  if (detailOpen) promote()
+                  navigate(item.kind === 'track' ? `/tracks/${item.id}` : `/cairns/${item.id}`)
+                }}
+                draggable={cairnsDraggable}
+                onMoveCairn={handleMoveLooseCairn}
+                revealSuspended={mapDecisionActive}
+                settleToken={settleToken}
+              />
+              {/* #271 — the world view in 3D: every visible trip's and loose
+                  track's route at rest, since there are no markers on that
+                  surface. `Track3DLayer` no-ops until the 3D surface actually
+                  mounts, so this costs nothing while 3D has never been
+                  turned on. */}
+              <Track3DLayer
+                tracks={worldTrackGeometry(worldTripsFor3D, tripStore, worldLooseTracksFor3D, looseStore)}
+              />
+              {/* #273 — the world view's loose cairns in 3D, at parity with
+                  `LooseLayer` above: no trip's own cairns here (design note's
+                  "Which cairns draw, on which face"), no dragging, and hover
+                  shares the same single hovered-id state a loose track and a
+                  trip dot already write. */}
+              <Cairn3DLayer
+                cairns={worldCairns}
+                accessToken={accessToken}
+                selectedCairnId={openLooseId ?? null}
+                onSelectCairn={(id) => {
+                  // #313 — same guard as `LooseLayer`'s own `onSelect` above.
+                  if (detailOpen) promote()
+                  navigate(`/cairns/${id}`)
+                }}
+                hoveredCairnIds={hoveredTripId ? new Set([hoveredTripId]) : undefined}
+                onHoverCairn={(ids) => setHoveredTripId(ids.size > 0 ? [...ids][0] : null)}
+              />
+              {/* #292 — the world view's own content framing: returning here
+                  (or a filtered set changing while already here) flies the 3D
+                  camera to frame it, falling back to `worldCairns` when there
+                  is no track geometry. Its own component so the effect gets a
+                  fresh start every time this block remounts — see its own
+                  doc comment. */}
+              <WorldTrack3DFraming
+                trips={worldTripsFor3D}
+                tripStore={tripStore}
+                looseTracks={worldLooseTracksFor3D}
+                looseStore={looseStore}
+                cairns={worldCairns}
+                revealSuspended={mapDecisionActive}
+              />
+            </>
+          )}
+          {!detailOpen &&
+            !draftOpen &&
+            !queueOpen &&
+            !createOpen &&
+            (noPlaces ? (
+              disconnected ? (
+                <MapEmptyOverlay heading="Sign in to see your map." />
+              ) : (
+                <MapEmptyOverlay
+                  heading="Nothing here yet"
+                  detail="Drop a KML, GPX or a photo anywhere to start."
+                />
+              )
+            ) : (
+              filteredEmpty && (
+                <MapEmptyOverlay
+                  heading="Nothing in this range"
+                  detail="Widen the filters to see your trips."
+                />
+              )
+            ))}
+  
+          <ShellColumn
+            flyoverToken={flyover.flyover?.token}
+            collapsed={collapsed}
+            onToggleCollapsed={() => setCollapsed((wasCollapsed) => !wasCollapsed)}
+            collapsible={!detailOpen && !draftOpen && !queueOpen && !createOpen}
+            // #258: the sheet's detents are suspended by decisions and by
+            // nothing else. A detail is a place — it keeps its grabber, and
+            // the map behind it stays reachable.
+            suspended={draftOpen || queueOpen || createOpen}
+            detailOpen={detailOpen}
+            onSettle={() => setSettleToken((token) => token + 1)}
+            onRegisterPromote={(fn) => {
+              promoteRef.current = fn ?? (() => {})
+            }}
+            searchCard={
+              <SearchCard
+                // #168: "Place this photo" over "needs a location" — the same
+                // name/kind slots a detail already uses, so `SearchCard`
+                // itself needs no placement-specific case. #156's create face
+                // uses them the same way: the typed name over `new cairn`.
+                detail={
+                  cairnDraft
+                    ? { name: cairnDraft.fields.name || 'New cairn', kind: 'new cairn' }
+                    : queueOpen
+                      ? { name: 'Place this photo', kind: 'needs a location' }
+                      : tripTrackDetail
+                        ? { name: tripTrackDetail.name, kind: 'track · in a trip' }
+                        : detailForCard(openTrip, openLoose)
+                }
+                // "Back, in the search card, discards the remaining queue —
+                // it is the same action as Discard n, reached from the other
+                // end. It does not silently save them." #156's Back is
+                // likewise identical to its Cancel.
+                //
+                // #226: a trip-owned track's face returns to the trip it came
+                // from, not to `/` — "leaving returns to where it was opened
+                // from", the same stance a loose track's own Back (unchanged,
+                // below) already takes by landing on the top-level list.
+                onBack={() =>
+                  createOpen
+                    ? cancelCairnDraft()
+                    : queueOpen
+                      ? setQueue(discardRemaining)
+                      : tripTrackDetail && openTripId
+                        ? navigate(`/trips/${openTripId}`)
+                        : navigate('/')
+                }
+                query={filters.name}
+                onQueryChange={(name) => setFilters((current) => ({ ...current, name }))}
+                accountBubble={<AccountBubble account={account} />}
+              />
+            }
+            chips={
+              // Hidden on a detail — filtering a list you are no longer
+              // looking at is noise — and while a draft or the placement
+              // queue is open, for the reason #81 already gives.
+              // #156 adds the create face to that list, for the same reason:
+              // it is a draft, and nothing it shows is a filterable list.
+              detailOpen || draftOpen || queueOpen || createOpen ? null : (
+                <>
+                  <FilterChips kind={kind} onChange={handleKindChange} />
+                  {/* #159: the facet row, subordinate to the main row and
+                      shown only while its own chip is active. */}
+                  {kind === 'cairns' && (
+                    <CairnFacetChips facet={cairnFacet} onChange={setCairnFacet} />
+                  )}
+                </>
+              )
+            }
+          >
+            {/* #156's create face replaces whatever face was showing — except
+                that a trip's face is *hidden* rather than replaced, below.
+                The placement queue still comes first: it is the one flow the
+                create gesture stands down for entirely. */}
+            {queueOpen ? (
+              <PlacementQueuePanel
+                queue={queue}
+                hasSuggestion={suggestionPosition !== undefined}
+                onSkip={() => setQueue(skipCurrent)}
+                onDiscard={() => setQueue(discardRemaining)}
+              />
+            ) : cairnDraft && !openTripId ? (
+              createFace
+            ) : draftTrip.draft ? (
+              <DraftPanel
+                draft={draftTrip.draft}
+                updateName={draftTrip.updateName}
+                updateDates={draftTrip.updateDates}
+                updateNotes={draftTrip.updateNotes}
+                onSave={() => void draftTrip.save()}
+                onCancel={draftTrip.cancel}
+                onKeepLoose={keepDraftLoose}
+                signedIn={!disconnected}
+                onSignIn={() => void account.signIn()}
+              />
+            ) : openTripId ? (
+              /* The trip face is hidden while the create face is up, never
+                 unmounted. Unmounting it would take with it both the writer
+                 that owns this trip's `cairns/` folder — the thing Create is
+                 about to call — and the trip's own track and cairn layers,
+                 which are exactly what the new pin is being placed relative
+                 to. `hidden` on a flex child is `display: none`, so the panel
+                 lays out around whichever of the two is showing. */
+              <>
+                {cairnDraft && createFace}
+                <div className="shell-column__hidden-face" hidden={createOpen}>
+                  <TripDetail
+                    key={openTripId}
+                    tripId={openTripId}
+                    tripStore={tripStore}
+                    accessToken={accessToken}
+                    cairnFolderId={cairnFolderId}
+                    onBack={() => navigate('/')}
+                    onReconnect={() => void account.reconnect()}
+                    onDropTargetChange={handleDropTargetChange}
+                    onGeometryChange={handleGeometryChange}
+                    // Back to the top level, with everything about it intact.
+                    // Reversible by adding it back, which is why it needs no
+                    // confirm — `Delete permanently` is the neighbouring one.
+                    onRemoveFromTrip={(file) => removeTrackFromTrip(file, openTripId)}
+                    onRemovePhotoFromTrip={(record) => removeCairnFromTrip(record, openTripId)}
+                    onNeedsPlacement={enqueueNeedsPlacement}
+                    onCreateTargetChange={handleCreateTargetChange}
+                    onCairnDetailChange={handleCairnDetailChange}
+                    cairnsDraggable={cairnsDraggable}
+                    openTrackId={openTripTrackId}
+                    onTrackDetailChange={handleTrackDetailChange}
+                    revealSuspended={mapDecisionActive}
+                    settleToken={settleToken}
+                  />
+                </div>
+              </>
+            ) : openLooseId ? (
+              openLoose ? (
+                <LooseFace
+                  key={openLooseId}
+                  item={openLoose}
+                  store={looseStore}
+                  trips={tripChoices}
+                  accessToken={accessToken}
+                  disabled={disconnected}
+                  busy={moving}
+                  error={moveError}
+                  onAddToTrip={(tripId) => void moveLooseToTrip(openLooseId, tripId)}
+                  onCreateTripWith={(name) => void createTripWithLoose(openLooseId, name)}
+                  onRename={(id, name) => looseStore.update(id, { name })}
+                  onRecolor={(id, color) => looseStore.update(id, { colorIndex: color })}
+                  // #156: retyping writes `icon` and nothing else — the
+                  // store's patch shape is what makes that literal.
+                  onSetIcon={(id, icon) => looseStore.update(id, { icon })}
+                  // #196: the same one-field patch, for the free text. The
+                  // store is already optimistic — local first, Drive after,
+                  // revert on failure — so the face gets its outcome without
+                  // the user waiting on a round trip to see their own typing.
+                  onSetDescription={(id, description) => looseStore.update(id, { description })}
+                  onExport={(id) => void handleExport(id)}
+                  exporting={exportingIds.has(openLooseId)}
+                  attaching={attachingLooseId === openLooseId}
+                  attachError={attachLooseError}
+                  moveWriteError={moveLooseError}
+                  onDelete={() => {
+                    // Trashes the Drive folder as well now. Best-effort and
+                    // not awaited: the row is gone either way, and a failed
+                    // trash leaves a folder nothing reads again.
+                    void looseStore.remove(openLooseId)
+                    navigate('/')
+                  }}
+                />
+              ) : (
+                <div className="trips-panel__empty">
+                  <p className="trips-panel__empty-title">Not found</p>
+                  <p className="trips-panel__empty-detail">It may have been deleted.</p>
+                </div>
+              )
+            ) : (
+              <TripsPanel
+                trips={visibleTrips}
+                trackCounts={trackCounts}
+                tripTotals={tripTotals}
+                looseItems={visibleLoose}
+                kind={kind}
+                facet={cairnFacet}
+                onFacetChange={setCairnFacet}
+                filters={filters}
+                onFiltersChange={setFilters}
+                dateSpan={dateSpan}
+                hoveredId={hoveredTripId}
+                onHover={setHoveredTripId}
+                onCreate={(name) => tripStore.createTrip(name)}
+                onDelete={(tripId) => tripStore.deleteTrip(tripId)}
+                onDeleteLoose={(id) => looseStore.remove(id)}
+                onRenameLoose={(id, name) => looseStore.update(id, { name })}
+                onRecolorLoose={(id, color) => looseStore.update(id, { colorIndex: color })}
+                onExportLoose={(id) => void handleExport(id)}
+                exportingIds={exportingIds}
+                onAddLooseToTrip={(id) =>
+                  navigate(
+                    looseStore.getItem(id)?.kind === 'track' ? `/tracks/${id}` : `/cairns/${id}`,
+                  )
+                }
+                disabled={disconnected}
+              />
+            )}
+          </ShellColumn>
+  
+          {dragActive && <DropOverlay label={dropOverlayLabel} />}
+          {archiveProgress && (
+            <p className="archive-progress" role="status">
+              {archiveProgress.name} — {archiveProgress.index} of {archiveProgress.total}
+            </p>
+          )}
+          <ToastStack toasts={toasts} onDismiss={dismissToast} />
+        </div>
+      </MapProvider>
+    </SheetPromotionProvider>
   )
 }

@@ -28,6 +28,10 @@ interface ShellColumnProps {
   /** #312 — forwarded straight to `BottomSheet`; desktop never renders a
       sheet to settle, so this is simply never called there. */
   onSettle?: () => void
+  /** #313 — forwarded straight to `BottomSheet`; desktop never registers a
+      promote function, so whoever holds the ref this fills keeps whatever
+      default (a no-op) it started with. */
+  onRegisterPromote?: (promote: (() => void) | null) => void
   children: ReactNode
 }
 
@@ -49,6 +53,7 @@ export function ShellColumn({
   searchCard,
   chips,
   onSettle,
+  onRegisterPromote,
   children,
 }: ShellColumnProps) {
   const isPhone = useIsPhone()
@@ -62,6 +67,7 @@ export function ShellColumn({
         searchCard={searchCard}
         chips={chips}
         onSettle={onSettle}
+        onRegisterPromote={onRegisterPromote}
       >
         {children}
       </BottomSheet>

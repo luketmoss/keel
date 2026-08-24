@@ -72,6 +72,13 @@ interface BottomSheetProps {
       dragged it there"; the map-side reframe this drives is already a
       three-step no-op whenever nothing needs to move. */
   onSettle?: () => void
+  /** #313 — registers this sheet's own "promote peek to half" with whatever
+      owns the map gestures that need to trigger it, the same shape
+      `TripDetail`'s `onDropTargetChange`/`onCreateTargetChange` already use
+      to hand a capability upward. Called with `null` on unmount. Never
+      restored — unlike the `detailOpen` promotion below, nothing closes to
+      restore from, so this never touches `restoreRef`. */
+  onRegisterPromote?: (promote: (() => void) | null) => void
   children: ReactNode
 }
 
@@ -91,6 +98,7 @@ export function BottomSheet({
   searchCard,
   chips,
   onSettle,
+  onRegisterPromote,
   children,
 }: BottomSheetProps) {
   const [heights, setHeights] = useState<Heights>(() =>
@@ -168,6 +176,21 @@ export function BottomSheet({
     restore()
   }, [detailOpen, restore])
 
+  /** #313 — a map gesture that selected something asks for this directly,
+      through `onRegisterPromote`, rather than through a prop like
+      `detailOpen` above: unlike opening a place, selecting something inside
+      one already open doesn't change any prop this component watches, so
+      there is no state transition to key an effect on. Registered once, on
+      mount, and de-registered on unmount — a caller with no sheet to
+      register against (desktop) simply never gets a function to call. */
+  const promoteToHalf = useCallback(() => {
+    setDetent((current) => (current === 'peek' ? 'half' : current))
+  }, [])
+  useEffect(() => {
+    onRegisterPromote?.(promoteToHalf)
+    return () => onRegisterPromote?.(null)
+  }, [onRegisterPromote, promoteToHalf])
+
   /** #274 — `Fly over` pressed: drops to the smallest available detent, a
       one-gesture exception (design note's "Mobile") rather than a restore
       candidate — the user drags straight back up, they do not get it back
@@ -188,7 +211,20 @@ export function BottomSheet({
   // it. Published as a custom property rather than plumbed through props so
   // the controls' own stylesheet owns the offset, and so the transition
   // stays in CSS where it matches the sheet's.
-  useEffect(() => {
+  //
+  // #313 — a `useLayoutEffect`, not a `useEffect`: `promoteToHalf` (below)
+  // can now be called from the same click handler that also changes a
+  // selection in `TripDetail`, a *descendant* of this component. Passive
+  // effects flush children-first, so `TripDetail`'s reveal-on-selection
+  // effect — which reads this exact property — would otherwise run before
+  // this one republishes it for the detent the promotion just landed on,
+  // reading the stale, pre-promotion height (#270's own ordering
+  // requirement, restated by #313 as "the reveal reads the detent the sheet
+  // is settling at, not the one it is leaving"). Layout effects flush
+  // before any passive effect anywhere in the tree, which is what actually
+  // closes the gap — being *called* synchronously never did, since the
+  // publish this depends on was still one effect flush away.
+  useLayoutEffect(() => {
     document.documentElement.style.setProperty('--sheet-current', `${Math.round(height)}px`)
     return () => {
       document.documentElement.style.removeProperty('--sheet-current')

@@ -8,6 +8,7 @@ import { Cairn3DLayer } from './Cairn3DLayer'
 import { columnInset, revealPoint, revealPoints } from '../map/reveal'
 import { dropInvalidLatitudes, normalizeAntimeridian } from '../map/geo'
 import { useIsPhone } from '../map/useIsPhone'
+import { useSheetPromotion } from '../map/sheetPromotion'
 import { useMap3DControl } from '../map/Map3DControl'
 import { flyToFramedGround } from '../map/flyToFramedGround'
 import { MAP3D_ID, TRACK3D_REVEAL_MS } from '../map/track3D'
@@ -206,6 +207,7 @@ export function TripDetail({
   const map3d = useMap3D(MAP3D_ID)
   const { on: is3DOn } = useMap3DControl()
   const isPhone = useIsPhone()
+  const promote = useSheetPromotion()
   const trip = useSyncExternalStore(tripStore.subscribe, () => tripStore.getTrip(tripId))
   const tripImport = useTripImport(tripId, accessToken, cairnFolderId, tripStore)
   const allTracks = useMemo(() => tripImport.tracks.flatMap((file) => file.tracks), [tripImport.tracks])
@@ -373,13 +375,39 @@ export function TripDetail({
       `handleRowClick`): select, then toggle the row's expansion. Selecting
       is idempotent, so clicking the selected track's route again only
       toggles the row — "stays selected" falls out for free rather than
-      needing a branch that tells the first click from the second. */
+      needing a branch that tells the first click from the second.
+
+      #313 — promotes the sheet, but only when the route tap actually
+      changes the selection: a second click on the already-selected track's
+      route is the same "no change" case a repeat marker tap is, and #313's
+      own table lists a route tap as a promoting gesture, not a toggle. */
   const handleSelectRoute = useCallback(
     (id: string) => {
-      setSelectedTrackId(id)
+      setSelectedTrackId((current) => {
+        if (current !== id) promote()
+        return id
+      })
       toggleTrackExpand(id)
     },
-    [toggleTrackExpand],
+    [toggleTrackExpand, promote],
+  )
+
+  /** #313 — the map-only half of a cairn selection: `onSelectCairn` passed
+      to `CairnLayer`/`Cairn3DLayer` below, never to `CairnList`'s row (which
+      calls `selectCairn` directly, per #250's shared onOpenRow/onOpenCairn
+      contract — this wrapper sits in front of that pair, not inside it, so
+      a row click never promotes). Promotes only on an actual change of
+      selection, so tapping the already-selected (and already-expanded)
+      cairn's marker again — which only collapses its row — leaves the sheet
+      exactly where it is, including at peek. */
+  const handleSelectCairnFromMap = useCallback(
+    (cairnId: string) => {
+      setSelectedCairnId((current) => {
+        if (current !== cairnId) promote()
+        return cairnId
+      })
+    },
+    [promote],
   )
 
   // #268 — mirrors `expandedCairnId`'s own cleanup: a track removed, or
@@ -1022,7 +1050,7 @@ export function TripDetail({
           cairns={positionedCairns}
           accessToken={accessToken}
           selectedCairnId={selectedCairnId}
-          onSelectCairn={setSelectedCairnId}
+          onSelectCairn={handleSelectCairnFromMap}
           onOpenCairn={selectCairn}
           draggable={cairnsDraggable}
           onMoveCairn={handleMoveCairn}
@@ -1037,7 +1065,7 @@ export function TripDetail({
         cairns={positionedCairns}
         accessToken={accessToken}
         selectedCairnId={selectedCairnId}
-        onSelectCairn={setSelectedCairnId}
+        onSelectCairn={handleSelectCairnFromMap}
         onOpenCairn={selectCairn}
         hoveredCairnIds={hoveredCairnIds}
         onHoverCairn={hoverCairns}

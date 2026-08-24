@@ -200,6 +200,8 @@ describe('WorldLayer', () => {
     fireEvent.click(container.querySelector('.world-map__cluster')!)
 
     expect(zoomToFitCluster).toHaveBeenCalledTimes(1)
+    // #312 — the inset-aware padding, not the bare `FIT_PADDING` default.
+    expect(zoomToFitCluster).toHaveBeenCalledWith(fakeMap, expect.anything(), expect.anything())
   })
 
   it('draws only the trips the shell filters admit', () => {

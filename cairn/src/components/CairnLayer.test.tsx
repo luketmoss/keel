@@ -691,6 +691,22 @@ describe('CairnLayer cluster expansion (#194)', () => {
     expect(fanned(container)).toHaveLength(0)
   })
 
+  /* #312 — the cluster zoom now passes the inset-aware padding every other
+     fit already does, rather than the bare `FIT_PADDING` default. `useIsPhone`
+     reads `false` here (no `matchMedia` stub in this file), so the expected
+     padding is the desktop column's — none of the tokens it reads
+     (`--space-4`, `--panel-width`) are set on the root, so it collapses to
+     `FIT_PADDING` on every edge. */
+  it('zooms to fit a cluster with the inset-aware padding, not the bare default', () => {
+    const { container } = render(
+      <CairnLayer cairns={pair('separates')} accessToken="token" selectedCairnId={null} onSelectCairn={() => {}} />,
+    )
+
+    clickCluster(container)
+
+    expect(fitBounds).toHaveBeenCalledWith(expect.anything(), { left: 48, right: 48, top: 48, bottom: 48 })
+  })
+
   it('expands a cluster whose members never separate, instead of doing nothing (criterion 6)', () => {
     const { container } = render(
       <CairnLayer cairns={pair('never')} accessToken="token" selectedCairnId={null} onSelectCairn={() => {}} />,

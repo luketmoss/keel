@@ -56,19 +56,26 @@ describe('columnInset', () => {
     document.documentElement.style.setProperty('--space-4', '16px')
     document.documentElement.style.setProperty('--panel-width', '380px')
     document.documentElement.style.setProperty('--sheet-current', '250px')
+    document.documentElement.style.setProperty('--space-2', '8px')
+    document.documentElement.style.setProperty('--search-height', '56px')
   })
   afterEach(() => {
     document.documentElement.style.removeProperty('--space-4')
     document.documentElement.style.removeProperty('--panel-width')
     document.documentElement.style.removeProperty('--sheet-current')
+    document.documentElement.style.removeProperty('--space-2')
+    document.documentElement.style.removeProperty('--search-height')
   })
 
   it('desktop: the column inset, left edge only', () => {
     expect(columnInset(false)).toEqual({ left: 412, right: 0, top: 0, bottom: 0 })
   })
 
-  it('phone: the sheet inset, bottom edge only', () => {
-    expect(columnInset(true)).toEqual({ left: 0, right: 0, top: 0, bottom: 250 })
+  /* #312 — the top edge is the search card's own footprint
+     (`--space-2` + `--search-height`), read the same measured way
+     `--sheet-current` already is rather than a fixed constant. */
+  it('phone: the sheet inset on the bottom, the search card on top', () => {
+    expect(columnInset(true)).toEqual({ left: 0, right: 0, top: 64, bottom: 250 })
   })
 })
 

@@ -45,14 +45,19 @@ vi.mock('@vis.gl/react-google-maps', () => ({
 /* #312 — the settle re-frame's `dragstart` listener (registered whenever
    `map` is truthy, which the mock above always is) needs `google.maps.event`
    to exist, the same minimal stub `CairnLayer.test.tsx` already carries for
-   its own always-on `zoom_changed` listener. Nothing here drives a drag
-   through it; the tests exercising `cameraDisownedRef` live in
-   `reveal.test.ts` and this file's own #270 suite reads `revealPoints`/
-   `revealPoint` at the module boundary instead. */
+   its own always-on `zoom_changed` listener. Registrations are tracked by
+   event name so the #312 settle suite below can fire `dragstart` directly
+   and prove the re-frame defers to a manual pan. */
+const mapListeners = new Map<string, Set<() => void>>()
 ;(globalThis as unknown as { google: unknown }).google = {
   maps: {
     event: {
-      addListener: () => ({ remove: () => {} }),
+      addListener: (_target: unknown, name: string, handler: () => void) => {
+        const handlers = mapListeners.get(name) ?? new Set<() => void>()
+        handlers.add(handler)
+        mapListeners.set(name, handlers)
+        return { remove: () => handlers.delete(handler) }
+      },
       addListenerOnce: () => {},
     },
   },
@@ -93,6 +98,7 @@ beforeEach(() => {
   revealPoints.mockClear()
   revealPoint.mockClear()
   columnInset.mockClear()
+  mapListeners.clear()
 })
 
 function looseCairn(overrides: Partial<Extract<LooseRecord, { kind: 'cairn' }>> = {}): LooseRecord {
@@ -403,5 +409,81 @@ describe('LooseLayer — #270 reveal', () => {
 
     expect(revealPoints).not.toHaveBeenCalled()
     expect(revealPoint).not.toHaveBeenCalled()
+  })
+
+  describe('#312 settle re-frame', () => {
+    it('is not called on mount, even with an initial settleToken already set', () => {
+      render(
+        <LooseLayer
+          items={[looseCairn({ id: 'c-1', position: { lat: 43, lng: 141 }, image: null, icon: 'campsite' })]}
+          store={noopStore}
+          accessToken="token"
+          hoveredId={null}
+          onHover={vi.fn()}
+          onSelect={vi.fn()}
+          selectedId="c-1"
+          settleToken={1}
+        />,
+      )
+
+      // The mount's own reveal-on-selection effect fires once; the settle
+      // effect must not add a second call for the same, already-mounted
+      // token.
+      expect(revealPoint).toHaveBeenCalledTimes(1)
+    })
+
+    it('re-reveals the selected cairn when the sheet settles at a new detent', () => {
+      const view = render(
+        <LooseLayer
+          items={[looseCairn({ id: 'c-1', position: { lat: 43, lng: 141 }, image: null, icon: 'campsite' })]}
+          store={noopStore}
+          accessToken="token"
+          hoveredId={null}
+          onHover={vi.fn()}
+          onSelect={vi.fn()}
+          selectedId="c-1"
+          settleToken={0}
+        />,
+      )
+      expect(revealPoint).toHaveBeenCalledTimes(1)
+
+      view.rerender(
+        <LooseLayer
+          items={[looseCairn({ id: 'c-1', position: { lat: 43, lng: 141 }, image: null, icon: 'campsite' })]}
+          store={noopStore}
+          accessToken="token"
+          hoveredId={null}
+          onHover={vi.fn()}
+          onSelect={vi.fn()}
+          selectedId="c-1"
+          settleToken={1}
+        />,
+      )
+
+      expect(revealPoint).toHaveBeenCalledTimes(2)
+    })
+
+    it('does not re-frame once the user has panned the map by hand since selecting', () => {
+      const props = {
+        items: [looseCairn({ id: 'c-1', position: { lat: 43, lng: 141 }, image: null, icon: 'campsite' })],
+        store: noopStore,
+        accessToken: 'token',
+        hoveredId: null,
+        onHover: vi.fn(),
+        onSelect: vi.fn(),
+        selectedId: 'c-1',
+      }
+      const view = render(<LooseLayer {...props} settleToken={0} />)
+      expect(revealPoint).toHaveBeenCalledTimes(1)
+
+      // Fires the `dragstart` listener the component registered on this
+      // same fake map — the user taking the camera back, per #270's
+      // deference extended here to the settle re-frame.
+      mapListeners.get('dragstart')?.forEach((handler) => handler())
+
+      view.rerender(<LooseLayer {...props} settleToken={1} />)
+
+      expect(revealPoint).toHaveBeenCalledTimes(1)
+    })
   })
 })

@@ -31,13 +31,20 @@ vi.mock('@vis.gl/react-google-maps', () => ({
 }))
 
 /* #312 — the settle re-frame's `dragstart` listener needs `google.maps.event`
-   to exist now that `map` (`fakeMap`, above) is truthy in this file — the
-   same minimal stub `CairnLayer.test.tsx`/`LooseLayer.test.tsx` carry for
-   their own always-on listeners. */
+   to exist now that `map` (`fakeMap`, above) is truthy in this file. Tracks
+   registrations by event name, the same style `CairnLayer.test.tsx` uses for
+   its own listeners, so a test can fire `dragstart` and prove the settle
+   re-frame defers to a manual pan. */
+const mapListeners = new Map<string, Set<() => void>>()
 ;(globalThis as unknown as { google: unknown }).google = {
   maps: {
     event: {
-      addListener: () => ({ remove: () => {} }),
+      addListener: (_target: unknown, name: string, handler: () => void) => {
+        const handlers = mapListeners.get(name) ?? new Set<() => void>()
+        handlers.add(handler)
+        mapListeners.set(name, handlers)
+        return { remove: () => handlers.delete(handler) }
+      },
       addListenerOnce: () => {},
     },
   },
@@ -159,7 +166,7 @@ function mockCairnImport(cairns: unknown[] = []) {
   })
 }
 
-function renderTrip(overrides: { revealSuspended?: boolean } = {}) {
+function renderTrip(overrides: { revealSuspended?: boolean; settleToken?: number } = {}) {
   const store = new LocalTripStore(fakeStorage())
   const entry = store.createTrip('Larapinta')
   const view = render(
@@ -190,6 +197,7 @@ beforeEach(() => {
   revealPoints.mockClear()
   revealPoint.mockClear()
   columnInset.mockClear()
+  mapListeners.clear()
   mockCairnImport()
 })
 
@@ -233,6 +241,108 @@ describe('TripDetail — #270 reveal', () => {
       bottom: 0,
     })
     expect(revealPoints).not.toHaveBeenCalled()
+  })
+
+  describe('#312 settle re-frame', () => {
+    function rerenderWithToken(
+      view: ReturnType<typeof renderTrip>,
+      settleToken: number,
+      overrides: { revealSuspended?: boolean } = {},
+    ) {
+      view.rerender(
+        <MemoryRouter initialEntries={[`/trips/${view.entry.id}`]}>
+          <TripDetail
+            tripId={view.entry.id}
+            tripStore={view.store}
+            accessToken="token"
+            cairnFolderId="cairn-folder-id"
+            onBack={() => {}}
+            onDropTargetChange={() => {}}
+            onGeometryChange={() => {}}
+            onNeedsPlacement={() => {}}
+            onCreateTargetChange={() => {}}
+            onCairnDetailChange={() => {}}
+            cairnsDraggable
+            settleToken={settleToken}
+            {...overrides}
+          />
+        </MemoryRouter>,
+      )
+    }
+
+    it('is not called on mount, even with an initial settleToken already set', () => {
+      useTripImport.mockReturnValue(baseTripImport({ tracks: [trackFile()] }))
+
+      renderTrip({ settleToken: 1 })
+
+      expect(revealPoints).not.toHaveBeenCalled()
+    })
+
+    it('re-reveals the selected track when the sheet settles at a new detent', () => {
+      useTripImport.mockReturnValue(baseTripImport({ tracks: [trackFile()] }))
+      const view = renderTrip({ settleToken: 0 })
+      fireEvent.click(screen.getByText('Belford-Oxford'))
+      expect(revealPoints).toHaveBeenCalledTimes(1)
+
+      rerenderWithToken(view, 1)
+
+      expect(revealPoints).toHaveBeenCalledTimes(2)
+      expect(revealPoints).toHaveBeenLastCalledWith(
+        fakeMap,
+        [{ lat: 37, lng: -122 }, { lat: 37.01, lng: -122.01 }],
+        { left: 0, right: 0, top: 0, bottom: 0 },
+      )
+    })
+
+    it('re-reveals the selected cairn, via revealPoint, when the sheet settles', () => {
+      useTripImport.mockReturnValue(baseTripImport({ tracks: [] }))
+      mockCairnImport([
+        {
+          id: 'p1',
+          name: 'sapporo.jpg',
+          position: { lat: 43, lng: 141 },
+          positionSource: 'exif',
+          icon: null,
+          image: { originalDriveFileId: 'orig-1', thumbnailDriveFileId: 'thumb-1' },
+          description: '',
+          date: '2024-06-01',
+        },
+      ])
+      const view = renderTrip({ settleToken: 0 })
+      fireEvent.click(screen.getByText('sapporo.jpg'))
+      expect(revealPoint).toHaveBeenCalledTimes(1)
+
+      rerenderWithToken(view, 1)
+
+      expect(revealPoint).toHaveBeenCalledTimes(2)
+    })
+
+    it('does not re-frame after a settle while a decision owns the map', () => {
+      useTripImport.mockReturnValue(baseTripImport({ tracks: [trackFile()] }))
+      const view = renderTrip({ settleToken: 0 })
+      fireEvent.click(screen.getByText('Belford-Oxford'))
+      expect(revealPoints).toHaveBeenCalledTimes(1)
+
+      rerenderWithToken(view, 1, { revealSuspended: true })
+
+      expect(revealPoints).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not re-frame once the user has panned the map by hand since selecting', () => {
+      useTripImport.mockReturnValue(baseTripImport({ tracks: [trackFile()] }))
+      const view = renderTrip({ settleToken: 0 })
+      fireEvent.click(screen.getByText('Belford-Oxford'))
+      expect(revealPoints).toHaveBeenCalledTimes(1)
+
+      // Fires the `dragstart` listener the component itself registered on
+      // this same fake map — the user taking the camera back, per #270's
+      // deference extended here to the settle re-frame.
+      mapListeners.get('dragstart')?.forEach((handler) => handler())
+
+      rerenderWithToken(view, 1)
+
+      expect(revealPoints).toHaveBeenCalledTimes(1)
+    })
   })
 
   it('does not reveal, and disables the route hit lines, while a decision owns the map', () => {

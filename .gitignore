@@ -13,3 +13,9 @@ __pycache__/
 !.env.example
 
 .claude/settings.local.json
+
+# Vitest writes a cache here when run from the workspace root rather than
+# inside a project folder.
+node_modules/
+
+scratchpad/

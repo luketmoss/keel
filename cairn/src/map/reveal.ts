@@ -198,7 +198,11 @@ export function revealPoint(map: google.maps.Map, point: LatLng, inset: Inset): 
   }
 }
 
-function toPadding(inset: Inset): google.maps.Padding {
+/** #304 — exported so `MapCanvas`'s home-extent fit (the initial load and
+    `Reset view`'s 2D form) can turn the same inset into the padding
+    `fitTracksToBounds`/`defaultBounds` take, rather than a second copy of
+    this arithmetic living beside them. */
+export function toPadding(inset: Inset): google.maps.Padding {
   return {
     left: inset.left + FIT_PADDING,
     right: inset.right + FIT_PADDING,

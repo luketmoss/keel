@@ -15,6 +15,7 @@ import type { FlyoverRequest } from '../map/Map3DControl'
 import { sampleGroundAltitude } from '../map/groundAltitude'
 import { createGoogleElevationSampler, type ElevationSampler } from '../geo/elevation'
 import type { LatLng } from '../map/geo'
+import { HOME_CENTER, HOME_CORNERS, HOME_RANGE } from '../map/homeView'
 import './Map3D.css'
 
 /* #271's camera choreography: "The camera tilts from 0° to 55° over
@@ -40,6 +41,11 @@ interface Map3DSurfaceProps {
       and then immediately to 65°". `undefined`/`null` behaves exactly as
       #271 always has. */
   flyover?: FlyoverRequest | null
+  /** #304 — a new token means `Reset view` was pressed while 3D is on. Flies
+      the camera to the home extent: its centre, a range covering it,
+      heading 0 and the standard tilt-in's own 55°, ground-resolved the same
+      way every other 3D move here is. Does not touch `on`. */
+  resetToken?: number | null
 }
 
 /** Mounted once, on the first `on`, and never unmounted again for the rest
@@ -48,7 +54,7 @@ interface Map3DSurfaceProps {
     own opacity in and out; the 2D map underneath needs no styling of its
     own; an opaque 3D surface fading to full opacity over an opaque 2D one
     reads as the same dissolve a true crossfade would. */
-export function Map3DSurface({ on, mode, flyover = null }: Map3DSurfaceProps) {
+export function Map3DSurface({ on, mode, flyover = null, resetToken = null }: Map3DSurfaceProps) {
   const map2d = useMap()
   const map3dRef = useRef<Map3DRef>(null)
   const [mounted, setMounted] = useState(false)
@@ -58,6 +64,8 @@ export function Map3DSurface({ on, mode, flyover = null }: Map3DSurfaceProps) {
       of an effect (a prop that changed for an unrelated reason) a no-op,
       and what a fresh `requestFlyover` press has to beat to run again. */
   const handledFlyoverToken = useRef<number | null>(null)
+  /** #304 — same idea as `handledFlyoverToken`, for `Reset view`. */
+  const handledResetToken = useRef<number | null>(null)
   const flightTimers = useRef<number[]>([])
   const flying = useRef(false)
 
@@ -342,6 +350,31 @@ export function Map3DSurface({ on, mode, flyover = null }: Map3DSurfaceProps) {
     if (flyover.token === handledFlyoverToken.current) return
     runFlyover(flyover)
   }, [flyover, mounted, visible, runFlyover])
+
+  /** #304 — `Reset view`'s 3D form: cancel whatever is running (the same
+      "a deliberate input on the surface cancels the flight" rule #274 gives
+      a flyover) and fly to the home extent, heading 0, at the tilt-in's own
+      standard 55° — never the flyover's 65°, and never the live heading or
+      tilt the way `flyToFramedGround` reuses for a reveal, since a reset
+      resets orientation too. */
+  const runReset = useCallback(() => {
+    stopFlight()
+    if (!map3dRef.current?.map3d) return
+    flying.current = true
+    void arriveAt(HOME_CENTER, HOME_RANGE, TILT_ON, TILT_ANIMATION_MS, HOME_CORNERS, () => {
+      flying.current = false
+    })
+  }, [stopFlight, arriveAt])
+
+  // Same shape as the flyover effect above — reset only fires once the
+  // surface is actually visible, and a token repeated for an unrelated
+  // re-render is a no-op.
+  useEffect(() => {
+    if (!mounted || !visible || resetToken === null) return
+    if (resetToken === handledResetToken.current) return
+    handledResetToken.current = resetToken
+    runReset()
+  }, [resetToken, mounted, visible, runReset])
 
   // #274's "Cancelling": any deliberate input on the 3D surface itself —
   // not camera-change events, which `flyCameraTo` fires on its own and

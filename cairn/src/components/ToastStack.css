@@ -24,6 +24,25 @@
   white-space: nowrap;
 }
 
+/* #327 — a toast reporting an expected state rather than a failure. */
+.toast--default {
+  color: var(--text);
+}
+
+.toast__action {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.toast__action:disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+
 .toast__dismiss {
   display: flex;
   align-items: center;

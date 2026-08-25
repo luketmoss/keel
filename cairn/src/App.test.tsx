@@ -1773,3 +1773,155 @@ describe('App cairn facets (#159)', () => {
     fetchSpy.mockRestore()
   })
 })
+
+/* cairn/docs/design/327-returned-home-by-an-expiry.md — the *automatic*
+   `signed-in` → `token-expired` transition (`useGoogleAccount`'s own
+   `onDriveAuthError` listener), fired here the same way
+   `useGoogleAccount.test.ts` does: `reportDriveAuthError` re-imported after
+   `renderApp`'s own `vi.resetModules()`, so it talks to the same module
+   instance the app under test subscribed to. */
+describe('App session-ended redirect (#327)', () => {
+  async function fireDriveAuthError(accessToken = 'tok') {
+    const { reportDriveAuthError } = await import('./drive/authEvents')
+    act(() => reportDriveAuthError(accessToken))
+  }
+
+  it('navigates home and shows a persistent message when the session expires on a detail route', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedLooseTrack('lt-327-a', 'Mount Rosea')
+
+    await renderApp('/tracks/lt-327-a', { googleClientId: 'a-client-id' })
+    await signIn()
+    await screen.findByText('512 points · Mount Rosea.kml')
+
+    await fireDriveAuthError()
+
+    expect(await screen.findByRole('heading', { name: 'Everything' })).toBeDefined()
+    expect(window.location.pathname).toBe('/')
+    expect(screen.queryByText('512 points · Mount Rosea.kml')).toBeNull()
+    expect(
+      screen.getByText('Your Drive session ended — sign in again to pick up where you left off.'),
+    ).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeDefined()
+
+    fetchSpy.mockRestore()
+  })
+
+  /* The redirect's own `onDetailRoute` check treats `/trips/:id` the same
+     as the loose-item routes above — worth its own test since a trip
+     opens a structurally different face (`TripDetail`) than a loose
+     item's (`LooseFace`), the two most likely to have diverged if the
+     three route matches had been wired up inconsistently. */
+  it('also navigates home from an open trip', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedTrip('trip-327', 'Hokkaido')
+
+    await renderApp('/trips/trip-327', { googleClientId: 'a-client-id' })
+    await signIn()
+    await screen.findByRole('button', { name: 'Back to the list' })
+
+    await fireDriveAuthError()
+
+    expect(await screen.findByRole('heading', { name: 'Everything' })).toBeDefined()
+    expect(window.location.pathname).toBe('/')
+    expect(screen.queryByRole('button', { name: 'Back to the list' })).toBeNull()
+    expect(
+      screen.getByText('Your Drive session ended — sign in again to pick up where you left off.'),
+    ).toBeDefined()
+
+    fetchSpy.mockRestore()
+  })
+
+  it('returns to the exact route on a successful reconnect, and clears the message', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedLooseTrack('lt-327-b', 'Mount Rosea')
+
+    await renderApp('/tracks/lt-327-b', { googleClientId: 'a-client-id' })
+    await signIn()
+    await fireDriveAuthError()
+    await screen.findByText('Your Drive session ended — sign in again to pick up where you left off.')
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    })
+
+    expect(await screen.findByText('512 points · Mount Rosea.kml')).toBeDefined()
+    expect(window.location.pathname).toBe('/tracks/lt-327-b')
+    expect(
+      screen.queryByText('Your Drive session ended — sign in again to pick up where you left off.'),
+    ).toBeNull()
+
+    fetchSpy.mockRestore()
+  })
+
+  it('leaves the user where they are, not the remembered route, if they navigated on their own first', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedLooseTrack('lt-327-c1', 'Mount Rosea')
+    seedLooseTrack('lt-327-c2', 'Ellery Creek')
+
+    await renderApp('/tracks/lt-327-c1', { googleClientId: 'a-client-id' })
+    await signIn()
+    await fireDriveAuthError()
+    await screen.findByRole('heading', { name: 'Everything' })
+
+    // The user moves on by hand before reconnecting — while disconnected
+    // (#73/#95) the list is empty, so there is nothing to click; a typed
+    // URL is the one navigation that doesn't depend on visible content.
+    // `history`'s `BrowserHistory` (what `useLocation` reads) is driven by
+    // `popstate`, which a raw `pushState` does not itself dispatch.
+    await act(async () => {
+      window.history.pushState({}, '', '/tracks/lt-327-c2')
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    })
+    await waitFor(() => expect(window.location.pathname).toBe('/tracks/lt-327-c2'))
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    })
+
+    await waitFor(() => expect(screen.queryByText('Sign in')).toBeNull())
+    expect(window.location.pathname).toBe('/tracks/lt-327-c2')
+
+    fetchSpy.mockRestore()
+  })
+
+  it('reconnecting with nothing remembered (already home when the session ended) leaves the user on /', async () => {
+    const fetchSpy = mockGoogleSignIn()
+
+    await renderApp('/', { googleClientId: 'a-client-id' })
+    await signIn()
+    await fireDriveAuthError()
+    await screen.findByText('Your Drive session ended — sign in again to pick up where you left off.')
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    })
+
+    await waitFor(() =>
+      expect(
+        screen.queryByText('Your Drive session ended — sign in again to pick up where you left off.'),
+      ).toBeNull(),
+    )
+    expect(window.location.pathname).toBe('/')
+
+    fetchSpy.mockRestore()
+  })
+
+  it('a deliberate sign-out does not navigate and shows no message', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedLooseTrack('lt-327-d', 'Mount Rosea')
+
+    await renderApp('/tracks/lt-327-d', { googleClientId: 'a-client-id' })
+    await signIn()
+
+    fireEvent.click(screen.getByRole('button', { name: /Account: jane@gmail.com/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
+
+    expect(window.location.pathname).toBe('/tracks/lt-327-d')
+    expect(
+      screen.queryByText('Your Drive session ended — sign in again to pick up where you left off.'),
+    ).toBeNull()
+
+    fetchSpy.mockRestore()
+  })
+})

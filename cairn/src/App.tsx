@@ -7,7 +7,7 @@ import {
   useSyncExternalStore,
   type DragEvent,
 } from 'react'
-import { BrowserRouter, Navigate, Route, Routes, useMatch, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useMatch, useNavigate } from 'react-router-dom'
 import { MapCanvas, MapProvider } from './components/MapCanvas'
 import { HomeResetOnNavigate } from './map/HomeResetOnNavigate'
 import { ShellColumn } from './components/ShellColumn'
@@ -132,6 +132,13 @@ function generateToastId(): string {
   return `toast-${nextToastId}`
 }
 
+/** #327 — a fixed id rather than `generateToastId()`: only one of these
+    ever exists at a time (design note), and a fixed id is what lets later
+    effects find and remove or replace this specific toast rather than
+    guessing which one it was. */
+const SESSION_ENDED_TOAST_ID = 'session-ended'
+const SESSION_ENDED_MESSAGE = 'Your Drive session ended — sign in again to pick up where you left off.'
+
 /** A cairn being placed by hand: where the gesture landed, which trip the
     gesture's context chose, and what has been typed so far.
  *
@@ -180,6 +187,7 @@ function AppShell() {
   const openCairnId = useMatch('/cairns/:id')?.params.id
   const openLooseId = openTrackId ?? openCairnId
   const navigate = useNavigate()
+  const location = useLocation()
   const account = useGoogleAccount()
   /** #274 — read only for the phone sheet's own detent drop; `MapCanvas`
       reads the rest of this same context for the actual 3D switch and
@@ -305,6 +313,69 @@ function AppShell() {
   // never signed in this session, signed out, or #72's token-expired — and
   // all three get the same read-only treatment.
   const disconnected = accessToken === null
+
+  /* #327 — turns the *automatic* `signed-in` → `token-expired` transition
+     (`useGoogleAccount`'s own `onDriveAuthError` listener) into a
+     navigation event, distinct from every other way `token-expired` is
+     reached (an already-lapsed session on load, `retryFolderSetup` hitting
+     an expired token) and from a deliberate `Sign out` — none of those are
+     "the user was on a page, and it stopped working under them". Tracked
+     by comparing against the *previous* status rather than reacting to
+     `token-expired` alone, since #72's own restore path can also land
+     there without ever having been signed in this tab. */
+  const prevAccountStatusRef = useRef(account.state.status)
+  /** The route to return to on a successful reconnect. A ref, not state:
+      writing it never needs to re-render anything on its own, and it is
+      read only once, at the moment a reconnect actually succeeds. `null`
+      once the user has navigated anywhere themselves — "the app gets one
+      chance to put them back" (design note). */
+  const rememberedRouteRef = useRef<string | null>(null)
+  /** Distinguishes a navigation this effect made itself (to `/`, or back
+      to the remembered route) from one the user made, so the
+      location-watching effect below can tell "the user moved on" from "we
+      just moved them" — both look identical as a `location.pathname`
+      change. */
+  const programmaticNavigationRef = useRef(false)
+
+  useEffect(() => {
+    const previous = prevAccountStatusRef.current
+    prevAccountStatusRef.current = account.state.status
+
+    if (previous === 'signed-in' && account.state.status === 'token-expired') {
+      const onDetailRoute = routeTripId !== undefined || openTrackId !== undefined || openCairnId !== undefined
+      if (onDetailRoute) {
+        rememberedRouteRef.current = location.pathname
+        programmaticNavigationRef.current = true
+        navigate('/')
+      }
+      setToasts((current) => [
+        ...current.filter((toast) => toast.id !== SESSION_ENDED_TOAST_ID),
+        { id: SESSION_ENDED_TOAST_ID, text: SESSION_ENDED_MESSAGE, persistent: true, tone: 'default' },
+      ])
+      return
+    }
+
+    if (previous === 'token-expired' && account.state.status === 'signed-in') {
+      setToasts((current) => current.filter((toast) => toast.id !== SESSION_ENDED_TOAST_ID))
+      const route = rememberedRouteRef.current
+      rememberedRouteRef.current = null
+      if (route) {
+        programmaticNavigationRef.current = true
+        navigate(route)
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [account.state.status])
+
+  // #327 — the other half: a route change this effect didn't cause itself
+  // is the user moving on, which discards whatever was remembered above.
+  useEffect(() => {
+    if (programmaticNavigationRef.current) {
+      programmaticNavigationRef.current = false
+      return
+    }
+    rememberedRouteRef.current = null
+  }, [location.pathname])
 
   const draftTrip = useDraftTrip(tripStore, accessToken, cairnFolderId)
 
@@ -1026,6 +1097,25 @@ function AppShell() {
     (item): item is Extract<LooseRecord, { kind: 'track' }> => item.kind === 'track',
   )
 
+  /* #327 — the session-ended toast's action is computed fresh on every
+     render rather than baked into the stored toast object, so `pending`
+     and `onClick` always read the account's *current* state and
+     `reconnect` rather than whatever they were the moment the toast was
+     created. */
+  const displayToasts = toasts.map((toast) =>
+    toast.id === SESSION_ENDED_TOAST_ID
+      ? {
+          ...toast,
+          action: {
+            label: 'Sign in',
+            pendingLabel: 'Signing in…',
+            pending: account.state.status === 'token-expired' && account.state.reconnecting === true,
+            onClick: () => void account.reconnect(),
+          },
+        }
+      : toast,
+  )
+
   return (
     // #313 — wraps everything: the map layers (siblings of `ShellColumn`
     // below, not its descendants) need `promote` exactly as much as
@@ -1375,7 +1465,7 @@ function AppShell() {
               {archiveProgress.name} — {archiveProgress.index} of {archiveProgress.total}
             </p>
           )}
-          <ToastStack toasts={toasts} onDismiss={dismissToast} />
+          <ToastStack toasts={displayToasts} onDismiss={dismissToast} />
         </div>
       </MapProvider>
     </SheetPromotionProvider>

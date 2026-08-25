@@ -116,6 +116,17 @@ export function CairnLayer({
      fan disappears, so there is no stale state to clean up. */
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
   const collapse = useCallback(() => setExpandedKey(null), [])
+  /* #328 — true for the span between a fan member's own click and the
+     camera settling on the reveal it causes. `bounds_changed` fires
+     repeatedly over that span (an animated `panTo`/`setZoom` reports
+     several times before it's done); this stays true across all of them so
+     none collapses the fan, and only comes back down on `idle` — Maps' own
+     signal that the camera has actually finished moving, fired once, after
+     every `bounds_changed` for the same move. Set only when the click will
+     actually change the selection (design doc's "no reveal fires" edge
+     case) — a click that doesn't could leave this stuck `true` with no
+     `idle` ever coming to clear it. */
+  const suppressCollapseRef = useRef(false)
 
   useEffect(() => {
     if (!map) return
@@ -140,7 +151,17 @@ export function CairnLayer({
   useEffect(() => {
     if (!map || expandedKey === null) return
     const clickListener = google.maps.event.addListener(map, 'click', collapse)
-    const cameraListener = google.maps.event.addListener(map, 'bounds_changed', collapse)
+    /* #328 — a camera move mid-reveal (`suppressCollapseRef.current`) is
+       the app's own doing and is ignored here rather than collapsing; a
+       user's drag, scroll-zoom or reset still collapses on its first tick,
+       unchanged from #194. */
+    const cameraListener = google.maps.event.addListener(map, 'bounds_changed', () => {
+      if (suppressCollapseRef.current) return
+      collapse()
+    })
+    const idleListener = google.maps.event.addListener(map, 'idle', () => {
+      suppressCollapseRef.current = false
+    })
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') collapse()
     }
@@ -148,6 +169,7 @@ export function CairnLayer({
     return () => {
       clickListener.remove()
       cameraListener.remove()
+      idleListener.remove()
       window.removeEventListener('keydown', handleKeyDown)
     }
   }, [map, expandedKey, collapse])
@@ -209,7 +231,15 @@ export function CairnLayer({
               zoom={zoom}
               accessToken={accessToken}
               selectedCairnId={selectedCairnId}
-              onSelect={onSelectCairn}
+              onSelect={(cairnId) => {
+                // #328 — arms the suppression above only when this click
+                // will actually move the selection (design doc's "no
+                // reveal fires" edge case) — arming it for a click that
+                // reselects the same cairn would leave it stuck `true`
+                // with no `idle` ever coming to bring it back down.
+                if (cairnId !== selectedCairnId) suppressCollapseRef.current = true
+                onSelectCairn(cairnId)
+              }}
               onOpen={onOpenCairn}
               onCollapse={collapse}
               hovered={hovered}

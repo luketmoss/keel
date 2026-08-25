@@ -830,6 +830,92 @@ describe('CairnLayer cluster expansion (#194)', () => {
     clickCluster(container)
     expect(fanned(container)).toHaveLength(0)
   })
+
+  /* #328 — withdraws #194's own "clicking one of its own markers" collapse
+     entry: a member click still selects and opens its cairn, per criterion
+     8 above, but the camera move #302 makes in response to that selection
+     no longer closes the fan out from under it. Real `bounds_changed`
+     events fire several times over one animated `panTo`/`setZoom` before
+     Maps reports `idle`, which is why these fire more than one to prove
+     the fan survives the whole span, not just its first tick. */
+  describe('a fan survives its own click', () => {
+    it('stays expanded through every camera move its own click causes', () => {
+      const { container } = render(
+        <CairnLayer cairns={pair('never')} accessToken="token" selectedCairnId={null} onSelectCairn={() => {}} />,
+      )
+
+      clickCluster(container)
+      clickMarker(container.querySelector('[data-cairn-id="b"]'))
+
+      act(() => fireMapEvent('bounds_changed'))
+      act(() => fireMapEvent('bounds_changed'))
+
+      expect(fanned(container)).toHaveLength(2)
+    })
+
+    it('still selects and opens the clicked member, unaffected by the suppression', () => {
+      const onSelectCairn = vi.fn()
+      const onOpenCairn = vi.fn()
+      const { container } = render(
+        <CairnLayer
+          cairns={pair('never')}
+          accessToken="token"
+          selectedCairnId={null}
+          onSelectCairn={onSelectCairn}
+          onOpenCairn={onOpenCairn}
+        />,
+      )
+
+      clickCluster(container)
+      clickMarker(container.querySelector('[data-cairn-id="b"]'))
+
+      expect(onSelectCairn).toHaveBeenCalledWith('b')
+      expect(onOpenCairn).toHaveBeenCalledWith('b')
+    })
+
+    it('collapses on the camera move that follows once the reveal has settled — idle alone does not collapse it', () => {
+      const { container } = render(
+        <CairnLayer cairns={pair('never')} accessToken="token" selectedCairnId={null} onSelectCairn={() => {}} />,
+      )
+
+      clickCluster(container)
+      clickMarker(container.querySelector('[data-cairn-id="b"]'))
+      act(() => fireMapEvent('bounds_changed'))
+      act(() => fireMapEvent('idle'))
+      expect(fanned(container)).toHaveLength(2)
+
+      // The reveal has settled; this is a real camera move — a drag, a
+      // scroll-zoom — same as any of #194's own.
+      act(() => fireMapEvent('bounds_changed'))
+      expect(fanned(container)).toHaveLength(0)
+    })
+
+    it('does not suppress collapse for a click that reselects the already-selected member', () => {
+      const { container } = render(
+        <CairnLayer cairns={pair('never')} accessToken="token" selectedCairnId="b" onSelectCairn={() => {}} />,
+      )
+
+      clickCluster(container)
+      // #302: selection doesn't change, so no reveal fires and nothing
+      // should have armed the suppression.
+      clickMarker(container.querySelector('[data-cairn-id="b"]'))
+
+      act(() => fireMapEvent('bounds_changed'))
+      expect(fanned(container)).toHaveLength(0)
+    })
+
+    it('still collapses on Escape and a click elsewhere while a reveal is in flight', () => {
+      const { container } = render(
+        <CairnLayer cairns={pair('never')} accessToken="token" selectedCairnId={null} onSelectCairn={() => {}} />,
+      )
+
+      clickCluster(container)
+      clickMarker(container.querySelector('[data-cairn-id="b"]'))
+
+      act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
+      expect(fanned(container)).toHaveLength(0)
+    })
+  })
 })
 
 describe('CairnLayer dragging (#158)', () => {

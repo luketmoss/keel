@@ -122,35 +122,15 @@ def issue_node_id(number):
 
 
 def find_item(number):
-    """Board item id for an issue, or None if the issue is not on the board."""
-    cursor = "null"
-    while True:
-        data = graphql(
-            """
-            query {
-              node(id: %s) {
-                ... on ProjectV2 {
-                  items(first: 100, after: %s) {
-                    pageInfo { hasNextPage endCursor }
-                    nodes {
-                      id
-                      content { ... on Issue { number } }
-                    }
-                  }
-                }
-              }
-            }
-            """
-            % (q(PROJECT_ID), cursor)
-        )
-        items = data["node"]["items"]
-        for item in items["nodes"]:
-            content = item.get("content") or {}
-            if content.get("number") == number:
-                return item["id"]
-        if not items["pageInfo"]["hasNextPage"]:
-            return None
-        cursor = q(items["pageInfo"]["endCursor"])
+    """Board item id for an issue, or None if the issue is not on the board.
+
+    Reads through `board_rows` rather than running its own query - see its
+    docstring for why there is only one paginated items() query in this file.
+    """
+    for row in board_rows():
+        if row["number"] == number:
+            return row["id"]
+    return None
 
 
 def ensure_item(number):
@@ -253,9 +233,13 @@ def cmd_set(args):
 def board_rows(status=None, project=None):
     """Every issue on the board, optionally narrowed to one stage or project.
 
-    The only place the project-items query lives. `list`, `holds-branch` and
-    `next` all read through here - three copies of a paginated GraphQL query
-    is three places for a field name to go stale.
+    The only place the project-items query lives. `find_item`, `list`,
+    `holds-branch` and `next` all read through here - one paginated GraphQL
+    query rather than several copies that can go stale independently.
+
+    Each row carries the project item `id` alongside the display fields, since
+    `find_item` needs it and callers that don't (`list`) drop it before
+    printing.
     """
     cursor = "null"
     rows = []
@@ -268,6 +252,7 @@ def board_rows(status=None, project=None):
                   items(first: 100, after: %s) {
                     pageInfo { hasNextPage endCursor }
                     nodes {
+                      id
                       content { ... on Issue { number title url } }
                       fieldValues(first: 20) {
                         nodes {
@@ -299,6 +284,7 @@ def board_rows(status=None, project=None):
                 continue
             rows.append(
                 {
+                    "id": item["id"],
                     "number": content["number"],
                     "title": content["title"],
                     "url": content["url"],
@@ -314,8 +300,14 @@ def board_rows(status=None, project=None):
     return rows
 
 
+def without_id(row):
+    """Drop the internal item `id` before a row reaches printed output."""
+    return {k: v for k, v in row.items() if k != "id"}
+
+
 def cmd_list(args):
-    print(json.dumps(board_rows(args.status, args.project), indent=2))
+    rows = [without_id(row) for row in board_rows(args.status, args.project)]
+    print(json.dumps(rows, indent=2))
 
 
 # The stages that own an open branch. Ready to Ship is one of them: #170 made
@@ -339,7 +331,7 @@ def cmd_holds_branch(args):
     parsing anything.
     """
     rows = [row for row in board_rows(project=args.project) if row["status"] in BRANCH_STAGES]
-    print(json.dumps(rows, indent=2))
+    print(json.dumps([without_id(row) for row in rows], indent=2))
     if rows:
         sys.exit(1)
 
@@ -366,7 +358,7 @@ def cmd_next(args):
     rows = board_rows(args.status, args.project)
     if not rows:
         sys.exit(1)
-    print(json.dumps(min(rows, key=pick_order), indent=2))
+    print(json.dumps(without_id(min(rows, key=pick_order)), indent=2))
 
 
 def cmd_projects(args):

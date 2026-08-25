@@ -68,6 +68,27 @@ something the system doesn't have, say that the project needs one.
 
 ## Exit
 
+**Commit and push the note to `origin/main` yourself, before anything else.**
+`/develop` commits a design note that's sitting in its own working tree, but it
+runs from a fresh worktree branched off `origin/main` — a note left uncommitted
+here simply doesn't exist there. The note has to be on `origin/main` before any
+`/develop` run, worktree or not, ever branches:
+
+```bash
+git fetch origin
+git checkout -b ux-note/<issue> origin/main
+git add <project>/docs/design/<issue>-<slug>.md
+git commit -m "Add design note for #<issue> (<slug>)"
+git push origin HEAD:main
+git checkout -
+git branch -D ux-note/<issue>
+```
+
+Base the commit on `origin/main` via the scratch branch, not on whatever the
+local `main` happens to be doing — another session's work-in-progress can be
+sitting there (see #203), and committing on top of it would drag that state
+onto `origin/main` on push.
+
 Link the design note from the issue body under `## Design`, then:
 
 ```bash

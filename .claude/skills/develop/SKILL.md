@@ -12,11 +12,23 @@ boring.
 
 ```bash
 python .keel/board.py show <issue>
+gh issue view <issue> --repo luketmoss/keel --json body,comments
 ```
 
 The issue must be in **Refined**. If it's in To Do or PM Refining it hasn't been
 through Gate 1 — stop and say so rather than refining it yourself on the way
 past. The gate exists because the user wants to see the spec before it's built.
+
+Read the comments, not just the body. A merge to the same Project since this
+issue went to Refined can invalidate the premise it was written against — see
+#203 — and `/ship` leaves a comment naming the merge when that risk exists.
+Two outcomes:
+
+- The merge it names doesn't touch what this issue depends on (a different
+  change to the same project) — proceed, and say so briefly in the report.
+- It does — **stop before cutting a branch.** Report what changed and what's
+  now in question. Do not guess at whether the premise still holds; that
+  guess is exactly what Gate 1 exists to avoid.
 
 Read, in order: the issue body, the project's `CLAUDE.md`, its stack skill, the
 **standing documents** under `<project>/docs/design/` — `CONVENTIONS.md` defines

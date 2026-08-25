@@ -49,6 +49,32 @@ Where a genuine choice exists between two reasonable approaches, pick one, say
 which, and say why in a sentence. Do not present the user a menu — that is what
 Gate 1 is for.
 
+## Measure the numbers
+
+A criterion phrased as a measurement — a pixel width, a character count, "at
+least twice the area", "at least Npx" — either holds or it doesn't, and that
+can be checked now instead of argued about later. Before such a criterion
+ships to Refined, whether it's already in the issue body or one you're about
+to write, measure it against the actual running app rather than an assumed
+baseline.
+
+Launch through the project's `.claude/launch.json` per the stack skill and
+read the real computed value — `getBoundingClientRect()` and friends for the
+web stack, per `stack-web/SKILL.md`'s "Verifying a browser UI"; whatever the
+equivalent stack skill names otherwise. Record what you measured and where in
+the design note, so the number in the criterion has a citation.
+
+If reality contradicts the criterion — the space is smaller than assumed, the
+target is arithmetically unreachable at the width the note itself specifies —
+revise the acceptance criteria in the issue body to match what you measured,
+the same way you'd sharpen a vague criterion into a concrete one. Don't ship a
+criterion you already know is false and flag it for later; that's what sent
+#193 and #197 to a halted `/test` run instead of a corrected number here.
+
+This only applies to criteria asserting a specific quantity. "Legible" and
+"obviously disabled" are judgment calls for a person to make, not something a
+`getBoundingClientRect()` call settles.
+
 ## Visual language
 
 **Reference tokens by name; never write a raw value.** `--space-4`, not `16px`.

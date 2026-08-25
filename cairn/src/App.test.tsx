@@ -1807,6 +1807,31 @@ describe('App session-ended redirect (#327)', () => {
     fetchSpy.mockRestore()
   })
 
+  /* The redirect's own `onDetailRoute` check treats `/trips/:id` the same
+     as the loose-item routes above — worth its own test since a trip
+     opens a structurally different face (`TripDetail`) than a loose
+     item's (`LooseFace`), the two most likely to have diverged if the
+     three route matches had been wired up inconsistently. */
+  it('also navigates home from an open trip', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedTrip('trip-327', 'Hokkaido')
+
+    await renderApp('/trips/trip-327', { googleClientId: 'a-client-id' })
+    await signIn()
+    await screen.findByRole('button', { name: 'Back to the list' })
+
+    await fireDriveAuthError()
+
+    expect(await screen.findByRole('heading', { name: 'Everything' })).toBeDefined()
+    expect(window.location.pathname).toBe('/')
+    expect(screen.queryByRole('button', { name: 'Back to the list' })).toBeNull()
+    expect(
+      screen.getByText('Your Drive session ended — sign in again to pick up where you left off.'),
+    ).toBeDefined()
+
+    fetchSpy.mockRestore()
+  })
+
   it('returns to the exact route on a successful reconnect, and clears the message', async () => {
     const fetchSpy = mockGoogleSignIn()
     seedLooseTrack('lt-327-b', 'Mount Rosea')

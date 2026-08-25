@@ -1,6 +1,7 @@
 import { act, fireEvent, render, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CairnLayer, type PositionedCairn } from './CairnLayer'
+import { CLUSTER_MAX_ZOOM } from '../map/fitBounds'
 
 /* Same stubbing strategy as TrackLayer.test.tsx — AdvancedMarker renders its
    children directly into a positioned div so assertions read the DOM rather
@@ -888,6 +889,43 @@ describe('CairnLayer cluster expansion (#194)', () => {
       // scroll-zoom — same as any of #194's own.
       act(() => fireMapEvent('bounds_changed'))
       expect(fanned(container)).toHaveLength(0)
+    })
+
+    /* AC: "the fan is drawn around the cluster anchor's new screen
+       position, with its members still individually clickable" — the
+       reveal's zoom-in is what moves it there. `fanOutPositions` already
+       recomputes from `zoom` on its own (`fanOut.ts`'s own docstring:
+       positions "are only correct at zoom"), reactively, regardless of the
+       suppression above — this proves that pre-existing recompute still
+       runs, and members are still clickable, through a click that keeps
+       the fan open. */
+    it('re-lays-out its members at the zoom the reveal closes in to, and they stay clickable', () => {
+      const { container } = render(
+        <CairnLayer cairns={pair('never')} accessToken="token" selectedCairnId={null} onSelectCairn={() => {}} />,
+      )
+
+      clickCluster(container)
+      const before = Array.from(fanned(container)).map((marker) => {
+        const advanced = marker.closest('[data-testid="advanced-marker"]') as HTMLElement
+        return `${advanced.getAttribute('data-lat')},${advanced.getAttribute('data-lng')}`
+      })
+
+      clickMarker(container.querySelector('[data-cairn-id="b"]'))
+      // #302 closes the zoom in to CLUSTER_MAX_ZOOM as part of this same
+      // reveal.
+      currentZoom = CLUSTER_MAX_ZOOM
+      act(() => fireMapEvent('zoom_changed'))
+      act(() => fireMapEvent('bounds_changed'))
+
+      const after = Array.from(fanned(container)).map((marker) => {
+        const advanced = marker.closest('[data-testid="advanced-marker"]') as HTMLElement
+        return `${advanced.getAttribute('data-lat')},${advanced.getAttribute('data-lng')}`
+      })
+
+      expect(after).toHaveLength(2)
+      expect(after).not.toEqual(before)
+      clickMarker(container.querySelector('[data-cairn-id="a"]'))
+      expect(fanned(container)).toHaveLength(2)
     })
 
     it('does not suppress collapse for a click that reselects the already-selected member', () => {

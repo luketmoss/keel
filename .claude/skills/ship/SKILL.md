@@ -96,7 +96,33 @@ the remedy, and it isn't the first move — reach for it only after the check
 above has run, so using it always means you looked. Reaching for it out of habit
 after every merge is how a one-click board setting stays broken forever.
 
+## Flag Refined siblings
+
+A merge can quietly invalidate the premise another Refined issue was written
+against — see #203. After merging, check what else is waiting in the same
+Project:
+
+```bash
+python .keel/board.py list --status Refined --project <project>
+```
+
+For each issue that comes back (excluding the one just shipped), post a
+comment naming the PR that just merged and briefly describing what changed:
+
+```bash
+gh issue comment <other-issue> --repo luketmoss/keel --body "\
+#<issue> just merged (<pr-url>): <one-line description of the change>.
+If this issue's premise depends on the area that changed, re-check it
+before starting development."
+```
+
+This runs after the merge and never blocks or changes its outcome — every
+Refined issue in the Project gets flagged, not just ones that provably
+overlap. `/develop` is what decides, per issue, whether a flag actually
+matters.
+
 ## Report
 
 What merged, the commit on main, and that CI is building. If the project has a
-deploy target, say where it's going.
+deploy target, say where it's going. Note any Refined siblings flagged in the
+same Project.

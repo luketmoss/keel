@@ -35,6 +35,8 @@ The run stops early if:
 
 - the issue is underspecified in a way that matters — `/develop` stops with the
   branch in place and says what's missing
+- a merge to the same Project since Refined invalidated this issue's premise
+  (#203) — `/develop` stops before cutting a branch and says what changed
 - a criterion fails and the fix isn't clear or is out of scope
 - the stack gates Testing — firmware always, mobile for device-dependent
   criteria. The run stops in Testing with the unverifiable criteria listed

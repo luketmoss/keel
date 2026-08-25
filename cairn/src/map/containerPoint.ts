@@ -87,3 +87,27 @@ export function containerPointFromLatLng(
     y: ((bounds.north - point.lat) / (bounds.north - bounds.south)) * height,
   }
 }
+
+/** `bounds`, shrunk or grown by `factor` around its own centre — the span a
+    viewport at a different zoom would show over the same spot, since a
+    Mercator viewport's span halves for every zoom level gained (`factor =
+    2 ** (fromZoom - toZoom)`). Used to answer "where on screen would this
+    point fall at the zoom the camera is about to reach", the same linear
+    approximation `latLngFromContainerPoint`/`containerPointFromLatLng`
+    already accept for a single viewport, applied once more so a reveal that
+    changes zoom doesn't measure its correction against the zoom it's
+    leaving (cairn/docs/design/329 — the bug this exists to fix). */
+export function scaleBounds(bounds: ViewportBounds, factor: number): ViewportBounds {
+  const lngSpan = bounds.east >= bounds.west ? bounds.east - bounds.west : bounds.east - bounds.west + 360
+  const centerLng = wrapLongitude(bounds.west + lngSpan / 2)
+  const newLngSpan = lngSpan * factor
+  const centerLat = (bounds.north + bounds.south) / 2
+  const newLatSpan = (bounds.north - bounds.south) * factor
+
+  return {
+    north: centerLat + newLatSpan / 2,
+    south: centerLat - newLatSpan / 2,
+    west: wrapLongitude(centerLng - newLngSpan / 2),
+    east: wrapLongitude(centerLng + newLngSpan / 2),
+  }
+}

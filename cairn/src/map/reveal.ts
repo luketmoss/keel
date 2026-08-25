@@ -11,7 +11,7 @@
    through, rather than a second, exact projection that could disagree with
    it about where something sits on screen. */
 
-import { containerPointFromLatLng, latLngFromContainerPoint, type ViewportBounds } from './containerPoint'
+import { containerPointFromLatLng, latLngFromContainerPoint, scaleBounds, type ViewportBounds } from './containerPoint'
 import { CLUSTER_MAX_ZOOM, FIT_PADDING, fitTracksToBounds } from './fitBounds'
 import { prefersReducedMotion } from './motion'
 import type { LatLng } from './geo'
@@ -172,7 +172,20 @@ export function revealPoint(map: google.maps.Map, point: LatLng, inset: Inset): 
   // against, same guard `revealPoints` keeps.
   if (!bounds || width === 0 || height === 0) return
 
-  const pixel = containerPointFromLatLng(point, width, height, bounds)
+  // Never zooms out: only raises the zoom to the close-up cap, never lowers
+  // it toward one.
+  const currentZoom = map.getZoom() ?? 0
+  const targetZoom = Math.max(currentZoom, CLUSTER_MAX_ZOOM)
+
+  // #329 — the correction has to be measured against the viewport the camera
+  // is about to have, not the one it's leaving. `bounds` is the current
+  // zoom's span; scaling it to `targetZoom`'s span (Mercator halves the
+  // visible span per zoom level gained) gives the viewport the point will
+  // actually be read against once the move completes, so the same pixel
+  // arithmetic that already works for a same-zoom pan works here too.
+  const targetBounds = targetZoom === currentZoom ? bounds : scaleBounds(bounds, 2 ** (currentZoom - targetZoom))
+
+  const pixel = containerPointFromLatLng(point, width, height, targetBounds)
   if (!pixel) return
 
   const visibleLeft = inset.left + FIT_PADDING
@@ -187,21 +200,18 @@ export function revealPoint(map: google.maps.Map, point: LatLng, inset: Inset): 
     mapCenterPixel.y + (pixel.y - visibleCenter.y),
     width,
     height,
-    bounds,
+    targetBounds,
   )
   if (!targetCenter) return
 
-  // Never zooms out: only raises the zoom to the close-up cap, never lowers
-  // it toward one.
-  const targetZoom = Math.max(map.getZoom() ?? 0, CLUSTER_MAX_ZOOM)
-
+  // `panTo` glides; reduced motion jumps straight there, same as every
+  // other camera move in the app.
   if (prefersReducedMotion()) {
     map.setCenter(targetCenter)
-    map.setZoom(targetZoom)
   } else {
     map.panTo(targetCenter)
-    map.setZoom(targetZoom)
   }
+  map.setZoom(targetZoom)
 }
 
 /** #304 — exported so `MapCanvas`'s home-extent fit (the initial load and

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { containerPointFromLatLng, latLngFromContainerPoint } from './containerPoint'
+import { containerPointFromLatLng, latLngFromContainerPoint, scaleBounds } from './containerPoint'
 
 /* The long-press half of #156's gesture has no Maps event to read a
    coordinate off, so this conversion is the whole of it. Tested against the
@@ -67,5 +67,33 @@ describe('containerPointFromLatLng', () => {
 
   it('returns null for an element with no size rather than dividing by it', () => {
     expect(containerPointFromLatLng({ lat: 30, lng: 120 }, 0, 0, VIEWPORT)).toBeNull()
+  })
+})
+
+/* cairn/docs/design/329 — the correction `revealPoint` makes has to be
+   measured against the viewport the camera is about to reach, not the one
+   it's leaving. `scaleBounds` is what turns "the current viewport" into
+   "the viewport at some other zoom", around the same centre. */
+describe('scaleBounds', () => {
+  it('shrinks the span around the same centre, leaving the centre unchanged', () => {
+    expect(scaleBounds(VIEWPORT, 0.5)).toEqual({ north: 35, south: 25, west: 110, east: 130 })
+  })
+
+  it('grows the span around the same centre', () => {
+    expect(scaleBounds(VIEWPORT, 2)).toEqual({ north: 50, south: 10, west: 80, east: 160 })
+  })
+
+  it('is a no-op at factor 1', () => {
+    expect(scaleBounds(VIEWPORT, 1)).toEqual(VIEWPORT)
+  })
+
+  it('keeps the antimeridian centred when scaling a straddling viewport', () => {
+    const straddling = { north: 10, south: -10, west: 170, east: -170 }
+    const scaled = scaleBounds(straddling, 0.5)
+    expect(scaled.north).toBe(5)
+    expect(scaled.south).toBe(-5)
+    // Half the 20°-wide span (170 to 180 to -170) is 10°, centred on ±180.
+    expect(scaled.west).toBeCloseTo(175, 10)
+    expect(scaled.east).toBeCloseTo(-175, 10)
   })
 })

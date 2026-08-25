@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { CLUSTER_MAX_ZOOM } from './fitBounds'
+import { containerPointFromLatLng } from './containerPoint'
+import { CLUSTER_MAX_ZOOM, FIT_PADDING } from './fitBounds'
 import { columnInset, revealPoint, revealPoints } from './reveal'
 
 /* cairn/docs/design/270-selecting-reveals-it-on-the-map.md — "The reveal
@@ -189,6 +190,60 @@ describe('revealPoint', () => {
     // Centre of the viewport at NO_INSET is already inside the visible area.
     revealPoint(map as unknown as google.maps.Map, { lat: 0, lng: 0 }, NO_INSET)
     expect(map.panTo).toHaveBeenCalledTimes(1)
+  })
+
+  /* #329 — the bug: the pixel correction was measured against the zoom the
+     map was leaving, so it landed the camera beside the cairn instead of on
+     it, by an error that grew with how far out the map started. Verified
+     independently of `revealPoint`'s own arithmetic: reconstruct the
+     viewport the map will actually show once it settles at the target
+     centre and the close-up zoom, and confirm the cairn projects to the
+     visible area's centre inside *that* viewport. */
+  it('lands the cairn at the centre of the visible area at the zoom it is closing in to, not the zoom it started at', () => {
+    const map = fakeMap({ zoom: 2, width: 1000, height: 1000 })
+    const point = { lat: 6, lng: -6 }
+
+    revealPoint(map as unknown as google.maps.Map, point, NO_INSET)
+
+    const targetCenter = map.panTo.mock.calls[0][0]
+    const spanFactor = 2 ** (2 - CLUSTER_MAX_ZOOM)
+    const lngSpan = (VIEWPORT.east - VIEWPORT.west) * spanFactor
+    const latSpan = (VIEWPORT.north - VIEWPORT.south) * spanFactor
+    const settledBounds = {
+      north: targetCenter.lat + latSpan / 2,
+      south: targetCenter.lat - latSpan / 2,
+      west: targetCenter.lng - lngSpan / 2,
+      east: targetCenter.lng + lngSpan / 2,
+    }
+
+    const pixel = containerPointFromLatLng(point, 1000, 1000, settledBounds)
+    expect(pixel!.x).toBeCloseTo(500, 6)
+    expect(pixel!.y).toBeCloseTo(500, 6)
+  })
+
+  it('lands the cairn at the centre of the visible area (inset-aware) at the target zoom', () => {
+    const map = fakeMap({ zoom: 3, width: 1000, height: 1000 })
+    const point = { lat: -4, lng: 7 }
+    const inset = { left: 300, right: 0, top: 0, bottom: 0 }
+
+    revealPoint(map as unknown as google.maps.Map, point, inset)
+
+    const targetCenter = map.panTo.mock.calls[0][0]
+    const spanFactor = 2 ** (3 - CLUSTER_MAX_ZOOM)
+    const lngSpan = (VIEWPORT.east - VIEWPORT.west) * spanFactor
+    const latSpan = (VIEWPORT.north - VIEWPORT.south) * spanFactor
+    const settledBounds = {
+      north: targetCenter.lat + latSpan / 2,
+      south: targetCenter.lat - latSpan / 2,
+      west: targetCenter.lng - lngSpan / 2,
+      east: targetCenter.lng + lngSpan / 2,
+    }
+
+    const pixel = containerPointFromLatLng(point, 1000, 1000, settledBounds)
+    const visibleLeft = inset.left + FIT_PADDING
+    const visibleRight = 1000 - FIT_PADDING
+    expect(pixel!.x).toBeCloseTo((visibleLeft + visibleRight) / 2, 6)
+    expect(pixel!.y).toBeCloseTo(500, 6)
   })
 
   it('never zooms back out when the map is already closer than the cluster cap', () => {

@@ -34,7 +34,10 @@ export function CoordinateResult({ point, onChoose }: CoordinateResultProps) {
   if (unavailable) return null
 
   return (
-    <ul className="coordinate-result">
+    /* Announced without stealing focus from the field mid-type: the row
+       appears while the user is still typing, and a polite live region is
+       what tells a screen reader it is there without interrupting. */
+    <ul className="coordinate-result" aria-live="polite">
       <li className="coordinate-result__row">
         <span className="coordinate-result__glyph" aria-hidden="true">
           ✛

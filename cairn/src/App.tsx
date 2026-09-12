@@ -1179,9 +1179,10 @@ function AppShell() {
             />
           )}
           {/* The 3D surface draws its own markers — an `AdvancedMarker` is
-              the 2D map's and never reaches it. Mounted unconditionally:
-              `useMap3D` resolves to null until the surface exists, so this
-              renders nothing until 3D has been turned on at least once. */}
+              the 2D map's and never reaches it. Mounted whenever there is a
+              fix, on or off 3D: `useMap3D` resolves to null until the
+              surface exists, so this draws nothing until 3D has been turned
+              on at least once, and needs no second condition saying so. */}
           {locationFix && <Position3DMarker fix={locationFix} />}
           {/* #168: the map itself is the placement queue's input — a
               crosshair cursor and a click-to-place listener while anything is

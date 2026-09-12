@@ -147,54 +147,53 @@ export function TripsPanel({
     if (kind === 'cairns') onFacetChange('any')
   }
 
-  /* Hoisted out of the branch below: #337's coordinate row makes the
-     list show in a case the empty states would otherwise have taken,
-     and one list rendered from two places is two lists to keep in
-     step. */
+  /* Hoisted out of the branch below: #337's coordinate row makes the list
+     show in a case the empty states would otherwise have taken, and one
+     list rendered from two places is two lists to keep in step. */
   const listRows = (
     <>
-        {visibleTrips.map((trip) => (
-          <TripRow
-            key={trip.id}
-            trip={trip}
-            trackCount={trackCounts.get(trip.id) ?? 0}
-            totals={tripTotals.get(trip.id) ?? null}
-            disabled={disabled}
-            emphasized={hoveredId === trip.id}
-            onHover={onHover}
-            confirming={confirmingId === trip.id}
-            confirmingRowRef={confirmingId === trip.id ? confirmingRowRef : undefined}
-            onStartConfirm={() => setConfirmingId(trip.id)}
-            onCancelConfirm={() => setConfirmingId(null)}
-            onDelete={() => {
-              setConfirmingId(null)
-              onDelete(trip.id)
-            }}
-          />
-        ))}
-        {visibleLoose.map((item) => (
-          <LooseRow
-            key={item.id}
-            item={item}
-            disabled={disabled}
-            emphasized={hoveredId === item.id}
-            onHover={onHover}
-            confirming={confirmingId === item.id}
-            confirmingRowRef={confirmingId === item.id ? confirmingRowRef : undefined}
-            onStartConfirm={() => setConfirmingId(item.id)}
-            onCancelConfirm={() => setConfirmingId(null)}
-            onAddToTrip={() => onAddLooseToTrip(item.id)}
-            onDelete={() => {
-              setConfirmingId(null)
-              onDeleteLoose(item.id)
-            }}
-            onRename={onRenameLoose}
-            onRecolor={onRecolorLoose}
-            onSaveError={setEditError}
-            onExport={() => onExportLoose(item.id)}
-            exporting={exportingIds.has(item.id)}
-          />
-        ))}
+      {visibleTrips.map((trip) => (
+        <TripRow
+          key={trip.id}
+          trip={trip}
+          trackCount={trackCounts.get(trip.id) ?? 0}
+          totals={tripTotals.get(trip.id) ?? null}
+          disabled={disabled}
+          emphasized={hoveredId === trip.id}
+          onHover={onHover}
+          confirming={confirmingId === trip.id}
+          confirmingRowRef={confirmingId === trip.id ? confirmingRowRef : undefined}
+          onStartConfirm={() => setConfirmingId(trip.id)}
+          onCancelConfirm={() => setConfirmingId(null)}
+          onDelete={() => {
+            setConfirmingId(null)
+            onDelete(trip.id)
+          }}
+        />
+      ))}
+      {visibleLoose.map((item) => (
+        <LooseRow
+          key={item.id}
+          item={item}
+          disabled={disabled}
+          emphasized={hoveredId === item.id}
+          onHover={onHover}
+          confirming={confirmingId === item.id}
+          confirmingRowRef={confirmingId === item.id ? confirmingRowRef : undefined}
+          onStartConfirm={() => setConfirmingId(item.id)}
+          onCancelConfirm={() => setConfirmingId(null)}
+          onAddToTrip={() => onAddLooseToTrip(item.id)}
+          onDelete={() => {
+            setConfirmingId(null)
+            onDeleteLoose(item.id)
+          }}
+          onRename={onRenameLoose}
+          onRecolor={onRecolorLoose}
+          onSaveError={setEditError}
+          onExport={() => onExportLoose(item.id)}
+          exporting={exportingIds.has(item.id)}
+        />
+      ))}
     </>
   )
 

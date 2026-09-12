@@ -75,3 +75,11 @@
 .position-callout__action:active {
   background: color-mix(in srgb, var(--accent) 80%, var(--ground));
 }
+
+/* The 3D form: the same dot, hosted by a `MarkerElement` rather than an
+   `AdvancedMarker`. It is not a button there — the 3D surface has no
+   callout to open — so it carries no cursor and no press affordance. */
+.position-marker--3d {
+  display: block;
+  cursor: default;
+}

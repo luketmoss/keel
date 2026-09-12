@@ -270,8 +270,13 @@ describe('#335 — dropping a cairn on the fix', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Drop a cairn here' }))
     })
 
-    // The existing create face, not a second one invented for this path.
+    // The existing create face, not a second one invented for this path:
+    // the name field focused, and the pin already down and drawn selected.
     expect(screen.getByLabelText('Name')).toBeDefined()
+    expect(document.activeElement).toBe(screen.getByLabelText('Name'))
+    const pin = document.querySelector('.cairn-draft-marker .cairn-marker--pin')
+    expect(pin).not.toBeNull()
+    expect(pin?.classList.contains('cairn-marker--selected')).toBe(true)
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Camp 2' } })
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Create' }))
@@ -325,5 +330,54 @@ describe('#335 — dropping a cairn on the fix', () => {
 
     expect(document.querySelector('.cairn-draft-marker')).toBeNull()
     expect(document.querySelector('.position-marker')).not.toBeNull()
+  })
+
+  /** A trip in `localStorage`, which is where the shell reads its index
+      from — enough to have one *open*, which is all this case is about.
+      Same seed `App.createCairn.test.tsx` uses for the gesture's own
+      ownership case. */
+  function seedTrip(tripId: string) {
+    const entry = {
+      id: tripId,
+      name: 'Larapinta',
+      status: 'planned',
+      startDate: null,
+      endDate: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+    }
+    window.localStorage.setItem('cairn.trips.index', JSON.stringify([entry]))
+    window.localStorage.setItem(`cairn.trips.trip.${tripId}`, JSON.stringify({ ...entry, notes: '' }))
+  }
+
+  /* `cairns.md`'s "the gesture's context decides ownership" — the locate
+     path is not an exception to that table. A trip open means the cairn
+     belongs to it, so nothing reaches the loose store. */
+  it('gives the cairn to the open trip rather than making it loose', async () => {
+    mockGoogleSignIn()
+    seedTrip('trip-7')
+    await renderApp('/trips/trip-7')
+    await signIn()
+    await waitFor(() => expect(document.querySelector('.trip-detail')).not.toBeNull())
+
+    await pressLocate()
+    await landFix()
+    fireEvent.click(positionDot().closest('[data-testid="advanced-marker"]')!)
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Drop a cairn here' }))
+    })
+
+    expect(screen.getByText('(a trip was open when you clicked)')).toBeDefined()
+    expect(screen.getByText('trip-7')).toBeDefined()
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+    })
+
+    // A missing writer reports itself; its absence is the assertion that
+    // the trip took it.
+    expect(screen.queryByText("Couldn't save this cairn — try again.")).toBeNull()
+    expect(screen.queryByLabelText('Name')).toBeNull()
+    // A trip-owned cairn is not a loose one.
+    expect(storedLooseItems()).toHaveLength(0)
   })
 })

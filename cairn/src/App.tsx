@@ -64,6 +64,7 @@ import { CairnCreateGesture } from './components/CairnCreateGesture'
 import { CairnCreatePanel, type CairnDraftFields } from './components/CairnCreatePanel'
 import { CairnDraftMarker } from './components/CairnDraftMarker'
 import { PositionMarker } from './components/PositionMarker'
+import { Position3DMarker } from './components/Position3DMarker'
 import { LocateCamera } from './map/LocateCamera'
 import { useGeolocation, type GeolocationFailure } from './map/useGeolocation'
 import {
@@ -1177,6 +1178,11 @@ function AppShell() {
               onCreate={() => beginCairnDraft(locationFix.position)}
             />
           )}
+          {/* The 3D surface draws its own markers — an `AdvancedMarker` is
+              the 2D map's and never reaches it. Mounted unconditionally:
+              `useMap3D` resolves to null until the surface exists, so this
+              renders nothing until 3D has been turned on at least once. */}
+          {locationFix && <Position3DMarker fix={locationFix} />}
           {/* #168: the map itself is the placement queue's input — a
               crosshair cursor and a click-to-place listener while anything is
               waiting, plus a pulsing suggestion ring when the current file's

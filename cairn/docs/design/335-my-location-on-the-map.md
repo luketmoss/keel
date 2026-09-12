@@ -338,10 +338,16 @@ ratio.
   and completed routes, the two things most likely to be next to it.
 - **Fitting to a fixed zoom.** Rejected: it shows a building-level view of a
   coordinate that may only be good to a kilometre.
-- **An accuracy circle in 3D.** Not taken now — the dot draws on the 3D surface
-  clamped to terrain per #285, and a ground-projected circle there is machinery
-  this issue does not need. The accuracy stays legible in 3D through the callout's
-  text.
+- **An accuracy circle in 3D.** Not taken — the dot draws on the 3D surface
+  clamped to terrain per #285 (`Position3DMarker`, a `MarkerElement` portaled
+  into, the shape `Cairn3DLayer` already established), and a ground-projected
+  circle there is machinery this issue does not need. The accuracy stays legible
+  from the marker's own accessible name.
+- **A callout in 3D.** Not taken, and not a preference: `Map3DElement` has no
+  documented way to project a coordinate to a pixel, which is exactly what
+  anchoring a card to a marker needs — the same limitation that keeps clustering
+  out of the 3D cairn layer. Dropping a cairn on your location is a 2D action;
+  the 3D surface shows you where you are and nothing more.
 - **A `Dismiss` control on the marker.** Rejected: a dot showing a real past
   position is not wrong, the age line handles the staleness, and a dismiss control
   is one more thing to look for and find missing.

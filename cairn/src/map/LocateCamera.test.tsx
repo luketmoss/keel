@@ -1,3 +1,4 @@
+import { StrictMode } from 'react'
 import { render } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -60,10 +61,17 @@ describe('LocateCamera', () => {
     expect(maxZoom).toBe(LOCATE_MAX_ZOOM)
   })
 
-  it('does not move the camera again for a fix it has already flown to', () => {
-    const same = fix()
-    const { rerender } = render(<LocateCamera fix={same} />)
-    rerender(<LocateCamera fix={same} />)
+  /* Under StrictMode React mounts, unmounts and remounts, running the effect
+     twice for the same fix — which is what the `flown` ref is actually for.
+     A plain rerender would not exercise it at all: the effect's own `[fix]`
+     dependency already prevents that, so a test built on one would pass with
+     the guard deleted. */
+  it('moves the camera once for a fix, even when the effect runs twice', () => {
+    render(
+      <StrictMode>
+        <LocateCamera fix={fix()} />
+      </StrictMode>,
+    )
 
     expect(fitTracksToBounds).toHaveBeenCalledTimes(1)
   })

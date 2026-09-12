@@ -1542,6 +1542,12 @@ function AppShell() {
                 exportingIds={exportingIds}
                 coordinate={coordinate}
                 onChooseCoordinate={() => coordinate && chooseCoordinate(coordinate)}
+                /* #338: the same function the map's drop hands its files
+                   to. A phone has no drag-and-drop, so without this the
+                   world view has no doorway at all — and everything past
+                   `importDroppedLoose` (the draft, the placement queue,
+                   the refusals) already works on touch. */
+                onImportFiles={(files) => void importDroppedLoose(files)}
                 onAddLooseToTrip={(id) =>
                   navigate(
                     looseStore.getItem(id)?.kind === 'track' ? `/tracks/${id}` : `/cairns/${id}`,

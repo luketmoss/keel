@@ -10,6 +10,15 @@
   --on-accent: #1b0c05;
   --danger: #ff4e6a;
 
+  /* #335 — the one hue outside the accent, spent on "this is you". The
+     accent means interactive, selected, completed; the position marker is
+     none of those, and drawing it in `--accent` would make it
+     indistinguishable at a glance from a selected cairn or a completed
+     route, the two things most likely to be beside it. A marker colour, the
+     same category as the track polyline exception the design language
+     already carves out. 6.43 on `--ground`, 5.77 on `--surface`. */
+  --position: #4c9bff;
+
   --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
   --muted-soft: color-mix(in srgb, var(--text-muted) 18%, transparent);
   --hover: color-mix(in srgb, var(--text) 6%, transparent);

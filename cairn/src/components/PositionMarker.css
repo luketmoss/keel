@@ -1,0 +1,85 @@
+/* cairn/docs/design/335-my-location-on-the-map.md — the position marker and
+   its callout. The accuracy circle is not here: it is a geographic circle
+   drawn by the Maps API in metres, so it has no CSS to carry. */
+
+.position-marker {
+  display: block;
+  width: var(--marker-size);
+  height: var(--marker-size);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-full);
+  background: none;
+  cursor: pointer;
+}
+
+.position-marker__dot {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: var(--marker-ring) solid var(--text);
+  border-radius: var(--radius-full);
+  background: var(--position);
+  /* The ring is what separates the dot from a satellite tile; the shadow is
+     what stops it dissolving into a pale one. */
+  box-shadow: var(--shadow-lifted);
+  box-sizing: border-box;
+}
+
+.position-callout {
+  position: absolute;
+  bottom: calc(100% + var(--space-2));
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 15rem;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur));
+  box-shadow: var(--shadow-lifted);
+  text-align: left;
+}
+
+.position-callout__title {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.position-callout__meta {
+  margin: 2px 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.position-callout__action {
+  display: block;
+  width: 100%;
+  min-height: var(--hit-target);
+  margin-top: var(--space-2);
+  padding: 0 var(--space-3);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.position-callout__action:hover {
+  background: color-mix(in srgb, var(--accent) 88%, var(--text));
+}
+
+.position-callout__action:active {
+  background: color-mix(in srgb, var(--accent) 80%, var(--ground));
+}
+
+/* The 3D form: the same dot, hosted by a `MarkerElement` rather than an
+   `AdvancedMarker`. It is not a button there — the 3D surface has no
+   callout to open — so it carries no cursor and no press affordance. */
+.position-marker--3d {
+  display: block;
+  cursor: default;
+}

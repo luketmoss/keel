@@ -11,6 +11,10 @@ export function fitTracksToBounds(
   map: google.maps.Map,
   points: LatLng[],
   padding: number | google.maps.Padding = FIT_PADDING,
+  /** #335 — a locate fits an accuracy circle rather than a walk, and stops
+      one step closer in (`LOCATE_MAX_ZOOM`). A parameter rather than a
+      third near-copy of this function beside `zoomToFitCluster`. */
+  maxZoom: number = MAX_FIT_ZOOM,
 ): void {
   if (points.length === 0) return
 
@@ -21,12 +25,12 @@ export function fitTracksToBounds(
     /* fitBounds does not change zoom for a degenerate (single-point) box —
        it only centers — so the cap has to be set explicitly here. */
     map.setCenter(bounds.getCenter())
-    map.setZoom(MAX_FIT_ZOOM)
+    map.setZoom(maxZoom)
     return
   }
 
   google.maps.event.addListenerOnce(map, 'idle', () => {
-    if ((map.getZoom() ?? 0) > MAX_FIT_ZOOM) map.setZoom(MAX_FIT_ZOOM)
+    if ((map.getZoom() ?? 0) > maxZoom) map.setZoom(maxZoom)
   })
   map.fitBounds(bounds, padding)
 }

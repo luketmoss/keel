@@ -124,13 +124,26 @@ interface MapCanvasProps {
   /** What "fit to everything" means right now: the trip's points on a trip
       face, every visible place on the list face. Read at click time. */
   getFitPoints: () => { lat: number; lng: number }[]
+  /** #335 — the locate control's state and its press. Owned by the shell,
+      because the fix it produces is also what the position marker draws and
+      what the create action places a cairn at, and those are siblings of
+      this component rather than descendants. */
+  locate: LocateControlProps
+}
+
+export interface LocateControlProps {
+  /** False where there is no `navigator.geolocation` — no API, or a
+      non-secure context. The control is not rendered at all then. */
+  supported: boolean
+  pending: boolean
+  onLocate: () => void
 }
 
 /** The map itself and the controls that belong to its corners (the standing
     document's "The map's corners"). No `id` on the `<Map>`, so it registers
     as the provider's default instance and every `useMap()` beneath
     `MapProvider` finds it. */
-export function MapCanvas({ panelCollapsed, canFit, getFitPoints }: MapCanvasProps) {
+export function MapCanvas({ panelCollapsed, canFit, getFitPoints, locate }: MapCanvasProps) {
   const baseMap = useBaseMapType()
   const unavailable = useContext(MapUnavailableContext)
   /* #271 — an in-memory switch, not a stored preference like the tile and
@@ -213,7 +226,7 @@ export function MapCanvas({ panelCollapsed, canFit, getFitPoints }: MapCanvasPro
           support={maps3DSupport}
         />
       </div>
-      <ZoomControls canFit={canFit} getFitPoints={getFitPoints} />
+      <ZoomControls canFit={canFit} getFitPoints={getFitPoints} locate={locate} />
     </div>
   )
 }
@@ -224,9 +237,11 @@ export function MapCanvas({ panelCollapsed, canFit, getFitPoints }: MapCanvasPro
 function ZoomControls({
   canFit,
   getFitPoints,
+  locate,
 }: {
   canFit: boolean
   getFitPoints: () => { lat: number; lng: number }[]
+  locate: LocateControlProps
 }) {
   const map = useMap()
   const isPhone = useIsPhone()
@@ -266,6 +281,30 @@ function ZoomControls({
       >
         <span aria-hidden="true">⛶</span>
       </button>
+      {/* #335 — between fit-to-everything and the zoom pair, which is where
+          #304's ordering rule puts it: reset frames a state, fit frames all
+          your content, locate frames a single point, zoom is relative.
+
+          Not a toggle. Google's version latches because it has a follow mode
+          to latch into; cairn has none, so a latched appearance would promise
+          a moving dot that never arrives. */}
+      {locate.supported && (
+        <button
+          type="button"
+          className="map-controls__button"
+          aria-label={locate.pending ? 'Finding your location…' : 'Show my location'}
+          title="Show my location"
+          aria-busy={locate.pending}
+          disabled={!map || locate.pending}
+          onClick={locate.onLocate}
+        >
+          {locate.pending ? (
+            <span className="map-controls__spinner" aria-hidden="true" />
+          ) : (
+            <span aria-hidden="true">◎</span>
+          )}
+        </button>
+      )}
       <div className="map-controls__zoom">
         <button
           type="button"

@@ -81,8 +81,10 @@ honest: a five-metre fix lands close in, a three-kilometre fix lands zoomed out
 over the area it actually describes, and the user is never shown a confident
 building-level view of a coordinate that does not support one.
 
-**Floored at zoom 17.** A fix accurate to two metres would otherwise fit to
-maximum zoom and land on an unreadable tile with no context around it.
+**Capped at zoom 17** (`LOCATE_MAX_ZOOM`). A fix accurate to two metres would
+otherwise fit to maximum zoom and land on an unreadable tile with no context
+around it. One step closer in than `fitTracksToBounds`'s own 16, which is
+framing a walk rather than a point.
 
 | 3D | What happens |
 |---|---|
@@ -100,7 +102,7 @@ Pressed mid-flyover, the flight is cancelled and the camera goes to the fix —
 A filled dot in `--position`, `--marker-size` across, with a `--marker-ring` ring
 in `--text` so it reads on satellite, terrain and the map basemap alike, and
 `--shadow-lifted` beneath it. Around it, a circle of the fix's reported accuracy
-in metres, filled `--position-soft` with a 1px `--position` stroke.
+in metres, filled `--position` at 16% with a 1px `--position` stroke.
 
 **The accuracy circle is a geographic circle, not a pixel radius.** Drawn in
 metres it grows and shrinks correctly as the user zooms, which is the entire
@@ -132,12 +134,15 @@ language already carves out: data about the world, not chrome.
 
 | Where | String |
 |---|---|
-| Marker `aria-label` | `Your location, accurate to about 12 m` |
-| Marker `aria-label`, coarse fix | `Your location, accurate to about 1.2 km` |
+| Marker `aria-label` | `Your location, accurate to about 39 ft` |
+| Marker `aria-label`, coarse fix | `Your location, accurate to about 0.2 mi` |
 
-Accuracy renders as whole metres below 1000, and as kilometres to one decimal at
-or above it. Always "about" — a reported accuracy is a radius of probability, and
-`±12 m` reads like a tolerance.
+**Accuracy goes through `formatDistance`, not a metre literal.** This note was
+drafted in metres; the app is imperial (`format/units.ts` holds one `SYSTEM`
+constant that every distance in the app obeys). A hand-written `12 m` here would
+have been the only distance in cairn that ignored that switch. Always "about" —
+a reported accuracy is a radius of probability, and `±39 ft` reads like a
+tolerance.
 
 ## The callout
 
@@ -176,8 +181,10 @@ line, in `--text-muted`:
 
 > `Located 14 minutes ago`
 
-Rendered with the existing relative-time formatter, and rounded the way the rest
-of the app rounds. `Drop a cairn here` stays enabled — marking somewhere you were
+Rendered by `formatTimeAgo`, added to `format/dates.ts` for this — cairn had no
+relative time before, so its rounding rule is decided there: minutes, then
+hours, then days, counted through the existing `pluralize` so the singular case
+cannot drift from every other count in the app. `Drop a cairn here` stays enabled — marking somewhere you were
 half an hour ago is a legitimate thing to want, and the line is there so it is a
 choice. Re-pressing the control in the stack is how you refresh; the callout does
 not carry its own update button, because the control is two taps away and a second
@@ -290,11 +297,15 @@ builds this should confirm it with a key present.
 
 | Token | Value | For |
 |---|---|---|
-| `--position` | `#4C9BFF` | the position marker's fill and the accuracy circle's stroke |
-| `--position-soft` | `color-mix(in srgb, var(--position) 16%, transparent)` | the accuracy circle's fill |
+| `--position` | `#4C9BFF` | the position marker's fill, and the accuracy circle's stroke and fill |
 
-`--position-soft` is derived with the same `color-mix` form as `--accent-soft`,
-so changing the hue propagates.
+**One token, not two.** This note first proposed a `--position-soft` derived with
+the same `color-mix` form as `--accent-soft`, for the accuracy circle's fill. It
+has nowhere to go: `google.maps.Circle` takes `fillColor` and `fillOpacity` as
+two separate options and cannot parse `color-mix()`, and the circle is the only
+thing that would have used it. The fill is `--position` at `0.16` — the same
+resulting colour, expressed the way that API accepts it — and a token nothing
+can reference is not worth adding to the system.
 
 Contrast, computed the same way [design-language.md](design-language.md)'s table
 is:
@@ -327,10 +338,16 @@ ratio.
   and completed routes, the two things most likely to be next to it.
 - **Fitting to a fixed zoom.** Rejected: it shows a building-level view of a
   coordinate that may only be good to a kilometre.
-- **An accuracy circle in 3D.** Not taken now — the dot draws on the 3D surface
-  clamped to terrain per #285, and a ground-projected circle there is machinery
-  this issue does not need. The accuracy stays legible in 3D through the callout's
-  text.
+- **An accuracy circle in 3D.** Not taken — the dot draws on the 3D surface
+  clamped to terrain per #285 (`Position3DMarker`, a `MarkerElement` portaled
+  into, the shape `Cairn3DLayer` already established), and a ground-projected
+  circle there is machinery this issue does not need. The accuracy stays legible
+  from the marker's own accessible name.
+- **A callout in 3D.** Not taken, and not a preference: `Map3DElement` has no
+  documented way to project a coordinate to a pixel, which is exactly what
+  anchoring a card to a marker needs — the same limitation that keeps clustering
+  out of the 3D cairn layer. Dropping a cairn on your location is a 2D action;
+  the 3D surface shows you where you are and nothing more.
 - **A `Dismiss` control on the marker.** Rejected: a dot showing a real past
   position is not wrong, the age line handles the staleness, and a dismiss control
   is one more thing to look for and find missing.

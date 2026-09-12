@@ -63,6 +63,10 @@ import { SuggestionRing } from './components/SuggestionRing'
 import { CairnCreateGesture } from './components/CairnCreateGesture'
 import { CairnCreatePanel, type CairnDraftFields } from './components/CairnCreatePanel'
 import { CairnDraftMarker } from './components/CairnDraftMarker'
+import { PositionMarker } from './components/PositionMarker'
+import { Position3DMarker } from './components/Position3DMarker'
+import { LocateCamera } from './map/LocateCamera'
+import { useGeolocation, type GeolocationFailure } from './map/useGeolocation'
 import {
   EMPTY_PLACEMENT_QUEUE,
   discardRemaining,
@@ -1081,6 +1085,27 @@ function AppShell() {
      stays live while the create face itself is open — that is the re-place
      the design note calls for. */
   const createGestureActive = !queueOpen && !draftOpen
+
+  /* #335 — two strings and not one, because they need different things from
+     the user: a denial is fixed in browser settings and retrying immediately
+     will fail again; an unavailable fix is fixed by moving and retrying. */
+  const handleLocateFailure = useCallback((failure: GeolocationFailure) => {
+    setToasts((prev) => [
+      ...prev,
+      {
+        id: generateToastId(),
+        text:
+          failure === 'denied'
+            ? 'Location is blocked. Allow location for this site in your browser, then try again.'
+            : "Couldn't find your location. Try again with a clearer view of the sky.",
+      },
+    ])
+  }, [])
+  const geolocation = useGeolocation(handleLocateFailure)
+  /* Bound to a const so the null check below narrows inside the create
+     handler's own closure, which a property read on `geolocation` does
+     not. */
+  const locationFix = geolocation.fix
   // #270: "a decision owns the map" — an import draft, the placement queue,
   // or the cairn-create gesture's own face — the same condition
   // `ShellColumn`'s `suspended` already reads for the sheet's detents,
@@ -1133,8 +1158,32 @@ function AppShell() {
             panelCollapsed={collapsed}
             canFit={detailOpen ? tripPointCount > 0 : listPlaces.length > 0}
             getFitPoints={() => (detailOpen ? tripGeometryRef.current : listPlaces)}
+            locate={{
+              supported: geolocation.supported,
+              pending: geolocation.status === 'pending',
+              onLocate: geolocation.request,
+            }}
           />
           <HomeResetOnNavigate />
+          {/* #335: the fix's camera move, and the dot it leaves behind. The
+              create action stands down for the placement queue and an import
+              draft — #156's rule, since the queue already owns the map's
+              click — but the locate control itself keeps working: seeing
+              where you are is not a placement intent. */}
+          <LocateCamera fix={locationFix} />
+          {locationFix && (
+            <PositionMarker
+              fix={locationFix}
+              canCreate={createGestureActive}
+              onCreate={() => beginCairnDraft(locationFix.position)}
+            />
+          )}
+          {/* The 3D surface draws its own markers — an `AdvancedMarker` is
+              the 2D map's and never reaches it. Mounted whenever there is a
+              fix, on or off 3D: `useMap3D` resolves to null until the
+              surface exists, so this draws nothing until 3D has been turned
+              on at least once, and needs no second condition saying so. */}
+          {locationFix && <Position3DMarker fix={locationFix} />}
           {/* #168: the map itself is the placement queue's input — a
               crosshair cursor and a click-to-place listener while anything is
               waiting, plus a pulsing suggestion ring when the current file's

@@ -123,3 +123,40 @@
     transition: none;
   }
 }
+
+/* #335 — the locate control's pending state. A rotating ring rather than a
+   swapped glyph, so the button's width never changes mid-request. Under
+   `prefers-reduced-motion` it pulses instead of turning: the control still
+   has to say "working", and stillness would read as a dead button. */
+.map-controls__spinner {
+  display: block;
+  width: 1em;
+  height: 1em;
+  border: 2px solid var(--muted-soft);
+  border-top-color: var(--accent);
+  border-radius: var(--radius-full);
+  animation: map-controls-spin 700ms linear infinite;
+}
+
+@keyframes map-controls-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-controls__spinner {
+    border-top-color: var(--accent);
+    animation: map-controls-pulse 1.2s ease-in-out infinite;
+  }
+
+  @keyframes map-controls-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.4;
+    }
+  }
+}

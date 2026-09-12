@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { formatTripDateRange } from './dates'
+import { formatTimeAgo, formatTripDateRange } from './dates'
 
 const currentYear = new Date().getFullYear()
 const pastYear = currentYear - 2
@@ -70,5 +70,21 @@ describe('formatTripDateRange', () => {
 
   it('rejects a calendar date that rolls over instead of silently normalizing it', () => {
     expect(formatTripDateRange('2026-02-30', null)).toBe('2026-02-30')
+  })
+})
+
+describe('formatTimeAgo', () => {
+  const now = new Date('2026-06-01T12:00:00Z').getTime()
+
+  it('coarsens as the fix ages — minutes, then hours, then days', () => {
+    expect(formatTimeAgo(now - 30_000, now)).toBe('just now')
+    expect(formatTimeAgo(now - 60_000, now)).toBe('1 minute ago')
+    expect(formatTimeAgo(now - 14 * 60_000, now)).toBe('14 minutes ago')
+    expect(formatTimeAgo(now - 2.5 * 3_600_000, now)).toBe('2 hours ago')
+    expect(formatTimeAgo(now - 50 * 3_600_000, now)).toBe('2 days ago')
+  })
+
+  it('reads "just now" rather than a negative age for a clock that ran backwards', () => {
+    expect(formatTimeAgo(now + 60_000, now)).toBe('just now')
   })
 })

@@ -181,3 +181,24 @@ export function tripRowAccessibleName(
   }
   return parts.join(', ')
 }
+
+const MINUTE_MS = 60_000
+const HOUR_MS = 60 * MINUTE_MS
+const DAY_MS = 24 * HOUR_MS
+
+/** `14 minutes ago`. #335's callout uses it to say how old a location fix
+    is once it stops being current; nothing else in the app had a relative
+    time before, so the rounding rule is decided here rather than inherited.
+ *
+ * Coarsens as it goes — minutes, then hours, then days — because the reason
+ * to show it at all is "is this still where you are", and that question does
+ * not get more useful from being told 143 minutes instead of 2 hours.
+ * Counts through `pluralize`, so the singular case cannot drift from every
+ * other count in the app. */
+export function formatTimeAgo(atMs: number, nowMs: number = Date.now()): string {
+  const elapsed = Math.max(0, nowMs - atMs)
+  if (elapsed < MINUTE_MS) return 'just now'
+  if (elapsed < HOUR_MS) return `${pluralize(Math.floor(elapsed / MINUTE_MS), 'minute')} ago`
+  if (elapsed < DAY_MS) return `${pluralize(Math.floor(elapsed / HOUR_MS), 'hour')} ago`
+  return `${pluralize(Math.floor(elapsed / DAY_MS), 'day')} ago`
+}

@@ -54,6 +54,45 @@ describe('fitTracksToBounds', () => {
     installFakeGoogleMaps()
   })
 
+  /* #335 — the locate fit stops one step closer in than a track fit. The
+     parameter is the whole reason `LOCATE_MAX_ZOOM` does not need a third
+     near-copy of this function beside `zoomToFitCluster`. */
+  it('caps a degenerate box at the given maxZoom rather than the default', () => {
+    const map = fakeMap()
+
+    fitTracksToBounds(map as unknown as google.maps.Map, [{ lat: 1, lng: 2 }], 48, 17)
+
+    expect(map.setZoom).toHaveBeenCalledWith(17)
+  })
+
+  it('defaults to the track cap when no maxZoom is given', () => {
+    const map = fakeMap()
+
+    fitTracksToBounds(map as unknown as google.maps.Map, [{ lat: 1, lng: 2 }])
+
+    expect(map.setZoom).toHaveBeenCalledWith(16)
+  })
+
+  it('clamps a multi-point fit back to the given maxZoom once it settles', () => {
+    const { addListenerOnce } = installFakeGoogleMaps()
+    const map = fakeMap()
+    map.getZoom.mockReturnValue(20)
+
+    fitTracksToBounds(
+      map as unknown as google.maps.Map,
+      [
+        { lat: 1, lng: 2 },
+        { lat: 3, lng: 4 },
+      ],
+      48,
+      17,
+    )
+    // The clamp runs on the map's own `idle`, not synchronously.
+    addListenerOnce.mock.calls[0][2]()
+
+    expect(map.setZoom).toHaveBeenCalledWith(17)
+  })
+
   it('does nothing when there are no points', () => {
     const map = fakeMap()
 

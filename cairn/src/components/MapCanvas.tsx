@@ -41,6 +41,15 @@ const WORLD_BOUNDS: google.maps.LatLngBoundsLiteral = { north: 85, south: -85, w
     improve. */
 const MapUnavailableContext = createContext<ReactNode | null>(null)
 
+/** Whether the map is not there at all — no API key, or a key Google
+    rejected. #337 reads it to decide whether a coordinate is worth
+    offering: there is nowhere to go, and the map's own unavailable state
+    (#2) already says the map is not there, so a row that opened a create
+    face over it would be the only thing claiming otherwise. */
+export function useMapUnavailable(): boolean {
+  return useContext(MapUnavailableContext) !== null
+}
+
 export function MapProvider({ children }: { children: ReactNode }) {
   /* Google validates the key asynchronously, after the provider has mounted,
      so a bad key cannot be caught by the check below. */

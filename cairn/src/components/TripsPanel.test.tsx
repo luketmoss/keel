@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import { TripsPanel } from './TripsPanel'
 import type { TripIndexEntry } from '../store/tripStore'
+import type { LatLng } from '../map/geo'
 import type { TripTotals } from '../geo/tripTotals'
 import type { LooseRecord } from '../store/looseStore'
 import type { KindFilter } from './FilterChips'
@@ -45,6 +46,8 @@ function TestTripsPanel({
   disabled = false,
   initialFilters = DEFAULT_TRIP_FILTERS,
   dateSpan = null,
+  coordinate = null,
+  onChooseCoordinate = () => {},
 }: {
   trips: TripIndexEntry[]
   trackCounts?: ReadonlyMap<string, number>
@@ -63,12 +66,16 @@ function TestTripsPanel({
   disabled?: boolean
   initialFilters?: TripFilters
   dateSpan?: { min: number; max: number } | null
+  coordinate?: LatLng | null
+  onChooseCoordinate?: () => void
 }) {
   const [filters, setFilters] = useState<TripFilters>(initialFilters)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [facet, setFacet] = useState<CairnFacet>(initialFacet)
   return (
     <TripsPanel
+      coordinate={coordinate}
+      onChooseCoordinate={onChooseCoordinate}
       trips={trips}
       trackCounts={trackCounts}
       tripTotals={tripTotals}
@@ -869,6 +876,44 @@ describe('TripsPanel', () => {
 
       fireEvent.mouseLeave(row)
       expect(container.querySelector('.trips-panel__row--emphasized')).toBeNull()
+    })
+  })
+  describe("#337's coordinate row", () => {
+    const SEATTLE = { lat: 47.6205, lng: -122.3493 }
+
+    it('offers the row above the rows', () => {
+      const { container } = renderPanel({
+        trips: [tripEntry({ id: 'abc', name: 'Kepler Track' })],
+        coordinate: SEATTLE,
+      })
+
+      expect(screen.getByText('47.62050, -122.34930')).toBeDefined()
+      // The row is the panel's first, ahead of any content.
+      const rows = container.querySelectorAll('.coordinate-result__row, .trips-panel__row')
+      expect(rows[0].className).toContain('coordinate-result__row')
+    })
+
+    it('suppresses the empty state while the row is up', () => {
+      // A string of digits matches no name, so the list underneath is empty —
+      // which is the ordinary outcome and not something to announce.
+      renderPanel({
+        trips: [tripEntry({ id: 'abc', name: 'Kepler Track' })],
+        initialFilters: { ...DEFAULT_TRIP_FILTERS, name: '47.6205, -122.3493' },
+        coordinate: SEATTLE,
+      })
+
+      expect(screen.queryByText('Nothing in this range')).toBeNull()
+      expect(screen.getByText('47.62050, -122.34930')).toBeDefined()
+    })
+
+    it('still shows the empty state when the query is an ordinary name', () => {
+      renderPanel({
+        trips: [tripEntry({ id: 'abc', name: 'Kepler Track' })],
+        initialFilters: { ...DEFAULT_TRIP_FILTERS, name: 'nothing matches this' },
+        coordinate: null,
+      })
+
+      expect(screen.getByText('Nothing in this range')).toBeDefined()
     })
   })
 })

@@ -1,0 +1,69 @@
+/* cairn/docs/design/337-pasting-a-coordinate.md — the coordinate row.
+   Row anatomy is the standing document's: glyph, text, `--row-touch`
+   minimum. There is no `⋮`, because there is nothing to act on but the row
+   itself. */
+.coordinate-result {
+  margin: 0;
+  padding: 0 var(--space-4);
+  list-style: none;
+}
+
+.coordinate-result__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--row-touch);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.coordinate-result__row:hover,
+.coordinate-result__row:focus-within {
+  background: var(--hover);
+}
+
+/* The create-pin mark, in the accent — the same thing the draft pin will be
+   the moment the row is chosen. */
+.coordinate-result__glyph {
+  flex: none;
+  width: var(--dot-size);
+  color: var(--accent);
+  font-size: var(--text-base);
+  line-height: 1;
+  text-align: center;
+}
+
+.coordinate-result__link {
+  flex: 1;
+  min-width: 0;
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Tabular numerals in the monospace face: the label's job is to be scanned
+   for a mis-read, and a number whose digits do not line up is harder to
+   scan than one whose digits do. */
+.coordinate-result__point {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--text-base);
+  font-variant-numeric: tabular-nums;
+}
+
+.coordinate-result__detail {
+  display: block;
+  margin-top: var(--space-1);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}

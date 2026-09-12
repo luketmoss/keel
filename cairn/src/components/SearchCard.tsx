@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useMapUnavailable } from './MapCanvas'
 import './SearchCard.css'
 
 interface SearchCardProps {
@@ -10,6 +11,10 @@ interface SearchCardProps {
   onBack: () => void
   query: string
   onQueryChange: (query: string) => void
+  /** #337: Enter, while the query is a coordinate. `undefined` when it is
+      not one, and the key then does what it has always done here, which is
+      nothing — the field is a filter, and there is no submission to make. */
+  onSubmitQuery?: () => void
   /** #32's account bubble, unchanged apart from where it is mounted. It
       keeps its own popover, states and reconnect flow; only its trigger's
       position moved. */
@@ -20,7 +25,11 @@ interface SearchCardProps {
     `AccountBubble` together: the identity lives in the mark, the account
     lives in the same card, and there is no navigation bar at all, because
     `World` and `Trips` were never destinations. */
-export function SearchCard({ detail, onBack, query, onQueryChange, accountBubble }: SearchCardProps) {
+export function SearchCard({ detail, onBack, query, onQueryChange, onSubmitQuery, accountBubble }: SearchCardProps) {
+  /* #337: the same gate the coordinate row reads, so Enter and the row
+     agree about whether there is a map to go to. */
+  const mapUnavailable = useMapUnavailable()
+
   return (
     <div className="search-card">
       {detail ? (
@@ -58,6 +67,15 @@ export function SearchCard({ detail, onBack, query, onQueryChange, accountBubble
           aria-label="Search trips, tracks and cairns"
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' || !onSubmitQuery || mapUnavailable) return
+            // The field is a `type="search"` inside no form, so Enter has
+            // nothing of its own to do and nothing to prevent — but a
+            // browser that decides otherwise would reload the shell out
+            // from under a draft.
+            event.preventDefault()
+            onSubmitQuery()
+          }}
         />
       )}
 

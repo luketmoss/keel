@@ -66,6 +66,8 @@ import { CairnDraftMarker } from './components/CairnDraftMarker'
 import { PositionMarker } from './components/PositionMarker'
 import { Position3DMarker } from './components/Position3DMarker'
 import { LocateCamera } from './map/LocateCamera'
+import { CoordinateCamera } from './map/CoordinateCamera'
+import { parseCoordinate } from './map/parseCoordinates'
 import { useGeolocation, type GeolocationFailure } from './map/useGeolocation'
 import {
   EMPTY_PLACEMENT_QUEUE,
@@ -155,6 +157,10 @@ interface CairnDraft {
   position: LatLng
   tripId: string | null
   fields: CairnDraftFields
+  /** #337: how the pin got here. The create face's ownership readout is
+      the only thing that reads it — "when you clicked" is false for a
+      coordinate that was searched for. */
+  origin: 'gesture' | 'search'
 }
 
 /** `156-creating-a-cairn.md`: "a date defaulting to today", in the
@@ -295,6 +301,11 @@ function AppShell() {
       ownership decision are all the map's, and the map is the shell's —
       the same reasoning `queue` above is held here for. */
   const [cairnDraft, setCairnDraft] = useState<CairnDraft | null>(null)
+  /* #337: the coordinate row's camera target. An object rather than the
+     point itself, so choosing the same coordinate twice is two targets and
+     therefore two moves — the identity is the event, the same shape
+     `LocateCamera` keys on. */
+  const [coordinateTarget, setCoordinateTarget] = useState<{ position: LatLng } | null>(null)
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   /* Registered by the trip face while one is open, so a drop anywhere still
@@ -971,11 +982,12 @@ function AppShell() {
    * cannot have been navigated away from without being cancelled, so this
    * only ever confirms what it already said. */
   const beginCairnDraft = useCallback(
-    (position: LatLng) => {
+    (position: LatLng, origin: 'gesture' | 'search' = 'gesture') => {
       setCreateError(null)
       setCairnDraft((current) => ({
         position,
         tripId: openTripId ?? null,
+        origin,
         fields: current?.fields ?? emptyDraftFields(),
       }))
     },
@@ -989,6 +1001,29 @@ function AppShell() {
     setCairnDraft(null)
     setCreateError(null)
   }, [])
+
+  /** #337: the point the search query describes, or `null` when it is an
+      ordinary name. Parsing is synchronous against the typed string — no
+      debounce and no loading state, the same stance #109 takes for the
+      chips — because it is a regex over a few dozen characters. */
+  const coordinate = useMemo(() => parseCoordinate(filters.name), [filters.name])
+
+  /** The coordinate row was chosen: the camera goes to the point and the
+      create face opens on a pin already dropped there. Both halves are
+      #156's, reached by a second route.
+   *
+   * **The field is cleared.** The coordinate has become a pin on the map,
+   * and the card's centre slot is the create face's title by then — leaving
+   * the string in a field the user can no longer see would mean it
+   * reappears on Cancel, offering to do again the thing just cancelled. */
+  const chooseCoordinate = useCallback(
+    (position: LatLng) => {
+      setFilters((current) => ({ ...current, name: '' }))
+      setCoordinateTarget({ position })
+      beginCairnDraft(position, 'search')
+    },
+    [beginCairnDraft],
+  )
 
   /** Commits the draft. The gesture's context decided ownership when the
       pin dropped, so this only follows it: a trip was open, so the trip
@@ -1071,6 +1106,7 @@ function AppShell() {
   const createFace = cairnDraft && (
     <CairnCreatePanel
       fields={cairnDraft.fields}
+      origin={cairnDraft.origin}
       onChange={(fields) => setCairnDraft((current) => (current ? { ...current, fields } : current))}
       tripId={cairnDraft.tripId}
       onCreate={() => void commitCairnDraft()}
@@ -1171,6 +1207,8 @@ function AppShell() {
               click — but the locate control itself keeps working: seeing
               where you are is not a placement intent. */}
           <LocateCamera fix={locationFix} />
+          {/* #337: the same shape, for the coordinate row's own move. */}
+          <CoordinateCamera target={coordinateTarget} />
           {locationFix && (
             <PositionMarker
               fix={locationFix}
@@ -1352,6 +1390,10 @@ function AppShell() {
                 }
                 query={filters.name}
                 onQueryChange={(name) => setFilters((current) => ({ ...current, name }))}
+                // #337: Enter chooses the coordinate row. `undefined` when
+                // the query is not a coordinate, which is what leaves the
+                // key doing what it has always done here — nothing.
+                onSubmitQuery={coordinate ? () => chooseCoordinate(coordinate) : undefined}
                 accountBubble={<AccountBubble account={account} />}
               />
             }
@@ -1498,6 +1540,8 @@ function AppShell() {
                 onRecolorLoose={(id, color) => looseStore.update(id, { colorIndex: color })}
                 onExportLoose={(id) => void handleExport(id)}
                 exportingIds={exportingIds}
+                coordinate={coordinate}
+                onChooseCoordinate={() => coordinate && chooseCoordinate(coordinate)}
                 onAddLooseToTrip={(id) =>
                   navigate(
                     looseStore.getItem(id)?.kind === 'track' ? `/tracks/${id}` : `/cairns/${id}`,

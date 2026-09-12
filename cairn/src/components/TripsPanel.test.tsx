@@ -971,10 +971,24 @@ describe('TripsPanel', () => {
       expect(onImportFiles).not.toHaveBeenCalled()
     })
 
-    it('imports the same file twice when it is chosen twice', () => {
+    it('clears the input so choosing the same file twice imports it twice', () => {
       const onImportFiles = vi.fn()
       renderPanel({ trips: [], onImportFiles })
       const input = importInput()
+
+      /* A file input's `value` cannot be assigned a real path from script,
+         in jsdom or in a browser, so `expect(input.value).toBe('')` is
+         true whether or not the handler clears it — it passed with the
+         clearing line deleted. Spying on the setter asserts the
+         assignment itself, which is the thing a browser needs: without it
+         the second selection of the same file fires no `change` at all. */
+      const cleared: string[] = []
+      Object.defineProperty(input, 'value', {
+        configurable: true,
+        get: () => '',
+        set: (next: string) => cleared.push(next),
+      })
+
       const choose = () => {
         Object.defineProperty(input, 'files', {
           value: [pngFile('same.png')],
@@ -983,10 +997,9 @@ describe('TripsPanel', () => {
         fireEvent.change(input)
       }
       choose()
-      // Without `value = ''` in the handler a browser fires no second
-      // `change` at all; this asserts the clearing rather than the browser.
-      expect(input.value).toBe('')
       choose()
+
+      expect(cleared).toEqual(['', ''])
       expect(onImportFiles).toHaveBeenCalledTimes(2)
     })
 

@@ -4,6 +4,7 @@ import JSZip from 'jszip'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { formatDistance, formatElevationGain } from './format/units'
+import { SIGNED_OUT_DROP_MESSAGE } from './store/looseStore'
 
 const { findOrCreateTripFolder } = vi.hoisted(() => ({ findOrCreateTripFolder: vi.fn() }))
 vi.mock('./drive/tripFolder', () => ({ findOrCreateTripFolder }))
@@ -1923,5 +1924,223 @@ describe('App session-ended redirect (#327)', () => {
     ).toBeNull()
 
     fetchSpy.mockRestore()
+  })
+})
+
+describe('App import without a drag (#338)', () => {
+  beforeEach(() => {
+    startResumableUpload.mockReset().mockResolvedValue('session-uri')
+    uploadFileContent.mockReset().mockResolvedValue({ id: 'drive-file-1' })
+    Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:fake-url'), revokeObjectURL: vi.fn() })
+  })
+
+  function gpsPhoto(as: string): File {
+    const buffer = readFileSync(join(__dirname, 'photo/fixtures/gps-and-timestamps.jpg'))
+    return new File([buffer], as, { type: 'image/jpeg' })
+  }
+
+  /** Choosing files through the header control, which is the whole point:
+      a phone cannot produce the drop these same assertions are written
+      against elsewhere. */
+  function choose(files: File[]) {
+    const input = document.querySelector('.trips-panel__import-input') as HTMLInputElement
+    Object.defineProperty(input, 'files', { value: files, configurable: true })
+    fireEvent.change(input)
+  }
+
+  it('a picked photo with EXIF GPS becomes a loose cairn, exactly as a dropped one does', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    await renderApp('/', { googleClientId: 'a-client-id' })
+    await signIn()
+
+    // The dropped file first, for the comparison this criterion is phrased
+    // as — "imports them exactly as dropping those same files does".
+    const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
+    await act(async () => {
+      fireEvent.drop(shell, { dataTransfer: fileDataTransfer([gpsPhoto('dropped.jpg')]) })
+    })
+    await waitFor(() => {
+      expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(1)
+    })
+    const [dropped] = JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')
+
+    await act(async () => {
+      choose([gpsPhoto('picked.jpg')])
+    })
+    await waitFor(() => {
+      expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(2)
+    })
+    const picked = JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]').find(
+      (item: { name: string }) => item.name === 'picked.jpg',
+    )
+
+    expect(picked.kind).toBe('cairn')
+    expect(picked.positionSource).toBe('exif')
+    // The same coordinate the drop resolved to, from the same EXIF tags.
+    expect(picked.position).toEqual(dropped.position)
+
+    fetchSpy.mockRestore()
+  })
+
+  it('a picked photo with no EXIF GPS goes to the placement queue, writing no record', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    await renderApp('/', { googleClientId: 'a-client-id' })
+    await signIn()
+
+    const buffer = readFileSync(join(__dirname, 'photo/fixtures/gps-stripped.jpg'))
+    await act(async () => {
+      choose([new File([buffer], 'no-gps.jpg', { type: 'image/jpeg' })])
+    })
+
+    // The placement queue's own draft banner reads `Not saved`; #81's
+    // track draft reads `NOT SAVED`. Two different drafts, two strings.
+    expect(await screen.findByText('Not saved')).toBeDefined()
+    expect(screen.getByText('1 photo · 0 placed · 1 needs a location')).toBeDefined()
+    // The whole point of the queue: nothing is written until it is placed.
+    expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(0)
+
+    fetchSpy.mockRestore()
+  })
+
+  it('a picked zip expands and routes its contents by type (#188)', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    await renderApp('/', { googleClientId: 'a-client-id' })
+    await signIn()
+
+    const zip = new JSZip()
+    zip.file('photos/one.jpg', readFileSync(join(__dirname, 'photo/fixtures/gps-and-timestamps.jpg')))
+    const archive = new File([await zip.generateAsync({ type: 'blob' })], 'photos.zip')
+
+    await act(async () => {
+      choose([archive])
+    })
+
+    await waitFor(() => {
+      expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(1)
+    })
+    const [item] = JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')
+    expect(item.kind).toBe('cairn')
+    expect(item.positionSource).toBe('exif')
+
+    fetchSpy.mockRestore()
+  })
+
+  it('a picked mix of a photo and a track does both halves in one gesture', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    await renderApp('/', { googleClientId: 'a-client-id' })
+    await signIn()
+
+    await act(async () => {
+      choose([gpsPhoto('mixed.jpg'), loadKmlFixture('linestring.kml', 'day1.kml')])
+    })
+
+    // The track half opens the draft...
+    expect(await screen.findByText('NOT SAVED')).toBeDefined()
+    // ...and the photo half saves without waiting on it.
+    await waitFor(() => {
+      expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(1)
+    })
+
+    fetchSpy.mockRestore()
+  })
+
+  it('a picked photo while signed out is refused once, and writes nothing', async () => {
+    await renderApp('/')
+
+    await act(async () => {
+      choose([gpsPhoto('a.jpg'), gpsPhoto('b.jpg')])
+    })
+
+    // #120: one toast for the batch, not one per file.
+    expect(await screen.findAllByText(SIGNED_OUT_DROP_MESSAGE)).toHaveLength(1)
+    expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(0)
+  })
+
+  /* The issue's criterion said an HEIC would surface `validateImageFile`'s
+     HEIC message. It does not — on either path. `isPhotoFile` accepts
+     `.heic`, so position resolution runs first and an HEIC with no GPS
+     lands in the placement queue; the refusal only arrives after the user
+     places it. That is pre-existing behaviour of the drop path, verified
+     side by side below, and changing it is this issue's Out of Scope.
+     Filed separately. What #338 owes is that the two paths agree. */
+  /* The issue's criterion said an HEIC would surface `validateImageFile`'s
+     HEIC message. It does not, on either path: `isPhotoFile` accepts
+     `.heic`, so position resolution runs first and an HEIC with no GPS
+     lands in the placement queue — the refusal only arrives after the user
+     has placed it. Pre-existing behaviour of the drop path, and changing
+     it is this issue's Out of Scope, so it is filed separately. These two
+     tests pin what #338 does owe: the picked file goes exactly where the
+     dropped one goes. */
+  it('a dropped HEIC reaches the placement queue rather than an up-front refusal', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    await renderApp('/', { googleClientId: 'a-client-id' })
+    await signIn()
+
+    const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
+    await act(async () => {
+      fireEvent.drop(shell, {
+        dataTransfer: fileDataTransfer([new File(['x'], 'x.heic', { type: 'image/heic' })]),
+      })
+    })
+
+    expect(await screen.findByText('Not saved')).toBeDefined()
+    expect(screen.getByText('x.heic')).toBeDefined()
+    expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(0)
+
+    fetchSpy.mockRestore()
+  })
+
+  it('a picked HEIC reaches the same place, by the same words', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    await renderApp('/', { googleClientId: 'a-client-id' })
+    await signIn()
+
+    await act(async () => {
+      choose([new File(['x'], 'x.heic', { type: 'image/heic' })])
+    })
+
+    expect(await screen.findByText('Not saved')).toBeDefined()
+    expect(screen.getByText('x.heic')).toBeDefined()
+    expect(screen.getByText('1 photo · 0 placed · 1 needs a location')).toBeDefined()
+    expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(0)
+
+    fetchSpy.mockRestore()
+  })
+
+  it('a picked unsupported type is refused with the same message a dropped one is', async () => {
+    await renderApp('/')
+
+    await act(async () => {
+      choose([new File(['x'], 'notes.pdf', { type: 'application/pdf' })])
+    })
+
+    // The draft's own message, because a `.pdf` is neither photo nor
+    // track — not `UNSUPPORTED_TYPE_ERROR`, which is the photo
+    // validator's and which the criterion wrongly named.
+    expect(await screen.findByText('Only .kml, .kmz and .gpx files can be imported.')).toBeDefined()
+    expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(0)
+  })
+
+  it('a picked KML opens the same draft a dropped one opens', async () => {
+    await renderApp('/')
+
+    await act(async () => {
+      choose([loadKmlFixture('linestring.kml', 'day1.kml')])
+    })
+
+    expect(await screen.findByText('NOT SAVED')).toBeDefined()
+    expect(screen.getByText('day1.kml · 1 track')).toBeDefined()
+  })
+
+  it('picks a track into the draft while signed out, which is why the control is never disabled', async () => {
+    await renderApp('/')
+
+    await act(async () => {
+      choose([loadKmlFixture('linestring.kml', 'day1.kml')])
+    })
+
+    // Signed out, and the draft still opens — #81/#120. Disabling the
+    // control (as `TripImportPanel` does) would have removed this.
+    expect(await screen.findByText('NOT SAVED')).toBeDefined()
   })
 })

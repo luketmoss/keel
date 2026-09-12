@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { deriveTripStatus, type TripIndexEntry } from '../store/tripStore'
 import { matchesTripFilters, type TripFilters } from '../store/tripFilters'
 import type { TripTotals } from '../geo/tripTotals'
+import type { LatLng } from '../map/geo'
 import { formatShortDate, formatTripMetaLine, tripRowAccessibleName } from '../format/dates'
 import { canChangeOwner, looseMetaLine, showExport, type LooseRecord } from '../store/looseStore'
 import { cairnMatchesFacet, type CairnFacet } from '../store/cairnRules'
@@ -12,6 +13,7 @@ import { NameInput } from './NameInput'
 import { ColorPopover } from './ColorPopover'
 import { CairnMarker } from './CairnMarker'
 import { trackColor, TRACK_COLORS } from '../map/palette'
+import { CoordinateResult } from './CoordinateResult'
 import './TripsPanel.css'
 
 interface TripsPanelProps {
@@ -55,6 +57,13 @@ interface TripsPanelProps {
   /** #73: no usable token — creating, moving or deleting go to the
       language's Disabled treatment. Reading is unaffected. */
   disabled: boolean
+  /** #337: the point the query parses as, or `null` when it is an ordinary
+      name. Parsed in `App` rather than here — the shell is what moves the
+      camera and opens the create face, and this panel only offers the
+      row. */
+  coordinate: LatLng | null
+  /** #337: the row was chosen. Clearing the query is the shell's job too. */
+  onChooseCoordinate: () => void
 }
 
 /** The panel's list face: trips, loose tracks and loose photos in one list,
@@ -81,6 +90,8 @@ export function TripsPanel({
   onExportLoose,
   exportingIds,
   disabled,
+  coordinate,
+  onChooseCoordinate,
 }: TripsPanelProps) {
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
@@ -136,6 +147,57 @@ export function TripsPanel({
     if (kind === 'cairns') onFacetChange('any')
   }
 
+  /* Hoisted out of the branch below: #337's coordinate row makes the
+     list show in a case the empty states would otherwise have taken,
+     and one list rendered from two places is two lists to keep in
+     step. */
+  const listRows = (
+    <>
+        {visibleTrips.map((trip) => (
+          <TripRow
+            key={trip.id}
+            trip={trip}
+            trackCount={trackCounts.get(trip.id) ?? 0}
+            totals={tripTotals.get(trip.id) ?? null}
+            disabled={disabled}
+            emphasized={hoveredId === trip.id}
+            onHover={onHover}
+            confirming={confirmingId === trip.id}
+            confirmingRowRef={confirmingId === trip.id ? confirmingRowRef : undefined}
+            onStartConfirm={() => setConfirmingId(trip.id)}
+            onCancelConfirm={() => setConfirmingId(null)}
+            onDelete={() => {
+              setConfirmingId(null)
+              onDelete(trip.id)
+            }}
+          />
+        ))}
+        {visibleLoose.map((item) => (
+          <LooseRow
+            key={item.id}
+            item={item}
+            disabled={disabled}
+            emphasized={hoveredId === item.id}
+            onHover={onHover}
+            confirming={confirmingId === item.id}
+            confirmingRowRef={confirmingId === item.id ? confirmingRowRef : undefined}
+            onStartConfirm={() => setConfirmingId(item.id)}
+            onCancelConfirm={() => setConfirmingId(null)}
+            onAddToTrip={() => onAddLooseToTrip(item.id)}
+            onDelete={() => {
+              setConfirmingId(null)
+              onDeleteLoose(item.id)
+            }}
+            onRename={onRenameLoose}
+            onRecolor={onRecolorLoose}
+            onSaveError={setEditError}
+            onExport={() => onExportLoose(item.id)}
+            exporting={exportingIds.has(item.id)}
+          />
+        ))}
+    </>
+  )
+
   return (
     <div className="trips-panel">
       <div className="trips-panel__header">
@@ -171,7 +233,17 @@ export function TripsPanel({
         )}
       </div>
 
-      {nothingAtAll ? (
+      {coordinate && <CoordinateResult point={coordinate} onChoose={onChooseCoordinate} />}
+
+      {/* #337: the empty states are suppressed while the coordinate row is
+          up — a panel with a row in it is not empty, and `Nothing in this
+          range` under a usable result would be describing the wrong half of
+          the list. The rows below are otherwise unaffected: name filtering
+          still runs on the same query and finds nothing, which is the
+          ordinary outcome for a string of digits. */}
+      {coordinate || !(nothingAtAll || filteredEmpty) ? (
+        <ul className="trips-panel__list">{listRows}</ul>
+      ) : nothingAtAll ? (
         <div className="trips-panel__empty">
           {disabled ? (
             <p className="trips-panel__empty-title">Sign in to see your map.</p>
@@ -182,7 +254,7 @@ export function TripsPanel({
             </>
           )}
         </div>
-      ) : filteredEmpty ? (
+      ) : (
         <div className="trips-panel__empty">
           {/* #159: a facet with no members is still selectable — see the
               design note's edge case — and lands here, under its own
@@ -194,51 +266,6 @@ export function TripsPanel({
             Clear filters
           </button>
         </div>
-      ) : (
-        <ul className="trips-panel__list">
-          {visibleTrips.map((trip) => (
-            <TripRow
-              key={trip.id}
-              trip={trip}
-              trackCount={trackCounts.get(trip.id) ?? 0}
-              totals={tripTotals.get(trip.id) ?? null}
-              disabled={disabled}
-              emphasized={hoveredId === trip.id}
-              onHover={onHover}
-              confirming={confirmingId === trip.id}
-              confirmingRowRef={confirmingId === trip.id ? confirmingRowRef : undefined}
-              onStartConfirm={() => setConfirmingId(trip.id)}
-              onCancelConfirm={() => setConfirmingId(null)}
-              onDelete={() => {
-                setConfirmingId(null)
-                onDelete(trip.id)
-              }}
-            />
-          ))}
-          {visibleLoose.map((item) => (
-            <LooseRow
-              key={item.id}
-              item={item}
-              disabled={disabled}
-              emphasized={hoveredId === item.id}
-              onHover={onHover}
-              confirming={confirmingId === item.id}
-              confirmingRowRef={confirmingId === item.id ? confirmingRowRef : undefined}
-              onStartConfirm={() => setConfirmingId(item.id)}
-              onCancelConfirm={() => setConfirmingId(null)}
-              onAddToTrip={() => onAddLooseToTrip(item.id)}
-              onDelete={() => {
-                setConfirmingId(null)
-                onDeleteLoose(item.id)
-              }}
-              onRename={onRenameLoose}
-              onRecolor={onRecolorLoose}
-              onSaveError={setEditError}
-              onExport={() => onExportLoose(item.id)}
-              exporting={exportingIds.has(item.id)}
-            />
-          ))}
-        </ul>
       )}
       {editError && <p className="trips-panel__edit-error">{editError}</p>}
     </div>

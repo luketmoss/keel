@@ -22,6 +22,11 @@ interface CairnCreatePanelProps {
   /** The trip the gesture's context chose, or `null` for a loose cairn.
       The readout below states which before there is anything to undo. */
   tripId: string | null
+  /** #337: how the pin got here. Only the ownership readout reads it —
+      #156's "(a trip was open when you clicked)" is false for a coordinate
+      that was searched for, and a readout that describes an action the user
+      did not take is worse than no readout. */
+  origin?: 'gesture' | 'search'
   onCreate: () => void
   onCancel: () => void
   /** #73: `Create` takes the Disabled treatment with one sentence. The form
@@ -40,6 +45,7 @@ export function CairnCreatePanel({
   fields,
   onChange,
   tripId,
+  origin = 'gesture',
   onCreate,
   onCancel,
   disabled = false,
@@ -144,7 +150,11 @@ export function CairnCreatePanel({
           </div>
         </dl>
         <p className="cairn-create__ownership">
-          {tripId ? '(a trip was open when you clicked)' : '(nothing was open — this will be loose)'}
+          {tripId
+            ? origin === 'search'
+              ? '(a trip was open when you searched)'
+              : '(a trip was open when you clicked)'
+            : '(nothing was open — this will be loose)'}
         </p>
 
         {disabled && <p className="cairn-create__signed-out">Sign in to keep cairns.</p>}

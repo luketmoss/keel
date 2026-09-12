@@ -57,14 +57,29 @@ function renderCanvas(
     points?: { lat: number; lng: number }[]
     mapReady?: boolean
     panelCollapsed?: boolean
+    locateSupported?: boolean
+    locatePending?: boolean
+    onLocate?: () => void
   } = {},
 ) {
-  const { canFit = true, points = [{ lat: 1, lng: 2 }], mapReady = true, panelCollapsed = false } =
-    options
+  const {
+    canFit = true,
+    points = [{ lat: 1, lng: 2 }],
+    mapReady = true,
+    panelCollapsed = false,
+    locateSupported = true,
+    locatePending = false,
+    onLocate = () => {},
+  } = options
   useMapResult.current = mapReady ? fakeMap : null
   return render(
     <Map3DControlProvider>
-      <MapCanvas panelCollapsed={panelCollapsed} canFit={canFit} getFitPoints={() => points} />
+      <MapCanvas
+        panelCollapsed={panelCollapsed}
+        canFit={canFit}
+        getFitPoints={() => points}
+        locate={{ supported: locateSupported, pending: locatePending, onLocate }}
+      />
     </Map3DControlProvider>,
   )
 }
@@ -223,5 +238,70 @@ describe('MapCanvas 3D/basemap coupling (#271)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Map' }))
 
     expect(screen.queryByRole('switch', { name: '3D' })).toBeNull()
+  })
+
+  /* #335 — the locate control. What the fix itself does to the camera and
+     the map is `LocateCamera`'s and `PositionMarker`'s; this covers only
+     what the button in the corner stack says and when it is there. */
+  it('offers a locate control that requests a fix', () => {
+    const onLocate = vi.fn()
+    renderCanvas({ onLocate })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show my location' }))
+
+    expect(onLocate).toHaveBeenCalledTimes(1)
+  })
+
+  it('sits between fit-to-everything and the zoom pair', () => {
+    renderCanvas()
+
+    const labels = Array.from(document.querySelectorAll('.map-controls button')).map((button) =>
+      button.getAttribute('aria-label'),
+    )
+
+    expect(labels).toEqual([
+      'Reset view',
+      'Fit to everything',
+      'Show my location',
+      'Zoom in',
+      'Zoom out',
+    ])
+  })
+
+  it('renders no locate control at all where geolocation is unavailable', () => {
+    renderCanvas({ locateSupported: false })
+
+    expect(screen.queryByRole('button', { name: 'Show my location' })).toBeNull()
+    // The rest of the stack is untouched.
+    expect(screen.getByRole('button', { name: 'Reset view' })).toBeDefined()
+  })
+
+  it('says it is working while a fix is in flight, and refuses a second press', () => {
+    const onLocate = vi.fn()
+    renderCanvas({ locatePending: true, onLocate })
+
+    const button = screen.getByRole('button', { name: 'Finding your location…' })
+    expect(button.getAttribute('aria-busy')).toBe('true')
+    expect(button.hasAttribute('disabled')).toBe(true)
+
+    fireEvent.click(button)
+    expect(onLocate).not.toHaveBeenCalled()
+  })
+
+  it('does not latch after a fix — it is a press, not a toggle', () => {
+    renderCanvas()
+
+    const button = screen.getByRole('button', { name: 'Show my location' })
+    expect(button.getAttribute('role')).toBeNull()
+    expect(button.getAttribute('aria-pressed')).toBeNull()
+    expect(button.getAttribute('aria-checked')).toBeNull()
+  })
+
+  it('goes with the map when the map cannot draw', () => {
+    renderCanvas({ mapReady: false })
+
+    expect(screen.getByRole('button', { name: 'Show my location' }).hasAttribute('disabled')).toBe(
+      true,
+    )
   })
 })

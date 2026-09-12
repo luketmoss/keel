@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent, type RefObject } from 'react'
 import { Link } from 'react-router-dom'
 import { deriveTripStatus, type TripIndexEntry } from '../store/tripStore'
 import { matchesTripFilters, type TripFilters } from '../store/tripFilters'
@@ -15,6 +15,10 @@ import { CairnMarker } from './CairnMarker'
 import { trackColor, TRACK_COLORS } from '../map/palette'
 import { CoordinateResult } from './CoordinateResult'
 import './TripsPanel.css'
+
+/** #338: one string for the accessible name and the tooltip. #199's rule —
+    two strings that mean the same thing drift apart. */
+const IMPORT_LABEL = 'Import files'
 
 interface TripsPanelProps {
   trips: TripIndexEntry[]
@@ -64,6 +68,10 @@ interface TripsPanelProps {
   coordinate: LatLng | null
   /** #337: the row was chosen. Clearing the query is the shell's job too. */
   onChooseCoordinate: () => void
+  /** #338: files chosen through the header's import control. The same
+      handler the map's drop takes — this panel offers the doorway and
+      knows nothing about what is behind it. */
+  onImportFiles: (files: File[]) => void
 }
 
 /** The panel's list face: trips, loose tracks and loose photos in one list,
@@ -92,9 +100,11 @@ export function TripsPanel({
   disabled,
   coordinate,
   onChooseCoordinate,
+  onImportFiles,
 }: TripsPanelProps) {
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
   // #133 — one shared line for a failed rename or recolour, the same shape
   // TrackList's own list-level error already takes, rather than a second
   // line per row that would have to fight the row's flex layout for space.
@@ -139,6 +149,16 @@ export function TripsPanel({
   const total = visibleTrips.length + visibleLoose.length
   const nothingAtAll = trips.length === 0 && looseItems.length === 0
   const filteredEmpty = !nothingAtAll && total === 0
+
+  /* Clearing `value` is what makes choosing the same file twice in a row
+     import it twice — without it the second selection fires no `change`
+     event at all. `TripImportPanel` does the same thing for the same
+     reason. */
+  function handleImportChange(event: ChangeEvent<HTMLInputElement>) {
+    const selected = Array.from(event.target.files ?? [])
+    event.target.value = ''
+    if (selected.length > 0) onImportFiles(selected)
+  }
 
   function clearFilters() {
     onFiltersChange({ ...filters, status: 'all', name: '', range: null })
@@ -203,6 +223,28 @@ export function TripsPanel({
         <div className="trips-panel__title-row">
           <h2 className="trips-panel__heading">{LIST_HEADINGS[kind]}</h2>
           <span className="trips-panel__count">{total}</span>
+          {/* #338: the world view's import doorway. Icon-only because a
+              labelled one overflows the title row at 320px — measured in
+              the design note — and never disabled, because #81/#120 keep
+              the track draft working while signed out and refusing the
+              photo half is `importDroppedLoose`'s job, one layer down. */}
+          <button
+            type="button"
+            className="trips-panel__import"
+            title={IMPORT_LABEL}
+            aria-label={IMPORT_LABEL}
+            onClick={() => importInputRef.current?.click()}
+          >
+            <span aria-hidden="true">↑</span>
+          </button>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".kml,.kmz,.gpx,.jpg,.jpeg,.png,.webp,.zip"
+            multiple
+            className="trips-panel__import-input"
+            onChange={handleImportChange}
+          />
           <button
             type="button"
             className="trips-panel__new"

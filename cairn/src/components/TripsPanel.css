@@ -64,6 +64,40 @@
   cursor: default;
 }
 
+/* #338: the import doorway, square at the hit target so it survives a
+   320px title row where a labelled button does not. Ghost, like the
+   `New trip` it sits beside — the two are the panel's creating actions and
+   should not read as different weights. */
+.trips-panel__import {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--hit-target);
+  min-height: var(--hit-target);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--accent);
+  font-family: inherit;
+  font-size: var(--text-base);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.trips-panel__import:hover {
+  background: var(--hover);
+}
+
+.trips-panel__import:active {
+  background: var(--pressed);
+}
+
+.trips-panel__import-input {
+  display: none;
+}
+
 .trips-panel__hint {
   margin: var(--space-2) 0 0;
   font-size: var(--text-sm);

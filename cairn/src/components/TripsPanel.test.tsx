@@ -48,6 +48,7 @@ function TestTripsPanel({
   dateSpan = null,
   coordinate = null,
   onChooseCoordinate = () => {},
+  onImportFiles = vi.fn(),
 }: {
   trips: TripIndexEntry[]
   trackCounts?: ReadonlyMap<string, number>
@@ -68,6 +69,7 @@ function TestTripsPanel({
   dateSpan?: { min: number; max: number } | null
   coordinate?: LatLng | null
   onChooseCoordinate?: () => void
+  onImportFiles?: (files: File[]) => void
 }) {
   const [filters, setFilters] = useState<TripFilters>(initialFilters)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
@@ -76,6 +78,7 @@ function TestTripsPanel({
     <TripsPanel
       coordinate={coordinate}
       onChooseCoordinate={onChooseCoordinate}
+      onImportFiles={onImportFiles}
       trips={trips}
       trackCounts={trackCounts}
       tripTotals={tripTotals}
@@ -914,6 +917,107 @@ describe('TripsPanel', () => {
       })
 
       expect(screen.getByText('Nothing in this range')).toBeDefined()
+    })
+  })
+  describe("#338's import control", () => {
+    function importInput() {
+      return document.querySelector('.trips-panel__import-input') as HTMLInputElement
+    }
+
+    function pngFile(name: string) {
+      return new File(['x'], name, { type: 'image/png' })
+    }
+
+    it('offers a control named for what it does, not for its glyph', () => {
+      renderPanel({ trips: [] })
+      const control = screen.getByRole('button', { name: 'Import files' })
+      // #199: the tooltip and the accessible name are one string, so they
+      // cannot drift apart.
+      expect(control.getAttribute('title')).toBe('Import files')
+    })
+
+    it('hands chosen files to the same handler the map drop uses', () => {
+      const onImportFiles = vi.fn()
+      renderPanel({ trips: [], onImportFiles })
+      const input = importInput()
+      const files = [pngFile('a.png'), pngFile('b.png')]
+      Object.defineProperty(input, 'files', { value: files, configurable: true })
+      fireEvent.change(input)
+      expect(onImportFiles).toHaveBeenCalledTimes(1)
+      expect(onImportFiles.mock.calls[0][0].map((file: File) => file.name)).toEqual([
+        'a.png',
+        'b.png',
+      ])
+    })
+
+    it('accepts tracks, photos and archives — the drop path\'s own list', () => {
+      renderPanel({ trips: [] })
+      expect(importInput().getAttribute('accept')).toBe(
+        '.kml,.kmz,.gpx,.jpg,.jpeg,.png,.webp,.zip',
+      )
+    })
+
+    it('does not set `capture`, which would force the camera over the library', () => {
+      renderPanel({ trips: [] })
+      expect(importInput().hasAttribute('capture')).toBe(false)
+    })
+
+    it('imports nothing when the chooser is dismissed with no selection', () => {
+      const onImportFiles = vi.fn()
+      renderPanel({ trips: [], onImportFiles })
+      const input = importInput()
+      Object.defineProperty(input, 'files', { value: [], configurable: true })
+      fireEvent.change(input)
+      expect(onImportFiles).not.toHaveBeenCalled()
+    })
+
+    it('clears the input so choosing the same file twice imports it twice', () => {
+      const onImportFiles = vi.fn()
+      renderPanel({ trips: [], onImportFiles })
+      const input = importInput()
+
+      /* A file input's `value` cannot be assigned a real path from script,
+         in jsdom or in a browser, so `expect(input.value).toBe('')` is
+         true whether or not the handler clears it — it passed with the
+         clearing line deleted. Spying on the setter asserts the
+         assignment itself, which is the thing a browser needs: without it
+         the second selection of the same file fires no `change` at all. */
+      const cleared: string[] = []
+      Object.defineProperty(input, 'value', {
+        configurable: true,
+        get: () => '',
+        set: (next: string) => cleared.push(next),
+      })
+
+      const choose = () => {
+        Object.defineProperty(input, 'files', {
+          value: [pngFile('same.png')],
+          configurable: true,
+        })
+        fireEvent.change(input)
+      }
+      choose()
+      choose()
+
+      expect(cleared).toEqual(['', ''])
+      expect(onImportFiles).toHaveBeenCalledTimes(2)
+    })
+
+    it('stays enabled while signed out, because a track still opens the draft', () => {
+      const onImportFiles = vi.fn()
+      renderPanel({ trips: [], disabled: true, onImportFiles })
+      const control = screen.getByRole('button', { name: 'Import files' })
+      expect(control.hasAttribute('disabled')).toBe(false)
+      // `New trip` beside it *is* disabled — the two are deliberately
+      // different, which is the decision most worth pinning down.
+      expect(screen.getByRole('button', { name: 'New trip' }).hasAttribute('disabled')).toBe(true)
+      const input = importInput()
+      Object.defineProperty(input, 'files', {
+        value: [new File(['x'], 'route.gpx')],
+        configurable: true,
+      })
+      fireEvent.change(input)
+      expect(onImportFiles).toHaveBeenCalledTimes(1)
     })
   })
 })

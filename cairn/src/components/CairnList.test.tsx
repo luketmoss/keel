@@ -1159,4 +1159,151 @@ describe('CairnList', () => {
       expect(screen.queryByRole('button', { name: 'View a.jpg larger' })).toBeNull()
     })
   })
+  /* #346 — the two non-destructive items. Everything behind them already
+     existed: `Edit` calls what the expanded row's body calls, and the
+     photo item drives the same input `AddPhotoButton` drives. What is new
+     is that a row can reach either one without being expanded first. */
+  describe('#346 edit and add a photo from the row', () => {
+    function fileInputIn(name: string) {
+      const li = screen.getByText(name).closest('li') as HTMLElement
+      return li.querySelector('.add-photo__input') as HTMLInputElement
+    }
+
+    function choose(element: HTMLInputElement, files: File[]) {
+      Object.defineProperty(element, 'files', { value: files, configurable: true })
+      fireEvent.change(element)
+    }
+
+    function renderOne(overrides: Record<string, unknown> = {}, rowOverrides: Partial<CairnListRow> = {}) {
+      const items = orderCairnListItems([row({ id: 'a', name: 'a.jpg', ...rowOverrides })])
+      return render(
+        <CairnList
+          items={items}
+          totalCount={1}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={vi.fn()}
+          onRemoveFromTrip={vi.fn()}
+          onAddPhoto={vi.fn()}
+          {...ownedProps()}
+          {...overrides}
+        />,
+      )
+    }
+
+    it('lists the two non-destructive items above the two exits', () => {
+      renderOne()
+      openRowMenu('a.jpg')
+
+      expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
+        'Edit',
+        'Replace the photo',
+        'Remove from trip',
+        'Delete permanently…',
+      ])
+    })
+
+    it("reads 'Add a photo' for a cairn that has none", () => {
+      renderOne({}, { thumbnailDriveFileId: null, originalDriveFileId: null, icon: 'campsite' })
+      openRowMenu('a.jpg')
+
+      expect(screen.getByRole('menuitem', { name: 'Add a photo' })).toBeDefined()
+      expect(screen.queryByRole('menuitem', { name: 'Replace the photo' })).toBeNull()
+    })
+
+    it('Edit opens the detail face from a row that was never expanded', () => {
+      const onOpenPreview = vi.fn()
+      renderOne({ ...ownedProps({ onOpenPreview, expandedCairnId: null }) })
+      openRowMenu('a.jpg')
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }))
+
+      expect(onOpenPreview).toHaveBeenCalledWith('a')
+    })
+
+    it('the photo item reaches the row\'s own file input, and the chosen file goes up with the cairn id', () => {
+      const onAddPhoto = vi.fn()
+      renderOne({ onAddPhoto })
+      const element = fileInputIn('a.jpg')
+      const clicked = vi.fn()
+      element.addEventListener('click', clicked)
+
+      openRowMenu('a.jpg')
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Replace the photo' }))
+      expect(clicked).toHaveBeenCalledTimes(1)
+
+      choose(element, [new File(['x'], 'camp.jpg', { type: 'image/jpeg' })])
+      expect(onAddPhoto).toHaveBeenCalledTimes(1)
+      expect(onAddPhoto.mock.calls[0][0]).toBe('a')
+      expect(onAddPhoto.mock.calls[0][1].name).toBe('camp.jpg')
+    })
+
+    it('does nothing when the chooser is dismissed with no selection', () => {
+      const onAddPhoto = vi.fn()
+      renderOne({ onAddPhoto })
+      choose(fileInputIn('a.jpg'), [])
+
+      expect(onAddPhoto).not.toHaveBeenCalled()
+    })
+
+    it('says uploading… in the ⋮\'s slot while its own attach is in flight, and offers no menu', () => {
+      renderOne({ attachingCairnId: 'a' })
+
+      expect(screen.getByText('uploading…')).toBeDefined()
+      expect(screen.queryByRole('button', { name: 'Row actions for a.jpg' })).toBeNull()
+    })
+
+    it('leaves an attaching row at full opacity — unlike a removing one, its cairn is fine', () => {
+      renderOne({ attachingCairnId: 'a' })
+      const li = screen.getByText('a.jpg').closest('li') as HTMLElement
+
+      expect(li.className).not.toContain('cairn-row--removing')
+    })
+
+    it('#157 — one at a time: another row\'s photo item is disabled while any attach runs', () => {
+      const items = orderCairnListItems([
+        row({ id: 'a', name: 'a.jpg' }),
+        row({ id: 'b', name: 'b.jpg' }),
+      ])
+      render(
+        <CairnList
+          items={items}
+          totalCount={2}
+          selectedCairnId={null}
+          accessToken="token"
+          onOpenRow={vi.fn()}
+          onAddPhoto={vi.fn()}
+          attachingCairnId="a"
+          {...ownedProps()}
+        />,
+      )
+      openRowMenu('b.jpg')
+
+      expect(screen.getByRole('menuitem', { name: 'Replace the photo' }).hasAttribute('disabled')).toBe(true)
+      // Edit is not a write and never joins the refusal.
+      expect(screen.getByRole('menuitem', { name: 'Edit' }).hasAttribute('disabled')).toBe(false)
+    })
+
+    it('reports a failed attach beneath the row it was started from', () => {
+      renderOne({ attachErrors: { a: "Couldn't add the photo — try again." } })
+
+      expect(screen.getByText("Couldn't add the photo — try again.")).toBeDefined()
+    })
+
+    it('#73 — signed out, Edit stays enabled and everything that writes does not', () => {
+      renderOne({ onAddPhoto: undefined, ...ownedProps({ disableRemove: true }) })
+      openRowMenu('a.jpg')
+
+      expect(screen.getByRole('menuitem', { name: 'Edit' }).hasAttribute('disabled')).toBe(false)
+      expect(screen.getByRole('menuitem', { name: 'Replace the photo' }).hasAttribute('disabled')).toBe(true)
+      expect(screen.getByRole('menuitem', { name: 'Remove from trip' }).hasAttribute('disabled')).toBe(true)
+      expect(screen.getByRole('menuitem', { name: 'Delete permanently…' }).hasAttribute('disabled')).toBe(true)
+    })
+
+    it('a confirming row still shows the confirm and no menu', () => {
+      renderOne({ ...ownedProps({ confirmingId: 'a' }) })
+
+      expect(screen.getByText('Remove "a.jpg"?')).toBeDefined()
+      expect(screen.queryByRole('button', { name: 'Row actions for a.jpg' })).toBeNull()
+    })
+  })
 })

@@ -1,4 +1,4 @@
-import { useRef, type ChangeEvent } from 'react'
+import { useRef, type ChangeEvent, type RefObject } from 'react'
 import './AddPhotoButton.css'
 
 /** #339: one image per cairn (`cairns.md`), so the input is deliberately
@@ -10,6 +10,37 @@ export const PHOTO_ACCEPT = '.jpg,.jpeg,.png,.webp'
 
 export const ADD_PHOTO_LABEL = 'Add a photo'
 export const REPLACE_PHOTO_LABEL = 'Replace the photo'
+
+/** #346 — the input on its own, split out of the button below because a
+    row's `⋮` item needs the input's behaviour without a button beside it.
+    The accept list, the single file and the `value` reset live here once;
+    both callers open it the same way, by `click()`ing the ref they passed. */
+export function PhotoFileInput({
+  inputRef,
+  onChoose,
+}: {
+  inputRef: RefObject<HTMLInputElement | null>
+  onChoose: (file: File) => void
+}) {
+  /* Clearing `value` is what makes choosing the same file twice in a row
+     attach it twice — without it the second selection fires no `change`
+     event at all. */
+  function handleChange(event: ChangeEvent<HTMLInputElement>) {
+    const [file] = Array.from(event.target.files ?? [])
+    event.target.value = ''
+    if (file) onChoose(file)
+  }
+
+  return (
+    <input
+      ref={inputRef}
+      type="file"
+      accept={PHOTO_ACCEPT}
+      className="add-photo__input"
+      onChange={handleChange}
+    />
+  )
+}
 
 interface AddPhotoButtonProps {
   /** Drives the label. #157's two cases, in their short form — the
@@ -43,15 +74,6 @@ export function AddPhotoButton({
   const label = hasImage ? REPLACE_PHOTO_LABEL : ADD_PHOTO_LABEL
   const blocked = disabled === true || attaching === true
 
-  /* Clearing `value` is what makes choosing the same file twice in a row
-     attach it twice — without it the second selection fires no `change`
-     event at all. */
-  function handleChange(event: ChangeEvent<HTMLInputElement>) {
-    const [file] = Array.from(event.target.files ?? [])
-    event.target.value = ''
-    if (file) onChoose(file)
-  }
-
   return (
     <>
       <button
@@ -62,13 +84,7 @@ export function AddPhotoButton({
       >
         {label}
       </button>
-      <input
-        ref={inputRef}
-        type="file"
-        accept={PHOTO_ACCEPT}
-        className="add-photo__input"
-        onChange={handleChange}
-      />
+      <PhotoFileInput inputRef={inputRef} onChoose={onChoose} />
     </>
   )
 }

@@ -629,21 +629,34 @@ export function TripDetail({
   // resolves for either case; only the *render* below is gated on having
   // an image to view.
   const openCairnRecord = openCairnId ? cairnImport.cairns.find((cairn) => cairn.id === openCairnId) : undefined
-  /** #157: this cairn's own attach state — one at a time, since only one
-      lightbox can be open. Cleared whenever the open cairn changes so a
-      stale error from a previous cairn never bleeds into the next one. */
+  /** #157: one attach at a time — there was only ever one lightbox to run
+      it from, and #346's row menu keeps the rule rather than relaxing it. */
   const [attachingCairnId, setAttachingCairnId] = useState<string | null>(null)
-  const [attachCairnError, setAttachCairnError] = useState<string | null>(null)
+  /** #346 — keyed by cairn rather than held as one string. An attach
+      started from a row belongs to that row, and #157's "a stale error
+      from a previous cairn must not bleed into the next one" then holds by
+      construction instead of by an effect that clears on open. */
+  const [attachCairnErrors, setAttachCairnErrors] = useState<Record<string, string>>({})
+  /** #346 — the same failures, minus the one whose face is open. The face
+      already carries it (#157's failure line), and one failure rendered
+      twice in two places is two answers to one question. */
+  const rowAttachErrors = useMemo(() => {
+    if (!openCairnId || !(openCairnId in attachCairnErrors)) return attachCairnErrors
+    const next = { ...attachCairnErrors }
+    delete next[openCairnId]
+    return next
+  }, [attachCairnErrors, openCairnId])
   /** #158: the open cairn's own drag-write failure, cleared the same way
-      `attachCairnError` is — a stale error from whatever was open before
-      must not bleed into the next one. A failure for a cairn that isn't
+      `attachCairnErrors` was before #346 keyed it by cairn — a stale error
+      from whatever was open before must not bleed into the next one, and
+      this one still needs the effect below to say so, because a move has
+      no row treatment to belong to. A failure for a cairn that isn't
       open has nowhere to show it (design note: the detail face carries the
       failure line) — the marker's own animated revert is the only signal
       for that case. */
   const [moveCairnError, setMoveCairnError] = useState<string | null>(null)
 
   useEffect(() => {
-    setAttachCairnError(null)
     setMoveCairnError(null)
   }, [openCairnId])
 
@@ -853,10 +866,18 @@ export function TripDetail({
       }
 
       setAttachingCairnId(cairnId)
-      setAttachCairnError(null)
+      setAttachCairnErrors((prev) => {
+        if (!(cairnId in prev)) return prev
+        const next = { ...prev }
+        delete next[cairnId]
+        return next
+      })
       const result = await cairnImport.attachImage(cairnId, first)
       setAttachingCairnId(null)
-      if (!result.ok) setAttachCairnError(result.error ?? ATTACH_IMAGE_FAILED_MESSAGE)
+      if (!result.ok) {
+        const message = result.error ?? ATTACH_IMAGE_FAILED_MESSAGE
+        setAttachCairnErrors((prev) => ({ ...prev, [cairnId]: message }))
+      }
     },
     [cairnImport.attachImage, addLocalFailure],
   )
@@ -874,7 +895,7 @@ export function TripDetail({
       if (dropped.length === 0) return
       if (!signedIn) {
         if (openCairnId) {
-          setAttachCairnError(SIGNED_OUT_PHOTO_MESSAGE)
+          setAttachCairnErrors((prev) => ({ ...prev, [openCairnId]: SIGNED_OUT_PHOTO_MESSAGE }))
         } else {
           addLocalFailure(
             `${dropped.length} file${dropped.length === 1 ? '' : 's'}`,
@@ -1201,6 +1222,16 @@ export function TripDetail({
               cairnImport.forgetCairn(id)
             })
           }
+          /* #346 — the row's `⋮` reaches the same attach the open face's
+             button does. `attachPhotoToCairn` has always taken a cairn id
+             rather than reading whichever lightbox is open, so no face has
+             to exist for this to work. Withheld while signed out, which
+             takes the item to Disabled rather than letting it start an
+             upload with no token — #339's split, at the second entry
+             point. */
+          onAddPhoto={signedIn ? (id, file) => void attachPhotoToCairn(id, [file]) : undefined}
+          attachingCairnId={attachingCairnId}
+          attachErrors={rowAttachErrors}
           confirmingId={removeConfirm.confirmingId}
           onStartConfirm={removeConfirm.onStartConfirm}
           onCancelConfirm={removeConfirm.onCancelConfirm}
@@ -1233,7 +1264,7 @@ export function TripDetail({
              while signed out, which takes the control to Disabled rather
              than letting it start an upload with no token. */
           onAddPhoto={signedIn ? (file) => void attachPhotoToCairn(openCairnRow.id, [file]) : undefined}
-          attachError={openCairnRow.id === openCairnId ? attachCairnError : null}
+          attachError={attachCairnErrors[openCairnRow.id] ?? null}
           moveError={openCairnRow.id === openCairnId ? moveCairnError : null}
           signedOut={!signedIn}
           onRemoveFromTrip={

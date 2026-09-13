@@ -625,3 +625,73 @@ describe('TripDetail — choosing a photo for an open cairn (#339)', () => {
     expect(screen.getByRole('button', { name: 'Add a photo' }).hasAttribute('disabled')).toBe(true)
   })
 })
+
+/* #346 — the same attach, started from a row's `⋮` instead of the open
+   face. `attachPhotoToCairn` always took a cairn id rather than reading
+   whichever lightbox was open, which is why this needs no second path. */
+describe('TripDetail — attaching a photo from the row menu (#346)', () => {
+  beforeEach(() => {
+    acquire.mockResolvedValue({ url: 'blob:thumb', release: vi.fn() })
+    useTripImport.mockReturnValue(baseTripImport())
+  })
+
+  function rowInput() {
+    const li = screen.getByText('sapporo.jpg').closest('li') as HTMLElement
+    return li.querySelector('.add-photo__input') as HTMLInputElement
+  }
+
+  function chooseInRow(files: File[]) {
+    const element = rowInput()
+    Object.defineProperty(element, 'files', { value: files, configurable: true })
+    fireEvent.change(element)
+  }
+
+  it('attaches to the row it was started from, with no detail face ever opened', async () => {
+    const attachImage = vi.fn().mockResolvedValue({ ok: true })
+    useCairnImport.mockReturnValue(
+      baseCairnImport({ cairns: [cairnRecord({ id: 'a', image: null, icon: 'campsite' })], attachImage }),
+    )
+    renderTrip()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Row actions for sapporo.jpg' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Add a photo' }))
+    await act(async () => {
+      chooseInRow([new File(['x'], 'camp.jpg', { type: 'image/jpeg' })])
+    })
+
+    expect(attachImage).toHaveBeenCalledTimes(1)
+    expect(attachImage.mock.calls[0][0]).toBe('a')
+    expect(attachImage.mock.calls[0][1].name).toBe('camp.jpg')
+    // The row never expanded and the lightbox never mounted.
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('reports a failed attach on that row, leaving the cairn as it was', async () => {
+    const attachImage = vi.fn().mockResolvedValue({ ok: false })
+    useCairnImport.mockReturnValue(
+      baseCairnImport({ cairns: [cairnRecord({ id: 'a', image: null, icon: 'campsite' })], attachImage }),
+    )
+    renderTrip()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Row actions for sapporo.jpg' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Add a photo' }))
+    await act(async () => {
+      chooseInRow([new File(['x'], 'camp.jpg', { type: 'image/jpeg' })])
+    })
+
+    const li = screen.getByText('sapporo.jpg').closest('li') as HTMLElement
+    expect(within(li).getByText("Couldn't add the photo — try again.")).toBeDefined()
+  })
+
+  it('#73 — the photo item is disabled while disconnected, and Edit is not', async () => {
+    useCairnImport.mockReturnValue(
+      baseCairnImport({ cairns: [cairnRecord({ id: 'a', image: null, icon: 'campsite' })] }),
+    )
+    renderTrip({ accessToken: null })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Row actions for sapporo.jpg' }))
+
+    expect(screen.getByRole('menuitem', { name: 'Add a photo' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('menuitem', { name: 'Edit' }).hasAttribute('disabled')).toBe(false)
+  })
+})

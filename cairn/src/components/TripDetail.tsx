@@ -1227,6 +1227,12 @@ export function TripDetail({
           onClose={closeLightbox}
           onNavigate={navigateCairn}
           attaching={attachingCairnId === openCairnRow.id}
+          /* #339: the chosen file goes to the same `attachPhotoToCairn`
+             the drop handler calls — one file, so the "only one photo per
+             cairn" refusals below it never fire from this route. Withheld
+             while signed out, which takes the control to Disabled rather
+             than letting it start an upload with no token. */
+          onAddPhoto={signedIn ? (file) => void attachPhotoToCairn(openCairnRow.id, [file]) : undefined}
           attachError={openCairnRow.id === openCairnId ? attachCairnError : null}
           moveError={openCairnRow.id === openCairnId ? moveCairnError : null}
           signedOut={!signedIn}

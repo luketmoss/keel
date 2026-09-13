@@ -17,6 +17,7 @@ import {
 } from '../store/looseStore'
 import { usePhotoImage } from '../photo/usePhotoImage'
 import { IconPicker } from './IconPicker'
+import { AddPhotoButton } from './AddPhotoButton'
 import { DescriptionInput } from './DescriptionInput'
 import { useEditableCairnText } from './useEditableCairnText'
 import { linesFromOverview } from '../geo/overviewLines'
@@ -71,6 +72,10 @@ interface LooseFaceProps {
   attaching?: boolean
   /** #157: the image slot's failure line, or `null`. Unused for a track. */
   attachError?: string | null
+  /** #339: a photo chosen through the face's own control rather than
+      dropped. Same destination — `App` hands both to the one
+      `attachPhotoToLooseCairn`. Unused for a track. */
+  onAddPhoto?: (file: File) => void
   /** #158: a drag's write failure, or `null`. The marker has already
       reverted by the time this shows. Unused for a track — trip and track
       markers do not drag. */
@@ -101,6 +106,7 @@ export function LooseFace({
   error,
   attaching,
   attachError,
+  onAddPhoto,
   moveWriteError,
 }: LooseFaceProps) {
   const [picking, setPicking] = useState(false)
@@ -265,6 +271,7 @@ export function LooseFace({
             disabled={disabled || !canMove}
             attaching={attaching}
             attachError={attachError}
+            onAddPhoto={onAddPhoto}
             moveWriteError={moveWriteError}
             signedOut={disabled}
           />
@@ -348,6 +355,7 @@ function CairnBody({
   disabled,
   attaching,
   attachError,
+  onAddPhoto,
   moveWriteError,
   signedOut,
 }: {
@@ -358,6 +366,7 @@ function CairnBody({
   disabled: boolean
   attaching?: boolean
   attachError?: string | null
+  onAddPhoto?: (file: File) => void
   moveWriteError?: string | null
   signedOut?: boolean
 }) {
@@ -416,6 +425,16 @@ function CairnBody({
         value={item.icon}
         onChange={onSelectIcon}
         disabled={disabled}
+      />
+      {/* #339: a loose cairn's face is where a dropped photo would have
+          landed, so it is where the control belongs. Disabled by the same
+          gate the grid above uses — an attach is a Drive upload and
+          nothing else. */}
+      <AddPhotoButton
+        hasImage={item.image !== null}
+        attaching={attaching}
+        disabled={disabled || !onAddPhoto}
+        onChoose={(file) => onAddPhoto?.(file)}
       />
       <p className="loose-face__position-source">{positionSourceSentence(item.positionSource)}</p>
       {/* #158 — one sentence per surface (#73), not a tooltip per marker. */}

@@ -1669,6 +1669,132 @@ describe('App attach a photo to an existing cairn (#157)', () => {
     fetchSpy.mockRestore()
   })
 
+  /* #339: the same attach, reached by the control instead of a drop —
+     which is the only route a phone has. */
+  it('chooses a photo through the face and attaches it, with no new cairn created', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedLooseCairn('c-339', 'Ellery Creek camp')
+    uploadFileContent
+      .mockResolvedValueOnce({ id: 'original-1' })
+      .mockResolvedValueOnce({ id: 'thumb-1' })
+    await renderApp('/cairns/c-339', { googleClientId: 'a-client-id' })
+    await signIn()
+
+    const button = await screen.findByRole('button', { name: 'Add a photo' })
+    const input = document.querySelector('.add-photo__input') as HTMLInputElement
+    Object.defineProperty(input, 'files', {
+      value: [new File(['jpeg'], 'a.jpg', { type: 'image/jpeg' })],
+      configurable: true,
+    })
+    expect(button.hasAttribute('disabled')).toBe(false)
+
+    await act(async () => {
+      fireEvent.change(input)
+    })
+
+    await waitFor(() => {
+      const stored = JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')
+      // One cairn still, now carrying both ids — never one of the two.
+      expect(stored).toHaveLength(1)
+      expect(stored[0].image).toEqual({
+        originalDriveFileId: 'original-1',
+        thumbnailDriveFileId: 'thumb-1',
+      })
+    })
+
+    fetchSpy.mockRestore()
+  })
+
+  it('leaves position, positionSource and icon untouched by an attach', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedLooseCairn('c-340', 'Ellery Creek camp')
+    uploadFileContent
+      .mockResolvedValueOnce({ id: 'original-1' })
+      .mockResolvedValueOnce({ id: 'thumb-1' })
+    await renderApp('/cairns/c-340', { googleClientId: 'a-client-id' })
+    await signIn()
+
+    const before = JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')[0]
+
+    await screen.findByRole('button', { name: 'Add a photo' })
+    const input = document.querySelector('.add-photo__input') as HTMLInputElement
+    // A photo carrying real EXIF GPS — `cairns.md` forbids it moving the
+    // cairn, which already has a position.
+    const gpsBuffer = readFileSync(join(__dirname, 'photo/fixtures/gps-and-timestamps.jpg'))
+    Object.defineProperty(input, 'files', {
+      value: [new File([gpsBuffer], 'sapporo.jpg', { type: 'image/jpeg' })],
+      configurable: true,
+    })
+
+    await act(async () => {
+      fireEvent.change(input)
+    })
+
+    await waitFor(() => {
+      expect(
+        JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')[0].image,
+      ).not.toBeNull()
+    })
+    const after = JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')[0]
+    expect(after.position).toEqual(before.position)
+    expect(after.positionSource).toBe('placed')
+    expect(after.icon).toBe('campsite')
+
+    fetchSpy.mockRestore()
+  })
+
+  /* #339's criterion: establish whether #344's HEIC defect reaches the
+     attach path. It does not. #344 is about *import*, where `isPhotoFile`
+     accepts `.heic` and position resolution runs first, so the refusal
+     arrives only after the user has placed the photo. Both `attachImage`
+     implementations call `validateImageFile` before anything else — there
+     is no position to resolve, because the cairn already has one — so the
+     refusal is immediate and lands on the face's own error line. */
+  it('refuses an HEIC immediately, unlike the import path #344 describes', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedLooseCairn('c-342', 'Ellery Creek camp')
+    await renderApp('/cairns/c-342', { googleClientId: 'a-client-id' })
+    await signIn()
+
+    await screen.findByRole('button', { name: 'Add a photo' })
+    const input = document.querySelector('.add-photo__input') as HTMLInputElement
+    Object.defineProperty(input, 'files', {
+      value: [new File(['x'], 'IMG_4423.heic', { type: 'image/heic' })],
+      configurable: true,
+    })
+
+    await act(async () => {
+      fireEvent.change(input)
+    })
+
+    expect(
+      await screen.findByText(
+        "iPhone HEIC photos aren't supported. In iOS, Settings → Camera → Formats → Most Compatible.",
+      ),
+    ).toBeDefined()
+    // Nothing uploaded, and the cairn is untouched.
+    expect(uploadFileContent).not.toHaveBeenCalled()
+    expect(
+      JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')[0].image,
+    ).toBeNull()
+
+    fetchSpy.mockRestore()
+  })
+
+  it('offers Replace the photo once the cairn has one', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedLooseCairn('c-341', 'Ellery Creek camp', {
+      image: { originalDriveFileId: 'o-1', thumbnailDriveFileId: 't-1' },
+    })
+    await renderApp('/cairns/c-341', { googleClientId: 'a-client-id' })
+    await signIn()
+
+    expect(await screen.findByRole('button', { name: 'Replace the photo' })).toBeDefined()
+    expect(screen.queryByRole('button', { name: 'Add a photo' })).toBeNull()
+
+    fetchSpy.mockRestore()
+  })
+
   it('dropping while the list face is open still imports as new cairns (#155)', async () => {
     const fetchSpy = mockGoogleSignIn()
     uploadFileContent

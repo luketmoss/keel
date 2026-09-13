@@ -549,3 +549,79 @@ describe('TripDetail — attaching a photo while a cairn is open (#157)', () => 
     expect(await screen.findByText('Sign in to keep photos.')).toBeDefined()
   })
 })
+
+describe('TripDetail — choosing a photo for an open cairn (#339)', () => {
+  /* #294/#250: the row click expands, and the expanded body's own click
+     opens the lightbox — but which body it is depends on the cairn. A
+     cairn with no image expands to the summary (`Open <name>`); one with
+     an image expands to the photo preview (`View <name> larger`). */
+  async function openLightbox() {
+    fireEvent.click(screen.getByText('sapporo.jpg'))
+    const opener =
+      screen.queryByRole('button', { name: 'Open sapporo.jpg' }) ??
+      (await screen.findByRole('button', { name: 'View sapporo.jpg larger' }))
+    fireEvent.click(opener)
+    await screen.findByRole('dialog')
+  }
+
+  function choosePhoto(file: File) {
+    const input = document.querySelector('.add-photo__input') as HTMLInputElement
+    Object.defineProperty(input, 'files', { value: [file], configurable: true })
+    fireEvent.change(input)
+  }
+
+  it('reaches the same attachImage a drop does, from the face itself', async () => {
+    const attachImage = vi.fn().mockResolvedValue({ ok: true })
+    const importFiles = vi.fn().mockResolvedValue(undefined)
+    useCairnImport.mockReturnValue(
+      baseCairnImport({
+        cairns: [cairnRecord({ id: 'a', image: null, icon: 'campsite' })],
+        attachImage,
+        importFiles,
+      }),
+    )
+    renderTrip()
+    await openLightbox()
+
+    expect(screen.getByRole('button', { name: 'Add a photo' })).toBeDefined()
+
+    await act(async () => {
+      choosePhoto(new File(['a'], 'chosen.jpg', { type: 'image/jpeg' }))
+    })
+
+    expect(attachImage).toHaveBeenCalledWith('a', expect.objectContaining({ name: 'chosen.jpg' }))
+    // The gesture was aimed at this cairn — it must not fall through to
+    // importing a new one, which is the whole hazard #157 names.
+    expect(importFiles).not.toHaveBeenCalled()
+  })
+
+  it('offers Replace the photo when the cairn already has one', async () => {
+    useCairnImport.mockReturnValue(
+      baseCairnImport({
+        cairns: [
+          cairnRecord({
+            id: 'a',
+            image: { originalDriveFileId: 'o-1', thumbnailDriveFileId: 't-1' },
+          }),
+        ],
+      }),
+    )
+    renderTrip()
+    await openLightbox()
+
+    expect(screen.getByRole('button', { name: 'Replace the photo' })).toBeDefined()
+    expect(screen.queryByRole('button', { name: 'Add a photo' })).toBeNull()
+  })
+
+  it('is disabled while disconnected, because an attach is a Drive upload and nothing else', async () => {
+    useCairnImport.mockReturnValue(
+      baseCairnImport({ cairns: [cairnRecord({ id: 'a', image: null, icon: 'campsite' })] }),
+    )
+    renderTrip({ accessToken: null })
+    await openLightbox()
+
+    // Unlike #338's import control, which stays enabled because its track
+    // half genuinely works offline. Nothing here does.
+    expect(screen.getByRole('button', { name: 'Add a photo' }).hasAttribute('disabled')).toBe(true)
+  })
+})

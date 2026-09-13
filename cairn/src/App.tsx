@@ -1504,6 +1504,12 @@ function AppShell() {
                   exporting={exportingIds.has(openLooseId)}
                   attaching={attachingLooseId === openLooseId}
                   attachError={attachLooseError}
+                  /* #339: the same `attachPhotoToLooseCairn` the drop
+                     handler calls, one file at a time. `disconnected`
+                     already takes the face's writing controls to Disabled,
+                     and this is one of them — an attach is a Drive upload
+                     and has no offline half the way #338's import does. */
+                  onAddPhoto={(file) => void attachPhotoToLooseCairn(openLooseId, [file])}
                   moveWriteError={moveLooseError}
                   onDelete={() => {
                     // Trashes the Drive folder as well now. Best-effort and

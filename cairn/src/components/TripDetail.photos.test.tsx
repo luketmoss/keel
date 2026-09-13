@@ -695,3 +695,122 @@ describe('TripDetail — attaching a photo from the row menu (#346)', () => {
     expect(screen.getByRole('menuitem', { name: 'Edit' }).hasAttribute('disabled')).toBe(false)
   })
 })
+
+/* #347 — the trip's half of creating a cairn with its photograph. The
+   shell hands the file down; this is what the open trip does with it. */
+describe('TripDetail — creating a cairn with a photo (#347)', () => {
+  beforeEach(() => {
+    acquire.mockResolvedValue({ url: 'blob:thumb', release: vi.fn() })
+    useTripImport.mockReturnValue(baseTripImport())
+  })
+
+  function captureCreate() {
+    let handler:
+      | ((input: Parameters<typeof Object>[0], photo: File | null) => Promise<unknown>)
+      | null = null
+    return {
+      onCreateTargetChange: (h: typeof handler) => {
+        handler = h
+      },
+      create: (photo: File | null) =>
+        handler?.(
+          {
+            name: 'Ellery Creek camp',
+            position: { lat: -23.7, lng: 133.2 },
+            icon: 'campsite',
+            description: '',
+            date: null,
+          } as never,
+          photo,
+        ),
+    }
+  }
+
+  function renderWithCreateTarget(target: ReturnType<typeof captureCreate>, signedIn = true) {
+    const store = new LocalTripStore(fakeStorage())
+    const entry = store.createTrip('Hokkaido')
+    render(
+      <MemoryRouter initialEntries={[`/trips/${entry.id}`]}>
+        <TripDetail
+          tripId={entry.id}
+          tripStore={store}
+          accessToken={signedIn ? 'token' : null}
+          cairnFolderId="cairn-folder-id"
+          onBack={() => {}}
+          onDropTargetChange={() => {}}
+          onGeometryChange={() => {}}
+          onNeedsPlacement={() => {}}
+          onCreateTargetChange={target.onCreateTargetChange}
+          onCairnDetailChange={() => {}}
+          cairnsDraggable={true}
+        />
+      </MemoryRouter>,
+    )
+  }
+
+  it('writes the cairn, then attaches the photo to the record it just made', async () => {
+    const createCairn = vi.fn().mockResolvedValue(cairnRecord({ id: 'new-1', image: null }))
+    const attachImage = vi.fn().mockResolvedValue({ ok: true })
+    useCairnImport.mockReturnValue(baseCairnImport({ cairns: [], createCairn, attachImage }))
+    const target = captureCreate()
+    renderWithCreateTarget(target)
+
+    const photo = new File(['x'], 'camp.jpg', { type: 'image/jpeg' })
+    let outcome: unknown
+    await act(async () => {
+      outcome = await target.create(photo)
+    })
+
+    expect(createCairn).toHaveBeenCalledTimes(1)
+    expect(attachImage).toHaveBeenCalledWith('new-1', photo)
+    expect(outcome).toEqual({ ok: true, photoAttached: true })
+  })
+
+  it('reports the photo failure without pretending the cairn failed', async () => {
+    const createCairn = vi.fn().mockResolvedValue(cairnRecord({ id: 'new-1', image: null }))
+    const attachImage = vi.fn().mockResolvedValue({ ok: false })
+    useCairnImport.mockReturnValue(baseCairnImport({ cairns: [], createCairn, attachImage }))
+    const target = captureCreate()
+    renderWithCreateTarget(target)
+
+    let outcome: unknown
+    await act(async () => {
+      outcome = await target.create(new File(['x'], 'camp.jpg', { type: 'image/jpeg' }))
+    })
+
+    // The cairn stands. Nothing is rolled back.
+    expect(outcome).toEqual({ ok: true, photoAttached: false })
+  })
+
+  it('attaches nothing when no photo was offered, and calls that attached', async () => {
+    const createCairn = vi.fn().mockResolvedValue(cairnRecord({ id: 'new-1', image: null }))
+    const attachImage = vi.fn()
+    useCairnImport.mockReturnValue(baseCairnImport({ cairns: [], createCairn, attachImage }))
+    const target = captureCreate()
+    renderWithCreateTarget(target)
+
+    let outcome: unknown
+    await act(async () => {
+      outcome = await target.create(null)
+    })
+
+    expect(attachImage).not.toHaveBeenCalled()
+    expect(outcome).toEqual({ ok: true, photoAttached: true })
+  })
+
+  it('never reaches the photo when the cairn itself could not be written', async () => {
+    const createCairn = vi.fn().mockResolvedValue(null)
+    const attachImage = vi.fn()
+    useCairnImport.mockReturnValue(baseCairnImport({ cairns: [], createCairn, attachImage }))
+    const target = captureCreate()
+    renderWithCreateTarget(target)
+
+    let outcome: unknown
+    await act(async () => {
+      outcome = await target.create(new File(['x'], 'camp.jpg', { type: 'image/jpeg' }))
+    })
+
+    expect(attachImage).not.toHaveBeenCalled()
+    expect(outcome).toEqual({ ok: false })
+  })
+})

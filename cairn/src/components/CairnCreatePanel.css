@@ -151,3 +151,69 @@
 .cairn-create__cancel:hover {
   background: var(--hover);
 }
+
+/* #347 — the preview of the file `Create` will attach. 4:3 at the face's
+   content width, which is the slot shape `LooseFace` and the lightbox
+   already draw: this is a preview of exactly what those will show. */
+.cairn-create__photo {
+  flex: none;
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  margin-top: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--surface-lift);
+  object-fit: cover;
+}
+
+/* The thing that tells two similar photographs apart, so it survives on
+   one line rather than wrapping. */
+.cairn-create__photo-name {
+  flex: none;
+  margin: var(--space-1) 0 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  /* The stack written out again, as #341 records that every caller must
+     until the token exists. Matching this file's own `__label` rather
+     than inventing a ninth spelling of it. */
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cairn-create__photo-actions {
+  flex: none;
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* The button already carries #339's treatment; it only has to stop being
+   full-width now that `Remove` sits beside it. */
+.cairn-create__photo-actions .cairn-create__add-photo {
+  flex: 1;
+  width: auto;
+}
+
+.cairn-create__photo-remove {
+  flex: none;
+  min-height: var(--hit-target);
+  padding: 0 var(--space-4);
+  border: none;
+  border-radius: var(--radius-sm);
+  margin-top: var(--space-3);
+  background: var(--surface-lift);
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.cairn-create__photo-remove:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.cairn-create__photo-remove:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

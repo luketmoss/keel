@@ -1,4 +1,5 @@
 import { useEffect, useRef, type RefObject } from 'react'
+import { ADD_PHOTO_LABEL, PhotoFileInput, REPLACE_PHOTO_LABEL } from './AddPhotoButton'
 import { prefersReducedMotion } from '../map/motion'
 import { usePhotoImage } from '../photo/usePhotoImage'
 import { cairnRowMetaLine, type CairnListItem, type CairnListRow } from '../photo/cairnListGroups'
@@ -82,6 +83,22 @@ interface CairnListProps {
       today; the type stays optional to match `TrackList.onRemoveFromTrip`'s
       shape). #193 moved both items into the row's `⋮`. */
   onRemoveFromTrip?: (id: string) => void
+  /** #346 — the `⋮`'s photo item. Attaches the chosen file to that cairn
+      through the same path a drop onto its open face takes; the face is
+      never opened. `undefined` when there is nothing to attach against
+      (signed out), which takes the item to Disabled rather than removing
+      it — #73's rule, the same one `disableRemove` already applies to its
+      two neighbours. */
+  onAddPhoto?: (cairnId: string, file: File) => void
+  /** #346 — the cairn whose attach is in flight, or `null`. #157 allows
+      one at a time, so this both marks that row and disables every other
+      row's photo item: a refusal that is visible before it is needed
+      rather than swallowed at the callback. */
+  attachingCairnId?: string | null
+  /** #346 — cairn id -> the attach failure to show beneath that row. Its
+      own map rather than a single string, because an attach started from
+      a row belongs to that row and not to whatever face is open. */
+  attachErrors?: Record<string, string>
   /** #77 — the single confirm slot, shared with `TrackList` by the parent
       (design doc: "tracks and photos sharing one slot"). `null` when no row
       anywhere in the trip is confirming. */
@@ -133,6 +150,9 @@ export function CairnList({
   onOpenPreview,
   onRemove,
   onRemoveFromTrip,
+  onAddPhoto,
+  attachingCairnId = null,
+  attachErrors = {},
   confirmingId,
   onStartConfirm,
   onCancelConfirm,
@@ -243,6 +263,10 @@ export function CairnList({
                 onOpenPreview={onOpenPreview}
                 onRemove={onRemove}
                 onRemoveFromTrip={onRemoveFromTrip}
+                onAddPhoto={onAddPhoto}
+                attaching={attachingCairnId === item.row.id}
+                photoBusy={attachingCairnId !== null}
+                attachError={attachErrors[item.row.id]}
                 confirming={confirmingId === item.row.id}
                 confirmingRowRef={confirmingId === item.row.id ? confirmingRowRef : undefined}
                 onStartConfirm={() => onStartConfirm(item.row.id)}
@@ -275,6 +299,10 @@ function CairnRow({
   onOpenPreview,
   onRemove,
   onRemoveFromTrip,
+  onAddPhoto,
+  attaching,
+  photoBusy,
+  attachError,
   confirming,
   confirmingRowRef,
   onStartConfirm,
@@ -307,6 +335,16 @@ function CairnRow({
   onOpenPreview: (cairnId: string) => void
   onRemove: (id: string) => void
   onRemoveFromTrip?: (id: string) => void
+  onAddPhoto?: (cairnId: string, file: File) => void
+  /** #346 — this row's own attach is in flight. `uploading…` takes the
+      `⋮`'s slot and the row stays at full opacity: unlike `removing`, the
+      cairn is fine and the row is still selectable, still openable, still
+      on the map. */
+  attaching: boolean
+  /** #346 — some row's attach is in flight, this one or another. #157
+      allows one at a time. */
+  photoBusy: boolean
+  attachError?: string
   confirming: boolean
   confirmingRowRef?: RefObject<HTMLElement | null>
   onStartConfirm: () => void
@@ -328,6 +366,10 @@ function CairnRow({
   // too" state, which the glyph never needed to tell apart from loading.
   const thumbnail = usePhotoImage(accessToken, row.thumbnailDriveFileId ?? undefined)
   const hasImage = row.thumbnailDriveFileId !== null
+  // #346 — the `⋮`'s photo item opens this, exactly as `AddPhotoButton`'s
+  // own button opens the one it renders. A menu item is not a button with
+  // an input beside it, which is why the input is its own component now.
+  const photoInputRef = useRef<HTMLInputElement>(null)
   // #294: every row can expand now, image or not — #250's guard against
   // expanding a removing row applies to both bodies alike. Confirming
   // never reaches this render at all (its branch returns above).
@@ -413,14 +455,36 @@ function CairnRow({
         </button>
         {removing ? (
           <span className="cairn-row__removing">Removing…</span>
+        ) : attaching ? (
+          /* #346 — the same slot `Removing…` uses, because that slot is
+             where a row says what it is doing. #157's word, unchanged. */
+          <span className="cairn-row__removing">uploading…</span>
         ) : (
           /* #193 — the `⤴` and `×` become named items behind the one `⋮`.
              `Remove from trip` is reversible by adding it back, which is
              what makes it the other exit; `Delete permanently…` keeps
-             #77's inline confirm, and the ellipsis is what says so. */
+             #77's inline confirm, and the ellipsis is what says so.
+             #346 puts the two non-destructive items above them: a menu
+             whose every item destroys the thing is not a menu, and the
+             same cairn sitting loose has had `Rename` and friends since
+             #133. */
           <RowMenu
             label={`Row actions for ${row.name}`}
             actions={[
+              /* Opens the detail face — `onOpenPreview`, the one the
+                 expanded row's own body calls, so the menu and the row
+                 cannot drift on what opening a cairn means. Named for why
+                 you clicked rather than for the mechanism, and enabled
+                 while signed out: looking at a cairn is not a write. */
+              { label: 'Edit', onSelect: () => onOpenPreview(row.id) },
+              {
+                label: hasImage ? REPLACE_PHOTO_LABEL : ADD_PHOTO_LABEL,
+                // Disabled while signed out (#339: an attach is a Drive
+                // upload and nothing else) and while any row is attaching
+                // (#157: one at a time).
+                disabled: !onAddPhoto || photoBusy,
+                onSelect: () => photoInputRef.current?.click(),
+              },
               ...(onRemoveFromTrip
                 ? [
                     {
@@ -439,8 +503,11 @@ function CairnRow({
             ]}
           />
         )}
+        {onAddPhoto && (
+          <PhotoFileInput inputRef={photoInputRef} onChoose={(file) => onAddPhoto(row.id, file)} />
+        )}
       </div>
-      {removeError && <p className="cairn-row__error">{removeError}</p>}
+      {(removeError || attachError) && <p className="cairn-row__error">{removeError ?? attachError}</p>}
       {/* #250 — the second block inside the same `<li>`, so the row grows
           rather than the list gaining an element. Mounted only while
           actually expanded: `CairnRowPreview` acquires the display-size

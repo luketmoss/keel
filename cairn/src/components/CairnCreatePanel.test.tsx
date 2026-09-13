@@ -1,9 +1,10 @@
 import { fireEvent, render } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CairnCreatePanel, type CairnDraftFields } from './CairnCreatePanel'
+import { HEIC_ERROR, UNSUPPORTED_TYPE_ERROR } from '../photo/thumbnail'
 
 function fields(overrides: Partial<CairnDraftFields> = {}): CairnDraftFields {
-  return { name: '', icon: null, description: '', date: '2026-08-15', ...overrides }
+  return { name: '', icon: null, description: '', date: '2026-08-15', photo: null, ...overrides }
 }
 
 function renderPanel(props: Partial<Parameters<typeof CairnCreatePanel>[0]> = {}) {
@@ -126,5 +127,97 @@ describe('CairnCreatePanel — disconnected (#73)', () => {
     fireEvent.click(getByRole('button', { name: 'Cancel' }))
 
     expect(onCancel).toHaveBeenCalled()
+  })
+})
+
+/* #347 — the photograph is a draft field like the typed ones. Nothing here
+   uploads: everything below stops at what `onChange` is handed. */
+describe('CairnCreatePanel — the photo (#347)', () => {
+  beforeEach(() => {
+    // jsdom implements neither, and the preview calls both.
+    URL.createObjectURL = vi.fn(() => 'blob:preview')
+    URL.revokeObjectURL = vi.fn()
+  })
+
+  function photoInput() {
+    return document.querySelector('.add-photo__input') as HTMLInputElement
+  }
+
+  function choose(files: File[]) {
+    const element = photoInput()
+    Object.defineProperty(element, 'files', { value: files, configurable: true })
+    fireEvent.change(element)
+  }
+
+  const jpeg = (name = 'IMG_4417.JPG') => new File(['x'], name, { type: 'image/jpeg' })
+
+  it('offers a Photo field reading "Add a photo" before one is chosen', () => {
+    const { getByText, getByRole } = renderPanel()
+
+    expect(getByText('Photo')).toBeDefined()
+    expect(getByRole('button', { name: 'Add a photo' })).toBeDefined()
+  })
+
+  it('hands the chosen file to the draft rather than uploading it', () => {
+    const { onChange } = renderPanel()
+    const file = jpeg()
+
+    choose([file])
+
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ photo: file }))
+  })
+
+  it('shows the file it will attach, by name and by preview', () => {
+    const file = jpeg('IMG_4417.JPG')
+    const { container, getByText, getByRole } = renderPanel({ fields: fields({ photo: file }) })
+
+    expect(container.querySelector('.cairn-create__photo')?.getAttribute('src')).toBe('blob:preview')
+    expect(getByText('IMG_4417.JPG')).toBeDefined()
+    // The label follows whether a file is chosen, not whether a record has
+    // an image — there is no record yet.
+    expect(getByRole('button', { name: 'Replace the photo' })).toBeDefined()
+  })
+
+  it('Remove clears the choice and uploads nothing', () => {
+    const { getByRole, onChange } = renderPanel({ fields: fields({ photo: jpeg() }) })
+
+    fireEvent.click(getByRole('button', { name: 'Remove' }))
+
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ photo: null }))
+  })
+
+  it('#344 — refuses an unsupported type when it is chosen, before anything is saved', () => {
+    const { getByText, onChange } = renderPanel()
+
+    choose([new File(['x'], 'notes.txt', { type: 'text/plain' })])
+
+    expect(getByText(UNSUPPORTED_TYPE_ERROR)).toBeDefined()
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ photo: null }))
+  })
+
+  it('#344 — refuses an HEIC the same way, with the setting to change', () => {
+    const { getByText } = renderPanel()
+
+    choose([new File(['x'], 'IMG_0001.HEIC', { type: 'image/heic' })])
+
+    expect(getByText(HEIC_ERROR)).toBeDefined()
+  })
+
+  it('#156 — the form still fills in while disconnected: only Create is refused', () => {
+    const { getByRole, onChange } = renderPanel({ disabled: true })
+
+    // Unlike the detail faces' copy of this control (#339), which *is* the
+    // write. Here it only fills in a draft field.
+    expect((getByRole('button', { name: 'Add a photo' }) as HTMLButtonElement).disabled).toBe(false)
+    choose([jpeg()])
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ photo: expect.any(File) }))
+    expect((getByRole('button', { name: 'Create' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('cannot be changed while the save is in flight', () => {
+    const { getByRole } = renderPanel({ fields: fields({ photo: jpeg() }), busy: true })
+
+    expect((getByRole('button', { name: 'Replace the photo' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((getByRole('button', { name: 'Remove' }) as HTMLButtonElement).disabled).toBe(true)
   })
 })

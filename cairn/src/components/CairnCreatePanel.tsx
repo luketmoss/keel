@@ -1,5 +1,7 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { IconPicker } from './IconPicker'
+import { AddPhotoButton } from './AddPhotoButton'
+import { validateImageFile } from '../photo/thumbnail'
 import type { CairnIcon } from '../store/looseStore'
 import './CairnCreatePanel.css'
 
@@ -14,6 +16,13 @@ export interface CairnDraftFields {
   icon: CairnIcon | null
   description: string
   date: string
+  /** #347: the photograph this cairn will be created with, or `null`.
+   *
+   * A `File` and not an upload — nothing reaches Drive until `Create`, so
+   * the photo inherits every rule the typed fields already have: `Cancel`
+   * discards it, Escape is `Cancel`, and a re-place keeps it, because it
+   * lives in the same object #156 said re-placing must not throw away. */
+  photo: File | null
 }
 
 interface CairnCreatePanelProps {
@@ -53,11 +62,32 @@ export function CairnCreatePanel({
   error,
 }: CairnCreatePanelProps) {
   const nameRef = useRef<HTMLInputElement>(null)
+  /** #347 — the refusal for a file this face will not attach. Its own
+      state rather than the `error` prop: that one is the save's, and a
+      photo refused before `Create` has not tried to save anything. */
+  const [photoError, setPhotoError] = useState<string | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
   // "Just opened: … name empty and focused."
   useEffect(() => {
     nameRef.current?.focus()
   }, [])
+
+  /* #347 — a preview of the chosen file, from the file itself. A filename
+     is not evidence you picked the right photograph, and this is the last
+     moment before the commit when being wrong is free. Revoked when the
+     choice changes and on unmount; nothing is read out of the file but its
+     pixels, and nothing is uploaded. */
+  useEffect(() => {
+    const file = fields.photo
+    if (!file) {
+      setPreviewUrl(null)
+      return
+    }
+    const url = URL.createObjectURL(file)
+    setPreviewUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [fields.photo])
 
   // Escape is equivalent to Cancel. On the document rather than the form,
   // so it still works when focus has landed on an icon cell or nowhere in
@@ -74,6 +104,21 @@ export function CairnCreatePanel({
 
   function set<K extends keyof CairnDraftFields>(key: K, value: CairnDraftFields[K]) {
     onChange({ ...fields, [key]: value })
+  }
+
+  /* #347/#344 — refused at the moment it is chosen, before `Create` and
+     before any pin has been placed on its account. `attachImage` would
+     refuse it too, but only after the cairn had been written, which is the
+     ordering #344 exists about. */
+  function choosePhoto(file: File) {
+    const typeError = validateImageFile(file.name)
+    if (typeError) {
+      setPhotoError(typeError)
+      set('photo', null)
+      return
+    }
+    setPhotoError(null)
+    set('photo', file)
   }
 
   return (
@@ -135,6 +180,50 @@ export function CairnCreatePanel({
           value={fields.date}
           onChange={(event) => set('date', event.target.value)}
         />
+
+        {/* #347 — before the readout, not after it: the readout and the
+            signed-out line are the face's closing argument, and a field
+            below them reads as an afterthought bolted under the summary. */}
+        <span className="cairn-create__label">Photo</span>
+        {fields.photo && previewUrl && (
+          <>
+            <img className="cairn-create__photo" src={previewUrl} alt="" />
+            <p className="cairn-create__photo-name" title={fields.photo.name}>
+              {fields.photo.name}
+            </p>
+          </>
+        )}
+        <div className="cairn-create__photo-actions">
+          {/* #339's control, reused whole. Its `hasImage` asks whether a
+              file has been chosen — there is no record here to have one —
+              which is what makes the label `Replace the photo` once one
+              has. Not disabled while disconnected, unlike the detail
+              faces': choosing a file writes nothing, and #156's rule for
+              this face is that the form still fills in and only the commit
+              is refused. */}
+          <AddPhotoButton
+            hasImage={fields.photo !== null}
+            disabled={busy}
+            className="cairn-create__add-photo"
+            onChoose={choosePhoto}
+          />
+          {fields.photo && (
+            /* `Cancel`'s treatment rather than `--danger`: nothing has
+               been written, so there is nothing to destroy. */
+            <button
+              type="button"
+              className="cairn-create__photo-remove"
+              disabled={busy}
+              onClick={() => {
+                setPhotoError(null)
+                set('photo', null)
+              }}
+            >
+              Remove
+            </button>
+          )}
+        </div>
+        {photoError && <p className="cairn-create__error">{photoError}</p>}
 
         {/* Not decoration. Ownership decided by context is the right
             default and a silent one is a trap, so the face says which it

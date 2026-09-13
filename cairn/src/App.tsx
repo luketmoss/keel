@@ -15,7 +15,7 @@ import { SearchCard } from './components/SearchCard'
 import { FilterChips, type KindFilter } from './components/FilterChips'
 import { CairnFacetChips } from './components/CairnFacetChips'
 import { TripsPanel } from './components/TripsPanel'
-import { TripDetail } from './components/TripDetail'
+import { TripDetail, type CairnCreateTarget } from './components/TripDetail'
 import { LooseFace } from './components/LooseFace'
 import { LooseLayer } from './components/LooseLayer'
 import { Track3DLayer } from './components/Track3DLayer'
@@ -176,7 +176,7 @@ function todayAsDateValue(): string {
 function emptyDraftFields(): CairnDraftFields {
   // Icons default to none: pre-selecting `campsite` would put a tent on
   // every cairn made by someone who did not look at the grid.
-  return { name: '', icon: null, description: '', date: todayAsDateValue() }
+  return { name: '', icon: null, description: '', date: todayAsDateValue(), photo: null }
 }
 
 /** The whole app: one map that is never unmounted, one column over it.
@@ -318,7 +318,7 @@ function AppShell() {
       same reason: a cairn placed while a trip is open belongs to that trip,
       and only the trip face holds the hook that can write into its
       folder. */
-  const tripCreateRef = useRef<((input: NewTripCairn) => Promise<boolean>) | null>(null)
+  const tripCreateRef = useRef<CairnCreateTarget | null>(null)
   const tripGeometryRef = useRef<{ lat: number; lng: number }[]>([])
   const [tripPointCount, setTripPointCount] = useState(0)
 
@@ -964,12 +964,9 @@ function AppShell() {
     if (wasLast && !openTripId) navigate(`/cairns/${result}`)
   }
 
-  const handleCreateTargetChange = useCallback(
-    (handler: ((input: NewTripCairn) => Promise<boolean>) | null) => {
-      tripCreateRef.current = handler
-    },
-    [],
-  )
+  const handleCreateTargetChange = useCallback((handler: CairnCreateTarget | null) => {
+    tripCreateRef.current = handler
+  }, [])
 
   /** The gesture landed. Opens the create face with the pin already dropped
       and selected — there is no armed mode to enter, because the gesture
@@ -1038,6 +1035,12 @@ function AppShell() {
     if (!draft || creating) return
     setCreateError(null)
     setCreating(true)
+    /* #347 — the loose attach runs *after* `creating` is released, not
+       inside it. `Create` is busy while the cairn is being written and no
+       longer; holding it through the upload would silently refuse the next
+       cairn placed while this one's photograph was still going up, and the
+       face that would have said so has already closed. */
+    let looseAttach: { id: string; name: string; photo: File } | null = null
     try {
       const input: NewTripCairn = {
         name: draft.fields.name.trim() || cairnDefaultName(draft.fields.icon),
@@ -1050,15 +1053,19 @@ function AppShell() {
         date: draft.fields.date || null,
       }
 
+      const photo = draft.fields.photo
+
       if (draft.tripId) {
         const write = tripCreateRef.current
-        if (!write || !(await write(input))) {
+        const outcome = write ? await write(input, photo) : { ok: false as const }
+        if (!outcome.ok) {
           setCreateError("Couldn't save this cairn — try again.")
           return
         }
         // The trip face is already showing; its list and its layer pick the
         // new cairn up from the hook that just wrote it.
         setCairnDraft(null)
+        if (!outcome.photoAttached) reportPhotoNotAttached(input.name)
         return
       }
 
@@ -1066,6 +1073,9 @@ function AppShell() {
         name: input.name,
         position: input.position,
         // A person put it here. Interpolation will never move it again.
+        // #347: whatever EXIF GPS the photo carries is ignored for the same
+        // reason — `cairns.md` forbids moving a placed cairn, and a
+        // photograph is not an argument about where you were standing.
         positionSource: 'placed',
         icon: input.icon,
         description: input.description,
@@ -1075,9 +1085,34 @@ function AppShell() {
       // Landing on the new cairn's own face is the confirmation, the same
       // stance the placement queue takes when it empties.
       navigate(`/cairns/${record.id}`)
+      /* #347 — the attach runs behind the face that just closed, so the
+         cairn's own face (which this just navigated to) carries the
+         `uploading…` treatment #157 already gives it. A failure still gets
+         the toast: `attachLooseError` only renders while that face is
+         open, and the user may have moved on. */
+      if (photo) looseAttach = { id: record.id, name: record.name, photo }
     } finally {
       setCreating(false)
     }
+
+    if (looseAttach) {
+      setAttachingLooseId(looseAttach.id)
+      const result = await looseStore.attachImage(looseAttach.id, looseAttach.photo)
+      setAttachingLooseId(null)
+      if (!result.ok) reportPhotoNotAttached(looseAttach.name)
+    }
+  }
+
+  /** #347 — the one failure the create face cannot show, because by the
+      time it happens the face has closed: the cairn was written and its
+      photograph was not. #157 is right that a success needs no toast — the
+      marker changing is the confirmation — but a failure with no surface
+      left needs one, and this is the shape the app already uses for it. */
+  function reportPhotoNotAttached(name: string) {
+    setToasts((prev) => [
+      ...prev,
+      { id: generateToastId(), text: `Couldn't add the photo — ${name} was saved without it.` },
+    ])
   }
 
   const handleGeometryChange = useCallback((points: { lat: number; lng: number }[]) => {

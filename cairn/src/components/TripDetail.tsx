@@ -97,6 +97,23 @@ function useRemoveConfirm() {
   }
 }
 
+/** #347 — what the open trip reports back when the create face commits.
+ *
+ * Two facts rather than one, because the commit is two writes and they can
+ * disagree: `ok` is the cairn's, `photoAttached` the photograph's. The
+ * cairn is the success — a failed upload leaves a real cairn behind and is
+ * reported without rolling anything back — so a single boolean could only
+ * ever have lied about one of them. `photoAttached` is `true` when no
+ * photo was offered, since nothing failed. */
+export type CairnCreateOutcome = { ok: false } | { ok: true; photoAttached: boolean }
+
+/** The handler `App` holds while a trip is open: a cairn placed on the map
+    is written into that trip's folder rather than the loose one. */
+export type CairnCreateTarget = (
+  input: NewTripCairn,
+  photo: File | null,
+) => Promise<CairnCreateOutcome>
+
 interface TripDetailProps {
   tripId: string
   tripStore: TripStore
@@ -140,7 +157,7 @@ interface TripDetailProps {
       hook that can write into its folder lives here. `null` on unmount, so
       the gesture falls back to creating a loose cairn the moment the trip
       face closes. */
-  onCreateTargetChange: (handler: ((input: NewTripCairn) => Promise<boolean>) | null) => void
+  onCreateTargetChange: (handler: CairnCreateTarget | null) => void
   /** #157: reports which cairn's detail (the lightbox) is currently open, so
       the shell's drop overlay can name it — `null` while none is. The shell
       owns the overlay because it owns the one drop target the whole map is;
@@ -923,11 +940,29 @@ export function TripDetail({
      context: while this face is mounted, a cairn placed on the map is
      written into this trip's folder rather than the loose one. */
   const createCairnHere = useCallback(
-    async (input: NewTripCairn): Promise<boolean> => {
-      if (!signedIn) return false
-      return (await cairnImport.createCairn(input)) !== null
+    async (input: NewTripCairn, photo: File | null): Promise<CairnCreateOutcome> => {
+      if (!signedIn) return { ok: false }
+      const record = await cairnImport.createCairn(input)
+      if (!record) return { ok: false }
+      /* #347 — the cairn first, and the cairn is the success. A photo that
+         fails to upload is not a reason to refuse the coordinate, the name
+         and the icon: those are the part that cannot be recovered by
+         trying again, and the photo is still in the library. The caller
+         says so with a toast; nothing here is rolled back.
+
+         This is why the outcome carries more than a boolean. Narrowing
+         `createCairn`'s record down to `true` was fine while nothing
+         happened after the write — an attach has to know what was made. */
+      if (!photo) return { ok: true, photoAttached: true }
+      /* #346's row treatment, for free: the new cairn's row says
+         `uploading…` while this runs, which is the only place left that
+         can — the create face closed the moment the cairn was written. */
+      setAttachingCairnId(record.id)
+      const result = await cairnImport.attachImage(record.id, photo)
+      setAttachingCairnId(null)
+      return { ok: true, photoAttached: result.ok }
     },
-    [signedIn, cairnImport.createCairn],
+    [signedIn, cairnImport.createCairn, cairnImport.attachImage],
   )
 
   useEffect(() => {

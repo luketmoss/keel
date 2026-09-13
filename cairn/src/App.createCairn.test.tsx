@@ -12,6 +12,28 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
  * the `contextmenu` handler the gesture registers, which is the one thing
  * this flow starts from. */
 
+/* #347 — the create face can now commit a photograph with the cairn, and
+   that lands in Drive. Same two stubs `App.test.tsx` uses for #157's
+   attach, for the same two reasons: the upload is not this suite's
+   subject, and jsdom has no `createImageBitmap` for the thumbnail. */
+const { startResumableUpload, uploadFileContent } = vi.hoisted(() => ({
+  startResumableUpload: vi.fn(),
+  uploadFileContent: vi.fn(),
+}))
+vi.mock('./drive/trackFiles', async () => {
+  const actual = await vi.importActual<typeof import('./drive/trackFiles')>('./drive/trackFiles')
+  return { ...actual, startResumableUpload, uploadFileContent }
+})
+
+/* Hoisted rather than created inside the factory: this suite's `afterEach`
+   calls `vi.restoreAllMocks()`, which would reset a factory-local `vi.fn()`
+   to returning `undefined` for every case after the first. */
+const { generateImagePair } = vi.hoisted(() => ({ generateImagePair: vi.fn() }))
+vi.mock('./photo/thumbnail', async () => {
+  const actual = await vi.importActual<typeof import('./photo/thumbnail')>('./photo/thumbnail')
+  return { ...actual, generateImagePair }
+})
+
 let contextMenuHandler: ((event: { latLng: { lat: () => number; lng: () => number } }) => void) | undefined
 
 /** Enough of a `google.maps.Map` for the layers the shell mounts around the
@@ -123,6 +145,13 @@ function storedLooseItems(): Record<string, unknown>[] {
 
 beforeEach(() => {
   contextMenuHandler = undefined
+  // jsdom implements neither, and #347's preview calls both.
+  URL.createObjectURL = vi.fn(() => 'blob:preview')
+  URL.revokeObjectURL = vi.fn()
+  uploadFileContent.mockReset().mockResolvedValue({ id: 'drive-file-1' })
+  generateImagePair
+    .mockReset()
+    .mockResolvedValue({ ok: true, display: new Blob(['display']), thumbnail: new Blob(['thumb']) })
   installGoogleMaps()
   window.history.pushState({}, '', '/')
   window.sessionStorage.clear()
@@ -406,5 +435,138 @@ describe('#156 — Cancel', () => {
 
     expect(storedLooseItems()).toHaveLength(0)
     expect(screen.queryByLabelText('Name')).toBeNull()
+  })
+})
+
+/* #347 — the cairn and its photograph in one step. The loose path end to
+   end; the trip path's own half is `TripDetail`'s, which this shell only
+   hands the file to. */
+describe('#347 — Create commits the photo with the cairn', () => {
+  function choosePhoto(file: File) {
+    const input = document.querySelector('.add-photo__input') as HTMLInputElement
+    Object.defineProperty(input, 'files', { value: [file], configurable: true })
+    fireEvent.change(input)
+  }
+
+  it('saves a loose cairn carrying the chosen image, with no second visit', async () => {
+    mockGoogleSignIn()
+    uploadFileContent
+      .mockReset()
+      .mockResolvedValueOnce({ id: 'original-1' })
+      .mockResolvedValueOnce({ id: 'thumb-1' })
+    await renderApp()
+    await signIn()
+
+    await rightClickMap(-23.7, 133.2)
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Ellery Creek camp' } })
+    await act(async () => {
+      choosePhoto(new File(['jpeg'], 'camp.jpg', { type: 'image/jpeg' }))
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+    })
+
+    await waitFor(() => {
+      const [saved] = storedLooseItems()
+      expect(saved.image).toEqual({ originalDriveFileId: 'original-1', thumbnailDriveFileId: 'thumb-1' })
+    })
+    // One cairn, not a cairn plus an imported photo.
+    expect(storedLooseItems()).toHaveLength(1)
+  })
+
+  it('leaves the pin where it was put, whatever the photo says', async () => {
+    mockGoogleSignIn()
+    await renderApp()
+    await signIn()
+
+    await rightClickMap(-23.7, 133.2)
+    await act(async () => {
+      choosePhoto(new File(['jpeg'], 'camp.jpg', { type: 'image/jpeg' }))
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+    })
+
+    await waitFor(() => expect(storedLooseItems()).toHaveLength(1))
+    expect(storedLooseItems()[0]).toMatchObject({
+      position: { lat: -23.7, lng: 133.2 },
+      positionSource: 'placed',
+    })
+  })
+
+  it('keeps the cairn and says so when only the photo fails', async () => {
+    mockGoogleSignIn()
+    uploadFileContent.mockReset().mockRejectedValue(new Error('drive said no'))
+    await renderApp()
+    await signIn()
+
+    await rightClickMap()
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Ellery Creek camp' } })
+    await act(async () => {
+      choosePhoto(new File(['jpeg'], 'camp.jpg', { type: 'image/jpeg' }))
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+    })
+
+    expect(
+      await screen.findByText("Couldn't add the photo — Ellery Creek camp was saved without it."),
+    ).toBeDefined()
+    // The cairn is real and is not rolled back — the coordinate and the
+    // name are the part that cannot be recovered by trying again.
+    const [saved] = storedLooseItems()
+    expect(saved).toMatchObject({ name: 'Ellery Creek camp', image: null })
+  })
+
+  it('Cancel discards the chosen photo and uploads nothing', async () => {
+    mockGoogleSignIn()
+    uploadFileContent.mockReset()
+    await renderApp()
+    await signIn()
+
+    await rightClickMap()
+    await act(async () => {
+      choosePhoto(new File(['jpeg'], 'camp.jpg', { type: 'image/jpeg' }))
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    })
+
+    expect(storedLooseItems()).toHaveLength(0)
+    expect(uploadFileContent).not.toHaveBeenCalled()
+  })
+
+  it('#156 — a second right-click keeps the chosen photo, as it keeps the typed values', async () => {
+    mockGoogleSignIn()
+    await renderApp()
+    await signIn()
+
+    await rightClickMap(-23.7, 133.2)
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Ellery Creek camp' } })
+    await act(async () => {
+      choosePhoto(new File(['jpeg'], 'camp.jpg', { type: 'image/jpeg' }))
+    })
+    await screen.findByText('camp.jpg')
+
+    await rightClickMap(-24.1, 133.9)
+
+    expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Ellery Creek camp')
+    expect(screen.getByText('camp.jpg')).toBeDefined()
+  })
+
+  it('creating with no photo is unchanged', async () => {
+    mockGoogleSignIn()
+    uploadFileContent.mockReset()
+    await renderApp()
+    await signIn()
+
+    await rightClickMap()
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Ellery Creek camp' } })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+    })
+
+    expect(storedLooseItems()[0]).toMatchObject({ name: 'Ellery Creek camp', image: null })
+    expect(uploadFileContent).not.toHaveBeenCalled()
   })
 })

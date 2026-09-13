@@ -1743,6 +1743,75 @@ describe('App attach a photo to an existing cairn (#157)', () => {
     fetchSpy.mockRestore()
   })
 
+  /** #157: the date is the only field other than `image` an attach writes,
+      and only when the cairn had none. One render each — two Apps mounted
+      over one shared `localStorage` is not a thing to assert against. */
+  async function attachGpsPhoto(id: string) {
+    uploadFileContent.mockResolvedValue({ id: 'drive-file-1' })
+    await renderApp(`/cairns/${id}`, { googleClientId: 'a-client-id' })
+    await signIn()
+    await screen.findByRole('button', { name: 'Add a photo' })
+    const input = document.querySelector('.add-photo__input') as HTMLInputElement
+    const gpsBuffer = readFileSync(join(__dirname, 'photo/fixtures/gps-and-timestamps.jpg'))
+    Object.defineProperty(input, 'files', {
+      value: [new File([gpsBuffer], 'sapporo.jpg', { type: 'image/jpeg' })],
+      configurable: true,
+    })
+    await act(async () => {
+      fireEvent.change(input)
+    })
+    await waitFor(() => {
+      expect(
+        JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')[0].image,
+      ).not.toBeNull()
+    })
+    return JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')[0]
+  }
+
+  it('fills a dateless cairn from the photo EXIF', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedLooseCairn('c-343', 'No date yet')
+
+    expect((await attachGpsPhoto('c-343')).date).toBe('2021-06-15T21:45:10.000Z')
+
+    fetchSpy.mockRestore()
+  })
+
+  it('leaves a cairn that already has a date alone', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedLooseCairn('c-344', 'Has a date', { date: '2020-01-01T00:00:00.000Z' })
+
+    expect((await attachGpsPhoto('c-344')).date).toBe('2020-01-01T00:00:00.000Z')
+
+    fetchSpy.mockRestore()
+  })
+
+  it('refuses an unsupported type with the existing message, writing nothing', async () => {
+    const fetchSpy = mockGoogleSignIn()
+    seedLooseCairn('c-345', 'Ellery Creek camp')
+    await renderApp('/cairns/c-345', { googleClientId: 'a-client-id' })
+    await signIn()
+
+    await screen.findByRole('button', { name: 'Add a photo' })
+    const input = document.querySelector('.add-photo__input') as HTMLInputElement
+    Object.defineProperty(input, 'files', {
+      value: [new File(['x'], 'notes.pdf', { type: 'application/pdf' })],
+      configurable: true,
+    })
+
+    await act(async () => {
+      fireEvent.change(input)
+    })
+
+    expect(await screen.findByText('only JPEG, PNG, and WebP photos can be imported')).toBeDefined()
+    expect(uploadFileContent).not.toHaveBeenCalled()
+    expect(
+      JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')[0].image,
+    ).toBeNull()
+
+    fetchSpy.mockRestore()
+  })
+
   /* #339's criterion: establish whether #344's HEIC defect reaches the
      attach path. It does not. #344 is about *import*, where `isPhotoFile`
      accepts `.heic` and position resolution runs first, so the refusal

@@ -66,7 +66,12 @@ export function CairnCreatePanel({
       state rather than the `error` prop: that one is the save's, and a
       photo refused before `Create` has not tried to save anything. */
   const [photoError, setPhotoError] = useState<string | null>(null)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  /** The object URL *and the file it was made from*, together. Holding the
+      URL alone renders one frame of the previous photograph beside the new
+      one's name after a replace — the effect below cannot run until after
+      that render — and a preview that shows the wrong image is worse than
+      no preview at all, since seeing the right one is the whole point. */
+  const [preview, setPreview] = useState<{ file: File; url: string } | null>(null)
 
   // "Just opened: … name empty and focused."
   useEffect(() => {
@@ -81,11 +86,11 @@ export function CairnCreatePanel({
   useEffect(() => {
     const file = fields.photo
     if (!file) {
-      setPreviewUrl(null)
+      setPreview(null)
       return
     }
     const url = URL.createObjectURL(file)
-    setPreviewUrl(url)
+    setPreview({ file, url })
     return () => URL.revokeObjectURL(url)
   }, [fields.photo])
 
@@ -185,9 +190,9 @@ export function CairnCreatePanel({
             signed-out line are the face's closing argument, and a field
             below them reads as an afterthought bolted under the summary. */}
         <span className="cairn-create__label">Photo</span>
-        {fields.photo && previewUrl && (
+        {fields.photo && preview?.file === fields.photo && (
           <>
-            <img className="cairn-create__photo" src={previewUrl} alt="" />
+            <img className="cairn-create__photo" src={preview.url} alt="" />
             <p className="cairn-create__photo-name" title={fields.photo.name}>
               {fields.photo.name}
             </p>

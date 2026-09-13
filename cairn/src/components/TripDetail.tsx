@@ -647,8 +647,10 @@ export function TripDetail({
     return next
   }, [attachCairnErrors, openCairnId])
   /** #158: the open cairn's own drag-write failure, cleared the same way
-      `attachCairnError` is — a stale error from whatever was open before
-      must not bleed into the next one. A failure for a cairn that isn't
+      `attachCairnErrors` was before #346 keyed it by cairn — a stale error
+      from whatever was open before must not bleed into the next one, and
+      this one still needs the effect below to say so, because a move has
+      no row treatment to belong to. A failure for a cairn that isn't
       open has nowhere to show it (design note: the detail face carries the
       failure line) — the marker's own animated revert is the only signal
       for that case. */

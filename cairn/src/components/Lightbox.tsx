@@ -11,6 +11,7 @@ import { usePhotoImage } from '../photo/usePhotoImage'
 import { IconPicker } from './IconPicker'
 import { NameInput } from './NameInput'
 import { DescriptionInput } from './DescriptionInput'
+import { AddPhotoButton } from './AddPhotoButton'
 import { useEditableCairnText } from './useEditableCairnText'
 import './Lightbox.css'
 
@@ -62,6 +63,11 @@ interface LightboxProps {
   onSaveText?: (patch: { name?: string; description?: string }) => Promise<boolean>
   /** #157: true while a dropped photo is uploading onto this cairn. */
   attaching?: boolean
+  /** #339: a photo chosen through the face's own control, rather than
+      dropped. Same destination — `TripDetail` hands both to the one
+      `attachPhotoToCairn`. `undefined` while there is nothing to write
+      through, which takes the control to Disabled. */
+  onAddPhoto?: (file: File) => void
   /** #157: the image slot's failure line, or `null`. */
   attachError?: string | null
   /** #158: a drag's write failure, or `null`. The marker has already
@@ -102,6 +108,7 @@ export function Lightbox({
   onSetIcon,
   onSaveText,
   attaching,
+  onAddPhoto,
   attachError,
   moveError,
   signedOut,
@@ -412,6 +419,16 @@ export function Lightbox({
             value={row.icon}
             onChange={(icon) => onSetIcon?.(icon)}
             disabled={!onSetIcon}
+          />
+          {/* #339: the control #157 never had. A phone cannot drop a file,
+              and this is the face where the photo would land. Above
+              `Remove from trip` so the two actions read in the order they
+              are likely to be wanted. */}
+          <AddPhotoButton
+            hasImage={hasImage}
+            attaching={attaching}
+            disabled={!onAddPhoto}
+            onChoose={(file) => onAddPhoto?.(file)}
           />
           {onRemoveFromTrip && (
             <button type="button" className="lightbox__remove-from-trip" onClick={onRemoveFromTrip}>

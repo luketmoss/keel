@@ -1,0 +1,35 @@
+/* #339: modelled on `.lightbox__remove-from-trip`, which is the treatment
+   both detail faces already use for an action in the column. The
+   `min-height` is the panel's real button standard — #338 measured
+   `New trip` at exactly `--hit-target`. */
+.add-photo {
+  display: block;
+  width: 100%;
+  min-height: var(--hit-target);
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--surface-lift);
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.add-photo:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.add-photo:active:not(:disabled) {
+  background: var(--pressed);
+}
+
+.add-photo:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.add-photo__input {
+  display: none;
+}

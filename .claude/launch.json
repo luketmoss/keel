@@ -4,8 +4,24 @@
     {
       "name": "cairn",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "cairn", "run", "dev"],
+      "runtimeArgs": [
+        "--prefix",
+        "cairn",
+        "run",
+        "dev"
+      ],
       "port": 5173
+    },
+    {
+      "name": "almanac",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "almanac",
+        "run",
+        "dev"
+      ],
+      "port": 5174
     }
   ]
 }

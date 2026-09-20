@@ -1,220 +1,178 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { loadSources, type Sandbox } from './apps-script-sandbox';
 
-// Since Apps Script concatenates all files into a global scope and doesn't
-// support ES modules, we replicate the pure functions here for testing.
-// These must stay in sync with apps-script/src/rules.ts and apps-script/src/types.ts.
+// These tests drive the real `apps-script/src/rules.js` through the sandboxed
+// loader in `apps-script-sandbox.ts` (#241). Nothing here transcribes source:
+// editing `rules.js` without editing this file breaks the suite.
+//
+// #243 deleted the `validateStatusTransition` and `validateOwnerChange` suites
+// that lived here. Both functions were removed from source in #228; their
+// transcribed copies survived and kept reporting coverage of deleted code.
 
-type ItemStatus = 'To Do' | 'In Progress' | 'Done';
+const NOW = '2026-05-01T12:00:00.000Z';
+const EARLIER = '2026-04-01T09:00:00.000Z';
+
+/**
+ * Load `utils.js` (for `isoNow`) and `rules.js` into one sandbox.
+ *
+ * `Date` is injected deliberately: a `node:vm` context has its own intrinsics,
+ * so vitest's fake timers — which patch the host `globalThis.Date` — would not
+ * otherwise reach `isoNow()`. Loading happens per test, after the clock is
+ * frozen, so the injected reference is the faked one.
+ */
+function loadRules(): Sandbox {
+  return loadSources(['utils.js', 'rules.js'], { Date: globalThis.Date });
+}
 
 interface Item {
   id: string;
   title: string;
-  description: string;
-  status: ItemStatus;
+  status: string;
   owner: string;
-  due_date: string;
-  labels: string;
   parent_id: string;
   created_at: string;
   updated_at: string;
   completed_at: string;
-  sort_order: number;
-  created_by: string;
+  board_id: string;
 }
-
-interface ValidationResult {
-  valid: boolean;
-  error?: string;
-}
-
-// --- Copied from rules.ts (pure logic, no Apps Script deps) ---
-
-function validateStatusTransition(
-  item: Item,
-  newStatus: ItemStatus,
-  allItems: Item[]
-): ValidationResult {
-  if (item.status === newStatus) {
-    return { valid: true };
-  }
-
-  if (item.status === 'To Do' && newStatus === 'In Progress') {
-    if (!item.owner) {
-      return { valid: false, error: 'Cannot move to In Progress: owner must be assigned' };
-    }
-  }
-
-  // Note: the "all children must be Done" check was removed in #162.
-  // Moving a parent to Done now cascades the status to all children automatically.
-
-  return { valid: true };
-}
-
-function checkParentCompletion(item: Item, allItems: Item[]): string | null {
-  if (!item.parent_id) return null;
-  const siblings = allItems.filter(i => i.parent_id === item.parent_id);
-  const allDone = siblings.every(i => i.status === 'Done');
-  return allDone ? item.parent_id : null;
-}
-
-// --- Test helpers ---
 
 function makeItem(overrides: Partial<Item> = {}): Item {
   return {
     id: 'item-1',
     title: 'Test Item',
-    description: '',
     status: 'To Do',
     owner: '',
-    due_date: '',
-    labels: '',
     parent_id: '',
-    created_at: '2025-01-01T00:00:00.000Z',
-    updated_at: '2025-01-01T00:00:00.000Z',
+    created_at: EARLIER,
+    updated_at: EARLIER,
     completed_at: '',
-    sort_order: 1,
-    created_by: '',
+    board_id: 'board-1',
     ...overrides,
   };
 }
 
-// --- Tests ---
+describe('applyStatusSideEffects', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(NOW));
+  });
 
-describe('validateStatusTransition', () => {
-  it('allows same-status no-op', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('sets completed_at when entering a terminal status', () => {
+    const { applyStatusSideEffects } = loadRules();
+    const item = makeItem({ status: 'In Progress' });
+
+    const result = applyStatusSideEffects(item, 'Done', true);
+
+    expect(result.status).toBe('Done');
+    expect(result.completed_at).toBe(NOW);
+  });
+
+  it('sets completed_at for a terminal column whatever it is called', () => {
+    const { applyStatusSideEffects } = loadRules();
+    const item = makeItem({ status: 'In Progress' });
+
+    // is_terminal drives completed_at, never the column's name (CLAUDE.md).
+    const result = applyStatusSideEffects(item, 'Shipped', true);
+
+    expect(result.status).toBe('Shipped');
+    expect(result.completed_at).toBe(NOW);
+  });
+
+  it('clears completed_at when leaving a terminal status', () => {
+    const { applyStatusSideEffects } = loadRules();
+    const item = makeItem({ status: 'Done', completed_at: EARLIER });
+
+    const result = applyStatusSideEffects(item, 'In Progress', false);
+
+    expect(result.status).toBe('In Progress');
+    expect(result.completed_at).toBe('');
+  });
+
+  // The fixture's empty `completed_at` is the point of this case, not an
+  // oversight. The rule only sees the *target* status's `is_terminal`, never
+  // the one it came from, so "leaving a terminal status" and "moving between
+  // two non-terminal statuses" are one code path; which branch runs is decided
+  // by whether `completed_at` was already set. An item sitting in a
+  // non-terminal column has none, which is the state modelled here. Populate it
+  // and the value is cleared instead — see the preceding test.
+  it('leaves completed_at untouched between two non-terminal statuses', () => {
+    const { applyStatusSideEffects } = loadRules();
     const item = makeItem({ status: 'To Do' });
-    const result = validateStatusTransition(item, 'To Do', []);
-    expect(result.valid).toBe(true);
+
+    const result = applyStatusSideEffects(item, 'In Progress', false);
+
+    expect(result.completed_at).toBe('');
   });
 
-  it('blocks To Do → In Progress without owner', () => {
-    const item = makeItem({ status: 'To Do', owner: '' });
-    const result = validateStatusTransition(item, 'In Progress', []);
-    expect(result.valid).toBe(false);
-    expect(result.error).toContain('owner must be assigned');
+  it('refreshes updated_at on every move', () => {
+    const { applyStatusSideEffects } = loadRules();
+
+    for (const [from, to, isTerminal] of [
+      ['To Do', 'In Progress', false],
+      ['In Progress', 'Done', true],
+      ['Done', 'To Do', false],
+    ] as const) {
+      const item = makeItem({
+        status: from,
+        completed_at: from === 'Done' ? EARLIER : '',
+      });
+
+      const result = applyStatusSideEffects(item, to, isTerminal);
+
+      expect(result.updated_at).toBe(NOW);
+      expect(result.updated_at).not.toBe(item.updated_at);
+    }
   });
 
-  it('allows To Do → In Progress with owner', () => {
-    const item = makeItem({ status: 'To Do', owner: 'Luke' });
-    const result = validateStatusTransition(item, 'In Progress', []);
-    expect(result.valid).toBe(true);
+  it('carries unrelated fields through untouched', () => {
+    const { applyStatusSideEffects } = loadRules();
+    const item = makeItem({ title: 'Buy milk', owner: 'Luke', created_at: EARLIER });
+
+    const result = applyStatusSideEffects(item, 'In Progress', false);
+
+    expect(result.title).toBe('Buy milk');
+    expect(result.owner).toBe('Luke');
+    expect(result.created_at).toBe(EARLIER);
+    expect(result.id).toBe('item-1');
   });
 
-  it('#162: allows move to Done when children are incomplete (cascade handles them)', () => {
-    const parent = makeItem({ id: 'parent', status: 'In Progress', owner: 'Luke' });
-    const child1 = makeItem({ id: 'child-1', title: 'Child 1', parent_id: 'parent', status: 'Done' });
-    const child2 = makeItem({ id: 'child-2', title: 'Child 2', parent_id: 'parent', status: 'In Progress' });
-    const allItems = [parent, child1, child2];
+  it('does not mutate the item it was given', () => {
+    const { applyStatusSideEffects } = loadRules();
+    const item = makeItem({ status: 'In Progress' });
 
-    const result = validateStatusTransition(parent, 'Done', allItems);
-    expect(result.valid).toBe(true);
-  });
+    applyStatusSideEffects(item, 'Done', true);
 
-  it('allows move to Done when all children are Done', () => {
-    const parent = makeItem({ id: 'parent', status: 'In Progress', owner: 'Luke' });
-    const child1 = makeItem({ id: 'child-1', parent_id: 'parent', status: 'Done' });
-    const child2 = makeItem({ id: 'child-2', parent_id: 'parent', status: 'Done' });
-    const allItems = [parent, child1, child2];
-
-    const result = validateStatusTransition(parent, 'Done', allItems);
-    expect(result.valid).toBe(true);
-  });
-
-  it('allows move to Done when item has no children', () => {
-    const item = makeItem({ status: 'In Progress', owner: 'Luke' });
-    const result = validateStatusTransition(item, 'Done', [item]);
-    expect(result.valid).toBe(true);
-  });
-
-  it('allows reopening: Done → To Do', () => {
-    const item = makeItem({ status: 'Done', owner: 'Luke', completed_at: '2025-01-02T00:00:00.000Z' });
-    const result = validateStatusTransition(item, 'To Do', [item]);
-    expect(result.valid).toBe(true);
-  });
-
-  it('allows reopening: Done → In Progress', () => {
-    const item = makeItem({ status: 'Done', owner: 'Luke', completed_at: '2025-01-02T00:00:00.000Z' });
-    const result = validateStatusTransition(item, 'In Progress', [item]);
-    expect(result.valid).toBe(true);
-  });
-
-  it('allows To Do → Done with no children', () => {
-    const item = makeItem({ status: 'To Do', owner: 'Luke' });
-    const result = validateStatusTransition(item, 'Done', [item]);
-    expect(result.valid).toBe(true);
-  });
-});
-
-// --- Copied from rules.js (pure logic, no Apps Script deps) ---
-
-function validateOwnerChange(
-  item: Item,
-  newOwner: string
-): ValidationResult {
-  if (item.status === 'In Progress' && !newOwner) {
-    return { valid: false, error: 'Cannot remove owner from In Progress items' };
-  }
-  return { valid: true };
-}
-
-describe('validateOwnerChange', () => {
-  it('allows changing owner on a To Do item', () => {
-    const item = makeItem({ status: 'To Do', owner: 'Luke' });
-    const result = validateOwnerChange(item, 'Sarah');
-    expect(result.valid).toBe(true);
-  });
-
-  it('allows changing owner on an In Progress item to a different owner', () => {
-    const item = makeItem({ status: 'In Progress', owner: 'Luke' });
-    const result = validateOwnerChange(item, 'Sarah');
-    expect(result.valid).toBe(true);
-  });
-
-  it('blocks removing owner from an In Progress item', () => {
-    const item = makeItem({ status: 'In Progress', owner: 'Luke' });
-    const result = validateOwnerChange(item, '');
-    expect(result.valid).toBe(false);
-    expect(result.error).toBe('Cannot remove owner from In Progress items');
-  });
-
-  it('allows removing owner from a To Do item', () => {
-    const item = makeItem({ status: 'To Do', owner: 'Luke' });
-    const result = validateOwnerChange(item, '');
-    expect(result.valid).toBe(true);
-  });
-
-  it('allows removing owner from a Done item', () => {
-    const item = makeItem({ status: 'Done', owner: 'Luke', completed_at: '2025-01-02T00:00:00.000Z' });
-    const result = validateOwnerChange(item, '');
-    expect(result.valid).toBe(true);
-  });
-
-  it('allows setting owner on an unassigned item', () => {
-    const item = makeItem({ status: 'To Do', owner: '' });
-    const result = validateOwnerChange(item, 'Luke');
-    expect(result.valid).toBe(true);
+    expect(item.status).toBe('In Progress');
+    expect(item.completed_at).toBe('');
+    expect(item.updated_at).toBe(EARLIER);
   });
 });
 
 describe('checkParentCompletion', () => {
   it('returns null for root items', () => {
+    const { checkParentCompletion } = loadRules();
     const item = makeItem({ parent_id: '' });
+
     expect(checkParentCompletion(item, [item])).toBeNull();
   });
 
-  it('returns parent ID when all siblings are Done', () => {
+  it('returns the parent ID when all siblings are Done', () => {
+    const { checkParentCompletion } = loadRules();
     const child1 = makeItem({ id: 'c1', parent_id: 'parent', status: 'Done' });
     const child2 = makeItem({ id: 'c2', parent_id: 'parent', status: 'Done' });
-    const allItems = [child1, child2];
 
-    expect(checkParentCompletion(child1, allItems)).toBe('parent');
+    expect(checkParentCompletion(child1, [child1, child2])).toBe('parent');
   });
 
   it('returns null when some siblings are not Done', () => {
+    const { checkParentCompletion } = loadRules();
     const child1 = makeItem({ id: 'c1', parent_id: 'parent', status: 'Done' });
     const child2 = makeItem({ id: 'c2', parent_id: 'parent', status: 'In Progress' });
-    const allItems = [child1, child2];
 
-    expect(checkParentCompletion(child1, allItems)).toBeNull();
+    expect(checkParentCompletion(child1, [child1, child2])).toBeNull();
   });
 });

@@ -1,7 +1,9 @@
 # Journal — Product Specification
 
 **Revision 1** — 20 September 2026
-**Status:** Draft. The app does not exist and has no repository yet.
+**Status:** Draft. Scaffolded 19 September 2026 as `almanac/` in the keel
+workspace — a project folder, not its own repository. §9's decisions were
+recorded the same day; the specification body below is otherwise Revision 1.
 **Companions:** `docs/data-architecture.md` (the cross-app contracts this
 depends on) and `docs/coros-sync-plan.md` (how the health data arrives).
 
@@ -9,7 +11,9 @@ This document specifies the app. The contracts it consumes live in
 `data-architecture.md` and are being built into Thrive and Hive
 independently — see §8 for what those apps owe this one.
 
-*(The app is referred to as "the Journal" throughout. It has no name yet.)*
+*(The app is called **almanac**, decided 19 September 2026 — see §9.4. It is
+still referred to as "the Journal" throughout the body of this document, which
+has not been rewritten around the name.)*
 
 ---
 
@@ -236,23 +240,37 @@ separate.
 | `getAuditLog` action | **New** — `data-architecture.md` §3 |
 | Explicit `completed` audit action | **New** — same |
 | Denver-local date filtering | **New** — same |
-| Due-date range queries | **Already works** — `getItems` filters `due_after` / `due_before` server-side |
+| Due-date range queries | **Partly** — `getItems()` filters `due_after` / `due_before` (`hive/apps-script/src/items.js` L31–36, with a test), but `main.js` never forwards the two parameters from the request, so the filter is unreachable over HTTP. Wiring them through is small, and is a fifth item rather than a freebie |
 | **Deep link to an item** | **New** — board and view are URL-bound, `selectedItemId` is not |
 
 ### Sequencing
 
 Thrive's API (Phase 2b) gates everything on the Thrive side. Hive's work is
-independent of it and can proceed in parallel — it is four small additions to
+independent of it and can proceed in parallel — it is five small additions to
 an existing deployment, none of which changes Hive's write path.
 
 ---
 
 ## 9. Open questions
 
-1. **[VERIFY §6]** Does COROS's daily payload carry a sleep score? If so,
-   `sleep_quality` is double-sourced and follows the same store-both rule.
-2. **[DECIDE §4]** "Due soon" window — three days, seven, or configurable?
-3. **[DECIDE §2]** Does the Journal show a week view, or only single days?
-   The original framing said "my day, week, etc." and this specification
-   currently describes only days.
-4. What is the app called, and does it get its own repository?
+1. **[VERIFY §6] Still open.** Does COROS's daily payload carry a sleep score?
+   If so, `sleep_quality` is double-sourced and follows the same store-both
+   rule. **This gates nothing** — §6 already fixes the rule that applies under
+   either answer, so no work upstream of it should wait. It is answered by
+   whoever builds sync Phase 3, from a real payload.
+
+2. **[DECIDE §4] Decided: three days, fixed.** The "due soon" window is a
+   fixed three-day forward window, not configurable. §5 leaves the Journal with
+   no settings surface at all, and one integer does not justify inventing one.
+
+3. **[DECIDE §2] Decided: single days now, a week view later.** The day screen
+   is date-addressable and carries all three day states from the start, because
+   §2's panels change kind rather than value and cannot be bolted on afterwards.
+   The data layer stays day-keyed so that a week is N days, and the week view is
+   its own later piece of work rather than a thing this screen grows into.
+
+4. **Decided: it is called `almanac`, and it does not get its own repository.**
+   It is a project folder in the keel workspace, on keel's board and lifecycle.
+   The name is load-bearing: an almanac is a day-by-day forward-looking
+   reference that happens to keep records, which is §1's framing. "Journal"
+   named the retrospective log §1 explicitly says this is not.

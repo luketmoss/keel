@@ -5,8 +5,9 @@ has no number, and it outranks any single note. Per-issue notes reference tokens
 from here by name instead of restating values.
 
 The prototype this was settled on is
-<https://claude.ai/artifact/Dk2WztPMbKAQLscNCKmnyP> (22 September 2026). Where
-this document and the prototype disagree, this document wins.
+<https://claude.ai/artifact/Dk2WztPMbKAQLscNCKmnyP> (22 September 2026), and its
+source is [`../prototype.html`](../prototype.html). Where this document and the
+prototype disagree, this document wins.
 
 ## The idea
 
@@ -199,8 +200,8 @@ are settled:
 - "Tap a choice again to clear it. Blank means you didn't say — it never counts
   as OK."
 - "Your range 49–55 bpm · in range"
-- "Completions before Sep 1 are approximate — rebuilt from Hive's status
-  changes."
+- "Completions before Sep 20 are approximate — rebuilt from Hive's status
+  changes." — the date hive#239 shipped
 - "Planned · not done" — a past planned workout that never happened
 
 ## Mark

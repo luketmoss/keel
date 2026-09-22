@@ -25,9 +25,15 @@ almanac/
 │   ├── App.tsx
 │   └── components/
 └── docs/
-    ├── spec.md         # the product specification
-    └── design/         # UX artifacts, one file per issue
+    ├── spec.md                 # the product specification
+    ├── implementation-plan.md  # the build order, issue by issue
+    ├── prototype.html          # the design prototype — a reference, not app code
+    └── design/                 # UX artifacts, one file per issue
 ```
+
+The build order is [`docs/implementation-plan.md`](docs/implementation-plan.md).
+The look is the standing
+[`docs/design/design-language.md`](docs/design/design-language.md).
 
 ## Decisions already made
 

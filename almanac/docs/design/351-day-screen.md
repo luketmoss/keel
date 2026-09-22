@@ -327,7 +327,9 @@ page.
 2. The header, pill, sun line and week strip change at once. If the new date is
    in another week, the strip shows that week, with no marks until its read
    returns.
-3. The panels are mounted fresh for the new date and each starts its own read.
+3. The panels are mounted fresh for the new date and each asks for its reads.
+   Panels asking for the same read over the same range share one call
+   ([Shared calls](#shared-calls)).
 4. The panel area (not the header or the strip) slides in from the side moved
    toward — from the right when going later, from the left when going earlier —
    by `--motion-day-shift`, fading in, over `--motion-day`. Under
@@ -469,13 +471,14 @@ same way.
 `useDayRead(name, from, to)` in `src/day/useDayRead.ts` takes the name of a
 `DataSource` read (`'readEntries'`, `'readWorkouts'`, `'readHealth'`,
 `'readHiveDue'` or `'readHiveCompleted'`) and an inclusive range, calls it on
-`getDataSource()`, and returns one of:
+`getDataSource()` — or joins a call for the same read already in flight, as
+[Shared calls](#shared-calls) describes — and returns one of:
 
 | Status | When | Carries |
 |---|---|---|
 | `not-connected` | The read is absent in this mode (#350: absent is "not connected", never an empty day). No call is made. | — |
-| `loading` | The first call for this range is in flight | — |
-| `ready` | It resolved | `data`: the `Map<IsoDate, T>` |
+| `loading` | The hook has no answer yet: the call it is waiting on, sent or joined, is in flight | — |
+| `ready` | That call resolved | `data`: the `Map<IsoDate, T>`. `sentAt`: when the call behind `data` was sent, as a `performance.now()` value |
 | `error` | It rejected with anything but `SessionExpiredError` | `offline` (`navigator.onLine` was false), `retry()` |
 | `session-expired` | It rejected with `SessionExpiredError` | — |
 
@@ -485,22 +488,97 @@ same way.
   as #357's range over the 30 days before the date (spec §9.8) or #353's
   overdue items and next three days. A panel needing two sources calls the
   hook twice.
-- **Stale answers are dropped.** A response for a range the hook no longer has,
-  or after its component has gone, is ignored.
+- **Stale answers are dropped, per hook.** A response for a range the hook no
+  longer has, or after its component has gone, is ignored by that hook, however
+  many other hooks are still waiting on the same call.
 - **After Reconnect** (#350's `session` signal becomes valid again), a
-  `session-expired` read runs again by itself and goes through `loading`.
+  `session-expired` read runs again by itself and goes through `loading`: one
+  call per read and range, however many hooks hold it.
 - **Coming back into view.** When `visibilitychange` reports the page visible,
   a `ready` read runs again in the background: what's showing stays until the
   new answer replaces it, and if the new call fails, what's showing stays and
-  no error appears. An `error` read runs again through `loading`. This is what
+  no error appears. An `error` read runs again through `loading`. Either way it
+  is one call per read and range, however many hooks hold it. This is what
   makes a tab left open since before the morning sync show the sync, and what
   brings back a change made in Thrive or Hive. It never starts a sync (#360).
 - A `SheetError` of kind `missing` still sends the app to #350's "Couldn't
   open" card; the hook sees it only as `error`.
 
-`PanelStatus` in `src/day/Panel.tsx` takes a `DayRead` and a source name
-("Thrive", "Hive", "COROS", or "your almanac sheet") and renders the body for
-every status except `ready`, for which it renders nothing:
+#### Shared calls
+
+Several panels often want the same read at the same moment. On a past day or
+today, #352's check-in and journal each read the day's entry (through
+`useEntry`), #357's Sleep row reads it a third time, and #357's Last night and
+Activity cards both read the day's health. Google Sheets allows 60 read
+requests a minute per user, and each Apps Script call takes a second or more,
+so a request per hook lets fast swiping reach the limit, and the panels then say
+"Couldn't load". So hooks asking for the same read share one call:
+
+- **The same read** is the same `name`, `from` and `to`, compared exactly — the
+  read's *key* — within one session (below). Nothing looser shares: a one-day
+  `readEntries` and a seven-day one are two calls even though one contains the
+  other, and `readHealth` and `readWorkouts` over the same day are two calls.
+- **At most one call in flight per key.** Whenever a hook needs to read — it
+  mounts, its range changes, **Try again**, the page comes back into view,
+  Reconnect — it joins the key's call if one is in flight, and otherwise sends
+  one, which is then the key's call until it settles. A hook that joins is
+  `loading` like one that sent the call, and takes the same answer.
+  `PanelStatus`'s 300ms before "Loading…" counts from when that panel started
+  waiting, so a panel joining a call already under way still stays quiet for
+  its first 300ms.
+- **Only calls in flight are shared.** Once a call settles, nothing keeps its
+  answer except the hooks that were waiting on it, and the next hook to ask for
+  the key sends a new call. *Why not hand a just-landed answer to a hook that
+  mounts a moment later:* that is a cache, and a cache needs an expiry rule
+  when every read is meant to be fresh. The cases that matter already ask
+  together — a day's panels mount in one render, and a refresh or Reconnect
+  asks for every key at once — so in-flight sharing makes each of them one
+  call. A part that mounts later, such as a row that appears once another read
+  is ready, makes a call of its own; a panel that wants its reads shared asks
+  for them when it mounts.
+- **A re-read reaches every hook holding the key.** Each of these reads a key
+  once and puts every hook it applies to on that call:
+
+  | Trigger | Hooks holding the key that take the call | Requests |
+  |---|---|---|
+  | `retry()`, from any of them | All of them: those without data through `loading`, those with data in the background | One. A second **Try again** while it is in flight joins it |
+  | The page becomes visible | `ready` ones in the background, `error` ones through `loading` | One per key |
+  | Reconnect | `session-expired` ones, through `loading` | One per key |
+
+  "In the background" is as above: what's showing stays until the answer
+  replaces it, and stays, with no error, if the call fails.
+- **Each hook takes only the answer of the call it is waiting on.** A hook
+  that moves to another range or unmounts stops waiting (the stale-answer rule,
+  per hook). The call isn't cancelled — its request is already made — and
+  carries on for any hooks still waiting; if none are, its answer is dropped.
+  Until it settles it can still be joined, so going back to a day before its
+  reads land, or crossing 960px while they are in flight, joins those calls
+  rather than sending new ones.
+- **An absent read** is `not-connected` for every hook that asks for it, with
+  no call and so nothing to share.
+- **One session.** A call is joined only in the session it was sent in. Once
+  #350's `session` signal changes — the session ends, Reconnect brings a new
+  token, another account signs in — calls already in flight are no longer
+  joined, and the next read of each key sends a new call. Hooks already waiting
+  on an older call still take its answer. In demo mode there is no session, so
+  this never applies. *Why:* a call sent just before the session ended can
+  still reject with `SessionExpiredError` after Reconnect, and a hook that
+  joined it would ask you to reconnect with the session already back; and a
+  call made for one account must never answer for another.
+- **`sentAt`.** With sharing, the moment a hook asks and the moment the call
+  behind its answer was sent can differ: a hook that joined a call, or took the
+  answer to another hook's **Try again**, didn't send it. `ready` therefore
+  carries when the call behind `data` was sent. A panel that orders reads against its own writes
+  compares with that, not with when its hook mounted: #352's rule that a read
+  asked for before a save landed never undoes that save needs it, since a
+  panel can join a read that went out before the save landed. A background
+  refresh changes `data` and `sentAt` together; a failed one leaves both.
+
+`PanelStatus` in `src/day/Panel.tsx` takes a `DayRead` and `source`, the name
+it puts into its sentences, and renders the body for every status except
+`ready`, for which it renders nothing. `source` is a plain `string`, used as
+given — "Thrive", "Hive", "COROS", or #352's "your almanac sheet" — not a fixed
+list like `Panel`'s chip, so a panel names its source in its own words:
 
 | Status | Body |
 |---|---|
@@ -534,12 +612,14 @@ The contract, for every slot component:
 2. It renders its card with `Panel`, following the title, chip and sub table
    above, and reads its data with `useDayRead` for the days it needs, showing
    `PanelStatus` until the read is `ready`. It reads only through
-   `getDataSource()`.
+   `getDataSource()`. Panels asking for the same read over the same range at
+   the same time share one call ([Shared calls](#shared-calls)).
 3. It is mounted fresh for each date and again when the layout crosses 960px.
    Anything it can't lose on a remount, such as text being typed, has to be
    saved or held outside it. That is #352's to design.
-4. A background refresh may hand it new data at any time; a panel holding
-   unsaved input must not let that overwrite it (#352).
+4. A background refresh, or **Try again** in another panel sharing its read,
+   may hand it new data at any time; a panel holding unsaved input must not let
+   that overwrite it (#352).
 5. `lastNight` renders `slots.checkIn` at its foot on past days and today.
 6. It never renders `lastNight` or `activity` content for a future day; the day
    screen doesn't ask it to.
@@ -583,9 +663,16 @@ prototype's, without Withings:
   themselves.
 - **Rapid moves.** Taps, swipes and buttons each move once; held keys move once.
   Each move mounts fresh panels, and answers for dates you've moved past are
-  dropped, so the last date you stop on is the one that shows.
-- **Crossing 960px while a read is in flight.** The rebuilt panels start their
-  own reads; the old answers are dropped.
+  dropped, so the last date you stop on is the one that shows. The calls for a
+  day you've left carry on until they land, so swiping back to it before then
+  joins them rather than reading it again.
+- **Crossing 960px while a read is in flight.** The rebuilt panels ask for the
+  same reads and join the calls still in flight; nothing is read twice.
+- **Several panels read the same thing.** On a past day or today, the check-in,
+  the journal and #357's Sleep row reading the day's entry send one request
+  between them, and so do #357's two cards reading the day's health over the
+  same range. The week strip's `readWorkouts(monday, sunday)` and #356's
+  one-day `readWorkouts` are different ranges, so two calls.
 - **Today's date written out** (`#/2026-09-22` on the 22nd) shows as today, with
   no Today control. After midnight it is yesterday, and the control appears.
 - **Demo mode across midnight.** The screen moves to the new day, but the
@@ -639,6 +726,8 @@ almanac is a scaffold, so nothing here could be measured. Every number is
 | Three marks a day | the prototype's `weekStrip()` |
 | Checking today every minute | chosen here: a rollover shows within a minute, for one cheap comparison |
 | 300ms before "Loading…" | chosen here: longer than an in-memory demo read, shorter than an Apps Script call |
+| 60 read requests a minute per user | Google Sheets API's per-user read quota, as #352's note cites it; the reason for [Shared calls](#shared-calls) |
+| A second or more per Apps Script call | implementation-plan.md § Risks |
 
 `sun()` gives these for Denver, and the port must too:
 

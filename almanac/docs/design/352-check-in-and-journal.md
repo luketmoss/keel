@@ -13,9 +13,11 @@ note says where that happened.
 This note builds on two settled seams: #350's `writeEntry(date, patch)`, which
 patches only the cells it is given, queues writes, never retries, and rejects
 with `SessionExpiredError` or a `SheetError`; and #351's panel contract —
-`slots.checkIn` and `slots.journal`, `Panel`, `PanelNote`, `PanelStatus` and
-`useDayRead`, with panels remounting on every day change and whenever the layout
-crosses 960px.
+`slots.checkIn` and `slots.journal`, `Panel`, `PanelNote`, `PanelStatus`, and a
+`useDayRead` that shares a read still in flight between hooks asking for the
+same one and says in `ready.sentAt` when the call behind its data was sent —
+with panels remounting on every day change and whenever the layout crosses
+960px.
 
 Nothing in this note exists yet to measure. See [Numbers](#numbers).
 
@@ -79,9 +81,12 @@ staying mounted.
 **What a field shows**, in this order:
 
 1. Its unsaved change, if it has one.
-2. Otherwise the newest answer about it — a read or a save's answer — where
-   "newest" is by when it was *asked for*. A read asked for before a save landed
-   never undoes that save, even if it arrives after it.
+2. Otherwise the newest answer about it — a read or a save's answer — where a
+   read counts as newer than a save's answer only if it was *sent* after that
+   save landed. So a read asked for before a save landed never undoes that
+   save, even if it arrives after it — and nor does one this block joined
+   later: #351 shares a read still in flight, so a block can take the answer
+   to a read that went out before it asked.
 3. Otherwise blank, shown as blank: unselected, or an empty field. Never `0`,
    never `OK`.
 
@@ -89,12 +94,17 @@ One more rule for the text box: while it has focus, its text is never replaced
 by a read, even for a field with nothing unsaved. Text doesn't move under the
 caret.
 
-*How, for `/develop`:* the store keeps, per date, when the last save landed;
-`useEntry` notes the moments its read is asked for — mounting, the page coming
-back into view, **Try again**, and the session becoming valid again, the same
-moments `useDayRead` reads — and trusts an answer only if it was asked for after
-that save landed. A remount always asks afresh, so returning to a day always
-shows the sheet as it is.
+*How, for `/develop`:* the store keeps, per date, when the last save landed, as
+a `performance.now()` value — the clock #351's `ready.sentAt` uses. `useEntry`
+trusts its read's `data` only if `ready.sentAt` is later than that; otherwise the
+last save's answer is the newest word on every field. A tie counts as before:
+`performance.now()` can be coarse, and trusting a read that went out before the
+save would undo it. `sentAt` is when the call behind `data` was sent, whichever
+hook sent it, so the check holds however the read reached this block: asked for
+at mount, a background refresh, **Try again** here or in the other block,
+Reconnect, or a remount that rejoins a read of the day still in flight from
+moments before (#351) rather than asking afresh. `useEntry` doesn't note read
+moments of its own.
 
 The held values last for the page's life. They are dropped on sign-out and when
 a Reconnect brings back a different Google account (#350 treats that as a fresh
@@ -106,7 +116,8 @@ sheet.
 In `src/panels/entry/useEntry.ts`. The check-in and the journal use it, and so
 does #357's Sleep row. It returns what `useDayRead` returns for the day —
 `not-connected`, `loading`, `error` with `offline` and `retry()`, or
-`session-expired` — except that `ready` carries `values`:
+`session-expired` — except that `ready` carries `values`, in place of `data` and
+`sentAt`:
 
 ```
 values: { notes, sleep_hours, sleep_quality, energy }   // each null when blank
@@ -116,10 +127,14 @@ These are the values as the blocks show them, by the rule above, unsaved changes
 included. They update the moment either block changes one, so a Sleep row
 reading `sleep_hours` stays in step with the check-in under it.
 
-Each call reads through `useDayRead`, as #351's contract says. A past day or
-today therefore asks for the same entry twice (the check-in and the journal),
-and three times once #357's Sleep row uses it. See
-[Numbers](#numbers) for why that's worth coalescing in `useDayRead` itself.
+*Why no `sentAt`:* `values` mix the read, the last save's answer and unsaved
+changes, so no one moment describes them.
+
+Each call reads through `useDayRead`, as #351's contract says, and `useDayRead`
+shares a read still in flight between hooks asking for the same one (#351's
+Shared calls). The check-in and the journal mount together, so a past day or
+today makes one `readEntries` call for the pair, and #357's Sleep row shares it
+too if it asks when its card mounts. See [Numbers](#numbers).
 
 ---
 
@@ -429,9 +444,16 @@ the moment the page is hidden.
 view. None of those loses anything here, because nothing unsaved lives in a
 component:
 
-- **Moving to another day and back:** the new mount reads afresh. Unsaved,
+- **Moving to another day and back:** the new mount reads the day again, or
+  rejoins a read of it still in flight from moments before (#351). Unsaved,
   in-flight and failed changes show again with their state; everything else
-  shows the sheet as it now is.
+  shows the newest answer by the rule in
+  [One set of values](#one-set-of-values-per-day). That rule is what makes
+  going back and forth quickly safe: leave a day with an unsaved journal edit,
+  come back and leave again while that save is in flight, then come back once
+  it has landed. The read from your first return can still be in flight, sent
+  before the save landed and holding the text from before; the journal rejoins
+  it, and still shows what you typed.
 - **Crossing 960px:** the same. And if the journal box or the hours field had
   focus when the layout was rebuilt, the new one gets focus back, with the same
   selection or caret position. (Only for the same date: a remount for a new day
@@ -439,7 +461,7 @@ component:
   from dropping the keyboard and the place you were typing.
 - **The page coming back into view:** fields with no unsaved change take the
   refreshed values — this is where another device's edit shows up — except the
-  text box while it has focus. A refresh asked for before your last save landed
+  text box while it has focus. A refresh sent before your last save landed
   never undoes it.
 
 ---
@@ -562,15 +584,14 @@ each side are about 52px each, so 164px with their gaps; with `--space-md`
 between label and group that's about 270px. If it doesn't fit, the choices wrap
 under their label, which is the designed fallback, not a failure.
 
-**Reads per day, and why `useDayRead` should share them.** The check-in and the
-journal each call `useDayRead('readEntries', date, date)`, per #351's contract,
-so a past day or today reads the sheet twice, and three times once #357's Sleep
-row calls `useEntry`. Each is one small Sheets request, and the behaviour here
-doesn't depend on how many there are — but Sheets' 60-reads-a-minute-per-user
-quota is reachable by swiping quickly through days, and a 429 shows as "Couldn't
-load". Two hooks asking for the same read and range at the same moment sharing
-one call would make it one read per day. That belongs in `useDayRead` (#351),
-not here.
+**Reads per day.** The check-in and the journal each call
+`useDayRead('readEntries', date, date)`, per #351's contract, and mount
+together, so they share one call: a past day or today reads the entry once, and
+#357's Sleep row shares that call if it asks when its card mounts. Each read is
+one small Sheets request against Sheets' 60-reads-a-minute-per-user quota, which
+swiping quickly through days could otherwise reach, and a 429 shows as "Couldn't
+load". Sharing is `useDayRead`'s (#351's Shared calls); nothing here depends on
+how many reads there are.
 
 `/test` checks the sizes in the running app, in demo mode, with
 `getBoundingClientRect()` at a 360px-wide viewport.

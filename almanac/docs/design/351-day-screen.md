@@ -468,11 +468,12 @@ and today, once #352 fills it.
 Every panel reads the same way, so every panel loads, fails and recovers the
 same way.
 
-`useDayRead(name, from, to)` in `src/day/useDayRead.ts` takes the name of a
-`DataSource` read (`'readEntries'`, `'readWorkouts'`, `'readHealth'`,
-`'readHiveDue'` or `'readHiveCompleted'`) and an inclusive range, calls it on
-`getDataSource()` — or joins a call for the same read already in flight, as
-[Shared calls](#shared-calls) describes — and returns one of:
+`useDayRead(name, from: IsoDate | null, to: IsoDate)` in
+`src/day/useDayRead.ts` takes the name of a `DataSource` read (`'readEntries'`,
+`'readWorkouts'`, `'readHealth'`, `'readHiveDue'` or `'readHiveCompleted'`) and
+an inclusive range, calls it on `getDataSource()` — or joins a call for the same
+read already in flight, as [Shared calls](#shared-calls) describes — and returns
+one of:
 
 | Status | When | Carries |
 |---|---|---|
@@ -488,6 +489,15 @@ same way.
   as #357's range over the 30 days before the date (spec §9.8) or #353's
   overdue items and next three days. A panel needing two sources calls the
   hook twice.
+- **A lower bound that may be absent.** `from` is `IsoDate | null`, and `null`
+  means no lower bound: `useDayRead('readHiveDue', null, to)` asks for every
+  open item due on or before `to`, however far back it goes. #353's To do card
+  is why — overdue has no floor, and its card wants everything due on or before
+  three days ahead in one call — and `readHiveDue` is the only read whose `from`
+  #350 made nullable; every other read is asked with a date at both ends. The
+  hook passes `from` to the read exactly as given, and never puts today or any
+  other date in place of `null`, which would silently drop the overdue items the
+  panel asked for. `to` is always a date.
 - **Stale answers are dropped, per hook.** A response for a range the hook no
   longer has, or after its component has gone, is ignored by that hook, however
   many other hooks are still waiting on the same call.
@@ -518,6 +528,12 @@ so a request per hook lets fast swiping reach the limit, and the panels then say
   read's *key* — within one session (below). Nothing looser shares: a one-day
   `readEntries` and a seven-day one are two calls even though one contains the
   other, and `readHealth` and `readWorkouts` over the same day are two calls.
+  A `null` `from` is a value in the key like any other, not a missing part of
+  one: two panels asking for `readHiveDue(null, T+3)` share one call, while
+  `(null, T+3)` and `(T, T+3)` are different keys and never share one — exact
+  comparison already says so, and an unbounded read and a bounded one are
+  different questions. A key written as a string writes the absent bound as
+  something no `YYYY-MM-DD` can be, so it cannot collide with a date.
 - **At most one call in flight per key.** Whenever a hook needs to read — it
   mounts, its range changes, **Try again**, the page comes back into view,
   Reconnect — it joins the key's call if one is in flight, and otherwise sends

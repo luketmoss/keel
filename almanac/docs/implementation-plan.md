@@ -1,32 +1,38 @@
 # almanac — implementation plan
 
-**Revision 1** — 22 September 2026
+**Revision 2** — 23 September 2026
 **Scope:** building almanac from its scaffold to its three screens. This
 document sequences the work. What almanac is and how it looks are decided in
 [`spec.md`](spec.md) (revision 2) and
 [`design/design-language.md`](design/design-language.md); this does not
 re-argue either.
 
+Revision 2 records the refinement run of 22–23 September: every issue in the
+order below is **Refined** and waiting at Gate 1, and §0's sizes are now the
+board's rather than expectations. Nothing split, nothing halted.
+
 ---
 
 ## 0. Issues
 
-| Order | Issue | What | Depends on | Expected size |
-|---|---|---|---|---|
-| 1 | [#350](https://github.com/luketmoss/keel/issues/350) | Foundation: app frame, sign-in, demo mode, the almanac sheet, deploy | — | L |
-| 2 | [#351](https://github.com/luketmoss/keel/issues/351) | The day screen: route, header, week strip, three day states, panel shells | #350 | M |
-| 3 | [#352](https://github.com/luketmoss/keel/issues/352) | Check-in and journal | #350, #351 | M |
-| 4 | [#355](https://github.com/luketmoss/keel/issues/355) | Reach Thrive's and Hive's APIs without shipping their keys | #350 | M, plus upstream |
-| 5 | [#353](https://github.com/luketmoss/keel/issues/353) | To do panel, from Hive | #350, #351, #355 | M |
-| 6 | [#356](https://github.com/luketmoss/keel/issues/356) | Training panel, from Thrive | #350, #351, #355 | M |
-| 7 | [#357](https://github.com/luketmoss/keel/issues/357) | Health panels: last night, steps, your range | #350–#352, #355; real data needs thrive#127 | L |
-| 8 | [#358](https://github.com/luketmoss/keel/issues/358) | Calendar | 1–7 | M |
-| 9 | [#359](https://github.com/luketmoss/keel/issues/359) | Trends | #350, #352, #355–#357 | L |
-| — | [#354](https://github.com/luketmoss/keel/issues/354) | Withings: weight, body fat, blood pressure | after 9 | |
-| — | [#360](https://github.com/luketmoss/keel/issues/360) | Spike: sync on demand | #355; thrive#127 | spike |
+| Order | Issue | What | Depends on | Size | Design note |
+|---|---|---|---|---|---|
+| 1 | [#350](https://github.com/luketmoss/keel/issues/350) | Foundation: app frame, sign-in, demo mode, the almanac sheet, deploy | — | L | [350-foundation](design/350-foundation.md) |
+| 2 | [#351](https://github.com/luketmoss/keel/issues/351) | The day screen: route, header, week strip, three day states, panel shells | #350 | L | [351-day-screen](design/351-day-screen.md) |
+| 3 | [#352](https://github.com/luketmoss/keel/issues/352) | Check-in and journal | #350, #351 | L | [352-check-in-and-journal](design/352-check-in-and-journal.md) |
+| 4 | [#355](https://github.com/luketmoss/keel/issues/355) | Reach Thrive's and Hive's APIs without shipping their keys | #350 | M | — (no surface) |
+| 5 | [#353](https://github.com/luketmoss/keel/issues/353) | To do panel, from Hive | #350, #351, #355 | L | [353-todo-panel](design/353-todo-panel.md) |
+| 6 | [#356](https://github.com/luketmoss/keel/issues/356) | Training panel, from Thrive | #350, #351, #355 | L | [356-training-panel](design/356-training-panel.md) |
+| 7 | [#357](https://github.com/luketmoss/keel/issues/357) | Health panels: last night, steps, your range | #350–#352, #355; real data needs thrive#127 | L | [357-health-panels](design/357-health-panels.md) |
+| 8 | [#358](https://github.com/luketmoss/keel/issues/358) | Calendar | 1–7 | L | [358-calendar](design/358-calendar.md) |
+| 9 | [#359](https://github.com/luketmoss/keel/issues/359) | Trends | #350, #352, #355–#357 | L | [359-trends](design/359-trends.md) |
+| — | [#354](https://github.com/luketmoss/keel/issues/354) | Withings: weight, body fat, blood pressure | after 9 | not refined | — |
+| — | [#360](https://github.com/luketmoss/keel/issues/360) | Spike: sync on demand | #355; thrive#127 | M, a half-day box | — (no surface) |
 
-The sizes are expectations to check at `/pm`, not board values. Nothing here is
-XL, and anything that refines to XL gets split.
+The sizes are the board's, set at `/pm`. Six issues came out a size above the
+expectation — #351, #352, #353, #356 and #358 at L rather than M — because each
+carries a seam the others build on rather than only its own surface. Nothing
+refined to XL, so nothing split.
 
 **The board carries the order.** Priority is P1 for 1–4, P2 for 5–9, and unset
 for the backlog. `board.py next` picks by priority and then the lowest issue
@@ -112,27 +118,54 @@ number, which gives exactly this order.
 | Audit log, item links, due-date filters | hive#239, #240, #241 | Done | #353 |
 | Workouts and planned workouts by date, `DailySummary` | thrive#130, #131 | Done | #356, #357 |
 | Create an item with its due date | hive#263 | To Do | #353's "Add" |
-| Plan a workout on a date | thrive#143 | To Do | #356's "Plan" |
+| Plan a workout on a date | thrive#143 | To Do | #356's "Plan", and keel#361 to point it there |
 | COROS sync, `DailyHealth` and its API actions | thrive#127, after thrive#133 | Not started | #357 real data, #358 shading, #359 health charts |
 | Syncs several times a day | the COROS job | In progress (you) | spec §9.9 |
-| API authentication without static keys | Thrive and Hive, if #355 chooses it | To file | #353, #356 |
-| Step goal in the COROS daily payload | thrive#133 | [VERIFY] | #357 |
+| Accept almanac's Google token for read actions | thrive#144, hive#264 | To Do | every live read (#353, #356, #357) |
+| Read `DailyHealth` through the API | thrive#147 | To Do | #357's stages, bed-to-wake and sync time; #359's VO₂ max (keel#364) |
+| Bed and wake times, and a step goal if COROS sends one | thrive#148 | To Do | #357; carries §9.11's `[VERIFY]`, which thrive#133 does not ask |
+| An estimated duration for a planned workout | thrive#145 | To Do | #356's "about 45 min" |
+| Exercise and set counts on `getPlannedWorkouts` | thrive#146 | To Do | #356's plan read, one call instead of N |
+| A daily FIT request budget, not a per-run one | thrive#149 | To Do | the multi-run cron change; found by #360 |
+| Audit rows carrying title and board | hive#265 | To Do | #353's past day, one call instead of two |
+| Every board's statuses in one call | hive#266 | To Do | #353 before 20 September 2026 |
 
 ## 5. Risks
 
 - **API keys in a public bundle.** The largest risk in the plan. It is why #355
   exists, and why it comes before every Thrive and Hive panel.
 - **The COROS sync slips.** The health panels, calendar shading and health
-  charts stay in their no-data states. Nothing else is affected.
+  charts stay in their no-data states. Nothing else is affected. Refinement
+  sharpened two things here: #358 **shades nothing and says so** rather than
+  hatching, because a hatch claims the watch has no data when almanac has not
+  asked; and VO₂ max has no route into almanac even after the sync runs, since
+  `DailySummary` carries no such column — #359's Fitness group ships with a
+  designed no-data state and keel#364 carries the swap.
 - **Apps Script latency.** Every read is a script execution, and a second or
   more per call is common. Month and range reads (#358, #359) batch and cache
   rather than fetching each day separately.
-- **Manual setup.** The sheet, the OAuth client's authorized origins and the
-  repo secrets need a person (#350).
+- **Manual setup.** A person is still needed, but not for the sheet: under
+  `drive.file` almanac creates and finds its own (#350). What is left is the
+  Google Cloud project, consent screen and OAuth client with its origins
+  (#350); the repo secrets `ALMANAC_GOOGLE_CLIENT_ID` (#350),
+  `ALMANAC_THRIVE_API_URL` and `ALMANAC_HIVE_API_URL` (#355) and
+  `ALMANAC_THRIVE_APP_URL` (#356); and, once thrive#144 and hive#264 ship,
+  re-deploying each Apps Script and setting its `TOKEN_CLIENT_ID` and
+  `TOKEN_ALLOWED_EMAIL` properties (#355).
 
 ## 6. Later
 
 - **#354, Withings:** weight, body fat and blood pressure on the day screen,
   plus the Body and Blood pressure groups in Trends.
 - **#360, a spike:** sync on demand, in addition to the scheduled runs.
+- **Found during refinement, all in To Do without a priority:**
+  [#361](https://github.com/luketmoss/keel/issues/361) point "Plan" at Thrive's
+  dated planner link once thrive#143 ships;
+  [#362](https://github.com/luketmoss/keel/issues/362) the dark theme's
+  calendar shading ramp fails AA at its third step;
+  [#363](https://github.com/luketmoss/keel/issues/363) the light theme's chart
+  dot fails the 3:1 non-text minimum;
+  [#364](https://github.com/luketmoss/keel/issues/364) read `DailyHealth`
+  directly once thrive#147 ships. #362 and #363 are changes to the standing
+  design language, which no issue may edit on its own.
 - **Spec §9.3 and §7:** a week view, and Forage.

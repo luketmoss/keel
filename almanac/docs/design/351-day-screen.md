@@ -470,10 +470,10 @@ same way.
 
 `useDayRead(name, from: IsoDate | null, to: IsoDate)` in
 `src/day/useDayRead.ts` takes the name of a `DataSource` read (`'readEntries'`,
-`'readWorkouts'`, `'readHealth'`, `'readHiveDue'` or `'readHiveCompleted'`) and
-an inclusive range, calls it on `getDataSource()` — or joins a call for the same
-read already in flight, as [Shared calls](#shared-calls) describes — and returns
-one of:
+`'readWorkouts'`, `'readWorkoutPlans'`, `'readHealth'`, `'readHiveDue'` or
+`'readHiveCompleted'`) and an inclusive range, calls it on `getDataSource()` —
+or joins a call for the same read already in flight, as
+[Shared calls](#shared-calls) describes — and returns one of:
 
 | Status | When | Carries |
 |---|---|---|
@@ -487,8 +487,14 @@ one of:
   keyed by day (spec §9.3): usually the panel's date as both `from` and `to`;
   the week strip's Monday to Sunday; wider where a panel's rule says so, such
   as #357's range over the 30 days before the date (spec §9.8) or #353's
-  overdue items and next three days. A panel needing two sources calls the
-  hook twice.
+  overdue items and next three days. A panel needing two reads calls the hook
+  twice, whether they are two sources or two reads of one source: #356's
+  Training panel asks for `readWorkouts` and `readWorkoutPlans` over its own
+  date. The hook reports each read on its own terms; which of them a card's
+  status follows is that panel's rule, not the hook's. #356's is that
+  `readWorkouts` drives its `PanelStatus` and `readWorkoutPlans` only enriches a
+  line inside an already rendered card, so a failure of the second is silent and
+  the line keeps its height — #356's rule about #356's card.
 - **A lower bound that may be absent.** `from` is `IsoDate | null`, and `null`
   means no lower bound: `useDayRead('readHiveDue', null, to)` asks for every
   open item due on or before `to`, however far back it goes. #353's To do card

@@ -485,7 +485,7 @@ load, so the same day always generates the same data.
 
 | Source | Range, relative to today | Read |
 |---|---|---|
-| Thrive workouts | Done from 567 days before through yesterday. Planned from today through 6 days ahead, on `build()`'s weekly `PLAN`. Days 7 to 21 ahead exist but have nothing planned. Plus the missed stretch 3 days ago. | `readWorkouts` |
+| Thrive workouts | Done from 567 days before through yesterday. Planned from today through 6 days ahead, on `build()`'s weekly `PLAN`. Days 7 to 21 ahead exist but have nothing planned. Plus the missed stretch 3 days ago. | `readWorkouts`, and the planned strength ones again through `readWorkoutPlans` |
 | COROS health | From 371 days before through today, and nothing before (the "no watch data" days). About 5% of nights are "watch not worn", with sleep, resting HR and HRV `null`. Steps and calories only on past days. | `readHealth` |
 | Hive completions | The last 240 days, plus yesterday's reopened item. | `readHiveCompleted` |
 | Hive open items | `OPEN`: due from 4 days ago to 13 days ahead, keyed by due date. The prototype's `BUSY` list is a design-options scenario and isn't ported. | `readHiveDue` |
@@ -502,6 +502,26 @@ argument: it never reads it as today, which would drop exactly the overdue items
 the caller asked for, and it never throws. #353's To do panel is why the bound
 is nullable — overdue has no floor, and today's card wants everything due on or
 before 3 days ahead in one call.
+
+**The plan detail: `readWorkoutPlans`.** Thrive is read twice. `readWorkouts`
+returns the workouts; `readWorkoutPlans` returns, for each **planned strength**
+workout in the range, a `WorkoutPlan` of its exercise and set counts, keyed by
+that workout's date. The demo source reads the two counts straight off the
+generated workout — `build()` gives every weight session its template's `ex`
+and `sets`, planned or done — so the two reads agree by construction. A planned
+workout of another type has no entry, a workout already done has none (it is not
+a plan), and a date with no planned strength session gets no key. In this data
+that means keys only between today and 6 days ahead: the missed plan 3 days ago
+is a stretch.
+
+It is a second read rather than two more fields on `Workout` because live the
+counts cost one `getWorkoutSets` call per planned strength workout (#356), and
+`readWorkouts` has to stay one call for any range — #351's week strip and #358's
+month read it and show no counts. That also sets what the counts are for: they
+are enrichment, never a card's status. #356's card renders without them and a
+failure to fetch them is silent, so nothing in this interface treats a missing
+`WorkoutPlan` as an error. It takes an `IsoDate` at both ends; `readHiveDue`
+stays the only read with a nullable lower bound.
 
 Not ported: the Withings parts (`W_START`, `wt`, `bp`), which are #354's, and
 everything outside `build()` (the design-options scenarios, `eff()` and the
@@ -522,6 +542,12 @@ field is `null`, never `0` and never a middle value. Times of day are
   `ascent_m`, `avg_hr` and `calories` (numbers or null). For strength only,
   from the prototype's templates and not Thrive columns: `exercise_count`,
   `set_count`, `sets_logged` and `est_minutes`.
+- **`WorkoutPlan`**, what `readWorkoutPlans` returns: `workout_id`,
+  `exercise_count` and `set_count`, all non-null — a planned session with no
+  counts has no `WorkoutPlan` rather than one full of zeroes. `Workout` is
+  unchanged by it and keeps its own four strength fields; in the demo the two
+  agree because both come from the same generated workout, and live (#356) only
+  `WorkoutPlan` is filled.
 - **`Health`**, named after `DailyHealth`'s columns in `coros-sync-plan.md`:
   `resting_hr`, `hrv`, `steps`, `calories`, `sleep_total_s`, `sleep_deep_s`,
   `sleep_rem_s`, `sleep_light_s`, `sleep_awake_s`, `vo2max` and

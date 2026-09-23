@@ -491,6 +491,18 @@ load, so the same day always generates the same data.
 | Hive open items | `OPEN`: due from 4 days ago to 13 days ahead, keyed by due date. The prototype's `BUSY` list is a design-options scenario and isn't ported. | `readHiveDue` |
 | Entries | About 72% of the 80 days before today, plus yesterday's hand-placed entry and a note 4 days ahead. Nothing today. | `readEntries` |
 
+**Ranges, and the one nullable lower bound.** Each demo read filters the
+generated data to the inclusive `from`–`to` range and keys it by Denver date,
+with no key for a day that has nothing. `readHiveDue` is the exception, and the
+only read whose `from` is `IsoDate | null`: `null` means no lower bound, so
+`readHiveDue(null, to)` returns every open item due on or before `to` — in this
+data, everything from 4 days before today onward, which is where the open items
+start. The demo source honours `null` as a value rather than a missing
+argument: it never reads it as today, which would drop exactly the overdue items
+the caller asked for, and it never throws. #353's To do panel is why the bound
+is nullable — overdue has no floor, and today's card wants everything due on or
+before 3 days ahead in one call.
+
 Not ported: the Withings parts (`W_START`, `wt`, `bp`), which are #354's, and
 everything outside `build()` (the design-options scenarios, `eff()` and the
 step goal), which is #357's if it wants them. The generator runs only in demo

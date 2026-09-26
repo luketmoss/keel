@@ -67,3 +67,11 @@ All board writes go through `python .keel/board.py` — never hand-write GraphQL
 against the project. This is the one board rule stated here rather than in
 `CONVENTIONS.md`, because it binds every session and `CONVENTIONS.md` gives it
 only in the narrower case of adding a project option.
+
+Cloud Claude Code sessions have no `gh`, and their GitHub access is repo-scoped
+REST only. There, `board.py` hands the same command to
+`.github/workflows/board.yml` (a `repository_dispatch`) and relays its output
+and exit code, 15–40 s later; it needs the `BOARD_TOKEN` repo secret, a classic
+PAT with `project`, `repo` and `read:org`. Every other `gh` step in a skill
+means the same operation through the GitHub MCP tools (`mcp__github__*`).
+Nothing changes where `gh` is installed.

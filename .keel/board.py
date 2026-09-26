@@ -18,13 +18,22 @@ an option to a single-select field - silently destroys data if done naively.
 `holds-branch` and `next` exit non-zero to mean "something holds a branch" and
 "nothing to pick" - they are read-only, and written to be called by a schedule
 that has no one to read its output.
+
+Without `gh` (a cloud Claude Code session), the same command runs remotely in
+.github/workflows/board.yml, and its stdout, stderr and exit code come back
+here. Those sessions can reach only repo-scoped REST endpoints, so the board
+itself is out of reach.
 """
 
 import argparse
 import json
 import os
+import random
+import shutil
+import string
 import subprocess
 import sys
+import time
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 with open(os.path.join(ROOT, "board.json")) as fh:
@@ -197,6 +206,82 @@ def item_values(number):
         if node and node.get("field"):
             values[node["field"]["name"]] = node.get("name")
     return values
+
+
+# --- without gh -------------------------------------------------------------
+
+
+def rest(method, path, body=None):
+    """A repo-scoped REST call. curl rather than urllib: it honours the
+    session's HTTPS proxy and CA without any setup."""
+    token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    if not token:
+        sys.exit("No gh, and no GH_TOKEN or GITHUB_TOKEN to reach GitHub with.")
+    cmd = [
+        "curl", "-sS", "-X", method, "-w", "\n%{http_code}",
+        "-H", "Authorization: bearer " + token,
+        "-H", "Accept: application/vnd.github+json",
+        "https://api.github.com/repos/{}/{}".format(REPO, path),
+    ]
+    if body is not None:
+        cmd += ["-H", "Content-Type: application/json", "--data", json.dumps(body)]
+    raw = subprocess.run(cmd, capture_output=True, text=True, check=True).stdout
+    text, _, status = raw.rpartition("\n")
+    if int(status) >= 300:
+        sys.exit("GitHub {} {} -> {}\n{}".format(method, path, status, text))
+    return json.loads(text) if text else None
+
+
+def run_remotely(argv):
+    """Run this command in board.yml and relay its result, exit code included.
+
+    The workflow returns stdout, stderr and the exit code as check-run
+    annotations: "board-out N", "board-err N" and "board-exit".
+    """
+    workflow = "actions/workflows/board.yml"
+    request_id = "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
+    rest("POST", "dispatches", {
+        "event_type": "board",
+        "client_payload": {"args": argv, "request_id": request_id},
+    })
+
+    deadline = time.time() + 5 * 60
+    run = None
+    while time.time() < deadline:
+        time.sleep(4)
+        if run is None:
+            runs = rest("GET", workflow + "/runs?event=repository_dispatch&per_page=20")
+            run = next((r for r in runs["workflow_runs"]
+                        if r["display_title"].endswith("[{}]".format(request_id))), None)
+            if run is None:
+                continue
+        run = rest("GET", "actions/runs/{}".format(run["id"]))
+        if run["status"] != "completed":
+            continue
+
+        jobs = rest("GET", "actions/runs/{}/jobs".format(run["id"]))["jobs"]
+        notes = rest("GET", "check-runs/{}/annotations?per_page=100".format(jobs[0]["id"])) if jobs else []
+
+        def stream(name):
+            parts = [a for a in notes if a["title"].startswith(name + " ")]
+            parts.sort(key=lambda a: int(a["title"][len(name) + 1:]))
+            return "\n".join(a["message"] for a in parts)
+
+        exit_note = next((a for a in notes if a["title"] == "board-exit"), None)
+        if exit_note is None:
+            sys.exit("The board workflow returned no result: " + run["html_url"])
+        out = stream("board-out")
+        err = "\n".join(filter(None, [
+            stream("board-err"),
+            next((a["message"] for a in notes if a["title"] == "board-truncated"), ""),
+        ]))
+        if out:
+            print(out)
+        if err:
+            print(err, file=sys.stderr)
+        sys.exit(int(exit_note["message"]))
+    sys.exit("Timed out waiting for the board workflow{}.".format(
+        ": " + run["html_url"] if run else ""))
 
 
 # --- commands ---------------------------------------------------------------
@@ -446,7 +531,11 @@ def main():
     p.add_argument("slug")
     p.set_defaults(func=cmd_add_project)
 
-    args = parser.parse_args()
+    # board.yml passes its arguments as a JSON array, so none pass through a shell.
+    argv = json.loads(os.environ["BOARD_ARGS"]) if os.environ.get("BOARD_ARGS") else sys.argv[1:]
+    args = parser.parse_args(argv)
+    if not shutil.which("gh"):
+        run_remotely(argv)
     args.func(args)
 
 

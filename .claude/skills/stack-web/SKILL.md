@@ -27,6 +27,15 @@ What follows is what worked.
 **Launch through the project's `.claude/launch.json` entry** and drive the
 preview pane. Never start the dev server with a bare shell command.
 
+**Cloud sessions have no preview pane.** There, `node .keel/look.mjs
+<launch-config> [path]` starts the same launch.json entry and drives it with
+the container's Playwright and Chromium: `--env VITE_FAKE_DRIVE=1` for cairn's
+fake Drive, `--width`/`--theme`, `--wait` before the screenshot, and PNGs you
+open with `Read`. For anything past a screenshot, `import { open }` from it and
+use the `page` it returns under the rules below; they hold unchanged. A
+criterion that needs a real Google key the environment lacks (the Maps key, for
+one) is *cannot be verified here*, not a pass.
+
 **Read state out of the DOM and the console, not off the screen.** Query for the
 element and assert on its text, its attributes, or its computed style. A
 screenshot answers *does this look right*; it never answers *is this correct*.

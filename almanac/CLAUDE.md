@@ -1,5 +1,13 @@
 # CLAUDE.md — almanac
 
+> **Superseded — 27 September 2026. almanac is retired and will not be built.**
+> Its purpose moved into Thrive, which becomes the one health app: the day
+> view (luketmoss/thrive#228), trends (thrive#229) and a daily note
+> (thrive#227). The Hive panel was dropped. The plan is
+> `luketmoss/thrive` → `docs/health-aggregator-plan.md`. This document is
+> kept as the record of the decisions that plan carries over, and as prior
+> art for Thrive's `/ux`. Do not work from it.
+
 A morning driver: one screen showing the day ahead — what training is
 scheduled, what is due, what last night's sleep looked like — linking into the
 apps that own each piece. Personal use.

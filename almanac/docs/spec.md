@@ -1,5 +1,13 @@
 # Journal — Product Specification
 
+> **Superseded — 27 September 2026. almanac is retired and will not be built.**
+> Its purpose moved into Thrive, which becomes the one health app: the day
+> view (luketmoss/thrive#228), trends (thrive#229) and a daily note
+> (thrive#227). The Hive panel was dropped. The plan is
+> `luketmoss/thrive` → `docs/health-aggregator-plan.md`. This document is
+> kept as the record of the decisions that plan carries over, and as prior
+> art for Thrive's `/ux`. Do not work from it.
+
 **Revision 2** — 22 September 2026
 **Status:** Draft. Scaffolded 19 September 2026 as `almanac/` in the keel
 workspace — a project folder, not its own repository. §9's first decisions were

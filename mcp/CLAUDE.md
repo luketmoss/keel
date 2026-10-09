@@ -36,6 +36,10 @@ the PR; the stack skill says how.
 
 ## Deploying
 
+The Worker is named `keel-mcp` (`wrangler.toml`), so it serves at
+`keel-mcp.<account-subdomain>.workers.dev`. The folder and board option stay
+`mcp`.
+
 Merge to `main` deploys, once the `CLOUDFLARE_API_TOKEN` repository secret
 exists; until then the deploy job skips with a notice. Worker secrets are set
 with `npx wrangler secret put`, never committed.

@@ -10,7 +10,7 @@ compatibility_flags = ["global_fetch_strictly_public"]
 # Set when the GitHub OAuth app is created (#369).
 GITHUB_CLIENT_ID = "Ov23lieyNEsMK4XTtE7m"
 # Owner hive_add_item uses when none is given. Set to your Hive owner name.
-HIVE_DEFAULT_OWNER = ""
+HIVE_DEFAULT_OWNER = "Luke"
 
 # No id: wrangler creates the namespace on first deploy and records it.
 [[kv_namespaces]]

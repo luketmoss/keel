@@ -53,6 +53,21 @@ to get it moving.
 judgment you make, not a question you ask. P0 if it's broken or blocking, P1 if
 it's the current focus, P2 if it's real but not now.
 
+### When the user approves a split
+
+Create the children with `/idea`, then connect each to the parent as a
+GitHub sub-issue. A mention in a comment or a checklist is not a link: the
+parent's sub-issue list and progress bar read from the real relationship.
+`gh` has no command for it, and the API wants the child's numeric `id`, not
+its issue number:
+
+```bash
+id=$(gh api repos/luketmoss/keel/issues/<child> -q .id)
+gh api -X POST repos/luketmoss/keel/issues/<parent>/sub_issues -F sub_issue_id=$id
+```
+
+Do this once per child. The parent stays in PM Refining as the tracking epic.
+
 ## Stop rather than guess
 
 If a question genuinely needs the user's judgment — a product decision, a

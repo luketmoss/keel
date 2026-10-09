@@ -6,3 +6,4 @@
 export const PUBLIC_URL = 'https://keel-mcp.luketmossbot.workers.dev'
 
 export const HIVE_RESOURCE = `${PUBLIC_URL}/hive/mcp`
+export const THRIVE_RESOURCE = `${PUBLIC_URL}/thrive/mcp`

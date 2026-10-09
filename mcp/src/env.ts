@@ -12,6 +12,10 @@ export interface Env {
   HIVE_API_URL: string
   /** Hive's MCP-only API key (`MCP_API_KEY` in Hive's script properties). */
   HIVE_API_KEY: string
+  /** Thrive's Apps Script `/exec` URL. A secret only because the URL plus a key is full access. */
+  THRIVE_API_URL: string
+  /** Thrive's MCP-only API key (`MCP_API_KEY` in Thrive's script properties). */
+  THRIVE_API_KEY: string
   /** Owner used by `hive_add_item` when none is given. Not secret; may be empty. */
   HIVE_DEFAULT_OWNER?: string
 }

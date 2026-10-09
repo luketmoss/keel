@@ -17,3 +17,10 @@ HIVE_API_URL=
 # Hive's MCP-only key: the MCP_API_KEY script property in Hive's Apps Script
 # (hive#273), NOT its API_KEY. Revoke by clearing that property.
 HIVE_API_KEY=
+
+# Thrive's Apps Script web-app URL (the /exec URL). Treated as a secret.
+THRIVE_API_URL=
+
+# Thrive's MCP-only key: the MCP_API_KEY script property in Thrive's Apps
+# Script (thrive#364), NOT its API_KEY, which the syncs and admin scripts hold.
+THRIVE_API_KEY=

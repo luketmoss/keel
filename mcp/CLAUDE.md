@@ -23,6 +23,7 @@ mcp/
 │   ├── allow.ts        # the one-GitHub-user-ID gate
 │   ├── github.ts       # GitHub OAuth calls and PKCE helpers
 │   ├── hive/           # /hive/mcp: api.ts (Apps Script client), tools.ts, index.ts
+│   ├── thrive/         # /thrive/mcp: the ported Thrive modules (JS) + index.ts
 │   ├── consent.ts      # consent and message pages
 │   ├── config.ts       # the Worker's public URL and resource URLs
 │   └── env.ts          # the Env interface: every binding
@@ -83,3 +84,44 @@ The Worker is named `keel-mcp` (`wrangler.toml`), so it serves at
 Merge to `main` deploys, once the `CLOUDFLARE_API_TOKEN` repository secret
 exists; until then the deploy job skips with a notice. Worker secrets are set
 with `npx wrangler secret put`, never committed.
+
+## Thrive
+
+`/thrive/mcp` serves the 22 Thrive tools, ported from `thrive/mcp-server` (the
+stdio copy stays until #372) and diffed against its recorded tool list
+(`test/fixtures/thrive-stdio-tools.json`). The ported modules in `src/thrive/`
+are plain JS with their original `node:test` suites (`npm run test:node`); only
+`tools.test.js` changed, to build the server in-process instead of spawning it.
+Secrets: `THRIVE_API_URL` and `THRIVE_API_KEY`, the MCP-only `MCP_API_KEY`, never
+Thrive's `API_KEY` (the syncs hold that one).
+
+Changes from the stdio server, all forced by running on a Worker:
+
+- **Home time.** Relative dates (`today`, `+3d`) and a new workout's default time
+  use America/Denver, the zone `domain.js` already treats as home. A Worker's
+  clock is UTC, so reading local time would make every evening's "today" tomorrow.
+- **A failed write says it may or may not have landed.** Writes are still sent
+  once and never retried.
+- The API URL and key come from `configureApi()` per request, not `process.env`.
+
+A Thrive `apps-script/` change that alters a response shape also needs a matching
+change here.
+
+## Approving the destructive tools
+
+`thrive_delete_workout`, `thrive_delete_exercise` and `thrive_set_journal_entry`
+can destroy data (clearing a note is a delete). Their dry-run-until-`confirm: true`
+behaviour only prevents accidents; against prompt injection the one control is a
+human approving each call.
+
+**Approval is stored per device, not per connector.** Tapping "Always allow" on a
+prompt switches it off on that device only, and a new device starts at the
+default. So:
+
+- **Never choose "Always allow" on those three tools, on any device.**
+- On each device you use, set them to "Needs approval" in the connector's tool
+  list, and check by calling one.
+
+The three tools also carry `destructiveHint` (and every read tool
+`readOnlyHint`), which a client may or may not honour; nothing relies on it.
+

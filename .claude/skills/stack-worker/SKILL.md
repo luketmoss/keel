@@ -32,6 +32,8 @@ recorded in the PR.
 - Every binding is typed in one `Env` interface in `src/env.ts`. A binding read
   anywhere else as `env.SOMETHING` without being declared there is a bug
 - Vitest for tests, in the default Node environment, colocated beside the code
+- CI runs Node 22: current wrangler refuses to run on 20, and the failure
+  surfaces only at the `build` step
 - `compatibility_date` is pinned in `wrangler.toml` and moved deliberately,
   never left to drift; `nodejs_compat` is added only when a dependency needs it
 - Errors become responses. A Worker that throws returns an opaque 1101 page

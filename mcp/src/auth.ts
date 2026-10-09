@@ -77,6 +77,12 @@ async function callback(request: Request, env: Env): Promise<Response> {
 
   // The gate. No grant is created, so no token exists, for anyone else.
   if (!isAllowedGithubUser(user.id, env.ALLOWED_GITHUB_ID)) {
+    // The signed-in ID is public. The allow-list value is not logged, only
+    // whether it is set and shaped like an ID, so a typo can be diagnosed.
+    const allowed = env.ALLOWED_GITHUB_ID
+    console.warn(
+      `refused github id=${user.id} allow-list ${allowed === undefined ? 'unset' : `length=${allowed.length} numeric=${/^\d+$/.test(allowed.trim())}`}`,
+    )
     return messagePage('Not authorised', 'This GitHub account is not allowed to use this server.', 403)
   }
 

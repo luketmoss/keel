@@ -1,3 +1,11 @@
 # Secrets the Worker reads in local development. Copy to .dev.vars (gitignored)
 # and fill in. In production each is set with `npx wrangler secret put NAME`.
-# None are read yet; the first ones arrive with the OAuth spike (#369).
+
+# Client secret of the GitHub OAuth app (GitHub > Settings > Developer settings
+# > OAuth Apps). The client ID is not secret and lives in wrangler.toml.
+GITHUB_CLIENT_SECRET=
+
+# The one GitHub numeric user ID allowed to sign in. Find yours with:
+#   curl https://api.github.com/users/<your-login>   (the "id" field)
+# Never the login name: logins can be renamed, IDs cannot.
+ALLOWED_GITHUB_ID=

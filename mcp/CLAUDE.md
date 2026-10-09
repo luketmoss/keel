@@ -18,10 +18,33 @@ mcp/
 ├── wrangler.toml
 ├── .dev.vars.example   # every secret the Worker reads
 ├── src/
-│   ├── index.ts        # fetch handler
+│   ├── index.ts        # OAuthProvider: routes /hello/mcp to the MCP handler
+│   ├── auth.ts         # /authorize, /callback, /health: consent, GitHub sign-in
+│   ├── allow.ts        # the one-GitHub-user-ID gate
+│   ├── github.ts       # GitHub OAuth calls and PKCE helpers
+│   ├── hello.ts        # the spike's MCP endpoint (whoami); removed in #370
+│   ├── consent.ts      # consent and message pages
+│   ├── config.ts       # the Worker's public URL
 │   └── env.ts          # the Env interface: every binding
+├── test/               # stand-in for `cloudflare:workers` under Node
 └── docs/design/        # UX artifacts, one file per issue
 ```
+
+## Sign-in
+
+The Worker is its own OAuth authorization server (`@cloudflare/workers-oauth-provider`,
+state in the `OAUTH_KV` namespace) and signs people in with GitHub. Only the
+GitHub numeric user ID in the `ALLOWED_GITHUB_ID` secret gets a token; anyone
+else sees "Not authorised" and no grant exists. The GitHub access token is used
+once to read the user's ID and login, and is never stored.
+
+Setup for a fresh account, once:
+
+1. Create a GitHub OAuth app. Callback URL: `<PUBLIC_URL>/callback`. Put its
+   client ID in `wrangler.toml` (`GITHUB_CLIENT_ID`).
+2. `npx wrangler secret put GITHUB_CLIENT_SECRET` and
+   `npx wrangler secret put ALLOWED_GITHUB_ID`.
+3. In claude.ai, add a custom connector pointing at `<PUBLIC_URL>/hello/mcp`.
 
 ## Board
 

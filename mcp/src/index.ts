@@ -1,18 +1,37 @@
-import type { Env } from './env'
+import OAuthProvider from '@cloudflare/workers-oauth-provider'
+import { handleAuth } from './auth'
+import { HELLO_RESOURCE, PUBLIC_URL } from './config'
+import type { Env, Props } from './env'
+import { handleHello } from './hello'
 
-export async function handle(request: Request, _env: Env): Promise<Response> {
-  const { pathname } = new URL(request.url)
-  if (pathname === '/health') return new Response('ok')
-  return new Response('Not found', { status: 404 })
-}
-
-export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    try {
-      return await handle(request, env)
-    } catch (err) {
-      console.error('unhandled', err instanceof Error ? err.message : err)
-      return new Response('Internal error', { status: 500 })
-    }
+export default new OAuthProvider<Env>({
+  apiRoute: '/hello/mcp',
+  apiHandler: {
+    async fetch(request: Request, _env: Env, ctx: ExecutionContext) {
+      try {
+        return await handleHello(request, (ctx as unknown as { props: Props }).props)
+      } catch (err) {
+        console.error('mcp error', err instanceof Error ? err.message : err)
+        return new Response('Internal error', { status: 500 })
+      }
+    },
   },
-}
+  defaultHandler: {
+    async fetch(request: Request, env: Env) {
+      try {
+        return await handleAuth(request, env)
+      } catch (err) {
+        console.error('auth error', err instanceof Error ? err.message : err)
+        return new Response('Internal error', { status: 500 })
+      }
+    },
+  },
+  authorizeEndpoint: '/authorize',
+  tokenEndpoint: '/oauth/token',
+  clientRegistrationEndpoint: '/oauth/register',
+  clientIdMetadataDocumentEnabled: true,
+  resourceMetadata: {
+    resource: HELLO_RESOURCE,
+    authorization_servers: [PUBLIC_URL],
+  },
+})

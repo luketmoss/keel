@@ -1,14 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { handle } from './index'
+import { handleAuth } from './auth'
+import type { Env } from './env'
 
-describe('handle', () => {
+const env = {} as Env
+
+describe('handleAuth', () => {
   it('answers /health', async () => {
-    const res = await handle(new Request('https://example.test/health'), {})
+    const res = await handleAuth(new Request('https://example.test/health'), env)
     expect(res.status).toBe(200)
   })
 
   it('404s everything else', async () => {
-    const res = await handle(new Request('https://example.test/nope'), {})
+    const res = await handleAuth(new Request('https://example.test/nope'), env)
     expect(res.status).toBe(404)
   })
 })

@@ -18,8 +18,8 @@ Ask with `AskUserQuestion`. Three things, one round — do not interrogate.
 - **Slug** — lowercase, hyphenated. Becomes the folder, the branch prefix, the
   tag prefix, the workflow filename, and the board option. Propose one from what
   they've told you rather than asking cold.
-- **Stack** — firmware, web, mobile, or cli. Determines which stack skill is
-  authoritative and what gets scaffolded.
+- **Stack** — firmware, web, mobile, cli, or worker. Determines which stack
+  skill is authoritative and what gets scaffolded.
 - **One-line purpose** — what it does and who for. Goes at the top of the
   project's CLAUDE.md.
 

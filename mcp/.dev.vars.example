@@ -1,0 +1,3 @@
+# Secrets the Worker reads in local development. Copy to .dev.vars (gitignored)
+# and fill in. In production each is set with `npx wrangler secret put NAME`.
+# None are read yet; the first ones arrive with the OAuth spike (#369).

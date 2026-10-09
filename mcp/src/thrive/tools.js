@@ -45,13 +45,15 @@ const fail = (t) => ({ content: [{ type: 'text', text: t }], isError: true });
 
 // Tool hints for clients (the Worker port, #371). Approval choices are stored
 // per device, so these are a free extra signal, not a control: whether a client
-// honours them is unverified. The three destructive tools are listed by name.
+// honours them is unverified. The four destructive tools are listed by name.
 const READ_ONLY = new Set([
   'thrive_list_workouts', 'thrive_get_workout', 'thrive_get_workout_payload', 'thrive_daily_health',
   'thrive_daily_summary', 'thrive_body_measurements', 'thrive_journal', 'thrive_list_exercises',
   'thrive_list_templates', 'thrive_exercise_history',
 ]);
-const DESTRUCTIVE = new Set(['thrive_delete_workout', 'thrive_delete_exercise', 'thrive_set_journal_entry']);
+const DESTRUCTIVE = new Set([
+  'thrive_delete_workout', 'thrive_delete_exercise', 'thrive_update_template', 'thrive_set_journal_entry',
+]);
 const annotationsFor = (name) =>
   READ_ONLY.has(name) ? { readOnlyHint: true } : DESTRUCTIVE.has(name) ? { destructiveHint: true } : undefined;
 

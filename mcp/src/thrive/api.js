@@ -23,9 +23,6 @@ export function configureApi({ url, key }) {
   config = { url, key };
 }
 
-export const API_URL = config.url;
-export const API_KEY = config.key;
-
 /** Strip the key and the URL from text that may reach a response or a log. */
 export function scrubSecrets(text) {
   let out = String(text);

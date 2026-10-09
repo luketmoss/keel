@@ -9,3 +9,11 @@ GITHUB_CLIENT_SECRET=
 #   curl https://api.github.com/users/<your-login>   (the "id" field)
 # Never the login name: logins can be renamed, IDs cannot.
 ALLOWED_GITHUB_ID=
+
+# Hive's Apps Script web-app URL (the /exec URL). Treated as a secret: the URL
+# plus a key is full access to Hive.
+HIVE_API_URL=
+
+# Hive's MCP-only key: the MCP_API_KEY script property in Hive's Apps Script
+# (hive#273), NOT its API_KEY. Revoke by clearing that property.
+HIVE_API_KEY=

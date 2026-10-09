@@ -37,9 +37,9 @@ async function showConsent(request: Request, env: Env): Promise<Response> {
   const authRequest = await oauth.parseAuthRequest(request)
   const details = await oauth.describeConsent(authRequest)
   const consent = await oauth.beginConsent(authRequest)
-  return new Response(consentPage(details, consent.handle), {
-    headers: consent.headers, // binding cookie, no framing, no caching
-  })
+  const headers = new Headers(consent.headers) // binding cookie, no framing, no caching
+  headers.set('Content-Type', 'text/html; charset=utf-8')
+  return new Response(consentPage(details, consent.handle), { headers })
 }
 
 async function approve(request: Request, env: Env): Promise<Response> {

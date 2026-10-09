@@ -7,7 +7,12 @@ const KEY = 'thrive-secret-key-123'
 const URL_ = 'https://script.google.com/macros/s/thrive/exec'
 const env = { THRIVE_API_URL: URL_, THRIVE_API_KEY: KEY } as Env
 
-const DESTRUCTIVE = ['thrive_delete_exercise', 'thrive_delete_workout', 'thrive_set_journal_entry']
+const DESTRUCTIVE = [
+  'thrive_delete_exercise',
+  'thrive_delete_workout',
+  'thrive_set_journal_entry',
+  'thrive_update_template',
+]
 const READ_ONLY = [
   'thrive_body_measurements',
   'thrive_daily_health',
@@ -96,7 +101,7 @@ describe('thrive tool list', () => {
     expect(worker).toEqual(stdio)
   })
 
-  it('marks the three destructive tools and every read tool', async () => {
+  it('marks the four destructive tools and every read tool', async () => {
     const tools = await listTools()
     const hint = (name: string) => tools.find((t) => t.name === name)?.annotations
     for (const name of DESTRUCTIVE) expect(hint(name)?.destructiveHint, name).toBe(true)

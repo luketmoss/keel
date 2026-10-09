@@ -27,9 +27,9 @@ mcp/
 │   ├── consent.ts      # consent and message pages
 │   ├── config.ts       # the Worker's public URL and resource URLs
 │   └── env.ts          # the Env interface: every binding
-├── test/               # `cloudflare:workers` stand-in; fixtures/ holds the stdio
-│                       # servers' tool lists the ports are diffed against
-├── scripts/            # dump-stdio-tools.mjs regenerates those fixtures
+├── test/               # `cloudflare:workers` stand-in; fixtures/ holds the retired
+│                       # stdio servers' tool lists the ports are diffed against
+├── docs/               # thrive-tools.md (reference), thrive-agent-brief.md
 └── docs/design/        # UX artifacts, one file per issue
 ```
 
@@ -57,8 +57,10 @@ server (`src/index.ts`) and `src/config.ts`.
 
 ## Hive
 
-`/hive/mcp` serves the 8 Hive tools, ported from the stdio server and diffed
-against its recorded tool list (`test/fixtures/hive-stdio-tools.json`). Secrets:
+`/hive/mcp` serves the 8 Hive tools, ported from the stdio server (retired in
+#372) and diffed against the tool list recorded from it
+(`test/fixtures/hive-stdio-tools.json`, a frozen contract: change a tool on
+purpose, then update the fixture by hand). Secrets:
 `HIVE_API_URL` and `HIVE_API_KEY`, where the key is Hive's MCP-only
 `MCP_API_KEY`, never its `API_KEY`. `HIVE_DEFAULT_OWNER` is a var in
 `wrangler.toml`. Errors reaching Hive come back as tool errors with the key and
@@ -87,9 +89,11 @@ with `npx wrangler secret put`, never committed.
 
 ## Thrive
 
-`/thrive/mcp` serves the 22 Thrive tools, ported from `thrive/mcp-server` (the
-stdio copy stays until #372) and diffed against its recorded tool list
-(`test/fixtures/thrive-stdio-tools.json`). The ported modules in `src/thrive/`
+`/thrive/mcp` serves the 22 Thrive tools, ported from the stdio server
+(retired in #372) and diffed against the tool list recorded from it
+(`test/fixtures/thrive-stdio-tools.json`, frozen the same way). The tool
+reference and the agent brief are in `docs/thrive-tools.md` and
+`docs/thrive-agent-brief.md`. The ported modules in `src/thrive/`
 are plain JS with their original `node:test` suites (`npm run test:node`); only
 `tools.test.js` changed, to build the server in-process instead of spawning it.
 Secrets: `THRIVE_API_URL` and `THRIVE_API_KEY`, the MCP-only `MCP_API_KEY`, never
@@ -109,8 +113,9 @@ change here.
 
 ## Approving the destructive tools
 
-`thrive_delete_workout`, `thrive_delete_exercise` and `thrive_set_journal_entry`
-can destroy data (clearing a note is a delete). Their dry-run-until-`confirm: true`
+`thrive_delete_workout`, `thrive_delete_exercise`, `thrive_update_template`
+(it deletes the old rows) and `thrive_set_journal_entry` can destroy data
+(clearing a note is a delete). Their dry-run-until-`confirm: true`
 behaviour only prevents accidents; against prompt injection the one control is a
 human approving each call.
 
@@ -118,10 +123,10 @@ human approving each call.
 prompt switches it off on that device only, and a new device starts at the
 default. So:
 
-- **Never choose "Always allow" on those three tools, on any device.**
+- **Never choose "Always allow" on those four tools, on any device.**
 - On each device you use, set them to "Needs approval" in the connector's tool
   list, and check by calling one.
 
-The three tools also carry `destructiveHint` (and every read tool
+The four tools also carry `destructiveHint` (and every read tool
 `readOnlyHint`), which a client may or may not honour; nothing relies on it.
 

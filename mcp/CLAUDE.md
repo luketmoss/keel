@@ -18,15 +18,17 @@ mcp/
 ├── wrangler.toml
 ├── .dev.vars.example   # every secret the Worker reads
 ├── src/
-│   ├── index.ts        # OAuthProvider: routes /hello/mcp to the MCP handler
+│   ├── index.ts        # authorization server + one resource server per MCP endpoint
 │   ├── auth.ts         # /authorize, /callback, /health: consent, GitHub sign-in
 │   ├── allow.ts        # the one-GitHub-user-ID gate
 │   ├── github.ts       # GitHub OAuth calls and PKCE helpers
-│   ├── hello.ts        # the spike's MCP endpoint (whoami); removed in #370
+│   ├── hive/           # /hive/mcp: api.ts (Apps Script client), tools.ts, index.ts
 │   ├── consent.ts      # consent and message pages
-│   ├── config.ts       # the Worker's public URL
+│   ├── config.ts       # the Worker's public URL and resource URLs
 │   └── env.ts          # the Env interface: every binding
-├── test/               # stand-in for `cloudflare:workers` under Node
+├── test/               # `cloudflare:workers` stand-in; fixtures/ holds the stdio
+│                       # servers' tool lists the ports are diffed against
+├── scripts/            # dump-stdio-tools.mjs regenerates those fixtures
 └── docs/design/        # UX artifacts, one file per issue
 ```
 
@@ -44,7 +46,22 @@ Setup for a fresh account, once:
    client ID in `wrangler.toml` (`GITHUB_CLIENT_ID`).
 2. `npx wrangler secret put GITHUB_CLIENT_SECRET` and
    `npx wrangler secret put ALLOWED_GITHUB_ID`.
-3. In claude.ai, add a custom connector pointing at `<PUBLIC_URL>/hello/mcp`.
+3. In claude.ai, add one custom connector per endpoint, for example
+   `<PUBLIC_URL>/hive/mcp`.
+
+Each endpoint is its own OAuth resource, so a token issued for one is refused at
+the others. To add an endpoint: a folder like `src/hive/`, an entry in
+`resources` in `src/index.ts`, and its URL in `resources` of the authorization
+server (`src/index.ts`) and `src/config.ts`.
+
+## Hive
+
+`/hive/mcp` serves the 8 Hive tools, ported from the stdio server and diffed
+against its recorded tool list (`test/fixtures/hive-stdio-tools.json`). Secrets:
+`HIVE_API_URL` and `HIVE_API_KEY`, where the key is Hive's MCP-only
+`MCP_API_KEY`, never its `API_KEY`. `HIVE_DEFAULT_OWNER` is a var in
+`wrangler.toml`. Errors reaching Hive come back as tool errors with the key and
+URL scrubbed.
 
 ## Board
 

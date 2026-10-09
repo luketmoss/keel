@@ -1,0 +1,238 @@
+[
+  {
+    "name": "hive_add_item",
+    "description": "Add a new item to a Hive kanban board. Status defaults to 'To Do'.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "board": {
+          "type": "string",
+          "description": "Board name (e.g., 'Work', 'Family')"
+        },
+        "title": {
+          "type": "string",
+          "description": "Item title"
+        },
+        "description": {
+          "description": "Item description",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Owner name (must match an existing owner)",
+          "type": "string"
+        },
+        "due_date": {
+          "description": "Due date in ISO format (YYYY-MM-DD)",
+          "type": "string"
+        },
+        "labels": {
+          "description": "Comma-separated labels",
+          "type": "string"
+        },
+        "status": {
+          "description": "Status (defaults to 'To Do')",
+          "type": "string",
+          "enum": [
+            "To Do",
+            "In Progress",
+            "Done"
+          ]
+        },
+        "parent_id": {
+          "description": "ID of parent item (for creating sub-tasks)",
+          "type": "string"
+        },
+        "position": {
+          "description": "Position in column: 'top', 'bottom', or a 1-based index (default: bottom)",
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "top",
+                "bottom"
+              ]
+            },
+            {
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "required": [
+        "board",
+        "title"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "hive_create_label",
+    "description": "Create a new label for Hive board items",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "Label name"
+        },
+        "color": {
+          "description": "Label color (e.g., 'red', '#FF0000')",
+          "type": "string"
+        },
+        "board": {
+          "description": "Board name to scope this label to (optional)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "label"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "hive_get_item",
+    "description": "Get full details of a single Hive item by ID. Use this to read the current description, status, etc. before updating.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "item_id": {
+          "type": "string",
+          "description": "ID of the item to fetch"
+        }
+      },
+      "required": [
+        "item_id"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "hive_list_boards",
+    "description": "List all Hive kanban boards",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "hive_list_items",
+    "description": "List items on a Hive kanban board, optionally filtered by status and/or date range. Omit board to query across all boards.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "board": {
+          "description": "Board name (e.g., 'Work', 'Family'). Omit to query all boards.",
+          "type": "string"
+        },
+        "status": {
+          "description": "Filter by status",
+          "type": "string",
+          "enum": [
+            "To Do",
+            "In Progress",
+            "Done"
+          ]
+        },
+        "due_after": {
+          "description": "Only items with due_date >= this date (YYYY-MM-DD)",
+          "type": "string"
+        },
+        "due_before": {
+          "description": "Only items with due_date <= this date (YYYY-MM-DD)",
+          "type": "string"
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "hive_list_labels",
+    "description": "List valid labels for Hive board items. Optionally filter by board.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "board": {
+          "description": "Board name to filter labels by (optional — omit to list all)",
+          "type": "string"
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "hive_list_owners",
+    "description": "List valid owners for Hive board items",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "hive_update_item",
+    "description": "Update an existing item on a Hive kanban board. Only provide fields you want to change.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "item_id": {
+          "type": "string",
+          "description": "ID of the item to update"
+        },
+        "title": {
+          "description": "New title",
+          "type": "string"
+        },
+        "description": {
+          "description": "New description",
+          "type": "string"
+        },
+        "status": {
+          "description": "New status",
+          "type": "string",
+          "enum": [
+            "To Do",
+            "In Progress",
+            "Done"
+          ]
+        },
+        "owner": {
+          "description": "New owner name",
+          "type": "string"
+        },
+        "due_date": {
+          "description": "New due date in ISO format (YYYY-MM-DD)",
+          "type": "string"
+        },
+        "labels": {
+          "description": "New comma-separated labels (replaces existing)",
+          "type": "string"
+        },
+        "parent_id": {
+          "description": "New parent item ID",
+          "type": "string"
+        },
+        "position": {
+          "description": "Position in column: 'top', 'bottom', or a 1-based index",
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "top",
+                "bottom"
+              ]
+            },
+            {
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "required": [
+        "item_id"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  }
+]

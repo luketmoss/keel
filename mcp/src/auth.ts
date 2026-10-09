@@ -1,4 +1,5 @@
 import {
+  type OAuthHelpers,
   AuthorizationError,
   CimdFetchError,
   authorizationErrorRedirect,
@@ -9,14 +10,14 @@ import type { Env, Props } from './env'
 import { exchangeForUser, githubAuthorizeUrl, newVerifier, s256 } from './github'
 
 /** The default handler: everything that is not the MCP endpoint itself. */
-export async function handleAuth(request: Request, env: Env): Promise<Response> {
+export async function handleAuth(request: Request, env: Env, oauth: OAuthHelpers): Promise<Response> {
   const { pathname } = new URL(request.url)
   try {
     if (pathname === '/health') return new Response('ok')
     if (pathname === '/authorize') {
-      return request.method === 'POST' ? await approve(request, env) : await showConsent(request, env)
+      return request.method === 'POST' ? await approve(request, env, oauth) : await showConsent(request, oauth)
     }
-    if (pathname === '/callback') return await callback(request, env)
+    if (pathname === '/callback') return await callback(request, env, oauth)
     return new Response('Not found', { status: 404 })
   } catch (error) {
     if (error instanceof AuthorizationError && error.redirectTo) {
@@ -32,8 +33,7 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
   }
 }
 
-async function showConsent(request: Request, env: Env): Promise<Response> {
-  const oauth = env.OAUTH_PROVIDER
+async function showConsent(request: Request, oauth: OAuthHelpers): Promise<Response> {
   const authRequest = await oauth.parseAuthRequest(request)
   const details = await oauth.describeConsent(authRequest)
   const consent = await oauth.beginConsent(authRequest)
@@ -42,8 +42,7 @@ async function showConsent(request: Request, env: Env): Promise<Response> {
   return new Response(consentPage(details, consent.handle), { headers })
 }
 
-async function approve(request: Request, env: Env): Promise<Response> {
-  const oauth = env.OAUTH_PROVIDER
+async function approve(request: Request, env: Env, oauth: OAuthHelpers): Promise<Response> {
   const form = await request.formData()
   const handle = String(form.get('handle') ?? '')
 
@@ -63,8 +62,7 @@ async function approve(request: Request, env: Env): Promise<Response> {
   return new Response(null, { status: 302, headers })
 }
 
-async function callback(request: Request, env: Env): Promise<Response> {
-  const oauth = env.OAUTH_PROVIDER
+async function callback(request: Request, env: Env, oauth: OAuthHelpers): Promise<Response> {
   const { request: original, data, headers } = await oauth.finishUpstream<{ verifier: string }>(request)
   const code = new URL(request.url).searchParams.get('code')
 

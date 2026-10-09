@@ -5,4 +5,4 @@
  */
 export const PUBLIC_URL = 'https://keel-mcp.luketmossbot.workers.dev'
 
-export const HELLO_RESOURCE = `${PUBLIC_URL}/hello/mcp`
+export const HIVE_RESOURCE = `${PUBLIC_URL}/hive/mcp`

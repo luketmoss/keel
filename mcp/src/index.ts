@@ -1,8 +1,9 @@
 import { OAuthAuthorizationServer, OAuthResourceServer } from '@cloudflare/workers-oauth-provider'
 import { handleAuth } from './auth'
-import { HIVE_RESOURCE, PUBLIC_URL } from './config'
+import { HIVE_RESOURCE, PUBLIC_URL, THRIVE_RESOURCE } from './config'
 import type { Env, Props } from './env'
 import { handleHive } from './hive'
+import { handleThrive } from './thrive'
 
 /**
  * The Worker is its own OAuth authorization server, and each MCP endpoint is a
@@ -11,7 +12,7 @@ import { handleHive } from './hive'
  */
 const authorizationServer = new OAuthAuthorizationServer<Env>({
   issuer: PUBLIC_URL,
-  resources: [HIVE_RESOURCE],
+  resources: [HIVE_RESOURCE, THRIVE_RESOURCE],
   clientRegistrationEndpoint: '/oauth/register',
   clientIdMetadataDocumentEnabled: true,
 })
@@ -37,7 +38,10 @@ function mcpResource(resource: string, handle: (request: Request, env: Env) => P
 }
 
 /** Add a resource here with its own path; routing and metadata follow from it. */
-const resources = [{ path: new URL(HIVE_RESOURCE).pathname, server: mcpResource(HIVE_RESOURCE, handleHive) }]
+const resources = [
+  { path: new URL(HIVE_RESOURCE).pathname, server: mcpResource(HIVE_RESOURCE, handleHive) },
+  { path: new URL(THRIVE_RESOURCE).pathname, server: mcpResource(THRIVE_RESOURCE, handleThrive) },
+]
 
 const WELL_KNOWN = '/.well-known/oauth-protected-resource'
 

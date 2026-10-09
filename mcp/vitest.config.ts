@@ -8,6 +8,8 @@ export default defineConfig({
     },
   },
   test: {
+    // The ported Thrive modules keep their node:test suites; `npm run test:node` runs them.
+    exclude: ['node_modules/**', 'src/thrive/**/*.test.js'],
     // The OAuth library is ESM in node_modules; inline it so the alias above
     // applies to its `cloudflare:workers` import.
     server: { deps: { inline: ['@cloudflare/workers-oauth-provider'] } },

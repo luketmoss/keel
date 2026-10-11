@@ -232,7 +232,7 @@ tool(
   'thrive_get_workout',
   'Get one workout in full: every exercise, every set, with weight, reps and effort, plus its activity ' +
     'measurements (distance, ascent, heart rate, moving time, calories) and provenance: synced from COROS, ' +
-    'hand-logged and enriched from COROS, or hand-logged. A measurement not shown is unknown, never zero. ' +
+    'hand-logged and enriched from COROS, or hand-logged, plus the COROS portal link for a COROS activity. A measurement not shown is unknown, never zero. ' +
     'The raw COROS payload is readable with thrive_get_workout_payload; the FIT file is archived but ' +
     'its contents are not readable through this server.',
   { workout_id: z.string().describe('Workout id (from thrive_list_workouts)') },

@@ -9,7 +9,7 @@ import {
   describeHealthDay, describeHealthRange, describeSummaryDay, describeSummaryRange,
 } from './daily.js';
 import {
-  normalizeDate, provenanceOf, provenanceTag, typeLabel, describeSyncedFields,
+  normalizeDate, corosActivityUrl, provenanceOf, provenanceTag, typeLabel, describeSyncedFields,
 } from './domain.js';
 
 // --- fixtures, as the API returns them --------------------------------
@@ -315,4 +315,31 @@ test('an enriched workout names its link and makes no FIT claim', () => {
 
 test('a hand-logged workout omits every blank field rather than printing 0', () => {
   assert.deepEqual(describeSyncedFields(manual), ['- Provenance: hand-logged']);
+});
+
+test('a COROS activity with both ids gets its portal link beside the provenance (#312)', () => {
+  const url = 'https://t.coros.com/activity-detail?labelId=471166302945817201&sportType=204';
+  const s = { ...synced, sport_type: '204' };
+  assert.equal(corosActivityUrl(s), url);
+  const lines = describeSyncedFields(s);
+  assert.equal(lines[lines.indexOf(`- COROS: ${url}`) - 1].startsWith('- Provenance:'), true);
+  const e = { ...enriched, sport_type: '402' };
+  assert.equal(corosActivityUrl(e), 'https://t.coros.com/activity-detail?labelId=471093115402967310&sportType=402');
+  assert.ok(describeSyncedFields(e).some((l) => l.startsWith('- COROS: https://t.coros.com/')));
+});
+
+test('no portal link when there is nothing to link to (#312)', () => {
+  assert.equal(corosActivityUrl({ ...synced, sport_type: '' }), null);
+  assert.equal(corosActivityUrl({ ...synced, sport_type: '20x' }), null);
+  assert.equal(corosActivityUrl({ ...synced, sport_type: '204', source_activity_id: 'abc' }), null);
+  assert.equal(corosActivityUrl({ ...synced, sport_type: '204', status: 'planned' }), null);
+  assert.equal(corosActivityUrl({ ...synced, sport_type: '204', source: 'garmin_import' }), null);
+  assert.equal(corosActivityUrl({ ...manual, sport_type: '204' }), null);
+  assert.ok(!describeSyncedFields({ ...synced, sport_type: '' }).some((l) => l.startsWith('- COROS:')));
+});
+
+test('the portal link carries only the two public ids (#312)', () => {
+  const url = corosActivityUrl({ ...synced, sport_type: '204' });
+  assert.equal(url.includes(synced.raw_ref), false);
+  assert.deepEqual([...new URL(url).searchParams.keys()], ['labelId', 'sportType']);
 });

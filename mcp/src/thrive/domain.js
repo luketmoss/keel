@@ -511,6 +511,25 @@ export function provenanceTag(w) {
   return '';
 }
 
+/** The COROS web portal. One constant, so a regional host is a one-line change. */
+export const COROS_PORTAL_HOST = 'https://t.coros.com';
+
+/**
+ * A COROS activity's page on the portal (#312), or null when there is nothing
+ * to link to: a planned workout, a manual or non-COROS row, or an id or sport
+ * code that is blank or not all digits. Mirrors `corosActivityUrl` in
+ * thrive's `frontend/src/api/coros-link.ts` (#260) — change both together.
+ * The portal opens an activity only with both ids; the URL carries nothing else.
+ */
+export function corosActivityUrl(w) {
+  if (w.status === 'planned') return null;
+  const p = provenanceOf(w);
+  if (!((p === 'synced' && w.source === 'coros') || p === 'enriched')) return null;
+  const digits = /^\d+$/;
+  if (!digits.test(w.source_activity_id || '') || !digits.test(w.sport_type || '')) return null;
+  return `${COROS_PORTAL_HOST}/activity-detail?labelId=${w.source_activity_id}&sportType=${w.sport_type}`;
+}
+
 /**
  * thrive_get_workout's lines for the synced columns: moving time, calories,
  * start instant, provenance, and what is archived. A blank field is omitted,
@@ -532,6 +551,9 @@ export function describeSyncedFields(w) {
   if (p === 'synced') out.push(`- Provenance: synced from ${sourceName(w.source)}${detail}`);
   else if (p === 'enriched') out.push(`- Provenance: hand-logged, enriched from COROS${detail}`);
   else out.push('- Provenance: hand-logged');
+
+  const url = corosActivityUrl(w);
+  if (url) out.push(`- COROS: ${url}`);
 
   if (p !== 'manual') {
     if (w.raw_ref) {

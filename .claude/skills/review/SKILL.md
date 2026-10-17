@@ -32,16 +32,16 @@ ready.** Required status checks are deliberately off — a path-filtered require
 check never reports and blocks its PR forever — so nothing else is watching.
 
 **One PR can trigger several workflows** — a change under `cairn/` runs
-`cairn` and `keel`, and a change to a shared folder runs every consumer. One green run
-does not clear the PR; every run it had to pass must.
+`cairn` and `keel`, and a change to a shared folder runs every consumer. One
+green run does not clear the PR; every run it had to pass must.
 
 1. **List the runs for the head commit.** Take the head SHA from the PR, then
    `gh run list --repo luketmoss/keel --commit <sha> --json
    workflowName,status,conclusion,url` (in a cloud session, the GitHub MCP
    equivalent), cross-checked against `statusCheckRollup`. **Runs for earlier
    commits are ignored** — a green run on an old commit says nothing about
-   this one, and neither does a run concurrency cancelled for a newer push. Where a
-   workflow has more than one attempt for the head commit, read the latest. If
+   this one, and neither does a run concurrency cancelled for a newer push.
+   Where a workflow has more than one attempt for the head commit, read the latest. If
    a push lands during the review, the head moved: rebuild the list.
 2. **Work out which workflows should have run.** Read each
    `.github/workflows/*.yml`. One is expected when its `pull_request` trigger

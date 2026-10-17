@@ -49,11 +49,17 @@ describe('index.html icons and chrome (#397)', () => {
 
 describe('manifest.json (#397)', () => {
   const m = JSON.parse(readFileSync(pub('manifest.json'), 'utf-8'));
-  it('lists the 192 and 512 PNGs as "any" only, no maskable', () => {
+  it('lists the 192 and 512 PNGs as "any" and the maskable 512 as "maskable" (#429)', () => {
     expect(m.icons).toEqual([
       { src: 'thrive-app-icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
       { src: 'thrive-app-icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: 'thrive-app-icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
     ]);
+  });
+  it('never lists one file under two purposes (#429)', () => {
+    const srcs = m.icons.map((i: { src: string }) => i.src);
+    expect(new Set(srcs).size).toBe(srcs.length);
+    for (const i of m.icons) expect(i.purpose.split(' ')).toHaveLength(1);
   });
   it('theme and background are the tile navy; identity fields are unchanged', () => {
     expect(m.theme_color).toBe('#0f2a7a');
@@ -75,6 +81,32 @@ describe('public/ icon files (#397)', () => {
     expect(b.subarray(1, 4).toString()).toBe('PNG');
     expect(b.readUInt32BE(16)).toBe(n);
     expect(b.readUInt32BE(20)).toBe(n);
+  });
+  it('thrive-app-icon-maskable-512.png is 512 px and opaque (#429)', () => {
+    const b = readFileSync(pub('thrive-app-icon-maskable-512.png'));
+    expect(b.subarray(1, 4).toString()).toBe('PNG');
+    expect(b.readUInt32BE(16)).toBe(512);
+    expect(b.readUInt32BE(20)).toBe(512);
+    expect(b[25]).toBe(2); // colour type 2: RGB, no alpha channel
+  });
+  it('the maskable SVG is the tile, full bleed, with every layer scaled to 86% (#429)', () => {
+    const tile = readFileSync(pub('thrive-app-icon.svg'), 'utf-8').replace(/\r\n/g, '\n').split('\n');
+    const mask = readFileSync(pub('thrive-app-icon-maskable.svg'), 'utf-8').replace(/\r\n/g, '\n').split('\n');
+    const end = tile.lastIndexOf('</svg>');
+    expect(mask).toEqual([
+      tile[0],
+      '<rect width="1024" height="1024" fill="#0f2a7a"/>',
+      '<g transform="translate(512 512) scale(.86) translate(-512 -512)">',
+      ...tile.slice(2, end),
+      '</g>',
+      ...tile.slice(end),
+    ]);
+  });
+  it("the maskable sun sits inside Android's 409.6 safe zone (#429)", () => {
+    const svg = readFileSync(pub('thrive-app-icon-maskable.svg'), 'utf-8');
+    const [, cx, cy, r] = svg.match(/<circle cx="(\d+)" cy="(\d+)" r="(\d+)"/)!.map(Number);
+    const far = (Math.hypot(cx - 512, cy - 512) + r) * 0.86;
+    expect(far).toBeLessThan(409.6);
   });
   it('favicon.ico holds 16, 32 and 48 px images', () => {
     const b = readFileSync(pub('favicon.ico'));

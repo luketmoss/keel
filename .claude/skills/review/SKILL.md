@@ -90,6 +90,18 @@ python .keel/board.py set <issue> --status "Ready to Ship"
 Report what you found: issue, PR, what changed, what you checked, and anything
 you noted that didn't block.
 
+If the PR changes a human-reviewed path (`CONVENTIONS.md` §Human-reviewed
+paths), add one line after the run list and before the findings. Name up to
+three matching paths, then `and N more`:
+
+```
+Human-reviewed: this PR changes <path> and N more. It will not merge
+unattended; /ship will ask first.
+```
+
+The outcome is unchanged — Ready to Ship. Detection uses the same changed-file
+list `/ship` does: `gh pr diff <pr> --repo luketmoss/keel --name-only`.
+
 **Do not merge here.** `/ship` does that, and inside `/finish` it runs next —
 which is exactly why this skill's build check is not a formality. Standalone,
 the issue rests in Ready to Ship until someone runs `/ship`.

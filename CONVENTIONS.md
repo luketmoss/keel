@@ -266,6 +266,34 @@ The only irreversible action in the system. `/finish` runs it; running it by
 hand is for an issue that parked here and has since been fixed.
 **Exit:** merged.
 
+#### Human-reviewed paths
+
+The delivery run merges without a person when the build is green and `/review`
+finds nothing blocking. Two places have a blast radius too large for that: an
+agent-authored change that weakens the MCP safety model, or a token change that
+breaks every app's contrast, should not land unattended.
+
+A PR that changes any of these paths is **human-reviewed**:
+
+- `mcp/**`
+- the shared token stylesheet under `ui/` — any file there whose name begins
+  `tokens`. A project's own token file (cairn's, Thrive's) is not shared and is
+  not on this list. #386 creates the shared one; when it settles the real
+  filename it amends this line
+
+Detection is the PR's changed-file list, with a rename counted at both its old
+and new path. Any match gates the **whole** PR, however small the match. The list
+that applies is the one on the PR's base branch, so a PR cannot un-gate itself.
+
+A human-reviewed PR is reviewed and built like any other and ends in Ready to
+Ship. `/ship` is where it differs: inside `/finish` it does not merge, and the
+issue stays in Ready to Ship; run on its own it names the matching paths and
+merges only on a yes in chat. The wording is in
+[docs/design/393-human-reviewed-paths.md](docs/design/393-human-reviewed-paths.md).
+
+This is a rule for the skills. CODEOWNERS, branch protection and required
+reviews are not used, and a person merging by hand is not stopped.
+
 ### 9. Done
 
 **Merged is deployed** — CI builds on merge to main, so there is no separate

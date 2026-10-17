@@ -41,6 +41,9 @@ The run stops early if:
 - the stack gates Testing — firmware always, mobile for device-dependent
   criteria. The run stops in Testing with the unverifiable criteria listed
 - `/review` finds something blocking — the issue returns to In Development
+- the PR changes a human-reviewed path (`CONVENTIONS.md` §Human-reviewed
+  paths). `/review` ends clean and `/ship` declines to merge; the issue stays
+  in Ready to Ship
 - `/ship` refuses — a draft PR, checks failing or absent, a conflict. The issue
   **stays in Ready to Ship**, which is what that column now means: not a queue
   of things to rubber-stamp, but the ones that could not finish on their own
@@ -58,3 +61,16 @@ When the run merges:
 - any judgment call that could reasonably have gone the other way
 
 When it stopped instead, say where and why, and that nothing merged.
+
+When it parked on a human-reviewed path, the report opens:
+
+```
+Parked in Ready to Ship — not merged.
+
+PR #<pr> changes human-reviewed paths:
+  <path>
+```
+
+One matching path per line, at most five, then `and N more`. Follow with
+everything else the run would normally report, then
+`Review the diff, then run /ship <issue> to merge.`

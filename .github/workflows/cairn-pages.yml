@@ -3,9 +3,11 @@ on:
   push:
     branches: [main]
     paths: ['cairn/**', 'geo/**', 'pages-root/**', '.github/workflows/cairn-pages.yml']
+  workflow_dispatch:
+# Shared with thrive-pages.yml: every writer to gh-pages uses this one group.
 concurrency:
-  group: cairn-pages-${{ github.ref }}
-  cancel-in-progress: true
+  group: gh-pages
+  cancel-in-progress: false
 jobs:
   deploy:
     runs-on: ubuntu-latest

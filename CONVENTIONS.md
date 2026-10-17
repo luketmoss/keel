@@ -247,9 +247,10 @@ nothing should rest here. Review comments live on the PR; the board records only
 that the issue is in review.
 
 **Command:** `/review` — reviews the diff against the acceptance criteria, posts
-comments on the PR, and confirms the workflow run passed. Since required status
-checks are deliberately not used (see `## Continuous integration`), that
-confirmation is the only thing between a red build and a PR that looks ready.
+comments on the PR, and confirms every workflow run it triggered passed. Since
+required status checks are deliberately not used (see `## Continuous
+integration`), that confirmation is the only thing between a red build and a PR
+that looks ready.
 **Exit:** review found nothing blocking and CI is green. Findings send the issue
 back to In Development, not forward with a caveat.
 
@@ -341,8 +342,8 @@ Copy it from there rather than reconstructing one from these bullets.
 **Required status checks are not used.** A required check that is path-filtered
 out never reports, and GitHub blocks the PR forever waiting for a run that will
 not happen. The workarounds are worse than the problem at this scale, so
-`/review` verifies the run instead, and nothing reaches Ready to Ship without a
-green build. Do not turn them on in branch protection.
+`/review` verifies every run instead, and nothing reaches Ready to Ship
+without a green build. Do not turn them on in branch protection.
 
 **Secrets are repo-wide** — every workflow can read every secret. If a project
 ever needs isolation, scope its credentials with a GitHub Environment.

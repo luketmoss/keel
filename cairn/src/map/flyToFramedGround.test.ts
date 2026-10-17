@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearGroundAltitudeCache } from './groundAltitude'
-import type { ElevationSampler } from '../geo/elevation'
+import type { ElevationSampler } from '@keel/geo'
 
 /* #303 — the one helper #288's reveal and #292's arrival fit both call.
    Exercised directly, the same way `groundAltitude.test.ts` and
@@ -8,7 +8,7 @@ import type { ElevationSampler } from '../geo/elevation'
    `Map3DElement` and a fake `ElevationSampler` are the whole surface it
    touches. */
 const { reducedMotion } = vi.hoisted(() => ({ reducedMotion: { current: false } }))
-vi.mock('./motion', () => ({ prefersReducedMotion: () => reducedMotion.current }))
+vi.mock('@keel/geo', async (importOriginal) => ({ ...(await importOriginal<typeof import('@keel/geo')>()), prefersReducedMotion: () => reducedMotion.current }))
 
 import { flyToFramedGround } from './flyToFramedGround'
 

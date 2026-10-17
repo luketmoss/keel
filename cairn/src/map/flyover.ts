@@ -1,4 +1,4 @@
-import type { LatLng } from './geo'
+import type { LatLng } from '@keel/geo'
 
 /** 274-a-flyover-of-a-trip.md's three phases and their numbers. Not design
     tokens — "parameters of a view of data," the same reasoning #271 gives

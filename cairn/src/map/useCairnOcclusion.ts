@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ElevationSampler } from '../geo/elevation'
+import type { ElevationSampler } from '@keel/geo'
 import { isCairnOccluded, OCCLUSION_MAX_CAIRNS, type CameraPosition } from './cairnOcclusion'
 
 export interface OccludableCairn {

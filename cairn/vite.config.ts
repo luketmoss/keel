@@ -1,9 +1,20 @@
+import { fileURLToPath } from 'node:url'
+import { searchForWorkspaceRoot } from 'vite'
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   base: process.env.VITE_BASE_PATH || '/',
   plugins: [react()],
+  server: {
+    fs: {
+      /* @keel/geo is a file: link to ../geo, shipped as TypeScript source with
+         no build step, so the dev server has to be allowed to serve it from
+         outside cairn/. The default allow-list is narrowed by naming
+         anything, so the workspace root is restated. */
+      allow: [searchForWorkspaceRoot(process.cwd()), fileURLToPath(new URL('../geo', import.meta.url))],
+    },
+  },
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test-setup.ts'],

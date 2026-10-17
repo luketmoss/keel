@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AdvancedMarker, Polyline, useMap } from '@vis.gl/react-google-maps'
 import { deriveTripStatus, type TripIndexEntry, type TripStatus } from '../store/tripStore'
-import type { Track } from '../kml/parse'
+import type { Track } from '@keel/geo'
 import { matchesTripFilters, type TripFilters } from '../store/tripFilters'
-import { fitTracksToBounds, zoomToFitCluster } from '../map/fitBounds'
+import { fitTracksToBounds, zoomToFitCluster } from '@keel/geo'
 import { columnInset, toPadding } from '../map/reveal'
 import { useIsPhone } from '../map/useIsPhone'
-import { clusterMarkers, type MarkerCluster } from '../map/cluster'
+import { clusterMarkers, type MarkerCluster } from '@keel/geo'
 import './WorldMap.css'
 
 /* --text from index.css, transcribed — Google Maps' Polyline options take

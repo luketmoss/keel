@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { parseTrack, type Track } from '../kml/parse'
+import { parseTrack, type Track } from '@keel/geo'
 import { isPhotoFile, isTrackFile } from './fileKinds'
 import { findOrCreateTripFolder } from '../drive/tripFolder'
 import { startResumableUpload, uploadFileContent } from '../drive/trackFiles'

@@ -1,6 +1,6 @@
 import type { FeatureCollection, LineString } from 'geojson'
-import type { Track } from '../kml/parse'
-import type { StoredTrackElevation } from '../kml/stats'
+import type { Track } from '@keel/geo'
+import type { StoredTrackElevation } from '@keel/geo'
 import {
   LocalTripStore,
   isFeatureCollection,

@@ -11,7 +11,7 @@
 
 import { resolvePhotoInstant, tripUtcOffsetHours } from './interpolate'
 import type { CairnRecord } from './useCairnImport'
-import type { Track } from '../kml/parse'
+import type { Track } from '@keel/geo'
 import { cairnMetaClauses, type CairnIcon, type PositionSource } from '../store/looseStore'
 import { formatShortDate } from '../format/dates'
 

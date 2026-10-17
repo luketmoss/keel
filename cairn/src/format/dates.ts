@@ -1,6 +1,6 @@
 import { deriveTripStatus } from '../store/tripStore'
 import { formatDistance, formatElevationGain, markSampled } from './units'
-import type { TripTotals } from '../geo/tripTotals'
+import type { TripTotals } from '@keel/geo'
 
 /* Hair space + en dash + hair space, matching the header's existing range
    separator. A plain hyphen ("Aug 1 - 5") reads as a subtraction in the

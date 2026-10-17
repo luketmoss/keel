@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useMap } from '@vis.gl/react-google-maps'
 import { latLngFromContainerPoint } from '../map/containerPoint'
-import type { LatLng } from '../map/geo'
+import type { LatLng } from '@keel/geo'
 
 /** How long a touch must be held before it counts as a placement, and how
     far it may travel first. `156-creating-a-cairn.md`: "Long-press is 480ms,

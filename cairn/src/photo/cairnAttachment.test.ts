@@ -7,7 +7,7 @@ import {
   visibleCairnIds,
   type AttachableTrackFile,
 } from './cairnAttachment'
-import type { Track } from '../kml/parse'
+import type { Track } from '@keel/geo'
 
 /* Longitude 0 throughout unless a test says otherwise, so `tripUtcOffsetHours`
    returns +0 and the day keys read straight off the timestamps. The one

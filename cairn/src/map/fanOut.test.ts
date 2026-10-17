@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { clusterSeparatesAtZoom, fanOutPositions } from './fanOut'
-import { project } from './cluster'
+import { project } from '@keel/geo'
 
 const FOOTPRINT = 28
 const CAP = 20

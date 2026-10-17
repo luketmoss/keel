@@ -25,7 +25,8 @@ import type { ImportedFile } from '../import/types'
    it. */
 const GROUND_METERS = 1200
 const elevationFails = { current: false }
-vi.mock('../geo/elevation', () => ({
+vi.mock('@keel/geo', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@keel/geo')>()),
   createGoogleElevationSampler: () => ({
     sampleAlongPath: async () =>
       elevationFails.current

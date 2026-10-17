@@ -1,10 +1,10 @@
 import type { FeatureCollection, LineString } from 'geojson'
-import type { Track } from '../kml/parse'
-import type { ElevationProfilePoint } from '../kml/stats'
-import { buildOverviewGeoJSON, computeTripOrigin } from '../geo/overview'
+import type { Track } from '@keel/geo'
+import type { ElevationProfilePoint } from '@keel/geo'
+import { buildOverviewGeoJSON, computeTripOrigin } from '@keel/geo'
 import { isFeatureCollection } from './tripStore'
 import { formatDistance, formatElevationGain } from '../format/units'
-import type { LatLng } from '../map/geo'
+import type { LatLng } from '@keel/geo'
 import { placeCairn } from './cairnRules'
 
 /* A track or a cairn that no trip owns.

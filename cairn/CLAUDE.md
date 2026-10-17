@@ -20,6 +20,21 @@ cairn/
 └── docs/design/        # UX artifacts, one file per issue
 ```
 
+## Map logic lives in `@keel/geo`
+
+KML and GPX parsing, track stats, simplification, overview GeoJSON, trip
+totals, elevation sampling, bounds fitting, the track palette, marker
+clustering and the reduced-motion check live in the sibling package `geo/`, not
+here. Import them from `@keel/geo`, never by a path into `../geo/`, and do not
+add a module to cairn that duplicates one of them.
+
+**A change in `geo/` is a change to every consumer.** That is why `cairn.yml`
+and `cairn-pages.yml` also trigger on `geo/**`. The package is TypeScript source
+with no build step, linked by `"@keel/geo": "file:../geo"`, so `vite.config.ts`
+allows the dev server to serve `../geo`. It may not import React or
+`@vis.gl/*`; React-bound map code (the canvas, the track layer, the elevation
+chart, the hooks) stays here. See [`geo/CLAUDE.md`](../geo/CLAUDE.md).
+
 ## Decisions already made
 
 These were settled before the project existed. Revisit them deliberately, not

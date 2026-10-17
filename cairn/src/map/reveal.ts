@@ -12,9 +12,9 @@
    it about where something sits on screen. */
 
 import { containerPointFromLatLng, latLngFromContainerPoint, scaleBounds, type ViewportBounds } from './containerPoint'
-import { CLUSTER_MAX_ZOOM, FIT_PADDING, fitTracksToBounds } from './fitBounds'
-import { prefersReducedMotion } from './motion'
-import type { LatLng } from './geo'
+import { CLUSTER_MAX_ZOOM, FIT_PADDING, fitTracksToBounds } from '@keel/geo'
+import { prefersReducedMotion } from '@keel/geo'
+import type { LatLng } from '@keel/geo'
 
 /** The margin an inset leaves on every edge, in the same units as
     `--panel-width`/`--space-4`/`--sheet-current` — pixels. */

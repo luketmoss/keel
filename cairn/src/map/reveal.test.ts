@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { containerPointFromLatLng } from './containerPoint'
-import { CLUSTER_MAX_ZOOM, FIT_PADDING } from './fitBounds'
+import { CLUSTER_MAX_ZOOM, FIT_PADDING } from '@keel/geo'
 import { columnInset, revealPoint, revealPoints } from './reveal'
 
 /* cairn/docs/design/270-selecting-reveals-it-on-the-map.md — "The reveal
@@ -9,8 +9,8 @@ import { columnInset, revealPoint, revealPoints } from './reveal'
    Google Maps instance, the same style `fitBounds.test.ts` already uses. */
 
 const { fitTracksToBounds } = vi.hoisted(() => ({ fitTracksToBounds: vi.fn() }))
-vi.mock('./fitBounds', async () => {
-  const actual = await vi.importActual<typeof import('./fitBounds')>('./fitBounds')
+vi.mock('@keel/geo', async () => {
+  const actual = await vi.importActual<typeof import('@keel/geo')>('@keel/geo')
   return { ...actual, fitTracksToBounds }
 })
 

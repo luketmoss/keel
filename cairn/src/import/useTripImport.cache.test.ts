@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useTripImport } from './useTripImport'
 import { TrackFileCache } from '../drive/trackFileCache'
 import { LocalTrackOverridesStore } from '../store/trackOverridesStore'
-import type { ParseResult } from '../kml/parse'
+import type { ParseResult } from '@keel/geo'
 import type { TripStore } from '../store/tripStore'
 
 /* #244 — the track-bytes cache, end to end against a mocked `fetch`, with
@@ -42,7 +42,7 @@ function fakeStorage(): Storage {
 }
 
 const { parseTrack } = vi.hoisted(() => ({ parseTrack: vi.fn() }))
-vi.mock('../kml/parse', () => ({ parseTrack }))
+vi.mock('@keel/geo', async (importOriginal) => ({ ...(await importOriginal<typeof import('@keel/geo')>()), parseTrack }))
 
 function track(name: string): ParseResult {
   return { ok: true, tracks: [{ name, points: [{ lat: 0, lon: 0 }] }] }

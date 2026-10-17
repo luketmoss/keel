@@ -1,4 +1,4 @@
-import type { LatLng } from './geo'
+import type { LatLng } from '@keel/geo'
 
 /** What one track draws on the 3D surface — a stable key, its own colour
     from `palette.ts`, and its geometry. Shared by every source that feeds

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { FeatureCollection, LineString } from 'geojson'
 import type { TripIndexEntry } from '../store/tripStore'
 import type { LooseRecord } from '../store/looseStore'
-import { trackColor } from '../map/palette'
+import { trackColor } from '@keel/geo'
 import { worldTrackGeometry } from './world3DRoutes'
 
 function overview(coords: [number, number][][]): FeatureCollection<LineString> {

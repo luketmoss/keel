@@ -20,7 +20,7 @@
    cairn at all. */
 
 import { tripUtcOffsetHours } from './interpolate'
-import type { Track } from '../kml/parse'
+import type { Track } from '@keel/geo'
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 

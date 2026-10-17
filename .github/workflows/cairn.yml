@@ -1,10 +1,10 @@
 name: cairn
 on:
   pull_request:
-    paths: ['cairn/**', '.github/workflows/cairn.yml']
+    paths: ['cairn/**', 'geo/**', '.github/workflows/cairn.yml']
   push:
     branches: [main]
-    paths: ['cairn/**', '.github/workflows/cairn.yml']
+    paths: ['cairn/**', 'geo/**', '.github/workflows/cairn.yml']
 concurrency:
   group: cairn-${{ github.ref }}
   cancel-in-progress: true

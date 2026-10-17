@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const { fitTracksToBounds } = vi.hoisted(() => ({ fitTracksToBounds: vi.fn() }))
-vi.mock('../map/fitBounds', () => ({ fitTracksToBounds, zoomToFitCluster: vi.fn(), FIT_PADDING: 48 }))
+vi.mock('@keel/geo', async (importOriginal) => ({ ...(await importOriginal<typeof import('@keel/geo')>()), fitTracksToBounds, zoomToFitCluster: vi.fn(), FIT_PADDING: 48 }))
 
 const { setZoom, getZoom, fakeMap } = vi.hoisted(() => {
   const setZoom = vi.fn()

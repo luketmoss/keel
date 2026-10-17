@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearGroundAltitudeCache, sampleGroundAltitude } from './groundAltitude'
-import type { ElevationSampler } from '../geo/elevation'
+import type { ElevationSampler } from '@keel/geo'
 
 function sampler(elevations: number[]): ElevationSampler & { calls: number } {
   const stub = {

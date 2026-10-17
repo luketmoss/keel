@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { RowMenu } from './RowMenu'
 import { NameInput } from './NameInput'
 import { TrackFaceBody } from './TrackFaceBody'
-import type { ElevationProfilePoint, TrackStats } from '../kml/stats'
-import type { Track } from '../kml/parse'
+import type { ElevationProfilePoint, TrackStats } from '@keel/geo'
+import type { Track } from '@keel/geo'
 import './LooseFace.css'
 
 interface TrackFaceProps {

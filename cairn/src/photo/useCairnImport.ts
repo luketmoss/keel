@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { Track } from '../kml/parse'
+import type { Track } from '@keel/geo'
 import { runWithConcurrency } from '../import/concurrency'
 import {
   DriveAuthError,
@@ -32,7 +32,7 @@ import {
 } from '../store/looseStore'
 import { isCairnRecord, readCachedCairns, writeCachedCairns } from '../store/cairnCache'
 import type { PlacementQueueItem } from '../import/placementQueue'
-import type { LatLng } from '../map/geo'
+import type { LatLng } from '@keel/geo'
 
 /* Trip-scoped cairn import — the trip-owned half of `cairns.md`'s model.
    Each cairn is a folder, `trips/<trip-id>/cairns/<cairn-id>/cairn.json`

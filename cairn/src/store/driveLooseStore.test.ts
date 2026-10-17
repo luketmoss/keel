@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DriveLooseStore } from './driveLooseStore'
-import type { Track } from '../kml/parse'
+import type { Track } from '@keel/geo'
 
 /** Same in-memory `Storage` helper the other store tests use. */
 function fakeStorage(): Storage {

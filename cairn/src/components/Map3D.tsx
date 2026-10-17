@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { GestureHandling, Map3D as GoogleMap3D, MapMode, useMap, type Map3DRef } from '@vis.gl/react-google-maps'
 import { MAP3D_ID } from '../map/track3D'
 import { zoomToRange, rangeToZoom } from '../map/camera3D'
-import { prefersReducedMotion } from '../map/motion'
+import { prefersReducedMotion } from '@keel/geo'
 import {
   FLYOVER_COMPOSITOR_BUFFER_MS,
   FLYOVER_FLY_IN_MS,
@@ -13,8 +13,8 @@ import {
 } from '../map/flyover'
 import type { FlyoverRequest } from '../map/Map3DControl'
 import { sampleGroundAltitude } from '../map/groundAltitude'
-import { createGoogleElevationSampler, type ElevationSampler } from '../geo/elevation'
-import type { LatLng } from '../map/geo'
+import { createGoogleElevationSampler, type ElevationSampler } from '@keel/geo'
+import type { LatLng } from '@keel/geo'
 import { HOME_CENTER, HOME_CORNERS, HOME_RANGE } from '../map/homeView'
 import './Map3D.css'
 

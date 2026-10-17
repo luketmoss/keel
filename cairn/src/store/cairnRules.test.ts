@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { cairnDrawsAsThumbnail, cairnMatchesFacet, interpolateCairn, isValidCairnImage, placeCairn } from './cairnRules'
 import type { LooseCairnRecord } from './looseStore'
 import { positionPhoto } from '../photo/interpolate'
-import type { Track } from '../kml/parse'
+import type { Track } from '@keel/geo'
 
 function makeCairn(overrides: Partial<LooseCairnRecord> = {}): LooseCairnRecord {
   return {

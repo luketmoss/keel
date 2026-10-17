@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import type { LatLng } from './geo'
-import { prefersReducedMotion } from './motion'
+import type { LatLng } from '@keel/geo'
+import { prefersReducedMotion } from '@keel/geo'
 
 /* #158 — the shared drag behaviour for a cairn's marker, on both the map's
    trip-owned path (`CairnLayer`) and its loose one (`LooseLayer`). Kept as

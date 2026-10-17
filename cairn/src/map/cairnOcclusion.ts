@@ -1,4 +1,4 @@
-import type { ElevationSampler } from '../geo/elevation'
+import type { ElevationSampler } from '@keel/geo'
 
 /** #285's "one call per cairn per novel camera position" — the sampling
     budget one settle can spend, so a face with more cairns than this

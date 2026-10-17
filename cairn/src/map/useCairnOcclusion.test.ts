@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useCairnOcclusion } from './useCairnOcclusion'
 import { clearCairnOcclusionCache } from './cairnOcclusion'
-import type { ElevationSampler } from '../geo/elevation'
+import type { ElevationSampler } from '@keel/geo'
 
 /* A fake `Map3DElement` — only what the hook touches: `cameraPosition` and
    the `gmp-steadychange` listener pair. Firing `steady()` is how a test

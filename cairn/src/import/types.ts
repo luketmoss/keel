@@ -1,5 +1,5 @@
-import type { Track } from '../kml/parse'
-import type { TrackStats } from '../kml/stats'
+import type { Track } from '@keel/geo'
+import type { TrackStats } from '@keel/geo'
 
 /** A trip's own imported track file (`useTripImport`) — every field
     populated, since a track only ever gets here by belonging to a trip. The

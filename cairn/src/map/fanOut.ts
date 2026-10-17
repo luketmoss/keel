@@ -14,7 +14,7 @@
    Pure geometry, like `cluster.ts` — no React and no Google Maps runtime,
    only the projection that file already owns. */
 
-import { clusterMarkers, project, unproject, type ClusterableMarker } from './cluster'
+import { clusterMarkers, project, unproject, type ClusterableMarker } from '@keel/geo'
 
 /** Far enough that two fanned markers plus their rings clear each other and
     the anchor badge underneath them, close enough that the fan still reads

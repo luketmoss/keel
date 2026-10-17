@@ -36,7 +36,8 @@ vi.mock('@vis.gl/react-google-maps', () => ({
 }))
 
 const GROUND_METERS = 1200
-vi.mock('../geo/elevation', () => ({
+vi.mock('@keel/geo', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@keel/geo')>()),
   createGoogleElevationSampler: () => ({
     sampleAlongPath: async () => ({ ok: true, samples: [{ lat: 0, lng: 0, elevationMeters: GROUND_METERS }] }),
   }),

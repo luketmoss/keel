@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Marker, Polyline, useMap } from '@vis.gl/react-google-maps'
 import type { ImportedFile } from '../import/types'
-import { trackColor } from '../map/palette'
-import { dropInvalidLatitudes, normalizeAntimeridian, type LatLng } from '../map/geo'
-import { fitTracksToBounds } from '../map/fitBounds'
+import { trackColor } from '@keel/geo'
+import { dropInvalidLatitudes, normalizeAntimeridian, type LatLng } from '@keel/geo'
+import { fitTracksToBounds } from '@keel/geo'
 import { columnInset, toPadding } from '../map/reveal'
 import { useIsPhone } from '../map/useIsPhone'
-import { prefersReducedMotion } from '../map/motion'
+import { prefersReducedMotion } from '@keel/geo'
 
 /* --motion-slow from index.css. Google Maps' Polyline animates by having its
    `path` prop grow frame to frame — there is no dash-offset to transition on

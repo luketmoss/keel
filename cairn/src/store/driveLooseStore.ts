@@ -1,5 +1,5 @@
 import type { FeatureCollection, LineString } from 'geojson'
-import type { Track } from '../kml/parse'
+import type { Track } from '@keel/geo'
 import {
   ATTACH_IMAGE_FAILED_MESSAGE,
   LocalLooseStore,

@@ -1,6 +1,6 @@
 import { act, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { LatLng } from './geo'
+import type { LatLng } from '@keel/geo'
 
 /* #292 — the shared hook both `Track3DLayer` mounts (`TripDetail`'s and the
    world view's `WorldTrack3DFraming`) call. Exercised directly here, the
@@ -15,11 +15,12 @@ import type { LatLng } from './geo'
    `elevationFails` flips the ground-unresolved fail-safe on for the one
    test that needs it. */
 const { reducedMotion } = vi.hoisted(() => ({ reducedMotion: { current: false } }))
-vi.mock('./motion', () => ({ prefersReducedMotion: () => reducedMotion.current }))
 
 const GROUND_METERS = 1200
 const elevationFails = { current: false }
-vi.mock('../geo/elevation', () => ({
+vi.mock('@keel/geo', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@keel/geo')>()),
+  prefersReducedMotion: () => reducedMotion.current,
   createGoogleElevationSampler: () => ({
     sampleAlongPath: async () =>
       elevationFails.current

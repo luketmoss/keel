@@ -99,7 +99,8 @@ vi.mock('@vis.gl/react-google-maps', () => ({
 // #285 — the occlusion hook builds its own `ElevationSampler` lazily via
 // this factory. Stubbed per test so occlusion can be asserted without a
 // real `google.maps.ElevationService`.
-vi.mock('../geo/elevation', () => ({
+vi.mock('@keel/geo', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@keel/geo')>()),
   createGoogleElevationSampler: () => samplerResult.current,
 }))
 

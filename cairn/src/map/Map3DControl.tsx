@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { use3DSupport, type Maps3DSupport } from './use3DSupport'
-import type { LatLng } from './geo'
+import type { LatLng } from '@keel/geo'
 
 /** One press of `Fly over`, or a restart of one already running — see
     274-a-flyover-of-a-trip.md's "Starting a flyover while one is running

@@ -1,5 +1,5 @@
 import { AdvancedMarker, useMap } from '@vis.gl/react-google-maps'
-import type { LatLng } from '../map/geo'
+import type { LatLng } from '@keel/geo'
 import './SuggestionRing.css'
 
 interface SuggestionRingProps {

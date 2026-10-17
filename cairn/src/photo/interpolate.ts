@@ -10,8 +10,8 @@
    offsetHours ≈ round(longitude / 15). Nothing fancier — no timezone-database lookup. */
 
 import type { PhotoExif } from './exif'
-import type { Track, TrackPoint } from '../kml/parse'
-import type { LatLng } from '../map/geo'
+import type { Track, TrackPoint } from '@keel/geo'
+import type { LatLng } from '@keel/geo'
 
 /** A track point bracketing search treats every track's points as one flat, time-sorted pool —
     points with no `time` are excluded outright, since there is nothing to bracket against. */

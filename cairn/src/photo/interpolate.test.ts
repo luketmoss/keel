@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Track } from '../kml/parse'
+import type { Track } from '@keel/geo'
 import {
   MAX_INTERPOLATION_GAP_MS,
   interpolatePosition,

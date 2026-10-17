@@ -1,6 +1,6 @@
 import { MAPS_3D_UNAVAILABLE_SENTENCE } from '../map/use3DSupport'
 import { useMap3DControl } from '../map/Map3DControl'
-import type { LatLng } from '../map/geo'
+import type { LatLng } from '@keel/geo'
 import './FlyoverButton.css'
 
 interface FlyoverButtonProps {

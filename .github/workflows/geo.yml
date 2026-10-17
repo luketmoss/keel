@@ -1,0 +1,26 @@
+name: geo
+on:
+  pull_request:
+    paths: ['geo/**', '.github/workflows/geo.yml']
+  push:
+    branches: [main]
+    paths: ['geo/**', '.github/workflows/geo.yml']
+concurrency:
+  group: geo-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: geo
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: geo/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test

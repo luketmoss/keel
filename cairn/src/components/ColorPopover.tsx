@@ -1,4 +1,4 @@
-import { TRACK_COLORS, TRACK_COLOR_NAMES } from '../map/palette'
+import { TRACK_COLORS, TRACK_COLOR_NAMES } from '@keel/geo'
 import './ColorPopover.css'
 
 /** The track colour palette grid, opened from a swatch button. Positions

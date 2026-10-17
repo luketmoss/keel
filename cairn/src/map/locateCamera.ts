@@ -1,4 +1,4 @@
-import type { LatLng } from './geo'
+import type { LatLng } from '@keel/geo'
 import type { PositionFix } from './useGeolocation'
 
 /** cairn/docs/design/335-my-location-on-the-map.md — "Capped at zoom 17". A

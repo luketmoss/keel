@@ -74,7 +74,6 @@ vi.mock('@vis.gl/react-google-maps', async () => {
   }
 })
 
-vi.mock('../map/motion', () => ({ prefersReducedMotion: () => reducedMotion.current }))
 const reducedMotion = { current: false }
 
 /* #282 — the camera's look-at is put on the terrain before it tilts, which
@@ -85,7 +84,9 @@ const GROUND_METERS = 1200
 /* #306 — flippable per test so the "ground could not be resolved" path can
    be exercised without a second mock module. */
 const elevationFails = { current: false }
-vi.mock('../geo/elevation', () => ({
+vi.mock('@keel/geo', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@keel/geo')>()),
+  prefersReducedMotion: () => reducedMotion.current,
   createGoogleElevationSampler: () => ({
     sampleAlongPath: async () =>
       elevationFails.current

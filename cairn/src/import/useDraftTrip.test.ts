@@ -33,7 +33,7 @@ function fakeStorage(): Storage {
 }
 
 function loadFixture(name: string, as = name): File {
-  const buffer = readFileSync(join(__dirname, '../kml/fixtures', name))
+  const buffer = readFileSync(join(__dirname, '../../../geo/src/kml/fixtures', name))
   return new File([buffer], as)
 }
 

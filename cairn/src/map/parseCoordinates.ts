@@ -1,4 +1,4 @@
-import type { LatLng } from './geo'
+import type { LatLng } from '@keel/geo'
 
 /** cairn/docs/design/337-pasting-a-coordinate.md — reading a longitude/
     latitude pair out of the search field.

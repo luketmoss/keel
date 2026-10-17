@@ -1,4 +1,4 @@
-import type { LatLng } from './geo'
+import type { LatLng } from '@keel/geo'
 import { frameGeometry } from './flyover'
 
 /** cairn/docs/design/304-the-home-view.md — the extent the map opens on and

@@ -9,8 +9,8 @@
    the queue, so a drop of forty with two stragglers doesn't read as a
    two-item task. */
 
-import type { Track } from '../kml/parse'
-import type { LatLng } from '../map/geo'
+import type { Track } from '@keel/geo'
+import type { LatLng } from '@keel/geo'
 
 export interface PlacementQueueItem {
   id: string

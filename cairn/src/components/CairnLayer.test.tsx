@@ -1,7 +1,7 @@
 import { act, fireEvent, render, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CairnLayer, type PositionedCairn } from './CairnLayer'
-import { CLUSTER_MAX_ZOOM } from '../map/fitBounds'
+import { CLUSTER_MAX_ZOOM } from '@keel/geo'
 
 /* Same stubbing strategy as TrackLayer.test.tsx — AdvancedMarker renders its
    children directly into a positioned div so assertions read the DOM rather

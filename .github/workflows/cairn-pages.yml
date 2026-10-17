@@ -2,7 +2,7 @@ name: cairn-pages
 on:
   push:
     branches: [main]
-    paths: ['cairn/**', 'pages-root/**', '.github/workflows/cairn-pages.yml']
+    paths: ['cairn/**', 'geo/**', 'pages-root/**', '.github/workflows/cairn-pages.yml']
 concurrency:
   group: cairn-pages-${{ github.ref }}
   cancel-in-progress: true

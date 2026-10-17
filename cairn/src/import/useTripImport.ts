@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { parseTrack, type Track } from '../kml/parse'
-import { computeTrackStats, hasUsableElevation, overlaySampledElevation, type StoredTrackElevation } from '../kml/stats'
-import { createGoogleElevationSampler, sampleTrackElevation, trackKey } from '../geo/elevation'
-import { readSampledElevation } from '../geo/tripTotals'
+import { parseTrack, type Track } from '@keel/geo'
+import { computeTrackStats, hasUsableElevation, overlaySampledElevation, type StoredTrackElevation } from '@keel/geo'
+import { createGoogleElevationSampler, sampleTrackElevation, trackKey } from '@keel/geo'
+import { readSampledElevation } from '@keel/geo'
 import { runWithConcurrency } from './concurrency'
 import type { ImportedFile } from './types'
 import {

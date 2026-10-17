@@ -1,6 +1,6 @@
 import { useEffect, useRef, type RefObject } from 'react'
 import { ADD_PHOTO_LABEL, PhotoFileInput, REPLACE_PHOTO_LABEL } from './AddPhotoButton'
-import { prefersReducedMotion } from '../map/motion'
+import { prefersReducedMotion } from '@keel/geo'
 import { usePhotoImage } from '../photo/usePhotoImage'
 import { cairnRowMetaLine, type CairnListItem, type CairnListRow } from '../photo/cairnListGroups'
 import { positionSourceSentence } from '../store/looseStore'

@@ -4,7 +4,7 @@ import { RowMenu } from './RowMenu'
 import { NameInput } from './NameInput'
 import { ColorPopover } from './ColorPopover'
 import { TrackFaceBody } from './TrackFaceBody'
-import { trackColor, TRACK_COLORS } from '../map/palette'
+import { trackColor, TRACK_COLORS } from '@keel/geo'
 import {
   ADD_DESCRIPTION_PLACEHOLDER,
   SIGNED_OUT_MOVE_MESSAGE,
@@ -20,7 +20,7 @@ import { IconPicker } from './IconPicker'
 import { AddPhotoButton } from './AddPhotoButton'
 import { DescriptionInput } from './DescriptionInput'
 import { useEditableCairnText } from './useEditableCairnText'
-import { linesFromOverview } from '../geo/overviewLines'
+import { linesFromOverview } from '@keel/geo'
 import './LooseFace.css'
 
 interface LooseFaceProps {

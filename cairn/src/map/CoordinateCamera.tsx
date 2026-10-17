@@ -5,7 +5,7 @@ import { useMap3DControl } from './Map3DControl'
 import { flyToFramedGround } from './flyToFramedGround'
 import { columnInset, revealPoint } from './reveal'
 import { useIsPhone } from './useIsPhone'
-import type { LatLng } from './geo'
+import type { LatLng } from '@keel/geo'
 
 /** What a chosen coordinate row does to the camera.
     cairn/docs/design/337-pasting-a-coordinate.md.

@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { TrackFaceBody } from './TrackFaceBody'
-import type { TrackStats } from '../kml/stats'
+import type { TrackStats } from '@keel/geo'
 
 const STATS: TrackStats = {
   distanceMeters: 10_000,

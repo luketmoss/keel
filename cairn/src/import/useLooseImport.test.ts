@@ -21,7 +21,7 @@ function fakeStorage(): Storage {
 }
 
 function kmlFixture(name: string, as = name): File {
-  return new File([readFileSync(join(__dirname, '..', 'kml', 'fixtures', name))], as)
+  return new File([readFileSync(join(__dirname, '..', '..', '..', 'geo', 'src', 'kml', 'fixtures', name))], as)
 }
 
 function photoFixture(name: string, as = name): File {

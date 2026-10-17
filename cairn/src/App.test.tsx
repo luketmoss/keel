@@ -45,7 +45,7 @@ function loadKmlFixture(name: string, as = name): File {
     implemented by jsdom, so this reads from disk rather than off the
     `File` — the same gap `kml/parse.ts` works around with a `FileReader`. */
 function kmlFixtureText(name: string): string {
-  return readFileSync(join(__dirname, 'kml/fixtures', name), 'utf8')
+  return readFileSync(join(__dirname, '../../geo/src/kml/fixtures', name), 'utf8')
 }
 
 /* #188: expansion runs for real in every test but one. That one needs to

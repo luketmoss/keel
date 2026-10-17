@@ -1,5 +1,5 @@
 import { formatDistance, formatElevation } from '../format/units'
-import type { ElevationProfilePoint } from '../kml/stats'
+import type { ElevationProfilePoint } from '@keel/geo'
 import './TrackElevationProfile.css'
 
 /* Arbitrary user-space units — the path is stretched to the row's actual

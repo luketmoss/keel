@@ -1,6 +1,6 @@
 import { AdvancedMarker } from '@vis.gl/react-google-maps'
 import type { CairnIcon } from '../store/looseStore'
-import type { LatLng } from '../map/geo'
+import type { LatLng } from '@keel/geo'
 import { CairnMarker } from './CairnMarker'
 import './CairnDraftMarker.css'
 

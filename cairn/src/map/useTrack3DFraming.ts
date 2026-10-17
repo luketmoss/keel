@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { flyToFramedGround } from './flyToFramedGround'
 import { TRACK3D_REVEAL_MS } from './track3D'
-import type { LatLng } from './geo'
+import type { LatLng } from '@keel/geo'
 
 interface UseTrack3DFramingOptions {
   map3d: google.maps.maps3d.Map3DElement | null

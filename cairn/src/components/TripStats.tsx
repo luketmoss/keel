@@ -1,8 +1,8 @@
-import { summarizeElevation, type TrackStats } from '../kml/stats'
+import { summarizeElevation, type TrackStats } from '@keel/geo'
 import { formatDistance, formatElevation, formatElevationGain, formatElevationLoss, markSampled } from '../format/units'
 import { StatGrid } from './StatGrid'
 import { FlyoverButton } from './FlyoverButton'
-import type { LatLng } from '../map/geo'
+import type { LatLng } from '@keel/geo'
 import './TripStats.css'
 
 export interface TripStatsProps {

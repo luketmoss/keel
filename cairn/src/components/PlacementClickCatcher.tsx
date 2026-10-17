@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useMap } from '@vis.gl/react-google-maps'
-import type { LatLng } from '../map/geo'
+import type { LatLng } from '@keel/geo'
 
 interface PlacementClickCatcherProps {
   active: boolean

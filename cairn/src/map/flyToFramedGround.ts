@@ -1,8 +1,8 @@
-import type { LatLng } from './geo'
+import type { LatLng } from '@keel/geo'
 import { frameGeometry } from './flyover'
 import { sampleGroundAltitude } from './groundAltitude'
-import { prefersReducedMotion } from './motion'
-import { createGoogleElevationSampler, type ElevationSampler } from '../geo/elevation'
+import { prefersReducedMotion } from '@keel/geo'
+import { createGoogleElevationSampler, type ElevationSampler } from '@keel/geo'
 
 /** #303 — the one helper both the track reveal (#288) and the arrival fit
     (#292) call to fly the 3D camera onto a framed subject, so their "resolve

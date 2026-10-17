@@ -6,8 +6,8 @@
    origins, per #93's acceptance criterion 3. */
 
 import type { TripRecord } from '../../store/tripStore'
-import { buildOverviewGeoJSON, computeTripOrigin } from '../../geo/overview'
-import type { Track } from '../../kml/parse'
+import { buildOverviewGeoJSON, computeTripOrigin } from '@keel/geo'
+import type { Track } from '@keel/geo'
 import type { FakeFile } from './store'
 
 export const FAKE_ACCOUNT = {

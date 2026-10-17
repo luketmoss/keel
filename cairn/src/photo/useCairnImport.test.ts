@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useCairnImport, ALREADY_IN_TRIP_MESSAGE, type CairnRecord } from './useCairnImport'
 import { readCachedCairns, writeCachedCairns } from '../store/cairnCache'
 import { DriveAuthError, DriveQuotaError } from '../drive/trackFiles'
-import type { Track } from '../kml/parse'
+import type { Track } from '@keel/geo'
 
 const { findOrCreateTripCairnsFolder, findOrCreateTripCairnItemFolder } = vi.hoisted(() => ({
   findOrCreateTripCairnsFolder: vi.fn(),

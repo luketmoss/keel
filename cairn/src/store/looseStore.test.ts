@@ -10,7 +10,7 @@ import {
   type CairnIcon,
 } from './looseStore'
 import { LocalTripStore } from './tripStore'
-import type { Track } from '../kml/parse'
+import type { Track } from '@keel/geo'
 import { formatDistance, formatElevationGain } from '../format/units'
 
 function fakeStorage(): Storage {

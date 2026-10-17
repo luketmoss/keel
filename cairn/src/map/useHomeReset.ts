@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { useMap } from '@vis.gl/react-google-maps'
 import { useMap3DControl } from './Map3DControl'
-import { fitTracksToBounds } from './fitBounds'
+import { fitTracksToBounds } from '@keel/geo'
 import { columnInset, toPadding } from './reveal'
 import { useIsPhone } from './useIsPhone'
 import { HOME_CORNERS } from './homeView'

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { LatLng } from './geo'
+import type { LatLng } from '@keel/geo'
 
 /** cairn/docs/design/335-my-location-on-the-map.md — one fix per press.
     There is no `watchPosition` anywhere in this feature: a moving dot fights

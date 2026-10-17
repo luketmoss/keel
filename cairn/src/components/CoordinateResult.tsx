@@ -1,6 +1,6 @@
 import { useMapUnavailable } from './MapCanvas'
 import { formatCoordinate } from '../map/parseCoordinates'
-import type { LatLng } from '../map/geo'
+import type { LatLng } from '@keel/geo'
 import './CoordinateResult.css'
 
 interface CoordinateResultProps {

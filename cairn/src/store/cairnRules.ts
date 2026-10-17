@@ -12,7 +12,7 @@
    reaches for it, the same way #52's `positionPhoto` existed before the
    full import pipeline did. */
 
-import type { LatLng } from '../map/geo'
+import type { LatLng } from '@keel/geo'
 import type { CairnIcon, CairnImage, LooseCairnRecord } from './looseStore'
 
 /** Rule 1 (`cairns.md`, "positionSource"): every cairn can be moved,

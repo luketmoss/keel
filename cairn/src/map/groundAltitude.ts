@@ -1,5 +1,5 @@
-import type { LatLng } from './geo'
-import type { ElevationSampler } from '../geo/elevation'
+import type { LatLng } from '@keel/geo'
+import type { ElevationSampler } from '@keel/geo'
 
 /** How long to wait for the Elevation API before giving up and framing at
     sea level anyway. A flyover that arrives a beat late is recoverable; one

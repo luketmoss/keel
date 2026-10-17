@@ -1,8 +1,8 @@
 import type { TripIndexEntry } from '../store/tripStore'
 import type { LooseRecord } from '../store/looseStore'
-import { trackColor } from '../map/palette'
+import { trackColor } from '@keel/geo'
 import type { Track3D } from '../map/track3D'
-import { linesFromOverview } from './overviewLines'
+import { linesFromOverview } from '@keel/geo'
 
 /** Exported so #292's `WorldTrack3DFraming` can type `tripStore`/`looseStore`
     against the same shape this function reads, rather than a second,

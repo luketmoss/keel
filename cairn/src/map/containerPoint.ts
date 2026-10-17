@@ -1,4 +1,4 @@
-import type { LatLng } from './geo'
+import type { LatLng } from '@keel/geo'
 
 /* Turning a pixel inside the map's own element into a coordinate.
  *

@@ -1,4 +1,4 @@
-import type { TrackStats, ElevationProfilePoint } from '../kml/stats'
+import type { TrackStats, ElevationProfilePoint } from '@keel/geo'
 import {
   formatDistance,
   formatDuration,
@@ -10,7 +10,7 @@ import {
 import { StatGrid } from './StatGrid'
 import { TrackElevationProfile } from './TrackElevationProfile'
 import { FlyoverButton } from './FlyoverButton'
-import type { LatLng } from '../map/geo'
+import type { LatLng } from '@keel/geo'
 import './TrackFaceBody.css'
 
 /** #226 — the track detail face's body: the profile, then the same

@@ -1,10 +1,10 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useTripImport } from './useTripImport'
-import type { ParseResult } from '../kml/parse'
+import type { ParseResult } from '@keel/geo'
 import { DriveAuthError } from '../drive/rootFolder'
 import { LocalTrackOverridesStore, type TrackOverridesStore } from '../store/trackOverridesStore'
-import { SIDECAR_VERSION, type StoredOverview } from '../geo/tripTotals'
+import { SIDECAR_VERSION, type StoredOverview } from '@keel/geo'
 import type { TripStore } from '../store/tripStore'
 
 /** A minimal in-memory `Storage`, same helper `tripStore.test.ts` and
@@ -48,8 +48,6 @@ vi.mock('../drive/trackFiles', () => ({
 }))
 
 const { parseTrack } = vi.hoisted(() => ({ parseTrack: vi.fn() }))
-vi.mock('../kml/parse', () => ({ parseTrack }))
-
 const { computeTrackStats } = vi.hoisted(() => ({
   computeTrackStats: vi.fn(() => ({
     distanceMeters: 0,
@@ -57,12 +55,13 @@ const { computeTrackStats } = vi.hoisted(() => ({
     elevationGainMeters: undefined,
   })),
 }))
-vi.mock('../kml/stats', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../kml/stats')>()
+vi.mock('@keel/geo', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@keel/geo')>()
   // #224's `overlaySampledElevation`/`hasUsableElevation` are left real —
-  // pure functions with nothing to fake — only `computeTrackStats` is
-  // stubbed, matching every test fixture's minimal single-point tracks.
-  return { ...actual, computeTrackStats }
+  // pure functions with nothing to fake — only `parseTrack` and
+  // `computeTrackStats` are stubbed, matching every test fixture's minimal
+  // single-point tracks.
+  return { ...actual, parseTrack, computeTrackStats }
 })
 
 /** #224: `useTripImport` reads a trip's sampled-elevation cache back

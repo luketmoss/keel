@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { TripStats } from './TripStats'
-import type { TrackStats } from '../kml/stats'
+import type { TrackStats } from '@keel/geo'
 
 function withElevation(overrides: Partial<TrackStats> = {}): TrackStats {
   return {

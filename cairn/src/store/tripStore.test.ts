@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { deriveTripStatus, LocalTripStore } from './tripStore'
-import { SIDECAR_VERSION, type StoredOverview } from '../geo/tripTotals'
+import { SIDECAR_VERSION, type StoredOverview } from '@keel/geo'
 import { cairnCacheKey } from './cairnCache'
 
 /** A minimal in-memory `Storage` so tests don't depend on jsdom's

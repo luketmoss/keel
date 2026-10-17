@@ -5,7 +5,7 @@ import {
   isCairnOccluded,
   OCCLUSION_CLEARANCE_METERS,
 } from './cairnOcclusion'
-import type { ElevationSampler } from '../geo/elevation'
+import type { ElevationSampler } from '@keel/geo'
 
 const CAMERA = { lat: 46.54, lng: 12.13, altitude: 3000 }
 const CAIRN = { lat: 46.42, lng: 11.87 }

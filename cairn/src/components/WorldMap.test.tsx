@@ -12,8 +12,8 @@ const { fitTracksToBounds, zoomToFitCluster } = vi.hoisted(() => ({
 }))
 // #312 — `../map/reveal`'s `toPadding` reads the real `FIT_PADDING` from
 // this same mocked module, so it has to stay exported.
-vi.mock('../map/fitBounds', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../map/fitBounds')>()
+vi.mock('@keel/geo', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@keel/geo')>()
   return { ...actual, fitTracksToBounds, zoomToFitCluster }
 })
 

@@ -1,4 +1,4 @@
-import type { TrackStats } from '../kml/stats'
+import type { TrackStats } from '@keel/geo'
 
 /* A guess about the reader, not a conclusion — flip this one constant to
    switch every formatted value to metric. Nothing else has to move. */

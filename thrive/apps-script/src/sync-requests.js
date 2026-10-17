@@ -2,7 +2,7 @@
 //
 // The SPA (#315) appends one `requested` row per vendor to the SyncRequests
 // tab; the poller appends one itself, for COROS, in the SYNC_SCHEDULE_SLOTS. pollSyncRequests, an installable time-driven trigger on the bot account,
-// reads the open rows and starts the EXISTING coros-sync.yml / withings-sync.yml
+// reads the open rows and starts the EXISTING thrive-coros-sync.yml / thrive-withings-sync.yml
 // through GitHub's workflow-dispatch API, then closes every row it started.
 // It never runs run.mjs itself: those workflows' concurrency groups are what
 // stop two runs presenting the same rotating refresh token.
@@ -27,15 +27,15 @@
 var SYNC_REQUESTS_SHEET = 'SyncRequests';
 
 var SYNC_GITHUB_OWNER = 'luketmoss';
-var SYNC_GITHUB_REPO = 'thrive';
+var SYNC_GITHUB_REPO = 'keel';
 var SYNC_GITHUB_REF = 'main';
 var SYNC_GITHUB_API_VERSION = '2026-03-10';
 var SYNC_DISPATCH_TOKEN_PROPERTY = 'GITHUB_DISPATCH_TOKEN';
 
 /** vendor -> the workflow it dispatches, the tab its runs log to, its name in words. */
 var SYNC_VENDOR_CONFIG = {
-  coros: { workflow: 'coros-sync.yml', logTab: 'SyncLog', name: 'COROS' },
-  withings: { workflow: 'withings-sync.yml', logTab: 'WithingsSyncLog', name: 'Withings' },
+  coros: { workflow: 'thrive-coros-sync.yml', logTab: 'SyncLog', name: 'COROS' },
+  withings: { workflow: 'thrive-withings-sync.yml', logTab: 'WithingsSyncLog', name: 'Withings' },
 };
 
 /** The trigger's interval. ClockTriggerBuilder allows 1, 5, 10, 15, 30; #331 decides 1 vs 5. */

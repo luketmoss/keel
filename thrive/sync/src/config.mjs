@@ -86,7 +86,7 @@ export const WITHINGS_SCOPES = 'user.metrics,user.info';
  * Withings refuses localhost and IP redirects, so there is no loopback option,
  * and the URL must match the developer app's registered callback exactly.
  */
-export const WITHINGS_REDIRECT_URI = 'https://luketmoss.github.io/thrive/withings-callback.html';
+export const WITHINGS_REDIRECT_URI = 'https://luketmoss.github.io/keel/thrive/withings-callback.html';
 
 /**
  * Refresh when the access token has less than this left. Withings access

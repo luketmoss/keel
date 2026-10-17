@@ -166,7 +166,7 @@ function harness(opts: {
 }
 
 const DISPATCH_URL = (wf: string) =>
-  `https://api.github.com/repos/luketmoss/thrive/actions/workflows/${wf}/dispatches`;
+  `https://api.github.com/repos/luketmoss/keel/actions/workflows/${wf}/dispatches`;
 
 describe('AC1: a press is dispatched in the same request', () => {
   it('dispatches both vendors once each with {"ref":"main"} and writes started, run id and dispatched_at', () => {
@@ -180,7 +180,7 @@ describe('AC1: a press is dispatched in the same request', () => {
       data: { requests: [{ request_id: COROS_ID, status: 'started' }, { request_id: WITHINGS_ID, status: 'started' }] },
     });
     expect(res.success).toBe(true);
-    expect(h.dispatches().map((f) => f.url)).toEqual([DISPATCH_URL('coros-sync.yml'), DISPATCH_URL('withings-sync.yml')]);
+    expect(h.dispatches().map((f) => f.url)).toEqual([DISPATCH_URL('thrive-coros-sync.yml'), DISPATCH_URL('thrive-withings-sync.yml')]);
     for (const f of h.dispatches()) {
       expect(f.method).toBe('post');
       expect(f.payload).toBe('{"ref":"main"}');
@@ -294,8 +294,8 @@ describe('AC2: the poller\'s rules, under the poller\'s lock', () => {
     ['no token', { ghToken: null }, 'Not started: no GitHub token is set.'],
     ['a 401', { dispatch: { status: 401, body: GH_BODY } }, 'Not started: GitHub refused the token (401).'],
     ['a 403', { dispatch: { status: 403, body: GH_BODY } }, 'Not started: GitHub refused the request (403).'],
-    ['a 404', { dispatch: { status: 404, body: GH_BODY } }, 'Not started: GitHub could not find coros-sync.yml (404).'],
-    ['a 422', { dispatch: { status: 422, body: GH_BODY } }, 'Not started: GitHub would not start coros-sync.yml (422).'],
+    ['a 404', { dispatch: { status: 404, body: GH_BODY } }, 'Not started: GitHub could not find thrive-coros-sync.yml (404).'],
+    ['a 422', { dispatch: { status: 422, body: GH_BODY } }, 'Not started: GitHub would not start thrive-coros-sync.yml (422).'],
     ['a 502', { dispatch: { status: 502, body: GH_BODY } }, 'Not started: GitHub answered 502.'],
     ['a fetch that throws', { dispatch: { throws: 'DNS ' + GH_TOKEN } }, 'Not started: GitHub could not be reached.'],
   ] as const)('%s: failed with the poller\'s sentence, and the call still succeeds', (_name, opts, start) => {
@@ -324,7 +324,7 @@ describe('AC2: the poller\'s rules, under the poller\'s lock', () => {
     });
     const { res } = h.ask([WITHINGS_ID]);
     expect(res.data.requests).toEqual([{ request_id: WITHINGS_ID, status: 'started' }]);
-    expect(h.dispatches().map((f) => f.url)).toEqual([DISPATCH_URL('withings-sync.yml')]);
+    expect(h.dispatches().map((f) => f.url)).toEqual([DISPATCH_URL('thrive-withings-sync.yml')]);
     expect(h.row(0).status).toBe('requested');
     // The COROS started row past its ceiling is the tick's to close, not this call's.
     expect(h.row(2).status).toBe('started');
@@ -350,7 +350,7 @@ describe('AC2: the poller\'s rules, under the poller\'s lock', () => {
     const h = harness({ requests: [req({ request_id: WITHINGS_ID, vendor: 'withings' }, inSlot)], now: inSlot });
     h.ask([WITHINGS_ID]);
     expect(h.rows).toHaveLength(1);
-    expect(h.dispatches().map((f) => f.url)).toEqual([DISPATCH_URL('withings-sync.yml')]);
+    expect(h.dispatches().map((f) => f.url)).toEqual([DISPATCH_URL('thrive-withings-sync.yml')]);
   });
 
   it('an unreadable row of the same vendor is left for the tick, unwritten', () => {
@@ -420,7 +420,7 @@ describe('AC4: owner-only, and it cannot be steered', () => {
     const steered = harness({ requests: [req()] });
     steered.ask([COROS_ID], {
       ref: 'evil-branch', inputs: { force_refresh: 'true', backfill: '365' },
-      workflow: 'withings-sync.yml', vendor: 'withings', owner: 'someone', repo: 'other',
+      workflow: 'thrive-withings-sync.yml', vendor: 'withings', owner: 'someone', repo: 'other',
     });
     const shape = (f: Fetch) => ({ url: f.url, method: f.method, headers: f.headers, payload: f.payload, options: f.options });
     expect(steered.github().map(shape)).toEqual(plain.github().map(shape));

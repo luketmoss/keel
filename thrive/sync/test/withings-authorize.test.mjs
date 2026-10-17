@@ -61,7 +61,7 @@ test('a pasted response is exchanged at once and written to Thrive Withings/with
 });
 
 test('a full callback URL and a bare code are accepted too', async () => {
-  const url = harness(['https://luketmoss.github.io/thrive/withings-callback.html?code=code-2-xxxxxxxx&state=state-abc'], [withingsTokens(1), measures(0)]);
+  const url = harness(['https://luketmoss.github.io/keel/thrive/withings-callback.html?code=code-2-xxxxxxxx&state=state-abc'], [withingsTokens(1), measures(0)]);
   await url.promise;
   assert.equal(url.calls[0].form.code, 'code-2-xxxxxxxx');
 

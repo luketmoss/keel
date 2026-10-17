@@ -2,8 +2,10 @@
 
 The COROS → Thrive sync (epic #163, design in `docs/coros-sync-plan.md`).
 It is a plain Node script with no model in the loop. It runs in GitHub Actions
-(`.github/workflows/coros-sync.yml`), four times a day (#156), and every run
-writes one `SyncLog` row.
+on `luketmoss/keel` (`.github/workflows/thrive-coros-sync.yml`), four times a
+day (#156), and every run writes one `SyncLog` row. Its scheduled runs are gated
+by the repository variable `THRIVE_SYNCS_LIVE`: see "Secrets and the off switch
+on luketmoss/keel" below.
 
 It authorizes against COROS and keeps the rotating token in Drive (#151), lands
 the window's raw COROS payloads in Drive, unmodified (#152), then normalizes
@@ -16,12 +18,16 @@ Drive too, within COROS's 50-a-day allowance (#154).
 
 | What | Where | Rotates? |
 |---|---|---|
-| Bot account's Google OAuth client ID and secret | Actions secrets `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` | No |
-| Bot account's Drive refresh token (`drive.file`) | Actions secret `GOOGLE_DRIVE_REFRESH_TOKEN` | No, once published to Production |
+| Bot account's Google OAuth client ID and secret | Actions secrets `THRIVE_BOT_GOOGLE_OAUTH_CLIENT_ID`, `THRIVE_BOT_GOOGLE_OAUTH_CLIENT_SECRET` (job env `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`) | No |
+| Bot account's Drive refresh token (`drive.file`) | Actions secret `THRIVE_BOT_DRIVE_REFRESH_TOKEN` (job env `GOOGLE_DRIVE_REFRESH_TOKEN`) | No, once published to Production |
 | COROS client ID, refresh and access tokens | `Thrive COROS/coros-token.json` in the bot's Drive | **Yes, on every refresh** |
-| Withings client ID and secret (#196) | Actions secrets `WITHINGS_CLIENT_ID`, `WITHINGS_CLIENT_SECRET`; environment variables for a local run | No |
+| Withings client ID and secret (#196) | Actions secrets `THRIVE_WITHINGS_CLIENT_ID`, `THRIVE_WITHINGS_CLIENT_SECRET` (job env `WITHINGS_CLIENT_ID`, `WITHINGS_CLIENT_SECRET`); environment variables for a local run | No |
 | Withings user ID, refresh and access tokens | `Thrive Withings/withings-token.json` in the bot's Drive | **Yes, on every refresh** |
 | Thrive API URL and key | Actions secrets `THRIVE_API_URL` (the Apps Script `/exec` URL) and `THRIVE_API_KEY` (its `API_KEY` script property); environment variables for a local run | No |
+
+The Actions secrets are on `luketmoss/keel`, where secrets are repo-wide, so
+each carries a `THRIVE_` prefix and the workflows map it onto the environment
+name the code reads. A local run still uses the unprefixed names.
 
 **Why Drive, and why the bot account.** COROS rotates its refresh token on every use, and a workflow
 cannot rewrite its own secrets, so the current token lives in a Drive file the sync rewrites. The
@@ -49,8 +55,8 @@ In the bot account's Cloud project:
    outside the repo.
 4. Store the client ID and secret:
    ```bash
-   gh secret set GOOGLE_OAUTH_CLIENT_ID --repo luketmoss/thrive
-   gh secret set GOOGLE_OAUTH_CLIENT_SECRET --repo luketmoss/thrive
+   gh secret set THRIVE_BOT_GOOGLE_OAUTH_CLIENT_ID --repo luketmoss/keel
+   gh secret set THRIVE_BOT_GOOGLE_OAUTH_CLIENT_SECRET --repo luketmoss/keel
    ```
 
 ### 2. Sign the sync in to Drive
@@ -65,7 +71,7 @@ app, which is expected for a personal one: click **Advanced → Go to Thrive Syn
 Continue**. The script prints the refresh token once. Store it:
 
 ```bash
-gh secret set GOOGLE_DRIVE_REFRESH_TOKEN --repo luketmoss/thrive
+gh secret set THRIVE_BOT_DRIVE_REFRESH_TOKEN --repo luketmoss/keel
 ```
 
 ### 3. Authorize COROS
@@ -81,9 +87,75 @@ only ever one. It ends by listing COROS's tools as a check.
 
 ### 4. Prove it from Actions
 
-Actions → **coros-sync** → Run workflow, with **force_refresh** ticked. Then run it again
-unticked. Both should log `Authenticated: …`. The second run authenticates with the token the first
-one rotated in.
+On `luketmoss/keel`, Actions → **thrive-coros-sync** → Run workflow, with **force_refresh** ticked.
+Then run it again unticked. Both should log `Authenticated: …`. The second run authenticates with
+the token the first one rotated in. With `THRIVE_SYNCS_LIVE` unset the job is skipped, a dispatch
+included.
+
+## Secrets and the off switch on luketmoss/keel (#398)
+
+The four workflows live in `luketmoss/keel`, renamed for a shared repository:
+`thrive-coros-sync.yml`, `thrive-withings-sync.yml`,
+`thrive-coros-sync-watchdog.yml` and `thrive-withings-sync-watchdog.yml`, with
+the concurrency groups of the same names. The two syncs queue and never cancel.
+
+| Keel secret | Job env | Value from |
+|---|---|---|
+| `THRIVE_BOT_GOOGLE_OAUTH_CLIENT_ID` | `GOOGLE_OAUTH_CLIENT_ID` | the bot's OAuth client, Google Cloud Console |
+| `THRIVE_BOT_GOOGLE_OAUTH_CLIENT_SECRET` | `GOOGLE_OAUTH_CLIENT_SECRET` | the same client |
+| `THRIVE_BOT_DRIVE_REFRESH_TOKEN` | `GOOGLE_DRIVE_REFRESH_TOKEN` | the existing token, or a fresh one from `node google-authorize.mjs` (Google's does not rotate, and a new one does not revoke the old) |
+| `THRIVE_WITHINGS_CLIENT_ID` | `WITHINGS_CLIENT_ID` | the Withings developer dashboard |
+| `THRIVE_WITHINGS_CLIENT_SECRET` | `WITHINGS_CLIENT_SECRET` | the same app |
+| `THRIVE_API_URL` | `THRIVE_API_URL` | the Apps Script `@2` deployment's `/exec` URL |
+| `THRIVE_API_KEY` | `THRIVE_API_KEY` | the `API_KEY` script property |
+
+The COROS sync reads the three Google secrets and the two API ones; the
+Withings sync reads all seven; the watchdogs read only `THRIVE_API_URL` and
+`THRIVE_API_KEY`. COROS has no Actions secret: its client and tokens are in
+Drive. **The Drive token files are the only copy and do not move.**
+
+**The off switch.** Both sync jobs (not the watchdogs) carry
+`if: vars.THRIVE_SYNCS_LIVE == 'true'`. Unset, or anything but `true`, the
+schedule still fires and the job is skipped, so nothing presents a token. It is
+the documented way to stop the syncs:
+
+```bash
+gh variable set THRIVE_SYNCS_LIVE --body true --repo luketmoss/keel    # on
+gh variable set THRIVE_SYNCS_LIVE --body false --repo luketmoss/keel   # off
+```
+
+The watchdogs are ungated: they only read the sheet, so they notice within
+16 h (COROS) or 14 h (Withings) if the switch is left off.
+
+### The cutover from luketmoss/thrive (one time)
+
+Concurrency groups do not span repositories. If a copy here and the old copy in
+`luketmoss/thrive` both run, one presents a spent refresh token and the grant
+dies, which only a re-authorization fixes. So the old copies go off before
+these go on, in this order, in one sitting:
+
+1. Set the seven secrets above on `luketmoss/keel`.
+2. Wait until no `coros-sync` or `withings-sync` run is in progress on
+   `luketmoss/thrive`, then `gh workflow disable` all four of its sync and
+   watchdog workflows (`coros-sync.yml`, `withings-sync.yml`,
+   `coros-sync-watchdog.yml`, `withings-sync-watchdog.yml`).
+3. `gh variable set THRIVE_SYNCS_LIVE --body true --repo luketmoss/keel`.
+4. Store the new `GITHUB_DISPATCH_TOKEN` (`apps-script/README.md`), `clasp push`
+   from `thrive/apps-script/`, and deploy a new version of `@2` (the URL does
+   not change).
+5. Dispatch `thrive-coros-sync` and `thrive-withings-sync` once each, with
+   default inputs:
+   ```bash
+   gh workflow run thrive-coros-sync.yml --repo luketmoss/keel
+   gh workflow run thrive-withings-sync.yml --repo luketmoss/keel
+   ```
+
+Between steps 2 and 4, a "Sync now" press or a 6:30 slot dispatches to disabled
+workflows and its request row ends `failed`. That window is minutes, and the
+next tick or press recovers.
+
+Rollback, until #399 archives the old repository: set `THRIVE_SYNCS_LIVE` to
+`false` here, re-enable the four workflows there, and point the poller back.
 
 ## The raw archive (#152)
 
@@ -348,7 +420,7 @@ allowance is a fixed 24-hour window opening at its first request, and a rolling
 **Four runs a day**, `17 9,13,18,0 * * *`: 03:17, 07:17, 12:17 and 18:17 MDT,
 an hour earlier in MST. DST drift is accepted (sync plan §9). 03:17 closes out
 yesterday; 07:17 brings in last night's sleep. `workflow_dispatch` still works,
-with `force_refresh`. The `coros-sync` concurrency group queues and never
+with `force_refresh`. The `thrive-coros-sync` concurrency group queues and never
 cancels a running job. GitHub keeps one *pending* run per group, so a newer one
 cancels an older pending one. That run never started and writes no row, and the
 window covers it.
@@ -375,7 +447,7 @@ error class names, and nothing COROS sent. The detail is in the run's
 `SyncLog.error_detail` in the sheet. Run `node run.mjs` locally, without
 `SYNC_LOG`, for the full step-by-step log.
 
-**The dead-man's switch** is `coros-sync-watchdog.yml`. Every 3 hours it runs
+**The dead-man's switch** is `thrive-coros-sync-watchdog.yml`. Every 3 hours it runs
 `node deadman.mjs` and fails when the newest `SyncLog` row, of any status, is
 more than **16 hours** old:
 - The gaps between runs are 9, 4, 5 and 6 h, so one dropped run leaves at most
@@ -399,10 +471,10 @@ the auto-disable after 60 days with no activity on a public repo. That layer is
 | `N failure(s): activity …` | One activity's detail, or the health bundle, failed after 3 attempts. Everything else landed | Nothing, if it clears on the next run. If one activity keeps failing, look at its logged error |
 | `COROS no longer offers …` | A tool was renamed or removed | Check `tools/list` and update `src/ingest.mjs` |
 | `health <date>: not written, unrecognized format in <tool>: …` | COROS changed how it words a value the parser reads | Fix `src/normalize-health.mjs` for the quoted line, then re-run. The archive still holds the text |
-| `THRIVE_API_URL and THRIVE_API_KEY not set`, or `ThriveApiError (config)` in a summary log | The Actions secrets are missing | `gh secret set THRIVE_API_URL` and `gh secret set THRIVE_API_KEY` |
+| `THRIVE_API_URL and THRIVE_API_KEY not set`, or `ThriveApiError (config)` in a summary log | The Actions secrets are missing | `gh secret set THRIVE_API_URL --repo luketmoss/keel` and `gh secret set THRIVE_API_KEY --repo luketmoss/keel` |
 | `the API returned 404 with a web page instead of JSON` | Apps Script served a 404 page to a write and it stayed that way after 3 retries (2, 6 and 15 s, jittered), or the 90 s retry budget was spent. Only that class is retried, and only for writes that are safe to replay; a retry that landed is a `notes` line, not a failure (#327) | Nothing, if it clears. The next run re-sends the window. If it persists, check that `THRIVE_API_URL` is the `/exec` URL of the web-app deployment |
 | `SyncLog row … was not written` | The API refused or missed the run's row. The rest of the run may have landed | Read the quoted error (a local run shows it). A missing tab means `scripts/migrate-156-sync-log-tab.mjs` has not run |
-| `coros-sync-watchdog`: `has not run for N hours` | No sync has recorded a run within 16 h | Actions → coros-sync: is the schedule enabled, and are runs cancelled or timing out? |
+| `thrive-coros-sync-watchdog`: `has not run for N hours` | No sync has recorded a run within 16 h | Actions → thrive-coros-sync: is `THRIVE_SYNCS_LIVE` set to `true`, is the schedule enabled, and are runs cancelled or timing out? |
 | `Lock timeout` | Another API caller held the script lock for over 30 s | Nothing, if it clears. The next run re-sends the window |
 | `DailyHealth: …` / `DailySummary rebuild: …` | The Thrive API refused the write or was unreachable | Read the quoted error. The next run re-sends the whole window |
 | `activity <id>: not written, unrecognized format in getActivityDetail: …` | COROS changed how it words a value the activity parser reads | Fix `src/normalize-activity.mjs` for the quoted line, then re-run. The archive still holds the text |
@@ -418,9 +490,9 @@ the auto-disable after 60 days with no activity on a public repo. That layer is
 | `WithingsTokenPersistError` | A rotated Withings token could not be written to Drive | Re-run the workflow. If it then reports a dead grant, `node withings-authorize.mjs` |
 | `WithingsUnavailableError` | Withings is down, rate limiting, or erroring after 3 attempts | Nothing. The next run retries |
 | `WithingsRequestError` | Withings refused a request with a status that is neither the grant nor an outage | Look the quoted status up in Withings' [response status list](https://developer.withings.com/api-reference/#section/Response-status) and fix `src/withings-oauth.mjs` |
-| `WITHINGS_CLIENT_ID and WITHINGS_CLIENT_SECRET are not both set` | The Actions secrets are missing | `gh secret set WITHINGS_CLIENT_ID` and `gh secret set WITHINGS_CLIENT_SECRET` |
-| `withings-sync-watchdog`: `has not run for N hours` | No Withings run has recorded a row within 14 h | Actions → withings-sync: is the schedule enabled, and are runs cancelled or timing out? |
-| `withings-sync-watchdog`: `WithingsSyncLog is empty` or `Could not read WithingsSyncLog` | No run has logged yet, the tab is missing, or the API is down | Run `scripts/migrate-200-withings-sync-log-tab.mjs` if the tab is missing, then dispatch withings-sync |
+| `WITHINGS_CLIENT_ID and WITHINGS_CLIENT_SECRET are not both set` | The Actions secrets are missing | `gh secret set THRIVE_WITHINGS_CLIENT_ID --repo luketmoss/keel` and `gh secret set THRIVE_WITHINGS_CLIENT_SECRET --repo luketmoss/keel` |
+| `thrive-withings-sync-watchdog`: `has not run for N hours` | No Withings run has recorded a row within 14 h | Actions → thrive-withings-sync: is `THRIVE_SYNCS_LIVE` set to `true`, is the schedule enabled, and are runs cancelled or timing out? |
+| `thrive-withings-sync-watchdog`: `WithingsSyncLog is empty` or `Could not read WithingsSyncLog` | No run has logged yet, the tab is missing, or the API is down | Run `scripts/migrate-200-withings-sync-log-tab.mjs` if the tab is missing, then dispatch thrive-withings-sync |
 | `WithingsSyncLog row … was not written` | The tab is missing, or the API refused the row | Run `scripts/migrate-200-withings-sync-log-tab.mjs`; read the row's error with `node withings-run.mjs` locally |
 | `ApiIgnoresLogError` | The deployed Apps Script predates #200 and would file Withings runs in `SyncLog`. Nothing was written | Deploy `apps-script/`, then re-run |
 | `BodyMeasurements not written` | The API refused the rows, or `THRIVE_API_URL`/`THRIVE_API_KEY` is missing. The archive stands | Read the quoted error. The next run re-sends the whole window |
@@ -433,7 +505,7 @@ the auto-disable after 60 days with no activity on a public repo. That layer is
   with it.
 - **One re-read before giving up.** An `invalid_grant` usually means another process rotated
   first. The run re-reads Drive and retries once, but only if the file holds a different token.
-- **Never two at once.** The workflow's `concurrency: coros-sync` group queues runs, and never
+- **Never two at once.** The workflow's `concurrency: thrive-coros-sync` group queues runs, and never
   cancels one mid-refresh.
 
 In a summary-mode log, a failure is only counted, and an abort shows only its
@@ -456,15 +528,15 @@ In the [Withings developer dashboard](https://developer.withings.com/dashboard/)
 signed in as the Withings account whose data Thrive reads:
 
 1. **Create an application** of type **Public API integration** (free plan).
-2. **Callback URL:** `https://luketmoss.github.io/thrive/withings-callback.html`,
+2. **Callback URL:** `https://luketmoss.github.io/keel/thrive/withings-callback.html`,
    exactly. Withings refuses localhost and IP redirects, so the callback is a
    static page on GitHub Pages (`frontend/public/withings-callback.html`). It
    shows the authorization response for you to paste back, and sends it nowhere.
 3. **Scopes:** `user.metrics,user.info` (the script asks for these).
 4. Store the client ID and secret:
    ```bash
-   gh secret set WITHINGS_CLIENT_ID --repo luketmoss/thrive
-   gh secret set WITHINGS_CLIENT_SECRET --repo luketmoss/thrive
+   gh secret set THRIVE_WITHINGS_CLIENT_ID --repo luketmoss/keel
+   gh secret set THRIVE_WITHINGS_CLIENT_SECRET --repo luketmoss/keel
    ```
 
 ### 2. Authorize
@@ -688,7 +760,7 @@ half.
   while the window holds rows, however few: a Withings fault answering
   `status 0` with an empty list must not empty the tab. To let a real sweep
   through, check the readings really are gone in the app, then dispatch
-  `withings-sync.yml` with `max_deletions` set to N (locally,
+  `thrive-withings-sync.yml` with `max_deletions` set to N (locally,
   `WITHINGS_MAX_DELETIONS=N`). That raises the cap for that run only, and,
   because the owner has now checked, also lets an empty answer delete. The
   schedule always uses the default.
@@ -720,14 +792,14 @@ checked: …` in `error_detail`, until the owner deploys.
 
 ## Withings: schedule, log and watchdog (#200)
 
-**Four runs a day**, `.github/workflows/withings-sync.yml` on
+**Four runs a day**, `.github/workflows/thrive-withings-sync.yml` on
 `41 1,7,13,19 * * *`: 01:41, 07:41, 13:41 and 19:41 UTC, every 6 hours, at a
 minute clear of COROS's :17 and both watchdogs. Withings asks for at most one
 poll per 10 minutes, and weight and BP change slowly. `workflow_dispatch` works
 too. Each run is `node withings-run.mjs` with a 15-minute timeout, in the
-`withings-sync` concurrency group, which queues and never cancels: the 3-hour
+`thrive-withings-sync` concurrency group, which queues and never cancels: the 3-hour
 access token means nearly every run rotates the refresh token, and a cancelled
-run could die between refresh and persist. It is not the `coros-sync` group:
+run could die between refresh and persist. It is not the `thrive-coros-sync` group:
 the two share no token. The workflow gets only the three Google secrets, the
 two Withings secrets and `THRIVE_API_URL`/`THRIVE_API_KEY`.
 
@@ -765,7 +837,7 @@ carries the `run_id`, window dates, counts, `status` and error class names. No
 run's `WithingsSyncLog` row. Run `node withings-run.mjs` locally, without
 `SYNC_LOG`, for the full log.
 
-**The dead-man's switch** is `withings-sync-watchdog.yml`, on `53 */3 * * *`
+**The dead-man's switch** is `thrive-withings-sync-watchdog.yml`, on `53 */3 * * *`
 in its own concurrency group. It runs `node deadman.mjs --log withings`, and
 fails when the newest `WithingsSyncLog` row, of any status, is more than
 **14 hours** old, or the tab is empty or unreadable:
@@ -785,7 +857,7 @@ group from its first reading to today — into `BodyMeasurements`, through the
 same archive → normalize → upsert path the scheduled sync uses:
 
 ```
-gh workflow run withings-sync.yml --repo luketmoss/thrive -f backfill=true
+gh workflow run thrive-withings-sync.yml --repo luketmoss/keel -f backfill=true
 ```
 
 (PowerShell quoting is the same; there is no separate local backfill command —
@@ -803,8 +875,8 @@ sight rather than a suspiciously wide 30-day window.
 **Why it is a workflow input, not a local script.** Withings' refresh token
 rotates on nearly every run (#196). A local backfill running at the same time
 as the schedule would present a spent token and could kill the grant. The
-`backfill` dispatch runs through `withings-sync.yml` itself, in the same
-`withings-sync` concurrency group as the schedule, so the two can never
+`backfill` dispatch runs through `thrive-withings-sync.yml` itself, in the same
+`thrive-withings-sync` concurrency group as the schedule, so the two can never
 overlap.
 
 **Cheap on a large first pass.** A per-group `drive.findOne` for thousands of

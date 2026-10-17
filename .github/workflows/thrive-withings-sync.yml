@@ -1,0 +1,91 @@
+name: thrive-withings-sync
+
+# The Withings → Thrive sync (epic #204). #196 authorizes, #197 archives each
+# measure group's raw payload in the bot's Drive, #198 normalizes them into
+# BodyMeasurements through the Thrive API, and #200 schedules it and writes one
+# WithingsSyncLog row a run; #215 removes rows for readings deleted in the app. thrive-withings-sync-watchdog.yml is the dead-man's
+# switch for this schedule. Nothing here touches SyncLog or thrive-coros-sync.
+on:
+  # Every 6 hours: 01:41, 07:41, 13:41 and 19:41 UTC. Withings asks for at
+  # most one poll per 10 minutes, and weight and BP change slowly; runs 6 h
+  # apart put a morning weigh-in in the sheet by 07:41 or 13:41 local. The odd
+  # minute is clear of COROS's :17, both watchdogs and the top-of-hour crowd.
+  schedule:
+    - cron: '41 1,7,13,19 * * *'
+  workflow_dispatch:
+    inputs:
+      # #199: the account's whole history, once, through this same job — never
+      # a separate schedule, so it shares the concurrency group below and can
+      # never present a refresh token the scheduled cadence just spent.
+      backfill:
+        description: 'Backfill all Withings history (startdate 0) instead of the rolling window'
+        type: boolean
+        default: false
+      # #215: raise the cap on rows deleted because Withings no longer returns
+      # them (default 5), for this dispatch only — after checking in the app
+      # that the readings really were deleted. Setting it also lets a run
+      # whose fetch came back empty delete, which the default never does.
+      max_deletions:
+        description: 'Allow this many BodyMeasurements deletions this run (blank = default 5)'
+        type: string
+        default: ''
+
+# Never two runs at once. The 3-hour access token means nearly every run
+# rotates the refresh token (#196), so a second run refreshing concurrently
+# would present a spent one. Queue, never cancel: a cancelled run could die
+# between refresh and persist and lose the grant.
+#
+# Deliberately not the thrive-coros-sync group: the two share no token, and one
+# should never wait on, or cancel a pending run of, the other.
+concurrency:
+  group: thrive-withings-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    # The off switch (#398). Concurrency groups do not span repositories, so
+    # this stays skipped until luketmoss/thrive's copy is disabled and the
+    # repository variable is set to true. thrive/sync/README.md has the cutover.
+    if: vars.THRIVE_SYNCS_LIVE == 'true'
+    runs-on: ubuntu-latest
+    # 45 minutes for a backfill (#199): a few thousand groups, each an
+    # archive write plus its share of a batched sheet call, comfortably clears
+    # the scheduled run's 15 but is raised here rather than for every run.
+    # sync/README.md "Backfilling Withings history" has the measured basis.
+    timeout-minutes: ${{ github.event.inputs.backfill == 'true' && 45 || 15 }}
+    defaults:
+      run:
+        working-directory: thrive/sync
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: thrive/sync/package-lock.json
+      - run: npm ci
+      - name: sync
+        run: node withings-run.mjs
+        env:
+          # The repo is public, and so is this log: counts, dates, status,
+          # run_id and error class names only. No grpid, measurement, device
+          # model or Withings text; the detail goes to the WithingsSyncLog row.
+          SYNC_LOG: summary
+          # Set only by a `backfill: true` dispatch; a schedule leaves the
+          # input (and so this) empty, which withings-run.mjs treats as false.
+          BACKFILL: ${{ github.event.inputs.backfill }}
+          # #215: set only by a dispatch's `max_deletions`; a schedule leaves
+          # it empty, which always means the default cap of 5.
+          WITHINGS_MAX_DELETIONS: ${{ github.event.inputs.max_deletions }}
+          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.THRIVE_BOT_GOOGLE_OAUTH_CLIENT_ID }}
+          GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.THRIVE_BOT_GOOGLE_OAUTH_CLIENT_SECRET }}
+          GOOGLE_DRIVE_REFRESH_TOKEN: ${{ secrets.THRIVE_BOT_DRIVE_REFRESH_TOKEN }}
+          WITHINGS_CLIENT_ID: ${{ secrets.THRIVE_WITHINGS_CLIENT_ID }}
+          WITHINGS_CLIENT_SECRET: ${{ secrets.THRIVE_WITHINGS_CLIENT_SECRET }}
+          # Without these the archive still lands and the run fails loudly,
+          # with no row written.
+          THRIVE_API_URL: ${{ secrets.THRIVE_API_URL }}
+          THRIVE_API_KEY: ${{ secrets.THRIVE_API_KEY }}

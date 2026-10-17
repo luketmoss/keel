@@ -1,0 +1,71 @@
+name: thrive-coros-sync
+
+# The COROS → Thrive sync (epic #163). #151 authorizes, #152 archives the
+# window's raw payloads in the bot's Drive, #165 and #166 normalize daily
+# health and activities into the sheet through the Thrive API and rebuild the
+# DailySummary rollup, and #156 schedules it and writes one SyncLog row a run.
+# thrive-coros-sync-watchdog.yml is the dead-man's switch for this schedule.
+on:
+  # 03:17, 07:17, 12:17 and 18:17 MDT (UTC-6); an hour earlier in MST. DST
+  # drift is accepted, not corrected (sync plan §9): one expression, never a
+  # second line, because two would double-run on changeover days. 03:17
+  # closes out yesterday; 07:17 is the run that brings in last night's sleep.
+  # The odd minute dodges the top-of-hour crowd GitHub delays or drops.
+  schedule:
+    - cron: '17 9,13,18,0 * * *'
+  workflow_dispatch:
+    inputs:
+      force_refresh:
+        description: Rotate the COROS token even if it is fresh (proves a rotated token survives into the next run)
+        type: boolean
+        default: false
+
+# Never two runs at once. COROS rotates the refresh token on every use, so a
+# second run refreshing concurrently would present a spent token and fail
+# with "Duplicate grant rejected". Queue, never cancel: a cancelled run could
+# die between refresh and persist and lose the grant.
+#
+# GitHub keeps at most one *pending* run per group: a newer one cancels an
+# older pending one. That run never started, so it began no refresh and writes
+# no SyncLog row; the rolling window fetches whatever it would have.
+concurrency:
+  group: thrive-coros-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    # The off switch (#398). Concurrency groups do not span repositories, so
+    # this stays skipped until luketmoss/thrive's copy is disabled and the
+    # repository variable is set to true. thrive/sync/README.md has the cutover.
+    if: vars.THRIVE_SYNCS_LIVE == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: thrive/sync
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: thrive/sync/package-lock.json
+      - run: npm ci
+      - name: sync
+        run: node run.mjs
+        env:
+          # Empty on a scheduled run, which therefore never forces a rotation.
+          FORCE_REFRESH: ${{ inputs.force_refresh }}
+          # The repo is public, and so is this log: counts, dates, status and
+          # run_id only. The detail goes to the run's SyncLog row (#156 AC5).
+          SYNC_LOG: summary
+          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.THRIVE_BOT_GOOGLE_OAUTH_CLIENT_ID }}
+          GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.THRIVE_BOT_GOOGLE_OAUTH_CLIENT_SECRET }}
+          GOOGLE_DRIVE_REFRESH_TOKEN: ${{ secrets.THRIVE_BOT_DRIVE_REFRESH_TOKEN }}
+          # The Apps Script web app's /exec URL and its API_KEY script property
+          # (#165). Without them the archive still lands and the run fails loudly.
+          THRIVE_API_URL: ${{ secrets.THRIVE_API_URL }}
+          THRIVE_API_KEY: ${{ secrets.THRIVE_API_KEY }}

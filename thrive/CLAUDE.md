@@ -11,10 +11,13 @@ Thrive.
 
 Imported from `luketmoss/thrive` with its history (#395). Thrive's own issues
 from before the import are written `luketmoss/thrive#N`; a bare `#N` here is a
-Keel issue. Until the cutover (#399) the live app, its syncs and its poller
-still run from `luketmoss/thrive`, so the workflows named below
-(`coros-sync.yml`, `withings-sync.yml` and their watchdogs) are that repo's
-until #398 brings them here.
+Keel issue. The sync and watchdog workflows are Keel's since #398:
+`thrive-coros-sync.yml`, `thrive-withings-sync.yml` and their watchdogs. Both
+sync jobs are gated by the repository variable `THRIVE_SYNCS_LIVE`, and until
+the owner's one-time cutover (`sync/README.md`) sets it, the syncs and the
+deployed poller still run from `luketmoss/thrive`. Never set it, dispatch a
+sync, or deploy the poller from a session: two copies running at once kill
+the vendors' refresh tokens.
 
 ## Stacks
 
@@ -175,12 +178,12 @@ Google Sheet "Groundwork" with these tabs:
   n_fit_fetched, n_errors, status (`ok`/`partial`/`failed`), error_detail,
   notes (luketmoss/thrive#155).
   Appended only by the COROS sync; the dead-man's switch
-  (`coros-sync-watchdog.yml`) fails when the newest row is over 16 h old.
+  (`thrive-coros-sync-watchdog.yml`) fails when the newest row is over 16 h old.
 - **WithingsSyncLog** (A:N) — one row per Withings sync run (luketmoss/thrive#200), `SyncLog`'s
   layout exactly: `n_seen` is measure groups fetched, `n_new`/`n_updated` are
   `BodyMeasurements` rows, `n_enriched`/`n_fit_fetched` are always `0`, `notes`
   lists unattributed groups skipped. Appended only by `sync/withings-run.mjs`
-  through `appendSyncLog` with `log: 'withings'`; `withings-sync-watchdog.yml`
+  through `appendSyncLog` with `log: 'withings'`; `thrive-withings-sync-watchdog.yml`
   fails when the newest row is over 14 h old. A separate tab because `SyncLog`
   has no source column: nothing that reads `SyncLog` may ever see a Withings run.
 - **Journal** (A:D) — one note per local date (luketmoss/thrive#233): date, note, created,
@@ -209,7 +212,7 @@ Google Sheet "Groundwork" with these tabs:
   (`apps-script/src/sync-requests.js`), a 5-minute Apps Script time-driven
   trigger on the bot account, writes every later value in E–I and never
   deletes or writes A–D of a row it did not add. It dispatches the existing
-  `coros-sync.yml`/`withings-sync.yml` with a fixed `{"ref":"main"}` and the
+  `thrive-coros-sync.yml`/`thrive-withings-sync.yml` (on `luketmoss/keel`) with a fixed `{"ref":"main"}` and the
   `GITHUB_DISPATCH_TOKEN` script property, and closes each row it started.
   Sync now does not wait for the next tick (luketmoss/thrive#410): once its rows are appended,
   the SPA POSTs `requestSync` (`request_ids` = the ids it just appended) with

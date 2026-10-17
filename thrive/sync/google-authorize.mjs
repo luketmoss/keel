@@ -89,10 +89,10 @@ async function main() {
     console.log(`\n  WARNING: that is not ${BOT_ACCOUNT}. Files would be owned by the wrong account.\n`);
   }
   console.log(`Saved for local runs: ${LOCAL_CREDENTIALS_PATH} (gitignored).\n`);
-  console.log('Store this refresh token as the GOOGLE_DRIVE_REFRESH_TOKEN Actions secret.');
+  console.log('Store this refresh token as the THRIVE_BOT_DRIVE_REFRESH_TOKEN Actions secret.');
   console.log('This is the only time it is shown:\n');
   console.log(`  ${tokens.refresh_token}\n`);
-  console.log('  gh secret set GOOGLE_DRIVE_REFRESH_TOKEN --repo luketmoss/thrive\n');
+  console.log('  gh secret set THRIVE_BOT_DRIVE_REFRESH_TOKEN --repo luketmoss/keel\n');
   console.log('Next: node authorize.mjs');
 }
 

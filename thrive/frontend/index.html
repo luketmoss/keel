@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Thrive — Workout Tracker</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#FF6B35" />
+  <link rel="icon" type="image/svg+xml" sizes="any" href="thrive-favicon.svg" />
+  <link rel="apple-touch-icon" href="thrive-icon-192.svg" />
+  <!-- Apply data-theme before first paint to prevent flash of wrong theme -->
+  <script>
+    (function() {
+      try {
+        // One-time migration: move gw-theme → thrive-theme for existing users
+        if (!localStorage.getItem('thrive-theme')) {
+          var legacy = localStorage.getItem('gw-theme');
+          if (legacy === 'dark' || legacy === 'light') {
+            localStorage.setItem('thrive-theme', legacy);
+            localStorage.removeItem('gw-theme');
+          }
+        }
+        var t = localStorage.getItem('thrive-theme');
+        var resolved;
+        if (t === 'dark') {
+          resolved = 'dark';
+        } else if (t === 'light') {
+          resolved = 'light';
+        } else {
+          // 'system' or missing/invalid: follow OS preference
+          resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-theme', resolved);
+      } catch(e) {}
+    })();
+  </script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,603 @@
+// Workouts + Sets domain API — wraps Sheets REST calls with demo-mode fallback.
+
+import type { Workout, WorkoutWithRow, WorkoutSet, SetWithRow, WorkoutType, Effort, BuilderExercise } from './types';
+import { sheetsGet, sheetsAppend, sheetsUpdate, sheetsDeleteRow, sheetsBatchUpdate, getSheetId, withReauth } from './sheets';
+import { isDemo, DEMO_SETS, shiftDemoWorkouts } from './demo-data';
+import { toLocalDateStr } from '../components/activities/activities-helpers';
+
+/**
+ * Thrown when a workout write targets a sheetRow that no longer holds that
+ * workout's id — the cached row index went stale (e.g. a row shift from a
+ * delete elsewhere in the same session). Writing anyway would silently
+ * clobber a different workout's row (see issue #95).
+ */
+export class WorkoutRowMismatchError extends Error {
+  constructor(public workoutId: string) {
+    super(`Workout row for id "${workoutId}" could not be verified — it may be out of sync`);
+    this.name = 'WorkoutRowMismatchError';
+  }
+}
+
+// ── Workouts tab (A:AB) ──────────────────────────────────────────────
+
+// Demo dates are shifted once per page load (#250): a later call must neither
+// re-shift nor recompute against a `now` that has crossed midnight.
+let _shiftedDemoWorkouts: WorkoutWithRow[] | null = null;
+
+export async function fetchWorkouts(token: string): Promise<WorkoutWithRow[]> {
+  if (isDemo()) {
+    if (!_shiftedDemoWorkouts) _shiftedDemoWorkouts = shiftDemoWorkouts(new Date());
+    return [..._shiftedDemoWorkouts];
+  }
+
+  return withReauth(token, async (t) => {
+    const rows = await sheetsGet('Workouts!A2:AB', t);
+    return rows.map((row, i) => rowToWorkout(row, i + 2));
+  });
+}
+
+/**
+ * Reads a `Workouts!A:AB` row. The Sheets API drops trailing empty cells, so a
+ * short row is normal and every missing cell reads as `''`.
+ */
+export function rowToWorkout(row: string[], sheetRow: number): WorkoutWithRow {
+  return {
+    id: row[0] || '',
+    date: row[1] || '',
+    time: row[2] || '',
+    type: (row[3] || 'weight') as WorkoutType,
+    name: row[4] || '',
+    template_id: row[5] || '',
+    notes: row[6] || '',
+    elapsed_seconds: row[7] || '',
+    created: row[8] || '',
+    copied_from: row[9] || '',
+    status: row[10] || '',
+    moving_seconds: row[11] || '',
+    effort: (row[12] || '') as Workout['effort'],
+    distance_m: row[13] || '',
+    ascent_m: row[14] || '',
+    descent_m: row[15] || '',
+    avg_hr: row[16] || '',
+    // #128 R-Z. A row written before the migration has no cells here at
+    // all, so `|| ''` is what keeps them blank rather than undefined.
+    sub_type: row[17] || '',
+    source: row[18] || '',
+    source_activity_id: row[19] || '',
+    raw_ref: row[20] || '',
+    fit_ref: row[21] || '',
+    fit_fetched_at: row[22] || '',
+    synced_at: row[23] || '',
+    started_at_utc: row[24] || '',
+    calories: row[25] || '',
+    // #145 AA. Blank on every row planned before it existed, and on every
+    // row nobody estimated.
+    estimated_seconds: row[26] || '',
+    // #260 AB. Blank until the sync or the backfill writes it.
+    sport_type: row[27] || '',
+    sheetRow,
+  };
+}
+
+/**
+ * Look up a single workout's current sheetRow by id. Used right after
+ * creating a workout so callers don't have to guess `workouts.value.length + 2`
+ * — that guess is only correct while the local list exactly mirrors the
+ * sheet, which a prior delete in the same session can silently break (see
+ * issue #95).
+ */
+export async function findWorkoutRow(workoutId: string, token: string): Promise<WorkoutWithRow | null> {
+  const all = await fetchWorkouts(token);
+  return all.find((w) => w.id === workoutId) ?? null;
+}
+
+/**
+ * Builds a `Workouts!A:AB` row. Both the create and the edit path go through
+ * here: `sheetsAppend`/`sheetsUpdate` write every value handed to them
+ * regardless of the range, so two builders that had to agree — and didn't —
+ * is exactly how #100 nearly resurrected a deleted column.
+ */
+export function workoutToRow(w: Workout): (string | number)[] {
+  return [
+    w.id,
+    w.date,
+    w.time,
+    w.type,
+    w.name,
+    w.template_id,
+    w.notes,
+    w.elapsed_seconds,
+    w.created,
+    w.copied_from,
+    w.status,
+    w.moving_seconds,
+    w.effort,
+    w.distance_m,
+    w.ascent_m,
+    w.descent_m,
+    w.avg_hr,
+    w.sub_type,
+    w.source,
+    w.source_activity_id,
+    w.raw_ref,
+    w.fit_ref,
+    w.fit_fetched_at,
+    w.synced_at,
+    w.started_at_utc,
+    w.calories,
+    w.estimated_seconds,
+    w.sport_type,
+  ];
+}
+
+export async function createWorkout(
+  data: { type: WorkoutType; name: string; template_id?: string; notes?: string; elapsed_seconds?: string; effort?: Effort | '';
+    distance_m?: string; ascent_m?: string; descent_m?: string; avg_hr?: string;
+    copied_from?: string; date?: string; status?: string; sub_type?: string; estimated_seconds?: string },
+  token: string,
+): Promise<Workout> {
+  const id = `w_${crypto.randomUUID().slice(0, 8)}`;
+  const now = new Date();
+  const date = data.date || toLocalDateStr(now);
+  const time = now.toTimeString().slice(0, 5);
+  const created = now.toISOString();
+
+  const workout: Workout = {
+    id,
+    date,
+    time,
+    type: data.type,
+    name: data.name,
+    template_id: data.template_id || '',
+    notes: data.notes || '',
+    elapsed_seconds: data.elapsed_seconds || '',
+    created,
+    copied_from: data.copied_from || '',
+    status: data.status || '',
+    // #101: nullable activity attributes. Populated by #102 (effort) and
+    // #103 (cardio); they ship empty and must never be defaulted.
+    moving_seconds: '',
+    effort: data.effort || '',
+    distance_m: data.distance_m || '',
+    ascent_m: data.ascent_m || '',
+    descent_m: data.descent_m || '',
+    avg_hr: data.avg_hr || '',
+    // #129: venue/terrain, chosen by the user. '' means unspecified.
+    sub_type: data.sub_type || '',
+    // #128: sync provenance. Nothing in the app writes these — a hand-logged
+    // workout is exactly the row with a blank `source`.
+    source: '',
+    source_activity_id: '',
+    raw_ref: '',
+    fit_ref: '',
+    fit_fetched_at: '',
+    synced_at: '',
+    started_at_utc: '',
+    calories: '',
+    // #145: only a plan carries one, and only when the user typed it.
+    estimated_seconds: data.estimated_seconds || '',
+    // #260: sync-owned, like the provenance columns above. Never set here.
+    sport_type: '',
+  };
+
+  if (!isDemo()) {
+    await withReauth(token, (t) =>
+      sheetsAppend('Workouts!A:AB', [workoutToRow(workout)], t),
+    );
+  }
+
+  return workout;
+}
+
+/**
+ * The fields a write changes. Anything absent is left as the sheet holds it.
+ * `id` is how the row is found, so it is never part of a patch.
+ */
+export type WorkoutPatch = Partial<Omit<Workout, 'id'>>;
+
+/**
+ * Writes `patch` over the row as the sheet holds it **now**, not over the
+ * app's cached copy (#172).
+ *
+ * The cached copy can be hours old. Writing it back whole reverts every column
+ * the COROS sync wrote since the app loaded: an enrichment's `moving_seconds`,
+ * `avg_hr` and `calories`, the `source_activity_id`/`raw_ref`/`synced_at`
+ * link, a synced row's `fit_ref`. On a synced row the sync then reads that
+ * revert as a user edit and stops updating the field. So the row is read
+ * fresh, only the patched fields change, and the whole row goes back.
+ * Apps Script's `updateWorkout` does the same.
+ *
+ * The fresh read is also the #95 check: a row that no longer holds this
+ * workout's id is refused instead of written.
+ *
+ * An empty patch writes nothing and returns `workout` unchanged.
+ *
+ * @returns the row as written, for the caller to put back in the store.
+ */
+export async function updateWorkout(
+  workout: WorkoutWithRow,
+  patch: WorkoutPatch,
+  token: string,
+): Promise<WorkoutWithRow> {
+  const { sheetRow } = workout;
+  if (Object.keys(patch).length === 0) return workout;
+  if (isDemo()) return { ...workout, ...patch, id: workout.id, sheetRow };
+
+  return withReauth(token, async (t) => {
+    const range = `Workouts!A${sheetRow}:AB${sheetRow}`;
+    const current = await sheetsGet(range, t);
+    if (!current[0] || (current[0][0] || '') !== workout.id) {
+      throw new WorkoutRowMismatchError(workout.id);
+    }
+
+    const written: WorkoutWithRow = { ...rowToWorkout(current[0], sheetRow), ...patch, id: workout.id, sheetRow };
+    await sheetsUpdate(range, [workoutToRow(written)], t);
+    return written;
+  });
+}
+
+export async function deleteWorkoutRows(
+  workout: WorkoutWithRow,
+  workoutSets: SetWithRow[],
+  token: string,
+): Promise<void> {
+  if (isDemo()) return;
+
+  await withReauth(token, async (t) => {
+    // Delete sets bottom-to-top to avoid row shift
+    const setsToDelete = workoutSets
+      .filter((s) => s.workout_id === workout.id)
+      .sort((a, b) => b.sheetRow - a.sheetRow);
+
+    if (setsToDelete.length > 0) {
+      const setsSheetId = await getSheetId('Sets', t);
+      for (const s of setsToDelete) {
+        await sheetsDeleteRow(setsSheetId, s.sheetRow, t);
+      }
+    }
+
+    // Delete the workout row
+    const workoutsSheetId = await getSheetId('Workouts', t);
+    await sheetsDeleteRow(workoutsSheetId, workout.sheetRow, t);
+  });
+}
+
+// ── Sets tab (A:J) ──────────────────────────────────────────────────
+
+export async function fetchSets(token: string): Promise<SetWithRow[]> {
+  if (isDemo()) return [...DEMO_SETS];
+
+  return withReauth(token, fetchSetsRaw);
+}
+
+async function fetchSetsRaw(token: string): Promise<SetWithRow[]> {
+  const rows = await sheetsGet('Sets!A2:J', token);
+  return rows.map((row, i) => ({
+    workout_id: row[0] || '',
+    exercise_id: row[1] || '',
+    exercise_name: row[2] || '',
+    section: row[3] || '',
+    exercise_order: Number(row[4]) || 0,
+    set_number: Number(row[5]) || 0,
+    planned_reps: row[6] || '',
+    weight: row[7] || '',
+    reps: row[8] || '',
+    effort: (row[9] || '') as SetWithRow['effort'],
+    sheetRow: i + 2,
+  }));
+}
+
+/**
+ * Builds a `Sets!A:J` row. Reads named fields, so a payload carrying extra
+ * properties — an offline-queue entry serialized under the old shape, say —
+ * contributes no stray trailing cell.
+ */
+export function setToRow(s: WorkoutSet): (string | number)[] {
+  return [
+    s.workout_id,
+    s.exercise_id,
+    s.exercise_name,
+    s.section,
+    s.exercise_order,
+    s.set_number,
+    s.planned_reps,
+    s.weight,
+    s.reps,
+    s.effort,
+  ];
+}
+
+export async function appendSet(set: WorkoutSet, token: string): Promise<void> {
+  if (isDemo()) return;
+
+  await withReauth(token, (t) =>
+    sheetsAppend('Sets!A:J', [setToRow(set)], t),
+  );
+}
+
+export async function appendSets(sets: WorkoutSet[], token: string): Promise<void> {
+  if (isDemo()) return;
+  if (sets.length === 0) return;
+
+  await withReauth(token, (t) =>
+    sheetsAppend('Sets!A:J', sets.map(setToRow), t),
+  );
+}
+
+export async function updateSet(
+  sheetRow: number,
+  set: WorkoutSet,
+  token: string,
+): Promise<void> {
+  if (isDemo()) return;
+
+  await withReauth(token, (t) =>
+    sheetsUpdate(`Sets!A${sheetRow}:J${sheetRow}`, [setToRow(set)], t),
+  );
+}
+
+export async function updateExerciseNameInSets(
+  exerciseId: string,
+  newName: string,
+  allSets: SetWithRow[],
+  token: string,
+): Promise<void> {
+  const affected = allSets.filter(s => s.exercise_id === exerciseId);
+  if (affected.length === 0) return;
+
+  if (isDemo()) return;
+
+  await withReauth(token, async (t) => {
+    for (const s of affected) {
+      await sheetsUpdate(
+        `Sets!C${s.sheetRow}`,
+        [[newName]],
+        t,
+      );
+    }
+  });
+}
+
+/**
+ * A builder's exercise list as `Sets` rows, the shape every new plan is
+ * written in: in list order, `exercise_order` is the position, a warmup is
+ * one row (set 1, blank `planned_reps`), anything else is `sets` rows with
+ * the builder's reps. Weight, reps and effort are blank.
+ *
+ * An entry carrying `planned_reps_by_set` (#350) writes set `n` with entry
+ * `n - 1` of that list instead, falling back to `planned_reps` for a set the
+ * list does not cover.
+ */
+export function builderExercisesToSets(workoutId: string, exercises: BuilderExercise[]): WorkoutSet[] {
+  const rows: WorkoutSet[] = [];
+  exercises.forEach((ex, index) => {
+    const base = {
+      workout_id: workoutId,
+      exercise_id: ex.exercise_id,
+      exercise_name: ex.exercise_name,
+      exercise_order: index + 1,
+      weight: '',
+      reps: '',
+      effort: '' as const,
+    };
+    if (ex.section === 'warmup') {
+      rows.push({ ...base, section: 'warmup', set_number: 1, planned_reps: '' });
+      return;
+    }
+    for (let s = 1; s <= ex.sets; s++) {
+      const planned_reps = ex.planned_reps_by_set?.[s - 1] ?? ex.planned_reps;
+      rows.push({ ...base, section: ex.section || 'primary', set_number: s, planned_reps });
+    }
+  });
+  return rows;
+}
+
+const setKey = (s: Pick<WorkoutSet, 'exercise_id' | 'section' | 'set_number'>) =>
+  `${s.exercise_id}\u0000${s.section}\u0000${s.set_number}`;
+
+const sourceKey = (exerciseId: string, order: number, setNumber: number) =>
+  `${exerciseId}\u0000${order}\u0000${setNumber}`;
+
+/**
+ * The planner edits structure only, so every value it does not show is
+ * carried from the stored set it replaces (#118, widened to reps and effort
+ * by #349), always from `stored` (the fresh read), never from the editor.
+ *
+ * Which stored set that is depends on where the entry came from (#380):
+ * - An entry with a `source_order` (built by the planned-workout editor from
+ *   stored rows) carries from the stored row with the same exercise, that
+ *   original `exercise_order` and the same set number, whatever its section
+ *   or position now. So a second same-section entry of a lift keeps its own
+ *   values, and a set with no such stored row is blank.
+ * - Any other entry (newly added) carries by exercise + section + set number,
+ *   first match wins, warmups included.
+ * A set with no stored match keeps the blanks it was built with.
+ *
+ * @param exercises the entries `desired` was built from by
+ *   `builderExercisesToSets`, so row `exercise_order` n is entry n - 1. Only
+ *   their `source_order` is read; it never reaches a row. Omitted, every row
+ *   uses the exercise + section + set number key.
+ */
+export function carryPlannedSetValues(
+  stored: WorkoutSet[],
+  desired: WorkoutSet[],
+  exercises: Pick<BuilderExercise, 'source_order'>[] = [],
+): WorkoutSet[] {
+  const byKey = new Map<string, WorkoutSet>();
+  const bySource = new Map<string, WorkoutSet>();
+  for (const s of stored) {
+    if (!byKey.has(setKey(s))) byKey.set(setKey(s), s);
+    const k = sourceKey(s.exercise_id, Number(s.exercise_order), Number(s.set_number));
+    if (!bySource.has(k)) bySource.set(k, s);
+  }
+  return desired.map((d) => {
+    const source = exercises[d.exercise_order - 1]?.source_order;
+    const match = source === undefined
+      ? byKey.get(setKey(d))
+      : bySource.get(sourceKey(d.exercise_id, source, d.set_number));
+    return match ? { ...d, weight: match.weight, reps: match.reps, effort: match.effort } : d;
+  });
+}
+
+export interface SetsReconcilePlan {
+  /** Stored rows overwritten in place, ascending. */
+  updates: { sheetRow: number; set: WorkoutSet }[];
+  /** Surplus stored rows, descending, so each delete leaves the rest where they were. */
+  deletes: number[];
+  /** Desired rows beyond the stored ones, appended at the end of the tab. */
+  appends: WorkoutSet[];
+}
+
+const sameRow = (a: WorkoutSet, b: WorkoutSet) => {
+  const ra = setToRow(a);
+  const rb = setToRow(b);
+  return ra.every((v, i) => String(v) === String(rb[i]));
+};
+
+/**
+ * Pairs one workout's stored rows (ascending) with its desired rows by
+ * position. Sets rows carry no identity, so position is as good a pairing as
+ * any, and it means only a shrinking set count ever deletes (and so shifts)
+ * a row. A pair that already matches is left out; an unchanged workout plans
+ * nothing at all.
+ */
+export function planSetsReconcile(stored: SetWithRow[], desired: WorkoutSet[]): SetsReconcilePlan {
+  const own = [...stored].sort((a, b) => a.sheetRow - b.sheetRow);
+  const updates: SetsReconcilePlan['updates'] = [];
+  const shared = Math.min(own.length, desired.length);
+  for (let i = 0; i < shared; i++) {
+    if (!sameRow(own[i], desired[i])) updates.push({ sheetRow: own[i].sheetRow, set: desired[i] });
+  }
+  const deletes = own.slice(shared).map((s) => s.sheetRow).sort((a, b) => b - a);
+  const appends = desired.slice(shared);
+  return { updates, deletes, appends };
+}
+
+export const isEmptyPlan = (p: SetsReconcilePlan) =>
+  p.updates.length === 0 && p.deletes.length === 0 && p.appends.length === 0;
+
+/**
+ * A `Sets!A:J` row as `CellData`, matching what `setToRow` writes under
+ * `valueInputOption=RAW`: text as text, the two numeric columns as numbers,
+ * and a blank as no value at all. So `fetchSets` reads it back identically.
+ */
+function setToCells(s: WorkoutSet) {
+  return {
+    values: setToRow(s).map((v) => {
+      if (typeof v === 'number') return { userEnteredValue: { numberValue: v } };
+      if (v === '') return {};
+      return { userEnteredValue: { stringValue: String(v) } };
+    }),
+  };
+}
+
+/** The plan as `batchUpdate` requests: overwrites, then deletes bottom-to-top, then appends. */
+export function reconcileRequests(plan: SetsReconcilePlan, sheetId: number): object[] {
+  const requests: object[] = [];
+  for (const u of plan.updates) {
+    requests.push({
+      updateCells: {
+        rows: [setToCells(u.set)],
+        fields: 'userEnteredValue',
+        start: { sheetId, rowIndex: u.sheetRow - 1, columnIndex: 0 },
+      },
+    });
+  }
+  for (const row of plan.deletes) {
+    requests.push({
+      deleteDimension: { range: { sheetId, dimension: 'ROWS', startIndex: row - 1, endIndex: row } },
+    });
+  }
+  if (plan.appends.length > 0) {
+    requests.push({
+      appendCells: { sheetId, rows: plan.appends.map(setToCells), fields: 'userEnteredValue' },
+    });
+  }
+  return requests;
+}
+
+/**
+ * Makes a planned workout's `Sets` rows the planner's structure (#349), in
+ * one atomic `batchUpdate`: either every row is as desired, or none changed.
+ *
+ * The workout's rows are found by a fresh read, never by cached `sheetRow`s,
+ * and the values the planner does not show (weight, reps, effort) are carried
+ * from that same read. When nothing differs, no request is made.
+ *
+ * @param desired the rows as `builderExercisesToSets` builds them.
+ * @param exercises the entries `desired` was built from, for each entry's
+ *   `source_order` (#380); see `carryPlannedSetValues`.
+ */
+export async function replaceWorkoutSets(
+  workoutId: string,
+  desired: WorkoutSet[],
+  token: string,
+  exercises: Pick<BuilderExercise, 'source_order'>[] = [],
+): Promise<void> {
+  if (isDemo()) return;
+
+  await withReauth(token, async (t) => {
+    const all = await fetchSetsRaw(t);
+    const stored = all.filter((s) => s.workout_id === workoutId);
+    const plan = planSetsReconcile(stored, carryPlannedSetValues(stored, desired, exercises));
+    if (isEmptyPlan(plan)) return;
+    const sheetId = await getSheetId('Sets', t);
+    await sheetsBatchUpdate(reconcileRequests(plan, sheetId), t);
+  });
+}
+
+/**
+ * What a `Sets` row's position-in-the-workout columns should now hold, by the
+ * row the client holds: `exercise_order` (column E, #392) and/or `section`
+ * (column D, #395). A field left out is not written.
+ */
+export interface SetOrderWrite {
+  sheetRow: number;
+  exercise_order?: number;
+  section?: string;
+}
+
+/**
+ * The order and section writes as `batchUpdate` requests (#392, #395): one
+ * `updateCells` per cell to change, on column D (`columnIndex: 3`, text) or E
+ * (`columnIndex: 4`, a number), as `setToCells` writes them. No other column
+ * is named, so no other cell is touched.
+ */
+export function setOrderRequests(rows: SetOrderWrite[], sheetId: number): object[] {
+  const cell = (sheetRow: number, columnIndex: number, userEnteredValue: object) => ({
+    updateCells: {
+      rows: [{ values: [{ userEnteredValue }] }],
+      fields: 'userEnteredValue',
+      start: { sheetId, rowIndex: sheetRow - 1, columnIndex },
+    },
+  });
+  return rows.flatMap((r) => [
+    ...(r.section !== undefined ? [cell(r.sheetRow, 3, { stringValue: r.section })] : []),
+    ...(r.exercise_order !== undefined ? [cell(r.sheetRow, 4, { numberValue: r.exercise_order })] : []),
+  ]);
+}
+
+/**
+ * Writes `exercise_order` and/or `section` to the given `Sets` rows in one
+ * `batchUpdate` (#392, #395): all of them, or none if it fails, as
+ * `replaceWorkoutSets` does. No row is read, appended or deleted. Nothing to
+ * write makes no request; demo mode writes nothing (the caller updates
+ * memory).
+ */
+export async function updateSetOrders(rows: SetOrderWrite[], token: string): Promise<void> {
+  if (isDemo() || !rows.some((r) => r.exercise_order !== undefined || r.section !== undefined)) return;
+
+  await withReauth(token, async (t) => {
+    const sheetId = await getSheetId('Sets', t);
+    await sheetsBatchUpdate(setOrderRequests(rows, sheetId), t);
+  });
+}
+
+export async function deleteSetRow(sheetRow: number, token: string): Promise<void> {
+  if (isDemo()) return;
+
+  await withReauth(token, async (t) => {
+    const sheetId = await getSheetId('Sets', t);
+    await sheetsDeleteRow(sheetId, sheetRow, t);
+  });
+}

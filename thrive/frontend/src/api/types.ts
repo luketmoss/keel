@@ -1,0 +1,139 @@
+// Thrive data types — mirrors Google Sheet column structure.
+
+export type WorkoutType = 'weight' | 'stretch' | 'bike' | 'hike' | 'run' | 'walk';
+export type Effort = 'Easy' | 'Medium' | 'Hard';
+export type Section = 'warmup' | 'primary' | 'SS1' | 'SS2' | 'SS3' | 'burnout' | 'cooldown';
+
+export interface Exercise {
+  id: string;
+  name: string;
+  tags: string;       // comma-separated
+  notes: string;
+  created: string;
+}
+export interface ExerciseWithRow extends Exercise { sheetRow: number; }
+
+export interface TemplateRow {
+  template_id: string;
+  template_name: string;
+  order: number;
+  exercise_id: string;
+  exercise_name: string;
+  section: Section | string;
+  sets: string;
+  reps: string;
+}
+export interface TemplateRowWithRow extends TemplateRow { sheetRow: number; }
+
+export interface Template {
+  id: string;
+  name: string;
+  exercises: TemplateRowWithRow[];
+}
+
+export interface Workout {
+  id: string;
+  date: string;
+  time: string;
+  type: WorkoutType;
+  name: string;
+  template_id: string;
+  notes: string;
+  elapsed_seconds: string;
+  created: string;
+  copied_from: string;
+  status: string; // '' = active/complete, 'planned' = saved for later
+  // Activity attributes (#101). All nullable — '' means nobody said, which is a
+  // legitimate permanent state. Never default these, least of all `effort`.
+  moving_seconds: string;
+  effort: Effort | '';
+  distance_m: string;
+  ascent_m: string;
+  descent_m: string;
+  avg_hr: string;
+  // Sync provenance and reference attributes (#128, columns R-Z). Nullable for
+  // the same reason as the block above: '' means nobody said. For `source`, ''
+  // positively means "logged by hand" — do not default it to a vendor name.
+  sub_type: string;
+  source: string;
+  source_activity_id: string;
+  raw_ref: string;
+  fit_ref: string;
+  fit_fetched_at: string;
+  synced_at: string;
+  started_at_utc: string;
+  calories: string;
+  // #145, column AA: how long a *planned* session is meant to take, in
+  // seconds, typed per plan. Nullable: '' means nobody estimated it — never a
+  // zero-minute session. Not time taken: that is `elapsed_seconds`, and
+  // starting a plan never copies one into the other.
+  estimated_seconds: string;
+  // #260, column AB: the COROS sport code (e.g. '204' mountain bike), which
+  // the COROS web portal needs with `source_activity_id` to open the
+  // activity. Sync-owned like R-Z: the SPA never sets it. Nullable: '' means
+  // unknown (not yet backfilled, or not a COROS row) — never '0'.
+  sport_type: string;
+}
+export interface WorkoutWithRow extends Workout { sheetRow: number; }
+
+export interface WorkoutSet {
+  workout_id: string;
+  exercise_id: string;
+  exercise_name: string;
+  section: string;
+  exercise_order: number;
+  set_number: number;
+  planned_reps: string;
+  weight: string;
+  reps: string;
+  effort: Effort | '';
+}
+export interface SetWithRow extends WorkoutSet { sheetRow: number; }
+
+export interface BuilderExercise {
+  exercise_id: string;
+  exercise_name: string;
+  section: string;
+  sets: number;
+  planned_reps: string;
+  /**
+   * Per-set planned reps to write instead of `planned_reps` (#350): entry
+   * `i` is set `i + 1`. A set beyond the list gets `planned_reps`. The
+   * planner always sends it for a non-warmup entry, one value per set, as its
+   * rows hold them (#375).
+   */
+  planned_reps_by_set?: string[];
+  /**
+   * The stored `exercise_order` this entry was built from (#380), set only by
+   * the planned-workout editor. The save carries each set's weight, reps and
+   * effort from the stored row at that order and set number. Never written
+   * to `Sets`: `builderExercisesToSets` does not copy it onto a row.
+   */
+  source_order?: number;
+}
+
+export interface Label {
+  id: string;
+  name: string;
+  color_key: string;
+  created: string;
+}
+export interface LabelWithRow extends Label { sheetRow: number; }
+
+/** One note per local day (#233); a day with no note has no row. */
+export interface JournalEntry {
+  /** Local YYYY-MM-DD, the key. */
+  date: string;
+  note: string;
+  /** ISO 8601, set on first write and kept. */
+  created: string;
+  /** ISO 8601, set on every write. */
+  updated: string;
+}
+export interface JournalEntryWithRow extends JournalEntry { sheetRow: number; }
+
+export interface UserInfo {
+  email: string;
+  name: string;
+  picture: string;
+}

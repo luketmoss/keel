@@ -1,0 +1,453 @@
+// DailySummary tab (A:Y) — one row per local calendar day, rolled up from
+// Workouts, DailyHealth and BodyMeasurements (#203).
+//
+// **Derived, never authoritative.** Every row is rebuildable at any time from
+// its sources. Nothing writes here by hand and no consumer may treat it as a
+// source of truth: if this tab and `Workouts` disagree, `Workouts` is right
+// and this tab is stale.
+//
+// It exists because neither source answers "what did this day look like" —
+// `Workouts` is one row per activity, `DailyHealth` is health only — and
+// computing that grain on read is fine for one day and bad for a year. The
+// Journal scrolls.
+
+var DAILY_SUMMARY_SHEET = 'DailySummary';
+// DAILY_HEALTH_SHEET is declared in daily-health.js, with the tab's writes.
+
+/**
+ * Venue modifiers whose activities are excluded from distance and ascent.
+ *
+ * A treadmill's "distance" and a trainer's "ascent" are machine estimates of
+ * ground that was never covered. Summing them with outdoor figures produces a
+ * number that means nothing. Mirrors INDOOR in cardio-fields.tsx.
+ */
+var INDOOR_SUB_TYPES = ['indoor'];
+
+/** Activity types that can carry cardio attributes. Mirrors CARDIO_TYPES. */
+var CARDIO_TYPES = ['bike', 'hike', 'run', 'walk'];
+
+function isIndoor(workout) {
+  return INDOOR_SUB_TYPES.indexOf(workout.sub_type) !== -1;
+}
+
+function isCardioWorkout(workout) {
+  return CARDIO_TYPES.indexOf(workout.type) !== -1;
+}
+
+/** Outdoor cardio — the only activities distance and ascent are summed over. */
+function isOutdoorCardio(workout) {
+  return isCardioWorkout(workout) && !isIndoor(workout);
+}
+
+/**
+ * Sums one nullable numeric field, counting how many values contributed.
+ * Distance, ascent and (#181) the two durations all go through here.
+ *
+ * `{ total, withData, of }` is deliberately the same shape as `sumCovered` in
+ * activities-helpers.ts rather than a parallel notion: a sum over nullable
+ * fields is incomplete information without its coverage, and "58 km" alone
+ * would silently overstate a day where only one of three rides was measured.
+ *
+ * A non-numeric or empty value is skipped but still counted in `of`, so the
+ * gap stays visible rather than having to be inferred.
+ */
+function sumCovered(workouts, field) {
+  var total = 0;
+  var withData = 0;
+  for (var i = 0; i < workouts.length; i++) {
+    var n = parseInt(workouts[i][field], 10);
+    if (isNaN(n)) continue;
+    total += n;
+    withData += 1;
+  }
+  return { total: total, withData: withData, of: workouts.length };
+}
+
+/**
+ * A covered total as its cells: `{ total, withData }`, both blank when there
+ * was nothing to cover, and the total blank when nothing contributed (#181;
+ * distance and ascent since #190).
+ *
+ * The sum of no values is not 0. Writing it as 0 claims "moved for no time"
+ * or "went nowhere" on a day where the truth is "nobody recorded it", the one
+ * thing blank-never-zero forbids.
+ */
+function coveredCells(covered) {
+  if (!covered.of) return { total: '', withData: '' };
+  return {
+    total: covered.withData ? String(covered.total) : '',
+    withData: String(covered.withData),
+  };
+}
+
+/**
+ * "bike:mountain,weight" — each activity as type, plus its venue when it has
+ * one, de-duplicated and stable-sorted so a rebuild is byte-identical.
+ */
+function describeActivityTypes(workouts) {
+  var seen = {};
+  var out = [];
+  for (var i = 0; i < workouts.length; i++) {
+    var w = workouts[i];
+    var label = w.sub_type ? w.type + ':' + w.sub_type : w.type;
+    if (!Object.prototype.hasOwnProperty.call(seen, label)) {
+      seen[label] = true;
+      out.push(label);
+    }
+  }
+  return out.sort().join(',');
+}
+
+/**
+ * Session effort, counted per workout (#131 AC4).
+ *
+ * Read from `Workouts!M` — the session-level value #113 established — never
+ * derived from per-set effort in `Sets!J`. A hard set does not make a hard
+ * session, and a session the athlete called Easy is Easy however the sets
+ * went.
+ *
+ * A blank effort is counted in neither the max nor the counts: nobody said is
+ * not a fourth effort level.
+ */
+function summarizeEffort(workouts) {
+  var counts = {};
+  var order = [];
+  for (var i = 0; i < workouts.length; i++) {
+    var e = workouts[i].effort;
+    if (!e || EFFORTS.indexOf(e) === -1) continue;
+    if (!Object.prototype.hasOwnProperty.call(counts, e)) {
+      counts[e] = 0;
+      order.push(e);
+    }
+    counts[e] += 1;
+  }
+
+  if (!order.length) return { max: '', counts: '' };
+
+  // Hardest first, then by the EFFORTS order, so a rebuild is deterministic.
+  var ranked = EFFORTS.slice().reverse().filter(function (e) {
+    return Object.prototype.hasOwnProperty.call(counts, e);
+  });
+
+  return {
+    max: ranked[0],
+    counts: ranked.map(function (e) { return e + ':' + counts[e]; }).join(','),
+  };
+}
+
+/**
+ * Every DailyHealth row, by date. The tab may not exist yet.
+ *
+ * Mapped through DAILY_HEALTH_FIELDS, never by position: #131 wrote this
+ * against a placeholder layout (steps in B, resting HR in C) before anyone had
+ * seen a payload, and #165 replaced it with sync plan §5's.
+ */
+function getDailyHealth() {
+  // readDailyHealthRows (daily-health.js) returns [] while the tab does not
+  // exist: every day is then legitimately health-less (#131 AC2).
+  var rows = readDailyHealthRows();
+  var byDate = {};
+  for (var i = 0; i < rows.length; i++) byDate[rows[i].date] = rows[i];
+  return byDate;
+}
+
+/**
+ * Every BodyMeasurements row, grouped by local date into its scale and BP
+ * readings (#203). A missing tab leaves this `{}`, exactly as a missing
+ * DailyHealth tab leaves `getDailyHealth` `{}`: a day with no BodyMeasurements
+ * is legitimately body-less, not a day of zeros.
+ */
+function getBodyMeasurementsByDate() {
+  var rows = readBodyMeasurementRows();
+  var byDate = {};
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    if (!Object.prototype.hasOwnProperty.call(byDate, r.date)) {
+      byDate[r.date] = { scale: [], bp: [] };
+    }
+    if (r.kind === 'scale') byDate[r.date].scale.push(r);
+    else if (r.kind === 'bp') byDate[r.date].bp.push(r);
+  }
+  return byDate;
+}
+
+/** Round half up to the nearest whole number — Math.round's tie-break, made explicit. */
+function roundHalfUp(n) {
+  return Math.floor(n + 0.5);
+}
+
+/**
+ * The day's five body columns (#203), from its BodyMeasurements readings, or
+ * all blank when the day had none.
+ *
+ * Weight and fat ratio come from the day's FIRST scale reading that has a
+ * weight, by `measured_at_utc` (not sheet order): a morning, pre-breakfast
+ * weigh-in is the most comparable figure day to day, and a mean would move
+ * with an evening one. Fat ratio comes from that same reading, never mixed in
+ * from another.
+ *
+ * Blood pressure is the mean of every BP reading that day, systolic and
+ * diastolic independently, rounded half up to whole mmHg. `bp_count` counts
+ * BP readings (rows), not the values that happened to be present in them — a
+ * reading missing one side still counts, and still contributes to the mean it
+ * has.
+ */
+function summarizeBodyDay(dayBody) {
+  var blank = {
+    weight_kg: '', fat_ratio_pct: '', systolic_mmhg: '', diastolic_mmhg: '', bp_count: '',
+  };
+  if (!dayBody) return blank;
+
+  var weight_kg = '';
+  var fat_ratio_pct = '';
+  var withWeight = dayBody.scale.filter(function (m) { return m.weight_kg !== ''; });
+  if (withWeight.length) {
+    withWeight.sort(function (a, b) {
+      return Date.parse(a.measured_at_utc) - Date.parse(b.measured_at_utc);
+    });
+    weight_kg = withWeight[0].weight_kg;
+    fat_ratio_pct = withWeight[0].fat_ratio_pct;
+  }
+
+  var sysSum = 0, sysCount = 0, diaSum = 0, diaCount = 0;
+  for (var i = 0; i < dayBody.bp.length; i++) {
+    var r = dayBody.bp[i];
+    if (r.systolic_mmhg !== '') { sysSum += Number(r.systolic_mmhg); sysCount += 1; }
+    if (r.diastolic_mmhg !== '') { diaSum += Number(r.diastolic_mmhg); diaCount += 1; }
+  }
+
+  return {
+    weight_kg: weight_kg,
+    fat_ratio_pct: fat_ratio_pct,
+    systolic_mmhg: sysCount ? String(roundHalfUp(sysSum / sysCount)) : '',
+    diastolic_mmhg: diaCount ? String(roundHalfUp(diaSum / diaCount)) : '',
+    bp_count: dayBody.bp.length ? String(dayBody.bp.length) : '',
+  };
+}
+
+/**
+ * The summary for one day, or `null` when the day has nothing to report.
+ *
+ * A day with no activities, no health data and no body measurement produces
+ * **no row** rather than a row of zeros (#131 AC1, extended by #203). Zero
+ * activities and "we have no information" are different claims, and only one
+ * of them is true of a day nobody trained, wore the watch or stepped on the
+ * scale.
+ */
+function buildDaySummary(date, workouts, health, computedAt, body) {
+  var health_ = health || null;
+  var body_ = body || null;
+  if (!workouts.length && !health_ && !body_) return null;
+  var bodySummary = summarizeBodyDay(body_);
+
+  var outdoorCardio = workouts.filter(isOutdoorCardio);
+  // Blank when no outdoor session measured it, never 0 (#190, as #181 did for
+  // duration). All four cells are blank on a day with no outdoor cardio.
+  var distance = coveredCells(sumCovered(outdoorCardio, 'distance_m'));
+  var ascent = coveredCells(sumCovered(outdoorCardio, 'ascent_m'));
+  var effort = summarizeEffort(workouts);
+  // Duration applies to every activity type, so its `of` is every activity
+  // that day (B), not the outdoor cardio (H) that qualifies distance and
+  // ascent (#181).
+  var moving = coveredCells(sumCovered(workouts, 'moving_seconds'));
+  var elapsed = coveredCells(sumCovered(workouts, 'elapsed_seconds'));
+
+  return {
+    date: date,
+    activity_count: workouts.length ? String(workouts.length) : '',
+    activity_types: describeActivityTypes(workouts),
+    total_moving_s: moving.total,
+    total_elapsed_s: elapsed.total,
+    // Outdoor only. This will NOT equal the sum of the day's activity
+    // distances on any day with an indoor session — correct, and surprising,
+    // so it is documented wherever this is displayed.
+    total_distance_m: distance.total,
+    total_ascent_m: ascent.total,
+    cardio_activity_count: outdoorCardio.length ? String(outdoorCardio.length) : '',
+    distance_withdata: distance.withData,
+    ascent_withdata: ascent.withData,
+    max_effort: effort.max,
+    effort_counts: effort.counts,
+    // Blank, not zero, on every day before the watch existed (#131 AC2).
+    steps: health_ ? health_.steps : '',
+    resting_hr: health_ ? health_.resting_hr : '',
+    hrv: health_ ? health_.hrv : '',
+    sleep_total_s: health_ ? health_.sleep_total_s : '',
+    training_load: health_ ? health_.training_load : '',
+    computed_at: computedAt,
+    // Appended after R, not beside D and E, so no column almanac reads moves.
+    moving_withdata: moving.withData,
+    elapsed_withdata: elapsed.withData,
+    // Appended after T (#203), for the same reason.
+    weight_kg: bodySummary.weight_kg,
+    fat_ratio_pct: bodySummary.fat_ratio_pct,
+    systolic_mmhg: bodySummary.systolic_mmhg,
+    diastolic_mmhg: bodySummary.diastolic_mmhg,
+    bp_count: bodySummary.bp_count,
+  };
+}
+
+function summaryToRow(summary) {
+  var row = [];
+  for (var i = 0; i < DAILY_SUMMARY_FIELDS.length; i++) {
+    row.push(cell(summary[DAILY_SUMMARY_FIELDS[i]]));
+  }
+  return row;
+}
+
+function rowToSummary(row, sheetRow) {
+  var summary = {};
+  for (var i = 0; i < DAILY_SUMMARY_FIELDS.length; i++) {
+    summary[DAILY_SUMMARY_FIELDS[i]] = cell(row[i]);
+  }
+  summary.sheetRow = sheetRow;
+  return summary;
+}
+
+/** Existing summary rows, by date. */
+function getDailySummaries(filters) {
+  var sheet = getSheet(DAILY_SUMMARY_SHEET);
+  var rows = getAllRows(sheet);
+  var summaries = [];
+  for (var i = 0; i < rows.length; i++) {
+    summaries.push(rowToSummary(rows[i], i + 2));
+  }
+
+  if (filters && filters.from) {
+    var from = validateDate('from', filters.from);
+    summaries = summaries.filter(function (s) { return s.date >= from; });
+  }
+  if (filters && filters.to) {
+    var to = validateDate('to', filters.to);
+    summaries = summaries.filter(function (s) { return s.date <= to; });
+  }
+  return summaries;
+}
+
+/** Every local date from `from` to `to`, inclusive. */
+function datesInRange(from, to) {
+  var dates = [];
+  var cursor = new Date(from + 'T12:00:00Z'); // midday avoids any DST edge
+  var end = new Date(to + 'T12:00:00Z');
+  while (cursor.getTime() <= end.getTime()) {
+    dates.push(Utilities.formatDate(cursor, 'UTC', 'yyyy-MM-dd'));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return dates;
+}
+
+/**
+ * Rebuild summaries for a date range.
+ *
+ * **The range is a parameter, not a window** (#131 AC1). The nightly job and
+ * the historical backfill call this same function with different ranges;
+ * there is no second implementation for "catch up" to drift out of step with
+ * the one for "last night".
+ *
+ * Idempotent: a day's row is a pure function of that day's sources plus
+ * `computed_at`, so rebuilding twice over the same range produces identical
+ * rows. `computed_at` is injected rather than read from the clock inside the
+ * loop, so a single rebuild stamps one time rather than a spread of them.
+ */
+function rebuildDailySummary(from, to, options) {
+  var opts = options || {};
+  var start = validateDate('from', from);
+  var end = validateDate('to', to);
+  if (!start || !end) throw new Error('from and to are required (YYYY-MM-DD)');
+  if (start > end) throw new Error('from must not be after to (' + start + ' > ' + end + ')');
+
+  var computedAt = opts.computed_at || isoNow();
+
+  var allWorkouts = getWorkouts();
+  var byDate = {};
+  for (var i = 0; i < allWorkouts.length; i++) {
+    var w = allWorkouts[i];
+    // A planned workout has not happened; it is not part of the day's rollup.
+    if (w.status === 'planned') continue;
+    if (!w.date) continue;
+    if (!Object.prototype.hasOwnProperty.call(byDate, w.date)) byDate[w.date] = [];
+    byDate[w.date].push(w);
+  }
+
+  var health = getDailyHealth();
+  var body = getBodyMeasurementsByDate();
+
+  var sheet = getSheet(DAILY_SUMMARY_SHEET);
+  var existing = getDailySummaries();
+  var rowByDate = {};
+  for (var j = 0; j < existing.length; j++) rowByDate[existing[j].date] = existing[j].sheetRow;
+
+  var dates = datesInRange(start, end);
+  var written = 0;
+  var skipped = 0;
+  var updated = 0;
+  var removed = [];
+
+  for (var k = 0; k < dates.length; k++) {
+    var date = dates[k];
+    var dayWorkouts = Object.prototype.hasOwnProperty.call(byDate, date) ? byDate[date] : [];
+    var dayHealth = Object.prototype.hasOwnProperty.call(health, date) ? health[date] : null;
+    var dayBody = Object.prototype.hasOwnProperty.call(body, date) ? body[date] : null;
+
+    var summary = buildDaySummary(date, dayWorkouts, dayHealth, computedAt, dayBody);
+    if (!summary) {
+      skipped += 1;
+      // A day that has a row but no longer earns one — its last workout was
+      // deleted, say. The row has to go: this tab is derived, so a row that
+      // its sources no longer imply is not stale data to be tolerated, it is
+      // wrong data. Collected here and removed after the loop, bottom-to-top.
+      if (Object.prototype.hasOwnProperty.call(rowByDate, date)) {
+        removed.push(rowByDate[date]);
+      }
+      continue;
+    }
+
+    var row = summaryToRow(summary);
+    if (Object.prototype.hasOwnProperty.call(rowByDate, date)) {
+      // Update in place, so a re-run after a later import corrects the day
+      // rather than duplicating it (#131 AC5).
+      sheet.getRange(rowByDate[date], 1, 1, DAILY_SUMMARY_COLUMN_COUNT).setValues([asText(row)]);
+      updated += 1;
+    } else {
+      sheet.appendRow(asText(row));
+      rowByDate[date] = sheet.getLastRow();
+      written += 1;
+    }
+  }
+
+  // Bottom-to-top: removing a row shifts every row below it up, so descending
+  // order is what keeps the remaining indices valid. The same rule as
+  // everywhere else in this codebase.
+  removed.sort(function (a, b) { return b - a; });
+  for (var r = 0; r < removed.length; r++) {
+    sheet.deleteRow(removed[r]);
+  }
+
+  return {
+    from: start,
+    to: end,
+    days: dates.length,
+    written: written,
+    updated: updated,
+    skipped: skipped,
+    removed: removed.length,
+    computed_at: computedAt,
+  };
+}
+
+/**
+ * The date range the existing history actually spans — the backfill's bounds,
+ * so it does not have to be told them.
+ */
+function historyDateRange() {
+  var workouts = getWorkouts();
+  var min = '';
+  var max = '';
+  for (var i = 0; i < workouts.length; i++) {
+    var d = workouts[i].date;
+    if (!d || workouts[i].status === 'planned') continue;
+    if (!min || d < min) min = d;
+    if (!max || d > max) max = d;
+  }
+  return { from: min, to: max };
+}

@@ -26,7 +26,7 @@ and this one for everything else. They share only the Keel-wide rules (#401) and
 framework-free documents, CSS and logic. Neither borrows tokens from the other.
 
 Per-app accent values are not in this document. They live in the colour registry
-in `keel-wide-rules.md` (#401), so a new app changes one file.
+in [`keel-wide-rules.md`](keel-wide-rules.md), so a new app changes one file.
 
 ## Colour
 
@@ -44,7 +44,7 @@ is everything interactive, and it is tuned per theme for contrast.
 | `--color-on-primary` | text and icons on a primary fill |
 
 An app's accent values are chosen against its neutrals, not borrowed from a
-neighbour. The values live in the colour registry in `keel-wide-rules.md` (#401).
+neighbour. The values live in the colour registry in [`keel-wide-rules.md`](keel-wide-rules.md).
 
 ### Neutrals
 

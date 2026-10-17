@@ -19,7 +19,9 @@ covers only what is specific to ui.
 ```
 ui/
 └── docs/design/
-    └── suite-language.md   # standing: the suite's colours, scales and layout
+    ├── suite-language.md   # standing: the suite's colours, scales and layout
+    ├── keel-wide-rules.md  # standing: what every app keeps; the colour registry
+    └── app-icons.md        # standing: the mark, the tile, the file set
 ```
 
 There is no package scaffold and no workflow yet. Nothing here builds, and

@@ -43,6 +43,47 @@ column exists to be looked at.
 computes it asynchronously. That is not a conflict; wait a few seconds and
 re-query rather than refusing on it.
 
+## Human-reviewed paths
+
+After the preconditions pass and **before `## Results` is read or written and
+before any merge command**, list the PR's changed files:
+
+```bash
+gh pr diff <pr> --repo luketmoss/keel --name-only
+```
+
+(In a cloud session, the GitHub MCP equivalent.) Compare them to
+`CONVENTIONS.md` §Human-reviewed paths, using the list on the PR's base branch.
+A rename counts at both paths. Any match gates the whole PR.
+
+On a match, list the matching paths one per line in changed-file order, at most
+five, then `and N more`.
+
+- **Inside `/finish`:** do not merge. Leave the issue in Ready to Ship and stop
+  with:
+
+  ```
+  Parked in Ready to Ship — not merged.
+
+  PR #<pr> changes human-reviewed paths:
+    <path>
+  ```
+
+- **On its own:** ask, naming the PR, and wait for the reply:
+
+  ```
+  PR #<pr> (<title>) changes human-reviewed paths:
+    <path>
+  These are not merged without your say-so. Merge it now? (yes / no)
+  ```
+
+  A yes, in reply to that question, continues with Results and the merge. A no,
+  anything that is not a yes, or a session with no way to ask, ends with `Not
+  merged. #<issue> stays in Ready to Ship.` — no retry, no second prompt. The
+  yes covers that PR in this invocation only; a bare `/ship` is not consent and
+  nothing is remembered. Shipping several PRs asks once per matching PR and
+  merges the unmatched ones without a question.
+
 ## Write the Results first
 
 Before merging, fill in `## Results` on the issue body — what actually happened,

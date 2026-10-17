@@ -31,17 +31,57 @@ session, and `gh pr diff` returns what you just typed.
 ready.** Required status checks are deliberately off — a path-filtered required
 check never reports and blocks its PR forever — so nothing else is watching.
 
-Check `statusCheckRollup`. If the run failed, the issue goes back to In
-Development with the failure quoted. If it's still pending, wait for it rather
-than reporting a result you don't have.
+**One PR can trigger several workflows** — a change under `cairn/` runs `cairn`
+and `keel`, and a change to a shared folder runs every consumer. One green run
+does not clear the PR; every run it had to pass must.
 
-**If it comes back empty, no check ran at all — treat that as not green.** An
-absent run and a passing run look identical from the board, and with required
-status checks off nothing else will notice. Name the workflow that should have
-covered this change, compare the PR's files against its `paths` filter, and
-stop. Either the project has no workflow or its filter doesn't reach the change;
-both are findings, and both send the issue back to In Development. Do not
-advance to Ready to Ship on a check that never reported.
+1. **List the runs for the head commit.** Take the head SHA from the PR, then
+   `gh run list --repo luketmoss/keel --commit <sha> --json
+   workflowName,status,conclusion,url` (in a cloud session, the GitHub MCP
+   equivalent), cross-checked against `statusCheckRollup`. **Runs for earlier
+   commits are ignored** — a green run on an old commit says nothing about this
+   one, and neither does a run concurrency cancelled for a newer push. Where a
+   workflow has more than one attempt for the head commit, read the latest. If
+   a push lands during the review, the head moved: rebuild the list.
+2. **Work out which workflows should have run.** Read each
+   `.github/workflows/*.yml`. One is expected when its `pull_request` trigger
+   has no `paths` filter, or a filter that matches any file in
+   `gh pr diff <pr> --repo luketmoss/keel --name-only`. Push-only and
+   scheduled workflows (`cairn-pages`) are not expected and are not listed.
+3. **Wait for any run that is queued or in progress.** Do not report a result
+   you don't have. If the wait outlasts your patience, report
+   `Build — N runs still in progress on <sha>`, leave the issue in Code
+   Review, and stop.
+4. **Require `success` from every expected run.** Any other conclusion —
+   `failure`, `cancelled`, `timed_out`, `action_required`, `skipped` — is not
+   green. Quote each: the first failing step's first error line for a failure,
+   otherwise the conclusion word (`action_required` adds that a run is waiting
+   for approval). Back to In Development, with no diff review.
+
+**An expected workflow with no run is not green.** An absent run and a passing
+one look identical from the board, and with required status checks off nothing
+else will notice. A run for the head commit may simply not be listed yet, so
+re-query once after a short wait, as `/ship` does for `mergeable`; if it is still
+missing, name the workflow, quote the `paths` entry that matches the PR's
+changed file, say that another workflow's green run does not cover it, and stop.
+Either the filter doesn't reach the change or the workflow didn't start; both
+are findings and both send the issue back to In Development.
+
+If **nothing at all** ran, that is the same case with every workflow absent: at
+least `keel` should have, since `keel.yml` runs on every PR.
+
+**Report the list**, one line per expected run — workflow name, then conclusion —
+under a heading that carries the commit:
+
+```
+Build — 2 runs on 9f3c2ab, all passed:
+  cairn   success
+  keel    success
+```
+
+With a failure the heading says `1 failed` and the line carries the quote; with
+an absent run it reads `Build — no run for cairn on 9f3c2ab.` followed by the
+reason above. Do not advance to Ready to Ship on a check that never reported.
 
 ## Review the diff
 

@@ -19,7 +19,9 @@ Ask with `AskUserQuestion`. Three things, one round — do not interrogate.
   tag prefix, the workflow filename, and the board option. Propose one from what
   they've told you rather than asking cold.
 - **Stack** — firmware, web, mobile, cli, or worker. Determines which stack
-  skill is authoritative and what gets scaffolded.
+  skill is authoritative and what gets scaffolded. If the project has more than
+  one component, ask instead for each component's path and stack (`frontend` →
+  web, `api` → worker), per `CONVENTIONS.md` §Multi-component projects.
 - **One-line purpose** — what it does and who for. Goes at the top of the
   project's CLAUDE.md.
 
@@ -32,7 +34,8 @@ Then confirm the slug is free: the folder must not exist and
 
 Read `.claude/skills/stack-<stack>/scaffold.md` for the scaffold and the CI
 workflow, and `.claude/skills/stack-<stack>/SKILL.md` for whether Testing is
-human-gated. Do not invent any of that here.
+human-gated. Do not invent any of that here. For a multi-component project, do
+this for each component's stack.
 
 Two files because only this skill needs the first one: every lifecycle command
 reads `SKILL.md`, and the scaffold sat inside it being read on every issue and
@@ -42,12 +45,18 @@ acted on by none of them.
 
 In order:
 
-1. `<slug>/` with the scaffold from `scaffold.md`
+1. `<slug>/` with the scaffold from `scaffold.md`. For a multi-component
+   project, each component's scaffold goes under `<slug>/<path>` instead, and
+   `<slug>/` itself holds only `CLAUDE.md` and `docs/`
 2. `<slug>/CLAUDE.md` — see below
 3. `<slug>/docs/design/.gitkeep`
 4. `.github/workflows/<slug>.yml` from `scaffold.md`'s template, with the
    slug substituted into the path filter, concurrency group, cache keys, and
-   `working-directory`
+   `working-directory`. For a multi-component project, one job per component,
+   named after its path, each built from that stack's scaffold with `<slug>`
+   in its paths read as `<slug>/<path>` — working directory and cache paths
+   included. The trigger filter, concurrency group and cache-key prefix stay the
+   project's: `<slug>/**`, with no per-job filtering
 5. `python .keel/board.py add-project <slug>`
 
 Never edit the Project field by any other route — the append is destructive if
@@ -81,6 +90,25 @@ Project option: `<slug>`. Filter the board by it to see only this project's work
 
 <from the stack skill — in particular, whether Testing is human-gated>
 ```
+
+A multi-component project replaces the `**Stack:**` paragraph with a table, and
+`## Testing` says which components are human-gated:
+
+```markdown
+## Stacks
+
+Location, never inference: a file takes the stack of the longest path below
+that contains it. Each stack's conventions are in
+`.claude/skills/stack-<stack>/SKILL.md`. Paths no row contains have no stack
+skill.
+
+| Path | Stack |
+|---|---|
+| `<path>/` | <stack> |
+```
+
+A one-component project writes the `**Stack:**` paragraph above and nothing
+here changes.
 
 ## 5. Commit and report
 

@@ -19,7 +19,8 @@ python .keel/board.py set <issue> --status "UX"
 gh issue view <issue> --repo luketmoss/keel --json title,body
 ```
 
-Read the project's `CLAUDE.md` and stack skill. Read any existing files under
+Read the project's `CLAUDE.md` and the stack skill of every component the issue
+touches. Read any existing files under
 `<project>/docs/design/` — consistency with what's already been decided matters
 more than any individual choice here.
 

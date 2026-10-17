@@ -30,10 +30,10 @@ Two outcomes:
   now in question. Do not guess at whether the premise still holds; that
   guess is exactly what Gate 1 exists to avoid.
 
-Read, in order: the issue body, the project's `CLAUDE.md`, its stack skill, the
-**standing documents** under `<project>/docs/design/` — `CONVENTIONS.md` defines
-which files those are, under the UX stage — and then the issue's own design note
-if one exists.
+Read, in order: the issue body, the project's `CLAUDE.md`, the stack skill of
+every component the change touches, the **standing documents** under
+`<project>/docs/design/` — `CONVENTIONS.md` defines which files those are, under
+the UX stage — and then the issue's own design note if one exists.
 
 The standing documents are not optional context. A note says what this issue
 does; they say what everything looks like, and building to the note alone is how

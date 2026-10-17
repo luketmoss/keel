@@ -11,7 +11,7 @@
 //     node withings-run.mjs
 //
 // Needs the Google credential from google-authorize.mjs and a Withings token
-// file from withings-authorize.mjs. .github/workflows/withings-sync.yml runs
+// file from withings-authorize.mjs. .github/workflows/thrive-withings-sync.yml runs
 // it every 6 hours.
 //
 // `withingsRun` is the fetch, archive and sheet write; `withingsSyncRun` wraps
@@ -21,7 +21,7 @@
 // instead of the rolling window (#199): `startdate: 0`, `window_start`
 // `1970-01-01` in the row, and the archive looked up in bulk once rather than
 // group by group, since most of a first backfill's groups are new.
-// withings-sync.yml's `backfill` workflow_dispatch input sets it; safe to
+// thrive-withings-sync.yml's `backfill` workflow_dispatch input sets it; safe to
 // re-dispatch if a run stops partway, since archiving and upserting are both
 // idempotent on `grpid`.
 //

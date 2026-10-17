@@ -1,5 +1,5 @@
 // #314 — the SyncRequests poller: an Apps Script time-driven trigger that
-// starts coros-sync.yml / withings-sync.yml from rows the SPA appends, and
+// starts thrive-coros-sync.yml / thrive-withings-sync.yml from rows the SPA appends, and
 // closes every row it started. Fakes only: no network, no live Apps Script,
 // the clock fixed.
 
@@ -187,7 +187,7 @@ function harness(opts: {
 }
 
 const DISPATCH_URL = (wf: string) =>
-  `https://api.github.com/repos/luketmoss/thrive/actions/workflows/${wf}/dispatches`;
+  `https://api.github.com/repos/luketmoss/keel/actions/workflows/${wf}/dispatches`;
 
 describe('AC1: the field lists in types.js', () => {
   it('declares SYNC_REQUEST_FIELDS (A:I), statuses and vendors', () => {
@@ -262,12 +262,12 @@ describe('AC2: an idle tick is cheap and silent', () => {
 });
 
 describe('AC3: a request starts its workflow with a fixed payload', () => {
-  it('POSTs exactly {"ref":"main"} to coros-sync.yml with the three headers', () => {
+  it('POSTs exactly {"ref":"main"} to thrive-coros-sync.yml with the three headers', () => {
     const h = harness({ requests: [req()], syncLog: [] });
     h.poll();
     expect(h.fetches).toHaveLength(1);
     const f = h.fetches[0];
-    expect(f.url).toBe(DISPATCH_URL('coros-sync.yml'));
+    expect(f.url).toBe(DISPATCH_URL('thrive-coros-sync.yml'));
     expect(f.method).toBe('post');
     expect(f.headers).toEqual({
       Authorization: `Bearer ${TOKEN}`,
@@ -279,10 +279,10 @@ describe('AC3: a request starts its workflow with a fixed payload', () => {
     expect(body).not.toHaveProperty('inputs');
   });
 
-  it('withings dispatches withings-sync.yml', () => {
+  it('withings dispatches thrive-withings-sync.yml', () => {
     const h = harness({ requests: [req({ vendor: 'withings' })], withingsLog: [] });
     h.poll();
-    expect(h.fetches.map((f) => f.url)).toEqual([DISPATCH_URL('withings-sync.yml')]);
+    expect(h.fetches.map((f) => f.url)).toEqual([DISPATCH_URL('thrive-withings-sync.yml')]);
   });
 
   it('no cell of the row reaches the URL, headers or body', () => {
@@ -490,7 +490,7 @@ describe('AC4: one run per vendor at a time', () => {
     h.poll();
     expect(h.row(0).status).toBe('skipped');
     expect(h.row(1).status).toBe('started');
-    expect(h.fetches.map((f) => f.url)).toEqual([DISPATCH_URL('withings-sync.yml')]);
+    expect(h.fetches.map((f) => f.url)).toEqual([DISPATCH_URL('thrive-withings-sync.yml')]);
   });
 
   it('both vendors may start in one tick', () => {
@@ -499,7 +499,7 @@ describe('AC4: one run per vendor at a time', () => {
       syncLog: [], withingsLog: [],
     });
     h.poll();
-    expect(h.fetches.map((f) => f.url)).toEqual([DISPATCH_URL('coros-sync.yml'), DISPATCH_URL('withings-sync.yml')]);
+    expect(h.fetches.map((f) => f.url)).toEqual([DISPATCH_URL('thrive-coros-sync.yml'), DISPATCH_URL('thrive-withings-sync.yml')]);
   });
 });
 
@@ -534,7 +534,7 @@ describe('AC5: the poller closes every row it started', () => {
     });
     h.poll();
     expect(h.row(0).status).toBe('started');
-    expect(h.fetches.map((f) => f.url)).toEqual(['https://api.github.com/repos/luketmoss/thrive/actions/runs/12']);
+    expect(h.fetches.map((f) => f.url)).toEqual(['https://api.github.com/repos/luketmoss/keel/actions/runs/12']);
     expect(h.fetches[0].method).toBe('get');
     expect(h.fetches[0].headers).toEqual({
       Authorization: `Bearer ${TOKEN}`,
@@ -656,9 +656,9 @@ describe('AC6: every failure in words', () => {
     [401, 'Not started: GitHub refused the token (401). It has expired or been revoked. Store a new one as ' +
       'GITHUB_DISPATCH_TOKEN (Apps Script → Project Settings → Script Properties, as luketmossbot).'],
     [403, 'Not started: GitHub refused the request (403). The token may lack Actions: Read and write on ' +
-      "luketmoss/thrive, or GitHub's rate limit was hit."],
-    [404, 'Not started: GitHub could not find coros-sync.yml (404). The token may not include luketmoss/thrive.'],
-    [422, 'Not started: GitHub would not start coros-sync.yml (422). The workflow may be disabled.'],
+      "luketmoss/keel, or GitHub's rate limit was hit."],
+    [404, 'Not started: GitHub could not find thrive-coros-sync.yml (404). The token may not include luketmoss/keel.'],
+    [422, 'Not started: GitHub would not start thrive-coros-sync.yml (422). The workflow may be disabled.'],
     [502, 'Not started: GitHub answered 502. Ask again later.'],
     [302, 'Not started: GitHub answered 302. Ask again later.'],
   ])('a %i fails with a fixed detail and no retry', (status, detail) => {
@@ -674,13 +674,13 @@ describe('AC6: every failure in words', () => {
     expect(h.row(1)).toMatchObject({ status: 'failed', detail });
   });
 
-  it('a 404 for Withings names withings-sync.yml', () => {
+  it('a 404 for Withings names thrive-withings-sync.yml', () => {
     const h = harness({
       requests: [req({ vendor: 'withings' })], withingsLog: [],
       reply: github({ dispatch: { status: 404, body: '' } }),
     });
     h.poll();
-    expect(h.row(0).detail).toBe('Not started: GitHub could not find withings-sync.yml (404). The token may not include luketmoss/thrive.');
+    expect(h.row(0).detail).toBe('Not started: GitHub could not find thrive-withings-sync.yml (404). The token may not include luketmoss/keel.');
   });
 
   it('a fetch that throws fails in words', () => {
@@ -697,7 +697,7 @@ describe('AC6: every failure in words', () => {
     // UrlFetchApp throwing is "could not be reached"; force an error past it instead.
     const real = h.sandbox.syncDispatch;
     h.sandbox.syncDispatch = (token: string, workflow: string) => {
-      if (workflow === 'coros-sync.yml') throw new Error('boom ' + TOKEN);
+      if (workflow === 'thrive-coros-sync.yml') throw new Error('boom ' + TOKEN);
       return real(token, workflow);
     };
     h.poll();
@@ -898,7 +898,7 @@ describe('the scheduled morning COROS sync', () => {
   it('at 6:30 appends a coros request from `schedule` and dispatches it in the same tick', () => {
     const h = harness({ requests: [], syncLog: [], now: at('2026-10-09T12:31:00.000Z') });
     h.poll();
-    expect(h.fetches.map((f) => f.url)).toEqual([DISPATCH_URL('coros-sync.yml')]);
+    expect(h.fetches.map((f) => f.url)).toEqual([DISPATCH_URL('thrive-coros-sync.yml')]);
     expect(h.row(0)).toMatchObject({
       vendor: 'coros', requested_by: 'schedule', status: 'started', workflow_run_id: '987654',
     });

@@ -36,7 +36,7 @@ test('redact masks Withings credentials as JSON fields and as parameters, code= 
   const out = redact(
     '{"access_token":"a1","refresh_token":"r1","client_secret":"s1"} ' +
     'action=requesttoken&grant_type=authorization_code&code=abc123&client_secret=s2&refresh_token=r2 ' +
-    'https://luketmoss.github.io/thrive/withings-callback.html?code=zzz999&state=st',
+    'https://luketmoss.github.io/keel/thrive/withings-callback.html?code=zzz999&state=st',
   );
   assert.doesNotMatch(out, /a1|r1|s1|abc123|s2|r2|zzz999/);
   assert.match(out, /grant_type=authorization_code/);

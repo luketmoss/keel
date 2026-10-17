@@ -24,7 +24,7 @@ test('the authorize URL asks for user.metrics,user.info and returns to the Pages
   assert.equal(url.searchParams.get('response_type'), 'code');
   assert.equal(url.searchParams.get('client_id'), CLIENT_ID);
   assert.equal(url.searchParams.get('scope'), 'user.metrics,user.info');
-  assert.equal(url.searchParams.get('redirect_uri'), 'https://luketmoss.github.io/thrive/withings-callback.html');
+  assert.equal(url.searchParams.get('redirect_uri'), 'https://luketmoss.github.io/keel/thrive/withings-callback.html');
   assert.equal(url.searchParams.get('state'), 'state-1');
 });
 
@@ -38,7 +38,7 @@ test('the exchange POSTs requesttoken with the code and stores the nested tokens
     client_id: CLIENT_ID,
     client_secret: CLIENT_SECRET,
     code: 'code-abcdefgh',
-    redirect_uri: 'https://luketmoss.github.io/thrive/withings-callback.html',
+    redirect_uri: 'https://luketmoss.github.io/keel/thrive/withings-callback.html',
   });
   assert.deepEqual(Object.keys(set), ['userid', 'access_token', 'refresh_token', 'access_expires_at', 'updated_at']);
   assert.equal(set.userid, '1234567');
@@ -76,7 +76,7 @@ test('the grant check counts only the measure groups, sent with the bearer token
 test('the callback page\'s text, the whole URL and a bare code all parse', () => {
   assert.deepEqual(parseWithingsPaste('code=abc123&state=s1'), { code: 'abc123', state: 's1', error: null });
   assert.deepEqual(
-    parseWithingsPaste('  https://luketmoss.github.io/thrive/withings-callback.html?code=abc123&state=s1 \n'),
+    parseWithingsPaste('  https://luketmoss.github.io/keel/thrive/withings-callback.html?code=abc123&state=s1 \n'),
     { code: 'abc123', state: 's1', error: null },
   );
   assert.deepEqual(parseWithingsPaste('abc123'), { code: 'abc123', state: null, error: null });

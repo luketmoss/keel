@@ -39,10 +39,10 @@ Withings ┘                                     └──▶ MCP server (in Kee
 
 | Workflow | Schedule (UTC) | Watchdog |
 |----------|----------------|----------|
-| `coros-sync.yml` | 00:17, 09:17, 13:17, 18:17 | `coros-sync-watchdog.yml` fails if the newest `SyncLog` row is over 16 h old |
-| `withings-sync.yml` | 01:41, 07:41, 13:41, 19:41 | `withings-sync-watchdog.yml` fails if the newest `WithingsSyncLog` row is over 14 h old |
+| `thrive-coros-sync.yml` | 00:17, 09:17, 13:17, 18:17 | `thrive-coros-sync-watchdog.yml` fails if the newest `SyncLog` row is over 16 h old |
+| `thrive-withings-sync.yml` | 01:41, 07:41, 13:41, 19:41 | `thrive-withings-sync-watchdog.yml` fails if the newest `WithingsSyncLog` row is over 14 h old |
 
-Both can also be dispatched on demand from the app (`SyncRequests` tab, polled by an Apps Script trigger).
+The workflows are in `luketmoss/keel`'s `.github/workflows/`. Both syncs run only while the repository variable `THRIVE_SYNCS_LIVE` is `true`; secrets, the switch and the one-time cutover are in [`sync/README.md`](sync/README.md). Both can also be dispatched on demand from the app (`SyncRequests` tab, polled by an Apps Script trigger).
 
 ## The sheet
 

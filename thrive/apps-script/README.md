@@ -540,7 +540,8 @@ On-demand sync, server half (#232 `## Results`, route c). The SPA (#315)
 appends one `requested` row per vendor to the `SyncRequests` tab.
 `pollSyncRequests`, an **installable time-driven trigger** running as
 luketmossbot, reads the open rows every **5 minutes** and starts the existing
-`coros-sync.yml` / `withings-sync.yml` through GitHub's workflow-dispatch API.
+`thrive-coros-sync.yml` / `thrive-withings-sync.yml` on `luketmoss/keel`
+through GitHub's workflow-dispatch API.
 It then closes every row it started: from the run's own
 `workflow_dispatch-<run id>-N` row in `SyncLog` / `WithingsSyncLog`, else from
 GitHub's run status, else after 20 minutes as `not_reported`. Each final
@@ -555,7 +556,7 @@ the trigger runs at once; `@2` matters only to the web app — and so to
 share one per-vendor step.
 
 What reaches GitHub is fixed in `sync-requests.js`: owner `luketmoss`, repo
-`thrive`, the workflow file per vendor, and a body of exactly `{"ref":"main"}`
+`keel`, the workflow file per vendor, and a body of exactly `{"ref":"main"}`
 with **no `inputs` key**, so `force_refresh`, `backfill` and `max_deletions`
 keep their defaults. No cell of the row is sent. One dispatch per vendor per
 tick, none while that vendor has a request open or ran in the last 10 minutes
@@ -600,19 +601,28 @@ leaves today's behaviour: the row is already there, and the next tick takes it.
 `GITHUB_DISPATCH_TOKEN`, a script property on this project set as
 luketmossbot, is read only by `sync-requests.js` and only sent in the
 `Authorization` header. It is a **fine-grained personal access token**:
-resource owner `luketmoss`, **Only select repositories → `luketmoss/thrive`**,
+resource owner `luketmoss`, **Only select repositories → `luketmoss/keel`**,
 repository permission **Actions: Read and write** and nothing else (Metadata:
 Read is added automatically), with an expiry date.
 
-Its full reach is more than "start a sync" (#232):
+Its full reach is more than "start a sync" (#232), and on Keel it is wider
+than it was on `luketmoss/thrive` (#398): it covers every project's workflows
+in the monorepo, not only Thrive's. This is accepted, because a separate
+repository just for the syncs is what Keel exists to remove. On
+`luketmoss/keel` it can:
 - dispatch **every** `workflow_dispatch` workflow, with any inputs and any
-  branch or tag: `deploy.yml`, both watchdogs, `coros-sync.yml` with
-  `force_refresh: true`, and `withings-sync.yml` with `backfill: true` or a
-  raised `max_deletions` (the input that lets a run delete more than 5
-  `BodyMeasurements` rows);
-- cancel, re-run and delete runs and their logs;
-- **disable and enable workflows**, the syncs and their watchdogs included —
-  a silent stop that only Settings' "Sync may have stopped" line would catch;
+  branch or tag: `thrive-pages.yml` and `cairn-pages.yml` (the Pages deploys),
+  both watchdogs, `thrive-coros-sync.yml` with `force_refresh: true`, and
+  `thrive-withings-sync.yml` with `backfill: true` or a raised
+  `max_deletions` (the input that lets a run delete more than 5
+  `BodyMeasurements` rows), and any workflow that gains a dispatch trigger
+  later;
+- cancel, re-run and delete runs and their logs, for **every** workflow:
+  cairn's, mcp's (the Worker deploy) and keel's own CI and board workflows as
+  well as Thrive's — a re-run of a deploy redeploys what that run built;
+- **disable and enable workflows**, any project's, the syncs and their
+  watchdogs included — a silent stop that only Settings' "Sync may have
+  stopped" line would catch;
 - delete artifacts and caches.
 
 It cannot read or set secrets or variables, push code, or send

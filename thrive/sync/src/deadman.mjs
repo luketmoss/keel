@@ -29,9 +29,9 @@ export const WITHINGS_THRESHOLD_HOURS = 14;
  * make a stopped COROS sync look alive, nor the reverse.
  */
 export const LOGS = {
-  coros: { tab: 'SyncLog', sync: 'COROS sync', workflow: 'coros-sync', thresholdHours: DEFAULT_THRESHOLD_HOURS },
+  coros: { tab: 'SyncLog', sync: 'COROS sync', workflow: 'thrive-coros-sync', thresholdHours: DEFAULT_THRESHOLD_HOURS },
   withings: {
-    tab: 'WithingsSyncLog', sync: 'Withings sync', workflow: 'withings-sync', thresholdHours: WITHINGS_THRESHOLD_HOURS,
+    tab: 'WithingsSyncLog', sync: 'Withings sync', workflow: 'thrive-withings-sync', thresholdHours: WITHINGS_THRESHOLD_HOURS,
   },
 };
 

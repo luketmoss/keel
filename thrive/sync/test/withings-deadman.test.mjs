@@ -66,7 +66,7 @@ test('AC3: the Withings default is 14 hours: passes at 14, trips just past, nami
   assert.equal((await checkFreshness({ api, now: at('2026-09-25T15:41:00Z'), log: 'withings' })).ok, true);
   const stale = await checkFreshness({ api, now: at('2026-09-25T15:42:00Z'), log: 'withings' });
   assert.equal(stale.ok, false);
-  assert.match(stale.message, /^The Withings sync has not run for 14\.0 hours: newest WithingsSyncLog row schedule-9-1 started 2026-09-25T01:41:00\.000Z, 14\.0 h ago, status failed; threshold 14 h\. Check Actions → withings-sync/);
+  assert.match(stale.message, /^The Withings sync has not run for 14\.0 hours: newest WithingsSyncLog row schedule-9-1 started 2026-09-25T01:41:00\.000Z, 14\.0 h ago, status failed; threshold 14 h\. Check Actions → thrive-withings-sync/);
 });
 
 test('AC3: a single dropped Withings run never alarms: 12 h plus an hour of delay', async () => {

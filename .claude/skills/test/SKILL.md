@@ -14,8 +14,10 @@ python .keel/board.py set <issue> --status "Testing"
 gh issue view <issue> --repo luketmoss/keel --json body
 ```
 
-Read the project's stack skill first. **It declares whether Testing is
-human-gated for this stack**, and that changes how this skill ends.
+Read the stack skill of every component the issue touches first. **Each
+declares whether Testing is human-gated for its stack**, and that changes how
+this skill ends. In a multi-component project the gate is per touched component:
+an issue touching a gated one is gated for the criteria that component owns.
 
 ## Verify
 
@@ -55,11 +57,11 @@ re-run this skill from the top. Don't accumulate half-verified criteria.
 
 ## Exit
 
-**If the stack skill declares Testing human-gated** (firmware always; mobile for
-device-dependent criteria): verify everything verifiable, then **stop**. List
-the criteria that need hardware or a device, in full, and hand back. Do not
-advance, and do not take the PR out of draft — it isn't ready for review while
-its behaviour is unconfirmed.
+**If a touched component's stack skill declares Testing human-gated** (firmware
+always; mobile for device-dependent criteria): verify everything verifiable,
+then **stop**. List the criteria that need hardware or a device, in full, and
+hand back. Do not advance, and do not take the PR out of draft — it isn't ready
+for review while its behaviour is unconfirmed.
 
 **Otherwise**, when every criterion passes:
 

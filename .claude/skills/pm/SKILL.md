@@ -18,8 +18,10 @@ python .keel/board.py set <issue> --status "PM Refining"
 gh issue view <issue> --repo luketmoss/keel --json title,body,labels
 ```
 
-Read the project's `CLAUDE.md` and its stack skill before specifying anything —
-what's cheap and what's expensive is stack-dependent, and a spec written without
+Read the project's `CLAUDE.md` and the stack skill of every component the issue
+touches before specifying anything (a multi-component project pins one per
+subfolder, per `CONVENTIONS.md`), and name those components in the Proposal.
+What's cheap and what's expensive is stack-dependent, and a spec written without
 that knowledge will be wrong in ways that only surface during development.
 
 ## Do the work

@@ -27,6 +27,41 @@ location is everything no project folder claims — which is also why its workfl
 cannot glob a folder the way every other project's does, and ends up triggering
 on all of them instead. See §Continuous integration.
 
+### Multi-component projects
+
+Most projects have one stack. A project whose parts need different conventions
+— a frontend, an API, scheduled jobs, one-off scripts — pins a stack skill per
+subfolder instead. "Location, never inference" still holds, one level deeper.
+
+The project's `CLAUDE.md` replaces its single `**Stack:**` line with a
+`## Stacks` table:
+
+```markdown
+| Path | Stack |
+|---|---|
+| `frontend/` | web |
+| `apps-script/` | apps-script |
+| `sync/` | node-jobs |
+| `scripts/` | — |
+```
+
+- **Longest path wins.** A file takes the stack of the longest path in the
+  table that contains it. `sync/src/run.mjs` is `node-jobs` and
+  `frontend/src/App.tsx` is `web`.
+- **`—` means no stack skill.** The component deliberately has none, and the
+  project's own `CLAUDE.md` is its only authority. `scripts/seed.mjs` is the
+  case.
+- **Unlisted paths have no stack skill either.** A path no row contains — the
+  project's `docs/design/x.md`, its root files — gets the workspace rules and
+  the project's `CLAUDE.md`, and nothing more.
+- **Single-stack projects are unchanged.** One `**Stack:**` line, no table. A
+  project moves to a table only when it has more than one component.
+- **Components are one level deep.** A component is not itself a
+  multi-component project.
+
+Design notes, the `Project` field and branch names stay per project. There is
+no per-component board option.
+
 ### Naming
 
 | Thing | Form | Example |
@@ -200,7 +235,9 @@ failure sends the issue back to In Development, not forward with a caveat.
 
 Where acceptance criteria cannot be verified without physical hardware, a stack
 skill may declare Testing human-gated. The delivery run then halts here rather
-than at Ready to Ship, and says so. Firmware is the obvious case — a green build
+than at Ready to Ship, and says so. In a multi-component project the gate is
+decided per touched component: an issue touching a gated one is gated for the
+criteria that component owns. Firmware is the obvious case — a green build
 is not evidence that a solenoid fired at the right microsecond.
 
 ### 7. Code Review
@@ -257,6 +294,18 @@ interfering with each other:
 - **Concurrency group prefixed with the slug**, or a push to one project cancels
   another project's in-flight run.
 - **Cache keys prefixed with the slug**, or projects evict each other's caches.
+
+A multi-component project still has one CI workflow, `<slug>.yml`, with one job
+per component, named after it. The four rules above apply unchanged and cover
+the whole project folder: every component's job runs on any change in the
+folder, with no per-job filtering. Per-job filters would need a third-party
+action and make `/review` reason about which jobs should have run. In a job,
+`<slug>` in a stack scaffold's paths reads as the component's directory,
+`<slug>/<component>`, so the scaffolds themselves do not change.
+
+A component's stack skill may call for further workflows — scheduled runs,
+watchdogs — named `<slug>-<purpose>.yml`, as `cairn-pages.yml` is. They are not
+CI, and the CI workflow stays the one `<slug>.yml`.
 
 The template is in each stack skill's `scaffold.md`, filled in for that stack.
 Copy it from there rather than reconstructing one from these bullets.

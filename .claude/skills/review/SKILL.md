@@ -45,7 +45,8 @@ advance to Ready to Ship on a check that never reported.
 
 ## Review the diff
 
-Read it against the acceptance criteria and the project's stack skill. Look for:
+Read it against the acceptance criteria and the stack skill of every component
+it touches. Look for:
 
 - **The design note exists** — if the issue body has a `## Design` section,
   resolve the path it links and confirm the file is on the branch. A missing

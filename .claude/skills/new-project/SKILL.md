@@ -34,8 +34,10 @@ Then confirm the slug is free: the folder must not exist and
 
 Read `.claude/skills/stack-<stack>/scaffold.md` for the scaffold and the CI
 workflow, and `.claude/skills/stack-<stack>/SKILL.md` for whether Testing is
-human-gated. Do not invent any of that here. For a multi-component project, do
-this for each component's stack.
+human-gated. For a web project, also pick the scaffold variant: `**View
+library:**` is `preact` by default, or `react` when the user asks for it, and
+the matching variant is the one transcribed. Do not invent any of that here. For
+a multi-component project, do this for each component's stack.
 
 Two files because only this skill needs the first one: every lifecycle command
 reads `SKILL.md`, and the scaffold sat inside it being read on every issue and
@@ -109,6 +111,10 @@ skill.
 
 A one-component project writes the `**Stack:**` paragraph above and nothing
 here changes.
+
+A web project, or a web component in a table, also records its view library with
+a `**View library:** preact` (or `react`) line directly under `**Stack:**`, or
+under the table. It must match the scaffold variant that was transcribed.
 
 ## 5. Commit and report
 

@@ -1,12 +1,47 @@
 ---
 name: stack-web
-description: Conventions, scaffold, and CI for web application projects in Keel (React, Vite, TypeScript). Use when working in a project folder whose CLAUDE.md names web as its stack.
+description: Conventions, scaffold, and CI for web application projects in Keel (React or Preact, Vite, TypeScript). Use when working in a project folder whose CLAUDE.md names web as its stack.
 ---
 
 # Web stack
 
-React + TypeScript on Vite. Authoritative for any project whose CLAUDE.md names
-`web`.
+React or Preact, with TypeScript, on Vite. Authoritative for any project whose
+CLAUDE.md names `web`.
+
+## View library
+
+Two families, one skill. The suite (Thrive, Hive, Forage, and new non-map apps)
+uses **Preact** with `@preact/signals`. cairn uses **React**. Everything in
+this skill applies to both except where a section says otherwise.
+
+**A project declares its choice** with a line in its `CLAUDE.md`, beside
+`**Stack:**`:
+
+```markdown
+**View library:** preact
+```
+
+or `react`. A web project that says nothing is React, which is what cairn is
+today, so adding the line to existing projects is never required.
+`/new-project` writes it, defaulting to Preact. A new map-centred app states
+its choice and a sentence of reason; shared map logic is framework-free, so
+either works.
+
+**Anything shared between the two families must be framework-free.** Design
+tokens are CSS. Shared logic imports no view library. The moment a shared
+package imports `react` or `preact`, one family can no longer use it.
+
+### Preact conventions
+
+The React conventions below, minus what differs:
+
+- Function components and hooks
+- State shared across components lives in module-level `@preact/signals`, not
+  `useState`
+- `react` and `react-dom` are aliased to `preact/compat` in both `tsconfig`
+  `paths` and the Vite config, so React-ecosystem packages still resolve. The
+  scaffold has both
+- Component tests use `@testing-library/preact`
 
 ## Testing
 
@@ -18,6 +53,8 @@ exception — those need eyes, and `/test` says so rather than passing them
 silently.
 
 ## Verifying a browser UI
+
+Applies to both view libraries.
 
 The suite covers what the suite covers. Criteria about what the running app
 does — it pans, it fits the bounds, it degrades without a key — are verified by
@@ -74,7 +111,8 @@ the script loads fine and is rejected afterwards. Google calls the
 ## Conventions
 
 - TypeScript, `strict` on. `any` requires a comment saying why
-- Function components and hooks. No class components
+- Function components and hooks. No class components (Preact's additions are
+  under View library above)
 - Colocate: a component's test and styles live beside it, not in a mirror tree
 - Data fetching stays out of components — a hook or a loader owns it
 - Vitest for unit tests, Playwright only when a flow genuinely needs a browser
@@ -86,6 +124,7 @@ the script loads fine and is rejected afterwards. Google calls the
 ## Scaffold and CI
 
 The project scaffold and the CI workflow template are in
-[scaffold.md](scaffold.md), beside this file. `/new-project` reads it when a
+[scaffold.md](scaffold.md), beside this file, with a variant for each view
+library. The CI template is the same for both. `/new-project` reads it when a
 project is created; nothing in the issue lifecycle does, which is why it is
 not here.

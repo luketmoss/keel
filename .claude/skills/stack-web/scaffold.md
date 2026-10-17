@@ -7,6 +7,11 @@ when a project is created.
 
 ## Scaffold
 
+Two variants, chosen by the project's `**View library:**` line (see
+[SKILL.md](SKILL.md)): React, below, and [Preact](#preact-variant) after the
+launch config. Everything not named in the Preact variant — `.env.example`,
+`.gitignore`, the launch config and the CI workflow — is shared.
+
 ```
 <slug>/
 ├── package.json
@@ -158,6 +163,159 @@ removes every other project's entry.
 are shared across the workspace too: a second web project picks a free one and
 pins it with `server.port` in `vite.config.ts`, or the two silently fight over
 5173.
+
+## Preact variant
+
+For a project whose CLAUDE.md says `**View library:** preact`. Same tree as
+above; the files below replace their React counterparts, and the scripts are
+named the same so the CI workflow does not change. Transcribe them rather than
+inventing them.
+
+### package.json (Preact)
+
+```json
+{
+  "name": "<slug>",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@preact/signals": "^2.0.0",
+    "preact": "^10.25.0"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.0",
+    "@testing-library/preact": "^3.2.4",
+    "jsdom": "^25.0.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0",
+    "vitest": "^3.0.0"
+  }
+}
+```
+
+The Vite/Vitest major rule above applies unchanged, as does the ban on
+`--passWithNoTests`.
+
+### tsconfig.json (Preact)
+
+`paths` is what keeps React-ecosystem packages typechecking: their `react`
+imports resolve to `preact/compat`. `jsxImportSource` makes JSX compile against
+Preact, not React.
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact",
+    "paths": {
+      "react": ["./node_modules/preact/compat/"],
+      "react-dom": ["./node_modules/preact/compat/"]
+    },
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "types": ["vite/client"]
+  },
+  "include": ["src", "vite.config.ts"]
+}
+```
+
+### vite.config.ts (Preact)
+
+The alias repeats what `tsconfig` says. `tsconfig` `paths` only informs the
+typechecker; Vite does not read it, so without `resolve.alias` a dependency's
+`react` import resolves to nothing at build time.
+
+```ts
+import { defineConfig } from 'vitest/config'
+import preact from '@preact/preset-vite'
+
+export default defineConfig({
+  plugins: [preact()],
+  resolve: {
+    alias: {
+      react: 'preact/compat',
+      'react-dom': 'preact/compat',
+    },
+  },
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./src/test-setup.ts'],
+  },
+})
+```
+
+### src (Preact)
+
+`src/main.tsx`:
+
+```tsx
+import { render } from 'preact'
+import App from './App'
+
+render(<App />, document.getElementById('app')!)
+```
+
+`index.html` is Vite's standard one: `<div id="app"></div>` and a module script
+pointing at `/src/main.tsx`.
+
+`src/App.tsx`:
+
+```tsx
+export default function App() {
+  return <h1><slug></h1>
+}
+```
+
+`src/test-setup.ts` — the same reasoning as the React one: globals are off, so
+unmount explicitly:
+
+```ts
+import { cleanup } from '@testing-library/preact'
+import { afterEach } from 'vitest'
+
+afterEach(cleanup)
+```
+
+`src/App.test.tsx` — as above, delete it once the first real test exists:
+
+```tsx
+import { render, screen } from '@testing-library/preact'
+import { describe, expect, it } from 'vitest'
+import App from './App'
+
+describe('App', () => {
+  it('renders its heading', () => {
+    render(<App />)
+    expect(screen.getByRole('heading', { name: '<slug>' })).toBeDefined()
+  })
+})
+```
+
+Shared state across components goes in module-level signals, not `useState`:
+
+```ts
+import { signal } from '@preact/signals'
+
+export const count = signal(0)
+```
 
 ## CI workflow
 

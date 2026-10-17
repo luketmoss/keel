@@ -37,8 +37,8 @@ no test reaches — see Testing.
 - **`src/appsscript.json` is pinned**, including `oauthScopes`. Unpinned,
   Apps Script infers scopes from the services the code touches, and `DriveApp`
   widens to full `drive`.
-- **`.clasp.json` is gitignored, `.clasp.json.example` committed.** The script
-  id is not a credential, but it is per-owner; `rootDir` in it is `src`.
+- **`.clasp.json` is gitignored, `.clasp.json.example` committed.** The file
+  holds the script id; its `rootDir` is `src`.
 - **`.js` and `.mjs` are pinned to LF in the repository's `.gitattributes`**
   (`*.js text eol=lf`, `*.mjs text eol=lf`). Vitest cannot load a shebang
   script that checked out with CRLF.

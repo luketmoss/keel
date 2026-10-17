@@ -130,7 +130,6 @@ job does not need says so in its README's credentials table.
   `Aborted by <ErrorName>` and the run id, and a row in the README's "When a
   run fails" table is looked up by that class. The message, which may quote the
   vendor, is in the run record only.
-- **Never log a secret's prefix or length.** Log that it was present.
 
 ## The run record
 

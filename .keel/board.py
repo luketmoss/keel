@@ -12,8 +12,14 @@ an option to a single-select field - silently destroys data if done naively.
   board.py list --status <stage> [--project <slug>]
   board.py holds-branch [--project <slug>]
   board.py next --status <stage> [--project <slug>]
+  board.py remove <issue> [--repo owner/name]
   board.py projects
   board.py add-project <slug>
+
+Only issues in this repo are visible. An issue from another repo can land on the
+board (linking it as a sub-issue adds it), and its number would otherwise pass
+for a Keel issue's. `remove` is how one comes off; `--repo` names the repo of an
+item whose number collides with a Keel issue.
 
 `holds-branch` and `next` exit non-zero to mean "something holds a branch" and
 "nothing to pick" - they are read-only, and written to be called by a schedule
@@ -130,13 +136,16 @@ def issue_node_id(number):
     ).strip()
 
 
-def find_item(number):
+def find_item(number, repo=REPO):
     """Board item id for an issue, or None if the issue is not on the board.
+
+    Matches the repo as well as the number: another repo's issue can sit on the
+    board, and #421 there is not #421 here.
 
     Reads through `board_rows` rather than running its own query - see its
     docstring for why there is only one paginated items() query in this file.
     """
-    for row in board_rows():
+    for row in board_rows(repo=repo):
         if row["number"] == number:
             return row["id"]
     return None
@@ -315,7 +324,7 @@ def cmd_set(args):
         print("#{} {} -> {}".format(args.issue, field_name, value))
 
 
-def board_rows(status=None, project=None):
+def board_rows(status=None, project=None, repo=REPO):
     """Every issue on the board, optionally narrowed to one stage or project.
 
     The only place the project-items query lives. `find_item`, `list`,
@@ -325,6 +334,9 @@ def board_rows(status=None, project=None):
     Each row carries the project item `id` alongside the display fields, since
     `find_item` needs it and callers that don't (`list`) drop it before
     printing.
+
+    Only issues in `repo` are returned, so no caller can mistake another repo's
+    issue for one of Keel's. `repo=None` returns every repo; only `remove` asks.
     """
     cursor = "null"
     rows = []
@@ -338,7 +350,7 @@ def board_rows(status=None, project=None):
                     pageInfo { hasNextPage endCursor }
                     nodes {
                       id
-                      content { ... on Issue { number title url } }
+                      content { ... on Issue { number title url repository { nameWithOwner } } }
                       fieldValues(first: 20) {
                         nodes {
                           ... on ProjectV2ItemFieldSingleSelectValue {
@@ -358,6 +370,9 @@ def board_rows(status=None, project=None):
         for item in items["nodes"]:
             content = item.get("content") or {}
             if not content.get("number"):
+                continue
+            item_repo = content["repository"]["nameWithOwner"]
+            if repo and item_repo.lower() != repo.lower():
                 continue
             values = {}
             for node in item["fieldValues"]["nodes"]:
@@ -446,6 +461,25 @@ def cmd_next(args):
     print(json.dumps(without_id(min(rows, key=pick_order)), indent=2))
 
 
+def cmd_remove(args):
+    """Take an issue's item off the board. The issue itself is untouched."""
+    repo = args.repo or REPO
+    item = find_item(args.issue, repo)
+    if not item:
+        sys.exit("{}#{} is not on the board. Nothing removed.".format(repo, args.issue))
+    graphql(
+        """
+        mutation {
+          deleteProjectV2Item(input: {projectId: %s, itemId: %s}) {
+            deletedItemId
+          }
+        }
+        """
+        % (q(PROJECT_ID), q(item))
+    )
+    print("Removed {}#{} from the board".format(repo, args.issue))
+
+
 def cmd_projects(args):
     for option in field("Project").get("options", []):
         print(option["name"])
@@ -523,6 +557,11 @@ def main():
     p.add_argument("--status", required=True)
     p.add_argument("--project")
     p.set_defaults(func=cmd_next)
+
+    p = sub.add_parser("remove", help="take an issue's item off the board")
+    p.add_argument("issue", type=int)
+    p.add_argument("--repo", help="owner/name; default is this repo")
+    p.set_defaults(func=cmd_remove)
 
     p = sub.add_parser("projects", help="list project options")
     p.set_defaults(func=cmd_projects)

@@ -1,25 +1,99 @@
-# Thrive — Personal Workout Tracker
+# CLAUDE.md — thrive
 
-## Project Overview
-Personal workout tracker: Preact SPA → Google Sheets REST API.
-- **frontend/**: Preact SPA (built with Vite) — deployed to GitHub Pages
-- **MCP server**: lives in Keel, not here: `luketmoss/keel` → `mcp/` (a Cloudflare Worker serving `/thrive/mcp` and `/hive/mcp` behind one GitHub sign-in, added once as a claude.ai connector so it works from the phone and the desktop). It is a thin client of the Apps Script API (#132) with its own MCP-only key (`MCP_API_KEY`, #364), and it holds **no row mapping**. The old local stdio `mcp-server/` was retired in luketmoss/keel#372 (git history is the fallback). **A change to `apps-script/` that alters a response shape also needs a matching change in `keel/mcp/src/thrive/`**, or the tools break silently. The COROS portal URL rule (`corosActivityUrl`, #260) has a second copy there (`domain.js`, #312): change both together.
-- **apps-script/**: the server-side API over the sheet (#130, #134). Row mapping in `apps-script/src/types.js` mirrors `frontend/src/api/*.ts` — **change both together**. Those are the only two copies, and every consumer arriving later (the COROS sync, the Journal) calls the API rather than adding a third. The SPA still reads and writes Sheets directly, as Hive's does, with one exception: after a Sync now press it asks the API's `requestSync` to dispatch the rows it just appended (#410, `frontend/src/api/thrive-api.ts`, built only when `VITE_THRIVE_API_URL` is set).
-- **sync/**: the COROS → Thrive sync (epic #163), run by `.github/workflows/coros-sync.yml`. Reaches Drive as the bot account (luketmossbot@gmail.com, `drive.file`), **not** the service account — a service account has no Drive storage quota. Keeps COROS's rotating refresh token in a Drive file it owns. Setup and failure modes: `sync/README.md`.
-- **scripts/**: one-time migrations and admin tools. They use the Google service account (`scripts/thrive-sa.json`, gitignored) directly, with their own `google-auth-library`, because schema changes — new columns, new tabs — need Sheets access the API deliberately does not offer.
+Personal workout and health tracker: a Preact SPA over a Google Sheet
+("Groundwork"), with an Apps Script API in front of the sheet and scheduled
+syncs that pull activities from COROS and body measurements from Withings.
+Personal use.
 
-## Key Commands
-- `cd frontend && npm run dev` — start Vite dev server (localhost:5173)
-- `cd frontend && npm run build` — production build to frontend/dist/
-- `cd frontend && npm test` — run frontend tests (vitest)
-- `cd frontend && npx tsc --noEmit` — TypeScript type checking
-- `cd sync && npm test` — run COROS sync tests (node --test, no network)
-- `cd apps-script && npm test` — run Apps Script tests (vitest, sandboxed `node:vm`)
-- `cd apps-script && npm run typecheck` — TypeScript check for the test harness
+Workspace rules live in the root `CLAUDE.md` and `CONVENTIONS.md`: the board,
+the pipeline and its skills, and CI. This file covers only what is specific to
+Thrive.
+
+Imported from `luketmoss/thrive` with its history (#395). Thrive's own issues
+from before the import are written `luketmoss/thrive#N`; a bare `#N` here is a
+Keel issue. Until the cutover (#399) the live app, its syncs and its poller
+still run from `luketmoss/thrive`, so the workflows named below
+(`coros-sync.yml`, `withings-sync.yml` and their watchdogs) are that repo's
+until #398 brings them here.
+
+## Stacks
+
+| Path | Stack |
+|---|---|
+| `frontend/` | web |
+| `apps-script/` | apps-script |
+| `sync/` | node-jobs |
+| `scripts/` | — |
+
+**View library:** preact
+
+The authoritative conventions for each component are in its stack skill:
+`.claude/skills/stack-web/SKILL.md`, `.claude/skills/stack-apps-script/SKILL.md`
+and `.claude/skills/stack-node-jobs/SKILL.md`. `scripts/` pins none; this file
+is its only authority.
+
+- **frontend/** — the Preact SPA, built with Vite. It reads and writes the
+  Sheets API directly with the signed-in user's Google token, with one
+  exception: after a Sync now press it asks the API's `requestSync` to dispatch
+  the rows it just appended (`frontend/src/api/thrive-api.ts`, built only when
+  `VITE_THRIVE_API_URL` is set).
+- **apps-script/** — the server-side API over the sheet. Every consumer that is
+  not the SPA (the syncs, the MCP Worker) calls it rather than holding its own
+  row mapping.
+- **sync/** — the COROS and Withings syncs, run on a schedule. They reach Drive
+  as the bot account (luketmossbot@gmail.com, `drive.file`), **not** the
+  service account, which has no Drive storage quota, and keep the vendors'
+  rotating refresh tokens in Drive files they own. Setup and failure modes:
+  `sync/README.md`.
+- **scripts/** — one-time migrations and admin tools. They use the Google
+  service account (`scripts/thrive-sa.json`, gitignored) directly, with their
+  own `google-auth-library`, because schema changes need Sheets access the API
+  deliberately does not offer.
+- **The MCP server** is not here: it is Keel's `mcp/`, a Cloudflare Worker
+  serving `/thrive/mcp` as a thin client of the Apps Script API with its own
+  MCP-only key (`MCP_API_KEY`). It holds no row mapping.
+- **`.claude/skills/brief/`** — `/brief`, the Morning and Weekly Brief. A
+  product, not part of the pipeline: two scheduled tasks run it. Its
+  `settings.local.md` (weather locations) is gitignored and never committed.
+
+## Key commands
+
+- `npm --prefix frontend run dev` — Vite dev server on port 5175
+- `cd frontend && npm test` / `npm run typecheck` / `npm run build`
+- `cd apps-script && npm test` / `npm run typecheck` — sandboxed `node:vm`
+- `cd sync && npm test` — `node --test`, no network
+
+## Change both together
+
+Thrive is one repository now, so each pair below changes in **one pull
+request**.
+
+- **The row mapping.** `apps-script/src/types.js` and `frontend/src/api/*.ts`
+  are the only two copies. A column or field changes in both.
+- **Response shapes.** A change to `apps-script/` that alters a response shape
+  also changes the MCP Worker's client in `mcp/src/thrive/`, or its tools break
+  silently. A pull request touching `mcp/` is human-reviewed (#393).
+- **The COROS portal URL rule** (`corosActivityUrl`) has two copies:
+  `frontend/src/api/coros-link.ts` and `mcp/src/thrive/domain.js`.
+
+## Changing the schema
+
+**Frozen.** No column or tab changes from the merge of #395 until #385 closes.
+
+After that, a column or tab changes only like this:
+
+1. Through a migration, `scripts/migrate-<issue>-<what>.mjs`, run by hand. No
+   other path edits the sheet's shape.
+2. **Columns are appended, never moved.** Agents, the API and the Worker read
+   tabs by column position.
+3. The API (`apps-script/`), the frontend mirror (`frontend/src/api/`) and the
+   Worker (`mcp/src/thrive/`) change in the same pull request.
+4. **Apps Script deploys first**, then its callers. Merging does not deploy it;
+   the steps are the owner's, per the apps-script stack skill.
 
 ## Environment
 - **Windows machine** — `jq` is NOT available. For JSON parsing in shell commands, use `gh` built-in `--jq` flags. Never pipe to a standalone `jq` command.
-- `.gitattributes` pins `*.js`/`*.mjs` to LF (#366): vitest cannot load a shebang script checked out with CRLF. A checkout from before #366 needs those files re-checked out once.
+- `thrive/.gitattributes` pins `*.js`/`*.mjs` to LF (luketmoss/thrive#366): vitest cannot load a shebang script checked out with CRLF. A checkout from before luketmoss/thrive#366 needs those files re-checked out once.
 - Node 20+, npm
 
 ## Architecture Notes
@@ -30,11 +104,6 @@ Personal workout tracker: Preact SPA → Google Sheets REST API.
 - Router: Signal-based hash router using signals (no library dependency)
 - Mobile-first design (375px primary breakpoint)
 - No backend server — SPA reads/writes Sheets API directly via OAuth
-
-## Preview & Demo Mode
-- The app requires Google OAuth to function. For preview testing (QA, UX agents), use **demo mode** by navigating to `http://localhost:5173/thrive/?demo=true` after starting the dev server.
-- Demo mode provides a fake user and skips Google auth. Changes are not persisted.
-- Cloud sessions have no Browser pane. `node .thrive/look.mjs [route]` drives the demo app with the container's Playwright and Chromium instead; `/qa` says how. On the desktop app use the Browser pane (`preview_start`); `look.mjs` fails there because Playwright is not installed locally.
 
 ## Data Model
 Google Sheet "Groundwork" with these tabs:
@@ -48,17 +117,17 @@ Google Sheet "Groundwork" with these tabs:
 - **Labels** (A:D): id, name, color_key, created
 - **DailyHealth** (A:S): date, resting_hr, hrv, steps, calories, sleep_total_s,
   sleep_deep_s, sleep_rem_s, sleep_light_s, sleep_awake_s, sleep_score, vo2max,
-  recovery, training_load, bed_time, wake_time, raw_ref, synced_at (#165),
-  stress_avg (#231: COROS's daily average stress, appended; no range assumed). One
+  recovery, training_load, bed_time, wake_time, raw_ref, synced_at (luketmoss/thrive#165),
+  stress_avg (luketmoss/thrive#231: COROS's daily average stress, appended; no range assumed). One
   row per local date, written only by the COROS sync through `upsertDailyHealth`.
   Every value is nullable: blank means COROS did not say, never `0`. Sleep is
   filed under its wake-up day; `sleep_total_s` includes awake time; `vo2max` and
   `recovery` are current-state snapshots. There is no step goal: COROS sends none.
-  The SPA reads it, read-only, through `frontend/src/api/health-api.ts` (#236).
-- **BodyMeasurements** (A:T) — one row per Withings measure group (#198),
+  The SPA reads it, read-only, through `frontend/src/api/health-api.ts` (luketmoss/thrive#236).
+- **BodyMeasurements** (A:T) — one row per Withings measure group (luketmoss/thrive#198),
   keyed by `grpid`, written only by the Withings sync (`sync/withings-run.mjs`)
   through `upsertBodyMeasurements`, which rewrites a row whole. A reading
-  deleted in the Withings app is removed by `reconcileBodyMeasurements` (#215),
+  deleted in the Withings app is removed by `reconcileBodyMeasurements` (luketmoss/thrive#215),
   capped at 5 rows a run; its archive file is kept and marked.
   grpid, date, time, measured_at_utc, kind, device_model, weight_kg,
   fat_ratio_pct, fat_mass_kg, fat_free_mass_kg, muscle_mass_kg, hydration_kg,
@@ -69,13 +138,13 @@ Google Sheet "Groundwork" with these tabs:
   nullable: blank means the group had no such measure, never `0`. `date`/`time`
   are local `America/Denver`. Groups with an `attrib` other than 0, 2, 4, 5, 7
   or 8 (1 is a guest or another user) are never written. The SPA reads it,
-  read-only and still in kg, through `frontend/src/api/health-api.ts` (#236).
+  read-only and still in kg, through `frontend/src/api/health-api.ts` (luketmoss/thrive#236).
   Later columns are only ever appended.
-- **DailySummary** (A:Y) — **derived, never authoritative** (#131). One row per
+- **DailySummary** (A:Y) — **derived, never authoritative** (luketmoss/thrive#131). One row per
   local calendar day, rebuildable at any time from `Workouts` + `DailyHealth` +
   `BodyMeasurements`. Nothing writes here by hand. If it disagrees with
   `Workouts`, `Workouts` is right and this is stale. The SPA reads it,
-  read-only, through `frontend/src/api/health-api.ts` (#236), and never
+  read-only, through `frontend/src/api/health-api.ts` (luketmoss/thrive#236), and never
   rebuilds or corrects it.
   date, activity_count, activity_types, total_moving_s, total_elapsed_s,
   total_distance_m, total_ascent_m, cardio_activity_count, distance_withdata,
@@ -84,14 +153,14 @@ Google Sheet "Groundwork" with these tabs:
   weight_kg, fat_ratio_pct, systolic_mmhg, diastolic_mmhg, bp_count.
   Every total carries its coverage: `total_moving_s`/`total_elapsed_s` are blank
   when no activity recorded them, and S/T count those that did out of
-  `activity_count` (#181). S/T are appended, not beside D/E, because agents and the API read
+  `activity_count` (luketmoss/thrive#181). S/T are appended, not beside D/E, because agents and the API read
   this tab by column: never move a column here.
   `total_distance_m`/`total_ascent_m` are **outdoor only**, so they will not
   equal the sum of a day's activity distances on any day with an indoor
   session — correct, and surprising, so say so wherever it is displayed.
   They are likewise blank when no outdoor session measured them, with I/J
-  counting those that did out of H (#190). A measured `0` stays `0`.
-  U:Y (#203) roll up `BodyMeasurements`, appended after T for the same
+  counting those that did out of H (luketmoss/thrive#190). A measured `0` stays `0`.
+  U:Y (luketmoss/thrive#203) roll up `BodyMeasurements`, appended after T for the same
   column-position reason. `weight_kg`/`fat_ratio_pct` come from the day's
   **first** scale reading with a weight, by `measured_at_utc` — a morning
   weigh-in is the comparable figure day to day, and fat ratio is read from
@@ -101,36 +170,36 @@ Google Sheet "Groundwork" with these tabs:
   values present in them. Either half is blank, never `0`, on a day with no
   such reading; a body-only day still gets a row, everything else blank as
   usual. A missing `BodyMeasurements` tab leaves U:Y blank everywhere.
-- **SyncLog** (A:N) — one row per COROS sync run (#156): run_id, started_at,
+- **SyncLog** (A:N) — one row per COROS sync run (luketmoss/thrive#156): run_id, started_at,
   finished_at, window_start, window_end, n_seen, n_new, n_updated, n_enriched,
   n_fit_fetched, n_errors, status (`ok`/`partial`/`failed`), error_detail,
-  notes (#155).
+  notes (luketmoss/thrive#155).
   Appended only by the COROS sync; the dead-man's switch
   (`coros-sync-watchdog.yml`) fails when the newest row is over 16 h old.
-- **WithingsSyncLog** (A:N) — one row per Withings sync run (#200), `SyncLog`'s
+- **WithingsSyncLog** (A:N) — one row per Withings sync run (luketmoss/thrive#200), `SyncLog`'s
   layout exactly: `n_seen` is measure groups fetched, `n_new`/`n_updated` are
   `BodyMeasurements` rows, `n_enriched`/`n_fit_fetched` are always `0`, `notes`
   lists unattributed groups skipped. Appended only by `sync/withings-run.mjs`
   through `appendSyncLog` with `log: 'withings'`; `withings-sync-watchdog.yml`
   fails when the newest row is over 14 h old. A separate tab because `SyncLog`
   has no source column: nothing that reads `SyncLog` may ever see a Withings run.
-- **Journal** (A:D) — one note per local date (#233): date, note, created,
+- **Journal** (A:D) — one note per local date (luketmoss/thrive#233): date, note, created,
   updated. Written by the SPA through `frontend/src/api/journal-api.ts`; saving a
   blank note deletes the day's row. Row mapping mirrors `JOURNAL_FIELDS` in
   `apps-script/src/types.js` — change both together. Created by
   `scripts/migrate-233-journal-tab.mjs`. The API reaches it through `getJournal`
   (a date range, oldest first) and `upsertJournal` (`{date, note}`: create,
   replace in place keeping `created`, or a blank note deletes the row), both
-  **key-only** (`apps-script/src/journal.js`, #234; neither is on
+  **key-only** (`apps-script/src/journal.js`, luketmoss/thrive#234; neither is on
   `TOKEN_READ_ACTIONS`: journal text is personal and nothing needs it by token).
   The MCP server exposes them as `thrive_journal` (default 30 days) and
   `thrive_set_journal_entry` (clearing an existing note is dry-run until
   `confirm: true`).
-- **SyncRequests** (A:I) — on-demand sync requests (#314, #232's route c): one
+- **SyncRequests** (A:I) — on-demand sync requests (luketmoss/thrive#314, luketmoss/thrive#232's route c): one
   row per vendor per "Sync now" press. request_id, vendor, requested_at,
   requested_by, status, workflow_run_id, dispatched_at, finished_at, detail.
   The SPA only ever appends A–E (`sr_` + 8 hex, `coros`|`withings`, ISO UTC,
-  the signed-in email or blank, `requested`; #315). The one other appender is
+  the signed-in email or blank, `requested`; luketmoss/thrive#315). The one other appender is
   the poller itself: on the first tick in a slot's 15-minute window
   (`SYNC_SCHEDULE_SLOTS`: 6:30 AM and 6:30 PM daily, America/Denver) it adds
   one `coros` row with `requested_by` = `schedule` (once per slot per day, any
@@ -142,7 +211,7 @@ Google Sheet "Groundwork" with these tabs:
   deletes or writes A–D of a row it did not add. It dispatches the existing
   `coros-sync.yml`/`withings-sync.yml` with a fixed `{"ref":"main"}` and the
   `GITHUB_DISPATCH_TOKEN` script property, and closes each row it started.
-  Sync now does not wait for the next tick (#410): once its rows are appended,
+  Sync now does not wait for the next tick (luketmoss/thrive#410): once its rows are appended,
   the SPA POSTs `requestSync` (`request_ids` = the ids it just appended) with
   its Google access token, and the API runs the tick's own per-vendor step for
   those rows' vendors, under the same lock and rules, appending nothing. The
@@ -158,7 +227,7 @@ Google Sheet "Groundwork" with these tabs:
   and `frontend/src/api/sync-requests-api.ts` — change both together. Created
   by `scripts/migrate-314-sync-requests-tab.mjs`. Later columns are only ever
   appended.
-  The Day view (#409) shows "Synced <age>" (the older of COROS's and Withings's
+  The Day view (luketmoss/thrive#409) shows "Synced <age>" (the older of COROS's and Withings's
   newest runs) with a Sync now control that shares `useSyncNow` with Settings;
   a request closing re-reads health, the sync logs and Workouts/Sets (held as
   `src/state/refresh-hold.ts` holds them).
@@ -173,18 +242,18 @@ no code path may default them to `0`. `Workouts!R-Z` are the sync provenance
 columns, nullable for the same reason; a blank `source` positively means
 "logged by hand", so nothing may default it to a vendor name.
 A new synced activity completes the day's one matching plan instead of
-appending beside it (#403): `upsertSyncedWorkout` claims the single
+appending beside it (luketmoss/thrive#403): `upsertSyncedWorkout` claims the single
 `status = planned` row of the activity's `type` and `date` with `source` and
 `source_activity_id` blank, keeps its name, notes, template, estimate and
 effort, and finishes it. Two or more such plans claim nothing, and the run's
 SyncLog notes name them.
-`Workouts!AA` `estimated_seconds` (#145) is how long a *planned* session is
+`Workouts!AA` `estimated_seconds` (luketmoss/thrive#145) is how long a *planned* session is
 meant to take, typed per plan in whole minutes and stored in seconds through
 the same `duration.ts` boundary. It is not time taken: starting a plan never
 copies it into `Elapsed (s)`, nothing sums it, and the sync never writes it.
 It stays on the row after the workout starts, as the plan's record. Blank
 means nobody estimated it; `0` is refused.
-`Workouts!AB` `sport_type` (#260) is the COROS sport code (e.g. `204`
+`Workouts!AB` `sport_type` (luketmoss/thrive#260) is the COROS sport code (e.g. `204`
 mountain bike, `402` strength), digits stored as text. Nullable with R-Z's
 provenance: blank means unknown (not a COROS row, or not yet backfilled),
 never `0`. Sync-owned: written by `upsertSyncedWorkout`/`enrichWorkout` and
@@ -212,7 +281,7 @@ Comma-separated, multiple per exercise. Common tags: Push, Pull, Legs, Chest, Ba
 ## UX Design Decisions
 These decisions were made with the user and must be respected by all agents:
 
-- **Landing screen**: the Day view (#228, decided 27 Sep 2026; #235 records the navigation; #237 built the screen).
+- **Landing screen**: the Day view (luketmoss/thrive#228, decided 27 Sep 2026; luketmoss/thrive#235 records the navigation; luketmoss/thrive#237 built the screen).
 - **Set logging**: Logbook-style — record sets when convenient, not real-time per-set
 - **Rest timers**: None in-app — rest times are planning data only (user uses watch)
 - **Supersets**: Flat list with section labels/colors (not grouped flow)
@@ -226,88 +295,12 @@ These decisions were made with the user and must be respected by all agents:
 - **Copy workout**: Pre-fill from previous + show "last time" reference while logging
 - **Device**: Mobile-first (375px primary breakpoint)
 
-## The Board
+## Preview and demo mode
 
-**Issue tracker: GitHub only.** All issue references mean GitHub issues; use the
-`gh` CLI exclusively. Project #4, `https://github.com/users/luketmoss/projects/4`.
-Cloud Claude Code sessions have no usable `gh`: some containers have none, and
-where one is installed its token is invalid or repo-scoped (their GitHub access
-is repo-scoped REST only), so it cannot reach the project. There, every `gh`
-step in a skill means the same operation through the GitHub MCP tools
-(`mcp__github__*`); the board still goes through `board.mjs`.
+The app needs Google OAuth. For previews, use **demo mode**: a fake user, no
+Google sign-in, nothing persisted.
 
-**All board writes go through `node .thrive/board.mjs`** — never hand-write
-GraphQL against the project and never call `gh project field-list` or
-`gh project item-add` directly. IDs live in `.thrive/board.json`; `board.mjs
-sync` refreshes them if a column is added or renamed. `board.mjs add <issue>
-[--status "<column>"]` puts an issue on the project (idempotently) and, for an
-issue not already there, sets its column in the same run; an issue already on
-the board keeps its column (`set` moves it) — this is how a cloud session,
-which can create issues but cannot otherwise reach the project, gets a new
-issue onto the board.
-
-Cloud Claude Code sessions cannot reach the project, so there `board.mjs` hands
-the same command to `.github/workflows/board.yml` (a `repository_dispatch`) and
-prints its result, 20–40 s later. That needs the `BOARD_TOKEN` repo secret: a
-classic PAT with `project`, `repo` and `read:org`, and a `GH_TOKEN` or
-`GITHUB_TOKEN` in the session to send the dispatch with. It takes that route
-when `gh` is missing, or when a command's first `gh` call fails and a cheap read
-of the project then fails too (#405); `BOARD_REMOTE=1` forces it with no `gh`
-call. A `gh` that works makes the same calls as before; a failure with a project
-it can reach is reported as `gh` said it, and `board.yml`'s own run never takes
-the route. `.thrive/board.test.mjs` skips itself on Windows (its fake `gh` does
-not run there, so the real one would move real cards); run it in CI or on
-another machine.
-
-| Stage | Skill | Gate |
-|---|---|---|
-| To Do | `/idea` | |
-| PM Refining | `/pm` | |
-| UX | `/ux` | |
-| Refined | — | **agree with the spec?** |
-| In Development | `/dev` | |
-| Testing | `/qa` | |
-| Code Review | `/review` | |
-| Ready to Ship | `/ship` | **agree with the implementation?** |
-| Done | — | |
-
-Each skill owns its own column moves. A stage skill is a step, not a stopping
-point — each one names the skill that moves the work on.
-
-## The Two Runs
-
-Work moves through the board in **runs**, not stage by stage. A run chains its
-stages back to back in one pass and does not check in between them.
-
-- **`/refine`** — To Do → Refined. "Get #42 ready for dev", "refine this",
-  "spec it out". Chains `/idea` (if the issue doesn't exist) → `/pm` → `/ux` →
-  `/pm`, and stops at the design gate.
-- **`/finish`** — Refined → Done. "Finish #42", "ship it", "build it out".
-  Chains `/dev` → `/qa` → `/review` → `/ship`, resuming from whatever column the
-  issue is actually in.
-
-The two runs are deliberately separate. Running them back to back skips the
-design gate, which is the only review of the spec.
-
-**Do not chain the stages by hand.** If the request is a run, invoke the run
-skill; it owns the sequence, the halt conditions, and the report.
-
-Outside the runs: `/orchestrator` to take several issues (a parent's children,
-or a list) through the runs in a batch, `/devops` for CI/CD and deployment
-problems, `/ux` on its own for a standalone audit.
-
-**Sub-agents and models are the skills' call.** One issue runs inline, on the
-session's model. A batch goes to `/orchestrator`, which refines in dependency
-waves with a sub-agent per issue on a model it picks (Opus for issues that set
-contracts or carry design, Sonnet for those that fill them) and checks the
-siblings for conflicts before the design gate. `/finish` runs its `/review` step
-in a fresh Opus sub-agent. The user's word overrides any of it.
-
-## Halting
-
-A run stops early only for the conditions its skill lists — an open product
-question, a failed criterion with no clear fix, a blocking review, a red check.
-Two attempts at a failing stage, then stop.
-
-**A halted run is a success.** Report where it stopped and why; do not work
-around a gate, and do not guess at an answer to a question you raised.
+- **Desktop:** start the root `.claude/launch.json` entry `thrive`
+  (`preview_start`), then open `http://localhost:5175/thrive/?demo=true`.
+- **Cloud sessions** have no preview pane: `node .keel/look.mjs thrive
+  "/thrive/?demo=true"` from the repository root, per the web stack skill.

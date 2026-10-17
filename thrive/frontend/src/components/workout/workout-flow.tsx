@@ -1,0 +1,242 @@
+import { useState, useEffect, useRef } from 'preact/hooks';
+import { workouts, activeWorkoutId, activeWorkoutSets, activeWarmupExercises, sets, templates } from '../../state/store';
+import { templateWarmupsToRestore } from './template-warmups';
+import { startWorkout, saveWorkoutForLater } from '../../state/actions';
+import { useAuth } from '../../auth/auth-context';
+import { navigate } from '../../router/router';
+import { TypeSelector } from './type-selector';
+import { IntentSelector } from './intent-selector';
+import { TemplatePicker } from './template-picker';
+import { WorkoutTracker } from './workout-tracker';
+import { SimpleWorkout } from './simple-workout';
+import { WorkoutPlanner } from './workout-planner';
+import { validPlanDate } from './plan-date';
+import type { WorkoutType } from '../../api/types';
+import type { PlannerExercise } from './workout-planner';
+import { plannedSetCount, plannerToBuilderExercises } from './planned-reps';
+
+type FlowStep = 'type' | 'intent' | 'template' | 'planner' | 'tracker' | 'simple';
+type Intent = 'track' | 'plan';
+
+interface Props {
+  workoutId?: string;
+  /**
+   * Raw `?plan=` value from `#/workout/new?plan=YYYY-MM-DD` (#143). When present
+   * — even empty or malformed — the flow starts in plan mode at the template
+   * step. Only a valid date reaches the planner; anything else means today.
+   */
+  planDate?: string;
+}
+
+export function WorkoutFlow({ workoutId, planDate }: Props) {
+  const { token } = useAuth();
+  const linkedPlan = planDate !== undefined;
+  const [step, setStep] = useState<FlowStep>(linkedPlan ? 'template' : 'type');
+  const [selectedType, setSelectedType] = useState<WorkoutType>('weight');
+  const [activeId, setActiveId] = useState<string | null>(workoutId || null);
+  const [workoutName, setWorkoutName] = useState('');
+  const [intent, setIntent] = useState<Intent>(linkedPlan ? 'plan' : 'track');
+  const [starting, setStarting] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Planner state: exercises to pre-populate when user picks a template for "plan for later"
+  const [plannerName, setPlannerName] = useState('');
+  const [plannerExercises, setPlannerExercises] = useState<PlannerExercise[]>([]);
+
+  // A query-only change while mounted (`?plan=A` → `?plan=B`) starts the flow
+  // afresh rather than keeping the old date (#143 AC5). Done here rather than by
+  // keying the component on the hash, because the Track Now hand-off from
+  // `/workout/new` to `/workout/:id` relies on this instance surviving.
+  const lastPlanDate = useRef(planDate);
+  useEffect(() => {
+    if (planDate === lastPlanDate.current) return;
+    lastPlanDate.current = planDate;
+    if (workoutId) return; // moved on to /workout/:id — the tracker owns the screen
+    const plan = planDate !== undefined;
+    setStep(plan ? 'template' : 'type');
+    setSelectedType('weight');
+    setIntent(plan ? 'plan' : 'track');
+    setPlannerName('');
+    setPlannerExercises([]);
+  }, [planDate, workoutId]);
+
+  // If resuming an existing workout, jump to the correct step
+  useEffect(() => {
+    if (!workoutId) return;
+
+    const workout = workouts.value.find((w) => w.id === workoutId);
+    if (!workout) {
+      navigate('/activities');
+      return;
+    }
+
+    setSelectedType(workout.type);
+    setWorkoutName(workout.name);
+    activeWorkoutId.value = workoutId;
+
+    // Load this workout's sets into activeWorkoutSets
+    activeWorkoutSets.value = sets.value.filter((s) => s.workout_id === workoutId);
+
+    // Always reassign the warmup list from this workout alone, through the
+    // rule startPlannedWorkout uses: nothing left by another workout or a
+    // plan survives into this one (#351 AC3/AC4).
+    activeWarmupExercises.value = templateWarmupsToRestore(
+      workout.template_id, activeWorkoutSets.value, templates.value,
+    );
+
+    if (workout.type === 'weight') {
+      setStep('tracker');
+    } else {
+      setStep('simple');
+    }
+  }, [workoutId]);
+
+  const handleTypeSelect = (type: WorkoutType) => {
+    setSelectedType(type);
+    if (type === 'weight') {
+      setStep('intent');
+    } else {
+      setStep('simple');
+    }
+  };
+
+  const handleIntentSelect = (selectedIntent: Intent) => {
+    setIntent(selectedIntent);
+    setStep('template');
+  };
+
+  // Called when the user taps a template card
+  const handleTemplateCardTap = async (templateId: string) => {
+    const tpl = templates.value.find((t) => t.id === templateId);
+    if (!tpl) return;
+
+    if (intent === 'track') {
+      // Track Now: go straight to tracker with template exercises
+      if (!token || starting) return;
+      setStarting(true);
+      try {
+        const name = tpl.name;
+        const id = await startWorkout({ type: 'weight', name, template_id: templateId }, token);
+        setActiveId(id);
+        setWorkoutName(name);
+        setStep('tracker');
+        window.location.hash = `#/workout/${id}`;
+      } catch {
+        // Error toast shown by action
+      } finally {
+        setStarting(false);
+      }
+    } else {
+      // Plan for Later: populate planner with template exercises
+      setPlannerName(tpl.name);
+      setPlannerExercises(
+        tpl.exercises.map((ex) => ({
+          exercise_id: ex.exercise_id,
+          exercise_name: ex.exercise_name,
+          section: ex.section as string,
+          sets: ex.section === 'warmup' ? '' : (ex.sets || '1'),
+          // Every set starts at the template's one Reps value (#375).
+          reps_by_set: ex.section === 'warmup' ? [] : Array(plannedSetCount(ex.sets || '1')).fill(ex.reps),
+        })),
+      );
+      setStep('planner');
+    }
+  };
+
+  // Called when the user taps "Build Custom"
+  const handleBuildCustomTap = async () => {
+    if (intent === 'track') {
+      // Track Now + Build Custom: go straight to tracker with empty workout
+      if (!token) return;
+      setStarting(true);
+      try {
+        const name = 'Custom Workout';
+        const id = await startWorkout({ type: 'weight', name }, token);
+        setActiveId(id);
+        setWorkoutName(name);
+        setStep('tracker');
+        window.location.hash = `#/workout/${id}`;
+      } catch {
+        // Error toast shown by action
+      } finally {
+        setStarting(false);
+      }
+    } else {
+      // Plan for Later + Build Custom: go to empty planner
+      setPlannerName('');
+      setPlannerExercises([]);
+      setStep('planner');
+    }
+  };
+
+  // Planner: "Save Workout" handler
+  const handlePlannerSave = async (name: string, exercises: PlannerExercise[], date: string, estimatedSeconds: string) => {
+    if (!token) return;
+    setSaving(true);
+    try {
+      // Each set as its row holds it (#375), as the planned-workout editor saves.
+      const builderExercises = plannerToBuilderExercises(exercises);
+      await saveWorkoutForLater({ type: 'weight', name, exercises: builderExercises, date, estimated_seconds: estimatedSeconds }, token);
+      navigate('/activities');
+    } catch {
+      // Error toast shown by action
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (starting && step !== 'planner') {
+    return (
+      <div class="loading-screen">
+        <div class="spinner" />
+        <p>Starting workout…</p>
+      </div>
+    );
+  }
+
+  switch (step) {
+    case 'type':
+      return <TypeSelector onSelect={handleTypeSelect} />;
+    case 'intent':
+      return (
+        <IntentSelector
+          onTrackNow={() => handleIntentSelect('track')}
+          onPlanForLater={() => handleIntentSelect('plan')}
+          onBack={() => setStep('type')}
+        />
+      );
+    case 'template':
+      return (
+        <TemplatePicker
+          onSelectTemplate={handleTemplateCardTap}
+          onBuildCustom={handleBuildCustomTap}
+          onBack={() => setStep('intent')}
+        />
+      );
+    case 'planner':
+      return (
+        <WorkoutPlanner
+          initialName={plannerName}
+          initialExercises={plannerExercises}
+          initialDate={validPlanDate(planDate)}
+          onSave={handlePlannerSave}
+          onDiscard={() => setStep('template')}
+          saving={saving}
+        />
+      );
+    case 'tracker':
+      return activeId ? (
+        <WorkoutTracker workoutId={activeId} workoutName={workoutName} />
+      ) : null;
+    case 'simple':
+      return (
+        <SimpleWorkout
+          workoutType={selectedType}
+          workoutId={workoutId}
+          onBack={() => setStep('type')}
+        />
+      );
+    default:
+      return null;
+  }
+}

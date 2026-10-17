@@ -1,0 +1,189 @@
+import { signal, computed } from '@preact/signals';
+import type { JournalEntry, ExerciseWithRow, LabelWithRow, Template, WorkoutWithRow, SetWithRow, WorkoutType } from '../api/types';
+import type { SyncLogEntryWithRow } from '../api/sync-log-api';
+import type { SyncRequestWithRow } from '../api/sync-requests-api';
+import type { DailyHealthRow, BodyMeasurementRow, DailySummaryRow } from '../api/health-api';
+import { sortPlannedWorkouts } from '../components/activities/activities-helpers';
+
+// Core data signals
+export const exercises = signal<ExerciseWithRow[]>([]);
+export const labels = signal<LabelWithRow[]>([]);
+export const templates = signal<Template[]>([]);
+export const workouts = signal<WorkoutWithRow[]>([]);
+export const sets = signal<SetWithRow[]>([]);
+export const loading = signal(true);
+
+// Warmup exercise metadata (no sets — display only in tracker)
+export interface WarmupExerciseInfo {
+  exercise_id: string;
+  exercise_name: string;
+  exercise_order: number;
+}
+
+// UI state
+export const activeWorkoutId = signal<string | null>(null);
+export const activeWorkoutSets = signal<SetWithRow[]>([]);
+export const activeWarmupExercises = signal<WarmupExerciseInfo[]>([]);
+export const isEditMode = signal(false);
+export const filterType = signal<WorkoutType | null>(null);
+export const filterTags = signal<string[]>([]);
+
+// Active workouts (status === 'active') — currently being tracked
+export const activeWorkouts = computed(() =>
+  workouts.value.filter(w => w.status === 'active'),
+);
+
+// Planned workouts (status === 'planned') — shown in dedicated section, excluded from history/stats.
+// Sorted soonest-first; overdue ones sort above upcoming since past dates come first.
+export const plannedWorkouts = computed(() =>
+  sortPlannedWorkouts(workouts.value.filter(w => w.status === 'planned')),
+);
+
+// Completed workouts — used for week streak / stats (excludes planned and active)
+export const completedWorkouts = computed(() =>
+  workouts.value.filter(w => !w.status),
+);
+
+// Derived signals
+export const filteredWorkouts = computed(() => {
+  // Exclude planned and active workouts — they have their own sections
+  let result = workouts.value.filter(w => !w.status);
+  if (filterType.value) {
+    result = result.filter(w => w.type === filterType.value);
+  }
+  // Tag filter: show workouts that contain exercises matching ANY selected tag
+  if (filterTags.value.length > 0) {
+    const tagSet = new Set(filterTags.value);
+    result = result.filter(w => {
+      // Find exercise IDs in this workout's sets
+      const workoutSets = sets.value.filter(s => s.workout_id === w.id);
+      const exerciseIds = new Set(workoutSets.map(s => s.exercise_id));
+      // Check if any of those exercises have a matching tag
+      return exercises.value.some(ex => {
+        if (!exerciseIds.has(ex.id)) return false;
+        const exTags = ex.tags.split(',').map(t => t.trim()).filter(Boolean);
+        return exTags.some(t => tagSet.has(t));
+      });
+    });
+  }
+  return result.sort((a, b) => {
+    const dateA = a.date + 'T' + (a.time || '00:00');
+    const dateB = b.date + 'T' + (b.time || '00:00');
+    return dateB.localeCompare(dateA);
+  });
+});
+
+// allTags: sourced from labels signal (backwards compat for filter rows)
+export const allTags = computed(() => {
+  return labels.value.map(l => l.name).sort();
+});
+
+/** Look up a label by name. */
+export function getLabelByName(name: string): LabelWithRow | undefined {
+  return labels.value.find(l => l.name === name);
+}
+
+/** Count how many exercises use a given label name. */
+export function labelUsageCount(labelName: string): number {
+  return exercises.value.filter(ex =>
+    ex.tags.split(',').map(t => t.trim()).filter(Boolean).includes(labelName),
+  ).length;
+}
+
+// Sync log state (#157, #210), read when Settings opens rather than on
+// initial load: only the "last synced" rows use it. Not to be confused with
+// the offline write queue below, which is the app's own "sync". `not-set-up`
+// is only ever reached by `withingsSyncLog`, before #200's tab migration has
+// run, but the type is shared so both rows render off the same shape.
+export type SyncLogState =
+  | { state: 'idle' }
+  | { state: 'loading' }
+  | { state: 'error' }
+  | { state: 'not-set-up' }
+  | { state: 'loaded'; entries: SyncLogEntryWithRow[] };
+export const syncLog = signal<SyncLogState>({ state: 'idle' });
+export const withingsSyncLog = signal<SyncLogState>({ state: 'idle' });
+
+// Sync now (#315): the SyncRequests rows as last read, and the append's own state.
+export const syncRequests = signal<SyncRequestWithRow[]>([]);
+export type SyncAskState = 'idle' | 'asking' | 'failed';
+export const syncAsk = signal<SyncAskState>('idle');
+/** Demo mode only: when the simulated request was pressed (real time), or null. */
+export const demoSyncPressedAt = signal<number | null>(null);
+
+// Health data (#236): DailyHealth, BodyMeasurements and DailySummary, each
+// read whole by `loadHealth` and held here in sheet order; consumers select a
+// range with `selectDailyRange` / `selectBodyMeasurementRange`. Three signals,
+// not one, because each tab stands alone: one failing never hides the others.
+// `error` means "couldn't load", distinct from loaded with no rows. Not part
+// of `loadInitialData`: the screens that need it call `loadHealth`.
+export type HealthTabState<T> =
+  | { state: 'idle' }
+  | { state: 'loading' }
+  | { state: 'error' }
+  | { state: 'loaded'; rows: T[] };
+export const dailyHealth = signal<HealthTabState<DailyHealthRow>>({ state: 'idle' });
+export const bodyMeasurements = signal<HealthTabState<BodyMeasurementRow>>({ state: 'idle' });
+export const dailySummary = signal<HealthTabState<DailySummaryRow>>({ state: 'idle' });
+
+// Journal (#240): every `Journal` row, read whole by `loadJournal` and held in
+// sheet order, one entry per date that has a note. A date with no note has NO
+// entry (never a blank one). The Day Note panel reads its date out of this; the
+// Calendar (#241) reads the dates that have notes from the same signal. A save
+// updates it in place (`applyJournalSave`), so entries carry no `sheetRow`:
+// after a save or a delete it would be stale. `loaded` is kept through a failed
+// background refresh. Not part of `loadInitialData`: the Day screen loads it.
+export type JournalState =
+  | { state: 'idle' }
+  | { state: 'loading' }
+  | { state: 'error' }
+  | { state: 'loaded'; entries: JournalEntry[] };
+export const journalEntries = signal<JournalState>({ state: 'idle' });
+
+let journalSaveCount = 0;
+const journalSavedAt = new Map<string, number>();
+/** Counts saves that landed, so a refresh that began before one can tell. */
+export function journalSaveSeq(): number {
+  return journalSaveCount;
+}
+export function journalSavedSince(date: string, seq: number): boolean {
+  return (journalSavedAt.get(date) ?? 0) > seq;
+}
+
+/**
+ * A save for `date` landed: put its result in `journalEntries` in place (null
+ * means the day now has no note). Leaves the signal alone until a load has
+ * landed, since that load will read the saved row.
+ */
+export function applyJournalSave(date: string, entry: JournalEntry | null): void {
+  journalSavedAt.set(date, ++journalSaveCount);
+  const cur = journalEntries.value;
+  if (cur.state !== 'loaded') return;
+  const i = cur.entries.findIndex((e) => e.date === date);
+  const entries = cur.entries.slice();
+  if (!entry) { if (i >= 0) entries.splice(i, 1); }
+  else if (i >= 0) entries[i] = entry;
+  else entries.push(entry);
+  journalEntries.value = { state: 'loaded', entries };
+}
+
+// Offline sync queue state
+export const pendingSyncCount = signal(0);
+export const isSyncing = signal(false);
+
+// Toast system
+export interface ToastMessage {
+  id: number;
+  text: string;
+  type: 'info' | 'error' | 'success';
+}
+let _toastId = 0;
+export const toasts = signal<ToastMessage[]>([]);
+
+export function showToast(text: string, type: ToastMessage['type'] = 'info') {
+  const id = ++_toastId;
+  toasts.value = [...toasts.value, { id, text, type }];
+  setTimeout(() => {
+    toasts.value = toasts.value.filter(t => t.id !== id);
+  }, 4000);
+}

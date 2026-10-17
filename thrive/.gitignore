@@ -1,0 +1,37 @@
+node_modules/
+dist/
+.env.local
+.env.*.local
+*.log
+
+# one-time migration backups (scripts/migrate-*.mjs)
+scripts/.migrate-*-backup-*.json
+
+# Google service account keys, used by scripts/ (#372: moved here from the
+# retired mcp-server/). Keep the patterns broad: a leaked key grants write
+# access to the whole Groundwork sheet.
+thrive-sa.json
+*-sa.json
+*service-account*.json
+*.key.json
+
+# Apps Script (#130) — holds the script id; the API key lives in script
+# properties and never on disk.
+.clasp.json
+
+# resumable backfill progress (scripts/backfill-*.mjs)
+scripts/.backfill-*-progress.json
+
+# COROS sync (#151) — the bot account's Google credential for local runs,
+# written by sync/google-authorize.mjs. In Actions it comes from secrets.
+sync/.google-credentials.json
+client_secret*.json
+
+# Claude Code per-machine permissions — personal, never shared
+.claude/settings.local.json
+
+# look.mjs screenshots — they belong in the temp dir it defaults to, never here
+look-*.png
+
+# /brief weather locations — where you live and ride, never committed
+.claude/skills/brief/settings.local.md

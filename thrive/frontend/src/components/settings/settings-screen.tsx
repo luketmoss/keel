@@ -1,0 +1,75 @@
+import { useAuth } from '../../auth/auth-context';
+import { ThemeToggle } from '../shared/theme-toggle';
+import { workouts, exercises, templates, labels } from '../../state/store';
+import { navigate } from '../../router/router';
+import { CorosSyncStatusRow, WithingsSyncStatusRow } from './sync-status-row';
+import { useSyncNow, SyncNowButton } from './sync-now';
+
+export function SettingsScreen() {
+  const { user, token, logout } = useAuth();
+  const sync = useSyncNow(token, user?.email ?? '');
+
+  return (
+    <div class="screen settings-screen">
+      <header class="screen-header">
+        <h1>Settings</h1>
+      </header>
+      <div class="screen-body">
+        <div class="settings-section">
+          <h2>Appearance</h2>
+          <div class="settings-row">
+            <span>Theme</span>
+            <ThemeToggle />
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h2>Data</h2>
+          <div class="settings-row">
+            <span>Workouts</span>
+            <span class="settings-detail">{workouts.value.length} logged</span>
+          </div>
+          <div class="settings-row">
+            <span>Exercises</span>
+            <span class="settings-detail">{exercises.value.length} in library</span>
+          </div>
+          <div class="settings-row">
+            <span>Templates</span>
+            <span class="settings-detail">{templates.value.length} saved</span>
+          </div>
+          <div
+            class="settings-row settings-row-link"
+            data-focus-key="manage-labels"
+            onClick={() => navigate('/settings/labels')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={e => { if (e.key === 'Enter') navigate('/settings/labels'); }}
+          >
+            <span>Labels</span>
+            <span class="settings-detail">{labels.value.length} defined &rsaquo;</span>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h2>Sync status</h2>
+          <SyncNowButton sync={sync} />
+          <CorosSyncStatusRow token={token} requestLine={sync.lines.coros} />
+          <WithingsSyncStatusRow token={token} requestLine={sync.lines.withings} />
+        </div>
+
+        <div class="settings-section">
+          <h2>Account</h2>
+          {user && (
+            <div class="settings-row">
+              <span>{user.name}</span>
+              <span class="settings-detail">{user.email}</span>
+            </div>
+          )}
+          <button class="settings-btn danger" onClick={logout}>
+            Sign Out
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

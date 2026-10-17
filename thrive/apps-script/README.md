@@ -1,0 +1,738 @@
+# Thrive Apps Script API
+
+The server-side API over the Groundwork sheet. Consumers call this instead of
+mapping rows themselves.
+
+## Why this exists
+
+The row layout was duplicated between `frontend/src/api/*.ts` and
+the MCP server's `domain.js` (now `keel/mcp/src/thrive/domain.js`), and CLAUDE.md requires they change together. Three more
+consumers are arriving — `DailySummary` (#131), the COROS sync, and the
+Journal. Without an API each would add another copy.
+
+This **caps the mirror count at two**, permanently, however many consumers
+appear. It does not reduce it to one: the SPA still reads Sheets directly and
+still mirrors the rules, exactly as Hive's does. The cap is the win.
+
+Since #132 moved the MCP server onto this API, `src/types.js` and
+`frontend/src/api/types.ts` are the only two copies. Per CLAUDE.md, a column
+added to a tab is added in both.
+
+## Layout
+
+| File | Contents |
+|---|---|
+| `src/types.js` | Column constants, valid enum values, timezone, payload limit |
+| `src/utils.js` | Sheet access, row ↔ object mapping, validation helpers |
+| `src/workouts.js` | `Workouts` reads, writes, and planned-by-date |
+| `src/exercises.js` | `Exercises`, plus the rename cascade |
+| `src/templates.js` | `Templates`, grouped reads and wholesale replace |
+| `src/sets.js` | `Sets`, slot resolution, atomic bulk update, history |
+| `src/daily-summary.js` | `DailySummary` rollup, rebuild over any range |
+| `src/daily-health.js` | `DailyHealth` upsert by date, for the COROS sync (#165) |
+| `src/body-measurements.js` | `BodyMeasurements` upsert by Withings `grpid`, for the Withings sync (#198) |
+| `src/sync-log.js` | `SyncLog` append and newest-first read, one row per sync run (#156) |
+| `src/sync-requests.js` | The `SyncRequests` poller: a time-driven trigger that dispatches the sync workflows, and its install/remove functions (#314). Not a web-app action |
+| `src/auth.js` | Who is calling: the key, the Google-token check, its cache, the token read allow-list (#144) |
+| `src/main.js` | `doGet`/`doPost` dispatch, response envelope |
+
+`Labels` is deliberately absent: `domain.js` contains no Labels code and no
+`thrive_*` tool touches it. Tab actions travel with their tabs, so
+`DailySummary`'s are in #131's scope, `DailyHealth`'s write in #165's,
+`SyncLog`'s in #156's, and `BodyMeasurements`' write in #198's.
+
+## The transport, and its limit
+
+**Key callers send everything through `doGet`, including writes.** Apps Script
+answers every call with a 302 to `script.googleusercontent.com`, and a client
+that does not follow a `POST`'s redirect never sees the answer, so writes pass
+their data as a URL-encoded `payload` query parameter.
+
+**`doPost` exists too (#144), and behaves identically.** Both entry points run
+one handler over `e.parameter`, which Apps Script fills from a form-encoded
+body exactly as from a query string. The SPA (#410; almanac, retired, before
+it), a browser app, POSTs so a live Google token never sits in a URL. A browser `fetch` follows the 302 as a `GET`,
+and both hops carry `Access-Control-Allow-Origin: *`, so it works provided the
+request stays CORS-simple: a `URLSearchParams` body, no headers set by hand.
+There is no `doOptions`, so a request that needs a preflight fails before it
+starts.
+
+That caps a request at the URL length Apps Script accepts — roughly 8KB for the
+whole URL, shared with the action, the key, and percent-encoding overhead that
+can triple the size of a JSON payload full of quotes and braces.
+`MAX_PAYLOAD_CHARS` is **6000**, leaving headroom for that overhead.
+
+A payload over the limit is **refused by length, before parsing**. That
+ordering is the point: the dangerous case is not a parse error but a payload
+truncated in transit that still parses, into an object quietly missing its last
+fields. #134's bulk actions are the first that will hit this, and they must
+batch rather than hope.
+
+## Writes store text; reads see what the SPA sees
+
+`appendRow` and `setValues` behave like **typing into a cell**, not like the REST
+API's `RAW` writes the SPA makes. Typed, `"2026-03-04"` becomes a date, `"07:00"` a
+time, `"3720"` a number, and `"=anything"` a live formula. So:
+
+- **Every write goes through `asText()`** (`src/utils.js`), which prefixes each value
+  with an apostrophe — Sheets' own escape. The value is stored exactly as given, the
+  apostrophe is not part of it, and a formula can never be injected.
+- **Every read uses `getDisplayValues()`**, never `getValues()`. Display values are
+  what the SPA reads (the REST API's default `FORMATTED_VALUE`), so both sides agree —
+  and a cell that was stored as a real date still reads as `"2026-03-04"`, not as
+  `"Wed Mar 04 2026 00:00:00 GMT-0700"`.
+
+Both were learned the hard way in #132: an update read a date cell with `getValues()`,
+stringified it, and wrote the long form back. The test sandbox's fake sheet now
+interprets writes the way Sheets does, so a write that skips `asText()` fails the suite.
+
+## Actions
+
+Every response — success, rejection or thrown error — is
+`{ success, data?, error?, code? }`. `code` appears only on the failures in
+the next section, so a key caller's envelope is exactly what it was before it
+existed.
+
+### Token callers (#144)
+
+A browser app cannot hold the key: a key in a public bundle is not a secret.
+It sends `access_token`, a Google access token from its own sign-in, instead.
+Since #410 that caller is the SPA (almanac, the first, is retired):
+`TOKEN_CLIENT_ID` is the SPA's OAuth client ID, the value of
+`VITE_GOOGLE_CLIENT_ID`.
+
+| Sent | Caller | May run |
+|---|---|---|
+| `key` only | key caller | everything, as before |
+| `access_token`, with or without `key` | token caller | the reads below, and `requestSync` |
+| neither | refused | nothing |
+
+`access_token` present makes a token caller whatever else is sent: privilege
+never rises by adding a parameter.
+
+The token is checked against `https://oauth2.googleapis.com/tokeninfo`: `aud`
+(and `azp`, when present) must equal the `TOKEN_CLIENT_ID` property, `email`
+must equal `TOKEN_ALLOWED_EMAIL` (trimmed, case-insensitive) with
+`email_verified` true, and `expires_in` must be positive. **Either property
+unset refuses every token call.** The verdict is cached under the SHA-256 of
+`token|TOKEN_CLIENT_ID|TOKEN_ALLOWED_EMAIL` — accepted until a minute before
+the token expires (at most an hour), refused for five minutes, never when
+Google could not be reached. The raw token is in no cache key, log line, error
+or response.
+
+A token caller may run `getWorkouts`, `getWorkout`, `getPlannedWorkouts`,
+`getExercises`, `getExercise`, `getExerciseHistory`, `getTemplates`,
+`getTemplate`, `getSets`, `getWorkoutSets`, `getDailySummary`,
+`getHistoryDateRange`, `getDailyHealth`, `getSyncLog` and `getBodyMeasurements`
+— `TOKEN_READ_ACTIONS` in `src/auth.js`. It is an allow-list: **an action
+added later is refused to token callers until someone names it there**, and a
+test fails until every `case` in `main.js` is classified. `previewSetUpdates`
+is deliberately off it: it writes nothing, but it is the dry run of a write
+and takes a write payload.
+
+**One write, on its own list (#410).** `TOKEN_WRITE_ACTIONS` is exactly
+`['requestSync']` (see [Sync now](#sync-now-requestsync-410)), kept apart from
+the reads so a write is never added by accident; a test pins the list. Every
+other write still answers a token caller `read_only`, before dispatch.
+
+| `code` | Meaning | The SPA does |
+|---|---|---|
+| `token_invalid` | Google rejected the token: expired, revoked or bogus alike | nothing on screen: the poller takes the request |
+| `token_forbidden` | wrong OAuth client or account, the two properties unset, or the script not yet re-authorized for `UrlFetchApp` | the same |
+| `token_unavailable` | tokeninfo unreachable or erroring; not a verdict, never cached | the same |
+| `read_only` | a token caller asked for anything off both lists; it did not run | the same |
+| `bad_request` | `requestSync`'s `request_ids` malformed; fixed text, never quoting the input | the same |
+
+```
+POST <exec url>        body: action=getWorkouts&access_token=...&from=2026-09-21&to=2026-09-27
+GET  <exec url>?action=getWorkouts&access_token=...       (from a terminal)
+```
+
+### Reads
+
+| Action | Parameters |
+|---|---|
+| `getWorkouts` | `date`, `from`, `to`, `type`, `status` (all optional) |
+| `getWorkout` | `id` (required) |
+| `getPlannedWorkouts` | `date` (optional, defaults to today in `America/Denver`) |
+
+```
+?action=getWorkouts&key=...&from=2026-09-01&to=2026-09-30&type=bike
+?action=getPlannedWorkouts&key=...&date=2026-09-21
+```
+
+`getPlannedWorkouts` adds two numbers to each workout (#146), counted from its
+`Sets` rows in one read of the tab: `exercise_count`, its exercise slots, and
+`set_count`, its set rows. **Warmups count in neither** — a warmup row is a
+placeholder, and counting it overstates the session. A slot is `exercise_id`
+plus `exercise_order`, so the same lift in two sections is two slots. A
+workout with no non-warmup rows reports `0` and `0`. `getWorkouts` and
+`getWorkout` do not count.
+
+### Writes
+
+| Action | Payload |
+|---|---|
+| `createWorkout` | `{"data":{...}}` — `type` and `name` required |
+| `updateWorkout` | `{"id":"...","changes":{...}}` |
+
+```
+?action=createWorkout&key=...&payload={"data":{"type":"bike","name":"Evening Ride"}}
+?action=updateWorkout&key=...&payload={"id":"w_1a2b3c4d","changes":{"effort":"Hard"}}
+```
+
+**An update merges.** Only the keys present in `changes` are touched; every
+other column keeps its value. A field is cleared by naming it with `''`, never
+by omitting it — omission means "don't touch". This is the distinction #122 got
+wrong in the MCP server.
+
+**An omitted field on create is written empty, never defaulted.** Blank
+`source` is not missing information: it positively means the workout was logged
+by hand.
+
+### Exercises, Templates, Sets (#134)
+
+| Action | Parameters / payload |
+|---|---|
+| `getExercises` | `tag` (optional) |
+| `getExercise` | `ref` — id, exact name, or unique partial |
+| `createExercise` | `{"data":{"name":"...","tags":"...","notes":"..."}}` |
+| `updateExercise` | `{"id":"...","changes":{...}}` |
+| `getExerciseHistory` | `ref`, `limit` (optional) |
+| `getTemplates` / `getTemplate` | `ref` for the single |
+| `createTemplate` | `{"data":{"name":"...","exercises":[...]}}` |
+| `replaceTemplate` | `{"template_id":"...","data":{...}}` |
+| `getSets` | `workout_id`, `exercise_id` (optional) |
+| `getWorkoutSets` | `workout_id` — grouped into slots |
+| `appendSets` | `{"sets":[...]}` |
+| `previewSetUpdates` | `{"workout_id":"...","updates":[...]}` — **writes nothing** |
+| `updateSets` | same payload — **all-or-nothing** |
+
+### DailySummary (#131)
+
+| Action | Parameters / payload |
+|---|---|
+| `getDailySummary` | `from`, `to` (optional) |
+| `rebuildDailySummary` | `{"from":"...","to":"...","computed_at":"..."}` |
+| `getHistoryDateRange` | — the span `Workouts` actually covers |
+
+`rebuildDailySummary` reads `DailyHealth` by `DAILY_HEALTH_FIELDS` (#165), never
+by column position.
+
+**The range is a parameter, not a window.** The nightly recompute and the
+historical backfill are the same call with different bounds, so there is no
+second implementation of "catch up" to drift out of step with the one for
+"last night".
+
+**Derived, never authoritative.** Every row is rebuildable from `Workouts` +
+`DailyHealth`. A day with no activities and no health data produces **no row**
+— zero activities and "we have no information" are different claims.
+
+`total_distance_m` and `total_ascent_m` are **outdoor only**: a treadmill's
+distance is a machine estimate of ground never covered. They will not equal
+the sum of a day's activity distances on any day with an indoor session.
+Each is **blank when no outdoor session that day measured it**, never `0`
+(#190); `distance_withdata` (I) and `ascent_withdata` (J) count those that did,
+out of `cardio_activity_count` (H). A measured `0` is still `0`.
+
+`total_moving_s` and `total_elapsed_s` are **blank when no activity that day
+recorded them**, never `0` (#181). `moving_withdata` (S) and `elapsed_withdata`
+(T) count the activities that did, out of `activity_count` (B), every activity
+of every type. They are appended after `computed_at` so no earlier column moved.
+
+`weight_kg` (U), `fat_ratio_pct` (V), `systolic_mmhg` (W), `diastolic_mmhg` (X)
+and `bp_count` (Y) are rolled up from `BodyMeasurements` (#198, #203), appended
+after `elapsed_withdata` for the same column-position reason. Weight and fat
+ratio come from the day's **first** scale reading with a weight, by
+`measured_at_utc`, never a mean — a morning weigh-in is the comparable figure
+day to day, and fat ratio is read from that same reading, never mixed in from
+another. Blood pressure is the **mean** of the day's BP readings, systolic and
+diastolic independently, rounded half up to whole mmHg, with `bp_count`
+counting the readings (rows), not the values that happened to be present in
+them. A day with no scale or no BP reading leaves that half blank, never `0`;
+a day with only body readings still gets a row, with every other column blank
+as usual. A missing `BodyMeasurements` tab leaves U:Y blank everywhere.
+
+### DailyHealth (#165, #158, #231)
+
+| Action | Parameters / payload |
+|---|---|
+| `getDailyHealth` | `from`, `to` (optional, inclusive) — oldest first |
+| `upsertDailyHealth` | `{"rows":[{"date":"2026-09-23","steps":"2617",...}],"synced_at":"..."}` |
+
+`getDailyHealth` returns every one of the 19 fields on every row (A:S; `stress_avg`,
+COROS's daily average stress, is S, appended by #231), a blank cell as
+`''` and never `0`, and no `sheetRow`. It reads the tab once. With no `DailyHealth`
+tab it answers `[]`: no tab means no health data, not a tab of zeros. It is a read,
+so it joins #144's token allow-list when that lands.
+
+`upsertDailyHealth` is called by the COROS sync alone, **key only**: it is a write,
+so it never joins #144's token read allow-list. Rows are domain objects keyed by field name
+(`DAILY_HEALTH_FIELDS` in `src/types.js`), addressed by `date`:
+
+- A date with no row is appended; a date with a row is updated in place, after
+  the row is re-read and its column A confirmed to still hold that date.
+- **Only the fields a row names are written.** An omitted field is left alone
+  (the sync omits `vo2max`/`recovery` on every day but the run date); a field
+  sent as `''` is written blank.
+- Every row is validated before anything is written: an unknown field, a
+  non-numeric metric or a clock time not `HH:mm` rejects the whole call.
+- `synced_at` is one value per call, stamped on every row it touches.
+
+### BodyMeasurements (#198, #201, #215)
+
+| Action | Parameters / payload |
+|---|---|
+| `getBodyMeasurements` | `from`, `to` (optional, inclusive), `kind` (optional: `scale` or `bp`) — oldest first |
+| `upsertBodyMeasurements` | `{"rows":[{"grpid":"5901234567","date":"2026-09-24","time":"06:41","measured_at_utc":"2026-09-24T06:41:12-06:00","kind":"scale","weight_kg":"81.234",...,"source":"withings","raw_ref":"<drive id>"}],"synced_at":"..."}` |
+| `reconcileBodyMeasurements` | `{"from":"2026-08-25","to":"2026-09-25","present_grpids":["101","103"],"max_deletions":5}` — optional `"allow_empty":true` |
+
+`getBodyMeasurements` returns every one of the 20 fields on every row, a blank
+cell as `''` and never `0`, and no `sheetRow`. `from`/`to` filter on the local
+`date` column, exactly as `getDailyHealth`; rows are sorted by `measured_at_utc`
+parsed as an instant, not sheet order, which a backfill scrambles. A `kind`
+other than `scale`/`bp` is refused, naming the valid values. With no
+`BodyMeasurements` tab it answers `[]`. It is a read, and is on
+`TOKEN_READ_ACTIONS`, so a token caller can call it.
+
+One row per Withings measure group, A:T (`BODY_MEASUREMENT_FIELDS` in
+`src/types.js`), SI units. Called by the Withings sync alone, **key only**: it is
+a write, so it never joins the token read allow-list.
+
+- A `grpid` with no row is appended. A `grpid` with a row is **rewritten whole**:
+  Withings keeps the `grpid` of an edited group, so a measure removed in the edit
+  becomes blank, and a field the row does not name is written blank. Before each
+  update the row is re-read and its column A confirmed to still hold that `grpid`.
+- The whole batch is validated before anything is written. It refuses an unknown
+  field, a per-row `synced_at`, a missing or non-numeric `grpid`, a `date` not
+  `YYYY-MM-DD`, a `time` not `HH:mm`, a `measured_at_utc` not ISO 8601 with an
+  offset, a `kind` other than `scale`/`bp`, a `source` other than `withings`, a
+  non-numeric or negative measure (G:P), a non-numeric `attrib`, and a `grpid`
+  repeated in one batch.
+- Re-sending the same rows leaves the tab identical except `synced_at`. It returns
+  `{ appended, updated, synced_at }`.
+- The tab must exist first: `scripts/migrate-198-body-measurements-tab.mjs`
+  creates it. Until then the action fails naming the missing sheet.
+- `readBodyMeasurementRows()` reads every row with a `grpid` (`[]` with no tab),
+  every field present, blank as `''`. The read action (#201) and the
+  `DailySummary` rollup (#203) build on it.
+
+`reconcileBodyMeasurements` (#215) removes the rows for readings deleted in the
+Withings app, which `getmeas` simply stops returning. The sync calls it only
+after a complete fetch, with every `grpid` it returned; the compare and the
+delete are this one call, under the script lock. **Key only**, like every write.
+
+- Only rows whose local `date` is in `from`..`to` (inclusive, both required)
+  are considered; every other row is untouched, however many there are.
+- **The cap.** It deletes nothing and answers `{ deleted: [], refused: true,
+  would_delete: N }` when more than `max_deletions` rows (a positive integer,
+  default 5) would go, or when `present_grpids` is empty while the window holds
+  a row — a Withings fault answering `status 0` with an empty list must never
+  empty the tab. `allow_empty: true` lifts the second rule, never the first;
+  the sync sends it only when the owner set the cap by hand.
+- **The row-drift guard.** Every target row is re-read and its column A
+  confirmed to still hold that `grpid` before anything is deleted, and again
+  just before its own delete; a row that moved stops the call, naming how many
+  rows had already gone. Rows are deleted bottom-up (`sheet.deleteRow`), so a
+  delete never shifts a row still to be deleted.
+- Otherwise it answers `{ deleted: ['102', …], refused: false }`. With no
+  `BodyMeasurements` tab it deletes nothing. It refuses a missing or malformed
+  `from`/`to`, `from` after `to`, a `present_grpids` that is not an array of
+  numeric strings, and a `max_deletions` that is not a positive integer.
+- An API deployed before #215 answers `Unknown action`. The sync treats that
+  as a failure of its deletion step alone; deploy to enable it.
+
+### Journal (#234)
+
+| Action | Parameters / payload |
+|---|---|
+| `getJournal` | `from`, `to` (optional, inclusive) — oldest first |
+| `upsertJournal` | `{"date":"2026-09-23","note":"Slept badly."}` |
+
+One free-text note per local date, A:D (`JOURNAL_FIELDS` in `src/types.js`).
+`getJournal` returns `{date, note, created, updated}` per day, no `sheetRow`,
+and `[]` for a missing tab. `from`/`to` are validated as `getDailyHealth`'s are.
+**Both are key-only**: `getJournal` is a read but is deliberately *not* on
+`TOKEN_READ_ACTIONS` (journal text is personal, and the token caller, now the
+SPA, reads the Journal from Sheets directly); adding it later is one line plus an entry in `token-auth.test.ts`.
+
+`upsertJournal` mirrors the SPA's write path, under the script lock: no row for
+the date appends one (`created` = `updated` = now); a row is rewritten in place,
+keeping `created`; a blank or whitespace-only `note` deletes the row, and is a
+no-op when there is none. It answers `{result, entry}` with `result` one of
+`created`, `updated`, `deleted`, `unchanged`. The payload may carry only `date`
+and `note`; `note` is stored as given, as literal text, and bounded only by the
+payload ceiling.
+
+### Synced workouts (#166)
+
+| Action | Payload |
+|---|---|
+| `upsertSyncedWorkout` | `{"source":"coros","source_activity_id":"...","incoming":{...},"last_written":null,"raw_ref":"<drive id>","synced_at":"..."}` |
+
+One synced activity, found by `(source, source_activity_id)` and merged with
+sync plan §8's three-way merge **inside the action**, so an edit made in the
+SPA between a read and a write cannot be lost. Key only, like every write.
+`incoming` holds only `SYNC_MERGED_FIELDS` (`src/types.js`); anything else,
+`effort` or `notes` included, is refused.
+
+- **No row:** appended through `createWorkout` (new `w_` id, `created`
+  stamped, every unsent field blank), unless `last_written` is set: then the
+  user deleted it, and the answer is `{"status":"deleted"}` with nothing written.
+- **One row:** re-read and its S/T confirmed, then per merged field the
+  incoming value is written only if the sheet still holds `last_written`'s.
+  `last_written: null` fills blanks only. `source`, `source_activity_id`,
+  `raw_ref` and `synced_at` are always overwritten; `effort`, `notes`,
+  `status` and `template_id` never are.
+- **`fit_ref` / `fit_fetched_at`** (#154) are sync-owned and optional: sent (both,
+  at top level), they are always overwritten; sent as neither, V and W are left
+  alone. `fit_ref` must be a Drive file ID (letters, digits, `-`, `_`), so a FIT
+  download URL can never land in the sheet, and `fit_fetched_at` an ISO instant.
+  `fit_fetched_at` set with `fit_ref` blank means "no FIT will be fetched".
+- **`sport_type`** (#260, `Workouts!AB`) is the COROS sport code, sync-owned and
+  optional the same way: a top-level `"sport_type":"204"` is always written; an
+  absent one leaves AB alone, so a caller that predates it never blanks it.
+  Digits or `""` only, stored as text. Never inside `incoming` and never merged,
+  so it is not in `written` or `edited`. The same rule (digits or `""`) holds
+  on `createWorkout` and `updateWorkout`.
+- **Two rows:** refused, naming both ids.
+- Returns `written`, the merged fields as the sheet now holds them plus
+  `edited` (the fields the user changed, which stay kept on every later run),
+  for the sync to store as the next `last_written`; and `kept`, the fields
+  this call declined to overwrite.
+
+### Strength enrichment (#155)
+
+| Action | Payload |
+|---|---|
+| `enrichWorkout` | `{"source_activity_id":"...","activity":{"date":"2026-09-23","time":"07:30","elapsed_seconds":"...","moving_seconds":"...","avg_hr":"...","calories":"..."},"last_written":null,"raw_ref":"<drive id>","synced_at":"..."}` |
+
+A COROS strength session fills blanks on its hand-logged `weight` row (sync
+plan §7). It never creates a row, and never overwrites a typed value. The
+match, the fill and the write happen inside the action. Key only.
+
+- **Already linked:** the row with `source` blank and this `source_activity_id`.
+  Each of `ENRICH_FIELDS` (`elapsed_seconds`, `moving_seconds`, `avg_hr`,
+  `calories`) is filled when the row holds a blank, COROS has a value, and
+  `last_written.filled` (for the same `workout_id`) does not name it. A filled
+  field is never written again, so an edit or a clearing in Thrive sticks.
+  Nothing to fill means nothing is written, `synced_at` included:
+  `{"status":"unchanged"}`.
+- **Not linked:** a candidate is `type = 'weight'` on `activity.date`, `source`
+  and `source_activity_id` blank, and `status` neither `planned` nor `active`.
+  It is within the tolerance when its `Time` is within
+  `STRENGTH_MATCH_TOLERANCE_MINUTES` (30, inclusive) of `activity.time`. A
+  blank `Time` always counts as within. Exactly one within: linked, and its
+  blanks filled. None, or several (even if one is nearer):
+  `{"status":"unmatched","reason":"no match"|"ambiguous","candidates":[...]}`,
+  and nothing is written.
+- A linked row gains `source_activity_id`, `raw_ref` and `synced_at`, and
+  keeps `source = ''`. That is what the UI reads as "enriched". A top-level
+  `sport_type` (#260) is written with them whenever the call writes the row;
+  an `unchanged` call writes nothing. No other column is written.
+- **Two rows carrying the activity ID:** refused, naming both.
+- Returns `filled` (this call's fields), `linked` (whether this call made the
+  link) and `written`, which is `{ workout_id, filled }` for the sync to store
+  as the next `last_written`.
+
+### SyncLog (#156)
+
+| Action | Parameters / payload |
+|---|---|
+| `appendSyncLog` | `{"row":{"run_id":"schedule-123-1","started_at":"...","finished_at":"...","window_start":"...","window_end":"...","n_seen":2,...,"status":"ok","error_detail":""}}` |
+| `getSyncLog` | `limit` (optional, 1–100, default 10) |
+
+- `appendSyncLog` validates the whole row first: `run_id` required, ISO instants,
+  `YYYY-MM-DD` window, non-negative integer counts, `status` one of `ok`,
+  `partial`, `failed`, no unknown fields. A `run_id` already present answers
+  `{"status":"exists"}` and writes nothing. Key only, like every write.
+- `notes` (column N, #155) holds what a run noted that is not a failure, such as
+  a strength session with no workout to enrich. It does not affect `status`.
+  `scripts/migrate-155-sync-log-notes.mjs` adds the column. A tab without it
+  still reads, with `notes` blank.
+- `getSyncLog` returns rows **newest first by `started_at`**, never by position.
+  The dead-man's switch (`sync/deadman.mjs`) reads `limit=1`.
+
+### Archived payloads (#179)
+
+| Action | Parameters |
+|---|---|
+| `getWorkoutPayload` | `id` (required, a workout id), `offset` (optional, default 0) |
+
+```
+?action=getWorkoutPayload&key=...&id=w_1325851e
+?action=getWorkoutPayload&key=...&id=w_1325851e&offset=20000
+```
+
+A synced or enriched workout's COROS detail payload, read from the sync's
+archive in the bot's Drive (`sync/README.md`, "The raw archive").
+
+- **Addressed by workout id, never by Drive ID.** The file is the one the row's
+  `raw_ref` names. Because `raw_ref` is an ordinary column (`updateWorkout` can
+  set it) and the same Drive holds `coros-token.json`, the file must also be
+  that activity's archive file before anything is read back: named
+  `<source_activity_id>.json`, the only file at
+  `Thrive COROS/activities/<YYYY>/<MM>/`, JSON, at most 5 MB, with
+  `source: "coros"`, the row's `activity_id` and a string `payload`. Anything
+  else is refused with one fixed message that quotes nothing from the file.
+- **Returns** `workout_id`, `source_activity_id`, `raw_ref`, `tool`,
+  `fetched_at` and `text`: the payload decoded from the JSON string literal the
+  archive stores it as. Nothing else in the file (`normalized`, `fit`, `args`,
+  `list_entry` with its start coordinates) is returned.
+- **Paged**, 20,000 characters at a time, with `offset`, `total_chars` and
+  `next_offset` (`null` when complete). A page never ends inside a surrogate
+  pair. An offset that is not a whole number, or is past the end, is refused.
+- **Key only.** A read, but not on `TOKEN_READ_ACTIONS`: no token caller needs
+  raw vendor text.
+- **FIT contents are not readable** here. The `.fit` files are binary and hold
+  the GPS track.
+- Needs the `drive.readonly` scope (see Setup). Until the owner grants it, the
+  action answers "The script is not yet allowed to read Drive…", and every
+  other action is unaffected.
+
+### The script lock
+
+`upsertSyncedWorkout`, `enrichWorkout`, `upsertDailyHealth`, `upsertBodyMeasurements` and `appendSyncLog` run under
+`LockService`'s script lock (`withScriptLock` in `src/utils.js`), so a local
+sync overlapping a scheduled one cannot interleave a read-then-write. A caller
+that waits over 30 s gets `Lock timeout`, and nothing is written. The SPA
+writes Sheets directly and is not covered.
+
+`pollSyncRequests` (#314) takes the same lock with `tryLock(5000)` instead,
+and skips its tick when the lock is busy. It holds it for at most a GitHub call
+or two per vendor, well inside a writer's 30 s. `requestSync` (#410) takes it
+the same way; busy, it writes nothing and leaves the rows for the next tick.
+
+## The shaping principle
+
+**The API accepts domain objects. It never accepts sheet rows or row
+indices.** A set is named by `workout_id`, exercise reference, `section`,
+`exercise_order` and `set_number`; the *server* works out which row that is.
+
+This is what decides whether the mirror actually goes away. An API of
+row-index CRUD would leave every caller still needing to know the sheet shape,
+and `mcp-server/` would keep its copy through the refactor.
+
+Two consequences worth knowing:
+
+- **Ambiguity is refused, never guessed.** The same lift as a warmup and as a
+  primary is two slots. Asking to change "Bench Press set 1" when both exist
+  returns an error naming both, with instructions to pass `section` or
+  `exercise_order`. A target matching nothing is refused rather than appended.
+- **`previewSetUpdates` is `updateSets` without the write** — literally the
+  same resolution function, not a parallel implementation, so a dry run and a
+  real write can never disagree about what a reference means.
+
+**A rename cascades.** `Templates!E` and `Sets!C` hold a denormalized copy of
+`exercise_name`. Renaming through `updateExercise` rewrites them in the same
+call, and reports how many of each it touched. #120 is the bug this prevents:
+a rename left the copies behind and a template expanded later wrote the *old*
+name into a fresh workout.
+
+**Narration stays client-side.** `describeSlots` is here because resolution
+errors need it, but `describeSetState` and `describeLoad` — which format MCP
+tool output for an agent to read — remain in the MCP server (`keel/mcp/src/thrive/`, formerly `mcp-server/`). They are a
+presentation concern, not a data one.
+
+## SyncRequests poller (#314)
+
+On-demand sync, server half (#232 `## Results`, route c). The SPA (#315)
+appends one `requested` row per vendor to the `SyncRequests` tab.
+`pollSyncRequests`, an **installable time-driven trigger** running as
+luketmossbot, reads the open rows every **5 minutes** and starts the existing
+`coros-sync.yml` / `withings-sync.yml` through GitHub's workflow-dispatch API.
+It then closes every row it started: from the run's own
+`workflow_dispatch-<run id>-N` row in `SyncLog` / `WithingsSyncLog`, else from
+GitHub's run status, else after 20 minutes as `not_reported`. Each final
+status gets its own sentence in column I.
+
+**The tick is not a web-app action.** `main.js` has no `case` for
+`pollSyncRequests`, `installSyncRequestTrigger` or `removeSyncRequestTrigger`:
+a key caller gets `Unknown action`, a token caller `read_only`. **A trigger runs
+the project's latest pushed code, not a deployment.** `clasp push` changes what
+the trigger runs at once; `@2` matters only to the web app — and so to
+`requestSync`, below. Push and deploy together: the tick and `requestSync`
+share one per-vendor step.
+
+What reaches GitHub is fixed in `sync-requests.js`: owner `luketmoss`, repo
+`thrive`, the workflow file per vendor, and a body of exactly `{"ref":"main"}`
+with **no `inputs` key**, so `force_refresh`, `backfill` and `max_deletions`
+keep their defaults. No cell of the row is sent. One dispatch per vendor per
+tick, none while that vendor has a request open or ran in the last 10 minutes
+(the newest `dispatched_at` here, or `started_at` in its log tab, scheduled
+runs included), and **no retries**: a refused dispatch is recorded `failed`, in
+words, and the user asks again. The whole tick runs under the script lock,
+taken with `tryLock(5000)`; when the lock is busy the tick does nothing.
+
+### Sync now: requestSync (#410)
+
+The poller alone makes a press wait up to 5 minutes before anything starts. So
+after the SPA appends its rows (unchanged: A–E, `requested`), it POSTs
+
+```
+action=requestSync&access_token=...&payload={"request_ids":["sr_1a2b3c4d","sr_5e6f7a8b"]}
+```
+
+and the API dispatches them in the same request. It is **a tick for those
+vendors, not a second dispatcher**: under the same script lock
+(`tryLock(5000)`), it re-reads `SyncRequests` and runs the tick's own
+per-vendor step (`syncRunVendors` → `syncPollVendor`) for the vendors of the
+named rows. Same cooldown, same "already under way", same fixed body and
+detail sentences, same E–I writes; it closes that vendor's finished `started`
+rows as the step always does. It never appends a row, never runs the
+schedule-slot check, and never touches the other vendor.
+
+- `payload.request_ids`: 1–2 distinct strings matching `^sr_[0-9a-f]{8}$`,
+  else `bad_request` before the lock, the sheet or any fetch. Nothing else in
+  the payload is read: `ref`, `inputs`, `workflow`, `vendor` change nothing.
+- Answers `{success: true, data: {requests: [{request_id, status}]}}` whatever
+  was decided: `started`, `skipped`, `failed`, `expired`, the status an
+  earlier tick already wrote, or `not_found`. No detail, run id or URL.
+- A busy lock writes nothing and answers the rows as they stand (`requested`).
+- Only the SPA's owner can call it: the token check above, never a client-sent
+  email or row content. A key caller may call it too.
+
+The SPA ignores the answer beyond "re-read now", so every failure of the call
+leaves today's behaviour: the row is already there, and the next tick takes it.
+
+### The token, and everything it can do
+
+`GITHUB_DISPATCH_TOKEN`, a script property on this project set as
+luketmossbot, is read only by `sync-requests.js` and only sent in the
+`Authorization` header. It is a **fine-grained personal access token**:
+resource owner `luketmoss`, **Only select repositories → `luketmoss/thrive`**,
+repository permission **Actions: Read and write** and nothing else (Metadata:
+Read is added automatically), with an expiry date.
+
+Its full reach is more than "start a sync" (#232):
+- dispatch **every** `workflow_dispatch` workflow, with any inputs and any
+  branch or tag: `deploy.yml`, both watchdogs, `coros-sync.yml` with
+  `force_refresh: true`, and `withings-sync.yml` with `backfill: true` or a
+  raised `max_deletions` (the input that lets a run delete more than 5
+  `BodyMeasurements` rows);
+- cancel, re-run and delete runs and their logs;
+- **disable and enable workflows**, the syncs and their watchdogs included —
+  a silent stop that only Settings' "Sync may have stopped" line would catch;
+- delete artifacts and caches.
+
+It cannot read or set secrets or variables, push code, or send
+`repository_dispatch` (that needs Contents: write, which can push to `main`,
+which deploys the SPA: never grant it here).
+
+When it expires, every request fails with "GitHub refused the token (401)"
+and nothing else says so. Rotate it before then.
+
+### Owner's steps, in order
+
+1. **Create the token** (above): GitHub → Settings → Developer settings →
+   Fine-grained tokens. Put the rotation date in your calendar.
+2. **Store it** as the script property `GITHUB_DISPATCH_TOKEN`: open this
+   Apps Script project signed in as luketmossbot → Project Settings → Script
+   Properties.
+3. **Install the trigger**: in the editor, as luketmossbot, choose
+   `installSyncRequestTrigger`, **Run**, and allow the new permission ("Allow
+   this application to run when you are not present"). If Google first shows
+   "Google hasn't verified this app", choose Advanced → Go to the project. The
+   log should read `Installed 1 trigger: pollSyncRequests every 5 minutes
+   (replaced 0).` This is what grants `script.scriptapp`: `doGet` alone would
+   grant nothing. If the token is not set yet, a second line says so.
+4. **Deploy a new version of `@2`**: Deploy → Manage deployments → `@2` → edit
+   → New version → Deploy. The URL stays the same. The trigger already runs the
+   pushed code; this keeps the web app's version in step with `main`.
+5. Optional: GitHub → Settings → Notifications → Actions, to choose between an
+   email for every completed run and failed runs only. Dispatched runs notify
+   the token's owner.
+
+Running `installSyncRequestTrigger` again is safe: it replaces its own trigger
+(`(replaced 1)`) and leaves exactly one.
+
+### Stopping it
+
+Run `removeSyncRequestTrigger` from the editor. It deletes only
+`pollSyncRequests` triggers and logs `Removed N pollSyncRequests trigger(s).
+Other triggers untouched.` Rows left `requested` stay as they are; the first
+tick after a reinstall expires any older than 20 minutes.
+
+### The interval
+
+`SYNC_POLL_MINUTES = 5`, the quota-safe start: the bot's time-driven triggers
+share 90 minutes of runtime a day across every script it owns, Hive's
+included. Only 1 or 5 is accepted. #331 measures the first week from the
+Executions dashboard (idle tick runtime, and trigger jitter from
+`dispatched_at − requested_at`); move to 1 minute only if idle ticks average
+under ~2 s, by changing the constant, pushing, and running
+`installSyncRequestTrigger` again.
+
+## Setup
+
+1. Create the Apps Script project and push `src/` to it (`clasp push`).
+   `.clasp.json` holds the script id and is gitignored.
+2. Set **script properties** — never put either in source, this repo is public:
+   - `API_KEY` — a long random string
+   - `MCP_API_KEY` — optional (#364): a second long random string with the
+     same full access, held **only** by the remote MCP Worker
+     ([luketmoss/keel#367](https://github.com/luketmoss/keel/issues/367)), so
+     it can be rotated or revoked without touching `API_KEY`'s holders (the
+     syncs, watchdogs and scripts). Leaving it unset changes nothing; it never
+     replaces `API_KEY`, which stays required.
+   - `SPREADSHEET_ID` — the Groundwork sheet id
+   - `TOKEN_CLIENT_ID` — the SPA's OAuth client ID, the value of
+     `VITE_GOOGLE_CLIENT_ID` (#410; almanac's, retired, before it, #144)
+   - `TOKEN_ALLOWED_EMAIL` — the one Google account allowed to call with a
+     token: the owner's (#144)
+
+   Leaving either `TOKEN_*` property unset refuses every token call and
+   leaves key callers untouched.
+3. Deploy as a web app: execute as **me**, access **anyone**. Anonymous access
+   is what makes the API key and the token check load-bearing — "anyone with a
+   Google account" would answer a browser `fetch` with a login page.
+   `appsscript.json` **pins its scopes** (#179): `spreadsheets`,
+   `script.external_request` (the token check's and the poller's `UrlFetchApp`),
+   `drive.readonly` (`getWorkoutPayload`) and `script.scriptapp` (#314:
+   `installSyncRequestTrigger`). Pinned, so `DriveApp` cannot widen
+   Drive access to full `drive` by inference. `drive.file` would not do: it
+   covers only files the script's own OAuth client created, and the archive
+   was created by the sync's client.
+
+   **Whenever a scope is added, the owner re-authorizes once.** The editor
+   prompts only for the scopes **the function being run actually uses**, not
+   for everything in the manifest. So running `doGet` (which never touches
+   Drive) grants nothing new — found the hard way in #179. Instead, signed in
+   as luketmossbot, open the script (`clasp open-script`) and paste a
+   throwaway function that calls the new service, e.g. for Drive:
+
+   ```javascript
+   function testDriveAccess() { Logger.log(DriveApp.getRootFolder().getName()); }
+   ```
+
+   Save, pick it in the function menu, **Run**, and allow the dialog. The
+   grant belongs to the account and script, not a deployment, so `@2` uses it
+   at once — **no redeploy**, and don't use the editor's Deploy button, which
+   would publish the throwaway. The next `clasp push` removes it. Until the
+   grant, only calls that need the new scope fail, each with a message saying
+   so. #179 confirmed this on a temporary deployment before updating `@2`.
+4. The deployment URL and key become `THRIVE_API_URL` / `THRIVE_API_KEY` for
+   consumers, and GitHub Actions secrets for the sync. The URL alone (not a
+   secret) is also the repo **variable** `VITE_THRIVE_API_URL`, which
+   `deploy.yml` builds into the SPA for Sync now (#410). Deploy the Apps
+   Script before the SPA; with the variable unset, the SPA makes no call.
+
+Re-deploy after every `clasp push` — Apps Script serves the last *deployed*
+version, not the last pushed one.
+
+## Tests
+
+```bash
+cd apps-script && npm test
+```
+
+The sources are plain `.js` evaluated into one shared global scope, with no
+modules and no exports. `tests/apps-script-sandbox.ts` reads the **real**
+`src/*.js` files and evaluates them into a `node:vm` context with the Google
+globals stubbed, so a test cannot pass against a transcribed copy while the
+real source is broken. Only the sheet accessor is replaced; row mapping is
+exercised by every test.
+
+CI runs these on every pull request, deliberately **not** path-filtered — a
+workflow that reports nothing at all on an unrelated PR reads as "no checks"
+and stalls the merge gate.

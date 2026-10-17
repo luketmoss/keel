@@ -40,7 +40,7 @@
   --nav-height: 64px;
 
   /* Brand accent (does not invert in dark mode) */
-  --color-accent: #FF6B35;
+  --color-accent: #2f66f0;
 
   /* Composite shadows (light-mode optimized — add dark-mode overrides before use in dark contexts) */
   --shadow: 0 1px 3px rgba(0,0,0,0.15), 0 1px 2px rgba(0,0,0,0.05);
@@ -61,19 +61,18 @@
      --color-border-light, the theme toggle track and row hover: 4.51:1.
      4.85:1 on --color-bg, 5.44:1 on the card. Still under --color-text-secondary. */
   --color-text-muted: #606b76;
-  --color-primary: #FF6B35;
-  --color-primary-hover: #D4400A;
-  --color-primary-light: #fff0eb;
-  /* Accent text ON --color-primary-light. --color-primary-hover measures only
-     4.17:1 against that tint and fails AA, so a selected control needs its
-     own darker step rather than reusing the hover colour. */
-  --color-primary-on-light: #B83508;
-  /* The brand orange as TEXT (#182). --color-primary is 2.84:1 on the card and
-     fails AA, so it stays for fills, borders and focus rings, and anything
-     that sets color: uses this. 5.27:1 on --color-bg, 5.33:1 on the tint. */
-  --color-primary-text: #B83508;
-  --color-primary-rgb: 255, 107, 53;
-  --color-primary-focus-ring: rgba(255, 107, 53, 0.25);
+  --color-primary: #2f66f0;
+  --color-primary-hover: #2452c9;
+  --color-primary-light: #ebf1ff;
+  /* Accent text ON --color-primary-light: 5.94:1 (#397). Kept as its own token
+     so a selected control never depends on the hover colour. */
+  --color-primary-on-light: #2452c9;
+  /* The brand cobalt as TEXT (#182, #397). --color-primary is 4.38:1 on the
+     page and fails AA, so it stays for fills, borders and focus rings, and
+     anything that sets color: uses this. 5.99:1 on --color-bg, 6.72:1 on the card. */
+  --color-primary-text: #2452c9;
+  --color-primary-rgb: 47, 102, 240;
+  --color-primary-focus-ring: rgba(47, 102, 240, 0.25);
   --color-danger: #d32f2f;
   --color-danger-hover: #b71c1c;
   /* Danger as small TEXT on the page background (#157). --color-danger is
@@ -94,17 +93,16 @@
   --overlay-2xl: rgba(0, 0, 0, 0.32);
   --overlay-3xl: rgba(0, 0, 0, 0.40);
   --overlay-4xl: rgba(0, 0, 0, 0.60);
-  /* Trends chart marks (#242). Dot and line are >= 3:1 (WCAG 1.4.11) on the
-     card and on the band: dot 3.98 / 3.29, line 5.91 / 4.89. --color-primary
-     is 2.84:1 on the card, so it is never the light line. Grid is decoration. */
+  /* Trends chart marks (#242, #397). Dot and line are >= 3:1 (WCAG 1.4.11) on
+     the card and on the band: dot 3.98 / 3.28, line 6.72 / 5.53. Grid is decoration. */
   --chart-dot: #7a8088;
-  --chart-line: #b83508;
-  --chart-band: #ffe4d9;
+  --chart-line: #2452c9;
+  --chart-band: #e1e9fd;
   --chart-grid: #e8eaed;
   /* Calendar shading (#241), low to high. Every bin carries its own passing
      pairs (calendar-shade-contrast.test.ts): --cal-on-shade text 14.13 /
      11.86 / 10.02 / 8.51, --color-primary-text (note dot, selected border)
-     5.07 / 4.25 / 3.60 / 3.05. keel#362's dark third step is the case. */
+     5.76 / 4.83 / 4.08 / 3.47 (#397). keel#362's dark third step is the case. */
   --cal-shade-1: #e3effb;
   --cal-shade-2: #c8ddf4;
   --cal-shade-3: #aecdee;
@@ -113,10 +111,11 @@
   /* --- #183 control contrast --- */
   /* Fills for controls that carry text. --color-on-fill is the text on every
      one of them (4.5:1 minimum; ratios on the fill: 4.63 / 5.91 / 4.98 / 6.57 /
-     5.13). --color-primary stays the brand orange for accents and rings. */
+     5.13). --color-primary stays the brand cobalt for accents and rings. Light
+     primary fill 4.91 (#397). */
   --color-on-fill: #ffffff;
-  --color-primary-fill: #D4400A;
-  --color-primary-fill-hover: #B83508;
+  --color-primary-fill: #2f66f0;
+  --color-primary-fill-hover: #2452c9;
   --color-danger-fill: #d32f2f;
   --color-danger-fill-hover: #b71c1c;
   --color-success-fill: #2e7d32;
@@ -137,13 +136,13 @@
   --color-text-secondary: #9aa0a6;
   /* 4.61:1 on --color-surface-raised, the darkest place it is drawn (#182). */
   --color-text-muted: #868e98;
-  --color-primary: #FF6B35;
-  --color-primary-hover: #FF9A76;
-  --color-primary-light: #2d1a10;
-  --color-primary-on-light: #FF9A76;
-  --color-primary-text: #FF6B35;
-  --color-primary-rgb: 255, 107, 53;
-  --color-primary-focus-ring: rgba(255, 107, 53, 0.3);
+  --color-primary: #6e97ff;
+  --color-primary-hover: #8fb1ff;
+  --color-primary-light: #16213f;
+  --color-primary-on-light: #8fb1ff;
+  --color-primary-text: #6e97ff;
+  --color-primary-rgb: 110, 151, 255;
+  --color-primary-focus-ring: rgba(110, 151, 255, 0.3);
   --color-danger: #ef5350;
   --color-danger-hover: #e53935;
   /* #ef5350 is 4.38:1 on --color-surface-raised; this is 5.15:1 (#182). */
@@ -163,13 +162,13 @@
   --overlay-2xl: rgba(255, 255, 255, 0.32);
   --overlay-3xl: rgba(255, 255, 255, 0.40);
   --overlay-4xl: rgba(0, 0, 0, 0.60);
-  /* Trends (#242): dot 5.11 / 4.03, line 6.12 / 4.82 on the card / band. */
+  /* Trends (#242, #397): dot 5.11 / 4.40, line 6.22 / 5.35 on the card / band. */
   --chart-dot: #868c93;
-  --chart-line: #ff6b35;
-  --chart-band: #402819;
+  --chart-line: #6e97ff;
+  --chart-band: #1a2645;
   --chart-grid: #2c2c30;
   /* Calendar (#241): --cal-on-shade 12.42 / 10.55 / 8.76 / 7.42,
-     --color-primary-text 5.28 / 4.49 / 3.72 / 3.15 on bins 1-4. */
+     --color-primary-text 5.37 / 4.56 / 3.79 / 3.21 on bins 1-4. */
   --cal-shade-1: #1b2836;
   --cal-shade-2: #1f344b;
   --cal-shade-3: #24415d;
@@ -179,8 +178,8 @@
   /* Dark keeps the bright fills and draws near-black text on them: on-fill on
      fill 6.61 / 9.04 / 5.37 / 6.31 / 7.92. */
   --color-on-fill: #121212;
-  --color-primary-fill: #FF6B35;
-  --color-primary-fill-hover: #FF9A76;
+  --color-primary-fill: #6e97ff;
+  --color-primary-fill-hover: #8fb1ff;
   --color-danger-fill: #ef5350;
   --color-danger-fill-hover: #f26b68;
   --color-success-fill: #66bb6a;
@@ -366,7 +365,7 @@ input, select, textarea {
 }
 
 /* The active tab must read without colour (#182, WCAG 1.4.1): the icons are
-   emoji and ignore `color`, and muted-at-AA sits close to the orange. So the
+   emoji and ignore `color`, and muted-at-AA sits close to the brand. So the
    label goes bold and a bar marks the top edge. */
 .bottom-nav-tab.active {
   color: var(--color-primary-text);
@@ -3933,8 +3932,8 @@ a.training-card {
    The month grid reached from the Day header. Its four shading tokens and
    --cal-on-shade live in the theme blocks with their measured pairs; this
    section uses tokens only. The note dot, focus ring and selected border are
-   --color-primary-text, not the brand orange fill token: that is 2.84:1 on
-   the light card and would fail the 3:1 the dot and border must keep. */
+   --color-primary-text, not the brand fill token, which is a different step
+   from the text one in each theme. */
 :root {
   /* The journal dot, sized like the week strip's marks. */
   --cal-note-size: 6px;

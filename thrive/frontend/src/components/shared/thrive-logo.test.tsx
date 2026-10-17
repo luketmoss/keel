@@ -2,51 +2,42 @@ import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/preact';
 import { ThriveLogo } from './thrive-logo';
 
-describe('ThriveLogo — AC2: inline SVG component', () => {
-  it('renders an inline <svg> element, not an <img>', () => {
+describe('ThriveLogo — #397: the cobalt mark as an <img> of the public asset', () => {
+  it('renders an <img>, not an inline <svg>', () => {
     const { container } = render(<ThriveLogo />);
-    const svg = container.querySelector('svg');
-    const img = container.querySelector('img');
-    expect(svg).toBeTruthy();
-    expect(img).toBeNull();
+    expect(container.querySelector('img')).toBeTruthy();
+    expect(container.querySelector('svg')).toBeNull();
+    expect(container.querySelector('polygon')).toBeNull();
   });
 
-  it('has aria-hidden="true" for decorative use', () => {
+  it('points at thrive-mark.svg under the base path', () => {
     const { container } = render(<ThriveLogo />);
-    const svg = container.querySelector('svg');
-    expect(svg?.getAttribute('aria-hidden')).toBe('true');
+    const src = container.querySelector('img')?.getAttribute('src');
+    expect(src).toBe(`${import.meta.env.BASE_URL}thrive-mark.svg`);
+    expect(src?.endsWith('thrive-mark.svg')).toBe(true);
+  });
+
+  it('is decorative: empty alt', () => {
+    const { container } = render(<ThriveLogo />);
+    expect(container.querySelector('img')?.getAttribute('alt')).toBe('');
   });
 
   it('defaults to size 24', () => {
     const { container } = render(<ThriveLogo />);
-    const svg = container.querySelector('svg');
-    expect(svg?.getAttribute('width')).toBe('24');
-    expect(svg?.getAttribute('height')).toBe('24');
+    const img = container.querySelector('img');
+    expect(img?.getAttribute('width')).toBe('24');
+    expect(img?.getAttribute('height')).toBe('24');
   });
 
   it('accepts a custom size prop', () => {
     const { container } = render(<ThriveLogo size={64} />);
-    const svg = container.querySelector('svg');
-    expect(svg?.getAttribute('width')).toBe('64');
-    expect(svg?.getAttribute('height')).toBe('64');
+    const img = container.querySelector('img');
+    expect(img?.getAttribute('width')).toBe('64');
+    expect(img?.getAttribute('height')).toBe('64');
   });
 
-  it('uses var(--color-accent) for hexagon fill', () => {
-    const { container } = render(<ThriveLogo />);
-    const polygon = container.querySelector('polygon');
-    expect(polygon?.getAttribute('fill')).toBe('var(--color-accent)');
-  });
-
-  it('contains a hexagon polygon', () => {
-    const { container } = render(<ThriveLogo />);
-    const polygon = container.querySelector('polygon');
-    expect(polygon).toBeTruthy();
-    expect(polygon?.getAttribute('points')).toContain('128');
-  });
-
-  it('passes class prop through to the svg element', () => {
+  it('passes class prop through to the img element', () => {
     const { container } = render(<ThriveLogo class="login-icon" />);
-    const svg = container.querySelector('svg');
-    expect(svg?.classList.contains('login-icon')).toBe(true);
+    expect(container.querySelector('img')?.classList.contains('login-icon')).toBe(true);
   });
 });

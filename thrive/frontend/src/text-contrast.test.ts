@@ -54,7 +54,7 @@ const decl = (body: string, prop: string) =>
   body.match(new RegExp(`(?:^|;|\\s)${prop}\\s*:\\s*([^;]+);`))?.[1].trim();
 
 // The backgrounds text sits on: page, card, raised surface (inputs, the effort
-// toggle, sheets), and the orange tint (tag badges, the last-time panel).
+// toggle, sheets), and the cobalt tint (tag badges, the last-time panel).
 const BACKGROUNDS = ['--color-bg', '--color-surface', '--color-surface-raised', '--color-primary-light'];
 
 // Tokens used as `color:`. --color-primary and --color-danger are fills and
@@ -113,8 +113,8 @@ describe('AC2/AC3: no rule sets color: to a fill-only token', () => {
   });
 
   it('the brand fill itself is unchanged', () => {
-    expect(token('light', '--color-primary')).toBe('#FF6B35');
-    expect(token('dark', '--color-primary')).toBe('#FF6B35');
+    expect(token('light', '--color-primary')).toBe('#2f66f0');
+    expect(token('dark', '--color-primary')).toBe('#6e97ff');
   });
 });
 

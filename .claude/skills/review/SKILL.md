@@ -31,16 +31,16 @@ session, and `gh pr diff` returns what you just typed.
 ready.** Required status checks are deliberately off — a path-filtered required
 check never reports and blocks its PR forever — so nothing else is watching.
 
-**One PR can trigger several workflows** — a change under `cairn/` runs `cairn`
-and `keel`, and a change to a shared folder runs every consumer. One green run
+**One PR can trigger several workflows** — a change under `cairn/` runs
+`cairn` and `keel`, and a change to a shared folder runs every consumer. One green run
 does not clear the PR; every run it had to pass must.
 
 1. **List the runs for the head commit.** Take the head SHA from the PR, then
    `gh run list --repo luketmoss/keel --commit <sha> --json
    workflowName,status,conclusion,url` (in a cloud session, the GitHub MCP
    equivalent), cross-checked against `statusCheckRollup`. **Runs for earlier
-   commits are ignored** — a green run on an old commit says nothing about this
-   one, and neither does a run concurrency cancelled for a newer push. Where a
+   commits are ignored** — a green run on an old commit says nothing about
+   this one, and neither does a run concurrency cancelled for a newer push. Where a
    workflow has more than one attempt for the head commit, read the latest. If
    a push lands during the review, the head moved: rebuild the list.
 2. **Work out which workflows should have run.** Read each
@@ -61,8 +61,8 @@ does not clear the PR; every run it had to pass must.
 **An expected workflow with no run is not green.** An absent run and a passing
 one look identical from the board, and with required status checks off nothing
 else will notice. A run for the head commit may simply not be listed yet, so
-re-query once after a short wait, as `/ship` does for `mergeable`; if it is still
-missing, name the workflow, quote the `paths` entry that matches the PR's
+re-query once after a short wait, as `/ship` does for `mergeable`; if it is
+still missing, name the workflow, quote the `paths` entry that matches the PR's
 changed file, say that another workflow's green run does not cover it, and stop.
 Either the filter doesn't reach the change or the workflow didn't start; both
 are findings and both send the issue back to In Development.
@@ -70,8 +70,8 @@ are findings and both send the issue back to In Development.
 If **nothing at all** ran, that is the same case with every workflow absent: at
 least `keel` should have, since `keel.yml` runs on every PR.
 
-**Report the list**, one line per expected run — workflow name, then conclusion —
-under a heading that carries the commit:
+**Report the list**, one line per expected run — workflow name, then
+conclusion — under a heading that carries the commit:
 
 ```
 Build — 2 runs on 9f3c2ab, all passed:

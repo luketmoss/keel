@@ -1,5 +1,5 @@
 /**
- * Tests for issue #79 — Apply unified orange color scheme
+ * Tests for issue #79 — Apply unified orange color scheme; #397 moved it to cobalt
  * Validates that global.css token values match the spec.
  *
  * Strategy: parse the raw CSS text and extract custom property values
@@ -37,45 +37,87 @@ function getToken(block: string, token: string): string | null {
   return m ? m[1].trim() : null;
 }
 
-describe('AC1: Primary color tokens — light mode', () => {
-  let lightBlock: string;
-  beforeAll(() => { lightBlock = extractBlock(cssText, '[data-theme="light"]'); });
+describe('AC1: Primary color tokens — light mode (#397 cobalt identity)', () => {
+  let block: string;
+  beforeAll(() => { block = extractBlock(cssText, '[data-theme="light"]'); });
 
-  it('--color-primary is #FF6B35', () => {
-    expect(getToken(lightBlock, '--color-primary')).toBe('#FF6B35');
+  it('--color-primary is #2f66f0', () => {
+    expect(getToken(block, '--color-primary')).toBe('#2f66f0');
   });
-  it('--color-primary-hover is #D4400A', () => {
-    expect(getToken(lightBlock, '--color-primary-hover')).toBe('#D4400A');
+  it('--color-primary-hover is #2452c9', () => {
+    expect(getToken(block, '--color-primary-hover')).toBe('#2452c9');
   });
-  it('--color-primary-light is #fff0eb', () => {
-    expect(getToken(lightBlock, '--color-primary-light')).toBe('#fff0eb');
+  it('--color-primary-light is #ebf1ff', () => {
+    expect(getToken(block, '--color-primary-light')).toBe('#ebf1ff');
   });
-  it('--color-primary-rgb is 255, 107, 53', () => {
-    expect(getToken(lightBlock, '--color-primary-rgb')).toBe('255, 107, 53');
+  it('--color-primary-on-light is #2452c9', () => {
+    expect(getToken(block, '--color-primary-on-light')).toBe('#2452c9');
   });
-  it('--color-primary-focus-ring is rgba(255, 107, 53, 0.25)', () => {
-    expect(getToken(lightBlock, '--color-primary-focus-ring')).toBe('rgba(255, 107, 53, 0.25)');
+  it('--color-primary-text is #2452c9', () => {
+    expect(getToken(block, '--color-primary-text')).toBe('#2452c9');
+  });
+  it('--color-primary-rgb is 47, 102, 240', () => {
+    expect(getToken(block, '--color-primary-rgb')).toBe('47, 102, 240');
+  });
+  it('--color-primary-focus-ring is rgba(47, 102, 240, 0.25)', () => {
+    expect(getToken(block, '--color-primary-focus-ring')).toBe('rgba(47, 102, 240, 0.25)');
+  });
+  it('--color-primary-fill is #2f66f0', () => {
+    expect(getToken(block, '--color-primary-fill')).toBe('#2f66f0');
+  });
+  it('--color-primary-fill-hover is #2452c9', () => {
+    expect(getToken(block, '--color-primary-fill-hover')).toBe('#2452c9');
+  });
+  it('--chart-line is #2452c9', () => {
+    expect(getToken(block, '--chart-line')).toBe('#2452c9');
+  });
+  it('--chart-band is #e1e9fd', () => {
+    expect(getToken(block, '--chart-band')).toBe('#e1e9fd');
   });
 });
 
-describe('AC2: Primary color tokens — dark mode', () => {
-  let darkBlock: string;
-  beforeAll(() => { darkBlock = extractBlock(cssText, '[data-theme="dark"]'); });
+describe('AC1: Primary color tokens — dark mode (#397 cobalt identity)', () => {
+  let block: string;
+  beforeAll(() => { block = extractBlock(cssText, '[data-theme="dark"]'); });
 
-  it('--color-primary is #FF6B35', () => {
-    expect(getToken(darkBlock, '--color-primary')).toBe('#FF6B35');
+  it('--color-primary is #6e97ff', () => {
+    expect(getToken(block, '--color-primary')).toBe('#6e97ff');
   });
-  it('--color-primary-hover is #FF9A76', () => {
-    expect(getToken(darkBlock, '--color-primary-hover')).toBe('#FF9A76');
+  it('--color-primary-hover is #8fb1ff', () => {
+    expect(getToken(block, '--color-primary-hover')).toBe('#8fb1ff');
   });
-  it('--color-primary-light is #2d1a10', () => {
-    expect(getToken(darkBlock, '--color-primary-light')).toBe('#2d1a10');
+  it('--color-primary-light is #16213f', () => {
+    expect(getToken(block, '--color-primary-light')).toBe('#16213f');
   });
-  it('--color-primary-rgb is 255, 107, 53', () => {
-    expect(getToken(darkBlock, '--color-primary-rgb')).toBe('255, 107, 53');
+  it('--color-primary-on-light is #8fb1ff', () => {
+    expect(getToken(block, '--color-primary-on-light')).toBe('#8fb1ff');
   });
-  it('--color-primary-focus-ring is rgba(255, 107, 53, 0.3)', () => {
-    expect(getToken(darkBlock, '--color-primary-focus-ring')).toBe('rgba(255, 107, 53, 0.3)');
+  it('--color-primary-text is #6e97ff', () => {
+    expect(getToken(block, '--color-primary-text')).toBe('#6e97ff');
+  });
+  it('--color-primary-rgb is 110, 151, 255', () => {
+    expect(getToken(block, '--color-primary-rgb')).toBe('110, 151, 255');
+  });
+  it('--color-primary-focus-ring is rgba(110, 151, 255, 0.3)', () => {
+    expect(getToken(block, '--color-primary-focus-ring')).toBe('rgba(110, 151, 255, 0.3)');
+  });
+  it('--color-primary-fill is #6e97ff', () => {
+    expect(getToken(block, '--color-primary-fill')).toBe('#6e97ff');
+  });
+  it('--color-primary-fill-hover is #8fb1ff', () => {
+    expect(getToken(block, '--color-primary-fill-hover')).toBe('#8fb1ff');
+  });
+  it('--chart-line is #6e97ff', () => {
+    expect(getToken(block, '--chart-line')).toBe('#6e97ff');
+  });
+  it('--chart-band is #1a2645', () => {
+    expect(getToken(block, '--chart-band')).toBe('#1a2645');
+  });
+});
+
+describe('AC1: brand accent and no orange left (#397)', () => {
+  it('--color-accent is #2f66f0', () => {
+    expect(cssText).toMatch(/--color-accent:\s*#2f66f0;/);
   });
 });
 
@@ -166,11 +208,11 @@ describe('AC5: Focus ring token, manifest, no blue remnants', () => {
     expect(cssText).not.toMatch(/#5a7af5/i);
   });
 
-  it('manifest.json background_color is #f0f2f5', () => {
+  it('manifest.json background_color is the tile navy #0f2a7a (#397)', () => {
     const manifest = JSON.parse(
       readFileSync(resolve(__dirname, '../public/manifest.json'), 'utf-8')
     );
-    expect(manifest.background_color).toBe('#f0f2f5');
+    expect(manifest.background_color).toBe('#0f2a7a');
   });
 });
 

@@ -69,19 +69,19 @@ describe.each(THEMES)('AC1: --color-on-fill meets 4.5:1 on every fill (%s)', (th
 });
 
 describe('AC1: the intended pairing per theme', () => {
-  it('light draws white on the darker fills, dark draws near-black on the bright ones', () => {
+  it('light draws white on the cobalt fills, dark draws near-black on the bright ones', () => {
     expect(token('light', '--color-on-fill').toLowerCase()).toBe('#ffffff');
-    expect(token('light', '--color-primary-fill').toLowerCase()).toBe('#d4400a');
-    expect(token('light', '--color-primary-fill-hover').toLowerCase()).toBe('#b83508');
+    expect(token('light', '--color-primary-fill').toLowerCase()).toBe('#2f66f0');
+    expect(token('light', '--color-primary-fill-hover').toLowerCase()).toBe('#2452c9');
     expect(token('dark', '--color-on-fill')).toBe('#121212');
-    expect(token('dark', '--color-primary-fill').toLowerCase()).toBe('#ff6b35');
+    expect(token('dark', '--color-primary-fill').toLowerCase()).toBe('#6e97ff');
   });
 
-  it('the brand colour and the old hover tokens are untouched', () => {
-    expect(token('light', '--color-primary')).toBe('#FF6B35');
-    expect(token('dark', '--color-primary')).toBe('#FF6B35');
-    expect(token('light', '--color-primary-hover')).toBe('#D4400A');
-    expect(token('dark', '--color-primary-hover')).toBe('#FF9A76');
+  it('the brand colour and hover tokens are the cobalt family', () => {
+    expect(token('light', '--color-primary')).toBe('#2f66f0');
+    expect(token('dark', '--color-primary')).toBe('#6e97ff');
+    expect(token('light', '--color-primary-hover')).toBe('#2452c9');
+    expect(token('dark', '--color-primary-hover')).toBe('#8fb1ff');
   });
 });
 
@@ -287,7 +287,7 @@ describe('#293 AC4: streak dot rules', () => {
     for (const s of sels) expect(rule(s).body).not.toMatch(/var\(--color-(?:surface|border|primary)\)/);
   });
   it('--color-primary stays the brand colour', () => {
-    expect(token('light', '--color-primary')).toBe('#FF6B35');
-    expect(token('dark', '--color-primary')).toBe('#FF6B35');
+    expect(token('light', '--color-primary')).toBe('#2f66f0');
+    expect(token('dark', '--color-primary')).toBe('#6e97ff');
   });
 });

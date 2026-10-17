@@ -5,32 +5,20 @@
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f0f2f5",
-  "theme_color": "#FF6B35",
+  "background_color": "#0f2a7a",
+  "theme_color": "#0f2a7a",
   "icons": [
     {
-      "src": "thrive-icon-192.svg",
+      "src": "thrive-app-icon-192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "thrive-icon-192-maskable.svg",
-      "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "maskable"
-    },
-    {
-      "src": "thrive-icon-512.svg",
+      "src": "thrive-app-icon-512.png",
       "sizes": "512x512",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any"
-    },
-    {
-      "src": "thrive-icon-512-maskable.svg",
-      "sizes": "512x512",
-      "type": "image/svg+xml",
-      "purpose": "maskable"
     }
   ]
 }

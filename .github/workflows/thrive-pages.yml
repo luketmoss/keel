@@ -1,0 +1,41 @@
+name: thrive-pages
+on:
+  push:
+    branches: [main]
+    paths: ['thrive/frontend/**', '.github/workflows/thrive-pages.yml']
+  workflow_dispatch:
+# One group for every writer to gh-pages (cairn-pages.yml uses the same), so two
+# deploys never push at once. Not cancelled: a running deploy finishes.
+concurrency:
+  group: gh-pages
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: thrive/frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: thrive/frontend/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+        env:
+          VITE_BASE_PATH: /keel/thrive/
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.THRIVE_GOOGLE_CLIENT_ID }}
+          VITE_SPREADSHEET_ID: ${{ secrets.THRIVE_SPREADSHEET_ID }}
+          VITE_THRIVE_API_URL: ${{ vars.VITE_THRIVE_API_URL }}
+      - uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: thrive/frontend/dist
+          destination_dir: thrive
+          keep_files: true

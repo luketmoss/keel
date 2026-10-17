@@ -301,6 +301,6 @@ The app needs Google OAuth. For previews, use **demo mode**: a fake user, no
 Google sign-in, nothing persisted.
 
 - **Desktop:** start the root `.claude/launch.json` entry `thrive`
-  (`preview_start`), then open `http://localhost:5175/thrive/?demo=true`.
+  (`preview_start`), then open `http://localhost:5175/?demo=true`.
 - **Cloud sessions** have no preview pane: `node .keel/look.mjs thrive
-  "/thrive/?demo=true"` from the repository root, per the web stack skill.
+  "/?demo=true"` from the repository root, per the web stack skill.

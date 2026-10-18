@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, fireEvent, cleanup } from '@testing-library/preact';
 import { h } from 'preact';
 import { templates } from '../../state/store';
+import { mountConfirmHost, confirmAsked } from '../shared/confirm-test-utils';
 import { toLocalDateStr } from '../activities/activities-helpers';
 
 const startWorkout = vi.fn(async (_data: unknown, _token: string) => 'w_new');
@@ -91,11 +92,11 @@ describe('WorkoutFlow ?plan= deep link (#143)', () => {
     });
 
     it('does not count the linked date as an unsaved edit', async () => {
-      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+      mountConfirmHost();
       const { container } = render(<WorkoutFlow planDate="2026-09-24" />);
       await tap(container, 'Upper Push A');
       await tap(container, 'Back');
-      expect(confirm).not.toHaveBeenCalled();
+      expect(await confirmAsked()).toBe(false);
       expect(heading(container)).toBe('Choose a template');
     });
   });

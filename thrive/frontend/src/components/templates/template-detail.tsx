@@ -4,6 +4,8 @@ import { removeTemplate, startWorkout } from '../../state/actions';
 import { useAuth } from '../../auth/auth-context';
 import { navigate } from '../../router/router';
 import { ExerciseCompactCard } from '../shared/exercise-compact-card';
+import { ask } from '../../state/confirm';
+import { deleteTemplateCopy } from '../shared/confirm-copy';
 
 interface Props {
   templateId: string;
@@ -28,7 +30,7 @@ export function TemplateDetail({ templateId }: Props) {
 
   const handleDelete = async () => {
     if (!token) return;
-    if (!confirm('Delete this template? This cannot be undone.')) return;
+    if (!(await ask(deleteTemplateCopy(tpl.name, tpl.exercises.length)))) return;
     setDeleting(true);
     try {
       await removeTemplate(templateId, tpl.exercises, token);

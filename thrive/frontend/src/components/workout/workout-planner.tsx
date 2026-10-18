@@ -8,6 +8,8 @@ import { toLocalDateStr } from '../activities/activities-helpers';
 import { estimateMinutesToSeconds, secondsToMinutesInput } from '../../api/duration';
 import { RepsField } from '../shared/reps-field';
 import { extendReps, heldReps, maxSetsOf, plannedSetCount, repsVary } from './planned-reps';
+import { ask } from '../../state/confirm';
+import { discardChangesCopy } from '../shared/confirm-copy';
 
 export interface PlannerExercise {
   exercise_id: string;
@@ -130,8 +132,8 @@ export function WorkoutPlanner({ initialName = '', initialExercises = [], initia
       <div class="template-editor-header">
         <button
           class="template-editor-back"
-          onClick={() => {
-            if (isDirty() && !confirm('Discard changes? Your edits will not be saved.')) return;
+          onClick={async () => {
+            if (isDirty() && !(await ask(discardChangesCopy('plan')))) return;
             onDiscard();
           }}
           aria-label="Back"
@@ -229,8 +231,8 @@ export function WorkoutPlanner({ initialName = '', initialExercises = [], initia
       <button
         class="btn btn-ghost"
         style={{ width: '100%', marginTop: 'var(--space-md)' }}
-        onClick={() => {
-          if (isDirty() && !confirm('Discard changes? Your edits will not be saved.')) return;
+        onClick={async () => {
+          if (isDirty() && !(await ask(discardChangesCopy('plan')))) return;
           onDiscard();
         }}
       >

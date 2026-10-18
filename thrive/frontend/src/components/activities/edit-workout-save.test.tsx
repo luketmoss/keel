@@ -9,6 +9,7 @@ import { render, fireEvent, cleanup } from '@testing-library/preact';
 import { h } from 'preact';
 import { workouts, sets, isEditMode, activeWorkoutId, activeWorkoutSets, activeWarmupExercises } from '../../state/store';
 import type { WorkoutWithRow } from '../../api/types';
+import { mountConfirmHost, answerConfirm } from '../shared/confirm-test-utils';
 
 let sheet: { Workouts: string[][]; Sets: string[][] };
 
@@ -312,18 +313,19 @@ describe('#348: leaving the edit forms uses goBack', () => {
     expect(navigate).not.toHaveBeenCalled();
   });
 
-  it('EditWorkoutForm: a cancelled Discard calls neither, a confirmed one goBack', () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
+  it('EditWorkoutForm: a cancelled Discard calls neither, a confirmed one goBack', async () => {
+    mountConfirmHost();
     const f = renderEdit();
     dirty(f);
     fireEvent.click(f.getByText('Discard Changes'));
+    await answerConfirm(false);
     expect(goBack).not.toHaveBeenCalled();
     expect(navigate).not.toHaveBeenCalled();
-    fireEvent.click(f.getByText('Discard Changes'));
+    fireEvent.click(f.getAllByText('Discard Changes')[0]);
+    await answerConfirm(true);
     expect(goBack).toHaveBeenCalledTimes(1);
     expect(goBack).toHaveBeenCalledWith('/activities');
     expect(navigate).not.toHaveBeenCalled();
-    confirmSpy.mockRestore();
   });
 
   function renderTracker() {
@@ -344,15 +346,16 @@ describe('#348: leaving the edit forms uses goBack', () => {
   });
 
   it('Tracker edit mode: a cancelled Discard calls neither, a confirmed one goBack once', async () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
+    mountConfirmHost();
     const t = renderTracker();
     fireEvent.click(t.getByText('Discard Changes'));
+    await answerConfirm(false);
     expect(goBack).not.toHaveBeenCalled();
     expect(navigate).not.toHaveBeenCalled();
-    fireEvent.click(t.getByText('Discard Changes'));
+    fireEvent.click(t.getAllByText('Discard Changes')[0]);
+    await answerConfirm(true);
     await vi.waitFor(() => expect(goBack).toHaveBeenCalledTimes(1));
     expect(goBack).toHaveBeenCalledWith('/activities');
     expect(navigate).not.toHaveBeenCalled();
-    confirmSpy.mockRestore();
   });
 });

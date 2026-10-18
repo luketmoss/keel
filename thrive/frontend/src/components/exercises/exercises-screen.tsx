@@ -7,6 +7,8 @@ import { LibraryHeader } from '../shared/library-header';
 import { LabelBadge } from '../shared/label-badge';
 import { getLastTimeDataFrom, formatLastTimeDate } from '../workout/last-time-data';
 import type { ExerciseWithRow, SetWithRow, WorkoutWithRow } from '../../api/types';
+import { ask } from '../../state/confirm';
+import { deleteExerciseCopy } from '../shared/confirm-copy';
 
 /** Build a map of exerciseId → most recent workout date string. */
 export function buildLastPerformedMap(
@@ -114,7 +116,7 @@ export function ExercisesScreen() {
 
   const handleDelete = async () => {
     if (!token || !editingExercise) return;
-    if (!window.confirm(`Delete "${editingExercise.name}"? This cannot be undone.`)) return;
+    if (!(await ask(deleteExerciseCopy(editingExercise.name)))) return;
     await removeExercise(editingExercise, token);
     setEditingExercise(null);
   };

@@ -5,9 +5,10 @@
 // WorkoutPlanner; only the writing actions are mocked. The new-plan planner
 // seeded from a template is covered in workout/planner-reps-per-set.test.tsx.
 
-import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent, screen } from '@testing-library/preact';
 import { templates } from '../../state/store';
+import { mountConfirmHost, confirmAsked } from './confirm-test-utils';
 import { DEMO_SETS, DEMO_TEMPLATE_ROWS, DEMO_WORKOUTS } from '../../api/demo-data';
 import { isHeldReps, isWholeReps, plannerToBuilderExercises, REPS_INPUT_PROPS } from '../workout/planned-reps';
 import type { PlannerExercise } from '../workout/workout-planner';
@@ -60,7 +61,6 @@ function openTemplate(i: number) {
   fireEvent.click(cards()[i]);
 }
 
-let confirmSpy: MockInstance<typeof window.confirm>;
 beforeEach(() => {
   templates.value = [
     {
@@ -73,11 +73,10 @@ beforeEach(() => {
     },
   ];
   editTemplate.mockClear();
-  confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+  mountConfirmHost();
 });
 afterEach(() => {
   cleanup();
-  confirmSpy.mockRestore();
   templates.value = [];
 });
 
@@ -178,24 +177,24 @@ describe('AC2: replacing, clearing or keeping held text (template editor)', () =
     expect((editTemplate.mock.calls[0][2] as { reps: string }[])[0].reps).toBe('8');
   });
 
-  it('an editor opened (and expanded) but untouched is not dirty: Back does not ask', () => {
+  it('an editor opened (and expanded) but untouched is not dirty: Back does not ask', async () => {
     openTemplate(T.bench);
     fireEvent.click(screen.getByLabelText('Back'));
-    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(await confirmAsked()).toBe(false);
   });
 
-  it('a refused keystroke does not make it dirty either', () => {
+  it('a refused keystroke does not make it dirty either', async () => {
     openTemplate(T.bench);
     type(repsInput(), '-');
     fireEvent.click(screen.getByLabelText('Back'));
-    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(await confirmAsked()).toBe(false);
   });
 
-  it('Clear makes it dirty: Back asks', () => {
+  it('Clear makes it dirty: Back asks', async () => {
     openTemplate(T.bench);
     fireEvent.click(clears()[0]);
     fireEvent.click(screen.getByLabelText('Back'));
-    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(await confirmAsked()).toBe(true);
   });
 });
 
@@ -348,7 +347,7 @@ describe('AC4: the planner', () => {
     type(allInput(), '0');
     expect(rowHeld()).toEqual(['4-6', '4-6', '4-6']);
     fireEvent.click(screen.getByLabelText('Back'));
-    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(await confirmAsked()).toBe(false);
     fireEvent.click(screen.getByText('Save Workout'));
     await Promise.resolve();
     expect(savedReps()).toEqual([['4-6', '4-6', '4-6']]);

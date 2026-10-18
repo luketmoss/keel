@@ -4,7 +4,8 @@ import { useModalFocus } from './use-modal-focus';
 interface ConfirmModalProps {
   title: string;
   message: string;
-  confirmLabel?: string;
+  /** Required (#403): a bare verb is how "Delete" ends up on a dialog that should say "Delete Template". */
+  confirmLabel: string;
   cancelLabel?: string;
   danger?: boolean;
   onConfirm: () => void;
@@ -14,7 +15,7 @@ interface ConfirmModalProps {
 export function ConfirmModal({
   title,
   message,
-  confirmLabel = 'Delete',
+  confirmLabel,
   cancelLabel = 'Cancel',
   danger = true,
   onConfirm,
@@ -41,12 +42,16 @@ export function ConfirmModal({
         aria-labelledby={titleId}
         ref={dialog}
       >
-        <h2 id={titleId} style="font-size: var(--text-lg); font-weight: 700; margin-bottom: var(--space-sm);">
+        <h2 id={titleId} style="font-size: var(--text-lg); font-weight: 700; margin-bottom: var(--space-sm); overflow-wrap: anywhere;">
           {title}
         </h2>
-        <p style="color: var(--color-text-secondary); margin-bottom: var(--space-lg);">
-          {message}
-        </p>
+        {message ? (
+          <p style="color: var(--color-text-secondary); margin-bottom: var(--space-lg);">
+            {message}
+          </p>
+        ) : (
+          <div style="margin-bottom: var(--space-lg);" />
+        )}
         <div class="form-actions">
           <button type="button" class="btn btn-secondary" data-modal-initial onClick={onCancel}>
             {cancelLabel}

@@ -12,6 +12,8 @@ import { CardioFields } from '../shared/cardio-fields';
 import { SubTypeToggle, subTypeOptions } from '../shared/sub-type-toggle';
 import type { CardioValues } from '../shared/cardio-fields';
 import { milesToMeters, feetToMeters, bpmToStored, metersToMilesInput, metersToFeetInput } from '../../api/units';
+import { ask } from '../../state/confirm';
+import { deleteWorkoutCopy, discardChangesCopy } from '../shared/confirm-copy';
 
 interface Props {
   workoutType: WorkoutType;
@@ -101,7 +103,11 @@ export function SimpleWorkout({ workoutType, workoutId, onBack }: Props) {
 
   const handleDelete = async () => {
     if (!token || !workoutId || busy) return;
-    if (!confirm('Delete this workout? This cannot be undone.')) return;
+    const copy = deleteWorkoutCopy(
+      existing ?? { name: '', type: workoutType, date: initial.date },
+      0, // a simple workout has no sets
+    );
+    if (!(await ask(copy))) return;
     setDeleting(true);
     try {
       await deleteWorkout(workoutId, token);
@@ -118,13 +124,13 @@ export function SimpleWorkout({ workoutType, workoutId, onBack }: Props) {
       <div class="template-editor-header">
         <button
           class="template-editor-back"
-          onClick={() => {
+          onClick={async () => {
             const dirty = name !== initial.name || date !== initial.date
               || notes !== initial.notes || duration !== initial.duration
               || effort !== initial.effort || subType !== initial.subType
               || cardio.distance !== initial.cardio.distance || cardio.ascent !== initial.cardio.ascent
               || cardio.descent !== initial.cardio.descent || cardio.avgHr !== initial.cardio.avgHr;
-            if (dirty && !confirm('Discard changes? Your edits will not be saved.')) return;
+            if (dirty && !(await ask(discardChangesCopy('workout')))) return;
             // A resumed workout has no type picker to go back to.
             if (workoutId) navigate('/activities');
             else onBack();

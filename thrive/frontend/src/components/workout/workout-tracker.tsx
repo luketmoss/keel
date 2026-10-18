@@ -25,6 +25,8 @@ import type { MoveDirection } from '../shared/reorder-focus';
 import { shiftTrackerRows } from './row-shift';
 import { unclaimedRowFor } from './adopt-row';
 import { orderWrites, queuedOrderMap } from './order-writes';
+import { ask } from '../../state/confirm';
+import { discardChangesCopy, discardWorkoutCopy, finishUnsyncedCopy, removeExerciseCopy, replaceSetsCopy } from '../shared/confirm-copy';
 
 /** Finish's toast when the exercise order or sections could not be written (#392 AC3, #395). */
 export const ORDER_SAVE_FAILED = "Couldn't save the exercise order and sections. Try again.";
@@ -422,7 +424,7 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
 
     // AC3: Confirmation when removing sets
     if (lastTimeSets.length < ex.sets.length) {
-      const ok = confirm(`Replace ${ex.sets.length} sets with ${lastTimeSets.length} from last time?`);
+      const ok = await ask(replaceSetsCopy(ex.exercise_name, ex.sets.length, lastTimeSets.length));
       if (!ok) return;
     }
 
@@ -555,7 +557,7 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
     const ex = findExercise(exerciseId, exerciseOrder);
     if (!ex?.rowKey) return;
 
-    if (!confirm(`Remove ${ex.exercise_name}? Logged sets will be deleted.`)) return;
+    if (!(await ask(removeExerciseCopy(ex.exercise_name, ex.sets.filter((s) => s.saved).length)))) return;
 
     const removal: Removal = (list, e) => ({
       exercises: list.filter((x) => x.rowKey !== e.rowKey),
@@ -688,13 +690,14 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
     if (!token) return;
 
     if (editMode) {
-      if (!confirm('Discard changes? Your edits will not be saved.')) return;
+      if (!(await ask(discardChangesCopy('workout')))) return;
       exitEditMode();
       goBack('/activities');
       return;
     }
 
-    if (!confirm('Discard this workout? All logged sets will be deleted.')) return;
+    const logged = listRef.current.reduce((n, e) => n + e.sets.filter((s) => s.saved).length, 0);
+    if (!(await ask(discardWorkoutCopy(logged)))) return;
     setFinishing(true);
     try {
       await deleteWorkout(workoutId, token);
@@ -723,13 +726,11 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
         ) : (
           <button
             class="btn btn-primary"
-            onClick={() => {
+            onClick={async () => {
               // AC7: Guard against finishing with unsynced sets
               const queuedCount = pendingSyncCount.value;
               if (queuedCount > 0) {
-                const ok = confirm(
-                  `You have ${queuedCount} unsynced set${queuedCount === 1 ? '' : 's'}. Finish anyway? Your sets will sync next time you open the app.`,
-                );
+                const ok = await ask(finishUnsyncedCopy(queuedCount));
                 if (!ok) return;
               }
               setShowFinishForm(!showFinishForm);

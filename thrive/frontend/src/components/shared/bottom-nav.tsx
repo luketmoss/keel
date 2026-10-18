@@ -1,11 +1,12 @@
 import { currentRoute, navigate, replaceRoute } from '../../router/router';
+import { SunIcon, ClipboardIcon, TrendIcon, BooksIcon, GearIcon } from './icons';
 
 const TABS = [
-  { name: 'day', label: 'Day', icon: '\u{1F5D3}️', path: '/' },
-  { name: 'activities', label: 'Activities', icon: '\u{1F4CB}', path: '/activities' },
-  { name: 'trends', label: 'Trends', icon: '\u{1F4C8}', path: '/trends' },
-  { name: 'library', label: 'Library', icon: '\u{1F4DA}', path: '/templates' },
-  { name: 'settings', label: 'Settings', icon: '⚙️', path: '/settings' },
+  { name: 'day', label: 'Day', Icon: SunIcon, path: '/' },
+  { name: 'activities', label: 'Activities', Icon: ClipboardIcon, path: '/activities' },
+  { name: 'trends', label: 'Trends', Icon: TrendIcon, path: '/trends' },
+  { name: 'library', label: 'Library', Icon: BooksIcon, path: '/templates' },
+  { name: 'settings', label: 'Settings', Icon: GearIcon, path: '/settings' },
 ];
 
 /** Which tab each route belongs to (#235). Every route marks exactly one tab. */
@@ -52,7 +53,7 @@ export function BottomNav() {
             aria-label={tab.label}
             aria-current={isActive ? 'page' : undefined}
           >
-            <span class="bottom-nav-icon">{tab.icon}</span>
+            <span class="bottom-nav-icon"><tab.Icon /></span>
             <span class="bottom-nav-label">{tab.label}</span>
           </button>
         );

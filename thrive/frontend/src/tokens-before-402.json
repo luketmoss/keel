@@ -30,7 +30,9 @@
     "--state-pressed": "var(--overlay-md)",
     "--opacity-disabled": "0.4",
     "--focus-ring-width": "2px",
-    "--focus-ring-offset": "2px"
+    "--focus-ring-offset": "2px",
+    "--icon-md": "24px",
+    "--icon-lg": "40px"
   },
   "[data-theme=\"light\"]": {
     "--color-bg": "#f0f2f5",

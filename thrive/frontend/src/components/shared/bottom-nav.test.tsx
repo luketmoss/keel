@@ -29,11 +29,13 @@ describe('BottomNav', () => {
     ]);
   });
 
-  it('uses the agreed icons', () => {
+  it('draws each tab an inline svg icon, not an emoji (#405)', () => {
     const { container } = renderAt('day');
-    expect(tabs(container).map((b) => b.querySelector('.bottom-nav-icon')?.textContent)).toEqual([
-      '\u{1F5D3}️', '\u{1F4CB}', '\u{1F4C8}', '\u{1F4DA}', '⚙️',
-    ]);
+    for (const b of tabs(container)) {
+      const icon = b.querySelector('.bottom-nav-icon');
+      expect(icon?.querySelector('svg')).not.toBeNull();
+      expect(icon?.textContent).toBe('');
+    }
   });
 
   it('marks only the active tab with aria-current="page"', () => {

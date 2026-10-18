@@ -4,7 +4,7 @@
 // property in its :root and two theme blocks, comments removed. #404 added its
 // five interaction-state tokens to Thrive's :root, and to the snapshot with
 // them, deliberately: the snapshot is what Thrive's tokens resolve to, and
-// those five are new, not changed.
+// those five are new, not changed. #405 did the same for --icon-md and --icon-lg.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';

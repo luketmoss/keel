@@ -1,3 +1,5 @@
+import { StopwatchIcon, CalendarPlusIcon } from '../shared/icons';
+
 interface Props {
   onTrackNow: () => void;
   onPlanForLater: () => void;
@@ -21,11 +23,11 @@ export function IntentSelector({ onTrackNow, onPlanForLater, onBack }: Props) {
 
       <div class="type-selector-grid">
         <button class="type-card type-card-weight" onClick={onTrackNow}>
-          <span class="type-card-icon">💪</span>
+          <span class="type-card-icon"><StopwatchIcon /></span>
           <span class="type-card-label">Track Now</span>
         </button>
         <button class="type-card" onClick={onPlanForLater}>
-          <span class="type-card-icon">📋</span>
+          <span class="type-card-icon"><CalendarPlusIcon /></span>
           <span class="type-card-label">Plan for Later</span>
         </button>
       </div>

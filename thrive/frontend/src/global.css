@@ -16,6 +16,14 @@
 :root {
   /* Brand accent (does not invert in dark mode) */
   --color-accent: #2f66f0;
+  /* Interaction states (#404). Thrive's own for now; whether they join the
+     suite file is #402's call. The overlays darken in light and lighten in
+     dark: --overlay-* is per theme, and data-theme sits on <html>. */
+  --state-hover: var(--overlay-sm);
+  --state-pressed: var(--overlay-md);
+  --opacity-disabled: 0.4;
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
 }
 
 /* ===== Light Theme ===== */
@@ -204,15 +212,14 @@ input, select, textarea {
   min-height: 44px;
 }
 
-.login-btn:hover {
-  background: var(--color-primary-fill-hover);
+@media (hover: hover) {
+  .login-btn:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--color-primary-fill-hover);
+  }
 }
 
-/* #353: Continue-as screen for a remembered user */
-.login-btn:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
+/* #353: the Continue-as screen for a remembered user. Disabled takes the
+   shared treatment (#404, Interaction states at the end of this file). */
 
 .login-card p.login-error {
   min-height: 1.5em;
@@ -228,10 +235,6 @@ input, select, textarea {
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
   text-decoration: underline;
-}
-
-.login-link:disabled {
-  opacity: 0.6;
 }
 
 /* ===== Bottom Nav ===== */
@@ -298,13 +301,15 @@ input, select, textarea {
   align-items: center;
   justify-content: center;
   box-shadow: 0 4px 16px var(--color-shadow-strong);
-  transition: background var(--transition-fast), transform var(--transition-fast);
+  transition: background var(--transition-fast);
   z-index: 50;
 }
 
-.fab:hover {
-  background: var(--color-primary-fill-hover);
-  transform: scale(1.05);
+/* No scale (#404): a hover or a press never moves the control. */
+@media (hover: hover) {
+  .fab:hover {
+    background: var(--color-primary-fill-hover);
+  }
 }
 
 /* ===== Toast Notifications ===== */
@@ -420,10 +425,12 @@ input, select, textarea {
   transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
 }
 
-.workout-card:hover,
-.template-card:hover {
-  border-color: var(--color-primary);
-  box-shadow: 0 2px 8px var(--color-shadow);
+@media (hover: hover) {
+  .workout-card:hover,
+  .template-card:hover {
+    border-color: var(--color-primary);
+    box-shadow: 0 2px 8px var(--color-shadow);
+  }
 }
 
 .workout-date {
@@ -705,13 +712,10 @@ input, select, textarea {
   transition: background var(--transition-fast), opacity var(--transition-fast);
 }
 
-.btn-ghost:hover {
-  background: var(--color-surface-raised);
-}
-
-.btn-ghost:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+@media (hover: hover) {
+  .btn-ghost:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--color-surface-raised);
+  }
 }
 
 /* ===== Section Badges ===== */
@@ -920,8 +924,10 @@ input, select, textarea {
   color: var(--color-on-fill);
 }
 
-.btn-primary:hover {
-  background: var(--color-primary-fill-hover);
+@media (hover: hover) {
+  .btn-primary:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--color-primary-fill-hover);
+  }
 }
 
 .btn-secondary {
@@ -935,8 +941,10 @@ input, select, textarea {
   color: var(--color-on-fill);
 }
 
-.btn-danger:hover {
-  background: var(--color-danger-fill-hover);
+@media (hover: hover) {
+  .btn-danger:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--color-danger-fill-hover);
+  }
 }
 
 /* ===== Tag Badge (Pill) ===== */
@@ -1000,8 +1008,10 @@ input, select, textarea {
   color: var(--color-on-fill);
 }
 
-.settings-btn.danger:hover {
-  background: var(--color-danger-fill-hover);
+@media (hover: hover) {
+  .settings-btn.danger:hover {
+    background: var(--color-danger-fill-hover);
+  }
 }
 
 /* ===== Exercise Library ===== */
@@ -1033,9 +1043,11 @@ input, select, textarea {
   transition: background var(--transition-fast);
 }
 
-.modal-close:hover {
-  background: var(--color-border-light);
-  color: var(--color-text);
+@media (hover: hover) {
+  .modal-close:hover {
+    background: var(--color-border-light);
+    color: var(--color-text);
+  }
 }
 
 .search-input {
@@ -1100,8 +1112,10 @@ input, select, textarea {
   cursor: pointer;
 }
 
-.exercise-list > .exercise-list-item:hover {
-  background: var(--color-border-light);
+@media (hover: hover) {
+  .exercise-list > .exercise-list-item:hover {
+    background: var(--color-border-light);
+  }
 }
 
 .exercise-list > .exercise-list-item:active {
@@ -1118,8 +1132,10 @@ input, select, textarea {
   gap: var(--space-sm);
 }
 
-.exercise-list-item-header:hover {
-  background: var(--color-border-light);
+@media (hover: hover) {
+  .exercise-list-item-header:hover {
+    background: var(--color-border-light);
+  }
 }
 
 .exercise-list-item-header:active {
@@ -1189,8 +1205,10 @@ input, select, textarea {
   border-radius: 0;
 }
 
-.create-new-row:hover {
-  background: var(--color-primary-light);
+@media (hover: hover) {
+  .create-new-row:hover {
+    background: var(--color-primary-light);
+  }
 }
 
 .form-actions {
@@ -1249,25 +1267,15 @@ input, select, textarea {
   transition: background var(--transition-fast), color var(--transition-fast);
 }
 
-.reorder-btn:hover:not(:disabled):not([aria-disabled="true"]) {
-  background: var(--color-border-light);
-  color: var(--color-text);
+@media (hover: hover) {
+  .reorder-btn:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--color-border-light);
+    color: var(--color-text);
+  }
 }
 
-.reorder-btn:disabled {
-  opacity: 0.25;
-  cursor: default;
-}
-
-/* #328: an end button stays focusable (aria-disabled), so only the glyph is
-   dimmed: opacity on the button itself would fade its focus ring too. */
-.reorder-btn[aria-disabled="true"] {
-  cursor: default;
-}
-
-.reorder-btn[aria-disabled="true"] > span {
-  opacity: 0.25;
-}
+/* #328: an end button stays focusable (aria-disabled): its glyph dims and its
+   ring does not, by the shared treatment (#404, Interaction states). */
 
 .template-exercise-config {
   padding: var(--space-md);
@@ -1466,9 +1474,11 @@ input, select, textarea {
   flex-shrink: 0;
 }
 
-.compact-card-remove:hover {
-  background: var(--color-danger-fill);
-  color: var(--color-on-fill);
+@media (hover: hover) {
+  .compact-card-remove:hover {
+    background: var(--color-danger-fill);
+    color: var(--color-on-fill);
+  }
 }
 
 /* ===== Workout Type Selector ===== */
@@ -1489,17 +1499,16 @@ input, select, textarea {
   border: 2px solid var(--color-border);
   border-radius: var(--radius-lg);
   cursor: pointer;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
   min-height: 120px;
 }
 
-.type-card:hover {
-  border-color: var(--color-primary);
-  box-shadow: 0 2px 12px var(--color-shadow);
-}
-
-.type-card:active {
-  transform: scale(0.97);
+/* No scale when pressed (#404): the pressed overlay says it instead. */
+@media (hover: hover) {
+  .type-card:hover {
+    border-color: var(--color-primary);
+    box-shadow: 0 2px 12px var(--color-shadow);
+  }
 }
 
 .type-card-icon {
@@ -1548,11 +1557,6 @@ input, select, textarea {
   padding: var(--space-sm) var(--space-md);
   cursor: pointer;
   margin-bottom: var(--space-sm);
-}
-
-.sync-status-bar:disabled {
-  opacity: 0.7;
-  cursor: default;
 }
 
 .finish-form {
@@ -1749,8 +1753,10 @@ input, select, textarea {
   justify-content: center;
 }
 
-.effort-btn:hover {
-  border-color: var(--color-text-muted);
+@media (hover: hover) {
+  .effort-btn:hover {
+    border-color: var(--color-text-muted);
+  }
 }
 
 /* Session-level variant (#102). The 28px .effort-btn above is retained only
@@ -1866,9 +1872,11 @@ input, select, textarea {
   transition: all var(--transition-fast);
 }
 
-.set-remove-btn:hover {
-  background: var(--color-danger-fill);
-  color: var(--color-on-fill);
+@media (hover: hover) {
+  .set-remove-btn:hover {
+    background: var(--color-danger-fill);
+    color: var(--color-on-fill);
+  }
 }
 
 /* ===== Simple Workout Form ===== */
@@ -1911,9 +1919,11 @@ input, select, textarea {
   transition: background var(--transition-fast);
 }
 
-.btn-icon:hover {
-  background: var(--color-border-light);
-  color: var(--color-text);
+@media (hover: hover) {
+  .btn-icon:hover {
+    background: var(--color-border-light);
+    color: var(--color-text);
+  }
 }
 
 /* ===== Activities Filters ===== */
@@ -1950,8 +1960,10 @@ input, select, textarea {
   border-color: var(--color-border-strong);
 }
 
-.filter-chip:not(.active):hover {
-  border-color: var(--color-text-muted);
+@media (hover: hover) {
+  .filter-chip:not(.active):hover {
+    border-color: var(--color-text-muted);
+  }
 }
 
 .filter-chip.active {
@@ -2273,8 +2285,10 @@ input, select, textarea {
   gap: var(--space-sm);
 }
 
-.exercise-detail-header:hover {
-  background: var(--color-border-light);
+@media (hover: hover) {
+  .exercise-detail-header:hover {
+    background: var(--color-border-light);
+  }
 }
 
 .exercise-detail-info {
@@ -2373,9 +2387,11 @@ input, select, textarea {
   transition: color var(--transition-fast), border-color var(--transition-fast);
 }
 
-.last-time-toggle:hover {
-  color: var(--color-primary-text);
-  border-color: var(--color-primary);
+@media (hover: hover) {
+  .last-time-toggle:hover {
+    color: var(--color-primary-text);
+    border-color: var(--color-primary);
+  }
 }
 
 .last-time-toggle[aria-expanded="true"] {
@@ -2443,9 +2459,11 @@ input, select, textarea {
   transition: background var(--transition-fast), color var(--transition-fast);
 }
 
-.copy-down-btn:hover {
-  background: var(--color-primary-fill);
-  color: var(--color-on-fill);
+@media (hover: hover) {
+  .copy-down-btn:hover {
+    background: var(--color-primary-fill);
+    color: var(--color-on-fill);
+  }
 }
 
 .last-time-close-btn {
@@ -2461,9 +2479,11 @@ input, select, textarea {
   transition: background var(--transition-fast), color var(--transition-fast);
 }
 
-.last-time-close-btn:hover {
-  background: var(--color-border);
-  color: var(--color-text);
+@media (hover: hover) {
+  .last-time-close-btn:hover {
+    background: var(--color-border);
+    color: var(--color-text);
+  }
 }
 
 @keyframes copy-down-highlight {
@@ -2558,8 +2578,10 @@ input, select, textarea {
   margin: 0 calc(-1 * var(--space-sm));
 }
 
-.settings-row-link:hover {
-  background: var(--color-border-light);
+@media (hover: hover) {
+  .settings-row-link:hover {
+    background: var(--color-border-light);
+  }
 }
 
 /* ===== Colored Tag Badges ===== */
@@ -2600,14 +2622,11 @@ input, select, textarea {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: border-color var(--transition-fast), transform var(--transition-fast);
+  transition: border-color var(--transition-fast);
   font-size: var(--text-base);
   font-weight: 700;
 }
 
-.color-swatch:hover {
-  transform: scale(1.08);
-}
 
 .color-swatch.selected {
   border-color: currentColor;
@@ -2647,8 +2666,10 @@ input, select, textarea {
   transition: all var(--transition-fast);
 }
 
-.label-chip:hover {
-  border-color: var(--color-text-muted);
+@media (hover: hover) {
+  .label-chip:hover {
+    border-color: var(--color-text-muted);
+  }
 }
 
 /* Unselected: the label's own hue as text, full strength, on the card, with
@@ -2704,8 +2725,10 @@ input, select, textarea {
   transition: color var(--transition-fast);
 }
 
-.manage-labels-link:hover {
-  color: var(--color-primary-text);
+@media (hover: hover) {
+  .manage-labels-link:hover {
+    color: var(--color-primary-text);
+  }
 }
 
 /* ===== Manage Labels Screen ===== */
@@ -2751,8 +2774,10 @@ input, select, textarea {
   cursor: pointer;
 }
 
-.manage-label-name:hover {
-  color: var(--color-primary-text);
+@media (hover: hover) {
+  .manage-label-name:hover {
+    color: var(--color-primary-text);
+  }
 }
 
 .manage-label-edit-input {
@@ -2781,9 +2806,11 @@ input, select, textarea {
   flex-shrink: 0;
 }
 
-.manage-label-delete:hover {
-  background: var(--color-danger-fill);
-  color: var(--color-on-fill);
+@media (hover: hover) {
+  .manage-label-delete:hover {
+    background: var(--color-danger-fill);
+    color: var(--color-on-fill);
+  }
 }
 
 .manage-label-create-form {
@@ -2837,8 +2864,10 @@ input, select, textarea {
   transition: opacity 0.1s;
 }
 
-.section-picker-pill:hover {
-  opacity: 0.85;
+@media (hover: hover) {
+  .section-picker-pill:hover {
+    opacity: 0.85;
+  }
 }
 
 .section-picker-pill-active {
@@ -2956,34 +2985,26 @@ input, select, textarea {
   transform: translate(-50%, -50%);
 }
 
-.exercise-toolbar-btn:hover:not(:disabled):not([aria-disabled="true"]) {
-  color: var(--color-text);
-  border-color: var(--color-border-strong, var(--color-border));
+@media (hover: hover) {
+  .exercise-toolbar-btn:hover:not(:disabled):not([aria-disabled="true"]) {
+    color: var(--color-text);
+    border-color: var(--color-border-strong, var(--color-border));
+  }
 }
 
-.exercise-toolbar-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-/* #371 (as #328): an end Move button stays focusable (aria-disabled), so only
-   the glyph is dimmed: opacity on the button itself would fade its focus ring. */
-.exercise-toolbar-btn[aria-disabled="true"] {
-  cursor: not-allowed;
-}
-
-.exercise-toolbar-btn[aria-disabled="true"] > span {
-  opacity: 0.3;
-}
+/* #371 (as #328): an end Move button stays focusable (aria-disabled), and
+   takes the shared disabled treatment (#404, Interaction states). */
 
 .exercise-toolbar-remove {
   color: var(--color-danger-text);
   border-color: var(--color-danger);
 }
 
-.exercise-toolbar-remove:hover:not(:disabled) {
-  background: var(--color-danger-fill);
-  color: var(--color-on-fill);
+@media (hover: hover) {
+  .exercise-toolbar-remove:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--color-danger-fill);
+    color: var(--color-on-fill);
+  }
 }
 
 /* Screen-reader only utility */
@@ -3169,10 +3190,6 @@ input, select, textarea {
 .sync-now-btn {
   width: 100%;
   margin-bottom: var(--space-sm);
-}
-
-.sync-now-btn[aria-disabled='true'] {
-  cursor: default;
 }
 
 .sync-request-line {
@@ -4334,7 +4351,7 @@ a.training-card {
 
 .trends-picker-row.is-blocked {
   color: var(--color-text-secondary);
-  cursor: not-allowed;
+  cursor: default;
 }
 
 .trends-picker-done {
@@ -4371,9 +4388,14 @@ a.training-card {
   inset: 0;
 }
 
-.trend-open-day:hover,
 .trend-open-day:active {
   text-decoration: underline;
+}
+
+@media (hover: hover) {
+  .trend-open-day:hover {
+    text-decoration: underline;
+  }
 }
 
 /* ===== Trends table: a row's date opens its day (#255) =====
@@ -4400,9 +4422,14 @@ a.training-card {
   scroll-margin-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px));
 }
 
-.trend-row-link:hover,
 .trend-row-link:active {
   text-decoration: underline;
+}
+
+@media (hover: hover) {
+  .trend-row-link:hover {
+    text-decoration: underline;
+  }
 }
 
 /* Inside the cell, so the region's overflow-x never clips it. */
@@ -4602,11 +4629,6 @@ a.training-card {
   font-weight: 600;
 }
 
-.day-sync-btn[aria-disabled='true'] {
-  cursor: default;
-  color: var(--color-text-secondary);
-}
-
 .day-sync-busy .day-sync-icon {
   animation: spin 1s linear infinite;
 }
@@ -4619,4 +4641,196 @@ a.training-card {
 
 .day-sync-request {
   overflow-wrap: anywhere;
+}
+
+
+/* ===== Interaction states (#404) =====
+   Every control answers rest, hover, pressed, focus, selected and disabled the
+   same way, decided per family rather than per class, so a new control joins
+   a family and inherits them (thrive/docs/design/404-interaction-states.md).
+   interaction-states.test.ts lists the families and fails on a control class
+   the TSX renders that is in none. Rest and selected stay with each component.
+
+   Last in the file on purpose: the state rules win ties with the components'
+   own rules. A state never moves a control (no transform), and none applies to
+   a disabled one: :disabled, or [aria-disabled="true"] where it keeps focus. */
+
+/* Focus: one ring for everything. The audited rings in focus-contrast.test.ts
+   override it; form fields keep their #183 border and halo instead. */
+:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-text);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Hover: only where a pointer really hovers, or on a phone it sticks to the
+   last control tapped. Filled buttons keep their own -fill-hover tokens above;
+   every other family lays --state-hover over its own background, so the fill
+   stays underneath and the text keeps its contrast. */
+@media (hover: hover) {
+  /* Quiet buttons */
+  .btn-secondary:hover:not(:disabled):not([aria-disabled="true"]),
+  .btn-ghost:hover:not(:disabled):not([aria-disabled="true"]),
+  .btn-link:hover:not(:disabled):not([aria-disabled="true"]),
+  .template-editor-back:hover:not(:disabled):not([aria-disabled="true"]),
+  .login-link:hover:not(:disabled):not([aria-disabled="true"]),
+  .filter-clear:hover:not(:disabled):not([aria-disabled="true"]),
+  .manage-labels-link:hover:not(:disabled):not([aria-disabled="true"]),
+  .day-today-btn:hover:not(:disabled):not([aria-disabled="true"]),
+  .training-plan-link:hover:not(:disabled):not([aria-disabled="true"]),
+  .detail-coros-link:hover:not(:disabled):not([aria-disabled="true"]),
+  /* Icon buttons */
+  .btn-icon:hover:not(:disabled):not([aria-disabled="true"]),
+  .modal-close:hover:not(:disabled):not([aria-disabled="true"]),
+  .day-arrow:hover:not(:disabled):not([aria-disabled="true"]),
+  .set-remove-btn:hover:not(:disabled):not([aria-disabled="true"]),
+  .compact-card-remove:hover:not(:disabled):not([aria-disabled="true"]),
+  .last-time-close-btn:hover:not(:disabled):not([aria-disabled="true"]),
+  .copy-down-btn:hover:not(:disabled):not([aria-disabled="true"]),
+  .reorder-btn:hover:not(:disabled):not([aria-disabled="true"]),
+  .exercise-toolbar-btn:hover:not(:disabled):not([aria-disabled="true"]),
+  .manage-label-delete:hover:not(:disabled):not([aria-disabled="true"]),
+  .day-sync-btn:hover:not(:disabled):not([aria-disabled="true"]),
+  .sync-now-btn:hover:not(:disabled):not([aria-disabled="true"]),
+  /* Chips and toggles; a selected one keeps its tint and tick underneath */
+  .filter-chip:hover:not(:disabled):not([aria-disabled="true"]),
+  .label-chip:hover:not(:disabled):not([aria-disabled="true"]),
+  button.tag-badge:hover:not(:disabled):not([aria-disabled="true"]),
+  .effort-btn:hover:not(:disabled):not([aria-disabled="true"]),
+  .sub-type-btn:hover:not(:disabled):not([aria-disabled="true"]),
+  .theme-toggle-btn:hover:not(:disabled):not([aria-disabled="true"]),
+  .trends-group-btn:hover:not(:disabled):not([aria-disabled="true"]),
+  .library-switch-btn:hover:not(:disabled):not([aria-disabled="true"]),
+  .color-swatch:hover:not(:disabled):not([aria-disabled="true"]),
+  .section-badge-btn:hover:not(:disabled):not([aria-disabled="true"]),
+  .section-picker-pill:hover:not(:disabled):not([aria-disabled="true"]),
+  .week-day:hover:not(:disabled):not([aria-disabled="true"]),
+  /* Rows and cards */
+  button.exercise-list-item:hover:not(:disabled):not([aria-disabled="true"]),
+  .create-new-row:hover:not(:disabled):not([aria-disabled="true"]),
+  .template-card:hover:not(:disabled):not([aria-disabled="true"]),
+  button.workout-card:hover:not(:disabled):not([aria-disabled="true"]),
+  a.workout-card:hover:not(:disabled):not([aria-disabled="true"]),
+  .compact-card-body[role="button"]:hover:not(:disabled):not([aria-disabled="true"]),
+  .type-card:hover:not(:disabled):not([aria-disabled="true"]),
+  .trend-row-link:hover:not(:disabled):not([aria-disabled="true"]),
+  .trend-open-day:hover:not(:disabled):not([aria-disabled="true"]),
+  .calendar-open-day:hover:not(:disabled):not([aria-disabled="true"]),
+  .calendar-day:hover:not(:disabled):not([aria-disabled="true"]),
+  .manage-label-name:hover:not(:disabled):not([aria-disabled="true"]),
+  .add-set-btn:hover:not(:disabled):not([aria-disabled="true"]),
+  .sync-status-bar:hover:not(:disabled):not([aria-disabled="true"]),
+  .settings-btn:hover:not(:disabled):not([aria-disabled="true"]),
+  .exercise-list-item-header:hover:not(:disabled):not([aria-disabled="true"]),
+  .settings-row-link:hover:not(:disabled):not([aria-disabled="true"]),
+  /* Navigation */
+  .bottom-nav-tab:hover:not(:disabled):not([aria-disabled="true"]) {
+    background-image: linear-gradient(var(--state-hover), var(--state-hover));
+  }
+}
+
+/* Pressed: --state-pressed over the background, filled buttons included, on
+   touch as well as with a pointer. Every family but fields. After the hover
+   rules, so a press while hovering shows the press. */
+/* Filled buttons */
+.btn-primary:active:not(:disabled):not([aria-disabled="true"]),
+.btn-danger:active:not(:disabled):not([aria-disabled="true"]),
+.fab:active:not(:disabled):not([aria-disabled="true"]),
+.login-btn:active:not(:disabled):not([aria-disabled="true"]),
+/* Quiet buttons */
+.btn-secondary:active:not(:disabled):not([aria-disabled="true"]),
+.btn-ghost:active:not(:disabled):not([aria-disabled="true"]),
+.btn-link:active:not(:disabled):not([aria-disabled="true"]),
+.template-editor-back:active:not(:disabled):not([aria-disabled="true"]),
+.login-link:active:not(:disabled):not([aria-disabled="true"]),
+.filter-clear:active:not(:disabled):not([aria-disabled="true"]),
+.manage-labels-link:active:not(:disabled):not([aria-disabled="true"]),
+.day-today-btn:active:not(:disabled):not([aria-disabled="true"]),
+.training-plan-link:active:not(:disabled):not([aria-disabled="true"]),
+.detail-coros-link:active:not(:disabled):not([aria-disabled="true"]),
+/* Icon buttons */
+.btn-icon:active:not(:disabled):not([aria-disabled="true"]),
+.modal-close:active:not(:disabled):not([aria-disabled="true"]),
+.day-arrow:active:not(:disabled):not([aria-disabled="true"]),
+.set-remove-btn:active:not(:disabled):not([aria-disabled="true"]),
+.compact-card-remove:active:not(:disabled):not([aria-disabled="true"]),
+.last-time-close-btn:active:not(:disabled):not([aria-disabled="true"]),
+.copy-down-btn:active:not(:disabled):not([aria-disabled="true"]),
+.reorder-btn:active:not(:disabled):not([aria-disabled="true"]),
+.exercise-toolbar-btn:active:not(:disabled):not([aria-disabled="true"]),
+.manage-label-delete:active:not(:disabled):not([aria-disabled="true"]),
+.day-sync-btn:active:not(:disabled):not([aria-disabled="true"]),
+.sync-now-btn:active:not(:disabled):not([aria-disabled="true"]),
+/* Chips and toggles */
+.filter-chip:active:not(:disabled):not([aria-disabled="true"]),
+.label-chip:active:not(:disabled):not([aria-disabled="true"]),
+button.tag-badge:active:not(:disabled):not([aria-disabled="true"]),
+.effort-btn:active:not(:disabled):not([aria-disabled="true"]),
+.sub-type-btn:active:not(:disabled):not([aria-disabled="true"]),
+.theme-toggle-btn:active:not(:disabled):not([aria-disabled="true"]),
+.trends-group-btn:active:not(:disabled):not([aria-disabled="true"]),
+.library-switch-btn:active:not(:disabled):not([aria-disabled="true"]),
+.color-swatch:active:not(:disabled):not([aria-disabled="true"]),
+.section-badge-btn:active:not(:disabled):not([aria-disabled="true"]),
+.section-picker-pill:active:not(:disabled):not([aria-disabled="true"]),
+.week-day:active:not(:disabled):not([aria-disabled="true"]),
+/* Rows and cards */
+button.exercise-list-item:active:not(:disabled):not([aria-disabled="true"]),
+.create-new-row:active:not(:disabled):not([aria-disabled="true"]),
+.template-card:active:not(:disabled):not([aria-disabled="true"]),
+button.workout-card:active:not(:disabled):not([aria-disabled="true"]),
+a.workout-card:active:not(:disabled):not([aria-disabled="true"]),
+.compact-card-body[role="button"]:active:not(:disabled):not([aria-disabled="true"]),
+.type-card:active:not(:disabled):not([aria-disabled="true"]),
+.trend-row-link:active:not(:disabled):not([aria-disabled="true"]),
+.trend-open-day:active:not(:disabled):not([aria-disabled="true"]),
+.calendar-open-day:active:not(:disabled):not([aria-disabled="true"]),
+.calendar-day:active:not(:disabled):not([aria-disabled="true"]),
+.manage-label-name:active:not(:disabled):not([aria-disabled="true"]),
+.add-set-btn:active:not(:disabled):not([aria-disabled="true"]),
+.sync-status-bar:active:not(:disabled):not([aria-disabled="true"]),
+.settings-btn:active:not(:disabled):not([aria-disabled="true"]),
+.exercise-list-item-header:active:not(:disabled):not([aria-disabled="true"]),
+.settings-row-link:active:not(:disabled):not([aria-disabled="true"]),
+/* Navigation */
+.bottom-nav-tab:active:not(:disabled):not([aria-disabled="true"]) {
+  background-image: linear-gradient(var(--state-pressed), var(--state-pressed));
+}
+
+/* Disabled: one treatment, replacing the five opacities there were. Dimmed,
+   a default cursor, and (by the guards above) no hover or pressed response. */
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: default;
+}
+
+/* An aria-disabled control keeps focus (#328), so its ring must not dim, and
+   opacity on the control would fade the outline with it. Its content dims
+   instead: every child, which is why such a control keeps its label in an
+   element. A filled one also veils its fill toward the page, which is what
+   opacity would have shown. */
+[aria-disabled="true"] {
+  cursor: default;
+}
+
+[aria-disabled="true"] > * {
+  opacity: var(--opacity-disabled);
+}
+
+.btn-primary[aria-disabled="true"],
+.btn-danger[aria-disabled="true"],
+.fab[aria-disabled="true"],
+.login-btn[aria-disabled="true"] {
+  background-image: linear-gradient(
+    color-mix(in srgb, var(--color-bg) calc(100% - var(--opacity-disabled) * 100%), transparent),
+    color-mix(in srgb, var(--color-bg) calc(100% - var(--opacity-disabled) * 100%), transparent)
+  );
+}
+
+/* A native checkbox has no children to dim, so it dims itself while it is not
+   showing its ring, and comes back to full strength while it is. */
+input[aria-disabled="true"]:not(:focus-visible) {
+  opacity: var(--opacity-disabled);
 }

@@ -17,6 +17,14 @@ function themeBlock(theme: Theme): string {
   return block;
 }
 
+// The ring width may be a :root token (#404's --focus-ring-width).
+function rootLength(name: string): string {
+  const root = css.match(/:root\s*\{([^}]+)\}/)?.[1] ?? '';
+  const m = root.match(new RegExp(`${name}\\s*:\\s*(\\d+(?:\\.\\d+)?px)\\s*;`));
+  if (!m) throw new Error(`${name} is not a px length in :root`);
+  return m[1];
+}
+
 function token(theme: Theme, name: string): string {
   const m = themeBlock(theme).match(new RegExp(`${name}\\s*:\\s*(#[0-9a-fA-F]{6})\\s*;`));
   if (!m) throw new Error(`${name} is not a six-digit hex in the ${theme} block`);
@@ -77,6 +85,8 @@ const AUDITED = [
   '.modal-close:focus-visible',
   // #260: the detail screen's "View on COROS" link, --color-text at +2px.
   '.detail-coros-link:focus-visible',
+  // #404: the global ring every other control draws, --color-text at the ring tokens.
+  ':focus-visible',
 ];
 
 // A ring exempt from the 3:1 check. Adding one needs a written reason. Empty on purpose.
@@ -123,9 +133,10 @@ describe.each(THEMES)('AC4: every focus ring is 2px and 3:1 on every surface (%s
     '%s',
     (selector, body) => {
       const outline = decl(body, 'outline')!;
-      const m = outline.match(/^(\d+(?:\.\d+)?)px solid var\((--[\w-]+)\)$/);
-      expect(m, `${selector}: outline "${outline}" must be Npx solid var(--token)`).not.toBeNull();
-      expect(Number(m![1]), `${selector} width`).toBeGreaterThanOrEqual(2);
+      const m = outline.match(/^(\d+(?:\.\d+)?px|var\(--[\w-]+\)) solid var\((--[\w-]+)\)$/);
+      expect(m, `${selector}: outline "${outline}" must be Npx (or a px token) solid var(--token)`).not.toBeNull();
+      const width = m![1].startsWith('var(') ? rootLength(m![1].slice(4, -1)) : m![1];
+      expect(parseFloat(width), `${selector} width`).toBeGreaterThanOrEqual(2);
       const colour = token(theme, m![2]);
       for (const surface of SURFACES) {
         const ratio = contrast(colour, token(theme, surface));
@@ -179,6 +190,20 @@ describe('AC3/AC4: the cascade keeps Day Training cards on the Day ring', () => 
     expect(decl(ringOf('.trend-table-wrap:focus-visible').body, 'outline-offset')).toBe('2px');
     expect(decl(ringOf('.trends-group-scroll:focus-visible').body, 'outline-offset')).toBe('2px');
     expect(decl(ringOf('.trend-row-link:focus-visible').body, 'outline-offset')).toBe('-2px');
+  });
+});
+
+describe('#404 AC6: the global ring', () => {
+  it('is --color-text, 2px wide at a 2px offset, through the ring tokens', () => {
+    const body = ringOf(':focus-visible').body;
+    expect(decl(body, 'outline')).toBe('var(--focus-ring-width) solid var(--color-text)');
+    expect(decl(body, 'outline-offset')).toBe('var(--focus-ring-offset)');
+    expect(rootLength('--focus-ring-width')).toBe('2px');
+    expect(rootLength('--focus-ring-offset')).toBe('2px');
+  });
+
+  it('is the one selector-less ring, so it applies to every control', () => {
+    expect(rings.filter((r) => r.selector === ':focus-visible')).toHaveLength(1);
   });
 });
 

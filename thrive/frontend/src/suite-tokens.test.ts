@@ -1,7 +1,10 @@
 // #402 — Thrive takes its shared tokens from the suite file, ui/tokens/suite.css,
 // and nothing visible changes. The snapshot, tokens-before-402.json, was taken
 // from global.css on main before it imported the suite file: every custom
-// property in its :root and two theme blocks, comments removed.
+// property in its :root and two theme blocks, comments removed. #404 added its
+// five interaction-state tokens to Thrive's :root, and to the snapshot with
+// them, deliberately: the snapshot is what Thrive's tokens resolve to, and
+// those five are new, not changed.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';

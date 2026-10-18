@@ -49,7 +49,8 @@ function NoteRetry({ busy, onPress }: { busy: boolean; onPress: () => void }) {
       aria-disabled={busy ? 'true' : undefined}
       onClick={() => { if (!busy) onPress(); }}
     >
-      Try again
+      {/* In an element, so aria-disabled dims the label, not the ring (#404). */}
+      <span>Try again</span>
     </button>
   );
 }

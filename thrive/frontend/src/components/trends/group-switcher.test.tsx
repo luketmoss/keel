@@ -2,11 +2,10 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/preact';
 import { h } from 'preact';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { GroupSwitcher } from './group-switcher';
 import type { TrendGroup } from './metrics';
 import { groupPref, readPref, writePref } from './prefs';
+import { readGlobalCss } from '../../test-css';
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); localStorage.clear(); });
 
@@ -45,7 +44,7 @@ describe('renders', () => {
 describe('layout contract (css)', () => {
   // jsdom has no layout; prove the rules that keep six groups inside the wrapper.
   it('the row never wraps and the wrapper scrolls sideways', () => {
-    const css = readFileSync(resolve(__dirname, '../../global.css'), 'utf8');
+    const css = readGlobalCss();
     expect(css).toMatch(/\.trends-group-scroll\s*{[^}]*overflow-x:\s*auto/);
     expect(css).toMatch(/\.trends-group-scroll\s*{[^}]*max-width:\s*100%/);
     expect(css).toMatch(/\.trends-group-row\s*{[^}]*flex-wrap:\s*nowrap/);

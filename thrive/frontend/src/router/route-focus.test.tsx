@@ -6,9 +6,8 @@ import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { freshRouter } from './history.test-utils';
 import { render, cleanup, waitFor } from '@testing-library/preact';
 import { h, type ComponentChildren } from 'preact';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { keyOf, findByKey, headingOf, remember, remembered } from './route-focus';
+import { readGlobalCss } from '../test-css';
 
 type Router = typeof import('./router');
 type Focus = typeof import('./route-focus');
@@ -403,7 +402,7 @@ describe('no focus ring only on route-focused headings', () => {
   });
 
   it("global.css's #256 rule matches main and a marked heading, never a Day panel title", async () => {
-    const css = readFileSync(resolve(__dirname, '../global.css'), 'utf-8').replace(/\r\n/g, '\n');
+    const css = readGlobalCss().replace(/\r\n/g, '\n');
     const block = css.slice(css.indexOf('Route focus (#256)'));
     const selectors = block.slice(block.indexOf('*/') + 2, block.indexOf('{')).split(',').map((s) => s.trim().replace(/:focus$/, ''));
     expect(selectors).toEqual(['.app-content', '[data-route-focus]']);

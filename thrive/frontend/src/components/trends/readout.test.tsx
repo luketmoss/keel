@@ -1,8 +1,6 @@
 // #247 AC2 — one formatter for the table's row and the chart's readout.
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { render, cleanup } from '@testing-library/preact';
 import { h } from 'preact';
 import { announceText, dayCells, pointsByDate, readoutLine, readoutDate, valueText } from './readout';
@@ -11,6 +9,7 @@ import { TrendCard } from './trend-chart';
 import { addDays } from '../../day/dates';
 import { dayAtX, dayIndexAtX, metricSeries, rangeBounds, datesBetween } from './series';
 import type { TrendGroup, TrendMetric, TrendPoint } from './metrics';
+import { readGlobalCss } from '../../test-css';
 
 afterEach(cleanup);
 
@@ -174,7 +173,7 @@ describe('#303: the readout prints the short coverage, everything else the sente
   });
 
   it('keeps the readout cell reserving two lines, 44 px at least', () => {
-    const css = readFileSync(resolve(__dirname, '../../global.css'), 'utf-8');
+    const css = readGlobalCss();
     expect(css).toMatch(/\.trend-readout-cell \{[^}]*min-height: max\(2lh, 44px\);/);
   });
 });

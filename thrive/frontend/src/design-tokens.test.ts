@@ -1,11 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
-import { resolve, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { readGlobalCss } from './test-css';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const css = readFileSync(resolve(__dirname, 'global.css'), 'utf-8');
+const css = readGlobalCss();
 
 // Helper: extract value of a CSS custom property from a named block
 function tokenValue(block: string, token: string): string | null {

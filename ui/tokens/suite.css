@@ -1,0 +1,158 @@
+/* The suite's shared tokens (#402): the values ui/docs/design/suite-language.md
+   records, which are Thrive's. Thrive, Hive and Forage import this file first
+   and then define what is their own: the accent family (the accent, every
+   primary token, the primary fills and the focus ring) and their data colours.
+   There is no accent value here, so this file can never be mistaken for any
+   one app's.
+
+   Plain CSS with no build step and no view library. A consumer imports it by
+   relative path and its bundler inlines it. Every app that imports it tests
+   it: ui/ has no test runner, and a change here runs the consumers' suites. */
+
+/* ===== Scales ===== */
+:root {
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+
+  /* Border radius. --radius is an alias of the medium radius. */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius: 8px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+
+  /* Typography */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, Consolas, monospace;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+
+  /* Bottom nav height */
+  --nav-height: 64px;
+
+  /* Composite shadows (light-mode optimized — add dark-mode overrides before use in dark contexts) */
+  --shadow: 0 1px 3px rgba(0,0,0,0.15), 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-lg: 0 4px 12px rgba(0,0,0,0.15);
+  --shadow-strong: 0 4px 24px rgba(0,0,0,0.15);
+}
+
+/* ===== Light Theme ===== */
+[data-theme="light"] {
+  /* Neutrals */
+  --color-bg: #f0f2f5;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-border: #dadce0;
+  --color-border-light: #e8eaed;
+  /* Outline of a text field and of an unselected chip: 3:1 (1.4.11) on the
+     page 3.41, card 3.83 (luketmoss/thrive#183). The plain border stays for
+     dividers and card edges. */
+  --color-border-strong: #7d838a;
+  --color-text: #1f1f1f;
+  --color-text-secondary: #5f6368;
+  /* Muted text meets AA (luketmoss/thrive#182) everywhere it is drawn. The
+     tightest is the light border, under a theme toggle track or row hover:
+     4.51:1. 4.85:1 on the page, 5.44:1 on the card. Still under secondary. */
+  --color-text-muted: #606b76;
+
+  /* Status: danger */
+  --color-danger: #d32f2f;
+  --color-danger-hover: #b71c1c;
+  /* Danger as small TEXT on the page background (luketmoss/thrive#157). The
+     plain danger colour is 4.44:1 on the page and fails AA; this is 5.86:1. */
+  --color-danger-text: #b71c1c;
+  --color-danger-fill: #d32f2f;
+  --color-danger-fill-hover: #b71c1c;
+
+  /* Status: success */
+  --color-success: #2e7d32;
+  --color-success-light: #e8f5e9;
+  --color-success-fill: #2e7d32;
+
+  /* Status: warning */
+  --color-warning: #a05d00;
+  --color-warning-light: #fff8e1;
+
+  /* Text and icons on every fill that carries text, each app's primary fills
+     included: 4.5:1 minimum (luketmoss/thrive#183). Danger fill 4.98, its
+     hover 6.57, success fill 5.13. */
+  --color-on-fill: #ffffff;
+
+  /* Overlays and shadow colours */
+  --color-overlay: rgba(0, 0, 0, 0.4);
+  --color-shadow: rgba(0, 0, 0, 0.08);
+  --color-shadow-strong: rgba(0, 0, 0, 0.15);
+  --overlay-xs: rgba(0, 0, 0, 0.04);
+  --overlay-sm: rgba(0, 0, 0, 0.08);
+  --overlay-md: rgba(0, 0, 0, 0.12);
+  --overlay-lg: rgba(0, 0, 0, 0.16);
+  --overlay-xl: rgba(0, 0, 0, 0.24);
+  --overlay-2xl: rgba(0, 0, 0, 0.32);
+  --overlay-3xl: rgba(0, 0, 0, 0.40);
+  --overlay-4xl: rgba(0, 0, 0, 0.60);
+}
+
+/* ===== Dark Theme ===== */
+[data-theme="dark"] {
+  /* Neutrals */
+  --color-bg: #121212;
+  --color-surface: #1a1a1e;
+  --color-surface-raised: #252528;
+  --color-border: #3c3c3c;
+  --color-border-light: #25252b;
+  /* 3.48 on the raised field, 3.95 card, 4.27 page. */
+  --color-border-strong: #74797f;
+  --color-text: #e8eaed;
+  --color-text-secondary: #9aa0a6;
+  /* 4.61:1 on the raised surface, the darkest place it is drawn
+     (luketmoss/thrive#182). 5.23:1 on the card. */
+  --color-text-muted: #868e98;
+
+  /* Status: danger */
+  --color-danger: #ef5350;
+  --color-danger-hover: #e53935;
+  /* The plain danger colour is 4.38:1 on the raised surface; this is 5.15:1
+     (luketmoss/thrive#182). */
+  --color-danger-text: #f26b68;
+  --color-danger-fill: #ef5350;
+  --color-danger-fill-hover: #f26b68;
+
+  /* Status: success */
+  --color-success: #66bb6a;
+  --color-success-light: #1b5e20;
+  --color-success-fill: #66bb6a;
+
+  /* Status: warning */
+  --color-warning: #ffb74d;
+  --color-warning-light: #2d2210;
+
+  /* Dark keeps the bright fills and draws near-black text on them
+     (luketmoss/thrive#183): danger fill 5.37, its hover 6.31, success fill 7.92. */
+  --color-on-fill: #121212;
+
+  /* Overlays and shadow colours */
+  --color-overlay: rgba(0, 0, 0, 0.6);
+  --color-shadow: rgba(0, 0, 0, 0.25);
+  --color-shadow-strong: rgba(0, 0, 0, 0.4);
+  --overlay-xs: rgba(255, 255, 255, 0.04);
+  --overlay-sm: rgba(255, 255, 255, 0.08);
+  --overlay-md: rgba(255, 255, 255, 0.12);
+  --overlay-lg: rgba(255, 255, 255, 0.16);
+  --overlay-xl: rgba(255, 255, 255, 0.24);
+  --overlay-2xl: rgba(255, 255, 255, 0.32);
+  --overlay-3xl: rgba(255, 255, 255, 0.40);
+  --overlay-4xl: rgba(0, 0, 0, 0.60);
+}

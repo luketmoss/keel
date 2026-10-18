@@ -5,9 +5,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, cleanup, screen } from '@testing-library/preact';
 import { h } from 'preact';
-import { readFileSync } from 'fs';
-import { resolve, dirname } from 'path';
-import { fileURLToPath } from 'url';
 
 vi.mock('../../auth/auth-context', () => ({ useAuth: () => ({ token: 'tok' }) }));
 
@@ -15,6 +12,7 @@ import { ActivitiesScreen } from './activities-screen';
 import { WorkoutDetail } from './workout-detail';
 import { workouts, sets, exercises } from '../../state/store';
 import type { WorkoutWithRow } from '../../api/types';
+import { readGlobalCss } from '../../test-css';
 
 function makeWorkout(overrides: Partial<WorkoutWithRow>): WorkoutWithRow {
   return {
@@ -97,8 +95,7 @@ describe('AC7: the detail screen shows the link', () => {
 });
 
 describe('AC7: the link\'s CSS', () => {
-  const here = dirname(fileURLToPath(import.meta.url));
-  const css = readFileSync(resolve(here, '../../global.css'), 'utf-8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const css = readGlobalCss().replace(/\/\*[\s\S]*?\*\//g, '');
   const rule = (sel: string) => {
     const esc = sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     return css.match(new RegExp(`(?:^|})\\s*${esc}\\s*\\{([^}]*)\\}`))?.[1] ?? '';

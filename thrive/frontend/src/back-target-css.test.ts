@@ -1,11 +1,8 @@
 // #280 — every header Back control, and the modal close, holds a 44 px target.
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
-import { resolve, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { readGlobalCss } from './test-css';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const raw = readFileSync(resolve(__dirname, 'global.css'), 'utf-8').replace(/\r\n/g, '\n');
+const raw = readGlobalCss().replace(/\r\n/g, '\n');
 const css = raw.replace(/\/\*[\s\S]*?\*\//g, '');
 
 function rules(selector: string): string[] {

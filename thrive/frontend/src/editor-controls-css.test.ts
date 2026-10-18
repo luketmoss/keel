@@ -64,9 +64,12 @@ describe('Editor control touch targets (#321)', () => {
 });
 
 describe('Move buttons at the ends (#328)', () => {
+  // #404 made this the shared treatment for every aria-disabled control, at
+  // --opacity-disabled; interaction-states.test.ts resolves it per control.
   it('dims only the glyph of an aria-disabled button, so its focus ring stays visible', () => {
-    expect(rule('.reorder-btn[aria-disabled="true"] > span')).toMatch(/opacity:\s*0\.25/);
-    expect(rule('.reorder-btn[aria-disabled="true"]')).not.toMatch(/opacity/);
+    expect(rule('[aria-disabled="true"] > *')).toMatch(/opacity:\s*var\(--opacity-disabled\)/);
+    expect(rule('[aria-disabled="true"]')).not.toMatch(/opacity/);
+    for (const body of rules('.reorder-btn[aria-disabled="true"]')) expect(body).not.toMatch(/opacity/);
   });
 
   it('gives an aria-disabled button no hover background', () => {

@@ -130,7 +130,8 @@ export function SyncNowButton({ sync }: { sync: SyncNow }) {
       aria-disabled={busy ? 'true' : undefined}
       onClick={() => { if (!busy) sync.press(); }}
     >
-      {sync.asking ? 'Asking…' : sync.bothOpen ? 'Sync under way' : 'Sync now'}
+      {/* In an element, so an aria-disabled press dims the label, not the ring (#404). */}
+      <span>{sync.asking ? 'Asking…' : sync.bothOpen ? 'Sync under way' : 'Sync now'}</span>
     </button>
   );
 }

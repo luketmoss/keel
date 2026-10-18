@@ -92,15 +92,22 @@ these in a test so a new class must be placed.
 | Family | Classes |
 |---|---|
 | Filled buttons | `.btn-primary`, `.btn-danger`, `.fab`, `.login-btn` |
-| Quiet buttons | `.btn-secondary`, `.btn-ghost`, `.btn-link`, `.template-editor-back`, `.login-link`, `.filter-clear`, `.manage-labels-link`, `.day-today-btn`, `.training-plan-link` |
+| Quiet buttons | `.btn-secondary`, `.btn-ghost`, `.btn-link`, `.template-editor-back`, `.login-link`, `.filter-clear`, `.manage-labels-link`, `.day-today-btn`, `.training-plan-link`, `.detail-coros-link` |
 | Icon buttons | `.btn-icon`, `.modal-close`, `.day-arrow`, `.set-remove-btn`, `.compact-card-remove`, `.last-time-close-btn`, `.copy-down-btn`, `.reorder-btn`, `.exercise-toolbar-btn`, `.manage-label-delete`, `.day-sync-btn`, `.sync-now-btn` |
-| Chips and toggles | `.filter-chip`, `.label-chip`, `.tag-badge` (as a button), `.effort-btn`, `.sub-type-btn`, `.theme-toggle-btn`, `.trends-group-btn`, `.library-switch-btn`, `.color-swatch` |
-| Rows and cards | `.exercise-list-item`, `.create-new-row`, `.template-card`, `.workout-card`, `.compact-card-body[role="button"]`, `.type-card`, `.trend-row-link`, `.trend-open-day`, `.calendar-open-day`, `.calendar-day`, `.manage-label-name`, `.add-set-btn`, `.sync-status-bar`, `.settings-btn` |
+| Chips and toggles | `.filter-chip`, `.label-chip`, `.tag-badge` (as a button), `.effort-btn`, `.sub-type-btn`, `.theme-toggle-btn`, `.trends-group-btn`, `.library-switch-btn`, `.color-swatch`, `.section-badge-btn`, `.section-picker-pill`, `.week-day` |
+| Rows and cards | `.exercise-list-item`, `.create-new-row`, `.template-card`, `.workout-card`, `.compact-card-body[role="button"]`, `.type-card`, `.trend-row-link`, `.trend-open-day`, `.calendar-open-day`, `.calendar-day`, `.manage-label-name`, `.add-set-btn`, `.sync-status-bar`, `.settings-btn`, `.exercise-list-item-header`, `.settings-row-link` |
 | Navigation | `.bottom-nav-tab` |
 | Fields | `.form-input`, `.form-select`, `.form-textarea` — keep their #183 focus treatment; gain the disabled state. |
 
 Selected applies only to chips and toggles, the bottom nav, `.calendar-day`
 and `.color-swatch`. Everything else has five states.
+
+Six classes were placed during development (#404), because the TSX renders
+them as controls and the table above had missed them: `.detail-coros-link`
+(a link, quiet), `.section-badge-btn`, `.section-picker-pill` and `.week-day`
+(each toggles or is selected, chips), and `.exercise-list-item-header` and
+`.settings-row-link` (`role="button"` rows). `interaction-states.test.ts`
+reads this table and fails if the two disagree.
 
 ## Edge cases
 

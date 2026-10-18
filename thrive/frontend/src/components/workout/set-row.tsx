@@ -56,6 +56,7 @@ export function SetRow({ set, onUpdate, onRemove }: Props) {
             class={`effort-btn effort-btn-${e.toLowerCase()}${set.effort === e ? ' active' : ''}`}
             onClick={() => onUpdate({ effort: set.effort === e ? '' : e })}
             aria-label={e}
+            aria-pressed={set.effort === e ? 'true' : 'false'}
           >
             {EFFORT_LABELS[e]}
           </button>

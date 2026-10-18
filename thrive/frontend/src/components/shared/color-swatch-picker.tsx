@@ -15,7 +15,7 @@ export function ColorSwatchPicker({ selected, onSelect }: ColorSwatchPickerProps
             key={color.key}
             type="button"
             class={`color-swatch${isSelected ? ' selected' : ''}`}
-            style={{ background: color.light.bg, color: color.light.text, borderColor: color.light.text }}
+            style={{ backgroundColor: color.light.bg, color: color.light.text, borderColor: color.light.text }}
             onClick={() => onSelect(color.key)}
             aria-label={color.name}
             role="radio"

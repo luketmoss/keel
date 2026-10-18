@@ -9,15 +9,21 @@ Workspace rules live in the root `CLAUDE.md` and `CONVENTIONS.md`: the board,
 the pipeline and its skills, and CI. This file covers only what is specific to
 Thrive.
 
-Imported from `luketmoss/thrive` with its history (#395). Thrive's own issues
-from before the import are written `luketmoss/thrive#N`; a bare `#N` here is a
-Keel issue. The sync and watchdog workflows are Keel's since #398:
-`thrive-coros-sync.yml`, `thrive-withings-sync.yml` and their watchdogs. Both
-sync jobs are gated by the repository variable `THRIVE_SYNCS_LIVE`, and until
-the owner's one-time cutover (`sync/README.md`) sets it, the syncs and the
-deployed poller still run from `luketmoss/thrive`. Never set it, dispatch a
-sync, or deploy the poller from a session: two copies running at once kill
-the vendors' refresh tokens.
+## History
+
+Thrive moved here from `luketmoss/thrive` (read-only, archived as #399's
+last step) in #385: imported with
+its history (#395), deployed at `luketmoss.github.io/keel/thrive/` (#396), and
+its syncs and poller cut over (#398, #399). Its issues from before the move
+stay in that repo and are cited `luketmoss/thrive#N`; a bare `#N` here is a
+Keel issue. The old URL, `luketmoss.github.io/thrive/`, only redirects here,
+and nothing should link to it.
+
+The sync and watchdog workflows are `thrive-coros-sync.yml`,
+`thrive-withings-sync.yml` and their watchdogs. Both sync jobs are gated by the
+repository variable `THRIVE_SYNCS_LIVE`, the documented off switch. Never
+re-enable the old repo's copies while it is on: two copies running at once
+kill the vendors' refresh tokens.
 
 ## Stacks
 

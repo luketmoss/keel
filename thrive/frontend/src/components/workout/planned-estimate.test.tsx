@@ -332,6 +332,21 @@ describe('#348: planned editor Back/Discard and detail Delete step back through 
     expect(navigate).not.toHaveBeenCalled();
   });
 
+  it("Delete counts only logged sets: a plan's targets are not logged (#403)", async () => {
+    render(h(WorkoutDetail, { workoutId: 'w_plan' }));
+    await tap('Delete Workout');
+    expect(confirmText()).toMatchObject({
+      title: 'Delete "Upper Pull A"?',
+      message: "Thu 31 Dec 2099. This can't be undone.",
+      confirm: 'Delete Workout',
+    });
+    await answerConfirm(false);
+    sets.value = [{ ...PLAN_SETS[0], weight: '135', reps: '8' }, ...PLAN_SETS.slice(1)];
+    await tap('Delete Workout');
+    expect(confirmText()!.message).toBe("Thu 31 Dec 2099 · its 1 logged set goes with it. This can't be undone.");
+    await answerConfirm(false);
+  });
+
   it('a cancelled Delete confirm, or a failed delete, calls neither', async () => {
     render(h(WorkoutDetail, { workoutId: 'w_plan' }));
     await tap('Delete Workout');

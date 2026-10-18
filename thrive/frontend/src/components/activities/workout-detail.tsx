@@ -101,7 +101,8 @@ export function WorkoutDetail({ workoutId }: Props) {
 
   const handleDelete = async () => {
     if (!token) return;
-    const logged = sets.value.filter((s) => s.workout_id === workoutId).length;
+    // A planned workout's sets are targets, not logged: only a set with a weight or reps counts.
+    const logged = sets.value.filter((s) => s.workout_id === workoutId && (s.weight || s.reps)).length;
     if (!(await ask(deleteWorkoutCopy(workout, logged)))) return;
     setDeleting(true);
     try {

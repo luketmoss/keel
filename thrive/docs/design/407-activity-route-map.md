@@ -7,7 +7,7 @@ custom properties in `thrive/frontend/src/global.css`. Cairn's map notes
 prior art for map *behaviour* only: bounds fitting, the zoom cap, casing,
 antimeridian handling. None of their colours or chrome carry over.
 
-The track itself is luketmoss/thrive#421's contract: a GeoJSON `Feature` with a
+The track itself is #432's contract: a GeoJSON `Feature` with a
 `LineString` of `[lon, lat]`, a `bbox`, and per-point `t` and `ele`, fetched by
 workout id through `getWorkoutTrack`.
 
@@ -186,7 +186,7 @@ offered rather than special-cased, because the copy stays honest either way.
 - **Two activities in a row** (back, then another): each fetches its own
   track; the Maps script is not loaded twice.
 - **A track crossing the antimeridian** draws as a short line, per step 1.
-- **A 5,000-point track** (luketmoss/thrive#421's ceiling) is one polyline.
+- **A 5,000-point track** (#432's ceiling) is one polyline.
   Google Maps draws that without trouble, as cairn's notes record for 10,000.
 - **Offline:** the track request fails, so Error. No offline copy.
 - **Rotation / resize:** the map fills its box at any width; the view is not

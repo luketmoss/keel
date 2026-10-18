@@ -9,11 +9,12 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+import { readGlobalCss } from './test-css';
 
 let cssText: string;
 
 beforeAll(() => {
-  cssText = readFileSync(resolve(__dirname, 'global.css'), 'utf-8');
+  cssText = readGlobalCss();
 });
 
 function extractBlock(css: string, selector: string): string {

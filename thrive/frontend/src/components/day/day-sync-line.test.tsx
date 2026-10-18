@@ -1,9 +1,6 @@
 // #409 AC1, AC2, AC4, AC5, AC6 — the Day view's sync line.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, screen, fireEvent, act } from '@testing-library/preact';
-import { readFileSync } from 'fs';
-import { resolve, dirname } from 'path';
-import { fileURLToPath } from 'url';
 
 const loadSyncLog = vi.fn();
 const loadWithingsSyncLog = vi.fn();
@@ -27,6 +24,7 @@ import { useSyncNow, POLL_MS } from '../settings/sync-now';
 import { syncRequests, syncAsk, demoSyncPressedAt, syncLog, withingsSyncLog } from '../../state/store';
 import { rowToSyncRequest } from '../../api/sync-requests-api';
 import { rowToSyncLog } from '../../api/sync-log-api';
+import { readGlobalCss } from '../../test-css';
 
 const NOW = new Date('2026-10-02T13:12:00.000Z');
 const HOUR = 3_600_000;
@@ -214,8 +212,7 @@ describe('Day sync line: layout and accessibility (AC5)', () => {
 });
 
 describe('Day sync line CSS (AC5)', () => {
-  const dir = dirname(fileURLToPath(import.meta.url));
-  const raw = readFileSync(resolve(dir, '../../global.css'), 'utf-8').replace(/\r\n/g, '\n');
+  const raw = readGlobalCss().replace(/\r\n/g, '\n');
   const css = raw.slice(raw.indexOf('/* ===== Day sync line (#409)')).replace(/\/\*[\s\S]*?\*\//g, '');
   const rule = (sel: string) => {
     const esc = sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

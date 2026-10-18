@@ -3,12 +3,9 @@
 // rules are scoped so the Exercises screen's .exercise-list-item is untouched.
 // jsdom has no layout, so this reads global.css, as editor-controls-css.test.ts does.
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
-import { resolve, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { readGlobalCss } from './test-css';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const css = readFileSync(resolve(__dirname, 'global.css'), 'utf-8')
+const css = readGlobalCss()
   .replace(/\r\n/g, '\n')
   .replace(/\/\*[\s\S]*?\*\//g, '');
 

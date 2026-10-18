@@ -9,13 +9,10 @@
 // opacity-dimmed chips and 3:1 control borders are #183.
 
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
-import { resolve, dirname } from 'path';
-import { fileURLToPath } from 'url';
 import { LABEL_COLORS } from './api/label-colors';
+import { readGlobalCss } from './test-css';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const css = readFileSync(resolve(__dirname, 'global.css'), 'utf-8').replace(/\/\*[\s\S]*?\*\//g, '');
+const css = readGlobalCss().replace(/\/\*[\s\S]*?\*\//g, '');
 
 const THEMES = ['light', 'dark'] as const;
 type Theme = (typeof THEMES)[number];

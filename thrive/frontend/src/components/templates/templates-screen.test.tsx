@@ -1,11 +1,10 @@
 // #301 — template cards are real buttons: tab stops, named, opened by key or click.
 import { describe, it, expect, afterEach, beforeEach } from 'vitest';
 import { render, cleanup, fireEvent, waitFor } from '@testing-library/preact';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { templates } from '../../state/store';
 import { currentRoute, navigate } from '../../router/router';
 import { TemplatesScreen } from './templates-screen';
+import { readGlobalCss } from '../../test-css';
 
 function tpl(id: string, name: string, sections: string[]) {
   return {
@@ -71,7 +70,7 @@ describe('AC3: accessible name', () => {
 });
 
 describe('AC3/AC5: focus ring CSS', () => {
-  const css = readFileSync(resolve(__dirname, '../../global.css'), 'utf-8').replace(/\r\n/g, '\n');
+  const css = readGlobalCss().replace(/\r\n/g, '\n');
   const section = css.slice(css.indexOf('/* ===== Library keyboard access (#301)'));
   const bare = section.replace(/\/\*[\s\S]*?\*\//g, '');
 

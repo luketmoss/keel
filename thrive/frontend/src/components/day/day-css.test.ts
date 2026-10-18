@@ -1,11 +1,8 @@
 // #237 AC2–AC5 — the Day screen's CSS carries the UX audit's contrast fixes.
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
-import { resolve, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { readGlobalCss } from '../../test-css';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const raw = readFileSync(resolve(__dirname, '../../global.css'), 'utf-8').replace(/\r\n/g, '\n');
+const raw = readGlobalCss().replace(/\r\n/g, '\n');
 const start = raw.indexOf('/* ===== Day screen (#237)');
 // Up to #243's section, appended after #237-#239, so it is not judged as Day CSS.
 const next = raw.indexOf('/* ===== Trends: metric groups (#243)', start);

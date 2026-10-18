@@ -5,12 +5,9 @@
 // control-contrast.test.ts does.
 
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
-import { resolve, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { readGlobalCss } from './test-css';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const css = readFileSync(resolve(__dirname, 'global.css'), 'utf-8').replace(/\/\*[\s\S]*?\*\//g, '');
+const css = readGlobalCss().replace(/\/\*[\s\S]*?\*\//g, '');
 
 function forcedBlock(): string {
   const start = css.indexOf('@media (forced-colors: active)');

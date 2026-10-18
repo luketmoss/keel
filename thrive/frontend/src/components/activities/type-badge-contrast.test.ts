@@ -6,12 +6,9 @@
 // badge colour is caught here instead of in a screenshot nobody takes.
 
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
-import { resolve, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { readGlobalCss } from '../../test-css';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const css = readFileSync(resolve(__dirname, '../../global.css'), 'utf-8');
+const css = readGlobalCss();
 
 /** The background/color pair declared for a badge class, light or dark. */
 function badgeColors(cls: string, dark = false): { background: string; color: string } {

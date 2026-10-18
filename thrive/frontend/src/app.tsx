@@ -5,6 +5,7 @@ import { useAuth } from './auth/auth-context';
 import { LoginScreen } from './auth/login-screen';
 import { BottomNav } from './components/shared/bottom-nav';
 import { Toast } from './components/shared/toast';
+import { ConfirmHost } from './components/shared/confirm-host';
 import { loadInitialData, workoutsRefresh, libraryRefresh } from './state/actions';
 import { loading } from './state/store';
 import { onPageVisible } from './state/page-visible';
@@ -135,6 +136,7 @@ function AppContent() {
     <>
       {isAuthenticated ? <AuthenticatedApp /> : <LoginScreen />}
       <Toast />
+      <ConfirmHost />
     </>
   );
 }

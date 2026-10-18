@@ -9,6 +9,8 @@ import { CardioFields } from '../shared/cardio-fields';
 import { SubTypeToggle, subTypeOptions } from '../shared/sub-type-toggle';
 import type { CardioValues } from '../shared/cardio-fields';
 import { workoutToEditInputs, editInputsToPatch, hasEdits } from '../shared/edit-patch';
+import { ask } from '../../state/confirm';
+import { discardChangesCopy } from '../shared/confirm-copy';
 
 interface Props {
   workoutId: string;
@@ -62,9 +64,9 @@ export function EditWorkoutForm({ workoutId }: Props) {
     }
   };
 
-  const handleDiscard = () => {
+  const handleDiscard = async () => {
     if (hasEdits(initial, current)) {
-      if (!confirm('Discard changes? Your edits will not be saved.')) return;
+      if (!(await ask(discardChangesCopy('workout')))) return;
     }
     goBack('/activities');
   };

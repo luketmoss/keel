@@ -17,6 +17,7 @@ import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/preact';
 import { activeWorkoutId, activeWorkoutSets, activeWarmupExercises, isEditMode, workouts, sets, toasts } from '../../state/store';
 import type { WorkoutWithRow } from '../../api/types';
+import { mountConfirmHost, answerConfirm, openedConfirm, confirmText } from '../shared/confirm-test-utils';
 
 type Row = string[];
 let sheet: { Sets: Row[] };
@@ -120,8 +121,10 @@ const saved = (c: HTMLElement, set = 0) =>
   setRows(c)[set].querySelector('.set-saved')!.getAttribute('aria-hidden') === 'false';
 const type = (c: HTMLElement, value: string, set = 0) =>
   fireEvent.input(weightInput(c, set), { target: { value } });
-const removeExercise = (c: HTMLElement) =>
+const removeExercise = async (c: HTMLElement) => {
   fireEvent.click(c.querySelector<HTMLButtonElement>('.exercise-toolbar-remove')!);
+  await answerConfirm(true);
+};
 const move = (c: HTMLElement, dir: 'up' | 'down') =>
   fireEvent.click(c.querySelector<HTMLButtonElement>(`[data-move="${dir}"]`)!);
 const activeRows = () =>
@@ -149,7 +152,7 @@ beforeEach(() => {
   workouts.value = [];
   isEditMode.value = false;
   finishWorkout.mockClear();
-  vi.spyOn(window, 'confirm').mockReturnValue(true);
+  mountConfirmHost();
 });
 afterEach(() => {
   cleanup();
@@ -232,7 +235,7 @@ describe('#394 AC1: after Remove set, every other set keeps its own row', () => 
     ]);
     fireEvent.click(removeSetBtn(card('Bench'), 0));
     await settle();
-    removeExercise(card('Bike'));
+    await removeExercise(card('Bike'));
     await settle();
     expect(deletes()).toEqual([2, 3]);
     expect(sheetBrief()).toEqual([
@@ -271,7 +274,7 @@ describe('#394 AC1: after Remove set, every other set keeps its own row', () => 
       ['w1', 'e_curl', 'Curl', 'primary', 2, 1, '', ''],
       ['w1', 'e_curl', 'Curl', 'primary', 3, 1, '50', '10'],
     ]);
-    removeExercise(card('Bench'));
+    await removeExercise(card('Bench'));
     await settle();
     expect(deletes()).toEqual([2]);
 
@@ -323,9 +326,10 @@ describe('#394 AC2: Copy-down, Change section to warmup and Remove exercise shif
       { id: 'w1', date: '2026-10-10', type: 'weight', name: 'Push A' } as unknown as WorkoutWithRow,
     ];
   };
-  const copyDown = (c: HTMLElement) => {
+  const copyDown = async (c: HTMLElement) => {
     fireEvent.click(c.querySelector<HTMLButtonElement>('.last-time-toggle')!);
     fireEvent.click(c.querySelector<HTMLButtonElement>('.copy-down-btn')!);
+    await answerConfirm(true);
   };
 
   it('copy-down onto fewer sets deletes the extra rows, then later writes hit their own rows', async () => {
@@ -337,7 +341,7 @@ describe('#394 AC2: Copy-down, Change section to warmup and Remove exercise shif
       ['w0', 'e_bench', 'Bench', 'primary', 1, 1, '120', '10'],
     ]);
     lastTimeWorkouts();
-    copyDown(card('Bench'));
+    await copyDown(card('Bench'));
     await settle();
     expect(deletes()).toEqual([4, 3]); // bottom to top
     expect(setRows(card('Bench'))).toHaveLength(1);
@@ -373,7 +377,7 @@ describe('#394 AC2: Copy-down, Change section to warmup and Remove exercise shif
     lastTimeWorkouts();
     const g = gate();
     deleteGate = g.p;
-    copyDown(card('Bench'));
+    await copyDown(card('Bench'));
     await settle();
     type(card('Row'), '100'); // while Bench set 2's delete is in flight
     move(card('Row'), 'up');
@@ -408,9 +412,26 @@ describe('#394 AC2: Copy-down, Change section to warmup and Remove exercise shif
     expect(sheetBrief()).toEqual([['w2', 'e_curl', 'primary', 1, 1, '30']]);
   });
 
+  it('Remove exercise names the exercise and its logged sets, and Cancel changes nothing (#403)', async () => {
+    await mount(BENCH3_ROW);
+    fireEvent.click(card('Bench').querySelector<HTMLButtonElement>('.exercise-toolbar-remove')!);
+    await openedConfirm();
+    expect(confirmText()).toEqual({
+      title: 'Remove "Bench" from this workout?',
+      message: 'Its 3 logged sets are deleted.',
+      cancel: 'Cancel',
+      confirm: 'Remove Exercise',
+      confirmIsDanger: true,
+    });
+    await answerConfirm(false);
+    await settle();
+    expect(deletes()).toEqual([]);
+    expect(card('Bench')).toBeDefined();
+  });
+
   it('Remove exercise deletes its rows, then later removes hit their own rows', async () => {
     await mount(BENCH3_ROW);
-    removeExercise(card('Bench'));
+    await removeExercise(card('Bench'));
     await settle();
     expect(deletes()).toEqual([4, 3, 2]);
     expect(card('Bench')).toBeUndefined();
@@ -433,7 +454,7 @@ describe('#394 AC2: Copy-down, Change section to warmup and Remove exercise shif
       const [gone] = sheet.Sets.splice(rowIndex - 2, 1);
       writes.push({ kind: 'delete', row: rowIndex, values: gone });
     });
-    removeExercise(card('Bench'));
+    await removeExercise(card('Bench'));
     await settle();
     expect(deletes()).toEqual([4]);
     expect(toasts.value.map((t) => t.text)).toContain('Failed to remove set');
@@ -454,7 +475,7 @@ describe('#394 AC2: Copy-down, Change section to warmup and Remove exercise shif
     ]);
 
     // Retrying deletes only the two rows still held, never the row deleted already.
-    removeExercise(card('Bench'));
+    await removeExercise(card('Bench'));
     await settle();
     expect(deletes()).toEqual([4, 4, 3, 2]);
     expect(sheetBrief()).toEqual([['w2', 'e_curl', 'primary', 1, 1, '30']]);
@@ -611,7 +632,7 @@ describe('#394 AC5: what does not change', () => {
     isEditMode.value = true;
     await mount(BENCH3_ROW);
     fireEvent.click(removeSetBtn(card('Bench'), 0));
-    removeExercise(card('Row'));
+    await removeExercise(card('Row'));
     await settle();
     expect(writes).toEqual([]);
     expect(setRows(card('Bench'))).toHaveLength(2);

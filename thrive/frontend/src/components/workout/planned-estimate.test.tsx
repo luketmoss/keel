@@ -8,6 +8,7 @@ import { render, fireEvent, cleanup, screen } from '@testing-library/preact';
 import { h } from 'preact';
 import { templates, workouts, sets, exercises } from '../../state/store';
 import type { WorkoutWithRow, SetWithRow } from '../../api/types';
+import { mountConfirmHost, answerConfirm, confirmDialog, confirmText } from '../shared/confirm-test-utils';
 
 const saveWorkoutForLater = vi.fn(async (_data: unknown, _token: string) => undefined);
 const deleteWorkout = vi.fn(async (_id: string, _token: string) => undefined);
@@ -86,6 +87,7 @@ const savedEstimate = () =>
 beforeEach(() => {
   vi.clearAllMocks();
   templates.value = [PUSH];
+  mountConfirmHost();
 });
 afterEach(() => {
   cleanup();
@@ -227,19 +229,19 @@ describe('AC3: the planned-workout editor changes the estimate and never loses i
   });
 
   it('an estimate-only change counts as unsaved, so Back asks first', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     render(<WorkoutEdit workoutId="w_plan" />);
     type(estimateInput(), '50');
     await tap('Back');
-    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(confirmText()).toMatchObject({ title: 'Discard your changes?', message: "Your edits to this plan won't be saved.", confirm: 'Discard Changes', cancel: 'Keep Editing' });
+    await answerConfirm(false);
+    expect(confirmDialog()).toBeNull();
     expect(navigate).not.toHaveBeenCalled();
   });
 
   it('an untouched estimate does not', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     render(<WorkoutEdit workoutId="w_plan" />);
     await tap('Back');
-    expect(confirm).not.toHaveBeenCalled();
+    expect(confirmDialog()).toBeNull();
   });
 });
 
@@ -307,39 +309,53 @@ describe('#348: planned editor Back/Discard and detail Delete step back through 
   });
 
   it('a cancelled "Discard changes?" calls neither; a confirmed one goes back', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
     render(<WorkoutEdit workoutId="w_plan" />);
     type(nameInput(), 'Changed');
     await tap('Discard');
+    await answerConfirm(false);
     expect(goBack).not.toHaveBeenCalled();
     expect(navigate).not.toHaveBeenCalled();
     await tap('Discard');
+    await answerConfirm(true);
     expect(goBack).toHaveBeenCalledTimes(1);
     expect(goBack).toHaveBeenCalledWith('/activities');
     expect(navigate).not.toHaveBeenCalled();
-    confirm.mockRestore();
   });
 
   it('Delete on the detail goes back to where the user came from, never navigate', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(h(WorkoutDetail, { workoutId: 'w_plan' }));
     await tap('Delete Workout');
+    await answerConfirm(true);
     expect(deleteWorkout).toHaveBeenCalledWith('w_plan', 'test-token');
     expect(goBack).toHaveBeenCalledTimes(1);
     expect(goBack).toHaveBeenCalledWith('/activities');
     expect(navigate).not.toHaveBeenCalled();
-    confirm.mockRestore();
+  });
+
+  it("Delete counts only logged sets: a plan's targets are not logged (#403)", async () => {
+    render(h(WorkoutDetail, { workoutId: 'w_plan' }));
+    await tap('Delete Workout');
+    expect(confirmText()).toMatchObject({
+      title: 'Delete "Upper Pull A"?',
+      message: "Thu 31 Dec 2099. This can't be undone.",
+      confirm: 'Delete Workout',
+    });
+    await answerConfirm(false);
+    sets.value = [{ ...PLAN_SETS[0], weight: '135', reps: '8' }, ...PLAN_SETS.slice(1)];
+    await tap('Delete Workout');
+    expect(confirmText()!.message).toBe("Thu 31 Dec 2099 · its 1 logged set goes with it. This can't be undone.");
+    await answerConfirm(false);
   });
 
   it('a cancelled Delete confirm, or a failed delete, calls neither', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
     render(h(WorkoutDetail, { workoutId: 'w_plan' }));
     await tap('Delete Workout');
+    await answerConfirm(false);
     expect(deleteWorkout).not.toHaveBeenCalled();
     deleteWorkout.mockRejectedValueOnce(new Error('boom'));
     await tap('Delete Workout');
+    await answerConfirm(true);
     expect(goBack).not.toHaveBeenCalled();
     expect(navigate).not.toHaveBeenCalled();
-    confirm.mockRestore();
   });
 });

@@ -28,7 +28,7 @@ describe('Manage Labels delete focus (#339 AC5)', () => {
     del.focus();
     fireEvent.click(del);
     expect(document.querySelector('[role="dialog"]')).not.toBeNull();
-    fireEvent.click(getByText('Delete', { selector: '.modal-content button' }));
+    fireEvent.click(getByText('Delete Label', { selector: '.modal-content button' }));
     await waitFor(() => expect(document.activeElement).toBe(container.querySelector('h1')));
     expect(container.querySelector('h1')!.getAttribute('tabindex')).toBe('-1');
   });

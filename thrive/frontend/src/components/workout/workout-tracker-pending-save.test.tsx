@@ -7,6 +7,7 @@
 // the Workouts tab, which these tests do not look at.
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/preact';
+import { mountConfirmHost, answerConfirm } from '../shared/confirm-test-utils';
 import { activeWorkoutId, activeWorkoutSets, activeWarmupExercises, isEditMode, workouts, sets } from '../../state/store';
 
 type Row = string[];
@@ -129,6 +130,7 @@ const brief = (r: Row) => [r[1], r[3], Number(r[4]), Number(r[5]), r[7]];
 
 beforeEach(() => {
   vi.useFakeTimers();
+  mountConfirmHost();
   writes.length = 0;
   orderWrites.length = 0;
   updateFailure = null;
@@ -337,7 +339,10 @@ describe('#389 with #394: a save after a row delete writes the set\'s own, shift
   ];
   const CURL = toRow(SPECS[3]);
   const nonDeletes = () => writes.filter((w) => w.kind !== 'delete');
-  const confirmYes = () => vi.spyOn(window, 'confirm').mockReturnValue(true);
+  const removeFirst = async () => {
+    fireEvent.click(cards()[0].querySelector('.exercise-toolbar-remove')!);
+    await answerConfirm(true);
+  };
   afterEach(() => vi.restoreAllMocks());
 
   it('Remove set, then edit a set below it: Row\'s own row is updated, Curl is untouched', async () => {
@@ -356,9 +361,8 @@ describe('#389 with #394: a save after a row delete writes the set\'s own, shift
   });
 
   it('Remove exercise, then edit a set below it: only that set\'s row is written', async () => {
-    confirmYes();
     await mount(SPECS);
-    fireEvent.click(cards()[0].querySelector('.exercise-toolbar-remove')!);
+    await removeFirst();
     await vi.advanceTimersByTimeAsync(0);
     expect(sheet.Sets).toHaveLength(2);
 
@@ -386,13 +390,12 @@ describe('#389 with #394: a save after a row delete writes the set\'s own, shift
 
   it('same-section duplicates after Remove exercise above them: the edit never hits the other copy', async () => {
     // Curl added twice mid-workout: both copies are `primary`.
-    confirmYes();
     await mount([
       ['e_bench', 'Bench', 'primary', 1, 1, '100', '5'],
       ['e_curl', 'Curl', 'primary', 2, 1, '', ''],
       ['e_curl', 'Curl', 'primary', 3, 1, '50', '10'],
     ]);
-    fireEvent.click(cards()[0].querySelector('.exercise-toolbar-remove')!);
+    await removeFirst();
     await vi.advanceTimersByTimeAsync(0);
     expect(sheet.Sets).toHaveLength(2);
 
@@ -410,13 +413,12 @@ describe('#389 with #394: a save after a row delete writes the set\'s own, shift
   });
 
   it('duplicates in different sections, a delete above them, a move, then typing: the SS1 copy is untouched', async () => {
-    confirmYes();
     await mount([
       ['e_bench', 'Bench', 'primary', 1, 1, '100', '5'],
       ['e_row', 'Row BB', 'primary', 2, 1, '', ''],
       ['e_row', 'Row BB', 'SS1', 3, 1, '95', '8'],
     ]);
-    fireEvent.click(cards()[0].querySelector('.exercise-toolbar-remove')!);
+    await removeFirst();
     await vi.advanceTimersByTimeAsync(0);
     // Move the primary copy below the SS1 copy: it takes order 3.
     fireEvent.click(cards()[0].querySelector<HTMLButtonElement>('[data-move="down"]')!);

@@ -10,6 +10,8 @@ import { formatDistance, formatElevation, formatHeartRate } from '../../api/unit
 import { provenanceDetail } from '../../api/provenance';
 import { WatchGlyph } from '../shared/provenance-mark';
 import { corosActivityUrl } from '../../api/coros-link';
+import { ask } from '../../state/confirm';
+import { deleteWorkoutCopy } from '../shared/confirm-copy';
 
 interface Props {
   workoutId: string;
@@ -99,7 +101,9 @@ export function WorkoutDetail({ workoutId }: Props) {
 
   const handleDelete = async () => {
     if (!token) return;
-    if (!confirm('Delete this workout? This cannot be undone.')) return;
+    // A planned workout's sets are targets, not logged: only a set with a weight or reps counts.
+    const logged = sets.value.filter((s) => s.workout_id === workoutId && (s.weight || s.reps)).length;
+    if (!(await ask(deleteWorkoutCopy(workout, logged)))) return;
     setDeleting(true);
     try {
       await deleteWorkout(workoutId, token);

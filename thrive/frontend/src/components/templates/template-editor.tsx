@@ -9,6 +9,8 @@ import { newRowKey, swapAt, useReorderFocus, type MoveDirection } from '../share
 import { SectionPicker } from '../shared/section-picker';
 import { RepsField } from '../shared/reps-field';
 import type { ExerciseWithRow } from '../../api/types';
+import { ask } from '../../state/confirm';
+import { deleteTemplateCopy, discardChangesCopy } from '../shared/confirm-copy';
 
 export interface TemplateExerciseSlot {
   exercise_id: string;
@@ -125,9 +127,9 @@ export function TemplateEditor({ templateId }: Props) {
 
   const handleDelete = async () => {
     if (!token || !templateId) return;
-    if (!confirm('Delete this template? This cannot be undone.')) return;
     const tpl = templates.value.find((t) => t.id === templateId);
     if (!tpl) return;
+    if (!(await ask(deleteTemplateCopy(tpl.name, tpl.exercises.length)))) return;
     setSaving(true);
     try {
       await removeTemplate(templateId, tpl.exercises, token);
@@ -145,8 +147,8 @@ export function TemplateEditor({ templateId }: Props) {
     return false;
   };
 
-  const handleDiscard = () => {
-    if (isDirty() && !confirm('Discard changes? Your edits will not be saved.')) return;
+  const handleDiscard = async () => {
+    if (isDirty() && !(await ask(discardChangesCopy('template')))) return;
     if (templateId) {
       navigate(`/templates/${templateId}`);
     } else {

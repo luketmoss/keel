@@ -5,6 +5,7 @@ import { useAuth } from '../../auth/auth-context';
 import { getLabelColor, LABEL_COLORS } from '../../api/label-colors';
 import { ColorSwatchPicker } from '../shared/color-swatch-picker';
 import { ConfirmModal } from '../shared/confirm-modal';
+import { deleteLabelCopy } from '../shared/confirm-copy';
 import { navigate } from '../../router/router';
 import type { LabelWithRow } from '../../api/types';
 
@@ -70,6 +71,7 @@ export function ManageLabelsScreen() {
   };
 
   const allLabels = labels.value;
+  const labelCopy = deletingLabel ? deleteLabelCopy(deletingLabel.name, labelUsageCount(deletingLabel.name)) : null;
 
   return (
     <div class="screen manage-labels-screen">
@@ -201,11 +203,11 @@ export function ManageLabelsScreen() {
         )}
       </div>
 
-      {deletingLabel && (
+      {deletingLabel && labelCopy && (
         <ConfirmModal
-          title="Delete Label"
-          message={`Remove '${deletingLabel.name}'? It is used by ${labelUsageCount(deletingLabel.name)} exercises. This cannot be undone.`}
-          confirmLabel="Delete"
+          title={labelCopy.title}
+          message={labelCopy.message}
+          confirmLabel={labelCopy.confirmLabel}
           onConfirm={confirmDelete}
           onCancel={() => setDeletingLabel(null)}
         />

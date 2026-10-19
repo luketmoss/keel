@@ -4,6 +4,7 @@ import {
   applyStatusSideEffects as frontendApply,
   statusTransitionAuditAction as frontendAuditAction,
   isBoardArchived as frontendIsBoardArchived,
+  normalizeCompletedAt as frontendNormalizeCompletedAt,
 } from '../../frontend/src/state/rules';
 import type { Item } from '../../frontend/src/api/types';
 
@@ -242,5 +243,43 @@ describe('isBoardArchived parity', () => {
   ])('%s', (_name, board, expected) => {
     expect(frontendIsBoardArchived(board as { archived_at?: string } | null)).toBe(expected);
     expect(appsScript()(board)).toBe(expected);
+  });
+});
+
+// #458: both doors must accept and refuse the same completed_at values, and
+// store the same normalised string.
+describe('normalizeCompletedAt parity', () => {
+  const appsScript = () =>
+    loadAppsScriptRules().normalizeCompletedAt as (value: unknown, now: Date) => string | null;
+  const NOW_DATE = new Date('2026-10-18T12:00:00.000Z');
+
+  it.each([
+    ['a date, as noon UTC', '2026-10-16', '2026-10-16T12:00:00.000Z'],
+    ['a UTC timestamp', '2026-10-16T18:30:00Z', '2026-10-16T18:30:00.000Z'],
+    ['an offset timestamp', '2026-10-16T19:30:00+01:00', '2026-10-16T18:30:00.000Z'],
+    ['fractional seconds', '2026-10-16T18:30:00.123Z', '2026-10-16T18:30:00.123Z'],
+    ['no seconds', '2026-10-16T18:30Z', '2026-10-16T18:30:00.000Z'],
+    ['surrounding whitespace', '  2026-10-16  ', '2026-10-16T12:00:00.000Z'],
+    ['far in the past', '1999-12-31', '1999-12-31T12:00:00.000Z'],
+    ['just under 24 hours ahead', '2026-10-19T11:59:00Z', '2026-10-19T11:59:00.000Z'],
+    ['tomorrow as a date (noon is under 24 hours ahead)', '2026-10-19', '2026-10-19T12:00:00.000Z'],
+    ['empty', '', null],
+    ['blank', '   ', null],
+    ['null', null, null],
+    ['a number', 20261016, null],
+    ['words', 'yesterday', null],
+    ['an impossible date', '2026-02-30', null],
+    ['an impossible date with a time', '2026-02-30T10:00:00Z', null],
+    ['no zone', '2026-10-16T10:00:00', null],
+    ['over 24 hours ahead', '2026-10-19T12:00:01Z', null],
+    ['a space instead of T', '2026-10-16 10:00:00Z', null],
+  ])('agrees on %s', (_name, input, expected) => {
+    expect(frontendNormalizeCompletedAt(input, NOW_DATE)).toBe(expected);
+    expect(appsScript()(input, NOW_DATE)).toBe(expected);
+  });
+
+  it('accepts now as a timestamp or a Date on both copies', () => {
+    expect(frontendNormalizeCompletedAt('2026-10-19T12:00:00Z', '2026-10-18T12:00:00.000Z')).toBe('2026-10-19T12:00:00.000Z');
+    expect(appsScript()('2026-10-19T12:00:00Z', '2026-10-18T12:00:00.000Z' as unknown as Date)).toBe('2026-10-19T12:00:00.000Z');
   });
 });

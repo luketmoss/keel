@@ -136,6 +136,30 @@ function updateItem(id, changes, actor, callId) {
   if (changes.board_id !== undefined) assertBoardNotArchived(changes.board_id, archived);
   var allItems = getItems();
   var originalStatus = item.status; // #162: capture before any changes
+  var preCompletedAt = item.completed_at; // #458: the audit row's old value, before any side effect
+
+  // #458: an explicit completed_at is validated, and the item's post-call column
+  // checked, BEFORE any write — the audit rows below are written as the status
+  // branch runs, and a refusal must leave the Items row and the log untouched.
+  var explicitCompletedAt = null;
+  if (Object.prototype.hasOwnProperty.call(changes, 'completed_at')) {
+    explicitCompletedAt = normalizeCompletedAt(changes.completed_at, new Date());
+    if (explicitCompletedAt === null) {
+      throw new Error(
+        'completed_at must be a date (YYYY-MM-DD) or a full ISO 8601 timestamp with Z or an offset, ' +
+        'not more than 24 hours ahead. It cannot be empty: move the item out of its terminal column to clear it'
+      );
+    }
+    var landsIn = changes.status && changes.status !== item.status ? changes.status : item.status;
+    var landsTerminal = false;
+    if (item.board_id) {
+      var landsStatus = getStatuses(item.board_id).find(function(s) { return s.name === landsIn; });
+      landsTerminal = landsStatus ? landsStatus.is_terminal : false;
+    }
+    if (!landsTerminal) {
+      throw new Error('completed_at can only be set on an item in a terminal column');
+    }
+  }
 
   // Handle status change with business rules
   if (changes.status && changes.status !== item.status) {
@@ -187,6 +211,16 @@ function updateItem(id, changes, actor, callId) {
       var newValue = String(changes[field]);
       item[field] = changes[field];
       writeAuditEntry(id, 'updated', field, oldValue, newValue, actor, callId);
+    }
+  }
+
+  // #458: the explicit value wins over the automatic stamp, applied after the
+  // status side effects. It is logged as an ordinary field update, against the
+  // value before this call, and a no-op is not logged.
+  if (explicitCompletedAt !== null) {
+    item.completed_at = explicitCompletedAt;
+    if (preCompletedAt !== explicitCompletedAt) {
+      writeAuditEntry(id, 'updated', 'completed_at', String(preCompletedAt), explicitCompletedAt, actor, callId);
     }
   }
 

@@ -28,6 +28,10 @@
 //   ?action=undoCall&payload={"call_id":"abc123"}
 //   ?action=undoCall&payload={"call_id":"abc123","confirm":true}
 //
+// #458: backdate an item that is in (or is moving to) a terminal column. A date is
+// stored as noon UTC; a zoned timestamp is stored as its UTC instant:
+//   ?action=updateItem&payload={"id":"uuid","changes":{"completed_at":"2026-10-16"}}
+//
 // Delete is dry-run by default (#244). The first call reports the whole
 // cascade and writes nothing; the second must carry the token it returned:
 //   ?action=deleteItem&payload={"id":"uuid","actor":"smoke-test"}

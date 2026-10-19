@@ -3,14 +3,11 @@ import { describe, it, expect } from 'vitest';
 // Read the global CSS to verify dark-mode background rules are present.
 // jsdom does not support computed styles from stylesheets,
 // so we validate the CSS source directly via Node fs (available in vitest).
-// @ts-ignore -- Node builtins available at test runtime
-import { readFileSync } from 'fs';
-// @ts-ignore
-import { resolve } from 'path';
+// The tokens now come from the suite file (#446), so read the stylesheet the
+// build sees, with the suite's blocks resolved into it.
+import { readGlobalCss } from '../../test-css';
 
-// @ts-ignore -- __dirname available in vitest CJS context
-const cssPath = resolve(__dirname, '../../global.css');
-const css = readFileSync(cssPath, 'utf-8');
+const css = readGlobalCss();
 
 /**
  * Extract the CSS block for a given selector (top-level, not inside media queries).
@@ -64,8 +61,8 @@ describe('Dark mode subtask input backgrounds (Issue #111)', () => {
 
   // AC3: Light mode uses --color-surface which is #ffffff — verified by token definition
   describe('AC3: Light mode --color-surface is white', () => {
-    it(':root defines --color-surface: #ffffff', () => {
-      expect(css).toMatch(/:root\s*\{[^}]*--color-surface:\s*#ffffff/);
+    it('light theme defines --color-surface: #ffffff', () => {
+      expect(css).toMatch(/\[data-theme="light"\]\s*\{[^}]*--color-surface:\s*#ffffff/s);
     });
   });
 
@@ -87,15 +84,15 @@ describe('Dark mode subtask input backgrounds (Issue #111)', () => {
 
   // AC4: Dark mode contrast — --color-text on --color-surface meets WCAG AA
   describe('AC4: Dark mode tokens meet WCAG AA contrast', () => {
-    it('dark theme defines --color-surface: #1e1e1e', () => {
-      expect(css).toMatch(/\[data-theme="dark"\]\s*\{[^}]*--color-surface:\s*#1e1e1e/s);
+    it('dark theme defines --color-surface: #1a1a1e', () => {
+      expect(css).toMatch(/\[data-theme="dark"\]\s*\{[^}]*--color-surface:\s*#1a1a1e/s);
     });
 
     it('dark theme defines --color-text: #e8eaed', () => {
       expect(css).toMatch(/\[data-theme="dark"\]\s*\{[^}]*--color-text:\s*#e8eaed/s);
     });
 
-    it('contrast ratio of #e8eaed on #1e1e1e is >= 4.5:1 (WCAG AA)', () => {
+    it('contrast ratio of #e8eaed on #1a1a1e is >= 4.5:1 (WCAG AA)', () => {
       // Calculate WCAG 2.1 contrast ratio
       function sRGBtoLinear(c: number): number {
         const s = c / 255;
@@ -107,8 +104,8 @@ describe('Dark mode subtask input backgrounds (Issue #111)', () => {
 
       // #e8eaed text
       const textL = luminance(0xe8, 0xea, 0xed);
-      // #1e1e1e background
-      const bgL = luminance(0x1e, 0x1e, 0x1e);
+      // #1a1a1e background
+      const bgL = luminance(0x1a, 0x1a, 0x1e);
 
       const ratio = (Math.max(textL, bgL) + 0.05) / (Math.min(textL, bgL) + 0.05);
       expect(ratio).toBeGreaterThanOrEqual(4.5);

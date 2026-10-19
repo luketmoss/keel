@@ -40,7 +40,7 @@ const HIVE_ROOT = [
   '--column-width', '--header-height', '--control-bar-height',
 ];
 const HIVE_THEME = [
-  '--color-primary', '--color-primary-hover', '--color-primary-rgb', '--color-focus',
+  '--color-primary', '--color-primary-hover', '--color-primary-rgb', '--color-focus', '--color-on-primary',
   '--color-todo', '--color-inprogress', '--color-done',
   '--color-col-indigo', '--color-col-purple', '--color-col-pink', '--color-col-teal', '--color-col-amber',
   '--color-bucket-overdue', '--color-bucket-this-week', '--color-bucket-next-week', '--color-bucket-later',
@@ -85,6 +85,12 @@ describe('AC3: exactly this moves', () => {
   // The design note's tables. Each entry is [token, was, becomes]; `null` is
   // "not defined".
   const light: [string, string | null, string | null][] = [
+    // #447: the light primary family darkens, and gains --color-on-primary.
+    ['--color-primary', '#C49200', '#805F00'],
+    ['--color-primary-hover', '#A67B00', '#6B5000'],
+    ['--color-primary-rgb', '196, 146, 0', '128, 95, 0'],
+    ['--color-focus', '#C49200', '#805F00'],
+    ['--color-on-primary', null, '#ffffff'],
     ['--color-surface-raised', '#f8f9fa', '#ffffff'],
     ['--color-border-light', '#969696', '#e8eaed'],
     ['--color-text-muted', '#767676', '#606b76'],
@@ -103,6 +109,7 @@ describe('AC3: exactly this moves', () => {
     ['--shadow-lg', '0 4px 12px var(--overlay-3xl)', '0 4px 12px rgba(0,0,0,0.15)'],
   ];
   const dark: [string, string | null, string | null][] = [
+    ['--color-on-primary', null, '#1f1f1f'],
     ['--color-surface', '#1e1e1e', '#1a1a1e'],
     ['--color-surface-raised', '#2a2a2a', '#252528'],
     ['--color-border-light', '#787878', '#25252b'],

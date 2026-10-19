@@ -14,10 +14,10 @@ Hive.
 
 ## History
 
-Hive moved here from `luketmoss/hive`, which is frozen until #445 archives it, in #442: imported
-with its history, its process skills and board left behind. Its issues from
-before the move stay in that repo and are cited `luketmoss/hive#N`; a bare `#N`
-in Keel is a Keel issue. Imported commit messages were rewritten to the
+Hive moved here from `luketmoss/hive` in #442: imported with its history, its
+process skills and board left behind. The old repo is frozen until #445
+archives it. Its closed issues stay there and are cited `luketmoss/hive#N`
+(the two still open moved here, below); a bare `#N` in Keel is a Keel issue. Imported commit messages were rewritten to the
 qualified form. The hundreds of bare `#N` in code comments and test names were
 not: they predate the move and mean `luketmoss/hive#N`.
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { LOCATE_MAX_ZOOM, accuracyCorners } from './locateCamera'
+import { LOCATE_MAX_ZOOM, accuracyCorners } from './locateFraming'
 import type { PositionFix } from './useGeolocation'
 
 function fix(lat: number, lng: number, accuracyMeters: number): PositionFix {

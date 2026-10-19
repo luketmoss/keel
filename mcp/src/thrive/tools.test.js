@@ -21,7 +21,7 @@ const W_FIELDS = [
   'id', 'date', 'time', 'type', 'name', 'template_id', 'notes', 'elapsed_seconds', 'created',
   'copied_from', 'status', 'moving_seconds', 'effort', 'distance_m', 'ascent_m', 'descent_m',
   'avg_hr', 'sub_type', 'source', 'source_activity_id', 'raw_ref', 'fit_ref', 'fit_fetched_at',
-  'synced_at', 'started_at_utc', 'calories', 'estimated_seconds',
+  'synced_at', 'started_at_utc', 'calories', 'estimated_seconds', 'track_ref',
 ];
 const workout = (o) => ({ ...Object.fromEntries(W_FIELDS.map((f) => [f, o[f] ?? ''])), sheetRow: 2 });
 
@@ -248,10 +248,11 @@ test('thrive_get_workout adds the synced fields and omits blanks', async () => {
   assert.match(synced, /- Started at: 2026-09-24T07:30:00-06:00/);
   assert.match(synced, /- Provenance: synced from COROS \(activity 4711, last synced 2026-09-24T17:41:10.000Z\)/);
   assert.match(synced, /- FIT file: not fetched yet/);
+  assert.match(synced, /- GPS track: none/);
 
   const manual = (await call('thrive_get_workout', { workout_id: 'w_man' })).text;
   assert.match(manual, /- Provenance: hand-logged/);
-  assert.doesNotMatch(manual, /Calories|Moving time|Distance|FIT/);
+  assert.doesNotMatch(manual, /Calories|Moving time|Distance|FIT|GPS track/);
 });
 
 // --- #179 ----------------------------------------------------------------

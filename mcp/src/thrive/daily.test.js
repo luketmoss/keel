@@ -42,7 +42,7 @@ const WORKOUT_FIELDS = [
   'id', 'date', 'time', 'type', 'name', 'template_id', 'notes', 'elapsed_seconds', 'created',
   'copied_from', 'status', 'moving_seconds', 'effort', 'distance_m', 'ascent_m', 'descent_m',
   'avg_hr', 'sub_type', 'source', 'source_activity_id', 'raw_ref', 'fit_ref', 'fit_fetched_at',
-  'synced_at', 'started_at_utc', 'calories',
+  'synced_at', 'started_at_utc', 'calories', 'track_ref',
 ];
 const workout = (o) => Object.fromEntries(WORKOUT_FIELDS.map((f) => [f, o[f] ?? '']));
 
@@ -272,7 +272,7 @@ const synced = workout({
   elapsed_seconds: '5400', moving_seconds: '5100', distance_m: '19956', calories: '640',
   source: 'coros', source_activity_id: '471166302945817201', raw_ref: 'raw-1',
   fit_ref: 'fit-1', fit_fetched_at: '2026-09-24T17:41:10.000Z', synced_at: '2026-09-24T17:41:10.000Z',
-  started_at_utc: '2026-09-24T07:30:00-06:00',
+  started_at_utc: '2026-09-24T07:30:00-06:00', track_ref: 'trk-1',
 });
 const enriched = workout({
   id: 'w_e', type: 'weight', name: 'Upper Push', avg_hr: '88', calories: '310',
@@ -295,7 +295,16 @@ test('a synced workout reports moving time, calories, start, provenance and arch
     '- Provenance: synced from COROS (activity 471166302945817201, last synced 2026-09-24T17:41:10.000Z)',
     '- Raw vendor payload: archived in Drive (raw-1); read it with thrive_get_workout_payload',
     '- FIT file: archived in Drive (fit-1), fetched 2026-09-24T17:41:10.000Z',
+    '- GPS track: stored in Drive (trk-1)',
   ]);
+});
+
+test('a synced workout with no track says so, whatever the reason (#432)', () => {
+  const none = describeSyncedFields({ ...synced, track_ref: '' });
+  assert.equal(none.at(-1), '- GPS track: none');
+  // An older API that does not return the field at all reads the same.
+  const { track_ref: _dropped, ...older } = synced;
+  assert.equal(describeSyncedFields(older).at(-1), '- GPS track: none');
 });
 
 test('FIT status tells settled-without-a-file apart from not fetched yet', () => {
@@ -305,7 +314,7 @@ test('FIT status tells settled-without-a-file apart from not fetched yet', () =>
   assert.ok(pending.includes('- FIT file: not fetched yet'));
 });
 
-test('an enriched workout names its link and makes no FIT claim', () => {
+test('an enriched workout names its link and makes no FIT or GPS track claim', () => {
   assert.deepEqual(describeSyncedFields(enriched), [
     '- Calories: 310 kcal',
     '- Provenance: hand-logged, enriched from COROS (activity 471093115402967310, last synced 2026-09-23T13:00:00.000Z)',

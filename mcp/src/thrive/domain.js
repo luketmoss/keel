@@ -427,6 +427,8 @@ export function buildWorkout(data) {
     synced_at: '',
     started_at_utc: '',
     calories: '',
+    // #432: sync-owned, like the provenance columns above.
+    track_ref: '',
     // #145: a plan's estimate, seconds. Only ever what the caller said.
     estimated_seconds: data.estimated_seconds || '',
   };
@@ -566,6 +568,10 @@ export function describeSyncedFields(w) {
     if (w.fit_ref) out.push(`- FIT file: archived in Drive (${w.fit_ref}), fetched ${w.fit_fetched_at || 'at an unknown time'}`);
     else if (w.fit_fetched_at) out.push(`- FIT file: none, and none will be fetched (settled ${w.fit_fetched_at})`);
     else out.push('- FIT file: not fetched yet');
+    // #432: the simplified GPS track the sync builds from the FIT. Blank means no map, whatever the
+    // reason (indoors, no valid positions, an unreadable FIT, not built yet), so the line says only
+    // that there is none, and does not guess why.
+    out.push(w.track_ref ? `- GPS track: stored in Drive (${w.track_ref})` : '- GPS track: none');
   }
   return out;
 }

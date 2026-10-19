@@ -33,6 +33,7 @@ added to a tab is added in both.
 | `src/body-measurements.js` | `BodyMeasurements` upsert by Withings `grpid`, for the Withings sync (#198) |
 | `src/sync-log.js` | `SyncLog` append and newest-first read, one row per sync run (#156) |
 | `src/sync-requests.js` | The `SyncRequests` poller: a time-driven trigger that dispatches the sync workflows, and its install/remove functions (#314). Not a web-app action |
+| `src/change-log.js` | The MCP change log: `MCPChangeLog` rows for every MCP-key write, `getChangeLog`, and `undoCall` (#434) |
 | `src/snapshot.js` | The daily Drive copy of the sheet, its install/remove functions, and retention (#433). Not a web-app action |
 | `src/auth.js` | Who is calling: the key, the Google-token check, its cache, the token read allow-list (#144) |
 | `src/main.js` | `doGet`/`doPost` dispatch, response envelope |
@@ -732,6 +733,40 @@ under ~2 s, by changing the constant, pushing, and running
 
 Re-deploy after every `clasp push` — Apps Script serves the last *deployed*
 version, not the last pushed one.
+
+## MCP change log and undo (#434)
+
+Every write made with `MCP_API_KEY` (the Keel MCP Worker's key; `API_KEY`, the
+SPA's token and the syncs are never logged) appends one `MCPChangeLog` row per
+sheet row it created, changed or deleted: `logged_at`, `call_id`, `action`,
+`tab`, `row_key`, `before_json`, `after_json`. It is called the change log, never
+the journal: `Journal` and `thrive_journal` are the daily notes.
+
+- **Logged actions:** `createWorkout`, `updateWorkout`, `deleteWorkout` (the
+  workout and each of its sets), `appendSets`, `updateSets`, `createExercise`,
+  `updateExercise` (including the rename's rows in Templates and Sets),
+  `deleteExercise`, `createTemplate`, `replaceTemplate` and `upsertJournal`
+  (a blanked note is a deletion). Sync-only actions are never logged.
+- **How:** the write runs under the script lock, and the tabs it can change are
+  read before and after, so the log holds exactly the rows that landed: nothing
+  for a write refused by validation, the landed rows for one that failed halfway.
+- **`call_id`:** a payload may carry `call_id` (1-64 of `[A-Za-z0-9_-]`) so the
+  several requests of one tool call share it. A missing or invalid one is
+  replaced with a fresh id, never refused.
+- **Row keys:** Workouts and Exercises `{id}`, Journal `{date}`, Templates
+  `{template_id, order}`, Sets `{workout_id, section, exercise_order, set_number}`
+  (a second row with the same key gets `dup`).
+- **The tab must exist.** Run `scripts/migrate-423-mcp-change-log-tab.mjs`; until
+  then an MCP write answers `MCPChangeLog tab missing — run
+  scripts/migrate-423-mcp-change-log-tab.mjs` and writes nothing.
+- **`getChangeLog`** (either key; never a token caller): `call_id`, `since`,
+  `limit` (default 200, max 1000). Newest call first, `before` and `after` parsed.
+- **`undoCall`** (`MCP_API_KEY` only): `{call_id}` previews, `{call_id, confirm:
+  true}` reverts: a deleted row comes back with its original key, a created row
+  is deleted, an updated row is rewritten whole. If any row no longer holds what
+  the call left, nothing is restored and every conflict is named (with current
+  and expected values). The revert is logged as a call with action `undo`, so it
+  can be undone.
 
 ## Daily snapshot (#433)
 

@@ -344,6 +344,8 @@ const KEY_ONLY_ACTIONS = [
   'getWorkoutPayload',
   // Journal text is personal and nothing needs it by token (#234): a read, key-only.
   'getJournal', 'upsertJournal',
+  // The MCP change log and its undo are key-only (#434): the log holds row values.
+  'getChangeLog', 'undoCall',
 ];
 
 const READ_PARAMS: Record<string, Record<string, string>> = {
@@ -397,6 +399,7 @@ describe('AC4: token callers run only the named reads', () => {
     getWorkoutPayload: {},
     getJournal: {},
     upsertJournal: { date: '2026-09-15', note: 'hello' },
+    getChangeLog: {}, undoCall: { call_id: 'c1', confirm: true },
   };
 
   for (const action of KEY_ONLY_ACTIONS) {

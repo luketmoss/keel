@@ -297,6 +297,24 @@ var JOURNAL_FIELDS = [
 
 var JOURNAL_COLUMN_COUNT = 4;
 
+// --- MCPChangeLog (A:G) — #434 ------------------------------------------------
+//
+// One row per sheet row an MCP-key write created, changed or deleted, written by
+// change-log.js and by nothing else. `before_json` is blank for a created row
+// and `after_json` for a deleted one. Created by
+// scripts/migrate-423-mcp-change-log-tab.mjs; later columns are only appended.
+var CHANGE_LOG_FIELDS = [
+  'logged_at',   // A  ISO 8601 UTC
+  'call_id',     // B  one MCP tool call's id: 1-64 of [A-Za-z0-9_-]
+  'action',      // C  the API action, or `undo`
+  'tab',         // D  Workouts | Sets | Exercises | Templates | Journal
+  'row_key',     // E  JSON identifying the row, per tab (change-log.js changeTabs)
+  'before_json', // F  the whole row before, as the API's domain object
+  'after_json',  // G  the whole row after
+];
+
+var CHANGE_LOG_COLUMN_COUNT = 7;
+
 
 // --- SyncRequests (A:I) — #314 --------------------------------------
 //

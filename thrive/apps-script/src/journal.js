@@ -62,7 +62,8 @@ function getJournalRows(filters) {
  *  - non-blank note, row exists: rewrite it in place, keeping `created`
  *  - blank or whitespace-only note: delete the row if there is one, else no-op
  *
- * The payload is exactly `date` and `note`; anything else is rejected. `note`
+ * The payload is exactly `date` and `note`, plus an optional `call_id` (#434);
+ * anything else is rejected. `note`
  * is free text and stored as given (every write through asText(), so a note
  * starting `=` is text, never a formula).
  *
@@ -77,7 +78,8 @@ function upsertJournal(payload) {
   }
   for (var key in payload) {
     if (!Object.prototype.hasOwnProperty.call(payload, key)) continue;
-    if (key !== 'date' && key !== 'note') {
+    // `call_id` (#434) only groups the change-log rows; it is never stored.
+    if (key !== 'date' && key !== 'note' && key !== 'call_id') {
       throw new Error('unknown field "' + key + '". Valid fields: date, note');
     }
   }

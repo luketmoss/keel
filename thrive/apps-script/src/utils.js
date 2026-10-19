@@ -149,13 +149,22 @@ function validateDate(field, value) {
  * read-then-write (#156). A scheduled sync overlapping a local one would
  * otherwise both see "no row" and both append. The SPA writes Sheets directly
  * and is not covered; the sync's writes are the ones that race each other.
+ *
+ * Re-entrant within one execution (#434): an MCP write is logged under the lock
+ * `withChangeLog` already holds, and some of those writes (`upsertJournal`) take
+ * it themselves. The inner call runs inside the outer one's hold.
  */
+var SCRIPT_LOCK_DEPTH = 0;
+
 function withScriptLock(fn) {
+  if (SCRIPT_LOCK_DEPTH > 0) return fn();
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
+  SCRIPT_LOCK_DEPTH++;
   try {
     return fn();
   } finally {
+    SCRIPT_LOCK_DEPTH--;
     lock.releaseLock();
   }
 }

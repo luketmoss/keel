@@ -1,25 +1,32 @@
-/* === Design Tokens === */
-:root {
-  /* Surfaces & background */
-  --color-bg: #f0f2f5;
-  --color-surface: #ffffff;
+/* The suite's shared tokens (#402, #446): scales, neutrals, status and
+   overlays. Imported first, so what follows is Hive's own and wins any clash. */
+@import '../../../ui/tokens/suite.css';
 
+/* === Design Tokens === */
+
+/* Theme-independent: identical in both themes. */
+:root {
   /* Brand colours — two-tier system:
      --color-accent (#F5B700): logo/branding/decorative (same both modes)
      --color-primary: interactive elements, tuned for WCAG AA contrast per mode */
   --color-accent: #F5B700;
+  /* Alpha-blended highlight; it follows --color-primary in either theme */
+  --color-primary-light: color-mix(in srgb, var(--color-primary) 8%, transparent);
+
+  /* Layout */
+  --focus-ring: 0 0 0 2px var(--color-focus);
+  --column-width: 320px;
+  --header-height: 44px;
+  --control-bar-height: 44px;
+}
+
+/* === Light theme === */
+[data-theme="light"] {
   --color-primary: #C49200;
   --color-primary-hover: #A67B00;
   /* RGB components for alpha-blended highlights */
   --color-primary-rgb: 196, 146, 0;
-  --color-primary-light: color-mix(in srgb, var(--color-primary) 8%, transparent);
-
-  /* Text */
-  --color-text: #1f1f1f;
-  --color-text-secondary: #5f6368;
-
-  /* Borders */
-  --color-border: #dadce0;
+  --color-focus: #C49200;
 
   /* Column pastels */
   --color-todo: #e3f2fd;
@@ -37,86 +44,20 @@
   --color-bucket-next-week: #e3f2fd;
   --color-bucket-later: #f5f5f5;
 
-  /* Status colours */
-  --color-danger: #d32f2f;
-  --color-danger-hover: #b71c1c;
-  --color-warning: #a05d00;
   /* WCAG AA ≥4.5:1 at 12px on --color-bg (#f0f2f5): #b71c1c → 5.4:1 ✓ */
   --color-overdue: #b71c1c;
-  --color-success: #2e7d32;
 
   /* Demo banner */
   --color-demo-bg: #fff3cd;
   --color-demo-text: #856404;
-
-  /* Overlay / shadow tokens — expressed as alpha-only rgba so they work with any bg */
-  --overlay-xs: rgba(0, 0, 0, 0.02);
-  --overlay-sm: rgba(0, 0, 0, 0.03);
-  --overlay-md: rgba(0, 0, 0, 0.05);
-  --overlay-lg: rgba(0, 0, 0, 0.06);
-  --overlay-xl: rgba(0, 0, 0, 0.08);
-  --overlay-2xl: rgba(0, 0, 0, 0.1);
-  --overlay-3xl: rgba(0, 0, 0, 0.15);
-  --overlay-4xl: rgba(0, 0, 0, 0.4);
-  --overlay-badge: rgba(0, 0, 0, 0.15);
-  --overlay-view-toggle: rgba(0, 0, 0, 0.04);
-
-  /* Spacing scale */
-  --space-xs: 4px;
-  --space-sm: 8px;
-  --space-md: 16px;
-  --space-lg: 24px;
-  --space-xl: 32px;
-  --space-2xl: 48px;
-
-  /* Typography scale */
-  --text-xs: 0.75rem;
-  --text-sm: 0.875rem;
-  --text-base: 1rem;
-  --text-lg: 1.125rem;
-  --text-xl: 1.25rem;
-  --text-2xl: 1.5rem;
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  --font-mono: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, Consolas, monospace;
-
-  /* Transitions */
-  --transition-fast: 150ms ease;
-  --transition-normal: 250ms ease;
-
-  /* Surface tokens */
-  --color-surface-raised: #f8f9fa;
-  --color-border-light: #969696;
-  --color-text-muted: #767676;
-
-  /* Layout */
-  --radius: 8px;
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 16px;
-  --radius-full: 9999px;
-  --shadow: 0 1px 3px var(--overlay-3xl), 0 1px 2px var(--overlay-md);
-  --shadow-lg: 0 4px 12px var(--overlay-3xl);
-  --color-focus: #C49200;
-  --focus-ring: 0 0 0 2px var(--color-focus);
-  --column-width: 320px;
-  --header-height: 44px;
-  --control-bar-height: 44px;
 }
 
-/* === Dark mode token overrides === */
+/* === Dark theme === */
 [data-theme="dark"] {
-  --color-bg: #121212;
-  --color-surface: #1e1e1e;
-
-  --color-accent: #F5B700;
   --color-primary: #F5B700;
   --color-primary-hover: #FFD54F;
   --color-primary-rgb: 245, 183, 0;
-
-  --color-text: #e8eaed;
-  --color-text-secondary: #9aa0a6;
-
-  --color-border: #3c3c3c;
+  --color-focus: #F5B700;
 
   /* Muted pastels for dark backgrounds — distinct, readable */
   --color-todo: #1a2a3a;
@@ -134,36 +75,15 @@
   --color-bucket-next-week: #1a2e3b;
   --color-bucket-later: #2a2a2a;
 
-  --color-danger: #ef5350;
-  --color-danger-hover: #e53935;
-  --color-warning: #ffb74d;
   /* WCAG AA ≥4.5:1 at 12px on --color-bg (#121212): #ff6b6b → 5.1:1 ✓ */
   --color-overdue: #ff6b6b;
-  --color-success: #66bb6a;
 
   --color-demo-bg: #3a2e00;
   --color-demo-text: #ffd54f;
 
-  /* Dark overlays should lighten rather than darken */
-  --overlay-xs: rgba(255, 255, 255, 0.02);
-  --overlay-sm: rgba(255, 255, 255, 0.03);
-  --overlay-md: rgba(255, 255, 255, 0.05);
-  --overlay-lg: rgba(255, 255, 255, 0.06);
-  --overlay-xl: rgba(255, 255, 255, 0.08);
-  --overlay-2xl: rgba(255, 255, 255, 0.1);
-  --overlay-3xl: rgba(255, 255, 255, 0.15);
-  --overlay-4xl: rgba(0, 0, 0, 0.6);
-  --overlay-badge: rgba(255, 255, 255, 0.15);
-  --overlay-view-toggle: rgba(255, 255, 255, 0.04);
-
-  --color-surface-raised: #2a2a2a;
-  --color-border-light: #787878;
-  --color-text-muted: #8b8b8b;
-
+  /* The suite's shadows are light-mode optimised; Hive keeps its own for dark */
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.5);
-  --color-focus: #F5B700;
-  --focus-ring: 0 0 0 2px var(--color-focus);
 }
 
 /* Date inputs: tell the browser to use dark-themed controls in dark mode */
@@ -219,7 +139,7 @@ body {
   background: transparent;
   color: var(--color-text-secondary);
 }
-.btn-ghost:hover { background: var(--overlay-md); }
+.btn-ghost:hover { background: var(--overlay-xs); }
 
 .btn-danger {
   background: var(--color-danger);
@@ -346,14 +266,14 @@ body {
 }
 
 .theme-toggle-btn:hover {
-  background: var(--overlay-md);
+  background: var(--overlay-xs);
   color: var(--color-text);
 }
 
 .theme-toggle-active {
   background: var(--color-surface);
   color: var(--color-text);
-  box-shadow: 0 1px 3px var(--overlay-3xl);
+  box-shadow: 0 1px 3px var(--color-shadow-strong);
 }
 
 .theme-toggle-active:hover {
@@ -458,7 +378,7 @@ body {
 
 .user-dropdown-trigger:hover,
 .user-dropdown-trigger:focus-visible {
-  background: var(--overlay-md);
+  background: var(--overlay-xs);
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
@@ -532,7 +452,7 @@ body {
 }
 
 .user-dropdown-edit-profile:hover {
-  background: var(--overlay-md);
+  background: var(--overlay-xs);
 }
 
 .user-dropdown-edit-profile:focus-visible {
@@ -553,7 +473,7 @@ body {
 }
 
 .user-dropdown-signout:hover {
-  background: var(--overlay-md);
+  background: var(--overlay-xs);
 }
 
 .user-dropdown-signout:focus-visible {
@@ -625,7 +545,7 @@ body {
 }
 
 .overflow-menu-btn:hover {
-  background: var(--overlay-md);
+  background: var(--overlay-xs);
   color: var(--color-text);
 }
 
@@ -666,7 +586,7 @@ body {
 }
 
 .overflow-menu-item:hover {
-  background: var(--overlay-md);
+  background: var(--overlay-xs);
 }
 
 .overflow-menu-item:focus-visible {
@@ -730,7 +650,7 @@ body {
 }
 
 .filter-search-clear:hover {
-  background: var(--overlay-md);
+  background: var(--overlay-xs);
   color: var(--color-text);
 }
 
@@ -806,7 +726,7 @@ body {
 }
 
 .control-bar-chip-remove:hover {
-  background: var(--overlay-md);
+  background: var(--overlay-xs);
 }
 
 .control-bar-chip-more {
@@ -825,7 +745,7 @@ body {
 }
 
 .control-bar-chip-more:hover {
-  background: var(--overlay-md);
+  background: var(--overlay-xs);
 }
 
 .control-bar-chip-more:focus-visible {
@@ -1041,7 +961,7 @@ body {
 }
 
 .column-count {
-  background: var(--overlay-badge);
+  background: var(--overlay-lg);
   color: var(--color-text);
   font-size: 12px;
   font-weight: 600;
@@ -1088,7 +1008,7 @@ body {
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-md, 8px);
   background: transparent;
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
   font-size: 13px;
   cursor: pointer;
   text-align: left;
@@ -1121,7 +1041,7 @@ body {
 .column-date-sort-overlay {
   position: absolute;
   inset: 0;
-  background: var(--overlay-4xl);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1690,9 +1610,9 @@ body {
   margin-bottom: 8px;
   background: transparent;
   color: var(--color-text);
-  border: 1px solid var(--color-border-light);
+  border: 1px solid var(--color-border-strong);
 }
-.share-archive-board-btn:hover:not(:disabled) { background: var(--overlay-md); }
+.share-archive-board-btn:hover:not(:disabled) { background: var(--overlay-xs); }
 .share-archive-board-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* === Archived Boards Dialog (#288) === */
@@ -1933,7 +1853,7 @@ body {
 .detail-overlay {
   position: fixed;
   inset: 0;
-  background: var(--overlay-4xl);
+  background: var(--color-overlay);
   z-index: 100;
   display: flex;
   justify-content: flex-end;
@@ -1947,7 +1867,7 @@ body {
   height: 100%;
   display: flex;
   flex-direction: column;
-  box-shadow: -4px 0 12px var(--overlay-3xl);
+  box-shadow: -4px 0 12px var(--color-shadow-strong);
   overflow-y: auto;
   transition: width 200ms ease;
 }
@@ -2056,7 +1976,7 @@ body {
   min-width: 0;
   padding: 10px 8px 10px 16px;
   border: none;
-  background: var(--overlay-md);
+  background: var(--overlay-xs);
   color: var(--color-text-muted);
   font-size: 12px;
   font-weight: 500;
@@ -2083,7 +2003,7 @@ body {
   padding-right: 12px;
 }
 .status-chevron.reached {
-  background: var(--overlay-xl);
+  background: var(--overlay-sm);
   color: var(--color-text-secondary);
 }
 .status-chevron.active {
@@ -2092,7 +2012,7 @@ body {
   font-size: 13px;
 }
 .status-chevron:not(.active):hover {
-  background: var(--overlay-2xl);
+  background: var(--overlay-md);
 }
 
 /* === #220: Owner avatar circles === */
@@ -2238,7 +2158,7 @@ body {
   transition: all var(--transition-fast);
 }
 .due-clear-btn:hover {
-  background: var(--overlay-xl);
+  background: var(--overlay-sm);
   color: var(--color-danger);
 }
 .due-clear-btn svg {
@@ -2324,7 +2244,7 @@ body {
   transition: all var(--transition-fast);
 }
 .label-gear-btn:hover {
-  background: var(--overlay-xl);
+  background: var(--overlay-sm);
   color: var(--color-text);
 }
 
@@ -2492,7 +2412,7 @@ body {
   width: 22px;
   height: 22px;
   border-radius: 6px;
-  border: 2px solid var(--color-border-light);
+  border: 2px solid var(--color-border-strong);
   background: transparent;
   display: flex;
   align-items: center;
@@ -2627,7 +2547,7 @@ body {
   flex-shrink: 0;
 }
 .subtask-kebab-btn:hover {
-  background: var(--overlay-xl);
+  background: var(--overlay-sm);
   color: var(--color-text);
 }
 
@@ -2659,7 +2579,7 @@ body {
   text-align: left;
 }
 .subtask-context-menu button:hover {
-  background: var(--overlay-sm);
+  background: var(--overlay-xs);
 }
 .subtask-context-menu button.danger {
   color: var(--color-danger);
@@ -2710,7 +2630,7 @@ body {
   color: var(--color-overdue);
 }
 .subtask-date-inline.done {
-  background: var(--overlay-md);
+  background: var(--overlay-xs);
   color: var(--color-text-muted);
   text-decoration: line-through;
 }
@@ -2904,7 +2824,7 @@ body {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: var(--overlay-4xl);
+  background: var(--color-overlay);
   z-index: 200;
   display: flex;
   align-items: center;
@@ -3143,7 +3063,7 @@ body {
 }
 
 .archive-search-clear:hover {
-  background: var(--overlay-xl);
+  background: var(--overlay-sm);
   color: var(--color-text);
 }
 
@@ -3507,7 +3427,7 @@ body {
 }
 
 .view-toggle-btn:hover {
-  background: var(--overlay-view-toggle);
+  background: var(--overlay-xs);
 }
 
 .view-toggle-active {
@@ -3546,7 +3466,7 @@ body {
 }
 
 .list-section-count {
-  background: var(--overlay-2xl);
+  background: var(--overlay-md);
   color: var(--color-text-secondary);
   font-size: 12px;
   font-weight: 600;
@@ -3692,7 +3612,7 @@ body {
 }
 
 .btn-icon:hover {
-  background: var(--overlay-xl);
+  background: var(--overlay-sm);
   color: var(--color-text);
 }
 
@@ -3978,7 +3898,7 @@ body {
 }
 
 .filter-popup-close:hover {
-  background: var(--overlay-sm);
+  background: var(--overlay-xs);
   color: var(--color-text);
 }
 
@@ -4301,7 +4221,7 @@ body {
 .control-bar-view-tabs {
   display: flex;
   gap: 2px;
-  background: var(--overlay-view-toggle);
+  background: var(--overlay-xs);
   border-radius: var(--radius-sm);
   padding: 2px;
   align-self: stretch;
@@ -4323,7 +4243,7 @@ body {
 }
 
 .view-tab:hover {
-  background: var(--overlay-sm);
+  background: var(--overlay-xs);
 }
 
 .view-tab:focus-visible {
@@ -4334,7 +4254,7 @@ body {
 .view-tab-active {
   background: var(--color-surface);
   color: var(--color-primary);
-  box-shadow: 0 1px 2px var(--overlay-md);
+  box-shadow: 0 1px 2px var(--color-shadow);
 }
 
 /* === Upcoming view === */

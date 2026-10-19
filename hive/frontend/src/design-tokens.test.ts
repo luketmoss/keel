@@ -1,13 +1,10 @@
 import { describe, it, expect } from 'vitest';
 
-// @ts-ignore -- Node builtins available at test runtime
-import { readFileSync } from 'fs';
-// @ts-ignore
-import { resolve } from 'path';
+import { readGlobalCss } from './test-css';
 
-// @ts-ignore -- __dirname available in vitest CJS context
-const cssPath = resolve(__dirname, 'global.css');
-const css = readFileSync(cssPath, 'utf-8');
+// The tokens come from the suite file (#446), so read the stylesheet the build
+// sees: global.css with ui/tokens/suite.css resolved into its token blocks.
+const css = readGlobalCss();
 
 /**
  * Extract the content of the :root block from CSS source.
@@ -47,6 +44,24 @@ function extractDarkBlock(source: string): string {
 }
 
 const darkBlock = extractDarkBlock(css);
+
+// Hive's light theme has a block of its own since #446; it used to be :root.
+function extractLightBlock(source: string): string {
+  const re = /\[data-theme=["']light["']\]\s*\{/g;
+  const match = re.exec(source);
+  if (!match) return '';
+  let depth = 1;
+  let i = match.index + match[0].length;
+  const start = i;
+  while (i < source.length && depth > 0) {
+    if (source[i] === '{') depth++;
+    if (source[i] === '}') depth--;
+    i++;
+  }
+  return source.slice(start, i - 1);
+}
+
+const lightBlock = extractLightBlock(css);
 
 describe('Design tokens: shared vocabulary (Issue #191)', () => {
   describe('AC1: Spacing scale tokens', () => {
@@ -94,28 +109,31 @@ describe('Design tokens: shared vocabulary (Issue #191)', () => {
   });
 
   describe('AC4: Surface and text colour tokens', () => {
-    it('--color-surface-raised is #f8f9fa in :root', () => {
-      expect(rootBlock).toMatch(/--color-surface-raised:\s*#f8f9fa/);
+    // #446: the suite supplies these. Raised is white in light, muted text is
+    // the AA tone, and --color-border-light is the suite's hairline; Hive's old
+    // outline meaning moved to --color-border-strong.
+    it('--color-surface-raised is #ffffff in [data-theme="light"]', () => {
+      expect(lightBlock).toMatch(/--color-surface-raised:\s*#ffffff/);
     });
 
-    it('--color-border-light is #969696 in :root', () => {
-      expect(rootBlock).toMatch(/--color-border-light:\s*#969696/);
+    it('--color-border-light is #e8eaed in [data-theme="light"]', () => {
+      expect(lightBlock).toMatch(/--color-border-light:\s*#e8eaed/);
     });
 
-    it('--color-text-muted is #767676 in :root', () => {
-      expect(rootBlock).toMatch(/--color-text-muted:\s*#767676/);
+    it('--color-text-muted is #606b76 in [data-theme="light"]', () => {
+      expect(lightBlock).toMatch(/--color-text-muted:\s*#606b76/);
     });
 
-    it('--color-surface-raised is #2a2a2a in [data-theme="dark"]', () => {
-      expect(darkBlock).toMatch(/--color-surface-raised:\s*#2a2a2a/);
+    it('--color-surface-raised is #252528 in [data-theme="dark"]', () => {
+      expect(darkBlock).toMatch(/--color-surface-raised:\s*#252528/);
     });
 
-    it('--color-border-light is #787878 in [data-theme="dark"]', () => {
-      expect(darkBlock).toMatch(/--color-border-light:\s*#787878/);
+    it('--color-border-light is #25252b in [data-theme="dark"]', () => {
+      expect(darkBlock).toMatch(/--color-border-light:\s*#25252b/);
     });
 
-    it('--color-text-muted is #8b8b8b in [data-theme="dark"]', () => {
-      expect(darkBlock).toMatch(/--color-text-muted:\s*#8b8b8b/);
+    it('--color-text-muted is #868e98 in [data-theme="dark"]', () => {
+      expect(darkBlock).toMatch(/--color-text-muted:\s*#868e98/);
     });
   });
 
@@ -144,17 +162,17 @@ describe('Design tokens: shared vocabulary (Issue #191)', () => {
 
 describe('Design tokens: gold color scheme (Issue #190)', () => {
   describe('AC1: Gold primary tokens in light mode', () => {
-    it('--color-primary is #C49200 in :root', () => {
-      expect(rootBlock).toMatch(/--color-primary:\s*#C49200/);
+    it('--color-primary is #C49200 in light theme', () => {
+      expect(lightBlock).toMatch(/--color-primary:\s*#C49200/);
     });
-    it('--color-primary-hover is #A67B00 in :root', () => {
-      expect(rootBlock).toMatch(/--color-primary-hover:\s*#A67B00/);
+    it('--color-primary-hover is #A67B00 in light theme', () => {
+      expect(lightBlock).toMatch(/--color-primary-hover:\s*#A67B00/);
     });
-    it('--color-primary-rgb is 196, 146, 0 in :root', () => {
-      expect(rootBlock).toMatch(/--color-primary-rgb:\s*196, 146, 0/);
+    it('--color-primary-rgb is 196, 146, 0 in light theme', () => {
+      expect(lightBlock).toMatch(/--color-primary-rgb:\s*196, 146, 0/);
     });
-    it('--color-focus is #C49200 in :root', () => {
-      expect(rootBlock).toMatch(/--color-focus:\s*#C49200/);
+    it('--color-focus is #C49200 in light theme', () => {
+      expect(lightBlock).toMatch(/--color-focus:\s*#C49200/);
     });
   });
 
@@ -177,8 +195,9 @@ describe('Design tokens: gold color scheme (Issue #190)', () => {
     it('--color-accent is #F5B700 in :root', () => {
       expect(rootBlock).toMatch(/--color-accent:\s*#F5B700/);
     });
-    it('--color-accent is #F5B700 in dark mode', () => {
-      expect(darkBlock).toMatch(/--color-accent:\s*#F5B700/);
+    it('--color-accent is not redefined per theme, so it is #F5B700 in dark mode too', () => {
+      expect(darkBlock).not.toMatch(/--color-accent:/);
+      expect(lightBlock).not.toMatch(/--color-accent:/);
     });
   });
 
@@ -218,19 +237,19 @@ describe('Design tokens: gold color scheme (Issue #190)', () => {
 
   describe('AC6: Semantic and neutral tokens unchanged', () => {
     it('--color-bg is #f0f2f5', () => {
-      expect(rootBlock).toMatch(/--color-bg:\s*#f0f2f5/);
+      expect(lightBlock).toMatch(/--color-bg:\s*#f0f2f5/);
     });
     it('--color-surface is #ffffff', () => {
-      expect(rootBlock).toMatch(/--color-surface:\s*#ffffff/);
+      expect(lightBlock).toMatch(/--color-surface:\s*#ffffff/);
     });
     it('--color-border is #dadce0', () => {
-      expect(rootBlock).toMatch(/--color-border:\s*#dadce0/);
+      expect(lightBlock).toMatch(/--color-border:\s*#dadce0/);
     });
     it('--color-text is #1f1f1f', () => {
-      expect(rootBlock).toMatch(/--color-text:\s*#1f1f1f/);
+      expect(lightBlock).toMatch(/--color-text:\s*#1f1f1f/);
     });
     it('--color-text-secondary is #5f6368', () => {
-      expect(rootBlock).toMatch(/--color-text-secondary:\s*#5f6368/);
+      expect(lightBlock).toMatch(/--color-text-secondary:\s*#5f6368/);
     });
   });
 });
@@ -305,8 +324,9 @@ describe('UX alignment (Issue #192)', () => {
   });
 
   describe('AC4: Modal styling', () => {
-    it('overlay uses rgba(0,0,0,0.4) via --overlay-4xl', () => {
-      expect(rootBlock).toMatch(/--overlay-4xl:\s*rgba\(0,\s*0,\s*0,\s*0\.4\)/);
+    it('overlay uses rgba(0,0,0,0.4) via --color-overlay', () => {
+      expect(lightBlock).toMatch(/--color-overlay:\s*rgba\(0,\s*0,\s*0,\s*0\.4\)/);
+      expect(css.match(/\.modal-overlay\s*\{[^}]*\}/)![0]).toContain('var(--color-overlay)');
     });
     it('.modal has border-radius var(--radius-lg)', () => {
       const match = css.match(/\.modal\s*\{[^}]*\}/);

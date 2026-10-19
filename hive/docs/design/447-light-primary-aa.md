@@ -119,9 +119,10 @@ surface are untouched.
 **Dark mode has white text on gold fills.** `.fab`, `.user-avatar-placeholder`,
 `.filter-badge`, `.view-toggle-active` and `.filter-chip-due.filter-chip-active`
 draw `white` on `#F5B700` in dark: **1.80:1**, and 1.41 on the hover. This is
-not in the issue and is a visible dark-mode change, so it is recorded rather
-than fixed. The fix is one line each: `color: var(--color-on-primary)`, which is
-`#1f1f1f` in dark and is 9.15 on the fill. It is a follow-up the user can add.
+not in this issue and is a visible dark-mode change, so it is recorded rather
+than fixed here. The user has since decided it is fixed in #452 (the interaction
+states), as one line each: `color: var(--color-on-primary)`, which is `#1f1f1f` in
+dark and is 9.15 on the fill.
 
 ## Tests
 

@@ -222,6 +222,11 @@ deletes find it again.
 - **The Audit Log is append-only.** A deliberate forensic trail, not dead
   weight to be tidied away. The frontend only appends to it; its one reader is
   the API's `getAuditLog` action (luketmoss/hive#239).
+- **An explicit `completed_at` is the API's too (#458).** `updateItem` accepts `changes.completed_at`
+  (a date, stored as noon UTC, or a zoned ISO timestamp; `normalizeCompletedAt` in `rules.js` and
+  `rules.ts`) only for an item that ends the call in a terminal column, and it wins over the
+  automatic stamp. The cascade to children still stamps now. The `completed` audit row keeps
+  the time of the move: the log is append-only.
 - **`parent_id` makes sub-items**, and a sub-item lives in the same `Items` tab
   as its parent. There is no separate sheet.
 - **No formula-injection sanitizer exists.** Nothing prefixes `'` to input

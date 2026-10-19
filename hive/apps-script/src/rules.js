@@ -1,5 +1,5 @@
 // Business rule helpers.
-// applyStatusSideEffects, statusTransitionAuditAction and isBoardArchived are duplicated in
+// applyStatusSideEffects, statusTransitionAuditAction, isBoardArchived and normalizeCompletedAt are duplicated in
 // frontend/src/state/rules.ts — keep in sync.
 
 function applyStatusSideEffects(item, newStatus, isTerminal) {
@@ -65,4 +65,52 @@ function checkParentCompletion(item, allItems) {
  */
 function isBoardArchived(board) {
   return !!(board && String(board.archived_at || '').trim());
+}
+
+/**
+ * #458: validate and normalise an explicit `completed_at`. Duplicated in
+ * frontend/src/state/rules.ts as normalizeCompletedAt — keep in sync
+ * (rules-parity.test.ts runs both).
+ *
+ * Accepts a date `YYYY-MM-DD` (stored as 12:00:00.000Z on that date: noon UTC
+ * keeps the calendar date in every zone from UTC-11 to UTC+11) or a full ISO
+ * 8601 timestamp with `Z` or a `+-hh:mm` offset. Returns it as
+ * `YYYY-MM-DDTHH:mm:ss.sssZ`, the shape isoNow() writes — a bare date written
+ * raw would be coerced to a Date cell by Sheets.
+ *
+ * Returns null for anything else: a non-string or empty value, a timestamp with
+ * no zone, an impossible date such as 2026-02-30, or an instant more than 24
+ * hours after `now` (which absorbs clock skew and "today" at noon). There is no
+ * lower bound: an item may be recorded long after the work was done.
+ *
+ * @param {*} value
+ * @param {Date|number|string} now
+ * @returns {string|null}
+ */
+function normalizeCompletedAt(value, now) {
+  if (typeof value !== 'string') return null;
+  var v = value.trim();
+  if (!v) return null;
+
+  var date = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+  var full = /^(\d{4})-(\d{2})-(\d{2})T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/.exec(v);
+  var parts = date || full;
+  if (!parts) return null;
+
+  // V8 rolls 2026-02-30 over to March 2 instead of refusing it, so the calendar
+  // date is checked on its own.
+  var y = Number(parts[1]);
+  var m = Number(parts[2]);
+  var d = Number(parts[3]);
+  var calendar = new Date(Date.UTC(y, m - 1, d));
+  if (calendar.getUTCFullYear() !== y || calendar.getUTCMonth() !== m - 1 || calendar.getUTCDate() !== d) {
+    return null;
+  }
+
+  var instant = date ? new Date(Date.UTC(y, m - 1, d, 12, 0, 0, 0)) : new Date(v);
+  if (isNaN(instant.getTime())) return null;
+
+  var nowMs = now instanceof Date ? now.getTime() : new Date(now).getTime();
+  if (instant.getTime() > nowMs + 24 * 60 * 60 * 1000) return null;
+  return instant.toISOString();
 }

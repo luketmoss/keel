@@ -1,0 +1,124 @@
+import { describe, it, expect } from 'vitest';
+
+// Read the global CSS to verify responsive rules are present.
+// jsdom does not support media queries or computed styles from stylesheets,
+// so we validate the CSS source directly via Node fs (available in vitest).
+// @ts-ignore -- Node builtins available at test runtime, no @types/node in this project
+import { readFileSync } from 'fs';
+// @ts-ignore
+import { resolve } from 'path';
+
+// @ts-ignore -- __dirname available in vitest CJS context
+const cssPath = resolve(__dirname, '../../global.css');
+const css = readFileSync(cssPath, 'utf-8');
+
+/**
+ * Extract the content of a @media (max-width: 768px) block from CSS source.
+ */
+function extractMobileBlock(source: string): string {
+  const re = /@media\s*\(\s*max-width:\s*768px\s*\)\s*\{/g;
+  const match = re.exec(source);
+  if (!match) return '';
+
+  let depth = 1;
+  let i = match.index + match[0].length;
+  const start = i;
+  while (i < source.length && depth > 0) {
+    if (source[i] === '{') depth++;
+    if (source[i] === '}') depth--;
+    i++;
+  }
+  return source.slice(start, i - 1);
+}
+
+const mobileBlock = extractMobileBlock(css);
+
+describe('Responsive CSS (Issue #10)', () => {
+  it('mobile media query block is found', () => {
+    expect(mobileBlock.length).toBeGreaterThan(0);
+  });
+
+  // AC1 removed in #248: it asserted the mobile block contained '.filter-bar select',
+  // a rule already deleted in #77. The assertion only still matched the leftover
+  // comment naming it, so it guarded nothing. The live touch-target rules for the
+  // ControlBar chips are covered below and in control-bar.test.tsx.
+
+  // AC2: Columns fill available desktop width
+  describe('AC2: Columns fill available desktop width', () => {
+    it('column uses flex: 1 instead of fixed width', () => {
+      expect(css).toMatch(/\.column\s*\{[^}]*flex:\s*1\s+1\s+0%/);
+    });
+
+    it('column has a max-width to prevent excessive stretching', () => {
+      expect(css).toMatch(/\.column\s*\{[^}]*max-width:\s*600px/);
+    });
+
+    it('column has a min-width for readability', () => {
+      expect(css).toMatch(/\.column\s*\{[^}]*min-width:\s*280px/);
+    });
+
+    it('mobile columns revert to fixed width for horizontal scroll', () => {
+      expect(mobileBlock).toContain('.column');
+      expect(mobileBlock).toMatch(/\.column\s*\{[^}]*flex:\s*0 0 280px/);
+    });
+  });
+
+  // #126: Immediate drag + title button styles
+  describe('#126: Card drag and title button styles', () => {
+    it('card has cursor: grab inside @media (pointer: fine)', () => {
+      expect(css).toMatch(/@media\s*\(pointer:\s*fine\)\s*\{[^}]*\.card\s*\{[^}]*cursor:\s*grab/);
+    });
+
+    it('card-title has cursor: pointer inside @media (pointer: fine)', () => {
+      expect(css).toMatch(/@media\s*\(pointer:\s*fine\)\s*\{[\s\S]*?\.card\s+\.card-title\s*\{[^}]*cursor:\s*pointer/);
+    });
+
+    it('no card-arming styles remain (removed in #126)', () => {
+      expect(css).not.toMatch(/\.card-arming/);
+    });
+
+    it('card-title has underline on hover', () => {
+      expect(css).toMatch(/\.card-title:hover\s*\{[^}]*text-decoration:\s*underline/);
+    });
+
+    it('no drag-handle styles remain (removed in #118)', () => {
+      // .drag-handle should only exist as .subtask-drag-handle
+      const nonSubtaskHandles = css.replace(/\.subtask-drag-handle/g, '').match(/\.drag-handle/);
+      expect(nonSubtaskHandles).toBeNull();
+    });
+  });
+
+  // AC5: Mobile card spacing >= 10px gap
+  describe('AC5: Mobile card spacing is touch-friendly', () => {
+    it('mobile media query sets column-cards gap to at least 10px', () => {
+      expect(mobileBlock).toContain('.column-cards');
+      // Extract the gap value from the mobile block
+      const gapMatch = mobileBlock.match(/\.column-cards\s*\{[^}]*gap:\s*(\d+)px/);
+      expect(gapMatch).not.toBeNull();
+      const gapValue = parseInt(gapMatch![1], 10);
+      expect(gapValue).toBeGreaterThanOrEqual(10);
+    });
+  });
+
+  // #206: Expand detail panel
+  describe('#206: Expand detail panel responsive CSS', () => {
+    it('AC5: expand button is hidden by default and shown only at min-width 769px', () => {
+      // Button should be display: none by default
+      expect(css).toMatch(/\.detail-expand-btn\s*\{[^}]*display:\s*none/);
+      // Shown via min-width: 769px media query
+      expect(css).toMatch(/@media\s*\(\s*min-width:\s*769px\s*\)/);
+      // Inside that query, the button is displayed
+      const desktopMatch = css.match(/@media\s*\(\s*min-width:\s*769px\s*\)\s*\{([\s\S]*?\})\s*\}/);
+      expect(desktopMatch).not.toBeNull();
+      expect(desktopMatch![1]).toContain('.detail-expand-btn');
+    });
+
+    it('expanded panel uses min(800px, 70vw) width', () => {
+      expect(css).toMatch(/\.detail-panel-expanded\s*\{[^}]*width:\s*min\(800px,\s*70vw\)/);
+    });
+
+    it('detail panel has width transition', () => {
+      expect(css).toMatch(/\.detail-panel\s*\{[^}]*transition:[^}]*width\s+200ms/);
+    });
+  });
+});

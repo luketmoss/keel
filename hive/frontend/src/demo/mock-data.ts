@@ -1,0 +1,474 @@
+// Static, deterministic mock data for demo mode.
+// Covers all board features: multiple statuses, owners, labels,
+// subtasks, overdue dates, long titles, unassigned items.
+
+import type { ItemWithRow, Owner, Label, Board, BoardPermission, BoardStatus } from '../api/types';
+
+// Helper to produce ISO date strings relative to "now" at module load time.
+// Using a fixed reference keeps data deterministic within a single page load.
+const NOW = new Date();
+function daysFromNow(days: number): string {
+  const d = new Date(NOW);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10); // YYYY-MM-DD
+}
+
+function daysAgo(days: number): string {
+  return daysFromNow(-days);
+}
+
+// --- Owners ---
+export const MOCK_OWNERS: Owner[] = [
+  { name: 'Demo User', google_account: 'demo@hive.local' },
+  { name: 'Mom', google_account: 'mom@family.com' },
+  { name: 'Dad', google_account: 'dad@family.com' },
+  { name: 'Kiddo', google_account: 'kiddo@family.com' },
+];
+
+// --- Labels ---
+export const MOCK_LABELS: Label[] = [
+  { label: 'Errands', color: '#42a5f5', board_id: 'board-family' },
+  { label: 'Home', color: '#66bb6a', board_id: 'board-family' },
+  { label: 'School', color: '#ffa726', board_id: 'board-family' },
+  { label: 'Health', color: '#ef5350', board_id: 'board-family' },
+  { label: 'Important', color: '#ab47bc', board_id: 'board-family' },
+  { label: 'Family', color: '#ec407a', board_id: 'board-family' },
+  { label: 'Fun', color: '#26c6da', board_id: 'board-family' },
+];
+
+// --- Boards ---
+export const MOCK_BOARDS: Board[] = [
+  { id: 'board-family', name: 'Family Board', created_at: daysAgo(30), created_by: 'mom@family.com', icon: '👨‍👩‍👧' },
+  { id: 'board-work', name: 'Work Projects', created_at: daysAgo(14), created_by: 'dad@family.com', icon: '🏢' },
+  // #288: archived — hidden everywhere until unarchived from "Archived boards".
+  { id: 'board-garage', name: 'Garage Cleanout', created_at: daysAgo(60), created_by: 'demo@hive.local', icon: '🔧', archived_at: daysAgo(5) },
+];
+
+// --- Permissions ---
+// Family Board: demo user is owner, shared with all (*).
+// Work Projects: Dad is owner, Mom is member, demo user has no access.
+export const MOCK_PERMISSIONS: BoardPermission[] = [
+  { board_id: 'board-family', user_email: 'demo@hive.local', role: 'owner' },
+  { board_id: 'board-family', user_email: 'mom@family.com', role: 'member' },
+  { board_id: 'board-family', user_email: '*', role: 'member' },
+  { board_id: 'board-work', user_email: 'dad@family.com', role: 'owner' },
+  { board_id: 'board-work', user_email: 'mom@family.com', role: 'member' },
+  { board_id: 'board-work', user_email: 'demo@hive.local', role: 'member' },
+  { board_id: 'board-garage', user_email: 'demo@hive.local', role: 'owner' },
+];
+
+// --- Statuses (Columns) ---
+// Each board has its own columns. Default: To Do, In Progress, Done.
+// Only "Done" column is terminal (sets completed_at, shows archive, sorts by completion).
+export const MOCK_STATUSES: BoardStatus[] = [
+  // Family Board
+  { id: 'status-fam-1', board_id: 'board-family', name: 'To Do', sort_order: 1, color: '#e3f2fd', is_terminal: false, created_at: daysAgo(30) },
+  { id: 'status-fam-2', board_id: 'board-family', name: 'In Progress', sort_order: 2, color: '#fff3e0', is_terminal: false, created_at: daysAgo(30) },
+  { id: 'status-fam-3', board_id: 'board-family', name: 'Done', sort_order: 3, color: '#e8f5e9', is_terminal: true, created_at: daysAgo(30) },
+  // Work Board
+  { id: 'status-work-1', board_id: 'board-work', name: 'To Do', sort_order: 1, color: '#e3f2fd', is_terminal: false, created_at: daysAgo(14) },
+  { id: 'status-work-2', board_id: 'board-work', name: 'In Progress', sort_order: 2, color: '#fff3e0', is_terminal: false, created_at: daysAgo(14) },
+  { id: 'status-work-3', board_id: 'board-work', name: 'Done', sort_order: 3, color: '#e8f5e9', is_terminal: true, created_at: daysAgo(14) },
+  // Garage Cleanout (archived)
+  { id: 'status-garage-1', board_id: 'board-garage', name: 'To Do', sort_order: 1, color: '#e3f2fd', is_terminal: false, created_at: daysAgo(60) },
+  { id: 'status-garage-2', board_id: 'board-garage', name: 'Done', sort_order: 2, color: '#e8f5e9', is_terminal: true, created_at: daysAgo(60) },
+];
+
+// --- Items ---
+// IDs are static UUIDs for reproducibility.
+export const MOCK_ITEMS: ItemWithRow[] = [
+  // 1. Grocery shopping — To Do, has 3 subtasks
+  {
+    id: 'demo-001',
+    title: 'Grocery shopping',
+    description: 'Weekly grocery run — check the fridge and pantry before leaving.',
+    status: 'To Do',
+    owner: 'Mom',
+    due_date: daysFromNow(1),
+
+    labels: 'Errands',
+    parent_id: '',
+    created_at: daysAgo(3),
+    updated_at: daysAgo(1),
+    completed_at: '',
+    sort_order: 1,
+    created_by: 'mom@family.com',
+    board_id: 'board-family',
+    sheetRow: 2,
+  },
+  // Subtask 1a: Buy vegetables — Done
+  {
+    id: 'demo-001a',
+    title: 'Buy vegetables',
+    description: '',
+    status: 'Done',
+    owner: 'Mom',
+    due_date: '',
+
+    labels: '',
+    parent_id: 'demo-001',
+    created_at: daysAgo(3),
+    updated_at: daysAgo(2),
+    completed_at: daysAgo(2),
+    sort_order: 1,
+    created_by: 'mom@family.com',
+    board_id: 'board-family',
+    sheetRow: 3,
+  },
+  // Subtask 1b: Buy cleaning supplies — Done
+  {
+    id: 'demo-001b',
+    title: 'Buy cleaning supplies',
+    description: '',
+    status: 'Done',
+    owner: 'Mom',
+    due_date: '',
+
+    labels: '',
+    parent_id: 'demo-001',
+    created_at: daysAgo(3),
+    updated_at: daysAgo(2),
+    completed_at: daysAgo(2),
+    sort_order: 2,
+    created_by: 'mom@family.com',
+    board_id: 'board-family',
+    sheetRow: 4,
+  },
+  // Subtask 1c: Pick up prescription — To Do, assigned to Dad
+  {
+    id: 'demo-001c',
+    title: 'Pick up prescription',
+    description: '',
+    status: 'To Do',
+    owner: 'Dad',
+    due_date: '',
+
+    labels: '',
+    parent_id: 'demo-001',
+    created_at: daysAgo(3),
+    updated_at: daysAgo(3),
+    completed_at: '',
+    sort_order: 3,
+    created_by: 'mom@family.com',
+    board_id: 'board-family',
+    sheetRow: 5,
+  },
+
+  // 2. Fix leaky faucet — In Progress
+  {
+    id: 'demo-002',
+    title: 'Fix leaky faucet',
+    description: 'Kitchen sink has been dripping. Check the washer first.',
+    status: 'In Progress',
+    owner: 'Dad',
+    due_date: daysFromNow(7),
+
+    labels: 'Home',
+    parent_id: '',
+    created_at: daysAgo(5),
+    updated_at: daysAgo(1),
+    completed_at: '',
+    sort_order: 1,
+    created_by: 'dad@family.com',
+    board_id: 'board-family',
+    sheetRow: 6,
+  },
+
+  // 3. Science fair project — In Progress, multi-label
+  {
+    id: 'demo-003',
+    title: 'Science fair project',
+    description: 'Build a model volcano. Need baking soda, vinegar, and paint.',
+    status: 'In Progress',
+    owner: 'Kiddo',
+    due_date: daysFromNow(3),
+
+    labels: 'School, Important',
+    parent_id: '',
+    created_at: daysAgo(10),
+    updated_at: daysAgo(0),
+    completed_at: '',
+    sort_order: 2,
+    created_by: 'kiddo@family.com',
+    board_id: 'board-family',
+    sheetRow: 7,
+  },
+
+  // 4. Plan birthday party — To Do, long description
+  {
+    id: 'demo-004',
+    title: 'Plan birthday party',
+    description: 'Reserve venue, order cake, send invitations to the whole class, buy decorations and party favors, arrange for a bounce house rental, and confirm the magician booking.',
+    status: 'To Do',
+    owner: 'Mom',
+    due_date: daysFromNow(14),
+
+    labels: 'Family, Fun',
+    parent_id: '',
+    created_at: daysAgo(7),
+    updated_at: daysAgo(7),
+    completed_at: '',
+    sort_order: 2,
+    created_by: 'mom@family.com',
+    board_id: 'board-family',
+    sheetRow: 8,
+  },
+
+  // 5. Book dentist appointments — Done
+  {
+    id: 'demo-005',
+    title: 'Book dentist appointments',
+    description: 'Annual checkup for the whole family.',
+    status: 'Done',
+    owner: 'Dad',
+    due_date: daysAgo(7),
+
+    labels: 'Health',
+    parent_id: '',
+    created_at: daysAgo(14),
+    updated_at: daysAgo(7),
+    completed_at: daysAgo(7),
+    sort_order: 1,
+    created_by: 'dad@family.com',
+    board_id: 'board-family',
+    sheetRow: 9,
+  },
+
+  // 6. Weekly meal planning — To Do, unassigned, no labels, no dates
+  {
+    id: 'demo-006',
+    title: 'Weekly meal planning',
+    description: '',
+    status: 'To Do',
+    owner: '',
+    due_date: '',
+
+    labels: '',
+    parent_id: '',
+    created_at: daysAgo(2),
+    updated_at: daysAgo(2),
+    completed_at: '',
+    sort_order: 3,
+    created_by: 'mom@family.com',
+    board_id: 'board-family',
+    sheetRow: 10,
+  },
+
+  // 7. Return library books — To Do, OVERDUE
+  {
+    id: 'demo-007',
+    title: 'Return library books',
+    description: 'Three books due — check the living room shelf.',
+    status: 'To Do',
+    owner: 'Kiddo',
+    due_date: daysAgo(2),
+
+    labels: 'Errands',
+    parent_id: '',
+    created_at: daysAgo(10),
+    updated_at: daysAgo(3),
+    completed_at: '',
+    sort_order: 4,
+    created_by: 'kiddo@family.com',
+    board_id: 'board-family',
+    sheetRow: 11,
+  },
+
+  // 8. Long title edge case — In Progress, with due date on work board
+  {
+    id: 'demo-008',
+    title: 'A very long task title that tests how the card handles text wrapping and overflow for wordy items',
+    description: '',
+    status: 'In Progress',
+    owner: 'Mom',
+    due_date: daysFromNow(10),
+
+    labels: 'Home',
+    parent_id: '',
+    created_at: daysAgo(4),
+    updated_at: daysAgo(2),
+    completed_at: '',
+    sort_order: 3,
+    created_by: 'mom@family.com',
+    board_id: 'board-work',
+    sheetRow: 12,
+  },
+
+  // 9. File taxes — Done
+  {
+    id: 'demo-009',
+    title: 'File taxes',
+    description: 'Federal and state returns submitted.',
+    status: 'Done',
+    owner: 'Dad',
+    due_date: daysAgo(30),
+
+    labels: 'Important',
+    parent_id: '',
+    created_at: daysAgo(60),
+    updated_at: daysAgo(30),
+    completed_at: daysAgo(30),
+    sort_order: 2,
+    created_by: 'dad@family.com',
+    board_id: 'board-family',
+    sheetRow: 13,
+  },
+
+  // 9b. Organize pantry — Done (recently, within 7 days)
+  {
+    id: 'demo-013',
+    title: 'Organize pantry',
+    description: 'Sorted canned goods, tossed expired items, added shelf labels.',
+    status: 'Done',
+    owner: 'Mom',
+    due_date: '',
+
+    labels: 'Home',
+    parent_id: '',
+    created_at: daysAgo(5),
+    updated_at: daysAgo(2),
+    completed_at: daysAgo(2),
+    sort_order: 3,
+    created_by: 'mom@family.com',
+    board_id: 'board-family',
+    sheetRow: 17,
+  },
+
+  // 10. Clean garage — To Do, no due date
+  {
+    id: 'demo-010',
+    title: 'Clean garage',
+    description: 'Sort out tools, donate old toys, sweep floor.',
+    status: 'To Do',
+    owner: 'Dad',
+    due_date: '',
+
+    labels: 'Home',
+    parent_id: '',
+    created_at: daysAgo(3),
+    updated_at: daysAgo(3),
+    completed_at: '',
+    sort_order: 5,
+    created_by: 'dad@family.com',
+    board_id: 'board-family',
+    sheetRow: 14,
+  },
+
+  // 11. Update family photo album — To Do, unassigned with a label
+  {
+    id: 'demo-011',
+    title: 'Update family photo album',
+    description: '',
+    status: 'To Do',
+    owner: '',
+    due_date: '',
+
+    labels: 'Fun',
+    parent_id: '',
+    created_at: daysAgo(1),
+    updated_at: daysAgo(1),
+    completed_at: '',
+    sort_order: 6,
+    created_by: 'kiddo@family.com',
+    board_id: 'board-family',
+    sheetRow: 15,
+  },
+
+  // 12. Call insurance company — In Progress, due today, no labels
+  {
+    id: 'demo-012',
+    title: 'Call insurance company',
+    description: 'Ask about the home policy renewal.',
+    status: 'In Progress',
+    owner: 'Mom',
+    due_date: daysFromNow(0),
+
+    labels: '',
+    parent_id: '',
+    created_at: daysAgo(5),
+    updated_at: daysAgo(0),
+    completed_at: '',
+    sort_order: 4,
+    created_by: 'mom@family.com',
+    board_id: 'board-work',
+    sheetRow: 16,
+  },
+
+  // 14. Quarterly review — To Do, due next week, work board
+  {
+    id: 'demo-014',
+    title: 'Quarterly review prep',
+    description: 'Prepare slides and metrics for the quarterly review.',
+    status: 'To Do',
+    owner: 'Dad',
+    due_date: daysFromNow(9),
+
+    labels: 'Important',
+    parent_id: '',
+    created_at: daysAgo(3),
+    updated_at: daysAgo(1),
+    completed_at: '',
+    sort_order: 5,
+    created_by: 'dad@family.com',
+    board_id: 'board-work',
+    sheetRow: 18,
+  },
+
+  // 15. Submit expense report — To Do, overdue, work board
+  {
+    id: 'demo-015',
+    title: 'Submit expense report',
+    description: 'March expenses need to be filed.',
+    status: 'To Do',
+    owner: 'Dad',
+    due_date: daysAgo(3),
+
+    labels: 'Errands',
+    parent_id: '',
+    created_at: daysAgo(10),
+    updated_at: daysAgo(5),
+    completed_at: '',
+    sort_order: 6,
+    created_by: 'dad@family.com',
+    board_id: 'board-work',
+    sheetRow: 19,
+  },
+  // #288: items on the archived Garage Cleanout board. Due soon on purpose, so
+  // Upcoming would show them if the archive filter failed.
+  {
+    id: 'demo-garage-1',
+    title: 'Sell the old bike',
+    description: '',
+    status: 'To Do',
+    owner: 'Dad',
+    due_date: daysFromNow(2),
+
+    labels: '',
+    parent_id: '',
+    created_at: daysAgo(40),
+    updated_at: daysAgo(6),
+    completed_at: '',
+    sort_order: 1,
+    created_by: 'demo@hive.local',
+    board_id: 'board-garage',
+    sheetRow: 20,
+  },
+  {
+    id: 'demo-garage-2',
+    title: 'Hang the pegboard',
+    description: '',
+    status: 'Done',
+    owner: 'Mom',
+    due_date: daysFromNow(0),
+
+    labels: '',
+    parent_id: '',
+    created_at: daysAgo(40),
+    updated_at: daysAgo(6),
+    completed_at: daysAgo(6),
+    sort_order: 2,
+    created_by: 'demo@hive.local',
+    board_id: 'board-garage',
+    sheetRow: 21,
+  },
+];

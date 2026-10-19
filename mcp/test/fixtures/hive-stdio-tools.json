@@ -245,6 +245,10 @@
               "type": "number"
             }
           ]
+        },
+        "completed_at": {
+          "description": "When the item is in a terminal column: set when it was completed, as a date (YYYY-MM-DD, stored as noon UTC) or a full ISO 8601 timestamp with Z or an offset, not more than 24 hours ahead. Refused for an item in any other column. Cleared by moving the item out of its terminal column, not by an empty value",
+          "type": "string"
         }
       },
       "required": [

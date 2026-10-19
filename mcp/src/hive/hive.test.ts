@@ -245,3 +245,89 @@ describe('hive tools', () => {
     expect(res.status).toBe(503)
   })
 })
+
+describe('completed_at through the tools (#450)', () => {
+  const DONE = '2026-10-16T12:00:00.000Z'
+  const base = { id: 'i1', title: 'Milk', status: 'Done', owner: 'Luke', due_date: '2026-10-20', labels: '', board_id: 'b1', description: '' }
+
+  function api(completed_at: string, update?: (payload: any) => unknown) {
+    return fakeHive((url) => {
+      const action = url.searchParams.get('action')
+      if (action === 'getItem') return { success: true, data: { ...base, completed_at } }
+      if (action === 'getBoards') return { success: true, data: [{ id: 'b1', name: 'Work' }] }
+      if (action === 'getItems') return { success: true, data: [{ ...base, completed_at, sort_order: 1 }] }
+      if (action === 'updateItem') {
+        const payload = JSON.parse(url.searchParams.get('payload')!)
+        return update ? update(payload) : { success: true, data: { ...base, completed_at } }
+      }
+      return { success: true, data: [] }
+    })
+  }
+  const updates = (calls: URL[]) =>
+    calls
+      .filter((u) => u.searchParams.get('action') === 'updateItem')
+      // The call id (#412) groups the app's log rows; it is not what is being asserted here.
+      .map((u) => {
+        const { call_id: _callId, ...rest } = JSON.parse(u.searchParams.get('payload')!)
+        return rest
+      })
+
+  it('hive_get_item shows the completed date after Due, and nothing without one', async () => {
+    api(DONE)
+    const withDate = (await call('hive_get_item', { item_id: 'i1' })).content[0].text.split('\n')
+    expect(withDate.indexOf(`- Completed: ${DONE}`)).toBe(withDate.indexOf('- Due: 2026-10-20') + 1)
+
+    api('')
+    const without = (await call('hive_get_item', { item_id: 'i1' })).content[0].text
+    expect(without).not.toContain('Completed')
+    expect(without).toBe(
+      ['**Milk** (id: i1)', '- Status: Done', '- Owner: Luke', '- Due: 2026-10-20', '- Labels: none', '- Board ID: b1', '- Description: (empty)'].join('\n'),
+    )
+  })
+
+  it('hive_list_items appends completed after due, and leaves an item without one unchanged', async () => {
+    api(DONE)
+    expect((await call('hive_list_items', { board: 'work' })).content[0].text).toContain(
+      `due: 2026-10-20 completed: ${DONE}`,
+    )
+    api('')
+    const line = (await call('hive_list_items', { board: 'work' })).content[0].text
+    expect(line).not.toContain('completed')
+    expect(line).toContain('board: Work (Luke) due: 2026-10-20')
+  })
+
+  it('hive_update_item forwards completed_at untouched, alone or with status, even when empty', async () => {
+    const calls = api(DONE)
+    await call('hive_update_item', { item_id: 'i1', completed_at: '2026-10-16' })
+    await call('hive_update_item', { item_id: 'i1', completed_at: '2026-10-16', status: 'Done' })
+    await call('hive_update_item', { item_id: 'i1', completed_at: '' })
+    expect(updates(calls)).toEqual([
+      { id: 'i1', changes: { completed_at: '2026-10-16' }, actor: 'hive-mcp' },
+      { id: 'i1', changes: { status: 'Done', completed_at: '2026-10-16' }, actor: 'hive-mcp' },
+      { id: 'i1', changes: { completed_at: '' }, actor: 'hive-mcp' },
+    ])
+  })
+
+  it('sends no completed_at key when none is given, and still says there is nothing to change', async () => {
+    const calls = api(DONE)
+    await call('hive_update_item', { item_id: 'i1', title: 'Renamed' })
+    expect(Object.keys(updates(calls)[0].changes)).toEqual(['title'])
+    const none = await call('hive_update_item', { item_id: 'i1' })
+    expect(none.content[0].text).toBe('No changes provided.')
+  })
+
+  it('shows the stored value in the reply, and nothing when there is none', async () => {
+    api(DONE)
+    expect((await call('hive_update_item', { item_id: 'i1', completed_at: '2026-10-16' })).content[0].text).toContain(
+      `- Completed: ${DONE}`,
+    )
+    api('')
+    expect((await call('hive_update_item', { item_id: 'i1', title: 'x' })).content[0].text).not.toContain('Completed')
+  })
+
+  it("passes the script's refusal through with nothing added", async () => {
+    api('', () => ({ success: false, error: 'completed_at can only be set on an item in a terminal column' }))
+    const result = await call('hive_update_item', { item_id: 'i1', completed_at: '2026-10-16' })
+    expect(result.content[0].text).toBe('Error updating item: completed_at can only be set on an item in a terminal column')
+  })
+})

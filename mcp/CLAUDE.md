@@ -171,7 +171,11 @@ purpose, then update the fixture by hand). Secrets:
 `HIVE_API_URL` and `HIVE_API_KEY`, where the key is Hive's MCP-only
 `MCP_API_KEY`, never its `API_KEY`. `HIVE_DEFAULT_OWNER` is a var in
 `wrangler.toml`. Errors reaching Hive come back as tool errors with the key and
-URL scrubbed.
+URL scrubbed. `hive_update_item` accepts `completed_at` and forwards it untouched; the rule
+(a date or zoned timestamp, only in a terminal column, not more than 24 h ahead) is Apps Script's
+(#458), and `hive_get_item` / `hive_list_items` / the update reply show an item's completed date.
+The Apps Script must be redeployed before the Worker that sends it: an old script ignores the
+field and still answers success.
 
 ## Board
 

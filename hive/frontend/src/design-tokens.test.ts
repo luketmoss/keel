@@ -162,17 +162,17 @@ describe('Design tokens: shared vocabulary (Issue #191)', () => {
 
 describe('Design tokens: gold color scheme (Issue #190)', () => {
   describe('AC1: Gold primary tokens in light mode', () => {
-    it('--color-primary is #C49200 in light theme', () => {
-      expect(lightBlock).toMatch(/--color-primary:\s*#C49200/);
+    it('--color-primary is #805F00 in light theme', () => {
+      expect(lightBlock).toMatch(/--color-primary:\s*#805F00/);
     });
-    it('--color-primary-hover is #A67B00 in light theme', () => {
-      expect(lightBlock).toMatch(/--color-primary-hover:\s*#A67B00/);
+    it('--color-primary-hover is #6B5000 in light theme', () => {
+      expect(lightBlock).toMatch(/--color-primary-hover:\s*#6B5000/);
     });
-    it('--color-primary-rgb is 196, 146, 0 in light theme', () => {
-      expect(lightBlock).toMatch(/--color-primary-rgb:\s*196, 146, 0/);
+    it('--color-primary-rgb is 128, 95, 0 in light theme', () => {
+      expect(lightBlock).toMatch(/--color-primary-rgb:\s*128, 95, 0/);
     });
-    it('--color-focus is #C49200 in light theme', () => {
-      expect(lightBlock).toMatch(/--color-focus:\s*#C49200/);
+    it('--color-focus is #805F00 in light theme', () => {
+      expect(lightBlock).toMatch(/--color-focus:\s*#805F00/);
     });
   });
 
@@ -202,11 +202,14 @@ describe('Design tokens: gold color scheme (Issue #190)', () => {
   });
 
   describe('AC4: WCAG AA contrast for interactive elements', () => {
-    it('.btn-primary uses dark text (#1f1f1f) not white', () => {
+    // #447: the light fill is dark enough for white text, so the text is a token:
+    // white in light, #1f1f1f in dark (as it was).
+    it('.btn-primary uses var(--color-on-primary), #1f1f1f in dark and not white', () => {
       const match = css.match(/\.btn-primary\s*\{[^}]*\}/);
       expect(match).not.toBeNull();
-      expect(match![0]).toContain('color: #1f1f1f');
+      expect(match![0]).toContain('color: var(--color-on-primary)');
       expect(match![0]).not.toContain('color: white');
+      expect(darkBlock).toMatch(/--color-on-primary:\s*#1f1f1f/);
     });
   });
 
@@ -226,7 +229,7 @@ describe('Design tokens: gold color scheme (Issue #190)', () => {
     it('.column-sort-active SVG uses gold fill in light mode', () => {
       const match = css.match(/\.column-sort-active\s*\{[^}]*\}/);
       expect(match).not.toBeNull();
-      expect(match![0]).toContain("fill='%23C49200'");
+      expect(match![0]).toContain("fill='%23805F00'");
     });
     it('[data-theme="dark"] .column-sort-active SVG uses gold fill', () => {
       const match = css.match(/\[data-theme="dark"\]\s*\.column-sort-active\s*\{[^}]*\}/);

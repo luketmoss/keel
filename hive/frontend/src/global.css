@@ -22,11 +22,15 @@
 
 /* === Light theme === */
 [data-theme="light"] {
-  --color-primary: #C49200;
-  --color-primary-hover: #A67B00;
+  /* Same gold hue, darkened until it passes AA everywhere it is drawn (#447):
+     5.91:1 on white, 4.57 on its own 18% tint, and white text on the fill. */
+  --color-primary: #805F00;
+  --color-primary-hover: #6B5000;
   /* RGB components for alpha-blended highlights */
-  --color-primary-rgb: 196, 146, 0;
-  --color-focus: #C49200;
+  --color-primary-rgb: 128, 95, 0;
+  --color-focus: #805F00;
+  /* Text and icons on a primary fill: white in light, 5.91 on the fill */
+  --color-on-primary: #ffffff;
 
   /* Column pastels */
   --color-todo: #e3f2fd;
@@ -58,6 +62,8 @@
   --color-primary-hover: #FFD54F;
   --color-primary-rgb: 245, 183, 0;
   --color-focus: #F5B700;
+  /* 9.15:1 on the dark fill; the near-black the buttons already carry */
+  --color-on-primary: #1f1f1f;
 
   /* Muted pastels for dark backgrounds — distinct, readable */
   --color-todo: #1a2a3a;
@@ -130,7 +136,7 @@ body {
 
 .btn-primary {
   background: var(--color-primary);
-  color: #1f1f1f;
+  color: var(--color-on-primary);
 }
 .btn-primary:hover { background: var(--color-primary-hover); }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -200,7 +206,7 @@ body {
   gap: 8px;
   padding: 12px 24px;
   background: var(--color-primary);
-  color: #1f1f1f;
+  color: var(--color-on-primary);
   border: none;
   border-radius: var(--radius);
   font-size: 16px;
@@ -954,7 +960,7 @@ body {
   border-color: var(--color-primary);
   color: var(--color-primary);
   font-weight: 600;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23C49200'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23805F00'/%3E%3C/svg%3E");
 }
 [data-theme="dark"] .column-sort-active {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23F5B700'/%3E%3C/svg%3E");

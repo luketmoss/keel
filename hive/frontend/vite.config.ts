@@ -3,7 +3,7 @@ import preact from '@preact/preset-vite';
 
 export default defineConfig({
   plugins: [preact()],
-  base: '/hive/',
+  base: process.env.VITE_BASE_PATH || '/',
   server: { port: 5176 },
   test: {
     environment: 'jsdom',

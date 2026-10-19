@@ -21,10 +21,16 @@ in Keel is a Keel issue. Imported commit messages were rewritten to the
 qualified form. The hundreds of bare `#N` in code comments and test names were
 not: they predate the move and mean `luketmoss/hive#N`.
 
-What runs where today: the live app is still served from the old repo's GitHub
-Pages until #444, and nothing in Keel deploys Hive until #443. The Apps Script
-deployment and its trigger are unchanged by the move. #443, #444 and #445 each
-update this section to what has become true.
+What runs where today: a second copy of the app is live at
+`https://luketmoss.github.io/keel/hive/`, built by `hive-pages.yml` from
+`hive/frontend` on a push to `main`. The old URL
+`https://luketmoss.github.io/hive/` still serves the app too, from the old
+repo's Pages, until #444. Both talk to the same sheet and share the origin's
+`localStorage`. `hive-pages.yml` shares the `gh-pages` concurrency group with
+cairn's and Thrive's workflows; GitHub keeps one pending run per group, so if
+three deploys queue together the middle one is dropped, and `workflow_dispatch`
+is the recovery. The Apps Script deployment and its trigger are unchanged by
+the move. #444 and #445 each update this section to what has become true.
 
 ## Stacks
 
@@ -43,7 +49,7 @@ The authoritative conventions for each component are in its stack skill:
 ## Key commands
 
 - `npm --prefix frontend run dev` — Vite dev server on port 5176, at
-  `http://localhost:5176/hive/`
+  `http://localhost:5176/`
 - `cd frontend && npm test` / `npm run typecheck` / `npm run build`
 - `cd apps-script && npm test` / `npm run typecheck` — sandboxed `node:vm`
 - The user's terminal is PowerShell 5.1 — no `&&`; use `;` or separate commands
@@ -136,7 +142,7 @@ removes it. A trigger runs the **pushed** code, not a deployment, so a drifted
 ## Preview & Demo Mode
 `preview_start` with the **`hive`** launch config (the root
 `.claude/launch.json`), then navigate to
-`http://localhost:5176/hive/?demo=true`.
+`http://localhost:5176/?demo=true`.
 
 Demo mode needs both `VITE_DEMO_MODE=true` (build-time: `cp .env.example
 .env.local` in `frontend/` sets it) and `?demo=true` (runtime). Both are checked
@@ -148,7 +154,7 @@ persisted; reloading restores the original demo set. A real sign-in on port
 call; demo mode needs none.
 
 Cloud sessions have no Browser pane. There,
-`node .keel/look.mjs hive "/hive/?demo=true" --env VITE_DEMO_MODE=true` drives
+`node .keel/look.mjs hive "/?demo=true" --env VITE_DEMO_MODE=true` drives
 the same demo app with the container's Playwright and Chromium
 (`stack-web` § Verifying a browser UI).
 

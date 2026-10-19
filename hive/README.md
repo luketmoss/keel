@@ -21,7 +21,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open http://localhost:5176/hive/?demo=true — you'll see the board with mock data. No sign-in required.
+Open http://localhost:5176/?demo=true — you'll see the board with mock data. No sign-in required.
 
 > Demo mode uses a fake user and sample data. Changes are not persisted. See [Demo Mode](#demo-mode) for details.
 
@@ -138,19 +138,20 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open http://localhost:5176/hive/ and sign in with Google.
+Open http://localhost:5176/ and sign in with Google.
 
 > `VITE_DEMO_MODE=true` is the default in `.env.example` and is safe to leave set — demo mode only activates when the `?demo=true` URL param is also present.
 
 ### 5. GitHub Pages (Production)
 
-> This describes the deploy from the old `luketmoss/hive` repository, which still serves the live app. Keel's Pages build is luketmoss/keel#443, which rewrites this section.
+`.github/workflows/hive-pages.yml` builds `hive/frontend` and publishes it to the `hive/` folder of the shared `gh-pages` branch, so the app is served at https://luketmoss.github.io/keel/hive/. It runs on a push to `main` touching `hive/frontend/**`, and by hand (`gh workflow run hive-pages.yml`).
 
-1. Set GitHub Pages source to **GitHub Actions** in repo settings
-2. Add repository secrets:
-   - `VITE_GOOGLE_CLIENT_ID` — your OAuth client ID
-   - `VITE_SPREADSHEET_ID` — your Google Sheet ID
-3. Push to `main` — the workflow builds and deploys automatically
+1. Add repository secrets on `luketmoss/keel` (identifiers, not credentials; secrets are repo-wide, so they carry a prefix):
+   - `HIVE_GOOGLE_CLIENT_ID` — your OAuth client ID
+   - `HIVE_SPREADSHEET_ID` — your Google Sheet ID
+2. Push to `main` — the workflow builds with `VITE_BASE_PATH=/keel/hive/` and deploys. It sets no `VITE_DEMO_MODE`, so the deployed app ignores `?demo=true`.
+
+The workflow shares the one `gh-pages` concurrency group with `cairn-pages.yml` and `thrive-pages.yml`, so deploys queue rather than collide. GitHub keeps one pending run per group; if three queue together the middle one is dropped and shows as cancelled. Re-run it with `workflow_dispatch`.
 
 ### Daily snapshots (Apps Script)
 
@@ -183,8 +184,8 @@ Demo mode lets you use the app without Google auth or a real spreadsheet. It req
 
 Both must be true for demo mode to activate. This means:
 - `cp .env.example .env.local` enables the build-time flag by default
-- Navigate to `http://localhost:5176/hive/?demo=true` to activate
-- Navigate to `http://localhost:5176/hive/` (without the param) to use real Google auth
+- Navigate to `http://localhost:5176/?demo=true` to activate
+- Navigate to `http://localhost:5176/` (without the param) to use real Google auth
 
 Demo mode provides a fake user and sample board data. Changes are not persisted.
 

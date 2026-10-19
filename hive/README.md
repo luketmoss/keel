@@ -14,14 +14,14 @@ A Kanban board app powered by Google Sheets. Manage tasks through a visual board
 See the app running in under 2 minutes — no Google account or API setup needed.
 
 ```bash
-git clone https://github.com/luketmoss/hive.git
-cd hive/frontend
+git clone https://github.com/luketmoss/keel.git
+cd keel/hive/frontend
 npm install
 cp .env.example .env.local
 npm run dev
 ```
 
-Open http://localhost:5173/hive/?demo=true — you'll see the board with mock data. No sign-in required.
+Open http://localhost:5176/hive/?demo=true — you'll see the board with mock data. No sign-in required.
 
 > Demo mode uses a fake user and sample data. Changes are not persisted. See [Demo Mode](#demo-mode) for details.
 
@@ -62,6 +62,8 @@ Open http://localhost:5173/hive/?demo=true — you'll see the board with mock da
 
 ## Project Structure
 
+Hive is one project in the [Keel](https://github.com/luketmoss/keel) workspace, at `hive/`. Its CI is Keel's `.github/workflows/hive.yml`.
+
 ```
 hive/
 ├── apps-script/              # Google Apps Script REST API (clasp-managed)
@@ -79,7 +81,7 @@ hive/
 │   │   ├── demo/             # Demo mode (mock data, no auth)
 │   │   └── state/            # Preact signals store + business rules
 │   └── public/
-└── .github/workflows/        # GitHub Pages deployment
+└── docs/design/              # design notes, one per Keel issue
 ```
 
 ## Full Setup (Google Sheets Backend)
@@ -107,7 +109,7 @@ The app creates the **Boards** and **Permissions** tabs automatically on first u
 2. Enable: **Google Sheets API**, **Google Apps Script API**, **Google Drive API**
 3. Configure **OAuth consent screen** (External, Testing mode, add your accounts as test users)
 4. Create an **OAuth client ID** (Web application) with authorized JavaScript origins:
-   - `http://localhost:5173` (local dev)
+   - `http://localhost:5176` (local dev)
    - `https://<username>.github.io` (production)
 
 ### 3. Apps Script API
@@ -136,11 +138,13 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open http://localhost:5173/hive/ and sign in with Google.
+Open http://localhost:5176/hive/ and sign in with Google.
 
 > `VITE_DEMO_MODE=true` is the default in `.env.example` and is safe to leave set — demo mode only activates when the `?demo=true` URL param is also present.
 
 ### 5. GitHub Pages (Production)
+
+> This describes the deploy from the old `luketmoss/hive` repository, which still serves the live app. Keel's Pages build is luketmoss/keel#443, which rewrites this section.
 
 1. Set GitHub Pages source to **GitHub Actions** in repo settings
 2. Add repository secrets:
@@ -164,13 +168,11 @@ A time-driven trigger copies the sheet to a dated file in a Drive folder once a 
 ## Running Tests
 
 ```bash
-# All tests (apps-script + frontend)
-npm test
-
-# Individual suites
-npm run test:apps-script
-npm run test:frontend
+(cd apps-script && npm test && npm run typecheck)
+(cd frontend && npm test && npm run typecheck)
 ```
+
+CI runs the same two suites as the `apps-script` and `frontend` jobs of `.github/workflows/hive.yml`.
 
 ## Demo Mode
 
@@ -181,14 +183,14 @@ Demo mode lets you use the app without Google auth or a real spreadsheet. It req
 
 Both must be true for demo mode to activate. This means:
 - `cp .env.example .env.local` enables the build-time flag by default
-- Navigate to `http://localhost:5173/hive/?demo=true` to activate
-- Navigate to `http://localhost:5173/hive/` (without the param) to use real Google auth
+- Navigate to `http://localhost:5176/hive/?demo=true` to activate
+- Navigate to `http://localhost:5176/hive/` (without the param) to use real Google auth
 
 Demo mode provides a fake user and sample board data. Changes are not persisted.
 
 ## AI Integration
 
-- **MCP Server (Claude, phone and desktop)** — Natural language board management through a remote MCP connector (`/hive/mcp`), served by the Worker in Keel (`luketmoss/keel` → `mcp/`). See that project's `CLAUDE.md` for setup.
+- **MCP Server (Claude, phone and desktop)** — Natural language board management through a remote MCP connector (`/hive/mcp`), served by Keel's Worker in `mcp/`. See [mcp/CLAUDE.md](../mcp/CLAUDE.md) for setup.
 
 ## Business Rules
 

@@ -92,3 +92,17 @@ function getNextSortOrder(items, status) {
   }
   return maxOrder + 1;
 }
+
+/**
+ * #457: run `fn` holding the script lock, so a multi-row pass (`undoCall`)
+ * cannot interleave with another write. Waits up to 30 s, then throws.
+ */
+function withScriptLock(fn) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    return fn();
+  } finally {
+    lock.releaseLock();
+  }
+}

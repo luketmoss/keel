@@ -20,7 +20,13 @@
 //
 // Write examples:
 //   ?action=createItem&payload={"data":{"title":"Test","owner":"Luke"},"actor":"smoke-test"}
-//   ?action=updateItem&payload={"id":"uuid","changes":{"status":"Done"},"actor":"smoke-test"}
+//   ?action=updateItem&payload={"id":"uuid","changes":{"status":"Done"},"call_id":"abc123"}
+//
+// #457: every write is attributed to `hive-mcp` whatever `actor` a payload
+// says, and its audit rows carry `payload.call_id` (a fresh id when it is
+// missing or invalid). `undoCall` reverts one call, dry-run until confirmed:
+//   ?action=undoCall&payload={"call_id":"abc123"}
+//   ?action=undoCall&payload={"call_id":"abc123","confirm":true}
 //
 // Delete is dry-run by default (#244). The first call reports the whole
 // cascade and writes nothing; the second must carry the token it returned:
@@ -113,6 +119,7 @@ function dispatchAction(action, params, payload) {
     // `from`/`to` are inclusive local calendar dates (AUDIT_TIMEZONE),
     // formatted YYYY-MM-DD. The action filter is `audit_action`, not
     // `action` — `action` is already the dispatch parameter.
+    // #457: `actor` and `call_id` narrow it to one caller's or one call's rows.
     case 'getAuditLog':
       result = {
         success: true,
@@ -120,6 +127,8 @@ function dispatchAction(action, params, payload) {
           from: params.from,
           to: params.to,
           action: params.audit_action,
+          actor: params.actor,
+          call_id: params.call_id,
         }),
       };
       break;
@@ -142,7 +151,7 @@ function dispatchAction(action, params, payload) {
         result = { success: false, error: 'payload.data field required' };
         break;
       }
-      result = { success: true, data: createItem(payload.data, payload.actor || 'api') };
+      result = { success: true, data: createItem(payload.data, MCP_ACTOR, payload.call_id) };
       break;
 
     case 'updateItem':
@@ -154,7 +163,7 @@ function dispatchAction(action, params, payload) {
         result = { success: false, error: 'payload.changes field required' };
         break;
       }
-      result = { success: true, data: updateItem(payload.id, payload.changes, payload.actor || 'api') };
+      result = { success: true, data: updateItem(payload.id, payload.changes, MCP_ACTOR, payload.call_id) };
       break;
 
     // #244: dry-run by default. No `confirm` returns the full cascade that
@@ -167,9 +176,10 @@ function dispatchAction(action, params, payload) {
       }
       result = {
         success: true,
-        data: deleteItem(payload.id, payload.actor || 'api', {
+        data: deleteItem(payload.id, MCP_ACTOR, {
           confirm: payload.confirm,
           token: payload.token,
+          callId: payload.call_id,
         }),
       };
       break;
@@ -179,7 +189,16 @@ function dispatchAction(action, params, payload) {
         result = { success: false, error: 'payload.label field required' };
         break;
       }
-      result = { success: true, data: createLabel(payload) };
+      result = { success: true, data: createLabel(payload, MCP_ACTOR, payload.call_id) };
+      break;
+
+    // #457: dry-run by default, like deleteItem; `confirm: true` reverts.
+    case 'undoCall':
+      if (!payload.call_id) {
+        result = { success: false, error: 'payload.call_id field required' };
+        break;
+      }
+      result = { success: true, data: undoCall(payload.call_id, payload.confirm === true) };
       break;
 
     case 'createStatus':
@@ -271,7 +290,7 @@ function doPost(e) {
     }
 
     var action = body.action;
-    var actor = body.actor || 'api';
+    var actor = MCP_ACTOR;
 
     switch (action) {
       case 'createItem':
@@ -279,7 +298,7 @@ function doPost(e) {
           result = { success: false, error: 'data field required' };
           break;
         }
-        result = { success: true, data: createItem(body.data, actor) };
+        result = { success: true, data: createItem(body.data, actor, body.call_id) };
         break;
 
       case 'updateItem':
@@ -291,7 +310,7 @@ function doPost(e) {
           result = { success: false, error: 'changes field required' };
           break;
         }
-        result = { success: true, data: updateItem(body.id, body.changes, actor) };
+        result = { success: true, data: updateItem(body.id, body.changes, actor, body.call_id) };
         break;
 
       // #244: same dry-run contract as doGet — no `confirm`, no write.
@@ -302,7 +321,7 @@ function doPost(e) {
         }
         result = {
           success: true,
-          data: deleteItem(body.id, actor, { confirm: body.confirm, token: body.token }),
+          data: deleteItem(body.id, actor, { confirm: body.confirm, token: body.token, callId: body.call_id }),
         };
         break;
 

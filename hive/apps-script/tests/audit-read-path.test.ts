@@ -109,6 +109,8 @@ describe('#239 AC3: getAuditLog returns entries for a Denver-local date range', 
       old_value: 'In Progress',
       new_value: 'Shipped',
       actor: 'luke@example.com',
+      call_id: '',
+      row_json: '',
       title: '',
       board_id: '',
     });

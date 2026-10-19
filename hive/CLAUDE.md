@@ -133,6 +133,12 @@ account that owns the script. Named here, never valued:
   loud rather than quietly rejecting everyone
 - `SNAPSHOT_FOLDER_ID` — the Drive folder the daily snapshot writes to
 
+#457 added two Audit Log columns. Once, in the editor, the owner runs
+`migrateAuditLogHeaders()` to head H and I (`call_id`, `row_json`). Until then
+writes still work (the cells just have no header). `undoCall` is the API action
+that reverts one call by its `call_id`: dry-run until `confirm: true`, and all or
+nothing if any field changed since.
+
 **There is one installed trigger, so this is not "no triggers".** The daily
 snapshot (luketmoss/hive#294): `installSnapshotTrigger()`, run once by the owner
 in the editor, installs a time-driven trigger that runs `takeSnapshot` at about
@@ -196,7 +202,11 @@ deletes find it again.
 - **Boards** (`A:F`): ID, Name, Created At, Created By, Color, Icon
 - **Permissions** (`A:C`): Board ID, User Email, Role
 - **Statuses** (`A:G`): id, board_id, name, sort_order, color, is_terminal, created_at
-- **Audit Log** (`A:G`, append-only): timestamp, item_id, action, field, old_value, new_value, actor
+- **Audit Log** (`A:I`, append-only): timestamp, item_id, action, field, old_value, new_value, actor,
+  call_id, row_json. The last two are the API's (#457): the frontend appends only `A:G`
+  and leaves them blank. Every API write is actor `hive-mcp`, whatever its payload says,
+  and its rows share one `call_id`. `row_json` holds the whole item (or label) on
+  `created`, `deleted`, `label_created` and `undo` rows, which is what `undoCall` rebuilds from
 
 ### Invariants
 - **Row deletion runs bottom-to-top.** Deleting top-down shifts every row beneath

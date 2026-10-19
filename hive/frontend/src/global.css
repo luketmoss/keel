@@ -3305,6 +3305,44 @@ body {
   gap: 8px;
 }
 
+/* #448: inline confirm that replaces a sub-task row */
+.subtask-item-confirming {
+  display: block;
+}
+
+.subtask-delete-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  width: 100%;
+  padding: var(--space-md);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.subtask-delete-confirm-title {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.subtask-delete-confirm-message {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.subtask-delete-confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
 .label-settings-delete-confirm {
   display: flex;
   flex-direction: column;

@@ -214,12 +214,26 @@ export function CardDetail() {
     submitSubtask();
   };
 
-  const handleDeleteSubtask = (childId: string, childTitle: string) => {
+  // #448: deleting a sub-task asks in the app. Only one confirm is open at a
+  // time; it is the id of the sub-task being confirmed.
+  const [confirmingSubtaskId, setConfirmingSubtaskId] = useState<string | null>(null);
+
+  // A confirm belongs to the item it was opened on.
+  useEffect(() => { setConfirmingSubtaskId(null); }, [item.id]);
+
+  const requestDeleteSubtask = (childId: string) => {
     if (!token) return;
-    const confirmed = confirm(`Delete sub-task '${childTitle}'?`);
-    if (confirmed) {
-      deleteSubtask(childId, actor, token);
-    }
+    setConfirmingSubtaskId(childId);
+  };
+
+  const cancelDeleteSubtask = () => setConfirmingSubtaskId(null);
+
+  const confirmDeleteSubtask = (childId: string) => {
+    if (!token) return;
+    setConfirmingSubtaskId(null);
+    deleteSubtask(childId, actor, token);
+    // The row is gone, so focus goes where it always exists
+    requestAnimationFrame(() => addSubtaskBtnRef.current?.focus());
   };
 
   const handleReorder = (childId: string, direction: 'up' | 'down') => {
@@ -483,7 +497,10 @@ export function CardDetail() {
                     startEditSubtaskTitle={startEditSubtaskTitle}
                     toggleChildStatus={toggleChildStatus}
                     handleSubtaskDateSave={handleSubtaskDateSave}
-                    handleDeleteSubtask={handleDeleteSubtask}
+                    confirmingDelete={confirmingSubtaskId === child.id}
+                    requestDeleteSubtask={requestDeleteSubtask}
+                    cancelDeleteSubtask={cancelDeleteSubtask}
+                    confirmDeleteSubtask={confirmDeleteSubtask}
                     handleReorder={handleReorder}
                     handleTouchReorderStart={handleTouchReorderStart}
                     handleTouchReorderMove={handleTouchReorderMove}
@@ -568,7 +585,10 @@ export function CardDetail() {
                     startEditSubtaskTitle={startEditSubtaskTitle}
                     toggleChildStatus={toggleChildStatus}
                     handleSubtaskDateSave={handleSubtaskDateSave}
-                    handleDeleteSubtask={handleDeleteSubtask}
+                    confirmingDelete={confirmingSubtaskId === child.id}
+                    requestDeleteSubtask={requestDeleteSubtask}
+                    cancelDeleteSubtask={cancelDeleteSubtask}
+                    confirmDeleteSubtask={confirmDeleteSubtask}
                     handleReorder={handleReorder}
                     handleTouchReorderStart={handleTouchReorderStart}
                     handleTouchReorderMove={handleTouchReorderMove}
@@ -1012,7 +1032,7 @@ function SubtaskDateInline({ child, onSave }: {
 }
 
 // #220: SubtaskRow component — handles checkbox, title, date, actions, context menu
-function SubtaskRow({ child, idx, allItems, isDone, editingSubtaskId, editingSubtaskDraft, setEditingSubtaskDraft, commitSubtaskTitleEdit, cancelSubtaskTitleEdit, startEditSubtaskTitle, toggleChildStatus, handleSubtaskDateSave, handleDeleteSubtask, handleReorder, handleTouchReorderStart, handleTouchReorderMove, handleTouchReorderEnd, token, actor, item }: {
+function SubtaskRow({ child, idx, allItems, isDone, editingSubtaskId, editingSubtaskDraft, setEditingSubtaskDraft, commitSubtaskTitleEdit, cancelSubtaskTitleEdit, startEditSubtaskTitle, toggleChildStatus, handleSubtaskDateSave, confirmingDelete, requestDeleteSubtask, cancelDeleteSubtask, confirmDeleteSubtask, handleReorder, handleTouchReorderStart, handleTouchReorderMove, handleTouchReorderEnd, token, actor, item }: {
   child: ItemWithRow;
   idx: number;
   allItems: ItemWithRow[];
@@ -1025,7 +1045,10 @@ function SubtaskRow({ child, idx, allItems, isDone, editingSubtaskId, editingSub
   startEditSubtaskTitle: (childId: string, title: string) => void;
   toggleChildStatus: (childId: string, status: any) => void;
   handleSubtaskDateSave: (childId: string, field: 'due_date', value: string) => void;
-  handleDeleteSubtask: (childId: string, title: string) => void;
+  confirmingDelete: boolean;
+  requestDeleteSubtask: (childId: string) => void;
+  cancelDeleteSubtask: () => void;
+  confirmDeleteSubtask: (childId: string) => void;
   handleReorder: (childId: string, dir: 'up' | 'down') => void;
   handleTouchReorderStart: (childId: string, idx: number, e: TouchEvent) => void;
   handleTouchReorderMove: (e: TouchEvent) => void;
@@ -1037,6 +1060,18 @@ function SubtaskRow({ child, idx, allItems, isDone, editingSubtaskId, editingSub
   const [contextMenu, setContextMenu] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const contextRef = useRef<HTMLDivElement>(null);
+  const kebabRef = useRef<HTMLButtonElement>(null);
+  const cancelBtnRef = useRef<HTMLButtonElement>(null);
+
+  // #448: focus lands on Cancel, the safe choice, when the confirm opens
+  useEffect(() => {
+    if (confirmingDelete) cancelBtnRef.current?.focus();
+  }, [confirmingDelete]);
+
+  const cancelConfirm = () => {
+    cancelDeleteSubtask();
+    requestAnimationFrame(() => kebabRef.current?.focus());
+  };
 
   // Long-press handler for touch
   const handleTouchStartLongPress = (e: TouchEvent) => {
@@ -1096,6 +1131,32 @@ function SubtaskRow({ child, idx, allItems, isDone, editingSubtaskId, editingSub
     el.style.height = '0';
     el.style.height = el.scrollHeight + 'px';
   };
+
+  // #448: the confirm replaces the whole row, so the only things to tap are its two buttons
+  if (confirmingDelete) {
+    const title = child.title.trim();
+    return (
+      <li key={child.id} class="subtask-item subtask-item-confirming">
+        <div
+          class="subtask-delete-confirm"
+          role="group"
+          aria-label="Confirm deleting sub-task"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') { e.stopPropagation(); cancelConfirm(); }
+          }}
+        >
+          <p class="subtask-delete-confirm-title">
+            {title ? `Delete sub-task "${child.title}"?` : 'Delete this sub-task?'}
+          </p>
+          <p class="subtask-delete-confirm-message">This cannot be undone.</p>
+          <div class="subtask-delete-confirm-actions">
+            <button ref={cancelBtnRef} class="btn btn-ghost" onClick={cancelConfirm}>Cancel</button>
+            <button class="btn btn-danger" onClick={() => confirmDeleteSubtask(child.id)}>Delete sub-task</button>
+          </div>
+        </div>
+      </li>
+    );
+  }
 
   return (
     <li
@@ -1207,6 +1268,7 @@ function SubtaskRow({ child, idx, allItems, isDone, editingSubtaskId, editingSub
 
       {/* Kebab menu (always visible) */}
       <button
+        ref={kebabRef}
         class="subtask-kebab-btn"
         aria-label="Sub-task options"
         onTouchStart={(e) => e.stopPropagation()}
@@ -1224,7 +1286,7 @@ function SubtaskRow({ child, idx, allItems, isDone, editingSubtaskId, editingSub
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17l9.2-9.2M17 17V7H7"/></svg>
             Turn into item
           </button>
-          <button class="danger" onClick={() => { handleDeleteSubtask(child.id, child.title); setContextMenu(false); }}>
+          <button class="danger" onClick={() => { requestDeleteSubtask(child.id); setContextMenu(false); }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
             Delete
           </button>

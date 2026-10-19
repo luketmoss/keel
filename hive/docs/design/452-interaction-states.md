@@ -68,7 +68,7 @@ and 3.70 under pressed, and in dark `#868e98` is 3.66 on the card under pressed
 (Thrive found this after shipping). So any quiet or icon control whose rest colour
 is `--color-text-muted` or `--color-text-secondary` takes `--color-text` on hover
 and pressed, which most of Hive's hovers already do (`.column-add-btn:hover`,
-`.filter-popup-close:hover`). `--color-text` stays above 9:1 on both overlays.
+`.filter-popup-close:hover`). `--color-text` stays above 8.7:1 on both overlays (the tightest is dark, raised surface, pressed).
 
 ### The focus ring
 
@@ -105,18 +105,24 @@ exception.
 Every control class the TSX renders belongs to one. The implementation lists
 these in a test so a new class must be placed; a test fails if the TSX renders a
 `<button>`, `<a href>`, `[role="button"]`, `[role="menuitem*"]`, `[role="radio"]`
-or form-field class that is in none. Read from the 187 interactive elements in the
-TSX; the developer places any class this table missed, as Thrive's did six.
+or form-field class that is in none. Read from the interactive elements in the
+TSX. Building it placed what the first reading missed: `.subtask-menu-item` (the
+sub-task menu's buttons had no class), `.completed-date-btn` and four fields;
+and removed what is no longer rendered anywhere (`.control-bar-chip-more`,
+`.control-bar-chip-remove`, `.due-clear-btn`, `.view-toggle-btn`,
+`.upcoming-card`, whose CSS is dead). `.card` is a `<div>` with `onClick`, not a
+keyboard control, so it is in the table for its pointer states and the test
+exempts it from "rendered as a control".
 
 | Family | Classes |
 |---|---|
 | Filled buttons | `.btn-primary`, `.btn-danger`, `.fab`, `.login-btn`, `.filter-popup-apply` |
-| Quiet buttons | `.btn-ghost`, `.share-archive-board-btn`, `.filter-popup-reset`, `.column-archive-link`, `.toast-action`, `.label-new-pill`, `.column-settings-add-btn`, `.column-settings-name`, `.control-bar-chip-more`, `.subtask-date-add-inline`, `.overflow-menu-btn` |
-| Icon buttons | `.btn-icon`, `.btn-icon-danger`, `.kebab-trigger`, `.subtask-kebab-btn`, `.subtask-action-btn`, `.subtask-add-circle`, `.archive-search-clear`, `.filter-search-clear`, `.filter-popup-close`, `.share-btn`, `.share-remove-btn`, `.staged-subtask-remove`, `.label-gear-btn`, `.column-add-btn`, `.control-bar-chip-remove`, `.column-settings-delete-btn`, `.date-clear-btn`, `.due-clear-btn`, `.user-dropdown-trigger` |
-| Chips and toggles | `.filter-chip` (and `-due`, `-label`), `.filter-toggle`, `.label-toggle`, `.theme-toggle-btn`, `.view-toggle-btn`, `.color-swatch`, `.column-color-swatch`, `.column-settings-swatch`, `.icon-swatch`, `.quick-date-chip`, `.owner-circle`, `.status-chevron`, `.check-icon`, `.subtask-date-inline` |
-| Rows and cards | `.card`, `.card-title`, `.upcoming-card`, `.archive-item`, `.kebab-item`, `.overflow-menu-item`, `.user-dropdown-edit-profile`, `.user-dropdown-signout`, `.subtask-context-menu button`, `.subtask-title`, `.editable-value`, `.due-date-btn`, `.column-add-row` |
+| Quiet buttons | `.btn-ghost`, `.share-archive-board-btn`, `.filter-popup-reset`, `.column-archive-link`, `.toast-action`, `.label-new-pill`, `.column-settings-add-btn`, `.column-settings-name`, `.subtask-date-add-inline`, `.overflow-menu-btn` |
+| Icon buttons | `.btn-icon`, `.btn-icon-danger`, `.kebab-trigger`, `.subtask-kebab-btn`, `.subtask-action-btn`, `.subtask-add-circle`, `.archive-search-clear`, `.filter-search-clear`, `.filter-popup-close`, `.share-btn`, `.share-remove-btn`, `.staged-subtask-remove`, `.label-gear-btn`, `.column-add-btn`, `.column-settings-delete-btn`, `.date-clear-btn`, `.user-dropdown-trigger` |
+| Chips and toggles | `.filter-chip`, `.filter-toggle`, `.label-toggle`, `.theme-toggle-btn`, `.color-swatch`, `.column-color-swatch`, `.column-settings-swatch`, `.icon-swatch`, `.quick-date-chip`, `.owner-circle`, `.status-chevron`, `.check-icon`, `.subtask-date-inline` |
+| Rows and cards | `.card`, `.card-title`, `.archive-item`, `.kebab-item`, `.overflow-menu-item`, `.user-dropdown-edit-profile`, `.user-dropdown-signout`, `.subtask-menu-item`, `.subtask-title`, `.editable-value`, `.due-date-btn`, `.completed-date-btn`, `.column-add-row` |
 | Navigation | `.view-tab`, `.settings-tab`, `.column-indicator-dot` |
-| Fields | `.form-field` inputs, selects and textareas, `.filter-search-input`, `.subtask-add-input`, `.subtask-add-date`, `.subtask-title-input`, `.label-form-input`, `.board-switcher-select`, `.column-sort-select`, `.archive-search-input`, `.profile-email-input`, `.column-settings-*-input`, radios and checkboxes — keep their focus treatment, gain the disabled state |
+| Fields | `.filter-search-input`, `.subtask-add-input`, `.subtask-add-date`, `.subtask-title-input`, `.label-form-input`, `.board-switcher-select`, `.column-sort-select`, `.archive-search-input`, `.profile-email-input`, `.due-date-hidden`, `.column-settings-name-inline`, `.column-settings-name-input`, `.column-settings-delete-select` — keep their focus treatment, gain the disabled state. Radios and checkboxes carry no class and are fields too; so is every input inside a `form-field` wrapper, which styles it |
 
 Selected applies to chips and toggles, the navigation tabs, `.check-icon`,
 `.status-chevron`, `.owner-circle`, `.overflow-menu-item` (checked) and

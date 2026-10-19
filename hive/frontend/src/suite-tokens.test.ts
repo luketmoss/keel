@@ -38,6 +38,8 @@ function theme(css: string, name: 'light' | 'dark'): Record<string, string> {
 const HIVE_ROOT = [
   '--color-accent', '--color-primary-light', '--focus-ring',
   '--column-width', '--header-height', '--control-bar-height',
+  // #452's interaction-state tokens
+  '--state-hover', '--state-pressed', '--opacity-disabled', '--focus-ring-width', '--focus-ring-offset',
 ];
 const HIVE_THEME = [
   '--color-primary', '--color-primary-hover', '--color-primary-rgb', '--color-focus', '--color-on-primary',
@@ -126,6 +128,14 @@ describe('AC3: exactly this moves', () => {
     ['--overlay-badge', 'rgba(255, 255, 255, 0.15)', null],
     ['--overlay-view-toggle', 'rgba(255, 255, 255, 0.04)', null],
   ];
+  // #452: Hive's five interaction-state tokens, theme-independent.
+  const STATES: [string, string | null, string | null][] = [
+    ['--state-hover', null, 'var(--overlay-sm)'],
+    ['--state-pressed', null, 'var(--overlay-md)'],
+    ['--opacity-disabled', null, '0.4'],
+    ['--focus-ring-width', null, '2px'],
+    ['--focus-ring-offset', null, '2px'],
+  ];
   // Tokens the suite defines and Hive did not: they arrive unused.
   const ARRIVE = [
     '--nav-height', '--shadow-strong', '--color-border-strong',
@@ -145,7 +155,7 @@ describe('AC3: exactly this moves', () => {
       }
       const norm = (s: string | null) => (s === null ? null : s.replace(/\s+/g, ''));
       const want: typeof changed = {};
-      for (const [k, a, b] of expected) want[k] = [a, b];
+      for (const [k, a, b] of [...expected, ...STATES]) want[k] = [a, b];
       for (const k of ARRIVE) if (!(k in was)) want[k] = [null, now[k] ?? null];
       // Values compared without whitespace; the keys must match exactly.
       expect(sorted(Object.keys(changed))).toEqual(sorted(Object.keys(want)));
@@ -268,13 +278,13 @@ describe('AC6: muted text passes AA on every surface Hive draws it on', () => {
 });
 
 describe('AC7: every variable the CSS reads is defined', () => {
-  // Undefined today, so the two rules reading them have no hover. Giving them
-  // one is an interaction state, which is #449's (#452), not this issue's.
+  // #452 gave the two rules that read --overlay-hover, and the one that read
+  // --color-surface-hover, the shared hover layer instead, so none is left.
   // --label-color and --label-text-color are set inline by the label components.
-  const PENDING_449 = ['--color-surface-hover', '--overlay-hover'];
+  const PENDING_449: string[] = [];
   const INLINE = ['--label-color', '--label-text-color'];
 
-  it('names only tokens that exist, bar the two hover tokens left for #449', () => {
+  it('names only tokens that exist', () => {
     const defined = new Set<string>();
     for (const s of TOKEN_SELECTORS) Object.keys(tokens(resolved, s)).forEach((n) => defined.add(n));
     // Not tokens: set inline or by a rule, not in a token block.

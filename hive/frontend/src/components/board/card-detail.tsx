@@ -550,9 +550,8 @@ export function CardDetail() {
                           class="btn-icon subtask-action-btn subtask-add-confirm"
                           aria-label="Add sub-task"
                           aria-disabled={!subtaskTitle.trim() ? 'true' : undefined}
-                          style={!subtaskTitle.trim() ? 'opacity: 0.4; cursor: not-allowed;' : undefined}
                           onClick={() => { if (subtaskTitle.trim()) submitSubtask(); }}
-                        >&#10003;</button>
+                        ><span>&#10003;</span></button>
                         <button
                           class="btn-icon subtask-action-btn"
                           aria-label="Cancel adding sub-task"
@@ -1282,11 +1281,11 @@ function SubtaskRow({ child, idx, allItems, isDone, editingSubtaskId, editingSub
           ref={contextRef}
           class="subtask-context-menu"
         >
-          <button onClick={handlePromoteToItem}>
+          <button class="subtask-menu-item" onClick={handlePromoteToItem}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17l9.2-9.2M17 17V7H7"/></svg>
             Turn into item
           </button>
-          <button class="danger" onClick={() => { requestDeleteSubtask(child.id); setContextMenu(false); }}>
+          <button class="subtask-menu-item danger" onClick={() => { requestDeleteSubtask(child.id); setContextMenu(false); }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
             Delete
           </button>

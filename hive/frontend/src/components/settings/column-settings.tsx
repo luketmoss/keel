@@ -202,6 +202,7 @@ export function ColumnSettings({ token }: ColumnSettingsProps) {
                         style={{ background: SWATCH_PREVIEW_COLORS[c] || c }}
                         onClick={() => handleColorChange(col, c)}
                         aria-label={`Color ${c}`}
+                        aria-pressed={col.color === c}
                       />
                     ))}
                   </div>
@@ -293,6 +294,7 @@ export function ColumnSettings({ token }: ColumnSettingsProps) {
                 style={{ background: SWATCH_PREVIEW_COLORS[c] || c }}
                 onClick={() => setCreateColor(c)}
                 aria-label={`Color ${c}`}
+                aria-pressed={createColor === c}
               />
             ))}
           </div>

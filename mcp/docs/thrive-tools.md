@@ -51,6 +51,7 @@ needs a matching change here.**
 |------|-------------|
 | `thrive_update_workout` | Fix date, name, type, notes, duration (`duration_min`, whole minutes), estimated duration (`estimated_min`), session effort, cardio attributes, or planned/completed status |
 | `thrive_update_set` | Correct one logged set's weight, reps, planned reps or effort (pass `section` when a lift appears twice) |
+| `thrive_undo` | Undo one write made through the MCP connector, from Thrive's change log. No arguments lists the last 20 calls; a `call_id` previews; `confirm: true` restores, all or nothing (any row changed since refuses the whole call). The undo is itself a call, so it can be undone. A write tool; counts toward the write limits |
 | `thrive_update_sets` | (Same 200-row ceiling and `confirm`.) Correct many sets of one workout in one call. All entries are validated first (any problem writes nothing), each request is atomic, and each updated set's resulting state is echoed |
 | `thrive_update_exercise` | Rename or retag an exercise |
 | `thrive_update_template` | Replace a template's exercise list wholesale |

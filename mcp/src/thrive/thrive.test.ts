@@ -12,6 +12,7 @@ const DESTRUCTIVE = [
   'thrive_delete_exercise',
   'thrive_delete_workout',
   'thrive_set_journal_entry',
+  'thrive_undo',
   'thrive_update_template',
 ]
 const READ_ONLY = [
@@ -97,11 +98,11 @@ function fakeThrive(answer: (action: string, url: URL) => unknown) {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('thrive tool list', () => {
-  it('serves exactly the 10 read tools on /thrive/mcp and the other 12 on /thrive/write/mcp (#409)', async () => {
+  it('serves exactly the 10 read tools on /thrive/mcp and the other 13 on /thrive/write/mcp (#409)', async () => {
     const read = (await listTools('read')).map((t) => t.name).sort()
     const write = (await listTools('write')).map((t) => t.name).sort()
     expect(read).toEqual([...READ_ONLY].sort())
-    expect(write).toHaveLength(12)
+    expect(write).toHaveLength(13)
     expect(write.filter((n) => read.includes(n))).toEqual([])
     expect([...read, ...write].sort()).toEqual(stdioTools.map((t) => t.name).sort())
   })
@@ -115,11 +116,11 @@ describe('thrive tool list', () => {
       description,
       inputSchema: canon(inputSchema),
     }))
-    expect(worker).toHaveLength(22)
+    expect(worker).toHaveLength(23)
     expect(worker).toEqual(stdio)
   })
 
-  it('marks the four destructive tools and every read tool', async () => {
+  it('marks the five destructive tools and every read tool', async () => {
     const tools = await listAll()
     const hint = (name: string) => tools.find((t) => t.name === name)?.annotations
     for (const name of DESTRUCTIVE) expect(hint(name)?.destructiveHint, name).toBe(true)

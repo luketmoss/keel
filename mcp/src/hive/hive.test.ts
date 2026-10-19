@@ -21,7 +21,7 @@ function rpc(method: string, params?: unknown): Request {
   })
 }
 
-const HIVE_WRITE = ['hive_add_item', 'hive_create_label', 'hive_update_item']
+const HIVE_WRITE = ['hive_add_item', 'hive_create_label', 'hive_undo', 'hive_update_item']
 const HIVE_READ = ['hive_get_item', 'hive_list_boards', 'hive_list_items', 'hive_list_labels', 'hive_list_owners']
 const REMINDER = "— Hive (write) is on. Turn it off in Search and tools when you've finished writing."
 
@@ -77,7 +77,7 @@ async function listed(mode: 'read' | 'write') {
 }
 
 describe('hive tool list (#409)', () => {
-  it('serves exactly the 5 read tools on /hive/mcp and the 3 write tools on /hive/write/mcp', async () => {
+  it('serves exactly the 5 read tools on /hive/mcp and the 4 write tools on /hive/write/mcp', async () => {
     expect((await listed('read')).map((t) => t.name)).toEqual(HIVE_READ)
     expect((await listed('write')).map((t) => t.name)).toEqual(HIVE_WRITE)
   })

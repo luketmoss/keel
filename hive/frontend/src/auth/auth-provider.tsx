@@ -185,7 +185,7 @@ export function AuthProvider({ children }: Props) {
               // auto-login on page load fails quietly, like its other failures.
               console.error('Failed to fetch user info:', err);
               if (!silentAutoLoginRef.current) {
-                showToast("Couldn't finish signing in — please try again", 'error');
+                showToast("Couldn't finish signing in â€” please try again", 'error');
               }
             } finally {
               if (silentAutoLoginRef.current) {

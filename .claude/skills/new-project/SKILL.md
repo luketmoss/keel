@@ -6,7 +6,8 @@ description: Add a new project to the Keel workspace - folder, CLAUDE.md, board 
 # /new-project
 
 Adds a project to the workspace. A project is a folder, a CLAUDE.md, a board
-option, and a CI workflow — not a repo.
+option, and a CI workflow — not a repo. For a repo that already exists, use
+`/adopt-project` instead; it plans the move and files it.
 
 Read `CONVENTIONS.md` before starting. Work from the repo root
 (`git rev-parse --show-toplevel`).

@@ -95,7 +95,7 @@
 }
 
 .search-card__kind {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--mono);
   font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;

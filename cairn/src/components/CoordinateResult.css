@@ -53,7 +53,7 @@
   white-space: nowrap;
   text-overflow: ellipsis;
   color: var(--text);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--mono);
   font-size: var(--text-base);
   font-variant-numeric: tabular-nums;
 }

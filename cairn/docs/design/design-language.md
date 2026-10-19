@@ -140,6 +140,7 @@ at 700 against a 400 body the hierarchy carries without needing size.
 | `--text-base` | `15px` | 400 | body, row titles, inputs, buttons |
 | `--text-lg` | `18px` | 700 | panel and section titles |
 | `--text-xl` | `24px` | 700 | page headings |
+| `--mono` | `ui-monospace, SFMono-Regular, Menlo, Consolas, monospace` | 400 or 700 | the monospace face: tabular numerals, uppercase labels, coordinates |
 
 Titles carry `letter-spacing: -0.01em`; nothing else is tracked. All numerals
 are `font-variant-numeric: tabular-nums` in a monospace face — a track's

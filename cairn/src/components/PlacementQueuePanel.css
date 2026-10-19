@@ -20,7 +20,7 @@
 .placement-queue__eyebrow {
   flex: none;
   color: var(--accent);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--mono);
   font-size: var(--text-xs);
   font-weight: 700;
   text-transform: uppercase;
@@ -76,7 +76,7 @@
   flex: none;
   margin: 0;
   color: var(--text-muted);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--mono);
   font-size: var(--text-xs);
 }
 
@@ -124,6 +124,6 @@
   border-radius: var(--radius-sm);
   background: var(--ground);
   color: var(--text-muted);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--mono);
   font-size: var(--text-xs);
 }

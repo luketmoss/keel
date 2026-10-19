@@ -23,7 +23,7 @@
   flex: none;
   margin-top: var(--space-2);
   color: var(--text-muted);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--mono);
   font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -66,7 +66,7 @@
   padding: var(--space-3);
   border-radius: var(--radius-sm);
   background: var(--ground);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--mono);
   font-size: var(--text-xs);
 }
 
@@ -176,7 +176,7 @@
   /* The stack written out again, as #341 records that every caller must
      until the token exists. Matching this file's own `__label` rather
      than inventing a ninth spelling of it. */
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--mono);
   font-size: var(--text-xs);
   text-overflow: ellipsis;
   white-space: nowrap;

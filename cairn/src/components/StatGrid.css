@@ -15,7 +15,7 @@
    --text-xs, uppercase, in the monospace face, the same treatment
    shell-and-content-model.md already uses for a meta label. */
 .stat__label {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--mono);
   font-size: var(--text-xs);
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -26,7 +26,7 @@
 /* "All numerals are tabular-nums in a monospace face" — design-language.md,
    Type. A grid of six figures is the case that rule exists for. */
 .stat__value {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--mono);
   font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;

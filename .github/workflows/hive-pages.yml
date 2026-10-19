@@ -1,0 +1,42 @@
+name: hive-pages
+on:
+  push:
+    branches: [main]
+    paths: ['hive/frontend/**', '.github/workflows/hive-pages.yml']
+  workflow_dispatch:
+# One group for every writer to gh-pages (cairn-pages.yml and thrive-pages.yml
+# use the same), so deploys never push at once. Not cancelled: a running deploy
+# finishes. GitHub keeps one pending run per group, so if three queue together
+# the middle one is dropped: workflow_dispatch is the recovery.
+concurrency:
+  group: gh-pages
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: hive/frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: hive/frontend/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+        env:
+          VITE_BASE_PATH: /keel/hive/
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.HIVE_GOOGLE_CLIENT_ID }}
+          VITE_SPREADSHEET_ID: ${{ secrets.HIVE_SPREADSHEET_ID }}
+      - uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: hive/frontend/dist
+          destination_dir: hive
+          keep_files: true

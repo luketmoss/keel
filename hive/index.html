@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hive — Family Board</title>
+  <link rel="manifest" href="/keel/hive/manifest.webmanifest" />
+  <meta name="theme-color" content="#2a1a0a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <link rel="icon" href="/keel/hive/favicon.ico" sizes="32x32" />
+  <link rel="icon" type="image/svg+xml" href="/keel/hive/hive-mark.svg" />
+  <link rel="apple-touch-icon" href="/keel/hive/hive-app-icon-180.png" />
+  <!-- AC4: Apply data-theme before first paint to prevent flash of wrong theme -->
+  <script>
+    (function() {
+      try {
+        var t = localStorage.getItem('hive-theme');
+        var resolved;
+        if (t === 'dark') {
+          resolved = 'dark';
+        } else if (t === 'light') {
+          resolved = 'light';
+        } else {
+          // 'system' or missing/invalid: follow OS preference
+          resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-theme', resolved);
+      } catch(e) {}
+    })();
+  </script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script type="module" crossorigin src="/keel/hive/assets/index-BJLTmvEp.js"></script>
+  <link rel="stylesheet" crossorigin href="/keel/hive/assets/index-ch4O9VRb.css">
+</head>
+<body>
+  <div id="app"></div>
+</body>
+</html>

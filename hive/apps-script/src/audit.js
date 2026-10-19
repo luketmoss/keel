@@ -10,7 +10,12 @@
 // which bootstrap their own headers. It exists because it was made by hand
 // during setup, and `getSheet` throws if it is missing.
 
-function writeAuditEntry(itemId, action, field, oldValue, newValue, actor) {
+/**
+ * #457: `callId` groups the rows one API call wrote, and `rowJson` (a string)
+ * carries a whole row for the entries `undoCall` must be able to rebuild. Both
+ * are blank for callers that pass neither.
+ */
+function writeAuditEntry(itemId, action, field, oldValue, newValue, actor, callId, rowJson) {
   var sheet = getSheet('Audit Log');
   sheet.appendRow([
     isoNow(),
@@ -20,7 +25,30 @@ function writeAuditEntry(itemId, action, field, oldValue, newValue, actor) {
     oldValue,
     newValue,
     actor,
+    callId || '',
+    rowJson || '',
   ]);
+}
+
+/**
+ * #457: the id that groups one call's audit rows. A valid `call_id` is 1-64
+ * characters of [A-Za-z0-9_-]; anything else is replaced, never refused, so a
+ * write cannot fail over its log.
+ */
+function resolveCallId(raw) {
+  if (typeof raw === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(raw)) return raw;
+  return generateUUID();
+}
+
+/**
+ * #457: one-off, run by the owner in the editor. Heads the two columns this
+ * issue appended to the Audit Log. Idempotent; A:G and every row are untouched.
+ */
+function migrateAuditLogHeaders() {
+  var sheet = getSheet('Audit Log');
+  var range = sheet.getRange(1, AUDIT_COL.CALL_ID + 1, 1, 2);
+  var current = range.getValues()[0];
+  range.setValues([[current[0] || 'call_id', current[1] || 'row_json']]);
 }
 
 /**
@@ -57,6 +85,8 @@ function rowToAuditEntry(row) {
     new_value: row[AUDIT_COL.NEW_VALUE] === undefined || row[AUDIT_COL.NEW_VALUE] === null
       ? '' : String(row[AUDIT_COL.NEW_VALUE]),
     actor: row[AUDIT_COL.ACTOR] || '',
+    call_id: row[AUDIT_COL.CALL_ID] ? String(row[AUDIT_COL.CALL_ID]) : '',
+    row_json: row[AUDIT_COL.ROW_JSON] ? String(row[AUDIT_COL.ROW_JSON]) : '',
   };
 }
 
@@ -86,6 +116,8 @@ function rowToAuditEntry(row) {
  * @param {string} [filters.from]   inclusive local start date, 'YYYY-MM-DD'
  * @param {string} [filters.to]     inclusive local end date, 'YYYY-MM-DD'
  * @param {string} [filters.action] exact action to match; omit for all actions
+ * @param {string} [filters.actor]   #457: exact actor to match
+ * @param {string} [filters.call_id] #457: exact call id to match
  * @returns {Array<Object>} matching entries, oldest first, each with `title` and `board_id` added
  */
 function getAuditLog(filters) {
@@ -93,6 +125,8 @@ function getAuditLog(filters) {
   var from = filters.from || '';
   var to = filters.to || '';
   var actionFilter = filters.action || '';
+  var actorFilter = filters.actor || '';
+  var callIdFilter = filters.call_id || '';
 
   var rows = getAllRows(getSheet('Audit Log'));
   var results = [];
@@ -102,6 +136,8 @@ function getAuditLog(filters) {
     if (!entry.timestamp) continue;
 
     if (actionFilter && entry.action !== actionFilter) continue;
+    if (actorFilter && entry.actor !== actorFilter) continue;
+    if (callIdFilter && entry.call_id !== callIdFilter) continue;
 
     // Lexical comparison is safe: both sides are zero-padded YYYY-MM-DD.
     if (from || to) {

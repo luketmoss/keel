@@ -61,9 +61,17 @@ var AUDIT_COL = {
   OLD_VALUE: 4,
   NEW_VALUE: 5,
   ACTOR: 6,
+  // #457: appended after ACTOR. The frontend still appends seven columns, so
+  // its rows leave both blank.
+  CALL_ID: 7,
+  ROW_JSON: 8,
 };
 
-var AUDIT_COLUMN_COUNT = 7;
+var AUDIT_COLUMN_COUNT = 9;
+
+// #457: every authenticated API write is the MCP Worker's (the one credential
+// is MCP_API_KEY), so the actor on its audit rows is fixed, whatever a payload says.
+var MCP_ACTOR = 'hive-mcp';
 
 // #239: the cross-app join key is the local calendar date in this zone,
 // formatted YYYY-MM-DD. No code path may slice an ISO timestamp to get a date.

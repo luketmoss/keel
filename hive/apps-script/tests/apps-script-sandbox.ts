@@ -353,7 +353,7 @@ export function loadAuthPath(opts: {
   // The other tabs stay read-only fakes — nothing in this file's tests
   // writes to them.
   const itemsSheet = makeWritableSheet(opts.itemRows ?? [], sandbox.ITEM_COLUMN_COUNT);
-  const auditSheet = makeWritableSheet(opts.auditRows ?? [], 7);
+  const auditSheet = makeWritableSheet(opts.auditRows ?? [], sandbox.AUDIT_COLUMN_COUNT);
   sandbox.SpreadsheetApp = makeSpreadsheetApp({
     Owners: makeSheet(opts.ownerRows ?? [], 2),
     Labels: makeSheet(opts.labelRows ?? [], 3),

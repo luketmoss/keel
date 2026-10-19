@@ -58,7 +58,7 @@ function getItem(id) {
   return item;
 }
 
-function createItem(data, actor) {
+function createItem(data, actor, callId) {
   actor = actor || 'api';
 
   if (!data.title) {
@@ -109,16 +109,18 @@ function createItem(data, actor) {
     board_id: data.board_id || '',
   };
 
+  callId = resolveCallId(callId);
   var sheet = getSheet('Items');
   sheet.appendRow(itemToRow(item));
 
-  writeAuditEntry(item.id, 'created', '', '', item.title, actor);
+  writeAuditEntry(item.id, 'created', '', '', item.title, actor, callId, JSON.stringify(item));
 
   return item;
 }
 
-function updateItem(id, changes, actor) {
+function updateItem(id, changes, actor, callId) {
   actor = actor || 'api';
+  callId = resolveCallId(callId);
 
   var sheet = getSheet('Items');
   var rowNum = findRowByItemId(sheet, id);
@@ -166,9 +168,9 @@ function updateItem(id, changes, actor) {
     // clears completed_at — `item` is reassigned over on the next line.
     var completionAction = statusTransitionAuditAction(item, isTerminal);
     item = applyStatusSideEffects(item, newStatus, isTerminal);
-    writeAuditEntry(id, 'status_changed', 'status', oldStatus, newStatus, actor);
+    writeAuditEntry(id, 'status_changed', 'status', oldStatus, newStatus, actor, callId);
     if (completionAction) {
-      writeAuditEntry(id, completionAction, 'status', oldStatus, newStatus, actor);
+      writeAuditEntry(id, completionAction, 'status', oldStatus, newStatus, actor, callId);
     }
   }
 
@@ -184,7 +186,7 @@ function updateItem(id, changes, actor) {
       var oldValue = String(item[field]);
       var newValue = String(changes[field]);
       item[field] = changes[field];
-      writeAuditEntry(id, 'updated', field, oldValue, newValue, actor);
+      writeAuditEntry(id, 'updated', field, oldValue, newValue, actor, callId);
     }
   }
 
@@ -215,9 +217,9 @@ function updateItem(id, changes, actor) {
         var childRowNum = findRowByItemId(sheet, child.id);
         if (childRowNum !== -1) {
           sheet.getRange(childRowNum, 1, 1, ITEM_COLUMN_COUNT).setValues([itemToRow(updatedChild)]);
-          writeAuditEntry(child.id, 'status_changed', 'status', childOldStatus, changes.status, actor);
+          writeAuditEntry(child.id, 'status_changed', 'status', childOldStatus, changes.status, actor, callId);
           if (childCompletionAction) {
-            writeAuditEntry(child.id, childCompletionAction, 'status', childOldStatus, changes.status, actor);
+            writeAuditEntry(child.id, childCompletionAction, 'status', childOldStatus, changes.status, actor, callId);
           }
         }
       }
@@ -228,7 +230,7 @@ function updateItem(id, changes, actor) {
   var refreshedItems = getItems();
   var readyParent = checkParentCompletion(item, refreshedItems);
   if (readyParent) {
-    writeAuditEntry(readyParent, 'parent_ready', '', '', 'All sub-tasks complete', actor);
+    writeAuditEntry(readyParent, 'parent_ready', '', '', 'All sub-tasks complete', actor, callId);
   }
 
   return item;
@@ -339,7 +341,7 @@ function buildDeletePreview(cascade) {
  *
  * @param {string} id
  * @param {string} [actor]
- * @param {Object} [options] - { confirm: boolean, token: string }
+ * @param {Object} [options] - { confirm: boolean, token: string, callId: string }
  * @returns {Object} the preview (dry run) or the result (confirmed delete)
  */
 function deleteItem(id, actor, options) {
@@ -382,6 +384,10 @@ function deleteItem(id, actor, options) {
   // the rows beneath it, so a row number read earlier in this loop would point
   // at the wrong record (CLAUDE.md: row deletion runs bottom-to-top).
   var ordered = cascade.slice().sort(function(a, b) { return b.depth - a.depth; });
+  // #457: each row is logged whole, as it stood before this delete.
+  var callId = resolveCallId(options.callId);
+  var itemsBefore = {};
+  getItems().forEach(function(i) { itemsBefore[i.id] = i; });
   var deleted = [];
   for (var i = 0; i < ordered.length; i++) {
     var entry = ordered[i];
@@ -397,7 +403,9 @@ function deleteItem(id, actor, options) {
       isRoot ? '' : 'cascade_root',
       entry.title,
       isRoot ? '' : id,
-      actor
+      actor,
+      callId,
+      JSON.stringify(itemsBefore[entry.id] || {})
     );
     deleted.push(entry);
   }

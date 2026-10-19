@@ -16,7 +16,7 @@ function getLabels(boardId) {
   return labels;
 }
 
-function createLabel(data) {
+function createLabel(data, actor, callId) {
   if (!data.label) throw new Error('label field is required');
   var sheet = getSheet('Labels');
   // Check for duplicate (scoped to board if board_id provided)
@@ -27,5 +27,9 @@ function createLabel(data) {
     }
   }
   sheet.appendRow([data.label, data.color || '', data.board_id || '']);
-  return { label: data.label, color: data.color || '', board_id: data.board_id || '' };
+  var created = { label: data.label, color: data.color || '', board_id: data.board_id || '' };
+  // #457: item id blank, since a label belongs to no item. The row is kept
+  // whole so `undoCall` can remove it.
+  writeAuditEntry('', 'label_created', 'label', '', data.label, actor || MCP_ACTOR, resolveCallId(callId), JSON.stringify(created));
+  return created;
 }

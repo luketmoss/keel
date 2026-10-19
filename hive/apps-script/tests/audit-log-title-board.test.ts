@@ -126,6 +126,8 @@ describe('#265 AC1: rows for existing items carry title and board', () => {
       old_value: 'In Progress',
       new_value: 'Done',
       actor: 'luke@example.com',
+      call_id: '',
+      row_json: '',
       title: 'Buy milk',
       board_id: 'B1',
     });
@@ -205,14 +207,14 @@ describe('#265 AC3: existing fields, filters and order are unchanged', () => {
     expect(filtered.res.data.map((e) => e.item_id)).toEqual(['a', 'b']);
   });
 
-  it('only adds the two new keys — the original seven are untouched', () => {
+  it('only adds the new keys — the original seven are untouched', () => {
     const { res } = query(
       [auditRow({ timestamp: '2026-09-12T15:00:00.000Z', item_id: 'a', action: 'completed', old_value: 'To Do', new_value: 'Done', actor: 'web' })],
       [itemRow('a', 'A', 'B1')],
       { from: '2026-09-12', to: '2026-09-12' },
     );
     expect(Object.keys(res.data[0]).sort()).toEqual(
-      ['action', 'actor', 'board_id', 'field', 'item_id', 'new_value', 'old_value', 'timestamp', 'title'].sort(),
+      ['action', 'actor', 'board_id', 'call_id', 'field', 'item_id', 'new_value', 'old_value', 'row_json', 'timestamp', 'title'].sort(),
     );
   });
 });

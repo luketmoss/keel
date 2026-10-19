@@ -99,7 +99,7 @@ Create a Google Sheet named **"Hive Board"** with six tabs:
 | **Labels** | label, color, board_id |
 | **Boards** | id, name, created_at, created_by, color, icon |
 | **Permissions** | board_id, user_email, role |
-| **Audit Log** | timestamp, item_id, action, field, old_value, new_value, actor |
+| **Audit Log** | timestamp, item_id, action, field, old_value, new_value, actor, call_id, row_json |
 
 The app creates the **Boards** and **Permissions** tabs automatically on first use if they don't exist. Add rows to **Owners** with your team members. Labels are managed per-board through the app UI.
 

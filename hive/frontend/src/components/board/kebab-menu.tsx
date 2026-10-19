@@ -153,7 +153,7 @@ export function KebabMenu({ actions, itemTitle }: Props) {
               onClick={(e: MouseEvent) => handleItemClick(action, e)}
               onKeyDown={(e: KeyboardEvent) => handleItemKeyDown(action, e)}
             >
-              {action.label}
+              <span>{action.label}</span>
             </div>
           ))}
         </div>

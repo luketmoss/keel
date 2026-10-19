@@ -18,6 +18,13 @@
   --column-width: 320px;
   --header-height: 44px;
   --control-bar-height: 44px;
+
+  /* Interaction states (#452): a layer over a control's own background */
+  --state-hover: var(--overlay-sm);
+  --state-pressed: var(--overlay-md);
+  --opacity-disabled: 0.4;
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
 }
 
 /* === Light theme === */
@@ -138,21 +145,27 @@ body {
   background: var(--color-primary);
   color: var(--color-on-primary);
 }
-.btn-primary:hover { background: var(--color-primary-hover); }
-.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+@media (hover: hover) {
+  .btn-primary:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--color-primary-hover);
+  }
+}
 
 .btn-ghost {
   background: transparent;
   color: var(--color-text-secondary);
 }
-.btn-ghost:hover { background: var(--overlay-xs); }
+
 
 .btn-danger {
   background: var(--color-danger);
   color: white;
 }
-.btn-danger:hover:not(:disabled) { background: var(--color-danger-hover); }
-.btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+@media (hover: hover) {
+  .btn-danger:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--color-danger-hover);
+  }
+}
 
 .btn-sm {
   padding: 4px 10px;
@@ -215,7 +228,11 @@ body {
   cursor: pointer;
   transition: background 0.15s;
 }
-.login-btn:hover { background: var(--color-primary-hover); }
+@media (hover: hover) {
+  .login-btn:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--color-primary-hover);
+  }
+}
 
 /* === Loading === */
 .loading-screen {
@@ -271,9 +288,10 @@ body {
   border-right: none;
 }
 
-.theme-toggle-btn:hover {
-  background: var(--overlay-xs);
-  color: var(--color-text);
+@media (hover: hover) {
+  .theme-toggle-btn:hover {
+    color: var(--color-text);
+  }
 }
 
 .theme-toggle-active {
@@ -282,9 +300,11 @@ body {
   box-shadow: 0 1px 3px var(--color-shadow-strong);
 }
 
-.theme-toggle-active:hover {
-  background: var(--color-surface);
-  color: var(--color-text);
+@media (hover: hover) {
+  .theme-toggle-active:hover {
+    background: var(--color-surface);
+    color: var(--color-text);
+  }
 }
 
 .theme-toggle-btn:focus-visible {
@@ -382,7 +402,6 @@ body {
   min-height: 36px;
 }
 
-.user-dropdown-trigger:hover,
 .user-dropdown-trigger:focus-visible {
   background: var(--overlay-xs);
   outline: 2px solid var(--color-primary);
@@ -409,7 +428,7 @@ body {
   height: 28px;
   border-radius: 50%;
   background: var(--color-primary);
-  color: white;
+  color: var(--color-on-primary);
   font-size: 13px;
   font-weight: 600;
   flex-shrink: 0;
@@ -457,9 +476,7 @@ body {
   width: 100%;
 }
 
-.user-dropdown-edit-profile:hover {
-  background: var(--overlay-xs);
-}
+
 
 .user-dropdown-edit-profile:focus-visible {
   outline: 2px solid var(--color-primary);
@@ -478,9 +495,7 @@ body {
   border-radius: var(--radius-sm);
 }
 
-.user-dropdown-signout:hover {
-  background: var(--overlay-xs);
-}
+
 
 .user-dropdown-signout:focus-visible {
   outline: 2px solid var(--color-primary);
@@ -550,9 +565,10 @@ body {
   color: var(--color-text-secondary);
 }
 
-.overflow-menu-btn:hover {
-  background: var(--overlay-xs);
-  color: var(--color-text);
+@media (hover: hover) {
+  .overflow-menu-btn:hover {
+    color: var(--color-text);
+  }
 }
 
 .overflow-menu-btn:focus-visible {
@@ -591,9 +607,7 @@ body {
   width: 100%;
 }
 
-.overflow-menu-item:hover {
-  background: var(--overlay-xs);
-}
+
 
 .overflow-menu-item:focus-visible {
   outline: 2px solid var(--color-primary);
@@ -655,9 +669,10 @@ body {
   border-radius: 50%;
 }
 
-.filter-search-clear:hover {
-  background: var(--overlay-xs);
-  color: var(--color-text);
+@media (hover: hover) {
+  .filter-search-clear:hover {
+    color: var(--color-text);
+  }
 }
 
 /* === Menu Section Headers & Dividers (#177) === */
@@ -680,12 +695,14 @@ body {
 .filter-chip-due.filter-chip-active {
   background: var(--color-primary);
   border-color: var(--color-primary);
-  color: white;
+  color: var(--color-on-primary);
 }
 
-.filter-chip-due.filter-chip-active:hover {
-  background: var(--color-primary-hover);
-  border-color: var(--color-primary-hover);
+@media (hover: hover) {
+  .filter-chip-due.filter-chip-active:hover {
+    background: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
+  }
 }
 
 /* Active filter chips inline */
@@ -731,9 +748,7 @@ body {
   border-radius: 50%;
 }
 
-.control-bar-chip-remove:hover {
-  background: var(--overlay-xs);
-}
+
 
 .control-bar-chip-more {
   display: inline-flex;
@@ -750,9 +765,7 @@ body {
   flex-shrink: 0;
 }
 
-.control-bar-chip-more:hover {
-  background: var(--overlay-xs);
-}
+
 
 .control-bar-chip-more:focus-visible {
   outline: 2px solid var(--color-primary);
@@ -875,9 +888,11 @@ body {
   font-family: inherit;
 }
 
-.column-archive-link:hover {
-  color: var(--color-primary);
-  text-decoration: underline;
+@media (hover: hover) {
+  .column-archive-link:hover {
+    color: var(--color-primary);
+    text-decoration: underline;
+  }
 }
 
 .column-archive-link:focus-visible {
@@ -913,10 +928,6 @@ body {
   flex-shrink: 0;
 }
 
-.column-sort-select:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
 
 .column-sort-select:focus-visible {
   outline: 2px solid var(--color-primary);
@@ -996,9 +1007,10 @@ body {
   line-height: 1;
   padding: 0;
 }
-.column-add-btn:hover {
-  background: var(--overlay-hover);
-  color: var(--color-text);
+@media (hover: hover) {
+  .column-add-btn:hover {
+    color: var(--color-text);
+  }
 }
 .column-add-btn:focus-visible {
   outline: 2px solid var(--color-focus);
@@ -1021,13 +1033,16 @@ body {
   align-items: center;
   gap: 4px;
 }
-.column:hover .column-add-row {
-  display: flex;
+@media (hover: hover) {
+  .column:hover .column-add-row {
+    display: flex;
+  }
 }
-.column-add-row:hover {
-  background: var(--overlay-hover);
-  color: var(--color-text);
-  border-color: var(--color-text-muted);
+@media (hover: hover) {
+  .column-add-row:hover {
+    color: var(--color-text);
+    border-color: var(--color-text-muted);
+  }
 }
 .column-add-row-icon {
   font-size: 15px;
@@ -1094,12 +1109,13 @@ body {
   }
 }
 
-.card:hover {
-  box-shadow: var(--shadow-lg);
+@media (hover: hover) {
+  .card:hover {
+    box-shadow: var(--shadow-lg);
+  }
 }
 
 .card:focus-visible {
-  outline: none;
   box-shadow: var(--shadow-lg);
 }
 
@@ -1141,8 +1157,10 @@ body {
   -webkit-box-orient: vertical;
 }
 
-.card-title:hover {
-  text-decoration: underline;
+@media (hover: hover) {
+  .card-title:hover {
+    text-decoration: underline;
+  }
 }
 
 .card-title:focus-visible {
@@ -1273,8 +1291,10 @@ body {
 
 /* Show on card hover (pointer devices) */
 @media (pointer: fine) {
-  .card:hover .kebab-trigger {
-    opacity: 1;
+    @media (hover: hover) {
+    .card:hover .kebab-trigger {
+      opacity: 1;
+    }
   }
 }
 
@@ -1284,13 +1304,8 @@ body {
   opacity: 1;
 }
 
-.kebab-trigger:hover {
-  background: color-mix(in srgb, var(--color-text) 8%, transparent);
-}
 
-.kebab-trigger:focus-visible {
-  box-shadow: var(--focus-ring);
-}
+
 
 .kebab-dropdown {
   position: absolute;
@@ -1314,7 +1329,6 @@ body {
   outline: none;
 }
 
-.kebab-item:hover,
 .kebab-item:focus-visible {
   background: color-mix(in srgb, var(--color-text) 8%, transparent);
 }
@@ -1323,12 +1337,6 @@ body {
   box-shadow: inset var(--focus-ring);
 }
 
-.kebab-item-disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.kebab-item-disabled:hover,
 .kebab-item-disabled:focus-visible {
   background: transparent;
 }
@@ -1383,9 +1391,7 @@ body {
   transition: transform 0.1s, box-shadow 0.1s;
 }
 
-.color-swatch:hover {
-  transform: scale(1.15);
-}
+
 
 .color-swatch:focus-visible {
   outline: 2px solid var(--color-focus);
@@ -1412,8 +1418,10 @@ body {
   transition: background 0.1s, border-color 0.1s;
 }
 
-.icon-swatch:hover {
-  background: var(--color-border);
+@media (hover: hover) {
+  .icon-swatch:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--color-border);
+  }
 }
 
 .icon-swatch:focus-visible {
@@ -1438,9 +1446,11 @@ body {
   color: var(--color-text-secondary);
 }
 
-.share-btn:hover {
-  color: var(--color-primary);
-  background: var(--color-primary-light);
+@media (hover: hover) {
+  .share-btn:hover {
+    color: var(--color-primary);
+    background: var(--color-primary-light);
+  }
 }
 
 /* === Share Modal === */
@@ -1520,8 +1530,10 @@ body {
   transition: background-color 0.3s ease;
 }
 
-.share-member-row:hover {
-  background: var(--color-bg);
+@media (hover: hover) {
+  .share-member-row:hover {
+    background: var(--color-bg);
+  }
 }
 
 .share-member-highlight {
@@ -1575,8 +1587,10 @@ body {
   color: var(--color-text-secondary);
 }
 
-.share-remove-btn:hover {
-  color: var(--color-danger, #ef4444);
+@media (hover: hover) {
+  .share-remove-btn:hover {
+    color: var(--color-danger, #ef4444);
+  }
 }
 
 .share-confirm-remove {
@@ -1618,8 +1632,7 @@ body {
   color: var(--color-text);
   border: 1px solid var(--color-border-strong);
 }
-.share-archive-board-btn:hover:not(:disabled) { background: var(--overlay-xs); }
-.share-archive-board-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
 
 /* === Archived Boards Dialog (#288) === */
 
@@ -1815,8 +1828,10 @@ body {
   white-space: nowrap;
 }
 
-.filter-chip:hover {
-  background: color-mix(in srgb, var(--color-border) 30%, transparent);
+@media (hover: hover) {
+  .filter-chip:hover {
+    background: color-mix(in srgb, var(--color-border) 30%, transparent);
+  }
 }
 
 /* #28 AC2: Label chips use label color for border */
@@ -1824,8 +1839,10 @@ body {
   border-color: var(--label-color, #999);
 }
 
-.filter-chip-label:hover {
-  background: color-mix(in srgb, var(--label-color, #999) 15%, transparent);
+@media (hover: hover) {
+  .filter-chip-label:hover {
+    background: color-mix(in srgb, var(--label-color, #999) 15%, transparent);
+  }
 }
 
 /* #28 AC4: Active label chip — filled with label color */
@@ -2017,8 +2034,10 @@ body {
   font-weight: 700;
   font-size: 13px;
 }
-.status-chevron:not(.active):hover {
-  background: var(--overlay-md);
+@media (hover: hover) {
+  .status-chevron:not(.active):hover {
+    background: var(--overlay-md);
+  }
 }
 
 /* === #220: Owner avatar circles === */
@@ -2076,9 +2095,7 @@ body {
 .owner-circle.active {
   box-shadow: 0 0 0 3px var(--color-surface), 0 0 0 5px var(--color-primary);
 }
-.owner-circle:not(.active):hover {
-  transform: scale(1.08);
-}
+
 .owner-circle-name {
   font-size: 10px;
   color: var(--color-text-secondary);
@@ -2106,9 +2123,7 @@ body {
   min-height: 44px;
   min-width: 44px;
 }
-.due-date-btn:hover {
-  background: var(--overlay-xs);
-}
+
 .due-date-btn svg {
   width: 24px;
   height: 24px;
@@ -2163,9 +2178,10 @@ body {
   flex-shrink: 0;
   transition: all var(--transition-fast);
 }
-.due-clear-btn:hover {
-  background: var(--overlay-sm);
-  color: var(--color-danger);
+@media (hover: hover) {
+  .due-clear-btn:hover {
+    color: var(--color-danger);
+  }
 }
 .due-clear-btn svg {
   width: 16px;
@@ -2191,9 +2207,7 @@ body {
   text-align: left;
   transition: all var(--transition-fast);
 }
-.completed-date-btn:hover {
-  background: var(--overlay-xs);
-}
+
 .completed-date-btn svg {
   width: 24px;
   height: 24px;
@@ -2231,9 +2245,11 @@ body {
   min-height: 32px;
   transition: all var(--transition-fast);
 }
-.label-new-pill:hover {
-  border-color: var(--color-text-secondary);
-  color: var(--color-text);
+@media (hover: hover) {
+  .label-new-pill:hover {
+    border-color: var(--color-text-secondary);
+    color: var(--color-text);
+  }
 }
 .label-gear-btn {
   width: 32px;
@@ -2249,9 +2265,10 @@ body {
   padding: 0;
   transition: all var(--transition-fast);
 }
-.label-gear-btn:hover {
-  background: var(--overlay-sm);
-  color: var(--color-text);
+@media (hover: hover) {
+  .label-gear-btn:hover {
+    color: var(--color-text);
+  }
 }
 
 /* #207: Date field row — inline date input + clear button */
@@ -2271,8 +2288,10 @@ body {
   color: var(--color-text-secondary);
 }
 
-.date-clear-btn:hover {
-  color: var(--color-text);
+@media (hover: hover) {
+  .date-clear-btn:hover {
+    color: var(--color-text);
+  }
 }
 
 .detail-field input,
@@ -2301,9 +2320,10 @@ body {
   white-space: pre-wrap;
 }
 
-.editable-value:hover {
-  border-color: var(--color-border);
-  background: var(--overlay-xs);
+@media (hover: hover) {
+  .editable-value:hover {
+    border-color: var(--color-border);
+  }
 }
 
 .placeholder {
@@ -2329,8 +2349,10 @@ body {
   transition: all 0.15s;
 }
 
-.label-toggle:hover {
-  background: color-mix(in srgb, var(--label-color, #999) 15%, transparent);
+@media (hover: hover) {
+  .label-toggle:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: color-mix(in srgb, var(--label-color, #999) 15%, transparent);
+  }
 }
 
 .label-toggle-active {
@@ -2373,8 +2395,10 @@ body {
   transition: background var(--transition-fast);
   padding: 0;
 }
-.subtask-add-circle:hover {
-  background: var(--color-primary-light);
+@media (hover: hover) {
+  .subtask-add-circle:hover {
+    background: var(--color-primary-light);
+  }
 }
 
 .subtask-list {
@@ -2395,9 +2419,7 @@ body {
   transition: background var(--transition-fast);
 }
 
-.subtask-item:hover {
-  background: var(--overlay-xs);
-}
+
 
 /* #220: Rounded square checkbox */
 .check-icon {
@@ -2425,8 +2447,10 @@ body {
   justify-content: center;
   transition: all var(--transition-fast);
 }
-.check-icon:hover .check-box {
-  border-color: var(--color-primary);
+@media (hover: hover) {
+  .check-icon:hover .check-box {
+    border-color: var(--color-primary);
+  }
 }
 .check-box.checked {
   background: var(--color-success);
@@ -2457,9 +2481,13 @@ body {
   cursor: pointer;
 }
 
-.subtask-title:hover,
 .subtask-title:focus-visible {
   text-decoration: underline;
+}
+@media (hover: hover) {
+  .subtask-title:hover {
+    text-decoration: underline;
+  }
 }
 
 /* Edit textarea that replaces the title span */
@@ -2530,8 +2558,10 @@ body {
 }
 
 /* #58: Add confirm button gets primary color hover for visual differentiation */
-.subtask-add-confirm:not([aria-disabled="true"]):hover {
-  color: var(--color-primary);
+@media (hover: hover) {
+  .subtask-add-confirm:not([aria-disabled="true"]):hover {
+    color: var(--color-primary);
+  }
 }
 
 /* #220: Kebab menu button (desktop only, hidden on mobile) */
@@ -2552,9 +2582,10 @@ body {
   transition: all var(--transition-fast);
   flex-shrink: 0;
 }
-.subtask-kebab-btn:hover {
-  background: var(--overlay-sm);
-  color: var(--color-text);
+@media (hover: hover) {
+  .subtask-kebab-btn:hover {
+    color: var(--color-text);
+  }
 }
 
 /* #220: Subtask context menu (kebab dropdown) */
@@ -2584,14 +2615,14 @@ body {
   cursor: pointer;
   text-align: left;
 }
-.subtask-context-menu button:hover {
-  background: var(--overlay-xs);
-}
+
 .subtask-context-menu button.danger {
   color: var(--color-danger);
 }
-.subtask-context-menu button.danger:hover {
-  background: rgba(211, 47, 47, 0.06);
+@media (hover: hover) {
+  .subtask-menu-item.danger:hover {
+    background: rgba(211, 47, 47, 0.06);
+  }
 }
 
 /* #220: Inline date badge under subtask title */
@@ -2624,8 +2655,10 @@ body {
   height: 44px;
   transform: translateX(-50%);
 }
-.subtask-date-inline:hover {
-  background: rgba(var(--color-primary-rgb), 0.18);
+@media (hover: hover) {
+  .subtask-date-inline:hover {
+    background: rgba(var(--color-primary-rgb), 0.18);
+  }
 }
 .subtask-date-inline svg {
   width: 14px;
@@ -2659,9 +2692,11 @@ body {
   min-height: 24px;
   position: relative;
 }
-.subtask-date-add-inline:hover {
-  border-color: var(--color-text-secondary);
-  color: var(--color-text-secondary);
+@media (hover: hover) {
+  .subtask-date-add-inline:hover {
+    border-color: var(--color-text-secondary);
+    color: var(--color-text-secondary);
+  }
 }
 .subtask-date-add-inline svg {
   width: 14px;
@@ -2992,9 +3027,11 @@ body {
   padding: 0;
 }
 
-.staged-subtask-remove:hover {
-  background: var(--color-border);
-  color: var(--color-danger);
+@media (hover: hover) {
+  .staged-subtask-remove:hover {
+    background: var(--color-border);
+    color: var(--color-danger);
+  }
 }
 
 .subtask-input-row {
@@ -3068,9 +3105,10 @@ body {
   padding: 0;
 }
 
-.archive-search-clear:hover {
-  background: var(--overlay-sm);
-  color: var(--color-text);
+@media (hover: hover) {
+  .archive-search-clear:hover {
+    color: var(--color-text);
+  }
 }
 
 .archive-results-count {
@@ -3109,9 +3147,11 @@ body {
   margin-bottom: 6px;
 }
 
-.archive-item:hover {
-  background: var(--color-bg);
-  border-color: var(--color-primary);
+@media (hover: hover) {
+  .archive-item:hover {
+    background: var(--color-bg);
+    border-color: var(--color-primary);
+  }
 }
 
 .archive-item:focus-visible {
@@ -3371,9 +3411,7 @@ body {
   font-size: 14px;
 }
 
-.user-dropdown-settings:hover {
-  background: var(--color-surface-hover);
-}
+
 
 /* === FAB (Floating Action Button) === */
 .fab {
@@ -3384,7 +3422,7 @@ body {
   height: 56px;
   border-radius: 50%;
   background: var(--color-primary);
-  color: white;
+  color: var(--color-on-primary);
   border: none;
   font-size: 28px;
   line-height: 1;
@@ -3394,9 +3432,10 @@ body {
   z-index: 50;
 }
 
-.fab:hover {
-  background: var(--color-primary-hover);
-  transform: scale(1.05);
+@media (hover: hover) {
+  .fab:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--color-primary-hover);
+  }
 }
 
 /* === Toast === */
@@ -3437,8 +3476,10 @@ body {
   white-space: nowrap;
 }
 
-.toast-action:hover {
-  background: rgba(255, 255, 255, 0.35);
+@media (hover: hover) {
+  .toast-action:hover {
+    background: rgba(255, 255, 255, 0.35);
+  }
 }
 
 .toast-action:focus-visible {
@@ -3470,18 +3511,18 @@ body {
   transition: background 0.15s, color 0.15s;
 }
 
-.view-toggle-btn:hover {
-  background: var(--overlay-xs);
-}
+
 
 .view-toggle-active {
   background: var(--color-primary);
-  color: white;
+  color: var(--color-on-primary);
   border-color: var(--color-primary);
 }
 
-.view-toggle-active:hover {
-  background: var(--color-primary-hover);
+@media (hover: hover) {
+  .view-toggle-active:hover {
+    background: var(--color-primary-hover);
+  }
 }
 
 /* === List View === */
@@ -3655,14 +3696,17 @@ body {
   transition: background 0.15s, color 0.15s;
 }
 
-.btn-icon:hover {
-  background: var(--overlay-sm);
-  color: var(--color-text);
+@media (hover: hover) {
+  .btn-icon:hover:not(:disabled):not([aria-disabled="true"]) {
+    color: var(--color-text);
+  }
 }
 
-.btn-icon-danger:hover {
-  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
-  color: var(--color-danger);
+@media (hover: hover) {
+  .btn-icon-danger:hover {
+    background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+    color: var(--color-danger);
+  }
 }
 
 /* Label form (create/edit) */
@@ -3719,9 +3763,7 @@ body {
   transition: border-color 0.15s, transform 0.15s;
 }
 
-.color-swatch:hover {
-  transform: scale(1.1);
-}
+
 
 .color-swatch:focus-visible {
   outline: none;
@@ -3772,10 +3814,12 @@ body {
   justify-content: center;
 }
 
-.quick-date-chip:hover {
-  border-color: var(--color-primary);
-  color: var(--color-text);
-  background: var(--color-surface);
+@media (hover: hover) {
+  .quick-date-chip:hover {
+    border-color: var(--color-primary);
+    color: var(--color-text);
+    background: var(--color-surface);
+  }
 }
 
 .quick-date-chip:focus-visible {
@@ -3790,10 +3834,12 @@ body {
   font-weight: 600;
 }
 
-.quick-date-chip-active:hover {
-  background: rgba(var(--color-primary-rgb), 0.18);
-  border-color: var(--color-primary);
-  color: var(--color-primary);
+@media (hover: hover) {
+  .quick-date-chip-active:hover {
+    background: rgba(var(--color-primary-rgb), 0.18);
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+  }
 }
 
 /* === Filter bar toggle (#88 AC3) === */
@@ -3819,8 +3865,10 @@ body {
   font-family: inherit;
 }
 
-.filter-toggle:hover {
-  background: color-mix(in srgb, var(--color-border) 30%, transparent);
+@media (hover: hover) {
+  .filter-toggle:hover {
+    background: color-mix(in srgb, var(--color-border) 30%, transparent);
+  }
 }
 
 .filter-toggle:focus-visible {
@@ -3837,7 +3885,7 @@ body {
   padding: 0 5px;
   border-radius: 9px;
   background: var(--color-primary);
-  color: white;
+  color: var(--color-on-primary);
   font-size: 11px;
   font-weight: 600;
 }
@@ -3900,8 +3948,10 @@ body {
   white-space: nowrap;
 }
 
-.filter-popup-reset:hover {
-  background: rgba(211, 47, 47, 0.06);
+@media (hover: hover) {
+  .filter-popup-reset:hover {
+    background: rgba(211, 47, 47, 0.06);
+  }
 }
 
 .filter-popup-apply {
@@ -3941,9 +3991,10 @@ body {
   color: var(--color-text-muted);
 }
 
-.filter-popup-close:hover {
-  background: var(--overlay-xs);
-  color: var(--color-text);
+@media (hover: hover) {
+  .filter-popup-close:hover {
+    color: var(--color-text);
+  }
 }
 
 .filter-popup-body {
@@ -3975,9 +4026,10 @@ body {
   align-self: center;
   transition: background var(--transition-fast);
 }
-.subtask-handle:hover {
-  background: var(--overlay-xs);
-  color: var(--color-text);
+@media (hover: hover) {
+  .subtask-handle:hover {
+    color: var(--color-text);
+  }
 }
 .subtask-handle[draggable="true"] {
   cursor: grab;
@@ -4286,9 +4338,7 @@ body {
   transition: background 0.15s, color 0.15s;
 }
 
-.view-tab:hover {
-  background: var(--overlay-xs);
-}
+
 
 .view-tab:focus-visible {
   outline: 2px solid var(--color-primary);
@@ -4367,8 +4417,10 @@ body {
   white-space: nowrap;
 }
 
-.settings-tab:hover {
-  color: var(--color-text);
+@media (hover: hover) {
+  .settings-tab:hover {
+    color: var(--color-text);
+  }
 }
 
 .settings-tab-active {
@@ -4435,8 +4487,10 @@ body {
   padding: 0;
 }
 
-.column-settings-swatch:hover {
-  border-color: var(--color-text-secondary);
+@media (hover: hover) {
+  .column-settings-swatch:hover {
+    border-color: var(--color-text-secondary);
+  }
 }
 
 .column-settings-color-popover {
@@ -4466,8 +4520,10 @@ body {
   text-align: left;
 }
 
-.column-settings-name:hover {
-  background: var(--color-border);
+@media (hover: hover) {
+  .column-settings-name:hover {
+    background: var(--color-border);
+  }
 }
 
 .column-settings-name-inline {
@@ -4511,8 +4567,8 @@ body {
 }
 
 .column-settings-terminal-toggle input:disabled + .column-settings-terminal-icon {
-  opacity: 0.4;
-  cursor: not-allowed;
+  opacity: var(--opacity-disabled);
+  cursor: default;
 }
 
 .column-settings-delete-btn {
@@ -4526,14 +4582,12 @@ body {
   flex-shrink: 0;
 }
 
-.column-settings-delete-btn:hover {
-  background: rgba(211, 47, 47, 0.1);
+@media (hover: hover) {
+  .column-settings-delete-btn:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: rgba(211, 47, 47, 0.1);
+  }
 }
 
-.column-settings-delete-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
 
 .column-settings-count {
   font-size: 12px;
@@ -4547,10 +4601,6 @@ body {
   padding: 2px 4px;
 }
 
-.column-settings-row .btn-icon:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
 
 .column-settings-name-input {
   width: 100%;
@@ -4577,8 +4627,10 @@ body {
   padding: 0;
 }
 
-.column-color-swatch:hover {
-  border-color: var(--color-text-secondary);
+@media (hover: hover) {
+  .column-color-swatch:hover {
+    border-color: var(--color-text-secondary);
+  }
 }
 
 .column-color-swatch-active {
@@ -4632,4 +4684,223 @@ body {
   margin: 0 0 12px;
   font-size: 13px;
   color: var(--color-text-secondary);
+}
+
+/* ===== Interaction states (#452) =====
+   Every control answers rest, hover, pressed, focus, selected and disabled the
+   same way, decided per family rather than per class, so a new control joins a
+   family and inherits them (hive/docs/design/452-interaction-states.md).
+   interaction-states.test.ts lists the families and fails on a control class
+   the TSX renders that is in none. Rest and selected stay with each component.
+
+   Last in the file on purpose: the state rules win ties with the components'
+   own rules. A state never moves a control (no transform), and none applies to
+   a disabled one: :disabled, or [aria-disabled="true"] where it keeps focus. */
+
+/* Focus: one ring for everything, in the focus colour. The rings the components
+   already draw override it; form fields keep their border and halo instead. */
+:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Hover: only where a pointer really hovers, or on a phone it sticks to the
+   last control tapped. Filled buttons keep their own -hover fill tokens; every
+   other family lays --state-hover over its own background, so the fill stays
+   underneath and the text keeps its contrast. */
+@media (hover: hover) {
+/* Quiet buttons */
+.btn-ghost:hover:not(:disabled):not([aria-disabled="true"]),
+.share-archive-board-btn:hover:not(:disabled):not([aria-disabled="true"]),
+.filter-popup-reset:hover:not(:disabled):not([aria-disabled="true"]),
+.column-archive-link:hover:not(:disabled):not([aria-disabled="true"]),
+.toast-action:hover:not(:disabled):not([aria-disabled="true"]),
+.label-new-pill:hover:not(:disabled):not([aria-disabled="true"]),
+.column-settings-add-btn:hover:not(:disabled):not([aria-disabled="true"]),
+.column-settings-name:hover:not(:disabled):not([aria-disabled="true"]),
+.subtask-date-add-inline:hover:not(:disabled):not([aria-disabled="true"]),
+.overflow-menu-btn:hover:not(:disabled):not([aria-disabled="true"]),
+/* Icon buttons */
+.btn-icon:hover:not(:disabled):not([aria-disabled="true"]),
+.btn-icon-danger:hover:not(:disabled):not([aria-disabled="true"]),
+.kebab-trigger:hover:not(:disabled):not([aria-disabled="true"]),
+.subtask-kebab-btn:hover:not(:disabled):not([aria-disabled="true"]),
+.subtask-action-btn:hover:not(:disabled):not([aria-disabled="true"]),
+.subtask-add-circle:hover:not(:disabled):not([aria-disabled="true"]),
+.archive-search-clear:hover:not(:disabled):not([aria-disabled="true"]),
+.filter-search-clear:hover:not(:disabled):not([aria-disabled="true"]),
+.filter-popup-close:hover:not(:disabled):not([aria-disabled="true"]),
+.share-btn:hover:not(:disabled):not([aria-disabled="true"]),
+.share-remove-btn:hover:not(:disabled):not([aria-disabled="true"]),
+.staged-subtask-remove:hover:not(:disabled):not([aria-disabled="true"]),
+.label-gear-btn:hover:not(:disabled):not([aria-disabled="true"]),
+.column-add-btn:hover:not(:disabled):not([aria-disabled="true"]),
+.column-settings-delete-btn:hover:not(:disabled):not([aria-disabled="true"]),
+.date-clear-btn:hover:not(:disabled):not([aria-disabled="true"]),
+.user-dropdown-trigger:hover:not(:disabled):not([aria-disabled="true"]),
+/* Chips and toggles */
+.filter-chip:hover:not(:disabled):not([aria-disabled="true"]),
+.filter-toggle:hover:not(:disabled):not([aria-disabled="true"]),
+.label-toggle:hover:not(:disabled):not([aria-disabled="true"]),
+.theme-toggle-btn:hover:not(:disabled):not([aria-disabled="true"]),
+.color-swatch:hover:not(:disabled):not([aria-disabled="true"]),
+.column-color-swatch:hover:not(:disabled):not([aria-disabled="true"]),
+.column-settings-swatch:hover:not(:disabled):not([aria-disabled="true"]),
+.icon-swatch:hover:not(:disabled):not([aria-disabled="true"]),
+.quick-date-chip:hover:not(:disabled):not([aria-disabled="true"]),
+.owner-circle:hover:not(:disabled):not([aria-disabled="true"]),
+.status-chevron:hover:not(:disabled):not([aria-disabled="true"]),
+.check-icon:hover:not(:disabled):not([aria-disabled="true"]),
+.subtask-date-inline:hover:not(:disabled):not([aria-disabled="true"]),
+/* Rows and cards */
+.card:hover:not(:disabled):not([aria-disabled="true"]),
+.card-title:hover:not(:disabled):not([aria-disabled="true"]),
+.archive-item:hover:not(:disabled):not([aria-disabled="true"]),
+.kebab-item:hover:not(:disabled):not([aria-disabled="true"]),
+.overflow-menu-item:hover:not(:disabled):not([aria-disabled="true"]),
+.user-dropdown-edit-profile:hover:not(:disabled):not([aria-disabled="true"]),
+.user-dropdown-signout:hover:not(:disabled):not([aria-disabled="true"]),
+.subtask-menu-item:hover:not(:disabled):not([aria-disabled="true"]),
+.subtask-title:hover:not(:disabled):not([aria-disabled="true"]),
+.editable-value:hover:not(:disabled):not([aria-disabled="true"]),
+.due-date-btn:hover:not(:disabled):not([aria-disabled="true"]),
+.completed-date-btn:hover:not(:disabled):not([aria-disabled="true"]),
+.column-add-row:hover:not(:disabled):not([aria-disabled="true"]),
+/* Navigation */
+.view-tab:hover:not(:disabled):not([aria-disabled="true"]),
+.settings-tab:hover:not(:disabled):not([aria-disabled="true"]),
+.column-indicator-dot:hover:not(:disabled):not([aria-disabled="true"]) {
+    background-image: linear-gradient(var(--state-hover), var(--state-hover));
+  }
+}
+
+/* Pressed: --state-pressed over the background, filled buttons included, on
+   touch as well as with a pointer. Every family but fields. After the hover
+   rules, so a press while hovering shows the press. */
+/* Filled buttons */
+.btn-primary:active:not(:disabled):not([aria-disabled="true"]),
+.btn-danger:active:not(:disabled):not([aria-disabled="true"]),
+.fab:active:not(:disabled):not([aria-disabled="true"]),
+.login-btn:active:not(:disabled):not([aria-disabled="true"]),
+.filter-popup-apply:active:not(:disabled):not([aria-disabled="true"]),
+/* Quiet buttons */
+.btn-ghost:active:not(:disabled):not([aria-disabled="true"]),
+.share-archive-board-btn:active:not(:disabled):not([aria-disabled="true"]),
+.filter-popup-reset:active:not(:disabled):not([aria-disabled="true"]),
+.column-archive-link:active:not(:disabled):not([aria-disabled="true"]),
+.toast-action:active:not(:disabled):not([aria-disabled="true"]),
+.label-new-pill:active:not(:disabled):not([aria-disabled="true"]),
+.column-settings-add-btn:active:not(:disabled):not([aria-disabled="true"]),
+.column-settings-name:active:not(:disabled):not([aria-disabled="true"]),
+.subtask-date-add-inline:active:not(:disabled):not([aria-disabled="true"]),
+.overflow-menu-btn:active:not(:disabled):not([aria-disabled="true"]),
+/* Icon buttons */
+.btn-icon:active:not(:disabled):not([aria-disabled="true"]),
+.btn-icon-danger:active:not(:disabled):not([aria-disabled="true"]),
+.kebab-trigger:active:not(:disabled):not([aria-disabled="true"]),
+.subtask-kebab-btn:active:not(:disabled):not([aria-disabled="true"]),
+.subtask-action-btn:active:not(:disabled):not([aria-disabled="true"]),
+.subtask-add-circle:active:not(:disabled):not([aria-disabled="true"]),
+.archive-search-clear:active:not(:disabled):not([aria-disabled="true"]),
+.filter-search-clear:active:not(:disabled):not([aria-disabled="true"]),
+.filter-popup-close:active:not(:disabled):not([aria-disabled="true"]),
+.share-btn:active:not(:disabled):not([aria-disabled="true"]),
+.share-remove-btn:active:not(:disabled):not([aria-disabled="true"]),
+.staged-subtask-remove:active:not(:disabled):not([aria-disabled="true"]),
+.label-gear-btn:active:not(:disabled):not([aria-disabled="true"]),
+.column-add-btn:active:not(:disabled):not([aria-disabled="true"]),
+.column-settings-delete-btn:active:not(:disabled):not([aria-disabled="true"]),
+.date-clear-btn:active:not(:disabled):not([aria-disabled="true"]),
+.user-dropdown-trigger:active:not(:disabled):not([aria-disabled="true"]),
+/* Chips and toggles */
+.filter-chip:active:not(:disabled):not([aria-disabled="true"]),
+.filter-toggle:active:not(:disabled):not([aria-disabled="true"]),
+.label-toggle:active:not(:disabled):not([aria-disabled="true"]),
+.theme-toggle-btn:active:not(:disabled):not([aria-disabled="true"]),
+.color-swatch:active:not(:disabled):not([aria-disabled="true"]),
+.column-color-swatch:active:not(:disabled):not([aria-disabled="true"]),
+.column-settings-swatch:active:not(:disabled):not([aria-disabled="true"]),
+.icon-swatch:active:not(:disabled):not([aria-disabled="true"]),
+.quick-date-chip:active:not(:disabled):not([aria-disabled="true"]),
+.owner-circle:active:not(:disabled):not([aria-disabled="true"]),
+.status-chevron:active:not(:disabled):not([aria-disabled="true"]),
+.check-icon:active:not(:disabled):not([aria-disabled="true"]),
+.subtask-date-inline:active:not(:disabled):not([aria-disabled="true"]),
+/* Rows and cards */
+.card:active:not(:disabled):not([aria-disabled="true"]),
+.card-title:active:not(:disabled):not([aria-disabled="true"]),
+.archive-item:active:not(:disabled):not([aria-disabled="true"]),
+.kebab-item:active:not(:disabled):not([aria-disabled="true"]),
+.overflow-menu-item:active:not(:disabled):not([aria-disabled="true"]),
+.user-dropdown-edit-profile:active:not(:disabled):not([aria-disabled="true"]),
+.user-dropdown-signout:active:not(:disabled):not([aria-disabled="true"]),
+.subtask-menu-item:active:not(:disabled):not([aria-disabled="true"]),
+.subtask-title:active:not(:disabled):not([aria-disabled="true"]),
+.editable-value:active:not(:disabled):not([aria-disabled="true"]),
+.due-date-btn:active:not(:disabled):not([aria-disabled="true"]),
+.completed-date-btn:active:not(:disabled):not([aria-disabled="true"]),
+.column-add-row:active:not(:disabled):not([aria-disabled="true"]),
+/* Navigation */
+.view-tab:active:not(:disabled):not([aria-disabled="true"]),
+.settings-tab:active:not(:disabled):not([aria-disabled="true"]),
+.column-indicator-dot:active:not(:disabled):not([aria-disabled="true"]) {
+  background-image: linear-gradient(var(--state-pressed), var(--state-pressed));
+}
+
+/* Quiet and icon controls draw muted or secondary text, which falls under 4.5:1
+   once an overlay sits behind it (3.70 pressed on the page in light), so hovered
+   and pressed they take the full text colour. */
+@media (hover: hover) {
+  .btn-ghost:hover:not(:disabled):not([aria-disabled="true"]),
+  .column-settings-add-btn:hover:not(:disabled):not([aria-disabled="true"]),
+  .subtask-date-add-inline:hover:not(:disabled):not([aria-disabled="true"]),
+  .kebab-trigger:hover:not(:disabled):not([aria-disabled="true"]),
+  .user-dropdown-trigger:hover:not(:disabled):not([aria-disabled="true"]) {
+    color: var(--color-text);
+  }
+}
+
+.btn-ghost:active:not(:disabled):not([aria-disabled="true"]),
+.column-archive-link:active:not(:disabled):not([aria-disabled="true"]),
+.label-new-pill:active:not(:disabled):not([aria-disabled="true"]),
+.column-settings-add-btn:active:not(:disabled):not([aria-disabled="true"]),
+.subtask-date-add-inline:active:not(:disabled):not([aria-disabled="true"]),
+.overflow-menu-btn:active:not(:disabled):not([aria-disabled="true"]),
+.btn-icon:active:not(:disabled):not([aria-disabled="true"]),
+.btn-icon-danger:active:not(:disabled):not([aria-disabled="true"]),
+.kebab-trigger:active:not(:disabled):not([aria-disabled="true"]),
+.subtask-kebab-btn:active:not(:disabled):not([aria-disabled="true"]),
+.subtask-action-btn:active:not(:disabled):not([aria-disabled="true"]),
+.archive-search-clear:active:not(:disabled):not([aria-disabled="true"]),
+.filter-search-clear:active:not(:disabled):not([aria-disabled="true"]),
+.filter-popup-close:active:not(:disabled):not([aria-disabled="true"]),
+.share-btn:active:not(:disabled):not([aria-disabled="true"]),
+.share-remove-btn:active:not(:disabled):not([aria-disabled="true"]),
+.staged-subtask-remove:active:not(:disabled):not([aria-disabled="true"]),
+.label-gear-btn:active:not(:disabled):not([aria-disabled="true"]),
+.column-add-btn:active:not(:disabled):not([aria-disabled="true"]),
+.date-clear-btn:active:not(:disabled):not([aria-disabled="true"]),
+.user-dropdown-trigger:active:not(:disabled):not([aria-disabled="true"]) {
+  color: var(--color-text);
+}
+
+/* Disabled: one treatment. Dimmed, a default cursor, and (by the guards above)
+   no hover or pressed response. */
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: default;
+}
+
+/* An aria-disabled control keeps focus, so its ring must not dim, and opacity on
+   the control would fade the outline with it. Its content dims instead: every
+   child, which is why such a control keeps its label in an element. */
+[aria-disabled="true"] {
+  cursor: default;
+}
+
+[aria-disabled="true"] > * {
+  opacity: var(--opacity-disabled);
 }

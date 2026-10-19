@@ -15,8 +15,8 @@ Hive.
 ## History
 
 Hive moved here from `luketmoss/hive` in #442: imported with its history, its
-process skills and board left behind. The old repo is frozen until #445
-archives it. Its closed issues stay there and are cited `luketmoss/hive#N`
+process skills and board left behind. The old repo is archived (read-only) since
+#445. Its closed issues stay there and are cited `luketmoss/hive#N`
 (the two still open moved here, below); a bare `#N` in Keel is a Keel issue. Imported commit messages were rewritten to the
 qualified form. The hundreds of bare `#N` in code comments and test names were
 not: they predate the move and mean `luketmoss/hive#N`.
@@ -27,7 +27,8 @@ What runs where today: the app is live only at
 `https://luketmoss.github.io/hive/` is a redirect since #444
 (luketmoss/hive#302): the old repo's Pages publishes a static page that sends
 `/hive/<rest>` to `/keel/hive/<rest>` with the query and hash kept, and no
-longer builds the app. Both addresses share the origin, so sign-in and
+longer builds the app. Archiving did not take that page down: it still serves
+and redirects. Both addresses share the origin, so sign-in and
 `localStorage` carried over. `hive-pages.yml` shares the `gh-pages` concurrency
 group with cairn's and Thrive's workflows; GitHub keeps one pending run per
 group, so if three deploys queue together the middle one is dropped, and
@@ -45,7 +46,8 @@ were. The issues still open in `luketmoss/hive` were transferred to Keel in
 | luketmoss/hive#279 | #458 | Hive MCP returns and edits an item's completed date (with #450) |
 
 Every other `luketmoss/hive#N` was closed before the move and stays there.
-#445 archives the old repo and updates this section again.
+`luketmoss/hive` was archived in #445 and its `BOARD_TOKEN` secret deleted
+first; it is read-only, and nothing in it changes again.
 
 ## Stacks
 

@@ -2,7 +2,7 @@ name: thrive-pages
 on:
   push:
     branches: [main]
-    paths: ['thrive/frontend/**', '.github/workflows/thrive-pages.yml']
+    paths: ['thrive/frontend/**', 'geo/**', '.github/workflows/thrive-pages.yml']
   workflow_dispatch:
 # One group for every writer to gh-pages (cairn-pages.yml uses the same), so two
 # deploys never push at once. Not cancelled: a running deploy finishes.
@@ -33,6 +33,8 @@ jobs:
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.THRIVE_GOOGLE_CLIENT_ID }}
           VITE_SPREADSHEET_ID: ${{ secrets.THRIVE_SPREADSHEET_ID }}
           VITE_THRIVE_API_URL: ${{ vars.VITE_THRIVE_API_URL }}
+          # #407: a browser key restricted to this site's referrer. Unset: no Route sections.
+          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.THRIVE_GOOGLE_MAPS_API_KEY }}
       - uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}

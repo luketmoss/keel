@@ -28,6 +28,16 @@
      the main figure of a large choice card. */
   --icon-md: 24px;
   --icon-lg: 40px;
+  /* The route map (#407). Not overridden in dark: the base map is light in both
+     themes, so the line is read against the same map either way. The line is
+     Thrive's light primary, written out so the dark theme's lighter primary
+     never reaches a light map. */
+  --map-track: #2f66f0;
+  --map-track-casing: #ffffff;
+  --map-track-width: 4px;
+  --map-track-width-casing: 7px;
+  --map-dot-size: 12px;
+  --detail-map-height: 280px;
 }
 
 /* ===== Light Theme ===== */
@@ -2263,6 +2273,30 @@ input, select, textarea {
 /* ===== Exercise Detail (Expandable) ===== */
 .detail-exercises {
   margin-bottom: var(--space-lg);
+}
+
+/* The route (#407): a fixed-height box in every state, so nothing below it moves
+   when the map replaces "Loading route…". */
+.detail-route {
+  margin-bottom: var(--space-lg);
+}
+
+.detail-route-map {
+  height: var(--detail-map-height);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+  background: var(--color-surface-raised);
+}
+
+.detail-route-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
 }
 
 .detail-section-header {

@@ -204,6 +204,13 @@ Google Sheet "Groundwork" with these tabs:
   The MCP server exposes them as `thrive_journal` (default 30 days) and
   `thrive_set_journal_entry` (clearing an existing note is dry-run until
   `confirm: true`).
+- **MCPChangeLog** (A:G) — one row per sheet row an MCP-key write created, changed or
+  deleted (#434; named change log, never "journal"): logged_at, call_id, action, tab,
+  row_key, before_json, after_json. Written only by `apps-script/src/change-log.js`
+  for calls made with `MCP_API_KEY`; read by `getChangeLog` and reverted by
+  `undoCall`. Created by `scripts/migrate-423-mcp-change-log-tab.mjs`; until it
+  exists every MCP write is refused. Row mapping mirrors `CHANGE_LOG_FIELDS` in
+  `apps-script/src/types.js`. Later columns are only ever appended.
 - **SyncRequests** (A:I) — on-demand sync requests (luketmoss/thrive#314, luketmoss/thrive#232's route c): one
   row per vendor per "Sync now" press. request_id, vendor, requested_at,
   requested_by, status, workflow_run_id, dispatched_at, finished_at, detail.

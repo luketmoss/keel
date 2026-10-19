@@ -383,6 +383,8 @@ export interface LoadedApi {
   withingsSyncLogRows?: CellValue[][];
   /** Journal's backing array, or undefined when the tab does not exist (#234). */
   journalRows?: CellValue[][];
+  /** MCPChangeLog's backing array, or undefined when the tab does not exist (#434). */
+  changeLogRows?: CellValue[][];
   /** How many times the script lock was taken, and whether it is held now. */
   lock: { acquired: number; held: boolean };
   /** The script cache's live backing map (#144). */
@@ -410,6 +412,8 @@ export interface Fixtures {
   withingsSyncLog?: CellValue[][];
   /** As dailyHealth: omit to model the tab not existing (#234). */
   journal?: CellValue[][];
+  /** As dailyHealth: omit to model the tab not existing, which refuses MCP writes (#434). */
+  changeLog?: CellValue[][];
 }
 
 /**
@@ -466,7 +470,7 @@ export function loadApi(
   const sandbox = loadSources(
     ['types.js', 'utils.js', 'workouts.js', 'exercises.js', 'templates.js', 'sets.js',
       'daily-summary.js', 'daily-health.js', 'journal.js', 'body-measurements.js', 'sync-log.js', 'payload.js', 'auth.js',
-      'sync-requests.js', 'main.js'],
+      'sync-requests.js', 'change-log.js', 'main.js'],
     {
       LockService: makeLockService(lock),
       ContentService: makeContentService(),
@@ -502,6 +506,9 @@ export function loadApi(
   if (fixtures.journal) {
     sheets.Journal = makeSheet(fixtures.journal, sandbox.JOURNAL_COLUMN_COUNT);
   }
+  if (fixtures.changeLog) {
+    sheets.MCPChangeLog = makeSheet(fixtures.changeLog, sandbox.CHANGE_LOG_COLUMN_COUNT);
+  }
   if (fixtures.withingsSyncLog) {
     sheets.WithingsSyncLog = makeSheet(fixtures.withingsSyncLog, sandbox.SYNC_LOG_COLUMN_COUNT);
   }
@@ -521,7 +528,7 @@ export function loadApi(
     sandbox, rows: workoutRows, exerciseRows, templateRows, setRows, summaryRows,
     healthRows: fixtures.dailyHealth, syncLogRows: fixtures.syncLog,
     bodyRows: fixtures.bodyMeasurements, withingsSyncLogRows: fixtures.withingsSyncLog,
-    journalRows: fixtures.journal, lock, cache, fetches,
+    journalRows: fixtures.journal, changeLogRows: fixtures.changeLog, lock, cache, fetches,
     driveCalls,
   };
 }

@@ -102,16 +102,26 @@ var TOKEN_REFUSAL_MESSAGES = {
  * nothing, not even an empty `key`.
  */
 function validateApiKey(key) {
-  var props = PropertiesService.getScriptProperties();
-  var expected = props.getProperty('API_KEY');
-  if (!expected) throw new Error('API_KEY not configured in script properties');
-  if (key === expected) return true;
-  var mcpKey = props.getProperty('MCP_API_KEY');
-  return !!mcpKey && key === mcpKey;
+  return identifyApiKey(key) !== null;
 }
 
 /**
- * Decide who is calling. Returns `{ mode: 'key' }`, `{ mode: 'token' }`, or
+ * Which key `key` is: `'api'` (API_KEY), `'mcp'` (MCP_API_KEY), or null (#434).
+ * The change log is written for the MCP key's writes alone, so the key has to be
+ * told apart. API_KEY wins if the two were ever set equal: the log must never
+ * claim a sync's write.
+ */
+function identifyApiKey(key) {
+  var props = PropertiesService.getScriptProperties();
+  var expected = props.getProperty('API_KEY');
+  if (!expected) throw new Error('API_KEY not configured in script properties');
+  if (key === expected) return 'api';
+  var mcpKey = props.getProperty('MCP_API_KEY');
+  return !!mcpKey && key === mcpKey ? 'mcp' : null;
+}
+
+/**
+ * Decide who is calling. Returns `{ mode: 'key' }`, `{ mode: 'mcp' }` (the MCP key), `{ mode: 'token' }`, or
  * `{ refusal }` — a failure envelope to send back as it is.
  */
 function resolveCaller(params) {
@@ -123,8 +133,10 @@ function resolveCaller(params) {
       ? 'token_forbidden' : verdict;
     return { refusal: fail(TOKEN_REFUSAL_MESSAGES[verdict], code) };
   }
-  if (!validateApiKey(params.key)) return { refusal: fail('Invalid or missing API key') };
-  return { mode: 'key' };
+  var kind = identifyApiKey(params.key);
+  if (kind === null) return { refusal: fail('Invalid or missing API key') };
+  // `mcp` is a key caller with the same access, told apart so its writes are logged (#434).
+  return { mode: kind === 'mcp' ? 'mcp' : 'key' };
 }
 
 function isTokenReadAction(action) {

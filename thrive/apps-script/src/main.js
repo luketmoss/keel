@@ -75,6 +75,13 @@
 //   ?action=appendSyncLog&key=...&payload={"row":{"run_id":"schedule-123-1",
 //     "started_at":"...","finished_at":"...","status":"ok",...}}
 //   ?action=getSyncLog&key=...&limit=1   — newest first by started_at
+//
+// MCP writes are logged row by row when they arrive with MCP_API_KEY (#434):
+//   ?action=getChangeLog&key=...&call_id=...&since=2026-10-01T00:00:00Z&limit=50
+//   ?action=undoCall&key=<MCP key>&payload={"call_id":"abc123"}   — dry run
+//   ?action=undoCall&key=<MCP key>&payload={"call_id":"abc123","confirm":true}
+// A write's payload may carry `call_id` (1-64 of [A-Za-z0-9_-]) to group its rows.
+//
 // The Withings sync's runs go to WithingsSyncLog, same layout (#200): add
 // "log":"withings" to appendSyncLog's payload, or &log=withings to getSyncLog.
 
@@ -159,7 +166,10 @@ function handleRequest(e) {
         'Read-only caller: action "' + (action || '') + '" is not permitted', 'read_only'));
     }
 
-    result = dispatch(action, params);
+    // #434: an MCP-key write is logged row by row, under the script lock.
+    result = isChangeLogged(caller, action)
+      ? withChangeLog(action, params, function () { return dispatch(action, params, caller); })
+      : dispatch(action, params, caller);
   } catch (err) {
     result = fail(err.message || String(err));
   }
@@ -170,7 +180,7 @@ function handleRequest(e) {
 }
 
 /** Run one action for an authenticated, authorized caller. */
-function dispatch(action, params) {
+function dispatch(action, params, caller) {
   var result;
   var payload;
   try {
@@ -551,6 +561,35 @@ function dispatch(action, params) {
     // `log=withings` reads WithingsSyncLog (#200); absent, SyncLog.
     case 'getSyncLog':
       result = { success: true, data: getSyncLog({ limit: params.limit, log: params.log }) };
+      break;
+
+    // --- MCP change log (#434) ---
+    // Key-only: not on TOKEN_READ_ACTIONS. `limit` defaults to 200, max 1000.
+    case 'getChangeLog':
+      result = {
+        success: true,
+        data: getChangeLog({ call_id: params.call_id, since: params.since, limit: params.limit }),
+      };
+      break;
+
+    // Dry-run until `confirm` is true; all or nothing. The MCP key only: a sync
+    // or script holding API_KEY has no business reverting the Worker's writes.
+    case 'undoCall':
+      if (!caller || caller.mode !== 'mcp') {
+        result = fail('undoCall requires the MCP key');
+        break;
+      }
+      if (!payload.call_id) {
+        result = fail('payload.call_id field required');
+        break;
+      }
+      try {
+        result = { success: true, data: undoCall(String(payload.call_id), payload.confirm === true) };
+      } catch (err) {
+        if (!err || !err.preview) throw err;
+        result = fail(err.message);
+        result.data = err.preview;
+      }
       break;
 
     // --- SyncRequests (#410) ---

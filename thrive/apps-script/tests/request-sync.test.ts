@@ -108,7 +108,7 @@ function harness(opts: {
   const sandbox = loadSources(
     ['types.js', 'utils.js', 'workouts.js', 'exercises.js', 'templates.js', 'sets.js',
       'daily-summary.js', 'daily-health.js', 'journal.js', 'body-measurements.js', 'sync-log.js', 'payload.js',
-      'auth.js', 'sync-requests.js', 'main.js'],
+      'auth.js', 'sync-requests.js', 'change-log.js', 'main.js'],
     {
       Logger: { log: capture },
       console: { log: capture, info: capture, warn: capture, error: capture, debug: capture },

@@ -42,7 +42,7 @@ describe('AC1: authentication', () => {
 
   // The key lives in script properties, never in source — this repo is public.
   it('errors rather than opening the door when no key is configured', () => {
-    const sandbox = loadSources(['types.js', 'utils.js', 'workouts.js', 'auth.js', 'main.js'], {
+    const sandbox = loadSources(['types.js', 'utils.js', 'workouts.js', 'auth.js', 'change-log.js', 'main.js'], {
       ContentService: makeContentService(),
       PropertiesService: makePropertiesService({ SPREADSHEET_ID: 'sheet-id' }),
     });

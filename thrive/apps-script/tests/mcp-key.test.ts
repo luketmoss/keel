@@ -16,7 +16,7 @@ const write = {
 };
 
 function load(properties: Record<string, string> = { MCP_API_KEY: MCP_KEY }, tokeninfo?: (url: string) => FetchReply) {
-  return loadApi({ workouts: [workoutRow()] }, { properties, tokeninfo });
+  return loadApi({ workouts: [workoutRow()], changeLog: [] }, { properties, tokeninfo });
 }
 
 describe('AC1: either key makes a key caller', () => {
@@ -70,7 +70,7 @@ describe('AC2: an unset or blank MCP key is never a door', () => {
 
 describe('AC3: API_KEY stays mandatory', () => {
   it('errors for the MCP key when API_KEY is unset', () => {
-    const sandbox = loadSources(['types.js', 'utils.js', 'workouts.js', 'auth.js', 'main.js'], {
+    const sandbox = loadSources(['types.js', 'utils.js', 'workouts.js', 'auth.js', 'change-log.js', 'main.js'], {
       ContentService: makeContentService(),
       PropertiesService: makePropertiesService({ SPREADSHEET_ID: 'sheet-id', MCP_API_KEY: MCP_KEY }),
     });

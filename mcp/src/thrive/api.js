@@ -15,14 +15,34 @@
 // is still read when present, which is how api.test.js and the stdio server this
 // was ported from configure it. Every request carries the same values, so one
 // module-level setting is safe here.
-import { markWrote } from '../call-context.js';
+import { markWrote, reserveWrite } from '../call-context.js';
+import { DEFAULT_LIMITS, WriteLimitError } from '../budget.js';
 
 const envVar = (name) => globalThis.process?.env?.[name];
 
 let config = { url: envVar('THRIVE_API_URL'), key: envVar('THRIVE_API_KEY') };
 
-export function configureApi({ url, key }) {
-  config = { url, key };
+/**
+ * `budget` (#410) is the hourly write counter for this request, `{ reserve(rows) }`,
+ * and `limits` the ceilings. Without a budget nothing is counted, which is how the
+ * stdio-era test suites run; the write endpoint refuses to start without one.
+ *
+ * @param {{url?: string, key?: string, budget?: {reserve(rows: number): Promise<{allowed: boolean}>}, limits?: {maxRowsPerCall: number}}} settings
+ */
+export function configureApi({ url, key, budget, limits }) {
+  config = { url, key, budget, limits };
+}
+
+/** Rows one call may write before it is held for `confirm: true` (#410). */
+export const rowCap = () => config.limits?.maxRowsPerCall ?? DEFAULT_LIMITS.maxRowsPerCall;
+
+/** The rows a write request will touch, for the hourly budget when the tool did not say. */
+function estimateRows(action, payload) {
+  if (action === 'appendSets') return payload.sets.length;
+  if (action === 'updateSets') return payload.updates.length;
+  if (action === 'createTemplate') return payload.data.exercises.length;
+  if (action === 'replaceTemplate') return payload.data.exercises.length;
+  return 1;
 }
 
 /** Strip the key and the URL from text that may reach a response or a log. */
@@ -127,6 +147,11 @@ export async function apiGet(action, params) {
  * deciding to try again.
  */
 export async function apiWrite(action, payload) {
+  // previewSetUpdates rides this door but only resolves: it is neither a write
+  // to count nor one to refuse (#410), and it changes nothing (#409).
+  if (action !== 'previewSetUpdates') {
+    await reserveWrite(config.budget, 'Thrive', estimateRows(action, payload));
+  }
   try {
     const data = await call(action, {}, payload);
     // previewSetUpdates rides apiWrite but only resolves; it changes nothing (#409).
@@ -253,6 +278,8 @@ export async function appendSets(sets) {
     try {
       await apiWrite('appendSets', { sets: chunk });
     } catch (err) {
+      // Refused before anything was sent: the limit's own words, not "0 of N written".
+      if (err instanceof WriteLimitError) throw err;
       throw new Error(
         `${err.message} — ${written} of ${sets.length} set rows were already written ` +
         `(chunk ${i + 1} of ${chunks.length} failed).`,

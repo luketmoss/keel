@@ -18,6 +18,12 @@ export interface Env {
   THRIVE_API_KEY: string
   /** Owner used by `hive_add_item` when none is given. Not secret; may be empty. */
   HIVE_DEFAULT_OWNER?: string
+  /** The hourly write counters (#410): one Durable Object per app, named `thrive` and `hive`. */
+  WRITE_BUDGET: DurableObjectNamespace<import('./budget-do').WriteBudget>
+  /** Write ceilings (#410), as vars. A missing or malformed value falls back to the default, never to "unlimited". */
+  MAX_ROWS_PER_CALL?: string
+  MAX_WRITES_PER_HOUR?: string
+  MAX_ROWS_PER_HOUR?: string
 }
 
 /** What a granted token carries into the MCP handler. */

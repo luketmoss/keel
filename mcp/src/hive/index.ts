@@ -3,11 +3,18 @@ import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/
 import { CfWorkerJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/cfworker'
 import type { Env } from '../env'
 import type { HiveConfig } from './api'
+import { budgetFor } from '../budget-do'
 import { instructions, type Mode } from '../mode.js'
 import { registerHiveTools } from './tools'
 
-export function hiveConfig(env: Env): HiveConfig {
-  return { apiUrl: env.HIVE_API_URL, apiKey: env.HIVE_API_KEY, defaultOwner: env.HIVE_DEFAULT_OWNER ?? '' }
+export function hiveConfig(env: Env, mode: Mode = 'read'): HiveConfig {
+  return {
+    apiUrl: env.HIVE_API_URL,
+    apiKey: env.HIVE_API_KEY,
+    defaultOwner: env.HIVE_DEFAULT_OWNER ?? '',
+    // Only the write endpoint writes, so only it has a budget (#410).
+    ...(mode === 'write' ? { budget: budgetFor(env, 'hive').budget } : {}),
+  }
 }
 
 export function buildHiveServer(cfg: HiveConfig, mode: Mode = 'read'): McpServer {
@@ -28,10 +35,14 @@ export async function handleHive(request: Request, env: Env, mode: Mode = 'read'
   if (!env.HIVE_API_URL || !env.HIVE_API_KEY) {
     return new Response('Hive is not configured on this Worker.', { status: 503 })
   }
+  // Without its counter the write endpoint would be unlimited: refuse to serve it.
+  if (mode === 'write' && !env.WRITE_BUDGET) {
+    return new Response('Hive writes are not configured on this Worker (no write budget).', { status: 503 })
+  }
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,
   })
-  await buildHiveServer(hiveConfig(env), mode).connect(transport)
+  await buildHiveServer(hiveConfig(env, mode), mode).connect(transport)
   return transport.handleRequest(request)
 }

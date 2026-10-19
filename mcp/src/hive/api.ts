@@ -5,12 +5,14 @@
  * so results are `any` here rather than a model that would drift from Hive.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { markWrote } from '../call-context.js'
+import { markWrote, reserveWrite } from '../call-context.js'
 
 export interface HiveConfig {
   apiUrl: string
   apiKey: string
   defaultOwner: string
+  /** The hourly write counter (#410). Every Hive write touches one row. */
+  budget?: { reserve(rows: number): Promise<{ allowed: boolean }> }
 }
 
 export interface ApiResult {
@@ -56,6 +58,7 @@ export function apiGet(cfg: HiveConfig, action: string, params: Record<string, s
 }
 
 export async function apiWrite(cfg: HiveConfig, action: string, payload: unknown) {
+  await reserveWrite(cfg.budget, 'Hive', 1)
   const url = new URL(cfg.apiUrl)
   // Apps Script redirects break POST for anonymous callers,
   // so write operations use GET with a URL-encoded payload param.

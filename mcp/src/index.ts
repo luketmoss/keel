@@ -5,6 +5,9 @@ import type { Env, Props } from './env'
 import { handleHive } from './hive'
 import { handleThrive } from './thrive'
 
+// The hourly write counter (#410). Cloudflare finds a Durable Object class on the entry module.
+export { WriteBudget } from './budget-do'
+
 /**
  * The Worker is its own OAuth authorization server, and each MCP endpoint is a
  * separate protected resource. Separate audiences are the point: a token issued

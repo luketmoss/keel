@@ -166,7 +166,7 @@ describe('the per-call row ceiling (#410)', () => {
   })
 
   it('holds thrive_update_sets over the ceiling using the API\'s own preview, and writes with confirm', async () => {
-    const { env } = envWith()
+    const { env, stored } = envWith()
     const updates = Array.from({ length: 201 }, (_, i) => ({ exercise: 'Bench Press', set_number: i + 1, reps: '5' }))
     const change = (i: number, setNumber: number) => ({
       index: i,

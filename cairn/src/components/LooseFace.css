@@ -44,7 +44,7 @@
 
 .loose-face__kind {
   margin: 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--mono);
   font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -111,7 +111,7 @@
 .loose-face__field-label {
   /* No margin — the body is a flex column with its own gap. */
   color: var(--text-muted);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--mono);
   font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -139,7 +139,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--mono);
   font-size: var(--text-xs);
   color: var(--text-muted);
 }

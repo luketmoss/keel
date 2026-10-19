@@ -42,6 +42,8 @@
   --text-base: 15px;
   --text-lg: 18px;
   --text-xl: 24px;
+  /* The monospace face: tabular numerals, uppercase labels, coordinates */
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   /* Elevation — "Elevation" */
   --blur: 20px;

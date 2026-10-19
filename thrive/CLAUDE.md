@@ -65,6 +65,23 @@ is its only authority.
   product, not part of the pipeline: two scheduled tasks run it. Its
   `settings.local.md` (weather locations) is gitignored and never committed.
 
+## Route map (#407)
+
+An activity with a `track_ref` shows a **Route** section on its detail screen: the track on a Google
+map, drawn with `@keel/geo` (a `file:../../geo` dependency, compiled by Thrive's own Vite and
+Vitest, like cairn's). The Maps script is loaded only when such a screen opens
+(`src/maps/google-maps.ts`), and the track comes from the API's `getWorkoutTrack` with the user's
+Google token, never from Drive.
+
+- **The key.** `VITE_GOOGLE_MAPS_API_KEY`, a browser key for the Maps JavaScript API, built in from
+  the repository secret `THRIVE_GOOGLE_MAPS_API_KEY` by `thrive-pages.yml`. A build without it, or
+  without `VITE_THRIVE_API_URL`, shows no Route section on any activity. Demo mode shows one on the
+  demo hike ("Ridge Trail") from a bundled synthetic track, with the key in `.env.local`.
+- **The tokens** (`--map-track`, `--map-track-casing`, widths, `--map-dot-size`,
+  `--detail-map-height`) are in `global.css`, not overridden in dark: the base map is light in both
+  themes.
+- A change under `geo/` rebuilds Thrive (`thrive.yml` and `thrive-pages.yml` trigger on `geo/**`).
+
 ## Key commands
 
 - `npm --prefix frontend run dev` — Vite dev server on port 5175

@@ -12,6 +12,7 @@ import { WatchGlyph } from '../shared/provenance-mark';
 import { corosActivityUrl } from '../../api/coros-link';
 import { ask } from '../../state/confirm';
 import { deleteWorkoutCopy } from '../shared/confirm-copy';
+import { RouteSection, routeAvailable } from './route-section';
 
 interface Props {
   workoutId: string;
@@ -144,6 +145,8 @@ export function WorkoutDetail({ workoutId }: Props) {
   const provenance = provenanceDetail(workout);
   const corosUrl = corosActivityUrl(workout);
   const estimate = formatEstimate(workout.estimated_seconds);
+  // #407: the route is a detail of its own, so the empty state below does not show over it.
+  const showRoute = routeAvailable(workout);
 
   return (
     <div class="screen workout-detail-screen">
@@ -247,6 +250,9 @@ export function WorkoutDetail({ workoutId }: Props) {
           <p class="detail-copied">Copied from a previous workout</p>
         )}
       </div>
+
+      {/* #407: the activity's route, straight after the title, stats and provenance. */}
+      {showRoute && <RouteSection workout={workout} />}
 
       {/* Planned workout: compact card view + footer actions */}
       {isPlanned && workout.type === 'weight' && (() => {
@@ -353,7 +359,7 @@ export function WorkoutDetail({ workoutId }: Props) {
       )}
 
       {/* Non-weight workouts just show notes (already shown above) */}
-      {exerciseGroups.length === 0 && workout.type !== 'weight' && !workout.notes && (
+      {exerciseGroups.length === 0 && workout.type !== 'weight' && !workout.notes && !showRoute && (
         <div class="empty-state">
           <p>No additional details</p>
         </div>

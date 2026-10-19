@@ -50,7 +50,7 @@ surfaces, from each app's stylesheet on 2026-10-13. "As text" means 4.5:1 and
 |---|---|---|---|---|
 | cairn | orange | `#FF7A4D` | none: Alpenglow is dark only | `--accent` `#FF7A4D` |
 | Thrive | cobalt | Thrive's `--color-accent` | `#2f66f0` | `#6e97ff`, with dark text (`--color-on-fill` `#121212`) on its fills |
-| Hive | gold | gold | `#C49200` | `#F5B700` |
+| Hive | gold | gold | `#805F00`, specified by #447 (shipped: `#C49200`) | `#F5B700` |
 | Forage | green | green | `#357A38` | `#66BB6A` |
 | none | amethyst | unassigned | unassigned | unassigned |
 
@@ -59,14 +59,19 @@ surfaces, from each app's stylesheet on 2026-10-13. "As text" means 4.5:1 and
 | cairn | 6.31 on `--surface` `#1B1F33` | passes | passes |
 | Thrive, light | 4.91 on white, 4.38 on `--color-bg` | fails on `--color-bg`; text uses `--color-primary-text` `#2452c9`, 5.99 on the page | passes |
 | Thrive, dark | 6.22 on `--color-surface` `#1a1a1e`; `#121212` on the fill 6.72 | passes | passes |
-| Hive, light | 2.82 on white | fails | **fails**: below 3:1 even as a ring, so a fill only |
+| Hive, light | `#805F00`: 5.91 on white, 5.27 on `--color-bg`, 4.57 on the tightest tint (an 18% tint of itself); white on the fill 5.91 | passes | passes |
+| Hive, light, as shipped | `#C49200`: 2.82 on white | fails | **fails**: below 3:1 even as a ring |
 | Hive, dark | 9.25 on `#1e1e1e` | passes | passes |
 | Forage, light | 5.26 on white, 4.69 on `--color-bg` | passes | passes |
 | Forage, dark | 7.05 on `#1e1e1e` | passes | passes |
 
-Hive's light value is recorded as failing rather than left out, because the
-registry is where that should be visible. It is recorded as shipped, and Hive's
-migration re-checks it.
+Hive's light value was recorded as failing rather than left out, because the
+registry is where that should be visible. #447 specifies the replacement: the
+same gold, 44.5° of hue against 44.7°, darkened to `#805F00` (hover `#6B5000`),
+measured against every surface the stylesheet draws it on in
+`hive/docs/design/447-light-primary-aa.md`. Until it ships, Hive's stylesheet
+still holds `#C49200`, which is why the shipped row stays. The brand accent
+`#F5B700` is unchanged, and so is Hive's dark value.
 
 **Excluded: red.** It reads as danger in both languages. An app whose accent is
 red cannot show a destructive action as different from its own chrome.

@@ -15,6 +15,8 @@
 // is still read when present, which is how api.test.js and the stdio server this
 // was ported from configure it. Every request carries the same values, so one
 // module-level setting is safe here.
+import { markWrote } from '../call-context.js';
+
 const envVar = (name) => globalThis.process?.env?.[name];
 
 let config = { url: envVar('THRIVE_API_URL'), key: envVar('THRIVE_API_KEY') };
@@ -126,7 +128,10 @@ export async function apiGet(action, params) {
  */
 export async function apiWrite(action, payload) {
   try {
-    return await call(action, {}, payload);
+    const data = await call(action, {}, payload);
+    // previewSetUpdates rides apiWrite but only resolves; it changes nothing (#409).
+    if (action !== 'previewSetUpdates') markWrote();
+    return data;
   } catch (err) {
     // The read-side wording says the request never reached the script. For a
     // write that is not proven (see above), so say what is: unknown.

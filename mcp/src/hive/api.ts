@@ -5,6 +5,7 @@
  * so results are `any` here rather than a model that would drift from Hive.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { markWrote } from '../call-context.js'
 
 export interface HiveConfig {
   apiUrl: string
@@ -54,7 +55,7 @@ export function apiGet(cfg: HiveConfig, action: string, params: Record<string, s
   return call(cfg, url.toString())
 }
 
-export function apiWrite(cfg: HiveConfig, action: string, payload: unknown) {
+export async function apiWrite(cfg: HiveConfig, action: string, payload: unknown) {
   const url = new URL(cfg.apiUrl)
   // Apps Script redirects break POST for anonymous callers,
   // so write operations use GET with a URL-encoded payload param.
@@ -62,7 +63,10 @@ export function apiWrite(cfg: HiveConfig, action: string, payload: unknown) {
   params.set('action', action)
   params.set('key', cfg.apiKey)
   params.set('payload', JSON.stringify(payload))
-  return call(cfg, `${url.origin}${url.pathname}?${params.toString()}`)
+  const result = await call(cfg, `${url.origin}${url.pathname}?${params.toString()}`)
+  // Only a write Hive accepted counts: a refusal changed nothing.
+  if (result.success) markWrote()
+  return result
 }
 
 export async function resolveBoard(cfg: HiveConfig, boardName: string) {

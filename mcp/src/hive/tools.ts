@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
+import { runToolCall } from '../call-context.js'
+import { withReminder, type Mode } from '../mode.js'
 import {
   HiveError,
   apiGet,
@@ -30,7 +32,37 @@ function guarded<A>(fn: (args: A) => Promise<ToolResult>) {
 const READ = { readOnlyHint: true } as const
 const WRITE = { readOnlyHint: false, destructiveHint: false } as const
 
-export function registerHiveTools(server: McpServer, cfg: HiveConfig): void {
+/** The tools the read endpoint serves (#409). Everything else registered here is a write tool. */
+export const HIVE_READ_TOOLS: ReadonlySet<string> = new Set([
+  'hive_list_boards',
+  'hive_list_owners',
+  'hive_list_labels',
+  'hive_list_items',
+  'hive_get_item',
+])
+
+/**
+ * Register the read tools, or the write tools, never both: the endpoints' lists
+ * are disjoint, so a client with both connectors on sees no tool twice. A write
+ * tool's successful result ends with a reminder that the write connector is on;
+ * a refusal or a call that wrote nothing does not.
+ */
+export function registerHiveTools(server: McpServer, cfg: HiveConfig, mode: Mode = 'read'): void {
+  const real = server
+  const gated = {
+    registerTool(name: string, config: unknown, handler: (args: any) => Promise<ToolResult>) {
+      const isRead = HIVE_READ_TOOLS.has(name)
+      if (isRead !== (mode === 'read')) return
+      const run = isRead
+        ? handler
+        : async (args: any): Promise<ToolResult> => {
+            const { result, state } = await runToolCall(() => handler(args))
+            return state.wrote && !result.isError ? withReminder(result, 'Hive') : result
+          }
+      ;(real.registerTool as any).call(real, name, config, run)
+    },
+  } as unknown as McpServer
+  server = gated
   server.registerTool(
     'hive_list_boards',
     { description: 'List all Hive kanban boards', annotations: READ },

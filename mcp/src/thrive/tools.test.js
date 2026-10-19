@@ -132,7 +132,7 @@ before(async () => {
 
   configureApi({ url: `http://127.0.0.1:${port}/exec`, key: 'k' });
   const mcp = new McpServer({ name: 'thrive', version: '1.0.0' });
-  registerThriveTools(mcp);
+  registerThriveTools(mcp, 'all');
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   await mcp.connect(serverSide);
   client = new Client({ name: 'tools-test', version: '0.0.0' });

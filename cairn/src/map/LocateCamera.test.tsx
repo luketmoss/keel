@@ -28,7 +28,7 @@ vi.mock('./reveal', () => ({
 }))
 
 import { LocateCamera } from './LocateCamera'
-import { LOCATE_MAX_ZOOM } from './locateCamera'
+import { LOCATE_MAX_ZOOM } from './locateFraming'
 import type { PositionFix } from './useGeolocation'
 
 function fix(overrides: Partial<PositionFix> = {}): PositionFix {

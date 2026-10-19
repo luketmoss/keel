@@ -153,6 +153,8 @@ Open http://localhost:5176/ and sign in with Google.
 
 The workflow shares the one `gh-pages` concurrency group with `cairn-pages.yml` and `thrive-pages.yml`, so deploys queue rather than collide. GitHub keeps one pending run per group; if three queue together the middle one is dropped and shows as cancelled. Re-run it with `workflow_dispatch`.
 
+The old address, https://luketmoss.github.io/hive/, is only a redirect: it sends `/hive/<path>?<query>#<hash>` to the same path, query and hash under `/keel/hive/`. Nothing builds or deploys the app from the old `luketmoss/hive` repository, and its issues and board moved to Keel (see `CLAUDE.md` § History).
+
 ### Daily snapshots (Apps Script)
 
 A time-driven trigger copies the sheet to a dated file in a Drive folder once a day and keeps the newest 60 (older ones go to Drive's trash). Google's own version history only reaches back about 30 days, so a snapshot is what makes a bad write recoverable after that.

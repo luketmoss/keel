@@ -11,6 +11,7 @@ frontend/dist/
 # clasp config (contains script ID specific to your account)
 apps-script/.clasp.json
 .clasprc.json
+*.clasp.json.bak
 
 # IDE
 .vscode/
@@ -27,22 +28,3 @@ desktop.ini
 # Logs
 *.log
 npm-debug.log*
-
-# Claude Code config (local settings, not skills or project settings)
-.claude/*
-!.claude/skills/
-!.claude/settings.json
-!.claude/retrospectives/
-.claude/retrospectives/**/*.md
-.claude/retrospectives/*.md
-board_full.json
-hive_fields.json
-hive_items.json
-hive_projects.json
-*.clasp.json.bak
-
-# board.mjs issue->item id cache (rebuilds on demand)
-.hive/.item-cache.json
-
-# look.mjs screenshots — they belong in the temp dir it defaults to, never here
-look-*.png

@@ -12,6 +12,9 @@
 
 import { z } from 'zod';
 
+import { runToolCall } from '../call-context.js';
+import { withReminder } from '../mode.js';
+
 import {
   ApiError, scrubSecrets,
   fetchWorkouts, fetchWorkout, fetchSets, fetchExercises, fetchTemplates,
@@ -58,7 +61,7 @@ const annotationsFor = (name) =>
   READ_ONLY.has(name) ? { readOnlyHint: true } : DESTRUCTIVE.has(name) ? { destructiveHint: true } : undefined;
 
 /** Register every Thrive tool on `server`. The API client is configured separately (configureApi). */
-export function registerThriveTools(server) {
+export function registerThriveTools(server, mode = 'read') {
 
 /**
  * Register a tool whose thrown errors surface as tool errors, not crashes.
@@ -68,6 +71,10 @@ export function registerThriveTools(server) {
  * field into "No changes provided" (#117).
  */
 function tool(name, description, shape, handler) {
+  // #409: the read endpoint serves READ_ONLY, the write endpoint everything else.
+  // `all` registers both, for the in-process test suite; no endpoint uses it.
+  const isRead = READ_ONLY.has(name);
+  if (mode !== 'all' && isRead !== (mode === 'read')) return;
   const accepted = Object.keys(shape);
   server.registerTool(
     name,
@@ -80,11 +87,16 @@ function tool(name, description, shape, handler) {
           `nothing was written. Accepted: ${accepted.join(', ') || '(none)'}.`,
         );
       }
-      try {
-        return await handler(args);
-      } catch (err) {
-        return fail(`Error: ${scrubSecrets(err.message)}`);
-      }
+      const { result, state } = await runToolCall(async () => {
+        try {
+          return await handler(args);
+        } catch (err) {
+          return fail(`Error: ${scrubSecrets(err.message)}`);
+        }
+      });
+      // A write that landed ends with the reminder that the write connector is on.
+      // A dry run, a refusal or a failed write did not (or may not have) change anything.
+      return mode === 'write' && state.wrote && !result.isError ? withReminder(result, 'Thrive') : result;
     },
   );
 }

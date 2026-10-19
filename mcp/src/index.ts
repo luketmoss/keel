@@ -1,6 +1,6 @@
 import { OAuthAuthorizationServer, OAuthResourceServer } from '@cloudflare/workers-oauth-provider'
 import { handleAuth } from './auth'
-import { HIVE_RESOURCE, PUBLIC_URL, THRIVE_RESOURCE } from './config'
+import { HIVE_RESOURCE, HIVE_WRITE_RESOURCE, PUBLIC_URL, THRIVE_RESOURCE, THRIVE_WRITE_RESOURCE } from './config'
 import type { Env, Props } from './env'
 import { handleHive } from './hive'
 import { handleThrive } from './thrive'
@@ -12,7 +12,7 @@ import { handleThrive } from './thrive'
  */
 const authorizationServer = new OAuthAuthorizationServer<Env>({
   issuer: PUBLIC_URL,
-  resources: [HIVE_RESOURCE, THRIVE_RESOURCE],
+  resources: [HIVE_RESOURCE, THRIVE_RESOURCE, HIVE_WRITE_RESOURCE, THRIVE_WRITE_RESOURCE],
   clientRegistrationEndpoint: '/oauth/register',
   clientIdMetadataDocumentEnabled: true,
 })
@@ -41,6 +41,15 @@ function mcpResource(resource: string, handle: (request: Request, env: Env) => P
 const resources = [
   { path: new URL(HIVE_RESOURCE).pathname, server: mcpResource(HIVE_RESOURCE, handleHive) },
   { path: new URL(THRIVE_RESOURCE).pathname, server: mcpResource(THRIVE_RESOURCE, handleThrive) },
+  // #409: each app's write tools, on a resource of their own.
+  {
+    path: new URL(HIVE_WRITE_RESOURCE).pathname,
+    server: mcpResource(HIVE_WRITE_RESOURCE, (request, env) => handleHive(request, env, 'write')),
+  },
+  {
+    path: new URL(THRIVE_WRITE_RESOURCE).pathname,
+    server: mcpResource(THRIVE_WRITE_RESOURCE, (request, env) => handleThrive(request, env, 'write')),
+  },
 ]
 
 const WELL_KNOWN = '/.well-known/oauth-protected-resource'

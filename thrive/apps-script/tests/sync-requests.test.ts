@@ -883,6 +883,7 @@ describe('AC7: install and remove the trigger', () => {
       'https://www.googleapis.com/auth/spreadsheets',
       'https://www.googleapis.com/auth/script.external_request',
       'https://www.googleapis.com/auth/drive.readonly',
+      'https://www.googleapis.com/auth/drive',
       'https://www.googleapis.com/auth/script.scriptapp',
     ]);
     expect(manifest.webapp).toEqual({ executeAs: 'USER_DEPLOYING', access: 'ANYONE_ANONYMOUS' });

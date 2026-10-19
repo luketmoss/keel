@@ -253,16 +253,19 @@ describe('AC3: paged deliberately, never truncated silently', () => {
 
 describe('AC5: scope and logging', () => {
   // #314 added script.scriptapp, for the SyncRequests poller's trigger.
-  it('pins exactly the four scopes, drive.readonly the only Drive one', () => {
+  // #433 added `drive`, for the snapshot's copy and trash, which `payload.js` never uses.
+  it('pins exactly the five scopes, drive.readonly the only Drive one payload.js needs', () => {
     const manifest = JSON.parse(readFileSync(path.join(SRC, 'appsscript.json'), 'utf8'));
     expect(manifest.oauthScopes).toEqual([
       'https://www.googleapis.com/auth/spreadsheets',
       'https://www.googleapis.com/auth/script.external_request',
       'https://www.googleapis.com/auth/drive.readonly',
+      'https://www.googleapis.com/auth/drive',
       'https://www.googleapis.com/auth/script.scriptapp',
     ]);
     expect(manifest.oauthScopes.filter((s: string) => s.includes('/auth/drive'))).toEqual([
       'https://www.googleapis.com/auth/drive.readonly',
+      'https://www.googleapis.com/auth/drive',
     ]);
     expect(manifest.webapp).toEqual({ executeAs: 'USER_DEPLOYING', access: 'ANYONE_ANONYMOUS' });
   });

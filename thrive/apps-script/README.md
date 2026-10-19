@@ -33,6 +33,7 @@ added to a tab is added in both.
 | `src/body-measurements.js` | `BodyMeasurements` upsert by Withings `grpid`, for the Withings sync (#198) |
 | `src/sync-log.js` | `SyncLog` append and newest-first read, one row per sync run (#156) |
 | `src/sync-requests.js` | The `SyncRequests` poller: a time-driven trigger that dispatches the sync workflows, and its install/remove functions (#314). Not a web-app action |
+| `src/snapshot.js` | The daily Drive copy of the sheet, its install/remove functions, and retention (#433). Not a web-app action |
 | `src/auth.js` | Who is calling: the key, the Google-token check, its cache, the token read allow-list (#144) |
 | `src/main.js` | `doGet`/`doPost` dispatch, response envelope |
 
@@ -698,11 +699,13 @@ under ~2 s, by changing the constant, pushing, and running
    Google account" would answer a browser `fetch` with a login page.
    `appsscript.json` **pins its scopes** (#179): `spreadsheets`,
    `script.external_request` (the token check's and the poller's `UrlFetchApp`),
-   `drive.readonly` (`getWorkoutPayload`) and `script.scriptapp` (#314:
-   `installSyncRequestTrigger`). Pinned, so `DriveApp` cannot widen
-   Drive access to full `drive` by inference. `drive.file` would not do: it
-   covers only files the script's own OAuth client created, and the archive
-   was created by the sync's client.
+   `drive.readonly` (`getWorkoutPayload`), `drive` (#433: the daily snapshot
+   copies the sheet and trashes old copies) and `script.scriptapp` (#314:
+   `installSyncRequestTrigger`). Pinned, so `DriveApp` cannot widen anything
+   by inference. `drive.file` would not do: it covers only files the script's
+   own OAuth client created, and the archive was created by the sync's client,
+   as the sheet was by hand. Only `snapshot.js` writes to Drive;
+   `getWorkoutPayload` still only reads.
 
    **Whenever a scope is added, the owner re-authorizes once.** The editor
    prompts only for the scopes **the function being run actually uses**, not
@@ -729,6 +732,48 @@ under ~2 s, by changing the constant, pushing, and running
 
 Re-deploy after every `clasp push` — Apps Script serves the last *deployed*
 version, not the last pushed one.
+
+## Daily snapshot (#433)
+
+Google's version history keeps about 30 days or 100 versions of the sheet, and a
+busy sync burns through them. Once a day a time-driven trigger copies the whole
+Groundwork spreadsheet to `Groundwork snapshot YYYY-MM-DD` (the date in
+America/Denver) in a Drive folder, and keeps the newest 60. It makes no web-app
+action and no response shape changes.
+
+The script runs as the deploying account (luketmossbot), so the copies live in
+that account's Drive, in a folder only the owner shares further than the sheet
+itself. Each copy counts against that account's storage quota: check the sheet's
+size times 60 against it before installing.
+
+Owner's steps, in order:
+
+1. In luketmossbot's Drive, create a folder for the snapshots.
+2. Project Settings → Script Properties: set `SNAPSHOT_FOLDER_ID` to the
+   folder's id (the last part of its URL).
+3. `clasp push`. The manifest gained the `drive` scope, so **re-authorize once**
+   (see Setup): run `installSnapshotTrigger` from the editor and allow the
+   dialog. Running it installs the trigger too, daily at about 03:00
+   America/Denver, outside the sync windows. Running it again leaves exactly one.
+4. Run `takeSnapshot` once by hand and check the file appears.
+
+A trigger runs the **pushed** code, so no redeploy is needed for it. The web app
+is unaffected.
+
+`SNAPSHOT_FOLDER_ID` unset, blank, or not a folder the account can write to makes
+`takeSnapshot` throw `SNAPSHOT_FOLDER_ID is not set or not writable`; it never
+falls back to the Drive root. A throw is how a failure reaches you: Apps Script
+mails failed triggers to the trigger's owner, **luketmossbot's inbox**, at most
+once a day. Read it, or a silent failure is a reading problem. A second run the
+same day creates nothing and logs `Snapshot for YYYY-MM-DD already exists`.
+Files in the folder whose names do not match `Groundwork snapshot YYYY-MM-DD`
+are never touched. Pruned snapshots go to Drive's trash.
+
+`removeSnapshotTrigger` removes only the snapshot trigger; the poller's is
+untouched.
+
+To restore a value by hand, open the snapshot, find the cell, and copy it into
+the live sheet. Tooling to restore one is not provided.
 
 ## Tests
 

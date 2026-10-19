@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
+import { WriteLimitError } from '../budget.js'
 import { runToolCall } from '../call-context.js'
 import { withReminder, type Mode } from '../mode.js'
 import {
@@ -24,6 +25,8 @@ function guarded<A>(fn: (args: A) => Promise<ToolResult>) {
       return await fn(args)
     } catch (err) {
       if (err instanceof HiveError) return { ...text(`Error: ${err.message}`), isError: true }
+      // The write budget's refusal is already the whole message (#410).
+      if (err instanceof WriteLimitError) return { ...text(err.message), isError: true }
       throw err
     }
   }

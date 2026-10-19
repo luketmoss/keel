@@ -8,6 +8,7 @@
 // The API functions and the exercise resolver are passed in rather than
 // imported, so this can be tested against fakes without a network.
 
+import { WriteLimitError } from '../budget.js';
 import { ApiError, chunkByPayload } from './api.js';
 import { SET_UPDATE_FIELDS, SET_UPDATE_KEYS, findUnknownFields } from './domain.js';
 
@@ -157,6 +158,7 @@ export async function planAndApplySetUpdates(workoutId, updates, deps) {
       const res = await updateSets(workoutId, chunk.map((e) => e.u));
       applied.push(...res.changes.map((c) => ({ ...c, index: chunk[c.index].i })));
     } catch (err) {
+      if (err instanceof WriteLimitError) throw err;
       throw new Error(
         `${err.message}\n\nChunk ${n + 1} of ${chunks.length} failed and wrote nothing, but ` +
         `${applied.length} of ${updates.length} entries were already written by earlier chunks` +

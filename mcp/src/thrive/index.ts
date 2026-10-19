@@ -2,7 +2,9 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
 import { CfWorkerJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/cfworker'
 import type { Env } from '../env'
+import { parseLimits } from '../budget.js'
 import { configureApi } from './api.js'
+import { budgetFor } from '../budget-do'
 import { instructions, type Mode } from '../mode.js'
 import { registerThriveTools } from './tools.js'
 
@@ -24,7 +26,12 @@ export async function handleThrive(request: Request, env: Env, mode: Mode = 'rea
   if (!env.THRIVE_API_URL || !env.THRIVE_API_KEY) {
     return new Response('Thrive is not configured on this Worker.', { status: 503 })
   }
-  configureApi({ url: env.THRIVE_API_URL, key: env.THRIVE_API_KEY })
+  // Without its counter the write endpoint would be unlimited: refuse to serve it (#410).
+  if (mode === 'write' && !env.WRITE_BUDGET) {
+    return new Response('Thrive writes are not configured on this Worker (no write budget).', { status: 503 })
+  }
+  const { budget, limits } = mode === 'write' ? budgetFor(env, 'thrive') : { budget: undefined, limits: parseLimits(env) }
+  configureApi({ url: env.THRIVE_API_URL, key: env.THRIVE_API_KEY, budget, limits })
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,

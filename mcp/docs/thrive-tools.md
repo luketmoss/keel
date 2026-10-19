@@ -40,10 +40,10 @@ needs a matching change here.**
 
 | Tool | Description |
 |------|-------------|
-| `thrive_schedule_workout` | Create a workout with status `planned` for a future date, expanded from a template or an explicit exercise list. Exercise entries can prescribe a `weight` (every set) or `set_weights` (per set); the whole list is validated before anything is written. `estimated_min` (whole minutes) records the plan's estimated duration |
-| `thrive_schedule_week` | Schedule several workouts in one call, each shaped like a `thrive_schedule_workout` call. All of them are validated first (any problem schedules none), then the sets are written, chunked if large, followed by the workouts |
+| `thrive_schedule_workout` | (Over 200 rows in the call it is previewed, not written, until `confirm: true`; see Write limits.) Create a workout with status `planned` for a future date, expanded from a template or an explicit exercise list. Exercise entries can prescribe a `weight` (every set) or `set_weights` (per set); the whole list is validated before anything is written. `estimated_min` (whole minutes) records the plan's estimated duration |
+| `thrive_schedule_week` | (Same 200-row ceiling and `confirm`.) Schedule several workouts in one call, each shaped like a `thrive_schedule_workout` call. All of them are validated first (any problem schedules none), then the sets are written, chunked if large, followed by the workouts |
 | `thrive_create_exercise` | Add to the exercise library (refuses duplicate names unless overridden) |
-| `thrive_create_template` | Create a reusable template from an ordered exercise list |
+| `thrive_create_template` | (Same 200-row ceiling and `confirm`.) Create a reusable template from an ordered exercise list |
 
 ### Repair
 
@@ -51,7 +51,7 @@ needs a matching change here.**
 |------|-------------|
 | `thrive_update_workout` | Fix date, name, type, notes, duration (`duration_min`, whole minutes), estimated duration (`estimated_min`), session effort, cardio attributes, or planned/completed status |
 | `thrive_update_set` | Correct one logged set's weight, reps, planned reps or effort (pass `section` when a lift appears twice) |
-| `thrive_update_sets` | Correct many sets of one workout in one call. All entries are validated first (any problem writes nothing), each request is atomic, and each updated set's resulting state is echoed |
+| `thrive_update_sets` | (Same 200-row ceiling and `confirm`.) Correct many sets of one workout in one call. All entries are validated first (any problem writes nothing), each request is atomic, and each updated set's resulting state is echoed |
 | `thrive_update_exercise` | Rename or retag an exercise |
 | `thrive_update_template` | Replace a template's exercise list wholesale |
 | `thrive_set_journal_entry` | Write the journal note for a day: a non-blank note is saved at once (a replaced note is quoted back); a blank note clears the day and is dry-run until `confirm: true` |

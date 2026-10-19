@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import stdioTools from '../../test/fixtures/thrive-stdio-tools.json'
 import type { Env } from '../env'
+import { fakeBudget } from '../../test/fake-budget'
 import { handleThrive } from './index'
 
 const KEY = 'thrive-secret-key-123'
 const URL_ = 'https://script.google.com/macros/s/thrive/exec'
-const env = { THRIVE_API_URL: URL_, THRIVE_API_KEY: KEY } as Env
+const env = { THRIVE_API_URL: URL_, THRIVE_API_KEY: KEY, WRITE_BUDGET: fakeBudget().namespace } as Env
 
 const DESTRUCTIVE = [
   'thrive_delete_exercise',

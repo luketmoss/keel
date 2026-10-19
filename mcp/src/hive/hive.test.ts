@@ -1,11 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Env } from '../env'
 import stdioTools from '../../test/fixtures/hive-stdio-tools.json'
+import { fakeBudget } from '../../test/fake-budget'
 import { handleHive } from './index'
 
 const KEY = 'secret-key-123'
 const URL_ = 'https://script.google.com/macros/s/abc/exec'
-const env = { HIVE_API_URL: URL_, HIVE_API_KEY: KEY, HIVE_DEFAULT_OWNER: 'Default Owner' } as Env
+const env = {
+  HIVE_API_URL: URL_,
+  HIVE_API_KEY: KEY,
+  HIVE_DEFAULT_OWNER: 'Default Owner',
+  WRITE_BUDGET: fakeBudget().namespace,
+} as Env
 
 function rpc(method: string, params?: unknown): Request {
   return new Request('https://example.test/hive/mcp', {

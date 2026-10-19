@@ -12,7 +12,22 @@ compatibility_flags = ["global_fetch_strictly_public", "nodejs_als"]
 GITHUB_CLIENT_ID = "Ov23lieyNEsMK4XTtE7m"
 # Owner hive_add_item uses when none is given. Set to your Hive owner name.
 HIVE_DEFAULT_OWNER = "Luke"
+# Write ceilings (#410). A missing or malformed value falls back to these, never to "unlimited".
+# Rows one call may write before it is held for `confirm: true` (Thrive's four bulk tools).
+MAX_ROWS_PER_CALL = "200"
+# Per app, over a rolling 60 minutes: write calls, or rows, whichever comes first.
+MAX_WRITES_PER_HOUR = "40"
+MAX_ROWS_PER_HOUR = "600"
 
 # No id: wrangler creates the namespace on first deploy and records it.
 [[kv_namespaces]]
 binding = "OAUTH_KV"
+
+# The hourly write counters (#410): one Durable Object per app, holding only timestamps and row counts.
+[[durable_objects.bindings]]
+name = "WRITE_BUDGET"
+class_name = "WriteBudget"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["WriteBudget"]

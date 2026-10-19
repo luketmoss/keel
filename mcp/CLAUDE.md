@@ -25,6 +25,8 @@ mcp/
 │   ├── hive/           # /hive/mcp and /hive/write/mcp: api.ts (Apps Script client), tools.ts, index.ts
 │   ├── thrive/         # /thrive/mcp and /thrive/write/mcp: the ported Thrive modules (JS) + index.ts
 │   ├── mode.js         # read vs write: the reminder line and the endpoints' instructions
+│   ├── budget.js       # the write ceilings as plain functions (window logic, wording, vars)
+│   ├── budget-do.ts    # WriteBudget, the hourly counter's Durable Object
 │   ├── call-context.js # state that belongs to one tool call (AsyncLocalStorage)
 │   ├── consent.ts      # consent and message pages
 │   ├── config.ts       # the Worker's public URL and resource URLs
@@ -95,6 +97,40 @@ state visible. Wording and edge cases:
   this repo lists the claude.ai write connectors while they are switched off in
   claude.ai. If it does, disable them in that session with `/mcp`. Record what
   was found here.
+
+## Write limits (#410)
+
+Two ceilings, both enforced in the Worker, both per app. Their values are `[vars]`
+in `wrangler.toml`; changing one is a one-line deploy. A missing or malformed
+value falls back to the default, never to "unlimited" (`parseLimits` in
+`src/budget.js`).
+
+| What | Var | Default | When it is hit |
+|---|---|---|---|
+| Rows in one call (Thrive's bulk tools) | `MAX_ROWS_PER_CALL` | 200 | The call is previewed, nothing written: `CAP — nothing written. This would write N rows, over the 200-row limit for one call.`, then the summary a success would give, then `Call again with confirm: true to write them.` |
+| Write calls per rolling 60 minutes | `MAX_WRITES_PER_HOUR` | 40 | Every write tool for that app is refused until the window moves on: `Write limit reached for Thrive: 40 writes in the last hour. Writing resumes at HH:MM (America/Denver). Reads still work.` |
+| Rows per rolling 60 minutes | `MAX_ROWS_PER_HOUR` | 600 | The same refusal, naming rows |
+
+- **Per-call ceiling.** `thrive_schedule_workout`, `thrive_schedule_week`,
+  `thrive_update_sets` and `thrive_create_template` count the rows they are about
+  to write from the plan they already validated, and gain an optional `confirm`
+  that does nothing at or under the ceiling. The destructive tools keep their own
+  dry runs. Hive writes touch one row each, so Hive has no per-call path.
+- **Hourly budget.** The Worker cannot see sessions, so it is per app over an
+  hour, not per session: a runaway loop lives inside one hour, and two sessions
+  writing at once share the budget. There is **no `confirm` past it**, because a
+  loop can send `confirm` as easily as anything else. Reads are never limited.
+  A tool call is one write against it however many requests it sends, counted
+  at its first request: a write whose request then fails still counts (it may
+  have landed), a call refused before any request does not, and neither does a
+  cap preview or `previewSetUpdates`.
+- **Where the count lives.** One Durable Object per app (`WriteBudget`, binding
+  `WRITE_BUDGET`, instance names `thrive` and `hive`), holding only
+  timestamps and row counts, never arguments or values. KV was rejected: it is
+  eventually consistent and takes one write per second per key, so a fast loop
+  would slip past it. A write endpoint with no `WRITE_BUDGET` binding answers 503
+  rather than run unlimited.
+- **Undo** (#412), when it lands, counts as a write like any other.
 
 ## Hive
 

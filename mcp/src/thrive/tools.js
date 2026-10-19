@@ -12,7 +12,8 @@
 
 import { z } from 'zod';
 
-import { runToolCall } from '../call-context.js';
+import { WriteLimitError } from '../budget.js';
+import { declareRows, runToolCall } from '../call-context.js';
 import { withReminder } from '../mode.js';
 
 import {
@@ -23,7 +24,7 @@ import {
   createWorkout, updateWorkout, deleteWorkout,
   createExercise, updateExercise, deleteExercise,
   createTemplate, replaceTemplate,
-  previewSetUpdates, updateSets, appendSets,
+  previewSetUpdates, updateSets, appendSets, rowCap,
 } from './api.js';
 import {
   planAndApplySetUpdates, EntryErrors, isEntryErrors, stripEntryPrefix,
@@ -91,6 +92,8 @@ function tool(name, description, shape, handler) {
         try {
           return await handler(args);
         } catch (err) {
+          // The write budget's refusal is already the whole message (#410).
+          if (err instanceof WriteLimitError) return fail(err.message);
           return fail(`Error: ${scrubSecrets(err.message)}`);
         }
       });
@@ -98,6 +101,33 @@ function tool(name, description, shape, handler) {
       // A dry run, a refusal or a failed write did not (or may not have) change anything.
       return mode === 'write' && state.wrote && !result.isError ? withReminder(result, 'Thrive') : result;
     },
+  );
+}
+
+/**
+ * The one optional field the four bulk tools gain (#410). It does nothing at or
+ * under the per-call row ceiling.
+ */
+const CONFIRM_OVER_CAP = z.boolean().optional().describe(
+  'Set true to write a call that is over the per-call row limit. Default false: such a call is previewed ' +
+  'and nothing is written. It has no effect at or under the limit.',
+);
+
+/**
+ * The per-call row ceiling (#410), taken after validation and before the first
+ * write. Over it, and not confirmed, the call becomes a preview: `summary` is
+ * what a successful call would have returned, so the agent sees the same thing
+ * either way. Returns that preview, or null to carry on and write.
+ */
+function capHold(rows, summary, confirm) {
+  const cap = rowCap();
+  if (rows <= cap || confirm) {
+    declareRows(rows);
+    return null;
+  }
+  return text(
+    `CAP — nothing written. This would write ${rows} rows, over the ${cap}-row limit for one call.\n\n` +
+    `${summary}\n\nCall again with confirm: true to write them.`,
   );
 }
 
@@ -612,8 +642,9 @@ tool(
       'Elevation loss in METERS. Recorded for hikes only. Pass "" to clear.',
     ),
     avg_hr: z.string().optional().describe('Average heart rate in bpm. Pass "" to clear.'),
+    confirm: CONFIRM_OVER_CAP,
   },
-  async (input) => {
+  async ({ confirm, ...input }) => {
     const p = prepareSchedule(input, await scheduleContext());
     if (p.errors.length) {
       throw new Error(
@@ -622,17 +653,11 @@ tool(
       );
     }
 
-    // Sets before the workout row: if the second write fails, the set rows
-    // are invisible orphans, whereas a workout row without its sets would show
-    // up as an empty session.
-    await appendSets(p.rows);
-    await createWorkout(p.workout);
-
     const { workout, rows, plan } = p;
     const detail = plan.map(
       (e, i) => `  ${i + 1}. ${e.exercise_name} [${e.section}] — ${e.sets} x ${e.reps}${describeLoad(e.weights)}`,
     );
-    return text(
+    const summary = (
       [
         `Scheduled **${workout.name}** for ${workout.date} [${workout.type}]${workout.status === 'planned' ? ' (planned)' : ''}`,
         `- id: ${workout.id}`,
@@ -640,8 +665,19 @@ tool(
         workout.estimated_seconds ? `- Estimated duration: ${secondsToMinutes(workout.estimated_seconds)} min` : null,
         rows.length ? `- ${plan.length} exercises, ${rows.length} planned sets:` : '- No exercises attached.',
         ...detail,
-      ].filter(Boolean).join('\n'),
+      ].filter(Boolean).join('\n')
     );
+
+    const held = capHold(rows.length + 1, summary, confirm);
+    if (held) return held;
+
+    // Sets before the workout row: if the second write fails, the set rows
+    // are invisible orphans, whereas a workout row without its sets would show
+    // up as an empty session.
+    await appendSets(p.rows);
+    await createWorkout(p.workout);
+
+    return text(summary);
   },
 );
 
@@ -660,8 +696,9 @@ tool(
       )
       .min(1)
       .describe('The sessions to schedule, in any order.'),
+    confirm: CONFIRM_OVER_CAP,
   },
-  async ({ workouts }) => {
+  async ({ workouts, confirm }) => {
     const ctx = await scheduleContext();
     const accepted = Object.keys(scheduleShape);
     const errors = [];
@@ -686,6 +723,17 @@ tool(
       );
     }
 
+    const summary = [
+      `Scheduled ${prepared.length} workout${prepared.length > 1 ? 's' : ''}:`,
+      ...prepared.map(({ workout: w, rows }) =>
+        `- ${w.date} **${w.name}** [${w.type}]${w.status === 'planned' ? ' (planned)' : ''} — ` +
+        `${rows.length} planned sets` +
+        `${w.estimated_seconds ? `, est. ${secondsToMinutes(w.estimated_seconds)} min` : ''} (id: ${w.id})`),
+    ].join('\n');
+
+    const held = capHold(prepared.reduce((n, p) => n + p.rows.length + 1, 0), summary, confirm);
+    if (held) return held;
+
     // Every set first, for the reason given in thrive_schedule_workout, then
     // the workouts. appendSets chunks a large week to fit the API's payload
     // limit (#132 AC5); if a workout write fails partway, say which landed.
@@ -705,15 +753,7 @@ tool(
       created.push(p.workout);
     }
 
-    return text(
-      [
-        `Scheduled ${prepared.length} workout${prepared.length > 1 ? 's' : ''}:`,
-        ...prepared.map(({ workout: w, rows }) =>
-          `- ${w.date} **${w.name}** [${w.type}]${w.status === 'planned' ? ' (planned)' : ''} — ` +
-          `${rows.length} planned sets` +
-          `${w.estimated_seconds ? `, est. ${secondsToMinutes(w.estimated_seconds)} min` : ''} (id: ${w.id})`),
-      ].join('\n'),
-    );
+    return text(summary);
   },
 );
 
@@ -967,33 +1007,46 @@ tool(
       )
       .min(1)
       .describe('One entry per set. Only the fields you pass change.'),
+    confirm: CONFIRM_OVER_CAP,
   },
-  async ({ workout_id, updates }) => {
+  async ({ workout_id, updates, confirm }) => {
     const [library] = await Promise.all([fetchExercises(), resolveWorkout(workout_id)]);
-
-    let changes;
-    try {
-      changes = await planAndApplySetUpdates(workout_id, updates, {
-        resolveExercise: (ref) => resolveExercise(ref, library),
-        previewSetUpdates,
-        updateSets,
-      });
-    } catch (err) {
-      if (!(err instanceof EntryErrors)) throw err;
-      throw new Error(
+    const summarize = (changes) => [
+      `Updated ${changes.length} set${changes.length > 1 ? 's' : ''} in ${workout_id}:`,
+      ...changes.map(
+        (c) => `- ${c.exercise.name} [${c.slot.section || 'no section'}] set ${c.after.set_number}: ${describeSetState(c.after)}`,
+      ),
+    ].join('\n');
+    const dependencies = { resolveExercise: (ref) => resolveExercise(ref, library), previewSetUpdates, updateSets };
+    const failed = (err) => {
+      if (!(err instanceof EntryErrors)) return err;
+      return new Error(
         `Nothing was written — ${err.errors.length} of ${updates.length} entries can't be applied:\n` +
         err.errors.map((e) => `  - ${e}`).join('\n'),
       );
-    }
+    };
 
-    return text(
-      [
-        `Updated ${changes.length} set${changes.length > 1 ? 's' : ''} in ${workout_id}:`,
-        ...changes.map(
-          (c) => `- ${c.exercise.name} [${c.slot.section || 'no section'}] set ${c.after.set_number}: ${describeSetState(c.after)}`,
-        ),
-      ].join('\n'),
-    );
+    // Each entry changes one set row. Over the ceiling, resolve the batch
+    // without writing (the preview is the API's own, so every problem is still
+    // found) and hold it until it is confirmed.
+    if (updates.length > rowCap() && !confirm) {
+      let preview;
+      try {
+        preview = await planAndApplySetUpdates(workout_id, updates, { ...dependencies, updateSets: previewSetUpdates });
+      } catch (err) {
+        throw failed(err);
+      }
+      return capHold(updates.length, summarize(preview), confirm);
+    }
+    declareRows(updates.length);
+
+    let changes;
+    try {
+      changes = await planAndApplySetUpdates(workout_id, updates, dependencies);
+    } catch (err) {
+      throw failed(err);
+    }
+    return text(summarize(changes));
   },
 );
 
@@ -1003,8 +1056,9 @@ tool(
   {
     name: z.string().describe('Template name'),
     exercises: z.array(exerciseSpec).describe('Exercises in the order they should be performed'),
+    confirm: CONFIRM_OVER_CAP,
   },
-  async ({ name, exercises }) => {
+  async ({ name, exercises, confirm }) => {
     if (!exercises.length) throw new Error('A template needs at least one exercise.');
     const library = await fetchExercises();
     const rows = exercises.map((spec) => {
@@ -1017,8 +1071,12 @@ tool(
         reps: normalizeRangeToMax(spec.reps),
       };
     });
-    const tpl = await createTemplate({ name, exercises: toTemplateExercises(rows) });
     const detail = rows.map((e, i) => `  ${i + 1}. ${e.exercise_name} [${e.section}] — ${e.sets} x ${e.reps}`);
+    // The id is only known once the API has created the template, so a preview has none.
+    const held = capHold(rows.length, `Would create template **${name}**\n${detail.join('\n')}`, confirm);
+    if (held) return held;
+
+    const tpl = await createTemplate({ name, exercises: toTemplateExercises(rows) });
     return text(`Created template **${name}** (id: ${tpl.id})\n${detail.join('\n')}`);
   },
 );

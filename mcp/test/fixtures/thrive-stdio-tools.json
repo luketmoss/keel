@@ -106,6 +106,10 @@
             "additionalProperties": false
           },
           "description": "Exercises in the order they should be performed"
+        },
+        "confirm": {
+          "type": "boolean",
+          "description": "Set true to write a call that is over the per-call row limit. Default false: such a call is previewed and nothing is written. It has no effect at or under the limit."
         }
       },
       "required": [
@@ -495,6 +499,10 @@
           },
           "minItems": 1,
           "description": "The sessions to schedule, in any order."
+        },
+        "confirm": {
+          "type": "boolean",
+          "description": "Set true to write a call that is over the per-call row limit. Default false: such a call is previewed and nothing is written. It has no effect at or under the limit."
         }
       },
       "required": [
@@ -620,6 +628,10 @@
         "avg_hr": {
           "type": "string",
           "description": "Average heart rate in bpm. Pass \"\" to clear."
+        },
+        "confirm": {
+          "type": "boolean",
+          "description": "Set true to write a call that is over the per-call row limit. Default false: such a call is previewed and nothing is written. It has no effect at or under the limit."
         }
       },
       "required": [
@@ -823,6 +835,10 @@
           },
           "minItems": 1,
           "description": "One entry per set. Only the fields you pass change."
+        },
+        "confirm": {
+          "type": "boolean",
+          "description": "Set true to write a call that is over the per-call row limit. Default false: such a call is previewed and nothing is written. It has no effect at or under the limit."
         }
       },
       "required": [

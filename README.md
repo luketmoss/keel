@@ -46,6 +46,7 @@ conflict — and that is what makes it the inbox worth looking at.
 | `/review` | Reviews the diff, posts comments, checks CI |
 | `/ship` | Merges — the only irreversible action; `/finish` runs it |
 | `/new-project` | Adds a project folder, CLAUDE.md, board option, CI workflow |
+| `/adopt-project` | Plans moving an existing repo into Keel and files it as an epic |
 
 ## Documentation
 

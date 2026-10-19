@@ -1,4 +1,5 @@
 import { isDemo } from './demo-data';
+import type { WorkoutTrack } from './types';
 
 // The one call the SPA makes to the Apps Script API (#410). Everything else
 // still reads and writes Sheets directly.
@@ -85,4 +86,72 @@ function outcomeOf(parsed: unknown): RequestSyncOutcome {
     return { ok: false, kind: 'not_found' };
   }
   return { ok: true };
+}
+
+// --- getWorkoutTrack (#432) ---------------------------------------------
+
+/**
+ * What became of a track read. `kind` names a failure without carrying the
+ * token, the response body or anything from the track: the same words as
+ * RequestSyncOutcome's, plus `no_track` for an activity the API answered has
+ * none (a blank `track_ref`, or a file it would not vouch for).
+ */
+export type WorkoutTrackOutcome = { ok: true; track: WorkoutTrack } | { ok: false; kind: string };
+
+/**
+ * A workout's simplified GPS track, read through the API with the user's
+ * Google token: the sync stores it in the bot's Drive, which the app cannot
+ * read. Never throws, and never logs: a track shows where the user rides.
+ * Demo mode and an unset API URL make no call.
+ */
+export async function getWorkoutTrack(
+  workoutId: string,
+  token: string,
+  options: RequestSyncOptions = {},
+): Promise<WorkoutTrackOutcome> {
+  const url = 'url' in options ? options.url : API_URL;
+  if (isDemo()) return { ok: false, kind: 'demo' };
+  if (!url) return { ok: false, kind: 'no_api_url' };
+
+  const body = new URLSearchParams();
+  body.set('action', 'getWorkoutTrack');
+  body.set('access_token', token);
+  body.set('id', workoutId);
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? THRIVE_API_TIMEOUT_MS);
+  try {
+    const res = await (options.fetchImpl ?? fetch)(url, { method: 'POST', body, signal: controller.signal });
+    if (!res.ok) return { ok: false, kind: `http_${res.status}` };
+    let parsed: unknown;
+    try {
+      parsed = await res.json();
+    } catch {
+      return { ok: false, kind: 'bad_response' };
+    }
+    if (!parsed || typeof parsed !== 'object') return { ok: false, kind: 'bad_response' };
+    const env = parsed as { success?: unknown; code?: unknown; data?: { track?: unknown } };
+    if (env.success !== true) {
+      // The API refuses with fixed text and, for a token problem, a code word. Anything else is "no track".
+      return { ok: false, kind: typeof env.code === 'string' && CODE.test(env.code) ? env.code : 'no_track' };
+    }
+    return isWorkoutTrack(env.data?.track) ? { ok: true, track: env.data.track } : { ok: false, kind: 'bad_response' };
+  } catch {
+    return { ok: false, kind: controller.signal.aborted ? 'timeout' : 'network' };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** The shape the map needs, checked at the boundary: a LineString of [lon, lat] pairs, with `t` beside it. */
+function isWorkoutTrack(value: unknown): value is WorkoutTrack {
+  const f = value as Partial<WorkoutTrack> | null;
+  if (!f || f.type !== 'Feature' || f.properties?.format !== 'thrive-track') return false;
+  const coordinates = f.geometry?.coordinates;
+  return (
+    f.geometry?.type === 'LineString' &&
+    Array.isArray(coordinates) &&
+    coordinates.length >= 2 &&
+    coordinates.every((c) => Array.isArray(c) && c.length === 2 && c.every((n) => Number.isFinite(n)))
+  );
 }

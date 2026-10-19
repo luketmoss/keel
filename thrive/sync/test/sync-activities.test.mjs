@@ -466,3 +466,56 @@ test('#403: a status the sync does not know fails that activity rather than coun
   assert.equal(out.failures.length, 1);
   assert.match(out.failures[0], /unknown status "merged"/);
 });
+
+// --- #432: the track rides the same upsert as the FIT --------------------
+
+test('#432: the track step builds from the stored FIT and its track_ref rides the upsert; a second run writes nothing', async () => {
+  const { createTrackStep } = await import('../src/track-step.mjs');
+  const { line, makeFit } = await import('./fit-fixture.mjs');
+  const { drive, archive, ids } = await archiveWith([GRAVEL]);
+  const id = GRAVEL.activity_id;
+  const fitBytes = makeFit([...line(80), ...line(40, { lon0: -99.99, lat: 45.003 })].map((p, i) => ({ ...p, ms: p.ms + i * 1000 })));
+  const fitId = await archive.storeFit({ activityId: id, localDate: GRAVEL.list_entry.date, bytes: fitBytes });
+  await archive.writeFit(ids[id], { status: 'stored', file_id: fitId, fetched_at: SYNCED });
+
+  const run = async () => {
+    const api = fakeApi();
+    const track = createTrackStep({ archive, startedAt: SYNCED, log: () => {} });
+    const out = await syncActivities({ archive, api, activityIds: [id], syncedAt: SYNCED, track, log: () => {} });
+    return { api, track, out };
+  };
+
+  const first = await run();
+  assert.deepEqual(first.out.failures, []);
+  const sent = first.api.calls.find((c) => c.action === 'upsertSyncedWorkout');
+  assert.match(sent.track_ref, /^file-/);
+  assert.equal(Object.hasOwn(sent, 'fit_ref'), false); // no FIT step ran, so the FIT's own fields are not re-sent here
+  assert.equal(first.track.counts.built, 1);
+  assert.equal(drive.pathOf(sent.track_ref).split('/').slice(0, 2).join('/'), 'Thrive COROS/tracks');
+  assert.equal(drive.files.get(sent.track_ref).props.kind, 'track');
+  assert.equal(drive.files.get(sent.track_ref).data.properties.format, 'thrive-track');
+  const recorded = drive.files.get(ids[id]).data.track;
+  assert.equal(recorded.status, 'stored');
+  assert.equal(recorded.file_id, sent.track_ref);
+
+  const writesBefore = drive.writes.length;
+  const second = await run();
+  assert.equal(second.api.calls.find((c) => c.action === 'upsertSyncedWorkout').track_ref, sent.track_ref);
+  assert.equal(second.track.counts.built + second.track.counts.rebuilt, 0);
+  // Only the merge's own bookkeeping may be written; no track, no archive track record.
+  assert.equal(drive.writes.slice(writesBefore).some((w) => w.id === sent.track_ref || w.id === recorded.file_id), false);
+});
+
+test('#432: an indoor activity gets no track_ref and no track file', async () => {
+  const { createTrackStep } = await import('../src/track-step.mjs');
+  const indoor = byPrefix('Indoor');
+  const { drive, archive, ids } = await archiveWith([indoor]);
+  const id = indoor.activity_id;
+  await archive.writeFit(ids[id], { status: 'stored', file_id: 'fit-x', fetched_at: SYNCED });
+  const api = fakeApi();
+  const track = createTrackStep({ archive, startedAt: SYNCED, log: () => {} });
+  await syncActivities({ archive, api, activityIds: [id], syncedAt: SYNCED, track, log: () => {} });
+  assert.equal(api.calls.find((c) => c.action === 'upsertSyncedWorkout').track_ref, '');
+  assert.equal([...drive.files.values()].some((f) => f.props?.kind === 'track'), false);
+  assert.equal(track.counts.none, 1);
+});

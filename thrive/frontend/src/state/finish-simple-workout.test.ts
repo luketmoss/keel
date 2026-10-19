@@ -21,7 +21,7 @@ const planned = (type: WorkoutType): WorkoutWithRow => ({
   moving_seconds: '', effort: '', distance_m: '', ascent_m: '', descent_m: '', avg_hr: '',
   sub_type: '', source: '', source_activity_id: '', raw_ref: '', fit_ref: '',
   fit_fetched_at: '', synced_at: '', started_at_utc: '', calories: '',
-  estimated_seconds: '1800', sport_type: '', sheetRow: 5,
+  estimated_seconds: '1800', sport_type: '', track_ref: '', sheetRow: 5,
 } as WorkoutWithRow);
 
 const data = {

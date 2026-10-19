@@ -118,10 +118,10 @@ After that, a column or tab changes only like this:
 Google Sheet "Groundwork" with these tabs:
 - **Exercises** (A:E): id, Name, Tags, Notes, Created
 - **Templates** (A:H): template_id, Template Name, Order, exercise_id, Exercise Name, Section, Sets, Reps
-- **Workouts** (A:AB): id, Date, Time, Type, Name, template_id, Notes, Elapsed (s), Created, copied_from, status,
+- **Workouts** (A:AC): id, Date, Time, Type, Name, template_id, Notes, Elapsed (s), Created, copied_from, status,
   Moving (s), Effort, Distance (m), Ascent (m), Descent (m), Avg HR (bpm),
   sub_type, source, source_activity_id, raw_ref, fit_ref, fit_fetched_at, synced_at, started_at_utc, calories,
-  estimated_seconds, sport_type
+  estimated_seconds, sport_type, track_ref
 - **Sets** (A:J): workout_id, exercise_id, Exercise Name, Section, Exercise Order, Set #, Planned Reps, Weight (lbs), Reps, Effort
 - **Labels** (A:D): id, name, color_key, created
 - **DailyHealth** (A:S): date, resting_hr, hrv, steps, calories, sleep_total_s,
@@ -278,6 +278,14 @@ never sets it and the user cannot edit it. The SPA builds the "View on COROS"
 portal link from it and `source_activity_id` (`frontend/src/api/coros-link.ts`).
 Added by `scripts/migrate-260-workouts-sport-type.mjs`; rows synced earlier
 were filled by `scripts/backfill-260-workouts-sport-type.mjs`.
+`Workouts!AC` `track_ref` (#432) is the Drive file ID of the activity's simplified
+GPS track (a small GeoJSON LineString the sync builds from the FIT, in
+`Thrive COROS/tracks/`), which the API's `getWorkoutTrack` serves to the signed-in
+app. Nullable with R-Z and AB: blank means no map, whatever the reason (indoors, no
+valid positions, an unreadable FIT, not built yet). Sync-owned: the SPA never sets
+it and a full-row write preserves it. Added by
+`scripts/migrate-421-workouts-track-ref.mjs`; earlier rows by
+`scripts/backfill-421-workouts-track.mjs`. The FIT stays the source of truth.
 
 ### Workout Types
 - `weight` — structured weight training with exercises, sets, reps, effort

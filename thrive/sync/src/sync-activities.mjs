@@ -9,7 +9,8 @@
 //
 // Before its merge, each activity passes the run's FIT step (#154,
 // src/fit.mjs), whose `fit_ref` / `fit_fetched_at` ride on the same upsert as
-// sync-owned fields.
+// sync-owned fields, and then the track step (#432, src/track-step.mjs), whose
+// `track_ref` does too.
 //
 // A strength session (402) never gets a row of its own (#155, sync plan §7).
 // It goes to `enrichWorkout`, which fills blanks on the matching hand-logged
@@ -23,6 +24,7 @@
 // instead of appending beside it (#403): the API answers `claimed`, counted as
 // created. Two or more such plans are a SyncLog note, and a new row as before.
 
+import { fitSheetFields } from './fit.mjs';
 import { ActivityFormatError, ACTIVITY_FIELDS, normalizeActivity } from './normalize-activity.mjs';
 import { redact } from './redact.mjs';
 import { classifySport } from './sport-codes.mjs';
@@ -90,7 +92,7 @@ export function sportTypeField(code) {
  *   `updated` counts rows whose merged fields changed (SyncLog's `n_updated`, #156); the API answers `updated` for every existing row, because
  *   `synced_at` always moves, so a row that held what it already held is `unchanged`.
  */
-export async function syncActivities({ archive, api, activityIds, syncedAt, fit = null, log = console.log }) {
+export async function syncActivities({ archive, api, activityIds, syncedAt, fit = null, track = null, log = console.log }) {
   const out = {
     created: 0, updated: 0, unchanged: 0, deleted: 0, skipped: 0,
     enriched: 0, unmatched: 0, notes: [], failures: [],
@@ -152,6 +154,18 @@ export async function syncActivities({ archive, api, activityIds, syncedAt, fit 
         })
         : {};
 
+      // The track follows the FIT (#432): built from the one the row now holds, and
+      // sent on the same call as a top-level, sync-owned key. An API without
+      // `track_ref` ignores it, so a sync deployed first never fails.
+      const fitNow = fit ? fitFields : fitSheetFields(file.data.fit);
+      const trackFields = track
+        ? await track.ensure({
+          activityId: id, fileId: file.fileId, record: file.data.track,
+          fitRef: fitNow.fit_ref, fitFetchedAt: fitNow.fit_fetched_at,
+          listEntry: file.data.list_entry, localDate: incoming.date, bytes: fit?.bytesFor?.(id),
+        })
+        : {};
+
       const lastWritten = file.data.normalized ?? null;
       const result = await api.upsertSyncedWorkout({
         source: SOURCE,
@@ -161,6 +175,7 @@ export async function syncActivities({ archive, api, activityIds, syncedAt, fit 
         raw_ref: file.fileId,
         synced_at: syncedAt,
         ...fitFields,
+        ...trackFields,
         ...sportType,
       });
 

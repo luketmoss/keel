@@ -318,6 +318,12 @@ differently.
    coordinates, not for a non-empty location. Only walk (900) reaches this
    rule among the mapped codes.
 
+*Amended by #432:* the FIT is now parsed, for **display geometry only**: the
+sync decodes it into a simplified GPS track (`Workouts!AC` `track_ref`, read
+through `getWorkoutTrack`). That never reaches normalization: no row value
+comes from the FIT, and a FIT the budget delays still changes nothing about a
+row later.
+
 Prefer a field on the *detail* payload over the FIT file. FIT retrieval is
 capped at 50/day and happens after normalization in the sync plan's §6 loop,
 so making venue depend on it would leave `sub_type` blank whenever the budget

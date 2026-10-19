@@ -47,7 +47,7 @@ function workout(id: string, over: Partial<WorkoutWithRow> = {}): WorkoutWithRow
     elapsed_seconds: '', created: '', copied_from: '', status: 'active',
     moving_seconds: '', effort: '', distance_m: '', ascent_m: '', descent_m: '', avg_hr: '',
     sub_type: '', source: '', source_activity_id: '', raw_ref: '', fit_ref: '', fit_fetched_at: '',
-    synced_at: '', started_at_utc: '', calories: '', estimated_seconds: '', sport_type: '',
+    synced_at: '', started_at_utc: '', calories: '', estimated_seconds: '', sport_type: '', track_ref: '',
     sheetRow: 2, ...over,
   };
 }

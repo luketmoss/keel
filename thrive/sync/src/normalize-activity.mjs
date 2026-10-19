@@ -127,6 +127,16 @@ export function walkVenue(listEntry) {
   return START_COORDINATES.test(text) ? 'outdoor' : 'indoor';
 }
 
+/**
+ * Whether the archived list entry has a `Start Coordinates` line: the one test
+ * for "this activity had a GPS track", shared by walkVenue and the track step
+ * (#432) so the two cannot disagree.
+ */
+export function hasStartCoordinates(listEntry) {
+  const text = listEntry?.text;
+  return typeof text === 'string' && START_COORDINATES.test(text);
+}
+
 const cell = (n) => (n === undefined || n === null ? '' : String(n));
 
 /**

@@ -138,6 +138,8 @@ function planRow(): string[] {
     // R-Z, AA, AB: never edited here; nonsense values on purpose, to prove they are passed through.
     'gym', 'coros', '123', 'raw/1', 'fit/1', 'x', 'y', 'z', '400',
     '2830', '402',
+    // AC, #432: the track, also passed through.
+    'trk/1',
   ];
 }
 
@@ -179,7 +181,7 @@ function toWorkouts(): WorkoutWithRow[] {
     effort: r[12] as any, distance_m: r[13], ascent_m: r[14], descent_m: r[15], avg_hr: r[16],
     sub_type: r[17], source: r[18], source_activity_id: r[19], raw_ref: r[20], fit_ref: r[21],
     fit_fetched_at: r[22], synced_at: r[23], started_at_utc: r[24], calories: r[25],
-    estimated_seconds: r[26], sport_type: r[27], sheetRow: i + 2,
+    estimated_seconds: r[26], sport_type: r[27], track_ref: r[28], sheetRow: i + 2,
   }));
 }
 
@@ -244,7 +246,7 @@ describe('AC1: Save keeps the workout\'s identity and every column it does not e
 
     const puts = vi.mocked(sheets.sheetsUpdate).mock.calls.filter(([r]) => r.startsWith('Workouts'));
     expect(puts).toHaveLength(1);
-    expect(puts[0][0]).toBe('Workouts!A3:AB3');
+    expect(puts[0][0]).toBe('Workouts!A3:AC3');
     expect(puts[0][1]).toEqual([before.map((v, i) => (i === 4 ? 'Legs B' : v))]);
 
     expect(vi.mocked(sheets.sheetsAppend)).not.toHaveBeenCalled();

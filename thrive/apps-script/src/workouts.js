@@ -118,6 +118,7 @@ function normalizeWorkoutFields(data) {
     );
   }
   if (out.sport_type !== undefined) out.sport_type = validateSportType('sport_type', out.sport_type);
+  if (out.track_ref !== undefined) out.track_ref = validateTrackRef('track_ref', out.track_ref);
 
   return out;
 }
@@ -132,6 +133,30 @@ function validateSportType(where, value) {
     throw new Error(where + ' must be a COROS sport code (digits only) or "" to clear, got "' + v + '"');
   }
   return v;
+}
+
+/**
+ * A track's Drive file ID (#432), or '' for no map. A Drive ID and nothing else:
+ * letters, digits, "-" and "_", so no URL or path can reach the sheet, and the
+ * refusal does not echo what was sent.
+ */
+function validateTrackRef(where, value) {
+  var v = cell(value);
+  if (v !== '' && !/^[A-Za-z0-9_-]+$/.test(v)) {
+    throw new Error(where + ' must be a Drive file ID (letters, digits, "-" and "_") or "" for no track; the value sent was not one');
+  }
+  return v;
+}
+
+/**
+ * The optional top-level `track_ref` of a sync write (#432), or undefined when
+ * the payload sends none, so the caller leaves AC alone: an API deployed
+ * before it, or a sync that predates it, never blanks a track. Sync-owned,
+ * overwritten when sent, never merged.
+ */
+function normalizeSyncedTrackRef(payload) {
+  if (payload.track_ref === undefined) return undefined;
+  return validateTrackRef('track_ref', payload.track_ref);
 }
 
 /**
@@ -344,6 +369,8 @@ function upsertSyncedWorkout(payload) {
   }
   var sportType = normalizeSyncedSportType(payload);
   if (sportType !== undefined) owned.sport_type = sportType;
+  var trackRef = normalizeSyncedTrackRef(payload);
+  if (trackRef !== undefined) owned.track_ref = trackRef;
 
   var sheet = getSheet(WORKOUTS_SHEET);
   var rows = getAllRows(sheet);

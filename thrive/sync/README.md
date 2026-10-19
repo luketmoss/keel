@@ -415,6 +415,62 @@ allowance is a fixed 24-hour window opening at its first request, and a rolling
 - A request made outside the sync (a probe, another client) does not appear
   in `SyncLog`, so the sync cannot count it.
 
+## GPS tracks (#432)
+
+When the sync holds an outdoor activity's FIT it also decodes it and keeps a
+small, simplified GPS track, so the app can draw the route (#407). The FIT in
+Drive is the source of truth; the track is display geometry derived from it. It
+never changes a row's values: distance, ascent and the rest still come from the
+detail prose (`docs/data-architecture.md` §4).
+
+- **Where.** `Thrive COROS/tracks/<YYYY>/<MM>/<activityId>.json`, foldered by
+  local start date like the FIT, tagged `{ source: coros, kind: track,
+  track_activity_id }` and found by tag, never by name. Its Drive file ID is the
+  row's `Workouts!AC` `track_ref`, and never changes: a rebuilt track replaces
+  the file in place.
+- **When.** For every activity that gets a row, whose FIT is `stored` and whose
+  archived list entry has a `Start Coordinates` line (the same test as the
+  walk's venue), when the archive file has no `track` record, or one built from
+  a different FIT (`fit_fetched_at` differs) or an older format `version`. A run
+  with nothing changed downloads nothing and writes no track. **No COROS request
+  is made for a track**, so the FIT allowance is untouched.
+- **Decoding** is Garmin's own `@garmin/fitsdk`, pinned to an exact version in
+  `sync/package.json` (its licence is Garmin's FIT SDK licence, not MIT). Only
+  `record` messages are read: position, altitude, timestamp. Simplification is
+  Ramer-Douglas-Peucker at 5 m over cairn's equirectangular projection (ported
+  into `src/track.mjs`, because the sync cannot import the web package until
+  Thrive moves into it), growing by 1.5x until 5,000 points or fewer remain.
+- **The file** is a GeoJSON `Feature` / `LineString` with a `bbox` and
+  `properties`: `format: "thrive-track"`, `version: 1`, `source`,
+  `activity_id`, `start_utc`, `t` (whole seconds since start, per coordinate),
+  `ele` (metres to 0.1, `null` where the FIT has none), `simplify` and
+  `points_in`. Coordinates are `[lon, lat]` to 5 decimals. The build is
+  deterministic: the same FIT and version give byte-identical JSON. Per-point
+  heart rate, speed and distance are not in it; a later need bumps `version` and
+  rebuilds every track from the stored FITs at no COROS cost.
+- **Outcomes**, in the archive file's `track` record (`status`, `file_id`,
+  `fit_fetched_at`, `version`, `points`, `built_at`): `stored`; `none` (no
+  `Start Coordinates`, or fewer than 2 valid positions: no file, no FIT
+  download for an indoor session); `unreadable` (the FIT could not be decoded:
+  a `SyncLog` note naming the activity, not a failure, and not retried until the
+  FIT or the format changes). `track_ref` is blank for all but `stored`. A Drive
+  failure records nothing and fails the run, as for a FIT, and the next run
+  tries again.
+- **No coordinate** ever appears in a log line, a `SyncLog` note, an error or a
+  committed test fixture (the repo is public; the fixtures are synthetic,
+  written with Garmin's encoder). The run's log line is counts only:
+  `Tracks: <built> built, <rebuilt> rebuilt, <none> none, <unreadable> unreadable, <failed> failed.`
+- **Size.** About 15-50 KB for a 1-2 h ride and a ceiling near 175 KB are the
+  expectation; **it has not been measured on a real activity yet** (the work was
+  done without access to the real FITs). Measure one ride and one hike after the
+  backfill and record the figures here.
+- **Backfill** for activities synced before this, from the FITs already in
+  Drive, with no COROS call: `scripts/backfill-421-workouts-track.mjs` (see the
+  owner's steps in #432's Results). It is capped (`--max-rows`, default 20),
+  paced, re-runnable and supports `--dry-run`; it writes `track_ref` alone
+  through `updateWorkout` and lists every row it cannot fill by workout id and
+  date. `garmin_import` rows have no FIT and are never touched.
+
 ## Schedule, SyncLog and the dead-man's switch (#156)
 
 **Four runs a day**, `17 9,13,18,0 * * *`: 03:17, 07:17, 12:17 and 18:17 MDT,

@@ -73,6 +73,33 @@ export interface Workout {
   // activity. Sync-owned like R-Z: the SPA never sets it. Nullable: '' means
   // unknown (not yet backfilled, or not a COROS row) — never '0'.
   sport_type: string;
+  // #432, column AC: the Drive file ID of the activity's simplified GPS track,
+  // which `getWorkoutTrack` reads (thrive-api.ts). Sync-owned like R-Z and AB:
+  // the SPA never sets it, and a full-row write preserves it. '' means no map,
+  // whatever the reason.
+  track_ref: string;
+}
+
+/**
+ * The stored track (#432): a GeoJSON Feature with a LineString, as the sync
+ * builds it (sync/src/track.mjs). `t` and `ele` run parallel to the
+ * coordinates, which are `[lon, lat]`.
+ */
+export interface WorkoutTrack {
+  type: 'Feature';
+  bbox: [number, number, number, number];
+  properties: {
+    format: 'thrive-track';
+    version: number;
+    source: string;
+    activity_id: string;
+    start_utc: string;
+    t: number[];
+    ele: (number | null)[];
+    simplify: { algorithm: string; tolerance_m: number };
+    points_in: number;
+  };
+  geometry: { type: 'LineString'; coordinates: [number, number][] };
 }
 export interface WorkoutWithRow extends Workout { sheetRow: number; }
 

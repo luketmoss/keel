@@ -20,7 +20,7 @@ function makeWorkout(overrides: Partial<WorkoutWithRow>): WorkoutWithRow {
     notes: '', elapsed_seconds: '5143', created: '', copied_from: '', status: '', moving_seconds: '',
     effort: '', distance_m: '6512', ascent_m: '', descent_m: '', avg_hr: '', sub_type: '',
     source: '', source_activity_id: '', raw_ref: '', fit_ref: '', fit_fetched_at: '', synced_at: '',
-    started_at_utc: '', calories: '', estimated_seconds: '', sport_type: '', sheetRow: 2, ...overrides,
+    started_at_utc: '', calories: '', estimated_seconds: '', sport_type: '', track_ref: '', sheetRow: 2, ...overrides,
   };
 }
 
@@ -120,12 +120,12 @@ describe('AC7: the link\'s CSS', () => {
 
 describe('AC8: no link, and nothing in its place, where there is nothing to link to', () => {
   const cases: [string, Partial<WorkoutWithRow>][] = [
-    ['a manual row', { source: '', source_activity_id: '', sport_type: '' }],
+    ['a manual row', { source: '', source_activity_id: '', sport_type: '', track_ref: '' }],
     ['a garmin_import row', { source: 'garmin_import', source_activity_id: ID, sport_type: '204' }],
     ['a planned workout', { source: 'coros', source_activity_id: ID, sport_type: '204', status: 'planned' }],
     ['a blank source_activity_id', { source: 'coros', source_activity_id: '', sport_type: '204' }],
     ['a non-digit source_activity_id', { source: 'coros', source_activity_id: 'demo_act_001', sport_type: '204' }],
-    ['a blank sport_type (not yet backfilled)', { source: 'coros', source_activity_id: ID, sport_type: '' }],
+    ['a blank sport_type (not yet backfilled)', { source: 'coros', source_activity_id: ID, sport_type: '', track_ref: '' }],
   ];
   for (const [what, over] of cases) {
     it(`renders nothing for ${what}`, () => {

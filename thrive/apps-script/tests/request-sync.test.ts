@@ -107,7 +107,7 @@ function harness(opts: {
   const capture = (...args: unknown[]) => { logs.push(args.map(String).join(' ')); };
   const sandbox = loadSources(
     ['types.js', 'utils.js', 'workouts.js', 'exercises.js', 'templates.js', 'sets.js',
-      'daily-summary.js', 'daily-health.js', 'journal.js', 'body-measurements.js', 'sync-log.js', 'payload.js',
+      'daily-summary.js', 'daily-health.js', 'journal.js', 'body-measurements.js', 'sync-log.js', 'payload.js', 'track.js',
       'auth.js', 'sync-requests.js', 'change-log.js', 'main.js'],
     {
       Logger: { log: capture },

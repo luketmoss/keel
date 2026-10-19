@@ -3,6 +3,7 @@
 //   Thrive COROS/activities/<YYYY>/<MM>/<activityId>.json   one per activity
 //   Thrive COROS/health/<YYYY>/<MM>/<YYYY-MM-DD>.json      one per local run date
 //   Thrive COROS/fit/<YYYY>/<MM>/<activityId>.fit          one per activity (#154)
+//   Thrive COROS/tracks/<YYYY>/<MM>/<activityId>.json      one per outdoor activity (#432)
 //
 // Every file and folder is found again by its `appProperties`, never by name,
 // so a moved or renamed file is updated rather than duplicated. A file is only
@@ -34,6 +35,12 @@ export const healthProps = (runDate) => ({ source: 'coros', kind: 'health', run_
  * that lookup would then refuse with "2 files match".
  */
 export const fitProps = (activityId) => ({ source: 'coros', kind: 'fit', fit_activity_id: String(activityId) });
+
+/**
+ * A track file's tags (#432). Like the FIT's, deliberately not `activity_id`,
+ * or the activity JSON's query would match it too.
+ */
+export const trackProps = (activityId) => ({ source: 'coros', kind: 'track', track_activity_id: String(activityId) });
 
 /**
  * A list entry with its position in the list removed. `text` begins "3. ",
@@ -233,6 +240,42 @@ export function createArchive(drive, { now = () => Date.now() } = {}) {
      */
     replaceFit(fileId, bytes) {
       return drive.updateBinary(fileId, bytes);
+    },
+
+    /**
+     * Record the activity's track state (#432): `status`, `file_id`,
+     * `fit_fetched_at`, `version`, `points`, `built_at`. Every other field is
+     * left alone, and an ingest update keeps it, as it keeps `fit`.
+     */
+    async writeTrack(fileId, track) {
+      const current = await drive.readJson(fileId);
+      await drive.updateJson(fileId, { ...current, track });
+    },
+
+    /** The activity's stored FIT bytes, by its Drive file id (#432). */
+    readFit(fitFileId) {
+      return drive.readBinary(fitFileId);
+    },
+
+    /** The activity's track file in Drive, or null. Found by tag, never by name. */
+    findTrack(activityId) {
+      return drive.findOne(trackProps(activityId));
+    },
+
+    /**
+     * Store a track file, foldered by the activity's local start date like its
+     * JSON. Returns the Drive file ID, which is the row's `track_ref`.
+     */
+    async storeTrack({ activityId, localDate, feature }) {
+      const id = String(activityId);
+      const [yyyy, mm] = localDate.split('-');
+      const parentId = await folderFor(['tracks', yyyy, mm]);
+      return drive.createJson({ name: `${id}.json`, parentId, props: trackProps(id), data: feature, compact: true });
+    },
+
+    /** Replace a stored track in place: its Drive ID, and the row's `track_ref`, never change. */
+    replaceTrack(fileId, feature) {
+      return drive.updateJson(fileId, feature, { compact: true });
     },
 
     /**

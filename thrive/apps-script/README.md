@@ -492,6 +492,43 @@ archive in the bot's Drive (`sync/README.md`, "The raw archive").
   action answers "The script is not yet allowed to read Drive…", and every
   other action is unaffected.
 
+### GPS tracks (#432)
+
+| Action | Parameters |
+|---|---|
+| `getWorkoutTrack` | `id` (required, a workout id) |
+
+```
+?action=getWorkoutTrack&key=...&id=w_1325851e
+```
+
+A synced activity's simplified GPS track: a GeoJSON `Feature` with a
+`LineString`, built by the sync from the activity's FIT and kept in the bot's
+Drive (`sync/README.md`, "GPS tracks"). Its Drive file ID is `Workouts!AC`
+`track_ref`.
+
+- **Addressed by workout id, never by Drive ID**, like `getWorkoutPayload`. The
+  file `track_ref` names must also be that activity's track before anything is
+  returned: named `<source_activity_id>.json`, the only file at
+  `Thrive COROS/tracks/<YYYY>/<MM>/`, at most 1 MB, `format: "thrive-track"` and
+  an `activity_id` equal to the row's. Anything else, or a blank `track_ref`,
+  is refused with fixed text that quotes nothing from the file.
+- **Returns** `workout_id`, `source_activity_id`, `track_ref` and `track`, the
+  stored Feature unchanged.
+- **A token caller may run it**: it is on `TOKEN_READ_ACTIONS`, because the
+  signed-in app draws the route. Token callers are already limited to the
+  owner's account, which is why this may be on the read list while
+  `getWorkoutPayload`, which no browser needs, stays key-only. A track shows
+  where the user lives and rides.
+- **No new scope**: the existing Drive scopes read it.
+- **`track_ref`** (`Workouts!AC`) is sync-owned like `fit_ref`: `upsertSyncedWorkout`
+  accepts an optional top-level `track_ref` (a Drive file ID, or `""`), always
+  written when sent, left alone when absent, never merged; `updateWorkout`
+  accepts it the same way, for the backfill. Anything but a Drive file ID is
+  refused without being echoed. An API deployed before it ignores the key, so a
+  sync deployed first never fails. Created by
+  `scripts/migrate-421-workouts-track-ref.mjs`.
+
 ### The script lock
 
 `upsertSyncedWorkout`, `enrichWorkout`, `upsertDailyHealth`, `upsertBodyMeasurements` and `appendSyncLog` run under

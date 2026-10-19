@@ -6,7 +6,7 @@
 // every consumer arriving later (the COROS sync, the Journal) calls the API
 // instead of adding another copy.
 
-// Column indices for the Workouts sheet (0-based), A:AB after #128/#129/#145/#260.
+// Column indices for the Workouts sheet (0-based), A:AC after #128/#129/#145/#260/#432.
 var COL = {
   ID: 0,                  // A
   DATE: 1,                // B  local calendar date, YYYY-MM-DD
@@ -37,9 +37,11 @@ var COL = {
   ESTIMATED_SECONDS: 26,  // AA planned duration, seconds, typed per plan (#145)
   SPORT_TYPE: 27,         // AB COROS sport code, digits as text (#260). Sync-owned;
                           //    blank means unknown, never 0
+  TRACK_REF: 28,          // AC Drive file ID of the simplified GPS track (#432). Sync-owned;
+                          //    blank means no map, whatever the reason
 };
 
-var WORKOUT_COLUMN_COUNT = 28;
+var WORKOUT_COLUMN_COUNT = 29;
 
 /**
  * The field name for each column, in sheet order. The read and write mappers
@@ -52,7 +54,7 @@ var WORKOUT_FIELDS = [
   'moving_seconds', 'effort', 'distance_m', 'ascent_m', 'descent_m', 'avg_hr',
   'sub_type', 'source', 'source_activity_id', 'raw_ref', 'fit_ref',
   'fit_fetched_at', 'synced_at', 'started_at_utc', 'calories',
-  'estimated_seconds', 'sport_type',
+  'estimated_seconds', 'sport_type', 'track_ref',
 ];
 
 var WORKOUT_TYPES = ['weight', 'stretch', 'bike', 'hike', 'run', 'walk'];
@@ -76,6 +78,9 @@ var WORKOUT_TYPES = ['weight', 'stretch', 'bike', 'hike', 'run', 'walk'];
  * a caller that predates it (or a Garmin import) never blanks it. It is the
  * COROS portal's key, not a fact the user edits, so it is never merged and
  * never appears in `written` / `edited`.
+ *
+ * Track: `track_ref` (#432) is sync-owned and optional the same way, a Drive
+ * file ID or '' (no map), always written when sent and left alone when absent.
  *
  * Every other column is never set by the action: `effort`, `notes`,
  * `status`, `template_id`, `copied_from` and `estimated_seconds` (#145) stay

@@ -27,6 +27,7 @@
 //   ?action=getWorkout&key=...&id=w_1a2b3c4d
 //   ?action=getPlannedWorkouts&key=...&date=2026-09-21   — adds exercise_count/set_count (#146)
 //   ?action=getWorkoutPayload&key=...&id=w_1a2b3c4d&offset=0   — key only (#179)
+//   ?action=getWorkoutTrack&key=...&id=w_1a2b3c4d   — the route; a token caller too (#432)
 //
 // Write examples:
 //   ?action=createWorkout&key=...&payload={"data":{"type":"bike","name":"Evening Ride"}}
@@ -226,6 +227,17 @@ function dispatch(action, params, caller) {
         break;
       }
       result = { success: true, data: getWorkoutPayload(params.id, params.offset) };
+      break;
+
+    // A synced activity's simplified GPS track (#432), by workout id. A read, and
+    // on TOKEN_READ_ACTIONS: the signed-in app draws it. Token callers are already
+    // limited to the owner's account.
+    case 'getWorkoutTrack':
+      if (!params.id) {
+        result = fail('id parameter required');
+        break;
+      }
+      result = { success: true, data: getWorkoutTrack(params.id) };
       break;
 
     // A date with nothing planned returns [], not an error.

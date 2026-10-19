@@ -2,10 +2,12 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import { WriteLimitError } from '../budget.js'
-import { runToolCall } from '../call-context.js'
+import { declareRows, runToolCall } from '../call-context.js'
 import { withReminder, type Mode } from '../mode.js'
+import { describeRowChange, keyText, listCalls } from '../undo-format.js'
 import {
   HiveError,
+  apiDry,
   apiGet,
   apiWrite,
   normalizeDate,
@@ -34,6 +36,8 @@ function guarded<A>(fn: (args: A) => Promise<ToolResult>) {
 
 const READ = { readOnlyHint: true } as const
 const WRITE = { readOnlyHint: false, destructiveHint: false } as const
+// Reverting is a write that can itself destroy later work (#412).
+const UNDO = { readOnlyHint: false, destructiveHint: true } as const
 
 /** The tools the read endpoint serves (#409). Everything else registered here is a write tool. */
 export const HIVE_READ_TOOLS: ReadonlySet<string> = new Set([
@@ -377,5 +381,88 @@ export function registerHiveTools(server: McpServer, cfg: HiveConfig, mode: Mode
         return text(parts.join('\n'))
       },
     ),
+  )
+  server.registerTool(
+    'hive_undo',
+    {
+      description:
+        "Undo one write an agent made through this connector, using Hive's own Audit Log. With no arguments it " +
+        'lists the last 20 MCP calls, newest first, each with its call id, time, actions and row count. With a ' +
+        'call_id it is a dry run: it shows every change it would revert, and writes nothing. With confirm: true ' +
+        'it reverts them. If any field the call touched has changed since, nothing is reverted and the changed ' +
+        'fields are listed: it is all or nothing. A deleted item comes back with its original id and its ' +
+        "sub-tasks, a created item or label is removed. The undo is itself a call in the list, so it can be " +
+        "undone the same way. Only writes made through this connector are in the list: not edits in the app. " +
+        'Reverting can destroy work done since, so only confirm what the user asked to undo.',
+      inputSchema: {
+        call_id: z.string().optional().describe('The call to undo, from the list. Omit to list recent calls'),
+        confirm: z.boolean().optional().describe('Set true to actually revert. Default false = preview only.'),
+      },
+      annotations: UNDO,
+    },
+    guarded(async ({ call_id, confirm }: { call_id?: string; confirm?: boolean }) => {
+      if (!call_id) {
+        const result = await apiGet(cfg, 'getAuditLog', { actor: 'hive-mcp' })
+        if (!result.success) return text(`Error: ${result.error}`)
+        const lines = listCalls(
+          (result.data as any[]).map((r) => ({ call_id: r.call_id, at: r.timestamp, action: r.action })),
+        )
+        return text(lines.length ? lines.join('\n') : "No MCP writes in Hive's Audit Log.")
+      }
+
+      const conflicted = (res: { error?: string; data?: any }): ToolResult | null => {
+        const conflicts: any[] | undefined = res.data?.conflicts
+        if (!conflicts) return null
+        return {
+          ...text(
+            [
+              `Nothing undone — ${conflicts.length} field${conflicts.length > 1 ? 's' : ''} changed since ${call_id}, ` +
+                'so none were reverted:',
+              ...conflicts.map(
+                (c) =>
+                  `- ${c.item_id || 'label'} ${c.field}: now ${JSON.stringify(c.current)}, expected ${JSON.stringify(c.expected)}`,
+              ),
+            ].join('\n'),
+          ),
+          isError: true,
+        }
+      }
+
+      const preview = await apiDry(cfg, 'undoCall', { call_id })
+      if (!preview.success) return conflicted(preview) ?? { ...text(`Error: ${preview.error}`), isError: true }
+      const changes: any[] = preview.data.changes
+      if (!confirm) {
+        const lines = changes.map(
+          (c) =>
+            `- ${c.type} "${c.title}"${c.item_id ? ` (${c.item_id})` : ''}` +
+            (c.type === 'set' ? `: ${describeRowChange({ [c.field]: c.current }, { [c.field]: c.restore })}` : ''),
+        )
+        return text(
+          [`DRY RUN — nothing reverted. Undoing ${call_id} would:`, ...lines, '', 'Call again with confirm: true to undo.'].join(
+            '\n',
+          ),
+        )
+      }
+
+      // The preview told us how many rows this will write, for the hourly budget.
+      declareRows(preview.data.count)
+      let done
+      try {
+        done = await apiWrite(cfg, 'undoCall', { call_id, confirm: true })
+      } catch (err) {
+        if (err instanceof HiveError && /not JSON|Could not reach/.test(err.message)) {
+          throw new HiveError(
+            `${err.message} The undo was sent once and not retried: it may or may not have applied. ` +
+              'Call hive_undo with no arguments to read the list again before retrying.',
+          )
+        }
+        throw err
+      }
+      if (!done.success) return conflicted(done) ?? { ...text(`Error: ${done.error}`), isError: true }
+      return text(
+        `Undid ${call_id}: ${done.data.count} rows restored. This undo is itself call ${done.data.undo_call_id}, ` +
+          'and can be undone the same way.',
+      )
+    }),
   )
 }

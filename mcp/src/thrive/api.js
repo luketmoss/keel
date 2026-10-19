@@ -15,7 +15,7 @@
 // is still read when present, which is how api.test.js and the stdio server this
 // was ported from configure it. Every request carries the same values, so one
 // module-level setting is safe here.
-import { markWrote, reserveWrite } from '../call-context.js';
+import { currentCallId, markWrote, reserveWrite } from '../call-context.js';
 import { DEFAULT_LIMITS, WriteLimitError } from '../budget.js';
 
 const envVar = (name) => globalThis.process?.env?.[name];
@@ -119,7 +119,12 @@ async function call(action, params = {}, payload) {
     );
   }
 
-  if (!parsed.success) throw new ApiError(action, parsed.error || `${action} failed`);
+  if (!parsed.success) {
+    const err = new ApiError(action, parsed.error || `${action} failed`);
+    // A refusal can carry detail, such as the rows an undo found changed (#412).
+    err.data = parsed.data;
+    throw err;
+  }
   return parsed.data;
 }
 
@@ -148,12 +153,17 @@ export async function apiGet(action, params) {
  */
 export async function apiWrite(action, payload) {
   // previewSetUpdates rides this door but only resolves: it is neither a write
-  // to count nor one to refuse (#410), and it changes nothing (#409).
-  if (action !== 'previewSetUpdates') {
+  // to count nor one to refuse (#410), it changes nothing (#409), and it is
+  // not logged, so it carries no call id (#412).
+  const isWrite = action !== 'previewSetUpdates';
+  if (isWrite) {
     await reserveWrite(config.budget, 'Thrive', estimateRows(action, payload));
   }
+  // Every write request of one tool call carries that call's id, so the app can
+  // log and undo them together (#412). A read never does.
+  const callId = isWrite ? currentCallId() : undefined;
   try {
-    const data = await call(action, {}, payload);
+    const data = await call(action, {}, callId ? { ...payload, call_id: callId } : payload);
     // previewSetUpdates rides apiWrite but only resolves; it changes nothing (#409).
     if (action !== 'previewSetUpdates') markWrote();
     return data;
@@ -168,6 +178,21 @@ export async function apiWrite(action, payload) {
       );
     }
     throw err;
+  }
+}
+
+/**
+ * A request that reads or previews and changes nothing, but takes a payload: an
+ * undo's dry run (#412). Retried like a read, never counted as a write.
+ */
+export async function apiDry(action, payload) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await call(action, {}, payload);
+    } catch (err) {
+      if (!(err instanceof NotReachedError) || attempt >= READ_RETRY_DELAYS_MS.length) throw err;
+      await new Promise((r) => setTimeout(r, READ_RETRY_DELAYS_MS[attempt]));
+    }
   }
 }
 
@@ -227,6 +252,15 @@ export const fetchJournal = (from, to) => apiGet('getJournal', { from, to });
  * workout id: the API finds the file from the row, never from us.
  */
 export const fetchWorkoutPayload = (id, offset) => apiGet('getWorkoutPayload', { id, offset });
+/** The change log, newest call first (#434). The API caps one answer at 1000 rows. */
+export const fetchChangeLog = () => apiGet('getChangeLog', { limit: 1000 });
+
+// --- undo (#412) -----------------------------------------------------
+
+/** What undoing `callId` would do. Writes nothing, so it is not a write to count. */
+export const previewUndo = (callId) => apiDry('undoCall', { call_id: callId });
+/** Revert `callId` (the API refuses the whole call if any row changed since). */
+export const applyUndo = (callId) => apiWrite('undoCall', { call_id: callId, confirm: true });
 
 // --- writes ---------------------------------------------------------
 

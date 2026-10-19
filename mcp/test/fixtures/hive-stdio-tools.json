@@ -171,6 +171,24 @@
     }
   },
   {
+    "name": "hive_undo",
+    "description": "Undo one write an agent made through this connector, using Hive's own Audit Log. With no arguments it lists the last 20 MCP calls, newest first, each with its call id, time, actions and row count. With a call_id it is a dry run: it shows every change it would revert, and writes nothing. With confirm: true it reverts them. If any field the call touched has changed since, nothing is reverted and the changed fields are listed: it is all or nothing. A deleted item comes back with its original id and its sub-tasks, a created item or label is removed. The undo is itself a call in the list, so it can be undone the same way. Only writes made through this connector are in the list: not edits in the app. Reverting can destroy work done since, so only confirm what the user asked to undo.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "call_id": {
+          "description": "The call to undo, from the list. Omit to list recent calls",
+          "type": "string"
+        },
+        "confirm": {
+          "description": "Set true to actually revert. Default false = preview only.",
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  {
     "name": "hive_update_item",
     "description": "Update an existing item on a Hive kanban board. Only provide fields you want to change.",
     "inputSchema": {

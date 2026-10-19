@@ -27,6 +27,7 @@ mcp/
 │   ├── mode.js         # read vs write: the reminder line and the endpoints' instructions
 │   ├── budget.js       # the write ceilings as plain functions (window logic, wording, vars)
 │   ├── budget-do.ts    # WriteBudget, the hourly counter's Durable Object
+│   ├── undo-format.js  # the wording of thrive_undo and hive_undo
 │   ├── call-context.js # state that belongs to one tool call (AsyncLocalStorage)
 │   ├── consent.ts      # consent and message pages
 │   ├── config.ts       # the Worker's public URL and resource URLs
@@ -132,6 +133,35 @@ value falls back to the default, never to "unlimited" (`parseLimits` in
   rather than run unlimited.
 - **Undo** (#412), when it lands, counts as a write like any other.
 
+## Undo (#412)
+
+`thrive_undo` and `hive_undo` are write tools: they are served only on the write
+endpoints, count against the write limits above, and carry the reminder on a
+successful undo. They are thin: the apps hold the record and do the reverting
+(`getChangeLog` and `undoCall` in Thrive's Apps Script, `getAuditLog` and
+`undoCall` in Hive's, #434 and #457).
+
+- **Every write request carries `call_id`.** The Worker mints one id per tool
+  call (`crypto.randomUUID()`, in `call-context.js` with the rest of the call's
+  state, never in a module variable) and sends it on every write request that
+  call makes, so `thrive_schedule_week`'s `appendSets` chunks and each
+  `createWorkout` are one undoable unit. Reads and `previewSetUpdates` carry none.
+- `thrive_undo {}` / `hive_undo {}` list the last 20 MCP calls, newest first:
+  `<call_id> · <YYYY-MM-DD HH:MM America/Denver> · <actions> · <n> rows`.
+- `{ call_id }` is a dry run, `{ call_id, confirm: true }` reverts. If any row
+  has changed since the call, the app refuses the whole call and the tool says
+  `Nothing undone —` and lists every changed row. The dry run is not a write and
+  is not counted; a confirmed undo counts as one write of as many rows as the
+  dry run reported.
+- An undo that fails in transit is sent once, says it may or may not have
+  applied, and points at the list.
+- **The tools need the apps deployed first.** They call actions the Apps Script
+  projects only have after the owner deploys #434 (Thrive) and #457 (Hive), and
+  every write now sends `call_id`, which Thrive's `upsertJournal` rejects as an
+  unknown field until #434 is deployed. Deploy the Apps Script first, then this.
+- Both are `destructiveHint` tools: reverting is a write that can itself destroy
+  later work. They join the list under "Approving the destructive tools" below.
+
 ## Hive
 
 `/hive/mcp` and `/hive/write/mcp` serve the 8 Hive tools between them, ported from the stdio server (retired in
@@ -190,12 +220,14 @@ change here.
 
 ## Approving the destructive tools
 
-The four tools below are on the write connector, `Thrive (write)`; approval is set
-on that connector's tools.
+The tools below are on the write connectors, `Thrive (write)` and `Hive (write)`;
+approval is set on that connector's tools.
 
 `thrive_delete_workout`, `thrive_delete_exercise`, `thrive_update_template`
-(it deletes the old rows) and `thrive_set_journal_entry` can destroy data
-(clearing a note is a delete). Their dry-run-until-`confirm: true`
+(it deletes the old rows), `thrive_set_journal_entry` (clearing a note is a
+delete) and `thrive_undo` can destroy data. `hive_undo` is the same
+for Hive, and gets the same treatment. Reverting can itself destroy work done
+since, so the app's conflict check is the first line and a human approval the second. Their dry-run-until-`confirm: true`
 behaviour only prevents accidents; against prompt injection the one control is a
 human approving each call.
 
@@ -203,10 +235,10 @@ human approving each call.
 prompt switches it off on that device only, and a new device starts at the
 default. So:
 
-- **Never choose "Always allow" on those four tools, on any device.**
+- **Never choose "Always allow" on those tools, `hive_undo` included, on any device.**
 - On each device you use, set them to "Needs approval" in the connector's tool
   list, and check by calling one.
 
-The four tools also carry `destructiveHint` (and every read tool
+These tools also carry `destructiveHint` (and every read tool
 `readOnlyHint`), which a client may or may not honour; nothing relies on it.
 

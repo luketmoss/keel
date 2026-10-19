@@ -47,6 +47,13 @@ const JOURNAL = [
   { date: '2026-09-24', note: 'Easy ride.', created: '2026-09-24T20:00:00.000Z', updated: '2026-09-24T20:00:00.000Z' },
 ];
 
+// #412: every write request carries its tool call's id; what else it carries is the assertion.
+function sentWithoutCallId(request) {
+  const { call_id: callId, ...rest } = JSON.parse(request.payload);
+  assert.match(callId, /^[A-Za-z0-9_-]{1,64}$/);
+  return rest;
+}
+
 const calls = [];
 let server;
 let client;
@@ -395,7 +402,7 @@ test('a non-blank note is written at once, new or replacing, with no confirm', a
   const created = await call('thrive_set_journal_entry', { date: '2026-09-25', note: 'Rest day.' });
   assert.equal(created.isError, false, created.text);
   assert.match(created.text, /Saved a new journal note for 2026-09-25/);
-  assert.deepEqual(JSON.parse(journalWrites().at(-1).payload), { date: '2026-09-25', note: 'Rest day.' });
+  assert.deepEqual(sentWithoutCallId(journalWrites().at(-1)), { date: '2026-09-25', note: 'Rest day.' });
 
   const replaced = await call('thrive_set_journal_entry', { date: '2026-09-25', note: 'Rest day, walked.' });
   assert.match(replaced.text, /Replaced the journal note for 2026-09-25\. It used to say:\n- 2026-09-25: Rest day\./);
@@ -412,7 +419,7 @@ test('clearing an existing note is a dry run until confirm: true', async () => {
   const done = await call('thrive_set_journal_entry', { date: '2026-09-25', note: '', confirm: true });
   assert.match(done.text, /Cleared the journal note for 2026-09-25/);
   assert.equal(journalWrites().length, before + 1);
-  assert.deepEqual(JSON.parse(journalWrites().at(-1).payload), { date: '2026-09-25', note: '' });
+  assert.deepEqual(sentWithoutCallId(journalWrites().at(-1)), { date: '2026-09-25', note: '' });
 });
 
 test('clearing a day with no note is a no-op that needs no confirmation', async () => {

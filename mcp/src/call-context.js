@@ -16,7 +16,9 @@ const storage = new AsyncLocalStorage();
  * state it left behind, so the caller can read what the call did.
  */
 export async function runToolCall(fn) {
-  const state = { wrote: false, reserved: false, rows: undefined };
+  // The id the apps group this call's log rows under (#412). One per tool call, held
+  // here with the rest of the call's state, never in a module variable.
+  const state = { wrote: false, reserved: false, rows: undefined, callId: globalThis.crypto.randomUUID() };
   const result = await storage.run(state, fn);
   return { result, state };
 }
@@ -47,6 +49,11 @@ export async function reserveWrite(budget, app, fallbackRows) {
   const verdict = await budget.reserve(state.rows ?? fallbackRows);
   if (!verdict.allowed) throw new WriteLimitError(limitMessage(app, verdict));
   state.reserved = true;
+}
+
+/** This tool call's id, or undefined outside one. Sent as `call_id` on every write request. */
+export function currentCallId() {
+  return storage.getStore()?.callId;
 }
 
 /** Record that this call changed data. A no-op outside a tool call. */

@@ -25,7 +25,9 @@ import {
   createExercise, updateExercise, deleteExercise,
   createTemplate, replaceTemplate,
   previewSetUpdates, updateSets, appendSets, rowCap,
+  fetchChangeLog, previewUndo, applyUndo,
 } from './api.js';
+import { describeRowChange, keyText, listCalls } from '../undo-format.js';
 import {
   planAndApplySetUpdates, EntryErrors, isEntryErrors, stripEntryPrefix,
 } from './set-updates.js';
@@ -57,6 +59,8 @@ const READ_ONLY = new Set([
 ]);
 const DESTRUCTIVE = new Set([
   'thrive_delete_workout', 'thrive_delete_exercise', 'thrive_update_template', 'thrive_set_journal_entry',
+  // Reverting is a write that can itself destroy later work (#412).
+  'thrive_undo',
 ]);
 const annotationsFor = (name) =>
   READ_ONLY.has(name) ? { readOnlyHint: true } : DESTRUCTIVE.has(name) ? { destructiveHint: true } : undefined;
@@ -1215,6 +1219,80 @@ tool(
 
     await deleteExercise(ex.id);
     return text(`Deleted exercise **${ex.name}** (${ex.id}).${inUse ? ' Referencing set/template rows were left in place.' : ''}`);
+  },
+);
+
+tool(
+  'thrive_undo',
+  "Undo one write an agent made through this connector, using Thrive's own change log. With no arguments it " +
+    'lists the last 20 MCP calls, newest first, each with its call id, time, actions and row count. With a call_id ' +
+    'it is a dry run: it shows every row it would restore, current value to restored value, and writes nothing. ' +
+    'With confirm: true it restores them. If any of those rows has changed since the call, nothing is restored ' +
+    'and the changed rows are listed: it is all or nothing. A deleted row comes back with its original id, a ' +
+    'created row is deleted. The undo is itself a call in the list, so it can be undone the same way. Only ' +
+    "writes made through this connector are in the list: not the app's own edits or the syncs. Reverting can " +
+    'destroy work done since, so only confirm what the user asked to undo.',
+  {
+    call_id: z.string().optional().describe('The call to undo, from the list. Omit to list recent calls'),
+    confirm: z.boolean().optional().describe('Set true to actually restore. Default false = preview only.'),
+  },
+  async ({ call_id, confirm = false }) => {
+    if (!call_id) {
+      const lines = listCalls(
+        (await fetchChangeLog()).map((r) => ({ call_id: r.call_id, at: r.logged_at, action: r.action })),
+      );
+      if (!lines.length) return text("No MCP writes in Thrive's change log.");
+      return text(lines.join('\n'));
+    }
+
+    const rowLines = (rows) => rows.map(
+      (r) => `- ${r.tab} [${keyText(r.row_key)}]: ${describeRowChange(r.current, r.restore)}`,
+    );
+    const conflicted = (err) => {
+      const conflicts = err instanceof ApiError ? err.data?.conflicts : undefined;
+      if (!conflicts) return null;
+      return fail([
+        `Nothing undone — ${conflicts.length} row${conflicts.length > 1 ? 's' : ''} changed since ${call_id}, ` +
+          'so none were restored:',
+        ...conflicts.map(
+          (c) => `- ${c.tab} [${keyText(c.row_key)}]: now ${JSON.stringify(c.current)}, expected ${JSON.stringify(c.expected)}`,
+        ),
+      ].join('\n'));
+    };
+
+    let preview;
+    try {
+      preview = await previewUndo(call_id);
+    } catch (err) {
+      const refused = conflicted(err);
+      if (refused) return refused;
+      throw err;
+    }
+
+    if (!confirm) {
+      return text(
+        [`DRY RUN — nothing restored. Undoing ${call_id} would:`, ...rowLines(preview.rows), '',
+          'Call again with confirm: true to undo.'].join('\n'),
+      );
+    }
+
+    // The preview told us how many rows this will write, for the hourly budget.
+    declareRows(preview.count);
+    let done;
+    try {
+      done = await applyUndo(call_id);
+    } catch (err) {
+      const refused = conflicted(err);
+      if (refused) return refused;
+      if (/may or may not have been applied/.test(err.message)) {
+        throw new Error(`${err.message} Call thrive_undo with no arguments to read the list again before retrying.`);
+      }
+      throw err;
+    }
+    return text(
+      `Undid ${call_id}: ${done.count} rows restored. This undo is itself call ${done.undo_call_id}, ` +
+      'and can be undone the same way.',
+    );
   },
 );
 

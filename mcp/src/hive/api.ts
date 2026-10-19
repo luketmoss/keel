@@ -5,7 +5,7 @@
  * so results are `any` here rather than a model that would drift from Hive.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { markWrote, reserveWrite } from '../call-context.js'
+import { currentCallId, markWrote, reserveWrite } from '../call-context.js'
 
 export interface HiveConfig {
   apiUrl: string
@@ -65,11 +65,27 @@ export async function apiWrite(cfg: HiveConfig, action: string, payload: unknown
   const params = new URLSearchParams()
   params.set('action', action)
   params.set('key', cfg.apiKey)
-  params.set('payload', JSON.stringify(payload))
+  // Every write request of one tool call carries that call's id, so the app can
+  // log and undo them together (#412).
+  const callId = currentCallId()
+  params.set('payload', JSON.stringify(callId ? { ...(payload as object), call_id: callId } : payload))
   const result = await call(cfg, `${url.origin}${url.pathname}?${params.toString()}`)
   // Only a write Hive accepted counts: a refusal changed nothing.
   if (result.success) markWrote()
   return result
+}
+
+/**
+ * A request that previews and changes nothing, but takes a payload: an undo's
+ * dry run (#412). Not a write to count, and it carries no call id.
+ */
+export function apiDry(cfg: HiveConfig, action: string, payload: unknown) {
+  const url = new URL(cfg.apiUrl)
+  const params = new URLSearchParams()
+  params.set('action', action)
+  params.set('key', cfg.apiKey)
+  params.set('payload', JSON.stringify(payload))
+  return call(cfg, `${url.origin}${url.pathname}?${params.toString()}`)
 }
 
 export async function resolveBoard(cfg: HiveConfig, boardName: string) {

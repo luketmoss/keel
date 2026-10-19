@@ -670,6 +670,25 @@
     }
   },
   {
+    "name": "thrive_undo",
+    "description": "Undo one write an agent made through this connector, using Thrive's own change log. With no arguments it lists the last 20 MCP calls, newest first, each with its call id, time, actions and row count. With a call_id it is a dry run: it shows every row it would restore, current value to restored value, and writes nothing. With confirm: true it restores them. If any of those rows has changed since the call, nothing is restored and the changed rows are listed: it is all or nothing. A deleted row comes back with its original id, a created row is deleted. The undo is itself a call in the list, so it can be undone the same way. Only writes made through this connector are in the list: not the app's own edits or the syncs. Reverting can destroy work done since, so only confirm what the user asked to undo.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "call_id": {
+          "description": "The call to undo, from the list. Omit to list recent calls",
+          "type": "string"
+        },
+        "confirm": {
+          "description": "Set true to actually restore. Default false = preview only.",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": {}
+    }
+  },
+  {
     "name": "thrive_update_exercise",
     "description": "Update an exercise. Renaming also rewrites the cached exercise name in every Sets and Templates row, so history stays consistent. Only pass the fields you want to change.",
     "inputSchema": {

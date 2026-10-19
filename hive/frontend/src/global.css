@@ -25,6 +25,9 @@
   --opacity-disabled: 0.4;
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
+
+  /* The floor for every control's box, on every viewport and pointer (#453) */
+  --touch-target: 44px;
 }
 
 /* === Light theme === */
@@ -4903,4 +4906,327 @@ textarea:disabled {
 
 [aria-disabled="true"] > * {
   opacity: var(--opacity-disabled);
+}
+
+/* ===== Touch targets (#453) =====
+   Every control's own box is at least --touch-target wide and tall, on every
+   viewport and every pointer (hive/docs/design/453-touch-targets.md). A glyph or
+   swatch keeps its drawn size; the box grows around it. min-width and min-height,
+   never a fixed size, so large text pushes the box out instead of clipping.
+   touch-targets.test.ts lists the classes and fails on a control that is in none.
+   Last in the file on purpose, so it wins over the sizes above and in the media
+   rules, which only ever make a control larger. */
+
+/* A box: a glyph or a drawn shape inside. */
+.btn-sm,
+.btn-icon,
+.btn-icon-danger,
+.kebab-trigger,
+.subtask-action-btn,
+.subtask-add-circle,
+.date-clear-btn,
+.staged-subtask-remove,
+.subtask-kebab-btn,
+.subtask-handle,
+.due-clear-btn,
+.label-gear-btn,
+.archive-search-clear,
+.filter-search-clear,
+.column-add-btn,
+.share-remove-btn,
+.column-settings-delete-btn,
+.user-dropdown-trigger,
+.theme-toggle-btn,
+.filter-popup-close,
+.share-btn,
+.label-new-pill,
+.column-settings-name,
+.column-settings-terminal-toggle,
+.owner-circle,
+.check-icon,
+.color-swatch,
+.icon-swatch,
+.column-settings-swatch,
+.column-color-swatch,
+.fab,
+.overflow-menu-btn,
+.column-indicator-dot {
+  min-width: var(--touch-target);
+  min-height: var(--touch-target);
+}
+
+/* A row or text control: as tall as the floor, as wide as its content. */
+.btn-ghost,
+.share-archive-board-btn,
+.filter-popup-reset,
+.filter-popup-apply,
+.column-archive-link,
+.toast-action,
+.label-new-pill,
+.column-settings-add-btn,
+.subtask-date-add-inline,
+.subtask-date-inline,
+.filter-chip,
+.filter-toggle,
+.label-toggle,
+.quick-date-chip,
+.status-chevron,
+.card-title,
+.archive-item,
+.kebab-item,
+.overflow-menu-item,
+.user-dropdown-edit-profile,
+.user-dropdown-signout,
+.subtask-menu-item,
+.subtask-title,
+.editable-value,
+.due-date-btn,
+.completed-date-btn,
+.column-add-row,
+.view-tab,
+.settings-tab,
+.login-btn {
+  min-height: var(--touch-target);
+}
+
+/* Text inputs, selects and date inputs. The font stays as it is (16px on phones). */
+.filter-search-input,
+.subtask-add-input,
+.subtask-add-date,
+.subtask-title-input,
+.label-form-input,
+.board-switcher-select,
+.column-sort-select,
+.archive-search-input,
+.profile-email-input,
+.column-settings-name-inline,
+.column-settings-name-input,
+.column-settings-delete-select,
+.form-field input,
+.form-field select,
+.form-field textarea,
+.detail-field input,
+.detail-field textarea,
+.delete-board-target select,
+.subtask-date-popover input[type="date"] {
+  min-height: var(--touch-target);
+}
+
+/* A div row centres its own text; a button already does. */
+.kebab-item,
+.subtask-title,
+.editable-value {
+  display: flex;
+  align-items: center;
+}
+
+/* The card's kebab is a 44px box in the card's corner, and the title keeps clear of
+   it always, so a title never rewraps when the card is hovered. The title is a 44px
+   box too, with its margins pulled in so the card does not grow. */
+.kebab-menu-container {
+  top: 0;
+  right: 0;
+}
+
+.card-title {
+  box-sizing: border-box;
+  width: calc(100% - 32px);
+  min-height: var(--touch-target);
+  margin: -12px 0 -4px;
+  -webkit-box-pack: center;
+}
+
+/* The view tabs fill the 44px header, so the strip's inset goes. */
+.control-bar-view-tabs {
+  padding: 0;
+}
+
+/* A clear (x) in a field is a full-height end of it. */
+.filter-search-clear,
+.archive-search-clear {
+  right: 0;
+}
+
+.filter-search-input,
+.archive-search-input {
+  padding-right: var(--touch-target);
+}
+
+/* Sub-task date buttons: a 44px-tall box around the same small pill. */
+.subtask-date-inline,
+.subtask-date-add-inline {
+  padding: 0;
+  border: none;
+  background: transparent;
+  align-self: flex-start;
+}
+
+.subtask-date-inline::after,
+.subtask-date-add-inline::after {
+  content: none;
+}
+
+.subtask-date-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.subtask-date-inline .subtask-date-pill {
+  background: rgba(var(--color-primary-rgb), 0.1);
+}
+
+.subtask-date-add-inline .subtask-date-pill {
+  border: 1px dashed var(--color-border);
+}
+
+@media (hover: hover) {
+  .subtask-date-inline:hover .subtask-date-pill {
+    background: rgba(var(--color-primary-rgb), 0.18);
+  }
+
+  .subtask-date-add-inline:hover .subtask-date-pill {
+    border-color: var(--color-text-secondary);
+  }
+}
+
+.subtask-date-inline.overdue .subtask-date-pill {
+  background: rgba(211, 47, 47, 0.1);
+}
+
+.subtask-date-inline.done .subtask-date-pill {
+  background: var(--overlay-xs);
+}
+
+/* Swatches: the shape is drawn inside the 44px box, at the size it always was. */
+.color-swatch,
+.icon-swatch,
+.column-settings-swatch,
+.column-color-swatch {
+  box-sizing: border-box;
+  background-clip: content-box !important;
+}
+
+.color-swatch {
+  padding: 4px;
+}
+
+.icon-swatch {
+  padding: 2px;
+}
+
+.column-settings-swatch {
+  padding: 11px;
+}
+
+.column-color-swatch {
+  padding: 8px;
+}
+
+/* The pager dots: the one control allowed under 44, and only in width. Each is 44
+   tall always, 44 wide when the row has room and shrinking evenly to 24 when it has
+   not; the 8px dot is drawn inside it. */
+.column-indicator-dot,
+.column-indicator-dot.active {
+  flex: 0 1 var(--touch-target);
+  min-width: 24px;
+  width: auto;
+  height: var(--touch-target);
+  border: none;
+  background: transparent;
+  opacity: 1;
+  transform: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.column-indicator-dot::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-text-muted);
+  opacity: 0.3;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.column-indicator-dot.active::before {
+  opacity: 1;
+  transform: scale(1.3);
+  background: var(--color-primary);
+}
+
+/* Native checkboxes and radios are drawn by us, a 20px box inside a 44px one: the
+   input is the control, and its own box is what has to be 44. */
+.share-toggle-label input[type="checkbox"],
+.delete-board-option input[type="radio"],
+.move-board-option input[type="radio"] {
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: var(--touch-target);
+  height: var(--touch-target);
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.share-toggle-label input[type="checkbox"]::before,
+.delete-board-option input[type="radio"]::before,
+.move-board-option input[type="radio"]::before {
+  content: '';
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--color-border-strong);
+  background: var(--color-surface);
+}
+
+.share-toggle-label input[type="checkbox"]::before {
+  border-radius: var(--radius-sm);
+}
+
+.delete-board-option input[type="radio"]::before,
+.move-board-option input[type="radio"]::before {
+  border-radius: 50%;
+}
+
+.share-toggle-label input[type="checkbox"]:checked::before {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.share-toggle-label input[type="checkbox"]::after {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 5px;
+  margin-top: -2px;
+  border-left: 2px solid var(--color-on-primary);
+  border-bottom: 2px solid var(--color-on-primary);
+  transform: rotate(-45deg);
+  opacity: 0;
+}
+
+.share-toggle-label input[type="checkbox"]:checked::after {
+  opacity: 1;
+}
+
+.delete-board-option input[type="radio"]:checked::before,
+.move-board-option input[type="radio"]:checked::before {
+  border-color: var(--color-primary);
+  background: radial-gradient(circle, var(--color-primary) 0 4px, var(--color-surface) 5px);
+}
+
+.column-settings-terminal-toggle {
+  justify-content: center;
 }

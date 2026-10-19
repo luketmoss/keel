@@ -21,15 +21,15 @@ before.
 
 | Path | Where the refusal shows | Today |
 |---|---|---|
-| A drop or pick into an open trip | a failure row for the file, in the import panel's list, with the message | the file waits in the placement queue and is refused after it is placed |
-| A drop or pick with no trip open | a toast, with the message | the same wait, then the refusal |
+| A drop or pick with no trip open (loose) | a toast, with the message | the file waits in the placement queue and is refused after it is placed: **the defect** |
+| A drop or pick into an open trip | a failure row for the file, in the import panel's list | already refused first, by `importOne`: unchanged, pinned by a test |
 | A photo inside a zip, on either path | as the path above (the archive is expanded first) | as above |
 | A photo chosen on a cairn's own face | its error line, immediately | already correct (#339), unchanged |
 
-Per file or once per batch: each surface keeps what it already does for a
-refused photo. The trip path has one failure row per file and the loose path one
-toast per file, so several HEIC files give several rows or toasts. No new
-batching is designed here; it would be a third rule beside #75's and #120's.
+Per file or once per batch: the surface keeps what it already does for a refused
+photo. The loose path shows one toast per refused file, so several HEIC files give
+several toasts. No new batching is designed here; it would be a third rule beside
+#75's and #120's.
 
 ## States
 

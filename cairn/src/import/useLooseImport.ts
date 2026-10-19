@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { parseTrack, type Track } from '@keel/geo'
 import { aggregateElevationProfile, aggregateTrackStats } from '@keel/geo'
 import { readPhotoExif } from '../photo/exif'
+import { validateImageFile } from '../photo/thumbnail'
 import { positionPhoto } from '../photo/interpolate'
 import { formatShortDate } from '../format/dates'
 import { isPhotoFile, isTrackFile } from '../import/fileKinds'
@@ -116,6 +117,14 @@ export function useLooseImport(store: LooseStore) {
         }
 
         if (isPhotoFile(file.name)) {
+          // #344: refused before EXIF is read and before a position is
+          // resolved, so a photo cairn can never decode (HEIC) is never
+          // queued for a placement that would be thrown away.
+          const typeError = validateImageFile(file.name)
+          if (typeError) {
+            rejections.push({ name: file.name, message: `${file.name} — ${typeError}` })
+            continue
+          }
           const exif = await readPhotoExif(file)
           const fields = exif.ok ? exif.exif : {}
           // A loose drop has no trip open, so there are no tracks to

@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { HEIC_ERROR } from './photo/thumbnail'
 import { join } from 'node:path'
 import JSZip from 'jszip'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -2251,22 +2252,12 @@ describe('App import without a drag (#338)', () => {
     expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(0)
   })
 
-  /* The issue's criterion said an HEIC would surface `validateImageFile`'s
-     HEIC message. It does not — on either path. `isPhotoFile` accepts
-     `.heic`, so position resolution runs first and an HEIC with no GPS
-     lands in the placement queue; the refusal only arrives after the user
-     places it. That is pre-existing behaviour of the drop path, verified
-     side by side below, and changing it is this issue's Out of Scope.
-     Filed separately. What #338 owes is that the two paths agree. */
-  /* The issue's criterion said an HEIC would surface `validateImageFile`'s
-     HEIC message. It does not, on either path: `isPhotoFile` accepts
-     `.heic`, so position resolution runs first and an HEIC with no GPS
-     lands in the placement queue — the refusal only arrives after the user
-     has placed it. Pre-existing behaviour of the drop path, and changing
-     it is this issue's Out of Scope, so it is filed separately. These two
-     tests pin what #338 does owe: the picked file goes exactly where the
-     dropped one goes. */
-  it('a dropped HEIC reaches the placement queue rather than an up-front refusal', async () => {
+  /* #338's `/test` found that an HEIC with no GPS reached the placement queue
+     and was refused only after the user placed it, on both the drop and the
+     pick; #344 moved the refusal ahead of position resolution. These two tests
+     pin that: the same refusal, by the same words, whichever way the file was
+     chosen. */
+  it('a dropped HEIC is refused up front, not queued for placement (#344)', async () => {
     const fetchSpy = mockGoogleSignIn()
     await renderApp('/', { googleClientId: 'a-client-id' })
     await signIn()
@@ -2278,14 +2269,15 @@ describe('App import without a drag (#338)', () => {
       })
     })
 
-    expect(await screen.findByText('Not saved')).toBeDefined()
-    expect(screen.getByText('x.heic')).toBeDefined()
+    expect(await screen.findByText(`x.heic — ${HEIC_ERROR}`)).toBeDefined()
+    // Nothing was asked of the user for it: no placement queue.
+    expect(screen.queryByText('Not saved')).toBeNull()
     expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(0)
 
     fetchSpy.mockRestore()
   })
 
-  it('a picked HEIC reaches the same place, by the same words', async () => {
+  it('a picked HEIC is refused the same way, by the same words (#344)', async () => {
     const fetchSpy = mockGoogleSignIn()
     await renderApp('/', { googleClientId: 'a-client-id' })
     await signIn()
@@ -2294,9 +2286,9 @@ describe('App import without a drag (#338)', () => {
       choose([new File(['x'], 'x.heic', { type: 'image/heic' })])
     })
 
-    expect(await screen.findByText('Not saved')).toBeDefined()
-    expect(screen.getByText('x.heic')).toBeDefined()
-    expect(screen.getByText('1 photo · 0 placed · 1 needs a location')).toBeDefined()
+    expect(await screen.findByText(`x.heic — ${HEIC_ERROR}`)).toBeDefined()
+    expect(screen.queryByText('Not saved')).toBeNull()
+    expect(screen.queryByText('1 photo · 0 placed · 1 needs a location')).toBeNull()
     expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')).toHaveLength(0)
 
     fetchSpy.mockRestore()

@@ -5,6 +5,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useLooseImport } from './useLooseImport'
 import { LocalLooseStore } from '../store/looseStore'
 import type { CairnRecord } from '../photo/useCairnImport'
+import { HEIC_ERROR } from '../photo/thumbnail'
+import * as exif from '../photo/exif'
+import * as interpolate from '../photo/interpolate'
 
 function fakeStorage(): Storage {
   const map = new Map<string, string>()
@@ -134,6 +137,63 @@ describe('useLooseImport', () => {
       kind: 'cairn',
       position: { lat: 12, lng: 34 },
       positionSource: 'placed',
+    })
+  })
+
+  // #344: cairn never decodes HEIC, so a HEIC is refused when the batch is
+  // read, before EXIF and before a position is resolved. It used to reach
+  // the placement queue and be refused only after the user had placed it.
+  describe('a HEIC photo (#344)', () => {
+    it.each(['IMG_4423.heic', 'IMG_4423.HEIC', 'IMG_4423.HeIf'])(
+      'refuses %s up front, never queuing it for placement',
+      async (name) => {
+        const readSpy = vi.spyOn(exif, 'readPhotoExif')
+        const positionSpy = vi.spyOn(interpolate, 'positionPhoto')
+
+        const { rejections, needsPlacement, resolvedCount } = await importer().importFiles([
+          new File(['x'], name, { type: 'image/heic' }),
+        ])
+
+        expect(rejections).toEqual([{ name, message: `${name} — ${HEIC_ERROR}` }])
+        expect(needsPlacement).toEqual([])
+        expect(resolvedCount).toBe(0)
+        expect(store.getItems()).toHaveLength(0)
+        expect(readSpy).not.toHaveBeenCalled()
+        expect(positionSpy).not.toHaveBeenCalled()
+        readSpy.mockRestore()
+        positionSpy.mockRestore()
+      },
+    )
+
+    it('refuses only the HEIC in a batch, importing the JPEG that has GPS', async () => {
+      const { rejections, resolvedCount } = await importer().importFiles([
+        new File(['x'], 'IMG_1.heic', { type: 'image/heic' }),
+        photoFixture('gps-and-timestamps.jpg'),
+      ])
+
+      expect(rejections).toHaveLength(1)
+      expect(rejections[0].name).toBe('IMG_1.heic')
+      expect(resolvedCount).toBe(1)
+      expect(store.getItems()).toHaveLength(1)
+    })
+
+    it('still queues a JPEG with no GPS for placement beside a refused HEIC', async () => {
+      const { rejections, needsPlacement } = await importer().importFiles([
+        new File(['x'], 'IMG_1.heic', { type: 'image/heic' }),
+        photoFixture('gps-stripped.jpg'),
+      ])
+
+      expect(rejections.map((r) => r.name)).toEqual(['IMG_1.heic'])
+      expect(needsPlacement.map((item) => item.name)).toEqual(['gps-stripped.jpg'])
+    })
+
+    it('gives one rejection per HEIC when several are chosen together', async () => {
+      const { rejections } = await importer().importFiles([
+        new File(['x'], 'a.heic'),
+        new File(['x'], 'b.heif'),
+      ])
+
+      expect(rejections.map((r) => r.name)).toEqual(['a.heic', 'b.heif'])
     })
   })
 

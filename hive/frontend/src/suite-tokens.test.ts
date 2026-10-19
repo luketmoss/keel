@@ -40,6 +40,8 @@ const HIVE_ROOT = [
   '--column-width', '--header-height', '--control-bar-height',
   // #452's interaction-state tokens
   '--state-hover', '--state-pressed', '--opacity-disabled', '--focus-ring-width', '--focus-ring-offset',
+  // #453's touch-target floor
+  '--touch-target',
 ];
 const HIVE_THEME = [
   '--color-primary', '--color-primary-hover', '--color-primary-rgb', '--color-focus', '--color-on-primary',
@@ -135,6 +137,7 @@ describe('AC3: exactly this moves', () => {
     ['--opacity-disabled', null, '0.4'],
     ['--focus-ring-width', null, '2px'],
     ['--focus-ring-offset', null, '2px'],
+    ['--touch-target', null, '44px'],
   ];
   // Tokens the suite defines and Hive did not: they arrive unused.
   const ARRIVE = [

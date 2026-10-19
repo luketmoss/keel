@@ -185,6 +185,28 @@ floor), with the 8px dot centred in each. The default board has three columns, s
 it is 44 x 44 in the usual case. This is the only control allowed under 44, and
 the test names it and its floor.
 
+## What building it added
+
+Measuring the running app, in demo mode at 375px and 1280px, found controls the
+tables above missed. Each is decided here:
+
+- **`.card-title`** is a `<button>` 21px tall. It is a 44px box now, with its margins
+  pulled in (`-12px` above, `-4px` below) so a card does not grow, and its text
+  centred in the box.
+- **Native checkboxes and radios** (Sharing's "Share with all Owners", the delete-board
+  and move-to-board choices) were 18px. They are drawn by Hive now, a 20px box inside
+  the 44px input (`appearance: none` and a pseudo-element), in the primary colour
+  when checked.
+- **`.label-new-pill`** (a 41px-wide round "+"), **`.column-settings-name`** (short
+  names were under 44 wide) and **`.column-settings-terminal-toggle`** (a 20px label
+  around a hidden checkbox) are 44 wide and tall.
+- **`.subtask-title`** (the click-to-edit text) is a 44px row, which is what makes a
+  sub-task with a date about 116px tall rather than the 92 estimated above; the
+  estimate counted the title at one line of text.
+
+The measured smallest box on every screen at both widths is 44 x 44. The exception
+is the pager dots, 44 x 44 with three columns.
+
 ## Fields
 
 Text inputs, selects and date inputs are 44 tall (`min-height: 44px`), as the

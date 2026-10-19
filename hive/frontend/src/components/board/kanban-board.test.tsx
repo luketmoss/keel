@@ -1,0 +1,584 @@
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+import { render, cleanup, fireEvent } from '@testing-library/preact';
+import { KanbanBoard } from './kanban-board';
+import { AuthContext } from '../../auth/auth-context';
+import type { AuthState } from '../../auth/auth-context';
+
+// Mutable mock state — defined as plain objects so vi.mock hoisting works
+const mockState = {
+  items: [] as any[],
+  showShareModal: false,
+  userBoardRole: null as string | null,
+  showCreateModal: false,
+  showCreateBoardModal: false,
+  showDeleteBoardModal: false,
+  showArchiveDialog: false,
+  selectedItem: null as any,
+  accessibleBoards: [] as any[],
+  groupByValue: 'none' as string,
+};
+
+const mockSwitchBoard = vi.fn();
+const mockSwitchToUpcoming = vi.fn();
+const mockSwitchToBoard = vi.fn();
+
+afterEach(() => {
+  cleanup();
+  mockState.items = [];
+  mockState.showShareModal = false;
+  mockState.userBoardRole = null;
+  mockState.showCreateModal = false;
+  mockState.showCreateBoardModal = false;
+  mockState.showDeleteBoardModal = false;
+  mockState.showArchiveDialog = false;
+  mockState.selectedItem = null;
+  mockState.accessibleBoards = [];
+  mockState.groupByValue = 'none';
+  mockSwitchBoard.mockClear();
+  mockSwitchToUpcoming.mockClear();
+  mockSwitchToBoard.mockClear();
+  mockMoveItem.mockClear();
+});
+
+vi.mock('../../state/board-store', () => ({
+  items: { get value() { return mockState.items; } },
+  columns: {
+    get value() {
+      return {
+        'To Do': mockState.items.filter((i: any) => i.status === 'To Do' && !i.parent_id),
+        'In Progress': mockState.items.filter((i: any) => i.status === 'In Progress' && !i.parent_id),
+        'Done': mockState.items.filter((i: any) => i.status === 'Done' && !i.parent_id),
+      };
+    },
+  },
+  rootItems: {
+    get value() { return mockState.items.filter((i: any) => !i.parent_id); },
+  },
+  showCreateModal: {
+    get value() { return mockState.showCreateModal; },
+    set value(v: boolean) { mockState.showCreateModal = v; },
+  },
+  selectedItem: {
+    get value() { return mockState.selectedItem; },
+    set value(v: any) { mockState.selectedItem = v; },
+  },
+  selectedItemId: { value: null },
+  openDetailWithTitleEdit: { value: false },
+  groupBy: { get value() { return mockState.groupByValue; }, set value(v: string) { mockState.groupByValue = v; } },
+  owners: { value: [] },
+  boardLabels: { value: [] },
+  filterOwner: { value: null },
+  filterLabel: { value: null },
+  loading: { value: false },
+  getChildCount: () => ({ done: 0, total: 0 }),
+  setGroupBy: (v: string) => { mockState.groupByValue = v; },
+  allDoneItems: { value: [] },
+  hasArchivedItems: { value: false },
+  showArchiveDialog: {
+    get value() { return mockState.showArchiveDialog; },
+    set value(v: boolean) { mockState.showArchiveDialog = v; },
+  },
+  boards: { value: [] },
+  boardItems: { get value() { return mockState.items; } },
+  showCreateBoardModal: {
+    get value() { return mockState.showCreateBoardModal; },
+    set value(v: boolean) { mockState.showCreateBoardModal = v; },
+  },
+  showShareModal: {
+    get value() { return mockState.showShareModal; },
+    set value(v: boolean) { mockState.showShareModal = v; },
+  },
+  showDeleteBoardModal: {
+    get value() { return mockState.showDeleteBoardModal; },
+    set value(v: boolean) { mockState.showDeleteBoardModal = v; },
+  },
+  showMoveToBoardModal: { value: false },
+  showArchiveBoardModal: { value: false },
+  showArchivedBoardsDialog: { value: false },
+  accessibleBoards: { get value() { return mockState.accessibleBoards; } },
+  activeBoard: { value: null },
+  userBoardRole: { get value() { return mockState.userBoardRole; } },
+  permissions: { value: [] },
+  currentUserEmail: { value: '' },
+  switchBoard: (...args: any[]) => mockSwitchBoard(...args),
+  theme: { value: 'system' },
+  applyTheme: () => {},
+  cycleTheme: () => {},
+  setTheme: () => {},
+  columnSortModes: {
+    get value() {
+      return { 'To Do': 'custom', 'In Progress': 'custom', 'Done': 'custom' };
+    },
+  },
+  setColumnSortMode: () => {},
+  columnAnnouncement: { value: null },
+  activeView: { value: 'board' },
+  switchToUpcoming: (...args: any[]) => mockSwitchToUpcoming(...args),
+  switchToBoard: (...args: any[]) => mockSwitchToBoard(...args),
+  boardStatuses: { value: [
+    { id: 's1', board_id: 'board-1', name: 'To Do', sort_order: 1, color: '#e3f2fd', is_terminal: false, created_at: '' },
+    { id: 's2', board_id: 'board-1', name: 'In Progress', sort_order: 2, color: '#fff3e0', is_terminal: false, created_at: '' },
+    { id: 's3', board_id: 'board-1', name: 'Done', sort_order: 3, color: '#e8f5e9', is_terminal: true, created_at: '' },
+  ] },
+  isTerminalStatus: (name: string) => name === 'Done',
+  defaultStatusName: () => 'To Do',
+  terminalStatusName: () => 'Done',
+}));
+
+const mockMoveItem = vi.fn();
+vi.mock('../../state/actions', () => ({
+  moveItem: (...args: any[]) => mockMoveItem(...args),
+  reorderItem: vi.fn(),
+}));
+
+// Mock new components
+vi.mock('../header/user-dropdown', () => ({
+  UserDropdown: (props: any) => (
+    <div data-testid="user-dropdown">
+      <span data-testid="user-dropdown-name">{props.displayName}</span>
+      {props.onOpenProfile && (
+        <button data-testid="user-dropdown-edit-profile" onClick={props.onOpenProfile}>Edit profile</button>
+      )}
+      <button data-testid="user-dropdown-signout" onClick={props.onSignOut}>Sign out</button>
+    </div>
+  ),
+}));
+
+vi.mock('../header/control-bar', () => ({
+  ControlBar: () => <div data-testid="control-bar" />,
+}));
+
+// Mock other sub-components
+vi.mock('./list-view', () => ({
+  ListView: () => <div class="list-view" data-testid="list-view" />,
+}));
+vi.mock('../upcoming/upcoming-view', () => ({
+  UpcomingView: () => <div class="upcoming-view" data-testid="upcoming-view" />,
+}));
+vi.mock('./card-detail', () => ({
+  CardDetail: () => <div data-testid="card-detail" />,
+}));
+vi.mock('../forms/create-item-modal', () => ({
+  CreateItemModal: () => <div data-testid="create-modal" />,
+}));
+vi.mock('./create-board-modal', () => ({
+  CreateBoardModal: () => null,
+}));
+vi.mock('./share-modal', () => ({
+  ShareModal: () => null,
+}));
+vi.mock('./delete-board-modal', () => ({
+  DeleteBoardModal: () => null,
+}));
+vi.mock('./shortcuts-help', () => ({
+  ShortcutsHelp: ({ onClose }: any) => <div data-testid="shortcuts-help"><button onClick={onClose}>Close</button></div>,
+}));
+vi.mock('../profile/profile-dialog', () => ({
+  ProfileDialog: () => <div data-testid="profile-dialog" />,
+}));
+vi.mock('../archive/archive-dialog', () => ({
+  ArchiveDialog: () => <div data-testid="archive-dialog" />,
+}));
+vi.mock('../shared/hive-logo', () => ({
+  HiveLogo: (props: any) => <svg data-testid="hive-logo" class={props.class} />,
+}));
+
+const mockAuth: AuthState = {
+  token: 'test-token',
+  user: { name: 'Luke', email: 'luke@example.com', picture: '' },
+  isAuthenticated: true,
+  isAuthLoading: false,
+  login: () => {},
+  logout: () => {},
+  updateUserName: () => {},
+};
+
+function renderBoard() {
+  return render(
+    <AuthContext.Provider value={mockAuth}>
+      <KanbanBoard />
+    </AuthContext.Provider>
+  );
+}
+
+describe('KanbanBoard empty/welcome state (Issue #11)', () => {
+  describe('AC1: Empty board shows welcome message', () => {
+    it('shows welcome message when board has zero items', () => {
+      mockState.items = [];
+      const { container } = renderBoard();
+      const welcome = container.querySelector('[data-testid="board-welcome"]');
+      expect(welcome).not.toBeNull();
+      expect(welcome!.textContent).toContain('No tasks yet');
+      expect(welcome!.textContent).toContain('+');
+    });
+
+    it('does not show welcome when board has items', () => {
+      mockState.items = [{
+        id: '1', title: 'Task', description: '', status: 'To Do',
+        owner: '', due_date: '', labels: '',
+        parent_id: '', created_at: '', updated_at: '', completed_at: '',
+        sort_order: 1, created_by: '', board_id: '', sheetRow: 2,
+      }];
+      const { container } = renderBoard();
+      const welcome = container.querySelector('[data-testid="board-welcome"]');
+      expect(welcome).toBeNull();
+    });
+
+    it('does not show columns when board is empty', () => {
+      mockState.items = [];
+      const { container } = renderBoard();
+      const columns = container.querySelector('.board-columns');
+      expect(columns).toBeNull();
+    });
+  });
+
+  describe('AC2: Empty columns still show standard text', () => {
+    it('renders columns with "No items" when board has items but some columns are empty', () => {
+      mockState.items = [{
+        id: '1', title: 'Task', description: '', status: 'To Do',
+        owner: '', due_date: '', labels: '',
+        parent_id: '', created_at: '', updated_at: '', completed_at: '',
+        sort_order: 1, created_by: '', board_id: '', sheetRow: 2,
+      }];
+      const { container } = renderBoard();
+      const welcome = container.querySelector('[data-testid="board-welcome"]');
+      expect(welcome).toBeNull();
+
+      const emptyColumns = container.querySelectorAll('.column-empty');
+      expect(emptyColumns.length).toBe(2);
+      emptyColumns.forEach(el => {
+        expect(el.textContent).toBe('No items');
+      });
+    });
+  });
+});
+
+describe('KanbanBoard compact header (Issue #132)', () => {
+  describe('AC1: Header layout', () => {
+    it('renders UserDropdown instead of standalone theme toggle and sign out', () => {
+      mockState.items = [];
+      const { container } = renderBoard();
+      const dropdown = container.querySelector('[data-testid="user-dropdown"]');
+      expect(dropdown).not.toBeNull();
+      // No standalone ThemeToggle or Sign out in header
+      const headerRight = container.querySelector('.board-header-right');
+      expect(headerRight!.querySelector('[data-testid="theme-toggle"]')).toBeNull();
+    });
+
+    it('renders ControlBar', () => {
+      mockState.items = [];
+      const { container } = renderBoard();
+      expect(container.querySelector('[data-testid="control-bar"]')).not.toBeNull();
+    });
+
+    it('does not render standalone view-toggle-bar', () => {
+      mockState.items = [];
+      const { container } = renderBoard();
+      expect(container.querySelector('[data-testid="view-toggle-bar"]')).toBeNull();
+    });
+  });
+});
+
+describe('KanbanBoard view tabs in header (Issue #198)', () => {
+  describe('AC1: View tabs appear in header, not control bar', () => {
+    it('renders view tab group inside board-header-left', () => {
+      mockState.items = [];
+      const { container } = renderBoard();
+      const headerLeft = container.querySelector('.board-header-left');
+      expect(headerLeft!.querySelector('[data-testid="control-bar-view-tabs"]')).not.toBeNull();
+    });
+
+    it('view tab group has role="group" and aria-label="View"', () => {
+      mockState.items = [];
+      const { container } = renderBoard();
+      const tabGroup = container.querySelector('[data-testid="control-bar-view-tabs"]') as HTMLElement;
+      expect(tabGroup.getAttribute('role')).toBe('group');
+      expect(tabGroup.getAttribute('aria-label')).toBe('View');
+    });
+  });
+
+  describe('AC2 + AC3: Tab state and ARIA', () => {
+    it('Board tab has aria-pressed="true" when in board view', () => {
+      mockState.items = [];
+      const { container } = renderBoard();
+      const boardTab = container.querySelector('[data-testid="view-tab-board"]') as HTMLElement;
+      expect(boardTab.getAttribute('aria-pressed')).toBe('true');
+    });
+
+    it('Upcoming tab has aria-pressed="false" when in board view', () => {
+      mockState.items = [];
+      const { container } = renderBoard();
+      const upcomingTab = container.querySelector('[data-testid="view-tab-upcoming"]') as HTMLElement;
+      expect(upcomingTab.getAttribute('aria-pressed')).toBe('false');
+    });
+
+    it('clicking Upcoming tab calls switchToUpcoming', () => {
+      mockState.items = [];
+      const { container } = renderBoard();
+      const upcomingTab = container.querySelector('[data-testid="view-tab-upcoming"]') as HTMLElement;
+      fireEvent.click(upcomingTab);
+      expect(mockSwitchToUpcoming).toHaveBeenCalled();
+    });
+
+    it('clicking Board tab when already active does not call switchToBoard', () => {
+      mockState.items = [];
+      const { container } = renderBoard();
+      const boardTab = container.querySelector('[data-testid="view-tab-board"]') as HTMLElement;
+      fireEvent.click(boardTab);
+      expect(mockSwitchToBoard).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe('KanbanBoard ARIA labels (Issue #7)', () => {
+  describe('AC2: FAB has accessible label', () => {
+    it('FAB button has aria-label="Create new item"', () => {
+      mockState.items = [];
+      const { container } = renderBoard();
+      const fab = container.querySelector('.fab') as HTMLElement;
+      expect(fab).not.toBeNull();
+      expect(fab.getAttribute('aria-label')).toBe('Create new item');
+    });
+
+    it('FAB button has title="Create new item"', () => {
+      mockState.items = [];
+      const { container } = renderBoard();
+      const fab = container.querySelector('.fab') as HTMLElement;
+      expect(fab.getAttribute('title')).toBe('Create new item');
+    });
+  });
+});
+
+describe('KanbanBoard keyboard shortcut (Issue #90)', () => {
+  describe('AC2: Ctrl+Shift+S opens share modal for owners', () => {
+    it('opens share modal on Ctrl+Shift+S when user is owner', () => {
+      mockState.items = [];
+      mockState.userBoardRole ='owner';
+      renderBoard();
+
+      fireEvent.keyDown(document, { key: 'S', ctrlKey: true, shiftKey: true });
+
+      expect(mockState.showShareModal).toBe(true);
+    });
+
+    it('opens share modal on Cmd+Shift+S (Mac) when user is owner', () => {
+      mockState.items = [];
+      mockState.userBoardRole ='owner';
+      renderBoard();
+
+      fireEvent.keyDown(document, { key: 'S', metaKey: true, shiftKey: true });
+
+      expect(mockState.showShareModal).toBe(true);
+    });
+  });
+
+  describe('AC3: Shortcut inactive for non-owners', () => {
+    it('does not open share modal when user is member', () => {
+      mockState.items = [];
+      mockState.userBoardRole ='member';
+      renderBoard();
+
+      fireEvent.keyDown(document, { key: 'S', ctrlKey: true, shiftKey: true });
+
+      expect(mockState.showShareModal).toBe(false);
+    });
+
+    it('does not open share modal when user has no role', () => {
+      mockState.items = [];
+      mockState.userBoardRole =null;
+      renderBoard();
+
+      fireEvent.keyDown(document, { key: 'S', ctrlKey: true, shiftKey: true });
+
+      expect(mockState.showShareModal).toBe(false);
+    });
+  });
+
+  describe('Shortcut guards', () => {
+    it('does not open share modal when another modal is open', () => {
+      mockState.items = [];
+      mockState.userBoardRole ='owner';
+      mockState.showCreateModal = true;
+      renderBoard();
+
+      fireEvent.keyDown(document, { key: 'S', ctrlKey: true, shiftKey: true });
+
+      expect(mockState.showShareModal).toBe(false);
+    });
+
+    it('does not open share modal when share modal is already open', () => {
+      mockState.items = [];
+      mockState.userBoardRole = 'owner';
+      mockState.showShareModal = true;
+      renderBoard();
+
+      fireEvent.keyDown(document, { key: 'S', ctrlKey: true, shiftKey: true });
+
+      expect(mockState.showShareModal).toBe(true);
+    });
+  });
+});
+
+describe('KanbanBoard keyboard shortcuts (Issue #91)', () => {
+  describe('AC1: Archive shortcut', () => {
+    it('opens archive dialog when A is pressed', () => {
+      mockState.items = [];
+      renderBoard();
+
+      fireEvent.keyDown(document, { key: 'a' });
+
+      expect(mockState.showArchiveDialog).toBe(true);
+    });
+
+    it('closes archive dialog when A is pressed again', () => {
+      mockState.items = [];
+      mockState.showArchiveDialog = true;
+      renderBoard();
+
+      fireEvent.keyDown(document, { key: 'a' });
+
+      expect(mockState.showArchiveDialog).toBe(false);
+    });
+  });
+
+  describe('AC2: Board switching shortcuts', () => {
+    it('switches to board at position with Ctrl+number', () => {
+      mockState.items = [];
+      mockState.accessibleBoards = [
+        { id: 'b1', name: 'Board 1' },
+        { id: 'b2', name: 'Board 2' },
+      ];
+      renderBoard();
+
+      fireEvent.keyDown(document, { key: '2', ctrlKey: true });
+
+      expect(mockSwitchBoard).toHaveBeenCalledWith('b2');
+    });
+
+    it('switches to first board with Cmd+1 (Mac)', () => {
+      mockState.items = [];
+      mockState.accessibleBoards = [
+        { id: 'b1', name: 'Board 1' },
+        { id: 'b2', name: 'Board 2' },
+      ];
+      renderBoard();
+
+      fireEvent.keyDown(document, { key: '1', metaKey: true });
+
+      expect(mockSwitchBoard).toHaveBeenCalledWith('b1');
+    });
+
+    it('does nothing when number exceeds board count', () => {
+      mockState.items = [];
+      mockState.accessibleBoards = [{ id: 'b1', name: 'Board 1' }];
+      renderBoard();
+
+      fireEvent.keyDown(document, { key: '5', ctrlKey: true });
+
+      expect(mockSwitchBoard).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('AC3: New item shortcut', () => {
+    it('opens create modal when N is pressed', () => {
+      mockState.items = [];
+      renderBoard();
+
+      fireEvent.keyDown(document, { key: 'n' });
+
+      expect(mockState.showCreateModal).toBe(true);
+    });
+
+    it('does not open create modal when another modal is already open', () => {
+      mockState.items = [];
+      mockState.showArchiveDialog = true;
+      renderBoard();
+
+      fireEvent.keyDown(document, { key: 'n' });
+
+      expect(mockState.showCreateModal).toBe(false);
+    });
+  });
+
+  describe('AC4: Shortcuts help overlay', () => {
+    it('opens shortcuts help when ? is pressed', () => {
+      mockState.items = [];
+      const { queryByTestId } = renderBoard();
+
+      fireEvent.keyDown(document, { key: '?', shiftKey: true });
+
+      expect(queryByTestId('shortcuts-help')).not.toBeNull();
+    });
+  });
+});
+
+describe('KanbanBoard logo in header (Issue #30 AC3)', () => {
+  it('renders HiveLogo in the board-header-left', () => {
+    mockState.items = [];
+    const { container } = renderBoard();
+    const headerLeft = container.querySelector('.board-header-left');
+    expect(headerLeft).not.toBeNull();
+    const logo = headerLeft!.querySelector('[data-testid="hive-logo"]');
+    expect(logo).not.toBeNull();
+  });
+
+  it('logo appears before the h1 heading', () => {
+    mockState.items = [];
+    const { container } = renderBoard();
+    const headerLeft = container.querySelector('.board-header-left');
+    const children = Array.from(headerLeft!.children);
+    const logoIdx = children.findIndex(c => c.getAttribute('data-testid') === 'hive-logo');
+    const h1Idx = children.findIndex(c => c.tagName === 'H1');
+    expect(logoIdx).toBeLessThan(h1Idx);
+  });
+
+  it('logo has the board-header-logo class', () => {
+    mockState.items = [];
+    const { container } = renderBoard();
+    const logo = container.querySelector('[data-testid="hive-logo"]');
+    expect(logo!.classList.contains('board-header-logo')).toBe(true);
+  });
+});
+
+describe('Status grouping renders ListView (Issue #137)', () => {
+  const sampleItem = {
+    id: '1', title: 'Task A', description: '', status: 'To Do',
+    owner: '', due_date: '', labels: '', parent_id: '',
+    created_at: '', updated_at: '', completed_at: '',
+    sort_order: 1, created_by: '', board_id: '', sheetRow: 2,
+  };
+
+  it('renders .list-view inside .board-main when groupBy is status', () => {
+    mockState.items = [sampleItem];
+    mockState.groupByValue = 'status';
+    const { container } = renderBoard();
+    const boardMain = container.querySelector('.board-main');
+    expect(boardMain).not.toBeNull();
+    const listView = boardMain!.querySelector('.list-view');
+    expect(listView).not.toBeNull();
+  });
+
+  it('does not render .list-view inside .board-main when groupBy is none', () => {
+    mockState.items = [sampleItem];
+    mockState.groupByValue = 'none';
+    const { container } = renderBoard();
+    const boardMain = container.querySelector('.board-main');
+    expect(boardMain).not.toBeNull();
+    const listView = boardMain!.querySelector('.list-view');
+    expect(listView).toBeNull();
+  });
+});
+
+describe('KanbanBoard — Edit profile integration (Issue #136)', () => {
+  // AC2: Clicking "Edit profile" in dropdown opens ProfileDialog
+  it('passes onOpenProfile to UserDropdown and shows ProfileDialog on click', () => {
+    mockState.items = [];
+    const { container } = renderBoard();
+    // The mock UserDropdown renders an "Edit profile" button if onOpenProfile is provided
+    const editBtn = container.querySelector('[data-testid="user-dropdown-edit-profile"]');
+    expect(editBtn).not.toBeNull();
+    fireEvent.click(editBtn as HTMLElement);
+    const dialog = container.querySelector('[data-testid="profile-dialog"]');
+    expect(dialog).not.toBeNull();
+  });
+});

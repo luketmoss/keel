@@ -104,8 +104,7 @@ The new copy is served beside the old one; the old URL is not touched.
 - The user opens the new URL and signs in; the old URL is unchanged.
 
 **Rollback:** delete `gh-pages/<slug>` on the `gh-pages` branch, and the
-workflow.
-The old URL never moved.
+workflow. The old URL never moved.
 
 ## 3. Identity (only when colour or icon is not in the registry)
 
@@ -125,9 +124,9 @@ gate: each sync job has `if: vars.<SLUG>_SYNCS_LIVE == 'true'`, with the
 variable unset. Watchdogs are ungated. Diff each against its original; cron,
 inputs, timeouts and permissions are identical. A poller that dispatches
 workflows is changed to dispatch into Keel, merged, and **not deployed**. Set
-the new secrets by copying existing values; run no authorize script, and never touch
-a rotating-token file. Ungated watchdogs fail until their secrets exist, so the
-user sets those first.
+the new secrets by copying existing values; run no authorize script, and never
+touch a rotating-token file. Ungated watchdogs fail until their secrets exist,
+so the user sets those first.
 
 **The flip, in the order Thrive ran it.** In a fresh session, with about half a
 usage window left, early in a day the user is around:

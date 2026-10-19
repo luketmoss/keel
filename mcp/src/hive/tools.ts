@@ -190,6 +190,7 @@ export function registerHiveTools(server: McpServer, cfg: HiveConfig, mode: Mode
             parts.push(`board: ${boardMap[i.board_id] || 'unknown'}`)
             if (i.owner) parts.push(`(${i.owner})`)
             if (i.due_date) parts.push(`due: ${i.due_date}`)
+            if (i.completed_at) parts.push(`completed: ${i.completed_at}`)
             if (i.labels) parts.push(`labels: ${i.labels}`)
             if (i.description) parts.push(`| ${i.description}`)
             return parts.join(' ')
@@ -294,6 +295,7 @@ export function registerHiveTools(server: McpServer, cfg: HiveConfig, mode: Mode
         `- Status: ${i.status}`,
         `- Owner: ${i.owner || 'none'}`,
         `- Due: ${i.due_date || 'none'}`,
+        ...(i.completed_at ? [`- Completed: ${i.completed_at}`] : []),
         `- Labels: ${i.labels || 'none'}`,
         `- Board ID: ${i.board_id}`,
         `- Description: ${i.description || '(empty)'}`,
@@ -314,6 +316,9 @@ export function registerHiveTools(server: McpServer, cfg: HiveConfig, mode: Mode
         status: z.enum(['To Do', 'In Progress', 'Done']).optional().describe('New status'),
         owner: z.string().optional().describe('New owner name'),
         due_date: z.string().optional().describe('New due date in ISO format (YYYY-MM-DD)'),
+        completed_at: z.string().optional().describe(
+          'When the item is in a terminal column: set when it was completed, as a date (YYYY-MM-DD, stored as noon UTC) or a full ISO 8601 timestamp with Z or an offset, not more than 24 hours ahead. Refused for an item in any other column. Cleared by moving the item out of its terminal column, not by an empty value',
+        ),
         labels: z.string().optional().describe('New comma-separated labels (replaces existing)'),
         parent_id: z.string().optional().describe('New parent item ID'),
         position: z
@@ -331,6 +336,7 @@ export function registerHiveTools(server: McpServer, cfg: HiveConfig, mode: Mode
         status,
         owner,
         due_date,
+        completed_at,
         labels,
         parent_id,
         position,
@@ -341,6 +347,7 @@ export function registerHiveTools(server: McpServer, cfg: HiveConfig, mode: Mode
         status?: 'To Do' | 'In Progress' | 'Done'
         owner?: string
         due_date?: string
+        completed_at?: string
         labels?: string
         parent_id?: string
         position?: 'top' | 'bottom' | number
@@ -351,6 +358,8 @@ export function registerHiveTools(server: McpServer, cfg: HiveConfig, mode: Mode
         if (status !== undefined) changes.status = status
         if (owner !== undefined) changes.owner = owner
         if (due_date !== undefined) changes.due_date = normalizeDate(due_date)
+        // Forwarded untouched, even when empty: the rule lives in Apps Script, and a third copy would drift.
+        if (completed_at !== undefined) changes.completed_at = completed_at
         if (labels !== undefined) changes.labels = labels
         if (parent_id !== undefined) changes.parent_id = parent_id
 
@@ -376,6 +385,7 @@ export function registerHiveTools(server: McpServer, cfg: HiveConfig, mode: Mode
         parts.push(`- Status: ${item.status}`)
         if (item.owner) parts.push(`- Owner: ${item.owner}`)
         if (item.due_date) parts.push(`- Due: ${item.due_date}`)
+        if (item.completed_at) parts.push(`- Completed: ${item.completed_at}`)
         if (item.labels) parts.push(`- Labels: ${item.labels}`)
         parts.push(`- ID: ${item.id}`)
         return text(parts.join('\n'))

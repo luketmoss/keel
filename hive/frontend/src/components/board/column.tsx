@@ -64,7 +64,10 @@ function resolveColumnColor(color?: string): string {
   return COLOR_TO_CSS_VAR[color] || color;
 }
 
-export function Column({ status, items, onDrop, onReorder, onMoveStatus, compact, color, isTerminal, allDoneCount, hasArchived, archiveTriggerRef, onOpenArchive, sortMode, onSortChange, onAddItem, onCopyItem, onDeleteItem }: Props) {
+export function Column({ status, items, onDrop, onReorder, onMoveStatus, compact, color, isTerminal, allDoneCount, hasArchived, archiveTriggerRef, onOpenArchive, sortMode: sortModeProp, onSortChange, onAddItem, onCopyItem, onDeleteItem }: Props) {
+  // #466: a column with no stored sort mode is in Custom order, which is what the board already
+  // does for it, so it gets the control too.
+  const sortMode: SortMode = sortModeProp ?? 'custom';
   // Track the insertion indicator position for within-column reorder
   const [dropIndicator, setDropIndicator] = useState<{ index: number; position: 'above' | 'below' } | null>(null);
   // aria-live announcement text
@@ -361,7 +364,7 @@ export function Column({ status, items, onDrop, onReorder, onMoveStatus, compact
               <option>Completion date</option>
             </select>
           )}
-          {!compact && !isTerminal && sortMode !== undefined && (
+          {!compact && !isTerminal && (
             <select
               class={`column-sort-select${isDateSorted ? ' column-sort-active' : ''}`}
               value={sortMode}

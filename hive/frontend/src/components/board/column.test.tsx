@@ -395,6 +395,41 @@ describe('Column sort mode (Issue #157)', () => {
     expect(options[2].value).toBe('created');
   });
 
+  // #466: no stored mode means Custom, and the control is shown for it.
+  describe('#466: a column with no sortMode', () => {
+    it('renders the sort select on Custom with all three options', () => {
+      const { container } = render(<Column status="To Do" items={[]} onDrop={vi.fn()} />);
+      const select = container.querySelector('.column-sort-select') as HTMLSelectElement;
+      expect(select).not.toBeNull();
+      expect(select.value).toBe('custom');
+      expect([...select.querySelectorAll('option')].map((o) => o.value)).toEqual(['custom', 'due_date', 'created']);
+      expect(select.getAttribute('aria-label')).toBe('Sort To Do column');
+      expect(select.classList.contains('column-sort-active')).toBe(false);
+    });
+
+    it('reports a choice made from that state', () => {
+      const onSortChange = vi.fn();
+      const { container } = render(
+        <Column status="In Progress" items={[]} onDrop={vi.fn()} onSortChange={onSortChange} />
+      );
+      const select = container.querySelector('.column-sort-select') as HTMLSelectElement;
+      select.value = 'due_date';
+      fireEvent.change(select);
+      expect(onSortChange).toHaveBeenCalledWith('due_date');
+    });
+
+    it('still shows the disabled Completion date control in the terminal column, and none when compact', () => {
+      const terminal = render(<Column status="Done" items={[]} onDrop={vi.fn()} isTerminal />);
+      const fixed = terminal.container.querySelector('.column-sort-select') as HTMLSelectElement;
+      expect(fixed.disabled).toBe(true);
+      expect(fixed.textContent).toBe('Completion date');
+      terminal.unmount();
+
+      const compact = render(<Column status="To Do" items={[]} onDrop={vi.fn()} compact />);
+      expect(compact.container.querySelector('.column-sort-select')).toBeNull();
+    });
+  });
+
   it('renders items in the order passed by parent (sorting handled by parent)', () => {
     const items = [
       makeItem({ id: 'sooner', title: 'Sooner', due_date: '2026-03-01', sort_order: 1 }),

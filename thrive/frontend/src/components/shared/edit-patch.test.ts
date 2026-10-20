@@ -5,8 +5,16 @@ import type { Workout } from '../../api/types';
 // Issue #172. The form-level behaviour is in edit-workout-save.test.tsx; this
 // pins the helper's contract directly.
 const W = {
-  date: '2026-09-20', name: 'Ridge Loop', notes: 'Windy', effort: '', sub_type: 'outdoor',
-  elapsed_seconds: '343', distance_m: '430', ascent_m: '37', descent_m: '41', avg_hr: '128.4',
+  date: '2026-09-20',
+  name: 'Ridge Loop',
+  notes: 'Windy',
+  effort: '',
+  sub_type: 'outdoor',
+  elapsed_seconds: '343',
+  distance_m: '430',
+  ascent_m: '37',
+  descent_m: '41',
+  avg_hr: '128.4',
 } as unknown as Workout;
 
 describe('editInputsToPatch (#172)', () => {
@@ -22,13 +30,17 @@ describe('editInputsToPatch (#172)', () => {
   });
 
   it('only the changed inputs appear, converted to stored units', () => {
-    expect(editInputsToPatch(initial, { ...initial, ascent: '200', effort: 'Hard' }))
-      .toEqual({ ascent_m: '61', effort: 'Hard' });
+    expect(editInputsToPatch(initial, { ...initial, ascent: '200', effort: 'Hard' })).toEqual({
+      ascent_m: '61',
+      effort: 'Hard',
+    });
   });
 
   it('a cleared input is a blank, never a zero', () => {
-    expect(editInputsToPatch(initial, { ...initial, avgHr: '', duration: '' }))
-      .toEqual({ avg_hr: '', elapsed_seconds: '' });
+    expect(editInputsToPatch(initial, { ...initial, avgHr: '', duration: '' })).toEqual({
+      avg_hr: '',
+      elapsed_seconds: '',
+    });
   });
 
   it('a changed name or note is trimmed', () => {
@@ -40,7 +52,14 @@ describe('editInputsToPatch (#172)', () => {
   });
 
   it('a blank workout pre-fills blank, never "0" or "null"', () => {
-    const blank = workoutToEditInputs({ ...W, elapsed_seconds: '', distance_m: '', ascent_m: '', descent_m: '', avg_hr: '' });
+    const blank = workoutToEditInputs({
+      ...W,
+      elapsed_seconds: '',
+      distance_m: '',
+      ascent_m: '',
+      descent_m: '',
+      avg_hr: '',
+    });
     expect(blank).toMatchObject({ duration: '', distance: '', ascent: '', descent: '', avgHr: '' });
   });
 });

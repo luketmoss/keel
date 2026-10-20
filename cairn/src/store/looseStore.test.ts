@@ -124,15 +124,12 @@ describe('LocalLooseStore', () => {
   })
 
   it('derives the track position from its geometry rather than trusting the caller', () => {
-    const record = store.addTrack(
-      { ...NEW_TRACK, position: { lat: 999, lng: 999 } },
-      [
-        track([
-          [10, 20],
-          [30, 40],
-        ]),
-      ],
-    )
+    const record = store.addTrack({ ...NEW_TRACK, position: { lat: 999, lng: 999 } }, [
+      track([
+        [10, 20],
+        [30, 40],
+      ]),
+    ])
 
     expect(store.getItem(record.id)?.position).toEqual({ lat: 10, lng: 20 })
   })
@@ -215,7 +212,12 @@ describe('LocalLooseStore', () => {
     })
 
     it('renames a cairn', async () => {
-      const cairn = store.addCairn({ name: 'a.jpg', date: null, position: { lat: 1, lng: 2 }, positionSource: 'exif' })
+      const cairn = store.addCairn({
+        name: 'a.jpg',
+        date: null,
+        position: { lat: 1, lng: 2 },
+        positionSource: 'exif',
+      })
 
       expect(await store.update(cairn.id, { name: 'sapporo.jpg' })).toBe(true)
 
@@ -226,7 +228,12 @@ describe('LocalLooseStore', () => {
     // than producing an error, since the UI never offers the control for
     // one in the first place.
     it('ignores a colour patch sent for a cairn', async () => {
-      const cairn = store.addCairn({ name: 'a.jpg', date: null, position: { lat: 1, lng: 2 }, positionSource: 'exif' })
+      const cairn = store.addCairn({
+        name: 'a.jpg',
+        date: null,
+        position: { lat: 1, lng: 2 },
+        positionSource: 'exif',
+      })
 
       expect(await store.update(cairn.id, { colorIndex: 3 })).toBe(true)
 
@@ -343,7 +350,10 @@ describe('LocalLooseStore', () => {
 
       expect(await store.update(cairn.id, { position: { lat: 1, lng: 2 } })).toBe(true)
 
-      const stored = store.getItem(cairn.id) as { position: { lat: number; lng: number }; positionSource: string }
+      const stored = store.getItem(cairn.id) as {
+        position: { lat: number; lng: number }
+        positionSource: string
+      }
       expect(stored.position).toEqual({ lat: 1, lng: 2 })
       expect(stored.positionSource).toBe('placed')
     })
@@ -549,10 +559,9 @@ describe('moveLooseIntoTrip', () => {
   it('carries the track name into the destination trip', async () => {
     const trips = new LocalTripStore(fakeStorage())
     const trip = trips.createTrip('Larapinta')
-    const record = store.addTrack(
-      { ...NEW_TRACK, name: 'Snowdon ridge', driveFileId: 'drive-1' },
-      [track([[1, 2]])],
-    )
+    const record = store.addTrack({ ...NEW_TRACK, name: 'Snowdon ridge', driveFileId: 'drive-1' }, [
+      track([[1, 2]]),
+    ])
 
     await moveLooseIntoTrip(store, trips, record.id, trip.id, carryName)
 
@@ -567,10 +576,7 @@ describe('moveLooseIntoTrip', () => {
   it('carries the track colour into the destination trip', async () => {
     const trips = new LocalTripStore(fakeStorage())
     const trip = trips.createTrip('Larapinta')
-    const record = store.addTrack(
-      { ...NEW_TRACK, driveFileId: 'drive-1', colorIndex: 3 },
-      [track([[1, 2]])],
-    )
+    const record = store.addTrack({ ...NEW_TRACK, driveFileId: 'drive-1', colorIndex: 3 }, [track([[1, 2]])])
 
     await moveLooseIntoTrip(store, trips, record.id, trip.id, carryName)
 
@@ -654,9 +660,7 @@ describe('looseMetaLine', () => {
 
   it('omits ascent when the source has no elevation at all', () => {
     const record = store.addTrack({ ...NEW_TRACK, ascentMeters: null }, [track([[1, 2]])])
-    expect(looseMetaLine(store.getItem(record.id)!, asIs)).toBe(
-      `2024-03-09 · ${formatDistance(14200)}`,
-    )
+    expect(looseMetaLine(store.getItem(record.id)!, asIs)).toBe(`2024-03-09 · ${formatDistance(14200)}`)
   })
 
   it('names a photo-only cairn by "photo", and an icon one by its label', () => {

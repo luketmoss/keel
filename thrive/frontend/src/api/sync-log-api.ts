@@ -10,25 +10,27 @@ import { isDemo, demoSyncLog, demoWithingsSyncLog } from './demo-data';
 import { SyncLogNotSetUpError } from './sync-log-errors';
 
 export const SYNC_LOG_FIELDS = [
-  'run_id',        // A
-  'started_at',    // B  ISO instant, the run's single synced_at
-  'finished_at',   // C
-  'window_start',  // D
-  'window_end',    // E
-  'n_seen',        // F
-  'n_new',         // G
-  'n_updated',     // H
-  'n_enriched',    // I
+  'run_id', // A
+  'started_at', // B  ISO instant, the run's single synced_at
+  'finished_at', // C
+  'window_start', // D
+  'window_end', // E
+  'n_seen', // F
+  'n_new', // G
+  'n_updated', // H
+  'n_enriched', // I
   'n_fit_fetched', // J
-  'n_errors',      // K
-  'status',        // L  ok | partial | failed
-  'error_detail',  // M  never displayed (#157)
-  'notes',         // N  never displayed (#157)
+  'n_errors', // K
+  'status', // L  ok | partial | failed
+  'error_detail', // M  never displayed (#157)
+  'notes', // N  never displayed (#157)
 ] as const;
 
-export type SyncLogField = typeof SYNC_LOG_FIELDS[number];
+export type SyncLogField = (typeof SYNC_LOG_FIELDS)[number];
 export type SyncLogEntry = Record<SyncLogField, string>;
-export interface SyncLogEntryWithRow extends SyncLogEntry { sheetRow: number; }
+export interface SyncLogEntryWithRow extends SyncLogEntry {
+  sheetRow: number;
+}
 
 /** One sheet row as an entry, '' where a cell is missing (a short row). */
 export function rowToSyncLog(row: unknown[], sheetRow: number): SyncLogEntryWithRow {
@@ -46,9 +48,7 @@ export async function fetchSyncLog(token: string): Promise<SyncLogEntryWithRow[]
 
   return withReauth(token, async (t) => {
     const rows = await sheetsGet('SyncLog!A2:N', t);
-    return rows
-      .map((row, i) => rowToSyncLog(row, i + 2))
-      .filter((e) => e.run_id);
+    return rows.map((row, i) => rowToSyncLog(row, i + 2)).filter((e) => e.run_id);
   });
 }
 
@@ -64,9 +64,7 @@ export async function fetchWithingsSyncLog(token: string): Promise<SyncLogEntryW
   return withReauth(token, async (t) => {
     try {
       const rows = await sheetsGet('WithingsSyncLog!A2:N', t);
-      return rows
-        .map((row, i) => rowToSyncLog(row, i + 2))
-        .filter((e) => e.run_id);
+      return rows.map((row, i) => rowToSyncLog(row, i + 2)).filter((e) => e.run_id);
     } catch (err) {
       if (isMissingTabError(err)) throw new SyncLogNotSetUpError('WithingsSyncLog does not exist yet');
       throw err;

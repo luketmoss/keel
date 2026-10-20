@@ -28,8 +28,9 @@ describe('calendarHref', () => {
 });
 
 describe('parseCalendarPath', () => {
-  it("shows today's month with no param", () => expect(parseCalendarPath(undefined, TODAY)).toEqual({ month: '2026-09', valid: true }));
-  it('shows a real month, today\'s included', () => {
+  it("shows today's month with no param", () =>
+    expect(parseCalendarPath(undefined, TODAY)).toEqual({ month: '2026-09', valid: true }));
+  it("shows a real month, today's included", () => {
     expect(parseCalendarPath('2025-01', TODAY)).toEqual({ month: '2025-01', valid: true });
     expect(parseCalendarPath('2026-09', TODAY)).toEqual({ month: '2026-09', valid: true });
   });

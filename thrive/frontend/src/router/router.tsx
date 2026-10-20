@@ -8,10 +8,21 @@ import { isIsoMonth } from '../calendar/dates';
  * without a document title.
  */
 export const ROUTE_NAMES = [
-  'day', 'calendar', 'trends', 'activities',
-  'workout-new', 'workout-active', 'workout-detail', 'workout-edit',
-  'templates', 'template-new', 'template-detail', 'template-edit',
-  'exercises', 'settings', 'manage-labels',
+  'day',
+  'calendar',
+  'trends',
+  'activities',
+  'workout-new',
+  'workout-active',
+  'workout-detail',
+  'workout-edit',
+  'templates',
+  'template-new',
+  'template-detail',
+  'template-edit',
+  'exercises',
+  'settings',
+  'manage-labels',
 ] as const;
 
 export type RouteName = (typeof ROUTE_NAMES)[number];
@@ -181,7 +192,9 @@ const listeners = new Set<(change: RouteChange) => void>();
 /** Listen for route changes; returns the unsubscribe. */
 export function onRouteChange(listener: (change: RouteChange) => void): () => void {
   listeners.add(listener);
-  return () => { listeners.delete(listener); };
+  return () => {
+    listeners.delete(listener);
+  };
 }
 
 function emit(change: RouteChange): void {

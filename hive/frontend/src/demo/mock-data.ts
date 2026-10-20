@@ -41,7 +41,14 @@ export const MOCK_BOARDS: Board[] = [
   { id: 'board-family', name: 'Family Board', created_at: daysAgo(30), created_by: 'mom@family.com', icon: '👨‍👩‍👧' },
   { id: 'board-work', name: 'Work Projects', created_at: daysAgo(14), created_by: 'dad@family.com', icon: '🏢' },
   // #288: archived — hidden everywhere until unarchived from "Archived boards".
-  { id: 'board-garage', name: 'Garage Cleanout', created_at: daysAgo(60), created_by: 'demo@hive.local', icon: '🔧', archived_at: daysAgo(5) },
+  {
+    id: 'board-garage',
+    name: 'Garage Cleanout',
+    created_at: daysAgo(60),
+    created_by: 'demo@hive.local',
+    icon: '🔧',
+    archived_at: daysAgo(5),
+  },
 ];
 
 // --- Permissions ---
@@ -62,16 +69,80 @@ export const MOCK_PERMISSIONS: BoardPermission[] = [
 // Only "Done" column is terminal (sets completed_at, shows archive, sorts by completion).
 export const MOCK_STATUSES: BoardStatus[] = [
   // Family Board
-  { id: 'status-fam-1', board_id: 'board-family', name: 'To Do', sort_order: 1, color: '#e3f2fd', is_terminal: false, created_at: daysAgo(30) },
-  { id: 'status-fam-2', board_id: 'board-family', name: 'In Progress', sort_order: 2, color: '#fff3e0', is_terminal: false, created_at: daysAgo(30) },
-  { id: 'status-fam-3', board_id: 'board-family', name: 'Done', sort_order: 3, color: '#e8f5e9', is_terminal: true, created_at: daysAgo(30) },
+  {
+    id: 'status-fam-1',
+    board_id: 'board-family',
+    name: 'To Do',
+    sort_order: 1,
+    color: '#e3f2fd',
+    is_terminal: false,
+    created_at: daysAgo(30),
+  },
+  {
+    id: 'status-fam-2',
+    board_id: 'board-family',
+    name: 'In Progress',
+    sort_order: 2,
+    color: '#fff3e0',
+    is_terminal: false,
+    created_at: daysAgo(30),
+  },
+  {
+    id: 'status-fam-3',
+    board_id: 'board-family',
+    name: 'Done',
+    sort_order: 3,
+    color: '#e8f5e9',
+    is_terminal: true,
+    created_at: daysAgo(30),
+  },
   // Work Board
-  { id: 'status-work-1', board_id: 'board-work', name: 'To Do', sort_order: 1, color: '#e3f2fd', is_terminal: false, created_at: daysAgo(14) },
-  { id: 'status-work-2', board_id: 'board-work', name: 'In Progress', sort_order: 2, color: '#fff3e0', is_terminal: false, created_at: daysAgo(14) },
-  { id: 'status-work-3', board_id: 'board-work', name: 'Done', sort_order: 3, color: '#e8f5e9', is_terminal: true, created_at: daysAgo(14) },
+  {
+    id: 'status-work-1',
+    board_id: 'board-work',
+    name: 'To Do',
+    sort_order: 1,
+    color: '#e3f2fd',
+    is_terminal: false,
+    created_at: daysAgo(14),
+  },
+  {
+    id: 'status-work-2',
+    board_id: 'board-work',
+    name: 'In Progress',
+    sort_order: 2,
+    color: '#fff3e0',
+    is_terminal: false,
+    created_at: daysAgo(14),
+  },
+  {
+    id: 'status-work-3',
+    board_id: 'board-work',
+    name: 'Done',
+    sort_order: 3,
+    color: '#e8f5e9',
+    is_terminal: true,
+    created_at: daysAgo(14),
+  },
   // Garage Cleanout (archived)
-  { id: 'status-garage-1', board_id: 'board-garage', name: 'To Do', sort_order: 1, color: '#e3f2fd', is_terminal: false, created_at: daysAgo(60) },
-  { id: 'status-garage-2', board_id: 'board-garage', name: 'Done', sort_order: 2, color: '#e8f5e9', is_terminal: true, created_at: daysAgo(60) },
+  {
+    id: 'status-garage-1',
+    board_id: 'board-garage',
+    name: 'To Do',
+    sort_order: 1,
+    color: '#e3f2fd',
+    is_terminal: false,
+    created_at: daysAgo(60),
+  },
+  {
+    id: 'status-garage-2',
+    board_id: 'board-garage',
+    name: 'Done',
+    sort_order: 2,
+    color: '#e8f5e9',
+    is_terminal: true,
+    created_at: daysAgo(60),
+  },
 ];
 
 // --- Items ---
@@ -198,7 +269,8 @@ export const MOCK_ITEMS: ItemWithRow[] = [
   {
     id: 'demo-004',
     title: 'Plan birthday party',
-    description: 'Reserve venue, order cake, send invitations to the whole class, buy decorations and party favors, arrange for a bounce house rental, and confirm the magician booking.',
+    description:
+      'Reserve venue, order cake, send invitations to the whole class, buy decorations and party favors, arrange for a bounce house rental, and confirm the magician booking.',
     status: 'To Do',
     owner: 'Mom',
     due_date: daysFromNow(14),

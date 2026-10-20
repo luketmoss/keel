@@ -29,7 +29,7 @@ function renderDropdown(props = {}) {
       onSignOut={mockSignOut}
       onOpenProfile={mockOpenProfile}
       {...props}
-    />
+    />,
   );
 }
 
@@ -177,8 +177,8 @@ describe('UserDropdown — Edit profile (Issue #136)', () => {
     // Verify it comes before Sign out in DOM order
     const panel = container.querySelector('[data-testid="user-dropdown-panel"]')!;
     const buttons = Array.from(panel.querySelectorAll('button'));
-    const editIdx = buttons.findIndex(b => b.dataset.testid === 'user-dropdown-edit-profile');
-    const signoutIdx = buttons.findIndex(b => b.dataset.testid === 'user-dropdown-signout');
+    const editIdx = buttons.findIndex((b) => b.dataset.testid === 'user-dropdown-edit-profile');
+    const signoutIdx = buttons.findIndex((b) => b.dataset.testid === 'user-dropdown-signout');
     expect(editIdx).toBeLessThan(signoutIdx);
   });
 
@@ -194,9 +194,7 @@ describe('UserDropdown — Edit profile (Issue #136)', () => {
 
   // AC5: Profile entry not shown in demo mode
   it('hides "Edit profile" when onOpenProfile is not provided', () => {
-    const { container } = render(
-      <UserDropdown user={mockUser} displayName="Luke" onSignOut={mockSignOut} />
-    );
+    const { container } = render(<UserDropdown user={mockUser} displayName="Luke" onSignOut={mockSignOut} />);
     fireEvent.click(container.querySelector('[data-testid="user-dropdown-trigger"]') as HTMLElement);
     const editProfile = container.querySelector('[data-testid="user-dropdown-edit-profile"]');
     expect(editProfile).toBeNull();

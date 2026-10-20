@@ -81,10 +81,7 @@ function seedTrip(tripId: string, name = 'Larapinta') {
     createdAt: '2026-01-01T00:00:00.000Z',
   }
   window.localStorage.setItem('cairn.trips.index', JSON.stringify([entry]))
-  window.localStorage.setItem(
-    `cairn.trips.trip.${tripId}`,
-    JSON.stringify({ ...entry, notes: '' }),
-  )
+  window.localStorage.setItem(`cairn.trips.trip.${tripId}`, JSON.stringify({ ...entry, notes: '' }))
 }
 
 /* Same sign-in stub `App.test.tsx` uses: the loose store refuses a move
@@ -205,9 +202,7 @@ describe('App — Remove from trip carries the name out (#150)', () => {
 
     // #177: no regression on the untouched path — sourceName still matches
     // the actual Drive filename.
-    expect(looseIndex()).toMatchObject([
-      { kind: 'track', name: 'Day one', sourceName: 'day-1.kml' },
-    ])
+    expect(looseIndex()).toMatchObject([{ kind: 'track', name: 'Day one', sourceName: 'day-1.kml' }])
     fetchSpy.mockRestore()
   })
 

@@ -18,81 +18,81 @@ import { sheetsGet, withReauth, isMissingTabError } from './sheets';
 import { isDemo, demoDailyHealth, demoBodyMeasurements, demoDailySummary } from './demo-data';
 
 export const DAILY_HEALTH_FIELDS = [
-  'date',          // A  PK, local date; sleep is filed under its wake-up day
-  'resting_hr',    // B
-  'hrv',           // C
-  'steps',         // D
-  'calories',      // E
+  'date', // A  PK, local date; sleep is filed under its wake-up day
+  'resting_hr', // B
+  'hrv', // C
+  'steps', // D
+  'calories', // E
   'sleep_total_s', // F  INCLUDES awake time
-  'sleep_deep_s',  // G
-  'sleep_rem_s',   // H
+  'sleep_deep_s', // G
+  'sleep_rem_s', // H
   'sleep_light_s', // I
   'sleep_awake_s', // J
-  'sleep_score',   // K
-  'vo2max',        // L  current-state snapshot, only on some days
-  'recovery',      // M  current-state snapshot, only on some days
+  'sleep_score', // K
+  'vo2max', // L  current-state snapshot, only on some days
+  'recovery', // M  current-state snapshot, only on some days
   'training_load', // N
-  'bed_time',      // O  local HH:mm
-  'wake_time',     // P  local HH:mm
-  'raw_ref',       // Q
-  'synced_at',     // R
-  'stress_avg',    // S  COROS daily average stress (#231), appended after R
+  'bed_time', // O  local HH:mm
+  'wake_time', // P  local HH:mm
+  'raw_ref', // Q
+  'synced_at', // R
+  'stress_avg', // S  COROS daily average stress (#231), appended after R
 ] as const;
 
 export const BODY_MEASUREMENT_FIELDS = [
-  'grpid',            // A  PK
-  'date',             // B  local YYYY-MM-DD, America/Denver
-  'time',             // C  local HH:mm
-  'measured_at_utc',  // D  ISO 8601 with the offset then in effect
-  'kind',             // E  scale | bp
-  'device_model',     // F
-  'weight_kg',        // G  kg, never lb
-  'fat_ratio_pct',    // H
-  'fat_mass_kg',      // I
+  'grpid', // A  PK
+  'date', // B  local YYYY-MM-DD, America/Denver
+  'time', // C  local HH:mm
+  'measured_at_utc', // D  ISO 8601 with the offset then in effect
+  'kind', // E  scale | bp
+  'device_model', // F
+  'weight_kg', // G  kg, never lb
+  'fat_ratio_pct', // H
+  'fat_mass_kg', // I
   'fat_free_mass_kg', // J
-  'muscle_mass_kg',   // K
-  'hydration_kg',     // L
-  'bone_mass_kg',     // M
-  'systolic_mmhg',    // N
-  'diastolic_mmhg',   // O
-  'pulse_bpm',        // P
-  'attrib',           // Q
-  'source',           // R
-  'raw_ref',          // S
-  'synced_at',        // T
+  'muscle_mass_kg', // K
+  'hydration_kg', // L
+  'bone_mass_kg', // M
+  'systolic_mmhg', // N
+  'diastolic_mmhg', // O
+  'pulse_bpm', // P
+  'attrib', // Q
+  'source', // R
+  'raw_ref', // S
+  'synced_at', // T
 ] as const;
 
 export const DAILY_SUMMARY_FIELDS = [
-  'date',                  // A  PK
-  'activity_count',        // B
-  'activity_types',        // C
-  'total_moving_s',        // D  S is its coverage, out of B
-  'total_elapsed_s',       // E  T is its coverage, out of B
-  'total_distance_m',      // F  OUTDOOR ONLY; I is its coverage, out of H
-  'total_ascent_m',        // G  OUTDOOR ONLY; J is its coverage, out of H
+  'date', // A  PK
+  'activity_count', // B
+  'activity_types', // C
+  'total_moving_s', // D  S is its coverage, out of B
+  'total_elapsed_s', // E  T is its coverage, out of B
+  'total_distance_m', // F  OUTDOOR ONLY; I is its coverage, out of H
+  'total_ascent_m', // G  OUTDOOR ONLY; J is its coverage, out of H
   'cardio_activity_count', // H  outdoor cardio
-  'distance_withdata',     // I
-  'ascent_withdata',       // J
-  'max_effort',            // K
-  'effort_counts',         // L
-  'steps',                 // M  from DailyHealth
-  'resting_hr',            // N
-  'hrv',                   // O
-  'sleep_total_s',         // P
-  'training_load',         // Q
-  'computed_at',           // R
-  'moving_withdata',       // S
-  'elapsed_withdata',      // T
-  'weight_kg',             // U  the day's first scale reading with a weight
-  'fat_ratio_pct',         // V  from that same reading
-  'systolic_mmhg',         // W  mean of the day's BP readings, half up
-  'diastolic_mmhg',        // X
-  'bp_count',              // Y  BP readings (rows)
+  'distance_withdata', // I
+  'ascent_withdata', // J
+  'max_effort', // K
+  'effort_counts', // L
+  'steps', // M  from DailyHealth
+  'resting_hr', // N
+  'hrv', // O
+  'sleep_total_s', // P
+  'training_load', // Q
+  'computed_at', // R
+  'moving_withdata', // S
+  'elapsed_withdata', // T
+  'weight_kg', // U  the day's first scale reading with a weight
+  'fat_ratio_pct', // V  from that same reading
+  'systolic_mmhg', // W  mean of the day's BP readings, half up
+  'diastolic_mmhg', // X
+  'bp_count', // Y  BP readings (rows)
 ] as const;
 
-export type DailyHealthField = typeof DAILY_HEALTH_FIELDS[number];
-export type BodyMeasurementField = typeof BODY_MEASUREMENT_FIELDS[number];
-export type DailySummaryField = typeof DAILY_SUMMARY_FIELDS[number];
+export type DailyHealthField = (typeof DAILY_HEALTH_FIELDS)[number];
+export type BodyMeasurementField = (typeof BODY_MEASUREMENT_FIELDS)[number];
+export type DailySummaryField = (typeof DAILY_SUMMARY_FIELDS)[number];
 
 export type DailyHealthRow = Record<DailyHealthField, string> & { sheetRow: number };
 export type BodyMeasurementRow = Record<BodyMeasurementField, string> & { sheetRow: number };

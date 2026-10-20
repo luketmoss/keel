@@ -40,7 +40,9 @@
   font-size: var(--text-lg);
   line-height: 1;
   cursor: pointer;
-  transition: color var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease);
+  transition:
+    color var(--motion-fast) var(--ease),
+    background var(--motion-fast) var(--ease);
 }
 
 .date-range__nav-button:hover {

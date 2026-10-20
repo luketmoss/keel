@@ -4,9 +4,33 @@ import type { ItemWithRow, BoardStatus } from '../api/types';
 const TEST_BOARD_ID = 'test-board';
 
 const DEFAULT_STATUSES: BoardStatus[] = [
-  { id: 's1', board_id: TEST_BOARD_ID, name: 'To Do', sort_order: 1, color: '#e3f2fd', is_terminal: false, created_at: '' },
-  { id: 's2', board_id: TEST_BOARD_ID, name: 'In Progress', sort_order: 2, color: '#fff3e0', is_terminal: false, created_at: '' },
-  { id: 's3', board_id: TEST_BOARD_ID, name: 'Done', sort_order: 3, color: '#e8f5e9', is_terminal: true, created_at: '' },
+  {
+    id: 's1',
+    board_id: TEST_BOARD_ID,
+    name: 'To Do',
+    sort_order: 1,
+    color: '#e3f2fd',
+    is_terminal: false,
+    created_at: '',
+  },
+  {
+    id: 's2',
+    board_id: TEST_BOARD_ID,
+    name: 'In Progress',
+    sort_order: 2,
+    color: '#fff3e0',
+    is_terminal: false,
+    created_at: '',
+  },
+  {
+    id: 's3',
+    board_id: TEST_BOARD_ID,
+    name: 'Done',
+    sort_order: 3,
+    color: '#e8f5e9',
+    is_terminal: true,
+    created_at: '',
+  },
 ];
 
 function makeItem(overrides: Partial<ItemWithRow>): ItemWithRow {
@@ -58,13 +82,13 @@ describe('Column sort — AC1: Default sort mode is custom', () => {
 
   it('columns computed uses sort_order by default', async () => {
     const store = await setupBoardStatuses();
-    store.columnSortModes.value = { 'To Do': 'custom', 'In Progress': 'custom', 'Done': 'custom' };
+    store.columnSortModes.value = { 'To Do': 'custom', 'In Progress': 'custom', Done: 'custom' };
     store.items.value = [
       makeItem({ id: 'c', status: 'To Do', sort_order: 3 }),
       makeItem({ id: 'a', status: 'To Do', sort_order: 1 }),
       makeItem({ id: 'b', status: 'To Do', sort_order: 2 }),
     ];
-    expect(store.columns.value['To Do'].map(i => i.id)).toEqual(['a', 'b', 'c']);
+    expect(store.columns.value['To Do'].map((i) => i.id)).toEqual(['a', 'b', 'c']);
   });
 });
 
@@ -80,24 +104,24 @@ describe('Column sort — AC2: Sort by due date (earliest first, nulls last)', (
 
   it('sorts items by due_date ascending, nulls last', async () => {
     const store = await setupBoardStatuses();
-    store.columnSortModes.value = { 'To Do': 'due_date', 'In Progress': 'custom', 'Done': 'custom' };
+    store.columnSortModes.value = { 'To Do': 'due_date', 'In Progress': 'custom', Done: 'custom' };
     store.items.value = [
       makeItem({ id: 'no-date', status: 'To Do', due_date: '', sort_order: 1 }),
       makeItem({ id: 'late', status: 'To Do', due_date: '2025-12-31', sort_order: 2 }),
       makeItem({ id: 'early', status: 'To Do', due_date: '2025-01-01', sort_order: 3 }),
     ];
-    expect(store.columns.value['To Do'].map(i => i.id)).toEqual(['early', 'late', 'no-date']);
+    expect(store.columns.value['To Do'].map((i) => i.id)).toEqual(['early', 'late', 'no-date']);
   });
 
   it('places multiple undated items after all dated items', async () => {
     const store = await setupBoardStatuses();
-    store.columnSortModes.value = { 'To Do': 'due_date', 'In Progress': 'custom', 'Done': 'custom' };
+    store.columnSortModes.value = { 'To Do': 'due_date', 'In Progress': 'custom', Done: 'custom' };
     store.items.value = [
       makeItem({ id: 'no-date-1', status: 'To Do', due_date: '', sort_order: 1 }),
       makeItem({ id: 'dated', status: 'To Do', due_date: '2025-06-01', sort_order: 2 }),
       makeItem({ id: 'no-date-2', status: 'To Do', due_date: '', sort_order: 3 }),
     ];
-    const ids = store.columns.value['To Do'].map(i => i.id);
+    const ids = store.columns.value['To Do'].map((i) => i.id);
     expect(ids[0]).toBe('dated');
     expect(ids.slice(1)).toEqual(expect.arrayContaining(['no-date-1', 'no-date-2']));
   });
@@ -115,13 +139,13 @@ describe('Column sort — AC3: Sort by creation date (oldest first)', () => {
 
   it('sorts items by created_at ascending', async () => {
     const store = await setupBoardStatuses();
-    store.columnSortModes.value = { 'To Do': 'custom', 'In Progress': 'created', 'Done': 'custom' };
+    store.columnSortModes.value = { 'To Do': 'custom', 'In Progress': 'created', Done: 'custom' };
     store.items.value = [
       makeItem({ id: 'newest', status: 'In Progress', created_at: '2025-03-10T10:00:00Z', sort_order: 1 }),
       makeItem({ id: 'oldest', status: 'In Progress', created_at: '2025-01-01T00:00:00Z', sort_order: 2 }),
       makeItem({ id: 'middle', status: 'In Progress', created_at: '2025-02-01T00:00:00Z', sort_order: 3 }),
     ];
-    expect(store.columns.value['In Progress'].map(i => i.id)).toEqual(['oldest', 'middle', 'newest']);
+    expect(store.columns.value['In Progress'].map((i) => i.id)).toEqual(['oldest', 'middle', 'newest']);
   });
 });
 
@@ -166,7 +190,9 @@ describe('Column sort — AC4: Sort preference persists across reloads', () => {
   });
 
   it('handles localStorage errors gracefully on read', async () => {
-    Storage.prototype.getItem = () => { throw new Error('quota exceeded'); };
+    Storage.prototype.getItem = () => {
+      throw new Error('quota exceeded');
+    };
     const { loadColumnSortModes } = await import('./board-store');
     expect(() => loadColumnSortModes()).not.toThrow();
     // With storage error and no statuses loaded, modes will be empty — just verify no throw
@@ -174,7 +200,9 @@ describe('Column sort — AC4: Sort preference persists across reloads', () => {
 
   it('handles localStorage errors gracefully on write', async () => {
     const { setColumnSortMode } = await import('./board-store');
-    Storage.prototype.setItem = () => { throw new Error('quota exceeded'); };
+    Storage.prototype.setItem = () => {
+      throw new Error('quota exceeded');
+    };
     expect(() => setColumnSortMode('To Do', 'due_date')).not.toThrow();
   });
 
@@ -198,14 +226,14 @@ describe('Column sort — Done column always uses completion date', () => {
   it('columns.Done is always recentDoneItems regardless of sort mode signal', async () => {
     const store = await setupBoardStatuses();
     // Set Done to a non-custom mode (should be ignored for Done column)
-    store.columnSortModes.value = { 'To Do': 'custom', 'In Progress': 'custom', 'Done': 'due_date' };
+    store.columnSortModes.value = { 'To Do': 'custom', 'In Progress': 'custom', Done: 'due_date' };
     const now = new Date().toISOString();
     store.items.value = [
       { ...makeItem({ id: 'done1', status: 'Done', completed_at: now, sort_order: 2 }) },
       { ...makeItem({ id: 'done2', status: 'Done', completed_at: now, sort_order: 1 }) },
     ];
     // Done column comes from recentDoneItems (sorted by sort_order), not the sort signal
-    const doneIds = store.columns.value['Done'].map(i => i.id);
+    const doneIds = store.columns.value['Done'].map((i) => i.id);
     expect(doneIds).toContain('done1');
     expect(doneIds).toContain('done2');
   });

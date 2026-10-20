@@ -1,6 +1,13 @@
 import { useState, useRef, useCallback, useMemo } from 'preact/hooks';
 import { useAuth } from '../../auth/auth-context';
-import { showCreateModal, createModalInitialStatus, createModalInitialDueDate, clearCreateItemUrlParams, owners, labels as labelsStore } from '../../state/board-store';
+import {
+  showCreateModal,
+  createModalInitialStatus,
+  createModalInitialDueDate,
+  clearCreateItemUrlParams,
+  owners,
+  labels as labelsStore,
+} from '../../state/board-store';
 import { createItem, createItemWithSubtasks } from '../../state/actions';
 import type { StagedSubtask } from '../../state/actions';
 import { LabelPickerManager } from '../labels/label-picker-manager';
@@ -11,8 +18,8 @@ import { QuickDateChips } from '../shared/quick-date-chips';
 export function CreateItemModal() {
   const { token, user } = useAuth();
   const defaultOwner = useMemo(
-    () => owners.value.find(o => o.google_account.toLowerCase() === user?.email?.toLowerCase())?.name ?? '',
-    [user?.email]
+    () => owners.value.find((o) => o.google_account.toLowerCase() === user?.email?.toLowerCase())?.name ?? '',
+    [user?.email],
   );
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -37,10 +44,7 @@ export function CreateItemModal() {
   // restore focus to — fall back to the "+" FAB, or the main content region in
   // the Upcoming view where the FAB isn't rendered.
   const restoreFocusTo = useCallback((): HTMLElement | null => {
-    return (
-      document.querySelector<HTMLElement>('.fab') ??
-      document.querySelector<HTMLElement>('.board-main')
-    );
+    return document.querySelector<HTMLElement>('.fab') ?? document.querySelector<HTMLElement>('.board-main');
   }, []);
   const trapRef = useFocusTrap(close, { restoreFocusTo });
 
@@ -68,20 +72,18 @@ export function CreateItemModal() {
   };
 
   const toggleLabel = (label: string) => {
-    setSelectedLabels(prev =>
-      prev.includes(label) ? prev.filter(l => l !== label) : [...prev, label]
-    );
+    setSelectedLabels((prev) => (prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label]));
   };
 
   const addSubtask = () => {
     if (!subtaskInput.trim()) return;
-    setSubtasks(prev => [...prev, { title: subtaskInput.trim(), owner: '' }]);
+    setSubtasks((prev) => [...prev, { title: subtaskInput.trim(), owner: '' }]);
     setSubtaskInput('');
     subtaskInputRef.current?.focus();
   };
 
   const removeSubtask = (index: number) => {
-    setSubtasks(prev => prev.filter((_, i) => i !== index));
+    setSubtasks((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubtaskKeyDown = (e: KeyboardEvent) => {
@@ -99,13 +101,19 @@ export function CreateItemModal() {
   };
 
   return (
-    <div class="modal-overlay" ref={trapRef} onClick={(e) => {
-      if ((e.target as HTMLElement).classList.contains('modal-overlay')) close();
-    }}>
+    <div
+      class="modal-overlay"
+      ref={trapRef}
+      onClick={(e) => {
+        if ((e.target as HTMLElement).classList.contains('modal-overlay')) close();
+      }}
+    >
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="create-modal-title">
         <div class="modal-header">
           <h2 id="create-modal-title">New Item</h2>
-          <button class="btn btn-ghost" onClick={close} aria-label="Close">✕</button>
+          <button class="btn btn-ghost" onClick={close} aria-label="Close">
+            ✕
+          </button>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -136,14 +144,12 @@ export function CreateItemModal() {
 
             <div class="form-field">
               <label for="owner">Owner</label>
-              <select
-                id="owner"
-                value={owner}
-                onChange={(e) => setOwner((e.target as HTMLSelectElement).value)}
-              >
+              <select id="owner" value={owner} onChange={(e) => setOwner((e.target as HTMLSelectElement).value)}>
                 <option value="">Unassigned</option>
-                {owners.value.map(o => (
-                  <option key={o.name} value={o.name}>{o.name}</option>
+                {owners.value.map((o) => (
+                  <option key={o.name} value={o.name}>
+                    {o.name}
+                  </option>
                 ))}
               </select>
             </div>
@@ -163,7 +169,9 @@ export function CreateItemModal() {
                     class="btn-icon date-clear-btn"
                     aria-label="Clear due date"
                     onClick={() => setDueDate('')}
-                  >&#215;</button>
+                  >
+                    &#215;
+                  </button>
                 )}
               </div>
               <QuickDateChips value={dueDate} onChange={setDueDate} />
@@ -171,17 +179,11 @@ export function CreateItemModal() {
 
             <div class="form-field">
               <label>Labels</label>
-              <LabelPickerManager
-                currentLabels={selectedLabels.join(', ')}
-                onToggle={toggleLabel}
-                token={token!}
-              />
+              <LabelPickerManager currentLabels={selectedLabels.join(', ')} onToggle={toggleLabel} token={token!} />
             </div>
 
             <div class="form-field subtasks-section">
-              <label>
-                Sub-tasks{subtasks.length > 0 && ` (${subtasks.length})`}
-              </label>
+              <label>Sub-tasks{subtasks.length > 0 && ` (${subtasks.length})`}</label>
 
               {subtasks.length > 0 && (
                 <ul class="staged-subtasks" role="list">
@@ -193,7 +195,9 @@ export function CreateItemModal() {
                         class="btn-icon staged-subtask-remove"
                         onClick={() => removeSubtask(i)}
                         aria-label={`Remove sub-task: ${s.title}`}
-                      >✕</button>
+                      >
+                        ✕
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -209,19 +213,18 @@ export function CreateItemModal() {
                   onKeyDown={handleSubtaskKeyDown}
                   placeholder="Sub-task title..."
                 />
-                <button
-                  type="button"
-                  class="btn btn-ghost"
-                  onClick={addSubtask}
-                  disabled={!subtaskInput.trim()}
-                >Add</button>
+                <button type="button" class="btn btn-ghost" onClick={addSubtask} disabled={!subtaskInput.trim()}>
+                  Add
+                </button>
               </div>
               <span class="form-hint">Enter to add · Esc to clear</span>
             </div>
           </div>
 
           <div class="modal-footer">
-            <button type="button" class="btn btn-ghost" onClick={close}>Cancel</button>
+            <button type="button" class="btn btn-ghost" onClick={close}>
+              Cancel
+            </button>
             <button type="submit" class="btn btn-primary" disabled={!title.trim()}>
               Create
             </button>

@@ -19,24 +19,46 @@ let mockChildren: any[] = [];
 
 vi.mock('../../state/board-store', () => ({
   selectedItemId: {
-    get value() { return mockSelectedItemId; },
-    set value(v: string | null) { mockSelectedItemId = v; },
+    get value() {
+      return mockSelectedItemId;
+    },
+    set value(v: string | null) {
+      mockSelectedItemId = v;
+    },
   },
-  selectItem: (id: string) => { mockSelectedItemId = id; },
-  clearSelectedItem: () => { mockSelectedItemId = null; },
+  selectItem: (id: string) => {
+    mockSelectedItemId = id;
+  },
+  clearSelectedItem: () => {
+    mockSelectedItemId = null;
+  },
   openDetailWithTitleEdit: { value: false },
   selectedItem: {
     get value() {
       if (!mockSelectedItemId) return null;
       return {
-        id: mockSelectedItemId, title: 'Parent', description: '', status: 'To Do', owner: '',
-        due_date: '', labels: '', parent_id: '', created_at: '2026-01-01T00:00:00Z',
-        updated_at: '2026-01-01T00:00:00Z', completed_at: '', sort_order: 1,
-        created_by: 'luke@example.com', sheetRow: 2,
+        id: mockSelectedItemId,
+        title: 'Parent',
+        description: '',
+        status: 'To Do',
+        owner: '',
+        due_date: '',
+        labels: '',
+        parent_id: '',
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+        completed_at: '',
+        sort_order: 1,
+        created_by: 'luke@example.com',
+        sheetRow: 2,
       };
     },
   },
-  childrenOfSelected: { get value() { return mockChildren; } },
+  childrenOfSelected: {
+    get value() {
+      return mockChildren;
+    },
+  },
   items: { value: [] },
   owners: { value: [] },
   labels: { value: [] },
@@ -45,10 +67,28 @@ vi.mock('../../state/board-store', () => ({
   accessibleBoards: { value: [] },
   activeBoardId: { value: 'board-1' },
   showMoveToBoardModal: { value: false },
-  boardStatuses: { value: [
-    { id: 's1', board_id: 'board-1', name: 'To Do', sort_order: 1, color: '#e3f2fd', is_terminal: false, created_at: '' },
-    { id: 's3', board_id: 'board-1', name: 'Done', sort_order: 3, color: '#e8f5e9', is_terminal: true, created_at: '' },
-  ] },
+  boardStatuses: {
+    value: [
+      {
+        id: 's1',
+        board_id: 'board-1',
+        name: 'To Do',
+        sort_order: 1,
+        color: '#e3f2fd',
+        is_terminal: false,
+        created_at: '',
+      },
+      {
+        id: 's3',
+        board_id: 'board-1',
+        name: 'Done',
+        sort_order: 3,
+        color: '#e8f5e9',
+        is_terminal: true,
+        created_at: '',
+      },
+    ],
+  },
   isTerminalStatus: (name: string) => name === 'Done',
   defaultStatusName: () => 'To Do',
   terminalStatusName: () => 'Done',
@@ -74,9 +114,20 @@ const mockAuth: AuthState = {
 };
 
 const child = (id: string, title: string, status = 'To Do') => ({
-  id, title, description: '', status, owner: '', due_date: '', labels: '', parent_id: 'parent-1',
-  created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z', completed_at: '',
-  sort_order: 1, created_by: 'luke@example.com', sheetRow: 3,
+  id,
+  title,
+  description: '',
+  status,
+  owner: '',
+  due_date: '',
+  labels: '',
+  parent_id: 'parent-1',
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-01-01T00:00:00Z',
+  completed_at: '',
+  sort_order: 1,
+  created_by: 'luke@example.com',
+  sheetRow: 3,
 });
 
 function renderDetail() {
@@ -211,7 +262,7 @@ describe('AC5: confirming deletes exactly once', () => {
 });
 
 describe('AC6: one confirm at a time', () => {
-  it('opening a second sub-task\'s confirm closes the first', () => {
+  it("opening a second sub-task's confirm closes the first", () => {
     const { container } = renderDetail();
     chooseFromMenu(container, 0, 'Delete');
     expect(container.querySelectorAll('.subtask-delete-confirm').length).toBe(1);

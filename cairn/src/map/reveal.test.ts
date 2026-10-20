@@ -127,21 +127,25 @@ describe('revealPoints', () => {
     // Insets that leave only a 4px sliver of visible area on each axis — a
     // single point's own zero-size bounds still fit inside it, so even a
     // point nowhere near that sliver still pans rather than fits.
-    revealPoints(map as unknown as google.maps.Map, [{ lat: 0, lng: 0 }], { left: 900, right: 0, top: 900, bottom: 0 })
+    revealPoints(map as unknown as google.maps.Map, [{ lat: 0, lng: 0 }], {
+      left: 900,
+      right: 0,
+      top: 900,
+      bottom: 0,
+    })
     expect(map.panTo).toHaveBeenCalledTimes(1)
     expect(fitTracksToBounds).not.toHaveBeenCalled()
   })
 
   it('fits bounds, with the inset folded into the padding, when the item cannot fit at the current zoom', () => {
     const map = fakeMap()
-    const points = [{ lat: 9, lng: -9 }, { lat: -9, lng: 9 }]
+    const points = [
+      { lat: 9, lng: -9 },
+      { lat: -9, lng: 9 },
+    ]
     revealPoints(map as unknown as google.maps.Map, points, { left: 400, right: 0, top: 0, bottom: 0 })
     expect(fitTracksToBounds).toHaveBeenCalledTimes(1)
-    expect(fitTracksToBounds).toHaveBeenCalledWith(
-      map,
-      points,
-      expect.objectContaining({ left: 448 }),
-    )
+    expect(fitTracksToBounds).toHaveBeenCalledWith(map, points, expect.objectContaining({ left: 448 }))
     expect(map.panTo).not.toHaveBeenCalled()
   })
 
@@ -155,7 +159,12 @@ describe('revealPoints', () => {
 
   it('fits when there is no visible rect left between opposing insets', () => {
     const map = fakeMap({ width: 100, height: 100 })
-    revealPoints(map as unknown as google.maps.Map, [{ lat: 0, lng: 0 }], { left: 60, right: 60, top: 0, bottom: 0 })
+    revealPoints(map as unknown as google.maps.Map, [{ lat: 0, lng: 0 }], {
+      left: 60,
+      right: 60,
+      top: 0,
+      bottom: 0,
+    })
     expect(fitTracksToBounds).toHaveBeenCalledTimes(1)
   })
 })

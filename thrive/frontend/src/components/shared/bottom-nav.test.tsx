@@ -15,7 +15,9 @@ function renderAt(name: RouteName) {
 
 const tabs = (c: Element) => [...c.querySelectorAll('button')];
 const currentLabel = (c: Element) =>
-  tabs(c).filter((b) => b.getAttribute('aria-current') === 'page').map((b) => b.getAttribute('aria-label'));
+  tabs(c)
+    .filter((b) => b.getAttribute('aria-current') === 'page')
+    .map((b) => b.getAttribute('aria-label'));
 
 describe('BottomNav', () => {
   it('keeps its five tabs in order', () => {

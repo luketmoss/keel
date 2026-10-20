@@ -295,7 +295,13 @@ describe('LocalTripStore', () => {
       store.subscribe(listener)
 
       store.saveOverview(trip.id, [
-        { name: 'Day 1', points: [{ lat: 37, lon: -122 }, { lat: 38, lon: -121 }] },
+        {
+          name: 'Day 1',
+          points: [
+            { lat: 37, lon: -122 },
+            { lat: 38, lon: -121 },
+          ],
+        },
       ])
 
       const overview = store.getOverview(trip.id)
@@ -321,7 +327,13 @@ describe('LocalTripStore', () => {
       const trip = store.createTrip('Hokkaido')
 
       store.saveOverview(trip.id, [
-        { name: 'Day 1', points: [{ lat: 37, lon: -122 }, { lat: 38, lon: -121, elevation: 100 }] },
+        {
+          name: 'Day 1',
+          points: [
+            { lat: 37, lon: -122 },
+            { lat: 38, lon: -121, elevation: 100 },
+          ],
+        },
       ])
 
       const overview = store.getOverview(trip.id) as StoredOverview
@@ -346,7 +358,13 @@ describe('LocalTripStore', () => {
       const trip = store.createTrip('Hokkaido')
 
       store.saveOverview(trip.id, [
-        { name: 'Day 1', points: [{ lat: 37, lon: -122 }, { lat: 38, lon: -121 }] },
+        {
+          name: 'Day 1',
+          points: [
+            { lat: 37, lon: -122 },
+            { lat: 38, lon: -121 },
+          ],
+        },
       ])
       store.saveOverview(trip.id, [])
 
@@ -358,7 +376,13 @@ describe('LocalTripStore', () => {
       const first = new LocalTripStore(storage)
       const trip = first.createTrip('Hokkaido')
       first.saveOverview(trip.id, [
-        { name: 'Day 1', points: [{ lat: 37, lon: -122 }, { lat: 38, lon: -121 }] },
+        {
+          name: 'Day 1',
+          points: [
+            { lat: 37, lon: -122 },
+            { lat: 38, lon: -121 },
+          ],
+        },
       ])
 
       const second = new LocalTripStore(storage)
@@ -371,7 +395,13 @@ describe('LocalTripStore', () => {
       const store = new LocalTripStore(storage)
       const trip = store.createTrip('Hokkaido')
       store.saveOverview(trip.id, [
-        { name: 'Day 1', points: [{ lat: 37, lon: -122 }, { lat: 38, lon: -121 }] },
+        {
+          name: 'Day 1',
+          points: [
+            { lat: 37, lon: -122 },
+            { lat: 38, lon: -121 },
+          ],
+        },
       ])
 
       store.deleteTrip(trip.id)
@@ -413,7 +443,13 @@ describe('LocalTripStore', () => {
       const trip = store.createTrip('Hokkaido')
 
       store.saveOverview(trip.id, [
-        { name: 'Day 1', points: [{ lat: 37, lon: -122 }, { lat: 38, lon: -121 }] },
+        {
+          name: 'Day 1',
+          points: [
+            { lat: 37, lon: -122 },
+            { lat: 38, lon: -121 },
+          ],
+        },
       ])
 
       expect(store.getTrip(trip.id)?.origin).toEqual({ lat: 37, lng: -122 })

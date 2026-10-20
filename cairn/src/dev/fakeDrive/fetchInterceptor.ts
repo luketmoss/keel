@@ -122,7 +122,8 @@ async function handleFilesPatch(
   const add = url.searchParams.get('addParents')
   const remove = url.searchParams.get('removeParents')
 
-  const parents = add || remove ? [...file.parents.filter((p) => p !== remove), ...(add ? [add] : [])] : file.parents
+  const parents =
+    add || remove ? [...file.parents.filter((p) => p !== remove), ...(add ? [add] : [])] : file.parents
 
   await store.patch(id, { trashed: parsed.trashed ?? file.trashed, parents })
   return jsonResponse({ id })
@@ -132,7 +133,10 @@ async function handleFilesPatch(
     two `--boundary`-delimited parts, each a `Content-Type` header, a blank
     line, then a JSON blob. Not a general MIME parser — see this module's
     doc comment on why matching this app's one producer is enough. */
-function parseMultipart(body: string, boundary: string): { metadata: { name: string; parents: string[] }; content: unknown } {
+function parseMultipart(
+  body: string,
+  boundary: string,
+): { metadata: { name: string; parents: string[] }; content: unknown } {
   const segments = body.split(`--${boundary}`)
   const jsonFrom = (segment: string): string => {
     const blankLine = segment.indexOf('\r\n\r\n')
@@ -143,7 +147,11 @@ function parseMultipart(body: string, boundary: string): { metadata: { name: str
   return { metadata, content }
 }
 
-async function handleUploadMultipartCreate(store: FakeDriveStore, body: string, contentType: string): Promise<Response> {
+async function handleUploadMultipartCreate(
+  store: FakeDriveStore,
+  body: string,
+  contentType: string,
+): Promise<Response> {
   const boundaryMatch = /boundary=([^;]+)/.exec(contentType)
   if (!boundaryMatch) return errorResponse(400, 'fake Drive: multipart upload missing a boundary')
   const { metadata, content } = parseMultipart(body, boundaryMatch[1])
@@ -156,7 +164,11 @@ async function handleUploadMultipartCreate(store: FakeDriveStore, body: string, 
   return jsonResponse(fileMetadata(file))
 }
 
-async function handleUploadMediaOverwrite(store: FakeDriveStore, id: string, body: string): Promise<Response> {
+async function handleUploadMediaOverwrite(
+  store: FakeDriveStore,
+  id: string,
+  body: string,
+): Promise<Response> {
   if (!store.get(id)) return errorResponse(404, `fake Drive: no file ${id}`)
   const content = JSON.parse(body) as unknown
   const { file, reportedVersion } = await store.overwrite(id, content)
@@ -170,7 +182,11 @@ function handleResumableInit(body: string): Response {
   return new Response(null, { status: 200, headers: { Location: `${RESUMABLE_PREFIX}${sessionId}` } })
 }
 
-async function handleResumablePut(store: FakeDriveStore, sessionId: string, init: RequestInit): Promise<Response> {
+async function handleResumablePut(
+  store: FakeDriveStore,
+  sessionId: string,
+  init: RequestInit,
+): Promise<Response> {
   const pending = pendingUploads.get(sessionId)
   if (!pending) return errorResponse(404, `fake Drive: unknown upload session ${sessionId}`)
 

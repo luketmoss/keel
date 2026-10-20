@@ -285,7 +285,7 @@ describe('KebabMenu', () => {
       const { container } = render(
         <div onClick={parentClick}>
           <KebabMenu actions={actions} itemTitle="Test" />
-        </div>
+        </div>,
       );
       fireEvent.click(container.querySelector('.kebab-trigger')!);
       expect(parentClick).not.toHaveBeenCalled();
@@ -297,7 +297,7 @@ describe('KebabMenu', () => {
       const { container } = render(
         <div onClick={parentClick}>
           <KebabMenu actions={actions} itemTitle="Test" />
-        </div>
+        </div>,
       );
       fireEvent.click(container.querySelector('.kebab-trigger')!);
       const items = container.querySelectorAll('[role="menuitem"]');

@@ -46,7 +46,7 @@ describe('ShortcutsHelp (Issue #91)', () => {
     it('shows shortcut key labels', () => {
       const { container } = renderHelp();
       const kbds = container.querySelectorAll('kbd.shortcut-keys');
-      const keys = Array.from(kbds).map(k => k.textContent);
+      const keys = Array.from(kbds).map((k) => k.textContent);
       expect(keys).toContain('Ctrl+1-9');
       expect(keys).toContain('?');
       expect(keys).toContain('N');

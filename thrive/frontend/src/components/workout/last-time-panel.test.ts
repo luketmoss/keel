@@ -7,7 +7,7 @@ import type { SetWithRow } from '../../api/types';
 
 // Mock getLastTimeData
 vi.mock('./last-time-data', async () => {
-  const actual = await vi.importActual('./last-time-data') as Record<string, unknown>;
+  const actual = (await vi.importActual('./last-time-data')) as Record<string, unknown>;
   return {
     ...actual,
     getLastTimeData: vi.fn(),

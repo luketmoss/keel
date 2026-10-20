@@ -67,7 +67,7 @@ describe('upsertOwner', () => {
       mockSheetsGetResponse([
         ['Mom', 'mom@example.com'],
         ['Dad', 'dad@example.com'],
-      ])
+      ]),
     );
     // Second call: sheetsAppend — appends the new owner row
     mockFetch.mockResolvedValueOnce(mockSheetsWriteResponse());
@@ -92,7 +92,7 @@ describe('upsertOwner', () => {
       mockSheetsGetResponse([
         ['Mom', 'mom@example.com'],
         ['Luke', 'luke@example.com'],
-      ])
+      ]),
     );
 
     const result = await upsertOwner('Luke', 'luke@example.com', 'test-token');
@@ -108,7 +108,7 @@ describe('upsertOwner', () => {
       mockSheetsGetResponse([
         ['Mom', 'mom@example.com'],
         ['Old Name', 'luke@example.com'],
-      ])
+      ]),
     );
     // sheetsUpdate call
     mockFetch.mockResolvedValueOnce(mockSheetsWriteResponse());
@@ -130,11 +130,7 @@ describe('upsertOwner', () => {
 
   // Email matching should be case-insensitive
   it('matches email case-insensitively', async () => {
-    mockFetch.mockResolvedValueOnce(
-      mockSheetsGetResponse([
-        ['Luke', 'Luke@Example.COM'],
-      ])
-    );
+    mockFetch.mockResolvedValueOnce(mockSheetsGetResponse([['Luke', 'Luke@Example.COM']]));
 
     const result = await upsertOwner('Luke', 'luke@example.com', 'test-token');
 
@@ -161,8 +157,7 @@ describe('upsertOwner', () => {
       text: async () => 'Internal Server Error',
     });
 
-    await expect(upsertOwner('Luke', 'luke@example.com', 'test-token'))
-      .rejects.toThrow('Sheets API 500');
+    await expect(upsertOwner('Luke', 'luke@example.com', 'test-token')).rejects.toThrow('Sheets API 500');
   });
 });
 
@@ -180,9 +175,7 @@ describe('withReauth: stale token triggers silent re-auth (AC2)', () => {
     mockAttemptReauth.mockResolvedValueOnce('fresh-token');
     // Retry call with fresh token: success
     mockFetch.mockResolvedValueOnce(
-      mockSheetsGetResponse([
-        ['id-1', 'Task 1', '', 'To Do', '', '', '', '', '', '', '', '', '1', ''],
-      ])
+      mockSheetsGetResponse([['id-1', 'Task 1', '', 'To Do', '', '', '', '', '', '', '', '', '1', '']]),
     );
 
     const result = await fetchAllItems('stale-token');
@@ -202,9 +195,7 @@ describe('withReauth: stale token triggers silent re-auth (AC2)', () => {
     // Reauth succeeds
     mockAttemptReauth.mockResolvedValueOnce('fresh-token');
     // Retry: success
-    mockFetch.mockResolvedValueOnce(
-      mockSheetsGetResponse([['Mom', 'mom@example.com']])
-    );
+    mockFetch.mockResolvedValueOnce(mockSheetsGetResponse([['Mom', 'mom@example.com']]));
 
     const result = await fetchOwners('stale-token');
 
@@ -225,9 +216,7 @@ describe('withReauth: reauth failure propagates (AC3)', () => {
     // First call: 401
     mockFetch.mockResolvedValueOnce(mock401Response());
     // Reauth fails
-    mockAttemptReauth.mockRejectedValueOnce(
-      new ReauthFailedError(new Error('popup blocked'))
-    );
+    mockAttemptReauth.mockRejectedValueOnce(new ReauthFailedError(new Error('popup blocked')));
 
     await expect(fetchAllItems('stale-token')).rejects.toThrow(ReauthFailedError);
     expect(mockAttemptReauth).toHaveBeenCalledTimes(1);
@@ -245,9 +234,19 @@ describe('withReauth: mid-session 401 retries API call (AC4)', () => {
 
   it('retries updateItemRow with new token after mid-session 401', async () => {
     const item = {
-      id: 'id-1', title: 'Test', description: '', status: 'To Do' as const,
-      owner: '', due_date: '', labels: '', parent_id: '',
-      created_at: '', updated_at: '', completed_at: '', sort_order: 1, created_by: '',
+      id: 'id-1',
+      title: 'Test',
+      description: '',
+      status: 'To Do' as const,
+      owner: '',
+      due_date: '',
+      labels: '',
+      parent_id: '',
+      created_at: '',
+      updated_at: '',
+      completed_at: '',
+      sort_order: 1,
+      created_by: '',
       board_id: '',
     };
 
@@ -275,21 +274,28 @@ describe('withReauth: mid-session reauth failure (AC5)', () => {
 
   it('propagates ReauthFailedError when mid-session reauth fails', async () => {
     const item = {
-      id: 'id-1', title: 'Test', description: '', status: 'To Do' as const,
-      owner: '', due_date: '', labels: '', parent_id: '',
-      created_at: '', updated_at: '', completed_at: '', sort_order: 1, created_by: '',
+      id: 'id-1',
+      title: 'Test',
+      description: '',
+      status: 'To Do' as const,
+      owner: '',
+      due_date: '',
+      labels: '',
+      parent_id: '',
+      created_at: '',
+      updated_at: '',
+      completed_at: '',
+      sort_order: 1,
+      created_by: '',
       board_id: '',
     };
 
     // First call: 401
     mockFetch.mockResolvedValueOnce(mock401Response());
     // Reauth fails
-    mockAttemptReauth.mockRejectedValueOnce(
-      new ReauthFailedError(new Error('consent revoked'))
-    );
+    mockAttemptReauth.mockRejectedValueOnce(new ReauthFailedError(new Error('consent revoked')));
 
-    await expect(updateItemRow(2, item, 'expired-token'))
-      .rejects.toThrow(ReauthFailedError);
+    await expect(updateItemRow(2, item, 'expired-token')).rejects.toThrow(ReauthFailedError);
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 

@@ -8,7 +8,14 @@
 
 import { DAILY_HEALTH_FIELDS, type DailyHealthRow } from '../../api/health-api';
 import { parse } from '../../api/units';
-import { yourRange, valuesInWindow, zoneOf, YOUR_RANGE_MIN_VALUES, type Unwelcome, type Zone } from '../../api/your-range';
+import {
+  yourRange,
+  valuesInWindow,
+  zoneOf,
+  YOUR_RANGE_MIN_VALUES,
+  type Unwelcome,
+  type Zone,
+} from '../../api/your-range';
 import { clock12, hoursMinutes, nightOf, syncTime, syncedLabel } from '../../day/format';
 
 export type HealthMetricKey = 'sleep' | 'resting_hr' | 'hrv' | 'stress' | 'steps';
@@ -34,25 +41,54 @@ const whole = (n: number) => Math.round(n);
 /** Every metric the panel can show, in order. Stress only once #231 adds `stress_avg`. */
 export const HEALTH_METRICS: readonly HealthMetric[] = [
   {
-    key: 'sleep', field: 'sleep_total_s', label: 'Sleep', unwelcome: 'below',
-    toDisplay: (s) => Math.round(s / 60), format: (min) => hoursMinutes(min * 60), unit: '',
+    key: 'sleep',
+    field: 'sleep_total_s',
+    label: 'Sleep',
+    unwelcome: 'below',
+    toDisplay: (s) => Math.round(s / 60),
+    format: (min) => hoursMinutes(min * 60),
+    unit: '',
     inProgressToday: false,
   },
   {
-    key: 'resting_hr', field: 'resting_hr', label: 'Resting HR', unwelcome: 'above',
-    toDisplay: whole, format: String, unit: ' bpm', inProgressToday: false,
+    key: 'resting_hr',
+    field: 'resting_hr',
+    label: 'Resting HR',
+    unwelcome: 'above',
+    toDisplay: whole,
+    format: String,
+    unit: ' bpm',
+    inProgressToday: false,
   },
   {
-    key: 'hrv', field: 'hrv', label: 'HRV', unwelcome: 'below',
-    toDisplay: whole, format: String, unit: ' ms', inProgressToday: false,
+    key: 'hrv',
+    field: 'hrv',
+    label: 'HRV',
+    unwelcome: 'below',
+    toDisplay: whole,
+    format: String,
+    unit: ' ms',
+    inProgressToday: false,
   },
   {
-    key: 'stress', field: 'stress_avg', label: 'Average stress', unwelcome: 'above',
-    toDisplay: whole, format: String, unit: '', inProgressToday: true,
+    key: 'stress',
+    field: 'stress_avg',
+    label: 'Average stress',
+    unwelcome: 'above',
+    toDisplay: whole,
+    format: String,
+    unit: '',
+    inProgressToday: true,
   },
   {
-    key: 'steps', field: 'steps', label: 'Steps', unwelcome: null,
-    toDisplay: whole, format: (n) => n.toLocaleString('en-US'), unit: '', inProgressToday: true,
+    key: 'steps',
+    field: 'steps',
+    label: 'Steps',
+    unwelcome: null,
+    toDisplay: whole,
+    format: (n) => n.toLocaleString('en-US'),
+    unit: '',
+    inProgressToday: true,
   },
 ];
 
@@ -78,8 +114,7 @@ export interface HealthRowView {
 }
 
 export type HealthView =
-  | { kind: 'note'; sub?: string; note: string }
-  | { kind: 'rows'; sub?: string; rows: HealthRowView[] };
+  { kind: 'note'; sub?: string; note: string } | { kind: 'rows'; sub?: string; rows: HealthRowView[] };
 
 const cell = (row: DailyHealthRow, field: string): string => (row as unknown as Record<string, string>)[field] ?? '';
 
@@ -94,7 +129,12 @@ export function seriesOf(rows: readonly DailyHealthRow[], field: string): Map<st
 }
 
 /** The range line for a value on `date`, or the "building" line with fewer than 14 values. */
-export function rangeCaption(metric: HealthMetric, stored: number, series: ReadonlyMap<string, number>, date: string): HealthCaption {
+export function rangeCaption(
+  metric: HealthMetric,
+  stored: number,
+  series: ReadonlyMap<string, number>,
+  date: string,
+): HealthCaption {
   const range = yourRange(series, date);
   if (!range) return { kind: 'building', n: valuesInWindow(series, date) };
   const lo = metric.toDisplay(range.lo);
@@ -107,9 +147,12 @@ export function rangeCaption(metric: HealthMetric, stored: number, series: Reado
 /** A caption as the words it shows (the arrow is drawn separately). */
 export function captionText(c: HealthCaption): string {
   switch (c.kind) {
-    case 'text': return c.text;
-    case 'stages': return c.items.join(' · ');
-    case 'building': return `Building your range — ${c.n} of ${YOUR_RANGE_MIN_VALUES} days so far.`;
+    case 'text':
+      return c.text;
+    case 'stages':
+      return c.items.join(' · ');
+    case 'building':
+      return `Building your range — ${c.n} of ${YOUR_RANGE_MIN_VALUES} days so far.`;
     case 'range':
       return c.zone === 'within'
         ? `Your range ${c.bounds} · in range`
@@ -141,11 +184,20 @@ function sleepCaptions(row: DailyHealthRow): HealthCaption[] {
  * The Health panel for `date`, from every loaded DailyHealth row (any order).
  * Only past and today: the panel never mounts on a future day.
  */
-export function healthView(rows: readonly DailyHealthRow[], date: string, isToday: boolean, fields: readonly string[] = DAILY_HEALTH_FIELDS): HealthView {
+export function healthView(
+  rows: readonly DailyHealthRow[],
+  date: string,
+  isToday: boolean,
+  fields: readonly string[] = DAILY_HEALTH_FIELDS,
+): HealthView {
   const row = rows.find((r) => r.date === date);
   if (!row) {
     return isToday
-      ? { kind: 'note', sub: 'Not synced yet today', note: "Last night's sleep and heart rate, and today's steps, arrive with the next sync." }
+      ? {
+          kind: 'note',
+          sub: 'Not synced yet today',
+          note: "Last night's sleep and heart rate, and today's steps, arrive with the next sync.",
+        }
       : { kind: 'note', note: 'No watch data for this day.' };
   }
 
@@ -158,7 +210,11 @@ export function healthView(rows: readonly DailyHealthRow[], date: string, isToda
       qualifier: metric.key === 'sleep' ? nightOf(date, isToday) : undefined,
     };
     if (stored === null) {
-      return { ...base, value: '', captions: [{ kind: 'text', text: isToday ? 'Arrives with the next sync.' : 'No reading this day.' }] };
+      return {
+        ...base,
+        value: '',
+        captions: [{ kind: 'text', text: isToday ? 'Arrives with the next sync.' : 'No reading this day.' }],
+      };
     }
     const shown = `${metric.format(metric.toDisplay(stored))}${metric.unit}`;
     const captions: HealthCaption[] = metric.key === 'sleep' ? sleepCaptions(row) : [];

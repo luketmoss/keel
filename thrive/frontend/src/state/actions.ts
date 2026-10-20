@@ -1,5 +1,28 @@
 import { batch } from '@preact/signals';
-import { journalEntries, journalSaveSeq, journalSavedSince, exercises, labels, templates, workouts, sets, loading, activeWorkoutId, activeWorkoutSets, activeWarmupExercises, isEditMode, showToast, syncLog, withingsSyncLog, syncRequests, syncAsk, demoSyncPressedAt, dailyHealth, bodyMeasurements, dailySummary } from './store';
+import {
+  journalEntries,
+  journalSaveSeq,
+  journalSavedSince,
+  exercises,
+  labels,
+  templates,
+  workouts,
+  sets,
+  loading,
+  activeWorkoutId,
+  activeWorkoutSets,
+  activeWarmupExercises,
+  isEditMode,
+  showToast,
+  syncLog,
+  withingsSyncLog,
+  syncRequests,
+  syncAsk,
+  demoSyncPressedAt,
+  dailyHealth,
+  bodyMeasurements,
+  dailySummary,
+} from './store';
 import type { HealthTabState, WarmupExerciseInfo } from './store';
 import { templateWarmupsToRestore } from '../components/workout/template-warmups';
 import type { JournalEntry } from '../api/types';
@@ -14,15 +37,61 @@ import { SyncLogNotSetUpError } from '../api/sync-log-errors';
 import { enqueueSet, initPendingCount, shiftQueueAfterDelete, dropQueuedAppend } from '../api/sync-queue';
 import { isDemo } from '../api/demo-data';
 import { throttled } from './page-visible';
-import { fetchExercises, createExercise, updateExercise as updateExerciseApi, deleteExercise as deleteExerciseApi } from '../api/exercises-api';
-import { fetchLabels, createLabel as createLabelApi, updateLabel as updateLabelApi, deleteLabel as deleteLabelApi, appendLabels } from '../api/labels-api';
-import { fetchTemplateRows, groupTemplateRows, createTemplate as createTemplateApi, updateTemplate as updateTemplateApi, deleteTemplate as deleteTemplateApi, updateExerciseNameInTemplates } from '../api/templates-api';
-import { fetchWorkouts, fetchSets, createWorkout as createWorkoutApi, updateWorkout as updateWorkoutApi, deleteWorkoutRows, appendSet as appendSetApi, appendSets as appendSetsApi, updateSet as updateSetApi, deleteSetRow, updateExerciseNameInSets, findWorkoutRow, WorkoutRowMismatchError, builderExercisesToSets, carryPlannedSetValues, replaceWorkoutSets as replaceWorkoutSetsApi, updateSetOrders } from '../api/workouts-api';
+import {
+  fetchExercises,
+  createExercise,
+  updateExercise as updateExerciseApi,
+  deleteExercise as deleteExerciseApi,
+} from '../api/exercises-api';
+import {
+  fetchLabels,
+  createLabel as createLabelApi,
+  updateLabel as updateLabelApi,
+  deleteLabel as deleteLabelApi,
+  appendLabels,
+} from '../api/labels-api';
+import {
+  fetchTemplateRows,
+  groupTemplateRows,
+  createTemplate as createTemplateApi,
+  updateTemplate as updateTemplateApi,
+  deleteTemplate as deleteTemplateApi,
+  updateExerciseNameInTemplates,
+} from '../api/templates-api';
+import {
+  fetchWorkouts,
+  fetchSets,
+  createWorkout as createWorkoutApi,
+  updateWorkout as updateWorkoutApi,
+  deleteWorkoutRows,
+  appendSet as appendSetApi,
+  appendSets as appendSetsApi,
+  updateSet as updateSetApi,
+  deleteSetRow,
+  updateExerciseNameInSets,
+  findWorkoutRow,
+  WorkoutRowMismatchError,
+  builderExercisesToSets,
+  carryPlannedSetValues,
+  replaceWorkoutSets as replaceWorkoutSetsApi,
+  updateSetOrders,
+} from '../api/workouts-api';
 import type { WorkoutPatch, SetOrderWrite } from '../api/workouts-api';
 import { toLocalDateStr, formatPlannedDate } from '../components/activities/activities-helpers';
 import { colorKeyFromName } from '../api/label-colors';
 import type { TemplateExerciseInput } from '../api/templates-api';
-import type { ExerciseWithRow, LabelWithRow, TemplateRowWithRow, Workout, WorkoutWithRow, WorkoutType, WorkoutSet, SetWithRow, BuilderExercise, Effort } from '../api/types';
+import type {
+  ExerciseWithRow,
+  LabelWithRow,
+  TemplateRowWithRow,
+  Workout,
+  WorkoutWithRow,
+  WorkoutType,
+  WorkoutSet,
+  SetWithRow,
+  BuilderExercise,
+  Effort,
+} from '../api/types';
 import { ReauthFailedError } from '../auth/reauth';
 import { SheetsApiError } from '../api/sheets';
 
@@ -50,7 +119,10 @@ async function resolveNewWorkoutRow(workout: Workout, token: string): Promise<Wo
 /** Parse a set range like "4-5" → 5 (upper bound), "3" → 3, "" → 3 (default). */
 export function parseSetCount(setsStr: string): number {
   if (!setsStr.trim()) return 3;
-  const parts = setsStr.split('-').map((s) => Number(s.trim())).filter((n) => !isNaN(n));
+  const parts = setsStr
+    .split('-')
+    .map((s) => Number(s.trim()))
+    .filter((n) => !isNaN(n));
   return parts.length > 0 ? Math.max(...parts) : 3;
 }
 
@@ -147,11 +219,7 @@ export async function refreshLibraryData(token: string): Promise<void> {
       fetchTemplateRows(token),
       fetchLabels(token),
     ]);
-    if (
-      exercises.value !== startExercises ||
-      templates.value !== startTemplates ||
-      labels.value !== startLabels
-    ) {
+    if (exercises.value !== startExercises || templates.value !== startTemplates || labels.value !== startLabels) {
       return;
     }
     batch(() => {
@@ -169,14 +237,15 @@ export async function refreshLibraryData(token: string): Promise<void> {
 export const libraryRefresh = throttled(refreshLibraryData);
 
 /** One-time migration: create label rows for all unique tags found in exercises. */
-async function bootstrapLabels(
-  exerciseData: ExerciseWithRow[],
-  token: string,
-): Promise<LabelWithRow[]> {
+async function bootstrapLabels(exerciseData: ExerciseWithRow[], token: string): Promise<LabelWithRow[]> {
   const tagSet = new Set<string>();
   for (const ex of exerciseData) {
     if (ex.tags) {
-      ex.tags.split(',').map(t => t.trim()).filter(Boolean).forEach(t => tagSet.add(t));
+      ex.tags
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean)
+        .forEach((t) => tagSet.add(t));
     }
   }
   if (tagSet.size === 0) return [];
@@ -209,11 +278,7 @@ export async function loadTemplates(token: string): Promise<void> {
   }
 }
 
-export async function addTemplate(
-  name: string,
-  exerciseInputs: TemplateExerciseInput[],
-  token: string,
-): Promise<void> {
+export async function addTemplate(name: string, exerciseInputs: TemplateExerciseInput[], token: string): Promise<void> {
   try {
     const created = await createTemplateApi(name, exerciseInputs, token);
     templates.value = [...templates.value, created].sort((a, b) => a.name.localeCompare(b.name));
@@ -283,10 +348,7 @@ export async function addExercise(
   }
 }
 
-export async function editExercise(
-  exercise: ExerciseWithRow,
-  token: string,
-): Promise<void> {
+export async function editExercise(exercise: ExerciseWithRow, token: string): Promise<void> {
   try {
     const oldExercise = exercises.value.find((e) => e.id === exercise.id);
     const nameChanged = oldExercise && oldExercise.name !== exercise.name;
@@ -330,7 +392,7 @@ export async function editExercise(
       }
 
       if (cascadeError) {
-        showToast('Exercise renamed, but some references couldn\'t update. Try editing the name again.', 'error');
+        showToast("Exercise renamed, but some references couldn't update. Try editing the name again.", 'error');
         return;
       }
     }
@@ -343,10 +405,7 @@ export async function editExercise(
   }
 }
 
-export async function removeExercise(
-  exercise: ExerciseWithRow,
-  token: string,
-): Promise<void> {
+export async function removeExercise(exercise: ExerciseWithRow, token: string): Promise<void> {
   try {
     await deleteExerciseApi(exercise.sheetRow, token);
     // Re-fetch to get correct sheetRow values after row shift
@@ -364,21 +423,28 @@ export async function removeExercise(
 
 export async function saveWorkoutForLater(
   data: {
-    type: WorkoutType; name: string; template_id?: string; exercises?: BuilderExercise[]; date?: string;
+    type: WorkoutType;
+    name: string;
+    template_id?: string;
+    exercises?: BuilderExercise[];
+    date?: string;
     /** #145: seconds, or '' / omitted when nobody estimated it. Never defaulted. */
     estimated_seconds?: string;
   },
   token: string,
 ): Promise<void> {
   try {
-    const workout = await createWorkoutApi({
-      type: data.type,
-      name: data.name,
-      template_id: data.template_id,
-      date: data.date,
-      status: 'planned',
-      estimated_seconds: data.estimated_seconds,
-    }, token);
+    const workout = await createWorkoutApi(
+      {
+        type: data.type,
+        name: data.name,
+        template_id: data.template_id,
+        date: data.date,
+        status: 'planned',
+        estimated_seconds: data.estimated_seconds,
+      },
+      token,
+    );
 
     const withRow = await resolveNewWorkoutRow(workout, token);
     workouts.value = [withRow, ...workouts.value];
@@ -399,10 +465,7 @@ export async function saveWorkoutForLater(
   }
 }
 
-export async function startPlannedWorkout(
-  workoutId: string,
-  token: string,
-): Promise<string> {
+export async function startPlannedWorkout(workoutId: string, token: string): Promise<string> {
   try {
     const workout = workouts.value.find((w) => w.id === workoutId);
     if (!workout) throw new Error('Workout not found');
@@ -419,7 +482,9 @@ export async function startPlannedWorkout(
 
     // #349 AC5's rule, shared with the resume effect (#351 AC4).
     activeWarmupExercises.value = templateWarmupsToRestore(
-      workout.template_id, activeWorkoutSets.value, templates.value,
+      workout.template_id,
+      activeWorkoutSets.value,
+      templates.value,
     );
 
     return workoutId;
@@ -441,13 +506,16 @@ export async function startWorkout(
   // The new workout, once its row exists and it is in `workouts`.
   let started: Workout | null = null;
   try {
-    const workout = await createWorkoutApi({
-      type: data.type,
-      name: data.name,
-      template_id: data.template_id,
-      copied_from: data.copied_from,
-      status: 'active',
-    }, token);
+    const workout = await createWorkoutApi(
+      {
+        type: data.type,
+        name: data.name,
+        template_id: data.template_id,
+        copied_from: data.copied_from,
+        status: 'active',
+      },
+      token,
+    );
 
     const withRow = await resolveNewWorkoutRow(workout, token);
     workouts.value = [withRow, ...workouts.value];
@@ -569,11 +637,7 @@ async function prepopulateSetsFromBuilder(
 }
 
 /** Append one workout's new set rows, update `sets`, and return its rows with their `sheetRow`s. */
-async function writePrepopulatedSets(
-  workoutId: string,
-  newSets: WorkoutSet[],
-  token: string,
-): Promise<SetWithRow[]> {
+async function writePrepopulatedSets(workoutId: string, newSets: WorkoutSet[], token: string): Promise<SetWithRow[]> {
   if (isDemo()) {
     // In demo mode, appendSets is a no-op and fetchSets returns static data
     // that won't contain our new workout ID. Add the rows to `sets` directly.
@@ -619,22 +683,21 @@ export class SetRowStaleError extends Error {
  * written or queued; the save is refused, the set stays unsaved, and Finish
  * saves it.
  */
-export async function saveSet(
-  set: WorkoutSet,
-  token: string,
-  ownRow?: number,
-): Promise<SetWithRow> {
-  const findByOrder = () => activeWorkoutSets.value.find(
-    (s) => s.workout_id === set.workout_id &&
-           s.exercise_id === set.exercise_id &&
-           s.exercise_order === set.exercise_order &&
-           s.set_number === set.set_number,
-  );
-  const targetRow = () => (ownRow !== undefined ? ownRow : findByOrder()?.sheetRow ?? -1);
+export async function saveSet(set: WorkoutSet, token: string, ownRow?: number): Promise<SetWithRow> {
+  const findByOrder = () =>
+    activeWorkoutSets.value.find(
+      (s) =>
+        s.workout_id === set.workout_id &&
+        s.exercise_id === set.exercise_id &&
+        s.exercise_order === set.exercise_order &&
+        s.set_number === set.set_number,
+    );
+  const targetRow = () => (ownRow !== undefined ? ownRow : (findByOrder()?.sheetRow ?? -1));
 
   if (ownRow !== undefined && ownRow > 0) {
     const at = activeWorkoutSets.value.find((s) => s.sheetRow === ownRow);
-    const holdsThisSet = !!at &&
+    const holdsThisSet =
+      !!at &&
       at.workout_id === set.workout_id &&
       at.exercise_id === set.exercise_id &&
       at.set_number === set.set_number &&
@@ -653,12 +716,8 @@ export async function saveSet(
       await updateSetApi(row, set, token);
       const updated: SetWithRow = { ...set, sheetRow: row };
 
-      activeWorkoutSets.value = activeWorkoutSets.value.map((s) =>
-        s.sheetRow === row ? updated : s,
-      );
-      sets.value = sets.value.map((s) =>
-        s.sheetRow === row ? updated : s,
-      );
+      activeWorkoutSets.value = activeWorkoutSets.value.map((s) => (s.sheetRow === row ? updated : s));
+      sets.value = sets.value.map((s) => (s.sheetRow === row ? updated : s));
       return updated;
     } else {
       // Append new row
@@ -687,9 +746,10 @@ export async function saveSet(
       // existing row, so an earlier match is another set's row — a
       // duplicate's twin at the same order and set number (#389).
       const matches = workoutSets.filter(
-        (s) => s.exercise_id === set.exercise_id &&
-               s.exercise_order === set.exercise_order &&
-               s.set_number === set.set_number,
+        (s) =>
+          s.exercise_id === set.exercise_id &&
+          s.exercise_order === set.exercise_order &&
+          s.set_number === set.set_number,
       );
       return matches[matches.length - 1] || { ...set, sheetRow: -1 };
     }
@@ -710,9 +770,7 @@ export async function saveSet(
  * every set below it holds one less, as in the sheet.
  */
 export function dropAndShiftRows<T extends { sheetRow: number }>(rows: T[], row: number): T[] {
-  return rows
-    .filter((s) => s.sheetRow !== row)
-    .map((s) => (s.sheetRow > row ? { ...s, sheetRow: s.sheetRow - 1 } : s));
+  return rows.filter((s) => s.sheetRow !== row).map((s) => (s.sheetRow > row ? { ...s, sheetRow: s.sheetRow - 1 } : s));
 }
 
 /**
@@ -720,10 +778,7 @@ export function dropAndShiftRows<T extends { sheetRow: number }>(rows: T[], row:
  * `activeWorkoutSets` and the offline queue follow it; rejects (with the
  * "Failed to remove set" toast) having shifted nothing.
  */
-export async function removeSet(
-  set: SetWithRow,
-  token: string,
-): Promise<void> {
+export async function removeSet(set: SetWithRow, token: string): Promise<void> {
   try {
     if (set.sheetRow > 0) {
       const row = set.sheetRow;
@@ -766,11 +821,7 @@ export async function removeSet(
  * the tracker decides what a failure means (a move or a section change
  * swallows it, Finish reports it). Rejects having changed nothing in memory.
  */
-export async function saveExerciseOrders(
-  workoutId: string,
-  rows: SetOrderWrite[],
-  token: string,
-): Promise<void> {
+export async function saveExerciseOrders(workoutId: string, rows: SetOrderWrite[], token: string): Promise<void> {
   if (rows.length === 0) return;
   await updateSetOrders(rows, token);
   const writeOf = new Map(rows.map((r) => [r.sheetRow, r]));
@@ -804,12 +855,16 @@ export async function finishWorkout(
     const startTime = new Date(`${workout.date}T${workout.time || '00:00'}`);
     const elapsedSeconds = Math.round((Date.now() - startTime.getTime()) / 1000);
 
-    const updated = await updateWorkoutApi(workout, {
-      notes,
-      status: '',
-      elapsed_seconds: String(elapsedSeconds > 0 ? elapsedSeconds : ''),
-      effort,
-    }, token);
+    const updated = await updateWorkoutApi(
+      workout,
+      {
+        notes,
+        status: '',
+        elapsed_seconds: String(elapsedSeconds > 0 ? elapsedSeconds : ''),
+        effort,
+      },
+      token,
+    );
 
     workouts.value = workouts.value.map((w) => (w.id === workoutId ? updated : w));
     activeWorkoutId.value = null;
@@ -826,10 +881,7 @@ export async function finishWorkout(
   }
 }
 
-export async function deleteWorkout(
-  workoutId: string,
-  token: string,
-): Promise<void> {
+export async function deleteWorkout(workoutId: string, token: string): Promise<void> {
   try {
     // Corrupted data can have more than one row sharing an id (issue #95) —
     // delete only the first matching row, not every row with this id.
@@ -840,9 +892,7 @@ export async function deleteWorkout(
     // If a duplicate row still shares this id, its Sets rows may be the
     // same rows the sibling duplicate needs — only remove Sets once this
     // is the last row for this id.
-    const workoutSets = matches.length === 1
-      ? sets.value.filter((s) => s.workout_id === workoutId)
-      : [];
+    const workoutSets = matches.length === 1 ? sets.value.filter((s) => s.workout_id === workoutId) : [];
 
     await deleteWorkoutRows(workout, workoutSets, token);
 
@@ -850,10 +900,7 @@ export async function deleteWorkout(
       // Re-fetch so every cached sheetRow reflects the post-delete row
       // shift (Sheets moves every row below the deleted one up by one) —
       // fixes the stale sheetRow bug behind issue #95.
-      const [freshWorkouts, freshSets] = await Promise.all([
-        fetchWorkouts(token),
-        fetchSets(token),
-      ]);
+      const [freshWorkouts, freshSets] = await Promise.all([fetchWorkouts(token), fetchSets(token)]);
       workouts.value = freshWorkouts;
       sets.value = freshSets;
       if (activeWorkoutId.value && activeWorkoutId.value !== workoutId) {
@@ -877,11 +924,7 @@ export async function deleteWorkout(
   }
 }
 
-export async function saveWorkoutAsTemplate(
-  workoutId: string,
-  templateName: string,
-  token: string,
-): Promise<void> {
+export async function saveWorkoutAsTemplate(workoutId: string, templateName: string, token: string): Promise<void> {
   try {
     const workoutSets = sets.value
       .filter((s) => s.workout_id === workoutId)
@@ -924,21 +967,21 @@ export async function saveWorkoutAsTemplate(
   }
 }
 
-export async function copyWorkout(
-  sourceWorkoutId: string,
-  token: string,
-): Promise<string> {
+export async function copyWorkout(sourceWorkoutId: string, token: string): Promise<string> {
   try {
     const source = workouts.value.find((w) => w.id === sourceWorkoutId);
     if (!source) throw new Error('Source workout not found');
 
     // Create new workout referencing the source
-    const workout = await createWorkoutApi({
-      type: source.type,
-      name: source.name,
-      template_id: source.template_id,
-      copied_from: sourceWorkoutId,
-    }, token);
+    const workout = await createWorkoutApi(
+      {
+        type: source.type,
+        name: source.name,
+        template_id: source.template_id,
+        copied_from: sourceWorkoutId,
+      },
+      token,
+    );
 
     const withRow = await resolveNewWorkoutRow(workout, token);
     workouts.value = [withRow, ...workouts.value];
@@ -981,25 +1024,38 @@ export async function copyWorkout(
 }
 
 export async function startSimpleWorkout(
-  data: { type: WorkoutType; name: string; notes: string; elapsed_seconds: string; effort: Effort | '';
-         distance_m: string; ascent_m: string; descent_m: string; avg_hr: string; date?: string;
-         sub_type?: string },
+  data: {
+    type: WorkoutType;
+    name: string;
+    notes: string;
+    elapsed_seconds: string;
+    effort: Effort | '';
+    distance_m: string;
+    ascent_m: string;
+    descent_m: string;
+    avg_hr: string;
+    date?: string;
+    sub_type?: string;
+  },
   token: string,
 ): Promise<void> {
   try {
-    const workout = await createWorkoutApi({
-      type: data.type,
-      name: data.name,
-      notes: data.notes,
-      elapsed_seconds: data.elapsed_seconds,
-      effort: data.effort,
-      distance_m: data.distance_m,
-      ascent_m: data.ascent_m,
-      descent_m: data.descent_m,
-      avg_hr: data.avg_hr,
-      sub_type: data.sub_type,
-      date: data.date,
-    }, token);
+    const workout = await createWorkoutApi(
+      {
+        type: data.type,
+        name: data.name,
+        notes: data.notes,
+        elapsed_seconds: data.elapsed_seconds,
+        effort: data.effort,
+        distance_m: data.distance_m,
+        ascent_m: data.ascent_m,
+        descent_m: data.descent_m,
+        avg_hr: data.avg_hr,
+        sub_type: data.sub_type,
+        date: data.date,
+      },
+      token,
+    );
 
     const withRow = await resolveNewWorkoutRow(workout, token);
     workouts.value = [withRow, ...workouts.value];
@@ -1012,9 +1068,16 @@ export async function startSimpleWorkout(
 }
 
 export interface SimpleWorkoutData {
-  name: string; notes: string; elapsed_seconds: string; effort: Effort | '';
-  distance_m: string; ascent_m: string; descent_m: string; avg_hr: string;
-  sub_type: string; date: string;
+  name: string;
+  notes: string;
+  elapsed_seconds: string;
+  effort: Effort | '';
+  distance_m: string;
+  ascent_m: string;
+  descent_m: string;
+  avg_hr: string;
+  sub_type: string;
+  date: string;
 }
 
 /**
@@ -1022,11 +1085,7 @@ export interface SimpleWorkoutData {
  * form's values go onto the existing row, `status` clears and the active state
  * is released. Never creates a row. `estimated_seconds` stays as the plan's record.
  */
-export async function finishSimpleWorkout(
-  workoutId: string,
-  data: SimpleWorkoutData,
-  token: string,
-): Promise<void> {
+export async function finishSimpleWorkout(workoutId: string, data: SimpleWorkoutData, token: string): Promise<void> {
   try {
     const workout = workouts.value.find((w) => w.id === workoutId);
     if (!workout) throw new Error('Workout not found');
@@ -1062,9 +1121,7 @@ export function enterEditMode(workoutId: string): void {
   if (workout.template_id) {
     const tpl = templates.value.find((t) => t.id === workout.template_id);
     if (tpl) {
-      const existingExerciseIds = new Set(
-        activeWorkoutSets.value.map((s) => s.exercise_id),
-      );
+      const existingExerciseIds = new Set(activeWorkoutSets.value.map((s) => s.exercise_id));
       activeWarmupExercises.value = tpl.exercises
         .filter((ex) => ex.section === 'warmup')
         .filter((ex) => !existingExerciseIds.has(ex.exercise_id))
@@ -1098,9 +1155,21 @@ export function exitEditMode(): void {
  * mile), so re-sending an untouched field would round a synced value and stop
  * it tracking COROS.
  */
-export type EditWorkoutData = Partial<Pick<Workout,
-  'date' | 'name' | 'notes' | 'elapsed_seconds' | 'effort'
-  | 'distance_m' | 'ascent_m' | 'descent_m' | 'avg_hr' | 'sub_type'>>;
+export type EditWorkoutData = Partial<
+  Pick<
+    Workout,
+    | 'date'
+    | 'name'
+    | 'notes'
+    | 'elapsed_seconds'
+    | 'effort'
+    | 'distance_m'
+    | 'ascent_m'
+    | 'descent_m'
+    | 'avg_hr'
+    | 'sub_type'
+  >
+>;
 
 export interface EditSetData {
   exercise_id: string;
@@ -1144,18 +1213,22 @@ export async function saveWorkoutEdits(
     // updates landed a row low per deletion: stale copies above, and the next
     // workout's first sets overwritten below (#177).
     for (const s of existingSets) {
-      await updateSetApi(s.sheetRow, {
-        workout_id: workoutId,
-        exercise_id: s.exercise_id,
-        exercise_name: s.exercise_name,
-        section: s.section,
-        exercise_order: s.exercise_order,
-        set_number: s.set_number,
-        planned_reps: s.planned_reps,
-        weight: s.weight,
-        reps: s.reps,
-        effort: s.effort as SetWithRow['effort'],
-      }, token);
+      await updateSetApi(
+        s.sheetRow,
+        {
+          workout_id: workoutId,
+          exercise_id: s.exercise_id,
+          exercise_name: s.exercise_name,
+          section: s.section,
+          exercise_order: s.exercise_order,
+          set_number: s.set_number,
+          planned_reps: s.planned_reps,
+          weight: s.weight,
+          reps: s.reps,
+          effort: s.effort as SetWithRow['effort'],
+        },
+        token,
+      );
     }
 
     // Then delete removed rows bottom-to-top, so each delete leaves the rows
@@ -1324,12 +1397,7 @@ export async function saveSimpleWorkoutEdits(
  * @param today the Day view's today, so the toast says "Moved to today" for it
  *   and "Rescheduled to <formatPlannedDate>" for any other date.
  */
-export async function rescheduleWorkout(
-  workoutId: string,
-  date: string,
-  token: string,
-  today: string,
-): Promise<void> {
+export async function rescheduleWorkout(workoutId: string, date: string, token: string, today: string): Promise<void> {
   try {
     const workout = workouts.value.find((w) => w.id === workoutId);
     if (!workout) throw new Error('Workout not found');
@@ -1352,10 +1420,7 @@ export async function rescheduleWorkout(
 
 // ── Labels ──────────────────────────────────────────────────────────
 
-export async function addLabel(
-  data: { name: string; color_key: string },
-  token: string,
-): Promise<LabelWithRow> {
+export async function addLabel(data: { name: string; color_key: string }, token: string): Promise<LabelWithRow> {
   try {
     const created = await createLabelApi(data, token);
     const withRow: LabelWithRow = {
@@ -1372,31 +1437,34 @@ export async function addLabel(
   }
 }
 
-export async function renameLabel(
-  label: LabelWithRow,
-  newName: string,
-  token: string,
-): Promise<void> {
+export async function renameLabel(label: LabelWithRow, newName: string, token: string): Promise<void> {
   try {
     const oldName = label.name;
 
     // Update all exercises that have this tag
-    const affected = exercises.value.filter(ex =>
-      ex.tags.split(',').map(t => t.trim()).filter(Boolean).includes(oldName),
+    const affected = exercises.value.filter((ex) =>
+      ex.tags
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean)
+        .includes(oldName),
     );
 
     for (const ex of affected) {
-      const tags = ex.tags.split(',').map(t => t.trim()).filter(Boolean);
-      const updated = tags.map(t => t === oldName ? newName : t).join(', ');
+      const tags = ex.tags
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
+      const updated = tags.map((t) => (t === oldName ? newName : t)).join(', ');
       const updatedEx: ExerciseWithRow = { ...ex, tags: updated };
       await updateExerciseApi(ex.sheetRow, updatedEx, token);
-      exercises.value = exercises.value.map(e => e.id === ex.id ? updatedEx : e);
+      exercises.value = exercises.value.map((e) => (e.id === ex.id ? updatedEx : e));
     }
 
     // Update the label itself
     const updatedLabel: LabelWithRow = { ...label, name: newName };
     await updateLabelApi(label.sheetRow, updatedLabel, token);
-    labels.value = labels.value.map(l => l.id === label.id ? updatedLabel : l);
+    labels.value = labels.value.map((l) => (l.id === label.id ? updatedLabel : l));
 
     showToast(`Renamed '${oldName}' to '${newName}' across ${affected.length} exercises`, 'success');
   } catch (err) {
@@ -1406,15 +1474,11 @@ export async function renameLabel(
   }
 }
 
-export async function updateLabelColor(
-  label: LabelWithRow,
-  newColorKey: string,
-  token: string,
-): Promise<void> {
+export async function updateLabelColor(label: LabelWithRow, newColorKey: string, token: string): Promise<void> {
   try {
     const updatedLabel: LabelWithRow = { ...label, color_key: newColorKey };
     await updateLabelApi(label.sheetRow, updatedLabel, token);
-    labels.value = labels.value.map(l => l.id === label.id ? updatedLabel : l);
+    labels.value = labels.value.map((l) => (l.id === label.id ? updatedLabel : l));
   } catch (err) {
     if (isReauthFailure(err)) throw err;
     showToast('Failed to update label color', 'error');
@@ -1422,24 +1486,28 @@ export async function updateLabelColor(
   }
 }
 
-export async function removeLabel(
-  label: LabelWithRow,
-  token: string,
-): Promise<number> {
+export async function removeLabel(label: LabelWithRow, token: string): Promise<number> {
   try {
     const labelName = label.name;
 
     // Remove from all exercises that have this tag
-    const affected = exercises.value.filter(ex =>
-      ex.tags.split(',').map(t => t.trim()).filter(Boolean).includes(labelName),
+    const affected = exercises.value.filter((ex) =>
+      ex.tags
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean)
+        .includes(labelName),
     );
 
     for (const ex of affected) {
-      const tags = ex.tags.split(',').map(t => t.trim()).filter(Boolean);
-      const updated = tags.filter(t => t !== labelName).join(', ');
+      const tags = ex.tags
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
+      const updated = tags.filter((t) => t !== labelName).join(', ');
       const updatedEx: ExerciseWithRow = { ...ex, tags: updated };
       await updateExerciseApi(ex.sheetRow, updatedEx, token);
-      exercises.value = exercises.value.map(e => e.id === ex.id ? updatedEx : e);
+      exercises.value = exercises.value.map((e) => (e.id === ex.id ? updatedEx : e));
     }
 
     // Delete the label row
@@ -1506,7 +1574,9 @@ export async function loadWithingsSyncLog(token: string): Promise<void> {
  * start (the guard `healthRefresh` uses). Two Sheets reads each time.
  */
 export const syncLogsRefresh = throttled(
-  async (token: string) => { await Promise.all([loadSyncLog(token), loadWithingsSyncLog(token)]); },
+  async (token: string) => {
+    await Promise.all([loadSyncLog(token), loadWithingsSyncLog(token)]);
+  },
   { minIntervalMs: 60_000 },
 );
 
@@ -1540,7 +1610,10 @@ export async function requestSyncNow(
 ): Promise<void> {
   if (vendors.length === 0 || syncAsk.value === 'asking') return;
   if (isDemo()) {
-    if (demoSyncNowScenario() === 'append-failed') { syncAsk.value = 'failed'; return; }
+    if (demoSyncNowScenario() === 'append-failed') {
+      syncAsk.value = 'failed';
+      return;
+    }
     syncAsk.value = 'idle';
     demoSyncPressedAt.value = Date.now();
     return;
@@ -1550,7 +1623,10 @@ export async function requestSyncNow(
   try {
     appended = await appendSyncRequests(vendors, email, token);
   } catch (err) {
-    if (isReauthFailure(err)) { syncAsk.value = 'idle'; return; }
+    if (isReauthFailure(err)) {
+      syncAsk.value = 'idle';
+      return;
+    }
     console.error('Failed to append SyncRequests:', err);
     syncAsk.value = 'failed';
     return;
@@ -1558,7 +1634,10 @@ export async function requestSyncNow(
   syncAsk.value = 'idle';
   // The append may have re-authed; the token it succeeded with is the live one.
   const live = appended.token;
-  const dispatching = requestSync(appended.rows.map((row) => row[0]), live);
+  const dispatching = requestSync(
+    appended.rows.map((row) => row[0]),
+    live,
+  );
   await loadSyncRequests(live);
   const outcome = await dispatching;
   if (!outcome.ok) {
@@ -1605,7 +1684,11 @@ export function loadHealth(token: string): Promise<void> {
     loadHealthTab(dailyHealth, fetchDailyHealth, token, 'DailyHealth'),
     loadHealthTab(bodyMeasurements, fetchBodyMeasurements, token, 'BodyMeasurements'),
     loadHealthTab(dailySummary, fetchDailySummary, token, 'DailySummary'),
-  ]).then(() => undefined).finally(() => { healthInFlight = null; });
+  ])
+    .then(() => undefined)
+    .finally(() => {
+      healthInFlight = null;
+    });
   return healthInFlight;
 }
 
@@ -1649,7 +1732,9 @@ async function readJournal(token: string): Promise<void> {
 
 export function loadJournal(token: string): Promise<void> {
   if (journalInFlight) return journalInFlight;
-  journalInFlight = readJournal(token).finally(() => { journalInFlight = null; });
+  journalInFlight = readJournal(token).finally(() => {
+    journalInFlight = null;
+  });
   return journalInFlight;
 }
 

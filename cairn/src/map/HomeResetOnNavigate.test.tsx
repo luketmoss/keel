@@ -3,7 +3,12 @@ import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const { fitTracksToBounds } = vi.hoisted(() => ({ fitTracksToBounds: vi.fn() }))
-vi.mock('@keel/geo', async (importOriginal) => ({ ...(await importOriginal<typeof import('@keel/geo')>()), fitTracksToBounds, zoomToFitCluster: vi.fn(), FIT_PADDING: 48 }))
+vi.mock('@keel/geo', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@keel/geo')>()),
+  fitTracksToBounds,
+  zoomToFitCluster: vi.fn(),
+  FIT_PADDING: 48,
+}))
 
 const { fakeMap } = vi.hoisted(() => ({ fakeMap: { id: 'fake-map' } }))
 vi.mock('@vis.gl/react-google-maps', () => ({ useMap: () => fakeMap }))

@@ -94,9 +94,7 @@ describe('ProfileDialog (Issue #40)', () => {
 
       // Wait for async
       await vi.waitFor(() => {
-        expect(mockUpdateDisplayName).toHaveBeenCalledWith(
-          'New Name', 'test@example.com', 'Test User', 'mock-token'
-        );
+        expect(mockUpdateDisplayName).toHaveBeenCalledWith('New Name', 'test@example.com', 'Test User', 'mock-token');
       });
     });
 
@@ -114,7 +112,12 @@ describe('ProfileDialog (Issue #40)', () => {
 
     it('shows loading state on save button while saving', async () => {
       let resolvePromise: (v: boolean) => void;
-      mockUpdateDisplayName.mockImplementation(() => new Promise(r => { resolvePromise = r; }));
+      mockUpdateDisplayName.mockImplementation(
+        () =>
+          new Promise((r) => {
+            resolvePromise = r;
+          }),
+      );
       const { container } = render(<ProfileDialog {...defaultProps} />);
       const form = container.querySelector('form') as HTMLFormElement;
       const saveBtn = container.querySelector('button[type="submit"]') as HTMLButtonElement;
@@ -213,9 +216,7 @@ describe('ProfileDialog (Issue #40)', () => {
   describe('AC5: Cancel / dismiss without saving', () => {
     it('calls onClose when Cancel is clicked', () => {
       const { container } = render(<ProfileDialog {...defaultProps} />);
-      const cancelBtn = Array.from(container.querySelectorAll('button')).find(
-        b => b.textContent === 'Cancel'
-      );
+      const cancelBtn = Array.from(container.querySelectorAll('button')).find((b) => b.textContent === 'Cancel');
       fireEvent.click(cancelBtn!);
       expect(defaultProps.onClose).toHaveBeenCalled();
     });
@@ -278,9 +279,7 @@ describe('ProfileDialog — Display name persistence (Issue #61)', () => {
     it('calls onNameUpdated with new name on successful save', async () => {
       mockUpdateDisplayName.mockResolvedValue(true);
       const onNameUpdated = vi.fn();
-      const { container } = render(
-        <ProfileDialog {...defaultProps} onNameUpdated={onNameUpdated} />
-      );
+      const { container } = render(<ProfileDialog {...defaultProps} onNameUpdated={onNameUpdated} />);
       const nameInput = container.querySelector('#profile-name') as HTMLInputElement;
       const form = container.querySelector('form') as HTMLFormElement;
 
@@ -295,9 +294,7 @@ describe('ProfileDialog — Display name persistence (Issue #61)', () => {
     it('does not call onNameUpdated on save failure', async () => {
       mockUpdateDisplayName.mockRejectedValue(new Error('fail'));
       const onNameUpdated = vi.fn();
-      const { container } = render(
-        <ProfileDialog {...defaultProps} onNameUpdated={onNameUpdated} />
-      );
+      const { container } = render(<ProfileDialog {...defaultProps} onNameUpdated={onNameUpdated} />);
       const form = container.querySelector('form') as HTMLFormElement;
 
       fireEvent.submit(form);
@@ -323,9 +320,7 @@ describe('ProfileDialog — Display name persistence (Issue #61)', () => {
       fireEvent.submit(form);
 
       await vi.waitFor(() => {
-        expect(mockUpdateDisplayName).toHaveBeenCalledWith(
-          'A', 'test@example.com', 'Alice', 'mock-token'
-        );
+        expect(mockUpdateDisplayName).toHaveBeenCalledWith('A', 'test@example.com', 'Alice', 'mock-token');
       });
     });
   });

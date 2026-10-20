@@ -1,11 +1,5 @@
 import { useCallback } from 'preact/hooks';
-import {
-  upcomingBuckets,
-  boards,
-  selectItem,
-  openDetailWithTitleEdit,
-  getChildCount,
-} from '../../state/board-store';
+import { upcomingBuckets, boards, selectItem, openDetailWithTitleEdit, getChildCount } from '../../state/board-store';
 import type { ItemWithRow } from '../../api/types';
 import { LabelBadge } from '../shared/label-badge';
 import { BoardBadge } from './board-badge';
@@ -31,7 +25,7 @@ export function UpcomingView() {
   return (
     <div class="upcoming-view" data-testid="upcoming-view">
       <div class="board-columns" data-testid="upcoming-buckets">
-        {buckets.map(bucket => (
+        {buckets.map((bucket) => (
           <div
             key={bucket.key}
             class={`column upcoming-bucket-${bucket.key}`}
@@ -46,7 +40,7 @@ export function UpcomingView() {
               </div>
             </div>
             <div class="column-cards">
-              {bucket.items.map(item => (
+              {bucket.items.map((item) => (
                 <UpcomingCard key={item.id} item={item} onClick={handleCardClick} />
               ))}
             </div>
@@ -65,12 +59,15 @@ interface UpcomingCardProps {
 function UpcomingCard({ item, onClick }: UpcomingCardProps) {
   const childCount = getChildCount(item.id);
   const itemLabels = item.labels
-    ? item.labels.split(',').map(l => l.trim()).filter(Boolean)
+    ? item.labels
+        .split(',')
+        .map((l) => l.trim())
+        .filter(Boolean)
     : [];
-  const board = boards.value.find(b => b.id === item.board_id);
+  const board = boards.value.find((b) => b.id === item.board_id);
 
-  const isOverdue = item.due_date && item.status !== 'Done' &&
-    parseLocalDate(item.due_date) < new Date(new Date().toDateString());
+  const isOverdue =
+    item.due_date && item.status !== 'Done' && parseLocalDate(item.due_date) < new Date(new Date().toDateString());
 
   return (
     <div
@@ -101,29 +98,24 @@ function UpcomingCard({ item, onClick }: UpcomingCardProps) {
           {item.title}
         </button>
 
-        {item.description && (
-          <div class="card-description">{item.description}</div>
-        )}
+        {item.description && <div class="card-description">{item.description}</div>}
 
         <div class="card-meta">
-          {item.owner ? (
-            <span class="card-owner">{item.owner}</span>
-          ) : (
-            <span class="card-unassigned">Unassigned</span>
-          )}
+          {item.owner ? <span class="card-owner">{item.owner}</span> : <span class="card-unassigned">Unassigned</span>}
           {item.due_date && (
             <span
               class={`card-due ${isOverdue ? 'card-due-overdue' : ''}`}
               aria-label={`Due date: ${formatDate(item.due_date)}${isOverdue ? ', overdue' : ''}`}
             >
-              {'\u{23F0}'} Due: {formatDate(item.due_date)}{isOverdue ? ' (overdue)' : ''}
+              {'\u{23F0}'} Due: {formatDate(item.due_date)}
+              {isOverdue ? ' (overdue)' : ''}
             </span>
           )}
         </div>
 
         <div class="upcoming-card-badges">
           {board && <BoardBadge board={board} />}
-          {itemLabels.map(label => (
+          {itemLabels.map((label) => (
             <LabelBadge key={label} label={label} />
           ))}
         </div>
@@ -141,7 +133,9 @@ function UpcomingCard({ item, onClick }: UpcomingCardProps) {
               class="subtask-bar"
               style={{ '--progress': `${(childCount.done / childCount.total) * 100}%` } as any}
             />
-            <span class="subtask-text">{childCount.done}/{childCount.total}</span>
+            <span class="subtask-text">
+              {childCount.done}/{childCount.total}
+            </span>
           </div>
         )}
       </div>

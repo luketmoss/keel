@@ -1,11 +1,23 @@
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import {
-  boards, activeBoardId, switchBoard, showCreateBoardModal, showShareModal,
-  accessibleBoards, userBoardRole,
-  filterLabel, filterSearch, filterDue, groupBy, setGroupBy,
-  boardLabels as labelsStore, rootItems,
+  boards,
+  activeBoardId,
+  switchBoard,
+  showCreateBoardModal,
+  showShareModal,
+  accessibleBoards,
+  userBoardRole,
+  filterLabel,
+  filterSearch,
+  filterDue,
+  groupBy,
+  setGroupBy,
+  boardLabels as labelsStore,
+  rootItems,
   activeView,
-  upcomingFilterSearch, upcomingFilterBoards, toggleUpcomingBoard,
+  upcomingFilterSearch,
+  upcomingFilterBoards,
+  toggleUpcomingBoard,
 } from '../../state/board-store';
 
 /**
@@ -27,7 +39,10 @@ export function ControlBar() {
   useEffect(() => {
     if (!filtersExpanded) return;
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.stopPropagation(); setFiltersExpanded(false); }
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        setFiltersExpanded(false);
+      }
     };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
@@ -38,8 +53,10 @@ export function ControlBar() {
     if (!menuOpen) return;
     const handleClickOutside = (e: MouseEvent) => {
       if (
-        menuDropdownRef.current && !menuDropdownRef.current.contains(e.target as Node) &&
-        menuBtnRef.current && !menuBtnRef.current.contains(e.target as Node)
+        menuDropdownRef.current &&
+        !menuDropdownRef.current.contains(e.target as Node) &&
+        menuBtnRef.current &&
+        !menuBtnRef.current.contains(e.target as Node)
       ) {
         setMenuOpen(false);
       }
@@ -59,7 +76,9 @@ export function ControlBar() {
       }
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();
-        const items = menuDropdownRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"], [role="menuitemradio"]');
+        const items = menuDropdownRef.current?.querySelectorAll<HTMLElement>(
+          '[role="menuitem"], [role="menuitemradio"]',
+        );
         if (!items || items.length === 0) return;
         const focused = document.activeElement as HTMLElement;
         const idx = Array.from(items).indexOf(focused);
@@ -106,12 +125,15 @@ export function ControlBar() {
   }, []);
 
   // Escape in search input clears it
-  const handleSearchKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape' && localSearch) {
-      e.preventDefault();
-      clearSearch();
-    }
-  }, [localSearch, clearSearch]);
+  const handleSearchKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && localSearch) {
+        e.preventDefault();
+        clearSearch();
+      }
+    },
+    [localSearch, clearSearch],
+  );
 
   // Upcoming search state
   const [localUpcomingSearch, setLocalUpcomingSearch] = useState('');
@@ -133,12 +155,15 @@ export function ControlBar() {
     upcomingSearchRef.current?.focus();
   }, []);
 
-  const handleUpcomingSearchKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape' && localUpcomingSearch) {
-      e.preventDefault();
-      clearUpcomingSearch();
-    }
-  }, [localUpcomingSearch, clearUpcomingSearch]);
+  const handleUpcomingSearchKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && localUpcomingSearch) {
+        e.preventDefault();
+        clearUpcomingSearch();
+      }
+    },
+    [localUpcomingSearch, clearUpcomingSearch],
+  );
 
   const handleBoardChange = (e: Event) => {
     const value = (e.target as HTMLSelectElement).value;
@@ -153,10 +178,7 @@ export function ControlBar() {
   const isOwner = userBoardRole.value === 'owner';
 
   // Active filter count for mobile badge
-  const activeCount =
-    (filterSearch.value ? 1 : 0) +
-    (filterDue.value ? 1 : 0) +
-    (filterLabel.value ? 1 : 0);
+  const activeCount = (filterSearch.value ? 1 : 0) + (filterDue.value ? 1 : 0) + (filterLabel.value ? 1 : 0);
 
   // Filtered card count for live region
   const filteredCount = rootItems.value.length;
@@ -167,7 +189,9 @@ export function ControlBar() {
       <div class="control-bar" data-testid="control-bar">
         <button
           class="btn btn-primary"
-          onClick={() => { showCreateBoardModal.value = true; }}
+          onClick={() => {
+            showCreateBoardModal.value = true;
+          }}
         >
           + New Board
         </button>
@@ -190,25 +214,38 @@ export function ControlBar() {
 
   // Upcoming view: show search + board chips only
   // Shared filter popup renderer (mobile bottom sheet)
-  const renderFilterPopup = (content: any, hasActive: boolean, onReset?: () => void) => (
+  const renderFilterPopup = (content: any, hasActive: boolean, onReset?: () => void) =>
     filtersExpanded ? (
       <div class="filter-popup-backdrop" onClick={closeFilters}>
-        <div
-          class="filter-popup"
-          role="dialog"
-          aria-label="Filters"
-          onClick={(e: Event) => e.stopPropagation()}
-        >
+        <div class="filter-popup" role="dialog" aria-label="Filters" onClick={(e: Event) => e.stopPropagation()}>
           <div class="filter-popup-header">
             <span class="filter-popup-title">Filters</span>
             <div class="filter-popup-header-actions">
               {hasActive && onReset && (
-                <button class="filter-popup-reset" onClick={() => { onReset(); closeFilters(); }}>
+                <button
+                  class="filter-popup-reset"
+                  onClick={() => {
+                    onReset();
+                    closeFilters();
+                  }}
+                >
                   Reset
                 </button>
               )}
               <button class="filter-popup-close" onClick={closeFilters} aria-label="Close filters">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M18 6L6 18" />
+                  <path d="M6 6l12 12" />
+                </svg>
               </button>
             </div>
           </div>
@@ -220,13 +257,11 @@ export function ControlBar() {
           </div>
         </div>
       </div>
-    ) : null
-  );
+    ) : null;
 
   if (isUpcoming) {
     const upcomingActiveCount =
-      (upcomingFilterSearch.value ? 1 : 0) +
-      (upcomingFilterBoards.value.size < accessibleBoards.value.length ? 1 : 0);
+      (upcomingFilterSearch.value ? 1 : 0) + (upcomingFilterBoards.value.size < accessibleBoards.value.length ? 1 : 0);
 
     const upcomingFilterChips = (
       <>
@@ -255,9 +290,14 @@ export function ControlBar() {
         </div>
 
         {accessibleBoards.value.length > 1 && (
-          <div role="group" aria-label="Filter by board" class="filter-chip-group" data-testid="upcoming-board-filter-group">
+          <div
+            role="group"
+            aria-label="Filter by board"
+            class="filter-chip-group"
+            data-testid="upcoming-board-filter-group"
+          >
             <span class="filter-chip-group-label">Board:</span>
-            {accessibleBoards.value.map(b => {
+            {accessibleBoards.value.map((b) => {
               const active = upcomingFilterBoards.value.has(b.id);
               return (
                 <button
@@ -283,7 +323,7 @@ export function ControlBar() {
           <button
             class="filter-toggle"
             aria-expanded={filtersExpanded}
-            onClick={() => setFiltersExpanded(prev => !prev)}
+            onClick={() => setFiltersExpanded((prev) => !prev)}
             data-testid="upcoming-filter-toggle"
           >
             Filters
@@ -333,7 +373,7 @@ export function ControlBar() {
       {/* AC4/AC5: Due date chips */}
       <div role="group" aria-label="Filter by due date" class="filter-chip-group" data-testid="filter-due-group">
         <span class="filter-chip-group-label">Due:</span>
-        {(['today', 'this-week'] as const).map(due => {
+        {(['today', 'this-week'] as const).map((due) => {
           const active = filterDue.value === due;
           const label = due === 'today' ? 'Today' : 'This Week';
           return (
@@ -353,7 +393,7 @@ export function ControlBar() {
       {/* Label chips */}
       <div role="group" aria-label="Filter by label" class="filter-chip-group">
         <span class="filter-chip-group-label">Label:</span>
-        {labelsStore.value.map(l => {
+        {labelsStore.value.map((l) => {
           const active = filterLabel.value === l.label;
           return (
             <button
@@ -361,7 +401,9 @@ export function ControlBar() {
               class={`filter-chip filter-chip-label${active ? ' filter-chip-active' : ''}`}
               aria-pressed={active ? 'true' : 'false'}
               style={`--label-color: ${l.color}`}
-              onClick={() => { filterLabel.value = active ? null : l.label; }}
+              onClick={() => {
+                filterLabel.value = active ? null : l.label;
+              }}
             >
               {l.label}
             </button>
@@ -375,7 +417,9 @@ export function ControlBar() {
     <div class="control-bar" data-testid="control-bar">
       {/* Board selector */}
       <div class="control-bar-section">
-        <span id="board-switcher-hint" class="sr-only">{BOARD_SWITCHER_HINT}</span>
+        <span id="board-switcher-hint" class="sr-only">
+          {BOARD_SWITCHER_HINT}
+        </span>
         <select
           class="board-switcher-select"
           value={activeBoardId.value}
@@ -399,15 +443,13 @@ export function ControlBar() {
       {/* Filters section */}
       <div class="control-bar-section control-bar-filters">
         {/* Mobile: search always visible in bar (hidden on desktop via CSS) */}
-        <div class="control-bar-mobile-search">
-          {searchInput}
-        </div>
+        <div class="control-bar-mobile-search">{searchInput}</div>
 
         {/* Mobile: Filters toggle */}
         <button
           class="filter-toggle"
           aria-expanded={filtersExpanded}
-          onClick={() => setFiltersExpanded(prev => !prev)}
+          onClick={() => setFiltersExpanded((prev) => !prev)}
           data-testid="control-bar-filter-toggle"
         >
           Filters
@@ -428,7 +470,7 @@ export function ControlBar() {
 
         {/* AC10: Live region for screen readers */}
         <div aria-live="polite" class="sr-only" data-testid="filter-live-region">
-          {(filterSearch.value || filterDue.value || filterLabel.value) ? `${filteredCount} cards shown` : ''}
+          {filterSearch.value || filterDue.value || filterLabel.value ? `${filteredCount} cards shown` : ''}
         </div>
       </div>
 
@@ -440,20 +482,17 @@ export function ControlBar() {
           aria-label="More options"
           aria-expanded={menuOpen}
           aria-haspopup="true"
-          onClick={() => setMenuOpen(prev => !prev)}
+          onClick={() => setMenuOpen((prev) => !prev)}
           data-testid="overflow-menu-btn"
         >
           ⋯
         </button>
         {menuOpen && (
-          <div
-            ref={menuDropdownRef}
-            role="menu"
-            class="overflow-menu-dropdown"
-            data-testid="overflow-menu-dropdown"
-          >
+          <div ref={menuDropdownRef} role="menu" class="overflow-menu-dropdown" data-testid="overflow-menu-dropdown">
             {/* GROUPING section */}
-            <div class="overflow-menu-section-header" role="presentation">Grouping</div>
+            <div class="overflow-menu-section-header" role="presentation">
+              Grouping
+            </div>
             <button
               role="menuitemradio"
               class={`overflow-menu-item${groupBy.value === 'none' ? ' overflow-menu-item-checked' : ''}`}
@@ -486,11 +525,16 @@ export function ControlBar() {
             {isOwner && (
               <>
                 <hr class="overflow-menu-divider" />
-                <div class="overflow-menu-section-header" role="presentation">Settings</div>
+                <div class="overflow-menu-section-header" role="presentation">
+                  Settings
+                </div>
                 <button
                   role="menuitem"
                   class="overflow-menu-item"
-                  onClick={() => { showShareModal.value = true; setMenuOpen(false); }}
+                  onClick={() => {
+                    showShareModal.value = true;
+                    setMenuOpen(false);
+                  }}
                   data-testid="overflow-menu-board-settings"
                 >
                   Board Settings

@@ -47,8 +47,12 @@ export function WeekStrip({ date, today, workouts, onSelect }: WeekStripProps) {
             aria-label={stripDayLabel(d, m.done, m.planned)}
             onClick={() => onSelect(d)}
           >
-            <span class="week-day-letter" aria-hidden="true">{weekdayLetter(d)}</span>
-            <span class="week-day-num" aria-hidden="true">{dayOfMonth(d)}</span>
+            <span class="week-day-letter" aria-hidden="true">
+              {weekdayLetter(d)}
+            </span>
+            <span class="week-day-num" aria-hidden="true">
+              {dayOfMonth(d)}
+            </span>
             <span class="week-day-marks" aria-hidden="true">
               {markKinds(m).map((k, j) => (
                 <span key={j} class={`week-mark week-mark-${k}`} />

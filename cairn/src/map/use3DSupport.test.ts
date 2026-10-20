@@ -13,7 +13,9 @@ function stubGoogle(importLibrary: (name: string) => Promise<unknown>) {
 }
 
 function stubCustomElements(hasIt: boolean) {
-  vi.stubGlobal('customElements', { get: (name: string) => (hasIt && name === 'gmp-map-3d' ? {} : undefined) })
+  vi.stubGlobal('customElements', {
+    get: (name: string) => (hasIt && name === 'gmp-map-3d' ? {} : undefined),
+  })
 }
 
 describe('use3DSupport (#271)', () => {

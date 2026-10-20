@@ -31,13 +31,13 @@ describe('FlyoverButton (#274)', () => {
     expect(button.textContent).not.toContain('Ridge Traverse')
   })
 
-  it('pressing it requests a flyover of the subject\'s own points', () => {
+  it("pressing it requests a flyover of the subject's own points", () => {
     render(<FlyoverButton label="Ridge Traverse" points={[{ lat: 1, lng: 2 }]} />)
     fireEvent.click(screen.getByRole('button', { name: 'Fly over Ridge Traverse' }))
     expect(controlResult.current.requestFlyover).toHaveBeenCalledWith([{ lat: 1, lng: 2 }])
   })
 
-  it('goes disabled with #271\'s own sentence when the browser cannot draw 3D', () => {
+  it("goes disabled with #271's own sentence when the browser cannot draw 3D", () => {
     controlResult.current = { ...controlResult.current, support: 'unavailable' }
     render(<FlyoverButton label="Ridge Traverse" points={[{ lat: 1, lng: 2 }]} />)
     const button = screen.getByRole('button', { name: 'Fly over Ridge Traverse' })

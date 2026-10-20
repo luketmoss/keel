@@ -1,11 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import {
-  registerReauthCallback,
-  onReauthFailed,
-  attemptReauth,
-  ReauthFailedError,
-  _resetForTesting,
-} from './reauth';
+import { registerReauthCallback, onReauthFailed, attemptReauth, ReauthFailedError, _resetForTesting } from './reauth';
 
 describe('reauth module', () => {
   beforeEach(() => {
@@ -38,8 +32,11 @@ describe('reauth module', () => {
 
   it('deduplicates concurrent reauth attempts', async () => {
     let resolveReauth: (token: string) => void;
-    const cb = vi.fn().mockImplementation(() =>
-      new Promise<string>(resolve => { resolveReauth = resolve; })
+    const cb = vi.fn().mockImplementation(
+      () =>
+        new Promise<string>((resolve) => {
+          resolveReauth = resolve;
+        }),
     );
     registerReauthCallback(cb);
 
@@ -59,9 +56,7 @@ describe('reauth module', () => {
   });
 
   it('allows new reauth after previous one completes', async () => {
-    const cb = vi.fn()
-      .mockResolvedValueOnce('token-1')
-      .mockResolvedValueOnce('token-2');
+    const cb = vi.fn().mockResolvedValueOnce('token-1').mockResolvedValueOnce('token-2');
     registerReauthCallback(cb);
 
     const t1 = await attemptReauth();

@@ -3,8 +3,12 @@ import type { ComponentChildren } from 'preact';
 import { syncLog, withingsSyncLog, type SyncLogState } from '../../state/store';
 import { loadSyncLog, loadWithingsSyncLog } from '../../state/actions';
 import {
-  summarizeSyncLog, formatAge, statusWords, syncTone,
-  COROS_STALE_AFTER_HOURS, WITHINGS_STALE_AFTER_HOURS,
+  summarizeSyncLog,
+  formatAge,
+  statusWords,
+  syncTone,
+  COROS_STALE_AFTER_HOURS,
+  WITHINGS_STALE_AFTER_HOURS,
 } from '../../api/sync-status';
 import { formatLocalStamp } from '../../api/provenance';
 import type { RequestView } from '../../api/sync-request-state';
@@ -73,9 +77,7 @@ export function SyncStatusRow({ id, label, token, log, staleAfterHours, loadFn, 
           )}
           {s.newest.status !== 'ok' && (
             <span class="sync-status-line sync-status-last-ok">
-              {s.lastOk
-                ? `Last successful run ${formatAge(s.lastOk.ageMs)}`
-                : 'No successful run in the log'}
+              {s.lastOk ? `Last successful run ${formatAge(s.lastOk.ageMs)}` : 'No successful run in the log'}
             </span>
           )}
         </>
@@ -89,7 +91,9 @@ export function SyncStatusRow({ id, label, token, log, staleAfterHours, loadFn, 
       <span class="sync-status" role="status" aria-labelledby={id}>
         {body}
         {requestLine && (
-          <span class={`sync-status-line sync-request-line${requestLine.tone === 'neutral' ? '' : ` sync-tone-${requestLine.tone}`}`}>
+          <span
+            class={`sync-status-line sync-request-line${requestLine.tone === 'neutral' ? '' : ` sync-tone-${requestLine.tone}`}`}
+          >
             {requestLine.text}
           </span>
         )}
@@ -114,7 +118,13 @@ export function CorosSyncStatusRow({ token, requestLine }: { token: string | nul
 }
 
 /** Withings's row: `WithingsSyncLog`, stale past 14 h (#200, #210). */
-export function WithingsSyncStatusRow({ token, requestLine }: { token: string | null; requestLine?: RequestView | null }) {
+export function WithingsSyncStatusRow({
+  token,
+  requestLine,
+}: {
+  token: string | null;
+  requestLine?: RequestView | null;
+}) {
   return (
     <SyncStatusRow
       id="sync-status-withings"

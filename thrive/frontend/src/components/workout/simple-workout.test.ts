@@ -16,21 +16,21 @@ describe('simple-workout date logic', () => {
   // AC2: a valid user-chosen date passes through to the API
   it('a valid past date string is accepted as-is', () => {
     const chosen = '2026-03-01';
-    const safeDate = (chosen && !isNaN(Date.parse(chosen))) ? chosen : today;
+    const safeDate = chosen && !isNaN(Date.parse(chosen)) ? chosen : today;
     expect(safeDate).toBe('2026-03-01');
   });
 
   // AC3: empty date falls back to today
   it('empty date string falls back to today', () => {
     const chosen = '';
-    const safeDate = (chosen && !isNaN(Date.parse(chosen))) ? chosen : today;
+    const safeDate = chosen && !isNaN(Date.parse(chosen)) ? chosen : today;
     expect(safeDate).toBe(today);
   });
 
   // AC3: invalid date falls back to today
   it('invalid date string falls back to today', () => {
     const chosen = 'not-a-date';
-    const safeDate = (chosen && !isNaN(Date.parse(chosen))) ? chosen : today;
+    const safeDate = chosen && !isNaN(Date.parse(chosen)) ? chosen : today;
     expect(safeDate).toBe(today);
   });
 

@@ -65,7 +65,14 @@ describe('Track3DLayer (#271)', () => {
 
   it('draws one interactive polyline per track, clamped to the ground, in its own colour', () => {
     const tracks: Track3D[] = [
-      { key: 'a', color: '#FF3B30', points: [{ lat: 1, lng: 2 }, { lat: 3, lng: 4 }] },
+      {
+        key: 'a',
+        color: '#FF3B30',
+        points: [
+          { lat: 1, lng: 2 },
+          { lat: 3, lng: 4 },
+        ],
+      },
     ]
     render(<Track3DLayer tracks={tracks} />)
 
@@ -88,7 +95,14 @@ describe('Track3DLayer (#271)', () => {
 
   it('removes a line whose track is no longer in the list', () => {
     const tracks: Track3D[] = [
-      { key: 'a', color: '#fff', points: [{ lat: 1, lng: 2 }, { lat: 3, lng: 4 }] },
+      {
+        key: 'a',
+        color: '#fff',
+        points: [
+          { lat: 1, lng: 2 },
+          { lat: 3, lng: 4 },
+        ],
+      },
     ]
     const { rerender } = render(<Track3DLayer tracks={tracks} />)
     expect(appended()).toHaveLength(1)
@@ -106,8 +120,26 @@ describe('Track3DLayer selection (#288)', () => {
   })
 
   const tracks: Track3D[] = [
-    { key: 'a', fileId: 'file-a', index: 0, color: '#FF3B30', points: [{ lat: 1, lng: 2 }, { lat: 3, lng: 4 }] },
-    { key: 'b', fileId: 'file-b', index: 1, color: '#0000FF', points: [{ lat: 5, lng: 6 }, { lat: 7, lng: 8 }] },
+    {
+      key: 'a',
+      fileId: 'file-a',
+      index: 0,
+      color: '#FF3B30',
+      points: [
+        { lat: 1, lng: 2 },
+        { lat: 3, lng: 4 },
+      ],
+    },
+    {
+      key: 'b',
+      fileId: 'file-b',
+      index: 1,
+      color: '#0000FF',
+      points: [
+        { lat: 5, lng: 6 },
+        { lat: 7, lng: 8 },
+      ],
+    },
   ]
 
   it('draws every track at rest, with no outer edge, when nothing is selected', () => {

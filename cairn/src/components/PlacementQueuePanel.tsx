@@ -1,9 +1,5 @@
 import { useEffect, useState } from 'react'
-import {
-  discardLabel,
-  placementQueueSummary,
-  type PlacementQueueState,
-} from '../import/placementQueue'
+import { discardLabel, placementQueueSummary, type PlacementQueueState } from '../import/placementQueue'
 import './PlacementQueuePanel.css'
 
 interface PlacementQueuePanelProps {
@@ -54,9 +50,7 @@ export function PlacementQueuePanel({ queue, hasSuggestion, onSkip, onDiscard }:
         <PlacementQueueBar queue={queue} />
         <p className="placement-queue__summary">{placementQueueSummary(queue)}</p>
 
-        <div className="placement-queue__image">
-          {preview && <img src={preview} alt="" />}
-        </div>
+        <div className="placement-queue__image">{preview && <img src={preview} alt="" />}</div>
         <p className="placement-queue__filename">
           {current.name}
           {current.captureLabel && <> · {current.captureLabel}</>}
@@ -78,8 +72,8 @@ export function PlacementQueuePanel({ queue, hasSuggestion, onSkip, onDiscard }:
         </div>
 
         <p className="placement-queue__reassurance">
-          These {remaining} are not in your library and nothing has been written to Drive. Placing one
-          is what makes it a cairn; discarding means they were never imported.
+          These {remaining} are not in your library and nothing has been written to Drive. Placing one is what
+          makes it a cairn; discarding means they were never imported.
         </p>
       </div>
     </div>

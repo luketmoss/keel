@@ -1,6 +1,14 @@
 // #239 AC1–AC3 — the Health panel's row rules, without the DOM.
 import { describe, it, expect } from 'vitest';
-import { healthView, rangeCaption, captionText, activeMetrics, HEALTH_METRICS, seriesOf, type HealthRowView } from './health-rows';
+import {
+  healthView,
+  rangeCaption,
+  captionText,
+  activeMetrics,
+  HEALTH_METRICS,
+  seriesOf,
+  type HealthRowView,
+} from './health-rows';
 import { DAILY_HEALTH_FIELDS, type DailyHealthRow } from '../../api/health-api';
 import { addDays } from '../../day/dates';
 
@@ -13,11 +21,21 @@ function hr(date: string, over: Partial<Record<string, string>> = {}): DailyHeal
 }
 
 const FULL = {
-  resting_hr: '52', hrv: '38', steps: '9412',
+  resting_hr: '52',
+  hrv: '38',
+  steps: '9412',
   sleep_total_s: String(7 * 3600 + 12 * 60),
-  sleep_deep_s: String(66 * 60), sleep_light_s: String(252 * 60), sleep_rem_s: String(102 * 60), sleep_awake_s: String(12 * 60),
-  bed_time: '23:24', wake_time: '06:12',
-  sleep_score: '88', recovery: '70', vo2max: '50', training_load: '90', calories: '2400',
+  sleep_deep_s: String(66 * 60),
+  sleep_light_s: String(252 * 60),
+  sleep_rem_s: String(102 * 60),
+  sleep_awake_s: String(12 * 60),
+  bed_time: '23:24',
+  wake_time: '06:12',
+  sleep_score: '88',
+  recovery: '70',
+  vo2max: '50',
+  training_load: '90',
+  calories: '2400',
   synced_at: '2026-09-26T13:17:04.000Z',
 };
 
@@ -43,12 +61,18 @@ describe('AC1 — a past day', () => {
 
   it('lists the sleep stages in order and bed to wake', () => {
     const sleep = byKey(rowsOf(healthView([hr(D, FULL)], D, false)), 'sleep');
-    expect(sleep.captions[0]).toEqual({ kind: 'stages', items: ['Deep 1h 06m', 'Light 4h 12m', 'REM 1h 42m', 'Awake 0h 12m'] });
+    expect(sleep.captions[0]).toEqual({
+      kind: 'stages',
+      items: ['Deep 1h 06m', 'Light 4h 12m', 'REM 1h 42m', 'Awake 0h 12m'],
+    });
     expect(texts(sleep)[1]).toBe('11:24 PM – 6:12 AM');
   });
 
   it('leaves out a blank stage and bed-to-wake without both times, and never recomputes the total', () => {
-    const sleep = byKey(rowsOf(healthView([hr(D, { ...FULL, sleep_rem_s: '', wake_time: '', sleep_total_s: '100' })], D, false)), 'sleep');
+    const sleep = byKey(
+      rowsOf(healthView([hr(D, { ...FULL, sleep_rem_s: '', wake_time: '', sleep_total_s: '100' })], D, false)),
+      'sleep',
+    );
     expect(sleep.captions[0]).toEqual({ kind: 'stages', items: ['Deep 1h 06m', 'Light 4h 12m', 'Awake 0h 12m'] });
     expect(texts(sleep).some((t) => t.includes('–') && t.includes('AM'))).toBe(false);
     expect(sleep.value).toBe('0h 02m');
@@ -64,7 +88,10 @@ describe('AC1 — a past day', () => {
   });
 
   it('says "No watch data for this day." when there is no row', () => {
-    expect(healthView([hr('2026-09-25', FULL)], D, false)).toEqual({ kind: 'note', note: 'No watch data for this day.' });
+    expect(healthView([hr('2026-09-25', FULL)], D, false)).toEqual({
+      kind: 'note',
+      note: 'No watch data for this day.',
+    });
   });
 
   it('never shows sleep score, recovery, VO2 max, training load or calories', () => {
@@ -76,7 +103,12 @@ describe('AC1 — a past day', () => {
     const fields = DAILY_HEALTH_FIELDS;
     expect(activeMetrics().map((m) => m.key)).toEqual(['sleep', 'resting_hr', 'hrv', 'stress', 'steps']);
     // A field list without the column (before #231) leaves the row out.
-    expect(activeMetrics(fields.filter((f) => f !== 'stress_avg')).map((m) => m.key)).toEqual(['sleep', 'resting_hr', 'hrv', 'steps']);
+    expect(activeMetrics(fields.filter((f) => f !== 'stress_avg')).map((m) => m.key)).toEqual([
+      'sleep',
+      'resting_hr',
+      'hrv',
+      'steps',
+    ]);
     const rows = rowsOf(healthView([hr(D, { ...FULL, stress_avg: '31' })], D, false, fields));
     expect(byKey(rows, 'stress').value).toBe('31');
     const blank = rowsOf(healthView([hr(D, FULL)], D, false, fields));
@@ -90,7 +122,11 @@ describe('AC2 — your range', () => {
   const steps = HEALTH_METRICS.find((m) => m.key === 'steps')!;
   const sleep = HEALTH_METRICS.find((m) => m.key === 'sleep')!;
   // 49 and 55 alternating: mean 52, sd 3, range 49–55.
-  const alt = (field: string) => seriesOf(history(D, 20, field, (i) => (i % 2 ? '49' : '55')), field);
+  const alt = (field: string) =>
+    seriesOf(
+      history(D, 20, field, (i) => (i % 2 ? '49' : '55')),
+      field,
+    );
 
   it('reads "in range" within, inclusive of the bounds', () => {
     expect(captionText(rangeCaption(rhr, 55, alt('resting_hr'), D))).toBe('Your range 49–55 bpm · in range');
@@ -108,30 +144,48 @@ describe('AC2 — your range', () => {
   });
 
   it('says it is still building with fewer than 14 values', () => {
-    const s = seriesOf(history(D, 9, 'resting_hr', () => '50'), 'resting_hr');
+    const s = seriesOf(
+      history(D, 9, 'resting_hr', () => '50'),
+      'resting_hr',
+    );
     expect(captionText(rangeCaption(rhr, 50, s, D))).toBe('Building your range — 9 of 14 days so far.');
   });
 
   it('decides on the displayed numbers: a value that rounds to the bound is within', () => {
     // 49.4 / 55.4 alternating: range 49.4–55.4 displays as 49–55; 55.3 displays as 55.
-    const s = seriesOf(history(D, 20, 'resting_hr', (i) => (i % 2 ? '49.4' : '55.4')), 'resting_hr');
+    const s = seriesOf(
+      history(D, 20, 'resting_hr', (i) => (i % 2 ? '49.4' : '55.4')),
+      'resting_hr',
+    );
     expect(rangeCaption(rhr, 55.3, s, D)).toMatchObject({ zone: 'within', bounds: '49–55 bpm' });
     expect(rangeCaption(rhr, 55.6, s, D)).toMatchObject({ zone: 'above' });
   });
 
   it('rounds sleep to whole minutes, bounds included', () => {
-    const s = seriesOf(history(D, 20, 'sleep_total_s', (i) => (i % 2 ? String(6 * 3600 + 40 * 60) : String(7 * 3600 + 50 * 60))), 'sleep_total_s');
+    const s = seriesOf(
+      history(D, 20, 'sleep_total_s', (i) => (i % 2 ? String(6 * 3600 + 40 * 60) : String(7 * 3600 + 50 * 60))),
+      'sleep_total_s',
+    );
     const c = rangeCaption(sleep, 6 * 3600 + 39 * 60 + 40, s, D); // 6h 39.67m → 6h 40m
     expect(c).toMatchObject({ zone: 'within', bounds: '6h 40m–7h 50m' });
   });
 
   it('writes one bound when every value is the same', () => {
-    const s = seriesOf(history(D, 20, 'resting_hr', () => '52'), 'resting_hr');
+    const s = seriesOf(
+      history(D, 20, 'resting_hr', () => '52'),
+      'resting_hr',
+    );
     expect(captionText(rangeCaption(rhr, 52, s, D))).toBe('Your range 52 bpm · in range');
   });
 
   it('builds the range from the loaded rows for the viewed day', () => {
-    const rows = rowsOf(healthView([...history(D, 20, 'resting_hr', (i) => (i % 2 ? '49' : '55')), hr(D, { ...FULL, resting_hr: '60' })], D, false));
+    const rows = rowsOf(
+      healthView(
+        [...history(D, 20, 'resting_hr', (i) => (i % 2 ? '49' : '55')), hr(D, { ...FULL, resting_hr: '60' })],
+        D,
+        false,
+      ),
+    );
     expect(texts(byKey(rows, 'resting_hr'))).toEqual(['Your range 49–55 bpm · above your range']);
   });
 });
@@ -152,7 +206,9 @@ describe('AC3 — today', () => {
   });
 
   it('shows an earlier-day sync with its date, and nothing for a blank or bad synced_at', () => {
-    expect(healthView([hr(D, { ...FULL, synced_at: '2026-09-26T00:17:00.000Z' })], D, true).sub).toBe('Synced Sep 25, 6:17 PM');
+    expect(healthView([hr(D, { ...FULL, synced_at: '2026-09-26T00:17:00.000Z' })], D, true).sub).toBe(
+      'Synced Sep 25, 6:17 PM',
+    );
     expect(healthView([hr(D, { ...FULL, synced_at: '' })], D, true).sub).toBeUndefined();
     expect(healthView([hr(D, { ...FULL, synced_at: 'soon' })], D, true).sub).toBeUndefined();
   });
@@ -165,11 +221,18 @@ describe('AC3 — today', () => {
 
   it('shows steps and stress so far with no range line, and the others with one', () => {
     const fields = [...DAILY_HEALTH_FIELDS, 'stress_avg'];
-    const rows = rowsOf(healthView(
-      [...history(D, 20, 'steps', () => '9000'), ...history(D, 20, 'resting_hr', () => '52').map((r) => ({ ...r, date: r.date })),
-        hr(D, { ...FULL, steps: '871', stress_avg: '31' })],
-      D, true, fields,
-    ));
+    const rows = rowsOf(
+      healthView(
+        [
+          ...history(D, 20, 'steps', () => '9000'),
+          ...history(D, 20, 'resting_hr', () => '52').map((r) => ({ ...r, date: r.date })),
+          hr(D, { ...FULL, steps: '871', stress_avg: '31' }),
+        ],
+        D,
+        true,
+        fields,
+      ),
+    );
     const steps = byKey(rows, 'steps');
     expect(steps.value).toBe('871 so far');
     expect(texts(steps)).toEqual(['As of the 7:17 AM sync']);

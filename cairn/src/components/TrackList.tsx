@@ -342,7 +342,10 @@ function TrackRow({
   // lazily above.
   const profile =
     canOpenDetail && hasOpened
-      ? effectiveElevationProfile(file.tracks[0], file.tracks[0].key ? sampledElevation[file.tracks[0].key] : undefined)
+      ? effectiveElevationProfile(
+          file.tracks[0],
+          file.tracks[0].key ? sampledElevation[file.tracks[0].key] : undefined,
+        )
       : undefined
 
   // #268 — the row's remaining non-interactive area also toggles, for
@@ -370,7 +373,10 @@ function TrackRow({
   useEffect(() => {
     if (!expandedOpen) return
     const raf = requestAnimationFrame(() => {
-      liRef.current?.scrollIntoView?.({ block: 'nearest', behavior: prefersReducedMotion() ? 'auto' : 'smooth' })
+      liRef.current?.scrollIntoView?.({
+        block: 'nearest',
+        behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+      })
     })
     return () => cancelAnimationFrame(raf)
   }, [expandedOpen])
@@ -488,9 +494,7 @@ function TrackRow({
         ) : null}
 
         {onRecolor ? (
-          <span
-            className={`track-row__swatch-wrap${disabled ? ' track-row__swatch-wrap--disabled' : ''}`}
-          >
+          <span className={`track-row__swatch-wrap${disabled ? ' track-row__swatch-wrap--disabled' : ''}`}>
             <button
               type="button"
               className={`track-row__swatch-button${savedField === 'color' ? ' track-row__field--saved' : ''}`}
@@ -541,7 +545,10 @@ function TrackRow({
               onToggleExpand()
             }}
           >
-            <span className={`track-row__name${savedField === 'name' ? ' track-row__field--saved' : ''}`} title={file.name}>
+            <span
+              className={`track-row__name${savedField === 'name' ? ' track-row__field--saved' : ''}`}
+              title={file.name}
+            >
               {file.name}
             </span>
             {/* A multi-track file has no unambiguous stats line, and no
@@ -551,7 +558,10 @@ function TrackRow({
           </button>
         ) : (
           <div className="track-row__text">
-            <span className={`track-row__name${savedField === 'name' ? ' track-row__field--saved' : ''}`} title={file.name}>
+            <span
+              className={`track-row__name${savedField === 'name' ? ' track-row__field--saved' : ''}`}
+              title={file.name}
+            >
               {file.name}
               <span className="track-row__count"> {file.tracks.length} tracks</span>
             </span>

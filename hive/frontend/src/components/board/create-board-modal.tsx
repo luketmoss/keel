@@ -24,7 +24,7 @@ export function CreateBoardModal() {
     const trimmed = value.trim();
     if (!trimmed) return 'Board name is required';
     if (trimmed.length > MAX_NAME_LENGTH) return `Name must be ${MAX_NAME_LENGTH} characters or fewer`;
-    if (boards.value.some(b => b.name.toLowerCase() === trimmed.toLowerCase())) {
+    if (boards.value.some((b) => b.name.toLowerCase() === trimmed.toLowerCase())) {
       return 'A board with this name already exists';
     }
     return '';
@@ -65,7 +65,9 @@ export function CreateBoardModal() {
       <div class="modal create-board-modal" role="dialog" aria-label="Create new board" aria-modal="true">
         <div class="modal-header">
           <h2>New Board</h2>
-          <button class="btn btn-ghost" onClick={close} aria-label="Close">✕</button>
+          <button class="btn btn-ghost" onClick={close} aria-label="Close">
+            ✕
+          </button>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -84,9 +86,13 @@ export function CreateBoardModal() {
             />
             <div class="board-name-meta">
               {error && (
-                <span id="board-name-error" class="form-error" role="alert">{error}</span>
+                <span id="board-name-error" class="form-error" role="alert">
+                  {error}
+                </span>
               )}
-              <span class={`char-counter ${name.length > MAX_NAME_LENGTH ? 'char-counter-danger' : name.length > MAX_NAME_LENGTH - 5 ? 'char-counter-warning' : ''}`}>
+              <span
+                class={`char-counter ${name.length > MAX_NAME_LENGTH ? 'char-counter-danger' : name.length > MAX_NAME_LENGTH - 5 ? 'char-counter-warning' : ''}`}
+              >
                 {name.length}/{MAX_NAME_LENGTH}
               </span>
             </div>
@@ -98,12 +104,10 @@ export function CreateBoardModal() {
           </div>
 
           <div class="modal-footer">
-            <button type="button" class="btn btn-ghost" onClick={close}>Cancel</button>
-            <button
-              type="submit"
-              class="btn btn-primary"
-              disabled={!name.trim() || submitting}
-            >
+            <button type="button" class="btn btn-ghost" onClick={close}>
+              Cancel
+            </button>
+            <button type="submit" class="btn btn-primary" disabled={!name.trim() || submitting}>
               {submitting ? 'Creating...' : 'Create'}
             </button>
           </div>

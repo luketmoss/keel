@@ -51,8 +51,7 @@ export function WorldTrack3DFraming({
   }, [tracks, cairns])
 
   const visibleKey = useMemo(
-    () =>
-      [...trips.map((trip) => trip.id), ...looseTracks.map((item) => item.id)].sort().join(','),
+    () => [...trips.map((trip) => trip.id), ...looseTracks.map((item) => item.id)].sort().join(','),
     [trips, looseTracks],
   )
 

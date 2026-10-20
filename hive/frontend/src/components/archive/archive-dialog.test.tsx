@@ -24,7 +24,7 @@ afterEach(() => {
 
 function daysAgoISO(days: number): string {
   const d = new Date();
-  d.setHours(0, 0, 0, 0);         // anchor to midnight so floor(diff/86400000) is always >= days
+  d.setHours(0, 0, 0, 0); // anchor to midnight so floor(diff/86400000) is always >= days
   d.setDate(d.getDate() - days);
   return d.toISOString();
 }
@@ -73,14 +73,12 @@ describe('Archive dialog (AC3)', () => {
       makeItem({ id: 'mid', title: 'Mid task', completed_at: daysAgoISO(10), sort_order: 3 }),
     ];
     const { container } = render(<ArchiveDialog onClose={onClose} />);
-    const titles = Array.from(container.querySelectorAll('.archive-item-title')).map(el => el.textContent);
+    const titles = Array.from(container.querySelectorAll('.archive-item-title')).map((el) => el.textContent);
     expect(titles).toEqual(['Recent task', 'Mid task', 'Old task']);
   });
 
   it('shows title, owner, and completed date for each item', () => {
-    items.value = [
-      makeItem({ id: 'a', title: 'My Task', owner: 'Mom', completed_at: daysAgoISO(3) }),
-    ];
+    items.value = [makeItem({ id: 'a', title: 'My Task', owner: 'Mom', completed_at: daysAgoISO(3) })];
     const { container } = render(<ArchiveDialog onClose={onClose} />);
     expect(container.querySelector('.archive-item-title')?.textContent).toBe('My Task');
     expect(container.querySelector('.archive-item-owner')?.textContent).toBe('Mom');
@@ -88,11 +86,9 @@ describe('Archive dialog (AC3)', () => {
   });
 
   it('shows labels when present', () => {
-    items.value = [
-      makeItem({ id: 'a', labels: 'Home, Fun' }),
-    ];
+    items.value = [makeItem({ id: 'a', labels: 'Home, Fun' })];
     const { container } = render(<ArchiveDialog onClose={onClose} />);
-    const labels = Array.from(container.querySelectorAll('[data-testid="label"]')).map(el => el.textContent);
+    const labels = Array.from(container.querySelectorAll('[data-testid="label"]')).map((el) => el.textContent);
     expect(labels).toEqual(['Home', 'Fun']);
   });
 
@@ -139,7 +135,7 @@ describe('Archive search (AC4)', () => {
     const input = container.querySelector('.archive-search-input') as HTMLInputElement;
 
     fireEvent.input(input, { target: { value: 'file' } });
-    const titles = Array.from(container.querySelectorAll('.archive-item-title')).map(el => el.textContent);
+    const titles = Array.from(container.querySelectorAll('.archive-item-title')).map((el) => el.textContent);
     expect(titles).toEqual(['File taxes', 'Organize files']);
   });
 
@@ -155,9 +151,7 @@ describe('Archive search (AC4)', () => {
   });
 
   it('shows "1 item" for singular count', () => {
-    items.value = [
-      makeItem({ id: 'a', title: 'Only task', completed_at: daysAgoISO(1), sort_order: 1 }),
-    ];
+    items.value = [makeItem({ id: 'a', title: 'Only task', completed_at: daysAgoISO(1), sort_order: 1 })];
     const { container } = render(<ArchiveDialog onClose={onClose} />);
     const count = container.querySelector('.archive-results-count');
     expect(count?.textContent).toBe('1 item');

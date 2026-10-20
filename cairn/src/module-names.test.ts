@@ -30,7 +30,9 @@ describe('module names (#480)', () => {
   })
 
   it('the framing maths is its own module, apart from the LocateCamera component', () => {
-    const names = sources(join(__dirname, 'map')).map((p) => p.slice(__dirname.length + 1).replace(/\\/g, '/'))
+    const names = sources(join(__dirname, 'map')).map((p) =>
+      p.slice(__dirname.length + 1).replace(/\\/g, '/'),
+    )
     expect(names).toContain('map/locateFraming.ts')
     expect(names).toContain('map/LocateCamera.tsx')
     expect(names).not.toContain('map/locateCamera.ts')

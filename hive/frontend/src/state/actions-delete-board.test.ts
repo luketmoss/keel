@@ -2,15 +2,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { deleteBoard } from './actions';
 
 // Mock board-store signals
-const mockBoards = { current: [
-  { id: 'board-1', name: 'Family Board', created_at: '', created_by: '', color: '', icon: '' },
-  { id: 'board-2', name: 'Work Board', created_at: '', created_by: '', color: '', icon: '' },
-] };
-const mockPerms = { current: [
-  { board_id: 'board-1', user_email: 'owner@test.com', role: 'owner' as const },
-  { board_id: 'board-1', user_email: '*', role: 'member' as const },
-  { board_id: 'board-2', user_email: 'owner@test.com', role: 'owner' as const },
-] };
+const mockBoards = {
+  current: [
+    { id: 'board-1', name: 'Family Board', created_at: '', created_by: '', color: '', icon: '' },
+    { id: 'board-2', name: 'Work Board', created_at: '', created_by: '', color: '', icon: '' },
+  ],
+};
+const mockPerms = {
+  current: [
+    { board_id: 'board-1', user_email: 'owner@test.com', role: 'owner' as const },
+    { board_id: 'board-1', user_email: '*', role: 'member' as const },
+    { board_id: 'board-2', user_email: 'owner@test.com', role: 'owner' as const },
+  ],
+};
 const mockItems = { current: [] as any[] };
 const mockActiveBoardId = { current: 'board-1' };
 const mockToast = { current: null as any };
@@ -18,18 +22,66 @@ const mockStatuses = { current: [] as any[] };
 const mockLabels = { current: [] as any[] };
 
 vi.mock('./board-store', () => ({
-  boards: { get value() { return mockBoards.current; }, set value(v: any) { mockBoards.current = v; } },
-  permissions: { get value() { return mockPerms.current; }, set value(v: any) { mockPerms.current = v; } },
-  items: { get value() { return mockItems.current; }, set value(v: any) { mockItems.current = v; } },
-  activeBoardId: { get value() { return mockActiveBoardId.current; }, set value(v: any) { mockActiveBoardId.current = v; } },
+  boards: {
+    get value() {
+      return mockBoards.current;
+    },
+    set value(v: any) {
+      mockBoards.current = v;
+    },
+  },
+  permissions: {
+    get value() {
+      return mockPerms.current;
+    },
+    set value(v: any) {
+      mockPerms.current = v;
+    },
+  },
+  items: {
+    get value() {
+      return mockItems.current;
+    },
+    set value(v: any) {
+      mockItems.current = v;
+    },
+  },
+  activeBoardId: {
+    get value() {
+      return mockActiveBoardId.current;
+    },
+    set value(v: any) {
+      mockActiveBoardId.current = v;
+    },
+  },
   currentUserEmail: { value: 'owner@test.com' },
   loading: { value: false },
   owners: { value: [] },
-  labels: { get value() { return mockLabels.current; }, set value(v: any) { mockLabels.current = v; } },
-  statuses: { get value() { return mockStatuses.current; }, set value(v: any) { mockStatuses.current = v; } },
-  showToast: (text: string, type?: string) => { mockToast.current = { text, type: type || 'success' }; },
+  labels: {
+    get value() {
+      return mockLabels.current;
+    },
+    set value(v: any) {
+      mockLabels.current = v;
+    },
+  },
+  statuses: {
+    get value() {
+      return mockStatuses.current;
+    },
+    set value(v: any) {
+      mockStatuses.current = v;
+    },
+  },
+  showToast: (text: string, type?: string) => {
+    mockToast.current = { text, type: type || 'success' };
+  },
   initActiveBoardFromUrl: vi.fn(),
-  accessibleBoards: { get value() { return mockBoards.current; } },
+  accessibleBoards: {
+    get value() {
+      return mockBoards.current;
+    },
+  },
   switchBoard: vi.fn(),
 }));
 
@@ -79,7 +131,13 @@ vi.mock('../api/sheets', () => ({
   deleteStatusRow: vi.fn().mockResolvedValue(undefined),
   fetchStatusesWithRows: vi.fn().mockResolvedValue([]),
   cascadeStatusRename: vi.fn().mockResolvedValue(undefined),
-  SheetsApiError: class extends Error { status: number; constructor(s: number, m: string) { super(m); this.status = s; } },
+  SheetsApiError: class extends Error {
+    status: number;
+    constructor(s: number, m: string) {
+      super(m);
+      this.status = s;
+    }
+  },
 }));
 
 vi.mock('../demo/mock-api', () => ({
@@ -154,7 +212,13 @@ describe('deleteBoard action (Issue #120)', () => {
     expect(mockDeleteAllBoardPermissions).toHaveBeenCalledWith('board-1', 'token');
     expect(mockDeleteBoardRow).toHaveBeenCalledWith('board-1', 'token');
     expect(mockAppendAuditEntry).toHaveBeenCalledWith(
-      'board-1', 'board_deleted', '', 'Family Board', '', 'owner@test.com', 'token'
+      'board-1',
+      'board_deleted',
+      '',
+      'Family Board',
+      '',
+      'owner@test.com',
+      'token',
     );
   });
 
@@ -193,9 +257,7 @@ describe('deleteBoard action (Issue #120)', () => {
   });
 
   it('shows success toast with migrate info (AC2)', async () => {
-    mockItems.current = [
-      { id: 'item-1', board_id: 'board-1', sheetRow: 2, parent_id: '' },
-    ];
+    mockItems.current = [{ id: 'item-1', board_id: 'board-1', sheetRow: 2, parent_id: '' }];
     mockFetchBoards.mockResolvedValue([{ id: 'board-2', name: 'Work Board' }]);
 
     await deleteBoard('board-1', 'migrate', 'board-2', 'owner@test.com', 'token');
@@ -207,7 +269,7 @@ describe('deleteBoard action (Issue #120)', () => {
     ['empty', null, null],
     ['migrate', 'migrate', 'board-2'],
     ['discard', 'discard', null],
-  ] as const)('deletes the board\'s columns and labels in %s mode (#292 AC1, AC2, AC4)', async (_n, mode, target) => {
+  ] as const)("deletes the board's columns and labels in %s mode (#292 AC1, AC2, AC4)", async (_n, mode, target) => {
     mockItems.current = [{ id: 'item-1', board_id: 'board-1', sheetRow: 2, parent_id: '' }];
     const result = await deleteBoard('board-1', mode as any, target as any, 'owner@test.com', 'token');
     expect(result).toBe(true);
@@ -216,7 +278,7 @@ describe('deleteBoard action (Issue #120)', () => {
     expect(mockDeleteAllBoardStatuses).not.toHaveBeenCalledWith('board-2', expect.anything());
   });
 
-  it('optimistically removes only the deleted board\'s columns and labels (#292)', async () => {
+  it("optimistically removes only the deleted board's columns and labels (#292)", async () => {
     let seen: any;
     mockDeleteBoardRow.mockImplementationOnce(async () => {
       seen = { statuses: [...mockStatuses.current], labels: [...mockLabels.current] };

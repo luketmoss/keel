@@ -30,8 +30,10 @@ export function KebabMenu({ actions, itemTitle }: Props) {
     const handler = (e: MouseEvent) => {
       const target = e.target as Node;
       if (
-        menuRef.current && !menuRef.current.contains(target) &&
-        triggerRef.current && !triggerRef.current.contains(target)
+        menuRef.current &&
+        !menuRef.current.contains(target) &&
+        triggerRef.current &&
+        !triggerRef.current.contains(target)
       ) {
         setOpen(false);
         // Don't refocus trigger on outside click — let natural focus flow
@@ -44,7 +46,7 @@ export function KebabMenu({ actions, itemTitle }: Props) {
   // Focus first enabled item when menu opens
   useEffect(() => {
     if (!open) return;
-    const firstEnabled = actions.findIndex(a => !a.disabled);
+    const firstEnabled = actions.findIndex((a) => !a.disabled);
     setFocusIndex(firstEnabled >= 0 ? firstEnabled : 0);
   }, [open, actions]);
 
@@ -57,14 +59,14 @@ export function KebabMenu({ actions, itemTitle }: Props) {
 
   const handleTriggerClick = (e: MouseEvent) => {
     e.stopPropagation(); // Don't open card detail
-    setOpen(prev => !prev);
+    setOpen((prev) => !prev);
   };
 
   const handleTriggerKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       e.stopPropagation(); // Don't open card detail
-      setOpen(prev => !prev);
+      setOpen((prev) => !prev);
     }
   };
 

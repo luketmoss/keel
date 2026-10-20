@@ -189,9 +189,11 @@ describe('PhotoImageCache', () => {
     // it. A fake `size` avoids actually allocating a quarter-gigabyte
     // buffer just to exercise the byte-counting logic.
     const big = { size: 250 * 1024 * 1024 - 2 } as unknown as Blob
-    const fetchImpl = vi.fn().mockImplementation(async (url: string) =>
-      url.includes('file-2') ? response('', { blob: big }) : response('bytes'),
-    )
+    const fetchImpl = vi
+      .fn()
+      .mockImplementation(async (url: string) =>
+        url.includes('file-2') ? response('', { blob: big }) : response('bytes'),
+      )
     const cache = new PhotoImageCache({ indexedDBFactory: db, objectUrls: fakeObjectUrls(), fetchImpl })
 
     const handle = await cache.acquire('token', 'file-1')

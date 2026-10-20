@@ -74,7 +74,7 @@ export function SimpleWorkout({ workoutType, workoutId, onBack }: Props) {
   const handleSave = async () => {
     if (!token) return;
     setSaving(true);
-    const safeDate = (date && !isNaN(Date.parse(date))) ? date : todayStr;
+    const safeDate = date && !isNaN(Date.parse(date)) ? date : todayStr;
     try {
       const data = {
         name: name.trim() || TYPE_LABELS[workoutType] || workoutType,
@@ -125,11 +125,17 @@ export function SimpleWorkout({ workoutType, workoutId, onBack }: Props) {
         <button
           class="template-editor-back"
           onClick={async () => {
-            const dirty = name !== initial.name || date !== initial.date
-              || notes !== initial.notes || duration !== initial.duration
-              || effort !== initial.effort || subType !== initial.subType
-              || cardio.distance !== initial.cardio.distance || cardio.ascent !== initial.cardio.ascent
-              || cardio.descent !== initial.cardio.descent || cardio.avgHr !== initial.cardio.avgHr;
+            const dirty =
+              name !== initial.name ||
+              date !== initial.date ||
+              notes !== initial.notes ||
+              duration !== initial.duration ||
+              effort !== initial.effort ||
+              subType !== initial.subType ||
+              cardio.distance !== initial.cardio.distance ||
+              cardio.ascent !== initial.cardio.ascent ||
+              cardio.descent !== initial.cardio.descent ||
+              cardio.avgHr !== initial.cardio.avgHr;
             if (dirty && !(await ask(discardChangesCopy('workout')))) return;
             // A resumed workout has no type picker to go back to.
             if (workoutId) navigate('/activities');
@@ -139,17 +145,15 @@ export function SimpleWorkout({ workoutType, workoutId, onBack }: Props) {
         >
           ← Back
         </button>
-        <button
-          class="btn btn-primary"
-          onClick={handleSave}
-          disabled={busy}
-        >
+        <button class="btn btn-primary" onClick={handleSave} disabled={busy}>
           {saving ? 'Saving...' : 'Save'}
         </button>
       </div>
 
       <div class="form-group">
-        <label class="form-label" htmlFor={nameId}>Name</label>
+        <label class="form-label" htmlFor={nameId}>
+          Name
+        </label>
         <input
           id={nameId}
           class="form-input"
@@ -161,7 +165,9 @@ export function SimpleWorkout({ workoutType, workoutId, onBack }: Props) {
       </div>
 
       <div class="form-group">
-        <label class="form-label" htmlFor="simple-date">Date</label>
+        <label class="form-label" htmlFor="simple-date">
+          Date
+        </label>
         <input
           id="simple-date"
           class="form-input"
@@ -169,12 +175,16 @@ export function SimpleWorkout({ workoutType, workoutId, onBack }: Props) {
           value={date}
           max={todayStr}
           onInput={(e) => setDate((e.target as HTMLInputElement).value)}
-          onBlur={() => { if (!date) setDate(todayStr); }}
+          onBlur={() => {
+            if (!date) setDate(todayStr);
+          }}
         />
       </div>
 
       <div class="form-group">
-        <label class="form-label" htmlFor={durationId}>Duration (minutes)</label>
+        <label class="form-label" htmlFor={durationId}>
+          Duration (minutes)
+        </label>
         <input
           id={durationId}
           class="form-input"
@@ -190,7 +200,9 @@ export function SimpleWorkout({ workoutType, workoutId, onBack }: Props) {
           are asked for, so the two belong together (#129 AC2). */}
       {subTypeOptions(workoutType).length > 0 && (
         <div class="form-group">
-          <span class="form-label" id={typeLabelId}>Type (optional)</span>
+          <span class="form-label" id={typeLabelId}>
+            Type (optional)
+          </span>
           <SubTypeToggle
             workoutType={workoutType}
             value={subType}
@@ -201,16 +213,12 @@ export function SimpleWorkout({ workoutType, workoutId, onBack }: Props) {
         </div>
       )}
 
-      <CardioFields
-        workoutType={workoutType}
-        subType={subType}
-        values={cardio}
-        onChange={patchCardio}
-        idPrefix="new"
-      />
+      <CardioFields workoutType={workoutType} subType={subType} values={cardio} onChange={patchCardio} idPrefix="new" />
 
       <div class="form-group">
-        <span class="form-label" id={effortLabelId}>Session Effort (optional)</span>
+        <span class="form-label" id={effortLabelId}>
+          Session Effort (optional)
+        </span>
         <EffortToggle
           value={effort}
           onChange={setEffort}
@@ -221,7 +229,9 @@ export function SimpleWorkout({ workoutType, workoutId, onBack }: Props) {
       </div>
 
       <div class="form-group">
-        <label class="form-label" htmlFor={notesId}>Notes</label>
+        <label class="form-label" htmlFor={notesId}>
+          Notes
+        </label>
         <textarea
           id={notesId}
           class="form-textarea"

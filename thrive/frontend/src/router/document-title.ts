@@ -44,22 +44,44 @@ export function titleFor(route: Pick<ParsedRoute, 'name' | 'params'>, lookups: T
   const templateName = () => clean(lookups.template(id)?.name);
   const screen = ((): string => {
     switch (name) {
-      case 'day': return route.params.date ? shortDate(route.params.date) : 'Today';
-      case 'calendar': return route.params.month ? monthTitle(route.params.month) : 'Calendar';
-      case 'trends': return 'Trends';
-      case 'activities': return 'Activities';
-      case 'settings': return 'Settings';
-      case 'manage-labels': return 'Manage Labels';
-      case 'templates': return 'Templates';
-      case 'exercises': return 'Exercises';
-      case 'template-new': return 'New Template';
-      case 'template-detail': return templateName() || 'Template';
-      case 'template-edit': { const n = templateName(); return n ? `Edit ${n}` : 'Template'; }
-      case 'workout-new': return 'New Workout';
-      case 'workout-detail': return workoutName() || 'Workout';
-      case 'workout-active': { const n = workoutName(); return n ? `Log ${n}` : 'Workout'; }
-      case 'workout-edit': { const n = workoutName(); return n ? `Edit ${n}` : 'Workout'; }
-      default: return unreachable(name);
+      case 'day':
+        return route.params.date ? shortDate(route.params.date) : 'Today';
+      case 'calendar':
+        return route.params.month ? monthTitle(route.params.month) : 'Calendar';
+      case 'trends':
+        return 'Trends';
+      case 'activities':
+        return 'Activities';
+      case 'settings':
+        return 'Settings';
+      case 'manage-labels':
+        return 'Manage Labels';
+      case 'templates':
+        return 'Templates';
+      case 'exercises':
+        return 'Exercises';
+      case 'template-new':
+        return 'New Template';
+      case 'template-detail':
+        return templateName() || 'Template';
+      case 'template-edit': {
+        const n = templateName();
+        return n ? `Edit ${n}` : 'Template';
+      }
+      case 'workout-new':
+        return 'New Workout';
+      case 'workout-detail':
+        return workoutName() || 'Workout';
+      case 'workout-active': {
+        const n = workoutName();
+        return n ? `Log ${n}` : 'Workout';
+      }
+      case 'workout-edit': {
+        const n = workoutName();
+        return n ? `Edit ${n}` : 'Workout';
+      }
+      default:
+        return unreachable(name);
     }
   })();
   return screen + TITLE_SUFFIX;
@@ -82,5 +104,10 @@ export function useDocumentTitle(): void {
   useLayoutEffect(() => {
     document.title = title;
   }, [title]);
-  useEffect(() => () => { document.title = DEFAULT_TITLE; }, []);
+  useEffect(
+    () => () => {
+      document.title = DEFAULT_TITLE;
+    },
+    [],
+  );
 }

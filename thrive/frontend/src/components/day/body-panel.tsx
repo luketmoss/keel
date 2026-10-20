@@ -40,11 +40,18 @@ export function bodyView(readings: readonly BodyMeasurementRow[], isToday: boole
   const rows: BodyRowView[] = [];
 
   if (day.weighIn) {
-    rows.push({ key: 'weight', label: 'Weight', value: formatWeight(day.weight_kg), caption: clock12(day.weighIn.time) });
+    rows.push({
+      key: 'weight',
+      label: 'Weight',
+      value: formatWeight(day.weight_kg),
+      caption: clock12(day.weighIn.time),
+    });
     const fat = Number(day.fat_ratio_pct);
-    rows.push(day.fat_ratio_pct !== '' && Number.isFinite(fat)
-      ? { key: 'fat', label: 'Body fat', value: `${fat.toFixed(1)}%`, caption: '' }
-      : { key: 'fat', label: 'Body fat', value: '', caption: 'Not measured at this weigh-in.' });
+    rows.push(
+      day.fat_ratio_pct !== '' && Number.isFinite(fat)
+        ? { key: 'fat', label: 'Body fat', value: `${fat.toFixed(1)}%`, caption: '' }
+        : { key: 'fat', label: 'Body fat', value: '', caption: 'Not measured at this weigh-in.' },
+    );
   } else {
     rows.push({ key: 'weight', label: 'Weight', value: '', caption: none });
     rows.push({ key: 'fat', label: 'Body fat', value: '', caption: none });
@@ -76,7 +83,9 @@ function BodyRow({ row }: { row: BodyRowView }) {
         {row.value && row.spoken && (
           <>
             <span class="sr-only">{row.spoken}</span>
-            <span class="health-value" aria-hidden="true">{row.value}</span>
+            <span class="health-value" aria-hidden="true">
+              {row.value}
+            </span>
           </>
         )}
         {row.value && !row.spoken && <span class="health-value">{row.value}</span>}
@@ -92,16 +101,28 @@ export function BodyPanel({ date, state }: DayPanelProps) {
   if (tab.state !== 'loaded') {
     return (
       <Panel title="Body">
-        <PanelStatus status={tab.state} what="your body measurements" onRetry={() => { if (token) void loadHealth(token); }} />
+        <PanelStatus
+          status={tab.state}
+          what="your body measurements"
+          onRetry={() => {
+            if (token) void loadHealth(token);
+          }}
+        />
       </Panel>
     );
   }
   const view = bodyView(selectBodyMeasurementRange(tab.rows, date, date), state === 'today');
   return (
     <Panel title="Body">
-      {view.kind === 'note'
-        ? <PanelNote>{view.note}</PanelNote>
-        : <dl class="health-list">{view.rows.map((r) => <BodyRow key={r.key} row={r} />)}</dl>}
+      {view.kind === 'note' ? (
+        <PanelNote>{view.note}</PanelNote>
+      ) : (
+        <dl class="health-list">
+          {view.rows.map((r) => (
+            <BodyRow key={r.key} row={r} />
+          ))}
+        </dl>
+      )}
     </Panel>
   );
 }

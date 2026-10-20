@@ -145,9 +145,7 @@ function looseCairn(overrides: Partial<Extract<LooseRecord, { kind: 'cairn' }>> 
   }
 }
 
-function renderPanel(
-  props: Partial<Parameters<typeof TestTripsPanel>[0]> & { trips: TripIndexEntry[] },
-) {
+function renderPanel(props: Partial<Parameters<typeof TestTripsPanel>[0]> & { trips: TripIndexEntry[] }) {
   return render(
     <MemoryRouter>
       <TestTripsPanel {...props} />
@@ -223,7 +221,11 @@ describe('TripsPanel', () => {
     })
 
     expect(screen.getByText('Kepler Track')).toBeDefined()
-    expect(screen.getByText(new RegExp(`${escapeRe(formatTripDateRange('2024-03-01', '2024-03-05'))} · 4 tracks · 128 photos`))).toBeDefined()
+    expect(
+      screen.getByText(
+        new RegExp(`${escapeRe(formatTripDateRange('2024-03-01', '2024-03-05'))} · 4 tracks · 128 photos`),
+      ),
+    ).toBeDefined()
   })
 
   // #131: the row's glyph carries status visually and is `aria-hidden`, so
@@ -282,7 +284,9 @@ describe('TripsPanel', () => {
   describe('trip totals', () => {
     it('appends distance and ascent to the meta line when totals are known', () => {
       renderPanel({
-        trips: [tripEntry({ id: 't1', name: 'Kepler Track', startDate: '2024-03-01', endDate: '2024-03-05' })],
+        trips: [
+          tripEntry({ id: 't1', name: 'Kepler Track', startDate: '2024-03-01', endDate: '2024-03-05' }),
+        ],
         trackCounts: new Map([['t1', 4]]),
         tripTotals: new Map([['t1', { distanceMeters: 42_806, elevationGainMeters: 2_121 }]]),
       })
@@ -340,9 +344,7 @@ describe('TripsPanel', () => {
         ]),
       })
 
-      expect(
-        screen.getByText(new RegExp(`~${escapeRe(formatElevationGain(2_121)!)}$`)),
-      ).toBeDefined()
+      expect(screen.getByText(new RegExp(`~${escapeRe(formatElevationGain(2_121)!)}$`))).toBeDefined()
     })
   })
 
@@ -413,10 +415,7 @@ describe('TripsPanel', () => {
       renderPanel({ trips: [tripEntry({ id: 'abc', name: 'Kepler Track' })], disabled: true })
       openRowMenu('Kepler Track')
 
-      expect(screen.getByRole('menuitem', { name: 'Delete trip…' })).toHaveProperty(
-        'disabled',
-        true,
-      )
+      expect(screen.getByRole('menuitem', { name: 'Delete trip…' })).toHaveProperty('disabled', true)
     })
   })
 
@@ -450,10 +449,7 @@ describe('TripsPanel', () => {
   describe('filtering', () => {
     it('filters the list by the shell-owned name term, case-insensitively', () => {
       renderPanel({
-        trips: [
-          tripEntry({ id: 'a', name: 'Kepler Track' }),
-          tripEntry({ id: 'b', name: 'Alta Via 1' }),
-        ],
+        trips: [tripEntry({ id: 'a', name: 'Kepler Track' }), tripEntry({ id: 'b', name: 'Alta Via 1' })],
         initialFilters: { ...DEFAULT_TRIP_FILTERS, name: 'KEPLER' },
       })
 
@@ -545,12 +541,8 @@ describe('TripsPanel', () => {
     it('links a track and a photo to their own faces', () => {
       renderPanel({ trips: [], looseItems: [looseTrack(), looseCairn()] })
 
-      expect(screen.getByText('Mount Rosea').closest('a')?.getAttribute('href')).toBe(
-        '/tracks/track-1',
-      )
-      expect(screen.getByText('sapporo.jpg').closest('a')?.getAttribute('href')).toBe(
-        '/cairns/cairn-1',
-      )
+      expect(screen.getByText('Mount Rosea').closest('a')?.getAttribute('href')).toBe('/tracks/track-1')
+      expect(screen.getByText('sapporo.jpg').closest('a')?.getAttribute('href')).toBe('/cairns/cairn-1')
     })
 
     it('offers Add to a trip and a separate Delete on a loose row', () => {
@@ -586,10 +578,7 @@ describe('TripsPanel', () => {
 
       openRowMenu('Mount Rosea')
       // A move is a file move, and there is nothing there yet to move.
-      expect(screen.getByRole('menuitem', { name: 'Add to a trip…' })).toHaveProperty(
-        'disabled',
-        true,
-      )
+      expect(screen.getByRole('menuitem', { name: 'Add to a trip…' })).toHaveProperty('disabled', true)
       // Deleting stays available: an item that failed to upload is exactly
       // the one a user most wants rid of.
       expect(screen.getByRole('menuitem', { name: 'Delete…' })).toHaveProperty('disabled', false)
@@ -606,10 +595,7 @@ describe('TripsPanel', () => {
       expect(container.querySelector('.trips-panel__row-detail--unplaced')).not.toBeNull()
 
       openRowMenu('Mount Rosea')
-      expect(screen.getByRole('menuitem', { name: 'Add to a trip…' })).toHaveProperty(
-        'disabled',
-        true,
-      )
+      expect(screen.getByRole('menuitem', { name: 'Add to a trip…' })).toHaveProperty('disabled', true)
     })
   })
 
@@ -738,9 +724,7 @@ describe('TripsPanel', () => {
       fireEvent.change(input, { target: { value: 'New name' } })
       fireEvent.keyDown(input, { key: 'Enter' })
 
-      await waitFor(() =>
-        expect(screen.getByText("Couldn't rename Mount Rosea — try again.")).toBeDefined(),
-      )
+      await waitFor(() => expect(screen.getByText("Couldn't rename Mount Rosea — try again.")).toBeDefined())
       expect(screen.getByText('Mount Rosea')).toBeDefined()
     })
 
@@ -752,9 +736,9 @@ describe('TripsPanel', () => {
       fireEvent.click(screen.getByRole('menuitem', { name: 'Change colour' }))
 
       expect(screen.getByRole('group', { name: 'Colours for Mount Rosea' })).toBeDefined()
-      const options = screen.getAllByRole('button', { name: /./ }).filter((el) =>
-        el.className.includes('color-popover__option'),
-      )
+      const options = screen
+        .getAllByRole('button', { name: /./ })
+        .filter((el) => el.className.includes('color-popover__option'))
       fireEvent.click(options[2])
 
       await waitFor(() => expect(onRecolorLoose).toHaveBeenCalledWith('track-1', 2))
@@ -765,10 +749,7 @@ describe('TripsPanel', () => {
 
       openRowMenu('Mount Rosea')
       expect(screen.getByRole('menuitem', { name: 'Rename' })).toHaveProperty('disabled', true)
-      expect(screen.getByRole('menuitem', { name: 'Change colour' })).toHaveProperty(
-        'disabled',
-        true,
-      )
+      expect(screen.getByRole('menuitem', { name: 'Change colour' })).toHaveProperty('disabled', true)
     })
 
     it('disables Rename while disconnected', () => {
@@ -944,17 +925,12 @@ describe('TripsPanel', () => {
       Object.defineProperty(input, 'files', { value: files, configurable: true })
       fireEvent.change(input)
       expect(onImportFiles).toHaveBeenCalledTimes(1)
-      expect(onImportFiles.mock.calls[0][0].map((file: File) => file.name)).toEqual([
-        'a.png',
-        'b.png',
-      ])
+      expect(onImportFiles.mock.calls[0][0].map((file: File) => file.name)).toEqual(['a.png', 'b.png'])
     })
 
-    it('accepts tracks, photos and archives — the drop path\'s own list', () => {
+    it("accepts tracks, photos and archives — the drop path's own list", () => {
       renderPanel({ trips: [] })
-      expect(importInput().getAttribute('accept')).toBe(
-        '.kml,.kmz,.gpx,.jpg,.jpeg,.png,.webp,.zip',
-      )
+      expect(importInput().getAttribute('accept')).toBe('.kml,.kmz,.gpx,.jpg,.jpeg,.png,.webp,.zip')
     })
 
     it('does not set `capture`, which would force the camera over the library', () => {

@@ -5,18 +5,15 @@ import { sets, workouts } from '../../state/store';
 import type { SetWithRow, WorkoutWithRow } from '../../api/types';
 
 export interface LastTimeResult {
-  workoutDate: string;       // ISO date string e.g. "2025-01-14"
-  sets: SetWithRow[];        // sorted by set_number
+  workoutDate: string; // ISO date string e.g. "2025-01-14"
+  sets: SetWithRow[]; // sorted by set_number
 }
 
 /**
  * Find the most recent workout's sets for a given exercise,
  * excluding the current workout.
  */
-export function getLastTimeData(
-  exerciseId: string,
-  currentWorkoutId: string,
-): LastTimeResult | null {
+export function getLastTimeData(exerciseId: string, currentWorkoutId: string): LastTimeResult | null {
   return getLastTimeDataFrom(exerciseId, currentWorkoutId, sets.value, workouts.value);
 }
 
@@ -34,9 +31,7 @@ export function getLastTimeDataFrom(
   }
 
   // Filter sets for this exercise, excluding current workout
-  const matchingSets = allSets.filter(
-    (s) => s.exercise_id === exerciseId && s.workout_id !== currentWorkoutId,
-  );
+  const matchingSets = allSets.filter((s) => s.exercise_id === exerciseId && s.workout_id !== currentWorkoutId);
 
   if (matchingSets.length === 0) return null;
 

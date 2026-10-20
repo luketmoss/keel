@@ -1,4 +1,23 @@
-import { items, showToast, boards, activeBoardId, initActiveBoardFromUrl, initActiveViewFromUrl, initSelectedItemFromUrl, initCreateItemFromUrl, initUpcomingBoardFilter, permissions, currentUserEmail, selectItem, clearSelectedItem, boardItems as boardItemsComputed, statuses, isTerminalStatus, defaultStatusName, boardStatuses } from './board-store';
+import {
+  items,
+  showToast,
+  boards,
+  activeBoardId,
+  initActiveBoardFromUrl,
+  initActiveViewFromUrl,
+  initSelectedItemFromUrl,
+  initCreateItemFromUrl,
+  initUpcomingBoardFilter,
+  permissions,
+  currentUserEmail,
+  selectItem,
+  clearSelectedItem,
+  boardItems as boardItemsComputed,
+  statuses,
+  isTerminalStatus,
+  defaultStatusName,
+  boardStatuses,
+} from './board-store';
 import { applyStatusSideEffects, statusTransitionAuditAction } from './rules';
 import {
   fetchAllItems as sheetsFetchAllItems,
@@ -172,7 +191,8 @@ const appendAuditEntry = (...args: Parameters<typeof sheetsAppendAuditEntry>) =>
 const createLabelRow = (...args: Parameters<typeof sheetsCreateLabelRow>) => api().createLabelRow(...args);
 const updateLabelRow = (...args: Parameters<typeof sheetsUpdateLabelRow>) => api().updateLabelRow(...args);
 const deleteLabelRow = (...args: Parameters<typeof sheetsDeleteLabelRow>) => api().deleteLabelRow(...args);
-const fetchLabelsWithRows = (...args: Parameters<typeof sheetsFetchLabelsWithRows>) => api().fetchLabelsWithRows(...args);
+const fetchLabelsWithRows = (...args: Parameters<typeof sheetsFetchLabelsWithRows>) =>
+  api().fetchLabelsWithRows(...args);
 const cascadeLabelUpdate = (...args: Parameters<typeof sheetsCascadeLabelUpdate>) => api().cascadeLabelUpdate(...args);
 const cascadeOwnerUpdate = (...args: Parameters<typeof sheetsCascadeOwnerUpdate>) => api().cascadeOwnerUpdate(...args);
 const upsertOwner = (...args: Parameters<typeof sheetsUpsertOwner>) => api().upsertOwner(...args);
@@ -181,20 +201,28 @@ const createBoardRowApi = (...args: Parameters<typeof sheetsCreateBoardRow>) => 
 const updateBoardRowApi = (...args: Parameters<typeof sheetsUpdateBoardRow>) => api().updateBoardRow(...args);
 const renameBoardRowApi = (...args: Parameters<typeof sheetsRenameBoardRow>) => api().renameBoardRow(...args);
 const fetchPermissionsApi = (...args: Parameters<typeof sheetsFetchPermissions>) => api().fetchPermissions(...args);
-const createPermissionRowApi = (...args: Parameters<typeof sheetsCreatePermissionRow>) => api().createPermissionRow(...args);
-const deletePermissionRowApi = (...args: Parameters<typeof sheetsDeletePermissionRow>) => api().deletePermissionRow(...args);
+const createPermissionRowApi = (...args: Parameters<typeof sheetsCreatePermissionRow>) =>
+  api().createPermissionRow(...args);
+const deletePermissionRowApi = (...args: Parameters<typeof sheetsDeletePermissionRow>) =>
+  api().deletePermissionRow(...args);
 const deleteBoardRowApi = (...args: Parameters<typeof sheetsDeleteBoardRow>) => api().deleteBoardRow(...args);
-const setBoardArchivedAtApi = (...args: Parameters<typeof sheetsSetBoardArchivedAt>) => api().setBoardArchivedAt(...args);
-const deleteAllBoardPermissionsApi = (...args: Parameters<typeof sheetsDeleteAllBoardPermissions>) => api().deleteAllBoardPermissions(...args);
-const deleteAllBoardStatusesApi = (...args: Parameters<typeof sheetsDeleteAllBoardStatuses>) => api().deleteAllBoardStatuses(...args);
-const deleteAllBoardLabelsApi = (...args: Parameters<typeof sheetsDeleteAllBoardLabels>) => api().deleteAllBoardLabels(...args);
+const setBoardArchivedAtApi = (...args: Parameters<typeof sheetsSetBoardArchivedAt>) =>
+  api().setBoardArchivedAt(...args);
+const deleteAllBoardPermissionsApi = (...args: Parameters<typeof sheetsDeleteAllBoardPermissions>) =>
+  api().deleteAllBoardPermissions(...args);
+const deleteAllBoardStatusesApi = (...args: Parameters<typeof sheetsDeleteAllBoardStatuses>) =>
+  api().deleteAllBoardStatuses(...args);
+const deleteAllBoardLabelsApi = (...args: Parameters<typeof sheetsDeleteAllBoardLabels>) =>
+  api().deleteAllBoardLabels(...args);
 const updateItemBoardIdApi = (...args: Parameters<typeof sheetsUpdateItemBoardId>) => api().updateItemBoardId(...args);
 const fetchStatusesApi = (...args: Parameters<typeof sheetsFetchStatuses>) => api().fetchStatuses(...args);
 const createStatusRowApi = (...args: Parameters<typeof sheetsCreateStatusRow>) => api().createStatusRow(...args);
 const updateStatusRowApi = (...args: Parameters<typeof sheetsUpdateStatusRow>) => api().updateStatusRow(...args);
 const deleteStatusRowApi = (...args: Parameters<typeof sheetsDeleteStatusRow>) => api().deleteStatusRow(...args);
-const fetchStatusesWithRowsApi = (...args: Parameters<typeof sheetsFetchStatusesWithRows>) => api().fetchStatusesWithRows(...args);
-const cascadeStatusRenameApi = (...args: Parameters<typeof sheetsCascadeStatusRename>) => api().cascadeStatusRename(...args);
+const fetchStatusesWithRowsApi = (...args: Parameters<typeof sheetsFetchStatusesWithRows>) =>
+  api().fetchStatusesWithRows(...args);
+const cascadeStatusRenameApi = (...args: Parameters<typeof sheetsCascadeStatusRename>) =>
+  api().cascadeStatusRename(...args);
 
 function generateUUID(): string {
   return crypto.randomUUID();
@@ -225,17 +253,20 @@ export async function loadBoard(token: string, user?: UserInfo | null) {
     statuses.value = statusesData;
 
     // AC4: One-time migration — assign board_id to orphaned labels
-    const orphanedLabels = labelsData.filter(l => !l.board_id);
+    const orphanedLabels = labelsData.filter((l) => !l.board_id);
     if (orphanedLabels.length > 0 && boardsData.length > 0) {
       // For each board, find labels used by that board's items
       const assignedNames = new Set<string>();
-      const migratedLabels = labelsData.map(l => ({ ...l }));
+      const migratedLabels = labelsData.map((l) => ({ ...l }));
 
       for (const board of boardsData) {
-        const boardItemsForMigration = itemsData.filter(i => i.board_id === board.id);
+        const boardItemsForMigration = itemsData.filter((i) => i.board_id === board.id);
         const usedLabelNames = new Set<string>();
         for (const item of boardItemsForMigration) {
-          for (const name of item.labels.split(',').map(s => s.trim()).filter(Boolean)) {
+          for (const name of item.labels
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)) {
             usedLabelNames.add(name);
           }
         }
@@ -259,7 +290,7 @@ export async function loadBoard(token: string, user?: UserInfo | null) {
       // Persist migration to sheet
       const labelsWithRows = await fetchLabelsWithRows(token);
       for (const label of migratedLabels) {
-        const rowData = labelsWithRows.find(r => r.label === label.label && !r.board_id);
+        const rowData = labelsWithRows.find((r) => r.label === label.label && !r.board_id);
         if (rowData) {
           await updateLabelRow(rowData.sheetRow, label.label, label.color, label.board_id, token);
         }
@@ -278,13 +309,13 @@ export async function loadBoard(token: string, user?: UserInfo | null) {
     // Migration (AC7): if boards exist but have no permission entries, create
     // wildcard entries so existing boards remain accessible.
     if (boardsData.length > 0 && permsData.length === 0) {
-      const migrationPerms = boardsData.map(b => ({
+      const migrationPerms = boardsData.map((b) => ({
         board_id: b.id,
         user_email: '*',
         role: 'member' as const,
       }));
       // Also grant owner role to board creators
-      const ownerPerms = boardsData.map(b => ({
+      const ownerPerms = boardsData.map((b) => ({
         board_id: b.id,
         user_email: b.created_by,
         role: 'owner' as const,
@@ -314,9 +345,7 @@ export async function loadBoard(token: string, user?: UserInfo | null) {
     // use the board. If the signed-in user's email isn't listed, reject.
     // Skip in demo mode — the mock user isn't in the mock owners list.
     if (user && !isDemoMode()) {
-      const allowed = ownersData.some(
-        o => o.google_account.toLowerCase() === user.email.toLowerCase()
-      );
+      const allowed = ownersData.some((o) => o.google_account.toLowerCase() === user.email.toLowerCase());
       if (!allowed) {
         throw new NotAllowedError(user.email);
       }
@@ -333,9 +362,10 @@ export async function loadBoard(token: string, user?: UserInfo | null) {
 export async function refreshItems(token: string) {
   try {
     const fetched = await fetchAllItems(token);
-    items.value = pendingDeleteIds.size === 0
-      ? fetched
-      : fetched.filter(i => !pendingDeleteIds.has(i.id) && !pendingDeleteIds.has(i.parent_id));
+    items.value =
+      pendingDeleteIds.size === 0
+        ? fetched
+        : fetched.filter((i) => !pendingDeleteIds.has(i.id) && !pendingDeleteIds.has(i.parent_id));
   } catch (err: any) {
     if (isReauthFailure(err)) return; // Auth layer handles this
     if (err.status === 401) throw err; // Let auth layer handle it
@@ -343,11 +373,7 @@ export async function refreshItems(token: string) {
   }
 }
 
-export async function createItem(
-  data: Partial<Item>,
-  actor: string,
-  token: string
-) {
+export async function createItem(data: Partial<Item>, actor: string, token: string) {
   if (!data.title?.trim()) {
     showToast('Title is required', 'error');
     return;
@@ -356,9 +382,7 @@ export async function createItem(
   const status: ItemStatus = data.status ?? defaultStatusName();
 
   const now = new Date().toISOString();
-  const maxOrder = items.value
-    .filter(i => i.status === status)
-    .reduce((max, i) => Math.max(max, i.sort_order), 0);
+  const maxOrder = items.value.filter((i) => i.status === status).reduce((max, i) => Math.max(max, i.sort_order), 0);
 
   const item: Item = {
     id: generateUUID(),
@@ -389,7 +413,7 @@ export async function createItem(
     showToast('Item created');
   } catch (err: any) {
     // Rollback
-    items.value = items.value.filter(i => i.id !== item.id);
+    items.value = items.value.filter((i) => i.id !== item.id);
     if (!isReauthFailure(err)) {
       showToast('Failed to create item: ' + err.message, 'error');
     }
@@ -405,7 +429,7 @@ export async function createItemWithSubtasks(
   data: Partial<Item>,
   subtasks: StagedSubtask[],
   actor: string,
-  token: string
+  token: string,
 ) {
   if (!data.title?.trim()) {
     showToast('Title is required', 'error');
@@ -415,9 +439,7 @@ export async function createItemWithSubtasks(
   const status: ItemStatus = data.status ?? defaultStatusName();
 
   const now = new Date().toISOString();
-  const maxOrder = items.value
-    .filter(i => i.status === status)
-    .reduce((max, i) => Math.max(max, i.sort_order), 0);
+  const maxOrder = items.value.filter((i) => i.status === status).reduce((max, i) => Math.max(max, i.sort_order), 0);
 
   const parentId = generateUUID();
   const parent: Item = {
@@ -438,7 +460,7 @@ export async function createItemWithSubtasks(
   };
 
   // Filter out blank subtasks and build child items
-  const validSubtasks = subtasks.filter(s => s.title.trim());
+  const validSubtasks = subtasks.filter((s) => s.title.trim());
   const firstStatus = defaultStatusName();
   const children: Item[] = validSubtasks.map((s, i) => ({
     id: generateUUID(),
@@ -458,7 +480,7 @@ export async function createItemWithSubtasks(
   }));
 
   // Optimistic update — add parent and all children
-  const allNew: ItemWithRow[] = [parent, ...children].map(item => ({ ...item, sheetRow: -1 }));
+  const allNew: ItemWithRow[] = [parent, ...children].map((item) => ({ ...item, sheetRow: -1 }));
   items.value = [...items.value, ...allNew];
 
   try {
@@ -476,29 +498,25 @@ export async function createItemWithSubtasks(
     showToast('Item created');
   } catch (err: any) {
     // Rollback all
-    const ids = new Set(allNew.map(i => i.id));
-    items.value = items.value.filter(i => !ids.has(i.id));
+    const ids = new Set(allNew.map((i) => i.id));
+    items.value = items.value.filter((i) => !ids.has(i.id));
     if (!isReauthFailure(err)) {
       showToast('Failed to create item: ' + err.message, 'error');
     }
   }
 }
 
-export async function copyItem(
-  itemId: string,
-  actor: string,
-  token: string
-): Promise<string | null> {
-  const original = items.value.find(i => i.id === itemId);
+export async function copyItem(itemId: string, actor: string, token: string): Promise<string | null> {
+  const original = items.value.find((i) => i.id === itemId);
   if (!original) return null;
 
   const now = new Date().toISOString();
 
   // Calculate sort_order to place copy right after the original
   const sameStatusItems = items.value
-    .filter(i => i.status === original.status && !i.parent_id)
+    .filter((i) => i.status === original.status && !i.parent_id)
     .sort((a, b) => a.sort_order - b.sort_order);
-  const origIndex = sameStatusItems.findIndex(i => i.id === original.id);
+  const origIndex = sameStatusItems.findIndex((i) => i.id === original.id);
   const origOrder = original.sort_order;
   const nextItem = sameStatusItems[origIndex + 1];
   const copyOrder = nextItem ? (origOrder + nextItem.sort_order) / 2 : origOrder + 1;
@@ -523,7 +541,7 @@ export async function copyItem(
 
   // Find and duplicate subtasks
   const originalChildren = items.value
-    .filter(i => i.parent_id === itemId)
+    .filter((i) => i.parent_id === itemId)
     .sort((a, b) => a.sort_order - b.sort_order);
 
   const children: Item[] = originalChildren.map((child, i) => ({
@@ -544,7 +562,7 @@ export async function copyItem(
   }));
 
   // Optimistic update
-  const allNew: ItemWithRow[] = [parent, ...children].map(item => ({ ...item, sheetRow: -1 }));
+  const allNew: ItemWithRow[] = [parent, ...children].map((item) => ({ ...item, sheetRow: -1 }));
   items.value = [...items.value, ...allNew];
 
   try {
@@ -560,8 +578,8 @@ export async function copyItem(
     return newParentId;
   } catch (err: any) {
     // Rollback
-    const ids = new Set(allNew.map(i => i.id));
-    items.value = items.value.filter(i => !ids.has(i.id));
+    const ids = new Set(allNew.map((i) => i.id));
+    items.value = items.value.filter((i) => !ids.has(i.id));
     if (!isReauthFailure(err)) {
       showToast('Failed to copy item: ' + err.message, 'error');
     }
@@ -574,9 +592,9 @@ export async function moveItem(
   newStatus: ItemStatus,
   actor: string,
   token: string,
-  targetIndex?: number
+  targetIndex?: number,
 ): Promise<boolean> {
-  const item = items.value.find(i => i.id === itemId);
+  const item = items.value.find((i) => i.id === itemId);
   if (!item) return false;
   if (item.status === newStatus) return true;
 
@@ -589,14 +607,12 @@ export async function moveItem(
 
   // Get destination column items (root items only, sorted by sort_order)
   const destColumnItems = items.value
-    .filter(i => i.status === newStatus && !i.parent_id && i.id !== itemId)
+    .filter((i) => i.status === newStatus && !i.parent_id && i.id !== itemId)
     .sort((a, b) => a.sort_order - b.sort_order);
 
   // #162: Cascade — find children to update (only for root items, not sub-tasks)
-  const children = !item.parent_id
-    ? items.value.filter(i => i.parent_id === itemId)
-    : [];
-  const childrenToUpdate = children.filter(c => c.status !== newStatus);
+  const children = !item.parent_id ? items.value.filter((i) => i.parent_id === itemId) : [];
+  const childrenToUpdate = children.filter((c) => c.status !== newStatus);
 
   if (targetIndex !== undefined) {
     // AC2: Insert at specific position and renumber the destination column
@@ -618,25 +634,26 @@ export async function moveItem(
     }));
 
     // #162: Apply cascade to children optimistically
-    const cascadedChildren: ItemWithRow[] = childrenToUpdate.map(c => ({
+    const cascadedChildren: ItemWithRow[] = childrenToUpdate.map((c) => ({
       ...applyStatusSideEffects(c, newStatus, terminal),
       sheetRow: c.sheetRow,
     }));
 
     // Optimistic update (parent column + cascaded children)
-    items.value = items.value.map(i => {
-      const colUpdate = updates.find(u => u.id === i.id);
+    items.value = items.value.map((i) => {
+      const colUpdate = updates.find((u) => u.id === i.id);
       if (colUpdate) return colUpdate;
-      const childUpdate = cascadedChildren.find(c => c.id === i.id);
+      const childUpdate = cascadedChildren.find((c) => c.id === i.id);
       if (childUpdate) return childUpdate;
       return i;
     });
 
     // AC6: Screen reader announcement with position + cascade count
     const totalInColumn = reordered.length;
-    const cascadeMsg = childrenToUpdate.length > 0
-      ? ` (${childrenToUpdate.length} sub-task${childrenToUpdate.length !== 1 ? 's' : ''} updated)`
-      : '';
+    const cascadeMsg =
+      childrenToUpdate.length > 0
+        ? ` (${childrenToUpdate.length} sub-task${childrenToUpdate.length !== 1 ? 's' : ''} updated)`
+        : '';
     showToast(`${item.title} moved to ${newStatus}, position ${clampedIndex + 1} of ${totalInColumn}${cascadeMsg}`);
 
     try {
@@ -651,9 +668,8 @@ export async function moveItem(
       // #162: Persist cascade
       for (const child of cascadedChildren) {
         await updateItemRow(child.sheetRow, child, token);
-        const oldChild = childrenToUpdate.find(c => c.id === child.id)!;
-        await appendAuditEntry(child.id, 'status_changed', 'status',
-          oldChild.status, newStatus, actor, token);
+        const oldChild = childrenToUpdate.find((c) => c.id === child.id)!;
+        await appendAuditEntry(child.id, 'status_changed', 'status', oldChild.status, newStatus, actor, token);
         // #239: one completion row per cascaded child, from its own prior state
         const childAction = statusTransitionAuditAction(oldChild, terminal);
         if (childAction) {
@@ -682,23 +698,24 @@ export async function moveItem(
   };
 
   // #162: Apply cascade to children optimistically
-  const cascadedChildren: ItemWithRow[] = childrenToUpdate.map(c => ({
+  const cascadedChildren: ItemWithRow[] = childrenToUpdate.map((c) => ({
     ...applyStatusSideEffects(c, newStatus, terminal),
     sheetRow: c.sheetRow,
   }));
 
   // Optimistic update (parent + cascaded children)
-  items.value = items.value.map(i => {
+  items.value = items.value.map((i) => {
     if (i.id === itemId) return updated;
-    const childUpdate = cascadedChildren.find(c => c.id === i.id);
+    const childUpdate = cascadedChildren.find((c) => c.id === i.id);
     if (childUpdate) return childUpdate;
     return i;
   });
 
   // #162: Toast with cascade count
-  const cascadeMsg = childrenToUpdate.length > 0
-    ? ` (${childrenToUpdate.length} sub-task${childrenToUpdate.length !== 1 ? 's' : ''} updated)`
-    : '';
+  const cascadeMsg =
+    childrenToUpdate.length > 0
+      ? ` (${childrenToUpdate.length} sub-task${childrenToUpdate.length !== 1 ? 's' : ''} updated)`
+      : '';
   showToast(`${item.title} moved to ${newStatus}${cascadeMsg}`);
 
   try {
@@ -711,9 +728,8 @@ export async function moveItem(
     // #162: Persist cascade
     for (const child of cascadedChildren) {
       await updateItemRow(child.sheetRow, child, token);
-      const oldChild = childrenToUpdate.find(c => c.id === child.id)!;
-      await appendAuditEntry(child.id, 'status_changed', 'status',
-        oldChild.status, newStatus, actor, token);
+      const oldChild = childrenToUpdate.find((c) => c.id === child.id)!;
+      await appendAuditEntry(child.id, 'status_changed', 'status', oldChild.status, newStatus, actor, token);
       // #239: one completion row per cascaded child, from its own prior state
       const childAction = statusTransitionAuditAction(oldChild, terminal);
       if (childAction) {
@@ -736,9 +752,9 @@ export async function updateItem(
   itemId: string,
   changes: Partial<Item>,
   actor: string,
-  token: string
+  token: string,
 ): Promise<boolean> {
-  const item = items.value.find(i => i.id === itemId);
+  const item = items.value.find((i) => i.id === itemId);
   if (!item) return false;
 
   const oldItem = { ...item };
@@ -754,22 +770,20 @@ export async function updateItem(
   }
 
   // Optimistic update
-  items.value = items.value.map(i => i.id === itemId ? updated : i);
+  items.value = items.value.map((i) => (i.id === itemId ? updated : i));
 
   try {
     await updateItemRow(item.sheetRow, updated, token);
     // Audit log for each changed field
     for (const key of Object.keys(changes) as (keyof Item)[]) {
       if (changes[key] !== undefined && changes[key] !== oldItem[key]) {
-        await appendAuditEntry(
-          itemId, 'updated', key, String(oldItem[key]), String(changes[key]), actor, token
-        );
+        await appendAuditEntry(itemId, 'updated', key, String(oldItem[key]), String(changes[key]), actor, token);
       }
     }
     await refreshItems(token);
     return true;
   } catch (err: any) {
-    items.value = items.value.map(i => i.id === itemId ? oldItem : i);
+    items.value = items.value.map((i) => (i.id === itemId ? oldItem : i));
     if (!isReauthFailure(err)) {
       showToast('Failed to update item: ' + err.message, 'error');
     }
@@ -777,24 +791,18 @@ export async function updateItem(
   }
 }
 
-export async function deleteItem(
-  itemId: string,
-  actor: string,
-  token: string
-) {
-  const item = items.value.find(i => i.id === itemId);
+export async function deleteItem(itemId: string, actor: string, token: string) {
+  const item = items.value.find((i) => i.id === itemId);
   if (!item) return;
 
   const oldItems = [...items.value];
 
   // Remove item and its children optimistically
-  items.value = items.value.filter(i => i.id !== itemId && i.parent_id !== itemId);
+  items.value = items.value.filter((i) => i.id !== itemId && i.parent_id !== itemId);
 
   try {
     // Delete children first (from bottom to top to avoid row shifting issues)
-    const children = oldItems
-      .filter(i => i.parent_id === itemId)
-      .sort((a, b) => b.sheetRow - a.sheetRow);
+    const children = oldItems.filter((i) => i.parent_id === itemId).sort((a, b) => b.sheetRow - a.sheetRow);
 
     for (const child of children) {
       await deleteItemRow(child.sheetRow, token);
@@ -803,7 +811,7 @@ export async function deleteItem(
 
     // Re-fetch to get updated row numbers after child deletions
     const freshItems = await fetchAllItems(token);
-    const freshItem = freshItems.find(i => i.id === itemId);
+    const freshItem = freshItems.find((i) => i.id === itemId);
     if (freshItem) {
       await deleteItemRow(freshItem.sheetRow, token);
       await appendAuditEntry(itemId, 'deleted', '', item.title, '', actor, token);
@@ -819,23 +827,19 @@ export async function deleteItem(
   }
 }
 
-export async function deleteSubtask(
-  itemId: string,
-  actor: string,
-  token: string
-) {
-  const item = items.value.find(i => i.id === itemId);
+export async function deleteSubtask(itemId: string, actor: string, token: string) {
+  const item = items.value.find((i) => i.id === itemId);
   if (!item) return;
 
   const oldItems = [...items.value];
 
   // Optimistic: remove just this sub-task (no children cascade for sub-tasks)
-  items.value = items.value.filter(i => i.id !== itemId);
+  items.value = items.value.filter((i) => i.id !== itemId);
 
   try {
     // Re-fetch to get current row numbers
     const freshItems = await fetchAllItems(token);
-    const freshItem = freshItems.find(i => i.id === itemId);
+    const freshItem = freshItems.find((i) => i.id === itemId);
     if (freshItem) {
       await deleteItemRow(freshItem.sheetRow, token);
       await appendAuditEntry(itemId, 'deleted', '', item.title, '', actor, token);
@@ -850,14 +854,9 @@ export async function deleteSubtask(
   }
 }
 
-export async function reorderSubtasks(
-  itemIdA: string,
-  itemIdB: string,
-  actor: string,
-  token: string
-) {
-  const itemA = items.value.find(i => i.id === itemIdA);
-  const itemB = items.value.find(i => i.id === itemIdB);
+export async function reorderSubtasks(itemIdA: string, itemIdB: string, actor: string, token: string) {
+  const itemA = items.value.find((i) => i.id === itemIdA);
+  const itemB = items.value.find((i) => i.id === itemIdB);
   if (!itemA || !itemB) return;
 
   const oldItems = [...items.value];
@@ -867,7 +866,7 @@ export async function reorderSubtasks(
   // Optimistic: swap sort_order values
   const updatedA: ItemWithRow = { ...itemA, sort_order: orderB, updated_at: new Date().toISOString() };
   const updatedB: ItemWithRow = { ...itemB, sort_order: orderA, updated_at: new Date().toISOString() };
-  items.value = items.value.map(i => {
+  items.value = items.value.map((i) => {
     if (i.id === itemIdA) return updatedA;
     if (i.id === itemIdB) return updatedB;
     return i;
@@ -891,16 +890,16 @@ export async function reorderItem(
   newIndex: number,
   columnItems: ItemWithRow[],
   actor: string,
-  token: string
+  token: string,
 ): Promise<boolean> {
-  const item = columnItems.find(i => i.id === itemId);
+  const item = columnItems.find((i) => i.id === itemId);
   if (!item) return false;
 
   const oldIndex = columnItems.indexOf(item);
   if (oldIndex === newIndex) return true;
 
   // Build new order: remove the item, insert at newIndex, renumber densely
-  const reordered = columnItems.filter(i => i.id !== itemId);
+  const reordered = columnItems.filter((i) => i.id !== itemId);
   reordered.splice(newIndex, 0, item);
 
   const oldItems = [...items.value];
@@ -911,8 +910,8 @@ export async function reorderItem(
   }));
 
   // Optimistic update
-  items.value = items.value.map(i => {
-    const updated = updates.find(u => u.id === i.id);
+  items.value = items.value.map((i) => {
+    const updated = updates.find((u) => u.id === i.id);
     return updated ?? i;
   });
 
@@ -941,7 +940,7 @@ export async function updateDisplayName(
   newName: string,
   email: string,
   oldName: string,
-  token: string
+  token: string,
 ): Promise<boolean> {
   // Strip control characters and newlines
   const cleaned = newName.replace(/[\x00-\x1f\x7f]/g, '').trim();
@@ -956,14 +955,10 @@ export async function updateDisplayName(
   // Optimistic update
   const oldItems = [...items.value];
   const oldOwners = [...owners.value];
-  owners.value = owners.value.map(o =>
-    o.google_account.toLowerCase() === email.toLowerCase()
-      ? { ...o, name: cleaned }
-      : o
+  owners.value = owners.value.map((o) =>
+    o.google_account.toLowerCase() === email.toLowerCase() ? { ...o, name: cleaned } : o,
   );
-  items.value = items.value.map(i =>
-    i.owner === oldName ? { ...i, owner: cleaned } : i
-  );
+  items.value = items.value.map((i) => (i.owner === oldName ? { ...i, owner: cleaned } : i));
 
   try {
     await upsertOwner(cleaned, email, token);
@@ -971,10 +966,7 @@ export async function updateDisplayName(
       await cascadeOwnerUpdate(oldName, cleaned, token);
     }
     // Refresh to get server state
-    const [freshItems, freshOwners] = await Promise.all([
-      fetchAllItems(token),
-      fetchOwners(token),
-    ]);
+    const [freshItems, freshOwners] = await Promise.all([fetchAllItems(token), fetchOwners(token)]);
     items.value = freshItems;
     owners.value = freshOwners;
     showToast('Display name updated');
@@ -1001,11 +993,7 @@ export async function refreshLabels(token: string) {
   }
 }
 
-export async function createLabel(
-  name: string,
-  color: string,
-  token: string
-) {
+export async function createLabel(name: string, color: string, token: string) {
   const boardId = activeBoardId.value;
   // Optimistic update
   const oldLabels = [...labels.value];
@@ -1023,16 +1011,11 @@ export async function createLabel(
   }
 }
 
-export async function updateLabel(
-  oldName: string,
-  newName: string,
-  newColor: string,
-  token: string
-) {
+export async function updateLabel(oldName: string, newName: string, newColor: string, token: string) {
   const boardId = activeBoardId.value;
   // Find the label row (scoped to active board)
   const labelsWithRows = await fetchLabelsWithRows(token);
-  const labelRow = labelsWithRows.find(l => l.label === oldName && l.board_id === boardId);
+  const labelRow = labelsWithRows.find((l) => l.label === oldName && l.board_id === boardId);
   if (!labelRow) {
     showToast('Label not found', 'error');
     return;
@@ -1041,16 +1024,19 @@ export async function updateLabel(
   // Optimistic update
   const oldLabels = [...labels.value];
   const oldItems = [...items.value];
-  labels.value = labels.value.map(l =>
-    l.label === oldName && l.board_id === boardId ? { label: newName, color: newColor, board_id: boardId } : l
+  labels.value = labels.value.map((l) =>
+    l.label === oldName && l.board_id === boardId ? { label: newName, color: newColor, board_id: boardId } : l,
   );
   // Also optimistically update items on this board if label was renamed
   if (oldName !== newName) {
-    items.value = items.value.map(i => {
+    items.value = items.value.map((i) => {
       if (i.board_id !== boardId) return i;
-      const labelsList = i.labels.split(',').map(x => x.trim()).filter(Boolean);
+      const labelsList = i.labels
+        .split(',')
+        .map((x) => x.trim())
+        .filter(Boolean);
       if (!labelsList.includes(oldName)) return i;
-      const updated = labelsList.map(l => l === oldName ? newName : l);
+      const updated = labelsList.map((l) => (l === oldName ? newName : l));
       return { ...i, labels: updated.join(', ') };
     });
   }
@@ -1072,14 +1058,11 @@ export async function updateLabel(
   }
 }
 
-export async function deleteLabel(
-  labelName: string,
-  token: string
-) {
+export async function deleteLabel(labelName: string, token: string) {
   const boardId = activeBoardId.value;
   // Find the label row (scoped to active board)
   const labelsWithRows = await fetchLabelsWithRows(token);
-  const labelRow = labelsWithRows.find(l => l.label === labelName && l.board_id === boardId);
+  const labelRow = labelsWithRows.find((l) => l.label === labelName && l.board_id === boardId);
   if (!labelRow) {
     showToast('Label not found', 'error');
     return;
@@ -1088,12 +1071,15 @@ export async function deleteLabel(
   // Optimistic update — only remove this board's label and update this board's items
   const oldLabels = [...labels.value];
   const oldItems = [...items.value];
-  labels.value = labels.value.filter(l => !(l.label === labelName && l.board_id === boardId));
-  items.value = items.value.map(i => {
+  labels.value = labels.value.filter((l) => !(l.label === labelName && l.board_id === boardId));
+  items.value = items.value.map((i) => {
     if (i.board_id !== boardId) return i;
-    const labelsList = i.labels.split(',').map(x => x.trim()).filter(Boolean);
+    const labelsList = i.labels
+      .split(',')
+      .map((x) => x.trim())
+      .filter(Boolean);
     if (!labelsList.includes(labelName)) return i;
-    const updated = labelsList.filter(l => l !== labelName);
+    const updated = labelsList.filter((l) => l !== labelName);
     return { ...i, labels: updated.join(', ') };
   });
 
@@ -1117,18 +1103,13 @@ export async function deleteLabel(
 import type { Board } from '../api/types';
 import { switchBoard } from './board-store';
 
-export async function createBoard(
-  name: string,
-  actor: string,
-  token: string,
-  icon?: string
-): Promise<boolean> {
+export async function createBoard(name: string, actor: string, token: string, icon?: string): Promise<boolean> {
   const trimmed = name.trim();
   if (!trimmed) return false;
   if (trimmed.length > 30) return false;
 
   // Check for duplicate name
-  if (boards.value.some(b => b.name.toLowerCase() === trimmed.toLowerCase())) {
+  if (boards.value.some((b) => b.name.toLowerCase() === trimmed.toLowerCase())) {
     return false;
   }
 
@@ -1142,16 +1123,12 @@ export async function createBoard(
 
   // Check if this is the first board — orphaned items need adopting
   const isFirstBoard = boards.value.length === 0;
-  const orphanedItems = isFirstBoard
-    ? items.value.filter(i => !i.board_id)
-    : [];
+  const orphanedItems = isFirstBoard ? items.value.filter((i) => !i.board_id) : [];
 
   // Optimistic update
   boards.value = [...boards.value, board];
   if (orphanedItems.length > 0) {
-    items.value = items.value.map(i =>
-      !i.board_id ? { ...i, board_id: board.id } : i
-    );
+    items.value = items.value.map((i) => (!i.board_id ? { ...i, board_id: board.id } : i));
   }
 
   // Optimistic: add owner permission
@@ -1160,9 +1137,33 @@ export async function createBoard(
 
   // Seed default statuses for the new board
   const defaultStatuses: import('../api/types').BoardStatus[] = [
-    { id: generateUUID(), board_id: board.id, name: 'To Do', sort_order: 1, color: '#e3f2fd', is_terminal: false, created_at: board.created_at },
-    { id: generateUUID(), board_id: board.id, name: 'In Progress', sort_order: 2, color: '#fff3e0', is_terminal: false, created_at: board.created_at },
-    { id: generateUUID(), board_id: board.id, name: 'Done', sort_order: 3, color: '#e8f5e9', is_terminal: true, created_at: board.created_at },
+    {
+      id: generateUUID(),
+      board_id: board.id,
+      name: 'To Do',
+      sort_order: 1,
+      color: '#e3f2fd',
+      is_terminal: false,
+      created_at: board.created_at,
+    },
+    {
+      id: generateUUID(),
+      board_id: board.id,
+      name: 'In Progress',
+      sort_order: 2,
+      color: '#fff3e0',
+      is_terminal: false,
+      created_at: board.created_at,
+    },
+    {
+      id: generateUUID(),
+      board_id: board.id,
+      name: 'Done',
+      sort_order: 3,
+      color: '#e8f5e9',
+      is_terminal: true,
+      created_at: board.created_at,
+    },
   ];
   statuses.value = [...statuses.value, ...defaultStatuses];
 
@@ -1187,13 +1188,11 @@ export async function createBoard(
     return true;
   } catch (err: any) {
     // Rollback
-    boards.value = boards.value.filter(b => b.id !== board.id);
-    permissions.value = permissions.value.filter(p => p.board_id !== board.id);
-    statuses.value = statuses.value.filter(s => s.board_id !== board.id);
+    boards.value = boards.value.filter((b) => b.id !== board.id);
+    permissions.value = permissions.value.filter((p) => p.board_id !== board.id);
+    statuses.value = statuses.value.filter((s) => s.board_id !== board.id);
     if (orphanedItems.length > 0) {
-      items.value = items.value.map(i =>
-        orphanedItems.some(o => o.id === i.id) ? { ...i, board_id: '' } : i
-      );
+      items.value = items.value.map((i) => (orphanedItems.some((o) => o.id === i.id) ? { ...i, board_id: '' } : i));
     }
     if (!isReauthFailure(err)) {
       showToast('Failed to create board: ' + err.message, 'error');
@@ -1202,17 +1201,11 @@ export async function createBoard(
   }
 }
 
-export async function updateBoardAppearance(
-  boardId: string,
-  icon: string,
-  token: string
-): Promise<boolean> {
+export async function updateBoardAppearance(boardId: string, icon: string, token: string): Promise<boolean> {
   const oldBoards = [...boards.value];
 
   // Optimistic update
-  boards.value = boards.value.map(b =>
-    b.id === boardId ? { ...b, icon } : b
-  );
+  boards.value = boards.value.map((b) => (b.id === boardId ? { ...b, icon } : b));
 
   try {
     await updateBoardRowApi(boardId, '', icon, token);
@@ -1226,25 +1219,19 @@ export async function updateBoardAppearance(
   }
 }
 
-export async function renameBoardName(
-  boardId: string,
-  newName: string,
-  token: string
-): Promise<boolean> {
+export async function renameBoardName(boardId: string, newName: string, token: string): Promise<boolean> {
   const trimmed = newName.trim();
   if (!trimmed || trimmed.length > 30) return false;
 
   // Duplicate check (case-insensitive, excluding the board being renamed)
-  if (boards.value.some(b => b.id !== boardId && b.name.toLowerCase() === trimmed.toLowerCase())) {
+  if (boards.value.some((b) => b.id !== boardId && b.name.toLowerCase() === trimmed.toLowerCase())) {
     return false;
   }
 
   const oldBoards = [...boards.value];
 
   // Optimistic update
-  boards.value = boards.value.map(b =>
-    b.id === boardId ? { ...b, name: trimmed } : b
-  );
+  boards.value = boards.value.map((b) => (b.id === boardId ? { ...b, name: trimmed } : b));
 
   // Update document title if this is the active board
   if (activeBoardId.value === boardId) {
@@ -1259,7 +1246,7 @@ export async function renameBoardName(
     // Rollback
     boards.value = oldBoards;
     if (activeBoardId.value === boardId) {
-      const original = oldBoards.find(b => b.id === boardId);
+      const original = oldBoards.find((b) => b.id === boardId);
       if (original) document.title = `Hive \u2014 ${original.name}`;
     }
     if (!isReauthFailure(err)) {
@@ -1278,11 +1265,11 @@ export async function shareBoard(
   userEmail: string,
   role: BoardPermission['role'],
   actor: string,
-  token: string
+  token: string,
 ): Promise<boolean> {
   // Check if already shared
   const existing = permissions.value.find(
-    p => p.board_id === boardId && p.user_email.toLowerCase() === userEmail.toLowerCase()
+    (p) => p.board_id === boardId && p.user_email.toLowerCase() === userEmail.toLowerCase(),
   );
   if (existing) {
     showToast('Already shared with this user', 'error');
@@ -1300,7 +1287,7 @@ export async function shareBoard(
     return true;
   } catch (err: any) {
     permissions.value = permissions.value.filter(
-      p => !(p.board_id === boardId && p.user_email.toLowerCase() === userEmail.toLowerCase())
+      (p) => !(p.board_id === boardId && p.user_email.toLowerCase() === userEmail.toLowerCase()),
     );
     if (!isReauthFailure(err)) {
       showToast('Failed to share board: ' + err.message, 'error');
@@ -1309,17 +1296,12 @@ export async function shareBoard(
   }
 }
 
-export async function unshareBoard(
-  boardId: string,
-  userEmail: string,
-  actor: string,
-  token: string
-): Promise<boolean> {
+export async function unshareBoard(boardId: string, userEmail: string, actor: string, token: string): Promise<boolean> {
   const oldPerms = [...permissions.value];
 
   // Optimistic update
   permissions.value = permissions.value.filter(
-    p => !(p.board_id === boardId && p.user_email.toLowerCase() === userEmail.toLowerCase())
+    (p) => !(p.board_id === boardId && p.user_email.toLowerCase() === userEmail.toLowerCase()),
   );
 
   try {
@@ -1335,7 +1317,6 @@ export async function unshareBoard(
   }
 }
 
-
 // --- Delete board ---
 
 import { accessibleBoards } from './board-store';
@@ -1346,22 +1327,22 @@ export async function moveItemToBoard(
   itemId: string,
   targetBoardId: string,
   actor: string,
-  token: string
+  token: string,
 ): Promise<boolean> {
-  const item = items.value.find(i => i.id === itemId);
+  const item = items.value.find((i) => i.id === itemId);
   if (!item) return false;
 
   const oldBoardId = item.board_id;
   if (oldBoardId === targetBoardId) return false;
 
   // Collect item + all subtasks
-  const subtasks = items.value.filter(i => i.parent_id === itemId);
+  const subtasks = items.value.filter((i) => i.parent_id === itemId);
   const allItems = [item, ...subtasks];
 
   const oldItems = [...items.value];
 
   // Optimistic update: change board_id for item and subtasks
-  items.value = items.value.map(i => {
+  items.value = items.value.map((i) => {
     if (i.id === itemId || i.parent_id === itemId) {
       return { ...i, board_id: targetBoardId, updated_at: new Date().toISOString() };
     }
@@ -1371,7 +1352,7 @@ export async function moveItemToBoard(
   // Close the detail panel
   clearSelectedItem();
 
-  const targetBoard = boards.value.find(b => b.id === targetBoardId);
+  const targetBoard = boards.value.find((b) => b.id === targetBoardId);
   const targetName = targetBoard?.name || 'another board';
   showToast(`Item moved to ${targetName}`);
 
@@ -1413,14 +1394,14 @@ function openBoard(boardId: string) {
 }
 
 async function setBoardArchived(boardId: string, archivedAt: string, actor: string, token: string): Promise<boolean> {
-  const board = boards.value.find(b => b.id === boardId);
+  const board = boards.value.find((b) => b.id === boardId);
   if (!board) return false;
   const archiving = archivedAt !== '';
   const oldBoards = [...boards.value];
   const oldActiveBoardId = activeBoardId.value;
 
   // Optimistic update
-  boards.value = boards.value.map(b => (b.id === boardId ? { ...b, archived_at: archivedAt } : b));
+  boards.value = boards.value.map((b) => (b.id === boardId ? { ...b, archived_at: archivedAt } : b));
   if (archiving && activeBoardId.value === boardId) {
     const next = accessibleBoards.value[0];
     if (next) switchBoard(next.id);
@@ -1435,7 +1416,15 @@ async function setBoardArchived(boardId: string, archivedAt: string, actor: stri
 
   try {
     await setBoardArchivedAtApi(boardId, archivedAt, token);
-    await appendAuditEntry(boardId, archiving ? 'board_archived' : 'board_unarchived', 'archived_at', board.archived_at || '', archivedAt, actor, token);
+    await appendAuditEntry(
+      boardId,
+      archiving ? 'board_archived' : 'board_unarchived',
+      'archived_at',
+      board.archived_at || '',
+      archivedAt,
+      actor,
+      token,
+    );
     return true;
   } catch (err: any) {
     boards.value = oldBoards;
@@ -1450,25 +1439,30 @@ async function setBoardArchived(boardId: string, archivedAt: string, actor: stri
 
 /** #288: Archive a board. The toast's Undo restores it and goes back to it. */
 export async function archiveBoard(boardId: string, actor: string, token: string): Promise<boolean> {
-  const name = boards.value.find(b => b.id === boardId)?.name || 'Board';
+  const name = boards.value.find((b) => b.id === boardId)?.name || 'Board';
   const ok = await setBoardArchived(boardId, new Date().toISOString(), actor, token);
   if (ok) {
-    showToast(`${name} archived`, 'success', {
-      label: 'Undo',
-      fn: async () => {
-        if (await setBoardArchived(boardId, '', actor, token)) {
-          openBoard(boardId);
-          showToast(`${name} restored`);
-        }
+    showToast(
+      `${name} archived`,
+      'success',
+      {
+        label: 'Undo',
+        fn: async () => {
+          if (await setBoardArchived(boardId, '', actor, token)) {
+            openBoard(boardId);
+            showToast(`${name} restored`);
+          }
+        },
       },
-    }, ACTION_TOAST_MS);
+      ACTION_TOAST_MS,
+    );
   }
   return ok;
 }
 
 /** #288: Unarchive a board. The toast's Open switches to it. */
 export async function unarchiveBoard(boardId: string, actor: string, token: string): Promise<boolean> {
-  const name = boards.value.find(b => b.id === boardId)?.name || 'Board';
+  const name = boards.value.find((b) => b.id === boardId)?.name || 'Board';
   const ok = await setBoardArchived(boardId, '', actor, token);
   if (ok) {
     showToast(`${name} restored`, 'success', { label: 'Open', fn: () => openBoard(boardId) }, ACTION_TOAST_MS);
@@ -1483,9 +1477,9 @@ export async function deleteBoard(
   mode: DeleteBoardMode | null,
   targetBoardId: string | null,
   actor: string,
-  token: string
+  token: string,
 ): Promise<boolean> {
-  const board = boards.value.find(b => b.id === boardId);
+  const board = boards.value.find((b) => b.id === boardId);
   if (!board) return false;
 
   // Snapshot for rollback
@@ -1495,25 +1489,23 @@ export async function deleteBoard(
   const oldStatuses = [...statuses.value];
   const oldLabels = [...labels.value];
 
-  const boardItemsList = items.value.filter(i => i.board_id === boardId);
+  const boardItemsList = items.value.filter((i) => i.board_id === boardId);
 
   // Optimistic update
-  boards.value = boards.value.filter(b => b.id !== boardId);
-  permissions.value = permissions.value.filter(p => p.board_id !== boardId);
-  statuses.value = statuses.value.filter(s => s.board_id !== boardId);
-  labels.value = labels.value.filter(l => l.board_id !== boardId);
+  boards.value = boards.value.filter((b) => b.id !== boardId);
+  permissions.value = permissions.value.filter((p) => p.board_id !== boardId);
+  statuses.value = statuses.value.filter((s) => s.board_id !== boardId);
+  labels.value = labels.value.filter((l) => l.board_id !== boardId);
 
   if (mode === 'migrate' && targetBoardId) {
-    items.value = items.value.map(i =>
-      i.board_id === boardId ? { ...i, board_id: targetBoardId } : i
-    );
+    items.value = items.value.map((i) => (i.board_id === boardId ? { ...i, board_id: targetBoardId } : i));
   } else if (mode === 'discard') {
-    items.value = items.value.filter(i => i.board_id !== boardId);
+    items.value = items.value.filter((i) => i.board_id !== boardId);
   }
 
   // Switch to another board
   const remaining = accessibleBoards.value;
-  if (targetBoardId && remaining.some(b => b.id === targetBoardId)) {
+  if (targetBoardId && remaining.some((b) => b.id === targetBoardId)) {
     switchBoard(targetBoardId);
   } else if (remaining.length > 0) {
     switchBoard(remaining[0].id);
@@ -1562,9 +1554,11 @@ export async function deleteBoard(
 
     // Toast
     if (mode === 'migrate' && targetBoardId) {
-      const targetBoard = freshBoards.find(b => b.id === targetBoardId);
+      const targetBoard = freshBoards.find((b) => b.id === targetBoardId);
       const targetName = targetBoard?.name || 'another board';
-      showToast(`${board.name} deleted \u2014 ${boardItemsList.length} item${boardItemsList.length !== 1 ? 's' : ''} moved to ${targetName}`);
+      showToast(
+        `${board.name} deleted \u2014 ${boardItemsList.length} item${boardItemsList.length !== 1 ? 's' : ''} moved to ${targetName}`,
+      );
     } else {
       showToast(`${board.name} deleted`);
     }
@@ -1590,12 +1584,7 @@ export async function deleteBoard(
 // Status (Column) CRUD
 // ──────────────────────────────────────────
 
-export async function createStatus(
-  name: string,
-  color: string,
-  isTerminal: boolean,
-  token: string,
-): Promise<boolean> {
+export async function createStatus(name: string, color: string, isTerminal: boolean, token: string): Promise<boolean> {
   const bid = activeBoardId.value;
   if (!bid) return false;
 
@@ -1618,7 +1607,7 @@ export async function createStatus(
     showToast(`Column "${name}" added`);
     return true;
   } catch (err: any) {
-    statuses.value = statuses.value.filter(s => s.id !== newStatus.id);
+    statuses.value = statuses.value.filter((s) => s.id !== newStatus.id);
     if (!isReauthFailure(err)) {
       showToast('Failed to add column: ' + err.message, 'error');
     }
@@ -1636,25 +1625,21 @@ export async function updateStatus(
   if (!statusWithRow) return false;
 
   // If renaming, cascade to items
-  const oldStatus = statuses.value.find(s => s.id === statusId);
+  const oldStatus = statuses.value.find((s) => s.id === statusId);
   const isRename = changes.name && oldStatus && changes.name !== oldStatus.name;
 
   // Optimistic
-  statuses.value = statuses.value.map(s =>
-    s.id === statusId ? { ...s, ...changes } : s
-  );
+  statuses.value = statuses.value.map((s) => (s.id === statusId ? { ...s, ...changes } : s));
 
   try {
-    const updated = statuses.value.find(s => s.id === statusId)!;
+    const updated = statuses.value.find((s) => s.id === statusId)!;
     await updateStatusRowApi(statusWithRow.sheetRow, updated, token);
 
     if (isRename && oldStatus) {
       await cascadeStatusRenameApi(oldStatus.board_id, oldStatus.name, changes.name!, token);
       // Update items in local state
-      items.value = items.value.map(i =>
-        i.status === oldStatus.name && i.board_id === oldStatus.board_id
-          ? { ...i, status: changes.name! }
-          : i
+      items.value = items.value.map((i) =>
+        i.status === oldStatus.name && i.board_id === oldStatus.board_id ? { ...i, status: changes.name! } : i,
       );
     }
 
@@ -1669,14 +1654,11 @@ export async function updateStatus(
   }
 }
 
-export async function reorderStatuses(
-  statusIds: string[],
-  token: string,
-): Promise<boolean> {
+export async function reorderStatuses(statusIds: string[], token: string): Promise<boolean> {
   const oldStatuses = [...statuses.value];
 
   // Optimistic: assign new sort_order based on position
-  statuses.value = statuses.value.map(s => {
+  statuses.value = statuses.value.map((s) => {
     const idx = statusIds.indexOf(s.id);
     return idx >= 0 ? { ...s, sort_order: idx + 1 } : s;
   });
@@ -1686,7 +1668,7 @@ export async function reorderStatuses(
     for (let i = 0; i < statusIds.length; i++) {
       const statusWithRow = await getStatusSheetRow(statusIds[i], token);
       if (statusWithRow) {
-        const updated = statuses.value.find(s => s.id === statusIds[i])!;
+        const updated = statuses.value.find((s) => s.id === statusIds[i])!;
         await updateStatusRowApi(statusWithRow.sheetRow, updated, token);
       }
     }
@@ -1706,7 +1688,7 @@ export async function deleteStatusWithMigration(
   token: string,
 ): Promise<boolean> {
   const bid = activeBoardId.value;
-  const statusToDelete = statuses.value.find(s => s.id === statusId);
+  const statusToDelete = statuses.value.find((s) => s.id === statusId);
   if (!statusToDelete || !bid) return false;
 
   const oldStatuses = [...statuses.value];
@@ -1715,16 +1697,16 @@ export async function deleteStatusWithMigration(
   // Migrate items if target provided
   if (targetStatusName) {
     const targetIsTerminal = statuses.value.some(
-      s => s.board_id === bid && s.name === targetStatusName && s.is_terminal
+      (s) => s.board_id === bid && s.name === targetStatusName && s.is_terminal,
     );
-    items.value = items.value.map(i => {
+    items.value = items.value.map((i) => {
       if (i.board_id === bid && i.status === statusToDelete.name) {
         const now = new Date().toISOString();
         return {
           ...i,
           status: targetStatusName,
           updated_at: now,
-          completed_at: targetIsTerminal ? now : (i.completed_at && !targetIsTerminal ? '' : i.completed_at),
+          completed_at: targetIsTerminal ? now : i.completed_at && !targetIsTerminal ? '' : i.completed_at,
         };
       }
       return i;
@@ -1732,16 +1714,14 @@ export async function deleteStatusWithMigration(
   }
 
   // Remove status optimistically
-  statuses.value = statuses.value.filter(s => s.id !== statusId);
+  statuses.value = statuses.value.filter((s) => s.id !== statusId);
 
   try {
     // Persist item migrations
     if (targetStatusName) {
-      const migratedItems = items.value.filter(
-        i => i.board_id === bid && i.status === targetStatusName
-      );
+      const migratedItems = items.value.filter((i) => i.board_id === bid && i.status === targetStatusName);
       for (const item of migratedItems) {
-        if (oldItems.find(o => o.id === item.id)?.status === statusToDelete.name) {
+        if (oldItems.find((o) => o.id === item.id)?.status === statusToDelete.name) {
           await updateItemRow(item.sheetRow, item, token);
         }
       }
@@ -1773,7 +1753,7 @@ async function getStatusSheetRow(
 ): Promise<{ sheetRow: number } | null> {
   try {
     const withRows = await fetchStatusesWithRowsApi(token);
-    const match = withRows.find(s => s.id === statusId);
+    const match = withRows.find((s) => s.id === statusId);
     return match ? { sheetRow: match.sheetRow } : null;
   } catch {
     return null;

@@ -34,7 +34,12 @@ export interface TrackElevationProfileProps {
     a text alternative naming the two endpoints and the distance for
     everyone else. The x axis is cumulative distance, not point index, and
     the y axis spans the track's own low and high rather than sea level. */
-export function TrackElevationProfile({ points, color, distanceMeters, sampled }: TrackElevationProfileProps) {
+export function TrackElevationProfile({
+  points,
+  color,
+  distanceMeters,
+  sampled,
+}: TrackElevationProfileProps) {
   const low = points.reduce((min, point) => (point.elevationMeters < min.elevationMeters ? point : min))
   const high = points.reduce((max, point) => (point.elevationMeters > max.elevationMeters ? point : max))
   const span = high.elevationMeters - low.elevationMeters || 1
@@ -84,11 +89,17 @@ export function TrackElevationProfile({ points, color, distanceMeters, sampled }
           render as an ellipse. */}
       <span
         className="track-elevation-profile__mark"
-        style={{ left: `${(toX(low.distanceMeters) / VIEW_WIDTH) * 100}%`, top: `${(toY(low.elevationMeters) / VIEW_HEIGHT) * 100}%` }}
+        style={{
+          left: `${(toX(low.distanceMeters) / VIEW_WIDTH) * 100}%`,
+          top: `${(toY(low.elevationMeters) / VIEW_HEIGHT) * 100}%`,
+        }}
       />
       <span
         className="track-elevation-profile__mark"
-        style={{ left: `${(toX(high.distanceMeters) / VIEW_WIDTH) * 100}%`, top: `${(toY(high.elevationMeters) / VIEW_HEIGHT) * 100}%` }}
+        style={{
+          left: `${(toX(high.distanceMeters) / VIEW_WIDTH) * 100}%`,
+          top: `${(toY(high.elevationMeters) / VIEW_HEIGHT) * 100}%`,
+        }}
       />
     </div>
   )

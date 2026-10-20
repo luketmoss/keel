@@ -31,9 +31,16 @@ export function CustomMetricsPicker({ selected, onChange, onClose }: Props) {
   };
 
   return (
-    <div class="modal-overlay" onClick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-overlay')) onClose(); }}>
+    <div
+      class="modal-overlay"
+      onClick={(e) => {
+        if ((e.target as HTMLElement).classList.contains('modal-overlay')) onClose();
+      }}
+    >
       <div class="modal-content trends-picker" role="dialog" aria-modal="true" aria-labelledby={TITLE_ID} ref={dialog}>
-        <h2 id={TITLE_ID} class="trends-picker-title">Choose metrics</h2>
+        <h2 id={TITLE_ID} class="trends-picker-title">
+          Choose metrics
+        </h2>
         <p class="trends-picker-hint">Up to {CUSTOM_MAX}. Each applies as you choose it.</p>
         <p class="trends-picker-status" role="status">
           {atCap ? `${CUSTOM_MAX} selected — remove one to add another.` : ''}
@@ -43,7 +50,9 @@ export function CustomMetricsPicker({ selected, onChange, onClose }: Props) {
             const headingId = `trends-picker-${section.label.toLowerCase().replace(/\s+/g, '-')}`;
             return (
               <div key={section.label} role="group" aria-labelledby={headingId}>
-                <h3 class="trends-picker-heading" id={headingId}>{section.label}</h3>
+                <h3 class="trends-picker-heading" id={headingId}>
+                  {section.label}
+                </h3>
                 {section.metrics.map((m) => {
                   const checked = selected.includes(m.id);
                   const blocked = atCap && !checked;
@@ -53,8 +62,12 @@ export function CustomMetricsPicker({ selected, onChange, onClose }: Props) {
                         type="checkbox"
                         checked={checked}
                         aria-disabled={blocked ? 'true' : undefined}
-                        onClick={(e) => { if (blocked) e.preventDefault(); }}
-                        onChange={(e) => { if (!blocked) toggle(m.id, (e.currentTarget as HTMLInputElement).checked); }}
+                        onClick={(e) => {
+                          if (blocked) e.preventDefault();
+                        }}
+                        onChange={(e) => {
+                          if (!blocked) toggle(m.id, (e.currentTarget as HTMLInputElement).checked);
+                        }}
                       />
                       <span>{m.label}</span>
                     </label>
@@ -64,7 +77,9 @@ export function CustomMetricsPicker({ selected, onChange, onClose }: Props) {
             );
           })}
         </div>
-        <button type="button" class="btn btn-primary trends-picker-done" onClick={onClose}>Done</button>
+        <button type="button" class="btn btn-primary trends-picker-done" onClick={onClose}>
+          Done
+        </button>
       </div>
     </div>
   );

@@ -31,7 +31,11 @@ vi.mock('@keel/geo', async (importOriginal) => {
 const fakeMap = { id: 'fake-map' }
 vi.mock('@vis.gl/react-google-maps', () => ({
   useMap: () => fakeMap,
-  Marker: (props: { position: { lat: number; lng: number }; icon: { fillColor: string; scale: number }; zIndex: number }) => (
+  Marker: (props: {
+    position: { lat: number; lng: number }
+    icon: { fillColor: string; scale: number }
+    zIndex: number
+  }) => (
     <div
       data-testid="marker"
       data-color={props.icon.fillColor}
@@ -88,7 +92,15 @@ function importedFile(overrides: Partial<ImportedFile> = {}): ImportedFile {
     driveFileId: 'drive-f1',
     colorIndex: 0,
     visible: true,
-    tracks: [{ name: 'Track', points: [{ lat: 37, lon: -122 }, { lat: 37.1, lon: -122.1 }] }],
+    tracks: [
+      {
+        name: 'Track',
+        points: [
+          { lat: 37, lon: -122 },
+          { lat: 37.1, lon: -122.1 },
+        ],
+      },
+    ],
     trackStats: [
       {
         distanceMeters: 0,
@@ -115,9 +127,7 @@ describe('TrackLayer', () => {
 
   it('draws a single-point track as a marker instead of a polyline', () => {
     const { container } = render(
-      <TrackLayer
-        files={[importedFile({ tracks: [{ name: 'Point', points: [{ lat: 10, lon: 20 }] }] })]}
-      />,
+      <TrackLayer files={[importedFile({ tracks: [{ name: 'Point', points: [{ lat: 10, lon: 20 }] }] })]} />,
     )
 
     expect(container.querySelectorAll('[data-testid="polyline"]')).toHaveLength(0)
@@ -145,7 +155,10 @@ describe('TrackLayer', () => {
     expect(fitTracksToBounds).toHaveBeenCalledTimes(1)
     expect(fitTracksToBounds).toHaveBeenCalledWith(
       fakeMap,
-      expect.arrayContaining([{ lat: 37, lng: -122 }, { lat: 37.1, lng: -122.1 }]),
+      expect.arrayContaining([
+        { lat: 37, lng: -122 },
+        { lat: 37.1, lng: -122.1 },
+      ]),
       expect.anything(),
     )
   })
@@ -155,9 +168,7 @@ describe('TrackLayer', () => {
     const { rerender } = render(<TrackLayer files={[importedFile({ id: 'a' })]} />)
     expect(fitTracksToBounds).toHaveBeenCalledTimes(1)
 
-    rerender(
-      <TrackLayer files={[importedFile({ id: 'a' }), importedFile({ id: 'b', colorIndex: 1 })]} />,
-    )
+    rerender(<TrackLayer files={[importedFile({ id: 'a' }), importedFile({ id: 'b', colorIndex: 1 })]} />)
 
     expect(fitTracksToBounds).toHaveBeenCalledTimes(2)
   })
@@ -184,7 +195,15 @@ describe('TrackLayer', () => {
             id: 'b',
             colorIndex: 1,
             visible: false,
-            tracks: [{ name: 'Hidden', points: [{ lat: 50, lon: 50 }, { lat: 51, lon: 51 }] }],
+            tracks: [
+              {
+                name: 'Hidden',
+                points: [
+                  { lat: 50, lon: 50 },
+                  { lat: 51, lon: 51 },
+                ],
+              },
+            ],
           }),
         ]}
       />,
@@ -298,9 +317,7 @@ describe('TrackLayer', () => {
     })
 
     it('draws a wide low-opacity halo beneath the casing for a selected file, moved off hover', () => {
-      const { container } = render(
-        <TrackLayer files={[importedFile({ id: 'a' })]} selectedFileId="a" />,
-      )
+      const { container } = render(<TrackLayer files={[importedFile({ id: 'a' })]} selectedFileId="a" />)
       const polylines = visiblePolylines(container)
       expect(polylines).toHaveLength(3)
       const halo = polylines.find((el) => el.getAttribute('data-weight') === '17')!
@@ -359,7 +376,9 @@ describe('TrackLayer', () => {
       )
       const polylines = Array.from(container.querySelectorAll('[data-testid="polyline"]'))
       const zIndices = (color: string) =>
-        polylines.filter((el) => el.getAttribute('data-color') === color).map((el) => Number(el.getAttribute('data-zindex')))
+        polylines
+          .filter((el) => el.getAttribute('data-color') === color)
+          .map((el) => Number(el.getAttribute('data-zindex')))
 
       const selectedZ = Math.max(...zIndices('#FF3B30'))
       const restZ = Math.max(...zIndices('#00D4FF'), ...zIndices('#FFCC00'))
@@ -387,13 +406,15 @@ describe('TrackLayer', () => {
 
     it('keeps resting tracks in their existing order relative to one another', () => {
       const { container } = render(
-        <TrackLayer
-          files={[importedFile({ id: 'a' }), importedFile({ id: 'b', colorIndex: 1 })]}
-        />,
+        <TrackLayer files={[importedFile({ id: 'a' }), importedFile({ id: 'b', colorIndex: 1 })]} />,
       )
       const polylines = Array.from(container.querySelectorAll('[data-testid="polyline"]'))
       const strokeZ = (color: string) =>
-        Number(polylines.find((el) => el.getAttribute('data-color') === color && el.getAttribute('data-weight') === '3')!.getAttribute('data-zindex'))
+        Number(
+          polylines
+            .find((el) => el.getAttribute('data-color') === color && el.getAttribute('data-weight') === '3')!
+            .getAttribute('data-zindex'),
+        )
 
       expect(strokeZ('#FF3B30')).toBeLessThan(strokeZ('#00D4FF'))
     })
@@ -436,9 +457,7 @@ describe('TrackLayer', () => {
     })
 
     it('draws the hit line topmost in its own band', () => {
-      const { container } = render(
-        <TrackLayer files={[importedFile({ id: 'a' })]} selectedFileId="a" />,
-      )
+      const { container } = render(<TrackLayer files={[importedFile({ id: 'a' })]} selectedFileId="a" />)
       const hitZ = Number(hitLine(container).getAttribute('data-zindex'))
       const otherZ = visiblePolylines(container).map((el) => Number(el.getAttribute('data-zindex')))
       expect(hitZ).toBeGreaterThan(Math.max(...otherZ))

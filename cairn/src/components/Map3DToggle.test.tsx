@@ -39,7 +39,9 @@ describe('Map3DToggle (#284)', () => {
 
     const swtch = screen.getByRole('switch', { name: '3D' })
     expect(swtch.hasAttribute('disabled')).toBe(true)
-    expect(screen.getByText("This browser can't draw 3D. Check that hardware acceleration is on.")).not.toBeNull()
+    expect(
+      screen.getByText("This browser can't draw 3D. Check that hardware acceleration is on."),
+    ).not.toBeNull()
   })
 
   it('reads as enabled while support is still being checked', () => {

@@ -34,19 +34,59 @@ const TRACK: WorkoutTrack = {
   type: 'Feature',
   bbox: [-100.02, 45, -100, 45.002],
   properties: {
-    format: 'thrive-track', version: 1, source: 'coros', activity_id: '1', start_utc: '2026-06-01T14:00:00.000Z',
-    t: [0, 30, 60], ele: [1, 2, 3], simplify: { algorithm: 'rdp', tolerance_m: 5 }, points_in: 99,
+    format: 'thrive-track',
+    version: 1,
+    source: 'coros',
+    activity_id: '1',
+    start_utc: '2026-06-01T14:00:00.000Z',
+    t: [0, 30, 60],
+    ele: [1, 2, 3],
+    simplify: { algorithm: 'rdp', tolerance_m: 5 },
+    points_in: 99,
   },
-  geometry: { type: 'LineString', coordinates: [[-100, 45], [-100.01, 45.002], [-100.02, 45]] },
+  geometry: {
+    type: 'LineString',
+    coordinates: [
+      [-100, 45],
+      [-100.01, 45.002],
+      [-100.02, 45],
+    ],
+  },
 };
 
 function workout(over: Partial<WorkoutWithRow> = {}): WorkoutWithRow {
   return {
-    id: 'w_ride', date: '2026-06-01', time: '08:10', type: 'bike', name: 'Gravel Bike', template_id: '', notes: '',
-    elapsed_seconds: '3600', created: '', copied_from: '', status: '', moving_seconds: '', effort: '',
-    distance_m: '20000', ascent_m: '', descent_m: '', avg_hr: '', sub_type: 'gravel', source: 'coros',
-    source_activity_id: '1', raw_ref: 'raw', fit_ref: 'fit', fit_fetched_at: '2026-06-01T15:00:00.000Z', synced_at: '',
-    started_at_utc: '', calories: '', estimated_seconds: '', sport_type: '203', track_ref: 'trk', sheetRow: 2, ...over,
+    id: 'w_ride',
+    date: '2026-06-01',
+    time: '08:10',
+    type: 'bike',
+    name: 'Gravel Bike',
+    template_id: '',
+    notes: '',
+    elapsed_seconds: '3600',
+    created: '',
+    copied_from: '',
+    status: '',
+    moving_seconds: '',
+    effort: '',
+    distance_m: '20000',
+    ascent_m: '',
+    descent_m: '',
+    avg_hr: '',
+    sub_type: 'gravel',
+    source: 'coros',
+    source_activity_id: '1',
+    raw_ref: 'raw',
+    fit_ref: 'fit',
+    fit_fetched_at: '2026-06-01T15:00:00.000Z',
+    synced_at: '',
+    started_at_utc: '',
+    calories: '',
+    estimated_seconds: '',
+    sport_type: '203',
+    track_ref: 'trk',
+    sheetRow: 2,
+    ...over,
   };
 }
 
@@ -116,7 +156,7 @@ describe('the section', () => {
     expect(state.polylines).toHaveLength(2);
   });
 
-  it('fetches the track through the API with the user\'s token', async () => {
+  it("fetches the track through the API with the user's token", async () => {
     render(h(RouteSection, { workout: workout() }));
     await waitFor(() => expect(state.maps).toHaveLength(1));
     expect(getWorkoutTrack).toHaveBeenCalledWith('w_ride', 'tok-secret');
@@ -128,8 +168,23 @@ describe('the section', () => {
     ['the track request times out', () => getWorkoutTrack.mockResolvedValue({ ok: false, kind: 'timeout' })],
     ['the Maps script fails to load', () => loadMaps.mockRejectedValue(new Error('maps_script'))],
     ['Google refuses the key', () => loadMaps.mockRejectedValue(new Error('maps_auth'))],
-    ['the track has fewer than two usable points', () =>
-      getWorkoutTrack.mockResolvedValue({ ok: true, track: { ...TRACK, geometry: { type: 'LineString', coordinates: [[1, 95], [2, 96]] } } })],
+    [
+      'the track has fewer than two usable points',
+      () =>
+        getWorkoutTrack.mockResolvedValue({
+          ok: true,
+          track: {
+            ...TRACK,
+            geometry: {
+              type: 'LineString',
+              coordinates: [
+                [1, 95],
+                [2, 96],
+              ],
+            },
+          },
+        }),
+    ],
   ])('shows the error line, in the same box, when %s', async (_n, arrange) => {
     arrange();
     const { container } = render(h(RouteSection, { workout: workout() }));
@@ -255,7 +310,14 @@ describe('the stylesheet', () => {
 
   it('defines the six tokens in :root, and none of them in a theme', () => {
     const root = css.match(/:root\s*\{([\s\S]*?)\n\}/)![1];
-    for (const t of ['--map-track', '--map-track-casing', '--map-track-width', '--map-track-width-casing', '--map-dot-size', '--detail-map-height']) {
+    for (const t of [
+      '--map-track',
+      '--map-track-casing',
+      '--map-track-width',
+      '--map-track-width-casing',
+      '--map-dot-size',
+      '--detail-map-height',
+    ]) {
       expect(root, t).toContain(`${t}:`);
     }
     expect(root).toMatch(/--map-track:\s*#2f66f0/);

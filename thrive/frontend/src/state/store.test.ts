@@ -49,7 +49,18 @@ function makeWorkout(overrides: Partial<WorkoutWithRow> = {}): WorkoutWithRow {
     ascent_m: '',
     descent_m: '',
     avg_hr: '',
-    sub_type: '', source: '', source_activity_id: '', raw_ref: '', fit_ref: '', fit_fetched_at: '', synced_at: '', started_at_utc: '', calories: '', estimated_seconds: '', sport_type: '', track_ref: '',
+    sub_type: '',
+    source: '',
+    source_activity_id: '',
+    raw_ref: '',
+    fit_ref: '',
+    fit_fetched_at: '',
+    synced_at: '',
+    started_at_utc: '',
+    calories: '',
+    estimated_seconds: '',
+    sport_type: '',
+    track_ref: '',
     sheetRow: 2,
     ...overrides,
   };
@@ -197,16 +208,12 @@ describe('filteredWorkouts', () => {
   });
 
   it('excludes workouts with no matching exercises when tag filter is active', () => {
-    exercises.value = [
-      makeExercise({ id: 'ex1', tags: 'Push, Chest' }),
-    ];
+    exercises.value = [makeExercise({ id: 'ex1', tags: 'Push, Chest' })];
     workouts.value = [
       makeWorkout({ id: 'w1', date: '2025-01-15' }),
       makeWorkout({ id: 'w2', date: '2025-01-14' }), // no sets
     ];
-    sets.value = [
-      makeSetRow({ workout_id: 'w1', exercise_id: 'ex1' }),
-    ];
+    sets.value = [makeSetRow({ workout_id: 'w1', exercise_id: 'ex1' })];
 
     filterTags.value = ['Push'];
     expect(filteredWorkouts.value).toHaveLength(1);
@@ -214,9 +221,7 @@ describe('filteredWorkouts', () => {
   });
 
   it('combines type and tag filters', () => {
-    exercises.value = [
-      makeExercise({ id: 'ex1', tags: 'Push, Chest' }),
-    ];
+    exercises.value = [makeExercise({ id: 'ex1', tags: 'Push, Chest' })];
     workouts.value = [
       makeWorkout({ id: 'w_weight_push', type: 'weight', date: '2025-01-15' }),
       makeWorkout({ id: 'w_stretch', type: 'stretch', date: '2025-01-14' }),
@@ -250,10 +255,7 @@ describe('filteredWorkouts', () => {
   });
 
   it('returns empty when all workouts are planned', () => {
-    workouts.value = [
-      makeWorkout({ id: 'w1', status: 'planned' }),
-      makeWorkout({ id: 'w2', status: 'planned' }),
-    ];
+    workouts.value = [makeWorkout({ id: 'w1', status: 'planned' }), makeWorkout({ id: 'w2', status: 'planned' })];
 
     expect(filteredWorkouts.value).toHaveLength(0);
   });
@@ -270,7 +272,7 @@ describe('plannedWorkouts', () => {
     ];
 
     expect(plannedWorkouts.value).toHaveLength(2);
-    expect(plannedWorkouts.value.every(w => w.status === 'planned')).toBe(true);
+    expect(plannedWorkouts.value.every((w) => w.status === 'planned')).toBe(true);
   });
 
   it('returns empty when no planned workouts exist', () => {
@@ -294,15 +296,12 @@ describe('completedWorkouts', () => {
     ];
 
     expect(completedWorkouts.value).toHaveLength(2);
-    expect(completedWorkouts.value.map(w => w.id)).toContain('w1');
-    expect(completedWorkouts.value.map(w => w.id)).toContain('w3');
+    expect(completedWorkouts.value.map((w) => w.id)).toContain('w1');
+    expect(completedWorkouts.value.map((w) => w.id)).toContain('w3');
   });
 
   it('returns all workouts when none are planned', () => {
-    workouts.value = [
-      makeWorkout({ id: 'w1', status: '' }),
-      makeWorkout({ id: 'w2', status: '' }),
-    ];
+    workouts.value = [makeWorkout({ id: 'w1', status: '' }), makeWorkout({ id: 'w2', status: '' })];
 
     expect(completedWorkouts.value).toHaveLength(2);
   });

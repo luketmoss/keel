@@ -48,11 +48,7 @@ function TemplateList() {
           </div>
         )}
       </div>
-      <button
-        class="fab"
-        onClick={() => navigate('/templates/new')}
-        aria-label="New template"
-      >
+      <button class="fab" onClick={() => navigate('/templates/new')} aria-label="New template">
         +
       </button>
     </div>

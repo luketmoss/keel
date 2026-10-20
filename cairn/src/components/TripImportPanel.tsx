@@ -82,9 +82,7 @@ export function TripImportPanel({
       />
 
       {!signedIn && (
-        <p className="trip-import-panel__signed-out">
-          Sign in to add tracks and photos to this trip.
-        </p>
+        <p className="trip-import-panel__signed-out">Sign in to add tracks and photos to this trip.</p>
       )}
 
       {progress.map((entry) => (

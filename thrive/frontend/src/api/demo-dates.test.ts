@@ -6,8 +6,12 @@ import { addDays, dayNumber, todayInDenver } from '../day/dates';
 import { DEMO_WORKOUTS, DEMO_SETS, DEMO_ANCHOR_DATE, shiftDemoWorkouts, addDaysToIso } from './demo-data';
 
 vi.mock('./sheets', () => ({
-  sheetsGet: vi.fn(), sheetsAppend: vi.fn(), sheetsUpdate: vi.fn(), sheetsDeleteRow: vi.fn(),
-  getSheetId: vi.fn(), withReauth: (_t: string, fn: (t: string) => unknown) => fn('t'),
+  sheetsGet: vi.fn(),
+  sheetsAppend: vi.fn(),
+  sheetsUpdate: vi.fn(),
+  sheetsDeleteRow: vi.fn(),
+  getSheetId: vi.fn(),
+  withReauth: (_t: string, fn: (t: string) => unknown) => fn('t'),
 }));
 
 // Noon UTC is the same Denver calendar day in both MST and MDT.
@@ -23,7 +27,9 @@ describe('AC1: shiftDemoWorkouts', () => {
   it('uses the Denver date, not UTC, near midnight', () => {
     // 03:00 UTC on the 1st is still the evening of Sep 30 in Denver (MDT).
     expect(todayInDenver(new Date('2026-10-01T03:00:00Z'))).toBe('2026-09-30');
-    expect(shiftDemoWorkouts(new Date('2026-10-01T03:00:00Z')).find((w) => w.id === 'w_demo001')!.date).toBe('2026-09-30');
+    expect(shiftDemoWorkouts(new Date('2026-10-01T03:00:00Z')).find((w) => w.id === 'w_demo001')!.date).toBe(
+      '2026-09-30',
+    );
   });
 
   it('is the identity when now is the anchor day', () => {
@@ -59,7 +65,7 @@ describe('AC1: shiftDemoWorkouts', () => {
 
   it('leaves every non-date field untouched', () => {
     const out = shiftDemoWorkouts(at('2026-09-30'));
-    const strip = (w: typeof DEMO_WORKOUTS[number]) => {
+    const strip = (w: (typeof DEMO_WORKOUTS)[number]) => {
       const { date, created, synced_at, started_at_utc, fit_fetched_at, ...rest } = w;
       return rest;
     };
@@ -82,8 +88,9 @@ describe('AC3: relative order and status survive the shift', () => {
     for (let i = 0; i < out.length; i++) {
       expect(out[i].status).toBe(DEMO_WORKOUTS[i].status);
       for (let j = 0; j < out.length; j++) {
-        expect(Math.sign(out[i].date.localeCompare(out[j].date)))
-          .toBe(Math.sign(DEMO_WORKOUTS[i].date.localeCompare(DEMO_WORKOUTS[j].date)));
+        expect(Math.sign(out[i].date.localeCompare(out[j].date))).toBe(
+          Math.sign(DEMO_WORKOUTS[i].date.localeCompare(DEMO_WORKOUTS[j].date)),
+        );
       }
     }
     expect(Math.max(...out.map((w) => Date.parse(w.date)))).toBe(Date.parse('2026-09-30'));

@@ -378,7 +378,11 @@ export class LocalTripStore implements TripStore {
     }
   }
 
-  saveOverview = (id: string, tracks: Track[], sampledElevation?: Record<string, StoredTrackElevation>): void => {
+  saveOverview = (
+    id: string,
+    tracks: Track[],
+    sampledElevation?: Record<string, StoredTrackElevation>,
+  ): void => {
     // #224: a caller that doesn't pass `sampledElevation` (nothing new
     // sampled this pass) carries forward whatever the sidecar already had,
     // rather than a `saveOverview` call for an unrelated reason (a rename,

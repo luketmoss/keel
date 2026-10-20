@@ -56,31 +56,31 @@ describe('Mock API layer (AC5)', () => {
     await createItemRow(newItem, 'demo-token');
     const after = await fetchAllItems('demo-token');
     expect(after.length).toBe(before.length + 1);
-    expect(after.find(i => i.id === 'demo-new')).toBeTruthy();
+    expect(after.find((i) => i.id === 'demo-new')).toBeTruthy();
   });
 
   it('updateItemRow modifies an item in-memory', async () => {
     const items = await fetchAllItems('demo-token');
-    const item = items.find(i => i.id === 'demo-001')!;
+    const item = items.find((i) => i.id === 'demo-001')!;
     const updated: Item = { ...item, title: 'Updated title' };
     await updateItemRow(item.sheetRow, updated, 'demo-token');
     const after = await fetchAllItems('demo-token');
-    const found = after.find(i => i.id === 'demo-001')!;
+    const found = after.find((i) => i.id === 'demo-001')!;
     expect(found.title).toBe('Updated title');
   });
 
   it('deleteItemRow removes an item in-memory', async () => {
     const items = await fetchAllItems('demo-token');
-    const item = items.find(i => i.id === 'demo-001')!;
+    const item = items.find((i) => i.id === 'demo-001')!;
     await deleteItemRow(item.sheetRow, 'demo-token');
     const after = await fetchAllItems('demo-token');
-    expect(after.find(i => i.id === 'demo-001')).toBeUndefined();
+    expect(after.find((i) => i.id === 'demo-001')).toBeUndefined();
     expect(after.length).toBe(items.length - 1);
   });
 
   it('appendAuditEntry is a no-op (does not throw)', async () => {
     await expect(
-      appendAuditEntry('demo-001', 'test', 'field', 'old', 'new', 'actor', 'demo-token')
+      appendAuditEntry('demo-001', 'test', 'field', 'old', 'new', 'actor', 'demo-token'),
     ).resolves.toBeUndefined();
   });
 
@@ -104,9 +104,19 @@ describe('Mock API layer (AC5)', () => {
     await fetchOwners('demo-token');
     await fetchLabels('demo-token');
     const newItem: Item = {
-      id: 'test-http', title: 'Test', description: '', status: 'To Do',
-      owner: '', due_date: '', labels: '', parent_id: '',
-      created_at: '', updated_at: '', completed_at: '', sort_order: 0, created_by: '',
+      id: 'test-http',
+      title: 'Test',
+      description: '',
+      status: 'To Do',
+      owner: '',
+      due_date: '',
+      labels: '',
+      parent_id: '',
+      created_at: '',
+      updated_at: '',
+      completed_at: '',
+      sort_order: 0,
+      created_by: '',
       board_id: '',
     };
     await createItemRow(newItem, 'demo-token');

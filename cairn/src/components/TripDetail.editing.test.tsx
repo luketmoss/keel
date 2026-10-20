@@ -104,9 +104,7 @@ function useStubCairnImport(saves: boolean) {
     attachImage: vi.fn(),
     setCairnText: async (id: string, patch: { name?: string; description?: string }) => {
       if (!saves) return false
-      setCairns((prev) =>
-        prev.map((cairn) => (cairn.id === id ? { ...cairn, ...patch } : cairn)),
-      )
+      setCairns((prev) => prev.map((cairn) => (cairn.id === id ? { ...cairn, ...patch } : cairn)))
       return true
     },
   }

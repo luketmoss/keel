@@ -9,7 +9,13 @@ import { describe, expect, it } from 'vitest';
 const here = dirname(fileURLToPath(import.meta.url));
 const read = (rel: string) => readFileSync(resolve(here, rel), 'utf-8');
 
-const FILES = ['google-maps.ts', 'draw-route.ts', '../components/activities/route-section.tsx', '../api/thrive-api.ts', '../api/demo-track.ts'];
+const FILES = [
+  'google-maps.ts',
+  'draw-route.ts',
+  '../components/activities/route-section.tsx',
+  '../api/thrive-api.ts',
+  '../api/demo-track.ts',
+];
 
 describe('the route map is Preact, over @keel/geo', () => {
   it.each(FILES)('%s imports no React', (file) => {

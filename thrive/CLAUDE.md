@@ -86,6 +86,7 @@ Google token, never from Drive.
 
 - `npm --prefix frontend run dev` — Vite dev server on port 5175
 - `cd frontend && npm test` / `npm run typecheck` / `npm run build`
+- `cd frontend && npm run format` before committing (Prettier: single quotes, semicolons; CI runs `format:check`)
 - `cd apps-script && npm test` / `npm run typecheck` — sandboxed `node:vm`
 - `cd sync && npm test` — `node --test`, no network
 

@@ -7,7 +7,12 @@ afterEach(() => {
 });
 
 // Provide a mutable reference for the mock
-let mockToastMessage: { text: string; type: 'success' | 'error'; action?: { label: string; fn: () => void }; duration?: number } | null = null;
+let mockToastMessage: {
+  text: string;
+  type: 'success' | 'error';
+  action?: { label: string; fn: () => void };
+  duration?: number;
+} | null = null;
 
 const mockPauseToastTimer = vi.fn();
 const mockResumeToastTimer = vi.fn();
@@ -15,7 +20,9 @@ const mockDismissToast = vi.fn();
 
 vi.mock('../../state/board-store', () => ({
   toastMessage: {
-    get value() { return mockToastMessage; },
+    get value() {
+      return mockToastMessage;
+    },
   },
   openDetailWithTitleEdit: { value: false },
   pauseToastTimer: (...args: unknown[]) => mockPauseToastTimer(...args),
@@ -111,7 +118,12 @@ describe('Toast action button (Issue #161 AC1/AC3)', () => {
 
   it('renders an Undo button when action is provided', () => {
     const fn = vi.fn();
-    mockToastMessage = { text: 'Switched to custom order', type: 'success', action: { label: 'Undo', fn }, duration: 10000 };
+    mockToastMessage = {
+      text: 'Switched to custom order',
+      type: 'success',
+      action: { label: 'Undo', fn },
+      duration: 10000,
+    };
     const { container } = render(<Toast />);
     const btn = container.querySelector('.toast-action') as HTMLButtonElement;
     expect(btn).not.toBeNull();
@@ -184,7 +196,7 @@ describe('Toast U key shortcut (Issue #161 AC3)', () => {
       <div>
         <Toast />
         <input type="text" data-testid="input" />
-      </div>
+      </div>,
     );
     const input = container.querySelector('input') as HTMLInputElement;
 

@@ -1,10 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import {
-  DriveAuthError,
-  DriveRequestError,
-  findOrCreateRootFolder,
-  getDriveAccount,
-} from './rootFolder'
+import { DriveAuthError, DriveRequestError, findOrCreateRootFolder, getDriveAccount } from './rootFolder'
 
 function jsonResponse(body: unknown, status = 200): Response {
   return {
@@ -80,9 +75,9 @@ describe('findOrCreateRootFolder', () => {
   })
 
   it('reuses an existing folder rather than creating a duplicate', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      jsonResponse({ files: [{ id: 'existing-id', createdTime: '2025-06-01' }] }),
-    )
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(jsonResponse({ files: [{ id: 'existing-id', createdTime: '2025-06-01' }] }))
 
     const folderId = await findOrCreateRootFolder('token')
 

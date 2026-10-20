@@ -9,12 +9,12 @@ import { MOCK_ITEMS, MOCK_OWNERS, MOCK_LABELS, MOCK_BOARDS, MOCK_PERMISSIONS, MO
 // In-memory state — deep-clone from static data so writes don't mutate the originals.
 const mockItemsState = signal<ItemWithRow[]>(structuredClone(MOCK_ITEMS));
 const mockLabelsState = signal<Array<Label & { sheetRow: number }>>(
-  structuredClone(MOCK_LABELS).map((l, i) => ({ ...l, board_id: l.board_id || '', sheetRow: i + 2 }))
+  structuredClone(MOCK_LABELS).map((l, i) => ({ ...l, board_id: l.board_id || '', sheetRow: i + 2 })),
 );
 const mockBoardsState = signal<Board[]>(structuredClone(MOCK_BOARDS));
 const mockPermissionsState = signal<BoardPermission[]>(structuredClone(MOCK_PERMISSIONS));
 const mockStatusesState = signal<Array<BoardStatus & { sheetRow: number }>>(
-  structuredClone(MOCK_STATUSES).map((s, i) => ({ ...s, sheetRow: i + 2 }))
+  structuredClone(MOCK_STATUSES).map((s, i) => ({ ...s, sheetRow: i + 2 })),
 );
 
 /** Reset in-memory state back to the original mock data (for page refresh behavior). */
@@ -49,13 +49,11 @@ export async function createItemRow(item: Item, _token: string): Promise<void> {
 }
 
 export async function updateItemRow(sheetRow: number, item: Item, _token: string): Promise<void> {
-  mockItemsState.value = mockItemsState.value.map(i =>
-    i.sheetRow === sheetRow ? { ...item, sheetRow } : i
-  );
+  mockItemsState.value = mockItemsState.value.map((i) => (i.sheetRow === sheetRow ? { ...item, sheetRow } : i));
 }
 
 export async function deleteItemRow(sheetRow: number, _token: string): Promise<void> {
-  mockItemsState.value = mockItemsState.value.filter(i => i.sheetRow !== sheetRow);
+  mockItemsState.value = mockItemsState.value.filter((i) => i.sheetRow !== sheetRow);
 }
 
 export async function appendAuditEntry(
@@ -65,26 +63,18 @@ export async function appendAuditEntry(
   _oldValue: string,
   _newValue: string,
   _actor: string,
-  _token: string
+  _token: string,
 ): Promise<void> {
   // No-op in demo mode — audit log is not displayed in the UI.
 }
 
-export async function upsertOwner(
-  name: string,
-  _email: string,
-  _token: string
-): Promise<boolean> {
+export async function upsertOwner(name: string, _email: string, _token: string): Promise<boolean> {
   // In demo mode, just return true to signal success.
   return true;
 }
 
-export async function cascadeOwnerUpdate(
-  oldName: string,
-  newName: string,
-  _token: string
-): Promise<void> {
-  mockItemsState.value = mockItemsState.value.map(item => {
+export async function cascadeOwnerUpdate(oldName: string, newName: string, _token: string): Promise<void> {
+  mockItemsState.value = mockItemsState.value.map((item) => {
     if (item.owner !== oldName) return item;
     return { ...item, owner: newName };
   });
@@ -97,39 +87,55 @@ export async function createLabelRow(label: string, color: string, boardId: stri
   mockLabelsState.value = [...mockLabelsState.value, { label, color, board_id: boardId, sheetRow: maxRow + 1 }];
 }
 
-export async function updateLabelRow(sheetRow: number, label: string, color: string, boardId: string, _token: string): Promise<void> {
-  mockLabelsState.value = mockLabelsState.value.map(l =>
-    l.sheetRow === sheetRow ? { label, color, board_id: boardId, sheetRow } : l
+export async function updateLabelRow(
+  sheetRow: number,
+  label: string,
+  color: string,
+  boardId: string,
+  _token: string,
+): Promise<void> {
+  mockLabelsState.value = mockLabelsState.value.map((l) =>
+    l.sheetRow === sheetRow ? { label, color, board_id: boardId, sheetRow } : l,
   );
 }
 
 export async function deleteLabelRow(sheetRow: number, _token: string): Promise<void> {
-  mockLabelsState.value = mockLabelsState.value.filter(l => l.sheetRow !== sheetRow);
+  mockLabelsState.value = mockLabelsState.value.filter((l) => l.sheetRow !== sheetRow);
 }
 
-export async function fetchLabelsWithRows(_token: string): Promise<Array<{ label: string; color: string; board_id: string; sheetRow: number }>> {
-  return mockLabelsState.value.map(l => ({ label: l.label, color: l.color, board_id: l.board_id || '', sheetRow: l.sheetRow }));
+export async function fetchLabelsWithRows(
+  _token: string,
+): Promise<Array<{ label: string; color: string; board_id: string; sheetRow: number }>> {
+  return mockLabelsState.value.map((l) => ({
+    label: l.label,
+    color: l.color,
+    board_id: l.board_id || '',
+    sheetRow: l.sheetRow,
+  }));
 }
 
 export async function cascadeLabelUpdate(
   oldName: string,
   newName: string,
   _token: string,
-  boardId?: string
+  boardId?: string,
 ): Promise<void> {
   // Update items in-memory: rename or remove the label from all items that reference it.
-  mockItemsState.value = mockItemsState.value.map(item => {
+  mockItemsState.value = mockItemsState.value.map((item) => {
     // Scope to board if provided
     if (boardId && item.board_id !== boardId) return item;
 
-    const labelsList = item.labels.split(',').map(l => l.trim()).filter(Boolean);
+    const labelsList = item.labels
+      .split(',')
+      .map((l) => l.trim())
+      .filter(Boolean);
     if (!labelsList.includes(oldName)) return item;
 
     let updated: string[];
     if (newName) {
-      updated = labelsList.map(l => l === oldName ? newName : l);
+      updated = labelsList.map((l) => (l === oldName ? newName : l));
     } else {
-      updated = labelsList.filter(l => l !== oldName);
+      updated = labelsList.filter((l) => l !== oldName);
     }
     return { ...item, labels: updated.join(', ') };
   });
@@ -146,15 +152,11 @@ export async function createBoardRow(board: Board, _token: string): Promise<void
 }
 
 export async function updateBoardRow(boardId: string, color: string, icon: string, _token: string): Promise<void> {
-  mockBoardsState.value = mockBoardsState.value.map(b =>
-    b.id === boardId ? { ...b, color, icon } : b
-  );
+  mockBoardsState.value = mockBoardsState.value.map((b) => (b.id === boardId ? { ...b, color, icon } : b));
 }
 
 export async function renameBoardRow(boardId: string, name: string, _token: string): Promise<void> {
-  mockBoardsState.value = mockBoardsState.value.map(b =>
-    b.id === boardId ? { ...b, name } : b
-  );
+  mockBoardsState.value = mockBoardsState.value.map((b) => (b.id === boardId ? { ...b, name } : b));
 }
 
 // --- Permission operations (in-memory) ---
@@ -169,35 +171,33 @@ export async function createPermissionRow(perm: BoardPermission, _token: string)
 
 export async function deletePermissionRow(boardId: string, userEmail: string, _token: string): Promise<void> {
   mockPermissionsState.value = mockPermissionsState.value.filter(
-    p => !(p.board_id === boardId && p.user_email.toLowerCase() === userEmail.toLowerCase())
+    (p) => !(p.board_id === boardId && p.user_email.toLowerCase() === userEmail.toLowerCase()),
   );
 }
 
 export async function setBoardArchivedAt(boardId: string, archivedAt: string, _token: string): Promise<void> {
-  mockBoardsState.value = mockBoardsState.value.map(b =>
-    b.id === boardId ? { ...b, archived_at: archivedAt } : b
-  );
+  mockBoardsState.value = mockBoardsState.value.map((b) => (b.id === boardId ? { ...b, archived_at: archivedAt } : b));
 }
 
 export async function deleteBoardRow(boardId: string, _token: string): Promise<void> {
-  mockBoardsState.value = mockBoardsState.value.filter(b => b.id !== boardId);
+  mockBoardsState.value = mockBoardsState.value.filter((b) => b.id !== boardId);
 }
 
 export async function deleteAllBoardPermissions(boardId: string, _token: string): Promise<void> {
-  mockPermissionsState.value = mockPermissionsState.value.filter(p => p.board_id !== boardId);
+  mockPermissionsState.value = mockPermissionsState.value.filter((p) => p.board_id !== boardId);
 }
 
 export async function deleteAllBoardStatuses(boardId: string, _token: string): Promise<void> {
-  mockStatusesState.value = mockStatusesState.value.filter(s => s.board_id !== boardId);
+  mockStatusesState.value = mockStatusesState.value.filter((s) => s.board_id !== boardId);
 }
 
 export async function deleteAllBoardLabels(boardId: string, _token: string): Promise<void> {
-  mockLabelsState.value = mockLabelsState.value.filter(l => l.board_id !== boardId);
+  mockLabelsState.value = mockLabelsState.value.filter((l) => l.board_id !== boardId);
 }
 
 export async function updateItemBoardId(sheetRow: number, newBoardId: string, _token: string): Promise<void> {
-  mockItemsState.value = mockItemsState.value.map(i =>
-    i.sheetRow === sheetRow ? { ...i, board_id: newBoardId } : i
+  mockItemsState.value = mockItemsState.value.map((i) =>
+    i.sheetRow === sheetRow ? { ...i, board_id: newBoardId } : i,
   );
 }
 
@@ -213,13 +213,11 @@ export async function createStatusRow(status: BoardStatus, _token: string): Prom
 }
 
 export async function updateStatusRow(sheetRow: number, status: BoardStatus, _token: string): Promise<void> {
-  mockStatusesState.value = mockStatusesState.value.map(s =>
-    s.sheetRow === sheetRow ? { ...status, sheetRow } : s
-  );
+  mockStatusesState.value = mockStatusesState.value.map((s) => (s.sheetRow === sheetRow ? { ...status, sheetRow } : s));
 }
 
 export async function deleteStatusRow(sheetRow: number, _token: string): Promise<void> {
-  mockStatusesState.value = mockStatusesState.value.filter(s => s.sheetRow !== sheetRow);
+  mockStatusesState.value = mockStatusesState.value.filter((s) => s.sheetRow !== sheetRow);
 }
 
 export async function fetchStatusesWithRows(_token: string): Promise<Array<BoardStatus & { sheetRow: number }>> {
@@ -230,9 +228,9 @@ export async function cascadeStatusRename(
   boardId: string,
   oldName: string,
   newName: string,
-  _token: string
+  _token: string,
 ): Promise<void> {
-  mockItemsState.value = mockItemsState.value.map(i =>
-    i.board_id === boardId && i.status === oldName ? { ...i, status: newName } : i
+  mockItemsState.value = mockItemsState.value.map((i) =>
+    i.board_id === boardId && i.status === oldName ? { ...i, status: newName } : i,
   );
 }

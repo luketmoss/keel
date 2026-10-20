@@ -3,11 +3,7 @@
 // hidden. The two together are what make switching venue safe.
 
 import { describe, it, expect } from 'vitest';
-import {
-  cardioFieldsFor,
-  hasCardioFields,
-  visibleCardioFields,
-} from './cardio-fields';
+import { cardioFieldsFor, hasCardioFields, visibleCardioFields } from './cardio-fields';
 import type { CardioValues } from './cardio-fields';
 
 const EMPTY: CardioValues = { distance: '', ascent: '', descent: '', avgHr: '' };
@@ -57,13 +53,16 @@ describe('AC1/AC4: which fields a (type, sub_type) pair earns', () => {
 
 describe('AC4: a field holding a value is never hidden', () => {
   it('still shows Ascent on an indoor ride when it already has a value', () => {
-    expect(visibleCardioFields('bike', 'indoor', values({ ascent: '1200' })))
-      .toEqual(['distance', 'ascent', 'avgHr']);
+    expect(visibleCardioFields('bike', 'indoor', values({ ascent: '1200' }))).toEqual(['distance', 'ascent', 'avgHr']);
   });
 
   it('still shows Descent on a bike when it already has a value', () => {
-    expect(visibleCardioFields('bike', 'gravel', values({ descent: '800' })))
-      .toEqual(['distance', 'ascent', 'descent', 'avgHr']);
+    expect(visibleCardioFields('bike', 'gravel', values({ descent: '800' }))).toEqual([
+      'distance',
+      'ascent',
+      'descent',
+      'avgHr',
+    ]);
   });
 
   it('hides Ascent indoors only while it is empty', () => {
@@ -78,8 +77,7 @@ describe('AC4: a field holding a value is never hidden', () => {
   });
 
   it('keeps the fields in declaration order however they become visible', () => {
-    expect(visibleCardioFields('hike', '', EMPTY))
-      .toEqual(['distance', 'ascent', 'descent', 'avgHr']);
+    expect(visibleCardioFields('hike', '', EMPTY)).toEqual(['distance', 'ascent', 'descent', 'avgHr']);
   });
 });
 
@@ -90,8 +88,7 @@ describe('AC5: a blank sub_type is a working state', () => {
   });
 
   it('gives a pre-#129 hike its full field set', () => {
-    expect(visibleCardioFields('hike', '', EMPTY))
-      .toEqual(['distance', 'ascent', 'descent', 'avgHr']);
+    expect(visibleCardioFields('hike', '', EMPTY)).toEqual(['distance', 'ascent', 'descent', 'avgHr']);
   });
 
   it('never treats blank as indoor', () => {

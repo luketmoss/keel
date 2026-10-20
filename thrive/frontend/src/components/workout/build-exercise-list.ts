@@ -52,10 +52,7 @@ export function buildExerciseList(setRows: SetWithRow[]): TrackerExercise[] {
  * Warmups that already exist in `tracked` (by exercise_id + exercise_order) are skipped
  * to avoid duplication.
  */
-export function mergeWarmups(
-  tracked: TrackerExercise[],
-  warmupInfos: WarmupExerciseInfo[],
-): TrackerExercise[] {
+export function mergeWarmups(tracked: TrackerExercise[], warmupInfos: WarmupExerciseInfo[]): TrackerExercise[] {
   const trackedKeys = new Set(tracked.map((e) => `${e.exercise_id}__${e.exercise_order}`));
 
   const newWarmups: TrackerExercise[] = warmupInfos

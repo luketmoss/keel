@@ -13,15 +13,16 @@ import { exercises, labels } from '../../state/store';
 import type { ExerciseWithRow } from '../../api/types';
 
 const ex = (id: string, name: string, tags = ''): ExerciseWithRow => ({
-  id, name, tags, notes: '', created: '', sheetRow: 2,
+  id,
+  name,
+  tags,
+  notes: '',
+  created: '',
+  sheetRow: 2,
 });
 
 beforeEach(() => {
-  exercises.value = [
-    ex('e2', 'Squat', 'Legs, Compound'),
-    ex('e1', 'Ab Wheel', 'Core'),
-    ex('e3', 'Plank'),
-  ];
+  exercises.value = [ex('e2', 'Squat', 'Legs, Compound'), ex('e1', 'Ab Wheel', 'Core'), ex('e3', 'Plank')];
   labels.value = [
     { id: 'l1', name: 'Core', color_key: 'red', created: '', sheetRow: 2 },
     { id: 'l2', name: 'Legs', color_key: 'blue', created: '', sheetRow: 3 },
@@ -36,7 +37,10 @@ afterEach(() => {
 });
 
 /** A caller like the template editor: an opener that stays mounted. */
-function Caller({ onSelect = () => {}, onClose = () => {} }: {
+function Caller({
+  onSelect = () => {},
+  onClose = () => {},
+}: {
   onSelect?: (e: ExerciseWithRow) => void;
   onClose?: () => void;
 }) {
@@ -45,8 +49,14 @@ function Caller({ onSelect = () => {}, onClose = () => {} }: {
     h('button', { id: 'add', onClick: () => setOpen(true) }, '+ Add Exercise'),
     open &&
       h(AddExerciseModal, {
-        onSelect: (e: ExerciseWithRow) => { onSelect(e); setOpen(false); },
-        onClose: () => { onClose(); setOpen(false); },
+        onSelect: (e: ExerciseWithRow) => {
+          onSelect(e);
+          setOpen(false);
+        },
+        onClose: () => {
+          onClose();
+          setOpen(false);
+        },
       }),
   ]);
 }
@@ -62,9 +72,17 @@ function openPicker(props: Parameters<typeof Caller>[0] = {}) {
 }
 
 const nameOf = (el: HTMLElement) =>
-  el.getAttribute('aria-labelledby')!.split(' ').map((id) => document.getElementById(id)!.textContent).join(' ');
+  el
+    .getAttribute('aria-labelledby')!
+    .split(' ')
+    .map((id) => document.getElementById(id)!.textContent)
+    .join(' ');
 const descOf = (el: HTMLElement) =>
-  el.getAttribute('aria-describedby')?.split(' ').map((id) => document.getElementById(id)!.textContent).join(' ');
+  el
+    .getAttribute('aria-describedby')
+    ?.split(' ')
+    .map((id) => document.getElementById(id)!.textContent)
+    .join(' ');
 
 describe('AC1: exercise rows are buttons', () => {
   it('renders each row as a button with span content only, in name order', () => {
@@ -76,7 +94,9 @@ describe('AC1: exercise rows are buttons', () => {
       expect(row.querySelector('div')).toBeNull();
     }
     expect(r.map(nameOf)).toEqual(['Ab Wheel', 'Plank', 'Squat']);
-    expect(document.querySelectorAll('.exercise-list div[onclick], .exercise-list .exercise-list-item:not(button)')).toHaveLength(0);
+    expect(
+      document.querySelectorAll('.exercise-list div[onclick], .exercise-list .exercise-list-item:not(button)'),
+    ).toHaveLength(0);
   });
 
   it('names a row by the exercise and describes it by its tags', () => {
@@ -124,7 +144,9 @@ describe('AC2: Create New Exercise is a button', () => {
   it('Cancel returns to the list with focus on search', () => {
     openPicker();
     fireEvent.click($('.create-new-row'));
-    fireEvent.click([...document.querySelectorAll<HTMLElement>('form button')].find((b) => b.textContent === 'Cancel')!);
+    fireEvent.click(
+      [...document.querySelectorAll<HTMLElement>('form button')].find((b) => b.textContent === 'Cancel')!,
+    );
     expect(document.activeElement).toBe($('.search-input'));
   });
 

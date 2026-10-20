@@ -12,7 +12,7 @@ interface IconPickerProps {
 export function IconPicker({ value, onChange, disabled }: IconPickerProps) {
   return (
     <div class="picker-row" role="radiogroup" aria-label="Board icon">
-      {BOARD_ICONS.map(icon => (
+      {BOARD_ICONS.map((icon) => (
         <button
           key={icon}
           type="button"

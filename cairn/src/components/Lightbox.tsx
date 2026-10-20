@@ -206,9 +206,7 @@ export function Lightbox({
     if (event.key !== 'Tab') return
     // #196: the name input and the description textarea join the trap's
     // set. Without them, Tab out of a field mid-edit escapes the dialog.
-    const all = dialogRef.current?.querySelectorAll<HTMLElement>(
-      'button:not(:disabled), input, textarea',
-    )
+    const all = dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input, textarea')
     if (!all || all.length === 0) return
     /* #197: in full bleed the detail column is `display: none`, but its
        controls are still in the DOM and still match the selector above.
@@ -262,7 +260,13 @@ export function Lightbox({
         aria-label={row.name}
         onKeyDown={handleTabTrap}
       >
-        <button ref={closeButtonRef} type="button" className="lightbox__control lightbox__close" aria-label="Close photo" onClick={onClose}>
+        <button
+          ref={closeButtonRef}
+          type="button"
+          className="lightbox__control lightbox__close"
+          aria-label="Close photo"
+          onClick={onClose}
+        >
           ×
         </button>
         <button
@@ -318,12 +322,8 @@ export function Lightbox({
                 <img className="lightbox__image" src={original.url} alt={row.name} />
               ) : (
                 <>
-                  {thumbnail.url && (
-                    <img className="lightbox__placeholder" src={thumbnail.url} alt="" />
-                  )}
-                  {original.failed && (
-                    <span className="lightbox__error">Couldn&apos;t load this photo.</span>
-                  )}
+                  {thumbnail.url && <img className="lightbox__placeholder" src={thumbnail.url} alt="" />}
+                  {original.failed && <span className="lightbox__error">Couldn&apos;t load this photo.</span>}
                 </>
               )}
             </button>

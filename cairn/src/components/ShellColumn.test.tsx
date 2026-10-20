@@ -84,9 +84,7 @@ describe('ShellColumn', () => {
     stubMatchMedia(true)
     renderShell({ collapsible: false, suspended: true })
 
-    expect(screen.getByRole('button', { name: 'Resize sheet' }).getAttribute('aria-expanded')).toBe(
-      'true',
-    )
+    expect(screen.getByRole('button', { name: 'Resize sheet' }).getAttribute('aria-expanded')).toBe('true')
   })
 
   /* #258: the sheet used to read `collapsible`, so a detail — which turns
@@ -96,9 +94,7 @@ describe('ShellColumn', () => {
     stubMatchMedia(true)
     renderShell({ collapsible: false, suspended: false, detailOpen: true })
 
-    expect(screen.getByRole('button', { name: 'Resize sheet' }).getAttribute('aria-expanded')).toBe(
-      'false',
-    )
+    expect(screen.getByRole('button', { name: 'Resize sheet' }).getAttribute('aria-expanded')).toBe('false')
   })
 
   it('falls back to the column when matchMedia is unavailable', () => {

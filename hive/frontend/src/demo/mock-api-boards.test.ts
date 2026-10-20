@@ -14,27 +14,30 @@ beforeEach(() => {
 describe('mock-api board icon', () => {
   it('fetchBoards returns boards with icon from MOCK_BOARDS', async () => {
     const boards = await fetchBoards('tok');
-    const familyBoard = boards.find(b => b.id === 'board-family');
+    const familyBoard = boards.find((b) => b.id === 'board-family');
     expect(familyBoard?.icon).toBe('👨‍👩‍👧');
   });
 
   it('board has no color property', async () => {
     const boards = await fetchBoards('tok');
-    const familyBoard = boards.find(b => b.id === 'board-family');
+    const familyBoard = boards.find((b) => b.id === 'board-family');
     expect(familyBoard).not.toHaveProperty('color');
   });
 
   it('createBoardRow stores icon', async () => {
-    await createBoardRow({
-      id: 'board-test',
-      name: 'Test Board',
-      created_at: '',
-      created_by: '',
-      icon: '🎯',
-    }, 'tok');
+    await createBoardRow(
+      {
+        id: 'board-test',
+        name: 'Test Board',
+        created_at: '',
+        created_by: '',
+        icon: '🎯',
+      },
+      'tok',
+    );
 
     const boards = await fetchBoards('tok');
-    const b = boards.find(x => x.id === 'board-test');
+    const b = boards.find((x) => x.id === 'board-test');
     expect(b?.icon).toBe('🎯');
   });
 
@@ -42,7 +45,7 @@ describe('mock-api board icon', () => {
     await updateBoardRow('board-family', '', '🎯', 'tok');
 
     const boards = await fetchBoards('tok');
-    const b = boards.find(x => x.id === 'board-family');
+    const b = boards.find((x) => x.id === 'board-family');
     expect(b?.icon).toBe('🎯');
   });
 
@@ -56,13 +59,13 @@ describe('mock-api board icon', () => {
 
 describe('MOCK_BOARDS has icon', () => {
   it('Family Board has icon set', () => {
-    const b = MOCK_BOARDS.find(x => x.id === 'board-family');
+    const b = MOCK_BOARDS.find((x) => x.id === 'board-family');
     expect(b?.icon).toBeTruthy();
     expect(b).not.toHaveProperty('color');
   });
 
   it('Work Projects board has icon set', () => {
-    const b = MOCK_BOARDS.find(x => x.id === 'board-work');
+    const b = MOCK_BOARDS.find((x) => x.id === 'board-work');
     expect(b?.icon).toBeTruthy();
     expect(b).not.toHaveProperty('color');
   });

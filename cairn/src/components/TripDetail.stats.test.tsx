@@ -178,9 +178,7 @@ describe('TripDetail — #218 trip totals', () => {
 
     renderTrip()
 
-    expect(
-      screen.getByText('Elevation from 1 of 2 tracks. Distance covers them all.'),
-    ).toBeDefined()
+    expect(screen.getByText('Elevation from 1 of 2 tracks. Distance covers them all.')).toBeDefined()
   })
 
   it('updates the block when a track is added to, then removed from, the trip', () => {

@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { secondsToMinutes, minutesToSeconds, secondsToMinutesInput, formatDuration, estimateMinutesToSeconds, formatEstimate } from './duration';
+import {
+  secondsToMinutes,
+  minutesToSeconds,
+  secondsToMinutesInput,
+  formatDuration,
+  estimateMinutesToSeconds,
+  formatEstimate,
+} from './duration';
 
 // Issue #101 — Workouts!H stores elapsed seconds; the UI reads and writes
 // whole minutes. These are the only two places that conversion happens.

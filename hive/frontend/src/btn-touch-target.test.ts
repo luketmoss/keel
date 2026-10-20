@@ -67,7 +67,7 @@ describe('#255 — .btn meets the WCAG 2.5.5 touch target minimum', () => {
   // so dense rows (share member list, label manager, column settings) do not reflow.
   it('.btn-sm opts out of both floors', () => {
     expect(btnSmRules.length).toBeGreaterThan(0);
-    const optsOutWidth = btnSmRules.some(r => decl(r, 'min-width') === 'auto');
+    const optsOutWidth = btnSmRules.some((r) => decl(r, 'min-width') === 'auto');
     expect(optsOutWidth).toBe(true);
   });
 });

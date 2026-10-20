@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { GestureHandling, Map3D as GoogleMap3D, MapMode, useMap, type Map3DRef } from '@vis.gl/react-google-maps'
+import {
+  GestureHandling,
+  Map3D as GoogleMap3D,
+  MapMode,
+  useMap,
+  type Map3DRef,
+} from '@vis.gl/react-google-maps'
 import { MAP3D_ID } from '../map/track3D'
 import { zoomToRange, rangeToZoom } from '../map/camera3D'
 import { prefersReducedMotion } from '@keel/geo'
@@ -300,7 +306,8 @@ export function Map3DSurface({ on, mode, flyover = null, resetToken = null }: Ma
       // off the element rather than anything cached, since the user may
       // have navigated the whole time it was on.
       const center3d = map3d.center
-      const range = map3d.range ?? zoomToRange(map2dInstance.getZoom() ?? 2, center3d?.lat ?? 0, viewportHeight)
+      const range =
+        map3d.range ?? zoomToRange(map2dInstance.getZoom() ?? 2, center3d?.lat ?? 0, viewportHeight)
       if (center3d) {
         const zoom = rangeToZoom(range, center3d.lat, viewportHeight)
         map2dInstance.setCenter({ lat: center3d.lat, lng: center3d.lng })

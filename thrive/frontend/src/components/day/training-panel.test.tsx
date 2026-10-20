@@ -17,17 +17,53 @@ const D = '2026-09-30';
 
 function wk(id: string, over: Partial<WorkoutWithRow> = {}): WorkoutWithRow {
   return {
-    id, date: D, time: '', type: 'weight', name: '', template_id: '', notes: '',
-    elapsed_seconds: '', created: '', copied_from: '', status: '',
-    moving_seconds: '', effort: '', distance_m: '', ascent_m: '', descent_m: '', avg_hr: '',
-    sub_type: '', source: '', source_activity_id: '', raw_ref: '', fit_ref: '',
-    fit_fetched_at: '', synced_at: '', started_at_utc: '', calories: '', estimated_seconds: '', sport_type: '', track_ref: '',
-    sheetRow: 2, ...over,
+    id,
+    date: D,
+    time: '',
+    type: 'weight',
+    name: '',
+    template_id: '',
+    notes: '',
+    elapsed_seconds: '',
+    created: '',
+    copied_from: '',
+    status: '',
+    moving_seconds: '',
+    effort: '',
+    distance_m: '',
+    ascent_m: '',
+    descent_m: '',
+    avg_hr: '',
+    sub_type: '',
+    source: '',
+    source_activity_id: '',
+    raw_ref: '',
+    fit_ref: '',
+    fit_fetched_at: '',
+    synced_at: '',
+    started_at_utc: '',
+    calories: '',
+    estimated_seconds: '',
+    sport_type: '',
+    track_ref: '',
+    sheetRow: 2,
+    ...over,
   };
 }
 function st(workout_id: string, exercise_id: string, order: number, n: number): SetWithRow {
-  return { workout_id, exercise_id, exercise_name: exercise_id, section: 'primary', exercise_order: order,
-    set_number: n, planned_reps: '', weight: '', reps: '', effort: '', sheetRow: 2 };
+  return {
+    workout_id,
+    exercise_id,
+    exercise_name: exercise_id,
+    section: 'primary',
+    exercise_order: order,
+    set_number: n,
+    planned_reps: '',
+    weight: '',
+    reps: '',
+    effort: '',
+    sheetRow: 2,
+  };
 }
 
 function panel(state: DayState, date = D) {
@@ -95,7 +131,9 @@ describe('AC2 — today', () => {
     workouts.value = [wk('a', { name: 'One', time: '06:00' }), wk('b', { name: 'Two', time: '07:00' })];
     const { container } = panel('today');
     const before = container.querySelectorAll('a.training-card')[1];
-    act(() => { workouts.value = workouts.value.map((w) => ({ ...w })); });
+    act(() => {
+      workouts.value = workouts.value.map((w) => ({ ...w }));
+    });
     expect(container.querySelectorAll('a.training-card')[1]).toBe(before);
   });
 
@@ -140,11 +178,21 @@ describe('AC4 — header Plan action', () => {
 
 describe('AC5 — a card', () => {
   it('shows every set field, joined, with a readable effort pill', () => {
-    workouts.value = [wk('r', {
-      type: 'bike', sub_type: 'Mountain', name: 'Ride', time: '07:30',
-      distance_m: '16093.4', moving_seconds: '3600', elapsed_seconds: '4200',
-      ascent_m: '304.8', descent_m: '300', avg_hr: '140', effort: 'Hard',
-    })];
+    workouts.value = [
+      wk('r', {
+        type: 'bike',
+        sub_type: 'Mountain',
+        name: 'Ride',
+        time: '07:30',
+        distance_m: '16093.4',
+        moving_seconds: '3600',
+        elapsed_seconds: '4200',
+        ascent_m: '304.8',
+        descent_m: '300',
+        avg_hr: '140',
+        effort: 'Hard',
+      }),
+    ];
     const { container } = panel('today');
     const card = container.querySelector('a.training-card')!;
     expect(card.getAttribute('href')).toBe('#/history/r');

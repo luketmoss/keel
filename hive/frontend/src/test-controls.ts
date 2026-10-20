@@ -18,31 +18,80 @@ export const here = dirname(fileURLToPath(import.meta.url));
 export const FAMILIES = {
   'Filled buttons': ['btn-primary', 'btn-danger', 'fab', 'login-btn', 'filter-popup-apply'],
   'Quiet buttons': [
-    'btn-ghost', 'share-archive-board-btn', 'filter-popup-reset', 'column-archive-link', 'toast-action',
-    'label-new-pill', 'column-settings-add-btn', 'column-settings-name',
-    'subtask-date-add-inline', 'overflow-menu-btn',
+    'btn-ghost',
+    'share-archive-board-btn',
+    'filter-popup-reset',
+    'column-archive-link',
+    'toast-action',
+    'label-new-pill',
+    'column-settings-add-btn',
+    'column-settings-name',
+    'subtask-date-add-inline',
+    'overflow-menu-btn',
   ],
   'Icon buttons': [
-    'btn-icon', 'btn-icon-danger', 'kebab-trigger', 'subtask-kebab-btn', 'subtask-action-btn', 'subtask-add-circle',
-    'archive-search-clear', 'filter-search-clear', 'filter-popup-close', 'share-btn', 'share-remove-btn',
-    'staged-subtask-remove', 'label-gear-btn', 'column-add-btn',
-    'column-settings-delete-btn', 'date-clear-btn', 'user-dropdown-trigger',
+    'btn-icon',
+    'btn-icon-danger',
+    'kebab-trigger',
+    'subtask-kebab-btn',
+    'subtask-action-btn',
+    'subtask-add-circle',
+    'archive-search-clear',
+    'filter-search-clear',
+    'filter-popup-close',
+    'share-btn',
+    'share-remove-btn',
+    'staged-subtask-remove',
+    'label-gear-btn',
+    'column-add-btn',
+    'column-settings-delete-btn',
+    'date-clear-btn',
+    'user-dropdown-trigger',
   ],
   'Chips and toggles': [
-    'filter-chip', 'filter-toggle', 'label-toggle', 'theme-toggle-btn', 'color-swatch',
-    'column-color-swatch', 'column-settings-swatch', 'icon-swatch', 'quick-date-chip', 'owner-circle',
-    'status-chevron', 'check-icon', 'subtask-date-inline',
+    'filter-chip',
+    'filter-toggle',
+    'label-toggle',
+    'theme-toggle-btn',
+    'color-swatch',
+    'column-color-swatch',
+    'column-settings-swatch',
+    'icon-swatch',
+    'quick-date-chip',
+    'owner-circle',
+    'status-chevron',
+    'check-icon',
+    'subtask-date-inline',
   ],
   'Rows and cards': [
-    'card', 'card-title', 'archive-item', 'kebab-item', 'overflow-menu-item',
-    'user-dropdown-edit-profile', 'user-dropdown-signout', 'subtask-menu-item', 'subtask-title',
-    'editable-value', 'due-date-btn', 'completed-date-btn', 'column-add-row',
+    'card',
+    'card-title',
+    'archive-item',
+    'kebab-item',
+    'overflow-menu-item',
+    'user-dropdown-edit-profile',
+    'user-dropdown-signout',
+    'subtask-menu-item',
+    'subtask-title',
+    'editable-value',
+    'due-date-btn',
+    'completed-date-btn',
+    'column-add-row',
   ],
   Navigation: ['view-tab', 'settings-tab', 'column-indicator-dot'],
   Fields: [
-    'filter-search-input', 'subtask-add-input', 'subtask-add-date', 'subtask-title-input',
-    'label-form-input', 'board-switcher-select', 'column-sort-select', 'archive-search-input',
-    'profile-email-input', 'due-date-hidden', 'column-settings-name-inline', 'column-settings-name-input',
+    'filter-search-input',
+    'subtask-add-input',
+    'subtask-add-date',
+    'subtask-title-input',
+    'label-form-input',
+    'board-switcher-select',
+    'column-sort-select',
+    'archive-search-input',
+    'profile-email-input',
+    'due-date-hidden',
+    'column-settings-name-inline',
+    'column-settings-name-input',
     'column-settings-delete-select',
   ],
 } as const satisfies Record<string, readonly string[]>;
@@ -93,7 +142,10 @@ function strings(node: ts.Node, acc: string[] = []): string[] {
       strings(span.expression, acc);
       acc.push(span.literal.text);
     }
-  } else ts.forEachChild(node, (c) => { strings(c, acc); });
+  } else
+    ts.forEachChild(node, (c) => {
+      strings(c, acc);
+    });
   return acc;
 }
 
@@ -120,7 +172,8 @@ function scan(): Control[] {
     const sf = ts.createSourceFile(path, readFileSync(path, 'utf-8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
     const locals = new Map<string, ts.Expression>();
     const collect = (n: ts.Node) => {
-      if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.initializer) locals.set(n.name.text, n.initializer);
+      if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.initializer)
+        locals.set(n.name.text, n.initializer);
       ts.forEachChild(n, collect);
     };
     collect(sf);
@@ -133,9 +186,14 @@ function scan(): Control[] {
       if (found.join('').trim() === '' && ts.isIdentifier(expr) && locals.has(expr.text)) {
         found = strings(locals.get(expr.text)!);
       }
-      const tokens = found.join(' ').split(/\s+/).filter((t) => /^[a-z][\w-]*[a-z0-9]$/.test(t));
+      const tokens = found
+        .join(' ')
+        .split(/\s+/)
+        .filter((t) => /^[a-z][\w-]*[a-z0-9]$/.test(t));
       if (tokens.length === 0) {
-        unresolved.push(`${file}|${expr.getText(sf)} (line ${sf.getLineAndCharacterOfPosition(expr.getStart()).line + 1})`);
+        unresolved.push(
+          `${file}|${expr.getText(sf)} (line ${sf.getLineAndCharacterOfPosition(expr.getStart()).line + 1})`,
+        );
       }
       return tokens;
     };
@@ -152,12 +210,17 @@ function scan(): Control[] {
         // A role given only when the element is interactive (`onClick ? 'button' : undefined`) counts.
         const roleInit = attrs.get('role');
         const role =
-          lit('role') ?? (roleInit && strings(roleInit).some((r) => /^(button|menuitem\w*|radio)$/.test(r)) ? strings(roleInit).find((r) => /^(button|menuitem\w*|radio)$/.test(r)) : undefined);
+          lit('role') ??
+          (roleInit && strings(roleInit).some((r) => /^(button|menuitem\w*|radio)$/.test(r))
+            ? strings(roleInit).find((r) => /^(button|menuitem\w*|radio)$/.test(r))
+            : undefined);
         const isControl =
           tag === 'button' ||
           (tag === 'a' && attrs.has('href')) ||
           (role !== undefined && /^(button|menuitem\w*|radio)$/.test(role)) ||
-          tag === 'input' || tag === 'select' || tag === 'textarea';
+          tag === 'input' ||
+          tag === 'select' ||
+          tag === 'textarea';
         if (isControl) {
           let childrenAreElements = true;
           if (ts.isJsxOpeningElement(n)) {
@@ -191,4 +254,3 @@ function scan(): Control[] {
 export const controls = scan();
 export const where = (c: Control) => `${c.file}:${c.line} <${c.tag} class="${c.classes.join(' ')}">`;
 export const isNativeToggle = (c: Control) => c.tag === 'input' && (c.type === 'checkbox' || c.type === 'radio');
-

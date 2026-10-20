@@ -81,8 +81,7 @@ export function useBaseMapType(storage: Storage = window.localStorage): BaseMapP
   return {
     type: stored.type,
     labels: stored.labels,
-    mapTypeId:
-      stored.type === 'satellite' ? (stored.labels ? 'hybrid' : 'satellite') : stored.type,
+    mapTypeId: stored.type === 'satellite' ? (stored.labels ? 'hybrid' : 'satellite') : stored.type,
     setType: (next) => write({ ...stored, type: next }),
     setLabels: (next) => write({ ...stored, labels: next }),
   }

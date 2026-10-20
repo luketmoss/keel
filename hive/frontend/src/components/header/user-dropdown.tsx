@@ -26,7 +26,7 @@ export function UserDropdown({ user, displayName, onSignOut, onOpenProfile }: Us
   }, []);
 
   const handleToggle = useCallback(() => {
-    setOpen(prev => !prev);
+    setOpen((prev) => !prev);
   }, []);
 
   const handleSignOut = useCallback(() => {
@@ -64,8 +64,10 @@ export function UserDropdown({ user, displayName, onSignOut, onOpenProfile }: Us
     const handleClick = (e: MouseEvent) => {
       const target = e.target as Node;
       if (
-        panelRef.current && !panelRef.current.contains(target) &&
-        triggerRef.current && !triggerRef.current.contains(target)
+        panelRef.current &&
+        !panelRef.current.contains(target) &&
+        triggerRef.current &&
+        !triggerRef.current.contains(target)
       ) {
         closeDropdown();
       }
@@ -78,34 +80,37 @@ export function UserDropdown({ user, displayName, onSignOut, onOpenProfile }: Us
   useEffect(() => {
     if (open && panelRef.current) {
       const firstFocusable = panelRef.current.querySelector<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
       );
       firstFocusable?.focus();
     }
   }, [open]);
 
   // Tab trap: Tab on last item closes dropdown
-  const handlePanelKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key !== 'Tab' || !panelRef.current) return;
+  const handlePanelKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key !== 'Tab' || !panelRef.current) return;
 
-    const focusable = panelRef.current.querySelectorAll<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-    );
-    if (focusable.length === 0) return;
+      const focusable = panelRef.current.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusable.length === 0) return;
 
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
 
-    if (e.shiftKey && document.activeElement === first) {
-      // Shift+Tab on first item: close dropdown
-      e.preventDefault();
-      closeDropdown();
-    } else if (!e.shiftKey && document.activeElement === last) {
-      // Tab on last item: close dropdown and move focus forward
-      e.preventDefault();
-      closeDropdown();
-    }
-  }, [closeDropdown]);
+      if (e.shiftKey && document.activeElement === first) {
+        // Shift+Tab on first item: close dropdown
+        e.preventDefault();
+        closeDropdown();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        // Tab on last item: close dropdown and move focus forward
+        e.preventDefault();
+        closeDropdown();
+      }
+    },
+    [closeDropdown],
+  );
 
   return (
     <div class="user-dropdown" data-testid="user-dropdown">
@@ -125,7 +130,9 @@ export function UserDropdown({ user, displayName, onSignOut, onOpenProfile }: Us
           </span>
         )}
         <span class="user-dropdown-name">{displayName}</span>
-        <span class="user-dropdown-caret" aria-hidden="true">&#9662;</span>
+        <span class="user-dropdown-caret" aria-hidden="true">
+          &#9662;
+        </span>
       </button>
 
       {open && (

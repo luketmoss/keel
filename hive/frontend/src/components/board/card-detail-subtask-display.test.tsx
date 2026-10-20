@@ -20,8 +20,12 @@ let mockItems: any[] = [];
 
 vi.mock('../../state/board-store', () => ({
   selectedItemId: {
-    get value() { return mockSelectedItemId; },
-    set value(v: string | null) { mockSelectedItemId = v; },
+    get value() {
+      return mockSelectedItemId;
+    },
+    set value(v: string | null) {
+      mockSelectedItemId = v;
+    },
   },
   openDetailWithTitleEdit: { value: false },
   selectedItem: {
@@ -46,10 +50,14 @@ vi.mock('../../state/board-store', () => ({
     },
   },
   childrenOfSelected: {
-    get value() { return mockChildren; },
+    get value() {
+      return mockChildren;
+    },
   },
   items: {
-    get value() { return mockItems; },
+    get value() {
+      return mockItems;
+    },
   },
   owners: { value: [{ name: 'Luke', google_account: 'luke@example.com' }] },
   labels: { value: [] },
@@ -58,11 +66,37 @@ vi.mock('../../state/board-store', () => ({
   accessibleBoards: { value: [] },
   activeBoardId: { value: 'board-1' },
   showMoveToBoardModal: { value: false },
-  boardStatuses: { value: [
-    { id: 's1', board_id: 'board-1', name: 'To Do', sort_order: 1, color: '#e3f2fd', is_terminal: false, created_at: '' },
-    { id: 's2', board_id: 'board-1', name: 'In Progress', sort_order: 2, color: '#fff3e0', is_terminal: false, created_at: '' },
-    { id: 's3', board_id: 'board-1', name: 'Done', sort_order: 3, color: '#e8f5e9', is_terminal: true, created_at: '' },
-  ] },
+  boardStatuses: {
+    value: [
+      {
+        id: 's1',
+        board_id: 'board-1',
+        name: 'To Do',
+        sort_order: 1,
+        color: '#e3f2fd',
+        is_terminal: false,
+        created_at: '',
+      },
+      {
+        id: 's2',
+        board_id: 'board-1',
+        name: 'In Progress',
+        sort_order: 2,
+        color: '#fff3e0',
+        is_terminal: false,
+        created_at: '',
+      },
+      {
+        id: 's3',
+        board_id: 'board-1',
+        name: 'Done',
+        sort_order: 3,
+        color: '#e8f5e9',
+        is_terminal: true,
+        created_at: '',
+      },
+    ],
+  },
   isTerminalStatus: (name: string) => name === 'Done',
   defaultStatusName: () => 'To Do',
   terminalStatusName: () => 'Done',
@@ -91,7 +125,7 @@ function renderDetail() {
   return render(
     <AuthContext.Provider value={mockAuth}>
       <CardDetail />
-    </AuthContext.Provider>
+    </AuthContext.Provider>,
   );
 }
 
@@ -149,9 +183,7 @@ describe('Issue #204: Sub-item display improvements', () => {
   // --- AC1: Subtask title display ---
   describe('AC1: Subtask title display', () => {
     it('desktop: subtask-title is a clickable span with role=button', () => {
-      mockChildren = [
-        makeChild({ id: 'c1', title: 'Buy groceries', status: 'To Do', sort_order: 1 }),
-      ];
+      mockChildren = [makeChild({ id: 'c1', title: 'Buy groceries', status: 'To Do', sort_order: 1 })];
       const { container } = renderDetail();
       const title = container.querySelector('.subtask-title');
       expect(title).not.toBeNull();
@@ -276,11 +308,11 @@ describe('Issue #204: Sub-item display improvements', () => {
       expect(draggableHandles.length).toBe(2);
 
       // Both done rows have a handle, and neither is draggable
-      const doneRows = Array.from(subtaskItems).filter(el =>
-        el.textContent?.includes('Done C') || el.textContent?.includes('Done D')
+      const doneRows = Array.from(subtaskItems).filter(
+        (el) => el.textContent?.includes('Done C') || el.textContent?.includes('Done D'),
       );
       expect(doneRows.length).toBe(2);
-      doneRows.forEach(row => {
+      doneRows.forEach((row) => {
         expect(row.querySelector('.subtask-handle')!.getAttribute('draggable')).not.toBe('true');
       });
 

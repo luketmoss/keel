@@ -441,8 +441,7 @@ export function useCairnImport(
         // Neither route resolved — waits in the placement queue rather than
         // being written without a position.
         const captureDate = exif.gpsTimestamp ?? exif.dateTimeOriginal
-        const captureInstantMs =
-          exif.gpsTimestamp !== undefined ? Date.parse(exif.gpsTimestamp) : undefined
+        const captureInstantMs = exif.gpsTimestamp !== undefined ? Date.parse(exif.gpsTimestamp) : undefined
         const item: PlacementQueueItem = {
           id: generateId('queue-trip'),
           name: file.name,

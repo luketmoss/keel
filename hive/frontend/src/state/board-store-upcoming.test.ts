@@ -51,7 +51,7 @@ describe('AC2: Upcoming view time buckets', () => {
     ];
 
     const buckets = store.upcomingBuckets.value;
-    const keys = buckets.map(b => b.key);
+    const keys = buckets.map((b) => b.key);
 
     // Overdue should appear
     expect(keys).toContain('overdue');
@@ -60,8 +60,8 @@ describe('AC2: Upcoming view time buckets', () => {
     // 30 days out is "later"
     expect(keys).toContain('later');
 
-    const overdueItems = buckets.find(b => b.key === 'overdue')!.items;
-    expect(overdueItems.map(i => i.id)).toContain('overdue-1');
+    const overdueItems = buckets.find((b) => b.key === 'overdue')!.items;
+    expect(overdueItems.map((i) => i.id)).toContain('overdue-1');
   });
 
   it('excludes Done items from upcoming view', async () => {
@@ -72,7 +72,7 @@ describe('AC2: Upcoming view time buckets', () => {
       makeItem({ id: 'todo-1', status: 'To Do', due_date: daysFromNow(1) }),
     ];
 
-    const allItemIds = store.upcomingBuckets.value.flatMap(b => b.items.map(i => i.id));
+    const allItemIds = store.upcomingBuckets.value.flatMap((b) => b.items.map((i) => i.id));
     expect(allItemIds).not.toContain('done-1');
     expect(allItemIds).toContain('todo-1');
   });
@@ -86,18 +86,16 @@ describe('AC2: Upcoming view time buckets', () => {
       makeItem({ id: 'later-c', due_date: daysFromNow(25) }),
     ];
 
-    const laterBucket = store.upcomingBuckets.value.find(b => b.key === 'later');
+    const laterBucket = store.upcomingBuckets.value.find((b) => b.key === 'later');
     expect(laterBucket).toBeDefined();
-    expect(laterBucket!.items.map(i => i.id)).toEqual(['later-a', 'later-b', 'later-c']);
+    expect(laterBucket!.items.map((i) => i.id)).toEqual(['later-a', 'later-b', 'later-c']);
   });
 
   it('hides empty buckets', async () => {
     const store = await import('./board-store');
 
     // Only overdue items
-    store.items.value = [
-      makeItem({ id: 'overdue-only', due_date: daysAgo(5) }),
-    ];
+    store.items.value = [makeItem({ id: 'overdue-only', due_date: daysAgo(5) })];
 
     const buckets = store.upcomingBuckets.value;
     expect(buckets.length).toBe(1);
@@ -107,12 +105,9 @@ describe('AC2: Upcoming view time buckets', () => {
   it('shows bucket item counts', async () => {
     const store = await import('./board-store');
 
-    store.items.value = [
-      makeItem({ id: 'o1', due_date: daysAgo(1) }),
-      makeItem({ id: 'o2', due_date: daysAgo(2) }),
-    ];
+    store.items.value = [makeItem({ id: 'o1', due_date: daysAgo(1) }), makeItem({ id: 'o2', due_date: daysAgo(2) })];
 
-    const overdueBucket = store.upcomingBuckets.value.find(b => b.key === 'overdue');
+    const overdueBucket = store.upcomingBuckets.value.find((b) => b.key === 'overdue');
     expect(overdueBucket!.items.length).toBe(2);
   });
 
@@ -124,7 +119,7 @@ describe('AC2: Upcoming view time buckets', () => {
       makeItem({ id: 'has-date', due_date: daysFromNow(1) }),
     ];
 
-    const allIds = store.upcomingBuckets.value.flatMap(b => b.items.map(i => i.id));
+    const allIds = store.upcomingBuckets.value.flatMap((b) => b.items.map((i) => i.id));
     expect(allIds).not.toContain('no-date');
     expect(allIds).toContain('has-date');
   });
@@ -147,7 +142,7 @@ describe('AC3: Parent items with qualifying children', () => {
       makeItem({ id: 'child-1', due_date: daysAgo(2), parent_id: 'parent-1' }),
     ];
 
-    const allIds = store.upcomingBuckets.value.flatMap(b => b.items.map(i => i.id));
+    const allIds = store.upcomingBuckets.value.flatMap((b) => b.items.map((i) => i.id));
     expect(allIds).toContain('parent-1');
   });
 
@@ -157,12 +152,12 @@ describe('AC3: Parent items with qualifying children', () => {
     store.items.value = [
       makeItem({ id: 'parent-1', due_date: '', parent_id: '' }),
       makeItem({ id: 'child-1', due_date: daysFromNow(20), parent_id: 'parent-1' }), // later
-      makeItem({ id: 'child-2', due_date: daysAgo(1), parent_id: 'parent-1' }),       // overdue
+      makeItem({ id: 'child-2', due_date: daysAgo(1), parent_id: 'parent-1' }), // overdue
     ];
 
-    const overdueBucket = store.upcomingBuckets.value.find(b => b.key === 'overdue');
+    const overdueBucket = store.upcomingBuckets.value.find((b) => b.key === 'overdue');
     expect(overdueBucket).toBeDefined();
-    expect(overdueBucket!.items.map(i => i.id)).toContain('parent-1');
+    expect(overdueBucket!.items.map((i) => i.id)).toContain('parent-1');
   });
 });
 
@@ -184,7 +179,7 @@ describe('AC5: Upcoming view filters', () => {
     ];
 
     store.upcomingFilterSearch.value = 'grocery';
-    const allIds = store.upcomingBuckets.value.flatMap(b => b.items.map(i => i.id));
+    const allIds = store.upcomingBuckets.value.flatMap((b) => b.items.map((i) => i.id));
     expect(allIds).toContain('match');
     expect(allIds).not.toContain('nomatch');
   });
@@ -198,7 +193,7 @@ describe('AC5: Upcoming view filters', () => {
     ];
 
     store.upcomingFilterLabel.value = 'Errands';
-    const allIds = store.upcomingBuckets.value.flatMap(b => b.items.map(i => i.id));
+    const allIds = store.upcomingBuckets.value.flatMap((b) => b.items.map((i) => i.id));
     expect(allIds).toContain('labeled');
     expect(allIds).not.toContain('other');
   });
@@ -212,7 +207,7 @@ describe('AC5: Upcoming view filters', () => {
     ];
 
     store.upcomingFilterBoards.value = new Set(['board-1']);
-    const allIds = store.upcomingBuckets.value.flatMap(b => b.items.map(i => i.id));
+    const allIds = store.upcomingBuckets.value.flatMap((b) => b.items.map((i) => i.id));
     expect(allIds).toContain('b1');
     expect(allIds).not.toContain('b2');
   });
@@ -222,16 +217,28 @@ describe('AC5: Upcoming view filters', () => {
 
     store.items.value = [
       makeItem({ id: 'perfect', title: 'Grocery', labels: 'Errands', board_id: 'board-1', due_date: daysFromNow(1) }),
-      makeItem({ id: 'wrong-board', title: 'Grocery', labels: 'Errands', board_id: 'board-2', due_date: daysFromNow(1) }),
+      makeItem({
+        id: 'wrong-board',
+        title: 'Grocery',
+        labels: 'Errands',
+        board_id: 'board-2',
+        due_date: daysFromNow(1),
+      }),
       makeItem({ id: 'wrong-label', title: 'Grocery', labels: 'Home', board_id: 'board-1', due_date: daysFromNow(1) }),
-      makeItem({ id: 'wrong-search', title: 'Fix faucet', labels: 'Errands', board_id: 'board-1', due_date: daysFromNow(1) }),
+      makeItem({
+        id: 'wrong-search',
+        title: 'Fix faucet',
+        labels: 'Errands',
+        board_id: 'board-1',
+        due_date: daysFromNow(1),
+      }),
     ];
 
     store.upcomingFilterSearch.value = 'grocery';
     store.upcomingFilterLabel.value = 'Errands';
     store.upcomingFilterBoards.value = new Set(['board-1']);
 
-    const allIds = store.upcomingBuckets.value.flatMap(b => b.items.map(i => i.id));
+    const allIds = store.upcomingBuckets.value.flatMap((b) => b.items.map((i) => i.id));
     expect(allIds).toEqual(['perfect']);
   });
 });

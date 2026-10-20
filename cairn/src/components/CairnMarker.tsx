@@ -46,7 +46,15 @@ export interface CairnMarkerProps {
     it has neither an icon nor an image — the loose-cairn placeholder
     `LooseLayer` used before this issue, kept as the fallback for that
     case). A pin that also carries an image gets a small camera badge. */
-export function CairnMarker({ icon, thumbnailUrl, hasImage, source, selected, hovered, small }: CairnMarkerProps) {
+export function CairnMarker({
+  icon,
+  thumbnailUrl,
+  hasImage,
+  source,
+  selected,
+  hovered,
+  small,
+}: CairnMarkerProps) {
   const asThumbnail = cairnDrawsAsThumbnail({
     icon,
     image: hasImage ? { originalDriveFileId: '', thumbnailDriveFileId: '' } : null,
@@ -76,7 +84,9 @@ export function CairnMarker({ icon, thumbnailUrl, hasImage, source, selected, ho
       <svg className="cairn-marker__pin-body" viewBox="0 0 30 36" aria-hidden="true">
         <path d="M15 1.4c-7.1 0-12.9 5.6-12.9 12.5 0 8.9 11.4 20 12.4 20.9a.75.75 0 0 0 1 0c1-.9 12.4-12 12.4-20.9C27.9 7 22.1 1.4 15 1.4Z" />
       </svg>
-      <span className="cairn-marker__pin-glyph">{icon ? <CairnIconGlyph icon={icon} /> : <span className="cairn-marker__pin-dot" />}</span>
+      <span className="cairn-marker__pin-glyph">
+        {icon ? <CairnIconGlyph icon={icon} /> : <span className="cairn-marker__pin-dot" />}
+      </span>
       {hasImage && <span className="cairn-marker__badge" aria-hidden="true" />}
     </span>
   )

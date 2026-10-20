@@ -1,6 +1,13 @@
 import { useState } from 'preact/hooks';
 import { navigate } from '../../router/router';
-import { filteredWorkouts, activeWorkouts, plannedWorkouts, completedWorkouts, sets, exercises } from '../../state/store';
+import {
+  filteredWorkouts,
+  activeWorkouts,
+  plannedWorkouts,
+  completedWorkouts,
+  sets,
+  exercises,
+} from '../../state/store';
 import { ActivitiesFilters } from './activities-filters';
 import {
   groupWorkoutsByDate,
@@ -32,10 +39,10 @@ import { formatDistance, formatElevation, metersToMiles, metersToFeet } from '..
 
 /** Type-color map for inset box-shadow accent (light theme). */
 const TYPE_COLORS: Record<string, { light: string; dark: string }> = {
-  weight:  { light: '#c53030', dark: '#fca5a5' },
+  weight: { light: '#c53030', dark: '#fca5a5' },
   stretch: { light: '#2e7d32', dark: '#86efac' },
-  bike:    { light: '#1565c0', dark: '#93c5fd' },
-  hike:    { light: '#5d4037', dark: '#d7ccc8' },
+  bike: { light: '#1565c0', dark: '#93c5fd' },
+  hike: { light: '#5d4037', dark: '#d7ccc8' },
 };
 
 function pluralWorkout(n: number): string {
@@ -87,7 +94,9 @@ export function ActivitiesScreen() {
     cardioCount > 0 && weekAscent.total > 0
       ? `${metersToFeet(String(weekAscent.total))?.toLocaleString('en-US')} feet of ascent across ${weekAscent.withData} of ${weekAscent.of} ${cardioUnit}.`
       : '',
-  ].filter(Boolean).join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <div class="screen activities-screen">
@@ -100,9 +109,16 @@ export function ActivitiesScreen() {
             aria-label="Toggle filters"
             aria-expanded={showFilters}
           >
-            {showFilters ? '✕' : (
+            {showFilters ? (
+              '✕'
+            ) : (
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-                <path d="M1 2h16l-6 7.5V15l-4 2v-7.5L1 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+                <path
+                  d="M1 2h16l-6 7.5V15l-4 2v-7.5L1 2z"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linejoin="round"
+                />
               </svg>
             )}
           </button>
@@ -113,30 +129,35 @@ export function ActivitiesScreen() {
         <p class="sr-only">{describeWeekStreak(weekDays)}</p>
         <div class="week-streak-dots" aria-hidden="true">
           {weekDays.map((d) => (
-            <div
-              key={d.date}
-              class={`streak-dot${d.hasWorkout ? ' filled' : ''}${d.isToday ? ' today' : ''}`}
-            />
+            <div key={d.date} class={`streak-dot${d.hasWorkout ? ' filled' : ''}${d.isToday ? ' today' : ''}`} />
           ))}
         </div>
         <div class="week-streak-labels" aria-hidden="true">
           {weekDays.map((d) => (
-            <span key={d.date} class={`streak-label${d.isToday ? ' today' : ''}`}>{d.label}</span>
+            <span key={d.date} class={`streak-label${d.isToday ? ' today' : ''}`}>
+              {d.label}
+            </span>
           ))}
         </div>
         <p class="sr-only">{statsSummary}</p>
         <div class="stats-bar" aria-hidden="true">
           <div class="stats-bar-cell">
             <span class="stats-bar-label">This week</span>
-            <span class="stats-bar-value">{pluralWorkout(weekCount)} · {weekMinutes} min</span>
+            <span class="stats-bar-value">
+              {pluralWorkout(weekCount)} · {weekMinutes} min
+            </span>
           </div>
           <div class="stats-bar-cell stats-bar-cell--center">
             <span class="stats-bar-label">Last week</span>
-            <span class="stats-bar-value">{pluralWorkout(lastWeekCount)} · {lastWeekMinutes} min</span>
+            <span class="stats-bar-value">
+              {pluralWorkout(lastWeekCount)} · {lastWeekMinutes} min
+            </span>
           </div>
           <div class="stats-bar-cell stats-bar-cell--right">
             <span class="stats-bar-label">This month</span>
-            <span class="stats-bar-value">{pluralWorkout(monthCount)} · {monthMinutes} min</span>
+            <span class="stats-bar-value">
+              {pluralWorkout(monthCount)} · {monthMinutes} min
+            </span>
           </div>
         </div>
 
@@ -147,10 +168,16 @@ export function ActivitiesScreen() {
             <span class="stats-bar-label">Cardio this week</span>
             <span class="stats-row-value">
               {weekDistance.total > 0 && (
-                <span>{formatDistance(String(weekDistance.total))}{coverageSuffix(weekDistance, cardioUnit)}</span>
+                <span>
+                  {formatDistance(String(weekDistance.total))}
+                  {coverageSuffix(weekDistance, cardioUnit)}
+                </span>
               )}
               {weekAscent.total > 0 && (
-                <span>↑ {formatElevation(String(weekAscent.total))}{coverageSuffix(weekAscent, cardioUnit)}</span>
+                <span>
+                  ↑ {formatElevation(String(weekAscent.total))}
+                  {coverageSuffix(weekAscent, cardioUnit)}
+                </span>
               )}
             </span>
           </div>
@@ -201,7 +228,9 @@ export function ActivitiesScreen() {
               `${overdue ? 'was scheduled for' : 'scheduled for'} ${spokenDate(dateLabel)}`,
               countLabel,
               formatEstimate(w.estimated_seconds, true),
-            ].filter(Boolean).join(', ');
+            ]
+              .filter(Boolean)
+              .join(', ');
 
             return (
               <button
@@ -217,10 +246,17 @@ export function ActivitiesScreen() {
                   <span class="workout-meta">
                     {countLabel}
                     {' · '}
-                    <span class={`planned-date${dateLabel === 'Today' || dateLabel === 'Tomorrow' ? ' planned-date-imminent' : ''}`}>
+                    <span
+                      class={`planned-date${dateLabel === 'Today' || dateLabel === 'Tomorrow' ? ' planned-date-imminent' : ''}`}
+                    >
                       {dateLabel}
                     </span>
-                    {estimate && <>{' · '}<span class="planned-estimate">{estimate}</span></>}
+                    {estimate && (
+                      <>
+                        {' · '}
+                        <span class="planned-estimate">{estimate}</span>
+                      </>
+                    )}
                   </span>
                   {tags.length > 0 && (
                     <div class="workout-card-tags">
@@ -249,9 +285,7 @@ export function ActivitiesScreen() {
           <div class="workout-list">
             {groups.map((group, groupIdx) => (
               <div key={group.label}>
-                <div class={`date-group-header${groupIdx === 0 ? ' first' : ''}`}>
-                  {group.label}
-                </div>
+                <div class={`date-group-header${groupIdx === 0 ? ' first' : ''}`}>{group.label}</div>
                 {group.workouts.map((w) => {
                   const workoutSets = sets.value.filter((s) => s.workout_id === w.id);
                   const exerciseCount = new Set(workoutSets.map((s) => `${s.exercise_id}__${s.exercise_order}`)).size;
@@ -264,7 +298,11 @@ export function ActivitiesScreen() {
                       key={w.id}
                       data-focus-key={`workout:${w.id}`}
                       class={`workout-card workout-card-${w.type}`}
-                      style={typeColor ? { '--type-accent': typeColor.light, '--type-accent-dark': typeColor.dark } as any : undefined}
+                      style={
+                        typeColor
+                          ? ({ '--type-accent': typeColor.light, '--type-accent-dark': typeColor.dark } as any)
+                          : undefined
+                      }
                       onClick={() => navigate(`/history/${w.id}`)}
                       aria-label={workoutCardAriaLabel(w, exerciseCount)}
                     >
@@ -297,10 +335,7 @@ export function ActivitiesScreen() {
                       <span class="workout-card-badges">
                         <span class={`type-badge badge-${w.type}`}>{w.type}</span>
                         {w.effort && (
-                          <span
-                            class={`workout-effort workout-effort-${w.effort.toLowerCase()}`}
-                            aria-hidden="true"
-                          >
+                          <span class={`workout-effort workout-effort-${w.effort.toLowerCase()}`} aria-hidden="true">
                             {w.effort}
                           </span>
                         )}

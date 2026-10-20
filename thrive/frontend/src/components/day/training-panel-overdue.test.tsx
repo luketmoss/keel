@@ -22,17 +22,53 @@ const D = '2026-09-30'; // today
 
 function wk(id: string, over: Partial<WorkoutWithRow> = {}): WorkoutWithRow {
   return {
-    id, date: D, time: '', type: 'weight', name: '', template_id: '', notes: '',
-    elapsed_seconds: '', created: '', copied_from: '', status: '',
-    moving_seconds: '', effort: '', distance_m: '', ascent_m: '', descent_m: '', avg_hr: '',
-    sub_type: '', source: '', source_activity_id: '', raw_ref: '', fit_ref: '',
-    fit_fetched_at: '', synced_at: '', started_at_utc: '', calories: '', estimated_seconds: '', sport_type: '', track_ref: '',
-    sheetRow: 2, ...over,
+    id,
+    date: D,
+    time: '',
+    type: 'weight',
+    name: '',
+    template_id: '',
+    notes: '',
+    elapsed_seconds: '',
+    created: '',
+    copied_from: '',
+    status: '',
+    moving_seconds: '',
+    effort: '',
+    distance_m: '',
+    ascent_m: '',
+    descent_m: '',
+    avg_hr: '',
+    sub_type: '',
+    source: '',
+    source_activity_id: '',
+    raw_ref: '',
+    fit_ref: '',
+    fit_fetched_at: '',
+    synced_at: '',
+    started_at_utc: '',
+    calories: '',
+    estimated_seconds: '',
+    sport_type: '',
+    track_ref: '',
+    sheetRow: 2,
+    ...over,
   };
 }
 function st(workout_id: string, exercise_id: string, order: number, n: number): SetWithRow {
-  return { workout_id, exercise_id, exercise_name: exercise_id, section: 'primary', exercise_order: order,
-    set_number: n, planned_reps: '', weight: '', reps: '', effort: '', sheetRow: 2 };
+  return {
+    workout_id,
+    exercise_id,
+    exercise_name: exercise_id,
+    section: 'primary',
+    exercise_order: order,
+    set_number: n,
+    planned_reps: '',
+    weight: '',
+    reps: '',
+    effort: '',
+    sheetRow: 2,
+  };
 }
 
 /** The real action's effect on the store: the date written in place. */
@@ -42,7 +78,9 @@ function moveInStore(id: string, date: string) {
 
 function panel(state: DayState = 'today', date = D) {
   return render(
-    <AuthContext.Provider value={{ token: 'tok', user: null, isAuthenticated: true, login: () => {}, logout: () => {} }}>
+    <AuthContext.Provider
+      value={{ token: 'tok', user: null, isAuthenticated: true, login: () => {}, logout: () => {} }}
+    >
       <TrainingPanel date={date} state={state} today={D} />
     </AuthContext.Provider>,
   );
@@ -51,8 +89,12 @@ const names = (c: Element) => [...c.querySelectorAll('.workout-name')].map((e) =
 const button = (c: Element, label: string) =>
   [...c.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === label)!;
 async function flush() {
-  await act(async () => { await Promise.resolve(); });
-  await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+  await act(async () => {
+    await Promise.resolve();
+  });
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 0));
+  });
 }
 
 afterEach(cleanup);
@@ -85,7 +127,7 @@ describe('overdueForToday', () => {
 });
 
 describe('AC1 — overdue plans are carried onto today, above its own', () => {
-  it('lists carried cards first, then today\'s planned, then done, with Overdue and the planned date', () => {
+  it("lists carried cards first, then today's planned, then done, with Overdue and the planned date", () => {
     workouts.value = [
       wk('d', { name: 'Done', time: '06:00' }),
       wk('p', { name: 'Today plan', status: 'planned' }),
@@ -103,7 +145,9 @@ describe('AC1 — overdue plans are carried onto today, above its own', () => {
     expect(carried[0].querySelector('.training-planned-for')!.textContent).toBe('Planned Sep 20');
     expect(carried[1].querySelector('.training-planned-for')!.textContent).toBe('Planned Yesterday');
     // Today's own plan keeps its Planned badge and no actions.
-    const own = [...container.querySelectorAll('.training-list > a')].find((a) => a.textContent!.includes('Today plan'))!;
+    const own = [...container.querySelectorAll('.training-list > a')].find((a) =>
+      a.textContent!.includes('Today plan'),
+    )!;
     expect(own.querySelector('.badge-planned')).not.toBeNull();
   });
 
@@ -172,7 +216,7 @@ describe('AC2 — regression guards', () => {
 });
 
 describe('AC3 — Move to today', () => {
-  it('writes today in place through rescheduleWorkout and focuses the card among today\'s plans', async () => {
+  it("writes today in place through rescheduleWorkout and focuses the card among today's plans", async () => {
     workouts.value = [wk('o', { name: 'Pull', status: 'planned', date: '2026-09-27' })];
     const { container } = panel();
     fireEvent.click(button(container, 'Move to today'));
@@ -297,9 +341,14 @@ describe('AC6 — in flight and failure', () => {
     workouts.value = [wk('o', { name: 'Pull', status: 'planned', date: '2026-09-27' })];
   });
 
-  it('disables the card\'s buttons and relabels the pressed one while a move is in flight; re-enables on failure', async () => {
+  it("disables the card's buttons and relabels the pressed one while a move is in flight; re-enables on failure", async () => {
     let fail!: (e: Error) => void;
-    rescheduleWorkout.mockImplementation(() => new Promise((_, reject) => { fail = reject; }));
+    rescheduleWorkout.mockImplementation(
+      () =>
+        new Promise((_, reject) => {
+          fail = reject;
+        }),
+    );
     const { container } = panel();
     fireEvent.click(button(container, 'Move to today'));
     await flush();
@@ -307,7 +356,9 @@ describe('AC6 — in flight and failure', () => {
     expect(busy.disabled).toBe(true);
     expect(button(container, 'Reschedule').disabled).toBe(true);
     expect(button(container, 'Start now').disabled).toBe(true);
-    await act(async () => { fail(new Error('boom')); });
+    await act(async () => {
+      fail(new Error('boom'));
+    });
     await flush();
     expect(button(container, 'Move to today').disabled).toBe(false);
     expect(container.querySelector('.training-overdue')).not.toBeNull();
@@ -335,11 +386,7 @@ describe('AC6 — in flight and failure', () => {
 
 describe('AC7 — cards open the detail view; buttons sit beside the link', () => {
   it('links planned and overdue cards to #/history/:id on any day, done cards unchanged', () => {
-    workouts.value = [
-      wk('o', { status: 'planned', date: '2026-09-27' }),
-      wk('p', { status: 'planned' }),
-      wk('d', {}),
-    ];
+    workouts.value = [wk('o', { status: 'planned', date: '2026-09-27' }), wk('p', { status: 'planned' }), wk('d', {})];
     const { container } = panel();
     const hrefs = [...container.querySelectorAll('a.training-card')].map((a) => a.getAttribute('href'));
     expect(hrefs).toEqual(['#/history/o', '#/history/p', '#/history/d']);
@@ -353,7 +400,7 @@ describe('AC7 — cards open the detail view; buttons sit beside the link', () =
     const { container } = panel();
     const unit = container.querySelector('.training-overdue')!;
     expect(unit.querySelector('a button')).toBeNull();
-    const stops = [...unit.querySelectorAll('a, button')].map((el) => el.tagName === 'A' ? 'link' : el.textContent);
+    const stops = [...unit.querySelectorAll('a, button')].map((el) => (el.tagName === 'A' ? 'link' : el.textContent));
     expect(stops).toEqual(['link', 'Move to today', 'Reschedule', 'Start now']);
   });
 
@@ -384,8 +431,12 @@ describe('AC9 — one unit, calm, named buttons', () => {
       expect(b.getAttribute('aria-label')!.startsWith(b.textContent!)).toBe(true);
     }
     expect(buttons.map((b) => b.getAttribute('aria-label'))).toEqual([
-      'Move to today: Upper Pull A', 'Reschedule: Upper Pull A', 'Start now: Upper Pull A',
-      'Move to today: bike', 'Reschedule: bike', 'Start now: bike',
+      'Move to today: Upper Pull A',
+      'Reschedule: Upper Pull A',
+      'Start now: Upper Pull A',
+      'Move to today: bike',
+      'Reschedule: bike',
+      'Start now: bike',
     ]);
   });
 });

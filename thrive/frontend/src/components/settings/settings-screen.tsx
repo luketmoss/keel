@@ -43,7 +43,9 @@ export function SettingsScreen() {
             onClick={() => navigate('/settings/labels')}
             role="button"
             tabIndex={0}
-            onKeyDown={e => { if (e.key === 'Enter') navigate('/settings/labels'); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') navigate('/settings/labels');
+            }}
           >
             <span>Labels</span>
             <span class="settings-detail">{labels.value.length} defined &rsaquo;</span>

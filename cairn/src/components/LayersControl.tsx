@@ -142,20 +142,13 @@ export function LayersControl({
 
   if (open) {
     return (
-      <div
-        className="layers-control__panel"
-        role="group"
-        aria-label="Layers"
-        ref={panelRef}
-      >
+      <div className="layers-control__panel" role="group" aria-label="Layers" ref={panelRef}>
         <div className="layers-control__strip" role="group" aria-label="Basemap">
           {BASE_MAP_TYPES.map((type) => (
             <button
               key={type}
               type="button"
-              className={`layers-control__option${
-                value === type ? ' layers-control__option--active' : ''
-              }`}
+              className={`layers-control__option${value === type ? ' layers-control__option--active' : ''}`}
               aria-pressed={value === type}
               // #284 — picking a tile no longer collapses the panel. #109's
               // "selecting collapses the strip" was about choosing a
@@ -187,9 +180,7 @@ export function LayersControl({
             onClick={() => onLabelsChange(!labels)}
           >
             <span
-              className={`layers-control__checkbox${
-                labelsShown ? ' layers-control__checkbox--on' : ''
-              }`}
+              className={`layers-control__checkbox${labelsShown ? ' layers-control__checkbox--on' : ''}`}
               aria-hidden="true"
             >
               {labelsShown ? '✓' : ''}

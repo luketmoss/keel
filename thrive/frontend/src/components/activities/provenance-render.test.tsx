@@ -15,16 +15,57 @@ import type { WorkoutWithRow } from '../../api/types';
 
 function makeWorkout(overrides: Partial<WorkoutWithRow>): WorkoutWithRow {
   return {
-    id: 'w1', date: '2026-09-20', time: '08:10', type: 'hike', name: 'Ridge Trail', template_id: '',
-    notes: '', elapsed_seconds: '5143', created: '', copied_from: '', status: '', moving_seconds: '',
-    effort: '', distance_m: '6512', ascent_m: '', descent_m: '', avg_hr: '', sub_type: '',
-    source: '', source_activity_id: '', raw_ref: '', fit_ref: '', fit_fetched_at: '', synced_at: '',
-    started_at_utc: '', calories: '', estimated_seconds: '', sport_type: '', track_ref: '', sheetRow: 2, ...overrides,
+    id: 'w1',
+    date: '2026-09-20',
+    time: '08:10',
+    type: 'hike',
+    name: 'Ridge Trail',
+    template_id: '',
+    notes: '',
+    elapsed_seconds: '5143',
+    created: '',
+    copied_from: '',
+    status: '',
+    moving_seconds: '',
+    effort: '',
+    distance_m: '6512',
+    ascent_m: '',
+    descent_m: '',
+    avg_hr: '',
+    sub_type: '',
+    source: '',
+    source_activity_id: '',
+    raw_ref: '',
+    fit_ref: '',
+    fit_fetched_at: '',
+    synced_at: '',
+    started_at_utc: '',
+    calories: '',
+    estimated_seconds: '',
+    sport_type: '',
+    track_ref: '',
+    sheetRow: 2,
+    ...overrides,
   };
 }
 
-const synced = makeWorkout({ id: 'w_s', name: 'Synced Hike', source: 'coros', source_activity_id: '4721', synced_at: '2026-09-20T18:00:00.000Z' });
-const enriched = makeWorkout({ id: 'w_e', name: 'Leg Day', type: 'weight', elapsed_seconds: '3947', distance_m: '', source_activity_id: '4722', synced_at: '2026-09-19T15:02:37.000Z', sheetRow: 3 });
+const synced = makeWorkout({
+  id: 'w_s',
+  name: 'Synced Hike',
+  source: 'coros',
+  source_activity_id: '4721',
+  synced_at: '2026-09-20T18:00:00.000Z',
+});
+const enriched = makeWorkout({
+  id: 'w_e',
+  name: 'Leg Day',
+  type: 'weight',
+  elapsed_seconds: '3947',
+  distance_m: '',
+  source_activity_id: '4722',
+  synced_at: '2026-09-19T15:02:37.000Z',
+  sheetRow: 3,
+});
 const manual = makeWorkout({ id: 'w_m', name: 'Manual Walk', type: 'walk', sheetRow: 4 });
 
 function card(name: string): HTMLElement {
@@ -73,7 +114,7 @@ describe('AC1: the card mark', () => {
     expect(c.querySelectorAll('.type-badge')).toHaveLength(1);
   });
 
-  it('speaks provenance in the card\'s single label', () => {
+  it("speaks provenance in the card's single label", () => {
     renderList();
     expect(card('Synced Hike').getAttribute('aria-label')).toBe(
       'Synced Hike, hike, 2026-09-20, 86 min, synced from COROS',

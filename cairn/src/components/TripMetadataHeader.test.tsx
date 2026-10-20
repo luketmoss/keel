@@ -149,7 +149,10 @@ describe('TripMetadataHeader', () => {
     // trip it returns — same flow `onUpdate` already models for every
     // other field in this file.
     rerender(
-      <TripMetadataHeader trip={trip({ startDate: '2020-01-01', endDate: '2020-01-05' })} onUpdate={onUpdate} />,
+      <TripMetadataHeader
+        trip={trip({ startDate: '2020-01-01', endDate: '2020-01-05' })}
+        onUpdate={onUpdate}
+      />,
     )
 
     expect(screen.getByText('completed')).toBeDefined()
@@ -196,7 +199,9 @@ describe('TripMetadataHeader', () => {
 
     it('renders "Show more" for a clamped note, and toggles to "Show less" and back', () => {
       stubClamped(true)
-      render(<TripMetadataHeader trip={trip({ notes: 'A very long note that overflows.' })} onUpdate={vi.fn()} />)
+      render(
+        <TripMetadataHeader trip={trip({ notes: 'A very long note that overflows.' })} onUpdate={vi.fn()} />,
+      )
 
       const showMore = screen.getByText('Show more')
       fireEvent.click(showMore)
@@ -209,7 +214,9 @@ describe('TripMetadataHeader', () => {
     it('does not start editing when the "Show more" control is clicked', () => {
       stubClamped(true)
       const onUpdate = vi.fn()
-      render(<TripMetadataHeader trip={trip({ notes: 'A very long note that overflows.' })} onUpdate={onUpdate} />)
+      render(
+        <TripMetadataHeader trip={trip({ notes: 'A very long note that overflows.' })} onUpdate={onUpdate} />,
+      )
 
       fireEvent.click(screen.getByText('Show more'))
 
@@ -227,7 +234,10 @@ describe('TripMetadataHeader', () => {
       expect(screen.getByText('Show less')).toBeDefined()
 
       rerender(
-        <TripMetadataHeader trip={trip({ notes: 'A different, still long note here.' })} onUpdate={onUpdate} />,
+        <TripMetadataHeader
+          trip={trip({ notes: 'A different, still long note here.' })}
+          onUpdate={onUpdate}
+        />,
       )
 
       expect(screen.queryByText('Show less')).toBeNull()

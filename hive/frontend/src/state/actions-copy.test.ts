@@ -125,7 +125,7 @@ describe('copyItem', () => {
       const newId = await copyItem('item-1', 'Luke', 'token');
 
       expect(newId).toBeTruthy();
-      const copy = items.value.find(i => i.id === newId);
+      const copy = items.value.find((i) => i.id === newId);
       expect(copy).toBeDefined();
       expect(copy!.title).toBe('Test Item (Copy)');
     });
@@ -135,7 +135,7 @@ describe('copyItem', () => {
       items.value = [original];
       const newId = await copyItem('item-1', 'Luke', 'token');
 
-      const copy = items.value.find(i => i.id === newId);
+      const copy = items.value.find((i) => i.id === newId);
       expect(copy!.description).toBe('A test description');
       expect(copy!.labels).toBe('bug, urgent');
       expect(copy!.owner).toBe('Luke');
@@ -150,7 +150,7 @@ describe('copyItem', () => {
       const newId = await copyItem('item-1', 'Alice', 'token');
 
       expect(newId).not.toBe('item-1');
-      const copy = items.value.find(i => i.id === newId);
+      const copy = items.value.find((i) => i.id === newId);
       expect(copy!.created_by).toBe('Alice');
     });
 
@@ -159,7 +159,7 @@ describe('copyItem', () => {
       items.value = [original];
       const newId = await copyItem('item-1', 'Luke', 'token');
 
-      const copy = items.value.find(i => i.id === newId);
+      const copy = items.value.find((i) => i.id === newId);
       expect(copy!.completed_at).toBe('');
     });
 
@@ -168,7 +168,7 @@ describe('copyItem', () => {
       items.value = [original];
       const newId = await copyItem('item-1', 'Luke', 'token');
 
-      const copy = items.value.find(i => i.id === newId);
+      const copy = items.value.find((i) => i.id === newId);
       expect(copy!.parent_id).toBe('');
     });
 
@@ -178,7 +178,7 @@ describe('copyItem', () => {
       items.value = [item1, item2];
       const newId = await copyItem('item-1', 'Luke', 'token');
 
-      const copy = items.value.find(i => i.id === newId);
+      const copy = items.value.find((i) => i.id === newId);
       expect(copy!.sort_order).toBeGreaterThan(1);
       expect(copy!.sort_order).toBeLessThan(2);
     });
@@ -189,17 +189,23 @@ describe('copyItem', () => {
     it('duplicates all subtasks with new parent_id', async () => {
       const parent = makeItem({ id: 'parent-1', title: 'Parent' });
       const child1 = makeItem({
-        id: 'child-1', title: 'Child 1', parent_id: 'parent-1',
-        sort_order: 1, owner: 'Alice',
+        id: 'child-1',
+        title: 'Child 1',
+        parent_id: 'parent-1',
+        sort_order: 1,
+        owner: 'Alice',
       });
       const child2 = makeItem({
-        id: 'child-2', title: 'Child 2', parent_id: 'parent-1',
-        sort_order: 2, owner: 'Bob',
+        id: 'child-2',
+        title: 'Child 2',
+        parent_id: 'parent-1',
+        sort_order: 2,
+        owner: 'Bob',
       });
       items.value = [parent, child1, child2];
       const newId = await copyItem('parent-1', 'Luke', 'token');
 
-      const copiedChildren = items.value.filter(i => i.parent_id === newId);
+      const copiedChildren = items.value.filter((i) => i.parent_id === newId);
       expect(copiedChildren).toHaveLength(2);
       expect(copiedChildren[0].title).toBe('Child 1');
       expect(copiedChildren[1].title).toBe('Child 2');
@@ -208,13 +214,15 @@ describe('copyItem', () => {
     it('gives subtasks new IDs and sets created_by to actor', async () => {
       const parent = makeItem({ id: 'parent-1', title: 'Parent' });
       const child = makeItem({
-        id: 'child-1', title: 'Child', parent_id: 'parent-1',
+        id: 'child-1',
+        title: 'Child',
+        parent_id: 'parent-1',
         created_by: 'OldUser',
       });
       items.value = [parent, child];
       const newId = await copyItem('parent-1', 'NewUser', 'token');
 
-      const copiedChildren = items.value.filter(i => i.parent_id === newId);
+      const copiedChildren = items.value.filter((i) => i.parent_id === newId);
       expect(copiedChildren).toHaveLength(1);
       expect(copiedChildren[0].id).not.toBe('child-1');
       expect(copiedChildren[0].created_by).toBe('NewUser');
@@ -223,13 +231,15 @@ describe('copyItem', () => {
     it('sets completed_at to empty on subtask copies', async () => {
       const parent = makeItem({ id: 'parent-1', title: 'Parent' });
       const child = makeItem({
-        id: 'child-1', title: 'Child', parent_id: 'parent-1',
+        id: 'child-1',
+        title: 'Child',
+        parent_id: 'parent-1',
         completed_at: '2025-06-01T00:00:00Z',
       });
       items.value = [parent, child];
       const newId = await copyItem('parent-1', 'Luke', 'token');
 
-      const copiedChildren = items.value.filter(i => i.parent_id === newId);
+      const copiedChildren = items.value.filter((i) => i.parent_id === newId);
       expect(copiedChildren[0].completed_at).toBe('');
     });
   });

@@ -16,9 +16,7 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-function renderCalendar(
-  props: Partial<React.ComponentProps<typeof DateRangeCalendar>> = {},
-) {
+function renderCalendar(props: Partial<React.ComponentProps<typeof DateRangeCalendar>> = {}) {
   const onCommit = vi.fn()
   const onCancel = vi.fn()
   const view = render(

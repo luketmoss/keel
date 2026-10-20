@@ -29,19 +29,21 @@ function row(overrides: Partial<CairnListRow> = {}): CairnListRow {
    the trip's, not the list's — both live in `TripDetail`. Kept as one
    spreadable default object rather than repeating eight props on every
    call site, and overridable per test. */
-function ownedProps(overrides: Partial<{
-  onRemove: ReturnType<typeof vi.fn>
-  confirmingId: string | null
-  onStartConfirm: ReturnType<typeof vi.fn>
-  onCancelConfirm: ReturnType<typeof vi.fn>
-  removingIds: Set<string>
-  removeErrors: Record<string, string>
-  disableRemove: boolean
-  facet: CairnFacet
-  onFacetChange: ReturnType<typeof vi.fn>
-  expandedCairnId: string | null
-  onOpenPreview: ReturnType<typeof vi.fn>
-}> = {}) {
+function ownedProps(
+  overrides: Partial<{
+    onRemove: ReturnType<typeof vi.fn>
+    confirmingId: string | null
+    onStartConfirm: ReturnType<typeof vi.fn>
+    onCancelConfirm: ReturnType<typeof vi.fn>
+    removingIds: Set<string>
+    removeErrors: Record<string, string>
+    disableRemove: boolean
+    facet: CairnFacet
+    onFacetChange: ReturnType<typeof vi.fn>
+    expandedCairnId: string | null
+    onOpenPreview: ReturnType<typeof vi.fn>
+  }> = {},
+) {
   return {
     onRemove: vi.fn(),
     confirmingId: null,
@@ -127,7 +129,10 @@ describe('CairnList', () => {
   })
 
   it('#198: renders a Not on a track divider for a cairn no track covers and never drops it', () => {
-    const rows = [row({ id: 'dated', name: 'z.jpg', date: '2023-06-01' }), row({ id: 'undated', name: 'a.jpg', date: null })]
+    const rows = [
+      row({ id: 'dated', name: 'z.jpg', date: '2023-06-01' }),
+      row({ id: 'undated', name: 'a.jpg', date: null }),
+    ]
     const items = orderCairnListItems(rows, new Set(['undated']))
 
     render(
@@ -376,10 +381,7 @@ describe('CairnList', () => {
 
       // #73's Disabled treatment on the menu item, not a hidden trigger.
       openRowMenu('a.jpg')
-      expect(screen.getByRole('menuitem', { name: 'Delete permanently…' })).toHaveProperty(
-        'disabled',
-        true,
-      )
+      expect(screen.getByRole('menuitem', { name: 'Delete permanently…' })).toHaveProperty('disabled', true)
     })
   })
 
@@ -467,14 +469,8 @@ describe('CairnList', () => {
 
       // Disabled items, not a hidden trigger — #73's Disabled treatment.
       openRowMenu('a.jpg')
-      expect(screen.getByRole('menuitem', { name: 'Remove from trip' })).toHaveProperty(
-        'disabled',
-        true,
-      )
-      expect(screen.getByRole('menuitem', { name: 'Delete permanently…' })).toHaveProperty(
-        'disabled',
-        true,
-      )
+      expect(screen.getByRole('menuitem', { name: 'Remove from trip' })).toHaveProperty('disabled', true)
+      expect(screen.getByRole('menuitem', { name: 'Delete permanently…' })).toHaveProperty('disabled', true)
     })
 
     it('hides both exits along with the row menu while a row is mid-removal', () => {
@@ -916,7 +912,9 @@ describe('CairnList', () => {
 
       // The record gains an image while the row stays expanded — the same
       // `expandedCairnId` prop, unchanged.
-      const withImage = [row({ id: 'a', name: 'a.jpg', thumbnailDriveFileId: 'thumb-1', originalDriveFileId: 'orig-1' })]
+      const withImage = [
+        row({ id: 'a', name: 'a.jpg', thumbnailDriveFileId: 'thumb-1', originalDriveFileId: 'orig-1' }),
+      ]
       rerender(
         <CairnList
           items={orderCairnListItems(withImage)}
@@ -935,7 +933,13 @@ describe('CairnList', () => {
 
     it('#294: shows No description yet. in place of an empty description', () => {
       const items = orderCairnListItems([
-        row({ id: 'a', name: 'a.jpg', thumbnailDriveFileId: null, originalDriveFileId: null, description: '' }),
+        row({
+          id: 'a',
+          name: 'a.jpg',
+          thumbnailDriveFileId: null,
+          originalDriveFileId: null,
+          description: '',
+        }),
       ])
 
       render(
@@ -1220,7 +1224,7 @@ describe('CairnList', () => {
       expect(onOpenPreview).toHaveBeenCalledWith('a')
     })
 
-    it('the photo item reaches the row\'s own file input, and the chosen file goes up with the cairn id', () => {
+    it("the photo item reaches the row's own file input, and the chosen file goes up with the cairn id", () => {
       const onAddPhoto = vi.fn()
       renderOne({ onAddPhoto })
       const element = fileInputIn('a.jpg')
@@ -1245,7 +1249,7 @@ describe('CairnList', () => {
       expect(onAddPhoto).not.toHaveBeenCalled()
     })
 
-    it('says uploading… in the ⋮\'s slot while its own attach is in flight, and offers no menu', () => {
+    it("says uploading… in the ⋮'s slot while its own attach is in flight, and offers no menu", () => {
       renderOne({ attachingCairnId: 'a' })
 
       expect(screen.getByText('uploading…')).toBeDefined()
@@ -1259,11 +1263,8 @@ describe('CairnList', () => {
       expect(li.className).not.toContain('cairn-row--removing')
     })
 
-    it('#157 — one at a time: another row\'s photo item is disabled while any attach runs', () => {
-      const items = orderCairnListItems([
-        row({ id: 'a', name: 'a.jpg' }),
-        row({ id: 'b', name: 'b.jpg' }),
-      ])
+    it("#157 — one at a time: another row's photo item is disabled while any attach runs", () => {
+      const items = orderCairnListItems([row({ id: 'a', name: 'a.jpg' }), row({ id: 'b', name: 'b.jpg' })])
       render(
         <CairnList
           items={items}
@@ -1296,7 +1297,9 @@ describe('CairnList', () => {
       expect(screen.getByRole('menuitem', { name: 'Edit' }).hasAttribute('disabled')).toBe(false)
       expect(screen.getByRole('menuitem', { name: 'Replace the photo' }).hasAttribute('disabled')).toBe(true)
       expect(screen.getByRole('menuitem', { name: 'Remove from trip' }).hasAttribute('disabled')).toBe(true)
-      expect(screen.getByRole('menuitem', { name: 'Delete permanently…' }).hasAttribute('disabled')).toBe(true)
+      expect(screen.getByRole('menuitem', { name: 'Delete permanently…' }).hasAttribute('disabled')).toBe(
+        true,
+      )
     })
 
     it('a confirming row still shows the confirm and no menu', () => {

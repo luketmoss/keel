@@ -20,8 +20,7 @@ vi.mock('@vis.gl/react-google-maps', () => ({
 }))
 
 let contextMenuHandler:
-  | ((event: { latLng: { lat: () => number; lng: () => number } | null; domEvent?: Event }) => void)
-  | undefined
+  ((event: { latLng: { lat: () => number; lng: () => number } | null; domEvent?: Event }) => void) | undefined
 const removeListener = vi.fn()
 
 ;(globalThis as unknown as { google: unknown }).google = {
@@ -44,8 +43,7 @@ const LAT_LNG = { latLng: { lat: () => 12.5, lng: () => -3.2 } }
 /** jsdom lays nothing out, so the map's box has to be stated for the
     long-press conversion to have anything to divide by. */
 function giveMapDivASize() {
-  mapDiv.getBoundingClientRect = () =>
-    ({ left: 0, top: 0, width: 400, height: 200 }) as DOMRect
+  mapDiv.getBoundingClientRect = () => ({ left: 0, top: 0, width: 400, height: 200 }) as DOMRect
 }
 
 /** jsdom implements no `PointerEvent`, so one is assembled from the
@@ -153,9 +151,7 @@ describe('CairnCreateGesture — long-press', () => {
     render(<CairnCreateGesture active={true} onPlace={onPlace} />)
 
     longPress(200, 100)
-    mapDiv.dispatchEvent(
-      pointerEvent('pointermove', { pointerType: 'touch', clientX: 260, clientY: 100 }),
-    )
+    mapDiv.dispatchEvent(pointerEvent('pointermove', { pointerType: 'touch', clientX: 260, clientY: 100 }))
     vi.advanceTimersByTime(480)
 
     expect(onPlace).not.toHaveBeenCalled()
@@ -166,9 +162,7 @@ describe('CairnCreateGesture — long-press', () => {
     render(<CairnCreateGesture active={true} onPlace={onPlace} />)
 
     longPress(200, 100)
-    mapDiv.dispatchEvent(
-      pointerEvent('pointermove', { pointerType: 'touch', clientX: 203, clientY: 102 }),
-    )
+    mapDiv.dispatchEvent(pointerEvent('pointermove', { pointerType: 'touch', clientX: 203, clientY: 102 }))
     vi.advanceTimersByTime(480)
 
     expect(onPlace).toHaveBeenCalled()
@@ -189,9 +183,7 @@ describe('CairnCreateGesture — long-press', () => {
     const onPlace = vi.fn()
     render(<CairnCreateGesture active={true} onPlace={onPlace} />)
 
-    mapDiv.dispatchEvent(
-      pointerEvent('pointerdown', { pointerType: 'mouse', clientX: 200, clientY: 100 }),
-    )
+    mapDiv.dispatchEvent(pointerEvent('pointerdown', { pointerType: 'mouse', clientX: 200, clientY: 100 }))
     vi.advanceTimersByTime(480)
 
     expect(onPlace).not.toHaveBeenCalled()

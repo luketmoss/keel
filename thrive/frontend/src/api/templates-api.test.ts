@@ -24,9 +24,30 @@ describe('groupTemplateRows', () => {
 
   it('groups rows by template_id into Template objects', () => {
     const rows: TemplateRowWithRow[] = [
-      makeRow({ template_id: 'tpl_001', template_name: 'Push A', order: 1, exercise_id: 'ex1', exercise_name: 'Bench', sheetRow: 2 }),
-      makeRow({ template_id: 'tpl_001', template_name: 'Push A', order: 2, exercise_id: 'ex2', exercise_name: 'Fly', sheetRow: 3 }),
-      makeRow({ template_id: 'tpl_002', template_name: 'Pull A', order: 1, exercise_id: 'ex3', exercise_name: 'Row', sheetRow: 4 }),
+      makeRow({
+        template_id: 'tpl_001',
+        template_name: 'Push A',
+        order: 1,
+        exercise_id: 'ex1',
+        exercise_name: 'Bench',
+        sheetRow: 2,
+      }),
+      makeRow({
+        template_id: 'tpl_001',
+        template_name: 'Push A',
+        order: 2,
+        exercise_id: 'ex2',
+        exercise_name: 'Fly',
+        sheetRow: 3,
+      }),
+      makeRow({
+        template_id: 'tpl_002',
+        template_name: 'Pull A',
+        order: 1,
+        exercise_id: 'ex3',
+        exercise_name: 'Row',
+        sheetRow: 4,
+      }),
     ];
 
     const templates = groupTemplateRows(rows);
@@ -66,9 +87,7 @@ describe('groupTemplateRows', () => {
   });
 
   it('handles a single template with one exercise', () => {
-    const rows: TemplateRowWithRow[] = [
-      makeRow(),
-    ];
+    const rows: TemplateRowWithRow[] = [makeRow()];
 
     const templates = groupTemplateRows(rows);
     expect(templates).toHaveLength(1);
@@ -94,11 +113,51 @@ describe('groupTemplateRows', () => {
   it('groups demo template rows correctly', () => {
     // Simulate a realistic multi-exercise template
     const rows: TemplateRowWithRow[] = [
-      makeRow({ template_id: 'tpl_001', template_name: 'Upper Push', order: 1, exercise_name: 'Push Ups', section: 'warmup', sets: '', sheetRow: 2 }),
-      makeRow({ template_id: 'tpl_001', template_name: 'Upper Push', order: 2, exercise_name: 'Bench Warmup', section: 'warmup', sets: '', sheetRow: 3 }),
-      makeRow({ template_id: 'tpl_001', template_name: 'Upper Push', order: 3, exercise_name: 'Bench Press', section: 'primary', sets: '4-5', sheetRow: 4 }),
-      makeRow({ template_id: 'tpl_001', template_name: 'Upper Push', order: 4, exercise_name: 'Incline DB', section: 'SS1', sets: '3', sheetRow: 5 }),
-      makeRow({ template_id: 'tpl_001', template_name: 'Upper Push', order: 5, exercise_name: 'Cable Fly', section: 'SS1', sets: '3', sheetRow: 6 }),
+      makeRow({
+        template_id: 'tpl_001',
+        template_name: 'Upper Push',
+        order: 1,
+        exercise_name: 'Push Ups',
+        section: 'warmup',
+        sets: '',
+        sheetRow: 2,
+      }),
+      makeRow({
+        template_id: 'tpl_001',
+        template_name: 'Upper Push',
+        order: 2,
+        exercise_name: 'Bench Warmup',
+        section: 'warmup',
+        sets: '',
+        sheetRow: 3,
+      }),
+      makeRow({
+        template_id: 'tpl_001',
+        template_name: 'Upper Push',
+        order: 3,
+        exercise_name: 'Bench Press',
+        section: 'primary',
+        sets: '4-5',
+        sheetRow: 4,
+      }),
+      makeRow({
+        template_id: 'tpl_001',
+        template_name: 'Upper Push',
+        order: 4,
+        exercise_name: 'Incline DB',
+        section: 'SS1',
+        sets: '3',
+        sheetRow: 5,
+      }),
+      makeRow({
+        template_id: 'tpl_001',
+        template_name: 'Upper Push',
+        order: 5,
+        exercise_name: 'Cable Fly',
+        section: 'SS1',
+        sets: '3',
+        sheetRow: 6,
+      }),
     ];
 
     const templates = groupTemplateRows(rows);

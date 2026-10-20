@@ -22,6 +22,7 @@ jobs:
           cache: npm
           cache-dependency-path: hive/frontend/package-lock.json
       - run: npm ci
+      - run: npm run format:check || { echo "::error::Unformatted files. Run 'npm run format' and commit the result."; exit 1; }
       - run: npm run typecheck
       - run: npm test
       - run: npm run build

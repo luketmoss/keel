@@ -98,12 +98,9 @@ describe('DriveTrackOverridesStore', () => {
     // store sharing the same backing storage — not through this session's
     // still-disconnected `DriveTrackOverridesStore`.
     const storage = fakeStorage()
-    await new LocalTrackOverridesStore(storage).setOverride(
-      'trip-1',
+    await new LocalTrackOverridesStore(storage).setOverride('trip-1', 'drive-1', { displayName: 'Day 3' }, [
       'drive-1',
-      { displayName: 'Day 3' },
-      ['drive-1'],
-    )
+    ])
 
     const store = new DriveTrackOverridesStore(storage)
     await store.connect('trip-1', 'token', 'cairn-folder-id')
@@ -170,12 +167,9 @@ describe('DriveTrackOverridesStore', () => {
     // the plain local store sharing the same storage, since `setOverride`
     // on a disconnected `DriveTrackOverridesStore` now refuses to write.
     const storage = fakeStorage()
-    await new LocalTrackOverridesStore(storage).setOverride(
-      'trip-1',
+    await new LocalTrackOverridesStore(storage).setOverride('trip-1', 'drive-1', { displayName: 'Day 3' }, [
       'drive-1',
-      { displayName: 'Day 3' },
-      ['drive-1'],
-    )
+    ])
     const store = new DriveTrackOverridesStore(storage)
 
     const connectPromise = store.connect('trip-1', 'token', 'cairn-folder-id') // queues the migration write
@@ -205,9 +199,7 @@ describe('DriveTrackOverridesStore', () => {
       headRevisionId: 'rev-2',
     })
 
-    const ok = await store.setOverride('trip-1', 'drive-1', { displayName: 'Second edit' }, [
-      'drive-1',
-    ])
+    const ok = await store.setOverride('trip-1', 'drive-1', { displayName: 'Second edit' }, ['drive-1'])
 
     expect(ok).toBe(false)
     expect(store.getOverrides('trip-1')).toEqual({
@@ -269,10 +261,7 @@ describe('DriveTrackOverridesStore', () => {
     readJsonFile.mockResolvedValueOnce({ data: {}, headRevisionId: 'rev-2' })
     await store.setOverride('trip-1', 'drive-1', { displayName: 'Second edit' }, ['drive-1'])
 
-    expect(errors).toHaveBeenCalledWith(
-      expect.stringContaining('trip-1'),
-      expect.any(DriveConflictError),
-    )
+    expect(errors).toHaveBeenCalledWith(expect.stringContaining('trip-1'), expect.any(DriveConflictError))
     expect(errors.mock.calls[0][0]).toContain('conflict')
     errors.mockRestore()
   })

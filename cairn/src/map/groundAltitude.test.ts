@@ -96,7 +96,10 @@ describe('sampleGroundAltitude (#282)', () => {
   })
 
   it('reduces a long path to MAX_SAMPLES points before asking, keeping both ends (#306)', async () => {
-    const longPath = Array.from({ length: 4233 }, (_, i) => ({ lat: 40 + i * 0.00001, lng: -107 + i * 0.00001 }))
+    const longPath = Array.from({ length: 4233 }, (_, i) => ({
+      lat: 40 + i * 0.00001,
+      lng: -107 + i * 0.00001,
+    }))
     let seen: { lat: number; lng: number }[] = []
     const spy: ElevationSampler = {
       sampleAlongPath: async (path) => {
@@ -112,7 +115,10 @@ describe('sampleGroundAltitude (#282)', () => {
   })
 
   it('costs one call for a long track and a short overview alike, when their endpoints agree (#306)', async () => {
-    const longPath = Array.from({ length: 4233 }, (_, i) => ({ lat: 40 + i * 0.00001, lng: -107 + i * 0.00001 }))
+    const longPath = Array.from({ length: 4233 }, (_, i) => ({
+      lat: 40 + i * 0.00001,
+      lng: -107 + i * 0.00001,
+    }))
     const stub = sampler([3200])
 
     await sampleGroundAltitude(longPath, stub)

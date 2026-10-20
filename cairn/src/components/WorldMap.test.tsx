@@ -32,12 +32,7 @@ vi.mock('@vis.gl/react-google-maps', () => ({
     onClick?: () => void
     children?: React.ReactNode
   }) => (
-    <div
-      data-testid="advanced-marker"
-      data-lat={position.lat}
-      data-lng={position.lng}
-      onClick={onClick}
-    >
+    <div data-testid="advanced-marker" data-lat={position.lat} data-lng={position.lng} onClick={onClick}>
       {children}
     </div>
   ),

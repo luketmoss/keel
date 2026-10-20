@@ -1,6 +1,12 @@
 import { useState, useCallback } from 'preact/hooks';
 import { useAuth } from '../../auth/auth-context';
-import { showMoveToBoardModal, selectedItem, childrenOfSelected, accessibleBoards, activeBoardId } from '../../state/board-store';
+import {
+  showMoveToBoardModal,
+  selectedItem,
+  childrenOfSelected,
+  accessibleBoards,
+  activeBoardId,
+} from '../../state/board-store';
 import { moveItemToBoard } from '../../state/actions';
 import { useFocusTrap } from '../../hooks/use-focus-trap';
 
@@ -11,7 +17,7 @@ export function MoveToBoardModal() {
 
   const actor = user?.name || 'web';
   const subtaskCount = childrenOfSelected.value.length;
-  const otherBoards = accessibleBoards.value.filter(b => b.id !== activeBoardId.value);
+  const otherBoards = accessibleBoards.value.filter((b) => b.id !== activeBoardId.value);
 
   const [targetBoardId, setTargetBoardId] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -41,14 +47,16 @@ export function MoveToBoardModal() {
       <div class="modal move-to-board-modal" role="dialog" aria-label="Move to board" aria-modal="true">
         <div class="modal-header">
           <h2>Move to Board</h2>
-          <button class="btn btn-ghost" onClick={close} aria-label="Close">&#10005;</button>
+          <button class="btn btn-ghost" onClick={close} aria-label="Close">
+            &#10005;
+          </button>
         </div>
 
         <div class="modal-body">
           <p>Select a board to move "{item.title}" to:</p>
 
           <div class="move-board-options" role="radiogroup" aria-label="Target board">
-            {otherBoards.map(b => (
+            {otherBoards.map((b) => (
               <label key={b.id} class="move-board-option">
                 <input
                   type="radio"
@@ -57,7 +65,10 @@ export function MoveToBoardModal() {
                   checked={targetBoardId === b.id}
                   onChange={() => setTargetBoardId(b.id)}
                 />
-                <span>{b.icon ? `${b.icon} ` : ''}{b.name}</span>
+                <span>
+                  {b.icon ? `${b.icon} ` : ''}
+                  {b.name}
+                </span>
               </label>
             ))}
           </div>
@@ -70,7 +81,9 @@ export function MoveToBoardModal() {
         </div>
 
         <div class="modal-footer">
-          <button type="button" class="btn btn-ghost" onClick={close}>Cancel</button>
+          <button type="button" class="btn btn-ghost" onClick={close}>
+            Cancel
+          </button>
           <button
             type="button"
             class="btn btn-primary"

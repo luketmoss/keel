@@ -43,7 +43,10 @@ export interface FramedCamera {
     as the target, and a range from the larger of its two spans with the
     given margin. `null` for no points at all, which is what makes "a subject
     with no usable geometry" a case the caller can render nothing for. */
-export function frameGeometry(points: LatLng[], marginPct: number = FLYOVER_MARGIN_PERCENT): FramedCamera | null {
+export function frameGeometry(
+  points: LatLng[],
+  marginPct: number = FLYOVER_MARGIN_PERCENT,
+): FramedCamera | null {
   if (points.length === 0) return null
 
   let north = -90

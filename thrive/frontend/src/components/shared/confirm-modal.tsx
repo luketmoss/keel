@@ -42,13 +42,14 @@ export function ConfirmModal({
         aria-labelledby={titleId}
         ref={dialog}
       >
-        <h2 id={titleId} style="font-size: var(--text-lg); font-weight: 700; margin-bottom: var(--space-sm); overflow-wrap: anywhere;">
+        <h2
+          id={titleId}
+          style="font-size: var(--text-lg); font-weight: 700; margin-bottom: var(--space-sm); overflow-wrap: anywhere;"
+        >
           {title}
         </h2>
         {message ? (
-          <p style="color: var(--color-text-secondary); margin-bottom: var(--space-lg);">
-            {message}
-          </p>
+          <p style="color: var(--color-text-secondary); margin-bottom: var(--space-lg);">{message}</p>
         ) : (
           <div style="margin-bottom: var(--space-lg);" />
         )}
@@ -56,11 +57,7 @@ export function ConfirmModal({
           <button type="button" class="btn btn-secondary" data-modal-initial onClick={onCancel}>
             {cancelLabel}
           </button>
-          <button
-            type="button"
-            class={`btn ${danger ? 'btn-danger' : 'btn-primary'}`}
-            onClick={onConfirm}
-          >
+          <button type="button" class={`btn ${danger ? 'btn-danger' : 'btn-primary'}`} onClick={onConfirm}>
             {confirmLabel}
           </button>
         </div>

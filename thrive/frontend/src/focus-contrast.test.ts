@@ -48,8 +48,7 @@ const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => ({
   body: m[2],
 }));
 
-const decl = (body: string, prop: string) =>
-  body.match(new RegExp(`(?:^|;|\\s)${prop}\\s*:\\s*([^;]+);`))?.[1].trim();
+const decl = (body: string, prop: string) => body.match(new RegExp(`(?:^|;|\\s)${prop}\\s*:\\s*([^;]+);`))?.[1].trim();
 
 // One entry per selector in a list, so `.a:focus-visible, .b:focus-visible` is two rings.
 // A :focus-visible inside :not(...) suppresses a ring, it does not draw one.
@@ -129,21 +128,18 @@ describe('AC4: the audited focus rings are all found', () => {
 });
 
 describe.each(THEMES)('AC4: every focus ring is 2px and 3:1 on every surface (%s)', (theme) => {
-  it.each(rings.filter((r) => !(r.selector in EXEMPT)).map((r) => [r.selector, r.body]))(
-    '%s',
-    (selector, body) => {
-      const outline = decl(body, 'outline')!;
-      const m = outline.match(/^(\d+(?:\.\d+)?px|var\(--[\w-]+\)) solid var\((--[\w-]+)\)$/);
-      expect(m, `${selector}: outline "${outline}" must be Npx (or a px token) solid var(--token)`).not.toBeNull();
-      const width = m![1].startsWith('var(') ? rootLength(m![1].slice(4, -1)) : m![1];
-      expect(parseFloat(width), `${selector} width`).toBeGreaterThanOrEqual(2);
-      const colour = token(theme, m![2]);
-      for (const surface of SURFACES) {
-        const ratio = contrast(colour, token(theme, surface));
-        expect(ratio, `${selector}: ${m![2]} on ${surface} is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(3);
-      }
-    },
-  );
+  it.each(rings.filter((r) => !(r.selector in EXEMPT)).map((r) => [r.selector, r.body]))('%s', (selector, body) => {
+    const outline = decl(body, 'outline')!;
+    const m = outline.match(/^(\d+(?:\.\d+)?px|var\(--[\w-]+\)) solid var\((--[\w-]+)\)$/);
+    expect(m, `${selector}: outline "${outline}" must be Npx (or a px token) solid var(--token)`).not.toBeNull();
+    const width = m![1].startsWith('var(') ? rootLength(m![1].slice(4, -1)) : m![1];
+    expect(parseFloat(width), `${selector} width`).toBeGreaterThanOrEqual(2);
+    const colour = token(theme, m![2]);
+    for (const surface of SURFACES) {
+      const ratio = contrast(colour, token(theme, surface));
+      expect(ratio, `${selector}: ${m![2]} on ${surface} is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(3);
+    }
+  });
 });
 
 describe('AC4: every outline suppression is named', () => {

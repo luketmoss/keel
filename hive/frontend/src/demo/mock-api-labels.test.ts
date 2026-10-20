@@ -26,7 +26,7 @@ describe('Mock API label CRUD', () => {
     await createLabelRow('New Label', '#FF0000', 'board-family', 'demo-token');
     const after = await fetchLabels('demo-token');
     expect(after.length).toBe(before.length + 1);
-    expect(after.find(l => l.label === 'New Label')).toBeTruthy();
+    expect(after.find((l) => l.label === 'New Label')).toBeTruthy();
   });
 
   // AC3: updateLabelRow modifies an existing label
@@ -35,10 +35,10 @@ describe('Mock API label CRUD', () => {
     const first = labelsWithRows[0];
     await updateLabelRow(first.sheetRow, 'Renamed', '#00FF00', first.board_id, 'demo-token');
     const after = await fetchLabels('demo-token');
-    const renamed = after.find(l => l.label === 'Renamed');
+    const renamed = after.find((l) => l.label === 'Renamed');
     expect(renamed).toBeTruthy();
     expect(renamed!.color).toBe('#00FF00');
-    expect(after.find(l => l.label === first.label)).toBeFalsy();
+    expect(after.find((l) => l.label === first.label)).toBeFalsy();
   });
 
   // AC4: deleteLabelRow removes a label
@@ -47,7 +47,7 @@ describe('Mock API label CRUD', () => {
     const first = labelsWithRows[0];
     await deleteLabelRow(first.sheetRow, 'demo-token');
     const after = await fetchLabels('demo-token');
-    expect(after.find(l => l.label === first.label)).toBeUndefined();
+    expect(after.find((l) => l.label === first.label)).toBeUndefined();
     expect(after.length).toBe(labelsWithRows.length - 1);
   });
 
@@ -55,7 +55,7 @@ describe('Mock API label CRUD', () => {
   it('fetchLabelsWithRows returns labels with sheetRow numbers', async () => {
     const labelsWithRows = await fetchLabelsWithRows('demo-token');
     expect(labelsWithRows.length).toBe(MOCK_LABELS.length);
-    labelsWithRows.forEach(l => {
+    labelsWithRows.forEach((l) => {
       expect(l.sheetRow).toBeGreaterThanOrEqual(2);
       expect(l.label).toBeTruthy();
       expect(l.color).toBeTruthy();
@@ -66,12 +66,12 @@ describe('Mock API label CRUD', () => {
   it('cascadeLabelUpdate renames a label in all items that reference it', async () => {
     // Find an item with labels
     const items = await fetchAllItems('demo-token');
-    const itemWithLabel = items.find(i => i.labels.includes('Errands'));
+    const itemWithLabel = items.find((i) => i.labels.includes('Errands'));
     expect(itemWithLabel).toBeTruthy();
 
     await cascadeLabelUpdate('Errands', 'Shopping', 'demo-token');
     const after = await fetchAllItems('demo-token');
-    const updatedItem = after.find(i => i.id === itemWithLabel!.id);
+    const updatedItem = after.find((i) => i.id === itemWithLabel!.id);
     expect(updatedItem!.labels).not.toContain('Errands');
     expect(updatedItem!.labels).toContain('Shopping');
   });
@@ -79,12 +79,12 @@ describe('Mock API label CRUD', () => {
   // AC4: cascadeLabelUpdate removes a label from items when newName is empty
   it('cascadeLabelUpdate removes a label from all items when newName is empty', async () => {
     const items = await fetchAllItems('demo-token');
-    const itemWithLabel = items.find(i => i.labels.includes('Errands'));
+    const itemWithLabel = items.find((i) => i.labels.includes('Errands'));
     expect(itemWithLabel).toBeTruthy();
 
     await cascadeLabelUpdate('Errands', '', 'demo-token');
     const after = await fetchAllItems('demo-token');
-    const updatedItem = after.find(i => i.id === itemWithLabel!.id);
+    const updatedItem = after.find((i) => i.id === itemWithLabel!.id);
     expect(updatedItem!.labels).not.toContain('Errands');
   });
 

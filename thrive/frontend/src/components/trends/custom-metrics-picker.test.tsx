@@ -21,8 +21,14 @@ describe('CustomMetricsPicker', () => {
     expect(dlg.getAttribute('aria-modal')).toBe('true');
     expect(document.getElementById(dlg.getAttribute('aria-labelledby')!)!.textContent).toBe('Choose metrics');
     expect(boxes(container)).toHaveLength(21);
-    expect([...container.querySelectorAll('h3')].map((x) => x.textContent))
-      .toEqual(['Recovery', 'Sleep', 'Fitness', 'Body', 'Blood Pressure', 'Activity']);
+    expect([...container.querySelectorAll('h3')].map((x) => x.textContent)).toEqual([
+      'Recovery',
+      'Sleep',
+      'Fitness',
+      'Body',
+      'Blood Pressure',
+      'Activity',
+    ]);
     expect(container.querySelector('label')!.textContent).toBe('Resting HR');
   });
 

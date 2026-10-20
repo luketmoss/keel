@@ -33,7 +33,9 @@ export function Panel({ title, sub, action, children }: PanelProps) {
     <section class="day-panel" aria-labelledby={id}>
       <div class="day-panel-head">
         <div class="day-panel-heading">
-          <h2 class="day-panel-title" id={id} tabIndex={-1}>{title}</h2>
+          <h2 class="day-panel-title" id={id} tabIndex={-1}>
+            {title}
+          </h2>
           {sub != null && <p class="day-panel-sub">{sub}</p>}
         </div>
         {action != null && <div class="day-panel-action">{action}</div>}
@@ -77,17 +79,20 @@ export function PanelStatus({ status, what, onRetry, returnFocusTo }: PanelStatu
   const ref = useRef<HTMLDivElement>(null);
   const returnRef = useRef(returnFocusTo);
   returnRef.current = returnFocusTo;
-  useLayoutEffect(() => () => {
-    const node = ref.current;
-    if (!node || document.activeElement !== node) return;
-    const heading = node.closest('.day-panel')?.querySelector<HTMLElement>('.day-panel-title');
-    // After Preact's commit, so a date change has already removed the panel.
-    queueMicrotask(() => {
-      const target = returnRef.current ? returnRef.current() : heading;
-      const active = document.activeElement;
-      if (target && target.isConnected && (active === document.body || active == null)) target.focus();
-    });
-  }, []);
+  useLayoutEffect(
+    () => () => {
+      const node = ref.current;
+      if (!node || document.activeElement !== node) return;
+      const heading = node.closest('.day-panel')?.querySelector<HTMLElement>('.day-panel-title');
+      // After Preact's commit, so a date change has already removed the panel.
+      queueMicrotask(() => {
+        const target = returnRef.current ? returnRef.current() : heading;
+        const active = document.activeElement;
+        if (target && target.isConnected && (active === document.body || active == null)) target.focus();
+      });
+    },
+    [],
+  );
   return (
     <div class="panel-status" role="status" tabIndex={-1} ref={ref}>
       {status === 'error' ? (

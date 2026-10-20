@@ -114,12 +114,37 @@ function loweredAfter(cls: string, prop: 'height' | 'width', from: number): stri
 
 /** Boxes with a glyph or a drawn shape inside: 44 wide and 44 tall. */
 const BOX = [
-  'btn-sm', 'btn-icon', 'btn-icon-danger', 'kebab-trigger', 'subtask-action-btn', 'subtask-add-circle',
-  'date-clear-btn', 'staged-subtask-remove', 'subtask-kebab-btn', 'due-clear-btn', 'label-gear-btn',
-  'archive-search-clear', 'filter-search-clear', 'column-add-btn', 'share-remove-btn', 'column-settings-delete-btn',
-  'user-dropdown-trigger', 'theme-toggle-btn', 'filter-popup-close', 'share-btn', 'owner-circle', 'check-icon',
-  'color-swatch', 'icon-swatch', 'column-settings-swatch', 'column-color-swatch', 'fab', 'overflow-menu-btn',
-  'label-new-pill', 'column-settings-name', 'column-settings-terminal-toggle',
+  'btn-sm',
+  'btn-icon',
+  'btn-icon-danger',
+  'kebab-trigger',
+  'subtask-action-btn',
+  'subtask-add-circle',
+  'date-clear-btn',
+  'staged-subtask-remove',
+  'subtask-kebab-btn',
+  'due-clear-btn',
+  'label-gear-btn',
+  'archive-search-clear',
+  'filter-search-clear',
+  'column-add-btn',
+  'share-remove-btn',
+  'column-settings-delete-btn',
+  'user-dropdown-trigger',
+  'theme-toggle-btn',
+  'filter-popup-close',
+  'share-btn',
+  'owner-circle',
+  'check-icon',
+  'color-swatch',
+  'icon-swatch',
+  'column-settings-swatch',
+  'column-color-swatch',
+  'fab',
+  'overflow-menu-btn',
+  'label-new-pill',
+  'column-settings-name',
+  'column-settings-terminal-toggle',
 ];
 /** The one control allowed under 44, and only in width. */
 const PAGER_DOT = 'column-indicator-dot';
@@ -127,25 +152,63 @@ const PAGER_DOT_MIN_WIDTH = 24;
 
 /** Rows and text controls: 44 tall, as wide as their content. */
 const TALL = [
-  'btn', 'btn-ghost', 'share-archive-board-btn', 'filter-popup-reset', 'filter-popup-apply',
-  'column-archive-link', 'toast-action', 'column-settings-add-btn', 'subtask-date-add-inline', 'subtask-date-inline',
-  'filter-chip', 'filter-toggle', 'label-toggle', 'quick-date-chip', 'status-chevron', 'card-title', 'archive-item',
-  'kebab-item', 'overflow-menu-item', 'user-dropdown-edit-profile', 'user-dropdown-signout', 'subtask-menu-item',
-  'subtask-title', 'editable-value', 'due-date-btn', 'completed-date-btn', 'column-add-row', 'view-tab', 'settings-tab',
+  'btn',
+  'btn-ghost',
+  'share-archive-board-btn',
+  'filter-popup-reset',
+  'filter-popup-apply',
+  'column-archive-link',
+  'toast-action',
+  'column-settings-add-btn',
+  'subtask-date-add-inline',
+  'subtask-date-inline',
+  'filter-chip',
+  'filter-toggle',
+  'label-toggle',
+  'quick-date-chip',
+  'status-chevron',
+  'card-title',
+  'archive-item',
+  'kebab-item',
+  'overflow-menu-item',
+  'user-dropdown-edit-profile',
+  'user-dropdown-signout',
+  'subtask-menu-item',
+  'subtask-title',
+  'editable-value',
+  'due-date-btn',
+  'completed-date-btn',
+  'column-add-row',
+  'view-tab',
+  'settings-tab',
   'login-btn',
 ];
 
 /** Text inputs, selects and date inputs. */
 const FIELDS = [
-  'filter-search-input', 'subtask-add-input', 'subtask-add-date', 'subtask-title-input', 'label-form-input',
-  'board-switcher-select', 'column-sort-select', 'archive-search-input', 'profile-email-input',
-  'column-settings-name-inline', 'column-settings-name-input', 'column-settings-delete-select',
+  'filter-search-input',
+  'subtask-add-input',
+  'subtask-add-date',
+  'subtask-title-input',
+  'label-form-input',
+  'board-switcher-select',
+  'column-sort-select',
+  'archive-search-input',
+  'profile-email-input',
+  'column-settings-name-inline',
+  'column-settings-name-input',
+  'column-settings-delete-select',
 ];
 
 /** Fields with no class of their own, styled by the wrapper they sit in. */
 const FIELD_RULES = [
-  '.form-field input', '.form-field select', '.form-field textarea', '.detail-field input',
-  '.detail-field textarea', '.delete-board-target select', '.subtask-date-popover input[type="date"]',
+  '.form-field input',
+  '.form-field select',
+  '.form-field textarea',
+  '.detail-field input',
+  '.detail-field textarea',
+  '.delete-board-target select',
+  '.subtask-date-popover input[type="date"]',
 ];
 
 /** Not a target: out of the tab order and hidden from assistive tech (#281), opened by its button. */
@@ -199,8 +262,12 @@ describe('AC1: every control class is held to the floor, and no control is in no
 });
 
 describe('The one exception: the pager dots', () => {
-  const dotRules = rulesFor(PAGER_DOT).filter((r) => r.order > rules.findIndex((x) => x.selector === '.btn-sm' && px(decl(x.body, 'min-height')) === FLOOR));
-  const own = dotRules.find((r) => decl(r.body, 'height') !== undefined && decl(r.body, 'min-width') === `${PAGER_DOT_MIN_WIDTH}px`);
+  const dotRules = rulesFor(PAGER_DOT).filter(
+    (r) => r.order > rules.findIndex((x) => x.selector === '.btn-sm' && px(decl(x.body, 'min-height')) === FLOOR),
+  );
+  const own = dotRules.find(
+    (r) => decl(r.body, 'height') !== undefined && decl(r.body, 'min-width') === `${PAGER_DOT_MIN_WIDTH}px`,
+  );
 
   it('is 44 tall always, no narrower than 24 wide, and shares the row evenly', () => {
     expect(own, 'the dot rule').toBeDefined();

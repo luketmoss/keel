@@ -38,7 +38,9 @@ function renderAt(hash: string) {
     replaceRoute(hash);
   });
   return render(
-    <AuthContext.Provider value={{ token: 'tok', user: null, isAuthenticated: true, login: () => {}, logout: () => {} }}>
+    <AuthContext.Provider
+      value={{ token: 'tok', user: null, isAuthenticated: true, login: () => {}, logout: () => {} }}
+    >
       <DayScreen />
     </AuthContext.Provider>,
   );
@@ -149,13 +151,17 @@ describe('AC2 — header', () => {
     expect(on.queryByText('Today', { selector: 'button' })).toBeNull();
     cleanup();
     const off = renderAt('#/day/2026-09-12');
-    const buttons = [...off.container.querySelectorAll('.day-nav button')].map((b) => b.getAttribute('aria-label') ?? b.textContent);
+    const buttons = [...off.container.querySelectorAll('.day-nav button')].map(
+      (b) => b.getAttribute('aria-label') ?? b.textContent,
+    );
     expect(buttons).toEqual(['Today', 'Previous day', 'Next day', 'Calendar']);
   });
 
   it('ends the controls with a 44 px Calendar button that pushes to the viewed month (#241 AC1)', () => {
     const on = renderAt('#/');
-    const onLabels = [...on.container.querySelectorAll('.day-nav button')].map((b) => b.getAttribute('aria-label') ?? b.textContent);
+    const onLabels = [...on.container.querySelectorAll('.day-nav button')].map(
+      (b) => b.getAttribute('aria-label') ?? b.textContent,
+    );
     expect(onLabels).toEqual(['Previous day', 'Next day', 'Calendar']);
     const cal = on.getByRole('button', { name: 'Calendar' });
     expect(cal.classList.contains('day-arrow')).toBe(true);
@@ -191,8 +197,24 @@ describe('AC3 — week strip', () => {
     expect(group.getAttribute('role')).toBe('group');
     expect(group.getAttribute('aria-label')).toBe('Week of September 28, 2026');
     const days = strip(container);
-    expect(days.map((b) => b.querySelector('.week-day-letter')!.textContent)).toEqual(['M', 'T', 'W', 'T', 'F', 'S', 'S']);
-    expect(days.map((b) => b.getAttribute('aria-pressed'))).toEqual(['false', 'false', 'false', 'false', 'true', 'false', 'false']);
+    expect(days.map((b) => b.querySelector('.week-day-letter')!.textContent)).toEqual([
+      'M',
+      'T',
+      'W',
+      'T',
+      'F',
+      'S',
+      'S',
+    ]);
+    expect(days.map((b) => b.getAttribute('aria-pressed'))).toEqual([
+      'false',
+      'false',
+      'false',
+      'false',
+      'true',
+      'false',
+      'false',
+    ]);
     expect(days.map((b) => b.getAttribute('aria-current'))).toEqual([null, null, 'date', null, null, null, null]);
     expect(days[2].classList.contains('week-day-today')).toBe(true);
     expect(days[4].classList.contains('week-day-viewed')).toBe(true);
@@ -218,7 +240,9 @@ describe('AC3 — week strip', () => {
     const { container } = renderAt('#/');
     const [mon, tue, wed] = strip(container);
     expect([...tue.querySelectorAll('.week-mark')].map((m) => m.className)).toEqual([
-      'week-mark week-mark-dot', 'week-mark week-mark-dot', 'week-mark week-mark-ring',
+      'week-mark week-mark-dot',
+      'week-mark week-mark-dot',
+      'week-mark week-mark-ring',
     ]);
     expect(tue.getAttribute('aria-label')).toBe('Tuesday, September 29 — 2 workouts done, 2 planned');
     expect(mon.querySelectorAll('.week-mark-ring')).toHaveLength(1);
@@ -230,7 +254,15 @@ describe('AC3 — week strip', () => {
   it('shows a week crossing a year end', () => {
     const { container } = renderAt('#/day/2027-01-01');
     expect(container.querySelector('.week-strip')!.getAttribute('aria-label')).toBe('Week of December 28, 2026');
-    expect(strip(container).map((b) => b.querySelector('.week-day-num')!.textContent)).toEqual(['28', '29', '30', '31', '1', '2', '3']);
+    expect(strip(container).map((b) => b.querySelector('.week-day-num')!.textContent)).toEqual([
+      '28',
+      '29',
+      '30',
+      '31',
+      '1',
+      '2',
+      '3',
+    ]);
     expect(strip(container)[6].getAttribute('aria-label')).toBe('Sunday, January 3');
   });
 });

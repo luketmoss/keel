@@ -1,5 +1,12 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
-import { workouts, activeWorkoutId, activeWorkoutSets, activeWarmupExercises, sets, templates } from '../../state/store';
+import {
+  workouts,
+  activeWorkoutId,
+  activeWorkoutSets,
+  activeWarmupExercises,
+  sets,
+  templates,
+} from '../../state/store';
 import { templateWarmupsToRestore } from './template-warmups';
 import { startWorkout, saveWorkoutForLater } from '../../state/actions';
 import { useAuth } from '../../auth/auth-context';
@@ -81,7 +88,9 @@ export function WorkoutFlow({ workoutId, planDate }: Props) {
     // rule startPlannedWorkout uses: nothing left by another workout or a
     // plan survives into this one (#351 AC3/AC4).
     activeWarmupExercises.value = templateWarmupsToRestore(
-      workout.template_id, activeWorkoutSets.value, templates.value,
+      workout.template_id,
+      activeWorkoutSets.value,
+      templates.value,
     );
 
     if (workout.type === 'weight') {
@@ -134,7 +143,7 @@ export function WorkoutFlow({ workoutId, planDate }: Props) {
           exercise_id: ex.exercise_id,
           exercise_name: ex.exercise_name,
           section: ex.section as string,
-          sets: ex.section === 'warmup' ? '' : (ex.sets || '1'),
+          sets: ex.section === 'warmup' ? '' : ex.sets || '1',
           // Every set starts at the template's one Reps value (#375).
           reps_by_set: ex.section === 'warmup' ? [] : Array(plannedSetCount(ex.sets || '1')).fill(ex.reps),
         })),
@@ -170,13 +179,21 @@ export function WorkoutFlow({ workoutId, planDate }: Props) {
   };
 
   // Planner: "Save Workout" handler
-  const handlePlannerSave = async (name: string, exercises: PlannerExercise[], date: string, estimatedSeconds: string) => {
+  const handlePlannerSave = async (
+    name: string,
+    exercises: PlannerExercise[],
+    date: string,
+    estimatedSeconds: string,
+  ) => {
     if (!token) return;
     setSaving(true);
     try {
       // Each set as its row holds it (#375), as the planned-workout editor saves.
       const builderExercises = plannerToBuilderExercises(exercises);
-      await saveWorkoutForLater({ type: 'weight', name, exercises: builderExercises, date, estimated_seconds: estimatedSeconds }, token);
+      await saveWorkoutForLater(
+        { type: 'weight', name, exercises: builderExercises, date, estimated_seconds: estimatedSeconds },
+        token,
+      );
       navigate('/activities');
     } catch {
       // Error toast shown by action
@@ -225,17 +242,9 @@ export function WorkoutFlow({ workoutId, planDate }: Props) {
         />
       );
     case 'tracker':
-      return activeId ? (
-        <WorkoutTracker workoutId={activeId} workoutName={workoutName} />
-      ) : null;
+      return activeId ? <WorkoutTracker workoutId={activeId} workoutName={workoutName} /> : null;
     case 'simple':
-      return (
-        <SimpleWorkout
-          workoutType={selectedType}
-          workoutId={workoutId}
-          onBack={() => setStep('type')}
-        />
-      );
+      return <SimpleWorkout workoutType={selectedType} workoutId={workoutId} onBack={() => setStep('type')} />;
     default:
       return null;
   }

@@ -116,6 +116,11 @@ the script loads fine and is rejected afterwards. Google calls the
 - Colocate: a component's test and styles live beside it, not in a mirror tree
 - Data fetching stays out of components — a hook or a loader owns it
 - Vitest for unit tests, Playwright only when a flow genuinely needs a browser
+- **Prettier formats the source**, pinned, with `npm run format` before committing and
+  `npm run format:check` in CI. A project's `.prettierrc` describes the project as it is: the
+  scaffold ships the suite's house style (single quotes, semicolons, 120 columns); a project whose
+  existing code differs, as cairn's does (no semicolons, 110 columns), says so in its own file. There
+  is no linter yet; that is its own decision
 - No CSS framework by default. Add one when there's a second opinion to
   reconcile, not before
 - Environment config through `import.meta.env`, never hardcoded per-environment

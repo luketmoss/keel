@@ -8,8 +8,11 @@ afterEach(() => vi.restoreAllMocks());
 
 describe('Trends prefs', () => {
   it('uses the documented keys and defaults', () => {
-    expect([RANGE_PREF.key, AVERAGE_PREF.key, VIEW_PREF.key])
-      .toEqual(['thrive-trends-range', 'thrive-trends-average', 'thrive-trends-view']);
+    expect([RANGE_PREF.key, AVERAGE_PREF.key, VIEW_PREF.key]).toEqual([
+      'thrive-trends-range',
+      'thrive-trends-average',
+      'thrive-trends-view',
+    ]);
     expect([readPref(RANGE_PREF), readPref(AVERAGE_PREF), readPref(VIEW_PREF)]).toEqual(['3M', '7d', 'Chart']);
   });
 
@@ -26,8 +29,12 @@ describe('Trends prefs', () => {
   });
 
   it('gives the default when storage cannot be read, and a failed write does not throw', () => {
-    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked'); });
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('quota'); });
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('quota');
+    });
     expect(readPref(AVERAGE_PREF)).toBe('7d');
     expect(() => writePref(AVERAGE_PREF, '30d')).not.toThrow();
   });

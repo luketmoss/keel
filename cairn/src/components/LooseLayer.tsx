@@ -273,15 +273,7 @@ function CairnDot({
 
 /** The track's route, read from its precomputed overview — never from a
     source KML, per cairn's performance rule, which covers loose tracks. */
-function LooseRoute({
-  id,
-  store,
-  colorIndex,
-}: {
-  id: string
-  store: LooseStore
-  colorIndex: number
-}) {
+function LooseRoute({ id, store, colorIndex }: { id: string; store: LooseStore; colorIndex: number }) {
   const map = useMap()
   const [overview, setOverview] = useState<FeatureCollection<LineString> | null>(null)
   const requestedFor = useRef<string | null>(null)

@@ -54,7 +54,10 @@ export type CairnFacet = 'any' | 'photo' | CairnIcon
     which answers a different question (how does this draw). A photographed
     campsite matches both `photo` and `campsite`, and neither answer is a lie
     about what it is. */
-export function cairnMatchesFacet(record: Pick<LooseCairnRecord, 'icon' | 'image'>, facet: CairnFacet): boolean {
+export function cairnMatchesFacet(
+  record: Pick<LooseCairnRecord, 'icon' | 'image'>,
+  facet: CairnFacet,
+): boolean {
   if (facet === 'any') return true
   if (facet === 'photo') return record.image !== null
   return record.icon === facet

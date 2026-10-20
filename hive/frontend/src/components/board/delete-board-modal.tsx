@@ -12,11 +12,11 @@ export function DeleteBoardModal() {
   const boardName = activeBoard.value?.name || 'board';
 
   // Count items on this board (root + subtasks)
-  const boardItemCount = items.value.filter(i => i.board_id === boardId).length;
+  const boardItemCount = items.value.filter((i) => i.board_id === boardId).length;
   const isEmpty = boardItemCount === 0;
 
   // Other boards to migrate to
-  const otherBoards = accessibleBoards.value.filter(b => b.id !== boardId);
+  const otherBoards = accessibleBoards.value.filter((b) => b.id !== boardId);
 
   const [mode, setMode] = useState<DeleteBoardMode | null>(null);
   const [targetBoardId, setTargetBoardId] = useState<string>(otherBoards[0]?.id || '');
@@ -36,7 +36,7 @@ export function DeleteBoardModal() {
       isEmpty ? null : mode,
       mode === 'migrate' ? targetBoardId : null,
       user?.email || '',
-      token
+      token,
     );
     setSubmitting(false);
     if (success) {
@@ -57,7 +57,9 @@ export function DeleteBoardModal() {
         <div class="modal delete-board-modal" role="dialog" aria-label={`Delete ${boardName}`} aria-modal="true">
           <div class="modal-header">
             <h2>Delete Board</h2>
-            <button class="btn btn-ghost" onClick={close} aria-label="Close">✕</button>
+            <button class="btn btn-ghost" onClick={close} aria-label="Close">
+              ✕
+            </button>
           </div>
 
           <div class="modal-body">
@@ -65,7 +67,9 @@ export function DeleteBoardModal() {
           </div>
 
           <div class="modal-footer">
-            <button type="button" class="btn btn-ghost" onClick={close}>Cancel</button>
+            <button type="button" class="btn btn-ghost" onClick={close}>
+              Cancel
+            </button>
             <button
               type="button"
               class="btn btn-danger"
@@ -95,11 +99,15 @@ export function DeleteBoardModal() {
       <div class="modal delete-board-modal" role="dialog" aria-label={`Delete ${boardName}`} aria-modal="true">
         <div class="modal-header">
           <h2>Delete Board</h2>
-          <button class="btn btn-ghost" onClick={close} aria-label="Close">✕</button>
+          <button class="btn btn-ghost" onClick={close} aria-label="Close">
+            ✕
+          </button>
         </div>
 
         <div class="modal-body">
-          <p>"{boardName}" has {boardItemCount} item{boardItemCount !== 1 ? 's' : ''}. What would you like to do?</p>
+          <p>
+            "{boardName}" has {boardItemCount} item{boardItemCount !== 1 ? 's' : ''}. What would you like to do?
+          </p>
 
           <div class="delete-board-options" role="radiogroup" aria-label="Delete options">
             {otherBoards.length > 0 && (
@@ -125,8 +133,10 @@ export function DeleteBoardModal() {
                   onChange={(e) => setTargetBoardId((e.target as HTMLSelectElement).value)}
                   data-testid="target-board-select"
                 >
-                  {otherBoards.map(b => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
+                  {otherBoards.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -147,7 +157,9 @@ export function DeleteBoardModal() {
         </div>
 
         <div class="modal-footer">
-          <button type="button" class="btn btn-ghost" onClick={close}>Cancel</button>
+          <button type="button" class="btn btn-ghost" onClick={close}>
+            Cancel
+          </button>
           <button
             type="button"
             class="btn btn-danger"

@@ -14,11 +14,7 @@ export function MissingFileRow({ file }: { file: MissingTripFile }) {
         <span className="track-row__name" title={file.name}>
           {file.name}
         </span>
-        <span
-          className="missing-file-row__warning"
-          role="img"
-          aria-label={`${file.name} — file missing`}
-        >
+        <span className="missing-file-row__warning" role="img" aria-label={`${file.name} — file missing`}>
           ⚠
         </span>
       </div>

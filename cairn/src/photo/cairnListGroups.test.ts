@@ -47,10 +47,7 @@ describe('buildCairnListRows', () => {
   })
 
   it('#169: includes an icon-only cairn with no image — the unified list folds it in', () => {
-    const rows = buildCairnListRows(
-      [cairnWithImage({ id: 'p1', image: null, icon: 'campsite' })],
-      [],
-    )
+    const rows = buildCairnListRows([cairnWithImage({ id: 'p1', image: null, icon: 'campsite' })], [])
 
     expect(rows).toHaveLength(1)
     expect(rows[0].icon).toBe('campsite')
@@ -58,10 +55,7 @@ describe('buildCairnListRows', () => {
   })
 
   it('resolves capture time via gpsTimestamp directly, needing no track offset', () => {
-    const rows = buildCairnListRows(
-      [cairnWithImage({ id: 'p1', gpsTimestamp: '2024-06-01T09:14:00Z' })],
-      [],
-    )
+    const rows = buildCairnListRows([cairnWithImage({ id: 'p1', gpsTimestamp: '2024-06-01T09:14:00Z' })], [])
 
     expect(rows[0].captureInstantMs).toBe(Date.parse('2024-06-01T09:14:00Z'))
   })
@@ -81,10 +75,7 @@ describe('buildCairnListRows', () => {
 
 describe('orderCairnListItems', () => {
   it('orders dated rows by date ascending', () => {
-    const rows = [
-      row({ id: 'late', date: '2024-06-02' }),
-      row({ id: 'early', date: '2024-06-01' }),
-    ]
+    const rows = [row({ id: 'late', date: '2024-06-02' }), row({ id: 'early', date: '2024-06-01' })]
 
     const items = orderCairnListItems(rows)
 
@@ -169,9 +160,9 @@ describe('cairnRowMetaLine (#169 — cairns.md "The row")', () => {
 
   it('a campsite with no photo reads "date · campsite"', () => {
     const when = formatShortDate('2023-06-13')
-    expect(
-      cairnRowMetaLine(row({ date: '2023-06-13', icon: 'campsite', thumbnailDriveFileId: null })),
-    ).toBe(`${when} · campsite`)
+    expect(cairnRowMetaLine(row({ date: '2023-06-13', icon: 'campsite', thumbnailDriveFileId: null }))).toBe(
+      `${when} · campsite`,
+    )
   })
 
   it('a campsite with a photo reads clauses for both', () => {
@@ -183,9 +174,9 @@ describe('cairnRowMetaLine (#169 — cairns.md "The row")', () => {
 
   it('neither an icon nor a photo reads "date · cairn"', () => {
     const when = formatShortDate('2026-08-14')
-    expect(
-      cairnRowMetaLine(row({ date: '2026-08-14', icon: null, thumbnailDriveFileId: null })),
-    ).toBe(`${when} · cairn`)
+    expect(cairnRowMetaLine(row({ date: '2026-08-14', icon: null, thumbnailDriveFileId: null }))).toBe(
+      `${when} · cairn`,
+    )
   })
 
   it('undated reads "undated" in place of the date', () => {

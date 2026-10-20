@@ -1,5 +1,11 @@
 import { summarizeElevation, type TrackStats } from '@keel/geo'
-import { formatDistance, formatElevation, formatElevationGain, formatElevationLoss, markSampled } from '../format/units'
+import {
+  formatDistance,
+  formatElevation,
+  formatElevationGain,
+  formatElevationLoss,
+  markSampled,
+} from '../format/units'
 import { StatGrid } from './StatGrid'
 import { FlyoverButton } from './FlyoverButton'
 import type { LatLng } from '@keel/geo'
@@ -88,9 +94,15 @@ export function TripStats({ trackStats, tripName, flyoverPoints }: TripStatsProp
       <div className="trip-stats">
         <StatGrid
           items={[
-            { label: 'Distance', value: trackCount === 0 ? undefined : formatDistance(totals.distanceMeters) },
+            {
+              label: 'Distance',
+              value: trackCount === 0 ? undefined : formatDistance(totals.distanceMeters),
+            },
             { label: 'Ascent', value: markSampled(formatElevationGain(totals.elevationGainMeters), sampled) },
-            { label: 'Descent', value: markSampled(formatElevationLoss(totals.elevationLossMeters), sampled) },
+            {
+              label: 'Descent',
+              value: markSampled(formatElevationLoss(totals.elevationLossMeters), sampled),
+            },
             { label: 'High point', value: markSampled(formatElevation(totals.highPointMeters), sampled) },
             { label: 'Low point', value: markSampled(formatElevation(totals.lowPointMeters), sampled) },
             { label: 'Tracks', value: String(trackCount) },

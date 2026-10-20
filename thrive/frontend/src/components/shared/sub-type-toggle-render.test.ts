@@ -11,13 +11,15 @@ afterEach(cleanup);
 
 function renderToggle(overrides: Record<string, unknown> = {}) {
   const onChange = vi.fn();
-  render(h(SubTypeToggle, {
-    workoutType: 'bike',
-    value: '',
-    onChange,
-    label: 'Activity type',
-    ...overrides,
-  } as never));
+  render(
+    h(SubTypeToggle, {
+      workoutType: 'bike',
+      value: '',
+      onChange,
+      label: 'Activity type',
+      ...overrides,
+    } as never),
+  );
   return { onChange };
 }
 
@@ -31,8 +33,7 @@ describe('AC3: the control matches the three-way control contract', () => {
     renderToggle({ value: 'gravel' });
     const buttons = screen.getAllByRole('button');
     expect(buttons).toHaveLength(3);
-    expect(buttons.map((b) => b.getAttribute('aria-pressed')))
-      .toEqual(['false', 'true', 'false']);
+    expect(buttons.map((b) => b.getAttribute('aria-pressed'))).toEqual(['false', 'true', 'false']);
   });
 
   it('prefixes each accessible name with the group label', () => {
@@ -64,9 +65,13 @@ describe('AC3: the control matches the three-way control contract', () => {
 
   // AC2: weight, stretch and hike show no control at all.
   it('renders nothing for a type with no venue split', () => {
-    const { container } = render(h(SubTypeToggle, {
-      workoutType: 'hike', value: '', onChange: vi.fn(),
-    } as never));
+    const { container } = render(
+      h(SubTypeToggle, {
+        workoutType: 'hike',
+        value: '',
+        onChange: vi.fn(),
+      } as never),
+    );
     expect(container.innerHTML).toBe('');
   });
 

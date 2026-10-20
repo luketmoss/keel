@@ -37,46 +37,110 @@ const { mockState, mockSwitchBoard, mockSetGroupBy, mockToggleUpcomingBoard } = 
 }));
 
 vi.mock('../../state/board-store', () => ({
-  boards: { get value() { return mockState.boards; } },
-  activeBoardId: { get value() { return mockState.activeBoardId; } },
-  accessibleBoards: { get value() { return mockState.accessibleBoards; } },
-  activeBoard: { get value() { return mockState.activeBoard; } },
-  userBoardRole: { get value() { return mockState.userBoardRole; } },
+  boards: {
+    get value() {
+      return mockState.boards;
+    },
+  },
+  activeBoardId: {
+    get value() {
+      return mockState.activeBoardId;
+    },
+  },
+  accessibleBoards: {
+    get value() {
+      return mockState.accessibleBoards;
+    },
+  },
+  activeBoard: {
+    get value() {
+      return mockState.activeBoard;
+    },
+  },
+  userBoardRole: {
+    get value() {
+      return mockState.userBoardRole;
+    },
+  },
   filterLabel: {
-    get value() { return mockState.filterLabel; },
-    set value(v: string | null) { mockState.filterLabel = v; },
+    get value() {
+      return mockState.filterLabel;
+    },
+    set value(v: string | null) {
+      mockState.filterLabel = v;
+    },
   },
   filterSearch: {
-    get value() { return mockState.filterSearch; },
-    set value(v: string) { mockState.filterSearch = v; },
+    get value() {
+      return mockState.filterSearch;
+    },
+    set value(v: string) {
+      mockState.filterSearch = v;
+    },
   },
   filterDue: {
-    get value() { return mockState.filterDue; },
-    set value(v: string | null) { mockState.filterDue = v; },
+    get value() {
+      return mockState.filterDue;
+    },
+    set value(v: string | null) {
+      mockState.filterDue = v;
+    },
   },
   groupBy: {
-    get value() { return mockState.groupBy; },
-    set value(v: string) { mockState.groupBy = v; },
+    get value() {
+      return mockState.groupBy;
+    },
+    set value(v: string) {
+      mockState.groupBy = v;
+    },
   },
-  boardLabels: { get value() { return mockState.labels; } },
-  rootItems: { get value() { return mockState.rootItems; } },
+  boardLabels: {
+    get value() {
+      return mockState.labels;
+    },
+  },
+  rootItems: {
+    get value() {
+      return mockState.rootItems;
+    },
+  },
   switchBoard: (...args: any[]) => mockSwitchBoard(...args),
   setGroupBy: (...args: any[]) => mockSetGroupBy(...args),
   showCreateBoardModal: {
-    get value() { return mockState.showCreateBoardModal; },
-    set value(v: boolean) { mockState.showCreateBoardModal = v; },
+    get value() {
+      return mockState.showCreateBoardModal;
+    },
+    set value(v: boolean) {
+      mockState.showCreateBoardModal = v;
+    },
   },
   showShareModal: {
-    get value() { return mockState.showShareModal; },
-    set value(v: boolean) { mockState.showShareModal = v; },
+    get value() {
+      return mockState.showShareModal;
+    },
+    set value(v: boolean) {
+      mockState.showShareModal = v;
+    },
   },
   openDetailWithTitleEdit: { value: false },
-  activeView: { get value() { return mockState.activeView; } },
-  upcomingFilterSearch: {
-    get value() { return mockState.upcomingFilterSearch; },
-    set value(v: string) { mockState.upcomingFilterSearch = v; },
+  activeView: {
+    get value() {
+      return mockState.activeView;
+    },
   },
-  upcomingFilterBoards: { get value() { return mockState.upcomingFilterBoards; } },
+  upcomingFilterSearch: {
+    get value() {
+      return mockState.upcomingFilterSearch;
+    },
+    set value(v: string) {
+      mockState.upcomingFilterSearch = v;
+    },
+  },
+  upcomingFilterBoards: {
+    get value() {
+      return mockState.upcomingFilterBoards;
+    },
+  },
   toggleUpcomingBoard: (...args: any[]) => mockToggleUpcomingBoard(...args),
 }));
 
@@ -269,7 +333,7 @@ describe('ControlBar', () => {
       Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1280 });
       const { container } = render(<ControlBar />);
       const labels = Array.from(container.querySelectorAll('.filter-chip-group-label'));
-      const ownerLabel = labels.find(l => l.textContent === 'Owner:');
+      const ownerLabel = labels.find((l) => l.textContent === 'Owner:');
       expect(ownerLabel).toBeUndefined();
     });
   });
@@ -286,14 +350,14 @@ describe('ControlBar', () => {
       const { container } = render(<ControlBar />);
       fireEvent.click(container.querySelector('[data-testid="overflow-menu-btn"]') as HTMLElement);
       const headers = Array.from(container.querySelectorAll('.overflow-menu-section-header'));
-      expect(headers.some(h => h.textContent === 'Views')).toBe(false);
+      expect(headers.some((h) => h.textContent === 'Views')).toBe(false);
     });
 
     it('3-dot menu has Grouping section header', () => {
       const { container } = render(<ControlBar />);
       fireEvent.click(container.querySelector('[data-testid="overflow-menu-btn"]') as HTMLElement);
       const headers = Array.from(container.querySelectorAll('.overflow-menu-section-header'));
-      expect(headers.some(h => h.textContent === 'Grouping')).toBe(true);
+      expect(headers.some((h) => h.textContent === 'Grouping')).toBe(true);
     });
 
     it('3-dot menu has Settings section header for owners', () => {
@@ -301,7 +365,7 @@ describe('ControlBar', () => {
       const { container } = render(<ControlBar />);
       fireEvent.click(container.querySelector('[data-testid="overflow-menu-btn"]') as HTMLElement);
       const headers = Array.from(container.querySelectorAll('.overflow-menu-section-header'));
-      expect(headers.some(h => h.textContent === 'Settings')).toBe(true);
+      expect(headers.some((h) => h.textContent === 'Settings')).toBe(true);
     });
 
     it('3-dot menu has hr dividers between sections', () => {
@@ -399,7 +463,10 @@ describe('ControlBar', () => {
   describe('#177 AC10: Search input accessibility', () => {
     it('live region shows filtered count when filters active', () => {
       mockState.filterSearch = 'test';
-      mockState.rootItems = [{ id: '1', title: 'Task 1' }, { id: '2', title: 'Task 2' }];
+      mockState.rootItems = [
+        { id: '1', title: 'Task 1' },
+        { id: '2', title: 'Task 2' },
+      ];
       const { container } = render(<ControlBar />);
       const liveRegion = container.querySelector('[data-testid="filter-live-region"]');
       expect(liveRegion).not.toBeNull();
@@ -574,15 +641,13 @@ describe('ControlBar', () => {
       expect(group!.getAttribute('role')).toBe('group');
       const chips = group!.querySelectorAll('button.filter-chip-label');
       expect(chips.length).toBe(2);
-      expect(Array.from(chips).map(c => c.textContent)).toEqual(['Urgent', 'Home']);
+      expect(Array.from(chips).map((c) => c.textContent)).toEqual(['Urgent', 'Home']);
     });
 
     it('clicking a label chip sets filterLabel and marks it active', () => {
       const { container } = render(<ControlBar />);
       const group = container.querySelector('[aria-label="Filter by label"]')!;
-      const chip = Array.from(group.querySelectorAll('button')).find(
-        b => b.textContent === 'Urgent',
-      ) as HTMLElement;
+      const chip = Array.from(group.querySelectorAll('button')).find((b) => b.textContent === 'Urgent') as HTMLElement;
       expect(chip.getAttribute('aria-pressed')).toBe('false');
       fireEvent.click(chip);
       expect(mockState.filterLabel).toBe('Urgent');
@@ -592,9 +657,7 @@ describe('ControlBar', () => {
       mockState.filterLabel = 'Urgent';
       const { container } = render(<ControlBar />);
       const group = container.querySelector('[aria-label="Filter by label"]')!;
-      const chip = Array.from(group.querySelectorAll('button')).find(
-        b => b.textContent === 'Urgent',
-      ) as HTMLElement;
+      const chip = Array.from(group.querySelectorAll('button')).find((b) => b.textContent === 'Urgent') as HTMLElement;
       expect(chip.getAttribute('aria-pressed')).toBe('true');
       expect(chip.className).toContain('filter-chip-active');
       fireEvent.click(chip);

@@ -124,12 +124,7 @@ export function ExerciseCompactCard({
       </div>
 
       {editable && (
-        <button
-          class="compact-card-remove"
-          onClick={onRemove}
-          type="button"
-          aria-label={`Remove ${exerciseName}`}
-        >
+        <button class="compact-card-remove" onClick={onRemove} type="button" aria-label={`Remove ${exerciseName}`}>
           <span aria-hidden="true">✕</span>
         </button>
       )}

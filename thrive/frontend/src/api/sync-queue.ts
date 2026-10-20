@@ -17,8 +17,7 @@ export interface SyncEntry {
   id?: string;
 }
 
-const newEntryId = (): string =>
-  `q${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+const newEntryId = (): string => `q${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
 export interface FlushResult {
   synced: number;
@@ -59,8 +58,11 @@ export function enqueueSet(payload: WorkoutSet & { sheetRow: number }): void {
   const queue = readQueue();
   // A set with a row replaces the entry aimed at that row, whatever key it
   // was stored under (one queued before #392 carries the old key).
-  const idx = queue.findIndex(e => e.key === key ||
-    (payload.sheetRow > 0 && e.payload.workout_id === payload.workout_id && e.payload.sheetRow === payload.sheetRow));
+  const idx = queue.findIndex(
+    (e) =>
+      e.key === key ||
+      (payload.sheetRow > 0 && e.payload.workout_id === payload.workout_id && e.payload.sheetRow === payload.sheetRow),
+  );
   if (idx >= 0) {
     queue[idx] = { key, payload, id: queue[idx].id ?? newEntryId() };
   } else {
@@ -71,7 +73,7 @@ export function enqueueSet(payload: WorkoutSet & { sheetRow: number }): void {
 
 /** Remove a single entry by composite key. */
 export function dequeueByKey(key: string): void {
-  writeQueue(readQueue().filter(e => e.key !== key));
+  writeQueue(readQueue().filter((e) => e.key !== key));
 }
 
 /**
@@ -81,14 +83,16 @@ export function dequeueByKey(key: string): void {
  */
 export function shiftQueueAfterDelete(row: number): void {
   const queue = readQueue();
-  if (!queue.some(e => e.payload.sheetRow >= row)) return;
-  writeQueue(queue
-    .filter(e => e.payload.sheetRow !== row)
-    .map(e => {
-      if (!(e.payload.sheetRow > row)) return e;
-      const payload = { ...e.payload, sheetRow: e.payload.sheetRow - 1 };
-      return { ...e, key: compositeKey(payload), payload };
-    }));
+  if (!queue.some((e) => e.payload.sheetRow >= row)) return;
+  writeQueue(
+    queue
+      .filter((e) => e.payload.sheetRow !== row)
+      .map((e) => {
+        if (!(e.payload.sheetRow > row)) return e;
+        const payload = { ...e.payload, sheetRow: e.payload.sheetRow - 1 };
+        return { ...e, key: compositeKey(payload), payload };
+      }),
+  );
 }
 
 /** Where a set of the moved or re-sectioned workout now sits, for `remapQueuedOrders`. */
@@ -121,7 +125,7 @@ export interface QueuedOrderMap {
 export function remapQueuedOrders(workoutId: string, map: QueuedOrderMap): void {
   const queue = readQueue();
   let changed = false;
-  const next = queue.map(e => {
+  const next = queue.map((e) => {
     const p = e.payload;
     if (p.workout_id !== workoutId) return e;
     let order: number | undefined;
@@ -133,9 +137,9 @@ export function remapQueuedOrders(workoutId: string, map: QueuedOrderMap): void 
         section = at.section;
       }
     } else {
-      order = map.moves.find(m => m.exercise_id === p.exercise_id && m.from === p.exercise_order)?.to;
+      order = map.moves.find((m) => m.exercise_id === p.exercise_id && m.from === p.exercise_order)?.to;
       const orderNow = order ?? p.exercise_order;
-      section = map.sections?.find(s => s.exercise_id === p.exercise_id && s.exercise_order === orderNow)?.section;
+      section = map.sections?.find((s) => s.exercise_id === p.exercise_id && s.exercise_order === orderNow)?.section;
     }
     const newOrder = order ?? p.exercise_order;
     const newSection = section ?? p.section;
@@ -155,8 +159,8 @@ export function remapQueuedOrders(workoutId: string, map: QueuedOrderMap): void 
 export function dropQueuedAppend(set: WorkoutSet): void {
   const key = compositeKey(set);
   const queue = readQueue();
-  if (!queue.some(e => e.key === key && !(e.payload.sheetRow > 0))) return;
-  writeQueue(queue.filter(e => !(e.key === key && !(e.payload.sheetRow > 0))));
+  if (!queue.some((e) => e.key === key && !(e.payload.sheetRow > 0))) return;
+  writeQueue(queue.filter((e) => !(e.key === key && !(e.payload.sheetRow > 0))));
 }
 
 /** Remove all queued entries. */
@@ -184,7 +188,7 @@ export async function flushQueue(token: string): Promise<FlushResult> {
   for (const queued of queue) {
     // The entry as it is now, not as it was read: a move may have given it a
     // new order since the flush began (#392). Gone meanwhile: nothing to send.
-    const entry = readQueue().find(e => (queued.id ? e.id === queued.id : e.key === queued.key));
+    const entry = readQueue().find((e) => (queued.id ? e.id === queued.id : e.key === queued.key));
     if (!entry) continue;
     try {
       const { payload } = entry;
@@ -196,13 +200,11 @@ export async function flushQueue(token: string): Promise<FlushResult> {
         // Only the active workout's own set belongs in activeWorkoutSets (#374).
         if (payload.workout_id === activeWorkoutId.value) {
           // By its row, never by exercise, order and set number (#392).
-          activeWorkoutSets.value = activeWorkoutSets.value.map(s =>
+          activeWorkoutSets.value = activeWorkoutSets.value.map((s) =>
             s.sheetRow === payload.sheetRow ? { ...updated } : s,
           );
         }
-        sets.value = sets.value.map(s =>
-          s.sheetRow === payload.sheetRow ? { ...updated } : s,
-        );
+        sets.value = sets.value.map((s) => (s.sheetRow === payload.sheetRow ? { ...updated } : s));
       } else {
         // Append new row and re-fetch to get sheetRow
         await appendSet(payload, token);
@@ -212,12 +214,12 @@ export async function flushQueue(token: string): Promise<FlushResult> {
         // queued set's: it may be from an earlier workout (#374).
         const activeId = activeWorkoutId.value;
         if (activeId) {
-          activeWorkoutSets.value = allSets.filter(s => s.workout_id === activeId);
+          activeWorkoutSets.value = allSets.filter((s) => s.workout_id === activeId);
         }
       }
 
       // By its id when it has one: a move may have re-keyed it meanwhile.
-      if (entry.id) writeQueue(readQueue().filter(e => e.id !== entry.id));
+      if (entry.id) writeQueue(readQueue().filter((e) => e.id !== entry.id));
       else dequeueByKey(entry.key);
       synced++;
     } catch {

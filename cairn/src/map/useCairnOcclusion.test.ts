@@ -61,13 +61,17 @@ describe('useCairnOcclusion (#285)', () => {
 
   it('hides nothing before the camera has ever settled', () => {
     const map3d = fakeMap3d({ lat: 0, lng: 0, altitude: 3000 })
-    const { result } = renderHook(() => useCairnOcclusion(map3d, CAIRNS, null, () => samplerAlwaysOccluding()))
+    const { result } = renderHook(() =>
+      useCairnOcclusion(map3d, CAIRNS, null, () => samplerAlwaysOccluding()),
+    )
     expect(result.current.size).toBe(0)
   })
 
   it('marks a cairn occluded once the camera settles with terrain in the way', async () => {
     const map3d = fakeMap3d({ lat: 0, lng: 0, altitude: 3000 })
-    const { result } = renderHook(() => useCairnOcclusion(map3d, CAIRNS, null, () => samplerAlwaysOccluding()))
+    const { result } = renderHook(() =>
+      useCairnOcclusion(map3d, CAIRNS, null, () => samplerAlwaysOccluding()),
+    )
 
     await act(async () => {
       map3d.steady()
@@ -202,9 +206,7 @@ describe('useCairnOcclusion (#285)', () => {
   it('issues no new requests when the camera returns to an already-evaluated position', async () => {
     const map3d = fakeMap3d({ lat: 0, lng: 0, altitude: 3000 })
     const sampleAlongPath = vi.fn(samplerAlwaysOccluding().sampleAlongPath)
-    const { result } = renderHook(() =>
-      useCairnOcclusion(map3d, CAIRNS, null, () => ({ sampleAlongPath })),
-    )
+    const { result } = renderHook(() => useCairnOcclusion(map3d, CAIRNS, null, () => ({ sampleAlongPath })))
 
     await act(async () => {
       map3d.steady()

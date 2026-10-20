@@ -53,7 +53,12 @@ describe('latLngFromContainerPoint', () => {
 
 describe('containerPointFromLatLng', () => {
   it('is the exact inverse of latLngFromContainerPoint', () => {
-    for (const [x, y] of [[200, 100], [0, 0], [400, 200], [100, 50]]) {
+    for (const [x, y] of [
+      [200, 100],
+      [0, 0],
+      [400, 200],
+      [100, 50],
+    ]) {
       const latLng = latLngFromContainerPoint(x, y, 400, 200, VIEWPORT)!
       expect(containerPointFromLatLng(latLng, 400, 200, VIEWPORT)).toEqual({ x, y })
     }

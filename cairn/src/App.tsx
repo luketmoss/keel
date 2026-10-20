@@ -254,9 +254,11 @@ function AppShell() {
   /* #188: what a large archive shows while it is being unpacked. Without
      it a zip of two hundred photos is a drop that appears to have been
      ignored — nothing exists to show a row for until the files are out. */
-  const [archiveProgress, setArchiveProgress] = useState<
-    { name: string; index: number; total: number } | null
-  >(null)
+  const [archiveProgress, setArchiveProgress] = useState<{
+    name: string
+    index: number
+    total: number
+  } | null>(null)
   /** #157: which trip-owned cairn's lightbox is open, reported up by
       `TripDetail` — `null` while none is, or while no trip is open at all.
       Read together with a loose cairn's own `openLoose` below to decide
@@ -357,7 +359,8 @@ function AppShell() {
     prevAccountStatusRef.current = account.state.status
 
     if (previous === 'signed-in' && account.state.status === 'token-expired') {
-      const onDetailRoute = routeTripId !== undefined || openTrackId !== undefined || openCairnId !== undefined
+      const onDetailRoute =
+        routeTripId !== undefined || openTrackId !== undefined || openCairnId !== undefined
       if (onDetailRoute) {
         rememberedRouteRef.current = location.pathname
         programmaticNavigationRef.current = true
@@ -476,9 +479,7 @@ function AppShell() {
   // Read from the *visible* set, not the raw one: #95's rule is that a
   // disconnected account shows nothing rather than a cache, and a typed URL
   // must not be the one way around that.
-  const openLoose = openLooseId
-    ? (visibleLoose.find((item) => item.id === openLooseId) ?? null)
-    : null
+  const openLoose = openLooseId ? (visibleLoose.find((item) => item.id === openLooseId) ?? null) : null
   const openLooseCairn = openLoose && openLoose.kind === 'cairn' ? openLoose : null
 
   // #157: whichever cairn's detail is open right now, loose or trip-owned —
@@ -722,8 +723,7 @@ function AppShell() {
       // from what Drive served rather than from the record, which is also
       // what leaves a cairn imported before the downscale exporting under
       // its own original extension.
-      const downloadName =
-        item.kind === 'track' ? filename : exportImageName(filename, file.type)
+      const downloadName = item.kind === 'track' ? filename : exportImageName(filename, file.type)
       const url = URL.createObjectURL(file)
       const link = document.createElement('a')
       link.href = url
@@ -754,10 +754,7 @@ function AppShell() {
 
   function addToasts(rejections: { name: string; message: string }[]) {
     if (rejections.length === 0) return
-    setToasts((prev) => [
-      ...prev,
-      ...rejections.map((r) => ({ id: generateToastId(), text: r.message })),
-    ])
+    setToasts((prev) => [...prev, ...rejections.map((r) => ({ id: generateToastId(), text: r.message }))])
   }
 
   function dismissToast(id: string) {
@@ -889,9 +886,7 @@ function AppShell() {
     const archive = files.find((file) => isArchiveFile(file.name))
     if (rest.length > 0) {
       const texts =
-        archive !== undefined
-          ? [extraPhotosMessage(rest.length)]
-          : rest.map(() => ONLY_ONE_PHOTO_MESSAGE)
+        archive !== undefined ? [extraPhotosMessage(rest.length)] : rest.map(() => ONLY_ONE_PHOTO_MESSAGE)
       setToasts((prev) => [...prev, ...texts.map((text) => ({ id: generateToastId(), text }))])
     }
     setAttachingLooseId(id)
@@ -952,7 +947,10 @@ function AppShell() {
     if (!item) return
     const result = await item.save(position)
     if (result === false) {
-      setToasts((prev) => [...prev, { id: generateToastId(), text: `Couldn't save ${item.name} — try again.` }])
+      setToasts((prev) => [
+        ...prev,
+        { id: generateToastId(), text: `Couldn't save ${item.name} — try again.` },
+      ])
       return
     }
     const wasLast = queue.items.length === 1
@@ -1261,14 +1259,15 @@ function AppShell() {
               crosshair cursor and a click-to-place listener while anything is
               waiting, plus a pulsing suggestion ring when the current file's
               capture time falls near the open trip's own tracks. */}
-          <PlacementClickCatcher active={queueOpen} onPlace={(position) => void placeCurrentQueueItem(position)} />
+          <PlacementClickCatcher
+            active={queueOpen}
+            onPlace={(position) => void placeCurrentQueueItem(position)}
+          />
           {/* #156: right-click, or long-press on touch, places a cairn where
               you clicked. No armed mode — the gesture carries its own
               coordinate, so there is nothing to enter and nothing to leave. */}
           <CairnCreateGesture active={createGestureActive} onPlace={beginCairnDraft} />
-          {cairnDraft && (
-            <CairnDraftMarker position={cairnDraft.position} icon={cairnDraft.fields.icon} />
-          )}
+          {cairnDraft && <CairnDraftMarker position={cairnDraft.position} icon={cairnDraft.fields.icon} />}
           {queueOpen && suggestionPosition && (
             <SuggestionRing
               position={suggestionPosition}
@@ -1375,7 +1374,7 @@ function AppShell() {
                 />
               )
             ))}
-  
+
           <ShellColumn
             flyoverToken={flyover.flyover?.token}
             collapsed={collapsed}
@@ -1443,9 +1442,7 @@ function AppShell() {
                   <FilterChips kind={kind} onChange={handleKindChange} />
                   {/* #159: the facet row, subordinate to the main row and
                       shown only while its own chip is active. */}
-                  {kind === 'cairns' && (
-                    <CairnFacetChips facet={cairnFacet} onChange={setCairnFacet} />
-                  )}
+                  {kind === 'cairns' && <CairnFacetChips facet={cairnFacet} onChange={setCairnFacet} />}
                 </>
               )
             }
@@ -1590,15 +1587,13 @@ function AppShell() {
                    the refusals) already works on touch. */
                 onImportFiles={(files) => void importDroppedLoose(files)}
                 onAddLooseToTrip={(id) =>
-                  navigate(
-                    looseStore.getItem(id)?.kind === 'track' ? `/tracks/${id}` : `/cairns/${id}`,
-                  )
+                  navigate(looseStore.getItem(id)?.kind === 'track' ? `/tracks/${id}` : `/cairns/${id}`)
                 }
                 disabled={disconnected}
               />
             )}
           </ShellColumn>
-  
+
           {dragActive && <DropOverlay label={dropOverlayLabel} />}
           {archiveProgress && (
             <p className="archive-progress" role="status">

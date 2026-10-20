@@ -8,10 +8,7 @@ interface ColumnSettingsProps {
 }
 
 // Stored values (light-mode pastels) — mapped to theme-aware CSS vars at render time
-const COLUMN_PRESET_COLORS = [
-  '#e3f2fd', '#e8eaf6', '#f3e5f5', '#fce4ec',
-  '#fff3e0', '#e8f5e9', '#e0f2f1', '#fff8e1',
-];
+const COLUMN_PRESET_COLORS = ['#e3f2fd', '#e8eaf6', '#f3e5f5', '#fce4ec', '#fff3e0', '#e8f5e9', '#e0f2f1', '#fff8e1'];
 
 // More saturated preview colors for the picker swatches (easier to differentiate)
 const SWATCH_PREVIEW_COLORS: Record<string, string> = {
@@ -41,13 +38,13 @@ export function ColumnSettings({ token }: ColumnSettingsProps) {
   const allItems = boardItems.value;
 
   const getItemCount = (statusName: string): number => {
-    return allItems.filter(i => i.status === statusName).length;
+    return allItems.filter((i) => i.status === statusName).length;
   };
 
   // --- Create ---
   const handleStartCreate = () => {
-    const usedColors = new Set(columns.map(c => c.color));
-    const firstUnused = COLUMN_PRESET_COLORS.find(c => !usedColors.has(c)) || COLUMN_PRESET_COLORS[0];
+    const usedColors = new Set(columns.map((c) => c.color));
+    const firstUnused = COLUMN_PRESET_COLORS.find((c) => !usedColors.has(c)) || COLUMN_PRESET_COLORS[0];
     setCreateColor(firstUnused);
     setCreateName('');
     setCreating(true);
@@ -57,7 +54,7 @@ export function ColumnSettings({ token }: ColumnSettingsProps) {
   const handleCreate = async () => {
     const trimmed = createName.trim();
     if (!trimmed) return;
-    if (columns.some(c => c.name.toLowerCase() === trimmed.toLowerCase())) return;
+    if (columns.some((c) => c.name.toLowerCase() === trimmed.toLowerCase())) return;
     await createStatus(trimmed, createColor, false, token);
     setCreating(false);
     setCreateName('');
@@ -74,7 +71,7 @@ export function ColumnSettings({ token }: ColumnSettingsProps) {
     const trimmed = editingNameValue.trim();
     setEditingNameId(null);
     if (!trimmed || trimmed === col.name) return;
-    if (columns.some(c => c.id !== col.id && c.name.toLowerCase() === trimmed.toLowerCase())) return;
+    if (columns.some((c) => c.id !== col.id && c.name.toLowerCase() === trimmed.toLowerCase())) return;
     await updateStatus(col.id, { name: trimmed }, token);
   };
 
@@ -90,7 +87,7 @@ export function ColumnSettings({ token }: ColumnSettingsProps) {
     // If already terminal, do nothing (user must pick a different column to swap)
     if (col.is_terminal) return;
     // Turn off existing terminal column(s), then turn on the new one
-    const currentTerminals = columns.filter(c => c.is_terminal);
+    const currentTerminals = columns.filter((c) => c.is_terminal);
     for (const t of currentTerminals) {
       await updateStatus(t.id, { is_terminal: false }, token);
     }
@@ -100,14 +97,14 @@ export function ColumnSettings({ token }: ColumnSettingsProps) {
   // --- Reorder ---
   const handleMoveUp = async (idx: number) => {
     if (idx <= 0) return;
-    const ids = columns.map(c => c.id);
+    const ids = columns.map((c) => c.id);
     [ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]];
     await reorderStatuses(ids, token);
   };
 
   const handleMoveDown = async (idx: number) => {
     if (idx >= columns.length - 1) return;
-    const ids = columns.map(c => c.id);
+    const ids = columns.map((c) => c.id);
     [ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]];
     await reorderStatuses(ids, token);
   };
@@ -115,16 +112,16 @@ export function ColumnSettings({ token }: ColumnSettingsProps) {
   // --- Delete ---
   const handleStartDelete = (col: BoardStatus) => {
     if (columns.length <= 1) return;
-    const terminalCount = columns.filter(c => c.is_terminal).length;
+    const terminalCount = columns.filter((c) => c.is_terminal).length;
     if (col.is_terminal && terminalCount <= 1) return;
     setDeletingId(col.id);
-    const otherColumns = columns.filter(c => c.id !== col.id);
+    const otherColumns = columns.filter((c) => c.id !== col.id);
     setDeleteTarget(otherColumns[0]?.name || '');
   };
 
   const handleConfirmDelete = async () => {
     if (!deletingId) return;
-    const col = columns.find(c => c.id === deletingId);
+    const col = columns.find((c) => c.id === deletingId);
     if (!col) return;
     const itemCount = getItemCount(col.name);
     const target = itemCount > 0 ? deleteTarget : null;
@@ -138,7 +135,7 @@ export function ColumnSettings({ token }: ColumnSettingsProps) {
     setDeleteTarget('');
   };
 
-  const terminalCount = columns.filter(c => c.is_terminal).length;
+  const terminalCount = columns.filter((c) => c.is_terminal).length;
 
   return (
     <div class="column-settings">
@@ -149,34 +146,40 @@ export function ColumnSettings({ token }: ColumnSettingsProps) {
 
           if (isDeleting) {
             const deleteItemCount = getItemCount(col.name);
-            const otherColumns = columns.filter(c => c.id !== col.id);
+            const otherColumns = columns.filter((c) => c.id !== col.id);
             return (
               <div key={col.id} class="column-settings-row column-settings-row-delete">
                 <div class="column-settings-delete-prompt">
                   {deleteItemCount > 0 ? (
                     <>
                       <p>
-                        <strong>{col.name}</strong> has {deleteItemCount} item{deleteItemCount !== 1 ? 's' : ''}.
-                        Move them to:
+                        <strong>{col.name}</strong> has {deleteItemCount} item{deleteItemCount !== 1 ? 's' : ''}. Move
+                        them to:
                       </p>
                       <select
                         value={deleteTarget}
                         onChange={(e) => setDeleteTarget((e.target as HTMLSelectElement).value)}
                         class="column-settings-delete-select"
                       >
-                        {otherColumns.map(c => (
-                          <option key={c.id} value={c.name}>{c.name}</option>
+                        {otherColumns.map((c) => (
+                          <option key={c.id} value={c.name}>
+                            {c.name}
+                          </option>
                         ))}
                       </select>
                     </>
                   ) : (
-                    <p>Delete column <strong>{col.name}</strong>?</p>
+                    <p>
+                      Delete column <strong>{col.name}</strong>?
+                    </p>
                   )}
                   <div class="column-settings-delete-actions">
                     <button class="btn btn-danger btn-sm" onClick={handleConfirmDelete}>
                       {deleteItemCount > 0 ? 'Move & Delete' : 'Delete'}
                     </button>
-                    <button class="btn btn-ghost btn-sm" onClick={handleCancelDelete}>Cancel</button>
+                    <button class="btn btn-ghost btn-sm" onClick={handleCancelDelete}>
+                      Cancel
+                    </button>
                   </div>
                 </div>
               </div>
@@ -195,7 +198,7 @@ export function ColumnSettings({ token }: ColumnSettingsProps) {
                 />
                 {colorPickerId === col.id && (
                   <div class="column-settings-color-popover">
-                    {COLUMN_PRESET_COLORS.map(c => (
+                    {COLUMN_PRESET_COLORS.map((c) => (
                       <button
                         key={c}
                         class={`column-color-swatch${col.color === c ? ' column-color-swatch-active' : ''}`}
@@ -220,15 +223,13 @@ export function ColumnSettings({ token }: ColumnSettingsProps) {
                   onBlur={() => handleSaveName(col)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                    if (e.key === 'Escape') { setEditingNameId(null); }
+                    if (e.key === 'Escape') {
+                      setEditingNameId(null);
+                    }
                   }}
                 />
               ) : (
-                <button
-                  class="column-settings-name"
-                  onClick={() => handleStartNameEdit(col)}
-                  title="Click to rename"
-                >
+                <button class="column-settings-name" onClick={() => handleStartNameEdit(col)} title="Click to rename">
                   {col.name}
                 </button>
               )}
@@ -236,7 +237,12 @@ export function ColumnSettings({ token }: ColumnSettingsProps) {
               <span class="column-settings-count">{itemCount}</span>
 
               {/* Terminal toggle */}
-              <label class="column-settings-terminal-toggle" title={col.is_terminal ? 'Completion column — click another column to change' : 'Set as completion column'}>
+              <label
+                class="column-settings-terminal-toggle"
+                title={
+                  col.is_terminal ? 'Completion column — click another column to change' : 'Set as completion column'
+                }
+              >
                 <input
                   type="checkbox"
                   checked={col.is_terminal}
@@ -247,18 +253,17 @@ export function ColumnSettings({ token }: ColumnSettingsProps) {
               </label>
 
               {/* Reorder arrows */}
-              <button
-                class="btn-icon"
-                aria-label="Move up"
-                disabled={idx === 0}
-                onClick={() => handleMoveUp(idx)}
-              >{'\u25B2'}</button>
+              <button class="btn-icon" aria-label="Move up" disabled={idx === 0} onClick={() => handleMoveUp(idx)}>
+                {'\u25B2'}
+              </button>
               <button
                 class="btn-icon"
                 aria-label="Move down"
                 disabled={idx === columns.length - 1}
                 onClick={() => handleMoveDown(idx)}
-              >{'\u25BC'}</button>
+              >
+                {'\u25BC'}
+              </button>
 
               {/* Delete — red text */}
               <button
@@ -266,7 +271,9 @@ export function ColumnSettings({ token }: ColumnSettingsProps) {
                 disabled={columns.length <= 1 || (col.is_terminal && terminalCount <= 1)}
                 onClick={() => handleStartDelete(col)}
                 aria-label={`Delete ${col.name}`}
-              >Delete</button>
+              >
+                Delete
+              </button>
             </div>
           );
         })}
@@ -287,7 +294,7 @@ export function ColumnSettings({ token }: ColumnSettingsProps) {
             }}
           />
           <div class="column-settings-color-row">
-            {COLUMN_PRESET_COLORS.map(c => (
+            {COLUMN_PRESET_COLORS.map((c) => (
               <button
                 key={c}
                 class={`column-color-swatch${createColor === c ? ' column-color-swatch-active' : ''}`}
@@ -299,8 +306,12 @@ export function ColumnSettings({ token }: ColumnSettingsProps) {
             ))}
           </div>
           <div class="column-settings-create-actions">
-            <button class="btn btn-primary btn-sm" onClick={handleCreate} disabled={!createName.trim()}>Add</button>
-            <button class="btn btn-ghost btn-sm" onClick={() => setCreating(false)}>Cancel</button>
+            <button class="btn btn-primary btn-sm" onClick={handleCreate} disabled={!createName.trim()}>
+              Add
+            </button>
+            <button class="btn btn-ghost btn-sm" onClick={() => setCreating(false)}>
+              Cancel
+            </button>
           </div>
         </div>
       ) : (

@@ -12,7 +12,9 @@ import { mountConfirmHost, answerConfirm, confirmDialog, confirmText } from '../
 
 const saveWorkoutForLater = vi.fn(async (_data: unknown, _token: string) => undefined);
 const deleteWorkout = vi.fn(async (_id: string, _token: string) => undefined);
-const savePlannedWorkoutEdits = vi.fn(async (_id: string, _patch: unknown, _exercises: unknown, _token: string) => undefined);
+const savePlannedWorkoutEdits = vi.fn(
+  async (_id: string, _patch: unknown, _exercises: unknown, _token: string) => undefined,
+);
 const navigate = vi.fn();
 const goBack = vi.fn();
 
@@ -43,23 +45,68 @@ const PUSH = {
   id: 'tpl_push',
   name: 'Upper Push A',
   exercises: [
-    { template_id: 'tpl_push', template_name: 'Upper Push A', order: 1, exercise_id: 'ex_1', exercise_name: 'Bench Press BB', section: 'primary', sets: '3', reps: '8', sheetRow: 2 },
+    {
+      template_id: 'tpl_push',
+      template_name: 'Upper Push A',
+      order: 1,
+      exercise_id: 'ex_1',
+      exercise_name: 'Bench Press BB',
+      section: 'primary',
+      sets: '3',
+      reps: '8',
+      sheetRow: 2,
+    },
   ],
 };
 
 function planned(overrides: Partial<WorkoutWithRow> = {}): WorkoutWithRow {
   return {
-    id: 'w_plan', date: '2099-12-31', time: '', type: 'weight', name: 'Upper Pull A', template_id: '',
-    notes: '', elapsed_seconds: '', created: '', copied_from: '', status: 'planned', moving_seconds: '',
-    effort: '', distance_m: '', ascent_m: '', descent_m: '', avg_hr: '', sub_type: '',
-    source: '', source_activity_id: '', raw_ref: '', fit_ref: '', fit_fetched_at: '', synced_at: '',
-    started_at_utc: '', calories: '', estimated_seconds: '2820', sport_type: '', track_ref: '', sheetRow: 2, ...overrides,
+    id: 'w_plan',
+    date: '2099-12-31',
+    time: '',
+    type: 'weight',
+    name: 'Upper Pull A',
+    template_id: '',
+    notes: '',
+    elapsed_seconds: '',
+    created: '',
+    copied_from: '',
+    status: 'planned',
+    moving_seconds: '',
+    effort: '',
+    distance_m: '',
+    ascent_m: '',
+    descent_m: '',
+    avg_hr: '',
+    sub_type: '',
+    source: '',
+    source_activity_id: '',
+    raw_ref: '',
+    fit_ref: '',
+    fit_fetched_at: '',
+    synced_at: '',
+    started_at_utc: '',
+    calories: '',
+    estimated_seconds: '2820',
+    sport_type: '',
+    track_ref: '',
+    sheetRow: 2,
+    ...overrides,
   };
 }
 
 const PLAN_SETS: SetWithRow[] = [1, 2, 3].map((n) => ({
-  workout_id: 'w_plan', exercise_id: 'ex_row', exercise_name: 'Row BB', section: 'primary', exercise_order: 1,
-  set_number: n, planned_reps: '8', weight: '', reps: '', effort: '', sheetRow: 1 + n,
+  workout_id: 'w_plan',
+  exercise_id: 'ex_row',
+  exercise_name: 'Row BB',
+  section: 'primary',
+  exercise_order: 1,
+  set_number: n,
+  planned_reps: '8',
+  weight: '',
+  reps: '',
+  effort: '',
+  sheetRow: 1 + n,
 }));
 
 const estimateInput = () => document.querySelector<HTMLInputElement>('#planner-estimate')!;
@@ -82,7 +129,8 @@ function type(input: HTMLInputElement, value: string) {
 }
 
 const savedEstimate = () =>
-  (saveWorkoutForLater.mock.calls[saveWorkoutForLater.mock.calls.length - 1][0] as { estimated_seconds?: string }).estimated_seconds;
+  (saveWorkoutForLater.mock.calls[saveWorkoutForLater.mock.calls.length - 1][0] as { estimated_seconds?: string })
+    .estimated_seconds;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -135,7 +183,9 @@ describe('AC2: the planner offers an optional estimate', () => {
     await tap('Save Workout');
     expect(saveWorkoutForLater).toHaveBeenCalledTimes(1);
     expect(saveWorkoutForLater.mock.calls[0][0]).toMatchObject({
-      name: 'Upper Push A', date: '2099-12-31', estimated_seconds: '2820',
+      name: 'Upper Push A',
+      date: '2099-12-31',
+      estimated_seconds: '2820',
     });
   });
 
@@ -173,7 +223,15 @@ describe('AC3: the planned-workout editor changes the estimate and never loses i
     expect(savePlannedWorkoutEdits.mock.calls[0][2]).toEqual([
       // Reps untouched, so the stored per-set values ride along (#350), and
       // the entry names the stored order it was built from (#380).
-      { exercise_id: 'ex_row', exercise_name: 'Row BB', section: 'primary', sets: 3, planned_reps: '8', planned_reps_by_set: ['8', '8', '8'], source_order: 1 },
+      {
+        exercise_id: 'ex_row',
+        exercise_name: 'Row BB',
+        section: 'primary',
+        sets: 3,
+        planned_reps: '8',
+        planned_reps_by_set: ['8', '8', '8'],
+        source_order: 1,
+      },
     ]);
     expect(deleteWorkout).not.toHaveBeenCalled();
     expect(saveWorkoutForLater).not.toHaveBeenCalled();
@@ -232,7 +290,12 @@ describe('AC3: the planned-workout editor changes the estimate and never loses i
     render(<WorkoutEdit workoutId="w_plan" />);
     type(estimateInput(), '50');
     await tap('Back');
-    expect(confirmText()).toMatchObject({ title: 'Discard your changes?', message: "Your edits to this plan won't be saved.", confirm: 'Discard Changes', cancel: 'Keep Editing' });
+    expect(confirmText()).toMatchObject({
+      title: 'Discard your changes?',
+      message: "Your edits to this plan won't be saved.",
+      confirm: 'Discard Changes',
+      cancel: 'Keep Editing',
+    });
     await answerConfirm(false);
     expect(confirmDialog()).toBeNull();
     expect(navigate).not.toHaveBeenCalled();

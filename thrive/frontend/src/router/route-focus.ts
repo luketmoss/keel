@@ -39,9 +39,7 @@ export function keyOf(el: Element | null, root?: Element | null): FocusKey | nul
 /** The first element under `root` with `key`, or null. Compared as strings: no selector escaping. */
 export function findByKey(root: ParentNode, key: FocusKey): HTMLElement | null {
   const [selector, attr] =
-    key.by === 'key' ? ['[data-focus-key]', 'data-focus-key']
-    : key.by === 'id' ? ['[id]', 'id']
-    : ['a[href]', 'href'];
+    key.by === 'key' ? ['[data-focus-key]', 'data-focus-key'] : key.by === 'id' ? ['[id]', 'id'] : ['a[href]', 'href'];
   for (const el of root.querySelectorAll<HTMLElement>(selector)) {
     if (el.getAttribute(attr) === key.value) return el;
   }
@@ -50,9 +48,11 @@ export function findByKey(root: ParentNode, key: FocusKey): HTMLElement | null {
 
 /** A screen's heading (AC1): `[data-screen-heading]`, else the first `h1`, else the first `h2`. */
 export function headingOf(main: ParentNode): HTMLElement | null {
-  return main.querySelector<HTMLElement>('[data-screen-heading]')
-    ?? main.querySelector<HTMLElement>('h1')
-    ?? main.querySelector<HTMLElement>('h2');
+  return (
+    main.querySelector<HTMLElement>('[data-screen-heading]') ??
+    main.querySelector<HTMLElement>('h1') ??
+    main.querySelector<HTMLElement>('h2')
+  );
 }
 
 // Openers by the hash of the screen they were on: memory only, per page load.

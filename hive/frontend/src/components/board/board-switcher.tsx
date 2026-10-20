@@ -1,4 +1,13 @@
-import { boards, activeBoardId, switchBoard, showCreateBoardModal, showShareModal, accessibleBoards, activeBoard, userBoardRole } from '../../state/board-store';
+import {
+  boards,
+  activeBoardId,
+  switchBoard,
+  showCreateBoardModal,
+  showShareModal,
+  accessibleBoards,
+  activeBoard,
+  userBoardRole,
+} from '../../state/board-store';
 
 /** Format the option label for a board: icon (if set) + name. */
 function boardOptionLabel(name: string, icon?: string): string {
@@ -25,7 +34,9 @@ export function BoardSwitcher() {
       <div class="board-switcher" data-testid="board-switcher">
         <button
           class="btn btn-primary"
-          onClick={() => { showCreateBoardModal.value = true; }}
+          onClick={() => {
+            showCreateBoardModal.value = true;
+          }}
         >
           + New Board
         </button>
@@ -38,7 +49,9 @@ export function BoardSwitcher() {
 
   return (
     <div class="board-switcher" data-testid="board-switcher">
-      <span id="board-switcher-hint" class="sr-only">{BOARD_SWITCHER_HINT}</span>
+      <span id="board-switcher-hint" class="sr-only">
+        {BOARD_SWITCHER_HINT}
+      </span>
       <select
         class="board-switcher-select"
         value={activeBoardId.value}
@@ -57,12 +70,24 @@ export function BoardSwitcher() {
       {isOwner && (
         <button
           class="btn btn-ghost share-btn"
-          onClick={() => { showShareModal.value = true; }}
+          onClick={() => {
+            showShareModal.value = true;
+          }}
           aria-label={`Share ${boardName}`}
           title="Share board (Ctrl+Shift+S)"
           data-testid="share-board-btn"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
             <circle cx="18" cy="5" r="3" />
             <circle cx="6" cy="12" r="3" />
             <circle cx="18" cy="19" r="3" />

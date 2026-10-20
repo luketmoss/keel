@@ -110,13 +110,7 @@ describe('carryTrackIntoTrip', () => {
     const store = new LocalTrackOverridesStore(fakeStorage())
 
     expect(
-      await carryTrackIntoTrip(
-        store,
-        'trip-1',
-        'drive-1',
-        { displayName: 'Snowdon ridge', color: 4 },
-        null,
-      ),
+      await carryTrackIntoTrip(store, 'trip-1', 'drive-1', { displayName: 'Snowdon ridge', color: 4 }, null),
     ).toBe(true)
 
     expect(store.getOverrides('trip-1')).toEqual({
@@ -129,17 +123,9 @@ describe('carryTrackIntoTrip', () => {
   // other name and colour the trip is holding.
   it('leaves every other track in the trip untouched', async () => {
     const store = new LocalTrackOverridesStore(fakeStorage())
-    await store.setOverride('trip-1', 'drive-9', { displayName: 'Day 1', color: 3, order: 0 }, [
-      'drive-9',
-    ])
+    await store.setOverride('trip-1', 'drive-9', { displayName: 'Day 1', color: 3, order: 0 }, ['drive-9'])
 
-    await carryTrackIntoTrip(
-      store,
-      'trip-1',
-      'drive-1',
-      { displayName: 'Snowdon ridge', color: 4 },
-      null,
-    )
+    await carryTrackIntoTrip(store, 'trip-1', 'drive-1', { displayName: 'Snowdon ridge', color: 4 }, null)
 
     expect(store.getOverrides('trip-1')).toEqual({
       'drive-9': { displayName: 'Day 1', color: 3, order: 0 },
@@ -149,17 +135,9 @@ describe('carryTrackIntoTrip', () => {
 
   it('leaves a track arriving with a name and colour it already had alone', async () => {
     const store = new LocalTrackOverridesStore(fakeStorage())
-    await store.setOverride('trip-1', 'drive-1', { displayName: 'Snowdon ridge', color: 2 }, [
-      'drive-1',
-    ])
+    await store.setOverride('trip-1', 'drive-1', { displayName: 'Snowdon ridge', color: 2 }, ['drive-1'])
 
-    await carryTrackIntoTrip(
-      store,
-      'trip-1',
-      'drive-1',
-      { displayName: 'Snowdon ridge', color: 2 },
-      null,
-    )
+    await carryTrackIntoTrip(store, 'trip-1', 'drive-1', { displayName: 'Snowdon ridge', color: 2 }, null)
 
     // Merged, not replaced — arriving does not cost the track its order.
     expect(store.getOverrides('trip-1')).toEqual({

@@ -8,7 +8,14 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/preact';
 import { mountConfirmHost, answerConfirm } from '../shared/confirm-test-utils';
-import { activeWorkoutId, activeWorkoutSets, activeWarmupExercises, isEditMode, workouts, sets } from '../../state/store';
+import {
+  activeWorkoutId,
+  activeWorkoutSets,
+  activeWarmupExercises,
+  isEditMode,
+  workouts,
+  sets,
+} from '../../state/store';
 
 type Row = string[];
 let sheet: { Sets: Row[] };
@@ -16,16 +23,18 @@ let updateFailure: Error | null = null;
 /** Thrown by the next Sets append, when set. */
 let appendFailure: Error | null = null;
 
-const colIndex = (letters: string) =>
-  [...letters].reduce((n, c) => n * 26 + (c.charCodeAt(0) - 64), 0) - 1;
+const colIndex = (letters: string) => [...letters].reduce((n, c) => n * 26 + (c.charCodeAt(0) - 64), 0) - 1;
 function parseRange(range: string) {
   const [tab, cells] = range.split('!');
   const m = cells.match(/^([A-Z]+)(\d*):([A-Z]+)(\d*)$/);
   if (!m) throw new Error(`Unsupported range: ${range}`);
   const [, colStart, rowStart, colEnd, rowEnd] = m;
   return {
-    tab, colStart: colIndex(colStart), colEnd: colIndex(colEnd),
-    rowStart: rowStart ? Number(rowStart) : null, rowEnd: rowEnd ? Number(rowEnd) : null,
+    tab,
+    colStart: colIndex(colStart),
+    colEnd: colIndex(colEnd),
+    rowStart: rowStart ? Number(rowStart) : null,
+    rowEnd: rowEnd ? Number(rowEnd) : null,
   };
 }
 
@@ -33,7 +42,9 @@ function parseRange(range: string) {
 const writes: { kind: 'update' | 'append' | 'delete'; row?: number; values: Row }[] = [];
 
 vi.mock('../../api/sheets', () => ({
-  SheetsApiError: class extends Error { status = 0; },
+  SheetsApiError: class extends Error {
+    status = 0;
+  },
   withReauth: vi.fn(async (token: string, fn: (t: string) => Promise<unknown>) => fn(token)),
   sheetsGet: vi.fn(async (range: string) => {
     const { colStart, colEnd } = parseRange(range);
@@ -76,7 +87,10 @@ vi.mock('../../api/sheets', () => ({
 /** #392's order writes (`Sets!E`), kept apart from `writes`. */
 const orderWrites: { row: number; order: number }[] = [];
 vi.mock('../../api/demo-data', () => ({
-  isDemo: () => false, DEMO_WORKOUTS: [], DEMO_SETS: [], shiftDemoWorkouts: (w: unknown) => w,
+  isDemo: () => false,
+  DEMO_WORKOUTS: [],
+  DEMO_SETS: [],
+  shiftDemoWorkouts: (w: unknown) => w,
 }));
 vi.mock('../../auth/reauth', () => ({ attemptReauth: vi.fn(), ReauthFailedError: class extends Error {} }));
 vi.mock('../../auth/auth-context', () => ({ useAuth: () => ({ token: 'test-token' }) }));
@@ -93,8 +107,18 @@ const { fetchSets } = await import('../../api/workouts-api');
 
 /** [exercise_id, name, section, order, set #, weight, reps] */
 type Spec = [string, string, string, number, number, string, string];
-const toRow = ([id, name, section, order, n, weight, reps]: Spec): Row =>
-  ['w1', id, name, section, String(order), String(n), '8', weight, reps, ''];
+const toRow = ([id, name, section, order, n, weight, reps]: Spec): Row => [
+  'w1',
+  id,
+  name,
+  section,
+  String(order),
+  String(n),
+  '8',
+  weight,
+  reps,
+  '',
+];
 
 const BENCH_ROW_CURL: Spec[] = [
   ['e_bench', 'Bench', 'primary', 1, 1, '', ''],
@@ -117,14 +141,11 @@ async function mount(specs: Spec[]) {
 
 const cards = () => [...document.querySelectorAll<HTMLElement>('.tracker-exercise-list > [data-row-key]')];
 const setRows = (card: number) => [...cards()[card].querySelectorAll<HTMLElement>('.tracker-set')];
-const weightInput = (card: number, set = 0) =>
-  setRows(card)[set].querySelector<HTMLInputElement>('.set-weight-input')!;
+const weightInput = (card: number, set = 0) => setRows(card)[set].querySelector<HTMLInputElement>('.set-weight-input')!;
 const saved = (card: number, set = 0) =>
   setRows(card)[set].querySelector('.set-saved')!.getAttribute('aria-hidden') === 'false';
-const type = (card: number, value: string, set = 0) =>
-  fireEvent.input(weightInput(card, set), { target: { value } });
-const moveUp = (card: number) =>
-  fireEvent.click(cards()[card].querySelector<HTMLButtonElement>('[data-move="up"]')!);
+const type = (card: number, value: string, set = 0) => fireEvent.input(weightInput(card, set), { target: { value } });
+const moveUp = (card: number) => fireEvent.click(cards()[card].querySelector<HTMLButtonElement>('[data-move="up"]')!);
 /** [exercise_id, section, order, set #, weight] of a Sets row. */
 const brief = (r: Row) => [r[1], r[3], Number(r[4]), Number(r[5]), r[7]];
 
@@ -149,7 +170,7 @@ afterEach(() => {
 });
 
 describe('#389 AC1: a save pending during a move lands once, on the moved row', () => {
-  it('updates Row\'s own row with its new order, marks the moved card, and Finish does not save it again', async () => {
+  it("updates Row's own row with its new order, marks the moved card, and Finish does not save it again", async () => {
     await mount(BENCH_ROW_CURL);
     type(1, '135');
     await vi.advanceTimersByTimeAsync(300);
@@ -174,8 +195,8 @@ describe('#389 AC1: a save pending during a move lands once, on the moved row', 
   });
 });
 
-describe('#389 AC2: a duplicate\'s twin is never written or marked', () => {
-  it('writes the SS1 copy\'s own row and leaves the primary copy alone', async () => {
+describe("#389 AC2: a duplicate's twin is never written or marked", () => {
+  it("writes the SS1 copy's own row and leaves the primary copy alone", async () => {
     await mount(ROWBB_TWINS);
     type(1, '135');
     await vi.advanceTimersByTimeAsync(300);
@@ -220,7 +241,7 @@ describe('#389 AC3: a set with no row yet is appended once and keeps that row', 
     expect(sheet.Sets).toHaveLength(4);
   });
 
-  it('with a duplicate, the appended set is never given the twin\'s matching row', async () => {
+  it("with a duplicate, the appended set is never given the twin's matching row", async () => {
     // The primary copy's set 2 sits at (e_row, order 1, set 2) in the sheet:
     // exactly the key the SS1 copy's new set 2 is appended under after its move.
     await mount([
@@ -328,7 +349,7 @@ describe('#389 AC5: what does not change', () => {
   });
 });
 
-describe('#389 with #394: a save after a row delete writes the set\'s own, shifted row', () => {
+describe("#389 with #394: a save after a row delete writes the set's own, shifted row", () => {
   // Bench S1 (row 2), Bench S2 (3), Row S1 (4), Curl S1 50x10 (5). Deleting
   // Bench S2 shifts Row to 3 and Curl to 4; the tracker shifts its rows too.
   const SPECS: Spec[] = [
@@ -345,7 +366,7 @@ describe('#389 with #394: a save after a row delete writes the set\'s own, shift
   };
   afterEach(() => vi.restoreAllMocks());
 
-  it('Remove set, then edit a set below it: Row\'s own row is updated, Curl is untouched', async () => {
+  it("Remove set, then edit a set below it: Row's own row is updated, Curl is untouched", async () => {
     await mount(SPECS);
     fireEvent.click(setRows(0)[1].querySelector('.set-remove-btn')!);
     await vi.advanceTimersByTimeAsync(0);
@@ -360,7 +381,7 @@ describe('#389 with #394: a save after a row delete writes the set\'s own, shift
     expect(saved(1)).toBe(true);
   });
 
-  it('Remove exercise, then edit a set below it: only that set\'s row is written', async () => {
+  it("Remove exercise, then edit a set below it: only that set's row is written", async () => {
     await mount(SPECS);
     await removeFirst();
     await vi.advanceTimersByTimeAsync(0);
@@ -506,7 +527,7 @@ describe('#389: a set whose offline append the queue flushed is not appended aga
     expect(sheet.Sets[3][8]).toBe('8');
   });
 
-  it('a duplicate\'s twin row is never taken, even when unclaimed rows exist for the same key', async () => {
+  it("a duplicate's twin row is never taken, even when unclaimed rows exist for the same key", async () => {
     // Twin copies: the primary copy holds row 2 (e_row, order 1, set 1).
     await mount(ROWBB_TWINS);
     fireEvent.click(cards()[1].querySelector('.add-set-btn')!);
@@ -523,7 +544,7 @@ describe('#389: a set whose offline append the queue flushed is not appended aga
     expect(brief(sheet.Sets[3])).toEqual(['e_row', 'SS1', 2, 2, '140']);
   });
 
-  it('same-section copies: B never takes A\'s flushed row, and A takes it back on its next edit', async () => {
+  it("same-section copies: B never takes A's flushed row, and A takes it back on its next edit", async () => {
     // Row added twice mid-workout: both copies `primary`.
     await mount([
       ['e_row', 'Row', 'primary', 1, 1, '95', '8'],
@@ -577,4 +598,3 @@ describe('#389: a set whose offline append the queue flushed is not appended aga
     expect(brief(sheet.Sets[3])).toEqual(['e_row', 'primary', 1, 2, '140']);
   });
 });
-

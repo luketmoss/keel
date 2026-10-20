@@ -32,34 +32,24 @@ describe('LabelPickerManager', () => {
   // Scenario 8: aria-pressed on label toggles in normal mode
   it('renders label toggles with aria-pressed in normal mode', () => {
     const { container } = render(
-      <LabelPickerManager
-        currentLabels="Errands, Home"
-        onToggle={() => {}}
-        token="test-token"
-      />
+      <LabelPickerManager currentLabels="Errands, Home" onToggle={() => {}} token="test-token" />,
     );
     const toggles = container.querySelectorAll('.label-toggle');
     expect(toggles.length).toBe(3);
 
     // Errands is active
-    const errands = Array.from(toggles).find(t => t.textContent === 'Errands')!;
+    const errands = Array.from(toggles).find((t) => t.textContent === 'Errands')!;
     expect(errands.getAttribute('aria-pressed')).toBe('true');
 
     // School is not active
-    const school = Array.from(toggles).find(t => t.textContent === 'School')!;
+    const school = Array.from(toggles).find((t) => t.textContent === 'School')!;
     expect(school.getAttribute('aria-pressed')).toBe('false');
   });
 
   // Scenario 1: Clicking label toggle in normal mode calls onToggle
   it('calls onToggle when a label is clicked in normal mode', () => {
     const onToggle = vi.fn();
-    const { container } = render(
-      <LabelPickerManager
-        currentLabels=""
-        onToggle={onToggle}
-        token="test-token"
-      />
-    );
+    const { container } = render(<LabelPickerManager currentLabels="" onToggle={onToggle} token="test-token" />);
     const toggles = container.querySelectorAll('.label-toggle');
     (toggles[0] as HTMLElement).click();
     expect(onToggle).toHaveBeenCalledWith('Errands');
@@ -67,26 +57,14 @@ describe('LabelPickerManager', () => {
 
   // Scenario 1: "+ New label" button is visible in normal mode
   it('shows "+ New label" button in normal mode', () => {
-    const { container } = render(
-      <LabelPickerManager
-        currentLabels=""
-        onToggle={() => {}}
-        token="test-token"
-      />
-    );
+    const { container } = render(<LabelPickerManager currentLabels="" onToggle={() => {}} token="test-token" />);
     const btn = container.querySelector('[data-testid="new-label-btn"]');
     expect(btn).toBeTruthy();
   });
 
   // Scenario 1: Clicking "+ New label" shows the inline create form
   it('shows inline create form when "+ New label" is clicked', async () => {
-    const { container } = render(
-      <LabelPickerManager
-        currentLabels=""
-        onToggle={() => {}}
-        token="test-token"
-      />
-    );
+    const { container } = render(<LabelPickerManager currentLabels="" onToggle={() => {}} token="test-token" />);
     expect(container.querySelector('[data-testid="label-form"]')).toBeFalsy();
     fireEvent.click(container.querySelector('[data-testid="new-label-btn"]')!);
     expect(container.querySelector('[data-testid="label-form"]')).toBeTruthy();
@@ -95,13 +73,7 @@ describe('LabelPickerManager', () => {
 
   // Scenario 1: Create form has name input, color swatches, Save/Cancel
   it('create form has name input, color swatch grid, and Save/Cancel buttons', () => {
-    const { container } = render(
-      <LabelPickerManager
-        currentLabels=""
-        onToggle={() => {}}
-        token="test-token"
-      />
-    );
+    const { container } = render(<LabelPickerManager currentLabels="" onToggle={() => {}} token="test-token" />);
     fireEvent.click(container.querySelector('[data-testid="new-label-btn"]')!);
     const form = container.querySelector('[data-testid="label-form"]')!;
     expect(form.querySelector('.label-form-input')).toBeTruthy();
@@ -112,13 +84,7 @@ describe('LabelPickerManager', () => {
 
   // Scenario 5: Save button disabled when name is empty
   it('Save button is disabled when name is empty', () => {
-    const { container } = render(
-      <LabelPickerManager
-        currentLabels=""
-        onToggle={() => {}}
-        token="test-token"
-      />
-    );
+    const { container } = render(<LabelPickerManager currentLabels="" onToggle={() => {}} token="test-token" />);
     fireEvent.click(container.querySelector('[data-testid="new-label-btn"]')!);
     const saveBtn = container.querySelector('[data-testid="label-save-btn"]') as HTMLButtonElement;
     expect(saveBtn.disabled).toBe(true);
@@ -126,13 +92,7 @@ describe('LabelPickerManager', () => {
 
   // Scenario 5: Duplicate label name shows validation error
   it('shows validation error for duplicate label name', () => {
-    const { container } = render(
-      <LabelPickerManager
-        currentLabels=""
-        onToggle={() => {}}
-        token="test-token"
-      />
-    );
+    const { container } = render(<LabelPickerManager currentLabels="" onToggle={() => {}} token="test-token" />);
     fireEvent.click(container.querySelector('[data-testid="new-label-btn"]')!);
     const input = container.querySelector('[data-testid="label-name-input"]') as HTMLInputElement;
     fireEvent.input(input, { target: { value: 'errands' } }); // case-insensitive
@@ -143,13 +103,7 @@ describe('LabelPickerManager', () => {
 
   // Scenario 5: Name over 30 characters shows validation error
   it('shows validation error when name exceeds 30 characters', () => {
-    const { container } = render(
-      <LabelPickerManager
-        currentLabels=""
-        onToggle={() => {}}
-        token="test-token"
-      />
-    );
+    const { container } = render(<LabelPickerManager currentLabels="" onToggle={() => {}} token="test-token" />);
     fireEvent.click(container.querySelector('[data-testid="new-label-btn"]')!);
     const input = container.querySelector('[data-testid="label-name-input"]') as HTMLInputElement;
     fireEvent.input(input, { target: { value: 'A'.repeat(31) } });
@@ -160,13 +114,7 @@ describe('LabelPickerManager', () => {
 
   // Scenario 1: Valid create calls createLabel action
   it('calls createLabel action with valid name and color', async () => {
-    const { container } = render(
-      <LabelPickerManager
-        currentLabels=""
-        onToggle={() => {}}
-        token="test-token"
-      />
-    );
+    const { container } = render(<LabelPickerManager currentLabels="" onToggle={() => {}} token="test-token" />);
     fireEvent.click(container.querySelector('[data-testid="new-label-btn"]')!);
     const input = container.querySelector('[data-testid="label-name-input"]') as HTMLInputElement;
     fireEvent.input(input, { target: { value: 'New Label' } });
@@ -180,13 +128,7 @@ describe('LabelPickerManager', () => {
 
   // Scenario 2: "Manage labels" button toggles edit mode
   it('shows "Manage labels" button (gear icon) that toggles to "Done"', () => {
-    const { container } = render(
-      <LabelPickerManager
-        currentLabels=""
-        onToggle={() => {}}
-        token="test-token"
-      />
-    );
+    const { container } = render(<LabelPickerManager currentLabels="" onToggle={() => {}} token="test-token" />);
     const manageBtn = container.querySelector('[data-testid="manage-labels-btn"]')!;
     // In normal mode: gear icon (SVG), accessible via aria-label
     expect(manageBtn.getAttribute('aria-label')).toBe('Manage labels');
@@ -198,13 +140,7 @@ describe('LabelPickerManager', () => {
 
   // Scenario 2: In edit mode, each label has edit and delete icons
   it('shows edit and delete icons for each label in edit mode', () => {
-    const { container } = render(
-      <LabelPickerManager
-        currentLabels=""
-        onToggle={() => {}}
-        token="test-token"
-      />
-    );
+    const { container } = render(<LabelPickerManager currentLabels="" onToggle={() => {}} token="test-token" />);
     fireEvent.click(container.querySelector('[data-testid="manage-labels-btn"]')!);
     for (const l of MOCK_LABELS) {
       expect(container.querySelector(`[data-testid="label-edit-${l.label}"]`)).toBeTruthy();
@@ -215,13 +151,7 @@ describe('LabelPickerManager', () => {
   // Scenario 2: Label toggles are disabled in edit mode
   it('disables label toggle clicks in edit mode', () => {
     const onToggle = vi.fn();
-    const { container } = render(
-      <LabelPickerManager
-        currentLabels=""
-        onToggle={onToggle}
-        token="test-token"
-      />
-    );
+    const { container } = render(<LabelPickerManager currentLabels="" onToggle={onToggle} token="test-token" />);
     fireEvent.click(container.querySelector('[data-testid="manage-labels-btn"]')!);
     const toggles = container.querySelectorAll('.label-toggle');
     (toggles[0] as HTMLElement).click();
@@ -230,13 +160,7 @@ describe('LabelPickerManager', () => {
 
   // Scenario 3: Edit icon opens edit form for a label
   it('clicking edit icon opens edit form with pre-filled name and color', async () => {
-    const { container } = render(
-      <LabelPickerManager
-        currentLabels=""
-        onToggle={() => {}}
-        token="test-token"
-      />
-    );
+    const { container } = render(<LabelPickerManager currentLabels="" onToggle={() => {}} token="test-token" />);
     fireEvent.click(container.querySelector('[data-testid="manage-labels-btn"]')!);
     fireEvent.click(container.querySelector('[data-testid="label-edit-Errands"]')!);
     const input = container.querySelector('[data-testid="label-name-input"]') as HTMLInputElement;
@@ -246,13 +170,7 @@ describe('LabelPickerManager', () => {
 
   // Scenario 3: Saving edit calls updateLabel action
   it('calls updateLabel when edit form is saved', async () => {
-    const { container } = render(
-      <LabelPickerManager
-        currentLabels=""
-        onToggle={() => {}}
-        token="test-token"
-      />
-    );
+    const { container } = render(<LabelPickerManager currentLabels="" onToggle={() => {}} token="test-token" />);
     fireEvent.click(container.querySelector('[data-testid="manage-labels-btn"]')!);
     fireEvent.click(container.querySelector('[data-testid="label-edit-Errands"]')!);
     const input = container.querySelector('[data-testid="label-name-input"]') as HTMLInputElement;
@@ -265,13 +183,7 @@ describe('LabelPickerManager', () => {
 
   // Scenario 4: Delete icon shows inline confirmation
   it('clicking delete icon shows inline confirmation', () => {
-    const { container } = render(
-      <LabelPickerManager
-        currentLabels=""
-        onToggle={() => {}}
-        token="test-token"
-      />
-    );
+    const { container } = render(<LabelPickerManager currentLabels="" onToggle={() => {}} token="test-token" />);
     fireEvent.click(container.querySelector('[data-testid="manage-labels-btn"]')!);
     fireEvent.click(container.querySelector('[data-testid="label-delete-Errands"]')!);
     const confirm = container.querySelector('[data-testid="label-delete-confirm"]');
@@ -281,13 +193,7 @@ describe('LabelPickerManager', () => {
 
   // Scenario 4: Confirming delete calls deleteLabel action
   it('calls deleteLabel when delete is confirmed', async () => {
-    const { container } = render(
-      <LabelPickerManager
-        currentLabels=""
-        onToggle={() => {}}
-        token="test-token"
-      />
-    );
+    const { container } = render(<LabelPickerManager currentLabels="" onToggle={() => {}} token="test-token" />);
     fireEvent.click(container.querySelector('[data-testid="manage-labels-btn"]')!);
     fireEvent.click(container.querySelector('[data-testid="label-delete-Errands"]')!);
     fireEvent.click(container.querySelector('[data-testid="label-delete-confirm-btn"]')!);
@@ -298,13 +204,7 @@ describe('LabelPickerManager', () => {
 
   // Scenario 4: Cancel delete dismisses confirmation
   it('cancelling delete dismisses confirmation', () => {
-    const { container } = render(
-      <LabelPickerManager
-        currentLabels=""
-        onToggle={() => {}}
-        token="test-token"
-      />
-    );
+    const { container } = render(<LabelPickerManager currentLabels="" onToggle={() => {}} token="test-token" />);
     fireEvent.click(container.querySelector('[data-testid="manage-labels-btn"]')!);
     fireEvent.click(container.querySelector('[data-testid="label-delete-Errands"]')!);
     const confirm = container.querySelector('[data-testid="label-delete-confirm"]');
@@ -318,13 +218,7 @@ describe('LabelPickerManager', () => {
   // Scenario 7: Empty state when no labels exist
   it('shows empty state with create button when no labels exist', () => {
     labels.value = [];
-    const { container } = render(
-      <LabelPickerManager
-        currentLabels=""
-        onToggle={() => {}}
-        token="test-token"
-      />
-    );
+    const { container } = render(<LabelPickerManager currentLabels="" onToggle={() => {}} token="test-token" />);
     expect(container.querySelector('.label-picker-empty')).toBeTruthy();
     expect(container.textContent).toContain('No labels yet');
     const createBtn = container.querySelector('.label-picker-empty .btn-primary');
@@ -334,13 +228,7 @@ describe('LabelPickerManager', () => {
 
   // Scenario 5: Valid name, no duplicate -- Save enabled
   it('enables Save when name is valid and unique', () => {
-    const { container } = render(
-      <LabelPickerManager
-        currentLabels=""
-        onToggle={() => {}}
-        token="test-token"
-      />
-    );
+    const { container } = render(<LabelPickerManager currentLabels="" onToggle={() => {}} token="test-token" />);
     fireEvent.click(container.querySelector('[data-testid="new-label-btn"]')!);
     const input = container.querySelector('[data-testid="label-name-input"]') as HTMLInputElement;
     fireEvent.input(input, { target: { value: 'Unique Label' } });
@@ -350,13 +238,7 @@ describe('LabelPickerManager', () => {
 
   // Scenario 5: Whitespace-only name keeps Save disabled
   it('keeps Save disabled for whitespace-only name', () => {
-    const { container } = render(
-      <LabelPickerManager
-        currentLabels=""
-        onToggle={() => {}}
-        token="test-token"
-      />
-    );
+    const { container } = render(<LabelPickerManager currentLabels="" onToggle={() => {}} token="test-token" />);
     fireEvent.click(container.querySelector('[data-testid="new-label-btn"]')!);
     const input = container.querySelector('[data-testid="label-name-input"]') as HTMLInputElement;
     fireEvent.input(input, { target: { value: '   ' } });
@@ -390,11 +272,9 @@ describe('LabelPickerManager — board-scoped filtering (Issue #210)', () => {
   // AC1: Label picker shows only current board's labels
   it('AC1: shows only labels belonging to the active board', () => {
     activeBoardId.value = 'board-a';
-    const { container } = render(
-      <LabelPickerManager currentLabels="" onToggle={() => {}} token="test-token" />
-    );
+    const { container } = render(<LabelPickerManager currentLabels="" onToggle={() => {}} token="test-token" />);
     const toggles = container.querySelectorAll('.label-toggle');
-    const labelNames = Array.from(toggles).map(t => t.textContent);
+    const labelNames = Array.from(toggles).map((t) => t.textContent);
     expect(labelNames).toContain('Errands');
     expect(labelNames).toContain('Home');
     expect(labelNames).not.toContain('Work');
@@ -404,11 +284,9 @@ describe('LabelPickerManager — board-scoped filtering (Issue #210)', () => {
   // AC2: Cross-board labels do not appear
   it('AC2: does not show labels from other boards', () => {
     activeBoardId.value = 'board-b';
-    const { container } = render(
-      <LabelPickerManager currentLabels="" onToggle={() => {}} token="test-token" />
-    );
+    const { container } = render(<LabelPickerManager currentLabels="" onToggle={() => {}} token="test-token" />);
     const toggles = container.querySelectorAll('.label-toggle');
-    const labelNames = Array.from(toggles).map(t => t.textContent);
+    const labelNames = Array.from(toggles).map((t) => t.textContent);
     expect(labelNames).toContain('Work');
     expect(labelNames).toContain('Finance');
     expect(labelNames).not.toContain('Errands');
@@ -418,9 +296,7 @@ describe('LabelPickerManager — board-scoped filtering (Issue #210)', () => {
   // AC4: No regression on single-board setups (no activeBoardId)
   it('AC4: shows all labels when no board is active', () => {
     activeBoardId.value = '';
-    const { container } = render(
-      <LabelPickerManager currentLabels="" onToggle={() => {}} token="test-token" />
-    );
+    const { container } = render(<LabelPickerManager currentLabels="" onToggle={() => {}} token="test-token" />);
     const toggles = container.querySelectorAll('.label-toggle');
     expect(toggles.length).toBe(4);
   });

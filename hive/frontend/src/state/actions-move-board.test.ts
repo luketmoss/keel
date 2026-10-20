@@ -2,20 +2,47 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { moveItemToBoard } from './actions';
 
 // Mock board-store signals
-const mockBoards = { current: [
-  { id: 'board-1', name: 'Family Board', created_at: '', created_by: '', color: '', icon: '' },
-  { id: 'board-2', name: 'Work Board', created_at: '', created_by: '', color: '', icon: '' },
-] };
+const mockBoards = {
+  current: [
+    { id: 'board-1', name: 'Family Board', created_at: '', created_by: '', color: '', icon: '' },
+    { id: 'board-2', name: 'Work Board', created_at: '', created_by: '', color: '', icon: '' },
+  ],
+};
 const mockItems = { current: [] as any[] };
 const mockSelectedItemId = { current: null as string | null };
 const mockToast = { current: null as any };
 
 vi.mock('./board-store', () => ({
-  boards: { get value() { return mockBoards.current; }, set value(v: any) { mockBoards.current = v; } },
-  items: { get value() { return mockItems.current; }, set value(v: any) { mockItems.current = v; } },
-  selectedItemId: { get value() { return mockSelectedItemId.current; }, set value(v: any) { mockSelectedItemId.current = v; } },
-  selectItem: (id: string) => { mockSelectedItemId.current = id; },
-  clearSelectedItem: () => { mockSelectedItemId.current = null; },
+  boards: {
+    get value() {
+      return mockBoards.current;
+    },
+    set value(v: any) {
+      mockBoards.current = v;
+    },
+  },
+  items: {
+    get value() {
+      return mockItems.current;
+    },
+    set value(v: any) {
+      mockItems.current = v;
+    },
+  },
+  selectedItemId: {
+    get value() {
+      return mockSelectedItemId.current;
+    },
+    set value(v: any) {
+      mockSelectedItemId.current = v;
+    },
+  },
+  selectItem: (id: string) => {
+    mockSelectedItemId.current = id;
+  },
+  clearSelectedItem: () => {
+    mockSelectedItemId.current = null;
+  },
   initSelectedItemFromUrl: vi.fn(),
   initActiveViewFromUrl: vi.fn(),
   initUpcomingBoardFilter: vi.fn(),
@@ -25,9 +52,15 @@ vi.mock('./board-store', () => ({
   owners: { value: [] },
   labels: { value: [] },
   permissions: { value: [] },
-  showToast: (text: string, type?: string) => { mockToast.current = { text, type: type || 'success' }; },
+  showToast: (text: string, type?: string) => {
+    mockToast.current = { text, type: type || 'success' };
+  },
   initActiveBoardFromUrl: vi.fn(),
-  accessibleBoards: { get value() { return mockBoards.current; } },
+  accessibleBoards: {
+    get value() {
+      return mockBoards.current;
+    },
+  },
   switchBoard: vi.fn(),
 }));
 
@@ -70,7 +103,13 @@ vi.mock('../api/sheets', () => ({
   deleteStatusRow: vi.fn().mockResolvedValue(undefined),
   fetchStatusesWithRows: vi.fn().mockResolvedValue([]),
   cascadeStatusRename: vi.fn().mockResolvedValue(undefined),
-  SheetsApiError: class extends Error { status: number; constructor(s: number, m: string) { super(m); this.status = s; } },
+  SheetsApiError: class extends Error {
+    status: number;
+    constructor(s: number, m: string) {
+      super(m);
+      this.status = s;
+    }
+  },
 }));
 
 vi.mock('../demo/mock-api', () => ({}));
@@ -166,7 +205,7 @@ describe('moveItemToBoard', () => {
     moveItemToBoard('parent-1', 'board-2', 'Tester', 'token');
 
     // Allow microtask queue to flush
-    await new Promise(r => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
 
     expect(mockItems.current.find((i: any) => i.id === 'parent-1')?.board_id).toBe('board-2');
     expect(mockItems.current.find((i: any) => i.id === 'sub-1')?.board_id).toBe('board-2');
@@ -180,7 +219,13 @@ describe('moveItemToBoard', () => {
     await moveItemToBoard('item-1', 'board-2', 'Tester', 'token');
 
     expect(mockAppendAuditEntry).toHaveBeenCalledWith(
-      'item-1', 'board_moved', 'board_id', 'board-1', 'board-2', 'Tester', 'token'
+      'item-1',
+      'board_moved',
+      'board_id',
+      'board-1',
+      'board-2',
+      'Tester',
+      'token',
     );
   });
 

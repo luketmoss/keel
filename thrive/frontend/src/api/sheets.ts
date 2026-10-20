@@ -8,7 +8,10 @@ const SPREADSHEET_ID = import.meta.env.VITE_SPREADSHEET_ID;
 const BASE = 'https://sheets.googleapis.com/v4/spreadsheets';
 
 export class SheetsApiError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(
+    public status: number,
+    message: string,
+  ) {
     super(`Sheets API ${status}: ${message}`);
     this.name = 'SheetsApiError';
   }
@@ -99,16 +102,21 @@ export async function sheetsBatchUpdate(requests: object[], token: string): Prom
 }
 
 export async function sheetsDeleteRow(sheetId: number, rowIndex: number, token: string): Promise<void> {
-  await sheetsBatchUpdate([{
-    deleteDimension: {
-      range: {
-        sheetId,
-        dimension: 'ROWS',
-        startIndex: rowIndex - 1, // 0-based
-        endIndex: rowIndex,
+  await sheetsBatchUpdate(
+    [
+      {
+        deleteDimension: {
+          range: {
+            sheetId,
+            dimension: 'ROWS',
+            startIndex: rowIndex - 1, // 0-based
+            endIndex: rowIndex,
+          },
+        },
       },
-    },
-  }], token);
+    ],
+    token,
+  );
 }
 
 /**
@@ -123,8 +131,6 @@ export async function getSheetId(sheetName: string, token: string): Promise<numb
   if (res.status === 401) throw new SheetsApiError(401, 'Token expired');
   if (!res.ok) throw new SheetsApiError(res.status, await res.text());
   const data = await res.json();
-  const sheet = data.sheets?.find(
-    (s: any) => s.properties.title === sheetName
-  );
+  const sheet = data.sheets?.find((s: any) => s.properties.title === sheetName);
   return sheet?.properties?.sheetId ?? 0;
 }

@@ -8,7 +8,7 @@ interface ColorSwatchPickerProps {
 export function ColorSwatchPicker({ selected, onSelect }: ColorSwatchPickerProps) {
   return (
     <div class="color-swatch-grid" role="radiogroup" aria-label="Label color">
-      {LABEL_COLORS.map(color => {
+      {LABEL_COLORS.map((color) => {
         const isSelected = selected === color.key;
         return (
           <button
@@ -22,7 +22,9 @@ export function ColorSwatchPicker({ selected, onSelect }: ColorSwatchPickerProps
             aria-checked={isSelected}
           >
             {isSelected && (
-              <span class="color-swatch-check" aria-hidden="true">&#10003;</span>
+              <span class="color-swatch-check" aria-hidden="true">
+                &#10003;
+              </span>
             )}
           </button>
         );

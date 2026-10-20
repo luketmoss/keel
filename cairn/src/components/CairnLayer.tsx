@@ -178,10 +178,7 @@ export function CairnLayer({
     () => cairns.map((cairn) => ({ lat: cairn.latitude, lng: cairn.longitude, cairn })),
     [cairns],
   )
-  const clusters = useMemo(
-    () => clusterMarkers(clusterable, zoom, MARKER_FOOTPRINT_PX),
-    [clusterable, zoom],
-  )
+  const clusters = useMemo(() => clusterMarkers(clusterable, zoom, MARKER_FOOTPRINT_PX), [clusterable, zoom])
 
   if (!map) return null
 
@@ -201,7 +198,9 @@ export function CairnLayer({
               draggable={draggable}
               onMove={onMoveCairn}
               hovered={hoveredCairnIds.has(cairn.id)}
-              onHoverChange={(hovered) => onHoverCairn(hovered ? new Set([cairn.id]) : EMPTY_HOVERED_CAIRN_IDS)}
+              onHoverChange={(hovered) =>
+                onHoverCairn(hovered ? new Set([cairn.id]) : EMPTY_HOVERED_CAIRN_IDS)
+              }
             />
           )
         }
@@ -221,7 +220,8 @@ export function CairnLayer({
         /* #270 — "a selected cairn inside a collapsed cluster gives that
            cluster the selected treatment", by the same member-id test
            `hovered` above already uses (design note's "The cluster"). */
-        const selected = selectedCairnId !== null && cluster.members.some((member) => member.cairn.id === selectedCairnId)
+        const selected =
+          selectedCairnId !== null && cluster.members.some((member) => member.cairn.id === selectedCairnId)
         const hoverMemberIds = () => new Set(cluster.members.map((member) => member.cairn.id))
         if (key === expandedKey) {
           return (

@@ -1,6 +1,17 @@
 import { useState, useCallback, useRef } from 'preact/hooks';
 import { useAuth } from '../../auth/auth-context';
-import { showShareModal, activeBoard, activeBoardId, permissions, owners, boards, showDeleteBoardModal, showArchiveBoardModal, userBoardRole, accessibleBoards } from '../../state/board-store';
+import {
+  showShareModal,
+  activeBoard,
+  activeBoardId,
+  permissions,
+  owners,
+  boards,
+  showDeleteBoardModal,
+  showArchiveBoardModal,
+  userBoardRole,
+  accessibleBoards,
+} from '../../state/board-store';
 import { shareBoard, unshareBoard, updateBoardAppearance, renameBoardName } from '../../state/actions';
 import { useFocusTrap } from '../../hooks/use-focus-trap';
 import { IconPicker } from '../shared/icon-picker';
@@ -30,9 +41,9 @@ export function ShareModal() {
   const isOwner = userBoardRole.value === 'owner';
 
   // Permissions for this board
-  const boardPerms = permissions.value.filter(p => p.board_id === boardId);
-  const hasWildcard = boardPerms.some(p => p.user_email === '*');
-  const memberPerms = boardPerms.filter(p => p.user_email !== '*');
+  const boardPerms = permissions.value.filter((p) => p.board_id === boardId);
+  const hasWildcard = boardPerms.some((p) => p.user_email === '*');
+  const memberPerms = boardPerms.filter((p) => p.user_email !== '*');
 
   const close = useCallback(() => {
     showShareModal.value = false;
@@ -45,7 +56,7 @@ export function ShareModal() {
     const trimmed = value.trim();
     if (!trimmed) return 'Board name is required';
     if (trimmed.length > MAX_NAME_LENGTH) return `Name must be ${MAX_NAME_LENGTH} characters or fewer`;
-    if (boards.value.some(b => b.id !== boardId && b.name.toLowerCase() === trimmed.toLowerCase())) {
+    if (boards.value.some((b) => b.id !== boardId && b.name.toLowerCase() === trimmed.toLowerCase())) {
       return 'A board with this name already exists';
     }
     return '';
@@ -90,16 +101,12 @@ export function ShareModal() {
       setEmailError('Enter a valid email address');
       return;
     }
-    const isOwnerEmail = owners.value.some(
-      o => o.google_account.toLowerCase() === trimmed
-    );
+    const isOwnerEmail = owners.value.some((o) => o.google_account.toLowerCase() === trimmed);
     if (!isOwnerEmail) {
       setEmailError("This person isn't a board member yet. Add them to the Owners list first.");
       return;
     }
-    const alreadyShared = boardPerms.some(
-      p => p.user_email.toLowerCase() === trimmed
-    );
+    const alreadyShared = boardPerms.some((p) => p.user_email.toLowerCase() === trimmed);
     if (alreadyShared) {
       setEmailError('Already shared with this person');
       return;
@@ -138,9 +145,7 @@ export function ShareModal() {
   };
 
   const nameForEmail = (emailAddr: string): string => {
-    const owner = owners.value.find(
-      o => o.google_account.toLowerCase() === emailAddr.toLowerCase()
-    );
+    const owner = owners.value.find((o) => o.google_account.toLowerCase() === emailAddr.toLowerCase());
     return owner?.name || emailAddr;
   };
 
@@ -153,7 +158,7 @@ export function ShareModal() {
     { id: 'danger', label: 'Danger Zone', ownerOnly: true },
   ];
 
-  const visibleTabs = tabs.filter(t => !t.ownerOnly || isOwner);
+  const visibleTabs = tabs.filter((t) => !t.ownerOnly || isOwner);
 
   return (
     <div
@@ -166,12 +171,14 @@ export function ShareModal() {
       <div class="modal share-modal" role="dialog" aria-labelledby={HEADING_ID} aria-modal="true">
         <div class="modal-header">
           <h2 id={HEADING_ID}>Board Settings</h2>
-          <button class="btn btn-ghost" onClick={close} aria-label="Close">&#10005;</button>
+          <button class="btn btn-ghost" onClick={close} aria-label="Close">
+            &#10005;
+          </button>
         </div>
 
         {/* Tab bar */}
         <div class="settings-tabs" role="tablist" aria-label="Settings sections">
-          {visibleTabs.map(tab => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab.id}
               class={`settings-tab${activeTab === tab.id ? ' settings-tab-active' : ''}${tab.id === 'danger' ? ' settings-tab-danger' : ''}`}
@@ -209,9 +216,13 @@ export function ShareModal() {
                     />
                     <div class="board-name-meta">
                       {nameError && (
-                        <span id="board-settings-name-error" class="form-error" role="alert">{nameError}</span>
+                        <span id="board-settings-name-error" class="form-error" role="alert">
+                          {nameError}
+                        </span>
                       )}
-                      <span class={`char-counter ${name.length > MAX_NAME_LENGTH ? 'char-counter-danger' : name.length > MAX_NAME_LENGTH - 5 ? 'char-counter-warning' : ''}`}>
+                      <span
+                        class={`char-counter ${name.length > MAX_NAME_LENGTH ? 'char-counter-danger' : name.length > MAX_NAME_LENGTH - 5 ? 'char-counter-warning' : ''}`}
+                      >
                         {name.length}/{MAX_NAME_LENGTH}
                       </span>
                     </div>
@@ -242,18 +253,14 @@ export function ShareModal() {
           {/* Columns tab */}
           {activeTab === 'columns' && isOwner && (
             <div id="settings-panel-columns" role="tabpanel" aria-labelledby="settings-tab-columns">
-              <div class="modal-body">
-                {token && <ColumnSettings token={token} />}
-              </div>
+              <div class="modal-body">{token && <ColumnSettings token={token} />}</div>
             </div>
           )}
 
           {/* Labels tab */}
           {activeTab === 'labels' && isOwner && (
             <div id="settings-panel-labels" role="tabpanel" aria-labelledby="settings-tab-labels">
-              <div class="modal-body">
-                {token && <LabelSettings token={token} />}
-              </div>
+              <div class="modal-body">{token && <LabelSettings token={token} />}</div>
             </div>
           )}
 
@@ -287,16 +294,14 @@ export function ShareModal() {
                         aria-invalid={emailError ? 'true' : undefined}
                         aria-describedby={emailError ? 'share-email-error' : undefined}
                       />
-                      <button
-                        type="submit"
-                        class="btn btn-primary"
-                        disabled={!email.trim() || submitting}
-                      >
+                      <button type="submit" class="btn btn-primary" disabled={!email.trim() || submitting}>
                         {submitting ? 'Adding...' : 'Add'}
                       </button>
                     </div>
                     {emailError && (
-                      <span id="share-email-error" class="form-error" role="alert">{emailError}</span>
+                      <span id="share-email-error" class="form-error" role="alert">
+                        {emailError}
+                      </span>
                     )}
                   </div>
 
@@ -304,7 +309,7 @@ export function ShareModal() {
                     {memberPerms.length === 0 && !hasWildcard && (
                       <p class="share-empty">Share this board with family members</p>
                     )}
-                    {memberPerms.map(perm => (
+                    {memberPerms.map((perm) => (
                       <div
                         key={perm.user_email}
                         class={`share-member-row ${recentlyAdded === perm.user_email ? 'share-member-highlight' : ''}`}
@@ -314,26 +319,22 @@ export function ShareModal() {
                           <span class="share-member-name">
                             {nameForEmail(perm.user_email)}
                             {perm.role === 'owner' && (
-                              <span class="share-owner-badge" aria-label="Board owner">(Owner)</span>
+                              <span class="share-owner-badge" aria-label="Board owner">
+                                (Owner)
+                              </span>
                             )}
                           </span>
                           <span class="share-member-email">{perm.user_email}</span>
                         </div>
                         <span class="share-member-role">{perm.role}</span>
-                        {perm.role !== 'owner' && (
-                          confirmRemove === perm.user_email ? (
+                        {perm.role !== 'owner' &&
+                          (confirmRemove === perm.user_email ? (
                             <div class="share-confirm-remove">
                               <span>Remove {nameForEmail(perm.user_email)}?</span>
-                              <button
-                                class="btn btn-ghost btn-sm"
-                                onClick={() => handleRemove(perm.user_email)}
-                              >
+                              <button class="btn btn-ghost btn-sm" onClick={() => handleRemove(perm.user_email)}>
                                 Yes
                               </button>
-                              <button
-                                class="btn btn-ghost btn-sm"
-                                onClick={() => setConfirmRemove(null)}
-                              >
+                              <button class="btn btn-ghost btn-sm" onClick={() => setConfirmRemove(null)}>
                                 No
                               </button>
                             </div>
@@ -346,15 +347,16 @@ export function ShareModal() {
                             >
                               &#10005;
                             </button>
-                          )
-                        )}
+                          ))}
                       </div>
                     ))}
                   </div>
                 </div>
 
                 <div class="modal-footer">
-                  <button type="button" class="btn btn-ghost" onClick={close}>Done</button>
+                  <button type="button" class="btn btn-ghost" onClick={close}>
+                    Done
+                  </button>
                 </div>
               </form>
             </div>
@@ -366,27 +368,36 @@ export function ShareModal() {
               <div class="modal-body">
                 <div class="share-danger-zone">
                   {/* #288: archiving is reversible, so it sits first and isn't danger-styled */}
-                  <p class="share-danger-zone-desc">
-                    Hide this board and its items. You can restore it any time.
-                  </p>
+                  <p class="share-danger-zone-desc">Hide this board and its items. You can restore it any time.</p>
                   <button
                     type="button"
                     class="btn share-archive-board-btn"
                     disabled={accessibleBoards.value.length <= 1}
-                    title={accessibleBoards.value.length <= 1 ? 'This is your last board and cannot be archived' : `Archive ${activeBoard.value?.name || 'board'}`}
-                    onClick={() => { showArchiveBoardModal.value = true; }}
+                    title={
+                      accessibleBoards.value.length <= 1
+                        ? 'This is your last board and cannot be archived'
+                        : `Archive ${activeBoard.value?.name || 'board'}`
+                    }
+                    onClick={() => {
+                      showArchiveBoardModal.value = true;
+                    }}
                     data-testid="archive-board-btn"
                   >
                     Archive board
                   </button>
                   <p class="share-danger-zone-desc">
-                    Deleting a board removes all its items, permissions, and columns. This cannot be undone. To keep them, archive the board instead.
+                    Deleting a board removes all its items, permissions, and columns. This cannot be undone. To keep
+                    them, archive the board instead.
                   </p>
                   <button
                     type="button"
                     class="btn btn-danger share-delete-board-btn"
                     disabled={accessibleBoards.value.length <= 1}
-                    title={accessibleBoards.value.length <= 1 ? 'This is your last board and cannot be deleted' : `Delete ${activeBoard.value?.name || 'board'}`}
+                    title={
+                      accessibleBoards.value.length <= 1
+                        ? 'This is your last board and cannot be deleted'
+                        : `Delete ${activeBoard.value?.name || 'board'}`
+                    }
                     onClick={() => {
                       showShareModal.value = false;
                       showDeleteBoardModal.value = true;

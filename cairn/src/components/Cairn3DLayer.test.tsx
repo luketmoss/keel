@@ -277,7 +277,9 @@ describe('Cairn3DLayer (#273)', () => {
     const mapGestureSpy = vi.fn()
     map3dElement.addEventListener('pointerdown', mapGestureSpy)
     try {
-      render(<Cairn3DLayer cairns={[PIN]} accessToken={null} selectedCairnId={null} onSelectCairn={vi.fn()} />)
+      render(
+        <Cairn3DLayer cairns={[PIN]} accessToken={null} selectedCairnId={null} onSelectCairn={vi.fn()} />,
+      )
       const marker = screen.getByTestId('cairn-marker-3d')
 
       fireEvent.pointerDown(marker, { pointerId: 1, clientX: 0, clientY: 0 })
@@ -299,7 +301,9 @@ describe('Cairn3DLayer (#273)', () => {
     const mapGestureSpy = vi.fn()
     map3dElement.addEventListener('pointerdown', mapGestureSpy)
     try {
-      render(<Cairn3DLayer cairns={[PIN]} accessToken={null} selectedCairnId={null} onSelectCairn={vi.fn()} />)
+      render(
+        <Cairn3DLayer cairns={[PIN]} accessToken={null} selectedCairnId={null} onSelectCairn={vi.fn()} />,
+      )
       const empty = document.createElement('div')
       map3dElement.appendChild(empty)
 
@@ -333,7 +337,12 @@ describe('Cairn3DLayer (#273)', () => {
 
   it('re-appends the selected marker so it is last in the surface child order', () => {
     const { rerender } = render(
-      <Cairn3DLayer cairns={[PIN, OTHER]} accessToken={null} selectedCairnId={null} onSelectCairn={vi.fn()} />,
+      <Cairn3DLayer
+        cairns={[PIN, OTHER]}
+        accessToken={null}
+        selectedCairnId={null}
+        onSelectCairn={vi.fn()}
+      />,
     )
     function lastMarker() {
       const markers = document.body.querySelectorAll('[data-fake-marker]')
@@ -342,7 +351,12 @@ describe('Cairn3DLayer (#273)', () => {
     expect(lastMarker().title).toBe('Camp')
 
     rerender(
-      <Cairn3DLayer cairns={[PIN, OTHER]} accessToken={null} selectedCairnId="cairn-1" onSelectCairn={vi.fn()} />,
+      <Cairn3DLayer
+        cairns={[PIN, OTHER]}
+        accessToken={null}
+        selectedCairnId="cairn-1"
+        onSelectCairn={vi.fn()}
+      />,
     )
 
     expect(lastMarker().title).toBe('Lookout')
@@ -410,7 +424,9 @@ describe('Cairn3DLayer occlusion (#285)', () => {
         ],
       }),
     }
-    render(<Cairn3DLayer cairns={[PIN]} accessToken={null} selectedCairnId="cairn-1" onSelectCairn={vi.fn()} />)
+    render(
+      <Cairn3DLayer cairns={[PIN]} accessToken={null} selectedCairnId="cairn-1" onSelectCairn={vi.fn()} />,
+    )
 
     await act(async () => {
       steadyHandler.current?.({ isSteady: true } as unknown as Event)

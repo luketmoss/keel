@@ -62,7 +62,10 @@ export function loadMaps(): Promise<void> {
     w.__thriveMapsReady = () => {
       const lib = w.google?.maps?.importLibrary;
       if (!lib) return fail('maps_unavailable');
-      lib.call(w.google!.maps, 'maps').then(() => resolve(), () => fail('maps_unavailable'));
+      lib.call(w.google!.maps, 'maps').then(
+        () => resolve(),
+        () => fail('maps_unavailable'),
+      );
     };
 
     const script = document.createElement('script');

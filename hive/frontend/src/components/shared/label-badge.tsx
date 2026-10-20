@@ -6,7 +6,7 @@ interface Props {
 }
 
 export function LabelBadge({ label }: Props) {
-  const labelDef = labelsStore.value.find(l => l.label === label);
+  const labelDef = labelsStore.value.find((l) => l.label === label);
   const color = labelDef?.color || '#999';
   const textColor = getContrastTextColor(color);
 

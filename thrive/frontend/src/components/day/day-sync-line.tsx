@@ -59,7 +59,11 @@ function SyncIcon() {
     <svg class="day-sync-icon" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" focusable="false">
       <path
         d="M16 7.5A6.5 6.5 0 0 0 4.2 6M4 12.5A6.5 6.5 0 0 0 15.8 14M4 3v3.5h3.5M16 17v-3.5h-3.5"
-        fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.7"
+        stroke-linecap="round"
+        stroke-linejoin="round"
       />
     </svg>
   );
@@ -100,14 +104,18 @@ export function DaySyncLine({ sync }: { sync: SyncNow }) {
         <div class="day-sync-text">
           <p class={`day-sync-age${status.tone === 'neutral' ? '' : ` sync-tone-${status.tone}`}`}>{status.text}</p>
           {status.notes.map((n) => (
-            <p key={n.vendor} class={`day-sync-note sync-tone-${n.tone}`}>{n.text}</p>
+            <p key={n.vendor} class={`day-sync-note sync-tone-${n.tone}`}>
+              {n.text}
+            </p>
           ))}
         </div>
         <button
           type="button"
           class={`day-sync-btn${busy ? ' day-sync-busy' : ''}`}
           aria-disabled={busy ? 'true' : undefined}
-          onClick={() => { if (!busy) sync.press(); }}
+          onClick={() => {
+            if (!busy) sync.press();
+          }}
         >
           <SyncIcon />
           <span>{busy ? 'Syncing…' : 'Sync now'}</span>
@@ -115,8 +123,12 @@ export function DaySyncLine({ sync }: { sync: SyncNow }) {
       </div>
       <div class="day-sync-requests" role="status" aria-live="polite">
         {entries.map((e) => (
-          <p key={e.vendor ?? 'both'} class={`day-sync-request${e.view.tone === 'neutral' ? '' : ` sync-tone-${e.view.tone}`}`}>
-            {e.vendor ? `${e.vendor}: ` : ''}{e.view.text}
+          <p
+            key={e.vendor ?? 'both'}
+            class={`day-sync-request${e.view.tone === 'neutral' ? '' : ` sync-tone-${e.view.tone}`}`}
+          >
+            {e.vendor ? `${e.vendor}: ` : ''}
+            {e.view.text}
           </p>
         ))}
       </div>

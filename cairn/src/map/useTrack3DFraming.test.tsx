@@ -176,9 +176,7 @@ describe('useTrack3DFraming (#292)', () => {
 
   it('does not frame while a decision owns the map', async () => {
     const map3d = fakeMap3d()
-    render(
-      <Probe map3d={map3d} totalCount={1} visibleKey="file-a" points={ONE_TRACK} revealSuspended />,
-    )
+    render(<Probe map3d={map3d} totalCount={1} visibleKey="file-a" points={ONE_TRACK} revealSuspended />)
     await settleFraming()
 
     expect(map3d.flyCameraTo).not.toHaveBeenCalled()

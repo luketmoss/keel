@@ -12,8 +12,12 @@ let mockSelectedItemId: string | null = 'aria-test-1';
 
 vi.mock('../../state/board-store', () => ({
   selectedItemId: {
-    get value() { return mockSelectedItemId; },
-    set value(v: string | null) { mockSelectedItemId = v; },
+    get value() {
+      return mockSelectedItemId;
+    },
+    set value(v: string | null) {
+      mockSelectedItemId = v;
+    },
   },
   openDetailWithTitleEdit: { value: false },
   selectedItem: {
@@ -85,11 +89,37 @@ vi.mock('../../state/board-store', () => ({
   accessibleBoards: { value: [] },
   activeBoardId: { value: 'board-1' },
   showMoveToBoardModal: { value: false },
-  boardStatuses: { value: [
-    { id: 's1', board_id: 'board-1', name: 'To Do', sort_order: 1, color: '#e3f2fd', is_terminal: false, created_at: '' },
-    { id: 's2', board_id: 'board-1', name: 'In Progress', sort_order: 2, color: '#fff3e0', is_terminal: false, created_at: '' },
-    { id: 's3', board_id: 'board-1', name: 'Done', sort_order: 3, color: '#e8f5e9', is_terminal: true, created_at: '' },
-  ] },
+  boardStatuses: {
+    value: [
+      {
+        id: 's1',
+        board_id: 'board-1',
+        name: 'To Do',
+        sort_order: 1,
+        color: '#e3f2fd',
+        is_terminal: false,
+        created_at: '',
+      },
+      {
+        id: 's2',
+        board_id: 'board-1',
+        name: 'In Progress',
+        sort_order: 2,
+        color: '#fff3e0',
+        is_terminal: false,
+        created_at: '',
+      },
+      {
+        id: 's3',
+        board_id: 'board-1',
+        name: 'Done',
+        sort_order: 3,
+        color: '#e8f5e9',
+        is_terminal: true,
+        created_at: '',
+      },
+    ],
+  },
   isTerminalStatus: (name: string) => name === 'Done',
   defaultStatusName: () => 'To Do',
   terminalStatusName: () => 'Done',
@@ -116,7 +146,7 @@ function renderCardDetail() {
   return render(
     <AuthContext.Provider value={mockAuth}>
       <CardDetail />
-    </AuthContext.Provider>
+    </AuthContext.Provider>,
   );
 }
 

@@ -115,7 +115,11 @@ function mockGoogleSignIn() {
   return vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
     const href = String(url)
     if (href.includes('/about')) {
-      return { ok: true, status: 200, json: async () => ({ user: { emailAddress: 'jane@gmail.com' } }) } as Response
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ user: { emailAddress: 'jane@gmail.com' } }),
+      } as Response
     }
     return {
       ok: true,

@@ -10,27 +10,91 @@ const mockOwners = { current: [] as any[] };
 const mockBoardId = { current: 'board-1' };
 const mockUserRole = { current: 'owner' as string };
 
-const mockBoards = { current: [
-  { id: 'board-1', name: 'Test Board', created_at: '', created_by: '', color: '', icon: '' },
-  { id: 'board-2', name: 'Other Board', created_at: '', created_by: '', color: '', icon: '' },
-] };
+const mockBoards = {
+  current: [
+    { id: 'board-1', name: 'Test Board', created_at: '', created_by: '', color: '', icon: '' },
+    { id: 'board-2', name: 'Other Board', created_at: '', created_by: '', color: '', icon: '' },
+  ],
+};
 
 vi.mock('../../state/board-store', () => ({
   showShareModal: { value: true },
-  activeBoard: { get value() { return { id: mockBoardId.current, name: mockBoards.current.find(b => b.id === mockBoardId.current)?.name || 'Test Board', color: '', icon: '' }; } },
-  activeBoardId: { get value() { return mockBoardId.current; } },
-  permissions: { get value() { return mockPerms.current; }, set value(v: any) { mockPerms.current = v; } },
-  owners: { get value() { return mockOwners.current; } },
-  boards: { get value() { return mockBoards.current; } },
-  userBoardRole: { get value() { return mockUserRole.current; } },
-  accessibleBoards: { get value() { return mockBoards.current; } },
+  activeBoard: {
+    get value() {
+      return {
+        id: mockBoardId.current,
+        name: mockBoards.current.find((b) => b.id === mockBoardId.current)?.name || 'Test Board',
+        color: '',
+        icon: '',
+      };
+    },
+  },
+  activeBoardId: {
+    get value() {
+      return mockBoardId.current;
+    },
+  },
+  permissions: {
+    get value() {
+      return mockPerms.current;
+    },
+    set value(v: any) {
+      mockPerms.current = v;
+    },
+  },
+  owners: {
+    get value() {
+      return mockOwners.current;
+    },
+  },
+  boards: {
+    get value() {
+      return mockBoards.current;
+    },
+  },
+  userBoardRole: {
+    get value() {
+      return mockUserRole.current;
+    },
+  },
+  accessibleBoards: {
+    get value() {
+      return mockBoards.current;
+    },
+  },
   showDeleteBoardModal: { value: false },
   openDetailWithTitleEdit: { value: false },
-  boardStatuses: { value: [
-    { id: 's1', board_id: 'board-1', name: 'To Do', sort_order: 1, color: '#e3f2fd', is_terminal: false, created_at: '' },
-    { id: 's2', board_id: 'board-1', name: 'In Progress', sort_order: 2, color: '#fff3e0', is_terminal: false, created_at: '' },
-    { id: 's3', board_id: 'board-1', name: 'Done', sort_order: 3, color: '#e8f5e9', is_terminal: true, created_at: '' },
-  ] },
+  boardStatuses: {
+    value: [
+      {
+        id: 's1',
+        board_id: 'board-1',
+        name: 'To Do',
+        sort_order: 1,
+        color: '#e3f2fd',
+        is_terminal: false,
+        created_at: '',
+      },
+      {
+        id: 's2',
+        board_id: 'board-1',
+        name: 'In Progress',
+        sort_order: 2,
+        color: '#fff3e0',
+        is_terminal: false,
+        created_at: '',
+      },
+      {
+        id: 's3',
+        board_id: 'board-1',
+        name: 'Done',
+        sort_order: 3,
+        color: '#e8f5e9',
+        is_terminal: true,
+        created_at: '',
+      },
+    ],
+  },
 }));
 
 const mockShareBoard = vi.fn().mockResolvedValue(true);
@@ -71,7 +135,7 @@ function renderModal(auth = mockAuth) {
   return render(
     <AuthContext.Provider value={auth}>
       <ShareModal />
-    </AuthContext.Provider>
+    </AuthContext.Provider>,
   );
 }
 
@@ -216,7 +280,7 @@ describe('ShareModal renamed to Board Settings (Issue #138)', () => {
     it('color picker buttons are disabled for non-owners', () => {
       const { container } = renderModal();
       const colorButtons = container.querySelectorAll('.color-swatch');
-      colorButtons.forEach(btn => {
+      colorButtons.forEach((btn) => {
         expect((btn as HTMLButtonElement).disabled).toBe(true);
       });
     });
@@ -224,7 +288,7 @@ describe('ShareModal renamed to Board Settings (Issue #138)', () => {
     it('icon picker buttons are disabled for non-owners', () => {
       const { container } = renderModal();
       const iconButtons = container.querySelectorAll('.icon-swatch');
-      iconButtons.forEach(btn => {
+      iconButtons.forEach((btn) => {
         expect((btn as HTMLButtonElement).disabled).toBe(true);
       });
     });
@@ -262,7 +326,11 @@ describe('ShareModal sharing behavior (Issue #42, preserved in #138)', () => {
 
       await waitFor(() => {
         expect(mockShareBoard).toHaveBeenCalledWith(
-          'board-1', 'other@family.com', 'member', 'owner@family.com', 'test-token'
+          'board-1',
+          'other@family.com',
+          'member',
+          'owner@family.com',
+          'test-token',
         );
       });
     });
@@ -277,7 +345,7 @@ describe('ShareModal sharing behavior (Issue #42, preserved in #138)', () => {
 
       await waitFor(() => {
         const alerts = getAllByRole('alert');
-        const shareAlert = alerts.find(a => a.textContent?.includes('Already shared'));
+        const shareAlert = alerts.find((a) => a.textContent?.includes('Already shared'));
         expect(shareAlert).toBeTruthy();
       });
     });
@@ -316,9 +384,7 @@ describe('ShareModal sharing behavior (Issue #42, preserved in #138)', () => {
       fireEvent.click(yesBtn);
 
       await waitFor(() => {
-        expect(mockUnshareBoard).toHaveBeenCalledWith(
-          'board-1', 'member@family.com', 'owner@family.com', 'test-token'
-        );
+        expect(mockUnshareBoard).toHaveBeenCalledWith('board-1', 'member@family.com', 'owner@family.com', 'test-token');
       });
     });
 
@@ -336,10 +402,7 @@ describe('ShareModal sharing behavior (Issue #42, preserved in #138)', () => {
     });
 
     it('renders toggle checked when wildcard entry exists', () => {
-      mockPerms.current = [
-        ...mockPerms.current,
-        { board_id: 'board-1', user_email: '*', role: 'member' },
-      ];
+      mockPerms.current = [...mockPerms.current, { board_id: 'board-1', user_email: '*', role: 'member' }];
       const { getByTestId } = renderSharingTab();
       const toggle = getByTestId('share-all-toggle') as HTMLInputElement;
       expect(toggle.checked).toBe(true);
@@ -357,9 +420,7 @@ describe('ShareModal sharing behavior (Issue #42, preserved in #138)', () => {
       fireEvent.click(toggle);
 
       await waitFor(() => {
-        expect(mockShareBoard).toHaveBeenCalledWith(
-          'board-1', '*', 'member', 'owner@family.com', 'test-token'
-        );
+        expect(mockShareBoard).toHaveBeenCalledWith('board-1', '*', 'member', 'owner@family.com', 'test-token');
       });
     });
   });
@@ -375,7 +436,7 @@ describe('ShareModal sharing behavior (Issue #42, preserved in #138)', () => {
 
       await waitFor(() => {
         const alerts = getAllByRole('alert');
-        const emailAlert = alerts.find(a => a.textContent?.includes('Email is required'));
+        const emailAlert = alerts.find((a) => a.textContent?.includes('Email is required'));
         expect(emailAlert).toBeTruthy();
       });
     });
@@ -390,7 +451,7 @@ describe('ShareModal sharing behavior (Issue #42, preserved in #138)', () => {
 
       await waitFor(() => {
         const alerts = getAllByRole('alert');
-        const emailAlert = alerts.find(a => a.textContent?.includes('valid email'));
+        const emailAlert = alerts.find((a) => a.textContent?.includes('valid email'));
         expect(emailAlert).toBeTruthy();
       });
     });

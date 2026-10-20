@@ -49,18 +49,22 @@ export function ArchiveBoardModal() {
       >
         <div class="modal-header">
           <h2 id="archive-board-title">Archive Board</h2>
-          <button class="btn btn-ghost" onClick={close} aria-label="Close">✕</button>
+          <button class="btn btn-ghost" onClick={close} aria-label="Close">
+            ✕
+          </button>
         </div>
 
         <div class="modal-body">
           <p>
-            Archive <strong>{boardName}</strong>? Its items will be hidden everywhere. You can
-            restore it from <strong>Archived boards</strong> in your profile menu.
+            Archive <strong>{boardName}</strong>? Its items will be hidden everywhere. You can restore it from{' '}
+            <strong>Archived boards</strong> in your profile menu.
           </p>
         </div>
 
         <div class="modal-footer">
-          <button type="button" class="btn btn-ghost" onClick={close}>Cancel</button>
+          <button type="button" class="btn btn-ghost" onClick={close}>
+            Cancel
+          </button>
           <button
             type="button"
             class="btn btn-primary"

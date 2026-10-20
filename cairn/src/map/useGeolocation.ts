@@ -95,9 +95,7 @@ export function useGeolocation(onFailure: (failure: GeolocationFailure) => void)
         setStatus('idle')
         /* The existing fix is deliberately left alone: a denial on the
            second press does not erase the position the first press found. */
-        onFailureRef.current(
-          error.code === error.PERMISSION_DENIED ? 'denied' : 'unavailable',
-        )
+        onFailureRef.current(error.code === error.PERMISSION_DENIED ? 'denied' : 'unavailable')
       },
       {
         enableHighAccuracy: true,

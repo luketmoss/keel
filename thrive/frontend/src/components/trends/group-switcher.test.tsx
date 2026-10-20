@@ -7,13 +7,19 @@ import type { TrendGroup } from './metrics';
 import { groupPref, readPref, writePref } from './prefs';
 import { readGlobalCss } from '../../test-css';
 
-afterEach(() => { cleanup(); vi.restoreAllMocks(); localStorage.clear(); });
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+  localStorage.clear();
+});
 
 const fixture = (n: number): TrendGroup[] =>
   Array.from({ length: n }, (_, i) => ({ id: `g${i}`, label: `Group ${i}`, metrics: [] }));
 
-const mount = (n: number, value = 'g0', onChange = vi.fn()) =>
-  ({ onChange, ...render(h(GroupSwitcher, { groups: fixture(n), value, onChange })) });
+const mount = (n: number, value = 'g0', onChange = vi.fn()) => ({
+  onChange,
+  ...render(h(GroupSwitcher, { groups: fixture(n), value, onChange })),
+});
 
 describe('renders', () => {
   it.each([3, 6])('with %i groups: one labelled row, one button per group in order', (n) => {
@@ -25,7 +31,9 @@ describe('renders', () => {
     expect(row.getAttribute('aria-label')).toBe('Metric group');
     const buttons = [...row.querySelectorAll('button')];
     expect(buttons.map((b) => b.textContent)).toEqual(fixture(n).map((g) => g.label));
-    expect(buttons.map((b) => b.getAttribute('aria-pressed'))).toEqual(buttons.map((_, i) => (i === 1 ? 'true' : 'false')));
+    expect(buttons.map((b) => b.getAttribute('aria-pressed'))).toEqual(
+      buttons.map((_, i) => (i === 1 ? 'true' : 'false')),
+    );
     expect(buttons.every((b) => b.classList.contains('trends-group-btn'))).toBe(true);
   });
 
@@ -61,7 +69,9 @@ describe('the group pref', () => {
     expect(readPref(p)).toBe('g0');
     localStorage.setItem(p.key, 'nope');
     expect(readPref(p)).toBe('g0');
-    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('x'); });
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('x');
+    });
     expect(readPref(p)).toBe('g0');
   });
   it('restores a stored group', () => {

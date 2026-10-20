@@ -38,9 +38,9 @@ describe('findOrCreateTripFolder', () => {
   })
 
   it('reuses an existing trip folder rather than creating a duplicate', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      jsonResponse({ files: [{ id: 'existing-id', createdTime: '2025-06-01' }] }),
-    )
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(jsonResponse({ files: [{ id: 'existing-id', createdTime: '2025-06-01' }] }))
 
     const folderId = await findOrCreateTripFolder('token', 'cairn-folder-id', 'trip-abc')
 
@@ -66,9 +66,9 @@ describe('findOrCreateTripFolder', () => {
   it('propagates DriveAuthError from the lookup call', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({}, 401))
 
-    await expect(
-      findOrCreateTripFolder('expired', 'cairn-folder-id', 'trip-abc'),
-    ).rejects.toBeInstanceOf(DriveAuthError)
+    await expect(findOrCreateTripFolder('expired', 'cairn-folder-id', 'trip-abc')).rejects.toBeInstanceOf(
+      DriveAuthError,
+    )
   })
 
   // Regression: `useDraftTrip.save()` calls `findOrCreateTripFolder` directly

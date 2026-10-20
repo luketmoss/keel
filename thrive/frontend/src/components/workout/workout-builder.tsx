@@ -22,13 +22,16 @@ export function WorkoutBuilder({ onBack, onStartWorkout, onSaveAsPlanned, starti
       setShowAddModal(false);
       return;
     }
-    setExercises((prev) => [...prev, {
-      exercise_id: ex.id,
-      exercise_name: ex.name,
-      section: 'primary',
-      sets: 3,
-      planned_reps: '',
-    }]);
+    setExercises((prev) => [
+      ...prev,
+      {
+        exercise_id: ex.id,
+        exercise_name: ex.name,
+        section: 'primary',
+        sets: 3,
+        planned_reps: '',
+      },
+    ]);
     setShowAddModal(false);
   };
 
@@ -40,15 +43,11 @@ export function WorkoutBuilder({ onBack, onStartWorkout, onSaveAsPlanned, starti
     const num = parseInt(value, 10);
     if (isNaN(num) || num < 1) return;
     const clamped = Math.min(num, 20);
-    setExercises((prev) => prev.map((e) =>
-      e.exercise_id === exerciseId ? { ...e, sets: clamped } : e,
-    ));
+    setExercises((prev) => prev.map((e) => (e.exercise_id === exerciseId ? { ...e, sets: clamped } : e)));
   };
 
   const handlePlannedRepsChange = (exerciseId: string, value: string) => {
-    setExercises((prev) => prev.map((e) =>
-      e.exercise_id === exerciseId ? { ...e, planned_reps: value } : e,
-    ));
+    setExercises((prev) => prev.map((e) => (e.exercise_id === exerciseId ? { ...e, planned_reps: value } : e)));
   };
 
   const handleStart = async () => {
@@ -62,11 +61,7 @@ export function WorkoutBuilder({ onBack, onStartWorkout, onSaveAsPlanned, starti
   return (
     <div class="screen builder-screen">
       <div class="template-editor-header">
-        <button
-          class="template-editor-back"
-          onClick={onBack}
-          aria-label="Back to template picker"
-        >
+        <button class="template-editor-back" onClick={onBack} aria-label="Back to template picker">
           ← Back
         </button>
       </div>
@@ -122,37 +117,21 @@ export function WorkoutBuilder({ onBack, onStartWorkout, onSaveAsPlanned, starti
           </div>
         )}
 
-        <button
-          class="btn btn-secondary builder-add-btn"
-          onClick={() => setShowAddModal(true)}
-        >
+        <button class="btn btn-secondary builder-add-btn" onClick={() => setShowAddModal(true)}>
           + Add Exercise
         </button>
       </div>
 
       <div class="builder-footer">
-        <button
-          class="btn btn-primary builder-footer-btn"
-          onClick={handleStart}
-          disabled={busy}
-        >
+        <button class="btn btn-primary builder-footer-btn" onClick={handleStart} disabled={busy}>
           {starting ? 'Starting\u2026' : 'Start Workout'}
         </button>
-        <button
-          class="btn btn-secondary builder-footer-btn"
-          onClick={handleSave}
-          disabled={busy}
-        >
+        <button class="btn btn-secondary builder-footer-btn" onClick={handleSave} disabled={busy}>
           {saving ? 'Saving\u2026' : 'Save as Planned'}
         </button>
       </div>
 
-      {showAddModal && (
-        <AddExerciseModal
-          onSelect={handleAddExercise}
-          onClose={() => setShowAddModal(false)}
-        />
-      )}
+      {showAddModal && <AddExerciseModal onSelect={handleAddExercise} onClose={() => setShowAddModal(false)} />}
     </div>
   );
 }

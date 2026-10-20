@@ -153,7 +153,10 @@ describe('isCairnOccluded (#285)', () => {
     const spy: ElevationSampler = {
       sampleAlongPath: async (path) => {
         seen = path
-        return { ok: true as const, samples: Array.from({ length: 16 }, () => ({ ...path[0], elevationMeters: 0 })) }
+        return {
+          ok: true as const,
+          samples: Array.from({ length: 16 }, () => ({ ...path[0], elevationMeters: 0 })),
+        }
       },
     }
     const overhead = { lat: CAIRN.lat, lng: CAIRN.lng, altitude: 500 }

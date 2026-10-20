@@ -76,7 +76,9 @@
   font-size: var(--text-sm);
   text-align: left;
   cursor: pointer;
-  transition: color var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease);
+  transition:
+    color var(--motion-fast) var(--ease),
+    background var(--motion-fast) var(--ease);
 }
 
 .layers-control__labels:hover:not(:disabled) {
@@ -115,7 +117,9 @@
   color: var(--on-accent);
   font-size: var(--text-xs);
   line-height: 1;
-  transition: background var(--motion-fast) var(--ease), box-shadow var(--motion-fast) var(--ease);
+  transition:
+    background var(--motion-fast) var(--ease),
+    box-shadow var(--motion-fast) var(--ease);
 }
 
 .layers-control__checkbox--on {
@@ -137,7 +141,9 @@
   color: var(--text-muted);
   font-size: var(--text-xs);
   cursor: pointer;
-  transition: color var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease);
+  transition:
+    color var(--motion-fast) var(--ease),
+    background var(--motion-fast) var(--ease);
 }
 
 .layers-control__option:hover {

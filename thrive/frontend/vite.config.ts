@@ -20,10 +20,7 @@ export default defineConfig({
     port: 5175,
     // global.css imports the suite token file from outside this folder (#402).
     fs: {
-      allow: [
-        searchForWorkspaceRoot(process.cwd()),
-        fileURLToPath(new URL('../../ui/tokens', import.meta.url)),
-      ],
+      allow: [searchForWorkspaceRoot(process.cwd()), fileURLToPath(new URL('../../ui/tokens', import.meta.url))],
     },
   },
   test: {

@@ -11,7 +11,12 @@ import {
   shiftDemoWorkouts,
   DEMO_HEALTH_DAYS,
 } from './demo-data';
-import { selectDailyRange, selectBodyMeasurementRange, type BodyMeasurementRow, type DailyHealthRow } from './health-api';
+import {
+  selectDailyRange,
+  selectBodyMeasurementRange,
+  type BodyMeasurementRow,
+  type DailyHealthRow,
+} from './health-api';
 
 const NOWS = [
   new Date('2026-09-30T18:05:00Z'), // mid-afternoon in Denver
@@ -34,8 +39,10 @@ afterEach(() => vi.restoreAllMocks());
 // label. A bare, venue-less cardio label (`run`) counts as outdoor.
 const indoorOnly = (types: string) => {
   const ts = types.split(',');
-  return ts.some((t) => t.endsWith(':indoor'))
-    && ts.every((t) => t.endsWith(':indoor') || !/^(bike|hike|run|walk)\b/.test(t));
+  return (
+    ts.some((t) => t.endsWith(':indoor')) &&
+    ts.every((t) => t.endsWith(':indoor') || !/^(bike|hike|run|walk)\b/.test(t))
+  );
 };
 
 describe('indoorOnly', () => {
@@ -99,7 +106,7 @@ describe.each(NOWS.map((now) => [now.toISOString(), now] as const))('demo health
     }
   });
 
-  it('has a partial row for today: steps so far and last night\'s sleep', () => {
+  it("has a partial row for today: steps so far and last night's sleep", () => {
     const t = healthByDate.get(today);
     expect(t).toBeDefined();
     expect(t!.steps).not.toBe('');
@@ -129,7 +136,8 @@ describe.each(NOWS.map((now) => [now.toISOString(), now] as const))('demo health
     // A day with a row and its other metrics, but no stress; and today's so-far value is present.
     expect(health.some((h) => h.stress_avg === '' && h.steps !== '' && h.resting_hr !== '')).toBe(true);
     expect(healthByDate.get(today)!.stress_avg).not.toBe('');
-    let run = 0, longest = 0;
+    let run = 0,
+      longest = 0;
     for (let d = first; d <= today; d = addDays(d, 1)) {
       run = (healthByDate.get(d)?.stress_avg ?? '') === '' ? run + 1 : 0;
       longest = Math.max(longest, run);
@@ -151,7 +159,8 @@ describe.each(NOWS.map((now) => [now.toISOString(), now] as const))('demo health
     if (!bodyByDate.has(m.date)) bodyByDate.set(m.date, []);
     bodyByDate.get(m.date)!.push(m);
   }
-  const scales = (d: string) => selectBodyMeasurementRange(bodyByDate.get(d) ?? [], d, d).filter((m) => m.kind === 'scale');
+  const scales = (d: string) =>
+    selectBodyMeasurementRange(bodyByDate.get(d) ?? [], d, d).filter((m) => m.kind === 'scale');
   const bps = (d: string) => (bodyByDate.get(d) ?? []).filter((m) => m.kind === 'bp');
   const pastDays: string[] = [];
   for (let d = first; d < today; d = addDays(d, 1)) pastDays.push(d);
@@ -161,10 +170,12 @@ describe.each(NOWS.map((now) => [now.toISOString(), now] as const))('demo health
   });
 
   it('has a day with two scale readings, the first by measured_at_utc having a weight', () => {
-    expect(pastDays.some((d) => {
-      const s = scales(d);
-      return s.length >= 2 && s[0].weight_kg !== '' && s.every((m) => m.weight_kg !== '');
-    })).toBe(true);
+    expect(
+      pastDays.some((d) => {
+        const s = scales(d);
+        return s.length >= 2 && s[0].weight_kg !== '' && s.every((m) => m.weight_kg !== '');
+      }),
+    ).toBe(true);
   });
 
   it('has a scale reading with no weight', () => {
@@ -192,7 +203,7 @@ describe.each(NOWS.map((now) => [now.toISOString(), now] as const))('demo health
     for (const d of [...healthByDate.keys(), ...bodyByDate.keys()]) expect(summaryDates.has(d), d).toBe(true);
   });
 
-  it('agrees with DailyHealth and BodyMeasurements by the tab\'s own rules', () => {
+  it("agrees with DailyHealth and BodyMeasurements by the tab's own rules", () => {
     for (const s of summary) {
       const h: DailyHealthRow | undefined = healthByDate.get(s.date);
       for (const f of ['steps', 'resting_hr', 'hrv', 'sleep_total_s', 'training_load'] as const) {
@@ -211,15 +222,18 @@ describe.each(NOWS.map((now) => [now.toISOString(), now] as const))('demo health
   });
 
   it('shows half-up rounding of a .5 BP mean somewhere', () => {
-    expect(pastDays.some((d) => {
-      const day = bps(d);
-      return day.length > 0 && (day.reduce((a, m) => a + Number(m.systolic_mmhg), 0) / day.length) % 1 === 0.5;
-    })).toBe(true);
+    expect(
+      pastDays.some((d) => {
+        const day = bps(d);
+        return day.length > 0 && (day.reduce((a, m) => a + Number(m.systolic_mmhg), 0) / day.length) % 1 === 0.5;
+      }),
+    ).toBe(true);
   });
 
   it('has activity coverage cases: partial, a measured 0, an indoor-only day', () => {
-    const partial = summary.find((s) =>
-      n(s.distance_withdata)! < n(s.cardio_activity_count)! && n(s.moving_withdata)! < n(s.activity_count)!);
+    const partial = summary.find(
+      (s) => n(s.distance_withdata)! < n(s.cardio_activity_count)! && n(s.moving_withdata)! < n(s.activity_count)!,
+    );
     expect(partial, 'a day with I < H and S < B').toBeDefined();
     expect(summary.some((s) => s.total_distance_m === '0' && s.distance_withdata !== '0')).toBe(true);
     // Indoor only: F/G blank, and H blank too — the rebuild writes no count of
@@ -235,7 +249,12 @@ describe.each(NOWS.map((now) => [now.toISOString(), now] as const))('demo health
   it('keeps coverage counts within their totals everywhere', () => {
     for (const s of summary) {
       if (s.activity_count === '') {
-        expect([s.moving_withdata, s.elapsed_withdata, s.cardio_activity_count, s.total_distance_m]).toEqual(['', '', '', '']);
+        expect([s.moving_withdata, s.elapsed_withdata, s.cardio_activity_count, s.total_distance_m]).toEqual([
+          '',
+          '',
+          '',
+          '',
+        ]);
         continue;
       }
       expect(n(s.moving_withdata)!).toBeLessThanOrEqual(n(s.activity_count)!);
@@ -271,7 +290,8 @@ describe('demo health determinism', () => {
   it('shows the same values for the same past date, whatever today is', () => {
     const a = new Date('2026-09-30T18:05:00Z');
     const b = new Date('2026-10-09T03:40:00Z');
-    const strip = <T extends { sheetRow: number; synced_at: string }>({ sheetRow: _r, synced_at: _s, ...rest }: T) => rest;
+    const strip = <T extends { sheetRow: number; synced_at: string }>({ sheetRow: _r, synced_at: _s, ...rest }: T) =>
+      rest;
     const { today: todayA } = windowOf(a);
     const { first: firstB } = windowOf(b);
     const overlap = (d: string) => d >= firstB && d < todayA;

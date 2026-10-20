@@ -42,9 +42,7 @@ export function WorkoutEdit({ workoutId }: Props) {
 
   // Planned workout: use planner-style editor
   if (isPlanned && workout.type === 'weight') {
-    return (
-      <PlannedWorkoutEditor workoutId={workoutId} />
-    );
+    return <PlannedWorkoutEditor workoutId={workoutId} />;
   }
 
   // Non-weight workouts use the lightweight form
@@ -99,9 +97,7 @@ function PlannedWorkoutEditor({ workoutId }: { workoutId: string }) {
     }
 
     // Already in set order, so entry i is set i + 1.
-    const own = workoutSets.filter(
-      (ws) => ws.exercise_id === s.exercise_id && ws.exercise_order === s.exercise_order,
-    );
+    const own = workoutSets.filter((ws) => ws.exercise_id === s.exercise_id && ws.exercise_order === s.exercise_order);
     // Each set's stored text, verbatim (#375): a row left alone saves it back.
     initialExercises.push({
       exercise_id: s.exercise_id,

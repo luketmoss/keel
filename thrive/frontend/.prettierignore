@@ -1,0 +1,12 @@
+node_modules
+dist
+package-lock.json
+# Markdown and docs are prose, not code: the formatter is for source.
+*.md
+docs
+# Built assets, static pages and design mockups.
+public
+*.html
+mockups
+# The CSS tests read the stylesheet as text (rules, quote style, spacing), so reformatting it breaks them.
+*.css

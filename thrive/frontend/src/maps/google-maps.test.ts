@@ -84,7 +84,13 @@ describe('loadMaps', () => {
 
   it('a library that will not import is a failure too', async () => {
     const loaded = loadMaps();
-    (window as any).google = { maps: { importLibrary: async () => { throw new Error('x'); } } };
+    (window as any).google = {
+      maps: {
+        importLibrary: async () => {
+          throw new Error('x');
+        },
+      },
+    };
     (window as any).__thriveMapsReady();
     await expect(loaded).rejects.toThrow('maps_unavailable');
     expect(scripts()).toHaveLength(0);

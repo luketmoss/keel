@@ -53,8 +53,13 @@ describe.each(NOWS.map((now) => [now.toISOString(), now] as const))('demo at %s'
     const body = demoBodyMeasurements(now, 'ok');
     for (const s of demoDailySummary(now, 'ok')) {
       const d = bodyDayOf(selectBodyMeasurementRange(body, s.date, s.date));
-      expect([d.weight_kg, d.fat_ratio_pct, d.systolic_mmhg, d.diastolic_mmhg, d.bp_count], s.date)
-        .toEqual([s.weight_kg, s.fat_ratio_pct, s.systolic_mmhg, s.diastolic_mmhg, s.bp_count]);
+      expect([d.weight_kg, d.fat_ratio_pct, d.systolic_mmhg, d.diastolic_mmhg, d.bp_count], s.date).toEqual([
+        s.weight_kg,
+        s.fat_ratio_pct,
+        s.systolic_mmhg,
+        s.diastolic_mmhg,
+        s.bp_count,
+      ]);
     }
   });
 

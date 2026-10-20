@@ -33,7 +33,12 @@ export function EffortToggle({ value, onChange, size = 'compact', label, labelle
   const session = size === 'session';
 
   return (
-    <div class={`effort-toggle${session ? ' effort-toggle-session' : ''}`} role="group" aria-label={labelledBy ? undefined : label} aria-labelledby={labelledBy}>
+    <div
+      class={`effort-toggle${session ? ' effort-toggle-session' : ''}`}
+      role="group"
+      aria-label={labelledBy ? undefined : label}
+      aria-labelledby={labelledBy}
+    >
       {EFFORTS.map((effort) => {
         const active = value === effort;
         return (

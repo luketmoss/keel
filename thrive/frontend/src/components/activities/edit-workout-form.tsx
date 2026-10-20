@@ -33,7 +33,10 @@ export function EditWorkoutForm({ workoutId }: Props) {
   const [effort, setEffort] = useState<Effort | ''>(initial.effort);
   const [subType, setSubType] = useState(initial.subType);
   const [cardio, setCardio] = useState<CardioValues>(() => ({
-    distance: initial.distance, ascent: initial.ascent, descent: initial.descent, avgHr: initial.avgHr,
+    distance: initial.distance,
+    ascent: initial.ascent,
+    descent: initial.descent,
+    avgHr: initial.avgHr,
   }));
   const patchCardio = (patch: Partial<CardioValues>) => setCardio((c) => ({ ...c, ...patch }));
   const [saving, setSaving] = useState(false);
@@ -43,7 +46,9 @@ export function EditWorkoutForm({ workoutId }: Props) {
       <div class="screen">
         <div class="empty-state">
           <p>Workout not found</p>
-          <button class="btn btn-primary" onClick={() => navigate('/activities')}>Back to Activities</button>
+          <button class="btn btn-primary" onClick={() => navigate('/activities')}>
+            Back to Activities
+          </button>
         </div>
       </div>
     );
@@ -74,18 +79,10 @@ export function EditWorkoutForm({ workoutId }: Props) {
   return (
     <div class="screen simple-workout-form">
       <div class="template-editor-header">
-        <button
-          class="template-editor-back"
-          onClick={handleDiscard}
-          aria-label="Back"
-        >
+        <button class="template-editor-back" onClick={handleDiscard} aria-label="Back">
           ← Back
         </button>
-        <button
-          class="btn btn-primary"
-          onClick={handleSave}
-          disabled={saving}
-        >
+        <button class="btn btn-primary" onClick={handleSave} disabled={saving}>
           {saving ? 'Saving...' : 'Save Changes'}
         </button>
       </div>
@@ -95,7 +92,9 @@ export function EditWorkoutForm({ workoutId }: Props) {
       </h2>
 
       <div class="form-group">
-        <label class="form-label" htmlFor="edit-name">Name</label>
+        <label class="form-label" htmlFor="edit-name">
+          Name
+        </label>
         <input
           id="edit-name"
           class="form-input"
@@ -106,7 +105,9 @@ export function EditWorkoutForm({ workoutId }: Props) {
       </div>
 
       <div class="form-group">
-        <label class="form-label" htmlFor="edit-date">Date</label>
+        <label class="form-label" htmlFor="edit-date">
+          Date
+        </label>
         <input
           id="edit-date"
           class="form-input"
@@ -117,7 +118,9 @@ export function EditWorkoutForm({ workoutId }: Props) {
       </div>
 
       <div class="form-group">
-        <label class="form-label" htmlFor="edit-duration">Duration (minutes)</label>
+        <label class="form-label" htmlFor="edit-duration">
+          Duration (minutes)
+        </label>
         <input
           id="edit-duration"
           class="form-input"
@@ -133,7 +136,9 @@ export function EditWorkoutForm({ workoutId }: Props) {
           are asked for, so the two belong together (#129 AC2). */}
       {subTypeOptions(workout.type).length > 0 && (
         <div class="form-group">
-          <span class="form-label" id={typeLabelId}>Type (optional)</span>
+          <span class="form-label" id={typeLabelId}>
+            Type (optional)
+          </span>
           <SubTypeToggle
             workoutType={workout.type}
             value={subType}
@@ -153,7 +158,9 @@ export function EditWorkoutForm({ workoutId }: Props) {
       />
 
       <div class="form-group">
-        <span class="form-label" id={effortLabelId}>Session Effort (optional)</span>
+        <span class="form-label" id={effortLabelId}>
+          Session Effort (optional)
+        </span>
         <EffortToggle
           value={effort}
           onChange={setEffort}
@@ -164,7 +171,9 @@ export function EditWorkoutForm({ workoutId }: Props) {
       </div>
 
       <div class="form-group">
-        <label class="form-label" htmlFor="edit-notes">Notes</label>
+        <label class="form-label" htmlFor="edit-notes">
+          Notes
+        </label>
         <textarea
           id="edit-notes"
           class="form-textarea"
@@ -175,11 +184,7 @@ export function EditWorkoutForm({ workoutId }: Props) {
         />
       </div>
 
-      <button
-        class="btn btn-danger"
-        style={{ width: '100%', marginTop: 'var(--space-lg)' }}
-        onClick={handleDiscard}
-      >
+      <button class="btn btn-danger" style={{ width: '100%', marginTop: 'var(--space-lg)' }} onClick={handleDiscard}>
         Discard Changes
       </button>
     </div>

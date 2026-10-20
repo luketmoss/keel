@@ -21,14 +21,7 @@ function choice(overrides: Partial<TripChoice> = {}): TripChoice {
 }
 
 function renderPicker(trips: TripChoice[]) {
-  return render(
-    <AddToTripPicker
-      trips={trips}
-      onChoose={vi.fn()}
-      onCreate={vi.fn()}
-      onCancel={vi.fn()}
-    />,
-  )
+  return render(<AddToTripPicker trips={trips} onChoose={vi.fn()} onCreate={vi.fn()} onCancel={vi.fn()} />)
 }
 
 describe('AddToTripPicker counts (#121)', () => {
@@ -76,14 +69,7 @@ describe('AddToTripPicker counts (#121)', () => {
 
   it('still chooses the trip it names', () => {
     const onChoose = vi.fn()
-    render(
-      <AddToTripPicker
-        trips={[choice()]}
-        onChoose={onChoose}
-        onCreate={vi.fn()}
-        onCancel={vi.fn()}
-      />,
-    )
+    render(<AddToTripPicker trips={[choice()]} onChoose={onChoose} onCreate={vi.fn()} onCancel={vi.fn()} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Larapinta Trail, 4 tracks, 128 photos' }))
     expect(onChoose).toHaveBeenCalledWith('t1')

@@ -27,7 +27,11 @@ function renderScreen() {
 }
 
 const hr = Array.from({ length: 10 }, (_, i) => ({
-  date: addDays(TODAY, -i), resting_hr: String(50 + i), sleep_score: String(80 + i), steps: String(5000 + i), sheetRow: i + 2,
+  date: addDays(TODAY, -i),
+  resting_hr: String(50 + i),
+  sleep_score: String(80 + i),
+  steps: String(5000 + i),
+  sheetRow: i + 2,
 })) as never[];
 
 beforeEach(() => {
@@ -40,7 +44,8 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-const titles = (c: Element) => [...c.querySelectorAll('.trend-card h2, .trend-card h3, .trend-title')].map((e) => e.textContent);
+const titles = (c: Element) =>
+  [...c.querySelectorAll('.trend-card h2, .trend-card h3, .trend-title')].map((e) => e.textContent);
 
 describe('Custom group', () => {
   it('lists Custom last in the switcher', () => {
@@ -82,7 +87,7 @@ describe('Custom group', () => {
     expect(text.indexOf('Sleep Score')).toBeLessThan(text.indexOf('Steps'));
   });
 
-  it('gates loading on exactly the union of the picked metrics\' tabs', () => {
+  it("gates loading on exactly the union of the picked metrics' tabs", () => {
     localStorage.setItem('thrive-trends-custom', JSON.stringify(['resting_hr']));
     bodyMeasurements.value = { state: 'error', message: 'x' } as never;
     dailySummary.value = { state: 'loading' };

@@ -56,7 +56,15 @@ interface Props {
   saving: boolean;
 }
 
-export function WorkoutPlanner({ initialName = '', initialExercises = [], initialDate, initialEstimatedSeconds = '', onSave, onDiscard, saving }: Props) {
+export function WorkoutPlanner({
+  initialName = '',
+  initialExercises = [],
+  initialDate,
+  initialEstimatedSeconds = '',
+  onSave,
+  onDiscard,
+  saving,
+}: Props) {
   const startName = initialName || 'Custom Workout';
   const startDate = initialDate || toLocalDateStr(new Date());
   const startEstimate = secondsToMinutesInput(initialEstimatedSeconds);
@@ -75,7 +83,12 @@ export function WorkoutPlanner({ initialName = '', initialExercises = [], initia
   // Compared as Save would write them, so a remembered tail is not a change.
   const serialize = (list: PlannerExercise[]) =>
     JSON.stringify(list.map((ex) => ({ ...ex, reps_by_set: heldReps(ex) })));
-  const initialSnapshot = useRef({ name: startName, date: startDate, estimate: startEstimate, exercises: serialize(initialExercises) });
+  const initialSnapshot = useRef({
+    name: startName,
+    date: startDate,
+    estimate: startEstimate,
+    exercises: serialize(initialExercises),
+  });
 
   const isDirty = () => {
     if (name !== initialSnapshot.current.name) return true;
@@ -100,9 +113,7 @@ export function WorkoutPlanner({ initialName = '', initialExercises = [], initia
   };
 
   const updateExercise = (index: number, updated: Partial<PlannerExercise>) => {
-    setExercises((prev) =>
-      prev.map((ex, i) => (i === index ? { ...ex, ...updated } : ex)),
-    );
+    setExercises((prev) => prev.map((ex, i) => (i === index ? { ...ex, ...updated } : ex)));
   };
 
   const move = (index: number, dir: MoveDirection) => {
@@ -140,17 +151,15 @@ export function WorkoutPlanner({ initialName = '', initialExercises = [], initia
         >
           ← Back
         </button>
-        <button
-          class="btn btn-primary"
-          onClick={handleSave}
-          disabled={saving || exercises.length === 0}
-        >
+        <button class="btn btn-primary" onClick={handleSave} disabled={saving || exercises.length === 0}>
           {saving ? 'Saving...' : 'Save Workout'}
         </button>
       </div>
 
       <div class="form-group">
-        <label class="form-label" for="planner-name">Workout Name</label>
+        <label class="form-label" for="planner-name">
+          Workout Name
+        </label>
         <input
           id="planner-name"
           class="form-input"
@@ -162,7 +171,9 @@ export function WorkoutPlanner({ initialName = '', initialExercises = [], initia
       </div>
 
       <div class="form-group">
-        <label class="form-label" for="planner-date">Scheduled for</label>
+        <label class="form-label" for="planner-date">
+          Scheduled for
+        </label>
         <input
           id="planner-date"
           class="form-input"
@@ -173,7 +184,9 @@ export function WorkoutPlanner({ initialName = '', initialExercises = [], initia
       </div>
 
       <div class="form-group">
-        <label class="form-label" for="planner-estimate">Estimated duration (minutes, optional)</label>
+        <label class="form-label" for="planner-estimate">
+          Estimated duration (minutes, optional)
+        </label>
         <input
           id="planner-estimate"
           class="form-input"
@@ -213,9 +226,7 @@ export function WorkoutPlanner({ initialName = '', initialExercises = [], initia
               onRemove={() => removeExercise(i)}
             />
 
-            {editingIndex === i && (
-              <PlannerExerciseConfig ex={ex} onChange={(updated) => updateExercise(i, updated)} />
-            )}
+            {editingIndex === i && <PlannerExerciseConfig ex={ex} onChange={(updated) => updateExercise(i, updated)} />}
           </div>
         ))}
       </div>
@@ -245,10 +256,7 @@ export function WorkoutPlanner({ initialName = '', initialExercises = [], initia
       </div>
 
       {showExercisePicker && (
-        <AddExerciseModal
-          onSelect={handleExerciseSelected}
-          onClose={() => setShowExercisePicker(false)}
-        />
+        <AddExerciseModal onSelect={handleExerciseSelected} onClose={() => setShowExercisePicker(false)} />
       )}
     </div>
   );
@@ -258,7 +266,13 @@ export function WorkoutPlanner({ initialName = '', initialExercises = [], initia
  * An expanded entry (#375): section, Sets, "Reps, all sets", and a row per
  * set. The rows shown are exactly the sets Save writes.
  */
-function PlannerExerciseConfig({ ex, onChange }: { ex: PlannerExercise; onChange: (updated: Partial<PlannerExercise>) => void }) {
+function PlannerExerciseConfig({
+  ex,
+  onChange,
+}: {
+  ex: PlannerExercise;
+  onChange: (updated: Partial<PlannerExercise>) => void;
+}) {
   const uid = useId();
   const maxSets = maxSetsOf(ex);
   const count = plannedSetCount(ex.sets, maxSets);
@@ -277,7 +291,9 @@ function PlannerExerciseConfig({ ex, onChange }: { ex: PlannerExercise; onChange
 
       <div class="config-row" style={{ marginTop: 'var(--space-sm)' }}>
         <div class="form-group" style={{ flex: 1 }}>
-          <label class="form-label" for={`${uid}-sets`}>Sets</label>
+          <label class="form-label" for={`${uid}-sets`}>
+            Sets
+          </label>
           <input
             id={`${uid}-sets`}
             class="form-input"
@@ -293,7 +309,9 @@ function PlannerExerciseConfig({ ex, onChange }: { ex: PlannerExercise; onChange
           />
         </div>
         <div class="form-group" style={{ flex: 1 }}>
-          <label class="form-label" for={`${uid}-all`}>Reps, all sets</label>
+          <label class="form-label" for={`${uid}-all`}>
+            Reps, all sets
+          </label>
           <RepsField
             id={`${uid}-all`}
             value={varies ? '' : held[0]}
@@ -312,7 +330,9 @@ function PlannerExerciseConfig({ ex, onChange }: { ex: PlannerExercise; onChange
           </legend>
           {held.map((value, s) => (
             <div class="planner-set-row" key={s}>
-              <label class="form-label" for={`${uid}-set-${s}`}>Set {s + 1}</label>
+              <label class="form-label" for={`${uid}-set-${s}`}>
+                Set {s + 1}
+              </label>
               <RepsField
                 id={`${uid}-set-${s}`}
                 value={value}

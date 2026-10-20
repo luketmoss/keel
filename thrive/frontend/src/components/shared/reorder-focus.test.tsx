@@ -32,8 +32,15 @@ beforeEach(() => {
       id: 't1',
       name: 'Upper Pull A',
       exercises: LIST.map(([exercise_id, exercise_name, section], i) => ({
-        template_id: 't1', template_name: 'Upper Pull A', order: i + 1,
-        exercise_id, exercise_name, section, sets: '3', reps: '8', sheetRow: i + 2,
+        template_id: 't1',
+        template_name: 'Upper Pull A',
+        order: i + 1,
+        exercise_id,
+        exercise_name,
+        section,
+        sets: '3',
+        reps: '8',
+        sheetRow: i + 2,
       })),
     },
   ];
@@ -42,7 +49,13 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 const plannerExercises = (): PlannerExercise[] =>
-  LIST.map(([exercise_id, exercise_name, section]) => ({ exercise_id, exercise_name, section, sets: '3', reps_by_set: ['8', '8', '8'] }));
+  LIST.map(([exercise_id, exercise_name, section]) => ({
+    exercise_id,
+    exercise_name,
+    section,
+    sets: '3',
+    reps_by_set: ['8', '8', '8'],
+  }));
 
 const onSave = vi.fn(async (..._args: unknown[]) => undefined);
 
@@ -52,7 +65,13 @@ const screens: [string, () => void][] = [
     'workout planner',
     () =>
       render(
-        <WorkoutPlanner initialName="Plan" initialExercises={plannerExercises()} onSave={onSave} onDiscard={() => {}} saving={false} />,
+        <WorkoutPlanner
+          initialName="Plan"
+          initialExercises={plannerExercises()}
+          onSave={onSave}
+          onDiscard={() => {}}
+          saving={false}
+        />,
       ),
   ],
 ];
@@ -140,17 +159,27 @@ describe('saved order is the displayed order, with no row key in it', () => {
     await vi.waitFor(() => expect(editTemplate).toHaveBeenCalled());
     const inputs = editTemplate.mock.calls[0][2] as Record<string, unknown>[];
     expect(inputs.map((x) => x.section)).toEqual(['warmup', 'SS1', 'primary', 'burnout']);
-    for (const x of inputs) expect(Object.keys(x).sort()).toEqual(['exercise_id', 'exercise_name', 'reps', 'section', 'sets']);
+    for (const x of inputs)
+      expect(Object.keys(x).sort()).toEqual(['exercise_id', 'exercise_name', 'reps', 'section', 'sets']);
   });
 
   it('workout planner', async () => {
     onSave.mockClear();
-    render(<WorkoutPlanner initialName="Plan" initialExercises={plannerExercises()} onSave={onSave} onDiscard={() => {}} saving={false} />);
+    render(
+      <WorkoutPlanner
+        initialName="Plan"
+        initialExercises={plannerExercises()}
+        onSave={onSave}
+        onDiscard={() => {}}
+        saving={false}
+      />,
+    );
     fireEvent.click(moveBtn(2, 'up'));
     fireEvent.click(document.querySelector('.btn-primary')!);
     await vi.waitFor(() => expect(onSave).toHaveBeenCalled());
     const saved = onSave.mock.calls[0][1] as Record<string, unknown>[];
     expect(saved.map((x) => x.section)).toEqual(['warmup', 'SS1', 'primary', 'burnout']);
-    for (const x of saved) expect(Object.keys(x).sort()).toEqual(['exercise_id', 'exercise_name', 'reps_by_set', 'section', 'sets']);
+    for (const x of saved)
+      expect(Object.keys(x).sort()).toEqual(['exercise_id', 'exercise_name', 'reps_by_set', 'section', 'sets']);
   });
 });

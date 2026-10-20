@@ -119,10 +119,7 @@ describe('useCairnImport — cached cairns (#243)', () => {
 
   it('replaces the cached set with what Drive holds when the read settles', async () => {
     // Cached: a and b. Drive: b (renamed) and c. One replacement, not a merge.
-    writeCachedCairns('trip-replace', [
-      cairnRecord({ id: 'a' }),
-      cairnRecord({ id: 'b', name: 'stale.jpg' }),
-    ])
+    writeCachedCairns('trip-replace', [cairnRecord({ id: 'a' }), cairnRecord({ id: 'b', name: 'stale.jpg' })])
     driveHolding('trip-replace', [cairnRecord({ id: 'b', name: 'renamed.jpg' }), cairnRecord({ id: 'c' })])
 
     const { result } = renderHook(() => useCairnImport('trip-replace', 'token', 'cairn-folder-id', []))

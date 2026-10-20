@@ -8,8 +8,15 @@ import { join } from 'node:path';
 import { ask } from '../../state/confirm';
 import { ConfirmModal } from './confirm-modal';
 import {
-  deleteWorkoutCopy, deleteTemplateCopy, deleteExerciseCopy, removeExerciseCopy, discardWorkoutCopy,
-  replaceSetsCopy, discardChangesCopy, deleteLabelCopy, finishUnsyncedCopy,
+  deleteWorkoutCopy,
+  deleteTemplateCopy,
+  deleteExerciseCopy,
+  removeExerciseCopy,
+  discardWorkoutCopy,
+  replaceSetsCopy,
+  discardChangesCopy,
+  deleteLabelCopy,
+  finishUnsyncedCopy,
 } from './confirm-copy';
 import { mountConfirmHost, confirmText, confirmDialog, answerConfirm, openedConfirm } from './confirm-test-utils';
 
@@ -43,7 +50,9 @@ describe('the copy (AC2, AC3, AC5)', () => {
     });
   });
   it('one logged set is singular, and zero drops the clause', () => {
-    expect(deleteWorkoutCopy(w, 1).message).toBe("Sat 12 Sep 2026 · its 1 logged set goes with it. This can't be undone.");
+    expect(deleteWorkoutCopy(w, 1).message).toBe(
+      "Sat 12 Sep 2026 · its 1 logged set goes with it. This can't be undone.",
+    );
     expect(deleteWorkoutCopy(w, 0).message).toBe("Sat 12 Sep 2026. This can't be undone.");
   });
   it('a blank name falls back to the type, unquoted', () => {
@@ -57,7 +66,9 @@ describe('the copy (AC2, AC3, AC5)', () => {
       confirmLabel: 'Delete Template',
     });
     expect(deleteTemplateCopy('Push Day', 1).message).toMatch(/^Its 1 exercise goes with it\./);
-    expect(deleteTemplateCopy('Push Day', 0).message).toBe("Workouts you've logged from it are kept. This can't be undone.");
+    expect(deleteTemplateCopy('Push Day', 0).message).toBe(
+      "Workouts you've logged from it are kept. This can't be undone.",
+    );
   });
   it('delete an exercise', () => {
     expect(deleteExerciseCopy('Bench Press')).toEqual({
@@ -122,8 +133,14 @@ describe('the copy (AC2, AC3, AC5)', () => {
   });
   it('no confirming button is a bare verb or OK', () => {
     const all = [
-      deleteWorkoutCopy(w, 1), deleteTemplateCopy('t', 1), deleteExerciseCopy('e'), removeExerciseCopy('e', 1),
-      discardWorkoutCopy(1), replaceSetsCopy('e', 2, 1), discardChangesCopy('workout'), deleteLabelCopy('l', 1),
+      deleteWorkoutCopy(w, 1),
+      deleteTemplateCopy('t', 1),
+      deleteExerciseCopy('e'),
+      removeExerciseCopy('e', 1),
+      discardWorkoutCopy(1),
+      replaceSetsCopy('e', 2, 1),
+      discardChangesCopy('workout'),
+      deleteLabelCopy('l', 1),
       finishUnsyncedCopy(1),
     ];
     for (const c of all) expect(c.confirmLabel).not.toMatch(/^(OK|Delete|Remove|Discard|Replace|Finish)$/);

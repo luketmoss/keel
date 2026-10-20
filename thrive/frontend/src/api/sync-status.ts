@@ -83,10 +83,14 @@ export function formatAge(ms: number): string {
 /** The status words for the newest run; '' for ok. Never error_detail. */
 export function statusWords(status: string): string {
   switch (status) {
-    case 'ok': return '';
-    case 'failed': return 'Last run failed';
-    case 'partial': return 'Last run finished with errors';
-    default: return 'Last run status unknown';
+    case 'ok':
+      return '';
+    case 'failed':
+      return 'Last run failed';
+    case 'partial':
+      return 'Last run finished with errors';
+    default:
+      return 'Last run status unknown';
   }
 }
 
@@ -131,18 +135,31 @@ export function collapseSyncStatus(coros: SyncLogState, withings: SyncLogState, 
   const ages: number[] = [];
   const notes: DaySyncNote[] = [];
   for (const { name, log, staleAfter } of vendors) {
-    if (log.state === 'idle' || log.state === 'loading') { checking = true; continue; }
+    if (log.state === 'idle' || log.state === 'loading') {
+      checking = true;
+      continue;
+    }
     if (log.state === 'not-set-up') continue;
-    if (log.state === 'error') { unreadable = true; continue; }
+    if (log.state === 'error') {
+      unreadable = true;
+      continue;
+    }
     const s = summarizeSyncLog(log.entries, now, staleAfter);
-    if (s.kind === 'unreadable') { unreadable = true; continue; }
+    if (s.kind === 'unreadable') {
+      unreadable = true;
+      continue;
+    }
     if (s.kind === 'empty') continue;
     ages.push(s.ageMs);
     if (s.newest.status === 'failed') notes.push({ vendor: name, text: `${name} last run failed`, tone: 'danger' });
     else if (s.stale) notes.push({ vendor: name, text: `${name} sync may have stopped`, tone: 'danger' });
     else if (s.newest.status !== 'ok') {
       const partial = s.newest.status === 'partial';
-      notes.push({ vendor: name, text: `${name} last run ${partial ? 'finished with errors' : 'status unknown'}`, tone: 'warning' });
+      notes.push({
+        vendor: name,
+        text: `${name} last run ${partial ? 'finished with errors' : 'status unknown'}`,
+        tone: 'warning',
+      });
     }
   }
   if (unreadable) return { text: "Couldn't read sync status", tone: 'warning', notes };

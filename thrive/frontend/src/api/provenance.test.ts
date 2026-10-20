@@ -3,7 +3,12 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  provenanceOf, provenanceMark, provenanceSpeech, provenanceDetail, sourceName, formatLocalStamp,
+  provenanceOf,
+  provenanceMark,
+  provenanceSpeech,
+  provenanceDetail,
+  sourceName,
+  formatLocalStamp,
 } from './provenance';
 
 const manual = { source: '', source_activity_id: '', synced_at: '' };
@@ -69,9 +74,7 @@ describe('formatLocalStamp', () => {
 
 describe('AC2: the detail line', () => {
   it('says synced from COROS with the last-synced time', () => {
-    expect(provenanceDetail(synced)).toBe(
-      `Synced from COROS · last synced ${formatLocalStamp(synced.synced_at)}`,
-    );
+    expect(provenanceDetail(synced)).toBe(`Synced from COROS · last synced ${formatLocalStamp(synced.synced_at)}`);
   });
   // On an enriched row synced_at is "last enriched" (§7).
   it('says logged by hand, enriched from COROS, with the enrichment time', () => {

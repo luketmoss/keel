@@ -21,8 +21,7 @@ export function isValidDateForm(value: string | null | undefined): value is stri
   const d = new Date(`${value}T00:00:00Z`);
   if (Number.isNaN(d.getTime())) return false;
 
-  const roundTripped =
-    `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+  const roundTripped = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
 
   return roundTripped === value;
 }

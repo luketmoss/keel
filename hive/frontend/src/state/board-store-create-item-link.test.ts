@@ -40,9 +40,7 @@ async function setup() {
     { board_id: 'board-1', user_email: 'user@test.com', role: 'owner', sheetRow: 2 },
     { board_id: 'board-2', user_email: 'user@test.com', role: 'owner', sheetRow: 3 },
   ] as any;
-  store.items.value = [
-    makeItem({ id: 'item-a', title: 'Buy milk', board_id: 'board-1' }),
-  ];
+  store.items.value = [makeItem({ id: 'item-a', title: 'Buy milk', board_id: 'board-1' })];
   store.activeBoardId.value = 'board-1';
   store.activeView.value = 'board';
   store.selectedItemId.value = null;

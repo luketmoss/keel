@@ -40,8 +40,7 @@ const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => ({
   body: m[2],
 }));
 
-const decl = (body: string, prop: string) =>
-  body.match(new RegExp(`(?:^|;|\\s)${prop}\\s*:\\s*([^;]+);`))?.[1].trim();
+const decl = (body: string, prop: string) => body.match(new RegExp(`(?:^|;|\\s)${prop}\\s*:\\s*([^;]+);`))?.[1].trim();
 
 const rule = (selector: string) => {
   const r = rules.find((x) => x.selector === selector);
@@ -103,7 +102,9 @@ describe('AC1: a rule filling with a fill token sets color: var(--color-on-fill)
 
   it('no rule fills with a raw brand, danger or success token and sets white or page-coloured text', () => {
     const raw = rules
-      .filter(({ body }) => /(?:^|;|\s)background(?:-color)?\s*:\s*var\(--color-(?:primary|danger|success)(?:-hover)?\)/.test(body))
+      .filter(({ body }) =>
+        /(?:^|;|\s)background(?:-color)?\s*:\s*var\(--color-(?:primary|danger|success)(?:-hover)?\)/.test(body),
+      )
       .filter(({ body }) => /#fff|--color-bg\)/.test(decl(body, 'color') ?? ''))
       .map(({ selector }) => selector);
     expect(raw).toEqual([]);
@@ -182,14 +183,26 @@ describe('AC4: nothing interactive is dimmed with opacity', () => {
     .map(({ selector }) => selector)
     // An aria-disabled control (#328) is disabled too; it only keeps focus.
     // A guard such as :not(:disabled) (#404) does not make a selector a disabled one.
-    .filter((selector) => !/:disabled|\[aria-disabled="true"\]/.test(selector.replace(/:not\([^()]*(?:\([^()]*\)[^()]*)*\)/g, '')) &&!/^(from|to|\d+%)$/.test(selector) && !ALLOWED.includes(selector));
+    .filter(
+      (selector) =>
+        !/:disabled|\[aria-disabled="true"\]/.test(selector.replace(/:not\([^()]*(?:\([^()]*\)[^()]*)*\)/g, '')) &&
+        !/^(from|to|\d+%)$/.test(selector) &&
+        !ALLOWED.includes(selector),
+    );
 
   it('only disabled controls and the allowlisted pill hover set opacity < 1', () => {
     expect(offenders).toEqual([]);
   });
 
   it('the dead tag suggestion and input rules are gone', () => {
-    for (const dead of ['.tag-suggestion', '.tag-suggestions', '.tag-badge-removable', '.tag-badge-remove', '.tag-input-wrapper', '.tag-input-field']) {
+    for (const dead of [
+      '.tag-suggestion',
+      '.tag-suggestions',
+      '.tag-badge-removable',
+      '.tag-badge-remove',
+      '.tag-input-wrapper',
+      '.tag-input-field',
+    ]) {
       expect(rules.some(({ selector }) => selector.startsWith(dead))).toBe(false);
     }
   });
@@ -210,12 +223,15 @@ describe.each(THEMES)('#293 AC1: the selected pill of the theme toggle and Libra
 });
 
 describe('#293 AC1: the pill rules', () => {
-  it.each(['.theme-toggle-btn.active', '.library-switch-btn.active'])('%s fills with the fill token, no surface or shadow', (sel) => {
-    const { body } = rule(sel);
-    expect(decl(body, 'background')).toBe('var(--color-primary-fill)');
-    expect(decl(body, 'color')).toBe('var(--color-on-fill)');
-    expect(body).not.toMatch(/box-shadow|--color-surface/);
-  });
+  it.each(['.theme-toggle-btn.active', '.library-switch-btn.active'])(
+    '%s fills with the fill token, no surface or shadow',
+    (sel) => {
+      const { body } = rule(sel);
+      expect(decl(body, 'background')).toBe('var(--color-primary-fill)');
+      expect(decl(body, 'color')).toBe('var(--color-on-fill)');
+      expect(body).not.toMatch(/box-shadow|--color-surface/);
+    },
+  );
   it('the track, the Library label weight and the 44 px segments are unchanged', () => {
     expect(decl(rule('.theme-toggle').body, 'background')).toBe('var(--color-border-light)');
     expect(decl(rule('.library-switch').body, 'background')).toBe('var(--color-border-light)');
@@ -253,7 +269,9 @@ describe('#293 AC3: segmented button rules', () => {
   });
   it('the 44 px / 28 px sizes are untouched', () => {
     expect(decl(rule('.effort-btn').body, 'height')).toBe('28px');
-    expect(decl(rule('.effort-toggle-session .effort-btn, .sub-type-toggle .sub-type-btn').body, 'min-height')).toBe('44px');
+    expect(decl(rule('.effort-toggle-session .effort-btn, .sub-type-toggle .sub-type-btn').body, 'min-height')).toBe(
+      '44px',
+    );
   });
 });
 
@@ -281,7 +299,13 @@ describe('#293 AC4: streak dot rules', () => {
     expect(decl(rule('.streak-dot.today.filled').body, 'box-shadow')).toBe('none');
   });
   it('no switch, segment or dot rule has gone back to the old tokens', () => {
-    const sels = ['.theme-toggle-btn.active', '.library-switch-btn.active', '.streak-dot', '.streak-dot.filled', '.streak-dot.today'];
+    const sels = [
+      '.theme-toggle-btn.active',
+      '.library-switch-btn.active',
+      '.streak-dot',
+      '.streak-dot.filled',
+      '.streak-dot.today',
+    ];
     for (const s of sels) expect(rule(s).body).not.toMatch(/var\(--color-(?:surface|border|primary)\)/);
   });
   it('--color-primary stays the brand colour', () => {

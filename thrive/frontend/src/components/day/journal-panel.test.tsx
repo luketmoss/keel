@@ -27,7 +27,11 @@ function mount(date = D, state: DayState = 'past') {
   );
 }
 const box = (c: Element) => c.querySelector('textarea') as HTMLTextAreaElement;
-const settle = () => act(async () => { await Promise.resolve(); await Promise.resolve(); });
+const settle = () =>
+  act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
 
 beforeEach(() => {
   loadJournal.mockClear();
@@ -37,7 +41,10 @@ beforeEach(() => {
   journalEntries.value = { state: 'loaded', entries: [entry(D, 'hello')] };
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 describe('Note panel', () => {
   it('fills the note slot', () => {
@@ -55,7 +62,11 @@ describe('Note panel', () => {
   });
 
   it('reads a day with no entry as blank, with a placeholder for each state', () => {
-    const cases: [DayState, string][] = [['past', 'What happened this day?'], ['today', "How's today going?"], ['future', 'Notes for this day…']];
+    const cases: [DayState, string][] = [
+      ['past', 'What happened this day?'],
+      ['today', "How's today going?"],
+      ['future', 'Notes for this day…'],
+    ];
     for (const [state, text] of cases) {
       const { container, unmount } = mount('2026-10-01', state);
       expect(box(container).value).toBe('');
@@ -133,15 +144,21 @@ describe('Note panel', () => {
 
   describe('whitespace-only typing (#278)', () => {
     const sub = (c: Element) => c.querySelector('.day-panel-sub')?.textContent ?? '';
-    beforeEach(() => { vi.useFakeTimers(); });
-    afterEach(() => { vi.useRealTimers(); });
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
 
     it('no note: sub stays empty past the debounce, box kept, nothing sent, dropped on blur', () => {
       const { container } = mount('2026-09-27');
       fireEvent.focus(box(container));
       fireEvent.input(box(container), { target: { value: ' \n ' } });
       expect(sub(container)).toBe('');
-      act(() => { vi.advanceTimersByTime(1500); });
+      act(() => {
+        vi.advanceTimersByTime(1500);
+      });
       expect(sub(container)).toBe('');
       expect(box(container).value).toBe(' \n ');
       expect(upsert).not.toHaveBeenCalled();
@@ -154,7 +171,9 @@ describe('Note panel', () => {
       const { container } = mount();
       fireEvent.focus(box(container));
       fireEvent.input(box(container), { target: { value: ' ' } });
-      act(() => { vi.advanceTimersByTime(1500); });
+      act(() => {
+        vi.advanceTimersByTime(1500);
+      });
       expect(upsert).not.toHaveBeenCalled();
       expect(sub(container)).toBe('');
       expect(box(container).value).toBe(' ');
@@ -164,7 +183,9 @@ describe('Note panel', () => {
       fireEvent.blur(box(container));
       expect(upsert).toHaveBeenCalledWith(D, ' ', 'tok');
       expect(sub(container)).toBe('Saving…');
-      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
       expect(sub(container)).toBe('Saved');
       expect(box(container).value).toBe('');
     });
@@ -175,7 +196,9 @@ describe('Note panel', () => {
       fireEvent.input(box(container), { target: { value: ' ' } });
       fireEvent.input(box(container), { target: { value: ' a' } });
       expect(sub(container)).toBe('Saving…');
-      act(() => { vi.advanceTimersByTime(1000); });
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
       expect(upsert).toHaveBeenCalledWith(D, ' a', 'tok');
     });
   });
@@ -200,7 +223,9 @@ describe('Note panel', () => {
     const { container } = mount();
     fireEvent.click(container.querySelector('.panel-retry')!);
     expect(document.activeElement).toBe(container.querySelector('[role="status"]'));
-    act(() => { journalEntries.value = { state: 'loaded', entries: [entry(D, 'hello')] }; });
+    act(() => {
+      journalEntries.value = { state: 'loaded', entries: [entry(D, 'hello')] };
+    });
     await settle();
     const h2 = container.querySelector('h2.day-panel-title')!;
     expect(h2.textContent).toBe('Note');
@@ -217,7 +242,9 @@ describe('Note panel', () => {
     journalEntries.value = { state: 'loading' };
     const loading = mount();
     expect(loading.container.querySelector('textarea')).toBeNull();
-    act(() => { journalEntries.value = { state: 'loaded', entries: [entry(D, 'hello')] }; });
+    act(() => {
+      journalEntries.value = { state: 'loaded', entries: [entry(D, 'hello')] };
+    });
     expect(box(loading.container).value).toBe('held');
   });
 });
@@ -236,7 +263,13 @@ describe('Note save retry focus (#290)', () => {
     await settle();
     let resolve!: (v: unknown) => void;
     let reject!: (e: Error) => void;
-    upsert.mockImplementationOnce(() => new Promise((res, rej) => { resolve = res; reject = rej; }));
+    upsert.mockImplementationOnce(
+      () =>
+        new Promise((res, rej) => {
+          resolve = res;
+          reject = rej;
+        }),
+    );
     const btn = retryBtn(view.container)!;
     btn.focus();
     fireEvent.click(btn);
@@ -287,7 +320,9 @@ describe('Note save retry focus (#290)', () => {
     fireEvent.blur(box(container));
     await settle();
     // The stored note catches up to the draft elsewhere, so the retry has nothing to send.
-    act(() => { journalEntries.value = { state: 'loaded', entries: [entry(D, 'changed')] }; });
+    act(() => {
+      journalEntries.value = { state: 'loaded', entries: [entry(D, 'changed')] };
+    });
     await settle();
     const btn = retryBtn(container)!;
     btn.focus();

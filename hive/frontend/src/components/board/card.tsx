@@ -1,4 +1,10 @@
-import { selectItem, getChildCount, openDetailWithTitleEdit, boardStatuses, isTerminalStatus } from '../../state/board-store';
+import {
+  selectItem,
+  getChildCount,
+  openDetailWithTitleEdit,
+  boardStatuses,
+  isTerminalStatus,
+} from '../../state/board-store';
 import { labels as labelsStore } from '../../state/board-store';
 import type { ItemWithRow, ItemStatus } from '../../api/types';
 import { LabelBadge } from '../shared/label-badge';
@@ -23,13 +29,27 @@ interface Props {
   onDelete?: (itemId: string) => void;
 }
 
-export function Card({ item, onMoveStatus, onReorder, columnItems, onMoveToTop, onMoveToBottom, onCopy, onDelete }: Props) {
+export function Card({
+  item,
+  onMoveStatus,
+  onReorder,
+  columnItems,
+  onMoveToTop,
+  onMoveToBottom,
+  onCopy,
+  onDelete,
+}: Props) {
   const childCount = getChildCount(item.id);
   const itemLabels = item.labels
-    ? item.labels.split(',').map(l => l.trim()).filter(Boolean)
+    ? item.labels
+        .split(',')
+        .map((l) => l.trim())
+        .filter(Boolean)
     : [];
 
-  const isOverdue = item.due_date && !isTerminalStatus(item.status) &&
+  const isOverdue =
+    item.due_date &&
+    !isTerminalStatus(item.status) &&
     parseLocalDate(item.due_date) < new Date(new Date().toDateString());
 
   const handleDragStart = (e: DragEvent) => {
@@ -83,7 +103,7 @@ export function Card({ item, onMoveStatus, onReorder, columnItems, onMoveToTop, 
     // Arrow keys for moving between columns (only without Alt)
     if (!e.altKey && onMoveStatus && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
       e.preventDefault();
-      const statusOrder = boardStatuses.value.map(s => s.name);
+      const statusOrder = boardStatuses.value.map((s) => s.name);
       const currentIndex = statusOrder.indexOf(item.status);
       if (currentIndex === -1) return;
       const newIndex = e.key === 'ArrowLeft' ? currentIndex - 1 : currentIndex + 1;
@@ -136,9 +156,7 @@ export function Card({ item, onMoveStatus, onReorder, columnItems, onMoveToTop, 
       data-item-id={item.id}
     >
       <div class="card-content">
-        {kebabActions.length > 0 && (
-          <KebabMenu actions={kebabActions} itemTitle={item.title} />
-        )}
+        {kebabActions.length > 0 && <KebabMenu actions={kebabActions} itemTitle={item.title} />}
         <button
           class="card-title"
           type="button"
@@ -150,29 +168,24 @@ export function Card({ item, onMoveStatus, onReorder, columnItems, onMoveToTop, 
           {item.title}
         </button>
 
-        {item.description && (
-          <div class="card-description">{item.description}</div>
-        )}
+        {item.description && <div class="card-description">{item.description}</div>}
 
         <div class="card-meta">
-          {item.owner ? (
-            <span class="card-owner">{item.owner}</span>
-          ) : (
-            <span class="card-unassigned">Unassigned</span>
-          )}
+          {item.owner ? <span class="card-owner">{item.owner}</span> : <span class="card-unassigned">Unassigned</span>}
           {item.due_date && (
             <span
               class={`card-due ${isOverdue ? 'card-due-overdue' : ''}`}
               aria-label={`Due date: ${formatDate(item.due_date)}${isOverdue ? ', overdue' : ''}`}
             >
-              {'\u{23F0}'} Due: {formatDate(item.due_date)}{isOverdue ? ' (overdue)' : ''}
+              {'\u{23F0}'} Due: {formatDate(item.due_date)}
+              {isOverdue ? ' (overdue)' : ''}
             </span>
           )}
         </div>
 
         {itemLabels.length > 0 && (
           <div class="card-labels">
-            {itemLabels.map(label => (
+            {itemLabels.map((label) => (
               <LabelBadge key={label} label={label} />
             ))}
           </div>
@@ -191,7 +204,9 @@ export function Card({ item, onMoveStatus, onReorder, columnItems, onMoveToTop, 
               class="subtask-bar"
               style={{ '--progress': `${(childCount.done / childCount.total) * 100}%` } as any}
             />
-            <span class="subtask-text">{childCount.done}/{childCount.total}</span>
+            <span class="subtask-text">
+              {childCount.done}/{childCount.total}
+            </span>
           </div>
         )}
       </div>

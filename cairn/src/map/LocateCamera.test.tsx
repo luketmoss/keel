@@ -6,7 +6,11 @@ const { fitTracksToBounds, flyToFramedGround } = vi.hoisted(() => ({
   fitTracksToBounds: vi.fn(),
   flyToFramedGround: vi.fn(),
 }))
-vi.mock('@keel/geo', async (importOriginal) => ({ ...(await importOriginal<typeof import('@keel/geo')>()), fitTracksToBounds, FIT_PADDING: 48 }))
+vi.mock('@keel/geo', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@keel/geo')>()),
+  fitTracksToBounds,
+  FIT_PADDING: 48,
+}))
 vi.mock('./flyToFramedGround', () => ({ flyToFramedGround }))
 
 const { useMapResult, useMap3DResult } = vi.hoisted(() => ({

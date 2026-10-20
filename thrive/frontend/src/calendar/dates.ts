@@ -72,6 +72,8 @@ export function gridRange(month: string): GridRange {
 export function monthTitle(month: string): string {
   const [y, m] = month.split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, 15, 12)).toLocaleDateString('en-US', {
-    timeZone: 'UTC', month: 'long', year: 'numeric',
+    timeZone: 'UTC',
+    month: 'long',
+    year: 'numeric',
   });
 }

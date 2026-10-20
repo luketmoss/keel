@@ -16,8 +16,12 @@ let mockActiveBoardId = 'board-family';
 
 vi.mock('../../state/board-store', () => ({
   showMoveToBoardModal: {
-    get value() { return mockShowMoveToBoardModal; },
-    set value(v: boolean) { mockShowMoveToBoardModal = v; },
+    get value() {
+      return mockShowMoveToBoardModal;
+    },
+    set value(v: boolean) {
+      mockShowMoveToBoardModal = v;
+    },
   },
   selectedItem: {
     get value() {
@@ -42,13 +46,19 @@ vi.mock('../../state/board-store', () => ({
     },
   },
   childrenOfSelected: {
-    get value() { return mockChildren; },
+    get value() {
+      return mockChildren;
+    },
   },
   accessibleBoards: {
-    get value() { return mockAccessibleBoards; },
+    get value() {
+      return mockAccessibleBoards;
+    },
   },
   activeBoardId: {
-    get value() { return mockActiveBoardId; },
+    get value() {
+      return mockActiveBoardId;
+    },
   },
 }));
 
@@ -72,7 +82,7 @@ function renderModal() {
   return render(
     <AuthContext.Provider value={mockAuth}>
       <MoveToBoardModal />
-    </AuthContext.Provider>
+    </AuthContext.Provider>,
   );
 }
 
@@ -118,14 +128,14 @@ describe('MoveToBoardModal', () => {
     fireEvent.click(moveBtn);
 
     // Wait for async handler
-    await new Promise(r => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
     expect(mockMoveItemToBoard).toHaveBeenCalledWith('item-1', 'board-work', 'Luke', 'test-token');
   });
 
   // AC2: Cancel closes modal without moving
   it('closes modal on Cancel without calling moveItemToBoard', () => {
     const { container } = renderModal();
-    const cancelBtn = Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Cancel');
+    const cancelBtn = Array.from(container.querySelectorAll('button')).find((b) => b.textContent === 'Cancel');
     expect(cancelBtn).not.toBeUndefined();
     fireEvent.click(cancelBtn!);
     expect(mockShowMoveToBoardModal).toBe(false);
@@ -159,9 +169,7 @@ describe('MoveToBoardModal', () => {
 
   // AC3: Singular form for 1 subtask
   it('shows singular form for 1 subtask', () => {
-    mockChildren = [
-      { id: 'child-1', title: 'Sub 1', status: 'To Do', parent_id: 'item-1', sort_order: 1 },
-    ];
+    mockChildren = [{ id: 'child-1', title: 'Sub 1', status: 'To Do', parent_id: 'item-1', sort_order: 1 }];
 
     const { container } = renderModal();
     const radio = container.querySelector('input[value="board-work"]') as HTMLInputElement;

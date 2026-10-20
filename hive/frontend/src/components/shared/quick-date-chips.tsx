@@ -22,7 +22,7 @@ export function QuickDateChips({ value, onChange }: QuickDateChipsProps) {
 
   return (
     <div class="quick-date-chips" role="group" aria-label="Quick date shortcuts">
-      {DATE_SHORTCUTS.map(s => (
+      {DATE_SHORTCUTS.map((s) => (
         <button
           key={s}
           type="button"

@@ -74,21 +74,10 @@ export function ProfileDialog({ user, currentName, token, onClose, onNameUpdated
 
   return (
     <div class="modal-overlay" onClick={handleOverlayClick}>
-      <div
-        class="modal profile-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-label="User Profile"
-        ref={trapRef}
-      >
+      <div class="modal profile-dialog" role="dialog" aria-modal="true" aria-label="User Profile" ref={trapRef}>
         <div class="modal-header">
           <h2>Profile</h2>
-          <button
-            class="btn btn-ghost"
-            onClick={handleClose}
-            aria-label="Close"
-            disabled={saving}
-          >
+          <button class="btn btn-ghost" onClick={handleClose} aria-label="Close" disabled={saving}>
             ✕
           </button>
         </div>
@@ -102,13 +91,7 @@ export function ProfileDialog({ user, currentName, token, onClose, onNameUpdated
 
           <div class="form-field">
             <label for="profile-email">Email</label>
-            <input
-              id="profile-email"
-              type="text"
-              value={user.email}
-              readOnly
-              class="profile-email-input"
-            />
+            <input id="profile-email" type="text" value={user.email} readOnly class="profile-email-input" />
           </div>
 
           <div class="form-field">
@@ -139,19 +122,10 @@ export function ProfileDialog({ user, currentName, token, onClose, onNameUpdated
           </div>
 
           <div class="modal-footer">
-            <button
-              type="button"
-              class="btn btn-ghost"
-              onClick={handleClose}
-              disabled={saving}
-            >
+            <button type="button" class="btn btn-ghost" onClick={handleClose} disabled={saving}>
               Cancel
             </button>
-            <button
-              type="submit"
-              class="btn btn-primary"
-              disabled={saving}
-            >
+            <button type="submit" class="btn btn-primary" disabled={saving}>
               {saving ? 'Saving…' : 'Save'}
             </button>
           </div>

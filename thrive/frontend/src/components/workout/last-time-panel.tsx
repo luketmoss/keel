@@ -52,11 +52,7 @@ export function LastTimePanel({ exerciseId, exerciseName, currentWorkoutId, onCo
         >
           Copy Down
         </button>
-        <button
-          class="last-time-close-btn"
-          onClick={onClose}
-          aria-label="Close history"
-        >
+        <button class="last-time-close-btn" onClick={onClose} aria-label="Close history">
           ✕
         </button>
       </div>

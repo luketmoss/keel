@@ -14,7 +14,9 @@ export function getStoredTheme(): ThemeChoice {
     }
     const val = localStorage.getItem('thrive-theme');
     if (val === 'light' || val === 'dark') return val;
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return 'system';
 }
 
@@ -34,7 +36,9 @@ function applyTheme(choice: ThemeChoice) {
     } else {
       localStorage.setItem('thrive-theme', choice);
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 // Apply on init

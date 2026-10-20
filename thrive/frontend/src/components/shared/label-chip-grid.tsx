@@ -37,7 +37,7 @@ export function LabelChipGrid({ selected, onToggle, onCreated }: LabelChipGridPr
   return (
     <div class="label-chip-grid-wrapper">
       <div class="label-chip-grid">
-        {labels.value.map(label => {
+        {labels.value.map((label) => {
           const isActive = selected.includes(label.name);
           const color = getLabelColor(label.color_key);
           const style: Record<string, string> = {};
@@ -56,17 +56,17 @@ export function LabelChipGrid({ selected, onToggle, onCreated }: LabelChipGridPr
               onClick={() => onToggle(label.name)}
               aria-pressed={isActive}
             >
-              {isActive && <span class="chip-check" aria-hidden="true">✓</span>}
+              {isActive && (
+                <span class="chip-check" aria-hidden="true">
+                  ✓
+                </span>
+              )}
               {label.name}
             </button>
           );
         })}
         {!creating && (
-          <button
-            type="button"
-            class="label-chip label-chip-create"
-            onClick={() => setCreating(true)}
-          >
+          <button type="button" class="label-chip label-chip-create" onClick={() => setCreating(true)}>
             + New Label
           </button>
         )}
@@ -78,11 +78,14 @@ export function LabelChipGrid({ selected, onToggle, onCreated }: LabelChipGridPr
             class="form-input"
             type="text"
             value={newName}
-            onInput={e => setNewName((e.target as HTMLInputElement).value)}
+            onInput={(e) => setNewName((e.target as HTMLInputElement).value)}
             placeholder="Label name"
             autoFocus
-            onKeyDown={e => {
-              if (e.key === 'Enter') { e.preventDefault(); handleCreate(); }
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleCreate();
+              }
               if (e.key === 'Escape') setCreating(false);
             }}
           />
@@ -103,11 +106,7 @@ export function LabelChipGrid({ selected, onToggle, onCreated }: LabelChipGridPr
         </div>
       )}
 
-      <button
-        type="button"
-        class="manage-labels-link"
-        onClick={() => navigate('/settings/labels')}
-      >
+      <button type="button" class="manage-labels-link" onClick={() => navigate('/settings/labels')}>
         Manage labels
       </button>
     </div>

@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { cairnCacheKey, isCairnRecord, readCachedCairns, writeCachedCairns, dropCachedCairns } from './cairnCache'
+import {
+  cairnCacheKey,
+  isCairnRecord,
+  readCachedCairns,
+  writeCachedCairns,
+  dropCachedCairns,
+} from './cairnCache'
 import type { CairnRecord } from '../photo/useCairnImport'
 
 /* #243 — the local cairn cache on its own terms. The hook's use of it is in
@@ -29,10 +35,7 @@ describe('cairnCache', () => {
   it('round-trips a trip’s cairns', () => {
     writeCachedCairns('trip-1', [cairnRecord(), cairnRecord({ id: 'cairn-b', name: 'b.jpg' })])
 
-    expect(readCachedCairns('trip-1')).toEqual([
-      cairnRecord(),
-      cairnRecord({ id: 'cairn-b', name: 'b.jpg' }),
-    ])
+    expect(readCachedCairns('trip-1')).toEqual([cairnRecord(), cairnRecord({ id: 'cairn-b', name: 'b.jpg' })])
   })
 
   it('reads an absent entry as a miss, not an empty trip', () => {

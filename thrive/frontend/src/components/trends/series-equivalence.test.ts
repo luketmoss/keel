@@ -3,7 +3,15 @@
 
 import { describe, it, expect, afterEach } from 'vitest';
 import {
-  AVERAGES, RANGES, averageDays, datesBetween, earliestDate, metricSeries, rangeBounds, rolling, usablePoints,
+  AVERAGES,
+  RANGES,
+  averageDays,
+  datesBetween,
+  earliestDate,
+  metricSeries,
+  rangeBounds,
+  rolling,
+  usablePoints,
 } from './series';
 import { addDays, dayNumber } from '../../day/dates';
 import { yourRange } from '../../api/your-range';
@@ -39,17 +47,30 @@ function refRolling(values: ReadonlyMap<string, number>, dates: readonly string[
 }
 
 /** metricSeries as it was, around `refRolling`. */
-function refSeries(metric: TrendMetric, from: string, to: string, avgDays: number, today: string, pts: readonly TrendPoint[]) {
+function refSeries(
+  metric: TrendMetric,
+  from: string,
+  to: string,
+  avgDays: number,
+  today: string,
+  pts: readonly TrendPoint[],
+) {
   const usable = metric.excludesToday ? pts.filter((p) => p.date !== today) : pts;
   const all = new Map(usable.map((p) => [p.date, p.value]));
   const dates: string[] = [];
-  for (let n = oldDayNumber(from), end = oldDayNumber(to); n <= end; n++) dates.push(new Date(n * MS).toISOString().slice(0, 10));
+  for (let n = oldDayNumber(from), end = oldDayNumber(to); n <= end; n++)
+    dates.push(new Date(n * MS).toISOString().slice(0, 10));
   const points = usable
     .filter((p) => p.date >= from && p.date <= to)
     .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   const mean = points.length ? points.reduce((a, p) => a + p.value, 0) / points.length : null;
   return {
-    dates, all, points, average: refRolling(all, dates, avgDays), mean, covered: points.length,
+    dates,
+    all,
+    points,
+    average: refRolling(all, dates, avgDays),
+    mean,
+    covered: points.length,
     band: metric.band ? yourRange(all, today) : null,
   };
 }
@@ -88,8 +109,13 @@ describe('AC1: the series equals what it was', () => {
       // Source order is not date order.
       pts.sort(() => rnd() - 0.5);
       const metric: TrendMetric = {
-        id: 'm', label: 'M', unit: 'u', points: () => pts, format: String,
-        band: rnd() < 0.5, excludesToday: rnd() < 0.5,
+        id: 'm',
+        label: 'M',
+        unit: 'u',
+        points: () => pts,
+        format: String,
+        band: rnd() < 0.5,
+        excludesToday: rnd() < 0.5,
       };
       const range = RANGES[Math.floor(rnd() * RANGES.length)];
       const avgKey = AVERAGES[Math.floor(rnd() * AVERAGES.length)];
@@ -135,7 +161,9 @@ describe('AC1: the series equals what it was', () => {
 
 describe('AC4: rolling allocates nothing per window day', () => {
   const RealDate = Date;
-  afterEach(() => { globalThis.Date = RealDate; });
+  afterEach(() => {
+    globalThis.Date = RealDate;
+  });
 
   it('builds All (2,300 days) with a 30-day average with no more Dates than datesBetween makes', () => {
     const from = addDays(TODAY, -2299);
@@ -173,7 +201,13 @@ describe('AC5: one copy of the day arithmetic', () => {
 
 describe('AC6: All starts from what is drawn', () => {
   const steps: TrendMetric = {
-    id: 'steps', label: 'Steps', unit: 'steps', points: () => [], format: String, band: true, excludesToday: true,
+    id: 'steps',
+    label: 'Steps',
+    unit: 'steps',
+    points: () => [],
+    format: String,
+    band: true,
+    excludesToday: true,
   };
   const other: TrendMetric = { id: 'o', label: 'O', unit: '', points: () => [], format: String, band: false };
   const earliestOf = (m: TrendMetric, pts: TrendPoint[]) => earliestDate([usablePoints(m, pts, TODAY)]);
@@ -185,11 +219,18 @@ describe('AC6: All starts from what is drawn', () => {
   });
 
   it('stays null in a group where every other metric is empty', () => {
-    expect(earliestDate([usablePoints(steps, [{ date: TODAY, value: 1 }], TODAY), usablePoints(other, [], TODAY)])).toBeNull();
+    expect(
+      earliestDate([usablePoints(steps, [{ date: TODAY, value: 1 }], TODAY), usablePoints(other, [], TODAY)]),
+    ).toBeNull();
   });
 
   it('keeps an older real value, and today for a metric that does not exclude it', () => {
-    expect(earliestOf(steps, [{ date: TODAY, value: 9 }, { date: '2026-01-05', value: 3 }])).toBe('2026-01-05');
+    expect(
+      earliestOf(steps, [
+        { date: TODAY, value: 9 },
+        { date: '2026-01-05', value: 3 },
+      ]),
+    ).toBe('2026-01-05');
     expect(earliestOf(other, [{ date: TODAY, value: 9 }])).toBe(TODAY);
   });
 });

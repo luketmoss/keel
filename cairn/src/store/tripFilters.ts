@@ -38,7 +38,8 @@ export function tripIsDated(trip: Pick<TripIndexEntry, 'startDate'>): boolean {
 }
 
 export function matchesTripFilters(trip: TripIndexEntry, filters: TripFilters): boolean {
-  if (filters.status !== 'all' && deriveTripStatus(trip.startDate, trip.endDate) !== filters.status) return false
+  if (filters.status !== 'all' && deriveTripStatus(trip.startDate, trip.endDate) !== filters.status)
+    return false
 
   const name = filters.name.trim().toLowerCase()
   if (name && !trip.name.toLowerCase().includes(name)) return false

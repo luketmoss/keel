@@ -16,8 +16,17 @@ vi.mock('../demo/is-demo-mode', () => ({ isDemoMode: () => false }));
 
 import { archiveBoard, unarchiveBoard } from './actions';
 import {
-  boards, permissions, items, activeBoardId, currentUserEmail, toastMessage,
-  accessibleBoards, archivedBoards, upcomingBuckets, upcomingFilterBoards, activeView,
+  boards,
+  permissions,
+  items,
+  activeBoardId,
+  currentUserEmail,
+  toastMessage,
+  accessibleBoards,
+  archivedBoards,
+  upcomingBuckets,
+  upcomingFilterBoards,
+  activeView,
   showArchivedBoardsDialog,
 } from './board-store';
 import type { ItemWithRow } from '../api/types';
@@ -26,9 +35,21 @@ const ME = 'owner@test.com';
 
 function item(id: string, boardId: string, status: string, dueDate: string): ItemWithRow {
   return {
-    id, title: id, description: '', status, owner: '', due_date: dueDate, labels: '',
-    parent_id: '', created_at: '', updated_at: '', completed_at: '', sort_order: 1,
-    created_by: '', board_id: boardId, sheetRow: 2,
+    id,
+    title: id,
+    description: '',
+    status,
+    owner: '',
+    due_date: dueDate,
+    labels: '',
+    parent_id: '',
+    created_at: '',
+    updated_at: '',
+    completed_at: '',
+    sort_order: 1,
+    created_by: '',
+    board_id: boardId,
+    sheetRow: 2,
   };
 }
 
@@ -58,7 +79,7 @@ beforeEach(() => {
 });
 
 function upcomingIds() {
-  return upcomingBuckets.value.flatMap(b => b.items.map(i => i.id));
+  return upcomingBuckets.value.flatMap((b) => b.items.map((i) => i.id));
 }
 
 describe('archiveBoard (AC1, AC2)', () => {
@@ -69,10 +90,20 @@ describe('archiveBoard (AC1, AC2)', () => {
     const [boardId, archivedAt] = mockSetBoardArchivedAt.mock.calls[0];
     expect(boardId).toBe('garage');
     expect(new Date(archivedAt).toISOString()).toBe(archivedAt);
-    expect(mockAppendAuditEntry).toHaveBeenCalledWith('garage', 'board_archived', 'archived_at', '', archivedAt, ME, 'tok');
+    expect(mockAppendAuditEntry).toHaveBeenCalledWith(
+      'garage',
+      'board_archived',
+      'archived_at',
+      '',
+      archivedAt,
+      ME,
+      'tok',
+    );
     // Items are untouched: still in the store, same statuses.
-    expect(items.value.map(i => [i.id, i.status])).toEqual([
-      ['g-todo', 'To Do'], ['g-doing', 'In Progress'], ['h-todo', 'To Do'],
+    expect(items.value.map((i) => [i.id, i.status])).toEqual([
+      ['g-todo', 'To Do'],
+      ['g-doing', 'In Progress'],
+      ['h-todo', 'To Do'],
     ]);
   });
 
@@ -86,8 +117,8 @@ describe('archiveBoard (AC1, AC2)', () => {
   it('drops the board from accessibleBoards and its items from Upcoming, whatever their status', async () => {
     expect(upcomingIds()).toEqual(expect.arrayContaining(['g-todo', 'g-doing']));
     await archiveBoard('garage', ME, 'tok');
-    expect(accessibleBoards.value.map(b => b.id)).toEqual(['home']);
-    expect(archivedBoards.value.map(b => b.id)).toEqual(['garage']);
+    expect(accessibleBoards.value.map((b) => b.id)).toEqual(['home']);
+    expect(archivedBoards.value.map((b) => b.id)).toEqual(['garage']);
     expect(upcomingIds()).toEqual(['h-todo']);
     // Leaves the filter snapshot too, so the filter badge compares like with like.
     expect([...upcomingFilterBoards.value]).toEqual(['home']);
@@ -98,14 +129,14 @@ describe('archiveBoard (AC1, AC2)', () => {
     await toastMessage.value!.action!.fn();
     await Promise.resolve();
     expect(mockSetBoardArchivedAt).toHaveBeenLastCalledWith('garage', '', 'tok');
-    expect(accessibleBoards.value.map(b => b.id)).toEqual(['home', 'garage']);
+    expect(accessibleBoards.value.map((b) => b.id)).toEqual(['home', 'garage']);
     expect(activeBoardId.value).toBe('garage');
   });
 
   it('rolls back and stays on the board when the write fails', async () => {
     mockSetBoardArchivedAt.mockRejectedValueOnce(new Error('boom'));
     expect(await archiveBoard('garage', ME, 'tok')).toBe(false);
-    expect(accessibleBoards.value.map(b => b.id)).toEqual(['home', 'garage']);
+    expect(accessibleBoards.value.map((b) => b.id)).toEqual(['home', 'garage']);
     expect(activeBoardId.value).toBe('garage');
     expect(toastMessage.value).toMatchObject({ type: 'error' });
     expect(mockAppendAuditEntry).not.toHaveBeenCalled();
@@ -114,7 +145,7 @@ describe('archiveBoard (AC1, AC2)', () => {
 
 describe('unarchiveBoard (AC3)', () => {
   beforeEach(() => {
-    boards.value = boards.value.map(b => (b.id === 'garage' ? { ...b, archived_at: '2026-10-01T00:00:00.000Z' } : b));
+    boards.value = boards.value.map((b) => (b.id === 'garage' ? { ...b, archived_at: '2026-10-01T00:00:00.000Z' } : b));
     upcomingFilterBoards.value = new Set(['home']);
     activeBoardId.value = 'home';
   });
@@ -123,7 +154,13 @@ describe('unarchiveBoard (AC3)', () => {
     expect(await unarchiveBoard('garage', ME, 'tok')).toBe(true);
     expect(mockSetBoardArchivedAt).toHaveBeenCalledWith('garage', '', 'tok');
     expect(mockAppendAuditEntry).toHaveBeenCalledWith(
-      'garage', 'board_unarchived', 'archived_at', '2026-10-01T00:00:00.000Z', '', ME, 'tok'
+      'garage',
+      'board_unarchived',
+      'archived_at',
+      '2026-10-01T00:00:00.000Z',
+      '',
+      ME,
+      'tok',
     );
     expect(archivedBoards.value).toEqual([]);
     expect(upcomingIds()).toEqual(expect.arrayContaining(['g-todo', 'g-doing', 'h-todo']));
@@ -152,6 +189,6 @@ describe('archivedBoards ordering (AC3)', () => {
       { board_id: 'a', user_email: ME, role: 'owner' },
       { board_id: 'b', user_email: '*', role: 'member' },
     ];
-    expect(archivedBoards.value.map(b => b.id)).toEqual(['b', 'a']);
+    expect(archivedBoards.value.map((b) => b.id)).toEqual(['b', 'a']);
   });
 });

@@ -268,7 +268,9 @@ describe('useFocusTrap', () => {
       const ref = useFocusTrap(onEscape);
       return (
         <div ref={ref} data-testid="trap-container">
-          <button data-testid="btn-hidden" data-hidden>Expand</button>
+          <button data-testid="btn-hidden" data-hidden>
+            Expand
+          </button>
           <button data-testid="btn-close">Close</button>
           <input data-testid="input-middle" type="text" />
         </div>
@@ -443,8 +445,9 @@ describe('useFocusTrap', () => {
 
     beforeEach(() => {
       // Check own property first, then walk the prototype chain
-      originalDescriptor = Object.getOwnPropertyDescriptor(navigator, 'userAgent')
-        ?? Object.getOwnPropertyDescriptor(Object.getPrototypeOf(navigator), 'userAgent');
+      originalDescriptor =
+        Object.getOwnPropertyDescriptor(navigator, 'userAgent') ??
+        Object.getOwnPropertyDescriptor(Object.getPrototypeOf(navigator), 'userAgent');
       Object.defineProperty(navigator, 'userAgent', {
         value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)',
         writable: true,

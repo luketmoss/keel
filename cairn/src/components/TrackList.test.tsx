@@ -228,7 +228,12 @@ describe('TrackList', () => {
   // than swapping to a different glyph.
   it('draws the show/hide control as an aria-hidden SVG, struck through only when hidden', () => {
     const { rerender } = render(
-      <TrackList files={[importedFile({ visible: true })]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} onStartConfirm={vi.fn()} />,
+      <TrackList
+        files={[importedFile({ visible: true })]}
+        onToggleVisibility={vi.fn()}
+        onRemove={vi.fn()}
+        onStartConfirm={vi.fn()}
+      />,
     )
 
     const visibleButton = screen.getByRole('button', { name: 'Hide trip.kml' })
@@ -238,7 +243,12 @@ describe('TrackList', () => {
     expect(svg?.querySelectorAll('path')).toHaveLength(1)
 
     rerender(
-      <TrackList files={[importedFile({ visible: false })]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} onStartConfirm={vi.fn()} />,
+      <TrackList
+        files={[importedFile({ visible: false })]}
+        onToggleVisibility={vi.fn()}
+        onRemove={vi.fn()}
+        onStartConfirm={vi.fn()}
+      />,
     )
 
     const hiddenButton = screen.getByRole('button', { name: 'Show trip.kml' })
@@ -247,11 +257,18 @@ describe('TrackList', () => {
 
   it('returns to the empty state after the last file is removed', () => {
     const { rerender } = render(
-      <TrackList files={[importedFile()]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} onStartConfirm={vi.fn()} />,
+      <TrackList
+        files={[importedFile()]}
+        onToggleVisibility={vi.fn()}
+        onRemove={vi.fn()}
+        onStartConfirm={vi.fn()}
+      />,
     )
     expect(screen.queryByText('No tracks yet')).toBeNull()
 
-    rerender(<TrackList files={[]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} onStartConfirm={vi.fn()} />)
+    rerender(
+      <TrackList files={[]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} onStartConfirm={vi.fn()} />,
+    )
 
     expect(screen.getByText('No tracks yet')).toBeDefined()
   })
@@ -277,21 +294,42 @@ describe('TrackList', () => {
   })
 
   it('does nothing on hover when onHoverFile is omitted', () => {
-    render(<TrackList files={[importedFile()]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} onStartConfirm={vi.fn()} />)
+    render(
+      <TrackList
+        files={[importedFile()]}
+        onToggleVisibility={vi.fn()}
+        onRemove={vi.fn()}
+        onStartConfirm={vi.fn()}
+      />,
+    )
 
     const row = screen.getByText('trip.kml', { exact: false }).closest('li')!
     expect(() => fireEvent.mouseEnter(row)).not.toThrow()
   })
 
   it('does not render a drag handle or colour button when their handlers are omitted (#46)', () => {
-    render(<TrackList files={[importedFile()]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} onStartConfirm={vi.fn()} />)
+    render(
+      <TrackList
+        files={[importedFile()]}
+        onToggleVisibility={vi.fn()}
+        onRemove={vi.fn()}
+        onStartConfirm={vi.fn()}
+      />,
+    )
 
     expect(screen.queryByLabelText('Reorder trip.kml')).toBeNull()
     expect(screen.queryByLabelText('Change colour for trip.kml')).toBeNull()
   })
 
   it('offers no Rename action when onRename is omitted (#219)', () => {
-    render(<TrackList files={[importedFile()]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} onStartConfirm={vi.fn()} />)
+    render(
+      <TrackList
+        files={[importedFile()]}
+        onToggleVisibility={vi.fn()}
+        onRemove={vi.fn()}
+        onStartConfirm={vi.fn()}
+      />,
+    )
 
     openRowMenu('trip.kml')
     expect(screen.queryByRole('menuitem', { name: 'Rename' })).toBeNull()
@@ -530,10 +568,7 @@ describe('TrackList', () => {
 
       // #73's Disabled treatment on the menu item, not a hidden trigger.
       openRowMenu('trip.kml')
-      expect(screen.getByRole('menuitem', { name: 'Delete permanently…' })).toHaveProperty(
-        'disabled',
-        true,
-      )
+      expect(screen.getByRole('menuitem', { name: 'Delete permanently…' })).toHaveProperty('disabled', true)
     })
   })
 
@@ -604,7 +639,14 @@ describe('TrackList', () => {
 
   describe('#110 remove from trip, beside delete', () => {
     it('offers no unlink action when the list is not inside a trip', () => {
-      render(<TrackList files={[importedFile()]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} onStartConfirm={vi.fn()} />)
+      render(
+        <TrackList
+          files={[importedFile()]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          onStartConfirm={vi.fn()}
+        />,
+      )
 
       openRowMenu('trip.kml')
       expect(screen.queryByRole('menuitem', { name: /from trip/ })).toBeNull()
@@ -664,14 +706,8 @@ describe('TrackList', () => {
 
       // Disabled items, not a hidden trigger — #73's Disabled treatment.
       openRowMenu('trip.kml')
-      expect(screen.getByRole('menuitem', { name: 'Remove from trip' })).toHaveProperty(
-        'disabled',
-        true,
-      )
-      expect(screen.getByRole('menuitem', { name: 'Delete permanently…' })).toHaveProperty(
-        'disabled',
-        true,
-      )
+      expect(screen.getByRole('menuitem', { name: 'Remove from trip' })).toHaveProperty('disabled', true)
+      expect(screen.getByRole('menuitem', { name: 'Delete permanently…' })).toHaveProperty('disabled', true)
     })
   })
 
@@ -780,13 +816,23 @@ describe('TrackList', () => {
 
     it("the visibility control's tooltip follows its current state", () => {
       const { rerender } = render(
-        <TrackList files={[importedFile({ visible: true })]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} onStartConfirm={vi.fn()} />,
+        <TrackList
+          files={[importedFile({ visible: true })]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          onStartConfirm={vi.fn()}
+        />,
       )
 
       expectTooltipMatchesLabel(screen.getByRole('button', { name: 'Hide trip.kml' }), 'Hide trip.kml')
 
       rerender(
-        <TrackList files={[importedFile({ visible: false })]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} onStartConfirm={vi.fn()} />,
+        <TrackList
+          files={[importedFile({ visible: false })]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          onStartConfirm={vi.fn()}
+        />,
       )
 
       expectTooltipMatchesLabel(screen.getByRole('button', { name: 'Show trip.kml' }), 'Show trip.kml')
@@ -1051,7 +1097,14 @@ describe('TrackList', () => {
     })
 
     it('offers no More details item in the row menu', () => {
-      render(<TrackList files={[trackWithProfile()]} onToggleVisibility={vi.fn()} onRemove={vi.fn()} onStartConfirm={vi.fn()} />)
+      render(
+        <TrackList
+          files={[trackWithProfile()]}
+          onToggleVisibility={vi.fn()}
+          onRemove={vi.fn()}
+          onStartConfirm={vi.fn()}
+        />,
+      )
 
       openRowMenu('trip.kml')
       expect(screen.queryByRole('menuitem', { name: 'More details' })).toBeNull()

@@ -8,7 +8,10 @@ import { isDemo, DEMO_TEMPLATE_ROWS } from './demo-data';
 export function normalizeRangeToMax(val: string): string {
   const trimmed = val.trim();
   if (!trimmed) return trimmed;
-  const parts = trimmed.split('-').map((s) => Number(s.trim())).filter((n) => !isNaN(n));
+  const parts = trimmed
+    .split('-')
+    .map((s) => Number(s.trim()))
+    .filter((n) => !isNaN(n));
   if (parts.length === 0) return trimmed;
   return String(Math.max(...parts));
 }
@@ -63,16 +66,7 @@ export function groupTemplateRows(rows: TemplateRowWithRow[]): Template[] {
  * spans would silently recreate the columns removed in #100.
  */
 export function templateRowValues(r: Omit<TemplateRowWithRow, 'sheetRow'>): (string | number)[] {
-  return [
-    r.template_id,
-    r.template_name,
-    r.order,
-    r.exercise_id,
-    r.exercise_name,
-    r.section,
-    r.sets,
-    r.reps,
-  ];
+  return [r.template_id, r.template_name, r.order, r.exercise_id, r.exercise_name, r.section, r.sets, r.reps];
 }
 
 export async function createTemplate(
@@ -147,18 +141,14 @@ export async function updateExerciseNameInTemplates(
   templateRows: TemplateRowWithRow[],
   token: string,
 ): Promise<void> {
-  const affected = templateRows.filter(r => r.exercise_id === exerciseId);
+  const affected = templateRows.filter((r) => r.exercise_id === exerciseId);
   if (affected.length === 0) return;
 
   if (isDemo()) return;
 
   await withReauth(token, async (t) => {
     for (const row of affected) {
-      await sheetsUpdate(
-        `Templates!E${row.sheetRow}`,
-        [[newName]],
-        t,
-      );
+      await sheetsUpdate(`Templates!E${row.sheetRow}`, [[newName]], t);
     }
   });
 }

@@ -44,17 +44,17 @@ describe('startResumableUpload', () => {
   it('throws DriveRequestError when no Location header is returned', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(response({}))
 
-    await expect(
-      startResumableUpload('token', 'folder-id', 'track.kml'),
-    ).rejects.toBeInstanceOf(DriveRequestError)
+    await expect(startResumableUpload('token', 'folder-id', 'track.kml')).rejects.toBeInstanceOf(
+      DriveRequestError,
+    )
   })
 
   it('throws DriveAuthError on a 401', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(response({}, { status: 401 }))
 
-    await expect(
-      startResumableUpload('expired', 'folder-id', 'track.kml'),
-    ).rejects.toBeInstanceOf(DriveAuthError)
+    await expect(startResumableUpload('expired', 'folder-id', 'track.kml')).rejects.toBeInstanceOf(
+      DriveAuthError,
+    )
   })
 })
 
@@ -64,9 +64,7 @@ describe('uploadFileContent', () => {
   })
 
   it('uploads the whole file in one PUT when nothing goes wrong', async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(response({ id: 'file-1' }))
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(response({ id: 'file-1' }))
 
     const result = await uploadFileContent('https://upload.example/session-1', file('hello'), 'token')
 
@@ -210,9 +208,11 @@ describe('listTrackFiles', () => {
   // #244: `modifiedTime` is what `trackFileCache` keys invalidation on —
   // requested here and passed through unchanged.
   it('requests modifiedTime and passes it through on each file', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      response({ files: [{ id: 'drive-1', name: 'day-1.kml', modifiedTime: '2024-01-01T00:00:00Z' }] }),
-    )
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        response({ files: [{ id: 'drive-1', name: 'day-1.kml', modifiedTime: '2024-01-01T00:00:00Z' }] }),
+      )
 
     await expect(listTrackFiles('token', 'folder-id')).resolves.toEqual([
       { id: 'drive-1', name: 'day-1.kml', modifiedTime: '2024-01-01T00:00:00Z' },

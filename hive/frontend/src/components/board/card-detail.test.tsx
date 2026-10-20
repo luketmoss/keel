@@ -18,11 +18,19 @@ let mockItemOverrides: Record<string, any> = {};
 
 vi.mock('../../state/board-store', () => ({
   selectedItemId: {
-    get value() { return mockSelectedItemId; },
-    set value(v: string | null) { mockSelectedItemId = v; },
+    get value() {
+      return mockSelectedItemId;
+    },
+    set value(v: string | null) {
+      mockSelectedItemId = v;
+    },
   },
-  selectItem: (id: string) => { mockSelectedItemId = id; },
-  clearSelectedItem: () => { mockSelectedItemId = null; },
+  selectItem: (id: string) => {
+    mockSelectedItemId = id;
+  },
+  clearSelectedItem: () => {
+    mockSelectedItemId = null;
+  },
   openDetailWithTitleEdit: { value: false },
   selectedItem: {
     get value() {
@@ -47,23 +55,58 @@ vi.mock('../../state/board-store', () => ({
     },
   },
   childrenOfSelected: {
-    get value() { return mockChildren; },
+    get value() {
+      return mockChildren;
+    },
   },
   items: {
-    get value() { return mockItems; },
+    get value() {
+      return mockItems;
+    },
   },
-  owners: { value: [{ name: 'Luke', google_account: 'luke@example.com' }, { name: 'Sarah', google_account: 'sarah@example.com' }] },
+  owners: {
+    value: [
+      { name: 'Luke', google_account: 'luke@example.com' },
+      { name: 'Sarah', google_account: 'sarah@example.com' },
+    ],
+  },
   labels: { value: [{ label: 'Urgent', color: '#ff0000' }] },
   boardLabels: { value: [{ label: 'Urgent', color: '#ff0000' }] },
   showToast: vi.fn(),
   accessibleBoards: { value: [] },
   activeBoardId: { value: 'board-1' },
   showMoveToBoardModal: { value: false },
-  boardStatuses: { value: [
-    { id: 's1', board_id: 'board-1', name: 'To Do', sort_order: 1, color: '#e3f2fd', is_terminal: false, created_at: '' },
-    { id: 's2', board_id: 'board-1', name: 'In Progress', sort_order: 2, color: '#fff3e0', is_terminal: false, created_at: '' },
-    { id: 's3', board_id: 'board-1', name: 'Done', sort_order: 3, color: '#e8f5e9', is_terminal: true, created_at: '' },
-  ] },
+  boardStatuses: {
+    value: [
+      {
+        id: 's1',
+        board_id: 'board-1',
+        name: 'To Do',
+        sort_order: 1,
+        color: '#e3f2fd',
+        is_terminal: false,
+        created_at: '',
+      },
+      {
+        id: 's2',
+        board_id: 'board-1',
+        name: 'In Progress',
+        sort_order: 2,
+        color: '#fff3e0',
+        is_terminal: false,
+        created_at: '',
+      },
+      {
+        id: 's3',
+        board_id: 'board-1',
+        name: 'Done',
+        sort_order: 3,
+        color: '#e8f5e9',
+        is_terminal: true,
+        created_at: '',
+      },
+    ],
+  },
   isTerminalStatus: (name: string) => name === 'Done',
   defaultStatusName: () => 'To Do',
   terminalStatusName: () => 'Done',
@@ -95,7 +138,7 @@ function renderCardDetail() {
   return render(
     <AuthContext.Provider value={mockAuth}>
       <CardDetail />
-    </AuthContext.Provider>
+    </AuthContext.Provider>,
   );
 }
 
@@ -253,7 +296,7 @@ describe('CardDetail keyboard accessibility (Issue #6)', () => {
 
       // Get all focusable elements
       const focusable = overlay.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), select:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        'button:not([disabled]), select:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
       );
       expect(focusable.length).toBeGreaterThan(1);
 
@@ -272,7 +315,7 @@ describe('CardDetail keyboard accessibility (Issue #6)', () => {
       const overlay = container.querySelector('.detail-overlay') as HTMLElement;
 
       const focusable = overlay.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), select:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        'button:not([disabled]), select:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
       );
       expect(focusable.length).toBeGreaterThan(1);
 
@@ -496,7 +539,7 @@ describe('CardDetail inline dialogs (Issue #9)', () => {
       expect(createItem).toHaveBeenCalledWith(
         { title: 'New subtask', parent_id: 'detail-test-1', owner: '', created_by: 'luke@example.com' },
         'Luke',
-        'test-token'
+        'test-token',
       );
 
       // #208: Input should stay open (Enter keeps row open for next subtask)
@@ -604,7 +647,7 @@ describe('CardDetail subtask double-submit fix (Issue #54)', () => {
     expect(createItem).toHaveBeenCalledWith(
       { title: 'Buy milk', parent_id: 'detail-test-1', owner: '', created_by: 'luke@example.com' },
       'Luke',
-      'test-token'
+      'test-token',
     );
   });
 
@@ -627,7 +670,7 @@ describe('CardDetail subtask double-submit fix (Issue #54)', () => {
     expect(createItem).toHaveBeenCalledWith(
       { title: 'Walk the dog', parent_id: 'detail-test-1', owner: '', created_by: 'luke@example.com' },
       'Luke',
-      'test-token'
+      'test-token',
     );
   });
 
@@ -724,7 +767,7 @@ describe('CardDetail created_by display (Issue #23)', () => {
       const metaSection = container.querySelector('.detail-meta');
       expect(metaSection).not.toBeNull();
       const smalls = metaSection!.querySelectorAll('small');
-      const createdByLine = Array.from(smalls).find(s => s.textContent?.startsWith('Created by:'));
+      const createdByLine = Array.from(smalls).find((s) => s.textContent?.startsWith('Created by:'));
       expect(createdByLine).not.toBeNull();
     });
 
@@ -734,7 +777,7 @@ describe('CardDetail created_by display (Issue #23)', () => {
       const { container } = renderCardDetail();
       const metaSection = container.querySelector('.detail-meta');
       const smalls = metaSection!.querySelectorAll('small');
-      const createdByLine = Array.from(smalls).find(s => s.textContent?.startsWith('Created by:'));
+      const createdByLine = Array.from(smalls).find((s) => s.textContent?.startsWith('Created by:'));
       expect(createdByLine!.textContent).toBe('Created by: Luke');
     });
   });
@@ -778,7 +821,7 @@ describe('CardDetail Add/Cancel buttons (Issue #58)', () => {
     expect(createItem).toHaveBeenCalledWith(
       { title: 'New subtask via button', parent_id: 'detail-test-1', owner: '', created_by: 'luke@example.com' },
       'Luke',
-      'test-token'
+      'test-token',
     );
     // Creation row should close
     expect(container.querySelector('.subtask-add-input')).toBeNull();
@@ -1000,13 +1043,13 @@ describe('CardDetail — Touch reorder (Issue #88)', () => {
       const { container } = renderCardDetail();
       const handles = container.querySelectorAll('.subtask-handle');
       expect(handles.length).toBe(mockChildren.length);
-      handles.forEach(h => expect(h.getAttribute('aria-hidden')).toBe('true'));
+      handles.forEach((h) => expect(h.getAttribute('aria-hidden')).toBe('true'));
     });
 
     it('the row itself is not draggable — only the handle is', () => {
       const { container } = renderCardDetail();
       const rows = container.querySelectorAll('.subtask-item');
-      rows.forEach(row => {
+      rows.forEach((row) => {
         expect(row.getAttribute('draggable')).toBeNull();
       });
     });
@@ -1233,7 +1276,7 @@ describe('CardDetail sub-task date fields (Issue #86)', () => {
           due_date: '2026-04-01',
         }),
         'Luke',
-        'test-token'
+        'test-token',
       );
     });
 
@@ -1481,8 +1524,8 @@ describe('CardDetail expand panel (Issue #206)', () => {
     const { container } = renderCardDetail();
     const header = container.querySelector('.detail-header');
     const buttons = header!.querySelectorAll('button');
-    const expandBtn = Array.from(buttons).find(b => b.getAttribute('aria-label') === 'Expand panel');
-    const closeBtn = Array.from(buttons).find(b => b.getAttribute('aria-label') === 'Close');
+    const expandBtn = Array.from(buttons).find((b) => b.getAttribute('aria-label') === 'Expand panel');
+    const closeBtn = Array.from(buttons).find((b) => b.getAttribute('aria-label') === 'Close');
     expect(expandBtn).not.toBeNull();
     expect(closeBtn).not.toBeNull();
     // Expand should come before close in DOM order
@@ -1526,13 +1569,13 @@ describe('CardDetail expand panel (Issue #206)', () => {
     rerender(
       <AuthContext.Provider value={mockAuth}>
         <CardDetail />
-      </AuthContext.Provider>
+      </AuthContext.Provider>,
     );
     mockSelectedItemId = 'detail-test-2';
     rerender(
       <AuthContext.Provider value={mockAuth}>
         <CardDetail />
-      </AuthContext.Provider>
+      </AuthContext.Provider>,
     );
 
     expect(container.querySelector('.detail-panel-expanded')).toBeNull();
@@ -1550,16 +1593,17 @@ describe('CardDetail expand default on desktop (Issue #233)', () => {
   it('AC1: opens expanded on desktop viewport (matchMedia matches)', () => {
     // Mock matchMedia to return true for desktop breakpoint
     const originalMatchMedia = window.matchMedia;
-    window.matchMedia = (query: string) => ({
-      matches: query === '(min-width: 769px)',
-      media: query,
-      onchange: null,
-      addListener: () => {},
-      removeListener: () => {},
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      dispatchEvent: () => false,
-    } as unknown as MediaQueryList);
+    window.matchMedia = (query: string) =>
+      ({
+        matches: query === '(min-width: 769px)',
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList;
 
     const { container } = renderCardDetail();
     expect(container.querySelector('.detail-panel-expanded')).not.toBeNull();
@@ -1577,16 +1621,17 @@ describe('CardDetail expand default on desktop (Issue #233)', () => {
 
   it('AC3: user can still toggle manually on desktop', () => {
     const originalMatchMedia = window.matchMedia;
-    window.matchMedia = (query: string) => ({
-      matches: query === '(min-width: 769px)',
-      media: query,
-      onchange: null,
-      addListener: () => {},
-      removeListener: () => {},
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      dispatchEvent: () => false,
-    } as unknown as MediaQueryList);
+    window.matchMedia = (query: string) =>
+      ({
+        matches: query === '(min-width: 769px)',
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList;
 
     const { container } = renderCardDetail();
     // Starts expanded on desktop
@@ -1602,16 +1647,17 @@ describe('CardDetail expand default on desktop (Issue #233)', () => {
 
   it('AC4: desktop default reapplied when switching tasks', () => {
     const originalMatchMedia = window.matchMedia;
-    window.matchMedia = (query: string) => ({
-      matches: query === '(min-width: 769px)',
-      media: query,
-      onchange: null,
-      addListener: () => {},
-      removeListener: () => {},
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      dispatchEvent: () => false,
-    } as unknown as MediaQueryList);
+    window.matchMedia = (query: string) =>
+      ({
+        matches: query === '(min-width: 769px)',
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList;
 
     const { container, rerender } = renderCardDetail();
     // Manually collapse
@@ -1624,7 +1670,7 @@ describe('CardDetail expand default on desktop (Issue #233)', () => {
     rerender(
       <AuthContext.Provider value={mockAuth}>
         <CardDetail />
-      </AuthContext.Provider>
+      </AuthContext.Provider>,
     );
     expect(container.querySelector('.detail-panel-expanded')).not.toBeNull();
 
@@ -1805,7 +1851,9 @@ describe('CardDetail board scroll position (Issue #284)', () => {
     Object.defineProperty(main, 'scrollLeft', {
       configurable: true,
       get: () => left,
-      set: (v: number) => { left = v; },
+      set: (v: number) => {
+        left = v;
+      },
     });
     document.body.appendChild(main);
     return main;

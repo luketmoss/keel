@@ -517,7 +517,12 @@ function CairnRow({
       {bodyOpen && (
         <div className="cairn-row__preview-wrap">
           {hasImage ? (
-            <CairnRowPreview row={row} accessToken={accessToken} thumbnail={thumbnail} onOpen={onOpenPreview} />
+            <CairnRowPreview
+              row={row}
+              accessToken={accessToken}
+              thumbnail={thumbnail}
+              onOpen={onOpenPreview}
+            />
           ) : (
             <CairnRowSummary row={row} onOpen={onOpenPreview} />
           )}
@@ -585,7 +590,9 @@ function CairnRowSummary({ row, onOpen }: { row: CairnListRow; onOpen: (cairnId:
       aria-label={`Open ${row.name}`}
       onClick={() => onOpen(row.id)}
     >
-      <p className={`cairn-row__summary-description${description ? '' : ' cairn-row__summary-description--empty'}`}>
+      <p
+        className={`cairn-row__summary-description${description ? '' : ' cairn-row__summary-description--empty'}`}
+      >
         {description || 'No description yet.'}
       </p>
       <p className="cairn-row__summary-position">{positionSourceSentence(row.source)}</p>

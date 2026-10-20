@@ -120,7 +120,9 @@ describe('AC3: what changes the days rebuilds, and nothing is stale', () => {
     expect(builds()).toBe(b + N);
     b = builds();
     const before = container.querySelector('.trend-summary')!.textContent;
-    act(() => { dailyHealth.value = { state: 'loaded', rows: rows(60, 40) }; });
+    act(() => {
+      dailyHealth.value = { state: 'loaded', rows: rows(60, 40) };
+    });
     expect(builds()).toBe(b + N);
     expect(container.querySelector('.trend-summary')!.textContent).not.toBe(before);
   });
@@ -128,7 +130,9 @@ describe('AC3: what changes the days rebuilds, and nothing is stale', () => {
   it('a reload of a tab the group does not read rebuilds nothing', () => {
     renderScreen();
     const b = builds();
-    act(() => { bodyMeasurements.value = { state: 'loaded', rows: [] }; });
+    act(() => {
+      bodyMeasurements.value = { state: 'loaded', rows: [] };
+    });
     expect(builds()).toBe(b);
   });
 

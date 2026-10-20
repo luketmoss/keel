@@ -10,7 +10,14 @@
 import { useLayoutEffect, useState } from 'preact/hooks';
 import type { TrendGroup, TrendMetric } from './metrics';
 import {
-  RANGE_PHRASE, type RangeKey, dateTicks, dayAtX, segments, tickLabel, windowText, yDomain,
+  RANGE_PHRASE,
+  type RangeKey,
+  dateTicks,
+  dayAtX,
+  segments,
+  tickLabel,
+  windowText,
+  yDomain,
   type MetricSeries,
 } from './series';
 import { withUnit } from './readout';
@@ -84,11 +91,22 @@ interface PlotProps {
 }
 
 /** The SVG itself. Exported for tests; cards use it through TrendCard. */
-export function TrendPlot({ metric, series, width, label, describedBy, avgDays = 1, selectedDate, onSelect }: PlotProps) {
+export function TrendPlot({
+  metric,
+  series,
+  width,
+  label,
+  describedBy,
+  avgDays = 1,
+  selectedDate,
+  onSelect,
+}: PlotProps) {
   const values = series.points.map((p) => p.value);
   for (const v of series.average.values()) values.push(v);
   const dom = yDomain(values, series.band, metric.zeroBased);
-  const tickLabels = dom.ticks.map((t) => (metric.axisFormat ? metric.axisFormat(t, dom.ticks) : tickLabel(t, dom.ticks)));
+  const tickLabels = dom.ticks.map((t) =>
+    metric.axisFormat ? metric.axisFormat(t, dom.ticks) : tickLabel(t, dom.ticks),
+  );
   const padLeft = PAD_LEFT;
   const plotW = Math.max(40, width - padLeft - PAD_RIGHT);
   const plotH = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM;
@@ -124,14 +142,21 @@ export function TrendPlot({ metric, series, width, label, describedBy, avgDays =
       onPointerDown={pick}
       onPointerMove={pick}
     >
-      {series.band && (() => {
-        const top = y(series.band.hi);
-        const h = Math.max(1, y(series.band.lo) - top);
-        return (
-          <rect class="trend-band" x={padLeft} y={h === 1 ? top - 0.5 : top} width={plotW} height={h}
-            fill="var(--chart-band)" />
-        );
-      })()}
+      {series.band &&
+        (() => {
+          const top = y(series.band.hi);
+          const h = Math.max(1, y(series.band.lo) - top);
+          return (
+            <rect
+              class="trend-band"
+              x={padLeft}
+              y={h === 1 ? top - 0.5 : top}
+              width={plotW}
+              height={h}
+              fill="var(--chart-band)"
+            />
+          );
+        })()}
       <g class="trend-grid">
         {dom.ticks.map((t, i) => (
           <g key={t}>
@@ -150,35 +175,84 @@ export function TrendPlot({ metric, series, width, label, describedBy, avgDays =
         ))}
       </g>
       <g class="trend-dots">
-        {series.points.map((p) => p.partial !== undefined ? (
-          <circle key={p.date} class="trend-dot trend-dot-partial" data-date={p.date} cx={x(p.date)} cy={y(p.value)}
-            r={Math.max(r, 2)} fill="var(--color-surface)" stroke="var(--chart-dot)" stroke-width={1.5} />
-        ) : (
-          <circle key={p.date} class="trend-dot" data-date={p.date} cx={x(p.date)} cy={y(p.value)} r={r}
-            fill="var(--chart-dot)" />
-        ))}
+        {series.points.map((p) =>
+          p.partial !== undefined ? (
+            <circle
+              key={p.date}
+              class="trend-dot trend-dot-partial"
+              data-date={p.date}
+              cx={x(p.date)}
+              cy={y(p.value)}
+              r={Math.max(r, 2)}
+              fill="var(--color-surface)"
+              stroke="var(--chart-dot)"
+              stroke-width={1.5}
+            />
+          ) : (
+            <circle
+              key={p.date}
+              class="trend-dot"
+              data-date={p.date}
+              cx={x(p.date)}
+              cy={y(p.value)}
+              r={r}
+              fill="var(--chart-dot)"
+            />
+          ),
+        )}
       </g>
       {avgPoints.length > 0 && (
         <g class="trend-average">
           {segments(avgPoints, avgDays).map((seg) => (
-            <path key={seg[0].date} class="trend-line" fill="none" stroke="var(--chart-line)" stroke-width={2}
-              stroke-linejoin="round" stroke-linecap="round"
-              d={seg.map((p, i) => `${i ? 'L' : 'M'}${x(p.date).toFixed(2)} ${y(p.value).toFixed(2)}`).join(' ')
-                + (seg.length === 1 ? ' l0 0' : '')} />
+            <path
+              key={seg[0].date}
+              class="trend-line"
+              fill="none"
+              stroke="var(--chart-line)"
+              stroke-width={2}
+              stroke-linejoin="round"
+              stroke-linecap="round"
+              d={
+                seg.map((p, i) => `${i ? 'L' : 'M'}${x(p.date).toFixed(2)} ${y(p.value).toFixed(2)}`).join(' ') +
+                (seg.length === 1 ? ' l0 0' : '')
+              }
+            />
           ))}
         </g>
       )}
       {selected && (
         <g class="trend-selection" pointer-events="none">
-          <line class="trend-hairline" x1={x(selected)} x2={x(selected)} y1={PAD_TOP} y2={PAD_TOP + plotH}
-            stroke="var(--color-text-secondary)" stroke-width={1} />
-          {selectedPoint && (selectedPoint.partial !== undefined ? (
-            <circle class="trend-marker trend-marker-partial" cx={x(selected)} cy={y(selectedPoint.value)} r={MARKER_R}
-              fill="var(--color-surface)" stroke="var(--color-text)" stroke-width={2} />
-          ) : (
-            <circle class="trend-marker" cx={x(selected)} cy={y(selectedPoint.value)} r={MARKER_R}
-              fill="var(--color-text)" stroke="var(--color-surface)" stroke-width={2} />
-          ))}
+          <line
+            class="trend-hairline"
+            x1={x(selected)}
+            x2={x(selected)}
+            y1={PAD_TOP}
+            y2={PAD_TOP + plotH}
+            stroke="var(--color-text-secondary)"
+            stroke-width={1}
+          />
+          {selectedPoint &&
+            (selectedPoint.partial !== undefined ? (
+              <circle
+                class="trend-marker trend-marker-partial"
+                cx={x(selected)}
+                cy={y(selectedPoint.value)}
+                r={MARKER_R}
+                fill="var(--color-surface)"
+                stroke="var(--color-text)"
+                stroke-width={2}
+              />
+            ) : (
+              <circle
+                class="trend-marker"
+                cx={x(selected)}
+                cy={y(selectedPoint.value)}
+                r={MARKER_R}
+                fill="var(--color-text)"
+                stroke="var(--color-surface)"
+                stroke-width={2}
+              />
+            ))}
         </g>
       )}
     </svg>
@@ -217,15 +291,24 @@ export function TrendCard({ metric, series, recorded, range, avgDays, today, sel
         {/* Summary and readout share one grid cell, so a selection never moves the card.
             The summary stays in the DOM, only hidden, for the chart's aria-describedby. */}
         <div class={`trend-readout-cell${selectedDate ? ' has-readout' : ''}`}>
-          <p class="trend-summary" id={summaryId}>{summaryText(metric, series, today)}</p>
+          <p class="trend-summary" id={summaryId}>
+            {summaryText(metric, series, today)}
+          </p>
           {selectedDate && series.dates.includes(selectedDate) && (
             <TrendReadout metric={metric} series={series} date={selectedDate} avgDays={avgDays} today={today} />
           )}
         </div>
         <div class="trend-plot-wrap" ref={measure}>
-          <TrendPlot metric={metric} series={series} width={width} avgDays={avgDays}
-            label={`${metric.label}, ${RANGE_PHRASE[range]}`} describedBy={describedBy}
-            selectedDate={selectedDate} onSelect={onSelect} />
+          <TrendPlot
+            metric={metric}
+            series={series}
+            width={width}
+            avgDays={avgDays}
+            label={`${metric.label}, ${RANGE_PHRASE[range]}`}
+            describedBy={describedBy}
+            selectedDate={selectedDate}
+            onSelect={onSelect}
+          />
         </div>
       </>
     );
@@ -236,7 +319,11 @@ export function TrendCard({ metric, series, recorded, range, avgDays, today, sel
         {metric.label}
         {metric.unit && <span class="trend-unit"> {metric.unit}</span>}
       </h2>
-      {metric.note && <p class="trend-note" id={noteId}>{metric.note}</p>}
+      {metric.note && (
+        <p class="trend-note" id={noteId}>
+          {metric.note}
+        </p>
+      )}
       {body}
     </section>
   );
@@ -260,8 +347,17 @@ export function TrendCharts({ group, series, recorded, range, avgDays, today, se
   return (
     <div class="trend-cards">
       {group.metrics.map((m, i) => (
-        <TrendCard key={m.id} metric={m} series={series[i]} recorded={recorded[i]} range={range} avgDays={avgDays} today={today}
-          selectedDate={selectedDate} onSelect={onSelect} />
+        <TrendCard
+          key={m.id}
+          metric={m}
+          series={series[i]}
+          recorded={recorded[i]}
+          range={range}
+          avgDays={avgDays}
+          today={today}
+          selectedDate={selectedDate}
+          onSelect={onSelect}
+        />
       ))}
     </div>
   );

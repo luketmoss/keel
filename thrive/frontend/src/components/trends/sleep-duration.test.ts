@@ -29,7 +29,15 @@ describe('axisSleep', () => {
 });
 
 describe('axisSleep on narrow ranges', () => {
-  const spreads = [[1.2, 1.25], [0.9, 1.05], [1.5, 1.52], [7, 7 + 1 / 60], [0, 1 / 60], [5 / 60, 6 / 60], [7.5, 7.5 + 20 / 3600]];
+  const spreads = [
+    [1.2, 1.25],
+    [0.9, 1.05],
+    [1.5, 1.52],
+    [7, 7 + 1 / 60],
+    [0, 1 / 60],
+    [5 / 60, 6 / 60],
+    [7.5, 7.5 + 20 / 3600],
+  ];
   it.each(spreads.map((v) => [v]))('gives every gridline its own label for %j', (values) => {
     const { ticks } = yDomain(values, null);
     const labels = ticks.map((t) => axisSleep(t, ticks));
@@ -71,11 +79,12 @@ describe('flat series that average to floating-point noise (#243 review)', () =>
     expect(niceTicks(1e16, 1e16 + 2).length).toBeLessThanOrEqual(101);
   });
 
-  it.each([
-    [[0, 1 / 60]], [[5 / 60, 6 / 60]], [[7, 7 + 1 / 60]], [[7.5, 7.5 + 0.0000001]], [[6.3, 6.3 + 3e-15]],
-  ])('keeps every gridline label distinct for %j', (values) => {
-    const { ticks } = yDomain(values, null);
-    const labels = ticks.map((t) => axisSleep(t, ticks));
-    expect(new Set(labels).size).toBe(labels.length);
-  });
+  it.each([[[0, 1 / 60]], [[5 / 60, 6 / 60]], [[7, 7 + 1 / 60]], [[7.5, 7.5 + 0.0000001]], [[6.3, 6.3 + 3e-15]]])(
+    'keeps every gridline label distinct for %j',
+    (values) => {
+      const { ticks } = yDomain(values, null);
+      const labels = ticks.map((t) => axisSleep(t, ticks));
+      expect(new Set(labels).size).toBe(labels.length);
+    },
+  );
 });

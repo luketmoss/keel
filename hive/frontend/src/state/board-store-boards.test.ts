@@ -38,7 +38,7 @@ describe('AC2: Items scoped to a board', () => {
       makeItem({ id: 'c', board_id: 'board-1' }),
     ];
 
-    expect(boardItems.value.map(i => i.id)).toEqual(['a', 'c']);
+    expect(boardItems.value.map((i) => i.id)).toEqual(['a', 'c']);
   });
 
   it('boardItems includes children whose parent is on the active board', async () => {
@@ -52,17 +52,14 @@ describe('AC2: Items scoped to a board', () => {
       makeItem({ id: 'child', board_id: 'board-1', parent_id: 'parent' }),
     ];
 
-    expect(boardItems.value.map(i => i.id)).toEqual(['parent', 'child']);
+    expect(boardItems.value.map((i) => i.id)).toEqual(['parent', 'child']);
   });
 
   it('returns all items when no active board is set', async () => {
     const { items, activeBoardId, boardItems } = await import('./board-store');
 
     activeBoardId.value = '';
-    items.value = [
-      makeItem({ id: 'a', board_id: 'board-1' }),
-      makeItem({ id: 'b', board_id: 'board-2' }),
-    ];
+    items.value = [makeItem({ id: 'a', board_id: 'board-1' }), makeItem({ id: 'b', board_id: 'board-2' })];
 
     expect(boardItems.value.length).toBe(2);
   });
@@ -70,7 +67,8 @@ describe('AC2: Items scoped to a board', () => {
 
 describe('AC3: switchBoard resets filters but not view mode', () => {
   it('resets filters and selection when switching boards', async () => {
-    const { boards, activeBoardId, filterOwner, filterLabel, selectedItemId, switchBoard } = await import('./board-store');
+    const { boards, activeBoardId, filterOwner, filterLabel, selectedItemId, switchBoard } =
+      await import('./board-store');
 
     boards.value = [
       { id: 'board-1', name: 'Family', created_at: '', created_by: '' },

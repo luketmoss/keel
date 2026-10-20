@@ -71,8 +71,10 @@ import { LabelBadge } from './label-badge';
 
 describe('#319: LabelBadge aria-pressed', () => {
   it('a toggle chip reports its state', () => {
-    const on = render(h(LabelBadge as any, { name: 'Core', active: true, onClick: () => {} })).container.firstElementChild!;
-    const off = render(h(LabelBadge as any, { name: 'Legs', active: false, onClick: () => {} })).container.firstElementChild!;
+    const on = render(h(LabelBadge as any, { name: 'Core', active: true, onClick: () => {} })).container
+      .firstElementChild!;
+    const off = render(h(LabelBadge as any, { name: 'Legs', active: false, onClick: () => {} })).container
+      .firstElementChild!;
     expect(on.tagName).toBe('BUTTON');
     expect(on.getAttribute('aria-pressed')).toBe('true');
     expect(off.getAttribute('aria-pressed')).toBe('false');

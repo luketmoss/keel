@@ -49,7 +49,10 @@ export class DriveTrackOverridesStore implements TrackOverridesStore {
   private enqueue<T>(id: string, task: () => Promise<T>): Promise<T> {
     const prior = this.queues.get(id) ?? Promise.resolve()
     const settled = prior.catch(() => {}).then(task)
-    this.queues.set(id, settled.catch(() => {}))
+    this.queues.set(
+      id,
+      settled.catch(() => {}),
+    )
     return settled
   }
 
@@ -142,7 +145,13 @@ export class DriveTrackOverridesStore implements TrackOverridesStore {
     const accessToken = this.accessToken
 
     const write = () =>
-      writeJsonFile(accessToken, ref.folderId, 'overrides.json', this.local.getOverrides(tripId), ref.file ?? null)
+      writeJsonFile(
+        accessToken,
+        ref.folderId,
+        'overrides.json',
+        this.local.getOverrides(tripId),
+        ref.file ?? null,
+      )
 
     try {
       this.refs.set(tripId, { ...ref, file: await write() })

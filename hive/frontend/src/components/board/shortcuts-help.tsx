@@ -32,20 +32,17 @@ export function ShortcutsHelp({ onClose }: ShortcutsHelpProps) {
       }}
       ref={containerRef}
     >
-      <div
-        class="modal shortcuts-help"
-        role="dialog"
-        aria-label="Keyboard shortcuts"
-        aria-modal="true"
-      >
+      <div class="modal shortcuts-help" role="dialog" aria-label="Keyboard shortcuts" aria-modal="true">
         <div class="modal-header">
           <h2>Keyboard Shortcuts</h2>
-          <button class="btn btn-ghost" onClick={onClose} aria-label="Close">✕</button>
+          <button class="btn btn-ghost" onClick={onClose} aria-label="Close">
+            ✕
+          </button>
         </div>
         <div class="modal-body">
           <div class="shortcuts-group">
             <h3 class="shortcuts-group-title">Navigation</h3>
-            {NAVIGATION_SHORTCUTS.map(s => (
+            {NAVIGATION_SHORTCUTS.map((s) => (
               <div key={s.keys} class="shortcut-row">
                 <kbd class="shortcut-keys">{s.keys}</kbd>
                 <span class="shortcut-desc">{s.description}</span>
@@ -54,7 +51,7 @@ export function ShortcutsHelp({ onClose }: ShortcutsHelpProps) {
           </div>
           <div class="shortcuts-group">
             <h3 class="shortcuts-group-title">Actions</h3>
-            {ACTION_SHORTCUTS.map(s => (
+            {ACTION_SHORTCUTS.map((s) => (
               <div key={s.keys} class="shortcut-row">
                 <kbd class="shortcut-keys">{s.keys}</kbd>
                 <span class="shortcut-desc">{s.description}</span>
@@ -63,7 +60,9 @@ export function ShortcutsHelp({ onClose }: ShortcutsHelpProps) {
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-ghost" onClick={onClose}>Done</button>
+          <button type="button" class="btn btn-ghost" onClick={onClose}>
+            Done
+          </button>
         </div>
       </div>
     </div>

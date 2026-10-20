@@ -93,10 +93,7 @@ export type ArchiveProgress = (archiveName: string, index: number, total: number
     there is nothing to do with it. Two photos sharing a name in different
     folders both import; ids are generated and the name is only a row
     label. */
-export async function expandArchive(
-  archive: File,
-  onProgress?: ArchiveProgress,
-): Promise<ExpandResult> {
+export async function expandArchive(archive: File, onProgress?: ArchiveProgress): Promise<ExpandResult> {
   let zip: JSZip
   try {
     // The `File` goes to JSZip directly rather than through
@@ -133,10 +130,7 @@ export async function expandArchive(
   if (importable.length > MAX_ARCHIVE_ENTRIES) {
     return {
       files: [],
-      rejections: [
-        ...rejections,
-        { name: archive.name, message: tooManyEntriesMessage(importable.length) },
-      ],
+      rejections: [...rejections, { name: archive.name, message: tooManyEntriesMessage(importable.length) }],
     }
   }
 
@@ -160,10 +154,7 @@ export async function expandArchive(
  *
  * One archive failing takes nothing else down with it — the other files in
  * the same drop still import, which is what criterion 10 is about. */
-export async function expandArchives(
-  files: File[],
-  onProgress?: ArchiveProgress,
-): Promise<ExpandResult> {
+export async function expandArchives(files: File[], onProgress?: ArchiveProgress): Promise<ExpandResult> {
   if (!files.some((file) => isArchiveFile(file.name))) return { files, rejections: [] }
 
   const expanded: File[] = []

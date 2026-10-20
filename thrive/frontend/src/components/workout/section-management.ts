@@ -4,7 +4,7 @@ import type { TrackerExercise } from './exercise-row';
 import type { TrackerSet } from './set-row';
 
 export const ALL_SECTIONS = ['warmup', 'primary', 'SS1', 'SS2', 'SS3', 'burnout', 'cooldown'] as const;
-export type SectionName = typeof ALL_SECTIONS[number];
+export type SectionName = (typeof ALL_SECTIONS)[number];
 
 export interface SectionChangeResult {
   exercises: TrackerExercise[];
@@ -64,9 +64,7 @@ export function applyMoveUp(
   exerciseOrder: number,
 ): TrackerExercise[] {
   const sorted = [...exercises].sort((a, b) => a.exercise_order - b.exercise_order);
-  const idx = sorted.findIndex(
-    (e) => e.exercise_id === exerciseId && e.exercise_order === exerciseOrder,
-  );
+  const idx = sorted.findIndex((e) => e.exercise_id === exerciseId && e.exercise_order === exerciseOrder);
   if (idx <= 0) return exercises;
 
   const prevEx = sorted[idx - 1];
@@ -95,9 +93,7 @@ export function applyMoveDown(
   exerciseOrder: number,
 ): TrackerExercise[] {
   const sorted = [...exercises].sort((a, b) => a.exercise_order - b.exercise_order);
-  const idx = sorted.findIndex(
-    (e) => e.exercise_id === exerciseId && e.exercise_order === exerciseOrder,
-  );
+  const idx = sorted.findIndex((e) => e.exercise_id === exerciseId && e.exercise_order === exerciseOrder);
   if (idx < 0 || idx >= sorted.length - 1) return exercises;
 
   const nextEx = sorted[idx + 1];

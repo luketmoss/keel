@@ -75,9 +75,7 @@ export function TemplateEditor({ templateId }: Props) {
   };
 
   const updateExercise = (index: number, updated: Partial<TemplateExerciseSlot>) => {
-    setExercises((prev) =>
-      prev.map((ex, i) => (i === index ? { ...ex, ...updated } : ex)),
-    );
+    setExercises((prev) => prev.map((ex, i) => (i === index ? { ...ex, ...updated } : ex)));
   };
 
   const move = (index: number, dir: MoveDirection) => {
@@ -159,11 +157,7 @@ export function TemplateEditor({ templateId }: Props) {
   return (
     <div class="screen template-editor">
       <div class="template-editor-header">
-        <button
-          class="template-editor-back"
-          onClick={handleDiscard}
-          aria-label="Back"
-        >
+        <button class="template-editor-back" onClick={handleDiscard} aria-label="Back">
           ← Back
         </button>
         <button
@@ -228,11 +222,7 @@ export function TemplateEditor({ templateId }: Props) {
 
       {templateId && (
         <>
-          <button
-            class="btn btn-ghost"
-            style={{ width: '100%', marginTop: 'var(--space-md)' }}
-            onClick={handleDiscard}
-          >
+          <button class="btn btn-ghost" style={{ width: '100%', marginTop: 'var(--space-md)' }} onClick={handleDiscard}>
             Discard Changes
           </button>
           <button
@@ -252,10 +242,7 @@ export function TemplateEditor({ templateId }: Props) {
       </div>
 
       {showExercisePicker && (
-        <AddExerciseModal
-          onSelect={handleExerciseSelected}
-          onClose={() => setShowExercisePicker(false)}
-        />
+        <AddExerciseModal onSelect={handleExerciseSelected} onClose={() => setShowExercisePicker(false)} />
       )}
     </div>
   );
@@ -266,7 +253,13 @@ export function TemplateEditor({ templateId }: Props) {
  * whole-number field (#376), so a stored range shows read-only and saves
  * exactly as stored until replaced. Labels tied by `useId`.
  */
-function TemplateExerciseConfig({ ex, onChange }: { ex: TemplateExerciseSlot; onChange: (updated: Partial<TemplateExerciseSlot>) => void }) {
+function TemplateExerciseConfig({
+  ex,
+  onChange,
+}: {
+  ex: TemplateExerciseSlot;
+  onChange: (updated: Partial<TemplateExerciseSlot>) => void;
+}) {
   const uid = useId();
   return (
     <div class="template-exercise-config">
@@ -274,7 +267,9 @@ function TemplateExerciseConfig({ ex, onChange }: { ex: TemplateExerciseSlot; on
 
       <div class="config-row" style={{ marginTop: 'var(--space-sm)' }}>
         <div class="form-group" style={{ flex: 1 }}>
-          <label class="form-label" for={`${uid}-sets`}>Sets</label>
+          <label class="form-label" for={`${uid}-sets`}>
+            Sets
+          </label>
           <input
             id={`${uid}-sets`}
             class="form-input"
@@ -287,7 +282,9 @@ function TemplateExerciseConfig({ ex, onChange }: { ex: TemplateExerciseSlot; on
           />
         </div>
         <div class="form-group" style={{ flex: 1, minWidth: 0 }}>
-          <label class="form-label" for={`${uid}-reps`}>Reps</label>
+          <label class="form-label" for={`${uid}-reps`}>
+            Reps
+          </label>
           <RepsField
             id={`${uid}-reps`}
             value={ex.reps}

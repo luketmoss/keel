@@ -160,26 +160,6 @@ export function captionText(c: HealthCaption): string {
   }
 }
 
-const STAGES: readonly [string, string][] = [
-  ['sleep_deep_s', 'Deep'],
-  ['sleep_light_s', 'Light'],
-  ['sleep_rem_s', 'REM'],
-  ['sleep_awake_s', 'Awake'],
-];
-
-function sleepCaptions(row: DailyHealthRow): HealthCaption[] {
-  const out: HealthCaption[] = [];
-  const items = STAGES.flatMap(([f, name]) => {
-    const v = parse(cell(row, f));
-    return v === null ? [] : [`${name} ${hoursMinutes(v)}`];
-  });
-  if (items.length) out.push({ kind: 'stages', items });
-  const bed = clock12(row.bed_time);
-  const wake = clock12(row.wake_time);
-  if (bed && wake) out.push({ kind: 'text', text: `${bed} – ${wake}` });
-  return out;
-}
-
 /**
  * The Health panel for `date`, from every loaded DailyHealth row (any order).
  * Only past and today: the panel never mounts on a future day.
@@ -202,15 +182,14 @@ export function healthView(
   }
 
   const synced = isToday ? syncTime(row.synced_at, date) : '';
-  // Steps moved to the glance row (#488); HEALTH_METRICS keeps the entry for Trends.
+  // Steps moved to the glance row (#488) and sleep to its own card (#490); HEALTH_METRICS keeps both for Trends.
   const view: HealthRowView[] = activeMetrics(fields)
-    .filter((metric) => metric.key !== 'steps')
+    .filter((metric) => metric.key !== 'steps' && metric.key !== 'sleep')
     .map((metric) => {
       const stored = parse(cell(row, metric.field));
       const base = {
         key: metric.key,
         label: metric.label,
-        qualifier: metric.key === 'sleep' ? nightOf(date, isToday) : undefined,
       };
       if (stored === null) {
         return {
@@ -220,7 +199,7 @@ export function healthView(
         };
       }
       const shown = `${metric.format(metric.toDisplay(stored))}${metric.unit}`;
-      const captions: HealthCaption[] = metric.key === 'sleep' ? sleepCaptions(row) : [];
+      const captions: HealthCaption[] = [];
       if (isToday && metric.inProgressToday) {
         if (metric.key === 'steps' && synced) captions.push({ kind: 'text', text: `As of the ${synced} sync` });
         return { ...base, value: `${shown} so far`, captions };
@@ -231,4 +210,92 @@ export function healthView(
 
   const sub = isToday ? syncedLabel(row.synced_at, date) || undefined : undefined;
   return { kind: 'rows', sub, rows: view };
+}
+
+// ── The Sleep card (#490) ───────────────────────────────────────────
+
+export type SleepStageKey = 'deep' | 'rem' | 'light' | 'awake';
+
+export interface SleepStageView {
+  key: SleepStageKey;
+  label: string;
+  seconds: number;
+  /** "1h 57m", or "41m" under an hour. */
+  text: string;
+  /** "1 hour 57 minutes". */
+  spoken: string;
+}
+
+export interface SleepView {
+  /** "last night", "Fri night". */
+  night: string;
+  /** The sleep score as shown, or `null` when blank. */
+  score: string | null;
+  /** Whole hours and minutes of the total, or `null` when blank. */
+  total: { h: number; m: number } | null;
+  /** Under a blank total: why there is none. */
+  none?: string;
+  /** Deep, REM, light, awake; the present ones only. */
+  stages: SleepStageView[];
+  /** Both times, or neither. */
+  times: { bed: string; wake: string } | null;
+  /** The range line, with a total only. */
+  range: HealthCaption | null;
+}
+
+const SLEEP_STAGES: readonly [SleepStageKey, string, string][] = [
+  ['deep', 'Deep', 'sleep_deep_s'],
+  ['rem', 'REM', 'sleep_rem_s'],
+  ['light', 'Light', 'sleep_light_s'],
+  ['awake', 'Awake', 'sleep_awake_s'],
+];
+
+/** "1h 57m", "41m": the legend's durations. */
+export function stageDuration(seconds: number): string {
+  const total = Math.round(seconds / 60);
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return h === 0 ? `${m}m` : `${h}h ${String(m).padStart(2, '0')}m`;
+}
+
+/** "1 hour 57 minutes", "41 minutes", "2 hours". */
+export function spokenDuration(seconds: number): string {
+  const total = Math.round(seconds / 60);
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  const parts: string[] = [];
+  if (h > 0) parts.push(`${h} ${h === 1 ? 'hour' : 'hours'}`);
+  if (m > 0 || h === 0) parts.push(`${m} ${m === 1 ? 'minute' : 'minutes'}`);
+  return parts.join(' ');
+}
+
+/**
+ * What the Sleep card draws for `date`, or `null` when no row exists for the
+ * day (the Health panel's note says so). Sleep is filed under the wake-up day
+ * and `sleep_total_s` includes awake time.
+ */
+export function sleepView(rows: readonly DailyHealthRow[], date: string, isToday: boolean): SleepView | null {
+  const row = rows.find((r) => r.date === date);
+  if (!row) return null;
+  const stored = parse(cell(row, 'sleep_total_s'));
+  const scoreN = parse(cell(row, 'sleep_score'));
+  const stages = SLEEP_STAGES.flatMap(([key, label, field]): SleepStageView[] => {
+    const seconds = parse(cell(row, field));
+    return seconds === null
+      ? []
+      : [{ key, label, seconds, text: stageDuration(seconds), spoken: spokenDuration(seconds) }];
+  });
+  const bed = clock12(row.bed_time);
+  const wake = clock12(row.wake_time);
+  const metric = HEALTH_METRICS[0];
+  const min = stored === null ? null : metric.toDisplay(stored);
+  return {
+    night: nightOf(date, isToday),
+    score: scoreN === null ? null : String(Math.round(scoreN)),
+    total: min === null ? null : { h: Math.floor(min / 60), m: min % 60 },
+    none: min === null ? (isToday ? 'Arrives with the next sync' : 'No sleep recorded') : undefined,
+    stages,
+    times: bed && wake ? { bed, wake } : null,
+    range: stored === null ? null : rangeCaption(metric, stored, seriesOf(rows, metric.field), date),
+  };
 }

@@ -10,7 +10,7 @@ import { useAuth } from '../../auth/auth-context';
 import { Panel, PanelNote, PanelStatus, type DayPanelProps } from './panel';
 import { captionText, healthView, type HealthCaption, type HealthRowView } from './health-rows';
 
-function Caption({ c }: { c: HealthCaption }) {
+export function Caption({ c }: { c: HealthCaption }) {
   if (c.kind === 'stages') {
     return (
       <span class="health-caption health-stages">

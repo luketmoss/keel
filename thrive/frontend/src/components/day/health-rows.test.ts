@@ -52,30 +52,10 @@ const byKey = (rows: HealthRowView[], key: string) => rows.find((r) => r.key ===
 const texts = (r: HealthRowView) => r.captions.map(captionText);
 
 describe('AC1 — a past day', () => {
-  it('shows sleep, resting HR, HRV and average stress (#231) in order, and no steps (#488)', () => {
+  it('shows resting HR, HRV and average stress (#231) in order, and no steps (#488) or sleep (#490)', () => {
     const rows = rowsOf(healthView([hr(D, { ...FULL, stress_avg: '31' })], D, false));
-    expect(rows.map((r) => r.label)).toEqual(['Sleep', 'Resting HR', 'HRV', 'Average stress']);
-    expect(rows.map((r) => r.value)).toEqual(['7h 12m', '52 bpm', '38 ms', '31']);
-    expect(byKey(rows, 'sleep').qualifier).toBe('Fri night');
-  });
-
-  it('lists the sleep stages in order and bed to wake', () => {
-    const sleep = byKey(rowsOf(healthView([hr(D, FULL)], D, false)), 'sleep');
-    expect(sleep.captions[0]).toEqual({
-      kind: 'stages',
-      items: ['Deep 1h 06m', 'Light 4h 12m', 'REM 1h 42m', 'Awake 0h 12m'],
-    });
-    expect(texts(sleep)[1]).toBe('11:24 PM – 6:12 AM');
-  });
-
-  it('leaves out a blank stage and bed-to-wake without both times, and never recomputes the total', () => {
-    const sleep = byKey(
-      rowsOf(healthView([hr(D, { ...FULL, sleep_rem_s: '', wake_time: '', sleep_total_s: '100' })], D, false)),
-      'sleep',
-    );
-    expect(sleep.captions[0]).toEqual({ kind: 'stages', items: ['Deep 1h 06m', 'Light 4h 12m', 'Awake 0h 12m'] });
-    expect(texts(sleep).some((t) => t.includes('–') && t.includes('AM'))).toBe(false);
-    expect(sleep.value).toBe('0h 02m');
+    expect(rows.map((r) => r.label)).toEqual(['Resting HR', 'HRV', 'Average stress']);
+    expect(rows.map((r) => r.value)).toEqual(['52 bpm', '38 ms', '31']);
   });
 
   it('shows a blank as blank with "No reading this day." and no range line; 0 is a value', () => {
@@ -198,10 +178,9 @@ describe('AC3 — today', () => {
     });
   });
 
-  it('says when it synced, and "last night"', () => {
+  it('says when it synced', () => {
     const v = healthView([hr(D, FULL)], D, true);
     expect(v.sub).toBe('Synced 7:17 AM');
-    expect(byKey(rowsOf(v), 'sleep').qualifier).toBe('last night');
   });
 
   it('shows an earlier-day sync with its date, and nothing for a blank or bad synced_at', () => {

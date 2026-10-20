@@ -4898,6 +4898,148 @@ a.training-card {
   color: var(--color-text);
 }
 
+/* ===== Day Sleep card (#490) =====
+   The score and total, a bar of the night's stages and a four-column legend.
+   Stage colours are the #485 tokens. */
+.sleep-icon {
+  display: inline-flex;
+  width: 100%;
+  height: 100%;
+  color: var(--metric-sleep);
+}
+
+.sleep-figures {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.sleep-score,
+.sleep-total,
+.sleep-none {
+  margin: 0;
+}
+
+.sleep-score {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.sleep-score-figure,
+.sleep-total {
+  font-size: var(--figure-lg);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.sleep-score-word {
+  font-size: var(--text-xs);
+  line-height: 1.2;
+  color: var(--color-text-secondary);
+}
+
+.sleep-unit {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.sleep-none {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+}
+
+.sleep-none .sleep-total {
+  color: var(--color-text-muted);
+}
+
+.sleep-none-note {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.sleep-bar {
+  display: flex;
+  gap: 2px;
+  height: 12px;
+  margin-top: var(--space-md);
+}
+
+.sleep-seg {
+  min-width: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.sleep-seg-deep {
+  background: var(--metric-sleep-deep);
+}
+
+.sleep-seg-rem {
+  background: var(--metric-sleep-rem);
+}
+
+.sleep-seg-light {
+  background: var(--metric-sleep-light);
+}
+
+.sleep-seg-awake {
+  background: var(--metric-sleep-awake);
+}
+
+.sleep-times {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--space-xs);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.sleep-legend {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-sm);
+  margin: var(--space-md) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sleep-legend-item {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sleep-legend-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.sleep-swatch {
+  flex: none;
+  width: 8px;
+  height: 8px;
+}
+
+.sleep-legend-time {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.sleep-range {
+  margin: var(--space-md) 0 0;
+}
+
 /* ===== Library keyboard access (#301) =====
    Template cards are <button>s and the editor's exercise rows are focusable
    buttons. The ring is --color-text (14.70:1 light, 15.54:1 dark), not
@@ -4983,6 +5125,12 @@ a.training-card {
    keep working; the selected cue is a fill, never an outline (AC5). Normal
    rendering is untouched: everything is inside this one block. */
 @media (forced-colors: active) {
+  /* #490: the sleep stages keep their boundaries when the fills flatten. */
+  .sleep-seg,
+  .sleep-swatch {
+    border: 1px solid CanvasText;
+  }
+
   .theme-toggle-btn.active,
   .library-switch-btn.active,
   .sub-type-btn.active,

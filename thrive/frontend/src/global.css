@@ -2650,62 +2650,287 @@ input, select, textarea {
 
 /* ===== Workout Detail ===== */
 .workout-detail-screen {
-  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space-sm) + var(--space-xs));
+  padding: 0 0 var(--space-md);
   max-width: 600px;
   margin: 0 auto;
 }
 
-.detail-header-actions {
+/* The sections sit --space-md in from the sides; the top bar keeps its own 12. */
+.workout-detail-screen > * {
+  margin-left: var(--space-md);
+  margin-right: var(--space-md);
+}
+
+/* ----- Top bar (#531) ----- */
+.workout-detail-screen > .detail-top-bar {
   display: flex;
-  gap: var(--space-sm);
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  margin: 0;
+  padding: var(--space-sm) calc(var(--space-sm) + var(--space-xs)) 0;
 }
 
-.btn-sm {
-  padding: 8px var(--space-md);
-  font-size: var(--text-sm);
-  min-height: 36px;
+.detail-top-actions {
+  display: flex;
+  align-items: center;
 }
 
-.detail-meta {
-  margin-bottom: var(--space-lg);
+/* No background here; #532's map gives them a scrim. */
+.detail-icon-btn {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
 }
 
-.detail-title {
-  font-size: var(--text-2xl);
-  font-weight: 700;
-  margin-bottom: var(--space-sm);
+.detail-icon-btn svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
 }
 
-.detail-info-row {
+.detail-menu-wrap {
+  position: relative;
+}
+
+.detail-menu {
+  position: absolute;
+  top: calc(100% + var(--space-xs));
+  right: 0;
+  z-index: 10;
+  box-sizing: border-box;
+  min-width: 200px;
+  max-width: calc(100vw - 2 * var(--space-md));
+  padding: var(--space-xs);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  box-shadow: 0 4px 16px var(--color-shadow-strong);
+}
+
+.detail-menu-item {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  flex-wrap: wrap;
-  margin-bottom: var(--space-sm);
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--space-sm);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-size: var(--text-base);
+  color: var(--color-text);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
 }
 
-.detail-date,
-.detail-time,
-.detail-duration {
+.detail-menu-item svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+/* Delete is last, set off by a hairline; the word and the confirm that follows
+   say what it does, so the colour is not the only signal. */
+.detail-menu-delete {
+  color: var(--color-danger-text);
+}
+
+.detail-menu-item + .detail-menu-delete {
+  margin-top: var(--space-xs);
+  border-top: 1px solid var(--color-border-light);
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+/* ----- Title block (#531) ----- */
+.detail-title-block {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.detail-tile {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: calc(var(--radius-md) + var(--space-xs));
+}
+
+.detail-tile svg {
+  width: 24px;
+  height: 24px;
+}
+
+.detail-tile-plan {
+  background: var(--color-primary-light);
+  color: var(--color-primary-on-light);
+}
+
+.detail-title-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.detail-title {
+  margin: 0;
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.detail-date-line {
+  margin: 0;
   font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.detail-title-block .workout-effort {
+  flex: none;
+}
+
+/* ----- Stats card (#531) ----- */
+.detail-stats-card,
+.detail-note-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+}
+
+.detail-headline {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+  margin: 0;
+}
+
+.detail-headline-figure {
+  font-size: var(--figure-xl);
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.detail-headline-unit {
+  font-size: var(--text-lg);
+  color: var(--color-text-secondary);
+}
+
+.detail-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-md) var(--space-sm);
+}
+
+.detail-stats-grid.with-rule {
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-border-light);
+}
+
+.detail-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.detail-stat-value {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.detail-stat-unit {
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+.detail-stat-label {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.detail-no-details {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+/* ----- Note card (#531) ----- */
+.detail-note-card {
+  padding: calc(var(--space-sm) + var(--space-xs)) var(--space-md);
+}
+
+.detail-note-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0 0 var(--space-xs);
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.detail-note-heading svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
   color: var(--color-text-secondary);
 }
 
 .detail-notes {
+  margin: 0;
   font-size: var(--text-sm);
-  color: var(--color-text-secondary);
-  background: var(--color-surface-raised);
-  padding: var(--space-sm) var(--space-md);
-  border-radius: var(--radius-md);
-  margin-top: var(--space-sm);
+  line-height: 1.5;
   white-space: pre-wrap;
+}
+
+/* ----- Provenance (#531) ----- */
+.detail-provenance-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.detail-provenance-row .detail-coros-link {
+  margin-left: auto;
 }
 
 .detail-copied {
   font-size: var(--text-xs);
   color: var(--color-text-muted);
   font-style: italic;
-  margin-top: var(--space-xs);
+  margin: 0;
+}
+
+/* The wrapper's own spacing replaces each block's margin. */
+.workout-detail-screen .detail-route,
+.workout-detail-screen .detail-exercises {
+  margin-bottom: 0;
+}
+
+.btn-sm {
+  padding: 8px var(--space-md);
+  font-size: var(--text-sm);
+  min-height: 36px;
 }
 
 /* ===== Exercise Detail (Expandable) ===== */
@@ -2984,9 +3209,7 @@ input, select, textarea {
 }
 
 .detail-actions {
-  margin-top: var(--space-xl);
-  padding-top: var(--space-lg);
-  border-top: 1px solid var(--color-border-light);
+  margin-top: var(--space-sm);
 }
 
 /* ===== Theme Toggle ===== */
@@ -3627,9 +3850,9 @@ input, select, textarea {
   display: flex;
   align-items: center;
   gap: var(--space-xs);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   color: var(--color-text-secondary);
-  margin-top: var(--space-xs);
+  margin: 0;
 }
 
 /* ===== View on COROS (#260) =====
@@ -6116,6 +6339,7 @@ a.training-card {
   .manage-label-delete:hover:not(:disabled):not([aria-disabled="true"]),
   .day-sync-btn:hover:not(:disabled):not([aria-disabled="true"]),
   .sync-now-btn:hover:not(:disabled):not([aria-disabled="true"]),
+  .detail-icon-btn:hover:not(:disabled):not([aria-disabled="true"]),
   /* Chips and toggles; a selected one keeps its tint and tick underneath */
   .filter-chip:hover:not(:disabled):not([aria-disabled="true"]),
   .label-chip:hover:not(:disabled):not([aria-disabled="true"]),
@@ -6127,6 +6351,7 @@ a.training-card {
   .trends-chip:hover:not(:disabled):not([aria-disabled="true"]),
   .trends-view-btn:hover:not(:disabled):not([aria-disabled="true"]),
   .trends-menu-item:hover:not(:disabled):not([aria-disabled="true"]),
+  .detail-menu-item:hover:not(:disabled):not([aria-disabled="true"]),
   .library-switch-btn:hover:not(:disabled):not([aria-disabled="true"]),
   .color-swatch:hover:not(:disabled):not([aria-disabled="true"]),
   .section-badge-btn:hover:not(:disabled):not([aria-disabled="true"]),
@@ -6189,6 +6414,7 @@ a.training-card {
 .manage-label-delete:active:not(:disabled):not([aria-disabled="true"]),
 .day-sync-btn:active:not(:disabled):not([aria-disabled="true"]),
 .sync-now-btn:active:not(:disabled):not([aria-disabled="true"]),
+.detail-icon-btn:active:not(:disabled):not([aria-disabled="true"]),
 /* Chips and toggles */
 .filter-chip:active:not(:disabled):not([aria-disabled="true"]),
 .label-chip:active:not(:disabled):not([aria-disabled="true"]),
@@ -6200,6 +6426,7 @@ button.tag-badge:active:not(:disabled):not([aria-disabled="true"]),
 .trends-chip:active:not(:disabled):not([aria-disabled="true"]),
 .trends-view-btn:active:not(:disabled):not([aria-disabled="true"]),
 .trends-menu-item:active:not(:disabled):not([aria-disabled="true"]),
+.detail-menu-item:active:not(:disabled):not([aria-disabled="true"]),
 .library-switch-btn:active:not(:disabled):not([aria-disabled="true"]),
 .color-swatch:active:not(:disabled):not([aria-disabled="true"]),
 .section-badge-btn:active:not(:disabled):not([aria-disabled="true"]),

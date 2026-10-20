@@ -114,14 +114,16 @@ describe('AC7: the detail screen shows the link', () => {
     expect(visible.trim()).toBe('View on COROS');
   });
 
-  it('sits on its own row directly after the provenance line and before the notes', () => {
+  it('sits on the provenance row, directly after the provenance line, below the note card', () => {
     const a = detail(synced)!;
     expect(a.parentElement!.classList.contains('detail-provenance')).toBe(false);
+    expect(a.parentElement!.classList.contains('detail-provenance-row')).toBe(true);
     expect(a.previousElementSibling!.classList.contains('detail-provenance')).toBe(true);
-    expect(a.nextElementSibling!.classList.contains('detail-notes')).toBe(true);
+    const note = document.querySelector('.detail-note-card')!;
+    expect(note.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('comes before the Exercises heading on an enriched weight workout', () => {
+  it('comes after the Exercises heading on an enriched weight workout', () => {
     workouts.value = [enriched];
     sets.value = [
       {
@@ -141,7 +143,7 @@ describe('AC7: the detail screen shows the link', () => {
     render(h(WorkoutDetail, { workoutId: 'w_e' }));
     const a = document.querySelector('a.detail-coros-link')!;
     const heading = [...document.querySelectorAll('h3')].find((x) => x.textContent === 'Exercises')!;
-    expect(a.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(heading.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
 

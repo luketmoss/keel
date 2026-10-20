@@ -5,14 +5,16 @@ import { useAuth } from '../../auth/auth-context';
 import { navigate, goBack } from '../../router/router';
 import { ExerciseDetail, groupSetsIntoExercises } from './exercise-detail';
 import { ExerciseCompactCard } from '../shared/exercise-compact-card';
-import { formatDuration, formatEstimate } from '../../api/duration';
-import { formatDistance, formatElevation, formatHeartRate } from '../../api/units';
 import { provenanceDetail } from '../../api/provenance';
 import { WatchGlyph } from '../shared/provenance-mark';
 import { corosActivityUrl } from '../../api/coros-link';
 import { ask } from '../../state/confirm';
 import { deleteWorkoutCopy } from '../shared/confirm-copy';
 import { RouteSection, routeAvailable } from './route-section';
+import { DetailTopBar } from './detail-top-bar';
+import { DetailTitle } from './detail-title';
+import { DetailStats, hasStatsCard } from './detail-stats';
+import { PencilLineIcon } from './detail-icons';
 
 interface Props {
   workoutId: string;
@@ -151,97 +153,29 @@ export function WorkoutDetail({ workoutId }: Props) {
   const handleResume = () => navigate(`/workout/${workoutId}`);
   const provenance = provenanceDetail(workout);
   const corosUrl = corosActivityUrl(workout);
-  const estimate = formatEstimate(workout.estimated_seconds);
   // #407: the route is a detail of its own, so the empty state below does not show over it.
   const showRoute = routeAvailable(workout);
 
   return (
     <div class="screen workout-detail-screen">
-      <div class="template-editor-header">
-        <button class="template-editor-back" onClick={() => goBack()} aria-label="Back">
-          ← Back
-        </button>
-        <div class="detail-header-actions">
-          {!isPlanned && workout.type === 'weight' && exerciseGroups.length > 0 && (
-            <button class="btn btn-secondary btn-sm" onClick={handleSaveAsTemplate}>
-              Save Template
-            </button>
-          )}
-          {!isPlanned && workout.type === 'weight' && (
-            <button class="btn btn-secondary btn-sm" onClick={handleCopy}>
-              Copy
-            </button>
-          )}
-          <button
-            class="btn btn-primary btn-sm"
-            data-focus-key="workout-edit"
-            onClick={() => navigate(`/history/${workoutId}/edit`)}
-          >
-            Edit
-          </button>
-        </div>
-      </div>
+      <DetailTopBar
+        canCopy={!isPlanned && workout.type === 'weight'}
+        canSaveTemplate={!isPlanned && workout.type === 'weight' && exerciseGroups.length > 0}
+        deleting={deleting}
+        onBack={() => goBack()}
+        onEdit={() => navigate(`/history/${workoutId}/edit`)}
+        onCopy={handleCopy}
+        onSaveTemplate={handleSaveAsTemplate}
+        onDelete={handleDelete}
+      />
 
-      <div class="detail-meta">
-        <h2 class="detail-title">{workout.name || workout.type}</h2>
-        <div class="detail-info-row">
-          {isPlanned ? (
-            <span class="type-badge badge-planned">Planned</span>
-          ) : isActive ? (
-            <span class="type-badge badge-active">Active</span>
-          ) : (
-            <span class={`type-badge badge-${workout.type}`}>{workout.type}</span>
-          )}
-          {/* #145: the plan's estimate, only while it is a plan. Once started,
-              elapsed time is the only duration shown. */}
-          {isPlanned && estimate && <span class="detail-duration detail-estimate">{estimate}</span>}
-          {!isPlanned && <span class="detail-date">{workout.date}</span>}
-          {!isPlanned && workout.time && <span class="detail-time">{workout.time}</span>}
-          {!isPlanned && workout.elapsed_seconds && (
-            <span class="detail-duration">{formatDuration(workout.elapsed_seconds)}</span>
-          )}
-          {/* AC2: unset shows nothing at all — no placeholder implying a value
-              was considered. A peer of date/time/duration, not a summary of
-              the sets (AC4). */}
-          {!isPlanned && workout.effort && (
-            <span class={`effort-${workout.effort.toLowerCase()}`}>{workout.effort}</span>
-          )}
-          {/* #103: cardio attributes, imperial, each omitted entirely when
-              empty — no "0 mi", no em dash. */}
-          {!isPlanned && workout.distance_m && (
-            <span class="detail-distance">{formatDistance(workout.distance_m)}</span>
-          )}
-          {!isPlanned && workout.ascent_m && <span class="detail-ascent">↑ {formatElevation(workout.ascent_m)}</span>}
-          {!isPlanned && workout.descent_m && (
-            <span class="detail-descent">↓ {formatElevation(workout.descent_m)}</span>
-          )}
-          {!isPlanned && workout.avg_hr && <span class="detail-hr">{formatHeartRate(workout.avg_hr)}</span>}
-        </div>
-        {/* #157: where this row came from (sync plan §8, §13). Manual rows,
-            most of them, show nothing. */}
-        {provenance && (
-          <p class="detail-provenance">
-            <WatchGlyph />
-            <span>{provenance}</span>
-          </p>
-        )}
-        {/* #260: the activity's page on the COROS web portal, on its own
-            row. Nothing at all when there is nothing to link to (AC8). */}
-        {corosUrl && (
-          <a class="detail-coros-link" href={corosUrl} target="_blank" rel="noopener noreferrer">
-            {/* The trailing space joins the label to the hidden text in the
-                accessible name; in an inline-flex row it draws nothing. */}
-            {'View on COROS '}
-            <span class="sr-only">(opens in a new tab)</span>
-            <ExternalGlyph />
-          </a>
-        )}
-        {workout.notes && <p class="detail-notes">{workout.notes}</p>}
-        {workout.copied_from && <p class="detail-copied">Copied from a previous workout</p>}
-      </div>
+      <DetailTitle workout={workout} />
 
-      {/* #407: the activity's route, straight after the title, stats and provenance. */}
+      {/* #407: the activity's route, straight after the title. */}
       {showRoute && <RouteSection workout={workout} />}
+
+      {/* #531: a completed cardio or stretch activity's figures; weight keeps its exercise list (#533). */}
+      {hasStatsCard(workout) && <DetailStats workout={workout} hideEmpty={showRoute} />}
 
       {/* Planned workout: compact card view + footer actions */}
       {isPlanned &&
@@ -295,7 +229,7 @@ export function WorkoutDetail({ workoutId }: Props) {
           plannedExercises.sort((a, b) => a.order - b.order);
 
           return plannedExercises.length > 0 ? (
-            <div class="compact-card-list" style={{ marginTop: 'var(--space-md)' }}>
+            <div class="compact-card-list">
               {plannedExercises.map((ex, i) => (
                 <div key={`${ex.id}-${i}`}>
                   <ExerciseCompactCard
@@ -356,38 +290,63 @@ export function WorkoutDetail({ workoutId }: Props) {
         </div>
       )}
 
-      {/* Non-weight workouts just show notes (already shown above) */}
-      {exerciseGroups.length === 0 && workout.type !== 'weight' && !workout.notes && !showRoute && (
-        <div class="empty-state">
-          <p>No additional details</p>
+      {/* Note card, then provenance (#531). */}
+      {workout.notes.trim() && (
+        <section class="detail-note-card">
+          <h2 class="detail-note-heading">
+            <PencilLineIcon />
+            Note
+          </h2>
+          <p class="detail-notes">{workout.notes}</p>
+        </section>
+      )}
+
+      {(provenance || corosUrl || workout.copied_from) && (
+        <div class="detail-provenance-block">
+          {(provenance || corosUrl) && (
+            <div class="detail-provenance-row">
+              {/* #157: where this row came from (sync plan §8, §13). Manual rows, most of them, show nothing. */}
+              {provenance && (
+                <p class="detail-provenance">
+                  <WatchGlyph />
+                  <span>{provenance}</span>
+                </p>
+              )}
+              {/* #260: the activity's page on the COROS web portal. Nothing at all when there is nothing to link to. */}
+              {corosUrl && (
+                <a class="detail-coros-link" href={corosUrl} target="_blank" rel="noopener noreferrer">
+                  {/* The trailing space joins the label to the hidden text in the
+                      accessible name; in an inline-flex row it draws nothing. */}
+                  {'View on COROS '}
+                  <span class="sr-only">(opens in a new tab)</span>
+                  <ExternalGlyph />
+                </a>
+              )}
+            </div>
+          )}
+          {workout.copied_from && <p class="detail-copied">Copied from a previous workout</p>}
         </div>
       )}
 
-      <div class="detail-actions">
-        {isPlanned && (
-          <button
-            class="btn btn-primary"
-            style={{ width: '100%' }}
-            onClick={handleStartPlanned}
-            disabled={startingPlanned || deleting}
-          >
-            {startingPlanned ? 'Starting...' : 'Start Workout'}
-          </button>
-        )}
-        {isActive && (
-          <button class="btn btn-primary" style={{ width: '100%' }} onClick={handleResume} disabled={deleting}>
-            Resume Workout
-          </button>
-        )}
-        <button
-          class="btn btn-danger"
-          style={{ width: '100%', marginTop: isPlanned || isActive ? 'var(--space-md)' : '0' }}
-          onClick={handleDelete}
-          disabled={deleting}
-        >
-          {deleting ? 'Deleting...' : 'Delete Workout'}
-        </button>
-      </div>
+      {(isPlanned || isActive) && (
+        <div class="detail-actions">
+          {isPlanned && (
+            <button
+              class="btn btn-primary"
+              style={{ width: '100%' }}
+              onClick={handleStartPlanned}
+              disabled={startingPlanned || deleting}
+            >
+              {startingPlanned ? 'Starting...' : 'Start Workout'}
+            </button>
+          )}
+          {isActive && (
+            <button class="btn btn-primary" style={{ width: '100%' }} onClick={handleResume} disabled={deleting}>
+              Resume Workout
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

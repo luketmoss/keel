@@ -68,20 +68,22 @@ afterEach(() => {
 });
 
 describe('AC1: Resume on the detail screen', () => {
-  it('offers Resume Workout for an active workout, above Delete, and no Start', () => {
+  it('offers Resume Workout for an active workout, with no Start and no bottom Delete', () => {
     workouts.value = [wk({})];
     const { container } = render(h(WorkoutDetail, { workoutId: 'w1' }));
     const actions = container.querySelector('.detail-actions')!;
     const buttons = [...actions.querySelectorAll('button')].map((b) => b.textContent);
-    expect(buttons).toEqual(['Resume Workout', 'Delete Workout']);
+    expect(buttons).toEqual(['Resume Workout']);
     expect(screen.queryByText('Start Workout')).toBeNull();
+    expect(screen.queryByText('Delete Workout')).toBeNull();
   });
 
-  it('reads "Active" in the badge instead of the type', () => {
+  it('reads "In progress" under the name, on the plan tile rather than the type tint', () => {
     workouts.value = [wk({})];
     const { container } = render(h(WorkoutDetail, { workoutId: 'w1' }));
-    expect(container.querySelector('.detail-info-row .badge-active')!.textContent).toBe('Active');
-    expect(container.querySelector('.detail-info-row .badge-weight')).toBeNull();
+    expect(container.querySelector('.detail-date-line')!.textContent).toBe('In progress');
+    expect(container.querySelector('.detail-tile-plan')).toBeTruthy();
+    expect(container.querySelector('.badge-weight')).toBeNull();
   });
 
   it.each(['weight', 'stretch', 'bike', 'hike', 'run', 'walk'] as const)(
@@ -94,10 +96,10 @@ describe('AC1: Resume on the detail screen', () => {
     },
   );
 
-  it('keeps Edit in the header', () => {
+  it('keeps Edit in the top bar', () => {
     workouts.value = [wk({})];
     render(h(WorkoutDetail, { workoutId: 'w1' }));
-    expect(screen.getByText('Edit')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Edit workout' })).toBeTruthy();
   });
 });
 
@@ -132,7 +134,7 @@ describe('AC4: nothing else changes', () => {
     workouts.value = [wk({ status: '' })];
     const { container } = render(h(WorkoutDetail, { workoutId: 'w1' }));
     expect(screen.queryByText('Resume Workout')).toBeNull();
-    expect(container.querySelector('.detail-info-row .badge-weight')).toBeTruthy();
+    expect(container.querySelector('.detail-tile.badge-weight')).toBeTruthy();
     cleanup();
     const p = render(h(TrainingPanel, { date: D, state: 'today', today: D }));
     const card = p.container.querySelector('a.training-card') as HTMLAnchorElement;

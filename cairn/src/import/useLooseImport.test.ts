@@ -24,7 +24,10 @@ function fakeStorage(): Storage {
 }
 
 function kmlFixture(name: string, as = name): File {
-  return new File([readFileSync(join(__dirname, '..', '..', '..', 'geo', 'src', 'kml', 'fixtures', name))], as)
+  return new File(
+    [readFileSync(join(__dirname, '..', '..', '..', 'geo', 'src', 'kml', 'fixtures', name))],
+    as,
+  )
 }
 
 function photoFixture(name: string, as = name): File {
@@ -227,9 +230,7 @@ describe('useLooseImport', () => {
       },
     ])
 
-    expect(store.getItems()).toMatchObject([
-      { kind: 'track', name: 'Day one', sourceName: 'day1.kml' },
-    ])
+    expect(store.getItems()).toMatchObject([{ kind: 'track', name: 'Day one', sourceName: 'day1.kml' }])
   })
 
   it('ignores a Keep loose with nothing parsed', () => {
@@ -350,9 +351,7 @@ describe('useLooseImport', () => {
        where a field gets forgotten. */
     it('carries the name and description out of a trip untouched', () => {
       const description = ['Loose slab.', 'Crossed high on the left.'].join('\n')
-      const record = importer().addCairnFromTrip(
-        tripCairn({ name: 'Notch Mountain hazard', description }),
-      )
+      const record = importer().addCairnFromTrip(tripCairn({ name: 'Notch Mountain hazard', description }))
 
       expect(record.name).toBe('Notch Mountain hazard')
       expect(record).toMatchObject({ description })

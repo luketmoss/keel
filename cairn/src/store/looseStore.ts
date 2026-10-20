@@ -29,14 +29,7 @@ export type PositionSource = 'exif' | 'interpolated' | 'placed'
     an open set is an emoji picker, and a marker nobody can read at a glance
     has no reason to carry a glyph. */
 export type CairnIcon =
-  | 'campsite'
-  | 'water'
-  | 'hut'
-  | 'viewpoint'
-  | 'summit'
-  | 'hazard'
-  | 'parking'
-  | 'junction'
+  'campsite' | 'water' | 'hut' | 'viewpoint' | 'summit' | 'hazard' | 'parking' | 'junction'
 
 /** Both Drive ids, or neither — never exactly one of the two. The rule the
     old photo record already applied to its Drive files, unchanged. */
@@ -706,10 +699,7 @@ export async function moveLooseIntoTrip(
   return true
 }
 
-function overviewToTracks(
-  overview: FeatureCollection<LineString> | null,
-  name = 'track',
-): Track[] {
+function overviewToTracks(overview: FeatureCollection<LineString> | null, name = 'track'): Track[] {
   if (!overview) return []
   return overview.features
     .filter((feature) => feature.geometry?.type === 'LineString')

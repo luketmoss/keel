@@ -70,16 +70,16 @@ export function MapProvider({ children }: { children: ReactNode }) {
     if (!googleMapsApiKey) {
       return (
         <MapUnavailable>
-          Set <code>VITE_GOOGLE_MAPS_API_KEY</code> in <code>cairn/.env.local</code>, then restart
-          the dev server.
+          Set <code>VITE_GOOGLE_MAPS_API_KEY</code> in <code>cairn/.env.local</code>, then restart the dev
+          server.
         </MapUnavailable>
       )
     }
     if (keyRejected) {
       return (
         <MapUnavailable>
-          Google rejected the API key. Check that the Maps JavaScript API is enabled for this
-          project and that the key permits this origin.
+          Google rejected the API key. Check that the Maps JavaScript API is enabled for this project and that
+          the key permits this origin.
         </MapUnavailable>
       )
     }

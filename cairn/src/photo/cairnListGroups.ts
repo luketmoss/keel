@@ -40,7 +40,8 @@ export interface CairnListRow {
     divider, this one carries a control: the group's own eye. */
 export type CairnListDivider = 'unattached'
 
-export type CairnListItem = { type: 'row'; row: CairnListRow } | { type: 'divider'; divider: CairnListDivider }
+export type CairnListItem =
+  { type: 'row'; row: CairnListRow } | { type: 'divider'; divider: CairnListDivider }
 
 /** One row per cairn in the trip, in no particular order yet —
     `orderCairnListItems` below does the grouping/ordering. */
@@ -72,7 +73,9 @@ function byName(a: CairnListRow, b: CairnListRow): number {
     photo-only list sorted on. */
 function orderWithinGroup(rows: CairnListRow[]): CairnListRow[] {
   const dated = rows.filter((row) => row.date !== null)
-  dated.sort((a, b) => new Date(a.date as string).getTime() - new Date(b.date as string).getTime() || byName(a, b))
+  dated.sort(
+    (a, b) => new Date(a.date as string).getTime() - new Date(b.date as string).getTime() || byName(a, b),
+  )
 
   const undated = rows.filter((row) => row.date === null)
   undated.sort(byName)
@@ -118,7 +121,9 @@ export function orderCairnListItems(
     same displayed order — what the lightbox's arrow-key navigation walks
     (design doc: "← and → move through the list in its displayed order"). */
 export function flattenCairnListRows(items: CairnListItem[]): CairnListRow[] {
-  return items.filter((item): item is { type: 'row'; row: CairnListRow } => item.type === 'row').map((item) => item.row)
+  return items
+    .filter((item): item is { type: 'row'; row: CairnListRow } => item.type === 'row')
+    .map((item) => item.row)
 }
 
 /** The row's meta line (`cairns.md`'s "The row" table): a date clause,

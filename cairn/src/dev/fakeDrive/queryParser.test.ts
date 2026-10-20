@@ -32,8 +32,7 @@ describe('parseDriveQuery negated mimetype clause (#211)', () => {
   })
 
   it('resolves the exact shape trackFiles.ts sends without throwing', () => {
-    const query =
-      "'folder-1' in parents and mimeType!='application/vnd.google-apps.folder' and trashed=false"
+    const query = "'folder-1' in parents and mimeType!='application/vnd.google-apps.folder' and trashed=false"
 
     let filter: ReturnType<typeof parseDriveQuery> | undefined
     expect(() => {
@@ -44,15 +43,11 @@ describe('parseDriveQuery negated mimetype clause (#211)', () => {
       filter?.(makeFile({ mimeType: 'application/vnd.google-apps.folder', parents: ['folder-1'] })),
     ).toBe(false)
     expect(filter?.(makeFile({ mimeType: 'image/jpeg', parents: ['folder-1'] }))).toBe(true)
-    expect(
-      filter?.(makeFile({ mimeType: 'image/jpeg', parents: ['folder-1'], trashed: true })),
-    ).toBe(false)
+    expect(filter?.(makeFile({ mimeType: 'image/jpeg', parents: ['folder-1'], trashed: true }))).toBe(false)
     expect(filter?.(makeFile({ mimeType: 'image/jpeg', parents: ['folder-2'] }))).toBe(false)
   })
 
   it('still throws on any other unrecognized clause shape', () => {
-    expect(() => parseDriveQuery("mimeType>'image/jpeg'")).toThrow(
-      /unrecognized query clause/,
-    )
+    expect(() => parseDriveQuery("mimeType>'image/jpeg'")).toThrow(/unrecognized query clause/)
   })
 })

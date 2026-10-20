@@ -54,7 +54,8 @@ vi.mock('@vis.gl/react-google-maps', () => ({
       // tests instead call these directly, the way `CairnLayer.tsx` itself
       // does through `useDraggableCairn`'s returned handlers.
       ref={(node) => {
-        if (node) Object.assign(node, { __onDragStart: onDragStart, __onDrag: onDrag, __onDragEnd: onDragEnd })
+        if (node)
+          Object.assign(node, { __onDragStart: onDragStart, __onDrag: onDrag, __onDragEnd: onDragEnd })
       }}
     >
       {children}
@@ -94,7 +95,10 @@ function fireDrag(element: Element, lat: number, lng: number) {
         this.points.push(point)
       }
       getNorthEast() {
-        return { equals: (other: { lat: number; lng: number }) => this.points.every((p) => p.lat === other.lat && p.lng === other.lng) }
+        return {
+          equals: (other: { lat: number; lng: number }) =>
+            this.points.every((p) => p.lat === other.lat && p.lng === other.lng),
+        }
       }
       getSouthWest() {
         return this.points[0]
@@ -215,7 +219,9 @@ describe('CairnLayer', () => {
     expect(a.getAttribute('data-selected')).toBe('false')
     expect(b.getAttribute('data-selected')).toBe('true')
 
-    a.querySelector('[data-testid="advanced-marker"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    a.querySelector('[data-testid="advanced-marker"]')?.dispatchEvent(
+      new MouseEvent('click', { bubbles: true }),
+    )
     a.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     expect(onSelectCairn).toHaveBeenCalledWith('a')
   })
@@ -428,7 +434,10 @@ describe('CairnLayer linked hover (#251)', () => {
   it('applies the hover scale/ring class to the marker named by hoveredCairnIds, and no other', () => {
     const { container } = render(
       <CairnLayer
-        cairns={[positionedCairn({ id: 'a', latitude: 1, longitude: 1 }), positionedCairn({ id: 'b', latitude: 40, longitude: 40 })]}
+        cairns={[
+          positionedCairn({ id: 'a', latitude: 1, longitude: 1 }),
+          positionedCairn({ id: 'b', latitude: 40, longitude: 40 }),
+        ]}
         accessToken="token"
         selectedCairnId={null}
         onSelectCairn={() => {}}
@@ -643,7 +652,9 @@ describe('CairnLayer — #270 the selected cluster', () => {
         ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
 
-    const anchor = container.querySelector('[data-testid="cairn-cluster"][data-expanded="true"]') as HTMLElement
+    const anchor = container.querySelector(
+      '[data-testid="cairn-cluster"][data-expanded="true"]',
+    ) as HTMLElement
     expect(anchor.getAttribute('data-selected')).toBe('true')
   })
 })
@@ -668,7 +679,9 @@ describe('CairnLayer cluster expansion (#194)', () => {
       re-render rather than a spy. */
   function clickMarker(element: Element | null | undefined) {
     act(() => {
-      element?.closest('[data-testid="advanced-marker"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      element
+        ?.closest('[data-testid="advanced-marker"]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
   }
 
@@ -683,7 +696,12 @@ describe('CairnLayer cluster expansion (#194)', () => {
 
   it('still zooms to fit a cluster whose members separate at the cap (criterion 5)', () => {
     const { container } = render(
-      <CairnLayer cairns={pair('separates')} accessToken="token" selectedCairnId={null} onSelectCairn={() => {}} />,
+      <CairnLayer
+        cairns={pair('separates')}
+        accessToken="token"
+        selectedCairnId={null}
+        onSelectCairn={() => {}}
+      />,
     )
 
     clickCluster(container)
@@ -700,7 +718,12 @@ describe('CairnLayer cluster expansion (#194)', () => {
      `FIT_PADDING` on every edge. */
   it('zooms to fit a cluster with the inset-aware padding, not the bare default', () => {
     const { container } = render(
-      <CairnLayer cairns={pair('separates')} accessToken="token" selectedCairnId={null} onSelectCairn={() => {}} />,
+      <CairnLayer
+        cairns={pair('separates')}
+        accessToken="token"
+        selectedCairnId={null}
+        onSelectCairn={() => {}}
+      />,
     )
 
     clickCluster(container)
@@ -710,7 +733,12 @@ describe('CairnLayer cluster expansion (#194)', () => {
 
   it('expands a cluster whose members never separate, instead of doing nothing (criterion 6)', () => {
     const { container } = render(
-      <CairnLayer cairns={pair('never')} accessToken="token" selectedCairnId={null} onSelectCairn={() => {}} />,
+      <CairnLayer
+        cairns={pair('never')}
+        accessToken="token"
+        selectedCairnId={null}
+        onSelectCairn={() => {}}
+      />,
     )
 
     clickCluster(container)
@@ -769,7 +797,12 @@ describe('CairnLayer cluster expansion (#194)', () => {
     ['a camera move', () => fireMapEvent('bounds_changed')],
   ])('collapses the expansion on %s (criterion 9)', (_name, dismiss) => {
     const { container } = render(
-      <CairnLayer cairns={pair('never')} accessToken="token" selectedCairnId={null} onSelectCairn={() => {}} />,
+      <CairnLayer
+        cairns={pair('never')}
+        accessToken="token"
+        selectedCairnId={null}
+        onSelectCairn={() => {}}
+      />,
     )
 
     clickCluster(container)
@@ -822,7 +855,12 @@ describe('CairnLayer cluster expansion (#194)', () => {
 
   it('clicking the anchor badge collapses its own expansion', () => {
     const { container } = render(
-      <CairnLayer cairns={pair('never')} accessToken="token" selectedCairnId={null} onSelectCairn={() => {}} />,
+      <CairnLayer
+        cairns={pair('never')}
+        accessToken="token"
+        selectedCairnId={null}
+        onSelectCairn={() => {}}
+      />,
     )
 
     clickCluster(container)
@@ -842,7 +880,12 @@ describe('CairnLayer cluster expansion (#194)', () => {
   describe('a fan survives its own click', () => {
     it('stays expanded through every camera move its own click causes', () => {
       const { container } = render(
-        <CairnLayer cairns={pair('never')} accessToken="token" selectedCairnId={null} onSelectCairn={() => {}} />,
+        <CairnLayer
+          cairns={pair('never')}
+          accessToken="token"
+          selectedCairnId={null}
+          onSelectCairn={() => {}}
+        />,
       )
 
       clickCluster(container)
@@ -876,7 +919,12 @@ describe('CairnLayer cluster expansion (#194)', () => {
 
     it('collapses on the camera move that follows once the reveal has settled — idle alone does not collapse it', () => {
       const { container } = render(
-        <CairnLayer cairns={pair('never')} accessToken="token" selectedCairnId={null} onSelectCairn={() => {}} />,
+        <CairnLayer
+          cairns={pair('never')}
+          accessToken="token"
+          selectedCairnId={null}
+          onSelectCairn={() => {}}
+        />,
       )
 
       clickCluster(container)
@@ -901,7 +949,12 @@ describe('CairnLayer cluster expansion (#194)', () => {
        the fan open. */
     it('re-lays-out its members at the zoom the reveal closes in to, and they stay clickable', () => {
       const { container } = render(
-        <CairnLayer cairns={pair('never')} accessToken="token" selectedCairnId={null} onSelectCairn={() => {}} />,
+        <CairnLayer
+          cairns={pair('never')}
+          accessToken="token"
+          selectedCairnId={null}
+          onSelectCairn={() => {}}
+        />,
       )
 
       clickCluster(container)
@@ -930,7 +983,12 @@ describe('CairnLayer cluster expansion (#194)', () => {
 
     it('does not suppress collapse for a click that reselects the already-selected member', () => {
       const { container } = render(
-        <CairnLayer cairns={pair('never')} accessToken="token" selectedCairnId="b" onSelectCairn={() => {}} />,
+        <CairnLayer
+          cairns={pair('never')}
+          accessToken="token"
+          selectedCairnId="b"
+          onSelectCairn={() => {}}
+        />,
       )
 
       clickCluster(container)
@@ -944,7 +1002,12 @@ describe('CairnLayer cluster expansion (#194)', () => {
 
     it('still collapses on Escape and a click elsewhere while a reveal is in flight', () => {
       const { container } = render(
-        <CairnLayer cairns={pair('never')} accessToken="token" selectedCairnId={null} onSelectCairn={() => {}} />,
+        <CairnLayer
+          cairns={pair('never')}
+          accessToken="token"
+          selectedCairnId={null}
+          onSelectCairn={() => {}}
+        />,
       )
 
       clickCluster(container)
@@ -959,9 +1022,16 @@ describe('CairnLayer cluster expansion (#194)', () => {
 describe('CairnLayer dragging (#158)', () => {
   it('marks the marker draggable when the layer is, and not otherwise (default)', () => {
     const { container } = render(
-      <CairnLayer cairns={[positionedCairn()]} accessToken="token" selectedCairnId={null} onSelectCairn={() => {}} />,
+      <CairnLayer
+        cairns={[positionedCairn()]}
+        accessToken="token"
+        selectedCairnId={null}
+        onSelectCairn={() => {}}
+      />,
     )
-    expect(container.querySelector('[data-testid="advanced-marker"]')?.getAttribute('data-draggable')).toBe('false')
+    expect(container.querySelector('[data-testid="advanced-marker"]')?.getAttribute('data-draggable')).toBe(
+      'false',
+    )
   })
 
   it('a real move calls onMoveCairn with the cairn id and the dropped coordinate', async () => {

@@ -6,7 +6,12 @@ import type { DraftState } from '../import/useDraftTrip'
 function draftState(overrides: Partial<DraftState> = {}): DraftState {
   return {
     files: [
-      { id: 'f1', name: 'day1.kml', file: new File(['x'], 'day1.kml'), tracks: [{ name: 'Day 1', points: [] }] },
+      {
+        id: 'f1',
+        name: 'day1.kml',
+        file: new File(['x'], 'day1.kml'),
+        tracks: [{ name: 'Day 1', points: [] }],
+      },
     ],
     name: 'day1',
     startDate: null,
@@ -47,7 +52,12 @@ describe('DraftPanel', () => {
         {...baseProps({
           draft: draftState({
             files: [
-              { id: 'f1', name: 'day1.kml', file: new File(['x'], 'day1.kml'), tracks: [{ name: 'Day 1', points: [] }] },
+              {
+                id: 'f1',
+                name: 'day1.kml',
+                file: new File(['x'], 'day1.kml'),
+                tracks: [{ name: 'Day 1', points: [] }],
+              },
               {
                 id: 'f2',
                 name: 'day2.kml',
@@ -117,9 +127,7 @@ describe('DraftPanel', () => {
       />,
     )
 
-    expect(
-      screen.getByText('Could not save. Your tracks are still here — try again.'),
-    ).toBeDefined()
+    expect(screen.getByText('Could not save. Your tracks are still here — try again.')).toBeDefined()
     expect(screen.getByRole('button', { name: 'Save' })).toHaveProperty('disabled', false)
   })
 

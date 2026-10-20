@@ -159,10 +159,7 @@ export function visibleCairnIds(
 
 /** The ids of every cairn attached to no track — the group that gets its
     own heading and its own eye in the list. */
-export function unattachedCairnIds(
-  cairns: AttachableCairn[],
-  files: AttachableTrackFile[],
-): Set<string> {
+export function unattachedCairnIds(cairns: AttachableCairn[], files: AttachableTrackFile[]): Set<string> {
   const attachments = cairnAttachments(cairns, files)
   return new Set(cairns.filter((cairn) => (attachments.get(cairn.id) ?? []).length === 0).map((c) => c.id))
 }

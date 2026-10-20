@@ -3,8 +3,7 @@
  * app has to render rather than crash on — an unset variable and one set to the
  * empty string in a committed `.env.example` are the same thing here.
  */
-export const googleMapsApiKey: string | null =
-  import.meta.env.VITE_GOOGLE_MAPS_API_KEY?.trim() || null
+export const googleMapsApiKey: string | null = import.meta.env.VITE_GOOGLE_MAPS_API_KEY?.trim() || null
 
 /**
  * The OAuth browser client ID used for Google sign-in. Same either-is-missing
@@ -12,8 +11,7 @@ export const googleMapsApiKey: string | null =
  * simply doesn't render rather than the app crashing or showing a broken
  * control.
  */
-export const googleClientId: string | null =
-  import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() || null
+export const googleClientId: string | null = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() || null
 
 /**
  * The Map ID that enables Advanced Markers (#54) — a classic `Marker` has no
@@ -22,5 +20,4 @@ export const googleClientId: string | null =
  * and `MapView` degrades by not rendering advanced markers rather than
  * crashing (Google refuses to mount `AdvancedMarker` at all without a Map ID).
  */
-export const googleMapsMapId: string | null =
-  import.meta.env.VITE_GOOGLE_MAPS_MAP_ID?.trim() || null
+export const googleMapsMapId: string | null = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID?.trim() || null

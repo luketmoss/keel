@@ -16,13 +16,22 @@ describe('frameGeometry (#274)', () => {
   })
 
   it('a larger span produces a larger range', () => {
-    const small = frameGeometry([{ lat: 0, lng: 0 }, { lat: 0.01, lng: 0.01 }])!
-    const large = frameGeometry([{ lat: 0, lng: 0 }, { lat: 1, lng: 1 }])!
+    const small = frameGeometry([
+      { lat: 0, lng: 0 },
+      { lat: 0.01, lng: 0.01 },
+    ])!
+    const large = frameGeometry([
+      { lat: 0, lng: 0 },
+      { lat: 1, lng: 1 },
+    ])!
     expect(large.range).toBeGreaterThan(small.range)
   })
 
   it('a larger margin produces a larger range for the same points', () => {
-    const points = [{ lat: 0, lng: 0 }, { lat: 1, lng: 1 }]
+    const points = [
+      { lat: 0, lng: 0 },
+      { lat: 1, lng: 1 },
+    ]
     const tighter = frameGeometry(points, 0)!
     const wider = frameGeometry(points, 40)!
     expect(wider.range).toBeGreaterThan(tighter.range)
@@ -43,7 +52,10 @@ describe('frameGeometry (#274)', () => {
   })
 
   it('defaults its margin to the shipped 20%', () => {
-    const points = [{ lat: 0, lng: 0 }, { lat: 1, lng: 1 }]
+    const points = [
+      { lat: 0, lng: 0 },
+      { lat: 1, lng: 1 },
+    ]
     expect(frameGeometry(points)).toEqual(frameGeometry(points, FLYOVER_MARGIN_PERCENT))
   })
 

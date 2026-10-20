@@ -96,7 +96,12 @@ export function TrackFace({
         {editError && <p className="loose-face__edit-error">{editError}</p>}
 
         {!confirming && (
-          <button type="button" className="loose-face__primary" disabled={disabled} onClick={onRemoveFromTrip}>
+          <button
+            type="button"
+            className="loose-face__primary"
+            disabled={disabled}
+            onClick={onRemoveFromTrip}
+          >
             Remove from trip
           </button>
         )}

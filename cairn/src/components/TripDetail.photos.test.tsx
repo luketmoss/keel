@@ -266,9 +266,7 @@ describe('TripDetail — #55 photo list and lightbox', () => {
     })
 
     it('shows the icon and photo clauses in the meta line', async () => {
-      useCairnImport.mockReturnValue(
-        baseCairnImport({ cairns: [cairnRecord({ icon: 'campsite' })] }),
-      )
+      useCairnImport.mockReturnValue(baseCairnImport({ cairns: [cairnRecord({ icon: 'campsite' })] }))
 
       renderTrip()
       await openLightbox('sapporo.jpg')
@@ -315,7 +313,9 @@ describe('TripDetail — #55 photo list and lightbox', () => {
     it('an icon-only cairn expands into its summary rather than opening the lightbox on the first click (#294)', async () => {
       useCairnImport.mockReturnValue(
         baseCairnImport({
-          cairns: [cairnRecord({ icon: 'campsite', image: null, description: 'Flat bench above the creek.' })],
+          cairns: [
+            cairnRecord({ icon: 'campsite', image: null, description: 'Flat bench above the creek.' }),
+          ],
         }),
       )
 
@@ -493,7 +493,11 @@ describe('TripDetail — attaching a photo while a cairn is open (#157)', () => 
     const attachImage = vi.fn().mockResolvedValue({ ok: true })
     const importFiles = vi.fn().mockResolvedValue(undefined)
     useCairnImport.mockReturnValue(
-      baseCairnImport({ cairns: [cairnRecord({ id: 'a', image: null, icon: 'campsite' })], attachImage, importFiles }),
+      baseCairnImport({
+        cairns: [cairnRecord({ id: 'a', image: null, icon: 'campsite' })],
+        attachImage,
+        importFiles,
+      }),
     )
     const { onDropTargetChange, drop } = capture()
     renderTrip({ onDropTargetChange })
@@ -517,7 +521,9 @@ describe('TripDetail — attaching a photo while a cairn is open (#157)', () => 
   it('still imports as new cairns when the drop lands with no cairn open', async () => {
     const attachImage = vi.fn().mockResolvedValue({ ok: true })
     const importFiles = vi.fn().mockResolvedValue({ resolvedCount: 0, needsPlacement: [] })
-    useCairnImport.mockReturnValue(baseCairnImport({ cairns: [cairnRecord({ id: 'a' })], attachImage, importFiles }))
+    useCairnImport.mockReturnValue(
+      baseCairnImport({ cairns: [cairnRecord({ id: 'a' })], attachImage, importFiles }),
+    )
     const { onDropTargetChange, drop } = capture()
     renderTrip({ onDropTargetChange })
 
@@ -705,9 +711,7 @@ describe('TripDetail — creating a cairn with a photo (#347)', () => {
   })
 
   function captureCreate() {
-    let handler:
-      | ((input: Parameters<typeof Object>[0], photo: File | null) => Promise<unknown>)
-      | null = null
+    let handler: ((input: Parameters<typeof Object>[0], photo: File | null) => Promise<unknown>) | null = null
     return {
       onCreateTargetChange: (h: typeof handler) => {
         handler = h

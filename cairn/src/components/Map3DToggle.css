@@ -34,7 +34,9 @@
   color: var(--text-muted);
   font-size: var(--text-sm);
   cursor: pointer;
-  transition: color var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease);
+  transition:
+    color var(--motion-fast) var(--ease),
+    background var(--motion-fast) var(--ease);
 }
 
 .map-3d-toggle__button:hover:not(:disabled) {

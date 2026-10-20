@@ -134,9 +134,7 @@ export function TripsPanel({
 
   const search = filters.name.trim().toLowerCase()
   const visibleTrips =
-    kind === 'all' || kind === 'trips'
-      ? trips.filter((trip) => matchesTripFilters(trip, filters))
-      : []
+    kind === 'all' || kind === 'trips' ? trips.filter((trip) => matchesTripFilters(trip, filters)) : []
   const visibleLoose = looseItems.filter((item) => {
     if (kind === 'trips') return false
     if (kind === 'tracks' && item.kind !== 'track') return false
@@ -313,13 +311,7 @@ export function TripsPanel({
   )
 }
 
-function NewTripField({
-  onCreate,
-  onCancel,
-}: {
-  onCreate: (name: string) => void
-  onCancel: () => void
-}) {
+function NewTripField({ onCreate, onCancel }: { onCreate: (name: string) => void; onCancel: () => void }) {
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
@@ -463,12 +455,7 @@ function TripRow({
 }) {
   if (confirming) {
     return (
-      <RowConfirm
-        name={trip.name}
-        rowRef={confirmingRowRef}
-        onDelete={onDelete}
-        onCancel={onCancelConfirm}
-      />
+      <RowConfirm name={trip.name} rowRef={confirmingRowRef} onDelete={onDelete} onCancel={onCancelConfirm} />
     )
   }
 
@@ -487,7 +474,13 @@ function TripRow({
       <Link
         to={`/trips/${trip.id}`}
         className="trips-panel__row-link"
-        aria-label={tripRowAccessibleName(trip.name, trip.startDate, trip.endDate, trackCount, trip.cairnCount)}
+        aria-label={tripRowAccessibleName(
+          trip.name,
+          trip.startDate,
+          trip.endDate,
+          trackCount,
+          trip.cairnCount,
+        )}
         onFocus={() => onHover(trip.id)}
         onBlur={() => onHover(null)}
       >
@@ -559,12 +552,7 @@ function LooseRow({
 
   if (confirming) {
     return (
-      <RowConfirm
-        name={item.name}
-        rowRef={confirmingRowRef}
-        onDelete={onDelete}
-        onCancel={onCancelConfirm}
-      />
+      <RowConfirm name={item.name} rowRef={confirmingRowRef} onDelete={onDelete} onCancel={onCancelConfirm} />
     )
   }
 
@@ -620,7 +608,13 @@ function LooseRow({
         />
       ) : (
         <span className="trips-panel__row-photo" aria-hidden="true">
-          <CairnMarker icon={item.icon} hasImage={item.image !== null} source={item.positionSource} selected={emphasized} small />
+          <CairnMarker
+            icon={item.icon}
+            hasImage={item.image !== null}
+            source={item.positionSource}
+            selected={emphasized}
+            small
+          />
         </span>
       )}
       <Link
@@ -632,9 +626,7 @@ function LooseRow({
         <span className="trips-panel__row-name" title={item.name}>
           {item.name}
         </span>
-        <span
-          className={`trips-panel__row-detail${unplaced ? ' trips-panel__row-detail--unplaced' : ''}`}
-        >
+        <span className={`trips-panel__row-detail${unplaced ? ' trips-panel__row-detail--unplaced' : ''}`}>
           {looseMetaLine(item, formatShortDate)}
         </span>
       </Link>

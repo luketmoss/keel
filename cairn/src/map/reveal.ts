@@ -11,7 +11,12 @@
    through, rather than a second, exact projection that could disagree with
    it about where something sits on screen. */
 
-import { containerPointFromLatLng, latLngFromContainerPoint, scaleBounds, type ViewportBounds } from './containerPoint'
+import {
+  containerPointFromLatLng,
+  latLngFromContainerPoint,
+  scaleBounds,
+  type ViewportBounds,
+} from './containerPoint'
 import { CLUSTER_MAX_ZOOM, FIT_PADDING, fitTracksToBounds } from '@keel/geo'
 import { prefersReducedMotion } from '@keel/geo'
 import type { LatLng } from '@keel/geo'
@@ -183,7 +188,8 @@ export function revealPoint(map: google.maps.Map, point: LatLng, inset: Inset): 
   // visible span per zoom level gained) gives the viewport the point will
   // actually be read against once the move completes, so the same pixel
   // arithmetic that already works for a same-zoom pan works here too.
-  const targetBounds = targetZoom === currentZoom ? bounds : scaleBounds(bounds, 2 ** (currentZoom - targetZoom))
+  const targetBounds =
+    targetZoom === currentZoom ? bounds : scaleBounds(bounds, 2 ** (currentZoom - targetZoom))
 
   const pixel = containerPointFromLatLng(point, width, height, targetBounds)
   if (!pixel) return

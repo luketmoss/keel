@@ -33,7 +33,8 @@ vi.mock('@vis.gl/react-google-maps', () => ({
       data-draggable={draggable}
       onClick={onClick}
       ref={(node) => {
-        if (node) Object.assign(node, { __onDragStart: onDragStart, __onDrag: onDrag, __onDragEnd: onDragEnd })
+        if (node)
+          Object.assign(node, { __onDragStart: onDragStart, __onDrag: onDrag, __onDragEnd: onDragEnd })
       }}
     >
       {children}
@@ -146,9 +147,7 @@ describe('LooseLayer — #134 the photo marker', () => {
     await waitFor(() => expect(acquire).toHaveBeenCalledWith('token', 'thumb-1'))
     await waitFor(() => expect(container.querySelector('.loose-marker__photo img')).not.toBeNull())
 
-    expect(container.querySelector('.loose-marker__photo img')?.getAttribute('src')).toBe(
-      'blob:fake-thumb',
-    )
+    expect(container.querySelector('.loose-marker__photo img')?.getAttribute('src')).toBe('blob:fake-thumb')
   })
 
   it('keeps drawing the plain circle marker when the thumbnail fails to load', async () => {
@@ -223,7 +222,9 @@ describe('LooseLayer dragging a cairn (#158)', () => {
         draggable={true}
       />,
     )
-    expect(container.querySelector('[data-testid="advanced-marker"]')?.getAttribute('data-draggable')).toBe('true')
+    expect(container.querySelector('[data-testid="advanced-marker"]')?.getAttribute('data-draggable')).toBe(
+      'true',
+    )
   })
 
   it('refuses to drag a cairn still mid-upload, even when the layer allows it (canChangeOwner)', () => {
@@ -239,7 +240,9 @@ describe('LooseLayer dragging a cairn (#158)', () => {
         draggable={true}
       />,
     )
-    expect(container.querySelector('[data-testid="advanced-marker"]')?.getAttribute('data-draggable')).toBe('false')
+    expect(container.querySelector('[data-testid="advanced-marker"]')?.getAttribute('data-draggable')).toBe(
+      'false',
+    )
   })
 
   it('a real move calls onMoveCairn with the item id and the dropped coordinate', () => {
@@ -331,12 +334,16 @@ describe('LooseLayer — #270 reveal', () => {
       />,
     )
 
-    expect(revealPoint).toHaveBeenCalledWith(fakeMap, { lat: 43, lng: 141 }, {
-      left: 0,
-      right: 0,
-      top: 0,
-      bottom: 0,
-    })
+    expect(revealPoint).toHaveBeenCalledWith(
+      fakeMap,
+      { lat: 43, lng: 141 },
+      {
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+      },
+    )
     expect(revealPoints).not.toHaveBeenCalled()
   })
 
@@ -347,7 +354,13 @@ describe('LooseLayer — #270 reveal', () => {
         {
           type: 'Feature' as const,
           properties: {},
-          geometry: { type: 'LineString' as const, coordinates: [[142, -37], [142.1, -37.1]] },
+          geometry: {
+            type: 'LineString' as const,
+            coordinates: [
+              [142, -37],
+              [142.1, -37.1],
+            ],
+          },
         },
       ],
     }
@@ -388,7 +401,10 @@ describe('LooseLayer — #270 reveal', () => {
     expect(store.getOverview).toHaveBeenCalledWith('t-1')
     expect(revealPoints).toHaveBeenCalledWith(
       fakeMap,
-      [{ lat: -37, lng: 142 }, { lat: -37.1, lng: 142.1 }],
+      [
+        { lat: -37, lng: 142 },
+        { lat: -37.1, lng: 142.1 },
+      ],
       { left: 0, right: 0, top: 0, bottom: 0 },
     )
   })

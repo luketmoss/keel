@@ -81,7 +81,9 @@
   font-size: var(--text-sm);
   line-height: 1;
   cursor: pointer;
-  transition: color var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease);
+  transition:
+    color var(--motion-fast) var(--ease),
+    background var(--motion-fast) var(--ease);
 }
 
 .shell-column__tab:hover {

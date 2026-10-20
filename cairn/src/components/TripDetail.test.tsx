@@ -285,13 +285,27 @@ describe('TripDetail — #51 partitioning a mixed drop between tracks and photos
     const photoRetry = vi.fn().mockResolvedValue(undefined)
     useTripImport.mockReturnValue(
       baseTripImport({
-        failures: [{ id: 'failure-1', name: 'day.kml', message: 'could not be uploaded, tap to retry', retryFile: new File(['x'], 'day.kml') }],
+        failures: [
+          {
+            id: 'failure-1',
+            name: 'day.kml',
+            message: 'could not be uploaded, tap to retry',
+            retryFile: new File(['x'], 'day.kml'),
+          },
+        ],
         retryFailure: tripRetry,
       }),
     )
     useCairnImport.mockReturnValue(
       baseCairnImport({
-        failures: [{ id: 'photo-failure-1', name: 'a.jpg', message: 'upload failed', retryFile: new File(['x'], 'a.jpg') }],
+        failures: [
+          {
+            id: 'photo-failure-1',
+            name: 'a.jpg',
+            message: 'upload failed',
+            retryFile: new File(['x'], 'a.jpg'),
+          },
+        ],
         retryFailure: photoRetry,
       }),
     )
@@ -408,7 +422,7 @@ describe('TripDetail — #73 disconnected is read-only', () => {
    that lists what a trip does take — so the stand-in is now `.rtf`, which
    is in neither `fileKinds.ts` list nor the archive doorway. */
 describe('TripDetail — #75 a file the app cannot identify', () => {
-  it('rejects an unclaimed file naming the formats trips take, not the photo pipeline\'s message', async () => {
+  it("rejects an unclaimed file naming the formats trips take, not the photo pipeline's message", async () => {
     const tripImportFiles = vi.fn().mockResolvedValue(undefined)
     const cairnImportFiles = cairnImportSpy()
     useTripImport.mockReturnValue(baseTripImport({ importFiles: tripImportFiles }))
@@ -468,9 +482,7 @@ describe('TripDetail — #75 empty-state copy naming the actual control', () => 
   it('points the empty track list at "Import files", not the nonexistent "Import tracks"', () => {
     renderTrip()
 
-    expect(
-      screen.getByText('Drop tracks or photos anywhere, or use Import files above.'),
-    ).toBeDefined()
+    expect(screen.getByText('Drop tracks or photos anywhere, or use Import files above.')).toBeDefined()
   })
 })
 

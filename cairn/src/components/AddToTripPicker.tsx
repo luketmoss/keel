@@ -139,8 +139,7 @@ export function AddToTripPicker({
                     something they asked about nor something they can act on.
                     It stops being shorter the first time the trip is opened. */}
                 <span className="add-to-trip__counts">
-                  {choice.trackCount}T
-                  {choice.cairnCount !== null && ` · ${choice.cairnCount}P`}
+                  {choice.trackCount}T{choice.cairnCount !== null && ` · ${choice.cairnCount}P`}
                 </span>
               </button>
             </li>

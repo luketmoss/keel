@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { cairnDrawsAsThumbnail, cairnMatchesFacet, interpolateCairn, isValidCairnImage, placeCairn } from './cairnRules'
+import {
+  cairnDrawsAsThumbnail,
+  cairnMatchesFacet,
+  interpolateCairn,
+  isValidCairnImage,
+  placeCairn,
+} from './cairnRules'
 import type { LooseCairnRecord } from './looseStore'
 import { positionPhoto } from '../photo/interpolate'
 import type { Track } from '@keel/geo'
@@ -66,7 +72,12 @@ describe('interpolateCairn', () => {
 describe('cairnMatchesFacet (#159)', () => {
   it('any matches every cairn', () => {
     expect(cairnMatchesFacet(makeCairn({ icon: null, image: null }), 'any')).toBe(true)
-    expect(cairnMatchesFacet(makeCairn({ icon: 'campsite', image: { originalDriveFileId: 'o', thumbnailDriveFileId: 't' } }), 'any')).toBe(true)
+    expect(
+      cairnMatchesFacet(
+        makeCairn({ icon: 'campsite', image: { originalDriveFileId: 'o', thumbnailDriveFileId: 't' } }),
+        'any',
+      ),
+    ).toBe(true)
   })
 
   it('photo matches a cairn carrying an image, whatever its icon', () => {

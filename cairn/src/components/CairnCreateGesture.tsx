@@ -95,7 +95,10 @@ export function CairnCreateGesture({ active, onPlace }: CairnCreateGestureProps)
     function handlePointerMove(event: PointerEvent) {
       if (!origin) return
       // A press that turns into a pan is a pan.
-      if (Math.abs(event.clientX - origin.x) > LONG_PRESS_SLOP_PX || Math.abs(event.clientY - origin.y) > LONG_PRESS_SLOP_PX) {
+      if (
+        Math.abs(event.clientX - origin.x) > LONG_PRESS_SLOP_PX ||
+        Math.abs(event.clientY - origin.y) > LONG_PRESS_SLOP_PX
+      ) {
         cancel()
       }
     }

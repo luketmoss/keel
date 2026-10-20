@@ -65,9 +65,7 @@ describe('LooseFace — #134 the cairn image', () => {
     const { container } = renderFace(looseCairn())
 
     await waitFor(() => expect(acquire).toHaveBeenCalledWith('token', 'thumb-1'))
-    await waitFor(() =>
-      expect(container.querySelector('.loose-face__image img')).not.toBeNull(),
-    )
+    await waitFor(() => expect(container.querySelector('.loose-face__image img')).not.toBeNull())
 
     const img = container.querySelector('.loose-face__image img')
     expect(img?.getAttribute('src')).toBe('blob:fake-thumb')
@@ -310,9 +308,7 @@ describe('LooseFace — #196 editing the description', () => {
     fireEvent.change(input(), { target: { value: 'Doomed.' } })
     fireEvent.keyDown(input(), { key: 'Enter' })
 
-    await waitFor(() =>
-      expect(document.body.textContent).toContain("Couldn't save — description reverted."),
-    )
+    await waitFor(() => expect(document.body.textContent).toContain("Couldn't save — description reverted."))
   })
 
   it('takes the field to Disabled while disconnected, and clicking does not start an edit', () => {
@@ -397,7 +393,13 @@ describe('LooseFace — the Fly over control keeps up with a hydrating overview 
         {
           type: 'Feature',
           properties: {},
-          geometry: { type: 'LineString', coordinates: [[142, -37], [142.01, -37.01]] },
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [142, -37],
+              [142.01, -37.01],
+            ],
+          },
         },
       ],
     }

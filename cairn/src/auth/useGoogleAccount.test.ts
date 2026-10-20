@@ -9,9 +9,7 @@ vi.mock('./googleIdentity', () => ({
 }))
 
 vi.mock('../drive/rootFolder', async () => {
-  const actual = await vi.importActual<typeof import('../drive/rootFolder')>(
-    '../drive/rootFolder',
-  )
+  const actual = await vi.importActual<typeof import('../drive/rootFolder')>('../drive/rootFolder')
   return {
     ...actual,
     getDriveAccount: vi.fn(),

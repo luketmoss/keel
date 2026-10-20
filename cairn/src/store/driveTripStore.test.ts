@@ -488,8 +488,9 @@ describe('DriveTripStore', () => {
       { id: 'folder-a', name: tripA.id },
       { id: 'folder-b', name: tripB.id },
     ])
-    findOrCreateTripFolder.mockImplementation(async (_token: string, _cairnFolderId: string, tripId: string) =>
-      tripId === tripA.id ? 'folder-a' : 'folder-b',
+    findOrCreateTripFolder.mockImplementation(
+      async (_token: string, _cairnFolderId: string, tripId: string) =>
+        tripId === tripA.id ? 'folder-a' : 'folder-b',
     )
     let releaseA: () => void = () => {}
     const aGate = new Promise<void>((resolve) => {
@@ -524,7 +525,9 @@ describe('DriveTripStore', () => {
     await connectPromise
 
     expect(updated?.name).toBe('Renamed')
-    const tripBWrites = writeJsonFile.mock.calls.filter((call) => call[1] === 'folder-b' && call[2] === 'trip.json')
+    const tripBWrites = writeJsonFile.mock.calls.filter(
+      (call) => call[1] === 'folder-b' && call[2] === 'trip.json',
+    )
     expect(tripBWrites).toHaveLength(1) // not a duplicate create alongside a later hydrate/overwrite
     expect(tripBWrites[0][4]).not.toBeNull() // overwrite of the file findJsonFile found, not a create
   })
@@ -552,7 +555,13 @@ describe('DriveTripStore', () => {
     writeJsonFile.mockResolvedValue({ fileId: 'overview-file', headRevisionId: 'rev-1' })
 
     store.saveOverview(entry.id, [
-      { name: 'Day 1', points: [{ lat: 37, lon: -122 }, { lat: 38, lon: -121 }] },
+      {
+        name: 'Day 1',
+        points: [
+          { lat: 37, lon: -122 },
+          { lat: 38, lon: -121 },
+        ],
+      },
     ])
     await flush()
 
@@ -575,7 +584,13 @@ describe('DriveTripStore', () => {
     writeJsonFile.mockResolvedValue({ fileId: 'trip-file', headRevisionId: 'rev-2' })
 
     store.saveOverview(entry.id, [
-      { name: 'Day 1', points: [{ lat: 37, lon: -122 }, { lat: 38, lon: -121 }] },
+      {
+        name: 'Day 1',
+        points: [
+          { lat: 37, lon: -122 },
+          { lat: 38, lon: -121 },
+        ],
+      },
     ])
     await flush()
 

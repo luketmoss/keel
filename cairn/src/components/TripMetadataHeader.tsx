@@ -83,11 +83,7 @@ export function TripMetadataHeader({ trip, onUpdate, disabled = false }: TripMet
             onCancel={() => setEditing(null)}
           />
         ) : (
-          <h1
-            className="trip-metadata__name"
-            title={trip.name}
-            onClick={() => startEditing('name')}
-          >
+          <h1 className="trip-metadata__name" title={trip.name} onClick={() => startEditing('name')}>
             {trip.name}
           </h1>
         )}
@@ -96,7 +92,10 @@ export function TripMetadataHeader({ trip, onUpdate, disabled = false }: TripMet
           {/* #147: derived from the dates, not editable — see
               `deriveTripStatus`. A label, not a control: no click handler,
               no hover or pressed state. */}
-          <span className={`trip-metadata__status trip-metadata__status--${status}`} title="Set by the trip's dates">
+          <span
+            className={`trip-metadata__status trip-metadata__status--${status}`}
+            title="Set by the trip's dates"
+          >
             {status}
           </span>
 
@@ -110,9 +109,7 @@ export function TripMetadataHeader({ trip, onUpdate, disabled = false }: TripMet
                 for. The shared range formatter is what the list rows read,
                 and "No dates set" is right there — but on a line whose only
                 job is to be clicked, it describes rather than invites. */}
-            {trip.startDate || trip.endDate
-              ? formatTripDateRange(trip.startDate, trip.endDate)
-              : 'Add dates'}
+            {trip.startDate || trip.endDate ? formatTripDateRange(trip.startDate, trip.endDate) : 'Add dates'}
           </span>
         </div>
 
@@ -216,15 +213,7 @@ function NotesEditor({
   )
 }
 
-function NotesDisplay({
-  notes,
-  saved,
-  onClick,
-}: {
-  notes: string
-  saved: boolean
-  onClick: () => void
-}) {
+function NotesDisplay({ notes, saved, onClick }: { notes: string; saved: boolean; onClick: () => void }) {
   const trimmed = notes.trim()
   const [expanded, setExpanded] = useState(false)
   const [clamped, setClamped] = useState(false)

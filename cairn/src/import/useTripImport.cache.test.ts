@@ -42,7 +42,10 @@ function fakeStorage(): Storage {
 }
 
 const { parseTrack } = vi.hoisted(() => ({ parseTrack: vi.fn() }))
-vi.mock('@keel/geo', async (importOriginal) => ({ ...(await importOriginal<typeof import('@keel/geo')>()), parseTrack }))
+vi.mock('@keel/geo', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@keel/geo')>()),
+  parseTrack,
+}))
 
 function track(name: string): ParseResult {
   return { ok: true, tracks: [{ name, points: [{ lat: 0, lon: 0 }] }] }

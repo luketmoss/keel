@@ -43,11 +43,7 @@ export class PhotoNotFoundError extends Error {
   }
 }
 
-async function fetchPhotoBlob(
-  fetchImpl: typeof fetch,
-  accessToken: string,
-  fileId: string,
-): Promise<Blob> {
+async function fetchPhotoBlob(fetchImpl: typeof fetch, accessToken: string, fileId: string): Promise<Blob> {
   const url = `${DRIVE_FILES_URL}/${fileId}?alt=media`
 
   let response: Response

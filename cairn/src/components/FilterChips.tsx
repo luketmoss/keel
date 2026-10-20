@@ -27,13 +27,7 @@ export const LIST_HEADINGS: Record<KindFilter, string> = {
 }
 
 /** The chip row, between the search card and the panel. */
-export function FilterChips({
-  kind,
-  onChange,
-}: {
-  kind: KindFilter
-  onChange: (kind: KindFilter) => void
-}) {
+export function FilterChips({ kind, onChange }: { kind: KindFilter; onChange: (kind: KindFilter) => void }) {
   return (
     <div className="filter-chips" role="group" aria-label="Filter">
       {CHIPS.map((chip) => (

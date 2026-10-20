@@ -29,21 +29,23 @@ interface Place {
 }
 
 export function placesForTrips(trips: TripIndexEntry[]): Place[] {
-  return trips
-    // A trip written before #79 has no `origin` field at all rather than
-    // an explicit `null` — the storage layer's existing "corrupted/missing
-    // is absent, not thrown" stance (see tripStore.ts's validators) means
-    // this has to tolerate `undefined` too, not just `null`.
-    .filter((trip): trip is TripIndexEntry & { origin: NonNullable<TripIndexEntry['origin']> } =>
-      Boolean(trip.origin),
-    )
-    .map((trip) => ({
-      tripId: trip.id,
-      name: trip.name,
-      status: deriveTripStatus(trip.startDate, trip.endDate),
-      lat: trip.origin.lat,
-      lng: trip.origin.lng,
-    }))
+  return (
+    trips
+      // A trip written before #79 has no `origin` field at all rather than
+      // an explicit `null` — the storage layer's existing "corrupted/missing
+      // is absent, not thrown" stance (see tripStore.ts's validators) means
+      // this has to tolerate `undefined` too, not just `null`.
+      .filter((trip): trip is TripIndexEntry & { origin: NonNullable<TripIndexEntry['origin']> } =>
+        Boolean(trip.origin),
+      )
+      .map((trip) => ({
+        tripId: trip.id,
+        name: trip.name,
+        status: deriveTripStatus(trip.startDate, trip.endDate),
+        lat: trip.origin.lat,
+        lng: trip.origin.lng,
+      }))
+  )
 }
 
 export function visibleTripsFor(trips: TripIndexEntry[], filters: TripFilters): TripIndexEntry[] {
@@ -161,10 +163,7 @@ function PlaceLayer({ places, hoveredTripId, onHoverTrip, onSelectTrip }: PlaceL
     () => places.map((place) => ({ lat: place.lat, lng: place.lng, place })),
     [places],
   )
-  const clusters = useMemo(
-    () => clusterMarkers(clusterable, zoom, MARKER_FOOTPRINT_PX),
-    [clusterable, zoom],
-  )
+  const clusters = useMemo(() => clusterMarkers(clusterable, zoom, MARKER_FOOTPRINT_PX), [clusterable, zoom])
 
   if (!map) return null
 

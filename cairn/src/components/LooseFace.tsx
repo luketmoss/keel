@@ -314,13 +314,7 @@ function useStoreVersion(subscribe: (listener: () => void) => () => void): numbe
   return useSyncExternalStore(subscribeAndBump, () => version.current)
 }
 
-function TrackBody({
-  item,
-  store,
-}: {
-  item: Extract<LooseRecord, { kind: 'track' }>
-  store: LooseStore
-}) {
+function TrackBody({ item, store }: { item: Extract<LooseRecord, { kind: 'track' }>; store: LooseStore }) {
   // Read fresh on every render, including the one this hook's own bump
   // forces — the return value itself is never used, only depended on.
   useStoreVersion(store.subscribe)
@@ -388,9 +382,18 @@ function CairnBody({
   return (
     <>
       {showImageSlot && (
-        <div className="loose-face__image" role="img" aria-label={item.name} aria-busy={attaching || undefined}>
+        <div
+          className="loose-face__image"
+          role="img"
+          aria-label={item.name}
+          aria-busy={attaching || undefined}
+        >
           {thumbnailUrl && (
-            <img src={thumbnailUrl} alt="" className={attaching ? 'loose-face__image--replacing' : undefined} />
+            <img
+              src={thumbnailUrl}
+              alt=""
+              className={attaching ? 'loose-face__image--replacing' : undefined}
+            />
           )}
           {attaching && <span className="loose-face__image-uploading">uploading…</span>}
         </div>
@@ -420,12 +423,7 @@ function CairnBody({
           stops drawing as a thumbnail and starts drawing as a pin with a
           camera badge, in the map and in its row together. */}
       <span className="loose-face__field-label">What is this place</span>
-      <IconPicker
-        label="What is this place"
-        value={item.icon}
-        onChange={onSelectIcon}
-        disabled={disabled}
-      />
+      <IconPicker label="What is this place" value={item.icon} onChange={onSelectIcon} disabled={disabled} />
       {/* #339: a loose cairn's face is where a dropped photo would have
           landed, so it is where the control belongs. Disabled by the same
           gate the grid above uses — an attach is a Drive upload and

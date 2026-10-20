@@ -53,9 +53,7 @@ describe('clusterProvenance', () => {
   })
 
   it('an all-derived cluster reports interpolated', () => {
-    expect(clusterProvenance([{ source: 'interpolated' }, { source: 'interpolated' }])).toBe(
-      'interpolated',
-    )
+    expect(clusterProvenance([{ source: 'interpolated' }, { source: 'interpolated' }])).toBe('interpolated')
   })
 
   it('a mixed cluster takes the weaker (interpolated) claim', () => {

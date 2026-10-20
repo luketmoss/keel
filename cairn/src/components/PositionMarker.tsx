@@ -26,8 +26,7 @@ const EQUATOR_METERS_PER_PIXEL = 156_543.03392
 
 /** The accuracy circle's on-screen radius, in CSS pixels, at a given zoom. */
 export function accuracyRadiusPixels(fix: PositionFix, zoom: number): number {
-  const metersPerPixel =
-    (EQUATOR_METERS_PER_PIXEL * Math.cos((fix.position.lat * Math.PI) / 180)) / 2 ** zoom
+  const metersPerPixel = (EQUATOR_METERS_PER_PIXEL * Math.cos((fix.position.lat * Math.PI) / 180)) / 2 ** zoom
   if (!(metersPerPixel > 0)) return Infinity
   return fix.accuracyMeters / metersPerPixel
 }

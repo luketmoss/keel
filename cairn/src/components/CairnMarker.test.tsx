@@ -4,7 +4,9 @@ import { CairnMarker } from './CairnMarker'
 
 describe('CairnMarker — the one marker predicate, drawn (#169)', () => {
   it('draws a thumbnail when it has an image and no icon', () => {
-    const { container } = render(<CairnMarker icon={null} hasImage thumbnailUrl="thumb.jpg" selected={false} />)
+    const { container } = render(
+      <CairnMarker icon={null} hasImage thumbnailUrl="thumb.jpg" selected={false} />,
+    )
     expect(container.querySelector('.cairn-marker--thumb')).not.toBeNull()
     expect(container.querySelector('.cairn-marker--pin')).toBeNull()
     expect(container.querySelector('img')?.getAttribute('src')).toBe('thumb.jpg')
@@ -44,7 +46,7 @@ describe('CairnMarker — the one marker predicate, drawn (#169)', () => {
     expect(marker.style.borderColor).toBe('var(--accent)')
   })
 
-  it('a thumbnail still carries #54\'s provenance ring — solid for exif, dashed for interpolated', () => {
+  it("a thumbnail still carries #54's provenance ring — solid for exif, dashed for interpolated", () => {
     const { container: exif } = render(<CairnMarker icon={null} hasImage selected={false} source="exif" />)
     const { container: interpolated } = render(
       <CairnMarker icon={null} hasImage selected={false} source="interpolated" />,

@@ -44,11 +44,7 @@ interface DriveFile {
   createdTime: string
 }
 
-async function driveFetch(
-  url: string,
-  accessToken: string,
-  init?: RequestInit,
-): Promise<unknown> {
+async function driveFetch(url: string, accessToken: string, init?: RequestInit): Promise<unknown> {
   let response: Response
   try {
     response = await fetch(url, {
@@ -92,9 +88,7 @@ async function listCairnFolders(accessToken: string): Promise<DriveFile[]> {
   // parent filter never distinguished anything. It only cost something: a
   // `/Cairn/` folder the user tidied out of Drive root became invisible,
   // and the next sign-in created a duplicate at root instead of finding it.
-  const query = [`name='${FOLDER_NAME}'`, `mimeType='${FOLDER_MIME_TYPE}'`, 'trashed=false'].join(
-    ' and ',
-  )
+  const query = [`name='${FOLDER_NAME}'`, `mimeType='${FOLDER_MIME_TYPE}'`, 'trashed=false'].join(' and ')
 
   const url = `${DRIVE_FILES_URL}?q=${encodeURIComponent(query)}&fields=files(id,createdTime)`
   const body = (await driveFetch(url, accessToken)) as { files?: DriveFile[] }

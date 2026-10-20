@@ -151,7 +151,7 @@ describe('Map3DSurface (#271)', () => {
     expect(container.querySelector('[data-testid="map3d"]')).toBeNull()
   })
 
-  it('mounts and frames the 3D camera on the 2D map\'s own centre when turned on', async () => {
+  it("mounts and frames the 3D camera on the 2D map's own centre when turned on", async () => {
     render(<Map3DSurface on={true} mode={'SATELLITE' as never} />)
 
     // Flat and overhead first — safe at sea level, because at tilt 0 the
@@ -187,7 +187,10 @@ describe('Map3DSurface (#271)', () => {
   })
 
   it('stays mounted after being turned off, and syncs the 2D map to where 3D got to', () => {
-    const fakeMap2d = useMapResult.current as { setCenter: ReturnType<typeof vi.fn>; setZoom: ReturnType<typeof vi.fn> }
+    const fakeMap2d = useMapResult.current as {
+      setCenter: ReturnType<typeof vi.fn>
+      setZoom: ReturnType<typeof vi.fn>
+    }
 
     const { rerender, container } = render(<Map3DSurface on={true} mode={'SATELLITE' as never} />)
     // The user navigates the 3D camera while it's on — read live, not the
@@ -294,7 +297,7 @@ describe('Map3DSurface flyover (#274)', () => {
     vi.unstubAllGlobals()
   })
 
-  it('turning on for a flyover skips #271\'s own tilt-in and flies to the framed geometry instead', async () => {
+  it("turning on for a flyover skips #271's own tilt-in and flies to the framed geometry instead", async () => {
     render(<Map3DSurface on={true} mode={'SATELLITE' as never} flyover={{ token: 1, points }} />)
     await settleFraming()
 
@@ -371,7 +374,9 @@ describe('Map3DSurface flyover (#274)', () => {
   })
 
   it('pressing Fly over again while one is running cancels it and starts fresh, rather than stacking', async () => {
-    const { rerender } = render(<Map3DSurface on={true} mode={'SATELLITE' as never} flyover={{ token: 1, points }} />)
+    const { rerender } = render(
+      <Map3DSurface on={true} mode={'SATELLITE' as never} flyover={{ token: 1, points }} />,
+    )
     await settleFraming()
     expect(flyCameraTo).toHaveBeenCalledTimes(1)
 
@@ -432,7 +437,9 @@ describe('Map3DSurface flyover (#274)', () => {
   })
 
   it('turning 3D off mid-flight cancels it before reading the camera back into 2D', async () => {
-    const { rerender } = render(<Map3DSurface on={true} mode={'SATELLITE' as never} flyover={{ token: 1, points }} />)
+    const { rerender } = render(
+      <Map3DSurface on={true} mode={'SATELLITE' as never} flyover={{ token: 1, points }} />,
+    )
     await settleFraming()
     expect(flyCameraTo).toHaveBeenCalledTimes(1)
 
@@ -470,7 +477,7 @@ describe('Map3DSurface reset (#304)', () => {
   /** A new `resetToken` while 3D is already on and settled — the surface
       turning on with no reset requested (`resetToken={null}` on mount, same
       as every other test in this file), then `Reset view` pressed. */
-  it('flies to the home extent, heading 0, at the standard tilt-in\'s own 55°', async () => {
+  it("flies to the home extent, heading 0, at the standard tilt-in's own 55°", async () => {
     const { rerender } = render(<Map3DSurface on={true} mode={'SATELLITE' as never} />)
     await settleFraming()
     flyCameraTo.mockClear()

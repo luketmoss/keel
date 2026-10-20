@@ -73,7 +73,15 @@ function trackFile(overrides: Partial<ImportedFile> = {}): ImportedFile {
     name: 'Belford-Oxford',
     sourceName: 'Belford-Oxford.kml',
     driveFileId: 'drive-a',
-    tracks: [{ name: 'Belford-Oxford', points: [{ lat: 37, lon: -122 }, { lat: 37.01, lon: -122.01 }] }],
+    tracks: [
+      {
+        name: 'Belford-Oxford',
+        points: [
+          { lat: 37, lon: -122 },
+          { lat: 37.01, lon: -122.01 },
+        ],
+      },
+    ],
     trackStats: [
       {
         distanceMeters: 10_300,

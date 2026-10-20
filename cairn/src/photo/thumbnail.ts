@@ -316,13 +316,7 @@ export async function generateImagePair(
   orientation: number | undefined,
   deps: ThumbnailDependencies = realDependencies,
 ): Promise<ImagePairResult> {
-  const display = await generateThumbnail(
-    file,
-    orientation,
-    deps,
-    DISPLAY_MAX_EDGE,
-    DISPLAY_JPEG_QUALITY,
-  )
+  const display = await generateThumbnail(file, orientation, deps, DISPLAY_MAX_EDGE, DISPLAY_JPEG_QUALITY)
   if (!display.ok) return display
 
   const displayFile = new File([display.blob], displayImageName(file.name), { type: 'image/jpeg' })

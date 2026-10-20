@@ -109,10 +109,7 @@ export type CairnCreateOutcome = { ok: false } | { ok: true; photoAttached: bool
 
 /** The handler `App` holds while a trip is open: a cairn placed on the map
     is written into that trip's folder rather than the loose one. */
-export type CairnCreateTarget = (
-  input: NewTripCairn,
-  photo: File | null,
-) => Promise<CairnCreateOutcome>
+export type CairnCreateTarget = (input: NewTripCairn, photo: File | null) => Promise<CairnCreateOutcome>
 
 interface TripDetailProps {
   tripId: string
@@ -288,9 +285,12 @@ export function TripDetail({
   /* #188: the unpacking row, in the same shape the import progress rows
      use so it renders through `TripImportPanel` with no new markup. One
      slot rather than a list — a drop is unpacked one archive at a time. */
-  const [archiveProgress, setArchiveProgress] = useState<
-    { id: string; name: string; index: number; total: number } | null
-  >(null)
+  const [archiveProgress, setArchiveProgress] = useState<{
+    id: string
+    name: string
+    index: number
+    total: number
+  } | null>(null)
   const nextLocalFailureId = useRef(0)
   const removeConfirm = useRemoveConfirm()
   const [hoveredFileId, setHoveredFileId] = useState<string | null>(null)
@@ -624,7 +624,10 @@ export function TripDetail({
     points: track3DFramePoints,
   })
 
-  const cairnListRows = useMemo(() => buildCairnListRows(facetedCairns, allTracks), [facetedCairns, allTracks])
+  const cairnListRows = useMemo(
+    () => buildCairnListRows(facetedCairns, allTracks),
+    [facetedCairns, allTracks],
+  )
   const cairnListItems = useMemo(
     () => orderCairnListItems(cairnListRows, unattachedIds),
     [cairnListRows, unattachedIds],
@@ -645,7 +648,9 @@ export function TripDetail({
   // it to show, so opening one only selects it. `openCairnRow` still
   // resolves for either case; only the *render* below is gated on having
   // an image to view.
-  const openCairnRecord = openCairnId ? cairnImport.cairns.find((cairn) => cairn.id === openCairnId) : undefined
+  const openCairnRecord = openCairnId
+    ? cairnImport.cairns.find((cairn) => cairn.id === openCairnId)
+    : undefined
   /** #157: one attach at a time — there was only ever one lightbox to run
       it from, and #346's row menu keeps the rule rather than relaxing it. */
   const [attachingCairnId, setAttachingCairnId] = useState<string | null>(null)
@@ -750,7 +755,10 @@ export function TripDetail({
 
   const addLocalFailure = useCallback((name: string, message: string) => {
     nextLocalFailureId.current += 1
-    setLocalFailures((prev) => [...prev, { id: `local-failure-${nextLocalFailureId.current}`, name, message }])
+    setLocalFailures((prev) => [
+      ...prev,
+      { id: `local-failure-${nextLocalFailureId.current}`, name, message },
+    ])
   }, [])
 
   // #77 — a cairn that's been removed can no longer be selected or open in
@@ -914,10 +922,7 @@ export function TripDetail({
         if (openCairnId) {
           setAttachCairnErrors((prev) => ({ ...prev, [openCairnId]: SIGNED_OUT_PHOTO_MESSAGE }))
         } else {
-          addLocalFailure(
-            `${dropped.length} file${dropped.length === 1 ? '' : 's'}`,
-            SIGNED_OUT_DROP_MESSAGE,
-          )
+          addLocalFailure(`${dropped.length} file${dropped.length === 1 ? '' : 's'}`, SIGNED_OUT_DROP_MESSAGE)
         }
         return
       }
@@ -1012,7 +1017,9 @@ export function TripDetail({
     if (selectedTrackId) {
       const file = tripImport.tracks.find((candidate) => candidate.id === selectedTrackId)
       if (file) {
-        const points = file.tracks.flatMap((track) => normalizeAntimeridian(dropInvalidLatitudes(track.points)))
+        const points = file.tracks.flatMap((track) =>
+          normalizeAntimeridian(dropInvalidLatitudes(track.points)),
+        )
         revealPoints(map, points, columnInset(isPhone))
       }
       return
@@ -1143,7 +1150,9 @@ export function TripDetail({
           stats={openTrackFile.trackStats[0]}
           profile={effectiveElevationProfile(
             openTrackFile.tracks[0],
-            openTrackFile.tracks[0].key ? tripImport.sampledElevation[openTrackFile.tracks[0].key] : undefined,
+            openTrackFile.tracks[0].key
+              ? tripImport.sampledElevation[openTrackFile.tracks[0].key]
+              : undefined,
           )}
           color={trackColor(openTrackFile.colorIndex)}
           disabled={!signedIn}

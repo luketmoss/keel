@@ -306,7 +306,9 @@ describe('Lightbox — #196 editing a cairn', () => {
 
     fireEvent.click(descriptionField())
 
-    const trapped = document.querySelectorAll('.lightbox__dialog button:not(:disabled), .lightbox__dialog input, .lightbox__dialog textarea')
+    const trapped = document.querySelectorAll(
+      '.lightbox__dialog button:not(:disabled), .lightbox__dialog input, .lightbox__dialog textarea',
+    )
     expect(Array.from(trapped)).toContain(descriptionInput())
   })
 

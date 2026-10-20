@@ -25,9 +25,21 @@ function looseTrack(id: string, colorIndex: number): Extract<LooseRecord, { kind
 }
 
 describe('worldTrackGeometry (#271)', () => {
-  it('draws every visible trip\'s tracks, one per overview feature, cycling the palette by position', () => {
+  it("draws every visible trip's tracks, one per overview feature, cycling the palette by position", () => {
     const trips = [trip('t1')]
-    const tripStore = { getOverview: () => overview([[[0, 0], [1, 1]], [[2, 2], [3, 3]]]) }
+    const tripStore = {
+      getOverview: () =>
+        overview([
+          [
+            [0, 0],
+            [1, 1],
+          ],
+          [
+            [2, 2],
+            [3, 3],
+          ],
+        ]),
+    }
     const looseStore = { getOverview: () => null }
 
     const result = worldTrackGeometry(trips, tripStore, [], looseStore)
@@ -45,7 +57,15 @@ describe('worldTrackGeometry (#271)', () => {
   })
 
   it('draws every visible loose track, keeping its own stored colour', () => {
-    const looseStore = { getOverview: () => overview([[[10, 20], [11, 21]]]) }
+    const looseStore = {
+      getOverview: () =>
+        overview([
+          [
+            [10, 20],
+            [11, 21],
+          ],
+        ]),
+    }
     const tripStore = { getOverview: () => null }
 
     const result = worldTrackGeometry([], tripStore, [looseTrack('l1', 5)], looseStore)
@@ -63,12 +83,9 @@ describe('worldTrackGeometry (#271)', () => {
   })
 
   it('skips a trip or loose track with no overview yet', () => {
-    const result = worldTrackGeometry(
-      [trip('t1')],
-      { getOverview: () => null },
-      [looseTrack('l1', 0)],
-      { getOverview: () => null },
-    )
+    const result = worldTrackGeometry([trip('t1')], { getOverview: () => null }, [looseTrack('l1', 0)], {
+      getOverview: () => null,
+    })
     expect(result).toEqual([])
   })
 })

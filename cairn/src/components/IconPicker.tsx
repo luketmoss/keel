@@ -34,7 +34,12 @@ interface IconPickerProps {
     its name as an `aria-label` and its selection as `aria-pressed`; the
     grid itself is a labelled group. `none` carries the word rather than a
     glyph — an icon meaning *no icon* is a riddle. */
-export function IconPicker({ value, onChange, disabled = false, label = 'What is this place' }: IconPickerProps) {
+export function IconPicker({
+  value,
+  onChange,
+  disabled = false,
+  label = 'What is this place',
+}: IconPickerProps) {
   return (
     <div className="icon-picker" role="group" aria-label={label}>
       {ICONS.map((icon) => (

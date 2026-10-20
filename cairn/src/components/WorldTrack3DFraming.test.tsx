@@ -39,7 +39,10 @@ const GROUND_METERS = 1200
 vi.mock('@keel/geo', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@keel/geo')>()),
   createGoogleElevationSampler: () => ({
-    sampleAlongPath: async () => ({ ok: true, samples: [{ lat: 0, lng: 0, elevationMeters: GROUND_METERS }] }),
+    sampleAlongPath: async () => ({
+      ok: true,
+      samples: [{ lat: 0, lng: 0, elevationMeters: GROUND_METERS }],
+    }),
   }),
 }))
 
@@ -68,7 +71,15 @@ function looseTrack(id: string, colorIndex: number): Extract<LooseRecord, { kind
 }
 
 function cairn(id: string, lat: number, lng: number): PositionedCairn {
-  return { id, name: id, thumbnailDriveFileId: null, icon: null, latitude: lat, longitude: lng, source: 'exif' }
+  return {
+    id,
+    name: id,
+    thumbnailDriveFileId: null,
+    icon: null,
+    latitude: lat,
+    longitude: lng,
+    source: 'exif',
+  }
 }
 
 const TRIP_STORE_WITH_ROUTE = {

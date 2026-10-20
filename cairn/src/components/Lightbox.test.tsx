@@ -94,7 +94,9 @@ describe('Lightbox', () => {
       />,
     )
 
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close photo' })))
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close photo' })),
+    )
 
     unmount()
     expect(document.activeElement).toBe(opener)
@@ -306,9 +308,7 @@ describe('Lightbox', () => {
         />,
       )
 
-      expect(
-        screen.getByText(/positioned by timestamp against this trip’s tracks/),
-      ).toBeDefined()
+      expect(screen.getByText(/positioned by timestamp against this trip’s tracks/)).toBeDefined()
     })
 
     it('offers Remove from trip when the caller supplies it, and calls it on click', () => {
@@ -464,7 +464,12 @@ describe('Lightbox', () => {
 
     it('leaves full bleed when the cairn arrowed to has no image', () => {
       const withImage = row({ id: 'a' })
-      const iconOnly = row({ id: 'b', icon: 'campsite', thumbnailDriveFileId: null, originalDriveFileId: null })
+      const iconOnly = row({
+        id: 'b',
+        icon: 'campsite',
+        thumbnailDriveFileId: null,
+        originalDriveFileId: null,
+      })
       const rows = [withImage, iconOnly]
       const { rerender } = renderBox({ row: withImage, rows })
 
@@ -528,38 +533,38 @@ describe('Lightbox', () => {
        dialog in both directions. */
     describe('the focus trap', () => {
       it('wraps within the controls still on screen in full bleed', () => {
-        renderBox({ onRemoveFromTrip: vi.fn() });
-        fireEvent.click(photo());
+        renderBox({ onRemoveFromTrip: vi.fn() })
+        fireEvent.click(photo())
 
-        const dialog = screen.getByRole('dialog');
-        const close = screen.getByRole('button', { name: 'Close photo' });
-        const removeFromTrip = screen.getByRole('button', { name: 'Remove from trip' });
+        const dialog = screen.getByRole('dialog')
+        const close = screen.getByRole('button', { name: 'Close photo' })
+        const removeFromTrip = screen.getByRole('button', { name: 'Remove from trip' })
 
         // Forward off the last on-screen control lands back on the first.
-        photo().focus();
-        fireEvent.keyDown(dialog, { key: 'Tab' });
-        expect(document.activeElement).toBe(close);
+        photo().focus()
+        fireEvent.keyDown(dialog, { key: 'Tab' })
+        expect(document.activeElement).toBe(close)
 
         // Backwards off the first lands on the photo, never on the hidden
         // `Remove from trip` that closes the DOM order.
-        close.focus();
-        fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true });
-        expect(document.activeElement).toBe(photo());
-        expect(document.activeElement).not.toBe(removeFromTrip);
-      });
+        close.focus()
+        fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true })
+        expect(document.activeElement).toBe(photo())
+        expect(document.activeElement).not.toBe(removeFromTrip)
+      })
 
       it('still includes the detail column on the detail face', () => {
-        renderBox({ onRemoveFromTrip: vi.fn() });
+        renderBox({ onRemoveFromTrip: vi.fn() })
 
-        const dialog = screen.getByRole('dialog');
-        const close = screen.getByRole('button', { name: 'Close photo' });
-        const removeFromTrip = screen.getByRole('button', { name: 'Remove from trip' });
+        const dialog = screen.getByRole('dialog')
+        const close = screen.getByRole('button', { name: 'Close photo' })
+        const removeFromTrip = screen.getByRole('button', { name: 'Remove from trip' })
 
-        close.focus();
-        fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true });
-        expect(document.activeElement).toBe(removeFromTrip);
-      });
-    });
+        close.focus()
+        fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true })
+        expect(document.activeElement).toBe(removeFromTrip)
+      })
+    })
 
     it('keeps the detail face reachable while a photo uploads onto a cairn with none', () => {
       const blank = row({ thumbnailDriveFileId: null, originalDriveFileId: null })

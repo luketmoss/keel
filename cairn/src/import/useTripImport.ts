@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { parseTrack, type Track } from '@keel/geo'
-import { computeTrackStats, hasUsableElevation, overlaySampledElevation, type StoredTrackElevation } from '@keel/geo'
+import {
+  computeTrackStats,
+  hasUsableElevation,
+  overlaySampledElevation,
+  type StoredTrackElevation,
+} from '@keel/geo'
 import { createGoogleElevationSampler, sampleTrackElevation, trackKey } from '@keel/geo'
 import { readSampledElevation } from '@keel/geo'
 import { runWithConcurrency } from './concurrency'
 import type { ImportedFile } from './types'
-import {
-  listTrackFiles,
-  startResumableUpload,
-  trashFile,
-  uploadFileContent,
-} from '../drive/trackFiles'
+import { listTrackFiles, startResumableUpload, trashFile, uploadFileContent } from '../drive/trackFiles'
 import { defaultTrackFileCache, type TrackFileCache } from '../drive/trackFileCache'
 import { findOrCreateTripFolder } from '../drive/tripFolder'
 import { DriveAuthError } from '../drive/rootFolder'
@@ -568,9 +568,7 @@ export function useTripImport(
           isAuthError
             ? 'signed out before this finished uploading, tap to reconnect'
             : 'could not be uploaded, tap to retry',
-          isAuthError
-            ? { retryFile: failure.retryFile, reconnect: true }
-            : { retryFile: failure.retryFile },
+          isAuthError ? { retryFile: failure.retryFile, reconnect: true } : { retryFile: failure.retryFile },
         )
       }
     },
@@ -580,9 +578,7 @@ export function useTripImport(
   const dismissFailures = useCallback(() => setFailures([]), [])
 
   const toggleVisibility = useCallback((id: string) => {
-    setTracks((prev) =>
-      prev.map((file) => (file.id === id ? { ...file, visible: !file.visible } : file)),
-    )
+    setTracks((prev) => prev.map((file) => (file.id === id ? { ...file, visible: !file.visible } : file)))
   }, [])
 
   /** Drops a track from this trip's local state and prunes its override,

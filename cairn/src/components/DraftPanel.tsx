@@ -87,12 +87,7 @@ export function DraftPanel({
         {draft.saveError && <p className="draft-panel__error">{draft.saveError}</p>}
       </div>
       <div className="draft-panel__actions">
-        <button
-          type="button"
-          className="draft-panel__cancel"
-          onClick={onCancel}
-          disabled={draft.saving}
-        >
+        <button type="button" className="draft-panel__cancel" onClick={onCancel} disabled={draft.saving}>
           Cancel
         </button>
         {/* #110: not becoming a trip is now a valid outcome. The tracks
@@ -107,12 +102,7 @@ export function DraftPanel({
           Keep loose
         </button>
         {signedIn ? (
-          <button
-            type="button"
-            className="draft-panel__save"
-            onClick={onSave}
-            disabled={!canSave}
-          >
+          <button type="button" className="draft-panel__save" onClick={onSave} disabled={!canSave}>
             {draft.saving ? 'Saving…' : 'Save'}
           </button>
         ) : (

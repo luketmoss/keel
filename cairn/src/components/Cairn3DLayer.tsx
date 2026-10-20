@@ -111,7 +111,9 @@ export function Cairn3DLayer({
     const surface = map3d as unknown as HTMLElement
 
     function resolveHit(event: PointerEvent): HTMLElement | null {
-      return event.target instanceof Element ? event.target.closest<HTMLElement>('.cairn-layer__hit--3d') : null
+      return event.target instanceof Element
+        ? event.target.closest<HTMLElement>('.cairn-layer__hit--3d')
+        : null
     }
 
     function handlePointerDown(event: PointerEvent) {
@@ -227,9 +229,7 @@ export function Cairn3DLayer({
               selected={selectedCairnId === id}
               hovered={hoveredCairnIds.has(id)}
               occluded={occludedCairnIds.has(id)}
-              onHoverChange={(hovered) =>
-                onHoverCairn(hovered ? new Set([id]) : EMPTY_HOVERED_CAIRN_IDS)
-              }
+              onHoverChange={(hovered) => onHoverCairn(hovered ? new Set([id]) : EMPTY_HOVERED_CAIRN_IDS)}
             />,
             marker,
             id,

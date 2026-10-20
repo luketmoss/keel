@@ -206,7 +206,12 @@ export function TrackLayer({
     array immediately. `prefersReducedMotion` collapses straight to the full
     array on the very first render, so a reduced-motion session never sees a
     partial path at all. */
-function useRevealedPoints(trackKey: string, points: LatLng[], alreadyAnimated: boolean, onAnimated: () => void) {
+function useRevealedPoints(
+  trackKey: string,
+  points: LatLng[],
+  alreadyAnimated: boolean,
+  onAnimated: () => void,
+) {
   const [revealed, setRevealed] = useState<LatLng[]>(() =>
     alreadyAnimated || prefersReducedMotion() ? points : points.slice(0, 1),
   )
@@ -329,7 +334,13 @@ function Track({
         clickable={false}
         zIndex={zBase + 1}
       />
-      <Polyline path={revealed} strokeColor={color} strokeWeight={strokeWeight} clickable={false} zIndex={zBase + 2} />
+      <Polyline
+        path={revealed}
+        strokeColor={color}
+        strokeWeight={strokeWeight}
+        clickable={false}
+        zIndex={zBase + 2}
+      />
       {/* #270 — the invisible click target, topmost in this track's own
           band so the emphasised track wins a click where routes overlap,
           the same ordering #269 draws by. `strokeOpacity: 0` changes

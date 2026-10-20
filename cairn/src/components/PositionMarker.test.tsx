@@ -31,12 +31,7 @@ vi.mock('@vis.gl/react-google-maps', () => ({
     onClick?: () => void
     children?: React.ReactNode
   }) => (
-    <div
-      data-testid="advanced-marker"
-      data-lat={position.lat}
-      data-lng={position.lng}
-      onClick={onClick}
-    >
+    <div data-testid="advanced-marker" data-lat={position.lat} data-lng={position.lng} onClick={onClick}>
       {children}
     </div>
   ),
@@ -103,9 +98,7 @@ describe('PositionMarker', () => {
   })
 
   it('omits the create action entirely while a decision owns the map', () => {
-    const { container } = render(
-      <PositionMarker fix={fix()} canCreate={false} onCreate={vi.fn()} />,
-    )
+    const { container } = render(<PositionMarker fix={fix()} canCreate={false} onCreate={vi.fn()} />)
 
     fireEvent.click(container.querySelector('[data-testid="advanced-marker"]')!)
 
@@ -114,27 +107,19 @@ describe('PositionMarker', () => {
   })
 
   it('says how old a stale fix is, and says nothing about a current one', () => {
-    const { container, rerender } = render(
-      <PositionMarker fix={fix()} canCreate onCreate={vi.fn()} />,
-    )
+    const { container, rerender } = render(<PositionMarker fix={fix()} canCreate onCreate={vi.fn()} />)
     fireEvent.click(container.querySelector('[data-testid="advanced-marker"]')!)
     expect(screen.queryByText(/Located/)).toBeNull()
 
     rerender(
-      <PositionMarker
-        fix={fix({ at: Date.now() - STALE_FIX_MS - 60_000 })}
-        canCreate
-        onCreate={vi.fn()}
-      />,
+      <PositionMarker fix={fix({ at: Date.now() - STALE_FIX_MS - 60_000 })} canCreate onCreate={vi.fn()} />,
     )
     fireEvent.click(container.querySelector('[data-testid="advanced-marker"]')!)
     expect(screen.getByText('Located 3 minutes ago')).toBeDefined()
   })
 
   it('closes the callout when a fresh fix replaces the one it described', () => {
-    const { container, rerender } = render(
-      <PositionMarker fix={fix()} canCreate onCreate={vi.fn()} />,
-    )
+    const { container, rerender } = render(<PositionMarker fix={fix()} canCreate onCreate={vi.fn()} />)
     fireEvent.click(container.querySelector('[data-testid="advanced-marker"]')!)
     expect(screen.getByText('You are here')).toBeDefined()
 

@@ -232,8 +232,6 @@ describe('expandArchives', () => {
     const result = await expandArchives([broken, good, new File(['b'], 'IMG_9.jpg')])
 
     expect(result.files.map((file) => file.name)).toEqual(['IMG_1.jpg', 'IMG_9.jpg'])
-    expect(result.rejections).toEqual([
-      { name: 'broken.zip', message: UNREADABLE_ARCHIVE_MESSAGE },
-    ])
+    expect(result.rejections).toEqual([{ name: 'broken.zip', message: UNREADABLE_ARCHIVE_MESSAGE }])
   })
 })

@@ -25,7 +25,14 @@ interface SearchCardProps {
     `AccountBubble` together: the identity lives in the mark, the account
     lives in the same card, and there is no navigation bar at all, because
     `World` and `Trips` were never destinations. */
-export function SearchCard({ detail, onBack, query, onQueryChange, onSubmitQuery, accountBubble }: SearchCardProps) {
+export function SearchCard({
+  detail,
+  onBack,
+  query,
+  onQueryChange,
+  onSubmitQuery,
+  accountBubble,
+}: SearchCardProps) {
   /* #337: the same gate the coordinate row reads, so Enter and the row
      agree about whether there is a map to go to. */
   const mapUnavailable = useMapUnavailable()

@@ -23,10 +23,25 @@ const FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder'
 // content, and a folder has none. Nothing reads a folder's, and inventing
 // one here would make the emulator lie about the one field #149 turns on.
 function folder(id: string, name: string, parents: string[], createdTime: string): FakeFile {
-  return { id, name, mimeType: FOLDER_MIME_TYPE, parents, trashed: false, version: 1, createdTime, content: null }
+  return {
+    id,
+    name,
+    mimeType: FOLDER_MIME_TYPE,
+    parents,
+    trashed: false,
+    version: 1,
+    createdTime,
+    content: null,
+  }
 }
 
-function jsonFile(id: string, name: string, parents: string[], content: unknown, createdTime: string): FakeFile {
+function jsonFile(
+  id: string,
+  name: string,
+  parents: string[],
+  content: unknown,
+  createdTime: string,
+): FakeFile {
   return {
     id,
     name,

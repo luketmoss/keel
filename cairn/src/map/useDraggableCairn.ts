@@ -45,7 +45,11 @@ export interface UseDraggableCairn {
   consumeDragClick: () => boolean
 }
 
-export function useDraggableCairn({ position, draggable, onMove }: UseDraggableCairnOptions): UseDraggableCairn {
+export function useDraggableCairn({
+  position,
+  draggable,
+  onMove,
+}: UseDraggableCairnOptions): UseDraggableCairn {
   const [dragging, setDragging] = useState(false)
   const [override, setOverride] = useState<LatLng | null>(null)
   const dragStartRef = useRef<LatLng>(position)

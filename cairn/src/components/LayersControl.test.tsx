@@ -40,7 +40,11 @@ function Harness({
 
 function open(
   props: Partial<React.ComponentProps<typeof LayersControl>> = {},
-  { withSibling = false, onSiblingClick, siblingDisabled = false }: {
+  {
+    withSibling = false,
+    onSiblingClick,
+    siblingDisabled = false,
+  }: {
     withSibling?: boolean
     onSiblingClick?: () => void
     siblingDisabled?: boolean

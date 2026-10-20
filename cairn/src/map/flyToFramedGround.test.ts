@@ -8,7 +8,10 @@ import type { ElevationSampler } from '@keel/geo'
    `Map3DElement` and a fake `ElevationSampler` are the whole surface it
    touches. */
 const { reducedMotion } = vi.hoisted(() => ({ reducedMotion: { current: false } }))
-vi.mock('@keel/geo', async (importOriginal) => ({ ...(await importOriginal<typeof import('@keel/geo')>()), prefersReducedMotion: () => reducedMotion.current }))
+vi.mock('@keel/geo', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@keel/geo')>()),
+  prefersReducedMotion: () => reducedMotion.current,
+}))
 
 import { flyToFramedGround } from './flyToFramedGround'
 

@@ -29,12 +29,7 @@ import {
   type DriveFileRef,
 } from '../drive/tripMetadata'
 import { startResumableUpload, trashFile, uploadFileContent } from '../drive/trackFiles'
-import {
-  displayImageName,
-  generateImagePair,
-  THUMBNAIL_SUFFIX,
-  validateImageFile,
-} from '../photo/thumbnail'
+import { displayImageName, generateImagePair, THUMBNAIL_SUFFIX, validateImageFile } from '../photo/thumbnail'
 import { readPhotoExif } from '../photo/exif'
 
 interface LooseDriveRef {
@@ -86,7 +81,10 @@ export class DriveLooseStore implements LooseStore {
   private enqueue<T>(id: string, task: () => Promise<T>): Promise<T> {
     const prior = this.queues.get(id) ?? Promise.resolve()
     const settled = prior.catch(() => {}).then(task)
-    this.queues.set(id, settled.catch(() => {}))
+    this.queues.set(
+      id,
+      settled.catch(() => {}),
+    )
     return settled
   }
 
@@ -171,7 +169,8 @@ export class DriveLooseStore implements LooseStore {
         let tripBucketId: string
         try {
           itemFolderId =
-            this.refs.get(id)?.folderId ?? (await findOrCreateLooseItemFolder(accessToken, cairnFolderId, 'cairn', id))
+            this.refs.get(id)?.folderId ??
+            (await findOrCreateLooseItemFolder(accessToken, cairnFolderId, 'cairn', id))
           looseBucketId = await findOrCreateLooseFolder(accessToken, cairnFolderId, 'cairn')
           tripBucketId = await findOrCreateTripCairnsFolder(accessToken, cairnFolderId, tripId)
           // A cairn is a folder — one Drive call re-parents it, image and
@@ -288,16 +287,14 @@ export class DriveLooseStore implements LooseStore {
     // No-op when nothing actually changes — a caller re-sending the value
     // it already holds costs no write, the same stance
     // `DriveTripStore.savePhotoCount` takes for a derived field.
-    const nameChanged = patch.name !== undefined && patch.name.trim() !== '' && patch.name.trim() !== previous.name
+    const nameChanged =
+      patch.name !== undefined && patch.name.trim() !== '' && patch.name.trim() !== previous.name
     const colorChanged =
-      patch.colorIndex !== undefined &&
-      previous.kind === 'track' &&
-      patch.colorIndex !== previous.colorIndex
+      patch.colorIndex !== undefined && previous.kind === 'track' && patch.colorIndex !== previous.colorIndex
     // #156: `null` is a real value here — clearing a cairn's icon is a
     // change, so this compares against `undefined` (the field was not sent)
     // rather than testing the patch for truthiness.
-    const iconChanged =
-      patch.icon !== undefined && previous.kind === 'cairn' && patch.icon !== previous.icon
+    const iconChanged = patch.icon !== undefined && previous.kind === 'cairn' && patch.icon !== previous.icon
     // #158: a drag of zero distance never reaches here at all (the caller
     // doesn't call `update` for one), but this guard is what makes that
     // true by construction rather than by every caller remembering it —
@@ -342,9 +339,9 @@ export class DriveLooseStore implements LooseStore {
     let ref: LooseDriveRef
     let existing: DriveFileRef | null
     try {
-      ref =
-        this.refs.get(id) ??
-        { folderId: await findOrCreateLooseItemFolder(accessToken, cairnFolderId, record.kind, id) }
+      ref = this.refs.get(id) ?? {
+        folderId: await findOrCreateLooseItemFolder(accessToken, cairnFolderId, record.kind, id),
+      }
       // No cached ref only means this session hasn't written or hydrated
       // the file yet, not that Drive has none — same #102 reasoning
       // `writeRecordFiles` and `DriveTripStore.flushTrip` both apply.
@@ -354,7 +351,13 @@ export class DriveLooseStore implements LooseStore {
     }
 
     const write = () =>
-      writeJsonFile(accessToken, ref.folderId, RECORD_FILE[record.kind], { ...record, uploadState: 'ok' }, existing)
+      writeJsonFile(
+        accessToken,
+        ref.folderId,
+        RECORD_FILE[record.kind],
+        { ...record, uploadState: 'ok' },
+        existing,
+      )
 
     try {
       this.refs.set(id, { ...ref, record: await write() })
@@ -507,9 +510,7 @@ export class DriveLooseStore implements LooseStore {
         continue
       }
       for (const folder of folders) {
-        const found = await this.enqueue(folder.name, () =>
-          this.hydrateItem(kind, folder.id, folder.name),
-        )
+        const found = await this.enqueue(folder.name, () => this.hydrateItem(kind, folder.id, folder.name))
         if (found) known.add(folder.name)
       }
     }
@@ -551,10 +552,7 @@ export class DriveLooseStore implements LooseStore {
       try {
         const overviewFile = await findJsonFile(accessToken, folderId, OVERVIEW_FILE)
         if (overviewFile) {
-          const overview = await readJsonFile<FeatureCollection<LineString>>(
-            accessToken,
-            overviewFile.fileId,
-          )
+          const overview = await readJsonFile<FeatureCollection<LineString>>(accessToken, overviewFile.fileId)
           if (isFeatureCollection(overview.data)) {
             this.local.hydrateOverview(id, overview.data)
             const ref = this.refs.get(id)

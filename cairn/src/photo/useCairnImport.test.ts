@@ -14,15 +14,21 @@ vi.mock('../drive/tripCairnFolder', () => ({
   findOrCreateTripCairnItemFolder,
 }))
 
-const { listSubfolders, writeJsonFile, findJsonFile, findJsonFilesByFolders, readJsonFileContent, trashFolder } =
-  vi.hoisted(() => ({
-    listSubfolders: vi.fn(),
-    writeJsonFile: vi.fn(),
-    findJsonFile: vi.fn(),
-    findJsonFilesByFolders: vi.fn(),
-    readJsonFileContent: vi.fn(),
-    trashFolder: vi.fn(),
-  }))
+const {
+  listSubfolders,
+  writeJsonFile,
+  findJsonFile,
+  findJsonFilesByFolders,
+  readJsonFileContent,
+  trashFolder,
+} = vi.hoisted(() => ({
+  listSubfolders: vi.fn(),
+  writeJsonFile: vi.fn(),
+  findJsonFile: vi.fn(),
+  findJsonFilesByFolders: vi.fn(),
+  readJsonFileContent: vi.fn(),
+  trashFolder: vi.fn(),
+}))
 vi.mock('../drive/tripMetadata', async () => {
   const actual = await vi.importActual<typeof import('../drive/tripMetadata')>('../drive/tripMetadata')
   return {
@@ -59,7 +65,15 @@ function file(name: string): File {
   return new File(['content'], name, { type: 'image/jpeg' })
 }
 
-function okExif(overrides: Partial<{ latitude: number; longitude: number; gpsTimestamp: string; dateTimeOriginal: string; orientation: number }> = {}) {
+function okExif(
+  overrides: Partial<{
+    latitude: number
+    longitude: number
+    gpsTimestamp: string
+    dateTimeOriginal: string
+    orientation: number
+  }> = {},
+) {
   return { ok: true as const, exif: overrides }
 }
 
@@ -541,7 +555,7 @@ describe('useCairnImport', () => {
       )
     })
 
-    it("does not touch position, positionSource, or icon", async () => {
+    it('does not touch position, positionSource, or icon', async () => {
       const result = await withImagedExifCairn()
       const id = result.current.cairns[0].id
       const before = result.current.cairns[0]
@@ -587,17 +601,13 @@ describe('useCairnImport', () => {
     it('replacing an image trashes the previous original and thumbnail only after the new ones land', async () => {
       const result = await withOneCairn()
       const id = result.current.cairns[0].id
-      uploadFileContent
-        .mockResolvedValueOnce({ id: 'orig-1' })
-        .mockResolvedValueOnce({ id: 'thumb-1' })
+      uploadFileContent.mockResolvedValueOnce({ id: 'orig-1' }).mockResolvedValueOnce({ id: 'thumb-1' })
       await act(async () => {
         await result.current.attachImage(id, file('first.jpg'))
       })
       expect(trashFile).not.toHaveBeenCalled()
 
-      uploadFileContent
-        .mockResolvedValueOnce({ id: 'orig-2' })
-        .mockResolvedValueOnce({ id: 'thumb-2' })
+      uploadFileContent.mockResolvedValueOnce({ id: 'orig-2' }).mockResolvedValueOnce({ id: 'thumb-2' })
       await act(async () => {
         await result.current.attachImage(id, file('second.jpg'))
       })
@@ -686,7 +696,11 @@ describe('useCairnImport', () => {
         await result.current.setCairnPosition(id, { lat: 9, lng: 10 })
       })
 
-      expect(result.current.cairns[0]).toEqual({ ...before, position: { lat: 9, lng: 10 }, positionSource: 'placed' })
+      expect(result.current.cairns[0]).toEqual({
+        ...before,
+        position: { lat: 9, lng: 10 },
+        positionSource: 'placed',
+      })
     })
 
     it('resolves true and writes nothing for a zero-distance drop', async () => {

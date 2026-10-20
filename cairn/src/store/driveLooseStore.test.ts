@@ -209,9 +209,7 @@ describe('importing a loose cairn', () => {
   it('uploads the original and a thumbnail alongside cairn.json', async () => {
     store = await connected()
     const source = new File(['jpeg'], 'sapporo.jpg')
-    uploadFileContent
-      .mockResolvedValueOnce({ id: 'original-1' })
-      .mockResolvedValueOnce({ id: 'thumb-1' })
+    uploadFileContent.mockResolvedValueOnce({ id: 'original-1' }).mockResolvedValueOnce({ id: 'thumb-1' })
 
     const record = store.addCairn({ ...NEW_CAIRN, orientation: 6 }, source)
     await settle()
@@ -222,16 +220,16 @@ describe('importing a loose cairn', () => {
       'sapporo.jpg.thumb.jpg',
     ])
     expect(writeJsonFile.mock.calls.map((call) => call[2])).toContain('cairn.json')
-    const stored = store.getItem(record.id) as { image?: { originalDriveFileId: string; thumbnailDriveFileId: string } | null }
+    const stored = store.getItem(record.id) as {
+      image?: { originalDriveFileId: string; thumbnailDriveFileId: string } | null
+    }
     expect(stored.image).toEqual({ originalDriveFileId: 'original-1', thumbnailDriveFileId: 'thumb-1' })
   })
 
   it('uploads the downscaled image rather than the camera file (#187)', async () => {
     store = await connected()
     const source = new File(['the whole 8MB camera original'], 'sapporo.png')
-    uploadFileContent
-      .mockResolvedValueOnce({ id: 'original-1' })
-      .mockResolvedValueOnce({ id: 'thumb-1' })
+    uploadFileContent.mockResolvedValueOnce({ id: 'original-1' }).mockResolvedValueOnce({ id: 'thumb-1' })
 
     store.addCairn({ ...NEW_CAIRN, orientation: 1 }, source)
     await settle()
@@ -315,16 +313,16 @@ describe('attaching a photo to an existing cairn (#157)', () => {
     store = await connected()
     const record = store.addCairn({ ...NEW_CAIRN, image: null, positionSource: 'placed' })
     await settle()
-    uploadFileContent
-      .mockResolvedValueOnce({ id: 'original-1' })
-      .mockResolvedValueOnce({ id: 'thumb-1' })
+    uploadFileContent.mockResolvedValueOnce({ id: 'original-1' }).mockResolvedValueOnce({ id: 'thumb-1' })
 
     const outcome = await store.attachImage(record.id, new File(['jpeg'], 'sunset.jpg'))
 
     expect(outcome.ok).toBe(true)
     expect(startResumableUpload.mock.calls.map((call) => call[2])).toContain('sunset.jpg')
     expect(startResumableUpload.mock.calls.map((call) => call[2])).toContain('sunset.jpg.thumb.jpg')
-    const stored = store.getItem(record.id) as { image: { originalDriveFileId: string; thumbnailDriveFileId: string } }
+    const stored = store.getItem(record.id) as {
+      image: { originalDriveFileId: string; thumbnailDriveFileId: string }
+    }
     expect(stored.image).toEqual({ originalDriveFileId: 'original-1', thumbnailDriveFileId: 'thumb-1' })
   })
 
@@ -332,9 +330,7 @@ describe('attaching a photo to an existing cairn (#157)', () => {
     store = await connected()
     const record = store.addCairn({ ...NEW_CAIRN, image: null, positionSource: 'placed' })
     await settle()
-    uploadFileContent
-      .mockResolvedValueOnce({ id: 'original-1' })
-      .mockResolvedValueOnce({ id: 'thumb-1' })
+    uploadFileContent.mockResolvedValueOnce({ id: 'original-1' }).mockResolvedValueOnce({ id: 'thumb-1' })
 
     const source = new File(['the whole 8MB camera original'], 'sunset.jpg')
     await store.attachImage(record.id, source)
@@ -348,7 +344,12 @@ describe('attaching a photo to an existing cairn (#157)', () => {
   it('fills date only when the cairn had none', async () => {
     store = await connected()
     readPhotoExif.mockResolvedValue({ ok: true, exif: { gpsTimestamp: '2024-06-01T09:14:00Z' } })
-    const withDate = store.addCairn({ ...NEW_CAIRN, image: null, positionSource: 'placed', date: '2024-01-01' })
+    const withDate = store.addCairn({
+      ...NEW_CAIRN,
+      image: null,
+      positionSource: 'placed',
+      date: '2024-01-01',
+    })
     await settle()
 
     await store.attachImage(withDate.id, new File(['jpeg'], 'sunset.jpg'))
@@ -590,9 +591,7 @@ describe('moving into a trip', () => {
   // `cairn.json` together, in one call.
   it("re-parents a cairn's whole folder from the loose bucket into the trip's cairns bucket", async () => {
     store = await connected()
-    uploadFileContent
-      .mockResolvedValueOnce({ id: 'original-1' })
-      .mockResolvedValueOnce({ id: 'thumb-1' })
+    uploadFileContent.mockResolvedValueOnce({ id: 'original-1' }).mockResolvedValueOnce({ id: 'thumb-1' })
     const record = store.addCairn(NEW_CAIRN, new File(['jpeg'], 'sapporo.jpg'))
     await settle()
     trashFolder.mockClear()
@@ -689,13 +688,18 @@ describe('claiming back out of a trip', () => {
 
     expect(await store.claimFromTrip(record.id, 'trip-1')).toBe(true)
 
-    expect(findOrCreateTripCairnItemFolder).toHaveBeenCalledWith('tok', 'cairn-folder', 'trip-1', 'trip-cairn-1')
+    expect(findOrCreateTripCairnItemFolder).toHaveBeenCalledWith(
+      'tok',
+      'cairn-folder',
+      'trip-1',
+      'trip-cairn-1',
+    )
     expect(moveDriveFile).toHaveBeenCalledWith('tok', 'trip-item-folder', 'trip-cairns-folder', 'kind-folder')
     expect(store.getItem(record.id)?.uploadState).toBe('ok')
     expect(writeJsonFile.mock.calls.map((call) => call[2])).toContain('cairn.json')
   })
 
-  it("leaves the cairn in the trip when its folder move fails", async () => {
+  it('leaves the cairn in the trip when its folder move fails', async () => {
     store = await connected()
     const record = store.addCairn({ ...NEW_CAIRN, id: 'trip-cairn-1' })
     moveDriveFile.mockRejectedValue(new Error('offline'))
@@ -825,7 +829,10 @@ describe('update — dragging a cairn (#158)', () => {
 
     expect(await store.update(record.id, { position: { lat: 1, lng: 2 } })).toBe(true)
 
-    const stored = store.getItem(record.id) as { position: { lat: number; lng: number }; positionSource: string }
+    const stored = store.getItem(record.id) as {
+      position: { lat: number; lng: number }
+      positionSource: string
+    }
     expect(stored.position).toEqual({ lat: 1, lng: 2 })
     expect(stored.positionSource).toBe('placed')
   })
@@ -849,7 +856,10 @@ describe('update — dragging a cairn (#158)', () => {
 
     expect(await store.update(record.id, { position: { lat: 1, lng: 2 } })).toBe(false)
 
-    const stored = store.getItem(record.id) as { position: { lat: number; lng: number }; positionSource: string }
+    const stored = store.getItem(record.id) as {
+      position: { lat: number; lng: number }
+      positionSource: string
+    }
     expect(stored.position).toEqual(record.position)
     expect(stored.positionSource).toBe('exif')
   })

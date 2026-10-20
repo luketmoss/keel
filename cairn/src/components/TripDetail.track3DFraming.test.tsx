@@ -169,7 +169,15 @@ function trackFile(overrides: Partial<ImportedFile> = {}): ImportedFile {
     name: 'Belford-Oxford',
     sourceName: 'Belford-Oxford.kml',
     driveFileId: 'drive-a',
-    tracks: [{ name: 'Belford-Oxford', points: [{ lat: 37, lon: -122 }, { lat: 37.01, lon: -122.01 }] }],
+    tracks: [
+      {
+        name: 'Belford-Oxford',
+        points: [
+          { lat: 37, lon: -122 },
+          { lat: 37.01, lon: -122.01 },
+        ],
+      },
+    ],
     trackStats: [
       {
         distanceMeters: 10_300,
@@ -239,7 +247,9 @@ function mockTripImportStateful(initial: ImportedFile[]) {
     return baseTripImport({
       tracks,
       toggleVisibility: (id: string) =>
-        setTracks((prev) => prev.map((file) => (file.id === id ? { ...file, visible: !file.visible } : file))),
+        setTracks((prev) =>
+          prev.map((file) => (file.id === id ? { ...file, visible: !file.visible } : file)),
+        ),
       removeFile: vi.fn().mockImplementation(async (id: string) => {
         setTracks((prev) => prev.filter((file) => file.id !== id))
       }),

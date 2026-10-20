@@ -155,7 +155,10 @@ describe('AccountBubble', () => {
   it('shows Retry on a folder setup failure, keeping the user signed in', () => {
     const retryFolderSetup = vi.fn()
     renderBubble(
-      makeAccount({ status: 'folder-error', email: 'jane@gmail.com', accessToken: 'tok' }, { retryFolderSetup }),
+      makeAccount(
+        { status: 'folder-error', email: 'jane@gmail.com', accessToken: 'tok' },
+        { retryFolderSetup },
+      ),
     )
     fireEvent.click(screen.getByRole('button', { name: /Account:/ }))
 
@@ -170,9 +173,7 @@ describe('AccountBubble', () => {
     renderBubble(makeAccount({ status: 'token-expired', email: 'jane@gmail.com' }, { reconnect }))
     fireEvent.click(screen.getByRole('button', { name: /Account:/ }))
 
-    expect(
-      screen.getByText('Your Drive session expired — reconnect to keep using Drive'),
-    ).toBeDefined()
+    expect(screen.getByText('Your Drive session expired — reconnect to keep using Drive')).toBeDefined()
     fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }))
     expect(reconnect).toHaveBeenCalledTimes(1)
   })
@@ -181,9 +182,7 @@ describe('AccountBubble', () => {
     renderBubble(makeAccount({ status: 'token-expired', email: 'jane@gmail.com', reconnecting: true }))
     fireEvent.click(screen.getByRole('button', { name: /Account:/ }))
 
-    expect(
-      screen.getByText('Your Drive session expired — reconnect to keep using Drive'),
-    ).toBeDefined()
+    expect(screen.getByText('Your Drive session expired — reconnect to keep using Drive')).toBeDefined()
     const button = screen.getByRole('button', { name: 'Reconnecting…' })
     expect(button).toHaveProperty('disabled', true)
   })

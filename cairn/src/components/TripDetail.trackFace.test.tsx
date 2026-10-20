@@ -255,7 +255,15 @@ describe('TripDetail — #226 the track face for a trip-owned track', () => {
       ...baseTripImport(),
       tracks: [
         trackFile({
-          tracks: [{ name: 'Flat', points: [{ lat: 1, lon: 2 }, { lat: 1.001, lon: 2 }] }],
+          tracks: [
+            {
+              name: 'Flat',
+              points: [
+                { lat: 1, lon: 2 },
+                { lat: 1.001, lon: 2 },
+              ],
+            },
+          ],
           trackStats: [
             {
               distanceMeters: 1000,
@@ -287,7 +295,16 @@ describe('TripDetail — #226 the track face for a trip-owned track', () => {
       ...baseTripImport(),
       tracks: [
         trackFile({
-          tracks: [{ name: 'Flat', points: [{ lat: 1, lon: 2 }, { lat: 1.001, lon: 2 }], key: 'drive-a' }],
+          tracks: [
+            {
+              name: 'Flat',
+              points: [
+                { lat: 1, lon: 2 },
+                { lat: 1.001, lon: 2 },
+              ],
+              key: 'drive-a',
+            },
+          ],
           trackStats: [
             {
               distanceMeters: 5000,
@@ -317,8 +334,6 @@ describe('TripDetail — #226 the track face for a trip-owned track', () => {
     const face = within(document.querySelector('.loose-face') as HTMLElement)
     expect(face.getByText(`~${formatElevationGain(600)}`)).toBeDefined()
     expect(face.getByText('Elevation estimated from terrain data.')).toBeDefined()
-    expect(
-      face.getByRole('img', { name: /Elevation profile, estimated from terrain data/ }),
-    ).toBeDefined()
+    expect(face.getByRole('img', { name: /Elevation profile, estimated from terrain data/ })).toBeDefined()
   })
 })

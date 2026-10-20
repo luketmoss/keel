@@ -30,7 +30,9 @@
   font-family: inherit;
   font-size: var(--text-xs);
   cursor: pointer;
-  transition: color var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease);
+  transition:
+    color var(--motion-fast) var(--ease),
+    background var(--motion-fast) var(--ease);
 }
 
 /* The eight place chips are icon-only, at --space-2 horizontal padding —

@@ -18,11 +18,7 @@ export function SuggestionRing({ position, onClick }: SuggestionRingProps) {
 
   return (
     <AdvancedMarker position={position} onClick={onClick} zIndex={2}>
-      <button
-        type="button"
-        className="suggestion-ring"
-        aria-label="Place it at the suggested location"
-      >
+      <button type="button" className="suggestion-ring" aria-label="Place it at the suggested location">
         {/* Always visible rather than revealed on hover — an offer, not a
             label (`155-cairns-replace-photos.md`'s "The suggestion ring"). */}
         <span className="suggestion-ring__chip" aria-hidden="true">

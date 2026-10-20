@@ -23,7 +23,7 @@ const trackNearIndochina: Track = {
 }
 
 describe('tripUtcOffsetHours', () => {
-  it('derives the offset from the mean longitude of the trip\'s tracks, not the browser timezone', () => {
+  it("derives the offset from the mean longitude of the trip's tracks, not the browser timezone", () => {
     expect(tripUtcOffsetHours([trackNearIndochina])).toBe(7)
   })
 
@@ -56,10 +56,7 @@ describe('needsInterpolation', () => {
 
 describe('resolvePhotoInstant', () => {
   it('uses gpsTimestamp directly, applying no trip offset (criterion 4)', () => {
-    const instant = resolvePhotoInstant(
-      { gpsTimestamp: '2021-06-15T21:45:10.000Z' },
-      /* tripOffsetHours */ 7,
-    )
+    const instant = resolvePhotoInstant({ gpsTimestamp: '2021-06-15T21:45:10.000Z' }, /* tripOffsetHours */ 7)
     expect(instant).toBe(Date.parse('2021-06-15T21:45:10.000Z'))
   })
 
@@ -167,7 +164,7 @@ describe('interpolatePosition', () => {
 })
 
 describe('positionPhoto (end-to-end)', () => {
-  it('uses the photo\'s own recorded position and never interpolates when GPS is present (criterion 3)', () => {
+  it("uses the photo's own recorded position and never interpolates when GPS is present (criterion 3)", () => {
     const photo = {
       latitude: 55,
       longitude: 55,

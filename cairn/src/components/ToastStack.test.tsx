@@ -54,7 +54,9 @@ describe('ToastStack', () => {
      existing rejected-file toast above. */
   it('does not auto-dismiss a persistent toast', () => {
     const onDismiss = vi.fn()
-    render(<ToastStack toasts={[{ id: '1', text: 'Session ended', persistent: true }]} onDismiss={onDismiss} />)
+    render(
+      <ToastStack toasts={[{ id: '1', text: 'Session ended', persistent: true }]} onDismiss={onDismiss} />,
+    )
 
     vi.advanceTimersByTime(60_000)
 
@@ -63,7 +65,9 @@ describe('ToastStack', () => {
 
   it('still dismisses a persistent toast by hand', () => {
     const onDismiss = vi.fn()
-    render(<ToastStack toasts={[{ id: '1', text: 'Session ended', persistent: true }]} onDismiss={onDismiss} />)
+    render(
+      <ToastStack toasts={[{ id: '1', text: 'Session ended', persistent: true }]} onDismiss={onDismiss} />,
+    )
 
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
 

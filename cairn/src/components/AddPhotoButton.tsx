@@ -63,13 +63,7 @@ interface AddPhotoButtonProps {
 /** The control #157 never had. Both detail faces need it and both would
     otherwise grow their own copy of the same hidden input, the same
     `value` reset and the same two labels. */
-export function AddPhotoButton({
-  hasImage,
-  attaching,
-  disabled,
-  className,
-  onChoose,
-}: AddPhotoButtonProps) {
+export function AddPhotoButton({ hasImage, attaching, disabled, className, onChoose }: AddPhotoButtonProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const label = hasImage ? REPLACE_PHOTO_LABEL : ADD_PHOTO_LABEL
   const blocked = disabled === true || attaching === true

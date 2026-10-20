@@ -51,11 +51,7 @@ async function driveFetch(url: string, accessToken: string, init?: RequestInit):
   return response.json()
 }
 
-async function listChildFolders(
-  accessToken: string,
-  parentId: string,
-  name: string,
-): Promise<DriveFile[]> {
+async function listChildFolders(accessToken: string, parentId: string, name: string): Promise<DriveFile[]> {
   const query = [
     `name='${name}'`,
     `mimeType='${FOLDER_MIME_TYPE}'`,
@@ -68,11 +64,7 @@ async function listChildFolders(
   return body.files ?? []
 }
 
-async function createChildFolder(
-  accessToken: string,
-  parentId: string,
-  name: string,
-): Promise<DriveFile> {
+async function createChildFolder(accessToken: string, parentId: string, name: string): Promise<DriveFile> {
   return (await driveFetch(DRIVE_FILES_URL, accessToken, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

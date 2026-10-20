@@ -222,9 +222,7 @@ describe('#335 — showing where you are', () => {
     await landFailure(1)
 
     expect(
-      screen.getByText(
-        'Location is blocked. Allow location for this site in your browser, then try again.',
-      ),
+      screen.getByText('Location is blocked. Allow location for this site in your browser, then try again.'),
     ).toBeDefined()
     expect(document.querySelector('.position-marker')).toBeNull()
   })

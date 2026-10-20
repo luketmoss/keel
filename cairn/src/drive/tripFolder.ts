@@ -17,11 +17,7 @@ interface DriveFile {
   createdTime: string
 }
 
-async function driveFetch(
-  url: string,
-  accessToken: string,
-  init?: RequestInit,
-): Promise<unknown> {
+async function driveFetch(url: string, accessToken: string, init?: RequestInit): Promise<unknown> {
   let response: Response
   try {
     response = await fetch(url, {

@@ -148,7 +148,10 @@ export function formatTripMetaLine(
   if (cairnCount !== null) parts.push(pluralize(cairnCount, 'photo'))
   if (totals) {
     parts.push(formatDistance(totals.distanceMeters))
-    const ascent = markSampled(formatElevationGain(totals.elevationGainMeters), totals.elevationSource === 'sampled')
+    const ascent = markSampled(
+      formatElevationGain(totals.elevationGainMeters),
+      totals.elevationSource === 'sampled',
+    )
     if (ascent !== undefined) parts.push(ascent)
   }
   return parts.join(' · ')

@@ -64,15 +64,8 @@ export interface DriveTrackFile {
     fails (a folder has no media), and renders it as #35's missing-file row
     — a permanent "your data is damaged" warning on every trip holding a
     cairn. */
-export async function listTrackFiles(
-  accessToken: string,
-  folderId: string,
-): Promise<DriveTrackFile[]> {
-  const query = [
-    `'${folderId}' in parents`,
-    `mimeType!='${FOLDER_MIME_TYPE}'`,
-    'trashed=false',
-  ].join(' and ')
+export async function listTrackFiles(accessToken: string, folderId: string): Promise<DriveTrackFile[]> {
+  const query = [`'${folderId}' in parents`, `mimeType!='${FOLDER_MIME_TYPE}'`, 'trashed=false'].join(' and ')
   const url = `${DRIVE_FILES_URL}?q=${encodeURIComponent(query)}&fields=files(id,name,modifiedTime)`
 
   let response: Response
@@ -97,11 +90,7 @@ export async function listTrackFiles(
     caller (which already has the name from `listTrackFiles`) supplies it —
     simpler than a second request for metadata just to learn what
     `listTrackFiles` already told us. */
-export async function downloadTrackFile(
-  accessToken: string,
-  fileId: string,
-  name: string,
-): Promise<File> {
+export async function downloadTrackFile(accessToken: string, fileId: string, name: string): Promise<File> {
   const url = `${DRIVE_FILES_URL}/${fileId}?alt=media`
 
   let response: Response
@@ -197,11 +186,7 @@ export async function startResumableUpload(
     a wildcard `Content-Range`). A `308` with no `Range` header means
     nothing has arrived yet; a success status means the prior attempt
     actually landed and there's nothing left to resume. */
-async function queryReceivedBytes(
-  sessionUri: string,
-  accessToken: string,
-  total: number,
-): Promise<number> {
+async function queryReceivedBytes(sessionUri: string, accessToken: string, total: number): Promise<number> {
   let response: Response
   try {
     response = await fetch(sessionUri, {

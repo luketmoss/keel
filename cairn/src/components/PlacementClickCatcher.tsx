@@ -21,14 +21,10 @@ export function PlacementClickCatcher({ active, onPlace }: PlacementClickCatcher
     if (!map || !active) return
 
     map.setOptions({ draggableCursor: 'crosshair' })
-    const listener = google.maps.event.addListener(
-      map,
-      'click',
-      (event: google.maps.MapMouseEvent) => {
-        if (!event.latLng) return
-        onPlace({ lat: event.latLng.lat(), lng: event.latLng.lng() })
-      },
-    )
+    const listener = google.maps.event.addListener(map, 'click', (event: google.maps.MapMouseEvent) => {
+      if (!event.latLng) return
+      onPlace({ lat: event.latLng.lat(), lng: event.latLng.lng() })
+    })
 
     return () => {
       listener.remove()

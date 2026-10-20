@@ -54,9 +54,7 @@ describe('findJsonFile', () => {
   it('throws DriveAuthError on a 401', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({}, 401))
 
-    await expect(findJsonFile('expired', 'folder-1', 'trip.json')).rejects.toBeInstanceOf(
-      DriveAuthError,
-    )
+    await expect(findJsonFile('expired', 'folder-1', 'trip.json')).rejects.toBeInstanceOf(DriveAuthError)
   })
 })
 
@@ -168,9 +166,9 @@ describe('findJsonFilesByFolders', () => {
   it('throws DriveAuthError on a 401', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({}, 401))
 
-    await expect(
-      findJsonFilesByFolders('expired', ['folder-a'], 'cairn.json'),
-    ).rejects.toBeInstanceOf(DriveAuthError)
+    await expect(findJsonFilesByFolders('expired', ['folder-a'], 'cairn.json')).rejects.toBeInstanceOf(
+      DriveAuthError,
+    )
   })
 })
 
@@ -321,12 +319,20 @@ describe('listSubfolders', () => {
 
   it('returns every direct child folder', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      jsonResponse({ files: [{ id: 'a', name: 'trip-a' }, { id: 'b', name: 'trip-b' }] }),
+      jsonResponse({
+        files: [
+          { id: 'a', name: 'trip-a' },
+          { id: 'b', name: 'trip-b' },
+        ],
+      }),
     )
 
     const folders = await listSubfolders('token', 'cairn-folder-id')
 
-    expect(folders).toEqual([{ id: 'a', name: 'trip-a' }, { id: 'b', name: 'trip-b' }])
+    expect(folders).toEqual([
+      { id: 'a', name: 'trip-a' },
+      { id: 'b', name: 'trip-b' },
+    ])
   })
 
   it('pages through 250 results across three requests', async () => {
@@ -348,7 +354,7 @@ describe('listSubfolders', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(3)
   })
 
-  it('carries the prior response\'s pageToken on each subsequent request', async () => {
+  it("carries the prior response's pageToken on each subsequent request", async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(jsonResponse({ files: [{ id: 'a', name: 'a' }], nextPageToken: 'token-2' }))
@@ -376,9 +382,9 @@ describe('listSubfolders', () => {
   })
 
   it('costs exactly one request for 100 or fewer subfolders', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      jsonResponse({ files: [{ id: 'a', name: 'trip-a' }] }),
-    )
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(jsonResponse({ files: [{ id: 'a', name: 'trip-a' }] }))
 
     await listSubfolders('token', 'cairn-folder-id')
 

@@ -75,11 +75,13 @@ interface CairnLayerProps {
   onOpenCairn?: (id: string) => void
 }
 const { lastCairnLayerProps } = vi.hoisted(() => ({
-  lastCairnLayerProps: { current: null as {
-    selectedCairnId: string | null
-    onSelectCairn?: (id: string) => void
-    onOpenCairn?: (id: string) => void
-  } | null },
+  lastCairnLayerProps: {
+    current: null as {
+      selectedCairnId: string | null
+      onSelectCairn?: (id: string) => void
+      onOpenCairn?: (id: string) => void
+    } | null,
+  },
 }))
 vi.mock('./CairnLayer', () => ({
   CairnLayer: (props: CairnLayerProps) => {
@@ -118,7 +120,15 @@ function trackFile(overrides: Partial<ImportedFile> = {}): ImportedFile {
     name: 'Belford-Oxford',
     sourceName: 'Belford-Oxford.kml',
     driveFileId: 'drive-a',
-    tracks: [{ name: 'Belford-Oxford', points: [{ lat: 37, lon: -122 }, { lat: 37.01, lon: -122.01 }] }],
+    tracks: [
+      {
+        name: 'Belford-Oxford',
+        points: [
+          { lat: 37, lon: -122 },
+          { lat: 37.01, lon: -122.01 },
+        ],
+      },
+    ],
     trackStats: [
       {
         distanceMeters: 10_300,
@@ -419,8 +429,20 @@ describe('TripDetail — #313/#276 sheet promotion', () => {
         tracks: [
           trackFile({
             tracks: [
-              { name: 'Day one', points: [{ lat: 37, lon: -122 }, { lat: 37.01, lon: -122.01 }] },
-              { name: 'Day two', points: [{ lat: 38, lon: -123 }, { lat: 38.01, lon: -123.01 }] },
+              {
+                name: 'Day one',
+                points: [
+                  { lat: 37, lon: -122 },
+                  { lat: 37.01, lon: -122.01 },
+                ],
+              },
+              {
+                name: 'Day two',
+                points: [
+                  { lat: 38, lon: -123 },
+                  { lat: 38.01, lon: -123.01 },
+                ],
+              },
             ],
           }),
         ],
@@ -440,7 +462,10 @@ describe('TripDetail — #313/#276 sheet promotion', () => {
     useTripImport.mockReturnValue(baseTripImport())
     let attachDone: ((result: { ok: boolean }) => void) | undefined
     const attachImage = vi.fn(
-      () => new Promise<{ ok: boolean }>((resolve) => { attachDone = resolve }),
+      () =>
+        new Promise<{ ok: boolean }>((resolve) => {
+          attachDone = resolve
+        }),
     )
     mockCairnImport(
       [
@@ -458,7 +483,11 @@ describe('TripDetail — #313/#276 sheet promotion', () => {
       { attachImage },
     )
     let drop: ((files: File[]) => void) | null = null
-    renderTrip({ onDropTargetChange: (handler) => { drop = handler } })
+    renderTrip({
+      onDropTargetChange: (handler) => {
+        drop = handler
+      },
+    })
 
     fireEvent.click(screen.getByText('sapporo.jpg'))
     fireEvent.click(await screen.findByRole('button', { name: 'Open sapporo.jpg' }))

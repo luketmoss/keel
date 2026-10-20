@@ -31,14 +31,15 @@ function fakeStorage(): Storage {
 const { findOrCreateTripFolder } = vi.hoisted(() => ({ findOrCreateTripFolder: vi.fn() }))
 vi.mock('../drive/tripFolder', () => ({ findOrCreateTripFolder }))
 
-const { listTrackFiles, downloadTrackFile, startResumableUpload, uploadFileContent, trashFile } =
-  vi.hoisted(() => ({
+const { listTrackFiles, downloadTrackFile, startResumableUpload, uploadFileContent, trashFile } = vi.hoisted(
+  () => ({
     listTrackFiles: vi.fn(),
     downloadTrackFile: vi.fn(),
     startResumableUpload: vi.fn(),
     uploadFileContent: vi.fn(),
     trashFile: vi.fn(),
-  }))
+  }),
+)
 vi.mock('../drive/trackFiles', () => ({
   listTrackFiles,
   downloadTrackFile,
@@ -109,7 +110,9 @@ function trackWithElevation(name: string): ParseResult {
   const elevations = [1000, 1000, 1000, 1010, 1020, 1035, 1050, 1050, 1050, 1045, 1030, 1010, 1000]
   return {
     ok: true,
-    tracks: [{ name, points: elevations.map((elevation, i) => ({ lat: 37 + i * 0.001, lon: -122, elevation })) }],
+    tracks: [
+      { name, points: elevations.map((elevation, i) => ({ lat: 37 + i * 0.001, lon: -122, elevation })) },
+    ],
   }
 }
 
@@ -117,12 +120,17 @@ function trackWithElevation(name: string): ParseResult {
     pattern `geo/elevation.test.ts` uses for the module in isolation, here
     exercised through the real `useTripImport` wiring end to end. */
 function mockGoogleElevation(
-  handler: () => { results: { location: { lat: () => number; lng: () => number }; elevation: number }[] | null; status: string },
+  handler: () => {
+    results: { location: { lat: () => number; lng: () => number }; elevation: number }[] | null
+    status: string
+  },
 ) {
-  const getElevationAlongPath = vi.fn((_request: unknown, callback: (results: unknown, status: string) => void) => {
-    const { results, status } = handler()
-    callback(results, status)
-  })
+  const getElevationAlongPath = vi.fn(
+    (_request: unknown, callback: (results: unknown, status: string) => void) => {
+      const { results, status } = handler()
+      callback(results, status)
+    },
+  )
   ;(globalThis as { google?: unknown }).google = {
     maps: {
       ElevationService: vi.fn().mockImplementation(() => ({ getElevationAlongPath })),
@@ -176,9 +184,7 @@ describe('useTripImport', () => {
       { id: 'drive-1', name: 'deleted.kml' },
       { id: 'drive-2', name: 'day-2.kml' },
     ])
-    downloadTrackFile
-      .mockRejectedValueOnce(new Error('404'))
-      .mockResolvedValueOnce(file('day-2.kml'))
+    downloadTrackFile.mockRejectedValueOnce(new Error('404')).mockResolvedValueOnce(file('day-2.kml'))
     parseTrack.mockResolvedValueOnce(track('Day 2'))
 
     const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
@@ -297,9 +303,7 @@ describe('useTripImport', () => {
     const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
     await waitFor(() => expect(result.current.loading).toBe(false))
 
-    await act(() =>
-      result.current.importFiles([file('bad.kml'), file('good-1.kml'), file('good-2.kml')]),
-    )
+    await act(() => result.current.importFiles([file('bad.kml'), file('good-1.kml'), file('good-2.kml')]))
 
     expect(result.current.tracks).toHaveLength(2)
     expect(result.current.failures).toHaveLength(1)
@@ -423,9 +427,7 @@ describe('useTripImport — #46 track overrides', () => {
       { id: 'drive-1', name: 'day-1.kml' },
       { id: 'drive-2', name: 'day-2.kml' },
     ])
-    downloadTrackFile.mockImplementation(async (_token: string, _id: string, name: string) =>
-      file(name),
-    )
+    downloadTrackFile.mockImplementation(async (_token: string, _id: string, name: string) => file(name))
     parseTrack.mockResolvedValue(track('Day 1'))
 
     const { result } = renderHook(() =>
@@ -741,7 +743,8 @@ describe('useTripImport — #77 removing a track', () => {
     parseTrack.mockResolvedValue(track('Day 1'))
 
     const { result, rerender } = renderHook(
-      ({ token }: { token: string | null }) => useTripImport('trip-1', token, 'cairn-folder-id', fakeTripStore()),
+      ({ token }: { token: string | null }) =>
+        useTripImport('trip-1', token, 'cairn-folder-id', fakeTripStore()),
       { initialProps: { token: 'token' as string | null } },
     )
     await waitFor(() => expect(result.current.loading).toBe(false))
@@ -768,9 +771,14 @@ describe('useTripImport — #77 removing a track', () => {
       listTrackFiles.mockResolvedValue([{ id: 'drive-1', name: 'flat.kml' }])
       downloadTrackFile.mockResolvedValue(file('flat.kml'))
       parseTrack.mockResolvedValueOnce(trackWithoutElevation('Flat', 10))
-      const getElevationAlongPath = mockGoogleElevation(() => ({ results: climbingSamples(10), status: 'OK' }))
+      const getElevationAlongPath = mockGoogleElevation(() => ({
+        results: climbingSamples(10),
+        status: 'OK',
+      }))
 
-      const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
+      const { result } = renderHook(() =>
+        useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()),
+      )
       await waitFor(() => expect(result.current.loading).toBe(false))
 
       await waitFor(() => expect(result.current.tracks[0].trackStats[0].elevationSource).toBe('sampled'))
@@ -784,7 +792,9 @@ describe('useTripImport — #77 removing a track', () => {
       parseTrack.mockResolvedValueOnce(trackWithElevation('Climb'))
       const getElevationAlongPath = mockGoogleElevation(() => ({ results: [], status: 'OK' }))
 
-      const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
+      const { result } = renderHook(() =>
+        useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()),
+      )
       await waitFor(() => expect(result.current.loading).toBe(false))
       // Nothing async left to settle beyond the read itself — a following
       // tick is enough to prove the effect declined to fire, without a
@@ -800,7 +810,9 @@ describe('useTripImport — #77 removing a track', () => {
       parseTrack.mockResolvedValueOnce(track('Point')) // one point, no elevation
       const getElevationAlongPath = mockGoogleElevation(() => ({ results: [], status: 'OK' }))
 
-      const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
+      const { result } = renderHook(() =>
+        useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()),
+      )
       await waitFor(() => expect(result.current.loading).toBe(false))
       await act(async () => {})
 
@@ -811,7 +823,10 @@ describe('useTripImport — #77 removing a track', () => {
       listTrackFiles.mockResolvedValue([{ id: 'drive-1', name: 'flat.kml' }])
       downloadTrackFile.mockResolvedValue(file('flat.kml'))
       parseTrack.mockResolvedValueOnce(trackWithoutElevation('Flat', 10))
-      const getElevationAlongPath = mockGoogleElevation(() => ({ results: climbingSamples(10), status: 'OK' }))
+      const getElevationAlongPath = mockGoogleElevation(() => ({
+        results: climbingSamples(10),
+        status: 'OK',
+      }))
 
       const cached: StoredOverview = {
         type: 'FeatureCollection',
@@ -848,12 +863,14 @@ describe('useTripImport — #77 removing a track', () => {
         .mockResolvedValueOnce(trackWithoutElevation('B', 5))
       mockGoogleElevation(() => ({ results: null, status: 'OVER_QUERY_LIMIT' }))
 
-      const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
+      const { result } = renderHook(() =>
+        useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()),
+      )
       await waitFor(() => expect(result.current.loading).toBe(false))
       await waitFor(() => expect(result.current.tracks).toHaveLength(2))
 
       await waitFor(() =>
-        expect(result.current.failures.some((f) => f.message.includes("2 tracks"))).toBe(true),
+        expect(result.current.failures.some((f) => f.message.includes('2 tracks'))).toBe(true),
       )
       expect(result.current.failures.filter((f) => f.name === 'Elevation')).toHaveLength(1)
       expect(result.current.tracks.every((t) => t.trackStats[0].elevationSource === undefined)).toBe(true)
@@ -875,7 +892,9 @@ describe('useTripImport — #77 removing a track', () => {
           .mockResolvedValueOnce(trackWithoutElevation('B', 5))
         mockGoogleElevation(() => ({ results: null, status: 'OVER_QUERY_LIMIT' }))
 
-        const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
+        const { result } = renderHook(() =>
+          useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()),
+        )
         await waitFor(() => expect(result.current.loading).toBe(false))
         await waitFor(() => expect(result.current.tracks).toHaveLength(2))
         await waitFor(() => expect(warn).toHaveBeenCalledTimes(1))
@@ -903,9 +922,14 @@ describe('useTripImport — #77 removing a track', () => {
         listTrackFiles.mockResolvedValue([{ id: 'drive-1', name: 'flat.kml' }])
         downloadTrackFile.mockResolvedValue(file('flat.kml'))
         parseTrack.mockResolvedValueOnce(trackWithoutElevation('Flat', 10))
-        const getElevationAlongPath = mockGoogleElevation(() => ({ results: climbingSamples(10), status: 'OK' }))
+        const getElevationAlongPath = mockGoogleElevation(() => ({
+          results: climbingSamples(10),
+          status: 'OK',
+        }))
 
-        const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
+        const { result } = renderHook(() =>
+          useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()),
+        )
         await waitFor(() => expect(result.current.loading).toBe(false))
         await act(async () => {})
 
@@ -916,7 +940,10 @@ describe('useTripImport — #77 removing a track', () => {
     })
 
     it('samples nothing while signed out', async () => {
-      const getElevationAlongPath = mockGoogleElevation(() => ({ results: climbingSamples(10), status: 'OK' }))
+      const getElevationAlongPath = mockGoogleElevation(() => ({
+        results: climbingSamples(10),
+        status: 'OK',
+      }))
 
       const { result } = renderHook(() => useTripImport('trip-1', null, null, fakeTripStore()))
       await waitFor(() => expect(result.current.loading).toBe(false))
@@ -933,9 +960,14 @@ describe('useTripImport — #77 removing a track', () => {
         listTrackFiles.mockResolvedValue([{ id: 'drive-1', name: 'flat.kml' }])
         downloadTrackFile.mockResolvedValue(file('flat.kml'))
         parseTrack.mockResolvedValueOnce(trackWithoutElevation('Flat', 5))
-        const getElevationAlongPath = mockGoogleElevation(() => ({ results: null, status: 'OVER_QUERY_LIMIT' }))
+        const getElevationAlongPath = mockGoogleElevation(() => ({
+          results: null,
+          status: 'OVER_QUERY_LIMIT',
+        }))
 
-        const rendered = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
+        const rendered = renderHook(() =>
+          useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()),
+        )
         await waitFor(() => expect(rendered.result.current.loading).toBe(false))
         await waitFor(() => expect(rendered.result.current.tracks).toHaveLength(1))
         await waitFor(() =>
@@ -963,7 +995,10 @@ describe('useTripImport — #77 removing a track', () => {
         listTrackFiles.mockResolvedValue([{ id: 'drive-1', name: 'flat.kml' }])
         downloadTrackFile.mockResolvedValue(file('flat.kml'))
         parseTrack.mockResolvedValueOnce(trackWithoutElevation('Flat', 5))
-        const getElevationAlongPath = mockGoogleElevation(() => ({ results: null, status: 'OVER_QUERY_LIMIT' }))
+        const getElevationAlongPath = mockGoogleElevation(() => ({
+          results: null,
+          status: 'OVER_QUERY_LIMIT',
+        }))
 
         const { result } = renderHook(() =>
           useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore(), store),
@@ -993,7 +1028,9 @@ describe('useTripImport — #77 removing a track', () => {
           { id: 'drive-1', name: 'failed.kml' },
           { id: 'drive-2', name: 'succeeded.kml' },
         ])
-        downloadTrackFile.mockResolvedValueOnce(file('failed.kml')).mockResolvedValueOnce(file('succeeded.kml'))
+        downloadTrackFile
+          .mockResolvedValueOnce(file('failed.kml'))
+          .mockResolvedValueOnce(file('succeeded.kml'))
         parseTrack
           .mockResolvedValueOnce(trackWithoutElevation('Failed', 5))
           .mockResolvedValueOnce(trackWithoutElevation('Succeeded', 10))
@@ -1005,7 +1042,9 @@ describe('useTripImport — #77 removing a track', () => {
             : { results: climbingSamples(10), status: 'OK' }
         })
 
-        const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
+        const { result } = renderHook(() =>
+          useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()),
+        )
         await waitFor(() => expect(result.current.loading).toBe(false))
         await waitFor(() => expect(result.current.tracks).toHaveLength(2))
         await waitFor(() =>
@@ -1056,7 +1095,9 @@ describe('useTripImport — #77 removing a track', () => {
         parseTrack.mockResolvedValueOnce(trackWithoutElevation('Flat', 5))
         const secondAttempt = mockGoogleElevation(() => ({ results: null, status: 'OVER_QUERY_LIMIT' }))
 
-        const { result } = renderHook(() => useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()))
+        const { result } = renderHook(() =>
+          useTripImport('trip-1', 'token', 'cairn-folder-id', fakeTripStore()),
+        )
         await waitFor(() => expect(result.current.loading).toBe(false))
         await waitFor(() => expect(secondAttempt).toHaveBeenCalledTimes(1))
       })

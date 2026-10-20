@@ -157,11 +157,7 @@ export function CairnCreatePanel({
             still fills in." Nothing here has been written yet, so there is
             nothing for a missing connection to refuse — only the commit at
             the end of it. */}
-        <IconPicker
-          label="What is this place"
-          value={fields.icon}
-          onChange={(icon) => set('icon', icon)}
-        />
+        <IconPicker label="What is this place" value={fields.icon} onChange={(icon) => set('icon', icon)} />
 
         <label className="cairn-create__label" htmlFor="cairn-create-description">
           Description

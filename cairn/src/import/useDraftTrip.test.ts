@@ -163,7 +163,9 @@ describe('useDraftTrip', () => {
       ])
     })
 
-    expect(rejections).toEqual([{ name: 'notes.txt', message: 'Only .kml, .kmz and .gpx files can be imported.' }])
+    expect(rejections).toEqual([
+      { name: 'notes.txt', message: 'Only .kml, .kmz and .gpx files can be imported.' },
+    ])
     expect(result.current.draft?.files).toHaveLength(1)
   })
 
@@ -251,9 +253,7 @@ describe('useDraftTrip', () => {
       expect(result.current.draft).not.toBeNull()
       expect(result.current.draft?.files).toHaveLength(1)
       expect(result.current.draft?.saving).toBe(false)
-      expect(result.current.draft?.saveError).toBe(
-        'Could not save. Your tracks are still here — try again.',
-      )
+      expect(result.current.draft?.saveError).toBe('Could not save. Your tracks are still here — try again.')
     })
 
     // #96: the real cause used to vanish entirely into the generic banner

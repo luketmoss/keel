@@ -75,7 +75,10 @@ export class DriveTripStore implements TripStore {
     // every task after it — each caller still sees its own task's outcome
     // via the returned (unswallowed) promise.
     const settled = prior.catch(() => {}).then(task)
-    this.queues.set(id, settled.catch(() => {}))
+    this.queues.set(
+      id,
+      settled.catch(() => {}),
+    )
     return settled
   }
 
@@ -131,7 +134,11 @@ export class DriveTripStore implements TripStore {
     }
   }
 
-  saveOverview = (id: string, tracks: Track[], sampledElevation?: Record<string, StoredTrackElevation>): void => {
+  saveOverview = (
+    id: string,
+    tracks: Track[],
+    sampledElevation?: Record<string, StoredTrackElevation>,
+  ): void => {
     this.local.saveOverview(id, tracks, sampledElevation)
     // #79: saveOverview also recomputes and persists the trip's origin (its
     // world-map dot), which lives on `trip.json` — flushed alongside the
@@ -289,7 +296,9 @@ export class DriveTripStore implements TripStore {
     if (!record) return 'ok'
 
     const lookup = async (): Promise<{ ref: TripDriveRef; existingTrip: DriveFileRef | null }> => {
-      const ref = this.refs.get(id) ?? { folderId: await findOrCreateTripFolder(accessToken, cairnFolderId, id) }
+      const ref = this.refs.get(id) ?? {
+        folderId: await findOrCreateTripFolder(accessToken, cairnFolderId, id),
+      }
       // #102: no cached `ref.trip` only means *this session* hasn't written
       // or hydrated the file yet — not that Drive has no `trip.json`. An
       // edit can reach here before `connect()`'s hydration pass gets to this
@@ -382,8 +391,16 @@ export class DriveTripStore implements TripStore {
     if (!overview) return
 
     try {
-      const ref = this.refs.get(id) ?? { folderId: await findOrCreateTripFolder(accessToken, cairnFolderId, id) }
-      const written = await writeJsonFile(accessToken, ref.folderId, 'overview.geojson', overview, ref.overview ?? null)
+      const ref = this.refs.get(id) ?? {
+        folderId: await findOrCreateTripFolder(accessToken, cairnFolderId, id),
+      }
+      const written = await writeJsonFile(
+        accessToken,
+        ref.folderId,
+        'overview.geojson',
+        overview,
+        ref.overview ?? null,
+      )
       this.refs.set(id, { ...ref, overview: written })
     } catch (error) {
       if (error instanceof DriveConflictError) {

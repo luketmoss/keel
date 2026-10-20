@@ -289,16 +289,12 @@ describe('exportImageName', () => {
   // edits (#133), not a filename. Treating everything after the last dot as
   // an extension eats most of the name.
   it('appends to a renamed cairn rather than truncating at the last dot', () => {
-    expect(exportImageName('Camp 1. Windy morning', 'image/jpeg')).toBe(
-      'Camp 1. Windy morning.jpg',
-    )
+    expect(exportImageName('Camp 1. Windy morning', 'image/jpeg')).toBe('Camp 1. Windy morning.jpg')
     expect(exportImageName('Rosea v1.2 summit', 'image/jpeg')).toBe('Rosea v1.2 summit.jpg')
   })
 
   it('appends when the name has no extension at all', () => {
-    expect(exportImageName('Sunset over the ridge', 'image/jpeg')).toBe(
-      'Sunset over the ridge.jpg',
-    )
+    expect(exportImageName('Sunset over the ridge', 'image/jpeg')).toBe('Sunset over the ridge.jpg')
   })
 
   it('still replaces a real image extension', () => {

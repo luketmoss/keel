@@ -2,7 +2,10 @@ import { IDBFactory } from 'fake-indexeddb'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DriveAuthError, DriveRequestError, TrackFileCache } from './trackFileCache'
 
-function response(body: BodyInit | Blob, { status = 200, blob }: { status?: number; blob?: Blob } = {}): Response {
+function response(
+  body: BodyInit | Blob,
+  { status = 200, blob }: { status?: number; blob?: Blob } = {},
+): Response {
   const resolvedBlob = blob ?? (body instanceof Blob ? body : new Blob([body as BlobPart]))
   return {
     ok: status >= 200 && status < 300,
@@ -63,15 +66,17 @@ describe('TrackFileCache', () => {
     const cache = new TrackFileCache({ indexedDBFactory: db })
     const fresh = await cache.getFile('token', 'file-1', 'a.kml', 'rev-1')
 
-    const written = await new Promise<{ value: { modifiedTime: string; type: string } }>((resolve, reject) => {
-      const req = db.open('cairn-track-cache', 2)
-      req.onsuccess = () => {
-        const tx = req.result.transaction('tracks', 'readonly')
-        const get = tx.objectStore('tracks').get('file-1')
-        get.onsuccess = () => resolve(get.result)
-        get.onerror = () => reject(get.error)
-      }
-    })
+    const written = await new Promise<{ value: { modifiedTime: string; type: string } }>(
+      (resolve, reject) => {
+        const req = db.open('cairn-track-cache', 2)
+        req.onsuccess = () => {
+          const tx = req.result.transaction('tracks', 'readonly')
+          const get = tx.objectStore('tracks').get('file-1')
+          get.onsuccess = () => resolve(get.result)
+          get.onerror = () => reject(get.error)
+        }
+      },
+    )
 
     expect(written.value.modifiedTime).toBe('rev-1')
     expect(written.value.type).toBe(fresh.type)

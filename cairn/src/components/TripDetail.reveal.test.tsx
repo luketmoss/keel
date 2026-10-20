@@ -111,7 +111,15 @@ function trackFile(overrides: Partial<ImportedFile> = {}): ImportedFile {
     name: 'Belford-Oxford',
     sourceName: 'Belford-Oxford.kml',
     driveFileId: 'drive-a',
-    tracks: [{ name: 'Belford-Oxford', points: [{ lat: 37, lon: -122 }, { lat: 37.01, lon: -122.01 }] }],
+    tracks: [
+      {
+        name: 'Belford-Oxford',
+        points: [
+          { lat: 37, lon: -122 },
+          { lat: 37.01, lon: -122.01 },
+        ],
+      },
+    ],
     trackStats: [
       {
         distanceMeters: 10_300,
@@ -211,7 +219,10 @@ describe('TripDetail — #270 reveal', () => {
     expect(revealPoints).toHaveBeenCalledTimes(1)
     expect(revealPoints).toHaveBeenCalledWith(
       fakeMap,
-      [{ lat: 37, lng: -122 }, { lat: 37.01, lng: -122.01 }],
+      [
+        { lat: 37, lng: -122 },
+        { lat: 37.01, lng: -122.01 },
+      ],
       { left: 0, right: 0, top: 0, bottom: 0 },
     )
   })
@@ -234,12 +245,16 @@ describe('TripDetail — #270 reveal', () => {
     renderTrip()
     fireEvent.click(screen.getByText('sapporo.jpg'))
 
-    expect(revealPoint).toHaveBeenCalledWith(fakeMap, { lat: 43, lng: 141 }, {
-      left: 0,
-      right: 0,
-      top: 0,
-      bottom: 0,
-    })
+    expect(revealPoint).toHaveBeenCalledWith(
+      fakeMap,
+      { lat: 43, lng: 141 },
+      {
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+      },
+    )
     expect(revealPoints).not.toHaveBeenCalled()
   })
 
@@ -289,7 +304,10 @@ describe('TripDetail — #270 reveal', () => {
       expect(revealPoints).toHaveBeenCalledTimes(2)
       expect(revealPoints).toHaveBeenLastCalledWith(
         fakeMap,
-        [{ lat: 37, lng: -122 }, { lat: 37.01, lng: -122.01 }],
+        [
+          { lat: 37, lng: -122 },
+          { lat: 37.01, lng: -122.01 },
+        ],
         { left: 0, right: 0, top: 0, bottom: 0 },
       )
     })

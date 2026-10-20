@@ -42,7 +42,10 @@ export function isCairnRecord(value: unknown): value is CairnRecord {
  * empty array is a trip we know has no cairns, and renders the empty state
  * immediately rather than sitting in Fetching until Drive confirms it
  * (`docs/design/243-cached-cairns.md`). */
-export function readCachedCairns(tripId: string, storage: Storage = window.localStorage): CairnRecord[] | null {
+export function readCachedCairns(
+  tripId: string,
+  storage: Storage = window.localStorage,
+): CairnRecord[] | null {
   let raw: string | null
   try {
     raw = storage.getItem(cairnCacheKey(tripId))

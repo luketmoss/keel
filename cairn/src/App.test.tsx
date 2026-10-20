@@ -149,10 +149,7 @@ function seedTrip(tripId: string, name = 'Hokkaido', extra: Record<string, unkno
   }
   const existing = JSON.parse(window.localStorage.getItem('cairn.trips.index') ?? '[]')
   window.localStorage.setItem('cairn.trips.index', JSON.stringify([...existing, entry]))
-  window.localStorage.setItem(
-    `cairn.trips.trip.${tripId}`,
-    JSON.stringify({ ...entry, notes: '' }),
-  )
+  window.localStorage.setItem(`cairn.trips.trip.${tripId}`, JSON.stringify({ ...entry, notes: '' }))
 }
 
 function seedLooseTrack(id: string, name: string, extra: Record<string, unknown> = {}) {
@@ -460,10 +457,7 @@ describe('App routing (#109)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Back to the list' }))
     await screen.findByRole('heading', { name: 'Everything' })
 
-    expect(screen.getByPlaceholderText('Search trips, tracks and cairns')).toHaveProperty(
-      'value',
-      'hokkaido',
-    )
+    expect(screen.getByPlaceholderText('Search trips, tracks and cairns')).toHaveProperty('value', 'hokkaido')
     expect(screen.queryByText('Alta Via 1')).toBeNull()
     fetchSpy.mockRestore()
   })
@@ -797,9 +791,7 @@ describe('App loose tracks and photos (#110)', () => {
     expect(screen.getByText(formatElevationGain(690)!)).toBeDefined()
     expect(screen.getByText('512 points · Mount Rosea.kml')).toBeDefined()
     // The card says what it is, and that no trip owns it.
-    expect(container.querySelector('.search-card__kind')?.textContent).toBe(
-      'track · not in a trip',
-    )
+    expect(container.querySelector('.search-card__kind')?.textContent).toBe('track · not in a trip')
     fetchSpy.mockRestore()
   })
 
@@ -1041,7 +1033,7 @@ describe('App loose tracks and photos (#110)', () => {
     const overridesFor = (tripId: string) =>
       JSON.parse(window.localStorage.getItem(`cairn.trips.trackOverrides.${tripId}`) ?? '{}')
 
-    it('carries a never-recoloured track\'s auto-assigned colour', async () => {
+    it("carries a never-recoloured track's auto-assigned colour", async () => {
       const fetchSpy = mockGoogleSignIn()
       seedTrip('t-154', 'Larapinta')
       seedLooseTrack('lt-154', 'Snowdon ridge', { driveFileId: 'drive-154', colorIndex: 0 })
@@ -1060,7 +1052,7 @@ describe('App loose tracks and photos (#110)', () => {
       fetchSpy.mockRestore()
     })
 
-    it('carries a user-recoloured track\'s chosen colour', async () => {
+    it("carries a user-recoloured track's chosen colour", async () => {
       const fetchSpy = mockGoogleSignIn()
       seedTrip('t-155', 'Larapinta')
       seedLooseTrack('lt-155', 'Snowdon ridge', { driveFileId: 'drive-155', colorIndex: 4 })
@@ -1175,11 +1167,11 @@ describe('App loose tracks and photos (#110)', () => {
       // filename this test is about actually shows up — `downloadTrackFile`
       // never puts it on the wire.
       const clickedDownloadNames: (string | null)[] = []
-      const clickSpy = vi
-        .spyOn(HTMLAnchorElement.prototype, 'click')
-        .mockImplementation(function (this: HTMLAnchorElement) {
-          clickedDownloadNames.push(this.download)
-        })
+      const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+        this: HTMLAnchorElement,
+      ) {
+        clickedDownloadNames.push(this.download)
+      })
 
       fireEvent.click(await screen.findByRole('button', { name: 'Actions for Mount Rosea' }))
       await act(async () => {
@@ -1261,11 +1253,11 @@ describe('App loose tracks and photos (#110)', () => {
         return { ok: true, status: 200, json: async () => ({ id: 'x', files: [] }) } as Response
       })
       const clickedDownloadNames: (string | null)[] = []
-      const clickSpy = vi
-        .spyOn(HTMLAnchorElement.prototype, 'click')
-        .mockImplementation(function (this: HTMLAnchorElement) {
-          clickedDownloadNames.push(this.download)
-        })
+      const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+        this: HTMLAnchorElement,
+      ) {
+        clickedDownloadNames.push(this.download)
+      })
 
       fireEvent.click(await screen.findByRole('button', { name: 'Actions for sunset.png' }))
       await act(async () => {
@@ -1611,7 +1603,7 @@ describe('App attach a photo to an existing cairn (#157)', () => {
   // lightbox instead, which stays mounted while signed out; see
   // `TripDetail`'s own coverage.
 
-  it("the overlay names the cairn while its detail is open, and imports as new cairns from the list", async () => {
+  it('the overlay names the cairn while its detail is open, and imports as new cairns from the list', async () => {
     const fetchSpy = mockGoogleSignIn()
     seedLooseCairn('c-2', 'Ellery Creek camp')
     await renderApp('/cairns/c-2', { googleClientId: 'a-client-id' })
@@ -1627,9 +1619,7 @@ describe('App attach a photo to an existing cairn (#157)', () => {
   it('drops one image onto an open cairn and attaches it, updating image with no new cairn created', async () => {
     const fetchSpy = mockGoogleSignIn()
     seedLooseCairn('c-3', 'Ellery Creek camp')
-    uploadFileContent
-      .mockResolvedValueOnce({ id: 'original-1' })
-      .mockResolvedValueOnce({ id: 'thumb-1' })
+    uploadFileContent.mockResolvedValueOnce({ id: 'original-1' }).mockResolvedValueOnce({ id: 'thumb-1' })
     await renderApp('/cairns/c-3', { googleClientId: 'a-client-id' })
     await signIn()
     const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
@@ -1649,9 +1639,7 @@ describe('App attach a photo to an existing cairn (#157)', () => {
   it('drops two images onto an open cairn: the first attaches, the second is refused', async () => {
     const fetchSpy = mockGoogleSignIn()
     seedLooseCairn('c-4', 'Ellery Creek camp')
-    uploadFileContent
-      .mockResolvedValueOnce({ id: 'original-1' })
-      .mockResolvedValueOnce({ id: 'thumb-1' })
+    uploadFileContent.mockResolvedValueOnce({ id: 'original-1' }).mockResolvedValueOnce({ id: 'thumb-1' })
     await renderApp('/cairns/c-4', { googleClientId: 'a-client-id' })
     await signIn()
     const shell = screen.getByTestId('map').closest('.shell') as HTMLElement
@@ -1675,9 +1663,7 @@ describe('App attach a photo to an existing cairn (#157)', () => {
   it('chooses a photo through the face and attaches it, with no new cairn created', async () => {
     const fetchSpy = mockGoogleSignIn()
     seedLooseCairn('c-339', 'Ellery Creek camp')
-    uploadFileContent
-      .mockResolvedValueOnce({ id: 'original-1' })
-      .mockResolvedValueOnce({ id: 'thumb-1' })
+    uploadFileContent.mockResolvedValueOnce({ id: 'original-1' }).mockResolvedValueOnce({ id: 'thumb-1' })
     await renderApp('/cairns/c-339', { googleClientId: 'a-client-id' })
     await signIn()
 
@@ -1709,9 +1695,7 @@ describe('App attach a photo to an existing cairn (#157)', () => {
   it('leaves position, positionSource and icon untouched by an attach', async () => {
     const fetchSpy = mockGoogleSignIn()
     seedLooseCairn('c-340', 'Ellery Creek camp')
-    uploadFileContent
-      .mockResolvedValueOnce({ id: 'original-1' })
-      .mockResolvedValueOnce({ id: 'thumb-1' })
+    uploadFileContent.mockResolvedValueOnce({ id: 'original-1' }).mockResolvedValueOnce({ id: 'thumb-1' })
     await renderApp('/cairns/c-340', { googleClientId: 'a-client-id' })
     await signIn()
 
@@ -1732,9 +1716,7 @@ describe('App attach a photo to an existing cairn (#157)', () => {
     })
 
     await waitFor(() => {
-      expect(
-        JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')[0].image,
-      ).not.toBeNull()
+      expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')[0].image).not.toBeNull()
     })
     const after = JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')[0]
     expect(after.position).toEqual(before.position)
@@ -1762,9 +1744,7 @@ describe('App attach a photo to an existing cairn (#157)', () => {
       fireEvent.change(input)
     })
     await waitFor(() => {
-      expect(
-        JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')[0].image,
-      ).not.toBeNull()
+      expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')[0].image).not.toBeNull()
     })
     return JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')[0]
   }
@@ -1806,9 +1786,7 @@ describe('App attach a photo to an existing cairn (#157)', () => {
 
     expect(await screen.findByText('only JPEG, PNG, and WebP photos can be imported')).toBeDefined()
     expect(uploadFileContent).not.toHaveBeenCalled()
-    expect(
-      JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')[0].image,
-    ).toBeNull()
+    expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')[0].image).toBeNull()
 
     fetchSpy.mockRestore()
   })
@@ -1844,9 +1822,7 @@ describe('App attach a photo to an existing cairn (#157)', () => {
     ).toBeDefined()
     // Nothing uploaded, and the cairn is untouched.
     expect(uploadFileContent).not.toHaveBeenCalled()
-    expect(
-      JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')[0].image,
-    ).toBeNull()
+    expect(JSON.parse(window.localStorage.getItem('cairn.loose.index') ?? '[]')[0].image).toBeNull()
 
     fetchSpy.mockRestore()
   })
@@ -1867,9 +1843,7 @@ describe('App attach a photo to an existing cairn (#157)', () => {
 
   it('dropping while the list face is open still imports as new cairns (#155)', async () => {
     const fetchSpy = mockGoogleSignIn()
-    uploadFileContent
-      .mockResolvedValueOnce({ id: 'original-1' })
-      .mockResolvedValueOnce({ id: 'thumb-1' })
+    uploadFileContent.mockResolvedValueOnce({ id: 'original-1' }).mockResolvedValueOnce({ id: 'thumb-1' })
     await renderApp('/', { googleClientId: 'a-client-id' })
     await signIn()
     const shell = screen.getByTestId('map').closest('.shell') as HTMLElement

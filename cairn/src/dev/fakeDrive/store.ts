@@ -152,7 +152,12 @@ export class FakeDriveStore {
     return this.all().filter(predicate)
   }
 
-  async create(input: { name: string; mimeType: string; parents: string[]; content: unknown }): Promise<FakeFile> {
+  async create(input: {
+    name: string
+    mimeType: string
+    parents: string[]
+    content: unknown
+  }): Promise<FakeFile> {
     const file: FakeFile = {
       id: generateFakeFileId(),
       name: input.name,

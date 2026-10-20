@@ -215,11 +215,15 @@ async function create(
     `${content}\r\n` +
     `--${boundary}--`
 
-  const response = await driveFetch(`${DRIVE_UPLOAD_URL}?uploadType=multipart&fields=id,headRevisionId`, accessToken, {
-    method: 'POST',
-    headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
-    body,
-  })
+  const response = await driveFetch(
+    `${DRIVE_UPLOAD_URL}?uploadType=multipart&fields=id,headRevisionId`,
+    accessToken,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
+      body,
+    },
+  )
   if (!response.ok) {
     throw new DriveRequestError(`Drive upload failed with status ${response.status}`)
   }

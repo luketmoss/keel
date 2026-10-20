@@ -2,7 +2,12 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const { fitTracksToBounds } = vi.hoisted(() => ({ fitTracksToBounds: vi.fn() }))
-vi.mock('@keel/geo', async (importOriginal) => ({ ...(await importOriginal<typeof import('@keel/geo')>()), fitTracksToBounds, zoomToFitCluster: vi.fn(), FIT_PADDING: 48 }))
+vi.mock('@keel/geo', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@keel/geo')>()),
+  fitTracksToBounds,
+  zoomToFitCluster: vi.fn(),
+  FIT_PADDING: 48,
+}))
 
 const { setZoom, getZoom, fakeMap } = vi.hoisted(() => {
   const setZoom = vi.fn()
@@ -124,10 +129,7 @@ describe('MapCanvas corner controls (#109)', () => {
   it('disables fit-to-everything when there is nothing to fit to', () => {
     renderCanvas({ canFit: false })
 
-    expect(screen.getByRole('button', { name: 'Fit to everything' })).toHaveProperty(
-      'disabled',
-      true,
-    )
+    expect(screen.getByRole('button', { name: 'Fit to everything' })).toHaveProperty('disabled', true)
     fireEvent.click(screen.getByRole('button', { name: 'Fit to everything' }))
     expect(fitTracksToBounds).not.toHaveBeenCalled()
   })
@@ -259,13 +261,7 @@ describe('MapCanvas 3D/basemap coupling (#271)', () => {
       button.getAttribute('aria-label'),
     )
 
-    expect(labels).toEqual([
-      'Reset view',
-      'Fit to everything',
-      'Show my location',
-      'Zoom in',
-      'Zoom out',
-    ])
+    expect(labels).toEqual(['Reset view', 'Fit to everything', 'Show my location', 'Zoom in', 'Zoom out'])
   })
 
   it('renders no locate control at all where geolocation is unavailable', () => {
@@ -300,8 +296,6 @@ describe('MapCanvas 3D/basemap coupling (#271)', () => {
   it('goes with the map when the map cannot draw', () => {
     renderCanvas({ mapReady: false })
 
-    expect(screen.getByRole('button', { name: 'Show my location' }).hasAttribute('disabled')).toBe(
-      true,
-    )
+    expect(screen.getByRole('button', { name: 'Show my location' }).hasAttribute('disabled')).toBe(true)
   })
 })

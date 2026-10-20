@@ -129,6 +129,9 @@ The raw COROS payload (`raw_ref`) and FIT file (`fit_ref`) live in the sync bot'
 This server has no Drive credential. `thrive_get_workout_payload` reads the payload through
 the API's `getWorkoutPayload`, which runs as the bot and finds the file from the workout row
 (#179). The FIT file's contents are not readable: it is binary and holds the GPS track.
+A synced workout's detail also says whether the sync has built a simplified GPS track for it
+(`track_ref`, #432): `GPS track: stored in Drive (<id>)` or `GPS track: none`. The track itself is
+not readable here either; the app draws it, and there is no tool that returns one.
 
 ### Approval on the destructive tools
 

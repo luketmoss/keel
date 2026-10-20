@@ -65,12 +65,15 @@ export function createTrackStep({ archive, startedAt, log = console.log }) {
   /**
    * @param {{ activityId: string, fileId: string, record: object | undefined,
    *   fitRef: string, fitFetchedAt: string, listEntry: object, localDate: string,
-   *   bytes?: Buffer }} activity
+   *   bytes?: Buffer, outdoor?: boolean }} activity
    *   `fitRef` and `fitFetchedAt` are what the row holds for the FIT after this
-   *   run's FIT step, which is the FIT this track is built from.
+   *   run's FIT step, which is the FIT this track is built from. `outdoor`
+   *   (#510) is for an activity with no COROS list entry, a Garmin import
+   *   whose FIT was kept only because it holds positions: when given, it
+   *   replaces the list entry's "Start Coordinates" test.
    * @returns {Promise<{ track_ref: string }>}
    */
-  async function ensure({ activityId, fileId, record: current, fitRef, fitFetchedAt, listEntry, localDate, bytes }) {
+  async function ensure({ activityId, fileId, record: current, fitRef, fitFetchedAt, listEntry, localDate, bytes, outdoor }) {
     // The FIT is not stored (budget, unavailable, not fetched): the track follows on the run that stores it.
     if (!fitRef || !fitFetchedAt) return trackSheetFields(current);
     if (settled(current, fitFetchedAt)) return trackSheetFields(current);
@@ -78,7 +81,7 @@ export function createTrackStep({ archive, startedAt, log = console.log }) {
     const base = { fit_fetched_at: fitFetchedAt, version: TRACK_VERSION, built_at: startedAt };
 
     // An indoor session: no download, no file.
-    if (!hasStartCoordinates(listEntry)) {
+    if (!(outdoor ?? hasStartCoordinates(listEntry))) {
       counts.none += 1;
       await record(fileId, activityId, { status: 'none', ...base });
       return { track_ref: '' };

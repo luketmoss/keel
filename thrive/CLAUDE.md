@@ -304,6 +304,11 @@ valid positions, an unreadable FIT, not built yet). Sync-owned: the SPA never se
 it and a full-row write preserves it. Added by
 `scripts/migrate-421-workouts-track-ref.mjs`; earlier rows by
 `scripts/backfill-421-workouts-track.mjs`. The FIT stays the source of truth.
+`garmin_import` rows get theirs in two hand-run steps (#510): `scripts/import-510-garmin-fits.mjs`
+reads the Garmin export's FIT zips, matches each activity FIT with positions to its row by **start time**
+(the FIT file names are upload ids, not activity ids), stores it in `Thrive Garmin/fit/` and sets `fit_ref`;
+the same backfill then builds the track, stored beside COROS's in `Thrive COROS/tracks/` because
+`getWorkoutTrack` reads only from there.
 
 ### Workout Types
 - `weight` — structured weight training with exercises, sets, reps, effort

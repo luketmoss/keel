@@ -16,7 +16,14 @@
  * - Each row is written through the API's `updateWorkout` as `{ track_ref }`
  *   alone. That action changes only the keys it is sent, so no other cell
  *   moves, `synced_at` included.
- * - `garmin_import` and hand-logged rows are never touched: they have no FIT.
+ * - Hand-logged rows are never touched: they have no FIT. `garmin_import` rows
+ *   are candidates from #510 on, once the FIT import
+ *   (import-510-garmin-fits.mjs) has given them a `fit_ref`. Their archive
+ *   file is the Garmin summary, not a COROS list entry, so a Garmin row is
+ *   treated as outdoor (the import keeps only FITs with positions) and the
+ *   FIT is confirmed by the Garmin archive's tag. Their tracks are stored
+ *   beside COROS's, in `Thrive COROS/tracks/`, because the API reads a track
+ *   only from there.
  * - The archive file's `activity_id` must equal the row's
  *   `source_activity_id`, and the FIT is confirmed by its `fit_activity_id`
  *   tag to be the one the row names, or the row is left alone and listed.
@@ -52,12 +59,16 @@ const text = (v) => String(v ?? '').trim();
 const oneLine = (s) => String(s).replace(/\s+/g, ' ').trim().slice(0, 200);
 const byDate = (a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.id < b.id ? -1 : 1);
 
-/** A row the backfill considers: COROS-synced, with a FIT, and no track yet. */
-export const isCandidate = (row) =>
-  text(row.source) === 'coros' && text(row.fit_ref) !== '' && text(row.track_ref) === '';
+export const SOURCES = ['coros', 'garmin_import'];
 
+/** A row the backfill considers: COROS-synced or Garmin-imported, with a FIT, and no track yet. */
+export const isCandidate = (row) =>
+  SOURCES.includes(text(row.source)) && text(row.fit_ref) !== '' && text(row.track_ref) === '';
+
+// A COROS archive file carries its `list_entry`, a Garmin one its `payload`.
 const isActivityFile = (f) =>
-  !!f && typeof f === 'object' && typeof f.activity_id === 'string' && typeof f.list_entry === 'object';
+  !!f && typeof f === 'object' && typeof f.activity_id === 'string' &&
+  (typeof f.list_entry === 'object' || typeof f.payload === 'object');
 
 /**
  * Which rows need a track, from the sheet's rows and the archive. Reads only:
@@ -109,14 +120,15 @@ export async function planBackfill({ rows, readFile, settled }) {
  * @returns {Promise<number>} the exit code: 1 if the API is not ready or a write failed
  */
 export async function backfill({
-  api, drive, archive, createTrackStep, trackVersion, dryRun = false,
+  api, drive, archive, garminArchive, createTrackStep, trackVersion, dryRun = false,
   maxRows = DEFAULTS.maxRows, batch = DEFAULTS.batch, pauseMs = DEFAULTS.pauseMs,
   now = () => new Date(), wait = (ms) => new Promise((r) => setTimeout(r, ms)),
   log = console.log, error = console.error,
 }) {
   const rows = await api.get('getWorkouts', {});
   const coros = rows.filter((r) => text(r.source) === 'coros');
-  log(`Workouts: ${rows.length} row(s), ${coros.length} COROS-synced`);
+  const garmin = rows.filter((r) => text(r.source) === 'garmin_import');
+  log(`Workouts: ${rows.length} row(s), ${coros.length} COROS-synced, ${garmin.length} Garmin-imported`);
   if (rows.length && !rows.every((r) => Object.prototype.hasOwnProperty.call(r, 'track_ref'))) {
     error(
       'REFUSING: getWorkouts does not return track_ref, so the deployed API predates #432.\n' +
@@ -160,9 +172,14 @@ export async function backfill({
   for (const t of thisRun) {
     const row = rows.find((r) => text(r.id) === t.id);
     // The FIT must be the one the row names, confirmed by its tag, never by trusting fit_ref alone.
+    const isGarmin = text(row.source) === 'garmin_import';
+    if (isGarmin && !garminArchive) {
+      error('REFUSING: a Garmin row needs the Garmin archive to confirm its FIT.');
+      return 1;
+    }
     let tagged;
     try {
-      tagged = await archive.findFit(t.activityId);
+      tagged = await (isGarmin ? garminArchive : archive).findFit(t.activityId);
     } catch (err) {
       notBuilt.push({ ...t, reason: `the FIT could not be looked up: ${oneLine(err.message || err)}` });
       continue;
@@ -180,6 +197,8 @@ export async function backfill({
         activityId: t.activityId, fileId: t.fileId, record: t.file.track,
         fitRef: text(row.fit_ref), fitFetchedAt: text(row.fit_fetched_at),
         listEntry: t.file.list_entry, localDate: text(row.date),
+        // A Garmin FIT was kept only because it holds positions; buildTrack still decides.
+        ...(isGarmin ? { outdoor: true } : {}),
       });
     } catch (err) {
       error(`FAILED building the track for ${t.id} (${t.date}): ${oneLine(err.name || 'Error')}`);
@@ -245,6 +264,7 @@ async function main() {
   const { createThriveApi, loadThriveApiConfig } = await import('../sync/src/thrive-api.mjs');
   const { createDrive } = await import('../sync/src/drive.mjs');
   const { createArchive } = await import('../sync/src/archive.mjs');
+  const { createGarminArchive } = await import('../sync/src/garmin-archive.mjs');
   const { googleTokenProvider, loadGoogleCredentials } = await import('../sync/src/google.mjs');
   const { createTrackStep } = await import('../sync/src/track-step.mjs');
   const { TRACK_VERSION } = await import('../sync/src/track.mjs');
@@ -254,7 +274,7 @@ async function main() {
     const api = createThriveApi(loadThriveApiConfig());
     const drive = createDrive({ getToken: googleTokenProvider(loadGoogleCredentials()) });
     process.exitCode = await backfill({
-      api, drive, archive: createArchive(drive), createTrackStep, trackVersion: TRACK_VERSION,
+      api, drive, archive: createArchive(drive), garminArchive: createGarminArchive(drive), createTrackStep, trackVersion: TRACK_VERSION,
       dryRun: args.includes('--dry-run'), maxRows, batch, pauseMs,
     });
   } catch (err) {

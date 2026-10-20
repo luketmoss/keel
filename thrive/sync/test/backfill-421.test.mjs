@@ -76,11 +76,12 @@ async function run(w, opts = {}) {
   return { ...f, code, waits, out: out.join('\n'), err: err.join('\n') };
 }
 
-test('only COROS-synced rows with a FIT and no track are candidates', () => {
+test('only COROS-synced and Garmin-imported rows with a FIT and no track are candidates', () => {
   assert.equal(isCandidate({ source: 'coros', fit_ref: 'f', track_ref: '' }), true);
   assert.equal(isCandidate({ source: 'coros', fit_ref: 'f', track_ref: 't' }), false);
   assert.equal(isCandidate({ source: 'coros', fit_ref: '', track_ref: '' }), false);
-  assert.equal(isCandidate({ source: 'garmin_import', fit_ref: 'f', track_ref: '' }), false);
+  assert.equal(isCandidate({ source: 'garmin_import', fit_ref: 'f', track_ref: '' }), true); // #510
+  assert.equal(isCandidate({ source: 'garmin_import', fit_ref: '', track_ref: '' }), false);
   assert.equal(isCandidate({ source: '', source_activity_id: '1', fit_ref: 'f', track_ref: '' }), false);
 });
 

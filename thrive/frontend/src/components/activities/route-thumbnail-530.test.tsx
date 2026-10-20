@@ -243,6 +243,9 @@ describe('AC3: when a track is requested, and how many at once', () => {
     expect(calls[2]).toBe(list[2].id);
     await act(async () => gates[1].resolve(null));
     await act(async () => gates[2].resolve(null));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+    });
     expect(calls).toHaveLength(3);
 
     // It asks again when it comes back.

@@ -16,6 +16,9 @@ hands to the user at Gate 1.
 3. **`/ux`** — only if `/pm` routed the issue there. `/pm` owns that decision.
 4. Stop. The issue is in **Refined**.
 
+When a step is handed to a subagent or a new session, pick its model from
+[CONVENTIONS.md](../../../CONVENTIONS.md#models) and name the row in the report.
+
 Each step is the real skill, not a summary of it. Read and follow
 `.claude/skills/<step>/SKILL.md` at each stage rather than approximating what it
 would have done.

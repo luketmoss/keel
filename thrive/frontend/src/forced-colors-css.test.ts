@@ -76,6 +76,11 @@ describe('forced-colors selected states (#330)', () => {
     expect(block).toMatch(/\.day-sync-dot\s*\{[^}]*background:\s*CanvasText/);
   });
 
+  it('#487: the filled viewed day keeps a drawn Highlight border and HighlightText marks', () => {
+    expect(block).toMatch(/\.week-day-viewed\s*\{[^}]*border:\s*2px solid Highlight/);
+    expect(block).toMatch(/\.week-day-viewed \.week-mark-dot\s*\{[^}]*background:\s*HighlightText/);
+  });
+
   it('keeps everything new inside the block (no top-level forced-colors rules)', () => {
     expect(css.replace(block, '')).not.toMatch(/Highlight(Text)?\b/);
   });

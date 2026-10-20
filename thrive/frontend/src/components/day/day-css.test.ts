@@ -17,11 +17,17 @@ function rule(selector: string): string {
 }
 
 describe('Day screen CSS (#237)', () => {
-  it('marks the viewed day with a --color-primary-text border on the tint, never white on primary', () => {
-    expect(rule('.week-day-viewed')).toMatch(/background:\s*var\(--color-primary-light\)/);
-    expect(rule('.week-day-viewed')).toMatch(/border-color:\s*var\(--color-primary-text\)/);
+  it('#487: fills the viewed day with --color-primary-fill and draws its text and marks in --color-on-fill', () => {
+    expect(rule('.week-day-viewed')).toMatch(/background:\s*var\(--color-primary-fill\)/);
+    expect(rule('.week-day-viewed .week-day-letter,\n.week-day-viewed .week-day-num')).toMatch(
+      /color:\s*var\(--color-on-fill\)/,
+    );
+    expect(rule('.week-day-viewed .week-mark-dot')).toMatch(/background:\s*var\(--color-on-fill\)/);
+    expect(rule('.week-day-viewed .week-mark-ring')).toMatch(/var\(--color-on-fill\)/);
     expect(rule('.week-day')).toMatch(/border:\s*2px solid transparent/);
-    expect(rule('.week-day-viewed .week-day-num')).toMatch(/color:\s*var\(--color-primary-on-light\)/);
+    expect(rule('.week-day')).toMatch(/border-radius:\s*var\(--radius-lg\)/);
+    expect(rule('.week-day-num')).toMatch(/font-size:\s*var\(--text-lg\)/);
+    expect(rule('.week-day-num')).toMatch(/font-weight:\s*600/);
     expect(section).not.toMatch(/var\(--color-primary\)/);
     expect(section).not.toMatch(/#fff\b/i);
   });
@@ -34,7 +40,7 @@ describe('Day screen CSS (#237)', () => {
   });
 
   it('keeps strip days 44 px tall and edge to edge below 375 px', () => {
-    expect(rule('.week-day')).toMatch(/min-height:\s*44px/);
+    expect(rule('.week-day')).toMatch(/min-height:\s*calc\(var\(--space-2xl\) \+ var\(--space-md\)\)/);
     expect(css).toMatch(/@media \(max-width: 374px\)\s*\{\s*\.week-strip\s*\{[^}]*gap:\s*0/);
   });
 

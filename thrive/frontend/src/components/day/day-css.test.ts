@@ -109,9 +109,9 @@ describe('Day Health and Body panels CSS (#239)', () => {
     expect(rule('.health-value-blank')).toMatch(/color:\s*var\(--color-text-muted\)/);
   });
 
-  it('wraps sleep stages only between items, and keeps Try again 44 px', () => {
+  it('keeps the zone words on one line, and keeps Try again 44 px', () => {
     expect(rule('.health-zone')).toMatch(/white-space:\s*nowrap/);
-    expect(css).toMatch(/\.health-stage,\s*\.health-zone\s*\{/);
+    expect(css).not.toMatch(/\.health-stage|\.health-qualifier/);
     expect(rule('.panel-retry')).toMatch(/min-height:\s*44px/);
     expect(rule('.panel-retry')).toMatch(/min-width:\s*44px/);
   });

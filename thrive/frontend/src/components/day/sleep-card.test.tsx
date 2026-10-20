@@ -6,7 +6,7 @@ vi.mock('../../state/actions', () => ({ loadHealth: vi.fn(async () => {}) }));
 
 import { AuthContext, type AuthState } from '../../auth/auth-context';
 import { SleepCard } from './sleep-card';
-import { sleepView, healthView, spokenDuration, stageDuration } from './health-rows';
+import { sleepView, vitalsView, spokenDuration, stageDuration } from './health-rows';
 import { SLOTS, slotsFor } from './slots';
 import { dailyHealth } from '../../state/store';
 import { DAILY_HEALTH_FIELDS, type DailyHealthRow } from '../../api/health-api';
@@ -139,9 +139,9 @@ describe('AC5 — the range line', () => {
 });
 
 describe('AC6 — Sleep leaves Health', () => {
-  it('is not among the Health rows', () => {
-    const v = healthView([hr(D, NIGHT)], D, false);
-    expect(v.kind === 'rows' && v.rows.map((r) => r.key)).not.toContain('sleep');
+  it('is not among the metric tiles (#491)', () => {
+    const v = vitalsView([hr(D, NIGHT)], D, false);
+    expect(v.kind === 'tiles' && v.tiles.map((t) => t.key as string)).not.toContain('sleep');
   });
 });
 
@@ -152,10 +152,10 @@ describe('AC7 — mounting and loading', () => {
     expect(slotsFor('future')).not.toContain('sleep');
   });
 
-  it('shows the panel status while loading or failed', () => {
+  it("draws nothing while loading or failed: the metric tiles' one Health card says so (#491)", () => {
     dailyHealth.value = { state: 'loading' };
     const a = render(<SleepCard date={D} state="past" today="2026-09-30" />);
-    expect(a.container.querySelector('[role="status"]')!.textContent).toBe('Loading…');
+    expect(a.container.innerHTML).toBe('');
     cleanup();
     dailyHealth.value = { state: 'error', message: 'x' } as never;
     const b = render(
@@ -163,7 +163,7 @@ describe('AC7 — mounting and loading', () => {
         <SleepCard date={D} state="past" today="2026-09-30" />
       </AuthContext.Provider>,
     );
-    expect(b.container.textContent).toContain("Couldn't load your sleep.");
+    expect(b.container.innerHTML).toBe('');
   });
 
   it('draws nothing for a day with no row', () => {

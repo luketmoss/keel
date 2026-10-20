@@ -1,6 +1,6 @@
-// #239 — the Health panel's rules: which rows, what each says, and how each
-// compares with your range. Pure: rows in, a view out; health-panel.tsx only
-// draws it.
+// #239 — the Day screen's health rules: what each metric says and how it
+// compares with your range. Pure: rows in, a view out; the metric tiles
+// (#491, metric-tile.tsx) and the Sleep card (#490) only draw it.
 //
 // The range comparison is decided on the DISPLAYED numbers: the value and
 // both bounds are rounded to the metric's display precision before `zoneOf`,
@@ -16,7 +16,8 @@ import {
   type Unwelcome,
   type Zone,
 } from '../../api/your-range';
-import { clock12, hoursMinutes, nightOf, syncTime, syncedLabel } from '../../day/format';
+import { clock12, hoursMinutes, nightOf } from '../../day/format';
+import { addDays } from '../../day/dates';
 
 export type HealthMetricKey = 'sleep' | 'resting_hr' | 'hrv' | 'stress' | 'steps';
 
@@ -99,22 +100,8 @@ export function activeMetrics(fields: readonly string[] = DAILY_HEALTH_FIELDS): 
 
 export type HealthCaption =
   | { kind: 'text'; text: string }
-  | { kind: 'stages'; items: string[] }
   | { kind: 'range'; bounds: string; zone: Zone; attention: boolean }
   | { kind: 'building'; n: number };
-
-export interface HealthRowView {
-  key: HealthMetricKey;
-  label: string;
-  /** Shown after the label: "Fri night", "last night". */
-  qualifier?: string;
-  /** '' for a blank, shown as "—". */
-  value: string;
-  captions: HealthCaption[];
-}
-
-export type HealthView =
-  { kind: 'note'; sub?: string; note: string } | { kind: 'rows'; sub?: string; rows: HealthRowView[] };
 
 const cell = (row: DailyHealthRow, field: string): string => (row as unknown as Record<string, string>)[field] ?? '';
 
@@ -128,6 +115,38 @@ export function seriesOf(rows: readonly DailyHealthRow[], field: string): Map<st
   return m;
 }
 
+/** A value against your range, all three numbers rounded to display precision. */
+export interface DisplayedRange {
+  lo: number;
+  hi: number;
+  value: number;
+  zone: Zone;
+  attention: boolean;
+}
+
+/**
+ * The one comparison: your range for `date` and where `stored` sits in it,
+ * decided on the displayed numbers. `{ building: n }` with fewer than 14 values.
+ */
+export function displayedRange(
+  metric: HealthMetric,
+  stored: number,
+  series: ReadonlyMap<string, number>,
+  date: string,
+): DisplayedRange | { building: number } {
+  const range = yourRange(series, date);
+  if (!range) return { building: valuesInWindow(series, date) };
+  const lo = metric.toDisplay(range.lo);
+  const hi = metric.toDisplay(range.hi);
+  const value = metric.toDisplay(stored);
+  return { lo, hi, value, ...zoneOf(value, { lo, hi }, metric.unwelcome) };
+}
+
+/** "49–56", or "52" when both bounds display the same. */
+function boundsText(metric: HealthMetric, lo: number, hi: number): string {
+  return lo === hi ? metric.format(lo) : `${metric.format(lo)}–${metric.format(hi)}`;
+}
+
 /** The range line for a value on `date`, or the "building" line with fewer than 14 values. */
 export function rangeCaption(
   metric: HealthMetric,
@@ -135,13 +154,14 @@ export function rangeCaption(
   series: ReadonlyMap<string, number>,
   date: string,
 ): HealthCaption {
-  const range = yourRange(series, date);
-  if (!range) return { kind: 'building', n: valuesInWindow(series, date) };
-  const lo = metric.toDisplay(range.lo);
-  const hi = metric.toDisplay(range.hi);
-  const { zone, attention } = zoneOf(metric.toDisplay(stored), { lo, hi }, metric.unwelcome);
-  const bounds = lo === hi ? metric.format(lo) : `${metric.format(lo)}–${metric.format(hi)}`;
-  return { kind: 'range', bounds: `${bounds}${metric.unit}`, zone, attention };
+  const r = displayedRange(metric, stored, series, date);
+  if ('building' in r) return { kind: 'building', n: r.building };
+  return {
+    kind: 'range',
+    bounds: `${boundsText(metric, r.lo, r.hi)}${metric.unit}`,
+    zone: r.zone,
+    attention: r.attention,
+  };
 }
 
 /** A caption as the words it shows (the arrow is drawn separately). */
@@ -149,8 +169,6 @@ export function captionText(c: HealthCaption): string {
   switch (c.kind) {
     case 'text':
       return c.text;
-    case 'stages':
-      return c.items.join(' · ');
     case 'building':
       return `Building your range — ${c.n} of ${YOUR_RANGE_MIN_VALUES} days so far.`;
     case 'range':
@@ -160,16 +178,69 @@ export function captionText(c: HealthCaption): string {
   }
 }
 
+// ── The metric tiles (#491) ─────────────────────────────────────────
+
+export type VitalKey = 'resting_hr' | 'hrv' | 'stress';
+
+/** Days in a tile's line (resting HR, HRV) and in its bars (stress). */
+export const LINE_DAYS = 14;
+export const BAR_DAYS = 7;
+
+export type TileCaption =
+  /** "49–56 · in range", "49–56 · ↑ above": bounds without the unit, which is beside the value. */
+  | { kind: 'range'; bounds: string; zone: Zone; attention: boolean }
+  | { kind: 'building'; n: number }
+  | { kind: 'text'; text: string };
+
+export interface TileView {
+  key: VitalKey;
+  label: string;
+  /** The number as shown, or `null` for a blank ("—"). */
+  value: string | null;
+  /** "bpm", "ms", or ''. */
+  unit: string;
+  /** A day in progress: "31 so far". */
+  soFar: boolean;
+  /** The line (14 days) or the bars (7 days), oldest first, ending on the viewed day; `null` is a blank day. */
+  days: (number | null)[];
+  chart: 'line' | 'bars';
+  /** The range bar, on the displayed numbers; only with a value, a range, and a line. */
+  bar: { lo: number; hi: number; value: number; attention: boolean } | null;
+  caption: TileCaption;
+}
+
+export type VitalsView = { kind: 'note'; sub?: string; note: string } | { kind: 'tiles'; tiles: TileView[] };
+
+/** The words a tile's caption reads as, arrow included. */
+export function tileCaptionText(c: TileCaption): string {
+  switch (c.kind) {
+    case 'text':
+      return c.text;
+    case 'building':
+      return `Building your range — ${c.n} of ${YOUR_RANGE_MIN_VALUES} days so far`;
+    case 'range':
+      return c.zone === 'within'
+        ? `${c.bounds} · in range`
+        : `${c.bounds} · ${c.zone === 'above' ? '↑' : '↓'} ${c.zone}`;
+  }
+}
+
+/** The `n` days ending on `date`, oldest first: each a stored number or `null`. */
+function lastDays(series: ReadonlyMap<string, number>, date: string, n: number): (number | null)[] {
+  return Array.from({ length: n }, (_, i) => series.get(addDays(date, i - (n - 1))) ?? null);
+}
+
 /**
- * The Health panel for `date`, from every loaded DailyHealth row (any order).
- * Only past and today: the panel never mounts on a future day.
+ * The metric tiles for `date` (#491), from every loaded DailyHealth row (any
+ * order): resting HR, HRV and average stress. Only past and today: the slot
+ * never mounts on a future day. No row for the day is one note in their place.
  */
-export function healthView(
+export function vitalsView(
   rows: readonly DailyHealthRow[],
   date: string,
   isToday: boolean,
   fields: readonly string[] = DAILY_HEALTH_FIELDS,
-): HealthView {
+): VitalsView {
   const row = rows.find((r) => r.date === date);
   if (!row) {
     return isToday
@@ -181,35 +252,42 @@ export function healthView(
       : { kind: 'note', note: 'No watch data for this day.' };
   }
 
-  const synced = isToday ? syncTime(row.synced_at, date) : '';
-  // Steps moved to the glance row (#488) and sleep to its own card (#490); HEALTH_METRICS keeps both for Trends.
-  const view: HealthRowView[] = activeMetrics(fields)
-    .filter((metric) => metric.key !== 'steps' && metric.key !== 'sleep')
-    .map((metric) => {
+  const tiles = activeMetrics(fields)
+    .filter(
+      (m): m is HealthMetric & { key: VitalKey } => m.key === 'resting_hr' || m.key === 'hrv' || m.key === 'stress',
+    )
+    .map((metric): TileView => {
+      const series = seriesOf(rows, metric.field);
       const stored = parse(cell(row, metric.field));
+      const bars = metric.key === 'stress';
       const base = {
         key: metric.key,
         label: metric.label,
+        unit: metric.unit.trim(),
+        chart: bars ? ('bars' as const) : ('line' as const),
+        days: lastDays(series, date, bars ? BAR_DAYS : LINE_DAYS),
       };
       if (stored === null) {
-        return {
-          ...base,
-          value: '',
-          captions: [{ kind: 'text', text: isToday ? 'Arrives with the next sync.' : 'No reading this day.' }],
-        };
+        const text = isToday ? 'Arrives with the next sync.' : 'No reading this day.';
+        return { ...base, value: null, soFar: false, bar: null, caption: { kind: 'text', text } };
       }
-      const shown = `${metric.format(metric.toDisplay(stored))}${metric.unit}`;
-      const captions: HealthCaption[] = [];
+      const value = metric.format(metric.toDisplay(stored));
       if (isToday && metric.inProgressToday) {
-        if (metric.key === 'steps' && synced) captions.push({ kind: 'text', text: `As of the ${synced} sync` });
-        return { ...base, value: `${shown} so far`, captions };
+        return { ...base, value, soFar: true, bar: null, caption: { kind: 'text', text: 'Last 7 days' } };
       }
-      captions.push(rangeCaption(metric, stored, seriesOf(rows, metric.field), date));
-      return { ...base, value: shown, captions };
+      const r = displayedRange(metric, stored, series, date);
+      if ('building' in r) {
+        return { ...base, value, soFar: false, bar: null, caption: { kind: 'building', n: r.building } };
+      }
+      return {
+        ...base,
+        value,
+        soFar: false,
+        bar: bars ? null : { lo: r.lo, hi: r.hi, value: r.value, attention: r.attention },
+        caption: { kind: 'range', bounds: boundsText(metric, r.lo, r.hi), zone: r.zone, attention: r.attention },
+      };
     });
-
-  const sub = isToday ? syncedLabel(row.synced_at, date) || undefined : undefined;
-  return { kind: 'rows', sub, rows: view };
+  return { kind: 'tiles', tiles };
 }
 
 // ── The Sleep card (#490) ───────────────────────────────────────────
@@ -271,7 +349,7 @@ export function spokenDuration(seconds: number): string {
 
 /**
  * What the Sleep card draws for `date`, or `null` when no row exists for the
- * day (the Health panel's note says so). Sleep is filed under the wake-up day
+ * day (the metric tiles' note says so). Sleep is filed under the wake-up day
  * and `sleep_total_s` includes awake time.
  */
 export function sleepView(rows: readonly DailyHealthRow[], date: string, isToday: boolean): SleepView | null {

@@ -1,4 +1,5 @@
-// #239 — the Health and Body panels and the shared PanelStatus.
+// #239 — the Body panel, the shared PanelStatus, and the Health card that
+// stands in for the metric tiles (#491) while health data loads or fails.
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, cleanup, fireEvent, act } from '@testing-library/preact';
 
@@ -6,7 +7,7 @@ const loadHealth = vi.fn(async (_t: string) => {});
 vi.mock('../../state/actions', () => ({ loadHealth: (t: string) => loadHealth(t) }));
 
 import { AuthContext, type AuthState } from '../../auth/auth-context';
-import { HealthPanel } from './health-panel';
+import { VitalsTiles } from './metric-tile';
 import { BodyPanel, bodyView } from './body-panel';
 import { PanelStatus } from './panel';
 import { SLOTS } from './slots';
@@ -17,7 +18,7 @@ import {
   type DailyHealthRow,
   type BodyMeasurementRow,
 } from '../../api/health-api';
-import { addDays, type DayState } from '../../day/dates';
+import type { DayState } from '../../day/dates';
 
 afterEach(cleanup);
 beforeEach(() => {
@@ -40,7 +41,7 @@ function bm(over: Partial<BodyMeasurementRow>): BodyMeasurementRow {
   return { ...r, attrib: '0', date: D, ...over };
 }
 
-function mount(Comp: typeof HealthPanel, state: DayState = 'past') {
+function mount(Comp: typeof VitalsTiles, state: DayState = 'past') {
   return render(
     <AuthContext.Provider value={AUTH}>
       <Comp date={D} state={state} today={state === 'today' ? D : '2026-09-30'} />
@@ -49,8 +50,8 @@ function mount(Comp: typeof HealthPanel, state: DayState = 'past') {
 }
 
 describe('slots', () => {
-  it('fills the health and body slots', () => {
-    expect(SLOTS.health).toBe(HealthPanel);
+  it('fills the vitals and body slots', () => {
+    expect(SLOTS.vitals).toBe(VitalsTiles);
     expect(SLOTS.body).toBe(BodyPanel);
   });
 });
@@ -91,7 +92,7 @@ describe('AC5 — each panel follows its own tab', () => {
   it('shows loading, and its own error with Try again calling loadHealth directly', () => {
     dailyHealth.value = { state: 'loading' };
     bodyMeasurements.value = { state: 'error' };
-    const health = mount(HealthPanel);
+    const health = mount(VitalsTiles);
     expect(health.container.querySelector('[role="status"]')!.textContent).toBe('Loading…');
     cleanup();
     const body = mount(BodyPanel);
@@ -106,56 +107,6 @@ describe('AC5 — each panel follows its own tab', () => {
     const { container } = mount(BodyPanel);
     expect(container.querySelector('[role="status"]')).toBeNull();
     expect(container.querySelector('.panel-note')!.textContent).toBe('No weigh-in or blood pressure this day.');
-  });
-});
-
-describe('AC1–AC3 — the Health panel draws its rows', () => {
-  const history = Array.from({ length: 20 }, (_, i) =>
-    hr(addDays(D, -(i + 1)), { resting_hr: i % 2 ? '49' : '55', hrv: i % 2 ? '41' : '50', steps: '9000' }),
-  );
-
-  it('is a dl of div > dt + dd: label, then value, then captions', () => {
-    dailyHealth.value = {
-      state: 'loaded',
-      rows: [
-        ...history,
-        hr(D, { resting_hr: '52', hrv: '', steps: '9412', sleep_total_s: '25920', sleep_deep_s: '3960' }),
-      ],
-    };
-    const { container } = mount(HealthPanel);
-    const rows = [...container.querySelectorAll('dl.health-list > div.health-row')];
-    expect(rows.map((r) => r.querySelector('dt')!.textContent)).toEqual(['Resting HR', 'HRV', 'Average stress']);
-    const hrv = rows[1].querySelector('dd')!;
-    expect(hrv.querySelector('.health-value-blank')!.textContent).toBe('—');
-    expect(hrv.textContent).toBe('—No reading this day.');
-    expect(rows[0].querySelector('dd')!.textContent).toBe('52 bpmYour range 49–55 bpm · in range');
-  });
-
-  it('bolds and colours only the unwelcome direction; the arrow is hidden from screen readers', () => {
-    dailyHealth.value = { state: 'loaded', rows: [...history, hr(D, { resting_hr: '60', hrv: '60', steps: '1' })] };
-    const { container } = mount(HealthPanel);
-    const [rhr, hrvRow] = [...container.querySelectorAll('.health-row')].map((r) => r.querySelector('dd')!);
-    const attention = rhr.querySelector('.health-attention')!;
-    expect(attention.textContent).toBe('↑ above your range');
-    expect(attention.querySelector('[aria-hidden="true"]')!.textContent).toBe('↑ ');
-    expect(hrvRow.querySelector('.health-attention')).toBeNull();
-    expect(hrvRow.textContent).toContain('↑ above your range');
-    expect(container.querySelectorAll('.health-attention')).toHaveLength(1);
-  });
-
-  it('on today before the sync: one note and the sub', () => {
-    dailyHealth.value = { state: 'loaded', rows: history };
-    const { container } = mount(HealthPanel, 'today');
-    expect(container.querySelector('.day-panel-sub')!.textContent).toBe('Not synced yet today');
-    expect(container.querySelectorAll('.panel-note')).toHaveLength(1);
-    expect(container.querySelector('dl')).toBeNull();
-  });
-
-  it('keeps showing loaded rows, not the status, while a reload runs', () => {
-    dailyHealth.value = { state: 'loaded', rows: [hr(D, { steps: '5' })] };
-    const { container } = mount(HealthPanel);
-    expect(container.querySelector('[role="status"]')).toBeNull();
-    expect(container.querySelector('dl')).not.toBeNull();
   });
 });
 
@@ -271,8 +222,8 @@ describe('#276 — focus after a retry succeeds', () => {
     (sig as unknown as { value: unknown }).value = value;
   };
   const loaded = (sig: Sig) => set(sig, { state: 'loaded', rows: [] });
-  const cases: [string, typeof HealthPanel, Sig][] = [
-    ['Health', HealthPanel, dailyHealth],
+  const cases: [string, typeof VitalsTiles, Sig][] = [
+    ['Health', VitalsTiles, dailyHealth],
     ['Body', BodyPanel, bodyMeasurements],
   ];
   const pressRetry = (c: Element) => {
@@ -282,7 +233,7 @@ describe('#276 — focus after a retry succeeds', () => {
 
   it('the panel h2 is programmatically focusable', () => {
     dailyHealth.value = { state: 'loaded', rows: [] };
-    const { container } = mount(HealthPanel);
+    const { container } = mount(VitalsTiles);
     expect(container.querySelector('h2.day-panel-title')!.getAttribute('tabindex')).toBe('-1');
   });
 
@@ -354,7 +305,7 @@ describe('#276 — focus after a retry succeeds', () => {
     bodyMeasurements.value = { state: 'error' };
     const { container } = render(
       <AuthContext.Provider value={AUTH}>
-        <HealthPanel date={D} state="past" today="2026-09-30" />
+        <VitalsTiles date={D} state="past" today="2026-09-30" />
         <BodyPanel date={D} state="past" today="2026-09-30" />
       </AuthContext.Provider>,
     );

@@ -2,13 +2,12 @@
 // of its stages. Reads the `dailyHealth` signal the screen already loads. The
 // rules (which night, the stage shares, the range line) are `sleepView` in
 // `health-rows.ts`; this only draws them. Never mounts on a future day.
+// While the tab is not loaded it draws nothing: the metric tiles' one "Health"
+// card says loading and Try again for the whole area (#491).
 
 import { dailyHealth } from '../../state/store';
-import { loadHealth } from '../../state/actions';
-import { useAuth } from '../../auth/auth-context';
-import { Panel, PanelStatus, type DayPanelProps } from './panel';
-import { Caption } from './health-panel';
-import { sleepView, type SleepStageView, type SleepView } from './health-rows';
+import { Panel, type DayPanelProps } from './panel';
+import { captionText, sleepView, type HealthCaption, type SleepStageView, type SleepView } from './health-rows';
 
 /** A crescent moon in the house style (#405); kept here, as the icon set is counted by its tests. */
 function MoonIcon() {
@@ -28,6 +27,27 @@ function MoonIcon() {
       <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
     </svg>
   );
+}
+
+/** The range line, #239's words: "Your range 6h 40m–8h 00m · in range". */
+function Caption({ c }: { c: HealthCaption }) {
+  if (c.kind === 'range') {
+    // The zone words never break across lines.
+    return (
+      <span class="health-caption">
+        {`Your range ${c.bounds} · `}
+        {c.zone === 'within' ? (
+          <span class="health-zone">in range</span>
+        ) : (
+          <span class={c.attention ? 'health-zone health-attention' : 'health-zone'}>
+            <span aria-hidden="true">{c.zone === 'above' ? '↑ ' : '↓ '}</span>
+            {`${c.zone} your range`}
+          </span>
+        )}
+      </span>
+    );
+  }
+  return <span class="health-caption">{captionText(c)}</span>;
 }
 
 function StageBar({ stages }: { stages: SleepStageView[] }) {
@@ -117,26 +137,13 @@ function SleepBody({ view }: { view: SleepView }) {
 }
 
 export function SleepCard({ date, state }: DayPanelProps) {
-  const { token } = useAuth();
   const tab = dailyHealth.value;
+  if (tab.state !== 'loaded') return null;
   const icon = (
     <span class="sleep-icon">
       <MoonIcon />
     </span>
   );
-  if (tab.state !== 'loaded') {
-    return (
-      <Panel title="Sleep" icon={icon}>
-        <PanelStatus
-          status={tab.state}
-          what="your sleep"
-          onRetry={() => {
-            if (token) void loadHealth(token);
-          }}
-        />
-      </Panel>
-    );
-  }
   const view = sleepView(tab.rows, date, state === 'today');
   if (!view) return null;
   return (

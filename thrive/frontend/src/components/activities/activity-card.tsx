@@ -5,7 +5,11 @@
 import { navigate } from '../../router/router';
 import type { WorkoutWithRow } from '../../api/types';
 import { formatEstimate, secondsToMinutes } from '../../api/duration';
+import { exercises, loading, sets } from '../../state/store';
 import { TYPE_ICONS } from './activities-filters';
+import { BodyFigure } from './body-figure';
+import { StretchFigure } from './stretch-figure';
+import { workedGroups, type MuscleGroup } from './muscle-regions';
 import {
   activityCardAriaLabel,
   cardDay,
@@ -18,9 +22,10 @@ import {
 } from './activities-helpers';
 
 /**
- * The visual slot. Until the muscle figure (#529) and the route thumbnail (#530)
- * replace it, every card draws the type's icon on a tint of its colour. Hidden
- * from assistive technology: the card's name already says the type.
+ * The visual slot. A weight card with a worked muscle group draws the muscle
+ * figure and a stretch card the side bend (#529); until the route thumbnail
+ * (#530) arrives every other card draws the type's icon on a tint of its colour.
+ * Hidden from assistive technology: the card's name already says the type.
  */
 function TypeTile({ type }: { type: WorkoutWithRow['type'] }) {
   const Icon = TYPE_ICONS[type];
@@ -35,6 +40,14 @@ export function ActivityCard({ workout: w, todayStr }: { workout: WorkoutWithRow
   const Icon = TYPE_ICONS[w.type];
   const figure = cardFigure(w);
   const stats = cardStats(w);
+  // While loading, the sets and exercises may be missing: keep the tile, never an empty figure.
+  const worked: MuscleGroup[] =
+    w.type === 'weight' && !loading.value
+      ? workedGroups(
+          sets.value.filter((s) => s.workout_id === w.id),
+          exercises.value,
+        )
+      : [];
 
   return (
     <button
@@ -42,7 +55,7 @@ export function ActivityCard({ workout: w, todayStr }: { workout: WorkoutWithRow
       data-focus-key={`workout:${w.id}`}
       class={`workout-card activity-card workout-card-${w.type}`}
       onClick={() => navigate(`/history/${w.id}`)}
-      aria-label={activityCardAriaLabel(w)}
+      aria-label={activityCardAriaLabel(w, worked)}
     >
       <span class="activity-card-body">
         <span class="activity-card-figure-line">
@@ -76,7 +89,17 @@ export function ActivityCard({ workout: w, todayStr }: { workout: WorkoutWithRow
           {cardDay(w.date, todayStr)} · {w.name || w.type}
         </span>
       </span>
-      <TypeTile type={w.type} />
+      {worked.length > 0 ? (
+        <span class="activity-visual" aria-hidden="true">
+          <BodyFigure worked={new Set(worked)} />
+        </span>
+      ) : w.type === 'stretch' ? (
+        <span class="activity-visual" aria-hidden="true">
+          <StretchFigure />
+        </span>
+      ) : (
+        <TypeTile type={w.type} />
+      )}
     </button>
   );
 }

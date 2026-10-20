@@ -80,6 +80,10 @@ Google token, never from Drive.
 - **The tokens** (`--map-track`, `--map-track-casing`, widths, `--map-dot-size`,
   `--detail-map-height`) are in `global.css`, not overridden in dark: the base map is light in both
   themes.
+- **Route thumbnails (#530).** A tracked card on the Activities list draws the route as a plain SVG
+  line (`components/activities/route-thumbnail.tsx`), with no basemap and no Maps request or key. Its
+  track comes from the same session cache and two-at-a-time queue as the detail screen
+  (`src/maps/track-cache.ts`), requested when the card is within a screen height of the viewport.
 - A change under `geo/` rebuilds Thrive (`thrive.yml` and `thrive-pages.yml` trigger on `geo/**`).
 
 ## Key commands

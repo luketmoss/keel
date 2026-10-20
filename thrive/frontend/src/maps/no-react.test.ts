@@ -13,6 +13,8 @@ const FILES = [
   'google-maps.ts',
   'draw-route.ts',
   '../components/activities/route-section.tsx',
+  '../components/activities/route-thumbnail.tsx',
+  'track-cache.ts',
   '../api/thrive-api.ts',
   '../api/demo-track.ts',
 ];

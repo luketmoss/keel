@@ -1,18 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   groupWorkoutsByDate,
-  getWeekStreak,
-  describeWeekStreak,
-  getWeekWorkoutCount,
-  getWeekTotalMinutes,
-  getLastWeekWorkoutCount,
-  getLastWeekTotalMinutes,
-  getMonthWorkoutCount,
-  getMonthTotalMinutes,
-  getWeekCardioDistance,
-  getWeekCardioAscent,
-  coverageSuffix,
-  cardioNoun,
   getWorkoutTags,
   EQUIPMENT_TAGS,
   toLocalDateStr,
@@ -22,6 +10,17 @@ import {
   effortForSpeech,
   workoutCardAriaLabel,
   pluralExercise,
+  TYPE_ORDER,
+  monthOf,
+  monthName,
+  monthYearLabel,
+  monthTitle,
+  monthOptions,
+  typesPresent,
+  typeCounts,
+  summarizeMonth,
+  splitDuration,
+  formatMonthTime,
 } from './activities-helpers';
 import type { WorkoutWithRow, SetWithRow, ExerciseWithRow } from '../../api/types';
 
@@ -195,308 +194,6 @@ describe('groupWorkoutsByDate', () => {
     const groups = groupWorkoutsByDate(workouts, today);
     expect(groups[0].workouts[0].date).toBe('2026-03-18');
     expect(groups[0].workouts[1].date).toBe('2026-03-16');
-  });
-});
-
-// ── Weekly streak ────────────────────────────────────────────────────
-
-describe('getWeekStreak', () => {
-  // 2026-03-15 is a Sunday; Mon of that week = 2026-03-09
-  const today = '2026-03-15';
-
-  it('returns 7 days', () => {
-    expect(getWeekStreak([], today)).toHaveLength(7);
-  });
-
-  it('starts on Monday', () => {
-    const days = getWeekStreak([], today);
-    expect(days[0].date).toBe('2026-03-09'); // Monday
-    expect(days[0].label).toBe('M');
-  });
-
-  it('ends on Sunday', () => {
-    const days = getWeekStreak([], today);
-    expect(days[6].date).toBe('2026-03-15'); // Sunday
-    expect(days[6].label).toBe('S');
-  });
-
-  it('marks today correctly', () => {
-    const days = getWeekStreak([], today);
-    const todayDay = days.find((d) => d.isToday);
-    expect(todayDay?.date).toBe('2026-03-15');
-    expect(todayDay?.isToday).toBe(true);
-    expect(days.filter((d) => d.isToday)).toHaveLength(1);
-  });
-
-  it('marks days with workouts as hasWorkout=true', () => {
-    const workouts = [
-      makeWorkout({ id: 'w1', date: '2026-03-09' }), // Monday
-      makeWorkout({ id: 'w2', date: '2026-03-11' }), // Wednesday
-    ];
-    const days = getWeekStreak(workouts, today);
-    expect(days[0].hasWorkout).toBe(true); // Mon
-    expect(days[1].hasWorkout).toBe(false); // Tue
-    expect(days[2].hasWorkout).toBe(true); // Wed
-    expect(days[3].hasWorkout).toBe(false); // Thu
-  });
-
-  it('ignores workouts outside the current week', () => {
-    const workouts = [
-      makeWorkout({ id: 'w1', date: '2026-03-01' }), // last week
-      makeWorkout({ id: 'w2', date: '2026-03-20' }), // next week
-    ];
-    const days = getWeekStreak(workouts, today);
-    expect(days.every((d) => !d.hasWorkout)).toBe(true);
-  });
-
-  it('all days empty when no workouts', () => {
-    const days = getWeekStreak([], today);
-    expect(days.every((d) => !d.hasWorkout)).toBe(true);
-  });
-
-  it('works correctly when today is Monday', () => {
-    const monday = '2026-03-09';
-    const days = getWeekStreak([], monday);
-    expect(days[0].date).toBe('2026-03-09');
-    expect(days[6].date).toBe('2026-03-15');
-    expect(days[0].isToday).toBe(true);
-  });
-
-  it('uses local dates (no UTC shift from toISOString)', () => {
-    const days = getWeekStreak([], '2026-03-15');
-    const dates = days.map((d) => d.date);
-    expect(dates).toEqual([
-      '2026-03-09',
-      '2026-03-10',
-      '2026-03-11',
-      '2026-03-12',
-      '2026-03-13',
-      '2026-03-14',
-      '2026-03-15',
-    ]);
-  });
-});
-
-describe('getWeekWorkoutCount', () => {
-  const today = '2026-03-15'; // Sunday; week = Mar 9–15
-
-  it('returns 0 for no workouts', () => {
-    expect(getWeekWorkoutCount([], today)).toBe(0);
-  });
-
-  it('counts workouts only within the current week', () => {
-    const workouts = [
-      makeWorkout({ id: 'w1', date: '2026-03-09' }),
-      makeWorkout({ id: 'w2', date: '2026-03-11' }),
-      makeWorkout({ id: 'w3', date: '2026-03-01' }), // outside week
-    ];
-    expect(getWeekWorkoutCount(workouts, today)).toBe(2);
-  });
-
-  it('counts multiple workouts on the same day', () => {
-    const workouts = [
-      makeWorkout({ id: 'w1', date: '2026-03-09', time: '07:00' }),
-      makeWorkout({ id: 'w2', date: '2026-03-09', time: '18:00' }),
-    ];
-    expect(getWeekWorkoutCount(workouts, today)).toBe(2);
-  });
-});
-
-// ── Weekly total minutes ─────────────────────────────────────────────
-
-describe('getWeekTotalMinutes', () => {
-  const today = '2026-03-15'; // Sunday; week = Mar 9–15
-
-  it('AC1: sums all durations when every workout has one', () => {
-    const workouts = [
-      makeWorkout({ id: 'w1', date: '2026-03-09', elapsed_seconds: '3600' }),
-      makeWorkout({ id: 'w2', date: '2026-03-11', elapsed_seconds: '2700' }),
-      makeWorkout({ id: 'w3', date: '2026-03-15', elapsed_seconds: '2700' }),
-    ];
-    expect(getWeekTotalMinutes(workouts, today)).toBe(150);
-  });
-
-  it('AC2: sums only workouts that have a duration (partial)', () => {
-    const workouts = [
-      makeWorkout({ id: 'w1', date: '2026-03-09', elapsed_seconds: '3600' }),
-      makeWorkout({ id: 'w2', date: '2026-03-11', elapsed_seconds: '' }),
-      makeWorkout({ id: 'w3', date: '2026-03-13', elapsed_seconds: '2700' }),
-    ];
-    expect(getWeekTotalMinutes(workouts, today)).toBe(105);
-  });
-
-  it('AC3: returns 0 when no workouts have a duration', () => {
-    const workouts = [
-      makeWorkout({ id: 'w1', date: '2026-03-09', elapsed_seconds: '' }),
-      makeWorkout({ id: 'w2', date: '2026-03-11', elapsed_seconds: '' }),
-    ];
-    expect(getWeekTotalMinutes(workouts, today)).toBe(0);
-  });
-
-  it('AC4: returns 0 for no workouts', () => {
-    expect(getWeekTotalMinutes([], today)).toBe(0);
-  });
-
-  it('ignores workouts outside the current week', () => {
-    const workouts = [
-      makeWorkout({ id: 'w1', date: '2026-03-09', elapsed_seconds: '3600' }),
-      makeWorkout({ id: 'w2', date: '2026-03-01', elapsed_seconds: '5400' }), // outside week
-    ];
-    expect(getWeekTotalMinutes(workouts, today)).toBe(60);
-  });
-});
-
-// ── Last week stats ──────────────────────────────────────────────────
-// today = '2026-03-18' (Wed); last week = Mar 9–15
-
-describe('getLastWeekWorkoutCount', () => {
-  const today = '2026-03-18';
-
-  it('returns 0 for no workouts', () => {
-    expect(getLastWeekWorkoutCount([], today)).toBe(0);
-  });
-
-  it('counts workouts in the previous Mon–Sun week', () => {
-    const workouts = [
-      makeWorkout({ id: 'w1', date: '2026-03-09' }), // Mon last week
-      makeWorkout({ id: 'w2', date: '2026-03-12' }), // Thu last week
-      makeWorkout({ id: 'w3', date: '2026-03-15' }), // Sun last week
-      makeWorkout({ id: 'w4', date: '2026-03-16' }), // This week (excluded)
-      makeWorkout({ id: 'w5', date: '2026-03-08' }), // Earlier (excluded)
-    ];
-    expect(getLastWeekWorkoutCount(workouts, today)).toBe(3);
-  });
-
-  it('returns 0 when no workouts fall in last week', () => {
-    const workouts = [
-      makeWorkout({ id: 'w1', date: '2026-03-17' }), // This week
-      makeWorkout({ id: 'w2', date: '2026-03-01' }), // Earlier
-    ];
-    expect(getLastWeekWorkoutCount(workouts, today)).toBe(0);
-  });
-
-  it('AC4: planned workouts filtered by caller are excluded', () => {
-    const completed = makeWorkout({ id: 'w1', date: '2026-03-11', status: '' });
-    expect(getLastWeekWorkoutCount([completed], today)).toBe(1);
-  });
-});
-
-describe('getLastWeekTotalMinutes', () => {
-  const today = '2026-03-18'; // last week = Mar 9–15
-
-  it('returns 0 for no workouts', () => {
-    expect(getLastWeekTotalMinutes([], today)).toBe(0);
-  });
-
-  it('sums durations for last week only', () => {
-    const workouts = [
-      makeWorkout({ id: 'w1', date: '2026-03-09', elapsed_seconds: '3600' }),
-      makeWorkout({ id: 'w2', date: '2026-03-12', elapsed_seconds: '2700' }),
-      makeWorkout({ id: 'w3', date: '2026-03-16', elapsed_seconds: '1800' }), // This week (excluded)
-      makeWorkout({ id: 'w4', date: '2026-03-01', elapsed_seconds: '5400' }), // Earlier (excluded)
-    ];
-    expect(getLastWeekTotalMinutes(workouts, today)).toBe(105);
-  });
-
-  it('skips workouts with no duration (contributes 0 min but still counted)', () => {
-    const workouts = [
-      makeWorkout({ id: 'w1', date: '2026-03-09', elapsed_seconds: '3600' }),
-      makeWorkout({ id: 'w2', date: '2026-03-11', elapsed_seconds: '' }),
-    ];
-    expect(getLastWeekTotalMinutes(workouts, today)).toBe(60);
-  });
-});
-
-// ── This month stats ─────────────────────────────────────────────────
-// today = '2026-03-18'; this month = March 2026
-
-describe('getMonthWorkoutCount', () => {
-  const today = '2026-03-18';
-
-  it('returns 0 for no workouts', () => {
-    expect(getMonthWorkoutCount([], today)).toBe(0);
-  });
-
-  it('counts workouts in the current calendar month', () => {
-    const workouts = [
-      makeWorkout({ id: 'w1', date: '2026-03-01' }),
-      makeWorkout({ id: 'w2', date: '2026-03-15' }),
-      makeWorkout({ id: 'w3', date: '2026-03-18' }),
-      makeWorkout({ id: 'w4', date: '2026-02-28' }), // Last month (excluded)
-      makeWorkout({ id: 'w5', date: '2026-04-01' }), // Next month (excluded)
-    ];
-    expect(getMonthWorkoutCount(workouts, today)).toBe(3);
-  });
-
-  it('returns 0 when no workouts this month', () => {
-    const workouts = [makeWorkout({ date: '2026-02-15' })];
-    expect(getMonthWorkoutCount(workouts, today)).toBe(0);
-  });
-
-  it('handles January correctly (year boundary)', () => {
-    const workouts = [
-      makeWorkout({ id: 'w1', date: '2026-01-10' }),
-      makeWorkout({ id: 'w2', date: '2025-12-31' }), // Last year (excluded)
-    ];
-    expect(getMonthWorkoutCount(workouts, '2026-01-15')).toBe(1);
-  });
-
-  it('AC5: excludes planned workouts when caller passes completedWorkouts', () => {
-    const completed = makeWorkout({ id: 'w1', date: '2026-03-15', status: '' });
-    expect(getMonthWorkoutCount([completed], today)).toBe(1);
-  });
-});
-
-describe('getMonthTotalMinutes', () => {
-  const today = '2026-03-18';
-
-  it('returns 0 for no workouts', () => {
-    expect(getMonthTotalMinutes([], today)).toBe(0);
-  });
-
-  it('sums durations for this month only', () => {
-    const workouts = [
-      makeWorkout({ id: 'w1', date: '2026-03-01', elapsed_seconds: '3600' }),
-      makeWorkout({ id: 'w2', date: '2026-03-15', elapsed_seconds: '2700' }),
-      makeWorkout({ id: 'w3', date: '2026-02-28', elapsed_seconds: '5400' }), // Last month (excluded)
-    ];
-    expect(getMonthTotalMinutes(workouts, today)).toBe(105);
-  });
-
-  it('AC4: workouts with no duration contribute 0 min but count in workout count', () => {
-    const workouts = [
-      makeWorkout({ id: 'w1', date: '2026-03-10', elapsed_seconds: '3600' }),
-      makeWorkout({ id: 'w2', date: '2026-03-12', elapsed_seconds: '' }),
-    ];
-    expect(getMonthTotalMinutes(workouts, today)).toBe(60);
-    expect(getMonthWorkoutCount(workouts, today)).toBe(2);
-  });
-});
-
-// ── Planned workout exclusion (caller responsibility) ────────────────
-
-describe('week stats exclude planned workouts (via caller filtering)', () => {
-  const today = '2026-03-15'; // week = Mar 9–15
-
-  it('getWeekStreak: planned workouts filtered out by caller are not counted', () => {
-    const completed = makeWorkout({ id: 'w_done', date: '2026-03-09', status: '' });
-    const completedOnly = [completed];
-    const days = getWeekStreak(completedOnly, today);
-
-    expect(days[0].hasWorkout).toBe(true); // Mon Mar 9 — completed
-    expect(days[2].hasWorkout).toBe(false); // Wed Mar 11 — planned was excluded
-  });
-
-  it('getWeekWorkoutCount: planned workouts filtered out by caller are not counted', () => {
-    const completed = makeWorkout({ id: 'w_done', date: '2026-03-09', status: '' });
-    const completedOnly = [completed];
-    expect(getWeekWorkoutCount(completedOnly, today)).toBe(1);
-  });
-
-  it('getWeekTotalMinutes: planned workouts filtered out by caller are not summed', () => {
-    const completed = makeWorkout({ id: 'w_done', date: '2026-03-09', elapsed_seconds: '3600', status: '' });
-    const completedOnly = [completed];
-    expect(getWeekTotalMinutes(completedOnly, today)).toBe(60);
   });
 });
 
@@ -763,143 +460,6 @@ describe('sortPlannedWorkouts', () => {
   });
 });
 
-// Issue #105 — cardio aggregation with coverage.
-describe('cardio aggregation (#105)', () => {
-  const TODAY = '2026-03-15'; // a Sunday; the Mon–Sun week is 03-09..03-15
-
-  function ride(overrides: Partial<WorkoutWithRow> = {}): WorkoutWithRow {
-    return makeWorkout({ type: 'bike', date: '2026-03-11', ...overrides });
-  }
-
-  describe('getWeekCardioDistance', () => {
-    // AC4: all workouts have data
-    it('sums every ride when all recorded a distance', () => {
-      const result = getWeekCardioDistance(
-        [ride({ id: 'w1', distance_m: '16093' }), ride({ id: 'w2', distance_m: '8047' })],
-        TODAY,
-      );
-      expect(result).toEqual({ total: 24140, withData: 2, of: 2 });
-    });
-
-    // AC4: none have data — skipped, not counted as zero
-    it('reports a zero total but full denominator when none recorded one', () => {
-      const result = getWeekCardioDistance(
-        [ride({ id: 'w1', distance_m: '' }), ride({ id: 'w2', distance_m: '' })],
-        TODAY,
-      );
-      expect(result).toEqual({ total: 0, withData: 0, of: 2 });
-    });
-
-    // AC4: some have data — the gap must be visible, not inferred
-    it('skips rides with no distance while still counting them in the denominator', () => {
-      const result = getWeekCardioDistance(
-        [
-          ride({ id: 'w1', distance_m: '16093' }),
-          ride({ id: 'w2', distance_m: '' }),
-          ride({ id: 'w3', distance_m: '8047' }),
-          ride({ id: 'w4', distance_m: '' }),
-          ride({ id: 'w5', distance_m: '4828' }),
-        ],
-        TODAY,
-      );
-      expect(result).toEqual({ total: 28968, withData: 3, of: 5 });
-    });
-
-    // AC4: the period is empty
-    it('reports an empty period as zero of zero', () => {
-      expect(getWeekCardioDistance([], TODAY)).toEqual({ total: 0, withData: 0, of: 0 });
-    });
-
-    it('ignores non-cardio workouts entirely', () => {
-      const result = getWeekCardioDistance(
-        [
-          ride({ id: 'w1', distance_m: '16093' }),
-          makeWorkout({ id: 'w2', type: 'weight', date: '2026-03-11' }),
-          makeWorkout({ id: 'w3', type: 'stretch', date: '2026-03-12' }),
-        ],
-        TODAY,
-      );
-      expect(result).toEqual({ total: 16093, withData: 1, of: 1 });
-    });
-
-    it('counts hikes alongside rides', () => {
-      const result = getWeekCardioDistance(
-        [
-          ride({ id: 'w1', distance_m: '16093' }),
-          makeWorkout({ id: 'w2', type: 'hike', date: '2026-03-12', distance_m: '8047' }),
-        ],
-        TODAY,
-      );
-      expect(result).toEqual({ total: 24140, withData: 2, of: 2 });
-    });
-
-    it('excludes activities outside the week', () => {
-      const result = getWeekCardioDistance(
-        [
-          ride({ id: 'w1', date: '2026-03-11', distance_m: '16093' }),
-          ride({ id: 'w2', date: '2026-03-01', distance_m: '99999' }),
-        ],
-        TODAY,
-      );
-      expect(result).toEqual({ total: 16093, withData: 1, of: 1 });
-    });
-  });
-
-  describe('getWeekCardioAscent', () => {
-    // AC2: ascent coverage is independent of distance coverage
-    it('counts ascent independently of distance', () => {
-      const workouts = [
-        ride({ id: 'w1', distance_m: '16093', ascent_m: '457' }),
-        ride({ id: 'w2', distance_m: '8047', ascent_m: '' }),
-      ];
-      expect(getWeekCardioDistance(workouts, TODAY)).toEqual({ total: 24140, withData: 2, of: 2 });
-      expect(getWeekCardioAscent(workouts, TODAY)).toEqual({ total: 457, withData: 1, of: 2 });
-    });
-
-    it('reports an empty period as zero of zero', () => {
-      expect(getWeekCardioAscent([], TODAY)).toEqual({ total: 0, withData: 0, of: 0 });
-    });
-  });
-});
-
-describe('coverageSuffix (#105)', () => {
-  // AC2: at full coverage the total stands alone — coverage is not shouted.
-  it('renders nothing when every activity contributed', () => {
-    expect(coverageSuffix({ total: 100, withData: 5, of: 5 })).toBe('');
-  });
-
-  // AC2: names what is being counted, so it cannot read as "4 of 5 miles".
-  it('names what is counted when there is a gap', () => {
-    expect(coverageSuffix({ total: 100, withData: 4, of: 5 })).toBe(' · 4/5 rides');
-  });
-
-  it('reports a total nobody contributed to', () => {
-    expect(coverageSuffix({ total: 0, withData: 0, of: 3 })).toBe(' · 0/3 rides');
-  });
-
-  it('renders nothing for an empty period', () => {
-    expect(coverageSuffix({ total: 0, withData: 0, of: 0 })).toBe('');
-  });
-});
-
-describe('cardioNoun (#105)', () => {
-  const bike = (id: string) => makeWorkout({ id, type: 'bike' });
-  const hike = (id: string) => makeWorkout({ id, type: 'hike' });
-
-  // AC2: coverage must name what is actually being counted.
-  it('says rides when the week is all rides', () => {
-    expect(cardioNoun([bike('w1'), bike('w2')])).toBe('rides');
-  });
-
-  it('says hikes when the week is all hikes, not rides', () => {
-    expect(cardioNoun([hike('w1'), hike('w2')])).toBe('hikes');
-  });
-
-  it('falls back to a neutral noun for a mixed week', () => {
-    expect(cardioNoun([bike('w1'), hike('w2')])).toBe('activities');
-  });
-});
-
 describe('effortForSpeech (#113 AC5)', () => {
   it('speaks each level in lower case with the word "effort"', () => {
     expect(effortForSpeech('Easy')).toBe('easy effort');
@@ -974,20 +534,116 @@ describe('pluralExercise (#113)', () => {
   });
 });
 
-describe('describeWeekStreak (#293 AC5)', () => {
-  const today = '2026-03-15'; // Sunday; week is Mon 03-09 to Sun 03-15
-  const w = (date: string) => ({ date }) as any;
+// ── Month summary (#527) ─────────────────────────────────────────────
 
-  it('names the days with a workout, in week order', () => {
-    const days = getWeekStreak([w('2026-03-12'), w('2026-03-09'), w('2026-03-10')], today);
-    expect(describeWeekStreak(days)).toBe('Workouts logged on Monday, Tuesday, Thursday this week.');
+describe('month names (#527)', () => {
+  it('monthOf takes the YYYY-MM of a date', () => {
+    expect(monthOf('2026-10-20')).toBe('2026-10');
   });
 
-  it('says so when there are none', () => {
-    expect(describeWeekStreak(getWeekStreak([], today))).toBe('No workouts logged yet this week.');
+  it('names the month, with its year for the button and picker', () => {
+    expect(monthName('2026-09')).toBe('September');
+    expect(monthYearLabel('2026-10')).toBe('October 2026');
   });
 
-  it('ignores workouts outside the week', () => {
-    expect(describeWeekStreak(getWeekStreak([w('2026-03-08')], today))).toBe('No workouts logged yet this week.');
+  it('titles the current month "so far" and a past month by name', () => {
+    expect(monthTitle('2026-10', '2026-10')).toBe('October so far');
+    expect(monthTitle('2026-09', '2026-10')).toBe('September');
+  });
+
+  it('adds the year to a past month outside the current year', () => {
+    expect(monthTitle('2025-12', '2026-10')).toBe('December 2025');
+  });
+});
+
+describe('monthOptions (#527)', () => {
+  const at = (date: string, extra: Partial<WorkoutWithRow> = {}) =>
+    makeWorkout({ id: date + extra.type, date, ...extra });
+
+  it('always lists the current month, even with nothing in it', () => {
+    expect(monthOptions([], '2026-10')).toEqual([{ ym: '2026-10', count: 0 }]);
+  });
+
+  it('lists each earlier month with a completed activity, newest first, with its count', () => {
+    const ws = [at('2026-08-02'), at('2026-09-03'), at('2026-09-20'), at('2026-10-01'), at('2026-05-09')];
+    expect(monthOptions(ws, '2026-10')).toEqual([
+      { ym: '2026-10', count: 1 },
+      { ym: '2026-09', count: 2 },
+      { ym: '2026-08', count: 1 },
+      { ym: '2026-05', count: 1 },
+    ]);
+  });
+
+  it('omits a month with none, so no past option opens on an empty list', () => {
+    const ws = [at('2026-10-01'), at('2026-07-01')];
+    expect(monthOptions(ws, '2026-10').map((o) => o.ym)).toEqual(['2026-10', '2026-07']);
+  });
+
+  it('counts every type', () => {
+    const ws = [at('2026-09-03', { type: 'bike' }), at('2026-09-04', { type: 'weight' })];
+    expect(monthOptions(ws, '2026-10')[1]).toEqual({ ym: '2026-09', count: 2 });
+  });
+});
+
+describe('typesPresent and typeCounts (#527)', () => {
+  const of = (...types: WorkoutWithRow['type'][]) => types.map((type, i) => makeWorkout({ id: `w${i}`, type }));
+
+  it('orders the types Weight, Bike, Stretch, Hike, Run, Walk', () => {
+    expect(TYPE_ORDER).toEqual(['weight', 'bike', 'stretch', 'hike', 'run', 'walk']);
+    expect(typesPresent(of('walk', 'hike', 'weight', 'weight'))).toEqual(['weight', 'hike', 'walk']);
+  });
+
+  it('counts per type in chip order and leaves out a type with none', () => {
+    expect(typeCounts(of('stretch', 'weight', 'weight', 'bike', 'weight'))).toEqual([
+      { type: 'weight', count: 3 },
+      { type: 'bike', count: 1 },
+      { type: 'stretch', count: 1 },
+    ]);
+  });
+});
+
+describe('summarizeMonth (#527)', () => {
+  it('counts, sums durations and sums distance in miles', () => {
+    const s = summarizeMonth([
+      makeWorkout({ id: 'a', elapsed_seconds: '3600', distance_m: '1609.344' }),
+      makeWorkout({ id: 'b', elapsed_seconds: '1800', distance_m: '3218.688' }),
+    ]);
+    expect(s).toEqual({ count: 2, seconds: 5400, timed: 2, miles: 3 });
+  });
+
+  it('skips an activity with no duration instead of counting it as zero', () => {
+    const s = summarizeMonth([
+      makeWorkout({ id: 'a', elapsed_seconds: '3600' }),
+      makeWorkout({ id: 'b', elapsed_seconds: '' }),
+    ]);
+    expect(s.count).toBe(2);
+    expect(s.timed).toBe(1);
+    expect(s.seconds).toBe(3600);
+  });
+
+  it('has no distance when no activity has one, and keeps a measured zero', () => {
+    expect(summarizeMonth([makeWorkout({ distance_m: '' })]).miles).toBeNull();
+    expect(summarizeMonth([makeWorkout({ distance_m: '0' })]).miles).toBe(0);
+  });
+
+  it('sums only the distances that exist', () => {
+    const s = summarizeMonth([
+      makeWorkout({ id: 'a', distance_m: '1609.344' }),
+      makeWorkout({ id: 'b', distance_m: '' }),
+    ]);
+    expect(s.miles).toBe(1);
+  });
+});
+
+describe('month time (#527)', () => {
+  it('rounds once from the total, then splits into hours and minutes', () => {
+    expect(splitDuration(14 * 3600 + 2 * 60 + 20)).toEqual({ hours: 14, minutes: 2 });
+    expect(splitDuration(45 * 60)).toEqual({ hours: 0, minutes: 45 });
+  });
+
+  it('formats "14 h 2" over an hour and "45 min" under', () => {
+    expect(formatMonthTime(14 * 3600 + 2 * 60)).toBe('14 h 2');
+    expect(formatMonthTime(45 * 60)).toBe('45 min');
+    expect(formatMonthTime(3600)).toBe('1 h 0');
   });
 });

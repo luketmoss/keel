@@ -1,4 +1,5 @@
-import type { WorkoutWithRow, SetWithRow, ExerciseWithRow, Effort } from '../../api/types';
+import type { WorkoutWithRow, SetWithRow, ExerciseWithRow, Effort, WorkoutType } from '../../api/types';
+import { metersToMiles } from '../../api/units';
 import { formatDuration } from '../../api/duration';
 import { provenanceSpeech } from '../../api/provenance';
 
@@ -59,17 +60,6 @@ export function groupWorkoutsByDate(workouts: WorkoutWithRow[], todayStr: string
   return ORDER.filter((label) => groups.has(label)).map((label) => ({ label, workouts: groups.get(label)! }));
 }
 
-// ── Weekly streak ────────────────────────────────────────────────────
-
-export interface WeekDay {
-  label: string; // 'M' | 'T' | 'W' | 'T' | 'F' | 'S' | 'S'
-  date: string; // ISO yyyy-mm-dd
-  hasWorkout: boolean;
-  isToday: boolean;
-}
-
-const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-
 /** Format a Date as 'YYYY-MM-DD' in local time (avoids UTC shift from toISOString). */
 export function toLocalDateStr(d: Date): string {
   const y = d.getFullYear();
@@ -78,152 +68,144 @@ export function toLocalDateStr(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-/**
- * Returns the Mon–Sun week days for the week containing `todayStr`,
- * with `hasWorkout` true for days that have at least one workout.
- * Reads from all workouts (unfiltered).
- */
-export function getWeekStreak(allWorkouts: WorkoutWithRow[], todayStr: string): WeekDay[] {
-  const today = new Date(todayStr + 'T00:00:00');
-  const day = today.getDay(); // 0=Sun…6=Sat
-  const diffToMonday = day === 0 ? 6 : day - 1;
+// ── Month summary (#527) ─────────────────────────────────────────────
 
-  const monday = new Date(today);
-  monday.setDate(today.getDate() - diffToMonday);
+/** The six types in the order the chips, the split bar and its legend use. */
+export const TYPE_ORDER: readonly WorkoutType[] = ['weight', 'bike', 'stretch', 'hike', 'run', 'walk'];
 
-  // Build set of workout dates this week for fast lookup
-  const workoutDates = new Set(allWorkouts.map((w) => w.date));
+/** The app's existing type words, capitalised for a chip. */
+export const TYPE_WORDS: Record<WorkoutType, string> = {
+  weight: 'Weight',
+  bike: 'Bike',
+  stretch: 'Stretch',
+  hike: 'Hike',
+  run: 'Run',
+  walk: 'Walk',
+};
 
-  return DAY_LABELS.map((label, i) => {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    const dateStr = toLocalDateStr(d);
-    return {
-      label,
-      date: dateStr,
-      hasWorkout: workoutDates.has(dateStr),
-      isToday: dateStr === todayStr,
-    };
-  });
+const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+/** 'YYYY-MM' of a 'YYYY-MM-DD' date. */
+export function monthOf(date: string): string {
+  return date.slice(0, 7);
 }
 
-const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-
-/**
- * The week streak as text (#293): the dots are aria-hidden and say nothing to
- * a screen reader, so the days with a workout are named here, in week order.
- */
-export function describeWeekStreak(days: WeekDay[]): string {
-  const names = days.flatMap((d, i) => (d.hasWorkout ? [DAY_NAMES[i]] : []));
-  if (names.length === 0) return 'No workouts logged yet this week.';
-  return `Workouts logged on ${names.join(', ')} this week.`;
+/** The month's name alone: "October". */
+export function monthName(ym: string): string {
+  return MONTH_NAMES[parseInt(ym.slice(5, 7), 10) - 1] ?? ym;
 }
 
-/**
- * Returns the count of workouts in the Mon–Sun week containing `todayStr`.
- */
-export function getWeekWorkoutCount(allWorkouts: WorkoutWithRow[], todayStr: string): number {
-  const days = getWeekStreak(allWorkouts, todayStr);
-  const weekDates = new Set(days.map((d) => d.date));
-  return allWorkouts.filter((w) => weekDates.has(w.date)).length;
+/** The month button's text and the picker's options: "October 2026". */
+export function monthYearLabel(ym: string): string {
+  return `${monthName(ym)} ${ym.slice(0, 4)}`;
 }
 
 /**
- * Returns the total duration in minutes for workouts in the Mon–Sun week
- * containing `todayStr`. Sums elapsed seconds and converts once at the end, so
- * no per-workout rounding accumulates. Workouts with an empty or non-numeric
- * `elapsed_seconds` are skipped, not counted as zero.
+ * The summary card's title: "October so far" while the month is the current
+ * one, otherwise its name, with the year when it is not the current year.
  */
-export function getWeekTotalMinutes(allWorkouts: WorkoutWithRow[], todayStr: string): number {
-  const days = getWeekStreak(allWorkouts, todayStr);
-  const weekDates = new Set(days.map((d) => d.date));
-  let total = 0;
-  for (const w of allWorkouts) {
-    if (!weekDates.has(w.date)) continue;
-    const seconds = parseInt(w.elapsed_seconds, 10);
-    if (!isNaN(seconds)) total += seconds;
+export function monthTitle(ym: string, currentYm: string): string {
+  if (ym === currentYm) return `${monthName(ym)} so far`;
+  return ym.slice(0, 4) === currentYm.slice(0, 4) ? monthName(ym) : monthYearLabel(ym);
+}
+
+export interface MonthOption {
+  ym: string;
+  count: number;
+}
+
+/**
+ * The picker's options, newest first: the current month always, then each
+ * earlier month with at least one completed activity. `completed` must already
+ * exclude planned and active rows; the count ignores the type chip.
+ */
+export function monthOptions(completed: WorkoutWithRow[], currentYm: string): MonthOption[] {
+  const counts = new Map<string, number>();
+  for (const w of completed) {
+    const ym = monthOf(w.date);
+    if (ym < currentYm) counts.set(ym, (counts.get(ym) ?? 0) + 1);
   }
-  return Math.round(total / 60);
+  const earlier = [...counts.entries()].sort((a, b) => b[0].localeCompare(a[0])).map(([ym, count]) => ({ ym, count }));
+  const current = completed.filter((w) => monthOf(w.date) === currentYm).length;
+  return [{ ym: currentYm, count: current }, ...earlier];
 }
 
-// ── Last-week helpers ────────────────────────────────────────────────
+/** The types that have any activity in `completed`, in chip order. */
+export function typesPresent(completed: WorkoutWithRow[]): WorkoutType[] {
+  const seen = new Set(completed.map((w) => w.type));
+  return TYPE_ORDER.filter((t) => seen.has(t));
+}
 
-/** Returns the set of ISO date strings for the Mon–Sun week before `todayStr`. */
-function getLastWeekDateSet(todayStr: string): Set<string> {
-  const today = new Date(todayStr + 'T00:00:00');
-  const day = today.getDay();
-  const diffToMonday = day === 0 ? 6 : day - 1;
+export interface TypeCount {
+  type: WorkoutType;
+  count: number;
+}
 
-  const thisMonday = new Date(today);
-  thisMonday.setDate(today.getDate() - diffToMonday);
+/** Per-type counts for the split bar, in chip order, types with none left out. */
+export function typeCounts(ws: WorkoutWithRow[]): TypeCount[] {
+  return TYPE_ORDER.map((type) => ({ type, count: ws.filter((w) => w.type === type).length })).filter(
+    (t) => t.count > 0,
+  );
+}
 
-  const dates = new Set<string>();
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(thisMonday);
-    d.setDate(thisMonday.getDate() - 7 + i);
-    dates.add(toLocalDateStr(d));
+export interface MonthSummary {
+  count: number;
+  /** Sum of the durations that exist, in seconds. */
+  seconds: number;
+  /** How many activities have a duration. Blank is not zero, so the rest are skipped, not counted as 0. */
+  timed: number;
+  /** Sum of the distances that exist, in miles to one decimal; null when no activity has one. */
+  miles: number | null;
+}
+
+export function summarizeMonth(ws: WorkoutWithRow[]): MonthSummary {
+  let seconds = 0;
+  let timed = 0;
+  let meters = 0;
+  let measured = 0;
+  for (const w of ws) {
+    const s = parseInt(w.elapsed_seconds, 10);
+    if (!isNaN(s)) {
+      seconds += s;
+      timed += 1;
+    }
+    const d = parseFloat(w.distance_m);
+    if (w.distance_m.trim() !== '' && !isNaN(d)) {
+      meters += d;
+      measured += 1;
+    }
   }
-  return dates;
+  return {
+    count: ws.length,
+    seconds,
+    timed,
+    miles: measured > 0 ? metersToMiles(String(meters)) : null,
+  };
 }
 
-/**
- * Returns the count of workouts in the Mon–Sun week prior to the week
- * containing `todayStr`.
- */
-export function getLastWeekWorkoutCount(allWorkouts: WorkoutWithRow[], todayStr: string): number {
-  const lastWeekDates = getLastWeekDateSet(todayStr);
-  return allWorkouts.filter((w) => lastWeekDates.has(w.date)).length;
+/** Seconds as whole hours and minutes, the minutes rounded once from the total. */
+export function splitDuration(seconds: number): { hours: number; minutes: number } {
+  const total = Math.round(seconds / 60);
+  return { hours: Math.floor(total / 60), minutes: total % 60 };
 }
 
-/**
- * Returns the total duration in minutes for workouts in the Mon–Sun week
- * prior to the week containing `todayStr`. Sums elapsed seconds and converts
- * once at the end; workouts with no duration are skipped, not counted as zero.
- */
-export function getLastWeekTotalMinutes(allWorkouts: WorkoutWithRow[], todayStr: string): number {
-  const lastWeekDates = getLastWeekDateSet(todayStr);
-  let total = 0;
-  for (const w of allWorkouts) {
-    if (!lastWeekDates.has(w.date)) continue;
-    const seconds = parseInt(w.elapsed_seconds, 10);
-    if (!isNaN(seconds)) total += seconds;
-  }
-  return Math.round(total / 60);
-}
-
-// ── This-month helpers ───────────────────────────────────────────────
-
-/**
- * Returns the count of workouts in the current calendar month (1st to today).
- */
-export function getMonthWorkoutCount(allWorkouts: WorkoutWithRow[], todayStr: string): number {
-  const today = new Date(todayStr + 'T00:00:00');
-  const thisYear = today.getFullYear();
-  const thisMonth = today.getMonth();
-  return allWorkouts.filter((w) => {
-    const d = new Date(w.date + 'T00:00:00');
-    return d.getFullYear() === thisYear && d.getMonth() === thisMonth;
-  }).length;
-}
-
-/**
- * Returns the total duration in minutes for workouts in the current calendar
- * month. Sums elapsed seconds and converts once at the end. Workouts with no
- * duration are skipped, not counted as zero — a month with one 60-minute
- * session and three untimed ones totals 60, not an average of 15.
- */
-export function getMonthTotalMinutes(allWorkouts: WorkoutWithRow[], todayStr: string): number {
-  const today = new Date(todayStr + 'T00:00:00');
-  const thisYear = today.getFullYear();
-  const thisMonth = today.getMonth();
-  let total = 0;
-  for (const w of allWorkouts) {
-    const d = new Date(w.date + 'T00:00:00');
-    if (d.getFullYear() !== thisYear || d.getMonth() !== thisMonth) continue;
-    const seconds = parseInt(w.elapsed_seconds, 10);
-    if (!isNaN(seconds)) total += seconds;
-  }
-  return Math.round(total / 60);
+/** "14 h 2" / "45 min" as one string, for the accessible name and tests. */
+export function formatMonthTime(seconds: number): string {
+  const { hours, minutes } = splitDuration(seconds);
+  return hours > 0 ? `${hours} h ${minutes}` : `${minutes} min`;
 }
 
 // ── Tag aggregation ──────────────────────────────────────────────────
@@ -316,85 +298,6 @@ export function sortPlannedWorkouts(workouts: WorkoutWithRow[]): WorkoutWithRow[
   return [...workouts].sort(
     (a, b) => a.date.localeCompare(b.date) || a.created.localeCompare(b.created) || a.id.localeCompare(b.id),
   );
-}
-
-// ── Cardio aggregation (#105) ────────────────────────────────────────
-
-/**
- * A total that cannot be rendered without its coverage.
- *
- * `withData` of `of` activities contributed to `total`; the rest recorded
- * nothing and were skipped, not counted as zero. Returning the pair in one
- * value is deliberate — a caller cannot reach for a bare total by accident,
- * and "58 mi" alone would silently overstate a week where only four of five
- * rides were measured.
- */
-export interface CoveredTotal {
-  total: number;
-  withData: number;
-  of: number;
-}
-
-/**
- * Names the activities being counted, so "2/3 rides" is accurate rather than
- * merely conventional — a week of hikes must not report rides.
- */
-export function cardioNoun(cardio: WorkoutWithRow[]): string {
-  const types = new Set(cardio.map((w) => w.type));
-  if (types.size === 1) return types.has('bike') ? 'rides' : 'hikes';
-  return 'activities';
-}
-
-/**
- * Renders coverage as a suffix naming *what* is counted — " · 4/5 rides",
- * never "(4 of 5)", which reads as four of five *miles*.
- *
- * Returns '' at full coverage: the total then stands alone, because coverage
- * is information about a gap and there is no gap to report.
- */
-export function coverageSuffix(c: CoveredTotal, noun = 'rides'): string {
-  return c.withData === c.of ? '' : ` · ${c.withData}/${c.of} ${noun}`;
-}
-
-/** Activities that can carry cardio attributes; see #103, extended by #129. */
-const CARDIO_TYPES = new Set(['bike', 'hike', 'run', 'walk']);
-
-export function isCardioWorkout(w: WorkoutWithRow): boolean {
-  return CARDIO_TYPES.has(w.type);
-}
-
-/**
- * Sums one nullable numeric field across the cardio activities in a set,
- * skipping those that recorded nothing while still counting them in `of`,
- * so the gap stays visible rather than having to be inferred.
- */
-function sumCovered(cardio: WorkoutWithRow[], field: (w: WorkoutWithRow) => string): CoveredTotal {
-  let total = 0;
-  let withData = 0;
-  for (const w of cardio) {
-    const n = parseInt(field(w), 10);
-    if (isNaN(n)) continue;
-    total += n;
-    withData += 1;
-  }
-  return { total, withData, of: cardio.length };
-}
-
-/** The cardio activities in the Mon–Sun week containing `todayStr`. */
-export function getWeekCardioWorkouts(allWorkouts: WorkoutWithRow[], todayStr: string): WorkoutWithRow[] {
-  const weekDates = new Set(getWeekStreak(allWorkouts, todayStr).map((d) => d.date));
-  return allWorkouts.filter((w) => weekDates.has(w.date) && isCardioWorkout(w));
-}
-
-/** Total distance in meters for this week's cardio, with coverage. */
-export function getWeekCardioDistance(allWorkouts: WorkoutWithRow[], todayStr: string): CoveredTotal {
-  return sumCovered(getWeekCardioWorkouts(allWorkouts, todayStr), (w) => w.distance_m);
-}
-
-/** Total ascent in meters for this week's cardio, with its own coverage. */
-export function getWeekCardioAscent(allWorkouts: WorkoutWithRow[], todayStr: string): CoveredTotal {
-  // Counted independently of distance — a ride may have one and not the other.
-  return sumCovered(getWeekCardioWorkouts(allWorkouts, todayStr), (w) => w.ascent_m);
 }
 
 // ── Card effort indicator (#113) ─────────────────────────────────────

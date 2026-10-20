@@ -807,7 +807,7 @@ describe.each(THEMES)('AC9: --color-on-fill on every #183 fill, with the overlay
 
 describe('AC10: selected keeps its non-colour cue and its ARIA state', () => {
   const SELECTED: Record<string, string[]> = {
-    'filter-chip': ['aria-pressed'],
+    'filter-chip': ['aria-pressed', 'aria-expanded'],
     'label-chip': ['aria-pressed'],
     'effort-btn': ['aria-pressed'],
     'sub-type-btn': ['aria-pressed'],

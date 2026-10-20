@@ -2025,26 +2025,51 @@ input, select, textarea {
   margin-bottom: var(--space-sm);
 }
 
-.filter-chip {
-  display: inline-flex;
+/* #527: the type chips are one row that scrolls sideways, no scrollbar drawn. Its padding keeps the
+   focus rings in view. The chips are 34px; the 44px hit row is the row's own height and each chip's
+   ::before, so a tap between two chips still lands on one. */
+.activities-chips {
+  display: flex;
   align-items: center;
+  gap: var(--space-xs);
   min-height: 44px;
-  padding: 4px 12px;
+  padding: 0 var(--space-xs);
+  margin: 0 calc(-1 * var(--space-xs)) var(--space-sm);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.activities-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.filter-chip {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 14px;
   border-radius: var(--radius-full);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   font-weight: 600;
-  text-transform: uppercase;
   cursor: pointer;
   border: 1px solid transparent;
   transition: border-color var(--transition-fast);
 }
 
-/* Unselected (#183): full strength, in the type's own hue on the card, with a
-   3:1 outline. :not(.active) because this sits after the .badge-* rules, and a
-   plain background here would also wipe the selected tint. */
+.filter-chip::before {
+  content: '';
+  position: absolute;
+  inset: -5px 0;
+}
+
+/* Unselected: outlined in --color-border-strong (3:1) on the card colour. */
 .filter-chip:not(.active) {
   background: var(--color-surface);
   border-color: var(--color-border-strong);
+  color: var(--color-text);
 }
 
 @media (hover: hover) {
@@ -2053,14 +2078,64 @@ input, select, textarea {
   }
 }
 
+/* Pressed: filled in the text colour with the page colour on it. The fill is the cue that does not
+   rest on a hue, and the type icon drops to currentColor so it stays legible on the fill. */
 .filter-chip.active {
-  border-color: currentColor;
+  background: var(--color-text);
+  border-color: var(--color-text);
+  color: var(--color-bg);
 }
 
-/* The selected cue that does not rest on the tint (#183). */
+.filter-chip-icon {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  color: var(--type-weight);
+}
+
+.filter-chip-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.filter-chip-weight .filter-chip-icon {
+  color: var(--type-weight);
+}
+
+.filter-chip-bike .filter-chip-icon {
+  color: var(--type-bike);
+}
+
+.filter-chip-stretch .filter-chip-icon {
+  color: var(--type-stretch);
+}
+
+.filter-chip-hike .filter-chip-icon {
+  color: var(--type-hike);
+}
+
+.filter-chip-run .filter-chip-icon {
+  color: var(--type-run);
+}
+
+.filter-chip-walk .filter-chip-icon {
+  color: var(--type-walk);
+}
+
+.filter-chip.active .filter-chip-icon {
+  color: currentColor;
+}
+
+/* The selected cue that does not rest on the tint (#183), still used by the label chips. */
 .chip-check {
   margin-right: var(--space-xs);
   font-weight: 700;
+}
+
+/* Tags: open, it takes the same outline cue as a pressed chip without the fill. */
+.filter-chip-tags[aria-expanded='true'] {
+  border-color: var(--color-text);
+  box-shadow: inset 0 0 0 1px var(--color-text);
 }
 
 .filter-clear {
@@ -2071,124 +2146,154 @@ input, select, textarea {
   padding: var(--space-xs) 0;
 }
 
-/* ===== Week Streak Bar ===== */
-.week-streak-bar {
-  padding: var(--space-md) var(--space-md) var(--space-sm);
-  border-bottom: 1px solid var(--color-border-light);
-}
-
-.week-streak-dots {
-  display: flex;
-  justify-content: space-between;
-  gap: 6px;
-  margin-bottom: 4px;
-}
-
-.streak-dot {
-  flex: 1;
-  height: 10px;
-  border-radius: var(--radius-full);
-  background: transparent;
-  box-shadow: inset 0 0 0 2px var(--color-border-strong);
-  transition: background var(--transition-fast);
-}
-
-.streak-dot.filled {
-  background: var(--color-primary-fill);
-  box-shadow: none;
-}
-
-.streak-dot.today {
-  box-shadow: inset 0 0 0 2px var(--color-primary-fill);
-}
-
-.streak-dot.today.filled {
-  box-shadow: none;
-}
-
-.week-streak-labels {
-  display: flex;
-  justify-content: space-between;
-  gap: 6px;
-  margin-bottom: var(--space-xs);
-}
-
-.streak-label {
-  flex: 1;
-  text-align: center;
-  font-size: 10px;
-  color: var(--color-text-muted);
-  line-height: 1;
-}
-
-.streak-label.today {
-  color: var(--color-primary-text);
-  font-weight: 600;
-}
-
-.stats-bar {
-  display: flex;
-  gap: 0;
-  margin-top: var(--space-xs);
-}
-
-.stats-bar-cell {
-  flex: 1;
+/* ===== Activities header, month picker and month summary (#527) ===== */
+/* The title is the Day header's (.day-title); the month button sits above it. */
+.activities-header {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  padding: var(--space-sm) 0 var(--space-xs);
 }
 
-.stats-bar-cell--center {
-  text-align: center;
+.month-picker {
+  position: relative;
 }
 
-.stats-bar-cell--right {
-  text-align: right;
-}
-
-.stats-bar-label {
-  font-size: var(--text-xs);
-  /* #105: --color-text-muted measures ~2.9:1 light and ~3.4:1 dark here, both
-     failing WCAG AA. Fixed on the class rather than only for the new labels,
-     which would have left a two-tone label row. --color-text-value already
-     used the passing token. */
+/* A quiet text button, not a pill: .trends-chip's family states, none of its chrome. */
+.trends-chip.month-button {
+  padding: 0 var(--space-sm) 0 0;
+  border-color: transparent;
+  background: transparent;
+  font-size: var(--text-sm);
+  font-weight: 500;
   color: var(--color-text-secondary);
-  line-height: 1.2;
 }
 
-.stats-bar-value {
-  font-size: var(--text-xs);
+.trends-chip.month-button[aria-expanded='true'] {
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-text);
+}
+
+.month-chevron {
+  flex: none;
+  width: 12px;
+  height: 12px;
+}
+
+.month-list {
+  max-height: calc(8 * 44px + 2 * var(--space-xs) + 2px);
+  overflow-y: auto;
+}
+
+.month-option-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.month-option-count {
+  font-variant-numeric: tabular-nums;
   color: var(--color-text-secondary);
-  line-height: 1.2;
-  /* Week-to-week figures must not jitter horizontally as digits change. */
+}
+
+.month-option.current .month-option-count {
+  color: inherit;
+}
+
+.month-card {
+  margin-bottom: var(--space-md);
+  padding: var(--space-md);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.month-card-title {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.month-card-empty {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.month-figures {
+  display: flex;
+  gap: var(--space-md);
+}
+
+.month-figure {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.month-figure-value {
+  font-size: var(--figure-md);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--color-text);
   font-variant-numeric: tabular-nums;
 }
 
-/* Full-width rows beneath the three-cell strip (#105). Each .stats-bar cell
-   gets only ~103px at 375px and the existing value string already needs ~120px,
-   so these cannot live inside the strip. Type stays at --text-xs, which is
-   already the floor of the scale. */
-.stats-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-sm);
-  margin-top: var(--space-sm);
-  padding-top: var(--space-sm);
-  border-top: 1px solid var(--color-border);
+.month-figure-unit {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
 }
 
-.stats-row-value {
+.month-figure-label {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+/* Segments are separated by 2px of the card's own colour, sized by count. */
+.month-split {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+  margin-top: var(--space-md);
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+}
+
+.month-split-seg {
+  flex-basis: 0;
+  min-width: 2px;
+}
+
+.month-legend {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
   gap: var(--space-xs) var(--space-md);
+  margin: var(--space-sm) 0 0;
+  padding: 0;
+  list-style: none;
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
-  line-height: 1.2;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
+}
+
+.month-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.month-legend-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-sm);
+}
+
+.month-legend-count {
+  font-weight: 600;
+  color: var(--color-text);
 }
 
 /* ===== Workout Card Enhancements ===== */
@@ -5551,18 +5656,11 @@ a.training-card {
     box-shadow: inset 0 0 0 1.5px HighlightText;
   }
 
-  .streak-dot {
-    border: 2px solid CanvasText;
-  }
-
-  .streak-dot.filled {
-    background: Highlight;
-    border-color: Highlight;
-  }
-
-  .streak-dot.today {
-    outline: 2px solid CanvasText;
-    outline-offset: 1px;
+  /* #527: the month split bar and its legend swatches are backgrounds; give them an edge. */
+  .month-split-seg,
+  .month-legend-swatch {
+    border: 1px solid CanvasText;
+    forced-color-adjust: none;
   }
 
   /* #486: the sync dot is a background, which forced colours drop; give it a CanvasText fill. */

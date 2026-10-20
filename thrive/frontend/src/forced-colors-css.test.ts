@@ -37,10 +37,9 @@ const SELECTORS = [
   '.tag-badge.active',
   '.tag-badge-colored.active',
   '.label-chip-active',
-  // AC3
-  '.streak-dot',
-  '.streak-dot.filled',
-  '.streak-dot.today',
+  // #527
+  '.month-split-seg',
+  '.month-legend-swatch',
   // AC4
   '.bottom-nav-tab.active',
   '.calendar-day-selected',
@@ -62,8 +61,8 @@ describe('forced-colors selected states (#330)', () => {
     expect(block).toMatch(/color:\s*HighlightText/);
   });
 
-  it('gives empty streak dots a real border, not a box-shadow', () => {
-    expect(block).toMatch(/\.streak-dot\s*\{[^}]*border:\s*2px solid CanvasText/);
+  it('#527: the month split bar segments and legend swatches keep an edge', () => {
+    expect(block).toMatch(/\.month-split-seg,\s*\.month-legend-swatch\s*\{[^}]*border:\s*1px solid CanvasText/);
   });
 
   it('never draws the selected cue with outline on the toggles (focus ring owns it)', () => {

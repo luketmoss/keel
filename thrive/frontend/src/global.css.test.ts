@@ -233,14 +233,9 @@ describe('AC5: Focus ring token, manifest, no blue remnants', () => {
   });
 });
 
-describe('#112: the weekly target row is removed, its shared styling is not', () => {
+describe('#112: the weekly target row is removed (#527 removed the stats rows with it)', () => {
   it('AC4: the .target-met rule is gone', () => {
     expect(cssText).not.toMatch(/\.target-met/);
-  });
-
-  it('AC2: .stats-row and .stats-row-value survive — the cardio row still uses them', () => {
-    expect(cssText).toMatch(/^\.stats-row \{/m);
-    expect(cssText).toMatch(/^\.stats-row-value \{/m);
   });
 
   it('AC4: --color-success stays, it is used elsewhere', () => {

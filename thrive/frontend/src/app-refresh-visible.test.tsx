@@ -20,7 +20,7 @@ vi.mock('./state/actions', async (orig) => ({
 }));
 
 const { App } = await import('./app');
-const { loading, pendingSyncCount, isSyncing, workouts, exercises } = await import('./state/store');
+const { loading, pendingSyncCount, isSyncing, workouts, exercises, activitiesMonth } = await import('./state/store');
 
 function visible() {
   Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
@@ -43,7 +43,11 @@ beforeEach(() => {
   isSyncing.value = false;
   go('#/activities');
 });
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  // #527: the Activities screen shows one month; the test below files its cards in September 2026.
+  activitiesMonth.value = new Date().toISOString().slice(0, 7);
+});
 
 describe('refresh on visible (#249)', () => {
   it('refreshes with the token on a normal screen', () => {
@@ -106,7 +110,8 @@ describe('refresh on visible (#249)', () => {
   });
 
   it('keeps focus on the same card when a workout is inserted above it', () => {
-    const base = { type: 'weight', date: '2026-09-20', sheetRow: 2 };
+    activitiesMonth.value = '2026-09';
+    const base = { type: 'weight', date: '2026-09-20', distance_m: '', elapsed_seconds: '', sheetRow: 2 };
     workouts.value = [
       { ...base, id: 'a', name: 'Alpha' },
       { ...base, id: 'b', name: 'Beta', sheetRow: 3 },

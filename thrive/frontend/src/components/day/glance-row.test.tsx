@@ -39,7 +39,7 @@ describe('AC1 — today with a recovery value', () => {
     expect(ring.querySelector('.glance-ring-value')!.getAttribute('stroke-dasharray')).toBe('76 100');
     expect(ring.querySelector('.glance-ring-text')!.getAttribute('aria-hidden')).toBe('true');
     const stats = [...section.querySelectorAll('.glance-stat')].map((s) => s.textContent);
-    expect(stats).toEqual(['4,450steps so far', '1,820kcal so far']);
+    expect(stats).toEqual(['4,450steps so farSteps 4,450 so far. Open Activity trends', '1,820kcal so far']);
     expect(section.className).not.toContain('glance-row-two');
   });
 

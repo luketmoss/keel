@@ -5739,6 +5739,7 @@ a.training-card {
   .settings-btn:hover:not(:disabled):not([aria-disabled="true"]),
   .exercise-list-item-header:hover:not(:disabled):not([aria-disabled="true"]),
   .settings-row-link:hover:not(:disabled):not([aria-disabled="true"]),
+  .day-card-link:hover:not(:disabled):not([aria-disabled="true"]),
   /* Navigation */
   .bottom-nav-tab:hover:not(:disabled):not([aria-disabled="true"]) {
     background-image: linear-gradient(var(--state-hover), var(--state-hover));
@@ -5811,6 +5812,7 @@ a.workout-card:active:not(:disabled):not([aria-disabled="true"]),
 .settings-btn:active:not(:disabled):not([aria-disabled="true"]),
 .exercise-list-item-header:active:not(:disabled):not([aria-disabled="true"]),
 .settings-row-link:active:not(:disabled):not([aria-disabled="true"]),
+.day-card-link:active:not(:disabled):not([aria-disabled="true"]),
 /* Navigation */
 .bottom-nav-tab:active:not(:disabled):not([aria-disabled="true"]) {
   background-image: linear-gradient(var(--state-pressed), var(--state-pressed));
@@ -5853,4 +5855,49 @@ textarea:disabled {
    showing its ring, and comes back to full strength while it is. */
 input[aria-disabled="true"]:not(:focus-visible) {
   opacity: var(--opacity-disabled);
+}
+
+/* ===== Day cards open Trends (#504) =====
+   A link stretched over its card, empty to the eye (its words are sr-only) so the
+   card keeps its h2 and text. Hover, pressed and the ring are on the link itself,
+   which is the card's size: the overlay is #404's and the ring is inset, as the card
+   clips an outside one. The corner radius comes from the card (or --link-radius for
+   a part of one). The › is the only mark; the Steps stat has none. */
+.day-panel-linked,
+.glance-stat-linked,
+.body-weight,
+.body-bp {
+  position: relative;
+}
+
+.glance-stat-linked,
+.body-weight,
+.body-bp {
+  --link-radius: var(--radius-sm);
+}
+
+.day-card-link {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--link-radius, inherit);
+  text-decoration: none;
+}
+
+.day-card-link:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-text);
+  outline-offset: -2px;
+}
+
+.day-card-chevron {
+  flex: none;
+  font-size: var(--text-lg);
+  line-height: 1;
+  color: var(--color-text-muted);
+}
+
+.body-figure-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-xs);
 }

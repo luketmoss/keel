@@ -1,6 +1,7 @@
 import { signal } from '@preact/signals';
 import { validPlanDate } from '../components/workout/plan-date';
 import { isIsoMonth } from '../calendar/dates';
+import { TREND_GROUPS, CUSTOM_GROUP_ID } from '../components/trends/metrics';
 
 /**
  * Every route name, in one list (#291). `ParsedRoute.name` is typed against it,
@@ -35,7 +36,14 @@ export interface ParsedRoute {
   badDay?: boolean;
   /** A `#/calendar/…` hash that names no real month (#241): shown as today's month, URL replaced with `#/calendar`. */
   badCalendar?: boolean;
+  /** A `#/trends/…` hash that names no linkable group (#504): shown as Trends, URL replaced with `#/trends`. */
+  badTrends?: boolean;
 }
+
+/** The group ids a `#/trends/<group>` link may name (#504): every registered group but Custom. */
+const LINKABLE_GROUPS: ReadonlySet<string> = new Set(
+  TREND_GROUPS.filter((g) => g.id !== CUSTOM_GROUP_ID).map((g) => g.id),
+);
 
 function parseHash(hash: string): ParsedRoute {
   const full = hash.replace(/^#/, '') || '/';
@@ -92,6 +100,16 @@ function parseHash(hash: string): ParsedRoute {
   // /trends (#235)
   if (path === '/trends') return { name: 'trends', params: {}, hash: path };
 
+  // /trends/<group>, optionally ?date=YYYY-MM-DD (#504): Trends on that group with the day
+  // selected, as a Day card links it. `date` is passed through raw, only when the key is
+  // present; Trends validates it. An unknown group, or Custom, is plain Trends.
+  match = path.match(/^\/trends\/([^/]+)$/);
+  if (match && LINKABLE_GROUPS.has(match[1])) {
+    const date = query.get('date');
+    return { name: 'trends', params: date === null ? { group: match[1] } : { group: match[1], date }, hash: full };
+  }
+  if (path.startsWith('/trends/')) return { name: 'trends', params: {}, hash: '/trends', badTrends: true };
+
   // /activities (#235): the list that used to live at `/`
   if (path === '/activities') return { name: 'activities', params: {}, hash: path };
 
@@ -118,11 +136,11 @@ function replaceHash(hash: string): void {
   window.history.replaceState(window.history.state, '', hash);
 }
 
-/** Parse, and replace a bad `#/day…` or `#/calendar/…` URL in place (#237 AC1, #241 AC1). */
+/** Parse, and replace a bad `#/day…`, `#/calendar/…` or `#/trends/…` URL in place (#237 AC1, #241 AC1, #504). */
 function settle(hash: string): ParsedRoute {
   const route = parseHash(hash);
-  if (!route.badDay && !route.badCalendar) return route;
-  replaceHash(route.badDay ? '#/' : '#/calendar');
+  if (!route.badDay && !route.badCalendar && !route.badTrends) return route;
+  replaceHash(route.badDay ? '#/' : route.badTrends ? '#/trends' : '#/calendar');
   return { name: route.name, params: route.params, hash: route.hash };
 }
 

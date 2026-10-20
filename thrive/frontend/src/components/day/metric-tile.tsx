@@ -14,6 +14,7 @@ import { dailyHealth } from '../../state/store';
 import { loadHealth } from '../../state/actions';
 import { useAuth } from '../../auth/auth-context';
 import { Panel, PanelNote, PanelStatus, type DayPanelProps } from './panel';
+import { CardChevron, CardLink, cardLinkName } from './card-link';
 import { tileCaptionText, vitalsView, type TileCaption, type TileView, type VitalKey } from './health-rows';
 
 // Drawn in the house style (#405) and kept here, as the shared icon set is counted by its tests.
@@ -195,10 +196,16 @@ function ZoneWords({ zone, attention }: { zone: 'above' | 'below'; attention: bo
   );
 }
 
-export function MetricTile({ tile }: { tile: TileView }) {
+/** The tile's value as it reads aloud for its link: "53 bpm", "31 so far", or null when blank. */
+function spokenValue(tile: TileView): string | null {
+  if (tile.value === null) return null;
+  return `${tile.value}${tile.unit ? ` ${tile.unit}` : ''}${tile.soFar ? ' so far' : ''}`;
+}
+
+export function MetricTile({ tile, date }: { tile: TileView; date: string }) {
   return (
     <div class={`metric-tile metric-tile-${tile.key}`} data-metric={tile.key}>
-      <Panel title={tile.label} icon={<Icon>{ICONS[tile.key]}</Icon>}>
+      <Panel title={tile.label} icon={<Icon>{ICONS[tile.key]}</Icon>} action={<CardChevron />} linked>
         <p class={tile.value === null ? 'tile-value tile-value-blank' : 'tile-value'}>
           {tile.value ?? '—'}
           {tile.value !== null && tile.unit && <span class="tile-unit">{` ${tile.unit}`}</span>}
@@ -207,6 +214,12 @@ export function MetricTile({ tile }: { tile: TileView }) {
         {tile.chart === 'line' ? <Line days={tile.days} /> : <Bars days={tile.days} label={tile.label} />}
         {tile.bar && <RangeBar bar={tile.bar} />}
         <Caption c={tile.caption} />
+        <CardLink
+          group="recovery"
+          date={date}
+          name={cardLinkName(tile.label, spokenValue(tile))}
+          focusKey={`day-link-${tile.key}`}
+        />
       </Panel>
     </div>
   );
@@ -249,7 +262,7 @@ export function VitalsTiles({ date, state }: DayPanelProps) {
   return (
     <>
       {view.tiles.map((t) => (
-        <MetricTile key={t.key} tile={t} />
+        <MetricTile key={t.key} tile={t} date={date} />
       ))}
     </>
   );

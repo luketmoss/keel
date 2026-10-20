@@ -7,6 +7,7 @@
 
 import { dailyHealth } from '../../state/store';
 import { Panel, type DayPanelProps } from './panel';
+import { CardChevron, CardLink, cardLinkName } from './card-link';
 import { captionText, sleepView, type HealthCaption, type SleepStageView, type SleepView } from './health-rows';
 
 /** A crescent moon in the house style (#405); kept here, as the icon set is counted by its tests. */
@@ -147,8 +148,14 @@ export function SleepCard({ date, state }: DayPanelProps) {
   const view = sleepView(tab.rows, date, state === 'today');
   if (!view) return null;
   return (
-    <Panel title="Sleep" icon={icon} meta={view.night}>
+    <Panel title="Sleep" icon={icon} meta={view.night} action={<CardChevron />} linked>
       <SleepBody view={view} />
+      <CardLink
+        group="sleep"
+        date={date}
+        name={cardLinkName('Sleep', view.total ? `${view.total.h}h ${view.total.m}m` : null)}
+        focusKey="day-link-sleep"
+      />
     </Panel>
   );
 }

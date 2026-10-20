@@ -84,6 +84,8 @@ const AUDITED = [
   '.modal-close:focus-visible',
   // #260: the detail screen's "View on COROS" link, --color-text at +2px.
   '.detail-coros-link:focus-visible',
+  // #504: a Day card's link, stretched over the card, --color-text inset like the other rows and cards.
+  '.day-card-link:focus-visible',
   // #404: the global ring every other control draws, --color-text at the ring tokens.
   ':focus-visible',
 ];

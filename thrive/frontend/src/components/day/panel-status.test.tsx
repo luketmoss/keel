@@ -106,7 +106,9 @@ describe('AC5 — each panel follows its own tab', () => {
     bodyMeasurements.value = { state: 'loaded', rows: [] };
     const { container } = mount(BodyPanel);
     expect(container.querySelector('[role="status"]')).toBeNull();
-    expect(container.querySelector('[data-metric="weight"]')!.textContent).toBe('—No reading this day.');
+    expect(container.querySelector('[data-metric="weight"]')!.textContent).toBe(
+      '—›No reading this day.Weight, no reading. Open Body trends',
+    );
   });
 });
 
@@ -228,7 +230,9 @@ describe('AC4 — Body', () => {
     expect(container.querySelector('[data-metric="weight"] .tile-caption')!.textContent).toBe(
       'Fat not measured · 7:52 AM',
     );
-    expect(container.querySelector('[data-metric="bp"]')!.textContent).toBe('—No reading this day.');
+    expect(container.querySelector('[data-metric="bp"]')!.textContent).toBe(
+      '—›No reading this day.Blood pressure, no reading. Open Blood Pressure trends',
+    );
   });
 
   it('shows "—" with the day-appropriate words when there is no reading, never another day', () => {

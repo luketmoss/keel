@@ -395,9 +395,7 @@ export const ASCENT: TrendMetric = {
   zeroBased: true,
 };
 
-const ACTIVITY_METRICS: TrendMetric[] = [ACTIVITY_COUNT, MOVING_TIME, DISTANCE, ASCENT];
-
-// ── Steps and the custom set (#246) ──────────────────────────────────
+// ── Steps (#246), and the Activity group (#504) ──────────────────────
 // Steps reads DailyHealth (the sync-written primary), not DailySummary's copy.
 // Today is a partial day, so it is not plotted.
 
@@ -411,6 +409,17 @@ export const STEPS: TrendMetric = {
   zeroBased: true,
   excludesToday: true,
 };
+
+const ACTIVITY_SUMMARY_METRICS: TrendMetric[] = [ACTIVITY_COUNT, MOVING_TIME, DISTANCE, ASCENT];
+
+/**
+ * Steps leads the Activity group (#504): the Day screen's Steps opens it, and it
+ * is the daily headline where the others are per-session. The Custom picker
+ * keeps Steps last, where #246 put it, so a stored custom set is unchanged.
+ */
+const ACTIVITY_METRICS: TrendMetric[] = [STEPS, ...ACTIVITY_SUMMARY_METRICS];
+
+// ── The custom set (#246) ────────────────────────────────────────────
 
 /** The most metrics a custom set holds. */
 export const CUSTOM_MAX = 4;
@@ -427,7 +436,7 @@ export const CUSTOM_SECTIONS: { label: string; metrics: TrendMetric[] }[] = [
   { label: 'Fitness', metrics: FITNESS_METRICS },
   { label: 'Body', metrics: BODY_METRICS },
   { label: 'Blood Pressure', metrics: BLOOD_PRESSURE_METRICS },
-  { label: 'Activity', metrics: [...ACTIVITY_METRICS, STEPS] },
+  { label: 'Activity', metrics: [...ACTIVITY_SUMMARY_METRICS, STEPS] },
 ];
 export const CUSTOM_PICKABLE: TrendMetric[] = CUSTOM_SECTIONS.flatMap((s) => s.metrics);
 

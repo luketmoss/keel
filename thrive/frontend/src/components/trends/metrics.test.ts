@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { TREND_GROUPS, SLEEP_TOTAL, SLEEP_DEEP, VO2MAX, TRAINING_LOAD, HRV, STRESS_AVG } from './metrics';
 import { dailyHealth, bodyMeasurements, dailySummary } from '../../state/store';
-import { ACTIVITY_COUNT, MOVING_TIME, DISTANCE, ASCENT } from './metrics';
+import { ACTIVITY_COUNT, MOVING_TIME, DISTANCE, ASCENT, STEPS } from './metrics';
 import { WEIGHT, BODY_FAT, SYSTOLIC, DIASTOLIC, BP_READINGS } from './metrics';
 
 const group = (id: string) => TREND_GROUPS.find((g) => g.id === id)!;
@@ -31,9 +31,8 @@ describe('registry', () => {
       'Activity',
       'Custom',
     ]);
-    expect(
-      TREND_GROUPS.filter((g) => g.id !== 'custom').every((g) => g.metrics.length >= 1 && g.metrics.length <= 4),
-    ).toBe(true);
+    // Activity holds five since Steps joined it (#504); only a custom set is capped at four.
+    expect(TREND_GROUPS.filter((g) => g.id !== 'custom').every((g) => g.metrics.length >= 1)).toBe(true);
   });
   it('Recovery: resting HR, HRV, then Average Stress, all banded (#248)', () => {
     expect(group('recovery').metrics.map((m) => [m.id, m.unit, m.band])).toEqual([
@@ -197,17 +196,21 @@ const day = (o: Record<string, string>, i = 1) =>
   }) as never;
 
 describe('Activity registry', () => {
-  it('four metrics in order, unbanded and zero-based, reading only DailySummary', () => {
+  it('is the same Steps the Custom picker offers (#504)', () => {
+    expect(group('activity').metrics[0]).toBe(STEPS);
+  });
+  it('Steps first (#504), then four metrics in order, unbanded and zero-based, reading DailySummary', () => {
     expect(
       group('activity').metrics.map((m) => [m.id, m.label, m.unit, m.band, m.zeroBased, m.note, m.source]),
     ).toEqual([
+      ['steps', 'Steps', 'steps', true, true, undefined, undefined],
       ['activity_count', 'Activities', '', false, true, undefined, 'dailySummary'],
       ['moving_time', 'Moving Time', 'min', false, true, undefined, 'dailySummary'],
       ['distance', 'Distance', 'mi', false, true, 'Outdoor only', 'dailySummary'],
       ['ascent', 'Ascent', 'ft', false, true, 'Outdoor only', 'dailySummary'],
     ]);
   });
-  it('is empty until DailySummary has loaded, and never reads DailyHealth', () => {
+  it('its four summary metrics are empty until DailySummary has loaded, and never read DailyHealth', () => {
     dailyHealth.value = { state: 'loaded', rows: [{ date: '2026-09-01', resting_hr: '50', sheetRow: 2 }] as never[] };
     dailySummary.value = { state: 'loading' };
     expect(ACTIVITY_COUNT.points()).toEqual([]);

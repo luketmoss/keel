@@ -455,14 +455,21 @@ describe('#245: Activity group state', () => {
       [...c.querySelectorAll<HTMLButtonElement>('.trends-group-btn')].find((b) => b.textContent === name)!,
     );
 
-  it('waits on DailySummary alone, and is not held up by the other tabs', () => {
-    dailyHealth.value = { state: 'loading' };
+  it('waits on DailySummary and DailyHealth (Steps, #504), and is not held up by Body', () => {
+    dailyHealth.value = { state: 'loaded', rows: [] };
     bodyMeasurements.value = { state: 'loading' };
     dailySummary.value = { state: 'loaded', rows: [] };
     const { container } = renderScreen();
     pickGroup(container, 'Activity');
     expect(container.querySelector('.trends-loading')).toBeNull();
     expect(container.textContent).toContain('Nothing recorded yet.');
+  });
+  it('is held up by DailyHealth, which Steps reads', () => {
+    dailyHealth.value = { state: 'loading' };
+    dailySummary.value = { state: 'loaded', rows: [] };
+    const { container } = renderScreen();
+    pickGroup(container, 'Activity');
+    expect(container.querySelector('.trends-loading')).not.toBeNull();
   });
   it('shows loading while DailySummary loads, and Recovery is unaffected by it', () => {
     dailyHealth.value = { state: 'loaded', rows: rows(5) };

@@ -11,6 +11,7 @@ import { dailyHealth } from '../../state/store';
 import { parse } from '../../api/units';
 import { FootprintsIcon } from '../shared/icons';
 import type { DayPanelProps } from './panel';
+import { CardLink, cardLinkName } from './card-link';
 
 /** Calories: a flame, drawn in the house style (#405) but kept here, as the icon set is counted by its tests. */
 function FlameIcon() {
@@ -71,19 +72,23 @@ function Stat({
   value,
   word,
   kind,
+  link,
 }: {
   icon: preact.ComponentChildren;
   value: number | null;
   word: string;
   kind: string;
+  /** The stat opens its Trends group (#504); the link is stretched over it. */
+  link?: preact.ComponentChildren;
 }) {
   return (
-    <div class={`glance-stat glance-${kind}`}>
+    <div class={link ? `glance-stat glance-${kind} glance-stat-linked` : `glance-stat glance-${kind}`}>
       <span class="glance-icon" aria-hidden="true">
         {icon}
       </span>
       <span class="glance-figure">{value === null ? '—' : num(value)}</span>
       <span class="glance-word">{word}</span>
+      {link}
     </div>
   );
 }
@@ -96,9 +101,23 @@ export function GlanceRow({ date, state }: DayPanelProps) {
   const isToday = state === 'today';
   const recovery = isToday ? parse(row.recovery) : null;
   const so = isToday ? ' so far' : '';
+  const steps = parse(row.steps);
   return (
     <section class={recovery === null ? 'glance-row glance-row-two' : 'glance-row'} aria-label="Day at a glance">
-      <Stat kind="steps" icon={<FootprintsIcon />} value={parse(row.steps)} word={`steps${so}`} />
+      <Stat
+        kind="steps"
+        icon={<FootprintsIcon />}
+        value={steps}
+        word={`steps${so}`}
+        link={
+          <CardLink
+            group="activity"
+            date={date}
+            name={cardLinkName('Steps', steps === null ? null : `${num(steps)}${so}`)}
+            focusKey="day-link-steps"
+          />
+        }
+      />
       {recovery !== null && <RecoveryRing value={recovery} />}
       <Stat kind="calories" icon={<FlameIcon />} value={parse(row.calories)} word={`kcal${so}`} />
     </section>

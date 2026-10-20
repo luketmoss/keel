@@ -50,9 +50,9 @@ const tile = (c: Element, key: string) => c.querySelector(`[data-metric="${key}"
 const caption = (c: Element, key: string) => tile(c, key).querySelector('.tile-caption')!.textContent;
 
 describe('slot', () => {
-  it('is the vitals slot, after sleep, and never mounts on a future day', () => {
+  it('is the vitals slot, after sleep and the drinks cards, and never mounts on a future day', () => {
     expect(SLOTS.vitals).toBe(VitalsTiles);
-    expect(slotsFor('past').indexOf('vitals')).toBe(slotsFor('past').indexOf('sleep') + 1);
+    expect(slotsFor('past').indexOf('vitals')).toBe(slotsFor('past').indexOf('drinks') + 1);
     expect(slotsFor('today')).toContain('vitals');
     expect(slotsFor('future')).not.toContain('vitals');
   });

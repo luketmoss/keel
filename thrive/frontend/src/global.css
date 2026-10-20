@@ -44,6 +44,7 @@
   --figure-lg: 2.25rem;
   --figure-xl: 2.75rem;
   --day-gap: 0.75rem;
+  --drink-bar-height: 12px;
   --range-track: var(--color-border-light);
   --range-band: var(--color-border);
   --range-marker: var(--color-text);
@@ -99,6 +100,9 @@
   --metric-sleep: var(--metric-sleep-rem);
   --metric-steps: #3b7a2a;
   --metric-calories: #b54708;
+  /* Drinks (#520): water a blue apart from the sleep stages, alcohol an amber apart from --color-warning. */
+  --metric-water: #0b6fb8;
+  --metric-alcohol: #b45309;
 }
 
 /* ===== Dark Theme ===== */
@@ -139,6 +143,8 @@
   --metric-sleep: var(--metric-sleep-rem);
   --metric-steps: #8bd17c;
   --metric-calories: #ff9a5c;
+  --metric-water: #5bb8f5;
+  --metric-alcohol: #f5a524;
 }
 
 /* ===== Base Styles ===== */
@@ -5900,4 +5906,166 @@ input[aria-disabled="true"]:not(:focus-visible) {
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-xs);
+}
+
+/* ===== Day Water and Alcohol cards (#520) =====
+   A total, for water a bar toward the goal, one add button and the day's
+   entries newest first. Colours are the --metric-water / --metric-alcohol
+   tokens; the buttons and the time field reuse the app's own classes. */
+.drink-icon {
+  display: inline-flex;
+  width: 100%;
+  height: 100%;
+}
+
+.drink-icon-water {
+  color: var(--metric-water);
+}
+
+.drink-icon-alcohol {
+  color: var(--metric-alcohol);
+}
+
+.drink-figure {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-sm);
+  margin: 0;
+}
+
+.drink-total {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+  font-size: var(--figure-lg);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.drink-total-reached {
+  color: var(--color-success);
+}
+
+.drink-check {
+  display: inline-flex;
+  align-self: center;
+  width: 22px;
+  height: 22px;
+}
+
+.drink-unit {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.drink-goal {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.drink-bar {
+  /* A transparent border shows as a real outline in forced colours. */
+  border: 1px solid transparent;
+  box-sizing: content-box;
+  height: var(--drink-bar-height);
+  border-radius: var(--radius-sm);
+  background: var(--range-track);
+  overflow: hidden;
+}
+
+.drink-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-sm);
+  background: var(--metric-water);
+  forced-color-adjust: none;
+}
+
+.drink-add {
+  width: 100%;
+}
+
+.drink-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.drink-entry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: 44px;
+  border-top: 1px solid var(--color-border-light);
+}
+
+.drink-entry-pending .drink-entry-time,
+.drink-entry-pending .drink-entry-amount {
+  color: var(--color-text-muted);
+}
+
+.drink-entry-time {
+  min-width: 5.5rem;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.drink-entry-amount {
+  flex: 1;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.drink-entry-saving {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.drink-more {
+  flex: none;
+}
+
+.drink-entry-tools {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  padding-bottom: var(--space-sm);
+}
+
+.drink-time-input {
+  width: auto;
+  min-height: 44px;
+}
+
+.drink-error {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-danger-text);
+}
+
+.settings-goal-input {
+  width: 6rem;
+  min-height: 44px;
+  text-align: right;
+}
+
+.settings-goal-row {
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.settings-goal-note {
+  margin: var(--space-xs) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
 }

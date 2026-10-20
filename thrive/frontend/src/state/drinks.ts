@@ -1,0 +1,338 @@
+// #520 - Thrive Sip's water and alcohol on the Day view: the state behind the
+// two cards and the Settings goal field.
+//
+// Entries are held per local date. A tap adds its entry at once, marked
+// `pending`, and the API call settles it: success swaps in the server's row,
+// failure removes the entry and says so. Every tap has its own UUID, so five
+// taps in a second are five rows and a re-send of one id is the same row, never
+// two (the API answers a repeated id with the row it already has). Nothing
+// here throws. Demo mode (`isDemo`) never calls the API: it keeps everything in
+// memory, seeded for today and yesterday.
+
+import { signal } from '@preact/signals';
+import { isDemo } from '../api/demo-data';
+import {
+  WATER_GOAL_DEFAULT_ML,
+  WATER_GOAL_KEY,
+  WATER_GOAL_MAX_ML,
+  WATER_GOAL_MIN_ML,
+  deleteDrink,
+  getDrinkTotals,
+  getDrinks,
+  logDrink,
+  updateDrinkTime,
+  updateSetting,
+  type Drink,
+  type DrinkKind,
+} from '../api/drinks';
+import { DENVER, addDays, todayInDenver } from '../day/dates';
+
+export const ML_PER_OZ = 29.5735;
+/** What "+ 4 oz" stores. */
+export const QUICK_WATER_ML = 118;
+
+/** A drink as held here: `pending` until the API has acknowledged it. */
+export interface DrinkEntry extends Drink {
+  pending?: boolean;
+}
+
+export interface DayDrinks {
+  status: 'loading' | 'loaded' | 'error';
+  entries: DrinkEntry[];
+}
+
+/** The drinks of each date read or logged so far. */
+export const drinkDays = signal<Record<string, DayDrinks>>({});
+/** The goal as the last read said it, in ml. */
+export const waterGoalMl = signal<number>(WATER_GOAL_DEFAULT_ML);
+/** One inline error per date and kind (`2026-10-20:water`), shown by its card. */
+export const drinkErrors = signal<Record<string, string>>({});
+
+export const errorKey = (date: string, kind: DrinkKind) => `${date}:${kind}`;
+
+export const ERROR_LOG = "Couldn't save that drink. Try again.";
+export const ERROR_DELETE = "Couldn't delete that drink.";
+export const ERROR_TIME = "Couldn't save that time.";
+
+function setError(date: string, kind: DrinkKind, text: string | null): void {
+  const next = { ...drinkErrors.value };
+  if (text === null) delete next[errorKey(date, kind)];
+  else next[errorKey(date, kind)] = text;
+  drinkErrors.value = next;
+}
+
+// ── Display ──────────────────────────────────────────────────────────
+
+/** ml as oz to one decimal with a trailing `.0` dropped: 118 ml is "4", 590 ml is "20". */
+export function formatOz(ml: number): string {
+  return String(Math.round((ml / ML_PER_OZ) * 10) / 10);
+}
+
+/** Whole ounces for the goal field. */
+export function goalOz(ml: number): number {
+  return Math.round(ml / ML_PER_OZ);
+}
+
+/** The goal in oz as typed, to ml; null when it is not a whole number the API will take. */
+export function ozToGoalMl(oz: string): number | null {
+  if (!/^\d{1,4}$/.test(oz.trim())) return null;
+  const ml = Math.round(Number(oz.trim()) * ML_PER_OZ);
+  return ml >= WATER_GOAL_MIN_ML && ml <= WATER_GOAL_MAX_ML ? ml : null;
+}
+
+/** The whole-ounce range ozToGoalMl accepts, for its message. */
+export const GOAL_OZ_MIN = Math.ceil(WATER_GOAL_MIN_ML / ML_PER_OZ);
+export const GOAL_OZ_MAX = Math.floor(WATER_GOAL_MAX_ML / ML_PER_OZ);
+
+// ── Time ─────────────────────────────────────────────────────────────
+
+const clockParts = new Intl.DateTimeFormat('en-US', {
+  timeZone: DENVER,
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hourCycle: 'h23',
+});
+
+/** The Denver local date and `HH:MM:SS` at an instant, the way the API files a drink. */
+export function denverClock(now: Date): { date: string; time: string } {
+  const parts = clockParts.formatToParts(now);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '00';
+  const hour = get('hour') === '24' ? '00' : get('hour');
+  return { date: todayInDenver(now), time: `${hour}:${get('minute')}:${get('second')}` };
+}
+
+function newId(): string {
+  const c = globalThis.crypto;
+  if (c && typeof c.randomUUID === 'function') return c.randomUUID();
+  return 'd-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
+}
+
+/** Newest first: by local time, then by the instant they were taken. */
+export function newestFirst(entries: readonly DrinkEntry[]): DrinkEntry[] {
+  return [...entries].sort(
+    (a, b) =>
+      b.time.localeCompare(a.time) || b.logged_at_utc.localeCompare(a.logged_at_utc) || b.id.localeCompare(a.id),
+  );
+}
+
+// ── Local changes, so a read that began earlier cannot undo them ──────
+
+let changeSeq = 0;
+const changedAt = new Map<string, number>();
+const touch = (id: string) => changedAt.set(id, ++changeSeq);
+
+function dayOf(date: string): DayDrinks {
+  return drinkDays.value[date] ?? { status: 'loaded', entries: [] };
+}
+
+function setDay(date: string, day: DayDrinks): void {
+  drinkDays.value = { ...drinkDays.value, [date]: day };
+}
+
+function updateEntries(date: string, change: (entries: DrinkEntry[]) => DrinkEntry[]): void {
+  const day = dayOf(date);
+  setDay(date, { status: day.status === 'loading' ? 'loading' : 'loaded', entries: change(day.entries) });
+}
+
+/** Put an entry in, replacing any with its id: an id is never listed twice. */
+function putEntry(date: string, entry: DrinkEntry): void {
+  updateEntries(date, (list) => [...list.filter((e) => e.id !== entry.id), entry]);
+}
+
+function removeEntry(date: string, id: string): void {
+  updateEntries(date, (list) => list.filter((e) => e.id !== id));
+}
+
+// ── Demo data ────────────────────────────────────────────────────────
+
+function demoEntry(id: string, kind: DrinkKind, date: string, time: string, source: 'app' | 'widget'): DrinkEntry {
+  const stamp = `${date}T${time}Z`;
+  return {
+    id,
+    kind,
+    amount: kind === 'water' ? QUICK_WATER_ML : 1,
+    date,
+    time,
+    logged_at_utc: stamp,
+    source,
+    created: stamp,
+    updated: stamp,
+  };
+}
+
+function demoDay(date: string): DrinkEntry[] {
+  const today = todayInDenver();
+  if (date === today) {
+    return [
+      demoEntry('demo-drink-1', 'water', date, '07:45:00', 'app'),
+      demoEntry('demo-drink-2', 'water', date, '10:20:00', 'widget'),
+      demoEntry('demo-drink-3', 'water', date, '12:05:00', 'app'),
+      demoEntry('demo-drink-4', 'alcohol', date, '12:40:00', 'app'),
+    ];
+  }
+  if (date === addDays(today, -1)) {
+    return [
+      demoEntry('demo-drink-5', 'water', date, '08:10:00', 'app'),
+      demoEntry('demo-drink-6', 'water', date, '13:30:00', 'app'),
+      demoEntry('demo-drink-7', 'alcohol', date, '20:15:00', 'app'),
+      demoEntry('demo-drink-8', 'alcohol', date, '21:05:00', 'app'),
+    ];
+  }
+  return [];
+}
+
+// ── Reads ────────────────────────────────────────────────────────────
+
+const inFlight = new Map<string, Promise<void>>();
+
+/**
+ * Read one date's drinks, and the goal that comes with them. The day is
+ * `loading` only the first time; a later read keeps what is shown and a failed
+ * one leaves it. Entries still pending, or changed here since the read began,
+ * win over what the read returns. A call while one runs for the same date joins it.
+ */
+export function loadDrinks(date: string, token: string): Promise<void> {
+  if (isDemo()) {
+    if (!drinkDays.value[date]) setDay(date, { status: 'loaded', entries: demoDay(date) });
+    return Promise.resolve();
+  }
+  const running = inFlight.get(date);
+  if (running) return running;
+  if (!drinkDays.value[date] || drinkDays.value[date].status === 'error') {
+    setDay(date, { status: 'loading', entries: drinkDays.value[date]?.entries ?? [] });
+  }
+  const startSeq = changeSeq;
+  const run = getDrinks({ from: date, to: date }, token)
+    .then((out) => {
+      const day = dayOf(date);
+      if (!out.ok) {
+        if (day.status !== 'loaded') setDay(date, { status: 'error', entries: day.entries });
+        return;
+      }
+      const local = new Map(day.entries.map((e) => [e.id, e]));
+      const recent = (id: string) => (changedAt.get(id) ?? 0) > startSeq;
+      const entries: DrinkEntry[] = [];
+      for (const d of out.data.drinks) {
+        if (d.date !== date) continue;
+        if (recent(d.id)) {
+          const mine = local.get(d.id);
+          if (mine) entries.push(mine); // a removed one stays removed
+        } else entries.push(d);
+      }
+      for (const e of day.entries) {
+        if (!entries.some((x) => x.id === e.id) && (e.pending || recent(e.id))) entries.push(e);
+      }
+      setDay(date, { status: 'loaded', entries });
+      waterGoalMl.value = out.data.water_goal_ml;
+    })
+    .finally(() => {
+      inFlight.delete(date);
+    });
+  inFlight.set(date, run);
+  return run;
+}
+
+/** The goal alone, for Settings. A failed read leaves the last value. */
+export async function loadGoal(token: string): Promise<void> {
+  if (isDemo()) return;
+  const out = await getDrinkTotals(token);
+  if (out.ok) waterGoalMl.value = out.data.water_goal_ml;
+}
+
+// ── Writes ───────────────────────────────────────────────────────────
+
+/**
+ * "+ 4 oz" / "+ 1 drink": the entry appears now, stamped with this moment. The
+ * button is never held back while a request runs, so each tap is its own call.
+ */
+export async function addDrink(kind: DrinkKind, token: string): Promise<void> {
+  const now = new Date();
+  const { date, time } = denverClock(now);
+  const stamp = now.toISOString();
+  const entry: DrinkEntry = {
+    id: newId(),
+    kind,
+    amount: kind === 'water' ? QUICK_WATER_ML : 1,
+    date,
+    time,
+    logged_at_utc: stamp,
+    source: 'app',
+    created: stamp,
+    updated: stamp,
+    pending: true,
+  };
+  setError(date, kind, null);
+  touch(entry.id);
+  putEntry(date, entry);
+  if (isDemo()) {
+    touch(entry.id);
+    putEntry(date, { ...entry, pending: false });
+    return;
+  }
+  const out = await logDrink({ id: entry.id, kind, amount: entry.amount, logged_at_utc: stamp, source: 'app' }, token);
+  touch(entry.id);
+  if (out.ok) {
+    putEntry(date, { ...out.data, pending: false });
+  } else {
+    removeEntry(date, entry.id);
+    setError(date, kind, ERROR_LOG);
+  }
+}
+
+/** Move a drink to another time that day (`HH:MM:SS`). Resolves true when it was saved. */
+export async function editDrinkTime(entry: DrinkEntry, time: string, token: string): Promise<boolean> {
+  setError(entry.date, entry.kind, null);
+  if (time === entry.time) return true;
+  if (isDemo()) {
+    touch(entry.id);
+    putEntry(entry.date, { ...entry, time, updated: new Date().toISOString() });
+    return true;
+  }
+  const out = await updateDrinkTime(entry.id, time, token);
+  if (!out.ok) {
+    setError(entry.date, entry.kind, ERROR_TIME);
+    return false;
+  }
+  touch(entry.id);
+  putEntry(entry.date, { ...out.data, pending: false });
+  return true;
+}
+
+/** Remove a drink. The entry stays until the API says it is gone. */
+export async function removeDrink(entry: DrinkEntry, token: string): Promise<boolean> {
+  setError(entry.date, entry.kind, null);
+  if (!isDemo()) {
+    const out = await deleteDrink(entry.id, token);
+    if (!out.ok) {
+      setError(entry.date, entry.kind, ERROR_DELETE);
+      return false;
+    }
+  }
+  touch(entry.id);
+  removeEntry(entry.date, entry.id);
+  return true;
+}
+
+/** Save the daily goal, in ml. Resolves true when it was saved; the Water card follows the signal. */
+export async function saveWaterGoal(ml: number, token: string): Promise<boolean> {
+  if (!isDemo()) {
+    const out = await updateSetting(WATER_GOAL_KEY, ml, token);
+    if (!out.ok) return false;
+    const stored = Number(out.data.value);
+    waterGoalMl.value = Number.isFinite(stored) && stored > 0 ? stored : ml;
+    return true;
+  }
+  waterGoalMl.value = ml;
+  return true;
+}
+
+/** Test seam: forget everything held. */
+export function resetDrinks(): void {
+  drinkDays.value = {};
+  drinkErrors.value = {};
+  waterGoalMl.value = WATER_GOAL_DEFAULT_ML;
+  inFlight.clear();
+  changedAt.clear();
+  changeSeq = 0;
+}

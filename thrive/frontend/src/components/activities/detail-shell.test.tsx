@@ -313,8 +313,13 @@ describe('AC4-6: the stats card', () => {
     expect(screen.getByRole('img', { name: '142 beats per minute' })).toBeTruthy();
   });
 
-  it('is not drawn for a weight workout, a plan or an active workout', () => {
-    for (const over of [{ type: 'weight' as const }, { status: 'planned' }, { status: 'active' }]) {
+  it('is not drawn for a plan or an active workout, weight or not', () => {
+    for (const over of [
+      { type: 'weight' as const, status: 'planned' },
+      { status: 'planned' },
+      { status: 'active' },
+      { type: 'weight' as const, status: 'active' },
+    ]) {
       const { container } = show(wk(over));
       expect(container.querySelector('.detail-stats-card, .detail-no-details')).toBeNull();
       cleanup();

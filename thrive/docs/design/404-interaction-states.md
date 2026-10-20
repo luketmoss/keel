@@ -92,7 +92,7 @@ these in a test so a new class must be placed.
 | Family | Classes |
 |---|---|
 | Filled buttons | `.btn-primary`, `.btn-danger`, `.fab`, `.login-btn` |
-| Quiet buttons | `.btn-secondary`, `.btn-ghost`, `.btn-link`, `.template-editor-back`, `.login-link`, `.filter-clear`, `.manage-labels-link`, `.day-today-btn`, `.training-plan-link`, `.detail-coros-link` |
+| Quiet buttons | `.btn-secondary`, `.btn-ghost`, `.template-editor-back`, `.login-link`, `.filter-clear`, `.manage-labels-link`, `.day-today-btn`, `.training-plan-link`, `.detail-coros-link` |
 | Icon buttons | `.btn-icon`, `.modal-close`, `.day-arrow`, `.set-remove-btn`, `.compact-card-remove`, `.last-time-close-btn`, `.copy-down-btn`, `.reorder-btn`, `.exercise-toolbar-btn`, `.manage-label-delete`, `.day-sync-btn`, `.sync-now-btn`, `.detail-icon-btn` |
 | Chips and toggles | `.filter-chip`, `.label-chip`, `.tag-badge` (as a button), `.effort-btn`, `.sub-type-btn`, `.theme-toggle-btn`, `.trends-group-btn`, `.trends-chip`, `.trends-view-btn`, `.trends-menu-item`, `.detail-menu-item`, `.library-switch-btn`, `.color-swatch`, `.section-badge-btn`, `.section-picker-pill`, `.week-day` |
 | Rows and cards | `.exercise-list-item`, `.create-new-row`, `.template-card`, `.workout-card`, `.compact-card-body[role="button"]`, `.type-card`, `.trend-row-link`, `.trend-open-day`, `.calendar-open-day`, `.calendar-day`, `.manage-label-name`, `.add-set-btn`, `.sync-status-bar`, `.settings-btn`, `.exercise-list-item-header`, `.settings-row-link`, `.day-card-link` |

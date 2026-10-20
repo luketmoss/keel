@@ -27,7 +27,6 @@ const FAMILIES = {
   'Quiet buttons': [
     'btn-secondary',
     'btn-ghost',
-    'btn-link',
     'template-editor-back',
     'login-link',
     'filter-clear',

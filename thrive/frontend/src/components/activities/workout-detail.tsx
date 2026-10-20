@@ -3,7 +3,14 @@ import { workouts, sets, templates, activeWorkoutId, showToast } from '../../sta
 import { deleteWorkout, copyWorkout, saveWorkoutAsTemplate, startPlannedWorkout } from '../../state/actions';
 import { useAuth } from '../../auth/auth-context';
 import { navigate, goBack } from '../../router/router';
-import { ExerciseDetail, groupSetsIntoExercises } from './exercise-detail';
+import {
+  SectionCard,
+  bestSetText,
+  groupBySection,
+  groupSetsIntoExercises,
+  type ExerciseGroup,
+} from './exercise-detail';
+import { SetEffortCard, StrengthHero, isCompletedWeight } from './strength-summary';
 import { ExerciseCompactCard } from '../shared/exercise-compact-card';
 import { provenanceDetail } from '../../api/provenance';
 import { WatchGlyph } from '../shared/provenance-mark';
@@ -15,7 +22,7 @@ import { ElevationProfile } from './elevation-profile';
 import { DetailTopBar } from './detail-top-bar';
 import { DetailTitle } from './detail-title';
 import { DetailStats, hasStatsCard } from './detail-stats';
-import { PencilLineIcon } from './detail-icons';
+import { HistoryIcon, PencilLineIcon } from './detail-icons';
 
 interface Props {
   workoutId: string;
@@ -60,10 +67,14 @@ function findPreviousWorkout(workoutId: string) {
   );
 }
 
+/** "Oct 12": the day a previous workout was done. */
+function shortDay(date: string): string {
+  return new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
 export function WorkoutDetail({ workoutId }: Props) {
   const { token } = useAuth();
   const workout = workouts.value.find((w) => w.id === workoutId);
-  const [expandedIndex, setExpandedIndex] = useState(-1);
   const [deleting, setDeleting] = useState(false);
   const [startingPlanned, setStartingPlanned] = useState(false);
   const [showLastTime, setShowLastTime] = useState(false);
@@ -93,6 +104,15 @@ export function WorkoutDetail({ workoutId }: Props) {
   const prevWorkout = findPreviousWorkout(workoutId);
   const prevSets = prevWorkout ? sets.value.filter((s) => s.workout_id === prevWorkout.id) : [];
   const prevGroups = prevSets.length > 0 ? groupSetsIntoExercises(prevSets) : [];
+  // "Last time (Oct 12): 50 lb × 10 · Medium", for an exercise found in the previous workout.
+  const lastTimeFor = (group: ExerciseGroup): string => {
+    if (!showLastTime || !prevWorkout) return '';
+    const prev = prevGroups.find(
+      (pg) => pg.exercise_id === group.exercise_id && pg.exercise_order === group.exercise_order,
+    );
+    const best = prev ? bestSetText(prev.sets) : '';
+    return best ? `Last time (${shortDay(prevWorkout.date)}): ${best}` : '';
+  };
 
   const handleStartPlanned = async () => {
     if (!token || startingPlanned) return;
@@ -160,6 +180,20 @@ export function WorkoutDetail({ workoutId }: Props) {
   // route is a detail of its own, so the empty state below does not show over it.
   const showRoute = routeAvailable(workout);
 
+  // Note card (#531), then provenance.
+  const noteCard = workout.notes.trim() ? (
+    <section class="detail-note-card">
+      <h2 class="detail-note-heading">
+        <PencilLineIcon />
+        Note
+      </h2>
+      <p class="detail-notes">{workout.notes}</p>
+    </section>
+  ) : null;
+  // #533: a weight workout that is not a plan lists its exercises as section cards.
+  const strength = workout.type === 'weight' && !isPlanned;
+  const sectionCards = groupBySection(exerciseGroups);
+
   return (
     <div class={`screen workout-detail-screen${showRoute ? ' has-hero' : ''}`}>
       {showRoute && <RouteHero trackState={trackState} />}
@@ -178,8 +212,16 @@ export function WorkoutDetail({ workoutId }: Props) {
       <div class="detail-sheet">
         <DetailTitle workout={workout} />
 
-        {/* #531: a completed cardio or stretch activity's figures; weight keeps its exercise list (#533). */}
+        {/* #531: a completed cardio or stretch activity's figures. */}
         {hasStatsCard(workout) && <DetailStats workout={workout} hideEmpty={showRoute} />}
+
+        {/* #533: a completed weight workout's sets ring and what else is known, then its set effort. */}
+        {isCompletedWeight(workout) && (
+          <>
+            <StrengthHero workout={workout} workoutSets={workoutSets} hideEmpty={showRoute} />
+            <SetEffortCard workoutSets={workoutSets} />
+          </>
+        )}
 
         {/* #532: the track's elevation, once it has arrived; with or without a map. */}
         {trackState.status === 'ready' && trackState.track && (
@@ -254,61 +296,33 @@ export function WorkoutDetail({ workoutId }: Props) {
             ) : null;
           })()}
 
-        {/* Exercise breakdown for completed weight workouts */}
-        {!isPlanned && exerciseGroups.length > 0 && (
-          <div class="detail-exercises">
-            <div class="detail-section-header">
-              <h3>Exercises</h3>
+        {/* #533: the Note card comes before the exercises of a weight workout. */}
+        {strength && noteCard}
+
+        {/* Exercises of a weight workout, one card per section with every set a tile (#533). */}
+        {strength && exerciseGroups.length > 0 && (
+          <>
+            <div class="strength-exercises-header">
+              <h2 class="strength-exercises-heading">Exercises</h2>
               {prevWorkout && (
-                <button class="btn-link" onClick={() => setShowLastTime(!showLastTime)}>
-                  {showLastTime ? 'Hide' : 'Show'} last time
+                <button
+                  type="button"
+                  class={`filter-chip last-time-chip${showLastTime ? ' active' : ''}`}
+                  aria-pressed={showLastTime}
+                  onClick={() => setShowLastTime(!showLastTime)}
+                >
+                  <HistoryIcon />
+                  Last time
                 </button>
               )}
             </div>
-
-            {exerciseGroups.map((group, i) => (
-              <div key={`${group.exercise_id}-${group.exercise_order}`}>
-                <ExerciseDetail
-                  group={group}
-                  expanded={expandedIndex === i}
-                  onToggle={() => setExpandedIndex(expandedIndex === i ? -1 : i)}
-                />
-                {showLastTime &&
-                  prevGroups.length > 0 &&
-                  (() => {
-                    const prev = prevGroups.find(
-                      (pg) => pg.exercise_id === group.exercise_id && pg.exercise_order === group.exercise_order,
-                    );
-                    if (!prev) return null;
-                    const prevBest = prev.sets.reduce<(typeof prev.sets)[0] | null>((best, s) => {
-                      if (!best) return s;
-                      return (Number(s.weight) || 0) > (Number(best.weight) || 0) ? s : best;
-                    }, null);
-                    if (!prevBest) return null;
-                    return (
-                      <div class="last-time-ref">
-                        Last time: {prevBest.weight ? `${prevBest.weight} lbs` : ''}
-                        {prevBest.weight && prevBest.reps ? ' × ' : ''}
-                        {prevBest.reps ? `${prevBest.reps} reps` : ''}
-                        {prevBest.effort ? ` (${prevBest.effort})` : ''}
-                      </div>
-                    );
-                  })()}
-              </div>
+            {sectionCards.map((card) => (
+              <SectionCard key={card.section} card={card} lastTimeFor={lastTimeFor} />
             ))}
-          </div>
+          </>
         )}
 
-        {/* Note card, then provenance (#531). */}
-        {workout.notes.trim() && (
-          <section class="detail-note-card">
-            <h2 class="detail-note-heading">
-              <PencilLineIcon />
-              Note
-            </h2>
-            <p class="detail-notes">{workout.notes}</p>
-          </section>
-        )}
+        {!strength && noteCard}
 
         {(provenance || corosUrl || workout.copied_from) && (
           <div class="detail-provenance-block">

@@ -122,6 +122,11 @@ Columns of numbers use `tabular-nums`; a lone large number does not.
 - **A bottom tab bar** is the primary navigation.
 - **Cards are for sources**, one per source, with hairline rows inside. Rows are
   separated by hairlines, never by nested cards.
+  A summary screen may give each metric its own card when the card is a chart
+  carrying the metric's word and value (Thrive's Day screen, #484). Lists of
+  rows still group by source. The split is for reading at a glance: one card
+  per chart keeps each metric's word, value and marks together, which a
+  source card of hairline rows cannot do once the rows become charts.
 - **Touch targets are at least 44px.**
 
 ## Showing data

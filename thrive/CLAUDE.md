@@ -167,9 +167,9 @@ Google Sheet "Groundwork" with these tabs:
   or 8 (1 is a guest or another user) are never written. The SPA reads it,
   read-only and still in kg, through `frontend/src/api/health-api.ts` (luketmoss/thrive#236).
   Later columns are only ever appended.
-- **DailySummary** (A:Y) — **derived, never authoritative** (luketmoss/thrive#131). One row per
+- **DailySummary** (A:AA) — **derived, never authoritative** (luketmoss/thrive#131). One row per
   local calendar day, rebuildable at any time from `Workouts` + `DailyHealth` +
-  `BodyMeasurements`. Nothing writes here by hand. If it disagrees with
+  `BodyMeasurements` + `Drinks`. Nothing writes here by hand. If it disagrees with
   `Workouts`, `Workouts` is right and this is stale. The SPA reads it,
   read-only, through `frontend/src/api/health-api.ts` (luketmoss/thrive#236), and never
   rebuilds or corrects it.
@@ -177,7 +177,8 @@ Google Sheet "Groundwork" with these tabs:
   total_distance_m, total_ascent_m, cardio_activity_count, distance_withdata,
   ascent_withdata, max_effort, effort_counts, steps, resting_hr, hrv,
   sleep_total_s, training_load, computed_at, moving_withdata, elapsed_withdata,
-  weight_kg, fat_ratio_pct, systolic_mmhg, diastolic_mmhg, bp_count.
+  weight_kg, fat_ratio_pct, systolic_mmhg, diastolic_mmhg, bp_count, water_ml,
+  alcohol_drinks.
   Every total carries its coverage: `total_moving_s`/`total_elapsed_s` are blank
   when no activity recorded them, and S/T count those that did out of
   `activity_count` (luketmoss/thrive#181). S/T are appended, not beside D/E, because agents and the API read
@@ -197,6 +198,12 @@ Google Sheet "Groundwork" with these tabs:
   values present in them. Either half is blank, never `0`, on a day with no
   such reading; a body-only day still gets a row, everything else blank as
   usual. A missing `BodyMeasurements` tab leaves U:Y blank everywhere.
+  Z:AA (#522) roll up `Drinks`: `water_ml` sums the day's water `amount`s,
+  `alcohol_drinks` its alcohol `amount`s, each blank, never `0`, on a day with
+  no drink of that kind. A drinks-only day gets a row; a missing `Drinks` tab
+  leaves Z:AA blank everywhere. Drink writes do not trigger a rebuild, so the
+  columns catch up on the normal rebuild path; Day and Trends read `Drinks`
+  directly. Added by `scripts/migrate-522-daily-summary-drinks.mjs`.
 - **SyncLog** (A:N) — one row per COROS sync run (luketmoss/thrive#156): run_id, started_at,
   finished_at, window_start, window_end, n_seen, n_new, n_updated, n_enriched,
   n_fit_fetched, n_errors, status (`ok`/`partial`/`failed`), error_detail,

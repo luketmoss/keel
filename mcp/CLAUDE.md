@@ -66,8 +66,8 @@ disjoint and together are exactly the app's tools.
 
 | Connector | URL | Serves | Normal state |
 |---|---|---|---|
-| `Thrive` | `<PUBLIC_URL>/thrive/mcp` | the 10 read tools | on |
-| `Thrive (write)` | `<PUBLIC_URL>/thrive/write/mcp` | the 12 write tools | **off** |
+| `Thrive` | `<PUBLIC_URL>/thrive/mcp` | the 11 read tools | on |
+| `Thrive (write)` | `<PUBLIC_URL>/thrive/write/mcp` | the 13 write tools | **off** |
 | `Hive` | `<PUBLIC_URL>/hive/mcp` | the 5 read tools | on |
 | `Hive (write)` | `<PUBLIC_URL>/hive/write/mcp` | the 3 write tools | **off** |
 
@@ -200,7 +200,7 @@ with `npx wrangler secret put`, never committed.
 
 ## Thrive
 
-`/thrive/mcp` and `/thrive/write/mcp` serve the 22 Thrive tools between them, ported from the stdio server
+`/thrive/mcp` and `/thrive/write/mcp` serve the 24 Thrive tools between them, ported from the stdio server
 (retired in #372) and diffed against the tool list recorded from it
 (`test/fixtures/thrive-stdio-tools.json`, frozen the same way). The tool
 reference and the agent brief are in `docs/thrive-tools.md` and
@@ -221,6 +221,13 @@ Changes from the stdio server, all forced by running on a Worker:
 
 A Thrive `apps-script/` change that alters a response shape also needs a matching
 change here.
+
+**Drinks are read-only here (#522).** `thrive_drinks` reads Thrive Sip's log through
+`getDrinks`, and `thrive_daily_summary` shows the summary's `water_ml` and
+`alcohol_drinks`. No tool logs, edits or deletes a drink: the owner does that from
+the widget or the app. So nothing here calls `logDrink`, `updateDrinkTime` or
+`deleteDrink`, and the API's MCP change log (#434), which does not record those
+actions, has nothing to miss from this Worker.
 
 ## Approving the destructive tools
 

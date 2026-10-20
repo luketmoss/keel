@@ -16,6 +16,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { configureApi } from './api.js';
 import { registerThriveTools } from './tools.js';
+import { todayStr } from './domain.js';
 
 const W_FIELDS = [
   'id', 'date', 'time', 'type', 'name', 'template_id', 'notes', 'elapsed_seconds', 'created',
@@ -47,6 +48,18 @@ const JOURNAL = [
   { date: '2026-09-24', note: 'Easy ride.', created: '2026-09-24T20:00:00.000Z', updated: '2026-09-24T20:00:00.000Z' },
 ];
 
+// #522: drinks as getDrinks returns them.
+const drinkEntry = (id, kind, amount, date, time) => ({
+  id, kind, amount, date, time, logged_at_utc: `${date}T14:00:00.000Z`, source: 'app',
+  created: `${date}T14:00:01.000Z`, updated: `${date}T14:00:01.000Z`,
+});
+const DRINKS = [
+  drinkEntry('d1', 'water', '118', '2026-10-19', '07:45:00'),
+  drinkEntry('d2', 'water', '118', '2026-10-19', '10:20:00'),
+  drinkEntry('d3', 'water', '118', '2026-10-19', '12:05:00'),
+  drinkEntry('d4', 'alcohol', '1', '2026-10-19', '19:10:00'),
+];
+
 // #412: every write request carries its tool call's id; what else it carries is the assertion.
 function sentWithoutCallId(request) {
   const { call_id: callId, ...rest } = JSON.parse(request.payload);
@@ -73,7 +86,12 @@ before(async () => {
           sleep_deep_s: '', sleep_rem_s: '', sleep_light_s: '', sleep_awake_s: '', sleep_score: '',
           vo2max: '', recovery: '', training_load: '', bed_time: '', wake_time: '', raw_ref: '', synced_at: '', stress_avg: '31' }];
         break;
-      case 'getDailySummary': data = []; break;
+      // #522: one rebuilt day carrying the drinks columns, as the API sends it.
+      case 'getDailySummary':
+        data = p.from <= '2026-10-19' && p.to >= '2026-10-19'
+          ? [{ date: '2026-10-19', steps: '8400', computed_at: '2026-10-20T13:00:00.000Z', water_ml: '354', alcohol_drinks: '1' }]
+          : [];
+        break;
       case 'getBodyMeasurements':
         data = p.kind === 'bp' ? [] : [{
           grpid: '1001', date: p.from, time: '06:42', measured_at_utc: `${p.from}T06:42:00-06:00`,
@@ -101,6 +119,13 @@ before(async () => {
         }
         break;
       }
+      // #522: the fake API's Drinks log, filtered by date as getDrinks does.
+      case 'getDrinks':
+        data = {
+          drinks: DRINKS.filter((d) => d.date >= p.from && d.date <= p.to),
+          water_goal_ml: 1893,
+        };
+        break;
       case 'getExercises': data = []; break;
       case 'getTemplates': data = []; break;
       case 'appendSets': data = { appended: 0 }; break;
@@ -441,4 +466,66 @@ test('thrive_set_journal_entry refuses an unreadable date and an over-long note 
   assert.equal(long.isError, true);
   assert.match(long.text, /too long to send/);
   assert.equal(journalWrites().length, before);
+});
+
+// --- #522 ------------------------------------------------------------
+
+test('thrive_drinks is registered read-only, with date_from and date_to only', async () => {
+  const { tools } = await client.listTools();
+  const t = tools.find((x) => x.name === 'thrive_drinks');
+  assert.ok(t);
+  assert.deepEqual(Object.keys(t.inputSchema.properties).sort(), ['date_from', 'date_to']);
+  assert.equal(t.annotations?.readOnlyHint, true);
+  assert.equal(t.annotations?.destructiveHint, undefined);
+  assert.match(t.description, /Read-only: no tool logs, edits or deletes a drink/);
+  assert.match(t.description, /At most 400 days per call/);
+});
+
+test('no tool can log, edit or delete a drink', async () => {
+  const { tools } = await client.listTools();
+  const drinkTools = tools.filter((t) => /drink/i.test(t.name));
+  assert.deepEqual(drinkTools.map((t) => t.name), ['thrive_drinks']);
+});
+
+test('thrive_drinks returns each entry with its time and kind, per-day totals in oz, and the goal', async () => {
+  const before = calls.length;
+  const { text, isError } = await call('thrive_drinks', { date_from: '2026-10-18', date_to: '2026-10-19' });
+  assert.equal(isError, false, text);
+  const sent = calls.slice(before);
+  assert.deepEqual(sent.map((c) => c.action), ['getDrinks']);
+  assert.equal(sent[0].from, '2026-10-18');
+  assert.equal(sent[0].to, '2026-10-19');
+  assert.equal(sent[0].payload, undefined); // a read: nothing sent to write
+  assert.match(text, /Water goal: 64 oz \(1893 ml\) a day/);
+  assert.match(text, /- 2026-10-19: water 12 oz \(354 ml\), 19% of goal · alcohol 1 drink \(4 entries\)/);
+  assert.match(text, / {2}- 07:45 water 4 oz \(118 ml\) \[app\]/);
+  assert.match(text, / {2}- 19:10 alcohol 1 drink \[app\]/);
+  assert.match(text, /No drinks logged for 1 day: 2026-10-18\./);
+});
+
+test('thrive_drinks with no range reads today only', async () => {
+  const before = calls.length;
+  const { text, isError } = await call('thrive_drinks');
+  assert.equal(isError, false, text);
+  const sent = calls[before];
+  assert.equal(sent.action, 'getDrinks');
+  assert.equal(sent.from, todayStr());
+  assert.equal(sent.to, todayStr());
+  assert.match(text, new RegExp(`^Drinks, ${todayStr()}: no drinks logged\\.`));
+});
+
+test('thrive_drinks refuses a range over 400 days before any request', async () => {
+  const before = calls.length;
+  const { text, isError } = await call('thrive_drinks', { date_from: '2025-01-01', date_to: '2026-02-05' });
+  assert.equal(isError, true);
+  assert.match(text, /reads at most 400 days at a time; 2025-01-01 to 2026-02-05 is 401 days/);
+  assert.equal(calls.length, before);
+});
+
+test('thrive_daily_summary shows water and alcohol for a day that has them', async () => {
+  const { text, isError } = await call('thrive_daily_summary', { date_from: '2026-10-19', date_to: '2026-10-19' });
+  assert.equal(isError, false, text);
+  assert.match(text, /- 2026-10-19: no activities logged .*· water 12 oz \(354 ml\) · alcohol 1 drink$/m);
+  const { tools } = await client.listTools();
+  assert.match(tools.find((t) => t.name === 'thrive_daily_summary').description, /water \(oz and ml\) and alcohol/);
 });

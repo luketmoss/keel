@@ -88,6 +88,8 @@ export const DAILY_SUMMARY_FIELDS = [
   'systolic_mmhg', // W  mean of the day's BP readings, half up
   'diastolic_mmhg', // X
   'bp_count', // Y  BP readings (rows)
+  'water_ml', // Z  #522: the day's water from Drinks, ml; blank when none
+  'alcohol_drinks', // AA #522: the day's alcohol from Drinks, standard drinks; blank when none
 ] as const;
 
 export type DailyHealthField = (typeof DAILY_HEALTH_FIELDS)[number];

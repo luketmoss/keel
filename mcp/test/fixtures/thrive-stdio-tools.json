@@ -141,7 +141,7 @@
   },
   {
     "name": "thrive_daily_summary",
-    "description": "One line per day rolled up across workouts and health: activity count and types, moving and elapsed time with how many of the day's sessions recorded them, outdoor distance and ascent with how many outdoor sessions were measured, session effort, and the day's steps, resting HR, HRV, sleep and training load. Use it for volume and load across days. Default range: the 7 days ending today. Distance and ascent are OUTDOOR ONLY, so on a day with an indoor session they will not equal the sum of that day's activity distances. The rollup is derived from the workouts and daily health, rebuilt on every COROS sync run: if it disagrees with thrive_list_workouts, the workouts are right. \"—\" means unknown, never zero: \"moving — (recorded on 0 of 2 sessions)\" means nobody recorded it, not that you stood still.",
+    "description": "One line per day rolled up across workouts and health: activity count and types, moving and elapsed time with how many of the day's sessions recorded them, outdoor distance and ascent with how many outdoor sessions were measured, session effort, and the day's steps, resting HR, HRV, sleep and training load, weight and BP, and the water (oz and ml) and alcohol (drinks) logged. Use it for volume and load across days. Default range: the 7 days ending today. Distance and ascent are OUTDOOR ONLY, so on a day with an indoor session they will not equal the sum of that day's activity distances. The rollup is derived from the workouts and daily health, rebuilt on every COROS sync run: if it disagrees with thrive_list_workouts, the workouts are right. \"—\" means unknown, never zero: \"moving — (recorded on 0 of 2 sessions)\" means nobody recorded it, not that you stood still. Water and alcohol catch up on the next rebuild: for drinks logged since, or entry by entry, use thrive_drinks.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -202,6 +202,25 @@
       "required": [
         "workout_id"
       ],
+      "additionalProperties": true,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "thrive_drinks",
+    "description": "Water and alcohol the user logged (Thrive Sip), read straight from the Drinks log: each entry with its local time, kind and amount, per-day totals (water in oz and ml with the % of the daily goal, alcohol in standard drinks), and the water goal. Over several days it also gives the average water on the days it was logged and the total alcohol. Default: today only. At most 400 days per call. A day or a kind with nothing logged is unknown, never zero. Read-only: no tool logs, edits or deletes a drink; the user does that in the app or the widget.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "date_from": {
+          "type": "string",
+          "description": "First day, inclusive (YYYY-MM-DD, 'today', '+7d'). Default: date_to"
+        },
+        "date_to": {
+          "type": "string",
+          "description": "Last day, inclusive. Default: today"
+        }
+      },
       "additionalProperties": true,
       "$schema": "http://json-schema.org/draft-07/schema#"
     }

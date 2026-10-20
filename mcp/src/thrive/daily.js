@@ -6,7 +6,7 @@
 // not conclude "no sleep", and a missing label would hide that the field
 // exists at all.
 
-import { todayStr, secondsToMinutes, metersToMiles, metersToFeet, kgToLb } from './domain.js';
+import { todayStr, secondsToMinutes, metersToMiles, metersToFeet, kgToLb, mlToOz } from './domain.js';
 
 export const BLANK = '—';
 
@@ -173,6 +173,12 @@ function bpMean(s) {
   return `${sys}/${dia} mean of ${s.bp_count}`;
 }
 
+/** "354" -> "12 oz (354 ml)"; blank -> "—" (#522). */
+const water = (ml) => (isBlank(ml) ? BLANK : `${mlToOz(ml)} oz (${ml} ml)`);
+
+/** "2" -> "2 drinks"; blank -> "—" (#522). */
+const alcohol = (n) => (isBlank(n) ? BLANK : `${n} drink${Number(n) === 1 ? '' : 's'}`);
+
 /** One DailySummary object -> one line. */
 export function describeSummaryDay(s) {
   const parts = [`- ${s.date}:`];
@@ -201,6 +207,8 @@ export function describeSummaryDay(s) {
   parts.push(`· weight ${mass(s.weight_kg)}`);
   parts.push(`· fat ${withUnit(s.fat_ratio_pct, ' %')}`);
   parts.push(`· BP ${bpMean(s)}`);
+  parts.push(`· water ${water(s.water_ml)}`);
+  parts.push(`· alcohol ${alcohol(s.alcohol_drinks)}`);
   return parts.join(' ');
 }
 
@@ -220,6 +228,11 @@ export function describeSummaryRange(rows, { from, to }) {
   out.push(
     'Weight and fat are the day\'s FIRST scale reading with a weight, not a mean; BP is the MEAN of the ' +
     "day's readings, with the count behind it. Both are rolled up from BodyMeasurements (#203); \"—\" means no such reading that day.",
+  );
+  out.push(
+    'Water and alcohol are the day\'s totals from the Drinks log (#522): "—" means none of that kind was logged, ' +
+    'not zero. They catch up on the next rebuild, so a drink logged since may be missing here; thrive_drinks ' +
+    'reads the log directly.',
   );
   const stamps = sorted.map((r) => r.computed_at).filter((v) => !isBlank(v)).sort();
   if (stamps.length) out.push(`Oldest row computed at ${stamps[0]}.`);

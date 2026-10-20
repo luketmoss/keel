@@ -94,6 +94,7 @@ Make these calls in parallel. They don't depend on each other.
 | Planned sessions, today + look-ahead | `thrive_list_workouts` with `date_from` = today, `date_to` = today + 3 days, `status: 'planned'` |
 | Body | `thrive_body_measurements` with `date_from` = 7 days ago |
 | Yesterday's note | `thrive_journal` with `date_from` = `date_to` = yesterday |
+| Yesterday's drinks | `thrive_drinks` with `date_from` = `date_to` = yesterday. It reads the Drinks log directly, so use it rather than the summary's water and alcohol, which lag until the next rebuild |
 | Board | `hive_list_items` with `due_before` = today + 3 days, once with `status: 'To Do'` and once with `status: 'In Progress'`. If a call errors (it has returned a 404 page once), retry it once before giving up. Never call it without a `status`: `due_before` has no lower bound, so an unfiltered call returns every finished item ever due and buries the open ones. Keep the Hive owner's items (see Settings). Overdue means a due date before today; list those separately from today's and the look-ahead's, oldest first, and say how many days overdue. |
 | Calendar | Events for today + 3 days from **each** calendar in Settings, if a calendar tool is connected. Pass the time zone from Settings, since a calendar's own zone can differ. Pass `eventType` as `DEFAULT`, `OUT_OF_OFFICE`, `FOCUS_TIME`, `FROM_GMAIL` and `BIRTHDAY`: birthdays are left out unless asked for. An empty result from one calendar is not "no events": say "no events" only when every calendar was read and all were empty. |
 | Weather | One Open-Meteo forecast for today + 3 days (below) |
@@ -216,6 +217,7 @@ weekly brief is still plain text.
 **Yesterday**
 <sessions: name, type, duration, distance, effort. Or "Rest day.">
 <the journal note in one line, if there was one>
+<drinks, in one line: see below>
 
 **Today**
 <planned sessions with estimates>
@@ -238,6 +240,18 @@ connected)."*
 Write it in plain words, second person, with no cheerleading. Show
 durations as `h:mm` or minutes and distances in miles, as the tools give
 them. Mention a trend only when it changes what to do today.
+
+**The drinks line** states yesterday's figures from `thrive_drinks` and
+nothing else: no advice, no judgement, no "too little" or "well done". Water
+in oz with its percentage of the goal, alcohol in drinks, each part said as
+not logged when that kind has no entry, never as zero:
+
+- both: *"Water 48 oz, 75% of your 64 oz goal · Alcohol 2 drinks"*
+- water only: *"Water 48 oz, 75% of your 64 oz goal · No alcohol logged"*
+- alcohol only: *"No water logged · Alcohol 1 drink"*
+- neither: *"No drinks logged."*
+
+The goal is the current setting, not yesterday's: there is no history of it.
 
 ## Step 6: Publish the page
 
@@ -267,6 +281,9 @@ content; a script in the page draws it. Never edit the CSS or the script.
   `series` is one number a night, oldest first, today last. `avgOf` is how
   many leading points make the average (the baseline nights before today).
   Sleep is minutes slept, awake time already taken off.
+- `drinks`: the drinks line (Step 5) as one string. Always present when
+  `thrive_drinks` answered, including "No drinks logged."; left out only when
+  the call failed, which the foot line then names.
 - `today`: `sessions` `[{name, note}]`, `weather`, `legend` `{best,
   calendar}`, `note` (for example that the trails are dry, with the rain
   figure), `events` `[{t, title}]`.
@@ -342,7 +359,14 @@ order, and the data for each (leave a key out and the section disappears):
   `{label, value, sub}`: sessions by type, moving time with how many
   sessions recorded it, outdoor distance, and the effort split. `load` is
   seven `{d, load, e}` as on the daily page. `note` names the longest or
-  hardest session.
+  hardest session. `drinks` is one line from `thrive_drinks` over the same
+  seven days, read off its "Across the range" line: the average daily water
+  in oz on the days it was logged, with how many days that was and its
+  percentage of the goal, and the week's total alcohol in drinks, e.g.
+  *"Water 52 oz a day on average, on the 6 days you logged it (81% of your
+  64 oz goal) · Alcohol 5 drinks in total"*. A kind with no entry all week is
+  *"No water logged"* or *"No alcohol logged"*, and a week with neither is
+  *"No drinks logged."*, never zero. Figures only, as on the daily page.
 - `recovery`: `{note, sleep, hrv, rhr}` as on the daily page, but each value
   is the week's average with the change from the week before in `sub`, plus
   the worst night with its likely cause if the journal says one. `series`

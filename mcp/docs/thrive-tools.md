@@ -1,6 +1,6 @@
 # Thrive tools
 
-Reference for the 22 `thrive_*` tools served at `/thrive/mcp`. Carried over from the
+Reference for the 24 `thrive_*` tools served at `/thrive/mcp`. Carried over from the
 README of the stdio server this Worker replaced (luketmoss/keel#372); the tool
 descriptions in `src/thrive/tools.js` are what an agent actually sees, and are the
 source of truth. For the conventions an agent needs to use the data safely, see
@@ -29,7 +29,8 @@ needs a matching change here.**
 | `thrive_get_workout` | One workout in full — every exercise, every set, its activity measurements, and its provenance: synced, enriched or hand-logged, with the COROS activity id, last sync, and whether the raw payload and FIT file are archived |
 | `thrive_get_workout_payload` | A synced or enriched workout's archived COROS detail payload: COROS's own text, with what the sheet does not carry (max speed, training effect, and max HR or laps where COROS includes them). 20,000 characters per call; a longer one ends with the `offset` for the next page. Hand-logged workouts have none |
 | `thrive_daily_health` | `DailyHealth` for a date range (default: the 7 days ending today): resting HR, HRV, average stress, steps, calories, sleep and its stages, sleep score, bed and wake time, VO2max, recovery, training load |
-| `thrive_daily_summary` | `DailySummary` for a date range: the per-day rollup of activities and health. Derived, and its distance and ascent are **outdoor only** |
+| `thrive_daily_summary` | `DailySummary` for a date range: the per-day rollup of activities, health, body and drinks (water in oz and ml, alcohol in drinks; #522). Derived, and its distance and ascent are **outdoor only** |
+| `thrive_drinks` | Thrive Sip's water and alcohol log for a date range (default: today; at most 400 days): each entry with its local time, kind and amount, per-day totals (water in oz and ml with the % of the goal, alcohol in drinks), the water goal, and over several days the average water on logged days and the total alcohol. **Read-only**: no tool logs, edits or deletes a drink |
 | `thrive_body_measurements` | Withings weight, body composition and blood pressure readings for a date range (default: the 30 days ending today), grouped by local date. Mass shown in kg and lb; filter by `kind` (`scale` / `bp`) |
 | `thrive_journal` | The user's own journal for a date range (default: the 30 days ending today): one free-text note per day, oldest first, with days that have no note listed as having none |
 | `thrive_list_exercises` | The exercise library, filterable by search text or tag |

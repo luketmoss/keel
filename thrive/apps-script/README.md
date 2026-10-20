@@ -106,7 +106,8 @@ Since #410 that caller is the SPA (almanac, the first, is retired):
 | Sent | Caller | May run |
 |---|---|---|
 | `key` only | key caller | everything, as before |
-| `access_token`, with or without `key` | token caller | the reads below, and `requestSync` |
+| `key` = `WIDGET_API_KEY` | widget caller (#519) | `logDrink` and `getDrinkTotals` only |
+| `access_token`, with or without `key` | token caller | the reads below, `requestSync`, and the drinks writes |
 | neither | refused | nothing |
 
 `access_token` present makes a token caller whatever else is sent: privilege
@@ -132,10 +133,13 @@ test fails until every `case` in `main.js` is classified. `previewSetUpdates`
 is deliberately off it: it writes nothing, but it is the dry run of a write
 and takes a write payload.
 
-**One write, on its own list (#410).** `TOKEN_WRITE_ACTIONS` is exactly
-`['requestSync']` (see [Sync now](#sync-now-requestsync-410)), kept apart from
-the reads so a write is never added by accident; a test pins the list. Every
-other write still answers a token caller `read_only`, before dispatch.
+**Writes, on their own list (#410, #519).** `TOKEN_WRITE_ACTIONS` is exactly
+`requestSync` (see [Sync now](#sync-now-requestsync-410)) and the app's four
+drinks writes, `logDrink`, `updateDrinkTime`, `deleteDrink` and `updateSetting`
+(see [Drinks](#drinks-and-settings-519)), kept apart from the reads so a write
+is never added by accident; a test pins the list. `getDrinks` and
+`getDrinkTotals` are on `TOKEN_READ_ACTIONS`. Every other write still answers a
+token caller `read_only`, before dispatch.
 
 | `code` | Meaning | The SPA does |
 |---|---|---|
@@ -143,6 +147,7 @@ other write still answers a token caller `read_only`, before dispatch.
 | `token_forbidden` | wrong OAuth client or account, the two properties unset, or the script not yet re-authorized for `UrlFetchApp` | the same |
 | `token_unavailable` | tokeninfo unreachable or erroring; not a verdict, never cached | the same |
 | `read_only` | a token caller asked for anything off both lists; it did not run | the same |
+| `widget_forbidden` | the widget key asked for anything but `logDrink` or `getDrinkTotals`; it did not run | n/a (the widget, not the SPA) |
 | `bad_request` | `requestSync`'s `request_ids` malformed; fixed text, never quoting the input | the same |
 
 ```
@@ -365,6 +370,49 @@ no-op when there is none. It answers `{result, entry}` with `result` one of
 `created`, `updated`, `deleted`, `unchanged`. The payload may carry only `date`
 and `note`; `note` is stored as given, as literal text, and bounded only by the
 payload ceiling.
+
+### Drinks and Settings (#519)
+
+Thrive Sip's intake. `Drinks` (A:I, `DRINK_FIELDS` in `types.js`) holds one row
+per drink and `Settings` (A:C) one row per key, both created by hand with
+`scripts/migrate-519-drinks-tab.mjs` and `scripts/migrate-519-settings-tab.mjs`.
+`src/drinks.js` is the only writer; `frontend/src/api/drinks.ts` mirrors the
+layout and wraps the six actions. Every refusal is fixed text that never
+quotes the input.
+
+```
+?action=logDrink&key=...&payload={"id":"<uuid>","kind":"water","amount":250,
+  "logged_at_utc":"2026-10-20T13:05:00Z","source":"widget"}
+?action=getDrinks&key=...&from=2026-10-01&to=2026-10-31   no range means today (Denver)
+?action=getDrinkTotals&key=...                            today's totals
+?action=updateDrinkTime&key=...&payload={"id":"<uuid>","time":"14:30:00"}
+?action=deleteDrink&key=...&payload={"id":"<uuid>"}
+?action=updateSetting&key=...&payload={"key":"water_goal_ml","value":2000}
+```
+
+- **`logDrink`** takes the id from the caller, so a retry after a dropped
+  connection leaves one row: a repeated id returns the existing row and writes
+  nothing. `date` and `time` are derived from `logged_at_utc` in
+  `America/Denver`, so 23:30 local is filed under that day even when UTC has
+  rolled over. `kind` is `water` or `alcohol`; water `amount` is a whole number
+  of ml, 1 to 2000, alcohol `amount` is exactly 1; `source` is `widget` or
+  `app`; `id` is 1-64 of `[A-Za-z0-9_-]`. It takes the script lock.
+- **`getDrinks`** takes `from` and `to` together (inclusive, at most 400 days)
+  or neither (today). It answers `{drinks, water_goal_ml}`, drinks in
+  `logged_at_utc` order. A missing tab is no drinks.
+- **`getDrinkTotals`** answers `{date, water_ml, alcohol_drinks,
+  water_goal_ml}` for today: zeros, never blanks.
+- **`updateDrinkTime`** changes `time` (`HH:MM:SS`) and `updated` only.
+  **`deleteDrink`** removes the row. An unknown id is an error for both.
+- **`updateSetting`** accepts only `water_goal_ml`, a whole number from 250 to
+  10000. The goal reads **1893** (64 oz) when the row, or the whole `Settings`
+  tab, is absent: the API supplies the default, the migration writes no row.
+- **Who may call.** `API_KEY` and `MCP_API_KEY` run all six. A token caller
+  runs all six (the app). **`WIDGET_API_KEY` runs `logDrink` and
+  `getDrinkTotals` only** and answers everything else
+  `Widget caller: this action is not permitted` with `code` `widget_forbidden`,
+  before dispatch: it can neither read the rest of the sheet nor edit or delete
+  a drink. MCP writes of these actions are not in the change log.
 
 ### Synced workouts (#166)
 
@@ -724,6 +772,10 @@ under ~2 s, by changing the constant, pushing, and running
      it can be rotated or revoked without touching `API_KEY`'s holders (the
      syncs, watchdogs and scripts). Leaving it unset changes nothing; it never
      replaces `API_KEY`, which stays required.
+   - `WIDGET_API_KEY` — optional (#519): a third long random string held only
+     by the Sip home-screen widget. It may run `logDrink` and `getDrinkTotals`
+     and nothing else, and rotates without touching any other holder. Unset or
+     blank, it matches nothing.
    - `SPREADSHEET_ID` — the Groundwork sheet id
    - `TOKEN_CLIENT_ID` — the SPA's OAuth client ID, the value of
      `VITE_GOOGLE_CLIENT_ID` (#410; almanac's, retired, before it, #144)

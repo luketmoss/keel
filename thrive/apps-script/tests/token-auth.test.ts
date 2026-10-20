@@ -357,6 +357,8 @@ const READ_PARAMS: Record<string, Record<string, string>> = {
   getDailyHealth: { from: '2026-09-01', to: '2026-09-30' }, getSyncLog: { limit: '1' },
   getBodyMeasurements: { from: '2026-09-01', to: '2026-09-30' },
   getWorkoutTrack: { id: 'w_001' },
+  // #519: the app's drinks reads.
+  getDrinks: { from: '2026-09-01', to: '2026-09-30' }, getDrinkTotals: {},
 };
 
 describe('AC4: token callers run only the named reads', () => {
@@ -447,9 +449,10 @@ describe('AC4: token callers run only the named reads', () => {
     expect(res.code).toBe('token_invalid');
   });
 
-  it('names exactly one token write, requestSync (#410)', () => {
+  it('names exactly the token writes: requestSync (#410) and the four drinks writes of the app (#519)', () => {
     const { sandbox } = load();
-    expect([...sandbox.TOKEN_WRITE_ACTIONS]).toEqual(['requestSync']);
+    expect([...sandbox.TOKEN_WRITE_ACTIONS]).toEqual(
+      ['requestSync', 'logDrink', 'updateDrinkTime', 'deleteDrink', 'updateSetting']);
   });
 
   it('classifies every action in the dispatcher as a read, a token write or key-only', () => {

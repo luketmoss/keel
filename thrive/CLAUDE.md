@@ -266,6 +266,24 @@ Google Sheet "Groundwork" with these tabs:
   a request closing re-reads health, the sync logs and Workouts/Sets (held as
   `src/state/refresh-hold.ts` holds them).
 
+- **Drinks** (A:I) and **Settings** (A:C) — Thrive Sip's intake (#519, epic #518).
+  Drinks is one row per drink: id, kind, amount, date, time, logged_at_utc,
+  source, created, updated. `id` is a UUID the **caller** generates, so logging
+  it twice leaves one row; `kind` is `water` or `alcohol`; `amount` is **water in
+  whole ml, alcohol in standard drinks** (always `1`), never blank or `0`;
+  `date`/`time` are local `America/Denver`, derived by the API from
+  `logged_at_utc` (the instant the caller says it was taken, never rewritten);
+  `source` is `widget` or `app`. **Written only by the API** (`logDrink`,
+  `updateDrinkTime`, `deleteDrink`; `apps-script/src/drinks.js`); the SPA does
+  not touch the tab directly, it calls `frontend/src/api/drinks.ts`, whose
+  `DRINK_FIELDS` mirrors `DRINK_FIELDS` in `apps-script/src/types.js` — change
+  both together. Settings is `key, value, updated` with one key, `water_goal_ml`
+  (250-10000 ml), whose default **1893** (64 oz) the API supplies when the row or
+  the tab is absent. `WIDGET_API_KEY`, a script property, is a third key caller
+  that may run `logDrink` and `getDrinkTotals` only. Created by
+  `scripts/migrate-519-drinks-tab.mjs` and `scripts/migrate-519-settings-tab.mjs`.
+  Later columns are only ever appended.
+
 `Created` on `Exercises`/`Workouts`/`Labels` is written but never read — a
 deliberate forensic trail, not dead weight to be removed.
 

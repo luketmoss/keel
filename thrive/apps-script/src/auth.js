@@ -1,10 +1,13 @@
 // Who is calling, and what they may do (#130, #144).
 //
-// Two kinds of caller:
+// Three kinds of caller:
 //
 // - A **key caller** sends `key`: the MCP server and the COROS sync. Full
 //   access, exactly as before #144. `key` may be `API_KEY` or, for the remote
 //   MCP Worker only, `MCP_API_KEY` (#364).
+// - A **widget caller** (#519) sends `key` too, but it is `WIDGET_API_KEY`, held
+//   by the Sip home-screen widget alone. It may run WIDGET_ACTIONS and nothing
+//   else, and can be rotated without touching any other holder.
 // - A **token caller** sends `access_token`, a Google access token from the
 //   SPA's own sign-in (#410; almanac's, retired, before it). The SPA is a
 //   browser app on GitHub Pages, so it cannot hold the key — a key in a public
@@ -49,6 +52,9 @@ var TOKEN_READ_ACTIONS = [
   // #432: the app shows the route on a map. Addressed by workout, never by Drive ID, and
   // confirmed to be that activity's track before anything is returned (track.js).
   'getWorkoutTrack',
+  // #519: the app shows today's intake and a day's drinks.
+  'getDrinks',
+  'getDrinkTotals',
 ];
 
 /**
@@ -56,10 +62,20 @@ var TOKEN_READ_ACTIONS = [
  * write is never added by accident. `requestSync` asks for the caller's own
  * just-appended SyncRequests rows to be dispatched now, under the poller's
  * rules; what reaches GitHub is fixed in sync-requests.js. `token-auth.test.ts`
- * asserts this list is exactly ['requestSync'], so the next one needs a
- * deliberate test change.
+ * asserts this list exactly, so the next one needs a deliberate test change.
  */
-var TOKEN_WRITE_ACTIONS = ['requestSync'];
+var TOKEN_WRITE_ACTIONS = [
+  'requestSync',
+  // #519: the app logs, re-times and removes drinks and sets the water goal.
+  'logDrink', 'updateDrinkTime', 'deleteDrink', 'updateSetting',
+];
+
+/**
+ * The only actions the widget key may run (#519): log a drink and read today's
+ * totals. Everything else is refused, whatever the action's own rules. The
+ * widget can neither read the rest of the sheet nor edit or delete a drink.
+ */
+var WIDGET_ACTIONS = ['logDrink', 'getDrinkTotals'];
 
 var TOKENINFO_URL ='https://oauth2.googleapis.com/tokeninfo';
 
@@ -109,10 +125,10 @@ function validateApiKey(key) {
 }
 
 /**
- * Which key `key` is: `'api'` (API_KEY), `'mcp'` (MCP_API_KEY), or null (#434).
+ * Which key `key` is: `'api'` (API_KEY), `'mcp'` (MCP_API_KEY), `'widget'` (WIDGET_API_KEY, #519), or null (#434).
  * The change log is written for the MCP key's writes alone, so the key has to be
- * told apart. API_KEY wins if the two were ever set equal: the log must never
- * claim a sync's write.
+ * told apart. API_KEY wins if keys were ever set equal, then MCP_API_KEY: the log must never
+ * claim a sync's write, and the narrow widget key must never shadow a wider one.
  */
 function identifyApiKey(key) {
   var props = PropertiesService.getScriptProperties();
@@ -120,11 +136,14 @@ function identifyApiKey(key) {
   if (!expected) throw new Error('API_KEY not configured in script properties');
   if (key === expected) return 'api';
   var mcpKey = props.getProperty('MCP_API_KEY');
-  return !!mcpKey && key === mcpKey ? 'mcp' : null;
+  if (!!mcpKey && key === mcpKey) return 'mcp';
+  // #519: the Sip widget's key, rotatable on its own. Unset or blank matches nothing.
+  var widgetKey = props.getProperty('WIDGET_API_KEY');
+  return !!widgetKey && key === widgetKey ? 'widget' : null;
 }
 
 /**
- * Decide who is calling. Returns `{ mode: 'key' }`, `{ mode: 'mcp' }` (the MCP key), `{ mode: 'token' }`, or
+ * Decide who is calling. Returns `{ mode: 'key' }`, `{ mode: 'mcp' }` (the MCP key), `{ mode: 'widget' }` (the widget key), `{ mode: 'token' }`, or
  * `{ refusal }` — a failure envelope to send back as it is.
  */
 function resolveCaller(params) {
@@ -139,11 +158,16 @@ function resolveCaller(params) {
   var kind = identifyApiKey(params.key);
   if (kind === null) return { refusal: fail('Invalid or missing API key') };
   // `mcp` is a key caller with the same access, told apart so its writes are logged (#434).
-  return { mode: kind === 'mcp' ? 'mcp' : 'key' };
+  // `widget` is a key caller with almost none: handleRequest limits it to WIDGET_ACTIONS (#519).
+  return { mode: kind === 'mcp' ? 'mcp' : kind === 'widget' ? 'widget' : 'key' };
 }
 
 function isTokenReadAction(action) {
   return TOKEN_READ_ACTIONS.indexOf(action) !== -1;
+}
+
+function isWidgetAction(action) {
+  return WIDGET_ACTIONS.indexOf(action) !== -1;
 }
 
 function isTokenWriteAction(action) {

@@ -155,3 +155,59 @@ function isWorkoutTrack(value: unknown): value is WorkoutTrack {
     coordinates.every((c) => Array.isArray(c) && c.length === 2 && c.every((n) => Number.isFinite(n)))
   );
 }
+
+// --- Any other action (#519) ---------------------------------------------
+
+/** What became of a call: the envelope's `data`, or a failure named without the token or the body. */
+export type ActionOutcome<T> = { ok: true; data: T } | { ok: false; kind: string; message?: string };
+
+/**
+ * Call one API action with the user's Google token, as requestSync does: a
+ * form-encoded POST with the token in the body. `fields` are plain form
+ * fields (`from`, `to`); `payload` is sent as the JSON `payload` parameter.
+ * Never throws. A refusal carries its `code` as `kind` (or `failed`), and the
+ * API's fixed-text `message`, which never quotes input or the token. Demo mode
+ * and an unset API URL make no call.
+ */
+export async function callAction<T>(
+  action: string,
+  token: string,
+  args: { fields?: Record<string, string>; payload?: unknown } = {},
+  options: RequestSyncOptions = {},
+): Promise<ActionOutcome<T>> {
+  const url = 'url' in options ? options.url : API_URL;
+  if (isDemo()) return { ok: false, kind: 'demo' };
+  if (!url) return { ok: false, kind: 'no_api_url' };
+
+  const body = new URLSearchParams();
+  body.set('action', action);
+  body.set('access_token', token);
+  for (const [k, v] of Object.entries(args.fields ?? {})) body.set(k, v);
+  if (args.payload !== undefined) body.set('payload', JSON.stringify(args.payload));
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? THRIVE_API_TIMEOUT_MS);
+  try {
+    const res = await (options.fetchImpl ?? fetch)(url, { method: 'POST', body, signal: controller.signal });
+    if (!res.ok) return { ok: false, kind: `http_${res.status}` };
+    let parsed: unknown;
+    try {
+      parsed = await res.json();
+    } catch {
+      return { ok: false, kind: 'bad_response' };
+    }
+    if (!parsed || typeof parsed !== 'object') return { ok: false, kind: 'bad_response' };
+    const env = parsed as { success?: unknown; code?: unknown; error?: unknown; data?: unknown };
+    if (env.success !== true) {
+      const kind = typeof env.code === 'string' && CODE.test(env.code) ? env.code : 'failed';
+      return typeof env.error === 'string' && env.error.length <= 200
+        ? { ok: false, kind, message: env.error }
+        : { ok: false, kind };
+    }
+    return { ok: true, data: env.data as T };
+  } catch {
+    return { ok: false, kind: controller.signal.aborted ? 'timeout' : 'network' };
+  } finally {
+    clearTimeout(timer);
+  }
+}

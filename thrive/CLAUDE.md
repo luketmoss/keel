@@ -32,13 +32,14 @@ kill the vendors' refresh tokens.
 | `frontend/` | web |
 | `apps-script/` | apps-script |
 | `sync/` | node-jobs |
+| `android/` | android |
 | `scripts/` | — |
 
 **View library:** preact
 
 The authoritative conventions for each component are in its stack skill:
-`.claude/skills/stack-web/SKILL.md`, `.claude/skills/stack-apps-script/SKILL.md`
-and `.claude/skills/stack-node-jobs/SKILL.md`. `scripts/` pins none; this file
+`.claude/skills/stack-web/SKILL.md`, `.claude/skills/stack-apps-script/SKILL.md`,
+`.claude/skills/stack-node-jobs/SKILL.md` and `.claude/skills/stack-android/SKILL.md`. `scripts/` pins none; this file
 is its only authority.
 
 - **frontend/** — the Preact SPA, built with Vite. It reads and writes the
@@ -81,6 +82,27 @@ Google token, never from Drive.
   `--detail-map-height`) are in `global.css`, not overridden in dark: the base map is light in both
   themes.
 - A change under `geo/` rebuilds Thrive (`thrive.yml` and `thrive-pages.yml` trigger on `geo/**`).
+
+## Sip widget (#524)
+
+`android/` is Thrive Sip's home-screen widget and one-screen settings app
+(Kotlin, Jetpack Glance), logging water (+4 oz) and alcohol (+1) in one tap.
+It calls the Apps Script API with `WIDGET_API_KEY`, which can run `logDrink` and
+`getDrinkTotals` only, and queues taps locally so a tap offline is sent later
+with its own id and tap time.
+
+- **Install is by sideload, never published.** Download the `thrive-sip-apk`
+  artifact from the latest green `thrive-android.yml` run and install it on the
+  phone. In the app, set the API URL (the Apps Script web app) and the widget key.
+- **CI needs four repository secrets**: `THRIVE_ANDROID_KEYSTORE_BASE64`,
+  `THRIVE_ANDROID_KEYSTORE_PASSWORD`, `THRIVE_ANDROID_KEY_ALIAS`,
+  `THRIVE_ANDROID_KEY_PASSWORD` (setup and the backup rule: the android stack
+  skill). Without them the workflow builds an unsigned APK and warns.
+- **The Gradle wrapper jar is not committed yet.** Run `gradle wrapper
+  --gradle-version 8.11.1 --distribution-type bin` in `android/` once and commit
+  the result; until then CI installs the pinned Gradle itself.
+- Key commands, from `android/`: `./gradlew test`, `./gradlew lintRelease`,
+  `./gradlew assembleRelease`.
 
 ## Key commands
 

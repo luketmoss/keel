@@ -95,8 +95,7 @@ describe('AC1: a rule filling with a fill token sets color: var(--color-on-fill)
   // A :hover rule that only swaps the fill inherits the colour from its base rule.
   it.each(filled.map((r) => [r.selector, r.body] as const))('%s', (selector, body) => {
     const color = decl(body, 'color');
-    // .streak-dot.filled (#293) is a 10 px mark with no text at all.
-    if (color === undefined) expect(selector).toMatch(/:hover|^\.streak-dot\.filled$/);
+    if (color === undefined) expect(selector).toMatch(/:hover/);
     else expect(color).toBe('var(--color-on-fill)');
   });
 
@@ -136,8 +135,11 @@ describe('AC2: unselected chips are full strength with the strong outline', () =
     expect(decl(rule('.label-chip:hover').body, 'border-color')).toBe('var(--color-text-muted)');
   });
 
-  it('type filter chips are 44px tall', () => {
-    expect(decl(rule('.filter-chip').body, 'min-height')).toBe('44px');
+  it('type filter chips are 34px tall inside a 44px hit row (#527)', () => {
+    expect(decl(rule('.filter-chip').body, 'min-height')).toBe('34px');
+    expect(decl(rule('.activities-chips').body, 'min-height')).toBe('44px');
+    // The chip's own hit area reaches the row's edges.
+    expect(decl(rule('.filter-chip::before').body, 'inset')).toBe('-5px 0');
   });
 });
 
@@ -210,7 +212,7 @@ describe('AC4: nothing interactive is dimmed with opacity', () => {
   });
 });
 
-// ── #293 segmented switches and the week streak ─────────────────────────────
+// ── #293 segmented switches ─────────────────────────────
 
 describe.each(THEMES)('#293 AC1: the selected pill of the theme toggle and Library switch (%s)', (theme) => {
   const track = token(theme, '--color-border-light');
@@ -277,39 +279,7 @@ describe('#293 AC3: segmented button rules', () => {
   });
 });
 
-describe.each(THEMES)('#293 AC4: week streak dots on the page (%s)', (theme) => {
-  const bg = token(theme, '--color-bg');
-  it('the solid fill and the hollow outline are each 3:1', () => {
-    expect(contrast(token(theme, '--color-primary-fill'), bg)).toBeGreaterThanOrEqual(3);
-    expect(contrast(token(theme, '--color-border-strong'), bg)).toBeGreaterThanOrEqual(3);
-  });
-});
-
-describe('#293 AC4: streak dot rules', () => {
-  it('empty is hollow with an inset strong outline', () => {
-    const r = rule('.streak-dot');
-    expect(decl(r.body, 'background')).toBe('transparent');
-    expect(decl(r.body, 'box-shadow')).toBe('inset 0 0 0 2px var(--color-border-strong)');
-    expect(decl(r.body, 'height')).toBe('10px');
-  });
-  it('filled is solid primary-fill', () => {
-    expect(decl(rule('.streak-dot.filled').body, 'background')).toBe('var(--color-primary-fill)');
-    expect(decl(rule('.streak-dot.filled').body, 'box-shadow')).toBe('none');
-  });
-  it('today, empty, is a primary-fill inset outline with no outer ring; today, filled, is just the fill', () => {
-    expect(decl(rule('.streak-dot.today').body, 'box-shadow')).toBe('inset 0 0 0 2px var(--color-primary-fill)');
-    expect(decl(rule('.streak-dot.today.filled').body, 'box-shadow')).toBe('none');
-  });
-  it('no switch, segment or dot rule has gone back to the old tokens', () => {
-    const sels = [
-      '.theme-toggle-btn.active',
-      '.library-switch-btn.active',
-      '.streak-dot',
-      '.streak-dot.filled',
-      '.streak-dot.today',
-    ];
-    for (const s of sels) expect(rule(s).body).not.toMatch(/var\(--color-(?:surface|border|primary)\)/);
-  });
+describe('#293: the brand colour', () => {
   it('--color-primary stays the brand colour', () => {
     expect(token('light', '--color-primary')).toBe('#2f66f0');
     expect(token('dark', '--color-primary')).toBe('#6e97ff');

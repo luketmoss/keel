@@ -11,7 +11,7 @@ import type {
 import type { SyncLogEntryWithRow } from '../api/sync-log-api';
 import type { SyncRequestWithRow } from '../api/sync-requests-api';
 import type { DailyHealthRow, BodyMeasurementRow, DailySummaryRow } from '../api/health-api';
-import { sortPlannedWorkouts } from '../components/activities/activities-helpers';
+import { sortPlannedWorkouts, toLocalDateStr } from '../components/activities/activities-helpers';
 
 // Core data signals
 export const exercises = signal<ExerciseWithRow[]>([]);
@@ -35,6 +35,10 @@ export const activeWarmupExercises = signal<WarmupExerciseInfo[]>([]);
 export const isEditMode = signal(false);
 export const filterType = signal<WorkoutType | null>(null);
 export const filterTags = signal<string[]>([]);
+// #527: the month the Activities screen shows, 'YYYY-MM'. Held here so it survives a visit to another
+// tab; a reload starts on the current month again. It is the chosen month, not "today's": a screen left
+// open across midnight on the 1st keeps showing the month it was on.
+export const activitiesMonth = signal<string>(toLocalDateStr(new Date()).slice(0, 7));
 
 // Active workouts (status === 'active') — currently being tracked
 export const activeWorkouts = computed(() => workouts.value.filter((w) => w.status === 'active'));
@@ -45,7 +49,7 @@ export const plannedWorkouts = computed(() =>
   sortPlannedWorkouts(workouts.value.filter((w) => w.status === 'planned')),
 );
 
-// Completed workouts — used for week streak / stats (excludes planned and active)
+// Completed workouts — used for the month summary and picker (excludes planned and active)
 export const completedWorkouts = computed(() => workouts.value.filter((w) => !w.status));
 
 // Derived signals

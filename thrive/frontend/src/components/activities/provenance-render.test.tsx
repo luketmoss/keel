@@ -9,7 +9,8 @@ vi.mock('../../auth/auth-context', () => ({ useAuth: () => ({ token: 'tok' }) })
 
 import { ActivitiesScreen } from './activities-screen';
 import { WorkoutDetail } from './workout-detail';
-import { workouts, sets, exercises } from '../../state/store';
+import { workouts, sets, exercises, activitiesMonth } from '../../state/store';
+import { toLocalDateStr } from './activities-helpers';
 import { formatLocalStamp } from '../../api/provenance';
 import type { WorkoutWithRow } from '../../api/types';
 
@@ -74,6 +75,7 @@ function card(name: string): HTMLElement {
 
 afterEach(() => {
   cleanup();
+  activitiesMonth.value = toLocalDateStr(new Date()).slice(0, 7);
   workouts.value = [];
   sets.value = [];
   exercises.value = [];
@@ -82,6 +84,7 @@ afterEach(() => {
 describe('AC1: the card mark', () => {
   function renderList() {
     workouts.value = [synced, enriched, manual];
+    activitiesMonth.value = '2026-09';
     render(h(ActivitiesScreen, {}));
   }
 

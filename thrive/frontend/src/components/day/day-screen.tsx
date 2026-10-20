@@ -19,7 +19,8 @@ import { moveAnnouncement } from '../../day/format';
 import { today as todaySignal, watchToday } from '../../day/today';
 import { DayHeader } from './day-header';
 import { WeekStrip } from './week-strip';
-import { SLOTS, slotsFor } from './slots';
+import { SLOTS, slotsFor, type SlotName } from './slots';
+import type { DayPanelProps } from './panel';
 import { useSwipe } from './use-swipe';
 import { useSyncNow } from '../settings/sync-now';
 
@@ -30,6 +31,24 @@ function inTextEntry(target: EventTarget | null): boolean {
     target.isContentEditable ||
     target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])') !== null
   );
+}
+
+const TILE_SLOTS: ReadonlySet<SlotName> = new Set(['vitals', 'body']);
+
+/** `slots` in order, with the tile slots that sit together as one group. */
+function groupSlots(slots: SlotName[]): SlotName[][] {
+  const groups: SlotName[][] = [];
+  for (const name of slots) {
+    const last = groups[groups.length - 1];
+    if (TILE_SLOTS.has(name) && last && TILE_SLOTS.has(last[0])) last.push(name);
+    else groups.push([name]);
+  }
+  return groups;
+}
+
+function DaySlot({ name, date, state, today }: { name: SlotName } & DayPanelProps) {
+  const Slot = SLOTS[name];
+  return <Slot date={date} state={state} today={today} />;
 }
 
 export function DayScreen() {
@@ -148,10 +167,18 @@ export function DayScreen() {
       />
       <WeekStrip date={date} today={today} workouts={workouts.value} onSelect={moveTo} />
       <div class="day-panels">
-        {slotsFor(state).map((name) => {
-          const Slot = SLOTS[name];
-          return <Slot key={`${name}:${date}`} date={date} state={state} today={today} />;
-        })}
+        {groupSlots(slotsFor(state)).map((group) =>
+          group.length === 1 && !TILE_SLOTS.has(group[0]) ? (
+            <DaySlot key={`${group[0]}:${date}`} name={group[0]} date={date} state={state} today={today} />
+          ) : (
+            // #492: the metric tiles and Body share one two-column grid.
+            <div class="vitals" key="tiles">
+              {group.map((name) => (
+                <DaySlot key={`${name}:${date}`} name={name} date={date} state={state} today={today} />
+              ))}
+            </div>
+          ),
+        )}
       </div>
       <p class="sr-only" role="status" aria-live="polite">
         {announcement}

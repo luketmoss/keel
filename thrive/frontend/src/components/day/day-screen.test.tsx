@@ -392,6 +392,16 @@ describe('AC5 — panels and health', () => {
     expect(panelTitles(future.container)).toEqual(['Training', 'Note']);
   });
 
+  it('#492: Body sits inside the same .vitals tile grid as the vitals, and a future day has no grid', () => {
+    const past = renderAt('#/day/2026-09-01');
+    const grid = past.container.querySelector('.day-panels > .vitals')!;
+    expect(grid.querySelector('.metric-tile-body')).not.toBeNull();
+    expect(past.container.querySelectorAll('.vitals')).toHaveLength(1);
+    cleanup();
+    const future = renderAt('#/day/2026-10-09');
+    expect(future.container.querySelector('.vitals')).toBeNull();
+  });
+
   it('labels each section by its h2', () => {
     const { container } = renderAt('#/');
     for (const s of container.querySelectorAll('section.day-panel')) {

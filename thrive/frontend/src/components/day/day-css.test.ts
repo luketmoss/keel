@@ -118,8 +118,10 @@ describe('Day Health and Body panels CSS (#239)', () => {
 });
 
 describe('Day Note panel CSS (#240)', () => {
-  it('draws the box on the card with no border of its own, growing, placeholder in the darker muted token', () => {
-    expect(rule('.note-box')).toMatch(/border:\s*0/);
+  it('#492: fills the box --color-surface-raised with a hairline border and --radius-md + 4 corners, growing, placeholder in the darker muted token', () => {
+    expect(rule('.note-box')).toMatch(/background:\s*var\(--color-surface-raised\)/);
+    expect(rule('.note-box')).toMatch(/border:\s*1px solid var\(--color-border\)/);
+    expect(rule('.note-box')).toMatch(/border-radius:\s*calc\(var\(--radius-md\) \+ var\(--space-xs\)\)/);
     expect(rule('.note-box')).toMatch(/resize:\s*none/);
     expect(rule('.note-box')).toMatch(/overflow:\s*hidden/);
     expect(rule('.note-box::placeholder')).toMatch(/color:\s*var\(--color-text-secondary\)/);

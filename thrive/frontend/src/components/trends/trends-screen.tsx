@@ -9,6 +9,7 @@ import type { ComponentChildren } from 'preact';
 import { signal } from '@preact/signals';
 import { useAuth } from '../../auth/auth-context';
 import { loadHealth } from '../../state/actions';
+import { drinkHistory, loadDrinkHistory } from '../../state/drinks';
 import { dailyHealth, bodyMeasurements, dailySummary } from '../../state/store';
 import { TREND_GROUPS, CUSTOM_GROUP_ID, customGroup, type TrendGroup, type TrendMetric } from './metrics';
 import {
@@ -77,8 +78,8 @@ function usePref<T extends string>(pref: Pref<T>, first?: T): [T, (v: T) => void
 }
 
 /** The caption: what the marks are, in words. */
-export function captionText(avgDays: number, hasBand: boolean): string {
-  const clauses = ['Dots are each day'];
+export function captionText(avgDays: number, hasBand: boolean, bars = false): string {
+  const clauses = [bars ? 'Bars are each day' : 'Dots are each day'];
   if (avgDays > 0) clauses.push(`line is the ${avgDays}-day average`);
   if (hasBand) clauses.push('shaded band is your range, the mean ± 1 SD of the 30 days before today');
   return `${clauses.join(' · ')}. Blank days stay blank.`;
@@ -196,7 +197,14 @@ export function TrendsScreen() {
   // DailyHealth nor spared by a BodyMeasurements failure. A custom set reads
   // exactly the union of its metrics' tabs, and none when nothing is picked.
   const sources = [...new Set(group.metrics.map((m) => m.source ?? 'dailyHealth'))];
-  const tabs = { dailyHealth, bodyMeasurements, dailySummary };
+  const showsDrinks = sources.includes('drinks');
+  // Drinks are read on every entry to a group that shows them (#521), not once like the health
+  // tabs: a drink logged on the Day view is there on the next visit. Rows already held stay up
+  // while it reads, so a revisit does not flash "Loading…".
+  useEffect(() => {
+    if (token && showsDrinks) void loadDrinkHistory(token);
+  }, [token, showsDrinks]);
+  const tabs = { dailyHealth, bodyMeasurements, dailySummary, drinks: drinkHistory };
   const states = sources.map((s) => tabs[s].value.state);
   const avgDays = averageDays(average);
 
@@ -228,7 +236,17 @@ export function TrendsScreen() {
       hasBand: groupHasBand(group.metrics, series),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, group, range, avgDays, today, rowsOf('dailyHealth'), rowsOf('bodyMeasurements'), rowsOf('dailySummary')]);
+  }, [
+    ready,
+    group,
+    range,
+    avgDays,
+    today,
+    rowsOf('dailyHealth'),
+    rowsOf('bodyMeasurements'),
+    rowsOf('dailySummary'),
+    rowsOf('drinks'),
+  ]);
 
   // The day the link named (#504), selected once per arrival and only when the charts plot it: a
   // date outside the range, in the future, or today for a group with a metric that does not plot
@@ -255,7 +273,10 @@ export function TrendsScreen() {
             onClick={(e) => {
               // Before the button is replaced by "Loading…" (#290).
               (e.currentTarget as HTMLElement).closest<HTMLElement>('.trends-state')?.focus();
-              if (token) void loadHealth(token);
+              if (token) {
+                if (sources.some((s) => s !== 'drinks')) void loadHealth(token);
+                if (showsDrinks) void loadDrinkHistory(token);
+              }
             }}
           >
             Try again
@@ -310,7 +331,9 @@ export function TrendsScreen() {
     };
     content = (
       <>
-        <p class="trends-caption">{captionText(avgDays, hasBand)}</p>
+        <p class="trends-caption">
+          {captionText(avgDays, hasBand, group.metrics.length > 0 && group.metrics.every((m) => m.bars))}
+        </p>
         {view === 'Table' && !nothingEver ? (
           <TrendTable group={group} series={series} range={range} avgDays={avgDays} today={today} />
         ) : (

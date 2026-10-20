@@ -384,6 +384,7 @@ describe('#243 AC4: switcher in the screen', () => {
       'Body',
       'Blood Pressure',
       'Activity',
+      'Intake',
       'Custom',
     ]);
     expect(container.querySelectorAll('.trend-card')).toHaveLength(3);

@@ -50,8 +50,13 @@ export function rangeText(metric: TrendMetric, s: MetricSeries, today: string): 
 /** The card's summary line: average, coverage, your range. */
 export function summaryText(metric: TrendMetric, s: MetricSeries, today: string): string {
   const out: string[] = [];
-  if (s.mean !== null) out.push(withUnit(`Average ${metric.format(s.mean)}`, metric.unit));
+  // A total over one day is no average (#521).
+  if (s.mean !== null && !(metric.bars && s.covered < 2)) {
+    out.push(withUnit(`Average ${metric.format(s.mean)}`, metric.unit));
+  }
   out.push(`${s.covered} of ${s.dates.length} days`);
+  const goal = metric.reference?.();
+  if (goal) out.push(`${goal.label.charAt(0).toUpperCase()}${goal.label.slice(1)}`);
   const r = rangeText(metric, s, today);
   if (r) out.push(r);
   return out.join(' · ');
@@ -103,7 +108,8 @@ export function TrendPlot({
 }: PlotProps) {
   const values = series.points.map((p) => p.value);
   for (const v of series.average.values()) values.push(v);
-  const dom = yDomain(values, series.band, metric.zeroBased);
+  const reference = metric.reference?.() ?? null;
+  const dom = yDomain(reference ? [...values, reference.value] : values, series.band, metric.zeroBased);
   const tickLabels = dom.ticks.map((t) =>
     metric.axisFormat ? metric.axisFormat(t, dom.ticks) : tickLabel(t, dom.ticks),
   );
@@ -116,6 +122,7 @@ export function TrendPlot({
   const x = (date: string) => padLeft + (index.get(date)! + 0.5) * slot;
   const y = (v: number) => PAD_TOP + (1 - (v - dom.min) / (dom.max - dom.min || 1)) * plotH;
   const r = Math.min(3.5, Math.max(MIN_DOT_R, slot * 0.35));
+  const barW = Math.max(1, slot * 0.7);
   const avgPoints = [...series.average].map(([date, value]) => ({ date, value }));
   const xTicks = dateTicks(series.dates[0], series.dates[n - 1], plotW);
   const selected = selectedDate && index.has(selectedDate) ? selectedDate : null;
@@ -174,8 +181,41 @@ export function TrendPlot({
           </text>
         ))}
       </g>
+      {metric.bars && (
+        <g class="trend-bars">
+          {series.points.map((p) => (
+            <rect
+              key={p.date}
+              class="trend-bar"
+              data-date={p.date}
+              x={x(p.date) - barW / 2}
+              y={y(p.value)}
+              width={barW}
+              height={Math.max(0, y(dom.min) - y(p.value))}
+              // The Day cards' colours (--metric-water, --metric-alcohol): a bars metric's id names its token.
+              fill={`var(--metric-${metric.id})`}
+            />
+          ))}
+        </g>
+      )}
+      {reference && (
+        <g class="trend-reference">
+          <line
+            x1={padLeft}
+            x2={padLeft + plotW}
+            y1={y(reference.value)}
+            y2={y(reference.value)}
+            stroke="var(--color-text-secondary)"
+            stroke-width={1.5}
+            stroke-dasharray="5 4"
+          />
+          <text x={padLeft + plotW} y={y(reference.value) - 4} text-anchor="end" class="trend-axis-label">
+            {reference.label}
+          </text>
+        </g>
+      )}
       <g class="trend-dots">
-        {series.points.map((p) =>
+        {(metric.bars ? [] : series.points).map((p) =>
           p.partial !== undefined ? (
             <circle
               key={p.date}
@@ -282,7 +322,7 @@ export function TrendCard({ metric, series, recorded, range, avgDays, today, sel
   const describedBy = metric.note ? `${noteId} ${summaryId}` : summaryId;
   let body;
   if (!recorded) {
-    body = <p class="trend-empty">Nothing recorded yet.</p>;
+    body = <p class="trend-empty">{metric.emptyText ?? 'Nothing recorded yet.'}</p>;
   } else if (series.points.length === 0) {
     body = <p class="trend-empty">No {midSentence(metric.label)} in this range.</p>;
   } else {

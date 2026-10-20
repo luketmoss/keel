@@ -12,7 +12,7 @@ beforeEach(() => {
 });
 
 describe('registry', () => {
-  it('has the six groups in order, then Custom', () => {
+  it('has the seven groups in order, then Custom', () => {
     expect(TREND_GROUPS.map((g) => g.id)).toEqual([
       'recovery',
       'sleep',
@@ -20,6 +20,7 @@ describe('registry', () => {
       'body',
       'blood_pressure',
       'activity',
+      'intake',
       'custom',
     ]);
     expect(TREND_GROUPS.map((g) => g.label)).toEqual([
@@ -29,6 +30,7 @@ describe('registry', () => {
       'Body',
       'Blood Pressure',
       'Activity',
+      'Intake',
       'Custom',
     ]);
     // Activity holds five since Steps joined it (#504); only a custom set is capped at four.

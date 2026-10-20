@@ -352,6 +352,31 @@ If a project's CI needs become genuinely incompatible with the others, that is
 the signal to extract it into its own repo with `git subtree split`, which
 preserves its history. The monorepo is a default, not a commitment.
 
+## Models
+
+Which model a session picks for work it hands off — the `model` parameter of
+`Agent` and `start_session`. This does **not** govern the model of your own
+session: that is whatever you opened it with.
+
+| Work | Model |
+|---|---|
+| Delivery (`/finish`, or any single stage) | **Sonnet** |
+| Delivery of a history rewrite or repo migration (`/adopt-project` children), or of a PR touching a human-reviewed path | Opus |
+| Re-running an issue whose Sonnet run halted on a failing criterion whose fix wasn't clear | Opus, once |
+| Mechanical chores: deleting, renaming, or docs-only edits with no judgment | Haiku |
+| Refinement (`/pm`, `/ux`) of an epic or of an issue sized L | Opus |
+| Other refinement | Sonnet |
+| Orchestrating: the session that only dispatches and collects reports | Sonnet |
+
+- **Never run more than one Opus subagent at a time.** Parallel Opus runs are
+  what exhausted the session limit.
+- **The handing-off session names the row it used** in its report, so a choice
+  that went against the table is visible at the gate.
+
+The default is Sonnet because, across 25 delivery subagents, Opus runs cost
+several times the tokens per issue with no visible difference in rework or
+follow-up bugs. The evidence is in #505.
+
 ## Issue anatomy
 
 ```markdown

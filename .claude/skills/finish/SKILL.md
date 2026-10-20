@@ -20,6 +20,9 @@ back skips the only review of the spec, which is the point of having two runs.
 3. **`/review`** — review the diff, confirm the build
 4. **`/ship`** — Results, merge, delete the branch
 
+When a step is handed to a subagent or a new session, pick its model from
+[CONVENTIONS.md](../../../CONVENTIONS.md#models) and name the row in the report.
+
 Each step is the real skill. Read and follow `.claude/skills/<step>/SKILL.md` at
 each stage rather than approximating it.
 

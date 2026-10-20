@@ -202,29 +202,32 @@ export function healthView(
   }
 
   const synced = isToday ? syncTime(row.synced_at, date) : '';
-  const view: HealthRowView[] = activeMetrics(fields).map((metric) => {
-    const stored = parse(cell(row, metric.field));
-    const base = {
-      key: metric.key,
-      label: metric.label,
-      qualifier: metric.key === 'sleep' ? nightOf(date, isToday) : undefined,
-    };
-    if (stored === null) {
-      return {
-        ...base,
-        value: '',
-        captions: [{ kind: 'text', text: isToday ? 'Arrives with the next sync.' : 'No reading this day.' }],
+  // Steps moved to the glance row (#488); HEALTH_METRICS keeps the entry for Trends.
+  const view: HealthRowView[] = activeMetrics(fields)
+    .filter((metric) => metric.key !== 'steps')
+    .map((metric) => {
+      const stored = parse(cell(row, metric.field));
+      const base = {
+        key: metric.key,
+        label: metric.label,
+        qualifier: metric.key === 'sleep' ? nightOf(date, isToday) : undefined,
       };
-    }
-    const shown = `${metric.format(metric.toDisplay(stored))}${metric.unit}`;
-    const captions: HealthCaption[] = metric.key === 'sleep' ? sleepCaptions(row) : [];
-    if (isToday && metric.inProgressToday) {
-      if (metric.key === 'steps' && synced) captions.push({ kind: 'text', text: `As of the ${synced} sync` });
-      return { ...base, value: `${shown} so far`, captions };
-    }
-    captions.push(rangeCaption(metric, stored, seriesOf(rows, metric.field), date));
-    return { ...base, value: shown, captions };
-  });
+      if (stored === null) {
+        return {
+          ...base,
+          value: '',
+          captions: [{ kind: 'text', text: isToday ? 'Arrives with the next sync.' : 'No reading this day.' }],
+        };
+      }
+      const shown = `${metric.format(metric.toDisplay(stored))}${metric.unit}`;
+      const captions: HealthCaption[] = metric.key === 'sleep' ? sleepCaptions(row) : [];
+      if (isToday && metric.inProgressToday) {
+        if (metric.key === 'steps' && synced) captions.push({ kind: 'text', text: `As of the ${synced} sync` });
+        return { ...base, value: `${shown} so far`, captions };
+      }
+      captions.push(rangeCaption(metric, stored, seriesOf(rows, metric.field), date));
+      return { ...base, value: shown, captions };
+    });
 
   const sub = isToday ? syncedLabel(row.synced_at, date) || undefined : undefined;
   return { kind: 'rows', sub, rows: view };

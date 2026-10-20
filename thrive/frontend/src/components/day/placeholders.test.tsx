@@ -8,10 +8,10 @@ import { Panel, PanelNote } from './panel';
 afterEach(cleanup);
 
 describe('slots', () => {
-  it('orders the four slots and drops health and body on a future day', () => {
-    expect(SLOT_ORDER).toEqual(['training', 'health', 'body', 'note']);
-    expect(slotsFor('past')).toEqual(['training', 'health', 'body', 'note']);
-    expect(slotsFor('today')).toEqual(['training', 'health', 'body', 'note']);
+  it('orders the five slots and drops health and body on a future day', () => {
+    expect(SLOT_ORDER).toEqual(['glance', 'training', 'health', 'body', 'note']);
+    expect(slotsFor('past')).toEqual(['glance', 'training', 'health', 'body', 'note']);
+    expect(slotsFor('today')).toEqual(['glance', 'training', 'health', 'body', 'note']);
     expect(slotsFor('future')).toEqual(['training', 'note']);
   });
 

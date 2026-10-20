@@ -52,10 +52,10 @@ const byKey = (rows: HealthRowView[], key: string) => rows.find((r) => r.key ===
 const texts = (r: HealthRowView) => r.captions.map(captionText);
 
 describe('AC1 — a past day', () => {
-  it('shows sleep, resting HR, HRV, average stress (#231) and steps in order', () => {
+  it('shows sleep, resting HR, HRV and average stress (#231) in order, and no steps (#488)', () => {
     const rows = rowsOf(healthView([hr(D, { ...FULL, stress_avg: '31' })], D, false));
-    expect(rows.map((r) => r.label)).toEqual(['Sleep', 'Resting HR', 'HRV', 'Average stress', 'Steps']);
-    expect(rows.map((r) => r.value)).toEqual(['7h 12m', '52 bpm', '38 ms', '31', '9,412']);
+    expect(rows.map((r) => r.label)).toEqual(['Sleep', 'Resting HR', 'HRV', 'Average stress']);
+    expect(rows.map((r) => r.value)).toEqual(['7h 12m', '52 bpm', '38 ms', '31']);
     expect(byKey(rows, 'sleep').qualifier).toBe('Fri night');
   });
 
@@ -80,11 +80,10 @@ describe('AC1 — a past day', () => {
 
   it('shows a blank as blank with "No reading this day." and no range line; 0 is a value', () => {
     const history14 = history(D, 20, 'hrv', () => '40');
-    const rows = rowsOf(healthView([...history14, hr(D, { ...FULL, hrv: '', steps: '0' })], D, false));
+    const rows = rowsOf(healthView([...history14, hr(D, { ...FULL, hrv: '' })], D, false));
     const hrv = byKey(rows, 'hrv');
     expect(hrv.value).toBe('');
     expect(texts(hrv)).toEqual(['No reading this day.']);
-    expect(byKey(rows, 'steps').value).toBe('0');
   });
 
   it('says "No watch data for this day." when there is no row', () => {
@@ -219,7 +218,7 @@ describe('AC3 — today', () => {
     expect(texts(hrv)).toEqual(['Arrives with the next sync.']);
   });
 
-  it('shows steps and stress so far with no range line, and the others with one', () => {
+  it('shows stress so far with no range line, and the others with one', () => {
     const fields = [...DAILY_HEALTH_FIELDS, 'stress_avg'];
     const rows = rowsOf(
       healthView(
@@ -233,9 +232,7 @@ describe('AC3 — today', () => {
         fields,
       ),
     );
-    const steps = byKey(rows, 'steps');
-    expect(steps.value).toBe('871 so far');
-    expect(texts(steps)).toEqual(['As of the 7:17 AM sync']);
+    expect(rows.some((r) => r.key === 'steps')).toBe(false);
     const stress = byKey(rows, 'stress');
     expect(stress.value).toBe('31 so far');
     expect(stress.captions).toEqual([]);

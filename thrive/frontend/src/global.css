@@ -4593,6 +4593,102 @@ a.training-card {
   outline: none;
 }
 
+/* ===== Day glance row (#488) =====
+   Steps, recovery ring, calories. Not a card: it sits on --color-bg. Three columns,
+   or two centred ones when there is no ring. tabular-nums: three numbers side by side. */
+.glance-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  justify-items: center;
+  margin-top: var(--space-md);
+  font-variant-numeric: tabular-nums;
+}
+
+.glance-row-two {
+  grid-template-columns: 1fr 1fr;
+}
+
+.glance-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  text-align: center;
+}
+
+.glance-icon {
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+}
+
+.glance-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.glance-steps .glance-icon {
+  color: var(--metric-steps);
+}
+
+.glance-calories .glance-icon {
+  color: var(--metric-calories);
+}
+
+.glance-figure {
+  font-size: var(--figure-md);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--color-text);
+}
+
+.glance-word {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.glance-ring {
+  position: relative;
+  width: 168px;
+  height: 160px;
+}
+
+.glance-ring svg {
+  display: block;
+}
+
+.glance-ring-track {
+  stroke: var(--color-surface-raised);
+}
+
+.glance-ring-value {
+  stroke: var(--color-primary);
+}
+
+.glance-ring-text {
+  position: absolute;
+  inset: 0;
+  top: 24px;
+  height: 112px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.glance-ring-figure {
+  font-size: var(--figure-xl);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--color-text);
+}
+
+.glance-ring-pct {
+  font-size: var(--text-xl);
+}
+
 /* ===== Library keyboard access (#301) =====
    Template cards are <button>s and the editor's exercise rows are focusable
    buttons. The ring is --color-text (14.70:1 light, 15.54:1 dark), not
@@ -4747,6 +4843,15 @@ a.training-card {
   .day-sync-dot {
     background: CanvasText;
     forced-color-adjust: none;
+  }
+
+  /* #488: the ring's track and value arc in system colours. */
+  .glance-ring-track {
+    stroke: GrayText;
+  }
+
+  .glance-ring-value {
+    stroke: Highlight;
   }
 
   /* #485: forced colours flatten the card and the page to Canvas. */

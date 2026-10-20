@@ -11,6 +11,7 @@ by reading:
   - every skill's frontmatter parses, and its name matches its directory
   - every relative link in a tracked .md file resolves
   - every design note cited by filename is committed
+  - pr.py's path-filter matcher, report and Results editor behave on fixtures
 
 Run it locally exactly as CI runs it:
 
@@ -252,7 +253,225 @@ def check_design_notes():
             problems)
 
 
-CHECKS = [check_python, check_frontmatter, check_links, check_design_notes]
+def check_pr_script():
+    """pr.py's matcher, workflow reader, report and Results editor.
+
+    The CI wait is the only thing between a red build and a merge, so the part
+    of it that can be wrong without a network is held to fixtures here: path
+    filters (`*` against `**`, a workflow's own file, a rename), the shapes a
+    workflow's `on:` block takes, the report and exit code for each outcome,
+    and the Results edit leaving every other section byte for byte.
+    """
+    sys.path.insert(0, os.path.join(ROOT, ".keel"))
+    try:
+        import pr
+    finally:
+        sys.path.pop(0)
+
+    problems = []
+    count = [0]
+
+    def expect(label, got, want):
+        count[0] += 1
+        if got != want:
+            problems.append("{}: got {!r}, want {!r}".format(label, got, want))
+
+    def wf(on):
+        return "name: x\non:\n" + on + "\njobs:\n  a:\n    name: not-it\n"
+
+    def names(workflows, files):
+        return [n for n, _ in pr.expected_workflows(workflows, files)]
+
+    def match(pattern, path):
+        return bool(pr.matching_entry([pattern], path))
+
+    # `*` stops at a slash, `**` does not.
+    expect("* one level", match("hive/*", "hive/a.ts"), True)
+    expect("* not deeper", match("hive/*", "hive/a/b.ts"), False)
+    expect("** deeper", match("hive/**", "hive/a/b.ts"), True)
+    expect("** leading", match("**/x.md", "x.md"), True)
+    expect("** leading nested", match("**/x.md", "a/b/x.md"), True)
+    expect("literal dot", match("a.yml", "abyml"), False)
+    expect("token name", match("ui/**/tokens*", "ui/tokens.css"), True)
+    expect("token dir is not a name", match("ui/**/tokens*",
+                                            "ui/tokens/suite.css"), False)
+    expect("negation", pr.matching_entry(["hive/**", "!hive/docs/**"],
+                                         "hive/docs/a.md"), None)
+
+    mcp = wf("  pull_request:\n    paths: ['mcp/**', '.github/workflows/mcp.yml']")
+    thrive = wf("  pull_request:\n    paths:\n      - 'thrive/**'\n"
+                "      - geo/**  # shared\n  push:\n    branches: [main]")
+    keel = wf("  pull_request:\n  push:\n    branches: [main]")
+    pages = wf("  push:\n    branches: [main]\n  workflow_dispatch:")
+    both = "name: b\non: [push, pull_request]\n"
+    solo = "name: s\non: push\n"
+    ignore = wf("  pull_request:\n    paths-ignore:\n      - 'docs/**'")
+    flows = {"mcp.yml": mcp, "thrive.yml": thrive, "keel.yml": keel,
+             "pages.yml": pages}
+
+    expect("on shapes", [pr.pull_request_filter(t)[1] is not None
+                         for t in (both, solo, pages, keel)],
+           [True, False, False, True])
+    expect("block list with comment",
+           pr.pull_request_filter(thrive)[1]["paths"],
+           ["thrive/**", "geo/**"])
+    expect("job name is not the workflow's", pr.pull_request_filter(mcp)[0],
+           "x")
+    expect("filtered out, push-only skipped",
+           names(flows, [("hive/a.ts", "")]), ["x"])
+    expect("filter reaches the change",
+           names({"t.yml": thrive, "k.yml": keel}, [("geo/a.ts", "")]),
+           ["x", "x"])
+    expect("workflow's own file",
+           names({"mcp.yml": mcp}, [(".github/workflows/mcp.yml", "")]),
+           ["x"])
+    expect("unrelated file", names({"mcp.yml": mcp}, [("hive/a.ts", "")]), [])
+    expect("rename counts at the old path",
+           names({"mcp.yml": mcp}, [("hive/a.ts", "mcp/a.ts")]), ["x"])
+    expect("rename counts at the new path",
+           names({"mcp.yml": mcp}, [("mcp/a.ts", "hive/a.ts")]), ["x"])
+    expect("paths-ignore, all ignored",
+           names({"i.yml": ignore}, [("docs/a.md", "")]), [])
+    expect("paths-ignore, one survives",
+           names({"i.yml": ignore}, [("docs/a.md", ""), ("a.md", "")]), ["x"])
+
+    # Human-reviewed paths.
+    files = [("mcp/a.ts", "hive/a.ts"), ("mcp/b.ts", ""), ("mcp/c.ts", ""),
+             ("mcp/d.ts", ""), ("hive/z.ts", "")]
+    expect("human-reviewed, rename at both ends",
+           pr.human_reviewed([("hive/a.ts", "mcp/a.ts")]), ["mcp/a.ts"])
+    expect("human-reviewed line",
+           pr.human_reviewed_line(pr.human_reviewed(files)),
+           "Human-reviewed: this PR changes mcp/a.ts, mcp/b.ts, mcp/c.ts "
+           "and 1 more. It will not merge unattended; /ship will ask first.")
+    expect("human-reviewed absent", pr.human_reviewed_line(
+        pr.human_reviewed([("hive/a.ts", "")])), None)
+    expect("human-reviewed list matches CONVENTIONS.md",
+           "`mcp/**`" in read(os.path.join(ROOT, "CONVENTIONS.md")), True)
+
+    # Reports and exit codes.
+    def run(name, status="completed", conclusion="success", ident=1,
+            event="pull_request"):
+        return {"workflowName": name, "status": status,
+                "conclusion": conclusion, "databaseId": ident,
+                "event": event, "url": ""}
+
+    def render(expected, runs):
+        done, running, absent = pr.verdict(expected, runs)
+        return pr.report("9f3c2abdeadbeef", done, running, absent,
+                         lambda r: r["conclusion"])
+
+    green = render([("cairn", ""), ("keel", "")],
+                   [run("keel"), run("cairn", ident=2)])
+    expect("green", green, ("Build — 2 runs on 9f3c2ab, all passed:\n"
+                            "  cairn  success\n  keel   success", 0))
+    absent = render([("cairn", "cairn/** (matches cairn/a.ts)"), ("keel", "")],
+                    [run("keel")])
+    expect("absent code", absent[1], 1)
+    expect("absent heading", absent[0].splitlines()[0],
+           "Build — no run for cairn on 9f3c2ab.")
+    expect("absent names the paths entry",
+           "no run — paths entry cairn/** (matches cairn/a.ts)" in absent[0],
+           True)
+    expect("nothing ran", render([("keel", "")], [])[1], 1)
+    failed = render([("keel", "")], [run("keel", conclusion="failure")])
+    expect("failed", (failed[0].splitlines()[0], failed[1]),
+           ("Build — 1 run on 9f3c2ab, 1 failed:", 1))
+    expect("newest attempt wins",
+           render([("keel", "")], [run("keel", conclusion="cancelled", ident=1),
+                                   run("keel", ident=2)])[1], 0)
+    expect("other event ignored",
+           render([("keel", "")], [run("keel", event="push")])[1], 1)
+    busy = render([("keel", "")], [run("keel", status="in_progress",
+                                       conclusion=None)])
+    expect("in progress", busy, ("Build — 1 run still in progress on 9f3c2ab\n"
+                                 "  keel  in_progress", 2))
+
+    # The wait: a timeout shorter than the run, and a re-query for a late run.
+    clock = [0]
+
+    def sleep(seconds):
+        clock[0] += seconds
+
+    def now():
+        return clock[0]
+
+    polls = []
+
+    def never():
+        polls.append(1)
+        return "abc", [("keel", "")], [run("keel", status="in_progress",
+                                           conclusion=None)]
+
+    _, _, running, _ = pr.wait_for_runs(never, 20, sleep, now)
+    expect("timeout leaves the run unfinished", len(running), 1)
+    expect("timeout is honoured", clock[0] <= 20, True)
+    clock[0] = 0
+    polls[:] = []
+    _, _, running, _ = pr.wait_for_runs(never, 0, sleep, now)
+    expect("zero timeout does not wait", (len(running), clock[0], len(polls)),
+           (1, 0, 1))
+
+    clock[0] = 0
+    late = [[], [run("keel", status="in_progress", conclusion=None)],
+            [run("keel")]]
+
+    def arrives():
+        return "abc", [("keel", "")], late.pop(0)
+
+    _, done, running, missing = pr.wait_for_runs(arrives, 600, sleep, now)
+    expect("late run is found and waited for",
+           (len(done), len(running), len(missing)), (1, 0, 0))
+    clock[0] = 0
+    _, _, _, missing = pr.wait_for_runs(lambda: ("abc", [("keel", "")], []),
+                                        600, sleep, now)
+    expect("re-queried once, then absent", (len(missing), clock[0]),
+           (1, pr.REQUERY_WAIT))
+
+    # The failure quote.
+    log = ("check\tpython .keel/check.py\t2026-10-19T17:10:33.1Z ok\n"
+           "check\tpython .keel/check.py\t2026-10-19T17:10:34.1Z FAIL  "
+           "markdown links\n"
+           "check\tpython .keel/check.py\t2026-10-19T17:10:35.1Z "
+           "##[error]Process completed with exit code 1.\n"
+           "check\tlater step\t2026-10-19T17:10:36.1Z error: not this\n")
+    expect("first error line of first failing step", pr.pick_error(log),
+           ("python .keel/check.py", "FAIL  markdown links"))
+
+    expect("##[error] outranks a line that merely says fail",
+           pr.pick_error("j\ts\t2026-10-19T17:10:33.1Z test reports a failure\n"
+                         "j\ts\t2026-10-19T17:10:34.1Z ##[error]Real one\n"),
+           ("s", "Real one"))
+
+    # Results.
+    other = "## Problem\n\nBody\nkept  \n\n```\n## Results\n```\n\n"
+    tail = "## Out of Scope\n\nNothing.\n"
+    first = other + tail
+    expect("append when absent",
+           pr.put_results(first, "Done well.\n"),
+           first + "\n## Results\n\nDone well.\n")
+    existing = other + "## Results\n\nFilled in at Done.\n\n" + tail
+    expect("replace in place", pr.put_results(existing, "Done well.\n"),
+           other + "## Results\n\nDone well.\n\n" + tail)
+    last = other + tail + "\n## Results\n\nFilled in at Done.\n"
+    expect("replace the last section", pr.put_results(last, "A\nB\n"),
+           other + tail + "\n## Results\n\nA\nB\n")
+    once = pr.put_results(existing, "Done well.\n")
+    expect("idempotent", pr.put_results(once, "Done well.\n"), once)
+    expect("heading in the file is not doubled",
+           pr.put_results(existing, "## Results\n\nDone well.\n"), once)
+    expect("fenced heading is not the section",
+           pr.results_span(other + tail), None)
+    expect("crlf kept",
+           pr.put_results("## A\r\n\r\nx\r\n", "one\ntwo\n"),
+           "## A\r\n\r\nx\r\n\r\n## Results\r\n\r\none\r\ntwo\r\n")
+    expect("empty body", pr.put_results("", "x\n"), "## Results\n\nx\n")
+
+    return "pr.py", "{} cases".format(count[0]), problems
+
+
+CHECKS = [check_python, check_frontmatter, check_links, check_design_notes,
+          check_pr_script]
 
 
 def main():

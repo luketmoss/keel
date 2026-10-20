@@ -35,18 +35,30 @@ check never reports and blocks its PR forever — so nothing else is watching.
 `cairn` and `keel`, and a change to a shared folder runs every consumer. One
 green run does not clear the PR; every run it had to pass must.
 
+Run it:
+
+```bash
+python .keel/pr.py ci <pr>
+```
+
+It implements the rules below and prints the block this section ends with. Its
+exit code is the verdict: **0** every expected run passed, **1** a run failed or
+is absent (back to In Development), **2** the wait timed out with runs still in
+progress (`--timeout SECONDS`, 900 by default). Do not read the workflow files
+to work out what should have run; that is the script's job, from the base
+branch's copies. In a cloud session there is no `gh`: do the same by hand with
+the GitHub MCP tools, following the rules.
+
 1. **List the runs for the head commit.** Take the head SHA from the PR, then
-   `gh run list --repo luketmoss/keel --commit <sha> --json
-   workflowName,status,conclusion,url` (in a cloud session, the GitHub MCP
-   equivalent), cross-checked against `statusCheckRollup`. **Runs for earlier
+   its runs, cross-checked against `statusCheckRollup`. **Runs for earlier
    commits are ignored** — a green run on an old commit says nothing about
    this one, and neither does a run concurrency cancelled for a newer push.
-   Where a workflow has more than one attempt for the head commit, read the latest. If
-   a push lands during the review, the head moved: rebuild the list.
-2. **Work out which workflows should have run.** Read each
-   `.github/workflows/*.yml`. One is expected when its `pull_request` trigger
-   has no `paths` filter, or a filter that matches any file in
-   `gh pr diff <pr> --repo luketmoss/keel --name-only`. Push-only and
+   Where a workflow has more than one attempt for the head commit, read the
+   latest. If a push lands during the review, the head moved: rebuild the list.
+2. **Work out which workflows should have run.** One is expected when its
+   `pull_request` trigger has no `paths` filter, or a filter that matches any
+   file the PR changes — a rename counts at both its old and new path. Match
+   by GitHub's glob rules: `*` does not cross `/`, `**` does. Push-only and
    scheduled workflows (`cairn-pages`) are not expected and are not listed.
 3. **Wait for any run that is queued or in progress.** Do not report a result
    you don't have. If the wait outlasts your patience, report
@@ -64,14 +76,15 @@ else will notice. A run for the head commit may simply not be listed yet, so
 re-query once after a short wait, as `/ship` does for `mergeable`; if it is
 still missing, name the workflow, quote the `paths` entry that matches the PR's
 changed file, say that another workflow's green run does not cover it, and stop.
+The script re-queries once itself and prints all of this.
 Either the filter doesn't reach the change or the workflow didn't start; both
 are findings and both send the issue back to In Development.
 
 If **nothing at all** ran, that is the same case with every workflow absent: at
 least `keel` should have, since `keel.yml` runs on every PR.
 
-**Report the list**, one line per expected run — workflow name, then
-conclusion — under a heading that carries the commit:
+**Report the list** (`pr.py ci` prints it), one line per expected run —
+workflow name, then conclusion — under a heading that carries the commit:
 
 ```
 Build — 2 runs on 9f3c2ab, all passed:
@@ -139,8 +152,9 @@ Human-reviewed: this PR changes <path> and N more. It will not merge
 unattended; /ship will ask first.
 ```
 
-The outcome is unchanged — Ready to Ship. Detection uses the same changed-file
-list `/ship` does: `gh pr diff <pr> --repo luketmoss/keel --name-only`.
+The outcome is unchanged — Ready to Ship. `pr.py ci` prints this line itself
+when a changed path matches, so use its wording. In a cloud session, detect it
+from the same changed-file list `/ship` does.
 
 **Do not merge here.** `/ship` does that, and inside `/finish` it runs next —
 which is exactly why this skill's build check is not a formality. Standalone,

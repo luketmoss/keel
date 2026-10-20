@@ -222,6 +222,15 @@ describe('AC4 — Body', () => {
     expect(tile.querySelector('[data-metric="bp"]')!.textContent).toContain('Average of 2 readings');
   });
 
+  it('says fat was not measured when the weigh-in has none, and "—" for an absent blood pressure', () => {
+    bodyMeasurements.value = { state: 'loaded', rows: [scale('07:52', '81.4')] };
+    const { container } = mount(BodyPanel);
+    expect(container.querySelector('[data-metric="weight"] .tile-caption')!.textContent).toBe(
+      'Fat not measured · 7:52 AM',
+    );
+    expect(container.querySelector('[data-metric="bp"]')!.textContent).toBe('—No reading this day.');
+  });
+
   it('shows "—" with the day-appropriate words when there is no reading, never another day', () => {
     bodyMeasurements.value = { state: 'loaded', rows: [] };
     for (const [state, words] of [

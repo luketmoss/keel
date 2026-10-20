@@ -394,6 +394,10 @@ The intended approach. May be revised during refinement.
 ## Out of Scope
 What this deliberately does not cover, so scope creep is a visible decision.
 
+## Plan
+Epics only, optional, after Proposal. Decisions, the plan and the next steps,
+kept current as they change. See "A phase is where a coordination session ends".
+
 ## Results
 Filled in at Done. What happened, what surprised you.
 ```
@@ -421,3 +425,13 @@ Sections may be empty in To Do. By Refined, everything above Results is filled.
   the board means the issue is underspecified, which is what Gate 1 is for.
   This is about the seams *between* runs — each run is still unattended
   end to end.
+- **A phase is where a coordination session ends.** Planning a migration,
+  dispatching lanes and answering "what's next?" are sessions too, and they
+  carry state between phases in the epic's `## Plan`, not in a scratchpad no
+  other session can find. When a phase finishes (a plan is agreed, a batch has
+  been dispatched and reported, a migration step is done), bring `## Plan` up
+  to date and stop; the next phase starts fresh from "continue epic #N". A
+  session left idle for more than an hour rewrites its whole prompt cache on
+  return, so a large one is not resumed: start fresh from the epic. One
+  coordination session ran five weeks, and its cache rewrites alone were 6.6M
+  tokens (#505).

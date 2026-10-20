@@ -32,6 +32,51 @@ so it runs against exactly what it expects — with its refusal conditions, its
 Results section and its board-workflow diagnosis intact. The only irreversible
 operation in the system is written down once.
 
+## Several issues
+
+Applies when `/finish` is given an epic, a list of issues, or both. A single
+issue runs the sequence above, unchanged. A batch is that sequence once per
+issue, each in a fresh context: run in one session, per-turn context grows with
+every issue's CSS, test output and diffs (#505). The wording of the plan,
+progress lines and report is in
+[docs/design/508-batch-finish.md](../../../docs/design/508-batch-finish.md).
+
+1. **Resolve the list.** Expand each epic into its open sub-issues, in
+   sub-issue order (`gh api repos/luketmoss/keel/issues/<n>/sub_issues`). A
+   child with sub-issues of its own is expanded where it sits, so #449 inside
+   #440 is replaced by its children and is not delivered itself. An issue named
+   twice is delivered once, at its first position. Any issue not in **Refined**
+   is listed as skipped with its stage, and is never refined on the way past —
+   Gate 1 applies to each one. Print the plan line before starting. If nothing
+   is left, print `Nothing to deliver` and start no subagent.
+2. **One subagent per issue, one at a time,** each running single-issue
+   `/finish <n>` in the main checkout, with no worktree. Take its model from
+   [CONVENTIONS.md](../../../CONVENTIONS.md#models). Its prompt holds the issue
+   number, "follow `.claude/skills/finish/SKILL.md`", the Report section above
+   as the format to end with, and "run plain, single-purpose commands".
+   Nothing about the code goes in it: the subagent starts cold from the issue,
+   as a gate requires.
+3. **Keep only the reports.** The orchestrator reads no code, diffs or test
+   output. Print a progress line as each issue ends, and start the next only
+   after the previous one is Done.
+4. **Halting.** An issue that does not reach Done stops the batch, and the rest
+   stay in Refined. The one exception is a halt on a failing criterion whose
+   fix wasn't clear: re-run that issue once on Opus, per §Models, and stop the
+   batch only if that fails too. Gate halts — human-gated Testing,
+   human-reviewed paths, `/ship` refusals, an underspecified issue — are never
+   retried. A subagent that returns no usable report is a halt with the reason
+   `subagent ended without a report`, never retried; read the issue's stage
+   with `python .keel/board.py show <n>` for its row.
+5. **Close epics.** When every sub-issue of an epic named in the request is
+   closed, write the epic's `## Results` — one line per child with its PR, and
+   anything the batch learned — and close it. An epic with unfinished children
+   stays open and is listed as such.
+6. **Report** as the design note specifies, built from the subagents' reports.
+
+A batch is sequential, across projects as well as within one; start separate
+batches per project for the same effect. A stopped batch is not resumed
+automatically: run `/finish` again with what's left.
+
 ## Halting
 
 The run stops early if:

@@ -66,18 +66,20 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe('Day screen: the sync line (#409)', () => {
-  it('sits in the header block under the sun line, above the week strip', () => {
+  it('puts the button in the title row and the lines under it, above the week strip', () => {
     const { container } = mount();
     const header = container.querySelector('header.day-header')!;
-    const line = header.querySelector('.day-sync')!;
-    expect(line.previousElementSibling).toBe(header.querySelector('.day-sun'));
+    const row = header.querySelector('.day-header-row')!;
+    expect(row.querySelector('.day-nav')!.lastElementChild).toBe(header.querySelector('.day-sync-btn'));
+    expect(row.nextElementSibling).toBe(header.querySelector('.day-sync'));
+    expect(header.querySelector('.day-sync [role="status"][aria-live="polite"]')).not.toBeNull();
     expect(header.nextElementSibling).toBe(container.querySelector('.week-strip'));
     expect(logsRun).toHaveBeenCalledWith('tok'); // logs read on show
   });
 
   it('a Sync now press starts the shared flow', () => {
     const { getByRole } = mount();
-    fireEvent.click(getByRole('button', { name: 'Sync now' }));
+    fireEvent.click(getByRole('button', { name: /^Sync now/ }));
     expect(requestSyncNow).toHaveBeenCalledWith('tok', 'me@example.com', ['coros', 'withings']);
   });
 

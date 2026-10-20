@@ -1,11 +1,15 @@
-// #237 AC2 — the Day screen's header: weekday, date, relative pill, sun line.
+// #237 AC2, #486 — the Day screen's header: a meta line (date, sunrise–sunset), the
+// title row ("Today" or the weekday, the controls, the sync icon) and, under it, the
+// sync status and request lines.
 
-import type { ComponentChildren, Ref } from 'preact';
-import { relativeLabel } from '../../day/dates';
-import { fullDate, weekdayName } from '../../day/format';
+import type { Ref } from 'preact';
+import { fullDate, metaDate, weekdayName } from '../../day/format';
 import { sunLine } from '../../day/sun';
 import { navigate } from '../../router/router';
 import { calendarHref, monthOf } from '../../calendar/dates';
+import { SunIcon } from '../shared/icons';
+import type { SyncNow } from '../settings/sync-now';
+import { DaySyncButton, DaySyncLines, useDaySync } from './day-sync-line';
 
 interface DayHeaderProps {
   date: string;
@@ -15,8 +19,8 @@ interface DayHeaderProps {
   onToday: () => void;
   headingRef: Ref<HTMLHeadingElement>;
   todayButtonRef: Ref<HTMLButtonElement>;
-  /** Rendered last in the header block, under the sun line (the sync line, #409). */
-  children?: ComponentChildren;
+  /** The shared Sync now flow (#409); its button ends the controls, its lines sit under them. */
+  sync: SyncNow;
 }
 
 /** A month page: drawn in currentColor, so it takes the button's own colour. */
@@ -43,16 +47,29 @@ export function DayHeader({
   onToday,
   headingRef,
   todayButtonRef,
-  children,
+  sync,
 }: DayHeaderProps) {
   const isToday = date === today;
   const sun = sunLine(date);
   const full = fullDate(date);
+  const daySync = useDaySync(sync);
   return (
     <header class="day-header">
+      <p class="day-meta">
+        <span>{metaDate(date)}</span>
+        <span class="day-meta-dot" aria-hidden="true" />
+        <span class="day-meta-sun">
+          <span class="day-meta-sun-icon" aria-hidden="true">
+            <SunIcon />
+          </span>
+          <span class="sr-only">Sunrise </span>
+          {sun.sunrise} – <span class="sr-only">sunset </span>
+          {sun.sunset}
+        </span>
+      </p>
       <div class="day-header-row">
         <h1 class="day-title" tabIndex={-1} ref={headingRef}>
-          {weekdayName(date)}
+          {isToday ? 'Today' : weekdayName(date)}
           <span class="sr-only">, {full}</span>
         </h1>
         <div class="day-nav">
@@ -77,22 +94,11 @@ export function DayHeader({
           >
             <CalendarIcon />
           </button>
+          {/* #486: last, so the arrows never move when its state changes. */}
+          <DaySyncButton view={daySync} />
         </div>
       </div>
-      <p class="day-date">
-        <span>{full}</span>
-        <span class={`day-pill${isToday ? ' day-pill-today' : ''}`}>{relativeLabel(date, today)}</span>
-      </p>
-      <p class="day-sun">
-        <span>Sunrise {sun.sunrise}</span>
-        {' · '}
-        <span>Sunset {sun.sunset}</span>
-        {' · '}
-        <span>
-          {sun.daylight} of daylight {sun.change}
-        </span>
-      </p>
-      {children}
+      <DaySyncLines view={daySync} />
     </header>
   );
 }

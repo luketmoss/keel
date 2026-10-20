@@ -94,26 +94,25 @@ afterEach(() => {
 describe('AC1 — addressed by date, today in Denver', () => {
   it('shows today at #/', () => {
     const { container } = renderAt('#/');
-    expect(h1(container).textContent).toBe('Wednesday, September 30, 2026');
-    expect(container.querySelector('.day-pill')!.textContent).toBe('Today');
+    expect(h1(container).textContent).toBe('Today, September 30, 2026');
+    expect(h1(container).firstChild!.textContent).toBe('Today');
   });
 
   it('shows an explicit date in its state, and #/day/<today> as today', () => {
     const { container } = renderAt('#/day/2026-09-12');
     expect(h1(container).textContent).toBe('Saturday, September 12, 2026');
-    expect(container.querySelector('.day-pill')!.textContent).toBe('3 weeks ago');
     cleanup();
     const again = renderAt('#/day/2026-09-30');
-    expect(again.container.querySelector('.day-pill')!.textContent).toBe('Today');
+    expect(again.container.querySelector('h1')!.firstChild!.textContent).toBe('Today');
   });
 
-  it('moves #/ to the new today at midnight; keeps an explicit date and updates its pill', () => {
+  it('moves #/ to the new today at midnight; keeps an explicit date and updates its title', () => {
     const { container } = renderAt('#/');
     act(() => {
       vi.setSystemTime(new Date('2026-10-01T06:30:00Z')); // 00:30 on 1 Oct in Denver
       vi.advanceTimersByTime(60_000);
     });
-    expect(h1(container).textContent).toBe('Thursday, October 1, 2026');
+    expect(h1(container).textContent).toBe('Today, October 1, 2026');
     expect(status(container)).toBe(''); // a rollover is not announced
     cleanup();
 
@@ -125,7 +124,7 @@ describe('AC1 — addressed by date, today in Denver', () => {
       visible();
     });
     expect(h1(other.container).textContent).toBe('Wednesday, September 30, 2026');
-    expect(other.container.querySelector('.day-pill')!.textContent).toBe('Yesterday');
+    expect(other.container.querySelector('h1')!.firstChild!.textContent).toBe('Wednesday');
   });
 
   it('moving between days replaces the history entry', () => {
@@ -143,7 +142,8 @@ describe('AC2 — header', () => {
     expect(container.querySelectorAll('h1')).toHaveLength(1);
     expect(h1(container).querySelector('.sr-only')!.textContent).toBe(', September 12, 2026');
     expect(h1(container).getAttribute('tabindex')).toBe('-1');
-    expect(container.querySelector('.day-date')!.textContent).toContain('September 12, 2026');
+    expect(container.querySelector('.day-meta')!.firstElementChild!.textContent).toBe('Sat, Sep 12');
+    expect(container.querySelector('.day-pill')).toBeNull();
   });
 
   it('shows Today only off today, before the arrows', () => {
@@ -151,7 +151,7 @@ describe('AC2 — header', () => {
     expect(on.queryByText('Today', { selector: 'button' })).toBeNull();
     cleanup();
     const off = renderAt('#/day/2026-09-12');
-    const buttons = [...off.container.querySelectorAll('.day-nav button')].map(
+    const buttons = [...off.container.querySelectorAll('.day-nav button:not(.day-sync-btn)')].map(
       (b) => b.getAttribute('aria-label') ?? b.textContent,
     );
     expect(buttons).toEqual(['Today', 'Previous day', 'Next day', 'Calendar']);
@@ -159,7 +159,7 @@ describe('AC2 — header', () => {
 
   it('ends the controls with a 44 px Calendar button that pushes to the viewed month (#241 AC1)', () => {
     const on = renderAt('#/');
-    const onLabels = [...on.container.querySelectorAll('.day-nav button')].map(
+    const onLabels = [...on.container.querySelectorAll('.day-nav button:not(.day-sync-btn)')].map(
       (b) => b.getAttribute('aria-label') ?? b.textContent,
     );
     expect(onLabels).toEqual(['Previous day', 'Next day', 'Calendar']);
@@ -173,20 +173,26 @@ describe('AC2 — header', () => {
     expect(window.location.hash).toBe('#/calendar/2025-01');
   });
 
-  it('writes the sun line in words, three nowrap items', () => {
+  it("shows the viewed day's sunrise and sunset on the meta line, and not the daylight sentence", () => {
     const { container } = renderAt('#/day/2026-09-27');
-    expect(container.querySelector('.day-sun')!.textContent).toBe(
-      'Sunrise 6:51 AM · Sunset 6:51 PM · 12h 00m of daylight (−3 min)',
-    );
-    expect(container.querySelectorAll('.day-sun > span')).toHaveLength(3);
+    const meta = container.querySelector('.day-meta')!;
+    expect(meta.textContent).toBe('Sun, Sep 27Sunrise 6:51 AM – sunset 6:51 PM');
+    expect(meta.querySelector('.day-meta-sun-icon')!.getAttribute('aria-hidden')).toBe('true');
+    expect(meta.querySelector('.day-meta-dot')!.getAttribute('aria-hidden')).toBe('true');
+    expect(container.textContent).not.toContain('of daylight');
+    expect(container.querySelector('.day-sun')).toBeNull();
   });
 
-  it("uses the today pill's colours only on today", () => {
+  it('puts the meta line above the title row', () => {
     const { container } = renderAt('#/');
-    expect(container.querySelector('.day-pill')!.classList.contains('day-pill-today')).toBe(true);
-    cleanup();
-    const past = renderAt('#/day/2026-09-29');
-    expect(past.container.querySelector('.day-pill')!.classList.contains('day-pill-today')).toBe(false);
+    expect(container.querySelector('.day-meta')!.nextElementSibling).toBe(container.querySelector('.day-header-row'));
+  });
+
+  it('ends the controls with the Sync button, after Calendar', () => {
+    const { container } = renderAt('#/');
+    const last = container.querySelector('.day-nav')!.lastElementChild!;
+    expect(last.classList.contains('day-sync-btn')).toBe(true);
+    expect(last.getAttribute('aria-label')).toMatch(/^Sync now, /);
   });
 });
 

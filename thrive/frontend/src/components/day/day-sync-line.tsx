@@ -1,16 +1,18 @@
-// #409 — the Day view's sync line: "Synced <age>" with a Sync now control, and
-// the request's state in place below it.
+// #409, #486 — the Day view's sync: an icon button in the header's title row
+// (`DaySyncButton`) and, under the header, the status and request lines
+// (`DaySyncStatus`), both drawn from one `useDaySync`.
 //
-// Row 1 is always the age (left) and the control (right, same place and width
-// idle or busy); request messages are extra rows below it and only ever grow
-// downward, so the control never moves under the finger. The request rows are
-// the one polite live region; the minute-by-minute age tick is outside it.
+// The age lives in the button's name ("Sync now, Synced 3:30 PM"); it is printed
+// only when the status is not neutral, so a problem is never colour alone.
+// Request messages only ever grow downward, in the one polite live region, so
+// the button never moves under the finger. The minute-by-minute age tick is
+// outside the live region.
 // "Sync" here is the COROS/Withings sync (#315), not the offline save queue.
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { syncLog, withingsSyncLog, syncRequests, syncAsk, demoSyncPressedAt } from '../../state/store';
 import { isDemo } from '../../api/demo-data';
-import { collapseSyncStatus } from '../../api/sync-status';
+import { collapseSyncStatus, type DaySyncStatus } from '../../api/sync-status';
 import { newestRequest, type RequestView } from '../../api/sync-request-state';
 import type { SyncRequestVendor } from '../../api/sync-requests-api';
 import type { SyncNow } from '../settings/sync-now';
@@ -56,7 +58,7 @@ export function dayRequestEntries(
 
 function SyncIcon() {
   return (
-    <svg class="day-sync-icon" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" focusable="false">
+    <svg class="day-sync-icon" viewBox="0 0 20 20" width="24" height="24" aria-hidden="true" focusable="false">
       <path
         d="M16 7.5A6.5 6.5 0 0 0 4.2 6M4 12.5A6.5 6.5 0 0 0 15.8 14M4 3v3.5h3.5M16 17v-3.5h-3.5"
         fill="none"
@@ -69,7 +71,14 @@ function SyncIcon() {
   );
 }
 
-export function DaySyncLine({ sync }: { sync: SyncNow }) {
+export interface DaySyncView {
+  status: DaySyncStatus;
+  entries: DayRequestEntry[];
+  busy: boolean;
+  press: () => void;
+}
+
+export function useDaySync(sync: SyncNow): DaySyncView {
   // A one-minute tick, so "just now" does not sit there for an hour.
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -97,30 +106,68 @@ export function DaySyncLine({ sync }: { sync: SyncNow }) {
   };
   const entries = dayRequestEntries(sync.lines, now, finalAt);
 
-  const busy = sync.bothOpen || sync.asking;
+  return { status, entries, busy: sync.bothOpen || sync.asking, press: sync.press };
+}
+
+/**
+ * The status's tone as a person would read it: its own when not neutral, else the
+ * worst vendor note's (a failed or stopped vendor leaves the age neutral but is
+ * still a problem).
+ */
+function problemTone(status: DaySyncStatus): 'warning' | 'danger' | null {
+  if (status.tone !== 'neutral') return status.tone;
+  if (status.notes.some((n) => n.tone === 'danger')) return 'danger';
+  return status.notes.length > 0 ? 'warning' : null;
+}
+
+/** The status dot: green when well, the problem's colour otherwise, none while unknown or busy. */
+function dotTone(status: DaySyncStatus): 'success' | 'warning' | 'danger' | null {
+  const problem = problemTone(status);
+  if (problem) return problem;
+  return status.text.startsWith('Synced ') ? 'success' : null;
+}
+
+function SyncDot({ tone }: { tone: 'success' | 'warning' | 'danger' | null }) {
+  if (!tone) return null;
+  return <span class={`day-sync-dot day-sync-dot-${tone}`} aria-hidden="true" />;
+}
+
+export function DaySyncButton({ view }: { view: DaySyncView }) {
+  const { status, busy } = view;
+  const name = busy ? 'Syncing…' : `Sync now, ${status.text}`;
+  const dot = busy ? null : dotTone(status);
+  return (
+    <button
+      type="button"
+      class={`day-sync-btn${busy ? ' day-sync-busy' : ''}`}
+      aria-label={name}
+      title={name}
+      aria-disabled={busy ? 'true' : undefined}
+      onClick={() => {
+        if (!busy) view.press();
+      }}
+    >
+      <SyncIcon />
+      <SyncDot tone={dot} />
+    </button>
+  );
+}
+
+export function DaySyncLines({ view }: { view: DaySyncView }) {
+  const { status, entries } = view;
+  const problem = problemTone(status);
   return (
     <div class="day-sync">
-      <div class="day-sync-row">
+      {problem && (
         <div class="day-sync-text">
-          <p class={`day-sync-age${status.tone === 'neutral' ? '' : ` sync-tone-${status.tone}`}`}>{status.text}</p>
+          <p class={`day-sync-age sync-tone-${problem}`}>{status.text}</p>
           {status.notes.map((n) => (
             <p key={n.vendor} class={`day-sync-note sync-tone-${n.tone}`}>
               {n.text}
             </p>
           ))}
         </div>
-        <button
-          type="button"
-          class={`day-sync-btn${busy ? ' day-sync-busy' : ''}`}
-          aria-disabled={busy ? 'true' : undefined}
-          onClick={() => {
-            if (!busy) sync.press();
-          }}
-        >
-          <SyncIcon />
-          <span>{busy ? 'Syncing…' : 'Sync now'}</span>
-        </button>
-      </div>
+      )}
       <div class="day-sync-requests" role="status" aria-live="polite">
         {entries.map((e) => (
           <p

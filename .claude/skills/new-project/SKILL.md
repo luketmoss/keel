@@ -19,9 +19,9 @@ Ask with `AskUserQuestion`. Three things, one round — do not interrogate.
 - **Slug** — lowercase, hyphenated. Becomes the folder, the branch prefix, the
   tag prefix, the workflow filename, and the board option. Propose one from what
   they've told you rather than asking cold.
-- **Stack** — firmware, web, mobile, cli, or worker. Determines which stack
-  skill is authoritative and what gets scaffolded. If the project has more than
-  one component, ask instead for each component's path and stack (`frontend` →
+- **Stack** — firmware, web, mobile, android, cli, or
+  worker. Determines which stack skill is authoritative and what gets
+  scaffolded. If the project has more than one component, ask instead for each component's path and stack (`frontend` →
   web, `api` → worker), per `CONVENTIONS.md` §Multi-component projects.
 - **One-line purpose** — what it does and who for. Goes at the top of the
   project's CLAUDE.md.

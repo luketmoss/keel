@@ -4,7 +4,7 @@
 //
 // Recovery is a current-state snapshot COROS writes only on the days a sync
 // ran, so the ring shows on today only (the owner's call, 2026-10-19). While
-// the tab is not loaded the row is not drawn; the Health panel's PanelStatus
+// the tab is not loaded the row is not drawn; the metric tiles' Health card (#491)
 // says loading and Try again. COROS sends no goals, so no step or calorie ring.
 
 import { dailyHealth } from '../../state/store';

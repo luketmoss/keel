@@ -3902,10 +3902,6 @@ a.training-card {
   flex-shrink: 0;
 }
 
-.health-qualifier {
-  color: var(--color-text-muted);
-}
-
 .health-data {
   margin: 0;
   display: flex;
@@ -3933,7 +3929,6 @@ a.training-card {
   color: var(--color-text-secondary);
 }
 
-.health-stage,
 .health-zone {
   white-space: nowrap;
 }
@@ -5040,6 +5035,168 @@ a.training-card {
   margin: var(--space-md) 0 0;
 }
 
+/* ===== Day metric tiles (#491) =====
+   Resting HR, HRV and average stress, two to a row. Each tile is a #485 card
+   with a 14-day line (or 7 stress bars) in its metric colour, a range bar on
+   the #485 range tokens, and a caption in words. Only the unwelcome side is
+   --color-warning, bold and with its arrow and word, never colour alone. */
+.vitals {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--day-gap);
+}
+
+.vitals-one {
+  display: block;
+}
+
+.metric-tile {
+  display: flex;
+  min-width: 0;
+}
+
+.metric-tile .day-panel {
+  flex: 1;
+  min-width: 0;
+  padding: calc(var(--space-md) - var(--space-xs));
+}
+
+.day-screen .metric-tile .day-panel-title {
+  font-size: var(--text-sm);
+}
+
+.metric-tile-resting_hr {
+  --tile-colour: var(--metric-heart);
+}
+
+.metric-tile-hrv {
+  --tile-colour: var(--metric-hrv);
+}
+
+.metric-tile-stress {
+  --tile-colour: var(--metric-stress);
+}
+
+.metric-tile .day-panel-icon {
+  color: var(--tile-colour);
+}
+
+.tile-value {
+  margin: 0;
+  font-size: var(--figure-lg);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--color-text);
+}
+
+.tile-value-blank {
+  color: var(--color-text-muted);
+}
+
+.tile-unit {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.tile-line {
+  display: block;
+  width: 100%;
+  height: 32px;
+  overflow: visible;
+}
+
+.tile-line-run,
+.tile-line-dot {
+  fill: none;
+  stroke: var(--tile-colour);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tile-line-run {
+  stroke-width: 2px;
+}
+
+.tile-line-dot {
+  stroke-width: 5px;
+}
+
+.tile-range {
+  position: relative;
+  height: 8px;
+}
+
+.tile-range::before {
+  content: '';
+  position: absolute;
+  inset: 2px 0;
+  border-radius: var(--radius-full);
+  background: var(--range-track);
+}
+
+.tile-range-band {
+  position: absolute;
+  top: 2px;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--range-band);
+}
+
+.tile-range-marker {
+  position: absolute;
+  top: 0;
+  width: 3px;
+  height: 8px;
+  margin-left: -1.5px;
+  border-radius: 1px;
+  background: var(--range-marker);
+}
+
+.tile-range-attention {
+  background: var(--color-warning);
+}
+
+.tile-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-xs);
+  height: 40px;
+}
+
+.tile-bar-slot {
+  display: flex;
+  align-items: flex-end;
+  flex: 1;
+  height: 100%;
+}
+
+.tile-bar {
+  width: 100%;
+  min-height: 2px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: color-mix(in srgb, var(--metric-stress) 35%, transparent);
+}
+
+.tile-bar-viewed {
+  background: var(--metric-stress);
+}
+
+.tile-caption {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.tile-zone {
+  white-space: nowrap;
+}
+
+.tile-attention {
+  font-weight: 700;
+  color: var(--color-warning);
+}
+
 /* ===== Library keyboard access (#301) =====
    Template cards are <button>s and the editor's exercise rows are focusable
    buttons. The ring is --color-text (14.70:1 light, 15.54:1 dark), not
@@ -5125,6 +5282,28 @@ a.training-card {
    keep working; the selected cue is a fill, never an outline (AC5). Normal
    rendering is untouched: everything is inside this one block. */
 @media (forced-colors: active) {
+  /* #491: the tiles' line, range bar and stress bars in system colours. */
+  .tile-line-run,
+  .tile-line-dot {
+    stroke: CanvasText;
+  }
+
+  .tile-range::before,
+  .tile-range-band {
+    border: 1px solid GrayText;
+  }
+
+  .tile-bar {
+    background: GrayText;
+    forced-color-adjust: none;
+  }
+
+  .tile-range-marker,
+  .tile-bar-viewed {
+    background: CanvasText;
+    forced-color-adjust: none;
+  }
+
   /* #490: the sleep stages keep their boundaries when the fills flatten. */
   .sleep-seg,
   .sleep-swatch {

@@ -1,13 +1,15 @@
-// #239 AC1–AC3 — the Health panel's row rules, without the DOM.
+// #239 AC1–AC3 — the health rules, without the DOM; the metric tiles (#491)
+// now carry resting HR, HRV and stress (`vitalsView`).
 import { describe, it, expect } from 'vitest';
 import {
-  healthView,
+  vitalsView,
   rangeCaption,
   captionText,
+  tileCaptionText,
   activeMetrics,
   HEALTH_METRICS,
   seriesOf,
-  type HealthRowView,
+  type TileView,
 } from './health-rows';
 import { DAILY_HEALTH_FIELDS, type DailyHealthRow } from '../../api/health-api';
 import { addDays } from '../../day/dates';
@@ -44,30 +46,36 @@ function history(date: string, k: number, field: string, value: (i: number) => s
   return Array.from({ length: k }, (_, j) => hr(addDays(date, -(j + 1)), { [field]: value(j + 1) }));
 }
 
-const rowsOf = (v: ReturnType<typeof healthView>) => {
-  if (v.kind !== 'rows') throw new Error(`expected rows, got ${v.kind}`);
-  return v.rows;
+const tilesOf = (v: ReturnType<typeof vitalsView>) => {
+  if (v.kind !== 'tiles') throw new Error(`expected tiles, got ${v.kind}`);
+  return v.tiles;
 };
-const byKey = (rows: HealthRowView[], key: string) => rows.find((r) => r.key === key)!;
-const texts = (r: HealthRowView) => r.captions.map(captionText);
+const byKey = (tiles: TileView[], key: string) => tiles.find((t) => t.key === key)!;
+const text = (t: TileView) => tileCaptionText(t.caption);
 
 describe('AC1 — a past day', () => {
   it('shows resting HR, HRV and average stress (#231) in order, and no steps (#488) or sleep (#490)', () => {
-    const rows = rowsOf(healthView([hr(D, { ...FULL, stress_avg: '31' })], D, false));
-    expect(rows.map((r) => r.label)).toEqual(['Resting HR', 'HRV', 'Average stress']);
-    expect(rows.map((r) => r.value)).toEqual(['52 bpm', '38 ms', '31']);
+    const tiles = tilesOf(vitalsView([hr(D, { ...FULL, stress_avg: '31' })], D, false));
+    expect(tiles.map((t) => t.label)).toEqual(['Resting HR', 'HRV', 'Average stress']);
+    expect(tiles.map((t) => [t.value, t.unit])).toEqual([
+      ['52', 'bpm'],
+      ['38', 'ms'],
+      ['31', ''],
+    ]);
   });
 
-  it('shows a blank as blank with "No reading this day." and no range line; 0 is a value', () => {
-    const history14 = history(D, 20, 'hrv', () => '40');
-    const rows = rowsOf(healthView([...history14, hr(D, { ...FULL, hrv: '' })], D, false));
-    const hrv = byKey(rows, 'hrv');
-    expect(hrv.value).toBe('');
-    expect(texts(hrv)).toEqual(['No reading this day.']);
+  it('shows a blank as blank with "No reading this day." and no range bar; 0 is a value', () => {
+    const tiles = tilesOf(vitalsView([...history(D, 20, 'hrv', () => '40'), hr(D, { ...FULL, hrv: '' })], D, false));
+    const hrv = byKey(tiles, 'hrv');
+    expect(hrv.value).toBeNull();
+    expect(hrv.bar).toBeNull();
+    expect(text(hrv)).toBe('No reading this day.');
+    expect(hrv.days.filter((v) => v !== null)).toHaveLength(13);
+    expect(byKey(tilesOf(vitalsView([hr(D, { ...FULL, hrv: '0' })], D, false)), 'hrv').value).toBe('0');
   });
 
   it('says "No watch data for this day." when there is no row', () => {
-    expect(healthView([hr('2026-09-25', FULL)], D, false)).toEqual({
+    expect(vitalsView([hr('2026-09-25', FULL)], D, false)).toEqual({
       kind: 'note',
       note: 'No watch data for this day.',
     });
@@ -78,20 +86,19 @@ describe('AC1 — a past day', () => {
     for (const f of ['sleep_score', 'recovery', 'vo2max', 'training_load', 'calories']) expect(labels).not.toContain(f);
   });
 
-  it('shows Average stress, before steps, now the field list has stress_avg (#231)', () => {
+  it('shows Average stress now the field list has stress_avg (#231)', () => {
     const fields = DAILY_HEALTH_FIELDS;
     expect(activeMetrics().map((m) => m.key)).toEqual(['sleep', 'resting_hr', 'hrv', 'stress', 'steps']);
-    // A field list without the column (before #231) leaves the row out.
+    // A field list without the column (before #231) leaves the tile out.
     expect(activeMetrics(fields.filter((f) => f !== 'stress_avg')).map((m) => m.key)).toEqual([
       'sleep',
       'resting_hr',
       'hrv',
       'steps',
     ]);
-    const rows = rowsOf(healthView([hr(D, { ...FULL, stress_avg: '31' })], D, false, fields));
-    expect(byKey(rows, 'stress').value).toBe('31');
-    const blank = rowsOf(healthView([hr(D, FULL)], D, false, fields));
-    expect(byKey(blank, 'stress').value).toBe('');
+    const tiles = tilesOf(vitalsView([hr(D, { ...FULL, stress_avg: '31' })], D, false, fields));
+    expect(byKey(tiles, 'stress').value).toBe('31');
+    expect(byKey(tilesOf(vitalsView([hr(D, FULL)], D, false, fields)), 'stress').value).toBeNull();
   });
 });
 
@@ -158,63 +165,47 @@ describe('AC2 — your range', () => {
   });
 
   it('builds the range from the loaded rows for the viewed day', () => {
-    const rows = rowsOf(
-      healthView(
+    const tiles = tilesOf(
+      vitalsView(
         [...history(D, 20, 'resting_hr', (i) => (i % 2 ? '49' : '55')), hr(D, { ...FULL, resting_hr: '60' })],
         D,
         false,
       ),
     );
-    expect(texts(byKey(rows, 'resting_hr'))).toEqual(['Your range 49–55 bpm · above your range']);
+    expect(text(byKey(tiles, 'resting_hr'))).toBe('49–55 · ↑ above');
   });
 });
 
 describe('AC3 — today', () => {
   it('says not synced yet, with one note, when today has no row', () => {
-    expect(healthView([hr('2026-09-25', FULL)], D, true)).toEqual({
+    expect(vitalsView([hr('2026-09-25', FULL)], D, true)).toEqual({
       kind: 'note',
       sub: 'Not synced yet today',
       note: "Last night's sleep and heart rate, and today's steps, arrive with the next sync.",
     });
   });
 
-  it('says when it synced', () => {
-    const v = healthView([hr(D, FULL)], D, true);
-    expect(v.sub).toBe('Synced 7:17 AM');
-  });
-
-  it('shows an earlier-day sync with its date, and nothing for a blank or bad synced_at', () => {
-    expect(healthView([hr(D, { ...FULL, synced_at: '2026-09-26T00:17:00.000Z' })], D, true).sub).toBe(
-      'Synced Sep 25, 6:17 PM',
-    );
-    expect(healthView([hr(D, { ...FULL, synced_at: '' })], D, true).sub).toBeUndefined();
-    expect(healthView([hr(D, { ...FULL, synced_at: 'soon' })], D, true).sub).toBeUndefined();
-  });
-
   it('treats a blank as pending', () => {
-    const hrv = byKey(rowsOf(healthView([hr(D, { ...FULL, hrv: '' })], D, true)), 'hrv');
-    expect(hrv.value).toBe('');
-    expect(texts(hrv)).toEqual(['Arrives with the next sync.']);
+    const hrv = byKey(tilesOf(vitalsView([hr(D, { ...FULL, hrv: '' })], D, true)), 'hrv');
+    expect(hrv.value).toBeNull();
+    expect(text(hrv)).toBe('Arrives with the next sync.');
   });
 
-  it('shows stress so far with no range line, and the others with one', () => {
-    const fields = [...DAILY_HEALTH_FIELDS, 'stress_avg'];
-    const rows = rowsOf(
-      healthView(
+  it('shows stress so far with "Last 7 days" and no range, and the others with one', () => {
+    const tiles = tilesOf(
+      vitalsView(
         [
-          ...history(D, 20, 'steps', () => '9000'),
-          ...history(D, 20, 'resting_hr', () => '52').map((r) => ({ ...r, date: r.date })),
+          ...history(D, 20, 'stress_avg', () => '25'),
+          ...history(D, 20, 'resting_hr', () => '52'),
           hr(D, { ...FULL, steps: '871', stress_avg: '31' }),
         ],
         D,
         true,
-        fields,
       ),
     );
-    expect(rows.some((r) => r.key === 'steps')).toBe(false);
-    const stress = byKey(rows, 'stress');
-    expect(stress.value).toBe('31 so far');
-    expect(stress.captions).toEqual([]);
-    expect(byKey(rows, 'resting_hr').captions.slice(-1)[0].kind).toMatch(/range|building/);
+    expect(tiles.some((t) => (t.key as string) === 'steps')).toBe(false);
+    const stress = byKey(tiles, 'stress');
+    expect([stress.value, stress.soFar, text(stress), stress.bar]).toEqual(['31', true, 'Last 7 days', null]);
+    expect(byKey(tiles, 'resting_hr').caption.kind).toBe('range');
   });
 });

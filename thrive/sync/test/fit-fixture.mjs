@@ -13,15 +13,16 @@ export const semicircles = (degrees) => Math.round(degrees * DEGREES_TO_SEMICIRC
 /**
  * @param {{ lat?: number, lon?: number, ms: number, altitude?: number }[]} points
  *   `lat`/`lon` in degrees; a point with neither is a record with no position.
+ * @param {{ timeCreated?: Date, type?: string }} [opts]  the file-id message (#510 reads the start from `timeCreated`)
  * @returns {Buffer} one whole FIT file
  */
-export function makeFit(points) {
+export function makeFit(points, { timeCreated = new Date(Date.UTC(2026, 0, 1)), type = 'activity' } = {}) {
   const encoder = new Encoder();
   encoder.onMesg(Profile.MesgNum.FILE_ID, {
     manufacturer: 'development',
     product: 1,
-    timeCreated: new Date(Date.UTC(2026, 0, 1)),
-    type: 'activity',
+    timeCreated,
+    type,
   });
   for (const p of points) {
     const record = { timestamp: new Date(p.ms) };

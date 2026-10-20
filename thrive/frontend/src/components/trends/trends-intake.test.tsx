@@ -11,7 +11,7 @@ vi.mock('../../api/drinks', async (orig) => ({
   getDrinks: (...a: unknown[]) => getDrinks(...a),
 }));
 
-import { TrendsScreen } from './trends-screen';
+import { TrendsScreen, captionText } from './trends-screen';
 import { AuthContext } from '../../auth/auth-context';
 import { dailyHealth, bodyMeasurements, dailySummary } from '../../state/store';
 import { drinkHistory, resetDrinks } from '../../state/drinks';
@@ -192,6 +192,9 @@ describe('the screen', () => {
     await waitFor(() => expect(container.querySelectorAll('.trend-card')).toHaveLength(2));
     expect(getDrinks).toHaveBeenCalledTimes(2);
     expect(loadHealth).not.toHaveBeenCalled();
+  });
+  it('calls the marks bars, not dots, in the caption', () => {
+    expect(captionText(7, false, true)).toBe('Bars are each day · line is the 7-day average. Blank days stay blank.');
   });
   it('does not read drinks for another group', async () => {
     localStorage.setItem('thrive-trends-group', 'recovery');

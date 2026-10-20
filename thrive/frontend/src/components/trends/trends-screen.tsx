@@ -78,8 +78,8 @@ function usePref<T extends string>(pref: Pref<T>, first?: T): [T, (v: T) => void
 }
 
 /** The caption: what the marks are, in words. */
-export function captionText(avgDays: number, hasBand: boolean): string {
-  const clauses = ['Dots are each day'];
+export function captionText(avgDays: number, hasBand: boolean, bars = false): string {
+  const clauses = [bars ? 'Bars are each day' : 'Dots are each day'];
   if (avgDays > 0) clauses.push(`line is the ${avgDays}-day average`);
   if (hasBand) clauses.push('shaded band is your range, the mean ± 1 SD of the 30 days before today');
   return `${clauses.join(' · ')}. Blank days stay blank.`;
@@ -331,7 +331,9 @@ export function TrendsScreen() {
     };
     content = (
       <>
-        <p class="trends-caption">{captionText(avgDays, hasBand)}</p>
+        <p class="trends-caption">
+          {captionText(avgDays, hasBand, group.metrics.length > 0 && group.metrics.every((m) => m.bars))}
+        </p>
         {view === 'Table' && !nothingEver ? (
           <TrendTable group={group} series={series} range={range} avgDays={avgDays} today={today} />
         ) : (

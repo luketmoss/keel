@@ -1,4 +1,4 @@
-// #407: the Route section of the activity detail screen, rendered.
+// #407, #532: the route map hero of the activity detail screen, rendered.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, act } from '@testing-library/preact';
@@ -22,7 +22,7 @@ vi.mock('../../maps/google-maps', () => ({
   mapsApiKey: () => maps.key,
 }));
 
-import { RouteSection, clearRouteCache, routeAvailable } from './route-section';
+import { RouteHero, clearRouteCache, routeAvailable, trackAvailable, useWorkoutTrack } from './route-section';
 import { WorkoutDetail } from './workout-detail';
 import { DEMO_TRACKS } from '../../api/demo-track';
 import { workouts, sets, exercises } from '../../state/store';
@@ -52,6 +52,11 @@ const TRACK: WorkoutTrack = {
       [-100.02, 45],
     ],
   },
+};
+
+const ELEVATED: WorkoutTrack = {
+  ...TRACK,
+  properties: { ...TRACK.properties, ele: [1650, 1700, 1800] },
 };
 
 function workout(over: Partial<WorkoutWithRow> = {}): WorkoutWithRow {
@@ -90,6 +95,11 @@ function workout(over: Partial<WorkoutWithRow> = {}): WorkoutWithRow {
   };
 }
 
+/** The hero as the detail screen builds it: the track hook, then the hero over it. */
+function RouteSection({ workout }: { workout: WorkoutWithRow }) {
+  return h(RouteHero, { trackState: useWorkoutTrack(workout.id) });
+}
+
 let state: FakeMapState;
 beforeEach(() => {
   vi.stubEnv('VITE_THRIVE_API_URL', 'https://script.google.com/macros/s/x/exec');
@@ -109,6 +119,18 @@ afterEach(() => {
   workouts.value = [];
   sets.value = [];
   exercises.value = [];
+});
+
+describe('trackAvailable (#532)', () => {
+  it('needs a track_ref and the API URL, and no Maps key', () => {
+    maps.key = '';
+    expect(trackAvailable(workout())).toBe(true);
+    expect(routeAvailable(workout())).toBe(false);
+    expect(trackAvailable(workout({ track_ref: '' }))).toBe(false);
+    expect(trackAvailable(workout({ status: 'planned' }))).toBe(false);
+    vi.stubEnv('VITE_THRIVE_API_URL', '');
+    expect(trackAvailable(workout())).toBe(false);
+  });
 });
 
 describe('routeAvailable', () => {
@@ -137,22 +159,22 @@ describe('routeAvailable', () => {
   });
 });
 
-describe('the section', () => {
+describe('the hero', () => {
   it('holds the map box while loading, then replaces it with the drawn map', async () => {
     let finish!: () => void;
     loadMaps.mockReturnValue(new Promise<void>((resolve) => (finish = resolve)));
     const { container } = render(h(RouteSection, { workout: workout() }));
-    expect(screen.getByRole('heading', { name: 'Route' })).toBeTruthy();
-    const box = container.querySelector('.detail-route-map')!;
+    expect(screen.queryByRole('heading', { name: 'Route' })).toBeNull();
+    const box = container.querySelector('.detail-hero-map')!;
     expect(box.getAttribute('aria-busy')).toBe('true');
     expect(box.getAttribute('role')).toBe('status');
     expect(box.textContent).toBe('Loading route…');
 
     await act(async () => finish());
     await waitFor(() => expect(container.querySelector('[role="region"][aria-label="Route map"]')).toBeTruthy());
-    expect(container.querySelectorAll('.detail-route-map')).toHaveLength(1);
+    expect(container.querySelectorAll('.detail-hero-map')).toHaveLength(1);
     await waitFor(() => expect(state.maps).toHaveLength(1));
-    expect(state.maps[0].container).toBe(container.querySelector('.detail-route-map'));
+    expect(state.maps[0].container).toBe(container.querySelector('.detail-hero-map'));
     expect(state.polylines).toHaveLength(2);
   });
 
@@ -189,10 +211,10 @@ describe('the section', () => {
     arrange();
     const { container } = render(h(RouteSection, { workout: workout() }));
     await waitFor(() => expect(screen.getByText("Couldn't load the route.")).toBeTruthy());
-    expect(container.querySelectorAll('.detail-route-map')).toHaveLength(1);
+    expect(container.querySelectorAll('.detail-hero-map')).toHaveLength(1);
     expect(screen.getByRole('button', { name: 'Try again' }).className).toContain('btn-secondary');
     expect(screen.getByRole('button', { name: 'Try again' }).className).not.toContain('btn-sm');
-    expect(screen.getByRole('heading', { name: 'Route' })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Route' })).toBeNull();
   });
 
   it('logs the reason once as a kind, never the token or a coordinate', async () => {
@@ -265,32 +287,76 @@ describe('on the detail screen', () => {
     return render(h(WorkoutDetail, { workoutId: w.id }));
   };
 
-  it('puts the Route section right after the title block, above the stats card', async () => {
+  it('puts the hero first, the bar over it, and the title block in the sheet, with no Route heading', async () => {
     const { container } = show(workout());
-    const title = container.querySelector('.detail-title-block')!;
-    const route = container.querySelector('.detail-route')!;
-    expect(route).toBeTruthy();
-    expect(title.nextElementSibling).toBe(route);
-    expect(route.nextElementSibling?.className).toBe('detail-stats-card');
+    const screenEl = container.querySelector('.workout-detail-screen')!;
+    expect(screenEl.classList.contains('has-hero')).toBe(true);
+    expect(screenEl.firstElementChild?.className).toBe('detail-hero');
+    expect(screenEl.querySelector('.detail-top-bar')).toBeTruthy();
+    const sheet = container.querySelector('.detail-sheet')!;
+    expect(sheet.firstElementChild).toBe(container.querySelector('.detail-title-block'));
+    expect(sheet.querySelector('.detail-stats-card')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Route' })).toBeNull();
     await waitFor(() => expect(state.maps).toHaveLength(1));
   });
 
-  it('shows no Route section, and asks for no map script, without a track_ref', () => {
+  it('gives a walk with a track the hero too: the rule is the track, not the type', async () => {
+    const { container } = show(workout({ type: 'walk', name: 'Walk' }));
+    expect(container.querySelector('.detail-hero')).toBeTruthy();
+    await waitFor(() => expect(state.maps).toHaveLength(1));
+  });
+
+  it('shows no hero, no placeholder and no Elevation card without a track_ref, and asks for nothing', () => {
     const { container } = show(workout({ track_ref: '' }));
-    expect(container.querySelector('.detail-route')).toBeNull();
-    expect(screen.queryByText('Route')).toBeNull();
+    expect(container.querySelector('.detail-hero')).toBeNull();
+    expect(container.querySelector('.has-hero')).toBeNull();
+    expect(container.querySelector('.detail-elevation-card')).toBeNull();
+    expect(screen.queryByText('Loading route…')).toBeNull();
     expect(loadMaps).not.toHaveBeenCalled();
     expect(getWorkoutTrack).not.toHaveBeenCalled();
   });
 
-  it('shows none anywhere in a build without the key or the API URL', () => {
-    maps.key = '';
-    expect(show(workout()).container.querySelector('.detail-route')).toBeNull();
-    cleanup();
-    maps.key = 'KEY';
+  it('shows no hero without the API URL, and asks for no map script', () => {
     vi.stubEnv('VITE_THRIVE_API_URL', '');
-    expect(show(workout()).container.querySelector('.detail-route')).toBeNull();
+    expect(show(workout()).container.querySelector('.detail-hero')).toBeNull();
     expect(loadMaps).not.toHaveBeenCalled();
+  });
+
+  it('without a Maps key: no hero and no map script, but the Elevation card, in the shell layout', async () => {
+    maps.key = '';
+    getWorkoutTrack.mockResolvedValue({ ok: true, track: ELEVATED });
+    const { container } = show(workout());
+    expect(container.querySelector('.detail-hero')).toBeNull();
+    await waitFor(() => expect(container.querySelector('.detail-elevation-card')).toBeTruthy());
+    expect(loadMaps).not.toHaveBeenCalled();
+    expect(getWorkoutTrack).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the Elevation card after the stats card once the track arrives, and not before', async () => {
+    getWorkoutTrack.mockResolvedValue({ ok: true, track: ELEVATED });
+    const { container } = show(workout());
+    expect(container.querySelector('.detail-elevation-card')).toBeNull();
+    await waitFor(() => expect(container.querySelector('.detail-elevation-card')).toBeTruthy());
+    expect(container.querySelector('.detail-stats-card')?.nextElementSibling).toBe(
+      container.querySelector('.detail-elevation-card'),
+    );
+    await waitFor(() => expect(state.maps).toHaveLength(1));
+  });
+
+  it('leaves the Elevation card out when the track fails, and keeps the sheet', async () => {
+    getWorkoutTrack.mockResolvedValue({ ok: false, kind: 'network' });
+    const { container } = show(workout());
+    await waitFor(() => expect(screen.getByText("Couldn't load the route.")).toBeTruthy());
+    expect(container.querySelector('.detail-elevation-card')).toBeNull();
+    expect(container.querySelector('.detail-title-block')).toBeTruthy();
+  });
+
+  it('keeps the bar buttons in the page over the loading state', () => {
+    loadMaps.mockReturnValue(new Promise(() => {}));
+    show(workout());
+    expect(screen.getByText('Loading route…')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Edit workout' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy();
   });
 
   it('says "No details recorded" when there is no route and nothing else to show', () => {
@@ -305,6 +371,18 @@ describe('on the detail screen', () => {
   });
 });
 
+describe('the map options (#532)', () => {
+  it('place zoom and full screen at the bottom right and the map type at the bottom left', async () => {
+    render(h(RouteSection, { workout: workout() }));
+    await waitFor(() => expect(state.maps).toHaveLength(1));
+    const o = state.maps[0].options;
+    expect(o.zoomControlOptions.position).toBe(12);
+    expect(o.fullscreenControlOptions.position).toBe(12);
+    expect(o.mapTypeControlOptions.position).toBe(6);
+    expect(o.gestureHandling).toBe('cooperative');
+  });
+});
+
 describe('the stylesheet', () => {
   const css = readGlobalCss();
 
@@ -316,25 +394,37 @@ describe('the stylesheet', () => {
       '--map-track-width',
       '--map-track-width-casing',
       '--map-dot-size',
-      '--detail-map-height',
+      '--detail-hero-height',
     ]) {
       expect(root, t).toContain(`${t}:`);
     }
     expect(root).toMatch(/--map-track:\s*#2f66f0/);
-    expect(root).toMatch(/--detail-map-height:\s*280px/);
+    expect(root).toMatch(/--detail-hero-height:\s*clamp\(320px, 62vh, 560px\)/);
+    expect(css).not.toContain('--detail-map-height');
     expect(css.match(/\[data-theme="(light|dark)"\]\s*\{[^}]*--map-/g)).toBeNull();
   });
 
-  it('gives the box a fixed height from the token in every state, the rounding and border of the cards below', () => {
-    const rule = css.match(/\.detail-route-map\s*\{([^}]*)\}/)![1];
-    expect(rule).toContain('height: var(--detail-map-height)');
-    expect(rule).toContain('var(--radius-md)');
-    expect(rule).toContain('var(--color-border)');
-    expect(rule).toContain('overflow: hidden');
+  it('gives the hero its height from the token, and the map box leaves room for the sheet overlap', () => {
+    const hero = css.match(/\.workout-detail-screen > \.detail-hero\s*\{([^}]*)\}/)![1];
+    expect(hero).toContain('height: var(--detail-hero-height)');
+    const box = css.match(/\.detail-hero-map\s*\{([^}]*)\}/)![1];
+    expect(box).toContain('calc(100% - var(--space-lg))');
+  });
+
+  it('overlaps the map with a rounded sheet, and floats the top bar on scrims', () => {
+    const sheet = css.match(/\.workout-detail-screen\.has-hero > \.detail-sheet\s*\{([^}]*)\}/)![1];
+    expect(sheet).toContain('margin-top: calc(-1 * var(--space-lg))');
+    expect(sheet).toContain('var(--radius-lg) var(--radius-lg) 0 0');
+    const bar = css.match(/\.workout-detail-screen\.has-hero > \.detail-top-bar\s*\{([^}]*)\}/)![1];
+    expect(bar).toContain('position: absolute');
+    expect(bar).toContain('env(safe-area-inset-top');
+    expect(css).toMatch(
+      /\.has-hero \.detail-icon-btn\s*\{[^}]*color-mix\(in srgb, var\(--color-bg\) 78%, transparent\)/,
+    );
   });
 
   it('uses the secondary text colour for its two lines, not the muted one', () => {
-    const rule = css.match(/\.detail-route-status\s*\{([^}]*)\}/)![1];
+    const rule = css.match(/\.detail-hero-status\s*\{([^}]*)\}/)![1];
     expect(rule).toContain('var(--color-text-secondary)');
     expect(rule).not.toContain('--color-text-muted');
   });

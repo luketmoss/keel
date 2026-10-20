@@ -53,6 +53,21 @@ export const MAP_OPTIONS: google.maps.MapOptions = {
 };
 
 /**
+ * Where Google's controls sit on the hero (#532): zoom and full screen at the
+ * bottom right, the map type at the bottom left, all clear of the floating bar
+ * at the top. Built when the map is, because `google.maps` is not there until the
+ * script has loaded.
+ */
+function controlPlacement(): google.maps.MapOptions {
+  const { ControlPosition, MapTypeControlStyle } = google.maps;
+  return {
+    zoomControlOptions: { position: ControlPosition.RIGHT_BOTTOM },
+    fullscreenControlOptions: { position: ControlPosition.RIGHT_BOTTOM },
+    mapTypeControlOptions: { position: ControlPosition.LEFT_BOTTOM, style: MapTypeControlStyle.HORIZONTAL_BAR },
+  };
+}
+
+/**
  * Create the map in `container` and draw `track` on it, fitted to the route
  * (at most zoom 16) with `--space-lg` of padding. Returns the points drawn, or
  * null when fewer than two usable points remain, which the caller shows as an
@@ -63,7 +78,12 @@ export function drawRoute(container: HTMLElement, track: WorkoutTrack): LatLng[]
   if (points.length < 2) return null;
 
   const tokens = readTokens(container);
-  const map = new google.maps.Map(container, { ...MAP_OPTIONS, center: points[0], zoom: 12 });
+  const map = new google.maps.Map(container, {
+    ...MAP_OPTIONS,
+    ...controlPlacement(),
+    center: points[0],
+    zoom: 12,
+  });
 
   new google.maps.Polyline({
     map,

@@ -67,19 +67,24 @@ is its only authority.
 
 ## Route map (#407)
 
-An activity with a `track_ref` shows a **Route** section on its detail screen: the track on a Google
-map, drawn with `@keel/geo` (a `file:../../geo` dependency, compiled by Thrive's own Vite and
-Vitest, like cairn's). The Maps script is loaded only when such a screen opens
-(`src/maps/google-maps.ts`), and the track comes from the API's `getWorkoutTrack` with the user's
-Google token, never from Drive.
+An activity with a drawable track opens on a full-width **map hero** at the top of its detail screen,
+whatever its type (#532): the track on a Google map, drawn with `@keel/geo` (a `file:../../geo`
+dependency, compiled by Thrive's own Vite and Vitest, like cairn's). The top bar floats over the map
+on round scrims, and the rest of the screen is a sheet with rounded top corners that overlaps the map
+and scrolls with the page. An **Elevation card** in the sheet, after the stats card, draws the
+track's elevation against distance (`elevation-profile.tsx`, over `computeElevationSeries` from
+`@keel/geo`, which keeps a missing elevation as a gap). The card needs the track but not a Maps key.
+The Maps script is loaded only when such a screen opens (`src/maps/google-maps.ts`), and the track
+comes from the API's `getWorkoutTrack` with the user's Google token, never from Drive.
 
 - **The key.** `VITE_GOOGLE_MAPS_API_KEY`, a browser key for the Maps JavaScript API, built in from
   the repository secret `THRIVE_GOOGLE_MAPS_API_KEY` by `thrive-pages.yml`. A build without it, or
-  without `VITE_THRIVE_API_URL`, shows no Route section on any activity. Demo mode shows one on the
+  without `VITE_THRIVE_API_URL`, shows no map hero on any activity (a build with the API URL but no
+  key still shows the Elevation card). Demo mode shows one on the
   demo hike ("Ridge Trail") from a bundled synthetic track, with the key in `.env.local`.
 - **The tokens** (`--map-track`, `--map-track-casing`, widths, `--map-dot-size`,
-  `--detail-map-height`) are in `global.css`, not overridden in dark: the base map is light in both
-  themes.
+  `--detail-hero-height`, which replaces `--detail-map-height`) are in `global.css`, not overridden in
+  dark: the base map is light in both themes.
 - **Route thumbnails (#530).** A tracked card on the Activities list draws the route as a plain SVG
   line (`components/activities/route-thumbnail.tsx`), with no basemap and no Maps request or key. Its
   track comes from the same session cache and two-at-a-time queue as the detail screen

@@ -38,7 +38,7 @@
     "--map-track-width": "4px",
     "--map-track-width-casing": "7px",
     "--map-dot-size": "12px",
-    "--detail-map-height": "280px",
+    "--detail-hero-height": "clamp(320px, 62vh, 560px)",
     "--figure-md": "1.75rem",
     "--figure-lg": "2.25rem",
     "--figure-xl": "2.75rem",

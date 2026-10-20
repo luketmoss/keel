@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   computeElevationProfile,
+  computeElevationSeries,
   computeTrackStats,
   effectiveElevationProfile,
   effectiveTrackStats,
@@ -456,5 +457,31 @@ describe('summarizeElevation', () => {
     const summary = summarizeElevation([none])
     expect(summary.elevationGainMeters).toBeUndefined()
     expect(summary.elevationTrackCount).toBe(0)
+  })
+})
+
+describe('computeElevationSeries (#532)', () => {
+  const pts = (elevations: (number | undefined)[]) =>
+    elevations.map((elevation, i) => ({ lat: 37 + i * 0.001, lon: -122, elevation }))
+
+  it('keeps a point without elevation as a null gap, with distance counted across it', () => {
+    const series = computeElevationSeries(pts([100, 110, undefined, 130, 120]))!
+    expect(series).toHaveLength(5)
+    expect(series.map((p) => p.elevationMeters)).toEqual([100, 110, null, 130, 120])
+    expect(series[0].distanceMeters).toBe(0)
+    for (let i = 1; i < series.length; i++) {
+      expect(series[i].distanceMeters).toBeGreaterThan(series[i - 1].distanceMeters)
+    }
+  })
+
+  it('does not filter the elevations', () => {
+    const series = computeElevationSeries(pts([100, 500, 100]))!
+    expect(series.map((p) => p.elevationMeters)).toEqual([100, 500, 100])
+  })
+
+  it('is a series for a flat track, and undefined under two elevation-bearing points', () => {
+    expect(computeElevationSeries(pts([50, 50, 50]))).toHaveLength(3)
+    expect(computeElevationSeries(pts([50, undefined, undefined]))).toBeUndefined()
+    expect(computeElevationSeries([])).toBeUndefined()
   })
 })

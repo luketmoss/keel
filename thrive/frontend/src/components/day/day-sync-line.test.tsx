@@ -306,8 +306,8 @@ describe('Day sync line CSS (AC5)', () => {
   };
 
   it('is a 44 px round icon button, and uses tokens only', () => {
-    expect(rule('.day-sync-btn')).toMatch(/width:\s*44px/);
-    expect(rule('.day-sync-btn')).toMatch(/height:\s*44px/);
+    expect(rule('.day-sync-btn')).toMatch(/(?:^|[\s;])width:\s*44px/);
+    expect(rule('.day-sync-btn')).toMatch(/(?:^|[\s;])height:\s*44px/);
     expect(rule('.day-sync-btn')).toMatch(/border-radius:\s*var\(--radius-full\)/);
     expect(rule('.day-sync-btn')).toMatch(/color:\s*var\(--color-text-secondary\)/);
     expect(css).not.toMatch(/#[0-9a-f]{3,6}\b/i);

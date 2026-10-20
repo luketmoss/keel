@@ -13,26 +13,28 @@ import type { ComponentType } from 'preact';
 import type { DayState } from '../../day/dates';
 import type { DayPanelProps } from './panel';
 import { GlanceRow } from './glance-row';
+import { SleepCard } from './sleep-card';
 import { TrainingPanel } from './training-panel';
 import { HealthPanel } from './health-panel';
 import { BodyPanel } from './body-panel';
 import { JournalPanel } from './journal-panel';
 
-export type SlotName = 'glance' | 'training' | 'health' | 'body' | 'note';
+export type SlotName = 'glance' | 'training' | 'sleep' | 'health' | 'body' | 'note';
 
 export const SLOTS: Record<SlotName, ComponentType<DayPanelProps>> = {
   glance: GlanceRow,
   training: TrainingPanel,
+  sleep: SleepCard,
   health: HealthPanel,
   body: BodyPanel,
   note: JournalPanel,
 };
 
 /** Top to bottom, one column. */
-export const SLOT_ORDER: readonly SlotName[] = ['glance', 'training', 'health', 'body', 'note'];
+export const SLOT_ORDER: readonly SlotName[] = ['glance', 'training', 'sleep', 'health', 'body', 'note'];
 
 /** Nothing is known about a future day's health or body. */
-const PAST_AND_TODAY_ONLY: ReadonlySet<SlotName> = new Set(['glance', 'health', 'body']);
+const PAST_AND_TODAY_ONLY: ReadonlySet<SlotName> = new Set(['glance', 'sleep', 'health', 'body']);
 
 /** The slots shown on a day in `state`, in order. */
 export function slotsFor(state: DayState): SlotName[] {

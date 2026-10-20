@@ -133,6 +133,32 @@ export const DEMO_EXERCISES: ExerciseWithRow[] = [
     created: '2025-01-01T00:00:00.000Z',
     sheetRow: 17,
   },
+  // #526: a warm-up that is the only place Back appears in its workout, and two
+  // exercises that carry no muscle tag at all, only a movement and equipment.
+  {
+    id: 'ex_demo016',
+    name: 'Band Pull-Apart',
+    tags: 'Warmup, Pull, Back',
+    notes: '',
+    created: '2025-01-01T00:00:00.000Z',
+    sheetRow: 18,
+  },
+  {
+    id: 'ex_demo017',
+    name: 'Kettlebell Swing KB',
+    tags: 'Pull, KB',
+    notes: '',
+    created: '2025-01-01T00:00:00.000Z',
+    sheetRow: 19,
+  },
+  {
+    id: 'ex_demo018',
+    name: 'Sled Push SL',
+    tags: 'Push, SL',
+    notes: '',
+    created: '2025-01-01T00:00:00.000Z',
+    sheetRow: 20,
+  },
 ];
 
 // Build demo labels from the unique tags in demo exercises
@@ -345,7 +371,7 @@ export const DEMO_TEMPLATES: Template[] = groupRows(DEMO_TEMPLATE_ROWS);
 
 const workoutDate = '2025-01-14';
 
-export const DEMO_WORKOUTS: WorkoutWithRow[] = [
+const DEMO_WORKOUTS_BASE: WorkoutWithRow[] = [
   {
     id: 'w_demo001',
     date: workoutDate,
@@ -685,6 +711,236 @@ export const DEMO_WORKOUTS: WorkoutWithRow[] = [
   },
 ];
 
+// ── Demo history (#526) ──────────────────────────────────────────────
+//
+// What the redesigned Activities screens draw: three months of completed
+// activities, every case of a card's figures (a tracked ride, a ride with a
+// distance and no track, a walk with only a duration), weight workouts that
+// carry each muscle tag between them and one that carries none, and plans
+// ahead of today. Every value is invented. Offsets are days from the anchor,
+// so the shift to "today" carries them with the rest.
+
+type DemoRowInput = Partial<WorkoutWithRow> &
+  Pick<WorkoutWithRow, 'id' | 'type' | 'name' | 'sheetRow'> & { offset: number };
+
+function demoRow(input: DemoRowInput): WorkoutWithRow {
+  const { offset, ...rest } = input;
+  const date = addDays(workoutDate, offset);
+  const time = rest.time ?? '07:30';
+  return {
+    date,
+    time,
+    template_id: '',
+    notes: '',
+    elapsed_seconds: '',
+    created: `${date}T${time || '07:30'}:00.000Z`,
+    copied_from: '',
+    status: '',
+    moving_seconds: '',
+    effort: '',
+    distance_m: '',
+    ascent_m: '',
+    descent_m: '',
+    avg_hr: '',
+    sub_type: '',
+    source: '',
+    source_activity_id: '',
+    raw_ref: '',
+    fit_ref: '',
+    fit_fetched_at: '',
+    synced_at: '',
+    started_at_utc: '',
+    calories: '',
+    estimated_seconds: '',
+    sport_type: '',
+    track_ref: '',
+    ...rest,
+  };
+}
+
+// The cases the epic's children each need to see.
+const DEMO_CASES: WorkoutWithRow[] = [
+  // A bike ride with a track (the second bundled one, demo-track.ts).
+  demoRow({
+    id: 'w_demo011',
+    offset: -8,
+    type: 'bike',
+    name: 'Canyon Road Ride',
+    time: '08:40',
+    elapsed_seconds: '3960',
+    moving_seconds: '3720',
+    effort: 'Medium',
+    distance_m: '12100',
+    ascent_m: '300',
+    descent_m: '42',
+    avg_hr: '148',
+    sub_type: 'outdoor',
+    source: 'coros',
+    source_activity_id: '100000000000000011',
+    raw_ref: 'demo/raw/100000000000000011.json',
+    synced_at: '2025-01-06T18:00:00.000Z',
+    started_at_utc: '2025-01-06T15:40:00.000Z',
+    track_ref: 'demo-track-ride',
+    sheetRow: 12,
+  }),
+  // A bike ride with a distance and no track: something to measure, nothing to draw.
+  demoRow({
+    id: 'w_demo012',
+    offset: -9,
+    type: 'bike',
+    name: 'Gravel Loop',
+    time: '16:15',
+    elapsed_seconds: '5400',
+    moving_seconds: '5100',
+    effort: 'Hard',
+    distance_m: '32000',
+    ascent_m: '410',
+    descent_m: '405',
+    avg_hr: '139',
+    sub_type: 'outdoor',
+    sheetRow: 13,
+  }),
+  // A stretch with neither a note nor an effort.
+  demoRow({
+    id: 'w_demo013',
+    offset: -10,
+    type: 'stretch',
+    name: 'Evening Stretch',
+    time: '21:00',
+    elapsed_seconds: '900',
+    sheetRow: 14,
+  }),
+  // A walk with a duration and nothing else.
+  demoRow({
+    id: 'w_demo014',
+    offset: -11,
+    type: 'walk',
+    name: 'Lunch Walk',
+    time: '12:20',
+    elapsed_seconds: '1500',
+    sheetRow: 15,
+  }),
+  // Back on a working set, and Arms, Shoulders and Core with it.
+  demoRow({
+    id: 'w_demo015',
+    offset: -13,
+    type: 'weight',
+    name: 'Upper Pull B',
+    time: '06:30',
+    template_id: 'tpl_demo002',
+    notes: 'Rows felt smooth',
+    elapsed_seconds: '3540',
+    effort: 'Medium',
+    sheetRow: 16,
+  }),
+  // Only a movement and equipment on every exercise: no muscle tag to draw.
+  demoRow({
+    id: 'w_demo016',
+    offset: -16,
+    type: 'weight',
+    name: 'Conditioning',
+    time: '06:45',
+    elapsed_seconds: '2400',
+    effort: 'Hard',
+    sheetRow: 17,
+  }),
+  // Back appears here only on a warm-up exercise.
+  demoRow({
+    id: 'w_demo017',
+    offset: -19,
+    type: 'weight',
+    name: 'Leg Day B',
+    time: '06:30',
+    elapsed_seconds: '3300',
+    effort: 'Medium',
+    sheetRow: 18,
+  }),
+  // Plans after today; today's plan and the overdue one are in the base fixture.
+  demoRow({
+    id: 'w_demo018',
+    offset: 1,
+    type: 'bike',
+    name: 'Tempo Ride',
+    time: '',
+    status: 'planned',
+    estimated_seconds: '3600',
+    sheetRow: 19,
+  }),
+  demoRow({
+    id: 'w_demo019',
+    offset: 2,
+    type: 'stretch',
+    name: 'Mobility',
+    time: '',
+    status: 'planned',
+    estimated_seconds: '1200',
+    sheetRow: 20,
+  }),
+  demoRow({
+    id: 'w_demo020',
+    offset: 4,
+    type: 'run',
+    name: 'Long Run',
+    time: '',
+    status: 'planned',
+    estimated_seconds: '4200',
+    sheetRow: 21,
+  }),
+];
+
+// Older months: one activity about every five days back past three months, so
+// the current month and the two before it each hold several however far into
+// the month "today" falls. Cycled through the types so the split has a mix.
+const HISTORY_TYPES: Workout['type'][] = ['run', 'bike', 'weight', 'walk', 'hike', 'stretch'];
+const HISTORY_NAMES: Record<string, string[]> = {
+  run: ['Tempo Run', 'Easy Run', 'Hill Repeats'],
+  bike: ['Evening Ride', 'River Path Ride', 'Climb Repeats'],
+  weight: ['Upper Push A', 'Lower Body A', 'Upper Pull A'],
+  walk: ['Morning Walk', 'Dog Walk', 'Errand Walk'],
+  hike: ['Ridge Hike', 'Creek Hike', 'Lookout Hike'],
+  stretch: ['Hip Opener', 'Full Body Stretch', 'Recovery Stretch'],
+};
+const HISTORY_EFFORTS = ['Easy', 'Medium', 'Hard', '', 'Medium', 'Easy'];
+const HISTORY_SECONDS: Record<string, number> = {
+  run: 2700,
+  bike: 4500,
+  hike: 6000,
+  walk: 2400,
+  weight: 3300,
+  stretch: 1200,
+};
+const HISTORY_METERS: Record<string, number> = { run: 7200, bike: 26000, hike: 8800, walk: 3600 };
+
+function demoHistory(): WorkoutWithRow[] {
+  const rows: WorkoutWithRow[] = [];
+  for (let i = 0; i < 17; i++) {
+    const type = HISTORY_TYPES[i % HISTORY_TYPES.length];
+    const k = Math.floor(i / HISTORY_TYPES.length);
+    const n = i + 1;
+    const cardio = type in HISTORY_METERS;
+    rows.push(
+      demoRow({
+        id: `w_demo${String(21 + i).padStart(3, '0')}`,
+        offset: -21 - 5 * i,
+        type,
+        name: HISTORY_NAMES[type][k % 3],
+        time: '07:15',
+        elapsed_seconds: String(HISTORY_SECONDS[type] + 120 * n),
+        effort: HISTORY_EFFORTS[i % HISTORY_EFFORTS.length] as Workout['effort'],
+        distance_m: cardio ? String(HISTORY_METERS[type] + 130 * n) : '',
+        ascent_m: type === 'hike' || type === 'bike' ? String(80 + 17 * n) : '',
+        avg_hr: cardio ? String(128 + (n % 7) * 3) : '',
+        sub_type: cardio ? 'outdoor' : '',
+        sheetRow: 22 + i,
+      }),
+    );
+  }
+  return rows;
+}
+
+// The base fixture, then the #526 additions. DEMO_WORKOUTS is the whole set.
+export const DEMO_WORKOUTS: WorkoutWithRow[] = [...DEMO_WORKOUTS_BASE, ...DEMO_CASES, ...demoHistory()];
+
 // ── Demo workout dates relative to today (#250) ──────────────────────
 //
 // `DEMO_WORKOUTS` keeps its literal January 2025 dates (demo-provenance.test.ts
@@ -782,7 +1038,7 @@ export function shiftDemoJournal(now: Date, fixture: JournalEntryWithRow[] = DEM
   }));
 }
 
-export const DEMO_SETS: SetWithRow[] = [
+const DEMO_SETS_BASE: SetWithRow[] = [
   // Warmup — Push Ups (no weight/reps tracked for warmup)
   {
     workout_id: 'w_demo001',
@@ -1514,6 +1770,66 @@ export const DEMO_SETS: SetWithRow[] = [
     sheetRow: 56,
   },
 ];
+
+// ── Demo sets for the history (#526) ─────────────────────────────────
+
+type DemoSetGroup = [exerciseId: string, name: string, section: string, sets: number, weight: string, reps: string];
+
+function demoSetsFor(workoutId: string, groups: DemoSetGroup[], firstRow: number): SetWithRow[] {
+  const out: SetWithRow[] = [];
+  let row = firstRow;
+  groups.forEach(([exercise_id, exercise_name, section, count, weight, reps], g) => {
+    for (let n = 1; n <= count; n++) {
+      out.push({
+        workout_id: workoutId,
+        exercise_id,
+        exercise_name,
+        section,
+        exercise_order: g + 1,
+        set_number: n,
+        planned_reps: '',
+        weight,
+        reps,
+        effort: section === 'warmup' ? '' : 'Medium',
+        sheetRow: row++,
+      });
+    }
+  });
+  return out;
+}
+
+const DEMO_SETS_HISTORY: SetWithRow[] = [
+  ...demoSetsFor(
+    'w_demo015',
+    [
+      ['ex_demo008', 'Row BB', 'primary', 3, '135', '8'],
+      ['ex_demo007', 'Pullups', 'SS1', 3, '', '8'],
+      ['ex_demo014', 'Face Pulls FT', 'SS1', 2, '40', '12'],
+      ['ex_demo011', 'Hammer Curls DB', 'SS2', 2, '30', '10'],
+      ['ex_demo013', 'Crunch FT', 'burnout', 2, '60', '15'],
+    ],
+    57,
+  ),
+  ...demoSetsFor(
+    'w_demo016',
+    [
+      ['ex_demo017', 'Kettlebell Swing KB', 'primary', 4, '53', '15'],
+      ['ex_demo018', 'Sled Push SL', 'SS1', 4, '90', '1'],
+    ],
+    69,
+  ),
+  ...demoSetsFor(
+    'w_demo017',
+    [
+      ['ex_demo016', 'Band Pull-Apart', 'warmup', 1, '', '20'],
+      ['ex_demo004', 'Squat BB', 'primary', 3, '205', '5'],
+      ['ex_demo006', 'RDL BB', 'SS1', 3, '165', '8'],
+    ],
+    77,
+  ),
+];
+
+export const DEMO_SETS: SetWithRow[] = [...DEMO_SETS_BASE, ...DEMO_SETS_HISTORY];
 
 // ── Demo SyncLog (#157) ──────────────────────────────────────────────
 //

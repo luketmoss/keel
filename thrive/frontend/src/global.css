@@ -103,6 +103,18 @@
   /* Drinks (#520): water a blue apart from the sleep stages, alcohol an amber apart from --color-warning. */
   --metric-water: #0b6fb8;
   --metric-alcohol: #b45309;
+  /* Activity type and effort colours (#526). Data colours: always beside the
+     type's word or icon, never text on their own. The values are the text
+     colours of the .badge-* and .workout-effort-* rules, which read them. */
+  --type-weight: #c53030;
+  --type-stretch: #2e7d32;
+  --type-bike: #1565c0;
+  --type-hike: #5d4037;
+  --type-run: #9d174d;
+  --type-walk: #10605a;
+  --effort-easy: #2e7d32;
+  --effort-medium: #a05d00;
+  --effort-hard: #c62828;
 }
 
 /* ===== Dark Theme ===== */
@@ -145,6 +157,15 @@
   --metric-calories: #ff9a5c;
   --metric-water: #5bb8f5;
   --metric-alcohol: #f5a524;
+  --type-weight: #fca5a5;
+  --type-stretch: #86efac;
+  --type-bike: #93c5fd;
+  --type-hike: #d7ccc8;
+  --type-run: #f5a8d3;
+  --type-walk: #7fded3;
+  --effort-easy: #86efac;
+  --effort-medium: #ffb74d;
+  --effort-hard: #ef9a9a;
 }
 
 /* ===== Base Styles ===== */
@@ -524,22 +545,22 @@ input, select, textarea {
 
 .badge-weight {
   background: #fde8e8;
-  color: #c53030;
+  color: var(--type-weight);
 }
 
 .badge-stretch {
   background: #e8f5e9;
-  color: #2e7d32;
+  color: var(--type-stretch);
 }
 
 .badge-bike {
   background: #e3f2fd;
-  color: #1565c0;
+  color: var(--type-bike);
 }
 
 .badge-hike {
   background: #efebe9;
-  color: #5d4037;
+  color: var(--type-hike);
 }
 
 /* #129. Run is rose and Walk is teal — chosen to sit clear of badge-bike's
@@ -551,42 +572,42 @@ input, select, textarea {
    properties. */
 .badge-run {
   background: #fce7f3;
-  color: #9d174d;
+  color: var(--type-run);
 }
 
 .badge-walk {
   background: #d7f2ee;
-  color: #10605a;
+  color: var(--type-walk);
 }
 
 [data-theme="dark"] .badge-weight {
   background: #3b1515;
-  color: #fca5a5;
+  color: var(--type-weight);
 }
 
 [data-theme="dark"] .badge-stretch {
   background: #14291a;
-  color: #86efac;
+  color: var(--type-stretch);
 }
 
 [data-theme="dark"] .badge-bike {
   background: #0d1f33;
-  color: #93c5fd;
+  color: var(--type-bike);
 }
 
 [data-theme="dark"] .badge-hike {
   background: #2c1f1a;
-  color: #d7ccc8;
+  color: var(--type-hike);
 }
 
 [data-theme="dark"] .badge-run {
   background: #2e1022;
-  color: #f5a8d3;
+  color: var(--type-run);
 }
 
 [data-theme="dark"] .badge-walk {
   background: #0c2a28;
-  color: #7fded3;
+  color: var(--type-walk);
 }
 
 .badge-planned {
@@ -3178,32 +3199,32 @@ input, select, textarea {
    the Medium toggle uses #c2410c (#182). Both pass. */
 .workout-effort-easy {
   background: #eef7ef;
-  color: #2e7d32;
+  color: var(--effort-easy);
 }
 
 .workout-effort-medium {
   background: #fdf5e6;
-  color: #a05d00;
+  color: var(--effort-medium);
 }
 
 .workout-effort-hard {
   background: #fbeeee;
-  color: #c62828;
+  color: var(--effort-hard);
 }
 
 [data-theme="dark"] .workout-effort-easy {
   background: #17241a;
-  color: #86efac;
+  color: var(--effort-easy);
 }
 
 [data-theme="dark"] .workout-effort-medium {
   background: #241c0e;
-  color: #ffb74d;
+  color: var(--effort-medium);
 }
 
 [data-theme="dark"] .workout-effort-hard {
   background: #241313;
-  color: #ef9a9a;
+  color: var(--effort-hard);
 }
 
 /* ===== Sync Provenance (#157) ===== */

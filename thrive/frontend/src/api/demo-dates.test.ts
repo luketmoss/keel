@@ -93,7 +93,10 @@ describe('AC3: relative order and status survive the shift', () => {
         );
       }
     }
-    expect(Math.max(...out.map((w) => Date.parse(w.date)))).toBe(Date.parse('2026-09-30'));
+    // Plans ahead of today (#526) are later than today; the latest done activity is today.
+    expect(Math.max(...out.filter((w) => w.status !== 'planned').map((w) => Date.parse(w.date)))).toBe(
+      Date.parse('2026-09-30'),
+    );
   });
 });
 

@@ -20,7 +20,10 @@ function badgeColors(cls: string, dark = false): { background: string; color: st
     if (!m) throw new Error(`.${cls} declares no ${prop}`);
     return m[1].trim();
   };
-  return { background: pick('background'), color: pick('color') };
+  // The text colour is a --type-* token (#526): resolve it from the theme block.
+  const color = pick('color');
+  const ref = color.match(/^var\((--[\w-]+)\)$/)?.[1];
+  return { background: pick('background'), color: ref ? token(ref, dark) : color };
 }
 
 function srgbToLinear(channel: number): number {

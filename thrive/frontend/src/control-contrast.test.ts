@@ -144,7 +144,9 @@ describe('AC2: unselected chips are full strength with the strong outline', () =
 describe.each(THEMES)('AC2: unselected type chips read at 4.5:1 on the card (%s)', (theme) => {
   const sel = theme === 'dark' ? (t: string) => `[data-theme="dark"] .badge-${t}` : (t: string) => `.badge-${t}`;
   it.each(['weight', 'stretch', 'bike', 'hike', 'run', 'walk'])('%s', (type) => {
-    const color = decl(rule(sel(type)).body, 'color')!;
+    // The badge reads its colour from a --type-* token (#526).
+    const declared = decl(rule(sel(type)).body, 'color')!;
+    const color = declared.startsWith('var(') ? token(theme, declared.slice(4, -1)) : declared;
     expect(contrast(color, token(theme, '--color-surface'))).toBeGreaterThanOrEqual(4.5);
   });
 });

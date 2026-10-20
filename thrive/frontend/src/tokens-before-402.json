@@ -109,7 +109,16 @@
     "--metric-steps": "#3b7a2a",
     "--metric-calories": "#b54708",
     "--metric-water": "#0b6fb8",
-    "--metric-alcohol": "#b45309"
+    "--metric-alcohol": "#b45309",
+    "--type-weight": "#c53030",
+    "--type-stretch": "#2e7d32",
+    "--type-bike": "#1565c0",
+    "--type-hike": "#5d4037",
+    "--type-run": "#9d174d",
+    "--type-walk": "#10605a",
+    "--effort-easy": "#2e7d32",
+    "--effort-medium": "#a05d00",
+    "--effort-hard": "#c62828"
   },
   "[data-theme=\"dark\"]": {
     "--color-bg": "#121212",
@@ -172,6 +181,15 @@
     "--metric-steps": "#8bd17c",
     "--metric-calories": "#ff9a5c",
     "--metric-water": "#5bb8f5",
-    "--metric-alcohol": "#f5a524"
+    "--metric-alcohol": "#f5a524",
+    "--type-weight": "#fca5a5",
+    "--type-stretch": "#86efac",
+    "--type-bike": "#93c5fd",
+    "--type-hike": "#d7ccc8",
+    "--type-run": "#f5a8d3",
+    "--type-walk": "#7fded3",
+    "--effort-easy": "#86efac",
+    "--effort-medium": "#ffb74d",
+    "--effort-hard": "#ef9a9a"
   }
 }

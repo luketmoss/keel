@@ -43,6 +43,8 @@ import { openDay } from './open-day';
 import { isRestoringFocus, ROUTE_FOCUS_ATTR } from '../../router/route-focus';
 import { useFocusHandoff } from '../focus-handoff';
 import { today as todaySignal, watchToday } from '../../day/today';
+import { currentRoute } from '../../router/router';
+import { validPlanDate } from '../workout/plan-date';
 
 /**
  * The day the charts have selected (#247), or null. Module-level, owned by this
@@ -62,9 +64,9 @@ function clearSelection() {
   announcement.value = '';
 }
 
-/** A control's state, read from and written to its remembered pref. */
-function usePref<T extends string>(pref: Pref<T>): [T, (v: T) => void] {
-  const [value, setValue] = useState<T>(() => readPref(pref));
+/** A control's state, read from and written to its remembered pref. `first` is what a link opened it on. */
+function usePref<T extends string>(pref: Pref<T>, first?: T): [T, (v: T) => void] {
+  const [value, setValue] = useState<T>(() => first ?? readPref(pref));
   return [
     value,
     (v: T) => {
@@ -120,7 +122,16 @@ export function TrendsScreen() {
   const [range, setRange] = usePref<RangeKey>(RANGE_PREF);
   const [average, setAverage] = usePref<AverageKey>(AVERAGE_PREF);
   const [view, setView] = usePref<ViewKey>(VIEW_PREF);
-  const [groupId, setGroupId] = usePref<string>(GROUP_PREF);
+  // Opened by a Day card (#504): `#/trends/<group>?date=<day>`. The group is the one shown and
+  // becomes the remembered one, as choosing its tab would; the day is selected once the charts exist.
+  const link = currentRoute.value.params;
+  const [groupId, setGroupId] = usePref<string>(GROUP_PREF, link.group);
+  const linkKey = link.group === undefined ? null : `${link.group}|${link.date ?? ''}`;
+  const appliedLink = useRef<string | null>(null);
+  useEffect(() => {
+    if (link.group !== undefined) setGroupId(link.group);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [link.group]);
   const [custom, setCustomIds] = useState<string[]>(readCustom);
   const [picking, setPicking] = useState(false);
   const charts = useRef<HTMLDivElement>(null);
@@ -218,6 +229,19 @@ export function TrendsScreen() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, group, range, avgDays, today, rowsOf('dailyHealth'), rowsOf('bodyMeasurements'), rowsOf('dailySummary')]);
+
+  // The day the link named (#504), selected once per arrival and only when the charts plot it: a
+  // date outside the range, in the future, or today for a group with a metric that does not plot
+  // today (Steps) selects nothing. Later controls clear it as they always do and it does not return.
+  useEffect(() => {
+    if (!built || linkKey === null || appliedLink.current === linkKey || group.id !== link.group) return;
+    appliedLink.current = linkKey;
+    const day = validPlanDate(link.date);
+    if (day === undefined || !(built.series[0]?.dates ?? []).includes(day)) return;
+    if (day === today && group.metrics.some((m) => m.excludesToday)) return;
+    selectedDay.value = day;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [built, linkKey]);
 
   let content;
   if (states.includes('error')) {

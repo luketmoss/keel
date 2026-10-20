@@ -27,11 +27,13 @@ export interface PanelProps {
   sub?: ComponentChildren;
   /** Optional control at the right of the title row. */
   action?: ComponentChildren;
+  /** The card is the target of a link placed in `children` (#504): it is the link's positioning box. */
+  linked?: boolean;
   children?: ComponentChildren;
 }
 
 /** One card on the Day screen: a `section` labelled by its `h2` title. */
-export function Panel({ title, icon, meta, sub, action, children }: PanelProps) {
+export function Panel({ title, icon, meta, sub, action, linked, children }: PanelProps) {
   const id = useId();
   const heading = (
     <h2 class="day-panel-title" id={id} tabIndex={-1}>
@@ -44,7 +46,7 @@ export function Panel({ title, icon, meta, sub, action, children }: PanelProps) 
     </h2>
   );
   return (
-    <section class="day-panel" aria-labelledby={id}>
+    <section class={linked ? 'day-panel day-panel-linked' : 'day-panel'} aria-labelledby={id}>
       <div class="day-panel-head">
         <div class="day-panel-heading">
           {meta != null ? (

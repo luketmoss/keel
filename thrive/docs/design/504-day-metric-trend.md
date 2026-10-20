@@ -117,19 +117,27 @@ view, group), as #503 specified; this issue adds no way to clear it.
 
 ## Interaction states (per #404)
 
-Each target is a **Rows and cards** control: an `<a>` with the card's title row
-as its link text (so the card keeps its `h2`) whose `::after` is stretched over
-the card, the card being `position: relative`. Rest as today; the hover overlay
-under `@media (hover: hover)`; pressed overlay; the global focus ring, inset
-(`-2px`) because the card clips an outside ring; no selected state; no disabled
-state. The Body tile has two links, one stretched over each half; the Steps
-stat's link wraps the stat. The class (`.day-card-link`) is added to the Rows
-and cards table in `404-interaction-states.md` in the same change, which
-`interaction-states.test.ts` enforces.
+Each target is a **Rows and cards** control: an `<a class="day-card-link">`
+stretched over its card (`position: absolute; inset: 0`, the card being
+`position: relative`), empty to the eye with its words `sr-only`. Rest as today;
+the hover overlay under `@media (hover: hover)` and the pressed overlay lie over
+the whole card, because the link is the card's size; the global focus ring,
+inset (`-2px`) because the card clips an outside ring, so it rings the card. No
+selected state; no disabled state. The Body tile has two links, one over each
+half; the Steps stat's link covers the stat. The class (`.day-card-link`) is in
+the Rows and cards table in `404-interaction-states.md`, which
+`interaction-states.test.ts` enforces, and its ring is in the audit table in
+`focus-contrast.test.ts`.
 
 Why a stretched link and not a link around the whole card: the card's `h2` and
 `section` labelling stay as they are (#485), and a link containing the Sleep
-card's legend and bar would read all of it as the link's name.
+card's legend and bar would read all of it as the link's name. The link is the
+card's last child so it paints above it, and carries a `data-focus-key`
+(`day-link-<metric>`) so Back returns focus to the card that was tapped.
+
+The `›` is a `span` in the card's title row (the head's action slot). The Body
+tile has one title for two targets, so each half carries its own `›` at the right
+of its figure.
 
 ## Accessible names
 

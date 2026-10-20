@@ -84,6 +84,7 @@ const FAMILIES = {
     'settings-btn',
     'exercise-list-item-header',
     'settings-row-link',
+    'day-card-link',
   ],
   Navigation: ['bottom-nav-tab'],
   Fields: ['form-input', 'form-select', 'form-textarea'],

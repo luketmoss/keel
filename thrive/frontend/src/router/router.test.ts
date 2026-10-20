@@ -580,3 +580,60 @@ describe('history depth (#264)', () => {
     });
   });
 });
+
+// #504: Trends on a group, with a day, from a Day card.
+describe('trends group links (#504)', () => {
+  const fresh = (hash: string) => freshRouter(hash);
+
+  it('parses #/trends/<group>?date= for every linkable group, URL unchanged', async () => {
+    for (const group of ['recovery', 'sleep', 'activity', 'body', 'blood_pressure']) {
+      const r = await fresh(`#/trends/${group}?date=2026-09-20`);
+      expect(r.currentRoute.value.name).toBe('trends');
+      expect(r.currentRoute.value.params).toEqual({ group, date: '2026-09-20' });
+      expect(window.location.hash).toBe(`#/trends/${group}?date=2026-09-20`);
+    }
+  });
+
+  it('leaves the date out of the params when the URL has none, and passes a bad one through for Trends', async () => {
+    let r = await fresh('#/trends/recovery');
+    expect(r.currentRoute.value.params).toEqual({ group: 'recovery' });
+    r = await fresh('#/trends/body?date=nonsense');
+    expect(r.currentRoute.value.params).toEqual({ group: 'body', date: 'nonsense' });
+    expect(window.location.hash).toBe('#/trends/body?date=nonsense');
+  });
+
+  it('plain #/trends has no group', async () => {
+    const r = await fresh('#/trends');
+    expect(r.currentRoute.value).toEqual({ name: 'trends', params: {}, hash: '/trends' });
+  });
+
+  it.each(['#/trends/nonsense?date=2026-09-20', '#/trends/custom?date=2026-09-20', '#/trends/', '#/trends/recovery/x'])(
+    'replaces %s with #/trends',
+    async (hash) => {
+      const r = await fresh(hash);
+      expect(r.currentRoute.value).toEqual({ name: 'trends', params: {}, hash: '/trends' });
+      expect(window.location.hash).toBe('#/trends');
+    },
+  );
+
+  it('replaces a bad group reached by a hashchange without adding an entry', async () => {
+    const r = await fresh('#/activities');
+    await nextHashchange(() => r.navigate('/activities?fresh'));
+    const before = window.history.length;
+    window.location.hash = '/trends/custom';
+    window.dispatchEvent(new Event('hashchange'));
+    expect(r.currentRoute.value.params).toEqual({});
+    expect(window.location.hash).toBe('#/trends');
+    expect(window.history.length).toBe(before + 1); // the push itself, and nothing more
+  });
+
+  it('Back from a group link lands on the Day it left', async () => {
+    const r = await fresh('#/day/2026-09-20');
+    await nextHashchange(() => r.navigate('/trends/recovery?date=2026-09-20'));
+    expect(r.currentRoute.value.name).toBe('trends');
+    expect(r.canGoBack()).toBe(true);
+    await nextHashchange(() => r.goBack('/'));
+    expect(window.location.hash).toBe('#/day/2026-09-20');
+    expect(r.currentRoute.value.name).toBe('day');
+  });
+});

@@ -14,6 +14,7 @@ import { formatWeight } from '../../api/units';
 import { clock12 } from '../../day/format';
 import type { ComponentChildren } from 'preact';
 import { Panel, PanelStatus, type DayPanelProps } from './panel';
+import { CardChevron, CardLink, cardLinkName } from './card-link';
 
 export interface BodyRowView {
   key: 'weight' | 'fat' | 'bp';
@@ -131,7 +132,7 @@ function BodyTile({ children }: { children: ComponentChildren }) {
   );
 }
 
-function BodyReadings({ rows, none }: { rows: BodyRowView[]; none: string }) {
+function BodyReadings({ rows, none, date }: { rows: BodyRowView[]; none: string; date: string }) {
   const by = (k: BodyRowView['key']) => rows.find((r) => r.key === k)!;
   const weight = by('weight');
   const fat = by('fat');
@@ -142,21 +143,39 @@ function BodyReadings({ rows, none }: { rows: BodyRowView[]; none: string }) {
   return (
     <>
       <div class="body-weight" data-metric="weight">
-        <Figure value={weight.value} className="tile-value" />
+        <div class="body-figure-row">
+          <Figure value={weight.value} className="tile-value" />
+          <CardChevron />
+        </div>
         <p class="tile-caption">{weighIn}</p>
+        <CardLink
+          group="body"
+          date={date}
+          name={cardLinkName('Weight', weight.value || null)}
+          focusKey="day-link-weight"
+        />
       </div>
       <div class="body-bp" data-metric="bp">
-        {bp.value && bp.spoken ? (
-          <>
-            <span class="sr-only">{bp.spoken}</span>
-            <span aria-hidden="true">
-              <Figure value={bp.value} className="body-bp-value" />
-            </span>
-          </>
-        ) : (
-          <Figure value="" className="body-bp-value" />
-        )}
+        <div class="body-figure-row">
+          {bp.value && bp.spoken ? (
+            <>
+              <span class="sr-only">{bp.spoken}</span>
+              <span aria-hidden="true">
+                <Figure value={bp.value} className="body-bp-value" />
+              </span>
+            </>
+          ) : (
+            <Figure value="" className="body-bp-value" />
+          )}
+          <CardChevron />
+        </div>
         <p class="tile-caption">{bp.caption}</p>
+        <CardLink
+          group="blood_pressure"
+          date={date}
+          name={cardLinkName('Blood pressure', bp.value || null)}
+          focusKey="day-link-bp"
+        />
       </div>
     </>
   );
@@ -192,7 +211,7 @@ export function BodyPanel({ date, state }: DayPanelProps) {
         ];
   return (
     <BodyTile>
-      <BodyReadings rows={rows} none={none} />
+      <BodyReadings rows={rows} none={none} date={date} />
     </BodyTile>
   );
 }

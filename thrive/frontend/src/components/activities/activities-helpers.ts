@@ -2,6 +2,7 @@ import type { WorkoutWithRow, SetWithRow, ExerciseWithRow, Effort, WorkoutType }
 import { metersToMiles, metersToFeet, parse } from '../../api/units';
 import { secondsToMinutes } from '../../api/duration';
 import { provenanceSpeech } from '../../api/provenance';
+import { spokenGroups } from './muscle-regions';
 
 // ── Equipment / non-muscle tags to exclude from card pills ───────────
 export const EQUIPMENT_TAGS = new Set(['BB', 'DB', 'FT', 'Warmup']);
@@ -490,7 +491,7 @@ export function spokenDay(dateStr: string): string {
  * part, then provenance (#157). Parts with no value are left out. The visible
  * text and this label come from the same functions, so they cannot drift.
  */
-export function activityCardAriaLabel(w: WorkoutWithRow): string {
+export function activityCardAriaLabel(w: WorkoutWithRow, worked: readonly string[] = []): string {
   return [
     w.name || w.type,
     w.type,
@@ -498,6 +499,7 @@ export function activityCardAriaLabel(w: WorkoutWithRow): string {
     cardFigure(w)?.spoken ?? '',
     ...cardStats(w).map((p) => p.spoken),
     provenanceSpeech(w),
+    worked.length > 0 ? `worked ${spokenGroups(worked)}` : '',
   ]
     .filter(Boolean)
     .join(', ');

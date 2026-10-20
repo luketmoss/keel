@@ -2487,6 +2487,25 @@ input, select, textarea {
   height: var(--icon-lg);
 }
 
+/* The muscle and stretch figures (#529): filled blocks, no tile behind them. */
+.activity-figure {
+  display: block;
+  width: 92px;
+  height: 80px;
+}
+
+.activity-figure .fig-on {
+  fill: var(--type-weight);
+}
+
+.activity-figure .fig-off {
+  fill: var(--color-border);
+}
+
+.activity-figure .fig-stretch {
+  fill: var(--type-stretch);
+}
+
 .week-group {
   margin-top: var(--space-lg);
 }
@@ -5789,6 +5808,20 @@ a.training-card {
    keep working; the selected cue is a fill, never an outline (AC5). Normal
    rendering is untouched: everything is inside this one block. */
 @media (forced-colors: active) {
+  /* #529: the figures keep their lit/unlit difference in system colours. */
+  .activity-figure {
+    forced-color-adjust: none;
+  }
+
+  .activity-figure .fig-on,
+  .activity-figure .fig-stretch {
+    fill: CanvasText;
+  }
+
+  .activity-figure .fig-off {
+    fill: GrayText;
+  }
+
   /* #491: the tiles' line, range bar and stress bars in system colours. */
   .tile-line-run,
   .tile-line-dot {

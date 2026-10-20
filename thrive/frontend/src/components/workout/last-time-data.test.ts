@@ -39,7 +39,18 @@ function makeWorkout(overrides: Partial<WorkoutWithRow> = {}): WorkoutWithRow {
     ascent_m: '',
     descent_m: '',
     avg_hr: '',
-    sub_type: '', source: '', source_activity_id: '', raw_ref: '', fit_ref: '', fit_fetched_at: '', synced_at: '', started_at_utc: '', calories: '', estimated_seconds: '', sport_type: '', track_ref: '',
+    sub_type: '',
+    source: '',
+    source_activity_id: '',
+    raw_ref: '',
+    fit_ref: '',
+    fit_fetched_at: '',
+    synced_at: '',
+    started_at_utc: '',
+    calories: '',
+    estimated_seconds: '',
+    sport_type: '',
+    track_ref: '',
     sheetRow: 2,
     ...overrides,
   };
@@ -89,12 +100,8 @@ describe('getLastTimeDataFrom', () => {
 
   // AC3: no previous data
   it('returns null when no previous sets exist for the exercise', () => {
-    const allSets: SetWithRow[] = [
-      makeSet({ workout_id: 'w_current', exercise_id: 'ex1', sheetRow: 2 }),
-    ];
-    const allWorkouts: WorkoutWithRow[] = [
-      makeWorkout({ id: 'w_current', date: '2026-03-15' }),
-    ];
+    const allSets: SetWithRow[] = [makeSet({ workout_id: 'w_current', exercise_id: 'ex1', sheetRow: 2 })];
+    const allWorkouts: WorkoutWithRow[] = [makeWorkout({ id: 'w_current', date: '2026-03-15' })];
 
     const result = getLastTimeDataFrom('ex1', 'w_current', allSets, allWorkouts);
     expect(result).toBeNull();
@@ -140,13 +147,92 @@ describe('getLastTimeDataFrom', () => {
   // AC2 + AC5: works with demo data shape
   it('works with demo data shape', () => {
     const allSets: SetWithRow[] = [
-      { workout_id: 'w_demo001', exercise_id: 'ex_demo001', exercise_name: 'Bench Press BB', section: 'primary', exercise_order: 3, set_number: 1, planned_reps: '4-6', weight: '185', reps: '6', effort: 'Medium', sheetRow: 4 },
-      { workout_id: 'w_demo001', exercise_id: 'ex_demo001', exercise_name: 'Bench Press BB', section: 'primary', exercise_order: 3, set_number: 2, planned_reps: '4-6', weight: '185', reps: '5', effort: 'Medium', sheetRow: 5 },
-      { workout_id: 'w_demo001', exercise_id: 'ex_demo001', exercise_name: 'Bench Press BB', section: 'primary', exercise_order: 3, set_number: 3, planned_reps: '4-6', weight: '185', reps: '5', effort: 'Hard', sheetRow: 6 },
-      { workout_id: 'w_demo001', exercise_id: 'ex_demo001', exercise_name: 'Bench Press BB', section: 'primary', exercise_order: 3, set_number: 4, planned_reps: '4-6', weight: '185', reps: '4', effort: 'Hard', sheetRow: 7 },
+      {
+        workout_id: 'w_demo001',
+        exercise_id: 'ex_demo001',
+        exercise_name: 'Bench Press BB',
+        section: 'primary',
+        exercise_order: 3,
+        set_number: 1,
+        planned_reps: '4-6',
+        weight: '185',
+        reps: '6',
+        effort: 'Medium',
+        sheetRow: 4,
+      },
+      {
+        workout_id: 'w_demo001',
+        exercise_id: 'ex_demo001',
+        exercise_name: 'Bench Press BB',
+        section: 'primary',
+        exercise_order: 3,
+        set_number: 2,
+        planned_reps: '4-6',
+        weight: '185',
+        reps: '5',
+        effort: 'Medium',
+        sheetRow: 5,
+      },
+      {
+        workout_id: 'w_demo001',
+        exercise_id: 'ex_demo001',
+        exercise_name: 'Bench Press BB',
+        section: 'primary',
+        exercise_order: 3,
+        set_number: 3,
+        planned_reps: '4-6',
+        weight: '185',
+        reps: '5',
+        effort: 'Hard',
+        sheetRow: 6,
+      },
+      {
+        workout_id: 'w_demo001',
+        exercise_id: 'ex_demo001',
+        exercise_name: 'Bench Press BB',
+        section: 'primary',
+        exercise_order: 3,
+        set_number: 4,
+        planned_reps: '4-6',
+        weight: '185',
+        reps: '4',
+        effort: 'Hard',
+        sheetRow: 7,
+      },
     ];
     const allWorkouts: WorkoutWithRow[] = [
-      { id: 'w_demo001', date: '2025-01-14', time: '06:30', type: 'weight', name: 'Upper Push A', template_id: 'tpl_demo001', notes: '', elapsed_seconds: '3720', created: '2025-01-14T06:30:00.000Z', copied_from: '', status: '', moving_seconds: '', effort: '', distance_m: '', ascent_m: '', descent_m: '', avg_hr: '', sub_type: '', source: '', source_activity_id: '', raw_ref: '', fit_ref: '', fit_fetched_at: '', synced_at: '', started_at_utc: '', calories: '', estimated_seconds: '', sport_type: '', track_ref: '', sheetRow: 2 },
+      {
+        id: 'w_demo001',
+        date: '2025-01-14',
+        time: '06:30',
+        type: 'weight',
+        name: 'Upper Push A',
+        template_id: 'tpl_demo001',
+        notes: '',
+        elapsed_seconds: '3720',
+        created: '2025-01-14T06:30:00.000Z',
+        copied_from: '',
+        status: '',
+        moving_seconds: '',
+        effort: '',
+        distance_m: '',
+        ascent_m: '',
+        descent_m: '',
+        avg_hr: '',
+        sub_type: '',
+        source: '',
+        source_activity_id: '',
+        raw_ref: '',
+        fit_ref: '',
+        fit_fetched_at: '',
+        synced_at: '',
+        started_at_utc: '',
+        calories: '',
+        estimated_seconds: '',
+        sport_type: '',
+        track_ref: '',
+        sheetRow: 2,
+      },
     ];
 
     const result = getLastTimeDataFrom('ex_demo001', 'w_new', allSets, allWorkouts);

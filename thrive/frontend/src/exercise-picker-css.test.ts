@@ -48,7 +48,9 @@ describe('#319 AC5: picker buttons keep their look and size', () => {
   });
 
   it('keeps the row divider and the create row top border', () => {
-    expect(rule('.exercise-list > .exercise-list-item')).toMatch(/border-bottom:\s*1px solid var\(--color-border-light\)/);
+    expect(rule('.exercise-list > .exercise-list-item')).toMatch(
+      /border-bottom:\s*1px solid var\(--color-border-light\)/,
+    );
     expect(rule('.create-new-row')).toMatch(/border-top:\s*1px solid var\(--color-border-light\)/);
   });
 

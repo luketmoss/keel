@@ -231,9 +231,19 @@ describe('#371: row key and guarded end buttons', () => {
   it('an aria-disabled end button does not call its handler', () => {
     let up = 0;
     let down = 0;
-    const { container } = renderExerciseRow({}, {
-      isFirst: true, isLast: true, onMoveUp: () => { up++; }, onMoveDown: () => { down++; },
-    });
+    const { container } = renderExerciseRow(
+      {},
+      {
+        isFirst: true,
+        isLast: true,
+        onMoveUp: () => {
+          up++;
+        },
+        onMoveDown: () => {
+          down++;
+        },
+      },
+    );
     (container.querySelector('[data-move="up"]') as HTMLButtonElement).click();
     (container.querySelector('[data-move="down"]') as HTMLButtonElement).click();
     expect(up).toBe(0);

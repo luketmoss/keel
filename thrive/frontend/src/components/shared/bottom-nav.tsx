@@ -43,7 +43,7 @@ export function BottomNav() {
 
   return (
     <nav class="bottom-nav">
-      {TABS.map(tab => {
+      {TABS.map((tab) => {
         const isActive = tab.name === activeTab;
         return (
           <button
@@ -53,7 +53,9 @@ export function BottomNav() {
             aria-label={tab.label}
             aria-current={isActive ? 'page' : undefined}
           >
-            <span class="bottom-nav-icon"><tab.Icon /></span>
+            <span class="bottom-nav-icon">
+              <tab.Icon />
+            </span>
             <span class="bottom-nav-label">{tab.label}</span>
           </button>
         );

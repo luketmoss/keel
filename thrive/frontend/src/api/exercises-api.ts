@@ -30,17 +30,11 @@ export async function createExercise(
 
   if (isDemo()) return exercise;
 
-  await withReauth(token, (t) =>
-    sheetsAppend('Exercises!A:E', [[id, data.name, data.tags, data.notes, created]], t),
-  );
+  await withReauth(token, (t) => sheetsAppend('Exercises!A:E', [[id, data.name, data.tags, data.notes, created]], t));
   return exercise;
 }
 
-export async function updateExercise(
-  sheetRow: number,
-  exercise: Exercise,
-  token: string,
-): Promise<void> {
+export async function updateExercise(sheetRow: number, exercise: Exercise, token: string): Promise<void> {
   if (isDemo()) return;
 
   await withReauth(token, (t) =>

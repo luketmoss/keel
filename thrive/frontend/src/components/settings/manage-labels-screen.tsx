@@ -76,15 +76,12 @@ export function ManageLabelsScreen() {
   return (
     <div class="screen manage-labels-screen">
       <header class="screen-header" style="display: flex; align-items: center; gap: var(--space-sm);">
-        <button
-          type="button"
-          class="template-editor-back"
-          aria-label="Back"
-          onClick={() => navigate('/settings')}
-        >
+        <button type="button" class="template-editor-back" aria-label="Back" onClick={() => navigate('/settings')}>
           &larr;
         </button>
-        <h1 ref={heading} tabIndex={-1}>Manage Labels</h1>
+        <h1 ref={heading} tabIndex={-1}>
+          Manage Labels
+        </h1>
       </header>
 
       <div class="screen-body">
@@ -104,7 +101,7 @@ export function ManageLabelsScreen() {
         ) : (
           <>
             <div class="manage-labels-list">
-              {allLabels.map(label => {
+              {allLabels.map((label) => {
                 const color = getLabelColor(label.color_key);
                 const usage = labelUsageCount(label.name);
                 const isEditing = editingId === label.id;
@@ -123,9 +120,12 @@ export function ManageLabelsScreen() {
                           class="form-input manage-label-edit-input"
                           type="text"
                           value={editName}
-                          onInput={e => setEditName((e.target as HTMLInputElement).value)}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') { e.preventDefault(); saveEdit(label); }
+                          onInput={(e) => setEditName((e.target as HTMLInputElement).value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              saveEdit(label);
+                            }
                             if (e.key === 'Escape') setEditingId(null);
                           }}
                           onBlur={() => saveEdit(label)}
@@ -151,10 +151,7 @@ export function ManageLabelsScreen() {
                         &times;
                       </button>
                     </div>
-                    <ColorSwatchPicker
-                      selected={label.color_key}
-                      onSelect={key => handleColorChange(label, key)}
-                    />
+                    <ColorSwatchPicker selected={label.color_key} onSelect={(key) => handleColorChange(label, key)} />
                   </div>
                 );
               })}
@@ -166,11 +163,14 @@ export function ManageLabelsScreen() {
                   class="form-input"
                   type="text"
                   value={newName}
-                  onInput={e => setNewName((e.target as HTMLInputElement).value)}
+                  onInput={(e) => setNewName((e.target as HTMLInputElement).value)}
                   placeholder="New label name"
                   autoFocus
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') { e.preventDefault(); handleCreate(); }
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleCreate();
+                    }
                     if (e.key === 'Escape') setCreating(false);
                   }}
                 />
@@ -190,12 +190,7 @@ export function ManageLabelsScreen() {
                 </div>
               </div>
             ) : (
-              <button
-                type="button"
-                class="btn btn-primary"
-                style="width: 100%;"
-                onClick={() => setCreating(true)}
-              >
+              <button type="button" class="btn btn-primary" style="width: 100%;" onClick={() => setCreating(true)}>
                 + New Label
               </button>
             )}

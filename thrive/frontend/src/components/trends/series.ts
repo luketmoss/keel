@@ -26,13 +26,21 @@ export type RangeKey = (typeof RANGES)[number];
 
 /** Days in each fixed range, ending today inclusive. All has none. */
 export const RANGE_DAYS: Record<Exclude<RangeKey, 'All'>, number> = {
-  '1W': 7, '1M': 30, '3M': 91, '6M': 182, '1Y': 365,
+  '1W': 7,
+  '1M': 30,
+  '3M': 91,
+  '6M': 182,
+  '1Y': 365,
 };
 
 /** "Resting HR, last 3 months" — the chart's accessible name. */
 export const RANGE_PHRASE: Record<RangeKey, string> = {
-  '1W': 'last 7 days', '1M': 'last 30 days', '3M': 'last 3 months',
-  '6M': 'last 6 months', '1Y': 'last year', All: 'all time',
+  '1W': 'last 7 days',
+  '1M': 'last 30 days',
+  '3M': 'last 3 months',
+  '6M': 'last 6 months',
+  '1Y': 'last year',
+  All: 'all time',
 };
 
 export const AVERAGES = ['Off', '7d', '14d', '30d'] as const;
@@ -231,7 +239,10 @@ export function windowText(from: string, to: string, today: string): string {
   return `(${fmt(from)} – ${fmt(to)})`;
 }
 
-export interface DateTick { date: string; label: string }
+export interface DateTick {
+  date: string;
+  label: string;
+}
 
 /** Rough px width of an axis label: 11px text at ~6.5px a character, plus a gap. */
 const labelWidth = (label: string) => label.length * 6.5 + 10;

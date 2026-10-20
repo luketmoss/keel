@@ -52,9 +52,7 @@ export function SectionPicker({ value, onChange, warnOnWarmup }: Props) {
       </div>
       {showWarmupConfirm && (
         <div class="warmup-confirm-row">
-          <p class="warmup-confirm-text">
-            Warmup exercises are list-only — set data will be removed.
-          </p>
+          <p class="warmup-confirm-text">Warmup exercises are list-only — set data will be removed.</p>
           <div class="warmup-confirm-actions">
             <button type="button" class="btn btn-danger" onClick={handleConfirmWarmup}>
               Switch to Warmup

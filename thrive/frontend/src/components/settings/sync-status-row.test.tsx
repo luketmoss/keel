@@ -22,11 +22,21 @@ const HOUR = 3600_000;
 function run(hoursAgo: number, status = 'ok'): SyncLogEntryWithRow {
   const started = new Date(NOW.getTime() - hoursAgo * HOUR).toISOString();
   return {
-    run_id: `r${hoursAgo}`, started_at: started, finished_at: started, window_start: '2026-09-14',
-    window_end: '2026-09-25', n_seen: '3', n_new: '0', n_updated: '0', n_enriched: '0',
-    n_fit_fetched: '0', n_errors: status === 'ok' ? '0' : '1', status,
+    run_id: `r${hoursAgo}`,
+    started_at: started,
+    finished_at: started,
+    window_start: '2026-09-14',
+    window_end: '2026-09-25',
+    n_seen: '3',
+    n_new: '0',
+    n_updated: '0',
+    n_enriched: '0',
+    n_fit_fetched: '0',
+    n_errors: status === 'ok' ? '0' : '1',
+    status,
     error_detail: status === 'ok' ? '' : 'CorosGrantDeadError: SECRET-DETAIL',
-    notes: 'Unmatched strength session NOTE-TEXT', sheetRow: 2,
+    notes: 'Unmatched strength session NOTE-TEXT',
+    sheetRow: 2,
   };
 }
 
@@ -103,7 +113,9 @@ describe('AC1: each row reads its own log and names itself', () => {
     syncLog.value = { state: 'loaded', entries: [run(40 / 60)] };
     render(h(CorosSyncStatusRow, { token: 'tok' }));
     expect(statusRegions()[0].textContent).toMatch(/^40 min ago/);
-    act(() => { vi.advanceTimersByTime(2 * 60_000); });
+    act(() => {
+      vi.advanceTimersByTime(2 * 60_000);
+    });
     expect(statusRegions()[0].textContent).toMatch(/^42 min ago/);
   });
 });

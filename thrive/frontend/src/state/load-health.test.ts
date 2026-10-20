@@ -43,7 +43,11 @@ describe('loadHealth', () => {
 
   it('reads in parallel, showing loading on each until it settles', async () => {
     let resolveHealth!: (v: unknown) => void;
-    fetchDailyHealth.mockReturnValue(new Promise((r) => { resolveHealth = r; }));
+    fetchDailyHealth.mockReturnValue(
+      new Promise((r) => {
+        resolveHealth = r;
+      }),
+    );
     fetchBodyMeasurements.mockResolvedValue([]);
     fetchDailySummary.mockResolvedValue([]);
     const done = loadHealth('tok');
@@ -68,7 +72,11 @@ describe('loadHealth', () => {
   it('keeps loaded rows visible while it re-reads', async () => {
     dailyHealth.value = { state: 'loaded', rows: [h('2026-09-19')] };
     let resolveHealth!: (v: unknown) => void;
-    fetchDailyHealth.mockReturnValue(new Promise((r) => { resolveHealth = r; }));
+    fetchDailyHealth.mockReturnValue(
+      new Promise((r) => {
+        resolveHealth = r;
+      }),
+    );
     fetchBodyMeasurements.mockResolvedValue([]);
     fetchDailySummary.mockResolvedValue([]);
     const done = loadHealth('tok');
@@ -92,7 +100,11 @@ describe('loadHealth', () => {
 describe('loadHealth in flight', () => {
   it('joins a load already running rather than starting another, and runs again once it settles', async () => {
     let resolveHealth!: (v: unknown) => void;
-    fetchDailyHealth.mockReturnValue(new Promise((r) => { resolveHealth = r; }));
+    fetchDailyHealth.mockReturnValue(
+      new Promise((r) => {
+        resolveHealth = r;
+      }),
+    );
     fetchBodyMeasurements.mockResolvedValue([]);
     fetchDailySummary.mockResolvedValue([]);
     const first = loadHealth('tok');

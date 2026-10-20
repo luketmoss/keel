@@ -27,18 +27,24 @@ export function provenanceOf(w: ProvenanceFields): Provenance {
  */
 export function sourceName(source: string): string {
   switch (source) {
-    case 'coros': return 'COROS';
-    case 'garmin_import': return 'Garmin';
-    default: return '';
+    case 'coros':
+      return 'COROS';
+    case 'garmin_import':
+      return 'Garmin';
+    default:
+      return '';
   }
 }
 
 /** The card's quiet mark: "COROS", "+ COROS", or null for a manual row. */
 export function provenanceMark(w: ProvenanceFields): string | null {
   switch (provenanceOf(w)) {
-    case 'synced': return sourceName(w.source) || 'Synced';
-    case 'enriched': return '+ COROS';
-    default: return null;
+    case 'synced':
+      return sourceName(w.source) || 'Synced';
+    case 'enriched':
+      return '+ COROS';
+    default:
+      return null;
   }
 }
 
@@ -49,8 +55,10 @@ export function provenanceSpeech(w: ProvenanceFields): string {
       const name = sourceName(w.source);
       return name ? `synced from ${name}` : 'synced';
     }
-    case 'enriched': return 'logged by hand, enriched from COROS';
-    default: return '';
+    case 'enriched':
+      return 'logged by hand, enriched from COROS';
+    default:
+      return '';
   }
 }
 
@@ -84,9 +92,7 @@ export function provenanceDetail(w: ProvenanceFields & Pick<Workout, 'synced_at'
       return stamp ? `${lead} · last synced ${stamp}` : lead;
     }
     case 'enriched':
-      return stamp
-        ? `Logged by hand · enriched from COROS ${stamp}`
-        : 'Logged by hand · enriched from COROS';
+      return stamp ? `Logged by hand · enriched from COROS ${stamp}` : 'Logged by hand · enriched from COROS';
     default:
       return null;
   }

@@ -20,11 +20,7 @@ export function TypeSelector({ onSelect }: Props) {
   return (
     <div class="screen type-selector-screen">
       <div class="template-editor-header">
-        <button
-          class="template-editor-back"
-          onClick={() => goBack()}
-          aria-label="Back"
-        >
+        <button class="template-editor-back" onClick={() => goBack()} aria-label="Back">
           ← Back
         </button>
       </div>
@@ -33,12 +29,10 @@ export function TypeSelector({ onSelect }: Props) {
 
       <div class="type-selector-grid">
         {TYPES.map(({ type, label, Icon }) => (
-          <button
-            key={type}
-            class={`type-card type-card-${type}`}
-            onClick={() => onSelect(type)}
-          >
-            <span class="type-card-icon"><Icon /></span>
+          <button key={type} class={`type-card type-card-${type}`} onClick={() => onSelect(type)}>
+            <span class="type-card-icon">
+              <Icon />
+            </span>
             <span class="type-card-label">{label}</span>
           </button>
         ))}

@@ -43,11 +43,7 @@ export async function fetchJournal(token: string): Promise<JournalEntryWithRow[]
  *  - blank or whitespace-only note: delete the row if there is one
  * Returns the stored entry, or null when the day now has no note.
  */
-export async function upsertJournalEntry(
-  date: string,
-  note: string,
-  token: string,
-): Promise<JournalEntry | null> {
+export async function upsertJournalEntry(date: string, note: string, token: string): Promise<JournalEntry | null> {
   const blank = note.trim() === '';
   const now = new Date().toISOString();
 

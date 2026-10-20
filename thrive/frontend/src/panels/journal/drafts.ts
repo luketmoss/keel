@@ -49,7 +49,14 @@ let tail: Promise<void> = Promise.resolve();
 function sequential<T>(fn: () => Promise<T>): Promise<T> {
   const p = pending === 0 ? fn() : tail.then(fn);
   pending++;
-  tail = p.then(() => undefined, () => undefined).then(() => { pending--; });
+  tail = p
+    .then(
+      () => undefined,
+      () => undefined,
+    )
+    .then(() => {
+      pending--;
+    });
   return p;
 }
 let focused: string | null = null;
@@ -154,7 +161,10 @@ export function editNote(date: string, text: string): void {
     return;
   }
   put(date, { text, status: 'waiting' });
-  timers.set(date, setTimeout(() => flushNote(date), NOTE_DEBOUNCE_MS));
+  timers.set(
+    date,
+    setTimeout(() => flushNote(date), NOTE_DEBOUNCE_MS),
+  );
 }
 
 /**

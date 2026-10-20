@@ -35,7 +35,8 @@ export function resetTableStop(): void {
 }
 
 const HINT_ID = 'trend-table-hint';
-const HINT = 'Up and down arrows, Home, End, Page Up and Page Down move between days. Enter opens a day in the Day view.';
+const HINT =
+  'Up and down arrows, Home, End, Page Up and Page Down move between days. Enter opens a day in the Day view.';
 const WEEK = 7;
 
 /** "Last 3 months" from "last 3 months". */
@@ -87,13 +88,26 @@ export function TrendTable({ group, series: built, range, avgDays, today }: Prop
     if (at < 0) return;
     let target: number;
     switch (e.key) {
-      case 'ArrowDown': target = at + 1; break;
-      case 'ArrowUp': target = at - 1; break;
-      case 'PageDown': target = at + WEEK; break;
-      case 'PageUp': target = at - WEEK; break;
-      case 'Home': target = 0; break;
-      case 'End': target = rows.length - 1; break;
-      default: return;
+      case 'ArrowDown':
+        target = at + 1;
+        break;
+      case 'ArrowUp':
+        target = at - 1;
+        break;
+      case 'PageDown':
+        target = at + WEEK;
+        break;
+      case 'PageUp':
+        target = at - WEEK;
+        break;
+      case 'Home':
+        target = 0;
+        break;
+      case 'End':
+        target = rows.length - 1;
+        break;
+      default:
+        return;
     }
     e.preventDefault();
     target = Math.min(rows.length - 1, Math.max(0, target));
@@ -117,7 +131,11 @@ export function TrendTable({ group, series: built, range, avgDays, today }: Prop
       aria-label={regionLabel}
       aria-describedby={rows.length > 0 ? HINT_ID : undefined}
     >
-      {rows.length > 0 && <p id={HINT_ID} class="sr-only">{HINT}</p>}
+      {rows.length > 0 && (
+        <p id={HINT_ID} class="sr-only">
+          {HINT}
+        </p>
+      )}
       <table class="trend-table">
         <caption>{captionParts.join(' ')}</caption>
         <thead>
@@ -125,9 +143,14 @@ export function TrendTable({ group, series: built, range, avgDays, today }: Prop
             <th scope="col">Date</th>
             {columns.map(({ metric }) => [
               <th scope="col" key={metric.id}>
-                {metric.label}{metric.unit ? ` (${metric.unit})` : ''}
+                {metric.label}
+                {metric.unit ? ` (${metric.unit})` : ''}
               </th>,
-              avgDays > 0 && <th scope="col" key={`${metric.id}-avg`}>{avgDays}-day avg</th>,
+              avgDays > 0 && (
+                <th scope="col" key={`${metric.id}-avg`}>
+                  {avgDays}-day avg
+                </th>
+              ),
             ])}
           </tr>
         </thead>
@@ -135,13 +158,19 @@ export function TrendTable({ group, series: built, range, avgDays, today }: Prop
           {rows.map((date) => (
             <tr key={date}>
               <th scope="row">
-                <a class="trend-row-link" href={openDayHref(date, today)} data-date={date}
-                  tabIndex={date === active ? 0 : -1} onClick={(e) => {
+                <a
+                  class="trend-row-link"
+                  href={openDayHref(date, today)}
+                  data-date={date}
+                  tabIndex={date === active ? 0 : -1}
+                  onClick={(e) => {
                     // Safari and Firefox on macOS do not focus a clicked link: remember the row here too.
                     rememberedStop = date;
                     openDayClick(date, today)(e);
-                  }}>
-                  {rowDate(date, today)}<span aria-hidden="true">›</span>
+                  }}
+                >
+                  {rowDate(date, today)}
+                  <span aria-hidden="true">›</span>
                 </a>
               </th>
               {columns.map(({ metric, series, byDate }) => {

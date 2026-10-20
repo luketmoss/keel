@@ -88,7 +88,9 @@ export function bodyDays(): [string, BodyDay][] {
     if (list) list.push(r);
     else byDate.set(r.date, [r]);
   }
-  const days = [...byDate].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([d, rs]) => [d, bodyDayOf(rs)] as [string, BodyDay]);
+  const days = [...byDate]
+    .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+    .map(([d, rs]) => [d, bodyDayOf(rs)] as [string, BodyDay]);
   dayCache = { rows: s.rows, days };
   return days;
 }
@@ -345,8 +347,12 @@ export const MOVING_TIME: TrendMetric = {
   source: 'dailySummary',
   label: 'Moving Time',
   unit: 'min',
-  points: () => dailySummaryPoints('total_moving_s', secondsToMinutes,
-    { withdata: 'moving_withdata', of: 'activity_count', what: 'activities recorded moving time' }),
+  points: () =>
+    dailySummaryPoints('total_moving_s', secondsToMinutes, {
+      withdata: 'moving_withdata',
+      of: 'activity_count',
+      what: 'activities recorded moving time',
+    }),
   format: formatWhole,
   band: false,
   zeroBased: true,
@@ -358,9 +364,13 @@ export const DISTANCE: TrendMetric = {
   label: 'Distance',
   unit: 'mi',
   note: 'Outdoor only',
-  points: () => dailySummaryPoints('total_distance_m', metersToMiles,
-    { withdata: 'distance_withdata', of: 'cardio_activity_count', what: 'outdoor activities recorded distance' },
-    'cardio_activity_count'),
+  points: () =>
+    dailySummaryPoints(
+      'total_distance_m',
+      metersToMiles,
+      { withdata: 'distance_withdata', of: 'cardio_activity_count', what: 'outdoor activities recorded distance' },
+      'cardio_activity_count',
+    ),
   format: (v) => v.toFixed(1),
   axisFormat: axisDecimal,
   band: false,
@@ -373,9 +383,13 @@ export const ASCENT: TrendMetric = {
   label: 'Ascent',
   unit: 'ft',
   note: 'Outdoor only',
-  points: () => dailySummaryPoints('total_ascent_m', metersToFeet,
-    { withdata: 'ascent_withdata', of: 'cardio_activity_count', what: 'outdoor activities recorded ascent' },
-    'cardio_activity_count'),
+  points: () =>
+    dailySummaryPoints(
+      'total_ascent_m',
+      metersToFeet,
+      { withdata: 'ascent_withdata', of: 'cardio_activity_count', what: 'outdoor activities recorded ascent' },
+      'cardio_activity_count',
+    ),
   format: formatWhole,
   band: false,
   zeroBased: true,
@@ -425,7 +439,9 @@ export const CUSTOM_PICKABLE: TrendMetric[] = CUSTOM_SECTIONS.flatMap((s) => s.m
 export function normaliseCustom(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   const wanted = new Set(raw.filter((x): x is string => typeof x === 'string'));
-  return CUSTOM_PICKABLE.filter((m) => wanted.has(m.id)).slice(0, CUSTOM_MAX).map((m) => m.id);
+  return CUSTOM_PICKABLE.filter((m) => wanted.has(m.id))
+    .slice(0, CUSTOM_MAX)
+    .map((m) => m.id);
 }
 
 /** The custom group for a selection: 0-4 metrics, the one group that may be empty. */

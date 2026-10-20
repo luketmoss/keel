@@ -35,7 +35,7 @@ export function RepsField({ id, value, onChange, exerciseName, setNumber, placeh
   const descId = `${id}-desc`;
   const inline = setNumber !== undefined;
   const what = inline ? `set ${setNumber} reps` : 'reps';
-  const shownPlaceholder = held ? '' : placeholder ?? (inline ? '' : 'e.g. 10');
+  const shownPlaceholder = held ? '' : (placeholder ?? (inline ? '' : 'e.g. 10'));
 
   const handleInput = (e: Event) => {
     const el = e.currentTarget as HTMLInputElement;
@@ -85,10 +85,14 @@ export function RepsField({ id, value, onChange, exerciseName, setNumber, placeh
         {input}
         {held ? (
           <span id={descId} class="reps-field-held">
-            <span class="sr-only">Planned </span>{value}<span class="sr-only">{rest}</span>
+            <span class="sr-only">Planned </span>
+            {value}
+            <span class="sr-only">{rest}</span>
           </span>
         ) : (
-          <span id={descId} class="sr-only">{hint ? `${hint} ` : ''}Whole number only.</span>
+          <span id={descId} class="sr-only">
+            {hint ? `${hint} ` : ''}Whole number only.
+          </span>
         )}
         {clearButton}
       </span>
@@ -101,12 +105,15 @@ export function RepsField({ id, value, onChange, exerciseName, setNumber, placeh
       {held ? (
         <div class="reps-field-held-line">
           <span id={descId} class="reps-field-held">
-            Planned: {value}<span class="sr-only">{rest}</span>
+            Planned: {value}
+            <span class="sr-only">{rest}</span>
           </span>
           {clearButton}
         </div>
       ) : (
-        <span id={descId} class="sr-only">{hint ? `${hint} ` : ''}Whole number only.</span>
+        <span id={descId} class="sr-only">
+          {hint ? `${hint} ` : ''}Whole number only.
+        </span>
       )}
     </div>
   );

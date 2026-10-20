@@ -78,8 +78,14 @@ describe('ConfirmModal', () => {
 
 describe('FinishWorkoutModal', () => {
   const props = (over = {}) => ({
-    notes: '', onNotesChange: () => {}, effort: '', onEffortChange: () => {},
-    onFinish: () => {}, onCancel: () => {}, finishing: false, ...over,
+    notes: '',
+    onNotesChange: () => {},
+    effort: '',
+    onEffortChange: () => {},
+    onFinish: () => {},
+    onCancel: () => {},
+    finishing: false,
+    ...over,
   });
 
   it('focuses the notes textarea, is labelled, and returns focus on Escape', () => {
@@ -119,9 +125,13 @@ describe('CustomMetricsPicker', () => {
   });
 
   it('keeps aria-disabled rows in the tab order at the cap', () => {
-    render(h(CustomMetricsPicker as any, {
-      selected: ['resting_hr', 'steps', 'hrv', 'distance'], onChange: () => {}, onClose: () => {},
-    }));
+    render(
+      h(CustomMetricsPicker as any, {
+        selected: ['resting_hr', 'steps', 'hrv', 'distance'],
+        onChange: () => {},
+        onClose: () => {},
+      }),
+    );
     const boxes = [...dialogOf().querySelectorAll<HTMLInputElement>('input[type=checkbox]')];
     expect(boxes.some((b) => b.getAttribute('aria-disabled') === 'true')).toBe(true);
     const done = dialogOf().querySelector<HTMLElement>('.trends-picker-done')!;

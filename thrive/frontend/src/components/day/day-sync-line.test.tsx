@@ -59,13 +59,18 @@ beforeEach(() => {
   syncLog.value = { state: 'loaded', entries: [logRow(2)] };
   withingsSyncLog.value = { state: 'loaded', entries: [logRow(5)] };
 });
-afterEach(() => { cleanup(); vi.useRealTimers(); });
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 describe('Day sync line: the age (AC1)', () => {
   it('reads the older vendor and ticks once a minute', async () => {
     const { container } = render(<Line />);
     expect(container.querySelector('.day-sync-age')!.textContent).toBe('Synced 5 h ago');
-    await act(() => { vi.advanceTimersByTime(60_000 * 61); });
+    await act(() => {
+      vi.advanceTimersByTime(60_000 * 61);
+    });
     expect(container.querySelector('.day-sync-age')!.textContent).toBe('Synced 6 h ago');
   });
 
@@ -76,9 +81,13 @@ describe('Day sync line: the age (AC1)', () => {
     expect(note.textContent).toBe('COROS last run failed');
     expect(note.className).toContain('sync-tone-danger');
 
-    act(() => { syncLog.value = { state: 'loading' }; });
+    act(() => {
+      syncLog.value = { state: 'loading' };
+    });
     expect(container.querySelector('.day-sync-age')!.textContent).toBe('Checking…');
-    act(() => { syncLog.value = { state: 'error' }; });
+    act(() => {
+      syncLog.value = { state: 'error' };
+    });
     expect(container.querySelector('.day-sync-age')!.textContent).toBe("Couldn't read sync status");
     expect(container.querySelector('.day-sync-age')!.className).toContain('sync-tone-warning');
   });
@@ -116,7 +125,10 @@ describe('Day sync line: Sync now (AC2)', () => {
     expect(rows[1]).toMatch(/^Withings: Requested .*\. Waiting for it to start\.$/);
 
     cleanup();
-    syncRequests.value = [req('coros', 'skipped', { detail: cooldown }), req('withings', 'skipped', { detail: cooldown })];
+    syncRequests.value = [
+      req('coros', 'skipped', { detail: cooldown }),
+      req('withings', 'skipped', { detail: cooldown }),
+    ];
     const again = render(<Line />);
     expect([...again.container.querySelectorAll('.day-sync-request')].map((e) => e.textContent)).toEqual([cooldown]);
   });
@@ -126,7 +138,9 @@ describe('Day sync line: Sync now (AC2)', () => {
     syncRequests.value = [req('coros', 'done', { detail: 'Finished.', finished_at: at.toISOString() }, at)];
     const { container } = render(<Line />);
     expect(container.querySelectorAll('.day-sync-request')).toHaveLength(1);
-    await act(() => { vi.advanceTimersByTime(2 * 60_000); });
+    await act(() => {
+      vi.advanceTimersByTime(2 * 60_000);
+    });
     expect(container.querySelectorAll('.day-sync-request')).toHaveLength(0);
     expect(container.querySelector('.day-sync-age')!.textContent).toMatch(/^Synced /);
   });
@@ -163,14 +177,20 @@ describe('Day sync line: one shared state, one poller (AC4)', () => {
   it('polls only while a request is open, 3 reads a poll, and stops on unmount', async () => {
     syncRequests.value = [req('coros', 'started', { workflow_run_id: '5', dispatched_at: NOW.toISOString() })];
     const { unmount } = render(<Line />);
-    loadSyncRequests.mockClear(); loadSyncLog.mockClear(); loadWithingsSyncLog.mockClear();
-    await act(() => { vi.advanceTimersByTime(POLL_MS * 2); });
+    loadSyncRequests.mockClear();
+    loadSyncLog.mockClear();
+    loadWithingsSyncLog.mockClear();
+    await act(() => {
+      vi.advanceTimersByTime(POLL_MS * 2);
+    });
     expect(loadSyncRequests).toHaveBeenCalledTimes(2);
     expect(loadSyncLog).toHaveBeenCalledTimes(2);
     expect(loadWithingsSyncLog).toHaveBeenCalledTimes(2);
     unmount();
     loadSyncRequests.mockClear();
-    await act(() => { vi.advanceTimersByTime(POLL_MS * 3); });
+    await act(() => {
+      vi.advanceTimersByTime(POLL_MS * 3);
+    });
     expect(loadSyncRequests).not.toHaveBeenCalled();
   });
 
@@ -181,7 +201,9 @@ describe('Day sync line: one shared state, one poller (AC4)', () => {
     const second = render(<Line />);
     expect(second.container.querySelector('.day-sync-request')!.textContent).toContain('Waiting for it to start');
     loadSyncRequests.mockClear();
-    await act(() => { vi.advanceTimersByTime(POLL_MS); });
+    await act(() => {
+      vi.advanceTimersByTime(POLL_MS);
+    });
     expect(loadSyncRequests).toHaveBeenCalledTimes(1);
   });
 });
@@ -205,7 +227,9 @@ describe('Day sync line: layout and accessibility (AC5)', () => {
     expect(container.querySelector('.day-sync-btn svg')!.getAttribute('aria-hidden')).toBe('true');
     btn().focus();
     expect(document.activeElement).toBe(btn());
-    act(() => { syncAsk.value = 'asking'; });
+    act(() => {
+      syncAsk.value = 'asking';
+    });
     expect(btn().getAttribute('aria-disabled')).toBe('true');
     expect(document.activeElement).toBe(btn());
   });
@@ -229,7 +253,9 @@ describe('Day sync line CSS (AC5)', () => {
   });
 
   it('stops the spinner under prefers-reduced-motion', () => {
-    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.day-sync-busy \.day-sync-icon\s*\{\s*animation:\s*none/);
+    expect(css).toMatch(
+      /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.day-sync-busy \.day-sync-icon\s*\{\s*animation:\s*none/,
+    );
   });
 });
 
@@ -239,9 +265,13 @@ describe('Day sync line: demo (AC6)', () => {
     demoSyncPressedAt.value = Date.now();
     const { container } = render(<DemoLine />);
     expect(container.querySelector('.day-sync-request')!.textContent).toContain('Waiting for it to start');
-    await act(() => { vi.advanceTimersByTime(1500); });
+    await act(() => {
+      vi.advanceTimersByTime(1500);
+    });
     expect(container.querySelector('.day-sync-request')!.textContent).toContain('Started');
-    await act(() => { vi.advanceTimersByTime(3000); });
+    await act(() => {
+      vi.advanceTimersByTime(3000);
+    });
     expect(container.querySelector('.day-sync-request')!.textContent).toMatch(/Finished .*: ok$/);
     expect(loadSyncRequests).not.toHaveBeenCalled();
     expect(loadSyncLog).not.toHaveBeenCalled();

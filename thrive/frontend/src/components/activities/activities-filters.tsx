@@ -22,9 +22,7 @@ export function ActivitiesFilters() {
   };
 
   const toggleTag = (tag: string) => {
-    filterTags.value = activeTags.includes(tag)
-      ? activeTags.filter((t) => t !== tag)
-      : [...activeTags, tag];
+    filterTags.value = activeTags.includes(tag) ? activeTags.filter((t) => t !== tag) : [...activeTags, tag];
   };
 
   const clearAll = () => {
@@ -43,7 +41,9 @@ export function ActivitiesFilters() {
             aria-pressed={activeType === value}
           >
             {activeType === value && (
-              <span class="chip-check" aria-hidden="true">✓</span>
+              <span class="chip-check" aria-hidden="true">
+                ✓
+              </span>
             )}
             {label}
           </button>
@@ -53,12 +53,7 @@ export function ActivitiesFilters() {
       {tags.length > 0 && (
         <div class="filter-row tag-filter-row">
           {tags.map((tag) => (
-            <LabelBadge
-              key={tag}
-              name={tag}
-              active={activeTags.includes(tag)}
-              onClick={() => toggleTag(tag)}
-            />
+            <LabelBadge key={tag} name={tag} active={activeTags.includes(tag)} onClick={() => toggleTag(tag)} />
           ))}
         </div>
       )}

@@ -22,7 +22,13 @@ interface Props {
 function ExternalGlyph() {
   return (
     <svg class="detail-coros-link-glyph" viewBox="0 0 12 12" fill="none" aria-hidden="true" focusable="false">
-      <path d="M7 1.5h3.5V5M10.5 1.5 5.5 6.5M9 7.5v2.25c0 .41-.34.75-.75.75h-6a.75.75 0 0 1-.75-.75v-6c0-.41.34-.75.75-.75H4.5" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" />
+      <path
+        d="M7 1.5h3.5V5M10.5 1.5 5.5 6.5M9 7.5v2.25c0 .41-.34.75-.75.75h-6a.75.75 0 0 1-.75-.75v-6c0-.41.34-.75.75-.75H4.5"
+        stroke="currentColor"
+        stroke-width="1.25"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
     </svg>
   );
 }
@@ -40,14 +46,15 @@ function findPreviousWorkout(workoutId: string) {
   });
 
   const thisDate = workout.date + 'T' + (workout.time || '00:00');
-  return sorted.find((w) =>
-    w.id !== workoutId &&
-    (w.date + 'T' + (w.time || '00:00')) < thisDate &&
-    (
-      (workout.template_id && w.template_id === workout.template_id) ||
-      (!workout.template_id && w.name === workout.name)
-    ),
-  ) || null;
+  return (
+    sorted.find(
+      (w) =>
+        w.id !== workoutId &&
+        w.date + 'T' + (w.time || '00:00') < thisDate &&
+        ((workout.template_id && w.template_id === workout.template_id) ||
+          (!workout.template_id && w.name === workout.name)),
+    ) || null
+  );
 }
 
 export function WorkoutDetail({ workoutId }: Props) {
@@ -63,7 +70,9 @@ export function WorkoutDetail({ workoutId }: Props) {
       <div class="screen">
         <div class="empty-state">
           <p>Workout not found</p>
-          <button class="btn btn-primary" onClick={() => navigate('/activities')}>Back to Activities</button>
+          <button class="btn btn-primary" onClick={() => navigate('/activities')}>
+            Back to Activities
+          </button>
         </div>
       </div>
     );
@@ -77,9 +86,7 @@ export function WorkoutDetail({ workoutId }: Props) {
 
   // "Last time" reference
   const prevWorkout = findPreviousWorkout(workoutId);
-  const prevSets = prevWorkout
-    ? sets.value.filter((s) => s.workout_id === prevWorkout.id)
-    : [];
+  const prevSets = prevWorkout ? sets.value.filter((s) => s.workout_id === prevWorkout.id) : [];
   const prevGroups = prevSets.length > 0 ? groupSetsIntoExercises(prevSets) : [];
 
   const handleStartPlanned = async () => {
@@ -151,11 +158,7 @@ export function WorkoutDetail({ workoutId }: Props) {
   return (
     <div class="screen workout-detail-screen">
       <div class="template-editor-header">
-        <button
-          class="template-editor-back"
-          onClick={() => goBack()}
-          aria-label="Back"
-        >
+        <button class="template-editor-back" onClick={() => goBack()} aria-label="Back">
           ← Back
         </button>
         <div class="detail-header-actions">
@@ -182,17 +185,16 @@ export function WorkoutDetail({ workoutId }: Props) {
       <div class="detail-meta">
         <h2 class="detail-title">{workout.name || workout.type}</h2>
         <div class="detail-info-row">
-          {isPlanned
-            ? <span class="type-badge badge-planned">Planned</span>
-            : isActive
-              ? <span class="type-badge badge-active">Active</span>
-              : <span class={`type-badge badge-${workout.type}`}>{workout.type}</span>
-          }
+          {isPlanned ? (
+            <span class="type-badge badge-planned">Planned</span>
+          ) : isActive ? (
+            <span class="type-badge badge-active">Active</span>
+          ) : (
+            <span class={`type-badge badge-${workout.type}`}>{workout.type}</span>
+          )}
           {/* #145: the plan's estimate, only while it is a plan. Once started,
               elapsed time is the only duration shown. */}
-          {isPlanned && estimate && (
-            <span class="detail-duration detail-estimate">{estimate}</span>
-          )}
+          {isPlanned && estimate && <span class="detail-duration detail-estimate">{estimate}</span>}
           {!isPlanned && <span class="detail-date">{workout.date}</span>}
           {!isPlanned && workout.time && <span class="detail-time">{workout.time}</span>}
           {!isPlanned && workout.elapsed_seconds && (
@@ -209,15 +211,11 @@ export function WorkoutDetail({ workoutId }: Props) {
           {!isPlanned && workout.distance_m && (
             <span class="detail-distance">{formatDistance(workout.distance_m)}</span>
           )}
-          {!isPlanned && workout.ascent_m && (
-            <span class="detail-ascent">↑ {formatElevation(workout.ascent_m)}</span>
-          )}
+          {!isPlanned && workout.ascent_m && <span class="detail-ascent">↑ {formatElevation(workout.ascent_m)}</span>}
           {!isPlanned && workout.descent_m && (
             <span class="detail-descent">↓ {formatElevation(workout.descent_m)}</span>
           )}
-          {!isPlanned && workout.avg_hr && (
-            <span class="detail-hr">{formatHeartRate(workout.avg_hr)}</span>
-          )}
+          {!isPlanned && workout.avg_hr && <span class="detail-hr">{formatHeartRate(workout.avg_hr)}</span>}
         </div>
         {/* #157: where this row came from (sync plan §8, §13). Manual rows,
             most of them, show nothing. */}
@@ -230,12 +228,7 @@ export function WorkoutDetail({ workoutId }: Props) {
         {/* #260: the activity's page on the COROS web portal, on its own
             row. Nothing at all when there is nothing to link to (AC8). */}
         {corosUrl && (
-          <a
-            class="detail-coros-link"
-            href={corosUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
+          <a class="detail-coros-link" href={corosUrl} target="_blank" rel="noopener noreferrer">
             {/* The trailing space joins the label to the hidden text in the
                 accessible name; in an inline-flex row it draws nothing. */}
             {'View on COROS '}
@@ -243,74 +236,80 @@ export function WorkoutDetail({ workoutId }: Props) {
             <ExternalGlyph />
           </a>
         )}
-        {workout.notes && (
-          <p class="detail-notes">{workout.notes}</p>
-        )}
-        {workout.copied_from && (
-          <p class="detail-copied">Copied from a previous workout</p>
-        )}
+        {workout.notes && <p class="detail-notes">{workout.notes}</p>}
+        {workout.copied_from && <p class="detail-copied">Copied from a previous workout</p>}
       </div>
 
       {/* #407: the activity's route, straight after the title, stats and provenance. */}
       {showRoute && <RouteSection workout={workout} />}
 
       {/* Planned workout: compact card view + footer actions */}
-      {isPlanned && workout.type === 'weight' && (() => {
-        // Build planned exercise list from sets or template
-        const plannedExercises: { id: string; name: string; section: string; order: number; sets: string; reps: string; repsBySet?: string[] }[] = [];
-        const seen = new Set<string>();
+      {isPlanned &&
+        workout.type === 'weight' &&
+        (() => {
+          // Build planned exercise list from sets or template
+          const plannedExercises: {
+            id: string;
+            name: string;
+            section: string;
+            order: number;
+            sets: string;
+            reps: string;
+            repsBySet?: string[];
+          }[] = [];
+          const seen = new Set<string>();
 
-        // Build from workout sets
-        for (const s of workoutSets) {
-          const key = `${s.exercise_id}__${s.exercise_order}`;
-          if (seen.has(key)) continue;
-          seen.add(key);
+          // Build from workout sets
+          for (const s of workoutSets) {
+            const key = `${s.exercise_id}__${s.exercise_order}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
 
-          // Warmup exercises are list-only — show without sets/reps
-          if (s.section === 'warmup') {
+            // Warmup exercises are list-only — show without sets/reps
+            if (s.section === 'warmup') {
+              plannedExercises.push({
+                id: s.exercise_id,
+                name: s.exercise_name,
+                section: 'warmup',
+                order: s.exercise_order,
+                sets: '',
+                reps: '',
+              });
+              continue;
+            }
+
+            const own = workoutSets
+              .filter((ws) => ws.exercise_id === s.exercise_id && ws.exercise_order === s.exercise_order)
+              .sort((a, b) => a.set_number - b.set_number);
             plannedExercises.push({
               id: s.exercise_id,
               name: s.exercise_name,
-              section: 'warmup',
+              section: s.section,
               order: s.exercise_order,
-              sets: '',
-              reps: '',
+              sets: String(own.length),
+              reps: s.planned_reps || '',
+              repsBySet: own.map((ws) => ws.planned_reps || ''),
             });
-            continue;
           }
 
-          const own = workoutSets
-            .filter((ws) => ws.exercise_id === s.exercise_id && ws.exercise_order === s.exercise_order)
-            .sort((a, b) => a.set_number - b.set_number);
-          plannedExercises.push({
-            id: s.exercise_id,
-            name: s.exercise_name,
-            section: s.section,
-            order: s.exercise_order,
-            sets: String(own.length),
-            reps: s.planned_reps || '',
-            repsBySet: own.map((ws) => ws.planned_reps || ''),
-          });
-        }
+          plannedExercises.sort((a, b) => a.order - b.order);
 
-        plannedExercises.sort((a, b) => a.order - b.order);
-
-        return plannedExercises.length > 0 ? (
-          <div class="compact-card-list" style={{ marginTop: 'var(--space-md)' }}>
-            {plannedExercises.map((ex, i) => (
-              <div key={`${ex.id}-${i}`}>
-                <ExerciseCompactCard
-                  section={ex.section}
-                  exerciseName={ex.name}
-                  sets={ex.sets}
-                  reps={ex.reps}
-                  repsBySet={ex.repsBySet}
-                />
-              </div>
-            ))}
-          </div>
-        ) : null;
-      })()}
+          return plannedExercises.length > 0 ? (
+            <div class="compact-card-list" style={{ marginTop: 'var(--space-md)' }}>
+              {plannedExercises.map((ex, i) => (
+                <div key={`${ex.id}-${i}`}>
+                  <ExerciseCompactCard
+                    section={ex.section}
+                    exerciseName={ex.name}
+                    sets={ex.sets}
+                    reps={ex.reps}
+                    repsBySet={ex.repsBySet}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : null;
+        })()}
 
       {/* Exercise breakdown for completed weight workouts */}
       {!isPlanned && exerciseGroups.length > 0 && (
@@ -318,10 +317,7 @@ export function WorkoutDetail({ workoutId }: Props) {
           <div class="detail-section-header">
             <h3>Exercises</h3>
             {prevWorkout && (
-              <button
-                class="btn-link"
-                onClick={() => setShowLastTime(!showLastTime)}
-              >
+              <button class="btn-link" onClick={() => setShowLastTime(!showLastTime)}>
                 {showLastTime ? 'Hide' : 'Show'} last time
               </button>
             )}
@@ -334,25 +330,27 @@ export function WorkoutDetail({ workoutId }: Props) {
                 expanded={expandedIndex === i}
                 onToggle={() => setExpandedIndex(expandedIndex === i ? -1 : i)}
               />
-              {showLastTime && prevGroups.length > 0 && (() => {
-                const prev = prevGroups.find(
-                  (pg) => pg.exercise_id === group.exercise_id && pg.exercise_order === group.exercise_order,
-                );
-                if (!prev) return null;
-                const prevBest = prev.sets.reduce<typeof prev.sets[0] | null>((best, s) => {
-                  if (!best) return s;
-                  return (Number(s.weight) || 0) > (Number(best.weight) || 0) ? s : best;
-                }, null);
-                if (!prevBest) return null;
-                return (
-                  <div class="last-time-ref">
-                    Last time: {prevBest.weight ? `${prevBest.weight} lbs` : ''}
-                    {prevBest.weight && prevBest.reps ? ' × ' : ''}
-                    {prevBest.reps ? `${prevBest.reps} reps` : ''}
-                    {prevBest.effort ? ` (${prevBest.effort})` : ''}
-                  </div>
-                );
-              })()}
+              {showLastTime &&
+                prevGroups.length > 0 &&
+                (() => {
+                  const prev = prevGroups.find(
+                    (pg) => pg.exercise_id === group.exercise_id && pg.exercise_order === group.exercise_order,
+                  );
+                  if (!prev) return null;
+                  const prevBest = prev.sets.reduce<(typeof prev.sets)[0] | null>((best, s) => {
+                    if (!best) return s;
+                    return (Number(s.weight) || 0) > (Number(best.weight) || 0) ? s : best;
+                  }, null);
+                  if (!prevBest) return null;
+                  return (
+                    <div class="last-time-ref">
+                      Last time: {prevBest.weight ? `${prevBest.weight} lbs` : ''}
+                      {prevBest.weight && prevBest.reps ? ' × ' : ''}
+                      {prevBest.reps ? `${prevBest.reps} reps` : ''}
+                      {prevBest.effort ? ` (${prevBest.effort})` : ''}
+                    </div>
+                  );
+                })()}
             </div>
           ))}
         </div>
@@ -377,12 +375,7 @@ export function WorkoutDetail({ workoutId }: Props) {
           </button>
         )}
         {isActive && (
-          <button
-            class="btn btn-primary"
-            style={{ width: '100%' }}
-            onClick={handleResume}
-            disabled={deleting}
-          >
+          <button class="btn btn-primary" style={{ width: '100%' }} onClick={handleResume} disabled={deleting}>
             Resume Workout
           </button>
         )}

@@ -1,5 +1,13 @@
 import { signal, computed } from '@preact/signals';
-import type { JournalEntry, ExerciseWithRow, LabelWithRow, Template, WorkoutWithRow, SetWithRow, WorkoutType } from '../api/types';
+import type {
+  JournalEntry,
+  ExerciseWithRow,
+  LabelWithRow,
+  Template,
+  WorkoutWithRow,
+  SetWithRow,
+  WorkoutType,
+} from '../api/types';
 import type { SyncLogEntryWithRow } from '../api/sync-log-api';
 import type { SyncRequestWithRow } from '../api/sync-requests-api';
 import type { DailyHealthRow, BodyMeasurementRow, DailySummaryRow } from '../api/health-api';
@@ -29,40 +37,39 @@ export const filterType = signal<WorkoutType | null>(null);
 export const filterTags = signal<string[]>([]);
 
 // Active workouts (status === 'active') — currently being tracked
-export const activeWorkouts = computed(() =>
-  workouts.value.filter(w => w.status === 'active'),
-);
+export const activeWorkouts = computed(() => workouts.value.filter((w) => w.status === 'active'));
 
 // Planned workouts (status === 'planned') — shown in dedicated section, excluded from history/stats.
 // Sorted soonest-first; overdue ones sort above upcoming since past dates come first.
 export const plannedWorkouts = computed(() =>
-  sortPlannedWorkouts(workouts.value.filter(w => w.status === 'planned')),
+  sortPlannedWorkouts(workouts.value.filter((w) => w.status === 'planned')),
 );
 
 // Completed workouts — used for week streak / stats (excludes planned and active)
-export const completedWorkouts = computed(() =>
-  workouts.value.filter(w => !w.status),
-);
+export const completedWorkouts = computed(() => workouts.value.filter((w) => !w.status));
 
 // Derived signals
 export const filteredWorkouts = computed(() => {
   // Exclude planned and active workouts — they have their own sections
-  let result = workouts.value.filter(w => !w.status);
+  let result = workouts.value.filter((w) => !w.status);
   if (filterType.value) {
-    result = result.filter(w => w.type === filterType.value);
+    result = result.filter((w) => w.type === filterType.value);
   }
   // Tag filter: show workouts that contain exercises matching ANY selected tag
   if (filterTags.value.length > 0) {
     const tagSet = new Set(filterTags.value);
-    result = result.filter(w => {
+    result = result.filter((w) => {
       // Find exercise IDs in this workout's sets
-      const workoutSets = sets.value.filter(s => s.workout_id === w.id);
-      const exerciseIds = new Set(workoutSets.map(s => s.exercise_id));
+      const workoutSets = sets.value.filter((s) => s.workout_id === w.id);
+      const exerciseIds = new Set(workoutSets.map((s) => s.exercise_id));
       // Check if any of those exercises have a matching tag
-      return exercises.value.some(ex => {
+      return exercises.value.some((ex) => {
         if (!exerciseIds.has(ex.id)) return false;
-        const exTags = ex.tags.split(',').map(t => t.trim()).filter(Boolean);
-        return exTags.some(t => tagSet.has(t));
+        const exTags = ex.tags
+          .split(',')
+          .map((t) => t.trim())
+          .filter(Boolean);
+        return exTags.some((t) => tagSet.has(t));
       });
     });
   }
@@ -75,18 +82,22 @@ export const filteredWorkouts = computed(() => {
 
 // allTags: sourced from labels signal (backwards compat for filter rows)
 export const allTags = computed(() => {
-  return labels.value.map(l => l.name).sort();
+  return labels.value.map((l) => l.name).sort();
 });
 
 /** Look up a label by name. */
 export function getLabelByName(name: string): LabelWithRow | undefined {
-  return labels.value.find(l => l.name === name);
+  return labels.value.find((l) => l.name === name);
 }
 
 /** Count how many exercises use a given label name. */
 export function labelUsageCount(labelName: string): number {
-  return exercises.value.filter(ex =>
-    ex.tags.split(',').map(t => t.trim()).filter(Boolean).includes(labelName),
+  return exercises.value.filter((ex) =>
+    ex.tags
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean)
+      .includes(labelName),
   ).length;
 }
 
@@ -118,10 +129,7 @@ export const demoSyncPressedAt = signal<number | null>(null);
 // `error` means "couldn't load", distinct from loaded with no rows. Not part
 // of `loadInitialData`: the screens that need it call `loadHealth`.
 export type HealthTabState<T> =
-  | { state: 'idle' }
-  | { state: 'loading' }
-  | { state: 'error' }
-  | { state: 'loaded'; rows: T[] };
+  { state: 'idle' } | { state: 'loading' } | { state: 'error' } | { state: 'loaded'; rows: T[] };
 export const dailyHealth = signal<HealthTabState<DailyHealthRow>>({ state: 'idle' });
 export const bodyMeasurements = signal<HealthTabState<BodyMeasurementRow>>({ state: 'idle' });
 export const dailySummary = signal<HealthTabState<DailySummaryRow>>({ state: 'idle' });
@@ -134,10 +142,7 @@ export const dailySummary = signal<HealthTabState<DailySummaryRow>>({ state: 'id
 // after a save or a delete it would be stale. `loaded` is kept through a failed
 // background refresh. Not part of `loadInitialData`: the Day screen loads it.
 export type JournalState =
-  | { state: 'idle' }
-  | { state: 'loading' }
-  | { state: 'error' }
-  | { state: 'loaded'; entries: JournalEntry[] };
+  { state: 'idle' } | { state: 'loading' } | { state: 'error' } | { state: 'loaded'; entries: JournalEntry[] };
 export const journalEntries = signal<JournalState>({ state: 'idle' });
 
 let journalSaveCount = 0;
@@ -161,8 +166,9 @@ export function applyJournalSave(date: string, entry: JournalEntry | null): void
   if (cur.state !== 'loaded') return;
   const i = cur.entries.findIndex((e) => e.date === date);
   const entries = cur.entries.slice();
-  if (!entry) { if (i >= 0) entries.splice(i, 1); }
-  else if (i >= 0) entries[i] = entry;
+  if (!entry) {
+    if (i >= 0) entries.splice(i, 1);
+  } else if (i >= 0) entries[i] = entry;
   else entries.push(entry);
   journalEntries.value = { state: 'loaded', entries };
 }
@@ -184,6 +190,6 @@ export function showToast(text: string, type: ToastMessage['type'] = 'info') {
   const id = ++_toastId;
   toasts.value = [...toasts.value, { id, text, type }];
   setTimeout(() => {
-    toasts.value = toasts.value.filter(t => t.id !== id);
+    toasts.value = toasts.value.filter((t) => t.id !== id);
   }, 4000);
 }

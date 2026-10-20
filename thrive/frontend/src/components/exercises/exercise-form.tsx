@@ -12,16 +12,17 @@ export function ExerciseForm({ initial, onSubmit, onCancel, submitLabel = 'Save'
   const [name, setName] = useState(initial?.name ?? '');
   const [tags, setTags] = useState<string[]>(() =>
     initial?.tags
-      ? initial.tags.split(',').map((t) => t.trim()).filter(Boolean)
+      ? initial.tags
+          .split(',')
+          .map((t) => t.trim())
+          .filter(Boolean)
       : [],
   );
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [submitting, setSubmitting] = useState(false);
 
   const toggleTag = (tagName: string) => {
-    setTags(prev =>
-      prev.includes(tagName) ? prev.filter(t => t !== tagName) : [...prev, tagName],
-    );
+    setTags((prev) => (prev.includes(tagName) ? prev.filter((t) => t !== tagName) : [...prev, tagName]));
   };
 
   const handleSubmit = async (e: Event) => {
@@ -54,10 +55,7 @@ export function ExerciseForm({ initial, onSubmit, onCancel, submitLabel = 'Save'
 
       <div class="form-group">
         <label class="form-label">Labels</label>
-        <LabelChipGrid
-          selected={tags}
-          onToggle={toggleTag}
-        />
+        <LabelChipGrid selected={tags} onToggle={toggleTag} />
       </div>
 
       <div class="form-group">
@@ -74,11 +72,7 @@ export function ExerciseForm({ initial, onSubmit, onCancel, submitLabel = 'Save'
         <button type="button" class="btn btn-secondary" onClick={onCancel}>
           Cancel
         </button>
-        <button
-          type="submit"
-          class="btn btn-primary"
-          disabled={submitting || !name.trim()}
-        >
+        <button type="submit" class="btn btn-primary" disabled={submitting || !name.trim()}>
           {submitting ? 'Saving...' : submitLabel}
         </button>
       </div>

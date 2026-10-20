@@ -18,10 +18,7 @@ export interface WorkoutGroup {
  * Each workout appears in exactly one section. Empty sections are omitted.
  * Preserves the order of workouts within each section.
  */
-export function groupWorkoutsByDate(
-  workouts: WorkoutWithRow[],
-  todayStr: string,
-): WorkoutGroup[] {
+export function groupWorkoutsByDate(workouts: WorkoutWithRow[], todayStr: string): WorkoutGroup[] {
   if (workouts.length === 0) return [];
 
   const today = new Date(todayStr + 'T00:00:00');
@@ -59,16 +56,14 @@ export function groupWorkoutsByDate(
 
   // Enforce canonical order regardless of insertion order
   const ORDER = ['This Week', 'Last Week', 'Earlier'];
-  return ORDER
-    .filter(label => groups.has(label))
-    .map(label => ({ label, workouts: groups.get(label)! }));
+  return ORDER.filter((label) => groups.has(label)).map((label) => ({ label, workouts: groups.get(label)! }));
 }
 
 // ── Weekly streak ────────────────────────────────────────────────────
 
 export interface WeekDay {
-  label: string;  // 'M' | 'T' | 'W' | 'T' | 'F' | 'S' | 'S'
-  date: string;   // ISO yyyy-mm-dd
+  label: string; // 'M' | 'T' | 'W' | 'T' | 'F' | 'S' | 'S'
+  date: string; // ISO yyyy-mm-dd
   hasWorkout: boolean;
   isToday: boolean;
 }
@@ -88,10 +83,7 @@ export function toLocalDateStr(d: Date): string {
  * with `hasWorkout` true for days that have at least one workout.
  * Reads from all workouts (unfiltered).
  */
-export function getWeekStreak(
-  allWorkouts: WorkoutWithRow[],
-  todayStr: string,
-): WeekDay[] {
+export function getWeekStreak(allWorkouts: WorkoutWithRow[], todayStr: string): WeekDay[] {
   const today = new Date(todayStr + 'T00:00:00');
   const day = today.getDay(); // 0=Sun…6=Sat
   const diffToMonday = day === 0 ? 6 : day - 1;
@@ -100,7 +92,7 @@ export function getWeekStreak(
   monday.setDate(today.getDate() - diffToMonday);
 
   // Build set of workout dates this week for fast lookup
-  const workoutDates = new Set(allWorkouts.map(w => w.date));
+  const workoutDates = new Set(allWorkouts.map((w) => w.date));
 
   return DAY_LABELS.map((label, i) => {
     const d = new Date(monday);
@@ -130,13 +122,10 @@ export function describeWeekStreak(days: WeekDay[]): string {
 /**
  * Returns the count of workouts in the Mon–Sun week containing `todayStr`.
  */
-export function getWeekWorkoutCount(
-  allWorkouts: WorkoutWithRow[],
-  todayStr: string,
-): number {
+export function getWeekWorkoutCount(allWorkouts: WorkoutWithRow[], todayStr: string): number {
   const days = getWeekStreak(allWorkouts, todayStr);
-  const weekDates = new Set(days.map(d => d.date));
-  return allWorkouts.filter(w => weekDates.has(w.date)).length;
+  const weekDates = new Set(days.map((d) => d.date));
+  return allWorkouts.filter((w) => weekDates.has(w.date)).length;
 }
 
 /**
@@ -145,12 +134,9 @@ export function getWeekWorkoutCount(
  * no per-workout rounding accumulates. Workouts with an empty or non-numeric
  * `elapsed_seconds` are skipped, not counted as zero.
  */
-export function getWeekTotalMinutes(
-  allWorkouts: WorkoutWithRow[],
-  todayStr: string,
-): number {
+export function getWeekTotalMinutes(allWorkouts: WorkoutWithRow[], todayStr: string): number {
   const days = getWeekStreak(allWorkouts, todayStr);
-  const weekDates = new Set(days.map(d => d.date));
+  const weekDates = new Set(days.map((d) => d.date));
   let total = 0;
   for (const w of allWorkouts) {
     if (!weekDates.has(w.date)) continue;
@@ -184,12 +170,9 @@ function getLastWeekDateSet(todayStr: string): Set<string> {
  * Returns the count of workouts in the Mon–Sun week prior to the week
  * containing `todayStr`.
  */
-export function getLastWeekWorkoutCount(
-  allWorkouts: WorkoutWithRow[],
-  todayStr: string,
-): number {
+export function getLastWeekWorkoutCount(allWorkouts: WorkoutWithRow[], todayStr: string): number {
   const lastWeekDates = getLastWeekDateSet(todayStr);
-  return allWorkouts.filter(w => lastWeekDates.has(w.date)).length;
+  return allWorkouts.filter((w) => lastWeekDates.has(w.date)).length;
 }
 
 /**
@@ -197,10 +180,7 @@ export function getLastWeekWorkoutCount(
  * prior to the week containing `todayStr`. Sums elapsed seconds and converts
  * once at the end; workouts with no duration are skipped, not counted as zero.
  */
-export function getLastWeekTotalMinutes(
-  allWorkouts: WorkoutWithRow[],
-  todayStr: string,
-): number {
+export function getLastWeekTotalMinutes(allWorkouts: WorkoutWithRow[], todayStr: string): number {
   const lastWeekDates = getLastWeekDateSet(todayStr);
   let total = 0;
   for (const w of allWorkouts) {
@@ -216,14 +196,11 @@ export function getLastWeekTotalMinutes(
 /**
  * Returns the count of workouts in the current calendar month (1st to today).
  */
-export function getMonthWorkoutCount(
-  allWorkouts: WorkoutWithRow[],
-  todayStr: string,
-): number {
+export function getMonthWorkoutCount(allWorkouts: WorkoutWithRow[], todayStr: string): number {
   const today = new Date(todayStr + 'T00:00:00');
   const thisYear = today.getFullYear();
   const thisMonth = today.getMonth();
-  return allWorkouts.filter(w => {
+  return allWorkouts.filter((w) => {
     const d = new Date(w.date + 'T00:00:00');
     return d.getFullYear() === thisYear && d.getMonth() === thisMonth;
   }).length;
@@ -235,10 +212,7 @@ export function getMonthWorkoutCount(
  * duration are skipped, not counted as zero — a month with one 60-minute
  * session and three untimed ones totals 60, not an average of 15.
  */
-export function getMonthTotalMinutes(
-  allWorkouts: WorkoutWithRow[],
-  todayStr: string,
-): number {
+export function getMonthTotalMinutes(allWorkouts: WorkoutWithRow[], todayStr: string): number {
   const today = new Date(todayStr + 'T00:00:00');
   const thisYear = today.getFullYear();
   const thisMonth = today.getMonth();
@@ -258,20 +232,20 @@ export function getMonthTotalMinutes(
  * Returns up to 3 most common muscle-group tags for a workout's exercises.
  * Excludes equipment tags (BB, DB, FT) and Warmup.
  */
-export function getWorkoutTags(
-  workoutSets: SetWithRow[],
-  allExercises: ExerciseWithRow[],
-): string[] {
+export function getWorkoutTags(workoutSets: SetWithRow[], allExercises: ExerciseWithRow[]): string[] {
   if (workoutSets.length === 0) return [];
 
   // Unique exercise IDs in this workout
-  const exerciseIds = new Set(workoutSets.map(s => s.exercise_id));
+  const exerciseIds = new Set(workoutSets.map((s) => s.exercise_id));
 
   // Count tag occurrences across exercises (not sets)
   const tagCounts = new Map<string, number>();
   for (const ex of allExercises) {
     if (!exerciseIds.has(ex.id)) continue;
-    const tags = ex.tags.split(',').map(t => t.trim()).filter(Boolean);
+    const tags = ex.tags
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean);
     for (const tag of tags) {
       if (EQUIPMENT_TAGS.has(tag)) continue;
       tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
@@ -340,10 +314,7 @@ export function isOverdue(dateStr: string, todayStr: string): boolean {
  */
 export function sortPlannedWorkouts(workouts: WorkoutWithRow[]): WorkoutWithRow[] {
   return [...workouts].sort(
-    (a, b) =>
-      a.date.localeCompare(b.date) ||
-      a.created.localeCompare(b.created) ||
-      a.id.localeCompare(b.id),
+    (a, b) => a.date.localeCompare(b.date) || a.created.localeCompare(b.created) || a.id.localeCompare(b.id),
   );
 }
 
@@ -397,10 +368,7 @@ export function isCardioWorkout(w: WorkoutWithRow): boolean {
  * skipping those that recorded nothing while still counting them in `of`,
  * so the gap stays visible rather than having to be inferred.
  */
-function sumCovered(
-  cardio: WorkoutWithRow[],
-  field: (w: WorkoutWithRow) => string,
-): CoveredTotal {
+function sumCovered(cardio: WorkoutWithRow[], field: (w: WorkoutWithRow) => string): CoveredTotal {
   let total = 0;
   let withData = 0;
   for (const w of cardio) {
@@ -413,27 +381,18 @@ function sumCovered(
 }
 
 /** The cardio activities in the Mon–Sun week containing `todayStr`. */
-export function getWeekCardioWorkouts(
-  allWorkouts: WorkoutWithRow[],
-  todayStr: string,
-): WorkoutWithRow[] {
+export function getWeekCardioWorkouts(allWorkouts: WorkoutWithRow[], todayStr: string): WorkoutWithRow[] {
   const weekDates = new Set(getWeekStreak(allWorkouts, todayStr).map((d) => d.date));
   return allWorkouts.filter((w) => weekDates.has(w.date) && isCardioWorkout(w));
 }
 
 /** Total distance in meters for this week's cardio, with coverage. */
-export function getWeekCardioDistance(
-  allWorkouts: WorkoutWithRow[],
-  todayStr: string,
-): CoveredTotal {
+export function getWeekCardioDistance(allWorkouts: WorkoutWithRow[], todayStr: string): CoveredTotal {
   return sumCovered(getWeekCardioWorkouts(allWorkouts, todayStr), (w) => w.distance_m);
 }
 
 /** Total ascent in meters for this week's cardio, with its own coverage. */
-export function getWeekCardioAscent(
-  allWorkouts: WorkoutWithRow[],
-  todayStr: string,
-): CoveredTotal {
+export function getWeekCardioAscent(allWorkouts: WorkoutWithRow[], todayStr: string): CoveredTotal {
   // Counted independently of distance — a ride may have one and not the other.
   return sumCovered(getWeekCardioWorkouts(allWorkouts, todayStr), (w) => w.ascent_m);
 }
@@ -469,10 +428,7 @@ export function effortForSpeech(effort: Effort | ''): string {
  * unchanged from what it has always been. Provenance (#157) goes after it for
  * the same reason: a manual card, most of them, keeps exactly its old label.
  */
-export function workoutCardAriaLabel(
-  w: WorkoutWithRow,
-  exerciseCount: number,
-): string {
+export function workoutCardAriaLabel(w: WorkoutWithRow, exerciseCount: number): string {
   return [
     w.name || w.type,
     w.type,
@@ -481,5 +437,7 @@ export function workoutCardAriaLabel(
     exerciseCount > 0 ? pluralExercise(exerciseCount) : '',
     effortForSpeech(w.effort),
     provenanceSpeech(w),
-  ].filter(Boolean).join(', ');
+  ]
+    .filter(Boolean)
+    .join(', ');
 }

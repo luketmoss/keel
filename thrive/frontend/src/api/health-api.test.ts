@@ -121,7 +121,13 @@ describe('AC2: blank stays blank, 0 stays 0, nothing is converted', () => {
 
   it('keeps BodyMeasurements in kg, with a blank fat ratio blank', () => {
     const m = rowToBodyMeasurement(
-      rowOf(BODY_MEASUREMENT_FIELDS, { grpid: '1', date: '2026-09-20', kind: 'scale', weight_kg: '81.4', fat_ratio_pct: '' }),
+      rowOf(BODY_MEASUREMENT_FIELDS, {
+        grpid: '1',
+        date: '2026-09-20',
+        kind: 'scale',
+        weight_kg: '81.4',
+        fat_ratio_pct: '',
+      }),
       2,
     );
     expect(m.weight_kg).toBe('81.4');
@@ -178,10 +184,13 @@ describe('AC3: ranges are selected in memory', () => {
   });
 
   function reading(grpid: string, date: string, measured: string): BodyMeasurementRow {
-    return rowToBodyMeasurement(rowOf(BODY_MEASUREMENT_FIELDS, { grpid, date, measured_at_utc: measured, kind: 'scale' }), 2);
+    return rowToBodyMeasurement(
+      rowOf(BODY_MEASUREMENT_FIELDS, { grpid, date, measured_at_utc: measured, kind: 'scale' }),
+      2,
+    );
   }
 
-  it('returns every reading in range oldest first by instant, a day\'s several kept apart', () => {
+  it("returns every reading in range oldest first by instant, a day's several kept apart", () => {
     const rows = [
       reading('3', '2026-09-21', '2026-09-21T19:20:00-06:00'),
       reading('1', '2026-09-21', '2026-09-21T06:40:00-06:00'),
@@ -193,7 +202,7 @@ describe('AC3: ranges are selected in memory', () => {
     expect(selectBodyMeasurementRange(rows, '2026-09-20', '2026-09-21').map((r) => r.grpid)).toEqual(['2', '1', '3']);
   });
 
-  it('selects BodyMeasurements by local date, not by the instant\'s UTC date', () => {
+  it("selects BodyMeasurements by local date, not by the instant's UTC date", () => {
     // 21:30 in Denver is the next day in UTC; the reading still belongs to the 21st.
     const rows = [reading('1', '2026-09-21', '2026-09-21T21:30:00-06:00')];
     expect(selectBodyMeasurementRange(rows, '2026-09-21', '2026-09-21')).toHaveLength(1);
@@ -210,16 +219,27 @@ describe('AC3/AC4: fetching each tab', () => {
   it('reads each tab once, whole, with the token, dropping rows without their key', async () => {
     sheetsGet.mockImplementation(async (range: string) => {
       if (range === 'DailyHealth!A2:S') return [['2026-09-20', '52'], [], ['', '60'], ['2026-09-19']];
-      if (range === 'BodyMeasurements!A2:T') return [['g1', '2026-09-20'], ['', '2026-09-20']];
+      if (range === 'BodyMeasurements!A2:T')
+        return [
+          ['g1', '2026-09-20'],
+          ['', '2026-09-20'],
+        ];
       if (range === 'DailySummary!A2:Y') return [['2026-09-20', '1'], ['']];
       throw new Error(`unexpected range ${range}`);
     });
-    const [h, b, s] = await Promise.all([fetchDailyHealth('tok'), fetchBodyMeasurements('tok'), fetchDailySummary('tok')]);
+    const [h, b, s] = await Promise.all([
+      fetchDailyHealth('tok'),
+      fetchBodyMeasurements('tok'),
+      fetchDailySummary('tok'),
+    ]);
     expect(sheetsGet).toHaveBeenCalledTimes(3);
     // Every read goes through withReauth, so a 401 re-auths like any other read.
     expect(withReauth).toHaveBeenCalledTimes(3);
     expect(sheetsGet).toHaveBeenCalledWith('DailyHealth!A2:S', 'tok');
-    expect(h.map((r) => [r.date, r.sheetRow])).toEqual([['2026-09-20', 2], ['2026-09-19', 5]]);
+    expect(h.map((r) => [r.date, r.sheetRow])).toEqual([
+      ['2026-09-20', 2],
+      ['2026-09-19', 5],
+    ]);
     expect(b.map((r) => [r.grpid, r.sheetRow])).toEqual([['g1', 2]]);
     expect(s.map((r) => [r.date, r.sheetRow])).toEqual([['2026-09-20', 2]]);
   });

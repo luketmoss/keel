@@ -101,9 +101,7 @@ export function RouteSection({ workout }: { workout: Pick<Workout, 'id'> }) {
       <div class="detail-section-header">
         <h3>Route</h3>
       </div>
-      {state === 'ready' && (
-        <div class="detail-route-map" role="region" aria-label="Route map" ref={mapRef} />
-      )}
+      {state === 'ready' && <div class="detail-route-map" role="region" aria-label="Route map" ref={mapRef} />}
       {state === 'loading' && (
         <div class="detail-route-map detail-route-status" role="status" aria-busy="true">
           <p>Loading route…</p>

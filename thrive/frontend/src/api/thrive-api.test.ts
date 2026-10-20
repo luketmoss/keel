@@ -21,11 +21,20 @@ function reply(body: unknown, init: { status?: number } = {}): Response {
 
 const ok = {
   success: true,
-  data: { requests: [{ request_id: IDS[0], status: 'started' }, { request_id: IDS[1], status: 'skipped' }] },
+  data: {
+    requests: [
+      { request_id: IDS[0], status: 'started' },
+      { request_id: IDS[1], status: 'skipped' },
+    ],
+  },
 };
 
-beforeEach(() => { demo = false; });
-afterEach(() => { vi.useRealTimers(); });
+beforeEach(() => {
+  demo = false;
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe('requestSync', () => {
   it('POSTs action, access_token and payload form-encoded, with nothing in the URL', async () => {
@@ -67,9 +76,12 @@ describe('requestSync', () => {
   it('aborts after 20 s', async () => {
     expect(THRIVE_API_TIMEOUT_MS).toBe(20_000);
     vi.useFakeTimers();
-    const fetchImpl = vi.fn((_u: string, init: RequestInit) => new Promise<Response>((_r, reject) => {
-      init.signal!.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
-    }));
+    const fetchImpl = vi.fn(
+      (_u: string, init: RequestInit) =>
+        new Promise<Response>((_r, reject) => {
+          init.signal!.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+        }),
+    );
     const pending = requestSync(IDS, TOKEN, { url: URL_, fetchImpl: fetchImpl as unknown as typeof fetch });
     await vi.advanceTimersByTimeAsync(19_999);
     expect(fetchImpl.mock.calls[0][1].signal!.aborted).toBe(false);
@@ -81,12 +93,37 @@ describe('requestSync', () => {
     ['a network error', () => Promise.reject(new TypeError('Failed to fetch')), 'network'],
     ['an HTTP error', () => Promise.resolve(reply('<html>' + TOKEN + '</html>', { status: 500 })), 'http_500'],
     ['a body that is not JSON', () => Promise.resolve(reply('<html>sign in</html>')), 'bad_response'],
-    ['token_invalid', () => Promise.resolve(reply({ success: false, error: 'x', code: 'token_invalid' })), 'token_invalid'],
-    ['token_forbidden', () => Promise.resolve(reply({ success: false, error: 'x', code: 'token_forbidden' })), 'token_forbidden'],
-    ['token_unavailable', () => Promise.resolve(reply({ success: false, error: 'x', code: 'token_unavailable' })), 'token_unavailable'],
-    ['success:false without a code', () => Promise.resolve(reply({ success: false, error: 'Unknown action' })), 'failed'],
-    ['a code that is not a plain word', () => Promise.resolve(reply({ success: false, error: 'x', code: TOKEN })), 'failed'],
-    ['a row not found', () => Promise.resolve(reply({ success: true, data: { requests: [{ request_id: IDS[0], status: 'not_found' }] } })), 'not_found'],
+    [
+      'token_invalid',
+      () => Promise.resolve(reply({ success: false, error: 'x', code: 'token_invalid' })),
+      'token_invalid',
+    ],
+    [
+      'token_forbidden',
+      () => Promise.resolve(reply({ success: false, error: 'x', code: 'token_forbidden' })),
+      'token_forbidden',
+    ],
+    [
+      'token_unavailable',
+      () => Promise.resolve(reply({ success: false, error: 'x', code: 'token_unavailable' })),
+      'token_unavailable',
+    ],
+    [
+      'success:false without a code',
+      () => Promise.resolve(reply({ success: false, error: 'Unknown action' })),
+      'failed',
+    ],
+    [
+      'a code that is not a plain word',
+      () => Promise.resolve(reply({ success: false, error: 'x', code: TOKEN })),
+      'failed',
+    ],
+    [
+      'a row not found',
+      () =>
+        Promise.resolve(reply({ success: true, data: { requests: [{ request_id: IDS[0], status: 'not_found' }] } })),
+      'not_found',
+    ],
     ['a success with no requests', () => Promise.resolve(reply({ success: true, data: {} })), 'bad_response'],
   ])('%s is answered as a kind, never thrown', async (_name, impl, kind) => {
     const outcome = await requestSync(IDS, TOKEN, { url: URL_, fetchImpl: vi.fn(impl) as unknown as typeof fetch });

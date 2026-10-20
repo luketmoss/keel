@@ -46,7 +46,8 @@ function rule(selector: string): string {
 
 describe('the Calendar CSS draws with these tokens', () => {
   it('shades bins 1-4 with --cal-shade-1..4', () => {
-    for (let b = 1; b <= 4; b++) expect(rule(`.calendar-shade-${b}`)).toMatch(new RegExp(`background:\\s*var\\(--cal-shade-${b}\\)`));
+    for (let b = 1; b <= 4; b++)
+      expect(rule(`.calendar-shade-${b}`)).toMatch(new RegExp(`background:\\s*var\\(--cal-shade-${b}\\)`));
   });
   it('turns the number and marks --cal-on-shade on a shaded day', () => {
     expect(rule('.calendar-day-shade .calendar-day-num')).toMatch(/color:\s*var\(--cal-on-shade\)/);
@@ -85,9 +86,11 @@ describe.each(THEMES)('calendar shading tokens (%s)', (theme) => {
     });
   }
 
-  it('the unshaded number is AA on the cell, the selected number on its fill, and today\'s on both', () => {
+  it("the unshaded number is AA on the cell, the selected number on its fill, and today's on both", () => {
     expect(contrast(token(theme, '--color-text'), token(theme, '--color-surface'))).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(token(theme, '--color-primary-on-light'), token(theme, '--color-primary-light'))).toBeGreaterThanOrEqual(4.5);
+    expect(
+      contrast(token(theme, '--color-primary-on-light'), token(theme, '--color-primary-light')),
+    ).toBeGreaterThanOrEqual(4.5);
     expect(contrast(token(theme, '--color-primary-text'), token(theme, '--color-surface'))).toBeGreaterThanOrEqual(4.5);
   });
 });
@@ -96,7 +99,9 @@ describe('Calendar components carry no literal colour', () => {
   const dir = resolve(__dirname, 'components/calendar');
   const files = readdirSync(dir).filter((f) => /\.tsx?$/.test(f) && !/\.test\./.test(f));
   it.each(files)('%s', (f) => {
-    const src = readFileSync(join(dir, f), 'utf-8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    const src = readFileSync(join(dir, f), 'utf-8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '');
     expect(src).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
     expect(src).not.toMatch(/\brgba?\(/);
   });

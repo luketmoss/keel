@@ -3,7 +3,10 @@
 // Usage: node frontend/scripts/seed.mjs <ACCESS_TOKEN>
 
 const TOKEN = process.argv[2];
-if (!TOKEN) { console.error('Usage: node seed.mjs <ACCESS_TOKEN>'); process.exit(1); }
+if (!TOKEN) {
+  console.error('Usage: node seed.mjs <ACCESS_TOKEN>');
+  process.exit(1);
+}
 
 const SHEET_ID = '1YvFnJsY9KlKmbRZ4CrFc67pFwGgjUpHc_LgMVQm2zeQ';
 const BASE = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}`;
@@ -17,7 +20,10 @@ async function clearTab(tabName) {
   if (!res.ok) throw new Error(`Read ${tabName} failed: ${res.status}`);
   const data = await res.json();
   const rowCount = data.values?.length || 0;
-  if (rowCount <= 1) { console.log(`✓ ${tabName}: already empty`); return; }
+  if (rowCount <= 1) {
+    console.log(`✓ ${tabName}: already empty`);
+    return;
+  }
 
   // Clear data rows (keep header)
   const clearUrl = `${BASE}/values/${encodeURIComponent(tabName + '!A2:Z' + rowCount)}:clear`;
@@ -125,10 +131,7 @@ function tpl(name) {
 function addExercise(template, order, exName, section, sets, reps, rest, groupRest) {
   const e = exercises[exName];
   if (!e) throw new Error(`Exercise not found: ${exName}`);
-  template.rows.push([
-    template.id, template.name, order, e.id, e.name,
-    section, sets, reps, rest, groupRest, now, now
-  ]);
+  template.rows.push([template.id, template.name, order, e.id, e.name, section, sets, reps, rest, groupRest, now, now]);
 }
 
 // === Workout 1: Upper Push A ===
@@ -221,15 +224,12 @@ function addSets(wk, exName, section, order, weight, repsArray, effort) {
   if (!e) throw new Error(`Exercise not found for sets: ${exName}`);
   // Find planned reps from template
   const tplRow = [t1, t2, t3, t4, t5, t6]
-    .find(t => t.id === wk.templateId)
-    ?.rows.find(r => r[3] === e.id && r[5] === section);
+    .find((t) => t.id === wk.templateId)
+    ?.rows.find((r) => r[3] === e.id && r[5] === section);
   const plannedReps = tplRow ? tplRow[7] : '';
 
   repsArray.forEach((reps, i) => {
-    wk.sets.push([
-      wk.id, e.id, e.name, section, order, i + 1,
-      plannedReps, weight, reps, effort, ''
-    ]);
+    wk.sets.push([wk.id, e.id, e.name, section, order, i + 1, plannedReps, weight, reps, effort, '']);
   });
 }
 
@@ -301,27 +301,30 @@ async function main() {
   await clearTab('Sets');
 
   // 2. Append exercises
-  const exerciseRows = Object.values(exercises).map(e => e.row);
+  const exerciseRows = Object.values(exercises).map((e) => e.row);
   console.log(`\nExercises: ${exerciseRows.length} unique`);
   await append('Exercises!A2:E', exerciseRows);
 
   // 3. Append templates
   const allTemplates = [t1, t2, t3, t4, t5, t6];
-  const templateRows = allTemplates.flatMap(t => t.rows);
+  const templateRows = allTemplates.flatMap((t) => t.rows);
   console.log(`Templates: ${allTemplates.length} templates, ${templateRows.length} rows`);
   await append('Templates!A2:L', templateRows);
 
   // 4. Append workouts
-  const workoutRows = allWorkouts.map(w => w.row);
+  const workoutRows = allWorkouts.map((w) => w.row);
   console.log(`\nWorkouts: ${workoutRows.length}`);
   await append('Workouts!A2:J', workoutRows);
 
   // 5. Append sets
-  const setRows = allWorkouts.flatMap(w => w.sets);
+  const setRows = allWorkouts.flatMap((w) => w.sets);
   console.log(`Sets: ${setRows.length} total`);
   await append('Sets!A2:K', setRows);
 
   console.log('\nDone! Check your Google Sheet.');
 }
 
-main().catch(err => { console.error(err.message); process.exit(1); });
+main().catch((err) => {
+  console.error(err.message);
+  process.exit(1);
+});

@@ -65,7 +65,15 @@ describe('AC3: overlay tokens defined in both themes', () => {
   });
 
   it('dark: --overlay-xs through --overlay-3xl use rgba(255,255,255,...)', () => {
-    ['--overlay-xs', '--overlay-sm', '--overlay-md', '--overlay-lg', '--overlay-xl', '--overlay-2xl', '--overlay-3xl'].forEach((token) => {
+    [
+      '--overlay-xs',
+      '--overlay-sm',
+      '--overlay-md',
+      '--overlay-lg',
+      '--overlay-xl',
+      '--overlay-2xl',
+      '--overlay-3xl',
+    ].forEach((token) => {
       const val = tokenValue(darkBlock, token);
       expect(val).not.toBeNull();
       expect(val).toMatch(/rgba\(255,\s*255,\s*255,/);

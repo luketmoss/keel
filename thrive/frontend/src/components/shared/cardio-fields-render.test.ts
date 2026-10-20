@@ -13,19 +13,26 @@ afterEach(cleanup);
 const EMPTY: CardioValues = { distance: '', ascent: '', descent: '', avgHr: '' };
 
 function renderFields(workoutType: string, subType: string, values = EMPTY) {
-  return render(h(CardioFields, {
-    workoutType, subType, values, onChange: vi.fn(), idPrefix: 't',
-  } as never));
+  return render(
+    h(CardioFields, {
+      workoutType,
+      subType,
+      values,
+      onChange: vi.fn(),
+      idPrefix: 't',
+    } as never),
+  );
 }
 
-const labels = () => Array.from(document.querySelectorAll('label.form-label'))
-  .map((el) => el.textContent);
+const labels = () => Array.from(document.querySelectorAll('label.form-label')).map((el) => el.textContent);
 
 describe('AC4: the legend comes from a type map, not a ternary', () => {
   it('names the activity for each type', () => {
     for (const [type, legend] of [
-      ['bike', 'Ride details'], ['hike', 'Hike details'],
-      ['run', 'Run details'], ['walk', 'Walk details'],
+      ['bike', 'Ride details'],
+      ['hike', 'Hike details'],
+      ['run', 'Run details'],
+      ['walk', 'Walk details'],
     ] as const) {
       cleanup();
       renderFields(type, '');

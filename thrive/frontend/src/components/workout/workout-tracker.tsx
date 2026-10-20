@@ -1,6 +1,22 @@
 import { useState, useEffect, useRef, useCallback, useId } from 'preact/hooks';
-import { activeWorkoutSets, activeWarmupExercises, isEditMode, workouts, pendingSyncCount, isSyncing, showToast } from '../../state/store';
-import { saveSet, removeSet, finishWorkout, deleteWorkout, saveWorkoutEdits, exitEditMode, saveExerciseOrders } from '../../state/actions';
+import {
+  activeWorkoutSets,
+  activeWarmupExercises,
+  isEditMode,
+  workouts,
+  pendingSyncCount,
+  isSyncing,
+  showToast,
+} from '../../state/store';
+import {
+  saveSet,
+  removeSet,
+  finishWorkout,
+  deleteWorkout,
+  saveWorkoutEdits,
+  exitEditMode,
+  saveExerciseOrders,
+} from '../../state/actions';
 import { flushQueue, remapQueuedOrders } from '../../api/sync-queue';
 import type { QueuedOrderMap } from '../../api/sync-queue';
 import { ReauthFailedError } from '../../auth/reauth';
@@ -26,7 +42,13 @@ import { shiftTrackerRows } from './row-shift';
 import { unclaimedRowFor } from './adopt-row';
 import { orderWrites, queuedOrderMap } from './order-writes';
 import { ask } from '../../state/confirm';
-import { discardChangesCopy, discardWorkoutCopy, finishUnsyncedCopy, removeExerciseCopy, replaceSetsCopy } from '../shared/confirm-copy';
+import {
+  discardChangesCopy,
+  discardWorkoutCopy,
+  finishUnsyncedCopy,
+  removeExerciseCopy,
+  replaceSetsCopy,
+} from '../shared/confirm-copy';
 
 /** Finish's toast when the exercise order or sections could not be written (#392 AC3, #395). */
 export const ORDER_SAVE_FAILED = "Couldn't save the exercise order and sections. Try again.";
@@ -58,8 +80,7 @@ interface Props {
  * builders; the order-based fallback, as the render key uses, only covers a
  * card that somehow lacks one. Client-only: never in a payload.
  */
-const trackerRowKey = (ex: TrackerExercise): string =>
-  ex.rowKey ?? `${ex.exercise_id}-${ex.exercise_order}`;
+const trackerRowKey = (ex: TrackerExercise): string => ex.rowKey ?? `${ex.exercise_id}-${ex.exercise_order}`;
 
 /** A pending save's timer: one per set of a card, whatever its order (#389). */
 const saveTimerKey = (exKey: string, setNumber: number): string => `${exKey}__${setNumber}`;
@@ -88,7 +109,7 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
   const [exerciseList, setExerciseListState] = useState<TrackerExercise[]>([]);
   const [showExercisePicker, setShowExercisePicker] = useState(false);
   const [finishing, setFinishing] = useState(false);
-  const [notes, setNotes] = useState(editMode ? (workout?.notes || '') : '');
+  const [notes, setNotes] = useState(editMode ? workout?.notes || '' : '');
   const [showFinishForm, setShowFinishForm] = useState(false);
   const reorder = useReorderFocus();
   const saveTimers = useRef<Map<string, number>>(new Map());
@@ -119,7 +140,9 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
   }, []);
   useEffect(() => {
     rowDeleteListeners.add(onOtherRowDelete);
-    return () => { rowDeleteListeners.delete(onOtherRowDelete); };
+    return () => {
+      rowDeleteListeners.delete(onOtherRowDelete);
+    };
   }, []);
   // Remove set taps whose write has not finished: a repeat tap is ignored.
   const pendingRemovals = useRef<Set<string>>(new Set());
@@ -160,22 +183,27 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
 
     // A set with no row may already have one: an offline save the queue
     // has since flushed. Take it rather than append a second (#389).
-    const ownRow = currentSet.sheetRow > 0
-      ? currentSet.sheetRow
-      : unclaimedRowFor(listRef.current, workoutId, current, currentSet, activeWorkoutSets.value);
+    const ownRow =
+      currentSet.sheetRow > 0
+        ? currentSet.sheetRow
+        : unclaimedRowFor(listRef.current, workoutId, current, currentSet, activeWorkoutSets.value);
 
-    const result = await saveSet({
-      workout_id: workoutId,
-      exercise_id: current.exercise_id,
-      exercise_name: current.exercise_name,
-      section: current.section,
-      exercise_order: current.exercise_order,
-      set_number: currentSet.set_number,
-      planned_reps: currentSet.planned_reps,
-      weight: currentSet.weight,
-      reps: currentSet.reps,
-      effort: currentSet.effort,
-    }, token, ownRow);
+    const result = await saveSet(
+      {
+        workout_id: workoutId,
+        exercise_id: current.exercise_id,
+        exercise_name: current.exercise_name,
+        section: current.section,
+        exercise_order: current.exercise_order,
+        set_number: currentSet.set_number,
+        planned_reps: currentSet.planned_reps,
+        weight: currentSet.weight,
+        reps: currentSet.reps,
+        effort: currentSet.effort,
+      },
+      token,
+      ownRow,
+    );
 
     // Mark as saved, on this exercise's own card wherever it now sits
     updateList((prev) =>
@@ -184,9 +212,7 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
           ? {
               ...e,
               sets: e.sets.map((s) =>
-                s.set_number === setNumber
-                  ? { ...s, saved: true, sheetRow: result.sheetRow }
-                  : s,
+                s.set_number === setNumber ? { ...s, saved: true, sheetRow: result.sheetRow } : s,
               ),
             }
           : e,
@@ -233,32 +259,35 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
   // from the latest list when its write starts: the exercise may have moved,
   // and its rows shifted, since the edit (#389, #394). The row key itself
   // never leaves the client.
-  const debouncedSave = useCallback((ex: TrackerExercise, set: TrackerSet) => {
-    if (!token || editMode) return;
-    // Only save if there's meaningful data
-    if (!set.weight && !set.reps) return;
+  const debouncedSave = useCallback(
+    (ex: TrackerExercise, set: TrackerSet) => {
+      if (!token || editMode) return;
+      // Only save if there's meaningful data
+      if (!set.weight && !set.reps) return;
 
-    const exKey = trackerRowKey(ex);
-    const key = saveTimerKey(exKey, set.set_number);
-    const existing = saveTimers.current.get(key);
-    if (existing) clearTimeout(existing);
+      const exKey = trackerRowKey(ex);
+      const key = saveTimerKey(exKey, set.set_number);
+      const existing = saveTimers.current.get(key);
+      if (existing) clearTimeout(existing);
 
-    const timer = window.setTimeout(() => {
-      saveTimers.current.delete(key);
+      const timer = window.setTimeout(() => {
+        saveTimers.current.delete(key);
 
-      // The write waits for any write ahead of it (a delete shifting rows),
-      // then reads the set from the latest list (#394).
-      void enqueueWrite(async () => {
-        try {
-          await saveOwnRow(exKey, set.set_number);
-        } catch {
-          // Error toast shown by saveSet action
-        }
-      });
-    }, 1000);
+        // The write waits for any write ahead of it (a delete shifting rows),
+        // then reads the set from the latest list (#394).
+        void enqueueWrite(async () => {
+          try {
+            await saveOwnRow(exKey, set.set_number);
+          } catch {
+            // Error toast shown by saveSet action
+          }
+        });
+      }, 1000);
 
-    saveTimers.current.set(key, timer);
-  }, [token, workoutId, editMode]);
+      saveTimers.current.set(key, timer);
+    },
+    [token, workoutId, editMode],
+  );
 
   const handleUpdateSet = (
     exerciseId: string,
@@ -271,9 +300,7 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
         if (ex.exercise_id !== exerciseId || ex.exercise_order !== exerciseOrder) return ex;
         return {
           ...ex,
-          sets: ex.sets.map((s) =>
-            s.set_number === setNumber ? { ...s, ...updates, saved: false } : s,
-          ),
+          sets: ex.sets.map((s) => (s.set_number === setNumber ? { ...s, ...updates, saved: false } : s)),
         };
       });
 
@@ -361,8 +388,8 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
       for (;;) {
         const ex = current();
         if (!ex) return false; // already gone: a repeat tap deletes nothing
-        const next = removal(listRef.current, ex).removedSets
-          .filter((s) => s.sheetRow > 0)
+        const next = removal(listRef.current, ex)
+          .removedSets.filter((s) => s.sheetRow > 0)
           .sort((a, b) => b.sheetRow - a.sheetRow)[0];
         if (!next) break;
         try {
@@ -413,9 +440,7 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
   };
 
   const findExercise = (exerciseId: string, exerciseOrder: number) =>
-    listRef.current.find(
-      (e) => e.exercise_id === exerciseId && e.exercise_order === exerciseOrder,
-    );
+    listRef.current.find((e) => e.exercise_id === exerciseId && e.exercise_order === exerciseOrder);
 
   const handleCopyDown = async (exerciseId: string, exerciseOrder: number, lastTimeSets: SetWithRow[]) => {
     const ex = findExercise(exerciseId, exerciseOrder);
@@ -428,8 +453,7 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
       if (!ok) return;
     }
 
-    const removal: Removal = (list, e) =>
-      applyCopyDown(list, e.exercise_id, e.exercise_order, lastTimeSets);
+    const removal: Removal = (list, e) => applyCopyDown(list, e.exercise_id, e.exercise_order, lastTimeSets);
 
     // In edit mode, don't delete from API — just update local state
     if (editMode || !token || removal(listRef.current, ex).removedSets.length === 0) {
@@ -504,8 +528,7 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
     const ex = findExercise(exerciseId, exerciseOrder);
     if (!ex?.rowKey) return;
 
-    const removal: Removal = (list, e) =>
-      applyChangeSection(list, e.exercise_id, e.exercise_order, newSection);
+    const removal: Removal = (list, e) => applyChangeSection(list, e.exercise_id, e.exercise_order, newSection);
 
     // In edit mode, don't delete from API
     if (editMode || removal(listRef.current, ex).removedSets.length === 0) {
@@ -531,9 +554,7 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
   // state updater; a move from an end does nothing at all.
   const handleMove = (exerciseId: string, exerciseOrder: number, dir: MoveDirection) => {
     const sorted = [...listRef.current].sort((a, b) => a.exercise_order - b.exercise_order);
-    const from = sorted.findIndex(
-      (e) => e.exercise_id === exerciseId && e.exercise_order === exerciseOrder,
-    );
+    const from = sorted.findIndex((e) => e.exercise_id === exerciseId && e.exercise_order === exerciseOrder);
     const to = dir === 'up' ? from - 1 : from + 1;
     if (from < 0 || to < 0 || to >= sorted.length) return;
     const moved = sorted[from];
@@ -580,15 +601,17 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
       section: 'primary',
       exercise_order: maxOrder + 1,
       rowKey: newRowKey(),
-      sets: [{
-        set_number: 1,
-        planned_reps: '',
-        weight: '',
-        reps: '',
-        effort: '',
-        saved: false,
-        sheetRow: -1,
-      }],
+      sets: [
+        {
+          set_number: 1,
+          planned_reps: '',
+          weight: '',
+          reps: '',
+          effort: '',
+          saved: false,
+          sheetRow: -1,
+        },
+      ],
       quickFillWeight: '',
       quickFillReps: '',
       quickFillEffort: '',
@@ -621,7 +644,11 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
         // Weight workouts have no cardio or venue inputs, so those fields are
         // left out and never written; nor is any input left untouched.
         editInputsToPatch(editInitial, {
-          date: editDate, name: editName, duration: editDuration, notes, effort: editEffort,
+          date: editDate,
+          name: editName,
+          duration: editDuration,
+          notes,
+          effort: editEffort,
         }),
         editedSets,
         token,
@@ -712,15 +739,9 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
   return (
     <div class="screen workout-tracker">
       <div class="workout-tracker-header">
-        <h2 class="workout-tracker-title">
-          {editMode ? `Edit: ${workoutName}` : workoutName}
-        </h2>
+        <h2 class="workout-tracker-title">{editMode ? `Edit: ${workoutName}` : workoutName}</h2>
         {editMode ? (
-          <button
-            class="btn btn-primary"
-            onClick={handleSaveEdits}
-            disabled={finishing}
-          >
+          <button class="btn btn-primary" onClick={handleSaveEdits} disabled={finishing}>
             {finishing ? 'Saving...' : 'Save Changes'}
           </button>
         ) : (
@@ -759,9 +780,7 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
           aria-live="polite"
           aria-label={`${pendingSyncCount.value} unsynced set${pendingSyncCount.value === 1 ? '' : 's'}, tap to sync now`}
         >
-          {isSyncing.value
-            ? 'Syncing…'
-            : `${pendingSyncCount.value} unsynced — Sync now`}
+          {isSyncing.value ? 'Syncing…' : `${pendingSyncCount.value} unsynced — Sync now`}
         </button>
       )}
 
@@ -769,7 +788,9 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
       {editMode && (
         <div class="finish-form" style={{ marginBottom: 'var(--space-md)' }}>
           <div class="form-group">
-            <label class="form-label" htmlFor="tracker-edit-name">Name</label>
+            <label class="form-label" htmlFor="tracker-edit-name">
+              Name
+            </label>
             <input
               id="tracker-edit-name"
               class="form-input"
@@ -779,7 +800,9 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
             />
           </div>
           <div class="form-group">
-            <label class="form-label" htmlFor="tracker-edit-date">Date</label>
+            <label class="form-label" htmlFor="tracker-edit-date">
+              Date
+            </label>
             <input
               id="tracker-edit-date"
               class="form-input"
@@ -789,7 +812,9 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
             />
           </div>
           <div class="form-group">
-            <label class="form-label" htmlFor="tracker-edit-duration">Duration (minutes)</label>
+            <label class="form-label" htmlFor="tracker-edit-duration">
+              Duration (minutes)
+            </label>
             <input
               id="tracker-edit-duration"
               class="form-input"
@@ -801,7 +826,9 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
             />
           </div>
           <div class="form-group">
-            <span class="form-label" id={effortLabelId}>Session Effort (optional)</span>
+            <span class="form-label" id={effortLabelId}>
+              Session Effort (optional)
+            </span>
             <EffortToggle
               value={editEffort}
               onChange={setEditEffort}
@@ -811,7 +838,9 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
             />
           </div>
           <div class="form-group">
-            <label class="form-label" htmlFor="tracker-edit-notes">Notes</label>
+            <label class="form-label" htmlFor="tracker-edit-notes">
+              Notes
+            </label>
             <textarea
               id="tracker-edit-notes"
               class="form-textarea"
@@ -838,11 +867,7 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
       )}
 
       {/* aria-live region for reorder announcements */}
-      <div
-        role="status"
-        aria-live="polite"
-        class="sr-only"
-      >
+      <div role="status" aria-live="polite" class="sr-only">
         {reorder.announcement}
       </div>
 
@@ -861,28 +886,14 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
               key={trackerRowKey(ex)}
               exercise={ex}
               currentWorkoutId={workoutId}
-              onUpdateSet={(setNum, updates) =>
-                handleUpdateSet(ex.exercise_id, ex.exercise_order, setNum, updates)
-              }
+              onUpdateSet={(setNum, updates) => handleUpdateSet(ex.exercise_id, ex.exercise_order, setNum, updates)}
               onAddSet={() => handleAddSet(ex.exercise_id, ex.exercise_order)}
-              onRemoveSet={(setNum) =>
-                handleRemoveSet(ex.exercise_id, ex.exercise_order, setNum)
-              }
-              onQuickFillWeight={(weight) =>
-                handleQuickFillWeight(ex.exercise_id, ex.exercise_order, weight)
-              }
-              onQuickFillReps={(reps) =>
-                handleQuickFillReps(ex.exercise_id, ex.exercise_order, reps)
-              }
-              onQuickFillEffort={(effort) =>
-                handleQuickFillEffort(ex.exercise_id, ex.exercise_order, effort)
-              }
-              onCopyDown={(lastTimeSets) =>
-                handleCopyDown(ex.exercise_id, ex.exercise_order, lastTimeSets)
-              }
-              onChangeSection={(newSection) =>
-                handleChangeSection(ex.exercise_id, ex.exercise_order, newSection)
-              }
+              onRemoveSet={(setNum) => handleRemoveSet(ex.exercise_id, ex.exercise_order, setNum)}
+              onQuickFillWeight={(weight) => handleQuickFillWeight(ex.exercise_id, ex.exercise_order, weight)}
+              onQuickFillReps={(reps) => handleQuickFillReps(ex.exercise_id, ex.exercise_order, reps)}
+              onQuickFillEffort={(effort) => handleQuickFillEffort(ex.exercise_id, ex.exercise_order, effort)}
+              onCopyDown={(lastTimeSets) => handleCopyDown(ex.exercise_id, ex.exercise_order, lastTimeSets)}
+              onChangeSection={(newSection) => handleChangeSection(ex.exercise_id, ex.exercise_order, newSection)}
               onMoveUp={() => handleMove(ex.exercise_id, ex.exercise_order, 'up')}
               onMoveDown={() => handleMove(ex.exercise_id, ex.exercise_order, 'down')}
               onRemoveExercise={() => handleRemoveExercise(ex.exercise_id, ex.exercise_order)}
@@ -912,10 +923,7 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
       </button>
 
       {showExercisePicker && (
-        <AddExerciseModal
-          onSelect={handleAddExercise}
-          onClose={() => setShowExercisePicker(false)}
-        />
+        <AddExerciseModal onSelect={handleAddExercise} onClose={() => setShowExercisePicker(false)} />
       )}
     </div>
   );

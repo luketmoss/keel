@@ -59,7 +59,9 @@ describe('Trends components carry no literal colour', () => {
   const files = readdirSync(dir).filter((f) => /\.tsx?$/.test(f) && !/\.test\./.test(f));
   it.each(files)('%s', (f) => {
     // Comments cite issues (#242) and are not colours.
-    const src = readFileSync(join(dir, f), 'utf-8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    const src = readFileSync(join(dir, f), 'utf-8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '');
     expect(src).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
     expect(src).not.toMatch(/\brgba?\(/);
   });

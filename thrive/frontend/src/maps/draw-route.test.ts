@@ -9,8 +9,14 @@ const track = (coordinates: [number, number][]): WorkoutTrack => ({
   type: 'Feature',
   bbox: [0, 0, 0, 0],
   properties: {
-    format: 'thrive-track', version: 1, source: 'coros', activity_id: '1', start_utc: '2026-06-01T14:00:00.000Z',
-    t: coordinates.map((_, i) => i), ele: coordinates.map(() => null), simplify: { algorithm: 'rdp', tolerance_m: 5 },
+    format: 'thrive-track',
+    version: 1,
+    source: 'coros',
+    activity_id: '1',
+    start_utc: '2026-06-01T14:00:00.000Z',
+    t: coordinates.map((_, i) => i),
+    ele: coordinates.map(() => null),
+    simplify: { algorithm: 'rdp', tolerance_m: 5 },
     points_in: coordinates.length,
   },
   geometry: { type: 'LineString', coordinates },
@@ -33,7 +39,12 @@ afterEach(() => {
   container.remove();
 });
 
-const LOOP: [number, number][] = [[-100, 45], [-100.01, 45.002], [-100.02, 45], [-100, 45]];
+const LOOP: [number, number][] = [
+  [-100, 45],
+  [-100.01, 45.002],
+  [-100.02, 45],
+  [-100, 45],
+];
 
 describe('routePoints: geometry comes from @keel/geo', () => {
   it('turns [lon, lat] into {lat, lng}', () => {
@@ -41,7 +52,14 @@ describe('routePoints: geometry comes from @keel/geo', () => {
   });
 
   it('drops invalid latitudes and unwraps the antimeridian', () => {
-    const points = routePoints(track([[179.9, 10], [-179.9, 10.1], [0, 95], [-179.8, 10.2]]));
+    const points = routePoints(
+      track([
+        [179.9, 10],
+        [-179.9, 10.1],
+        [0, 95],
+        [-179.8, 10.2],
+      ]),
+    );
     expect(points).toHaveLength(3);
     // The second point is carried across the date line instead of jumping the long way round.
     expect(points[1].lng).toBeCloseTo(180.1, 5);
@@ -78,8 +96,14 @@ describe('drawRoute', () => {
     expect(state.maps).toHaveLength(1);
     expect(state.maps[0].container).toBe(container);
     expect(MAP_OPTIONS).toMatchObject({
-      gestureHandling: 'cooperative', streetViewControl: false, rotateControl: false, tilt: 0, clickableIcons: false,
-      zoomControl: true, mapTypeControl: true, fullscreenControl: true,
+      gestureHandling: 'cooperative',
+      streetViewControl: false,
+      rotateControl: false,
+      tilt: 0,
+      clickableIcons: false,
+      zoomControl: true,
+      mapTypeControl: true,
+      fullscreenControl: true,
     });
     expect(state.maps[0].options).toMatchObject(MAP_OPTIONS);
   });
@@ -92,7 +116,15 @@ describe('drawRoute', () => {
 
   it('refuses a track with fewer than two usable points, drawing nothing', () => {
     expect(drawRoute(container, track([[-100, 45]]))).toBeNull();
-    expect(drawRoute(container, track([[-100, 95], [-100.1, 96]]))).toBeNull();
+    expect(
+      drawRoute(
+        container,
+        track([
+          [-100, 95],
+          [-100.1, 96],
+        ]),
+      ),
+    ).toBeNull();
     expect(state.maps).toHaveLength(0);
     expect(state.polylines).toHaveLength(0);
   });

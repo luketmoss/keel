@@ -41,9 +41,18 @@ beforeEach(() => {
   syncAsk.value = 'idle';
   syncRequests.value = [];
   demoSyncPressedAt.value = null;
-  appendSyncRequests.mockReset().mockImplementation(async () => { events.push(`append:${syncAsk.value}`); return { rows: ROWS, token: TOKEN }; });
-  fetchSyncRequests.mockReset().mockImplementation(async () => { events.push('read'); return []; });
-  requestSync.mockReset().mockImplementation(async () => { events.push(`call:${syncAsk.value}`); return { ok: true }; });
+  appendSyncRequests.mockReset().mockImplementation(async () => {
+    events.push(`append:${syncAsk.value}`);
+    return { rows: ROWS, token: TOKEN };
+  });
+  fetchSyncRequests.mockReset().mockImplementation(async () => {
+    events.push('read');
+    return [];
+  });
+  requestSync.mockReset().mockImplementation(async () => {
+    events.push(`call:${syncAsk.value}`);
+    return { ok: true };
+  });
   warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
@@ -68,7 +77,12 @@ describe('requestSyncNow (#410)', () => {
 
   it('re-reads after the call settles, not before', async () => {
     let settle!: (v: unknown) => void;
-    requestSync.mockImplementation(() => new Promise((r) => { settle = r; }));
+    requestSync.mockImplementation(
+      () =>
+        new Promise((r) => {
+          settle = r;
+        }),
+    );
     const pending = requestSyncNow(TOKEN, '', ['coros']);
     await vi.waitFor(() => expect(fetchSyncRequests).toHaveBeenCalledTimes(1));
     await new Promise((r) => setTimeout(r, 0));
@@ -89,7 +103,8 @@ describe('requestSyncNow (#410)', () => {
       const line = String(warn.mock.calls[0][0]);
       expect(line).toContain(kind);
       expect(line).not.toContain(TOKEN);
-    });
+    },
+  );
 
   it('with no API URL nothing was called, so it reads once, as before, and warns once', async () => {
     requestSync.mockResolvedValue({ ok: false, kind: 'no_api_url' });

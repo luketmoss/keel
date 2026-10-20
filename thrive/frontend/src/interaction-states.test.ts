@@ -25,21 +25,62 @@ const here = dirname(fileURLToPath(import.meta.url));
 const FAMILIES = {
   'Filled buttons': ['btn-primary', 'btn-danger', 'fab', 'login-btn'],
   'Quiet buttons': [
-    'btn-secondary', 'btn-ghost', 'btn-link', 'template-editor-back', 'login-link', 'filter-clear',
-    'manage-labels-link', 'day-today-btn', 'training-plan-link', 'detail-coros-link',
+    'btn-secondary',
+    'btn-ghost',
+    'btn-link',
+    'template-editor-back',
+    'login-link',
+    'filter-clear',
+    'manage-labels-link',
+    'day-today-btn',
+    'training-plan-link',
+    'detail-coros-link',
   ],
   'Icon buttons': [
-    'btn-icon', 'modal-close', 'day-arrow', 'set-remove-btn', 'compact-card-remove', 'last-time-close-btn',
-    'copy-down-btn', 'reorder-btn', 'exercise-toolbar-btn', 'manage-label-delete', 'day-sync-btn', 'sync-now-btn',
+    'btn-icon',
+    'modal-close',
+    'day-arrow',
+    'set-remove-btn',
+    'compact-card-remove',
+    'last-time-close-btn',
+    'copy-down-btn',
+    'reorder-btn',
+    'exercise-toolbar-btn',
+    'manage-label-delete',
+    'day-sync-btn',
+    'sync-now-btn',
   ],
   'Chips and toggles': [
-    'filter-chip', 'label-chip', 'tag-badge', 'effort-btn', 'sub-type-btn', 'theme-toggle-btn', 'trends-group-btn',
-    'library-switch-btn', 'color-swatch', 'section-badge-btn', 'section-picker-pill', 'week-day',
+    'filter-chip',
+    'label-chip',
+    'tag-badge',
+    'effort-btn',
+    'sub-type-btn',
+    'theme-toggle-btn',
+    'trends-group-btn',
+    'library-switch-btn',
+    'color-swatch',
+    'section-badge-btn',
+    'section-picker-pill',
+    'week-day',
   ],
   'Rows and cards': [
-    'exercise-list-item', 'create-new-row', 'template-card', 'workout-card', 'compact-card-body', 'type-card',
-    'trend-row-link', 'trend-open-day', 'calendar-open-day', 'calendar-day', 'manage-label-name', 'add-set-btn',
-    'sync-status-bar', 'settings-btn', 'exercise-list-item-header', 'settings-row-link',
+    'exercise-list-item',
+    'create-new-row',
+    'template-card',
+    'workout-card',
+    'compact-card-body',
+    'type-card',
+    'trend-row-link',
+    'trend-open-day',
+    'calendar-open-day',
+    'calendar-day',
+    'manage-label-name',
+    'add-set-btn',
+    'sync-status-bar',
+    'settings-btn',
+    'exercise-list-item-header',
+    'settings-row-link',
   ],
   Navigation: ['bottom-nav-tab'],
   Fields: ['form-input', 'form-select', 'form-textarea'],
@@ -120,7 +161,10 @@ function strings(node: ts.Node, acc: string[] = []): string[] {
       strings(span.expression, acc);
       acc.push(span.literal.text);
     }
-  } else ts.forEachChild(node, (c) => { strings(c, acc); });
+  } else
+    ts.forEachChild(node, (c) => {
+      strings(c, acc);
+    });
   return acc;
 }
 
@@ -134,7 +178,8 @@ function scan(): Control[] {
     const sf = ts.createSourceFile(path, readFileSync(path, 'utf-8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
     const locals = new Map<string, ts.Expression>();
     const collect = (n: ts.Node) => {
-      if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.initializer) locals.set(n.name.text, n.initializer);
+      if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.initializer)
+        locals.set(n.name.text, n.initializer);
       ts.forEachChild(n, collect);
     };
     collect(sf);
@@ -147,7 +192,10 @@ function scan(): Control[] {
       if (found.join('').trim() === '' && ts.isIdentifier(expr) && locals.has(expr.text)) {
         found = strings(locals.get(expr.text)!);
       }
-      const tokens = found.join(' ').split(/\s+/).filter((t) => /^[a-z][\w-]*[a-z0-9]$/.test(t));
+      const tokens = found
+        .join(' ')
+        .split(/\s+/)
+        .filter((t) => /^[a-z][\w-]*[a-z0-9]$/.test(t));
       if (tokens.length === 0) {
         const key = `${file}|${expr.getText(sf)}`;
         if (DYNAMIC[key]) {
@@ -175,7 +223,9 @@ function scan(): Control[] {
           tag === 'button' ||
           (tag === 'a' && attrs.has('href')) ||
           role === 'button' ||
-          tag === 'input' || tag === 'select' || tag === 'textarea';
+          tag === 'input' ||
+          tag === 'select' ||
+          tag === 'textarea';
         if (isControl) {
           let childrenAreElements = true;
           if (ts.isJsxOpeningElement(n)) {
@@ -327,8 +377,7 @@ function cascade(el: Element, state: State = {}): Map<string, { value: string; s
   set('data-s-hover', state.hover);
   set('data-s-active', state.active);
   set('data-s-focus', state.focus);
-  const allowed = (media: string[]) =>
-    media.every((m) => m === HOVER_MEDIA && state.hoverDevice !== false);
+  const allowed = (media: string[]) => media.every((m) => m === HOVER_MEDIA && state.hoverDevice !== false);
   const won = new Map<string, { value: string; selector: string; rank: number[] }>();
   for (const r of rules) {
     if (!allowed(r.media)) continue;
@@ -406,7 +455,7 @@ function representative(cls: string): HTMLElement {
 // ── AC1: families ───────────────────────────────────────────────────────────
 
 describe('AC1: every control class is in exactly one family', () => {
-  it('the families match the design note\'s Families table', () => {
+  it("the families match the design note's Families table", () => {
     const note = readFileSync(resolve(here, '../../docs/design/404-interaction-states.md'), 'utf-8');
     const table = note.slice(note.indexOf('## Families'), note.indexOf('## Edge cases'));
     const fromNote: Record<string, string[]> = {};
@@ -451,7 +500,9 @@ describe('AC1: every control class is in exactly one family', () => {
 
   it('every family class is still rendered by some control', () => {
     const rendered = new Set(controls.flatMap((c) => c.classes));
-    const stale = ALL_FAMILY_CLASSES.filter((c) => !rendered.has(c) && !(c in RENDERED_ELSEWHERE) && !(c in NOT_RENDERED));
+    const stale = ALL_FAMILY_CLASSES.filter(
+      (c) => !rendered.has(c) && !(c in RENDERED_ELSEWHERE) && !(c in NOT_RENDERED),
+    );
     expect(stale).toEqual([]);
   });
 });
@@ -466,7 +517,9 @@ describe('AC2: a disabled .btn is dimmed, default-cursor and unmoved by hover', 
     expect(value(el, 'cursor')).toBe('default');
     for (const prop of ['background-color', 'background-image']) {
       for (const hover of [{ hover: true }, { active: true }, { hover: true, active: true }]) {
-        expect(value(el, prop, { ...hover, hoverDevice: true }), `${prop} ${JSON.stringify(hover)}`).toBe(value(el, prop));
+        expect(value(el, prop, { ...hover, hoverDevice: true }), `${prop} ${JSON.stringify(hover)}`).toBe(
+          value(el, prop),
+        );
       }
     }
   });
@@ -487,16 +540,20 @@ describe('AC2: a disabled .btn is dimmed, default-cursor and unmoved by hover', 
 });
 
 describe('AC3: one disabled opacity, the token', () => {
-  const disabledRules = rules.filter((r) => /:disabled|\[aria-disabled="true"\]/.test(r.selector.replace(/:not\((?:[^()]|\([^()]*\))*\)/g, '')));
+  const disabledRules = rules.filter((r) =>
+    /:disabled|\[aria-disabled="true"\]/.test(r.selector.replace(/:not\((?:[^()]|\([^()]*\))*\)/g, '')),
+  );
 
   it('every disabled rule that sets opacity uses --opacity-disabled', () => {
     const withOpacity = disabledRules.filter((r) => declarations(r.body).has('opacity'));
     expect(withOpacity.length).toBeGreaterThanOrEqual(3);
-    for (const r of withOpacity) expect(declarations(r.body).get('opacity')!.value, r.selector).toBe('var(--opacity-disabled)');
+    for (const r of withOpacity)
+      expect(declarations(r.body).get('opacity')!.value, r.selector).toBe('var(--opacity-disabled)');
   });
 
   it('no disabled rule sets cursor: not-allowed, and none says aria-disabled in single quotes', () => {
-    for (const r of disabledRules) expect(declarations(r.body).get('cursor')?.value, r.selector).not.toBe('not-allowed');
+    for (const r of disabledRules)
+      expect(declarations(r.body).get('cursor')?.value, r.selector).not.toBe('not-allowed');
     expect(css).not.toMatch(/\[aria-disabled='true'\]/);
   });
 
@@ -514,7 +571,16 @@ describe('AC4: an aria-disabled control dims, and its focus ring does not', () =
 
   it('found the aria-disabled controls', () => {
     expect(ariaControls.map((c) => c.classes[0] ?? c.tag).sort()).toEqual(
-      ['btn', 'day-sync-btn', 'exercise-toolbar-btn', 'exercise-toolbar-btn', 'input', 'reorder-btn', 'reorder-btn', 'btn'].sort(),
+      [
+        'btn',
+        'day-sync-btn',
+        'exercise-toolbar-btn',
+        'exercise-toolbar-btn',
+        'input',
+        'reorder-btn',
+        'reorder-btn',
+        'btn',
+      ].sort(),
     );
   });
 
@@ -600,7 +666,9 @@ const stateRules = rules.filter((r) => /:hover|:active/.test(r.selector));
 
 describe('AC7: hover applies only on a device that hovers', () => {
   it('every :hover selector is inside @media (hover: hover)', () => {
-    const outside = rules.filter((r) => r.selector.includes(':hover') && !r.media.includes(HOVER_MEDIA)).map((r) => r.selector);
+    const outside = rules
+      .filter((r) => r.selector.includes(':hover') && !r.media.includes(HOVER_MEDIA))
+      .map((r) => r.selector);
     expect(outside).toEqual([]);
   });
 
@@ -620,7 +688,9 @@ describe('Hover, on a device that hovers', () => {
   });
 
   it.each(FAMILIES['Filled buttons'])('.%s keeps its -fill-hover token', (cls) => {
-    expect(value(representative(cls), 'background-color', { hover: true, hoverDevice: true })).toMatch(/-fill-hover\)$/);
+    expect(value(representative(cls), 'background-color', { hover: true, hoverDevice: true })).toMatch(
+      /-fill-hover\)$/,
+    );
   });
 });
 
@@ -662,7 +732,10 @@ describe('AC8: every family but fields has a pressed state, and no state moves',
 
   it('every hover and pressed rule on a control that can be disabled excludes the disabled one', () => {
     const disablable = new Set(
-      controls.filter((c) => c.disabled || c.ariaDisabled).flatMap((c) => c.classes).filter((c) => ALL_FAMILY_CLASSES.includes(c)),
+      controls
+        .filter((c) => c.disabled || c.ariaDisabled)
+        .flatMap((c) => c.classes)
+        .filter((c) => ALL_FAMILY_CLASSES.includes(c)),
     );
     for (const c of ['btn-primary', 'btn-danger', 'btn-secondary', 'btn-ghost']) disablable.add(c);
     const unguarded = stateRules
@@ -680,7 +753,8 @@ describe('AC8: every family but fields has a pressed state, and no state moves',
 
 function rgba(colour: string): [number, number, number, number] {
   const hex = colour.match(/^#([0-9a-f]{6})$/i);
-  if (hex) return [0, 2, 4].map((i) => parseInt(hex[1].slice(i, i + 2), 16)).concat(1) as [number, number, number, number];
+  if (hex)
+    return [0, 2, 4].map((i) => parseInt(hex[1].slice(i, i + 2), 16)).concat(1) as [number, number, number, number];
   const m = colour.match(/^rgba\(\s*(\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\s*\)$/);
   if (!m) throw new Error(`not a colour: ${colour}`);
   return [Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4])];
@@ -705,15 +779,24 @@ function contrast(a: string, b: string): number {
 
 describe.each(THEMES)('AC9: --color-on-fill on every #183 fill, with the overlays applied (%s)', (theme) => {
   // control-contrast.test.ts's FILLS.
-  const FILLS = ['--color-primary-fill', '--color-primary-fill-hover', '--color-danger-fill', '--color-danger-fill-hover', '--color-success-fill'];
+  const FILLS = [
+    '--color-primary-fill',
+    '--color-primary-fill-hover',
+    '--color-danger-fill',
+    '--color-danger-fill-hover',
+    '--color-success-fill',
+  ];
   const text = resolveVar('var(--color-on-fill)', theme);
-  it.each(FILLS.flatMap((f) => ['--state-hover', '--state-pressed'].map((o) => [f, o] as const)))('%s under %s', (fill, overlay) => {
-    const base = resolveVar(`var(${fill})`, theme);
-    const shown = over(resolveVar(`var(${overlay})`, theme), base);
-    expect(contrast(text, shown), `${shown}`).toBeGreaterThanOrEqual(4.5);
-    // The overlay moves the fill away from its text, never toward it.
-    expect(contrast(text, shown)).toBeGreaterThanOrEqual(contrast(text, base));
-  });
+  it.each(FILLS.flatMap((f) => ['--state-hover', '--state-pressed'].map((o) => [f, o] as const)))(
+    '%s under %s',
+    (fill, overlay) => {
+      const base = resolveVar(`var(${fill})`, theme);
+      const shown = over(resolveVar(`var(${overlay})`, theme), base);
+      expect(contrast(text, shown), `${shown}`).toBeGreaterThanOrEqual(4.5);
+      // The overlay moves the fill away from its text, never toward it.
+      expect(contrast(text, shown)).toBeGreaterThanOrEqual(contrast(text, base));
+    },
+  );
 });
 
 // ── AC10: selected ──────────────────────────────────────────────────────────
@@ -739,7 +822,11 @@ describe('AC10: selected keeps its non-colour cue and its ARIA state', () => {
   it.each(Object.entries(SELECTED))('every .%s exposes its state', (cls, attrs) => {
     const found = controls.filter((c) => c.classes.includes(cls) && !c.classes.some((x) => NEVER_SELECTED.includes(x)));
     expect(found.length).toBeGreaterThan(0);
-    for (const c of found) expect(c.aria.some((a) => attrs.includes(a)), where(c)).toBe(true);
+    for (const c of found)
+      expect(
+        c.aria.some((a) => attrs.includes(a)),
+        where(c),
+      ).toBe(true);
   });
 
   const body = (selector: string) => {

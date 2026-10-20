@@ -17,7 +17,11 @@ import { fetchDailyHealth, fetchBodyMeasurements, fetchDailySummary } from './he
 describe('health reads in demo mode', () => {
   it('serve the demo history without calling Sheets or fetch', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network'));
-    const [h, b, s] = await Promise.all([fetchDailyHealth('tok'), fetchBodyMeasurements('tok'), fetchDailySummary('tok')]);
+    const [h, b, s] = await Promise.all([
+      fetchDailyHealth('tok'),
+      fetchBodyMeasurements('tok'),
+      fetchDailySummary('tok'),
+    ]);
     expect(h.length).toBeGreaterThan(60);
     expect(b.length).toBeGreaterThan(60);
     expect(s.length).toBeGreaterThan(60);

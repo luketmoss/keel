@@ -43,7 +43,10 @@ export type TrainingKind = 'done' | 'planned' | 'overdue';
  * planned and missed; today and later read what is planned, then what is done.
  * Done ones are by time, planned ones in sheet order.
  */
-export function trainingOrder(day: readonly WorkoutWithRow[], state: DayPanelProps['state']): Array<{ w: WorkoutWithRow; kind: TrainingKind }> {
+export function trainingOrder(
+  day: readonly WorkoutWithRow[],
+  state: DayPanelProps['state'],
+): Array<{ w: WorkoutWithRow; kind: TrainingKind }> {
   const planned = day.filter(isPlanned);
   const done = byTime(day.filter((w) => !isPlanned(w)));
   return state === 'past'
@@ -65,16 +68,26 @@ export function overdueForToday(all: readonly WorkoutWithRow[], today: string): 
 }
 
 /** A workout row, a link to `href` when there is an id to open. */
-function CardShell({ id, href, className, label, children }: {
+function CardShell({
+  id,
+  href,
+  className,
+  label,
+  children,
+}: {
   id: string;
   href: string;
   className: string;
   label?: string;
   children: preact.ComponentChildren;
 }) {
-  return id
-    ? <a class={className} href={href} data-workout-id={id} aria-label={label}>{children}</a>
-    : <div class={className}>{children}</div>;
+  return id ? (
+    <a class={className} href={href} data-workout-id={id} aria-label={label}>
+      {children}
+    </a>
+  ) : (
+    <div class={className}>{children}</div>
+  );
 }
 
 function DoneCard({ w }: { w: WorkoutWithRow }) {
@@ -83,14 +96,7 @@ function DoneCard({ w }: { w: WorkoutWithRow }) {
   const ascent = formatElevation(w.ascent_m);
   const descent = formatElevation(w.descent_m);
   const hr = formatHeartRate(w.avg_hr);
-  const meta = [
-    w.time,
-    distance,
-    duration,
-    ascent && `↑ ${ascent}`,
-    descent && `↓ ${descent}`,
-    hr,
-  ].filter(Boolean);
+  const meta = [w.time, distance, duration, ascent && `↑ ${ascent}`, descent && `↓ ${descent}`, hr].filter(Boolean);
   // #362: an in-progress workout goes straight back into the tracker, as the
   // Activities In Progress card does, with the same accessible name.
   const active = w.status === 'active';
@@ -110,9 +116,7 @@ function DoneCard({ w }: { w: WorkoutWithRow }) {
           {w.sub_type ? `${w.type} · ${w.sub_type}` : w.type}
         </span>
         {w.status === 'active' && <span class="type-badge badge-active">Active</span>}
-        {w.effort && (
-          <span class={`workout-effort workout-effort-${w.effort.toLowerCase()}`}>{w.effort}</span>
-        )}
+        {w.effort && <span class={`workout-effort workout-effort-${w.effort.toLowerCase()}`}>{w.effort}</span>}
       </span>
     </CardShell>
   );
@@ -122,7 +126,12 @@ function DoneCard({ w }: { w: WorkoutWithRow }) {
  * A planned or overdue card. It opens the read-only detail view, where Start
  * Workout is (#347 AC7), not the editor.
  */
-function PlannedCard({ w, overdue, plannedFor, className = '' }: {
+function PlannedCard({
+  w,
+  overdue,
+  plannedFor,
+  className = '',
+}: {
   w: WorkoutWithRow;
   overdue: boolean;
   /** Today, on a card carried onto it: adds "Planned <formatPlannedDate>". */
@@ -139,7 +148,11 @@ function PlannedCard({ w, overdue, plannedFor, className = '' }: {
   }
   const meta = [counts, formatEstimate(w.estimated_seconds)].filter(Boolean).join(' · ');
   return (
-    <CardShell id={w.id} href={`#/history/${w.id}`} className={`workout-card training-card workout-card-planned${className}`}>
+    <CardShell
+      id={w.id}
+      href={`#/history/${w.id}`}
+      className={`workout-card training-card workout-card-planned${className}`}
+    >
       <div class="workout-card-center">
         <span class="workout-name">{w.name || w.type}</span>
         {meta && <span class="workout-meta">{meta}</span>}
@@ -175,7 +188,11 @@ interface FocusRequest {
  * holding the card link and, below it and never inside it, the actions row or,
  * while rescheduling, the date row in its place.
  */
-function OverdueCard({ w, today, onSettled }: {
+function OverdueCard({
+  w,
+  today,
+  onSettled,
+}: {
   w: WorkoutWithRow;
   today: string;
   onSettled: (req: FocusRequest) => void;
@@ -248,7 +265,9 @@ function OverdueCard({ w, today, onSettled }: {
       <PlannedCard w={w} overdue plannedFor={today} className=" training-overdue-link" />
       {editing ? (
         <div class="training-overdue-row training-reschedule">
-          <label class="form-label training-reschedule-label" for={fieldId}>New date</label>
+          <label class="form-label training-reschedule-label" for={fieldId}>
+            New date
+          </label>
           <input
             ref={dateRef}
             id={fieldId}
@@ -270,7 +289,9 @@ function OverdueCard({ w, today, onSettled }: {
               type="button"
               class="btn btn-secondary btn-sm training-action"
               disabled={!canSave}
-              onClick={(e) => { if (canSave) write(newDate, newDate === today ? 'move' : 'save', e.currentTarget as Element); }}
+              onClick={(e) => {
+                if (canSave) write(newDate, newDate === today ? 'move' : 'save', e.currentTarget as Element);
+              }}
             >
               {busy ? 'Saving…' : 'Save'}
             </button>
@@ -301,7 +322,10 @@ function OverdueCard({ w, today, onSettled }: {
             class="btn btn-secondary btn-sm training-action"
             aria-label={`Reschedule: ${name}`}
             disabled={disabled}
-            onClick={() => { setNewDate(today); setEditing(true); }}
+            onClick={() => {
+              setNewDate(today);
+              setEditing(true);
+            }}
           >
             Reschedule
           </button>
@@ -336,33 +360,60 @@ export function TrainingPanel({ date, state, today }: DayPanelProps) {
     const { panel, to, id } = focus;
     if (!panel || !panel.isConnected) return;
     const heading = panel.querySelector<HTMLElement>('.day-panel-title');
-    const card = to === 'card'
-      ? [...panel.querySelectorAll<HTMLElement>('a[data-workout-id]')].find((a) => a.dataset.workoutId === id)
-      : undefined;
+    const card =
+      to === 'card'
+        ? [...panel.querySelectorAll<HTMLElement>('a[data-workout-id]')].find((a) => a.dataset.workoutId === id)
+        : undefined;
     (card ?? heading)?.focus();
   }, [focus]);
 
   if (day.length === 0 && carried.length === 0) {
     return (
       <Panel title="Training">
-        <PanelNote>{state === 'past' ? 'No activities.' : state === 'today' ? 'Nothing planned today.' : 'Nothing planned.'}</PanelNote>
-        {canPlan && <a class="btn btn-secondary training-plan-btn" href={planHref}>Plan in Thrive</a>}
+        <PanelNote>
+          {state === 'past' ? 'No activities.' : state === 'today' ? 'Nothing planned today.' : 'Nothing planned.'}
+        </PanelNote>
+        {canPlan && (
+          <a class="btn btn-secondary training-plan-btn" href={planHref}>
+            Plan in Thrive
+          </a>
+        )}
       </Panel>
     );
   }
 
   // A carried row with no id renders as an ordinary overdue card: no link, no actions (AC7).
-  const overdueCards = carried.map((w) => (w.id
-    ? <OverdueCard key={`overdue-${w.id}`} w={w} today={today} onSettled={setFocus} />
-    : <PlannedCard key={`overdue-row${w.sheetRow}`} w={w} overdue plannedFor={today} />));
+  const overdueCards = carried.map((w) =>
+    w.id ? (
+      <OverdueCard key={`overdue-${w.id}`} w={w} today={today} onSettled={setFocus} />
+    ) : (
+      <PlannedCard key={`overdue-row${w.sheetRow}`} w={w} overdue plannedFor={today} />
+    ),
+  );
   const cards = trainingOrder(day, state).map(({ w, kind }) => {
     const key = w.id || `row${w.sheetRow}`;
-    return kind === 'done' ? <DoneCard key={key} w={w} /> : <PlannedCard key={key} w={w} overdue={kind === 'overdue'} />;
+    return kind === 'done' ? (
+      <DoneCard key={key} w={w} />
+    ) : (
+      <PlannedCard key={key} w={w} overdue={kind === 'overdue'} />
+    );
   });
 
   return (
-    <Panel title="Training" action={canPlan ? <a class="training-plan-link" href={planHref}>Plan</a> : undefined}>
-      <div class="training-list">{overdueCards}{cards}</div>
+    <Panel
+      title="Training"
+      action={
+        canPlan ? (
+          <a class="training-plan-link" href={planHref}>
+            Plan
+          </a>
+        ) : undefined
+      }
+    >
+      <div class="training-list">
+        {overdueCards}
+        {cards}
+      </div>
     </Panel>
   );
 }

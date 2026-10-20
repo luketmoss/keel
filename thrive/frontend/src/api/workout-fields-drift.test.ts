@@ -64,7 +64,7 @@ describe('Workouts row mapping', () => {
   });
 });
 
-describe('#260 AC4: the SPA never sets sport_type, and an edit keeps the sheet\'s', () => {
+describe("#260 AC4: the SPA never sets sport_type, and an edit keeps the sheet's", () => {
   beforeEach(() => {
     sheetsGet.mockReset();
     sheetsAppend.mockReset();

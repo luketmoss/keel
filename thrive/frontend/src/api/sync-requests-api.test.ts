@@ -7,7 +7,10 @@ import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import {
-  SYNC_REQUEST_FIELDS, SYNC_REQUEST_STATUSES, SYNC_REQUEST_VENDORS, rowToSyncRequest,
+  SYNC_REQUEST_FIELDS,
+  SYNC_REQUEST_STATUSES,
+  SYNC_REQUEST_VENDORS,
+  rowToSyncRequest,
 } from './sync-requests-api';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -41,14 +44,31 @@ describe('SyncRequests mirrors types.js', () => {
 
 describe('rowToSyncRequest', () => {
   it('maps a full row by position', () => {
-    const r = rowToSyncRequest([
-      'sr_1a2b3c4d', 'coros', '2026-10-02T13:28:00.000Z', 'me@example.com', 'started',
-      '987654', '2026-10-02T13:30:00.000Z', '', '',
-    ], 4);
+    const r = rowToSyncRequest(
+      [
+        'sr_1a2b3c4d',
+        'coros',
+        '2026-10-02T13:28:00.000Z',
+        'me@example.com',
+        'started',
+        '987654',
+        '2026-10-02T13:30:00.000Z',
+        '',
+        '',
+      ],
+      4,
+    );
     expect(r).toEqual({
-      request_id: 'sr_1a2b3c4d', vendor: 'coros', requested_at: '2026-10-02T13:28:00.000Z',
-      requested_by: 'me@example.com', status: 'started', workflow_run_id: '987654',
-      dispatched_at: '2026-10-02T13:30:00.000Z', finished_at: '', detail: '', sheetRow: 4,
+      request_id: 'sr_1a2b3c4d',
+      vendor: 'coros',
+      requested_at: '2026-10-02T13:28:00.000Z',
+      requested_by: 'me@example.com',
+      status: 'started',
+      workflow_run_id: '987654',
+      dispatched_at: '2026-10-02T13:30:00.000Z',
+      finished_at: '',
+      detail: '',
+      sheetRow: 4,
     });
   });
 

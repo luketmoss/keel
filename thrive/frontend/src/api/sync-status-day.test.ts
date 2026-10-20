@@ -9,7 +9,10 @@ const HOUR = 3_600_000;
 
 function run(hoursAgo: number, status = 'ok'): ReturnType<typeof rowToSyncLog> {
   const started = new Date(NOW.getTime() - hoursAgo * HOUR).toISOString();
-  return rowToSyncLog(['r' + hoursAgo, started, started, '', '', 0, 0, 0, 0, 0, 0, status, 'SECRET DETAIL', 'SECRET NOTES'], 2);
+  return rowToSyncLog(
+    ['r' + hoursAgo, started, started, '', '', 0, 0, 0, 0, 0, 0, status, 'SECRET DETAIL', 'SECRET NOTES'],
+    2,
+  );
 }
 const loaded = (...e: ReturnType<typeof run>[]): SyncLogState => ({ state: 'loaded', entries: e });
 const idle: SyncLogState = { state: 'idle' };
@@ -44,15 +47,19 @@ describe('collapseSyncStatus', () => {
   });
 
   it('names a vendor whose newest run failed, finished with errors or went stale', () => {
-    expect(collapseSyncStatus(loaded(run(1, 'failed')), loaded(run(1)), NOW).notes)
-      .toEqual([{ vendor: 'COROS', text: 'COROS last run failed', tone: 'danger' }]);
-    expect(collapseSyncStatus(loaded(run(1)), loaded(run(1, 'partial')), NOW).notes)
-      .toEqual([{ vendor: 'Withings', text: 'Withings last run finished with errors', tone: 'warning' }]);
+    expect(collapseSyncStatus(loaded(run(1, 'failed')), loaded(run(1)), NOW).notes).toEqual([
+      { vendor: 'COROS', text: 'COROS last run failed', tone: 'danger' },
+    ]);
+    expect(collapseSyncStatus(loaded(run(1)), loaded(run(1, 'partial')), NOW).notes).toEqual([
+      { vendor: 'Withings', text: 'Withings last run finished with errors', tone: 'warning' },
+    ]);
     // Withings goes stale past 14 h, COROS only past 16 h.
-    expect(collapseSyncStatus(loaded(run(15)), loaded(run(15)), NOW).notes)
-      .toEqual([{ vendor: 'Withings', text: 'Withings sync may have stopped', tone: 'danger' }]);
-    expect(collapseSyncStatus(loaded(run(17)), loaded(run(1)), NOW).notes)
-      .toEqual([{ vendor: 'COROS', text: 'COROS sync may have stopped', tone: 'danger' }]);
+    expect(collapseSyncStatus(loaded(run(15)), loaded(run(15)), NOW).notes).toEqual([
+      { vendor: 'Withings', text: 'Withings sync may have stopped', tone: 'danger' },
+    ]);
+    expect(collapseSyncStatus(loaded(run(17)), loaded(run(1)), NOW).notes).toEqual([
+      { vendor: 'COROS', text: 'COROS sync may have stopped', tone: 'danger' },
+    ]);
   });
 
   it('never carries error_detail or notes', () => {

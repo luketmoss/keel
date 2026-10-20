@@ -34,7 +34,17 @@ import { ReauthFailedError } from '../auth/reauth';
 const ex = (id: string) => ({ id, name: id, sheetRow: 2 }) as never;
 const lb = (id: string) => ({ id, name: id, sheetRow: 2 }) as never;
 const row = (tid: string, exId: string) =>
-  ({ template_id: tid, template_name: tid, order: 1, exercise_id: exId, exercise_name: exId, section: 'primary', sets: '3', reps: '8', sheetRow: 2 }) as never;
+  ({
+    template_id: tid,
+    template_name: tid,
+    order: 1,
+    exercise_id: exId,
+    exercise_name: exId,
+    section: 'primary',
+    sets: '3',
+    reps: '8',
+    sheetRow: 2,
+  }) as never;
 const snapshot = () =>
   `${(exercises.value[0] as { id: string }).id}/${(templates.value[0] as { id: string } | undefined)?.id}/${(labels.value[0] as { id: string }).id}`;
 
@@ -102,7 +112,9 @@ describe('refreshLibraryData', () => {
     'discards the result whole when %s were replaced locally meanwhile',
     async (which) => {
       let done!: (v: unknown[]) => void;
-      fetchExercises.mockReturnValue(which === 'exercises' ? new Promise((r) => (done = r)) : Promise.resolve([ex('new')]));
+      fetchExercises.mockReturnValue(
+        which === 'exercises' ? new Promise((r) => (done = r)) : Promise.resolve([ex('new')]),
+      );
       fetchTemplateRows.mockReturnValue(which === 'templates' ? new Promise((r) => (done = r)) : Promise.resolve([]));
       fetchLabels.mockReturnValue(which === 'labels' ? new Promise((r) => (done = r)) : Promise.resolve([lb('new')]));
       const p = refreshLibraryData('tok');
@@ -112,7 +124,7 @@ describe('refreshLibraryData', () => {
       if (which === 'labels') labels.value = local;
       done([]);
       await p;
-      expect(({ exercises, templates, labels })[which].value).toBe(local);
+      expect({ exercises, templates, labels }[which].value).toBe(local);
       if (which !== 'exercises') expect((exercises.value[0] as { id: string }).id).toBe('old');
     },
   );

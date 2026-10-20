@@ -1,8 +1,17 @@
 // #237 AC2, AC3, AC4 — dates in words.
 import { describe, it, expect } from 'vitest';
 import {
-  weekdayName, weekdayLetter, dayOfMonth, fullDate, weekdayFullDate, stripDayLabel, moveAnnouncement,
-  hoursMinutes, clock12, nightOf, syncedLabel,
+  weekdayName,
+  weekdayLetter,
+  dayOfMonth,
+  fullDate,
+  weekdayFullDate,
+  stripDayLabel,
+  moveAnnouncement,
+  hoursMinutes,
+  clock12,
+  nightOf,
+  syncedLabel,
 } from './format';
 
 describe('format', () => {

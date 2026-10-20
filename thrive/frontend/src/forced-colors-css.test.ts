@@ -24,14 +24,24 @@ const block = forcedBlock();
 
 const SELECTORS = [
   // AC1
-  '.theme-toggle-btn.active', '.library-switch-btn.active', '.sub-type-btn.active',
-  '.calendar-shade-toggle .sub-type-btn.active', '.trends-group-btn.active',
+  '.theme-toggle-btn.active',
+  '.library-switch-btn.active',
+  '.sub-type-btn.active',
+  '.calendar-shade-toggle .sub-type-btn.active',
+  '.trends-group-btn.active',
   // AC2
-  '.filter-chip.active', '.tag-badge.active', '.tag-badge-colored.active', '.label-chip-active',
+  '.filter-chip.active',
+  '.tag-badge.active',
+  '.tag-badge-colored.active',
+  '.label-chip-active',
   // AC3
-  '.streak-dot', '.streak-dot.filled', '.streak-dot.today',
+  '.streak-dot',
+  '.streak-dot.filled',
+  '.streak-dot.today',
   // AC4
-  '.bottom-nav-tab.active', '.calendar-day-selected', '.section-picker-pill-active',
+  '.bottom-nav-tab.active',
+  '.calendar-day-selected',
+  '.section-picker-pill-active',
   '.effort-btn.active',
 ];
 

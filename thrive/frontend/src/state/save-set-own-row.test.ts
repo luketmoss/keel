@@ -26,16 +26,33 @@ vi.mock('../api/sync-queue', async (orig) => ({
 const { saveSet, SetRowStaleError } = await import('./actions');
 
 const row = (o: Partial<SetWithRow>): SetWithRow => ({
-  workout_id: 'w1', exercise_id: 'e_row', exercise_name: 'Row BB', section: 'primary',
-  exercise_order: 1, set_number: 1, planned_reps: '8', weight: '95', reps: '8', effort: '',
-  sheetRow: 2, ...o,
+  workout_id: 'w1',
+  exercise_id: 'e_row',
+  exercise_name: 'Row BB',
+  section: 'primary',
+  exercise_order: 1,
+  set_number: 1,
+  planned_reps: '8',
+  weight: '95',
+  reps: '8',
+  effort: '',
+  sheetRow: 2,
+  ...o,
 });
 // The primary copy at order 1 (row 2); the SS1 copy, moved to order 1 in the
 // tracker, still at order 2 in the sheet (row 3).
 const TWINS = [row({}), row({ section: 'SS1', exercise_order: 2, weight: '', reps: '', sheetRow: 3 })];
 const ss1Edit: WorkoutSet = {
-  workout_id: 'w1', exercise_id: 'e_row', exercise_name: 'Row BB', section: 'SS1',
-  exercise_order: 1, set_number: 1, planned_reps: '8', weight: '135', reps: '', effort: '',
+  workout_id: 'w1',
+  exercise_id: 'e_row',
+  exercise_name: 'Row BB',
+  section: 'SS1',
+  exercise_order: 1,
+  set_number: 1,
+  planned_reps: '8',
+  weight: '135',
+  reps: '',
+  effort: '',
 };
 
 beforeEach(() => {
@@ -74,7 +91,7 @@ describe('#389 saveSet row targeting', () => {
     expect(enqueueSet).toHaveBeenCalledWith({ ...ss1Edit, sheetRow: 3 });
   });
 
-  it('network failure on an append queues -1, not a twin\'s row', async () => {
+  it("network failure on an append queues -1, not a twin's row", async () => {
     api.appendSet.mockRejectedValueOnce(new TypeError('Failed to fetch'));
     await expect(saveSet(ss1Edit, 'tok', -1)).rejects.toThrow(TypeError);
     expect(enqueueSet).toHaveBeenCalledWith({ ...ss1Edit, sheetRow: -1 });
@@ -95,7 +112,7 @@ describe('#389 saveSet row targeting', () => {
       expect(api.updateSet).not.toHaveBeenCalled();
     });
 
-    it('refuses the twin\'s row: same exercise and set number, other section and order', async () => {
+    it("refuses the twin's row: same exercise and set number, other section and order", async () => {
       // The primary copy's save, aimed by a stale row at the SS1 copy's row 3.
       const primaryEdit = { ...ss1Edit, section: 'primary', exercise_order: 1 };
       await expect(saveSet(primaryEdit, 'tok', 3)).rejects.toBeInstanceOf(SetRowStaleError);

@@ -20,11 +20,19 @@ function mapOf(dates: string[], value: (i: number) => number): Map<string, numbe
 
 describe('yourRange', () => {
   it('returns null with exactly 13 values', () => {
-    expect(yourRange(mapOf(daysBefore(13), () => 50), D)).toBeNull();
+    expect(
+      yourRange(
+        mapOf(daysBefore(13), () => 50),
+        D,
+      ),
+    ).toBeNull();
   });
 
   it('returns a range with exactly 14 values', () => {
-    const r = yourRange(mapOf(daysBefore(14), (i) => (i % 2 ? 48 : 52)), D);
+    const r = yourRange(
+      mapOf(daysBefore(14), (i) => (i % 2 ? 48 : 52)),
+      D,
+    );
     expect(r).not.toBeNull();
     expect(r!.n).toBe(14);
     expect(r!.mean).toBe(50);
@@ -34,7 +42,10 @@ describe('yourRange', () => {
   });
 
   it('names its window: D − 30 … D − 1', () => {
-    const r = yourRange(mapOf(daysBefore(30), () => 50), D)!;
+    const r = yourRange(
+      mapOf(daysBefore(30), () => 50),
+      D,
+    )!;
     expect(r.from).toBe('2026-08-28');
     expect(r.to).toBe('2026-09-26');
     expect(r.n).toBe(30);
@@ -59,7 +70,10 @@ describe('yourRange', () => {
   });
 
   it('gives sd 0 when every value is equal', () => {
-    const r = yourRange(mapOf(daysBefore(20), () => 55), D)!;
+    const r = yourRange(
+      mapOf(daysBefore(20), () => 55),
+      D,
+    )!;
     expect(r.sd).toBe(0);
     expect(r.lo).toBe(55);
     expect(r.hi).toBe(55);
@@ -68,7 +82,10 @@ describe('yourRange', () => {
   it('skips gaps inside the window', () => {
     // Every other day of the 30: 15 values.
     const dates = daysBefore(30).filter((_, i) => i % 2 === 0);
-    const r = yourRange(mapOf(dates, (i) => 40 + i), D)!;
+    const r = yourRange(
+      mapOf(dates, (i) => 40 + i),
+      D,
+    )!;
     expect(r.n).toBe(15);
     expect(r.mean).toBe(47);
     // Remove one more: 14 still a range; 13 is not.

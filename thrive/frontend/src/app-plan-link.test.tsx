@@ -62,9 +62,7 @@ describe('the Plan link through sign-in (#143 AC6)', () => {
     // Plan mode, straight to the template picker, then the planner on the date.
     await findByText('Choose a template');
     fireEvent.click(await findByText('Build Custom'));
-    await waitFor(() =>
-      expect(container.querySelector<HTMLInputElement>('#planner-date')?.value).toBe('2026-09-24'),
-    );
+    await waitFor(() => expect(container.querySelector<HTMLInputElement>('#planner-date')?.value).toBe('2026-09-24'));
     expect(window.location.hash).toBe(LINK);
   });
 });

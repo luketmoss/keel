@@ -150,7 +150,10 @@ describe('AC4: sizes come from --icon-md and --icon-lg', () => {
     expect(blockBody(css, '.bottom-nav')).toMatch(/height:\s*var\(--nav-height\)/);
     expect(blockBody(css, '.bottom-nav-tab')).toMatch(/padding:\s*var\(--space-xs\)/);
     // 4px top and bottom + 24px icon + 2px gap + an 18px label line.
-    const nav = parseInt(tokens(readFileSync(resolve(here, '../../../ui/tokens/suite.css'), 'utf-8'), ':root')['--nav-height'], 10);
+    const nav = parseInt(
+      tokens(readFileSync(resolve(here, '../../../ui/tokens/suite.css'), 'utf-8'), ':root')['--nav-height'],
+      10,
+    );
     expect(4 * 2 + 24 + 2 + 18).toBeLessThanOrEqual(nav);
   });
 });

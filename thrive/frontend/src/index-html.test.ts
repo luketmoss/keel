@@ -21,11 +21,12 @@ describe('index.html viewport meta (#272)', () => {
 // #397 — Thrive's cobalt identity: icons, theme colour and manifest.
 const pub = (f: string) => resolve(__dirname, '../public', f);
 const links = [...html.matchAll(/<link\s+([^>]*)>/g)].map((m) => m[1]);
-const linkFor = (rel: string, extra = '') =>
-  links.find((l) => new RegExp(`rel="${rel}"`).test(l) && l.includes(extra));
+const linkFor = (rel: string, extra = '') => links.find((l) => new RegExp(`rel="${rel}"`).test(l) && l.includes(extra));
 const href = (l: string | undefined) => l?.match(/href="([^"]*)"/)?.[1];
 const sha = (f: string) =>
-  createHash('sha256').update(readFileSync(pub(f), 'utf-8').replace(/\r\n/g, '\n')).digest('hex');
+  createHash('sha256')
+    .update(readFileSync(pub(f), 'utf-8').replace(/\r\n/g, '\n'))
+    .digest('hex');
 
 describe('index.html icons and chrome (#397)', () => {
   it('declares the ICO and the mark as icons, through %BASE_URL%', () => {
@@ -116,8 +117,14 @@ describe('public/ icon files (#397)', () => {
     expect(sizes).toEqual([16, 32, 48]);
   });
   it.each([
-    'thrive-favicon.svg', 'thrive-icon-192.svg', 'thrive-icon-192-maskable.svg', 'thrive-icon-512.svg',
-    'thrive-icon-512-maskable.svg', 'thrive-icon-compact.svg', 'thrive-icon-minimal.svg', 'thrive-icon-primary.svg',
+    'thrive-favicon.svg',
+    'thrive-icon-192.svg',
+    'thrive-icon-192-maskable.svg',
+    'thrive-icon-512.svg',
+    'thrive-icon-512-maskable.svg',
+    'thrive-icon-compact.svg',
+    'thrive-icon-minimal.svg',
+    'thrive-icon-primary.svg',
   ])('%s is gone and nothing references it', (f) => {
     expect(existsSync(pub(f))).toBe(false);
     expect(html).not.toContain(f);

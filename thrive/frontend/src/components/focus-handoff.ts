@@ -25,16 +25,19 @@ export function useFocusHandoff(
   targetRef.current = target;
   const beforeRef = useRef(beforeFocus);
   beforeRef.current = beforeFocus;
-  useLayoutEffect(() => () => {
-    const node = ref.current;
-    if (!node || document.activeElement !== node) return;
-    const to = targetRef.current(node);
-    if (!to) return;
-    queueMicrotask(() => {
-      const active = document.activeElement;
-      if (!to.isConnected || (active !== document.body && active != null)) return;
-      beforeRef.current?.(to);
-      to.focus();
-    });
-  }, []);
+  useLayoutEffect(
+    () => () => {
+      const node = ref.current;
+      if (!node || document.activeElement !== node) return;
+      const to = targetRef.current(node);
+      if (!to) return;
+      queueMicrotask(() => {
+        const active = document.activeElement;
+        if (!to.isConnected || (active !== document.body && active != null)) return;
+        beforeRef.current?.(to);
+        to.focus();
+      });
+    },
+    [],
+  );
 }

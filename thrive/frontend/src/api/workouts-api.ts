@@ -1,7 +1,15 @@
 // Workouts + Sets domain API — wraps Sheets REST calls with demo-mode fallback.
 
 import type { Workout, WorkoutWithRow, WorkoutSet, SetWithRow, WorkoutType, Effort, BuilderExercise } from './types';
-import { sheetsGet, sheetsAppend, sheetsUpdate, sheetsDeleteRow, sheetsBatchUpdate, getSheetId, withReauth } from './sheets';
+import {
+  sheetsGet,
+  sheetsAppend,
+  sheetsUpdate,
+  sheetsDeleteRow,
+  sheetsBatchUpdate,
+  getSheetId,
+  withReauth,
+} from './sheets';
 import { isDemo, DEMO_SETS, shiftDemoWorkouts } from './demo-data';
 import { toLocalDateStr } from '../components/activities/activities-helpers';
 
@@ -134,9 +142,23 @@ export function workoutToRow(w: Workout): (string | number)[] {
 }
 
 export async function createWorkout(
-  data: { type: WorkoutType; name: string; template_id?: string; notes?: string; elapsed_seconds?: string; effort?: Effort | '';
-    distance_m?: string; ascent_m?: string; descent_m?: string; avg_hr?: string;
-    copied_from?: string; date?: string; status?: string; sub_type?: string; estimated_seconds?: string },
+  data: {
+    type: WorkoutType;
+    name: string;
+    template_id?: string;
+    notes?: string;
+    elapsed_seconds?: string;
+    effort?: Effort | '';
+    distance_m?: string;
+    ascent_m?: string;
+    descent_m?: string;
+    avg_hr?: string;
+    copied_from?: string;
+    date?: string;
+    status?: string;
+    sub_type?: string;
+    estimated_seconds?: string;
+  },
   token: string,
 ): Promise<Workout> {
   const id = `w_${crypto.randomUUID().slice(0, 8)}`;
@@ -186,9 +208,7 @@ export async function createWorkout(
   };
 
   if (!isDemo()) {
-    await withReauth(token, (t) =>
-      sheetsAppend('Workouts!A:AC', [workoutToRow(workout)], t),
-    );
+    await withReauth(token, (t) => sheetsAppend('Workouts!A:AC', [workoutToRow(workout)], t));
   }
 
   return workout;
@@ -250,9 +270,7 @@ export async function deleteWorkoutRows(
 
   await withReauth(token, async (t) => {
     // Delete sets bottom-to-top to avoid row shift
-    const setsToDelete = workoutSets
-      .filter((s) => s.workout_id === workout.id)
-      .sort((a, b) => b.sheetRow - a.sheetRow);
+    const setsToDelete = workoutSets.filter((s) => s.workout_id === workout.id).sort((a, b) => b.sheetRow - a.sheetRow);
 
     if (setsToDelete.length > 0) {
       const setsSheetId = await getSheetId('Sets', t);
@@ -315,30 +333,20 @@ export function setToRow(s: WorkoutSet): (string | number)[] {
 export async function appendSet(set: WorkoutSet, token: string): Promise<void> {
   if (isDemo()) return;
 
-  await withReauth(token, (t) =>
-    sheetsAppend('Sets!A:J', [setToRow(set)], t),
-  );
+  await withReauth(token, (t) => sheetsAppend('Sets!A:J', [setToRow(set)], t));
 }
 
 export async function appendSets(sets: WorkoutSet[], token: string): Promise<void> {
   if (isDemo()) return;
   if (sets.length === 0) return;
 
-  await withReauth(token, (t) =>
-    sheetsAppend('Sets!A:J', sets.map(setToRow), t),
-  );
+  await withReauth(token, (t) => sheetsAppend('Sets!A:J', sets.map(setToRow), t));
 }
 
-export async function updateSet(
-  sheetRow: number,
-  set: WorkoutSet,
-  token: string,
-): Promise<void> {
+export async function updateSet(sheetRow: number, set: WorkoutSet, token: string): Promise<void> {
   if (isDemo()) return;
 
-  await withReauth(token, (t) =>
-    sheetsUpdate(`Sets!A${sheetRow}:J${sheetRow}`, [setToRow(set)], t),
-  );
+  await withReauth(token, (t) => sheetsUpdate(`Sets!A${sheetRow}:J${sheetRow}`, [setToRow(set)], t));
 }
 
 export async function updateExerciseNameInSets(
@@ -347,18 +355,14 @@ export async function updateExerciseNameInSets(
   allSets: SetWithRow[],
   token: string,
 ): Promise<void> {
-  const affected = allSets.filter(s => s.exercise_id === exerciseId);
+  const affected = allSets.filter((s) => s.exercise_id === exerciseId);
   if (affected.length === 0) return;
 
   if (isDemo()) return;
 
   await withReauth(token, async (t) => {
     for (const s of affected) {
-      await sheetsUpdate(
-        `Sets!C${s.sheetRow}`,
-        [[newName]],
-        t,
-      );
+      await sheetsUpdate(`Sets!C${s.sheetRow}`, [[newName]], t);
     }
   });
 }
@@ -437,9 +441,8 @@ export function carryPlannedSetValues(
   }
   return desired.map((d) => {
     const source = exercises[d.exercise_order - 1]?.source_order;
-    const match = source === undefined
-      ? byKey.get(setKey(d))
-      : bySource.get(sourceKey(d.exercise_id, source, d.set_number));
+    const match =
+      source === undefined ? byKey.get(setKey(d)) : bySource.get(sourceKey(d.exercise_id, source, d.set_number));
     return match ? { ...d, weight: match.weight, reps: match.reps, effort: match.effort } : d;
   });
 }
@@ -473,7 +476,10 @@ export function planSetsReconcile(stored: SetWithRow[], desired: WorkoutSet[]): 
   for (let i = 0; i < shared; i++) {
     if (!sameRow(own[i], desired[i])) updates.push({ sheetRow: own[i].sheetRow, set: desired[i] });
   }
-  const deletes = own.slice(shared).map((s) => s.sheetRow).sort((a, b) => b - a);
+  const deletes = own
+    .slice(shared)
+    .map((s) => s.sheetRow)
+    .sort((a, b) => b - a);
   const appends = desired.slice(shared);
   return { updates, deletes, appends };
 }

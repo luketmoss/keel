@@ -27,7 +27,9 @@ export function loadCachedAuth(): { token: string; user: UserInfo; expiry: numbe
     // Expired or missing — drop the token but keep the user (#353), so the
     // login screen can offer "Continue as <email>" instead of a bare sign-in.
     clearCachedToken();
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return null;
 }
 
@@ -46,7 +48,9 @@ export function clearCachedToken() {
   try {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(TOKEN_EXPIRY_KEY);
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 export function saveCachedAuth(token: string, user: UserInfo, expiresIn: number) {
@@ -55,7 +59,9 @@ export function saveCachedAuth(token: string, user: UserInfo, expiresIn: number)
     localStorage.setItem(USER_KEY, JSON.stringify(user));
     // GIS tokens last ~3600s; shave 60s to avoid edge-case expiry
     localStorage.setItem(TOKEN_EXPIRY_KEY, String(Date.now() + (expiresIn - 60) * 1000));
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 export function clearCachedAuth() {
@@ -63,7 +69,9 @@ export function clearCachedAuth() {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     localStorage.removeItem(TOKEN_EXPIRY_KEY);
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 declare const google: any;
@@ -93,9 +101,7 @@ export function AuthProvider({ children }: Props) {
   // Token expiry (ms epoch) as last cached; drives the touch-armed renewal (#353).
   const expiryRef = useRef<number | null>(cached?.expiry ?? null);
   const userRef = useRef<UserInfo | null>(demo ? DEMO_USER : (cached?.user ?? loadRememberedUser()));
-  const [rememberedUser, setRememberedUser] = useState<UserInfo | null>(
-    demo || cached ? null : loadRememberedUser(),
-  );
+  const [rememberedUser, setRememberedUser] = useState<UserInfo | null>(demo || cached ? null : loadRememberedUser());
 
   // Demo mode: skip GIS entirely — provide fake auth context
   if (demo) {
@@ -243,14 +249,15 @@ export function AuthProvider({ children }: Props) {
     // the foreground; one-shot; a failure here leaves the old token alone.
     let armed = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const needsRenewal = () =>
-      expiryRef.current !== null && Date.now() >= expiryRef.current - RENEW_AHEAD_MS;
+    const needsRenewal = () => expiryRef.current !== null && Date.now() >= expiryRef.current - RENEW_AHEAD_MS;
     const onTouch = () => {
       armed = false;
       if (!needsRenewal() || !tokenClientRef.current) return;
       attemptReauth({ quiet: true })
         .then(() => scheduleTouchRenewal())
-        .catch(() => { /* old token still works; the next foreground or 401 deals with it */ });
+        .catch(() => {
+          /* old token still works; the next foreground or 401 deals with it */
+        });
     };
     const armTouchRenewal = () => {
       if (armed || !needsRenewal()) return;

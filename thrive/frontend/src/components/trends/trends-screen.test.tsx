@@ -66,7 +66,11 @@ describe('AC1: controls', () => {
     const { container } = renderScreen();
     expect(container.querySelectorAll('h1')).toHaveLength(1);
     expect(container.querySelector('h1')!.textContent).toBe('Trends');
-    expect([...container.querySelectorAll('.trends-control-label')].map((l) => l.textContent)).toEqual(['Range', 'Average', 'View']);
+    expect([...container.querySelectorAll('.trends-control-label')].map((l) => l.textContent)).toEqual([
+      'Range',
+      'Average',
+      'View',
+    ]);
     const buttons = (n: string) => [...group(container, n).querySelectorAll('button')].map((b) => b.textContent);
     expect(buttons('Range')).toEqual(['1W', '1M', '3M', '6M', '1Y', 'All']);
     expect(buttons('Average')).toEqual(['Off', '7d', '14d', '30d']);
@@ -81,8 +85,16 @@ describe('AC1: controls', () => {
     loaded(rows(100));
     const first = renderScreen();
     expect(loadHealth).not.toHaveBeenCalled();
-    fireEvent.click([...group(first.container, 'Range').querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === '1W')!);
-    fireEvent.click([...group(first.container, 'Average').querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === 'Off')!);
+    fireEvent.click(
+      [...group(first.container, 'Range').querySelectorAll<HTMLButtonElement>('button')].find(
+        (b) => b.textContent === '1W',
+      )!,
+    );
+    fireEvent.click(
+      [...group(first.container, 'Average').querySelectorAll<HTMLButtonElement>('button')].find(
+        (b) => b.textContent === 'Off',
+      )!,
+    );
     expect(first.container.querySelector('svg')!.getAttribute('aria-label')).toBe('Resting HR, last 7 days');
     expect(first.container.querySelectorAll('circle.trend-dot')).toHaveLength(7);
     expect(first.container.querySelector('path.trend-line')).toBeNull();
@@ -96,12 +108,20 @@ describe('AC1: controls', () => {
   });
 
   it('applies a choice for this visit when storage fails, and reads defaults when it cannot read', () => {
-    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked'); });
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked'); });
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
     loaded(rows(100));
     const { container } = renderScreen();
     expect(pressed(group(container, 'Range'))).toEqual(['3M']);
-    fireEvent.click([...group(container, 'View').querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === 'Table')!);
+    fireEvent.click(
+      [...group(container, 'View').querySelectorAll<HTMLButtonElement>('button')].find(
+        (b) => b.textContent === 'Table',
+      )!,
+    );
     expect(pressed(group(container, 'View'))).toEqual(['Table']);
     expect(container.querySelector('table')).not.toBeNull();
   });
@@ -120,7 +140,11 @@ describe('AC2: caption', () => {
     loaded(rows(100));
     const { container } = renderScreen();
     expect(container.querySelector('.trends-caption')!.textContent).toContain('7-day average');
-    fireEvent.click([...group(container, 'View').querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === 'Table')!);
+    fireEvent.click(
+      [...group(container, 'View').querySelectorAll<HTMLButtonElement>('button')].find(
+        (b) => b.textContent === 'Table',
+      )!,
+    );
     expect(container.querySelector('.trends-caption')).not.toBeNull();
     expect(container.querySelector('svg')).toBeNull();
     expect(container.querySelectorAll('tbody tr')).toHaveLength(91);
@@ -180,8 +204,15 @@ import type { TrendMetric } from './metrics';
 
 describe('#243 AC5: mixed band flags', () => {
   const pts = Array.from({ length: 60 }, (_, i) => ({ date: addDays(TODAY, -i), value: 50 + (i % 5) }));
-  const m = (id: string, band: boolean): TrendMetric => ({ id, label: id, unit: '', points: () => pts, format: String, band });
-  const built = (metrics: TrendMetric[], sets: typeof pts[]) =>
+  const m = (id: string, band: boolean): TrendMetric => ({
+    id,
+    label: id,
+    unit: '',
+    points: () => pts,
+    format: String,
+    band,
+  });
+  const built = (metrics: TrendMetric[], sets: (typeof pts)[]) =>
     metrics.map((x, i) => metricSeries(x, addDays(TODAY, -29), TODAY, 7, TODAY, sets[i]));
 
   it('keeps the clause when one metric has a band', () => {
@@ -196,21 +227,37 @@ describe('#243 AC5: mixed band flags', () => {
 
 describe('#243 AC4: switcher in the screen', () => {
   const click = (c: Element, text: string) =>
-    fireEvent.click([...c.querySelectorAll<HTMLButtonElement>('.trends-group-btn')].find((b) => b.textContent === text)!);
+    fireEvent.click(
+      [...c.querySelectorAll<HTMLButtonElement>('.trends-group-btn')].find((b) => b.textContent === text)!,
+    );
 
   it('shows the groups above the controls, defaulting to Recovery', () => {
     loaded(rows(100));
     const { container } = renderScreen();
     const region = container.querySelector('[role="region"][aria-label="Metric group"]')!;
-    expect(region.compareDocumentPosition(container.querySelector('.trends-controls')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect([...region.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Recovery', 'Sleep', 'Fitness', 'Body', 'Blood Pressure', 'Activity', 'Custom']);
+    expect(
+      region.compareDocumentPosition(container.querySelector('.trends-controls')!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect([...region.querySelectorAll('button')].map((b) => b.textContent)).toEqual([
+      'Recovery',
+      'Sleep',
+      'Fitness',
+      'Body',
+      'Blood Pressure',
+      'Activity',
+      'Custom',
+    ]);
     expect(container.querySelectorAll('.trend-card')).toHaveLength(3);
   });
 
   it('swaps the cards, stores the group, keeps other controls, and restores on reopen', () => {
     loaded(rows(100));
     const first = renderScreen();
-    fireEvent.click([...group(first.container, 'Range').querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === '1W')!);
+    fireEvent.click(
+      [...group(first.container, 'Range').querySelectorAll<HTMLButtonElement>('button')].find(
+        (b) => b.textContent === '1W',
+      )!,
+    );
     click(first.container, 'Sleep');
     expect(first.container.querySelectorAll('.trend-card')).toHaveLength(4);
     expect(first.container.textContent).toContain('Nothing recorded yet.');
@@ -231,7 +278,9 @@ describe('#243 AC4: switcher in the screen', () => {
 
 describe('#244: per-group loading and error state', () => {
   const pickGroup = (c: Element, name: string) =>
-    fireEvent.click([...c.querySelectorAll<HTMLButtonElement>('.trends-group-btn')].find((b) => b.textContent === name)!);
+    fireEvent.click(
+      [...c.querySelectorAll<HTMLButtonElement>('.trends-group-btn')].find((b) => b.textContent === name)!,
+    );
 
   it('Body is not held up by DailyHealth still loading', () => {
     dailyHealth.value = { state: 'loading' };
@@ -267,7 +316,9 @@ describe('#244: per-group loading and error state', () => {
 
 describe('#245: Activity group state', () => {
   const pickGroup = (c: Element, name: string) =>
-    fireEvent.click([...c.querySelectorAll<HTMLButtonElement>('.trends-group-btn')].find((b) => b.textContent === name)!);
+    fireEvent.click(
+      [...c.querySelectorAll<HTMLButtonElement>('.trends-group-btn')].find((b) => b.textContent === name)!,
+    );
 
   it('waits on DailySummary alone, and is not held up by the other tabs', () => {
     dailyHealth.value = { state: 'loading' };
@@ -312,7 +363,9 @@ describe('#256 AC5: Back restores the charts without selecting a day', () => {
   }
   function renderInMain() {
     return render(
-      h('main', { class: 'app-content', tabIndex: -1 },
+      h(
+        'main',
+        { class: 'app-content', tabIndex: -1 },
         h(AuthContext.Provider, {
           value: { token: 'tok', user: null, isAuthenticated: true, login: () => {}, logout: () => {} },
           children: h(Screen, {}),
@@ -347,7 +400,9 @@ describe('#256 AC5: Back restores the charts without selecting a day', () => {
     // Every value either signal takes on the way back, not just the last:
     // the screen's mount effect clears the selection, which would hide one.
     const seen: unknown[] = [];
-    const stop = effect(() => { seen.push(selectedDay.value, announcement.value); });
+    const stop = effect(() => {
+      seen.push(selectedDay.value, announcement.value);
+    });
     await go(() => goBack(), 'trends');
     stop();
     const charts = container.querySelector<HTMLElement>('.trend-charts')!;
@@ -377,7 +432,10 @@ describe('#290: Try again focus', () => {
     bodyMeasurements.value = { state: 'loaded', rows: [] };
     dailySummary.value = { state: 'loaded', rows: [] };
   };
-  const flush = () => act(async () => { await Promise.resolve(); });
+  const flush = () =>
+    act(async () => {
+      await Promise.resolve();
+    });
 
   it('the press focuses the container; error, loading, error keeps node and focus', async () => {
     asError();
@@ -389,11 +447,15 @@ describe('#290: Try again focus', () => {
     btn.focus();
     fireEvent.click(btn);
     expect(document.activeElement).toBe(holder);
-    act(() => { dailyHealth.value = { state: 'loading' }; });
+    act(() => {
+      dailyHealth.value = { state: 'loading' };
+    });
     expect(state(container)).toBe(holder);
     expect(holder.querySelector('[role="status"]')!.textContent).toBe('Loading…');
     expect(document.activeElement).toBe(holder);
-    act(() => { dailyHealth.value = { state: 'error' } as never; });
+    act(() => {
+      dailyHealth.value = { state: 'error' } as never;
+    });
     await flush();
     expect(state(container)).toBe(holder);
     expect(document.activeElement).toBe(holder);
@@ -407,8 +469,12 @@ describe('#290: Try again focus', () => {
     asError();
     const { container } = renderScreen();
     fireEvent.click(container.querySelector('.trends-retry')!);
-    act(() => { dailyHealth.value = { state: 'loading' }; });
-    act(() => { loaded(rows(100)); });
+    act(() => {
+      dailyHealth.value = { state: 'loading' };
+    });
+    act(() => {
+      loaded(rows(100));
+    });
     await flush();
     const h1 = container.querySelector('h1')!;
     expect(h1.getAttribute('tabindex')).toBe('-1');
@@ -422,10 +488,14 @@ describe('#290: Try again focus', () => {
     asError();
     const { container } = renderScreen();
     fireEvent.click(container.querySelector('.trends-retry')!);
-    act(() => { dailyHealth.value = { state: 'loading' }; });
+    act(() => {
+      dailyHealth.value = { state: 'loading' };
+    });
     const control = container.querySelector('.sub-type-btn') as HTMLElement;
     control.focus();
-    act(() => { loaded(rows(100)); });
+    act(() => {
+      loaded(rows(100));
+    });
     await flush();
     expect(document.activeElement).toBe(control);
   });
@@ -445,10 +515,14 @@ describe('#290: Try again focus', () => {
     dailySummary.value = { state: 'loading' };
     const { container } = renderScreen();
     expect(state(container)).not.toBeNull();
-    act(() => { loaded(rows(100)); });
+    act(() => {
+      loaded(rows(100));
+    });
     await flush();
     expect(document.activeElement).toBe(document.body);
-    act(() => { asError(); });
+    act(() => {
+      asError();
+    });
     expect(document.activeElement).toBe(document.body);
   });
 });

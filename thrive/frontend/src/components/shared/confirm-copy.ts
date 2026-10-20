@@ -56,9 +56,7 @@ export function deleteWorkoutCopy(w: Pick<Workout, 'name' | 'type' | 'date'>, se
 
 export function deleteTemplateCopy(name: string, exerciseCount: number): ConfirmCopy {
   const goes =
-    exerciseCount > 0
-      ? `Its ${exerciseCount} ${exerciseCount === 1 ? 'exercise goes' : 'exercises go'} with it. `
-      : '';
+    exerciseCount > 0 ? `Its ${exerciseCount} ${exerciseCount === 1 ? 'exercise goes' : 'exercises go'} with it. ` : '';
   return {
     title: `Delete the template "${name}"?`,
     message: `${goes}Workouts you've logged from it are kept. ${CANT_UNDO}`,

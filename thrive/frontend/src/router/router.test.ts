@@ -164,7 +164,13 @@ describe('router', () => {
 
   it('parses #/ as day, /activities as activities and /trends as trends (#235)', async () => {
     const { currentRoute } = await import('./router');
-    for (const [hash, name] of [['/', 'day'], ['/activities', 'activities'], ['/trends', 'trends'], ['/exercises', 'exercises'], ['/settings/labels', 'manage-labels']]) {
+    for (const [hash, name] of [
+      ['/', 'day'],
+      ['/activities', 'activities'],
+      ['/trends', 'trends'],
+      ['/exercises', 'exercises'],
+      ['/settings/labels', 'manage-labels'],
+    ]) {
       window.location.hash = hash;
       window.dispatchEvent(new Event('hashchange'));
       expect(currentRoute.value.name).toBe(name);
@@ -426,7 +432,9 @@ describe('history depth (#264)', () => {
       const r = await freshRouter('');
       await go(r, '/activities');
       expect(stampNow()).toEqual({ depth: 1, prev: '#/' });
-      await nextHashchange(() => { window.location.hash = '/settings'; });
+      await nextHashchange(() => {
+        window.location.hash = '/settings';
+      });
       expect(stampNow()).toEqual({ depth: 2, prev: '#/activities' });
       const a = document.createElement('a');
       a.href = '#/trends';
@@ -472,7 +480,9 @@ describe('history depth (#264)', () => {
       await go(r, '/trends');
       const seen = kinds(r);
       let writes = 0;
-      const stop = r.currentRoute.subscribe(() => { writes += 1; });
+      const stop = r.currentRoute.subscribe(() => {
+        writes += 1;
+      });
       writes = 0; // subscribe calls once with the current value
       window.dispatchEvent(new Event('hashchange'));
       window.dispatchEvent(new Event('hashchange'));
@@ -524,7 +534,9 @@ describe('history depth (#264)', () => {
       const r = await freshRouter('#/activities');
       await go(r, '/trends');
       let during = '';
-      r.onRouteChange(() => { during = r.currentRoute.value.name; });
+      r.onRouteChange(() => {
+        during = r.currentRoute.value.name;
+      });
       await back();
       expect(during).toBe('trends');
       expect(r.currentRoute.value.name).toBe('activities');

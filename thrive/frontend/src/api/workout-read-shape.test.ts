@@ -28,15 +28,36 @@ vi.mock('./demo-data', () => ({
 const { fetchWorkouts } = await import('./workouts-api');
 
 const SYNC_FIELDS = [
-  'sub_type', 'source', 'source_activity_id', 'raw_ref', 'fit_ref',
-  'fit_fetched_at', 'synced_at', 'started_at_utc', 'calories',
+  'sub_type',
+  'source',
+  'source_activity_id',
+  'raw_ref',
+  'fit_ref',
+  'fit_fetched_at',
+  'synced_at',
+  'started_at_utc',
+  'calories',
 ] as const;
 
 // Exactly what the API returns for a row written under the A:Q shape.
 const PRE_MIGRATION_ROW = [
-  'w_001', '2026-03-15', '07:00', 'weight', 'Upper Push A', 'tpl_001',
-  'Felt strong', '3720', '2026-03-15T07:00:00.000Z', '', '',
-  '', 'Hard', '', '', '', '',
+  'w_001',
+  '2026-03-15',
+  '07:00',
+  'weight',
+  'Upper Push A',
+  'tpl_001',
+  'Felt strong',
+  '3720',
+  '2026-03-15T07:00:00.000Z',
+  '',
+  '',
+  '',
+  'Hard',
+  '',
+  '',
+  '',
+  '',
 ];
 
 describe('fetchWorkouts on a pre-migration row', () => {
@@ -88,12 +109,20 @@ describe('fetchWorkouts on a pre-migration row', () => {
   });
 
   it('reads a migrated row through to calories', async () => {
-    sheetsGet.mockResolvedValue([[
-      ...PRE_MIGRATION_ROW,
-      'gravel', 'coros', '4821', 'raw_1', 'fit_1',
-      '2026-03-15T09:00:00.000Z', '2026-03-15T09:01:00.000Z',
-      '2026-03-15T07:00:00-06:00', '612',
-    ]]);
+    sheetsGet.mockResolvedValue([
+      [
+        ...PRE_MIGRATION_ROW,
+        'gravel',
+        'coros',
+        '4821',
+        'raw_1',
+        'fit_1',
+        '2026-03-15T09:00:00.000Z',
+        '2026-03-15T09:01:00.000Z',
+        '2026-03-15T07:00:00-06:00',
+        '612',
+      ],
+    ]);
     const [w] = await fetchWorkouts('token');
     expect(w.sub_type).toBe('gravel');
     expect(w.source).toBe('coros');
@@ -103,11 +132,7 @@ describe('fetchWorkouts on a pre-migration row', () => {
   });
 
   it('reads AA as estimated_seconds (#145)', async () => {
-    sheetsGet.mockResolvedValue([[
-      ...PRE_MIGRATION_ROW,
-      '', '', '', '', '', '', '', '', '',
-      '2820',
-    ]]);
+    sheetsGet.mockResolvedValue([[...PRE_MIGRATION_ROW, '', '', '', '', '', '', '', '', '', '2820']]);
     const [w] = await fetchWorkouts('token');
     expect(w.estimated_seconds).toBe('2820');
     expect(w.elapsed_seconds).toBe('3720');

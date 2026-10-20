@@ -54,15 +54,14 @@ export function FinishWorkoutModal({
         ref={dialog}
         style="max-width: 400px;"
       >
-        <h2
-          id={HEADING_ID}
-          style="font-size: var(--text-lg); font-weight: 700; margin-bottom: var(--space-md);"
-        >
+        <h2 id={HEADING_ID} style="font-size: var(--text-lg); font-weight: 700; margin-bottom: var(--space-md);">
           Finish Workout
         </h2>
 
         <div class="form-group" style="margin-bottom: var(--space-md);">
-          <label class="form-label" htmlFor={notesId}>Workout Notes (optional)</label>
+          <label class="form-label" htmlFor={notesId}>
+            Workout Notes (optional)
+          </label>
           <textarea
             id={notesId}
             class="form-textarea"
@@ -74,7 +73,9 @@ export function FinishWorkoutModal({
         </div>
 
         <div class="form-group" style="margin-bottom: var(--space-md);">
-          <span class="form-label" id={effortLabelId}>Session Effort (optional)</span>
+          <span class="form-label" id={effortLabelId}>
+            Session Effort (optional)
+          </span>
           <EffortToggle
             value={effort}
             onChange={onEffortChange}
@@ -85,20 +86,10 @@ export function FinishWorkoutModal({
         </div>
 
         <div style="display: flex; flex-direction: column; gap: var(--space-sm);">
-          <button
-            class="btn btn-primary"
-            onClick={onFinish}
-            disabled={finishing}
-            style="width: 100%;"
-          >
+          <button class="btn btn-primary" onClick={onFinish} disabled={finishing} style="width: 100%;">
             {finishing ? 'Saving...' : 'Save & Finish'}
           </button>
-          <button
-            class="btn btn-secondary"
-            onClick={onCancel}
-            disabled={finishing}
-            style="width: 100%;"
-          >
+          <button class="btn btn-secondary" onClick={onCancel} disabled={finishing} style="width: 100%;">
             Cancel
           </button>
         </div>

@@ -35,8 +35,17 @@ const LIST: [string, string, string][] = [
 
 function setRows(): SetWithRow[] {
   return LIST.map(([exercise_id, exercise_name, section], i) => ({
-    workout_id: 'w1', exercise_id, exercise_name, section, exercise_order: i + 1, set_number: 1,
-    planned_reps: '8', weight: '', reps: '', effort: '', sheetRow: i + 2,
+    workout_id: 'w1',
+    exercise_id,
+    exercise_name,
+    section,
+    exercise_order: i + 1,
+    set_number: 1,
+    planned_reps: '8',
+    weight: '',
+    reps: '',
+    effort: '',
+    sheetRow: i + 2,
   }));
 }
 
@@ -60,7 +69,10 @@ const moveBtn = (row: number, dir: 'up' | 'down') =>
   rows()[row].querySelector<HTMLButtonElement>(`[data-move="${dir}"]`)!;
 const status = () => document.querySelector('.workout-tracker [role="status"]')!;
 
-const modes: [string, boolean][] = [['log mode', false], ['edit mode', true]];
+const modes: [string, boolean][] = [
+  ['log mode', false],
+  ['edit mode', true],
+];
 
 describe.each(modes)('%s', (_name, edit) => {
   const mount = () => {

@@ -24,7 +24,8 @@ vi.mock('../../state/actions', () => ({
 const { DayScreen } = await import('./day-screen');
 const { AuthContext } = await import('../../auth/auth-context');
 const { replaceRoute } = await import('../../router/router');
-const { syncRequests, syncAsk, demoSyncPressedAt, syncLog, withingsSyncLog, pendingSyncCount } = await import('../../state/store');
+const { syncRequests, syncAsk, demoSyncPressedAt, syncLog, withingsSyncLog, pendingSyncCount } =
+  await import('../../state/store');
 const { workoutsRefreshPending } = await import('../../state/refresh-hold');
 const { rowToSyncRequest } = await import('../../api/sync-requests-api');
 
@@ -33,9 +34,20 @@ function row(vendor: string, status: string, extra: Partial<Record<string, strin
 }
 
 function mount() {
-  act(() => { window.history.replaceState(null, '', '#/'); replaceRoute('#/'); });
+  act(() => {
+    window.history.replaceState(null, '', '#/');
+    replaceRoute('#/');
+  });
   return render(
-    <AuthContext.Provider value={{ token: 'tok', user: { email: 'me@example.com' } as never, isAuthenticated: true, login: () => {}, logout: () => {} }}>
+    <AuthContext.Provider
+      value={{
+        token: 'tok',
+        user: { email: 'me@example.com' } as never,
+        isAuthenticated: true,
+        login: () => {},
+        logout: () => {},
+      }}
+    >
       <DayScreen />
     </AuthContext.Provider>,
   );
@@ -72,8 +84,12 @@ describe('Day screen: the sync line (#409)', () => {
   it('a request closing re-reads health, the sync logs and Workouts/Sets', async () => {
     syncRequests.value = [row('coros', 'started', { workflow_run_id: '5', dispatched_at: new Date().toISOString() })];
     mount();
-    healthRun.mockClear(); logsRun.mockClear(); workoutsRun.mockClear();
-    await act(() => { syncRequests.value = [row('coros', 'done', { detail: 'Finished: ok' })]; });
+    healthRun.mockClear();
+    logsRun.mockClear();
+    workoutsRun.mockClear();
+    await act(() => {
+      syncRequests.value = [row('coros', 'done', { detail: 'Finished: ok' })];
+    });
     expect(healthRun).toHaveBeenCalledWith('tok');
     expect(logsInvalidate).toHaveBeenCalled();
     expect(logsRun).toHaveBeenCalledWith('tok');
@@ -86,7 +102,9 @@ describe('Day screen: the sync line (#409)', () => {
     syncRequests.value = [row('coros', 'started', { workflow_run_id: '5', dispatched_at: new Date().toISOString() })];
     mount();
     workoutsRun.mockClear();
-    await act(() => { syncRequests.value = [row('coros', 'done', { detail: 'Finished: ok' })]; });
+    await act(() => {
+      syncRequests.value = [row('coros', 'done', { detail: 'Finished: ok' })];
+    });
     expect(healthRun).toHaveBeenCalled(); // health is not held
     expect(workoutsRun).not.toHaveBeenCalled();
     expect(workoutsRefreshPending.value).toBe(true); // app.tsx's effect runs it once on lift
@@ -95,7 +113,9 @@ describe('Day screen: the sync line (#409)', () => {
   it('does not refresh on an ask that failed (nothing landed)', async () => {
     mount();
     workoutsRun.mockClear();
-    await act(() => { syncAsk.value = 'failed'; });
+    await act(() => {
+      syncAsk.value = 'failed';
+    });
     expect(workoutsRun).not.toHaveBeenCalled();
   });
 });

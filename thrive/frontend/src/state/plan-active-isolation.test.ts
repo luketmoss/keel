@@ -5,16 +5,21 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
-  workouts, sets, templates, toasts,
-  activeWorkoutId, activeWorkoutSets, activeWarmupExercises, isEditMode,
+  workouts,
+  sets,
+  templates,
+  toasts,
+  activeWorkoutId,
+  activeWorkoutSets,
+  activeWarmupExercises,
+  isEditMode,
 } from './store';
 import type { SetWithRow, Template, BuilderExercise } from '../api/types';
 
 let sheet: { Workouts: string[][]; Sets: string[][] };
 let demo = false;
 
-const colIndex = (letters: string) =>
-  [...letters].reduce((n, c) => n * 26 + (c.charCodeAt(0) - 64), 0) - 1;
+const colIndex = (letters: string) => [...letters].reduce((n, c) => n * 26 + (c.charCodeAt(0) - 64), 0) - 1;
 
 function parseRange(range: string) {
   const [tab, cells] = range.split('!');
@@ -31,7 +36,9 @@ function parseRange(range: string) {
 }
 
 vi.mock('../api/sheets', () => ({
-  SheetsApiError: class extends Error { status = 0; },
+  SheetsApiError: class extends Error {
+    status = 0;
+  },
   withReauth: vi.fn(async (token: string, fn: (t: string) => Promise<unknown>) => fn(token)),
   sheetsGet: vi.fn(async (range: string) => {
     const { tab, colStart, colEnd, rowStart, rowEnd } = parseRange(range);
@@ -67,16 +74,60 @@ const PUSH: Template = {
   id: 'tpl_push',
   name: 'Upper Push A',
   exercises: [
-    { template_id: 'tpl_push', template_name: 'Upper Push A', order: 1, exercise_id: 'ex_wu', exercise_name: 'Band Pull-Apart', section: 'warmup', sets: '', reps: '', sheetRow: 2 },
-    { template_id: 'tpl_push', template_name: 'Upper Push A', order: 2, exercise_id: 'ex_bp', exercise_name: 'Bench Press BB', section: 'primary', sets: '3', reps: '8', sheetRow: 3 },
+    {
+      template_id: 'tpl_push',
+      template_name: 'Upper Push A',
+      order: 1,
+      exercise_id: 'ex_wu',
+      exercise_name: 'Band Pull-Apart',
+      section: 'warmup',
+      sets: '',
+      reps: '',
+      sheetRow: 2,
+    },
+    {
+      template_id: 'tpl_push',
+      template_name: 'Upper Push A',
+      order: 2,
+      exercise_id: 'ex_bp',
+      exercise_name: 'Bench Press BB',
+      section: 'primary',
+      sets: '3',
+      reps: '8',
+      sheetRow: 3,
+    },
   ],
 };
 
-const WARMUP_EX: BuilderExercise = { exercise_id: 'ex_wu', exercise_name: 'Band Pull-Apart', section: 'warmup', sets: 1, planned_reps: '' };
-const MAIN_EX: BuilderExercise = { exercise_id: 'ex_bp', exercise_name: 'Bench Press BB', section: 'primary', sets: 3, planned_reps: '8' };
+const WARMUP_EX: BuilderExercise = {
+  exercise_id: 'ex_wu',
+  exercise_name: 'Band Pull-Apart',
+  section: 'warmup',
+  sets: 1,
+  planned_reps: '',
+};
+const MAIN_EX: BuilderExercise = {
+  exercise_id: 'ex_bp',
+  exercise_name: 'Bench Press BB',
+  section: 'primary',
+  sets: 3,
+  planned_reps: '8',
+};
 
 const A_SETS: SetWithRow[] = [
-  { workout_id: 'w_a', exercise_id: 'ex_sq', exercise_name: 'Squat', section: 'primary', exercise_order: 1, set_number: 1, planned_reps: '5', weight: '225', reps: '5', effort: 'Hard', sheetRow: 2 },
+  {
+    workout_id: 'w_a',
+    exercise_id: 'ex_sq',
+    exercise_name: 'Squat',
+    section: 'primary',
+    exercise_order: 1,
+    set_number: 1,
+    planned_reps: '5',
+    weight: '225',
+    reps: '5',
+    effort: 'Hard',
+    sheetRow: 2,
+  },
 ];
 const A_WARMUPS = [{ exercise_id: 'ex_hip', exercise_name: 'Hip Circles', exercise_order: 0 }];
 
@@ -91,7 +142,10 @@ function planRows() {
   return sets.value.filter((s) => s.workout_id !== 'w_a');
 }
 
-describe.each([['live', false], ['demo', true]])('#351 (%s)', (_mode, isDemoMode) => {
+describe.each([
+  ['live', false],
+  ['demo', true],
+])('#351 (%s)', (_mode, isDemoMode) => {
   beforeEach(() => {
     demo = isDemoMode;
     sheet = {
@@ -156,7 +210,9 @@ describe.each([['live', false], ['demo', true]])('#351 (%s)', (_mode, isDemoMode
     it('from a template: its rows and the template warmups', async () => {
       const id = await startWorkout({ type: 'weight', name: 'Upper Push A', template_id: 'tpl_push' }, TOKEN);
       expect(activeWorkoutSets.value.map((s) => s.workout_id)).toEqual(Array(4).fill(id));
-      expect(activeWarmupExercises.value).toEqual([{ exercise_id: 'ex_wu', exercise_name: 'Band Pull-Apart', exercise_order: 1 }]);
+      expect(activeWarmupExercises.value).toEqual([
+        { exercise_id: 'ex_wu', exercise_name: 'Band Pull-Apart', exercise_order: 1 },
+      ]);
     });
 
     it('from builder exercises: its rows and the builder warmups', async () => {

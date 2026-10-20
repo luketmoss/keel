@@ -51,13 +51,15 @@ function makeLastTimeSet(overrides: Partial<SetWithRow> = {}): SetWithRow {
 describe('applyCopyDown', () => {
   // AC1: Copy down populates weight and reps from last-time; effort is blank
   it('copies weight and reps from last-time sets; effort is always blank', () => {
-    const exercises = [makeExercise({
-      sets: [
-        makeSet({ set_number: 1, planned_reps: '8-10' }),
-        makeSet({ set_number: 2, planned_reps: '8-10' }),
-        makeSet({ set_number: 3, planned_reps: '6-8' }),
-      ],
-    })];
+    const exercises = [
+      makeExercise({
+        sets: [
+          makeSet({ set_number: 1, planned_reps: '8-10' }),
+          makeSet({ set_number: 2, planned_reps: '8-10' }),
+          makeSet({ set_number: 3, planned_reps: '6-8' }),
+        ],
+      }),
+    ];
 
     const lastTime = [
       makeLastTimeSet({ set_number: 1, weight: '135', reps: '10', effort: 'Medium' }),
@@ -81,9 +83,11 @@ describe('applyCopyDown', () => {
 
   // AC2: Effort remains blank even when last-time sets had effort values
   it('leaves effort blank even when last-time sets had effort values', () => {
-    const exercises = [makeExercise({
-      sets: [makeSet({ set_number: 1 }), makeSet({ set_number: 2 })],
-    })];
+    const exercises = [
+      makeExercise({
+        sets: [makeSet({ set_number: 1 }), makeSet({ set_number: 2 })],
+      }),
+    ];
 
     const lastTime = [
       makeLastTimeSet({ set_number: 1, weight: '100', reps: '12', effort: 'Easy' }),
@@ -98,12 +102,11 @@ describe('applyCopyDown', () => {
 
   // AC1: planned_reps preserved
   it('preserves planned_reps from current sets', () => {
-    const exercises = [makeExercise({
-      sets: [
-        makeSet({ set_number: 1, planned_reps: '8-10' }),
-        makeSet({ set_number: 2, planned_reps: '6-8' }),
-      ],
-    })];
+    const exercises = [
+      makeExercise({
+        sets: [makeSet({ set_number: 1, planned_reps: '8-10' }), makeSet({ set_number: 2, planned_reps: '6-8' })],
+      }),
+    ];
 
     const lastTime = [
       makeLastTimeSet({ set_number: 1, planned_reps: '12-15' }),
@@ -119,17 +122,16 @@ describe('applyCopyDown', () => {
 
   // AC1: All copied sets marked unsaved
   it('marks all copied sets as unsaved', () => {
-    const exercises = [makeExercise({
-      sets: [
-        makeSet({ set_number: 1, saved: true, sheetRow: 5 }),
-        makeSet({ set_number: 2, saved: true, sheetRow: 6 }),
-      ],
-    })];
-
-    const lastTime = [
-      makeLastTimeSet({ set_number: 1 }),
-      makeLastTimeSet({ set_number: 2 }),
+    const exercises = [
+      makeExercise({
+        sets: [
+          makeSet({ set_number: 1, saved: true, sheetRow: 5 }),
+          makeSet({ set_number: 2, saved: true, sheetRow: 6 }),
+        ],
+      }),
     ];
+
+    const lastTime = [makeLastTimeSet({ set_number: 1 }), makeLastTimeSet({ set_number: 2 })];
 
     const { exercises: result } = applyCopyDown(exercises, 'ex1', 1, lastTime);
 
@@ -142,12 +144,11 @@ describe('applyCopyDown', () => {
 
   // AC2: More sets in last-time → creates additional sets
   it('creates additional sets when last-time has more', () => {
-    const exercises = [makeExercise({
-      sets: [
-        makeSet({ set_number: 1, planned_reps: '8-10' }),
-        makeSet({ set_number: 2, planned_reps: '8-10' }),
-      ],
-    })];
+    const exercises = [
+      makeExercise({
+        sets: [makeSet({ set_number: 1, planned_reps: '8-10' }), makeSet({ set_number: 2, planned_reps: '8-10' })],
+      }),
+    ];
 
     const lastTime = [
       makeLastTimeSet({ set_number: 1, weight: '135', reps: '10', effort: 'Easy' }),
@@ -175,14 +176,16 @@ describe('applyCopyDown', () => {
 
   // AC3: Fewer sets in last-time → excess sets returned for removal
   it('returns excess sets for removal when last-time has fewer', () => {
-    const exercises = [makeExercise({
-      sets: [
-        makeSet({ set_number: 1, saved: true, sheetRow: 5 }),
-        makeSet({ set_number: 2, saved: true, sheetRow: 6 }),
-        makeSet({ set_number: 3, saved: true, sheetRow: 7 }),
-        makeSet({ set_number: 4, saved: false, sheetRow: -1 }),
-      ],
-    })];
+    const exercises = [
+      makeExercise({
+        sets: [
+          makeSet({ set_number: 1, saved: true, sheetRow: 5 }),
+          makeSet({ set_number: 2, saved: true, sheetRow: 6 }),
+          makeSet({ set_number: 3, saved: true, sheetRow: 7 }),
+          makeSet({ set_number: 4, saved: false, sheetRow: -1 }),
+        ],
+      }),
+    ];
 
     const lastTime = [
       makeLastTimeSet({ set_number: 1, weight: '135', reps: '10', effort: 'Medium' }),
@@ -205,9 +208,7 @@ describe('applyCopyDown', () => {
       makeExercise({ exercise_id: 'ex2', exercise_order: 2, exercise_name: 'Squat' }),
     ];
 
-    const lastTime = [
-      makeLastTimeSet({ set_number: 1, weight: '200', reps: '5', effort: 'Hard' }),
-    ];
+    const lastTime = [makeLastTimeSet({ set_number: 1, weight: '200', reps: '5', effort: 'Hard' })];
 
     const { exercises: result } = applyCopyDown(exercises, 'ex1', 1, lastTime);
 

@@ -49,7 +49,13 @@ describe('buildExerciseList', () => {
 
   it('includes warmup set rows as exercises', () => {
     const rows = [
-      makeSetRow({ exercise_id: 'w1', exercise_name: 'Arm Circles', section: 'warmup', exercise_order: 1, set_number: 1 }),
+      makeSetRow({
+        exercise_id: 'w1',
+        exercise_name: 'Arm Circles',
+        section: 'warmup',
+        exercise_order: 1,
+        set_number: 1,
+      }),
     ];
     const result = buildExerciseList(rows);
     expect(result).toHaveLength(1);
@@ -71,9 +77,7 @@ describe('mergeWarmups', () => {
       }),
       makeExercise({ exercise_id: 'ex1', exercise_name: 'Bench Press', section: 'primary', exercise_order: 2 }),
     ];
-    const warmupInfos = [
-      { exercise_id: 'w1', exercise_name: 'Arm Circles', exercise_order: 1 },
-    ];
+    const warmupInfos = [{ exercise_id: 'w1', exercise_name: 'Arm Circles', exercise_order: 1 }];
 
     const result = mergeWarmups(tracked, warmupInfos);
     const warmups = result.filter((e) => e.exercise_id === 'w1');
@@ -87,9 +91,7 @@ describe('mergeWarmups', () => {
       makeExercise({ exercise_id: 'w1', section: 'warmup', exercise_order: 1 }),
       makeExercise({ exercise_id: 'ex1', section: 'primary', exercise_order: 2 }),
     ];
-    const warmupInfos = [
-      { exercise_id: 'w1', exercise_name: 'Arm Circles', exercise_order: 1 },
-    ];
+    const warmupInfos = [{ exercise_id: 'w1', exercise_name: 'Arm Circles', exercise_order: 1 }];
 
     const result = mergeWarmups(tracked, warmupInfos);
     const keys = result.map((e) => `${e.exercise_id}__${e.exercise_order}`);
@@ -140,12 +142,8 @@ describe('mergeWarmups', () => {
   });
 
   it('preserves sort order by exercise_order', () => {
-    const tracked = [
-      makeExercise({ exercise_id: 'ex1', section: 'primary', exercise_order: 3 }),
-    ];
-    const warmupInfos = [
-      { exercise_id: 'w1', exercise_name: 'Arm Circles', exercise_order: 1 },
-    ];
+    const tracked = [makeExercise({ exercise_id: 'ex1', section: 'primary', exercise_order: 3 })];
+    const warmupInfos = [{ exercise_id: 'w1', exercise_name: 'Arm Circles', exercise_order: 1 }];
 
     const result = mergeWarmups(tracked, warmupInfos);
     expect(result[0].exercise_order).toBe(1);

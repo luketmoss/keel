@@ -24,7 +24,9 @@ async function boot(hash: string) {
     return h('div', { class: 'screen' }, screen ? screen() : h('h1', {}, route.name));
   }
   const tabBar = h('nav', {}, h('button', { id: 'tab' }, 'Tab'));
-  const utils = render(h('div', {}, h('main', { class: 'app-content', tabIndex: -1 }, h(Stub, {}), h(focus.RouteFocus, {})), tabBar));
+  const utils = render(
+    h('div', {}, h('main', { class: 'app-content', tabIndex: -1 }, h(Stub, {}), h(focus.RouteFocus, {})), tabBar),
+  );
   // Let RouteFocus subscribe (its effect runs after paint).
   await new Promise((r) => setTimeout(r, 0));
   await new Promise((r) => setTimeout(r, 30));
@@ -39,7 +41,8 @@ async function go(router: Router, move: () => void, name: string) {
 }
 
 const active = () => document.activeElement as HTMLElement;
-const byText = (text: string) => [...document.querySelectorAll<HTMLElement>('button, a, h1, h2, div')].find((e) => e.textContent === text)!;
+const byText = (text: string) =>
+  [...document.querySelectorAll<HTMLElement>('button, a, h1, h2, div')].find((e) => e.textContent === text)!;
 
 let scrollTo: ReturnType<typeof vi.fn>;
 
@@ -54,7 +57,9 @@ afterEach(() => {
 });
 
 describe('helpers', () => {
-  beforeEach(() => { document.body.innerHTML = ''; });
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
 
   it('keyOf: data-focus-key, else id, else an <a> href; a descendant uses its closest [data-focus-key]', () => {
     document.body.innerHTML = `
@@ -120,11 +125,21 @@ describe('AC1: a push focuses the new screen heading', () => {
   it('every route name lands on a heading', async () => {
     const { router } = await boot('#/activities');
     const paths: Array<[string, string]> = [
-      ['/', 'day'], ['/calendar', 'calendar'], ['/trends', 'trends'], ['/activities', 'activities'],
-      ['/workout/new', 'workout-new'], ['/history/w1', 'workout-detail'], ['/history/w1/edit', 'workout-edit'],
-      ['/workout/w1', 'workout-active'], ['/templates', 'templates'], ['/templates/new', 'template-new'],
-      ['/templates/t1', 'template-detail'], ['/templates/t1/edit', 'template-edit'], ['/exercises', 'exercises'],
-      ['/settings', 'settings'], ['/settings/labels', 'manage-labels'],
+      ['/', 'day'],
+      ['/calendar', 'calendar'],
+      ['/trends', 'trends'],
+      ['/activities', 'activities'],
+      ['/workout/new', 'workout-new'],
+      ['/history/w1', 'workout-detail'],
+      ['/history/w1/edit', 'workout-edit'],
+      ['/workout/w1', 'workout-active'],
+      ['/templates', 'templates'],
+      ['/templates/new', 'template-new'],
+      ['/templates/t1', 'template-detail'],
+      ['/templates/t1/edit', 'template-edit'],
+      ['/exercises', 'exercises'],
+      ['/settings', 'settings'],
+      ['/settings/labels', 'manage-labels'],
     ];
     for (const [path, name] of paths) {
       await go(router, () => router.navigate(path), name);
@@ -154,7 +169,10 @@ describe('AC1: a push focuses the new screen heading', () => {
   });
 
   it('leaves a field that focused itself on mount (autoFocus) alone', async () => {
-    screens['template-new'] = () => [h('h1', {}, 'New'), h('input', { ref: (el: HTMLInputElement | null) => el?.focus(), 'aria-label': 'Name' })];
+    screens['template-new'] = () => [
+      h('h1', {}, 'New'),
+      h('input', { ref: (el: HTMLInputElement | null) => el?.focus(), 'aria-label': 'Name' }),
+    ];
     const { router } = await boot('#/templates');
     await go(router, () => router.navigate('/templates/new'), 'template-new');
     expect(active().tagName).toBe('INPUT');
@@ -311,7 +329,13 @@ describe('AC3: Back restores the opener', () => {
     const { router } = await boot('#/activities');
     byText('W1').focus();
     await go(router, () => router.navigate('/history/w1'), 'workout-detail');
-    await go(router, () => { window.location.hash = '#/activities'; }, 'activities');
+    await go(
+      router,
+      () => {
+        window.location.hash = '#/activities';
+      },
+      'activities',
+    );
     expect(active().textContent).toBe('Activities');
   });
 
@@ -336,7 +360,9 @@ describe('AC4: failure modes land on the heading', () => {
     disabled = false;
     screens.activities = () => [
       h('h1', {}, 'Activities'),
-      ...list.map((id) => h('button', { key: id, 'data-focus-key': `workout:${id}`, disabled: disabled && id === 'w2' }, id)),
+      ...list.map((id) =>
+        h('button', { key: id, 'data-focus-key': `workout:${id}`, disabled: disabled && id === 'w2' }, id),
+      ),
     ];
   });
 
@@ -404,7 +430,10 @@ describe('no focus ring only on route-focused headings', () => {
   it("global.css's #256 rule matches main and a marked heading, never a Day panel title", async () => {
     const css = readGlobalCss().replace(/\r\n/g, '\n');
     const block = css.slice(css.indexOf('Route focus (#256)'));
-    const selectors = block.slice(block.indexOf('*/') + 2, block.indexOf('{')).split(',').map((s) => s.trim().replace(/:focus$/, ''));
+    const selectors = block
+      .slice(block.indexOf('*/') + 2, block.indexOf('{'))
+      .split(',')
+      .map((s) => s.trim().replace(/:focus$/, ''));
     expect(selectors).toEqual(['.app-content', '[data-route-focus]']);
     document.body.innerHTML = `
       <main class="app-content"><div class="day-screen">

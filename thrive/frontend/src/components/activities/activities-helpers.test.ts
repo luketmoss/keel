@@ -44,7 +44,18 @@ function makeWorkout(overrides: Partial<WorkoutWithRow> = {}): WorkoutWithRow {
     ascent_m: '',
     descent_m: '',
     avg_hr: '',
-    sub_type: '', source: '', source_activity_id: '', raw_ref: '', fit_ref: '', fit_fetched_at: '', synced_at: '', started_at_utc: '', calories: '', estimated_seconds: '', sport_type: '', track_ref: '',
+    sub_type: '',
+    source: '',
+    source_activity_id: '',
+    raw_ref: '',
+    fit_ref: '',
+    fit_fetched_at: '',
+    synced_at: '',
+    started_at_utc: '',
+    calories: '',
+    estimated_seconds: '',
+    sport_type: '',
+    track_ref: '',
     sheetRow: 2,
     ...overrides,
   };
@@ -122,7 +133,7 @@ describe('groupWorkoutsByDate', () => {
       makeWorkout({ id: 'w3', date: '2026-03-01' }), // Earlier
     ];
     const groups = groupWorkoutsByDate(workouts, today);
-    expect(groups.map(g => g.label)).toEqual(['This Week', 'Last Week', 'Earlier']);
+    expect(groups.map((g) => g.label)).toEqual(['This Week', 'Last Week', 'Earlier']);
   });
 
   it('omits empty sections', () => {
@@ -159,7 +170,7 @@ describe('groupWorkoutsByDate', () => {
       makeWorkout({ id: 'w4', date: '2026-03-08' }), // Earlier
     ];
     const groups = groupWorkoutsByDate(workouts, monday);
-    expect(groups.map(g => g.label)).toEqual(['This Week', 'Last Week', 'Earlier']);
+    expect(groups.map((g) => g.label)).toEqual(['This Week', 'Last Week', 'Earlier']);
     expect(groups[0].workouts).toHaveLength(1);
     expect(groups[1].workouts).toHaveLength(2);
     expect(groups[2].workouts).toHaveLength(1);
@@ -175,15 +186,12 @@ describe('groupWorkoutsByDate', () => {
       makeWorkout({ id: 'w3', date: '2026-03-15' }), // Last Week (Sun)
     ];
     const groups = groupWorkoutsByDate(workouts, sunday);
-    expect(groups.map(g => g.label)).toEqual(['This Week', 'Last Week']);
+    expect(groups.map((g) => g.label)).toEqual(['This Week', 'Last Week']);
     expect(groups[0].workouts).toHaveLength(2);
   });
 
   it('preserves reverse-chronological order within each section', () => {
-    const workouts = [
-      makeWorkout({ id: 'w1', date: '2026-03-18' }),
-      makeWorkout({ id: 'w2', date: '2026-03-16' }),
-    ];
+    const workouts = [makeWorkout({ id: 'w1', date: '2026-03-18' }), makeWorkout({ id: 'w2', date: '2026-03-16' })];
     const groups = groupWorkoutsByDate(workouts, today);
     expect(groups[0].workouts[0].date).toBe('2026-03-18');
     expect(groups[0].workouts[1].date).toBe('2026-03-16');
@@ -214,10 +222,10 @@ describe('getWeekStreak', () => {
 
   it('marks today correctly', () => {
     const days = getWeekStreak([], today);
-    const todayDay = days.find(d => d.isToday);
+    const todayDay = days.find((d) => d.isToday);
     expect(todayDay?.date).toBe('2026-03-15');
     expect(todayDay?.isToday).toBe(true);
-    expect(days.filter(d => d.isToday)).toHaveLength(1);
+    expect(days.filter((d) => d.isToday)).toHaveLength(1);
   });
 
   it('marks days with workouts as hasWorkout=true', () => {
@@ -226,9 +234,9 @@ describe('getWeekStreak', () => {
       makeWorkout({ id: 'w2', date: '2026-03-11' }), // Wednesday
     ];
     const days = getWeekStreak(workouts, today);
-    expect(days[0].hasWorkout).toBe(true);  // Mon
+    expect(days[0].hasWorkout).toBe(true); // Mon
     expect(days[1].hasWorkout).toBe(false); // Tue
-    expect(days[2].hasWorkout).toBe(true);  // Wed
+    expect(days[2].hasWorkout).toBe(true); // Wed
     expect(days[3].hasWorkout).toBe(false); // Thu
   });
 
@@ -238,12 +246,12 @@ describe('getWeekStreak', () => {
       makeWorkout({ id: 'w2', date: '2026-03-20' }), // next week
     ];
     const days = getWeekStreak(workouts, today);
-    expect(days.every(d => !d.hasWorkout)).toBe(true);
+    expect(days.every((d) => !d.hasWorkout)).toBe(true);
   });
 
   it('all days empty when no workouts', () => {
     const days = getWeekStreak([], today);
-    expect(days.every(d => !d.hasWorkout)).toBe(true);
+    expect(days.every((d) => !d.hasWorkout)).toBe(true);
   });
 
   it('works correctly when today is Monday', () => {
@@ -256,10 +264,15 @@ describe('getWeekStreak', () => {
 
   it('uses local dates (no UTC shift from toISOString)', () => {
     const days = getWeekStreak([], '2026-03-15');
-    const dates = days.map(d => d.date);
+    const dates = days.map((d) => d.date);
     expect(dates).toEqual([
-      '2026-03-09', '2026-03-10', '2026-03-11', '2026-03-12',
-      '2026-03-13', '2026-03-14', '2026-03-15',
+      '2026-03-09',
+      '2026-03-10',
+      '2026-03-11',
+      '2026-03-12',
+      '2026-03-13',
+      '2026-03-14',
+      '2026-03-15',
     ]);
   });
 });
@@ -470,7 +483,7 @@ describe('week stats exclude planned workouts (via caller filtering)', () => {
     const completedOnly = [completed];
     const days = getWeekStreak(completedOnly, today);
 
-    expect(days[0].hasWorkout).toBe(true);  // Mon Mar 9 — completed
+    expect(days[0].hasWorkout).toBe(true); // Mon Mar 9 — completed
     expect(days[2].hasWorkout).toBe(false); // Wed Mar 11 — planned was excluded
   });
 
@@ -498,10 +511,58 @@ describe('getWorkoutTags', () => {
   ];
 
   const workoutSets: SetWithRow[] = [
-    { workout_id: 'w1', exercise_id: 'ex1', exercise_name: 'Bench Press BB', section: 'primary', exercise_order: 1, set_number: 1, planned_reps: '', weight: '185', reps: '6', effort: 'Medium', sheetRow: 2 },
-    { workout_id: 'w1', exercise_id: 'ex2', exercise_name: 'Incline Press DB', section: 'SS1', exercise_order: 2, set_number: 1, planned_reps: '', weight: '55', reps: '12', effort: 'Medium', sheetRow: 3 },
-    { workout_id: 'w1', exercise_id: 'ex3', exercise_name: 'Lateral Raise DB', section: 'SS2', exercise_order: 3, set_number: 1, planned_reps: '', weight: '15', reps: '15', effort: 'Easy', sheetRow: 4 },
-    { workout_id: 'w1', exercise_id: 'ex4', exercise_name: 'Ab Wheel', section: 'burnout', exercise_order: 4, set_number: 1, planned_reps: '', weight: '', reps: '10', effort: 'Medium', sheetRow: 5 },
+    {
+      workout_id: 'w1',
+      exercise_id: 'ex1',
+      exercise_name: 'Bench Press BB',
+      section: 'primary',
+      exercise_order: 1,
+      set_number: 1,
+      planned_reps: '',
+      weight: '185',
+      reps: '6',
+      effort: 'Medium',
+      sheetRow: 2,
+    },
+    {
+      workout_id: 'w1',
+      exercise_id: 'ex2',
+      exercise_name: 'Incline Press DB',
+      section: 'SS1',
+      exercise_order: 2,
+      set_number: 1,
+      planned_reps: '',
+      weight: '55',
+      reps: '12',
+      effort: 'Medium',
+      sheetRow: 3,
+    },
+    {
+      workout_id: 'w1',
+      exercise_id: 'ex3',
+      exercise_name: 'Lateral Raise DB',
+      section: 'SS2',
+      exercise_order: 3,
+      set_number: 1,
+      planned_reps: '',
+      weight: '15',
+      reps: '15',
+      effort: 'Easy',
+      sheetRow: 4,
+    },
+    {
+      workout_id: 'w1',
+      exercise_id: 'ex4',
+      exercise_name: 'Ab Wheel',
+      section: 'burnout',
+      exercise_order: 4,
+      set_number: 1,
+      planned_reps: '',
+      weight: '',
+      reps: '10',
+      effort: 'Medium',
+      sheetRow: 5,
+    },
   ];
 
   it('returns top 3 most common muscle group tags', () => {
@@ -528,7 +589,19 @@ describe('getWorkoutTags', () => {
       { id: 'ex1', name: 'Custom Exercise', tags: '', notes: '', created: '', sheetRow: 2 },
     ];
     const singleSet: SetWithRow[] = [
-      { workout_id: 'w1', exercise_id: 'ex1', exercise_name: 'Custom Exercise', section: 'primary', exercise_order: 1, set_number: 1, planned_reps: '', weight: '', reps: '', effort: '', sheetRow: 2 },
+      {
+        workout_id: 'w1',
+        exercise_id: 'ex1',
+        exercise_name: 'Custom Exercise',
+        section: 'primary',
+        exercise_order: 1,
+        set_number: 1,
+        planned_reps: '',
+        weight: '',
+        reps: '',
+        effort: '',
+        sheetRow: 2,
+      },
     ];
     expect(getWorkoutTags(singleSet, noTagExercises)).toEqual([]);
   });
@@ -538,7 +611,19 @@ describe('getWorkoutTags', () => {
       { id: 'ex4', name: 'Ab Wheel', tags: 'Core', notes: '', created: '', sheetRow: 5 },
     ];
     const singleSet: SetWithRow[] = [
-      { workout_id: 'w1', exercise_id: 'ex4', exercise_name: 'Ab Wheel', section: 'burnout', exercise_order: 1, set_number: 1, planned_reps: '', weight: '', reps: '10', effort: '', sheetRow: 2 },
+      {
+        workout_id: 'w1',
+        exercise_id: 'ex4',
+        exercise_name: 'Ab Wheel',
+        section: 'burnout',
+        exercise_order: 1,
+        set_number: 1,
+        planned_reps: '',
+        weight: '',
+        reps: '10',
+        effort: '',
+        sheetRow: 2,
+      },
     ];
     expect(getWorkoutTags(singleSet, singleEx)).toEqual(['Core']);
   });
@@ -548,7 +633,19 @@ describe('getWorkoutTags', () => {
       { id: 'ex1', name: 'Push Ups', tags: 'Warmup, Push, Chest', notes: '', created: '', sheetRow: 2 },
     ];
     const warmupSets: SetWithRow[] = [
-      { workout_id: 'w1', exercise_id: 'ex1', exercise_name: 'Push Ups', section: 'warmup', exercise_order: 1, set_number: 1, planned_reps: '', weight: '', reps: '15', effort: '', sheetRow: 2 },
+      {
+        workout_id: 'w1',
+        exercise_id: 'ex1',
+        exercise_name: 'Push Ups',
+        section: 'warmup',
+        exercise_order: 1,
+        set_number: 1,
+        planned_reps: '',
+        weight: '',
+        reps: '15',
+        effort: '',
+        sheetRow: 2,
+      },
     ];
     const tags = getWorkoutTags(warmupSets, warmupEx);
     expect(tags).not.toContain('Warmup');
@@ -638,7 +735,7 @@ describe('sortPlannedWorkouts', () => {
       makeWorkout({ id: 'a', date: '2026-04-02' }),
       makeWorkout({ id: 'b', date: '2026-04-05' }),
     ];
-    expect(sortPlannedWorkouts(list).map(w => w.id)).toEqual(['a', 'b', 'c']);
+    expect(sortPlannedWorkouts(list).map((w) => w.id)).toEqual(['a', 'b', 'c']);
   });
 
   it('places overdue workouts above upcoming ones', () => {
@@ -646,7 +743,7 @@ describe('sortPlannedWorkouts', () => {
       makeWorkout({ id: 'upcoming', date: '2026-04-05' }),
       makeWorkout({ id: 'overdue', date: '2026-03-20' }),
     ];
-    expect(sortPlannedWorkouts(list).map(w => w.id)).toEqual(['overdue', 'upcoming']);
+    expect(sortPlannedWorkouts(list).map((w) => w.id)).toEqual(['overdue', 'upcoming']);
   });
 
   it('breaks ties on created, then id, for a deterministic order', () => {
@@ -655,17 +752,14 @@ describe('sortPlannedWorkouts', () => {
       makeWorkout({ id: 'a', date: '2026-04-02', created: '2026-01-02T00:00:00Z' }),
       makeWorkout({ id: 'm', date: '2026-04-02', created: '2026-01-01T00:00:00Z' }),
     ];
-    expect(sortPlannedWorkouts(list).map(w => w.id)).toEqual(['m', 'a', 'z']);
+    expect(sortPlannedWorkouts(list).map((w) => w.id)).toEqual(['m', 'a', 'z']);
   });
 
   it('does not mutate the input array', () => {
-    const list = [
-      makeWorkout({ id: 'b', date: '2026-04-10' }),
-      makeWorkout({ id: 'a', date: '2026-04-02' }),
-    ];
-    const before = list.map(w => w.id);
+    const list = [makeWorkout({ id: 'b', date: '2026-04-10' }), makeWorkout({ id: 'a', date: '2026-04-02' })];
+    const before = list.map((w) => w.id);
     sortPlannedWorkouts(list);
-    expect(list.map(w => w.id)).toEqual(before);
+    expect(list.map((w) => w.id)).toEqual(before);
   });
 });
 
@@ -680,31 +774,34 @@ describe('cardio aggregation (#105)', () => {
   describe('getWeekCardioDistance', () => {
     // AC4: all workouts have data
     it('sums every ride when all recorded a distance', () => {
-      const result = getWeekCardioDistance([
-        ride({ id: 'w1', distance_m: '16093' }),
-        ride({ id: 'w2', distance_m: '8047' }),
-      ], TODAY);
+      const result = getWeekCardioDistance(
+        [ride({ id: 'w1', distance_m: '16093' }), ride({ id: 'w2', distance_m: '8047' })],
+        TODAY,
+      );
       expect(result).toEqual({ total: 24140, withData: 2, of: 2 });
     });
 
     // AC4: none have data — skipped, not counted as zero
     it('reports a zero total but full denominator when none recorded one', () => {
-      const result = getWeekCardioDistance([
-        ride({ id: 'w1', distance_m: '' }),
-        ride({ id: 'w2', distance_m: '' }),
-      ], TODAY);
+      const result = getWeekCardioDistance(
+        [ride({ id: 'w1', distance_m: '' }), ride({ id: 'w2', distance_m: '' })],
+        TODAY,
+      );
       expect(result).toEqual({ total: 0, withData: 0, of: 2 });
     });
 
     // AC4: some have data — the gap must be visible, not inferred
     it('skips rides with no distance while still counting them in the denominator', () => {
-      const result = getWeekCardioDistance([
-        ride({ id: 'w1', distance_m: '16093' }),
-        ride({ id: 'w2', distance_m: '' }),
-        ride({ id: 'w3', distance_m: '8047' }),
-        ride({ id: 'w4', distance_m: '' }),
-        ride({ id: 'w5', distance_m: '4828' }),
-      ], TODAY);
+      const result = getWeekCardioDistance(
+        [
+          ride({ id: 'w1', distance_m: '16093' }),
+          ride({ id: 'w2', distance_m: '' }),
+          ride({ id: 'w3', distance_m: '8047' }),
+          ride({ id: 'w4', distance_m: '' }),
+          ride({ id: 'w5', distance_m: '4828' }),
+        ],
+        TODAY,
+      );
       expect(result).toEqual({ total: 28968, withData: 3, of: 5 });
     });
 
@@ -714,27 +811,36 @@ describe('cardio aggregation (#105)', () => {
     });
 
     it('ignores non-cardio workouts entirely', () => {
-      const result = getWeekCardioDistance([
-        ride({ id: 'w1', distance_m: '16093' }),
-        makeWorkout({ id: 'w2', type: 'weight', date: '2026-03-11' }),
-        makeWorkout({ id: 'w3', type: 'stretch', date: '2026-03-12' }),
-      ], TODAY);
+      const result = getWeekCardioDistance(
+        [
+          ride({ id: 'w1', distance_m: '16093' }),
+          makeWorkout({ id: 'w2', type: 'weight', date: '2026-03-11' }),
+          makeWorkout({ id: 'w3', type: 'stretch', date: '2026-03-12' }),
+        ],
+        TODAY,
+      );
       expect(result).toEqual({ total: 16093, withData: 1, of: 1 });
     });
 
     it('counts hikes alongside rides', () => {
-      const result = getWeekCardioDistance([
-        ride({ id: 'w1', distance_m: '16093' }),
-        makeWorkout({ id: 'w2', type: 'hike', date: '2026-03-12', distance_m: '8047' }),
-      ], TODAY);
+      const result = getWeekCardioDistance(
+        [
+          ride({ id: 'w1', distance_m: '16093' }),
+          makeWorkout({ id: 'w2', type: 'hike', date: '2026-03-12', distance_m: '8047' }),
+        ],
+        TODAY,
+      );
       expect(result).toEqual({ total: 24140, withData: 2, of: 2 });
     });
 
     it('excludes activities outside the week', () => {
-      const result = getWeekCardioDistance([
-        ride({ id: 'w1', date: '2026-03-11', distance_m: '16093' }),
-        ride({ id: 'w2', date: '2026-03-01', distance_m: '99999' }),
-      ], TODAY);
+      const result = getWeekCardioDistance(
+        [
+          ride({ id: 'w1', date: '2026-03-11', distance_m: '16093' }),
+          ride({ id: 'w2', date: '2026-03-01', distance_m: '99999' }),
+        ],
+        TODAY,
+      );
       expect(result).toEqual({ total: 16093, withData: 1, of: 1 });
     });
   });
@@ -819,16 +925,12 @@ describe('workoutCardAriaLabel (#113 AC5)', () => {
 
   // AC5: effort goes last, so the opening of the label is unchanged.
   it('appends the effort after the existing parts', () => {
-    expect(workoutCardAriaLabel(rated, 5)).toBe(
-      'Pull Day, weight, 2026-09-11, 47 min, 5 exercises, hard effort',
-    );
+    expect(workoutCardAriaLabel(rated, 5)).toBe('Pull Day, weight, 2026-09-11, 47 min, 5 exercises, hard effort');
   });
 
   // AC5: an unrated card's label is exactly what it has always been.
   it('leaves an unrated workout label untouched', () => {
-    expect(workoutCardAriaLabel({ ...rated, effort: '' }, 5)).toBe(
-      'Pull Day, weight, 2026-09-11, 47 min, 5 exercises',
-    );
+    expect(workoutCardAriaLabel({ ...rated, effort: '' }, 5)).toBe('Pull Day, weight, 2026-09-11, 47 min, 5 exercises');
   });
 
   // AC1: effort is session-level for every type, not just weight training.
@@ -840,9 +942,7 @@ describe('workoutCardAriaLabel (#113 AC5)', () => {
       elapsed_seconds: '4080',
       effort: 'Medium',
     });
-    expect(workoutCardAriaLabel(ride, 0)).toBe(
-      'Evening Ride, bike, 2026-09-08, 68 min, medium effort',
-    );
+    expect(workoutCardAriaLabel(ride, 0)).toBe('Evening Ride, bike, 2026-09-08, 68 min, medium effort');
   });
 
   // AC3: no combination of absent parts may leave a stray separator.
@@ -854,14 +954,11 @@ describe('workoutCardAriaLabel (#113 AC5)', () => {
       elapsed_seconds: '',
       effort: 'Easy',
     });
-    expect(workoutCardAriaLabel(bare, 0)).toBe(
-      'stretch, stretch, 2026-09-09, easy effort',
-    );
+    expect(workoutCardAriaLabel(bare, 0)).toBe('stretch, stretch, 2026-09-09, easy effort');
   });
 
   it('falls back to the type when the workout has no name', () => {
-    const unnamed = makeWorkout({ name: '', type: 'hike', date: '2026-09-05',
-      elapsed_seconds: '', effort: '' });
+    const unnamed = makeWorkout({ name: '', type: 'hike', date: '2026-09-05', elapsed_seconds: '', effort: '' });
     expect(workoutCardAriaLabel(unnamed, 0)).toBe('hike, hike, 2026-09-05');
   });
 });
@@ -879,7 +976,7 @@ describe('pluralExercise (#113)', () => {
 
 describe('describeWeekStreak (#293 AC5)', () => {
   const today = '2026-03-15'; // Sunday; week is Mon 03-09 to Sun 03-15
-  const w = (date: string) => ({ date } as any);
+  const w = (date: string) => ({ date }) as any;
 
   it('names the days with a workout, in week order', () => {
     const days = getWeekStreak([w('2026-03-12'), w('2026-03-09'), w('2026-03-10')], today);

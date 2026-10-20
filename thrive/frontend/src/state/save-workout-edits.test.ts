@@ -20,8 +20,7 @@ interface FakeSheet {
 let sheet: FakeSheet;
 
 /** Column letters -> zero-based index: A = 0, Z = 25, AA = 26 (#145). */
-const colIndex = (letters: string) =>
-  [...letters].reduce((n, c) => n * 26 + (c.charCodeAt(0) - 64), 0) - 1;
+const colIndex = (letters: string) => [...letters].reduce((n, c) => n * 26 + (c.charCodeAt(0) - 64), 0) - 1;
 
 function parseRange(range: string) {
   const [tab, cells] = range.split('!');
@@ -92,14 +91,25 @@ vi.mock('../api/demo-data', async (importOriginal) => ({
 }));
 
 vi.mock('../api/exercises-api', () => ({
-  fetchExercises: vi.fn(), createExercise: vi.fn(), updateExercise: vi.fn(), deleteExercise: vi.fn(),
+  fetchExercises: vi.fn(),
+  createExercise: vi.fn(),
+  updateExercise: vi.fn(),
+  deleteExercise: vi.fn(),
 }));
 vi.mock('../api/templates-api', () => ({
-  fetchTemplateRows: vi.fn(), groupTemplateRows: vi.fn(), createTemplate: vi.fn(),
-  updateTemplate: vi.fn(), deleteTemplate: vi.fn(), updateExerciseNameInTemplates: vi.fn(),
+  fetchTemplateRows: vi.fn(),
+  groupTemplateRows: vi.fn(),
+  createTemplate: vi.fn(),
+  updateTemplate: vi.fn(),
+  deleteTemplate: vi.fn(),
+  updateExerciseNameInTemplates: vi.fn(),
 }));
 vi.mock('../api/labels-api', () => ({
-  fetchLabels: vi.fn(), createLabel: vi.fn(), updateLabel: vi.fn(), deleteLabel: vi.fn(), appendLabels: vi.fn(),
+  fetchLabels: vi.fn(),
+  createLabel: vi.fn(),
+  updateLabel: vi.fn(),
+  deleteLabel: vi.fn(),
+  appendLabels: vi.fn(),
 }));
 vi.mock('../api/label-colors', () => ({ colorKeyFromName: vi.fn().mockReturnValue('blue') }));
 vi.mock('../auth/reauth', () => ({ attemptReauth: vi.fn(), ReauthFailedError: class extends Error {} }));
@@ -158,7 +168,7 @@ describe('AC1: a notes-only save keeps every set, warmups included', () => {
     expect(edited.filter((s) => s.section === 'warmup')).toHaveLength(2);
   });
 
-  it('keeps all 20 of w_demo001\'s set rows, each unchanged in its own row', async () => {
+  it("keeps all 20 of w_demo001's set rows, each unchanged in its own row", async () => {
     const before = text(sheet.Sets);
 
     await saveWorkoutEdits(WORKOUT_ID, notesOnlyPatch('Edited notes'), collectEditedSets(editScreen()), TOKEN);
@@ -166,8 +176,10 @@ describe('AC1: a notes-only save keeps every set, warmups included', () => {
     expect(text(sheet.Sets)).toEqual(before);
     const stored = sets.value.filter((s) => s.workout_id === WORKOUT_ID);
     expect(stored).toHaveLength(20);
-    expect(stored.filter((s) => s.section === 'warmup').map((s) => s.exercise_name))
-      .toEqual(['Push Ups', 'Bench Press BB']);
+    expect(stored.filter((s) => s.section === 'warmup').map((s) => s.exercise_name)).toEqual([
+      'Push Ups',
+      'Bench Press BB',
+    ]);
   });
 
   it('keeps the warmups in demo mode too', async () => {
@@ -187,9 +199,7 @@ describe('AC2: deliberate deletions still delete exactly what was removed', () =
     // Remove the Push Ups warmup exercise (row 2) and Incline Press set 2 (row 9).
     const list = editScreen()
       .filter((ex) => ex.exercise_id !== 'ex_demo_pushup')
-      .map((ex) => (ex.exercise_id === 'ex_demo002'
-        ? { ...ex, sets: ex.sets.filter((s) => s.set_number !== 2) }
-        : ex));
+      .map((ex) => (ex.exercise_id === 'ex_demo002' ? { ...ex, sets: ex.sets.filter((s) => s.set_number !== 2) } : ex));
 
     await saveWorkoutEdits(WORKOUT_ID, {}, collectEditedSets(list), TOKEN);
 
@@ -206,9 +216,11 @@ describe('AC3: kept sets are written to their own rows when rows are deleted', (
     // weight of Bench Press set 1 (row 4, just below them).
     const list = editScreen()
       .filter((ex) => ex.section !== 'warmup')
-      .map((ex) => (ex.exercise_id === 'ex_demo001'
-        ? { ...ex, sets: ex.sets.map((s) => (s.set_number === 1 ? { ...s, weight: '190' } : s)) }
-        : ex));
+      .map((ex) =>
+        ex.exercise_id === 'ex_demo001'
+          ? { ...ex, sets: ex.sets.map((s) => (s.set_number === 1 ? { ...s, weight: '190' } : s)) }
+          : ex,
+      );
 
     await saveWorkoutEdits(WORKOUT_ID, {}, collectEditedSets(list), TOKEN);
 
@@ -255,9 +267,7 @@ describe('AC4: stored rows are matched by row, not by exercise/order/set key', (
     expect(pushUps).toHaveLength(1);
     expect(pushUps[0][3]).toBe('primary');
     expect(rowsOf(WORKOUT_ID)).toHaveLength(20);
-    expect(rowsOf('w_demo004')).toEqual(
-      text(DEMO_SETS.filter((s) => s.workout_id === 'w_demo004').map(setToRow)),
-    );
+    expect(rowsOf('w_demo004')).toEqual(text(DEMO_SETS.filter((s) => s.workout_id === 'w_demo004').map(setToRow)));
   });
 });
 

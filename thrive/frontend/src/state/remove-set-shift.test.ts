@@ -13,14 +13,20 @@ let deleteFailure: Error | null = null;
 const calls: string[] = [];
 
 vi.mock('../api/sheets', () => ({
-  SheetsApiError: class extends Error { status = 0; },
+  SheetsApiError: class extends Error {
+    status = 0;
+  },
   withReauth: vi.fn(async (token: string, fn: (t: string) => Promise<unknown>) => fn(token)),
   sheetsGet: vi.fn(async () => {
     calls.push('get');
     return sheet.map((r) => [...r]);
   }),
-  sheetsUpdate: vi.fn(async () => { calls.push('update'); }),
-  sheetsAppend: vi.fn(async () => { calls.push('append'); }),
+  sheetsUpdate: vi.fn(async () => {
+    calls.push('update');
+  }),
+  sheetsAppend: vi.fn(async () => {
+    calls.push('append');
+  }),
   sheetsDeleteRow: vi.fn(async (_id: number, rowIndex: number) => {
     calls.push(`delete ${rowIndex}`);
     if (deleteFailure) throw deleteFailure;
@@ -41,8 +47,17 @@ const { removeSet, saveSet, dropAndShiftRows } = await import('./actions');
 const { enqueueSet, readQueue, clearQueue } = await import('../api/sync-queue');
 
 const row = (w: string, ex: string, order: number, n: number, sheetRow: number): SetWithRow => ({
-  workout_id: w, exercise_id: ex, exercise_name: ex, section: 'primary',
-  exercise_order: order, set_number: n, planned_reps: '8', weight: '100', reps: '8', effort: '', sheetRow,
+  workout_id: w,
+  exercise_id: ex,
+  exercise_name: ex,
+  section: 'primary',
+  exercise_order: order,
+  set_number: n,
+  planned_reps: '8',
+  weight: '100',
+  reps: '8',
+  effort: '',
+  sheetRow,
 });
 
 const ALL = [
@@ -92,7 +107,7 @@ describe('#394 AC4: removeSet shifts memory instead of re-fetching', () => {
     expect(rows(sets.value.filter((s) => s.workout_id === 'w1'))).toEqual([['w1', 'e_bench', 1, 2]]);
   });
 
-  it('shifts the offline queue: an entry below gets one less, the removed set\'s entry is dropped', async () => {
+  it("shifts the offline queue: an entry below gets one less, the removed set's entry is dropped", async () => {
     enqueueSet({ ...ALL[0], weight: '1' });
     enqueueSet({ ...ALL[2], weight: '2' });
     enqueueSet({ ...ALL[3], weight: '3' });
@@ -131,7 +146,7 @@ describe('#394 AC4: removeSet shifts memory instead of re-fetching', () => {
   });
 });
 
-describe('#394 AC4: demo mode keeps a Build Custom workout\'s sets for a resume', () => {
+describe("#394 AC4: demo mode keeps a Build Custom workout's sets for a resume", () => {
   it('a demo append is kept in memory below the last row, and a later remove shifts it like any other', async () => {
     demo = true;
     sets.value = [row('w0', 'e_bench', 1, 1, 2)];
@@ -141,7 +156,10 @@ describe('#394 AC4: demo mode keeps a Build Custom workout\'s sets for a resume'
     const b = await saveSet({ ...first, set_number: 2 }, 'tok');
     expect([a.sheetRow, b.sheetRow]).toEqual([3, 4]);
     expect(calls).toEqual([]);
-    expect(rows(activeWorkoutSets.value)).toEqual([['w1', 'e_bench', 1, 3], ['w1', 'e_bench', 2, 4]]);
+    expect(rows(activeWorkoutSets.value)).toEqual([
+      ['w1', 'e_bench', 1, 3],
+      ['w1', 'e_bench', 2, 4],
+    ]);
 
     await removeSet(a, 'tok');
     expect(rows(sets.value.filter((s) => s.workout_id === 'w1'))).toEqual([['w1', 'e_bench', 2, 3]]);

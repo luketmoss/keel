@@ -18,7 +18,8 @@ import { ReauthFailedError } from '../auth/reauth';
 
 const w = (id: string) => ({ id, sheetRow: 2 }) as never;
 const s = (id: string) => ({ workout_id: id, sheetRow: 2 }) as never;
-const first = () => `${(workouts.value[0] as { id: string }).id}/${(sets.value[0] as { workout_id: string }).workout_id}`;
+const first = () =>
+  `${(workouts.value[0] as { id: string }).id}/${(sets.value[0] as { workout_id: string }).workout_id}`;
 
 beforeEach(() => {
   fetchWorkouts.mockReset();

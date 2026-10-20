@@ -165,9 +165,7 @@ describe('flushQueue', () => {
 
   it('calls appendSet (POST) when sheetRow is -1 (new row)', async () => {
     vi.mocked(workoutsApi.appendSet).mockResolvedValue(undefined);
-    vi.mocked(workoutsApi.fetchSets).mockResolvedValue([
-      { ...makeSet({ sheetRow: 10 }) },
-    ]);
+    vi.mocked(workoutsApi.fetchSets).mockResolvedValue([{ ...makeSet({ sheetRow: 10 }) }]);
     store.activeWorkoutSets.value = [];
     enqueueSet(makeSet({ sheetRow: -1 }));
     const result = await flushQueue('tok');
@@ -241,7 +239,7 @@ describe('shiftQueueAfterDelete (#394)', () => {
 });
 
 describe('dropQueuedAppend (#394)', () => {
-  it('drops the removed set\'s queued append', () => {
+  it("drops the removed set's queued append", () => {
     enqueueSet(makeSet({ set_number: 2, sheetRow: -1 }));
     enqueueSet(makeSet({ set_number: 1, sheetRow: 2 }));
     dropQueuedAppend(makeSet({ set_number: 2 }));
@@ -267,11 +265,17 @@ describe('row keys (#392 AC5)', () => {
   it("a duplicate's two copies sharing exercise, order and set number keep separate entries", () => {
     enqueueSet(makeSet({ sheetRow: 2, section: 'primary', weight: '95' }));
     enqueueSet(makeSet({ sheetRow: 3, section: 'SS1', weight: '135' }));
-    expect(readQueue().map((e) => [e.payload.sheetRow, e.payload.weight])).toEqual([[2, '95'], [3, '135']]);
+    expect(readQueue().map((e) => [e.payload.sheetRow, e.payload.weight])).toEqual([
+      [2, '95'],
+      [3, '135'],
+    ]);
   });
 
   it('a second save of the same row replaces its entry, even one stored under the old key', () => {
-    localStorage.setItem('gw_sync_queue', JSON.stringify([{ key: 'w1|ex1|1|1', payload: makeSet({ sheetRow: 4, weight: '90' }) }]));
+    localStorage.setItem(
+      'gw_sync_queue',
+      JSON.stringify([{ key: 'w1|ex1|1|1', payload: makeSet({ sheetRow: 4, weight: '90' }) }]),
+    );
     enqueueSet(makeSet({ sheetRow: 4, exercise_order: 2, weight: '95' }));
     const q = readQueue();
     expect(q).toHaveLength(1);
@@ -286,10 +290,13 @@ describe('row keys (#392 AC5)', () => {
 
   it('entries stored under the old key still flush, once each', async () => {
     vi.mocked(workoutsApi.updateSet).mockResolvedValue(undefined);
-    localStorage.setItem('gw_sync_queue', JSON.stringify([
-      { key: 'w1|ex1|1|1', payload: makeSet({ sheetRow: 4 }) },
-      { key: 'w1|ex1|1|2', payload: makeSet({ sheetRow: 5, set_number: 2 }) },
-    ]));
+    localStorage.setItem(
+      'gw_sync_queue',
+      JSON.stringify([
+        { key: 'w1|ex1|1|1', payload: makeSet({ sheetRow: 4 }) },
+        { key: 'w1|ex1|1|2', payload: makeSet({ sheetRow: 5, set_number: 2 }) },
+      ]),
+    );
     const result = await flushQueue('tok');
     expect(result).toEqual({ synced: 2, failed: 0, remaining: 0 });
     expect(vi.mocked(workoutsApi.updateSet).mock.calls.map((c) => c[0])).toEqual([4, 5]);
@@ -298,14 +305,19 @@ describe('row keys (#392 AC5)', () => {
 
 describe('remapQueuedOrders (#392 AC5)', () => {
   const byRow = (...rows: [number, string, number, number][]) =>
-    new Map(rows.map(([row, exercise_id, set_number, exercise_order]) => [row, { exercise_id, set_number, exercise_order }]));
+    new Map(
+      rows.map(([row, exercise_id, set_number, exercise_order]) => [row, { exercise_id, set_number, exercise_order }]),
+    );
 
   it("gives an entry with a row the order of the set holding that row, when it is the entry's own", () => {
     enqueueSet(makeSet({ sheetRow: 2, exercise_order: 1 }));
     enqueueSet(makeSet({ sheetRow: 3, exercise_order: 2, exercise_id: 'ex2' }));
     remapQueuedOrders('w1', { byRow: byRow([2, 'ex1', 1, 2], [3, 'ex1', 1, 1]), moves: [] });
     // Row 3 is held by another exercise's set: left alone.
-    expect(readQueue().map((e) => [e.payload.sheetRow, e.payload.exercise_order])).toEqual([[2, 2], [3, 2]]);
+    expect(readQueue().map((e) => [e.payload.sheetRow, e.payload.exercise_order])).toEqual([
+      [2, 2],
+      [3, 2],
+    ]);
   });
 
   it('swaps the orders of entries with no row in one pass, keeping both', () => {
@@ -313,9 +325,15 @@ describe('remapQueuedOrders (#392 AC5)', () => {
     enqueueSet(makeSet({ exercise_order: 2, weight: 'B' }));
     remapQueuedOrders('w1', {
       byRow: new Map(),
-      moves: [{ exercise_id: 'ex1', from: 1, to: 2 }, { exercise_id: 'ex1', from: 2, to: 1 }],
+      moves: [
+        { exercise_id: 'ex1', from: 1, to: 2 },
+        { exercise_id: 'ex1', from: 2, to: 1 },
+      ],
     });
-    expect(readQueue().map((e) => [e.key, e.payload.weight])).toEqual([['w1|ex1|2|1', 'A'], ['w1|ex1|1|1', 'B']]);
+    expect(readQueue().map((e) => [e.key, e.payload.weight])).toEqual([
+      ['w1|ex1|2|1', 'A'],
+      ['w1|ex1|1|1', 'B'],
+    ]);
   });
 
   it("leaves other workouts' entries alone", () => {
@@ -336,7 +354,8 @@ describe('remapQueuedOrders (#392 AC5)', () => {
       moves: [],
     });
     expect(readQueue().map((e) => [e.key, e.payload.section, e.payload.exercise_order])).toEqual([
-      ['w1|row:2', 'SS1', 1], ['w1|row:3', 'primary', 1],
+      ['w1|row:2', 'SS1', 1],
+      ['w1|row:3', 'primary', 1],
     ]);
   });
 
@@ -347,11 +366,16 @@ describe('remapQueuedOrders (#392 AC5)', () => {
     // Order 1 of ex1 moves to 2 and takes SS1; ex1 at order 2 goes to 1, section unchanged.
     remapQueuedOrders('w1', {
       byRow: new Map(),
-      moves: [{ exercise_id: 'ex1', from: 1, to: 2 }, { exercise_id: 'ex1', from: 2, to: 1 }],
+      moves: [
+        { exercise_id: 'ex1', from: 1, to: 2 },
+        { exercise_id: 'ex1', from: 2, to: 1 },
+      ],
       sections: [{ exercise_id: 'ex1', exercise_order: 2, section: 'SS1' }],
     });
     expect(readQueue().map((e) => [e.key, e.payload.weight, e.payload.section])).toEqual([
-      ['w1|ex1|2|1', 'A', 'SS1'], ['w1|ex1|1|1', 'B', 'primary'], ['w1|ex2|1|1', 'C', 'primary'],
+      ['w1|ex1|2|1', 'A', 'SS1'],
+      ['w1|ex1|1|1', 'B', 'primary'],
+      ['w1|ex2|1|1', 'C', 'primary'],
     ]);
   });
 
@@ -367,7 +391,12 @@ describe('remapQueuedOrders (#392 AC5)', () => {
 
   it('an entry re-keyed while it is being flushed is still removed once it lands', async () => {
     let release!: () => void;
-    vi.mocked(workoutsApi.appendSet).mockImplementation(() => new Promise<void>((r) => { release = r; }));
+    vi.mocked(workoutsApi.appendSet).mockImplementation(
+      () =>
+        new Promise<void>((r) => {
+          release = r;
+        }),
+    );
     vi.mocked(workoutsApi.fetchSets).mockResolvedValue([]);
     enqueueSet(makeSet({ exercise_order: 1 }));
     const flushing = flushQueue('tok');
@@ -383,7 +412,12 @@ describe('flushQueue sends each entry as it is when its turn comes (#392)', () =
   it('an entry a move re-keyed during the flush goes out with its new order', async () => {
     let release!: () => void;
     vi.mocked(workoutsApi.updateSet)
-      .mockImplementationOnce(() => new Promise<void>((r) => { release = r; }))
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((r) => {
+            release = r;
+          }),
+      )
       .mockResolvedValue(undefined);
     enqueueSet(makeSet({ sheetRow: 2, set_number: 1 }));
     enqueueSet(makeSet({ sheetRow: 3, set_number: 2, exercise_order: 1 }));
@@ -409,8 +443,12 @@ describe('flushQueue updates the in-memory set by its row (#392 AC5)', () => {
     store.activeWorkoutSets.value = [twinA, twinB] as never;
     enqueueSet(makeSet({ sheetRow: 3, section: 'SS1', weight: '135' }));
     await flushQueue('tok');
-    expect((store.activeWorkoutSets.value as { sheetRow: number; weight: string }[]).map((s) => [s.sheetRow, s.weight]))
-      .toEqual([[2, '95'], [3, '135']]);
+    expect(
+      (store.activeWorkoutSets.value as { sheetRow: number; weight: string }[]).map((s) => [s.sheetRow, s.weight]),
+    ).toEqual([
+      [2, '95'],
+      [3, '135'],
+    ]);
     store.activeWorkoutId.value = null as never;
   });
 });

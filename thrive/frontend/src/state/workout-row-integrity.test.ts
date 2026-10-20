@@ -21,8 +21,7 @@ interface FakeSheet {
 let sheet: FakeSheet;
 
 /** Column letters -> zero-based index: A = 0, Z = 25, AA = 26 (#145). */
-const colIndex = (letters: string) =>
-  [...letters].reduce((n, c) => n * 26 + (c.charCodeAt(0) - 64), 0) - 1;
+const colIndex = (letters: string) => [...letters].reduce((n, c) => n * 26 + (c.charCodeAt(0) - 64), 0) - 1;
 
 function parseRange(range: string) {
   const [tab, cells] = range.split('!');
@@ -92,38 +91,76 @@ vi.mock('../api/demo-data', () => ({
 }));
 
 vi.mock('../api/exercises-api', () => ({
-  fetchExercises: vi.fn(), createExercise: vi.fn(), updateExercise: vi.fn(), deleteExercise: vi.fn(),
+  fetchExercises: vi.fn(),
+  createExercise: vi.fn(),
+  updateExercise: vi.fn(),
+  deleteExercise: vi.fn(),
 }));
 vi.mock('../api/templates-api', () => ({
-  fetchTemplateRows: vi.fn(), groupTemplateRows: vi.fn(), createTemplate: vi.fn(),
-  updateTemplate: vi.fn(), deleteTemplate: vi.fn(), updateExerciseNameInTemplates: vi.fn(),
+  fetchTemplateRows: vi.fn(),
+  groupTemplateRows: vi.fn(),
+  createTemplate: vi.fn(),
+  updateTemplate: vi.fn(),
+  deleteTemplate: vi.fn(),
+  updateExerciseNameInTemplates: vi.fn(),
 }));
 vi.mock('../api/labels-api', () => ({
-  fetchLabels: vi.fn(), createLabel: vi.fn(), updateLabel: vi.fn(), deleteLabel: vi.fn(), appendLabels: vi.fn(),
+  fetchLabels: vi.fn(),
+  createLabel: vi.fn(),
+  updateLabel: vi.fn(),
+  deleteLabel: vi.fn(),
+  appendLabels: vi.fn(),
 }));
 vi.mock('../api/label-colors', () => ({ colorKeyFromName: vi.fn().mockReturnValue('blue') }));
 vi.mock('../auth/reauth', () => ({ attemptReauth: vi.fn(), ReauthFailedError: class extends Error {} }));
 
-const {
-  deleteWorkout,
-  saveWorkoutForLater,
-  copyWorkout,
-  finishWorkout,
-  startPlannedWorkout,
-  rescheduleWorkout,
-} = await import('./actions');
+const { deleteWorkout, saveWorkoutForLater, copyWorkout, finishWorkout, startPlannedWorkout, rescheduleWorkout } =
+  await import('./actions');
 
 const TOKEN = 'test-token';
 
-function workoutRow(w: { id: string; date: string; time: string; type: string; name: string; status?: string; estimated_seconds?: string }): string[] {
+function workoutRow(w: {
+  id: string;
+  date: string;
+  time: string;
+  type: string;
+  name: string;
+  status?: string;
+  estimated_seconds?: string;
+}): string[] {
   // A:AC — eleven original columns, the six nullable attributes (#101),
   // the nine sync provenance columns (#128), the estimate (#145) and the
   // COROS sport code (#260).
   return [
-    w.id, w.date, w.time, w.type, w.name, '', '', '', '', '', w.status || '',
-    '', '', '', '', '', '',
-    '', '', '', '', '', '', '', '', '',
-    w.estimated_seconds || '', '', '',
+    w.id,
+    w.date,
+    w.time,
+    w.type,
+    w.name,
+    '',
+    '',
+    '',
+    '',
+    '',
+    w.status || '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    w.estimated_seconds || '',
+    '',
+    '',
   ];
 }
 
@@ -134,24 +171,52 @@ function setRow(s: { workout_id: string; exercise_id: string; exercise_name: str
 
 function workoutsFromSheet(): WorkoutWithRow[] {
   return sheet.Workouts.map((row, i) => ({
-    id: row[0], date: row[1], time: row[2], type: row[3] as any, name: row[4],
-    template_id: row[5], notes: row[6], elapsed_seconds: row[7], created: row[8],
-    copied_from: row[9], status: row[10],
-    moving_seconds: row[11] || '', effort: (row[12] || '') as WorkoutWithRow['effort'],
-    distance_m: row[13] || '', ascent_m: row[14] || '',
-    descent_m: row[15] || '', avg_hr: row[16] || '',
-    sub_type: row[17] || '', source: row[18] || '', source_activity_id: row[19] || '',
-    raw_ref: row[20] || '', fit_ref: row[21] || '', fit_fetched_at: row[22] || '',
-    synced_at: row[23] || '', started_at_utc: row[24] || '', calories: row[25] || '', estimated_seconds: row[26] || '', sport_type: row[27] || '', track_ref: row[28] || '',
+    id: row[0],
+    date: row[1],
+    time: row[2],
+    type: row[3] as any,
+    name: row[4],
+    template_id: row[5],
+    notes: row[6],
+    elapsed_seconds: row[7],
+    created: row[8],
+    copied_from: row[9],
+    status: row[10],
+    moving_seconds: row[11] || '',
+    effort: (row[12] || '') as WorkoutWithRow['effort'],
+    distance_m: row[13] || '',
+    ascent_m: row[14] || '',
+    descent_m: row[15] || '',
+    avg_hr: row[16] || '',
+    sub_type: row[17] || '',
+    source: row[18] || '',
+    source_activity_id: row[19] || '',
+    raw_ref: row[20] || '',
+    fit_ref: row[21] || '',
+    fit_fetched_at: row[22] || '',
+    synced_at: row[23] || '',
+    started_at_utc: row[24] || '',
+    calories: row[25] || '',
+    estimated_seconds: row[26] || '',
+    sport_type: row[27] || '',
+    track_ref: row[28] || '',
     sheetRow: i + 2,
   }));
 }
 
 function setsFromSheet(): SetWithRow[] {
   return sheet.Sets.map((row, i) => ({
-    workout_id: row[0], exercise_id: row[1], exercise_name: row[2], section: row[3],
-    exercise_order: Number(row[4]), set_number: Number(row[5]), planned_reps: row[6],
-    weight: row[7], reps: row[8], effort: row[9] as any, sheetRow: i + 2,
+    workout_id: row[0],
+    exercise_id: row[1],
+    exercise_name: row[2],
+    section: row[3],
+    exercise_order: Number(row[4]),
+    set_number: Number(row[5]),
+    planned_reps: row[6],
+    weight: row[7],
+    reps: row[8],
+    effort: row[9] as any,
+    sheetRow: i + 2,
   }));
 }
 
@@ -182,7 +247,7 @@ describe('AC1: deleteWorkout keeps cached sheetRow correct after the row shift',
   });
 });
 
-describe('AC2: a workout write never targets another workout\'s row', () => {
+describe("AC2: a workout write never targets another workout's row", () => {
   it('aborts finishWorkout without writing when the cached row no longer matches', async () => {
     sheet.Workouts = [
       workoutRow({ id: 'w_real', date: '2026-09-01', time: '09:00', type: 'weight', name: 'Real', status: 'active' }),
@@ -190,10 +255,35 @@ describe('AC2: a workout write never targets another workout\'s row', () => {
     // Simulate staleness: the app's cache thinks 'w_ghost' lives at row 2,
     // but row 2 actually belongs to 'w_real'.
     const staleWorkout: WorkoutWithRow = {
-      id: 'w_ghost', date: '2026-09-01', time: '09:00', type: 'weight', name: 'Ghost',
-      template_id: '', notes: '', elapsed_seconds: '', created: '', copied_from: '', status: 'active',
-      moving_seconds: '', effort: '', distance_m: '', ascent_m: '', descent_m: '', avg_hr: '',
-      sub_type: '', source: '', source_activity_id: '', raw_ref: '', fit_ref: '', fit_fetched_at: '', synced_at: '', started_at_utc: '', calories: '', estimated_seconds: '', sport_type: '', track_ref: '',
+      id: 'w_ghost',
+      date: '2026-09-01',
+      time: '09:00',
+      type: 'weight',
+      name: 'Ghost',
+      template_id: '',
+      notes: '',
+      elapsed_seconds: '',
+      created: '',
+      copied_from: '',
+      status: 'active',
+      moving_seconds: '',
+      effort: '',
+      distance_m: '',
+      ascent_m: '',
+      descent_m: '',
+      avg_hr: '',
+      sub_type: '',
+      source: '',
+      source_activity_id: '',
+      raw_ref: '',
+      fit_ref: '',
+      fit_fetched_at: '',
+      synced_at: '',
+      started_at_utc: '',
+      calories: '',
+      estimated_seconds: '',
+      sport_type: '',
+      track_ref: '',
       sheetRow: 2,
     };
     workouts.value = [staleWorkout];
@@ -215,14 +305,37 @@ describe('AC2: a workout write never targets another workout\'s row', () => {
   });
 
   it('aborts startPlannedWorkout the same way', async () => {
-    sheet.Workouts = [
-      workoutRow({ id: 'w_real', date: '2026-09-01', time: '09:00', type: 'weight', name: 'Real' }),
-    ];
+    sheet.Workouts = [workoutRow({ id: 'w_real', date: '2026-09-01', time: '09:00', type: 'weight', name: 'Real' })];
     const staleWorkout: WorkoutWithRow = {
-      id: 'w_planned', date: '', time: '', type: 'weight', name: 'Planned',
-      template_id: '', notes: '', elapsed_seconds: '', created: '', copied_from: '', status: 'planned',
-      moving_seconds: '', effort: '', distance_m: '', ascent_m: '', descent_m: '', avg_hr: '',
-      sub_type: '', source: '', source_activity_id: '', raw_ref: '', fit_ref: '', fit_fetched_at: '', synced_at: '', started_at_utc: '', calories: '', estimated_seconds: '', sport_type: '', track_ref: '',
+      id: 'w_planned',
+      date: '',
+      time: '',
+      type: 'weight',
+      name: 'Planned',
+      template_id: '',
+      notes: '',
+      elapsed_seconds: '',
+      created: '',
+      copied_from: '',
+      status: 'planned',
+      moving_seconds: '',
+      effort: '',
+      distance_m: '',
+      ascent_m: '',
+      descent_m: '',
+      avg_hr: '',
+      sub_type: '',
+      source: '',
+      source_activity_id: '',
+      raw_ref: '',
+      fit_ref: '',
+      fit_fetched_at: '',
+      synced_at: '',
+      started_at_utc: '',
+      calories: '',
+      estimated_seconds: '',
+      sport_type: '',
+      track_ref: '',
       sheetRow: 2,
     };
     workouts.value = [staleWorkout];
@@ -267,9 +380,7 @@ describe('AC4: deleting one of two same-id rows removes only one', () => {
       workoutRow({ id: 'w_dup', date: '2026-08-31', time: '09:00', type: 'weight', name: 'Week 1' }),
       workoutRow({ id: 'w_dup', date: '2026-08-31', time: '10:00', type: 'weight', name: 'Week 1' }),
     ];
-    sheet.Sets = [
-      setRow({ workout_id: 'w_dup', exercise_id: 'ex_1', exercise_name: 'Bench Press' }),
-    ];
+    sheet.Sets = [setRow({ workout_id: 'w_dup', exercise_id: 'ex_1', exercise_name: 'Bench Press' })];
     workouts.value = workoutsFromSheet();
     sets.value = setsFromSheet();
 
@@ -309,7 +420,15 @@ describe('#145: a planned workout estimate', () => {
 
   it('starting a plan keeps AA and leaves elapsed blank (AC4)', async () => {
     sheet.Workouts = [
-      workoutRow({ id: 'w_p', date: '2099-12-31', time: '', type: 'weight', name: 'Pull A', status: 'planned', estimated_seconds: '2820' }),
+      workoutRow({
+        id: 'w_p',
+        date: '2099-12-31',
+        time: '',
+        type: 'weight',
+        name: 'Pull A',
+        status: 'planned',
+        estimated_seconds: '2820',
+      }),
     ];
     workouts.value = workoutsFromSheet();
 
@@ -330,7 +449,15 @@ describe('#145: a planned workout estimate', () => {
     const date = `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`;
     const time = `${pad(start.getHours())}:${pad(start.getMinutes())}`;
     sheet.Workouts = [
-      workoutRow({ id: 'w_p', date, time, type: 'weight', name: 'Pull A', status: 'active', estimated_seconds: '2820' }),
+      workoutRow({
+        id: 'w_p',
+        date,
+        time,
+        type: 'weight',
+        name: 'Pull A',
+        status: 'active',
+        estimated_seconds: '2820',
+      }),
     ];
     workouts.value = workoutsFromSheet();
     activeWorkoutId.value = 'w_p';
@@ -352,7 +479,15 @@ describe('#347: rescheduleWorkout moves a workout in place', () => {
   function seed() {
     sheet.Workouts = [
       workoutRow({ id: 'w_x', date: '2026-09-20', time: '07:00', type: 'bike', name: 'Other' }),
-      workoutRow({ id: 'w_p', date: '2026-09-27', time: '', type: 'weight', name: 'Pull A', status: 'planned', estimated_seconds: '2820' }),
+      workoutRow({
+        id: 'w_p',
+        date: '2026-09-27',
+        time: '',
+        type: 'weight',
+        name: 'Pull A',
+        status: 'planned',
+        estimated_seconds: '2820',
+      }),
     ];
     sheet.Workouts[1][5] = 'tpl_1';
     sheet.Workouts[1][6] = 'Heavy week';
@@ -401,6 +536,8 @@ describe('#347: rescheduleWorkout moves a workout in place', () => {
     expect(sheet.Workouts[0][1]).toBe('2026-09-20');
     expect(sheet.Workouts[1][1]).toBe('2026-09-27');
     expect(workouts.value.find((w) => w.id === 'w_p')!.date).toBe('2026-09-27');
-    expect(toasts.value.map((t) => t.text)).toContain("Couldn't save — this workout is out of sync. Reload and try again.");
+    expect(toasts.value.map((t) => t.text)).toContain(
+      "Couldn't save — this workout is out of sync. Reload and try again.",
+    );
   });
 });

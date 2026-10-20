@@ -12,11 +12,31 @@ import { loadHealth } from '../../state/actions';
 import { dailyHealth, bodyMeasurements, dailySummary } from '../../state/store';
 import { TREND_GROUPS, CUSTOM_GROUP_ID, customGroup, type TrendGroup, type TrendMetric } from './metrics';
 import {
-  RANGES, AVERAGES, VIEWS, type RangeKey, type AverageKey, type ViewKey,
-  averageDays, earliestDate, metricSeries, rangeBounds, usablePoints, type MetricSeries,
+  RANGES,
+  AVERAGES,
+  VIEWS,
+  type RangeKey,
+  type AverageKey,
+  type ViewKey,
+  averageDays,
+  earliestDate,
+  metricSeries,
+  rangeBounds,
+  usablePoints,
+  type MetricSeries,
 } from './series';
 import { announceText } from './readout';
-import { RANGE_PREF, AVERAGE_PREF, VIEW_PREF, GROUP_PREF, readPref, writePref, readCustom, writeCustom, type Pref } from './prefs';
+import {
+  RANGE_PREF,
+  AVERAGE_PREF,
+  VIEW_PREF,
+  GROUP_PREF,
+  readPref,
+  writePref,
+  readCustom,
+  writeCustom,
+  type Pref,
+} from './prefs';
 import { CustomMetricsPicker } from './custom-metrics-picker';
 import { GroupSwitcher } from './group-switcher';
 import { TrendCharts } from './trend-chart';
@@ -40,7 +60,9 @@ function Segmented<T extends string>({ label, id, options, value, onChange, tigh
   const labelId = `trends-${id}-label`;
   return (
     <div class="trends-control">
-      <span class="trends-control-label" id={labelId}>{label}</span>
+      <span class="trends-control-label" id={labelId}>
+        {label}
+      </span>
       <div class={`sub-type-toggle${tight ? ' trends-toggle-tight' : ''}`} role="group" aria-labelledby={labelId}>
         {options.map((o) => (
           <button
@@ -68,7 +90,8 @@ export const selectedDay = signal<string | null>(null);
 export const announcement = signal('');
 
 const HINT_ID = 'trends-charts-hint';
-const HINT = 'Left and right arrows read one day at a time. Enter opens it in the Day view. The table view lists every day.';
+const HINT =
+  'Left and right arrows read one day at a time. Enter opens it in the Day view. The table view lists every day.';
 
 function clearSelection() {
   selectedDay.value = null;
@@ -78,10 +101,13 @@ function clearSelection() {
 /** A control's state, read from and written to its remembered pref. */
 function usePref<T extends string>(pref: Pref<T>): [T, (v: T) => void] {
   const [value, setValue] = useState<T>(() => readPref(pref));
-  return [value, (v: T) => {
-    setValue(v);
-    writePref(pref, v);
-  }];
+  return [
+    value,
+    (v: T) => {
+      setValue(v);
+      writePref(pref, v);
+    },
+  ];
 }
 
 /** The caption: what the marks are, in words. */
@@ -118,7 +144,11 @@ function TrendsState({ children }: { children: ComponentChildren }) {
       h.addEventListener('blur', () => h.removeAttribute(ROUTE_FOCUS_ATTR), { once: true });
     },
   );
-  return <div class="trends-state" tabIndex={-1} ref={ref}>{children}</div>;
+  return (
+    <div class="trends-state" tabIndex={-1} ref={ref}>
+      {children}
+    </div>
+  );
 }
 
 export function TrendsScreen() {
@@ -141,13 +171,17 @@ export function TrendsScreen() {
   useEffect(() => watchToday(), []);
   // A rollover changes what the days are, so it clears the selection like any
   // control that does (#247 AC5). It does not re-fetch health.
-  useEffect(() => { clearSelection(); }, [today]);
+  useEffect(() => {
+    clearSelection();
+  }, [today]);
 
   // A selection lives only as long as the view it was made in: leaving the
   // screen clears it, and so does a tap or click outside the charts.
   useEffect(() => {
     clearSelection();
-    const anyKey = () => { pointerFocus.current = false; };
+    const anyKey = () => {
+      pointerFocus.current = false;
+    };
     document.addEventListener('keydown', anyKey, true);
     const outside = (e: Event) => {
       if (selectedDay.value !== null && !charts.current?.contains(e.target as Node)) clearSelection();
@@ -160,10 +194,12 @@ export function TrendsScreen() {
     };
   }, []);
   // A control that changes what the days are clears the day. Average does not.
-  const clearing = <T,>(set: (v: T) => void) => (v: T) => {
-    clearSelection();
-    set(v);
-  };
+  const clearing =
+    <T,>(set: (v: T) => void) =>
+    (v: T) => {
+      clearSelection();
+      set(v);
+    };
 
   useEffect(() => {
     if (!token) return;
@@ -189,8 +225,8 @@ export function TrendsScreen() {
   const states = sources.map((s) => tabs[s].value.state);
   const avgDays = averageDays(average);
 
-  const ready = !states.includes('error') && states.every((s) => s === 'loaded')
-    && !(isCustom && group.metrics.length === 0);
+  const ready =
+    !states.includes('error') && states.every((s) => s === 'loaded') && !(isCustom && group.metrics.length === 0);
   // Each metric's series, built once per (group, range, average, today, rows of
   // the tabs it reads) and shared by the band check, the cards or table, the
   // readout and the keyboard announcement (#270). A selection changes none of
@@ -209,7 +245,9 @@ export function TrendsScreen() {
     const { from, to } = rangeBounds(range, today, earliest);
     const series = group.metrics.map((m, i) => metricSeries(m, from, to, avgDays, today, pointSets[i]));
     return {
-      from, to, series,
+      from,
+      to,
+      series,
       recorded: pointSets.map((p) => p.length > 0),
       nothingEver: pointSets.every((p) => p.length === 0),
       hasBand: groupHasBand(group.metrics, series),
@@ -238,7 +276,13 @@ export function TrendsScreen() {
       </TrendsState>
     );
   } else if (states.some((s) => s !== 'loaded')) {
-    content = <TrendsState><p class="trends-loading" role="status">Loading…</p></TrendsState>;
+    content = (
+      <TrendsState>
+        <p class="trends-loading" role="status">
+          Loading…
+        </p>
+      </TrendsState>
+    );
   } else if (isCustom && group.metrics.length === 0) {
     content = <p class="trends-custom-empty">Pick up to 4 metrics to see them here.</p>;
   } else if (built) {
@@ -248,9 +292,9 @@ export function TrendsScreen() {
     const moveTo = (date: string) => {
       selectedDay.value = date;
       announcement.value = announceText(
-        date, today,
-        group.metrics.flatMap((metric, i) =>
-          series[i].points.length ? [{ metric, series: series[i] }] : []),
+        date,
+        today,
+        group.metrics.flatMap((metric, i) => (series[i].points.length ? [{ metric, series: series[i] }] : [])),
         avgDays,
       );
     };
@@ -290,10 +334,18 @@ export function TrendsScreen() {
             role="group"
             aria-label={`${group.label} charts`}
             aria-describedby={HINT_ID}
-            onPointerDown={() => { pointerFocus.current = true; }}
-            onClick={() => { pointerFocus.current = false; }}
-            onPointerCancel={() => { pointerFocus.current = false; }}
-            onPointerLeave={(e) => { if (e.pointerType === 'mouse') clearSelection(); }}
+            onPointerDown={() => {
+              pointerFocus.current = true;
+            }}
+            onClick={() => {
+              pointerFocus.current = false;
+            }}
+            onPointerCancel={() => {
+              pointerFocus.current = false;
+            }}
+            onPointerLeave={(e) => {
+              if (e.pointerType === 'mouse') clearSelection();
+            }}
             onFocus={() => {
               // Arriving by Tab selects today and says so; a press does not,
               // nor does Back restoring focus here (#256 AC5).
@@ -308,9 +360,21 @@ export function TrendsScreen() {
             }}
             onKeyDown={onKeyDown}
           >
-            <p class="sr-only" id={HINT_ID}>{HINT}</p>
-            <TrendCharts group={group} series={series} recorded={recorded} range={range} avgDays={avgDays} today={today}
-              selectedDate={selectedDay.value} onSelect={(d) => { selectedDay.value = d; }} />
+            <p class="sr-only" id={HINT_ID}>
+              {HINT}
+            </p>
+            <TrendCharts
+              group={group}
+              series={series}
+              recorded={recorded}
+              range={range}
+              avgDays={avgDays}
+              today={today}
+              selectedDate={selectedDay.value}
+              onSelect={(d) => {
+                selectedDay.value = d;
+              }}
+            />
           </div>
         )}
       </>
@@ -337,7 +401,9 @@ export function TrendsScreen() {
           </div>
         )}
         {content}
-        <p class="sr-only" role="status" id="trends-announce">{announcement.value}</p>
+        <p class="sr-only" role="status" id="trends-announce">
+          {announcement.value}
+        </p>
         {picking && <CustomMetricsPicker selected={custom} onChange={setCustom} onClose={closePicker} />}
       </div>
     </div>

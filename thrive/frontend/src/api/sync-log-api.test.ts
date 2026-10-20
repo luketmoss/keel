@@ -71,7 +71,10 @@ describe('fetchSyncLog', () => {
     ]);
     const rows = await fetchSyncLog('tok');
     expect(sheetsGet).toHaveBeenCalledWith('SyncLog!A2:N', 'tok');
-    expect(rows.map((r) => [r.run_id, r.sheetRow])).toEqual([['schedule-1-1', 2], ['schedule-2-1', 5]]);
+    expect(rows.map((r) => [r.run_id, r.sheetRow])).toEqual([
+      ['schedule-1-1', 2],
+      ['schedule-2-1', 5],
+    ]);
   });
 });
 

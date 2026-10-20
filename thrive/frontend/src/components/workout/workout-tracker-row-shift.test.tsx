@@ -15,7 +15,15 @@
 // side of it: the rows the tracker holds, and the rows in memory.
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/preact';
-import { activeWorkoutId, activeWorkoutSets, activeWarmupExercises, isEditMode, workouts, sets, toasts } from '../../state/store';
+import {
+  activeWorkoutId,
+  activeWorkoutSets,
+  activeWarmupExercises,
+  isEditMode,
+  workouts,
+  sets,
+  toasts,
+} from '../../state/store';
 import type { WorkoutWithRow } from '../../api/types';
 import { mountConfirmHost, answerConfirm, openedConfirm, confirmText } from '../shared/confirm-test-utils';
 
@@ -25,16 +33,18 @@ let deleteFailure: Error | null = null;
 let deleteGate: Promise<void> | null = null;
 let appendGate: Promise<void> | null = null;
 
-const colIndex = (letters: string) =>
-  [...letters].reduce((n, c) => n * 26 + (c.charCodeAt(0) - 64), 0) - 1;
+const colIndex = (letters: string) => [...letters].reduce((n, c) => n * 26 + (c.charCodeAt(0) - 64), 0) - 1;
 function parseRange(range: string) {
   const [tab, cells] = range.split('!');
   const m = cells.match(/^([A-Z]+)(\d*):([A-Z]+)(\d*)$/);
   if (!m) throw new Error(`Unsupported range: ${range}`);
   const [, colStart, rowStart, colEnd, rowEnd] = m;
   return {
-    tab, colStart: colIndex(colStart), colEnd: colIndex(colEnd),
-    rowStart: rowStart ? Number(rowStart) : null, rowEnd: rowEnd ? Number(rowEnd) : null,
+    tab,
+    colStart: colIndex(colStart),
+    colEnd: colIndex(colEnd),
+    rowStart: rowStart ? Number(rowStart) : null,
+    rowEnd: rowEnd ? Number(rowEnd) : null,
   };
 }
 
@@ -43,7 +53,9 @@ const writes: { kind: 'update' | 'append' | 'delete'; row?: number; values: Row 
 let fetches = 0;
 
 vi.mock('../../api/sheets', () => ({
-  SheetsApiError: class extends Error { status = 0; },
+  SheetsApiError: class extends Error {
+    status = 0;
+  },
   withReauth: vi.fn(async (token: string, fn: (t: string) => Promise<unknown>) => fn(token)),
   sheetsGet: vi.fn(async (range: string) => {
     fetches++;
@@ -74,7 +86,10 @@ vi.mock('../../api/sheets', () => ({
   getSheetId: vi.fn(async () => 1),
 }));
 vi.mock('../../api/demo-data', () => ({
-  isDemo: () => false, DEMO_WORKOUTS: [], DEMO_SETS: [], shiftDemoWorkouts: (w: unknown) => w,
+  isDemo: () => false,
+  DEMO_WORKOUTS: [],
+  DEMO_SETS: [],
+  shiftDemoWorkouts: (w: unknown) => w,
 }));
 vi.mock('../../auth/reauth', () => ({ attemptReauth: vi.fn(), ReauthFailedError: class extends Error {} }));
 vi.mock('../../auth/auth-context', () => ({ useAuth: () => ({ token: 'test-token' }) }));
@@ -91,8 +106,18 @@ const { fetchSets } = await import('../../api/workouts-api');
 
 /** [workout_id, exercise_id, name, section, order, set #, weight, reps] */
 type Spec = [string, string, string, string, number, number, string, string];
-const toRow = ([w, id, name, section, order, n, weight, reps]: Spec): Row =>
-  [w, id, name, section, String(order), String(n), '8', weight, reps, ''];
+const toRow = ([w, id, name, section, order, n, weight, reps]: Spec): Row => [
+  w,
+  id,
+  name,
+  section,
+  String(order),
+  String(n),
+  '8',
+  weight,
+  reps,
+  '',
+];
 
 /** [workout, exercise_id, section, order, set #, weight] of a Sets row. */
 const brief = (r: Row) => [r[0], r[1], r[3], Number(r[4]), Number(r[5]), r[7]];
@@ -110,17 +135,14 @@ async function mount(specs: Spec[]) {
 
 /** The exercise cards in screen order (warmups included). */
 const cards = () => [...document.querySelectorAll<HTMLElement>('.tracker-exercise-list > [data-row-key]')];
-const card = (name: string, nth = 0) =>
-  cards().filter((c) => c.textContent!.includes(name))[nth];
+const card = (name: string, nth = 0) => cards().filter((c) => c.textContent!.includes(name))[nth];
 const setRows = (c: HTMLElement) => [...c.querySelectorAll<HTMLElement>('.tracker-set')];
 const removeSetBtn = (c: HTMLElement, set: number) =>
   setRows(c)[set].querySelector<HTMLButtonElement>('.set-remove-btn')!;
-const weightInput = (c: HTMLElement, set = 0) =>
-  setRows(c)[set].querySelector<HTMLInputElement>('.set-weight-input')!;
+const weightInput = (c: HTMLElement, set = 0) => setRows(c)[set].querySelector<HTMLInputElement>('.set-weight-input')!;
 const saved = (c: HTMLElement, set = 0) =>
   setRows(c)[set].querySelector('.set-saved')!.getAttribute('aria-hidden') === 'false';
-const type = (c: HTMLElement, value: string, set = 0) =>
-  fireEvent.input(weightInput(c, set), { target: { value } });
+const type = (c: HTMLElement, value: string, set = 0) => fireEvent.input(weightInput(c, set), { target: { value } });
 const removeExercise = async (c: HTMLElement) => {
   fireEvent.click(c.querySelector<HTMLButtonElement>('.exercise-toolbar-remove')!);
   await answerConfirm(true);
@@ -135,7 +157,9 @@ const settle = () => vi.advanceTimersByTimeAsync(50);
 
 function gate() {
   let open!: () => void;
-  const p = new Promise<void>((r) => { open = r; });
+  const p = new Promise<void>((r) => {
+    open = r;
+  });
   return { p, open };
 }
 
@@ -171,7 +195,7 @@ const BENCH3_ROW: Spec[] = [
 ];
 
 describe('#394 AC1: after Remove set, every other set keeps its own row', () => {
-  it('Bench 1 then Bench 3: the second remove deletes Bench 3\'s row, never Row\'s', async () => {
+  it("Bench 1 then Bench 3: the second remove deletes Bench 3's row, never Row's", async () => {
     await mount(BENCH3_ROW);
     fireEvent.click(removeSetBtn(card('Bench'), 0));
     await settle();
@@ -196,11 +220,15 @@ describe('#394 AC1: after Remove set, every other set keeps its own row', () => 
       ['e_bench', 'primary', 1, 2, 2],
       ['e_row', 'primary', 2, 1, 3],
     ]);
-    expect(sets.value.map((s) => [s.workout_id, s.sheetRow])).toEqual([['w1', 2], ['w1', 3], ['w2', 4]]);
+    expect(sets.value.map((s) => [s.workout_id, s.sheetRow])).toEqual([
+      ['w1', 2],
+      ['w1', 3],
+      ['w2', 4],
+    ]);
     expect(fetches).toBe(0);
   });
 
-  it('typing into Row set 1 afterwards updates Row\'s own row (now 3) and appends nothing', async () => {
+  it("typing into Row set 1 afterwards updates Row's own row (now 3) and appends nothing", async () => {
     await mount(BENCH3_ROW);
     fireEvent.click(removeSetBtn(card('Bench'), 0));
     await settle();
@@ -295,7 +323,7 @@ describe('#394 AC1: after Remove set, every other set keeps its own row', () => 
   });
 
   // #393 review, case 2: cross-section twins plus a move after a delete.
-  it('cross-section twins plus a move: removing a copy\'s set deletes that copy\'s own row', async () => {
+  it("cross-section twins plus a move: removing a copy's set deletes that copy's own row", async () => {
     await mount([
       ['w1', 'e_bench', 'Bench', 'primary', 1, 1, '135', '8'],
       ['w1', 'e_row', 'Row BB', 'primary', 2, 1, '', ''],
@@ -391,7 +419,7 @@ describe('#394 AC2: Copy-down, Change section to warmup and Remove exercise shif
     expect(setRows(card('Bench'))).toHaveLength(1);
   });
 
-  it('Change section to warmup deletes the exercise\'s rows bottom to top, then shifts the rest', async () => {
+  it("Change section to warmup deletes the exercise's rows bottom to top, then shifts the rest", async () => {
     await mount([
       ['w1', 'e_bench', 'Bench', 'primary', 1, 1, '135', '8'],
       ['w1', 'e_bench', 'Bench', 'primary', 1, 2, '145', '8'],
@@ -400,8 +428,14 @@ describe('#394 AC2: Copy-down, Change section to warmup and Remove exercise shif
     ]);
     const bench = card('Bench');
     fireEvent.click(bench.querySelector<HTMLButtonElement>('.section-badge-btn')!);
-    fireEvent.click([...bench.querySelectorAll<HTMLButtonElement>('.section-picker-row button')].find((b) => b.textContent === 'warmup')!);
-    fireEvent.click([...bench.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === 'Switch to Warmup')!);
+    fireEvent.click(
+      [...bench.querySelectorAll<HTMLButtonElement>('.section-picker-row button')].find(
+        (b) => b.textContent === 'warmup',
+      )!,
+    );
+    fireEvent.click(
+      [...bench.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === 'Switch to Warmup')!,
+    );
     await settle();
     expect(deletes()).toEqual([3, 2]);
     expect(card('Bench').classList.contains('tracker-exercise-warmup')).toBe(true);
@@ -482,7 +516,7 @@ describe('#394 AC2: Copy-down, Change section to warmup and Remove exercise shif
   });
 });
 
-describe('#394 AC3: the tracker\'s writes run one at a time', () => {
+describe("#394 AC3: the tracker's writes run one at a time", () => {
   it('a second tap of Remove set deletes nothing further', async () => {
     await mount(BENCH3_ROW);
     const g = gate();
@@ -529,7 +563,10 @@ describe('#394 AC3: the tracker\'s writes run one at a time', () => {
     appendGate = null;
     await settle();
 
-    expect(writes.map((w) => [w.kind, w.row])).toEqual([['append', undefined], ['delete', 7]]);
+    expect(writes.map((w) => [w.kind, w.row])).toEqual([
+      ['append', undefined],
+      ['delete', 7],
+    ]);
     expect(sheet.Sets).toEqual(BENCH3_ROW.map(toRow)); // no orphan row
     expect(setRows(card('Row'))).toHaveLength(1);
     expect(activeRows()).toHaveLength(4);
@@ -548,7 +585,10 @@ describe('#394 AC3: the tracker\'s writes run one at a time', () => {
     deleteGate = null;
     await settle();
 
-    expect(writes.map((w) => [w.kind, w.row])).toEqual([['delete', 2], ['update', 4]]);
+    expect(writes.map((w) => [w.kind, w.row])).toEqual([
+      ['delete', 2],
+      ['update', 4],
+    ]);
     expect(sheetBrief()).toEqual([
       ['w1', 'e_bench', 'primary', 1, 2, '145'],
       ['w1', 'e_bench', 'primary', 1, 3, '155'],
@@ -575,7 +615,10 @@ describe('#394 AC3: the tracker\'s writes run one at a time', () => {
     g.open();
     deleteGate = null;
     await vi.advanceTimersByTimeAsync(500);
-    expect(writes.map((w) => [w.kind, w.row])).toEqual([['delete', 2], ['append', undefined]]);
+    expect(writes.map((w) => [w.kind, w.row])).toEqual([
+      ['delete', 2],
+      ['append', undefined],
+    ]);
     expect(finishWorkout).toHaveBeenCalledTimes(1);
     expect(sheetBrief()).toEqual([
       ['w1', 'e_bench', 'primary', 1, 2, '145'],
@@ -615,9 +658,33 @@ describe('#394 AC4: the offline queue follows the same shift', () => {
   it('a queued entry below the deleted row gets one less; one for the removed set is dropped', async () => {
     await mount(BENCH3_ROW);
     const base = { exercise_name: 'x', section: 'primary', planned_reps: '8', reps: '8', effort: '' as const };
-    enqueueSet({ ...base, workout_id: 'w1', exercise_id: 'e_bench', exercise_order: 1, set_number: 1, weight: '1', sheetRow: 2 });
-    enqueueSet({ ...base, workout_id: 'w1', exercise_id: 'e_row', exercise_order: 2, set_number: 1, weight: '2', sheetRow: 5 });
-    enqueueSet({ ...base, workout_id: 'w2', exercise_id: 'e_curl', exercise_order: 1, set_number: 1, weight: '3', sheetRow: 6 });
+    enqueueSet({
+      ...base,
+      workout_id: 'w1',
+      exercise_id: 'e_bench',
+      exercise_order: 1,
+      set_number: 1,
+      weight: '1',
+      sheetRow: 2,
+    });
+    enqueueSet({
+      ...base,
+      workout_id: 'w1',
+      exercise_id: 'e_row',
+      exercise_order: 2,
+      set_number: 1,
+      weight: '2',
+      sheetRow: 5,
+    });
+    enqueueSet({
+      ...base,
+      workout_id: 'w2',
+      exercise_id: 'e_curl',
+      exercise_order: 1,
+      set_number: 1,
+      weight: '3',
+      sheetRow: 6,
+    });
     fireEvent.click(removeSetBtn(card('Bench'), 0));
     await settle();
     expect(readQueue().map((e) => [e.payload.exercise_id, e.payload.sheetRow])).toEqual([

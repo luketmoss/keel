@@ -37,9 +37,7 @@ describe('ExercisesScreen', () => {
     it('filters exercises by search term', () => {
       exercises.value = mockExercises;
       const search = 'bench';
-      const filtered = exercises.value.filter(ex =>
-        ex.name.toLowerCase().includes(search.toLowerCase())
-      );
+      const filtered = exercises.value.filter((ex) => ex.name.toLowerCase().includes(search.toLowerCase()));
       expect(filtered).toHaveLength(1);
       expect(filtered[0].name).toBe('Bench Press');
     });
@@ -47,8 +45,11 @@ describe('ExercisesScreen', () => {
     it('filters exercises by tag (single tag — OR unchanged)', () => {
       exercises.value = mockExercises;
       const selectedTag = 'Pull';
-      const filtered = exercises.value.filter(ex =>
-        ex.tags.split(',').map(t => t.trim()).includes(selectedTag)
+      const filtered = exercises.value.filter((ex) =>
+        ex.tags
+          .split(',')
+          .map((t) => t.trim())
+          .includes(selectedTag),
       );
       expect(filtered).toHaveLength(1);
       expect(filtered[0].name).toBe('Row BB');
@@ -58,9 +59,9 @@ describe('ExercisesScreen', () => {
     it('AC2: multiple selected tags use AND logic — only exercises with ALL tags shown', () => {
       exercises.value = mockExercises;
       const selectedTags = ['Push', 'Chest'];
-      const filtered = exercises.value.filter(ex => {
-        const exTags = ex.tags.split(',').map(t => t.trim());
-        return selectedTags.every(tag => exTags.includes(tag));
+      const filtered = exercises.value.filter((ex) => {
+        const exTags = ex.tags.split(',').map((t) => t.trim());
+        return selectedTags.every((tag) => exTags.includes(tag));
       });
       // Only Bench Press has both Push and Chest
       expect(filtered).toHaveLength(1);
@@ -70,9 +71,9 @@ describe('ExercisesScreen', () => {
     it('AC2: AND logic excludes exercises that match only one of two selected tags', () => {
       exercises.value = mockExercises;
       const selectedTags = ['Pull', 'Chest'];
-      const filtered = exercises.value.filter(ex => {
-        const exTags = ex.tags.split(',').map(t => t.trim());
-        return selectedTags.every(tag => exTags.includes(tag));
+      const filtered = exercises.value.filter((ex) => {
+        const exTags = ex.tags.split(',').map((t) => t.trim());
+        return selectedTags.every((tag) => exTags.includes(tag));
       });
       // No exercise has both Pull and Chest
       expect(filtered).toHaveLength(0);
@@ -81,10 +82,10 @@ describe('ExercisesScreen', () => {
     it('AC3: no tags selected shows all exercises', () => {
       exercises.value = mockExercises;
       const selectedTags: string[] = [];
-      const filtered = exercises.value.filter(ex => {
+      const filtered = exercises.value.filter((ex) => {
         if (selectedTags.length === 0) return true;
-        const exTags = ex.tags.split(',').map(t => t.trim());
-        return selectedTags.every(tag => exTags.includes(tag));
+        const exTags = ex.tags.split(',').map((t) => t.trim());
+        return selectedTags.every((tag) => exTags.includes(tag));
       });
       expect(filtered).toHaveLength(mockExercises.length);
     });
@@ -92,9 +93,9 @@ describe('ExercisesScreen', () => {
     it('AC4: AND filter returning zero results triggers empty state', () => {
       exercises.value = mockExercises;
       const selectedTags = ['Chest', 'Legs']; // no exercise has both
-      const filtered = exercises.value.filter(ex => {
-        const exTags = ex.tags.split(',').map(t => t.trim());
-        return selectedTags.every(tag => exTags.includes(tag));
+      const filtered = exercises.value.filter((ex) => {
+        const exTags = ex.tags.split(',').map((t) => t.trim());
+        return selectedTags.every((tag) => exTags.includes(tag));
       });
       expect(filtered).toHaveLength(0);
     });
@@ -119,8 +120,8 @@ describe('ExercisesScreen', () => {
       exercises.value = [...mockExercises];
       const updated: ExerciseWithRow = { ...mockExercises[0], name: 'Incline Bench Press' };
       // Simulate what editExercise does to the signal
-      exercises.value = exercises.value.map(e => e.id === updated.id ? updated : e);
-      expect(exercises.value.find(e => e.id === 'ex1')?.name).toBe('Incline Bench Press');
+      exercises.value = exercises.value.map((e) => (e.id === updated.id ? updated : e));
+      expect(exercises.value.find((e) => e.id === 'ex1')?.name).toBe('Incline Bench Press');
     });
   });
 
@@ -128,9 +129,9 @@ describe('ExercisesScreen', () => {
     it('removeExercise removes the exercise from the signal', () => {
       exercises.value = [...mockExercises];
       // Simulate what removeExercise does
-      exercises.value = exercises.value.filter(e => e.id !== 'ex1');
+      exercises.value = exercises.value.filter((e) => e.id !== 'ex1');
       expect(exercises.value).toHaveLength(2);
-      expect(exercises.value.find(e => e.id === 'ex1')).toBeUndefined();
+      expect(exercises.value.find((e) => e.id === 'ex1')).toBeUndefined();
     });
   });
 
@@ -161,8 +162,8 @@ describe('Issue #64 — Create exercise from Exercises screen', () => {
         sheetRow: 5,
       };
       exercises.value = [...exercises.value, newEx];
-      expect(exercises.value.find(e => e.id === 'ex_new')).toBeDefined();
-      expect(exercises.value.find(e => e.name === 'Pull Up')).toBeDefined();
+      expect(exercises.value.find((e) => e.id === 'ex_new')).toBeDefined();
+      expect(exercises.value.find((e) => e.name === 'Pull Up')).toBeDefined();
     });
   });
 
@@ -222,13 +223,80 @@ describe('Issue #87 — Exercises FAB', () => {
 // === Issue #23: Show last workout date and details on exercise cards ===
 
 const mockSets: SetWithRow[] = [
-  { workout_id: 'w1', exercise_id: 'ex1', exercise_name: 'Bench Press', section: 'primary', exercise_order: 1, set_number: 1, planned_reps: '8-10', weight: '185', reps: '8', effort: 'Medium', sheetRow: 2 },
-  { workout_id: 'w1', exercise_id: 'ex1', exercise_name: 'Bench Press', section: 'primary', exercise_order: 1, set_number: 2, planned_reps: '8-10', weight: '185', reps: '7', effort: 'Hard', sheetRow: 3 },
-  { workout_id: 'w1', exercise_id: 'ex2', exercise_name: 'Row BB', section: 'primary', exercise_order: 2, set_number: 1, planned_reps: '8-10', weight: '135', reps: '10', effort: 'Easy', sheetRow: 4 },
+  {
+    workout_id: 'w1',
+    exercise_id: 'ex1',
+    exercise_name: 'Bench Press',
+    section: 'primary',
+    exercise_order: 1,
+    set_number: 1,
+    planned_reps: '8-10',
+    weight: '185',
+    reps: '8',
+    effort: 'Medium',
+    sheetRow: 2,
+  },
+  {
+    workout_id: 'w1',
+    exercise_id: 'ex1',
+    exercise_name: 'Bench Press',
+    section: 'primary',
+    exercise_order: 1,
+    set_number: 2,
+    planned_reps: '8-10',
+    weight: '185',
+    reps: '7',
+    effort: 'Hard',
+    sheetRow: 3,
+  },
+  {
+    workout_id: 'w1',
+    exercise_id: 'ex2',
+    exercise_name: 'Row BB',
+    section: 'primary',
+    exercise_order: 2,
+    set_number: 1,
+    planned_reps: '8-10',
+    weight: '135',
+    reps: '10',
+    effort: 'Easy',
+    sheetRow: 4,
+  },
 ];
 
 const mockWorkouts: WorkoutWithRow[] = [
-  { id: 'w1', date: '2026-03-10', time: '07:00', type: 'weight', name: 'Push A', template_id: '', notes: '', elapsed_seconds: '3600', created: '2026-03-10T07:00:00.000Z', copied_from: '', status: '', moving_seconds: '', effort: '', distance_m: '', ascent_m: '', descent_m: '', avg_hr: '', sub_type: '', source: '', source_activity_id: '', raw_ref: '', fit_ref: '', fit_fetched_at: '', synced_at: '', started_at_utc: '', calories: '', estimated_seconds: '', sport_type: '', track_ref: '', sheetRow: 2 },
+  {
+    id: 'w1',
+    date: '2026-03-10',
+    time: '07:00',
+    type: 'weight',
+    name: 'Push A',
+    template_id: '',
+    notes: '',
+    elapsed_seconds: '3600',
+    created: '2026-03-10T07:00:00.000Z',
+    copied_from: '',
+    status: '',
+    moving_seconds: '',
+    effort: '',
+    distance_m: '',
+    ascent_m: '',
+    descent_m: '',
+    avg_hr: '',
+    sub_type: '',
+    source: '',
+    source_activity_id: '',
+    raw_ref: '',
+    fit_ref: '',
+    fit_fetched_at: '',
+    synced_at: '',
+    started_at_utc: '',
+    calories: '',
+    estimated_seconds: '',
+    sport_type: '',
+    track_ref: '',
+    sheetRow: 2,
+  },
 ];
 
 describe('Issue #23 — Exercise card last-workout info', () => {
@@ -252,12 +320,98 @@ describe('Issue #23 — Exercise card last-workout info', () => {
 
     it('buildLastPerformedMap picks the most recent workout date per exercise', () => {
       const setsMulti: SetWithRow[] = [
-        { workout_id: 'w_old', exercise_id: 'ex1', exercise_name: 'Bench Press', section: 'primary', exercise_order: 1, set_number: 1, planned_reps: '', weight: '135', reps: '10', effort: '', sheetRow: 2 },
-        { workout_id: 'w_new', exercise_id: 'ex1', exercise_name: 'Bench Press', section: 'primary', exercise_order: 1, set_number: 1, planned_reps: '', weight: '185', reps: '8', effort: '', sheetRow: 3 },
+        {
+          workout_id: 'w_old',
+          exercise_id: 'ex1',
+          exercise_name: 'Bench Press',
+          section: 'primary',
+          exercise_order: 1,
+          set_number: 1,
+          planned_reps: '',
+          weight: '135',
+          reps: '10',
+          effort: '',
+          sheetRow: 2,
+        },
+        {
+          workout_id: 'w_new',
+          exercise_id: 'ex1',
+          exercise_name: 'Bench Press',
+          section: 'primary',
+          exercise_order: 1,
+          set_number: 1,
+          planned_reps: '',
+          weight: '185',
+          reps: '8',
+          effort: '',
+          sheetRow: 3,
+        },
       ];
       const wkts: WorkoutWithRow[] = [
-        { id: 'w_old', date: '2026-01-01', time: '', type: 'weight', name: '', template_id: '', notes: '', elapsed_seconds: '', created: '', copied_from: '', status: '', moving_seconds: '', effort: '', distance_m: '', ascent_m: '', descent_m: '', avg_hr: '', sub_type: '', source: '', source_activity_id: '', raw_ref: '', fit_ref: '', fit_fetched_at: '', synced_at: '', started_at_utc: '', calories: '', estimated_seconds: '', sport_type: '', track_ref: '', sheetRow: 2 },
-        { id: 'w_new', date: '2026-03-10', time: '', type: 'weight', name: '', template_id: '', notes: '', elapsed_seconds: '', created: '', copied_from: '', status: '', moving_seconds: '', effort: '', distance_m: '', ascent_m: '', descent_m: '', avg_hr: '', sub_type: '', source: '', source_activity_id: '', raw_ref: '', fit_ref: '', fit_fetched_at: '', synced_at: '', started_at_utc: '', calories: '', estimated_seconds: '', sport_type: '', track_ref: '', sheetRow: 3 },
+        {
+          id: 'w_old',
+          date: '2026-01-01',
+          time: '',
+          type: 'weight',
+          name: '',
+          template_id: '',
+          notes: '',
+          elapsed_seconds: '',
+          created: '',
+          copied_from: '',
+          status: '',
+          moving_seconds: '',
+          effort: '',
+          distance_m: '',
+          ascent_m: '',
+          descent_m: '',
+          avg_hr: '',
+          sub_type: '',
+          source: '',
+          source_activity_id: '',
+          raw_ref: '',
+          fit_ref: '',
+          fit_fetched_at: '',
+          synced_at: '',
+          started_at_utc: '',
+          calories: '',
+          estimated_seconds: '',
+          sport_type: '',
+          track_ref: '',
+          sheetRow: 2,
+        },
+        {
+          id: 'w_new',
+          date: '2026-03-10',
+          time: '',
+          type: 'weight',
+          name: '',
+          template_id: '',
+          notes: '',
+          elapsed_seconds: '',
+          created: '',
+          copied_from: '',
+          status: '',
+          moving_seconds: '',
+          effort: '',
+          distance_m: '',
+          ascent_m: '',
+          descent_m: '',
+          avg_hr: '',
+          sub_type: '',
+          source: '',
+          source_activity_id: '',
+          raw_ref: '',
+          fit_ref: '',
+          fit_fetched_at: '',
+          synced_at: '',
+          started_at_utc: '',
+          calories: '',
+          estimated_seconds: '',
+          sport_type: '',
+          track_ref: '',
+          sheetRow: 3,
+        },
       ];
       const map = buildLastPerformedMap(setsMulti, wkts);
       expect(map.get('ex1')).toBe('2026-03-10');
@@ -285,7 +439,7 @@ describe('Issue #23 — Exercise card last-workout info', () => {
     });
 
     it('effort values map to correct CSS classes', () => {
-      const effortClass = (effort: string) => effort ? `effort-${effort.toLowerCase()}` : '';
+      const effortClass = (effort: string) => (effort ? `effort-${effort.toLowerCase()}` : '');
       expect(effortClass('Easy')).toBe('effort-easy');
       expect(effortClass('Medium')).toBe('effort-medium');
       expect(effortClass('Hard')).toBe('effort-hard');

@@ -20,8 +20,14 @@ import { today as todaySignal, watchToday } from '../../day/today';
 import { addMonths, calendarHref, gridRange, monthOf, monthTitle, parseCalendarPath } from '../../calendar/dates';
 import { markKinds, marksFor } from '../../calendar/marks';
 import {
-  formatValue, metricWords, readShade, shadeChoices, shadeMonth, writeShade,
-  type ShadeChoice, type ShadeKey,
+  formatValue,
+  metricWords,
+  readShade,
+  shadeChoices,
+  shadeMonth,
+  writeShade,
+  type ShadeChoice,
+  type ShadeKey,
 } from '../../calendar/shade';
 import { seriesOf } from '../day/health-rows';
 import { trainingOrder } from '../day/training-panel';
@@ -159,9 +165,8 @@ export function CalendarScreen() {
     }
   }, [health.state, retrying]);
   const statusOn = shade.metric !== null && (health.state === 'error' || (retrying && health.state === 'loading'));
-  const series = shade.metric && health.state === 'loaded'
-    ? seriesOf(health.rows, shade.metric.field)
-    : new Map<string, number>();
+  const series =
+    shade.metric && health.state === 'loaded' ? seriesOf(health.rows, shade.metric.field) : new Map<string, number>();
   const shading = shadeMonth(inMonth, series);
   const shadingOn = shade.metric !== null && health.state === 'loaded';
 
@@ -182,17 +187,26 @@ export function CalendarScreen() {
       </div>
 
       <div class="calendar-month-row">
-        <button type="button" class="day-arrow" aria-label="Previous month" onClick={() => showMonth(addMonths(month, -1))}>
+        <button
+          type="button"
+          class="day-arrow"
+          aria-label="Previous month"
+          onClick={() => showMonth(addMonths(month, -1))}
+        >
           <span aria-hidden="true">‹</span>
         </button>
-        <h1 class="calendar-title" id={headingId}>{monthTitle(month)}</h1>
+        <h1 class="calendar-title" id={headingId}>
+          {monthTitle(month)}
+        </h1>
         <button type="button" class="day-arrow" aria-label="Next month" onClick={() => showMonth(addMonths(month, 1))}>
           <span aria-hidden="true">›</span>
         </button>
       </div>
 
       <div class="calendar-shade">
-        <span class="calendar-shade-label" aria-hidden="true">Shade by</span>
+        <span class="calendar-shade-label" aria-hidden="true">
+          Shade by
+        </span>
         <div class="sub-type-toggle calendar-shade-toggle" role="group" ref={shadeRef} aria-label="Shade days by">
           {choices.map((c) => (
             <button
@@ -207,7 +221,18 @@ export function CalendarScreen() {
           ))}
         </div>
         {statusOn && (
-          <PanelStatus status={health.state === 'error' ? 'error' : 'loading'} what="your health data" onRetry={() => { if (token) { sawLoading.current = false; setRetrying(true); void loadHealth(token); } }} returnFocusTo={() => shadeRef.current?.querySelector<HTMLElement>('[aria-pressed="true"]')} />
+          <PanelStatus
+            status={health.state === 'error' ? 'error' : 'loading'}
+            what="your health data"
+            onRetry={() => {
+              if (token) {
+                sawLoading.current = false;
+                setRetrying(true);
+                void loadHealth(token);
+              }
+            }}
+            returnFocusTo={() => shadeRef.current?.querySelector<HTMLElement>('[aria-pressed="true"]')}
+          />
         )}
       </div>
 
@@ -237,7 +262,9 @@ export function CalendarScreen() {
                 noData && 'calendar-day-nodata',
                 isToday && 'calendar-day-today',
                 isSelected && 'calendar-day-selected',
-              ].filter(Boolean).join(' ');
+              ]
+                .filter(Boolean)
+                .join(' ');
               return (
                 // Keyed by position: the cell a user is on stays the same
                 // element across a month change, so focus can stay with it.
@@ -246,7 +273,9 @@ export function CalendarScreen() {
                   type="button"
                   role="gridcell"
                   class={cls}
-                  ref={(el) => { cells.current[i] = el; }}
+                  ref={(el) => {
+                    cells.current[i] = el;
+                  }}
                   tabIndex={isSelected ? 0 : -1}
                   aria-selected={isSelected ? 'true' : 'false'}
                   aria-current={isToday ? 'date' : undefined}
@@ -254,7 +283,9 @@ export function CalendarScreen() {
                   onClick={() => select(d)}
                   onKeyDown={(e) => onCellKey(e, i)}
                 >
-                  <span class="calendar-day-num" aria-hidden="true">{dayOfMonth(d)}</span>
+                  <span class="calendar-day-num" aria-hidden="true">
+                    {dayOfMonth(d)}
+                  </span>
                   {hasNote && <span class="calendar-note" aria-hidden="true" />}
                   <span class="calendar-marks" aria-hidden="true">
                     {markKinds(marks[d]).map((k, n) => (
@@ -283,13 +314,29 @@ export function CalendarScreen() {
   );
 }
 
-function Legend({ shade, on, low, high }: { shade: ShadeChoice; on: boolean; low: number | null; high: number | null }) {
+function Legend({
+  shade,
+  on,
+  low,
+  high,
+}: {
+  shade: ShadeChoice;
+  on: boolean;
+  low: number | null;
+  high: number | null;
+}) {
   return (
     <div class="calendar-legend">
       <p class="calendar-legend-marks">
-        <span class="calendar-key"><span class="calendar-mark calendar-mark-dot" aria-hidden="true" /> Done</span>
-        <span class="calendar-key"><span class="calendar-mark calendar-mark-ring" aria-hidden="true" /> Planned</span>
-        <span class="calendar-key"><span class="calendar-note calendar-note-key" aria-hidden="true" /> Journal entry</span>
+        <span class="calendar-key">
+          <span class="calendar-mark calendar-mark-dot" aria-hidden="true" /> Done
+        </span>
+        <span class="calendar-key">
+          <span class="calendar-mark calendar-mark-ring" aria-hidden="true" /> Planned
+        </span>
+        <span class="calendar-key">
+          <span class="calendar-note calendar-note-key" aria-hidden="true" /> Journal entry
+        </span>
       </p>
       {on && shade.metric && (
         <p class="calendar-scale">
@@ -298,7 +345,9 @@ function Legend({ shade, on, low, high }: { shade: ShadeChoice; on: boolean; low
               <span class="sr-only">{`${shade.label}, lowest to highest this month:`}</span>
               <span>{formatValue(shade.metric, low)}</span>
               <span class="calendar-swatches" aria-hidden="true">
-                {[1, 2, 3, 4].map((b) => <span key={b} class={`calendar-swatch calendar-shade-${b}`} />)}
+                {[1, 2, 3, 4].map((b) => (
+                  <span key={b} class={`calendar-swatch calendar-shade-${b}`} />
+                ))}
               </span>
               <span>{formatValue(shade.metric, high)}</span>
             </span>

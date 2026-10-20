@@ -11,7 +11,12 @@ import { BodyPanel, bodyView } from './body-panel';
 import { PanelStatus } from './panel';
 import { SLOTS } from './slots';
 import { dailyHealth, bodyMeasurements } from '../../state/store';
-import { DAILY_HEALTH_FIELDS, BODY_MEASUREMENT_FIELDS, type DailyHealthRow, type BodyMeasurementRow } from '../../api/health-api';
+import {
+  DAILY_HEALTH_FIELDS,
+  BODY_MEASUREMENT_FIELDS,
+  type DailyHealthRow,
+  type BodyMeasurementRow,
+} from '../../api/health-api';
 import { addDays, type DayState } from '../../day/dates';
 
 afterEach(cleanup);
@@ -72,7 +77,9 @@ describe('AC5 — PanelStatus', () => {
     const button = box.querySelector('button.btn.btn-secondary.panel-retry') as HTMLButtonElement;
     expect(button.textContent).toBe('Try again');
     let focusedAtRetry: Element | null = null;
-    onRetry.mockImplementation(() => { focusedAtRetry = document.activeElement; });
+    onRetry.mockImplementation(() => {
+      focusedAtRetry = document.activeElement;
+    });
     fireEvent.click(button);
     expect(onRetry).toHaveBeenCalledTimes(1);
     expect(focusedAtRetry).toBe(box);
@@ -104,13 +111,26 @@ describe('AC5 — each panel follows its own tab', () => {
 
 describe('AC1–AC3 — the Health panel draws its rows', () => {
   const history = Array.from({ length: 20 }, (_, i) =>
-    hr(addDays(D, -(i + 1)), { resting_hr: i % 2 ? '49' : '55', hrv: i % 2 ? '41' : '50', steps: '9000' }));
+    hr(addDays(D, -(i + 1)), { resting_hr: i % 2 ? '49' : '55', hrv: i % 2 ? '41' : '50', steps: '9000' }),
+  );
 
   it('is a dl of div > dt + dd: label, then value, then captions', () => {
-    dailyHealth.value = { state: 'loaded', rows: [...history, hr(D, { resting_hr: '52', hrv: '', steps: '9412', sleep_total_s: '25920', sleep_deep_s: '3960' })] };
+    dailyHealth.value = {
+      state: 'loaded',
+      rows: [
+        ...history,
+        hr(D, { resting_hr: '52', hrv: '', steps: '9412', sleep_total_s: '25920', sleep_deep_s: '3960' }),
+      ],
+    };
     const { container } = mount(HealthPanel);
     const rows = [...container.querySelectorAll('dl.health-list > div.health-row')];
-    expect(rows.map((r) => r.querySelector('dt')!.textContent)).toEqual(['Sleep · Fri night', 'Resting HR', 'HRV', 'Average stress', 'Steps']);
+    expect(rows.map((r) => r.querySelector('dt')!.textContent)).toEqual([
+      'Sleep · Fri night',
+      'Resting HR',
+      'HRV',
+      'Average stress',
+      'Steps',
+    ]);
     const sleep = rows[0].querySelector('dd')!;
     expect(sleep.querySelector('.health-value')!.textContent).toBe('7h 12m');
     expect(sleep.querySelector('.health-stage')!.textContent).toBe('Deep 1h 06m');
@@ -123,7 +143,9 @@ describe('AC1–AC3 — the Health panel draws its rows', () => {
   it('bolds and colours only the unwelcome direction; the arrow is hidden from screen readers', () => {
     dailyHealth.value = { state: 'loaded', rows: [...history, hr(D, { resting_hr: '60', hrv: '60', steps: '1' })] };
     const { container } = mount(HealthPanel);
-    const [rhr, hrvRow, , steps] = [...container.querySelectorAll('.health-row')].slice(1).map((r) => r.querySelector('dd')!);
+    const [rhr, hrvRow, , steps] = [...container.querySelectorAll('.health-row')]
+      .slice(1)
+      .map((r) => r.querySelector('dd')!);
     const attention = rhr.querySelector('.health-attention')!;
     expect(attention.textContent).toBe('↑ above your range');
     expect(attention.querySelector('[aria-hidden="true"]')!.textContent).toBe('↑ ');
@@ -152,17 +174,47 @@ describe('AC1–AC3 — the Health panel draws its rows', () => {
 
 describe('AC4 — Body', () => {
   const scale = (time: string, weight: string, fat = '') =>
-    bm({ grpid: time, kind: 'scale', time, measured_at_utc: `${D}T${time}:00-06:00`, weight_kg: weight, fat_ratio_pct: fat });
+    bm({
+      grpid: time,
+      kind: 'scale',
+      time,
+      measured_at_utc: `${D}T${time}:00-06:00`,
+      weight_kg: weight,
+      fat_ratio_pct: fat,
+    });
   const bp = (time: string, sys: string, dia: string) =>
-    bm({ grpid: `bp${time}`, kind: 'bp', time, measured_at_utc: `${D}T${time}:00-06:00`, systolic_mmhg: sys, diastolic_mmhg: dia });
+    bm({
+      grpid: `bp${time}`,
+      kind: 'bp',
+      time,
+      measured_at_utc: `${D}T${time}:00-06:00`,
+      systolic_mmhg: sys,
+      diastolic_mmhg: dia,
+    });
 
   it('shows the first weigh-in in lb with its time, its body fat, and the mean BP', () => {
-    expect(bodyView([scale('19:10', '82.0', '19.0'), scale('06:58', '80.9', '18.2'), bp('07:04', '125', '80'), bp('07:08', '126', '81')], false)).toEqual({
+    expect(
+      bodyView(
+        [
+          scale('19:10', '82.0', '19.0'),
+          scale('06:58', '80.9', '18.2'),
+          bp('07:04', '125', '80'),
+          bp('07:08', '126', '81'),
+        ],
+        false,
+      ),
+    ).toEqual({
       kind: 'rows',
       rows: [
         { key: 'weight', label: 'Weight', value: '178.4 lb', caption: '6:58 AM' },
         { key: 'fat', label: 'Body fat', value: '18.2%', caption: '' },
-        { key: 'bp', label: 'Blood pressure', value: '126/81 mmHg', spoken: '126 over 81 millimetres of mercury', caption: 'Average of 2 readings' },
+        {
+          key: 'bp',
+          label: 'Blood pressure',
+          value: '126/81 mmHg',
+          spoken: '126 over 81 millimetres of mercury',
+          caption: 'Average of 2 readings',
+        },
       ],
     });
   });
@@ -175,23 +227,39 @@ describe('AC4 — Body', () => {
   it('says a blank fat is not measured, and the missing kind is "No reading this day." or "None yet today."', () => {
     const past = bodyView([scale('06:58', '80.9')], false);
     expect(past.kind === 'rows' && past.rows.map((r) => [r.value, r.caption])).toEqual([
-      ['178.4 lb', '6:58 AM'], ['', 'Not measured at this weigh-in.'], ['', 'No reading this day.'],
+      ['178.4 lb', '6:58 AM'],
+      ['', 'Not measured at this weigh-in.'],
+      ['', 'No reading this day.'],
     ]);
     const today = bodyView([bp('07:04', '126', '81')], true);
     expect(today.kind === 'rows' && today.rows.slice(0, 2).map((r) => [r.value, r.caption])).toEqual([
-      ['', 'None yet today.'], ['', 'None yet today.'],
+      ['', 'None yet today.'],
+      ['', 'None yet today.'],
     ]);
   });
 
   it('shows one note on a day with no reading', () => {
     expect(bodyView([], false)).toEqual({ kind: 'note', note: 'No weigh-in or blood pressure this day.' });
-    expect(bodyView([], true)).toEqual({ kind: 'note', note: 'No reading yet today. One taken on the scale or cuff shows here after the next sync.' });
+    expect(bodyView([], true)).toEqual({
+      kind: 'note',
+      note: 'No reading yet today. One taken on the scale or cuff shows here after the next sync.',
+    });
   });
 
   it('reads BP as words with the visible value hidden, in the dl structure, for its own day only', () => {
     bodyMeasurements.value = {
       state: 'loaded',
-      rows: [bp('07:04', '126', '81'), bm({ grpid: 'x', kind: 'bp', date: '2026-09-25', systolic_mmhg: '140', diastolic_mmhg: '90', measured_at_utc: '2026-09-25T07:00:00-06:00' })],
+      rows: [
+        bp('07:04', '126', '81'),
+        bm({
+          grpid: 'x',
+          kind: 'bp',
+          date: '2026-09-25',
+          systolic_mmhg: '140',
+          diastolic_mmhg: '90',
+          measured_at_utc: '2026-09-25T07:00:00-06:00',
+        }),
+      ],
     };
     const { container } = mount(BodyPanel);
     const dd = container.querySelector('dl.health-list > div[data-metric="bp"] > dd')!;
@@ -207,7 +275,11 @@ describe('AC4 — Body', () => {
 // #276 — a successful Try again hands focus to the panel's heading.
 describe('#276 — focus after a retry succeeds', () => {
   type Sig = typeof dailyHealth | typeof bodyMeasurements;
-  const settle = () => act(async () => { await Promise.resolve(); await Promise.resolve(); });
+  const settle = () =>
+    act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
   const set = (sig: Sig, value: { state: 'loading' | 'error' } | { state: 'loaded'; rows: never[] }) => {
     (sig as unknown as { value: unknown }).value = value;
   };
@@ -229,7 +301,9 @@ describe('#276 — focus after a retry succeeds', () => {
 
   for (const [title, Comp, sig] of cases) {
     describe(title, () => {
-      beforeEach(() => { set(sig, { state: 'error' }); });
+      beforeEach(() => {
+        set(sig, { state: 'error' });
+      });
 
       it('AC1: success puts focus on the h2, not body', async () => {
         const { container } = mount(Comp);
@@ -313,7 +387,9 @@ describe('#276 — focus after a retry succeeds', () => {
   it('a returnFocusTo target is used instead of the heading, and a removed one is skipped', async () => {
     const target = document.createElement('button');
     document.body.appendChild(target);
-    const { container, rerender } = render(<PanelStatus status="error" what="x" onRetry={() => {}} returnFocusTo={() => target} />);
+    const { container, rerender } = render(
+      <PanelStatus status="error" what="x" onRetry={() => {}} returnFocusTo={() => target} />,
+    );
     fireEvent.click(container.querySelector('.panel-retry')!);
     rerender(<div />);
     await settle();

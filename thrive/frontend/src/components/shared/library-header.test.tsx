@@ -24,7 +24,10 @@ describe('LibraryHeader', () => {
   });
 
   it('marks the current section with aria-current="page"', () => {
-    for (const [route, label] of [['templates', 'Templates'], ['exercises', 'Exercises']] as [RouteName, string][]) {
+    for (const [route, label] of [
+      ['templates', 'Templates'],
+      ['exercises', 'Exercises'],
+    ] as [RouteName, string][]) {
       const { container } = renderAt(route);
       const current = [...container.querySelectorAll('[aria-current="page"]')];
       expect(current.map((b) => b.textContent)).toEqual([label]);

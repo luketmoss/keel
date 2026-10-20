@@ -183,22 +183,12 @@ export function ExerciseRow({
 
   const warmupConfirmRow = showWarmupConfirm && (
     <div class="warmup-confirm-row">
-      <p class="warmup-confirm-text">
-        Warmup exercises are list-only — set data will be removed.
-      </p>
+      <p class="warmup-confirm-text">Warmup exercises are list-only — set data will be removed.</p>
       <div class="warmup-confirm-actions">
-        <button
-          type="button"
-          class="btn btn-danger"
-          onClick={handleConfirmWarmup}
-        >
+        <button type="button" class="btn btn-danger" onClick={handleConfirmWarmup}>
           Switch to Warmup
         </button>
-        <button
-          type="button"
-          class="btn btn-secondary"
-          onClick={() => setShowWarmupConfirm(false)}
-        >
+        <button type="button" class="btn btn-secondary" onClick={() => setShowWarmupConfirm(false)}>
           Cancel
         </button>
       </div>
@@ -224,9 +214,7 @@ export function ExerciseRow({
             {exercise.section}
           </button>
           <span class="tracker-exercise-name">{exercise.exercise_name}</span>
-          <div class="tracker-exercise-actions">
-            {actionButtons}
-          </div>
+          <div class="tracker-exercise-actions">{actionButtons}</div>
         </div>
         {sectionPickerRow}
         {warmupConfirmRow}
@@ -258,7 +246,17 @@ export function ExerciseRow({
             aria-label={`View previous performance for ${exercise.exercise_name}`}
             aria-expanded={showLastTime ? 'true' : 'false'}
           >
-            <svg class="last-time-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg
+              class="last-time-icon"
+              viewBox="0 0 24 24"
+              width="18"
+              height="18"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
               <circle cx="12" cy="12" r="10" />
               <polyline points="12 6 12 12 16 14" />
             </svg>
@@ -316,11 +314,7 @@ export function ExerciseRow({
             onInput={(e) => onQuickFillReps((e.target as HTMLInputElement).value)}
           />
         </div>
-        <EffortToggle
-          value={exercise.quickFillEffort}
-          onChange={onQuickFillEffort}
-          label="Fill all sets"
-        />
+        <EffortToggle value={exercise.quickFillEffort} onChange={onQuickFillEffort} label="Fill all sets" />
         <span class="quick-fill-end-spacer" aria-hidden="true" />
       </div>
 

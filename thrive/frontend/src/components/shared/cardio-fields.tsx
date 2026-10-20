@@ -25,7 +25,9 @@ interface Props {
 }
 
 /** Seeds the form from stored meters. An unset field seeds blank, never "0". */
-export function storedToCardio(w: Pick<Workout, 'distance_m' | 'ascent_m' | 'descent_m' | 'avg_hr'> | undefined): CardioValues {
+export function storedToCardio(
+  w: Pick<Workout, 'distance_m' | 'ascent_m' | 'descent_m' | 'avg_hr'> | undefined,
+): CardioValues {
   return {
     distance: metersToMilesInput(w?.distance_m ?? ''),
     ascent: metersToFeetInput(w?.ascent_m ?? ''),
@@ -79,11 +81,7 @@ export function hasCardioFields(type: WorkoutType, subType = ''): boolean {
  * distinct from `0` everywhere else in the activity columns. Switching venue
  * therefore never destroys anything typed; it only stops *asking*.
  */
-export function visibleCardioFields(
-  type: WorkoutType,
-  subType: string,
-  values: CardioValues,
-): CardioField[] {
+export function visibleCardioFields(type: WorkoutType, subType: string, values: CardioValues): CardioField[] {
   const earned = cardioFieldsFor(type, subType);
   if (earned.size === 0) return [];
   return ALL_FIELDS.filter((f) => earned.has(f) || values[f] !== '');
@@ -125,7 +123,9 @@ export function CardioFields({ workoutType, subType, values, onChange, idPrefix 
     const id = `${idPrefix}-${key}`;
     return (
       <div class="form-group" key={key}>
-        <label class="form-label" htmlFor={id}>{label}</label>
+        <label class="form-label" htmlFor={id}>
+          {label}
+        </label>
         <input
           id={id}
           class="form-input"
@@ -144,9 +144,7 @@ export function CardioFields({ workoutType, subType, values, onChange, idPrefix 
 
   return (
     <fieldset class="cardio-fields">
-      <legend class="cardio-fields-legend">
-        {LEGENDS[workoutType] ?? 'Activity details'}
-      </legend>
+      <legend class="cardio-fields-legend">{LEGENDS[workoutType] ?? 'Activity details'}</legend>
 
       {/* The field set changes when venue changes. Announce it politely
           rather than moving focus — the user is mid-form and focus belongs
@@ -158,9 +156,7 @@ export function CardioFields({ workoutType, subType, values, onChange, idPrefix 
       {visible.map(field)}
 
       {visible.includes('ascent') || visible.includes('descent') ? (
-        <p class="cardio-fields-note">
-          Elevation is recorded to the nearest {ELEVATION_STEP_FT} feet.
-        </p>
+        <p class="cardio-fields-note">Elevation is recorded to the nearest {ELEVATION_STEP_FT} feet.</p>
       ) : null}
     </fieldset>
   );

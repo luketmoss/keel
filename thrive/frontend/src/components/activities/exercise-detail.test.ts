@@ -80,9 +80,30 @@ describe('groupSetsIntoExercises', () => {
   it('treats same exercise at different exercise_order as separate groups', () => {
     // Same exercise appearing as warmup (order 1) and primary (order 3)
     const sets: SetWithRow[] = [
-      makeSet({ exercise_id: 'ex1', exercise_name: 'Bench Press', section: 'warmup', exercise_order: 1, set_number: 1, sheetRow: 2 }),
-      makeSet({ exercise_id: 'ex1', exercise_name: 'Bench Press', section: 'primary', exercise_order: 3, set_number: 1, sheetRow: 3 }),
-      makeSet({ exercise_id: 'ex1', exercise_name: 'Bench Press', section: 'primary', exercise_order: 3, set_number: 2, sheetRow: 4 }),
+      makeSet({
+        exercise_id: 'ex1',
+        exercise_name: 'Bench Press',
+        section: 'warmup',
+        exercise_order: 1,
+        set_number: 1,
+        sheetRow: 2,
+      }),
+      makeSet({
+        exercise_id: 'ex1',
+        exercise_name: 'Bench Press',
+        section: 'primary',
+        exercise_order: 3,
+        set_number: 1,
+        sheetRow: 3,
+      }),
+      makeSet({
+        exercise_id: 'ex1',
+        exercise_name: 'Bench Press',
+        section: 'primary',
+        exercise_order: 3,
+        set_number: 2,
+        sheetRow: 4,
+      }),
     ];
 
     const groups = groupSetsIntoExercises(sets);
@@ -96,8 +117,22 @@ describe('groupSetsIntoExercises', () => {
   it('preserves section labels per group', () => {
     const sets: SetWithRow[] = [
       makeSet({ exercise_id: 'ex1', section: 'SS1', exercise_order: 4, set_number: 1, sheetRow: 2 }),
-      makeSet({ exercise_id: 'ex2', exercise_name: 'Cable Fly', section: 'SS1', exercise_order: 5, set_number: 1, sheetRow: 3 }),
-      makeSet({ exercise_id: 'ex3', exercise_name: 'Ab Wheel', section: 'burnout', exercise_order: 8, set_number: 1, sheetRow: 4 }),
+      makeSet({
+        exercise_id: 'ex2',
+        exercise_name: 'Cable Fly',
+        section: 'SS1',
+        exercise_order: 5,
+        set_number: 1,
+        sheetRow: 3,
+      }),
+      makeSet({
+        exercise_id: 'ex3',
+        exercise_name: 'Ab Wheel',
+        section: 'burnout',
+        exercise_order: 8,
+        set_number: 1,
+        sheetRow: 4,
+      }),
     ];
 
     const groups = groupSetsIntoExercises(sets);
@@ -109,10 +144,58 @@ describe('groupSetsIntoExercises', () => {
   it('handles real demo data shape correctly', () => {
     // Simulate a subset of DEMO_SETS for w_demo001
     const sets: SetWithRow[] = [
-      { workout_id: 'w_demo001', exercise_id: 'ex_demo_pushup', exercise_name: 'Push Ups', section: 'warmup', exercise_order: 1, set_number: 1, planned_reps: '', weight: '', reps: '15', effort: '', sheetRow: 2 },
-      { workout_id: 'w_demo001', exercise_id: 'ex_demo001', exercise_name: 'Bench Press BB', section: 'warmup', exercise_order: 2, set_number: 1, planned_reps: '', weight: '95', reps: '10', effort: 'Easy', sheetRow: 3 },
-      { workout_id: 'w_demo001', exercise_id: 'ex_demo001', exercise_name: 'Bench Press BB', section: 'primary', exercise_order: 3, set_number: 1, planned_reps: '4-6', weight: '185', reps: '6', effort: 'Medium', sheetRow: 4 },
-      { workout_id: 'w_demo001', exercise_id: 'ex_demo001', exercise_name: 'Bench Press BB', section: 'primary', exercise_order: 3, set_number: 2, planned_reps: '4-6', weight: '185', reps: '5', effort: 'Medium', sheetRow: 5 },
+      {
+        workout_id: 'w_demo001',
+        exercise_id: 'ex_demo_pushup',
+        exercise_name: 'Push Ups',
+        section: 'warmup',
+        exercise_order: 1,
+        set_number: 1,
+        planned_reps: '',
+        weight: '',
+        reps: '15',
+        effort: '',
+        sheetRow: 2,
+      },
+      {
+        workout_id: 'w_demo001',
+        exercise_id: 'ex_demo001',
+        exercise_name: 'Bench Press BB',
+        section: 'warmup',
+        exercise_order: 2,
+        set_number: 1,
+        planned_reps: '',
+        weight: '95',
+        reps: '10',
+        effort: 'Easy',
+        sheetRow: 3,
+      },
+      {
+        workout_id: 'w_demo001',
+        exercise_id: 'ex_demo001',
+        exercise_name: 'Bench Press BB',
+        section: 'primary',
+        exercise_order: 3,
+        set_number: 1,
+        planned_reps: '4-6',
+        weight: '185',
+        reps: '6',
+        effort: 'Medium',
+        sheetRow: 4,
+      },
+      {
+        workout_id: 'w_demo001',
+        exercise_id: 'ex_demo001',
+        exercise_name: 'Bench Press BB',
+        section: 'primary',
+        exercise_order: 3,
+        set_number: 2,
+        planned_reps: '4-6',
+        weight: '185',
+        reps: '5',
+        effort: 'Medium',
+        sheetRow: 5,
+      },
     ];
 
     const groups = groupSetsIntoExercises(sets);

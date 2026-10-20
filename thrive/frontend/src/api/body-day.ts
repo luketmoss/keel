@@ -56,9 +56,7 @@ function meanHalfUp(rows: BodyMeasurementRow[], field: 'systolic_mmhg' | 'diasto
 }
 
 export function bodyDayOf(readings: readonly BodyMeasurementRow[]): BodyDay {
-  const weighIn = readings
-    .filter((r) => r.kind === 'scale' && r.weight_kg !== '')
-    .sort(byInstant)[0] ?? null;
+  const weighIn = readings.filter((r) => r.kind === 'scale' && r.weight_kg !== '').sort(byInstant)[0] ?? null;
   const bp = readings.filter((r) => r.kind === 'bp').sort(byInstant);
   return {
     weighIn,

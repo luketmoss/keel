@@ -7,11 +7,13 @@ export type Section = 'warmup' | 'primary' | 'SS1' | 'SS2' | 'SS3' | 'burnout' |
 export interface Exercise {
   id: string;
   name: string;
-  tags: string;       // comma-separated
+  tags: string; // comma-separated
   notes: string;
   created: string;
 }
-export interface ExerciseWithRow extends Exercise { sheetRow: number; }
+export interface ExerciseWithRow extends Exercise {
+  sheetRow: number;
+}
 
 export interface TemplateRow {
   template_id: string;
@@ -23,7 +25,9 @@ export interface TemplateRow {
   sets: string;
   reps: string;
 }
-export interface TemplateRowWithRow extends TemplateRow { sheetRow: number; }
+export interface TemplateRowWithRow extends TemplateRow {
+  sheetRow: number;
+}
 
 export interface Template {
   id: string;
@@ -101,7 +105,9 @@ export interface WorkoutTrack {
   };
   geometry: { type: 'LineString'; coordinates: [number, number][] };
 }
-export interface WorkoutWithRow extends Workout { sheetRow: number; }
+export interface WorkoutWithRow extends Workout {
+  sheetRow: number;
+}
 
 export interface WorkoutSet {
   workout_id: string;
@@ -115,7 +121,9 @@ export interface WorkoutSet {
   reps: string;
   effort: Effort | '';
 }
-export interface SetWithRow extends WorkoutSet { sheetRow: number; }
+export interface SetWithRow extends WorkoutSet {
+  sheetRow: number;
+}
 
 export interface BuilderExercise {
   exercise_id: string;
@@ -145,7 +153,9 @@ export interface Label {
   color_key: string;
   created: string;
 }
-export interface LabelWithRow extends Label { sheetRow: number; }
+export interface LabelWithRow extends Label {
+  sheetRow: number;
+}
 
 /** One note per local day (#233); a day with no note has no row. */
 export interface JournalEntry {
@@ -157,7 +167,9 @@ export interface JournalEntry {
   /** ISO 8601, set on every write. */
   updated: string;
 }
-export interface JournalEntryWithRow extends JournalEntry { sheetRow: number; }
+export interface JournalEntryWithRow extends JournalEntry {
+  sheetRow: number;
+}
 
 export interface UserInfo {
   email: string;

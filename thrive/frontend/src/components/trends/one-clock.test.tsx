@@ -55,11 +55,13 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
-  if (realTZ === undefined) delete process.env.TZ; else process.env.TZ = realTZ;
+  if (realTZ === undefined) delete process.env.TZ;
+  else process.env.TZ = realTZ;
   recheckToday();
 });
 
-const dots = (c: Element) => [...c.querySelectorAll<SVGElement>('.trend-card:first-of-type .trend-dot')].map((d) => d.getAttribute('data-date')!);
+const dots = (c: Element) =>
+  [...c.querySelectorAll<SVGElement>('.trend-card:first-of-type .trend-dot')].map((d) => d.getAttribute('data-date')!);
 const lastTableRow = (c: Element) => [...c.querySelectorAll('tbody tr th a')].pop()!.firstChild!.textContent;
 const firstTableRow = (c: Element) => c.querySelector('tbody tr th a')!.firstChild!.textContent;
 
@@ -79,13 +81,15 @@ describe.each([
     expect(localDate(new Date(iso))).toBe(addDays(DENVER_TODAY, offset));
   });
 
-  it('ends the chart and the table on Denver\'s date', () => {
+  it("ends the chart and the table on Denver's date", () => {
     pin(iso, tz);
     const { container } = renderScreen();
     const d = dots(container);
     expect(d[d.length - 1]).toBe(DENVER_TODAY);
     expect(d[0]).toBe(addDays(DENVER_TODAY, -6));
-    fireEvent.click([...container.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === 'Table')!);
+    fireEvent.click(
+      [...container.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === 'Table')!,
+    );
     // The table lists the newest day first.
     expect(firstTableRow(container)).toBe(rowDate(DENVER_TODAY, DENVER_TODAY));
     expect(lastTableRow(container)).toBe(rowDate(addDays(DENVER_TODAY, -6), DENVER_TODAY));
@@ -99,12 +103,14 @@ describe.each([
       expect(container.querySelector('a.trend-open-day')!.getAttribute('href')).toBe('#/');
       selectedDay.value = addDays(DENVER_TODAY, -1);
       return Promise.resolve().then(() => {
-        expect(container.querySelector('a.trend-open-day')!.getAttribute('href')).toBe(`#/day/${addDays(DENVER_TODAY, -1)}`);
+        expect(container.querySelector('a.trend-open-day')!.getAttribute('href')).toBe(
+          `#/day/${addDays(DENVER_TODAY, -1)}`,
+        );
       });
     });
   });
 
-  it('Enter on the last day goes to the Day view\'s today', () => {
+  it("Enter on the last day goes to the Day view's today", () => {
     pin(iso, tz);
     const { container } = renderScreen();
     const wrap = container.querySelector<HTMLElement>('.trend-charts')!;

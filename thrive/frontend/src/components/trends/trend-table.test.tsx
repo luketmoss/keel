@@ -8,19 +8,38 @@ import type { TrendGroup, TrendMetric, TrendPoint } from './metrics';
 import { addDays } from '../../day/dates';
 import { metricSeries, rangeBounds } from './series';
 
-beforeEach(() => { resetTableStop(); window.location.hash = '#/trends'; });
+beforeEach(() => {
+  resetTableStop();
+  window.location.hash = '#/trends';
+});
 afterEach(cleanup);
 
 const TODAY = '2026-09-27';
 
 function metric(pts: TrendPoint[], extra: Partial<TrendMetric> = {}): TrendMetric {
-  return { id: 'resting_hr', label: 'Resting HR', unit: 'bpm', points: () => pts, format: (v) => String(Math.round(v)), band: true, ...extra };
+  return {
+    id: 'resting_hr',
+    label: 'Resting HR',
+    unit: 'bpm',
+    points: () => pts,
+    format: (v) => String(Math.round(v)),
+    band: true,
+    ...extra,
+  };
 }
 
 function renderTable(m: TrendMetric, avgDays = 7, range: '1W' | '1M' = '1W', metrics: TrendMetric[] = [m]) {
   const group: TrendGroup = { id: 'g', label: 'Heart', metrics };
   const { from, to } = rangeBounds(range, TODAY, null);
-  return render(h(TrendTable, { group, series: metrics.map((m) => metricSeries(m, from, to, avgDays, TODAY)), range, avgDays, today: TODAY }));
+  return render(
+    h(TrendTable, {
+      group,
+      series: metrics.map((m) => metricSeries(m, from, to, avgDays, TODAY)),
+      range,
+      avgDays,
+      today: TODAY,
+    }),
+  );
 }
 
 const pts: TrendPoint[] = [];
@@ -39,8 +58,11 @@ describe('TrendTable', () => {
 
   it('adds the chosen average column, and none when Off', () => {
     let r = renderTable(metric(pts));
-    expect([...r.container.querySelectorAll('thead th[scope="col"]')].map((t) => t.textContent))
-      .toEqual(['Date', 'Resting HR (bpm)', '7-day avg']);
+    expect([...r.container.querySelectorAll('thead th[scope="col"]')].map((t) => t.textContent)).toEqual([
+      'Date',
+      'Resting HR (bpm)',
+      '7-day avg',
+    ]);
     cleanup();
     r = renderTable(metric(pts), 0);
     expect(r.container.querySelectorAll('thead th')).toHaveLength(2);
@@ -48,8 +70,9 @@ describe('TrendTable', () => {
 
   it('captions the range and your range with its window', () => {
     const { container } = renderTable(metric(pts));
-    expect(container.querySelector('caption')!.textContent)
-      .toBe('Last 7 days. Resting HR: your range 50–50 bpm (Aug 28 – Sep 26).');
+    expect(container.querySelector('caption')!.textContent).toBe(
+      'Last 7 days. Resting HR: your range 50–50 bpm (Aug 28 – Sep 26).',
+    );
   });
 
   it('sits in a keyboard-reachable, labelled region', () => {
@@ -60,7 +83,7 @@ describe('TrendTable', () => {
     expect(region.querySelector('table')).not.toBeNull();
   });
 
-  it('shows a partial day\'s sentence as text', () => {
+  it("shows a partial day's sentence as text", () => {
     const p = [...pts];
     p[p.length - 1] = { ...p[p.length - 1], partial: 'partial day' };
     const { container } = renderTable(metric(p));
@@ -68,7 +91,15 @@ describe('TrendTable', () => {
   });
 
   it('has no links and no description on a group with no rows', () => {
-    const { container } = render(h(TrendTable, { group: { id: 'g', label: 'Heart', metrics: [] }, series: [], range: '1W', avgDays: 0, today: TODAY }));
+    const { container } = render(
+      h(TrendTable, {
+        group: { id: 'g', label: 'Heart', metrics: [] },
+        series: [],
+        range: '1W',
+        avgDays: 0,
+        today: TODAY,
+      }),
+    );
     expect(container.querySelectorAll('a')).toHaveLength(0);
     expect(container.querySelector('[role="region"]')!.getAttribute('aria-describedby')).toBeNull();
   });
@@ -142,7 +173,9 @@ describe('#255 AC3/AC4: one tab stop and the keys', () => {
     const { container } = renderTable(metric(pts));
     const region = container.querySelector('[role="region"]')!;
     const hint = container.querySelector('#' + region.getAttribute('aria-describedby'))!;
-    expect(hint.textContent).toBe('Up and down arrows, Home, End, Page Up and Page Down move between days. Enter opens a day in the Day view.');
+    expect(hint.textContent).toBe(
+      'Up and down arrows, Home, End, Page Up and Page Down move between days. Enter opens a day in the Day view.',
+    );
     expect(region.getAttribute('aria-label')).toBe('Resting HR table');
   });
 
@@ -240,6 +273,8 @@ describe('#255 AC3/AC4: one tab stop and the keys', () => {
 
   it('sets the measured header height on the wrapper for scroll-margin', () => {
     const { container } = renderTable(metric(pts));
-    expect(container.querySelector<HTMLElement>('.trend-table-wrap')!.style.getPropertyValue('--trend-head-h')).toMatch(/px$/);
+    expect(container.querySelector<HTMLElement>('.trend-table-wrap')!.style.getPropertyValue('--trend-head-h')).toMatch(
+      /px$/,
+    );
   });
 });

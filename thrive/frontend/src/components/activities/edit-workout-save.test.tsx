@@ -7,15 +7,21 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, fireEvent, cleanup } from '@testing-library/preact';
 import { h } from 'preact';
-import { workouts, sets, isEditMode, activeWorkoutId, activeWorkoutSets, activeWarmupExercises } from '../../state/store';
+import {
+  workouts,
+  sets,
+  isEditMode,
+  activeWorkoutId,
+  activeWorkoutSets,
+  activeWarmupExercises,
+} from '../../state/store';
 import type { WorkoutWithRow } from '../../api/types';
 import { mountConfirmHost, answerConfirm } from '../shared/confirm-test-utils';
 
 let sheet: { Workouts: string[][]; Sets: string[][] };
 
 /** Column letters -> zero-based index: A = 0, Z = 25, AA = 26 (#145). */
-const colIndex = (letters: string) =>
-  [...letters].reduce((n, c) => n * 26 + (c.charCodeAt(0) - 64), 0) - 1;
+const colIndex = (letters: string) => [...letters].reduce((n, c) => n * 26 + (c.charCodeAt(0) - 64), 0) - 1;
 
 function parseRange(range: string) {
   const [tab, cells] = range.split('!');
@@ -42,11 +48,15 @@ const sheetsGet = vi.fn(async (range: string) => {
 const sheetsUpdate = vi.fn(async (range: string, values: string[][]) => {
   const { tab, colStart, rowStart } = parseRange(range);
   const row = sheet[tab][(rowStart as number) - 2];
-  values[0].forEach((v, i) => { row[colStart + i] = String(v); });
+  values[0].forEach((v, i) => {
+    row[colStart + i] = String(v);
+  });
 });
 
 vi.mock('../../api/sheets', () => ({
-  SheetsApiError: class extends Error { status = 0; },
+  SheetsApiError: class extends Error {
+    status = 0;
+  },
   withReauth: async (token: string, fn: (t: string) => Promise<unknown>) => fn(token),
   sheetsGet: (range: string) => sheetsGet(range),
   sheetsUpdate: (range: string, values: string[][]) => sheetsUpdate(range, values),
@@ -56,14 +66,25 @@ vi.mock('../../api/sheets', () => ({
 }));
 vi.mock('../../api/demo-data', () => ({ isDemo: () => false, DEMO_WORKOUTS: [], DEMO_SETS: [] }));
 vi.mock('../../api/exercises-api', () => ({
-  fetchExercises: vi.fn(), createExercise: vi.fn(), updateExercise: vi.fn(), deleteExercise: vi.fn(),
+  fetchExercises: vi.fn(),
+  createExercise: vi.fn(),
+  updateExercise: vi.fn(),
+  deleteExercise: vi.fn(),
 }));
 vi.mock('../../api/templates-api', () => ({
-  fetchTemplateRows: vi.fn(), groupTemplateRows: vi.fn(), createTemplate: vi.fn(),
-  updateTemplate: vi.fn(), deleteTemplate: vi.fn(), updateExerciseNameInTemplates: vi.fn(),
+  fetchTemplateRows: vi.fn(),
+  groupTemplateRows: vi.fn(),
+  createTemplate: vi.fn(),
+  updateTemplate: vi.fn(),
+  deleteTemplate: vi.fn(),
+  updateExerciseNameInTemplates: vi.fn(),
 }));
 vi.mock('../../api/labels-api', () => ({
-  fetchLabels: vi.fn(), createLabel: vi.fn(), updateLabel: vi.fn(), deleteLabel: vi.fn(), appendLabels: vi.fn(),
+  fetchLabels: vi.fn(),
+  createLabel: vi.fn(),
+  updateLabel: vi.fn(),
+  deleteLabel: vi.fn(),
+  appendLabels: vi.fn(),
 }));
 vi.mock('../../auth/reauth', () => ({ attemptReauth: vi.fn(), ReauthFailedError: class extends Error {} }));
 vi.mock('../../auth/auth-context', () => ({ useAuth: () => ({ token: 'test-token' }) }));
@@ -85,24 +106,69 @@ async function clickSave(view: ReturnType<typeof render>) {
 
 // A COROS hike as the sync writes it. Values are made up.
 const SYNCED: WorkoutWithRow = {
-  id: 'w_sync1', date: '2026-09-20', time: '07:05', type: 'hike', name: 'Ridge Loop',
-  template_id: '', notes: 'Windy', elapsed_seconds: '343', created: '2026-09-20T12:00:00.000Z',
-  copied_from: '', status: '', moving_seconds: '301', effort: '',
-  distance_m: '430', ascent_m: '37', descent_m: '41', avg_hr: '128',
-  sub_type: 'outdoor', source: 'coros', source_activity_id: 'act_0001',
-  raw_ref: 'raw/act_0001.json', fit_ref: 'fit/act_0001.fit', fit_fetched_at: '2026-09-20T13:00:00Z',
-  synced_at: '2026-09-20T13:00:00Z', started_at_utc: '2026-09-20T14:05:00Z', calories: '212', estimated_seconds: '', sport_type: '', track_ref: '',
+  id: 'w_sync1',
+  date: '2026-09-20',
+  time: '07:05',
+  type: 'hike',
+  name: 'Ridge Loop',
+  template_id: '',
+  notes: 'Windy',
+  elapsed_seconds: '343',
+  created: '2026-09-20T12:00:00.000Z',
+  copied_from: '',
+  status: '',
+  moving_seconds: '301',
+  effort: '',
+  distance_m: '430',
+  ascent_m: '37',
+  descent_m: '41',
+  avg_hr: '128',
+  sub_type: 'outdoor',
+  source: 'coros',
+  source_activity_id: 'act_0001',
+  raw_ref: 'raw/act_0001.json',
+  fit_ref: 'fit/act_0001.fit',
+  fit_fetched_at: '2026-09-20T13:00:00Z',
+  synced_at: '2026-09-20T13:00:00Z',
+  started_at_utc: '2026-09-20T14:05:00Z',
+  calories: '212',
+  estimated_seconds: '',
+  sport_type: '',
+  track_ref: '',
   sheetRow: 2,
 };
 
 // A hand-logged strength session that #155's enrichment has filled and linked.
 const ENRICHED: WorkoutWithRow = {
-  id: 'w_lift1', date: '2026-09-21', time: '06:30', type: 'weight', name: 'Upper Push A',
-  template_id: '', notes: 'Solid', elapsed_seconds: '343', created: '2026-09-21T11:30:00.000Z',
-  copied_from: '', status: '', moving_seconds: '290', effort: 'Medium',
-  distance_m: '', ascent_m: '', descent_m: '', avg_hr: '112',
-  sub_type: '', source: '', source_activity_id: 'act_0002', raw_ref: 'raw/act_0002.json',
-  fit_ref: '', fit_fetched_at: '', synced_at: '2026-09-21T13:00:00Z', started_at_utc: '', calories: '180', estimated_seconds: '', sport_type: '', track_ref: '',
+  id: 'w_lift1',
+  date: '2026-09-21',
+  time: '06:30',
+  type: 'weight',
+  name: 'Upper Push A',
+  template_id: '',
+  notes: 'Solid',
+  elapsed_seconds: '343',
+  created: '2026-09-21T11:30:00.000Z',
+  copied_from: '',
+  status: '',
+  moving_seconds: '290',
+  effort: 'Medium',
+  distance_m: '',
+  ascent_m: '',
+  descent_m: '',
+  avg_hr: '112',
+  sub_type: '',
+  source: '',
+  source_activity_id: 'act_0002',
+  raw_ref: 'raw/act_0002.json',
+  fit_ref: '',
+  fit_fetched_at: '',
+  synced_at: '2026-09-21T13:00:00Z',
+  started_at_utc: '',
+  calories: '180',
+  estimated_seconds: '',
+  sport_type: '',
+  track_ref: '',
   sheetRow: 3,
 };
 
@@ -233,10 +299,18 @@ describe('AC4: the strength edit mode behaves the same', () => {
 describe('AC5: a save never reverts or blanks a column it did not change', () => {
   it('a copy loaded before enrichment does not wipe what enrichment wrote', async () => {
     // The app loaded the row before the sync ran: no enrichment, no link.
-    workouts.value = [{ ...SYNCED }, {
-      ...ENRICHED, moving_seconds: '', avg_hr: '', calories: '',
-      source_activity_id: '', raw_ref: '', synced_at: '',
-    }];
+    workouts.value = [
+      { ...SYNCED },
+      {
+        ...ENRICHED,
+        moving_seconds: '',
+        avg_hr: '',
+        calories: '',
+        source_activity_id: '',
+        raw_ref: '',
+        synced_at: '',
+      },
+    ];
 
     await saveSimpleWorkoutEdits(ENRICHED.id, { notes: 'Late note' }, 'test-token');
 
@@ -267,7 +341,9 @@ describe('AC5: a save never reverts or blanks a column it did not change', () =>
     sheet.Workouts[0][0] = 'w_other';
     const before = sheet.Workouts.map((r) => [...r]);
 
-    await expect(saveSimpleWorkoutEdits(SYNCED.id, { notes: 'x' }, 'test-token')).rejects.toThrow(/could not be verified/);
+    await expect(saveSimpleWorkoutEdits(SYNCED.id, { notes: 'x' }, 'test-token')).rejects.toThrow(
+      /could not be verified/,
+    );
     expect(sheet.Workouts).toEqual(before);
   });
 });

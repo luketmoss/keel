@@ -10,9 +10,14 @@ const EMPTY: CardioValues = { distance: '', ascent: '', descent: '', avgHr: '' }
 
 function renderFields(workoutType: string, values: Partial<CardioValues> = {}) {
   const onChange = vi.fn();
-  const result = render(h(CardioFields as any, {
-    workoutType, values: { ...EMPTY, ...values }, onChange, idPrefix: 'test',
-  }));
+  const result = render(
+    h(CardioFields as any, {
+      workoutType,
+      values: { ...EMPTY, ...values },
+      onChange,
+      idPrefix: 'test',
+    }),
+  );
   return { ...result, onChange };
 }
 
@@ -29,9 +34,7 @@ describe('CardioFields', () => {
 
     it('shows all four on a hike, ordered by how often each is filled', () => {
       const { container } = renderFields('hike');
-      expect(labels(container)).toEqual([
-        'Distance (miles)', 'Ascent (feet)', 'Descent (feet)', 'Avg HR (bpm)',
-      ]);
+      expect(labels(container)).toEqual(['Distance (miles)', 'Ascent (feet)', 'Descent (feet)', 'Avg HR (bpm)']);
     });
 
     it('renders nothing at all for a weight workout', () => {
@@ -105,13 +108,21 @@ describe('CardioFields', () => {
     });
 
     it('seeds imperial values from stored meters', () => {
-      expect(storedToCardio({ distance_m: '19956', ascent_m: '457', descent_m: '', avg_hr: '136' }))
-        .toEqual({ distance: '12.4', ascent: '1500', descent: '', avgHr: '136' });
+      expect(storedToCardio({ distance_m: '19956', ascent_m: '457', descent_m: '', avg_hr: '136' })).toEqual({
+        distance: '12.4',
+        ascent: '1500',
+        descent: '',
+        avgHr: '136',
+      });
     });
 
     it('seeds a deliberate stored 0 as "0", distinct from blank', () => {
-      expect(storedToCardio({ distance_m: '0', ascent_m: '', descent_m: '', avg_hr: '0' }))
-        .toEqual({ distance: '0', ascent: '', descent: '', avgHr: '0' });
+      expect(storedToCardio({ distance_m: '0', ascent_m: '', descent_m: '', avg_hr: '0' })).toEqual({
+        distance: '0',
+        ascent: '',
+        descent: '',
+        avgHr: '0',
+      });
     });
   });
 });

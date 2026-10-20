@@ -14,8 +14,20 @@ function req(over: Record<string, string> = {}) {
 }
 function logRow(run_id: string, status = 'ok'): SyncLogEntry {
   return {
-    run_id, started_at: iso(2), finished_at: iso(3), window_start: '', window_end: '', n_seen: '0', n_new: '0',
-    n_updated: '0', n_enriched: '0', n_fit_fetched: '0', n_errors: '0', status, error_detail: 'SECRET', notes: '',
+    run_id,
+    started_at: iso(2),
+    finished_at: iso(3),
+    window_start: '',
+    window_end: '',
+    n_seen: '0',
+    n_new: '0',
+    n_updated: '0',
+    n_enriched: '0',
+    n_fit_fetched: '0',
+    n_errors: '0',
+    status,
+    error_detail: 'SECRET',
+    notes: '',
   };
 }
 
@@ -23,7 +35,10 @@ describe('requestView', () => {
   it('is null with no request', () => expect(requestView(null, [], at(0))).toBeNull());
 
   it('requested: waiting, then not picked up, then past the ceiling', () => {
-    expect(requestView(req(), [], at(1))).toMatchObject({ open: true, text: 'Requested 7:12 AM. Waiting for it to start.' });
+    expect(requestView(req(), [], at(1))).toMatchObject({
+      open: true,
+      text: 'Requested 7:12 AM. Waiting for it to start.',
+    });
     expect(requestView(req(), [], at(5))).toMatchObject({ open: true, tone: 'warning' });
     expect(requestView(req(), [], at(5))!.text).toContain('not picked up yet');
     const late = requestView(req(), [], at(20))!;
@@ -48,7 +63,9 @@ describe('requestView', () => {
     expect(requestView(r, [logRow('workflow_dispatch-123-1')], at(4))!.open).toBe(true);
     const v = requestView(r, [logRow('workflow_dispatch-12-1')], at(4))!;
     expect(v).toMatchObject({ open: false, tone: 'neutral', text: 'Finished 7:15 AM: ok' });
-    expect(requestView(r, [logRow('workflow_dispatch-12-1', 'partial')], at(4))!.text).toContain('finished with errors');
+    expect(requestView(r, [logRow('workflow_dispatch-12-1', 'partial')], at(4))!.text).toContain(
+      'finished with errors',
+    );
     expect(requestView(r, [logRow('workflow_dispatch-12-1', 'failed')], at(4))!.tone).toBe('danger');
     // Never error_detail.
     expect(JSON.stringify(v)).not.toContain('SECRET');

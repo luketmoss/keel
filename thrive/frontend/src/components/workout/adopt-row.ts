@@ -41,9 +41,13 @@ export function unclaimedRowFor(
     }
   }
 
-  const candidates = rows.filter((r) =>
-    r.sheetRow > 0 && !claimed.has(r.sheetRow) &&
-    r.workout_id === workoutId && r.exercise_id === ex.exercise_id && r.set_number === set.set_number,
+  const candidates = rows.filter(
+    (r) =>
+      r.sheetRow > 0 &&
+      !claimed.has(r.sheetRow) &&
+      r.workout_id === workoutId &&
+      r.exercise_id === ex.exercise_id &&
+      r.set_number === set.set_number,
   );
 
   if (contested) {

@@ -26,7 +26,18 @@ import type { WorkoutWithRow } from '../../api/types';
 const TODAY = '2026-09-30'; // a Wednesday
 
 function wk(over: Partial<WorkoutWithRow>): WorkoutWithRow {
-  return { id: '', date: '', status: '', type: 'bike', sub_type: '', name: '', elapsed_seconds: '', moving_seconds: '', sheetRow: 2, ...over } as WorkoutWithRow;
+  return {
+    id: '',
+    date: '',
+    status: '',
+    type: 'bike',
+    sub_type: '',
+    name: '',
+    elapsed_seconds: '',
+    moving_seconds: '',
+    sheetRow: 2,
+    ...over,
+  } as WorkoutWithRow;
 }
 
 function hr(date: string, over: Partial<Record<string, string>> = {}): DailyHealthRow {
@@ -41,7 +52,9 @@ function renderAt(hash: string) {
     replaceRoute(hash);
   });
   return render(
-    <AuthContext.Provider value={{ token: 'tok', user: null, isAuthenticated: true, login: () => {}, logout: () => {} }}>
+    <AuthContext.Provider
+      value={{ token: 'tok', user: null, isAuthenticated: true, login: () => {}, logout: () => {} }}
+    >
       <CalendarScreen />
     </AuthContext.Provider>,
   );
@@ -52,7 +65,11 @@ const cell = (c: Element, date: string) => {
   const day = Number(date.slice(8));
   const month = Number(date.slice(5, 7));
   // In-month cells are found by their label's date words.
-  const words = new Date(Date.UTC(2000, month - 1, day)).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric' });
+  const words = new Date(Date.UTC(2000, month - 1, day)).toLocaleDateString('en-US', {
+    timeZone: 'UTC',
+    month: 'long',
+    day: 'numeric',
+  });
   const found = cells(c).filter((b) => b.getAttribute('aria-label')!.split(', ')[1] === words);
   if (found.length !== 1) throw new Error(`no single cell for ${date}`);
   return found[0];
@@ -118,7 +135,13 @@ describe('AC2 — the month grid', () => {
     const heads = [...grid.querySelectorAll('[role="columnheader"]')];
     expect(heads.map((h) => h.textContent)).toEqual(['M', 'T', 'W', 'T', 'F', 'S', 'S']);
     expect(heads.map((h) => h.getAttribute('aria-label'))).toEqual([
-      'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
     ]);
     expect(grid.querySelectorAll('[role="row"]')).toHaveLength(6); // header + 5 weeks
     expect(cells(container)).toHaveLength(35);
@@ -134,7 +157,7 @@ describe('AC2 — the month grid', () => {
     }
   });
 
-  it('marks today with aria-current and selects it on open, the grid\'s one Tab stop', () => {
+  it("marks today with aria-current and selects it on open, the grid's one Tab stop", () => {
     const { container } = renderAt('#/calendar');
     const t = cell(container, TODAY);
     expect(t.getAttribute('aria-current')).toBe('date');
@@ -153,7 +176,7 @@ describe('AC2 — the month grid', () => {
     expect(all.filter((c) => c.className.includes('calendar-day-outside'))).toHaveLength(5);
   });
 
-  it('draws dots then rings, three at most, and names the day\'s activity', () => {
+  it("draws dots then rings, three at most, and names the day's activity", () => {
     workouts.value = [
       wk({ id: 'a', date: '2025-01-14', name: 'Mountain Bike' }),
       wk({ id: 'b', date: '2025-01-14', status: 'planned', name: 'Leg day', type: 'weight' }),
@@ -161,13 +184,17 @@ describe('AC2 — the month grid', () => {
     const { container } = renderAt('#/calendar/2025-01');
     const c = cell(container, '2025-01-14');
     expect([...c.querySelectorAll('.calendar-mark')].map((m) => m.className)).toEqual([
-      'calendar-mark calendar-mark-dot', 'calendar-mark calendar-mark-ring',
+      'calendar-mark calendar-mark-dot',
+      'calendar-mark calendar-mark-ring',
     ]);
     expect(c.getAttribute('aria-label')).toBe('Tuesday, January 14, Mountain Bike, 1 planned');
   });
 
   it('shows a journal dot exactly on days with an entry, and says so', () => {
-    journalEntries.value = { state: 'loaded', entries: [{ date: '2026-09-12', note: 'Felt good', created: '', updated: '' }] };
+    journalEntries.value = {
+      state: 'loaded',
+      entries: [{ date: '2026-09-12', note: 'Felt good', created: '', updated: '' }],
+    };
     const { container } = renderAt('#/calendar');
     const c = cell(container, '2026-09-12');
     expect(c.querySelector('.calendar-note')!.getAttribute('aria-hidden')).toBe('true');
@@ -206,8 +233,22 @@ describe('AC3 — shading by one metric', () => {
     const group = getByRole('group', { name: 'Shade days by' });
     expect(group.classList.contains('sub-type-toggle')).toBe(true);
     const buttons = [...group.querySelectorAll('button')];
-    expect(buttons.map((b) => b.textContent)).toEqual(['Nothing', 'Sleep', 'Resting HR', 'HRV', 'Steps', 'Average stress']);
-    expect(buttons.map((b) => b.getAttribute('aria-pressed'))).toEqual(['true', 'false', 'false', 'false', 'false', 'false']);
+    expect(buttons.map((b) => b.textContent)).toEqual([
+      'Nothing',
+      'Sleep',
+      'Resting HR',
+      'HRV',
+      'Steps',
+      'Average stress',
+    ]);
+    expect(buttons.map((b) => b.getAttribute('aria-pressed'))).toEqual([
+      'true',
+      'false',
+      'false',
+      'false',
+      'false',
+      'false',
+    ]);
     expect(container.querySelector('.calendar-day-shade, .calendar-day-nodata')).toBeNull();
   });
 
@@ -261,7 +302,11 @@ describe('AC3 — shading by one metric', () => {
 
   // #276 AC5 — focus goes to the pressed shading button, not body.
   describe('#276 — focus after the shading error retry', () => {
-    const settle = () => act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    const settle = () =>
+      act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
     const open = () => {
       dailyHealth.value = { state: 'error' };
       const r = renderAt('#/calendar');
@@ -273,7 +318,9 @@ describe('AC3 — shading by one metric', () => {
     it('success lands focus on the pressed Shade by button', async () => {
       const { getByRole } = open();
       expect(document.activeElement).toBe(document.querySelector('.panel-status'));
-      act(() => { dailyHealth.value = { state: 'loaded', rows: [hr('2026-09-10', { sleep_total_s: '25000' })] }; });
+      act(() => {
+        dailyHealth.value = { state: 'loaded', rows: [hr('2026-09-10', { sleep_total_s: '25000' })] };
+      });
       await settle();
       expect(document.activeElement).toBe(getByRole('button', { name: 'Sleep' }));
       expect(document.activeElement!.getAttribute('aria-pressed')).toBe('true');
@@ -283,14 +330,18 @@ describe('AC3 — shading by one metric', () => {
     it('a retry that fails again keeps the same container, and the focus on it', async () => {
       const { getByRole } = open();
       const before = document.querySelector('.panel-status')!;
-      act(() => { dailyHealth.value = { state: 'loading' }; });
+      act(() => {
+        dailyHealth.value = { state: 'loading' };
+      });
       await settle();
       const during = document.querySelector('.panel-status')!;
       expect(during).toBe(before);
       expect(during.textContent).toBe('Loading…');
       expect(during.querySelector('button')).toBeNull();
       expect(document.activeElement).toBe(before);
-      act(() => { dailyHealth.value = { state: 'error' }; });
+      act(() => {
+        dailyHealth.value = { state: 'error' };
+      });
       await settle();
       const after = document.querySelector('.panel-status')!;
       expect(after).toBe(before);
@@ -301,11 +352,15 @@ describe('AC3 — shading by one metric', () => {
 
       // A second press works the same way (no stale latch).
       fireEvent.click(getByRole('button', { name: 'Try again' }));
-      act(() => { dailyHealth.value = { state: 'loading' }; });
+      act(() => {
+        dailyHealth.value = { state: 'loading' };
+      });
       await settle();
       expect(document.querySelector('.panel-status')).toBe(before);
       expect(before.textContent).toBe('Loading…');
-      act(() => { dailyHealth.value = { state: 'error' }; });
+      act(() => {
+        dailyHealth.value = { state: 'error' };
+      });
       await settle();
       expect(document.querySelector('.panel-status')).toBe(before);
       expect(document.activeElement).toBe(before);
@@ -313,10 +368,14 @@ describe('AC3 — shading by one metric', () => {
 
     it('a retry that succeeds after loading hands focus to the pressed button', async () => {
       const { getByRole } = open();
-      act(() => { dailyHealth.value = { state: 'loading' }; });
+      act(() => {
+        dailyHealth.value = { state: 'loading' };
+      });
       await settle();
       expect(document.activeElement).toBe(document.querySelector('.panel-status'));
-      act(() => { dailyHealth.value = { state: 'loaded', rows: [] }; });
+      act(() => {
+        dailyHealth.value = { state: 'loaded', rows: [] };
+      });
       await settle();
       expect(document.querySelector('.panel-status')).toBeNull();
       expect(document.activeElement).toBe(getByRole('button', { name: 'Sleep' }));
@@ -324,11 +383,15 @@ describe('AC3 — shading by one metric', () => {
 
     it('leaves focus alone when the user moved on mid-retry', async () => {
       const { getByRole } = open();
-      act(() => { dailyHealth.value = { state: 'loading' }; });
+      act(() => {
+        dailyHealth.value = { state: 'loading' };
+      });
       await settle();
       const back = getByRole('button', { name: 'Back to Day' });
       back.focus();
-      act(() => { dailyHealth.value = { state: 'loaded', rows: [] }; });
+      act(() => {
+        dailyHealth.value = { state: 'loaded', rows: [] };
+      });
       await settle();
       expect(document.activeElement).toBe(back);
     });
@@ -336,12 +399,20 @@ describe('AC3 — shading by one metric', () => {
     // AC3 — only a Try again press shows "Loading…".
     it('shows no Loading status for a loading the user did not ask for, even after a past retry', async () => {
       const { getByRole } = open();
-      act(() => { dailyHealth.value = { state: 'loading' }; });
-      act(() => { dailyHealth.value = { state: 'error' }; });
+      act(() => {
+        dailyHealth.value = { state: 'loading' };
+      });
+      act(() => {
+        dailyHealth.value = { state: 'error' };
+      });
       await settle();
-      act(() => { dailyHealth.value = { state: 'loaded', rows: [] }; });
+      act(() => {
+        dailyHealth.value = { state: 'loaded', rows: [] };
+      });
       await settle();
-      act(() => { dailyHealth.value = { state: 'loading' }; }); // throttled refresh
+      act(() => {
+        dailyHealth.value = { state: 'loading' };
+      }); // throttled refresh
       await settle();
       expect(document.querySelector('.panel-status')).toBeNull();
       expect(getByRole('button', { name: 'Sleep' })).toBeTruthy();
@@ -349,12 +420,16 @@ describe('AC3 — shading by one metric', () => {
 
     it('with Nothing chosen the status never shows, and choosing it mid-retry removes it', async () => {
       const { getByRole } = open();
-      act(() => { dailyHealth.value = { state: 'loading' }; });
+      act(() => {
+        dailyHealth.value = { state: 'loading' };
+      });
       await settle();
       expect(document.querySelector('.panel-status')).not.toBeNull();
       fireEvent.click(getByRole('button', { name: 'Nothing' }));
       expect(document.querySelector('.panel-status')).toBeNull();
-      act(() => { dailyHealth.value = { state: 'error' }; });
+      act(() => {
+        dailyHealth.value = { state: 'error' };
+      });
       await settle();
       expect(document.querySelector('.panel-status')).toBeNull();
     });
@@ -363,7 +438,9 @@ describe('AC3 — shading by one metric', () => {
     it('keeps the same status through a month change, and moves no focus', async () => {
       const { getByRole } = open();
       const before = document.querySelector('.panel-status')!;
-      act(() => { dailyHealth.value = { state: 'loading' }; });
+      act(() => {
+        dailyHealth.value = { state: 'loading' };
+      });
       fireEvent.click(getByRole('button', { name: 'Next month' }));
       await settle();
       expect(document.querySelector('.panel-status')).toBe(before);
@@ -372,7 +449,9 @@ describe('AC3 — shading by one metric', () => {
 
     it('unmounting mid-retry is clean and moves no focus', async () => {
       const r = open();
-      act(() => { dailyHealth.value = { state: 'loading' }; });
+      act(() => {
+        dailyHealth.value = { state: 'loading' };
+      });
       await settle();
       r.unmount();
       await settle();
@@ -383,7 +462,9 @@ describe('AC3 — shading by one metric', () => {
       const { getByRole } = open();
       const back = getByRole('button', { name: 'Back to Day' });
       back.focus();
-      act(() => { dailyHealth.value = { state: 'loaded', rows: [] }; });
+      act(() => {
+        dailyHealth.value = { state: 'loaded', rows: [] };
+      });
       await settle();
       expect(document.activeElement).toBe(back);
     });

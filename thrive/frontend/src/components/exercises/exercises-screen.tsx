@@ -11,10 +11,7 @@ import { ask } from '../../state/confirm';
 import { deleteExerciseCopy } from '../shared/confirm-copy';
 
 /** Build a map of exerciseId → most recent workout date string. */
-export function buildLastPerformedMap(
-  allSets: SetWithRow[],
-  allWorkouts: WorkoutWithRow[],
-): Map<string, string> {
+export function buildLastPerformedMap(allSets: SetWithRow[], allWorkouts: WorkoutWithRow[]): Map<string, string> {
   const workoutDateMap = new Map<string, string>();
   for (const w of allWorkouts) {
     workoutDateMap.set(w.id, w.date);
@@ -57,18 +54,19 @@ export function ExercisesScreen() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const toggleTag = (tag: string) => {
-    setSelectedTags(prev =>
-      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag],
-    );
+    setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
   };
 
   const filtered = exercisesSignal.value
-    .filter(ex => {
+    .filter((ex) => {
       const matchesSearch = ex.name.toLowerCase().includes(search.toLowerCase());
       const matchesTags =
         selectedTags.length === 0 ||
-        selectedTags.every(tag =>
-          ex.tags.split(',').map(t => t.trim()).includes(tag),
+        selectedTags.every((tag) =>
+          ex.tags
+            .split(',')
+            .map((t) => t.trim())
+            .includes(tag),
         );
       return matchesSearch && matchesTags;
     })
@@ -93,7 +91,7 @@ export function ExercisesScreen() {
   }, [expandedId]);
 
   const handleToggle = (exId: string) => {
-    setExpandedId(prev => (prev === exId ? null : exId));
+    setExpandedId((prev) => (prev === exId ? null : exId));
   };
 
   const handleCreate = async (data: { name: string; tags: string; notes: string }) => {
@@ -128,11 +126,7 @@ export function ExercisesScreen() {
           <h1>New Exercise</h1>
         </header>
         <div class="screen-body">
-          <ExerciseForm
-            onSubmit={handleCreate}
-            onCancel={() => setCreatingExercise(false)}
-            submitLabel="Create"
-          />
+          <ExerciseForm onSubmit={handleCreate} onCancel={() => setCreatingExercise(false)} submitLabel="Create" />
         </div>
       </div>
     );
@@ -177,18 +171,13 @@ export function ExercisesScreen() {
           type="text"
           placeholder="Search exercises..."
           value={search}
-          onInput={e => setSearch((e.target as HTMLInputElement).value)}
+          onInput={(e) => setSearch((e.target as HTMLInputElement).value)}
         />
 
         {allTags.value.length > 0 && (
           <div class="tag-filter-row">
-            {allTags.value.map(tag => (
-              <LabelBadge
-                key={tag}
-                name={tag}
-                active={selectedTags.includes(tag)}
-                onClick={() => toggleTag(tag)}
-              />
+            {allTags.value.map((tag) => (
+              <LabelBadge key={tag} name={tag} active={selectedTags.includes(tag)} onClick={() => toggleTag(tag)} />
             ))}
           </div>
         )}
@@ -204,18 +193,13 @@ export function ExercisesScreen() {
           </div>
         ) : (
           <div class="exercises-full-list" style="padding-bottom: 88px;">
-            {filtered.map(ex => {
+            {filtered.map((ex) => {
               const isExpanded = expandedId === ex.id;
               const lastDate = lastPerformedMap.get(ex.id);
-              const lastTimeData = isExpanded
-                ? getLastTimeDataFrom(ex.id, '', sets.value, workouts.value)
-                : null;
+              const lastTimeData = isExpanded ? getLastTimeDataFrom(ex.id, '', sets.value, workouts.value) : null;
 
               return (
-                <div
-                  key={ex.id}
-                  class="exercise-list-item"
-                >
+                <div key={ex.id} class="exercise-list-item">
                   <div
                     class="exercise-list-item-header"
                     data-focus-key={`exercise:${ex.id}`}
@@ -232,16 +216,16 @@ export function ExercisesScreen() {
                   >
                     <div class="exercise-list-item-info">
                       <span class="exercise-list-item-name">{ex.name}</span>
-                      {lastDate && (
-                        <span class="exercise-list-item-last-date">
-                          Last: {formatShortDate(lastDate)}
-                        </span>
-                      )}
+                      {lastDate && <span class="exercise-list-item-last-date">Last: {formatShortDate(lastDate)}</span>}
                       {ex.tags && (
                         <div class="exercise-list-item-tags">
-                          {ex.tags.split(',').map(t => t.trim()).filter(Boolean).map(tag => (
-                            <LabelBadge key={tag} name={tag} />
-                          ))}
+                          {ex.tags
+                            .split(',')
+                            .map((t) => t.trim())
+                            .filter(Boolean)
+                            .map((tag) => (
+                              <LabelBadge key={tag} name={tag} />
+                            ))}
                         </div>
                       )}
                     </div>
@@ -252,9 +236,7 @@ export function ExercisesScreen() {
                     <div class="exercise-list-item-panel">
                       {lastTimeData ? (
                         <>
-                          <div class="last-time-date">
-                            {formatLastTimeDate(lastTimeData.workoutDate)}
-                          </div>
+                          <div class="last-time-date">{formatLastTimeDate(lastTimeData.workoutDate)}</div>
                           <div class="exercise-detail-sets">
                             <div class="exercise-detail-sets-header">
                               <span>Set</span>
@@ -262,7 +244,7 @@ export function ExercisesScreen() {
                               <span>Reps</span>
                               <span>Effort</span>
                             </div>
-                            {lastTimeData.sets.map(s => (
+                            {lastTimeData.sets.map((s) => (
                               <div key={s.set_number} class="exercise-detail-set-row">
                                 <span class="set-num">{s.set_number}</span>
                                 <span>{s.weight ? `${s.weight} lbs` : '—'}</span>
@@ -293,11 +275,7 @@ export function ExercisesScreen() {
           </div>
         )}
       </div>
-      <button
-        class="fab"
-        aria-label="New exercise"
-        onClick={() => setCreatingExercise(true)}
-      >
+      <button class="fab" aria-label="New exercise" onClick={() => setCreatingExercise(true)}>
         +
       </button>
     </div>

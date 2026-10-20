@@ -18,8 +18,23 @@ const summaryOf = (rows: BodyMeasurementRow[]) => {
 describe('bodyDayOf: weight and body fat from the first weigh-in (#203 AC2)', () => {
   it('takes the earliest scale reading by measured_at_utc, not sheet order', () => {
     const d = bodyDayOf([
-      bodyRow({ grpid: '2', date: '2026-09-15', time: '19:10', measured_at_utc: '2026-09-15T19:10:00-06:00', kind: 'scale', weight_kg: '73.1' }),
-      bodyRow({ grpid: '1', date: '2026-09-15', time: '06:40', measured_at_utc: '2026-09-15T06:40:00-06:00', kind: 'scale', weight_kg: '72.3', fat_ratio_pct: '21.4' }),
+      bodyRow({
+        grpid: '2',
+        date: '2026-09-15',
+        time: '19:10',
+        measured_at_utc: '2026-09-15T19:10:00-06:00',
+        kind: 'scale',
+        weight_kg: '73.1',
+      }),
+      bodyRow({
+        grpid: '1',
+        date: '2026-09-15',
+        time: '06:40',
+        measured_at_utc: '2026-09-15T06:40:00-06:00',
+        kind: 'scale',
+        weight_kg: '72.3',
+        fat_ratio_pct: '21.4',
+      }),
     ]);
     expect(d.weight_kg).toBe('72.3');
     expect(d.fat_ratio_pct).toBe('21.4');
@@ -35,35 +50,67 @@ describe('bodyDayOf: weight and body fat from the first weigh-in (#203 AC2)', ()
   });
 
   it('leaves fat blank when the first weigh-in had none, even though a later one does', () => {
-    expect(summaryOf([
-      bodyRow({ grpid: '1', measured_at_utc: '2026-09-15T06:40:00-06:00', kind: 'scale', weight_kg: '72.3' }),
-      bodyRow({ grpid: '2', measured_at_utc: '2026-09-15T19:10:00-06:00', kind: 'scale', weight_kg: '73.1', fat_ratio_pct: '22.0' }),
-    ]).slice(0, 2)).toEqual(['72.3', '']);
+    expect(
+      summaryOf([
+        bodyRow({ grpid: '1', measured_at_utc: '2026-09-15T06:40:00-06:00', kind: 'scale', weight_kg: '72.3' }),
+        bodyRow({
+          grpid: '2',
+          measured_at_utc: '2026-09-15T19:10:00-06:00',
+          kind: 'scale',
+          weight_kg: '73.1',
+          fat_ratio_pct: '22.0',
+        }),
+      ]).slice(0, 2),
+    ).toEqual(['72.3', '']);
   });
 
   it('skips a first reading with no weight in favour of the next that has it', () => {
-    expect(summaryOf([
-      bodyRow({ grpid: '1', measured_at_utc: '2026-09-15T06:00:00-06:00', kind: 'scale', fat_ratio_pct: '20.0' }),
-      bodyRow({ grpid: '2', measured_at_utc: '2026-09-15T06:40:00-06:00', kind: 'scale', weight_kg: '72.3', fat_ratio_pct: '21.4' }),
-    ]).slice(0, 2)).toEqual(['72.3', '21.4']);
+    expect(
+      summaryOf([
+        bodyRow({ grpid: '1', measured_at_utc: '2026-09-15T06:00:00-06:00', kind: 'scale', fat_ratio_pct: '20.0' }),
+        bodyRow({
+          grpid: '2',
+          measured_at_utc: '2026-09-15T06:40:00-06:00',
+          kind: 'scale',
+          weight_kg: '72.3',
+          fat_ratio_pct: '21.4',
+        }),
+      ]).slice(0, 2),
+    ).toEqual(['72.3', '21.4']);
   });
 });
 
 describe('bodyDayOf: blood pressure is the mean, with its count (#203 AC3)', () => {
   const bp = (grpid: string, time: string, sys: string, dia: string) =>
-    bodyRow({ grpid, time, measured_at_utc: `2026-09-15T${time}:00-06:00`, kind: 'bp', systolic_mmhg: sys, diastolic_mmhg: dia });
+    bodyRow({
+      grpid,
+      time,
+      measured_at_utc: `2026-09-15T${time}:00-06:00`,
+      kind: 'bp',
+      systolic_mmhg: sys,
+      diastolic_mmhg: dia,
+    });
 
   it('means systolic and diastolic separately, rounded half up, counting readings', () => {
-    expect(summaryOf([bp('1', '08:00', '121', '79'), bp('2', '08:05', '118', '76'), bp('3', '08:10', '116', '77')]).slice(2))
-      .toEqual(['118', '77', '3']);
+    expect(
+      summaryOf([bp('1', '08:00', '121', '79'), bp('2', '08:05', '118', '76'), bp('3', '08:10', '116', '77')]).slice(2),
+    ).toEqual(['118', '77', '3']);
   });
 
   it('rounds a mean exactly at the half up, not to even', () => {
-    expect(summaryOf([bp('1', '08:00', '120', '80'), bp('2', '08:05', '121', '81')]).slice(2)).toEqual(['121', '81', '2']);
+    expect(summaryOf([bp('1', '08:00', '120', '80'), bp('2', '08:05', '121', '81')]).slice(2)).toEqual([
+      '121',
+      '81',
+      '2',
+    ]);
   });
 
   it('a reading missing one value contributes only to the mean it has, but still counts', () => {
-    expect(summaryOf([bp('1', '08:00', '120', '80'), bp('2', '08:05', '100', '')]).slice(2)).toEqual(['110', '80', '2']);
+    expect(summaryOf([bp('1', '08:00', '120', '80'), bp('2', '08:05', '100', '')]).slice(2)).toEqual([
+      '110',
+      '80',
+      '2',
+    ]);
   });
 
   it('keeps the readings oldest first', () => {
@@ -74,10 +121,22 @@ describe('bodyDayOf: blood pressure is the mean, with its count (#203 AC3)', () 
 
 describe('bodyDayOf: blank, never 0 (#203 AC4)', () => {
   it('leaves weight blank on a day with only BP, and BP blank on a day with only a weigh-in', () => {
-    expect(summaryOf([bodyRow({ grpid: '1', measured_at_utc: '2026-09-15T08:00:00-06:00', kind: 'bp', systolic_mmhg: '120', diastolic_mmhg: '80' })]).slice(0, 2))
-      .toEqual(['', '']);
-    expect(summaryOf([bodyRow({ grpid: '1', measured_at_utc: '2026-09-15T06:40:00-06:00', kind: 'scale', weight_kg: '72.3' })]).slice(2))
-      .toEqual(['', '', '']);
+    expect(
+      summaryOf([
+        bodyRow({
+          grpid: '1',
+          measured_at_utc: '2026-09-15T08:00:00-06:00',
+          kind: 'bp',
+          systolic_mmhg: '120',
+          diastolic_mmhg: '80',
+        }),
+      ]).slice(0, 2),
+    ).toEqual(['', '']);
+    expect(
+      summaryOf([
+        bodyRow({ grpid: '1', measured_at_utc: '2026-09-15T06:40:00-06:00', kind: 'scale', weight_kg: '72.3' }),
+      ]).slice(2),
+    ).toEqual(['', '', '']);
   });
 
   it('is all blank for no readings', () => {

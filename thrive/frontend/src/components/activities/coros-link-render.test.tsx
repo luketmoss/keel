@@ -16,23 +16,60 @@ import { readGlobalCss } from '../../test-css';
 
 function makeWorkout(overrides: Partial<WorkoutWithRow>): WorkoutWithRow {
   return {
-    id: 'w1', date: '2026-09-20', time: '08:10', type: 'hike', name: 'Ridge Trail', template_id: '',
-    notes: '', elapsed_seconds: '5143', created: '', copied_from: '', status: '', moving_seconds: '',
-    effort: '', distance_m: '6512', ascent_m: '', descent_m: '', avg_hr: '', sub_type: '',
-    source: '', source_activity_id: '', raw_ref: '', fit_ref: '', fit_fetched_at: '', synced_at: '',
-    started_at_utc: '', calories: '', estimated_seconds: '', sport_type: '', track_ref: '', sheetRow: 2, ...overrides,
+    id: 'w1',
+    date: '2026-09-20',
+    time: '08:10',
+    type: 'hike',
+    name: 'Ridge Trail',
+    template_id: '',
+    notes: '',
+    elapsed_seconds: '5143',
+    created: '',
+    copied_from: '',
+    status: '',
+    moving_seconds: '',
+    effort: '',
+    distance_m: '6512',
+    ascent_m: '',
+    descent_m: '',
+    avg_hr: '',
+    sub_type: '',
+    source: '',
+    source_activity_id: '',
+    raw_ref: '',
+    fit_ref: '',
+    fit_fetched_at: '',
+    synced_at: '',
+    started_at_utc: '',
+    calories: '',
+    estimated_seconds: '',
+    sport_type: '',
+    track_ref: '',
+    sheetRow: 2,
+    ...overrides,
   };
 }
 
 const ID = '480640601618940011';
 const URL_204 = `https://t.coros.com/activity-detail?labelId=${ID}&sportType=204`;
 const synced = makeWorkout({
-  id: 'w_s', name: 'MTB', type: 'bike', source: 'coros', source_activity_id: ID, sport_type: '204',
-  synced_at: '2026-09-20T18:00:00.000Z', notes: 'Muddy',
+  id: 'w_s',
+  name: 'MTB',
+  type: 'bike',
+  source: 'coros',
+  source_activity_id: ID,
+  sport_type: '204',
+  synced_at: '2026-09-20T18:00:00.000Z',
+  notes: 'Muddy',
 });
 const enriched = makeWorkout({
-  id: 'w_e', name: 'Leg Day', type: 'weight', source_activity_id: '4722', sport_type: '402',
-  synced_at: '2026-09-19T15:02:37.000Z', sheetRow: 3,
+  id: 'w_e',
+  name: 'Leg Day',
+  type: 'weight',
+  source_activity_id: '4722',
+  sport_type: '402',
+  synced_at: '2026-09-19T15:02:37.000Z',
+  sheetRow: 3,
 });
 
 afterEach(() => {
@@ -70,7 +107,10 @@ describe('AC7: the detail screen shows the link', () => {
     const svg = a.querySelector('svg')!;
     expect(svg.getAttribute('aria-hidden')).toBe('true');
     expect(svg.getAttribute('focusable')).toBe('false');
-    const visible = [...a.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join('');
+    const visible = [...a.childNodes]
+      .filter((n) => n.nodeType === 3)
+      .map((n) => n.textContent)
+      .join('');
     expect(visible.trim()).toBe('View on COROS');
   });
 
@@ -83,10 +123,21 @@ describe('AC7: the detail screen shows the link', () => {
 
   it('comes before the Exercises heading on an enriched weight workout', () => {
     workouts.value = [enriched];
-    sets.value = [{
-      workout_id: 'w_e', exercise_id: 'ex1', exercise_name: 'Squat', section: 'primary',
-      exercise_order: 1, set_number: 1, planned_reps: '5', weight: '225', reps: '5', effort: '', sheetRow: 2,
-    }];
+    sets.value = [
+      {
+        workout_id: 'w_e',
+        exercise_id: 'ex1',
+        exercise_name: 'Squat',
+        section: 'primary',
+        exercise_order: 1,
+        set_number: 1,
+        planned_reps: '5',
+        weight: '225',
+        reps: '5',
+        effort: '',
+        sheetRow: 2,
+      },
+    ];
     render(h(WorkoutDetail, { workoutId: 'w_e' }));
     const a = document.querySelector('a.detail-coros-link')!;
     const heading = [...document.querySelectorAll('h3')].find((x) => x.textContent === 'Exercises')!;
@@ -94,7 +145,7 @@ describe('AC7: the detail screen shows the link', () => {
   });
 });
 
-describe('AC7: the link\'s CSS', () => {
+describe("AC7: the link's CSS", () => {
   const css = readGlobalCss().replace(/\/\*[\s\S]*?\*\//g, '');
   const rule = (sel: string) => {
     const esc = sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -125,7 +176,10 @@ describe('AC8: no link, and nothing in its place, where there is nothing to link
     ['a planned workout', { source: 'coros', source_activity_id: ID, sport_type: '204', status: 'planned' }],
     ['a blank source_activity_id', { source: 'coros', source_activity_id: '', sport_type: '204' }],
     ['a non-digit source_activity_id', { source: 'coros', source_activity_id: 'demo_act_001', sport_type: '204' }],
-    ['a blank sport_type (not yet backfilled)', { source: 'coros', source_activity_id: ID, sport_type: '', track_ref: '' }],
+    [
+      'a blank sport_type (not yet backfilled)',
+      { source: 'coros', source_activity_id: ID, sport_type: '', track_ref: '' },
+    ],
   ];
   for (const [what, over] of cases) {
     it(`renders nothing for ${what}`, () => {

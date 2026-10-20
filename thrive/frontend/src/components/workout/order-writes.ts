@@ -16,11 +16,7 @@ import type { QueuedOrderMap } from '../../api/sync-queue';
  * identity. A row is written only when memory holds this workout's set of the
  * same exercise and set number there, so a stale row is never written to.
  */
-export function orderWrites(
-  list: TrackerExercise[],
-  stored: SetWithRow[],
-  workoutId: string,
-): SetOrderWrite[] {
+export function orderWrites(list: TrackerExercise[], stored: SetWithRow[], workoutId: string): SetOrderWrite[] {
   const byRow = new Map(stored.map((s) => [s.sheetRow, s]));
   const out = new Map<number, SetOrderWrite>();
   for (const ex of list) {
@@ -51,10 +47,7 @@ export function orderWrites(
  * `before` → `after`, each card whose order changed (a move) or whose section
  * changed, for queued sets with no row.
  */
-export function queuedOrderMap(
-  after: TrackerExercise[],
-  before: TrackerExercise[] = after,
-): QueuedOrderMap {
+export function queuedOrderMap(after: TrackerExercise[], before: TrackerExercise[] = after): QueuedOrderMap {
   const byRow: QueuedOrderMap['byRow'] = new Map();
   for (const ex of after) {
     for (const s of ex.sets) {

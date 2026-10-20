@@ -27,7 +27,10 @@ import { DaySyncLine } from './day-sync-line';
 /** True when a key press belongs to a text field, not the screen. */
 function inTextEntry(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
-  return target.isContentEditable || target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])') !== null;
+  return (
+    target.isContentEditable ||
+    target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])') !== null
+  );
 }
 
 export function DayScreen() {
@@ -155,7 +158,12 @@ export function DayScreen() {
       <p class="sr-only" role="status" aria-live="polite">
         {announcement}
       </p>
-      <button class="fab" data-focus-key="start-workout" onClick={() => navigate('/workout/new')} aria-label="Start workout">
+      <button
+        class="fab"
+        data-focus-key="start-workout"
+        onClick={() => navigate('/workout/new')}
+        aria-label="Start workout"
+      >
         +
       </button>
     </div>

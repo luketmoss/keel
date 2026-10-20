@@ -26,9 +26,7 @@ describe('setToRow', () => {
   });
 
   it('emits the columns in sheet order', () => {
-    expect(setToRow(makeSet())).toEqual([
-      'w_001', 'ex1', 'Bench Press', 'primary', 2, 3, '8', '185', '8', 'Medium',
-    ]);
+    expect(setToRow(makeSet())).toEqual(['w_001', 'ex1', 'Bench Press', 'primary', 2, 3, '8', '185', '8', 'Medium']);
   });
 
   it('round-trips an unset effort as an empty cell rather than dropping it', () => {
@@ -64,9 +62,7 @@ describe('templateRowValues', () => {
   });
 
   it('emits the columns in sheet order', () => {
-    expect(templateRowValues(row)).toEqual([
-      'tpl_001', 'Upper Push A', 1, 'ex1', 'Bench Press', 'primary', '5', '6',
-    ]);
+    expect(templateRowValues(row)).toEqual(['tpl_001', 'Upper Push A', 1, 'ex1', 'Bench Press', 'primary', '5', '6']);
   });
 });
 
@@ -101,7 +97,9 @@ describe('workoutToRow', () => {
     synced_at: '',
     started_at_utc: '',
     calories: '',
-    estimated_seconds: '', sport_type: '', track_ref: '',
+    estimated_seconds: '',
+    sport_type: '',
+    track_ref: '',
   };
 
   // AC2: sheetsAppend writes every value it is handed regardless of the range,
@@ -121,15 +119,15 @@ describe('workoutToRow', () => {
     expect(workoutToRow(workout)[26]).toBe('');
     const row = workoutToRow({ ...workout, estimated_seconds: '2820' });
     expect(row[26]).toBe('2820');
-    expect(row[7]).toBe('3720');                        // H elapsed untouched
+    expect(row[7]).toBe('3720'); // H elapsed untouched
   });
 
   it('keeps Created, copied_from and status at I, J, K so they do not shift', () => {
     const row = workoutToRow(workout);
-    expect(row[7]).toBe('3720');                        // H Elapsed (s)
-    expect(row[8]).toBe('2026-03-15T07:00:00.000Z');    // I Created
-    expect(row[9]).toBe('');                            // J copied_from
-    expect(row[10]).toBe('');                           // K status
+    expect(row[7]).toBe('3720'); // H Elapsed (s)
+    expect(row[8]).toBe('2026-03-15T07:00:00.000Z'); // I Created
+    expect(row[9]).toBe(''); // J copied_from
+    expect(row[10]).toBe(''); // K status
   });
 
   // #101 AC1: the activity attributes ship empty and are never defaulted.
@@ -154,10 +152,10 @@ describe('workoutToRow', () => {
       started_at_utc: '2026-03-15T07:00:00-06:00',
       calories: '612',
     });
-    expect(row[17]).toBe('gravel');                      // R sub_type
-    expect(row[18]).toBe('coros');                       // S source
-    expect(row[19]).toBe('4821');                        // T source_activity_id
-    expect(row[24]).toBe('2026-03-15T07:00:00-06:00');   // Y started_at_utc
-    expect(row[25]).toBe('612');                         // Z calories
+    expect(row[17]).toBe('gravel'); // R sub_type
+    expect(row[18]).toBe('coros'); // S source
+    expect(row[19]).toBe('4821'); // T source_activity_id
+    expect(row[24]).toBe('2026-03-15T07:00:00-06:00'); // Y started_at_utc
+    expect(row[25]).toBe('612'); // Z calories
   });
 });

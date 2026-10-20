@@ -23,12 +23,19 @@ describe('loadJournal', () => {
     fetchJournal.mockResolvedValue([row('2026-09-20', 'a'), row('2026-09-21', 'b')]);
     await loadJournal('tok');
     expect(fetchJournal).toHaveBeenCalledWith('tok');
-    expect(journalEntries.value).toEqual({ state: 'loaded', entries: [entry('2026-09-20', 'a'), entry('2026-09-21', 'b')] });
+    expect(journalEntries.value).toEqual({
+      state: 'loaded',
+      entries: [entry('2026-09-20', 'a'), entry('2026-09-21', 'b')],
+    });
   });
 
   it('shows loading while the first read runs, and a call during it joins it', async () => {
     let resolve!: (v: unknown) => void;
-    fetchJournal.mockReturnValue(new Promise((r) => { resolve = r; }));
+    fetchJournal.mockReturnValue(
+      new Promise((r) => {
+        resolve = r;
+      }),
+    );
     const a = loadJournal('tok');
     const b = loadJournal('tok');
     expect(journalEntries.value.state).toBe('loading');
@@ -56,7 +63,10 @@ describe('loadJournal', () => {
   });
 
   it('leaves a date with an unsaved edit or a focused textarea alone', async () => {
-    journalEntries.value = { state: 'loaded', entries: [entry('2026-09-20', 'mine'), entry('2026-09-21', 'mine2'), entry('2026-09-22', 'x')] };
+    journalEntries.value = {
+      state: 'loaded',
+      entries: [entry('2026-09-20', 'mine'), entry('2026-09-21', 'mine2'), entry('2026-09-22', 'x')],
+    };
     editNote('2026-09-20', 'typing');
     setNoteFocus('2026-09-21');
     fetchJournal.mockResolvedValue([row('2026-09-20', 'theirs'), row('2026-09-21', 'theirs2'), row('2026-09-22', 'y')]);
@@ -69,7 +79,11 @@ describe('loadJournal', () => {
   it('a refresh sent before a save landed never overwrites it', async () => {
     journalEntries.value = { state: 'loaded', entries: [entry('2026-09-20', 'old')] };
     let resolve!: (v: unknown) => void;
-    fetchJournal.mockReturnValue(new Promise((r) => { resolve = r; }));
+    fetchJournal.mockReturnValue(
+      new Promise((r) => {
+        resolve = r;
+      }),
+    );
     const p = loadJournal('tok');
     applyJournalSave('2026-09-20', entry('2026-09-20', 'saved'));
     resolve([row('2026-09-20', 'old')]);
@@ -87,7 +101,11 @@ describe('loadJournal', () => {
       resetNoteDrafts();
       journalEntries.value = { state: 'loaded', entries: [entry('2026-09-20', 'mine'), entry('2026-09-22', 'x')] };
       let resolve!: (v: unknown) => void;
-      fetchJournal.mockReturnValue(new Promise((r) => { resolve = r; }));
+      fetchJournal.mockReturnValue(
+        new Promise((r) => {
+          resolve = r;
+        }),
+      );
       const p = loadJournal('tok'); // begun before the edit
       setNoteFocus('2026-09-20');
       editNote('2026-09-20', '  ');

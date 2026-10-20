@@ -6,17 +6,31 @@ vi.mock('../../api/journal-api', () => ({ upsertJournalEntry: (...a: unknown[]) 
 let demo = false;
 vi.mock('../../api/demo-data', () => ({ isDemo: () => demo }));
 
-import { editNote, flushNote, flushAllNotes, noteDrafts, setNoteToken, setNoteFocus, isNoteLocked, resetNoteDrafts, NOTE_DEBOUNCE_MS } from './drafts';
+import {
+  editNote,
+  flushNote,
+  flushAllNotes,
+  noteDrafts,
+  setNoteToken,
+  setNoteFocus,
+  isNoteLocked,
+  resetNoteDrafts,
+  NOTE_DEBOUNCE_MS,
+} from './drafts';
 import { journalEntries } from '../../state/store';
 
 const D = '2026-09-26';
 const E = '2026-09-27';
 const entry = (date: string, note: string) => ({ date, note, created: 'c', updated: 'u' });
-const flush = async () => { await vi.advanceTimersByTimeAsync(0); };
+const flush = async () => {
+  await vi.advanceTimersByTimeAsync(0);
+};
 
 function deferred<T>() {
   let resolve!: (v: T) => void;
-  const promise = new Promise<T>((a) => { resolve = a; });
+  const promise = new Promise<T>((a) => {
+    resolve = a;
+  });
   return { promise, resolve };
 }
 
@@ -30,7 +44,10 @@ beforeEach(() => {
   journalEntries.value = { state: 'loaded', entries: [entry(D, 'old')] };
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
-afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 describe('triggers', () => {
   it('sends 1000 ms after the last keystroke, only that date, whole field', async () => {

@@ -12,7 +12,11 @@ vi.mock('./sheets', () => ({
   sheetsAppend: (...a: unknown[]) => sheetsAppend(...a),
   withReauth: async (token: string, fn: (t: string) => unknown) => {
     if (reauthTo === null) return fn(token);
-    try { return await fn(token); } catch { return fn(reauthTo); }
+    try {
+      return await fn(token);
+    } catch {
+      return fn(reauthTo);
+    }
   },
 }));
 vi.mock('./demo-data', async () => {
@@ -41,7 +45,13 @@ describe('appendSyncRequests', () => {
     expect(range).toBe('SyncRequests!A:E');
     expect(token).toBe('tok');
     expect(values).toHaveLength(2);
-    expect(values[0]).toEqual([expect.stringMatching(/^sr_[0-9a-f]{8}$/), 'coros', '2026-10-02T13:12:00.000Z', 'me@example.com', 'requested']);
+    expect(values[0]).toEqual([
+      expect.stringMatching(/^sr_[0-9a-f]{8}$/),
+      'coros',
+      '2026-10-02T13:12:00.000Z',
+      'me@example.com',
+      'requested',
+    ]);
     expect(values[1][1]).toBe('withings');
     expect(values[0][0]).not.toBe(values[1][0]);
   });
@@ -75,10 +85,17 @@ describe('appendSyncRequests', () => {
 
 describe('fetchSyncRequests', () => {
   it('reads A2:I with sheet rows from 2, dropping rows without an id', async () => {
-    sheetsGet.mockResolvedValue([['sr_1', 'coros', '2026-10-02T13:12:00.000Z', '', 'requested'], [], ['sr_2', 'withings']]);
+    sheetsGet.mockResolvedValue([
+      ['sr_1', 'coros', '2026-10-02T13:12:00.000Z', '', 'requested'],
+      [],
+      ['sr_2', 'withings'],
+    ]);
     const rows = await fetchSyncRequests('tok');
     expect(sheetsGet).toHaveBeenCalledWith('SyncRequests!A2:I', 'tok');
-    expect(rows.map((r) => [r.request_id, r.sheetRow])).toEqual([['sr_1', 2], ['sr_2', 4]]);
+    expect(rows.map((r) => [r.request_id, r.sheetRow])).toEqual([
+      ['sr_1', 2],
+      ['sr_2', 4],
+    ]);
   });
 
   it('demo mode has no sheet rows and makes no call', async () => {

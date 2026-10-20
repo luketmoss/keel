@@ -47,8 +47,7 @@ const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => ({
   body: m[2],
 }));
 
-const decl = (body: string, prop: string) =>
-  body.match(new RegExp(`(?:^|;|\\s)${prop}\\s*:\\s*([^;]+);`))?.[1].trim();
+const decl = (body: string, prop: string) => body.match(new RegExp(`(?:^|;|\\s)${prop}\\s*:\\s*([^;]+);`))?.[1].trim();
 
 // The backgrounds text sits on: page, card, raised surface (inputs, the effort
 // toggle, sheets), and the cobalt tint (tag badges, the last-time panel).
@@ -150,7 +149,7 @@ describe('AC4: placeholders use the muted token at full opacity', () => {
     expect(placeholder).toBeDefined();
   });
 
-  it('colours it --color-text-muted and undoes Firefox\'s dimming', () => {
+  it("colours it --color-text-muted and undoes Firefox's dimming", () => {
     expect(decl(placeholder!.body, 'color')).toBe('var(--color-text-muted)');
     expect(decl(placeholder!.body, 'opacity')).toBe('1');
   });

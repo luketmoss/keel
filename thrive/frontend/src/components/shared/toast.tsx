@@ -5,12 +5,8 @@ export function Toast() {
 
   return (
     <div class="toast-container" role="status" aria-live="polite">
-      {toasts.value.map(t => (
-        <div
-          key={t.id}
-          class={`toast toast-${t.type}`}
-          role={t.type === 'error' ? 'alert' : undefined}
-        >
+      {toasts.value.map((t) => (
+        <div key={t.id} class={`toast toast-${t.type}`} role={t.type === 'error' ? 'alert' : undefined}>
           {t.text}
         </div>
       ))}

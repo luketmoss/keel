@@ -54,7 +54,8 @@ function visible(el: Element | null): string | null {
   copy.querySelectorAll('.sr-only').forEach((n) => n.remove());
   return copy.textContent;
 }
-const description = (el: HTMLInputElement) => document.getElementById(el.getAttribute('aria-describedby')!)?.textContent ?? null;
+const description = (el: HTMLInputElement) =>
+  document.getElementById(el.getAttribute('aria-describedby')!)?.textContent ?? null;
 
 function openTemplate(i: number) {
   render(<TemplateEditor templateId="t1" />);
@@ -67,8 +68,15 @@ beforeEach(() => {
       id: 't1',
       name: 'Push Day',
       exercises: ROWS.map(([exercise_id, exercise_name, sets, reps], i) => ({
-        template_id: 't1', template_name: 'Push Day', order: i + 1,
-        exercise_id, exercise_name, section: 'primary', sets, reps, sheetRow: i + 2,
+        template_id: 't1',
+        template_name: 'Push Day',
+        order: i + 1,
+        exercise_id,
+        exercise_name,
+        section: 'primary',
+        sets,
+        reps,
+        sheetRow: i + 2,
       })),
     },
   ];
@@ -124,13 +132,14 @@ describe('AC1: the template editor shows held text read-only', () => {
     expect(heldLine()).toBeNull();
   });
 
-  it.each([[T.plank, 'Planned: AMRAP'], [T.dip, 'Planned: 0'], [T.lunge, 'Planned: 8 each side']])(
-    'held text is shown exactly as stored (%i)',
-    (i, text) => {
-      openTemplate(i);
-      expect(visible(heldLine()!.querySelector('.reps-field-held'))).toBe(text);
-    },
-  );
+  it.each([
+    [T.plank, 'Planned: AMRAP'],
+    [T.dip, 'Planned: 0'],
+    [T.lunge, 'Planned: 8 each side'],
+  ])('held text is shown exactly as stored (%i)', (i, text) => {
+    openTemplate(i);
+    expect(visible(heldLine()!.querySelector('.reps-field-held'))).toBe(text);
+  });
 });
 
 // ── AC2 ────────────────────────────────────────────────────────────
@@ -209,7 +218,13 @@ describe('AC3: whole numbers only', () => {
     expect(el.getAttribute('pattern')).toBe('[0-9]*');
     expect(el.maxLength).toBe(3);
     expect(el.getAttribute('autocomplete')).toBe('off');
-    expect(REPS_INPUT_PROPS).toEqual({ type: 'text', inputMode: 'numeric', pattern: '[0-9]*', maxLength: 3, autoComplete: 'off' });
+    expect(REPS_INPUT_PROPS).toEqual({
+      type: 'text',
+      inputMode: 'numeric',
+      pattern: '[0-9]*',
+      maxLength: 3,
+      autoComplete: 'off',
+    });
   });
 
   it.each(['12.', '12-', '12+', '12e', '12 ', '1234', '4-6', '8.5'])('on 12, %j is refused and 12 kept', async (v) => {
@@ -257,11 +272,17 @@ describe('AC3: whole numbers only', () => {
 
 const onSave = vi.fn(async (..._args: unknown[]) => undefined);
 function openPlanner(list: PlannerExercise[], i = 0) {
-  render(<WorkoutPlanner initialName="Plan" initialExercises={list} onSave={onSave} onDiscard={() => {}} saving={false} />);
+  render(
+    <WorkoutPlanner initialName="Plan" initialExercises={list} onSave={onSave} onDiscard={() => {}} saving={false} />,
+  );
   fireEvent.click(cards()[i]);
 }
 const rowBB = (reps: string[]): PlannerExercise => ({
-  exercise_id: 'ex_row', exercise_name: 'Row BB', section: 'primary', sets: String(reps.length), reps_by_set: reps,
+  exercise_id: 'ex_row',
+  exercise_name: 'Row BB',
+  section: 'primary',
+  sets: String(reps.length),
+  reps_by_set: reps,
 });
 const allInput = () => screen.getByLabelText('Reps, all sets') as HTMLInputElement;
 const rowInputs = () => Array.from(document.querySelectorAll<HTMLInputElement>('.planner-set-row input'));
@@ -308,7 +329,7 @@ describe('AC4: the planner', () => {
     expect(heldLine()).toBeNull();
   });
 
-  it('Set 2\'s Clear clears only set 2 and focuses its input', () => {
+  it("Set 2's Clear clears only set 2 and focuses its input", () => {
     openPlanner([rowBB(['4-6', '4-6', '4-6'])]);
     const set2 = clears().find((b) => b.getAttribute('aria-label')!.startsWith('Clear set 2'))!;
     fireEvent.click(set2);
@@ -332,13 +353,16 @@ describe('AC4: the planner', () => {
     expect(rowHeld()).toEqual(['4-6', '4-6', '4-6', '4-6']);
   });
 
-  it('Save untouched writes each set\'s stored text; the summaries read 3 × 4-6 and 3 × 4-6/4-6/8', async () => {
+  it("Save untouched writes each set's stored text; the summaries read 3 × 4-6 and 3 × 4-6/4-6/8", async () => {
     openPlanner([rowBB(['4-6', '4-6', '4-6']), rowBB(['4-6', '4-6', '8'])]);
     expect(summary(0)).toBe('3 × 4-6');
     expect(summary(1)).toBe('3 × 4-6/4-6/8');
     fireEvent.click(screen.getByText('Save Workout'));
     await Promise.resolve();
-    expect(savedReps()).toEqual([['4-6', '4-6', '4-6'], ['4-6', '4-6', '8']]);
+    expect(savedReps()).toEqual([
+      ['4-6', '4-6', '4-6'],
+      ['4-6', '4-6', '8'],
+    ]);
   });
 
   it('refused edits leave the held rows and the save unchanged; Back does not ask', async () => {
@@ -407,7 +431,7 @@ describe('AC5: accessibility', () => {
     ]);
   });
 
-  it('the template editor\'s Sets and Reps labels are tied by for/id, unique per open panel', () => {
+  it("the template editor's Sets and Reps labels are tied by for/id, unique per open panel", () => {
     openTemplate(T.bench);
     const sets = screen.getByLabelText('Sets') as HTMLInputElement;
     expect(document.querySelector(`label[for="${sets.id}"]`)!.textContent).toBe('Sets');
@@ -426,7 +450,7 @@ describe('AC7: demo mode holds a range in a template row and a planned entry', (
   it('a template row', () => {
     expect(DEMO_TEMPLATE_ROWS.some((r) => r.section !== 'warmup' && /^\d+-\d+$/.test(r.reps))).toBe(true);
   });
-  it('a planned workout\'s entry', () => {
+  it("a planned workout's entry", () => {
     const planned = new Set(DEMO_WORKOUTS.filter((w) => w.status === 'planned').map((w) => w.id));
     expect(DEMO_SETS.some((s) => planned.has(s.workout_id) && /^\d+-\d+$/.test(s.planned_reps))).toBe(true);
   });

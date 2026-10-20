@@ -65,7 +65,9 @@ describe('AC3: one tab stop', () => {
     expect(w.getAttribute('role')).toBe('group');
     expect(w.getAttribute('aria-label')).toMatch(/ charts$/);
     const hint = container.querySelector(`#${w.getAttribute('aria-describedby')}`)!;
-    expect(hint.textContent).toBe('Left and right arrows read one day at a time. Enter opens it in the Day view. The table view lists every day.');
+    expect(hint.textContent).toBe(
+      'Left and right arrows read one day at a time. Enter opens it in the Day view. The table view lists every day.',
+    );
     expect(hint.classList.contains('sr-only')).toBe(true);
     expect(w.querySelectorAll('[tabindex]')).toHaveLength(0);
     expect(w.querySelector('svg')!.getAttribute('role')).toBe('img');
@@ -203,13 +205,24 @@ describe('AC1: marks across the group', () => {
 
   it('draws a partial point as a hollow marker', () => {
     const m: TrendMetric = {
-      id: 'p', label: 'P', unit: 'u', band: false, format: String,
+      id: 'p',
+      label: 'P',
+      unit: 'u',
+      band: false,
+      format: String,
       points: () => [{ date: TODAY, value: 5, partial: 'partial day' }],
     };
     const { from, to } = rangeBounds('1W', TODAY, null);
-    const { container } = render(h(TrendPlot, {
-      metric: m, series: metricSeries(m, from, to, 0, TODAY), width: 300, label: 'P', describedBy: 'x', selectedDate: TODAY,
-    }));
+    const { container } = render(
+      h(TrendPlot, {
+        metric: m,
+        series: metricSeries(m, from, to, 0, TODAY),
+        width: 300,
+        label: 'P',
+        describedBy: 'x',
+        selectedDate: TODAY,
+      }),
+    );
     const mk = container.querySelector('circle.trend-marker')!;
     expect(mk.getAttribute('fill')).toBe('var(--color-surface)');
     expect(mk.getAttribute('stroke')).toBe('var(--color-text)');
@@ -255,7 +268,10 @@ describe('AC5: lifetime of a selection', () => {
     fireEvent.click([...g.querySelectorAll('button')].find((b) => b.textContent === name)!);
   };
 
-  it.each([['Range', '1M'], ['View', 'Table']])('clears on a change of %s', (g, v) => {
+  it.each([
+    ['Range', '1M'],
+    ['View', 'Table'],
+  ])('clears on a change of %s', (g, v) => {
     const { container } = renderScreen();
     fireEvent.focus(wrapper(container));
     press(container, g, v);
@@ -266,7 +282,9 @@ describe('AC5: lifetime of a selection', () => {
   it('clears on a change of group', () => {
     const { container } = renderScreen();
     fireEvent.focus(wrapper(container));
-    const btn = [...container.querySelectorAll<HTMLButtonElement>('.trends-group-btn')].find((b) => !b.classList.contains('active'))!;
+    const btn = [...container.querySelectorAll<HTMLButtonElement>('.trends-group-btn')].find(
+      (b) => !b.classList.contains('active'),
+    )!;
     fireEvent.click(btn);
     expect(selectedDay.value).toBeNull();
   });

@@ -13,14 +13,19 @@ function Holder() {
 function Page({ show }: { show: boolean }) {
   return (
     <div>
-      <h2 id="target" tabIndex={-1}>target</h2>
+      <h2 id="target" tabIndex={-1}>
+        target
+      </h2>
       <input id="other" />
       {show && <Holder />}
     </div>
   );
 }
 
-const flush = () => act(async () => { await Promise.resolve(); });
+const flush = () =>
+  act(async () => {
+    await Promise.resolve();
+  });
 afterEach(cleanup);
 
 describe('useFocusHandoff', () => {

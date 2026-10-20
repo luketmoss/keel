@@ -1,8 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import {
-  milesToMeters, metersToMiles, feetToMeters, metersToFeet,
-  metersToMilesInput, metersToFeetInput, bpmToStored,
-  formatDistance, formatElevation, formatHeartRate, kgToLb, formatWeight,
+  milesToMeters,
+  metersToMiles,
+  feetToMeters,
+  metersToFeet,
+  metersToMilesInput,
+  metersToFeetInput,
+  bpmToStored,
+  formatDistance,
+  formatElevation,
+  formatHeartRate,
+  kgToLb,
+  formatWeight,
 } from './units';
 
 // Issue #103 — entered in miles and feet, stored as integer meters.

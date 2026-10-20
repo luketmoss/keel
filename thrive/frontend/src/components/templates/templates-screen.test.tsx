@@ -11,7 +11,13 @@ function tpl(id: string, name: string, sections: string[]) {
     id,
     name,
     exercises: sections.map((section, i) => ({
-      exercise_id: `e${i}`, exercise_name: `Ex ${i}`, section, sets: '3', reps: '8', order: i + 1, sheetRow: i + 2,
+      exercise_id: `e${i}`,
+      exercise_name: `Ex ${i}`,
+      section,
+      sets: '3',
+      reps: '8',
+      order: i + 1,
+      sheetRow: i + 2,
     })),
     sheetRow: 2,
   };
@@ -75,7 +81,9 @@ describe('AC3/AC5: focus ring CSS', () => {
   const bare = section.replace(/\/\*[\s\S]*?\*\//g, '');
 
   it('uses --color-text, inset, never --color-primary', () => {
-    const rule = bare.match(/\.template-card:focus-visible,\n\.compact-card-body\[role="button"\]:focus-visible \{([^}]*)\}/)![1];
+    const rule = bare.match(
+      /\.template-card:focus-visible,\n\.compact-card-body\[role="button"\]:focus-visible \{([^}]*)\}/,
+    )![1];
     expect(rule).toMatch(/outline:\s*2px solid var\(--color-text\)/);
     expect(rule).toMatch(/outline-offset:\s*-2px/);
     expect(bare).not.toMatch(/--color-primary/);

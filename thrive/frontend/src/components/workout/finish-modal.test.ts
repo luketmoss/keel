@@ -204,14 +204,24 @@ describe('FinishWorkoutModal', () => {
 describe('FinishWorkoutModal — session effort (#102)', () => {
   let onEffortChange: ReturnType<typeof vi.fn>;
 
-  beforeEach(() => { onEffortChange = vi.fn(); });
+  beforeEach(() => {
+    onEffortChange = vi.fn();
+  });
   afterEach(cleanup);
 
   function renderWithEffort(overrides: Record<string, unknown> = {}) {
-    return render(h(FinishWorkoutModal as any, {
-      notes: '', onNotesChange: vi.fn(), effort: '', onEffortChange,
-      onFinish: vi.fn(), onCancel: vi.fn(), finishing: false, ...overrides,
-    }));
+    return render(
+      h(FinishWorkoutModal as any, {
+        notes: '',
+        onNotesChange: vi.fn(),
+        effort: '',
+        onEffortChange,
+        onFinish: vi.fn(),
+        onCancel: vi.fn(),
+        finishing: false,
+        ...overrides,
+      }),
+    );
   }
 
   // AC1: nothing pre-selected, and saving untouched leaves it empty.
@@ -266,10 +276,18 @@ describe('FinishWorkoutModal — session effort (#102)', () => {
 describe('FinishWorkoutModal accessible names (#372)', () => {
   afterEach(cleanup);
   const mk = (extra: Record<string, unknown> = {}) =>
-    render(h(FinishWorkoutModal as any, {
-      notes: '', onNotesChange: vi.fn(), effort: '', onEffortChange: vi.fn(),
-      onFinish: vi.fn(), onCancel: vi.fn(), finishing: false, ...extra,
-    }));
+    render(
+      h(FinishWorkoutModal as any, {
+        notes: '',
+        onNotesChange: vi.fn(),
+        effort: '',
+        onEffortChange: vi.fn(),
+        onFinish: vi.fn(),
+        onCancel: vi.fn(),
+        finishing: false,
+        ...extra,
+      }),
+    );
 
   it('names the notes textarea by its visible label, not the placeholder', () => {
     const { getByRole } = mk();
@@ -292,8 +310,18 @@ describe('FinishWorkoutModal accessible names (#372)', () => {
   });
 
   it('generates distinct ids for two instances in one tree', () => {
-    const props = { notes: '', onNotesChange: vi.fn(), effort: '', onEffortChange: vi.fn(), onFinish: vi.fn(), onCancel: vi.fn(), finishing: false };
-    const { container } = render(h('div', null, h(FinishWorkoutModal as any, props), h(FinishWorkoutModal as any, props)));
+    const props = {
+      notes: '',
+      onNotesChange: vi.fn(),
+      effort: '',
+      onEffortChange: vi.fn(),
+      onFinish: vi.fn(),
+      onCancel: vi.fn(),
+      finishing: false,
+    };
+    const { container } = render(
+      h('div', null, h(FinishWorkoutModal as any, props), h(FinishWorkoutModal as any, props)),
+    );
     const ids = [...container.querySelectorAll('textarea')].map((t) => t.id);
     expect(ids.length).toBe(2);
     expect(new Set(ids).size).toBe(2);

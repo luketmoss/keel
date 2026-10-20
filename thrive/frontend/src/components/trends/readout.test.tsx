@@ -66,14 +66,26 @@ describe('the table and the readout agree', () => {
   it.each([[7], [0]])('for every day with the average at %i', (avgDays) => {
     const m = metric(pts);
     const group: TrendGroup = { id: 'g', label: 'Heart', metrics: [m] };
-    const table = render(h(TrendTable, { group, series: [metricSeries(m, from, to, avgDays, TODAY)], range: '1W', avgDays, today: TODAY }));
+    const table = render(
+      h(TrendTable, { group, series: [metricSeries(m, from, to, avgDays, TODAY)], range: '1W', avgDays, today: TODAY }),
+    );
     const rows = [...table.container.querySelectorAll('tbody tr')];
     expect(rows).toHaveLength(7);
     for (const row of rows) {
       const rowHead = row.querySelector('th a')!.firstChild!.textContent!;
       const date = datesBetween(from, to).find((d) => readoutDate(d, TODAY) === rowHead)!;
       const cells = [...row.querySelectorAll('td')].map((td) => td.textContent!.trim());
-      const card = render(h(TrendCard, { metric: m, series: metricSeries(m, from, to, avgDays, TODAY), recorded: true, range: '1W', avgDays, today: TODAY, selectedDate: date }));
+      const card = render(
+        h(TrendCard, {
+          metric: m,
+          series: metricSeries(m, from, to, avgDays, TODAY),
+          recorded: true,
+          range: '1W',
+          avgDays,
+          today: TODAY,
+          selectedDate: date,
+        }),
+      );
       const lines = card.container.querySelectorAll('.trend-readout p');
       expect(lines[0].textContent).toBe(rowHead);
       const value = lines[1].textContent!;
@@ -134,10 +146,12 @@ describe('dayAtX', () => {
 
 describe('#303: the readout prints the short coverage, everything else the sentence', () => {
   const sentence = '1 of 2 outdoor activities recorded distance';
-  const dist = metric(
-    [{ date: TODAY, value: 6.1, partial: sentence, partialShort: '(1 of 2)' }],
-    { id: 'distance', label: 'Distance', unit: 'mi', format: (v) => v.toFixed(1) },
-  );
+  const dist = metric([{ date: TODAY, value: 6.1, partial: sentence, partialShort: '(1 of 2)' }], {
+    id: 'distance',
+    label: 'Distance',
+    unit: 'mi',
+    format: (v) => v.toFixed(1),
+  });
   const series = (avg: number) => metricSeries(dist, from, to, avg, TODAY);
   const cells = (avg: number) => {
     const s = series(avg);
@@ -158,15 +172,16 @@ describe('#303: the readout prints the short coverage, everything else the sente
     const group: TrendGroup = { id: 'g', label: 'Activity', metrics: [dist] };
     const t = render(h(TrendTable, { group, series: [series(7)], range: '1W', avgDays: 7, today: TODAY }));
     expect(t.container.querySelector('.trend-partial')!.textContent!.trim()).toBe(sentence);
-    expect(announceText(TODAY, TODAY, [{ metric: dist, series: series(7) }], 7))
-      .toBe(`${readoutDate(TODAY, TODAY)}. Distance 6.1 mi ${sentence}, 7-day avg —.`);
+    expect(announceText(TODAY, TODAY, [{ metric: dist, series: series(7) }], 7)).toBe(
+      `${readoutDate(TODAY, TODAY)}. Distance 6.1 mi ${sentence}, 7-day avg —.`,
+    );
   });
 
   it('fits one 256 px line for the worst realistic data (<= 42 characters)', () => {
-    const worst = metric(
-      [{ date: TODAY, value: 12345, partial: 'x', partialShort: '(10 of 12)' }],
-      { unit: 'ft', format: (v) => v.toLocaleString('en-US') },
-    );
+    const worst = metric([{ date: TODAY, value: 12345, partial: 'x', partialShort: '(10 of 12)' }], {
+      unit: 'ft',
+      format: (v) => v.toLocaleString('en-US'),
+    });
     const s = metricSeries(worst, from, to, 30, TODAY);
     const line = readoutLine(worst, dayCells(worst, s, pointsByDate(s), TODAY, 30), 30);
     expect(line.length).toBeLessThanOrEqual(42);

@@ -9,8 +9,14 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
-  workouts, sets, templates, toasts,
-  activeWorkoutId, activeWorkoutSets, activeWarmupExercises, isEditMode,
+  workouts,
+  sets,
+  templates,
+  toasts,
+  activeWorkoutId,
+  activeWorkoutSets,
+  activeWarmupExercises,
+  isEditMode,
 } from './store';
 import type { SetWithRow, Template, BuilderExercise, WorkoutSet } from '../api/types';
 
@@ -21,8 +27,7 @@ let appendFailure: Partial<Record<Tab, Error>> = {};
 /** Thrown by every `sheetsGet` of Sets, when set. */
 let setsGetFailure: Error | null = null;
 
-const colIndex = (letters: string) =>
-  [...letters].reduce((n, c) => n * 26 + (c.charCodeAt(0) - 64), 0) - 1;
+const colIndex = (letters: string) => [...letters].reduce((n, c) => n * 26 + (c.charCodeAt(0) - 64), 0) - 1;
 
 function parseRange(range: string) {
   const [tab, cells] = range.split('!');
@@ -39,7 +44,9 @@ function parseRange(range: string) {
 }
 
 vi.mock('../api/sheets', () => ({
-  SheetsApiError: class extends Error { status = 0; },
+  SheetsApiError: class extends Error {
+    status = 0;
+  },
   withReauth: vi.fn(async (token: string, fn: (t: string) => Promise<unknown>) => fn(token)),
   sheetsGet: vi.fn(async (range: string) => {
     const { tab, colStart, colEnd, rowStart, rowEnd } = parseRange(range);
@@ -55,7 +62,9 @@ vi.mock('../api/sheets', () => ({
     const { tab, colStart, rowStart } = parseRange(range);
     values.forEach((row, i) => {
       const target = sheet[tab][(rowStart ?? 2) - 2 + i];
-      row.forEach((v, j) => { target[colStart + j] = String(v); });
+      row.forEach((v, j) => {
+        target[colStart + j] = String(v);
+      });
     });
   }),
   sheetsAppend: vi.fn(async (range: string, values: (string | number)[][]) => {
@@ -88,14 +97,46 @@ const PUSH: Template = {
   id: 'tpl_push',
   name: 'Upper Push A',
   exercises: [
-    { template_id: 'tpl_push', template_name: 'Upper Push A', order: 1, exercise_id: 'ex_wu', exercise_name: 'Band Pull-Apart', section: 'warmup', sets: '', reps: '', sheetRow: 2 },
-    { template_id: 'tpl_push', template_name: 'Upper Push A', order: 2, exercise_id: 'ex_bp', exercise_name: 'Bench Press BB', section: 'primary', sets: '3', reps: '8', sheetRow: 3 },
+    {
+      template_id: 'tpl_push',
+      template_name: 'Upper Push A',
+      order: 1,
+      exercise_id: 'ex_wu',
+      exercise_name: 'Band Pull-Apart',
+      section: 'warmup',
+      sets: '',
+      reps: '',
+      sheetRow: 2,
+    },
+    {
+      template_id: 'tpl_push',
+      template_name: 'Upper Push A',
+      order: 2,
+      exercise_id: 'ex_bp',
+      exercise_name: 'Bench Press BB',
+      section: 'primary',
+      sets: '3',
+      reps: '8',
+      sheetRow: 3,
+    },
   ],
 };
 const PUSH_WARMUPS = [{ exercise_id: 'ex_wu', exercise_name: 'Band Pull-Apart', exercise_order: 1 }];
 
-const WARMUP_EX: BuilderExercise = { exercise_id: 'ex_wu', exercise_name: 'Band Pull-Apart', section: 'warmup', sets: 1, planned_reps: '' };
-const MAIN_EX: BuilderExercise = { exercise_id: 'ex_bp', exercise_name: 'Bench Press BB', section: 'primary', sets: 3, planned_reps: '8' };
+const WARMUP_EX: BuilderExercise = {
+  exercise_id: 'ex_wu',
+  exercise_name: 'Band Pull-Apart',
+  section: 'warmup',
+  sets: 1,
+  planned_reps: '',
+};
+const MAIN_EX: BuilderExercise = {
+  exercise_id: 'ex_bp',
+  exercise_name: 'Bench Press BB',
+  section: 'primary',
+  sets: 3,
+  planned_reps: '8',
+};
 
 function makeSet(workoutId: string, overrides: Partial<WorkoutSet> = {}): WorkoutSet {
   return {
@@ -131,7 +172,7 @@ beforeEach(() => {
 });
 
 describe('#374 flushQueue', () => {
-  it('repro: A\'s queued set flushed from B\'s tracker, then B\'s set edited, leaves one B row', async () => {
+  it("repro: A's queued set flushed from B's tracker, then B's set edited, leaves one B row", async () => {
     // A is active; its set save fails on the network and is queued with no row.
     activeWorkoutId.value = 'w_a';
     appendFailure.Sets = new TypeError('Failed to fetch');
@@ -152,11 +193,16 @@ describe('#374 flushQueue', () => {
     expect(sheetRowsFor('w_b').map((r) => r[7])).toEqual(['110']);
   });
 
-  describe('AC1: flushing another workout\'s queued set leaves the active workout\'s sets alone', () => {
+  describe("AC1: flushing another workout's queued set leaves the active workout's sets alone", () => {
     async function setUpB(): Promise<SetWithRow> {
       // A has one row on the sheet already (row 2); B is active with one saved set (row 3).
       sheet.Sets.push(['w_a', 'ex_dl', 'Deadlift', 'primary', '2', '1', '5', '200', '5', 'Hard']);
-      sets.value = [{ ...makeSet('w_a', { exercise_id: 'ex_dl', exercise_name: 'Deadlift', exercise_order: 2, weight: '200' }), sheetRow: 2 }];
+      sets.value = [
+        {
+          ...makeSet('w_a', { exercise_id: 'ex_dl', exercise_name: 'Deadlift', exercise_order: 2, weight: '200' }),
+          sheetRow: 2,
+        },
+      ];
       activeWorkoutId.value = 'w_b';
       return saveSet(makeSet('w_b', { exercise_id: 'ex_bp', exercise_name: 'Bench' }), TOKEN);
     }
@@ -166,7 +212,10 @@ describe('#374 flushQueue', () => {
       expect(bSaved.sheetRow).toBe(3);
       const bBefore = activeWorkoutSets.value;
 
-      enqueueSet({ ...makeSet('w_a', { exercise_id: 'ex_dl', exercise_name: 'Deadlift', exercise_order: 2, weight: '210' }), sheetRow: 2 });
+      enqueueSet({
+        ...makeSet('w_a', { exercise_id: 'ex_dl', exercise_name: 'Deadlift', exercise_order: 2, weight: '210' }),
+        sheetRow: 2,
+      });
       enqueueSet({ ...makeSet('w_a', { weight: '150' }), sheetRow: -1 });
 
       const result = await flushQueue(TOKEN);
@@ -175,7 +224,10 @@ describe('#374 flushQueue', () => {
       // A's sets are written and `sets` reflects them.
       expect(sheetRowsFor('w_a').map((r) => r[7])).toEqual(['210', '150']);
       const aInSets = sets.value.filter((s) => s.workout_id === 'w_a');
-      expect(aInSets.map((s) => [s.weight, s.sheetRow])).toEqual([['210', 2], ['150', 4]]);
+      expect(aInSets.map((s) => [s.weight, s.sheetRow])).toEqual([
+        ['210', 2],
+        ['150', 4],
+      ]);
 
       // B's rows only, with their current sheetRow from the fresh fetch.
       expect(activeWorkoutSets.value).toEqual(bBefore);
@@ -186,10 +238,13 @@ describe('#374 flushQueue', () => {
       expect(sheetRowsFor('w_b').map((r) => r[7])).toEqual(['120']);
     });
 
-    it('with only a queued A set that has a sheet row, B\'s in-memory sets are not touched', async () => {
+    it("with only a queued A set that has a sheet row, B's in-memory sets are not touched", async () => {
       await setUpB();
       const bBefore = activeWorkoutSets.value;
-      enqueueSet({ ...makeSet('w_a', { exercise_id: 'ex_dl', exercise_name: 'Deadlift', exercise_order: 2, weight: '210' }), sheetRow: 2 });
+      enqueueSet({
+        ...makeSet('w_a', { exercise_id: 'ex_dl', exercise_name: 'Deadlift', exercise_order: 2, weight: '210' }),
+        sheetRow: 2,
+      });
 
       await flushQueue(TOKEN);
 
@@ -198,7 +253,7 @@ describe('#374 flushQueue', () => {
     });
   });
 
-  describe('AC2: flushing the active workout\'s own queued set still updates it in memory', () => {
+  describe("AC2: flushing the active workout's own queued set still updates it in memory", () => {
     it('a queued B set with no sheet row is appended and appears with its new sheetRow', async () => {
       activeWorkoutId.value = 'w_b';
       enqueueSet({ ...makeSet('w_b'), sheetRow: -1 });
@@ -252,8 +307,18 @@ describe('#374 AC4: a start whose set write fails leaves the active signals agre
   ];
 
   const FAILURES: [string, () => void][] = [
-    ['the Sets append', () => { appendFailure.Sets = new Error('append failed'); }],
-    ['the re-fetch after it', () => { setsGetFailure = new Error('fetch failed'); }],
+    [
+      'the Sets append',
+      () => {
+        appendFailure.Sets = new Error('append failed');
+      },
+    ],
+    [
+      'the re-fetch after it',
+      () => {
+        setsGetFailure = new Error('fetch failed');
+      },
+    ],
   ];
 
   describe.each(FAILURES)('when %s throws', (_label, arrange) => {
@@ -278,7 +343,9 @@ describe('#374 AC4: a start whose set write fails leaves the active signals agre
   it('when creating the workout row itself fails, nothing in the three signals changes', async () => {
     appendFailure.Workouts = new Error('create failed');
 
-    await expect(startWorkout({ type: 'weight', name: 'New', template_id: 'tpl_push' }, TOKEN)).rejects.toThrow('create failed');
+    await expect(startWorkout({ type: 'weight', name: 'New', template_id: 'tpl_push' }, TOKEN)).rejects.toThrow(
+      'create failed',
+    );
 
     expect(toasts.value.map((t) => t.text)).toContain('Failed to start workout');
     expect(activeWorkoutId.value).toBe('w_a');

@@ -3,8 +3,13 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  summarizeSyncLog, newestFirst, formatAge, statusWords, syncTone,
-  COROS_STALE_AFTER_HOURS, WITHINGS_STALE_AFTER_HOURS,
+  summarizeSyncLog,
+  newestFirst,
+  formatAge,
+  statusWords,
+  syncTone,
+  COROS_STALE_AFTER_HOURS,
+  WITHINGS_STALE_AFTER_HOURS,
 } from './sync-status';
 import type { SyncLogEntry } from './sync-log-api';
 
@@ -14,10 +19,20 @@ const HOUR = 3600_000;
 function run(hoursAgo: number, status = 'ok', id = `r${hoursAgo}`): SyncLogEntry {
   const started = new Date(NOW.getTime() - hoursAgo * HOUR).toISOString();
   return {
-    run_id: id, started_at: started, finished_at: started, window_start: '2026-09-14',
-    window_end: '2026-09-25', n_seen: '3', n_new: '0', n_updated: '0', n_enriched: '0',
-    n_fit_fetched: '0', n_errors: status === 'ok' ? '0' : '1', status,
-    error_detail: status === 'ok' ? '' : 'CorosApiError: secret detail', notes: '',
+    run_id: id,
+    started_at: started,
+    finished_at: started,
+    window_start: '2026-09-14',
+    window_end: '2026-09-25',
+    n_seen: '3',
+    n_new: '0',
+    n_updated: '0',
+    n_enriched: '0',
+    n_fit_fetched: '0',
+    n_errors: status === 'ok' ? '0' : '1',
+    status,
+    error_detail: status === 'ok' ? '' : 'CorosApiError: secret detail',
+    notes: '',
   };
 }
 
@@ -49,11 +64,17 @@ describe('AC3: newest run by started_at', () => {
   });
 
   it('is unreadable when no row has a parseable started_at', () => {
-    expect(summarizeSyncLog([{ ...run(1), started_at: 'yesterday' }], NOW, COROS_STALE_AFTER_HOURS)).toEqual({ kind: 'unreadable' });
+    expect(summarizeSyncLog([{ ...run(1), started_at: 'yesterday' }], NOW, COROS_STALE_AFTER_HOURS)).toEqual({
+      kind: 'unreadable',
+    });
   });
 
   it('skips an unparseable row rather than letting it be newest', () => {
-    const s = summarizeSyncLog([{ ...run(0, 'ok', 'bad'), started_at: '' }, run(3, 'ok', 'good')], NOW, COROS_STALE_AFTER_HOURS);
+    const s = summarizeSyncLog(
+      [{ ...run(0, 'ok', 'bad'), started_at: '' }, run(3, 'ok', 'good')],
+      NOW,
+      COROS_STALE_AFTER_HOURS,
+    );
     expect(s.kind === 'run' && s.newest.run_id).toBe('good');
   });
 });
@@ -72,7 +93,7 @@ describe('formatAge', () => {
 });
 
 describe('AC4: stale past the watchdog threshold', () => {
-  it('uses the COROS watchdog\'s 16 hours', () => {
+  it("uses the COROS watchdog's 16 hours", () => {
     expect(COROS_STALE_AFTER_HOURS).toBe(16);
   });
 
@@ -91,7 +112,7 @@ describe('AC4: stale past the watchdog threshold', () => {
 });
 
 describe('#210: a threshold passed in, per vendor', () => {
-  it('uses the Withings watchdog\'s 14 hours', () => {
+  it("uses the Withings watchdog's 14 hours", () => {
     expect(WITHINGS_STALE_AFTER_HOURS).toBe(14);
   });
 
@@ -119,7 +140,11 @@ describe('AC4: failed and partial are distinguishable from ok', () => {
   });
 
   it('gives the age of the newest ok run when the newest is not ok', () => {
-    const s = summarizeSyncLog([run(1.2, 'failed'), run(6.2, 'failed'), run(10.2, 'ok', 'good'), run(14, 'ok')], NOW, COROS_STALE_AFTER_HOURS);
+    const s = summarizeSyncLog(
+      [run(1.2, 'failed'), run(6.2, 'failed'), run(10.2, 'ok', 'good'), run(14, 'ok')],
+      NOW,
+      COROS_STALE_AFTER_HOURS,
+    );
     expect(s.kind).toBe('run');
     if (s.kind === 'run') {
       expect(s.lastOk?.entry.run_id).toBe('good');

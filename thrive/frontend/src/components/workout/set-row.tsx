@@ -44,7 +44,8 @@ export function SetRow({ set, onUpdate, onRemove }: Props) {
         />
         {set.planned_reps && (
           <span class="set-planned-target" aria-label={`target: ${set.planned_reps} reps`}>
-            <span aria-hidden="true">/ </span>{set.planned_reps}
+            <span aria-hidden="true">/ </span>
+            {set.planned_reps}
           </span>
         )}
       </div>
@@ -72,11 +73,7 @@ export function SetRow({ set, onUpdate, onRemove }: Props) {
         ✓
       </span>
 
-      <button
-        class="set-remove-btn"
-        onClick={onRemove}
-        aria-label="Remove set"
-      >
+      <button class="set-remove-btn" onClick={onRemove} aria-label="Remove set">
         ×
       </button>
     </div>

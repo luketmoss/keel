@@ -128,9 +128,7 @@ describe('applyChangeSection', () => {
 
   describe('AC4: section value preserved in exercises list', () => {
     it('returns the new section on the matching exercise', () => {
-      const exercises = [
-        makeExercise({ exercise_id: 'ex1', exercise_order: 1, section: 'primary' }),
-      ];
+      const exercises = [makeExercise({ exercise_id: 'ex1', exercise_order: 1, section: 'primary' })];
       const { exercises: result } = applyChangeSection(exercises, 'ex1', 1, 'SS3');
       expect(result[0].section).toBe('SS3');
     });
@@ -163,8 +161,8 @@ describe('applyMoveUp', () => {
       const result = applyMoveUp(exercises, 'ex1', 1);
 
       // exercise_order unchanged
-      expect(result.find(e => e.exercise_id === 'ex1')?.exercise_order).toBe(1);
-      expect(result.find(e => e.exercise_id === 'ex2')?.exercise_order).toBe(2);
+      expect(result.find((e) => e.exercise_id === 'ex1')?.exercise_order).toBe(1);
+      expect(result.find((e) => e.exercise_id === 'ex2')?.exercise_order).toBe(2);
     });
 
     it('preserves exercise data when swapping', () => {
@@ -176,7 +174,7 @@ describe('applyMoveUp', () => {
 
       const result = applyMoveUp(exercises, 'ex2', 2);
 
-      const ex1 = result.find(e => e.exercise_id === 'ex1');
+      const ex1 = result.find((e) => e.exercise_id === 'ex1');
       expect(ex1?.sets[0].weight).toBe('200');
     });
   });
@@ -207,7 +205,7 @@ describe('applyMoveDown', () => {
 
       const result = applyMoveDown(exercises, 'ex2', 2);
 
-      expect(result.find(e => e.exercise_id === 'ex2')?.exercise_order).toBe(2);
+      expect(result.find((e) => e.exercise_id === 'ex2')?.exercise_order).toBe(2);
     });
 
     it('only affects the two exercises being swapped', () => {
@@ -219,7 +217,7 @@ describe('applyMoveDown', () => {
 
       const result = applyMoveDown(exercises, 'ex1', 1);
 
-      expect(result.find(e => e.exercise_id === 'ex3')?.exercise_order).toBe(3);
+      expect(result.find((e) => e.exercise_id === 'ex3')?.exercise_order).toBe(3);
     });
   });
 });

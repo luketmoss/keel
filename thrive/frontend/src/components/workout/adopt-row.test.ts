@@ -7,15 +7,37 @@ import type { TrackerSet } from './set-row';
 import type { SetWithRow } from '../../api/types';
 
 const tset = (n: number, sheetRow: number): TrackerSet => ({
-  set_number: n, planned_reps: '', weight: '', reps: '', effort: '', saved: sheetRow > 0, sheetRow,
+  set_number: n,
+  planned_reps: '',
+  weight: '',
+  reps: '',
+  effort: '',
+  saved: sheetRow > 0,
+  sheetRow,
 });
 const tex = (section: string, order: number, sets: TrackerSet[], rowKey: string): TrackerExercise => ({
-  exercise_id: 'e_row', exercise_name: 'Row BB', section, exercise_order: order, rowKey, sets,
-  quickFillWeight: '', quickFillReps: '', quickFillEffort: '',
+  exercise_id: 'e_row',
+  exercise_name: 'Row BB',
+  section,
+  exercise_order: order,
+  rowKey,
+  sets,
+  quickFillWeight: '',
+  quickFillReps: '',
+  quickFillEffort: '',
 });
 const srow = (section: string, order: number, n: number, sheetRow: number, workout_id = 'w1'): SetWithRow => ({
-  workout_id, exercise_id: 'e_row', exercise_name: 'Row BB', section, exercise_order: order,
-  set_number: n, planned_reps: '', weight: '1', reps: '', effort: '', sheetRow,
+  workout_id,
+  exercise_id: 'e_row',
+  exercise_name: 'Row BB',
+  section,
+  exercise_order: order,
+  set_number: n,
+  planned_reps: '',
+  weight: '1',
+  reps: '',
+  effort: '',
+  sheetRow,
 });
 
 const PRIMARY = tex('primary', 1, [tset(1, 2), tset(2, 3)], 'a');
@@ -38,7 +60,7 @@ describe('unclaimedRowFor', () => {
     expect(unclaimedRowFor([PRIMARY, moved], 'w1', moved, moved.sets[1], ROWS)).toBe(-1);
   });
 
-  it('ignores another workout\'s rows and rows matching neither section nor order', () => {
+  it("ignores another workout's rows and rows matching neither section nor order", () => {
     expect(unclaimedRowFor(LIST, 'w1', SS1, SS1.sets[1], [...ROWS, srow('SS1', 2, 2, 5, 'w0')])).toBe(-1);
     expect(unclaimedRowFor(LIST, 'w1', SS1, SS1.sets[1], [...ROWS, srow('SS3', 7, 2, 5)])).toBe(-1);
   });
@@ -49,7 +71,7 @@ describe('unclaimedRowFor', () => {
     expect(unclaimedRowFor(LIST, 'w1', SS1, SS1.sets[1], rows.slice(0, 5))).toBe(6);
   });
 
-  it('contested by another card\'s set with no row: only the single unclaimed row at this card\'s order', () => {
+  it("contested by another card's set with no row: only the single unclaimed row at this card's order", () => {
     // Two same-section copies, both with a set 2 not yet on a row: the
     // unclaimed row 5 could be either one's flushed append.
     const a = tex('primary', 1, [tset(1, 2), tset(2, -1)], 'a');
@@ -69,4 +91,3 @@ describe('unclaimedRowFor', () => {
     expect(unclaimedRowFor([a, bSaved], 'w1', a, a.sets[1], [...rows, srow('primary', 2, 2, 6)])).toBe(5);
   });
 });
-

@@ -10,15 +10,24 @@ function resetSignals() {
 
 function makeExercise(overrides: Partial<ExerciseWithRow> = {}): ExerciseWithRow {
   return {
-    id: 'ex1', name: 'Bench Press', tags: 'Push, Chest', notes: '',
-    created: '2025-01-01T00:00:00.000Z', sheetRow: 2, ...overrides,
+    id: 'ex1',
+    name: 'Bench Press',
+    tags: 'Push, Chest',
+    notes: '',
+    created: '2025-01-01T00:00:00.000Z',
+    sheetRow: 2,
+    ...overrides,
   };
 }
 
 function makeLabel(overrides: Partial<LabelWithRow> = {}): LabelWithRow {
   return {
-    id: 'lbl1', name: 'Push', color_key: 'red',
-    created: '2025-01-01T00:00:00.000Z', sheetRow: 2, ...overrides,
+    id: 'lbl1',
+    name: 'Push',
+    color_key: 'red',
+    created: '2025-01-01T00:00:00.000Z',
+    sheetRow: 2,
+    ...overrides,
   };
 }
 
@@ -27,9 +36,7 @@ describe('AC1: Label metadata storage and migration', () => {
 
   it('allTags is sourced from labels signal, not exercises', () => {
     exercises.value = [makeExercise({ tags: 'Push, Chest' })];
-    labels.value = [
-      makeLabel({ name: 'Arms', color_key: 'red' }),
-    ];
+    labels.value = [makeLabel({ name: 'Arms', color_key: 'red' })];
     // allTags should reflect labels, not exercise tags
     expect(allTags.value).toEqual(['Arms']);
   });
@@ -38,7 +45,7 @@ describe('AC1: Label metadata storage and migration', () => {
     const key1 = colorKeyFromName('Push');
     const key2 = colorKeyFromName('Push');
     expect(key1).toBe(key2);
-    expect(LABEL_COLORS.map(c => c.key)).toContain(key1);
+    expect(LABEL_COLORS.map((c) => c.key)).toContain(key1);
   });
 
   it('migration populates labels from unique exercise tags', () => {
@@ -49,19 +56,26 @@ describe('AC1: Label metadata storage and migration', () => {
     ];
     const tagSet = new Set<string>();
     for (const ex of exerciseData) {
-      ex.tags.split(',').map(t => t.trim()).filter(Boolean).forEach(t => tagSet.add(t));
+      ex.tags
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean)
+        .forEach((t) => tagSet.add(t));
     }
     const sorted = Array.from(tagSet).sort();
     const migrated = sorted.map((name, i) => ({
-      id: `lbl_${i}`, name, color_key: colorKeyFromName(name),
-      created: '', sheetRow: i + 2,
+      id: `lbl_${i}`,
+      name,
+      color_key: colorKeyFromName(name),
+      created: '',
+      sheetRow: i + 2,
     }));
 
     expect(migrated).toHaveLength(3); // Chest, Pull, Push
-    expect(migrated.map(l => l.name)).toEqual(['Chest', 'Pull', 'Push']);
+    expect(migrated.map((l) => l.name)).toEqual(['Chest', 'Pull', 'Push']);
     // Each should have a valid color_key
     for (const l of migrated) {
-      expect(LABEL_COLORS.map(c => c.key)).toContain(l.color_key);
+      expect(LABEL_COLORS.map((c) => c.key)).toContain(l.color_key);
     }
   });
 });
@@ -78,10 +92,7 @@ describe('AC2: Manage Labels page', () => {
   });
 
   it('labelUsageCount returns correct count for each label', () => {
-    labels.value = [
-      makeLabel({ name: 'Push' }),
-      makeLabel({ name: 'Pull', id: 'lbl2', sheetRow: 3 }),
-    ];
+    labels.value = [makeLabel({ name: 'Push' }), makeLabel({ name: 'Pull', id: 'lbl2', sheetRow: 3 })];
     exercises.value = [
       makeExercise({ id: 'ex1', tags: 'Push, Chest' }),
       makeExercise({ id: 'ex2', tags: 'Push, Arms', sheetRow: 3 }),
@@ -118,16 +129,19 @@ describe('AC3: Create, rename, and delete labels', () => {
     // Simulate rename propagation
     const oldName = 'Push';
     const newName = 'Pressing';
-    const affected = exercises.value.filter(ex =>
-      ex.tags.split(',').map(t => t.trim()).includes(oldName),
+    const affected = exercises.value.filter((ex) =>
+      ex.tags
+        .split(',')
+        .map((t) => t.trim())
+        .includes(oldName),
     );
     expect(affected).toHaveLength(1);
 
     // Simulate updating affected exercises
-    exercises.value = exercises.value.map(ex => {
-      const tags = ex.tags.split(',').map(t => t.trim());
+    exercises.value = exercises.value.map((ex) => {
+      const tags = ex.tags.split(',').map((t) => t.trim());
       if (tags.includes(oldName)) {
-        return { ...ex, tags: tags.map(t => t === oldName ? newName : t).join(', ') };
+        return { ...ex, tags: tags.map((t) => (t === oldName ? newName : t)).join(', ') };
       }
       return ex;
     });
@@ -145,11 +159,14 @@ describe('AC3: Create, rename, and delete labels', () => {
 
     // Simulate delete propagation
     const labelName = 'Push';
-    exercises.value = exercises.value.map(ex => {
-      const tags = ex.tags.split(',').map(t => t.trim()).filter(t => t !== labelName);
+    exercises.value = exercises.value.map((ex) => {
+      const tags = ex.tags
+        .split(',')
+        .map((t) => t.trim())
+        .filter((t) => t !== labelName);
       return { ...ex, tags: tags.join(', ') };
     });
-    labels.value = labels.value.filter(l => l.name !== labelName);
+    labels.value = labels.value.filter((l) => l.name !== labelName);
 
     expect(exercises.value[0].tags).toBe('Chest');
     expect(exercises.value[1].tags).toBe('');
@@ -170,7 +187,7 @@ describe('AC4: Tap-to-toggle label chips', () => {
   it('toggling an active label off removes it from exercise tags', () => {
     const tags = ['Push', 'Chest'];
     const removeTag = 'Chest';
-    const updated = tags.filter(t => t !== removeTag);
+    const updated = tags.filter((t) => t !== removeTag);
     expect(updated).toEqual(['Push']);
   });
 

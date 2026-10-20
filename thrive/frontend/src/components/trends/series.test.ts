@@ -2,8 +2,19 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  averageDays, dateTicks, datesBetween, earliestDate, metricSeries, niceTicks,
-  rangeBounds, rolling, rowDate, segments, tickLabel, windowText, yDomain,
+  averageDays,
+  dateTicks,
+  datesBetween,
+  earliestDate,
+  metricSeries,
+  niceTicks,
+  rangeBounds,
+  rolling,
+  rowDate,
+  segments,
+  tickLabel,
+  windowText,
+  yDomain,
 } from './series';
 import { addDays } from '../../day/dates';
 import type { TrendMetric, TrendPoint } from './metrics';
@@ -12,7 +23,11 @@ const TODAY = '2026-09-27';
 
 describe('rangeBounds', () => {
   it.each([
-    ['1W', 7], ['1M', 30], ['3M', 91], ['6M', 182], ['1Y', 365],
+    ['1W', 7],
+    ['1M', 30],
+    ['3M', 91],
+    ['6M', 182],
+    ['1Y', 365],
   ] as const)('%s covers %i days ending today, inclusive', (range, n) => {
     const { from, to } = rangeBounds(range, TODAY, null);
     expect(to).toBe(TODAY);
@@ -28,7 +43,9 @@ describe('rangeBounds', () => {
   });
 
   it('earliestDate looks across every metric', () => {
-    expect(earliestDate([[{ date: '2026-02-01', value: 1 }], [{ date: '2025-12-31', value: 0 }], []])).toBe('2025-12-31');
+    expect(earliestDate([[{ date: '2026-02-01', value: 1 }], [{ date: '2025-12-31', value: 0 }], []])).toBe(
+      '2025-12-31',
+    );
     expect(earliestDate([[], []])).toBeNull();
   });
 });
@@ -50,32 +67,48 @@ describe('rolling', () => {
   });
 
   it('reaches back before the range', () => {
-    const v = new Map([['2026-08-31', 10], ['2026-09-01', 20]]);
+    const v = new Map([
+      ['2026-08-31', 10],
+      ['2026-09-01', 20],
+    ]);
     expect(rolling(v, ['2026-09-01'], 2).get('2026-09-01')).toBe(15);
   });
 
   it('needs a value on the day itself', () => {
-    const v = new Map([['2026-09-01', 1], ['2026-09-02', 1]]);
+    const v = new Map([
+      ['2026-09-01', 1],
+      ['2026-09-02', 1],
+    ]);
     expect(rolling(v, ['2026-09-03'], 3).has('2026-09-03')).toBe(false);
   });
 
   it('needs at least min(⌈N/2⌉, 2) values in the window (#407)', () => {
     // A weight read every 3 days: 7d averages with two readings.
-    const sparse = new Map([['2026-09-10', 5], ['2026-09-07', 7]]);
+    const sparse = new Map([
+      ['2026-09-10', 5],
+      ['2026-09-07', 7],
+    ]);
     expect(rolling(sparse, ['2026-09-10'], 7).get('2026-09-10')).toBe(6);
     // Alone in its window, a day has no average, however wide the window.
-    for (const n of [7, 14, 30]) expect(rolling(new Map([['2026-09-10', 5]]), ['2026-09-10'], n).has('2026-09-10')).toBe(false);
+    for (const n of [7, 14, 30])
+      expect(rolling(new Map([['2026-09-10', 5]]), ['2026-09-10'], n).has('2026-09-10')).toBe(false);
     // A window of 2 or less still needs only ⌈N/2⌉.
     expect(rolling(new Map([['2026-09-10', 5]]), ['2026-09-10'], 1).get('2026-09-10')).toBe(5);
   });
 
   it('leaves a day with no reading blank (#407 AC3)', () => {
-    const v = new Map([['2026-09-08', 5], ['2026-09-10', 7]]);
+    const v = new Map([
+      ['2026-09-08', 5],
+      ['2026-09-10', 7],
+    ]);
     expect(rolling(v, ['2026-09-09'], 7).has('2026-09-09')).toBe(false);
   });
 
   it('counts a 0 and never fills a blank', () => {
-    const v = new Map([['2026-09-01', 0], ['2026-09-02', 4]]);
+    const v = new Map([
+      ['2026-09-01', 0],
+      ['2026-09-02', 4],
+    ]);
     expect(rolling(v, ['2026-09-02'], 2).get('2026-09-02')).toBe(2);
     expect(rolling(v, dates, 0).size).toBe(0);
   });
@@ -83,10 +116,14 @@ describe('rolling', () => {
 
 describe('segments', () => {
   it('breaks the line at any day without a point', () => {
-    const pts = ['2026-09-01', '2026-09-02', '2026-09-04', '2026-09-05', '2026-09-06', '2026-09-09']
-      .map((date) => ({ date, value: 1 }));
+    const pts = ['2026-09-01', '2026-09-02', '2026-09-04', '2026-09-05', '2026-09-06', '2026-09-09'].map((date) => ({
+      date,
+      value: 1,
+    }));
     expect(segments(pts).map((s) => s.map((p) => p.date.slice(-2)))).toEqual([
-      ['01', '02'], ['04', '05', '06'], ['09'],
+      ['01', '02'],
+      ['04', '05', '06'],
+      ['09'],
     ]);
   });
 
@@ -97,7 +134,10 @@ describe('segments', () => {
   });
 
   it('sorts first and joins across a month end', () => {
-    const pts = [{ date: '2026-10-01', value: 1 }, { date: '2026-09-30', value: 1 }];
+    const pts = [
+      { date: '2026-10-01', value: 1 },
+      { date: '2026-09-30', value: 1 },
+    ];
     expect(segments(pts)).toHaveLength(1);
   });
 });
@@ -113,7 +153,11 @@ describe('niceTicks and yDomain', () => {
   });
 
   it('uses 1, 2 or 5 steps, and labels them to the step precision', () => {
-    for (const [lo, hi] of [[47.3, 58.1], [0.2, 1.7], [4000, 11000]]) {
+    for (const [lo, hi] of [
+      [47.3, 58.1],
+      [0.2, 1.7],
+      [4000, 11000],
+    ]) {
       const t = niceTicks(lo, hi);
       const step = t[1] - t[0];
       const mant = step / 10 ** Math.floor(Math.log10(step));
@@ -171,24 +215,24 @@ describe('dateTicks', () => {
   }
 
   it('uses weekdays for 1W', () => {
-    const t = noOverlap(...Object.values(rangeBounds('1W', TODAY, null)) as [string, string]);
+    const t = noOverlap(...(Object.values(rangeBounds('1W', TODAY, null)) as [string, string]));
     expect(t.every((x) => /^(Sun|Mon|Tue|Wed|Thu|Fri|Sat)$/.test(x.label))).toBe(true);
   });
 
   it('uses dates for 1M, always labelling today', () => {
-    const t = noOverlap(...Object.values(rangeBounds('1M', TODAY, null)) as [string, string]);
+    const t = noOverlap(...(Object.values(rangeBounds('1M', TODAY, null)) as [string, string]));
     expect(t.every((x) => /^[A-Z][a-z]{2} \d+$/.test(x.label))).toBe(true);
     expect(t[t.length - 1].date).toBe(TODAY);
   });
 
   it.each(['3M', '6M', '1Y'] as const)('uses months for %s, without overlap', (r) => {
-    const t = noOverlap(...Object.values(rangeBounds(r, TODAY, null)) as [string, string]);
+    const t = noOverlap(...(Object.values(rangeBounds(r, TODAY, null)) as [string, string]));
     expect(t.length).toBeGreaterThanOrEqual(2);
     expect(t.every((x) => /^([A-Z][a-z]{2}|\d{4})$/.test(x.label))).toBe(true);
   });
 
   it('keeps January, labelled with its year, when months are thinned', () => {
-    const t = dateTicks(...Object.values(rangeBounds('1Y', TODAY, null)) as [string, string], WIDTH_375);
+    const t = dateTicks(...(Object.values(rangeBounds('1Y', TODAY, null)) as [string, string]), WIDTH_375);
     expect(t.map((x) => x.label)).toContain('2026');
   });
 
@@ -200,11 +244,21 @@ describe('dateTicks', () => {
 
 describe('metricSeries', () => {
   const metric = (pts: TrendPoint[], extra: Partial<TrendMetric> = {}): TrendMetric => ({
-    id: 'm', label: 'M', unit: 'u', points: () => pts, format: String, band: true, ...extra,
+    id: 'm',
+    label: 'M',
+    unit: 'u',
+    points: () => pts,
+    format: String,
+    band: true,
+    ...extra,
   });
 
   it('keeps the range whole, and counts coverage and the mean over values only', () => {
-    const pts = [{ date: TODAY, value: 0 }, { date: addDays(TODAY, -2), value: 6 }, { date: '2020-01-01', value: 99 }];
+    const pts = [
+      { date: TODAY, value: 0 },
+      { date: addDays(TODAY, -2), value: 6 },
+      { date: '2020-01-01', value: 99 },
+    ];
     const s = metricSeries(metric(pts), addDays(TODAY, -6), TODAY, 0, TODAY);
     expect(s.dates).toHaveLength(7);
     expect(s.points.map((p) => p.value)).toEqual([6, 0]);
@@ -214,7 +268,13 @@ describe('metricSeries', () => {
   });
 
   it('drops today when the metric excludes it', () => {
-    const s = metricSeries(metric([{ date: TODAY, value: 5 }], { excludesToday: true }), addDays(TODAY, -6), TODAY, 0, TODAY);
+    const s = metricSeries(
+      metric([{ date: TODAY, value: 5 }], { excludesToday: true }),
+      addDays(TODAY, -6),
+      TODAY,
+      0,
+      TODAY,
+    );
     expect(s.points).toHaveLength(0);
   });
 });

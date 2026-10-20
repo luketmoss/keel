@@ -54,9 +54,14 @@ export function requestView(req: SyncRequest | null, log: readonly SyncLogEntry[
   const logged = loggedRun(req, log);
   if (logged) {
     const when = clock(logged.finished_at || logged.started_at, now);
-    const outcome = logged.status === 'ok' ? 'ok'
-      : logged.status === 'partial' ? 'finished with errors'
-      : logged.status === 'failed' ? 'the run failed' : logged.status;
+    const outcome =
+      logged.status === 'ok'
+        ? 'ok'
+        : logged.status === 'partial'
+          ? 'finished with errors'
+          : logged.status === 'failed'
+            ? 'the run failed'
+            : logged.status;
     return {
       open: false,
       text: `Finished${when ? ` ${when}` : ''}: ${outcome}`,
@@ -81,16 +86,26 @@ export function requestView(req: SyncRequest | null, log: readonly SyncLogEntry[
       }
       const started = clock(req.dispatched_at, now);
       return {
-        open: true, tone: 'neutral',
+        open: true,
+        tone: 'neutral',
         text: `Started${started ? ` ${started}` : ''}. Running; a result may take up to 5 minutes to show here.`,
       };
     }
-    case 'done': case 'cancelled': case 'failed': case 'not_reported': case 'skipped': case 'expired':
+    case 'done':
+    case 'cancelled':
+    case 'failed':
+    case 'not_reported':
+    case 'skipped':
+    case 'expired':
       return {
         open: false,
         text: req.detail.trim() || FINAL_FALLBACK[req.status],
-        tone: req.status === 'done' || req.status === 'skipped' ? 'neutral'
-          : req.status === 'cancelled' ? 'warning' : 'danger',
+        tone:
+          req.status === 'done' || req.status === 'skipped'
+            ? 'neutral'
+            : req.status === 'cancelled'
+              ? 'warning'
+              : 'danger',
       };
     default:
       return null;
@@ -105,7 +120,10 @@ export function newestRequest<T extends SyncRequest>(rows: readonly T[], vendor:
     if (r.vendor !== vendor) continue;
     const t = Date.parse(r.requested_at);
     const ms = Number.isNaN(t) ? -Infinity : t;
-    if (best === null || ms > bestMs) { best = r; bestMs = ms; }
+    if (best === null || ms > bestMs) {
+      best = r;
+      bestMs = ms;
+    }
   }
   return best;
 }

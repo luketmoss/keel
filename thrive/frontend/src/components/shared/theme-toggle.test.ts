@@ -101,8 +101,15 @@ describe('theme-toggle — #293 AC2: selection is exposed to assistive tech', ()
     const group = container.querySelector('.theme-toggle')!;
     expect(group.getAttribute('role')).toBe('group');
     expect(group.getAttribute('aria-label')).toBe('Theme');
-    const pressed = [...container.querySelectorAll('button')].map((b) => [b.textContent, b.getAttribute('aria-pressed')]);
-    expect(pressed).toEqual([['Light', 'false'], ['Dark', 'true'], ['System', 'false']]);
+    const pressed = [...container.querySelectorAll('button')].map((b) => [
+      b.textContent,
+      b.getAttribute('aria-pressed'),
+    ]);
+    expect(pressed).toEqual([
+      ['Light', 'false'],
+      ['Dark', 'true'],
+      ['System', 'false'],
+    ]);
     cleanup();
     localStorage.clear();
   });

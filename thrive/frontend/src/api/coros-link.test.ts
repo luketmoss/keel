@@ -4,7 +4,10 @@ import { describe, it, expect } from 'vitest';
 import { corosActivityUrl, COROS_PORTAL_HOST } from './coros-link';
 
 const synced = {
-  source: 'coros', source_activity_id: '480640601618940011', sport_type: '204', status: '',
+  source: 'coros',
+  source_activity_id: '480640601618940011',
+  sport_type: '204',
+  status: '',
 };
 
 describe('corosActivityUrl', () => {

@@ -5,27 +5,52 @@ import type { TrackerExercise } from './exercise-row';
 import type { SetWithRow } from '../../api/types';
 
 const ex = (rowKey: string, exercise_id: string, order: number, rows: number[]): TrackerExercise => ({
-  rowKey, exercise_id, exercise_name: exercise_id, section: 'primary', exercise_order: order,
-  quickFillWeight: '', quickFillReps: '', quickFillEffort: '',
+  rowKey,
+  exercise_id,
+  exercise_name: exercise_id,
+  section: 'primary',
+  exercise_order: order,
+  quickFillWeight: '',
+  quickFillReps: '',
+  quickFillEffort: '',
   sets: rows.map((sheetRow, i) => ({
-    set_number: i + 1, planned_reps: '8', weight: '', reps: '', effort: '', saved: sheetRow > 0, sheetRow,
+    set_number: i + 1,
+    planned_reps: '8',
+    weight: '',
+    reps: '',
+    effort: '',
+    saved: sheetRow > 0,
+    sheetRow,
   })),
 });
 const stored = (w: string, exercise_id: string, order: number, set_number: number, sheetRow: number): SetWithRow => ({
-  workout_id: w, exercise_id, exercise_name: exercise_id, section: 'primary', exercise_order: order,
-  set_number, planned_reps: '8', weight: '', reps: '', effort: '', sheetRow,
+  workout_id: w,
+  exercise_id,
+  exercise_name: exercise_id,
+  section: 'primary',
+  exercise_order: order,
+  set_number,
+  planned_reps: '8',
+  weight: '',
+  reps: '',
+  effort: '',
+  sheetRow,
 });
 
 describe('orderWrites', () => {
   const STORED = [
-    stored('w1', 'bench', 1, 1, 2), stored('w1', 'bench', 1, 2, 3),
-    stored('w1', 'row', 2, 1, 4), stored('w1', 'curl', 3, 1, 5),
+    stored('w1', 'bench', 1, 1, 2),
+    stored('w1', 'bench', 1, 2, 3),
+    stored('w1', 'row', 2, 1, 4),
+    stored('w1', 'curl', 3, 1, 5),
   ];
 
   it('every saved row whose stored order differs, by row; nothing else', () => {
     const list = [ex('a', 'bench', 2, [2, 3]), ex('b', 'row', 1, [4]), ex('c', 'curl', 3, [5])];
     expect(orderWrites(list, STORED, 'w1')).toEqual([
-      { sheetRow: 2, exercise_order: 2 }, { sheetRow: 3, exercise_order: 2 }, { sheetRow: 4, exercise_order: 1 },
+      { sheetRow: 2, exercise_order: 2 },
+      { sheetRow: 3, exercise_order: 2 },
+      { sheetRow: 4, exercise_order: 1 },
     ]);
   });
 
@@ -54,7 +79,13 @@ describe('orderWrites', () => {
 
   it('nothing when the section matches what is stored, and never a set with no row (#395)', () => {
     const list = [ex('a', 'bench', 1, [2, -1]), ex('b', 'row', 2, [4]), ex('c', 'curl', 3, [5])];
-    expect(orderWrites(list.map((e) => ({ ...e, section: 'primary' })), STORED, 'w1')).toEqual([]);
+    expect(
+      orderWrites(
+        list.map((e) => ({ ...e, section: 'primary' })),
+        STORED,
+        'w1',
+      ),
+    ).toEqual([]);
     const moved = [{ ...ex('a', 'bench', 1, [-1]), section: 'SS1' }];
     expect(orderWrites(moved, STORED, 'w1')).toEqual([]);
   });

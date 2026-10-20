@@ -33,13 +33,15 @@ function makeExercise(overrides: Partial<TrackerExercise> = {}): TrackerExercise
 describe('applyQuickFillWeight', () => {
   // AC1: Quick fill overwrites pre-filled set weights
   it('overwrites pre-filled set weights with new value', () => {
-    const exercises = [makeExercise({
-      sets: [
-        makeSet({ set_number: 1, weight: '135', saved: true, sheetRow: 2 }),
-        makeSet({ set_number: 2, weight: '135', saved: true, sheetRow: 3 }),
-        makeSet({ set_number: 3, weight: '140', saved: true, sheetRow: 4 }),
-      ],
-    })];
+    const exercises = [
+      makeExercise({
+        sets: [
+          makeSet({ set_number: 1, weight: '135', saved: true, sheetRow: 2 }),
+          makeSet({ set_number: 2, weight: '135', saved: true, sheetRow: 3 }),
+          makeSet({ set_number: 3, weight: '140', saved: true, sheetRow: 4 }),
+        ],
+      }),
+    ];
 
     const result = applyQuickFillWeight(exercises, 'ex1', 1, '155');
 
@@ -55,12 +57,11 @@ describe('applyQuickFillWeight', () => {
 
   // AC2: Quick fill still works on fresh (empty) sets
   it('fills empty sets with weight value', () => {
-    const exercises = [makeExercise({
-      sets: [
-        makeSet({ set_number: 1, weight: '' }),
-        makeSet({ set_number: 2, weight: '' }),
-      ],
-    })];
+    const exercises = [
+      makeExercise({
+        sets: [makeSet({ set_number: 1, weight: '' }), makeSet({ set_number: 2, weight: '' })],
+      }),
+    ];
 
     const result = applyQuickFillWeight(exercises, 'ex1', 1, '185');
 
@@ -70,13 +71,15 @@ describe('applyQuickFillWeight', () => {
 
   // AC3: Clearing quick fill does not wipe individual set weights
   it('does not clear existing set weights when quick fill is cleared', () => {
-    const exercises = [makeExercise({
-      quickFillWeight: '135',
-      sets: [
-        makeSet({ set_number: 1, weight: '135', saved: true, sheetRow: 2 }),
-        makeSet({ set_number: 2, weight: '135', saved: true, sheetRow: 3 }),
-      ],
-    })];
+    const exercises = [
+      makeExercise({
+        quickFillWeight: '135',
+        sets: [
+          makeSet({ set_number: 1, weight: '135', saved: true, sheetRow: 2 }),
+          makeSet({ set_number: 2, weight: '135', saved: true, sheetRow: 3 }),
+        ],
+      }),
+    ];
 
     const result = applyQuickFillWeight(exercises, 'ex1', 1, '');
 
@@ -104,13 +107,15 @@ describe('applyQuickFillWeight', () => {
   });
 
   it('handles mixed pre-filled and empty sets', () => {
-    const exercises = [makeExercise({
-      sets: [
-        makeSet({ set_number: 1, weight: '135' }),
-        makeSet({ set_number: 2, weight: '' }),
-        makeSet({ set_number: 3, weight: '140' }),
-      ],
-    })];
+    const exercises = [
+      makeExercise({
+        sets: [
+          makeSet({ set_number: 1, weight: '135' }),
+          makeSet({ set_number: 2, weight: '' }),
+          makeSet({ set_number: 3, weight: '140' }),
+        ],
+      }),
+    ];
 
     const result = applyQuickFillWeight(exercises, 'ex1', 1, '155');
 
@@ -124,13 +129,15 @@ describe('applyQuickFillWeight', () => {
 describe('applyQuickFillReps', () => {
   // AC1: Reps quick-fill applies rep count to all sets
   it('fills all sets with reps value and marks unsaved', () => {
-    const exercises = [makeExercise({
-      sets: [
-        makeSet({ set_number: 1, reps: '' }),
-        makeSet({ set_number: 2, reps: '' }),
-        makeSet({ set_number: 3, reps: '' }),
-      ],
-    })];
+    const exercises = [
+      makeExercise({
+        sets: [
+          makeSet({ set_number: 1, reps: '' }),
+          makeSet({ set_number: 2, reps: '' }),
+          makeSet({ set_number: 3, reps: '' }),
+        ],
+      }),
+    ];
 
     const result = applyQuickFillReps(exercises, 'ex1', 1, '10');
 
@@ -145,12 +152,14 @@ describe('applyQuickFillReps', () => {
 
   // AC2: Lbs and reps quick-fill work independently — reps does not touch weight
   it('does not modify weight values when filling reps', () => {
-    const exercises = [makeExercise({
-      sets: [
-        makeSet({ set_number: 1, weight: '135', reps: '8', saved: true, sheetRow: 2 }),
-        makeSet({ set_number: 2, weight: '135', reps: '6', saved: true, sheetRow: 3 }),
-      ],
-    })];
+    const exercises = [
+      makeExercise({
+        sets: [
+          makeSet({ set_number: 1, weight: '135', reps: '8', saved: true, sheetRow: 2 }),
+          makeSet({ set_number: 2, weight: '135', reps: '6', saved: true, sheetRow: 3 }),
+        ],
+      }),
+    ];
 
     const result = applyQuickFillReps(exercises, 'ex1', 1, '10');
 
@@ -164,12 +173,11 @@ describe('applyQuickFillReps', () => {
 
   // AC2: Weight quick-fill does not touch reps
   it('weight quick-fill does not modify reps values', () => {
-    const exercises = [makeExercise({
-      sets: [
-        makeSet({ set_number: 1, weight: '', reps: '10' }),
-        makeSet({ set_number: 2, weight: '', reps: '8' }),
-      ],
-    })];
+    const exercises = [
+      makeExercise({
+        sets: [makeSet({ set_number: 1, weight: '', reps: '10' }), makeSet({ set_number: 2, weight: '', reps: '8' })],
+      }),
+    ];
 
     const result = applyQuickFillWeight(exercises, 'ex1', 1, '185');
 
@@ -182,13 +190,15 @@ describe('applyQuickFillReps', () => {
 
   // AC3: Clearing reps quick-fill does not wipe individual set reps
   it('does not clear existing set reps when quick fill is cleared', () => {
-    const exercises = [makeExercise({
-      quickFillReps: '10',
-      sets: [
-        makeSet({ set_number: 1, reps: '10', saved: true, sheetRow: 2 }),
-        makeSet({ set_number: 2, reps: '10', saved: true, sheetRow: 3 }),
-      ],
-    })];
+    const exercises = [
+      makeExercise({
+        quickFillReps: '10',
+        sets: [
+          makeSet({ set_number: 1, reps: '10', saved: true, sheetRow: 2 }),
+          makeSet({ set_number: 2, reps: '10', saved: true, sheetRow: 3 }),
+        ],
+      }),
+    ];
 
     const result = applyQuickFillReps(exercises, 'ex1', 1, '');
 
@@ -216,12 +226,14 @@ describe('applyQuickFillReps', () => {
   });
 
   it('overwrites pre-filled reps with new value', () => {
-    const exercises = [makeExercise({
-      sets: [
-        makeSet({ set_number: 1, reps: '8', saved: true, sheetRow: 2 }),
-        makeSet({ set_number: 2, reps: '6', saved: true, sheetRow: 3 }),
-      ],
-    })];
+    const exercises = [
+      makeExercise({
+        sets: [
+          makeSet({ set_number: 1, reps: '8', saved: true, sheetRow: 2 }),
+          makeSet({ set_number: 2, reps: '6', saved: true, sheetRow: 3 }),
+        ],
+      }),
+    ];
 
     const result = applyQuickFillReps(exercises, 'ex1', 1, '10');
 
@@ -235,13 +247,15 @@ describe('applyQuickFillReps', () => {
 describe('applyQuickFillEffort', () => {
   // AC2: Effort quick-fill applies to all sets and marks unsaved
   it('applies effort to all sets and marks them unsaved', () => {
-    const exercises = [makeExercise({
-      sets: [
-        makeSet({ set_number: 1, effort: '', saved: true, sheetRow: 2 }),
-        makeSet({ set_number: 2, effort: '', saved: true, sheetRow: 3 }),
-        makeSet({ set_number: 3, effort: '', saved: true, sheetRow: 4 }),
-      ],
-    })];
+    const exercises = [
+      makeExercise({
+        sets: [
+          makeSet({ set_number: 1, effort: '', saved: true, sheetRow: 2 }),
+          makeSet({ set_number: 2, effort: '', saved: true, sheetRow: 3 }),
+          makeSet({ set_number: 3, effort: '', saved: true, sheetRow: 4 }),
+        ],
+      }),
+    ];
 
     const result = applyQuickFillEffort(exercises, 'ex1', 1, 'Medium');
 
@@ -256,13 +270,15 @@ describe('applyQuickFillEffort', () => {
 
   // AC3: Toggle-off clears quickFillEffort but does not modify set efforts
   it('does not clear existing set efforts when toggled off', () => {
-    const exercises = [makeExercise({
-      quickFillEffort: 'Medium',
-      sets: [
-        makeSet({ set_number: 1, effort: 'Medium', saved: true, sheetRow: 2 }),
-        makeSet({ set_number: 2, effort: 'Medium', saved: true, sheetRow: 3 }),
-      ],
-    })];
+    const exercises = [
+      makeExercise({
+        quickFillEffort: 'Medium',
+        sets: [
+          makeSet({ set_number: 1, effort: 'Medium', saved: true, sheetRow: 2 }),
+          makeSet({ set_number: 2, effort: 'Medium', saved: true, sheetRow: 3 }),
+        ],
+      }),
+    ];
 
     const result = applyQuickFillEffort(exercises, 'ex1', 1, '');
 
@@ -277,12 +293,14 @@ describe('applyQuickFillEffort', () => {
 
   // AC4: Effort quick-fill does not modify weight or reps
   it('does not modify weight or reps values', () => {
-    const exercises = [makeExercise({
-      sets: [
-        makeSet({ set_number: 1, weight: '135', reps: '10', effort: '', saved: true, sheetRow: 2 }),
-        makeSet({ set_number: 2, weight: '185', reps: '8', effort: '', saved: true, sheetRow: 3 }),
-      ],
-    })];
+    const exercises = [
+      makeExercise({
+        sets: [
+          makeSet({ set_number: 1, weight: '135', reps: '10', effort: '', saved: true, sheetRow: 2 }),
+          makeSet({ set_number: 2, weight: '185', reps: '8', effort: '', saved: true, sheetRow: 3 }),
+        ],
+      }),
+    ];
 
     const result = applyQuickFillEffort(exercises, 'ex1', 1, 'Hard');
 

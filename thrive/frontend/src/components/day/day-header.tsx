@@ -24,12 +24,27 @@ function CalendarIcon() {
   return (
     <svg class="day-calendar-icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false">
       <rect x="3" y="4.5" width="14" height="12.5" rx="2" fill="none" stroke="currentColor" stroke-width="1.6" />
-      <path d="M3 8.5h14M7 2.5v4M13 2.5v4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+      <path
+        d="M3 8.5h14M7 2.5v4M13 2.5v4"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.6"
+        stroke-linecap="round"
+      />
     </svg>
   );
 }
 
-export function DayHeader({ date, today, onPrevious, onNext, onToday, headingRef, todayButtonRef, children }: DayHeaderProps) {
+export function DayHeader({
+  date,
+  today,
+  onPrevious,
+  onNext,
+  onToday,
+  headingRef,
+  todayButtonRef,
+  children,
+}: DayHeaderProps) {
   const isToday = date === today;
   const sun = sunLine(date);
   const full = fullDate(date);

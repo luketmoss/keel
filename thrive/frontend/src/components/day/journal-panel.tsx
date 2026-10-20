@@ -11,7 +11,14 @@ import { journalEntries } from '../../state/store';
 import { loadJournal } from '../../state/actions';
 import { fullDate } from '../../day/format';
 import type { DayState } from '../../day/dates';
-import { editNote, flushNote, noteDrafts, setNoteFocus, setNoteToken, type NoteStatus } from '../../panels/journal/drafts';
+import {
+  editNote,
+  flushNote,
+  noteDrafts,
+  setNoteFocus,
+  setNoteToken,
+  type NoteStatus,
+} from '../../panels/journal/drafts';
 import { Panel, PanelStatus, type DayPanelProps } from './panel';
 import { useFocusHandoff } from '../focus-handoff';
 
@@ -47,7 +54,9 @@ function NoteRetry({ busy, onPress }: { busy: boolean; onPress: () => void }) {
       class="btn btn-secondary panel-retry"
       aria-label="Try again — save note"
       aria-disabled={busy ? 'true' : undefined}
-      onClick={() => { if (!busy) onPress(); }}
+      onClick={() => {
+        if (!busy) onPress();
+      }}
     >
       {/* In an element, so aria-disabled dims the label, not the ring (#404). */}
       <span>Try again</span>
@@ -64,7 +73,10 @@ export function JournalPanel({ date, state }: DayPanelProps) {
   // #290: a Try again is in flight (keeps its button mounted), and its save landed.
   const [retrying, setRetrying] = useState(false);
   const [savedAfterRetry, setSavedAfterRetry] = useState(false);
-  useEffect(() => { setRetrying(false); setSavedAfterRetry(false); }, [date]);
+  useEffect(() => {
+    setRetrying(false);
+    setSavedAfterRetry(false);
+  }, [date]);
   const status = draft?.status;
   useEffect(() => {
     if (!retrying || status === 'saving' || status === 'failed') return;
@@ -74,13 +86,16 @@ export function JournalPanel({ date, state }: DayPanelProps) {
 
   // A day swipe, the week strip, a tab change or the midnight rollover
   // unmounts this: send what is held to the date it was showing.
-  useEffect(() => () => {
-    setNoteFocus(null);
-    flushNote(date);
-  }, [date]);
+  useEffect(
+    () => () => {
+      setNoteFocus(null);
+      flushNote(date);
+    },
+    [date],
+  );
 
   const loaded = tab.state === 'loaded';
-  const entryText = loaded ? tab.entries.find((e) => e.date === date)?.note ?? '' : '';
+  const entryText = loaded ? (tab.entries.find((e) => e.date === date)?.note ?? '') : '';
   const value = draft?.text ?? entryText;
 
   // Grow with the content: the page scrolls, the box does not.
@@ -100,7 +115,9 @@ export function JournalPanel({ date, state }: DayPanelProps) {
         <PanelStatus
           status={tab.state === 'error' ? 'error' : tab.state === 'loading' ? 'loading' : 'idle'}
           what="your journal"
-          onRetry={() => { if (token) void loadJournal(token); }}
+          onRetry={() => {
+            if (token) void loadJournal(token);
+          }}
         />
       </Panel>
     );
@@ -112,12 +129,18 @@ export function JournalPanel({ date, state }: DayPanelProps) {
     <Panel
       title="Note"
       sub={sub}
-      action={showRetry ? (
-        <NoteRetry
-          busy={status === 'saving'}
-          onPress={() => { setRetrying(true); setSavedAfterRetry(false); flushNote(date); }}
-        />
-      ) : undefined}
+      action={
+        showRetry ? (
+          <NoteRetry
+            busy={status === 'saving'}
+            onPress={() => {
+              setRetrying(true);
+              setSavedAfterRetry(false);
+              flushNote(date);
+            }}
+          />
+        ) : undefined
+      }
     >
       <label class="sr-only" for={textId}>{`Journal entry for ${fullDate(date)}`}</label>
       <textarea
@@ -135,9 +158,14 @@ export function JournalPanel({ date, state }: DayPanelProps) {
           editNote(date, (e.currentTarget as HTMLTextAreaElement).value);
         }}
         onFocus={() => setNoteFocus(date)}
-        onBlur={() => { setNoteFocus(null); flushNote(date); }}
+        onBlur={() => {
+          setNoteFocus(null);
+          flushNote(date);
+        }}
       />
-      <p class="sr-only" role="status">{failed ? "Couldn't save your note." : savedAfterRetry ? 'Note saved.' : ''}</p>
+      <p class="sr-only" role="status">
+        {failed ? "Couldn't save your note." : savedAfterRetry ? 'Note saved.' : ''}
+      </p>
     </Panel>
   );
 }

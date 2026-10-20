@@ -8,14 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import {
-  SUITE_CSS_PATH,
-  TOKEN_SELECTORS,
-  readGlobalCss,
-  readGlobalCssRaw,
-  readSuiteCss,
-  tokens,
-} from './test-css';
+import { SUITE_CSS_PATH, TOKEN_SELECTORS, readGlobalCss, readGlobalCssRaw, readSuiteCss, tokens } from './test-css';
 import before from './tokens-before-402.json';
 
 const suite = readSuiteCss();
@@ -23,29 +16,67 @@ const raw = readGlobalCssRaw();
 const resolved = readGlobalCss();
 
 const SCALES = [
-  '--space-xs', '--space-sm', '--space-md', '--space-lg', '--space-xl', '--space-2xl',
-  '--radius-sm', '--radius-md', '--radius', '--radius-lg', '--radius-full',
-  '--font-sans', '--font-mono',
-  '--text-xs', '--text-sm', '--text-base', '--text-lg', '--text-xl', '--text-2xl',
-  '--transition-fast', '--transition-normal',
+  '--space-xs',
+  '--space-sm',
+  '--space-md',
+  '--space-lg',
+  '--space-xl',
+  '--space-2xl',
+  '--radius-sm',
+  '--radius-md',
+  '--radius',
+  '--radius-lg',
+  '--radius-full',
+  '--font-sans',
+  '--font-mono',
+  '--text-xs',
+  '--text-sm',
+  '--text-base',
+  '--text-lg',
+  '--text-xl',
+  '--text-2xl',
+  '--transition-fast',
+  '--transition-normal',
   '--nav-height',
-  '--shadow', '--shadow-lg', '--shadow-strong',
+  '--shadow',
+  '--shadow-lg',
+  '--shadow-strong',
 ];
 const NEUTRALS = [
-  '--color-bg', '--color-surface', '--color-surface-raised',
-  '--color-border', '--color-border-light', '--color-border-strong',
-  '--color-text', '--color-text-secondary', '--color-text-muted',
+  '--color-bg',
+  '--color-surface',
+  '--color-surface-raised',
+  '--color-border',
+  '--color-border-light',
+  '--color-border-strong',
+  '--color-text',
+  '--color-text-secondary',
+  '--color-text-muted',
 ];
 const STATUS = [
-  '--color-danger', '--color-danger-hover', '--color-danger-text',
-  '--color-danger-fill', '--color-danger-fill-hover',
-  '--color-success', '--color-success-light', '--color-success-fill',
-  '--color-warning', '--color-warning-light',
+  '--color-danger',
+  '--color-danger-hover',
+  '--color-danger-text',
+  '--color-danger-fill',
+  '--color-danger-fill-hover',
+  '--color-success',
+  '--color-success-light',
+  '--color-success-fill',
+  '--color-warning',
+  '--color-warning-light',
 ];
 const OVERLAYS = [
-  '--color-overlay', '--color-shadow', '--color-shadow-strong',
-  '--overlay-xs', '--overlay-sm', '--overlay-md', '--overlay-lg',
-  '--overlay-xl', '--overlay-2xl', '--overlay-3xl', '--overlay-4xl',
+  '--color-overlay',
+  '--color-shadow',
+  '--color-shadow-strong',
+  '--overlay-xs',
+  '--overlay-sm',
+  '--overlay-md',
+  '--overlay-lg',
+  '--overlay-xl',
+  '--overlay-2xl',
+  '--overlay-3xl',
+  '--overlay-4xl',
 ];
 const THEME = [...NEUTRALS, ...STATUS, '--color-on-fill', ...OVERLAYS];
 
@@ -102,7 +133,11 @@ describe('AC3: the neutrals equal the suite language table', () => {
 
 describe('AC4: global.css imports the suite file and redefines none of it', () => {
   it('imports it by relative path before any rule', () => {
-    const first = raw.replace(/\/\*[\s\S]*?\*\//g, '').trim().split('\n')[0].trim();
+    const first = raw
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .trim()
+      .split('\n')[0]
+      .trim();
     expect(first).toBe("@import '../../../ui/tokens/suite.css';");
   });
 

@@ -29,7 +29,17 @@ const PUSH = {
   id: 'tpl_push',
   name: 'Upper Push A',
   exercises: [
-    { template_id: 'tpl_push', template_name: 'Upper Push A', order: 1, exercise_id: 'ex_1', exercise_name: 'Bench Press BB', section: 'primary', sets: '3', reps: '8', sheetRow: 2 },
+    {
+      template_id: 'tpl_push',
+      template_name: 'Upper Push A',
+      order: 1,
+      exercise_id: 'ex_1',
+      exercise_name: 'Bench Press BB',
+      section: 'primary',
+      sets: '3',
+      reps: '8',
+      sheetRow: 2,
+    },
   ],
 };
 

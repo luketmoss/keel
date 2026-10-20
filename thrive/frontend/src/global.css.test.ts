@@ -27,7 +27,13 @@ function extractBlock(css: string, selector: string): string {
   let end = start;
   for (let i = start; i < css.length; i++) {
     if (css[i] === '{') depth++;
-    else if (css[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
+    else if (css[i] === '}') {
+      depth--;
+      if (depth === 0) {
+        end = i;
+        break;
+      }
+    }
   }
   return css.slice(start + 1, end);
 }
@@ -40,7 +46,9 @@ function getToken(block: string, token: string): string | null {
 
 describe('AC1: Primary color tokens — light mode (#397 cobalt identity)', () => {
   let block: string;
-  beforeAll(() => { block = extractBlock(cssText, '[data-theme="light"]'); });
+  beforeAll(() => {
+    block = extractBlock(cssText, '[data-theme="light"]');
+  });
 
   it('--color-primary is #2f66f0', () => {
     expect(getToken(block, '--color-primary')).toBe('#2f66f0');
@@ -79,7 +87,9 @@ describe('AC1: Primary color tokens — light mode (#397 cobalt identity)', () =
 
 describe('AC1: Primary color tokens — dark mode (#397 cobalt identity)', () => {
   let block: string;
-  beforeAll(() => { block = extractBlock(cssText, '[data-theme="dark"]'); });
+  beforeAll(() => {
+    block = extractBlock(cssText, '[data-theme="dark"]');
+  });
 
   it('--color-primary is #6e97ff', () => {
     expect(getToken(block, '--color-primary')).toBe('#6e97ff');
@@ -124,7 +134,9 @@ describe('AC1: brand accent and no orange left (#397)', () => {
 
 describe('AC3: Neutral palette tokens — light mode', () => {
   let lightBlock: string;
-  beforeAll(() => { lightBlock = extractBlock(cssText, '[data-theme="light"]'); });
+  beforeAll(() => {
+    lightBlock = extractBlock(cssText, '[data-theme="light"]');
+  });
 
   it('--color-bg is #f0f2f5', () => {
     expect(getToken(lightBlock, '--color-bg')).toBe('#f0f2f5');
@@ -145,7 +157,9 @@ describe('AC3: Neutral palette tokens — light mode', () => {
 
 describe('AC3: Neutral palette tokens — dark mode', () => {
   let darkBlock: string;
-  beforeAll(() => { darkBlock = extractBlock(cssText, '[data-theme="dark"]'); });
+  beforeAll(() => {
+    darkBlock = extractBlock(cssText, '[data-theme="dark"]');
+  });
 
   it('--color-bg is #121212', () => {
     expect(getToken(darkBlock, '--color-bg')).toBe('#121212');
@@ -166,7 +180,9 @@ describe('AC3: Neutral palette tokens — dark mode', () => {
 
 describe('AC4: Semantic color tokens — light mode', () => {
   let lightBlock: string;
-  beforeAll(() => { lightBlock = extractBlock(cssText, '[data-theme="light"]'); });
+  beforeAll(() => {
+    lightBlock = extractBlock(cssText, '[data-theme="light"]');
+  });
 
   it('--color-danger is #d32f2f', () => {
     expect(getToken(lightBlock, '--color-danger')).toBe('#d32f2f');
@@ -181,7 +197,9 @@ describe('AC4: Semantic color tokens — light mode', () => {
 
 describe('AC4: Semantic color tokens — dark mode', () => {
   let darkBlock: string;
-  beforeAll(() => { darkBlock = extractBlock(cssText, '[data-theme="dark"]'); });
+  beforeAll(() => {
+    darkBlock = extractBlock(cssText, '[data-theme="dark"]');
+  });
 
   it('--color-danger is #ef5350', () => {
     expect(getToken(darkBlock, '--color-danger')).toBe('#ef5350');
@@ -210,9 +228,7 @@ describe('AC5: Focus ring token, manifest, no blue remnants', () => {
   });
 
   it('manifest.json background_color is the tile navy #0f2a7a (#397)', () => {
-    const manifest = JSON.parse(
-      readFileSync(resolve(__dirname, '../public/manifest.json'), 'utf-8')
-    );
+    const manifest = JSON.parse(readFileSync(resolve(__dirname, '../public/manifest.json'), 'utf-8'));
     expect(manifest.background_color).toBe('#0f2a7a');
   });
 });

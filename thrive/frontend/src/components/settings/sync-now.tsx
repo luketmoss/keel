@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import {
-  syncLog, withingsSyncLog, syncRequests, syncAsk, demoSyncPressedAt,
+  syncLog,
+  withingsSyncLog,
+  syncRequests,
+  syncAsk,
+  demoSyncPressedAt,
   type SyncLogState,
 } from '../../state/store';
-import {
-  loadSyncLog, loadWithingsSyncLog, loadSyncRequests, requestSyncNow, healthRefresh,
-} from '../../state/actions';
+import { loadSyncLog, loadWithingsSyncLog, loadSyncRequests, requestSyncNow, healthRefresh } from '../../state/actions';
 import { onPageVisible } from '../../state/page-visible';
 import { isDemo } from '../../api/demo-data';
 import { SYNC_REQUEST_VENDORS, type SyncRequestVendor } from '../../api/sync-requests-api';
@@ -59,7 +61,8 @@ export function useSyncNow(token: string | null, email: string, onLanded?: () =>
   }
 
   const open: Record<SyncRequestVendor, boolean> = {
-    coros: !!views.coros?.open, withings: !!views.withings?.open,
+    coros: !!views.coros?.open,
+    withings: !!views.withings?.open,
   };
   const anyOpen = open.coros || open.withings || ask === 'asking';
 
@@ -82,7 +85,10 @@ export function useSyncNow(token: string | null, email: string, onLanded?: () =>
     };
     const timer = setInterval(tick, demo ? DEMO_TICK_MS : POLL_MS);
     const off = onPageVisible(tick);
-    return () => { clearInterval(timer); off(); };
+    return () => {
+      clearInterval(timer);
+      off();
+    };
   }, [anyOpen, token, demo]);
 
   // Day's next read must not be swallowed by its 60 s limit after a requested run (AC4).
@@ -107,9 +113,11 @@ export function useSyncNow(token: string | null, email: string, onLanded?: () =>
   };
 
   const askLine: RequestView | null =
-    ask === 'asking' ? { open: true, tone: 'neutral', text: 'Asking for a sync…' }
-    : ask === 'failed' ? { open: false, tone: 'danger', text: ASK_FAILED_TEXT }
-    : null;
+    ask === 'asking'
+      ? { open: true, tone: 'neutral', text: 'Asking for a sync…' }
+      : ask === 'failed'
+        ? { open: false, tone: 'danger', text: ASK_FAILED_TEXT }
+        : null;
   const lines: VendorViews = {
     coros: askLine ?? views.coros,
     withings: askLine ?? views.withings,
@@ -128,7 +136,9 @@ export function SyncNowButton({ sync }: { sync: SyncNow }) {
       type="button"
       class="btn btn-primary sync-now-btn"
       aria-disabled={busy ? 'true' : undefined}
-      onClick={() => { if (!busy) sync.press(); }}
+      onClick={() => {
+        if (!busy) sync.press();
+      }}
     >
       {/* In an element, so an aria-disabled press dims the label, not the ring (#404). */}
       <span>{sync.asking ? 'Asking…' : sync.bothOpen ? 'Sync under way' : 'Sync now'}</span>

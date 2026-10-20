@@ -77,7 +77,12 @@ describe('titleFor (AC1, AC3, AC5)', () => {
       for (const e of readdirSync(dir, { withFileTypes: true })) {
         const p = resolve(dir, e.name);
         if (e.isDirectory()) walk(p);
-        else if (/\.tsx?$/.test(e.name) && !/\.test\./.test(e.name) && /document\.title\s*=/.test(readFileSync(p, 'utf8'))) offenders.push(e.name);
+        else if (
+          /\.tsx?$/.test(e.name) &&
+          !/\.test\./.test(e.name) &&
+          /document\.title\s*=/.test(readFileSync(p, 'utf8'))
+        )
+          offenders.push(e.name);
       }
     };
     walk(src);
@@ -98,7 +103,9 @@ describe('useDocumentTitle through RouteFocus (AC1-AC4, AC6)', () => {
   }
   const title = () => document.title;
 
-  beforeEach(() => { document.title = DEFAULT_TITLE; });
+  beforeEach(() => {
+    document.title = DEFAULT_TITLE;
+  });
   afterEach(cleanup);
 
   it('follows Back and Forward, and a same-name move to another workout', async () => {

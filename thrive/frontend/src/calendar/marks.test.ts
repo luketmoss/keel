@@ -8,9 +8,10 @@ const wk = (date: string, status = '') => ({ id: date + status, date, status }) 
 
 describe('marksFor', () => {
   it('counts planned and everything else, for the dates asked only', () => {
-    const m = marksFor(['2025-01-14', '2025-01-15'], [
-      wk('2025-01-14'), wk('2025-01-14', 'active'), wk('2025-01-14', 'planned'), wk('2025-01-16'),
-    ]);
+    const m = marksFor(
+      ['2025-01-14', '2025-01-15'],
+      [wk('2025-01-14'), wk('2025-01-14', 'active'), wk('2025-01-14', 'planned'), wk('2025-01-16')],
+    );
     expect(m).toEqual({ '2025-01-14': { done: 2, planned: 1 }, '2025-01-15': { done: 0, planned: 0 } });
   });
 });

@@ -8,9 +8,15 @@ import { activeWorkoutSets, activeWarmupExercises, isEditMode, workouts } from '
 import type { WorkoutWithRow } from '../../api/types';
 
 vi.mock('../../state/actions', () => ({
-  saveSet: vi.fn(), removeSet: vi.fn(), finishWorkout: vi.fn(), deleteWorkout: vi.fn(),
-  saveWorkoutEdits: vi.fn(), exitEditMode: vi.fn(), saveSimpleWorkoutEdits: vi.fn(),
-  startSimpleWorkout: vi.fn(), finishSimpleWorkout: vi.fn(),
+  saveSet: vi.fn(),
+  removeSet: vi.fn(),
+  finishWorkout: vi.fn(),
+  deleteWorkout: vi.fn(),
+  saveWorkoutEdits: vi.fn(),
+  exitEditMode: vi.fn(),
+  saveSimpleWorkoutEdits: vi.fn(),
+  startSimpleWorkout: vi.fn(),
+  finishSimpleWorkout: vi.fn(),
 }));
 vi.mock('../../auth/auth-context', () => ({ useAuth: () => ({ token: 'test-token' }) }));
 vi.mock('../../router/router', () => ({ navigate: vi.fn(), goBack: vi.fn() }));
@@ -21,11 +27,36 @@ const { WorkoutTracker } = await import('../workout/workout-tracker');
 const { SubTypeToggle } = await import('./sub-type-toggle');
 
 const BIKE = {
-  id: 'w_b1', date: '2026-09-20', time: '07:05', type: 'bike', name: 'Ride', template_id: '',
-  notes: '', elapsed_seconds: '', created: '', copied_from: '', status: '', moving_seconds: '',
-  effort: '', distance_m: '', ascent_m: '', descent_m: '', avg_hr: '', sub_type: '', source: '',
-  source_activity_id: '', raw_ref: '', fit_ref: '', fit_fetched_at: '', synced_at: '',
-  started_at_utc: '', calories: '', estimated_seconds: '', sport_type: '', track_ref: '', sheetRow: 2,
+  id: 'w_b1',
+  date: '2026-09-20',
+  time: '07:05',
+  type: 'bike',
+  name: 'Ride',
+  template_id: '',
+  notes: '',
+  elapsed_seconds: '',
+  created: '',
+  copied_from: '',
+  status: '',
+  moving_seconds: '',
+  effort: '',
+  distance_m: '',
+  ascent_m: '',
+  descent_m: '',
+  avg_hr: '',
+  sub_type: '',
+  source: '',
+  source_activity_id: '',
+  raw_ref: '',
+  fit_ref: '',
+  fit_fetched_at: '',
+  synced_at: '',
+  started_at_utc: '',
+  calories: '',
+  estimated_seconds: '',
+  sport_type: '',
+  track_ref: '',
+  sheetRow: 2,
 } as WorkoutWithRow;
 
 afterEach(() => {
@@ -102,9 +133,20 @@ describe('AC5: SubTypeToggle', () => {
   });
 
   it('with labelledBy the visible text names the group; buttons keep label', () => {
-    render(h('div', null,
-      h('span', { id: 'lbl' }, 'Type (optional)'),
-      h(SubTypeToggle as never, { workoutType: 'bike', value: '', onChange: vi.fn(), label: 'Activity type', labelledBy: 'lbl' })));
+    render(
+      h(
+        'div',
+        null,
+        h('span', { id: 'lbl' }, 'Type (optional)'),
+        h(SubTypeToggle as never, {
+          workoutType: 'bike',
+          value: '',
+          onChange: vi.fn(),
+          label: 'Activity type',
+          labelledBy: 'lbl',
+        }),
+      ),
+    );
     expect(screen.getByRole('group', { name: 'Type (optional)' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Activity type: Gravel' })).toBeTruthy();
   });

@@ -8,7 +8,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, fireEvent, cleanup } from '@testing-library/preact';
 import { h } from 'preact';
 import {
-  workouts, sets, templates, activeWorkoutId, activeWorkoutSets, activeWarmupExercises,
+  workouts,
+  sets,
+  templates,
+  activeWorkoutId,
+  activeWorkoutSets,
+  activeWarmupExercises,
 } from '../../state/store';
 import type { SetWithRow, Template, WorkoutWithRow } from '../../api/types';
 import { buildExerciseList, mergeWarmups } from './build-exercise-list';
@@ -24,8 +29,11 @@ vi.mock('../../router/router', () => ({ navigate: (p: string) => navigate(p) }))
 vi.mock('./workout-tracker', () => ({
   WorkoutTracker: ({ workoutId }: { workoutId: string }) => {
     const list = mergeWarmups(buildExerciseList(activeWorkoutSets.value), activeWarmupExercises.value);
-    return h('ul', { 'data-testid': 'tracker', 'data-workout': workoutId },
-      list.map((ex) => h('li', null, `${ex.exercise_order}:${ex.section}:${ex.exercise_name}`)));
+    return h(
+      'ul',
+      { 'data-testid': 'tracker', 'data-workout': workoutId },
+      list.map((ex) => h('li', null, `${ex.exercise_order}:${ex.section}:${ex.exercise_name}`)),
+    );
   },
 }));
 
@@ -36,34 +44,94 @@ const PUSH: Template = {
   id: 'tpl_push',
   name: 'Upper Push A',
   exercises: [
-    { template_id: 'tpl_push', template_name: 'Upper Push A', order: 1, exercise_id: 'ex_wu', exercise_name: 'Band Pull-Apart', section: 'warmup', sets: '', reps: '', sheetRow: 2 },
-    { template_id: 'tpl_push', template_name: 'Upper Push A', order: 2, exercise_id: 'ex_bp', exercise_name: 'Bench Press BB', section: 'primary', sets: '3', reps: '8', sheetRow: 3 },
+    {
+      template_id: 'tpl_push',
+      template_name: 'Upper Push A',
+      order: 1,
+      exercise_id: 'ex_wu',
+      exercise_name: 'Band Pull-Apart',
+      section: 'warmup',
+      sets: '',
+      reps: '',
+      sheetRow: 2,
+    },
+    {
+      template_id: 'tpl_push',
+      template_name: 'Upper Push A',
+      order: 2,
+      exercise_id: 'ex_bp',
+      exercise_name: 'Bench Press BB',
+      section: 'primary',
+      sets: '3',
+      reps: '8',
+      sheetRow: 3,
+    },
   ],
 };
 
 function workout(id: string, over: Partial<WorkoutWithRow> = {}): WorkoutWithRow {
   return {
-    id, date: '2026-10-09', time: '09:00', type: 'weight', name: id, template_id: '', notes: '',
-    elapsed_seconds: '', created: '', copied_from: '', status: 'active',
-    moving_seconds: '', effort: '', distance_m: '', ascent_m: '', descent_m: '', avg_hr: '',
-    sub_type: '', source: '', source_activity_id: '', raw_ref: '', fit_ref: '', fit_fetched_at: '',
-    synced_at: '', started_at_utc: '', calories: '', estimated_seconds: '', sport_type: '', track_ref: '',
-    sheetRow: 2, ...over,
+    id,
+    date: '2026-10-09',
+    time: '09:00',
+    type: 'weight',
+    name: id,
+    template_id: '',
+    notes: '',
+    elapsed_seconds: '',
+    created: '',
+    copied_from: '',
+    status: 'active',
+    moving_seconds: '',
+    effort: '',
+    distance_m: '',
+    ascent_m: '',
+    descent_m: '',
+    avg_hr: '',
+    sub_type: '',
+    source: '',
+    source_activity_id: '',
+    raw_ref: '',
+    fit_ref: '',
+    fit_fetched_at: '',
+    synced_at: '',
+    started_at_utc: '',
+    calories: '',
+    estimated_seconds: '',
+    sport_type: '',
+    track_ref: '',
+    sheetRow: 2,
+    ...over,
   };
 }
 
 let nextRow = 2;
-function set(workout_id: string, exercise_id: string, exercise_name: string, section: string, exercise_order: number, set_number = 1): SetWithRow {
+function set(
+  workout_id: string,
+  exercise_id: string,
+  exercise_name: string,
+  section: string,
+  exercise_order: number,
+  set_number = 1,
+): SetWithRow {
   return {
-    workout_id, exercise_id, exercise_name, section, exercise_order, set_number,
-    planned_reps: '', weight: '', reps: '', effort: '', sheetRow: nextRow++,
+    workout_id,
+    exercise_id,
+    exercise_name,
+    section,
+    exercise_order,
+    set_number,
+    planned_reps: '',
+    weight: '',
+    reps: '',
+    effort: '',
+    sheetRow: nextRow++,
   };
 }
 
 const STALE = [{ exercise_id: 'ex_stale', exercise_name: 'Stale Warmup', exercise_order: 0 }];
 
-const listed = (c: Element) =>
-  Array.from(c.querySelectorAll('[data-testid="tracker"] li')).map((li) => li.textContent);
+const listed = (c: Element) => Array.from(c.querySelectorAll('[data-testid="tracker"] li')).map((li) => li.textContent);
 
 beforeEach(() => {
   nextRow = 2;
@@ -134,7 +202,9 @@ describe('AC4: resuming a template workout uses the plan-start warmup rule', () 
 
     const { container } = render(<WorkoutFlow workoutId="w_t" />);
 
-    expect(activeWarmupExercises.value).toEqual([{ exercise_id: 'ex_wu', exercise_name: 'Band Pull-Apart', exercise_order: 1 }]);
+    expect(activeWarmupExercises.value).toEqual([
+      { exercise_id: 'ex_wu', exercise_name: 'Band Pull-Apart', exercise_order: 1 },
+    ]);
     expect(listed(container)).toEqual(['1:warmup:Band Pull-Apart', '2:primary:Bench Press BB']);
   });
 
@@ -155,7 +225,7 @@ describe('AC4: resuming a template workout uses the plan-start warmup rule', () 
 });
 
 describe('AC5: planning a template while a custom workout is active', () => {
-  it('leaves the active workout\'s list exactly as it was, and the plan keeps its warmups', async () => {
+  it("leaves the active workout's list exactly as it was, and the plan keeps its warmups", async () => {
     workouts.value = [workout('w_a')];
     sets.value = [
       set('w_a', 'ex_sq', 'Squat', 'primary', 1),
@@ -182,8 +252,12 @@ describe('AC5: planning a template while a custom workout is active', () => {
 
     const plan = workouts.value.find((w) => w.status === 'planned')!;
     expect(plan).toBeDefined();
-    expect(sets.value.filter((s) => s.workout_id === plan.id).map((s) => `${s.exercise_order}:${s.section}`))
-      .toEqual(['1:warmup', '2:primary', '2:primary', '2:primary']);
+    expect(sets.value.filter((s) => s.workout_id === plan.id).map((s) => `${s.exercise_order}:${s.section}`)).toEqual([
+      '1:warmup',
+      '2:primary',
+      '2:primary',
+      '2:primary',
+    ]);
 
     // Return to the active workout.
     cleanup();

@@ -40,7 +40,11 @@ export function pointsByDate(series: MetricSeries): ReadonlyMap<string, TrendPoi
 
 /** What the table prints for `date` in this metric's columns. */
 export function dayCells(
-  metric: TrendMetric, series: MetricSeries, byDate: ReadonlyMap<string, TrendPoint>, date: string, avgDays: number,
+  metric: TrendMetric,
+  series: MetricSeries,
+  byDate: ReadonlyMap<string, TrendPoint>,
+  date: string,
+  avgDays: number,
 ): DayCells {
   const p = byDate.get(date);
   const avg = series.average.get(date);

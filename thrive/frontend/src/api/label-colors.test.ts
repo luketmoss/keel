@@ -18,7 +18,7 @@ describe('LABEL_COLORS', () => {
   });
 
   it('has unique keys', () => {
-    const keys = LABEL_COLORS.map(c => c.key);
+    const keys = LABEL_COLORS.map((c) => c.key);
     expect(new Set(keys).size).toBe(keys.length);
   });
 });
@@ -38,7 +38,7 @@ describe('getLabelColor', () => {
 describe('colorKeyFromName', () => {
   it('returns a valid color key', () => {
     const key = colorKeyFromName('Push');
-    const validKeys = LABEL_COLORS.map(c => c.key);
+    const validKeys = LABEL_COLORS.map((c) => c.key);
     expect(validKeys).toContain(key);
   });
 
@@ -53,7 +53,7 @@ describe('colorKeyFromName', () => {
     const pushKey = colorKeyFromName('Push');
     const pullKey = colorKeyFromName('Pull');
     // At least verify both are valid keys
-    const validKeys = LABEL_COLORS.map(c => c.key);
+    const validKeys = LABEL_COLORS.map((c) => c.key);
     expect(validKeys).toContain(pushKey);
     expect(validKeys).toContain(pullKey);
   });

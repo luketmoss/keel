@@ -22,7 +22,9 @@ export function TemplateDetail({ templateId }: Props) {
       <div class="screen">
         <div class="empty-state">
           <p>Template not found</p>
-          <button class="btn btn-primary" onClick={() => navigate('/templates')}>Back to Templates</button>
+          <button class="btn btn-primary" onClick={() => navigate('/templates')}>
+            Back to Templates
+          </button>
         </div>
       </div>
     );
@@ -50,10 +52,7 @@ export function TemplateDetail({ templateId }: Props) {
     }
     setStarting(true);
     try {
-      const id = await startWorkout(
-        { type: 'weight', name: tpl.name, template_id: tpl.id },
-        token,
-      );
+      const id = await startWorkout({ type: 'weight', name: tpl.name, template_id: tpl.id }, token);
       navigate(`/workout/${id}`);
     } catch {
       // Error toast shown by action
@@ -65,22 +64,17 @@ export function TemplateDetail({ templateId }: Props) {
   return (
     <div class="screen template-detail-screen">
       <div class="template-editor-header">
-        <button
-          class="template-editor-back"
-          onClick={() => navigate('/templates')}
-          aria-label="Back"
-        >
+        <button class="template-editor-back" onClick={() => navigate('/templates')} aria-label="Back">
           ← Back
         </button>
-        <button
-          class="btn btn-primary btn-sm"
-          onClick={() => navigate(`/templates/${templateId}/edit`)}
-        >
+        <button class="btn btn-primary btn-sm" onClick={() => navigate(`/templates/${templateId}/edit`)}>
           Edit
         </button>
       </div>
 
-      <h2 class="detail-title" style={{ marginBottom: 'var(--space-md)' }}>{tpl.name}</h2>
+      <h2 class="detail-title" style={{ marginBottom: 'var(--space-md)' }}>
+        {tpl.name}
+      </h2>
 
       <div class="compact-card-list">
         {tpl.exercises.map((ex, i) => (

@@ -42,9 +42,7 @@ export function AddExerciseModal({ onSelect, onClose }: AddExerciseModalProps) {
   }, [showCreateForm]);
 
   const toggleTag = (tag: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
-    );
+    setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
   };
 
   const filtered = exercisesSignal.value
@@ -76,13 +74,7 @@ export function AddExerciseModal({ onSelect, onClose }: AddExerciseModalProps) {
 
   return (
     <div class="modal-overlay" onClick={handleBackgroundClick}>
-      <div
-        class="modal-content"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={TITLE_ID}
-        ref={dialogRef}
-      >
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby={TITLE_ID} ref={dialogRef}>
         <div class="modal-header">
           <h2 id={TITLE_ID}>{showCreateForm ? 'New Exercise' : 'Select Exercise'}</h2>
           <button type="button" class="modal-close" onClick={onClose} aria-label="Close">
@@ -111,12 +103,7 @@ export function AddExerciseModal({ onSelect, onClose }: AddExerciseModalProps) {
             {allTags.value.length > 0 && (
               <div class="tag-filter-row" role="group" aria-label="Filter by tag">
                 {allTags.value.map((tag) => (
-                  <LabelBadge
-                    key={tag}
-                    name={tag}
-                    active={selectedTags.includes(tag)}
-                    onClick={() => toggleTag(tag)}
-                  />
+                  <LabelBadge key={tag} name={tag} active={selectedTags.includes(tag)} onClick={() => toggleTag(tag)} />
                 ))}
               </div>
             )}
@@ -127,7 +114,10 @@ export function AddExerciseModal({ onSelect, onClose }: AddExerciseModalProps) {
                 {filtered.length === 0 && <div class="exercise-list-empty">No matching exercises</div>}
               </div>
               {filtered.map((ex) => {
-                const tags = ex.tags.split(',').map((t) => t.trim()).filter(Boolean);
+                const tags = ex.tags
+                  .split(',')
+                  .map((t) => t.trim())
+                  .filter(Boolean);
                 const nameId = `add-exercise-${ex.id}-name`;
                 const tagsId = `add-exercise-${ex.id}-tags`;
                 return (
@@ -139,7 +129,9 @@ export function AddExerciseModal({ onSelect, onClose }: AddExerciseModalProps) {
                     aria-describedby={tags.length > 0 ? tagsId : undefined}
                     onClick={() => onSelect(ex)}
                   >
-                    <span id={nameId} class="exercise-list-item-name">{ex.name}</span>
+                    <span id={nameId} class="exercise-list-item-name">
+                      {ex.name}
+                    </span>
                     {tags.length > 0 && (
                       <span id={tagsId} class="exercise-list-item-tags">
                         {tags.map((tag, i) => (

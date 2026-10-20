@@ -35,14 +35,16 @@ export function TrendReadout({ metric, series, date, avgDays, today }: Props) {
   return (
     <div class="trend-readout" data-date={date}>
       <div class="trend-readout-head">
-        <p class="trend-readout-date" aria-hidden="true">{readoutDate(date, today)}</p>
-        <a class="trend-open-day" href={openDayHref(date, today)} tabIndex={-1}
-          onClick={openDayClick(date, today)}>
-          Open day<span class="sr-only">{`, ${openDayName(date, today)}`}</span>{' '}
-          <span aria-hidden="true">›</span>
+        <p class="trend-readout-date" aria-hidden="true">
+          {readoutDate(date, today)}
+        </p>
+        <a class="trend-open-day" href={openDayHref(date, today)} tabIndex={-1} onClick={openDayClick(date, today)}>
+          Open day<span class="sr-only">{`, ${openDayName(date, today)}`}</span> <span aria-hidden="true">›</span>
         </a>
       </div>
-      <p class="trend-readout-value" aria-hidden="true">{readoutLine(metric, cells, avgDays)}</p>
+      <p class="trend-readout-value" aria-hidden="true">
+        {readoutLine(metric, cells, avgDays)}
+      </p>
     </div>
   );
 }

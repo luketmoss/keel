@@ -98,10 +98,15 @@ export function nightOf(date: string, isToday: boolean): string {
 }
 
 const denverClock = new Intl.DateTimeFormat('en-US', {
-  timeZone: DENVER, hour: 'numeric', minute: '2-digit', hour12: true,
+  timeZone: DENVER,
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true,
 });
 const denverMonthDay = new Intl.DateTimeFormat('en-US', {
-  timeZone: DENVER, month: 'short', day: 'numeric',
+  timeZone: DENVER,
+  month: 'short',
+  day: 'numeric',
 });
 
 /**

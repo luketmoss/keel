@@ -45,7 +45,11 @@ export function sun(date: string): SunTimes {
   const g = ((2 * Math.PI) / 365) * (doy - 1);
   const eq =
     229.18 *
-    (0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g) - 0.014615 * Math.cos(2 * g) - 0.040849 * Math.sin(2 * g));
+    (0.000075 +
+      0.001868 * Math.cos(g) -
+      0.032077 * Math.sin(g) -
+      0.014615 * Math.cos(2 * g) -
+      0.040849 * Math.sin(2 * g));
   const decl =
     0.006918 -
     0.399912 * Math.cos(g) +
@@ -56,7 +60,8 @@ export function sun(date: string): SunTimes {
     0.00148 * Math.sin(3 * g);
   const lat = (LAT * Math.PI) / 180;
   const ha =
-    (Math.acos(Math.cos((ZENITH * Math.PI) / 180) / (Math.cos(lat) * Math.cos(decl)) - Math.tan(lat) * Math.tan(decl)) * 180) /
+    (Math.acos(Math.cos((ZENITH * Math.PI) / 180) / (Math.cos(lat) * Math.cos(decl)) - Math.tan(lat) * Math.tan(decl)) *
+      180) /
     Math.PI;
   const off = tzOffset(date);
   const rise = 720 - 4 * (LON + ha) - eq + off;

@@ -14,7 +14,9 @@ import { plannedSetCount, repsSummary, REPS_INPUT_PROPS, MAX_PLANNED_SETS } from
 import { WorkoutPlanner, type PlannerExercise } from './workout-planner';
 
 const saveWorkoutForLater = vi.fn(async (_data: unknown, _token: string) => undefined);
-const savePlannedWorkoutEdits = vi.fn(async (_id: string, _patch: unknown, _exercises: unknown, _token: string) => undefined);
+const savePlannedWorkoutEdits = vi.fn(
+  async (_id: string, _patch: unknown, _exercises: unknown, _token: string) => undefined,
+);
 
 vi.mock('../../state/actions', () => ({
   startWorkout: vi.fn(),
@@ -43,19 +45,53 @@ const { WorkoutDetail } = await import('../activities/workout-detail');
 
 function planned(): WorkoutWithRow {
   return {
-    id: 'w_plan', date: '2099-12-31', time: '', type: 'weight', name: 'Upper Push A', template_id: '',
-    notes: '', elapsed_seconds: '', created: '', copied_from: '', status: 'planned', moving_seconds: '',
-    effort: '', distance_m: '', ascent_m: '', descent_m: '', avg_hr: '', sub_type: '',
-    source: '', source_activity_id: '', raw_ref: '', fit_ref: '', fit_fetched_at: '', synced_at: '',
-    started_at_utc: '', calories: '', estimated_seconds: '', sport_type: '', track_ref: '', sheetRow: 2,
+    id: 'w_plan',
+    date: '2099-12-31',
+    time: '',
+    type: 'weight',
+    name: 'Upper Push A',
+    template_id: '',
+    notes: '',
+    elapsed_seconds: '',
+    created: '',
+    copied_from: '',
+    status: 'planned',
+    moving_seconds: '',
+    effort: '',
+    distance_m: '',
+    ascent_m: '',
+    descent_m: '',
+    avg_hr: '',
+    sub_type: '',
+    source: '',
+    source_activity_id: '',
+    raw_ref: '',
+    fit_ref: '',
+    fit_fetched_at: '',
+    synced_at: '',
+    started_at_utc: '',
+    calories: '',
+    estimated_seconds: '',
+    sport_type: '',
+    track_ref: '',
+    sheetRow: 2,
   };
 }
 
 let row = 1;
 function planSets(id: string, name: string, section: string, order: number, reps: string[]): SetWithRow[] {
   return reps.map((planned_reps, i) => ({
-    workout_id: 'w_plan', exercise_id: id, exercise_name: name, section, exercise_order: order,
-    set_number: i + 1, planned_reps, weight: '', reps: '', effort: '', sheetRow: ++row,
+    workout_id: 'w_plan',
+    exercise_id: id,
+    exercise_name: name,
+    section,
+    exercise_order: order,
+    set_number: i + 1,
+    planned_reps,
+    weight: '',
+    reps: '',
+    effort: '',
+    sheetRow: ++row,
   }));
 }
 
@@ -88,7 +124,8 @@ const setsInput = () => screen.getByLabelText('Sets') as HTMLInputElement;
 const allInput = () => screen.getByLabelText('Reps, all sets') as HTMLInputElement;
 const rowInputs = () => Array.from(document.querySelectorAll<HTMLInputElement>('.planner-set-row input'));
 const rowValues = () => rowInputs().map((el) => el.value);
-const rowLabels = () => Array.from(document.querySelectorAll<HTMLLabelElement>('.planner-set-row label')).map((l) => l.textContent);
+const rowLabels = () =>
+  Array.from(document.querySelectorAll<HTMLLabelElement>('.planner-set-row label')).map((l) => l.textContent);
 const type = (el: HTMLInputElement, value: string) => fireEvent.input(el, { target: { value } });
 
 function button(text: string): HTMLElement {
@@ -111,7 +148,11 @@ function openEditor(i: number) {
 async function savedEditorEntries() {
   await tap('Save Workout');
   expect(savePlannedWorkoutEdits).toHaveBeenCalledTimes(1);
-  return savePlannedWorkoutEdits.mock.calls[0][2] as { exercise_id: string; sets: number; planned_reps_by_set?: string[] }[];
+  return savePlannedWorkoutEdits.mock.calls[0][2] as {
+    exercise_id: string;
+    sets: number;
+    planned_reps_by_set?: string[];
+  }[];
 }
 const benchSaved = async () => (await savedEditorEntries()).find((e) => e.exercise_id === 'ex_bench')!;
 
@@ -134,11 +175,20 @@ afterEach(() => {
 
 describe('plannedSetCount: one rule for the rows and the save', () => {
   it.each([
-    ['3', 3], ['', 1], ['0', 1], ['-1', 1], ['abc', 1], ['2.9', 2], ['0.5', 1], ['20', 20], ['21', 20], ['999', 20],
+    ['3', 3],
+    ['', 1],
+    ['0', 1],
+    ['-1', 1],
+    ['abc', 1],
+    ['2.9', 2],
+    ['0.5', 1],
+    ['20', 20],
+    ['21', 20],
+    ['999', 20],
   ])('%j → %i', (typed, n) => {
     expect(plannedSetCount(typed)).toBe(n);
   });
-  it('caps at the Sets input\'s own max', () => {
+  it("caps at the Sets input's own max", () => {
     expect(MAX_PLANNED_SETS).toBe(20);
   });
 });
@@ -159,7 +209,7 @@ describe('repsSummary', () => {
 
 // ── AC1 ────────────────────────────────────────────────────────────
 
-describe('AC1: the editor shows each set\'s planned reps', () => {
+describe("AC1: the editor shows each set's planned reps", () => {
   it('a varied entry: a "Reps per set" group, one row per set in order, "Reps, all sets" blank with Varies', () => {
     openEditor(ENTRY.bench);
     expect(setsInput().value).toBe('3');
@@ -199,7 +249,7 @@ describe('AC1: the editor shows each set\'s planned reps', () => {
     expect(meta(ENTRY.warm)).toBeNull();
   });
 
-  it('the planned workout\'s detail view reads the same summaries', () => {
+  it("the planned workout's detail view reads the same summaries", () => {
     render(<WorkoutDetail workoutId="w_plan" />);
     const metas = Array.from(document.querySelectorAll('.compact-card-meta'));
     const texts = metas.map((m) => (m.querySelector('[aria-hidden="true"]') ?? m).textContent);
@@ -303,7 +353,10 @@ describe('AC3: changing the Sets count', () => {
   });
 
   it.each([
-    ['', 1], ['0', 1], ['2.7', 2], ['25', 20],
+    ['', 1],
+    ['0', 1],
+    ['2.7', 2],
+    ['25', 20],
   ])('Sets %j shows and saves %i rows', async (typed, n) => {
     openEditor(ENTRY.row);
     type(setsInput(), typed);
@@ -316,7 +369,9 @@ describe('AC3: changing the Sets count', () => {
   it('warmup hides the rows (nothing saved for them); back again shows their values', async () => {
     openEditor(ENTRY.bench);
     const pill = (text: string) =>
-      Array.from(document.querySelectorAll<HTMLButtonElement>('.section-picker-row button')).find((b) => b.textContent === text)!;
+      Array.from(document.querySelectorAll<HTMLButtonElement>('.section-picker-row button')).find(
+        (b) => b.textContent === text,
+      )!;
     fireEvent.click(pill('warmup'));
     expect(rowInputs()).toHaveLength(0);
     expect(meta(ENTRY.bench)).toBeNull();
@@ -335,17 +390,41 @@ describe('AC4: the new-plan planner behaves the same', () => {
     id: 'tpl_push',
     name: 'Upper Push A',
     exercises: [
-      { template_id: 'tpl_push', template_name: 'Upper Push A', order: 1, exercise_id: 'ex_w', exercise_name: 'Arm Circles', section: 'warmup', sets: '', reps: '', sheetRow: 2 },
-      { template_id: 'tpl_push', template_name: 'Upper Push A', order: 2, exercise_id: 'ex_1', exercise_name: 'Bench Press BB', section: 'primary', sets: '3', reps: '8', sheetRow: 3 },
+      {
+        template_id: 'tpl_push',
+        template_name: 'Upper Push A',
+        order: 1,
+        exercise_id: 'ex_w',
+        exercise_name: 'Arm Circles',
+        section: 'warmup',
+        sets: '',
+        reps: '',
+        sheetRow: 2,
+      },
+      {
+        template_id: 'tpl_push',
+        template_name: 'Upper Push A',
+        order: 2,
+        exercise_id: 'ex_1',
+        exercise_name: 'Bench Press BB',
+        section: 'primary',
+        sets: '3',
+        reps: '8',
+        sheetRow: 3,
+      },
     ],
   };
   beforeEach(() => {
     templates.value = [PUSH];
   });
   const saved = () =>
-    (saveWorkoutForLater.mock.calls[0][0] as { exercises: { exercise_id: string; sets: number; planned_reps_by_set?: string[] }[] }).exercises;
+    (
+      saveWorkoutForLater.mock.calls[0][0] as {
+        exercises: { exercise_id: string; sets: number; planned_reps_by_set?: string[] }[];
+      }
+    ).exercises;
 
-  it('a template row with Sets 3, Reps 8 shows three rows reading 8; Save writes each set\'s own value', async () => {
+  it("a template row with Sets 3, Reps 8 shows three rows reading 8; Save writes each set's own value", async () => {
     render(<WorkoutFlow planDate="2099-12-31" />);
     await tap('Upper Push A');
     expect(visual(1)).toBe('3 × 8');
@@ -363,7 +442,7 @@ describe('AC4: the new-plan planner behaves the same', () => {
     ]);
   });
 
-  it('an untouched template plan saves the template\'s Reps on every set, as today', async () => {
+  it("an untouched template plan saves the template's Reps on every set, as today", async () => {
     render(<WorkoutFlow planDate="2099-12-31" />);
     await tap('Upper Push A');
     await tap('Save Workout');
@@ -371,10 +450,12 @@ describe('AC4: the new-plan planner behaves the same', () => {
   });
 
   it('#376 AC4: a template row with Reps 4-6 holds 4-6 in every row, read-only, and Save writes it to every set', async () => {
-    templates.value = [{
-      ...PUSH,
-      exercises: PUSH.exercises.map((r) => (r.exercise_id === 'ex_1' ? { ...r, reps: '4-6' } : r)),
-    }];
+    templates.value = [
+      {
+        ...PUSH,
+        exercises: PUSH.exercises.map((r) => (r.exercise_id === 'ex_1' ? { ...r, reps: '4-6' } : r)),
+      },
+    ];
     render(<WorkoutFlow planDate="2099-12-31" />);
     await tap('Upper Push A');
     fireEvent.click(cards()[1]);

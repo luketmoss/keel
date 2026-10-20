@@ -141,9 +141,10 @@ function rule(selector: string): string {
 }
 
 function tokens(theme: 'light' | 'dark'): Record<string, string> {
-  const block = theme === 'light'
-    ? style.match(/:root\s*\{([^}]*)\}/)![1]
-    : style.match(/@media \(prefers-color-scheme: dark\)\s*\{\s*:root\s*\{([^}]*)\}/)![1];
+  const block =
+    theme === 'light'
+      ? style.match(/:root\s*\{([^}]*)\}/)![1]
+      : style.match(/@media \(prefers-color-scheme: dark\)\s*\{\s*:root\s*\{([^}]*)\}/)![1];
   return Object.fromEntries([...block.matchAll(/(--[\w-]+)\s*:\s*(#[0-9a-fA-F]{6})/g)].map((m) => [m[1], m[2]]));
 }
 

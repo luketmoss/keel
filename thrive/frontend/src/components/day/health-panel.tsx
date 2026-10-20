@@ -50,10 +50,14 @@ export function HealthRow({ row }: { row: HealthRowView }) {
         {row.qualifier && <span class="health-qualifier">{` · ${row.qualifier}`}</span>}
       </dt>
       <dd class="health-data">
-        {row.value
-          ? <span class="health-value">{row.value}</span>
-          : <span class="health-value health-value-blank">—</span>}
-        {row.captions.map((c, i) => <Caption key={i} c={c} />)}
+        {row.value ? (
+          <span class="health-value">{row.value}</span>
+        ) : (
+          <span class="health-value health-value-blank">—</span>
+        )}
+        {row.captions.map((c, i) => (
+          <Caption key={i} c={c} />
+        ))}
       </dd>
     </div>
   );
@@ -65,16 +69,28 @@ export function HealthPanel({ date, state }: DayPanelProps) {
   if (tab.state !== 'loaded') {
     return (
       <Panel title="Health">
-        <PanelStatus status={tab.state} what="your health data" onRetry={() => { if (token) void loadHealth(token); }} />
+        <PanelStatus
+          status={tab.state}
+          what="your health data"
+          onRetry={() => {
+            if (token) void loadHealth(token);
+          }}
+        />
       </Panel>
     );
   }
   const view = healthView(tab.rows, date, state === 'today');
   return (
     <Panel title="Health" sub={view.sub}>
-      {view.kind === 'note'
-        ? <PanelNote>{view.note}</PanelNote>
-        : <dl class="health-list">{view.rows.map((r) => <HealthRow key={r.key} row={r} />)}</dl>}
+      {view.kind === 'note' ? (
+        <PanelNote>{view.note}</PanelNote>
+      ) : (
+        <dl class="health-list">
+          {view.rows.map((r) => (
+            <HealthRow key={r.key} row={r} />
+          ))}
+        </dl>
+      )}
     </Panel>
   );
 }

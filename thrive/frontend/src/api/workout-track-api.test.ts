@@ -11,10 +11,23 @@ const TRACK = {
   type: 'Feature',
   bbox: [-100.01, 45, -100, 45.002],
   properties: {
-    format: 'thrive-track', version: 1, source: 'coros', activity_id: '1', start_utc: '2026-06-01T14:00:00.000Z',
-    t: [0, 60], ele: [800, null], simplify: { algorithm: 'rdp', tolerance_m: 5 }, points_in: 100,
+    format: 'thrive-track',
+    version: 1,
+    source: 'coros',
+    activity_id: '1',
+    start_utc: '2026-06-01T14:00:00.000Z',
+    t: [0, 60],
+    ele: [800, null],
+    simplify: { algorithm: 'rdp', tolerance_m: 5 },
+    points_in: 100,
   },
-  geometry: { type: 'LineString', coordinates: [[-100, 45], [-100.01, 45.002]] },
+  geometry: {
+    type: 'LineString',
+    coordinates: [
+      [-100, 45],
+      [-100.01, 45.002],
+    ],
+  },
 };
 
 const answer = (body: unknown, init: ResponseInit = { status: 200 }) =>
@@ -22,10 +35,14 @@ const answer = (body: unknown, init: ResponseInit = { status: 200 }) =>
 
 describe('getWorkoutTrack', () => {
   it('POSTs the token in the body, never the URL, and returns the track', async () => {
-    const fetchImpl = vi.fn(async (_url: unknown, _init?: RequestInit) =>
-      new Response(JSON.stringify({ success: true, data: { workout_id: 'w1', track: TRACK } }), { status: 200 }),
+    const fetchImpl = vi.fn(
+      async (_url: unknown, _init?: RequestInit) =>
+        new Response(JSON.stringify({ success: true, data: { workout_id: 'w1', track: TRACK } }), { status: 200 }),
     );
-    const out = await getWorkoutTrack('w1', 'tok-secret', { url: URL_, fetchImpl: fetchImpl as unknown as typeof fetch });
+    const out = await getWorkoutTrack('w1', 'tok-secret', {
+      url: URL_,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
     expect(out).toEqual({ ok: true, track: TRACK });
     const [url, init] = fetchImpl.mock.calls[0];
     expect(String(url)).toBe(URL_);
@@ -45,15 +62,22 @@ describe('getWorkoutTrack', () => {
   });
 
   it('says no_track for a refusal, and passes a token code word through', async () => {
-    const none = await getWorkoutTrack('w1', 't', { url: URL_, fetchImpl: answer({ success: false, error: 'has no GPS track' }) });
+    const none = await getWorkoutTrack('w1', 't', {
+      url: URL_,
+      fetchImpl: answer({ success: false, error: 'has no GPS track' }),
+    });
     expect(none).toEqual({ ok: false, kind: 'no_track' });
-    const bad = await getWorkoutTrack('w1', 't', { url: URL_, fetchImpl: answer({ success: false, code: 'token_invalid', error: 'x' }) });
+    const bad = await getWorkoutTrack('w1', 't', {
+      url: URL_,
+      fetchImpl: answer({ success: false, code: 'token_invalid', error: 'x' }),
+    });
     expect(bad).toEqual({ ok: false, kind: 'token_invalid' });
   });
 
   it('never carries the response body or the token in a failure', async () => {
     const out = await getWorkoutTrack('w1', 'tok-secret', {
-      url: URL_, fetchImpl: answer({ success: false, error: 'tok-secret leaked here' }),
+      url: URL_,
+      fetchImpl: answer({ success: false, error: 'tok-secret leaked here' }),
     });
     expect(JSON.stringify(out)).not.toContain('leaked');
     expect(JSON.stringify(out)).not.toContain('tok-secret');
@@ -65,20 +89,41 @@ describe('getWorkoutTrack', () => {
       { ...TRACK, properties: { ...TRACK.properties, format: 'other' } },
       { ...TRACK, geometry: { type: 'Point', coordinates: [0, 0] } },
       { ...TRACK, geometry: { type: 'LineString', coordinates: [[1, 2]] } },
-      { ...TRACK, geometry: { type: 'LineString', coordinates: [[1, 2], ['a', 'b']] } },
+      {
+        ...TRACK,
+        geometry: {
+          type: 'LineString',
+          coordinates: [
+            [1, 2],
+            ['a', 'b'],
+          ],
+        },
+      },
     ]) {
-      const out = await getWorkoutTrack('w1', 't', { url: URL_, fetchImpl: answer({ success: true, data: { track } }) });
+      const out = await getWorkoutTrack('w1', 't', {
+        url: URL_,
+        fetchImpl: answer({ success: true, data: { track } }),
+      });
       expect(out).toEqual({ ok: false, kind: 'bad_response' });
     }
   });
 
   it('classifies http, network and timeout failures without throwing', async () => {
-    expect(await getWorkoutTrack('w1', 't', { url: URL_, fetchImpl: answer({}, { status: 500 }) })).toEqual({ ok: false, kind: 'http_500' });
-    const down = vi.fn(async () => { throw new TypeError('offline'); }) as unknown as typeof fetch;
+    expect(await getWorkoutTrack('w1', 't', { url: URL_, fetchImpl: answer({}, { status: 500 }) })).toEqual({
+      ok: false,
+      kind: 'http_500',
+    });
+    const down = vi.fn(async () => {
+      throw new TypeError('offline');
+    }) as unknown as typeof fetch;
     expect(await getWorkoutTrack('w1', 't', { url: URL_, fetchImpl: down })).toEqual({ ok: false, kind: 'network' });
-    const hang = vi.fn((_u: unknown, init?: RequestInit) =>
-      new Promise((_r, reject) => init?.signal?.addEventListener('abort', () => reject(new Error('aborted')))),
+    const hang = vi.fn(
+      (_u: unknown, init?: RequestInit) =>
+        new Promise((_r, reject) => init?.signal?.addEventListener('abort', () => reject(new Error('aborted')))),
     ) as unknown as typeof fetch;
-    expect(await getWorkoutTrack('w1', 't', { url: URL_, fetchImpl: hang, timeoutMs: 5 })).toEqual({ ok: false, kind: 'timeout' });
+    expect(await getWorkoutTrack('w1', 't', { url: URL_, fetchImpl: hang, timeoutMs: 5 })).toEqual({
+      ok: false,
+      kind: 'timeout',
+    });
   });
 });

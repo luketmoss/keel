@@ -17,7 +17,7 @@ function AuthenticatedApp() {
   useEffect(() => {
     if (!token) return;
 
-    loadBoard(token, user).catch(err => {
+    loadBoard(token, user).catch((err) => {
       if (err instanceof NotAllowedError) {
         showToast(err.message, 'error');
         logout();

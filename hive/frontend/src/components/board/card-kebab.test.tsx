@@ -33,9 +33,7 @@ function makeItem(overrides: Partial<ItemWithRow> = {}): ItemWithRow {
 }
 
 function makeColumnItems(count: number): ItemWithRow[] {
-  return Array.from({ length: count }, (_, i) =>
-    makeItem({ id: `item-${i}`, title: `Item ${i}`, sort_order: i + 1 })
-  );
+  return Array.from({ length: count }, (_, i) => makeItem({ id: `item-${i}`, title: `Item ${i}`, sort_order: i + 1 }));
 }
 
 describe('Card kebab menu integration', () => {
@@ -44,13 +42,7 @@ describe('Card kebab menu integration', () => {
     it('renders kebab trigger when onDelete is provided', () => {
       const items = makeColumnItems(3);
       const { container } = render(
-        <Card
-          item={items[1]}
-          columnItems={items}
-          onMoveToTop={vi.fn()}
-          onMoveToBottom={vi.fn()}
-          onDelete={vi.fn()}
-        />
+        <Card item={items[1]} columnItems={items} onMoveToTop={vi.fn()} onMoveToBottom={vi.fn()} onDelete={vi.fn()} />,
       );
       const trigger = container.querySelector('.kebab-trigger');
       expect(trigger).not.toBeNull();
@@ -66,13 +58,7 @@ describe('Card kebab menu integration', () => {
     it('kebab trigger is keyboard-accessible (tabIndex=0)', () => {
       const items = makeColumnItems(3);
       const { container } = render(
-        <Card
-          item={items[1]}
-          columnItems={items}
-          onMoveToTop={vi.fn()}
-          onMoveToBottom={vi.fn()}
-          onDelete={vi.fn()}
-        />
+        <Card item={items[1]} columnItems={items} onMoveToTop={vi.fn()} onMoveToBottom={vi.fn()} onDelete={vi.fn()} />,
       );
       const trigger = container.querySelector('.kebab-trigger') as HTMLElement;
       expect(trigger.getAttribute('tabindex')).toBe('0');
@@ -84,13 +70,7 @@ describe('Card kebab menu integration', () => {
     it('"Move to top" is disabled when card is first in column', () => {
       const items = makeColumnItems(3);
       const { container } = render(
-        <Card
-          item={items[0]}
-          columnItems={items}
-          onMoveToTop={vi.fn()}
-          onMoveToBottom={vi.fn()}
-          onDelete={vi.fn()}
-        />
+        <Card item={items[0]} columnItems={items} onMoveToTop={vi.fn()} onMoveToBottom={vi.fn()} onDelete={vi.fn()} />,
       );
       fireEvent.click(container.querySelector('.kebab-trigger')!);
       const menuItems = container.querySelectorAll('[role="menuitem"]');
@@ -100,13 +80,7 @@ describe('Card kebab menu integration', () => {
     it('"Move to top" is enabled when card is not first in column', () => {
       const items = makeColumnItems(3);
       const { container } = render(
-        <Card
-          item={items[1]}
-          columnItems={items}
-          onMoveToTop={vi.fn()}
-          onMoveToBottom={vi.fn()}
-          onDelete={vi.fn()}
-        />
+        <Card item={items[1]} columnItems={items} onMoveToTop={vi.fn()} onMoveToBottom={vi.fn()} onDelete={vi.fn()} />,
       );
       fireEvent.click(container.querySelector('.kebab-trigger')!);
       const menuItems = container.querySelectorAll('[role="menuitem"]');
@@ -123,7 +97,7 @@ describe('Card kebab menu integration', () => {
           onMoveToTop={onMoveToTop}
           onMoveToBottom={vi.fn()}
           onDelete={vi.fn()}
-        />
+        />,
       );
       fireEvent.click(container.querySelector('.kebab-trigger')!);
       const menuItems = container.querySelectorAll('[role="menuitem"]');
@@ -137,13 +111,7 @@ describe('Card kebab menu integration', () => {
     it('"Move to bottom" is disabled when card is last in column', () => {
       const items = makeColumnItems(3);
       const { container } = render(
-        <Card
-          item={items[2]}
-          columnItems={items}
-          onMoveToTop={vi.fn()}
-          onMoveToBottom={vi.fn()}
-          onDelete={vi.fn()}
-        />
+        <Card item={items[2]} columnItems={items} onMoveToTop={vi.fn()} onMoveToBottom={vi.fn()} onDelete={vi.fn()} />,
       );
       fireEvent.click(container.querySelector('.kebab-trigger')!);
       const menuItems = container.querySelectorAll('[role="menuitem"]');
@@ -153,13 +121,7 @@ describe('Card kebab menu integration', () => {
     it('"Move to bottom" is enabled when card is not last in column', () => {
       const items = makeColumnItems(3);
       const { container } = render(
-        <Card
-          item={items[0]}
-          columnItems={items}
-          onMoveToTop={vi.fn()}
-          onMoveToBottom={vi.fn()}
-          onDelete={vi.fn()}
-        />
+        <Card item={items[0]} columnItems={items} onMoveToTop={vi.fn()} onMoveToBottom={vi.fn()} onDelete={vi.fn()} />,
       );
       fireEvent.click(container.querySelector('.kebab-trigger')!);
       const menuItems = container.querySelectorAll('[role="menuitem"]');
@@ -176,7 +138,7 @@ describe('Card kebab menu integration', () => {
           onMoveToTop={vi.fn()}
           onMoveToBottom={onMoveToBottom}
           onDelete={vi.fn()}
-        />
+        />,
       );
       fireEvent.click(container.querySelector('.kebab-trigger')!);
       const menuItems = container.querySelectorAll('[role="menuitem"]');
@@ -197,7 +159,7 @@ describe('Card kebab menu integration', () => {
           onMoveToBottom={vi.fn()}
           onCopy={vi.fn()}
           onDelete={vi.fn()}
-        />
+        />,
       );
       fireEvent.click(container.querySelector('.kebab-trigger')!);
       const menuItems = container.querySelectorAll('[role="menuitem"]');
@@ -218,7 +180,7 @@ describe('Card kebab menu integration', () => {
           onMoveToBottom={vi.fn()}
           onCopy={onCopy}
           onDelete={vi.fn()}
-        />
+        />,
       );
       fireEvent.click(container.querySelector('.kebab-trigger')!);
       const menuItems = container.querySelectorAll('[role="menuitem"]');
@@ -229,13 +191,7 @@ describe('Card kebab menu integration', () => {
     it('"Copy" is not shown when onCopy is not provided', () => {
       const items = makeColumnItems(3);
       const { container } = render(
-        <Card
-          item={items[1]}
-          columnItems={items}
-          onMoveToTop={vi.fn()}
-          onMoveToBottom={vi.fn()}
-          onDelete={vi.fn()}
-        />
+        <Card item={items[1]} columnItems={items} onMoveToTop={vi.fn()} onMoveToBottom={vi.fn()} onDelete={vi.fn()} />,
       );
       fireEvent.click(container.querySelector('.kebab-trigger')!);
       const menuItems = container.querySelectorAll('[role="menuitem"]');
@@ -257,7 +213,7 @@ describe('Card kebab menu integration', () => {
           onMoveToBottom={vi.fn()}
           onCopy={vi.fn()}
           onDelete={onDelete}
-        />
+        />,
       );
       fireEvent.click(container.querySelector('.kebab-trigger')!);
       const menuItems = container.querySelectorAll('[role="menuitem"]');
@@ -275,7 +231,7 @@ describe('Card kebab menu integration', () => {
           onMoveToBottom={vi.fn()}
           onCopy={vi.fn()}
           onDelete={vi.fn()}
-        />
+        />,
       );
       fireEvent.click(container.querySelector('.kebab-trigger')!);
       const menuItems = container.querySelectorAll('[role="menuitem"]');
@@ -288,13 +244,7 @@ describe('Card kebab menu integration', () => {
     it('both move actions are disabled when column has only one item', () => {
       const items = makeColumnItems(1);
       const { container } = render(
-        <Card
-          item={items[0]}
-          columnItems={items}
-          onMoveToTop={vi.fn()}
-          onMoveToBottom={vi.fn()}
-          onDelete={vi.fn()}
-        />
+        <Card item={items[0]} columnItems={items} onMoveToTop={vi.fn()} onMoveToBottom={vi.fn()} onDelete={vi.fn()} />,
       );
       fireEvent.click(container.querySelector('.kebab-trigger')!);
       const menuItems = container.querySelectorAll('[role="menuitem"]');

@@ -126,8 +126,7 @@ export function useFocusTrap(onEscape?: () => void, options?: FocusTrapOptions) 
     const focusableEls = focusableIn(container);
     // Skip a hidden autofocus target only when there is a rendered alternative;
     // without layout information (jsdom) the declared target still wins.
-    const autofocusUsable =
-      autofocusEl && (isRendered(autofocusEl) || !focusableEls.some(isRendered));
+    const autofocusUsable = autofocusEl && (isRendered(autofocusEl) || !focusableEls.some(isRendered));
     if (autofocusUsable) {
       autofocusEl.focus();
     } else if (focusableEls.length > 0) {
@@ -175,11 +174,8 @@ export function useFocusTrap(onEscape?: () => void, options?: FocusTrapOptions) 
       // rather than dropping focus on `document.body`.
       const trigger = triggerRef.current;
       const triggerUsable =
-        trigger &&
-        trigger !== document.body &&
-        trigger.isConnected &&
-        typeof trigger.focus === 'function';
-      const target = triggerUsable ? trigger : optionsRef.current?.restoreFocusTo?.() ?? null;
+        trigger && trigger !== document.body && trigger.isConnected && typeof trigger.focus === 'function';
+      const target = triggerUsable ? trigger : (optionsRef.current?.restoreFocusTo?.() ?? null);
       if (target && target.isConnected) {
         focusRestoreTarget(target);
       }

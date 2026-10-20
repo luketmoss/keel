@@ -11,14 +11,7 @@ import { readFileSync } from 'fs';
 import { dirname, resolve } from 'path';
 // @ts-ignore -- Node builtins available at test runtime
 import { fileURLToPath } from 'url';
-import {
-  SUITE_CSS_PATH,
-  TOKEN_SELECTORS,
-  readGlobalCss,
-  readGlobalCssRaw,
-  readSuiteCss,
-  tokens,
-} from './test-css';
+import { SUITE_CSS_PATH, TOKEN_SELECTORS, readGlobalCss, readGlobalCssRaw, readSuiteCss, tokens } from './test-css';
 import before from './tokens-before-446.json';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -36,19 +29,42 @@ function theme(css: string, name: 'light' | 'dark'): Record<string, string> {
 }
 
 const HIVE_ROOT = [
-  '--color-accent', '--color-primary-light', '--focus-ring',
-  '--column-width', '--header-height', '--control-bar-height',
+  '--color-accent',
+  '--color-primary-light',
+  '--focus-ring',
+  '--column-width',
+  '--header-height',
+  '--control-bar-height',
   // #452's interaction-state tokens
-  '--state-hover', '--state-pressed', '--opacity-disabled', '--focus-ring-width', '--focus-ring-offset',
+  '--state-hover',
+  '--state-pressed',
+  '--opacity-disabled',
+  '--focus-ring-width',
+  '--focus-ring-offset',
   // #453's touch-target floor
   '--touch-target',
 ];
 const HIVE_THEME = [
-  '--color-primary', '--color-primary-hover', '--color-primary-rgb', '--color-focus', '--color-on-primary',
-  '--color-todo', '--color-inprogress', '--color-done',
-  '--color-col-indigo', '--color-col-purple', '--color-col-pink', '--color-col-teal', '--color-col-amber',
-  '--color-bucket-overdue', '--color-bucket-this-week', '--color-bucket-next-week', '--color-bucket-later',
-  '--color-overdue', '--color-demo-bg', '--color-demo-text',
+  '--color-primary',
+  '--color-primary-hover',
+  '--color-primary-rgb',
+  '--color-focus',
+  '--color-on-primary',
+  '--color-todo',
+  '--color-inprogress',
+  '--color-done',
+  '--color-col-indigo',
+  '--color-col-purple',
+  '--color-col-pink',
+  '--color-col-teal',
+  '--color-col-amber',
+  '--color-bucket-overdue',
+  '--color-bucket-this-week',
+  '--color-bucket-next-week',
+  '--color-bucket-later',
+  '--color-overdue',
+  '--color-demo-bg',
+  '--color-demo-text',
 ];
 
 describe('AC1: global.css imports the suite file and redefines none of it', () => {
@@ -62,10 +78,11 @@ describe('AC1: global.css imports the suite file and redefines none of it', () =
     const shared = new Set(TOKEN_SELECTORS.flatMap((s) => Object.keys(tokens(suite, s))));
     const declared = [...stripComments(raw).matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]);
     expect(declared.filter((n) => shared.has(n)).sort()).toEqual(['--shadow', '--shadow-lg']);
-    expect(Object.keys(tokens(raw, '[data-theme="dark"]')).filter((n) => shared.has(n)).sort()).toEqual([
-      '--shadow',
-      '--shadow-lg',
-    ]);
+    expect(
+      Object.keys(tokens(raw, '[data-theme="dark"]'))
+        .filter((n) => shared.has(n))
+        .sort(),
+    ).toEqual(['--shadow', '--shadow-lg']);
   });
 });
 
@@ -109,7 +126,11 @@ describe('AC3: exactly this moves', () => {
     ['--overlay-badge', 'rgba(0, 0, 0, 0.15)', null],
     ['--overlay-view-toggle', 'rgba(0, 0, 0, 0.04)', null],
     // Same colour, now spelt as the suite's literal rather than through --overlay-*.
-    ['--shadow', '0 1px 3px var(--overlay-3xl), 0 1px 2px var(--overlay-md)', '0 1px 3px rgba(0,0,0,0.15), 0 1px 2px rgba(0,0,0,0.05)'],
+    [
+      '--shadow',
+      '0 1px 3px var(--overlay-3xl), 0 1px 2px var(--overlay-md)',
+      '0 1px 3px rgba(0,0,0,0.15), 0 1px 2px rgba(0,0,0,0.05)',
+    ],
     ['--shadow-lg', '0 4px 12px var(--overlay-3xl)', '0 4px 12px rgba(0,0,0,0.15)'],
   ];
   const dark: [string, string | null, string | null][] = [
@@ -141,34 +162,43 @@ describe('AC3: exactly this moves', () => {
   ];
   // Tokens the suite defines and Hive did not: they arrive unused.
   const ARRIVE = [
-    '--nav-height', '--shadow-strong', '--color-border-strong',
-    '--color-danger-text', '--color-danger-fill', '--color-danger-fill-hover',
-    '--color-success-light', '--color-success-fill', '--color-warning-light',
-    '--color-on-fill', '--color-overlay', '--color-shadow', '--color-shadow-strong',
+    '--nav-height',
+    '--shadow-strong',
+    '--color-border-strong',
+    '--color-danger-text',
+    '--color-danger-fill',
+    '--color-danger-fill-hover',
+    '--color-success-light',
+    '--color-success-fill',
+    '--color-warning-light',
+    '--color-on-fill',
+    '--color-overlay',
+    '--color-shadow',
+    '--color-shadow-strong',
   ];
 
-  it.each([['light', light], ['dark', dark]] as const)(
-    '%s: the resolved set differs from the snapshot in the tabulated places only',
-    (name, expected) => {
-      const was = snapshot[name];
-      const now = theme(resolved, name);
-      const changed: Record<string, [string | null, string | null]> = {};
-      for (const k of new Set([...Object.keys(was), ...Object.keys(now)])) {
-        if ((was[k] ?? null) !== (now[k] ?? null)) changed[k] = [was[k] ?? null, now[k] ?? null];
-      }
-      const norm = (s: string | null) => (s === null ? null : s.replace(/\s+/g, ''));
-      const want: typeof changed = {};
-      for (const [k, a, b] of [...expected, ...STATES]) want[k] = [a, b];
-      for (const k of ARRIVE) if (!(k in was)) want[k] = [null, now[k] ?? null];
-      // Values compared without whitespace; the keys must match exactly.
-      expect(sorted(Object.keys(changed))).toEqual(sorted(Object.keys(want)));
-      for (const k of Object.keys(want)) {
-        expect([norm(changed[k][0]), norm(changed[k][1])]).toEqual([norm(want[k][0]), norm(want[k][1])]);
-      }
-    },
-  );
+  it.each([
+    ['light', light],
+    ['dark', dark],
+  ] as const)('%s: the resolved set differs from the snapshot in the tabulated places only', (name, expected) => {
+    const was = snapshot[name];
+    const now = theme(resolved, name);
+    const changed: Record<string, [string | null, string | null]> = {};
+    for (const k of new Set([...Object.keys(was), ...Object.keys(now)])) {
+      if ((was[k] ?? null) !== (now[k] ?? null)) changed[k] = [was[k] ?? null, now[k] ?? null];
+    }
+    const norm = (s: string | null) => (s === null ? null : s.replace(/\s+/g, ''));
+    const want: typeof changed = {};
+    for (const [k, a, b] of [...expected, ...STATES]) want[k] = [a, b];
+    for (const k of ARRIVE) if (!(k in was)) want[k] = [null, now[k] ?? null];
+    // Values compared without whitespace; the keys must match exactly.
+    expect(sorted(Object.keys(changed))).toEqual(sorted(Object.keys(want)));
+    for (const k of Object.keys(want)) {
+      expect([norm(changed[k][0]), norm(changed[k][1])]).toEqual([norm(want[k][0]), norm(want[k][1])]);
+    }
+  });
 
-  it('dark keeps its own shadows, not the suite\'s', () => {
+  it("dark keeps its own shadows, not the suite's", () => {
     expect(theme(resolved, 'dark')['--shadow']).toBe(snapshot.dark['--shadow']);
     expect(theme(resolved, 'dark')['--shadow-lg']).toBe(snapshot.dark['--shadow-lg']);
   });
@@ -252,8 +282,14 @@ describe('AC6: muted text passes AA on every surface Hive draws it on', () => {
     return (hi + 0.05) / (lo + 0.05);
   };
   const PASTELS = [
-    '--color-todo', '--color-inprogress', '--color-done', '--color-col-indigo',
-    '--color-col-purple', '--color-col-pink', '--color-col-teal', '--color-col-amber',
+    '--color-todo',
+    '--color-inprogress',
+    '--color-done',
+    '--color-col-indigo',
+    '--color-col-purple',
+    '--color-col-pink',
+    '--color-col-teal',
+    '--color-col-amber',
   ];
   // The two pastels muted text misses by a hair (4.489 and 4.412). Only
   // .column-add-row draws text on them; the "+" glyph needs 3:1.

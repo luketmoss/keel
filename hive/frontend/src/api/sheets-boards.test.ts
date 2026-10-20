@@ -51,7 +51,7 @@ describe('fetchBoards — icon column', () => {
       mockSheetsGetResponse([
         ['board-1', 'Family', '2025-01-01', 'user@test.com', '', '🏠'],
         ['board-2', 'Work', '2025-01-02', 'other@test.com', '', '🏢'],
-      ])
+      ]),
     );
 
     const boards = await fetchBoards('test-token');
@@ -63,9 +63,7 @@ describe('fetchBoards — icon column', () => {
 
   it('board has no color property', async () => {
     mockFetch.mockResolvedValueOnce(
-      mockSheetsGetResponse([
-        ['board-1', 'Family', '2025-01-01', 'user@test.com', '#1976d2', '🏠'],
-      ])
+      mockSheetsGetResponse([['board-1', 'Family', '2025-01-01', 'user@test.com', '#1976d2', '🏠']]),
     );
 
     const boards = await fetchBoards('test-token');
@@ -78,7 +76,7 @@ describe('fetchBoards — icon column', () => {
       mockSheetsGetResponse([
         ['board-1', 'Old Board', '2024-01-01', 'user@test.com'],
         // No columns E or F — pre-feature board
-      ])
+      ]),
     );
 
     const boards = await fetchBoards('test-token');
@@ -102,29 +100,35 @@ describe('createBoardRow — icon written to column F, color always empty', () =
   it('appends board with empty color and icon', async () => {
     mockFetch.mockResolvedValueOnce(mockSheetsWriteResponse());
 
-    await createBoardRow({
-      id: 'b1',
-      name: 'My Board',
-      created_at: '2025-01-01',
-      created_by: 'user@test.com',
-      icon: '🎯',
-    }, 'test-token');
+    await createBoardRow(
+      {
+        id: 'b1',
+        name: 'My Board',
+        created_at: '2025-01-01',
+        created_by: 'user@test.com',
+        icon: '🎯',
+      },
+      'test-token',
+    );
 
     const body = JSON.parse(mockFetch.mock.calls[0][1].body);
     const row = body.values[0];
-    expect(row[4]).toBe('');   // column E = color (always empty)
+    expect(row[4]).toBe(''); // column E = color (always empty)
     expect(row[5]).toBe('🎯'); // column F = icon
   });
 
   it('writes empty strings when icon is not set', async () => {
     mockFetch.mockResolvedValueOnce(mockSheetsWriteResponse());
 
-    await createBoardRow({
-      id: 'b2',
-      name: 'Plain Board',
-      created_at: '2025-01-01',
-      created_by: 'user@test.com',
-    }, 'test-token');
+    await createBoardRow(
+      {
+        id: 'b2',
+        name: 'Plain Board',
+        created_at: '2025-01-01',
+        created_by: 'user@test.com',
+      },
+      'test-token',
+    );
 
     const body = JSON.parse(mockFetch.mock.calls[0][1].body);
     const row = body.values[0];
@@ -138,12 +142,7 @@ describe('createBoardRow — icon written to column F, color always empty', () =
 describe('updateBoardRow', () => {
   it('finds board row by ID and updates columns E and F', async () => {
     // First call: sheetsGet('Boards!A2:A') to find the row
-    mockFetch.mockResolvedValueOnce(
-      mockSheetsGetResponse([
-        ['board-1'],
-        ['board-2'],
-      ])
-    );
+    mockFetch.mockResolvedValueOnce(mockSheetsGetResponse([['board-1'], ['board-2']]));
     // Second call: sheetsUpdate to write color and icon
     mockFetch.mockResolvedValueOnce(mockSheetsWriteResponse());
 
@@ -160,9 +159,7 @@ describe('updateBoardRow', () => {
   });
 
   it('is a no-op if board ID is not found', async () => {
-    mockFetch.mockResolvedValueOnce(
-      mockSheetsGetResponse([['board-1'], ['board-2']])
-    );
+    mockFetch.mockResolvedValueOnce(mockSheetsGetResponse([['board-1'], ['board-2']]));
 
     await updateBoardRow('board-999', '', '❓', 'test-token');
 
@@ -175,12 +172,7 @@ describe('updateBoardRow', () => {
 describe('renameBoardRow (issue #138)', () => {
   it('finds board row by ID and updates column B with the new name', async () => {
     // First call: sheetsGet('Boards!A2:A') to find the row
-    mockFetch.mockResolvedValueOnce(
-      mockSheetsGetResponse([
-        ['board-1'],
-        ['board-2'],
-      ])
-    );
+    mockFetch.mockResolvedValueOnce(mockSheetsGetResponse([['board-1'], ['board-2']]));
     // Second call: sheetsUpdate to write name
     mockFetch.mockResolvedValueOnce(mockSheetsWriteResponse());
 
@@ -197,9 +189,7 @@ describe('renameBoardRow (issue #138)', () => {
   });
 
   it('is a no-op if board ID is not found', async () => {
-    mockFetch.mockResolvedValueOnce(
-      mockSheetsGetResponse([['board-1'], ['board-2']])
-    );
+    mockFetch.mockResolvedValueOnce(mockSheetsGetResponse([['board-1'], ['board-2']]));
 
     await renameBoardRow('board-999', 'Ghost Board', 'test-token');
 
@@ -207,9 +197,7 @@ describe('renameBoardRow (issue #138)', () => {
   });
 
   it('writes to the correct row for the first board (row 2)', async () => {
-    mockFetch.mockResolvedValueOnce(
-      mockSheetsGetResponse([['board-1']])
-    );
+    mockFetch.mockResolvedValueOnce(mockSheetsGetResponse([['board-1']]));
     mockFetch.mockResolvedValueOnce(mockSheetsWriteResponse());
 
     await renameBoardRow('board-1', 'My Board', 'test-token');
@@ -227,10 +215,10 @@ describe('fetchBoards — archived_at column', () => {
       mockSheetsGetResponse([
         ['board-1', 'Home', '', '', '', '🏠'],
         ['board-2', 'Garage', '', '', '', '🔧', '2026-10-18T12:00:00.000Z'],
-      ])
+      ]),
     );
     const boards = await fetchBoards('test-token');
-    expect(boards.map(b => b.archived_at)).toEqual(['', '2026-10-18T12:00:00.000Z']);
+    expect(boards.map((b) => b.archived_at)).toEqual(['', '2026-10-18T12:00:00.000Z']);
   });
 });
 

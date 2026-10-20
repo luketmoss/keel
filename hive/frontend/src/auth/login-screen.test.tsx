@@ -20,8 +20,8 @@ describe('LoginScreen logo (Issue #30 AC4)', () => {
 
     // Logo should come before h1
     const children = Array.from(card!.children);
-    const logoIdx = children.findIndex(c => c.getAttribute('data-testid') === 'hive-logo');
-    const h1Idx = children.findIndex(c => c.tagName === 'H1');
+    const logoIdx = children.findIndex((c) => c.getAttribute('data-testid') === 'hive-logo');
+    const h1Idx = children.findIndex((c) => c.tagName === 'H1');
     expect(logoIdx).toBeLessThan(h1Idx);
   });
 
@@ -50,9 +50,9 @@ describe('Login tagline (Issue #189)', () => {
     const { container } = render(<LoginScreen />);
     const card = container.querySelector('.login-card')!;
     const children = Array.from(card.children);
-    const h1Idx = children.findIndex(c => c.tagName === 'H1');
-    const pIdx = children.findIndex(c => c.tagName === 'P');
-    const btnIdx = children.findIndex(c => c.tagName === 'BUTTON');
+    const h1Idx = children.findIndex((c) => c.tagName === 'H1');
+    const pIdx = children.findIndex((c) => c.tagName === 'P');
+    const btnIdx = children.findIndex((c) => c.tagName === 'BUTTON');
     expect(pIdx).toBeGreaterThan(h1Idx);
     expect(pIdx).toBeLessThan(btnIdx);
   });

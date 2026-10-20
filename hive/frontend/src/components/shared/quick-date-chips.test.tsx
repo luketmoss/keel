@@ -28,7 +28,7 @@ describe('QuickDateChips — Issue #82', () => {
     it('chips have type="button" to prevent form submission', () => {
       const { container } = render(<QuickDateChips value="" onChange={() => {}} />);
       const chips = container.querySelectorAll('.quick-date-chip');
-      chips.forEach(chip => {
+      chips.forEach((chip) => {
         expect((chip as HTMLButtonElement).type).toBe('button');
       });
     });
@@ -70,7 +70,7 @@ describe('QuickDateChips — Issue #82', () => {
     it('non-active chips have aria-pressed="false"', () => {
       const { container } = render(<QuickDateChips value="" onChange={() => {}} />);
       const chips = container.querySelectorAll('.quick-date-chip');
-      chips.forEach(chip => {
+      chips.forEach((chip) => {
         expect(chip.getAttribute('aria-pressed')).toBe('false');
       });
     });

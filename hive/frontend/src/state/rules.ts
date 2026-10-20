@@ -55,7 +55,7 @@ export function applyStatusSideEffects(item: Item, newStatus: ItemStatus, isTerm
  */
 export function statusTransitionAuditAction(
   item: Pick<Item, 'completed_at'>,
-  isTerminal: boolean
+  isTerminal: boolean,
 ): 'completed' | 'reopened' | null {
   if (isTerminal) return 'completed';
   if (item.completed_at) return 'reopened';

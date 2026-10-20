@@ -8,7 +8,10 @@ const SPREADSHEET_ID = import.meta.env.VITE_SPREADSHEET_ID;
 const BASE = 'https://sheets.googleapis.com/v4/spreadsheets';
 
 class SheetsApiError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(
+    public status: number,
+    message: string,
+  ) {
     super(`Sheets API ${status}: ${message}`);
     this.name = 'SheetsApiError';
   }
@@ -80,16 +83,18 @@ async function sheetsDeleteRow(sheetId: number, rowIndex: number, token: string)
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      requests: [{
-        deleteDimension: {
-          range: {
-            sheetId,
-            dimension: 'ROWS',
-            startIndex: rowIndex - 1, // 0-based
-            endIndex: rowIndex,
+      requests: [
+        {
+          deleteDimension: {
+            range: {
+              sheetId,
+              dimension: 'ROWS',
+              startIndex: rowIndex - 1, // 0-based
+              endIndex: rowIndex,
+            },
           },
         },
-      }],
+      ],
     }),
   });
   if (res.status === 401) throw new SheetsApiError(401, 'Token expired');
@@ -119,10 +124,20 @@ function rowToItem(row: any[]): Item {
 
 function itemToRow(item: Item): any[] {
   return [
-    item.id, item.title, item.description, item.status,
-    item.owner, item.due_date, item.labels,
-    item.parent_id, item.created_at, item.updated_at, item.completed_at,
-    item.sort_order, item.created_by, item.board_id,
+    item.id,
+    item.title,
+    item.description,
+    item.status,
+    item.owner,
+    item.due_date,
+    item.labels,
+    item.parent_id,
+    item.created_at,
+    item.updated_at,
+    item.completed_at,
+    item.sort_order,
+    item.created_by,
+    item.board_id,
   ];
 }
 
@@ -141,7 +156,7 @@ export async function fetchAllItems(token: string): Promise<ItemWithRow[]> {
 export async function fetchOwners(token: string): Promise<Owner[]> {
   return withReauth(token, async (t) => {
     const rows = await sheetsGet('Owners!A2:B', t);
-    return rows.map(row => ({
+    return rows.map((row) => ({
       name: row[0] || '',
       google_account: row[1] || '',
     }));
@@ -151,7 +166,7 @@ export async function fetchOwners(token: string): Promise<Owner[]> {
 export async function fetchLabels(token: string): Promise<Label[]> {
   return withReauth(token, async (t) => {
     const rows = await sheetsGet('Labels!A2:C', t);
-    return rows.map(row => ({
+    return rows.map((row) => ({
       label: row[0] || '',
       color: row[1] || '',
       board_id: row[2] || '',
@@ -175,9 +190,7 @@ export async function deleteItemRow(sheetRow: number, token: string): Promise<vo
       headers: { Authorization: `Bearer ${t}` },
     });
     const data = await res.json();
-    const itemsSheet = data.sheets?.find(
-      (s: any) => s.properties.title === 'Items'
-    );
+    const itemsSheet = data.sheets?.find((s: any) => s.properties.title === 'Items');
     const sheetId = itemsSheet?.properties?.sheetId ?? 0;
     await sheetsDeleteRow(sheetId, sheetRow, t);
   });
@@ -190,18 +203,12 @@ export async function deleteItemRow(sheetRow: number, token: string): Promise<vo
  * - If the email is not found, appends a new row (returns true).
  * Returns true if a write occurred (caller should re-fetch owners).
  */
-export async function upsertOwner(
-  name: string,
-  email: string,
-  token: string
-): Promise<boolean> {
+export async function upsertOwner(name: string, email: string, token: string): Promise<boolean> {
   return withReauth(token, async (t) => {
     const rows = await sheetsGet('Owners!A2:B', t);
 
     // Find existing row by email (column B)
-    const existingIndex = rows.findIndex(
-      row => (row[1] || '').toLowerCase() === email.toLowerCase()
-    );
+    const existingIndex = rows.findIndex((row) => (row[1] || '').toLowerCase() === email.toLowerCase());
 
     if (existingIndex >= 0) {
       // Email already exists — check if name needs updating
@@ -228,11 +235,11 @@ export async function appendAuditEntry(
   oldValue: string,
   newValue: string,
   actor: string,
-  token: string
+  token: string,
 ): Promise<void> {
-  return withReauth(token, (t) => sheetsAppend('Audit Log!A:G', [[
-    new Date().toISOString(), itemId, action, field, oldValue, newValue, actor,
-  ]], t));
+  return withReauth(token, (t) =>
+    sheetsAppend('Audit Log!A:G', [[new Date().toISOString(), itemId, action, field, oldValue, newValue, actor]], t),
+  );
 }
 
 // --- Label CRUD ---
@@ -241,7 +248,13 @@ export async function createLabelRow(label: string, color: string, boardId: stri
   return withReauth(token, (t) => sheetsAppend('Labels!A:C', [[label, color, boardId]], t));
 }
 
-export async function updateLabelRow(sheetRow: number, label: string, color: string, boardId: string, token: string): Promise<void> {
+export async function updateLabelRow(
+  sheetRow: number,
+  label: string,
+  color: string,
+  boardId: string,
+  token: string,
+): Promise<void> {
   return withReauth(token, (t) => sheetsUpdate(`Labels!A${sheetRow}:C${sheetRow}`, [[label, color, boardId]], t));
 }
 
@@ -253,9 +266,7 @@ export async function deleteLabelRow(sheetRow: number, token: string): Promise<v
       headers: { Authorization: `Bearer ${t}` },
     });
     const data = await res.json();
-    const labelsSheet = data.sheets?.find(
-      (s: any) => s.properties.title === 'Labels'
-    );
+    const labelsSheet = data.sheets?.find((s: any) => s.properties.title === 'Labels');
     const sheetId = labelsSheet?.properties?.sheetId ?? 0;
     await sheetsDeleteRow(sheetId, sheetRow, t);
   });
@@ -264,7 +275,9 @@ export async function deleteLabelRow(sheetRow: number, token: string): Promise<v
 /**
  * Fetch labels with their sheet row numbers for update/delete operations.
  */
-export async function fetchLabelsWithRows(token: string): Promise<Array<{ label: string; color: string; board_id: string; sheetRow: number }>> {
+export async function fetchLabelsWithRows(
+  token: string,
+): Promise<Array<{ label: string; color: string; board_id: string; sheetRow: number }>> {
   return withReauth(token, async (t) => {
     const rows = await sheetsGet('Labels!A2:C', t);
     return rows.map((row, i) => ({
@@ -285,7 +298,7 @@ export async function cascadeLabelUpdate(
   oldName: string,
   newName: string,
   token: string,
-  boardId?: string
+  boardId?: string,
 ): Promise<void> {
   return withReauth(token, async (t) => {
     const rows = await sheetsGet('Items!A2:N', t);
@@ -294,12 +307,15 @@ export async function cascadeLabelUpdate(
       if (boardId && (rows[i][13] || '') !== boardId) continue;
 
       const labelsStr = rows[i][6] || '';
-      const labelsList = labelsStr.split(',').map((l: string) => l.trim()).filter(Boolean);
+      const labelsList = labelsStr
+        .split(',')
+        .map((l: string) => l.trim())
+        .filter(Boolean);
       if (!labelsList.includes(oldName)) continue;
 
       let updated: string[];
       if (newName) {
-        updated = labelsList.map((l: string) => l === oldName ? newName : l);
+        updated = labelsList.map((l: string) => (l === oldName ? newName : l));
       } else {
         updated = labelsList.filter((l: string) => l !== oldName);
       }
@@ -317,11 +333,7 @@ export async function cascadeLabelUpdate(
  * Cascade rename an owner across all Items that reference the old name.
  * Updates the owner column (E) for each matching row.
  */
-export async function cascadeOwnerUpdate(
-  oldName: string,
-  newName: string,
-  token: string
-): Promise<void> {
+export async function cascadeOwnerUpdate(oldName: string, newName: string, token: string): Promise<void> {
   return withReauth(token, async (t) => {
     const rows = await sheetsGet('Items!A2:N', t);
     for (let i = 0; i < rows.length; i++) {
@@ -342,7 +354,7 @@ export async function fetchBoards(token: string): Promise<Board[]> {
       // #288: column G (archived_at) is absent on older sheets — a short row
       // reads back as active.
       const rows = await sheetsGet('Boards!A2:G', t);
-      return rows.map(row => ({
+      return rows.map((row) => ({
         id: row[0] || '',
         name: row[1] || '',
         created_at: row[2] || '',
@@ -380,24 +392,30 @@ async function ensureBoardsTab(token: string): Promise<void> {
     throw new SheetsApiError(res.status, text);
   }
   // Add header row
-  await sheetsUpdate('Boards!A1:G1', [['ID', 'Name', 'Created At', 'Created By', 'Color', 'Icon', BOARDS_ARCHIVED_AT_HEADER]], token);
+  await sheetsUpdate(
+    'Boards!A1:G1',
+    [['ID', 'Name', 'Created At', 'Created By', 'Color', 'Icon', BOARDS_ARCHIVED_AT_HEADER]],
+    token,
+  );
 }
 
 export async function createBoardRow(board: Board, token: string): Promise<void> {
   return withReauth(token, async (t) => {
     try {
-      await sheetsAppend('Boards!A:F', [[
-        board.id, board.name, board.created_at, board.created_by,
-        '', board.icon || '',
-      ]], t);
+      await sheetsAppend(
+        'Boards!A:F',
+        [[board.id, board.name, board.created_at, board.created_by, '', board.icon || '']],
+        t,
+      );
     } catch (err) {
       // If Boards tab doesn't exist, create it and retry
       if (err instanceof SheetsApiError && err.status === 400) {
         await ensureBoardsTab(t);
-        await sheetsAppend('Boards!A:F', [[
-          board.id, board.name, board.created_at, board.created_by,
-          '', board.icon || '',
-        ]], t);
+        await sheetsAppend(
+          'Boards!A:F',
+          [[board.id, board.name, board.created_at, board.created_by, '', board.icon || '']],
+          t,
+        );
         return;
       }
       throw err;
@@ -412,7 +430,7 @@ export async function createBoardRow(board: Board, token: string): Promise<void>
 export async function updateBoardRow(boardId: string, color: string, icon: string, token: string): Promise<void> {
   return withReauth(token, async (t) => {
     const rows = await sheetsGet('Boards!A2:A', t);
-    const rowIndex = rows.findIndex(row => (row[0] || '') === boardId);
+    const rowIndex = rows.findIndex((row) => (row[0] || '') === boardId);
     if (rowIndex < 0) return; // Board not found — no-op
     const sheetRow = rowIndex + 2; // 1-based + header
     await sheetsUpdate(`Boards!E${sheetRow}:F${sheetRow}`, [[color, icon]], t);
@@ -427,7 +445,7 @@ export async function updateBoardRow(boardId: string, color: string, icon: strin
 export async function setBoardArchivedAt(boardId: string, archivedAt: string, token: string): Promise<void> {
   return withReauth(token, async (t) => {
     const rows = await sheetsGet('Boards!A2:A', t);
-    const rowIndex = rows.findIndex(row => (row[0] || '') === boardId);
+    const rowIndex = rows.findIndex((row) => (row[0] || '') === boardId);
     if (rowIndex < 0) throw new Error(`Board "${boardId}" not found`);
     const header = await sheetsGet('Boards!G1', t);
     if ((header[0]?.[0] || '') !== BOARDS_ARCHIVED_AT_HEADER) {
@@ -445,7 +463,7 @@ export async function setBoardArchivedAt(boardId: string, archivedAt: string, to
 export async function renameBoardRow(boardId: string, name: string, token: string): Promise<void> {
   return withReauth(token, async (t) => {
     const rows = await sheetsGet('Boards!A2:A', t);
-    const rowIndex = rows.findIndex(row => (row[0] || '') === boardId);
+    const rowIndex = rows.findIndex((row) => (row[0] || '') === boardId);
     if (rowIndex < 0) return; // Board not found — no-op
     const sheetRow = rowIndex + 2; // 1-based + header
     await sheetsUpdate(`Boards!B${sheetRow}`, [[name]], t);
@@ -458,7 +476,7 @@ export async function fetchPermissions(token: string): Promise<BoardPermission[]
   try {
     return await withReauth(token, async (t) => {
       const rows = await sheetsGet('Permissions!A2:C', t);
-      return rows.map(row => ({
+      return rows.map((row) => ({
         board_id: row[0] || '',
         user_email: row[1] || '',
         role: (row[2] || 'member') as BoardPermission['role'],
@@ -512,7 +530,7 @@ export async function deletePermissionRow(boardId: string, userEmail: string, to
     // Find the row to delete
     const rows = await sheetsGet('Permissions!A2:C', t);
     const rowIndex = rows.findIndex(
-      row => row[0] === boardId && (row[1] || '').toLowerCase() === userEmail.toLowerCase()
+      (row) => row[0] === boardId && (row[1] || '').toLowerCase() === userEmail.toLowerCase(),
     );
     if (rowIndex < 0) return;
 
@@ -522,9 +540,7 @@ export async function deletePermissionRow(boardId: string, userEmail: string, to
       headers: { Authorization: `Bearer ${t}` },
     });
     const data = await res.json();
-    const permSheet = data.sheets?.find(
-      (s: any) => s.properties.title === 'Permissions'
-    );
+    const permSheet = data.sheets?.find((s: any) => s.properties.title === 'Permissions');
     const sheetId = permSheet?.properties?.sheetId ?? 0;
     await sheetsDeleteRow(sheetId, rowIndex + 2, t); // +2: 1-based + header
   });
@@ -534,7 +550,7 @@ export async function deleteBoardRow(boardId: string, token: string): Promise<vo
   return withReauth(token, async (t) => {
     // Find the board row by ID
     const rows = await sheetsGet('Boards!A2:A', t);
-    const rowIndex = rows.findIndex(row => (row[0] || '') === boardId);
+    const rowIndex = rows.findIndex((row) => (row[0] || '') === boardId);
     if (rowIndex < 0) return;
 
     // Get Boards sheet ID
@@ -543,9 +559,7 @@ export async function deleteBoardRow(boardId: string, token: string): Promise<vo
       headers: { Authorization: `Bearer ${t}` },
     });
     const data = await res.json();
-    const boardsSheet = data.sheets?.find(
-      (s: any) => s.properties.title === 'Boards'
-    );
+    const boardsSheet = data.sheets?.find((s: any) => s.properties.title === 'Boards');
     const sheetId = boardsSheet?.properties?.sheetId ?? 0;
     await sheetsDeleteRow(sheetId, rowIndex + 2, t); // +2: 1-based + header
   });
@@ -557,7 +571,7 @@ export async function deleteAllBoardPermissions(boardId: string, token: string):
     const rows = await sheetsGet('Permissions!A2:C', t);
     const indices = rows
       .map((row, i) => (row[0] === boardId ? i : -1))
-      .filter(i => i >= 0)
+      .filter((i) => i >= 0)
       .sort((a, b) => b - a); // bottom-to-top to avoid row shifting
 
     if (indices.length === 0) return;
@@ -568,9 +582,7 @@ export async function deleteAllBoardPermissions(boardId: string, token: string):
       headers: { Authorization: `Bearer ${t}` },
     });
     const data = await res.json();
-    const permSheet = data.sheets?.find(
-      (s: any) => s.properties.title === 'Permissions'
-    );
+    const permSheet = data.sheets?.find((s: any) => s.properties.title === 'Permissions');
     const sheetId = permSheet?.properties?.sheetId ?? 0;
 
     for (const idx of indices) {
@@ -579,12 +591,18 @@ export async function deleteAllBoardPermissions(boardId: string, token: string):
   });
 }
 
-async function deleteAllRowsForBoard(tab: 'Statuses' | 'Labels', range: string, boardCol: number, boardId: string, token: string): Promise<void> {
+async function deleteAllRowsForBoard(
+  tab: 'Statuses' | 'Labels',
+  range: string,
+  boardCol: number,
+  boardId: string,
+  token: string,
+): Promise<void> {
   return withReauth(token, async (t) => {
     const rows = await sheetsGet(range, t);
     const indices = rows
       .map((row, i) => (row[boardCol] === boardId ? i : -1))
-      .filter(i => i >= 0)
+      .filter((i) => i >= 0)
       .sort((a, b) => b - a); // bottom-to-top to avoid row shifting
 
     if (indices.length === 0) return;
@@ -610,17 +628,13 @@ export async function deleteAllBoardLabels(boardId: string, token: string): Prom
 }
 
 export async function updateItemBoardId(sheetRow: number, newBoardId: string, token: string): Promise<void> {
-  return withReauth(token, (t) =>
-    sheetsUpdate(`Items!N${sheetRow}`, [[newBoardId]], t)
-  );
+  return withReauth(token, (t) => sheetsUpdate(`Items!N${sheetRow}`, [[newBoardId]], t));
 }
 
 // --- Statuses (Columns) CRUD ---
 
 export async function fetchStatuses(token: string): Promise<BoardStatus[]> {
-  const rows = await withReauth(token, (t) =>
-    sheetsGet('Statuses!A2:G', t)
-  );
+  const rows = await withReauth(token, (t) => sheetsGet('Statuses!A2:G', t));
 
   return rows.map((row: any) => ({
     id: row[0] || '',
@@ -636,29 +650,41 @@ export async function fetchStatuses(token: string): Promise<BoardStatus[]> {
 export async function createStatusRow(status: BoardStatus, token: string): Promise<void> {
   await ensureStatusesTab(token);
   return withReauth(token, (t) =>
-    sheetsAppend('Statuses!A:G', [[
-      status.id,
-      status.board_id,
-      status.name,
-      status.sort_order,
-      status.color,
-      status.is_terminal ? 'TRUE' : 'FALSE',
-      status.created_at,
-    ]], t)
+    sheetsAppend(
+      'Statuses!A:G',
+      [
+        [
+          status.id,
+          status.board_id,
+          status.name,
+          status.sort_order,
+          status.color,
+          status.is_terminal ? 'TRUE' : 'FALSE',
+          status.created_at,
+        ],
+      ],
+      t,
+    ),
   );
 }
 
 export async function updateStatusRow(sheetRow: number, status: BoardStatus, token: string): Promise<void> {
   return withReauth(token, (t) =>
-    sheetsUpdate(`Statuses!A${sheetRow}:G${sheetRow}`, [[
-      status.id,
-      status.board_id,
-      status.name,
-      status.sort_order,
-      status.color,
-      status.is_terminal ? 'TRUE' : 'FALSE',
-      status.created_at,
-    ]], t)
+    sheetsUpdate(
+      `Statuses!A${sheetRow}:G${sheetRow}`,
+      [
+        [
+          status.id,
+          status.board_id,
+          status.name,
+          status.sort_order,
+          status.color,
+          status.is_terminal ? 'TRUE' : 'FALSE',
+          status.created_at,
+        ],
+      ],
+      t,
+    ),
   );
 }
 
@@ -669,18 +695,14 @@ export async function deleteStatusRow(sheetRow: number, token: string): Promise<
       headers: { Authorization: `Bearer ${t}` },
     });
     const data = await res.json();
-    const statusesSheet = data.sheets?.find(
-      (s: any) => s.properties.title === 'Statuses'
-    );
+    const statusesSheet = data.sheets?.find((s: any) => s.properties.title === 'Statuses');
     const sheetId = statusesSheet?.properties?.sheetId ?? 0;
     await sheetsDeleteRow(sheetId, sheetRow, t);
   });
 }
 
 export async function fetchStatusesWithRows(token: string): Promise<Array<BoardStatus & { sheetRow: number }>> {
-  const rows = await withReauth(token, (t) =>
-    sheetsGet('Statuses!A2:G', t)
-  );
+  const rows = await withReauth(token, (t) => sheetsGet('Statuses!A2:G', t));
 
   return rows.map((row: any, index: number) => ({
     id: row[0] || '',
@@ -698,7 +720,7 @@ export async function cascadeStatusRename(
   boardId: string,
   oldName: string,
   newName: string,
-  token: string
+  token: string,
 ): Promise<void> {
   // Read all items, find those with old status name on this board, update to new name
   const items = await fetchAllItems(token);
@@ -719,7 +741,7 @@ async function ensureStatusesTab(token: string): Promise<void> {
       sheetsGet('Sheet1!A1', t).then(() => {
         // Get spreadsheet ID from token context (complex — for now assume it exists)
         // In real impl, would parse from spreadsheetId constant
-      })
+      }),
     );
     // For MVP, assume Statuses sheet auto-created via Apps Script on first append
   }

@@ -7,29 +7,74 @@ import type { AuthState } from '../../auth/auth-context';
 // Mutable mock state
 const mockBoardId = { current: 'board-1' };
 const mockItems = { current: [] as any[] };
-const mockBoards = { current: [
-  { id: 'board-1', name: 'Family Board', created_at: '', created_by: '', color: '', icon: '' },
-  { id: 'board-2', name: 'Work Board', created_at: '', created_by: '', color: '', icon: '' },
-] };
-const mockPerms = { current: [
-  { board_id: 'board-1', user_email: 'owner@family.com', role: 'owner' },
-  { board_id: 'board-2', user_email: 'owner@family.com', role: 'owner' },
-] };
+const mockBoards = {
+  current: [
+    { id: 'board-1', name: 'Family Board', created_at: '', created_by: '', color: '', icon: '' },
+    { id: 'board-2', name: 'Work Board', created_at: '', created_by: '', color: '', icon: '' },
+  ],
+};
+const mockPerms = {
+  current: [
+    { board_id: 'board-1', user_email: 'owner@family.com', role: 'owner' },
+    { board_id: 'board-2', user_email: 'owner@family.com', role: 'owner' },
+  ],
+};
 const mockShowDeleteBoardModal = { current: true };
 
 vi.mock('../../state/board-store', () => ({
   showDeleteBoardModal: {
-    get value() { return mockShowDeleteBoardModal.current; },
-    set value(v: boolean) { mockShowDeleteBoardModal.current = v; },
+    get value() {
+      return mockShowDeleteBoardModal.current;
+    },
+    set value(v: boolean) {
+      mockShowDeleteBoardModal.current = v;
+    },
   },
-  activeBoard: { get value() { return mockBoards.current.find(b => b.id === mockBoardId.current) || null; } },
-  activeBoardId: { get value() { return mockBoardId.current; } },
-  boards: { get value() { return mockBoards.current; }, set value(v: any) { mockBoards.current = v; } },
-  items: { get value() { return mockItems.current; }, set value(v: any) { mockItems.current = v; } },
-  permissions: { get value() { return mockPerms.current; }, set value(v: any) { mockPerms.current = v; } },
-  accessibleBoards: { get value() { return mockBoards.current; } },
+  activeBoard: {
+    get value() {
+      return mockBoards.current.find((b) => b.id === mockBoardId.current) || null;
+    },
+  },
+  activeBoardId: {
+    get value() {
+      return mockBoardId.current;
+    },
+  },
+  boards: {
+    get value() {
+      return mockBoards.current;
+    },
+    set value(v: any) {
+      mockBoards.current = v;
+    },
+  },
+  items: {
+    get value() {
+      return mockItems.current;
+    },
+    set value(v: any) {
+      mockItems.current = v;
+    },
+  },
+  permissions: {
+    get value() {
+      return mockPerms.current;
+    },
+    set value(v: any) {
+      mockPerms.current = v;
+    },
+  },
+  accessibleBoards: {
+    get value() {
+      return mockBoards.current;
+    },
+  },
   currentUserEmail: { value: 'owner@family.com' },
-  userBoardRole: { get value() { return 'owner'; } },
+  userBoardRole: {
+    get value() {
+      return 'owner';
+    },
+  },
   openDetailWithTitleEdit: { value: false },
 }));
 
@@ -57,7 +102,7 @@ function renderModal(auth = mockAuth) {
   return render(
     <AuthContext.Provider value={auth}>
       <DeleteBoardModal />
-    </AuthContext.Provider>
+    </AuthContext.Provider>,
   );
 }
 
@@ -99,9 +144,7 @@ describe('DeleteBoardModal (Issue #120)', () => {
       fireEvent.click(btn);
 
       await waitFor(() => {
-        expect(mockDeleteBoard).toHaveBeenCalledWith(
-          'board-1', null, null, 'owner@family.com', 'test-token'
-        );
+        expect(mockDeleteBoard).toHaveBeenCalledWith('board-1', null, null, 'owner@family.com', 'test-token');
       });
     });
 
@@ -122,8 +165,40 @@ describe('DeleteBoardModal (Issue #120)', () => {
   describe('AC2: Delete board — migrate items', () => {
     beforeEach(() => {
       mockItems.current = [
-        { id: 'item-1', title: 'Task', status: 'To Do', board_id: 'board-1', sheetRow: 2, parent_id: '', owner: '', due_date: '', labels: '', description: '', created_at: '', updated_at: '', completed_at: '', sort_order: 1, created_by: '' },
-        { id: 'item-2', title: 'Subtask', status: 'To Do', board_id: 'board-1', sheetRow: 3, parent_id: 'item-1', owner: '', due_date: '', labels: '', description: '', created_at: '', updated_at: '', completed_at: '', sort_order: 1, created_by: '' },
+        {
+          id: 'item-1',
+          title: 'Task',
+          status: 'To Do',
+          board_id: 'board-1',
+          sheetRow: 2,
+          parent_id: '',
+          owner: '',
+          due_date: '',
+          labels: '',
+          description: '',
+          created_at: '',
+          updated_at: '',
+          completed_at: '',
+          sort_order: 1,
+          created_by: '',
+        },
+        {
+          id: 'item-2',
+          title: 'Subtask',
+          status: 'To Do',
+          board_id: 'board-1',
+          sheetRow: 3,
+          parent_id: 'item-1',
+          owner: '',
+          due_date: '',
+          labels: '',
+          description: '',
+          created_at: '',
+          updated_at: '',
+          completed_at: '',
+          sort_order: 1,
+          created_by: '',
+        },
       ];
     });
 
@@ -155,9 +230,7 @@ describe('DeleteBoardModal (Issue #120)', () => {
       fireEvent.click(getByTestId('confirm-delete-board'));
 
       await waitFor(() => {
-        expect(mockDeleteBoard).toHaveBeenCalledWith(
-          'board-1', 'migrate', 'board-2', 'owner@family.com', 'test-token'
-        );
+        expect(mockDeleteBoard).toHaveBeenCalledWith('board-1', 'migrate', 'board-2', 'owner@family.com', 'test-token');
       });
     });
 
@@ -171,7 +244,23 @@ describe('DeleteBoardModal (Issue #120)', () => {
   describe('AC3: Delete board — discard all items', () => {
     beforeEach(() => {
       mockItems.current = [
-        { id: 'item-1', title: 'Task', status: 'To Do', board_id: 'board-1', sheetRow: 2, parent_id: '', owner: '', due_date: '', labels: '', description: '', created_at: '', updated_at: '', completed_at: '', sort_order: 1, created_by: '' },
+        {
+          id: 'item-1',
+          title: 'Task',
+          status: 'To Do',
+          board_id: 'board-1',
+          sheetRow: 2,
+          parent_id: '',
+          owner: '',
+          due_date: '',
+          labels: '',
+          description: '',
+          created_at: '',
+          updated_at: '',
+          completed_at: '',
+          sort_order: 1,
+          created_by: '',
+        },
       ];
     });
 
@@ -187,9 +276,7 @@ describe('DeleteBoardModal (Issue #120)', () => {
       fireEvent.click(getByTestId('confirm-delete-board'));
 
       await waitFor(() => {
-        expect(mockDeleteBoard).toHaveBeenCalledWith(
-          'board-1', 'discard', null, 'owner@family.com', 'test-token'
-        );
+        expect(mockDeleteBoard).toHaveBeenCalledWith('board-1', 'discard', null, 'owner@family.com', 'test-token');
       });
     });
   });
@@ -203,7 +290,23 @@ describe('DeleteBoardModal (Issue #120)', () => {
 
     it('radio group has accessible label', () => {
       mockItems.current = [
-        { id: 'item-1', title: 'Task', status: 'To Do', board_id: 'board-1', sheetRow: 2, parent_id: '', owner: '', due_date: '', labels: '', description: '', created_at: '', updated_at: '', completed_at: '', sort_order: 1, created_by: '' },
+        {
+          id: 'item-1',
+          title: 'Task',
+          status: 'To Do',
+          board_id: 'board-1',
+          sheetRow: 2,
+          parent_id: '',
+          owner: '',
+          due_date: '',
+          labels: '',
+          description: '',
+          created_at: '',
+          updated_at: '',
+          completed_at: '',
+          sort_order: 1,
+          created_by: '',
+        },
       ];
       const { getByRole } = renderModal();
       const radiogroup = getByRole('radiogroup');

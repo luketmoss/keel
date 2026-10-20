@@ -26,7 +26,9 @@ export function loadCachedAuth(): { token: string; user: UserInfo; expiry: numbe
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     localStorage.removeItem(TOKEN_EXPIRY_KEY);
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return null;
 }
 
@@ -38,18 +40,26 @@ export function saveCachedAuth(token: string, user: UserInfo, expiresIn: number)
     localStorage.setItem(TOKEN_EXPIRY_KEY, String(Date.now() + (expiresIn - 60) * 1000));
     // Persist user separately so we can attempt silent auto-login after token expiry
     localStorage.setItem(PRIOR_USER_KEY, JSON.stringify(user));
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 function loadPriorUser(): UserInfo | null {
   try {
     const raw = localStorage.getItem(PRIOR_USER_KEY);
     return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 function clearPriorUser() {
-  try { localStorage.removeItem(PRIOR_USER_KEY); } catch { /* ignore */ }
+  try {
+    localStorage.removeItem(PRIOR_USER_KEY);
+  } catch {
+    /* ignore */
+  }
 }
 
 export function clearCachedAuth() {
@@ -57,7 +67,9 @@ export function clearCachedAuth() {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     localStorage.removeItem(TOKEN_EXPIRY_KEY);
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 declare const google: any;
@@ -77,8 +89,8 @@ export function AuthProvider({ children }: Props) {
   const demo = isDemoMode();
   const cached = demo ? null : loadCachedAuth();
   const shouldAttemptSilentAuth = !demo && !cached && !!loadPriorUser();
-  const [token, setToken] = useState<string | null>(demo ? 'demo-token' : cached?.token ?? null);
-  const [user, setUser] = useState<UserInfo | null>(demo ? DEMO_USER : cached?.user ?? null);
+  const [token, setToken] = useState<string | null>(demo ? 'demo-token' : (cached?.token ?? null));
+  const [user, setUser] = useState<UserInfo | null>(demo ? DEMO_USER : (cached?.user ?? null));
   const [isAuthLoading, setIsAuthLoading] = useState(shouldAttemptSilentAuth);
   const tokenClientRef = useRef<any>(null);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -109,7 +121,7 @@ export function AuthProvider({ children }: Props) {
     return () => {
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -268,7 +280,7 @@ export function AuthProvider({ children }: Props) {
   }, []);
 
   const updateUserName = useCallback((newName: string) => {
-    setUser(prev => {
+    setUser((prev) => {
       if (!prev) return prev;
       const updated = { ...prev, name: newName };
       // Update localStorage cache so the name survives page reload

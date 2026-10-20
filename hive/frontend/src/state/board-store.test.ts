@@ -39,7 +39,7 @@ describe('Done column 7-day filter (AC1)', () => {
       makeItem({ id: 'old-2', completed_at: daysAgoISO(30), sort_order: 4 }),
     ];
 
-    expect(recentDoneItems.value.map(i => i.id)).toEqual(['recent-1', 'recent-2']);
+    expect(recentDoneItems.value.map((i) => i.id)).toEqual(['recent-1', 'recent-2']);
     expect(allDoneItems.value.length).toBe(4);
   });
 
@@ -51,7 +51,7 @@ describe('Done column 7-day filter (AC1)', () => {
       makeItem({ id: 'has-date', completed_at: daysAgoISO(2), sort_order: 2 }),
     ];
 
-    expect(recentDoneItems.value.map(i => i.id)).toEqual(['has-date']);
+    expect(recentDoneItems.value.map((i) => i.id)).toEqual(['has-date']);
   });
 
   it('columns.Done uses recentDoneItems, not all Done items', async () => {
@@ -61,7 +61,15 @@ describe('Done column 7-day filter (AC1)', () => {
     activeBoardId.value = bid;
     statuses.value = [
       { id: 's1', board_id: bid, name: 'To Do', sort_order: 1, color: '#e3f2fd', is_terminal: false, created_at: '' },
-      { id: 's2', board_id: bid, name: 'In Progress', sort_order: 2, color: '#fff3e0', is_terminal: false, created_at: '' },
+      {
+        id: 's2',
+        board_id: bid,
+        name: 'In Progress',
+        sort_order: 2,
+        color: '#fff3e0',
+        is_terminal: false,
+        created_at: '',
+      },
       { id: 's3', board_id: bid, name: 'Done', sort_order: 3, color: '#e8f5e9', is_terminal: true, created_at: '' },
     ];
 
@@ -71,8 +79,8 @@ describe('Done column 7-day filter (AC1)', () => {
       makeItem({ id: 'todo', status: 'To Do', completed_at: '', sort_order: 1, board_id: bid }),
     ];
 
-    expect(columns.value['Done'].map(i => i.id)).toEqual(['recent']);
-    expect(columns.value['To Do'].map(i => i.id)).toEqual(['todo']);
+    expect(columns.value['Done'].map((i) => i.id)).toEqual(['recent']);
+    expect(columns.value['To Do'].map((i) => i.id)).toEqual(['todo']);
 
     // Clean up to avoid leaking into subsequent tests
     activeBoardId.value = '';
@@ -88,7 +96,7 @@ describe('Done column 7-day filter (AC1)', () => {
       makeItem({ id: 'child', parent_id: 'root', completed_at: daysAgoISO(1), sort_order: 1 }),
     ];
 
-    expect(recentDoneItems.value.map(i => i.id)).toEqual(['root']);
+    expect(recentDoneItems.value.map((i) => i.id)).toEqual(['root']);
   });
 });
 
@@ -126,7 +134,7 @@ describe('Archive dialog sorting (AC3)', () => {
       makeItem({ id: 'mid', completed_at: daysAgoISO(5), sort_order: 3 }),
     ];
 
-    expect(allDoneItemsSorted.value.map(i => i.id)).toEqual(['recent', 'mid', 'old']);
+    expect(allDoneItemsSorted.value.map((i) => i.id)).toEqual(['recent', 'mid', 'old']);
   });
 });
 
@@ -141,7 +149,7 @@ describe('#177 AC2/AC3: Text search filter', () => {
     ];
     store.filterSearch.value = 'grocery';
     const roots = store.rootItems.value;
-    expect(roots.map(i => i.id)).toEqual(['a']);
+    expect(roots.map((i) => i.id)).toEqual(['a']);
     store.filterSearch.value = '';
   });
 
@@ -152,7 +160,7 @@ describe('#177 AC2/AC3: Text search filter', () => {
       makeItem({ id: 'b', title: 'Task B', description: 'Clean house', status: 'To Do', parent_id: '' }),
     ];
     store.filterSearch.value = 'milk';
-    expect(store.rootItems.value.map(i => i.id)).toEqual(['a']);
+    expect(store.rootItems.value.map((i) => i.id)).toEqual(['a']);
     store.filterSearch.value = '';
   });
 
@@ -163,7 +171,7 @@ describe('#177 AC2/AC3: Text search filter', () => {
       makeItem({ id: 'b', title: 'Task B', labels: 'Work', status: 'To Do', parent_id: '' }),
     ];
     store.filterSearch.value = 'urgent';
-    expect(store.rootItems.value.map(i => i.id)).toEqual(['a']);
+    expect(store.rootItems.value.map((i) => i.id)).toEqual(['a']);
     store.filterSearch.value = '';
   });
 
@@ -176,7 +184,7 @@ describe('#177 AC2/AC3: Text search filter', () => {
     ];
     store.filterSearch.value = 'milk';
     const roots = store.rootItems.value;
-    expect(roots.map(i => i.id)).toEqual(['parent']);
+    expect(roots.map((i) => i.id)).toEqual(['parent']);
     store.filterSearch.value = '';
   });
 });
@@ -207,7 +215,7 @@ describe('#177 AC4/AC5: Due date filter', () => {
       makeItem({ id: 'nodate', title: 'No due', due_date: '', status: 'To Do', parent_id: '' }),
     ];
     store.filterDue.value = 'today';
-    expect(store.rootItems.value.map(i => i.id)).toEqual(['today']);
+    expect(store.rootItems.value.map((i) => i.id)).toEqual(['today']);
     store.filterDue.value = null;
   });
 
@@ -221,8 +229,8 @@ describe('#177 AC4/AC5: Due date filter', () => {
     store.filterDue.value = 'this-week';
     const roots = store.rootItems.value;
     // Today and tomorrow should be within this week (10 days out should not)
-    expect(roots.some(i => i.id === 'today')).toBe(true);
-    expect(roots.some(i => i.id === 'far')).toBe(false);
+    expect(roots.some((i) => i.id === 'today')).toBe(true);
+    expect(roots.some((i) => i.id === 'far')).toBe(false);
     store.filterDue.value = null;
   });
 });
@@ -235,15 +243,36 @@ describe('#177 AC6: Filters combine (AND)', () => {
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     })();
     store.items.value = [
-      makeItem({ id: 'match', title: 'Grocery run', labels: 'Urgent', due_date: today, status: 'To Do', parent_id: '' }),
-      makeItem({ id: 'no-label', title: 'Grocery run', labels: 'Home', due_date: today, status: 'To Do', parent_id: '' }),
-      makeItem({ id: 'no-search', title: 'Fix bike', labels: 'Urgent', due_date: today, status: 'To Do', parent_id: '' }),
+      makeItem({
+        id: 'match',
+        title: 'Grocery run',
+        labels: 'Urgent',
+        due_date: today,
+        status: 'To Do',
+        parent_id: '',
+      }),
+      makeItem({
+        id: 'no-label',
+        title: 'Grocery run',
+        labels: 'Home',
+        due_date: today,
+        status: 'To Do',
+        parent_id: '',
+      }),
+      makeItem({
+        id: 'no-search',
+        title: 'Fix bike',
+        labels: 'Urgent',
+        due_date: today,
+        status: 'To Do',
+        parent_id: '',
+      }),
       makeItem({ id: 'no-due', title: 'Grocery run', labels: 'Urgent', due_date: '', status: 'To Do', parent_id: '' }),
     ];
     store.filterSearch.value = 'grocery';
     store.filterLabel.value = 'Urgent';
     store.filterDue.value = 'today';
-    expect(store.rootItems.value.map(i => i.id)).toEqual(['match']);
+    expect(store.rootItems.value.map((i) => i.id)).toEqual(['match']);
     store.filterSearch.value = '';
     store.filterLabel.value = null;
     store.filterDue.value = null;
@@ -317,7 +346,9 @@ describe('groupBy persistence', () => {
   });
 
   it('handles localStorage errors gracefully on read', async () => {
-    Storage.prototype.getItem = () => { throw new Error('quota exceeded'); };
+    Storage.prototype.getItem = () => {
+      throw new Error('quota exceeded');
+    };
     const store = await import('./board-store');
     expect(store.groupBy.value).toBe('none');
   });
@@ -325,7 +356,9 @@ describe('groupBy persistence', () => {
   it('handles localStorage errors gracefully on write', async () => {
     localStorage.removeItem('hive-group-by');
     const store = await import('./board-store');
-    Storage.prototype.setItem = () => { throw new Error('quota exceeded'); };
+    Storage.prototype.setItem = () => {
+      throw new Error('quota exceeded');
+    };
     expect(() => store.setGroupBy('status')).not.toThrow();
     expect(store.groupBy.value).toBe('status');
   });
@@ -420,7 +453,9 @@ describe('theme persistence (AC1, AC3, AC4)', () => {
 
   // AC4: localStorage errors handled gracefully on read
   it('handles localStorage errors gracefully on read', async () => {
-    Storage.prototype.getItem = () => { throw new Error('quota exceeded'); };
+    Storage.prototype.getItem = () => {
+      throw new Error('quota exceeded');
+    };
     const store = await import('./board-store');
     expect(store.loadTheme()).toBe('system');
   });
@@ -429,7 +464,9 @@ describe('theme persistence (AC1, AC3, AC4)', () => {
   it('handles localStorage errors gracefully on write', async () => {
     localStorage.removeItem('hive-theme');
     const store = await import('./board-store');
-    Storage.prototype.setItem = () => { throw new Error('quota exceeded'); };
+    Storage.prototype.setItem = () => {
+      throw new Error('quota exceeded');
+    };
     expect(() => store.setTheme('dark')).not.toThrow();
     expect(store.theme.value).toBe('dark');
   });

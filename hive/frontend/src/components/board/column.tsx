@@ -64,7 +64,25 @@ function resolveColumnColor(color?: string): string {
   return COLOR_TO_CSS_VAR[color] || color;
 }
 
-export function Column({ status, items, onDrop, onReorder, onMoveStatus, compact, color, isTerminal, allDoneCount, hasArchived, archiveTriggerRef, onOpenArchive, sortMode: sortModeProp, onSortChange, onAddItem, onCopyItem, onDeleteItem }: Props) {
+export function Column({
+  status,
+  items,
+  onDrop,
+  onReorder,
+  onMoveStatus,
+  compact,
+  color,
+  isTerminal,
+  allDoneCount,
+  hasArchived,
+  archiveTriggerRef,
+  onOpenArchive,
+  sortMode: sortModeProp,
+  onSortChange,
+  onAddItem,
+  onCopyItem,
+  onDeleteItem,
+}: Props) {
   // #466: a column with no stored sort mode is in Custom order, which is what the board already
   // does for it, so it gets the control too.
   const sortMode: SortMode = sortModeProp ?? 'custom';
@@ -104,7 +122,7 @@ export function Column({ status, items, onDrop, onReorder, onMoveStatus, compact
     }
 
     const targetId = target.getAttribute('data-item-id');
-    const targetIndex = items.findIndex(i => i.id === targetId);
+    const targetIndex = items.findIndex((i) => i.id === targetId);
     if (targetIndex === -1) {
       (e.currentTarget as HTMLElement).classList.add('column-drag-over');
       return;
@@ -147,11 +165,11 @@ export function Column({ status, items, onDrop, onReorder, onMoveStatus, compact
         const previousMode = sortMode!;
         // Compute new index for the dropped card
         const target = (e.target as HTMLElement).closest('.card') as HTMLElement;
-        const sourceIndex = items.findIndex(i => i.id === itemId);
+        const sourceIndex = items.findIndex((i) => i.id === itemId);
         let newIndex = sourceIndex;
         if (target) {
           const targetId = target.getAttribute('data-item-id');
-          const targetIndex = items.findIndex(i => i.id === targetId);
+          const targetIndex = items.findIndex((i) => i.id === targetId);
           if (targetIndex !== -1) {
             const rect = target.getBoundingClientRect();
             const midY = rect.top + rect.height / 2;
@@ -170,12 +188,17 @@ export function Column({ status, items, onDrop, onReorder, onMoveStatus, compact
           onReorder(itemId, newIndex, items);
         }
         // Show undo toast (10s)
-        showToast('Switched to custom order', 'success', {
-          label: 'Undo',
-          fn: () => {
-            if (onSortChange) onSortChange(previousMode);
+        showToast(
+          'Switched to custom order',
+          'success',
+          {
+            label: 'Undo',
+            fn: () => {
+              if (onSortChange) onSortChange(previousMode);
+            },
           },
-        }, 10000);
+          10000,
+        );
         restoreFocus(itemId);
         return;
       }
@@ -183,13 +206,13 @@ export function Column({ status, items, onDrop, onReorder, onMoveStatus, compact
         const target = (e.target as HTMLElement).closest('.card') as HTMLElement;
         if (target) {
           const targetId = target.getAttribute('data-item-id');
-          const targetIndex = items.findIndex(i => i.id === targetId);
+          const targetIndex = items.findIndex((i) => i.id === targetId);
           if (targetIndex !== -1) {
             const rect = target.getBoundingClientRect();
             const midY = rect.top + rect.height / 2;
             let newIndex = e.clientY < midY ? targetIndex : targetIndex + 1;
             // Adjust: if dragged item was before the target, account for removal
-            const sourceIndex = items.findIndex(i => i.id === itemId);
+            const sourceIndex = items.findIndex((i) => i.id === itemId);
             if (sourceIndex !== -1 && sourceIndex < newIndex) {
               newIndex--;
             }
@@ -217,7 +240,7 @@ export function Column({ status, items, onDrop, onReorder, onMoveStatus, compact
     const target = (e.target as HTMLElement).closest('.card') as HTMLElement;
     if (target) {
       const targetId = target.getAttribute('data-item-id');
-      const targetIndex = items.findIndex(i => i.id === targetId);
+      const targetIndex = items.findIndex((i) => i.id === targetId);
       if (targetIndex !== -1) {
         const rect = target.getBoundingClientRect();
         const midY = rect.top + rect.height / 2;
@@ -249,7 +272,7 @@ export function Column({ status, items, onDrop, onReorder, onMoveStatus, compact
     // AC5: If date-sorted, switch to custom and perform the reorder
     if (isDateSorted) {
       const previousMode = sortMode!;
-      const currentIndex = items.findIndex(i => i.id === itemId);
+      const currentIndex = items.findIndex((i) => i.id === itemId);
       if (currentIndex === -1) return;
       const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
       if (newIndex < 0 || newIndex >= items.length) return;
@@ -257,15 +280,20 @@ export function Column({ status, items, onDrop, onReorder, onMoveStatus, compact
       if (onSortChange) onSortChange('custom');
       onReorder(itemId, newIndex, items);
       // Show undo toast (10s)
-      showToast('Switched to custom order', 'success', {
-        label: 'Undo',
-        fn: () => {
-          if (onSortChange) onSortChange(previousMode);
+      showToast(
+        'Switched to custom order',
+        'success',
+        {
+          label: 'Undo',
+          fn: () => {
+            if (onSortChange) onSortChange(previousMode);
+          },
         },
-      }, 10000);
+        10000,
+      );
       return;
     }
-    const currentIndex = items.findIndex(i => i.id === itemId);
+    const currentIndex = items.findIndex((i) => i.id === itemId);
     if (currentIndex === -1) return;
 
     const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
@@ -288,10 +316,17 @@ export function Column({ status, items, onDrop, onReorder, onMoveStatus, compact
       const previousMode = sortMode!;
       if (onSortChange) onSortChange('custom');
       onReorder(itemId, 0, items);
-      showToast('Switched to custom order', 'success', {
-        label: 'Undo',
-        fn: () => { if (onSortChange) onSortChange(previousMode); },
-      }, 10000);
+      showToast(
+        'Switched to custom order',
+        'success',
+        {
+          label: 'Undo',
+          fn: () => {
+            if (onSortChange) onSortChange(previousMode);
+          },
+        },
+        10000,
+      );
       return;
     }
     onReorder(itemId, 0, items);
@@ -305,10 +340,17 @@ export function Column({ status, items, onDrop, onReorder, onMoveStatus, compact
       const previousMode = sortMode!;
       if (onSortChange) onSortChange('custom');
       onReorder(itemId, items.length - 1, items);
-      showToast('Switched to custom order', 'success', {
-        label: 'Undo',
-        fn: () => { if (onSortChange) onSortChange(previousMode); },
-      }, 10000);
+      showToast(
+        'Switched to custom order',
+        'success',
+        {
+          label: 'Undo',
+          fn: () => {
+            if (onSortChange) onSortChange(previousMode);
+          },
+        },
+        10000,
+      );
       return;
     }
     onReorder(itemId, items.length - 1, items);
@@ -347,11 +389,9 @@ export function Column({ status, items, onDrop, onReorder, onMoveStatus, compact
           <h2>{status}</h2>
           <span class="column-count">{items.length}</span>
           {!compact && onAddItem && (
-            <button
-              class="column-add-btn"
-              onClick={onAddItem}
-              aria-label={`Add item to ${status}`}
-            >+</button>
+            <button class="column-add-btn" onClick={onAddItem} aria-label={`Add item to ${status}`}>
+              +
+            </button>
           )}
           {/* Sort selector only in board view (not compact/swimlane) */}
           {!compact && isTerminal && (
@@ -378,11 +418,7 @@ export function Column({ status, items, onDrop, onReorder, onMoveStatus, compact
           )}
         </div>
         {isTerminal && hasArchived && onOpenArchive && (
-          <button
-            class="column-archive-link"
-            ref={archiveTriggerRef}
-            onClick={onOpenArchive}
-          >
+          <button class="column-archive-link" ref={archiveTriggerRef} onClick={onOpenArchive}>
             View all {allDoneCount} completed
           </button>
         )}
@@ -408,25 +444,15 @@ export function Column({ status, items, onDrop, onReorder, onMoveStatus, compact
             )}
           </div>
         ))}
-        {items.length === 0 && (
-          <div class="column-empty">No items</div>
-        )}
+        {items.length === 0 && <div class="column-empty">No items</div>}
         {/* Hover "Add item" row — only in board view, hidden during drag */}
         {!compact && onAddItem && !currentDragStatus && (
-          <button
-            class="column-add-row"
-            onClick={onAddItem}
-            tabIndex={-1}
-          >
+          <button class="column-add-row" onClick={onAddItem} tabIndex={-1}>
             <span class="column-add-row-icon">+</span> Add item
           </button>
         )}
         {/* AC7/AC8: Date-sort overlay for cross-column drag */}
-        {showDateSortOverlay && (
-          <div class="column-date-sort-overlay">
-            {getOverlayText()}
-          </div>
-        )}
+        {showDateSortOverlay && <div class="column-date-sort-overlay">{getOverlayText()}</div>}
       </div>
     </div>
   );

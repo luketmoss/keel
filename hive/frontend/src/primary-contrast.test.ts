@@ -28,18 +28,30 @@ const over = (fg: RGB, alpha: number, bg: RGB): RGB =>
 const PRIMARY = hex('#805F00');
 const WHITE = hex('#ffffff');
 const COLUMNS = [
-  '--color-todo', '--color-inprogress', '--color-done', '--color-col-indigo',
-  '--color-col-purple', '--color-col-pink', '--color-col-teal', '--color-col-amber',
+  '--color-todo',
+  '--color-inprogress',
+  '--color-done',
+  '--color-col-indigo',
+  '--color-col-purple',
+  '--color-col-pink',
+  '--color-col-teal',
+  '--color-col-amber',
 ];
 const BUCKETS = [
-  '--color-bucket-overdue', '--color-bucket-this-week', '--color-bucket-next-week', '--color-bucket-later',
+  '--color-bucket-overdue',
+  '--color-bucket-this-week',
+  '--color-bucket-next-week',
+  '--color-bucket-later',
 ];
 
 /** Every light surface the primary is drawn on as text, tints included. */
 function surfaces(): [string, RGB][] {
   const white = hex(light['--color-surface']);
   const page = hex(light['--color-bg']);
-  const out: [string, RGB][] = [['surface', white], ['page', page]];
+  const out: [string, RGB][] = [
+    ['surface', white],
+    ['page', page],
+  ];
   // The note's rows: the 8% tint sits on the control bar and on the page; the
   // 10%, 12% and 18% ones (sub-task date chip, quick-date chip, both hovers)
   // sit on the white surface.

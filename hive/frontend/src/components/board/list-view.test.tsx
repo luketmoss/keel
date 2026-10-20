@@ -14,21 +14,51 @@ vi.mock('../../state/board-store', () => ({
       return {
         'To Do': mockItemsRef.current.filter((i: any) => i.status === 'To Do' && !i.parent_id),
         'In Progress': mockItemsRef.current.filter((i: any) => i.status === 'In Progress' && !i.parent_id),
-        'Done': mockItemsRef.current.filter((i: any) => i.status === 'Done' && !i.parent_id),
+        Done: mockItemsRef.current.filter((i: any) => i.status === 'Done' && !i.parent_id),
       };
     },
   },
   selectedItemId: mockSelectedItemId,
-  selectItem: (id: string) => { mockSelectedItemId.value = id; },
-  clearSelectedItem: () => { mockSelectedItemId.value = null; },
+  selectItem: (id: string) => {
+    mockSelectedItemId.value = id;
+  },
+  clearSelectedItem: () => {
+    mockSelectedItemId.value = null;
+  },
   openDetailWithTitleEdit: { value: false },
   labels: { value: [] },
   getChildCount: () => ({ done: 0, total: 0 }),
-  boardStatuses: { value: [
-    { id: 's1', board_id: 'board-1', name: 'To Do', sort_order: 1, color: '#e3f2fd', is_terminal: false, created_at: '' },
-    { id: 's2', board_id: 'board-1', name: 'In Progress', sort_order: 2, color: '#fff3e0', is_terminal: false, created_at: '' },
-    { id: 's3', board_id: 'board-1', name: 'Done', sort_order: 3, color: '#e8f5e9', is_terminal: true, created_at: '' },
-  ] },
+  boardStatuses: {
+    value: [
+      {
+        id: 's1',
+        board_id: 'board-1',
+        name: 'To Do',
+        sort_order: 1,
+        color: '#e3f2fd',
+        is_terminal: false,
+        created_at: '',
+      },
+      {
+        id: 's2',
+        board_id: 'board-1',
+        name: 'In Progress',
+        sort_order: 2,
+        color: '#fff3e0',
+        is_terminal: false,
+        created_at: '',
+      },
+      {
+        id: 's3',
+        board_id: 'board-1',
+        name: 'Done',
+        sort_order: 3,
+        color: '#e8f5e9',
+        is_terminal: true,
+        created_at: '',
+      },
+    ],
+  },
   isTerminalStatus: (name: string) => name === 'Done',
   defaultStatusName: () => 'To Do',
   terminalStatusName: () => 'Done',
@@ -104,9 +134,9 @@ describe('ListView (Issue #13)', () => {
       const { container } = render(<ListView />);
 
       const counts = container.querySelectorAll('.list-section-count');
-      expect(counts[0].textContent).toBe('2');  // To Do
-      expect(counts[1].textContent).toBe('1');  // In Progress
-      expect(counts[2].textContent).toBe('0');  // Done
+      expect(counts[0].textContent).toBe('2'); // To Do
+      expect(counts[1].textContent).toBe('1'); // In Progress
+      expect(counts[2].textContent).toBe('0'); // Done
     });
 
     it('shows "No items" for empty status sections', () => {
@@ -115,7 +145,7 @@ describe('ListView (Issue #13)', () => {
 
       const empties = container.querySelectorAll('.list-section-empty');
       expect(empties.length).toBe(3);
-      empties.forEach(el => {
+      empties.forEach((el) => {
         expect(el.textContent).toBe('No items');
       });
     });

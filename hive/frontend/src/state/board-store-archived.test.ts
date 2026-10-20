@@ -1,7 +1,16 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  boards, permissions, items, activeBoardId, currentUserEmail, toastMessage, selectedItemId,
-  accessibleBoards, initActiveBoardFromUrl, initSelectedItemFromUrl, ITEM_UNAVAILABLE_MESSAGE,
+  boards,
+  permissions,
+  items,
+  activeBoardId,
+  currentUserEmail,
+  toastMessage,
+  selectedItemId,
+  accessibleBoards,
+  initActiveBoardFromUrl,
+  initSelectedItemFromUrl,
+  ITEM_UNAVAILABLE_MESSAGE,
 } from './board-store';
 import type { ItemWithRow } from '../api/types';
 
@@ -12,9 +21,21 @@ const ME = 'me@test.com';
 
 function item(id: string, boardId: string): ItemWithRow {
   return {
-    id, title: id, description: '', status: 'To Do', owner: '', due_date: '', labels: '',
-    parent_id: '', created_at: '', updated_at: '', completed_at: '', sort_order: 1,
-    created_by: '', board_id: boardId, sheetRow: 2,
+    id,
+    title: id,
+    description: '',
+    status: 'To Do',
+    owner: '',
+    due_date: '',
+    labels: '',
+    parent_id: '',
+    created_at: '',
+    updated_at: '',
+    completed_at: '',
+    sort_order: 1,
+    created_by: '',
+    board_id: boardId,
+    sheetRow: 2,
   };
 }
 
@@ -40,7 +61,7 @@ beforeEach(() => {
 
 describe('#288 AC2: archived boards are hidden from navigation', () => {
   it('accessibleBoards (switcher, Ctrl+1–9, Move to board) leaves the archived board out', () => {
-    expect(accessibleBoards.value.map(b => b.id)).toEqual(['home']);
+    expect(accessibleBoards.value.map((b) => b.id)).toEqual(['home']);
   });
 
   it('?board=<archived> falls back to the first active board', () => {

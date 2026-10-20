@@ -1,32 +1,48 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/preact';
 
-const {
-  mockBoards,
-  mockActiveBoardId,
-  mockUserRole,
-  mockSwitchBoard,
-  mockShowCreateBoardModal,
-  mockShowShareModal,
-} = vi.hoisted(() => ({
-  mockBoards: { current: [
-    { id: 'b1', name: 'Work', icon: '💼', color: '#ff0000', created_at: '', created_by: '' },
-    { id: 'b2', name: 'Family', icon: '', color: '', created_at: '', created_by: '' },
-    { id: 'b3', name: 'Personal', icon: '🏠', color: '', created_at: '', created_by: '' },
-  ] },
-  mockActiveBoardId: { current: 'b1' },
-  mockUserRole: { current: 'owner' as string },
-  mockSwitchBoard: vi.fn(),
-  mockShowCreateBoardModal: { value: false },
-  mockShowShareModal: { value: false },
-}));
+const { mockBoards, mockActiveBoardId, mockUserRole, mockSwitchBoard, mockShowCreateBoardModal, mockShowShareModal } =
+  vi.hoisted(() => ({
+    mockBoards: {
+      current: [
+        { id: 'b1', name: 'Work', icon: '💼', color: '#ff0000', created_at: '', created_by: '' },
+        { id: 'b2', name: 'Family', icon: '', color: '', created_at: '', created_by: '' },
+        { id: 'b3', name: 'Personal', icon: '🏠', color: '', created_at: '', created_by: '' },
+      ],
+    },
+    mockActiveBoardId: { current: 'b1' },
+    mockUserRole: { current: 'owner' as string },
+    mockSwitchBoard: vi.fn(),
+    mockShowCreateBoardModal: { value: false },
+    mockShowShareModal: { value: false },
+  }));
 
 vi.mock('../../state/board-store', () => ({
-  boards: { get value() { return mockBoards.current; } },
-  accessibleBoards: { get value() { return mockBoards.current; } },
-  activeBoardId: { get value() { return mockActiveBoardId.current; } },
-  activeBoard: { get value() { return mockBoards.current.find(b => b.id === mockActiveBoardId.current) || null; } },
-  userBoardRole: { get value() { return mockUserRole.current; } },
+  boards: {
+    get value() {
+      return mockBoards.current;
+    },
+  },
+  accessibleBoards: {
+    get value() {
+      return mockBoards.current;
+    },
+  },
+  activeBoardId: {
+    get value() {
+      return mockActiveBoardId.current;
+    },
+  },
+  activeBoard: {
+    get value() {
+      return mockBoards.current.find((b) => b.id === mockActiveBoardId.current) || null;
+    },
+  },
+  userBoardRole: {
+    get value() {
+      return mockUserRole.current;
+    },
+  },
   switchBoard: (...args: any[]) => mockSwitchBoard(...args),
   showCreateBoardModal: mockShowCreateBoardModal,
   showShareModal: mockShowShareModal,
@@ -55,7 +71,7 @@ describe('BoardSwitcher — AC1: Board option labels no longer include shortcut 
   it('option for first board shows icon + name only, no (Ctrl+1) suffix', () => {
     const { container } = render(<BoardSwitcher />);
     const options = container.querySelectorAll('option');
-    const workOption = Array.from(options).find(o => o.value === 'b1');
+    const workOption = Array.from(options).find((o) => o.value === 'b1');
     expect(workOption).not.toBeNull();
     expect(workOption!.textContent).toBe('💼 Work');
     expect(workOption!.textContent).not.toContain('Ctrl');
@@ -64,7 +80,7 @@ describe('BoardSwitcher — AC1: Board option labels no longer include shortcut 
   it('option for second board shows name only (no icon, no shortcut)', () => {
     const { container } = render(<BoardSwitcher />);
     const options = container.querySelectorAll('option');
-    const familyOption = Array.from(options).find(o => o.value === 'b2');
+    const familyOption = Array.from(options).find((o) => o.value === 'b2');
     expect(familyOption).not.toBeNull();
     expect(familyOption!.textContent).toBe('Family');
     expect(familyOption!.textContent).not.toContain('Ctrl');
@@ -73,7 +89,7 @@ describe('BoardSwitcher — AC1: Board option labels no longer include shortcut 
   it('no option contains a "(Ctrl+N)" pattern', () => {
     const { container } = render(<BoardSwitcher />);
     const options = container.querySelectorAll('option');
-    options.forEach(option => {
+    options.forEach((option) => {
       expect(option.textContent).not.toMatch(/\(Ctrl\+\d\)/);
     });
   });

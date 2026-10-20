@@ -19,7 +19,13 @@ const { mockBoardStore } = vi.hoisted(() => {
     showCreateModal: { value: true },
     createModalInitialStatus: { value: null as string | null },
     createModalInitialDueDate: { value: null as string | null },
-    owners: { value: [{ name: 'Test User', google_account: 'test@example.com' }, { name: 'Mom', google_account: 'mom@test.com' }, { name: 'Dad', google_account: 'dad@test.com' }] },
+    owners: {
+      value: [
+        { name: 'Test User', google_account: 'test@example.com' },
+        { name: 'Mom', google_account: 'mom@test.com' },
+        { name: 'Dad', google_account: 'dad@test.com' },
+      ],
+    },
     labels: { value: [{ label: 'Urgent', color: '#ff0000' }] },
     openDetailWithTitleEdit: { value: false },
     clearCreateItemUrlParams: vi.fn(),
@@ -59,9 +65,7 @@ describe('CreateItemModal — Inline Sub-tasks (Issue #55)', () => {
   }
 
   function getAddButton(container: Element) {
-    return Array.from(container.querySelectorAll('button')).find(
-      b => b.textContent === 'Add'
-    ) as HTMLButtonElement;
+    return Array.from(container.querySelectorAll('button')).find((b) => b.textContent === 'Add') as HTMLButtonElement;
   }
 
   function addSubtaskViaEnter(container: Element, title: string) {
@@ -92,7 +96,7 @@ describe('CreateItemModal — Inline Sub-tasks (Issue #55)', () => {
     it('shows Enter to add hint', () => {
       const { container } = render(<CreateItemModal />);
       const hints = container.querySelectorAll('.form-hint');
-      const subtaskHint = Array.from(hints).find(h => h.textContent?.includes('Enter to add'));
+      const subtaskHint = Array.from(hints).find((h) => h.textContent?.includes('Enter to add'));
       expect(subtaskHint).not.toBeNull();
     });
 

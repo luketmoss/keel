@@ -19,7 +19,7 @@ export function ArchiveDialog({ onClose }: ArchiveDialogProps) {
 
   const allItems = allDoneItemsSorted.value;
   const filtered = search.trim()
-    ? allItems.filter(i => i.title.toLowerCase().includes(search.trim().toLowerCase()))
+    ? allItems.filter((i) => i.title.toLowerCase().includes(search.trim().toLowerCase()))
     : allItems;
 
   const handleOverlayClick = (e: Event) => {
@@ -51,11 +51,7 @@ export function ArchiveDialog({ onClose }: ArchiveDialogProps) {
       >
         <div class="modal-header">
           <h2>Completed Items</h2>
-          <button
-            class="btn btn-ghost"
-            onClick={handleClose}
-            aria-label="Close"
-          >
+          <button class="btn btn-ghost" onClick={handleClose} aria-label="Close">
             ✕
           </button>
         </div>
@@ -72,11 +68,7 @@ export function ArchiveDialog({ onClose }: ArchiveDialogProps) {
               data-autofocus
             />
             {search && (
-              <button
-                class="archive-search-clear"
-                onClick={clearSearch}
-                aria-label="Clear search"
-              >
+              <button class="archive-search-clear" onClick={clearSearch} aria-label="Clear search">
                 ✕
               </button>
             )}
@@ -88,13 +80,9 @@ export function ArchiveDialog({ onClose }: ArchiveDialogProps) {
 
         <div class="archive-list">
           {filtered.length === 0 ? (
-            <div class="archive-empty">
-              {search.trim() ? 'No matching items' : 'No completed items'}
-            </div>
+            <div class="archive-empty">{search.trim() ? 'No matching items' : 'No completed items'}</div>
           ) : (
-            filtered.map(item => (
-              <ArchiveItem key={item.id} item={item} onClick={handleItemClick} />
-            ))
+            filtered.map((item) => <ArchiveItem key={item.id} item={item} onClick={handleItemClick} />)
           )}
         </div>
       </div>
@@ -109,7 +97,10 @@ interface ArchiveItemProps {
 
 function ArchiveItem({ item, onClick }: ArchiveItemProps) {
   const itemLabels = item.labels
-    ? item.labels.split(',').map(l => l.trim()).filter(Boolean)
+    ? item.labels
+        .split(',')
+        .map((l) => l.trim())
+        .filter(Boolean)
     : [];
 
   return (
@@ -122,13 +113,11 @@ function ArchiveItem({ item, onClick }: ArchiveItemProps) {
         <div class="archive-item-title">{item.title}</div>
         <div class="archive-item-meta">
           {item.owner && <span class="archive-item-owner">{item.owner}</span>}
-          <span class="archive-item-date">
-            {formatRelativeDate(item.completed_at)}
-          </span>
+          <span class="archive-item-date">{formatRelativeDate(item.completed_at)}</span>
         </div>
         {itemLabels.length > 0 && (
           <div class="archive-item-labels">
-            {itemLabels.map(label => (
+            {itemLabels.map((label) => (
               <LabelBadge key={label} label={label} />
             ))}
           </div>

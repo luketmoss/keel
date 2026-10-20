@@ -66,16 +66,20 @@ export function ArchivedBoardsDialog() {
       >
         <div class="modal-header">
           <h2 id="archived-boards-title">Archived Boards</h2>
-          <button ref={closeRef} class="btn btn-ghost" onClick={close} aria-label="Close">✕</button>
+          <button ref={closeRef} class="btn btn-ghost" onClick={close} aria-label="Close">
+            ✕
+          </button>
         </div>
 
         <div class="modal-body">
           {list.length === 0 ? (
-            <p class="archived-boards-empty" data-testid="archived-boards-empty">No archived boards</p>
+            <p class="archived-boards-empty" data-testid="archived-boards-empty">
+              No archived boards
+            </p>
           ) : (
             <ul class="archived-boards-list" ref={listRef}>
               {list.map((b, index) => {
-                const count = items.value.filter(i => i.board_id === b.id).length;
+                const count = items.value.filter((i) => i.board_id === b.id).length;
                 const isOwner = userRoleForBoard(b.id) === 'owner';
                 const date = formatArchivedDate(b.archived_at || '');
                 return (
@@ -86,7 +90,8 @@ export function ArchivedBoardsDialog() {
                         {b.name}
                       </div>
                       <div class="archived-boards-meta">
-                        {date ? `Archived ${date} · ` : ''}{count} item{count !== 1 ? 's' : ''}
+                        {date ? `Archived ${date} · ` : ''}
+                        {count} item{count !== 1 ? 's' : ''}
                       </div>
                     </div>
                     {isOwner && (
@@ -109,7 +114,9 @@ export function ArchivedBoardsDialog() {
         </div>
 
         <div class="modal-footer">
-          <button type="button" class="btn btn-ghost" onClick={close}>Done</button>
+          <button type="button" class="btn btn-ghost" onClick={close}>
+            Done
+          </button>
         </div>
       </div>
     </div>

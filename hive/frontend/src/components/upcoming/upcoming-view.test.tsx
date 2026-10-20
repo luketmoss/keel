@@ -16,16 +16,36 @@ const { mockState } = vi.hoisted(() => ({
 }));
 
 vi.mock('../../state/board-store', () => ({
-  upcomingBuckets: { get value() { return mockState.upcomingBuckets; } },
-  boards: { get value() { return mockState.boards; } },
-  items: { get value() { return mockState.items; } },
+  upcomingBuckets: {
+    get value() {
+      return mockState.upcomingBuckets;
+    },
+  },
+  boards: {
+    get value() {
+      return mockState.boards;
+    },
+  },
+  items: {
+    get value() {
+      return mockState.items;
+    },
+  },
   selectedItemId: {
-    get value() { return mockState.selectedItemId; },
-    set value(v: string | null) { mockState.selectedItemId = v; },
+    get value() {
+      return mockState.selectedItemId;
+    },
+    set value(v: string | null) {
+      mockState.selectedItemId = v;
+    },
   },
   openDetailWithTitleEdit: {
-    get value() { return mockState.openDetailWithTitleEdit; },
-    set value(v: boolean) { mockState.openDetailWithTitleEdit = v; },
+    get value() {
+      return mockState.openDetailWithTitleEdit;
+    },
+    set value(v: boolean) {
+      mockState.openDetailWithTitleEdit = v;
+    },
   },
   getChildCount: () => ({ total: 0, done: 0 }),
   // Required by LabelBadge which is used in UpcomingCard
@@ -67,7 +87,23 @@ describe('UpcomingView', () => {
           key: 'overdue',
           label: 'Overdue',
           items: [
-            { id: 'i1', title: 'Fix bug', status: 'To Do', owner: 'Luke', due_date: '2024-01-01', labels: '', description: '', board_id: 'b1', parent_id: '', created_at: '', updated_at: '', completed_at: '', sort_order: 0, created_by: '', sheetRow: 1 },
+            {
+              id: 'i1',
+              title: 'Fix bug',
+              status: 'To Do',
+              owner: 'Luke',
+              due_date: '2024-01-01',
+              labels: '',
+              description: '',
+              board_id: 'b1',
+              parent_id: '',
+              created_at: '',
+              updated_at: '',
+              completed_at: '',
+              sort_order: 0,
+              created_by: '',
+              sheetRow: 1,
+            },
           ],
         },
         {
@@ -123,7 +159,23 @@ describe('UpcomingView', () => {
           key: 'this-week',
           label: 'This Week',
           items: [
-            { id: 'c1', title: 'Write tests', status: 'To Do', owner: 'Luke', due_date: '2026-04-02', labels: 'Work', description: 'A task', board_id: 'b1', parent_id: '', created_at: '', updated_at: '', completed_at: '', sort_order: 0, created_by: '', sheetRow: 2 },
+            {
+              id: 'c1',
+              title: 'Write tests',
+              status: 'To Do',
+              owner: 'Luke',
+              due_date: '2026-04-02',
+              labels: 'Work',
+              description: 'A task',
+              board_id: 'b1',
+              parent_id: '',
+              created_at: '',
+              updated_at: '',
+              completed_at: '',
+              sort_order: 0,
+              created_by: '',
+              sheetRow: 2,
+            },
           ],
         },
       ];

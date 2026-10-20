@@ -1,5 +1,14 @@
 import { signal, computed } from '@preact/signals';
-import type { ItemWithRow, Owner, Label, ItemStatus, Board, BoardPermission, PermissionRole, BoardStatus } from '../api/types';
+import type {
+  ItemWithRow,
+  Owner,
+  Label,
+  ItemStatus,
+  Board,
+  BoardPermission,
+  PermissionRole,
+  BoardStatus,
+} from '../api/types';
 import { isValidDateForm } from '../utils/validate-date';
 import { isBoardArchived } from './rules';
 
@@ -18,17 +27,15 @@ export const loading = signal(true);
 export const currentUserEmail = signal<string>('');
 
 /** The currently active board object. */
-export const activeBoard = computed(() =>
-  boards.value.find(b => b.id === activeBoardId.value) ?? null
-);
+export const activeBoard = computed(() => boards.value.find((b) => b.id === activeBoardId.value) ?? null);
 
 /** Every board the current user has access to (via direct permission or wildcard), archived or not. */
 const permittedBoards = computed(() => {
   const email = currentUserEmail.value.toLowerCase();
   if (!email) return boards.value; // No user context = show all (fallback)
-  return boards.value.filter(b => {
-    return permissions.value.some(p =>
-      p.board_id === b.id && (p.user_email === '*' || p.user_email.toLowerCase() === email)
+  return boards.value.filter((b) => {
+    return permissions.value.some(
+      (p) => p.board_id === b.id && (p.user_email === '*' || p.user_email.toLowerCase() === email),
     );
   });
 });
@@ -38,26 +45,22 @@ const permittedBoards = computed(() => {
  * the list every view reads — the switcher, shortcuts, Upcoming, Move to
  * board, deep links — so an archived board drops out of all of them at once.
  */
-export const accessibleBoards = computed(() =>
-  permittedBoards.value.filter(b => !isBoardArchived(b))
-);
+export const accessibleBoards = computed(() => permittedBoards.value.filter((b) => !isBoardArchived(b)));
 
 /** #288: Archived boards the current user can access, most recently archived first. */
 export const archivedBoards = computed(() =>
   permittedBoards.value
-    .filter(b => isBoardArchived(b))
-    .sort((a, b) => (b.archived_at || '').localeCompare(a.archived_at || ''))
+    .filter((b) => isBoardArchived(b))
+    .sort((a, b) => (b.archived_at || '').localeCompare(a.archived_at || '')),
 );
 
 /** #288: The current user's role on any board, not just the active one. */
 export function userRoleForBoard(boardId: string): PermissionRole | null {
   const email = currentUserEmail.value.toLowerCase();
   if (!email || !boardId) return null;
-  const direct = permissions.value.find(
-    p => p.board_id === boardId && p.user_email.toLowerCase() === email
-  );
+  const direct = permissions.value.find((p) => p.board_id === boardId && p.user_email.toLowerCase() === email);
   if (direct) return direct.role;
-  const wildcard = permissions.value.find(p => p.board_id === boardId && p.user_email === '*');
+  const wildcard = permissions.value.find((p) => p.board_id === boardId && p.user_email === '*');
   return wildcard ? 'member' : null;
 }
 
@@ -68,30 +71,28 @@ export const userBoardRole = computed((): PermissionRole | null => userRoleForBo
 export const boardLabels = computed(() => {
   const bid = activeBoardId.value;
   if (!bid) return labels.value;
-  return labels.value.filter(l => l.board_id === bid);
+  return labels.value.filter((l) => l.board_id === bid);
 });
 
 /** Statuses (columns) for the active board, sorted by sort_order. */
 export const boardStatuses = computed(() => {
   const bid = activeBoardId.value;
-  return statuses.value
-    .filter(s => s.board_id === bid)
-    .sort((a, b) => a.sort_order - b.sort_order);
+  return statuses.value.filter((s) => s.board_id === bid).sort((a, b) => a.sort_order - b.sort_order);
 });
 
 /** Check if a status name is a terminal (done) status for the active board.
  * Falls back to checking if name is 'Done' when no statuses are loaded (backward compat). */
 export function isTerminalStatus(statusName: string): boolean {
   if (boardStatuses.value.length === 0) return statusName === 'Done';
-  return boardStatuses.value.some(s => s.name === statusName && s.is_terminal);
+  return boardStatuses.value.some((s) => s.name === statusName && s.is_terminal);
 }
 
 /** Check if a status name is terminal for a specific board (cross-board lookups).
  * Falls back to checking if name is 'Done' when no statuses are loaded. */
 export function isTerminalStatusForBoard(statusName: string, boardId: string): boolean {
-  const boardStats = statuses.value.filter(s => s.board_id === boardId);
+  const boardStats = statuses.value.filter((s) => s.board_id === boardId);
   if (boardStats.length === 0) return statusName === 'Done';
-  return boardStats.some(s => s.name === statusName && s.is_terminal);
+  return boardStats.some((s) => s.name === statusName && s.is_terminal);
 }
 
 /** Get the first (default) status name for the active board. Falls back to 'To Do'. */
@@ -102,7 +103,7 @@ export function defaultStatusName(): string {
 
 /** Get the terminal status name for the active board. Falls back to 'Done'. */
 export function terminalStatusName(): string {
-  const terminal = boardStatuses.value.find(s => s.is_terminal);
+  const terminal = boardStatuses.value.find((s) => s.is_terminal);
   return terminal ? terminal.name : 'Done';
 }
 
@@ -111,12 +112,8 @@ export const boardItems = computed(() => {
   const bid = activeBoardId.value;
   if (!bid) return items.value;
   // Include items on this board, plus children whose parent is on this board
-  const boardRoots = new Set(
-    items.value.filter(i => i.board_id === bid && !i.parent_id).map(i => i.id)
-  );
-  return items.value.filter(i =>
-    (i.board_id === bid) || (i.parent_id && boardRoots.has(i.parent_id))
-  );
+  const boardRoots = new Set(items.value.filter((i) => i.board_id === bid && !i.parent_id).map((i) => i.id));
+  return items.value.filter((i) => i.board_id === bid || (i.parent_id && boardRoots.has(i.parent_id)));
 });
 
 // --- Filters ---
@@ -138,7 +135,9 @@ function loadGroupBy(): GroupBy {
       localStorage.removeItem('hive-view-mode');
       return 'status';
     }
-  } catch { /* localStorage unavailable */ }
+  } catch {
+    /* localStorage unavailable */
+  }
   return 'none';
 }
 
@@ -148,7 +147,9 @@ export function setGroupBy(mode: GroupBy) {
   groupBy.value = mode;
   try {
     localStorage.setItem('hive-group-by', mode);
-  } catch { /* localStorage unavailable */ }
+  } catch {
+    /* localStorage unavailable */
+  }
 }
 
 // --- Active view (Board vs Upcoming) ---
@@ -174,7 +175,7 @@ export function switchToBoard() {
     url.searchParams.set('board', activeBoardId.value);
   }
   window.history.replaceState(null, '', url.toString());
-  const board = boards.value.find(b => b.id === activeBoardId.value);
+  const board = boards.value.find((b) => b.id === activeBoardId.value);
   if (board) document.title = `Hive — ${board.name}`;
 }
 
@@ -194,7 +195,7 @@ export const upcomingFilterBoards = signal<Set<string>>(new Set());
 
 /** Initialize upcoming board filter to all accessible boards. */
 export function initUpcomingBoardFilter() {
-  upcomingFilterBoards.value = new Set(accessibleBoards.value.map(b => b.id));
+  upcomingFilterBoards.value = new Set(accessibleBoards.value.map((b) => b.id));
 }
 
 /** Toggle a board in the upcoming filter. */
@@ -237,7 +238,7 @@ function syncSelectedItemParam(id: string | null) {
 /** The title to show when no item detail is open. */
 function contextTitle(): string {
   if (activeView.value === 'upcoming') return 'Hive — Upcoming';
-  const board = boards.value.find(b => b.id === activeBoardId.value);
+  const board = boards.value.find((b) => b.id === activeBoardId.value);
   return board ? `Hive — ${board.name}` : 'Hive';
 }
 
@@ -249,7 +250,7 @@ function contextTitle(): string {
 export function selectItem(id: string) {
   selectedItemId.value = id;
   syncSelectedItemParam(id);
-  const item = items.value.find(i => i.id === id);
+  const item = items.value.find((i) => i.id === id);
   document.title = item ? `Hive — ${item.title}` : contextTitle();
 }
 
@@ -275,8 +276,8 @@ export function initSelectedItemFromUrl() {
   const itemParam = params.get('item');
   if (!itemParam) return;
 
-  const item = items.value.find(i => i.id === itemParam);
-  const reachable = !!item && accessibleBoards.value.some(b => b.id === item.board_id);
+  const item = items.value.find((i) => i.id === itemParam);
+  const reachable = !!item && accessibleBoards.value.some((b) => b.id === item.board_id);
 
   if (!item || !reachable) {
     syncSelectedItemParam(null);
@@ -358,11 +359,16 @@ export function initCreateItemFromUrl() {
   // initActiveBoardFromUrl's job, already run) but gets a toast here — only
   // because `new=1` asked for it. A plain `?board=<bad>` load stays silent.
   const boardParam = params.get('board');
-  if (boardParam && !accessibleBoards.value.some(b => b.id === boardParam)) {
+  if (boardParam && !accessibleBoards.value.some((b) => b.id === boardParam)) {
     showToast(BOARD_UNAVAILABLE_MESSAGE, 'error');
   }
 }
-export const toastMessage = signal<{ text: string; type: 'success' | 'error'; action?: { label: string; fn: () => void }; duration?: number } | null>(null);
+export const toastMessage = signal<{
+  text: string;
+  type: 'success' | 'error';
+  action?: { label: string; fn: () => void };
+  duration?: number;
+} | null>(null);
 
 // --- Theme ---
 export type Theme = 'light' | 'dark' | 'system';
@@ -372,7 +378,9 @@ export function loadTheme(): Theme {
   try {
     const stored = localStorage.getItem('hive-theme');
     if (stored === 'light' || stored === 'dark' || stored === 'system') return stored;
-  } catch { /* localStorage unavailable */ }
+  } catch {
+    /* localStorage unavailable */
+  }
   return 'system';
 }
 
@@ -390,7 +398,9 @@ export function setTheme(t: Theme) {
   theme.value = t;
   try {
     localStorage.setItem('hive-theme', t);
-  } catch { /* localStorage unavailable */ }
+  } catch {
+    /* localStorage unavailable */
+  }
   applyTheme(t);
 }
 
@@ -443,8 +453,11 @@ export const filteredItems = computed(() => {
 
   if (filterLabel.value) {
     const label = filterLabel.value;
-    result = result.filter(i =>
-      i.labels.split(',').map(l => l.trim()).includes(label)
+    result = result.filter((i) =>
+      i.labels
+        .split(',')
+        .map((l) => l.trim())
+        .includes(label),
     );
   }
 
@@ -471,7 +484,7 @@ export const filteredItems = computed(() => {
       }
     }
 
-    result = result.filter(i => {
+    result = result.filter((i) => {
       // Children pass through — they're filtered out by rootItems
       if (i.parent_id) return true;
 
@@ -484,9 +497,7 @@ export const filteredItems = computed(() => {
   return result;
 });
 
-export const rootItems = computed(() =>
-  filteredItems.value.filter(i => !i.parent_id)
-);
+export const rootItems = computed(() => filteredItems.value.filter((i) => !i.parent_id));
 
 const bySortOrder = (a: ItemWithRow, b: ItemWithRow) => a.sort_order - b.sort_order;
 const byCompletedAtDesc = (a: ItemWithRow, b: ItemWithRow) => {
@@ -498,27 +509,21 @@ const byCompletedAtDesc = (a: ItemWithRow, b: ItemWithRow) => {
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** All root items in terminal (done) columns (unfiltered by date). */
-export const allDoneItems = computed(() =>
-  rootItems.value.filter(i => isTerminalStatus(i.status))
-);
+export const allDoneItems = computed(() => rootItems.value.filter((i) => isTerminalStatus(i.status)));
 
 /** Root terminal-column items completed within the last 7 days. */
 export const recentDoneItems = computed(() => {
   const cutoff = Date.now() - SEVEN_DAYS_MS;
   return allDoneItems.value
-    .filter(i => i.completed_at && new Date(i.completed_at).getTime() >= cutoff)
+    .filter((i) => i.completed_at && new Date(i.completed_at).getTime() >= cutoff)
     .sort(bySortOrder);
 });
 
 /** True when there are terminal items older than 7 days (archived). */
-export const hasArchivedItems = computed(() =>
-  allDoneItems.value.length > recentDoneItems.value.length
-);
+export const hasArchivedItems = computed(() => allDoneItems.value.length > recentDoneItems.value.length);
 
 /** All terminal items sorted by completed_at descending, for the archive dialog. */
-export const allDoneItemsSorted = computed(() =>
-  allDoneItems.value.slice().sort(byCompletedAtDesc)
-);
+export const allDoneItemsSorted = computed(() => allDoneItems.value.slice().sort(byCompletedAtDesc));
 
 // --- UI state for archive dialog ---
 export const showArchiveDialog = signal(false);
@@ -559,7 +564,7 @@ export function switchBoard(boardId: string) {
   window.history.replaceState(null, '', url.toString());
 
   // Update document title
-  const board = boards.value.find(b => b.id === boardId);
+  const board = boards.value.find((b) => b.id === boardId);
   if (board) {
     document.title = `Hive \u2014 ${board.name}`;
   }
@@ -571,13 +576,13 @@ export function initActiveBoardFromUrl() {
   const boardParam = params.get('board');
   // Filter to boards the current user can access (AC3), which excludes archived ones (#288)
   const available = accessibleBoards.value;
-  if (boardParam && available.some(b => b.id === boardParam)) {
+  if (boardParam && available.some((b) => b.id === boardParam)) {
     activeBoardId.value = boardParam;
   } else if (available.length > 0) {
     activeBoardId.value = available[0].id;
   }
   // Update document title
-  const board = boards.value.find(b => b.id === activeBoardId.value);
+  const board = boards.value.find((b) => b.id === activeBoardId.value);
   if (board) {
     document.title = `Hive \u2014 ${board.name}`;
   }
@@ -614,7 +619,9 @@ export function loadColumnSortModes(): Record<string, SortMode> {
         }
       }
     }
-  } catch { /* localStorage unavailable */ }
+  } catch {
+    /* localStorage unavailable */
+  }
   return modes;
 }
 
@@ -624,7 +631,9 @@ export function setColumnSortMode(status: string, mode: SortMode) {
   columnSortModes.value = { ...columnSortModes.value, [status]: mode };
   try {
     localStorage.setItem(sortKey(status), mode);
-  } catch { /* localStorage unavailable */ }
+  } catch {
+    /* localStorage unavailable */
+  }
 }
 
 function sortItems(itemList: ItemWithRow[], mode: SortMode): ItemWithRow[] {
@@ -650,8 +659,8 @@ export const columns = computed((): Record<string, ItemWithRow[]> => {
     } else {
       const mode = columnSortModes.value[status.name] || 'custom';
       result[status.name] = sortItems(
-        rootItems.value.filter(i => i.status === status.name),
-        mode
+        rootItems.value.filter((i) => i.status === status.name),
+        mode,
       );
     }
   }
@@ -697,7 +706,14 @@ function nextWeekRange(d: Date): [string, string] {
   return [monday, sunday];
 }
 
-function classifyDueDate(dueDate: string, today: string, thisMonday: string, thisSunday: string, nextMonday: string, nextSunday: string): UpcomingBucket {
+function classifyDueDate(
+  dueDate: string,
+  today: string,
+  thisMonday: string,
+  thisSunday: string,
+  nextMonday: string,
+  nextSunday: string,
+): UpcomingBucket {
   if (dueDate < today) return 'overdue';
   if (dueDate >= thisMonday && dueDate <= thisSunday) return 'this-week';
   if (dueDate >= nextMonday && dueDate <= nextSunday) return 'next-week';
@@ -715,17 +731,18 @@ export const upcomingBuckets = computed((): UpcomingBucketData[] => {
   // is a snapshot taken at load, so archived boards are dropped here as well:
   // a board archived since then must not keep its items in Upcoming (#288).
   const selectedBoards = upcomingFilterBoards.value;
-  const archivedIds = new Set(boards.value.filter(isBoardArchived).map(b => b.id));
-  const allItems = items.value.filter(i =>
-    !isTerminalStatusForBoard(i.status, i.board_id) && selectedBoards.has(i.board_id) && !archivedIds.has(i.board_id)
+  const archivedIds = new Set(boards.value.filter(isBoardArchived).map((b) => b.id));
+  const allItems = items.value.filter(
+    (i) =>
+      !isTerminalStatusForBoard(i.status, i.board_id) && selectedBoards.has(i.board_id) && !archivedIds.has(i.board_id),
   );
 
   const search = upcomingFilterSearch.value.trim();
   const labelFilter = upcomingFilterLabel.value;
 
   // Classify items with due dates into buckets
-  const rootsWithDue = allItems.filter(i => !i.parent_id && i.due_date);
-  const children = allItems.filter(i => i.parent_id);
+  const rootsWithDue = allItems.filter((i) => !i.parent_id && i.due_date);
+  const children = allItems.filter((i) => i.parent_id);
 
   // Build parent → earliest child bucket map for AC3
   const parentBucketMap = new Map<string, UpcomingBucket>();
@@ -740,10 +757,10 @@ export const upcomingBuckets = computed((): UpcomingBucketData[] => {
 
   // Collect all qualifying root items
   const buckets: Record<UpcomingBucket, ItemWithRow[]> = {
-    'overdue': [],
+    overdue: [],
     'this-week': [],
     'next-week': [],
-    'later': [],
+    later: [],
   };
 
   // Roots with their own due dates
@@ -753,7 +770,7 @@ export const upcomingBuckets = computed((): UpcomingBucketData[] => {
   }
 
   // AC3: Parents without qualifying due date but with qualifying children
-  const rootsWithoutDue = allItems.filter(i => !i.parent_id && !i.due_date);
+  const rootsWithoutDue = allItems.filter((i) => !i.parent_id && !i.due_date);
   for (const item of rootsWithoutDue) {
     const childBucket = parentBucketMap.get(item.id);
     if (childBucket) {
@@ -770,15 +787,19 @@ export const upcomingBuckets = computed((): UpcomingBucketData[] => {
     let result = list;
     if (search) {
       const t = search.toLowerCase();
-      result = result.filter(i =>
-        i.title.toLowerCase().includes(t) ||
-        i.description.toLowerCase().includes(t) ||
-        i.labels.toLowerCase().includes(t)
+      result = result.filter(
+        (i) =>
+          i.title.toLowerCase().includes(t) ||
+          i.description.toLowerCase().includes(t) ||
+          i.labels.toLowerCase().includes(t),
       );
     }
     if (labelFilter) {
-      result = result.filter(i =>
-        i.labels.split(',').map(l => l.trim()).includes(labelFilter)
+      result = result.filter((i) =>
+        i.labels
+          .split(',')
+          .map((l) => l.trim())
+          .includes(labelFilter),
       );
     }
     return result;
@@ -811,18 +832,16 @@ export const upcomingBuckets = computed((): UpcomingBucketData[] => {
 });
 
 function bucketOrder(bucket: UpcomingBucket): number {
-  const order: Record<UpcomingBucket, number> = { 'overdue': 0, 'this-week': 1, 'next-week': 2, 'later': 3 };
+  const order: Record<UpcomingBucket, number> = { overdue: 0, 'this-week': 1, 'next-week': 2, later: 3 };
   return order[bucket];
 }
 
 export const selectedItem = computed(() =>
-  selectedItemId.value ? items.value.find(i => i.id === selectedItemId.value) ?? null : null
+  selectedItemId.value ? (items.value.find((i) => i.id === selectedItemId.value) ?? null) : null,
 );
 
 export const childrenOfSelected = computed(() =>
-  selectedItemId.value
-    ? items.value.filter(i => i.parent_id === selectedItemId.value).sort(bySortOrder)
-    : []
+  selectedItemId.value ? items.value.filter((i) => i.parent_id === selectedItemId.value).sort(bySortOrder) : [],
 );
 
 // --- Helpers ---
@@ -830,7 +849,12 @@ export const childrenOfSelected = computed(() =>
 /** Timer ID for the current toast auto-dismiss. Exported for pause/resume in Toast component. */
 export let toastTimerId: ReturnType<typeof setTimeout> | null = null;
 
-export function showToast(text: string, type: 'success' | 'error' = 'success', action?: { label: string; fn: () => void }, duration?: number) {
+export function showToast(
+  text: string,
+  type: 'success' | 'error' = 'success',
+  action?: { label: string; fn: () => void },
+  duration?: number,
+) {
   // Clear any existing timer
   if (toastTimerId !== null) {
     clearTimeout(toastTimerId);
@@ -873,9 +897,9 @@ export function dismissToast(): void {
 }
 
 export function getChildCount(itemId: string): { done: number; total: number } {
-  const children = items.value.filter(i => i.parent_id === itemId);
+  const children = items.value.filter((i) => i.parent_id === itemId);
   return {
-    done: children.filter(i => isTerminalStatus(i.status)).length,
+    done: children.filter((i) => isTerminalStatus(i.status)).length,
     total: children.length,
   };
 }

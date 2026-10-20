@@ -17,11 +17,19 @@ let mockItemOverrides: Record<string, any> = {};
 
 vi.mock('../../state/board-store', () => ({
   selectedItemId: {
-    get value() { return mockSelectedItemId; },
-    set value(v: string | null) { mockSelectedItemId = v; },
+    get value() {
+      return mockSelectedItemId;
+    },
+    set value(v: string | null) {
+      mockSelectedItemId = v;
+    },
   },
-  selectItem: (id: string) => { mockSelectedItemId = id; },
-  clearSelectedItem: () => { mockSelectedItemId = null; },
+  selectItem: (id: string) => {
+    mockSelectedItemId = id;
+  },
+  clearSelectedItem: () => {
+    mockSelectedItemId = null;
+  },
   openDetailWithTitleEdit: { value: false },
   selectedItem: {
     get value() {
@@ -46,23 +54,58 @@ vi.mock('../../state/board-store', () => ({
     },
   },
   childrenOfSelected: {
-    get value() { return mockChildren; },
+    get value() {
+      return mockChildren;
+    },
   },
   items: {
-    get value() { return mockItems; },
+    get value() {
+      return mockItems;
+    },
   },
-  owners: { value: [{ name: 'Luke', google_account: 'luke@example.com' }, { name: 'Sarah', google_account: 'sarah@example.com' }] },
+  owners: {
+    value: [
+      { name: 'Luke', google_account: 'luke@example.com' },
+      { name: 'Sarah', google_account: 'sarah@example.com' },
+    ],
+  },
   labels: { value: [{ label: 'Urgent', color: '#ff0000' }] },
   boardLabels: { value: [{ label: 'Urgent', color: '#ff0000' }] },
   showToast: vi.fn(),
   accessibleBoards: { value: [] },
   activeBoardId: { value: 'board-1' },
   showMoveToBoardModal: { value: false },
-  boardStatuses: { value: [
-    { id: 's1', board_id: 'board-1', name: 'To Do', sort_order: 1, color: '#e3f2fd', is_terminal: false, created_at: '' },
-    { id: 's2', board_id: 'board-1', name: 'In Progress', sort_order: 2, color: '#fff3e0', is_terminal: false, created_at: '' },
-    { id: 's3', board_id: 'board-1', name: 'Done', sort_order: 3, color: '#e8f5e9', is_terminal: true, created_at: '' },
-  ] },
+  boardStatuses: {
+    value: [
+      {
+        id: 's1',
+        board_id: 'board-1',
+        name: 'To Do',
+        sort_order: 1,
+        color: '#e3f2fd',
+        is_terminal: false,
+        created_at: '',
+      },
+      {
+        id: 's2',
+        board_id: 'board-1',
+        name: 'In Progress',
+        sort_order: 2,
+        color: '#fff3e0',
+        is_terminal: false,
+        created_at: '',
+      },
+      {
+        id: 's3',
+        board_id: 'board-1',
+        name: 'Done',
+        sort_order: 3,
+        color: '#e8f5e9',
+        is_terminal: true,
+        created_at: '',
+      },
+    ],
+  },
   isTerminalStatus: (name: string) => name === 'Done',
   defaultStatusName: () => 'To Do',
   terminalStatusName: () => 'Done',
@@ -94,10 +137,9 @@ function renderCardDetail() {
   return render(
     <AuthContext.Provider value={mockAuth}>
       <CardDetail />
-    </AuthContext.Provider>
+    </AuthContext.Provider>,
   );
 }
-
 
 function daysAgoIso(n: number): string {
   const d = new Date();
@@ -151,7 +193,9 @@ describe('CardDetail completed date (#280)', () => {
     const { container } = renderCardDetail();
     const input = container.querySelector('[data-testid="completed-date-input"]') as HTMLInputElement;
     const picked = ymd(daysAgoIso(4));
-    await act(async () => { fireEvent.change(input, { target: { value: picked } }); });
+    await act(async () => {
+      fireEvent.change(input, { target: { value: picked } });
+    });
     expect(mockUpdateItem).toHaveBeenCalledTimes(1);
     const [id, changes] = mockUpdateItem.mock.calls[0];
     expect(id).toBe('detail-test-1');
@@ -168,7 +212,9 @@ describe('CardDetail completed date (#280)', () => {
     mockItemOverrides = { status: 'Done', completed_at: prev };
     const { container } = renderCardDetail();
     const input = container.querySelector('[data-testid="completed-date-input"]') as HTMLInputElement;
-    await act(async () => { fireEvent.change(input, { target: { value: ymd(prev) } }); });
+    await act(async () => {
+      fireEvent.change(input, { target: { value: ymd(prev) } });
+    });
     expect(mockUpdateItem).not.toHaveBeenCalled();
   });
 
@@ -178,7 +224,9 @@ describe('CardDetail completed date (#280)', () => {
     const input = container.querySelector('[data-testid="completed-date-input"]') as HTMLInputElement;
     const t = new Date();
     t.setDate(t.getDate() + 3);
-    await act(async () => { fireEvent.change(input, { target: { value: ymd(t.toISOString()) } }); });
+    await act(async () => {
+      fireEvent.change(input, { target: { value: ymd(t.toISOString()) } });
+    });
     expect(mockUpdateItem).not.toHaveBeenCalled();
     const err = container.querySelector('[data-testid="save-indicator-error"]')!;
     expect(err.textContent).toBe("Completed date can't be in the future");
@@ -190,7 +238,9 @@ describe('CardDetail completed date (#280)', () => {
     mockItemOverrides = { status: 'Done', completed_at: prev };
     const { container } = renderCardDetail();
     const input = container.querySelector('[data-testid="completed-date-input"]') as HTMLInputElement;
-    await act(async () => { fireEvent.change(input, { target: { value: '' } }); });
+    await act(async () => {
+      fireEvent.change(input, { target: { value: '' } });
+    });
     expect(mockUpdateItem).not.toHaveBeenCalled();
     expect(container.querySelector('[data-testid="save-indicator-error"]')).toBeNull();
     expect(input.value).toBe(ymd(prev));
@@ -200,7 +250,9 @@ describe('CardDetail completed date (#280)', () => {
     mockItemOverrides = { status: 'Done', completed_at: daysAgoIso(1), created_at: daysAgoIso(1) };
     const { container } = renderCardDetail();
     const input = container.querySelector('[data-testid="completed-date-input"]') as HTMLInputElement;
-    await act(async () => { fireEvent.change(input, { target: { value: ymd(daysAgoIso(3)) } }); });
+    await act(async () => {
+      fireEvent.change(input, { target: { value: ymd(daysAgoIso(3)) } });
+    });
     expect(mockUpdateItem).toHaveBeenCalledTimes(1);
   });
 
@@ -208,7 +260,9 @@ describe('CardDetail completed date (#280)', () => {
     mockItemOverrides = { status: 'Done', completed_at: daysAgoIso(1), title: 'Pantry' };
     const { container } = renderCardDetail();
     const input = container.querySelector('[data-testid="completed-date-input"]') as HTMLInputElement;
-    await act(async () => { fireEvent.change(input, { target: { value: ymd(daysAgoIso(12)) } }); });
+    await act(async () => {
+      fireEvent.change(input, { target: { value: ymd(daysAgoIso(12)) } });
+    });
     await waitFor(() => expect(showToast).toHaveBeenCalledWith('Pantry moved to the archive', 'success'));
   });
 
@@ -216,16 +270,20 @@ describe('CardDetail completed date (#280)', () => {
     mockItemOverrides = { status: 'Done', completed_at: daysAgoIso(1) };
     const first = renderCardDetail();
     await act(async () => {
-      fireEvent.change(first.container.querySelector('[data-testid="completed-date-input"]')!, { target: { value: ymd(daysAgoIso(4)) } });
+      fireEvent.change(first.container.querySelector('[data-testid="completed-date-input"]')!, {
+        target: { value: ymd(daysAgoIso(4)) },
+      });
     });
     first.unmount();
     mockItemOverrides = { status: 'Done', completed_at: daysAgoIso(20) };
     const second = renderCardDetail();
     await act(async () => {
-      fireEvent.change(second.container.querySelector('[data-testid="completed-date-input"]')!, { target: { value: ymd(daysAgoIso(2)) } });
+      fireEvent.change(second.container.querySelector('[data-testid="completed-date-input"]')!, {
+        target: { value: ymd(daysAgoIso(2)) },
+      });
     });
     await waitFor(() => expect(mockUpdateItem).toHaveBeenCalledTimes(2));
-    await new Promise(r => setTimeout(r, 20));
+    await new Promise((r) => setTimeout(r, 20));
     expect(showToast).not.toHaveBeenCalled();
   });
 });

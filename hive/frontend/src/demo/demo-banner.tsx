@@ -3,12 +3,7 @@
 
 export function DemoBanner() {
   return (
-    <div
-      class="demo-banner"
-      role="status"
-      aria-live="polite"
-      data-testid="demo-banner"
-    >
+    <div class="demo-banner" role="status" aria-live="polite" data-testid="demo-banner">
       <strong>Demo Mode</strong> — Changes are not saved
     </div>
   );

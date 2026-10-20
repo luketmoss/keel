@@ -3,8 +3,14 @@ import { render, cleanup, fireEvent, waitFor } from '@testing-library/preact';
 import { AuthContext } from '../../auth/auth-context';
 import type { AuthState } from '../../auth/auth-context';
 import {
-  boards, permissions, items, activeBoardId, currentUserEmail,
-  showArchiveBoardModal, showArchivedBoardsDialog, showShareModal,
+  boards,
+  permissions,
+  items,
+  activeBoardId,
+  currentUserEmail,
+  showArchiveBoardModal,
+  showArchivedBoardsDialog,
+  showShareModal,
 } from '../../state/board-store';
 import type { ItemWithRow } from '../../api/types';
 
@@ -42,9 +48,21 @@ function withAuth(node: preact.ComponentChild) {
 
 function item(id: string, boardId: string): ItemWithRow {
   return {
-    id, title: id, description: '', status: 'To Do', owner: '', due_date: '', labels: '',
-    parent_id: '', created_at: '', updated_at: '', completed_at: '', sort_order: 1,
-    created_by: '', board_id: boardId, sheetRow: 2,
+    id,
+    title: id,
+    description: '',
+    status: 'To Do',
+    owner: '',
+    due_date: '',
+    labels: '',
+    parent_id: '',
+    created_at: '',
+    updated_at: '',
+    completed_at: '',
+    sort_order: 1,
+    created_by: '',
+    board_id: boardId,
+    sheetRow: 2,
   };
 }
 
@@ -130,7 +148,14 @@ describe('AC3: Archived boards dialog', () => {
   beforeEach(() => {
     boards.value = [
       { id: 'home', name: 'Home', created_at: '', created_by: '' },
-      { id: 'garage', name: 'Garage', created_at: '', created_by: '', icon: '🔧', archived_at: '2026-10-18T12:00:00.000Z' },
+      {
+        id: 'garage',
+        name: 'Garage',
+        created_at: '',
+        created_by: '',
+        icon: '🔧',
+        archived_at: '2026-10-18T12:00:00.000Z',
+      },
       { id: 'shed', name: 'Shed', created_at: '', created_by: '', archived_at: '2026-09-02T12:00:00.000Z' },
     ];
     permissions.value = [
@@ -143,7 +168,7 @@ describe('AC3: Archived boards dialog', () => {
 
   it('lists archived boards newest first with date and item count', () => {
     const view = withAuth(<ArchivedBoardsDialog />);
-    const rows = view.getAllByTestId('archived-board-row').map(r => r.textContent);
+    const rows = view.getAllByTestId('archived-board-row').map((r) => r.textContent);
     expect(rows[0]).toContain('Garage');
     expect(rows[0]).toContain('Archived Oct 18, 2026 · 2 items');
     expect(rows[1]).toContain('Shed');
@@ -159,9 +184,9 @@ describe('AC3: Archived boards dialog', () => {
   });
 
   it('unarchives through the action, and moves focus to Close when the list empties', async () => {
-    boards.value = boards.value.filter(b => b.id !== 'shed');
+    boards.value = boards.value.filter((b) => b.id !== 'shed');
     mockUnarchiveBoard.mockImplementation(async () => {
-      boards.value = boards.value.map(b => ({ ...b, archived_at: '' }));
+      boards.value = boards.value.map((b) => ({ ...b, archived_at: '' }));
       return true;
     });
     const view = withAuth(<ArchivedBoardsDialog />);

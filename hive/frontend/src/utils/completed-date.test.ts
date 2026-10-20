@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { withLocalDate, localYmdOf, isFutureLocalDate, isOutsideDoneWindow, completedRelativeLabel, toLocalYmd } from './completed-date';
+import {
+  withLocalDate,
+  localYmdOf,
+  isFutureLocalDate,
+  isOutsideDoneWindow,
+  completedRelativeLabel,
+  toLocalYmd,
+} from './completed-date';
 
 describe('completed-date helpers (#280)', () => {
   it('withLocalDate keeps local time of day and lands on the picked local date', () => {

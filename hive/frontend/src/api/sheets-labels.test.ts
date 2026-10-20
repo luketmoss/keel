@@ -13,13 +13,7 @@ vi.mock('../auth/reauth', () => ({
   },
 }));
 
-import {
-  createLabelRow,
-  updateLabelRow,
-  deleteLabelRow,
-  fetchLabelsWithRows,
-  cascadeLabelUpdate,
-} from './sheets';
+import { createLabelRow, updateLabelRow, deleteLabelRow, fetchLabelsWithRows, cascadeLabelUpdate } from './sheets';
 
 // Mock fetch globally
 const mockFetch = vi.fn() as Mock;
@@ -115,7 +109,7 @@ describe('Sheets API label CRUD', () => {
       mockSheetsGetResponse([
         ['Errands', '#42a5f5', 'board-1'],
         ['Home', '#66bb6a', 'board-1'],
-      ])
+      ]),
     );
 
     const result = await fetchLabelsWithRows('test-token');
@@ -134,7 +128,7 @@ describe('Sheets API label CRUD', () => {
         ['id-1', 'Task 1', '', 'To Do', '', '', 'Errands, Home', '', '', '', '', '1', ''],
         ['id-2', 'Task 2', '', 'To Do', '', '', 'Home', '', '', '', '', '2', ''],
         ['id-3', 'Task 3', '', 'Done', '', '', '', '', '', '', '', '3', ''],
-      ])
+      ]),
     );
     // PUT for item id-1 (only this item has Errands)
     mockFetch.mockResolvedValueOnce(mockSheetsWriteResponse());
@@ -156,7 +150,7 @@ describe('Sheets API label CRUD', () => {
       mockSheetsGetResponse([
         ['id-1', 'Task 1', '', 'To Do', '', '', 'Errands, Home', '', '', '', '', '1', ''],
         ['id-2', 'Task 2', '', 'To Do', '', '', 'Errands', '', '', '', '', '2', ''],
-      ])
+      ]),
     );
     // Two PUT calls (both items have Errands)
     mockFetch.mockResolvedValueOnce(mockSheetsWriteResponse());
@@ -176,9 +170,7 @@ describe('Sheets API label CRUD', () => {
   // Edge case: cascadeLabelUpdate with no matching items
   it('cascadeLabelUpdate does nothing when no items reference the label', async () => {
     mockFetch.mockResolvedValueOnce(
-      mockSheetsGetResponse([
-        ['id-1', 'Task 1', '', 'To Do', '', '', 'Home', '', '', '', '', '1', ''],
-      ])
+      mockSheetsGetResponse([['id-1', 'Task 1', '', 'To Do', '', '', 'Home', '', '', '', '', '1', '']]),
     );
 
     await cascadeLabelUpdate('NonExistent', 'Something', 'test-token');

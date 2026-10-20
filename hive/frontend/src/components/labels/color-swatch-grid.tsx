@@ -15,51 +15,48 @@ const COLUMNS = 5;
 export function ColorSwatchGrid({ selectedColor, onSelect }: Props) {
   const gridRef = useRef<HTMLDivElement>(null);
 
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    const container = gridRef.current;
-    if (!container) return;
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      const container = gridRef.current;
+      if (!container) return;
 
-    const swatches = Array.from(container.querySelectorAll<HTMLButtonElement>('[role="radio"]'));
-    const currentIndex = swatches.findIndex(s => s === document.activeElement);
-    if (currentIndex === -1) return;
+      const swatches = Array.from(container.querySelectorAll<HTMLButtonElement>('[role="radio"]'));
+      const currentIndex = swatches.findIndex((s) => s === document.activeElement);
+      if (currentIndex === -1) return;
 
-    let nextIndex = currentIndex;
-    switch (e.key) {
-      case 'ArrowRight':
-        e.preventDefault();
-        nextIndex = (currentIndex + 1) % swatches.length;
-        break;
-      case 'ArrowLeft':
-        e.preventDefault();
-        nextIndex = (currentIndex - 1 + swatches.length) % swatches.length;
-        break;
-      case 'ArrowDown':
-        e.preventDefault();
-        nextIndex = Math.min(currentIndex + COLUMNS, swatches.length - 1);
-        break;
-      case 'ArrowUp':
-        e.preventDefault();
-        nextIndex = Math.max(currentIndex - COLUMNS, 0);
-        break;
-      case 'Enter':
-      case ' ':
-        e.preventDefault();
-        onSelect(swatches[currentIndex].dataset.color!);
-        return;
-      default:
-        return;
-    }
-    swatches[nextIndex].focus();
-  }, [onSelect]);
+      let nextIndex = currentIndex;
+      switch (e.key) {
+        case 'ArrowRight':
+          e.preventDefault();
+          nextIndex = (currentIndex + 1) % swatches.length;
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          nextIndex = (currentIndex - 1 + swatches.length) % swatches.length;
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          nextIndex = Math.min(currentIndex + COLUMNS, swatches.length - 1);
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          nextIndex = Math.max(currentIndex - COLUMNS, 0);
+          break;
+        case 'Enter':
+        case ' ':
+          e.preventDefault();
+          onSelect(swatches[currentIndex].dataset.color!);
+          return;
+        default:
+          return;
+      }
+      swatches[nextIndex].focus();
+    },
+    [onSelect],
+  );
 
   return (
-    <div
-      ref={gridRef}
-      class="color-swatch-grid"
-      role="radiogroup"
-      aria-label="Label color"
-      onKeyDown={handleKeyDown}
-    >
+    <div ref={gridRef} class="color-swatch-grid" role="radiogroup" aria-label="Label color" onKeyDown={handleKeyDown}>
       {PRESET_COLORS.map((pc, i) => {
         const isSelected = selectedColor.toUpperCase() === pc.hex.toUpperCase();
         return (

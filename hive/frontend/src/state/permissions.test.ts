@@ -1,8 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  boards, permissions, currentUserEmail, activeBoardId,
-  accessibleBoards, userBoardRole,
-} from './board-store';
+import { boards, permissions, currentUserEmail, activeBoardId, accessibleBoards, userBoardRole } from './board-store';
 
 describe('Board permissions (Issue #42)', () => {
   beforeEach(() => {
@@ -24,7 +21,7 @@ describe('Board permissions (Issue #42)', () => {
     it('shows all boards when user has access via wildcard or direct permission', () => {
       currentUserEmail.value = 'mom@family.com';
       // Mom has: b1 (wildcard + owner), b2 (member)
-      const accessible = accessibleBoards.value.map(b => b.id);
+      const accessible = accessibleBoards.value.map((b) => b.id);
       expect(accessible).toContain('b1');
       expect(accessible).toContain('b2');
       expect(accessible).not.toContain('b3');
@@ -33,7 +30,7 @@ describe('Board permissions (Issue #42)', () => {
     it('shows wildcard boards to any user', () => {
       currentUserEmail.value = 'kiddo@family.com';
       // Kiddo has: b1 (wildcard only)
-      const accessible = accessibleBoards.value.map(b => b.id);
+      const accessible = accessibleBoards.value.map((b) => b.id);
       expect(accessible).toContain('b1');
       expect(accessible).not.toContain('b2');
       expect(accessible).not.toContain('b3');
@@ -46,7 +43,7 @@ describe('Board permissions (Issue #42)', () => {
 
     it('shows boards with direct owner permission', () => {
       currentUserEmail.value = 'dad@family.com';
-      const accessible = accessibleBoards.value.map(b => b.id);
+      const accessible = accessibleBoards.value.map((b) => b.id);
       expect(accessible).toContain('b1'); // wildcard
       expect(accessible).toContain('b2'); // owner
       expect(accessible).toContain('b3'); // owner

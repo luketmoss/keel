@@ -112,7 +112,7 @@ describe('createBoard stores icon', () => {
     const success = await createBoard('My Board', 'user@test.com', 'tok', '🏠');
 
     expect(success).toBe(true);
-    const created = boards.value.find(b => b.name === 'My Board');
+    const created = boards.value.find((b) => b.name === 'My Board');
     expect(created?.icon).toBe('🏠');
   });
 
@@ -120,22 +120,19 @@ describe('createBoard stores icon', () => {
     const success = await createBoard('Plain Board', 'user@test.com', 'tok');
 
     expect(success).toBe(true);
-    const created = boards.value.find(b => b.name === 'Plain Board');
+    const created = boards.value.find((b) => b.name === 'Plain Board');
     expect(created?.icon).toBe('');
   });
 
   it('passes icon to createBoardRow', async () => {
     await createBoard('Colored Board', 'user@test.com', 'tok', '🎯');
 
-    expect(mockCreateBoardRow).toHaveBeenCalledWith(
-      expect.objectContaining({ icon: '🎯' }),
-      'tok'
-    );
+    expect(mockCreateBoardRow).toHaveBeenCalledWith(expect.objectContaining({ icon: '🎯' }), 'tok');
   });
 
   it('board has no color property', async () => {
     await createBoard('No Color', 'user@test.com', 'tok', '🎯');
-    const created = boards.value.find(b => b.name === 'No Color');
+    const created = boards.value.find((b) => b.name === 'No Color');
     expect(created).not.toHaveProperty('color');
   });
 });
@@ -167,9 +164,7 @@ describe('Board type has no color field', () => {
 
 describe('updateBoardAppearance updates icon only', () => {
   it('updates board icon in store (optimistic)', async () => {
-    boards.value = [
-      { id: 'board-1', name: 'Test', created_at: '', created_by: '', icon: '' },
-    ];
+    boards.value = [{ id: 'board-1', name: 'Test', created_at: '', created_by: '', icon: '' }];
 
     await updateBoardAppearance('board-1', '🏠', 'tok');
 
@@ -177,9 +172,7 @@ describe('updateBoardAppearance updates icon only', () => {
   });
 
   it('calls updateBoardRow with empty color and correct icon', async () => {
-    boards.value = [
-      { id: 'board-1', name: 'Test', created_at: '', created_by: '', icon: '' },
-    ];
+    boards.value = [{ id: 'board-1', name: 'Test', created_at: '', created_by: '', icon: '' }];
 
     await updateBoardAppearance('board-1', '🎯', 'tok');
 
@@ -187,18 +180,14 @@ describe('updateBoardAppearance updates icon only', () => {
   });
 
   it('returns true on success', async () => {
-    boards.value = [
-      { id: 'board-1', name: 'Test', created_at: '', created_by: '', icon: '' },
-    ];
+    boards.value = [{ id: 'board-1', name: 'Test', created_at: '', created_by: '', icon: '' }];
 
     const result = await updateBoardAppearance('board-1', '🏠', 'tok');
     expect(result).toBe(true);
   });
 
   it('rolls back on API failure', async () => {
-    boards.value = [
-      { id: 'board-1', name: 'Test', created_at: '', created_by: '', icon: '🎮' },
-    ];
+    boards.value = [{ id: 'board-1', name: 'Test', created_at: '', created_by: '', icon: '🎮' }];
     mockUpdateBoardRow.mockRejectedValueOnce(new Error('API error'));
 
     const result = await updateBoardAppearance('board-1', '🏠', 'tok');
@@ -217,7 +206,7 @@ describe('Migration — existing boards without icon', () => {
   it('createBoard with icon stores in boards signal', async () => {
     const result = await createBoard('New Board', 'user@t.com', 'tok', '✈️');
     expect(result).toBe(true);
-    const b = boards.value.find(x => x.name === 'New Board');
+    const b = boards.value.find((x) => x.name === 'New Board');
     expect(b?.icon).toBe('✈️');
   });
 });

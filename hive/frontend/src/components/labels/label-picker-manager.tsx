@@ -38,11 +38,15 @@ export function LabelPickerManager({ currentLabels, onToggle, token }: Props) {
   const manageBtnRef = useRef<HTMLButtonElement>(null);
 
   const allLabels = labelsStore.value;
-  const currentLabelsList = currentLabels.split(',').map(x => x.trim()).filter(Boolean);
+  const currentLabelsList = currentLabels
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean);
 
   // Determine first unused color for new labels
-  const usedColors = new Set(allLabels.map(l => l.color.toUpperCase()));
-  const firstUnusedColor = PRESET_COLORS.find(pc => !usedColors.has(pc.hex.toUpperCase()))?.hex || PRESET_COLORS[0].hex;
+  const usedColors = new Set(allLabels.map((l) => l.color.toUpperCase()));
+  const firstUnusedColor =
+    PRESET_COLORS.find((pc) => !usedColors.has(pc.hex.toUpperCase()))?.hex || PRESET_COLORS[0].hex;
 
   const openCreateForm = () => {
     setForm({ mode: 'create', name: '', color: firstUnusedColor });
@@ -51,7 +55,7 @@ export function LabelPickerManager({ currentLabels, onToggle, token }: Props) {
   };
 
   const openEditForm = (labelName: string) => {
-    const label = allLabels.find(l => l.label === labelName);
+    const label = allLabels.find((l) => l.label === labelName);
     if (!label) return;
     setForm({ mode: 'edit-label', name: label.label, color: label.color, originalName: label.label });
     setConfirmingDelete(null);
@@ -71,7 +75,7 @@ export function LabelPickerManager({ currentLabels, onToggle, token }: Props) {
   };
 
   const toggleEditMode = () => {
-    setMode(m => m === 'normal' ? 'edit' : 'normal');
+    setMode((m) => (m === 'normal' ? 'edit' : 'normal'));
     setForm(null);
     setConfirmingDelete(null);
   };
@@ -82,8 +86,8 @@ export function LabelPickerManager({ currentLabels, onToggle, token }: Props) {
     if (!trimmed) return 'Label name is required';
     if (trimmed.length > 30) return 'Label name must be 30 characters or fewer';
     const isDuplicate = allLabels.some(
-      l => l.label.toLowerCase() === trimmed.toLowerCase() &&
-        l.label.toLowerCase() !== (originalName || '').toLowerCase()
+      (l) =>
+        l.label.toLowerCase() === trimmed.toLowerCase() && l.label.toLowerCase() !== (originalName || '').toLowerCase(),
     );
     if (isDuplicate) return 'A label with this name already exists';
     return null;
@@ -124,11 +128,7 @@ export function LabelPickerManager({ currentLabels, onToggle, token }: Props) {
     return (
       <div class="label-picker-empty">
         <span class="label-picker-empty-text">No labels yet</span>
-        <button
-          type="button"
-          class="btn btn-primary btn-sm"
-          onClick={openCreateForm}
-        >
+        <button type="button" class="btn btn-primary btn-sm" onClick={openCreateForm}>
           + Create label
         </button>
         {form && renderForm()}
@@ -149,20 +149,27 @@ export function LabelPickerManager({ currentLabels, onToggle, token }: Props) {
           value={form.name}
           onInput={(e) => setForm({ ...form, name: (e.target as HTMLInputElement).value })}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && canSave) { e.preventDefault(); handleSave(); }
-            if (e.key === 'Escape') { e.stopPropagation(); closeForm(); }
+            if (e.key === 'Enter' && canSave) {
+              e.preventDefault();
+              handleSave();
+            }
+            if (e.key === 'Escape') {
+              e.stopPropagation();
+              closeForm();
+            }
           }}
           data-testid="label-name-input"
         />
         {validationError && form.name.trim() !== '' && (
-          <span class="label-form-error" data-testid="label-validation-error">{validationError}</span>
+          <span class="label-form-error" data-testid="label-validation-error">
+            {validationError}
+          </span>
         )}
-        <ColorSwatchGrid
-          selectedColor={form.color}
-          onSelect={(hex) => setForm({ ...form, color: hex })}
-        />
+        <ColorSwatchGrid selectedColor={form.color} onSelect={(hex) => setForm({ ...form, color: hex })} />
         <div class="label-form-actions">
-          <button type="button" class="btn btn-ghost btn-sm" onClick={closeForm}>Cancel</button>
+          <button type="button" class="btn btn-ghost btn-sm" onClick={closeForm}>
+            Cancel
+          </button>
           <button
             type="button"
             class="btn btn-primary btn-sm"
@@ -180,7 +187,7 @@ export function LabelPickerManager({ currentLabels, onToggle, token }: Props) {
   return (
     <div class="label-picker-manager">
       <div class="label-picker">
-        {allLabels.map(l => {
+        {allLabels.map((l) => {
           const isActive = currentLabelsList.includes(l.label);
           const isDeleting = confirmingDelete === l.label;
           const isBeingEdited = form?.mode === 'edit-label' && form.originalName === l.label;
@@ -193,7 +200,9 @@ export function LabelPickerManager({ currentLabels, onToggle, token }: Props) {
             return (
               <div key={l.label} class="label-delete-confirm" data-testid="label-delete-confirm">
                 <span class="delete-confirm-text">Remove label from all items?</span>
-                <button type="button" class="btn btn-ghost btn-sm" onClick={cancelDelete}>Cancel</button>
+                <button type="button" class="btn btn-ghost btn-sm" onClick={cancelDelete}>
+                  Cancel
+                </button>
                 <button
                   type="button"
                   class="btn btn-danger btn-sm"
@@ -230,7 +239,19 @@ export function LabelPickerManager({ currentLabels, onToggle, token }: Props) {
                     onClick={() => openEditForm(l.label)}
                     data-testid={`label-edit-${l.label}`}
                   >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                      <path d="m15 5 4 4" />
+                    </svg>
                   </button>
                   <button
                     type="button"
@@ -240,7 +261,20 @@ export function LabelPickerManager({ currentLabels, onToggle, token }: Props) {
                     onClick={() => handleDelete(l.label)}
                     data-testid={`label-delete-${l.label}`}
                   >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M3 6h18" />
+                      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                    </svg>
                   </button>
                 </span>
               )}
@@ -255,7 +289,9 @@ export function LabelPickerManager({ currentLabels, onToggle, token }: Props) {
             onClick={openCreateForm}
             data-testid="new-label-btn"
             aria-label="New label"
-          >+</button>
+          >
+            +
+          </button>
         )}
         <button
           ref={manageBtnRef}
@@ -266,8 +302,22 @@ export function LabelPickerManager({ currentLabels, onToggle, token }: Props) {
           aria-label={mode === 'edit' ? 'Done managing labels' : 'Manage labels'}
           title={mode === 'edit' ? 'Done' : 'Manage labels'}
         >
-          {mode === 'edit' ? 'Done' : (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          {mode === 'edit' ? (
+            'Done'
+          ) : (
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
           )}
         </button>
       </div>

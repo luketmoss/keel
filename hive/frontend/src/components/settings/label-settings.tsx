@@ -29,14 +29,15 @@ export function LabelSettings({ token }: LabelSettingsProps) {
   const allItems = boardItems.value;
 
   const getUsageCount = (labelName: string): number => {
-    return allItems.filter(item => {
-      const labelsList = item.labels.split(',').map(l => l.trim());
+    return allItems.filter((item) => {
+      const labelsList = item.labels.split(',').map((l) => l.trim());
       return labelsList.includes(labelName);
     }).length;
   };
 
-  const usedColors = new Set(allLabels.map(l => l.color.toUpperCase()));
-  const firstUnusedColor = PRESET_COLORS.find(pc => !usedColors.has(pc.hex.toUpperCase()))?.hex || PRESET_COLORS[0].hex;
+  const usedColors = new Set(allLabels.map((l) => l.color.toUpperCase()));
+  const firstUnusedColor =
+    PRESET_COLORS.find((pc) => !usedColors.has(pc.hex.toUpperCase()))?.hex || PRESET_COLORS[0].hex;
 
   // --- Validation ---
   const validateName = (name: string, originalName?: string): string | null => {
@@ -44,8 +45,8 @@ export function LabelSettings({ token }: LabelSettingsProps) {
     if (!trimmed) return 'Label name is required';
     if (trimmed.length > 30) return 'Label name must be 30 characters or fewer';
     const isDuplicate = allLabels.some(
-      l => l.label.toLowerCase() === trimmed.toLowerCase() &&
-        l.label.toLowerCase() !== (originalName || '').toLowerCase()
+      (l) =>
+        l.label.toLowerCase() === trimmed.toLowerCase() && l.label.toLowerCase() !== (originalName || '').toLowerCase(),
     );
     if (isDuplicate) return 'A label with this name already exists';
     return null;
@@ -79,7 +80,7 @@ export function LabelSettings({ token }: LabelSettingsProps) {
 
   // --- Edit ---
   const startEdit = (labelName: string) => {
-    const label = allLabels.find(l => l.label === labelName);
+    const label = allLabels.find((l) => l.label === labelName);
     if (!label) return;
     setEditingLabel(labelName);
     setEditState({ name: label.label, color: label.color, originalName: label.label });
@@ -94,7 +95,8 @@ export function LabelSettings({ token }: LabelSettingsProps) {
   };
 
   const editValidationError = editState ? validateName(editState.name, editState.originalName) : null;
-  const canSaveEdit = editState !== null && editState.name.trim() !== '' && !editValidationError && editState.color !== '';
+  const canSaveEdit =
+    editState !== null && editState.name.trim() !== '' && !editValidationError && editState.color !== '';
 
   const handleSaveEdit = async () => {
     if (!editState || !canSaveEdit) return;
@@ -138,12 +140,7 @@ export function LabelSettings({ token }: LabelSettingsProps) {
         <h3 class="label-settings-heading">Labels</h3>
         <div class="label-settings-empty" data-testid="label-settings-empty">
           <p>No labels yet.</p>
-          <button
-            type="button"
-            class="btn btn-primary"
-            onClick={startCreate}
-            data-testid="label-settings-create-first"
-          >
+          <button type="button" class="btn btn-primary" onClick={startCreate} data-testid="label-settings-create-first">
             Create your first label
           </button>
         </div>
@@ -155,12 +152,7 @@ export function LabelSettings({ token }: LabelSettingsProps) {
     <section class="label-settings" data-testid="label-settings" aria-label="Labels">
       <div class="label-settings-header">
         <h3 class="label-settings-heading">Labels</h3>
-        <button
-          type="button"
-          class="btn btn-primary btn-sm"
-          onClick={startCreate}
-          data-testid="label-settings-new-btn"
-        >
+        <button type="button" class="btn btn-primary btn-sm" onClick={startCreate} data-testid="label-settings-new-btn">
           New Label
         </button>
       </div>
@@ -177,8 +169,14 @@ export function LabelSettings({ token }: LabelSettingsProps) {
               value={createName}
               onInput={(e) => setCreateName((e.target as HTMLInputElement).value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && canCreate) { e.preventDefault(); handleCreate(); }
-                if (e.key === 'Escape') { e.stopPropagation(); cancelCreate(); }
+                if (e.key === 'Enter' && canCreate) {
+                  e.preventDefault();
+                  handleCreate();
+                }
+                if (e.key === 'Escape') {
+                  e.stopPropagation();
+                  cancelCreate();
+                }
               }}
               aria-invalid={createValidationError && createName.trim() !== '' ? 'true' : undefined}
               aria-describedby={createValidationError && createName.trim() !== '' ? 'label-create-error' : undefined}
@@ -192,7 +190,9 @@ export function LabelSettings({ token }: LabelSettingsProps) {
           </div>
           <ColorSwatchGrid selectedColor={createColor} onSelect={setCreateColor} />
           <div class="label-settings-form-actions">
-            <button type="button" class="btn btn-ghost btn-sm" onClick={cancelCreate}>Cancel</button>
+            <button type="button" class="btn btn-ghost btn-sm" onClick={cancelCreate}>
+              Cancel
+            </button>
             <button
               type="button"
               class="btn btn-primary btn-sm"
@@ -212,11 +212,13 @@ export function LabelSettings({ token }: LabelSettingsProps) {
             <th>Color</th>
             <th>Name</th>
             <th>Items</th>
-            <th><span class="sr-only">Actions</span></th>
+            <th>
+              <span class="sr-only">Actions</span>
+            </th>
           </tr>
         </thead>
         <tbody>
-          {allLabels.map(l => {
+          {allLabels.map((l) => {
             const usageCount = getUsageCount(l.label);
             const isEditing = editingLabel === l.label;
             const isDeleting = deletingLabel === l.label;
@@ -236,22 +238,40 @@ export function LabelSettings({ token }: LabelSettingsProps) {
                           value={editState.name}
                           onInput={(e) => setEditState({ ...editState, name: (e.target as HTMLInputElement).value })}
                           onKeyDown={(e) => {
-                            if (e.key === 'Enter' && canSaveEdit) { e.preventDefault(); handleSaveEdit(); }
-                            if (e.key === 'Escape') { e.stopPropagation(); cancelEdit(); }
+                            if (e.key === 'Enter' && canSaveEdit) {
+                              e.preventDefault();
+                              handleSaveEdit();
+                            }
+                            if (e.key === 'Escape') {
+                              e.stopPropagation();
+                              cancelEdit();
+                            }
                           }}
                           aria-invalid={editValidationError && editState.name.trim() !== '' ? 'true' : undefined}
-                          aria-describedby={editValidationError && editState.name.trim() !== '' ? 'label-edit-error' : undefined}
+                          aria-describedby={
+                            editValidationError && editState.name.trim() !== '' ? 'label-edit-error' : undefined
+                          }
                           data-testid="label-edit-name-input"
                         />
                         {editValidationError && editState.name.trim() !== '' && (
-                          <span id="label-edit-error" class="label-settings-error" role="alert" data-testid="label-edit-error">
+                          <span
+                            id="label-edit-error"
+                            class="label-settings-error"
+                            role="alert"
+                            data-testid="label-edit-error"
+                          >
                             {editValidationError}
                           </span>
                         )}
                       </div>
-                      <ColorSwatchGrid selectedColor={editState.color} onSelect={(hex) => setEditState({ ...editState, color: hex })} />
+                      <ColorSwatchGrid
+                        selectedColor={editState.color}
+                        onSelect={(hex) => setEditState({ ...editState, color: hex })}
+                      />
                       <div class="label-settings-form-actions">
-                        <button type="button" class="btn btn-ghost btn-sm" onClick={cancelEdit}>Cancel</button>
+                        <button type="button" class="btn btn-ghost btn-sm" onClick={cancelEdit}>
+                          Cancel
+                        </button>
                         <button
                           type="button"
                           class="btn btn-primary btn-sm"
@@ -269,16 +289,21 @@ export function LabelSettings({ token }: LabelSettingsProps) {
             }
 
             if (isDeleting) {
-              const deleteMessage = usageCount > 0
-                ? `This label is used by ${usageCount} item${usageCount === 1 ? '' : 's'}. Remove it from all items and delete?`
-                : 'Delete this label?';
+              const deleteMessage =
+                usageCount > 0
+                  ? `This label is used by ${usageCount} item${usageCount === 1 ? '' : 's'}. Remove it from all items and delete?`
+                  : 'Delete this label?';
               return (
                 <tr key={l.label} data-testid={`label-row-${l.label}`}>
                   <td colSpan={4}>
                     <div class="label-settings-delete-confirm" data-testid="label-delete-confirm">
-                      <span class="label-settings-delete-message" data-testid="label-delete-message">{deleteMessage}</span>
+                      <span class="label-settings-delete-message" data-testid="label-delete-message">
+                        {deleteMessage}
+                      </span>
                       <div class="label-settings-form-actions">
-                        <button type="button" class="btn btn-ghost btn-sm" onClick={cancelDelete}>Cancel</button>
+                        <button type="button" class="btn btn-ghost btn-sm" onClick={cancelDelete}>
+                          Cancel
+                        </button>
                         <button
                           type="button"
                           class="btn btn-danger btn-sm"

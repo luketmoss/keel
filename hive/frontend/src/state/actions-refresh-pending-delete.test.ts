@@ -13,8 +13,7 @@ import { refreshItems } from './actions';
 import { items, pendingDeleteIds } from './board-store';
 import { fetchAllItems } from '../api/sheets';
 
-const mk = (id: string, parent_id = '') =>
-  ({ id, title: id, parent_id, sheetRow: 2 } as any);
+const mk = (id: string, parent_id = '') => ({ id, title: id, parent_id, sheetRow: 2 }) as any;
 
 describe('refreshItems with a pending delete (#276)', () => {
   beforeEach(() => {
@@ -26,7 +25,7 @@ describe('refreshItems with a pending delete (#276)', () => {
     vi.mocked(fetchAllItems).mockResolvedValue([mk('a'), mk('b'), mk('b1', 'b')]);
     pendingDeleteIds.add('b');
     await refreshItems('t');
-    expect(items.value.map(i => i.id)).toEqual(['a']);
+    expect(items.value.map((i) => i.id)).toEqual(['a']);
   });
 
   it('shows the item again once it is no longer pending (undo or failure)', async () => {
@@ -35,6 +34,6 @@ describe('refreshItems with a pending delete (#276)', () => {
     await refreshItems('t');
     pendingDeleteIds.delete('b');
     await refreshItems('t');
-    expect(items.value.map(i => i.id)).toEqual(['a', 'b']);
+    expect(items.value.map((i) => i.id)).toEqual(['a', 'b']);
   });
 });

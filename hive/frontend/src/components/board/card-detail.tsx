@@ -1,12 +1,35 @@
 import { useState, useRef, useCallback, useEffect } from 'preact/hooks';
 import { useAuth } from '../../auth/auth-context';
-import { clearSelectedItem, selectedItem, childrenOfSelected, items, owners, labels as labelsStore, showToast, openDetailWithTitleEdit, accessibleBoards, activeBoardId, showMoveToBoardModal, boardStatuses, isTerminalStatus, defaultStatusName, terminalStatusName } from '../../state/board-store';
+import {
+  clearSelectedItem,
+  selectedItem,
+  childrenOfSelected,
+  items,
+  owners,
+  labels as labelsStore,
+  showToast,
+  openDetailWithTitleEdit,
+  accessibleBoards,
+  activeBoardId,
+  showMoveToBoardModal,
+  boardStatuses,
+  isTerminalStatus,
+  defaultStatusName,
+  terminalStatusName,
+} from '../../state/board-store';
 import { updateItem, deleteItem, deleteSubtask, createItem, moveItem, reorderSubtasks } from '../../state/actions';
 import { LabelBadge } from '../shared/label-badge';
 import { LabelPickerManager } from '../labels/label-picker-manager';
 import { useFocusTrap } from '../../hooks/use-focus-trap';
 import { getContrastTextColor } from '../../utils/color';
-import { localYmdOf, toLocalYmd, withLocalDate, isFutureLocalDate, isOutsideDoneWindow, completedRelativeLabel } from '../../utils/completed-date';
+import {
+  localYmdOf,
+  toLocalYmd,
+  withLocalDate,
+  isFutureLocalDate,
+  isOutsideDoneWindow,
+  completedRelativeLabel,
+} from '../../utils/completed-date';
 // QuickDateChips removed in #220 follow-up — native date picker only
 import type { ItemStatus, ItemWithRow } from '../../api/types';
 
@@ -62,8 +85,8 @@ export function CardDetail() {
   const children = childrenOfSelected.value;
 
   // #220: Flat list — incomplete first, then divider, then done
-  const incompleteChildren = children.filter(c => !isTerminalStatus(c.status));
-  const doneChildren = children.filter(c => isTerminalStatus(c.status));
+  const incompleteChildren = children.filter((c) => !isTerminalStatus(c.status));
+  const doneChildren = children.filter((c) => isTerminalStatus(c.status));
 
   // #206: Expand/collapse panel state — #233: default expanded on desktop
   const isDesktop = () => window.matchMedia('(min-width: 769px)').matches;
@@ -159,7 +182,12 @@ export function CardDetail() {
   const doCreateSubtask = (): boolean => {
     const trimmed = subtaskTitleRef.current.trim();
     if (trimmed && token) {
-      const newSubtask: Record<string, string> = { title: trimmed, parent_id: item.id, owner: '', created_by: user?.email || '' };
+      const newSubtask: Record<string, string> = {
+        title: trimmed,
+        parent_id: item.id,
+        owner: '',
+        created_by: user?.email || '',
+      };
       if (subtaskDueDate) newSubtask.due_date = subtaskDueDate;
       createItem(newSubtask, actor, token);
       return true;
@@ -219,7 +247,9 @@ export function CardDetail() {
   const [confirmingSubtaskId, setConfirmingSubtaskId] = useState<string | null>(null);
 
   // A confirm belongs to the item it was opened on.
-  useEffect(() => { setConfirmingSubtaskId(null); }, [item.id]);
+  useEffect(() => {
+    setConfirmingSubtaskId(null);
+  }, [item.id]);
 
   const requestDeleteSubtask = (childId: string) => {
     if (!token) return;
@@ -240,7 +270,7 @@ export function CardDetail() {
     if (!token) return;
     // #220: Reorder within incomplete children only
     const reorderList = incompleteChildren;
-    const idx = reorderList.findIndex(c => c.id === childId);
+    const idx = reorderList.findIndex((c) => c.id === childId);
     if (idx < 0) return;
     const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
     if (swapIdx < 0 || swapIdx >= reorderList.length) return;
@@ -263,7 +293,7 @@ export function CardDetail() {
       // AC5: Empty title — restore original, no save
       return;
     }
-    const child = children.find(c => c.id === childId);
+    const child = children.find((c) => c.id === childId);
     if (!child || trimmed === child.title) return;
     if (!token) return;
     const ok = await updateItem(childId, { title: trimmed }, actor, token);
@@ -306,7 +336,7 @@ export function CardDetail() {
       startY: e.touches[0].clientY,
       listEl: list,
       rowHeight,
-      childIds: incompleteChildren.map(c => c.id),
+      childIds: incompleteChildren.map((c) => c.id),
     };
   };
 
@@ -342,7 +372,7 @@ export function CardDetail() {
 
     // Clean up DOM styles
     const items = Array.from(drag.listEl.querySelectorAll('.subtask-item')) as HTMLElement[];
-    items.forEach(el => {
+    items.forEach((el) => {
       el.style.transform = '';
       el.style.position = '';
       el.style.zIndex = '';
@@ -370,7 +400,7 @@ export function CardDetail() {
   // --- Move to Board ---
   // AC6: Hidden for subtasks. AC7: Hidden when only one accessible board.
   const isSubtask = !!item.parent_id;
-  const otherBoards = accessibleBoards.value.filter(b => b.id !== activeBoardId.value);
+  const otherBoards = accessibleBoards.value.filter((b) => b.id !== activeBoardId.value);
   const showMoveToBoard = !isSubtask && otherBoards.length > 0;
 
   const toggleChildStatus = (childId: string, currentStatus: ItemStatus) => {
@@ -403,18 +433,51 @@ export function CardDetail() {
               class="btn btn-ghost detail-expand-btn"
               aria-label={expanded ? 'Collapse panel' : 'Expand panel'}
               onClick={() => setExpanded(!expanded)}
-            >{expanded
-              ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="20" x2="10" y2="14"/><polyline points="10 20 4 20 4 14"/><line x1="20" y1="4" x2="14" y2="10"/><polyline points="14 4 20 4 20 10"/></svg>
-              : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="14" y1="10" x2="20" y2="4"/><polyline points="20 10 20 4 14 4"/><line x1="10" y1="14" x2="4" y2="20"/><polyline points="4 14 4 20 10 20"/></svg>
-            }</button>
-            <button class="btn btn-ghost" aria-label="Close" onClick={close}>✕</button>
+            >
+              {expanded ? (
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <line x1="4" y1="20" x2="10" y2="14" />
+                  <polyline points="10 20 4 20 4 14" />
+                  <line x1="20" y1="4" x2="14" y2="10" />
+                  <polyline points="14 4 20 4 20 10" />
+                </svg>
+              ) : (
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <line x1="14" y1="10" x2="20" y2="4" />
+                  <polyline points="20 10 20 4 14 4" />
+                  <line x1="10" y1="14" x2="4" y2="20" />
+                  <polyline points="4 14 4 20 10 20" />
+                </svg>
+              )}
+            </button>
+            <button class="btn btn-ghost" aria-label="Close" onClick={close}>
+              ✕
+            </button>
           </div>
         </div>
 
         {/* #220: Status chevron pipeline — between header and body */}
         <div class="status-pipeline" role="radiogroup" aria-label="Status">
           {boardStatuses.value.map((s, i) => {
-            const activeIdx = boardStatuses.value.findIndex(bs => bs.name === item.status);
+            const activeIdx = boardStatuses.value.findIndex((bs) => bs.name === item.status);
             const isActive = s.name === item.status;
             const isReached = i < activeIdx;
             const resolvedColor = resolveColumnColor(s.color);
@@ -427,7 +490,9 @@ export function CardDetail() {
                 aria-checked={isActive}
                 style={isActive ? { background: resolvedColor } : undefined}
                 onClick={() => handleMoveStatus(s.name as ItemStatus)}
-              >{s.name}</button>
+              >
+                {s.name}
+              </button>
             );
           })}
         </div>
@@ -439,7 +504,9 @@ export function CardDetail() {
             value={item.title}
             onSave={(v) => save('title', v)}
             initialEditing={openDetailWithTitleEdit.value}
-            onEditStart={() => { openDetailWithTitleEdit.value = false; }}
+            onEditStart={() => {
+              openDetailWithTitleEdit.value = false;
+            }}
           />
 
           <EditableField
@@ -457,10 +524,13 @@ export function CardDetail() {
               <LabelPickerManager
                 currentLabels={item.labels}
                 onToggle={async (labelName) => {
-                  const currentLabels = item.labels.split(',').map(x => x.trim()).filter(Boolean);
+                  const currentLabels = item.labels
+                    .split(',')
+                    .map((x) => x.trim())
+                    .filter(Boolean);
                   const isActive = currentLabels.includes(labelName);
                   const updated = isActive
-                    ? currentLabels.filter(x => x !== labelName)
+                    ? currentLabels.filter((x) => x !== labelName)
                     : [...currentLabels, labelName];
                   const ok = await save('labels', updated.join(', '));
                   onFieldSaved(ok);
@@ -473,10 +543,30 @@ export function CardDetail() {
           {/* Sub-tasks (#220 redesigned) */}
           <div class="detail-subtasks">
             <div class="detail-subtasks-header">
-              <label>Sub-tasks ({doneChildren.length}/{children.length})</label>
+              <label>
+                Sub-tasks ({doneChildren.length}/{children.length})
+              </label>
               {!addingSubtask && (
-                <button ref={addSubtaskBtnRef} class="subtask-add-circle" onClick={handleAddSubtask} aria-label="Add sub-task">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                <button
+                  ref={addSubtaskBtnRef}
+                  class="subtask-add-circle"
+                  onClick={handleAddSubtask}
+                  aria-label="Add sub-task"
+                >
+                  <svg
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="16" />
+                    <line x1="8" y1="12" x2="16" y2="12" />
+                  </svg>
                 </button>
               )}
             </div>
@@ -512,11 +602,7 @@ export function CardDetail() {
                 ))}
                 {addingSubtask && (
                   <li class="subtask-add-li">
-                    <div
-                      class="subtask-add-wrapper"
-                      ref={subtaskRowRef}
-                      onFocusOut={handleCreationRowFocusOut}
-                    >
+                    <div class="subtask-add-wrapper" ref={subtaskRowRef} onFocusOut={handleCreationRowFocusOut}>
                       <div class="subtask-add-inline">
                         <input
                           ref={subtaskInputRef}
@@ -532,8 +618,14 @@ export function CardDetail() {
                             setSubtaskTitle(v);
                           }}
                           onKeyDown={(e) => {
-                            if (e.key === 'Enter') { e.preventDefault(); submitAndContinue(); }
-                            if (e.key === 'Escape') { e.stopPropagation(); cancelSubtask(); }
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              submitAndContinue();
+                            }
+                            if (e.key === 'Escape') {
+                              e.stopPropagation();
+                              cancelSubtask();
+                            }
                           }}
                         />
                         <input
@@ -543,22 +635,33 @@ export function CardDetail() {
                           aria-label="Due date for new sub-task"
                           onChange={(e) => setSubtaskDueDate((e.target as HTMLInputElement).value)}
                           onKeyDown={(e) => {
-                            if (e.key === 'Escape') { e.stopPropagation(); cancelSubtask(); }
+                            if (e.key === 'Escape') {
+                              e.stopPropagation();
+                              cancelSubtask();
+                            }
                           }}
                         />
                         <button
                           class="btn-icon subtask-action-btn subtask-add-confirm"
                           aria-label="Add sub-task"
                           aria-disabled={!subtaskTitle.trim() ? 'true' : undefined}
-                          onClick={() => { if (subtaskTitle.trim()) submitSubtask(); }}
-                        ><span>&#10003;</span></button>
+                          onClick={() => {
+                            if (subtaskTitle.trim()) submitSubtask();
+                          }}
+                        >
+                          <span>&#10003;</span>
+                        </button>
                         <button
                           class="btn-icon subtask-action-btn"
                           aria-label="Cancel adding sub-task"
                           onClick={() => cancelSubtask()}
-                        >&#10005;</button>
+                        >
+                          &#10005;
+                        </button>
                       </div>
-                      <span id="subtask-add-hint" class="subtask-add-hint">Enter to add another · Esc to cancel</span>
+                      <span id="subtask-add-hint" class="subtask-add-hint">
+                        Enter to add another · Esc to cancel
+                      </span>
                     </div>
                   </li>
                 )}
@@ -600,16 +703,18 @@ export function CardDetail() {
               </ul>
             )}
             {/* #88 AC5: Announce reorder to screen readers */}
-            <div class="reorder-live-region" aria-live="polite" role="status">{reorderAnnouncement}</div>
+            <div class="reorder-live-region" aria-live="polite" role="status">
+              {reorderAnnouncement}
+            </div>
           </div>
 
           <div class="detail-meta">
             {item.created_by && (
-              <small>Created by: {owners.value.find(o => o.google_account === item.created_by)?.name || item.created_by}</small>
+              <small>
+                Created by: {owners.value.find((o) => o.google_account === item.created_by)?.name || item.created_by}
+              </small>
             )}
-            {!item.created_by && (
-              <small>Created by: Unknown</small>
-            )}
+            {!item.created_by && <small>Created by: Unknown</small>}
             <small>Created: {new Date(item.created_at).toLocaleString()}</small>
             <small>Updated: {new Date(item.updated_at).toLocaleString()}</small>
             {item.completed_at && !isTerminalStatus(item.status) && (
@@ -624,7 +729,9 @@ export function CardDetail() {
               <button
                 class="btn btn-ghost"
                 aria-label="Move to board"
-                onClick={() => { showMoveToBoardModal.value = true; }}
+                onClick={() => {
+                  showMoveToBoardModal.value = true;
+                }}
               >
                 Move to board
               </button>
@@ -635,15 +742,24 @@ export function CardDetail() {
               <div
                 class="delete-confirm-inline"
                 onKeyDown={(e) => {
-                  if (e.key === 'Escape') { e.stopPropagation(); cancelDelete(); }
+                  if (e.key === 'Escape') {
+                    e.stopPropagation();
+                    cancelDelete();
+                  }
                 }}
               >
                 <span class="delete-confirm-text">Are you sure?</span>
-                <button class="btn btn-ghost btn-sm" onClick={cancelDelete}>Cancel</button>
-                <button class="btn btn-danger btn-sm" onClick={confirmDelete}>Delete</button>
+                <button class="btn btn-ghost btn-sm" onClick={cancelDelete}>
+                  Cancel
+                </button>
+                <button class="btn btn-danger btn-sm" onClick={confirmDelete}>
+                  Delete
+                </button>
               </div>
             ) : (
-              <button class="btn btn-danger" onClick={handleDelete}>Delete</button>
+              <button class="btn btn-danger" onClick={handleDelete}>
+                Delete
+              </button>
             )}
           </div>
         </div>
@@ -654,7 +770,11 @@ export function CardDetail() {
 
 // --- Combined owner + date row (no labels) ---
 
-function OwnerDateRow({ item, owners: ownersList, save }: {
+function OwnerDateRow({
+  item,
+  owners: ownersList,
+  save,
+}: {
   item: ItemWithRow;
   owners: Array<{ name: string; google_account: string }>;
   save: (field: string, value: string) => Promise<boolean>;
@@ -678,8 +798,13 @@ function OwnerDateRow({ item, owners: ownersList, save }: {
   const onCompletedChange = async (e: Event) => {
     const input = e.target as HTMLInputElement;
     const picked = input.value;
-    const revert = () => { input.value = completedYmd; };
-    if (!picked) { revert(); return; }
+    const revert = () => {
+      input.value = completedYmd;
+    };
+    if (!picked) {
+      revert();
+      return;
+    }
     if (isFutureLocalDate(picked)) {
       revert();
       setFeedback('future');
@@ -688,11 +813,17 @@ function OwnerDateRow({ item, owners: ownersList, save }: {
     }
     if (picked === completedYmd) return;
     const next = withLocalDate(item.completed_at, picked);
-    if (!next) { revert(); return; }
+    if (!next) {
+      revert();
+      return;
+    }
     const wasInWindow = !isOutsideDoneWindow(item.completed_at);
     const ok = await save('completed_at', next);
     onSaved(ok);
-    if (!ok) { revert(); return; }
+    if (!ok) {
+      revert();
+      return;
+    }
     if (wasInWindow && isOutsideDoneWindow(next)) {
       showToast(`${item.title} moved to the archive`, 'success');
     }
@@ -704,13 +835,23 @@ function OwnerDateRow({ item, owners: ownersList, save }: {
   return (
     <div class="owner-date-row">
       {feedback === 'saved' && (
-        <span class="save-indicator save-indicator-success owner-date-feedback" data-testid="save-indicator">Saved</span>
+        <span class="save-indicator save-indicator-success owner-date-feedback" data-testid="save-indicator">
+          Saved
+        </span>
       )}
       {feedback === 'error' && (
-        <span class="save-indicator save-indicator-error owner-date-feedback" data-testid="save-indicator-error">Error</span>
+        <span class="save-indicator save-indicator-error owner-date-feedback" data-testid="save-indicator-error">
+          Error
+        </span>
       )}
       {feedback === 'future' && (
-        <span class="save-indicator save-indicator-error owner-date-feedback" data-testid="save-indicator-error" role="alert">Completed date can't be in the future</span>
+        <span
+          class="save-indicator save-indicator-error owner-date-feedback"
+          data-testid="save-indicator-error"
+          role="alert"
+        >
+          Completed date can't be in the future
+        </span>
       )}
       <div class="owner-circles">
         {ownersList.map((o, i) => (
@@ -721,7 +862,9 @@ function OwnerDateRow({ item, owners: ownersList, save }: {
               title={o.name}
               style={{ background: getOwnerColor(i) }}
               onClick={async () => onSaved(await save('owner', o.name))}
-            >{getInitials(o.name)}</button>
+            >
+              {getInitials(o.name)}
+            </button>
             <span class="owner-circle-name">{o.name.split(' ')[0]}</span>
           </div>
         ))}
@@ -733,7 +876,19 @@ function OwnerDateRow({ item, owners: ownersList, save }: {
             style={{ background: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
             onClick={async () => onSaved(await save('owner', ''))}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
           </button>
           <span class="owner-circle-name">None</span>
         </div>
@@ -748,16 +903,34 @@ function OwnerDateRow({ item, owners: ownersList, save }: {
           onClick={() => hiddenDateRef.current?.showPicker()}
         >
           {hasDate ? (
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z" />
+            </svg>
           ) : (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
           )}
           <div class="date-info">
             {hasDate ? (
               <>
-                <span class={`date-text${isOverdue(dateVal, item.status) ? ' due-date-overdue-text' : ''}`}>{formatCompactDate(dateVal)}</span>
+                <span class={`date-text${isOverdue(dateVal, item.status) ? ' due-date-overdue-text' : ''}`}>
+                  {formatCompactDate(dateVal)}
+                </span>
                 {getRelativeDateLabel(dateVal) && (
-                  <span class={`date-relative${isOverdue(dateVal, item.status) ? ' due-date-overdue-text' : ''}`}>{getRelativeDateLabel(dateVal)}</span>
+                  <span class={`date-relative${isOverdue(dateVal, item.status) ? ' due-date-overdue-text' : ''}`}>
+                    {getRelativeDateLabel(dateVal)}
+                  </span>
                 )}
               </>
             ) : (
@@ -785,10 +958,23 @@ function OwnerDateRow({ item, owners: ownersList, save }: {
             aria-label={`Completed ${completedFull}. Change completed date`}
             onClick={() => completedDateRef.current?.showPicker()}
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="8 12 11 15 16 9"/></svg>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="8 12 11 15 16 9" />
+            </svg>
             <div class="date-info">
               <span class="date-text">Completed</span>
-              <span class="date-relative">{formatCompactDate(completedYmd)} · {completedRelativeLabel(completedYmd)}</span>
+              <span class="date-relative">
+                {formatCompactDate(completedYmd)} · {completedRelativeLabel(completedYmd)}
+              </span>
             </div>
           </button>
           <input
@@ -810,7 +996,11 @@ function OwnerDateRow({ item, owners: ownersList, save }: {
 
 // --- Save feedback wrapper for non-editable fields (selects, dates, labels) ---
 
-function SaveFeedbackField({ label, children, hideLabel }: {
+function SaveFeedbackField({
+  label,
+  children,
+  hideLabel,
+}: {
   label: string;
   children: (onFieldSaved: (success: boolean) => void) => any;
   hideLabel?: boolean;
@@ -828,18 +1018,26 @@ function SaveFeedbackField({ label, children, hideLabel }: {
         <label>
           {label}
           {feedback === 'saved' && (
-            <span class="save-indicator save-indicator-success" data-testid="save-indicator">Saved</span>
+            <span class="save-indicator save-indicator-success" data-testid="save-indicator">
+              Saved
+            </span>
           )}
           {feedback === 'error' && (
-            <span class="save-indicator save-indicator-error" data-testid="save-indicator-error">Error</span>
+            <span class="save-indicator save-indicator-error" data-testid="save-indicator-error">
+              Error
+            </span>
           )}
         </label>
       )}
       {hideLabel && feedback === 'saved' && (
-        <span class="save-indicator save-indicator-success" data-testid="save-indicator">Saved</span>
+        <span class="save-indicator save-indicator-success" data-testid="save-indicator">
+          Saved
+        </span>
       )}
       {hideLabel && feedback === 'error' && (
-        <span class="save-indicator save-indicator-error" data-testid="save-indicator-error">Error</span>
+        <span class="save-indicator save-indicator-error" data-testid="save-indicator-error">
+          Error
+        </span>
       )}
       {children(onFieldSaved)}
     </div>
@@ -848,7 +1046,15 @@ function SaveFeedbackField({ label, children, hideLabel }: {
 
 // --- Inline editable field ---
 
-function EditableField({ label, hideLabel, value, onSave, multiline, initialEditing, onEditStart }: {
+function EditableField({
+  label,
+  hideLabel,
+  value,
+  onSave,
+  multiline,
+  initialEditing,
+  onEditStart,
+}: {
   label: string;
   hideLabel?: boolean;
   value: string;
@@ -889,23 +1095,37 @@ function EditableField({ label, hideLabel, value, onSave, multiline, initialEdit
 
   if (!editing) {
     return (
-      <div class={`detail-field${hideLabel ? ' detail-field-no-label' : ''}`} onClick={() => { setDraft(value); setEditing(true); }}>
+      <div
+        class={`detail-field${hideLabel ? ' detail-field-no-label' : ''}`}
+        onClick={() => {
+          setDraft(value);
+          setEditing(true);
+        }}
+      >
         {!hideLabel && (
           <label>
             {label}
             {feedback === 'saved' && (
-              <span class="save-indicator save-indicator-success" data-testid="save-indicator">Saved</span>
+              <span class="save-indicator save-indicator-success" data-testid="save-indicator">
+                Saved
+              </span>
             )}
             {feedback === 'error' && (
-              <span class="save-indicator save-indicator-error" data-testid="save-indicator-error">Error</span>
+              <span class="save-indicator save-indicator-error" data-testid="save-indicator-error">
+                Error
+              </span>
             )}
           </label>
         )}
         {hideLabel && feedback === 'saved' && (
-          <span class="save-indicator save-indicator-success" data-testid="save-indicator">Saved</span>
+          <span class="save-indicator save-indicator-success" data-testid="save-indicator">
+            Saved
+          </span>
         )}
         {hideLabel && feedback === 'error' && (
-          <span class="save-indicator save-indicator-error" data-testid="save-indicator-error">Error</span>
+          <span class="save-indicator save-indicator-error" data-testid="save-indicator-error">
+            Error
+          </span>
         )}
         <div
           class={`editable-value${hideLabel ? (multiline ? ' editable-value-desc' : ' editable-value-title') : ''}`}
@@ -920,7 +1140,9 @@ function EditableField({ label, hideLabel, value, onSave, multiline, initialEdit
             }
           }}
         >
-          {value || <span class="placeholder">{hideLabel && multiline ? 'Add a description...' : 'Click to edit'}</span>}
+          {value || (
+            <span class="placeholder">{hideLabel && multiline ? 'Add a description...' : 'Click to edit'}</span>
+          )}
         </div>
       </div>
     );
@@ -934,7 +1156,12 @@ function EditableField({ label, hideLabel, value, onSave, multiline, initialEdit
           value={draft}
           onInput={(e) => setDraft((e.target as HTMLTextAreaElement).value)}
           onBlur={commit}
-          onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); cancel(); } }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.stopPropagation();
+              cancel();
+            }
+          }}
           autoFocus
           rows={4}
         />
@@ -946,7 +1173,10 @@ function EditableField({ label, hideLabel, value, onSave, multiline, initialEdit
           onBlur={commit}
           onKeyDown={(e) => {
             if (e.key === 'Enter') commit();
-            if (e.key === 'Escape') { e.stopPropagation(); cancel(); }
+            if (e.key === 'Escape') {
+              e.stopPropagation();
+              cancel();
+            }
           }}
           autoFocus
         />
@@ -979,7 +1209,10 @@ function isOverdue(dateStr: string, status: string): boolean {
 }
 
 // #220: Subtask inline date — launches native picker directly (single click)
-function SubtaskDateInline({ child, onSave }: {
+function SubtaskDateInline({
+  child,
+  onSave,
+}: {
   child: ItemWithRow;
   onSave: (childId: string, field: 'due_date', value: string) => void;
 }) {
@@ -1014,18 +1247,38 @@ function SubtaskDateInline({ child, onSave }: {
           onClick={openPicker}
         >
           <span class="subtask-date-pill">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
             {formatCompactDate(child.due_date)}
           </span>
         </button>
       ) : (
-        <button
-          class="subtask-date-add-inline"
-          aria-label={`Add due date for ${child.title}`}
-          onClick={openPicker}
-        >
+        <button class="subtask-date-add-inline" aria-label={`Add due date for ${child.title}`} onClick={openPicker}>
           <span class="subtask-date-pill">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
             Add date
           </span>
         </button>
@@ -1035,7 +1288,31 @@ function SubtaskDateInline({ child, onSave }: {
 }
 
 // #220: SubtaskRow component — handles checkbox, title, date, actions, context menu
-function SubtaskRow({ child, idx, allItems, isDone, editingSubtaskId, editingSubtaskDraft, setEditingSubtaskDraft, commitSubtaskTitleEdit, cancelSubtaskTitleEdit, startEditSubtaskTitle, toggleChildStatus, handleSubtaskDateSave, confirmingDelete, requestDeleteSubtask, cancelDeleteSubtask, confirmDeleteSubtask, handleReorder, handleTouchReorderStart, handleTouchReorderMove, handleTouchReorderEnd, token, actor, item }: {
+function SubtaskRow({
+  child,
+  idx,
+  allItems,
+  isDone,
+  editingSubtaskId,
+  editingSubtaskDraft,
+  setEditingSubtaskDraft,
+  commitSubtaskTitleEdit,
+  cancelSubtaskTitleEdit,
+  startEditSubtaskTitle,
+  toggleChildStatus,
+  handleSubtaskDateSave,
+  confirmingDelete,
+  requestDeleteSubtask,
+  cancelDeleteSubtask,
+  confirmDeleteSubtask,
+  handleReorder,
+  handleTouchReorderStart,
+  handleTouchReorderMove,
+  handleTouchReorderEnd,
+  token,
+  actor,
+  item,
+}: {
   child: ItemWithRow;
   idx: number;
   allItems: ItemWithRow[];
@@ -1145,7 +1422,10 @@ function SubtaskRow({ child, idx, allItems, isDone, editingSubtaskId, editingSub
           role="group"
           aria-label="Confirm deleting sub-task"
           onKeyDown={(e) => {
-            if (e.key === 'Escape') { e.stopPropagation(); cancelConfirm(); }
+            if (e.key === 'Escape') {
+              e.stopPropagation();
+              cancelConfirm();
+            }
           }}
         >
           <p class="subtask-delete-confirm-title">
@@ -1153,8 +1433,12 @@ function SubtaskRow({ child, idx, allItems, isDone, editingSubtaskId, editingSub
           </p>
           <p class="subtask-delete-confirm-message">This cannot be undone.</p>
           <div class="subtask-delete-confirm-actions">
-            <button ref={cancelBtnRef} class="btn btn-ghost" onClick={cancelConfirm}>Cancel</button>
-            <button class="btn btn-danger" onClick={() => confirmDeleteSubtask(child.id)}>Delete sub-task</button>
+            <button ref={cancelBtnRef} class="btn btn-ghost" onClick={cancelConfirm}>
+              Cancel
+            </button>
+            <button class="btn btn-danger" onClick={() => confirmDeleteSubtask(child.id)}>
+              Delete sub-task
+            </button>
           </div>
         </div>
       </li>
@@ -1179,7 +1463,7 @@ function SubtaskRow({ child, idx, allItems, isDone, editingSubtaskId, editingSub
         (e.currentTarget as HTMLElement).classList.remove('subtask-drop-target');
         const draggedId = (e as DragEvent).dataTransfer!.getData('text/plain');
         if (draggedId && draggedId !== child.id) {
-          const fromIdx = allItems.findIndex(i => i.id === draggedId);
+          const fromIdx = allItems.findIndex((i) => i.id === draggedId);
           if (fromIdx !== -1) {
             const dir = fromIdx < idx ? 'down' : 'up';
             const steps = Math.abs(fromIdx - idx);
@@ -1189,9 +1473,18 @@ function SubtaskRow({ child, idx, allItems, isDone, editingSubtaskId, editingSub
       }}
       onContextMenu={handleContextMenuEvent}
       onTouchStart={(e) => handleTouchStartLongPress(e as unknown as TouchEvent)}
-      onTouchMove={(e) => { handleTouchMoveLongPress(); handleTouchReorderMove(e as unknown as TouchEvent); }}
-      onTouchEnd={() => { handleTouchEndLongPress(); handleTouchReorderEnd(); }}
-      onTouchCancel={() => { handleTouchEndLongPress(); handleTouchReorderEnd(); }}
+      onTouchMove={(e) => {
+        handleTouchMoveLongPress();
+        handleTouchReorderMove(e as unknown as TouchEvent);
+      }}
+      onTouchEnd={() => {
+        handleTouchEndLongPress();
+        handleTouchReorderEnd();
+      }}
+      onTouchCancel={() => {
+        handleTouchEndLongPress();
+        handleTouchReorderEnd();
+      }}
     >
       {/* #237: Grab handle — sole drag/reorder initiator, keeps rest of row scrollable/tappable.
           Not a real button: it isn't keyboard-operable (no keyboard reorder yet), so it's
@@ -1208,16 +1501,19 @@ function SubtaskRow({ child, idx, allItems, isDone, editingSubtaskId, editingSub
         }}
         onDragEnd={(e) => {
           (e.currentTarget as HTMLElement).closest('.subtask-item')?.classList.remove('subtask-dragging');
-          document.querySelectorAll('.subtask-drop-target').forEach(el => el.classList.remove('subtask-drop-target'));
+          document.querySelectorAll('.subtask-drop-target').forEach((el) => el.classList.remove('subtask-drop-target'));
         }}
         onTouchStart={(e) => {
           if (!isDone && allItems.length > 1) handleTouchReorderStart(child.id, idx, e as unknown as TouchEvent);
         }}
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-          <circle cx="5" cy="3" r="1.3"/><circle cx="11" cy="3" r="1.3"/>
-          <circle cx="5" cy="8" r="1.3"/><circle cx="11" cy="8" r="1.3"/>
-          <circle cx="5" cy="13" r="1.3"/><circle cx="11" cy="13" r="1.3"/>
+          <circle cx="5" cy="3" r="1.3" />
+          <circle cx="11" cy="3" r="1.3" />
+          <circle cx="5" cy="8" r="1.3" />
+          <circle cx="11" cy="8" r="1.3" />
+          <circle cx="5" cy="13" r="1.3" />
+          <circle cx="11" cy="13" r="1.3" />
         </svg>
       </span>
 
@@ -1225,7 +1521,9 @@ function SubtaskRow({ child, idx, allItems, isDone, editingSubtaskId, editingSub
       <button class="check-icon" onClick={() => toggleChildStatus(child.id, child.status)} aria-label={child.title}>
         <span class={`check-box${isTerminalStatus(child.status) ? ' checked' : ''}`}>
           {isTerminalStatus(child.status) && (
-            <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+            <svg viewBox="0 0 24 24">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
           )}
         </span>
       </button>
@@ -1246,10 +1544,18 @@ function SubtaskRow({ child, idx, allItems, isDone, editingSubtaskId, editingSub
             }}
             onBlur={() => commitSubtaskTitleEdit(child.id)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') { e.preventDefault(); commitSubtaskTitleEdit(child.id); }
-              if (e.key === 'Escape') { e.stopPropagation(); cancelSubtaskTitleEdit(); }
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                commitSubtaskTitleEdit(child.id);
+              }
+              if (e.key === 'Escape') {
+                e.stopPropagation();
+                cancelSubtaskTitleEdit();
+              }
             }}
-            ref={(el) => { if (el) requestAnimationFrame(() => autoResize(el)); }}
+            ref={(el) => {
+              if (el) requestAnimationFrame(() => autoResize(el));
+            }}
           />
         ) : (
           <span
@@ -1264,7 +1570,9 @@ function SubtaskRow({ child, idx, allItems, isDone, editingSubtaskId, editingSub
                 startEditSubtaskTitle(child.id, child.title);
               }
             }}
-          >{child.title}</span>
+          >
+            {child.title}
+          </span>
         )}
         <SubtaskDateInline child={child} onSave={handleSubtaskDateSave} />
       </div>
@@ -1276,21 +1584,53 @@ function SubtaskRow({ child, idx, allItems, isDone, editingSubtaskId, editingSub
         aria-label="Sub-task options"
         onTouchStart={(e) => e.stopPropagation()}
         onTouchEnd={(e) => e.stopPropagation()}
-        onClick={(e) => { e.stopPropagation(); setContextMenu(!contextMenu); }}
-      >&#8942;</button>
+        onClick={(e) => {
+          e.stopPropagation();
+          setContextMenu(!contextMenu);
+        }}
+      >
+        &#8942;
+      </button>
 
       {/* Context menu */}
       {contextMenu && (
-        <div
-          ref={contextRef}
-          class="subtask-context-menu"
-        >
+        <div ref={contextRef} class="subtask-context-menu">
           <button class="subtask-menu-item" onClick={handlePromoteToItem}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17l9.2-9.2M17 17V7H7"/></svg>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M7 17l9.2-9.2M17 17V7H7" />
+            </svg>
             Turn into item
           </button>
-          <button class="subtask-menu-item danger" onClick={() => { requestDeleteSubtask(child.id); setContextMenu(false); }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+          <button
+            class="subtask-menu-item danger"
+            onClick={() => {
+              requestDeleteSubtask(child.id);
+              setContextMenu(false);
+            }}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M3 6h18" />
+              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+            </svg>
             Delete
           </button>
         </div>

@@ -44,8 +44,7 @@ export function useKeyboardShortcuts(shortcuts: Shortcut[], enabled = true) {
 
     const handleKeyDown = (e: KeyboardEvent) => {
       for (const shortcut of shortcuts) {
-        const keyMatch = e.key.toLowerCase() === shortcut.key.toLowerCase()
-          || e.key === shortcut.key; // exact match for non-alpha like '?'
+        const keyMatch = e.key.toLowerCase() === shortcut.key.toLowerCase() || e.key === shortcut.key; // exact match for non-alpha like '?'
 
         if (!keyMatch) continue;
 

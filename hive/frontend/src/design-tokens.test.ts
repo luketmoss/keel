@@ -377,7 +377,7 @@ describe('Design token: --color-primary-light (Issue #104)', () => {
 
     it('uses color-mix with 8% primary', () => {
       expect(rootBlock).toMatch(
-        /--color-primary-light:\s*color-mix\(in srgb,\s*var\(--color-primary\)\s+8%,\s*transparent\)/
+        /--color-primary-light:\s*color-mix\(in srgb,\s*var\(--color-primary\)\s+8%,\s*transparent\)/,
       );
     });
 

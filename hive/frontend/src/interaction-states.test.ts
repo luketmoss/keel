@@ -18,8 +18,19 @@ import { readFileSync } from 'fs';
 import { relative, resolve } from 'path';
 import { readGlobalCss } from './test-css';
 import {
-  FAMILIES, ALL_FAMILY_CLASSES, familyOf, NON_FIELD, OVERLAY_HOVER, NOT_A_CONTROL, here, tsxFiles,
-  unresolved, controls, where, isNativeToggle, type Control,
+  FAMILIES,
+  ALL_FAMILY_CLASSES,
+  familyOf,
+  NON_FIELD,
+  OVERLAY_HOVER,
+  NOT_A_CONTROL,
+  here,
+  tsxFiles,
+  unresolved,
+  controls,
+  where,
+  isNativeToggle,
+  type Control,
 } from './test-controls';
 
 // ── The stylesheet, and a small cascade over it ─────────────────────────────
@@ -143,7 +154,9 @@ function cascade(el: Element, state: State = {}): Map<string, { value: string; s
   // Other media (pointer, width) are not modelled: their rules are skipped, as the
   // checks here are about the state rules, which are never in them.
   const allowed = (media: string[]) =>
-    media.length > 0 && media.every((m) => m === HOVER_MEDIA && state.hoverDevice !== false) ? true : media.length === 0;
+    media.length > 0 && media.every((m) => m === HOVER_MEDIA && state.hoverDevice !== false)
+      ? true
+      : media.length === 0;
   const won = new Map<string, { value: string; selector: string; rank: number[] }>();
   for (const r of rules) {
     if (!allowed(r.media)) continue;
@@ -221,7 +234,7 @@ function representative(cls: string): HTMLElement {
 // ── AC1: families ───────────────────────────────────────────────────────────
 
 describe('AC1: every control class is in exactly one family', () => {
-  it('the families match the design note\'s Families table', () => {
+  it("the families match the design note's Families table", () => {
     const note = readFileSync(resolve(here, '../../docs/design/452-interaction-states.md'), 'utf-8');
     const table = note.slice(note.indexOf('## Families'), note.indexOf('Selected applies to'));
     const fromNote: Record<string, string[]> = {};
@@ -277,7 +290,9 @@ describe('AC4: a disabled filled or quiet button is dimmed, default-cursor and u
     expect(value(el, 'cursor')).toBe('default');
     for (const prop of ['background-color', 'background-image']) {
       for (const hover of [{ hover: true }, { active: true }, { hover: true, active: true }]) {
-        expect(value(el, prop, { ...hover, hoverDevice: true }), `${prop} ${JSON.stringify(hover)}`).toBe(value(el, prop));
+        expect(value(el, prop, { ...hover, hoverDevice: true }), `${prop} ${JSON.stringify(hover)}`).toBe(
+          value(el, prop),
+        );
       }
     }
   });
@@ -298,16 +313,20 @@ describe('AC4: a disabled filled or quiet button is dimmed, default-cursor and u
 });
 
 describe('AC4: one disabled opacity, the token', () => {
-  const disabledRules = rules.filter((r) => /:disabled|\[aria-disabled="true"\]/.test(r.selector.replace(/:not\((?:[^()]|\([^()]*\))*\)/g, '')));
+  const disabledRules = rules.filter((r) =>
+    /:disabled|\[aria-disabled="true"\]/.test(r.selector.replace(/:not\((?:[^()]|\([^()]*\))*\)/g, '')),
+  );
 
   it('every disabled rule that sets opacity uses --opacity-disabled', () => {
     const withOpacity = disabledRules.filter((r) => declarations(r.body).has('opacity'));
     expect(withOpacity.length).toBeGreaterThanOrEqual(3);
-    for (const r of withOpacity) expect(declarations(r.body).get('opacity')!.value, r.selector).toBe('var(--opacity-disabled)');
+    for (const r of withOpacity)
+      expect(declarations(r.body).get('opacity')!.value, r.selector).toBe('var(--opacity-disabled)');
   });
 
   it('no disabled rule sets cursor: not-allowed, and none says aria-disabled in single quotes', () => {
-    for (const r of disabledRules) expect(declarations(r.body).get('cursor')?.value, r.selector).not.toBe('not-allowed');
+    for (const r of disabledRules)
+      expect(declarations(r.body).get('cursor')?.value, r.selector).not.toBe('not-allowed');
     expect(css).not.toMatch(/\[aria-disabled='true'\]/);
     expect(css).not.toContain('not-allowed');
   });
@@ -440,13 +459,33 @@ describe('AC3: the ring is at least 3:1 on every surface, in both themes', () =>
   const over = (fg: string, alpha: number, bg: string) => {
     const f = rgb(fg);
     const b = rgb(bg);
-    return '#' + f.map((c, i) => Math.round(c * alpha + b[i] * (1 - alpha)).toString(16).padStart(2, '0')).join('');
+    return (
+      '#' +
+      f
+        .map((c, i) =>
+          Math.round(c * alpha + b[i] * (1 - alpha))
+            .toString(16)
+            .padStart(2, '0'),
+        )
+        .join('')
+    );
   };
   const SURFACES = [
-    '--color-surface', '--color-bg', '--color-surface-raised',
-    '--color-todo', '--color-inprogress', '--color-done', '--color-col-indigo', '--color-col-purple',
-    '--color-col-pink', '--color-col-teal', '--color-col-amber',
-    '--color-bucket-overdue', '--color-bucket-this-week', '--color-bucket-next-week', '--color-bucket-later',
+    '--color-surface',
+    '--color-bg',
+    '--color-surface-raised',
+    '--color-todo',
+    '--color-inprogress',
+    '--color-done',
+    '--color-col-indigo',
+    '--color-col-purple',
+    '--color-col-pink',
+    '--color-col-teal',
+    '--color-col-amber',
+    '--color-bucket-overdue',
+    '--color-bucket-this-week',
+    '--color-bucket-next-week',
+    '--color-bucket-later',
   ];
 
   it.each(THEMES)('%s: --color-focus on every surface, the tightest tint included', (theme) => {
@@ -466,7 +505,9 @@ const stateRules = rules.filter((r) => /:hover|:active/.test(r.selector));
 
 describe('AC6: hover applies only on a device that hovers', () => {
   it('every :hover selector is inside @media (hover: hover)', () => {
-    const outside = rules.filter((r) => r.selector.includes(':hover') && !r.media.includes(HOVER_MEDIA)).map((r) => r.selector);
+    const outside = rules
+      .filter((r) => r.selector.includes(':hover') && !r.media.includes(HOVER_MEDIA))
+      .map((r) => r.selector);
     expect(outside).toEqual([]);
   });
 
@@ -528,7 +569,10 @@ describe('AC7: every family but fields has a pressed state, and no state moves',
 
   it('every hover and pressed rule on a control that can be disabled excludes the disabled one', () => {
     const disablable = new Set(
-      controls.filter((c) => c.disabled || c.ariaDisabled).flatMap((c) => c.classes).filter((c) => ALL_FAMILY_CLASSES.includes(c)),
+      controls
+        .filter((c) => c.disabled || c.ariaDisabled)
+        .flatMap((c) => c.classes)
+        .filter((c) => ALL_FAMILY_CLASSES.includes(c)),
     );
     for (const c of ['btn-primary', 'btn-danger', 'btn-ghost', 'fab', 'login-btn']) disablable.add(c);
     const unguarded = stateRules
@@ -546,7 +590,8 @@ describe('AC7: every family but fields has a pressed state, and no state moves',
 
 function rgba(colour: string): [number, number, number, number] {
   const hex = colour.match(/^#([0-9a-f]{6})$/i);
-  if (hex) return [0, 2, 4].map((i) => parseInt(hex[1].slice(i, i + 2), 16)).concat(1) as [number, number, number, number];
+  if (hex)
+    return [0, 2, 4].map((i) => parseInt(hex[1].slice(i, i + 2), 16)).concat(1) as [number, number, number, number];
   const m = colour.match(/^rgba\(\s*(\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\s*\)$/);
   if (!m) throw new Error(`not a colour: ${colour}`);
   return [Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4])];
@@ -592,7 +637,10 @@ describe.each(THEMES)('AC8: quiet and icon controls keep 4.5:1 under hover and p
       // Hovered it may take any colour of its own (text, the primary, danger); what it
       // may not do is stay muted or secondary under the overlay. Pressed is the same
       // on touch, where no hover rule applies.
-      for (const state of [{ hover: true, hoverDevice: true }, { active: true, hoverDevice: false }] as State[]) {
+      for (const state of [
+        { hover: true, hoverDevice: true },
+        { active: true, hoverDevice: false },
+      ] as State[]) {
         const c = value(el, 'color', state);
         if (!c || /--color-text-(muted|secondary)/.test(c)) offenders.push(`.${cls} ${JSON.stringify(state)}: ${c}`);
       }
@@ -622,7 +670,10 @@ describe('AC9: the five gold fills read in dark', () => {
     const el = build('button', classes);
     const rest = value(el, 'background-color')!;
     const hover = value(el, 'background-color', { hover: true, hoverDevice: true }) ?? rest;
-    for (const [fill, min] of [[rest, 0], [hover, 0]] as const) {
+    for (const [fill, min] of [
+      [rest, 0],
+      [hover, 0],
+    ] as const) {
       void min;
       const d = contrast(resolveVar('var(--color-on-primary)', 'dark'), resolveVar(fill, 'dark'));
       expect(d, `${fill} dark`).toBeGreaterThanOrEqual(9);
@@ -656,9 +707,15 @@ describe('AC10: selected keeps its ARIA state', () => {
 
   it.each(Object.entries(SELECTED))('every .%s exposes its state', (cls, attrs) => {
     // The overflow menu's group-by choices are the radios; its other items are plain actions.
-    const found = controls.filter((c) => c.classes.includes(cls) && (cls !== 'overflow-menu-item' || c.role === 'menuitemradio'));
+    const found = controls.filter(
+      (c) => c.classes.includes(cls) && (cls !== 'overflow-menu-item' || c.role === 'menuitemradio'),
+    );
     expect(found.length).toBeGreaterThan(0);
-    for (const c of found) expect(c.aria.some((a) => attrs.includes(a)), where(c)).toBe(true);
+    for (const c of found)
+      expect(
+        c.aria.some((a) => attrs.includes(a)),
+        where(c),
+      ).toBe(true);
   });
 
   it('a hovered or pressed selected control keeps its tint underneath the overlay', () => {

@@ -1,6 +1,44 @@
 import { useState, useCallback, useMemo, useEffect } from 'preact/hooks';
 import { useAuth } from '../../auth/auth-context';
-import { pendingDeleteIds, columns, showCreateModal, createModalInitialStatus, selectedItem, selectItem, groupBy, rootItems, items, owners, boardLabels as labelsStore, allDoneItems, hasArchivedItems, showArchiveDialog, boards, showCreateBoardModal, showShareModal, showDeleteBoardModal, showArchiveBoardModal, showArchivedBoardsDialog, showMoveToBoardModal, boardItems, userBoardRole, accessibleBoards, switchBoard, theme, applyTheme, cycleTheme, columnSortModes, setColumnSortMode, columnAnnouncement, showToast, activeView, switchToUpcoming, switchToBoard, boardStatuses, isTerminalStatus } from '../../state/board-store';
+import {
+  pendingDeleteIds,
+  columns,
+  showCreateModal,
+  createModalInitialStatus,
+  selectedItem,
+  selectItem,
+  groupBy,
+  rootItems,
+  items,
+  owners,
+  boardLabels as labelsStore,
+  allDoneItems,
+  hasArchivedItems,
+  showArchiveDialog,
+  boards,
+  showCreateBoardModal,
+  showShareModal,
+  showDeleteBoardModal,
+  showArchiveBoardModal,
+  showArchivedBoardsDialog,
+  showMoveToBoardModal,
+  boardItems,
+  userBoardRole,
+  accessibleBoards,
+  switchBoard,
+  theme,
+  applyTheme,
+  cycleTheme,
+  columnSortModes,
+  setColumnSortMode,
+  columnAnnouncement,
+  showToast,
+  activeView,
+  switchToUpcoming,
+  switchToBoard,
+  boardStatuses,
+  isTerminalStatus,
+} from '../../state/board-store';
 import type { SortMode } from '../../state/board-store';
 import { moveItem, reorderItem, createItem, deleteItem, copyItem } from '../../state/actions';
 import { useKeyboardShortcuts } from '../../hooks/use-keyboard-shortcuts';
@@ -47,7 +85,7 @@ export function KanbanBoard() {
 
   // Derive display name from Owners sheet (source of truth), falling back to Google account name
   const displayName = user
-    ? (owners.value.find(o => o.google_account.toLowerCase() === user.email.toLowerCase())?.name || user.name)
+    ? owners.value.find((o) => o.google_account.toLowerCase() === user.email.toLowerCase())?.name || user.name
     : '';
 
   /** True when no modal or overlay is open — shortcuts should be active. */
@@ -64,71 +102,74 @@ export function KanbanBoard() {
     !showShortcutsHelp;
 
   // Build shortcut definitions
-  const shortcuts = useMemo<Shortcut[]>(() => [
-    // AC1: Archive shortcut — 'A' toggles archive dialog
-    {
-      key: 'a',
-      action: () => {
-        if (showArchiveDialog.value) {
-          showArchiveDialog.value = false;
-        } else if (noModalOpen()) {
-          showArchiveDialog.value = true;
-        }
+  const shortcuts = useMemo<Shortcut[]>(
+    () => [
+      // AC1: Archive shortcut — 'A' toggles archive dialog
+      {
+        key: 'a',
+        action: () => {
+          if (showArchiveDialog.value) {
+            showArchiveDialog.value = false;
+          } else if (noModalOpen()) {
+            showArchiveDialog.value = true;
+          }
+        },
       },
-    },
-    // AC3: New item shortcut — 'N' opens create modal
-    {
-      key: 'n',
-      action: () => {
-        if (noModalOpen()) {
-          showCreateModal.value = true;
-        }
+      // AC3: New item shortcut — 'N' opens create modal
+      {
+        key: 'n',
+        action: () => {
+          if (noModalOpen()) {
+            showCreateModal.value = true;
+          }
+        },
       },
-    },
-    // AC4: Shortcuts help overlay — '?' toggles help
-    {
-      key: '?',
-      action: () => {
-        if (showShortcutsHelp) {
-          setShowShortcutsHelp(false);
-        } else if (noModalOpen()) {
-          setShowShortcutsHelp(true);
-        }
+      // AC4: Shortcuts help overlay — '?' toggles help
+      {
+        key: '?',
+        action: () => {
+          if (showShortcutsHelp) {
+            setShowShortcutsHelp(false);
+          } else if (noModalOpen()) {
+            setShowShortcutsHelp(true);
+          }
+        },
       },
-    },
-    // AC7: Theme cycle — 'T' cycles Light → Dark → System → Light
-    {
-      key: 't',
-      action: () => {
-        if (noModalOpen()) {
-          cycleTheme();
-        }
+      // AC7: Theme cycle — 'T' cycles Light → Dark → System → Light
+      {
+        key: 't',
+        action: () => {
+          if (noModalOpen()) {
+            cycleTheme();
+          }
+        },
       },
-    },
-    // #138: Ctrl+Shift+S opens board settings modal — only for board owners
-    {
-      key: 's',
-      ctrl: true,
-      shift: true,
-      action: () => {
-        if (userBoardRole.value === 'owner' && noModalOpen()) {
-          showShareModal.value = true;
-        }
+      // #138: Ctrl+Shift+S opens board settings modal — only for board owners
+      {
+        key: 's',
+        ctrl: true,
+        shift: true,
+        action: () => {
+          if (userBoardRole.value === 'owner' && noModalOpen()) {
+            showShareModal.value = true;
+          }
+        },
       },
-    },
-    // AC2: Board switching — Ctrl+1 through Ctrl+9
-    ...Array.from({ length: 9 }, (_, i) => ({
-      key: String(i + 1),
-      ctrl: true,
-      action: () => {
-        if (!noModalOpen()) return;
-        const boardList = accessibleBoards.value;
-        if (i < boardList.length) {
-          switchBoard(boardList[i].id);
-        }
-      },
-    })),
-  ], [showShortcutsHelp]);
+      // AC2: Board switching — Ctrl+1 through Ctrl+9
+      ...Array.from({ length: 9 }, (_, i) => ({
+        key: String(i + 1),
+        ctrl: true,
+        action: () => {
+          if (!noModalOpen()) return;
+          const boardList = accessibleBoards.value;
+          if (i < boardList.length) {
+            switchBoard(boardList[i].id);
+          }
+        },
+      })),
+    ],
+    [showShortcutsHelp],
+  );
 
   useKeyboardShortcuts(shortcuts);
 
@@ -152,15 +193,19 @@ export function KanbanBoard() {
       const destSortMode = columnSortModes.value[newStatus];
       const isDestDateSorted = (destSortMode && destSortMode !== 'custom') || isTerminalStatus(newStatus);
       if (isDestDateSorted) {
-        const sortLabel = isTerminalStatus(newStatus) ? 'completion date'
-          : destSortMode === 'due_date' ? 'due date'
-          : 'creation date';
+        const sortLabel = isTerminalStatus(newStatus)
+          ? 'completion date'
+          : destSortMode === 'due_date'
+            ? 'due date'
+            : 'creation date';
         columnAnnouncement.value = {
           status: newStatus,
           text: `Moving to ${newStatus} — will be added in ${sortLabel} order`,
         };
         // Clear after screen reader has time to read
-        setTimeout(() => { columnAnnouncement.value = null; }, 3000);
+        setTimeout(() => {
+          columnAnnouncement.value = null;
+        }, 3000);
       }
       moveItem(itemId, newStatus, user?.name || 'web', token);
     }
@@ -173,55 +218,66 @@ export function KanbanBoard() {
   };
 
   /** Kebab menu: delete with undo toast (AC7) */
-  const handleDeleteItem = useCallback((itemId: string) => {
-    if (!token) return;
-    const item = items.value.find(i => i.id === itemId);
-    if (!item) return;
+  const handleDeleteItem = useCallback(
+    (itemId: string) => {
+      if (!token) return;
+      const item = items.value.find((i) => i.id === itemId);
+      if (!item) return;
 
-    const oldItems = [...items.value];
+      const oldItems = [...items.value];
 
-    // Optimistic removal (item + children)
-    items.value = items.value.filter(i => i.id !== itemId && i.parent_id !== itemId);
-    // Keep the 30s poll from re-fetching the still-present sheet row during the undo window
-    pendingDeleteIds.add(itemId);
+      // Optimistic removal (item + children)
+      items.value = items.value.filter((i) => i.id !== itemId && i.parent_id !== itemId);
+      // Keep the 30s poll from re-fetching the still-present sheet row during the undo window
+      pendingDeleteIds.add(itemId);
 
-    let undone = false;
-    showToast('Item deleted', 'success', {
-      label: 'Undo',
-      fn: () => {
-        undone = true;
-        pendingDeleteIds.delete(itemId);
-        items.value = oldItems;
-      },
-    }, 10000);
+      let undone = false;
+      showToast(
+        'Item deleted',
+        'success',
+        {
+          label: 'Undo',
+          fn: () => {
+            undone = true;
+            pendingDeleteIds.delete(itemId);
+            items.value = oldItems;
+          },
+        },
+        10000,
+      );
 
-    // Commit deletion after toast expires (if not undone)
-    setTimeout(async () => {
-      if (!undone) {
-        // Re-insert only the deleted item(s) into current state so deleteItem can find them
-        const present = new Set(items.value.map(i => i.id));
-        const deletedItems = oldItems.filter(
-          i => (i.id === itemId || i.parent_id === itemId) && !present.has(i.id)
-        );
-        items.value = [...items.value, ...deletedItems];
-        try {
-          await deleteItem(itemId, user?.name || 'web', token);
-        } finally {
-          pendingDeleteIds.delete(itemId);
+      // Commit deletion after toast expires (if not undone)
+      setTimeout(async () => {
+        if (!undone) {
+          // Re-insert only the deleted item(s) into current state so deleteItem can find them
+          const present = new Set(items.value.map((i) => i.id));
+          const deletedItems = oldItems.filter(
+            (i) => (i.id === itemId || i.parent_id === itemId) && !present.has(i.id),
+          );
+          items.value = [...items.value, ...deletedItems];
+          try {
+            await deleteItem(itemId, user?.name || 'web', token);
+          } finally {
+            pendingDeleteIds.delete(itemId);
+          }
         }
-      }
-    }, 10100);
-  }, [token, user]);
+      }, 10100);
+    },
+    [token, user],
+  );
 
   /** Kebab menu: copy task + subtasks, open detail view */
-  const handleCopyItem = useCallback(async (itemId: string) => {
-    if (!token) return;
-    const newId = await copyItem(itemId, user?.name || 'web', token);
-    if (newId) {
-      selectItem(newId);
-      showToast('Task copied');
-    }
-  }, [token, user]);
+  const handleCopyItem = useCallback(
+    async (itemId: string) => {
+      if (!token) return;
+      const newId = await copyItem(itemId, user?.name || 'web', token);
+      if (newId) {
+        selectItem(newId);
+        showToast('Task copied');
+      }
+    },
+    [token, user],
+  );
 
   const handleAddItemToColumn = useCallback((status: ItemStatus) => {
     createModalInitialStatus.value = status;
@@ -237,7 +293,7 @@ export function KanbanBoard() {
     if (group === 'none') {
       return (
         <div class="board-columns">
-          {statuses.map(status => (
+          {statuses.map((status) => (
             <Column
               key={status.name}
               status={status.name}
@@ -252,24 +308,29 @@ export function KanbanBoard() {
               onAddItem={() => handleAddItemToColumn(status.name)}
               onCopyItem={handleCopyItem}
               onDeleteItem={handleDeleteItem}
-              {...(status.is_terminal ? {
-                allDoneCount: allDoneItems.value.length,
-                hasArchived: hasArchivedItems.value,
-                onOpenArchive: handleOpenArchive,
-              } : {})}
+              {...(status.is_terminal
+                ? {
+                    allDoneCount: allDoneItems.value.length,
+                    hasArchived: hasArchivedItems.value,
+                    onOpenArchive: handleOpenArchive,
+                  }
+                : {})}
             />
           ))}
         </div>
       );
     }
 
-    const groupValues = labelsStore.value.map(l => l.label);
+    const groupValues = labelsStore.value.map((l) => l.label);
 
     return (
       <div class="board-swimlanes">
-        {groupValues.map(groupValue => {
-          const swimlaneItems = rootItems.value.filter(item =>
-            item.labels.split(',').map(l => l.trim()).includes(groupValue)
+        {groupValues.map((groupValue) => {
+          const swimlaneItems = rootItems.value.filter((item) =>
+            item.labels
+              .split(',')
+              .map((l) => l.trim())
+              .includes(groupValue),
           );
 
           if (swimlaneItems.length === 0) return null;
@@ -278,13 +339,13 @@ export function KanbanBoard() {
             <div key={groupValue} class="swimlane">
               <div class="swimlane-header">{groupValue}</div>
               <div class="board-columns">
-                {statuses.map(status => (
+                {statuses.map((status) => (
                   <Column
                     key={`${groupValue}-${status.name}`}
                     status={status.name}
                     color={status.color}
                     isTerminal={status.is_terminal}
-                    items={swimlaneItems.filter(i => i.status === status.name)}
+                    items={swimlaneItems.filter((i) => i.status === status.name)}
                     onDrop={handleDrop}
                     onReorder={handleReorder}
                     onMoveStatus={handleMoveStatus}
@@ -311,7 +372,9 @@ export function KanbanBoard() {
           <div class="control-bar-view-tabs" role="group" aria-label="View" data-testid="control-bar-view-tabs">
             <button
               class={`view-tab${activeView.value === 'upcoming' ? ' view-tab-active' : ''}`}
-              onClick={() => { if (activeView.value !== 'upcoming') switchToUpcoming(); }}
+              onClick={() => {
+                if (activeView.value !== 'upcoming') switchToUpcoming();
+              }}
               aria-pressed={activeView.value === 'upcoming' ? 'true' : 'false'}
               data-testid="view-tab-upcoming"
             >
@@ -319,7 +382,9 @@ export function KanbanBoard() {
             </button>
             <button
               class={`view-tab${activeView.value !== 'upcoming' ? ' view-tab-active' : ''}`}
-              onClick={() => { if (activeView.value === 'upcoming') switchToBoard(); }}
+              onClick={() => {
+                if (activeView.value === 'upcoming') switchToBoard();
+              }}
               aria-pressed={activeView.value !== 'upcoming' ? 'true' : 'false'}
               data-testid="view-tab-board"
             >
@@ -349,7 +414,9 @@ export function KanbanBoard() {
           <div class="board-welcome" data-testid="board-welcome">
             <div class="board-welcome-icon">&#128203;</div>
             <h2>No tasks yet</h2>
-            <p>Click <strong>+</strong> to create your first one.</p>
+            <p>
+              Click <strong>+</strong> to create your first one.
+            </p>
           </div>
         ) : groupBy.value === 'status' ? (
           <ListView />
@@ -358,14 +425,14 @@ export function KanbanBoard() {
         )}
       </main>
 
-      {activeView.value !== 'upcoming' && groupBy.value === 'none' && (
-        <ColumnIndicator />
-      )}
+      {activeView.value !== 'upcoming' && groupBy.value === 'none' && <ColumnIndicator />}
 
       {activeView.value !== 'upcoming' && (
         <button
           class="fab"
-          onClick={() => { showCreateModal.value = true; }}
+          onClick={() => {
+            showCreateModal.value = true;
+          }}
           title="Create new item"
           aria-label="Create new item"
         >

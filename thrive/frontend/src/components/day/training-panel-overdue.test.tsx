@@ -140,15 +140,19 @@ describe('AC1 — overdue plans are carried onto today, above its own', () => {
     const carried = [...container.querySelectorAll('.training-overdue')];
     expect(carried).toHaveLength(2);
     expect(carried[0].querySelector('.badge-overdue')!.textContent).toBe('Overdue');
-    expect(carried[0].querySelector('.training-type')!.textContent).toBe('weight');
+    // #489: a planned card has no type badge; its name carries date, name and state.
+    expect(carried[0].querySelector('a')!.getAttribute('aria-label')).toBe(
+      'Overdue, Sunday September 20: Old plan, planned',
+    );
     expect(carried[0].querySelector('.workout-meta')!.textContent).toBe('1 exercise · 2 sets · about 45 min');
     expect(carried[0].querySelector('.training-planned-for')!.textContent).toBe('Planned Sep 20');
     expect(carried[1].querySelector('.training-planned-for')!.textContent).toBe('Planned Yesterday');
-    // Today's own plan keeps its Planned badge and no actions.
+    // Today's own plan is planned (#489: no badge, said in its name) and has no actions.
     const own = [...container.querySelectorAll('.training-list > a')].find((a) =>
       a.textContent!.includes('Today plan'),
     )!;
-    expect(own.querySelector('.badge-planned')).not.toBeNull();
+    expect(own.getAttribute('aria-label')).toBe('Today, Wednesday September 30: Today plan, planned');
+    expect(own.querySelector('.badge-overdue')).toBeNull();
   });
 
   it('replaces "Nothing planned today." with the list and the header Plan link', () => {
@@ -224,7 +228,7 @@ describe('AC3 — Move to today', () => {
     expect(rescheduleWorkout).toHaveBeenCalledWith('o', D, 'tok', D);
     expect(container.querySelector('.training-overdue')).toBeNull();
     const card = container.querySelector<HTMLAnchorElement>('a.training-card')!;
-    expect(card.querySelector('.badge-planned')).not.toBeNull();
+    expect(card.getAttribute('aria-label')).toBe('Today, Wednesday September 30: Pull, planned');
     expect(document.activeElement).toBe(card);
   });
 });

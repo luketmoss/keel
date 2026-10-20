@@ -107,7 +107,7 @@ describe('AC1 — past day', () => {
 });
 
 describe('AC2 — today', () => {
-  it('lists planned in sheet order with a Planned pill, then done by time', () => {
+  it('lists planned in sheet order, named as planned, then done by time', () => {
     workouts.value = [
       wk('d2', { name: 'Done late', time: '17:00' }),
       wk('p2', { name: 'Plan two', status: 'planned' }),
@@ -116,7 +116,8 @@ describe('AC2 — today', () => {
     ];
     const { container } = panel('today');
     expect(names(container)).toEqual(['Plan two', 'Plan one', 'Done early', 'Done late']);
-    expect(container.querySelector('.badge-planned')!.textContent).toBe('Planned');
+    // #489: no Planned badge on today's plans; the card's name says it.
+    expect(container.querySelector('a.training-planned')!.getAttribute('aria-label')).toMatch(/: Plan two, planned$/);
     expect(container.querySelector('.badge-overdue')).toBeNull();
   });
 
@@ -177,7 +178,7 @@ describe('AC4 — header Plan action', () => {
 });
 
 describe('AC5 — a card', () => {
-  it('shows every set field, joined, with a readable effort pill', () => {
+  it('shows duration and distance (#489), the type badge and a readable effort pill', () => {
     workouts.value = [
       wk('r', {
         type: 'bike',
@@ -197,14 +198,8 @@ describe('AC5 — a card', () => {
     const card = container.querySelector('a.training-card')!;
     expect(card.getAttribute('href')).toBe('#/history/r');
     expect(card.querySelector('.training-type')!.textContent).toBe('bike · Mountain');
-    const meta = card.querySelector('.workout-meta')!.textContent!;
-    expect(meta).toContain('07:30');
-    expect(meta).toContain('10 mi');
-    expect(meta).toContain('60 min');
-    expect(meta).not.toContain('70 min');
-    expect(meta).toContain('↑ 1,000 ft');
-    expect(meta).toContain('↓');
-    expect(meta).toContain('140 bpm');
+    // #489: moving time, else elapsed, then the distance; nothing else.
+    expect(card.querySelector('.workout-meta')!.textContent).toBe('60 min · 10 mi');
     const pill = card.querySelector('.workout-effort-hard')!;
     expect(pill.textContent).toBe('Hard');
     expect(pill.getAttribute('aria-hidden')).toBeNull();

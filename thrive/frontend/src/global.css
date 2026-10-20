@@ -3823,15 +3823,16 @@ a.training-card {
 }
 
 /* A planned workout carried onto today (#347 AC9): one visual unit. The
-   wrapper carries the planned card's border, radius and background; the link
+   wrapper carries the planned card's border, radius and background (#489's
+   dashed outline); the link
    (upper area, its own focus ring, drawn inside so the wrapper never clips it)
    and the actions row below it are siblings, so a button is never in a link. */
 .training-overdue {
   display: flex;
   flex-direction: column;
-  border: 1.5px dashed var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-raised);
+  border: 1px dashed var(--color-border);
+  border-radius: calc(var(--radius-md) + var(--space-xs));
+  background: transparent;
 }
 
 .training-overdue > .training-overdue-link {
@@ -4689,6 +4690,214 @@ a.training-card {
   font-size: var(--text-xl);
 }
 
+/* ===== Day Training cards (#489) =====
+   Outside the Day section (#237-#243), which keeps --color-primary out: the
+   sets ring, the title icon and the load bars are drawn in it. Day screen
+   only: .training-card is the Training panel's alone. A done card is filled
+   and borderless; a planned one (today's, overdue, Up next) is a dashed
+   outline with a date block. The old left-edge type accent is gone here. */
+.day-panel-titlerow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-sm);
+}
+
+.day-panel-meta {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.training-icon {
+  display: inline-flex;
+  width: 100%;
+  height: 100%;
+}
+
+/* A drawn barbell in --color-primary: the stroke, not text colour (fill tokens are never text). */
+.training-icon svg {
+  width: 100%;
+  height: 100%;
+  stroke: var(--color-primary);
+}
+
+.workout-card.training-card {
+  flex-wrap: nowrap;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border: none;
+  border-radius: calc(var(--radius-md) + var(--space-xs));
+  box-shadow: none;
+}
+
+.training-done {
+  background: var(--color-surface-raised);
+}
+
+.training-list > .training-planned {
+  border: 1px dashed var(--color-border);
+  background: transparent;
+}
+
+.training-mark {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+}
+
+.training-type-mark {
+  border-radius: var(--radius-full);
+  background: var(--color-primary-light);
+  color: var(--color-primary-text);
+}
+
+.training-type-mark svg {
+  width: 24px;
+  height: 24px;
+}
+
+.training-ring svg {
+  position: absolute;
+  inset: 0;
+}
+
+.training-ring-track {
+  stroke: var(--color-border-light);
+}
+
+.training-ring-value {
+  stroke: var(--color-primary);
+}
+
+.training-ring-count {
+  position: relative;
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.workout-meta.training-meta {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.training-meta b {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.training-date {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 36px;
+  line-height: 1.15;
+}
+
+.training-date-day {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--color-primary-text);
+}
+
+.training-date-num {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.training-planned-end {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.training-chevron {
+  font-size: var(--text-lg);
+  color: var(--color-text-muted);
+}
+
+/* The 7-day load: --space-md under the cards (the panel's own gap is --space-sm). */
+.training-load {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-top: var(--space-sm);
+}
+
+.training-load-sum {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.training-load-label {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.training-load-total {
+  font-size: var(--figure-lg);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--color-text);
+}
+
+.training-load-bars {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.training-load-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.training-load-track {
+  position: relative;
+  display: block;
+  width: 14px;
+  height: 54px;
+  border-radius: var(--radius-sm);
+  background: var(--range-track);
+  overflow: hidden;
+}
+
+.training-load-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: var(--radius-sm);
+  /* 45% of --color-primary, mixed rather than dimmed with opacity (#404 AC4). */
+  background: color-mix(in srgb, var(--color-primary) 45%, transparent);
+}
+
+.training-load-viewed .training-load-bar {
+  background: var(--color-primary);
+}
+
+.training-load-letter {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.training-load-viewed .training-load-letter {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
 /* ===== Library keyboard access (#301) =====
    Template cards are <button>s and the editor's exercise rows are focusable
    buttons. The ring is --color-text (14.70:1 light, 15.54:1 dark), not
@@ -4857,6 +5066,28 @@ a.training-card {
   /* #485: forced colours flatten the card and the page to Canvas. */
   .day-screen .day-panel {
     border: 1px solid CanvasText;
+  }
+
+  /* #489: the done card's outline, the sets ring and the load bars in system colours. */
+  .training-done {
+    border: 1px solid CanvasText;
+  }
+
+  .training-ring-track {
+    stroke: GrayText;
+  }
+
+  .training-ring-value {
+    stroke: Highlight;
+  }
+
+  .training-load-track {
+    border: 1px solid GrayText;
+  }
+
+  .training-load-bar {
+    background: Highlight;
+    forced-color-adjust: none;
   }
 }
 

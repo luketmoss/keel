@@ -65,6 +65,8 @@ export function installFakeGoogleMaps(): FakeMapState {
       Polyline,
       LatLngBounds,
       SymbolPath: { CIRCLE: 0 },
+      ControlPosition: { LEFT_BOTTOM: 6, RIGHT_BOTTOM: 12 },
+      MapTypeControlStyle: { HORIZONTAL_BAR: 1 },
       event: { addListenerOnce: () => ({}) },
       importLibrary: async () => ({}),
     },

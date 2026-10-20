@@ -342,6 +342,35 @@ export function computeElevationProfile(points: Track['points']): ElevationProfi
   }))
 }
 
+export interface ElevationSeriesPoint {
+  /** Cumulative distance along the whole track, counting points that have no elevation. */
+  distanceMeters: number
+  /** `null` where the point has no elevation: a gap, never bridged (#532). */
+  elevationMeters: number | null
+}
+
+/* #532's series — the profile's distance axis over every point, with a point
+   that lacks elevation kept as `null` so a chart can break its line there
+   instead of drawing across it. Raw, not median-filtered: a Thrive track is
+   already simplified, and the lowest and highest point shown beside the chart
+   must be points on it. `undefined` under fewer than two elevation-bearing
+   points; a flat series is still a series. */
+export function computeElevationSeries(points: Track['points']): ElevationSeriesPoint[] | undefined {
+  if (points.filter((point) => point.elevation !== undefined && Number.isFinite(point.elevation)).length < 2) {
+    return undefined
+  }
+
+  let distance = 0
+  return points.map((point, i) => {
+    if (i > 0) distance += haversineMeters(points[i - 1], point)
+    const elevation = point.elevation
+    return {
+      distanceMeters: distance,
+      elevationMeters: elevation !== undefined && Number.isFinite(elevation) ? elevation : null,
+    }
+  })
+}
+
 /** #226 — the loose face's mirror of `aggregateTrackStats`: one profile for
     a whole file, each track's own profile appended after the last, offset
     by that track's total distance so the x axis still reads left-to-right

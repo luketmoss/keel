@@ -90,3 +90,12 @@ export function TrashIcon() {
     </Icon>
   );
 }
+
+/** Elevation: a mountain range. */
+export function MountainIcon() {
+  return (
+    <Icon>
+      <path d="M3 19l6-11 4 7 2-3 6 7z" />
+    </Icon>
+  );
+}

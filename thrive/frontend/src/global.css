@@ -37,7 +37,8 @@
   --map-track-width: 4px;
   --map-track-width-casing: 7px;
   --map-dot-size: 12px;
-  --detail-map-height: 280px;
+  /* The activity detail's map hero (#532). */
+  --detail-hero-height: clamp(320px, 62vh, 560px);
   /* The visual Day screen (#485). Figure sizes for big numbers, the gap
      between Day cards, and the range bar's three layers (#491). */
   --figure-md: 1.75rem;
@@ -2679,7 +2680,7 @@ input, select, textarea {
   align-items: center;
 }
 
-/* No background here; #532's map gives them a scrim. */
+/* No background on a plain screen; over the map hero they get a scrim (#532). */
 .detail-icon-btn {
   box-sizing: border-box;
   display: inline-flex;
@@ -2922,7 +2923,6 @@ input, select, textarea {
 }
 
 /* The wrapper's own spacing replaces each block's margin. */
-.workout-detail-screen .detail-route,
 .workout-detail-screen .detail-exercises {
   margin-bottom: 0;
 }
@@ -2938,21 +2938,36 @@ input, select, textarea {
   margin-bottom: var(--space-lg);
 }
 
-/* The route (#407): a fixed-height box in every state, so nothing below it moves
-   when the map replaces "Loading route…". */
-.detail-route {
-  margin-bottom: var(--space-lg);
+/* ----- Map hero and sheet (#532) ----- */
+.workout-detail-screen > .detail-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space-sm) + var(--space-xs));
+  margin: 0;
+  padding: 0 var(--space-md);
 }
 
-.detail-route-map {
-  height: var(--detail-map-height);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
-  overflow: hidden;
+.workout-detail-screen.has-hero {
+  position: relative;
+  gap: 0;
+}
+
+/* The map reaches the top of the screen, behind the status bar; the bar floats over it. */
+.workout-detail-screen > .detail-hero {
+  position: relative;
+  z-index: 0;
+  height: var(--detail-hero-height);
+  margin: 0;
   background: var(--color-surface-raised);
 }
 
-.detail-route-status {
+/* The bottom --space-lg is under the sheet's overlap, so Google's bottom controls clear it. */
+.detail-hero-map {
+  height: calc(100% - var(--space-lg));
+}
+
+.detail-hero-status {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2960,6 +2975,104 @@ input, select, textarea {
   gap: var(--space-sm);
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
+}
+
+.workout-detail-screen.has-hero > .detail-top-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  padding-top: calc(env(safe-area-inset-top, 0px) + var(--space-sm) + var(--space-xs));
+  pointer-events: none;
+}
+
+.has-hero .detail-top-bar > *,
+.has-hero .detail-top-actions > * {
+  pointer-events: auto;
+}
+
+.has-hero .detail-icon-btn {
+  background: color-mix(in srgb, var(--color-bg) 78%, transparent);
+}
+
+.workout-detail-screen.has-hero > .detail-sheet {
+  position: relative;
+  z-index: 2;
+  margin-top: calc(-1 * var(--space-lg));
+  padding-top: var(--space-md);
+  background: var(--color-bg);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+/* ----- Elevation card (#532) ----- */
+.detail-elevation-card {
+  padding: var(--space-md);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+}
+
+.detail-elevation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.detail-elevation-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.detail-elevation-heading svg {
+  width: 16px;
+  height: 16px;
+  color: var(--chart-line);
+}
+
+.detail-elevation-ascent,
+.detail-elevation-range {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.detail-elevation-range {
+  margin: 0 0 var(--space-sm);
+}
+
+.detail-elevation-chart {
+  display: block;
+  width: 100%;
+  height: 96px;
+  overflow: visible;
+}
+
+.detail-elevation-area {
+  fill: var(--chart-band);
+  stroke: none;
+}
+
+.detail-elevation-line {
+  fill: none;
+  stroke: var(--chart-line);
+  stroke-width: 2px;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.detail-elevation-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--space-xs);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
 }
 
 .detail-section-header {

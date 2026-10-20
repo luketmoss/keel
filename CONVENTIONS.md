@@ -216,6 +216,11 @@ started cold without asking a question.
 - Project, Priority, and Type fields set
 - No unresolved questions in the body
 
+An epic moves to Refined when all of its open sub-issues are, and sits directly
+above them in the column in sub-issue order. `board.py group <epic> --promote`
+does both, and `/pm`, `/ux` and `/refine` run it; it needs the column sorted
+manually, since a view sorted by a field ignores positions.
+
 **Exit:** selected as next work — the delivery run starts here.
 
 ### 5. In Development

@@ -32,7 +32,10 @@ Refuse, and say why, if:
 - the issue is not in **Ready to Ship** — it hasn't been reviewed
 - the PR is still a draft
 - checks are failing, pending, or absent — a check that never ran is not a check
-  that passed, and `/review` treats an empty rollup the same way
+  that passed, and `/review` treats an empty rollup the same way. Run
+  `python .keel/pr.py ci <pr>` for this: exit 0 clears it, anything else is the
+  refusal, and its output is the reason. (No `gh`, as in a cloud session: read
+  `statusCheckRollup` from the PR instead.)
 - the PR has conflicts
 
 Don't work around any of these. Report and stop, leaving the issue in Ready to
@@ -96,10 +99,19 @@ It is also the highest-value habit in the pipeline and the easiest to skip.
 Months from now the Results section is the only part of the issue anyone reads.
 Write something worth reading — "done" is not that.
 
+Write the text to a file, then let the script put it in the body:
+
+```bash
+python .keel/pr.py results <issue> <file>
+```
+
+It replaces an existing `## Results` section, or appends one, and leaves every
+other section of the body byte for byte as it was. In a cloud session, edit the
+body through the GitHub MCP tools and keep the other sections the same way.
+
 ## Merge
 
 ```bash
-gh issue edit <issue> --repo luketmoss/keel --body-file <path>
 gh pr merge <pr> --repo luketmoss/keel --squash --delete-branch
 ```
 

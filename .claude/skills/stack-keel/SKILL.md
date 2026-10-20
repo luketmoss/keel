@@ -22,7 +22,7 @@ exactly where they must agree. The root `CLAUDE.md` is keel's project
 | `CLAUDE.md` | workspace rules, loaded in every session, and keel's own |
 | `README.md` | the outside view |
 | `.claude/skills/` | lifecycle and stack skills |
-| `.keel/` | `board.json`, `board.py`, `check.py` |
+| `.keel/` | `board.json`, `board.py`, `pr.py`, `check.py` |
 | `.github/workflows/` | one per project, generated from stack skills |
 | `docs/design/` | keel's UX artifacts, one file per issue |
 
@@ -69,12 +69,14 @@ moved it to — which is precisely the drift the board exists to prevent.
 **Python**
 
 - Standard library only. No `pyproject.toml`, no `uv`, no test framework —
-  `.keel/` is two scripts, and keeping them dependency-free is what keeps CI to
+  `.keel/` is scripts, and keeping them dependency-free is what keeps CI to
   a single step with nothing to install.
 - Match `board.py`: a module docstring carrying the usage, `.format()` over
   f-strings, `# --- section ---` rules between groups of functions.
 - Every board write goes through `board.py`, per the root `CLAUDE.md`. The
-  hazard that makes it a rule is in `CONVENTIONS.md` §Board fields.
+  hazard that makes it a rule is in `CONVENTIONS.md` §Board fields. `pr.py` is
+  the pull request's counterpart — the CI check and the issue's Results — and
+  never touches the board.
 
 **Issues**
 
@@ -89,11 +91,11 @@ moved it to — which is precisely the drift the board exists to prevent.
 python .keel/check.py
 ```
 
-Four things, all of which have a right answer that needs no judgment: `.keel/`
+Five things, all of which have a right answer that needs no judgment: `.keel/`
 compiles, every skill's frontmatter parses and matches its directory, every
-relative link in a tracked `.md` file resolves, and every design note cited by
-filename is committed. CI runs this and nothing else, so a green run here is a
-green run there.
+relative link in a tracked `.md` file resolves, every design note cited by
+filename is committed, and `pr.py`'s matcher and editors behave on fixtures.
+CI runs this and nothing else, so a green run here is a green run there.
 
 Adding a check means adding a function to `CHECKS` in `check.py`. Do not add one
 to the workflow — a check CI enforces that the local run doesn't is a check that

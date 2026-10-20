@@ -61,6 +61,66 @@ describe('layout contract (css)', () => {
   });
 });
 
+describe('underlined tabs (#503)', () => {
+  const rule = (sel: string) => {
+    const css = readGlobalCss();
+    const at = css.indexOf(`${sel} {`);
+    expect(at, sel).toBeGreaterThan(-1);
+    return css.slice(at, css.indexOf('}', at));
+  };
+
+  it('are text on the page: no box, a 2px underline slot, a rule under the row', () => {
+    const tab = rule('.trends-group-btn');
+    expect(tab).toMatch(/border:\s*none/);
+    expect(tab).toMatch(/border-bottom:\s*2px solid transparent/);
+    expect(tab).toMatch(/background:\s*transparent/);
+    expect(rule('.trends-group-row')).toMatch(/border-bottom:\s*1px solid var\(--color-border\)/);
+  });
+
+  it('the selected one is underlined and bold as well as coloured', () => {
+    const on = rule('.trends-group-btn.active');
+    expect(on).toMatch(/border-bottom-color:\s*var\(--color-primary-text\)/);
+    expect(on).toMatch(/font-weight:\s*700/);
+    expect(on).toMatch(/color:\s*var\(--color-primary-text\)/);
+  });
+});
+
+describe('the selected tab is scrolled fully into view (#503)', () => {
+  /** A 300px scroller over a row of 100px tabs, tab i at x = i * 100 - scrollLeft. */
+  function layout(scroller: HTMLElement) {
+    const tabs = [...scroller.querySelectorAll('button')];
+    vi.spyOn(scroller, 'getBoundingClientRect').mockReturnValue({ left: 0, right: 300 } as DOMRect);
+    tabs.forEach((t, i) =>
+      vi
+        .spyOn(t, 'getBoundingClientRect')
+        .mockImplementation(
+          () => ({ left: i * 100 - scroller.scrollLeft, right: i * 100 + 100 - scroller.scrollLeft }) as DOMRect,
+        ),
+    );
+  }
+
+  it('on arrival, brings an off-screen selected tab in at the right edge', () => {
+    const { container, rerender } = mount(7, 'g0');
+    const scroller = container.querySelector<HTMLElement>('.trends-group-scroll')!;
+    layout(scroller);
+    expect(scroller.scrollLeft).toBe(0);
+    rerender(h(GroupSwitcher, { groups: fixture(7), value: 'g6', onChange: vi.fn() }));
+    // Tab 6 spans 600-700; the scroller shows 300 wide, so it ends at 700.
+    expect(scroller.scrollLeft).toBe(400);
+  });
+
+  it('brings one hidden on the left back, and leaves a visible one alone', () => {
+    const { container, rerender } = mount(7, 'g0');
+    const scroller = container.querySelector<HTMLElement>('.trends-group-scroll')!;
+    layout(scroller);
+    scroller.scrollLeft = 400;
+    rerender(h(GroupSwitcher, { groups: fixture(7), value: 'g5', onChange: vi.fn() }));
+    expect(scroller.scrollLeft).toBe(400); // 500-600 is within 400-700
+    rerender(h(GroupSwitcher, { groups: fixture(7), value: 'g1', onChange: vi.fn() }));
+    expect(scroller.scrollLeft).toBe(100);
+  });
+});
+
 describe('the group pref', () => {
   const groups = fixture(6);
   it('defaults to the first group when missing, unknown or unreadable', () => {

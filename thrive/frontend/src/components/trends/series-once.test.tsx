@@ -13,6 +13,7 @@ vi.mock('./series', async (orig) => {
 
 import { TrendsScreen, selectedDay, announcement } from './trends-screen';
 import { metricSeries } from './series';
+import { pickRange, pickAverage } from './toolbar-test-utils';
 import { TREND_GROUPS, CUSTOM_PICKABLE } from './metrics';
 import { CUSTOM_KEY } from './prefs';
 import { AuthContext } from '../../auth/auth-context';
@@ -66,8 +67,6 @@ afterEach(() => {
 });
 
 const wrapper = (c: Element) => c.querySelector<HTMLElement>('.trend-charts')!;
-const press = (c: Element, label: string) =>
-  fireEvent.click([...c.querySelectorAll('button')].find((b) => b.textContent === label)!);
 
 describe('AC2: one series per metric', () => {
   it('builds N series and calls points() N times for the chart view, band check included', () => {
@@ -113,10 +112,10 @@ describe('AC3: what changes the days rebuilds, and nothing is stale', () => {
   it('range, average, group and rows each rebuild all N', () => {
     const { container } = renderScreen();
     let b = builds();
-    press(container, '1W');
+    pickRange(container, '1W');
     expect(builds()).toBe(b + N);
     b = builds();
-    press(container, '30d');
+    pickAverage(container, '30d');
     expect(builds()).toBe(b + N);
     b = builds();
     const before = container.querySelector('.trend-summary')!.textContent;

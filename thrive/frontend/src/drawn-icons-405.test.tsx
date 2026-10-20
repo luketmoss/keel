@@ -116,8 +116,8 @@ describe('AC2: each control renders its assigned icon, hidden from assistive tec
 describe('AC3: every icon is drawn in the house style', () => {
   const all = Object.entries(icons) as [string, ComponentType][];
 
-  it('exports exactly the thirteen icons', () => {
-    expect(all).toHaveLength(13);
+  it('exports exactly the seventeen icons', () => {
+    expect(all).toHaveLength(17);
   });
 
   it.each(all)('%s', (_name, Icon) => {

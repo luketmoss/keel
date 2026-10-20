@@ -15,6 +15,7 @@ import { AuthContext } from '../../auth/auth-context';
 import { dailyHealth, bodyMeasurements, dailySummary } from '../../state/store';
 import { addDays } from '../../day/dates';
 import { rowDate } from './series';
+import { pickView } from './toolbar-test-utils';
 import { todayInDenver } from '../../day/dates';
 import { today as todaySignal, recheckToday } from '../../day/today';
 
@@ -87,9 +88,7 @@ describe.each([
     const d = dots(container);
     expect(d[d.length - 1]).toBe(DENVER_TODAY);
     expect(d[0]).toBe(addDays(DENVER_TODAY, -6));
-    fireEvent.click(
-      [...container.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === 'Table')!,
-    );
+    pickView(container, 'Table');
     // The table lists the newest day first.
     expect(firstTableRow(container)).toBe(rowDate(DENVER_TODAY, DENVER_TODAY));
     expect(lastTableRow(container)).toBe(rowDate(addDays(DENVER_TODAY, -6), DENVER_TODAY));

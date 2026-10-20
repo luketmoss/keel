@@ -16,6 +16,7 @@ import { AuthContext } from '../../auth/auth-context';
 import { dailyHealth, bodyMeasurements, dailySummary } from '../../state/store';
 import { addDays } from '../../day/dates';
 import { todayInDenver } from '../../day/dates';
+import { chip, menuItems, pickRange, pickAverage, pickView, viewButton } from './toolbar-test-utils';
 
 const TODAY = todayInDenver();
 
@@ -54,48 +55,109 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const group = (c: Element, name: string) => {
-  const label = [...c.querySelectorAll('.trends-control-label')].find((l) => l.textContent === name)!;
-  return c.querySelector(`[role="group"][aria-labelledby="${label.id}"]`)!;
-};
-const pressed = (g: Element) => [...g.querySelectorAll('button[aria-pressed="true"]')].map((b) => b.textContent);
+const pressed = (g: Element) =>
+  [...g.querySelectorAll('button[aria-pressed="true"]')].map((b) => b.getAttribute('aria-label'));
+const viewGroup = (c: Element) => c.querySelector('.trends-view-switch')!;
 
 describe('AC1: controls', () => {
-  it('renders one h1 and three labelled groups in order, each with one pressed default', () => {
+  it('puts a range chip, an average chip and a View switch on the heading row, right of the heading', () => {
     loaded(rows(100));
     const { container } = renderScreen();
     expect(container.querySelectorAll('h1')).toHaveLength(1);
     expect(container.querySelector('h1')!.textContent).toBe('Trends');
-    expect([...container.querySelectorAll('.trends-control-label')].map((l) => l.textContent)).toEqual([
-      'Range',
-      'Average',
-      'View',
+    // The three labelled rows are gone.
+    expect(container.querySelector('.trends-controls')).toBeNull();
+    expect(container.querySelector('.trends-control-label')).toBeNull();
+    const header = container.querySelector('header')!;
+    const toolbar = header.querySelector('.trends-toolbar')!;
+    expect(
+      header.querySelector('h1')!.compareDocumentPosition(toolbar) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect([...toolbar.children].map((el) => el.className)).toEqual([
+      'trends-menu-wrap',
+      'trends-menu-wrap',
+      'trends-view-switch',
     ]);
-    const buttons = (n: string) => [...group(container, n).querySelectorAll('button')].map((b) => b.textContent);
-    expect(buttons('Range')).toEqual(['1W', '1M', '3M', '6M', '1Y', 'All']);
-    expect(buttons('Average')).toEqual(['Off', '7d', '14d', '30d']);
-    expect(buttons('View')).toEqual(['Chart', 'Table']);
-    expect(pressed(group(container, 'Range'))).toEqual(['3M']);
-    expect(pressed(group(container, 'Average'))).toEqual(['7d']);
-    expect(pressed(group(container, 'View'))).toEqual(['Chart']);
-    expect(group(container, 'Range').classList.contains('trends-toggle-tight')).toBe(true);
+    expect(chip(container, 'Range').textContent).toBe('3M');
+    expect(chip(container, 'Average').textContent).toBe('7d');
+  });
+
+  it('names the chips for their state, and the View buttons in a group named View', () => {
+    loaded(rows(100));
+    const { container } = renderScreen();
+    expect(chip(container, 'Range').getAttribute('aria-label')).toBe('Range: 3M');
+    expect(chip(container, 'Average').getAttribute('aria-label')).toBe('Average: 7-day');
+    for (const w of ['Range', 'Average'] as const) {
+      expect(chip(container, w).getAttribute('aria-haspopup')).toBe('menu');
+      expect(chip(container, w).getAttribute('aria-expanded')).toBe('false');
+    }
+    const view = viewGroup(container);
+    expect(view.getAttribute('role')).toBe('group');
+    expect(view.getAttribute('aria-label')).toBe('View');
+    expect([...view.querySelectorAll('button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Chart', 'Table']);
+    expect(pressed(view)).toEqual(['Chart']);
+    pickAverage(container, 'Off');
+    expect(chip(container, 'Average').getAttribute('aria-label')).toBe('Average: off');
+    expect(chip(container, 'Average').textContent).toBe('Off');
+  });
+
+  it('lists the six ranges and four averages, marks the current one, and follows aria-expanded', () => {
+    loaded(rows(100));
+    const { container } = renderScreen();
+    fireEvent.click(chip(container, 'Range'));
+    expect(chip(container, 'Range').getAttribute('aria-expanded')).toBe('true');
+    const items = menuItems(container);
+    expect(items.map((b) => b.querySelector('.trends-menu-label')!.textContent)).toEqual([
+      'Last 7 days',
+      'Last 30 days',
+      'Last 3 months',
+      'Last 6 months',
+      'Last year',
+      'All time',
+    ]);
+    expect(items.map((b) => b.getAttribute('aria-checked'))).toEqual([
+      'false',
+      'false',
+      'true',
+      'false',
+      'false',
+      'false',
+    ]);
+    expect(items.map((b) => b.textContent!.includes('✓'))).toEqual([false, false, true, false, false, false]);
+    fireEvent.click(chip(container, 'Average'));
+    // Opening one closes the other.
+    expect(chip(container, 'Range').getAttribute('aria-expanded')).toBe('false');
+    expect(chip(container, 'Average').getAttribute('aria-expanded')).toBe('true');
+    expect(container.querySelectorAll('[role="menu"]')).toHaveLength(1);
+    expect(menuItems(container).map((b) => b.querySelector('.trends-menu-label')!.textContent)).toEqual([
+      'No average',
+      '7-day average',
+      '14-day average',
+      '30-day average',
+    ]);
+    expect(menuItems(container).map((b) => b.getAttribute('aria-checked'))).toEqual([
+      'false',
+      'true',
+      'false',
+      'false',
+    ]);
   });
 
   it('redraws from loaded rows without a read, stores the choice, and restores it', () => {
     loaded(rows(100));
     const first = renderScreen();
     expect(loadHealth).not.toHaveBeenCalled();
-    fireEvent.click(
-      [...group(first.container, 'Range').querySelectorAll<HTMLButtonElement>('button')].find(
-        (b) => b.textContent === '1W',
-      )!,
+    pickRange(first.container, '1W');
+    pickAverage(first.container, 'Off');
+    // A choice closes the menu and puts focus back on the chip.
+    expect(first.container.querySelector('[role="menu"]')).toBeNull();
+    expect(chip(first.container, 'Average').getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(chip(first.container, 'Average'));
+    expect(chip(first.container, 'Range').textContent).toBe('1W');
+    expect(chip(first.container, 'Average').textContent).toBe('Off');
+    expect(first.container.querySelector('svg[role="img"]')!.getAttribute('aria-label')).toBe(
+      'Resting HR, last 7 days',
     );
-    fireEvent.click(
-      [...group(first.container, 'Average').querySelectorAll<HTMLButtonElement>('button')].find(
-        (b) => b.textContent === 'Off',
-      )!,
-    );
-    expect(first.container.querySelector('svg')!.getAttribute('aria-label')).toBe('Resting HR, last 7 days');
     expect(first.container.querySelectorAll('circle.trend-dot')).toHaveLength(7);
     expect(first.container.querySelector('path.trend-line')).toBeNull();
     expect(localStorage.getItem('thrive-trends-range')).toBe('1W');
@@ -103,8 +165,8 @@ describe('AC1: controls', () => {
     expect(loadHealth).not.toHaveBeenCalled();
     cleanup();
     const again = renderScreen();
-    expect(pressed(group(again.container, 'Range'))).toEqual(['1W']);
-    expect(pressed(group(again.container, 'Average'))).toEqual(['Off']);
+    expect(chip(again.container, 'Range').textContent).toBe('1W');
+    expect(chip(again.container, 'Average').textContent).toBe('Off');
   });
 
   it('applies a choice for this visit when storage fails, and reads defaults when it cannot read', () => {
@@ -116,14 +178,95 @@ describe('AC1: controls', () => {
     });
     loaded(rows(100));
     const { container } = renderScreen();
-    expect(pressed(group(container, 'Range'))).toEqual(['3M']);
-    fireEvent.click(
-      [...group(container, 'View').querySelectorAll<HTMLButtonElement>('button')].find(
-        (b) => b.textContent === 'Table',
-      )!,
-    );
-    expect(pressed(group(container, 'View'))).toEqual(['Table']);
+    expect(chip(container, 'Range').textContent).toBe('3M');
+    pickView(container, 'Table');
+    expect(viewButton(container, 'Table').getAttribute('aria-pressed')).toBe('true');
+    expect(viewButton(container, 'Chart').getAttribute('aria-pressed')).toBe('false');
     expect(container.querySelector('table')).not.toBeNull();
+  });
+});
+
+describe('#503: menus open, move and close', () => {
+  const open = (c: Element, w: 'Range' | 'Average') => fireEvent.click(chip(c, w));
+
+  it('opens with focus on the current item, and Arrow keys wrap while Home and End jump', () => {
+    loaded(rows(100));
+    const { container } = renderScreen();
+    open(container, 'Range');
+    const items = menuItems(container);
+    expect(document.activeElement).toBe(items[2]);
+    const menu = container.querySelector('[role="menu"]')!;
+    fireEvent.keyDown(menu, { key: 'ArrowDown' });
+    expect(document.activeElement).toBe(items[3]);
+    fireEvent.keyDown(menu, { key: 'End' });
+    expect(document.activeElement).toBe(items[5]);
+    fireEvent.keyDown(menu, { key: 'ArrowDown' });
+    expect(document.activeElement).toBe(items[0]);
+    fireEvent.keyDown(menu, { key: 'ArrowUp' });
+    expect(document.activeElement).toBe(items[5]);
+    fireEvent.keyDown(menu, { key: 'Home' });
+    expect(document.activeElement).toBe(items[0]);
+  });
+
+  it('ArrowDown on a closed chip opens it', () => {
+    loaded(rows(100));
+    const { container } = renderScreen();
+    fireEvent.keyDown(chip(container, 'Average'), { key: 'ArrowDown' });
+    expect(container.querySelector('[role="menu"]')).not.toBeNull();
+  });
+
+  it('Escape closes and returns focus to the chip, choosing nothing', () => {
+    loaded(rows(100));
+    const { container } = renderScreen();
+    open(container, 'Range');
+    fireEvent.keyDown(container.querySelector('[role="menu"]')!, { key: 'Escape' });
+    expect(container.querySelector('[role="menu"]')).toBeNull();
+    expect(document.activeElement).toBe(chip(container, 'Range'));
+    expect(chip(container, 'Range').textContent).toBe('3M');
+  });
+
+  it('Tab closes it', () => {
+    loaded(rows(100));
+    const { container } = renderScreen();
+    open(container, 'Average');
+    fireEvent.keyDown(container.querySelector('[role="menu"]')!, { key: 'Tab' });
+    expect(container.querySelector('[role="menu"]')).toBeNull();
+  });
+
+  it('a press outside closes it, a press on a group tab too, and a press on its own chip does not', () => {
+    loaded(rows(100));
+    const { container } = renderScreen();
+    open(container, 'Range');
+    fireEvent.pointerDown(chip(container, 'Range'));
+    expect(container.querySelector('[role="menu"]')).not.toBeNull();
+    fireEvent.pointerDown(container.querySelector('.trend-card')!);
+    expect(container.querySelector('[role="menu"]')).toBeNull();
+    open(container, 'Average');
+    fireEvent.pointerDown(container.querySelector('.trends-group-btn')!);
+    expect(container.querySelector('[role="menu"]')).toBeNull();
+    open(container, 'Average');
+    pickView(container, 'Table');
+    expect(container.querySelector('[role="menu"]')).toBeNull();
+  });
+
+  it('items are real buttons, so Enter and Space press them', () => {
+    loaded(rows(100));
+    const { container } = renderScreen();
+    open(container, 'Range');
+    for (const b of menuItems(container)) {
+      expect(b.tagName).toBe('BUTTON');
+      expect(b.getAttribute('type')).toBe('button');
+    }
+  });
+
+  it('opens while the data is loading and a choice is remembered for when it lands', () => {
+    dailyHealth.value = { state: 'loading' };
+    bodyMeasurements.value = { state: 'loading' };
+    dailySummary.value = { state: 'loading' };
+    const { container } = renderScreen();
+    pickRange(container, '6M');
+    expect(chip(container, 'Range').textContent).toBe('6M');
+    expect(localStorage.getItem('thrive-trends-range')).toBe('6M');
   });
 });
 
@@ -140,13 +283,9 @@ describe('AC2: caption', () => {
     loaded(rows(100));
     const { container } = renderScreen();
     expect(container.querySelector('.trends-caption')!.textContent).toContain('7-day average');
-    fireEvent.click(
-      [...group(container, 'View').querySelectorAll<HTMLButtonElement>('button')].find(
-        (b) => b.textContent === 'Table',
-      )!,
-    );
+    pickView(container, 'Table');
     expect(container.querySelector('.trends-caption')).not.toBeNull();
-    expect(container.querySelector('svg')).toBeNull();
+    expect(container.querySelector('svg[role="img"]')).toBeNull();
     expect(container.querySelectorAll('tbody tr')).toHaveLength(91);
   });
 });
@@ -186,14 +325,14 @@ describe('AC5: loading, empty and failed', () => {
     loaded([]);
     const { container } = renderScreen();
     expect(container.textContent).toContain('Nothing recorded yet.');
-    expect(container.querySelector('svg')).toBeNull();
+    expect(container.querySelector('svg[role="img"]')).toBeNull();
   });
 
   it('says "No resting HR in this range." when none fall in it', () => {
     loaded([{ date: addDays(TODAY, -200), resting_hr: '50', sheetRow: 2 }] as never[]);
     const { container } = renderScreen();
     expect(container.textContent).toContain('No resting HR in this range.');
-    expect(container.querySelector('svg')).toBeNull();
+    expect(container.querySelector('svg[role="img"]')).toBeNull();
   });
 });
 
@@ -231,12 +370,12 @@ describe('#243 AC4: switcher in the screen', () => {
       [...c.querySelectorAll<HTMLButtonElement>('.trends-group-btn')].find((b) => b.textContent === text)!,
     );
 
-  it('shows the groups above the controls, defaulting to Recovery', () => {
+  it('shows the groups as tabs under the heading, defaulting to Recovery', () => {
     loaded(rows(100));
     const { container } = renderScreen();
     const region = container.querySelector('[role="region"][aria-label="Metric group"]')!;
     expect(
-      region.compareDocumentPosition(container.querySelector('.trends-controls')!) & Node.DOCUMENT_POSITION_FOLLOWING,
+      container.querySelector('header')!.compareDocumentPosition(region) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect([...region.querySelectorAll('button')].map((b) => b.textContent)).toEqual([
       'Recovery',
@@ -253,15 +392,11 @@ describe('#243 AC4: switcher in the screen', () => {
   it('swaps the cards, stores the group, keeps other controls, and restores on reopen', () => {
     loaded(rows(100));
     const first = renderScreen();
-    fireEvent.click(
-      [...group(first.container, 'Range').querySelectorAll<HTMLButtonElement>('button')].find(
-        (b) => b.textContent === '1W',
-      )!,
-    );
+    pickRange(first.container, '1W');
     click(first.container, 'Sleep');
     expect(first.container.querySelectorAll('.trend-card')).toHaveLength(4);
     expect(first.container.textContent).toContain('Nothing recorded yet.');
-    expect(pressed(group(first.container, 'Range'))).toEqual(['1W']);
+    expect(chip(first.container, 'Range').textContent).toBe('1W');
     expect(localStorage.getItem('thrive-trends-group')).toBe('sleep');
     cleanup();
     const again = renderScreen();
@@ -491,7 +626,7 @@ describe('#290: Try again focus', () => {
     act(() => {
       dailyHealth.value = { state: 'loading' };
     });
-    const control = container.querySelector('.sub-type-btn') as HTMLElement;
+    const control = chip(container, 'Range');
     control.focus();
     act(() => {
       loaded(rows(100));

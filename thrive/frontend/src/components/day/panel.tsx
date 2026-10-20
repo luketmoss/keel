@@ -21,6 +21,8 @@ export interface PanelProps {
   title: string;
   /** Optional drawn icon before the title; hidden from the heading's accessible name. */
   icon?: ComponentChildren;
+  /** Optional words right of the title, at `--text-xs` muted: "1 done · 1 planned" (#489). */
+  meta?: ComponentChildren;
   /** Optional line under the title, such as a time or a range. */
   sub?: ComponentChildren;
   /** Optional control at the right of the title row. */
@@ -29,20 +31,30 @@ export interface PanelProps {
 }
 
 /** One card on the Day screen: a `section` labelled by its `h2` title. */
-export function Panel({ title, icon, sub, action, children }: PanelProps) {
+export function Panel({ title, icon, meta, sub, action, children }: PanelProps) {
   const id = useId();
+  const heading = (
+    <h2 class="day-panel-title" id={id} tabIndex={-1}>
+      {icon != null && (
+        <span class="day-panel-icon" aria-hidden="true">
+          {icon}
+        </span>
+      )}
+      {title}
+    </h2>
+  );
   return (
     <section class="day-panel" aria-labelledby={id}>
       <div class="day-panel-head">
         <div class="day-panel-heading">
-          <h2 class="day-panel-title" id={id} tabIndex={-1}>
-            {icon != null && (
-              <span class="day-panel-icon" aria-hidden="true">
-                {icon}
-              </span>
-            )}
-            {title}
-          </h2>
+          {meta != null ? (
+            <div class="day-panel-titlerow">
+              {heading}
+              <span class="day-panel-meta">{meta}</span>
+            </div>
+          ) : (
+            heading
+          )}
           {sub != null && <p class="day-panel-sub">{sub}</p>}
         </div>
         {action != null && <div class="day-panel-action">{action}</div>}

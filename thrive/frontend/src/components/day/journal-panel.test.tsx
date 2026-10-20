@@ -56,7 +56,7 @@ describe('Note panel', () => {
     expect(box(container).value).toBe('hello');
     expect(getByLabelText('Journal entry for September 26, 2026')).toBe(box(container));
     expect(box(container).getAttribute('maxlength')).toBe('50000');
-    expect(box(container).getAttribute('rows')).toBe('4');
+    expect(box(container).getAttribute('rows')).toBe('2');
     expect(box(container).getAttribute('autocapitalize')).toBe('sentences');
     expect(container.querySelector('.day-panel-sub')).toBeNull();
   });

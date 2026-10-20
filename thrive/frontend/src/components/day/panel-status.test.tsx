@@ -101,12 +101,12 @@ describe('AC5 — each panel follows its own tab', () => {
     expect(loadHealth).toHaveBeenCalledWith('tok');
   });
 
-  it('an error in one never changes the other; an empty tab is the no-reading note', () => {
+  it('an error in one never changes the other; an empty tab is two blank figures with the no-reading words', () => {
     dailyHealth.value = { state: 'error' };
     bodyMeasurements.value = { state: 'loaded', rows: [] };
     const { container } = mount(BodyPanel);
     expect(container.querySelector('[role="status"]')).toBeNull();
-    expect(container.querySelector('.panel-note')!.textContent).toBe('No weigh-in or blood pressure this day.');
+    expect(container.querySelector('[data-metric="weight"]')!.textContent).toBe('—No reading this day.');
   });
 });
 
@@ -200,13 +200,42 @@ describe('AC4 — Body', () => {
       ],
     };
     const { container } = mount(BodyPanel);
-    const dd = container.querySelector('dl.health-list > div[data-metric="bp"] > dd')!;
+    const dd = container.querySelector('.metric-tile-body [data-metric="bp"]')!;
     expect(dd.querySelector('.sr-only')!.textContent).toBe('126 over 81 millimetres of mercury');
-    const shown = dd.querySelector('.health-value')!;
+    const shown = dd.querySelector('[aria-hidden="true"]')!;
     expect(shown.textContent).toBe('126/81 mmHg');
-    expect(shown.getAttribute('aria-hidden')).toBe('true');
     expect(dd.textContent).toContain('One reading, 7:04 AM');
     expect(container.querySelector('.health-attention')).toBeNull();
+  });
+
+  // #492 — Body as the fourth tile.
+  it('shows the first weigh-in, its fat and time, and the mean BP with its caption', () => {
+    bodyMeasurements.value = {
+      state: 'loaded',
+      rows: [scale('07:52', '81.4', '9.6'), bp('06:18', '134', '86'), bp('21:00', '134', '86')],
+    };
+    const { container } = mount(BodyPanel);
+    const tile = container.querySelector('.metric-tile-body')!;
+    expect(tile.querySelector('h2')!.textContent).toBe('Body');
+    expect(tile.querySelector('[data-metric="weight"] .tile-value')!.textContent).toBe('179.5 lb');
+    expect(tile.querySelector('[data-metric="weight"] .tile-caption')!.textContent).toBe('fat 9.6% · 7:52 AM');
+    expect(tile.querySelector('[data-metric="bp"]')!.textContent).toContain('Average of 2 readings');
+  });
+
+  it('shows "—" with the day-appropriate words when there is no reading, never another day', () => {
+    bodyMeasurements.value = { state: 'loaded', rows: [] };
+    for (const [state, words] of [
+      ['today', 'None yet today.'],
+      ['past', 'No reading this day.'],
+    ] as const) {
+      const { container, unmount } = mount(BodyPanel, state);
+      for (const m of ['weight', 'bp']) {
+        const g = container.querySelector(`[data-metric="${m}"]`)!;
+        expect(g.textContent).toContain('—');
+        expect(g.textContent).toContain(words);
+      }
+      unmount();
+    }
   });
 });
 

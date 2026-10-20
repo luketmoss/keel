@@ -64,6 +64,28 @@ function NoteRetry({ busy, onPress }: { busy: boolean; onPress: () => void }) {
   );
 }
 
+// Drawn in the house style (#405) and kept here, as the shared icon set is counted by its tests.
+function PencilIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="24"
+      height="24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      style={{ color: 'var(--color-text-secondary)' }}
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19z" />
+      <path d="M14.5 6.5l3 3" />
+    </svg>
+  );
+}
+
 export function JournalPanel({ date, state }: DayPanelProps) {
   const { token } = useAuth();
   setNoteToken(token);
@@ -111,7 +133,7 @@ export function JournalPanel({ date, state }: DayPanelProps) {
 
   if (!loaded) {
     return (
-      <Panel title="Note">
+      <Panel title="Note" icon={<PencilIcon />}>
         <PanelStatus
           status={tab.state === 'error' ? 'error' : tab.state === 'loading' ? 'loading' : 'idle'}
           what="your journal"
@@ -128,6 +150,7 @@ export function JournalPanel({ date, state }: DayPanelProps) {
   return (
     <Panel
       title="Note"
+      icon={<PencilIcon />}
       sub={sub}
       action={
         showRetry ? (
@@ -147,7 +170,7 @@ export function JournalPanel({ date, state }: DayPanelProps) {
         id={textId}
         ref={ref}
         class="form-textarea note-box"
-        rows={4}
+        rows={2}
         maxLength={NOTE_MAX_LENGTH}
         autocapitalize="sentences"
         placeholder={NOTE_PLACEHOLDER[state]}

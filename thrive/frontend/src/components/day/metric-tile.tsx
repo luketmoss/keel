@@ -212,14 +212,14 @@ export function MetricTile({ tile }: { tile: TileView }) {
   );
 }
 
-/** The `vitals` slot: the tiles, two to a row, or one "Health" card in their place. */
+/** The `vitals` slot: the tiles, two to a row (in the Day screen's `.vitals` grid), or one "Health" card in their place. */
 export function VitalsTiles({ date, state }: DayPanelProps) {
   const { token } = useAuth();
   const ref = useRef<HTMLDivElement>(null);
   const tab = dailyHealth.value;
   if (tab.state !== 'loaded') {
     return (
-      <div class="vitals vitals-one" ref={ref}>
+      <div class="vitals-one" ref={ref}>
         <Panel title="Health">
           <PanelStatus
             status={tab.state}
@@ -237,18 +237,20 @@ export function VitalsTiles({ date, state }: DayPanelProps) {
   const view = vitalsView(tab.rows, date, state === 'today');
   if (view.kind === 'note') {
     return (
-      <div class="vitals vitals-one" ref={ref}>
+      <div class="vitals-one" ref={ref}>
         <Panel title="Health" sub={view.sub}>
           <PanelNote>{view.note}</PanelNote>
         </Panel>
       </div>
     );
   }
+  // The tiles are grid items of the `.vitals` grid the Day screen wraps this slot
+  // and `body` in (#492), so Body sits beside stress as the fourth.
   return (
-    <div class="vitals" ref={ref}>
+    <>
       {view.tiles.map((t) => (
         <MetricTile key={t.key} tile={t} />
       ))}
-    </div>
+    </>
   );
 }

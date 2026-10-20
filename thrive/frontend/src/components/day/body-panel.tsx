@@ -1,7 +1,9 @@
-// #239 AC4 — the Day screen's Body panel: the day's first weigh-in and its
+// #239 AC4 — the Day screen's Body tile: the day's first weigh-in and its
 // mean blood pressure, in lb and mmHg. Reads the `bodyMeasurements` signal;
 // the day's readings are reduced by `bodyDayOf`, DailySummary U:Y's rules.
 // Nothing here is compared or coloured: values are shown as measured.
+// #492 draws it as the fourth metric tile (weight at --figure-lg, a hairline,
+// then blood pressure); `bodyView` is unchanged.
 
 import { bodyMeasurements } from '../../state/store';
 import { loadHealth } from '../../state/actions';
@@ -10,7 +12,8 @@ import { selectBodyMeasurementRange, type BodyMeasurementRow } from '../../api/h
 import { bodyDayOf } from '../../api/body-day';
 import { formatWeight } from '../../api/units';
 import { clock12 } from '../../day/format';
-import { Panel, PanelNote, PanelStatus, type DayPanelProps } from './panel';
+import type { ComponentChildren } from 'preact';
+import { Panel, PanelStatus, type DayPanelProps } from './panel';
 
 export interface BodyRowView {
   key: 'weight' | 'fat' | 'bp';
@@ -24,6 +27,11 @@ export interface BodyRowView {
 
 export type BodyView = { kind: 'note'; note: string } | { kind: 'rows'; rows: BodyRowView[] };
 
+/** What a missing weight or blood pressure says (#239). */
+export function noReadingWords(isToday: boolean): string {
+  return isToday ? 'None yet today.' : 'No reading this day.';
+}
+
 /** The Body panel for one day's readings (any order). Pure. */
 export function bodyView(readings: readonly BodyMeasurementRow[], isToday: boolean): BodyView {
   const day = bodyDayOf(readings);
@@ -36,7 +44,7 @@ export function bodyView(readings: readonly BodyMeasurementRow[], isToday: boole
         : 'No weigh-in or blood pressure this day.',
     };
   }
-  const none = isToday ? 'None yet today.' : 'No reading this day.';
+  const none = noReadingWords(isToday);
   const rows: BodyRowView[] = [];
 
   if (day.weighIn) {
@@ -74,24 +82,83 @@ export function bodyView(readings: readonly BodyMeasurementRow[], isToday: boole
   return { kind: 'rows', rows };
 }
 
-function BodyRow({ row }: { row: BodyRowView }) {
+// Drawn in the house style (#405) and kept here, as the shared icon set is counted by its tests.
+function ScaleIcon() {
   return (
-    <div class="health-row" data-metric={row.key}>
-      <dt class="health-label">{row.label}</dt>
-      <dd class="health-data">
-        {!row.value && <span class="health-value health-value-blank">—</span>}
-        {row.value && row.spoken && (
+    <svg
+      viewBox="0 0 24 24"
+      width="24"
+      height="24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <rect x="4" y="4" width="16" height="16" rx="4" />
+      <path d="M8.5 9.5a5 5 0 0 1 7 0" />
+      <path d="M12 12l1.5-1.5" />
+    </svg>
+  );
+}
+
+/** "179.5 lb" into its figure and unit, so the unit can sit small beside it. */
+function splitUnit(value: string): [string, string] {
+  const at = value.lastIndexOf(' ');
+  return at < 0 ? [value, ''] : [value.slice(0, at), value.slice(at + 1)];
+}
+
+function Figure({ value, className }: { value: string; className: string }) {
+  if (!value) return <p class={`${className} tile-value-blank`}>—</p>;
+  const [figure, unit] = splitUnit(value);
+  return (
+    <p class={className}>
+      {figure}
+      {unit && <span class="tile-unit">{` ${unit}`}</span>}
+    </p>
+  );
+}
+
+function BodyTile({ children }: { children: ComponentChildren }) {
+  return (
+    <div class="metric-tile metric-tile-body" data-metric="body">
+      <Panel title="Body" icon={<ScaleIcon />}>
+        {children}
+      </Panel>
+    </div>
+  );
+}
+
+function BodyReadings({ rows, none }: { rows: BodyRowView[]; none: string }) {
+  const by = (k: BodyRowView['key']) => rows.find((r) => r.key === k)!;
+  const weight = by('weight');
+  const fat = by('fat');
+  const bp = by('bp');
+  const weighIn = weight.value
+    ? [fat.value ? `fat ${fat.value}` : 'Fat not measured', weight.caption].join(' · ')
+    : none;
+  return (
+    <>
+      <div class="body-weight" data-metric="weight">
+        <Figure value={weight.value} className="tile-value" />
+        <p class="tile-caption">{weighIn}</p>
+      </div>
+      <div class="body-bp" data-metric="bp">
+        {bp.value && bp.spoken ? (
           <>
-            <span class="sr-only">{row.spoken}</span>
-            <span class="health-value" aria-hidden="true">
-              {row.value}
+            <span class="sr-only">{bp.spoken}</span>
+            <span aria-hidden="true">
+              <Figure value={bp.value} className="body-bp-value" />
             </span>
           </>
+        ) : (
+          <Figure value="" className="body-bp-value" />
         )}
-        {row.value && !row.spoken && <span class="health-value">{row.value}</span>}
-        {row.caption && <span class="health-caption">{row.caption}</span>}
-      </dd>
-    </div>
+        <p class="tile-caption">{bp.caption}</p>
+      </div>
+    </>
   );
 }
 
@@ -100,7 +167,7 @@ export function BodyPanel({ date, state }: DayPanelProps) {
   const tab = bodyMeasurements.value;
   if (tab.state !== 'loaded') {
     return (
-      <Panel title="Body">
+      <BodyTile>
         <PanelStatus
           status={tab.state}
           what="your body measurements"
@@ -108,21 +175,24 @@ export function BodyPanel({ date, state }: DayPanelProps) {
             if (token) void loadHealth(token);
           }}
         />
-      </Panel>
+      </BodyTile>
     );
   }
-  const view = bodyView(selectBodyMeasurementRange(tab.rows, date, date), state === 'today');
+  const isToday = state === 'today';
+  const view = bodyView(selectBodyMeasurementRange(tab.rows, date, date), isToday);
+  const none = noReadingWords(isToday);
+  // No reading at all: the same two figures, blank, each with the same words.
+  const rows: BodyRowView[] =
+    view.kind === 'rows'
+      ? view.rows
+      : [
+          { key: 'weight', label: 'Weight', value: '', caption: none },
+          { key: 'fat', label: 'Body fat', value: '', caption: none },
+          { key: 'bp', label: 'Blood pressure', value: '', caption: none },
+        ];
   return (
-    <Panel title="Body">
-      {view.kind === 'note' ? (
-        <PanelNote>{view.note}</PanelNote>
-      ) : (
-        <dl class="health-list">
-          {view.rows.map((r) => (
-            <BodyRow key={r.key} row={r} />
-          ))}
-        </dl>
-      )}
-    </Panel>
+    <BodyTile>
+      <BodyReadings rows={rows} none={none} />
+    </BodyTile>
   );
 }

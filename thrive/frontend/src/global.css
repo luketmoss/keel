@@ -3960,20 +3960,14 @@ a.training-card {
    draws none of its own, and it grows with its text rather than scrolling. */
 .note-box {
   display: block;
-  min-height: 96px;
-  padding: var(--space-xs) 0;
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
+  min-height: 0;
+  padding: var(--space-sm) calc(var(--space-md) - var(--space-xs));
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: calc(var(--radius-md) + var(--space-xs));
   resize: none;
   overflow: hidden;
   line-height: 1.5;
-}
-
-.note-box:focus {
-  border: 0;
-  box-shadow: none;
 }
 
 /* The only cue to the box's purpose on an empty day: --color-text-secondary
@@ -5047,7 +5041,8 @@ a.training-card {
 }
 
 .vitals-one {
-  display: block;
+  grid-column: 1 / -1;
+  min-width: 0;
 }
 
 .metric-tile {
@@ -5195,6 +5190,46 @@ a.training-card {
 .tile-attention {
   font-weight: 700;
   color: var(--color-warning);
+}
+
+/* ===== Day Body tile (#492) =====
+   The fourth tile, beside stress: weight at --figure-lg, a hairline, then blood
+   pressure at --text-xl. Reuses .tile-value, .tile-unit and .tile-caption. The
+   icon is drawn in --color-primary by stroke (the contrast test forbids it as
+   a text colour). The Note icon is quieter: --color-text-secondary. */
+.metric-tile-body .day-panel-icon svg {
+  stroke: var(--color-primary);
+}
+
+.vitals-one ~ .metric-tile-body {
+  grid-column: 1 / -1;
+}
+
+.body-weight {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.body-bp {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--color-border-light);
+}
+
+.body-bp-value {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.body-bp-value.tile-value-blank {
+  color: var(--color-text-muted);
 }
 
 /* ===== Library keyboard access (#301) =====

@@ -11,7 +11,8 @@ import { TrendPlot } from './trend-chart';
 import { AuthContext } from '../../auth/auth-context';
 import { dailyHealth, bodyMeasurements, dailySummary } from '../../state/store';
 import { addDays } from '../../day/dates';
-import { metricSeries, rangeBounds } from './series';
+import { metricSeries, rangeBounds, type RangeKey, type AverageKey, type ViewKey } from './series';
+import { pickRange, pickAverage, pickView } from './toolbar-test-utils';
 import { todayInDenver } from '../../day/dates';
 import { readoutDate } from './readout';
 import type { TrendMetric } from './metrics';
@@ -179,12 +180,14 @@ describe('AC1: marks across the group', () => {
   it('draws the marks last, above the dots and the line', () => {
     const { container } = renderScreen();
     fireEvent.focus(wrapper(container));
-    expect(container.querySelector('svg')!.lastElementChild!.classList.contains('trend-selection')).toBe(true);
+    expect(container.querySelector('svg[role="img"]')!.lastElementChild!.classList.contains('trend-selection')).toBe(
+      true,
+    );
   });
 
   it('selects by pointer without announcing, and a mouse leaving the wrapper clears it', () => {
     const { container } = renderScreen();
-    const svg = container.querySelector('svg')!;
+    const svg = container.querySelector('svg[role="img"]')!;
     fireEvent.pointerMove(svg, { clientX: 9999, pointerType: 'mouse' });
     expect(selectedDay.value).toBe(TODAY);
     fireEvent.pointerMove(svg, { clientX: 0, pointerType: 'mouse' });
@@ -196,7 +199,7 @@ describe('AC1: marks across the group', () => {
 
   it('keeps a touch selection after the finger lifts', () => {
     const { container } = renderScreen();
-    const svg = container.querySelector('svg')!;
+    const svg = container.querySelector('svg[role="img"]')!;
     fireEvent.pointerDown(svg, { clientX: 9999, pointerType: 'touch' });
     fireEvent.pointerUp(svg, { pointerType: 'touch' });
     fireEvent.pointerLeave(wrapper(container), { pointerType: 'touch' });
@@ -263,9 +266,9 @@ describe('AC4: the status region', () => {
 
 describe('AC5: lifetime of a selection', () => {
   const press = (c: Element, group: string, name: string) => {
-    const label = [...c.querySelectorAll('.trends-control-label')].find((l) => l.textContent === group)!;
-    const g = c.querySelector(`[role="group"][aria-labelledby="${label.id}"]`)!;
-    fireEvent.click([...g.querySelectorAll('button')].find((b) => b.textContent === name)!);
+    if (group === 'View') pickView(c, name as ViewKey);
+    else if (group === 'Range') pickRange(c, name as RangeKey);
+    else pickAverage(c, name as AverageKey);
   };
 
   it.each([

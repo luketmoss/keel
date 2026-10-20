@@ -161,3 +161,42 @@ export function CalendarPlusIcon() {
     </Icon>
   );
 }
+
+/** Trends range: a calendar page with two binding rings and a header rule. */
+export function CalendarIcon() {
+  return (
+    <Icon>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+    </Icon>
+  );
+}
+
+/** Trends average: one smooth wave, a line that rises and falls. */
+export function WaveIcon() {
+  return (
+    <Icon>
+      <path d="M2 12c2.5-6 4.5-6 7 0s4.5 6 7 0 3.5-4 6-2" />
+    </Icon>
+  );
+}
+
+/** Trends chart view: a rising and falling line over an L-shaped axis. */
+export function ChartLineIcon() {
+  return (
+    <Icon>
+      <path d="M3 3v18h18" />
+      <path d="M7 15l4-5 3 3 5-6" />
+    </Icon>
+  );
+}
+
+/** Trends table view: a ruled grid, a header row over two columns. */
+export function TableIcon() {
+  return (
+    <Icon>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M3 10h18M3 15h18M10 10v10" />
+    </Icon>
+  );
+}

@@ -29,6 +29,9 @@ const SELECTORS = [
   '.sub-type-btn.active',
   '.calendar-shade-toggle .sub-type-btn.active',
   '.trends-group-btn.active',
+  '.trends-view-btn.active',
+  '.trends-chip.open',
+  '.trends-menu-item.current',
   // AC2
   '.filter-chip.active',
   '.tag-badge.active',

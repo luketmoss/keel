@@ -1,5 +1,5 @@
-// The Trends screen (#242): range, average and view controls, remembered on
-// this device, over one group of metric cards or their table.
+// The Trends screen (#242): range, average and view controls (a toolbar beside
+// the heading, #503), remembered on this device, over one group of metric cards or their table.
 //
 // Loads the health tabs once on entry if nothing has loaded them; every
 // control then redraws from the rows already in memory, with no sheet read.
@@ -12,9 +12,6 @@ import { loadHealth } from '../../state/actions';
 import { dailyHealth, bodyMeasurements, dailySummary } from '../../state/store';
 import { TREND_GROUPS, CUSTOM_GROUP_ID, customGroup, type TrendGroup, type TrendMetric } from './metrics';
 import {
-  RANGES,
-  AVERAGES,
-  VIEWS,
   type RangeKey,
   type AverageKey,
   type ViewKey,
@@ -39,46 +36,13 @@ import {
 } from './prefs';
 import { CustomMetricsPicker } from './custom-metrics-picker';
 import { GroupSwitcher } from './group-switcher';
+import { TrendsToolbar } from './trends-toolbar';
 import { TrendCharts } from './trend-chart';
 import { TrendTable } from './trend-table';
 import { openDay } from './open-day';
 import { isRestoringFocus, ROUTE_FOCUS_ATTR } from '../../router/route-focus';
 import { useFocusHandoff } from '../focus-handoff';
 import { today as todaySignal, watchToday } from '../../day/today';
-
-interface SegmentedProps<T extends string> {
-  label: string;
-  id: string;
-  options: readonly T[];
-  value: T;
-  onChange: (v: T) => void;
-  tight?: boolean;
-}
-
-/** A labelled `.sub-type-toggle` group (#129): exactly one button pressed. */
-function Segmented<T extends string>({ label, id, options, value, onChange, tight }: SegmentedProps<T>) {
-  const labelId = `trends-${id}-label`;
-  return (
-    <div class="trends-control">
-      <span class="trends-control-label" id={labelId}>
-        {label}
-      </span>
-      <div class={`sub-type-toggle${tight ? ' trends-toggle-tight' : ''}`} role="group" aria-labelledby={labelId}>
-        {options.map((o) => (
-          <button
-            key={o}
-            type="button"
-            class={`sub-type-btn${o === value ? ' active' : ''}`}
-            aria-pressed={o === value ? 'true' : 'false'}
-            onClick={() => onChange(o)}
-          >
-            {o}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 /**
  * The day the charts have selected (#247), or null. Module-level, owned by this
@@ -383,16 +347,19 @@ export function TrendsScreen() {
 
   return (
     <div class="screen trends-screen">
-      <header class="screen-header">
+      <header class="screen-header trends-header">
         <h1 tabIndex={-1}>Trends</h1>
+        <TrendsToolbar
+          range={range}
+          average={average}
+          view={view}
+          onRange={clearing(setRange)}
+          onAverage={setAverage}
+          onView={clearing(setView)}
+        />
       </header>
       <div class="screen-body">
         <GroupSwitcher groups={TREND_GROUPS} value={group.id} onChange={clearing(setGroupId)} />
-        <div class="trends-controls">
-          <Segmented label="Range" id="range" options={RANGES} value={range} onChange={clearing(setRange)} tight />
-          <Segmented label="Average" id="average" options={AVERAGES} value={average} onChange={setAverage} />
-          <Segmented label="View" id="view" options={VIEWS} value={view} onChange={clearing(setView)} />
-        </div>
         {isCustom && (
           <div class="trends-custom-head">
             <button type="button" class="btn btn-secondary trends-custom-edit" onClick={() => setPicking(true)}>

@@ -22,7 +22,6 @@ import { WeekStrip } from './week-strip';
 import { SLOTS, slotsFor } from './slots';
 import { useSwipe } from './use-swipe';
 import { useSyncNow } from '../settings/sync-now';
-import { DaySyncLine } from './day-sync-line';
 
 /** True when a key press belongs to a text field, not the screen. */
 function inTextEntry(target: EventTarget | null): boolean {
@@ -131,7 +130,7 @@ export function DayScreen() {
   }, []);
 
   const swipe = useSwipe({
-    ignore: '.week-strip, .day-sync',
+    ignore: '.week-strip, .day-sync-status, .day-sync-btn',
     onSwipe: (dir) => moveTo(addDays(date, dir === 'left' ? 1 : -1)),
   });
 
@@ -145,9 +144,8 @@ export function DayScreen() {
         onToday={() => moveTo(today)}
         headingRef={headingRef}
         todayButtonRef={todayButtonRef}
-      >
-        <DaySyncLine sync={sync} />
-      </DayHeader>
+        sync={sync}
+      />
       <WeekStrip date={date} today={today} workouts={workouts.value} onSelect={moveTo} />
       <div class="day-panels">
         {slotsFor(state).map((name) => {

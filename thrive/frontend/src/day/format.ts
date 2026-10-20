@@ -39,6 +39,11 @@ export function shortDate(date: string): string {
   return `${fmt(date, { weekday: 'short' })} ${dayOfMonth(date)} ${fmt(date, { month: 'short' })} ${date.slice(0, 4)}`;
 }
 
+/** "Mon, Oct 19" (#486: the Day header's meta line) */
+export function metaDate(date: string): string {
+  return fmt(date, { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
 /** "Saturday, September 12, 2026" */
 export function weekdayFullDate(date: string): string {
   return `${weekdayName(date)}, ${fullDate(date)}`;

@@ -76,13 +76,21 @@ describe('Day screen CSS (#237)', () => {
     expect(css).not.toMatch(/(?:^|[\s,])\.day-panel\s*,/);
   });
 
-  it('uses the pill pairs, and nowrap sun items', () => {
-    expect(rule('.day-pill')).toMatch(/background:\s*var\(--color-border-light\)/);
-    expect(rule('.day-pill-today')).toMatch(/color:\s*var\(--color-primary-on-light\)/);
+  it('#486: the title is --figure-lg bold, and the meta line is secondary text with nowrap items', () => {
     expect(rule('.day-today-btn')).toMatch(/min-height:\s*44px/);
     expect(rule('.day-arrow')).toMatch(/width:\s*44px/);
-    expect(rule('.day-sun > span')).toMatch(/white-space:\s*nowrap/);
-    expect(rule('.day-title')).toMatch(/font-size:\s*var\(--text-2xl\)/);
+    const title = rule('.day-title');
+    expect(title).toMatch(/font-size:\s*var\(--figure-lg\)/);
+    expect(title).toMatch(/font-weight:\s*700/);
+    expect(title).toMatch(/letter-spacing:\s*-0\.01em/);
+    expect(title).toMatch(/color:\s*var\(--color-text\)/);
+    expect(rule('.day-meta')).toMatch(/color:\s*var\(--color-text-secondary\)/);
+    expect(rule('.day-meta')).toMatch(/font-size:\s*var\(--text-sm\)/);
+    expect(rule('.day-meta > span,\n.day-meta-sun')).toMatch(/white-space:\s*nowrap/);
+    expect(rule('.day-meta-dot')).toMatch(/width:\s*3px/);
+    expect(rule('.day-meta-dot')).toMatch(/var\(--color-text-muted\)/);
+    expect(rule('.day-meta-sun-icon')).toMatch(/color:\s*var\(--metric-calories\)/);
+    expect(css).not.toMatch(/\.day-pill|\.day-sun\b/);
   });
 });
 

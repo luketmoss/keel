@@ -19,7 +19,7 @@ vi.mock('../../api/demo-data', async () => {
   return { ...actual, isDemo: () => demo };
 });
 
-import { DaySyncLine, dayRequestEntries, DAY_FINAL_FOR_MS } from './day-sync-line';
+import { DaySyncButton, DaySyncLines, useDaySync, dayRequestEntries, DAY_FINAL_FOR_MS } from './day-sync-line';
 import { useSyncNow, POLL_MS } from '../settings/sync-now';
 import { syncRequests, syncAsk, demoSyncPressedAt, syncLog, withingsSyncLog } from '../../state/store';
 import { rowToSyncRequest } from '../../api/sync-requests-api';
@@ -29,14 +29,25 @@ import { readGlobalCss } from '../../test-css';
 const NOW = new Date('2026-10-02T13:12:00.000Z');
 const HOUR = 3_600_000;
 
+// The header puts the button in its title row and the lines under it; the test host does the same.
+function Host({ token, email }: { token: string | null; email: string }) {
+  const view = useDaySync(useSyncNow(token, email));
+  return (
+    <header>
+      <div class="day-nav">
+        <DaySyncButton view={view} />
+      </div>
+      <DaySyncLines view={view} />
+    </header>
+  );
+}
+
 function Line() {
-  const sync = useSyncNow('tok', 'me@example.com');
-  return <DaySyncLine sync={sync} />;
+  return <Host token="tok" email="me@example.com" />;
 }
 
 function DemoLine() {
-  const sync = useSyncNow(null, '');
-  return <DaySyncLine sync={sync} />;
+  return <Host token={null} email="" />;
 }
 
 function req(vendor: string, status: string, extra: Partial<Record<string, string>> = {}, at = NOW) {
@@ -47,6 +58,7 @@ function logRow(hoursAgo: number, status = 'ok') {
   return rowToSyncLog(['r' + hoursAgo, t, t, '', '', 0, 0, 0, 0, 0, 0, status, '', ''], 2);
 }
 const btn = () => screen.getByRole('button', { name: /Sync now|Syncing…/ });
+const dotOf = (c: Element) => c.querySelector('.day-sync-dot');
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -65,31 +77,74 @@ afterEach(() => {
 });
 
 describe('Day sync line: the age (AC1)', () => {
-  it('reads the older vendor and ticks once a minute', async () => {
+  it('puts the older vendor age in the button name and title, and ticks once a minute', async () => {
     const { container } = render(<Line />);
-    expect(container.querySelector('.day-sync-age')!.textContent).toBe('Synced 5 h ago');
+    expect(btn().getAttribute('aria-label')).toBe('Sync now, Synced 5 h ago');
+    expect(btn().getAttribute('title')).toBe('Sync now, Synced 5 h ago');
     await act(() => {
       vi.advanceTimersByTime(60_000 * 61);
     });
-    expect(container.querySelector('.day-sync-age')!.textContent).toBe('Synced 6 h ago');
+    expect(btn().getAttribute('aria-label')).toBe('Sync now, Synced 6 h ago');
+    expect(container.querySelector('.day-sync-age')).toBeNull();
   });
 
-  it('names a failed vendor in words, and shows Checking and the unreadable state', () => {
+  it('prints nothing about the age when all is well', () => {
+    const { container } = render(<Line />);
+    expect(container.querySelector('.day-sync-text')).toBeNull();
+    expect(container.querySelector('.day-sync')!.textContent).toBe('');
+  });
+
+  it('prints a failed vendor in words, with the tone class, and the name carries the status', () => {
     syncLog.value = { state: 'loaded', entries: [logRow(1, 'failed')] };
     const { container } = render(<Line />);
     const note = container.querySelector('.day-sync-note')!;
     expect(note.textContent).toBe('COROS last run failed');
     expect(note.className).toContain('sync-tone-danger');
+    expect(btn().getAttribute('aria-label')).toMatch(/^Sync now, Synced /);
+  });
 
-    act(() => {
-      syncLog.value = { state: 'loading' };
-    });
-    expect(container.querySelector('.day-sync-age')!.textContent).toBe('Checking…');
-    act(() => {
-      syncLog.value = { state: 'error' };
-    });
+  it('prints the status text when stale, and the unreadable state, in a tone class', () => {
+    syncLog.value = { state: 'error' };
+    const { container } = render(<Line />);
     expect(container.querySelector('.day-sync-age')!.textContent).toBe("Couldn't read sync status");
     expect(container.querySelector('.day-sync-age')!.className).toContain('sync-tone-warning');
+    expect(btn().getAttribute('aria-label')).toBe("Sync now, Couldn't read sync status");
+  });
+
+  it('says Checking… and No sync recorded yet only in the name', () => {
+    syncLog.value = { state: 'loading' };
+    const { container } = render(<Line />);
+    expect(btn().getAttribute('aria-label')).toBe('Sync now, Checking…');
+    expect(container.querySelector('.day-sync-age')).toBeNull();
+    act(() => {
+      syncLog.value = { state: 'loaded', entries: [] };
+      withingsSyncLog.value = { state: 'loaded', entries: [] };
+    });
+    expect(btn().getAttribute('aria-label')).toBe('Sync now, No sync recorded yet');
+    expect(dotOf(container)).toBeNull();
+  });
+});
+
+describe('Day sync line: the status dot (#486)', () => {
+  it('is success when well, the status tone when not, and absent while a request is open', () => {
+    const { container } = render(<Line />);
+    expect(dotOf(container)!.className).toContain('day-sync-dot-success');
+    expect(dotOf(container)!.getAttribute('aria-hidden')).toBe('true');
+    cleanup();
+
+    syncLog.value = { state: 'error' };
+    const warn = render(<Line />);
+    expect(dotOf(warn.container)!.className).toContain('day-sync-dot-warning');
+    cleanup();
+
+    syncLog.value = { state: 'loaded', entries: [logRow(30)] };
+    const stale = render(<Line />);
+    expect(dotOf(stale.container)!.className).toContain('day-sync-dot-danger');
+    cleanup();
+
+    syncRequests.value = [req('coros', 'requested'), req('withings', 'requested')];
+    const busy = render(<Line />);
+    expect(dotOf(busy.container)).toBeNull();
   });
 });
 
@@ -104,7 +159,7 @@ describe('Day sync line: Sync now (AC2)', () => {
     syncRequests.value = [req('coros', 'requested'), req('withings', 'requested')];
     render(<Line />);
     expect(btn().getAttribute('aria-disabled')).toBe('true');
-    expect(btn().textContent).toBe('Syncing…');
+    expect(btn().getAttribute('aria-label')).toBe('Syncing…');
     fireEvent.click(btn());
     expect(requestSyncNow).not.toHaveBeenCalled();
 
@@ -142,7 +197,7 @@ describe('Day sync line: Sync now (AC2)', () => {
       vi.advanceTimersByTime(2 * 60_000);
     });
     expect(container.querySelectorAll('.day-sync-request')).toHaveLength(0);
-    expect(container.querySelector('.day-sync-age')!.textContent).toMatch(/^Synced /);
+    expect(btn().getAttribute('aria-label')).toMatch(/^Sync now, Synced /);
   });
 
   it('shows a failed ask in the line in words, never as a toast', () => {
@@ -209,21 +264,26 @@ describe('Day sync line: one shared state, one poller (AC4)', () => {
 });
 
 describe('Day sync line: layout and accessibility (AC5)', () => {
-  it('keeps the age out of the live region and the control in row 1, before the request rows', () => {
+  it('keeps the button out of the live region, which holds only the request rows', () => {
     syncRequests.value = [req('coros', 'requested'), req('withings', 'requested')];
+    syncLog.value = { state: 'error' };
     const { container } = render(<Line />);
     const region = container.querySelector('[role="status"]')!;
     expect(region.getAttribute('aria-live')).toBe('polite');
     expect(region.querySelector('.day-sync-age')).toBeNull();
     expect(region.contains(btn())).toBe(false);
-    const row = container.querySelector('.day-sync-row')!;
-    expect(row.contains(btn())).toBe(true);
-    expect(row.contains(container.querySelector('.day-sync-age'))).toBe(true);
-    expect(row.nextElementSibling).toBe(region);
+    expect(container.querySelector('.day-nav')!.contains(btn())).toBe(true);
+    expect(region.previousElementSibling).toBe(container.querySelector('.day-sync-text'));
   });
 
-  it('has a text label beside an aria-hidden icon, and keeps focus when it becomes disabled', () => {
+  it('keeps the live region mounted with no messages, so the first one is announced', () => {
     const { container } = render(<Line />);
+    expect(container.querySelector('[role="status"]')!.children).toHaveLength(0);
+  });
+
+  it('is an icon button with an aria-hidden icon, and keeps focus when it becomes disabled', () => {
+    const { container } = render(<Line />);
+    expect(btn().textContent).toBe('');
     expect(container.querySelector('.day-sync-btn svg')!.getAttribute('aria-hidden')).toBe('true');
     btn().focus();
     expect(document.activeElement).toBe(btn());
@@ -245,11 +305,20 @@ describe('Day sync line CSS (AC5)', () => {
     return m[1];
   };
 
-  it('is 44 px, a fixed minimum width so idle and busy match, and uses tokens only', () => {
-    expect(rule('.day-sync-btn')).toMatch(/min-height:\s*44px/);
-    expect(rule('.day-sync-btn')).toMatch(/min-width:\s*\d+px/);
-    expect(rule('.day-sync-row')).toMatch(/min-height:\s*44px/);
+  it('is a 44 px round icon button, and uses tokens only', () => {
+    expect(rule('.day-sync-btn')).toMatch(/(?:^|[\s;])width:\s*44px/);
+    expect(rule('.day-sync-btn')).toMatch(/(?:^|[\s;])height:\s*44px/);
+    expect(rule('.day-sync-btn')).toMatch(/border-radius:\s*var\(--radius-full\)/);
+    expect(rule('.day-sync-btn')).toMatch(/color:\s*var\(--color-text-secondary\)/);
     expect(css).not.toMatch(/#[0-9a-f]{3,6}\b/i);
+  });
+
+  it('draws the dot 8 px with a 2 px page ring, in the success, warning and danger tokens', () => {
+    expect(rule('.day-sync-dot')).toMatch(/width:\s*8px/);
+    expect(rule('.day-sync-dot')).toMatch(/0 0 0 2px var\(--color-bg\)/);
+    expect(rule('.day-sync-dot-success')).toMatch(/var\(--color-success\)/);
+    expect(rule('.day-sync-dot-warning')).toMatch(/var\(--color-warning\)/);
+    expect(rule('.day-sync-dot-danger')).toMatch(/var\(--color-danger\)/);
   });
 
   it('stops the spinner under prefers-reduced-motion', () => {

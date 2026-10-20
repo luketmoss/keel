@@ -1,63 +1,84 @@
 import type { WorkoutWithRow, SetWithRow, ExerciseWithRow, Effort, WorkoutType } from '../../api/types';
-import { metersToMiles } from '../../api/units';
-import { formatDuration } from '../../api/duration';
+import { metersToMiles, metersToFeet, parse } from '../../api/units';
+import { secondsToMinutes } from '../../api/duration';
 import { provenanceSpeech } from '../../api/provenance';
 
 // ── Equipment / non-muscle tags to exclude from card pills ───────────
 export const EQUIPMENT_TAGS = new Set(['BB', 'DB', 'FT', 'Warmup']);
 
-// ── Date grouping (week-based) ───────────────────────────────────────
+// ── Week grouping (#528) ─────────────────────────────────────────────
 
 export interface WorkoutGroup {
+  /** The Monday that starts the week, 'YYYY-MM-DD'. */
+  monday: string;
+  /** "This week", "Last week" or the date range. */
   label: string;
   workouts: WorkoutWithRow[];
 }
 
-/**
- * Groups workouts into weekly sections: "This Week" (current Mon–Sun),
- * "Last Week" (previous Mon–Sun), and "Earlier" (everything before last week).
- * Each workout appears in exactly one section. Empty sections are omitted.
- * Preserves the order of workouts within each section.
- */
-export function groupWorkoutsByDate(workouts: WorkoutWithRow[], todayStr: string): WorkoutGroup[] {
-  if (workouts.length === 0) return [];
+/** A 'YYYY-MM-DD' date moved by whole calendar days. */
+function addDays(dateStr: string, days: number): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  return toLocalDateStr(d);
+}
 
-  const today = new Date(todayStr + 'T00:00:00');
-  const day = today.getDay(); // 0=Sun…6=Sat
-  const diffToMonday = day === 0 ? 6 : day - 1;
+/** The Monday on or before a 'YYYY-MM-DD' date, as 'YYYY-MM-DD'. */
+export function mondayOf(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return toLocalDateStr(d);
+}
 
-  const thisMonday = new Date(today);
-  thisMonday.setDate(today.getDate() - diffToMonday);
+const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-  const lastMonday = new Date(thisMonday);
-  lastMonday.setDate(thisMonday.getDate() - 7);
-
-  const thisMondayStr = toLocalDateStr(thisMonday);
-  const lastMondayStr = toLocalDateStr(lastMonday);
-
-  const groups = new Map<string, WorkoutWithRow[]>();
-
-  for (const w of workouts) {
-    let label: string;
-    if (w.date >= thisMondayStr) {
-      label = 'This Week';
-    } else if (w.date >= lastMondayStr) {
-      label = 'Last Week';
-    } else {
-      label = 'Earlier';
-    }
-
-    let arr = groups.get(label);
-    if (!arr) {
-      arr = [];
-      groups.set(label, arr);
-    }
-    arr.push(w);
+/** "Oct 5 – 11", "Sep 29 – Oct 5", or "Dec 29, 2025 – Jan 4" for the week starting `monday`. */
+export function weekRange(monday: string): string {
+  const start = new Date(monday + 'T00:00:00');
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  const startText = `${SHORT_MONTHS[start.getMonth()]} ${start.getDate()}`;
+  if (start.getFullYear() !== end.getFullYear()) {
+    return `${startText}, ${start.getFullYear()} – ${SHORT_MONTHS[end.getMonth()]} ${end.getDate()}`;
   }
+  if (start.getMonth() !== end.getMonth()) return `${startText} – ${SHORT_MONTHS[end.getMonth()]} ${end.getDate()}`;
+  return `${startText} – ${end.getDate()}`;
+}
 
-  // Enforce canonical order regardless of insertion order
-  const ORDER = ['This Week', 'Last Week', 'Earlier'];
-  return ORDER.filter((label) => groups.has(label)).map((label) => ({ label, workouts: groups.get(label)! }));
+/**
+ * Groups workouts into Monday-to-Sunday weeks, newest week first. A week's
+ * heading is "This week", "Last week" or its date range. Each workout is in
+ * exactly one group; the order of workouts within a group is preserved.
+ */
+export function groupWorkoutsByWeek(workouts: WorkoutWithRow[], todayStr: string): WorkoutGroup[] {
+  const thisMonday = mondayOf(todayStr);
+  const lastMonday = addDays(thisMonday, -7);
+  const groups = new Map<string, WorkoutWithRow[]>();
+  for (const w of workouts) {
+    const monday = mondayOf(w.date);
+    const arr = groups.get(monday);
+    if (arr) arr.push(w);
+    else groups.set(monday, [w]);
+  }
+  return [...groups.keys()]
+    .sort((a, b) => b.localeCompare(a))
+    .map((monday) => ({
+      monday,
+      label: monday === thisMonday ? 'This week' : monday === lastMonday ? 'Last week' : weekRange(monday),
+      workouts: groups.get(monday)!,
+    }));
+}
+
+/** A week heading's totals: "7 · 6 h 40 · 23.2 mi". Parts with nothing to sum are left out. */
+export function weekTotals(ws: WorkoutWithRow[]): string {
+  const sum = summarizeMonth(ws);
+  return [
+    String(sum.count),
+    sum.timed > 0 ? formatMonthTime(sum.seconds) : '',
+    sum.miles !== null && sum.miles > 0 ? `${sum.miles} mi` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 /** Format a Date as 'YYYY-MM-DD' in local time (avoids UTC shift from toISOString). */
@@ -318,29 +339,181 @@ export function effortForSpeech(effort: Effort | ''): string {
   return effort ? `${effort.toLowerCase()} effort` : '';
 }
 
+// ── Activity card (#528) ─────────────────────────────────────────────
+
+const METERS_PER_MILE = 1609.344;
+const DISTANCE_TYPES: readonly WorkoutType[] = ['bike', 'hike', 'run', 'walk'];
+
+const WEEKDAYS_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const WEEKDAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** One piece of a card's stats line: what is drawn, and what is spoken. */
+export interface StatPart {
+  text: string;
+  spoken: string;
+  /** Drawn in the effort's colour. */
+  effort?: Effort;
+}
+
+export interface CardFigure {
+  value: string;
+  unit: string;
+  spoken: string;
+}
+
+function plural(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? '' : 's'}`;
+}
+
+/** The distance in metres when it is a real, positive measurement; blank and 0 are neither. */
+function distanceMeters(w: WorkoutWithRow): number | null {
+  const m = parse(w.distance_m);
+  return m !== null && m > 0 ? m : null;
+}
+
+/** Whether the big figure is a distance: a bike, hike, run or walk that has one. */
+export function hasDistanceFigure(w: WorkoutWithRow): boolean {
+  return DISTANCE_TYPES.includes(w.type) && distanceMeters(w) !== null;
+}
+
+/** 6472 -> "1:47:52", 2873 -> "47:53". */
+export function formatClock(totalSeconds: number): string {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const ss = String(totalSeconds % 60).padStart(2, '0');
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+}
+
+/** 6472 -> "1 hour 47 minutes", 2873 -> "47 minutes", 40 -> "40 seconds". */
+function spokenElapsed(totalSeconds: number): string {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  if (h > 0) return m > 0 ? `${plural(h, 'hour')} ${plural(m, 'minute')}` : plural(h, 'hour');
+  if (m > 0) return plural(m, 'minute');
+  return plural(totalSeconds, 'second');
+}
+
+/** 760 -> "12 minutes 40 seconds", 480 -> "8 minutes": a pace keeps its seconds. */
+function spokenPace(totalSeconds: number): string {
+  const m = Math.floor(totalSeconds / 60);
+  const sec = totalSeconds % 60;
+  if (m === 0) return plural(sec, 'second');
+  return sec === 0 ? plural(m, 'minute') : `${plural(m, 'minute')} ${plural(sec, 'second')}`;
+}
+
+/** The card's one big figure, or null when there is neither a distance nor a duration. */
+export function cardFigure(w: WorkoutWithRow): CardFigure | null {
+  if (hasDistanceFigure(w)) {
+    const miles = metersToMiles(w.distance_m)!;
+    const value = miles.toFixed(1);
+    return { value, unit: 'mi', spoken: `${value} ${miles === 1 ? 'mile' : 'miles'}` };
+  }
+  const mins = secondsToMinutes(w.elapsed_seconds);
+  if (mins === null) return null;
+  if (mins < 60) return { value: String(mins), unit: 'min', spoken: plural(mins, 'minute') };
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return {
+    value: `${h}:${String(m).padStart(2, '0')}`,
+    unit: 'h',
+    spoken: m === 0 ? plural(h, 'hour') : `${plural(h, 'hour')} ${plural(m, 'minute')}`,
+  };
+}
+
+/** The first line of a note, trimmed; '' when there is none. */
+export function firstLine(note: string): string {
+  return note.split(/\r?\n/)[0].trim();
+}
+
+function effortPart(effort: Effort): StatPart {
+  return { text: effort.toLowerCase(), spoken: effort.toLowerCase(), effort };
+}
+
 /**
- * The full `aria-label` for a completed workout card.
- *
- * Lives here, and is the single source for the label, because the visible card
- * and its label are assembled from the same parts. When they were two separate
- * expressions in the screen, adding one optional part meant getting the
- * separator right twice.
- *
- * Effort is appended last so the opening of the label stays stable — screen
- * reader users scan these by their first words, and an unrated card's label is
- * unchanged from what it has always been. Provenance (#157) goes after it for
- * the same reason: a manual card, most of them, keeps exactly its old label.
+ * A card's stats line, one part per piece of data that exists. A blank source
+ * leaves its part out; nothing is ever drawn as 0 or a dash (#101).
  */
-export function workoutCardAriaLabel(w: WorkoutWithRow, exerciseCount: number): string {
+export function cardStats(w: WorkoutWithRow): StatPart[] {
+  const parts: StatPart[] = [];
+  if (DISTANCE_TYPES.includes(w.type)) {
+    const meters = distanceMeters(w);
+    const secs = parse(w.elapsed_seconds);
+    // Elapsed time is a stat only when the figure is the distance; speed and pace need both values.
+    if (meters !== null && secs !== null && secs > 0) {
+      const total = Math.round(secs);
+      parts.push({ text: formatClock(total), spoken: spokenElapsed(total) });
+      const miles = meters / METERS_PER_MILE;
+      if (w.type === 'bike') {
+        const mph = (miles / (secs / 3600)).toFixed(1);
+        parts.push({ text: `${mph} mph`, spoken: `${mph} miles per hour` });
+      } else {
+        const perMile = Math.round(secs / miles);
+        const pace = `${Math.floor(perMile / 60)}:${String(perMile % 60).padStart(2, '0')}`;
+        parts.push({ text: `${pace} /mi`, spoken: `${spokenPace(perMile)} per mile` });
+      }
+    }
+    const feet = metersToFeet(w.ascent_m);
+    if (feet !== null && feet > 0) {
+      const f = feet.toLocaleString('en-US');
+      parts.push({ text: `↑${f} ft`, spoken: `${f} feet climbed` });
+    }
+  } else if (w.type === 'weight') {
+    const hr = parse(w.avg_hr);
+    if (hr !== null && hr > 0) {
+      parts.push({ text: `${Math.round(hr)} bpm`, spoken: `average ${Math.round(hr)} beats per minute` });
+    }
+    if (w.effort) parts.push(effortPart(w.effort));
+  } else if (w.type === 'stretch') {
+    if (w.effort) parts.push(effortPart(w.effort));
+    const line = firstLine(w.notes);
+    if (line) parts.push({ text: line, spoken: line });
+  }
+  return parts;
+}
+
+/** The card's day: "Today", "Yesterday", otherwise the three-letter weekday. */
+export function cardDay(dateStr: string, todayStr: string): string {
+  const diff = dayDiff(todayStr, dateStr);
+  if (diff === 0) return 'Today';
+  if (diff === -1) return 'Yesterday';
+  return WEEKDAYS_SHORT[new Date(dateStr + 'T00:00:00').getDay()];
+}
+
+/** "Sunday October 18", for the accessible name. */
+export function spokenDay(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  return `${WEEKDAYS_LONG[d.getDay()]} ${monthName(monthOf(dateStr))} ${d.getDate()}`;
+}
+
+/**
+ * The card's accessible name (#528): name, type, day, the figure, each stats
+ * part, then provenance (#157). Parts with no value are left out. The visible
+ * text and this label come from the same functions, so they cannot drift.
+ */
+export function activityCardAriaLabel(w: WorkoutWithRow): string {
   return [
     w.name || w.type,
     w.type,
-    w.date,
-    formatDuration(w.elapsed_seconds),
-    exerciseCount > 0 ? pluralExercise(exerciseCount) : '',
-    effortForSpeech(w.effort),
+    spokenDay(w.date),
+    cardFigure(w)?.spoken ?? '',
+    ...cardStats(w).map((p) => p.spoken),
     provenanceSpeech(w),
   ]
     .filter(Boolean)
     .join(', ');
+}
+
+// ── Up next (#528) ───────────────────────────────────────────────────
+
+/** Planned workouts for the Up next row: overdue first (oldest first), then by date, then sheet order. */
+export function upNextOrder(planned: WorkoutWithRow[]): WorkoutWithRow[] {
+  return [...planned].sort((a, b) => a.date.localeCompare(b.date) || a.sheetRow - b.sheetRow);
+}
+
+/** The Up next card's date line: "TODAY", "TUE 21", or for an overdue plan "OCT 18". */
+export function upNextDate(dateStr: string, todayStr: string): string {
+  if (dateStr === todayStr) return 'TODAY';
+  const d = new Date(dateStr + 'T00:00:00');
+  if (dateStr < todayStr) return `${SHORT_MONTHS[d.getMonth()].toUpperCase()} ${d.getDate()}`;
+  return `${WEEKDAYS_SHORT[d.getDay()].toUpperCase()} ${d.getDate()}`;
 }

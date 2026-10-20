@@ -10,41 +10,29 @@ import {
   filterTags,
   loading,
   sets,
-  exercises,
 } from '../../state/store';
 import { ActivitiesFilters, TypeChips } from './activities-filters';
 import { MonthPicker } from './month-picker';
 import { MonthSummary } from './month-summary';
+import { ActivityCard, UpNextCard } from './activity-card';
 import {
-  groupWorkoutsByDate,
-  getWorkoutTags,
+  TYPE_WORDS,
+  groupWorkoutsByWeek,
+  monthName,
   monthOf,
   monthOptions,
   toLocalDateStr,
-  formatPlannedDate,
-  isOverdue,
-  pluralExercise,
-  workoutCardAriaLabel,
+  upNextOrder,
+  weekTotals,
 } from './activities-helpers';
-import { LabelBadge } from '../shared/label-badge';
-import { ProvenanceMark } from '../shared/provenance-mark';
-import { provenanceMark } from '../../api/provenance';
-import { formatDuration, formatEstimate } from '../../api/duration';
 
-/** Type-color map for inset box-shadow accent (light theme). */
-const TYPE_COLORS: Record<string, { light: string; dark: string }> = {
-  weight: { light: '#c53030', dark: '#fca5a5' },
-  stretch: { light: '#2e7d32', dark: '#86efac' },
-  bike: { light: '#1565c0', dark: '#93c5fd' },
-  hike: { light: '#5d4037', dark: '#d7ccc8' },
-};
-
-/**
- * Spoken form of a scheduled-date label. Relative words read naturally in
- * lower case mid-sentence; absolute dates keep their capitalisation.
- */
-function spokenDate(label: string): string {
-  return ['Today', 'Tomorrow', 'Yesterday'].includes(label) ? label.toLowerCase() : label;
+/** The list's empty line, by what is limiting it. */
+function emptyLine(month: string, currentMonth: string): string {
+  if (filterType.value) return `No ${TYPE_WORDS[filterType.value].toLowerCase()} activities in ${monthName(month)}.`;
+  if (filterTags.value.length > 0) return `No activities with these tags in ${monthName(month)}.`;
+  return month === currentMonth
+    ? 'Nothing logged yet. Tap + to start a workout.'
+    : `Nothing logged in ${monthName(month)}.`;
 }
 
 export function ActivitiesScreen() {
@@ -57,8 +45,9 @@ export function ActivitiesScreen() {
   const options = monthOptions(completed, currentMonth);
   // #527: one month at a time. The type and tag filters apply inside it, and the summary card reads the same rows.
   const monthWorkouts = filteredWorkouts.value.filter((w) => monthOf(w.date) === month);
-  const groups = groupWorkoutsByDate(monthWorkouts, todayStr);
-  const planned = plannedWorkouts.value;
+  const groups = groupWorkoutsByWeek(monthWorkouts, todayStr);
+  const isCurrent = month === currentMonth;
+  const upNext = upNextOrder(plannedWorkouts.value);
 
   return (
     <div class="screen activities-screen">
@@ -85,8 +74,8 @@ export function ActivitiesScreen() {
         loading={loading.value}
       />
 
-      {/* In Progress section — tap to resume active workout */}
-      {activeWorkouts.value.length > 0 && (
+      {/* In Progress — tap to resume the active workout. Current month only (#528). */}
+      {isCurrent && activeWorkouts.value.length > 0 && (
         <div class="planned-section">
           <div class="date-group-header first">In Progress</div>
           {activeWorkouts.value.map((w) => (
@@ -108,141 +97,46 @@ export function ActivitiesScreen() {
         </div>
       )}
 
-      {/* Planned workouts section — between the summary and history */}
-      {planned.length > 0 && (
-        <div class="planned-section">
-          <div class="date-group-header first">Planned</div>
-          {planned.map((w) => {
-            const workoutSets = sets.value.filter((s) => s.workout_id === w.id);
-            const exerciseCount = new Set(workoutSets.map((s) => `${s.exercise_id}__${s.exercise_order}`)).size;
-            const tags = getWorkoutTags(workoutSets, exercises.value);
-            const dateLabel = formatPlannedDate(w.date, todayStr);
-            const overdue = isOverdue(w.date, todayStr);
-            const countLabel = exerciseCount > 0 ? pluralExercise(exerciseCount) : 'No exercises yet';
-            // #145: omitted entirely when nobody estimated it.
-            const estimate = formatEstimate(w.estimated_seconds);
-            const ariaLabel = [
-              w.name || w.type,
-              overdue ? 'overdue' : 'planned',
-              `${overdue ? 'was scheduled for' : 'scheduled for'} ${spokenDate(dateLabel)}`,
-              countLabel,
-              formatEstimate(w.estimated_seconds, true),
-            ]
-              .filter(Boolean)
-              .join(', ');
-
-            return (
-              <button
-                type="button"
-                key={w.id}
-                data-focus-key={`workout:${w.id}`}
-                class="workout-card workout-card-planned"
-                onClick={() => navigate(`/history/${w.id}`)}
-                aria-label={ariaLabel}
-              >
-                <div class="workout-card-center">
-                  <span class="workout-name">{w.name || w.type}</span>
-                  <span class="workout-meta">
-                    {countLabel}
-                    {' · '}
-                    <span
-                      class={`planned-date${dateLabel === 'Today' || dateLabel === 'Tomorrow' ? ' planned-date-imminent' : ''}`}
-                    >
-                      {dateLabel}
-                    </span>
-                    {estimate && (
-                      <>
-                        {' · '}
-                        <span class="planned-estimate">{estimate}</span>
-                      </>
-                    )}
-                  </span>
-                  {tags.length > 0 && (
-                    <div class="workout-card-tags">
-                      {tags.map((tag) => (
-                        <LabelBadge key={tag} name={tag} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <span class={`type-badge ${overdue ? 'badge-overdue' : 'badge-planned'}`}>
-                  {overdue ? 'Overdue' : 'Planned'}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+      {/* Up next — plans for today or later, and overdue ones. Current month only. */}
+      {isCurrent && upNext.length > 0 && (
+        <section class="up-next" aria-labelledby="up-next-title">
+          <div class="week-heading">
+            <h2 id="up-next-title">Up next</h2>
+            <span class="week-totals">{upNext.length} planned</span>
+          </div>
+          <div class="up-next-row">
+            {upNext.map((w) => {
+              const workoutSets = sets.value.filter((s) => s.workout_id === w.id);
+              const exerciseCount = new Set(workoutSets.map((s) => `${s.exercise_id}__${s.exercise_order}`)).size;
+              return (
+                <UpNextCard
+                  key={w.id}
+                  workout={w}
+                  todayStr={todayStr}
+                  exerciseCount={exerciseCount}
+                  setCount={workoutSets.length}
+                />
+              );
+            })}
+          </div>
+        </section>
       )}
 
       <div class="screen-body">
-        {completed.length === 0 ? (
-          <div class="empty-state">
-            <p>No workouts yet</p>
-            <p>Tap + to start your first workout</p>
-          </div>
+        {!loading.value && monthWorkouts.length === 0 ? (
+          <p class="activities-empty">{emptyLine(month, currentMonth)}</p>
         ) : (
           <div class="workout-list">
-            {groups.map((group, groupIdx) => (
-              <div key={group.label}>
-                <div class={`date-group-header${groupIdx === 0 ? ' first' : ''}`}>{group.label}</div>
-                {group.workouts.map((w) => {
-                  const workoutSets = sets.value.filter((s) => s.workout_id === w.id);
-                  const exerciseCount = new Set(workoutSets.map((s) => `${s.exercise_id}__${s.exercise_order}`)).size;
-                  const typeColor = TYPE_COLORS[w.type];
-                  const tags = w.type === 'weight' ? getWorkoutTags(workoutSets, exercises.value) : [];
-
-                  return (
-                    <button
-                      type="button"
-                      key={w.id}
-                      data-focus-key={`workout:${w.id}`}
-                      class={`workout-card workout-card-${w.type}`}
-                      style={
-                        typeColor
-                          ? ({ '--type-accent': typeColor.light, '--type-accent-dark': typeColor.dark } as any)
-                          : undefined
-                      }
-                      onClick={() => navigate(`/history/${w.id}`)}
-                      aria-label={workoutCardAriaLabel(w, exerciseCount)}
-                    >
-                      <div class="workout-card-left">
-                        <span class="workout-date">{w.date}</span>
-                        {w.time && <span class="workout-time">{w.time}</span>}
-                      </div>
-                      <div class="workout-card-center">
-                        <span class="workout-name">{w.name || w.type}</span>
-                        <span class="workout-meta">
-                          {formatDuration(w.elapsed_seconds)}
-                          {w.elapsed_seconds && exerciseCount > 0 ? ' · ' : ''}
-                          {exerciseCount > 0 ? `${exerciseCount} exercise${exerciseCount !== 1 ? 's' : ''}` : ''}
-                          {/* #157: the separator sits outside the mark, so a
-                              375px wrap breaks before the glyph, never inside. */}
-                          {provenanceMark(w) && (w.elapsed_seconds || exerciseCount > 0) ? ' · ' : ''}
-                          <ProvenanceMark workout={w} />
-                        </span>
-                        {tags.length > 0 && (
-                          <div class="workout-card-tags">
-                            {tags.map((tag) => (
-                              <LabelBadge key={tag} name={tag} />
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      {/* #113: the pill stacks under the badge. aria-hidden
-                          because workoutCardAriaLabel already speaks the
-                          effort — the card is one button with one label. */}
-                      <span class="workout-card-badges">
-                        <span class={`type-badge badge-${w.type}`}>{w.type}</span>
-                        {w.effort && (
-                          <span class={`workout-effort workout-effort-${w.effort.toLowerCase()}`} aria-hidden="true">
-                            {w.effort}
-                          </span>
-                        )}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+            {groups.map((group) => (
+              <section key={group.monday} class="week-group" aria-labelledby={`week-${group.monday}`}>
+                <div class="week-heading">
+                  <h2 id={`week-${group.monday}`}>{group.label}</h2>
+                  <span class="week-totals">{weekTotals(group.workouts)}</span>
+                </div>
+                {group.workouts.map((w) => (
+                  <ActivityCard key={w.id} workout={w} todayStr={todayStr} />
+                ))}
+              </section>
             ))}
           </div>
         )}

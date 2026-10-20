@@ -1,6 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import {
-  groupWorkoutsByDate,
+  groupWorkoutsByWeek,
+  weekRange,
+  weekTotals,
+  cardFigure,
+  cardStats,
+  cardDay,
+  spokenDay,
+  activityCardAriaLabel,
+  upNextOrder,
+  upNextDate,
   getWorkoutTags,
   EQUIPMENT_TAGS,
   toLocalDateStr,
@@ -8,7 +17,6 @@ import {
   isOverdue,
   sortPlannedWorkouts,
   effortForSpeech,
-  workoutCardAriaLabel,
   pluralExercise,
   TYPE_ORDER,
   monthOf,
@@ -79,121 +87,241 @@ describe('toLocalDateStr', () => {
   });
 });
 
-// ── Weekly section grouping ──────────────────────────────────────────
+// ── Week grouping (#528) ─────────────────────────────────────────────
 // today = '2026-03-18' (Wednesday)
 // This week: 2026-03-16 (Mon) – 2026-03-22 (Sun)
 // Last week: 2026-03-09 (Mon) – 2026-03-15 (Sun)
-// Earlier:   anything before 2026-03-09
 
-describe('groupWorkoutsByDate', () => {
+describe('groupWorkoutsByWeek', () => {
   const today = '2026-03-18'; // Wednesday
 
   it('returns empty array for no workouts', () => {
-    expect(groupWorkoutsByDate([], today)).toEqual([]);
+    expect(groupWorkoutsByWeek([], today)).toEqual([]);
   });
 
-  it('groups workouts in the current Mon–Sun week into "This Week"', () => {
-    const workouts = [
-      makeWorkout({ id: 'w1', date: '2026-03-16' }), // Mon
-      makeWorkout({ id: 'w2', date: '2026-03-18' }), // Wed (today)
+  it('heads the current Mon–Sun week "This week" and the one before "Last week"', () => {
+    const groups = groupWorkoutsByWeek(
+      [
+        makeWorkout({ id: 'a', date: '2026-03-22' }), // Sun
+        makeWorkout({ id: 'b', date: '2026-03-16' }), // Mon
+        makeWorkout({ id: 'c', date: '2026-03-15' }), // Sun last week
+        makeWorkout({ id: 'd', date: '2026-03-09' }), // Mon last week
+      ],
+      today,
+    );
+    expect(groups.map((g) => [g.label, g.workouts.map((w) => w.id)])).toEqual([
+      ['This week', ['a', 'b']],
+      ['Last week', ['c', 'd']],
+    ]);
+  });
+
+  it('heads older weeks with their range, newest first', () => {
+    const groups = groupWorkoutsByWeek(
+      [makeWorkout({ id: 'a', date: '2026-03-04' }), makeWorkout({ id: 'b', date: '2026-02-27' })],
+      today,
+    );
+    expect(groups.map((g) => g.label)).toEqual(['Mar 2 – 8', 'Feb 23 – Mar 1']);
+  });
+
+  it('puts Sunday and the following Monday in different groups', () => {
+    const groups = groupWorkoutsByWeek(
+      [makeWorkout({ id: 'a', date: '2026-03-16' }), makeWorkout({ id: 'b', date: '2026-03-15' })],
+      today,
+    );
+    expect(groups.map((g) => g.workouts.map((w) => w.id))).toEqual([['a'], ['b']]);
+  });
+
+  it('works when today is Monday or Sunday', () => {
+    expect(groupWorkoutsByWeek([makeWorkout({ date: '2026-03-16' })], '2026-03-16')[0].label).toBe('This week');
+    expect(groupWorkoutsByWeek([makeWorkout({ date: '2026-03-16' })], '2026-03-22')[0].label).toBe('This week');
+    expect(groupWorkoutsByWeek([makeWorkout({ date: '2026-03-15' })], '2026-03-22')[0].label).toBe('Last week');
+  });
+
+  it('keeps the incoming order inside a group', () => {
+    const groups = groupWorkoutsByWeek(
+      [makeWorkout({ id: 'a', date: '2026-03-18' }), makeWorkout({ id: 'b', date: '2026-03-16' })],
+      today,
+    );
+    expect(groups[0].workouts.map((w) => w.id)).toEqual(['a', 'b']);
+  });
+});
+
+describe('weekRange', () => {
+  it('names one month once', () => {
+    expect(weekRange('2026-10-05')).toBe('Oct 5 – 11');
+  });
+
+  it('names both months across a month', () => {
+    expect(weekRange('2026-09-28')).toBe('Sep 28 – Oct 4');
+    expect(weekRange('2026-03-30')).toBe('Mar 30 – Apr 5');
+  });
+
+  it('adds the year across a year', () => {
+    expect(weekRange('2025-12-29')).toBe('Dec 29, 2025 – Jan 4');
+  });
+});
+
+describe('weekTotals', () => {
+  it('reads count, time and distance', () => {
+    const ws = [
+      makeWorkout({ elapsed_seconds: '3600', distance_m: '16093' }),
+      makeWorkout({ elapsed_seconds: '1500', distance_m: '' }),
     ];
-    const groups = groupWorkoutsByDate(workouts, today);
-    expect(groups).toHaveLength(1);
-    expect(groups[0].label).toBe('This Week');
-    expect(groups[0].workouts).toHaveLength(2);
+    expect(weekTotals(ws)).toBe('2 · 1 h 25 · 10 mi');
   });
 
-  it('groups workouts in the previous Mon–Sun week into "Last Week"', () => {
-    const workouts = [
-      makeWorkout({ id: 'w1', date: '2026-03-09' }), // Mon last week
-      makeWorkout({ id: 'w2', date: '2026-03-15' }), // Sun last week
+  it('says minutes under an hour', () => {
+    expect(weekTotals([makeWorkout({ elapsed_seconds: '2700', distance_m: '' })])).toBe('1 · 45 min');
+  });
+
+  it('leaves out time and distance when nothing has them', () => {
+    expect(weekTotals([makeWorkout({ elapsed_seconds: '', distance_m: '' })])).toBe('1');
+    expect(weekTotals([makeWorkout({ elapsed_seconds: '600', distance_m: '0' })])).toBe('1 · 10 min');
+  });
+});
+
+// ── Activity card (#528) ─────────────────────────────────────────────
+
+describe('cardFigure', () => {
+  it('is the distance in miles to one decimal for a bike, hike, run or walk with one', () => {
+    for (const type of ['bike', 'hike', 'run', 'walk'] as const) {
+      expect(cardFigure(makeWorkout({ type, distance_m: '24203', elapsed_seconds: '6000' }))).toEqual({
+        value: '15.0',
+        unit: 'mi',
+        spoken: '15.0 miles',
+      });
+    }
+  });
+
+  it('is the duration for everything else: minutes under an hour, h:mm from an hour', () => {
+    expect(cardFigure(makeWorkout({ type: 'weight', elapsed_seconds: '1980' }))).toEqual({
+      value: '33',
+      unit: 'min',
+      spoken: '33 minutes',
+    });
+    expect(cardFigure(makeWorkout({ type: 'bike', distance_m: '', elapsed_seconds: '6480' }))).toEqual({
+      value: '1:48',
+      unit: 'h',
+      spoken: '1 hour 48 minutes',
+    });
+    expect(cardFigure(makeWorkout({ type: 'weight', elapsed_seconds: '3600' }))).toMatchObject({ value: '1:00' });
+  });
+
+  it('is the duration when a cardio type has a blank or zero distance', () => {
+    expect(cardFigure(makeWorkout({ type: 'walk', distance_m: '', elapsed_seconds: '1200' }))?.unit).toBe('min');
+    expect(cardFigure(makeWorkout({ type: 'walk', distance_m: '0', elapsed_seconds: '1200' }))?.unit).toBe('min');
+  });
+
+  it('is null with neither a distance nor a duration', () => {
+    expect(cardFigure(makeWorkout({ type: 'weight', elapsed_seconds: '' }))).toBeNull();
+    expect(cardFigure(makeWorkout({ type: 'bike', distance_m: '', elapsed_seconds: '' }))).toBeNull();
+  });
+});
+
+describe('cardStats', () => {
+  const ride = makeWorkout({
+    type: 'bike',
+    distance_m: '24203', // 15.04 mi
+    elapsed_seconds: '6473', // 1:47:53
+    ascent_m: '494', // 1,620 ft
+  });
+
+  it('gives a bike its elapsed time, speed over elapsed time, and ascent', () => {
+    expect(cardStats(ride).map((p) => p.text)).toEqual(['1:47:53', '8.4 mph', '↑1,620 ft']);
+    expect(cardStats(ride).map((p) => p.spoken)).toEqual([
+      '1 hour 47 minutes',
+      '8.4 miles per hour',
+      '1,620 feet climbed',
+    ]);
+  });
+
+  it('gives a hike, run or walk its pace per mile in place of speed', () => {
+    const run = makeWorkout({ type: 'run', distance_m: '8047', elapsed_seconds: '2400', ascent_m: '' }); // 5 mi, 8:00
+    expect(cardStats(run).map((p) => p.text)).toEqual(['40:00', '8:00 /mi']);
+    expect(cardStats(run)[1].spoken).toBe('8 minutes per mile');
+  });
+
+  it('leaves out each part whose value is blank, and shows no zero', () => {
+    expect(cardStats({ ...ride, ascent_m: '' }).map((p) => p.text)).toEqual(['1:47:53', '8.4 mph']);
+    expect(cardStats({ ...ride, ascent_m: '0' }).map((p) => p.text)).toEqual(['1:47:53', '8.4 mph']);
+    expect(cardStats({ ...ride, elapsed_seconds: '' }).map((p) => p.text)).toEqual(['↑1,620 ft']);
+    expect(cardStats({ ...ride, elapsed_seconds: '0' }).map((p) => p.text)).toEqual(['↑1,620 ft']);
+  });
+
+  it('shows only ascent when the figure is the duration', () => {
+    const noDistance = { ...ride, distance_m: '' };
+    expect(cardStats(noDistance).map((p) => p.text)).toEqual(['↑1,620 ft']);
+  });
+
+  it('gives a weight card its average heart rate and effort word', () => {
+    const lift = makeWorkout({ type: 'weight', avg_hr: '89', effort: 'Hard' });
+    expect(cardStats(lift)).toEqual([
+      { text: '89 bpm', spoken: 'average 89 beats per minute' },
+      { text: 'hard', spoken: 'hard', effort: 'Hard' },
+    ]);
+    expect(cardStats(makeWorkout({ type: 'weight', avg_hr: '', effort: 'Easy' })).map((p) => p.text)).toEqual(['easy']);
+    expect(cardStats(makeWorkout({ type: 'weight', avg_hr: '0', effort: '' }))).toEqual([]);
+  });
+
+  it("gives a stretch card its effort word, then the note's first line", () => {
+    const s = makeWorkout({ type: 'stretch', effort: 'Easy', notes: 'Hips and hamstrings\nfelt tight' });
+    expect(cardStats(s).map((p) => p.text)).toEqual(['easy', 'Hips and hamstrings']);
+    expect(cardStats(makeWorkout({ type: 'stretch', effort: '', notes: '' }))).toEqual([]);
+    expect(cardStats(makeWorkout({ type: 'stretch', effort: '', notes: 'Just this' })).map((p) => p.text)).toEqual([
+      'Just this',
+    ]);
+  });
+});
+
+describe('cardDay and spokenDay', () => {
+  it('reads Today, Yesterday, else the short weekday', () => {
+    expect(cardDay('2026-10-20', '2026-10-20')).toBe('Today');
+    expect(cardDay('2026-10-19', '2026-10-20')).toBe('Yesterday');
+    expect(cardDay('2026-10-18', '2026-10-20')).toBe('Sun');
+  });
+
+  it('spells the day out', () => {
+    expect(spokenDay('2026-10-18')).toBe('Sunday October 18');
+  });
+});
+
+describe('activityCardAriaLabel (#528)', () => {
+  it('holds the name, type, day, figure, each stats part and provenance, in that order', () => {
+    const ride = makeWorkout({
+      name: 'Mountain Bike',
+      type: 'bike',
+      date: '2026-10-18',
+      distance_m: '24203',
+      elapsed_seconds: '6473',
+      ascent_m: '494',
+      source: 'coros',
+    });
+    expect(activityCardAriaLabel(ride)).toBe(
+      'Mountain Bike, bike, Sunday October 18, 15.0 miles, 1 hour 47 minutes, 8.4 miles per hour, 1,620 feet climbed, synced from COROS',
+    );
+  });
+
+  it('leaves out parts with no value and falls back to the type for a blank name', () => {
+    const bare = makeWorkout({ name: '', type: 'weight', date: '2026-10-18', elapsed_seconds: '', effort: '' });
+    expect(activityCardAriaLabel(bare)).toBe('weight, weight, Sunday October 18');
+  });
+});
+
+describe('Up next helpers', () => {
+  it('orders by date, then sheet order', () => {
+    const ws = [
+      makeWorkout({ id: 'c', date: '2026-10-22', sheetRow: 2 }),
+      makeWorkout({ id: 'b', date: '2026-10-20', sheetRow: 9 }),
+      makeWorkout({ id: 'a', date: '2026-10-18', sheetRow: 5 }),
+      makeWorkout({ id: 'd', date: '2026-10-20', sheetRow: 4 }),
     ];
-    const groups = groupWorkoutsByDate(workouts, today);
-    expect(groups).toHaveLength(1);
-    expect(groups[0].label).toBe('Last Week');
-    expect(groups[0].workouts).toHaveLength(2);
+    expect(upNextOrder(ws).map((w) => w.id)).toEqual(['a', 'd', 'b', 'c']);
   });
 
-  it('groups workouts before last week into "Earlier"', () => {
-    const workouts = [
-      makeWorkout({ id: 'w1', date: '2026-03-08' }), // day before last Mon
-      makeWorkout({ id: 'w2', date: '2025-12-01' }),
-    ];
-    const groups = groupWorkoutsByDate(workouts, today);
-    expect(groups).toHaveLength(1);
-    expect(groups[0].label).toBe('Earlier');
-    expect(groups[0].workouts).toHaveLength(2);
-  });
-
-  it('handles mixed groups in correct order: This Week → Last Week → Earlier', () => {
-    const workouts = [
-      makeWorkout({ id: 'w1', date: '2026-03-18' }), // This Week
-      makeWorkout({ id: 'w2', date: '2026-03-12' }), // Last Week
-      makeWorkout({ id: 'w3', date: '2026-03-01' }), // Earlier
-    ];
-    const groups = groupWorkoutsByDate(workouts, today);
-    expect(groups.map((g) => g.label)).toEqual(['This Week', 'Last Week', 'Earlier']);
-  });
-
-  it('omits empty sections', () => {
-    const workouts = [makeWorkout({ date: '2026-03-18' })];
-    const groups = groupWorkoutsByDate(workouts, today);
-    expect(groups).toHaveLength(1);
-    expect(groups[0].label).toBe('This Week');
-  });
-
-  it('no duplicates — week boundary workout falls into exactly one section', () => {
-    // Sunday of last week vs Monday of this week
-    const workouts = [
-      makeWorkout({ id: 'w1', date: '2026-03-16' }), // Mon this week
-      makeWorkout({ id: 'w2', date: '2026-03-15' }), // Sun last week
-    ];
-    const groups = groupWorkoutsByDate(workouts, today);
-    expect(groups).toHaveLength(2);
-    expect(groups[0].label).toBe('This Week');
-    expect(groups[0].workouts).toHaveLength(1);
-    expect(groups[0].workouts[0].date).toBe('2026-03-16');
-    expect(groups[1].label).toBe('Last Week');
-    expect(groups[1].workouts).toHaveLength(1);
-    expect(groups[1].workouts[0].date).toBe('2026-03-15');
-  });
-
-  it('works correctly when today is Monday', () => {
-    // today = 2026-03-16 (Monday)
-    // This week: Mar 16–22; Last week: Mar 9–15
-    const monday = '2026-03-16';
-    const workouts = [
-      makeWorkout({ id: 'w1', date: '2026-03-16' }), // This Week (today)
-      makeWorkout({ id: 'w2', date: '2026-03-15' }), // Last Week (Sun)
-      makeWorkout({ id: 'w3', date: '2026-03-09' }), // Last Week (Mon)
-      makeWorkout({ id: 'w4', date: '2026-03-08' }), // Earlier
-    ];
-    const groups = groupWorkoutsByDate(workouts, monday);
-    expect(groups.map((g) => g.label)).toEqual(['This Week', 'Last Week', 'Earlier']);
-    expect(groups[0].workouts).toHaveLength(1);
-    expect(groups[1].workouts).toHaveLength(2);
-    expect(groups[2].workouts).toHaveLength(1);
-  });
-
-  it('works correctly when today is Sunday', () => {
-    // today = 2026-03-22 (Sunday)
-    // This week: Mar 16–22; Last week: Mar 9–15
-    const sunday = '2026-03-22';
-    const workouts = [
-      makeWorkout({ id: 'w1', date: '2026-03-22' }), // This Week (today)
-      makeWorkout({ id: 'w2', date: '2026-03-16' }), // This Week (Mon)
-      makeWorkout({ id: 'w3', date: '2026-03-15' }), // Last Week (Sun)
-    ];
-    const groups = groupWorkoutsByDate(workouts, sunday);
-    expect(groups.map((g) => g.label)).toEqual(['This Week', 'Last Week']);
-    expect(groups[0].workouts).toHaveLength(2);
-  });
-
-  it('preserves reverse-chronological order within each section', () => {
-    const workouts = [makeWorkout({ id: 'w1', date: '2026-03-18' }), makeWorkout({ id: 'w2', date: '2026-03-16' })];
-    const groups = groupWorkoutsByDate(workouts, today);
-    expect(groups[0].workouts[0].date).toBe('2026-03-18');
-    expect(groups[0].workouts[1].date).toBe('2026-03-16');
+  it('writes TODAY, a weekday and day number, or the month and day of an overdue plan', () => {
+    expect(upNextDate('2026-10-20', '2026-10-20')).toBe('TODAY');
+    expect(upNextDate('2026-10-27', '2026-10-20')).toBe('TUE 27');
+    expect(upNextDate('2026-10-18', '2026-10-20')).toBe('OCT 18');
   });
 });
 
@@ -471,55 +599,6 @@ describe('effortForSpeech (#113 AC5)', () => {
   // the data does not make.
   it('says nothing at all when the workout is unrated', () => {
     expect(effortForSpeech('')).toBe('');
-  });
-});
-
-describe('workoutCardAriaLabel (#113 AC5)', () => {
-  const rated = makeWorkout({
-    name: 'Pull Day',
-    type: 'weight',
-    date: '2026-09-11',
-    elapsed_seconds: '2820',
-    effort: 'Hard',
-  });
-
-  // AC5: effort goes last, so the opening of the label is unchanged.
-  it('appends the effort after the existing parts', () => {
-    expect(workoutCardAriaLabel(rated, 5)).toBe('Pull Day, weight, 2026-09-11, 47 min, 5 exercises, hard effort');
-  });
-
-  // AC5: an unrated card's label is exactly what it has always been.
-  it('leaves an unrated workout label untouched', () => {
-    expect(workoutCardAriaLabel({ ...rated, effort: '' }, 5)).toBe('Pull Day, weight, 2026-09-11, 47 min, 5 exercises');
-  });
-
-  // AC1: effort is session-level for every type, not just weight training.
-  it('speaks effort on a cardio activity with no exercises', () => {
-    const ride = makeWorkout({
-      name: 'Evening Ride',
-      type: 'bike',
-      date: '2026-09-08',
-      elapsed_seconds: '4080',
-      effort: 'Medium',
-    });
-    expect(workoutCardAriaLabel(ride, 0)).toBe('Evening Ride, bike, 2026-09-08, 68 min, medium effort');
-  });
-
-  // AC3: no combination of absent parts may leave a stray separator.
-  it('joins cleanly when duration and exercises are both absent', () => {
-    const bare = makeWorkout({
-      name: '',
-      type: 'stretch',
-      date: '2026-09-09',
-      elapsed_seconds: '',
-      effort: 'Easy',
-    });
-    expect(workoutCardAriaLabel(bare, 0)).toBe('stretch, stretch, 2026-09-09, easy effort');
-  });
-
-  it('falls back to the type when the workout has no name', () => {
-    const unnamed = makeWorkout({ name: '', type: 'hike', date: '2026-09-05', elapsed_seconds: '', effort: '' });
-    expect(workoutCardAriaLabel(unnamed, 0)).toBe('hike, hike, 2026-09-05');
   });
 });
 

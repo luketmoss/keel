@@ -70,7 +70,7 @@ const enriched = makeWorkout({
 const manual = makeWorkout({ id: 'w_m', name: 'Manual Walk', type: 'walk', sheetRow: 4 });
 
 function card(name: string): HTMLElement {
-  return screen.getByText(name).closest('button') as HTMLElement;
+  return screen.getByText(new RegExp(`· ${name}$`)).closest('button') as HTMLElement;
 }
 
 afterEach(() => {
@@ -81,51 +81,30 @@ afterEach(() => {
   exercises.value = [];
 });
 
-describe('AC1: the card mark', () => {
+describe('AC1: provenance on the card (#528: spoken, not drawn)', () => {
   function renderList() {
     workouts.value = [synced, enriched, manual];
     activitiesMonth.value = '2026-09';
     render(h(ActivitiesScreen, {}));
   }
 
-  it('ends a synced card\'s meta line with "COROS"', () => {
+  it('draws no provenance mark and no chip on any card', () => {
     renderList();
-    const meta = card('Synced Hike').querySelector('.workout-meta')!;
-    expect(meta.textContent).toBe('86 min · COROS');
-    expect(meta.querySelector('.provenance-mark svg')).toBeTruthy();
+    expect(document.querySelector('.provenance-mark')).toBeNull();
+    expect(document.querySelectorAll('.workout-card .type-badge')).toHaveLength(0);
   });
 
-  it('reads "+ COROS" on an enriched card', () => {
-    renderList();
-    expect(card('Leg Day').querySelector('.workout-meta')!.textContent).toBe('66 min · + COROS');
-  });
-
-  it('leaves a manual card exactly as before', () => {
-    renderList();
-    const c = card('Manual Walk');
-    expect(c.querySelector('.provenance-mark')).toBeNull();
-    expect(c.querySelector('.workout-meta')!.textContent).toBe('86 min');
-  });
-
-  it('is a quiet mark, not a second chip, and hidden from the accessibility tree', () => {
-    renderList();
-    const c = card('Synced Hike');
-    const mark = c.querySelector('.provenance-mark')!;
-    expect(mark.closest('.workout-card-badges')).toBeNull();
-    expect(mark.classList.contains('type-badge')).toBe(false);
-    expect(mark.getAttribute('aria-hidden')).toBe('true');
-    expect(c.querySelectorAll('.type-badge')).toHaveLength(1);
-  });
-
-  it("speaks provenance in the card's single label", () => {
+  it("speaks provenance last in the card's single label", () => {
     renderList();
     expect(card('Synced Hike').getAttribute('aria-label')).toBe(
-      'Synced Hike, hike, 2026-09-20, 86 min, synced from COROS',
+      'Synced Hike, hike, Sunday September 20, 4.0 miles, 1 hour 25 minutes, 21 minutes 11 seconds per mile, synced from COROS',
     );
     expect(card('Leg Day').getAttribute('aria-label')).toBe(
-      'Leg Day, weight, 2026-09-20, 66 min, logged by hand, enriched from COROS',
+      'Leg Day, weight, Sunday September 20, 1 hour 6 minutes, logged by hand, enriched from COROS',
     );
-    expect(card('Manual Walk').getAttribute('aria-label')).toBe('Manual Walk, walk, 2026-09-20, 86 min');
+    expect(card('Manual Walk').getAttribute('aria-label')).toBe(
+      'Manual Walk, walk, Sunday September 20, 4.0 miles, 1 hour 25 minutes, 21 minutes 11 seconds per mile',
+    );
   });
 });
 

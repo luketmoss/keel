@@ -313,13 +313,13 @@ describe('AC2: a planned workout shows its estimate', () => {
     return screen.getByText(name).closest('button') as HTMLElement;
   }
 
-  it('ends the planned card meta with "about 47 min", after the date', () => {
+  it('ends the Up next card meta with "~47 min", after the exercises and sets', () => {
     workouts.value = [planned()];
     sets.value = PLAN_SETS;
     render(h(ActivitiesScreen, {}));
-    const meta = card('Upper Pull A').querySelector('.workout-meta')!;
-    expect(meta.textContent).toMatch(/^1 exercise · .+ · about 47 min$/);
-    expect(card('Upper Pull A').getAttribute('aria-label')).toMatch(/, 1 exercise, about 47 minutes$/);
+    const meta = card('Upper Pull A').querySelector('.up-next-meta')!;
+    expect(meta.textContent).toMatch(/^1 exercise · \d+ sets? · ~47 min$/);
+    expect(card('Upper Pull A').getAttribute('aria-label')).toMatch(/, 1 exercise, \d+ sets?, about 47 minutes$/);
   });
 
   it('shows nothing on a card with no estimate — no "0 min", no dash', () => {
@@ -327,7 +327,7 @@ describe('AC2: a planned workout shows its estimate', () => {
     sets.value = PLAN_SETS;
     render(h(ActivitiesScreen, {}));
     const c = card('Upper Pull A');
-    expect(c.querySelector('.workout-meta')!.textContent).not.toMatch(/min|—/);
+    expect(c.querySelector('.up-next-meta')!.textContent).not.toMatch(/min|—/);
     expect(c.getAttribute('aria-label')).not.toMatch(/minute/);
   });
 

@@ -135,3 +135,12 @@ export function finishUnsyncedCopy(unsynced: number): ConfirmCopy {
     danger: false,
   };
 }
+
+/** Delete one logged drink from the Day view's Water or Alcohol card (#520). `detail` is "3:42 PM · 4 oz of water". */
+export function deleteDrinkCopy(detail: string): ConfirmCopy {
+  return {
+    title: 'Delete this drink?',
+    message: `${detail}. ${CANT_UNDO}`,
+    confirmLabel: 'Delete',
+  };
+}

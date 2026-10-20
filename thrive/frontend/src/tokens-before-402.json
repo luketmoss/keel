@@ -43,6 +43,7 @@
     "--figure-lg": "2.25rem",
     "--figure-xl": "2.75rem",
     "--day-gap": "0.75rem",
+    "--drink-bar-height": "12px",
     "--range-track": "var(--color-border-light)",
     "--range-band": "var(--color-border)",
     "--range-marker": "var(--color-text)"
@@ -106,7 +107,9 @@
     "--metric-sleep-awake": "#8a6d00",
     "--metric-sleep": "var(--metric-sleep-rem)",
     "--metric-steps": "#3b7a2a",
-    "--metric-calories": "#b54708"
+    "--metric-calories": "#b54708",
+    "--metric-water": "#0b6fb8",
+    "--metric-alcohol": "#b45309"
   },
   "[data-theme=\"dark\"]": {
     "--color-bg": "#121212",
@@ -167,6 +170,8 @@
     "--metric-sleep-awake": "#f2c94c",
     "--metric-sleep": "var(--metric-sleep-rem)",
     "--metric-steps": "#8bd17c",
-    "--metric-calories": "#ff9a5c"
+    "--metric-calories": "#ff9a5c",
+    "--metric-water": "#5bb8f5",
+    "--metric-alcohol": "#f5a524"
   }
 }

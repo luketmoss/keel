@@ -67,6 +67,7 @@ The authoritative conventions for each component are in its stack skill:
 
 - `npm --prefix frontend run dev` — Vite dev server on port 5176, at
   `http://localhost:5176/`
+- `cd frontend && npm run format` before committing (Prettier: single quotes, semicolons; CI runs `format:check`)
 - `cd frontend && npm test` / `npm run typecheck` / `npm run build`
 - `cd apps-script && npm test` / `npm run typecheck` — sandboxed `node:vm`
 - The user's terminal is PowerShell 5.1 — no `&&`; use `;` or separate commands

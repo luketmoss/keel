@@ -93,6 +93,14 @@ local — swapping in Drive should touch that module and nothing else.
 
 Project option: `cairn`. Filter the board by it to see only this project's work.
 
+## Formatting
+
+Run `npm run format` before committing. It is Prettier, pinned, configured in `.prettierrc` to cairn's
+own style: single quotes, **no semicolons**, trailing commas, 110 columns. (Thrive's and Hive's frontends
+use semicolons and 120 columns; the web stack's scaffold ships that one.) CI runs `npm run format:check`
+and fails on an unformatted file, naming `npm run format`. `.prettierignore` leaves Markdown, `docs/`,
+`public/` and HTML alone.
+
 ## Testing
 
 Automated. `/test` runs the suite and verifies acceptance criteria against it,

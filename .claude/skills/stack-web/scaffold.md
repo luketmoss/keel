@@ -19,6 +19,8 @@ launch config. Everything not named in the Preact variant — `.env.example`,
 ├── vite.config.ts
 ├── index.html
 ├── .env.example
+├── .prettierrc
+├── .prettierignore
 ├── src/
 │   ├── main.tsx
 │   ├── App.tsx
@@ -30,9 +32,9 @@ launch config. Everything not named in the Preact variant — `.env.example`,
 
 Plus one appended entry in `.claude/launch.json` at the repository root.
 
-Transcribe the files below rather than inventing them. CI runs `typecheck`,
-`test` and `build` by name, so a project that names its scripts differently
-fails in a way that reads as a CI bug.
+Transcribe the files below rather than inventing them. CI runs `format:check`,
+`typecheck`, `test` and `build` by name, so a project that names its scripts
+differently fails in a way that reads as a CI bug.
 
 ### package.json
 
@@ -47,7 +49,9 @@ fails in a way that reads as a CI bug.
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "react": "^19.0.0",
@@ -59,6 +63,7 @@ fails in a way that reads as a CI bug.
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",
     "jsdom": "^25.0.0",
+    "prettier": "3.9.10",
     "typescript": "^5.7.0",
     "vite": "^6.0.0",
     "vitest": "^3.0.0"
@@ -76,6 +81,43 @@ because that is the truth about it. cairn shipped a visibly broken map through a
 green `typecheck`/`test`/`build`, and the flag is what made the middle one
 vacuous. The example test below is what keeps the step honest from the first
 commit.
+
+### Formatting
+
+Prettier, pinned to an exact version (a formatter's output changes between
+releases, and an unpinned one makes CI fail on code nobody touched).
+`.prettierrc` is the suite's house style, which is what Thrive and Hive use;
+change it to the project's own if the project already has code in another
+style, and say so in its `CLAUDE.md`. `endOfLine: "auto"` keeps each file's
+line endings, so a Windows checkout and CI both pass.
+
+```json
+{
+  "singleQuote": true,
+  "semi": true,
+  "trailingComma": "all",
+  "printWidth": 120,
+  "endOfLine": "auto"
+}
+```
+
+`.prettierignore` leaves out what is not source: dependencies, build output,
+the lockfile, prose and static pages.
+
+```
+node_modules
+dist
+package-lock.json
+*.md
+docs
+public
+*.html
+```
+
+Run `npm run format` once on the new project before the first commit, so
+`format:check` is green from the start. Configure from a trial run, not by
+assumption: run Prettier over existing code under candidate options and keep the
+set that changes the fewest lines.
 
 ### Test harness
 
@@ -184,7 +226,9 @@ inventing them.
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@preact/signals": "^2.0.0",
@@ -194,6 +238,7 @@ inventing them.
     "@preact/preset-vite": "^2.10.0",
     "@testing-library/preact": "^3.2.4",
     "jsdom": "^25.0.0",
+    "prettier": "3.9.10",
     "typescript": "^5.7.0",
     "vite": "^6.0.0",
     "vitest": "^3.0.0"
@@ -344,6 +389,7 @@ jobs:
           cache: npm
           cache-dependency-path: <slug>/package-lock.json
       - run: npm ci
+      - run: npm run format:check || { echo "::error::Unformatted files. Run 'npm run format' and commit the result."; exit 1; }
       - run: npm run typecheck
       - run: npm test
       - run: npm run build

@@ -1,0 +1,10 @@
+node_modules
+dist
+package-lock.json
+.claude
+# Markdown and docs are prose, not code: the formatter is for source.
+*.md
+docs
+# Built assets and static pages.
+public
+*.html

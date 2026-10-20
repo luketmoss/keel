@@ -12,6 +12,7 @@ an option to a single-select field - silently destroys data if done naively.
   board.py list --status <stage> [--project <slug>]
   board.py holds-branch [--project <slug>]
   board.py next --status <stage> [--project <slug>]
+  board.py group <epic> [--promote]
   board.py remove <issue> [--repo owner/name]
   board.py projects
   board.py add-project <slug>
@@ -20,6 +21,11 @@ Only issues in this repo are visible. An issue from another repo can land on the
 board (linking it as a sub-issue adds it), and its number would otherwise pass
 for a Keel issue's. `remove` is how one comes off; `--repo` names the repo of an
 item whose number collides with a Keel issue.
+
+`group` sorts an epic's sub-issues directly under it in the column they share, in
+sub-issue order. With `--promote` it first moves the epic from PM Refining to
+Refined when every open sub-issue is Refined or later. Positions only show in a
+column that is sorted manually; it warns when a view sorts by a field.
 
 `holds-branch` and `next` exit non-zero to mean "something holds a branch" and
 "nothing to pick" - they are read-only, and written to be called by a schedule
@@ -461,6 +467,159 @@ def cmd_next(args):
     print(json.dumps(without_id(min(rows, key=pick_order)), indent=2))
 
 
+# --- group ------------------------------------------------------------------
+
+STAGES = list(CFG["fields"]["status"]["options"])
+
+
+def stage_index(status):
+    """Position in the pipeline; an unset status sorts before every stage."""
+    return STAGES.index(status) if status in STAGES else -1
+
+
+def descendants(epic, children_of):
+    """Every sub-issue under `epic`, depth first, in sub-issue order.
+
+    `children_of(n)` returns the open sub-issues of n in order. A child that
+    has sub-issues is followed by them, so a grandchild sits under its own
+    parent. An issue reachable twice is listed once, at its first position.
+    """
+    found = []
+    seen = {epic}
+
+    def walk(number):
+        for child in children_of(number):
+            if child in seen:
+                continue
+            seen.add(child)
+            found.append(child)
+            walk(child)
+
+    walk(epic)
+    return found
+
+
+def promotion(epic_status, child_statuses):
+    """(promote, blockers): whether the epic moves from PM Refining to Refined.
+
+    Only PM Refining moves, never backwards and never out of another stage. The
+    blockers are the open children not yet Refined or later, in the order given.
+    """
+    refined = stage_index("Refined")
+    blockers = [n for n, status in child_statuses
+                if stage_index(status) < refined]
+    return epic_status == "PM Refining" and not blockers, blockers
+
+
+def group_moves(board_order, epic, children):
+    """[(number, after_number)] that put `children` under `epic`, in order.
+
+    `board_order` is [(number, status)] in board order. Only items sharing the
+    epic's status are placed; the epic stays where it is and each child goes
+    directly after the one before it. Already contiguous and in order is no
+    moves, so a second run changes nothing.
+    """
+    status = dict(board_order)[epic]
+    members = [epic] + [c for c in children if dict(board_order).get(c) == status]
+    column = [n for n, s in board_order if s == status]
+    at = [column.index(n) for n in members]
+    if at == list(range(at[0], at[0] + len(members))):
+        return []
+    return [(members[i], members[i - 1]) for i in range(1, len(members))]
+
+
+def sort_warnings(views):
+    """Lines warning about views that sort by a field, which hides positions."""
+    return ["View {!r} sorts by {}, so item positions will not show there. "
+            "Set its sort to manual.".format(v["name"], ", ".join(v["sort"]))
+            for v in views if v["sort"]]
+
+
+def sub_issues(number):
+    """Open sub-issues of `number` in this repo, in sub-issue order."""
+    out = gh(["api", "repos/{}/issues/{}/sub_issues?per_page=100".format(REPO, number)])
+    return [c["number"] for c in json.loads(out)
+            if c["state"] == "open"
+            and c["repository_url"].lower().endswith("/" + REPO.lower())]
+
+
+def project_views():
+    data = graphql(
+        """
+        query {
+          node(id: %s) {
+            ... on ProjectV2 {
+              views(first: 20) {
+                nodes {
+                  name
+                  sortByFields(first: 5) {
+                    nodes { field { ... on ProjectV2FieldCommon { name } } }
+                  }
+                }
+              }
+            }
+          }
+        }
+        """
+        % q(PROJECT_ID)
+    )
+    return [{"name": v["name"],
+             "sort": [n["field"]["name"] for n in v["sortByFields"]["nodes"]]}
+            for v in data["node"]["views"]["nodes"]]
+
+
+def cmd_group(args):
+    rows = board_rows()
+    item = {r["number"]: r["id"] for r in rows}
+    status = {r["number"]: r["status"] for r in rows}
+    if args.epic not in item:
+        sys.exit("Issue #{} is not on the board. Run: board.py sync {}".format(
+            args.epic, args.epic))
+    children = descendants(args.epic, sub_issues)
+    if not children:
+        sys.exit("#{} has no open sub-issues.".format(args.epic))
+    off_board = [c for c in children if c not in item]
+    children = [c for c in children if c in item]
+
+    if args.promote:
+        promote, blockers = promotion(
+            status[args.epic], [(c, status[c]) for c in children])
+        if promote:
+            set_field(item[args.epic], "Status", "Refined")
+            status[args.epic] = "Refined"
+            print("#{} Status -> Refined".format(args.epic))
+        elif status[args.epic] == "PM Refining":
+            print("#{} stays in PM Refining; not yet Refined: {}".format(
+                args.epic, ", ".join("#{}".format(n) for n in blockers)))
+
+    order = [(r["number"], status[r["number"]]) for r in rows]
+    moves = group_moves(order, args.epic, children)
+    for number, after in moves:
+        graphql(
+            """
+            mutation {
+              updateProjectV2ItemPosition(input: {
+                projectId: %s, itemId: %s, afterId: %s
+              }) { items(first: 1) { nodes { id } } }
+            }
+            """
+            % (q(PROJECT_ID), q(item[number]), q(item[after]))
+        )
+        print("#{} -> after #{}".format(number, after))
+    if not moves:
+        print("Nothing moved.")
+    elsewhere = [c for c in children if status[c] != status[args.epic]]
+    if elsewhere:
+        print("Left in place (not in {}): {}".format(
+            status[args.epic], ", ".join("#{}".format(c) for c in elsewhere)))
+    if off_board:
+        print("Not on the board: {}".format(
+            ", ".join("#{}".format(c) for c in off_board)))
+    for line in sort_warnings(project_views()):
+        print("Warning: " + line)
+
+
+
 def cmd_remove(args):
     """Take an issue's item off the board. The issue itself is untouched."""
     repo = args.repo or REPO
@@ -557,6 +716,11 @@ def main():
     p.add_argument("--status", required=True)
     p.add_argument("--project")
     p.set_defaults(func=cmd_next)
+
+    p = sub.add_parser("group", help="sort an epic's sub-issues under it; --promote moves it to Refined")
+    p.add_argument("epic", type=int)
+    p.add_argument("--promote", action="store_true")
+    p.set_defaults(func=cmd_group)
 
     p = sub.add_parser("remove", help="take an issue's item off the board")
     p.add_argument("issue", type=int)

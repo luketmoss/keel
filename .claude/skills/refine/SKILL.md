@@ -14,7 +14,9 @@ hands to the user at Gate 1.
    refined" starts here; "refine issue 42" does not.
 2. **`/pm`** — always.
 3. **`/ux`** — only if `/pm` routed the issue there. `/pm` owns that decision.
-4. Stop. The issue is in **Refined**.
+4. If the issue has a parent, `python .keel/board.py group <parent> --promote`
+   (`/pm` or `/ux` already ran it; this covers a run that reached Refined some
+   other way). Stop. The issue is in **Refined**.
 
 When a step is handed to a subagent or a new session, pick its model from
 [CONVENTIONS.md](../../../CONVENTIONS.md#models) and name the row in the report.
@@ -44,6 +46,8 @@ When the run completes, give the user what they need to work Gate 1:
 - the acceptance criteria, in full — this is what they're approving
 - size, and the design note path if `/ux` ran
 - anything you decided that could reasonably have gone the other way
+- when the issue has a parent: whether it was promoted to Refined, or which
+  children still hold it back
 
 That last point matters. The user is reviewing your judgment, not just your
 output, and decisions buried silently in a spec are the ones that produce the

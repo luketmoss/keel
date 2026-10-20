@@ -69,6 +69,7 @@ gh api -X POST repos/luketmoss/keel/issues/<parent>/sub_issues -F sub_issue_id=$
 ```
 
 Do this once per child. The parent stays in PM Refining as the tracking epic.
+Then `python .keel/board.py group <parent>` so the children sit under it.
 
 ## Stop rather than guess
 
@@ -95,3 +96,8 @@ sees, taps, or reads. Otherwise **Refined**: refactors, build tooling, firmware
 timing, internal APIs.
 
 Decide this yourself. Do not ask.
+
+When the issue went to **Refined** and has a parent, run
+`python .keel/board.py group <parent> --promote`. It moves the parent to
+Refined once every open sub-issue is, and sorts the children under it. An issue
+going to UX does not run it; `/ux` does at its own exit.

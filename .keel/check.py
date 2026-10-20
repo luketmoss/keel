@@ -12,6 +12,7 @@ by reading:
   - every relative link in a tracked .md file resolves
   - every design note cited by filename is committed
   - pr.py's path-filter matcher, report and Results editor behave on fixtures
+  - board.py's epic grouping and promotion decisions behave on fixtures
 
 Run it locally exactly as CI runs it:
 
@@ -470,8 +471,70 @@ def check_pr_script():
     return "pr.py", "{} cases".format(count[0]), problems
 
 
+def check_board_group():
+    """board.py's grouping order and promotion decision, without a network.
+
+    `group` is the only board command whose decisions are worth holding to
+    fixtures: which sub-issues sit under an epic and in what order, whether the
+    epic is promoted, and whether a second run moves anything.
+    """
+    sys.path.insert(0, os.path.join(ROOT, ".keel"))
+    try:
+        import board
+    finally:
+        sys.path.pop(0)
+
+    problems = []
+    count = [0]
+
+    def expect(label, got, want):
+        count[0] += 1
+        if got != want:
+            problems.append("{}: got {!r}, want {!r}".format(label, got, want))
+
+    tree = {1: [2, 3], 2: [4], 3: [2, 5]}
+    expect("depth first, once",
+           board.descendants(1, lambda n: tree.get(n, [])), [2, 4, 3, 5])
+    expect("no children", board.descendants(9, lambda n: []), [])
+
+    expect("all refined or later promotes",
+           board.promotion("PM Refining", [(2, "Refined"), (3, "Done")]),
+           (True, []))
+    expect("one in To Do blocks",
+           board.promotion("PM Refining", [(2, "Refined"), (3, "To Do")]),
+           (False, [3]))
+    expect("a child with no status blocks",
+           board.promotion("PM Refining", [(2, None)]), (False, [2]))
+    expect("only PM Refining moves",
+           board.promotion("UX", [(2, "Refined")]), (False, []))
+    expect("never out of Refined",
+           board.promotion("Refined", [(2, "Refined")]), (False, []))
+
+    ordered = [(1, "Refined"), (2, "Refined"), (3, "Refined")]
+    expect("contiguous and in order moves nothing",
+           board.group_moves(ordered, 1, [2, 3]), [])
+    expect("another stage between does not break it",
+           board.group_moves([(1, "Refined"), (8, "To Do"), (2, "Refined")],
+                             1, [2]), [])
+    scattered = [(2, "Refined"), (7, "Refined"), (1, "Refined"),
+                 (9, "Refined"), (3, "Refined")]
+    expect("scattered children go after the epic in order",
+           board.group_moves(scattered, 1, [2, 3]), [(2, 1), (3, 2)])
+    expect("wrong order is moved",
+           board.group_moves([(1, "Refined"), (3, "Refined"), (2, "Refined")],
+                             1, [2, 3]), [(2, 1), (3, 2)])
+    expect("a child in another stage is left alone",
+           board.group_moves([(1, "Refined"), (5, "To Do"), (2, "Refined")],
+                             1, [5, 2]), [])
+    expect("sort by field warns",
+           len(board.sort_warnings([{"name": "Board", "sort": ["Priority"]},
+                                    {"name": "Manual", "sort": []}])), 1)
+
+    return "board.py group", "{} cases".format(count[0]), problems
+
+
 CHECKS = [check_python, check_frontmatter, check_links, check_design_notes,
-          check_pr_script]
+          check_pr_script, check_board_group]
 
 
 def main():

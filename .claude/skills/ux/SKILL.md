@@ -122,4 +122,8 @@ Link the design note from the issue body under `## Design`, then:
 python .keel/board.py set <issue> --status "Refined"
 ```
 
+If the issue has a parent, then run
+`python .keel/board.py group <parent> --promote`: it moves the parent to
+Refined once every open sub-issue is, and sorts the children under it.
+
 The issue is now at Gate 1 and waits for the user.

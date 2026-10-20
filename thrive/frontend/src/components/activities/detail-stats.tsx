@@ -31,12 +31,12 @@ export interface DetailStatsData {
 }
 
 /** A positive count of seconds, or null for blank, 0 and non-numeric. */
-function positive(value: string): number | null {
+export function positive(value: string): number | null {
   const n = parse(value);
   return n !== null && n > 0 ? n : null;
 }
 
-const grouped = (n: number) => n.toLocaleString('en-US');
+export const grouped = (n: number) => n.toLocaleString('en-US');
 
 /** Whether this activity gets a stats card: completed, and not weight. */
 export function hasStatsCard(w: WorkoutWithRow): boolean {
@@ -99,6 +99,19 @@ export function detailStats(w: WorkoutWithRow): DetailStatsData {
   return { headline, cells };
 }
 
+/** One cell of a stats grid: the value with its unit, over its label. */
+export function StatCellView({ cell: c }: { cell: StatCell }) {
+  return (
+    <div class="detail-stat">
+      <span class="detail-stat-value" role="img" aria-label={c.spoken}>
+        {c.value}
+        {c.unit && <span class="detail-stat-unit">{c.unit === '/mi' ? c.unit : ` ${c.unit}`}</span>}
+      </span>
+      <span class="detail-stat-label">{c.label}</span>
+    </div>
+  );
+}
+
 /**
  * `hideEmpty`: the route is shown (#407), so an activity with nothing else to say
  * is not told "No details recorded" under its map.
@@ -120,13 +133,7 @@ export function DetailStats({ workout, hideEmpty = false }: { workout: WorkoutWi
       {cells.length > 0 && (
         <div class={`detail-stats-grid${headline ? ' with-rule' : ''}`}>
           {cells.map((c) => (
-            <div key={c.label} class="detail-stat">
-              <span class="detail-stat-value" role="img" aria-label={c.spoken}>
-                {c.value}
-                {c.unit && <span class="detail-stat-unit">{c.unit === '/mi' ? c.unit : ` ${c.unit}`}</span>}
-              </span>
-              <span class="detail-stat-label">{c.label}</span>
-            </div>
+            <StatCellView key={c.label} cell={c} />
           ))}
         </div>
       )}

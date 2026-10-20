@@ -44,6 +44,8 @@
   --figure-md: 1.75rem;
   --figure-lg: 2.25rem;
   --figure-xl: 2.75rem;
+  /* The effort word on a set tile (#533), upper case at 700: the one use below --text-xs. */
+  --text-2xs: 0.625rem;
   --day-gap: 0.75rem;
   --drink-bar-height: 12px;
   --range-track: var(--color-border-light);
@@ -2922,20 +2924,302 @@ input, select, textarea {
   margin: 0;
 }
 
-/* The wrapper's own spacing replaces each block's margin. */
-.workout-detail-screen .detail-exercises {
-  margin-bottom: 0;
-}
-
 .btn-sm {
   padding: 8px var(--space-md);
   font-size: var(--text-sm);
   min-height: 36px;
 }
 
-/* ===== Exercise Detail (Expandable) ===== */
-.detail-exercises {
-  margin-bottom: var(--space-lg);
+/* ----- Strength detail (#533) ----- */
+.strength-hero {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--space-md) + var(--space-xs));
+}
+
+.strength-ring {
+  position: relative;
+  flex: none;
+  width: 108px;
+  height: 108px;
+}
+
+.strength-ring svg {
+  position: absolute;
+  inset: 0;
+}
+
+.strength-ring-track {
+  stroke: var(--color-border-light);
+}
+
+.strength-ring-value {
+  stroke: var(--type-weight);
+}
+
+.strength-ring-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.strength-ring-count {
+  font-size: var(--figure-lg);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.strength-ring-of {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.strength-hero-grid {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-md) var(--space-sm);
+}
+
+.strength-effort-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+}
+
+.strength-effort-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.strength-effort-heading {
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.strength-effort-working {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.strength-effort-bar {
+  display: flex;
+  gap: 2px;
+  height: 12px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.strength-effort-segment {
+  flex-basis: 0;
+  min-width: 0;
+}
+
+.strength-effort-easy {
+  background: var(--effort-easy);
+}
+
+.strength-effort-medium {
+  background: var(--effort-medium);
+}
+
+.strength-effort-hard {
+  background: var(--effort-hard);
+}
+
+.strength-effort-legend {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+.strength-effort-legend-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.strength-effort-legend-word {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.strength-effort-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.strength-effort-legend-count {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.strength-effort-without {
+  margin: var(--space-sm) 0 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.strength-exercises-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-top: calc(var(--space-lg) - var(--space-sm) - var(--space-xs));
+}
+
+.strength-exercises-heading {
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.last-time-chip svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+/* Pressed: the tint and its text, not the filter chip's solid fill. The pressed state is also in aria-pressed. */
+.filter-chip.last-time-chip.active {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary-text);
+  color: var(--color-primary-text);
+}
+
+.strength-section-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: calc(var(--space-sm) + var(--space-xs)) var(--space-md);
+}
+
+.strength-section-heading {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.strength-exercise {
+  padding: calc(var(--space-sm) + var(--space-xs)) 0;
+}
+
+.strength-exercise + .strength-exercise {
+  border-top: 1px solid var(--color-border-light);
+}
+
+.strength-warmup-row,
+.strength-exercise-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.strength-warmup-row .strength-exercise-name {
+  font-size: var(--text-sm);
+}
+
+.strength-exercise-name {
+  min-width: 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.strength-warmup-row .strength-exercise-name {
+  font-weight: 400;
+}
+
+.strength-exercise-top {
+  flex: none;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.set-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--space-xs) + 2px);
+  margin-top: var(--space-sm);
+}
+
+.set-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 44px;
+  border-radius: calc(var(--radius-md) + 2px);
+  background: var(--color-surface-raised);
+  font-variant-numeric: tabular-nums;
+}
+
+.set-tile-value {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.set-tile-effort {
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.set-tile-effort-easy {
+  color: var(--effort-easy);
+}
+
+.set-tile-effort-medium {
+  color: var(--effort-medium);
+}
+
+.set-tile-effort-hard {
+  color: var(--effort-hard);
+}
+
+.set-tile-undone {
+  background: transparent;
+  border: 1px dashed var(--color-border);
+}
+
+.set-tile-undone .set-tile-value,
+.set-tile-note {
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+
+.set-tile-note {
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.last-time-line {
+  margin: var(--space-sm) 0 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
 }
 
 /* ----- Map hero and sheet (#532) ----- */
@@ -3075,76 +3359,6 @@ input, select, textarea {
   font-variant-numeric: tabular-nums;
 }
 
-.detail-section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-sm);
-}
-
-.detail-section-header h3 {
-  font-size: var(--text-lg);
-  font-weight: 600;
-}
-
-.btn-link {
-  font-size: var(--text-sm);
-  color: var(--color-primary-text);
-  font-weight: 500;
-}
-
-.exercise-detail {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  margin-bottom: var(--space-sm);
-  overflow: hidden;
-}
-
-.exercise-detail-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-md);
-  cursor: pointer;
-  transition: background var(--transition-fast);
-  gap: var(--space-sm);
-}
-
-@media (hover: hover) {
-  .exercise-detail-header:hover {
-    background: var(--color-border-light);
-  }
-}
-
-.exercise-detail-info {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  min-width: 0;
-  flex: 1;
-}
-
-.exercise-detail-name {
-  font-weight: 600;
-  font-size: var(--text-sm);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.exercise-detail-summary {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  flex-shrink: 0;
-}
-
-.exercise-detail-summary-text {
-  font-size: var(--text-sm);
-  color: var(--color-text-secondary);
-}
-
 .exercise-detail-chevron {
   font-size: var(--text-sm);
   color: var(--color-text-muted);
@@ -3188,18 +3402,6 @@ input, select, textarea {
 .exercise-detail-set-row .set-num {
   color: var(--color-text-muted);
   font-weight: 600;
-}
-
-/* ===== Last Time Reference ===== */
-.last-time-ref {
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-  padding: var(--space-xs) var(--space-md);
-  background: var(--color-primary-light);
-  border-radius: 0 0 var(--radius-md) var(--radius-md);
-  margin-top: calc(-1 * var(--space-sm));
-  margin-bottom: var(--space-sm);
-  font-style: italic;
 }
 
 /* ===== Last Time Toggle Button ===== */
@@ -6431,7 +6633,6 @@ a.training-card {
   /* Quiet buttons */
   .btn-secondary:hover:not(:disabled):not([aria-disabled="true"]),
   .btn-ghost:hover:not(:disabled):not([aria-disabled="true"]),
-  .btn-link:hover:not(:disabled):not([aria-disabled="true"]),
   .template-editor-back:hover:not(:disabled):not([aria-disabled="true"]),
   .login-link:hover:not(:disabled):not([aria-disabled="true"]),
   .filter-clear:hover:not(:disabled):not([aria-disabled="true"]),
@@ -6506,7 +6707,6 @@ a.training-card {
 /* Quiet buttons */
 .btn-secondary:active:not(:disabled):not([aria-disabled="true"]),
 .btn-ghost:active:not(:disabled):not([aria-disabled="true"]),
-.btn-link:active:not(:disabled):not([aria-disabled="true"]),
 .template-editor-back:active:not(:disabled):not([aria-disabled="true"]),
 .login-link:active:not(:disabled):not([aria-disabled="true"]),
 .filter-clear:active:not(:disabled):not([aria-disabled="true"]),

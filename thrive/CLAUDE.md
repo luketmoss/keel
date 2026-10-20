@@ -365,7 +365,7 @@ These decisions were made with the user and must be respected by all agents:
 - **Templates**: Create via dedicated editor AND save-from-workout
 - **Navigation**: Bottom tab bar (Day | Activities | Trends | Library | Settings); Library = Templates + Exercises
 - **Activity cards**: one big figure (distance, else duration), a stats line, day · name, and a visual on the right (route, muscle figure, or type tile); no type badge (decided 2026-10-20, #525). Tap to view details
-- **Activity detail**: Summary per exercise, tap to expand set-by-set
+- **Activity detail**: exercises in section cards with every set shown as a tile (value and effort); no expand (decided 2026-10-20, #525)
 - **Copy workout**: Pre-fill from previous + show "last time" reference while logging
 - **Device**: Mobile-first (375px primary breakpoint)
 

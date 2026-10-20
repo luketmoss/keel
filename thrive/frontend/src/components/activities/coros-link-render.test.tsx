@@ -142,7 +142,7 @@ describe('AC7: the detail screen shows the link', () => {
     ];
     render(h(WorkoutDetail, { workoutId: 'w_e' }));
     const a = document.querySelector('a.detail-coros-link')!;
-    const heading = [...document.querySelectorAll('h3')].find((x) => x.textContent === 'Exercises')!;
+    const heading = [...document.querySelectorAll('h2')].find((x) => x.textContent === 'Exercises')!;
     expect(heading.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

@@ -209,6 +209,8 @@ export function createFitStep({ client, archive, api, startedAt, log = console.l
   const failures = [];
   const notes = [];
   let budget = null;
+  // Bytes this run downloaded, by activity, for the track step (#432) to use without a Drive read.
+  const fetched = new Map();
 
   const fail = (message) => {
     failures.push(message);
@@ -295,6 +297,7 @@ export function createFitStep({ client, archive, api, startedAt, log = console.l
     // The file is in hand. A Drive failure from here on is not COROS's, so it
     // does not use up an attempt; the request still counted.
     try {
+      fetched.set(String(activityId), bytes);
       const fitId = await archive.storeFit({ activityId, localDate, bytes });
       const stored = { status: 'stored', file_id: fitId, fetched_at: startedAt, attempts, bytes: bytes.length,
         ...(payloadHash ? { payload_hash: payloadHash } : {}),
@@ -361,6 +364,7 @@ export function createFitStep({ client, archive, api, startedAt, log = console.l
 
     // The bytes are in hand. A Drive failure from here on is not COROS's, so
     // it uses up no attempt; the request still counted.
+    fetched.set(String(activityId), bytes);
     let fileIdNow = record.file_id;
     let recreated = false;
     try {
@@ -416,6 +420,8 @@ export function createFitStep({ client, archive, api, startedAt, log = console.l
 
   return {
     ensure,
+    /** The FIT bytes this run downloaded for the activity, or undefined (#432). */
+    bytesFor: (activityId) => fetched.get(String(activityId)),
     counts,
     failures,
     notes,

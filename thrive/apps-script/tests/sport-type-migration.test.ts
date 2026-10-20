@@ -81,7 +81,7 @@ describe('#260 AC1: migrate-260 appends Workouts!AB sport_type', () => {
   it('has 28 headers, one per WORKOUT_FIELDS entry, ending in AA estimated_seconds and AB sport_type', async () => {
     const { HEADERS, BEFORE, TAB } = await load();
     expect(TAB).toBe('Workouts');
-    expect(HEADERS).toHaveLength(FIELDS.length);
+    expect(HEADERS).toHaveLength(FIELDS.length - 1); // #432 appended AC after this migration
     expect(HEADERS[26]).toBe('estimated_seconds');
     expect(HEADERS[27]).toBe(FIELDS[27]);
     expect(HEADERS[27]).toBe('sport_type');

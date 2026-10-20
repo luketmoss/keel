@@ -18,7 +18,7 @@ function makeWorkout(overrides: Partial<WorkoutWithRow>): WorkoutWithRow {
     notes: '', elapsed_seconds: '3600', created: '', copied_from: '', status: '', moving_seconds: '',
     effort: '', distance_m: '8046.72', ascent_m: '304.8', descent_m: '', avg_hr: '', sub_type: '',
     source: '', source_activity_id: '', raw_ref: '', fit_ref: '', fit_fetched_at: '', synced_at: '',
-    started_at_utc: '', calories: '', estimated_seconds: '', sport_type: '', sheetRow: 2, ...overrides,
+    started_at_utc: '', calories: '', estimated_seconds: '', sport_type: '', track_ref: '', sheetRow: 2, ...overrides,
   };
 }
 

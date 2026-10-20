@@ -101,13 +101,13 @@ describe('workoutToRow', () => {
     synced_at: '',
     started_at_utc: '',
     calories: '',
-    estimated_seconds: '', sport_type: '',
+    estimated_seconds: '', sport_type: '', track_ref: '',
   };
 
   // AC2: sheetsAppend writes every value it is handed regardless of the range,
   // so a short row would leave stale cells behind on an edit.
-  it('emits exactly twenty-eight cells, spanning A:AB', () => {
-    expect(workoutToRow(workout)).toHaveLength(28);
+  it('emits exactly twenty-nine cells, spanning A:AC', () => {
+    expect(workoutToRow(workout)).toHaveLength(29);
   });
 
   // #260 AC4: the COROS sport code is AB, last, and ships blank.

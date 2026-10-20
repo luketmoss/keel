@@ -125,6 +125,10 @@ export function memoryDrive() {
       files.get(id).bytes = Buffer.from(bytes);
       writes.push({ op: 'updateBinary', id });
     },
+    async readBinary(id) {
+      if (!files.get(id)?.bytes) throw new DriveError(404, `File not found: ${id}`);
+      return Buffer.from(files.get(id).bytes);
+    },
     async readJson(id) {
       calls.readJson += 1;
       return JSON.parse(JSON.stringify(files.get(id).data));

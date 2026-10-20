@@ -46,6 +46,9 @@ var TOKEN_READ_ACTIONS = [
   'getDailyHealth',
   'getSyncLog',
   'getBodyMeasurements',
+  // #432: the app shows the route on a map. Addressed by workout, never by Drive ID, and
+  // confirmed to be that activity's track before anything is returned (track.js).
+  'getWorkoutTrack',
 ];
 
 /**

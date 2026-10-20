@@ -37,7 +37,7 @@ export function appPropertiesQuery(props, mimeType) {
  *   `getToken` returns a Google access token, or throws DriveAuthError.
  */
 export function createDrive({ getToken, fetchImpl = fetch }) {
-  async function request(method, url, { json, body, headers = {} } = {}) {
+  async function request(method, url, { json, body, headers = {}, binary = false } = {}) {
     const token = await getToken();
     const res = await fetchImpl(url, {
       method,
@@ -48,7 +48,8 @@ export function createDrive({ getToken, fetchImpl = fetch }) {
       },
       body: json !== undefined ? JSON.stringify(json) : body,
     });
-    const text = await res.text();
+    // A binary read is only the bytes of a 2xx answer; an error body is still text.
+    const text = binary && res.ok ? Buffer.from(await res.arrayBuffer()) : await res.text();
     if (res.status === 401) throw new DriveAuthError(`Drive answered 401`);
     if (!res.ok) {
       let message = text.slice(0, 300);
@@ -114,12 +115,12 @@ export function createDrive({ getToken, fetchImpl = fetch }) {
     return created.id;
   }
 
-  async function createJson({ name, parentId, props, data }) {
+  async function createJson({ name, parentId, props, data, compact = false }) {
     const boundary = `thrive-sync-${Date.now().toString(36)}`;
     const metadata = { name, mimeType: 'application/json', appProperties: props, parents: [parentId] };
     const body =
       `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
-      `--${boundary}\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(data, null, 2)}\r\n` +
+      `--${boundary}\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(data, null, compact ? 0 : 2)}\r\n` +
       `--${boundary}--`;
     const created = JSON.parse(await request('POST', `${UPLOAD}?uploadType=multipart&fields=id`, {
       body,
@@ -167,13 +168,24 @@ export function createDrive({ getToken, fetchImpl = fetch }) {
     return JSON.parse(await request('GET', `${API}/${encodeURIComponent(fileId)}?alt=media`));
   }
 
-  /** Replaces the content. The file ID, and anything pointing at it, is unchanged. */
-  async function updateJson(fileId, data) {
+  /**
+   * A binary file's bytes (a stored FIT, #432), as a Buffer. Read as the sync
+   * wrote it: through `drive.file`, so only files this sync created are visible.
+   */
+  async function readBinary(fileId) {
+    return request('GET', `${API}/${encodeURIComponent(fileId)}?alt=media`, { binary: true });
+  }
+
+  /**
+   * Replaces the content. The file ID, and anything pointing at it, is
+   * unchanged. `compact` writes no indentation: a track is thousands of numbers.
+   */
+  async function updateJson(fileId, data, { compact = false } = {}) {
     await request('PATCH', `${UPLOAD}/${encodeURIComponent(fileId)}?uploadType=media&fields=id`, {
-      body: JSON.stringify(data, null, 2),
+      body: JSON.stringify(data, null, compact ? 0 : 2),
       headers: { 'Content-Type': 'application/json' },
     });
   }
 
-  return { findFiles, findAll, findOne, ensureFolder, createJson, createBinary, updateBinary, readJson, updateJson };
+  return { findFiles, findAll, findOne, ensureFolder, createJson, createBinary, updateBinary, readBinary, readJson, updateJson };
 }

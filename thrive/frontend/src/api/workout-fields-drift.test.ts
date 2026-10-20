@@ -41,8 +41,9 @@ describe('Workouts row mapping', () => {
     // Each field holds its own name, so the row reads back as the field order.
     const named = Object.fromEntries(fields.map((f) => [f, f])) as unknown as Workout;
     expect(workoutToRow(named)).toEqual(fields);
-    expect(fields).toHaveLength(28); // A:AB
+    expect(fields).toHaveLength(29); // A:AC
     expect(fields[27]).toBe('sport_type');
+    expect(fields[28]).toBe('track_ref'); // #432
   });
 
   it('rowToWorkout reads every WORKOUT_FIELDS column back into its field', () => {
@@ -70,16 +71,16 @@ describe('#260 AC4: the SPA never sets sport_type, and an edit keeps the sheet\'
     sheetsUpdate.mockReset();
   });
 
-  it('createWorkout appends A:AB with a blank AB', async () => {
+  it('createWorkout appends A:AC with a blank AB', async () => {
     await createWorkout({ type: 'hike', name: 'Hike' }, 'token');
     expect(sheetsAppend).toHaveBeenCalledTimes(1);
     const [range, rows] = sheetsAppend.mock.calls[0];
-    expect(range).toBe('Workouts!A:AB');
-    expect(rows[0]).toHaveLength(28);
+    expect(range).toBe('Workouts!A:AC');
+    expect(rows[0]).toHaveLength(29);
     expect(rows[0][27]).toBe('');
   });
 
-  it('updateWorkout reads A:AB fresh and writes back the sport_type the sheet holds', async () => {
+  it('updateWorkout reads A:AC fresh and writes back the sport_type the sheet holds', async () => {
     const fresh = Array.from({ length: 28 }, () => '');
     fresh[0] = 'w_1';
     fresh[18] = 'coros';
@@ -87,12 +88,12 @@ describe('#260 AC4: the SPA never sets sport_type, and an edit keeps the sheet\'
     fresh[27] = '204';
     sheetsGet.mockResolvedValue([fresh]);
     // The cached copy predates the backfill: its sport_type is still blank.
-    const cached = { ...rowToWorkout(fresh, 5), sport_type: '' };
+    const cached = { ...rowToWorkout(fresh, 5), sport_type: '', track_ref: '' };
     const written = await updateWorkout(cached, { notes: 'muddy' }, 'token');
-    expect(sheetsGet).toHaveBeenCalledWith('Workouts!A5:AB5', 't');
+    expect(sheetsGet).toHaveBeenCalledWith('Workouts!A5:AC5', 't');
     const [range, rows] = sheetsUpdate.mock.calls[0];
-    expect(range).toBe('Workouts!A5:AB5');
-    expect(rows[0]).toHaveLength(28);
+    expect(range).toBe('Workouts!A5:AC5');
+    expect(rows[0]).toHaveLength(29);
     expect(rows[0][27]).toBe('204');
     expect(rows[0][6]).toBe('muddy');
     expect(written.sport_type).toBe('204');

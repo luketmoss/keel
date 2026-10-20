@@ -356,6 +356,7 @@ const READ_PARAMS: Record<string, Record<string, string>> = {
   getDailySummary: { from: '2026-09-01', to: '2026-09-30' }, getHistoryDateRange: {},
   getDailyHealth: { from: '2026-09-01', to: '2026-09-30' }, getSyncLog: { limit: '1' },
   getBodyMeasurements: { from: '2026-09-01', to: '2026-09-30' },
+  getWorkoutTrack: { id: 'w_001' },
 };
 
 describe('AC4: token callers run only the named reads', () => {
@@ -368,7 +369,8 @@ describe('AC4: token callers run only the named reads', () => {
     it(`runs ${action} for a token caller exactly as for a key caller`, () => {
       const asKey = callEntry(load().sandbox, 'doGet', { action, key: 'test-key', ...params });
       const asToken = callEntry(load().sandbox, 'doPost', { action, access_token: TOKEN, ...params });
-      expect(asKey.res.success, asKey.text).toBe(true);
+      // getWorkoutTrack answers a fixed refusal for this row (no track): the same one to both callers.
+      if (action !== 'getWorkoutTrack') expect(asKey.res.success, asKey.text).toBe(true);
       expect(asToken.text).toBe(asKey.text);
     });
   }

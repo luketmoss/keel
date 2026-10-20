@@ -49,8 +49,8 @@ describe('AC2: the column is AB, the row is 28 cells', () => {
     const { sandbox } = loadApi([]);
     expect(sandbox.COL.SPORT_TYPE).toBe(AB);
     expect(sandbox.WORKOUT_FIELDS[AB]).toBe('sport_type');
-    expect(sandbox.WORKOUT_FIELDS).toHaveLength(28);
-    expect(sandbox.WORKOUT_COLUMN_COUNT).toBe(28);
+    expect(sandbox.WORKOUT_FIELDS).toHaveLength(29);
+    expect(sandbox.WORKOUT_COLUMN_COUNT).toBe(29);
   });
 });
 
@@ -76,7 +76,7 @@ describe('AC2: upsertSyncedWorkout takes an optional top-level sport_type', () =
   it('writes it on a new row, as text, in a 28-cell row', () => {
     const { res, rows } = upsert([], { sport_type: '204' });
     expect(res.success, res.error).toBe(true);
-    expect(rows[0]).toHaveLength(28);
+    expect(rows[0]).toHaveLength(29);
     expect(rows[0][AB]).toBe('204');
     expect(typeof rows[0][AB]).toBe('string');
   });

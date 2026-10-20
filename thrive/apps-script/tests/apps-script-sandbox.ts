@@ -469,7 +469,7 @@ export function loadApi(
 
   const sandbox = loadSources(
     ['types.js', 'utils.js', 'workouts.js', 'exercises.js', 'templates.js', 'sets.js',
-      'daily-summary.js', 'daily-health.js', 'journal.js', 'body-measurements.js', 'sync-log.js', 'payload.js', 'auth.js',
+      'daily-summary.js', 'daily-health.js', 'journal.js', 'body-measurements.js', 'sync-log.js', 'payload.js', 'track.js', 'auth.js',
       'sync-requests.js', 'change-log.js', 'main.js'],
     {
       LockService: makeLockService(lock),
@@ -591,7 +591,7 @@ export function workoutRow(overrides: Record<string, CellValue> = {}): CellValue
     'moving_seconds', 'effort', 'distance_m', 'ascent_m', 'descent_m', 'avg_hr',
     'sub_type', 'source', 'source_activity_id', 'raw_ref', 'fit_ref',
     'fit_fetched_at', 'synced_at', 'started_at_utc', 'calories',
-    'estimated_seconds', 'sport_type',
+    'estimated_seconds', 'sport_type', 'track_ref',
   ];
   return ORDER.map((f) => fields[f] ?? '');
 }

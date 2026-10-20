@@ -134,3 +134,37 @@ test('#257: a FIT is replaced in place, byte for byte, by a media PATCH on the s
   assert.equal(calls[0].init.headers['Content-Type'], 'application/octet-stream');
   assert.deepEqual(calls[0].init.body, bytes);
 });
+
+// --- #432 ---------------------------------------------------------------
+
+test('readBinary answers the file bytes as a Buffer, and an error body is still text', async () => {
+  const bytes = Buffer.from([0x0e, 0x10, 0xd9, 0x07, 0x00, 0xff, 0x80, 0x2e, 0x46, 0x49, 0x54]);
+  const seen = [];
+  const fetchImpl = async (url, init) => {
+    seen.push({ url: String(url), method: init.method });
+    return seen.length === 1
+      ? new Response(bytes, { status: 200 })
+      : new Response(JSON.stringify({ error: { message: 'File not found' } }), { status: 404 });
+  };
+  const drive = createDrive({ getToken, fetchImpl });
+  const got = await drive.readBinary('abc/def');
+  assert.ok(Buffer.isBuffer(got));
+  assert.deepEqual([...got], [...bytes]);
+  assert.match(seen[0].url, /files\/abc%2Fdef\?alt=media$/);
+  await assert.rejects(drive.readBinary('gone'), (err) => err instanceof DriveError && err.status === 404);
+});
+
+test('compact JSON writes carry no indentation, and the default still does', async () => {
+  const bodies = [];
+  const fetchImpl = async (url, init) => {
+    bodies.push(typeof init.body === 'string' ? init.body : String(init.body));
+    return new Response(JSON.stringify({ id: 'f1' }), { status: 200 });
+  };
+  const drive = createDrive({ getToken, fetchImpl });
+  await drive.updateJson('f1', { a: [1, 2], b: { c: 1 } }, { compact: true });
+  await drive.updateJson('f1', { a: [1, 2] });
+  assert.equal(bodies[0], '{"a":[1,2],"b":{"c":1}}');
+  assert.match(bodies[1], /\n  "a": \[\n/);
+  await drive.createJson({ name: 'n', parentId: 'p', props: {}, data: { x: [1] }, compact: true });
+  assert.match(bodies[2], /\r\n\{"x":\[1\]\}\r\n/);
+});

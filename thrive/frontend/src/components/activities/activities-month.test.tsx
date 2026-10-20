@@ -173,8 +173,8 @@ describe('AC2: the month button and picker', () => {
 describe('AC3: one month at a time', () => {
   it('lists only completed activities dated in the chosen month, opening on the current one', () => {
     show([w(THIS, { name: 'Now' }), w(LAST, { name: 'Before' }), w(THIS, { name: 'Soon', status: 'planned' })]);
-    expect(screen.queryByText('Now')).toBeTruthy();
-    expect(screen.queryByText('Before')).toBeNull();
+    expect(screen.queryByText(/· Now$/)).toBeTruthy();
+    expect(screen.queryByText(/· Before$/)).toBeNull();
     // The planned row stays in its own section, not in the month's list.
     expect(document.querySelector('.workout-list')!.textContent).not.toContain('Soon');
   });
@@ -182,8 +182,8 @@ describe('AC3: one month at a time', () => {
   it('shows a past month when it is chosen', () => {
     activitiesMonth.value = LAST;
     show([w(THIS, { name: 'Now' }), w(LAST, { name: 'Before' })]);
-    expect(screen.queryByText('Before')).toBeTruthy();
-    expect(screen.queryByText('Now')).toBeNull();
+    expect(screen.queryByText(/· Before$/)).toBeTruthy();
+    expect(screen.queryByText(/· Now$/)).toBeNull();
   });
 
   it('keeps a picked month when the screen is left and opened again', () => {
@@ -194,7 +194,7 @@ describe('AC3: one month at a time', () => {
     cleanup();
     render(h(ActivitiesScreen, {}));
     expect(monthButton().textContent).toBe(monthYearLabel(LAST));
-    expect(screen.queryByText('Before')).toBeTruthy();
+    expect(screen.queryByText(/· Before$/)).toBeTruthy();
   });
 });
 

@@ -111,7 +111,17 @@ describe('refresh on visible (#249)', () => {
 
   it('keeps focus on the same card when a workout is inserted above it', () => {
     activitiesMonth.value = '2026-09';
-    const base = { type: 'weight', date: '2026-09-20', distance_m: '', elapsed_seconds: '', sheetRow: 2 };
+    const base = {
+      type: 'weight',
+      date: '2026-09-20',
+      distance_m: '',
+      elapsed_seconds: '',
+      ascent_m: '',
+      avg_hr: '',
+      effort: '',
+      notes: '',
+      sheetRow: 2,
+    };
     workouts.value = [
       { ...base, id: 'a', name: 'Alpha' },
       { ...base, id: 'b', name: 'Beta', sheetRow: 3 },

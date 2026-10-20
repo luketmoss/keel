@@ -40,20 +40,6 @@ describe('simple-workout TYPE_LABELS', () => {
   });
 });
 
-describe('activities-screen TYPE_COLORS', () => {
-  // AC2: earth-tone colors for hike
-  it('has hike with brown earth-tone colors', () => {
-    const TYPE_COLORS: Record<string, { light: string; dark: string }> = {
-      weight: { light: '#c53030', dark: '#fca5a5' },
-      stretch: { light: '#2e7d32', dark: '#86efac' },
-      bike: { light: '#1565c0', dark: '#93c5fd' },
-      hike: { light: '#5d4037', dark: '#d7ccc8' },
-    };
-    expect(TYPE_COLORS['hike']).toEqual({ light: '#5d4037', dark: '#d7ccc8' });
-    expect(TYPE_COLORS).not.toHaveProperty('yoga');
-  });
-});
-
 describe('activities-filters TYPES array', () => {
   // AC3: Hike filter chip exists, yoga does not
   it('contains hike, not yoga', () => {

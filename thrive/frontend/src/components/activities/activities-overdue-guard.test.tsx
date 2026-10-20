@@ -10,7 +10,7 @@ vi.mock('../../auth/auth-context', () => ({ useAuth: () => ({ token: 'tok' }) })
 
 import { ActivitiesScreen } from './activities-screen';
 import { isOverdue } from './activities-helpers';
-import { workouts, sets, exercises } from '../../state/store';
+import { workouts, sets, exercises, activitiesMonth } from '../../state/store';
 import type { WorkoutWithRow } from '../../api/types';
 
 function wk(over: Partial<WorkoutWithRow>): WorkoutWithRow {
@@ -52,6 +52,7 @@ function wk(over: Partial<WorkoutWithRow>): WorkoutWithRow {
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date('2026-09-30T12:00:00'));
+  activitiesMonth.value = '2026-09';
 });
 afterEach(() => {
   cleanup();
@@ -61,24 +62,26 @@ afterEach(() => {
   exercises.value = [];
 });
 
-describe('#347 AC2 — the Activities Planned section is unchanged', () => {
+describe('#347 AC2 — the Activities plans are unchanged', () => {
   it('isOverdue keeps its meaning: strictly before today', () => {
     expect(isOverdue('2026-09-29', '2026-09-30')).toBe(true);
     expect(isOverdue('2026-09-30', '2026-09-30')).toBe(false);
     expect(isOverdue('2026-10-01', '2026-09-30')).toBe(false);
   });
 
-  it("lists a missed plan once, on its own date, as overdue, and today's as planned", () => {
+  it("lists a missed plan once, first, as overdue, and today's as planned, in Up next (#528)", () => {
     workouts.value = [
       wk({ id: 'old', name: 'Missed Pull', date: '2026-09-27', sheetRow: 2 }),
       wk({ id: 'now', name: 'Today Push', date: '2026-09-30', sheetRow: 3 }),
     ];
     const { container } = render(h(ActivitiesScreen, {}));
-    const cards = [...container.querySelectorAll<HTMLButtonElement>('.planned-section button.workout-card-planned')];
-    expect(cards.map((c) => c.querySelector('.workout-name')!.textContent)).toEqual(['Missed Pull', 'Today Push']);
-    expect(cards[0].getAttribute('aria-label')).toContain('Missed Pull, overdue, was scheduled for');
-    expect(cards[0].querySelector('.planned-date')!.textContent).toBe('Sep 27');
-    expect(cards[1].getAttribute('aria-label')).toContain('Today Push, planned, scheduled for');
+    const cards = [...container.querySelectorAll<HTMLButtonElement>('.up-next-row button.up-next-card')];
+    expect(cards.map((c) => c.querySelector('.up-next-name')!.textContent)).toEqual(['Missed Pull', 'Today Push']);
+    expect(cards[0].getAttribute('aria-label')).toContain('Missed Pull, overdue, was planned for Sunday September 27');
+    expect(cards[0].querySelector('.badge-overdue')!.textContent).toBe('Overdue');
+    expect(cards[0].querySelector('.up-next-date')!.textContent).toBe('Overdue SEP 27');
+    expect(cards[1].getAttribute('aria-label')).toContain('Today Push, planned for Wednesday September 30');
+    expect(cards[1].querySelector('.up-next-date')!.textContent).toBe('TODAY');
     // No Day-view actions here.
     expect(container.querySelector('.training-overdue')).toBeNull();
   });

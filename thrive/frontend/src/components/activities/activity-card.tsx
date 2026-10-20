@@ -2,6 +2,7 @@
 // (icon and one big figure, a stats line, day · name, a visual on the right) and
 // the Up next row's dashed plan cards.
 
+import { useRef } from 'preact/hooks';
 import { navigate } from '../../router/router';
 import type { WorkoutWithRow } from '../../api/types';
 import { formatEstimate, secondsToMinutes } from '../../api/duration';
@@ -9,6 +10,7 @@ import { exercises, loading, sets } from '../../state/store';
 import { TYPE_ICONS } from './activities-filters';
 import { BodyFigure } from './body-figure';
 import { StretchFigure } from './stretch-figure';
+import { RouteThumbnail, useRouteThumbnail } from './route-thumbnail';
 import { workedGroups, type MuscleGroup } from './muscle-regions';
 import {
   activityCardAriaLabel,
@@ -22,9 +24,10 @@ import {
 } from './activities-helpers';
 
 /**
- * The visual slot. A weight card with a worked muscle group draws the muscle
- * figure and a stretch card the side bend (#529); until the route thumbnail
- * (#530) arrives every other card draws the type's icon on a tint of its colour.
+ * The visual slot's default: the type's icon on a tint of its colour. A weight
+ * card with a worked muscle group draws the muscle figure and a stretch card the
+ * side bend (#529), and a card whose route is in draws the route (#530); a
+ * tracked card keeps this tile until its route arrives, and if it fails.
  * Hidden from assistive technology: the card's name already says the type.
  */
 function TypeTile({ type }: { type: WorkoutWithRow['type'] }) {
@@ -38,6 +41,8 @@ function TypeTile({ type }: { type: WorkoutWithRow['type'] }) {
 
 export function ActivityCard({ workout: w, todayStr }: { workout: WorkoutWithRow; todayStr: string }) {
   const Icon = TYPE_ICONS[w.type];
+  const cardRef = useRef<HTMLButtonElement>(null);
+  const route = useRouteThumbnail(w, cardRef);
   const figure = cardFigure(w);
   const stats = cardStats(w);
   // While loading, the sets and exercises may be missing: keep the tile, never an empty figure.
@@ -52,6 +57,7 @@ export function ActivityCard({ workout: w, todayStr }: { workout: WorkoutWithRow
   return (
     <button
       type="button"
+      ref={cardRef}
       data-focus-key={`workout:${w.id}`}
       class={`workout-card activity-card workout-card-${w.type}`}
       onClick={() => navigate(`/history/${w.id}`)}
@@ -89,7 +95,9 @@ export function ActivityCard({ workout: w, todayStr }: { workout: WorkoutWithRow
           {cardDay(w.date, todayStr)} · {w.name || w.type}
         </span>
       </span>
-      {worked.length > 0 ? (
+      {route ? (
+        <RouteThumbnail points={route} />
+      ) : worked.length > 0 ? (
         <span class="activity-visual" aria-hidden="true">
           <BodyFigure worked={new Set(worked)} />
         </span>

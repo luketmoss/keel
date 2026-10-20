@@ -11,18 +11,13 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { useAuth } from '../../auth/auth-context';
 import { DEMO_TRACKS } from '../../api/demo-track';
 import { isDemo } from '../../api/demo-data';
-import { getWorkoutTrack } from '../../api/thrive-api';
 import type { Workout, WorkoutTrack } from '../../api/types';
 import { drawRoute } from '../../maps/draw-route';
 import { loadMaps, mapsApiKey } from '../../maps/google-maps';
+import { fetchTrack } from '../../maps/track-cache';
 
-/** Tracks fetched this session, by workout id. Nothing persists across a reload. */
-const trackCache = new Map<string, WorkoutTrack>();
-
-/** For tests. */
-export function clearRouteCache(): void {
-  trackCache.clear();
-}
+/** For tests: the session track cache is shared with the Activities list (#530). */
+export { clearTrackCache as clearRouteCache } from '../../maps/track-cache';
 
 /**
  * Whether this activity gets a Route section. A workout with no `track_ref` has
@@ -34,24 +29,6 @@ export function routeAvailable(workout: Pick<Workout, 'id' | 'track_ref' | 'stat
   if (!mapsApiKey()) return false;
   if (isDemo()) return workout.id in DEMO_TRACKS;
   return Boolean((import.meta.env.VITE_THRIVE_API_URL ?? '').trim());
-}
-
-async function fetchTrack(workoutId: string, token: string | null): Promise<WorkoutTrack> {
-  const cached = trackCache.get(workoutId);
-  if (cached) return cached;
-
-  let track: WorkoutTrack;
-  if (isDemo()) {
-    track = DEMO_TRACKS[workoutId];
-    if (!track) throw new Error('no_track');
-  } else {
-    if (!token) throw new Error('no_token');
-    const out = await getWorkoutTrack(workoutId, token);
-    if (!out.ok) throw new Error(out.kind);
-    track = out.track;
-  }
-  trackCache.set(workoutId, track);
-  return track;
 }
 
 type State = 'loading' | 'ready' | 'error';

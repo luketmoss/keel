@@ -16,6 +16,7 @@ import {
   WATER_GOAL_KEY,
   WATER_GOAL_MAX_ML,
   WATER_GOAL_MIN_ML,
+  DRINKS_MAX_RANGE_DAYS,
   deleteDrink,
   getDrinkTotals,
   getDrinks,
@@ -26,6 +27,7 @@ import {
   type DrinkKind,
 } from '../api/drinks';
 import { DENVER, addDays, todayInDenver } from '../day/dates';
+import type { HealthTabState } from './store';
 
 export const ML_PER_OZ = 29.5735;
 /** What "+ 4 oz" stores. */
@@ -240,6 +242,63 @@ export async function loadGoal(token: string): Promise<void> {
   if (out.ok) waterGoalMl.value = out.data.water_goal_ml;
 }
 
+// ── History, for Trends (#521) ───────────────────────────────────────
+
+/**
+ * Every drink of the last DRINKS_MAX_RANGE_DAYS days, as Trends sums them per
+ * local day. Read from `getDrinks`, never from DailySummary, so it agrees with
+ * the Day cards. Held apart from `drinkDays`: those are one date at a time and
+ * carry the optimistic, unsaved taps; this is a read-only copy.
+ */
+export const drinkHistory = signal<HealthTabState<Drink>>({ state: 'idle' });
+
+/** Synthetic history for demo mode: a pattern over three weeks, today and yesterday as the Day cards show them. */
+function demoHistory(): Drink[] {
+  const today = todayInDenver();
+  const out: Drink[] = demoDay(today).concat(demoDay(addDays(today, -1)));
+  for (let back = 2; back <= 20; back++) {
+    const date = addDays(today, -back);
+    const glasses = 3 + ((back * 5) % 9);
+    for (let i = 0; i < glasses; i++) {
+      out.push(demoEntry(`demo-h-${back}-${i}`, 'water', date, `${String(7 + i).padStart(2, '0')}:00:00`, 'app'));
+    }
+    if (back % 3 === 0) out.push(demoEntry(`demo-h-${back}-a`, 'alcohol', date, '19:30:00', 'app'));
+  }
+  return out;
+}
+
+let historyInFlight: Promise<void> | null = null;
+
+/**
+ * Read the history window ending today. One read at a time: a call while one
+ * runs joins it. A failed read leaves rows already loaded; with none, it is an
+ * error. Trends calls it on every entry, so a drink logged on the Day view is
+ * there on the next visit with no rebuild step.
+ */
+export function loadDrinkHistory(token: string): Promise<void> {
+  if (isDemo()) {
+    drinkHistory.value = { state: 'loaded', rows: demoHistory() };
+    return Promise.resolve();
+  }
+  if (historyInFlight) return historyInFlight;
+  if (drinkHistory.value.state !== 'loaded') drinkHistory.value = { state: 'loading' };
+  const to = todayInDenver();
+  const from = addDays(to, -(DRINKS_MAX_RANGE_DAYS - 1));
+  historyInFlight = getDrinks({ from, to }, token)
+    .then((out) => {
+      if (out.ok) {
+        drinkHistory.value = { state: 'loaded', rows: out.data.drinks };
+        waterGoalMl.value = out.data.water_goal_ml;
+      } else if (drinkHistory.value.state !== 'loaded') {
+        drinkHistory.value = { state: 'error' };
+      }
+    })
+    .finally(() => {
+      historyInFlight = null;
+    });
+  return historyInFlight;
+}
+
 // ── Writes ───────────────────────────────────────────────────────────
 
 /**
@@ -331,6 +390,8 @@ export async function saveWaterGoal(ml: number, token: string): Promise<boolean>
 export function resetDrinks(): void {
   drinkDays.value = {};
   drinkErrors.value = {};
+  drinkHistory.value = { state: 'idle' };
+  historyInFlight = null;
   waterGoalMl.value = WATER_GOAL_DEFAULT_ML;
   inFlight.clear();
   changedAt.clear();

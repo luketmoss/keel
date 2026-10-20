@@ -10,6 +10,9 @@ import { parse, kgToLb, metersToMiles, metersToFeet } from '../../api/units';
 import { secondsToMinutes } from '../../api/duration';
 import { bodyDayOf, type BodyDay } from '../../api/body-day';
 import { formatSleep, axisSleep } from './sleep-duration';
+import { drinkHistory, waterGoalMl, formatOz, ML_PER_OZ } from '../../state/drinks';
+import { today as todaySignal } from '../../day/today';
+import { datesBetween } from './series';
 
 export interface TrendPoint {
   date: string;
@@ -21,7 +24,7 @@ export interface TrendPoint {
 }
 
 /** The health tab a metric's `points()` reads; Trends waits on, and reports errors from, exactly these. */
-export type TrendSource = 'dailyHealth' | 'bodyMeasurements' | 'dailySummary';
+export type TrendSource = 'dailyHealth' | 'bodyMeasurements' | 'dailySummary' | 'drinks';
 
 export interface TrendMetric {
   id: string;
@@ -43,6 +46,12 @@ export interface TrendMetric {
   excludesToday?: boolean;
   /** One line under the card's header, e.g. "Outdoor only" (#245). */
   note?: string;
+  /** Each day is a bar from zero, not a dot (#521): a total, where the others are readings. */
+  bars?: boolean;
+  /** A dashed reference line (the water goal), in the metric's own unit, with its label; null draws none. */
+  reference?(): { value: number; label: string } | null;
+  /** What the card says when the metric has no value on any date; the default is "Nothing recorded yet." */
+  emptyText?: string;
 }
 
 /** 1–4 metrics, one card each, on one shared x domain. */
@@ -419,6 +428,70 @@ const ACTIVITY_SUMMARY_METRICS: TrendMetric[] = [ACTIVITY_COUNT, MOVING_TIME, DI
  */
 const ACTIVITY_METRICS: TrendMetric[] = [STEPS, ...ACTIVITY_SUMMARY_METRICS];
 
+// ── Intake (#521) ────────────────────────────────────────────────────
+// Water and alcohol, summed per local day from getDrinks, never DailySummary
+// (which lags the day's last tap). "Logged nothing" is a real value here: every
+// day from the first drink ever logged to today is a point, `0` when it had
+// none, and the days before that are blank, so the chart does not open on a
+// long run of zeros from before tracking began.
+
+type IntakeKind = 'water' | 'alcohol';
+
+/** One point per day from the first drink to today (or the last drink): the day's sum for `kind`, `convert`ed. */
+export function intakePoints(kind: IntakeKind, convert: (amount: number) => number): TrendPoint[] {
+  const s = drinkHistory.value;
+  if (s.state !== 'loaded' || s.rows.length === 0) return [];
+  const sums = new Map<string, number>();
+  let first = '';
+  let last = '';
+  for (const d of s.rows) {
+    if (!d.date) continue;
+    if (first === '' || d.date < first) first = d.date;
+    if (d.date > last) last = d.date;
+    if (d.kind === kind) sums.set(d.date, (sums.get(d.date) ?? 0) + d.amount);
+  }
+  if (first === '') return [];
+  const today = todaySignal.value;
+  return datesBetween(first, last > today ? last : today).map((date) => ({
+    date,
+    value: convert(sums.get(date) ?? 0),
+  }));
+}
+
+export const WATER: TrendMetric = {
+  id: 'water',
+  source: 'drinks',
+  label: 'Water',
+  unit: 'oz',
+  points: () => intakePoints('water', (ml) => ml / ML_PER_OZ),
+  format: (v) => String(Math.round(v * 10) / 10),
+  axisFormat: axisDecimal,
+  band: false,
+  zeroBased: true,
+  bars: true,
+  reference: () =>
+    drinkHistory.value.state === 'loaded' && waterGoalMl.value > 0
+      ? { value: waterGoalMl.value / ML_PER_OZ, label: `goal ${formatOz(waterGoalMl.value)} oz` }
+      : null,
+  emptyText: 'No drinks logged yet.',
+};
+
+export const ALCOHOL: TrendMetric = {
+  id: 'alcohol',
+  source: 'drinks',
+  label: 'Alcohol',
+  unit: 'drinks',
+  points: () => intakePoints('alcohol', (n) => n),
+  format: (v) => (Number.isInteger(v) ? String(v) : v.toFixed(1)),
+  axisFormat: axisDecimal,
+  band: false,
+  zeroBased: true,
+  bars: true,
+  emptyText: 'No drinks logged yet.',
+};
+
+const INTAKE_METRICS: TrendMetric[] = [WATER, ALCOHOL];
+
 // ── The custom set (#246) ────────────────────────────────────────────
 
 /** The most metrics a custom set holds. */
@@ -470,6 +543,7 @@ export const TREND_GROUPS: TrendGroup[] = [
   { id: 'body', label: 'Body', metrics: BODY_METRICS },
   { id: 'blood_pressure', label: 'Blood Pressure', metrics: BLOOD_PRESSURE_METRICS },
   { id: 'activity', label: 'Activity', metrics: ACTIVITY_METRICS },
+  { id: 'intake', label: 'Intake', metrics: INTAKE_METRICS },
   // A placeholder: its metrics come from the stored selection (customGroup).
   { id: CUSTOM_GROUP_ID, label: 'Custom', metrics: [] },
 ];

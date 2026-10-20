@@ -302,6 +302,46 @@ var JOURNAL_FIELDS = [
 
 var JOURNAL_COLUMN_COUNT = 4;
 
+// --- Drinks (A:I) and Settings (A:C) - #519 ---------------------------------
+//
+// One row per drink (Thrive Sip, #518), written by the API alone: the widget,
+// the app and later the MCP Worker all go through logDrink and friends
+// (drinks.js). Mirrored, read-only here, by frontend/src/api/drinks.ts; change
+// both together. Created by scripts/migrate-519-drinks-tab.mjs; later columns
+// are only appended.
+var DRINK_FIELDS = [
+  'id',            // A  PK, a UUID the caller generates: logging it twice leaves one row
+  'kind',          // B  water | alcohol
+  'amount',        // C  water in whole ml, alcohol in standard drinks (always 1); never blank or 0
+  'date',          // D  local YYYY-MM-DD (TIMEZONE), derived from logged_at_utc
+  'time',          // E  local HH:MM:SS, editable through updateDrinkTime
+  'logged_at_utc', // F  ISO 8601 UTC, the moment the caller says it was taken; never rewritten
+  'source',        // G  widget | app
+  'created',       // H  ISO 8601, server clock
+  'updated',       // I  ISO 8601, server clock
+];
+
+var DRINK_COLUMN_COUNT = 9;
+var DRINK_KINDS = ['water', 'alcohol'];
+var DRINK_SOURCES = ['widget', 'app'];
+
+// Settings (A:C): key/value, one row per key, created by
+// scripts/migrate-519-settings-tab.mjs. The API supplies every default, never
+// the migration, so a missing row and a missing tab read the same.
+var SETTING_FIELDS = [
+  'key',     // A  PK
+  'value',   // B  text
+  'updated', // C  ISO 8601
+];
+
+var SETTING_COLUMN_COUNT = 3;
+var SETTING_WATER_GOAL = 'water_goal_ml';
+var WATER_GOAL_DEFAULT_ML = 1893; // 64 oz
+var WATER_GOAL_MIN_ML = 250;
+var WATER_GOAL_MAX_ML = 10000;
+var WATER_AMOUNT_MAX_ML = 2000;
+var DRINKS_MAX_RANGE_DAYS = 400;
+
 // --- MCPChangeLog (A:G) — #434 ------------------------------------------------
 //
 // One row per sheet row an MCP-key write created, changed or deleted, written by

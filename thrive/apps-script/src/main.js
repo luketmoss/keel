@@ -83,6 +83,16 @@
 //   ?action=undoCall&key=<MCP key>&payload={"call_id":"abc123","confirm":true}
 // A write's payload may carry `call_id` (1-64 of [A-Za-z0-9_-]) to group its rows.
 //
+// Drinks (#519): one row per drink, the caller's UUID as id so a retry is safe.
+//   ?action=logDrink&key=...&payload={"id":"<uuid>","kind":"water","amount":250,
+//     "logged_at_utc":"2026-10-20T13:05:00Z","source":"widget"}
+//   ?action=getDrinks&key=...&from=2026-10-01&to=2026-10-31   - no range means today
+//   ?action=getDrinkTotals&key=...   - today's water_ml, alcohol_drinks, water_goal_ml
+//   ?action=updateDrinkTime&key=...&payload={"id":"<uuid>","time":"14:30:00"}
+//   ?action=deleteDrink&key=...&payload={"id":"<uuid>"}
+//   ?action=updateSetting&key=...&payload={"key":"water_goal_ml","value":2000}
+// WIDGET_API_KEY may run logDrink and getDrinkTotals only.
+//
 // The Withings sync's runs go to WithingsSyncLog, same layout (#200): add
 // "log":"withings" to appendSyncLog's payload, or &log=withings to getSyncLog.
 
@@ -98,7 +108,7 @@ function envelope(result) {
 
 /**
  * A failure. `code` is optional and additive (#144): `token_invalid`,
- * `token_forbidden`, `token_unavailable`, `read_only`, or `bad_request`
+ * `token_forbidden`, `token_unavailable`, `read_only`, `widget_forbidden` (#519), or `bad_request`
  * (requestSync's malformed `request_ids`, #410), so a caller can tell
  * the cases apart without matching English. Without one, the envelope is
  * exactly what it was before #144.
@@ -161,6 +171,11 @@ function handleRequest(e) {
   try {
     var caller = resolveCaller(params);
     if (caller.refusal) return envelope(caller.refusal);
+
+    // #519: the widget key runs two actions. Fixed text, so an action name is not echoed.
+    if (caller.mode === 'widget' && !isWidgetAction(action)) {
+      return envelope(fail('Widget caller: this action is not permitted', 'widget_forbidden'));
+    }
 
     if (caller.mode === 'token' && !isTokenReadAction(action) && !isTokenWriteAction(action)) {
       return envelope(fail(
@@ -610,6 +625,34 @@ function dispatch(action, params, caller) {
     // takes its own lock, so not withScriptLock: a busy lock is an answer here.
     case 'requestSync':
       result = requestSync(payload);
+      break;
+
+    // --- Drinks and Settings (#519) ---
+    // Reads take from/to as parameters, like getJournal. Writes are payloads and
+    // take the script lock: logDrink reads for its id, then appends. The widget
+    // key runs logDrink and getDrinkTotals only (WIDGET_ACTIONS).
+    case 'getDrinks':
+      result = { success: true, data: getDrinks({ from: params.from, to: params.to }) };
+      break;
+
+    case 'getDrinkTotals':
+      result = { success: true, data: getDrinkTotals() };
+      break;
+
+    case 'logDrink':
+      result = { success: true, data: withScriptLock(function () { return logDrink(payload); }) };
+      break;
+
+    case 'updateDrinkTime':
+      result = { success: true, data: withScriptLock(function () { return updateDrinkTime(payload); }) };
+      break;
+
+    case 'deleteDrink':
+      result = { success: true, data: withScriptLock(function () { return deleteDrink(payload); }) };
+      break;
+
+    case 'updateSetting':
+      result = { success: true, data: withScriptLock(function () { return updateSetting(payload); }) };
       break;
 
     default:

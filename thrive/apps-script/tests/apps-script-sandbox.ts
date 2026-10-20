@@ -165,11 +165,16 @@ export function makeUtilities(uuids: string[] = []) {
         const wd = new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'short' }).format(date);
         return String(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].indexOf(wd) + 1);
       }
+      if (format === 'HH:mm:ss') {
+        return new Intl.DateTimeFormat('en-GB', {
+          timeZone, hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+        }).format(date);
+      }
       if (format === 'HH:mm') {
         return new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(date);
       }
       if (format !== 'yyyy-MM-dd') {
-        throw new Error('Utilities.formatDate stub only supports yyyy-MM-dd and h:mm a, got: ' + format);
+        throw new Error('Utilities.formatDate stub only supports yyyy-MM-dd, HH:mm, HH:mm:ss and h:mm a, got: ' + format);
       }
       // 'en-CA' renders YYYY-MM-DD, which is what Apps Script's 'yyyy-MM-dd'
       // produces.
@@ -385,6 +390,9 @@ export interface LoadedApi {
   journalRows?: CellValue[][];
   /** MCPChangeLog's backing array, or undefined when the tab does not exist (#434). */
   changeLogRows?: CellValue[][];
+  /** Drinks' and Settings' backing arrays, or undefined when the tab does not exist (#519). */
+  drinkRows?: CellValue[][];
+  settingRows?: CellValue[][];
   /** How many times the script lock was taken, and whether it is held now. */
   lock: { acquired: number; held: boolean };
   /** The script cache's live backing map (#144). */
@@ -414,6 +422,9 @@ export interface Fixtures {
   journal?: CellValue[][];
   /** As dailyHealth: omit to model the tab not existing, which refuses MCP writes (#434). */
   changeLog?: CellValue[][];
+  /** As dailyHealth: omit to model the tab not existing (#519). */
+  drinks?: CellValue[][];
+  settings?: CellValue[][];
 }
 
 /**
@@ -469,7 +480,7 @@ export function loadApi(
 
   const sandbox = loadSources(
     ['types.js', 'utils.js', 'workouts.js', 'exercises.js', 'templates.js', 'sets.js',
-      'daily-summary.js', 'daily-health.js', 'journal.js', 'body-measurements.js', 'sync-log.js', 'payload.js', 'track.js', 'auth.js',
+      'daily-summary.js', 'daily-health.js', 'journal.js', 'drinks.js', 'body-measurements.js', 'sync-log.js', 'payload.js', 'track.js', 'auth.js',
       'sync-requests.js', 'change-log.js', 'main.js'],
     {
       LockService: makeLockService(lock),
@@ -509,6 +520,12 @@ export function loadApi(
   if (fixtures.changeLog) {
     sheets.MCPChangeLog = makeSheet(fixtures.changeLog, sandbox.CHANGE_LOG_COLUMN_COUNT);
   }
+  if (fixtures.drinks) {
+    sheets.Drinks = makeSheet(fixtures.drinks, sandbox.DRINK_COLUMN_COUNT);
+  }
+  if (fixtures.settings) {
+    sheets.Settings = makeSheet(fixtures.settings, sandbox.SETTING_COLUMN_COUNT);
+  }
   if (fixtures.withingsSyncLog) {
     sheets.WithingsSyncLog = makeSheet(fixtures.withingsSyncLog, sandbox.SYNC_LOG_COLUMN_COUNT);
   }
@@ -528,7 +545,8 @@ export function loadApi(
     sandbox, rows: workoutRows, exerciseRows, templateRows, setRows, summaryRows,
     healthRows: fixtures.dailyHealth, syncLogRows: fixtures.syncLog,
     bodyRows: fixtures.bodyMeasurements, withingsSyncLogRows: fixtures.withingsSyncLog,
-    journalRows: fixtures.journal, changeLogRows: fixtures.changeLog, lock, cache, fetches,
+    journalRows: fixtures.journal, changeLogRows: fixtures.changeLog,
+    drinkRows: fixtures.drinks, settingRows: fixtures.settings, lock, cache, fetches,
     driveCalls,
   };
 }

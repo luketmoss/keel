@@ -49,7 +49,7 @@ class Outbox(
             when (api.logDrink(head)) {
                 SendOutcome.Sent -> remove(head.id)
                 SendOutcome.KeyRejected -> return FlushResult.KeyRejected
-                SendOutcome.Failed -> { remove(head.id); return FlushResult.Failed }
+                SendOutcome.Failed -> return FlushResult.Failed
             }
         }
     }

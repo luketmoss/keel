@@ -81,7 +81,7 @@ object WidgetViews {
 
         // A read from before Denver midnight says nothing about today: today starts at zero.
         val base = s.totals?.takeIf { it.date == today.toString() }
-        val waterMl = (base?.waterMl ?: 0)
+        val waterMl = (base?.waterMl ?: 0) + queuedWater
         val alcohol = (base?.alcoholDrinks ?: 0) + queuedAlcohol
         val goal = s.totals?.waterGoalMl?.takeIf { it > 0 }
 

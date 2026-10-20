@@ -49,6 +49,7 @@ const FAMILIES = {
     'manage-label-delete',
     'day-sync-btn',
     'sync-now-btn',
+    'detail-icon-btn',
   ],
   'Chips and toggles': [
     'filter-chip',
@@ -61,6 +62,7 @@ const FAMILIES = {
     'trends-chip',
     'trends-view-btn',
     'trends-menu-item',
+    'detail-menu-item',
     'library-switch-btn',
     'color-swatch',
     'section-badge-btn',
@@ -578,6 +580,7 @@ describe('AC4: an aria-disabled control dims, and its focus ring does not', () =
       [
         'btn',
         'day-sync-btn',
+        'detail-icon-btn',
         'exercise-toolbar-btn',
         'exercise-toolbar-btn',
         'input',

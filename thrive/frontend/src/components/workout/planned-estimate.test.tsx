@@ -118,6 +118,14 @@ function button(text: string): HTMLElement {
   return el as HTMLElement;
 }
 
+/** Delete workout lives in the More actions menu (#531). */
+async function tapDelete() {
+  fireEvent.click(document.querySelector('[aria-label="More actions"]')!);
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Delete workout' }));
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
 async function tap(text: string) {
   fireEvent.click(button(text));
   await Promise.resolve();
@@ -331,27 +339,24 @@ describe('AC2: a planned workout shows its estimate', () => {
     expect(c.getAttribute('aria-label')).not.toMatch(/minute/);
   });
 
-  it('shows "about 47 min" beside the Planned badge on the detail', () => {
+  it('ends the detail date line with "about 47 min", after the planned date', () => {
     workouts.value = [planned()];
     sets.value = PLAN_SETS;
     render(h(WorkoutDetail, { workoutId: 'w_plan' }));
-    const row = document.querySelector('.detail-info-row')!;
-    expect(row.querySelector('.badge-planned')).toBeTruthy();
-    expect(row.querySelector('.detail-estimate')!.textContent).toBe('about 47 min');
+    expect(document.querySelector('.detail-date-line')!.textContent).toBe('Planned for Thu, Dec 31 · about 47 min');
   });
 
   it('shows no estimate on the detail when there is none', () => {
     workouts.value = [planned({ estimated_seconds: '' })];
     render(h(WorkoutDetail, { workoutId: 'w_plan' }));
-    expect(document.querySelector('.detail-estimate')).toBeNull();
+    expect(document.querySelector('.detail-date-line')!.textContent).toBe('Planned for Thu, Dec 31');
   });
 
   it('shows no estimate once the workout is no longer planned (AC4)', () => {
     workouts.value = [planned({ status: '', elapsed_seconds: '3300', time: '07:00' })];
     sets.value = PLAN_SETS;
     render(h(WorkoutDetail, { workoutId: 'w_plan' }));
-    expect(document.querySelector('.detail-estimate')).toBeNull();
-    expect(document.querySelector('.detail-duration')!.textContent).toBe('55 min');
+    expect(document.querySelector('.detail-date-line')!.textContent).toBe('Thu, Dec 31 · 7:00 AM');
   });
 });
 
@@ -387,7 +392,7 @@ describe('#348: planned editor Back/Discard and detail Delete step back through 
 
   it('Delete on the detail goes back to where the user came from, never navigate', async () => {
     render(h(WorkoutDetail, { workoutId: 'w_plan' }));
-    await tap('Delete Workout');
+    await tapDelete();
     await answerConfirm(true);
     expect(deleteWorkout).toHaveBeenCalledWith('w_plan', 'test-token');
     expect(goBack).toHaveBeenCalledTimes(1);
@@ -397,7 +402,7 @@ describe('#348: planned editor Back/Discard and detail Delete step back through 
 
   it("Delete counts only logged sets: a plan's targets are not logged (#403)", async () => {
     render(h(WorkoutDetail, { workoutId: 'w_plan' }));
-    await tap('Delete Workout');
+    await tapDelete();
     expect(confirmText()).toMatchObject({
       title: 'Delete "Upper Pull A"?',
       message: "Thu 31 Dec 2099. This can't be undone.",
@@ -405,18 +410,18 @@ describe('#348: planned editor Back/Discard and detail Delete step back through 
     });
     await answerConfirm(false);
     sets.value = [{ ...PLAN_SETS[0], weight: '135', reps: '8' }, ...PLAN_SETS.slice(1)];
-    await tap('Delete Workout');
+    await tapDelete();
     expect(confirmText()!.message).toBe("Thu 31 Dec 2099 · its 1 logged set goes with it. This can't be undone.");
     await answerConfirm(false);
   });
 
   it('a cancelled Delete confirm, or a failed delete, calls neither', async () => {
     render(h(WorkoutDetail, { workoutId: 'w_plan' }));
-    await tap('Delete Workout');
+    await tapDelete();
     await answerConfirm(false);
     expect(deleteWorkout).not.toHaveBeenCalled();
     deleteWorkout.mockRejectedValueOnce(new Error('boom'));
-    await tap('Delete Workout');
+    await tapDelete();
     await answerConfirm(true);
     expect(goBack).not.toHaveBeenCalled();
     expect(navigate).not.toHaveBeenCalled();

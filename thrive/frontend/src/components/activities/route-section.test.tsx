@@ -265,13 +265,13 @@ describe('on the detail screen', () => {
     return render(h(WorkoutDetail, { workoutId: w.id }));
   };
 
-  it('puts the Route section right after the title, stats and provenance, and before the actions', async () => {
+  it('puts the Route section right after the title block, above the stats card', async () => {
     const { container } = show(workout());
-    const meta = container.querySelector('.detail-meta')!;
+    const title = container.querySelector('.detail-title-block')!;
     const route = container.querySelector('.detail-route')!;
     expect(route).toBeTruthy();
-    expect(meta.nextElementSibling).toBe(route);
-    expect(route.nextElementSibling?.className).toBe('detail-actions');
+    expect(title.nextElementSibling).toBe(route);
+    expect(route.nextElementSibling?.className).toBe('detail-stats-card');
     await waitFor(() => expect(state.maps).toHaveLength(1));
   });
 
@@ -293,14 +293,14 @@ describe('on the detail screen', () => {
     expect(loadMaps).not.toHaveBeenCalled();
   });
 
-  it('leaves the rest of the screen unchanged when there is no route, empty state included', () => {
-    const { container } = show(workout({ track_ref: '' }));
-    expect(container.textContent).toContain('No additional details');
+  it('says "No details recorded" when there is no route and nothing else to show', () => {
+    const { container } = show(workout({ track_ref: '', elapsed_seconds: '', distance_m: '' }));
+    expect(container.textContent).toContain('No details recorded');
   });
 
-  it('does not show "No additional details" over a route', async () => {
-    const { container } = show(workout());
-    expect(container.textContent).not.toContain('No additional details');
+  it('does not say "No details recorded" over a route', async () => {
+    const { container } = show(workout({ elapsed_seconds: '', distance_m: '' }));
+    expect(container.textContent).not.toContain('No details recorded');
     await waitFor(() => expect(state.maps).toHaveLength(1));
   });
 });

@@ -367,7 +367,7 @@ function plural(n: number, word: string): string {
 }
 
 /** The distance in metres when it is a real, positive measurement; blank and 0 are neither. */
-function distanceMeters(w: WorkoutWithRow): number | null {
+export function distanceMeters(w: WorkoutWithRow): number | null {
   const m = parse(w.distance_m);
   return m !== null && m > 0 ? m : null;
 }
@@ -386,7 +386,7 @@ export function formatClock(totalSeconds: number): string {
 }
 
 /** 6472 -> "1 hour 47 minutes", 2873 -> "47 minutes", 40 -> "40 seconds". */
-function spokenElapsed(totalSeconds: number): string {
+export function spokenElapsed(totalSeconds: number): string {
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
   if (h > 0) return m > 0 ? `${plural(h, 'hour')} ${plural(m, 'minute')}` : plural(h, 'hour');
@@ -395,7 +395,7 @@ function spokenElapsed(totalSeconds: number): string {
 }
 
 /** 760 -> "12 minutes 40 seconds", 480 -> "8 minutes": a pace keeps its seconds. */
-function spokenPace(totalSeconds: number): string {
+export function spokenPace(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60);
   const sec = totalSeconds % 60;
   if (m === 0) return plural(sec, 'second');

@@ -58,8 +58,8 @@ re-run this skill from the top. Don't accumulate half-verified criteria.
 ## Exit
 
 **If a touched component's stack skill declares Testing human-gated** (firmware
-always; mobile and android for device-dependent criteria): verify everything verifiable,
-then **stop**. List the criteria that need hardware or a device, in full, and
+always; mobile and android for device-dependent criteria): verify everything
+verifiable, then **stop**. List the criteria that need hardware or a device, in full, and
 hand back. Do not advance, and do not take the PR out of draft — it isn't ready
 for review while its behaviour is unconfirmed.
 

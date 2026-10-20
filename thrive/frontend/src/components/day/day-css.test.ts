@@ -59,6 +59,23 @@ describe('Day screen CSS (#237)', () => {
     expect(rule('.panel-note')).toMatch(/color:\s*var\(--color-text-muted\)/);
   });
 
+  it('#485: Day cards have no border, --radius-lg corners and a sentence-case --text-base title in --color-text', () => {
+    expect(rule('.day-screen .day-panel')).toMatch(/border:\s*none/);
+    expect(rule('.day-screen .day-panel')).toMatch(/border-radius:\s*var\(--radius-lg\)/);
+    const title = rule('.day-screen .day-panel-title');
+    expect(title).toMatch(/text-transform:\s*none/);
+    expect(title).toMatch(/font-size:\s*var\(--text-base\)/);
+    expect(title).toMatch(/color:\s*var\(--color-text\)/);
+    expect(rule('.day-panel-title')).toMatch(/font-weight:\s*600/);
+    expect(rule('.day-screen .day-panels')).toMatch(/gap:\s*var\(--day-gap\)/);
+    expect(rule('.day-panel-icon')).toMatch(/width:\s*18px/);
+  });
+
+  it('#485: the base card is unchanged, so the Calendar summary that shares it keeps its border', () => {
+    expect(css).not.toMatch(/(?:^|\n)\s*\.day-panel\s*\{[^}]*border:\s*none/);
+    expect(css).not.toMatch(/(?:^|[\s,])\.day-panel\s*,/);
+  });
+
   it('uses the pill pairs, and nowrap sun items', () => {
     expect(rule('.day-pill')).toMatch(/background:\s*var\(--color-border-light\)/);
     expect(rule('.day-pill-today')).toMatch(/color:\s*var\(--color-primary-on-light\)/);

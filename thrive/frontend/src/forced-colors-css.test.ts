@@ -68,6 +68,10 @@ describe('forced-colors selected states (#330)', () => {
     expect(selectedRule).not.toMatch(/outline/);
   });
 
+  it('#485: Day cards, borderless otherwise, keep a visible CanvasText outline', () => {
+    expect(block).toMatch(/\.day-screen \.day-panel\s*\{[^}]*border:\s*1px solid CanvasText/);
+  });
+
   it('keeps everything new inside the block (no top-level forced-colors rules)', () => {
     expect(css.replace(block, '')).not.toMatch(/Highlight(Text)?\b/);
   });

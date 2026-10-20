@@ -38,7 +38,14 @@
     "--map-track-width": "4px",
     "--map-track-width-casing": "7px",
     "--map-dot-size": "12px",
-    "--detail-map-height": "280px"
+    "--detail-map-height": "280px",
+    "--figure-md": "1.75rem",
+    "--figure-lg": "2.25rem",
+    "--figure-xl": "2.75rem",
+    "--day-gap": "0.75rem",
+    "--range-track": "var(--color-border-light)",
+    "--range-band": "var(--color-border)",
+    "--range-marker": "var(--color-text)"
   },
   "[data-theme=\"light\"]": {
     "--color-bg": "#f0f2f5",
@@ -89,7 +96,17 @@
     "--color-danger-fill": "#d32f2f",
     "--color-danger-fill-hover": "#b71c1c",
     "--color-success-fill": "#2e7d32",
-    "--color-border-strong": "#7d838a"
+    "--color-border-strong": "#7d838a",
+    "--metric-heart": "#c2185b",
+    "--metric-hrv": "#00796b",
+    "--metric-stress": "#8a5a00",
+    "--metric-sleep-deep": "#1e3a8a",
+    "--metric-sleep-rem": "#7c3aed",
+    "--metric-sleep-light": "#5b8def",
+    "--metric-sleep-awake": "#8a6d00",
+    "--metric-sleep": "var(--metric-sleep-rem)",
+    "--metric-steps": "#3b7a2a",
+    "--metric-calories": "#b54708"
   },
   "[data-theme=\"dark\"]": {
     "--color-bg": "#121212",
@@ -140,6 +157,16 @@
     "--color-danger-fill": "#ef5350",
     "--color-danger-fill-hover": "#f26b68",
     "--color-success-fill": "#66bb6a",
-    "--color-border-strong": "#74797f"
+    "--color-border-strong": "#74797f",
+    "--metric-heart": "#f47a95",
+    "--metric-hrv": "#4fd1c5",
+    "--metric-stress": "#e0a458",
+    "--metric-sleep-deep": "#5470d0",
+    "--metric-sleep-rem": "#b9a3ff",
+    "--metric-sleep-light": "#4f86f7",
+    "--metric-sleep-awake": "#f2c94c",
+    "--metric-sleep": "var(--metric-sleep-rem)",
+    "--metric-steps": "#8bd17c",
+    "--metric-calories": "#ff9a5c"
   }
 }

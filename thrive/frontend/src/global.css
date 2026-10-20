@@ -38,6 +38,15 @@
   --map-track-width-casing: 7px;
   --map-dot-size: 12px;
   --detail-map-height: 280px;
+  /* The visual Day screen (#485). Figure sizes for big numbers, the gap
+     between Day cards, and the range bar's three layers (#491). */
+  --figure-md: 1.75rem;
+  --figure-lg: 2.25rem;
+  --figure-xl: 2.75rem;
+  --day-gap: 0.75rem;
+  --range-track: var(--color-border-light);
+  --range-band: var(--color-border);
+  --range-marker: var(--color-text);
 }
 
 /* ===== Light Theme ===== */
@@ -76,6 +85,20 @@
   --color-primary-fill: #2f66f0;
   --color-primary-fill-hover: #2452c9;
   /* --- end #183 --- */
+  /* Metric colours (#485): data colours for a metric's icon and chart marks,
+     never text, never status. Each is >= 3:1 on the card; the sleep stages,
+     in bar order, differ from their neighbours by >= 1.4:1
+     (metric-contrast.test.ts). */
+  --metric-heart: #c2185b;
+  --metric-hrv: #00796b;
+  --metric-stress: #8a5a00;
+  --metric-sleep-deep: #1e3a8a;
+  --metric-sleep-rem: #7c3aed;
+  --metric-sleep-light: #5b8def;
+  --metric-sleep-awake: #8a6d00;
+  --metric-sleep: var(--metric-sleep-rem);
+  --metric-steps: #3b7a2a;
+  --metric-calories: #b54708;
 }
 
 /* ===== Dark Theme ===== */
@@ -105,6 +128,17 @@
   --color-primary-fill: #6e97ff;
   --color-primary-fill-hover: #8fb1ff;
   /* --- end #183 --- */
+  /* Metric colours (#485), as in light. */
+  --metric-heart: #f47a95;
+  --metric-hrv: #4fd1c5;
+  --metric-stress: #e0a458;
+  --metric-sleep-deep: #5470d0;
+  --metric-sleep-rem: #b9a3ff;
+  --metric-sleep-light: #4f86f7;
+  --metric-sleep-awake: #f2c94c;
+  --metric-sleep: var(--metric-sleep-rem);
+  --metric-steps: #8bd17c;
+  --metric-calories: #ff9a5c;
 }
 
 /* ===== Base Styles ===== */
@@ -3691,6 +3725,42 @@ input, select, textarea {
   color: var(--color-text-muted);
 }
 
+/* ===== Day card (#485) =====
+   On the Day screen only, so the Calendar's day summary, which shares
+   .day-panel, keeps its border. No border: the surface sits on --color-bg in
+   both themes; forced colours put it back. */
+.day-screen .day-panels {
+  gap: var(--day-gap);
+}
+
+.day-screen .day-panel {
+  border: none;
+  border-radius: var(--radius-lg);
+}
+
+.day-screen .day-panel-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--text-base);
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--color-text);
+}
+
+/* An optional drawn icon before the title's words (#405's way), aria-hidden. */
+.day-panel-icon {
+  display: inline-flex;
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+
+.day-panel-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
 /* ===== Day Training panel (#238) =====
    After the Day section and apart from it. Cards reuse .workout-card,
    .type-badge and .workout-effort; only what they lack is here. */
@@ -4633,6 +4703,11 @@ a.training-card {
   .streak-dot.today {
     outline: 2px solid CanvasText;
     outline-offset: 1px;
+  }
+
+  /* #485: forced colours flatten the card and the page to Canvas. */
+  .day-screen .day-panel {
+    border: 1px solid CanvasText;
   }
 }
 

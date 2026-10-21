@@ -708,3 +708,122 @@ describe('demo mode', () => {
     expect(api.logDrink).not.toHaveBeenCalled();
   });
 });
+
+// #553 - back in the foreground, the cards re-read what the widget may have logged.
+describe('returning to the app', () => {
+  const dayReads = (date: string) =>
+    api.getDrinks.mock.calls.filter(([range]) => range.from === date && range.to === date);
+  const historyReads = () => api.getDrinks.mock.calls.filter(([range]) => range.from !== range.to);
+  const comeBack = async () => {
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await flush();
+  };
+  const later = (ms: number) => vi.setSystemTime(new Date(Date.now() + ms));
+  let visibility: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+  });
+  afterEach(() => visibility.mockRestore());
+
+  it('shows a drink logged elsewhere, in the total, the list and the 7-day bars, with no loading state', async () => {
+    const { container } = await mount();
+    expect(total(container, 'Water')).toBe('0oz');
+    const widget = drink('w1', 'water', TODAY, '11:00:00', 354);
+    api.getDrinks.mockResolvedValue({ ok: true, data: { drinks: [widget], water_goal_ml: 1893 } });
+    later(61_000);
+    const seen: string[] = [];
+    const watch = new MutationObserver(() => seen.push(total(container, 'Water')!));
+    watch.observe(container, { childList: true, subtree: true, characterData: true });
+    await comeBack();
+    watch.disconnect();
+    expect(total(container, 'Water')).toBe('12oz');
+    expect(seen).not.toContain('—');
+    expect(entries(container, 'Water')).toHaveLength(1);
+    expect(card(container, 'Water').querySelector('.drink-week')!.getAttribute('aria-label')).toContain('12');
+  });
+
+  it('starts at most one day read and one history read in 60 s, and another after it', async () => {
+    await mount();
+    expect(dayReads(TODAY)).toHaveLength(1);
+    expect(historyReads()).toHaveLength(1);
+    later(30_000);
+    await comeBack();
+    await comeBack();
+    expect(dayReads(TODAY)).toHaveLength(1);
+    expect(historyReads()).toHaveLength(1);
+    later(31_000);
+    await comeBack();
+    await comeBack();
+    expect(dayReads(TODAY)).toHaveLength(2);
+    expect(historyReads()).toHaveLength(2);
+  });
+
+  it('never starts a second read while one is running', async () => {
+    await mount();
+    let release!: (v: unknown) => void;
+    api.getDrinks.mockReturnValue(new Promise((r) => (release = r)));
+    later(61_000);
+    await comeBack();
+    later(61_000);
+    await comeBack();
+    expect(dayReads(TODAY)).toHaveLength(2);
+    release({ ok: true, data: { drinks: [], water_goal_ml: 1893 } });
+    await flush();
+  });
+
+  it('keeps a tap that is still saving, once, when the re-read lands', async () => {
+    const { container } = await mount();
+    let settle!: (v: unknown) => void;
+    api.logDrink.mockReturnValue(new Promise((r) => (settle = r)));
+    fireEvent.click(button(container, 'Add 4 ounces of water'));
+    expect(total(container, 'Water')).toBe('4oz');
+    later(61_000);
+    await comeBack(); // the server has not seen the tap yet
+    expect(total(container, 'Water')).toBe('4oz');
+    expect(entries(container, 'Water')).toHaveLength(1);
+    const id = api.logDrink.mock.calls[0][0].id;
+    settle({ ok: true, data: { ...drink(id, 'water', TODAY, '12:00:00', 118), logged_at_utc: NOW.toISOString() } });
+    await flush();
+    expect(total(container, 'Water')).toBe('4oz');
+    expect(entries(container, 'Water')).toHaveLength(1);
+  });
+
+  it('leaves the shown entries alone, with no error panel, when the re-read fails', async () => {
+    api.getDrinks.mockResolvedValue({
+      ok: true,
+      data: { drinks: [drink('a', 'water', TODAY, '09:00:00', 236)], water_goal_ml: 1893 },
+    });
+    const { container } = await mount();
+    api.getDrinks.mockResolvedValue({ ok: false, kind: 'network' });
+    later(61_000);
+    await comeBack();
+    expect(total(container, 'Water')).toBe('8oz');
+    expect(container.textContent).not.toContain("Couldn't load");
+  });
+
+  it('re-reads the date shown when it is a past day', async () => {
+    await mount(YESTERDAY, 'past');
+    later(61_000);
+    await comeBack();
+    expect(dayReads(YESTERDAY)).toHaveLength(2);
+    expect(dayReads(TODAY)).toHaveLength(0);
+  });
+
+  it('stops listening when the cards go away', async () => {
+    const { unmount } = await mount();
+    unmount();
+    later(61_000);
+    await comeBack();
+    expect(dayReads(TODAY)).toHaveLength(1);
+  });
+
+  it('makes no API call on return in demo mode', async () => {
+    demo.on = true;
+    await mount();
+    later(61_000);
+    await comeBack();
+    expect(api.getDrinks).not.toHaveBeenCalled();
+  });
+});

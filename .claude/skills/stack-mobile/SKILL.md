@@ -8,15 +8,27 @@ description: Conventions, scaffold, and CI for mobile app projects in Keel (Reac
 React Native on Expo, managed workflow. Authoritative for any project whose
 CLAUDE.md names `mobile`.
 
-## Testing is partly human-gated
+## Testing is not human-gated
 
-`/test` runs the automated suite and verifies what it can. Acceptance criteria
-that require a device — gestures, permissions prompts, Bluetooth, camera,
-background behaviour — cannot be checked in CI. Those are listed back explicitly
-and the run stops rather than claiming them.
+The owner is the only user and has waived the on-device check before merge.
+`/test` runs the automated suite (`npx expo lint`, `npm test --if-present`, as
+CI does) and verifies what it can.
 
-Criteria that are pure logic or component behaviour pass normally, and if all of
-an issue's criteria are of that kind the run continues to Ready to Ship.
+Criteria that are pure logic or component behaviour pass on evidence.
+
+Criteria that need a device — gestures, permissions prompts, Bluetooth, camera,
+background behaviour — cannot be checked in CI. They are **not** passed and
+not failed: `/test` lists them back as **waived by the owner, not verified**,
+and the run continues to Ready to Ship and merge. They are never reported as
+passing.
+
+`/ship` writes those behaviours into the issue's `## Results` as things to watch
+after install, with the reminder that the build to install is an EAS build of
+the merged `main` commit (CI does not build the app, see
+[scaffold.md](scaffold.md)), not a build made for the PR. If one is wrong on the
+device the owner reports it and it is fixed as a new issue. In a
+multi-component project this applies to the criteria the `mobile/` component
+owns.
 
 ## Conventions
 

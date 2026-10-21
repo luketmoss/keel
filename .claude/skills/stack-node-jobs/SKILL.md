@@ -233,7 +233,7 @@ just rotated in.
 `/test` runs the suite and verifies what it can. Fakes verify the **logic**. They
 cannot verify anything that only a real run produces, so those acceptance
 criteria are listed back as **cannot be verified here**, and the run stops in
-Testing rather than claiming them — the same shape as mobile. If all of an
+Testing rather than claiming them — the same shape as firmware. If all of an
 issue's criteria are covered by fakes, the run continues to Ready to Ship.
 
 What `/test` cannot verify, and how the owner proves each:

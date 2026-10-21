@@ -72,8 +72,8 @@ not check `src/*.js` itself; the sandbox tests are what exercise the source.
 `/test` runs the suite and verifies what it can. Criteria that need the
 **deployed** script cannot be checked in CI or from a session. They are listed
 back explicitly, and the run stops in Testing rather than claiming them — the
-same shape as mobile. If all of an issue's criteria are covered by the sandbox,
-the run continues to Ready to Ship.
+same shape as firmware. If all of an issue's criteria are covered by the
+sandbox, the run continues to Ready to Ship.
 
 What `/test` cannot verify here, and how the owner proves each:
 

@@ -16,6 +16,7 @@ Alcohol right. Under the grid, inside the same slot, one log row.
 ┌ (drop) Water      › ┐ ┌ (glass) Alcohol   › ┐
 │ 8 oz  of 64         │ │ 1 drink             │
 │ [██░░░░░░░░░░]      │ │                     │
+│ ▁ ▃ ▅ ▂ ▆ ▄ █       │ │ ▁ ▁ ▂ ▁ ▃ ▁ ▂       │
 │ [ + 4 oz ]          │ │ [ + 1 ]             │
 └─────────────────────┘ └─────────────────────┘
   Today's log · 3 drinks                     ⌄
@@ -24,20 +25,34 @@ Alcohol right. Under the grid, inside the same slot, one log row.
 ## A tile
 
 1. **Title row**: icon (`--metric-water` / `--metric-alcohol`) and "Water" /
-   "Alcohol", `--text-sm` 600; at the right the `CardChevron`. The title is a
-   `CardLink` to Trends' **Intake** group (#521) for the viewed date, as the
-   metric tiles link to theirs (#504).
+   "Alcohol", `--text-sm` 600; at the right the `CardChevron`.
+   **The whole tile opens Trends' Intake group** (#521) for the viewed date,
+   exactly as the metric tiles open theirs (#504): a `CardLink` stretched over
+   the tile. `TrendsLinkGroup` gains `'intake'`. The add button sits above the
+   link (`position: relative; z-index: 1`), so tapping it adds a drink and
+   never navigates; tapping anywhere else on the tile opens Trends.
 2. **Value**: `--figure-lg`, then the unit ("oz", "drink"/"drinks") and, for
    water, "of 64" in `--text-sm` `--color-text-secondary`. The goal's unit is
    dropped because it is beside the value's.
 3. **Bar** (water only): `--drink-bar-height` is reduced to 6px, matching the
    widget and the metric tiles' range bar weight; full tile width.
-4. **Add button** (today only): `.btn .btn-sm` in the metric colour, label
+4. **Last 7 days**: seven bars, drawn as #491's stress tile draws its bars
+   (bars 32px max, `--radius-sm` tops), the 7 days ending on the viewed day.
+   Water's height is the day's total ÷ the goal, capped at full, with a 1px
+   `--color-border` line at the goal height; alcohol's is the day's count ÷ 4,
+   capped. The viewed day's bar in the metric colour, the others at 35%
+   opacity. A day before the first drink ever logged is an empty slot, a later
+   day with none is a zero-height bar (#521's rule). Data: the same
+   `getDrinks` history Trends reads (#521's `drinkHistory`), loaded for the
+   last 7 days when the Day view opens. `role="img"`, `aria-label` "Water,
+   last 7 days: 32, 48, 64, 20, 56, 40, 8 ounces" ("no data" for an empty
+   slot).
+5. **Add button** (today only): `.btn .btn-sm` in the metric colour, label
    "+ 4 oz" / "+ 1", left-aligned, width to its label. `.btn-sm` is the app's
    compact button (36px tall); a transparent `::before` extends its hit area to
    the 44px minimum without changing how it looks. On a past day the button is
    not drawn and the tile simply ends after the value (bar for water).
-5. The two tiles stretch to the same height (grid `align-items: stretch`), and
+6. The two tiles stretch to the same height (grid `align-items: stretch`), and
    the buttons sit at the bottom of each tile, so they share a baseline even
    though only Water has a bar.
 

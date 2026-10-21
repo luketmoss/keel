@@ -86,10 +86,10 @@ The run stops early if:
 - a merge to the same Project since Refined invalidated this issue's premise
   (#203) — `/develop` stops before cutting a branch and says what changed
 - a criterion fails and the fix isn't clear or is out of scope
-- the stack gates Testing — firmware always, mobile for device-dependent
-  criteria. The run stops in Testing with the unverifiable criteria listed.
-  Android is not gated: its phone-dependent criteria are waived by the owner,
-  listed back as not verified, and the run continues
+- the stack gates Testing — firmware always. The run stops in Testing with the
+  unverifiable criteria listed. Android and mobile are not gated: their
+  device-dependent criteria are waived by the owner, listed back as not
+  verified, and the run continues
 - `/review` finds something blocking — the issue returns to In Development
 - the PR changes a human-reviewed path (`CONVENTIONS.md` §Human-reviewed
   paths). `/review` ends clean and `/ship` declines to merge; the issue stays

@@ -58,16 +58,15 @@ re-run this skill from the top. Don't accumulate half-verified criteria.
 ## Exit
 
 **If a touched component's stack skill declares Testing human-gated** (firmware
-always; mobile for device-dependent criteria): verify everything
-verifiable, then **stop**. List the criteria that need hardware or a device, in full, and
-hand back. Do not advance, and do not take the PR out of draft — it isn't ready
-for review while its behaviour is unconfirmed.
+always): verify everything verifiable, then **stop**. List the criteria that
+need hardware, in full, and hand back. Do not advance, and do not take the PR
+out of draft — it isn't ready for review while its behaviour is unconfirmed.
 
-**If the stack skill says the owner waived the device check** (android): verify
-everything verifiable, then list the phone-dependent criteria back as **waived
-by the owner, not verified**, in full and by number. They are not passes and
-must not be worded as passes. Then continue as below; the list is what `/ship`
-carries into `## Results` as things to watch after install.
+**If the stack skill says the owner waived the device check** (android,
+mobile): verify everything verifiable, then list the device-dependent criteria
+back as **waived by the owner, not verified**, in full and by number. They are
+not passes and must not be worded as passes. Then continue as below; the list
+is what `/ship` carries into `## Results` as things to watch after install.
 
 **Otherwise**, when every criterion passes (or is waived, above):
 

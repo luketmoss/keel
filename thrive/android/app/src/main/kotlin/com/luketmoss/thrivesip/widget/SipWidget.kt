@@ -57,15 +57,27 @@ import androidx.glance.Button
 import androidx.glance.ButtonDefaults
 import androidx.glance.color.ColorProvider as DayNightColorProvider
 
-// Three heights, two widths. Responsive mode draws the largest declared size
+// Three heights, two widths, and a third width for the short row (coffee, #561). Responsive mode draws the largest declared size
 // that fits, so each layout below is sized to fit inside its own declared size.
 private val SMALL_SHORT = DpSize(110.dp, 56.dp)
 private val WIDE_SHORT = DpSize(250.dp, 56.dp)
+private val WIDER_SHORT = DpSize(360.dp, 56.dp)
 private val SMALL = DpSize(110.dp, 100.dp)
 private val WIDE = DpSize(250.dp, 100.dp)
 private val SMALL_TALL = DpSize(110.dp, 150.dp)
 private val WIDE_TALL = DpSize(250.dp, 150.dp)
 private val WIDE_FROM = 200.dp
+
+/** From this up a one-row widget has room for coffee as well as water and alcohol. */
+private val WIDER_FROM = 300.dp
+
+/**
+ * A coffee or alcohol cell in the two-cells-tall layout: icon and count over a
+ * "+ 1" button. Water takes the rest, so at the 250dp minimum it keeps about
+ * what it had before the third column.
+ */
+private val COUNT_COLUMN = 52.dp
+private val COLUMN_GAP = 8.dp
 
 /** Below this everything sits on one row: figure and button, no title or bar. */
 private val SHORT_BELOW = 100.dp
@@ -81,6 +93,7 @@ private fun accent(light: Long, dark: Long): androidx.glance.unit.ColorProvider 
     DayNightColorProvider(day = Color(light), night = Color(dark))
 
 private val WATER = accent(SipColors.WATER_LIGHT, SipColors.WATER_DARK)
+private val COFFEE = accent(SipColors.COFFEE_LIGHT, SipColors.COFFEE_DARK)
 private val ALCOHOL = accent(SipColors.ALCOHOL_LIGHT, SipColors.ALCOHOL_DARK)
 private val ON_ACCENT = accent(SipColors.ON_ACCENT_LIGHT, SipColors.ON_ACCENT_DARK)
 private val TRACK = accent(SipColors.TRACK_LIGHT, SipColors.TRACK_DARK)
@@ -92,7 +105,7 @@ private val TRACK = accent(SipColors.TRACK_LIGHT, SipColors.TRACK_DARK)
  * already running.
  */
 class SipWidget : GlanceAppWidget() {
-    override val sizeMode = SizeMode.Responsive(setOf(SMALL_SHORT, WIDE_SHORT, SMALL, WIDE, SMALL_TALL, WIDE_TALL))
+    override val sizeMode = SizeMode.Responsive(setOf(SMALL_SHORT, WIDE_SHORT, WIDER_SHORT, SMALL, WIDE, SMALL_TALL, WIDE_TALL))
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val store = SipStore(context)
@@ -106,6 +119,7 @@ class SipWidget : GlanceAppWidget() {
                     wide = size.width >= WIDE_FROM,
                     short = size.height < SHORT_BELOW,
                     tall = size.height >= TALL_FROM,
+                    wider = size.width >= WIDER_FROM,
                 )
             }
         }
@@ -125,14 +139,14 @@ object WidgetUpdater {
 }
 
 @Composable
-private fun Content(view: WidgetView, wide: Boolean, short: Boolean, tall: Boolean) {
+private fun Content(view: WidgetView, wide: Boolean, short: Boolean, tall: Boolean, wider: Boolean) {
     val openThrive: Action = actionStartActivity<OpenThriveActivity>()
     val openSettings: Action = actionStartActivity<MainActivity>()
     val bodyAction = if (view.mode == Mode.NOT_CONFIGURED || view.mode == Mode.KEY_REJECTED) openSettings else openThrive
     val secondary = GlanceTheme.colors.onSurfaceVariant
 
     if (short) {
-        ShortContent(view, wide, bodyAction)
+        ShortContent(view, wide, wider, bodyAction)
         return
     }
 
@@ -177,8 +191,10 @@ private fun Content(view: WidgetView, wide: Boolean, short: Boolean, tall: Boole
         Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
             Column(modifier = GlanceModifier.defaultWeight()) { WaterFigure(view, withBar = false) }
             if (wide) {
-                Spacer(GlanceModifier.width(12.dp))
-                Column(modifier = GlanceModifier.defaultWeight()) { AlcoholFigure(view) }
+                Spacer(GlanceModifier.width(COLUMN_GAP))
+                Column(modifier = GlanceModifier.width(COUNT_COLUMN)) { CoffeeFigure(view) }
+                Spacer(GlanceModifier.width(COLUMN_GAP))
+                Column(modifier = GlanceModifier.width(COUNT_COLUMN)) { AlcoholFigure(view, countOnly = true) }
             }
         }
 
@@ -192,9 +208,8 @@ private fun Content(view: WidgetView, wide: Boolean, short: Boolean, tall: Boole
                     backgroundColor = TRACK,
                 )
                 if (wide) {
-                    // Holds the bar to the water half, so it ends where the water button does.
-                    Spacer(GlanceModifier.width(12.dp))
-                    Spacer(GlanceModifier.defaultWeight())
+                    // Holds the bar to the water column, so it ends where the water button does.
+                    Spacer(GlanceModifier.width(COLUMN_GAP + COUNT_COLUMN + COLUMN_GAP + COUNT_COLUMN))
                 }
             }
         }
@@ -212,12 +227,21 @@ private fun Content(view: WidgetView, wide: Boolean, short: Boolean, tall: Boole
                 colors = ButtonDefaults.buttonColors(backgroundColor = WATER, contentColor = ON_ACCENT),
             )
             if (wide) {
-                Spacer(GlanceModifier.width(12.dp))
+                Spacer(GlanceModifier.width(COLUMN_GAP))
+                Button(
+                    text = "+ 1",
+                    onClick = actionRunCallback<AddCoffeeAction>(),
+                    enabled = view.buttonsEnabled,
+                    modifier = GlanceModifier.width(COUNT_COLUMN).height(BUTTON_HEIGHT)
+                        .semantics { contentDescription = "Add one cup of coffee" },
+                    colors = ButtonDefaults.buttonColors(backgroundColor = COFFEE, contentColor = ON_ACCENT),
+                )
+                Spacer(GlanceModifier.width(COLUMN_GAP))
                 Button(
                     text = "+ 1",
                     onClick = actionRunCallback<AddAlcoholAction>(),
                     enabled = view.buttonsEnabled,
-                    modifier = GlanceModifier.defaultWeight().height(BUTTON_HEIGHT)
+                    modifier = GlanceModifier.width(COUNT_COLUMN).height(BUTTON_HEIGHT)
                         .semantics { contentDescription = "Add one alcoholic drink" },
                     colors = ButtonDefaults.buttonColors(backgroundColor = ALCOHOL, contentColor = ON_ACCENT),
                 )
@@ -227,7 +251,7 @@ private fun Content(view: WidgetView, wide: Boolean, short: Boolean, tall: Boole
 }
 
 @Composable
-private fun WaterFigure(view: WidgetView, withBar: Boolean = true) {
+private fun WaterFigure(view: WidgetView, withBar: Boolean = true, withGoal: Boolean = true) {
     val onSurface = GlanceTheme.colors.onSurface
     val secondary = GlanceTheme.colors.onSurfaceVariant
     if (view.mode == Mode.LOADING) {
@@ -247,7 +271,7 @@ private fun WaterFigure(view: WidgetView, withBar: Boolean = true) {
         )
         Spacer(GlanceModifier.width(4.dp))
         Text(text = view.waterText, style = TextStyle(color = onSurface, fontSize = 20.sp, fontWeight = FontWeight.Bold))
-        if (view.goalText != null) {
+        if (withGoal && view.goalText != null) {
             Spacer(GlanceModifier.width(4.dp))
             Text(text = view.goalText, style = TextStyle(color = secondary, fontSize = 12.sp))
         }
@@ -265,9 +289,9 @@ private fun WaterFigure(view: WidgetView, withBar: Boolean = true) {
 }
 
 @Composable
-private fun AlcoholFigure(view: WidgetView) {
+private fun AlcoholFigure(view: WidgetView, countOnly: Boolean = false) {
     val onSurface = GlanceTheme.colors.onSurface
-    if (view.alcoholText == null) return
+    val text = (if (countOnly) view.alcoholCount else view.alcoholText) ?: return
     Row(
         modifier = GlanceModifier.semantics { contentDescription = view.alcoholDescription },
         verticalAlignment = Alignment.Bottom,
@@ -279,17 +303,38 @@ private fun AlcoholFigure(view: WidgetView) {
             colorFilter = ColorFilter.tint(ALCOHOL),
         )
         Spacer(GlanceModifier.width(4.dp))
-        Text(text = view.alcoholText, style = TextStyle(color = onSurface, fontSize = 20.sp, fontWeight = FontWeight.Bold))
+        Text(text = text, style = TextStyle(color = onSurface, fontSize = 20.sp, fontWeight = FontWeight.Bold))
+    }
+}
+
+/** Icon and cup count; "cups" stays in the content description. */
+@Composable
+private fun CoffeeFigure(view: WidgetView) {
+    val onSurface = GlanceTheme.colors.onSurface
+    if (view.coffeeText == null) return
+    Row(
+        modifier = GlanceModifier.semantics { contentDescription = view.coffeeDescription },
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        Image(
+            provider = ImageProvider(R.drawable.ic_coffee),
+            contentDescription = null,
+            modifier = GlanceModifier.size(20.dp),
+            colorFilter = ColorFilter.tint(COFFEE),
+        )
+        Spacer(GlanceModifier.width(4.dp))
+        Text(text = view.coffeeText, style = TextStyle(color = onSurface, fontSize = 20.sp, fontWeight = FontWeight.Bold))
     }
 }
 
 /**
  * One row, no title, status or bar, for a widget a single cell tall: figure and
- * button for water, then (when wide) the same for alcohol. The not-configured
+ * button for water, then (when wide) the same for alcohol, and from 300dp
+ * (the 360dp size) coffee between them (#561). The not-configured
  * and key-rejected prompts replace the figures so they are never hidden.
  */
 @Composable
-private fun ShortContent(view: WidgetView, wide: Boolean, bodyAction: Action) {
+private fun ShortContent(view: WidgetView, wide: Boolean, wider: Boolean, bodyAction: Action) {
     val onSurface = GlanceTheme.colors.onSurface
     Row(
         modifier = GlanceModifier
@@ -306,7 +351,7 @@ private fun ShortContent(view: WidgetView, wide: Boolean, bodyAction: Action) {
             return@Row
         }
         Column(modifier = GlanceModifier.defaultWeight()) {
-            WaterFigure(view, withBar = false)
+            WaterFigure(view, withBar = false, withGoal = !wider)
         }
         Button(
             text = "+ 4 oz",
@@ -316,7 +361,28 @@ private fun ShortContent(view: WidgetView, wide: Boolean, bodyAction: Action) {
                 .semantics { contentDescription = "Add 4 ounces of water" },
             colors = ButtonDefaults.buttonColors(backgroundColor = WATER, contentColor = ON_ACCENT),
         )
-        if (wide) {
+        if (wider) {
+            Spacer(GlanceModifier.width(COLUMN_GAP))
+            Column(modifier = GlanceModifier.defaultWeight()) { CoffeeFigure(view) }
+            Button(
+                text = "+ 1",
+                onClick = actionRunCallback<AddCoffeeAction>(),
+                enabled = view.buttonsEnabled,
+                modifier = GlanceModifier.width(48.dp).height(BUTTON_HEIGHT)
+                    .semantics { contentDescription = "Add one cup of coffee" },
+                colors = ButtonDefaults.buttonColors(backgroundColor = COFFEE, contentColor = ON_ACCENT),
+            )
+            Spacer(GlanceModifier.width(COLUMN_GAP))
+            Column(modifier = GlanceModifier.defaultWeight()) { AlcoholFigure(view, countOnly = true) }
+            Button(
+                text = "+ 1",
+                onClick = actionRunCallback<AddAlcoholAction>(),
+                enabled = view.buttonsEnabled,
+                modifier = GlanceModifier.width(48.dp).height(BUTTON_HEIGHT)
+                    .semantics { contentDescription = "Add one alcoholic drink" },
+                colors = ButtonDefaults.buttonColors(backgroundColor = ALCOHOL, contentColor = ON_ACCENT),
+            )
+        } else if (wide) {
             Spacer(GlanceModifier.width(12.dp))
             Column(modifier = GlanceModifier.defaultWeight()) { AlcoholFigure(view) }
             Button(

@@ -16,6 +16,7 @@ val SipJson = Json { ignoreUnknownKeys = true }
 object Kind {
     const val WATER = "water"
     const val ALCOHOL = "alcohol"
+    const val COFFEE = "coffee"
 }
 
 /**
@@ -43,8 +44,10 @@ data class Totals(
     @SerialName("water_ml") val waterMl: Int,
     @SerialName("alcohol_drinks") val alcoholDrinks: Int,
     @SerialName("water_goal_ml") val waterGoalMl: Int,
+    /** Defaulted so a deployment that predates coffee (#560) still reads. */
+    @SerialName("coffee_cups") val coffeeCups: Int = 0,
 ) {
-    fun isSane(): Boolean = waterMl >= 0 && alcoholDrinks >= 0 && waterGoalMl >= 0
+    fun isSane(): Boolean = waterMl >= 0 && alcoholDrinks >= 0 && waterGoalMl >= 0 && coffeeCups >= 0
 }
 
 /** The tap instant in the form the API takes: ISO 8601 UTC, whole seconds, `...Z`. */

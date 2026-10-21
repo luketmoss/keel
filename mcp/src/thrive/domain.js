@@ -341,6 +341,20 @@ export function kgToLb(kg) {
   return Number.isFinite(n) ? (n * 2.20462262185).toFixed(1) : '';
 }
 
+/** ml in one US fluid ounce: ML_PER_OZ in thrive/frontend/src/state/drinks.ts. Change both together. */
+export const ML_PER_OZ = 29.5735;
+
+/**
+ * Water ml (as stored, #519) -> US fl oz to one decimal, as the app's
+ * formatOz shows it (#522). `''` stays `''`: no water logged is unknown,
+ * never zero.
+ */
+export function mlToOz(ml) {
+  if (ml === '' || ml === null || ml === undefined) return '';
+  const n = Number(ml);
+  return Number.isFinite(n) ? String(Math.round((n / ML_PER_OZ) * 10) / 10) : '';
+}
+
 /** Seconds (as stored) -> whole minutes, or null when unset. Never 0. */
 export function secondsToMinutes(elapsedSeconds) {
   const seconds = parseInt(elapsedSeconds, 10);

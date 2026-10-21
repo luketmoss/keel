@@ -60,7 +60,14 @@ signal — several `Easy` sessions on a lift mean it's time to add load.
 
 **Read and analyze** — `thrive_list_workouts`, `thrive_get_workout`,
 `thrive_list_exercises`, `thrive_list_templates`, `thrive_exercise_history`,
-`thrive_daily_health`, `thrive_daily_summary`, `thrive_body_measurements`, `thrive_journal`.
+`thrive_daily_health`, `thrive_daily_summary`, `thrive_body_measurements`, `thrive_journal`,
+`thrive_drinks`.
+
+`thrive_drinks` reads the water and alcohol the user logged (default: today): each entry,
+per-day totals (water in oz and ml against the daily goal, alcohol in standard drinks) and
+the goal. A day with nothing logged is unknown, not a day without water. It is read-only:
+no tool logs a drink, so if the user asks you to, tell them to use the app or the widget.
+`thrive_daily_summary` carries the same daily totals, but only as of its last rebuild.
 
 `thrive_exercise_history` is the one for progression decisions: it returns every logged
 set of a lift over time, newest first, with effort.

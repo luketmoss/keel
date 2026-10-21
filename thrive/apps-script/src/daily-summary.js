@@ -1,5 +1,5 @@
-// DailySummary tab (A:Y) — one row per local calendar day, rolled up from
-// Workouts, DailyHealth and BodyMeasurements (#203).
+// DailySummary tab (A:AA) — one row per local calendar day, rolled up from
+// Workouts, DailyHealth, BodyMeasurements (#203) and Drinks (#522).
 //
 // **Derived, never authoritative.** Every row is rebuildable at any time from
 // its sources. Nothing writes here by hand and no consumer may treat it as a
@@ -171,6 +171,48 @@ function getBodyMeasurementsByDate() {
   return byDate;
 }
 
+/**
+ * Every Drinks row, grouped by its local `date` (#522). A missing tab leaves
+ * this `{}`, as a missing BodyMeasurements tab does: every day is then
+ * legitimately drink-less, and Z:AA stay blank everywhere.
+ */
+function getDrinksByDate() {
+  var sheet = getSpreadsheet().getSheetByName(DRINKS_SHEET);
+  if (!sheet) return {};
+  var rows = getAllRows(sheet);
+  var byDate = {};
+  for (var i = 0; i < rows.length; i++) {
+    var drink = {};
+    for (var f = 0; f < DRINK_FIELDS.length; f++) drink[DRINK_FIELDS[f]] = cell(rows[i][f]);
+    if (!drink.id || !drink.date) continue;
+    if (!Object.prototype.hasOwnProperty.call(byDate, drink.date)) byDate[drink.date] = [];
+    byDate[drink.date].push(drink);
+  }
+  return byDate;
+}
+
+/**
+ * The day's two drinks columns (#522): `water_ml` the sum of its water
+ * amounts, `alcohol_drinks` the sum of its alcohol amounts. Each is blank,
+ * never `0`, on a day with no drink of that kind: blank means not recorded,
+ * the rule every other column here keeps. An amount that is not a whole
+ * number is skipped; the API never writes one.
+ */
+function summarizeDrinksDay(dayDrinks) {
+  var water = 0, waterCount = 0, alcohol = 0, alcoholCount = 0;
+  var list = dayDrinks || [];
+  for (var i = 0; i < list.length; i++) {
+    var amount = String(list[i].amount).trim();
+    if (!/^\d+$/.test(amount)) continue;
+    if (list[i].kind === 'water') { water += Number(amount); waterCount += 1; }
+    else if (list[i].kind === 'alcohol') { alcohol += Number(amount); alcoholCount += 1; }
+  }
+  return {
+    water_ml: waterCount ? String(water) : '',
+    alcohol_drinks: alcoholCount ? String(alcohol) : '',
+  };
+}
+
 /** Round half up to the nearest whole number — Math.round's tie-break, made explicit. */
 function roundHalfUp(n) {
   return Math.floor(n + 0.5);
@@ -228,17 +270,19 @@ function summarizeBodyDay(dayBody) {
 /**
  * The summary for one day, or `null` when the day has nothing to report.
  *
- * A day with no activities, no health data and no body measurement produces
- * **no row** rather than a row of zeros (#131 AC1, extended by #203). Zero
- * activities and "we have no information" are different claims, and only one
- * of them is true of a day nobody trained, wore the watch or stepped on the
- * scale.
+ * A day with no activities, no health data, no body measurement and no drink
+ * produces **no row** rather than a row of zeros (#131 AC1, extended by #203
+ * and #522). Zero activities and "we have no information" are different
+ * claims, and only one of them is true of a day nobody trained, wore the
+ * watch, stepped on the scale or logged a drink.
  */
-function buildDaySummary(date, workouts, health, computedAt, body) {
+function buildDaySummary(date, workouts, health, computedAt, body, drinks) {
   var health_ = health || null;
   var body_ = body || null;
-  if (!workouts.length && !health_ && !body_) return null;
+  var drinks_ = drinks && drinks.length ? drinks : null;
+  if (!workouts.length && !health_ && !body_ && !drinks_) return null;
   var bodySummary = summarizeBodyDay(body_);
+  var drinksSummary = summarizeDrinksDay(drinks_);
 
   var outdoorCardio = workouts.filter(isOutdoorCardio);
   // Blank when no outdoor session measured it, never 0 (#190, as #181 did for
@@ -284,6 +328,9 @@ function buildDaySummary(date, workouts, health, computedAt, body) {
     systolic_mmhg: bodySummary.systolic_mmhg,
     diastolic_mmhg: bodySummary.diastolic_mmhg,
     bp_count: bodySummary.bp_count,
+    // Appended after Y (#522), for the same reason.
+    water_ml: drinksSummary.water_ml,
+    alcohol_drinks: drinksSummary.alcohol_drinks,
   };
 }
 
@@ -371,6 +418,7 @@ function rebuildDailySummary(from, to, options) {
 
   var health = getDailyHealth();
   var body = getBodyMeasurementsByDate();
+  var drinks = getDrinksByDate();
 
   var sheet = getSheet(DAILY_SUMMARY_SHEET);
   var existing = getDailySummaries();
@@ -388,8 +436,9 @@ function rebuildDailySummary(from, to, options) {
     var dayWorkouts = Object.prototype.hasOwnProperty.call(byDate, date) ? byDate[date] : [];
     var dayHealth = Object.prototype.hasOwnProperty.call(health, date) ? health[date] : null;
     var dayBody = Object.prototype.hasOwnProperty.call(body, date) ? body[date] : null;
+    var dayDrinks = Object.prototype.hasOwnProperty.call(drinks, date) ? drinks[date] : null;
 
-    var summary = buildDaySummary(date, dayWorkouts, dayHealth, computedAt, dayBody);
+    var summary = buildDaySummary(date, dayWorkouts, dayHealth, computedAt, dayBody, dayDrinks);
     if (!summary) {
       skipped += 1;
       // A day that has a row but no longer earns one — its last workout was

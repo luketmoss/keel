@@ -19,6 +19,7 @@ const READ_ONLY = [
   'thrive_body_measurements',
   'thrive_daily_health',
   'thrive_daily_summary',
+  'thrive_drinks',
   'thrive_exercise_history',
   'thrive_get_workout',
   'thrive_get_workout_payload',
@@ -98,7 +99,7 @@ function fakeThrive(answer: (action: string, url: URL) => unknown) {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('thrive tool list', () => {
-  it('serves exactly the 10 read tools on /thrive/mcp and the other 13 on /thrive/write/mcp (#409)', async () => {
+  it('serves exactly the 11 read tools on /thrive/mcp and the other 13 on /thrive/write/mcp (#409, #522)', async () => {
     const read = (await listTools('read')).map((t) => t.name).sort()
     const write = (await listTools('write')).map((t) => t.name).sort()
     expect(read).toEqual([...READ_ONLY].sort())
@@ -116,7 +117,7 @@ describe('thrive tool list', () => {
       description,
       inputSchema: canon(inputSchema),
     }))
-    expect(worker).toHaveLength(23)
+    expect(worker).toHaveLength(24)
     expect(worker).toEqual(stdio)
   })
 
@@ -125,6 +126,9 @@ describe('thrive tool list', () => {
     const hint = (name: string) => tools.find((t) => t.name === name)?.annotations
     for (const name of DESTRUCTIVE) expect(hint(name)?.destructiveHint, name).toBe(true)
     for (const name of READ_ONLY) expect(hint(name)?.readOnlyHint, name).toBe(true)
+    // #522: thrive_drinks is read-only, and nothing on the write endpoint touches drinks.
+    expect(hint('thrive_drinks')).toEqual({ readOnlyHint: true })
+    expect((await listTools('write')).filter((t) => /drink/i.test(t.name))).toEqual([])
     // No other tool claims either hint.
     for (const t of tools) {
       if (DESTRUCTIVE.includes(t.name) || READ_ONLY.includes(t.name)) continue

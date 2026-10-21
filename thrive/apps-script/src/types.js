@@ -203,7 +203,7 @@ var SECTIONS = ['warmup', 'primary', 'SS1', 'SS2', 'SS3', 'burnout', 'cooldown']
 /** The fields a set correction may change. Mirrors SET_UPDATE_FIELDS. */
 var SET_UPDATE_FIELDS = ['weight', 'reps', 'planned_reps', 'effort'];
 
-// --- DailySummary (A:T) — #131, #181 --------------------------------
+// --- DailySummary (A:AA) — #131, #181, #203, #522 -------------------
 //
 // One row per local calendar day. Derived, never authoritative: if this tab
 // and Workouts disagree, Workouts is right and this is stale.
@@ -213,9 +213,10 @@ var SET_UPDATE_FIELDS = ['weight', 'reps', 'planned_reps', 'effort'];
 // coverage, so they belong together; readable ordering is free while the tab
 // does not exist yet, and a migration later.
 //
-// The duration coverage (S, T) came later (#181), and the body columns (U-Y)
-// later still (#203); both are appended, not inserted, because almanac
-// (luketmoss/keel) reads this tab by column, so no letter A:T may move.
+// The duration coverage (S, T) came later (#181), the body columns (U-Y)
+// later still (#203), and the drinks columns (Z, AA) after that (#522); each
+// is appended, not inserted, because almanac (luketmoss/keel) reads this tab
+// by column, so no earlier letter may move.
 var DAILY_SUMMARY_FIELDS = [
   'date',                  // A  PK, America/Denver local calendar date
   'activity_count',        // B  all activities, indoor and outdoor
@@ -242,9 +243,11 @@ var DAILY_SUMMARY_FIELDS = [
   'systolic_mmhg',         // W  #203: mean of the day's BP readings, rounded half up
   'diastolic_mmhg',        // X  #203: mean of the day's BP readings, rounded half up
   'bp_count',              // Y  #203: BP readings that day (rows, not values)
+  'water_ml',              // Z  #522: sum of the day's water amounts from Drinks; blank when none
+  'alcohol_drinks',        // AA #522: sum of the day's alcohol amounts (standard drinks); blank when none
 ];
 
-var DAILY_SUMMARY_COLUMN_COUNT = 25;
+var DAILY_SUMMARY_COLUMN_COUNT = 27;
 
 // --- DailyHealth (A:S) — #165, #231 ---------------------------------
 //
@@ -304,9 +307,9 @@ var JOURNAL_COLUMN_COUNT = 4;
 
 // --- Drinks (A:I) and Settings (A:C) - #519 ---------------------------------
 //
-// One row per drink (Thrive Sip, #518), written by the API alone: the widget,
-// the app and later the MCP Worker all go through logDrink and friends
-// (drinks.js). Mirrored, read-only here, by frontend/src/api/drinks.ts; change
+// One row per drink (Thrive Sip, #518), written by the API alone: the widget
+// and the app go through logDrink and friends (drinks.js). The MCP Worker only
+// reads, through getDrinks (#522). Mirrored, read-only here, by frontend/src/api/drinks.ts; change
 // both together. Created by scripts/migrate-519-drinks-tab.mjs; later columns
 // are only appended.
 var DRINK_FIELDS = [

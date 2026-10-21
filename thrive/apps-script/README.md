@@ -260,6 +260,14 @@ them. A day with no scale or no BP reading leaves that half blank, never `0`;
 a day with only body readings still gets a row, with every other column blank
 as usual. A missing `BodyMeasurements` tab leaves U:Y blank everywhere.
 
+`water_ml` (Z) and `alcohol_drinks` (AA) are rolled up from `Drinks` (#522),
+appended after `bp_count` for the same reason: the sum of the day's water
+`amount`s (ml) and of its alcohol `amount`s (standard drinks). Each is blank,
+never `0`, on a day with no drink of that kind; a day with only drinks still
+gets a row, and a missing `Drinks` tab leaves Z:AA blank everywhere. Logging a
+drink does not rebuild the summary: the columns catch up on the next rebuild,
+and the app's Day and Trends read `Drinks` directly, so they are never stale.
+
 ### DailyHealth (#165, #158, #231)
 
 | Action | Parameters / payload |

@@ -252,6 +252,12 @@ export const fetchJournal = (from, to) => apiGet('getJournal', { from, to });
  * workout id: the API finds the file from the row, never from us.
  */
 export const fetchWorkoutPayload = (id, offset) => apiGet('getWorkoutPayload', { id, offset });
+/**
+ * Drinks in an inclusive date range, oldest first, with the current water goal
+ * (#519, #522): `{ drinks, water_goal_ml }`. A read: nothing in this client
+ * calls logDrink, updateDrinkTime or deleteDrink.
+ */
+export const fetchDrinks = (from, to) => apiGet('getDrinks', { from, to });
 /** The change log, newest call first (#434). The API caps one answer at 1000 rows. */
 export const fetchChangeLog = () => apiGet('getChangeLog', { limit: 1000 });
 

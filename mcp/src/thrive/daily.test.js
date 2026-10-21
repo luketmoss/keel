@@ -35,6 +35,7 @@ const SUMMARY_FIELDS = [
   'ascent_withdata', 'max_effort', 'effort_counts', 'steps', 'resting_hr', 'hrv',
   'sleep_total_s', 'training_load', 'computed_at', 'moving_withdata', 'elapsed_withdata',
   'weight_kg', 'fat_ratio_pct', 'systolic_mmhg', 'diastolic_mmhg', 'bp_count',
+  'water_ml', 'alcohol_drinks',
 ];
 const summary = (o) => ({ ...Object.fromEntries(SUMMARY_FIELDS.map((f) => [f, o[f] ?? ''])), sheetRow: 2 });
 
@@ -139,7 +140,7 @@ test('a summary day carries outdoor totals with their coverage', () => {
       'outdoor distance 12.4 mi (measured on 1 of 1 outdoor cardio session) · ' +
       'outdoor ascent 1,500 ft (measured on 1 of 1 outdoor cardio session) · ' +
       'max effort Hard (Hard 1, Medium 2) · steps 8,400 · resting HR 57 bpm · HRV 41 ms · ' +
-      'sleep 7:15 · training load 7 · weight — · fat — · BP —',
+      'sleep 7:15 · training load 7 · weight — · fat — · BP — · water — · alcohol —',
   );
 });
 
@@ -234,8 +235,34 @@ test('weight, fat and BP show in kg/lb and mmHg, with the BP count', () => {
 
 test('a day with no body reading shows weight, fat and BP as —, and bp_count never 0', () => {
   const line = describeSummaryDay(summary({ date: '2026-09-15' }));
-  assert.match(line, /· weight — · fat — · BP —$/);
+  assert.match(line, /· weight — · fat — · BP — ·/);
   assert.doesNotMatch(line, /BP 0/);
+});
+
+// #522: water and alcohol rolled up from Drinks.
+test('water shows in oz and ml, and alcohol as drinks, for a day that has them', () => {
+  const line = describeSummaryDay(summary({ date: '2026-10-19', water_ml: '354', alcohol_drinks: '2' }));
+  assert.match(line, /· water 12 oz \(354 ml\) · alcohol 2 drinks$/);
+  assert.match(describeSummaryDay(summary({ alcohol_drinks: '1' })), /· alcohol 1 drink$/);
+});
+
+test('a kind not logged shows as —, never 0', () => {
+  const waterOnly = describeSummaryDay(summary({ date: '2026-10-19', water_ml: '250' }));
+  assert.match(waterOnly, /· water 8\.5 oz \(250 ml\) · alcohol —$/);
+  const neither = describeSummaryDay(summary({ date: '2026-10-19' }));
+  assert.match(neither, /· water — · alcohol —$/);
+  assert.doesNotMatch(neither, /water 0|alcohol 0/);
+});
+
+test('a row from before #522, with no drinks fields at all, reads as —', () => {
+  const { water_ml: _w, alcohol_drinks: _a, ...older } = summary({ date: '2026-10-19' });
+  assert.match(describeSummaryDay(older), /· water — · alcohol —$/);
+});
+
+test('the summary range explains the drinks columns and points at thrive_drinks', () => {
+  const text = describeSummaryRange([summary({ date: '2026-10-19' })], { from: '2026-10-19', to: '2026-10-19' });
+  assert.match(text, /Water and alcohol are the day's totals from the Drinks log/);
+  assert.match(text, /thrive_drinks reads the log directly/);
 });
 
 test('a BP reading missing one side shows that side alone as —, still with the mean of the other', () => {

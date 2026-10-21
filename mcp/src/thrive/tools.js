@@ -20,7 +20,7 @@ import {
   ApiError, scrubSecrets,
   fetchWorkouts, fetchWorkout, fetchSets, fetchExercises, fetchTemplates,
   fetchDailyHealth, fetchDailySummary, fetchBodyMeasurements, fetchWorkoutPayload, fetchJournal,
-  upsertJournal,
+  fetchDrinks, upsertJournal,
   createWorkout, updateWorkout, deleteWorkout,
   createExercise, updateExercise, deleteExercise,
   createTemplate, replaceTemplate,
@@ -43,6 +43,7 @@ import {
 import { resolveRange, describeHealthRange, describeSummaryRange } from './daily.js';
 import { describeBodyRange } from './body.js';
 import { describeJournalRange, describeJournalDay } from './journal.js';
+import { checkDrinksRange, describeDrinksRange } from './drinks.js';
 
 // --- helpers --------------------------------------------------------
 
@@ -56,6 +57,8 @@ const READ_ONLY = new Set([
   'thrive_list_workouts', 'thrive_get_workout', 'thrive_get_workout_payload', 'thrive_daily_health',
   'thrive_daily_summary', 'thrive_body_measurements', 'thrive_journal', 'thrive_list_exercises',
   'thrive_list_templates', 'thrive_exercise_history',
+  // #522: read-only by design. No tool logs, edits or deletes a drink.
+  'thrive_drinks',
 ]);
 const DESTRUCTIVE = new Set([
   'thrive_delete_workout', 'thrive_delete_exercise', 'thrive_update_template', 'thrive_set_journal_entry',
@@ -377,17 +380,39 @@ tool(
   'One line per day rolled up across workouts and health: activity count and types, moving and elapsed ' +
     'time with how many of the day\'s sessions recorded them, outdoor distance and ascent with how many ' +
     'outdoor sessions were measured, session effort, and the ' +
-    "day's steps, resting HR, HRV, sleep and training load. Use it for volume and load across days. " +
+    "day's steps, resting HR, HRV, sleep and training load, weight and BP, and the water (oz and ml) and " +
+    'alcohol (drinks) logged. Use it for volume and load across days. ' +
     'Default range: the 7 days ending today. Distance and ascent are OUTDOOR ONLY, so on a day with an ' +
     "indoor session they will not equal the sum of that day's activity distances. The rollup is derived " +
     'from the workouts and daily health, rebuilt on every COROS sync run: if it disagrees with ' +
     'thrive_list_workouts, the workouts are right. "—" means unknown, never zero: "moving — (recorded ' +
-    'on 0 of 2 sessions)" means nobody recorded it, not that you stood still.',
+    'on 0 of 2 sessions)" means nobody recorded it, not that you stood still. Water and alcohol catch up on ' +
+    'the next rebuild: for drinks logged since, or entry by entry, use thrive_drinks.',
   RANGE_SHAPE,
   async (args) => {
     const range = resolveRange(args, normalizeDate);
     const rows = await fetchDailySummary(range.from, range.to);
     return text(describeSummaryRange(rows, range));
+  },
+);
+
+tool(
+  'thrive_drinks',
+  'Water and alcohol the user logged (Thrive Sip), read straight from the Drinks log: each entry with its local ' +
+    'time, kind and amount, per-day totals (water in oz and ml with the % of the daily goal, alcohol in standard ' +
+    'drinks), and the water goal. Over several days it also gives the average water on the days it was logged and ' +
+    'the total alcohol. Default: today only. At most 400 days per call. A day or a kind with nothing logged is ' +
+    'unknown, never zero. Read-only: no tool logs, edits or deletes a drink; the user does that in the app or ' +
+    'the widget.',
+  {
+    date_from: z.string().optional().describe("First day, inclusive (YYYY-MM-DD, 'today', '+7d'). Default: date_to"),
+    date_to: z.string().optional().describe('Last day, inclusive. Default: today'),
+  },
+  async (args) => {
+    const range = resolveRange(args, normalizeDate, undefined, 1);
+    checkDrinksRange(range);
+    const data = await fetchDrinks(range.from, range.to);
+    return text(describeDrinksRange(data, range));
   },
 );
 

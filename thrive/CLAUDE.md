@@ -100,24 +100,26 @@ It calls the Apps Script API with `WIDGET_API_KEY`, which can run `logDrink` and
 `getDrinkTotals` only, and queues taps locally so a tap offline is sent later
 with its own id and tap time.
 
-- **Install is by sideload, never published.** Download the
-  `thrive-sip-debug-apk` artifact from the latest green `thrive-android.yml` run
-  and install it on the phone; it is signed with Gradle's generated debug key, so
-  it needs no keystore. `thrive-sip-apk` is the release build, installable only
-  once the secrets below exist. In the app, set the API URL (the Apps Script web
-  app) and the widget key.
+- **Install is by sideload, never published.** Download the `thrive-sip-apk`
+  artifact from the latest green `thrive-android.yml` run and install it on the
+  phone. It is the release build, signed with the same key every run, so each
+  new build installs over the last without an uninstall. In the app, set the API
+  URL (the Apps Script web app) and the widget key.
 - **Testing is not human-gated.** `/test` passes the JVM and CI-checkable
   criteria; tap, launcher, Doze and offline criteria are waived by the owner and
   listed in the issue's `## Results` as things to watch. Install the APK from the
-  merge's CI run on `main`, not a debug build made for the PR; if the widget is
+  merge's CI run on `main`, not a build made for the PR; if the widget is
   wrong, report it and it is fixed as a new issue.
-- **CI needs four repository secrets**: `THRIVE_ANDROID_KEYSTORE_BASE64`,
+- **Moving from the debug build (once).** The earlier debug build was signed
+  with a throwaway key and cannot be updated in place. Open the old app online
+  first so queued taps are sent (they are lost on uninstall), uninstall Thrive
+  Sip, install the release APK, re-enter the API URL and widget key, and re-add
+  the widget.
+- **Signing secrets**: `THRIVE_ANDROID_KEYSTORE_BASE64`,
   `THRIVE_ANDROID_KEYSTORE_PASSWORD`, `THRIVE_ANDROID_KEY_ALIAS`,
   `THRIVE_ANDROID_KEY_PASSWORD` (setup and the backup rule: the android stack
-  skill). Without them the workflow builds an unsigned APK and warns.
-- **The Gradle wrapper jar is not committed yet.** Run `gradle wrapper
-  --gradle-version 8.11.1 --distribution-type bin` in `android/` once and commit
-  the result; until then CI installs the pinned Gradle itself.
+  skill). A push to main fails if any is missing; a pull request without them
+  builds unsigned and warns.
 - Key commands, from `android/`: `./gradlew test`, `./gradlew lintRelease`,
   `./gradlew assembleRelease`.
 

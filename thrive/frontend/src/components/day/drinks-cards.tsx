@@ -10,6 +10,7 @@ import { useAuth } from '../../auth/auth-context';
 import type { DayState } from '../../day/dates';
 import { clock12, weekdayShort } from '../../day/format';
 import { ask } from '../../state/confirm';
+import { onPageVisible } from '../../state/page-visible';
 import {
   addDrink,
   drinkDays,
@@ -21,6 +22,8 @@ import {
   loadDrinkHistory,
   loadDrinks,
   newestFirst,
+  refreshDrinks,
+  drinksRefresh,
   removeDrink,
   waterGoalMl,
   type DrinkEntry,
@@ -335,8 +338,15 @@ export function DrinkCards({ date, state }: DayPanelProps) {
   }, [date, token]);
   // The last 7 days' bars read the history Trends reads, once for the screen.
   useEffect(() => {
-    if (token) void loadDrinkHistory(token);
+    if (!token) return;
+    void loadDrinkHistory(token);
+    drinksRefresh.markStarted(); // the initial read counts toward the 60 s guard
   }, [token]);
+  // Back in the foreground: a drink logged elsewhere shows without a reload (#553).
+  useEffect(() => {
+    if (!token) return;
+    return onPageVisible(() => void refreshDrinks(date, token));
+  }, [date, token]);
 
   const day = drinkDays.value[date];
   const status = day?.status ?? 'loading';

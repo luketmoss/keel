@@ -28,6 +28,7 @@ import {
 } from '../api/drinks';
 import { DENVER, addDays, todayInDenver } from '../day/dates';
 import type { HealthTabState } from './store';
+import { throttled } from './page-visible';
 
 export const ML_PER_OZ = 29.5735;
 /** What "+ 4 oz" stores. */
@@ -299,6 +300,30 @@ export function loadDrinkHistory(token: string): Promise<void> {
   return historyInFlight;
 }
 
+// ── Refresh on return (#553) ─────────────────────────────────────────
+
+let refreshDate = '';
+
+/**
+ * The Day cards' re-read when the app comes back to the foreground, so a drink
+ * logged elsewhere (the widget, another device) shows without a reload: the
+ * shown date and the history window, one start per 60 s and never two at once,
+ * the guard `healthRefresh` uses. The loaders keep pending and recently changed
+ * entries and join a read in flight, so a re-read cannot drop or double a tap.
+ */
+export const drinksRefresh = throttled(
+  async (token) => {
+    await Promise.all([loadDrinks(refreshDate, token), loadDrinkHistory(token)]);
+  },
+  { minIntervalMs: 60_000 },
+);
+
+/** Re-read `date`'s drinks and the history, unless one started under 60 s ago. */
+export function refreshDrinks(date: string, token: string): Promise<void> {
+  refreshDate = date;
+  return drinksRefresh.run(token);
+}
+
 // ── Writes ───────────────────────────────────────────────────────────
 
 /**
@@ -394,6 +419,8 @@ export function resetDrinks(): void {
   historyInFlight = null;
   waterGoalMl.value = WATER_GOAL_DEFAULT_ML;
   inFlight.clear();
+  drinksRefresh.invalidate();
+  refreshDate = '';
   changedAt.clear();
   changeSeq = 0;
 }

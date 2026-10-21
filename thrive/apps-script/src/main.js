@@ -87,7 +87,7 @@
 //   ?action=logDrink&key=...&payload={"id":"<uuid>","kind":"water","amount":250,
 //     "logged_at_utc":"2026-10-20T13:05:00Z","source":"widget"}
 //   ?action=getDrinks&key=...&from=2026-10-01&to=2026-10-31   - no range means today
-//   ?action=getDrinkTotals&key=...   - today's water_ml, alcohol_drinks, water_goal_ml
+//   ?action=getDrinkTotals&key=...   - today's water_ml, alcohol_drinks, coffee_cups, water_goal_ml
 //   ?action=updateDrinkTime&key=...&payload={"id":"<uuid>","time":"14:30:00"}
 //   ?action=deleteDrink&key=...&payload={"id":"<uuid>"}
 //   ?action=updateSetting&key=...&payload={"key":"water_goal_ml","value":2000}

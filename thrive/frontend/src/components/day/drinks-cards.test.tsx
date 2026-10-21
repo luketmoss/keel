@@ -43,7 +43,7 @@ const YESTERDAY = '2026-10-19';
 /** 12:00 in Denver (MDT, UTC-6). */
 const NOW = new Date('2026-10-20T18:00:00.000Z');
 
-function drink(id: string, kind: 'water' | 'alcohol', date: string, time: string, amount?: number): Drink {
+function drink(id: string, kind: 'water' | 'alcohol' | 'coffee', date: string, time: string, amount?: number): Drink {
   return {
     id,
     kind,
@@ -84,7 +84,7 @@ const openLog = (c: Element) => {
 /** One kind's entries, from the one list under the tiles (opened if it is not). */
 const entries = (c: Element, title: string) => {
   openLog(c);
-  const icon = title === 'Water' ? '.drink-icon-water' : '.drink-icon-alcohol';
+  const icon = `.drink-icon-${title.toLowerCase()}`;
   return [...c.querySelectorAll('li.drink-entry')].filter((li) => li.querySelector(icon));
 };
 const total = (c: Element, title: string) => card(c, title).querySelector('.drink-total')!.textContent;
@@ -131,6 +131,7 @@ describe('display', () => {
     expect(card(container, 'Water').textContent).toContain('of 64');
     expect(card(container, 'Water').textContent).not.toContain('of 64 oz');
     expect(total(container, 'Alcohol')).toBe('0drinks');
+    expect(total(container, 'Coffee')).toBe('0cups');
     expect(container.querySelector('.drinks-log-empty')!.textContent).toBe('Nothing logged yet.');
     expect(toggle(container)).toBeNull();
     expect(card(container, 'Water').querySelector('.drink-bar-fill')!.getAttribute('style')).toContain('width: 0%');
@@ -179,6 +180,8 @@ describe('display', () => {
     expect(card(container, 'Alcohol').querySelector('p.sr-only[role="status"]')!.textContent).toBe('Alcohol 0 drinks');
     expect(button(container, 'Add 4 ounces of water').textContent).toBe('+ 4 oz');
     expect(button(container, 'Add one alcoholic drink').textContent).toBe('+ 1');
+    expect(card(container, 'Coffee').querySelector('p.sr-only[role="status"]')!.textContent).toBe('Coffee 0 cups');
+    expect(button(container, 'Add one cup of coffee').textContent).toBe('+ 1');
   });
 
   it('uses the goal the API returned', async () => {
@@ -193,16 +196,22 @@ describe('the tiles', () => {
     api.getDrinks.mockResolvedValue({
       ok: true,
       data: {
-        drinks: [drink('a', 'water', TODAY, '10:00:00'), drink('c', 'alcohol', TODAY, '21:05:00')],
+        drinks: [
+          drink('a', 'water', TODAY, '10:00:00'),
+          drink('c', 'alcohol', TODAY, '21:05:00'),
+          drink('k', 'coffee', TODAY, '07:00:00'),
+          drink('k2', 'coffee', TODAY, '08:00:00'),
+        ],
         water_goal_ml: 1893,
       },
     });
 
-  it("are two grid items side by side, in the metric tiles' two-column grid, with the card padding and title size", async () => {
+  it('are Water full width, then Coffee and Alcohol side by side, in a two-column grid, with the card padding and title size', async () => {
     const { container } = await mount();
     const grid = container.querySelector('.drinks-grid')!;
-    expect([...grid.children].map((c) => c.getAttribute('data-drink'))).toEqual(['water', 'alcohol']);
+    expect([...grid.children].map((c) => c.getAttribute('data-drink'))).toEqual(['water', 'coffee', 'alcohol']);
     const css = readGlobalCss();
+    expect(css).toMatch(/\.drink-tile-water\s*\{[^}]*grid-column:\s*1 \/ -1/);
     expect(css).toMatch(/\.drinks-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
     expect(css).toMatch(/\.drinks-grid\s*\{[^}]*gap:\s*var\(--day-gap\)/);
     expect(css).toMatch(/\.drink-tile \.day-panel\s*\{[^}]*padding:\s*calc\(var\(--space-md\) - var\(--space-xs\)\)/);
@@ -219,6 +228,10 @@ describe('the tiles', () => {
     expect(water.textContent).toBe('Water 4 oz. Open Intake trends');
     expect(card(container, 'Alcohol').querySelector('a.day-card-link')!.textContent).toBe(
       'Alcohol 1 drink. Open Intake trends',
+    );
+    expect(card(container, 'Coffee').querySelector('.day-card-chevron')).not.toBeNull();
+    expect(card(container, 'Coffee').querySelector<HTMLAnchorElement>('a.day-card-link')!.textContent).toBe(
+      'Coffee 2 cups. Open Intake trends',
     );
   });
 
@@ -247,11 +260,12 @@ describe('the tiles', () => {
     expect(readGlobalCss()).toMatch(/--drink-bar-height:\s*6px/);
     expect(card(container, 'Water').querySelector('.drink-bar')).not.toBeNull();
     expect(card(container, 'Alcohol').querySelector('.drink-bar')).toBeNull();
+    expect(card(container, 'Coffee').querySelector('.drink-bar')).toBeNull();
   });
 
   it('give the add buttons the compact size, left-aligned, at the foot of the tile', async () => {
     const { container } = await mount();
-    for (const label of ['Add 4 ounces of water', 'Add one alcoholic drink']) {
+    for (const label of ['Add 4 ounces of water', 'Add one cup of coffee', 'Add one alcoholic drink']) {
       expect(button(container, label).classList.contains('btn-sm')).toBe(true);
     }
     expect(readGlobalCss()).toMatch(/\.drink-add\s*\{[^}]*align-self:\s*flex-start;[^}]*margin-top:\s*auto/);
@@ -261,7 +275,7 @@ describe('the tiles', () => {
     seed();
     const { container } = await mount(YESTERDAY, 'past');
     expect(container.querySelector('.drink-add')).toBeNull();
-    expect(container.querySelectorAll('.drink-week')).toHaveLength(2);
+    expect(container.querySelectorAll('.drink-week')).toHaveLength(3);
   });
 
   it('do not say "Drinks can only be added today." any more, nor label the card "today"', async () => {
@@ -299,6 +313,27 @@ describe('the tiles', () => {
     expect(alcohol.querySelector('.drink-week-goal')).toBeNull();
   });
 
+  it('draw coffee bars on a 4-cup scale, capped, with the cups worded', async () => {
+    api.getDrinks.mockResolvedValue({
+      ok: true,
+      data: {
+        drinks: [
+          drink('k1', 'coffee', '2026-10-17', '08:00:00'),
+          ...[1, 2, 3, 4, 5].map((n) => drink(`k2${n}`, 'coffee', '2026-10-18', `0${n}:00:00`)),
+          drink('k3', 'coffee', TODAY, '07:00:00'),
+          drink('k4', 'coffee', TODAY, '09:00:00'),
+        ],
+        water_goal_ml: 1893,
+      },
+    });
+    const { container } = await mount();
+    const coffee = card(container, 'Coffee').querySelector('.drink-week')!;
+    expect(coffee.getAttribute('aria-label')).toBe('Coffee, last 7 days: no data, no data, no data, 1, 5, 0, 2 cups');
+    expect(coffee.querySelector('.drink-week-goal')).toBeNull();
+    const heights = [...coffee.querySelectorAll('.drink-week-bar')].map((b) => b.getAttribute('style'));
+    expect(heights).toEqual(['height: 25%;', 'height: 100%;', 'height: 0%;', 'height: 50%;']);
+  });
+
   it("move the viewed day's bar at once when a drink is added", async () => {
     const { container } = await mount();
     api.getDrinks.mockClear();
@@ -306,6 +341,62 @@ describe('the tiles', () => {
     fireEvent.click(button(container, 'Add 4 ounces of water'));
     const label = card(container, 'Water').querySelector('.drink-week')!.getAttribute('aria-label')!;
     expect(label.endsWith('4 ounces')).toBe(true);
+  });
+});
+
+describe('coffee', () => {
+  it('shows "1 cup" and "2 cups" in the figure and in the log, and counts coffee in the log row', async () => {
+    api.getDrinks.mockResolvedValue({
+      ok: true,
+      data: {
+        drinks: [drink('k1', 'coffee', TODAY, '07:00:00'), drink('k2', 'coffee', TODAY, '09:00:00')],
+        water_goal_ml: 1893,
+      },
+    });
+    const { container } = await mount();
+    expect(total(container, 'Coffee')).toBe('2cups');
+    expect(toggle(container)!.textContent).toContain("Today's log · 2 drinks");
+    const rows = entries(container, 'Coffee');
+    expect(rows).toHaveLength(2);
+    expect(rows[0].querySelector('.drink-entry-amount')!.textContent).toBe('1 cup');
+  });
+
+  it('+ 1 raises the cups, the log and the bar at once, without touching water or alcohol', async () => {
+    const { container } = await mount();
+    fireEvent.click(button(container, 'Add one cup of coffee'));
+    expect(total(container, 'Coffee')).toBe('1cup');
+    expect(toggle(container)!.textContent).toContain('1 drink');
+    expect(card(container, 'Coffee').querySelector('.drink-week')!.getAttribute('aria-label')!.endsWith('1 cups')).toBe(
+      true,
+    );
+    await flush();
+    expect(api.logDrink.mock.calls[0][0]).toMatchObject({ kind: 'coffee', amount: 1 });
+    expect(total(container, 'Alcohol')).toBe('0drinks');
+    expect(total(container, 'Water')).toBe('0oz');
+  });
+
+  it('rolls back and shows the error under the Coffee tile when the log fails', async () => {
+    api.logDrink.mockResolvedValue({ ok: false, kind: 'network' });
+    const { container } = await mount();
+    fireEvent.click(button(container, 'Add one cup of coffee'));
+    await flush();
+    expect(total(container, 'Coffee')).toBe('0cups');
+    expect(card(container, 'Coffee').querySelector('.drink-error')).not.toBeNull();
+    expect(card(container, 'Alcohol').querySelector('.drink-error')).toBeNull();
+  });
+
+  it('names the entry "1 cup" in the delete confirm', async () => {
+    api.getDrinks.mockResolvedValue({
+      ok: true,
+      data: { drinks: [drink('k1', 'coffee', TODAY, '07:00:00')], water_goal_ml: 1893 },
+    });
+    mountConfirmHost();
+    const { container } = await mount();
+    openLog(container);
+    fireEvent.click(button(container, 'More actions for the 7:00 AM coffee entry'));
+    fireEvent.click([...container.querySelectorAll('button')].find((b) => b.textContent === 'Delete')!);
+    await openedConfirm();
+    expect(confirmText()!.message).toContain('7:00 AM · 1 cup.');
   });
 });
 
@@ -604,6 +695,8 @@ describe('loading and failure', () => {
     const { container } = await mount();
     expect(card(container, 'Water').querySelector('.drink-total')!.textContent).toBe('—');
     expect(card(container, 'Alcohol').querySelector('.drink-total')!.textContent).toBe('—');
+    expect(card(container, 'Coffee').querySelector('.drink-total')!.textContent).toBe('—');
+    expect(button(container, 'Add one cup of coffee').disabled).toBe(true);
     expect(container.querySelector('.drinks-log, .drinks-log-empty')).toBeNull();
     expect(button(container, 'Add 4 ounces of water').disabled).toBe(true);
     expect(button(container, 'Add one alcoholic drink').disabled).toBe(true);
@@ -612,10 +705,11 @@ describe('loading and failure', () => {
     expect(button(container, 'Add 4 ounces of water').disabled).toBe(false);
   });
 
-  it('shows one panel error with a retry across both tiles when the read fails', async () => {
+  it('shows one panel error, titled Drinks, with a retry across all tiles when the read fails', async () => {
     api.getDrinks.mockResolvedValueOnce({ ok: false, kind: 'network' });
     const { container } = await mount();
     expect(container.querySelectorAll('section.day-panel')).toHaveLength(1);
+    expect(container.querySelector('h2')!.textContent).toBe('Drinks');
     expect(container.textContent).toContain("Couldn't load your drinks.");
     expect(container.querySelector('.drink-add')).toBeNull();
     const retry = [...container.querySelectorAll('button')].find((b) => b.textContent === 'Try again')!;

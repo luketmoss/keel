@@ -192,7 +192,7 @@ export function TrendPlot({
               y={y(p.value)}
               width={barW}
               height={Math.max(0, y(dom.min) - y(p.value))}
-              // The Day cards' colours (--metric-water, --metric-alcohol): a bars metric's id names its token.
+              // The Day cards' colours (--metric-water, --metric-coffee, --metric-alcohol): a bars metric's id names its token.
               fill={`var(--metric-${metric.id})`}
             />
           ))}

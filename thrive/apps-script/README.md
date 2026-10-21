@@ -406,14 +406,14 @@ quotes the input.
   connection leaves one row: a repeated id returns the existing row and writes
   nothing. `date` and `time` are derived from `logged_at_utc` in
   `America/Denver`, so 23:30 local is filed under that day even when UTC has
-  rolled over. `kind` is `water` or `alcohol`; water `amount` is a whole number
-  of ml, 1 to 2000, alcohol `amount` is exactly 1; `source` is `widget` or
+  rolled over. `kind` is `water`, `alcohol` or `coffee`; water `amount` is a whole
+  number of ml, 1 to 2000, alcohol and coffee `amount` is exactly 1; `source` is `widget` or
   `app`; `id` is 1-64 of `[A-Za-z0-9_-]`. It takes the script lock.
 - **`getDrinks`** takes `from` and `to` together (inclusive, at most 400 days)
   or neither (today). It answers `{drinks, water_goal_ml}`, drinks in
   `logged_at_utc` order. A missing tab is no drinks.
 - **`getDrinkTotals`** answers `{date, water_ml, alcohol_drinks,
-  water_goal_ml}` for today: zeros, never blanks.
+  coffee_cups, water_goal_ml}` for today: zeros, never blanks.
 - **`updateDrinkTime`** changes `time` (`HH:MM:SS`) and `updated` only.
   **`deleteDrink`** removes the row. An unknown id is an error for both.
 - **`updateSetting`** accepts only `water_goal_ml`, a whole number from 250 to

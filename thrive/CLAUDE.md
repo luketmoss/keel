@@ -91,9 +91,12 @@ It calls the Apps Script API with `WIDGET_API_KEY`, which can run `logDrink` and
 `getDrinkTotals` only, and queues taps locally so a tap offline is sent later
 with its own id and tap time.
 
-- **Install is by sideload, never published.** Download the `thrive-sip-apk`
-  artifact from the latest green `thrive-android.yml` run and install it on the
-  phone. In the app, set the API URL (the Apps Script web app) and the widget key.
+- **Install is by sideload, never published.** Download the
+  `thrive-sip-debug-apk` artifact from the latest green `thrive-android.yml` run
+  and install it on the phone; it is signed with Gradle's generated debug key, so
+  it needs no keystore. `thrive-sip-apk` is the release build, installable only
+  once the secrets below exist. In the app, set the API URL (the Apps Script web
+  app) and the widget key.
 - **CI needs four repository secrets**: `THRIVE_ANDROID_KEYSTORE_BASE64`,
   `THRIVE_ANDROID_KEYSTORE_PASSWORD`, `THRIVE_ANDROID_KEY_ALIAS`,
   `THRIVE_ANDROID_KEY_PASSWORD` (setup and the backup rule: the android stack

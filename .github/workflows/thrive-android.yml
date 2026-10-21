@@ -49,3 +49,13 @@ jobs:
           path: thrive/android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 30
+      # Installable without a keystore: Gradle signs a debug build with its own
+      # generated debug key. Fine for sideloading to the owner's phone; the
+      # release APK above is the signed one once the secrets exist.
+      - run: gradle assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: thrive-sip-debug-apk
+          path: thrive/android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 30

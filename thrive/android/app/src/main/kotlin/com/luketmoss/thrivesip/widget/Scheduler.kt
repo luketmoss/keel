@@ -12,14 +12,16 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.luketmoss.thrivesip.core.Refresh
 import com.luketmoss.thrivesip.core.nextDenverMidnight
 import java.time.Instant
 import java.util.concurrent.TimeUnit
 
-/** Every background job: the send, the 30-minute refresh and the Denver-midnight redraw. */
+/** Every background job: the send, the 15-minute refresh, the body-tap re-reads and the Denver-midnight redraw. */
 object Scheduler {
     private const val SEND = "sip-send"
     private const val PERIODIC = "sip-refresh"
+    private const val BODY_TAP = "sip-body-tap"
     private const val MIDNIGHT_REQUEST = 1
 
     private val online = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
@@ -39,14 +41,39 @@ object Scheduler {
             .enqueueUniqueWork(SEND, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
     }
 
-    /** Android may delay a periodic run; 30 minutes is a target, not a promise. */
+    /**
+     * The widget body was tapped (Thrive is opening): read now, again after
+     * [Refresh.BODY_TAP_FIRST_MINUTES] and again after [Refresh.BODY_TAP_SECOND_MINUTES],
+     * to pick up a drink fixed in the app. One unique chain, so a later tap
+     * replaces it rather than stacking a second; each link is the ordinary
+     * send-then-read worker, so a queued tap is always sent before any read.
+     */
+    fun scheduleBodyTapReads(context: Context) {
+        val links = Refresh.bodyTapDelaysMinutes().map { delay ->
+            OneTimeWorkRequestBuilder<SendWorker>()
+                .setConstraints(online)
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+                .setInitialDelay(delay, TimeUnit.MINUTES)
+                .build()
+        }
+        var chain = WorkManager.getInstance(context)
+            .beginUniqueWork(BODY_TAP, ExistingWorkPolicy.REPLACE, links.first())
+        links.drop(1).forEach { chain = chain.then(it) }
+        chain.enqueue()
+    }
+
+    /**
+     * Android may delay a periodic run; 15 minutes is a target, not a promise.
+     * UPDATE, not KEEP: a phone that installed the 30-minute request picks up
+     * the new period the next time this runs (every update, boot and widget add).
+     */
     fun ensurePeriodic(context: Context) {
-        val request = PeriodicWorkRequestBuilder<SendWorker>(30, TimeUnit.MINUTES)
+        val request = PeriodicWorkRequestBuilder<SendWorker>(Refresh.PERIODIC_MINUTES, TimeUnit.MINUTES)
             .setConstraints(online)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
             .build()
         WorkManager.getInstance(context)
-            .enqueueUniquePeriodicWork(PERIODIC, ExistingPeriodicWorkPolicy.KEEP, request)
+            .enqueueUniquePeriodicWork(PERIODIC, ExistingPeriodicWorkPolicy.UPDATE, request)
     }
 
     /**
@@ -70,6 +97,7 @@ object Scheduler {
 
     fun stop(context: Context) {
         WorkManager.getInstance(context).cancelUniqueWork(PERIODIC)
+        WorkManager.getInstance(context).cancelUniqueWork(BODY_TAP)
         context.getSystemService(AlarmManager::class.java)?.cancel(midnightIntent(context))
     }
 

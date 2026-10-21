@@ -1,8 +1,6 @@
 package com.luketmoss.thrivesip.widget
 
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
@@ -58,8 +56,6 @@ import java.time.Instant
 import androidx.glance.Button
 import androidx.glance.ButtonDefaults
 import androidx.glance.color.ColorProvider as DayNightColorProvider
-
-private const val THRIVE_URL = "https://luketmoss.github.io/keel/thrive/"
 
 // Three heights, two widths. Responsive mode draws the largest declared size
 // that fits, so each layout below is sized to fit inside its own declared size.
@@ -130,7 +126,7 @@ object WidgetUpdater {
 
 @Composable
 private fun Content(view: WidgetView, wide: Boolean, short: Boolean, tall: Boolean) {
-    val openThrive: Action = actionStartActivity(Intent(Intent.ACTION_VIEW, Uri.parse(THRIVE_URL)))
+    val openThrive: Action = actionStartActivity<OpenThriveActivity>()
     val openSettings: Action = actionStartActivity<MainActivity>()
     val bodyAction = if (view.mode == Mode.NOT_CONFIGURED || view.mode == Mode.KEY_REJECTED) openSettings else openThrive
     val secondary = GlanceTheme.colors.onSurfaceVariant

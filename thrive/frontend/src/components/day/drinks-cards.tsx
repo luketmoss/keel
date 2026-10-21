@@ -1,5 +1,5 @@
-// #520, #551 - the Day screen's Water and Alcohol tiles (Thrive Sip). Two
-// half-width tiles in one slot, after Sleep and before the metric tiles, with a
+// #520, #551, #560 - the Day screen's Water, Coffee and Alcohol tiles (Thrive Sip). Water
+// full width, then Coffee and Alcohol half width, in one slot, after Sleep and before the metric tiles, with a
 // collapsed log row under them. The data, the optimistic add and the rules live
 // in `state/drinks.ts`; this draws them. Never mounts on a future day. "+ 4 oz"
 // and "+ 1" are offered on today only, because the API files a drink under the
@@ -66,8 +66,23 @@ function GlassIcon() {
   );
 }
 
+function CupIcon() {
+  return (
+    <svg {...SVG}>
+      <path d="M5 11h11v4a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4z" />
+      <path d="M16 12h1.5a2.5 2.5 0 0 1 0 5H16" />
+      <path d="M8.5 3.5c-1 1 1 2 0 3.5M12.5 3.5c-1 1 1 2 0 3.5" />
+    </svg>
+  );
+}
+
+const ICONS = { water: DropIcon, alcohol: GlassIcon, coffee: CupIcon } as const;
+const TITLES = { water: 'Water', alcohol: 'Alcohol', coffee: 'Coffee' } as const;
+const unitWord = (kind: DrinkKind, n: number) =>
+  kind === 'coffee' ? (n === 1 ? 'cup' : 'cups') : n === 1 ? 'drink' : 'drinks';
+
 const amountText = (e: DrinkEntry) =>
-  e.kind === 'water' ? `${formatOz(e.amount)} oz` : `${e.amount} ${e.amount === 1 ? 'drink' : 'drinks'}`;
+  e.kind === 'water' ? `${formatOz(e.amount)} oz` : `${e.amount} ${unitWord(e.kind, e.amount)}`;
 const hhmm = (time: string) => time.slice(0, 5);
 const countText = (n: number) => `${n} ${n === 1 ? 'drink' : 'drinks'}`;
 
@@ -87,6 +102,7 @@ function Entry({
   const moreRef = useRef<HTMLButtonElement>(null);
   const time = clock12(entry.time);
   const water = entry.kind === 'water';
+  const EntryIcon = ICONS[entry.kind];
   // A deleted entry takes its button with it: focus goes to the log row, or to the first tile's heading
   // when that was the last entry, never `body`.
   useFocusHandoff(moreRef, (el) => {
@@ -116,8 +132,8 @@ function Entry({
 
   return (
     <li class={entry.pending ? 'drink-entry drink-entry-pending' : 'drink-entry'} data-entry-id={entry.id}>
-      <span class={water ? 'drink-entry-icon drink-icon-water' : 'drink-entry-icon drink-icon-alcohol'}>
-        {water ? <DropIcon /> : <GlassIcon />}
+      <span class={`drink-entry-icon drink-icon-${entry.kind}`}>
+        <EntryIcon />
       </span>
       <span class="drink-entry-time">{time}</span>
       <span class="drink-entry-amount">{amountText(entry)}</span>
@@ -179,7 +195,7 @@ interface TileProps {
   token: string | null;
 }
 
-/** One half-width tile: the figure, the bar toward the goal (water), the last 7 days, and the add button. */
+/** One tile (Water is full width): the figure, the bar toward the goal (water), the last 7 days, and the add button. */
 function DrinkTile({ kind, date, state, loaded, entries, token }: TileProps) {
   const water = kind === 'water';
   const total = entries.filter((e) => e.kind === kind).reduce((sum, e) => sum + e.amount, 0);
@@ -189,18 +205,19 @@ function DrinkTile({ kind, date, state, loaded, entries, token }: TileProps) {
   const goalText = formatOz(goal);
   const reached = water && loaded && total >= goal;
   const pct = water && goal > 0 ? Math.min(100, (total / goal) * 100) : 0;
-  const unit = water ? 'oz' : total === 1 ? 'drink' : 'drinks';
+  const unit = water ? 'oz' : unitWord(kind, total);
   const shown = loaded ? `${water ? totalOz : total} ${unit}` : null;
   const spokenTotal = water
     ? `Water ${totalOz} ${totalOz === '1' ? 'ounce' : 'ounces'} of ${goalText}`
-    : `Alcohol ${total} ${total === 1 ? 'drink' : 'drinks'}`;
+    : `${TITLES[kind]} ${total} ${unit}`;
 
   const days = drinkWeek(kind, date, drinkHistory.value, drinkDays.value[date]);
-  const title = water ? 'Water' : 'Alcohol';
+  const title = TITLES[kind];
+  const TileIcon = ICONS[kind];
 
   const icon = (
-    <span class={water ? 'drink-icon drink-icon-water' : 'drink-icon drink-icon-alcohol'}>
-      {water ? <DropIcon /> : <GlassIcon />}
+    <span class={`drink-icon drink-icon-${kind}`}>
+      <TileIcon />
     </span>
   );
 
@@ -258,7 +275,9 @@ function DrinkTile({ kind, date, state, loaded, entries, token }: TileProps) {
             type="button"
             class="btn btn-secondary btn-sm drink-add"
             disabled={!loaded}
-            aria-label={water ? 'Add 4 ounces of water' : 'Add one alcoholic drink'}
+            aria-label={
+              water ? 'Add 4 ounces of water' : kind === 'coffee' ? 'Add one cup of coffee' : 'Add one alcoholic drink'
+            }
             onClick={() => {
               if (token) void addDrink(kind, token);
             }}
@@ -358,7 +377,7 @@ export function DrinkCards({ date, state }: DayPanelProps) {
   if (status === 'error') {
     return (
       <div class="drinks">
-        <Panel title="Water and alcohol">
+        <Panel title="Drinks">
           <PanelStatus status="error" what="your drinks" onRetry={retry} />
         </Panel>
       </div>
@@ -369,6 +388,7 @@ export function DrinkCards({ date, state }: DayPanelProps) {
     <div class="drinks">
       <div class="drinks-grid">
         <DrinkTile kind="water" date={date} state={state} loaded={loaded} entries={entries} token={token} />
+        <DrinkTile kind="coffee" date={date} state={state} loaded={loaded} entries={entries} token={token} />
         <DrinkTile kind="alcohol" date={date} state={state} loaded={loaded} entries={entries} token={token} />
       </div>
       {loaded && <DrinkLog date={date} state={state} entries={entries} token={token} />}

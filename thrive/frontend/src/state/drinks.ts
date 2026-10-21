@@ -169,6 +169,8 @@ function demoDay(date: string): DrinkEntry[] {
   if (date === today) {
     return [
       demoEntry('demo-drink-1', 'water', date, '07:45:00', 'app'),
+      demoEntry('demo-drink-c1', 'coffee', date, '07:10:00', 'app'),
+      demoEntry('demo-drink-c2', 'coffee', date, '10:30:00', 'app'),
       demoEntry('demo-drink-2', 'water', date, '10:20:00', 'widget'),
       demoEntry('demo-drink-3', 'water', date, '12:05:00', 'app'),
       demoEntry('demo-drink-4', 'alcohol', date, '12:40:00', 'app'),
@@ -177,6 +179,7 @@ function demoDay(date: string): DrinkEntry[] {
   if (date === addDays(today, -1)) {
     return [
       demoEntry('demo-drink-5', 'water', date, '08:10:00', 'app'),
+      demoEntry('demo-drink-c3', 'coffee', date, '07:30:00', 'app'),
       demoEntry('demo-drink-6', 'water', date, '13:30:00', 'app'),
       demoEntry('demo-drink-7', 'alcohol', date, '20:15:00', 'app'),
       demoEntry('demo-drink-8', 'alcohol', date, '21:05:00', 'app'),
@@ -264,6 +267,10 @@ function demoHistory(): Drink[] {
       out.push(demoEntry(`demo-h-${back}-${i}`, 'water', date, `${String(7 + i).padStart(2, '0')}:00:00`, 'app'));
     }
     if (back % 3 === 0) out.push(demoEntry(`demo-h-${back}-a`, 'alcohol', date, '19:30:00', 'app'));
+    const cups = back % 4 === 0 ? 0 : 1 + (back % 3);
+    for (let i = 0; i < cups; i++) {
+      out.push(demoEntry(`demo-h-${back}-c${i}`, 'coffee', date, `${String(7 + i * 3).padStart(2, '0')}:15:00`, 'app'));
+    }
   }
   return out;
 }

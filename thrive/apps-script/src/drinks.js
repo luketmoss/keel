@@ -13,9 +13,9 @@ var SETTINGS_SHEET = 'Settings';
 // Literals, not types.js constants: Apps Script does not promise a file load order.
 var DRINK_ERRORS = {
   id: 'id is required: 1-64 characters of letters, digits, _ and -',
-  kind: 'kind must be water or alcohol',
+  kind: 'kind must be water, alcohol or coffee',
   waterAmount: 'amount for water must be a whole number of ml, 1 to 2000',
-  alcoholAmount: 'amount for alcohol must be 1',
+  alcoholAmount: 'amount for alcohol or coffee must be 1',
   loggedAt: 'logged_at_utc is required: an ISO 8601 UTC time such as 2026-10-20T13:05:00Z',
   source: 'source must be widget or app',
   range: 'from and to must be given together, as YYYY-MM-DD, from no later than to',
@@ -202,12 +202,14 @@ function getDrinkTotals() {
   var rows = drinkRowsBetween(date, date);
   var water = 0;
   var alcohol = 0;
+  var coffee = 0;
   for (var i = 0; i < rows.length; i++) {
     var amount = wholeNumber(rows[i].amount) || 0;
     if (rows[i].kind === 'water') water += amount;
     else if (rows[i].kind === 'alcohol') alcohol += amount;
+    else if (rows[i].kind === 'coffee') coffee += amount;
   }
-  return { date: date, water_ml: water, alcohol_drinks: alcohol, water_goal_ml: getWaterGoal() };
+  return { date: date, water_ml: water, alcohol_drinks: alcohol, coffee_cups: coffee, water_goal_ml: getWaterGoal() };
 }
 
 /** Change a drink's local `time` and `updated`; nothing else (#519). */

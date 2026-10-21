@@ -12,6 +12,7 @@ import { bodyDayOf, type BodyDay } from '../../api/body-day';
 import { formatSleep, axisSleep } from './sleep-duration';
 import { drinkHistory, waterGoalMl, formatOz, ML_PER_OZ } from '../../state/drinks';
 import { today as todaySignal } from '../../day/today';
+import type { DrinkKind } from '../../api/drinks';
 import { datesBetween } from './series';
 
 export interface TrendPoint {
@@ -429,16 +430,14 @@ const ACTIVITY_SUMMARY_METRICS: TrendMetric[] = [ACTIVITY_COUNT, MOVING_TIME, DI
 const ACTIVITY_METRICS: TrendMetric[] = [STEPS, ...ACTIVITY_SUMMARY_METRICS];
 
 // ── Intake (#521) ────────────────────────────────────────────────────
-// Water and alcohol, summed per local day from getDrinks, never DailySummary
+// Water, coffee and alcohol, summed per local day from getDrinks, never DailySummary
 // (which lags the day's last tap). "Logged nothing" is a real value here: every
 // day from the first drink ever logged to today is a point, `0` when it had
 // none, and the days before that are blank, so the chart does not open on a
 // long run of zeros from before tracking began.
 
-type IntakeKind = 'water' | 'alcohol';
-
 /** One point per day from the first drink to today (or the last drink): the day's sum for `kind`, `convert`ed. */
-export function intakePoints(kind: IntakeKind, convert: (amount: number) => number): TrendPoint[] {
+export function intakePoints(kind: DrinkKind, convert: (amount: number) => number): TrendPoint[] {
   const s = drinkHistory.value;
   if (s.state !== 'loaded' || s.rows.length === 0) return [];
   const sums = new Map<string, number>();
@@ -490,7 +489,21 @@ export const ALCOHOL: TrendMetric = {
   emptyText: 'No drinks logged yet.',
 };
 
-const INTAKE_METRICS: TrendMetric[] = [WATER, ALCOHOL];
+export const COFFEE: TrendMetric = {
+  id: 'coffee',
+  source: 'drinks',
+  label: 'Coffee',
+  unit: 'cups',
+  points: () => intakePoints('coffee', (n) => n),
+  format: (v) => (Number.isInteger(v) ? String(v) : v.toFixed(1)),
+  axisFormat: axisDecimal,
+  band: false,
+  zeroBased: true,
+  bars: true,
+  emptyText: 'No drinks logged yet.',
+};
+
+const INTAKE_METRICS: TrendMetric[] = [WATER, COFFEE, ALCOHOL];
 
 // ── The custom set (#246) ────────────────────────────────────────────
 

@@ -103,9 +103,10 @@
   --metric-sleep: var(--metric-sleep-rem);
   --metric-steps: #3b7a2a;
   --metric-calories: #b54708;
-  /* Drinks (#520): water a blue apart from the sleep stages, alcohol an amber apart from --color-warning. */
+  /* Drinks (#520): water a blue apart from the sleep stages, alcohol an amber apart from --color-warning, coffee (#560) a roast brown apart from both. */
   --metric-water: #0b6fb8;
   --metric-alcohol: #b45309;
+  --metric-coffee: #6f4e37;
   /* Activity type and effort colours (#526). Data colours: always beside the
      type's word or icon, never text on their own. The values are the text
      colours of the .badge-* and .workout-effort-* rules, which read them. */
@@ -160,6 +161,7 @@
   --metric-calories: #ff9a5c;
   --metric-water: #5bb8f5;
   --metric-alcohol: #f5a524;
+  --metric-coffee: #c9a27e;
   --type-weight: #fca5a5;
   --type-stretch: #86efac;
   --type-bike: #93c5fd;
@@ -6853,8 +6855,8 @@ input[aria-disabled="true"]:not(:focus-visible) {
   gap: var(--space-xs);
 }
 
-/* ===== Day Water and Alcohol tiles (#520, #551) =====
-   Two half-width tiles in #491's anatomy, then a collapsed log row. A tile is a
+/* ===== Day Water, Coffee and Alcohol tiles (#520, #551, #560) =====
+   Water full width, then Coffee and Alcohol as half-width tiles in #491's anatomy, then a collapsed log row. A tile is a
    total, for water a thin bar toward the goal, seven bars for the last 7 days and
    a compact add button over the tile's link. Colours are the --metric-water /
    --metric-alcohol tokens; the buttons and the time field reuse the app's classes. */
@@ -6889,10 +6891,15 @@ input[aria-disabled="true"]:not(:focus-visible) {
 
 .drink-tile-water {
   --tile-colour: var(--metric-water);
+  grid-column: 1 / -1;
 }
 
 .drink-tile-alcohol {
   --tile-colour: var(--metric-alcohol);
+}
+
+.drink-tile-coffee {
+  --tile-colour: var(--metric-coffee);
 }
 
 .drink-icon {
@@ -6907,6 +6914,10 @@ input[aria-disabled="true"]:not(:focus-visible) {
 
 .drink-icon-alcohol {
   color: var(--metric-alcohol);
+}
+
+.drink-icon-coffee {
+  color: var(--metric-coffee);
 }
 
 .drink-figure {

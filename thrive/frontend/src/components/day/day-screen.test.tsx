@@ -380,13 +380,13 @@ describe('AC4 — moving between days', () => {
 });
 
 describe('AC5 — panels and health', () => {
-  it('renders Training, Water, Alcohol, Health, Body and Note on a past day and today; Training and Note on a future day', () => {
+  it('renders Training, Water, Coffee, Alcohol, Health, Body and Note on a past day and today; Training and Note on a future day', () => {
     // Health is still loading: one Health card stands in for the sleep card and the tiles (#491).
     const past = renderAt('#/day/2026-09-01');
-    expect(panelTitles(past.container)).toEqual(['Training', 'Water', 'Alcohol', 'Health', 'Body', 'Note']);
+    expect(panelTitles(past.container)).toEqual(['Training', 'Water', 'Coffee', 'Alcohol', 'Health', 'Body', 'Note']);
     cleanup();
     const now = renderAt('#/');
-    expect(panelTitles(now.container)).toEqual(['Training', 'Water', 'Alcohol', 'Health', 'Body', 'Note']);
+    expect(panelTitles(now.container)).toEqual(['Training', 'Water', 'Coffee', 'Alcohol', 'Health', 'Body', 'Note']);
     cleanup();
     const future = renderAt('#/day/2026-10-09');
     expect(panelTitles(future.container)).toEqual(['Training', 'Note']);

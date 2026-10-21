@@ -317,8 +317,8 @@ Google Sheet "Groundwork" with these tabs:
 - **Drinks** (A:I) and **Settings** (A:C) — Thrive Sip's intake (#519, epic #518).
   Drinks is one row per drink: id, kind, amount, date, time, logged_at_utc,
   source, created, updated. `id` is a UUID the **caller** generates, so logging
-  it twice leaves one row; `kind` is `water` or `alcohol`; `amount` is **water in
-  whole ml, alcohol in standard drinks** (always `1`), never blank or `0`;
+  it twice leaves one row; `kind` is `water`, `alcohol` or `coffee`; `amount` is **water in
+  whole ml, alcohol in standard drinks, coffee in cups** (always `1`), never blank or `0`;
   `date`/`time` are local `America/Denver`, derived by the API from
   `logged_at_utc` (the instant the caller says it was taken, never rewritten);
   `source` is `widget` or `app`. **Written only by the API** (`logDrink`,

@@ -22,6 +22,7 @@ const METRICS = [
   '--metric-calories',
   '--metric-water',
   '--metric-alcohol',
+  '--metric-coffee',
 ];
 
 /** Deep, REM, light, awake: the order they sit in along the sleep bar. */

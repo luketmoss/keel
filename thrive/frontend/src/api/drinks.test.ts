@@ -59,8 +59,8 @@ describe('the field lists mirror types.js', () => {
   });
 
   it('the vocabularies and limits agree', () => {
-    expect([...DRINK_KINDS]).toEqual(['water', 'alcohol']);
-    expect(typesJs).toMatch(/var DRINK_KINDS = \['water', 'alcohol'\];/);
+    expect([...DRINK_KINDS]).toEqual(['water', 'alcohol', 'coffee']);
+    expect(typesJs).toMatch(/var DRINK_KINDS = \['water', 'alcohol', 'coffee'\];/);
     expect([...DRINK_SOURCES]).toEqual(['widget', 'app']);
     expect(typesJs).toMatch(/var DRINK_SOURCES = \['widget', 'app'\];/);
     expect(typesJs).toContain(`var SETTING_WATER_GOAL = '${WATER_GOAL_KEY}';`);
@@ -290,8 +290,8 @@ describe('the typed client', () => {
       after();
     });
 
-    it('getDrinkTotals returns the four numbers', async () => {
-      const totals = { date: '2026-10-20', water_ml: 750, alcohol_drinks: 1, water_goal_ml: 1893 };
+    it('getDrinkTotals returns the five numbers', async () => {
+      const totals = { date: '2026-10-20', water_ml: 750, alcohol_drinks: 1, coffee_cups: 2, water_goal_ml: 1893 };
       const { mod, fetchImpl } = await client(reply({ success: true, data: totals }));
       expect(await mod.getDrinkTotals(TOKEN)).toEqual({ ok: true, data: totals });
       expect(sent(fetchImpl).get('action')).toBe('getDrinkTotals');

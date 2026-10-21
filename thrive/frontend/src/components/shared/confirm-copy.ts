@@ -136,7 +136,7 @@ export function finishUnsyncedCopy(unsynced: number): ConfirmCopy {
   };
 }
 
-/** Delete one logged drink from the Day view's Water or Alcohol card (#520). `detail` is "3:42 PM · 4 oz of water". */
+/** Delete one logged drink from the Day view's Water, Coffee or Alcohol tile (#520). `detail` is "3:42 PM · 4 oz of water". */
 export function deleteDrinkCopy(detail: string): ConfirmCopy {
   return {
     title: 'Delete this drink?',

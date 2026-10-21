@@ -28,7 +28,7 @@ export const DRINK_FIELDS = [
 /** Settings' A:C order. */
 export const SETTING_FIELDS = ['key', 'value', 'updated'] as const;
 
-export const DRINK_KINDS = ['water', 'alcohol'] as const;
+export const DRINK_KINDS = ['water', 'alcohol', 'coffee'] as const;
 export const DRINK_SOURCES = ['widget', 'app'] as const;
 export type DrinkKind = (typeof DRINK_KINDS)[number];
 export type DrinkSource = (typeof DRINK_SOURCES)[number];
@@ -71,6 +71,7 @@ export interface DrinkTotals {
   date: string;
   water_ml: number;
   alcohol_drinks: number;
+  coffee_cups: number;
   water_goal_ml: number;
 }
 
@@ -156,8 +157,15 @@ export async function getDrinkTotals(token: string): Promise<DrinkOutcome<DrinkT
       typeof d.date === 'string' &&
       isNonNegativeInt(d.water_ml) &&
       isNonNegativeInt(d.alcohol_drinks) &&
+      isNonNegativeInt(d.coffee_cups) &&
       isNonNegativeInt(d.water_goal_ml)
-      ? { date: d.date, water_ml: d.water_ml, alcohol_drinks: d.alcohol_drinks, water_goal_ml: d.water_goal_ml }
+      ? {
+          date: d.date,
+          water_ml: d.water_ml,
+          alcohol_drinks: d.alcohol_drinks,
+          coffee_cups: d.coffee_cups,
+          water_goal_ml: d.water_goal_ml,
+        }
       : null;
   });
 }

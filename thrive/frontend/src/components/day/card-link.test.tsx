@@ -113,6 +113,7 @@ describe('which cards link, and where', () => {
 
   it('builds the href from a group and a date', () => {
     expect(trendsHref('blood_pressure', '2026-01-02')).toBe('#/trends/blood_pressure?date=2026-01-02');
+    expect(trendsHref('intake', '2026-01-02')).toBe('#/trends/intake?date=2026-01-02');
   });
 
   it('gives the Recovery ring, Calories and the Note card no link', () => {

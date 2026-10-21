@@ -1,21 +1,24 @@
-// #520 - the Day screen's Water and Alcohol cards (Thrive Sip). Two cards in one
-// slot, after Sleep and before the metric tiles. The data, the optimistic add and
-// the rules live in `state/drinks.ts`; this draws them. Never mounts on a future
-// day. "+ 4 oz" and "+ 1 drink" are offered on today only, because the API files
-// a drink under the date of the moment it is logged.
+// #520, #551 - the Day screen's Water and Alcohol tiles (Thrive Sip). Two
+// half-width tiles in one slot, after Sleep and before the metric tiles, with a
+// collapsed log row under them. The data, the optimistic add and the rules live
+// in `state/drinks.ts`; this draws them. Never mounts on a future day. "+ 4 oz"
+// and "+ 1" are offered on today only, because the API files a drink under the
+// date of the moment it is logged. A tile opens Trends' Intake group (#504).
 
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useId, useRef, useState } from 'preact/hooks';
 import { useAuth } from '../../auth/auth-context';
 import type { DayState } from '../../day/dates';
-import { clock12, weekdayName } from '../../day/format';
+import { clock12, weekdayShort } from '../../day/format';
 import { ask } from '../../state/confirm';
 import {
   addDrink,
   drinkDays,
   drinkErrors,
+  drinkHistory,
   editDrinkTime,
   errorKey,
   formatOz,
+  loadDrinkHistory,
   loadDrinks,
   newestFirst,
   removeDrink,
@@ -25,7 +28,9 @@ import {
 import type { DrinkKind } from '../../api/drinks';
 import { deleteDrinkCopy } from '../shared/confirm-copy';
 import { useFocusHandoff } from '../focus-handoff';
-import { Panel, PanelNote, PanelStatus, type DayPanelProps } from './panel';
+import { Panel, PanelStatus, type DayPanelProps } from './panel';
+import { CardChevron, CardLink, cardLinkName } from './card-link';
+import { barHeight, drinkWeek, weekLabel } from './drink-week';
 
 const SVG = {
   viewBox: '0 0 24 24',
@@ -58,21 +63,10 @@ function GlassIcon() {
   );
 }
 
-function CheckIcon() {
-  return (
-    <svg {...SVG}>
-      <path d="M5 12.5l4.5 4.5L19 7.5" />
-    </svg>
-  );
-}
-
 const amountText = (e: DrinkEntry) =>
   e.kind === 'water' ? `${formatOz(e.amount)} oz` : `${e.amount} ${e.amount === 1 ? 'drink' : 'drinks'}`;
-const spokenAmount = (e: DrinkEntry) =>
-  e.kind === 'water'
-    ? `${formatOz(e.amount)} ${formatOz(e.amount) === '1' ? 'ounce' : 'ounces'} of water`
-    : `${e.amount} ${e.amount === 1 ? 'alcoholic drink' : 'alcoholic drinks'}`;
 const hhmm = (time: string) => time.slice(0, 5);
+const countText = (n: number) => `${n} ${n === 1 ? 'drink' : 'drinks'}`;
 
 function Entry({
   entry,
@@ -89,8 +83,15 @@ function Entry({
   const [busy, setBusy] = useState(false);
   const moreRef = useRef<HTMLButtonElement>(null);
   const time = clock12(entry.time);
-  // A deleted entry takes its button with it: focus goes to the card's heading, never `body`.
-  useFocusHandoff(moreRef, (el) => el.closest('.day-panel')?.querySelector<HTMLElement>('.day-panel-title'));
+  const water = entry.kind === 'water';
+  // A deleted entry takes its button with it: focus goes to the log row, or to the first tile's heading
+  // when that was the last entry, never `body`.
+  useFocusHandoff(moreRef, (el) => {
+    const slot = el.closest('.drinks');
+    return (
+      slot?.querySelector<HTMLElement>('.drinks-log-toggle') ?? slot?.querySelector<HTMLElement>('.day-panel-title')
+    );
+  });
 
   async function save() {
     if (!token || editing === null || editing === '' || busy) return;
@@ -106,13 +107,15 @@ function Entry({
   async function remove() {
     if (!token) return;
     onToggle(false);
-    if (!(await ask(deleteDrinkCopy(`${time} · ${amountText(entry)}${entry.kind === 'water' ? ' of water' : ''}`))))
-      return;
+    if (!(await ask(deleteDrinkCopy(`${time} · ${amountText(entry)}${water ? ' of water' : ''}`)))) return;
     await removeDrink(entry, token);
   }
 
   return (
     <li class={entry.pending ? 'drink-entry drink-entry-pending' : 'drink-entry'} data-entry-id={entry.id}>
+      <span class={water ? 'drink-entry-icon drink-icon-water' : 'drink-entry-icon drink-icon-alcohol'}>
+        {water ? <DropIcon /> : <GlassIcon />}
+      </span>
       <span class="drink-entry-time">{time}</span>
       <span class="drink-entry-amount">{amountText(entry)}</span>
       {entry.pending ? (
@@ -164,32 +167,33 @@ function Entry({
   );
 }
 
-interface CardProps {
+interface TileProps {
   kind: DrinkKind;
   date: string;
   state: DayState;
-  status: 'loading' | 'loaded' | 'error';
+  loaded: boolean;
   entries: DrinkEntry[];
   token: string | null;
-  onRetry: () => void;
 }
 
-function DrinkCard({ kind, date, state, status, entries, token, onRetry }: CardProps) {
-  const [openId, setOpenId] = useState<string | null>(null);
+/** One half-width tile: the figure, the bar toward the goal (water), the last 7 days, and the add button. */
+function DrinkTile({ kind, date, state, loaded, entries, token }: TileProps) {
   const water = kind === 'water';
-  const mine = newestFirst(entries.filter((e) => e.kind === kind));
-  const total = mine.reduce((sum, e) => sum + e.amount, 0);
+  const total = entries.filter((e) => e.kind === kind).reduce((sum, e) => sum + e.amount, 0);
   const goal = waterGoalMl.value;
   const error = drinkErrors.value[errorKey(date, kind)];
-  const loaded = status === 'loaded';
-
   const totalOz = formatOz(total);
   const goalText = formatOz(goal);
   const reached = water && loaded && total >= goal;
+  const pct = water && goal > 0 ? Math.min(100, (total / goal) * 100) : 0;
+  const unit = water ? 'oz' : total === 1 ? 'drink' : 'drinks';
+  const shown = loaded ? `${water ? totalOz : total} ${unit}` : null;
   const spokenTotal = water
     ? `Water ${totalOz} ${totalOz === '1' ? 'ounce' : 'ounces'} of ${goalText}`
     : `Alcohol ${total} ${total === 1 ? 'drink' : 'drinks'}`;
-  const pct = water && goal > 0 ? Math.min(100, (total / goal) * 100) : 0;
+
+  const days = drinkWeek(kind, date, drinkHistory.value, drinkDays.value[date]);
+  const title = water ? 'Water' : 'Alcohol';
 
   const icon = (
     <span class={water ? 'drink-icon drink-icon-water' : 'drink-icon drink-icon-alcohol'}>
@@ -198,78 +202,129 @@ function DrinkCard({ kind, date, state, status, entries, token, onRetry }: CardP
   );
 
   return (
-    <Panel title={water ? 'Water' : 'Alcohol'} icon={icon} meta={state === 'today' ? 'today' : weekdayName(date)}>
-      {loaded ? (
-        <>
-          <p class="drink-figure" aria-hidden="true">
-            <span class={reached ? 'drink-total drink-total-reached' : 'drink-total'}>
-              {reached && (
-                <span class="drink-check">
-                  <CheckIcon />
-                </span>
-              )}
-              {water ? totalOz : total}
-              <span class="drink-unit">{water ? 'oz' : total === 1 ? 'drink' : 'drinks'}</span>
-            </span>
-            {water && <span class="drink-goal">{`of ${goalText} oz`}</span>}
-          </p>
+    <div class={`drink-tile drink-tile-${kind}`} data-drink={kind}>
+      <Panel title={title} icon={icon} action={<CardChevron />} linked>
+        <p class="drink-figure" aria-hidden="true">
+          {loaded ? (
+            <>
+              <span class={reached ? 'drink-total drink-total-reached' : 'drink-total'}>
+                {water ? totalOz : total}
+                <span class="drink-unit">{unit}</span>
+              </span>
+              {water && <span class="drink-goal">{`of ${goalText}`}</span>}
+            </>
+          ) : (
+            <span class="drink-total drink-total-blank">—</span>
+          )}
+        </p>
+        {loaded && (
           <p class="sr-only" role="status">
             {spokenTotal}
           </p>
-          {water && (
-            <div
-              class="drink-bar"
-              role="progressbar"
-              aria-label="Water today"
-              aria-valuemin={0}
-              aria-valuemax={Number(goalText)}
-              aria-valuenow={Math.min(Number(totalOz), Number(goalText))}
-              aria-valuetext={spokenTotal}
-            >
-              <span class="drink-bar-fill" style={{ width: `${pct}%` }} />
-            </div>
-          )}
-        </>
-      ) : (
-        <PanelStatus status={status === 'error' ? 'error' : 'loading'} what="your drinks" onRetry={onRetry} />
-      )}
-      {state === 'today' ? (
-        <button
-          type="button"
-          class="btn btn-primary drink-add"
-          disabled={!loaded}
-          aria-label={water ? 'Add 4 ounces of water' : 'Add one alcoholic drink'}
-          onClick={() => {
-            if (token) void addDrink(kind, token);
-          }}
-        >
-          {water ? '+ 4 oz' : '+ 1 drink'}
-        </button>
-      ) : (
-        loaded && <PanelNote>Drinks can only be added today.</PanelNote>
-      )}
-      {error && (
-        <p class="drink-error" role="alert">
-          {error}
-        </p>
-      )}
-      {loaded &&
-        (mine.length === 0 ? (
-          <PanelNote>Nothing logged yet.</PanelNote>
-        ) : (
-          <ul class="drink-list" aria-label={`${water ? 'Water' : 'Alcohol'} entries`}>
-            {mine.map((e) => (
-              <Entry
-                key={e.id}
-                entry={e}
-                token={token}
-                open={openId === e.id}
-                onToggle={(open) => setOpenId(open ? e.id : null)}
-              />
+        )}
+        {loaded && water && (
+          <div
+            class="drink-bar"
+            role="progressbar"
+            aria-label="Water today"
+            aria-valuemin={0}
+            aria-valuemax={Number(goalText)}
+            aria-valuenow={Math.min(Number(totalOz), Number(goalText))}
+            aria-valuetext={spokenTotal}
+          >
+            <span class="drink-bar-fill" style={{ width: `${pct}%` }} />
+          </div>
+        )}
+        {loaded && (
+          <div class="drink-week" role="img" aria-label={weekLabel(kind, days)}>
+            {water && <span class="drink-week-goal" />}
+            {days.map((v, i) => (
+              <span key={i} class="drink-week-slot">
+                {v !== null && (
+                  <span
+                    class={i === days.length - 1 ? 'drink-week-bar drink-week-bar-viewed' : 'drink-week-bar'}
+                    style={{ height: `${Math.round(barHeight(kind, v, goal) * 1000) / 10}%` }}
+                  />
+                )}
+              </span>
             ))}
-          </ul>
-        ))}
-    </Panel>
+          </div>
+        )}
+        {state === 'today' && (
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm drink-add"
+            disabled={!loaded}
+            aria-label={water ? 'Add 4 ounces of water' : 'Add one alcoholic drink'}
+            onClick={() => {
+              if (token) void addDrink(kind, token);
+            }}
+          >
+            {water ? '+ 4 oz' : '+ 1'}
+          </button>
+        )}
+        {error && (
+          <p class="drink-error" role="alert">
+            {error}
+          </p>
+        )}
+        {loaded && (
+          <CardLink group="intake" date={date} name={cardLinkName(title, shown)} focusKey={`day-link-${kind}`} />
+        )}
+      </Panel>
+    </div>
+  );
+}
+
+/** The collapsed log row and, opened, #520's entry list. */
+function DrinkLog({
+  date,
+  state,
+  entries,
+  token,
+}: {
+  date: string;
+  state: DayState;
+  entries: DrinkEntry[];
+  token: string | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const listId = useId();
+  const list = newestFirst(entries);
+
+  if (list.length === 0) return <p class="drinks-log-empty">Nothing logged yet.</p>;
+  const label = `${state === 'today' ? "Today's" : `${weekdayShort(date)}'s`} log · ${countText(list.length)}`;
+  return (
+    <div class="drinks-log">
+      <button
+        type="button"
+        class="btn-ghost drinks-log-toggle"
+        aria-expanded={open}
+        aria-controls={listId}
+        onClick={() => setOpen(!open)}
+      >
+        <span>{label}</span>
+        <span class={open ? 'drinks-log-chevron drinks-log-chevron-open' : 'drinks-log-chevron'} aria-hidden="true">
+          <svg {...SVG} width={18} height={18}>
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </span>
+      </button>
+      {open && (
+        <ul class="drink-list" id={listId} aria-label="Drinks logged">
+          {list.map((e) => (
+            <Entry
+              key={e.id}
+              entry={e}
+              token={token}
+              open={openId === e.id}
+              onToggle={(o) => setOpenId(o ? e.id : null)}
+            />
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -278,6 +333,10 @@ export function DrinkCards({ date, state }: DayPanelProps) {
   useEffect(() => {
     if (token) void loadDrinks(date, token);
   }, [date, token]);
+  // The last 7 days' bars read the history Trends reads, once for the screen.
+  useEffect(() => {
+    if (token) void loadDrinkHistory(token);
+  }, [token]);
 
   const day = drinkDays.value[date];
   const status = day?.status ?? 'loading';
@@ -285,26 +344,24 @@ export function DrinkCards({ date, state }: DayPanelProps) {
   const retry = () => {
     if (token) void loadDrinks(date, token);
   };
+
+  if (status === 'error') {
+    return (
+      <div class="drinks">
+        <Panel title="Water and alcohol">
+          <PanelStatus status="error" what="your drinks" onRetry={retry} />
+        </Panel>
+      </div>
+    );
+  }
+  const loaded = status === 'loaded';
   return (
-    <>
-      <DrinkCard
-        kind="water"
-        date={date}
-        state={state}
-        status={status}
-        entries={entries}
-        token={token}
-        onRetry={retry}
-      />
-      <DrinkCard
-        kind="alcohol"
-        date={date}
-        state={state}
-        status={status}
-        entries={entries}
-        token={token}
-        onRetry={retry}
-      />
-    </>
+    <div class="drinks">
+      <div class="drinks-grid">
+        <DrinkTile kind="water" date={date} state={state} loaded={loaded} entries={entries} token={token} />
+        <DrinkTile kind="alcohol" date={date} state={state} loaded={loaded} entries={entries} token={token} />
+      </div>
+      {loaded && <DrinkLog date={date} state={state} entries={entries} token={token} />}
+    </div>
   );
 }

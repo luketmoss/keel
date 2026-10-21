@@ -19,6 +19,11 @@ export function weekdayName(date: string): string {
   return fmt(date, { weekday: 'long' });
 }
 
+/** "Fri" */
+export function weekdayShort(date: string): string {
+  return fmt(date, { weekday: 'short' });
+}
+
 /** "S" */
 export function weekdayLetter(date: string): string {
   return fmt(date, { weekday: 'narrow' });

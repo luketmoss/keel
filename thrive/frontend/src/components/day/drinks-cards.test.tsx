@@ -1,6 +1,7 @@
-// #520 - the Water and Alcohol cards and the state under them: the optimistic
-// add, rollback, time edit, delete behind the in-app confirm, the past-day and
-// future-day rules, loading and failure, rapid taps, the goal, and demo mode.
+// #520, #551 - the Water and Alcohol tiles, the log row under them and the state
+// behind both: the optimistic add, rollback, time edit, delete behind the in-app
+// confirm, the past-day and future-day rules, loading and failure, rapid taps,
+// the goal, the Trends link, the last 7 days, and demo mode.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, fireEvent, act } from '@testing-library/preact';
 
@@ -23,6 +24,7 @@ import { AuthContext, type AuthState } from '../../auth/auth-context';
 import type { Drink } from '../../api/drinks';
 import { DrinkCards } from './drinks-cards';
 import { SLOTS, slotsFor } from './slots';
+import { readGlobalCss } from '../../test-css';
 import { confirmText, mountConfirmHost, openedConfirm } from '../shared/confirm-test-utils';
 import {
   addDrink,
@@ -73,7 +75,18 @@ async function mount(date = TODAY, state: 'today' | 'past' = 'today') {
 
 const card = (c: Element, title: string) =>
   [...c.querySelectorAll('section.day-panel')].find((s) => s.querySelector('h2')!.textContent === title)!;
-const entries = (c: Element, title: string) => [...card(c, title).querySelectorAll('li.drink-entry')];
+const toggle = (c: Element) => c.querySelector<HTMLButtonElement>('button.drinks-log-toggle');
+/** The log row opens on a press; the entry list is not there before it. */
+const openLog = (c: Element) => {
+  const t = toggle(c);
+  if (t && t.getAttribute('aria-expanded') === 'false') fireEvent.click(t);
+};
+/** One kind's entries, from the one list under the tiles (opened if it is not). */
+const entries = (c: Element, title: string) => {
+  openLog(c);
+  const icon = title === 'Water' ? '.drink-icon-water' : '.drink-icon-alcohol';
+  return [...c.querySelectorAll('li.drink-entry')].filter((li) => li.querySelector(icon));
+};
 const total = (c: Element, title: string) => card(c, title).querySelector('.drink-total')!.textContent;
 const button = (c: Element, label: string) => c.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)!;
 
@@ -112,13 +125,14 @@ describe('display', () => {
     expect(formatOz(100)).toBe('3.4');
   });
 
-  it('shows 0 oz / 0 drinks and a one-line empty state on a quiet day', async () => {
+  it('shows 0 oz / 0 drinks and one "Nothing logged yet." line, not a button, on a quiet day', async () => {
     const { container } = await mount();
     expect(total(container, 'Water')).toBe('0oz');
-    expect(card(container, 'Water').textContent).toContain('of 64 oz');
+    expect(card(container, 'Water').textContent).toContain('of 64');
+    expect(card(container, 'Water').textContent).not.toContain('of 64 oz');
     expect(total(container, 'Alcohol')).toBe('0drinks');
-    expect(card(container, 'Water').textContent).toContain('Nothing logged yet.');
-    expect(card(container, 'Alcohol').textContent).toContain('Nothing logged yet.');
+    expect(container.querySelector('.drinks-log-empty')!.textContent).toBe('Nothing logged yet.');
+    expect(toggle(container)).toBeNull();
     expect(card(container, 'Water').querySelector('.drink-bar-fill')!.getAttribute('style')).toContain('width: 0%');
   });
 
@@ -149,7 +163,7 @@ describe('display', () => {
     const { container } = await mount();
     const bar = card(container, 'Water').querySelector('.drink-bar')!;
     expect(total(container, 'Water')).toBe('72oz');
-    expect(card(container, 'Water').textContent).toContain('of 64 oz');
+    expect(card(container, 'Water').textContent).toContain('of 64');
     expect(bar.querySelector('.drink-bar-fill')!.getAttribute('style')).toContain('width: 100%');
     expect(bar.getAttribute('aria-valuenow')).toBe('64');
     expect(bar.getAttribute('aria-valuemax')).toBe('64');
@@ -164,13 +178,199 @@ describe('display', () => {
     );
     expect(card(container, 'Alcohol').querySelector('p.sr-only[role="status"]')!.textContent).toBe('Alcohol 0 drinks');
     expect(button(container, 'Add 4 ounces of water').textContent).toBe('+ 4 oz');
-    expect(button(container, 'Add one alcoholic drink').textContent).toBe('+ 1 drink');
+    expect(button(container, 'Add one alcoholic drink').textContent).toBe('+ 1');
   });
 
   it('uses the goal the API returned', async () => {
     api.getDrinks.mockResolvedValue({ ok: true, data: { drinks: [], water_goal_ml: 2957 } });
     const { container } = await mount();
-    expect(card(container, 'Water').textContent).toContain('of 100 oz');
+    expect(card(container, 'Water').textContent).toContain('of 100');
+  });
+});
+
+describe('the tiles', () => {
+  const seed = () =>
+    api.getDrinks.mockResolvedValue({
+      ok: true,
+      data: {
+        drinks: [drink('a', 'water', TODAY, '10:00:00'), drink('c', 'alcohol', TODAY, '21:05:00')],
+        water_goal_ml: 1893,
+      },
+    });
+
+  it("are two grid items side by side, in the metric tiles' two-column grid, with the card padding and title size", async () => {
+    const { container } = await mount();
+    const grid = container.querySelector('.drinks-grid')!;
+    expect([...grid.children].map((c) => c.getAttribute('data-drink'))).toEqual(['water', 'alcohol']);
+    const css = readGlobalCss();
+    expect(css).toMatch(/\.drinks-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
+    expect(css).toMatch(/\.drinks-grid\s*\{[^}]*gap:\s*var\(--day-gap\)/);
+    expect(css).toMatch(/\.drink-tile \.day-panel\s*\{[^}]*padding:\s*calc\(var\(--space-md\) - var\(--space-xs\)\)/);
+    expect(css).toMatch(/\.day-screen \.drink-tile \.day-panel-title\s*\{[^}]*font-size:\s*var\(--text-sm\)/);
+  });
+
+  it('show the figure, the ›, and a link to Trends Intake for the viewed date', async () => {
+    seed();
+    const { container } = await mount();
+    expect(card(container, 'Water').querySelector('.day-card-chevron')!.textContent).toBe('›');
+    expect(card(container, 'Alcohol').querySelector('.day-card-chevron')).not.toBeNull();
+    const water = card(container, 'Water').querySelector<HTMLAnchorElement>('a.day-card-link')!;
+    expect(water.getAttribute('href')).toBe(`#/trends/intake?date=${TODAY}`);
+    expect(water.textContent).toBe('Water 4 oz. Open Intake trends');
+    expect(card(container, 'Alcohol').querySelector('a.day-card-link')!.textContent).toBe(
+      'Alcohol 1 drink. Open Intake trends',
+    );
+  });
+
+  it('link the date being viewed, not today', async () => {
+    const { container } = await mount(YESTERDAY, 'past');
+    expect(card(container, 'Water').querySelector('a.day-card-link')!.getAttribute('href')).toBe(
+      `#/trends/intake?date=${YESTERDAY}`,
+    );
+  });
+
+  it('keep the add button apart from the link: it adds and never navigates', async () => {
+    const { container } = await mount();
+    const before = location.hash;
+    const add = button(container, 'Add 4 ounces of water');
+    expect(add.closest('a')).toBeNull();
+    fireEvent.click(add);
+    expect(location.hash).toBe(before);
+    expect(total(container, 'Water')).toBe('4oz');
+    const css = readGlobalCss();
+    expect(css).toMatch(/\.drink-add\s*\{[^}]*position:\s*relative;[^}]*z-index:\s*1/);
+    expect(css).toMatch(/\.drink-add::before\s*\{[^}]*inset:\s*-5px 0/);
+  });
+
+  it('draw the water bar 6px and no bar for alcohol', async () => {
+    const { container } = await mount();
+    expect(readGlobalCss()).toMatch(/--drink-bar-height:\s*6px/);
+    expect(card(container, 'Water').querySelector('.drink-bar')).not.toBeNull();
+    expect(card(container, 'Alcohol').querySelector('.drink-bar')).toBeNull();
+  });
+
+  it('give the add buttons the compact size, left-aligned, at the foot of the tile', async () => {
+    const { container } = await mount();
+    for (const label of ['Add 4 ounces of water', 'Add one alcoholic drink']) {
+      expect(button(container, label).classList.contains('btn-sm')).toBe(true);
+    }
+    expect(readGlobalCss()).toMatch(/\.drink-add\s*\{[^}]*align-self:\s*flex-start;[^}]*margin-top:\s*auto/);
+  });
+
+  it('have no add button on a past day, and still link and draw their bars', async () => {
+    seed();
+    const { container } = await mount(YESTERDAY, 'past');
+    expect(container.querySelector('.drink-add')).toBeNull();
+    expect(container.querySelectorAll('.drink-week')).toHaveLength(2);
+  });
+
+  it('do not say "Drinks can only be added today." any more, nor label the card "today"', async () => {
+    const { container } = await mount(YESTERDAY, 'past');
+    expect(container.textContent).not.toContain('Drinks can only be added today.');
+    expect(card(container, 'Water').querySelector('.day-panel-meta')).toBeNull();
+  });
+
+  it('draw seven bars for the 7 days ending on the viewed day, the viewed day highlighted', async () => {
+    api.getDrinks.mockResolvedValue({
+      ok: true,
+      data: {
+        drinks: [
+          drink('h1', 'water', '2026-10-16', '09:00:00', 946), // 32 oz
+          drink('h2', 'water', '2026-10-17', '09:00:00', 1419), // 48 oz
+          drink('h4', 'alcohol', '2026-10-17', '20:00:00'),
+          drink('h5', 'water', TODAY, '09:00:00', 236),
+        ],
+        water_goal_ml: 1893,
+      },
+    });
+    const { container } = await mount();
+    const water = card(container, 'Water').querySelector('.drink-week')!;
+    expect(water.getAttribute('role')).toBe('img');
+    expect(water.getAttribute('aria-label')).toBe('Water, last 7 days: no data, no data, 32, 48, 0, 0, 8 ounces');
+    expect(water.querySelectorAll('.drink-week-slot')).toHaveLength(7);
+    expect(water.querySelectorAll('.drink-week-slot:empty')).toHaveLength(2);
+    expect(water.querySelectorAll('.drink-week-bar-viewed')).toHaveLength(1);
+    expect(water.querySelector('.drink-week-slot:last-child .drink-week-bar-viewed')).not.toBeNull();
+    expect(water.querySelector('.drink-week-goal')).not.toBeNull();
+    const heights = [...water.querySelectorAll('.drink-week-bar')].map((b) => b.getAttribute('style'));
+    expect(heights).toEqual(['height: 50%;', 'height: 75%;', 'height: 0%;', 'height: 0%;', 'height: 12.5%;']);
+    const alcohol = card(container, 'Alcohol').querySelector('.drink-week')!;
+    expect(alcohol.getAttribute('aria-label')).toBe('Alcohol, last 7 days: no data, no data, 0, 1, 0, 0, 0 drinks');
+    expect(alcohol.querySelector('.drink-week-goal')).toBeNull();
+  });
+
+  it("move the viewed day's bar at once when a drink is added", async () => {
+    const { container } = await mount();
+    api.getDrinks.mockClear();
+    expect(card(container, 'Water').querySelector('.drink-week')!.getAttribute('aria-label')).toContain('no data');
+    fireEvent.click(button(container, 'Add 4 ounces of water'));
+    const label = card(container, 'Water').querySelector('.drink-week')!.getAttribute('aria-label')!;
+    expect(label.endsWith('4 ounces')).toBe(true);
+  });
+});
+
+describe('the log row', () => {
+  it('is collapsed on load, counts the drinks, and opens the list on a press', async () => {
+    api.getDrinks.mockResolvedValue({
+      ok: true,
+      data: {
+        drinks: [
+          drink('a', 'water', TODAY, '13:10:00'),
+          drink('b', 'water', TODAY, '15:42:00'),
+          drink('c', 'alcohol', TODAY, '21:05:00'),
+        ],
+        water_goal_ml: 1893,
+      },
+    });
+    const { container } = await mount();
+    const t = toggle(container)!;
+    expect(t.textContent).toBe("Today's log · 3 drinks");
+    expect(t.getAttribute('aria-expanded')).toBe('false');
+    expect(container.querySelector('li.drink-entry')).toBeNull();
+    fireEvent.click(t);
+    expect(t.getAttribute('aria-expanded')).toBe('true');
+    expect(t.getAttribute('aria-controls')).toBe(container.querySelector('ul.drink-list')!.id);
+    expect([...container.querySelectorAll('li.drink-entry')].map((li) => li.getAttribute('data-entry-id'))).toEqual([
+      'c',
+      'b',
+      'a',
+    ]);
+    fireEvent.click(t);
+    expect(t.getAttribute('aria-expanded')).toBe('false');
+    expect(container.querySelector('li.drink-entry')).toBeNull();
+  });
+
+  it('says "1 drink" for one entry and names the weekday on a past day', async () => {
+    api.getDrinks.mockResolvedValue({
+      ok: true,
+      data: { drinks: [drink('p1', 'water', YESTERDAY, '08:00:00')], water_goal_ml: 1893 },
+    });
+    const { container } = await mount(YESTERDAY, 'past');
+    expect(toggle(container)!.textContent).toBe("Mon's log · 1 drink");
+  });
+
+  it('counts a pending add at once', async () => {
+    let release!: (v: unknown) => void;
+    api.logDrink.mockReturnValue(new Promise((r) => (release = r)));
+    const { container } = await mount();
+    expect(toggle(container)).toBeNull();
+    fireEvent.click(button(container, 'Add 4 ounces of water'));
+    expect(toggle(container)!.textContent).toBe("Today's log · 1 drink");
+    release({ ok: false, kind: 'network' });
+    await flush();
+    expect(toggle(container)).toBeNull();
+  });
+
+  it('is closed again on the next load: the open state is not kept', async () => {
+    api.getDrinks.mockResolvedValue({
+      ok: true,
+      data: { drinks: [drink('a', 'water', TODAY, '13:10:00')], water_goal_ml: 1893 },
+    });
+    const first = await mount();
+    openLog(first.container);
+    first.unmount();
+    const second = await mount();
+    expect(toggle(second.container)!.getAttribute('aria-expanded')).toBe('false');
   });
 });
 
@@ -181,12 +381,13 @@ describe('adding', () => {
     for (let i = 0; i < 5; i++) fireEvent.click(add);
     // Before the API answers: five pending entries, already counted.
     expect(total(container, 'Water')).toBe('20oz');
+    expect(toggle(container)!.textContent).toBe("Today's log · 5 drinks");
     expect(entries(container, 'Water')).toHaveLength(5);
     expect(entries(container, 'Water')[0].textContent).toContain('12:00 PM');
     expect(entries(container, 'Water')[0].textContent).toContain('Saving…');
     await flush();
     expect(total(container, 'Water')).toBe('20oz');
-    expect(card(container, 'Water').textContent).not.toContain('Saving…');
+    expect(container.textContent).not.toContain('Saving…');
   });
 
   it('sends one call per tap, each with its own id, 118 ml and the instant of the tap', async () => {
@@ -203,7 +404,7 @@ describe('adding', () => {
     expect(api.logDrink.mock.calls[0][1]).toBe('tok');
   });
 
-  it('+ 1 drink raises the alcohol count by 1', async () => {
+  it('+ 1 raises the alcohol count by 1', async () => {
     const { container } = await mount();
     fireEvent.click(button(container, 'Add one alcoholic drink'));
     expect(total(container, 'Alcohol')).toBe('1drink');
@@ -267,15 +468,17 @@ describe('past and future days', () => {
     const { container } = await mount(YESTERDAY, 'past');
     expect(api.getDrinks).toHaveBeenCalledWith({ from: YESTERDAY, to: YESTERDAY }, 'tok');
     expect(container.querySelector('.drink-add')).toBeNull();
-    expect(card(container, 'Water').textContent).toContain('Drinks can only be added today.');
-    expect(card(container, 'Water').textContent).toContain('Monday');
     expect(total(container, 'Water')).toBe('4oz');
     expect(entries(container, 'Water')[0].querySelector('.drink-more')).not.toBeNull();
   });
 
-  it('today is labelled "today"', async () => {
+  it("today's log row says Today's", async () => {
+    api.getDrinks.mockResolvedValue({
+      ok: true,
+      data: { drinks: [drink('a', 'water', TODAY, '13:10:00')], water_goal_ml: 1893 },
+    });
     const { container } = await mount();
-    expect(card(container, 'Water').querySelector('.day-panel-meta')!.textContent).toBe('today');
+    expect(toggle(container)!.textContent).toContain("Today's log");
   });
 });
 
@@ -312,6 +515,7 @@ describe('editing a time', () => {
   it('saving the same time sends nothing', async () => {
     seed();
     const { container } = await mount();
+    openLog(container);
     fireEvent.click(button(container, 'More actions for the 10:00 AM water entry'));
     fireEvent.click([...container.querySelectorAll('button')].find((b) => b.textContent === 'Edit time')!);
     fireEvent.click([...container.querySelectorAll('button')].find((b) => b.textContent === 'Save')!);
@@ -324,6 +528,7 @@ describe('editing a time', () => {
     seed();
     api.updateDrinkTime.mockResolvedValue({ ok: false, kind: 'network' });
     const { container } = await mount();
+    openLog(container);
     fireEvent.click(button(container, 'More actions for the 10:00 AM water entry'));
     fireEvent.click([...container.querySelectorAll('button')].find((b) => b.textContent === 'Edit time')!);
     fireEvent.input(container.querySelector('input[type="time"]')!, { target: { value: '09:00' } });
@@ -345,6 +550,7 @@ describe('deleting', () => {
       },
     });
   const openDelete = (c: Element) => {
+    openLog(c);
     fireEvent.click(button(c, 'More actions for the 10:00 AM water entry'));
     fireEvent.click([...c.querySelectorAll('button')].find((b) => b.textContent === 'Delete')!);
   };
@@ -392,12 +598,13 @@ describe('deleting', () => {
 });
 
 describe('loading and failure', () => {
-  it('shows a loading state with the add buttons disabled while the first read runs', async () => {
+  it('shows "—" in both tiles, the add buttons disabled and no log row while the first read runs', async () => {
     let release!: (v: unknown) => void;
     api.getDrinks.mockReturnValue(new Promise((r) => (release = r)));
     const { container } = await mount();
-    expect(card(container, 'Water').textContent).toContain('Loading…');
-    expect(card(container, 'Alcohol').textContent).toContain('Loading…');
+    expect(card(container, 'Water').querySelector('.drink-total')!.textContent).toBe('—');
+    expect(card(container, 'Alcohol').querySelector('.drink-total')!.textContent).toBe('—');
+    expect(container.querySelector('.drinks-log, .drinks-log-empty')).toBeNull();
     expect(button(container, 'Add 4 ounces of water').disabled).toBe(true);
     expect(button(container, 'Add one alcoholic drink').disabled).toBe(true);
     release({ ok: true, data: { drinks: [], water_goal_ml: 1893 } });
@@ -405,17 +612,18 @@ describe('loading and failure', () => {
     expect(button(container, 'Add 4 ounces of water').disabled).toBe(false);
   });
 
-  it('shows the standard panel error with a retry, buttons disabled, when the read fails', async () => {
+  it('shows one panel error with a retry across both tiles when the read fails', async () => {
     api.getDrinks.mockResolvedValueOnce({ ok: false, kind: 'network' });
     const { container } = await mount();
-    expect(card(container, 'Water').textContent).toContain("Couldn't load your drinks.");
-    expect(button(container, 'Add 4 ounces of water').disabled).toBe(true);
-    expect(button(container, 'Add one alcoholic drink').disabled).toBe(true);
-    const retry = [...card(container, 'Water').querySelectorAll('button')].find((b) => b.textContent === 'Try again')!;
+    expect(container.querySelectorAll('section.day-panel')).toHaveLength(1);
+    expect(container.textContent).toContain("Couldn't load your drinks.");
+    expect(container.querySelector('.drink-add')).toBeNull();
+    const retry = [...container.querySelectorAll('button')].find((b) => b.textContent === 'Try again')!;
     fireEvent.click(retry);
     await flush();
-    expect(api.getDrinks).toHaveBeenCalledTimes(2);
-    expect(card(container, 'Water').textContent).not.toContain("Couldn't load");
+    const dayReads = api.getDrinks.mock.calls.filter(([range]) => range.from === range.to);
+    expect(dayReads).toHaveLength(2);
+    expect(container.textContent).not.toContain("Couldn't load");
     expect(button(container, 'Add 4 ounces of water').disabled).toBe(false);
   });
 });
@@ -435,7 +643,7 @@ describe('the goal', () => {
   it('saves through updateSetting and the Water card follows it without a reload', async () => {
     api.updateSetting.mockResolvedValue({ ok: true, data: { key: 'water_goal_ml', value: '2957', updated: 'u' } });
     const { container } = await mount();
-    expect(card(container, 'Water').textContent).toContain('of 64 oz');
+    expect(card(container, 'Water').textContent).toContain('of 64');
     let ok = false;
     await act(async () => {
       ok = await saveWaterGoal(2957, 'tok');
@@ -443,7 +651,7 @@ describe('the goal', () => {
     expect(ok).toBe(true);
     expect(api.updateSetting).toHaveBeenCalledWith('water_goal_ml', 2957, 'tok');
     expect(waterGoalMl.value).toBe(2957);
-    expect(card(container, 'Water').textContent).toContain('of 100 oz');
+    expect(card(container, 'Water').textContent).toContain('of 100');
   });
 
   it('keeps the old goal when the save fails', async () => {
@@ -458,11 +666,13 @@ describe('demo mode', () => {
     demo.on = true;
   });
 
-  it('shows cards populated from memory, makes no API call, and can add, edit and delete', async () => {
+  it('shows tiles populated from memory, makes no API call, and can add, edit and delete', async () => {
     mountConfirmHost();
     const { container } = await mount();
     expect(api.getDrinks).not.toHaveBeenCalled();
     expect(entries(container, 'Water').length).toBeGreaterThan(0);
+    // The last 7 days come from the demo history, with no call either.
+    expect(card(container, 'Water').querySelector('.drink-week')!.getAttribute('aria-label')).not.toContain('no data');
     const before = Number(total(container, 'Water')!.replace('oz', ''));
 
     fireEvent.click(button(container, 'Add 4 ounces of water'));

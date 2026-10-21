@@ -44,7 +44,7 @@
     "--figure-xl": "2.75rem",
     "--text-2xs": "0.625rem",
     "--day-gap": "0.75rem",
-    "--drink-bar-height": "12px",
+    "--drink-bar-height": "6px",
     "--range-track": "var(--color-border-light)",
     "--range-band": "var(--color-border)",
     "--range-marker": "var(--color-text)"

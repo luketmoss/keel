@@ -208,7 +208,7 @@ Google Sheet "Groundwork" with these tabs:
   or 8 (1 is a guest or another user) are never written. The SPA reads it,
   read-only and still in kg, through `frontend/src/api/health-api.ts` (luketmoss/thrive#236).
   Later columns are only ever appended.
-- **DailySummary** (A:AA) — **derived, never authoritative** (luketmoss/thrive#131). One row per
+- **DailySummary** (A:AB) — **derived, never authoritative** (luketmoss/thrive#131). One row per
   local calendar day, rebuildable at any time from `Workouts` + `DailyHealth` +
   `BodyMeasurements` + `Drinks`. Nothing writes here by hand. If it disagrees with
   `Workouts`, `Workouts` is right and this is stale. The SPA reads it,
@@ -219,7 +219,7 @@ Google Sheet "Groundwork" with these tabs:
   ascent_withdata, max_effort, effort_counts, steps, resting_hr, hrv,
   sleep_total_s, training_load, computed_at, moving_withdata, elapsed_withdata,
   weight_kg, fat_ratio_pct, systolic_mmhg, diastolic_mmhg, bp_count, water_ml,
-  alcohol_drinks.
+  alcohol_drinks, coffee_cups.
   Every total carries its coverage: `total_moving_s`/`total_elapsed_s` are blank
   when no activity recorded them, and S/T count those that did out of
   `activity_count` (luketmoss/thrive#181). S/T are appended, not beside D/E, because agents and the API read
@@ -245,6 +245,10 @@ Google Sheet "Groundwork" with these tabs:
   leaves Z:AA blank everywhere. Drink writes do not trigger a rebuild, so the
   columns catch up on the normal rebuild path; Day and Trends read `Drinks`
   directly. Added by `scripts/migrate-522-daily-summary-drinks.mjs`.
+  AB (#562) is `coffee_cups`, the sum of the day's coffee `amount`s in cups,
+  blank, never `0`, on a day with no coffee, by the same rules; a missing
+  `Drinks` tab leaves Z:AB blank. Added by
+  `scripts/migrate-562-daily-summary-coffee.mjs`.
 - **SyncLog** (A:N) — one row per COROS sync run (luketmoss/thrive#156): run_id, started_at,
   finished_at, window_start, window_end, n_seen, n_new, n_updated, n_enriched,
   n_fit_fetched, n_errors, status (`ok`/`partial`/`failed`), error_detail,
@@ -317,8 +321,9 @@ Google Sheet "Groundwork" with these tabs:
 - **Drinks** (A:I) and **Settings** (A:C) — Thrive Sip's intake (#519, epic #518).
   Drinks is one row per drink: id, kind, amount, date, time, logged_at_utc,
   source, created, updated. `id` is a UUID the **caller** generates, so logging
-  it twice leaves one row; `kind` is `water` or `alcohol`; `amount` is **water in
-  whole ml, alcohol in standard drinks** (always `1`), never blank or `0`;
+  it twice leaves one row; `kind` is `water`, `alcohol` or `coffee` (#558; the API accepts
+  it from #560); `amount` is **water in whole ml, alcohol in standard drinks**
+  (always `1`), **coffee in cups**, never blank or `0`;
   `date`/`time` are local `America/Denver`, derived by the API from
   `logged_at_utc` (the instant the caller says it was taken, never rewritten);
   `source` is `widget` or `app`. **Written only by the API** (`logDrink`,

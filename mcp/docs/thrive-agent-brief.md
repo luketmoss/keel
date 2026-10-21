@@ -63,9 +63,9 @@ signal — several `Easy` sessions on a lift mean it's time to add load.
 `thrive_daily_health`, `thrive_daily_summary`, `thrive_body_measurements`, `thrive_journal`,
 `thrive_drinks`.
 
-`thrive_drinks` reads the water and alcohol the user logged (default: today): each entry,
-per-day totals (water in oz and ml against the daily goal, alcohol in standard drinks) and
-the goal. A day with nothing logged is unknown, not a day without water. It is read-only:
+`thrive_drinks` reads the water, coffee and alcohol the user logged (default: today): each
+entry, per-day totals (water in oz and ml against the daily goal, coffee in cups, alcohol in
+standard drinks) and the goal. A day with nothing logged is unknown, not a day without water. It is read-only:
 no tool logs a drink, so if the user asks you to, tell them to use the app or the widget.
 `thrive_daily_summary` carries the same daily totals, but only as of its last rebuild.
 

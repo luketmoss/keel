@@ -203,7 +203,7 @@ var SECTIONS = ['warmup', 'primary', 'SS1', 'SS2', 'SS3', 'burnout', 'cooldown']
 /** The fields a set correction may change. Mirrors SET_UPDATE_FIELDS. */
 var SET_UPDATE_FIELDS = ['weight', 'reps', 'planned_reps', 'effort'];
 
-// --- DailySummary (A:AA) — #131, #181, #203, #522 -------------------
+// --- DailySummary (A:AB) — #131, #181, #203, #522, #562 --------------
 //
 // One row per local calendar day. Derived, never authoritative: if this tab
 // and Workouts disagree, Workouts is right and this is stale.
@@ -214,7 +214,8 @@ var SET_UPDATE_FIELDS = ['weight', 'reps', 'planned_reps', 'effort'];
 // does not exist yet, and a migration later.
 //
 // The duration coverage (S, T) came later (#181), the body columns (U-Y)
-// later still (#203), and the drinks columns (Z, AA) after that (#522); each
+// later still (#203), the drinks columns (Z, AA) after that (#522), and
+// coffee (AB) last (#562); each
 // is appended, not inserted, because almanac (luketmoss/keel) reads this tab
 // by column, so no earlier letter may move.
 var DAILY_SUMMARY_FIELDS = [
@@ -245,9 +246,10 @@ var DAILY_SUMMARY_FIELDS = [
   'bp_count',              // Y  #203: BP readings that day (rows, not values)
   'water_ml',              // Z  #522: sum of the day's water amounts from Drinks; blank when none
   'alcohol_drinks',        // AA #522: sum of the day's alcohol amounts (standard drinks); blank when none
+  'coffee_cups',           // AB #562: sum of the day's coffee amounts (cups); blank when none
 ];
 
-var DAILY_SUMMARY_COLUMN_COUNT = 27;
+var DAILY_SUMMARY_COLUMN_COUNT = 28;
 
 // --- DailyHealth (A:S) — #165, #231 ---------------------------------
 //

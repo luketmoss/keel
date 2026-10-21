@@ -251,7 +251,7 @@ h1, h2, h3, p { margin: 0; text-wrap: balance; }
       "sub": "Average 53 bpm, so 1 lower."
     }
   },
-  "drinks": "Water 48 oz, 75% of your 64 oz goal · Alcohol 2 drinks",
+  "drinks": "Water 48 oz, 75% of your 64 oz goal · Coffee 2 cups · Alcohol 2 drinks",
   "today": {
     "sessions": [
       {
@@ -766,7 +766,7 @@ h1, h2, h3, p { margin: 0; text-wrap: balance; }
     root.appendChild(rs);
   }
 
-  // #522: one line of yesterday's water and alcohol, as text.
+  // #522, #562: one line of yesterday's water, coffee and alcohol, as text.
   if (D.drinks) {
     var dk = sec("Drinks", "yesterday");
     dk.appendChild(el("div", "card", null, [el("p", null, D.drinks)]));

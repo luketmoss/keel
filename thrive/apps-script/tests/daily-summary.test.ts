@@ -18,7 +18,7 @@ const COL = {
   sleep_total_s: 15, training_load: 16, computed_at: 17,
   moving_withdata: 18, elapsed_withdata: 19,
   weight_kg: 20, fat_ratio_pct: 21, systolic_mmhg: 22, diastolic_mmhg: 23, bp_count: 24,
-  water_ml: 25, alcohol_drinks: 26,
+  water_ml: 25, alcohol_drinks: 26, coffee_cups: 27,
 };
 
 function rebuild(
@@ -459,13 +459,13 @@ describe('the tab is readable, and history bounds are discoverable', () => {
     expect(res.data).toEqual({ from: '2026-03-04', to: '2026-09-15' });
   });
 
-  it('returns all 27 columns on a read', () => {
+  it('returns all 28 columns on a read', () => {
     const first = rebuild({
       workouts: [workoutRow({ id: 'w_1', date: '2026-09-15', type: 'weight' })],
     }, '2026-09-15', '2026-09-15');
     const res = callDoGet<any[]>(first.sandbox, { action: 'getDailySummary' });
-    expect(Object.keys(res.data[0])).toHaveLength(28); // 27 + sheetRow
-    expect(first.summaryRows[0]).toHaveLength(27);
+    expect(Object.keys(res.data[0])).toHaveLength(29); // 28 + sheetRow
+    expect(first.summaryRows[0]).toHaveLength(28);
   });
 });
 
@@ -926,7 +926,7 @@ describe('#203 AC5: the rollup stays idempotent with the body columns', () => {
 // --- #522: water and alcohol, rolled up from Drinks -------------------------
 
 /** One Drinks row, A:I, as the API writes it (DRINK_FIELDS). */
-function drinkRow(id: string, kind: 'water' | 'alcohol', amount: string, date: string, time = '08:00:00'): CellValue[] {
+function drinkRow(id: string, kind: 'water' | 'alcohol' | 'coffee', amount: string, date: string, time = '08:00:00'): CellValue[] {
   return [id, kind, amount, date, time, `${date}T14:00:00.000Z`, 'app', `${date}T14:00:01.000Z`, `${date}T14:00:01.000Z`];
 }
 
@@ -943,13 +943,12 @@ describe('#522 AC1: Z and AA are appended, and the migration matches', () => {
     const { sandbox } = loadApi();
     const fields = [...sandbox.DAILY_SUMMARY_FIELDS];
     expect(fields.slice(0, 25)).toEqual(headersIn('migrate-203-daily-summary-body.mjs'));
-    expect(fields.slice(25)).toEqual(['water_ml', 'alcohol_drinks']);
-    expect(sandbox.DAILY_SUMMARY_COLUMN_COUNT).toBe(27);
+    expect(fields.slice(25, 27)).toEqual(['water_ml', 'alcohol_drinks']);
   });
 
   it('matches the headers the #522 migration writes', () => {
     const { sandbox } = loadApi();
-    expect(headersIn('migrate-522-daily-summary-drinks.mjs')).toEqual([...sandbox.DAILY_SUMMARY_FIELDS]);
+    expect(headersIn('migrate-522-daily-summary-drinks.mjs')).toEqual([...sandbox.DAILY_SUMMARY_FIELDS].slice(0, 27));
   });
 });
 
@@ -1052,5 +1051,76 @@ describe('#522 AC4: getDailySummary returns the two fields', () => {
     const res = callDoGet<any[]>(first.sandbox, { action: 'getDailySummary', from: '2026-10-19', to: '2026-10-19' });
     expect(res.data[0].water_ml).toBe('354');
     expect(res.data[0].alcohol_drinks).toBe('1');
+  });
+});
+
+// --- #562: coffee, rolled up from Drinks ------------------------------------
+
+describe('#562 AC3: AB is appended, and the migration matches', () => {
+  it('appends coffee_cups after alcohol_drinks, moving nothing', () => {
+    const { sandbox } = loadApi();
+    const fields = [...sandbox.DAILY_SUMMARY_FIELDS];
+    expect(fields.slice(-3)).toEqual(['water_ml', 'alcohol_drinks', 'coffee_cups']);
+    expect(fields).toHaveLength(28);
+    expect(sandbox.DAILY_SUMMARY_COLUMN_COUNT).toBe(28);
+  });
+});
+
+describe('#562 AC2: the day sums its coffee cups', () => {
+  it('writes 2 for two coffees, and leaves water and alcohol as they were', () => {
+    const { res, summaryRows } = rebuild({
+      workouts: [],
+      drinks: [
+        drinkRow('d1', 'water', '354', '2026-10-19', '07:00:00'),
+        drinkRow('c1', 'coffee', '1', '2026-10-19', '07:10:00'),
+        drinkRow('d2', 'alcohol', '1', '2026-10-19', '19:00:00'),
+        drinkRow('c2', 'coffee', '1', '2026-10-19', '13:00:00'),
+        // Another day's coffee never leaks in.
+        drinkRow('c3', 'coffee', '1', '2026-10-20'),
+      ],
+    }, '2026-10-19', '2026-10-19');
+    expect(res.success, res.error).toBe(true);
+    expect(summaryRows).toHaveLength(1);
+    expect(summaryRows[0][COL.coffee_cups]).toBe('2');
+    expect(summaryRows[0][COL.water_ml]).toBe('354');
+    expect(summaryRows[0][COL.alcohol_drinks]).toBe('1');
+  });
+
+  it('leaves coffee_cups blank, not 0, on a day with no coffee', () => {
+    const { summaryRows } = rebuild({
+      workouts: [workoutRow({ id: 'w_1', date: '2026-10-19', type: 'weight' })],
+      drinks: [drinkRow('d1', 'water', '250', '2026-10-19'), drinkRow('c1', 'coffee', '1', '2026-10-18')],
+    }, '2026-10-19', '2026-10-19');
+    expect(summaryRows[0][COL.coffee_cups]).toBe('');
+    expect(summaryRows[0][COL.water_ml]).toBe('250');
+  });
+
+  it('gives a coffee-only day a row, with water and alcohol blank', () => {
+    const { summaryRows } = rebuild({
+      workouts: [],
+      drinks: [drinkRow('c1', 'coffee', '1', '2026-10-19')],
+    }, '2026-10-19', '2026-10-19');
+    expect(summaryRows).toHaveLength(1);
+    expect(summaryRows[0][COL.coffee_cups]).toBe('1');
+    expect(summaryRows[0][COL.water_ml]).toBe('');
+    expect(summaryRows[0][COL.alcohol_drinks]).toBe('');
+  });
+
+  it('leaves Z:AB blank, without error, when there is no Drinks tab', () => {
+    const { res, drinkRows, summaryRows } = rebuild({
+      workouts: [workoutRow({ id: 'w_1', date: '2026-10-19', type: 'weight' })],
+    }, '2026-10-19', '2026-10-19');
+    expect(res.success, res.error).toBe(true);
+    expect(drinkRows).toBeUndefined();
+    expect(summaryRows[0].slice(COL.water_ml)).toEqual(['', '', '']);
+  });
+
+  it('reads coffee_cups back by name', () => {
+    const first = rebuild({
+      workouts: [],
+      drinks: [drinkRow('c1', 'coffee', '1', '2026-10-19'), drinkRow('c2', 'coffee', '1', '2026-10-19')],
+    }, '2026-10-19', '2026-10-19');
+    const res = callDoGet<any[]>(first.sandbox, { action: 'getDailySummary', from: '2026-10-19', to: '2026-10-19' });
+    expect(res.data[0].coffee_cups).toBe('2');
   });
 });

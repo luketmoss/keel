@@ -158,4 +158,19 @@ class OutboxTest {
         assertEquals("https://example.test/exec", seenUrl)
         assertEquals("secret-key", seenForm["key"])
     }
+
+    @Test
+    fun coffeeTapsAreQueuedSeparatelyAsOneCupEach() = runBlocking {
+        val first = outbox.enqueue(Kind.COFFEE, 1)
+        val second = outbox.enqueue(Kind.COFFEE, 1)
+        assertNotEquals(first.id, second.id)
+        assertEquals("coffee", first.kind)
+        assertEquals(1, first.amount)
+        assertEquals(2, queue.load().size)
+
+        val server = FakeServer()
+        outbox.flush(api(server))
+        assertEquals("coffee", server.rows.getValue(first.id).getValue("kind").jsonPrimitive.content)
+        assertEquals("1", server.rows.getValue(second.id).getValue("amount").jsonPrimitive.content)
+    }
 }

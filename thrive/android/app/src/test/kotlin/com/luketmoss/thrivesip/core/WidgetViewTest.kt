@@ -127,4 +127,45 @@ class WidgetViewTest {
         assertEquals("1 drink", one.alcoholText)
         assertEquals("1 alcoholic drink", one.alcoholDescription)
     }
+
+    @Test
+    fun coffeeIsTodaysCupsPlusQueuedTaps() {
+        val withCoffee = today.copy(coffeeCups = 2)
+        val view = WidgetViews.build(snapshot(totals = withCoffee, pending = listOf(tap(Kind.COFFEE, 1))))
+        assertEquals("3", view.coffeeText)
+        assertEquals("3 cups of coffee", view.coffeeDescription)
+        // The queue counts coffee: one queued tap is "1 queued", water and alcohol alike.
+        assertEquals("offline · 1 queued", view.status)
+    }
+
+    @Test
+    fun coffeeDescriptionIsSingularForOneAndPluralForZero() {
+        assertEquals("0 cups of coffee", WidgetViews.build(snapshot()).coffeeDescription)
+        val one = WidgetViews.build(snapshot(totals = today.copy(coffeeCups = 1)))
+        assertEquals("1 cup of coffee", one.coffeeDescription)
+        assertEquals("1", one.coffeeText)
+    }
+
+    @Test
+    fun coffeeFromBeforeDenverMidnightCountsFromZero() {
+        val yesterday = today.copy(coffeeCups = 4)
+        val view = WidgetViews.build(snapshot(totals = yesterday, at = Instant.parse("2026-10-21T06:30:00Z")))
+        assertEquals("0", view.coffeeText)
+        assertEquals("0 cups of coffee", view.coffeeDescription)
+    }
+
+    @Test
+    fun alcoholAlsoHasABareCountForTheThreeColumnLayout() {
+        val view = WidgetViews.build(snapshot())
+        assertEquals("2", view.alcoholCount)
+        assertEquals("2 drinks", view.alcoholText)
+    }
+
+    @Test
+    fun coffeeIsAbsentWhileLoadingAndWhenNotConfigured() {
+        assertNull(WidgetViews.build(snapshot(totals = null)).coffeeText)
+        val off = WidgetViews.build(snapshot(configured = false, totals = null))
+        assertNull(off.coffeeText)
+        assertEquals("Set up Thrive Sip", off.coffeeDescription)
+    }
 }

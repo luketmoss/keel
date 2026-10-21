@@ -53,6 +53,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** Opening the settings app re-reads totals, so the widget is current when you get back to it. */
+    override fun onStart() {
+        super.onStart()
+        Scheduler.enqueueSend(applicationContext)
+    }
+
     private suspend fun save(store: SipStore, url: String, key: String): TestResult? {
         if (!ConnectionTest.isValidUrl(url)) return TestResult.BadUrl
         store.saveConfig(url, key)

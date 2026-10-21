@@ -16,7 +16,7 @@ Part of #518. A native Android widget and a one-screen settings app, from the "H
 - Left: water. Total in oz at the large size, "of 64 oz" smaller, bar beneath, "+ 4 oz" button. Right: alcohol count and "+ 1" button. Buttons ≥48dp tall.
 - Colours follow the app: water blue, alcohol amber, on the system's light or dark widget surface (Material You colours where available, fixed fallbacks otherwise).
 - "updated 3:42 PM" is the last good read; it turns to "offline · 2 queued" when taps are waiting.
-- Tapping the title/body (not a button) opens `https://luketmoss.github.io/keel/thrive/`.
+- Tapping the title/body (not a button) opens `https://luketmoss.github.io/keel/thrive/`, and schedules re-reads (see Refresh triggers). Not set up or key rejected, the body opens settings instead and schedules nothing.
 
 ## Main path
 
@@ -24,6 +24,17 @@ Part of #518. A native Android widget and a one-screen settings app, from the "H
 2. Tap "+ 4 oz": the total and bar move at once, a short haptic fires, the drink is saved to the local queue with a new UUID and the tap instant, and a send is scheduled immediately. On success the widget re-reads and redraws; on failure the drink stays queued.
 3. Same for "+ 1".
 4. At local midnight (Denver) the widget redraws with zeros from the app's own alarm and re-reads on the next refresh.
+
+## Refresh triggers
+
+The widget redraws from the last read, so it is only as fresh as its last `getDrinkTotals`. Every read is the one send-then-read worker, so a queued tap always goes out first and extra runs never drop or double a drink. Reads happen:
+
+- after each of its own taps, at Denver midnight and after boot or an app update;
+- **every 15 minutes** (WorkManager's minimum; Android may run it late under Doze). The request is updated in place on each update, boot and widget add, so a phone that had the old 30-minute request moves to 15;
+- **after a body tap** (#555): the tap opens Thrive and reads now, at about 1 minute and at about 5 minutes, to pick up a drink fixed in Thrive. The three reads are one unique chain, so a second tap restarts it instead of adding to it, and each waits for a connection. The delays are `Refresh` constants in `core/`;
+- **when the settings app is opened**.
+
+Not built: screen-on or unlock listeners (not registrable in the manifest on Android 8+, and a dynamic receiver dies with the process) and server push.
 
 ## States
 

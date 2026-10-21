@@ -31,7 +31,7 @@ The widget redraws from the last read, so it is only as fresh as its last `getDr
 
 - after each of its own taps, at Denver midnight and after boot or an app update;
 - **every 15 minutes** (WorkManager's minimum; Android may run it late under Doze). The request is updated in place on each update, boot and widget add, so a phone that had the old 30-minute request moves to 15;
-- **after a body tap** (#555): the tap opens Thrive and reads now, at about 1 minute and at about 5 minutes, to pick up a drink fixed in Thrive. The three reads are one unique chain, so a second tap restarts it instead of adding to it, and each waits for a connection. The delays are `Refresh` constants in `core/`;
+- **after a body tap** (#555): the tap launches a no-UI trampoline activity (a widget may start an activity directly, but not from a callback or receiver in the background), which schedules the reads and opens Thrive, so it reads now, at about 1 minute and at about 5 minutes, to pick up a drink fixed in Thrive. The three reads are one unique chain, so a second tap restarts it instead of adding to it, and each waits for a connection. The delays are `Refresh` constants in `core/`;
 - **when the settings app is opened**.
 
 Not built: screen-on or unlock listeners (not registrable in the manifest on Android 8+, and a dynamic receiver dies with the process) and server push.

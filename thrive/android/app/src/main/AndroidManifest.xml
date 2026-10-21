@@ -24,6 +24,15 @@
             </intent-filter>
         </activity>
 
+        <!-- Widget body trampoline: no UI, schedules the re-reads and hands off to the browser. -->
+        <activity
+            android:name=".widget.OpenThriveActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.NoDisplay" />
+
         <receiver
             android:name=".widget.SipWidgetReceiver"
             android:exported="true">

@@ -126,7 +126,7 @@ object WidgetUpdater {
 
 @Composable
 private fun Content(view: WidgetView, wide: Boolean, short: Boolean, tall: Boolean) {
-    val openThrive: Action = actionRunCallback<OpenThriveAction>()
+    val openThrive: Action = actionStartActivity<OpenThriveActivity>()
     val openSettings: Action = actionStartActivity<MainActivity>()
     val bodyAction = if (view.mode == Mode.NOT_CONFIGURED || view.mode == Mode.KEY_REJECTED) openSettings else openThrive
     val secondary = GlanceTheme.colors.onSurfaceVariant

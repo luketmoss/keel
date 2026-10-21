@@ -223,8 +223,10 @@ A Thrive `apps-script/` change that alters a response shape also needs a matchin
 change here.
 
 **Drinks are read-only here (#522).** `thrive_drinks` reads Thrive Sip's log through
-`getDrinks`, and `thrive_daily_summary` shows the summary's `water_ml` and
-`alcohol_drinks`. No tool logs, edits or deletes a drink: the owner does that from
+`getDrinks`, and `thrive_daily_summary` shows the summary's `water_ml`,
+`coffee_cups` (#562) and `alcohol_drinks`. Each entry is narrated by its own kind
+(water, coffee or alcohol); a kind the Worker does not know is said by its raw kind and
+amount, never as alcohol. No tool logs, edits or deletes a drink: the owner does that from
 the widget or the app. So nothing here calls `logDrink`, `updateDrinkTime` or
 `deleteDrink`, and the API's MCP change log (#434), which does not record those
 actions, has nothing to miss from this Worker.

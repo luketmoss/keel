@@ -1,10 +1,12 @@
-// Narration for thrive_drinks (#522): Thrive Sip's water and alcohol log.
+// Narration for thrive_drinks (#522): Thrive Sip's water, coffee and alcohol log.
 //
 // Pure. The API's getDrinks (#519) answers { drinks, water_goal_ml }, each
 // drink a domain object ({ id, kind, amount, date, time, logged_at_utc,
 // source, created, updated }); nothing here knows a column. Water `amount` is
-// whole ml, alcohol `amount` standard drinks. Read-only: no tool logs, edits
-// or deletes a drink. The owner logs from the widget or the app.
+// whole ml, coffee `amount` cups (#562), alcohol `amount` standard drinks. A
+// kind this file does not know is narrated by its raw kind and amount, never
+// as one it does. Read-only: no tool logs, edits or deletes a drink. The owner
+// logs from the widget or the app.
 
 import { datesBetween, describeDateRuns } from './daily.js';
 import { mlToOz } from './domain.js';
@@ -34,13 +36,14 @@ function amountOf(drink) {
   return /^\d+$/.test(s) ? Number(s) : null;
 }
 
-/** One day's entries -> { water, waterCount, alcohol, alcoholCount }. */
+/** One day's entries -> { water, waterCount, coffee, coffeeCount, alcohol, alcoholCount }. */
 export function dayTotals(entries) {
-  const t = { water: 0, waterCount: 0, alcohol: 0, alcoholCount: 0 };
+  const t = { water: 0, waterCount: 0, coffee: 0, coffeeCount: 0, alcohol: 0, alcoholCount: 0 };
   for (const d of entries) {
     const n = amountOf(d);
     if (n === null) continue;
     if (d.kind === 'water') { t.water += n; t.waterCount += 1; }
+    else if (d.kind === 'coffee') { t.coffee += n; t.coffeeCount += 1; }
     else if (d.kind === 'alcohol') { t.alcohol += n; t.alcoholCount += 1; }
   }
   return t;
@@ -49,13 +52,19 @@ export function dayTotals(entries) {
 /** "62% of goal", from whole ml against the goal in ml. */
 const ofGoal = (ml, goal) => `${Math.round((ml / goal) * 100)}% of goal`;
 
+/** How each known kind says its amount; any other kind is said raw. */
+const AMOUNT_OF_KIND = {
+  water,
+  coffee: (n) => plural(n, 'cup'),
+  alcohol: (n) => plural(n, 'drink'),
+};
+
 /** One entry -> "  - 07:45 water 4 oz (118 ml) [app]". */
 export function describeDrink(d) {
   const time = String(d.time ?? '').slice(0, 5) || '—';
   const n = amountOf(d);
-  const what = d.kind === 'water'
-    ? `water ${n === null ? String(d.amount) : water(n)}`
-    : `alcohol ${n === null ? String(d.amount) : plural(n, 'drink')}`;
+  const say = Object.prototype.hasOwnProperty.call(AMOUNT_OF_KIND, d.kind) ? AMOUNT_OF_KIND[d.kind] : null;
+  const what = `${d.kind ?? ''} ${n === null || !say ? String(d.amount ?? '') : say(n)}`.trim();
   return `  - ${time} ${what}${d.source ? ` [${d.source}]` : ''}`;
 }
 
@@ -65,8 +74,9 @@ export function describeDrinkDay(date, entries, goal) {
   const waterPart = t.waterCount
     ? `water ${water(t.water)}, ${ofGoal(t.water, goal)}`
     : 'no water logged';
+  const coffeePart = t.coffeeCount ? `coffee ${plural(t.coffee, 'cup')}` : 'no coffee logged';
   const alcoholPart = t.alcoholCount ? `alcohol ${plural(t.alcohol, 'drink')}` : 'no alcohol logged';
-  return `- ${date}: ${waterPart} · ${alcoholPart} (${plural(entries.length, 'entry', 'entries')})`;
+  return `- ${date}: ${waterPart} · ${coffeePart} · ${alcoholPart} (${plural(entries.length, 'entry', 'entries')})`;
 }
 
 /** The thrive_drinks response. */
@@ -86,7 +96,7 @@ export function describeDrinksRange({ drinks, water_goal_ml: goal }, { from, to 
       : `Drinks, ${range}: no drinks logged.`,
     `Water goal: ${mlToOz(goal)} oz (${goal} ml) a day. It is the current setting, applied to every day shown: ` +
       'past goals are not kept.',
-    'Water is in US fl oz and ml; alcohol in standard drinks. A day, or a kind, with nothing logged is unknown, ' +
+    'Water is in US fl oz and ml; coffee in cups; alcohol in standard drinks. A day, or a kind, with nothing logged is unknown, ' +
       'not zero. Times are local (America/Denver).',
   ];
 
@@ -98,6 +108,7 @@ export function describeDrinksRange({ drinks, water_goal_ml: goal }, { from, to 
     if (dates.length) {
       const totals = dates.map((d) => dayTotals(byDate.get(d)));
       const waterDays = totals.filter((t) => t.waterCount);
+      const coffeeDays = totals.filter((t) => t.coffeeCount);
       const alcoholDays = totals.filter((t) => t.alcoholCount);
       const waterLine = waterDays.length
         ? (() => {
@@ -106,11 +117,15 @@ export function describeDrinksRange({ drinks, water_goal_ml: goal }, { from, to 
             `(${ofGoal(avg, goal)}) on those days`;
         })()
         : 'no water logged';
+      const coffeeLine = coffeeDays.length
+        ? `coffee ${plural(coffeeDays.reduce((s, t) => s + t.coffee, 0), 'cup')} in total, ` +
+          `on ${plural(coffeeDays.length, 'day')}`
+        : 'no coffee logged';
       const alcoholLine = alcoholDays.length
         ? `alcohol ${plural(alcoholDays.reduce((s, t) => s + t.alcohol, 0), 'drink')} in total, ` +
           `on ${plural(alcoholDays.length, 'day')}`
         : 'no alcohol logged';
-      out.push(`Across the range: ${waterLine}; ${alcoholLine}.`);
+      out.push(`Across the range: ${waterLine}; ${coffeeLine}; ${alcoholLine}.`);
     }
   }
 

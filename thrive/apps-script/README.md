@@ -264,9 +264,13 @@ as usual. A missing `BodyMeasurements` tab leaves U:Y blank everywhere.
 appended after `bp_count` for the same reason: the sum of the day's water
 `amount`s (ml) and of its alcohol `amount`s (standard drinks). Each is blank,
 never `0`, on a day with no drink of that kind; a day with only drinks still
-gets a row, and a missing `Drinks` tab leaves Z:AA blank everywhere. Logging a
+gets a row, and a missing `Drinks` tab leaves Z:AB blank everywhere. Logging a
 drink does not rebuild the summary: the columns catch up on the next rebuild,
 and the app's Day and Trends read `Drinks` directly, so they are never stale.
+
+`coffee_cups` (AB) is the sum of the day's coffee `amount`s in cups (#562),
+appended after `alcohol_drinks` by `scripts/migrate-562-daily-summary-coffee.mjs`
+and blank, never `0`, on a day with no coffee, as for the other two.
 
 ### DailyHealth (#165, #158, #231)
 

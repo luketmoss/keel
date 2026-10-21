@@ -99,6 +99,10 @@ It is also the highest-value habit in the pipeline and the easiest to skip.
 Months from now the Results section is the only part of the issue anyone reads.
 Write something worth reading — "done" is not that.
 
+If `/test` listed criteria as **waived by the owner, not verified** (android),
+`## Results` lists them under "Watch after install", worded as unverified, and
+says the APK to install comes from the merge's CI run on `main`.
+
 Write the text to a file, then let the script put it in the body:
 
 ```bash

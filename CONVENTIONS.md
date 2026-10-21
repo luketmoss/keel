@@ -245,6 +245,11 @@ decided per touched component: an issue touching a gated one is gated for the
 criteria that component owns. Firmware is the obvious case — a green build
 is not evidence that a solenoid fired at the right microsecond.
 
+An owner can instead waive a stack's device check. Those criteria are listed
+back as waived, not verified, never passed; the run continues, and they are
+carried into the issue's `## Results` as things to watch. The stack skill says
+which stacks.
+
 ### 7. Code Review
 
 The PR is out of draft and is being reviewed or is waiting on CI. Transient —

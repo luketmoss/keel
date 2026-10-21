@@ -106,6 +106,11 @@ with its own id and tap time.
   it needs no keystore. `thrive-sip-apk` is the release build, installable only
   once the secrets below exist. In the app, set the API URL (the Apps Script web
   app) and the widget key.
+- **Testing is not human-gated.** `/test` passes the JVM and CI-checkable
+  criteria; tap, launcher, Doze and offline criteria are waived by the owner and
+  listed in the issue's `## Results` as things to watch. Install the APK from the
+  merge's CI run on `main`, not a debug build made for the PR; if the widget is
+  wrong, report it and it is fixed as a new issue.
 - **CI needs four repository secrets**: `THRIVE_ANDROID_KEYSTORE_BASE64`,
   `THRIVE_ANDROID_KEYSTORE_PASSWORD`, `THRIVE_ANDROID_KEY_ALIAS`,
   `THRIVE_ANDROID_KEY_PASSWORD` (setup and the backup rule: the android stack

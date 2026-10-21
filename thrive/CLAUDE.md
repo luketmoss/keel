@@ -32,13 +32,14 @@ kill the vendors' refresh tokens.
 | `frontend/` | web |
 | `apps-script/` | apps-script |
 | `sync/` | node-jobs |
+| `android/` | android |
 | `scripts/` | — |
 
 **View library:** preact
 
 The authoritative conventions for each component are in its stack skill:
-`.claude/skills/stack-web/SKILL.md`, `.claude/skills/stack-apps-script/SKILL.md`
-and `.claude/skills/stack-node-jobs/SKILL.md`. `scripts/` pins none; this file
+`.claude/skills/stack-web/SKILL.md`, `.claude/skills/stack-apps-script/SKILL.md`,
+`.claude/skills/stack-node-jobs/SKILL.md` and `.claude/skills/stack-android/SKILL.md`. `scripts/` pins none; this file
 is its only authority.
 
 - **frontend/** — the Preact SPA, built with Vite. It reads and writes the
@@ -90,6 +91,30 @@ comes from the API's `getWorkoutTrack` with the user's Google token, never from 
   track comes from the same session cache and two-at-a-time queue as the detail screen
   (`src/maps/track-cache.ts`), requested when the card is within a screen height of the viewport.
 - A change under `geo/` rebuilds Thrive (`thrive.yml` and `thrive-pages.yml` trigger on `geo/**`).
+
+## Sip widget (#524)
+
+`android/` is Thrive Sip's home-screen widget and one-screen settings app
+(Kotlin, Jetpack Glance), logging water (+4 oz) and alcohol (+1) in one tap.
+It calls the Apps Script API with `WIDGET_API_KEY`, which can run `logDrink` and
+`getDrinkTotals` only, and queues taps locally so a tap offline is sent later
+with its own id and tap time.
+
+- **Install is by sideload, never published.** Download the
+  `thrive-sip-debug-apk` artifact from the latest green `thrive-android.yml` run
+  and install it on the phone; it is signed with Gradle's generated debug key, so
+  it needs no keystore. `thrive-sip-apk` is the release build, installable only
+  once the secrets below exist. In the app, set the API URL (the Apps Script web
+  app) and the widget key.
+- **CI needs four repository secrets**: `THRIVE_ANDROID_KEYSTORE_BASE64`,
+  `THRIVE_ANDROID_KEYSTORE_PASSWORD`, `THRIVE_ANDROID_KEY_ALIAS`,
+  `THRIVE_ANDROID_KEY_PASSWORD` (setup and the backup rule: the android stack
+  skill). Without them the workflow builds an unsigned APK and warns.
+- **The Gradle wrapper jar is not committed yet.** Run `gradle wrapper
+  --gradle-version 8.11.1 --distribution-type bin` in `android/` once and commit
+  the result; until then CI installs the pinned Gradle itself.
+- Key commands, from `android/`: `./gradlew test`, `./gradlew lintRelease`,
+  `./gradlew assembleRelease`.
 
 ## Key commands
 

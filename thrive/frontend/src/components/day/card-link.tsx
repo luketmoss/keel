@@ -8,7 +8,7 @@
 
 import { TREND_GROUPS } from '../trends/metrics';
 
-export type TrendsLinkGroup = 'recovery' | 'sleep' | 'activity' | 'body' | 'blood_pressure';
+export type TrendsLinkGroup = 'recovery' | 'sleep' | 'activity' | 'body' | 'blood_pressure' | 'intake';
 
 /** Where a card goes: Trends on `group`, with `date` selected. */
 export function trendsHref(group: TrendsLinkGroup, date: string): string {

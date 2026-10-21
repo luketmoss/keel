@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import {
   weekdayName,
   weekdayLetter,
+  weekdayShort,
   dayOfMonth,
   fullDate,
   weekdayFullDate,
@@ -18,6 +19,7 @@ describe('format', () => {
   it('names the date without the device time zone moving it', () => {
     expect(weekdayName('2026-09-12')).toBe('Saturday');
     expect(weekdayLetter('2026-09-28')).toBe('M');
+    expect(weekdayShort('2026-10-16')).toBe('Fri');
     expect(dayOfMonth('2026-09-05')).toBe('5');
     expect(fullDate('2026-09-12')).toBe('September 12, 2026');
     expect(weekdayFullDate('2027-01-01')).toBe('Friday, January 1, 2027');

@@ -102,5 +102,5 @@ paths exactly as `393-human-reviewed-paths.md` does: at most five, then
   This is treated as a halt with the reason `subagent ended without a report`,
   and is never retried. The issue's board stage is read with `board.py show`
   and given in the row, because the run may have stopped part way through.
-- **Human-gated Testing** (firmware, device-dependent mobile or android). The row reads
+- **Human-gated Testing** (firmware, device-dependent mobile). The row reads
   `Halted in Testing — needs hardware: AC2, AC4` and the batch stops.

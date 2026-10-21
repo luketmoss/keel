@@ -22,21 +22,24 @@ workflow artifact, and the person installs it by downloading it to the phone
 track, and an issue that asks for one is a new stack decision, not a small
 change.
 
-## Testing is partly human-gated
+## Testing is not human-gated
 
+The owner is the only user and has waived the on-phone check before merge.
 `/test` runs what CI runs, from the project folder:
 
 ```bash
 ./gradlew test lintRelease assembleRelease
 ```
 
-Criteria that are pure logic pass normally: JVM unit tests (`./gradlew test`)
-cover parsing, the request queue, state reducers and anything with no Android
-framework in it, and a green `assembleRelease` proves the APK builds and signs.
+Criteria that are pure logic or checkable in CI pass on evidence: JVM unit tests
+(`./gradlew test`) cover parsing, the request queue, state reducers and anything
+with no Android framework in it, and a green `assembleRelease` proves the APK
+builds and signs.
 
-Criteria that need a launcher, a widget on the home screen, or a device cannot
-be checked in CI, and are listed back explicitly with the run stopping rather
-than claiming them:
+Criteria that need a phone, a launcher, or a widget on the home screen cannot be
+checked in CI. They are **not** passed and not failed: `/test` lists them back
+as **waived by the owner, not verified**, and the run continues to Ready to Ship
+and merge. They are never reported as passing. They are:
 
 - what the widget looks like or how it resizes on a launcher
 - a tap on the widget, or any gesture
@@ -44,10 +47,12 @@ than claiming them:
 - offline behaviour: airplane mode, a request queued and sent later
 - permissions prompts and notifications
 
-Criteria that are pure logic or component behaviour pass normally, and if all of
-an issue's criteria are of that kind the run continues to Ready to Ship. In a
-multi-component project the gate applies to the criteria the `android/`
-component owns.
+`/ship` writes those behaviours into the issue's `## Results` as things to watch
+after install, with the reminder that the APK to install comes from the merge's
+CI run (the `main` run, not a debug build made for the PR). If one is wrong on
+the phone the owner reports it and it is fixed as a new issue. In a
+multi-component project this applies to the criteria the `android/` component
+owns.
 
 Instrumented tests and an emulator are not used. They are slow, flaky in CI and
 would still not be a launcher, so the line is drawn at the JVM.

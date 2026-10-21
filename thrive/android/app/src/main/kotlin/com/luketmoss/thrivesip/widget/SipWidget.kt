@@ -36,7 +36,6 @@ import androidx.glance.layout.Alignment
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
-import androidx.glance.layout.fillMaxHeight
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
@@ -62,14 +61,23 @@ import androidx.glance.color.ColorProvider as DayNightColorProvider
 
 private const val THRIVE_URL = "https://luketmoss.github.io/keel/thrive/"
 
-private val SMALL = DpSize(110.dp, 110.dp)
-private val WIDE = DpSize(250.dp, 110.dp)
+// Three heights, two widths. Responsive mode draws the largest declared size
+// that fits, so each layout below is sized to fit inside its own declared size.
 private val SMALL_SHORT = DpSize(110.dp, 56.dp)
 private val WIDE_SHORT = DpSize(250.dp, 56.dp)
+private val SMALL = DpSize(110.dp, 100.dp)
+private val WIDE = DpSize(250.dp, 100.dp)
+private val SMALL_TALL = DpSize(110.dp, 150.dp)
+private val WIDE_TALL = DpSize(250.dp, 150.dp)
 private val WIDE_FROM = 200.dp
 
-/** Below this the title, status and bar are dropped and everything sits on one row. */
+/** Below this everything sits on one row: figure and button, no title or bar. */
 private val SHORT_BELOW = 100.dp
+
+/** From this up the title and status line are shown above the figures. */
+private val TALL_FROM = 150.dp
+
+private val BUTTON_HEIGHT = 40.dp
 
 private val REVISION = longPreferencesKey("revision")
 
@@ -88,7 +96,7 @@ private val TRACK = accent(SipColors.TRACK_LIGHT, SipColors.TRACK_DARK)
  * already running.
  */
 class SipWidget : GlanceAppWidget() {
-    override val sizeMode = SizeMode.Responsive(setOf(SMALL, WIDE, SMALL_SHORT, WIDE_SHORT))
+    override val sizeMode = SizeMode.Responsive(setOf(SMALL_SHORT, WIDE_SHORT, SMALL, WIDE, SMALL_TALL, WIDE_TALL))
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val store = SipStore(context)
@@ -97,7 +105,12 @@ class SipWidget : GlanceAppWidget() {
             val view = remember(revision) { WidgetViews.build(store.snapshot(Instant.now())) }
             GlanceTheme {
                 val size = LocalSize.current
-                Content(view, wide = size.width >= WIDE_FROM, short = size.height < SHORT_BELOW)
+                Content(
+                    view,
+                    wide = size.width >= WIDE_FROM,
+                    short = size.height < SHORT_BELOW,
+                    tall = size.height >= TALL_FROM,
+                )
             }
         }
     }
@@ -116,7 +129,7 @@ object WidgetUpdater {
 }
 
 @Composable
-private fun Content(view: WidgetView, wide: Boolean, short: Boolean) {
+private fun Content(view: WidgetView, wide: Boolean, short: Boolean, tall: Boolean) {
     val openThrive: Action = actionStartActivity(Intent(Intent.ACTION_VIEW, Uri.parse(THRIVE_URL)))
     val openSettings: Action = actionStartActivity<MainActivity>()
     val bodyAction = if (view.mode == Mode.NOT_CONFIGURED || view.mode == Mode.KEY_REJECTED) openSettings else openThrive
@@ -127,28 +140,32 @@ private fun Content(view: WidgetView, wide: Boolean, short: Boolean) {
         return
     }
 
+    // Built in rows, not per-drink columns, so the two figures share a
+    // baseline and the two buttons share a top edge whatever either side holds.
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
             .background(GlanceTheme.colors.widgetBackground)
             .cornerRadius(16.dp)
-            .padding(12.dp)
+            .padding(horizontal = 12.dp, vertical = 10.dp)
             .clickable(bodyAction),
     ) {
-        Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = "Thrive Sip",
-                style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 12.sp, fontWeight = FontWeight.Bold),
-            )
-            if (wide && view.status.isNotEmpty() && view.mode != Mode.KEY_REJECTED) {
-                Spacer(GlanceModifier.defaultWeight())
-                Text(text = view.status, style = TextStyle(color = secondary, fontSize = 11.sp))
+        if (tall) {
+            Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Thrive Sip",
+                    style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 12.sp, fontWeight = FontWeight.Bold),
+                )
+                if (wide && view.status.isNotEmpty() && view.mode != Mode.KEY_REJECTED) {
+                    Spacer(GlanceModifier.defaultWeight())
+                    Text(text = view.status, style = TextStyle(color = secondary, fontSize = 11.sp))
+                }
             }
+            Spacer(GlanceModifier.height(6.dp))
         }
-        Spacer(GlanceModifier.height(4.dp))
 
         if (view.mode == Mode.KEY_REJECTED) {
-            // Either size: this is the one status that must not be dropped, since taps are going nowhere.
+            // Every size: the one status that must not be dropped, since taps are going nowhere.
             Text(text = view.status, style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 11.sp))
             Spacer(GlanceModifier.height(4.dp))
         }
@@ -161,33 +178,53 @@ private fun Content(view: WidgetView, wide: Boolean, short: Boolean) {
             )
         }
 
-        Row(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
-            Column(modifier = GlanceModifier.defaultWeight().fillMaxHeight()) {
-                WaterFigure(view)
-                Spacer(GlanceModifier.defaultWeight())
-                Button(
-                    text = "+ 4 oz",
-                    onClick = actionRunCallback<AddWaterAction>(),
-                    enabled = view.buttonsEnabled,
-                    modifier = GlanceModifier.fillMaxWidth().height(48.dp)
-                        .semantics { contentDescription = "Add 4 ounces of water" },
-                    colors = ButtonDefaults.buttonColors(backgroundColor = WATER, contentColor = ON_ACCENT),
-                )
-            }
+        Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+            Column(modifier = GlanceModifier.defaultWeight()) { WaterFigure(view, withBar = false) }
             if (wide) {
                 Spacer(GlanceModifier.width(12.dp))
-                Column(modifier = GlanceModifier.defaultWeight().fillMaxHeight()) {
-                    AlcoholFigure(view)
+                Column(modifier = GlanceModifier.defaultWeight()) { AlcoholFigure(view) }
+            }
+        }
+
+        if (view.progress != null && view.mode != Mode.LOADING) {
+            Spacer(GlanceModifier.height(4.dp))
+            Row(modifier = GlanceModifier.fillMaxWidth()) {
+                LinearProgressIndicator(
+                    progress = view.progress,
+                    modifier = GlanceModifier.defaultWeight().height(6.dp),
+                    color = WATER,
+                    backgroundColor = TRACK,
+                )
+                if (wide) {
+                    // Holds the bar to the water half, so it ends where the water button does.
+                    Spacer(GlanceModifier.width(12.dp))
                     Spacer(GlanceModifier.defaultWeight())
-                    Button(
-                        text = "+ 1",
-                        onClick = actionRunCallback<AddAlcoholAction>(),
-                        enabled = view.buttonsEnabled,
-                        modifier = GlanceModifier.fillMaxWidth().height(48.dp)
-                            .semantics { contentDescription = "Add one alcoholic drink" },
-                        colors = ButtonDefaults.buttonColors(backgroundColor = ALCOHOL, contentColor = ON_ACCENT),
-                    )
                 }
+            }
+        }
+
+        // Extra height goes here, between the figures and the buttons.
+        Spacer(GlanceModifier.defaultWeight())
+
+        Row(modifier = GlanceModifier.fillMaxWidth()) {
+            Button(
+                text = "+ 4 oz",
+                onClick = actionRunCallback<AddWaterAction>(),
+                enabled = view.buttonsEnabled,
+                modifier = GlanceModifier.defaultWeight().height(BUTTON_HEIGHT)
+                    .semantics { contentDescription = "Add 4 ounces of water" },
+                colors = ButtonDefaults.buttonColors(backgroundColor = WATER, contentColor = ON_ACCENT),
+            )
+            if (wide) {
+                Spacer(GlanceModifier.width(12.dp))
+                Button(
+                    text = "+ 1",
+                    onClick = actionRunCallback<AddAlcoholAction>(),
+                    enabled = view.buttonsEnabled,
+                    modifier = GlanceModifier.defaultWeight().height(BUTTON_HEIGHT)
+                        .semantics { contentDescription = "Add one alcoholic drink" },
+                    colors = ButtonDefaults.buttonColors(backgroundColor = ALCOHOL, contentColor = ON_ACCENT),
+                )
             }
         }
     }
@@ -279,7 +316,7 @@ private fun ShortContent(view: WidgetView, wide: Boolean, bodyAction: Action) {
             text = "+ 4 oz",
             onClick = actionRunCallback<AddWaterAction>(),
             enabled = view.buttonsEnabled,
-            modifier = GlanceModifier.width(76.dp).height(40.dp)
+            modifier = GlanceModifier.width(76.dp).height(BUTTON_HEIGHT)
                 .semantics { contentDescription = "Add 4 ounces of water" },
             colors = ButtonDefaults.buttonColors(backgroundColor = WATER, contentColor = ON_ACCENT),
         )
@@ -290,7 +327,7 @@ private fun ShortContent(view: WidgetView, wide: Boolean, bodyAction: Action) {
                 text = "+ 1",
                 onClick = actionRunCallback<AddAlcoholAction>(),
                 enabled = view.buttonsEnabled,
-                modifier = GlanceModifier.width(56.dp).height(40.dp)
+                modifier = GlanceModifier.width(56.dp).height(BUTTON_HEIGHT)
                     .semantics { contentDescription = "Add one alcoholic drink" },
                 colors = ButtonDefaults.buttonColors(backgroundColor = ALCOHOL, contentColor = ON_ACCENT),
             )

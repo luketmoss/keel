@@ -176,6 +176,9 @@ function bpMean(s) {
 /** "354" -> "12 oz (354 ml)"; blank -> "—" (#522). */
 const water = (ml) => (isBlank(ml) ? BLANK : `${mlToOz(ml)} oz (${ml} ml)`);
 
+/** "2" -> "2 cups"; blank -> "—" (#562). */
+const coffee = (n) => (isBlank(n) ? BLANK : `${n} cup${Number(n) === 1 ? '' : 's'}`);
+
 /** "2" -> "2 drinks"; blank -> "—" (#522). */
 const alcohol = (n) => (isBlank(n) ? BLANK : `${n} drink${Number(n) === 1 ? '' : 's'}`);
 
@@ -208,6 +211,8 @@ export function describeSummaryDay(s) {
   parts.push(`· fat ${withUnit(s.fat_ratio_pct, ' %')}`);
   parts.push(`· BP ${bpMean(s)}`);
   parts.push(`· water ${water(s.water_ml)}`);
+  // A row from before #562's migration has no coffee_cups: blank, so "—".
+  parts.push(`· coffee ${coffee(s.coffee_cups)}`);
   parts.push(`· alcohol ${alcohol(s.alcohol_drinks)}`);
   return parts.join(' ');
 }
@@ -230,8 +235,8 @@ export function describeSummaryRange(rows, { from, to }) {
     "day's readings, with the count behind it. Both are rolled up from BodyMeasurements (#203); \"—\" means no such reading that day.",
   );
   out.push(
-    'Water and alcohol are the day\'s totals from the Drinks log (#522): "—" means none of that kind was logged, ' +
-    'not zero. They catch up on the next rebuild, so a drink logged since may be missing here; thrive_drinks ' +
+    'Water, coffee (in cups) and alcohol are the day\'s totals from the Drinks log (#522, #562): "—" means none ' +
+    'of that kind was logged, not zero. They catch up on the next rebuild, so a drink logged since may be missing here; thrive_drinks ' +
     'reads the log directly.',
   );
   const stamps = sorted.map((r) => r.computed_at).filter((v) => !isBlank(v)).sort();

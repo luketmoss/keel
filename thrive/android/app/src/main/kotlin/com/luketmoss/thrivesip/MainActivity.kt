@@ -24,10 +24,12 @@ import kotlinx.coroutines.launch
  * moment, so backing out still places the widget (it then says "Set up Thrive Sip").
  */
 class MainActivity : ComponentActivity() {
+    private var widgetId = AppWidgetManager.INVALID_APPWIDGET_ID
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val widgetId = intent?.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+        widgetId = intent?.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
             ?: AppWidgetManager.INVALID_APPWIDGET_ID
         if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
             setResult(Activity.RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId))
@@ -57,6 +59,12 @@ class MainActivity : ComponentActivity() {
         WidgetUpdater.redraw(applicationContext)
         // Whatever was queued while the key was wrong goes out now.
         Scheduler.start(applicationContext)
+        // Opened to configure a widget: the system places it only when this
+        // activity finishes, so Save has to end the screen or nothing appears.
+        if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+            setResult(Activity.RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId))
+            finish()
+        }
         return null
     }
 }

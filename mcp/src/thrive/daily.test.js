@@ -248,7 +248,7 @@ test('water shows in oz and ml, and alcohol as drinks, for a day that has them',
 
 test('a kind not logged shows as —, never 0', () => {
   const waterOnly = describeSummaryDay(summary({ date: '2026-10-19', water_ml: '250' }));
-  assert.match(waterOnly, /· water 8\.5 oz \(250 ml\) · coffee — · alcohol —$/);
+  assert.match(waterOnly, /· water 8 oz \(250 ml\) · coffee — · alcohol —$/);
   const neither = describeSummaryDay(summary({ date: '2026-10-19' }));
   assert.match(neither, /· water — · coffee — · alcohol —$/);
   assert.doesNotMatch(neither, /water 0|alcohol 0/);

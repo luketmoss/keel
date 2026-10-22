@@ -66,9 +66,13 @@ function setError(date: string, kind: DrinkKind, text: string | null): void {
 
 // ── Display ──────────────────────────────────────────────────────────
 
-/** ml as oz to one decimal with a trailing `.0` dropped: 118 ml is "4", 590 ml is "20". */
+/**
+ * ml to the nearest whole ounce: 118 ml is "4", 590 ml is "20". Whole, not
+ * tenths, because QUICK_WATER_ML is 3.99 oz and tenths would show the shortfall
+ * once taps pile up: six taps, 708 ml, read "23.9" (#571, as the widget in #569).
+ */
 export function formatOz(ml: number): string {
-  return String(Math.round((ml / ML_PER_OZ) * 10) / 10);
+  return String(goalOz(ml));
 }
 
 /** Whole ounces for the goal field. */

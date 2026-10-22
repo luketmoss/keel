@@ -89,7 +89,7 @@ class WidgetViewTest {
     fun overTheGoalTheBarIsFullAndTheFigureContinues() {
         val view = WidgetViews.build(snapshot(totals = Totals("2026-10-20", 2400, 0, 1893)))
         assertEquals(1f, view.progress!!, 0f)
-        assertEquals("81.2 oz", view.waterText)
+        assertEquals("81 oz", view.waterText)
     }
 
     @Test

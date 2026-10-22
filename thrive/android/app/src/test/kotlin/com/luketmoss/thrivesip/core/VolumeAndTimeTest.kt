@@ -6,12 +6,21 @@ import org.junit.Test
 
 class VolumeAndTimeTest {
     @Test
-    fun ouncesFollowTheDayCards() {
+    fun ouncesAreWhole() {
         assertEquals("4", Volume.formatOz(118))
         assertEquals("64", Volume.formatOz(1893))
         assertEquals("48", Volume.formatOz(1420))
         assertEquals("0", Volume.formatOz(0))
-        assertEquals("8.5", Volume.formatOz(251))
+        assertEquals("8", Volume.formatOz(251))
+        assertEquals("81", Volume.formatOz(2400))
+    }
+
+    @Test
+    fun quickTapsAlwaysReadAsMultiplesOfFour() {
+        // 118 ml is 3.99 oz: tenths showed six taps as "23.9" (#569).
+        for (taps in 1..40) {
+            assertEquals("${taps * 4}", Volume.formatOz(taps * Volume.QUICK_WATER_ML))
+        }
     }
 
     @Test

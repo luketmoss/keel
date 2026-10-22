@@ -345,14 +345,15 @@ export function kgToLb(kg) {
 export const ML_PER_OZ = 29.5735;
 
 /**
- * Water ml (as stored, #519) -> US fl oz to one decimal, as the app's
- * formatOz shows it (#522). `''` stays `''`: no water logged is unknown,
+ * Water ml (as stored, #519) -> whole US fl oz, as the app's formatOz shows
+ * it. Whole, not tenths: "+ 4 oz" stores 118 ml, 3.99 oz, and tenths showed
+ * ten taps as "39.9" (#573). `''` stays `''`: no water logged is unknown,
  * never zero.
  */
 export function mlToOz(ml) {
   if (ml === '' || ml === null || ml === undefined) return '';
   const n = Number(ml);
-  return Number.isFinite(n) ? String(Math.round((n / ML_PER_OZ) * 10) / 10) : '';
+  return Number.isFinite(n) ? String(Math.round(n / ML_PER_OZ)) : '';
 }
 
 /** Seconds (as stored) -> whole minutes, or null when unset. Never 0. */

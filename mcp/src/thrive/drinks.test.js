@@ -20,10 +20,12 @@ const DAY = [
   drink('d5', 'alcohol', '1', '2026-10-19', '20:30:00'),
 ];
 
-test('ml converts to US fl oz to one decimal, as the app shows it, and blank stays blank', () => {
+test('ml converts to whole US fl oz, as the app shows it, and blank stays blank', () => {
   assert.equal(mlToOz(1893), '64');
   assert.equal(mlToOz('354'), '12');
-  assert.equal(mlToOz('250'), '8.5');
+  assert.equal(mlToOz('250'), '8');
+  assert.equal(mlToOz(1180), '40'); // ten + 4 oz taps read 39.9 in tenths (#573)
+  for (let taps = 1; taps <= 40; taps++) assert.equal(mlToOz(taps * 118), String(taps * 4));
   assert.equal(mlToOz(''), '');
 });
 
@@ -78,7 +80,7 @@ test('several days: the missing days, the average water on logged days and the t
   assert.match(text, /^Drinks, 2026-10-19 to 2026-10-22: 7 entries on 2 days\./);
   assert.match(text, /No drinks logged for 2 days: 2026-10-20, 2026-10-22\./);
   // (354 + 1000) / 2 = 677 ml
-  assert.match(text, /Across the range: water logged on 2 of 4 days, averaging 22\.9 oz \(677 ml\) \(36% of goal\) on those days; no coffee logged; alcohol 2 drinks in total, on 1 day\./);
+  assert.match(text, /Across the range: water logged on 2 of 4 days, averaging 23 oz \(677 ml\) \(36% of goal\) on those days; no coffee logged; alcohol 2 drinks in total, on 1 day\./);
   assert.ok(text.indexOf('- 2026-10-19:') < text.indexOf('- 2026-10-21:'));
 });
 

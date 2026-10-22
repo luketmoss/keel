@@ -7,9 +7,10 @@ object Volume {
     /** What "+ 4 oz" logs. */
     const val QUICK_WATER_ML = 118
 
-    /** ml ÷ 29.5735, one decimal, a trailing `.0` dropped: 1893 is "64", 118 is "4". */
-    fun formatOz(ml: Int): String {
-        val tenths = Math.floor(ml / ML_PER_OZ * 10 + 0.5).toLong()
-        return if (tenths % 10 == 0L) (tenths / 10).toString() else "${tenths / 10}.${tenths % 10}"
-    }
+    /**
+     * ml ÷ 29.5735 to the nearest whole ounce: 1893 is "64", 118 is "4".
+     * Whole, not tenths, because [QUICK_WATER_ML] is 3.99 oz and tenths would
+     * show the shortfall once taps pile up: six taps, 708 ml, read "23.9" (#569).
+     */
+    fun formatOz(ml: Int): String = Math.floor(ml / ML_PER_OZ + 0.5).toLong().toString()
 }

@@ -32,6 +32,7 @@ import {
   formatOz,
   loadDrinks,
   ozToGoalMl,
+  QUICK_WATER_ML,
   resetDrinks,
   saveWaterGoal,
   waterGoalMl,
@@ -117,12 +118,20 @@ describe('slot', () => {
 });
 
 describe('display', () => {
-  it('formats ounces to one decimal and drops a trailing .0', () => {
+  it('formats ounces to the nearest whole ounce', () => {
     expect(formatOz(118)).toBe('4');
     expect(formatOz(590)).toBe('20');
     expect(formatOz(1893)).toBe('64');
     expect(formatOz(0)).toBe('0');
-    expect(formatOz(100)).toBe('3.4');
+    expect(formatOz(100)).toBe('3');
+    expect(formatOz(251)).toBe('8');
+  });
+
+  it('reads any number of + 4 oz taps as a multiple of 4', () => {
+    // 118 ml is 3.99 oz: tenths showed six taps as "23.9" (#571).
+    for (let taps = 1; taps <= 40; taps++) {
+      expect(formatOz(taps * QUICK_WATER_ML)).toBe(String(taps * 4));
+    }
   });
 
   it('shows 0 oz / 0 drinks and one "Nothing logged yet." line, not a button, on a quiet day', async () => {

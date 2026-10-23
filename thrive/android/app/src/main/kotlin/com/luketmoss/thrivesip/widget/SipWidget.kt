@@ -273,7 +273,8 @@ private fun WaterFigure(view: WidgetView, withBar: Boolean = true, withGoal: Boo
         Text(text = view.waterText, style = TextStyle(color = onSurface, fontSize = 20.sp, fontWeight = FontWeight.Bold))
         if (withGoal && view.goalText != null) {
             Spacer(GlanceModifier.width(4.dp))
-            Text(text = view.goalText, style = TextStyle(color = secondary, fontSize = 12.sp))
+            // One line: where the row is too narrow, the trailing "oz" drops rather than wrapping under.
+            Text(text = view.goalText, style = TextStyle(color = secondary, fontSize = 12.sp), maxLines = 1)
         }
     }
     if (!withBar) return

@@ -27,6 +27,19 @@ test('normalizeDate understands relative keywords', () => {
   assert.equal(normalizeDate('+3d'), todayStr(d));
 });
 
+test('#595: normalizeDate resolves yesterday and -Nd against the given home date', () => {
+  const now = new Date('2026-10-10T02:30:00Z'); // 20:30 on 9 Oct in Denver
+  assert.equal(normalizeDate('today', now), '2026-10-09');
+  assert.equal(normalizeDate('yesterday', now), '2026-10-08');
+  assert.equal(normalizeDate('Yesterday', now), '2026-10-08');
+  assert.equal(normalizeDate('-3d', now), '2026-10-06');
+  assert.equal(normalizeDate('-1d', new Date('2026-03-01T18:00:00Z')), '2026-02-28');
+  // Every earlier form resolves as before.
+  assert.equal(normalizeDate('tomorrow', now), '2026-10-10');
+  assert.equal(normalizeDate('+3d', now), '2026-10-12');
+  assert.equal(normalizeDate('2026-03-14', now), '2026-03-14');
+});
+
 test('normalizeDate returns empty for junk and empty input', () => {
   assert.equal(normalizeDate('next tuesday-ish'), '');
   assert.equal(normalizeDate(''), '');

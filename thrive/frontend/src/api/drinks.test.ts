@@ -61,8 +61,8 @@ describe('the field lists mirror types.js', () => {
   it('the vocabularies and limits agree', () => {
     expect([...DRINK_KINDS]).toEqual(['water', 'alcohol', 'coffee']);
     expect(typesJs).toMatch(/var DRINK_KINDS = \['water', 'alcohol', 'coffee'\];/);
-    expect([...DRINK_SOURCES]).toEqual(['widget', 'app']);
-    expect(typesJs).toMatch(/var DRINK_SOURCES = \['widget', 'app'\];/);
+    expect([...DRINK_SOURCES]).toEqual(['widget', 'app', 'mcp']);
+    expect(typesJs).toMatch(/var DRINK_SOURCES = \['widget', 'app', 'mcp'\];/);
     expect(typesJs).toContain(`var SETTING_WATER_GOAL = '${WATER_GOAL_KEY}';`);
     expect(numberOf('WATER_GOAL_DEFAULT_ML')).toBe(WATER_GOAL_DEFAULT_ML);
     expect(numberOf('WATER_GOAL_MIN_ML')).toBe(WATER_GOAL_MIN_ML);
@@ -106,7 +106,11 @@ describe('rowToDrink / rowToSetting', () => {
     expect(rowToDrink(['d', 'juice', ...ROW.slice(2)])).toBeNull();
     expect(rowToDrink([...ROW.slice(0, 2), '0', ...ROW.slice(3)])).toBeNull();
     expect(rowToDrink([...ROW.slice(0, 2), '1.5', ...ROW.slice(3)])).toBeNull();
-    expect(rowToDrink([...ROW.slice(0, 6), 'mcp', 'c', 'u'])).toBeNull();
+    expect(rowToDrink([...ROW.slice(0, 6), 'chat', 'c', 'u'])).toBeNull();
+  });
+
+  it('keeps a drink the MCP logged (#595), so the Day view and Trends show it', () => {
+    expect(rowToDrink([...ROW.slice(0, 6), 'mcp', 'c', 'u'])).toEqual({ ...DRINK, source: 'mcp' });
   });
 
   it('maps a settings row', () => {

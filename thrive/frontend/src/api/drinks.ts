@@ -30,7 +30,9 @@ export const DRINK_FIELDS = [
 export const SETTING_FIELDS = ['key', 'value', 'updated'] as const;
 
 export const DRINK_KINDS = ['water', 'alcohol', 'coffee'] as const;
-export const DRINK_SOURCES = ['widget', 'app'] as const;
+// 'mcp' (#595): a drink logged from a chat. rowToDrink drops a source it does
+// not know, so a row the MCP wrote would otherwise vanish from Day and Trends.
+export const DRINK_SOURCES = ['widget', 'app', 'mcp'] as const;
 export type DrinkKind = (typeof DRINK_KINDS)[number];
 export type DrinkSource = (typeof DRINK_SOURCES)[number];
 

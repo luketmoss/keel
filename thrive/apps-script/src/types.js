@@ -176,24 +176,36 @@ var TIMEZONE = 'America/Denver';
  */
 var MAX_PAYLOAD_CHARS = 6000;
 
-// --- Exercises (A:E), Templates (A:H), Sets (A:J) — #134 ------------
+// --- Exercises (A:E), Templates (A:J), Sets (A:M) — #134, #576 ------
 
 var EXERCISE_FIELDS = ['id', 'name', 'tags', 'notes', 'created'];
 var EXERCISE_COLUMN_COUNT = 5;
 
+// I and J (#576) are a section's rest, in whole seconds: every row of a section
+// carries the same values, and blank means "use the Settings default".
+// `switch_s` is always blank for primary, warmup and cooldown; warmup and
+// cooldown have no rest. Added by scripts/migrate-576-rest-times.mjs, after
+// the last used column; #100 deleted the old I/J, so they land here.
 var TEMPLATE_FIELDS = [
   'template_id', 'template_name', 'order',
   'exercise_id', 'exercise_name', 'section', 'sets', 'reps',
+  'rest_s',   // I  #576: rest after a set (primary) or a round (SS*, burnout)
+  'switch_s', // J  #576: between exercises within a round (SS*, burnout only)
 ];
-var TEMPLATE_COLUMN_COUNT = 8;
+var TEMPLATE_COLUMN_COUNT = 10;
 
-// Ten cells. #100 removed column K "Notes"; a row wider than ten would write
-// it back, because Sheets writes every value it is handed.
+// #100 deleted column K "Notes" outright (a column delete, not a clear), so the
+// three #576 columns land at K:M: scripts/migrate-576-rest-times.mjs places
+// them after the last column holding a header or any value, and refuses if
+// that is not K, because these mirrors would then be wrong.
 var SET_FIELDS = [
   'workout_id', 'exercise_id', 'exercise_name', 'section',
   'exercise_order', 'set_number', 'planned_reps', 'weight', 'reps', 'effort',
+  'rest_target_s', // K  #576: the rest planned after this set, resolved when the set is created
+  'set_s',         // L  #576: actual seconds under the bar, written by Lift Mode (#577)
+  'rest_s',        // M  #576: actual seconds resting, written by Lift Mode (#577)
 ];
-var SET_COLUMN_COUNT = 10;
+var SET_COLUMN_COUNT = 13;
 
 /** Columns A..F of a Sets row — the identity a staleness check re-reads. */
 var SET_IDENTITY_COLUMN_COUNT = 6;
@@ -345,6 +357,21 @@ var WATER_GOAL_DEFAULT_ML = 1893; // 64 oz
 var WATER_GOAL_MIN_ML = 250;
 var WATER_GOAL_MAX_ML = 10000;
 var WATER_AMOUNT_MAX_ML = 2000;
+
+// Rest defaults (#576), whole seconds, supplied by the API when the row or the
+// tab is absent, exactly as water_goal_ml is. Rest keys accept 15-600 and
+// switch keys 0-120. Mirrored by frontend/src/api/rest-times.ts.
+var REST_SETTINGS = [
+  { key: 'rest_primary_s', def: 90, min: 15, max: 600 },    // between sets of a primary exercise
+  { key: 'rest_superset_s', def: 45, min: 15, max: 600 },   // after each round of SS1-SS3
+  { key: 'switch_superset_s', def: 15, min: 0, max: 120 },  // between exercises within a superset round
+  { key: 'rest_burnout_s', def: 45, min: 15, max: 600 },    // after each round of burnout
+  { key: 'switch_burnout_s', def: 10, min: 0, max: 120 },   // between exercises within a burnout round
+];
+var REST_SECONDS_MIN = 15;
+var REST_SECONDS_MAX = 600;
+var SWITCH_SECONDS_MIN = 0;
+var SWITCH_SECONDS_MAX = 120;
 var DRINKS_MAX_RANGE_DAYS = 400;
 
 // --- MCPChangeLog (A:G) — #434 ------------------------------------------------

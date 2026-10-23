@@ -11,6 +11,9 @@ import { RepsField } from '../shared/reps-field';
 import type { ExerciseWithRow } from '../../api/types';
 import { ask } from '../../state/confirm';
 import { deleteTemplateCopy, discardChangesCopy } from '../shared/confirm-copy';
+import { REST_SECTIONS, SWITCH_SECTIONS, sectionRestOf, type SectionRest } from '../../api/rest-times';
+import { loadRestSettings, restSettings } from '../../state/rest-settings';
+import { SectionRestBand } from './template-rest';
 
 export interface TemplateExerciseSlot {
   exercise_id: string;
@@ -24,6 +27,29 @@ interface Props {
   templateId?: string;
 }
 
+const BLANK_REST: SectionRest = { rest_s: '', switch_s: '' };
+
+/**
+ * What saving writes per section (#576): the values of each section that still
+ * has an exercise and carries a rest, switch only where a switch applies.
+ * Warm-up and cool-down get blanks, as does a section with nothing set.
+ */
+export function restToSave(
+  exercises: readonly Pick<TemplateExerciseSlot, 'section'>[],
+  rest: Record<string, SectionRest>,
+): Record<string, SectionRest> {
+  const out: Record<string, SectionRest> = {};
+  for (const { section } of exercises) {
+    if (section in out) continue;
+    const own = rest[section] ?? BLANK_REST;
+    out[section] = {
+      rest_s: REST_SECTIONS.includes(section) ? own.rest_s : '',
+      switch_s: SWITCH_SECTIONS.includes(section) ? own.switch_s : '',
+    };
+  }
+  return out;
+}
+
 export function TemplateEditor({ templateId }: Props) {
   const { token } = useAuth();
   const [name, setName] = useState('');
@@ -34,14 +60,21 @@ export function TemplateEditor({ templateId }: Props) {
   const [showExercisePicker, setShowExercisePicker] = useState(false);
   const [editingIndex, setEditingIndex] = useState(-1);
   const [saving, setSaving] = useState(false);
+  // #576: each section's rest and switch, '' meaning Default. Saved onto every
+  // row of the section; a section with no exercise left saves nothing.
+  const [sectionRest, setSectionRest] = useState<Record<string, SectionRest>>({});
 
   // Track initial state for dirty checking
-  const initialState = useRef({ name: '', exercises: '' });
+  const initialState = useRef({ name: '', exercises: '', rest: '{}' });
+
+  useEffect(() => {
+    if (token) void loadRestSettings(token);
+  }, [token]);
 
   // Populate state in edit mode
   useEffect(() => {
     if (!templateId) {
-      initialState.current = { name: '', exercises: '' };
+      initialState.current = { name: '', exercises: '', rest: '{}' };
       return;
     }
     const tpl = templates.value.find((t) => t.id === templateId);
@@ -53,10 +86,16 @@ export function TemplateEditor({ templateId }: Props) {
         sets: r.sets,
         reps: r.reps,
       }));
+      const rest = sectionRestOf(tpl.exercises);
       setName(tpl.name);
       setExercises(mapped);
       setRowKeys(mapped.map(() => newRowKey()));
-      initialState.current = { name: tpl.name, exercises: JSON.stringify(mapped) };
+      setSectionRest(rest);
+      initialState.current = {
+        name: tpl.name,
+        exercises: JSON.stringify(mapped),
+        rest: JSON.stringify(restToSave(mapped, rest)),
+      };
     }
   }, [templateId]);
 
@@ -99,12 +138,15 @@ export function TemplateEditor({ templateId }: Props) {
     if (!token || !name.trim() || exercises.length === 0) return;
     setSaving(true);
     try {
+      const rest = restToSave(exercises, sectionRest);
       const inputs = exercises.map((ex) => ({
         exercise_id: ex.exercise_id,
         exercise_name: ex.exercise_name,
         section: ex.section,
         sets: ex.sets || '1',
         reps: ex.reps,
+        rest_s: rest[ex.section]?.rest_s ?? '',
+        switch_s: rest[ex.section]?.switch_s ?? '',
       }));
 
       if (templateId) {
@@ -142,8 +184,13 @@ export function TemplateEditor({ templateId }: Props) {
   const isDirty = () => {
     if (name !== initialState.current.name) return true;
     if (JSON.stringify(exercises) !== initialState.current.exercises) return true;
+    if (JSON.stringify(restToSave(exercises, sectionRest)) !== initialState.current.rest) return true;
     return false;
   };
+
+  // The index of each section's last exercise: its rest band goes under it.
+  const lastOfSection = new Map<string, number>();
+  exercises.forEach((ex, i) => lastOfSection.set(ex.section, i));
 
   const handleDiscard = async () => {
     if (isDirty() && !(await ask(discardChangesCopy('template')))) return;
@@ -207,6 +254,15 @@ export function TemplateEditor({ templateId }: Props) {
 
             {editingIndex === i && (
               <TemplateExerciseConfig ex={ex} onChange={(updated) => updateExercise(i, updated)} />
+            )}
+
+            {lastOfSection.get(ex.section) === i && (
+              <SectionRestBand
+                section={ex.section}
+                value={sectionRest[ex.section] ?? BLANK_REST}
+                defaults={restSettings.value}
+                onChange={(next) => setSectionRest((prev) => ({ ...prev, [ex.section]: next }))}
+              />
             )}
           </div>
         ))}

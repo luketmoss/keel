@@ -91,7 +91,14 @@
 //   ?action=updateDrinkTime&key=...&payload={"id":"<uuid>","time":"14:30:00"}
 //   ?action=deleteDrink&key=...&payload={"id":"<uuid>"}
 //   ?action=updateSetting&key=...&payload={"key":"water_goal_ml","value":2000}
+//   ?action=updateSetting&key=...&payload={"key":"rest_primary_s","value":120}   - #576
+//   ?action=getSettings&key=...   - every setting, defaults filled in (#576)
 // WIDGET_API_KEY may run logDrink and getDrinkTotals only.
+//
+// Rest (#576): Templates rows carry a section's `rest_s`/`switch_s` (blank =
+// the Settings default); replaceTemplate keeps a section's values when the
+// payload leaves them out. appendSets resolves `rest_target_s` for a workout
+// whose sets all leave it out, from the workout's template and the defaults.
 //
 // The Withings sync's runs go to WithingsSyncLog, same layout (#200): add
 // "log":"withings" to appendSyncLog's payload, or &log=withings to getSyncLog.
@@ -653,6 +660,11 @@ function dispatch(action, params, caller) {
 
     case 'updateSetting':
       result = { success: true, data: withScriptLock(function () { return updateSetting(payload); }) };
+      break;
+
+    // Every setting with its default filled in (#576): the app's Settings screen.
+    case 'getSettings':
+      result = { success: true, data: getSettings() };
       break;
 
     default:

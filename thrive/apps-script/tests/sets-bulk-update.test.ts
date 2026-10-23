@@ -46,9 +46,9 @@ describe('AC2: a good batch applies in full', () => {
     expect(setRows[0][2]).toBe('Bench Press');
   });
 
-  it('writes exactly ten cells, so column K stays gone', () => {
+  it('writes exactly thirteen cells (#576), keeping the set rest columns as they were', () => {
     const { setRows } = apply([{ exercise: 'Bench Press', set_number: 1, reps: '7' }]);
-    expect(setRows[0]).toHaveLength(10);
+    expect(setRows[0]).toHaveLength(13);
   });
 
   it('can clear a field deliberately', () => {

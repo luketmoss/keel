@@ -52,20 +52,22 @@ describe('AC6: Exercises A2:E', () => {
   });
 });
 
-describe('AC6: Templates A2:H', () => {
+describe('AC6: Templates A2:J (#576 appended I/J)', () => {
   const TEMPLATES = () => [
     templateRow({ template_id: 'tpl_b', template_name: 'Push B', order: 2, exercise_id: 'ex_2', exercise_name: 'Incline' }),
     templateRow({ template_id: 'tpl_b', template_name: 'Push B', order: 1, exercise_id: 'ex_1', exercise_name: 'Bench' }),
     templateRow({ template_id: 'tpl_a', template_name: 'Push A', order: 1, exercise_id: 'ex_1', exercise_name: 'Bench' }),
   ];
 
-  it('returns all eight columns on each row', () => {
-    const { sandbox } = loadApi({ templates: TEMPLATES() });
+  it('returns all ten columns on each row, an eight-cell row from before #576 with blank rest', () => {
+    const { sandbox } = loadApi({ templates: TEMPLATES().map((r) => r.slice(0, 8)) });
     const [tpl] = callDoGet<any[]>(sandbox, { action: 'getTemplates' }).data;
     expect(Object.keys(tpl.exercises[0]).sort()).toEqual(
-      ['exercise_id', 'exercise_name', 'order', 'reps', 'section', 'sets', 'sheetRow',
-        'template_id', 'template_name'].sort()
+      ['exercise_id', 'exercise_name', 'order', 'reps', 'rest_s', 'section', 'sets', 'sheetRow',
+        'switch_s', 'template_id', 'template_name'].sort()
     );
+    expect(tpl.exercises[0].rest_s).toBe('');
+    expect(tpl.exercises[0].switch_s).toBe('');
   });
 
   it('groups rows into templates, sorted by name', () => {
@@ -98,7 +100,7 @@ describe('AC6: Templates A2:H', () => {
     });
     expect(res.success).toBe(true);
     expect(api.templateRows[0][4]).toBe('Bench Press BB');
-    expect(api.templateRows[0]).toHaveLength(8);
+    expect(api.templateRows[0]).toHaveLength(10);
   });
 
   it('replaces a template wholesale, deleting bottom-to-top', () => {
@@ -138,14 +140,16 @@ describe('AC6: Templates A2:H', () => {
   });
 });
 
-describe('AC6: Sets A2:J, ten cells and no column K', () => {
-  it('returns all ten columns', () => {
-    const { sandbox } = loadApi({ sets: [setRow()] });
+describe('AC6: Sets A2:M, thirteen cells (#576 appended K:M)', () => {
+  it('returns all thirteen columns, a ten-cell row from before #576 with blank rest', () => {
+    const { sandbox } = loadApi({ sets: [setRow().slice(0, 10)] });
     const [s] = callDoGet<any[]>(sandbox, { action: 'getSets' }).data;
     expect(Object.keys(s).sort()).toEqual(
       ['effort', 'exercise_id', 'exercise_name', 'exercise_order', 'planned_reps',
-        'reps', 'section', 'set_number', 'sheetRow', 'weight', 'workout_id'].sort()
+        'reps', 'rest_s', 'rest_target_s', 'section', 'set_number', 'set_s', 'sheetRow', 'weight',
+        'workout_id'].sort()
     );
+    expect([s.rest_target_s, s.set_s, s.rest_s]).toEqual(['', '', '']);
   });
 
   it('reads unset weight, reps and effort as empty strings', () => {
@@ -156,7 +160,7 @@ describe('AC6: Sets A2:J, ten cells and no column K', () => {
     expect(s.effort).toBe('');
   });
 
-  it('appends exactly ten cells', () => {
+  it('appends exactly thirteen cells', () => {
     const api = loadApi({});
     const res = callDoGet<any[]>(api.sandbox, {
       action: 'appendSets',
@@ -165,10 +169,10 @@ describe('AC6: Sets A2:J, ten cells and no column K', () => {
       }),
     });
     expect(res.success).toBe(true);
-    expect(api.setRows[0]).toHaveLength(10);
+    expect(api.setRows[0]).toHaveLength(13);
   });
 
-  it('drops a stale eleventh field rather than writing column K back', () => {
+  it('drops a stale field it does not know rather than writing it anywhere', () => {
     const api = loadApi({});
     callDoGet(api.sandbox, {
       action: 'appendSets',
@@ -176,7 +180,7 @@ describe('AC6: Sets A2:J, ten cells and no column K', () => {
         sets: [{ workout_id: 'w_1', exercise_id: 'ex_1', exercise_name: 'Bench', section: 'primary', exercise_order: 1, set_number: 1, planned_reps: '6', notes: 'from an older shape' }],
       }),
     });
-    expect(api.setRows[0]).toHaveLength(10);
+    expect(api.setRows[0]).toHaveLength(13);
     expect(api.setRows[0]).not.toContain('from an older shape');
   });
 

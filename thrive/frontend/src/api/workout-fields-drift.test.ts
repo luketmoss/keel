@@ -1,3 +1,4 @@
+// #576 adds the Sets and Templates mirrors (SET_FIELDS, TEMPLATE_FIELDS).
 // #260 AC4 — the SPA's Workouts row mirrors WORKOUT_FIELDS in
 // apps-script/src/types.js (CLAUDE.md: change both together). This test is
 // what notices when only one side changed, as sync-log-api.test.ts does for
@@ -21,10 +22,27 @@ vi.mock('./sheets', () => ({
   getSheetId: vi.fn(),
   withReauth: (_token: string, fn: (t: string) => unknown) => fn('t'),
 }));
-vi.mock('./demo-data', () => ({ isDemo: () => false, DEMO_WORKOUTS: [], DEMO_SETS: [] }));
+vi.mock('./demo-data', () => ({
+  isDemo: () => false,
+  DEMO_WORKOUTS: [],
+  DEMO_SETS: [],
+  DEMO_TEMPLATE_ROWS: [],
+}));
 
-const { workoutToRow, rowToWorkout, createWorkout, updateWorkout } = await import('./workouts-api');
-import type { Workout } from './types';
+const {
+  workoutToRow,
+  rowToWorkout,
+  createWorkout,
+  updateWorkout,
+  SET_FIELDS,
+  setToNewRow,
+  rowToSet,
+  fetchSets,
+  updateSet,
+  appendSets,
+} = await import('./workouts-api');
+const { TEMPLATE_FIELDS, templateRowValues, rowToTemplateRow, fetchTemplateRows } = await import('./templates-api');
+import type { TemplateRow, Workout, WorkoutSet } from './types';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -61,6 +79,100 @@ describe('Workouts row mapping', () => {
     row[27] = '204';
     expect(rowToWorkout(row, 2).sport_type).toBe('204');
     expect(rowToWorkout(row.slice(0, 27), 2).sport_type).toBe('');
+  });
+});
+
+// #576: Templates I/J and Sets K:M, mirrored the same way.
+function fieldsOf(name: string): string[] {
+  const src = readFileSync(resolve(__dirname, '../../../apps-script/src/types.js'), 'utf-8');
+  const block = src.match(new RegExp(`var ${name} = \\[([\\s\\S]*?)\\];`))?.[1];
+  expect(block, `${name} not found in types.js`).toBeTruthy();
+  return Array.from(block!.matchAll(/'([a-z_]+)'/g), (m) => m[1]);
+}
+
+describe('#576: Sets and Templates row mappings mirror types.js', () => {
+  it('SET_FIELDS and TEMPLATE_FIELDS match apps-script/src/types.js, in order', () => {
+    expect([...SET_FIELDS]).toEqual(fieldsOf('SET_FIELDS'));
+    expect([...TEMPLATE_FIELDS]).toEqual(fieldsOf('TEMPLATE_FIELDS'));
+    expect(SET_FIELDS.slice(10)).toEqual(['rest_target_s', 'set_s', 'rest_s']);
+    expect(TEMPLATE_FIELDS.slice(8)).toEqual(['rest_s', 'switch_s']);
+  });
+
+  it('setToNewRow and rowToSet round-trip every SET_FIELDS column', () => {
+    const named = Object.fromEntries(SET_FIELDS.map((f) => [f, f])) as unknown as WorkoutSet;
+    expect(setToNewRow(named)).toEqual([...SET_FIELDS]);
+    const s = rowToSet([...SET_FIELDS], 2) as unknown as Record<string, unknown>;
+    for (const f of SET_FIELDS) if (f !== 'exercise_order' && f !== 'set_number') expect(s[f], f).toBe(f);
+  });
+
+  it('templateRowValues and rowToTemplateRow round-trip every TEMPLATE_FIELDS column', () => {
+    const named = Object.fromEntries(TEMPLATE_FIELDS.map((f) => [f, f])) as unknown as TemplateRow;
+    expect(templateRowValues(named)).toEqual([...TEMPLATE_FIELDS]);
+    const t = rowToTemplateRow([...TEMPLATE_FIELDS], 2) as unknown as Record<string, unknown>;
+    for (const f of ['template_id', 'exercise_id', 'section', 'rest_s', 'switch_s']) expect(t[f], f).toBe(f);
+  });
+
+  it('a row written before the migration reads back with blank rest, and nothing else changes', () => {
+    const oldSet = ['w_1', 'ex_1', 'Bench', 'primary', '1', '2', '6', '185', '6', 'Hard'];
+    expect(rowToSet(oldSet, 7)).toEqual({
+      workout_id: 'w_1',
+      exercise_id: 'ex_1',
+      exercise_name: 'Bench',
+      section: 'primary',
+      exercise_order: 1,
+      set_number: 2,
+      planned_reps: '6',
+      weight: '185',
+      reps: '6',
+      effort: 'Hard',
+      rest_target_s: '',
+      set_s: '',
+      rest_s: '',
+      sheetRow: 7,
+    });
+    const oldTemplate = ['tpl_1', 'Push', '3', 'ex_1', 'Bench', 'primary', '4', '4-6'];
+    expect(rowToTemplateRow(oldTemplate, 4)).toEqual({
+      template_id: 'tpl_1',
+      template_name: 'Push',
+      order: 3,
+      exercise_id: 'ex_1',
+      exercise_name: 'Bench',
+      section: 'primary',
+      sets: '4',
+      reps: '6',
+      rest_s: '',
+      switch_s: '',
+      sheetRow: 4,
+    });
+  });
+
+  it('fetchSets reads A2:M; an edit writes A:J only, so K:M stay as the sheet holds them', async () => {
+    sheetsGet.mockReset();
+    sheetsUpdate.mockReset();
+    sheetsGet.mockResolvedValue([]);
+    await fetchSets('token');
+    expect(sheetsGet).toHaveBeenCalledWith('Sets!A2:M', 't');
+    await updateSet(9, { ...rowToSet([], 9), workout_id: 'w_1', rest_target_s: '90' }, 'token');
+    const [range, rows] = sheetsUpdate.mock.calls[0];
+    expect(range).toBe('Sets!A9:J9');
+    expect(rows[0]).toHaveLength(10);
+  });
+
+  it('appendSets writes A:M with the planned rest the set carries', async () => {
+    sheetsAppend.mockReset();
+    await appendSets([{ ...rowToSet([], 0), workout_id: 'w_1', rest_target_s: '45' }], 'token');
+    const [range, rows] = sheetsAppend.mock.calls[0];
+    expect(range).toBe('Sets!A:M');
+    expect(rows[0]).toHaveLength(13);
+    expect(rows[0][10]).toBe('45');
+  });
+
+  it('fetchTemplateRows reads A2:J', async () => {
+    sheetsGet.mockReset();
+    sheetsGet.mockResolvedValue([['tpl_1', 'Push', '1', 'ex_1', 'Bench', 'SS1', '3', '10', '60', '15']]);
+    const [row] = await fetchTemplateRows('token');
+    expect(sheetsGet).toHaveBeenCalledWith('Templates!A2:J', 't');
+    expect([row.rest_s, row.switch_s]).toEqual(['60', '15']);
   });
 });
 

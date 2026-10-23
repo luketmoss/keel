@@ -24,6 +24,14 @@ export interface TemplateRow {
   section: Section | string;
   sets: string;
   reps: string;
+  /**
+   * #576, columns I and J: the section's rest and switch, whole seconds as
+   * text. Every row of a section carries the same values; '' (or absent, on a
+   * row built before #576) means "use the Settings default". `switch_s` is
+   * only ever set on SS1-SS3 and burnout, and warmup/cooldown have neither.
+   */
+  rest_s?: string;
+  switch_s?: string;
 }
 export interface TemplateRowWithRow extends TemplateRow {
   sheetRow: number;
@@ -120,6 +128,16 @@ export interface WorkoutSet {
   weight: string;
   reps: string;
   effort: Effort | '';
+  /**
+   * #576, columns K:M, whole seconds as text, '' when blank (absent on a set
+   * built in memory). `rest_target_s` is the rest planned after this set,
+   * resolved once when the set is created and never recomputed; `set_s` and
+   * `rest_s` are what Lift Mode (#577) measures. Written only by an append:
+   * every edit writes A:J and leaves these as the sheet holds them.
+   */
+  rest_target_s?: string;
+  set_s?: string;
+  rest_s?: string;
 }
 export interface SetWithRow extends WorkoutSet {
   sheetRow: number;

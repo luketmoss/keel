@@ -42,6 +42,33 @@ const WORKOUTS = [
   workout({ id: 'w_plan', date: '2026-09-21', type: 'weight', name: 'Upper Pull A', status: 'planned', estimated_seconds: '2820' }),
 ];
 
+// #576: a template whose SS1 sets its own rest and switch, and sets carrying rest.
+const tplRow = (order, exercise_id, exercise_name, section, rest_s = '', switch_s = '') => ({
+  template_id: 'tpl_upb', template_name: 'Upper Push B', order, exercise_id, exercise_name, section,
+  sets: '3', reps: '10', rest_s, switch_s, sheetRow: order + 1,
+});
+const REST_TEMPLATES = [{
+  id: 'tpl_upb', name: 'Upper Push B', exercises: [
+    tplRow(1, 'ex_ohp', 'OH Press', 'primary'),
+    tplRow(2, 'ex_arnold', 'Arnold Press', 'SS1', '60', '20'),
+    tplRow(3, 'ex_lat', 'Lateral Raise', 'SS1', '60', '20'),
+    tplRow(4, 'ex_abw', 'Ab Wheel', 'burnout', '', '0'),
+  ],
+}];
+const REST_EXERCISES = [
+  { id: 'ex_ohp', name: 'OH Press', tags: '', notes: '', created: '' },
+  { id: 'ex_arnold', name: 'Arnold Press', tags: '', notes: '', created: '' },
+];
+const restSet = (set_number, rest) => ({
+  workout_id: 'w_enr', exercise_id: 'ex_ohp', exercise_name: 'OH Press', section: 'primary',
+  exercise_order: 1, set_number, planned_reps: '5', weight: '95', reps: '5', effort: '',
+  rest_target_s: '', set_s: '', rest_s: '', ...rest, sheetRow: set_number + 1,
+});
+const REST_SETS = [
+  restSet(1, { rest_target_s: '90', set_s: '41', rest_s: '95' }),
+  restSet(2, {}),
+];
+
 // #234: the fake API's journal, mutated by upsertJournal the way the real one is.
 const JOURNAL = [
   { date: '2026-09-22', note: 'Legs heavy.\nSlept badly.', created: '2026-09-22T20:00:00.000Z', updated: '2026-09-22T20:00:00.000Z' },
@@ -82,7 +109,10 @@ before(async () => {
     let data;
     switch (p.action) {
       case 'getWorkouts': data = WORKOUTS; break;
-      case 'getSets': data = []; break;
+      // #576: w_enr's sets carry the rest columns, one with every value, one with none.
+      case 'getSets':
+        data = p.workout_id === 'w_enr' ? REST_SETS : [];
+        break;
       case 'getWorkout': data = WORKOUTS.find((w) => w.id === p.id); break;
       case 'getDailyHealth':
         data = [{ date: p.from, resting_hr: '57', hrv: '', steps: '8400', calories: '', sleep_total_s: '',
@@ -129,8 +159,9 @@ before(async () => {
           water_goal_ml: 1893,
         };
         break;
-      case 'getExercises': data = []; break;
-      case 'getTemplates': data = []; break;
+      case 'getExercises': data = REST_EXERCISES; break;
+      case 'getTemplates': data = REST_TEMPLATES; break;
+      case 'replaceTemplate': data = JSON.parse(p.payload).data; break;
       case 'appendSets': data = { appended: 0 }; break;
       case 'createWorkout': data = JSON.parse(p.payload).data; break;
       case 'updateWorkout': {
@@ -533,4 +564,38 @@ test('thrive_daily_summary shows water and alcohol for a day that has them', asy
   const { tools } = await client.listTools();
   assert.match(tools.find((t) => t.name === 'thrive_daily_summary').description, /water \(oz and ml\), coffee \(cups\) and alcohol/);
   assert.match(tools.find((t) => t.name === 'thrive_drinks').description, /Water, coffee and alcohol/);
+});
+
+// --- #576: rest times -------------------------------------------------------
+
+test('thrive_list_templates shows a section rest and switch where set, never an absent one as 0', async () => {
+  const { text, isError } = await call('thrive_list_templates');
+  assert.equal(isError, false, text);
+  assert.match(text, /3\. Lateral Raise \[SS1\] — 3 x 10\n {5}SS1 rest 1:00 · switch 0:20\n/);
+  assert.match(text, /4\. Ab Wheel \[burnout\] — 3 x 10\n {5}burnout switch 0:00$/);
+  assert.doesNotMatch(text, /primary rest/);
+  assert.doesNotMatch(text, /burnout rest/);
+});
+
+test('thrive_get_workout shows a set rest_target_s, set_s and rest_s where present', async () => {
+  const { text, isError } = await call('thrive_get_workout', { workout_id: 'w_enr' });
+  assert.equal(isError, false, text);
+  assert.match(text, /- set 1: .*\(rest target 90s, set 41s, rested 95s\)\n/);
+  assert.match(text, /- set 2: 95 lbs x 5 reps$/m);
+});
+
+test('thrive_update_template sends no rest fields, so the API keeps each section rest', async () => {
+  const { text, isError } = await call('thrive_update_template', {
+    template: 'Upper Push B',
+    exercises: [
+      { exercise: 'OH Press', section: 'primary', sets: 4, reps: '5' },
+      { exercise: 'Arnold Press', section: 'SS1', sets: 3, reps: '10' },
+    ],
+    confirm: true,
+  });
+  assert.equal(isError, false, text);
+  for (const ex of payloadOf('replaceTemplate').data.exercises) {
+    assert.equal('rest_s' in ex, false);
+    assert.equal('switch_s' in ex, false);
+  }
 });

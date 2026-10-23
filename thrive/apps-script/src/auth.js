@@ -55,6 +55,9 @@ var TOKEN_READ_ACTIONS = [
   // #519: the app shows today's intake and a day's drinks.
   'getDrinks',
   'getDrinkTotals',
+  // #576: the app's Settings screen shows the rest defaults, and the app resolves
+  // a new workout's planned rest from them.
+  'getSettings',
 ];
 
 /**

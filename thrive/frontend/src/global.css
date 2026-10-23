@@ -2012,7 +2012,8 @@ input, select, textarea {
 }
 
 @media (hover: hover) {
-  .btn-icon:hover {
+  /* #576: the duration stepper's end buttons are aria-disabled btn-icons. */
+  .btn-icon:hover:not(:disabled):not([aria-disabled="true"]) {
     background: var(--color-border-light);
     color: var(--color-text);
   }
@@ -6299,6 +6300,92 @@ a.training-card {
 
 .body-bp-value.tile-value-blank {
   color: var(--color-text-muted);
+}
+
+/* ===== Rest times (#576) =====
+   The duration stepper (Settings, the template editor, #577's start screen),
+   the Settings "Rest times" group and the template editor's rest band. The
+   stepper's buttons are Icon buttons and the text links Quiet buttons (#404),
+   so hover, press, focus and an end button's aria-disabled dimming are the
+   shared treatment in Interaction states. Kept above the Library section,
+   which a test reads to the end of the file for --color-primary. */
+.duration-stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+}
+
+.duration-stepper-btn {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  line-height: 1;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.duration-stepper-value {
+  min-width: 3.5em; /* holds "10:00", so the buttons never move */
+  text-align: center;
+  font-size: var(--text-base);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.rest-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  min-height: 44px;
+}
+
+.rest-row-label {
+  min-width: 0;
+}
+
+.rest-note {
+  margin: var(--space-xs) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.template-rest-band {
+  margin-top: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-light);
+}
+
+.template-rest-default {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--color-text-secondary);
+}
+
+.template-rest-set {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.btn-ghost.rest-link {
+  min-height: 44px;
+  padding: 0 var(--space-xs);
+  color: var(--color-primary-text);
+  font-weight: 400;
+}
+
+.btn-ghost.rest-link-sm {
+  font-size: var(--text-sm);
 }
 
 /* ===== Library keyboard access (#301) =====

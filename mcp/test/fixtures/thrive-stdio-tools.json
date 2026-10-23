@@ -332,7 +332,7 @@
   },
   {
     "name": "thrive_list_templates",
-    "description": "List workout templates with their exercises, sets, reps and sections.",
+    "description": "List workout templates with their exercises, sets, reps and sections, and a section's rest and switch time where the template sets one (otherwise it uses the Settings default).",
     "inputSchema": {
       "type": "object",
       "properties": {

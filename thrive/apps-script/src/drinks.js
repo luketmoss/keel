@@ -1,4 +1,5 @@
-// Drinks and Settings tabs (#519) - Thrive Sip's water and alcohol intake.
+// Drinks tab (#519) - Thrive Sip's water and alcohol intake. The Settings tab
+// it introduced is read and written by settings.js.
 //
 // One Drinks row per drink, written by the API alone. DRINK_FIELDS in types.js
 // is the one layout on this side; frontend/src/api/drinks.ts mirrors it.
@@ -8,7 +9,7 @@
 // caller's input back to a credential that lives on a phone.
 
 var DRINKS_SHEET = 'Drinks';
-var SETTINGS_SHEET = 'Settings';
+// The Settings tab (getWaterGoal, updateSetting) is settings.js's since #576.
 
 // Literals, not types.js constants: Apps Script does not promise a file load order.
 var DRINK_ERRORS = {
@@ -22,8 +23,6 @@ var DRINK_ERRORS = {
   rangeTooLong: 'the range may be at most 400 days',
   time: 'time must be HH:MM:SS, 00:00:00 to 23:59:59',
   notFound: 'No drink with that id',
-  setting: 'only water_goal_ml can be set',
-  waterGoal: 'water_goal_ml must be a whole number of ml, 250 to 10000',
 };
 
 /** A Drinks row -> {id, ..., updated}, '' where unset. */
@@ -154,24 +153,6 @@ function drinkRowsBetween(from, to) {
 }
 
 /**
- * The current water goal in ml. A missing tab, a missing row and a stored value
- * outside the accepted range all read as the default: the API supplies it, the
- * migration never writes it.
- */
-function getWaterGoal() {
-  var sheet = getSpreadsheet().getSheetByName(SETTINGS_SHEET);
-  if (!sheet) return WATER_GOAL_DEFAULT_ML;
-  var rows = getAllRows(sheet);
-  for (var i = 0; i < rows.length; i++) {
-    if (cell(rows[i][0]) !== SETTING_WATER_GOAL) continue;
-    var goal = wholeNumber(cell(rows[i][1]));
-    return goal !== null && goal >= WATER_GOAL_MIN_ML && goal <= WATER_GOAL_MAX_ML
-      ? goal : WATER_GOAL_DEFAULT_ML;
-  }
-  return WATER_GOAL_DEFAULT_ML;
-}
-
-/**
  * Drinks for an inclusive range of local dates, with the current goal (#519).
  * `from` and `to` come together or not at all; neither means today (Denver).
  * A missing tab is no drinks, not an error.
@@ -239,30 +220,4 @@ function deleteDrink(payload) {
   if (!found) throw new Error(DRINK_ERRORS.notFound);
   sheet.deleteRow(found.rowNum);
   return found.drink;
-}
-
-/** Set water_goal_ml, the one setting. Returns the stored { key, value, updated }. */
-function updateSetting(payload) {
-  payload = drinkPayload(payload);
-  if (payload.key !== SETTING_WATER_GOAL) throw new Error(DRINK_ERRORS.setting);
-  var goal = wholeNumber(payload.value);
-  if (goal === null || goal < WATER_GOAL_MIN_ML || goal > WATER_GOAL_MAX_ML) {
-    throw new Error(DRINK_ERRORS.waterGoal);
-  }
-  var sheet = getSheet(SETTINGS_SHEET);
-  var setting = { key: SETTING_WATER_GOAL, value: String(goal), updated: isoNow() };
-  var row = [setting.key, setting.value, setting.updated];
-
-  var lastRow = sheet.getLastRow();
-  if (lastRow >= 2) {
-    var rows = sheet.getRange(2, 1, lastRow - 1, SETTING_COLUMN_COUNT).getDisplayValues();
-    for (var i = 0; i < rows.length; i++) {
-      if (cell(rows[i][0]) === SETTING_WATER_GOAL) {
-        sheet.getRange(i + 2, 1, 1, SETTING_COLUMN_COUNT).setValues([asText(row)]);
-        return setting;
-      }
-    }
-  }
-  sheet.appendRow(asText(row));
-  return setting;
 }

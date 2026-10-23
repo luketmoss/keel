@@ -159,8 +159,17 @@ describe('saved order is the displayed order, with no row key in it', () => {
     await vi.waitFor(() => expect(editTemplate).toHaveBeenCalled());
     const inputs = editTemplate.mock.calls[0][2] as Record<string, unknown>[];
     expect(inputs.map((x) => x.section)).toEqual(['warmup', 'SS1', 'primary', 'burnout']);
+    // rest_s / switch_s: the section's rest (#576), on every row of it.
     for (const x of inputs)
-      expect(Object.keys(x).sort()).toEqual(['exercise_id', 'exercise_name', 'reps', 'section', 'sets']);
+      expect(Object.keys(x).sort()).toEqual([
+        'exercise_id',
+        'exercise_name',
+        'reps',
+        'rest_s',
+        'section',
+        'sets',
+        'switch_s',
+      ]);
   });
 
   it('workout planner', async () => {

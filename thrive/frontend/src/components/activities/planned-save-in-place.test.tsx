@@ -306,6 +306,10 @@ function toSets(): SetWithRow[] {
     weight: r[7],
     reps: r[8],
     effort: r[9] as any,
+    // #576: K:M, '' on these ten-cell rows.
+    rest_target_s: r[10] ?? '',
+    set_s: r[11] ?? '',
+    rest_s: r[12] ?? '',
     sheetRow: i + 2,
   }));
 }

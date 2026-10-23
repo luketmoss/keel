@@ -480,7 +480,7 @@ export function loadApi(
 
   const sandbox = loadSources(
     ['types.js', 'utils.js', 'workouts.js', 'exercises.js', 'templates.js', 'sets.js',
-      'daily-summary.js', 'daily-health.js', 'journal.js', 'drinks.js', 'body-measurements.js', 'sync-log.js', 'payload.js', 'track.js', 'auth.js',
+      'daily-summary.js', 'daily-health.js', 'journal.js', 'drinks.js', 'settings.js', 'body-measurements.js', 'sync-log.js', 'payload.js', 'track.js', 'auth.js',
       'sync-requests.js', 'change-log.js', 'main.js'],
     {
       LockService: makeLockService(lock),
@@ -623,7 +623,7 @@ export function exerciseRow(overrides: Record<string, CellValue> = {}): CellValu
   return ['id', 'name', 'tags', 'notes', 'created'].map((k) => f[k] ?? '');
 }
 
-/** A Templates row (A:H). */
+/** A Templates row (A:J, #576), rest blank unless named. `.slice(0, 8)` is a row from before #576. */
 export function templateRow(overrides: Record<string, CellValue> = {}): CellValue[] {
   const f: Record<string, CellValue> = {
     template_id: 'tpl_001', template_name: 'Upper Push A', order: 1,
@@ -632,10 +632,10 @@ export function templateRow(overrides: Record<string, CellValue> = {}): CellValu
     ...overrides,
   };
   return ['template_id', 'template_name', 'order', 'exercise_id', 'exercise_name',
-    'section', 'sets', 'reps'].map((k) => f[k] ?? '');
+    'section', 'sets', 'reps', 'rest_s', 'switch_s'].map((k) => f[k] ?? '');
 }
 
-/** A Sets row (A:J) — ten cells, no column K (#100). */
+/** A Sets row (A:M, #576), rest blank unless named. `.slice(0, 10)` is a row from before #576. */
 export function setRow(overrides: Record<string, CellValue> = {}): CellValue[] {
   const f: Record<string, CellValue> = {
     workout_id: 'w_001', exercise_id: 'ex_001', exercise_name: 'Bench Press',
@@ -644,7 +644,8 @@ export function setRow(overrides: Record<string, CellValue> = {}): CellValue[] {
     ...overrides,
   };
   return ['workout_id', 'exercise_id', 'exercise_name', 'section', 'exercise_order',
-    'set_number', 'planned_reps', 'weight', 'reps', 'effort'].map((k) => f[k] ?? '');
+    'set_number', 'planned_reps', 'weight', 'reps', 'effort',
+    'rest_target_s', 'set_s', 'rest_s'].map((k) => f[k] ?? '');
 }
 
 /** DailyHealth's A:S order (#165, #231). Mirrors DAILY_HEALTH_FIELDS in types.js. */

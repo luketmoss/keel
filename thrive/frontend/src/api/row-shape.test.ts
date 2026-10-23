@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { setToRow, workoutToRow } from './workouts-api';
+import { setToNewRow, setToRow, workoutToRow } from './workouts-api';
 import { templateRowValues } from './templates-api';
 import type { WorkoutSet, Workout } from './types';
 
@@ -42,9 +42,31 @@ describe('setToRow', () => {
   });
 });
 
-// Issue #100 — the Templates tab is A:H; columns I/J were removed as dead.
+// #576 — a new Sets row is A:M: the ten cells an edit writes, then K:M.
+describe('setToNewRow', () => {
+  it('emits exactly thirteen cells, spanning A:M, with K:M blank on a set that carries none', () => {
+    const row = setToNewRow(makeSet());
+    expect(row).toHaveLength(13);
+    expect(row.slice(0, 10)).toEqual(setToRow(makeSet()));
+    expect(row.slice(10)).toEqual(['', '', '']);
+  });
+
+  it('writes rest_target_s at K, set_s at L and rest_s at M', () => {
+    expect(setToNewRow(makeSet({ rest_target_s: '90', set_s: '41', rest_s: '95' })).slice(10)).toEqual([
+      '90',
+      '41',
+      '95',
+    ]);
+  });
+
+  it('setToRow, which every edit writes, never carries K:M', () => {
+    expect(setToRow(makeSet({ rest_target_s: '90', set_s: '41', rest_s: '95' }))).toHaveLength(10);
+  });
+});
+
+// Issue #100 deleted Templates I/J; #576 appends rest_s and switch_s there.
 // sheetsAppend writes every value it is handed regardless of the range it is
-// given, so a row wider than eight cells would rewrite the deleted columns.
+// given, so the row is exactly ten cells, A:J.
 describe('templateRowValues', () => {
   const row = {
     template_id: 'tpl_001',
@@ -57,12 +79,24 @@ describe('templateRowValues', () => {
     reps: '6',
   };
 
-  it('emits exactly eight cells, spanning A:H', () => {
-    expect(templateRowValues(row)).toHaveLength(8);
+  it('emits exactly ten cells, spanning A:J, with blank rest when the row carries none', () => {
+    expect(templateRowValues(row)).toHaveLength(10);
+    expect(templateRowValues(row).slice(8)).toEqual(['', '']);
   });
 
   it('emits the columns in sheet order', () => {
-    expect(templateRowValues(row)).toEqual(['tpl_001', 'Upper Push A', 1, 'ex1', 'Bench Press', 'primary', '5', '6']);
+    expect(templateRowValues({ ...row, section: 'SS1', rest_s: '60', switch_s: '20' })).toEqual([
+      'tpl_001',
+      'Upper Push A',
+      1,
+      'ex1',
+      'Bench Press',
+      'SS1',
+      '5',
+      '6',
+      '60',
+      '20',
+    ]);
   });
 });
 

@@ -203,9 +203,36 @@ function setLine(s) {
   return `set ${s.set_number}: ${bits.join(' x ')}`;
 }
 
-/** The API's `exercises` shape for a template, from resolved rows. */
+/**
+ * The API's `exercises` shape for a template, from resolved rows. It carries no
+ * rest_s / switch_s (#576): the API keeps a section's stored rest when the
+ * payload leaves it out, so a replace never blanks rest it was not asked to change.
+ */
 const toTemplateExercises = (rows) =>
   rows.map((r) => ({ exercise: r.exercise_id, section: r.section, sets: r.sets, reps: r.reps }));
+
+/** Whole seconds as m:ss (#576): 90 -> "1:30". */
+const mss = (seconds) => {
+  const s = Math.max(0, Math.round(Number(seconds)));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
+
+/** A template section's rest line (#576), or null when neither value is set. Absent is never 0. */
+function sectionRestLine(row) {
+  const bits = [];
+  if (row.rest_s !== undefined && row.rest_s !== '') bits.push(`rest ${mss(row.rest_s)}`);
+  if (row.switch_s !== undefined && row.switch_s !== '') bits.push(`switch ${mss(row.switch_s)}`);
+  return bits.length ? `     ${row.section} ${bits.join(' · ')}` : null;
+}
+
+/** A set's rest fields (#576), where present: planned rest, time under the bar, rest taken. */
+function setRestBits(s) {
+  const bits = [];
+  if (s.rest_target_s !== undefined && s.rest_target_s !== '') bits.push(`rest target ${s.rest_target_s}s`);
+  if (s.set_s !== undefined && s.set_s !== '') bits.push(`set ${s.set_s}s`);
+  if (s.rest_s !== undefined && s.rest_s !== '') bits.push(`rested ${s.rest_s}s`);
+  return bits.length ? ` (${bits.join(', ')})` : '';
+}
 
 // --- read tools -----------------------------------------------------
 
@@ -319,7 +346,7 @@ tool(
         `**${g.exercise_name}** [${g.section || 'no section'}] ` +
           `(${g.exercise_id}, exercise_order ${g.exercise_order})`,
       );
-      for (const s of g.sets) out.push(`  - ${setLine(s)}`);
+      for (const s of g.sets) out.push(`  - ${setLine(s)}${setRestBits(s)}`);
     }
     return text(out.join('\n'));
   },
@@ -528,7 +555,8 @@ tool(
 
 tool(
   'thrive_list_templates',
-  'List workout templates with their exercises, sets, reps and sections.',
+  'List workout templates with their exercises, sets, reps and sections, and a section\'s rest and ' +
+    'switch time where the template sets one (otherwise it uses the Settings default).',
   { name_contains: z.string().optional().describe('Case-insensitive substring match on template name') },
   async ({ name_contains }) => {
     const templates = await fetchTemplates();
@@ -538,9 +566,13 @@ tool(
     if (!list.length) return text('No templates found.');
 
     const blocks = list.map((t) => {
-      const rows = t.exercises.map(
-        (e) => `  ${e.order}. ${e.exercise_name} [${e.section || 'no section'}] — ${e.sets} x ${e.reps}`,
-      );
+      // #576: a section's rest, where set, under its last exercise.
+      const last = new Map(t.exercises.map((e, i) => [e.section, i]));
+      const rows = t.exercises.flatMap((e, i) => {
+        const line = `  ${e.order}. ${e.exercise_name} [${e.section || 'no section'}] — ${e.sets} x ${e.reps}`;
+        const rest = last.get(e.section) === i ? sectionRestLine(e) : null;
+        return rest ? [line, rest] : [line];
+      });
       return `**${t.name}** (id: ${t.id}, ${t.exercises.length} exercises)\n${rows.join('\n')}`;
     });
     return text(blocks.join('\n\n'));

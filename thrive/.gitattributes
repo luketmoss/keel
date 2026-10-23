@@ -3,3 +3,7 @@
 # working copy whatever core.autocrlf says.
 *.js text eol=lf
 *.mjs text eol=lf
+# Stylesheets check out LF too: the CSS tests match multi-line selectors such
+# as `.a,\n.b` as text, and a CRLF working copy on Windows breaks them (#598).
+# The index is already LF; this pins the working copy whatever core.autocrlf says.
+*.css text eol=lf

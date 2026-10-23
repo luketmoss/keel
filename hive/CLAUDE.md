@@ -155,7 +155,7 @@ removes it. A trigger runs the **pushed** code, not a deployment, so a drifted
 
 ## Architecture Notes
 - Frontend uses direct `fetch()` to the Sheets REST API (not gapi.client)
-- Auth: Google Identity Services (GIS) token model; `withReauth()` wraps every Sheets call and retries once on an expired token
+- Auth: Google Identity Services (GIS) token model, through `@keel/auth` (#609, a `file:../../auth` dependency, keys prefixed `hive_`). `src/auth/auth-provider.tsx` only mirrors its session into context (plus the demo short-circuit, the one-time `hive_prior_user` migration and `updateUserName`); `login-screen.tsx` stays here. Renewal happens on the next tap, never on a timer or page load. `withReauth()` wraps every Sheets call and retries once on a 401 via `attemptReauth`. A change under `auth/` rebuilds Hive (`hive.yml` and `hive-pages.yml` trigger on it)
 - State: @preact/signals — module-level `signal()`/`computed()`. `useState` only for component-local state
 - Demo mode is gated at the app/state layer (`frontend/src/demo/`, `app.tsx`, `auth-provider.tsx`, `state/actions-*`), **not** inside each API function
 - Drag and drop: HTML5 native, no library

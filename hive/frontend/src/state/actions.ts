@@ -90,7 +90,7 @@ import {
   cascadeStatusRename as mockCascadeStatusRename,
 } from '../demo/mock-api';
 import { isDemoMode } from '../demo/is-demo-mode';
-import { ReauthFailedError } from '../auth/reauth';
+import { ReauthFailedError } from '@keel/auth';
 import { owners, labels, loading, pendingDeleteIds } from './board-store';
 import type { Item, ItemStatus, ItemWithRow, UserInfo, BoardStatus } from '../api/types';
 

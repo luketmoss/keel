@@ -2,7 +2,7 @@
 // No gapi.client dependency — smaller, more control.
 
 import type { Item, ItemWithRow, Owner, Label, Board, BoardPermission, BoardStatus } from './types';
-import { attemptReauth } from '../auth/reauth';
+import { attemptReauth } from '@keel/auth';
 
 const SPREADSHEET_ID = import.meta.env.VITE_SPREADSHEET_ID;
 const BASE = 'https://sheets.googleapis.com/v4/spreadsheets';

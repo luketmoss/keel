@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 
 // Mock the reauth module before importing sheets
-vi.mock('../auth/reauth', () => ({
+vi.mock('@keel/auth', () => ({
   attemptReauth: vi.fn(),
   ReauthFailedError: class ReauthFailedError extends Error {
     declare cause?: Error;
@@ -14,8 +14,8 @@ vi.mock('../auth/reauth', () => ({
 }));
 
 import { upsertOwner, fetchAllItems, fetchOwners, updateItemRow } from './sheets';
-import { attemptReauth } from '../auth/reauth';
-import { ReauthFailedError } from '../auth/reauth';
+import { attemptReauth } from '@keel/auth';
+import { ReauthFailedError } from '@keel/auth';
 
 const mockAttemptReauth = vi.mocked(attemptReauth);
 

@@ -1,78 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
-import { AuthContext } from './auth-context';
+import { createAuthSession, type AuthSessionState } from '@keel/auth';
+import { AuthContext, type AuthState } from './auth-context';
 import type { UserInfo } from '../api/types';
 import { isDemoMode } from '../demo/is-demo-mode';
-import { registerReauthCallback, onReauthFailed } from './reauth';
-import { showToast } from '../state/board-store';
 
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const SCOPES = 'https://www.googleapis.com/auth/spreadsheets openid email profile';
 
-const TOKEN_KEY = 'hive_token';
 const USER_KEY = 'hive_user';
-const TOKEN_EXPIRY_KEY = 'hive_token_expiry';
+/** Left by the sign-in before @keel/auth, which remembered the user here after the token lapsed. */
 const PRIOR_USER_KEY = 'hive_prior_user';
-
-export function loadCachedAuth(): { token: string; user: UserInfo; expiry: number } | null {
-  try {
-    const token = localStorage.getItem(TOKEN_KEY);
-    const user = localStorage.getItem(USER_KEY);
-    const expiry = localStorage.getItem(TOKEN_EXPIRY_KEY);
-    if (token && user && expiry && Date.now() < Number(expiry)) {
-      return { token, user: JSON.parse(user), expiry: Number(expiry) };
-    }
-    // Expired or missing — clear stale data
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
-    localStorage.removeItem(TOKEN_EXPIRY_KEY);
-  } catch {
-    /* ignore */
-  }
-  return null;
-}
-
-export function saveCachedAuth(token: string, user: UserInfo, expiresIn: number) {
-  try {
-    localStorage.setItem(TOKEN_KEY, token);
-    localStorage.setItem(USER_KEY, JSON.stringify(user));
-    // GIS tokens last ~3600s; shave 60s to avoid edge-case expiry
-    localStorage.setItem(TOKEN_EXPIRY_KEY, String(Date.now() + (expiresIn - 60) * 1000));
-    // Persist user separately so we can attempt silent auto-login after token expiry
-    localStorage.setItem(PRIOR_USER_KEY, JSON.stringify(user));
-  } catch {
-    /* ignore */
-  }
-}
-
-function loadPriorUser(): UserInfo | null {
-  try {
-    const raw = localStorage.getItem(PRIOR_USER_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function clearPriorUser() {
-  try {
-    localStorage.removeItem(PRIOR_USER_KEY);
-  } catch {
-    /* ignore */
-  }
-}
-
-export function clearCachedAuth() {
-  try {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
-    localStorage.removeItem(TOKEN_EXPIRY_KEY);
-  } catch {
-    /* ignore */
-  }
-}
-
-declare const google: any;
 
 /** Mock user injected in demo mode. */
 const DEMO_USER: UserInfo = {
@@ -85,242 +23,125 @@ interface Props {
   children: ComponentChildren;
 }
 
+/**
+ * Carry an old `hive_prior_user` over once: it becomes `hive_user` (which is
+ * what the session remembers) unless one is already there, and is removed.
+ */
+function migratePriorUser() {
+  try {
+    const prior = localStorage.getItem(PRIOR_USER_KEY);
+    if (prior === null) return;
+    if (!localStorage.getItem(USER_KEY)) localStorage.setItem(USER_KEY, prior);
+    localStorage.removeItem(PRIOR_USER_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 export function AuthProvider({ children }: Props) {
-  const demo = isDemoMode();
-  const cached = demo ? null : loadCachedAuth();
-  const shouldAttemptSilentAuth = !demo && !cached && !!loadPriorUser();
-  const [token, setToken] = useState<string | null>(demo ? 'demo-token' : (cached?.token ?? null));
-  const [user, setUser] = useState<UserInfo | null>(demo ? DEMO_USER : (cached?.user ?? null));
-  const [isAuthLoading, setIsAuthLoading] = useState(shouldAttemptSilentAuth);
-  const tokenClientRef = useRef<any>(null);
-  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const silentAutoLoginRef = useRef(shouldAttemptSilentAuth);
+  if (isDemoMode()) return <DemoAuthProvider>{children}</DemoAuthProvider>;
+  return <LiveAuthProvider>{children}</LiveAuthProvider>;
+}
 
-  /** Schedule a silent token refresh 5 minutes before expiry. */
-  const scheduleRefresh = useCallback((expiresInSec: number) => {
-    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
-    const delayMs = Math.max(0, (expiresInSec - 300) * 1000);
-    refreshTimerRef.current = setTimeout(() => {
-      tokenClientRef.current?.requestAccessToken({ prompt: '' });
-    }, delayMs);
+/** Demo mode: skip GIS entirely, provide fake auth context. */
+function DemoAuthProvider({ children }: Props) {
+  const [user, setUser] = useState<UserInfo>(DEMO_USER);
+  const updateUserName = useCallback((name: string) => setUser((prev) => ({ ...prev, name })), []);
+  // Leaving demo means loading the app without ?demo.
+  const logout = useCallback(() => {
+    window.location.search = '';
   }, []);
 
-  /**
-   * Pending reauth resolver. When a silent re-auth is triggered by a 401
-   * in sheets.ts, we store the resolve/reject pair here so the GIS callback
-   * can settle the promise returned to the API layer.
-   */
-  const reauthResolveRef = useRef<((token: string) => void) | null>(null);
-  const reauthRejectRef = useRef<((err: Error) => void) | null>(null);
+  const value: AuthState = {
+    token: 'demo-token',
+    user,
+    isAuthenticated: true,
+    login: () => {},
+    logout,
+    updateUserName,
+    rememberedUser: null,
+    ready: true,
+    renewing: false,
+    renewError: null,
+    continueAs: () => {},
+  };
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
 
-  // If we loaded a cached token on mount, schedule a refresh for when it nears expiry.
-  useEffect(() => {
-    if (demo || !cached) return;
-    const remainingSec = Math.max(0, (cached.expiry - Date.now()) / 1000);
-    scheduleRefresh(remainingSec);
-    return () => {
-      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+/** Mirrors an `@keel/auth` session into context. The sign-in behaviour lives in the session. */
+function LiveAuthProvider({ children }: Props) {
+  const [session] = useState(() => {
+    migratePriorUser();
+    return createAuthSession({ clientId: CLIENT_ID, scopes: SCOPES, storagePrefix: 'hive_' });
+  });
+  const [state, setState] = useState<AuthSessionState>(session.getState);
+  // A name edited in Hive. The session only knows the name Google gave it, and
+  // writes that back to storage on every renewal, so this wins over it.
+  const editedName = useRef<{ email: string; name: string } | null>(null);
 
-  useEffect(() => {
-    // In demo mode, skip GIS initialization entirely.
-    if (demo) return;
-
-    // Wait for GIS script to load
-    const init = () => {
-      if (typeof google === 'undefined' || !google.accounts?.oauth2) {
-        setTimeout(init, 100);
-        return;
-      }
-
-      tokenClientRef.current = google.accounts.oauth2.initTokenClient({
-        client_id: CLIENT_ID,
-        scope: SCOPES,
-        prompt: '',
-        callback: async (response: any) => {
-          if (response.error) {
-            console.error('OAuth error:', response.error);
-            // If this was a silent reauth attempt, reject the promise
-            if (reauthRejectRef.current) {
-              reauthRejectRef.current(new Error(`OAuth error: ${response.error}`));
-              reauthResolveRef.current = null;
-              reauthRejectRef.current = null;
-            }
-            return;
-          }
-
-          const newToken = response.access_token;
-
-          // Fetch user info (skip if this is a background reauth — use cached user)
-          if (reauthResolveRef.current) {
-            setToken(newToken);
-            // Silent reauth: resolve the promise with the new token and update cache
-            // Re-use the existing cached user info to avoid an extra network call
-            const cachedUser = loadCachedAuth()?.user;
-            if (cachedUser) {
-              const expiresIn = response.expires_in || 3600;
-              saveCachedAuth(newToken, cachedUser, expiresIn);
-              scheduleRefresh(expiresIn);
-            }
-            reauthResolveRef.current(newToken);
-            reauthResolveRef.current = null;
-            reauthRejectRef.current = null;
-          } else {
-            // Normal login (including silent auto-login on page load): fetch user info.
-            // #285: the token is set only once the user is known. `isAuthenticated`
-            // is `!!token`, and the board loads the moment it turns true — with a
-            // null user it never learns the email, so owner-only UI (Board
-            // Settings) disappears until a reload.
-            try {
-              const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                headers: { Authorization: `Bearer ${newToken}` },
-              });
-              if (!res.ok) throw new Error(`userinfo responded ${res.status}`);
-              const info = await res.json();
-              // #289: a response without an email is a failed call, not a user
-              if (!info?.email) throw new Error('userinfo response had no email');
-              const userInfo: UserInfo = {
-                email: info.email,
-                name: info.name,
-                picture: info.picture,
-              };
-              setUser(userInfo);
-              setToken(newToken);
-              const expiresIn = response.expires_in || 3600;
-              saveCachedAuth(newToken, userInfo, expiresIn);
-              scheduleRefresh(expiresIn);
-            } catch (err) {
-              // #289: fail the sign-in visibly rather than mount a half-signed-in
-              // app. No token is set, so the login screen stays. A silent
-              // auto-login on page load fails quietly, like its other failures.
-              console.error('Failed to fetch user info:', err);
-              if (!silentAutoLoginRef.current) {
-                showToast("Couldn't finish signing in — please try again", 'error');
-              }
-            } finally {
-              if (silentAutoLoginRef.current) {
-                silentAutoLoginRef.current = false;
-                setIsAuthLoading(false);
-              }
-            }
-          }
-        },
-        error_callback: (error: any) => {
-          console.error('Token client error:', error);
-          if (silentAutoLoginRef.current) {
-            // Silent auto-login failed — fall back to login screen (no toast)
-            silentAutoLoginRef.current = false;
-            setIsAuthLoading(false);
-          } else if (reauthRejectRef.current) {
-            // Silent reauth attempt (401 retry) — reject the promise
-            reauthRejectRef.current(new Error(`Token client error: ${error?.type || error?.message || 'unknown'}`));
-            reauthResolveRef.current = null;
-            reauthRejectRef.current = null;
-          }
-        },
-      });
-    };
-
-    init();
-
-    // If user previously logged in but token expired, attempt silent auto-login
-    let silentAuthTimeout: ReturnType<typeof setTimeout> | null = null;
-    if (silentAutoLoginRef.current) {
-      // Poll until GIS client is ready, then fire silent auth
-      const attemptSilentAuth = () => {
-        if (tokenClientRef.current) {
-          tokenClientRef.current.requestAccessToken({ prompt: '' });
-        } else {
-          setTimeout(attemptSilentAuth, 100);
-        }
-      };
-      attemptSilentAuth();
-      // Safety timeout — don't leave user staring at spinner forever
-      silentAuthTimeout = setTimeout(() => {
-        if (silentAutoLoginRef.current) {
-          silentAutoLoginRef.current = false;
-          setIsAuthLoading(false);
-        }
-      }, 5000);
+  /** Put the edited name back in `hive_user` after the session rewrites it. */
+  const storeEditedName = useCallback((s: AuthSessionState) => {
+    const edit = editedName.current;
+    if (!edit || !s.token || s.user?.email !== edit.email) return;
+    try {
+      localStorage.setItem(USER_KEY, JSON.stringify({ ...s.user, name: edit.name }));
+    } catch {
+      /* ignore */
     }
+  }, []);
 
-    // Register the reauth callback so sheets.ts can trigger silent re-auth on 401
-    const unregisterReauth = registerReauthCallback(() => {
-      return new Promise<string>((resolve, reject) => {
-        if (!tokenClientRef.current) {
-          reject(new Error('GIS token client not initialized'));
-          return;
-        }
-        reauthResolveRef.current = resolve;
-        reauthRejectRef.current = reject;
-        // Request a new token silently (prompt: '' skips consent screen)
-        tokenClientRef.current.requestAccessToken({ prompt: '' });
-      });
+  useEffect(() => {
+    const unsubscribe = session.subscribe((s) => {
+      storeEditedName(s);
+      setState(s);
     });
-
-    // Register the reauth-failed callback — clears auth state and shows login
-    const unregisterFailed = onReauthFailed(() => {
-      clearCachedAuth();
-      setToken(null);
-      setUser(null);
-      showToast('Session expired \u2014 please sign in again', 'error');
-    });
-
+    const stop = session.start();
+    setState(session.getState());
     return () => {
-      unregisterReauth();
-      unregisterFailed();
-      if (silentAuthTimeout) clearTimeout(silentAuthTimeout);
+      unsubscribe();
+      stop();
     };
-  }, [demo]);
+  }, [session, storeEditedName]);
 
-  const login = useCallback(() => {
-    tokenClientRef.current?.requestAccessToken();
-  }, []);
+  const withEdit = (u: UserInfo | null): UserInfo | null => {
+    const edit = editedName.current;
+    return u && edit && edit.email === u.email ? { ...u, name: edit.name } : u;
+  };
 
-  const updateUserName = useCallback((newName: string) => {
-    setUser((prev) => {
-      if (!prev) return prev;
-      const updated = { ...prev, name: newName };
-      // Update localStorage cache so the name survives page reload
-      const cachedToken = localStorage.getItem(TOKEN_KEY);
-      const cachedExpiry = localStorage.getItem(TOKEN_EXPIRY_KEY);
-      if (cachedToken && cachedExpiry) {
-        const remainingSec = Math.max(0, (Number(cachedExpiry) - Date.now()) / 1000);
-        saveCachedAuth(cachedToken, updated, remainingSec);
-      }
-      return updated;
-    });
-  }, []);
+  const updateUserName = useCallback(
+    (name: string) => {
+      const current = session.getState().user;
+      if (!current) return;
+      editedName.current = { email: current.email, name };
+      storeEditedName(session.getState());
+      // Re-render with the edit applied; the session's own state is unchanged.
+      setState({ ...session.getState() });
+    },
+    [session, storeEditedName],
+  );
 
   const logout = useCallback(() => {
-    if (demo) {
-      // In demo mode, navigate to app without ?demo param to exit demo mode
-      window.location.search = '';
-      return;
+    editedName.current = null;
+    session.logout();
+    try {
+      localStorage.removeItem(PRIOR_USER_KEY);
+    } catch {
+      /* ignore */
     }
-    // Don't revoke the token — that removes the consent grant and forces
-    // the full consent flow on next login. Just clear local state.
-    clearCachedAuth();
-    clearPriorUser();
-    setToken(null);
-    setUser(null);
-  }, [token, demo]);
+  }, [session]);
 
-  return (
-    <AuthContext.Provider
-      value={{
-        token,
-        user,
-        isAuthenticated: !!token,
-        isAuthLoading,
-        login,
-        logout,
-        updateUserName,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
+  const value: AuthState = {
+    token: state.token,
+    user: withEdit(state.user),
+    isAuthenticated: !!state.token,
+    login: session.login,
+    logout,
+    updateUserName,
+    rememberedUser: withEdit(state.rememberedUser),
+    ready: state.ready,
+    renewing: state.renewing,
+    renewError: state.renewError,
+    continueAs: session.continueAs,
+  };
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

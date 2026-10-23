@@ -1,10 +1,10 @@
 name: hive
 on:
   pull_request:
-    paths: ['hive/**', 'ui/tokens/**', '.github/workflows/hive.yml']
+    paths: ['hive/**', 'auth/**', 'ui/tokens/**', '.github/workflows/hive.yml']
   push:
     branches: [main]
-    paths: ['hive/**', 'ui/tokens/**', '.github/workflows/hive.yml']
+    paths: ['hive/**', 'auth/**', 'ui/tokens/**', '.github/workflows/hive.yml']
 concurrency:
   group: hive-${{ github.ref }}
   cancel-in-progress: true

@@ -2,7 +2,7 @@ name: hive-pages
 on:
   push:
     branches: [main]
-    paths: ['hive/frontend/**', '.github/workflows/hive-pages.yml']
+    paths: ['hive/frontend/**', 'auth/**', '.github/workflows/hive-pages.yml']
   workflow_dispatch:
 # One group for every writer to gh-pages (cairn-pages.yml and thrive-pages.yml
 # use the same), so deploys never push at once. Not cancelled: a running deploy

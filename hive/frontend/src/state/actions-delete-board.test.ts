@@ -176,7 +176,7 @@ vi.mock('../demo/mock-api', () => ({
   cascadeStatusRename: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('../demo/is-demo-mode', () => ({ isDemoMode: () => false }));
-vi.mock('../auth/reauth', () => ({ ReauthFailedError: class extends Error {} }));
+vi.mock('@keel/auth', () => ({ ReauthFailedError: class extends Error {} }));
 
 beforeEach(() => {
   vi.clearAllMocks();

@@ -114,7 +114,7 @@ vi.mock('../api/sheets', () => ({
 
 vi.mock('../demo/mock-api', () => ({}));
 vi.mock('../demo/is-demo-mode', () => ({ isDemoMode: () => false }));
-vi.mock('../auth/reauth', () => ({ ReauthFailedError: class extends Error {} }));
+vi.mock('@keel/auth', () => ({ ReauthFailedError: class extends Error {} }));
 
 function makeItem(overrides: Record<string, any> = {}) {
   return {

@@ -24,6 +24,7 @@ import { useAuth } from '../../auth/auth-context';
 import { navigate, goBack } from '../../router/router';
 import { AddExerciseModal } from '../exercises/add-exercise-modal';
 import { FinishWorkoutModal } from './finish-modal';
+import { resetRun } from './lift/lift-run';
 import { ExerciseRow } from './exercise-row';
 import type { TrackerExercise } from './exercise-row';
 import type { TrackerSet } from './set-row';
@@ -111,6 +112,7 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
   const [finishing, setFinishing] = useState(false);
   const [notes, setNotes] = useState(editMode ? workout?.notes || '' : '');
   const [showFinishForm, setShowFinishForm] = useState(false);
+  const [switchingToLift, setSwitchingToLift] = useState(false);
   const reorder = useReorderFocus();
   const saveTimers = useRef<Map<string, number>>(new Map());
 
@@ -632,6 +634,35 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
     });
   };
 
+  /**
+   * #579 — Logbook → Lift Mode. A set edit still waiting on its debounce is written first, as
+   * a save would; if one fails its toast shows and nothing switches. Lift Mode then opens at the
+   * first unlogged working set, with no clock (`resetRun`).
+   */
+  const switchToLift = async () => {
+    if (!token || switchingToLift) return;
+    setSwitchingToLift(true);
+    try {
+      const pending = [...saveTimers.current.keys()];
+      for (const [, timer] of saveTimers.current) clearTimeout(timer);
+      saveTimers.current.clear();
+      let failed = false;
+      for (const key of pending) {
+        const at = key.lastIndexOf('__');
+        const exKey = key.slice(0, at);
+        const setNumber = Number(key.slice(at + 2));
+        await enqueueWrite(() => saveOwnRow(exKey, setNumber)).catch(() => {
+          failed = true;
+        });
+      }
+      if (failed) return;
+      resetRun(workoutId);
+      navigate(`/workout/${workoutId}/lift`);
+    } finally {
+      setSwitchingToLift(false);
+    }
+  };
+
   const handleSaveEdits = async () => {
     if (!token) return;
     setFinishing(true);
@@ -745,21 +776,33 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
             {finishing ? 'Saving...' : 'Save Changes'}
           </button>
         ) : (
-          <button
-            class="btn btn-primary"
-            onClick={async () => {
-              // AC7: Guard against finishing with unsynced sets
-              const queuedCount = pendingSyncCount.value;
-              if (queuedCount > 0) {
-                const ok = await ask(finishUnsyncedCopy(queuedCount));
-                if (!ok) return;
-              }
-              setShowFinishForm(!showFinishForm);
-            }}
-            disabled={finishing}
-          >
-            Finish
-          </button>
+          <div class="workout-tracker-actions">
+            {workout?.type === 'weight' && workout.status === 'active' && (
+              <button
+                type="button"
+                class="btn btn-secondary workout-tracker-lift"
+                onClick={() => void switchToLift()}
+                disabled={finishing || switchingToLift}
+              >
+                Lift Mode
+              </button>
+            )}
+            <button
+              class="btn btn-primary"
+              onClick={async () => {
+                // AC7: Guard against finishing with unsynced sets
+                const queuedCount = pendingSyncCount.value;
+                if (queuedCount > 0) {
+                  const ok = await ask(finishUnsyncedCopy(queuedCount));
+                  if (!ok) return;
+                }
+                setShowFinishForm(!showFinishForm);
+              }}
+              disabled={finishing}
+            >
+              Finish
+            </button>
+          </div>
         )}
       </div>
 

@@ -136,6 +136,10 @@ Its end is a summary (#578, `lift-summary.tsx`), not the finish modal: totals, o
 (`lift-sets-list.tsx`, also the All sets sheet) whose rows open to the Log card's controls
 (`lift-set-controls.tsx`), then session effort and notes, kept in the stored run under `notes` and
 `sessionEffort`, and Save, which is `finishWorkout`. Logbook keeps the modal.
+The two switch mid-workout (#579): the tracker's header has a Lift Mode button (`resetRun`, so it opens at the first
+unlogged working set with no clock, or on the summary with none left), and All sets has Switch to logbook, which clears
+the stored run and writes nothing for the interrupted step. The start choice is remembered in `localStorage`
+`thrive.weightMode` and only preselects the choice sheet.
 
 ## Key commands
 

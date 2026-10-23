@@ -1638,6 +1638,30 @@ input, select, textarea {
   gap: var(--space-md);
 }
 
+.workout-tracker-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+/* #579: the tracker's way into Lift Mode, drawn like Lift Mode's own header chips. */
+.workout-tracker-lift {
+  min-height: 44px;
+  padding: 0 var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-primary-text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.workout-tracker-lift:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .workout-tracker-title {
   font-size: var(--text-xl);
   font-weight: 700;

@@ -88,6 +88,23 @@ export function clearRun(workoutId: string): void {
   }
 }
 
+/**
+ * #579 — Logbook → Lift Mode: forget where the run was, so it opens at Ready on
+ * the first unlogged working set with no clock. The session clock's zero, notes
+ * and session effort stay. A phase of `start` is never in progress (`initialRun`
+ * passes over it), and nothing is stored when there was no run.
+ */
+export function resetRun(workoutId: string): void {
+  const stored = loadRun(workoutId);
+  if (!stored) return;
+  saveRun(workoutId, {
+    ...FRESH_RUN,
+    sessionStartedAt: stored.sessionStartedAt,
+    notes: stored.notes,
+    sessionEffort: stored.sessionEffort,
+  });
+}
+
 /** Whole seconds from `since` to `now`, never negative. */
 export function secondsSince(since: number | null, now: number): number {
   return since === null ? 0 : Math.max(0, Math.floor((now - since) / 1000));

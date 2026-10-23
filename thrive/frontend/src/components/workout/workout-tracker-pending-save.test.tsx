@@ -102,6 +102,7 @@ vi.mock('../../state/actions', async (orig) => ({
 }));
 
 const { WorkoutTracker } = await import('./workout-tracker');
+const { navigate } = await import('../../router/router');
 const { readQueue, clearQueue, flushQueue } = await import('../../api/sync-queue');
 const { fetchSets } = await import('../../api/workouts-api');
 
@@ -596,5 +597,74 @@ describe('#389: a set whose offline append the queue flushed is not appended aga
     expect(writes[writes.length - 1]).toMatchObject({ kind: 'update', row: 5 });
     expect(sheet.Sets).toHaveLength(4);
     expect(brief(sheet.Sets[3])).toEqual(['e_row', 'primary', 1, 2, '140']);
+  });
+});
+
+describe('#579: the Lift Mode button', () => {
+  const liftWorkout = (over: Record<string, unknown> = {}) =>
+    ({ id: 'w1', type: 'weight', name: 'Pull A', status: 'active', template_id: '', ...over }) as never;
+  const liftButton = () => [...document.querySelectorAll('button')].find((b) => b.textContent === 'Lift Mode');
+
+  beforeEach(() => {
+    vi.mocked(navigate).mockClear();
+    window.localStorage.clear();
+  });
+
+  it('writes a set still waiting on its debounce, then opens Lift Mode on the workout', async () => {
+    workouts.value = [liftWorkout()];
+    await mount(BENCH_ROW_CURL);
+    type(0, '135');
+    await vi.advanceTimersByTimeAsync(300);
+    expect(writes).toHaveLength(0);
+    fireEvent.click(liftButton()!);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(writes).toHaveLength(1);
+    expect(brief(writes[0].values)).toEqual(['e_bench', 'primary', 1, 1, '135']);
+    expect(navigate).toHaveBeenCalledWith('/workout/w1/lift');
+    // The debounce does not write it a second time.
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(writes).toHaveLength(1);
+  });
+
+  it('does not switch when that save fails', async () => {
+    workouts.value = [liftWorkout()];
+    await mount(BENCH_ROW_CURL);
+    type(0, '135');
+    await vi.advanceTimersByTimeAsync(300);
+    updateFailure = new Error('offline');
+    fireEvent.click(liftButton()!);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('resets a stored run so Lift Mode opens at the first unlogged set', async () => {
+    workouts.value = [liftWorkout()];
+    await mount(BENCH_ROW_CURL);
+    window.localStorage.setItem(
+      'thrive.lift.w1',
+      JSON.stringify({ phase: 'rest', stepIndex: 1, restStartedAt: 5, restFor: 0, sessionStartedAt: 3 }),
+    );
+    fireEvent.click(liftButton()!);
+    await vi.advanceTimersByTimeAsync(0);
+    const stored = JSON.parse(window.localStorage.getItem('thrive.lift.w1')!);
+    expect(stored).toMatchObject({ phase: 'start', restStartedAt: null, setStartedAt: null, sessionStartedAt: 3 });
+    expect(navigate).toHaveBeenCalledWith('/workout/w1/lift');
+  });
+
+  it.each([
+    ['a stretch workout', { type: 'stretch' }],
+    ['a planned workout', { status: 'planned' }],
+    ['a finished workout', { status: '' }],
+  ])('is not on %s', async (_label, over) => {
+    workouts.value = [liftWorkout(over)];
+    await mount(BENCH_ROW_CURL);
+    expect(liftButton()).toBeUndefined();
+  });
+
+  it('is not in edit mode', async () => {
+    workouts.value = [liftWorkout({ status: '' })];
+    isEditMode.value = true;
+    await mount(BENCH_ROW_CURL);
+    expect(liftButton()).toBeUndefined();
   });
 });

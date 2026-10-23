@@ -71,6 +71,7 @@ describe('WorkoutFlow ?plan= deep link (#143)', () => {
   beforeEach(() => {
     templates.value = [PUSH];
     vi.clearAllMocks();
+    window.localStorage.removeItem('thrive.weightMode');
   });
   afterEach(() => {
     cleanup();

@@ -161,6 +161,19 @@ export function initialRun(status: string | undefined, steps: readonly LiftStep[
   return idx >= 0 ? { ...base, phase: 'ready', stepIndex: idx } : { ...base, phase: 'cooldown' };
 }
 
+/**
+ * Whether Lift Mode opens on the summary: an active workout with no run in
+ * progress (none stored, or one reset by the tracker's Lift Mode button, #579)
+ * and no working set left to do.
+ */
+export function opensOnSummary(
+  status: string | undefined,
+  steps: readonly LiftStep[],
+  stored: LiftRun | null,
+): boolean {
+  return status === 'active' && (!stored || stored.phase === 'start') && nextIndex(steps, -1) < 0;
+}
+
 /** The warm-up or cool-down exercises as a checklist: stored rows, and (warm-up) a template's not yet stored. */
 function checklistFor(
   section: 'warmup' | 'cooldown',
@@ -220,7 +233,8 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
       const next = { ...runRef.current, ...patch };
       runRef.current = next;
       setRun(next);
-      if (next.phase !== 'start') saveRun(workoutId, next);
+      // Not once Lift Mode is being left: the stored run was just cleared, and stays so.
+      if (next.phase !== 'start' && !leaving.current) saveRun(workoutId, next);
     },
     [workoutId],
   );
@@ -228,11 +242,14 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
   const [starting, setStarting] = useState(false);
   const [showAll, setShowAll] = useState(false);
   /** When the summary opened, which freezes its session time; null while Lift Mode is on screen. */
-  const [summaryAt, setSummaryAt] = useState<number | null>(null);
+  const [summaryAt, setSummaryAt] = useState<number | null>(() =>
+    opensOnSummary(workout?.status, steps, loadRun(workoutId)) ? Date.now() : null,
+  );
   const [finishing, setFinishing] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [localDone, setLocalDone] = useState<ReadonlySet<string>>(new Set());
   const leaving = useRef(false);
+  const switchingMode = useRef(false);
 
   const now = useNow(run.phase !== 'start');
   useWakeLock(active);
@@ -482,6 +499,22 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
     afterWorking();
   };
 
+  // #579: back to the tracker on this workout. Held stepper changes land first; the running
+  // set or rest clock is dropped with the stored run, so neither writes set_s or rest_s.
+  const switchToLogbook = async () => {
+    if (switchingMode.current) return;
+    switchingMode.current = true;
+    setShowAll(false);
+    try {
+      await flushLogDrafts();
+    } finally {
+      leaving.current = true;
+      clearRun(workoutId);
+      showToast('Switched to logbook', 'info');
+      navigate(`/workout/${workoutId}`);
+    }
+  };
+
   const finish = async () => {
     if (!token || finishing) return;
     setFinishing(true);
@@ -698,6 +731,7 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
           token={token}
           onClose={() => setShowAll(false)}
           onFinish={() => void openSummary()}
+          onSwitch={() => void switchToLogbook()}
         />
       )}
     </div>

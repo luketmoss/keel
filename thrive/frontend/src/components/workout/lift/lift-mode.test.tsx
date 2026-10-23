@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, fireEvent, cleanup, act } from '@testing-library/preact';
 import type { SetWithRow, WorkoutWithRow } from '../../../api/types';
-import { loadRun, runKey } from './lift-run';
+import { loadRun, resetRun, runKey } from './lift-run';
 
 const startPlannedWorkout = vi.fn();
 const saveSet = vi.fn(async (_set: unknown, _token: string, _row?: number) => ({}));
@@ -873,5 +873,124 @@ describe('finishing', () => {
     workouts.value = [];
     render(<LiftMode workoutId={W} />);
     expect(navigate).toHaveBeenCalledWith('/activities');
+  });
+});
+
+describe('switching with the tracker (#579)', () => {
+  const logged = (n: number) =>
+    plan()
+      .slice(1)
+      .map((s, i) => (i < n ? { ...s, reps: '8', weight: '90', effort: 'Easy' as const } : s));
+
+  it('Switch to logbook during a rest opens the tracker, clears the run and writes no rest_s', async () => {
+    withoutWarmup(() => (sets.value = plan().slice(1)));
+    workouts.value = [workout('active')];
+    const { container } = render(<LiftMode workoutId={W} />);
+    await click(container, 'Start set');
+    await click(container, 'Done · rest 1:30');
+    await advance(20_000);
+    expect(loadRun(W)?.phase).toBe('rest');
+    saveSetTimings.mockClear();
+    await click(container, 'All sets');
+    await click(container, 'Switch to logbook');
+    expect(navigate).toHaveBeenCalledWith(`/workout/${W}`);
+    expect(window.localStorage.getItem(runKey(W))).toBeNull();
+    // set_s was written by Done; the interrupted rest wrote nothing.
+    expect(saveSetTimings).not.toHaveBeenCalled();
+    await advance(5_000);
+    expect(window.localStorage.getItem(runKey(W))).toBeNull();
+  });
+
+  it('reopening Lift Mode after the switch does not resume the old clock', async () => {
+    withoutWarmup(() => (sets.value = logged(1)));
+    workouts.value = [workout('active')];
+    const first = render(<LiftMode workoutId={W} />);
+    await click(first.container, 'Start set');
+    await click(first.container, 'All sets');
+    await click(first.container, 'Switch to logbook');
+    first.unmount();
+    const { container } = render(<LiftMode workoutId={W} />);
+    expect(text(container)).toContain('UP NEXT');
+    expect(container.querySelector('[role="timer"]')).toBeNull();
+  });
+
+  it('a run left mid-set is reset to Ready on the first unlogged working set, keeping the session clock', () => {
+    withoutWarmup(() => (sets.value = logged(1)));
+    workouts.value = [workout('active')];
+    const t = Date.now();
+    window.localStorage.setItem(
+      runKey(W),
+      JSON.stringify({
+        phase: 'set',
+        stepIndex: 1,
+        setStartedAt: t - 5000,
+        restStartedAt: null,
+        restTarget: 0,
+        alertedAt: null,
+        restFor: null,
+        sessionStartedAt: t - 600_000,
+      }),
+    );
+    resetRun(W);
+    const { container } = render(<LiftMode workoutId={W} />);
+    expect(text(container)).toContain('UP NEXT');
+    expect(text(container)).toContain('Set 2 of 2');
+    expect(container.querySelector('[role="timer"]')).toBeNull();
+    expect(container.querySelector('.lift-session-clock')?.textContent).toBe('10:00');
+  });
+
+  it('resetRun stores nothing when there was no run', () => {
+    resetRun(W);
+    expect(window.localStorage.getItem(runKey(W))).toBeNull();
+  });
+
+  it('opens on the first unlogged set when an earlier one is skipped', () => {
+    withoutWarmup(
+      () =>
+        (sets.value = plan()
+          .slice(1)
+          .map((s, i) => (i === 1 ? { ...s, reps: '8', weight: '90', effort: 'Easy' as const } : s))),
+    );
+    workouts.value = [workout('active')];
+    const { container } = render(<LiftMode workoutId={W} />);
+    expect(text(container)).toContain('Set 1 of 2');
+  });
+
+  it('with every working set logged it opens the summary', () => {
+    withoutWarmup(() => (sets.value = logged(4)));
+    workouts.value = [workout('active')];
+    const { container } = render(<LiftMode workoutId={W} />);
+    expect(byText(container, 'Save workout')).toBeDefined();
+    expect(container.querySelector('[role="timer"]')).toBeNull();
+  });
+
+  it('with only warm-ups left unlogged it opens the summary', () => {
+    templates.value = [];
+    sets.value = plan().map((s) =>
+      s.section === 'warmup' ? s : { ...s, reps: '8', weight: '90', effort: 'Easy' as const },
+    );
+    workouts.value = [workout('active')];
+    const { container } = render(<LiftMode workoutId={W} />);
+    expect(byText(container, 'Save workout')).toBeDefined();
+  });
+
+  it('a stored cool-down is still where a reload returns, not the summary', () => {
+    withoutWarmup(() => (sets.value = logged(4)));
+    workouts.value = [workout('active')];
+    window.localStorage.setItem(
+      runKey(W),
+      JSON.stringify({
+        phase: 'cooldown',
+        stepIndex: 0,
+        setStartedAt: null,
+        restStartedAt: null,
+        restTarget: 0,
+        alertedAt: null,
+        restFor: null,
+        sessionStartedAt: Date.now() - 1000,
+      }),
+    );
+    const { container } = render(<LiftMode workoutId={W} />);
+    expect(byText(container, 'Save workout')).toBeUndefined();
   });
 });

@@ -458,6 +458,7 @@ export function AllSetsSheet({
   token,
   onClose,
   onFinish,
+  onSwitch,
 }: {
   steps: readonly LiftStep[];
   current: number | null;
@@ -465,6 +466,8 @@ export function AllSetsSheet({
   token: string;
   onClose: () => void;
   onFinish: () => void;
+  /** #579: leave Lift Mode for the tracker on this workout. */
+  onSwitch: () => void;
 }) {
   const dialog = useRef<HTMLDivElement>(null);
   useModalFocus(dialog, onClose);
@@ -489,6 +492,9 @@ export function AllSetsSheet({
           </button>
         </div>
         <SetsList steps={steps} current={current} summary={false} workoutId={workoutId} token={token} />
+        <button type="button" class="btn btn-secondary lift-sheet-finish" onClick={onSwitch}>
+          Switch to logbook
+        </button>
         <button type="button" class="btn btn-secondary lift-sheet-finish" onClick={onFinish}>
           Finish workout now
         </button>

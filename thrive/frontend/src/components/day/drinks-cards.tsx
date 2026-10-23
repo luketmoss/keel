@@ -1,5 +1,5 @@
-// #520, #551, #560 - the Day screen's Water, Coffee and Alcohol tiles (Thrive Sip). Water
-// full width, then Coffee and Alcohol half width, in one slot, after Sleep and before the metric tiles, with a
+// #520, #551, #560, #590 - the Day screen's Water, Coffee, Alcohol and Unwind tiles (Thrive Sip). Water
+// full width, then Coffee, Alcohol and Unwind a third each, in one slot, after Sleep and before the metric tiles, with a
 // collapsed log row under them. The data, the optimistic add and the rules live
 // in `state/drinks.ts`; this draws them. Never mounts on a future day. "+ 4 oz"
 // and "+ 1" are offered on past days too (#588), filed at 11:59 PM that day.
@@ -80,10 +80,26 @@ function CupIcon() {
   );
 }
 
-const ICONS = { water: DropIcon, alcohol: GlassIcon, coffee: CupIcon } as const;
-const TITLES = { water: 'Water', alcohol: 'Alcohol', coffee: 'Coffee' } as const;
+function MoonIcon() {
+  return (
+    <svg {...SVG}>
+      <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" />
+    </svg>
+  );
+}
+
+const ICONS = { water: DropIcon, alcohol: GlassIcon, coffee: CupIcon, unwind: MoonIcon } as const;
+const TITLES = { water: 'Water', alcohol: 'Alcohol', coffee: 'Coffee', unwind: 'Unwind' } as const;
 const unitWord = (kind: DrinkKind, n: number) =>
-  kind === 'coffee' ? (n === 1 ? 'cup' : 'cups') : n === 1 ? 'drink' : 'drinks';
+  kind === 'unwind' ? 'mg' : kind === 'coffee' ? (n === 1 ? 'cup' : 'cups') : n === 1 ? 'drink' : 'drinks';
+
+/** The add button's label and its accessible name (the viewed day is appended on a past day). */
+const ADD = {
+  water: { text: '+ 4 oz', name: 'Add 4 ounces of water' },
+  coffee: { text: '+ 1', name: 'Add one cup of coffee' },
+  alcohol: { text: '+ 1', name: 'Add one alcoholic drink' },
+  unwind: { text: '+ 5 mg', name: 'Add 5 mg of Unwind' },
+} as const;
 
 const amountText = (e: DrinkEntry) =>
   e.kind === 'water' ? `${formatOz(e.amount)} oz` : `${e.amount} ${unitWord(e.kind, e.amount)}`;
@@ -288,7 +304,7 @@ function DrinkTile({ kind, date, state, loaded, entries, token }: TileProps) {
 
   return (
     <div class={`drink-tile drink-tile-${kind}`} data-drink={kind}>
-      <Panel title={title} icon={icon} action={<CardChevron />} linked>
+      <Panel title={title} icon={icon} action={water ? <CardChevron /> : undefined} linked>
         <p class="drink-figure" aria-hidden="true">
           {loaded ? (
             <>
@@ -339,14 +355,12 @@ function DrinkTile({ kind, date, state, loaded, entries, token }: TileProps) {
           type="button"
           class="btn btn-secondary btn-sm drink-add"
           disabled={!loaded}
-          aria-label={`${
-            water ? 'Add 4 ounces of water' : kind === 'coffee' ? 'Add one cup of coffee' : 'Add one alcoholic drink'
-          }${state === 'today' ? '' : ` to ${metaDate(date)}`}`}
+          aria-label={`${ADD[kind].name}${state === 'today' ? '' : ` to ${metaDate(date)}`}`}
           onClick={() => {
             if (token) void addDrink(kind, token, date);
           }}
         >
-          {water ? '+ 4 oz' : '+ 1'}
+          {ADD[kind].text}
         </button>
         {error && (
           <p class="drink-error" role="alert">
@@ -453,6 +467,7 @@ export function DrinkCards({ date, state }: DayPanelProps) {
         <DrinkTile kind="water" date={date} state={state} loaded={loaded} entries={entries} token={token} />
         <DrinkTile kind="coffee" date={date} state={state} loaded={loaded} entries={entries} token={token} />
         <DrinkTile kind="alcohol" date={date} state={state} loaded={loaded} entries={entries} token={token} />
+        <DrinkTile kind="unwind" date={date} state={state} loaded={loaded} entries={entries} token={token} />
       </div>
       {loaded && <DrinkLog date={date} state={state} entries={entries} token={token} />}
     </div>

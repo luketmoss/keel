@@ -430,7 +430,7 @@ const ACTIVITY_SUMMARY_METRICS: TrendMetric[] = [ACTIVITY_COUNT, MOVING_TIME, DI
 const ACTIVITY_METRICS: TrendMetric[] = [STEPS, ...ACTIVITY_SUMMARY_METRICS];
 
 // ── Intake (#521) ────────────────────────────────────────────────────
-// Water, coffee and alcohol, summed per local day from getDrinks, never DailySummary
+// Water, coffee, alcohol and Unwind, summed per local day from getDrinks, never DailySummary
 // (which lags the day's last tap). "Logged nothing" is a real value here: every
 // day from the first drink ever logged to today is a point, `0` when it had
 // none, and the days before that are blank, so the chart does not open on a
@@ -503,7 +503,21 @@ export const COFFEE: TrendMetric = {
   emptyText: 'No drinks logged yet.',
 };
 
-const INTAKE_METRICS: TrendMetric[] = [WATER, COFFEE, ALCOHOL];
+export const UNWIND: TrendMetric = {
+  id: 'unwind',
+  source: 'drinks',
+  label: 'Unwind',
+  unit: 'mg',
+  points: () => intakePoints('unwind', (n) => n),
+  format: (v) => String(Math.round(v * 10) / 10),
+  axisFormat: axisDecimal,
+  band: false,
+  zeroBased: true,
+  bars: true,
+  emptyText: 'No drinks logged yet.',
+};
+
+const INTAKE_METRICS: TrendMetric[] = [WATER, COFFEE, ALCOHOL, UNWIND];
 
 // ── The custom set (#246) ────────────────────────────────────────────
 
@@ -523,6 +537,8 @@ export const CUSTOM_SECTIONS: { label: string; metrics: TrendMetric[] }[] = [
   { label: 'Body', metrics: BODY_METRICS },
   { label: 'Blood Pressure', metrics: BLOOD_PRESSURE_METRICS },
   { label: 'Activity', metrics: [...ACTIVITY_SUMMARY_METRICS, STEPS] },
+  // Only Unwind is pickable here (#590); Water, Coffee and Alcohol are read in the Intake group alone.
+  { label: 'Intake', metrics: [UNWIND] },
 ];
 export const CUSTOM_PICKABLE: TrendMetric[] = CUSTOM_SECTIONS.flatMap((s) => s.metrics);
 

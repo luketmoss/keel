@@ -1,4 +1,4 @@
-// #520, #551 - the Water and Alcohol tiles, the log row under them and the state
+// #520, #551, #590 - the Water, Coffee, Alcohol and Unwind tiles, the log row under them and the state
 // behind both: the optimistic add, rollback, time edit, delete behind the in-app
 // confirm, the past-day and future-day rules, loading and failure, rapid taps,
 // the goal, the Trends link, the last 7 days, and demo mode.
@@ -46,11 +46,17 @@ const YESTERDAY = '2026-10-19';
 /** 12:00 in Denver (MDT, UTC-6). */
 const NOW = new Date('2026-10-20T18:00:00.000Z');
 
-function drink(id: string, kind: 'water' | 'alcohol' | 'coffee', date: string, time: string, amount?: number): Drink {
+function drink(
+  id: string,
+  kind: 'water' | 'alcohol' | 'coffee' | 'unwind',
+  date: string,
+  time: string,
+  amount?: number,
+): Drink {
   return {
     id,
     kind,
-    amount: amount ?? (kind === 'water' ? 118 : 1),
+    amount: amount ?? (kind === 'water' ? 118 : kind === 'unwind' ? 5 : 1),
     date,
     time,
     logged_at_utc: `${date}T${time}Z`,
@@ -212,20 +218,31 @@ describe('the tiles', () => {
           drink('c', 'alcohol', TODAY, '21:05:00'),
           drink('k', 'coffee', TODAY, '07:00:00'),
           drink('k2', 'coffee', TODAY, '08:00:00'),
+          drink('u', 'unwind', TODAY, '21:30:00'),
+          drink('u2', 'unwind', TODAY, '22:10:00'),
         ],
         water_goal_ml: 1893,
       },
     });
 
-  it('are Water full width, then Coffee and Alcohol side by side, in a two-column grid, with the card padding and title size', async () => {
+  it('are Water full width, then Coffee, Alcohol and Unwind side by side, in a three-column grid, with their own padding and the title size', async () => {
     const { container } = await mount();
     const grid = container.querySelector('.drinks-grid')!;
-    expect([...grid.children].map((c) => c.getAttribute('data-drink'))).toEqual(['water', 'coffee', 'alcohol']);
+    expect([...grid.children].map((c) => c.getAttribute('data-drink'))).toEqual([
+      'water',
+      'coffee',
+      'alcohol',
+      'unwind',
+    ]);
     const css = readGlobalCss();
     expect(css).toMatch(/\.drink-tile-water\s*\{[^}]*grid-column:\s*1 \/ -1/);
-    expect(css).toMatch(/\.drinks-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
+    expect(css).toMatch(/\.drinks-grid\s*\{[^}]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/);
     expect(css).toMatch(/\.drinks-grid\s*\{[^}]*gap:\s*var\(--day-gap\)/);
     expect(css).toMatch(/\.drink-tile \.day-panel\s*\{[^}]*padding:\s*calc\(var\(--space-md\) - var\(--space-xs\)\)/);
+    expect(css).toMatch(/\.drink-tile:not\(\.drink-tile-water\) \.day-panel\s*\{[^}]*padding:\s*var\(--space-sm\)/);
+    expect(css).toMatch(
+      /\.drink-tile:not\(\.drink-tile-water\) \.drink-add\s*\{[^}]*padding-inline:\s*var\(--space-sm\)/,
+    );
     expect(css).toMatch(/\.day-screen \.drink-tile \.day-panel-title\s*\{[^}]*font-size:\s*var\(--text-sm\)/);
   });
 
@@ -233,14 +250,19 @@ describe('the tiles', () => {
     seed();
     const { container } = await mount();
     expect(card(container, 'Water').querySelector('.day-card-chevron')!.textContent).toBe('›');
-    expect(card(container, 'Alcohol').querySelector('.day-card-chevron')).not.toBeNull();
+    // Only Water keeps the ›; the three small tiles drop it and stay whole-tile links (#590).
+    expect(card(container, 'Alcohol').querySelector('.day-card-chevron')).toBeNull();
     const water = card(container, 'Water').querySelector<HTMLAnchorElement>('a.day-card-link')!;
     expect(water.getAttribute('href')).toBe(`#/trends/intake?date=${TODAY}`);
     expect(water.textContent).toBe('Water 4 oz. Open Intake trends');
     expect(card(container, 'Alcohol').querySelector('a.day-card-link')!.textContent).toBe(
       'Alcohol 1 drink. Open Intake trends',
     );
-    expect(card(container, 'Coffee').querySelector('.day-card-chevron')).not.toBeNull();
+    expect(card(container, 'Coffee').querySelector('.day-card-chevron')).toBeNull();
+    expect(card(container, 'Unwind').querySelector('.day-card-chevron')).toBeNull();
+    expect(card(container, 'Unwind').querySelector<HTMLAnchorElement>('a.day-card-link')!.textContent).toBe(
+      'Unwind 10 mg. Open Intake trends',
+    );
     expect(card(container, 'Coffee').querySelector<HTMLAnchorElement>('a.day-card-link')!.textContent).toBe(
       'Coffee 2 cups. Open Intake trends',
     );
@@ -276,7 +298,12 @@ describe('the tiles', () => {
 
   it('give the add buttons the compact size, left-aligned, at the foot of the tile', async () => {
     const { container } = await mount();
-    for (const label of ['Add 4 ounces of water', 'Add one cup of coffee', 'Add one alcoholic drink']) {
+    for (const label of [
+      'Add 4 ounces of water',
+      'Add one cup of coffee',
+      'Add one alcoholic drink',
+      'Add 5 mg of Unwind',
+    ]) {
       expect(button(container, label).classList.contains('btn-sm')).toBe(true);
     }
     expect(readGlobalCss()).toMatch(/\.drink-add\s*\{[^}]*align-self:\s*flex-start;[^}]*margin-top:\s*auto/);
@@ -285,11 +312,12 @@ describe('the tiles', () => {
   it('have their add button on a past day too, naming the day, and still link and draw their bars', async () => {
     seed();
     const { container } = await mount(YESTERDAY, 'past');
-    expect(container.querySelectorAll('.drink-add')).toHaveLength(3);
+    expect(container.querySelectorAll('.drink-add')).toHaveLength(4);
     expect(button(container, 'Add 4 ounces of water to Mon, Oct 19')).not.toBeNull();
     expect(button(container, 'Add one cup of coffee to Mon, Oct 19')).not.toBeNull();
     expect(button(container, 'Add one alcoholic drink to Mon, Oct 19')).not.toBeNull();
-    expect(container.querySelectorAll('.drink-week')).toHaveLength(3);
+    expect(button(container, 'Add 5 mg of Unwind to Mon, Oct 19')).not.toBeNull();
+    expect(container.querySelectorAll('.drink-week')).toHaveLength(4);
   });
 
   it('do not say "Drinks can only be added today." any more, nor label the card "today"', async () => {
@@ -411,6 +439,115 @@ describe('coffee', () => {
     fireEvent.click([...container.querySelectorAll('button')].find((b) => b.textContent === 'Delete')!);
     await openedConfirm();
     expect(confirmText()!.message).toContain('7:00 AM · 1 cup.');
+  });
+});
+
+describe('unwind', () => {
+  const log = (...rows: Drink[]) =>
+    api.getDrinks.mockResolvedValue({ ok: true, data: { drinks: rows, water_goal_ml: 1893 } });
+
+  it('shows "0 mg", "5 mg" and "10 mg" with a moon icon, no progress bar, and counts Unwind in the log row', async () => {
+    const quiet = await mount();
+    expect(total(quiet.container, 'Unwind')).toBe('0mg');
+    expect(card(quiet.container, 'Unwind').querySelector('.drink-bar')).toBeNull();
+    expect(card(quiet.container, 'Unwind').querySelector('.drink-icon-unwind svg')).not.toBeNull();
+    cleanup();
+    resetDrinks();
+    log(drink('u1', 'unwind', TODAY, '21:30:00'));
+    const one = await mount();
+    expect(total(one.container, 'Unwind')).toBe('5mg');
+    cleanup();
+    resetDrinks();
+    log(
+      drink('u1', 'unwind', TODAY, '21:30:00'),
+      drink('u2', 'unwind', TODAY, '22:10:00'),
+      drink('w', 'water', TODAY, '08:00:00'),
+    );
+    const { container } = await mount();
+    expect(total(container, 'Unwind')).toBe('10mg');
+    expect(card(container, 'Unwind').querySelector('p.sr-only[role="status"]')!.textContent).toBe('Unwind 10 mg');
+    expect(toggle(container)!.textContent).toContain("Today's log · 3 drinks");
+    const rows = entries(container, 'Unwind');
+    expect(rows).toHaveLength(2);
+    expect(rows[0].textContent).toContain('10:10 PM5 mg');
+  });
+
+  it('draws its bars on a 20 mg scale, capped, with the mg worded', async () => {
+    log(
+      drink('u1', 'unwind', '2026-10-17', '21:00:00'),
+      ...[1, 2, 3, 4, 5].map((n) => drink(`u2${n}`, 'unwind', '2026-10-18', `2${n}:00:00`)),
+      drink('u3', 'unwind', TODAY, '21:30:00'),
+      drink('u4', 'unwind', TODAY, '22:10:00'),
+    );
+    const { container } = await mount();
+    const week = card(container, 'Unwind').querySelector('.drink-week')!;
+    expect(week.getAttribute('aria-label')).toBe('Unwind, last 7 days: no data, no data, no data, 5, 25, 0, 10 mg');
+    expect(week.querySelector('.drink-week-goal')).toBeNull();
+    const heights = [...week.querySelectorAll('.drink-week-bar')].map((b) => b.getAttribute('style'));
+    expect(heights).toEqual(['height: 25%;', 'height: 100%;', 'height: 0%;', 'height: 50%;']);
+  });
+
+  it('+ 5 mg raises the figure, the bar and the log at once, and two quick taps are two entries of 5', async () => {
+    const { container } = await mount();
+    const add = button(container, 'Add 5 mg of Unwind');
+    expect(add.textContent).toBe('+ 5 mg');
+    fireEvent.click(add);
+    expect(total(container, 'Unwind')).toBe('5mg');
+    expect(toggle(container)!.textContent).toContain('1 drink');
+    expect(card(container, 'Unwind').querySelector('.drink-week')!.getAttribute('aria-label')!.endsWith('5 mg')).toBe(
+      true,
+    );
+    fireEvent.click(add);
+    expect(total(container, 'Unwind')).toBe('10mg');
+    await flush();
+    expect(api.logDrink).toHaveBeenCalledTimes(2);
+    expect(api.logDrink.mock.calls[0][0]).toMatchObject({ kind: 'unwind', amount: 5, source: 'app' });
+    expect(api.logDrink.mock.calls[0][0].id).not.toBe(api.logDrink.mock.calls[1][0].id);
+    expect(total(container, 'Coffee')).toBe('0cups');
+    expect(total(container, 'Alcohol')).toBe('0drinks');
+  });
+
+  it('rolls back and shows the error under the Unwind tile when the log fails', async () => {
+    api.logDrink.mockResolvedValue({ ok: false, kind: 'network' });
+    const { container } = await mount();
+    fireEvent.click(button(container, 'Add 5 mg of Unwind'));
+    await flush();
+    expect(total(container, 'Unwind')).toBe('0mg');
+    expect(card(container, 'Unwind').querySelector('.drink-error')).not.toBeNull();
+    expect(card(container, 'Coffee').querySelector('.drink-error')).toBeNull();
+  });
+
+  it('files a past-day tap under the viewed date at 23:59 Denver', async () => {
+    const { container } = await mount(YESTERDAY, 'past');
+    fireEvent.click(button(container, 'Add 5 mg of Unwind to Mon, Oct 19'));
+    expect(total(container, 'Unwind')).toBe('5mg');
+    expect(drinkDays.value[YESTERDAY].entries[0]).toMatchObject({ kind: 'unwind', amount: 5, time: '23:59:00' });
+    await flush();
+    expect(api.logDrink.mock.calls[0][0]).toMatchObject({
+      kind: 'unwind',
+      amount: 5,
+      logged_at_utc: endOfDayInstant(YESTERDAY).toISOString(),
+    });
+  });
+
+  it('offers Edit time and Delete on an entry, never Edit amount, and names it "5 mg" in the delete confirm', async () => {
+    log(drink('u1', 'unwind', TODAY, '22:10:00'));
+    mountConfirmHost();
+    const { container } = await mount();
+    openLog(container);
+    fireEvent.click(button(container, 'More actions for the 10:10 PM unwind entry'));
+    const tools = [...container.querySelectorAll('.drink-entry-tools button')].map((b) => b.textContent);
+    expect(tools).toEqual(['Edit time', 'Delete']);
+    fireEvent.click([...container.querySelectorAll('button')].find((b) => b.textContent === 'Delete')!);
+    await openedConfirm();
+    expect(confirmText()!.message).toContain('10:10 PM · 5 mg.');
+  });
+
+  it('shows "—" with its button disabled while loading', async () => {
+    api.getDrinks.mockReturnValue(new Promise(() => {}));
+    const { container } = await mount();
+    expect(total(container, 'Unwind')).toBe('—');
+    expect(button(container, 'Add 5 mg of Unwind').disabled).toBe(true);
   });
 });
 

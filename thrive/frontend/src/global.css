@@ -116,6 +116,8 @@
   --metric-water: #0b6fb8;
   --metric-alcohol: #b45309;
   --metric-coffee: #6f4e37;
+  /* Unwind (#590): a muted sage, greyer than --metric-steps and clear of --metric-hrv's teal. */
+  --metric-unwind: #5e7c62;
   /* Activity type and effort colours (#526). Data colours: always beside the
      type's word or icon, never text on their own. The values are the text
      colours of the .badge-* and .workout-effort-* rules, which read them. */
@@ -171,6 +173,7 @@
   --metric-water: #5bb8f5;
   --metric-alcohol: #f5a524;
   --metric-coffee: #c9a27e;
+  --metric-unwind: #9cbf9f;
   --type-weight: #fca5a5;
   --type-stretch: #86efac;
   --type-bike: #93c5fd;
@@ -7807,8 +7810,8 @@ input[aria-disabled="true"]:not(:focus-visible) {
   gap: var(--space-xs);
 }
 
-/* ===== Day Water, Coffee and Alcohol tiles (#520, #551, #560) =====
-   Water full width, then Coffee and Alcohol as half-width tiles in #491's anatomy, then a collapsed log row. A tile is a
+/* ===== Day Water, Coffee, Alcohol and Unwind tiles (#520, #551, #560, #590) =====
+   Water full width, then Coffee, Alcohol and Unwind as third-width tiles in #491's anatomy, then a collapsed log row. A tile is a
    total, for water a thin bar toward the goal, seven bars for the last 7 days and
    a compact add button over the tile's link. Colours are the --metric-water /
    --metric-alcohol tokens; the buttons and the time field reuse the app's classes. */
@@ -7819,7 +7822,7 @@ input[aria-disabled="true"]:not(:focus-visible) {
 
 .drinks-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--day-gap);
 }
 
@@ -7835,6 +7838,12 @@ input[aria-disabled="true"]:not(:focus-visible) {
   min-width: 0;
   gap: var(--space-xs);
   padding: calc(var(--space-md) - var(--space-xs));
+}
+
+/* The three small tiles (#590) have 82px inside the old padding, which the title row alone needs 96px of
+   with its chevron: they drop the chevron (the whole tile is still the link) and pad by --space-sm. */
+.drink-tile:not(.drink-tile-water) .day-panel {
+  padding: var(--space-sm);
 }
 
 .day-screen .drink-tile .day-panel-title {
@@ -7854,6 +7863,10 @@ input[aria-disabled="true"]:not(:focus-visible) {
   --tile-colour: var(--metric-coffee);
 }
 
+.drink-tile-unwind {
+  --tile-colour: var(--metric-unwind);
+}
+
 .drink-icon {
   display: inline-flex;
   width: 100%;
@@ -7870,6 +7883,10 @@ input[aria-disabled="true"]:not(:focus-visible) {
 
 .drink-icon-coffee {
   color: var(--metric-coffee);
+}
+
+.drink-icon-unwind {
+  color: var(--metric-unwind);
 }
 
 .drink-figure {
@@ -7976,6 +7993,10 @@ input[aria-disabled="true"]:not(:focus-visible) {
   padding-block: 6px;
   line-height: 1.3;
   border-color: var(--tile-colour);
+}
+
+.drink-tile:not(.drink-tile-water) .drink-add {
+  padding-inline: var(--space-sm);
 }
 
 .drink-add::before {

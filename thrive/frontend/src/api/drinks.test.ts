@@ -22,6 +22,7 @@ import {
   WATER_GOAL_DEFAULT_ML,
   WATER_GOAL_MIN_ML,
   WATER_GOAL_MAX_ML,
+  UNWIND_AMOUNT_MG,
   WATER_AMOUNT_MAX_ML,
   DRINKS_MAX_RANGE_DAYS,
   rowToDrink,
@@ -59,8 +60,9 @@ describe('the field lists mirror types.js', () => {
   });
 
   it('the vocabularies and limits agree', () => {
-    expect([...DRINK_KINDS]).toEqual(['water', 'alcohol', 'coffee']);
-    expect(typesJs).toMatch(/var DRINK_KINDS = \['water', 'alcohol', 'coffee'\];/);
+    expect([...DRINK_KINDS]).toEqual(['water', 'alcohol', 'coffee', 'unwind']);
+    expect(typesJs).toMatch(/var DRINK_KINDS = \['water', 'alcohol', 'coffee', 'unwind'\];/);
+    expect(numberOf('UNWIND_AMOUNT_MG')).toBe(UNWIND_AMOUNT_MG);
     expect([...DRINK_SOURCES]).toEqual(['widget', 'app', 'mcp']);
     expect(typesJs).toMatch(/var DRINK_SOURCES = \['widget', 'app', 'mcp'\];/);
     expect(typesJs).toContain(`var SETTING_WATER_GOAL = '${WATER_GOAL_KEY}';`);
@@ -295,7 +297,14 @@ describe('the typed client', () => {
     });
 
     it('getDrinkTotals returns the five numbers', async () => {
-      const totals = { date: '2026-10-20', water_ml: 750, alcohol_drinks: 1, coffee_cups: 2, water_goal_ml: 1893 };
+      const totals = {
+        date: '2026-10-20',
+        water_ml: 750,
+        alcohol_drinks: 1,
+        coffee_cups: 2,
+        unwind_mg: 10,
+        water_goal_ml: 1893,
+      };
       const { mod, fetchImpl } = await client(reply({ success: true, data: totals }));
       expect(await mod.getDrinkTotals(TOKEN)).toEqual({ ok: true, data: totals });
       expect(sent(fetchImpl).get('action')).toBe('getDrinkTotals');

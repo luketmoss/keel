@@ -1,4 +1,4 @@
-// #551 - the seven bars under each Water, Coffee and Alcohol tile: the 7 days ending on
+// #551 - the seven bars under each Water, Coffee, Alcohol and Unwind tile: the 7 days ending on
 // the viewed day. Pure. Water is the day's ml, alcohol its count; the tile turns
 // them into heights (`barHeight`) and words (`weekLabel`).
 //
@@ -17,6 +17,8 @@ export const WEEK_DAYS = 7;
 export const ALCOHOL_FULL = 4;
 /** Coffee bars are full at this many cups. */
 export const COFFEE_FULL = 4;
+/** Unwind bars are full at this many mg (#590). */
+export const UNWIND_FULL = 20;
 
 export function drinkWeek(
   kind: DrinkKind,
@@ -49,9 +51,10 @@ export function drinkWeek(
   });
 }
 
-/** A bar's height as a fraction of the chart, 0 to 1: water against the goal, alcohol and coffee against four. */
+/** A bar's height as a fraction of the chart, 0 to 1: water against the goal, alcohol and coffee against four, Unwind against 20 mg. */
 export function barHeight(kind: DrinkKind, amount: number, goalMl: number): number {
-  const full = kind === 'water' ? goalMl : kind === 'coffee' ? COFFEE_FULL : ALCOHOL_FULL;
+  const full =
+    kind === 'water' ? goalMl : kind === 'coffee' ? COFFEE_FULL : kind === 'unwind' ? UNWIND_FULL : ALCOHOL_FULL;
   if (!(full > 0) || !(amount > 0)) return 0;
   return Math.min(1, amount / full);
 }
@@ -60,6 +63,7 @@ export function barHeight(kind: DrinkKind, amount: number, goalMl: number): numb
 export function weekLabel(kind: DrinkKind, days: readonly (number | null)[]): string {
   const spoken = days.map((v) => (v === null ? 'no data' : kind === 'water' ? formatOz(v) : String(v))).join(', ');
   if (kind === 'water') return `Water, last ${days.length} days: ${spoken} ounces`;
+  if (kind === 'unwind') return `Unwind, last ${days.length} days: ${spoken} mg`;
   return kind === 'coffee'
     ? `Coffee, last ${days.length} days: ${spoken} cups`
     : `Alcohol, last ${days.length} days: ${spoken} drinks`;

@@ -1,4 +1,4 @@
-// #521 — Water and Alcohol in Trends: the Intake group, summed per local day from getDrinks.
+// #521, #590 — Water, Coffee, Alcohol and Unwind in Trends: the Intake group, summed per local day from getDrinks.
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, cleanup, fireEvent, waitFor } from '@testing-library/preact';
 import { h } from 'preact';
@@ -16,7 +16,7 @@ import { AuthContext } from '../../auth/auth-context';
 import { dailyHealth, bodyMeasurements, dailySummary } from '../../state/store';
 import { drinkHistory, resetDrinks } from '../../state/drinks';
 import { addDays, todayInDenver } from '../../day/dates';
-import { WATER, COFFEE, ALCOHOL, TREND_GROUPS, intakePoints } from './metrics';
+import { WATER, COFFEE, ALCOHOL, UNWIND, TREND_GROUPS, CUSTOM_SECTIONS, intakePoints } from './metrics';
 import { summaryText, TrendPlot } from './trend-chart';
 import { metricSeries } from './series';
 import { today as todaySignal } from '../../day/today';
@@ -24,7 +24,7 @@ import { today as todaySignal } from '../../day/today';
 const TODAY = todayInDenver();
 const day = (back: number) => addDays(TODAY, -back);
 
-function drink(id: string, kind: 'water' | 'alcohol' | 'coffee', amount: number, date: string) {
+function drink(id: string, kind: 'water' | 'alcohol' | 'coffee' | 'unwind', amount: number, date: string) {
   return {
     id,
     kind,
@@ -65,13 +65,29 @@ const loadedHistory = (rows: ReturnType<typeof drink>[]) => {
 };
 
 describe('the registry', () => {
-  it('has Intake after Activity with Water (oz), Coffee (cups) then Alcohol (drinks), none banded', () => {
+  it('has Intake after Activity with Water (oz), Coffee (cups), Alcohol (drinks) then Unwind (mg), none banded', () => {
     const ids = TREND_GROUPS.map((g) => g.id);
     expect(ids.indexOf('intake')).toBe(ids.indexOf('activity') + 1);
-    expect(TREND_GROUPS.find((g) => g.id === 'intake')!.metrics).toEqual([WATER, COFFEE, ALCOHOL]);
-    expect([WATER.unit, COFFEE.unit, ALCOHOL.unit]).toEqual(['oz', 'cups', 'drinks']);
-    expect([WATER.band, COFFEE.band, ALCOHOL.band]).toEqual([false, false, false]);
+    expect(TREND_GROUPS.find((g) => g.id === 'intake')!.metrics).toEqual([WATER, COFFEE, ALCOHOL, UNWIND]);
+    expect([WATER.unit, COFFEE.unit, ALCOHOL.unit, UNWIND.unit]).toEqual(['oz', 'cups', 'drinks', 'mg']);
+    expect([WATER.band, COFFEE.band, ALCOHOL.band, UNWIND.band]).toEqual([false, false, false, false]);
+    expect([UNWIND.source, UNWIND.bars, UNWIND.zeroBased, UNWIND.reference]).toEqual(['drinks', true, true, undefined]);
+    expect(CUSTOM_SECTIONS.flatMap((s) => s.metrics)).toContain(UNWIND);
     expect([COFFEE.source, COFFEE.bars, COFFEE.zeroBased, COFFEE.reference]).toEqual(['drinks', true, true, undefined]);
+  });
+  it('sums Unwind in mg per day, with every day from the first entry of any kind a point', () => {
+    loadedHistory([
+      drink('a', 'water', 250, day(3)),
+      drink('u1', 'unwind', 5, day(1)),
+      drink('u2', 'unwind', 5, day(1)),
+    ]);
+    const pts = UNWIND.points();
+    expect(pts.map((p) => p.date)).toEqual([day(3), day(2), day(1), day(0)]);
+    expect(pts.map((p) => p.value)).toEqual([0, 0, 10, 0]);
+    expect(UNWIND.format(10)).toBe('10');
+    // Unwind rows are not water, coffee or alcohol.
+    expect(WATER.points().every((p) => p.value === 0 || p.date === day(3))).toBe(true);
+    expect(ALCOHOL.points().every((p) => p.value === 0)).toBe(true);
   });
   it('prints water in oz to one decimal with a trailing .0 dropped, alcohol whole', () => {
     expect(WATER.format(4)).toBe('4');
@@ -158,26 +174,27 @@ describe('the chart', () => {
 });
 
 describe('the screen', () => {
-  it('reads getDrinks for the history window on entry and shows all three cards', async () => {
+  it('reads getDrinks for the history window on entry and shows all four cards', async () => {
     getDrinks.mockResolvedValue({
       ok: true,
       data: { drinks: [drink('a', 'water', 1893, day(1)), drink('b', 'alcohol', 1, day(1))], water_goal_ml: 1893 },
     });
     const { container } = renderScreen();
-    await waitFor(() => expect(container.querySelectorAll('.trend-card')).toHaveLength(3));
+    await waitFor(() => expect(container.querySelectorAll('.trend-card')).toHaveLength(4));
     expect(getDrinks).toHaveBeenCalledTimes(1);
     expect(getDrinks.mock.calls[0][0]).toEqual({ from: addDays(TODAY, -399), to: TODAY });
     expect([...container.querySelectorAll('.trend-card-title')].map((e) => e.textContent?.trim())).toEqual([
       'Water oz',
       'Coffee cups',
       'Alcohol drinks',
+      'Unwind mg',
     ]);
     expect(loadHealth).not.toHaveBeenCalled();
   });
   it('says no drinks are logged yet when none ever were', async () => {
     getDrinks.mockResolvedValue({ ok: true, data: { drinks: [], water_goal_ml: 1893 } });
     const { container } = renderScreen();
-    await waitFor(() => expect(container.querySelectorAll('.trend-empty')).toHaveLength(3));
+    await waitFor(() => expect(container.querySelectorAll('.trend-empty')).toHaveLength(4));
     expect(container.querySelector('.trend-empty')!.textContent).toBe('No drinks logged yet.');
   });
   it('shows Loading, then the standard error with Try again, which reads again', async () => {
@@ -191,7 +208,7 @@ describe('the screen', () => {
       data: { drinks: [drink('a', 'water', 250, day(0))], water_goal_ml: 1893 },
     });
     fireEvent.click(container.querySelector('.trends-retry')!);
-    await waitFor(() => expect(container.querySelectorAll('.trend-card')).toHaveLength(3));
+    await waitFor(() => expect(container.querySelectorAll('.trend-card')).toHaveLength(4));
     expect(getDrinks).toHaveBeenCalledTimes(2);
     expect(loadHealth).not.toHaveBeenCalled();
   });

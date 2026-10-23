@@ -29,7 +29,9 @@ export const DRINK_FIELDS = [
 /** Settings' A:C order. */
 export const SETTING_FIELDS = ['key', 'value', 'updated'] as const;
 
-export const DRINK_KINDS = ['water', 'alcohol', 'coffee'] as const;
+export const DRINK_KINDS = ['water', 'alcohol', 'coffee', 'unwind'] as const;
+/** What one Unwind entry is, in mg (#590): the API refuses any other amount. */
+export const UNWIND_AMOUNT_MG = 5;
 // 'mcp' (#595): a drink logged from a chat. rowToDrink drops a source it does
 // not know, so a row the MCP wrote would otherwise vanish from Day and Trends.
 export const DRINK_SOURCES = ['widget', 'app', 'mcp'] as const;
@@ -48,8 +50,8 @@ export const WATER_AMOUNT_MAX_ML = 2000;
 export const DRINKS_MAX_RANGE_DAYS = 400;
 
 /**
- * One drink. `amount` is whole ml for water and standard drinks for alcohol
- * (always 1 today). `date`/`time` are local America/Denver; `logged_at_utc` is
+ * One drink. `amount` is whole ml for water, standard drinks for alcohol and
+ * cups for coffee (always 1), and mg for unwind (always 5). `date`/`time` are local America/Denver; `logged_at_utc` is
  * the instant the caller says it was taken and is never rewritten.
  */
 export interface Drink {
@@ -75,6 +77,8 @@ export interface DrinkTotals {
   water_ml: number;
   alcohol_drinks: number;
   coffee_cups: number;
+  /** Unwind, in mg (#590). 0 from an API that predates it. */
+  unwind_mg: number;
   water_goal_ml: number;
 }
 
@@ -161,12 +165,14 @@ export async function getDrinkTotals(token: string): Promise<DrinkOutcome<DrinkT
       isNonNegativeInt(d.water_ml) &&
       isNonNegativeInt(d.alcohol_drinks) &&
       isNonNegativeInt(d.coffee_cups) &&
+      (d.unwind_mg === undefined || isNonNegativeInt(d.unwind_mg)) &&
       isNonNegativeInt(d.water_goal_ml)
       ? {
           date: d.date,
           water_ml: d.water_ml,
           alcohol_drinks: d.alcohol_drinks,
           coffee_cups: d.coffee_cups,
+          unwind_mg: d.unwind_mg ?? 0,
           water_goal_ml: d.water_goal_ml,
         }
       : null;

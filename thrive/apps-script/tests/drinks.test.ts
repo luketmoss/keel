@@ -84,6 +84,18 @@ describe('logDrink', () => {
     expect(drinkRows).toHaveLength(1);
   });
 
+  it('logs one 5 mg Unwind entry, and a repeated id leaves one row', () => {
+    const { call, drinkRows } = setup();
+    const first = call('logDrink', drink({ kind: 'unwind', amount: 5 }));
+    expect(first.success, first.error).toBe(true);
+    expect(first.data.kind).toBe('unwind');
+    expect(first.data.amount).toBe('5');
+    call('logDrink', drink({ kind: 'unwind', amount: 5 }));
+    expect(drinkRows).toHaveLength(1);
+    expect(drinkRows![0][1]).toBe('unwind');
+    expect(drinkRows![0][2]).toBe('5');
+  });
+
   it('writes every value as text, so an id like -1 stays text', () => {
     const { call, drinkRows } = setup();
     const res = call('logDrink', drink({ id: '-1' }));
@@ -93,8 +105,8 @@ describe('logDrink', () => {
   });
 
   const refusals: Array<[string, Record<string, unknown>, RegExp]> = [
-    ['an unknown kind', { kind: 'juice' }, /kind must be water, alcohol or coffee/],
-    ['tea', { kind: 'tea' }, /kind must be water, alcohol or coffee/],
+    ['an unknown kind', { kind: 'juice' }, /kind must be water, alcohol, coffee or unwind/],
+    ['tea', { kind: 'tea' }, /kind must be water, alcohol, coffee or unwind/],
     ['a missing kind', { kind: undefined }, /kind must be/],
     ['a water amount of 0', { amount: 0 }, /amount for water/],
     ['a negative water amount', { amount: -250 }, /amount for water/],
@@ -107,6 +119,10 @@ describe('logDrink', () => {
     ['a coffee amount of 2', { kind: 'coffee', amount: 2 }, /amount for alcohol or coffee must be 1/],
     ['a coffee amount of 0', { kind: 'coffee', amount: 0 }, /amount for alcohol or coffee must be 1/],
     ['a blank coffee amount', { kind: 'coffee', amount: '' }, /amount for alcohol or coffee must be 1/],
+    ['an unwind amount of 1', { kind: 'unwind', amount: 1 }, /^amount for unwind must be 5$/],
+    ['an unwind amount of 10', { kind: 'unwind', amount: 10 }, /^amount for unwind must be 5$/],
+    ['an unwind amount of 0', { kind: 'unwind', amount: 0 }, /^amount for unwind must be 5$/],
+    ['a blank unwind amount', { kind: 'unwind', amount: '' }, /^amount for unwind must be 5$/],
     ['a missing id', { id: undefined }, /id is required/],
     ['an empty id', { id: '' }, /id is required/],
     ['an id with spaces', { id: 'a b' }, /id is required/],
@@ -194,16 +210,17 @@ describe('getDrinkTotals', () => {
         row({ id: '1', amount: '250' }), row({ id: '2', amount: '500' }),
         row({ id: '3', kind: 'alcohol', amount: '1' }), row({ id: '4', kind: 'alcohol', amount: '1' }),
         row({ id: '6', kind: 'coffee', amount: '1' }), row({ id: '7', kind: 'coffee', amount: '1' }), row({ id: '8', kind: 'coffee', amount: '1' }),
+        row({ id: '9', kind: 'unwind', amount: '5' }), row({ id: '10', kind: 'unwind', amount: '5' }),
         row({ id: '5', date: '2026-10-19', amount: '900' }),
       ],
     });
     expect(call('getDrinkTotals').data).toEqual({
-      date: '2026-10-20', water_ml: 750, alcohol_drinks: 2, coffee_cups: 3, water_goal_ml: 1893,
+      date: '2026-10-20', water_ml: 750, alcohol_drinks: 2, coffee_cups: 3, unwind_mg: 10, water_goal_ml: 1893,
     });
   });
 
   it('returns zeros, not blanks, with no drinks or no tab', () => {
-    const zeros = { date: '2026-10-20', water_ml: 0, alcohol_drinks: 0, coffee_cups: 0, water_goal_ml: 1893 };
+    const zeros = { date: '2026-10-20', water_ml: 0, alcohol_drinks: 0, coffee_cups: 0, unwind_mg: 0, water_goal_ml: 1893 };
     expect(setup({ drinks: [] }).call('getDrinkTotals').data).toEqual(zeros);
     expect(setup({}).call('getDrinkTotals').data).toEqual(zeros);
   });

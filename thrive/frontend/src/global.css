@@ -4180,20 +4180,6 @@ input, select, textarea {
 }
 
 /* ===== Sync Provenance (#157) ===== */
-/* A quiet mark, not a second chip (sync plan §8): no background, no border,
-   sentence weight. --color-text-secondary rather than the meta line's muted
-   grey, which measures 2.9:1 on the card. inline-flex makes the glyph and the
-   word one unit, so a wrap at 375px breaks before the glyph, never inside. */
-.provenance-mark {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  white-space: nowrap;
-  color: var(--color-text-secondary);
-  font-weight: 500;
-  vertical-align: bottom;
-}
-
 .provenance-glyph {
   flex: none;
 }

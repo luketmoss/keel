@@ -15,7 +15,6 @@ interface Props {
 }
 
 export function WorkoutEdit({ workoutId }: Props) {
-  const { token } = useAuth();
   const workout = workouts.value.find((w) => w.id === workoutId);
   const isPlanned = workout?.status === 'planned';
 
@@ -66,7 +65,6 @@ function PlannedWorkoutEditor({ workoutId }: { workoutId: string }) {
   const { token } = useAuth();
   const workout = workouts.value.find((w) => w.id === workoutId);
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
 
   if (!workout) return null;
 

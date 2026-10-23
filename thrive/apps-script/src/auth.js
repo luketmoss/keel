@@ -9,7 +9,7 @@
 //   by the Sip home-screen widget alone. It may run WIDGET_ACTIONS and nothing
 //   else, and can be rotated without touching any other holder.
 // - A **token caller** sends `access_token`, a Google access token from the
-//   SPA's own sign-in (#410; almanac's, retired, before it). The SPA is a
+//   SPA's own sign-in (#410). The SPA is a
 //   browser app on GitHub Pages, so it cannot hold the key — a key in a public
 //   bundle is not a secret. A token caller may run only the reads named in
 //   TOKEN_READ_ACTIONS and the one write in TOKEN_WRITE_ACTIONS.
@@ -25,30 +25,17 @@
 // cache, nothing here logs, and every message below is fixed text.
 
 /**
- * The reads a token caller may run. An allow-list, never a deny-list: an
- * action added to the dispatcher later is refused to token callers until
- * someone names it here. `token-auth.test.ts` fails when a `case` in main.js
+ * The reads a token caller may run: only the ones the app makes. An allow-list,
+ * never a deny-list: an action added to the dispatcher later is refused to
+ * token callers until someone names it here. The workout, template, health and
+ * sync-log reads were here for almanac and are key-only since it retired: the
+ * app reads those tabs through the Sheets API. `token-auth.test.ts` fails when a `case` in main.js
  * is on neither this list nor the test's list of key-only actions.
  *
  * `previewSetUpdates` is deliberately absent although it writes nothing: it is
  * the dry run of a write, and takes a write payload.
  */
 var TOKEN_READ_ACTIONS = [
-  'getWorkouts',
-  'getWorkout',
-  'getPlannedWorkouts',
-  'getExercises',
-  'getExercise',
-  'getExerciseHistory',
-  'getTemplates',
-  'getTemplate',
-  'getSets',
-  'getWorkoutSets',
-  'getDailySummary',
-  'getHistoryDateRange',
-  'getDailyHealth',
-  'getSyncLog',
-  'getBodyMeasurements',
   // #432: the app shows the route on a map. Addressed by workout, never by Drive ID, and
   // confirmed to be that activity's track before anything is returned (track.js).
   'getWorkoutTrack',

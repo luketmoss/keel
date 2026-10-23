@@ -40,7 +40,6 @@ export const FAMILIES = {
     'archive-search-clear',
     'filter-search-clear',
     'filter-popup-close',
-    'share-btn',
     'share-remove-btn',
     'staged-subtask-remove',
     'label-gear-btn',

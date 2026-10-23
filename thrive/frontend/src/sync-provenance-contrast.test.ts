@@ -54,15 +54,11 @@ describe.each(['light', 'dark'] as const)('%s theme', (name) => {
 });
 
 describe('the new text uses the AA tokens, not the muted grey', () => {
-  it.each(['.provenance-mark', '.detail-provenance', '.sync-status'])('%s is --color-text-secondary', (sel) => {
+  it.each(['.detail-provenance', '.sync-status'])('%s is --color-text-secondary', (sel) => {
     expect(rule(sel)).toMatch(/color:\s*var\(--color-text-secondary\)/);
   });
 
   it('danger tone uses --color-danger-text, not --color-danger', () => {
     expect(rule('.sync-tone-danger')).toMatch(/color:\s*var\(--color-danger-text\)/);
-  });
-
-  it('the mark is not a chip: no background, no border', () => {
-    expect(rule('.provenance-mark')).not.toMatch(/background|border/);
   });
 });

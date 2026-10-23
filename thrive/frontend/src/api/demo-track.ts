@@ -89,11 +89,5 @@ function ride(): WorkoutTrack {
   };
 }
 
-/** The demo COROS hike's `track_ref`: not a Drive file id, so it can never be mistaken for one. */
-export const DEMO_TRACK_REF = 'demo-track';
-
 /** Demo workouts that have a route, by workout id. */
 export const DEMO_TRACKS: Record<string, WorkoutTrack> = { w_demo008: loop(), w_demo011: ride() };
-
-/** The demo ride's `track_ref` (#526). */
-export const DEMO_TRACK_RIDE_REF = 'demo-track-ride';

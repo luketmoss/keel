@@ -391,13 +391,6 @@ describe('Design token: --color-primary-light (Issue #104)', () => {
 
   // AC2: Ad-hoc primary tints unified under the token
   describe('AC2: Ad-hoc tints replaced with var(--color-primary-light)', () => {
-    it('.share-btn:hover uses var(--color-primary-light)', () => {
-      const match = css.match(/\.share-btn:hover\s*\{[^}]*\}/);
-      expect(match).not.toBeNull();
-      expect(match![0]).toContain('var(--color-primary-light)');
-      expect(match![0]).not.toContain('rgba(var(--color-primary-rgb)');
-    });
-
     it('.share-member-highlight uses var(--color-primary-light)', () => {
       const match = css.match(/\.share-member-highlight\s*\{[^}]*\}/);
       expect(match).not.toBeNull();

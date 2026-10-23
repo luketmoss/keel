@@ -88,10 +88,6 @@ service account, which means Thrive's business rules live in whichever
 client is running. The two projects have diverged on this, and the Journal
 is the first thing that makes the divergence cost something.
 
-*(A ChatGPT custom GPT is also documented against Hive's API in
-`chatgpt-gpt-setup.md`, but it is unused — MCP from Claude is the live
-consumer.)*
-
 So a Journal built today would call an API for Hive and hand-roll Sheets
 reads for Thrive. That asymmetry drives §6.
 

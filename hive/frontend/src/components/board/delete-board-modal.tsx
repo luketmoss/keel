@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'preact/hooks';
 import { useAuth } from '../../auth/auth-context';
-import { showDeleteBoardModal, activeBoard, activeBoardId, boards, accessibleBoards } from '../../state/board-store';
+import { showDeleteBoardModal, activeBoard, activeBoardId, accessibleBoards } from '../../state/board-store';
 import { deleteBoard } from '../../state/actions';
 import type { DeleteBoardMode } from '../../state/actions';
 import { useFocusTrap } from '../../hooks/use-focus-trap';

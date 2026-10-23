@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'preact/hooks';
+import { useState, useCallback } from 'preact/hooks';
 import { useFocusTrap } from '../../hooks/use-focus-trap';
 import { updateDisplayName } from '../../state/actions';
 import type { UserInfo } from '../../api/types';

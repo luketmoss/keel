@@ -133,7 +133,6 @@ const BOX = [
   'user-dropdown-trigger',
   'theme-toggle-btn',
   'filter-popup-close',
-  'share-btn',
   'owner-circle',
   'check-icon',
   'color-swatch',

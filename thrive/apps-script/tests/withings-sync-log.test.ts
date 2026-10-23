@@ -150,9 +150,9 @@ describe('AC3: getSyncLog reads one tab only', () => {
     expect(res.error).toMatch(/log must be "withings" or absent/);
   });
 
-  it('stays a token read, for either tab', () => {
+  it('is key-only, for either tab', () => {
     const { sandbox } = loadApi();
-    expect(sandbox.isTokenReadAction('getSyncLog')).toBe(true);
+    expect(sandbox.isTokenReadAction('getSyncLog')).toBe(false);
     expect(sandbox.isTokenReadAction('appendSyncLog')).toBe(false);
   });
 });

@@ -4,9 +4,7 @@ import {
   clearSelectedItem,
   selectedItem,
   childrenOfSelected,
-  items,
   owners,
-  labels as labelsStore,
   showToast,
   openDetailWithTitleEdit,
   accessibleBoards,
@@ -18,10 +16,8 @@ import {
   terminalStatusName,
 } from '../../state/board-store';
 import { updateItem, deleteItem, deleteSubtask, createItem, moveItem, reorderSubtasks } from '../../state/actions';
-import { LabelBadge } from '../shared/label-badge';
 import { LabelPickerManager } from '../labels/label-picker-manager';
 import { useFocusTrap } from '../../hooks/use-focus-trap';
-import { getContrastTextColor } from '../../utils/color';
 import {
   localYmdOf,
   toLocalYmd,

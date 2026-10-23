@@ -68,7 +68,7 @@ export async function appendAuditEntry(
   // No-op in demo mode — audit log is not displayed in the UI.
 }
 
-export async function upsertOwner(name: string, _email: string, _token: string): Promise<boolean> {
+export async function upsertOwner(_name: string, _email: string, _token: string): Promise<boolean> {
   // In demo mode, just return true to signal success.
   return true;
 }

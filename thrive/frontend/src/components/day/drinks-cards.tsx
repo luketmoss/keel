@@ -2,13 +2,13 @@
 // full width, then Coffee and Alcohol half width, in one slot, after Sleep and before the metric tiles, with a
 // collapsed log row under them. The data, the optimistic add and the rules live
 // in `state/drinks.ts`; this draws them. Never mounts on a future day. "+ 4 oz"
-// and "+ 1" are offered on today only, because the API files a drink under the
-// date of the moment it is logged. A tile opens Trends' Intake group (#504).
+// and "+ 1" are offered on past days too (#588), filed at 11:59 PM that day.
+// A tile opens Trends' Intake group (#504).
 
 import { useEffect, useId, useRef, useState } from 'preact/hooks';
 import { useAuth } from '../../auth/auth-context';
 import type { DayState } from '../../day/dates';
-import { clock12, weekdayShort } from '../../day/format';
+import { clock12, metaDate, weekdayShort } from '../../day/format';
 import { ask } from '../../state/confirm';
 import { onPageVisible } from '../../state/page-visible';
 import {
@@ -16,12 +16,16 @@ import {
   drinkDays,
   drinkErrors,
   drinkHistory,
+  editDrinkAmount,
   editDrinkTime,
   errorKey,
   formatOz,
   loadDrinkHistory,
   loadDrinks,
   newestFirst,
+  ozToWaterMl,
+  WATER_OZ_MAX,
+  goalOz,
   refreshDrinks,
   drinksRefresh,
   removeDrink,
@@ -98,6 +102,7 @@ function Entry({
   onToggle: (open: boolean) => void;
 }) {
   const [editing, setEditing] = useState<string | null>(null);
+  const [amountEditing, setAmountEditing] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const moreRef = useRef<HTMLButtonElement>(null);
   const time = clock12(entry.time);
@@ -120,6 +125,21 @@ function Entry({
     if (done) {
       setEditing(null);
       onToggle(false);
+    }
+  }
+
+  async function saveAmount() {
+    if (!token || amountEditing === null || busy) return;
+    // Unchanged is sent as nothing, even for an odd-ml entry whose rounding was never touched.
+    const ml = amountEditing === String(goalOz(entry.amount)) ? entry.amount : ozToWaterMl(amountEditing);
+    if (ml === null) return;
+    setBusy(true);
+    const done = await editDrinkAmount(entry, ml, token);
+    setBusy(false);
+    if (done) {
+      setAmountEditing(null);
+      onToggle(false);
+      moreRef.current?.focus();
     }
   }
 
@@ -148,19 +168,64 @@ function Entry({
           aria-expanded={open}
           onClick={() => {
             setEditing(null);
+            setAmountEditing(null);
             onToggle(!open);
           }}
         >
           <span aria-hidden="true">⋯</span>
         </button>
       )}
-      {open && !entry.pending && editing === null && (
+      {open && !entry.pending && editing === null && amountEditing === null && (
         <div class="drink-entry-tools">
           <button type="button" class="btn btn-secondary" onClick={() => setEditing(hhmm(entry.time))}>
             Edit time
           </button>
+          {water && (
+            <button
+              type="button"
+              class="btn btn-secondary"
+              onClick={() => setAmountEditing(String(goalOz(entry.amount)))}
+            >
+              Edit amount
+            </button>
+          )}
           <button type="button" class="btn btn-secondary" onClick={() => void remove()}>
             Delete
+          </button>
+        </div>
+      )}
+      {open && !entry.pending && amountEditing !== null && (
+        <div class="drink-entry-tools">
+          <input
+            type="number"
+            inputMode="numeric"
+            class="form-input drink-amount-input"
+            aria-label={`Amount in ounces for the ${time} water entry`}
+            min={1}
+            max={WATER_OZ_MAX}
+            step={1}
+            value={amountEditing}
+            required
+            onInput={(e) => setAmountEditing((e.currentTarget as HTMLInputElement).value)}
+          />
+          <span class="drink-amount-unit">oz</span>
+          <button
+            type="button"
+            class="btn btn-primary"
+            disabled={busy || ozToWaterMl(amountEditing) === null}
+            onClick={() => void saveAmount()}
+          >
+            Save
+          </button>
+          <button
+            type="button"
+            class="btn btn-secondary"
+            onClick={() => {
+              setAmountEditing(null);
+              moreRef.current?.focus();
+            }}
+          >
+            Cancel
           </button>
         </div>
       )}
@@ -270,21 +335,19 @@ function DrinkTile({ kind, date, state, loaded, entries, token }: TileProps) {
             ))}
           </div>
         )}
-        {state === 'today' && (
-          <button
-            type="button"
-            class="btn btn-secondary btn-sm drink-add"
-            disabled={!loaded}
-            aria-label={
-              water ? 'Add 4 ounces of water' : kind === 'coffee' ? 'Add one cup of coffee' : 'Add one alcoholic drink'
-            }
-            onClick={() => {
-              if (token) void addDrink(kind, token);
-            }}
-          >
-            {water ? '+ 4 oz' : '+ 1'}
-          </button>
-        )}
+        <button
+          type="button"
+          class="btn btn-secondary btn-sm drink-add"
+          disabled={!loaded}
+          aria-label={`${
+            water ? 'Add 4 ounces of water' : kind === 'coffee' ? 'Add one cup of coffee' : 'Add one alcoholic drink'
+          }${state === 'today' ? '' : ` to ${metaDate(date)}`}`}
+          onClick={() => {
+            if (token) void addDrink(kind, token, date);
+          }}
+        >
+          {water ? '+ 4 oz' : '+ 1'}
+        </button>
         {error && (
           <p class="drink-error" role="alert">
             {error}

@@ -287,6 +287,43 @@ describe('updateDrinkTime', () => {
   });
 });
 
+describe('updateDrinkAmount', () => {
+  it('changes amount and updated, and nothing else', () => {
+    const { call, drinkRows } = setup({ drinks: [row({ id: 'z' }), row({ id: 'a' })] });
+    const res = call('updateDrinkAmount', { id: 'a', amount: 473 });
+    expect(res.success, res.error).toBe(true);
+    expect(res.data).toMatchObject({
+      id: 'a', kind: 'water', amount: '473', date: '2026-10-20', time: '07:00:00',
+      logged_at_utc: '2026-10-20T13:00:00.000Z', source: 'app', created: '2026-10-20T13:00:01.000Z',
+      updated: NOW_ISO,
+    });
+    expect(drinkRows![1][2]).toBe('473');
+    expect(drinkRows![0][2]).toBe('250');
+  });
+
+  it('refuses a non-water entry, a bad amount and an unknown id, before any write', () => {
+    const { call, drinkRows } = setup({
+      drinks: [row({ id: 'a' }), row({ id: 'b', kind: 'alcohol', amount: '1' }), row({ id: 'c', kind: 'coffee', amount: '1' })],
+    });
+    const before = JSON.stringify(drinkRows);
+    expect(call('updateDrinkAmount', { id: 'b', amount: 2 }).error).toMatch(/only a water drink/);
+    expect(call('updateDrinkAmount', { id: 'c', amount: 2 }).error).toMatch(/only a water drink/);
+    for (const amount of [0, -5, 2001, 1.5, '', 'abc', null, undefined]) {
+      expect(call('updateDrinkAmount', { id: 'a', amount }).error, String(amount)).toMatch(/whole number of ml, 1 to 2000/);
+    }
+    expect(call('updateDrinkAmount', { id: 'nope', amount: 100 }).error).toMatch(/No drink with that id/);
+    expect(call('updateDrinkAmount', { amount: 100 }).error).toMatch(/id is required/);
+    expect(JSON.stringify(drinkRows)).toBe(before);
+  });
+
+  it('accepts the bounds 1 and 2000', () => {
+    const { call, drinkRows } = setup({ drinks: [row({ id: 'a' })] });
+    expect(call('updateDrinkAmount', { id: 'a', amount: 1 }).success).toBe(true);
+    expect(call('updateDrinkAmount', { id: 'a', amount: 2000 }).success).toBe(true);
+    expect(drinkRows![0][2]).toBe('2000');
+  });
+});
+
 describe('deleteDrink', () => {
   it('removes only that row', () => {
     const { call, drinkRows } = setup({ drinks: [row({ id: 'a' }), row({ id: 'b' }), row({ id: 'c' })] });

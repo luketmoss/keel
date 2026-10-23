@@ -89,6 +89,7 @@
 //   ?action=getDrinks&key=...&from=2026-10-01&to=2026-10-31   - no range means today
 //   ?action=getDrinkTotals&key=...   - today's water_ml, alcohol_drinks, coffee_cups, water_goal_ml
 //   ?action=updateDrinkTime&key=...&payload={"id":"<uuid>","time":"14:30:00"}
+//   ?action=updateDrinkAmount&key=...&payload={"id":"<uuid>","amount":148}   - water only, whole ml (#588)
 //   ?action=deleteDrink&key=...&payload={"id":"<uuid>"}
 //   ?action=updateSetting&key=...&payload={"key":"water_goal_ml","value":2000}
 //   ?action=updateSetting&key=...&payload={"key":"rest_primary_s","value":120}   - #576
@@ -668,6 +669,10 @@ function dispatch(action, params, caller) {
 
     case 'updateDrinkTime':
       result = { success: true, data: withScriptLock(function () { return updateDrinkTime(payload); }) };
+      break;
+
+    case 'updateDrinkAmount':
+      result = { success: true, data: withScriptLock(function () { return updateDrinkAmount(payload); }) };
       break;
 
     case 'deleteDrink':

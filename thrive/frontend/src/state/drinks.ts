@@ -12,6 +12,7 @@
 import { signal } from '@preact/signals';
 import { isDemo } from '../api/demo-data';
 import {
+  WATER_AMOUNT_MAX_ML,
   WATER_GOAL_DEFAULT_ML,
   WATER_GOAL_KEY,
   WATER_GOAL_MAX_ML,
@@ -21,6 +22,7 @@ import {
   getDrinkTotals,
   getDrinks,
   logDrink,
+  updateDrinkAmount,
   updateDrinkTime,
   updateSetting,
   type Drink,
@@ -56,6 +58,7 @@ export const errorKey = (date: string, kind: DrinkKind) => `${date}:${kind}`;
 export const ERROR_LOG = "Couldn't save that drink. Try again.";
 export const ERROR_DELETE = "Couldn't delete that drink.";
 export const ERROR_TIME = "Couldn't save that time.";
+export const ERROR_AMOUNT = "Couldn't save that amount.";
 
 function setError(date: string, kind: DrinkKind, text: string | null): void {
   const next = { ...drinkErrors.value };
@@ -78,6 +81,16 @@ export function formatOz(ml: number): string {
 /** Whole ounces for the goal field. */
 export function goalOz(ml: number): number {
   return Math.round(ml / ML_PER_OZ);
+}
+
+/** The largest whole ounce under WATER_AMOUNT_MAX_ML: 67 oz is 1981 ml. */
+export const WATER_OZ_MAX = Math.floor(WATER_AMOUNT_MAX_ML / ML_PER_OZ);
+
+/** A water amount in whole oz as typed, to ml; null when it is not a whole number from 1 to WATER_OZ_MAX. */
+export function ozToWaterMl(oz: string): number | null {
+  if (!/^\d{1,3}$/.test(oz.trim())) return null;
+  const n = Number(oz.trim());
+  return n >= 1 && n <= WATER_OZ_MAX ? Math.round(n * ML_PER_OZ) : null;
 }
 
 /** The goal in oz as typed, to ml; null when it is not a whole number the API will take. */
@@ -107,6 +120,21 @@ export function denverClock(now: Date): { date: string; time: string } {
   const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '00';
   const hour = get('hour') === '24' ? '00' : get('hour');
   return { date: todayInDenver(now), time: `${hour}:${get('minute')}:${get('second')}` };
+}
+
+/**
+ * The UTC instant of 23:59:00 Denver on a local date, DST-correct: 05:59Z the
+ * next day in MDT, 06:59Z in MST. Tries each offset and keeps the one that
+ * reads back as that local time.
+ */
+export function endOfDayInstant(date: string): Date {
+  const [y, m, d] = date.split('-').map(Number);
+  for (const offset of [6, 7]) {
+    const instant = new Date(Date.UTC(y, m - 1, d, 23 + offset, 59, 0));
+    const clock = denverClock(instant);
+    if (clock.date === date && clock.time === '23:59:00') return instant;
+  }
+  return new Date(Date.UTC(y, m - 1, d, 30, 59, 0));
 }
 
 function newId(): string {
@@ -338,13 +366,19 @@ export function refreshDrinks(date: string, token: string): Promise<void> {
 // ── Writes ───────────────────────────────────────────────────────────
 
 /**
- * "+ 4 oz" / "+ 1 drink": the entry appears now, stamped with this moment. The
- * button is never held back while a request runs, so each tap is its own call.
+ * "+ 4 oz" / "+ 1 drink": the entry appears now. Viewed date today (Denver, read
+ * at the tap): stamped with this moment. A past date (#588): filed under it at
+ * 23:59:00 Denver, so a screen left open past midnight still files under the day
+ * on show. The button is never held back while a request runs, so each tap is
+ * its own call.
  */
-export async function addDrink(kind: DrinkKind, token: string): Promise<void> {
+export async function addDrink(kind: DrinkKind, token: string, viewed?: string): Promise<void> {
   const now = new Date();
-  const { date, time } = denverClock(now);
-  const stamp = now.toISOString();
+  const current = denverClock(now);
+  const past = viewed !== undefined && viewed < current.date;
+  const instant = past ? endOfDayInstant(viewed) : now;
+  const { date, time } = past ? { date: viewed, time: '23:59:00' } : current;
+  const stamp = instant.toISOString();
   const entry: DrinkEntry = {
     id: newId(),
     kind,
@@ -387,6 +421,25 @@ export async function editDrinkTime(entry: DrinkEntry, time: string, token: stri
   const out = await updateDrinkTime(entry.id, time, token);
   if (!out.ok) {
     setError(entry.date, entry.kind, ERROR_TIME);
+    return false;
+  }
+  touch(entry.id);
+  putEntry(entry.date, { ...out.data, pending: false });
+  return true;
+}
+
+/** Change a water entry's amount, in ml. Resolves true when it was saved; the entry keeps its old amount until then. */
+export async function editDrinkAmount(entry: DrinkEntry, amount: number, token: string): Promise<boolean> {
+  setError(entry.date, entry.kind, null);
+  if (amount === entry.amount) return true;
+  if (isDemo()) {
+    touch(entry.id);
+    putEntry(entry.date, { ...entry, amount, updated: new Date().toISOString() });
+    return true;
+  }
+  const out = await updateDrinkAmount(entry.id, amount, token);
+  if (!out.ok) {
+    setError(entry.date, entry.kind, ERROR_AMOUNT);
     return false;
   }
   touch(entry.id);

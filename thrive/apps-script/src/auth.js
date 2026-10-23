@@ -71,6 +71,8 @@ var TOKEN_WRITE_ACTIONS = [
   'requestSync',
   // #519: the app logs, re-times and removes drinks and sets the water goal.
   'logDrink', 'updateDrinkTime', 'deleteDrink', 'updateSetting',
+  // #588: the app corrects a water entry's amount. Not a widget action.
+  'updateDrinkAmount',
 ];
 
 /**

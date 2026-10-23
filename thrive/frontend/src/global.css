@@ -8100,9 +8100,20 @@ input[aria-disabled="true"]:not(:focus-visible) {
   padding-bottom: var(--space-sm);
 }
 
-.drink-time-input {
+.drink-time-input,
+.drink-amount-input {
   width: auto;
   min-height: 44px;
+}
+
+.drink-amount-input {
+  width: 5ch;
+  box-sizing: content-box;
+}
+
+.drink-amount-unit {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
 }
 
 .drink-error {

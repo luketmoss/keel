@@ -454,10 +454,10 @@ describe('AC4: token callers run only the named reads', () => {
     expect(res.code).toBe('token_invalid');
   });
 
-  it('names exactly the token writes: requestSync (#410) and the four drinks writes of the app (#519)', () => {
+  it('names exactly the token writes: requestSync (#410), the four drinks writes of the app (#519) and updateDrinkAmount (#588)', () => {
     const { sandbox } = load();
     expect([...sandbox.TOKEN_WRITE_ACTIONS]).toEqual(
-      ['requestSync', 'logDrink', 'updateDrinkTime', 'deleteDrink', 'updateSetting']);
+      ['requestSync', 'logDrink', 'updateDrinkTime', 'deleteDrink', 'updateSetting', 'updateDrinkAmount']);
   });
 
   it('classifies every action in the dispatcher as a read, a token write or key-only', () => {

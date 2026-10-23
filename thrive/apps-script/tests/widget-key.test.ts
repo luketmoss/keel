@@ -67,7 +67,7 @@ describe('the widget key runs logDrink and getDrinkTotals', () => {
 describe('the widget key is refused on everything else', () => {
   const refused = [
     'getDrinks', 'getWorkouts', 'getWorkout', 'getJournal', 'getSyncLog', 'getDailySummary',
-    'deleteDrink', 'updateDrinkTime', 'updateSetting', 'createWorkout', 'deleteWorkout',
+    'deleteDrink', 'updateDrinkTime', 'updateDrinkAmount', 'updateSetting', 'createWorkout', 'deleteWorkout',
     'upsertJournal', 'requestSync', 'undoCall', 'noSuchAction',
   ];
   for (const action of refused) {
@@ -90,7 +90,7 @@ describe('the widget key is refused on everything else', () => {
   it('cannot edit or delete a drink it logged', () => {
     const api = load();
     callEntry(api.sandbox, 'doGet', { action: 'logDrink', key: WIDGET_KEY, payload: logPayload('w1') });
-    for (const action of ['updateDrinkTime', 'deleteDrink']) {
+    for (const action of ['updateDrinkTime', 'updateDrinkAmount', 'deleteDrink']) {
       const { res } = callEntry<any>(api.sandbox, 'doGet', {
         action, key: WIDGET_KEY, payload: JSON.stringify({ id: 'w1', time: '01:00:00' }),
       });
@@ -145,7 +145,7 @@ describe('who may run the six drinks actions', () => {
   ];
 
   for (const key of ['test-key', MCP_KEY]) {
-    it(`runs all six as ${key === MCP_KEY ? 'MCP_API_KEY' : 'API_KEY'}`, () => {
+    it(`runs all seven as ${key === MCP_KEY ? 'MCP_API_KEY' : 'API_KEY'}`, () => {
       const api = load();
       for (const [action, params] of calls) {
         const { res, text } = callEntry<any>(api.sandbox, 'doGet', { action, key, ...params });
@@ -154,7 +154,7 @@ describe('who may run the six drinks actions', () => {
     });
   }
 
-  it('lets a token caller run all six (the app logs, re-times, deletes and sets the goal)', () => {
+  it('lets a token caller run all seven (the app logs, re-times, deletes and sets the goal)', () => {
     const api = load();
     for (const [action, params] of calls) {
       const { res, text } = callEntry<any>(api.sandbox, 'doPost', { action, access_token: TOKEN, ...params });

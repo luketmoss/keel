@@ -10,6 +10,7 @@ const api = vi.hoisted(() => ({
   getDrinks: vi.fn(),
   getDrinkTotals: vi.fn(),
   updateDrinkTime: vi.fn(),
+  updateDrinkAmount: vi.fn(),
   deleteDrink: vi.fn(),
   updateSetting: vi.fn(),
 }));
@@ -29,6 +30,7 @@ import { confirmText, mountConfirmHost, openedConfirm } from '../shared/confirm-
 import {
   addDrink,
   drinkDays,
+  endOfDayInstant,
   formatOz,
   loadDrinks,
   ozToGoalMl,
@@ -280,10 +282,13 @@ describe('the tiles', () => {
     expect(readGlobalCss()).toMatch(/\.drink-add\s*\{[^}]*align-self:\s*flex-start;[^}]*margin-top:\s*auto/);
   });
 
-  it('have no add button on a past day, and still link and draw their bars', async () => {
+  it('have their add button on a past day too, naming the day, and still link and draw their bars', async () => {
     seed();
     const { container } = await mount(YESTERDAY, 'past');
-    expect(container.querySelector('.drink-add')).toBeNull();
+    expect(container.querySelectorAll('.drink-add')).toHaveLength(3);
+    expect(button(container, 'Add 4 ounces of water to Mon, Oct 19')).not.toBeNull();
+    expect(button(container, 'Add one cup of coffee to Mon, Oct 19')).not.toBeNull();
+    expect(button(container, 'Add one alcoholic drink to Mon, Oct 19')).not.toBeNull();
     expect(container.querySelectorAll('.drink-week')).toHaveLength(3);
   });
 
@@ -560,14 +565,14 @@ describe('adding', () => {
 });
 
 describe('past and future days', () => {
-  it('a past day has entries, totals and actions, and no add buttons', async () => {
+  it('a past day has entries, totals, actions and add buttons', async () => {
     api.getDrinks.mockResolvedValue({
       ok: true,
       data: { drinks: [drink('p1', 'water', YESTERDAY, '08:00:00')], water_goal_ml: 1893 },
     });
     const { container } = await mount(YESTERDAY, 'past');
     expect(api.getDrinks).toHaveBeenCalledWith({ from: YESTERDAY, to: YESTERDAY }, 'tok');
-    expect(container.querySelector('.drink-add')).toBeNull();
+    expect(container.querySelector('.drink-add')).not.toBeNull();
     expect(total(container, 'Water')).toBe('4oz');
     expect(entries(container, 'Water')[0].querySelector('.drink-more')).not.toBeNull();
   });
@@ -579,6 +584,190 @@ describe('past and future days', () => {
     });
     const { container } = await mount();
     expect(toggle(container)!.textContent).toContain("Today's log");
+  });
+});
+
+describe('adding on a past day (#588)', () => {
+  it('files the drink under the viewed date at 23:59:00 Denver and counts it at once', async () => {
+    const { container } = await mount(YESTERDAY, 'past');
+    fireEvent.click(button(container, 'Add 4 ounces of water to Mon, Oct 19'));
+    expect(total(container, 'Water')).toBe('4oz');
+    expect(toggle(container)!.textContent).toBe("Mon's log · 1 drink");
+    expect(entries(container, 'Water')[0].textContent).toContain('11:59 PM');
+    expect(entries(container, 'Water')[0].textContent).toContain('Saving…');
+    await flush();
+    expect(api.logDrink).toHaveBeenCalledWith(
+      { id: expect.any(String), kind: 'water', amount: 118, logged_at_utc: '2026-10-20T05:59:00.000Z', source: 'app' },
+      'tok',
+    );
+  });
+
+  it('rolls back and shows the inline error when the save fails', async () => {
+    api.logDrink.mockResolvedValue({ ok: false, kind: 'network' });
+    const { container } = await mount(YESTERDAY, 'past');
+    fireEvent.click(button(container, 'Add one alcoholic drink to Mon, Oct 19'));
+    await flush();
+    expect(card(container, 'Alcohol').querySelector('[role="alert"]')!.textContent).toBe(
+      "Couldn't save that drink. Try again.",
+    );
+    expect(total(container, 'Alcohol')).toBe('0drinks');
+  });
+
+  it('files under the shown date, not the new day, when the screen stayed open past midnight', async () => {
+    const { container } = await mount(TODAY, 'today');
+    vi.setSystemTime(new Date('2026-10-21T06:30:00.000Z')); // 00:30 on the 21st in Denver
+    fireEvent.click(button(container, 'Add 4 ounces of water'));
+    await flush();
+    expect(api.logDrink.mock.calls[0][0].logged_at_utc).toBe('2026-10-21T05:59:00.000Z');
+    expect(total(container, 'Water')).toBe('4oz');
+  });
+
+  it('on today still stamps the current moment', async () => {
+    const { container } = await mount();
+    fireEvent.click(button(container, 'Add 4 ounces of water'));
+    await flush();
+    expect(api.logDrink.mock.calls[0][0].logged_at_utc).toBe(NOW.toISOString());
+  });
+});
+
+describe('endOfDayInstant (#588)', () => {
+  it('is 05:59Z the next day in MDT and 06:59Z in MST', () => {
+    expect(endOfDayInstant('2026-07-15').toISOString()).toBe('2026-07-16T05:59:00.000Z');
+    expect(endOfDayInstant('2026-12-15').toISOString()).toBe('2026-12-16T06:59:00.000Z');
+  });
+  it('is right on the DST change days', () => {
+    expect(endOfDayInstant('2026-03-08').toISOString()).toBe('2026-03-09T05:59:00.000Z'); // spring forward day, ends in MDT
+    expect(endOfDayInstant('2026-11-01').toISOString()).toBe('2026-11-02T06:59:00.000Z'); // fall back day, ends in MST
+    expect(endOfDayInstant('2026-03-07').toISOString()).toBe('2026-03-08T06:59:00.000Z');
+  });
+});
+
+describe('editing an amount (#588)', () => {
+  const seed = (amount = 118) =>
+    api.getDrinks.mockResolvedValue({
+      ok: true,
+      data: {
+        drinks: [
+          drink('a', 'water', TODAY, '10:00:00', amount),
+          drink('c', 'coffee', TODAY, '09:00:00'),
+          drink('x', 'alcohol', TODAY, '11:00:00'),
+        ],
+        water_goal_ml: 1893,
+      },
+    });
+  const click = (c: Element, text: string) =>
+    fireEvent.click([...c.querySelectorAll('button')].find((b) => b.textContent === text)!);
+  const openAmount = async () => {
+    const view = await mount();
+    openLog(view.container);
+    fireEvent.click(button(view.container, 'More actions for the 10:00 AM water entry'));
+    click(view.container, 'Edit amount');
+    return view;
+  };
+
+  it('offers Edit amount on water only', async () => {
+    seed();
+    const { container } = await mount();
+    openLog(container);
+    fireEvent.click(button(container, 'More actions for the 9:00 AM coffee entry'));
+    expect([...container.querySelectorAll('.drink-entry-tools button')].map((b) => b.textContent)).toEqual([
+      'Edit time',
+      'Delete',
+    ]);
+    fireEvent.click(button(container, 'More actions for the 10:00 AM water entry'));
+    expect([...container.querySelectorAll('.drink-entry-tools button')].map((b) => b.textContent)).toEqual([
+      'Edit time',
+      'Edit amount',
+      'Delete',
+    ]);
+  });
+
+  it('offers it on a past day', async () => {
+    api.getDrinks.mockResolvedValue({
+      ok: true,
+      data: { drinks: [drink('p1', 'water', YESTERDAY, '08:00:00')], water_goal_ml: 1893 },
+    });
+    const { container } = await mount(YESTERDAY, 'past');
+    openLog(container);
+    fireEvent.click(button(container, 'More actions for the 8:00 AM water entry'));
+    expect([...container.querySelectorAll('.drink-entry-tools button')].map((b) => b.textContent)).toContain(
+      'Edit amount',
+    );
+  });
+
+  it('prefills the rounded ounces, and saves round(oz x 29.5735) ml', async () => {
+    seed();
+    api.updateDrinkAmount.mockResolvedValue({ ok: true, data: drink('a', 'water', TODAY, '10:00:00', 296) });
+    const { container } = await openAmount();
+    const input = container.querySelector<HTMLInputElement>('input[type="number"]')!;
+    expect(input.value).toBe('4');
+    expect(input.min).toBe('1');
+    expect(input.max).toBe('67');
+    expect(input.getAttribute('aria-label')).toBe('Amount in ounces for the 10:00 AM water entry');
+    fireEvent.input(input, { target: { value: '10' } });
+    click(container, 'Save');
+    await flush();
+    expect(api.updateDrinkAmount).toHaveBeenCalledWith('a', 296, 'tok');
+    expect(container.querySelector('input[type="number"]')).toBeNull();
+    expect(total(container, 'Water')).toBe('10oz');
+    expect(entries(container, 'Water')[0].textContent).toContain('10 oz');
+  });
+
+  it('sends nothing when the prefilled value is saved unchanged, even for an odd-ml entry', async () => {
+    seed(250);
+    const { container } = await openAmount();
+    expect(container.querySelector<HTMLInputElement>('input[type="number"]')!.value).toBe('8');
+    click(container, 'Save');
+    await flush();
+    expect(api.updateDrinkAmount).not.toHaveBeenCalled();
+    expect(container.querySelector('input[type="number"]')).toBeNull();
+  });
+
+  it('disables Save for blank, 0, over 67 and fractions, and accepts 67', async () => {
+    seed();
+    const { container } = await openAmount();
+    const input = container.querySelector<HTMLInputElement>('input[type="number"]')!;
+    const save = () => [...container.querySelectorAll('button')].find((b) => b.textContent === 'Save')!;
+    for (const v of ['', '0', '68', '1.5', '-3']) {
+      fireEvent.input(input, { target: { value: v } });
+      expect(save().disabled, v).toBe(true);
+    }
+    fireEvent.input(input, { target: { value: '67' } });
+    expect(save().disabled).toBe(false);
+  });
+
+  it('keeps the editor open with its value and says so when the save fails', async () => {
+    seed();
+    api.updateDrinkAmount.mockResolvedValue({ ok: false, kind: 'network' });
+    const { container } = await openAmount();
+    fireEvent.input(container.querySelector('input[type="number"]')!, { target: { value: '12' } });
+    click(container, 'Save');
+    await flush();
+    expect(card(container, 'Water').querySelector('[role="alert"]')!.textContent).toBe("Couldn't save that amount.");
+    expect(container.querySelector<HTMLInputElement>('input[type="number"]')!.value).toBe('12');
+    expect(total(container, 'Water')).toBe('4oz');
+  });
+
+  it('Cancel returns to the tools row and sends nothing', async () => {
+    seed();
+    const { container } = await openAmount();
+    click(container, 'Cancel');
+    expect(container.querySelector('input[type="number"]')).toBeNull();
+    expect(container.textContent).toContain('Edit amount');
+    expect(api.updateDrinkAmount).not.toHaveBeenCalled();
+  });
+
+  it('works in demo mode', async () => {
+    demo.on = true;
+    const { container } = await mount();
+    openLog(container);
+    fireEvent.click(button(container, 'More actions for the 7:45 AM water entry'));
+    click(container, 'Edit amount');
+    fireEvent.input(container.querySelector('input[type="number"]')!, { target: { value: '20' } });
+    click(container, 'Save');
+    await flush();
+    expect(api.updateDrinkAmount).not.toHaveBeenCalled();
+    expect(entries(container, 'Water').some((e) => e.textContent!.includes('20 oz'))).toBe(true);
   });
 });
 

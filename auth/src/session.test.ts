@@ -274,7 +274,7 @@ describe('Continue', () => {
 
 describe('a fresh sign-in is signed in only once the user is known (hive#287, hive#289)', () => {
   for (const [name, res] of [
-    ['returns non-2xx', { ok: false, status: 401, body: { error: 'bad' } }],
+    ['returns non-2xx', { ok: false, status: 401, body: USER }],
     ['throws', { throws: true }],
     ['has no email', { body: { name: 'Me' } }],
   ] as const) {

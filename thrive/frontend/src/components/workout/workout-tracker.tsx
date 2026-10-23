@@ -780,7 +780,7 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
             {workout?.type === 'weight' && workout.status === 'active' && (
               <button
                 type="button"
-                class="workout-tracker-lift"
+                class="btn btn-secondary workout-tracker-lift"
                 onClick={() => void switchToLift()}
                 disabled={finishing || switchingToLift}
               >

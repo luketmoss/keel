@@ -1654,14 +1654,8 @@ input, select, textarea {
   color: var(--color-primary-text);
   font-size: var(--text-sm);
   font-weight: 600;
-  cursor: pointer;
 }
-
-.workout-tracker-lift:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
+
 .workout-tracker-title {
   font-size: var(--text-xl);
   font-weight: 700;

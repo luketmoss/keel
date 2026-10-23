@@ -176,6 +176,11 @@ export async function updateDrinkTime(id: string, time: string, token: string): 
   return parsed(await callAction('updateDrinkTime', token, { payload: { id, time } }), asDrink);
 }
 
+/** Change a water drink's amount (whole ml, 1 to WATER_AMOUNT_MAX_ML) and nothing else (#588). */
+export async function updateDrinkAmount(id: string, amount: number, token: string): Promise<DrinkOutcome<Drink>> {
+  return parsed(await callAction('updateDrinkAmount', token, { payload: { id, amount } }), asDrink);
+}
+
 /** Remove a drink. An unknown id is a failure, not a silent success. */
 export async function deleteDrink(id: string, token: string): Promise<DrinkOutcome<Drink>> {
   return parsed(await callAction('deleteDrink', token, { payload: { id } }), asDrink);

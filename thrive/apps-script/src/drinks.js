@@ -22,6 +22,7 @@ var DRINK_ERRORS = {
   range: 'from and to must be given together, as YYYY-MM-DD, from no later than to',
   rangeTooLong: 'the range may be at most 400 days',
   time: 'time must be HH:MM:SS, 00:00:00 to 23:59:59',
+  amountKind: 'only a water drink has an amount to change',
   notFound: 'No drink with that id',
 };
 
@@ -206,6 +207,28 @@ function updateDrinkTime(payload) {
   if (!found) throw new Error(DRINK_ERRORS.notFound);
   var drink = found.drink;
   drink.time = time;
+  drink.updated = isoNow();
+  sheet.getRange(found.rowNum, 1, 1, DRINK_COLUMN_COUNT).setValues([asText(drinkToRow(drink))]);
+  return drink;
+}
+
+/**
+ * Change a water drink's `amount` and `updated`; nothing else (#588). Whole ml
+ * within logDrink's bounds. Alcohol and coffee are always 1, so they are refused.
+ */
+function updateDrinkAmount(payload) {
+  payload = drinkPayload(payload);
+  var id = validateDrinkId(payload.id);
+  var amount = wholeNumber(payload.amount);
+  if (amount === null || amount < 1 || amount > WATER_AMOUNT_MAX_ML) {
+    throw new Error(DRINK_ERRORS.waterAmount);
+  }
+  var sheet = getSheet(DRINKS_SHEET);
+  var found = findDrink(sheet, id);
+  if (!found) throw new Error(DRINK_ERRORS.notFound);
+  var drink = found.drink;
+  if (drink.kind !== 'water') throw new Error(DRINK_ERRORS.amountKind);
+  drink.amount = String(amount);
   drink.updated = isoNow();
   sheet.getRange(found.rowNum, 1, 1, DRINK_COLUMN_COUNT).setValues([asText(drinkToRow(drink))]);
   return drink;

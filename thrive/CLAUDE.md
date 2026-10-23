@@ -357,7 +357,7 @@ Google Sheet "Groundwork" with these tabs:
   `date`/`time` are local `America/Denver`, derived by the API from
   `logged_at_utc` (the instant the caller says it was taken, never rewritten);
   `source` is `widget` or `app`. **Written only by the API** (`logDrink`,
-  `updateDrinkTime`, `deleteDrink`; `apps-script/src/drinks.js`); the SPA does
+  `updateDrinkTime`, `updateDrinkAmount` (#588, water only), `deleteDrink`; `apps-script/src/drinks.js`); the SPA does
   not touch the tab directly, it calls `frontend/src/api/drinks.ts`, whose
   `DRINK_FIELDS` mirrors `DRINK_FIELDS` in `apps-script/src/types.js` — change
   both together. Settings is `key, value, updated`: `water_goal_ml`

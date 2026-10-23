@@ -1655,7 +1655,7 @@ input, select, textarea {
   font-size: var(--text-sm);
   font-weight: 600;
 }
-
+
 .workout-tracker-title {
   font-size: var(--text-xl);
   font-weight: 700;

@@ -6535,11 +6535,6 @@ a.training-card {
   color: var(--color-warning);
 }
 
-.lift-state-skipped {
-  color: var(--color-text-muted);
-  text-decoration: line-through;
-}
-
 .lift-state-muted {
   color: var(--color-text-muted);
 }
@@ -6915,6 +6910,132 @@ a.training-card {
   text-align: center;
   pointer-events: none;
   box-shadow: 0 4px 16px var(--color-shadow-strong);
+}
+
+/* The sets list (#578): a row per set, which opens to the log controls in place. */
+.lift-set-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lift-set-row {
+  border-top: 1px solid var(--color-border-light);
+}
+
+.lift-set-row:first-child {
+  border-top: 0;
+}
+
+.lift-set-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-xs) 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.lift-set-btn {
+  cursor: pointer;
+}
+
+.lift-set-no {
+  flex: 0 0 44px;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-secondary);
+}
+
+.lift-set-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lift-set-open .lift-state,
+.lift-set-open .lift-set-name {
+  color: var(--color-primary-text);
+  font-weight: 600;
+}
+
+.lift-set-editor {
+  margin-bottom: var(--space-sm);
+  padding: var(--space-sm);
+  background: var(--color-bg);
+  border-radius: var(--radius-md);
+}
+
+.lift-set-hint {
+  margin: var(--space-sm) 0 0;
+  color: var(--color-text-muted);
+}
+
+/* The summary (#578). */
+.lift-totals {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-sm);
+}
+
+.lift-tile {
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
+}
+
+.lift-tile-value {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.lift-tile-label {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.lift-sets-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.lift-eyebrow {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.lift-need-effort {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-warning);
+}
+
+.lift-session-effort {
+  margin: var(--space-sm) 0 var(--space-md);
+}
+
+.lift-notes-label {
+  display: block;
+  margin-bottom: var(--space-sm);
+}
+
+.lift-notes {
+  min-height: 64px;
 }
 
 /* All sets, a bottom sheet. */
@@ -7383,6 +7504,7 @@ a.training-card {
   .settings-row-link:hover:not(:disabled):not([aria-disabled="true"]),
   .day-card-link:hover:not(:disabled):not([aria-disabled="true"]),
   .lift-check:hover:not(:disabled):not([aria-disabled="true"]),
+  .lift-set-btn:hover:not(:disabled):not([aria-disabled="true"]),
   .lift-choice-card:hover:not(:disabled):not([aria-disabled="true"]),
   /* Navigation */
   .bottom-nav-tab:hover:not(:disabled):not([aria-disabled="true"]) {
@@ -7459,6 +7581,7 @@ a.workout-card:active:not(:disabled):not([aria-disabled="true"]),
 .settings-row-link:active:not(:disabled):not([aria-disabled="true"]),
 .day-card-link:active:not(:disabled):not([aria-disabled="true"]),
 .lift-check:active:not(:disabled):not([aria-disabled="true"]),
+.lift-set-btn:active:not(:disabled):not([aria-disabled="true"]),
 .lift-choice-card:active:not(:disabled):not([aria-disabled="true"]),
 /* Navigation */
 .bottom-nav-tab:active:not(:disabled):not([aria-disabled="true"]) {

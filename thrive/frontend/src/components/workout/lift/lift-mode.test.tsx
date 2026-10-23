@@ -402,7 +402,7 @@ describe('logging during a rest', () => {
     expect(container.querySelector('.lift-exercise')?.textContent).toBe('OH Press');
   });
 
-  it('the last working set opens the finish rather than a rest', async () => {
+  it('the last working set opens the summary rather than a rest', async () => {
     withoutWarmup(() => (sets.value = plan().slice(3)));
     const { container } = render(<LiftMode workoutId={W} />);
     await click(container, 'Start workout');
@@ -410,8 +410,9 @@ describe('logging during a rest', () => {
     await click(container, 'Done · switch');
     await click(container, 'Start set');
     await click(container, 'Done · finish');
-    // The last set opens the finish rather than a rest.
-    expect(container.querySelector('[role="dialog"]')?.textContent).toContain('Finish Workout');
+    // The last set opens the summary rather than a rest or the finish modal.
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(text(container)).toContain('Session effort');
   });
 });
 
@@ -560,41 +561,312 @@ describe('the wake lock', () => {
   });
 });
 
-describe('finishing', () => {
-  async function toLastSet() {
-    withoutWarmup(() => (sets.value = plan().slice(4)));
+describe('the summary', () => {
+  /** An active workout: OH Press 1 and 2 done, Arnold skipped past, Lateral still to come. */
+  function mid() {
+    withoutWarmup(() => {
+      sets.value = plan()
+        .slice(1)
+        .map((r, i) =>
+          i === 0
+            ? { ...r, reps: '8', weight: '90', effort: 'Easy' as const, set_s: '40', rest_s: '100' }
+            : i === 1
+              ? { ...r, reps: '8', weight: '90', set_s: '35', rest_s: '70' }
+              : r,
+        );
+    });
     workouts.value = [workout('active')];
-    const view = render(<LiftMode workoutId={W} />);
-    await click(view.container, 'Start set');
-    return view;
+    // As the real saveSet does: the store follows the write.
+    saveSet.mockImplementation(async (set: unknown) => {
+      const w = set as SetWithRow;
+      sets.value = sets.value.map((r) => (r.sheetRow === w.sheetRow ? { ...r, ...w } : r));
+      return w;
+    });
   }
+  async function openSummary(c: Element) {
+    await click(c, 'All sets');
+    await click(c.querySelector('[role="dialog"]')!, 'Finish workout now');
+  }
+  const row = (c: Element, no: number, name: string) =>
+    [...c.querySelectorAll<HTMLElement>('.lift-set-row')].find(
+      (r) => text(r).includes(`Set ${no}`) && text(r).includes(name),
+    )!;
+  const rowButton = (c: Element, no: number, name: string) => row(c, no, name).querySelector('button')!;
 
-  it('Done on the last working set opens the finish modal and saving finishes the workout', async () => {
-    const { container } = await toLastSet();
-    expect(text(container)).toContain("That's the last set. Done opens the finish.");
-    await click(container, 'Done · finish');
-    expect(container.querySelector('[role="dialog"]')?.textContent).toContain('Finish Workout');
-    await click(container, 'Save & Finish');
-    expect(finishWorkout).toHaveBeenCalledWith(W, '', '', 'tok');
+  it('opens from Finish workout now with the totals, the sets and no clock, bar or All sets', async () => {
+    mid();
+    const { container } = render(<LiftMode workoutId={W} />);
+    await advance(47 * 60_000 + 12_000);
+    await openSummary(container);
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(container.querySelector('.lift-session-clock')).toBeNull();
+    expect(container.querySelector('.lift-progress')).toBeNull();
+    expect(byText(container, 'All sets')).toBeUndefined();
+    const tiles = [...container.querySelectorAll('.lift-tile')].map((t) => text(t));
+    expect(tiles).toEqual(['47:12Session', '2/4Sets', '1:15Under the bar', '2:50Resting · avg −0:05 vs plan']);
+    expect(text(container)).toContain('1 need effort');
+    expect(text(row(container, 1, 'OH Press'))).toContain('90 × 8 · Easy');
+    expect(text(row(container, 2, 'OH Press'))).toContain('90 × 8 · needs effort');
+    expect(text(row(container, 1, 'Arnold'))).toContain('skipped');
+    expect(text(row(container, 1, 'Lateral'))).toContain('skipped');
+    expect(byText(container, 'Back')).toBeDefined();
+    expect(byText(container, 'Save workout')).toBeDefined();
+    // The session time is frozen at the moment it opened.
+    await advance(60_000);
+    expect(container.querySelector('.lift-tile-value')?.textContent).toBe('47:12');
+  });
+
+  it('reads a dash for a total with no data, never 0:00, and Resting alone', async () => {
+    withoutWarmup(() => (sets.value = plan().slice(1)));
+    workouts.value = [workout('active')];
+    const { container } = render(<LiftMode workoutId={W} />);
+    await openSummary(container);
+    const tiles = [...container.querySelectorAll('.lift-tile')].map((t) => text(t));
+    expect(tiles.slice(1)).toEqual(['0/4Sets', '—Under the bar', '—Resting']);
+    expect(text(container)).not.toContain('need effort');
+  });
+
+  it('tapping a row opens its editor and closes the other; tapping it again closes it', async () => {
+    mid();
+    const { container } = render(<LiftMode workoutId={W} />);
+    await openSummary(container);
+    const first = rowButton(container, 1, 'OH Press');
+    expect(first.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(first);
+    expect(first.getAttribute('aria-expanded')).toBe('true');
+    expect(container.querySelectorAll('.lift-set-editor')).toHaveLength(1);
+    fireEvent.click(rowButton(container, 2, 'OH Press'));
+    expect(first.getAttribute('aria-expanded')).toBe('false');
+    expect(row(container, 2, 'OH Press').querySelector('.lift-set-editor')).not.toBeNull();
+    expect(container.querySelectorAll('.lift-set-editor')).toHaveLength(1);
+    fireEvent.click(rowButton(container, 2, 'OH Press'));
+    expect(container.querySelector('.lift-set-editor')).toBeNull();
+  });
+
+  it('an effort tap writes the set through saveSet and the row text follows', async () => {
+    mid();
+    const { container } = render(<LiftMode workoutId={W} />);
+    await openSummary(container);
+    fireEvent.click(rowButton(container, 2, 'OH Press'));
+    await click(row(container, 2, 'OH Press') as Element, 'Hard');
+    expect(saveSet).toHaveBeenLastCalledWith(
+      expect.objectContaining({ exercise_name: 'OH Press', set_number: 2, weight: '90', reps: '8', effort: 'Hard' }),
+      'tok',
+      4,
+    );
+    expect(text(row(container, 2, 'OH Press'))).toContain('90 × 8 · Hard');
+    expect(text(container)).not.toContain('need effort');
+  });
+
+  it('a stepper change is held until an effort tap or the row closes, then written', async () => {
+    mid();
+    const { container } = render(<LiftMode workoutId={W} />);
+    await openSummary(container);
+    fireEvent.click(rowButton(container, 1, 'OH Press'));
+    fireEvent.click(container.querySelector('[aria-label="More OH Press reps"]')!);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(saveSet).not.toHaveBeenCalled();
+    // Opening another row closes this one, which writes what it held.
+    fireEvent.click(rowButton(container, 2, 'OH Press'));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(saveSet).toHaveBeenCalledTimes(1);
+    expect(saveSet).toHaveBeenCalledWith(
+      expect.objectContaining({ set_number: 1, reps: '9', effort: 'Easy' }),
+      'tok',
+      3,
+    );
+    expect(text(row(container, 1, 'OH Press'))).toContain('90 × 9 · Easy');
+  });
+
+  it('a skipped set opens prefilled with the hint, and an effort logs it', async () => {
+    mid();
+    const { container } = render(<LiftMode workoutId={W} />);
+    await openSummary(container);
+    fireEvent.click(rowButton(container, 1, 'Arnold'));
+    expect(text(row(container, 1, 'Arnold'))).toContain('Tap an effort to log this set.');
+    expect(text(row(container, 1, 'Arnold').querySelector('.lift-set-editor')!)).toContain('8 reps');
+    await click(row(container, 1, 'Arnold') as Element, 'Medium');
+    expect(saveSet).toHaveBeenCalledWith(
+      expect.objectContaining({ exercise_name: 'Arnold', reps: '8', effort: 'Medium' }),
+      'tok',
+      5,
+    );
+    expect(text(row(container, 1, 'Arnold'))).toContain('BW × 8 · Medium');
+    expect(text(row(container, 1, 'Arnold'))).not.toContain('Tap an effort');
+  });
+
+  it('a failed write puts the row back and keeps the summary open', async () => {
+    mid();
+    const { container } = render(<LiftMode workoutId={W} />);
+    await openSummary(container);
+    fireEvent.click(rowButton(container, 1, 'OH Press'));
+    saveSet.mockImplementationOnce(async () => {
+      throw new Error('offline');
+    });
+    await click(row(container, 1, 'OH Press') as Element, 'Hard');
+    expect(text(row(container, 1, 'OH Press'))).toContain('90 × 8 · Easy');
+    const pressed = row(container, 1, 'OH Press').querySelector('[aria-pressed="true"]');
+    expect(pressed?.textContent).toBe('Easy');
+    expect(text(container)).toContain('Session effort');
+  });
+
+  it('Save finishes with the notes and effort typed before and after a row edit, and clears the run', async () => {
+    mid();
+    const { container } = render(<LiftMode workoutId={W} />);
+    await openSummary(container);
+    const notes = container.querySelector<HTMLTextAreaElement>('textarea')!;
+    fireEvent.input(notes, { target: { value: 'Shoulder felt good' } });
+    await click(container.querySelector('[aria-label="Session"]')!, 'Hard');
+    fireEvent.click(rowButton(container, 2, 'OH Press'));
+    await click(row(container, 2, 'OH Press') as Element, 'Medium');
+    expect(container.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe('Shoulder felt good');
+    await click(container, 'Save workout');
+    expect(finishWorkout).toHaveBeenCalledWith(W, 'Shoulder felt good', 'Hard', 'tok');
     expect(navigate).toHaveBeenCalledWith('/activities');
     expect(window.localStorage.getItem(runKey(W))).toBeNull();
   });
 
-  it('All sets lists each working set with its state and has Finish workout now', async () => {
-    withoutWarmup(
-      () =>
-        (sets.value = plan()
-          .slice(1)
-          .map((s, i) => (i === 0 ? { ...s, reps: '8', weight: '90', effort: 'Easy' } : s))),
-    );
+  it('a failed save keeps the summary and everything typed', async () => {
+    mid();
+    const { container } = render(<LiftMode workoutId={W} />);
+    await openSummary(container);
+    fireEvent.input(container.querySelector('textarea')!, { target: { value: 'Keep me' } });
+    finishWorkout.mockImplementationOnce(async () => {
+      throw new Error('nope');
+    });
+    await click(container, 'Save workout');
+    expect(navigate).not.toHaveBeenCalled();
+    expect(container.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe('Keep me');
+    expect(byText(container, 'Save workout')).toBeDefined();
+  });
+
+  it('notes and session effort survive a reload', async () => {
+    mid();
+    const first = render(<LiftMode workoutId={W} />);
+    await openSummary(first.container);
+    fireEvent.input(first.container.querySelector('textarea')!, { target: { value: 'Typed' } });
+    await click(first.container.querySelector('[aria-label="Session"]')!, 'Easy');
+    first.unmount();
+    cleanup();
+    const again = render(<LiftMode workoutId={W} />);
+    await openSummary(again.container);
+    expect(again.container.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe('Typed');
+    expect(again.container.querySelector('[aria-label="Session"] [aria-pressed="true"]')?.textContent).toBe('Easy');
+  });
+
+  it('Back returns to the step it came from, with the rest still counting from its Done', async () => {
+    withoutWarmup(() => (sets.value = plan().slice(1)));
+    const { container } = render(<LiftMode workoutId={W} />);
+    await click(container, 'Start workout');
+    await click(container, 'Start set');
+    await click(container, 'Done · rest 1:30');
+    await advance(20_000);
+    await openSummary(container);
+    await advance(15_000);
+    await click(container, 'Back');
+    expect(container.querySelector('.lift-hero-label')?.textContent).toBe('Rest');
+    expect(clock(container)).toBe('0:35');
+    expect(container.querySelector('.lift-next-exercise')?.textContent).toBe('OH Press');
+  });
+
+  it('Back from Done on the last set shows that set rest with no Up next and Finish workout', async () => {
+    withoutWarmup(() => (sets.value = plan().slice(4)));
     workouts.value = [workout('active')];
+    const { container } = render(<LiftMode workoutId={W} />);
+    await click(container, 'Start set');
+    await advance(30_000);
+    await click(container, 'Done · finish');
+    expect(text(container)).toContain('Session effort');
+    expect(saveSetTimings).toHaveBeenCalledWith([{ sheetRow: 6, patch: { set_s: '30' } }], 'tok');
+    await advance(10_000);
+    await click(container, 'Back');
+    expect(clock(container)).toBe('0:10');
+    expect(container.querySelector('.lift-hero')).not.toBeNull();
+    expect(container.querySelector('.lift-log-item')).not.toBeNull();
+    expect(container.querySelector('.lift-next')).toBeNull();
+    expect(byText(container, 'Start set')).toBeUndefined();
+    await click(container, 'Finish workout');
+    await advance(10);
+    expect(text(container)).toContain('Session effort');
+  });
+
+  it('a cool-down checklist comes before the summary, and Back returns to it', async () => {
+    withoutWarmup(() => {
+      sets.value = [...plan().slice(4), mk('cooldown', 5, 'Quad Stretch', 1)];
+    });
+    workouts.value = [workout('active')];
+    const { container } = render(<LiftMode workoutId={W} />);
+    await click(container, 'Start set');
+    await click(container, 'Done · finish');
+    expect(text(container)).toContain('Cool-down');
+    expect(text(container)).not.toContain('Session effort');
+    await click(container, 'Finish workout');
+    expect(text(container)).toContain('Session effort');
+    await click(container, 'Back');
+    expect(text(container)).toContain('Quad Stretch');
+  });
+});
+
+describe('All sets', () => {
+  it('opens sets done or skipped for editing, and keeps the one being lifted and later ones read-only', async () => {
+    withoutWarmup(() => {
+      sets.value = plan()
+        .slice(1)
+        .map((r, i) => (i === 0 ? { ...r, reps: '8', weight: '90', effort: 'Easy' as const } : r));
+    });
+    workouts.value = [workout('active')];
+    // Ready at OH Press 2: OH Press 1 is done, 2 is lifting now, the superset is to come.
     const { container } = render(<LiftMode workoutId={W} />);
     await click(container, 'All sets');
     const sheet = container.querySelector('[role="dialog"]')!;
-    expect(sheet.textContent).toContain('90 × 8 · Easy');
-    expect(sheet.textContent).toContain('lifting now');
-    await click(sheet as Element, 'Finish workout now');
-    expect(container.querySelector('[role="dialog"]')?.textContent).toContain('Finish Workout');
+    const rows = [...sheet.querySelectorAll<HTMLElement>('.lift-set-row')];
+    expect(rows.map((r) => !!r.querySelector('button'))).toEqual([true, false, false, false]);
+    expect(text(rows[0])).toContain('90 × 8 · Easy');
+    expect(text(rows[1])).toContain('lifting now');
+    expect(text(rows[2])).toContain('8 reps');
+    fireEvent.click(rows[0].querySelector('button')!);
+    expect(rows[0].querySelector('.lift-set-editor')).not.toBeNull();
+  });
+
+  it('shows a set passed over as skipped, and logging it makes it done', async () => {
+    withoutWarmup(() => (sets.value = plan().slice(1)));
+    saveSet.mockImplementation(async (set: unknown) => {
+      const w = set as SetWithRow;
+      sets.value = sets.value.map((r) => (r.sheetRow === w.sheetRow ? { ...r, ...w } : r));
+      return w;
+    });
+    const { container } = render(<LiftMode workoutId={W} />);
+    await click(container, 'Start workout');
+    await click(container, 'Start set');
+    await click(container, 'Done · rest 1:30');
+    await click(container, 'Skip set');
+    await click(container, 'All sets');
+    const sheet = container.querySelector('[role="dialog"]')!;
+    const second = [...sheet.querySelectorAll<HTMLElement>('.lift-set-row')].find((r) => text(r).includes('Set 2'))!;
+    expect(text(second)).toContain('skipped');
+    fireEvent.click(second.querySelector('button')!);
+    await click(second, 'Easy');
+    expect(text(second)).toContain('90 × 8 · Easy');
+  });
+});
+
+describe('finishing', () => {
+  it('Done on the last working set opens the summary and Save finishes the workout', async () => {
+    withoutWarmup(() => (sets.value = plan().slice(4)));
+    workouts.value = [workout('active')];
+    const { container } = render(<LiftMode workoutId={W} />);
+    await click(container, 'Start set');
+    expect(text(container)).toContain("That's the last set. Done opens the finish.");
+    await click(container, 'Done · finish');
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    await click(container, 'Save workout');
+    expect(finishWorkout).toHaveBeenCalledWith(W, '', '', 'tok');
+    expect(navigate).toHaveBeenCalledWith('/activities');
+    expect(window.localStorage.getItem(runKey(W))).toBeNull();
   });
 
   it('leaves for the list when the workout is gone', () => {

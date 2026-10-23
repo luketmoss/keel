@@ -87,6 +87,7 @@ const FAMILIES = {
     'settings-row-link',
     'day-card-link',
     'lift-check',
+    'lift-set-btn',
     'lift-choice-card',
   ],
   Navigation: ['bottom-nav-tab'],

@@ -1,23 +1,18 @@
 // #577 — Lift Mode's screens. Presentational: the run, the clocks and every
 // write belong to lift-mode.tsx, which passes in what each one shows.
 
-import { useEffect, useId, useRef, useState } from 'preact/hooks';
-import { saveSet } from '../../../state/actions';
-import type { Effort, SetWithRow } from '../../../api/types';
+import { useRef, useState } from 'preact/hooks';
+import type { SetWithRow } from '../../../api/types';
 import { formatMSS, type RestKind, type RestSettings } from '../../../api/rest-times';
 import { DurationStepper } from '../../shared/duration-stepper';
-import { EffortToggle } from '../../shared/effort-toggle';
 import { sectionBadgeClass } from '../../shared/section-utils';
 import { useModalFocus } from '../../shared/use-modal-focus';
 import { sectionTitle } from '../../activities/exercise-detail';
 import { restRowsFor } from '../../templates/template-rest';
 import {
   isWorkingSection,
-  lastTimeFor,
   lastTimeLine,
   restTargetOf,
-  stepState,
-  stepWeight,
   targetParts,
   targetWeight,
   weightText,
@@ -25,6 +20,8 @@ import {
   type LiftStep,
 } from './lift-plan';
 import { sectionValues, type SectionValues } from './lift-rest';
+import { SetControls } from './lift-set-controls';
+import { SetsList } from './lift-sets-list';
 import type { RestView } from './lift-run';
 
 const SECTION_CLASS = (section: string): string => (section.startsWith('SS') ? 'ss' : section);
@@ -43,6 +40,7 @@ export function LiftHeader({
   done,
   total,
   onAllSets,
+  showProgress = true,
 }: {
   name: string;
   /** The session clock, absent on the start screen. */
@@ -50,6 +48,8 @@ export function LiftHeader({
   done: number;
   total: number;
   onAllSets: (() => void) | null;
+  /** False on the summary, which has no progress bar. */
+  showProgress?: boolean;
 }) {
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   return (
@@ -67,16 +67,18 @@ export function LiftHeader({
           </button>
         )}
       </div>
-      <div
-        class="lift-progress"
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={total}
-        aria-valuenow={done}
-        aria-label={`${done} of ${total} sets done`}
-      >
-        <div class="lift-progress-fill" style={{ width: `${pct}%` }} />
-      </div>
+      {showProgress && (
+        <div
+          class="lift-progress"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={total}
+          aria-valuenow={done}
+          aria-label={`${done} of ${total} sets done`}
+        >
+          <div class="lift-progress-fill" style={{ width: `${pct}%` }} />
+        </div>
+      )}
     </header>
   );
 }
@@ -308,11 +310,14 @@ export function RestHero({
   target,
   label,
   view,
+  final = false,
 }: {
   clock: string;
   target: number;
   label: string;
   view: RestView;
+  /** The rest after the last working set: nothing is coming, so no hint about the next one. */
+  final?: boolean;
 }) {
   const kind = label.startsWith('Switch') ? 'Switch' : 'Rest';
   const shown = view.up ? (kind === 'Switch' ? "Switch time's up" : "Rest's up") : kind;
@@ -341,143 +346,31 @@ export function RestHero({
       <div class="lift-hero-side">
         <div class="lift-hero-label">{shown}</div>
         {target > 0 && <div class="lift-hint">Target {formatMSS(target)}</div>}
-        <div class="lift-hint">
-          {view.up ? "Still counting. Start when you're ready." : 'Counting until you start the next set'}
-        </div>
+        {!final && (
+          <div class="lift-hint">
+            {view.up ? "Still counting. Start when you're ready." : 'Counting until you start the next set'}
+          </div>
+        )}
       </div>
     </section>
   );
 }
 
-// Every mounted LogItem's "save what is held", so Finish can wait for them.
-const flushers = new Set<() => Promise<void>>();
-
-/** Writes every held stepper change in the Log card; resolves when they have all settled. */
-export async function flushLogDrafts(): Promise<void> {
-  await Promise.all([...flushers].map((f) => f()));
-}
-
-/** One set in the Log card: steppers, and an effort that saves. Leaving the card saves a held change. */
+/** One set in the Log card: its head, then the controls. Leaving the card saves a held change. */
 function LogItem({ step, workoutId, token }: { step: LiftStep; workoutId: string; token: string }) {
   const row = step.row;
-  const rowRef = useRef(row);
-  rowRef.current = row;
-  const last = lastTimeFor(row, workoutId);
-  const [draft, setDraft] = useState(() => ({
-    weight: row.weight || last.set?.weight || '',
-    reps: row.reps || row.planned_reps || '',
-    effort: row.effort as Effort | '',
-  }));
-  const draftRef = useRef(draft);
-  const dirty = useRef(false);
-  const busy = useRef(false);
-  const uid = useId();
-
-  const write = async (d: typeof draft) => {
-    busy.current = true;
-    try {
-      await saveSet(
-        { ...rowRef.current, weight: d.weight, reps: d.reps, effort: d.effort },
-        token,
-        rowRef.current.sheetRow,
-      );
-      dirty.current = false;
-    } catch {
-      // saveSet showed its toast; the controls keep the values for another try.
-    } finally {
-      busy.current = false;
-    }
-  };
-
-  useEffect(() => {
-    const flush = async () => {
-      if (dirty.current && !busy.current) await write(draftRef.current);
-    };
-    flushers.add(flush);
-    return () => {
-      flushers.delete(flush);
-      void flush();
-    };
-  }, []);
-
-  const edit = (next: typeof draft, save: boolean) => {
-    if (busy.current) return;
-    draftRef.current = next;
-    setDraft(next);
-    if (save) void write(next);
-    else dirty.current = true;
-  };
-
-  const weight = Number(draft.weight);
-  const reps = Number(draft.reps) || 0;
-  const hasWeight = draft.weight !== '';
-  const name = row.exercise_name;
   return (
-    <li class="lift-log-item" aria-label={`${name} set ${row.set_number}`}>
-      <div class="lift-log-head">
-        <strong>{name}</strong>
-        <span class="lift-log-meta">
-          Set {row.set_number}
-          {row.set_s ? ` · ${formatMSS(Number(row.set_s))}` : ''}
-        </span>
-      </div>
-      <div class="lift-steppers">
-        {hasWeight ? (
-          <Stepper
-            label="lb"
-            value={String(Number(weight.toFixed(2)))}
-            onLess={() => edit({ ...draft, weight: String(stepWeight(weight, -1)) }, false)}
-            onMore={() => edit({ ...draft, weight: String(stepWeight(weight, 1)) }, false)}
-            what={`${name} weight`}
-          />
-        ) : (
-          <span class="lift-bodyweight">Bodyweight</span>
-        )}
-        <Stepper
-          label="reps"
-          value={String(reps)}
-          onLess={() => edit({ ...draft, reps: String(Math.max(0, reps - 1)) }, false)}
-          onMore={() => edit({ ...draft, reps: String(reps + 1) }, false)}
-          what={`${name} reps`}
-        />
-      </div>
-      <div class="lift-effort" id={`lift-effort-${uid}`}>
-        <EffortToggle
-          value={draft.effort}
-          onChange={(e) => edit({ ...draft, effort: e }, true)}
-          size="session"
-          label={`${name} set ${row.set_number} effort`}
-        />
-      </div>
+    <li class="lift-log-item" aria-label={`${row.exercise_name} set ${row.set_number}`}>
+      <SetControls step={step} workoutId={workoutId} token={token}>
+        <div class="lift-log-head">
+          <strong>{row.exercise_name}</strong>
+          <span class="lift-log-meta">
+            Set {row.set_number}
+            {row.set_s ? ` · ${formatMSS(Number(row.set_s))}` : ''}
+          </span>
+        </div>
+      </SetControls>
     </li>
-  );
-}
-
-function Stepper({
-  label,
-  value,
-  onLess,
-  onMore,
-  what,
-}: {
-  label: string;
-  value: string;
-  onLess: () => void;
-  onMore: () => void;
-  what: string;
-}) {
-  return (
-    <div class="lift-stepper" role="group" aria-label={what}>
-      <button type="button" class="btn-icon duration-stepper-btn" aria-label={`Less ${what}`} onClick={onLess}>
-        <span aria-hidden="true">−</span>
-      </button>
-      <span class="lift-stepper-value">
-        <span class="lift-stepper-number">{value}</span> <span class="lift-stepper-unit">{label}</span>
-      </span>
-      <button type="button" class="btn-icon duration-stepper-btn" aria-label={`More ${what}`} onClick={onMore}>
-        <span aria-hidden="true">+</span>
-      </button>
-    </div>
   );
 }
 
@@ -561,18 +454,20 @@ export function UpNextCard({
 export function AllSetsSheet({
   steps,
   current,
+  workoutId,
+  token,
   onClose,
   onFinish,
 }: {
   steps: readonly LiftStep[];
   current: number | null;
+  workoutId: string;
+  token: string;
   onClose: () => void;
   onFinish: () => void;
 }) {
   const dialog = useRef<HTMLDivElement>(null);
   useModalFocus(dialog, onClose);
-  const sections: string[] = [];
-  for (const s of steps) if (!sections.includes(s.section)) sections.push(s.section);
   return (
     <div
       class="modal-overlay lift-sheet-overlay"
@@ -593,47 +488,11 @@ export function AllSetsSheet({
             Close
           </button>
         </div>
-        {sections.map((section) => (
-          <section class="lift-card" key={section} aria-label={sectionTitle(section)}>
-            <div class="lift-card-head">
-              <span class={sectionBadgeClass(section)}>{sectionTitle(section)}</span>
-            </div>
-            <ul class="lift-plan-list">
-              {steps
-                .filter((s) => s.section === section)
-                .map((s) => (
-                  <li key={s.key} class="lift-plan-row">
-                    <span class="lift-plan-name">
-                      Set {s.row.set_number} · {s.row.exercise_name}
-                    </span>
-                    <StateText step={s} state={stepState(s, current)} />
-                  </li>
-                ))}
-            </ul>
-          </section>
-        ))}
+        <SetsList steps={steps} current={current} summary={false} workoutId={workoutId} token={token} />
         <button type="button" class="btn btn-secondary lift-sheet-finish" onClick={onFinish}>
           Finish workout now
         </button>
       </div>
     </div>
   );
-}
-
-function StateText({ step, state }: { step: LiftStep; state: ReturnType<typeof stepState> }) {
-  const row = step.row;
-  if (state === 'now') return <span class="lift-state lift-state-now">lifting now</span>;
-  if (state === 'skipped') return <span class="lift-state lift-state-skipped">skipped</span>;
-  if (state === 'logged' || state === 'no-effort') {
-    const figures = `${row.weight ? Number(row.weight) : 'BW'} × ${row.reps || '?'}`;
-    return state === 'logged' ? (
-      <span class="lift-state">
-        {figures} · {row.effort}
-      </span>
-    ) : (
-      <span class="lift-state lift-state-warn">{row.reps || row.weight ? `${figures} · ` : ''}no effort</span>
-    );
-  }
-  const t = targetParts(step, row.weight);
-  return <span class="lift-state lift-state-muted">{[t.reps, t.weight].filter(Boolean).join(' · ')}</span>;
 }

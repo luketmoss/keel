@@ -1,14 +1,18 @@
-// #577 — the run order, the labels and the step arithmetic.
+// #577, #578 — the run order, the labels, the step arithmetic and the summary's totals.
 import { describe, it, expect } from 'vitest';
 import type { SetWithRow } from '../../../api/types';
 import {
   buildSteps,
   doneLabel,
+  figuresText,
+  isEditable,
   lastTimeLine,
   nextIndex,
   progressOf,
   roundUpTo,
+  signedMSS,
   stepState,
+  summaryTotals,
   stepWeight,
   targetWeight,
   weightText,
@@ -193,5 +197,74 @@ describe('stepState', () => {
   });
   it('has no skipped or now before the run starts', () => {
     expect(steps.map((s) => stepState(s, null))).toEqual(['logged', 'no-effort', 'todo', 'todo', 'todo']);
+  });
+  it('on the summary nothing is now or to do: what was not done is skipped', () => {
+    expect(steps.map((s) => stepState(s, null, true))).toEqual([
+      'logged',
+      'no-effort',
+      'skipped',
+      'skipped',
+      'skipped',
+    ]);
+  });
+});
+
+describe('isEditable', () => {
+  it('opens every row on the summary, and only done or skipped ones during the workout', () => {
+    expect((['logged', 'no-effort', 'skipped', 'now', 'todo'] as const).map((s) => isEditable(s, false))).toEqual([
+      true,
+      true,
+      true,
+      false,
+      false,
+    ]);
+    expect((['logged', 'no-effort', 'skipped', 'now', 'todo'] as const).every((s) => isEditable(s, true))).toBe(true);
+  });
+});
+
+describe('figuresText', () => {
+  it('reads weight times reps, BW for none and ? for reps not logged', () => {
+    expect(figuresText({ weight: '90', reps: '8' })).toBe('90 × 8');
+    expect(figuresText({ weight: '', reps: '12' })).toBe('BW × 12');
+    expect(figuresText({ weight: '0', reps: '' })).toBe('BW × ?');
+  });
+});
+
+describe('signedMSS', () => {
+  it('signs with a plus or a true minus', () => {
+    expect(signedMSS(12)).toBe('+0:12');
+    expect(signedMSS(-5)).toBe('−0:05');
+    expect(signedMSS(0)).toBe('+0:00');
+  });
+});
+
+describe('summaryTotals', () => {
+  it('counts sets with reps, sums set and rest time, and averages rest against plan over sets with both', () => {
+    const steps = buildSteps([
+      mk('primary', 1, 'X', 1, { reps: '8', effort: 'Easy', set_s: '40', rest_s: '100', rest_target_s: '90' }),
+      mk('primary', 1, 'X', 2, { reps: '8', set_s: '35', rest_s: '70', rest_target_s: '90' }),
+      mk('primary', 1, 'X', 3, { set_s: '30', rest_s: '60' }),
+      mk('primary', 1, 'X', 4),
+    ]);
+    expect(summaryTotals(steps)).toEqual({
+      setsDone: 2,
+      setsTotal: 4,
+      liftingS: 105,
+      restingS: 230,
+      restVsPlanS: -5,
+      needEffort: 2,
+    });
+  });
+
+  it('leaves a total with no data null, never 0', () => {
+    const t = summaryTotals(buildSteps([mk('primary', 1, 'X', 1), mk('primary', 1, 'X', 2, { rest_s: '50' })]));
+    expect(t.liftingS).toBeNull();
+    expect(t.restingS).toBe(50);
+    expect(t.restVsPlanS).toBeNull();
+    expect(t.setsDone).toBe(0);
+  });
+
+  it('keeps a measured zero', () => {
+    expect(summaryTotals(buildSteps([mk('primary', 1, 'X', 1, { set_s: '0' })])).liftingS).toBe(0);
   });
 });

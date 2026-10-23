@@ -6,7 +6,8 @@
 // every clock is read from stored timestamps, so a reload or a sleeping screen
 // changes nothing. What is written to the sheet: `set_s` on Done, `rest_s` on
 // Start set, weight, reps and effort through `saveSet` as the tracker does, and
-// `rest_target_s` when today's rest is changed on the start screen.
+// `rest_target_s` when today's rest is changed on the start screen. The end of
+// the workout is the summary (#578), not the tracker's finish modal.
 
 import { batch } from '@preact/signals';
 import type { JSX } from 'preact';
@@ -25,8 +26,7 @@ import { loadRestSettings, restSettings } from '../../../state/rest-settings';
 import { useAuth } from '../../../auth/auth-context';
 import { navigate, replaceRoute } from '../../../router/router';
 import { formatMSS } from '../../../api/rest-times';
-import type { Effort, SetWithRow } from '../../../api/types';
-import { FinishWorkoutModal } from '../finish-modal';
+import type { SetWithRow } from '../../../api/types';
 import { templateWarmupsToRestore } from '../template-warmups';
 import {
   AllSetsSheet,
@@ -37,9 +37,10 @@ import {
   SetScreen,
   StartScreen,
   UpNextCard,
-  flushLogDrafts,
   type ChecklistItem,
 } from './lift-screens';
+import { flushLogDrafts } from './lift-set-controls';
+import { SummaryScreen } from './lift-summary';
 import {
   buildSteps,
   doneLabel,
@@ -139,13 +140,24 @@ export function initialRun(status: string | undefined, steps: readonly LiftStep[
   if (status !== 'active') return FRESH_RUN;
   if (stored && stored.phase !== 'start') {
     if (stored.phase === 'warmup' || stored.phase === 'cooldown') return stored;
+    // The rest after the last working set, which has no Up next: its set is the one logged.
+    if (stored.phase === 'rest' && stored.restFor !== null && stored.restFor === stored.stepIndex) {
+      const done = steps[stored.stepIndex];
+      if (done && isStepLogged(done.row) && nextIndex(steps, stored.stepIndex) < 0 && stored.restStartedAt !== null)
+        return stored;
+    }
     const step = steps[stored.stepIndex];
     if (step && !isStepLogged(step.row) && (stored.phase !== 'set' || stored.setStartedAt !== null)) {
       if (stored.phase !== 'rest' || stored.restStartedAt !== null) return stored;
     }
   }
   const idx = nextIndex(steps, -1);
-  const base = { ...FRESH_RUN, sessionStartedAt: stored?.sessionStartedAt ?? null };
+  const base = {
+    ...FRESH_RUN,
+    sessionStartedAt: stored?.sessionStartedAt ?? null,
+    notes: stored?.notes ?? '',
+    sessionEffort: stored?.sessionEffort ?? '',
+  };
   return idx >= 0 ? { ...base, phase: 'ready', stepIndex: idx } : { ...base, phase: 'cooldown' };
 }
 
@@ -215,10 +227,9 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
 
   const [starting, setStarting] = useState(false);
   const [showAll, setShowAll] = useState(false);
-  const [showFinish, setShowFinish] = useState(false);
+  /** When the summary opened, which freezes its session time; null while Lift Mode is on screen. */
+  const [summaryAt, setSummaryAt] = useState<number | null>(null);
   const [finishing, setFinishing] = useState(false);
-  const [notes, setNotes] = useState('');
-  const [finishEffort, setFinishEffort] = useState<Effort | ''>('');
   const [toast, setToast] = useState<string | null>(null);
   const [localDone, setLocalDone] = useState<ReadonlySet<string>>(new Set());
   const leaving = useRef(false);
@@ -278,16 +289,43 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
   useEffect(() => () => void flushRest(), [flushRest]);
 
   // ── What comes next ──
-  const afterWorking = useCallback(() => {
-    const cooldown = checklistFor(
-      'cooldown',
-      sets.value.filter((s) => s.workout_id === workoutId),
-      workout,
-    ).items;
-    go({ phase: 'cooldown', setStartedAt: null, restStartedAt: null, restFor: null, restTarget: 0 });
-    // Nothing to tick off after the last set: it goes straight to the finish.
-    if (cooldown.length === 0) setShowFinish(true);
-  }, [go, workoutId, workout]);
+  /** Opens the summary once held stepper changes (and `after`, a write in flight) are in the sheet. */
+  const openSummary = useCallback(async (after?: Promise<unknown>) => {
+    setShowAll(false);
+    await Promise.all([flushLogDrafts(), after]);
+    setSummaryAt(Date.now());
+  }, []);
+
+  /**
+   * After the last working set: the cool-down checklist, or with none the
+   * summary. `lastDone` is the set just finished by Done, whose rest then stays
+   * on screen behind the summary for Back, without an Up next.
+   */
+  const afterWorking = useCallback(
+    (lastDone?: { index: number; at: number; written: Promise<unknown> }) => {
+      const cooldown = checklistFor(
+        'cooldown',
+        sets.value.filter((s) => s.workout_id === workoutId),
+        workout,
+      ).items;
+      if (cooldown.length === 0 && lastDone) {
+        go({
+          phase: 'rest',
+          stepIndex: lastDone.index,
+          setStartedAt: null,
+          restStartedAt: lastDone.at,
+          restTarget: 0,
+          alertedAt: null,
+          restFor: lastDone.index,
+        });
+      } else {
+        go({ phase: 'cooldown', setStartedAt: null, restStartedAt: null, restFor: null, restTarget: 0 });
+      }
+      // Nothing to tick off after the last set: it goes straight to the summary.
+      if (cooldown.length === 0) void openSummary(lastDone?.written);
+    },
+    [go, workoutId, workout, openSummary],
+  );
 
   // ── Rest alerts: once at the target, then every 30 s; none for a rest resumed past them ──
   const alerts = useRef<{ key: number | null; slot: number }>({ key: null, slot: -1 });
@@ -296,7 +334,7 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
     setTimeout(() => setToast((t) => (t === text ? null : t)), TOAST_MS);
   };
   useEffect(() => {
-    if (run.phase !== 'rest' || run.restStartedAt === null) {
+    if (run.phase !== 'rest' || run.restStartedAt === null || summaryAt !== null) {
       alerts.current = { key: null, slot: -1 };
       return;
     }
@@ -321,13 +359,13 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
         : `Still resting. Next up: ${next?.row.exercise_name ?? ''}`,
     );
     go({ alertedAt: Date.now() });
-  }, [now, run.phase, run.restStartedAt]);
+  }, [now, run.phase, run.restStartedAt, summaryAt !== null]);
 
   // ── Transitions ──
-  const timing = (index: number, patch: { set_s?: string; rest_s?: string }) => {
+  const timing = (index: number, patch: { set_s?: string; rest_s?: string }): Promise<unknown> => {
     const row = steps[index]?.row;
-    if (!row || !token) return;
-    void saveSetTimings([{ sheetRow: row.sheetRow, patch }], token).catch(() => false);
+    if (!row || !token) return Promise.resolve();
+    return saveSetTimings([{ sheetRow: row.sheetRow, patch }], token).catch(() => false);
   };
 
   const warmups = checklistFor('warmup', rows, workout).items;
@@ -351,7 +389,7 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
         if (first >= 0) go({ ...FRESH_RUN, phase: 'ready', stepIndex: first, sessionStartedAt: t });
         else {
           go({ ...FRESH_RUN, phase: 'cooldown', sessionStartedAt: t });
-          if (cooldowns.length === 0) setShowFinish(true);
+          if (cooldowns.length === 0) void openSummary();
         }
       }
     } catch {
@@ -404,10 +442,12 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
     const step = steps[run.stepIndex];
     if (!step) return;
     const t = Date.now();
-    timing(run.stepIndex, { set_s: String(run.setStartedAt === null ? 0 : wholeSeconds(run.setStartedAt, t)) });
+    const written = timing(run.stepIndex, {
+      set_s: String(run.setStartedAt === null ? 0 : wholeSeconds(run.setStartedAt, t)),
+    });
     const next = nextIndex(steps, run.stepIndex);
     if (next < 0) {
-      afterWorking();
+      afterWorking({ index: run.stepIndex, at: t, written });
       return;
     }
     go({
@@ -442,23 +482,17 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
     afterWorking();
   };
 
-  const openFinish = async () => {
-    setShowAll(false);
-    await flushLogDrafts();
-    setShowFinish(true);
-  };
-
   const finish = async () => {
     if (!token || finishing) return;
     setFinishing(true);
     try {
       await flushLogDrafts();
-      await finishWorkout(workoutId, notes, finishEffort, token);
+      await finishWorkout(workoutId, runRef.current.notes, runRef.current.sessionEffort, token);
       leaving.current = true;
       clearRun(workoutId);
       navigate('/activities');
     } catch {
-      // finishWorkout showed its toast; the form stays as it is.
+      // finishWorkout showed its toast; the summary stays as it is.
     } finally {
       setFinishing(false);
     }
@@ -476,12 +510,14 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
 
   const restFor = run.restFor !== null ? steps[run.restFor] : undefined;
   const switching = restFor ? !restFor.lastInRound : false;
+  // The rest after the last working set: no Up next, and Finish workout in place of Start set.
+  const finalRest = run.phase === 'rest' && run.restFor !== null && run.restFor === run.stepIndex;
   const restElapsed = secondsSince(run.restStartedAt, now);
   const view = restView(restElapsed, run.restTarget);
 
   let body: JSX.Element | null = null;
   let primary: { label: string; onClick: () => void; warn?: boolean; disabled?: boolean } | null = null;
-  let secondary: { label: string; onClick: () => void } | null = null;
+  let secondary: { label: string; onClick: () => void; disabled?: boolean } | null = null;
 
   const withLocal = (items: ReturnType<typeof checklistFor>['items']): ChecklistItem[] =>
     items.map((i) => ({ key: i.key, name: i.name, repsText: i.repsText, done: i.done || localDone.has(i.key) }));
@@ -565,13 +601,18 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
             target={run.restTarget}
             label={switching ? 'Switch' : 'Rest'}
             view={view}
+            final={finalRest}
           />
           {token && <LogCard items={card} workoutId={workoutId} token={token} earlierWithoutEffort={earlier} />}
-          {step && <UpNextCard step={step} last={last} inRound={switching} />}
+          {step && !finalRest && <UpNextCard step={step} last={last} inRound={switching} />}
         </div>
       );
-      primary = { label: 'Start set', onClick: startSet, warn: view.up };
-      secondary = { label: 'Skip set', onClick: skipSet };
+      if (finalRest) {
+        primary = { label: 'Finish workout', onClick: () => void openSummary() };
+      } else {
+        primary = { label: 'Start set', onClick: startSet, warn: view.up };
+        secondary = { label: 'Skip set', onClick: skipSet };
+      }
       break;
     }
     case 'cooldown':
@@ -589,19 +630,37 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
             <div class="lift-tip">No sets left. Finish the workout when you are done.</div>
           </div>
         );
-      primary = { label: 'Finish workout', onClick: () => setShowFinish(true) };
+      primary = { label: 'Finish workout', onClick: () => void openSummary() };
       break;
   }
 
-  const inSets = run.phase === 'set' || run.phase === 'rest' || run.phase === 'ready';
+  if (summaryAt !== null && token) {
+    body = (
+      <SummaryScreen
+        steps={steps}
+        sessionSeconds={secondsSince(sessionStart, summaryAt)}
+        workoutId={workoutId}
+        token={token}
+        notes={run.notes}
+        effort={run.sessionEffort}
+        onNotes={(notes) => go({ notes })}
+        onEffort={(sessionEffort) => go({ sessionEffort })}
+      />
+    );
+    primary = { label: finishing ? 'Saving…' : 'Save workout', onClick: () => void finish(), disabled: finishing };
+    secondary = { label: 'Back', onClick: () => setSummaryAt(null), disabled: finishing };
+  }
+
+  const inSets = (run.phase === 'set' || run.phase === 'rest' || run.phase === 'ready') && !finalRest;
   return (
     <div class="lift screen">
       <LiftHeader
         name={workout.name}
-        clock={clock}
+        clock={summaryAt !== null ? null : clock}
         done={progress.done}
         total={progress.total}
-        onAllSets={run.phase === 'start' ? null : () => setShowAll(true)}
+        onAllSets={run.phase === 'start' || summaryAt !== null ? null : () => setShowAll(true)}
+        showProgress={summaryAt === null}
       />
       {body}
       {toast && (
@@ -612,7 +671,12 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
       {primary && (
         <div class="lift-actions">
           {secondary && (
-            <button type="button" class="btn btn-secondary lift-btn lift-btn-secondary" onClick={secondary.onClick}>
+            <button
+              type="button"
+              class="btn btn-secondary lift-btn lift-btn-secondary"
+              onClick={secondary.onClick}
+              disabled={secondary.disabled}
+            >
               {secondary.label}
             </button>
           )}
@@ -626,23 +690,14 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
           </button>
         </div>
       )}
-      {showAll && (
+      {showAll && token && (
         <AllSetsSheet
           steps={steps}
           current={inSets && step ? step.index : null}
+          workoutId={workoutId}
+          token={token}
           onClose={() => setShowAll(false)}
-          onFinish={() => void openFinish()}
-        />
-      )}
-      {showFinish && (
-        <FinishWorkoutModal
-          notes={notes}
-          onNotesChange={(e) => setNotes((e.target as HTMLTextAreaElement).value)}
-          effort={finishEffort}
-          onEffortChange={setFinishEffort}
-          onFinish={() => void finish()}
-          onCancel={() => setShowFinish(false)}
-          finishing={finishing}
+          onFinish={() => void openSummary()}
         />
       )}
     </div>

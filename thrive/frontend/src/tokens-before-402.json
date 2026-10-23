@@ -50,6 +50,7 @@
     "--range-marker": "var(--color-text)",
     "--lift-clock-size": "4.5rem",
     "--lift-ring-size": "132px",
+    "--lift-ring-size-compact": "84px",
     "--sec-warmup": "#c2410c",
     "--sec-primary": "#1565c0",
     "--sec-ss": "#7b1fa2",

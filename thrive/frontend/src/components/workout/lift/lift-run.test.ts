@@ -25,6 +25,16 @@ describe('the stored run', () => {
     expect(loadRun('w1')).toBeNull();
   });
 
+  it('keeps the summary notes and session effort, and drops a bad effort', () => {
+    saveRun('w1', { ...FRESH_RUN, phase: 'rest', notes: 'Felt strong', sessionEffort: 'Hard' });
+    expect(loadRun('w1')).toMatchObject({ notes: 'Felt strong', sessionEffort: 'Hard' });
+    window.localStorage.setItem(
+      runKey('w1'),
+      JSON.stringify({ phase: 'rest', stepIndex: 1, notes: 4, sessionEffort: 'Brutal' }),
+    );
+    expect(loadRun('w1')).toMatchObject({ notes: '', sessionEffort: '' });
+  });
+
   it('reads nothing from garbage, and never throws', () => {
     window.localStorage.setItem(runKey('w1'), '{nope');
     expect(loadRun('w1')).toBeNull();

@@ -132,6 +132,10 @@ makes it `active` as the tracker's start does. Its run (step, set and rest start
 `localStorage` under `thrive.lift.<workoutId>`, and every clock is read from those timestamps. It writes
 `set_s` on Done and `rest_s` on Start set (`saveSetTimings`, Sets K:M, no `apps-script/` change), and weight,
 reps and effort through `saveSet`. A weight alone does not count as a set logged there: a plan can prescribe one.
+Its end is a summary (#578, `lift-summary.tsx`), not the finish modal: totals, one shared sets list
+(`lift-sets-list.tsx`, also the All sets sheet) whose rows open to the Log card's controls
+(`lift-set-controls.tsx`), then session effort and notes, kept in the stored run under `notes` and
+`sessionEffort`, and Save, which is `finishWorkout`. Logbook keeps the modal.
 
 ## Key commands
 

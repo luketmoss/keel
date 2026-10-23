@@ -1,6 +1,9 @@
 // #577 — Lift Mode's run state, kept on the device per workout so a reload
 // resumes the same step, and the clock arithmetic every screen shares. Times
-// are epoch ms, and every clock is read from them, never counted.
+// are epoch ms, and every clock is read from them, never counted. Since #578 it
+// also holds the summary's notes and session effort, so a reload keeps them.
+
+import type { Effort } from '../../../api/types';
 
 export type LiftPhase = 'start' | 'warmup' | 'ready' | 'set' | 'rest' | 'cooldown';
 
@@ -18,6 +21,10 @@ export interface LiftRun {
   restFor: number | null;
   /** When Start workout was pressed: the session clock's zero. */
   sessionStartedAt: number | null;
+  /** The summary's notes, kept as they are typed. */
+  notes: string;
+  /** The summary's session effort. */
+  sessionEffort: Effort | '';
 }
 
 export const FRESH_RUN: LiftRun = {
@@ -29,6 +36,8 @@ export const FRESH_RUN: LiftRun = {
   alertedAt: null,
   restFor: null,
   sessionStartedAt: null,
+  notes: '',
+  sessionEffort: '',
 };
 
 const PHASES: readonly string[] = ['start', 'warmup', 'ready', 'set', 'rest', 'cooldown'];
@@ -54,6 +63,9 @@ export function loadRun(workoutId: string): LiftRun | null {
       alertedAt: num(v.alertedAt),
       restFor: num(v.restFor),
       sessionStartedAt: num(v.sessionStartedAt),
+      notes: typeof v.notes === 'string' ? v.notes : '',
+      sessionEffort:
+        v.sessionEffort === 'Easy' || v.sessionEffort === 'Medium' || v.sessionEffort === 'Hard' ? v.sessionEffort : '',
     };
   } catch {
     return null;

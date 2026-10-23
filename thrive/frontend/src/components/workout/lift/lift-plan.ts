@@ -180,12 +180,82 @@ export function progressOf(steps: readonly LiftStep[]): { done: number; total: n
   return { done: steps.filter((s) => isStepLogged(s.row)).length, total: steps.length };
 }
 
-/** A set's state in All sets. */
+/** A set's state in the sets list. */
 export type StepState = 'logged' | 'no-effort' | 'skipped' | 'now' | 'todo';
 
-export function stepState(step: LiftStep, current: number | null): StepState {
-  if (current === step.index) return 'now';
+/**
+ * `current` is the set on screen (null when none is), and `ended` that the
+ * workout is over for this list: the summary, where whatever was not done is
+ * skipped and nothing is "now" or still to come.
+ */
+export function stepState(step: LiftStep, current: number | null, ended = false): StepState {
+  if (!ended && current === step.index) return 'now';
   if (isStepLogged(step.row)) return step.row.effort ? 'logged' : 'no-effort';
-  if (current !== null && step.index < current) return 'skipped';
+  if (ended || (current !== null && step.index < current)) return 'skipped';
   return 'todo';
+}
+
+/** Whether a row of the sets list opens: all of them on the summary, only the done and skipped during the workout. */
+export function isEditable(state: StepState, ended: boolean): boolean {
+  return ended || state === 'logged' || state === 'no-effort' || state === 'skipped';
+}
+
+/** "90 × 8" with "BW" for no weight, and "?" for reps not logged. */
+export function figuresText(row: Pick<SetWithRow, 'weight' | 'reps'>): string {
+  const w = Number(row.weight);
+  const weight = row.weight === '' || !Number.isFinite(w) || w === 0 ? 'BW' : String(Number(w.toFixed(2)));
+  return `${weight} × ${row.reps || '?'}`;
+}
+
+/** Whole seconds in a Sets cell, or null when it is blank or not a number. */
+const seconds = (v: string | undefined): number | null => {
+  if (v === undefined || v.trim() === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+export interface SummaryTotals {
+  /** Working sets with reps logged. */
+  setsDone: number;
+  /** Working sets in the workout. */
+  setsTotal: number;
+  /** The sum of `set_s`, or null with none. */
+  liftingS: number | null;
+  /** The sum of `rest_s`, or null with none. */
+  restingS: number | null;
+  /** The mean of `rest_s - rest_target_s` over sets with both, rounded, or null with none. */
+  restVsPlanS: number | null;
+  /** Working sets that were done with no effort. */
+  needEffort: number;
+}
+
+export function summaryTotals(steps: readonly LiftStep[]): SummaryTotals {
+  let lifting: number | null = null;
+  let resting: number | null = null;
+  let diffSum = 0;
+  let diffN = 0;
+  for (const { row } of steps) {
+    const set = seconds(row.set_s);
+    if (set !== null) lifting = (lifting ?? 0) + set;
+    const rest = seconds(row.rest_s);
+    if (rest !== null) resting = (resting ?? 0) + rest;
+    const target = seconds(row.rest_target_s);
+    if (rest !== null && target !== null) {
+      diffSum += rest - target;
+      diffN += 1;
+    }
+  }
+  return {
+    setsDone: steps.filter((s) => s.row.reps !== '').length,
+    setsTotal: steps.length,
+    liftingS: lifting,
+    restingS: resting,
+    restVsPlanS: diffN > 0 ? Math.round(diffSum / diffN) : null,
+    needEffort: steps.filter((s) => isStepLogged(s.row) && !s.row.effort).length,
+  };
+}
+
+/** "+0:12" or "−0:05" (a true minus sign). */
+export function signedMSS(s: number): string {
+  return `${s < 0 ? '−' : '+'}${formatMSS(Math.abs(s))}`;
 }

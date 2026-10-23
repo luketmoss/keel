@@ -128,7 +128,8 @@ function AuthenticatedApp() {
         <Router />
         <RouteFocus />
       </main>
-      <BottomNav />
+      {/* #580: Lift Mode has its own action bar at the bottom, so the tab bar steps aside at any height. */}
+      {currentRoute.value.name !== 'workout-lift' && <BottomNav />}
     </div>
   );
 }

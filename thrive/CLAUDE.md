@@ -140,6 +140,8 @@ The two switch mid-workout (#579): the tracker's header has a Lift Mode button (
 unlogged working set with no clock, or on the summary with none left), and All sets has Switch to logbook, which clears
 the stored run and writes nothing for the interrupted step. The start choice is remembered in `localStorage`
 `thrive.weightMode` and only preselects the choice sheet.
+In a window 560 CSS px tall or less (Android split screen under a video, #580) Lift Mode uses a compact layout from one
+`@media (max-height: 560px)` block in `global.css`, live as the divider moves; the tab bar is not rendered on this route at any height.
 
 ## Key commands
 

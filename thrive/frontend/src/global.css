@@ -51,10 +51,11 @@
   --range-track: var(--color-border-light);
   --range-band: var(--color-border);
   --range-marker: var(--color-text);
-  /* Lift Mode (#577): the set clock is larger than any figure above, the rest ring is 132px (#580
-     overrides it), and the section colours are the badge text colours, for the Up next border. */
+  /* Lift Mode (#577): the set clock is larger than any figure above, the rest ring is 132px (84px in
+     a short window, #580), and the section colours are the badge text colours, for the Up next border. */
   --lift-clock-size: 4.5rem;
   --lift-ring-size: 132px;
+  --lift-ring-size-compact: 84px;
   --sec-warmup: #c2410c;
   --sec-primary: #1565c0;
   --sec-ss: #7b1fa2;
@@ -6419,7 +6420,12 @@ a.training-card {
 }
 
 /* ===== Lift Mode (#577) =====
-   Cards are the surface on a light border; the action bar sits above the tab bar until #580 hides it. */
+   Cards are the surface on a light border. The action bar is the bottom of the screen: the tab bar is
+   not rendered on this route (#580), so the body's room for it goes too. */
+body:has(.lift) {
+  padding-bottom: 0;
+}
+
 .lift {
   display: flex;
   flex-direction: column;
@@ -6845,16 +6851,17 @@ a.training-card {
   font-weight: 700;
 }
 
-/* The action bar, above the tab bar. */
+/* The action bar, at the bottom of the screen. */
 .lift-actions {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px));
+  bottom: 0;
   z-index: 90;
   display: flex;
   gap: var(--space-sm);
   padding: var(--space-md);
+  padding-bottom: calc(var(--space-md) + env(safe-area-inset-bottom, 0px));
   background: var(--color-surface);
   border-top: 1px solid var(--color-border-light);
 }
@@ -6914,7 +6921,7 @@ a.training-card {
 .lift-toast {
   position: fixed;
   left: 50%;
-  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 52px + var(--space-md) * 2 + var(--space-sm));
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 52px + var(--space-md) * 2 + var(--space-sm));
   z-index: 1000;
   width: calc(100% - 32px);
   max-width: 400px;
@@ -7128,6 +7135,116 @@ a.training-card {
 
 .lift-choice-actions .btn {
   width: 100%;
+}
+
+/* ===== Lift Mode, compact (#580) =====
+   Any window 560px tall or shorter, which is what split screen gives Thrive under a video. A live query,
+   so moving the divider swaps the layout in place; the run is in signals and localStorage, not layout. */
+.lift-note-pair {
+  display: contents;
+}
+
+@media (max-height: 560px) {
+  .lift {
+    padding-bottom: calc(44px + var(--space-sm) + var(--space-md) + 1px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .lift-header {
+    padding: var(--space-xs) var(--space-md) 0;
+  }
+
+  .lift-title {
+    font-size: var(--text-base);
+  }
+
+  .lift-content {
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+  }
+
+  .lift-card {
+    padding: var(--space-sm) var(--space-md);
+  }
+
+  .lift-tip {
+    display: none;
+  }
+
+  /* The set screen. */
+  .lift-clock-block {
+    margin: var(--space-xs) 0;
+  }
+
+  .lift-clock {
+    font-size: var(--figure-xl);
+  }
+
+  .lift-exercise {
+    font-size: var(--text-xl);
+  }
+
+  /* Last time and what comes next, one card of two lines. */
+  .lift-note-pair {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding: var(--space-sm) var(--space-md);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-lg);
+  }
+
+  .lift-note-pair .lift-note-card {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    font-size: var(--text-sm);
+  }
+
+  /* The rest screen: the clock, then Up next, then the log card, which is the part that scrolls. */
+  .lift-hero {
+    order: -2;
+    gap: var(--space-sm);
+  }
+
+  .lift-content > .lift-next {
+    order: -1;
+  }
+
+  .lift-ring {
+    width: var(--lift-ring-size-compact);
+    height: var(--lift-ring-size-compact);
+  }
+
+  .lift-rest-clock {
+    font-size: var(--text-xl);
+  }
+
+  .lift-hero-label {
+    font-size: var(--text-lg);
+  }
+
+  .lift-next-exercise {
+    font-size: var(--text-base);
+  }
+
+  /* The action bar and its buttons. */
+  .lift-actions {
+    padding: var(--space-sm) var(--space-sm) var(--space-md);
+    padding-bottom: calc(var(--space-md) + env(safe-area-inset-bottom, 0px));
+  }
+
+  .lift-btn {
+    min-height: 44px;
+  }
+
+  .lift-toast {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 44px + var(--space-sm) + var(--space-md) + var(--space-sm));
+  }
+
+  .lift-sheet {
+    max-height: 92vh;
+  }
 }
 
 /* ===== Library keyboard access (#301) =====

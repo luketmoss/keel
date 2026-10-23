@@ -294,8 +294,11 @@ export function SetScreen({
         </div>
         <div class="lift-clock-caption">SET TIME</div>
       </div>
-      <div class="lift-note-card">{lastTimeLine(last, step.row.set_number)}</div>
-      <div class="lift-note-card lift-note-card-sm">{nextLine}</div>
+      {/* #580: two cards, or one card of two lines in a short window. */}
+      <div class="lift-note-pair">
+        <div class="lift-note-card">{lastTimeLine(last, step.row.set_number)}</div>
+        <div class="lift-note-card lift-note-card-sm">{nextLine}</div>
+      </div>
     </div>
   );
 }

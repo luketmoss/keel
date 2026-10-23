@@ -41,10 +41,10 @@ needs a matching change here.**
 
 | Tool | Description |
 |------|-------------|
-| `thrive_schedule_workout` | (Over 200 rows in the call it is previewed, not written, until `confirm: true`; see Write limits.) Create a workout with status `planned` for a future date, expanded from a template or an explicit exercise list. Exercise entries can prescribe a `weight` (every set) or `set_weights` (per set); the whole list is validated before anything is written. `estimated_min` (whole minutes) records the plan's estimated duration |
-| `thrive_schedule_week` | (Same 200-row ceiling and `confirm`.) Schedule several workouts in one call, each shaped like a `thrive_schedule_workout` call. All of them are validated first (any problem schedules none), then the sets are written, chunked if large, followed by the workouts |
+| `thrive_schedule_workout` | (Over 200 rows in the call it is previewed, not written, until `confirm: true`; see Write limits.) Create a workout with status `planned` for a future date, expanded from a template or an explicit exercise list. Exercise entries can prescribe a `weight` (every set) or `set_weights` (per set); the whole list is validated before anything is written. `estimated_min` (whole minutes) records the plan's estimated duration. `rest` sets the rest and switch times by section (see Rest times); the confirmation lists each timed section's resolved rest |
+| `thrive_schedule_week` | (Same 200-row ceiling and `confirm`.) Schedule several workouts in one call, each shaped like a `thrive_schedule_workout` call, `rest` included and resolved per entry. All of them are validated first (any problem schedules none), then the sets are written, chunked if large, followed by the workouts |
 | `thrive_create_exercise` | Add to the exercise library (refuses duplicate names unless overridden) |
-| `thrive_create_template` | (Same 200-row ceiling and `confirm`.) Create a reusable template from an ordered exercise list |
+| `thrive_create_template` | (Same 200-row ceiling and `confirm`.) Create a reusable template from an ordered exercise list, with an optional `rest` per section |
 
 ### Repair
 
@@ -55,7 +55,8 @@ needs a matching change here.**
 | `thrive_undo` | Undo one write made through the MCP connector, from Thrive's change log. No arguments lists the last 20 calls; a `call_id` previews; `confirm: true` restores, all or nothing (any row changed since refuses the whole call). The undo is itself a call, so it can be undone. A write tool; counts toward the write limits |
 | `thrive_update_sets` | (Same 200-row ceiling and `confirm`.) Correct many sets of one workout in one call. All entries are validated first (any problem writes nothing), each request is atomic, and each updated set's resulting state is echoed |
 | `thrive_update_exercise` | Rename or retag an exercise |
-| `thrive_update_template` | Replace a template's exercise list wholesale |
+| `thrive_update_template` | Replace a template's exercise list wholesale. Each section keeps its stored rest unless `rest` names it; the dry run shows rest before and after |
+| `thrive_set_workout_rest` | Change a planned or active workout's rest and switch times by section (`rest`, required): re-resolves the planned rest of each set in the named sections, leaves sets already done (reps or `set_s` logged) as they ran, refuses a completed workout. Dry-run until `confirm: true`; `thrive_undo` reverts it |
 | `thrive_set_journal_entry` | Write the journal note for a day: a non-blank note is saved at once (a replaced note is quoted back); a blank note clears the day and is dry-run until `confirm: true` |
 | `thrive_delete_workout` | Delete a workout and cascade to its sets |
 | `thrive_delete_exercise` | Delete a library entry |
@@ -63,10 +64,11 @@ needs a matching change here.**
 ## Safety model
 
 Destructive tools — `thrive_delete_workout`, `thrive_delete_exercise`,
-`thrive_update_template` and clearing a day's note with `thrive_set_journal_entry` —
-are **dry-run by default**. Called without `confirm: true`
+`thrive_update_template`, `thrive_set_workout_rest` and clearing a day's note with
+`thrive_set_journal_entry` — are **dry-run by default**. Called without `confirm: true`
 they report exactly what they would change and write nothing. The preview is built from
-API reads, so the API's delete and replace actions only ever run once confirmed:
+API reads (for `thrive_set_workout_rest`, the API's own dry run of the same action), so
+the API's delete, replace and rest actions only ever change data once confirmed:
 
 ```
 DRY RUN — nothing deleted. This would remove:
@@ -111,7 +113,41 @@ measures each write and splits one that would not fit:
   written, then applied chunk by chunk, each chunk atomic. If a later chunk fails, the
   error names the entries earlier chunks already wrote.
 - **`thrive_schedule_week`** — set rows are chunked the same way, then the workouts are
-  created. A failure partway says what already landed.
+  created. A failure partway says what already landed. A superset or burnout round is
+  never split across chunks: the API resolves its switch and rest from the whole round.
+
+### Rest times (#583)
+
+`thrive_schedule_workout`, each entry of `thrive_schedule_week`, `thrive_create_template`,
+`thrive_update_template` and `thrive_set_workout_rest` take the same `rest` parameter:
+
+```
+rest: [{ section: "primary", rest_s: 120 }, { section: "SS1", rest_s: 60, switch_s: 15 }]
+```
+
+- **Sections**: `primary`, `SS1`, `SS2`, `SS3` and `burnout`. Warmup and cooldown have no
+  rest. Each named section must be in the workout or template, and named once.
+- **Values** are whole seconds. `rest_s` is 15–600: after every set of `primary`, and after
+  each round of a superset or burnout. `switch_s` is 0–120, the pause between exercises
+  within a round, and is refused on `primary`. These are the ranges of the Settings
+  defaults (#576).
+- **Left out** — a section, or one field of it — means "as it would be without `rest`".
+  `null` means the Settings default.
+- **Precedence when scheduling**: the entry's `rest`, then the template's section rest,
+  then the Settings defaults. A schedule from an explicit exercise list has no template.
+- **Templates**: the values are written on every row of the section. On
+  `thrive_update_template` a section `rest` does not name keeps its stored values, and
+  `null` clears one back to the default.
+- **A planned workout**: `thrive_set_workout_rest` re-resolves `rest_target_s` for the
+  named sections only, and only for sets not yet done (no reps and no `set_s`), so a
+  workout in progress keeps the targets it ran against. It refuses a workout that is
+  neither `planned` nor `active`, and is undone with `thrive_undo`.
+- **The API resolves rest**, never this server: which set of a round takes the switch and
+  which the rest is `resolveRestTargets` in `thrive/apps-script/src/sets.js`. The sets are
+  sent before the workout row, so each `appendSets` carries the workout's template id and
+  `rest` (`rest_plans`) for the API to resolve from. A refusal names the entry, the section
+  and the problem, and nothing is written; in `thrive_schedule_week` one bad entry stops
+  the whole call.
 
 ### Synced data, and what an agent cannot see (#158)
 
@@ -136,9 +172,10 @@ not readable here either; the app draws it, and there is no tool that returns on
 
 ### Approval on the destructive tools
 
-Four tools destroy data and are dry-run until `confirm: true`:
+Five tools destroy data and are dry-run until `confirm: true`:
 `thrive_delete_workout`, `thrive_delete_exercise`, `thrive_update_template`
-(it deletes the old rows) and `thrive_set_journal_entry` when it clears a note.
+(it deletes the old rows), `thrive_set_workout_rest` (it overwrites planned rest) and
+`thrive_set_journal_entry` when it clears a note.
 The dry-run only prevents accidents. Against prompt injection the control is a person
 approving each call, and approval is stored **per device**: see "Approving the
 destructive tools" in [../CLAUDE.md](../CLAUDE.md).

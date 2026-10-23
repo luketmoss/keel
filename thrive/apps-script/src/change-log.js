@@ -37,6 +37,7 @@ var CHANGE_LOGGED_ACTIONS = {
   deleteWorkout: ['Workouts', 'Sets'],
   appendSets: ['Sets'],
   updateSets: ['Sets'],
+  setWorkoutRest: ['Sets'],
   createExercise: ['Exercises'],
   updateExercise: ['Exercises', 'Templates', 'Sets'],
   deleteExercise: ['Exercises'],

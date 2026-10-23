@@ -367,32 +367,26 @@ function applySetUpdates(workoutId, updates) {
   return { changes: plan.changes, applied: true };
 }
 
+/** Which Settings default each timed section falls back to (#576). */
+var REST_KINDS = {
+  primary: { rest: 'rest_primary_s' },
+  SS1: { rest: 'rest_superset_s', sw: 'switch_superset_s' },
+  SS2: { rest: 'rest_superset_s', sw: 'switch_superset_s' },
+  SS3: { rest: 'rest_superset_s', sw: 'switch_superset_s' },
+  burnout: { rest: 'rest_burnout_s', sw: 'switch_burnout_s' },
+};
+
 /**
- * The rest planned after each set (#576), as text parallel to `sets`, which
- * are one workout's rows.
+ * Which of its section's values each set takes, parallel to `sets` (one
+ * workout's rows): 'rest_s', 'switch_s', or '' for a section with no rest.
  *
  * A round is one section's sets with the same set number; an exercise with
  * fewer sets drops out of later rounds. In a superset or burnout every
- * exercise but the last in its round (by exercise_order) gets the switch time
- * and the last gets the round rest. A primary set always gets the primary
- * rest. Warmup, cooldown and anything else get blank.
- *
- * Each value is the template section's (`sectionRest[section]`), else the
- * Settings default. Mirrors resolveRestTargets in frontend/src/api/rest-times.ts.
+ * exercise but the last in its round (by exercise_order) takes the switch and
+ * the last takes the round rest. A primary set always takes the rest. Warmup,
+ * cooldown and anything else take nothing.
  */
-function resolveRestTargets(sets, sectionRest, defaults) {
-  var kinds = {
-    primary: { rest: 'rest_primary_s' },
-    SS1: { rest: 'rest_superset_s', sw: 'switch_superset_s' },
-    SS2: { rest: 'rest_superset_s', sw: 'switch_superset_s' },
-    SS3: { rest: 'rest_superset_s', sw: 'switch_superset_s' },
-    burnout: { rest: 'rest_burnout_s', sw: 'switch_burnout_s' },
-  };
-  var pick = function (section, field, defaultKey) {
-    var own = sectionRest && sectionRest[section] ? cell(sectionRest[section][field]) : '';
-    return own !== '' ? own : String(defaults[defaultKey]);
-  };
-
+function restFieldsOf(sets) {
   // The highest exercise_order in each round.
   var lastInRound = {};
   sets.forEach(function (s) {
@@ -402,20 +396,146 @@ function resolveRestTargets(sets, sectionRest, defaults) {
   });
 
   return sets.map(function (s) {
-    var kind = Object.prototype.hasOwnProperty.call(kinds, s.section) ? kinds[s.section] : null;
+    var kind = Object.prototype.hasOwnProperty.call(REST_KINDS, s.section) ? REST_KINDS[s.section] : null;
     if (!kind) return '';
-    if (!kind.sw) return pick(s.section, 'rest_s', kind.rest);
+    if (!kind.sw) return 'rest_s';
     var last = lastInRound[s.section + '\u0000' + Number(s.set_number)] === (Number(s.exercise_order) || 0);
-    return last ? pick(s.section, 'rest_s', kind.rest) : pick(s.section, 'switch_s', kind.sw);
+    return last ? 'rest_s' : 'switch_s';
   });
 }
 
 /**
- * Fill `rest_target_s` on new sets (#576) for every workout none of whose sets
- * in this call names it: from the workout's template, by section, else the
- * Settings defaults. A caller that sends the field, even blank, keeps it.
+ * The rest planned after each set (#576), as text parallel to `sets`, which
+ * are one workout's rows: the round rule of `restFieldsOf`, then each value
+ * from `sectionRest[section]` (a template section, with any #583 overrides
+ * laid over it), else the Settings default. Mirrors resolveRestTargets in
+ * frontend/src/api/rest-times.ts.
  */
-function withRestTargets(sets) {
+function resolveRestTargets(sets, sectionRest, defaults) {
+  var fields = restFieldsOf(sets);
+  return sets.map(function (s, i) {
+    var field = fields[i];
+    if (!field) return '';
+    var kind = REST_KINDS[s.section];
+    var own = sectionRest && sectionRest[s.section] ? cell(sectionRest[s.section][field]) : '';
+    return own !== '' ? own : String(defaults[field === 'rest_s' ? kind.rest : kind.sw]);
+  });
+}
+
+/**
+ * A caller's per-section rest (#583): a list of `{ section, rest_s?, switch_s? }`
+ * in whole seconds, the MCP's `rest` parameter. Returns
+ * `{ sections: { SS1: { rest_s: '60' } }, errors }`: a field left out stays
+ * out, and `null` (or '') becomes '', the Settings default. Every problem is
+ * collected, each naming the entry and its section.
+ */
+function parseRestOverrides(list) {
+  var sections = {};
+  var errors = [];
+  if (list === undefined || list === null) return { sections: sections, errors: errors };
+  if (!Array.isArray(list)) return { sections: sections, errors: ['rest must be a list of sections'] };
+
+  list.forEach(function (entry, i) {
+    var where = 'rest[' + i + ']';
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      errors.push(where + ': must be { section, rest_s, switch_s }');
+      return;
+    }
+    var section = entry.section;
+    where += ' (' + (section === undefined ? 'no section' : String(section)) + ')';
+    var unknown = Object.keys(entry).filter(function (k) {
+      return ['section', 'rest_s', 'switch_s'].indexOf(k) === -1;
+    });
+    if (unknown.length) {
+      errors.push(where + ': unknown field ' + unknown.map(function (k) { return '"' + k + '"'; }).join(', ') +
+        ' — accepted: section, rest_s, switch_s');
+      return;
+    }
+    if (REST_SECTIONS.indexOf(section) === -1) {
+      errors.push(where + ': section must be one of ' + REST_SECTIONS.join(', '));
+      return;
+    }
+    if (Object.prototype.hasOwnProperty.call(sections, section)) {
+      errors.push(where + ': section ' + section + ' is named twice');
+      return;
+    }
+    if (entry.rest_s === undefined && entry.switch_s === undefined) {
+      errors.push(where + ': nothing to change — pass rest_s, switch_s or both');
+      return;
+    }
+    if (entry.switch_s !== undefined && SWITCH_SECTIONS.indexOf(section) === -1) {
+      errors.push(where + ': switch_s applies only to SS1, SS2, SS3 and burnout');
+      return;
+    }
+    var mine = {};
+    try {
+      if (entry.rest_s !== undefined) {
+        mine.rest_s = templateRestValue(where, 'rest_s', entry.rest_s, REST_SECONDS_MIN, REST_SECONDS_MAX);
+      }
+      if (entry.switch_s !== undefined) {
+        mine.switch_s = templateRestValue(where, 'switch_s', entry.switch_s, SWITCH_SECONDS_MIN, SWITCH_SECONDS_MAX);
+      }
+    } catch (err) {
+      errors.push(err.message);
+      return;
+    }
+    sections[section] = mine;
+  });
+  return { sections: sections, errors: errors };
+}
+
+/** `base` (a template's section rest) with `overrides` laid over it, field by field (#583). */
+function mergeSectionRest(base, overrides) {
+  var out = {};
+  Object.keys(base || {}).forEach(function (s) {
+    out[s] = { rest_s: base[s].rest_s, switch_s: base[s].switch_s };
+  });
+  Object.keys(overrides || {}).forEach(function (s) {
+    var mine = out[s] || (out[s] = {});
+    if (overrides[s].rest_s !== undefined) mine.rest_s = overrides[s].rest_s;
+    if (overrides[s].switch_s !== undefined) mine.switch_s = overrides[s].switch_s;
+  });
+  return out;
+}
+
+/**
+ * Check `rest_plans` (#583) before anything is written: `{ <workout_id>:
+ * { template_id?, rest? } }`. Returns each workout's template and parsed
+ * overrides, or throws with every problem.
+ */
+function parseRestPlans(restPlans) {
+  var out = {};
+  if (restPlans === undefined || restPlans === null) return out;
+  if (typeof restPlans !== 'object' || Array.isArray(restPlans)) {
+    throw new Error('rest_plans must be an object keyed by workout_id');
+  }
+  var errors = [];
+  Object.keys(restPlans).forEach(function (id) {
+    var plan = restPlans[id] || {};
+    var parsed = parseRestOverrides(plan.rest);
+    parsed.errors.forEach(function (e) { errors.push('rest_plans.' + id + ' ' + e); });
+    out[id] = {
+      hasTemplate: Object.prototype.hasOwnProperty.call(plan, 'template_id'),
+      template_id: cell(plan.template_id),
+      sections: parsed.sections,
+    };
+  });
+  if (errors.length) throw new Error(errors.join('; '));
+  return out;
+}
+
+/**
+ * Fill `rest_target_s` on new sets (#576) for every workout none of whose sets
+ * in this call names it. A caller that sends the field, even blank, keeps it.
+ *
+ * Precedence, per section and field (#583): the workout's `rest_plans` entry,
+ * then its template's section rest, then the Settings default. The template is
+ * the plan's `template_id` when the plan names one (blank: no template), else
+ * the workout row's. The MCP appends sets before the workout row exists, so it
+ * names the template here.
+ */
+function withRestTargets(sets, restPlans) {
+  var plans = restPlans || {};
   var byWorkout = {};
   sets.forEach(function (s) {
     var id = cell(s.workout_id);
@@ -431,15 +551,23 @@ function withRestTargets(sets) {
     var group = byWorkout[id];
     if (group.some(function (s) { return s.rest_target_s !== undefined; })) return;
 
-    if (workouts === null) workouts = getWorkouts({});
     if (defaults === null) defaults = getRestSettings();
-    var workout = workouts.filter(function (w) { return w.id === id; })[0];
+    var plan = Object.prototype.hasOwnProperty.call(plans, id) ? plans[id] : null;
+    var templateId = '';
+    if (plan && plan.hasTemplate) {
+      templateId = plan.template_id;
+    } else {
+      if (workouts === null) workouts = getWorkouts({});
+      var workout = workouts.filter(function (w) { return w.id === id; })[0];
+      if (workout) templateId = workout.template_id;
+    }
     var sectionRest = {};
-    if (workout && workout.template_id) {
+    if (templateId) {
       if (templates === null) templates = getTemplates();
-      var tpl = templates.filter(function (t) { return t.id === workout.template_id; })[0];
+      var tpl = templates.filter(function (t) { return t.id === templateId; })[0];
       if (tpl) sectionRest = sectionRestOf(tpl.exercises);
     }
+    if (plan) sectionRest = mergeSectionRest(sectionRest, plan.sections);
 
     var targets = resolveRestTargets(group, sectionRest, defaults);
     group.forEach(function (s, i) {
@@ -452,10 +580,13 @@ function withRestTargets(sets) {
   return out;
 }
 
-/** Append set rows. Used when a workout is scheduled or built. */
-function appendSets(sets) {
+/**
+ * Append set rows. Used when a workout is scheduled or built. `restPlans`
+ * (#583) is optional, and checked before anything is written.
+ */
+function appendSets(sets, restPlans) {
   if (!sets || !sets.length) throw new Error('sets are required');
-  sets = withRestTargets(sets);
+  sets = withRestTargets(sets, parseRestPlans(restPlans));
   var sheet = getSheet(SETS_SHEET);
   var appended = [];
   for (var i = 0; i < sets.length; i++) {
@@ -464,6 +595,97 @@ function appendSets(sets) {
     appended.push(rowToSet(row, sheet.getLastRow()));
   }
   return appended;
+}
+
+/** A set already done (#583): reps or set_s recorded. A weight alone is a prescription. */
+function isSetDone(s) {
+  return cell(s.reps) !== '' || cell(s.set_s) !== '';
+}
+
+/**
+ * Re-resolve `rest_target_s` on one planned or active workout (#583), in the
+ * sections `rest` names. A dry run unless `confirm` is true.
+ *
+ * Only the named sections change, and in them only the sets that take a field
+ * the entry gives: a rest given alone leaves the switch sets as they are. A
+ * done set (reps or set_s) keeps the target it ran against. `null` means the
+ * Settings default. The round rule is appendSets', over the workout's sets.
+ *
+ * @param {{workout_id: string, rest: Array, confirm?: boolean}} payload
+ */
+function setWorkoutRest(payload) {
+  payload = payload || {};
+  var workoutId = cell(payload.workout_id);
+  if (!workoutId) throw new Error('workout_id is required');
+  if (!Array.isArray(payload.rest) || !payload.rest.length) {
+    throw new Error('rest is required: a list of { section, rest_s, switch_s }');
+  }
+  var confirm = payload.confirm === true;
+
+  var workout = getWorkouts({}).filter(function (w) { return w.id === workoutId; })[0];
+  if (!workout) throw new Error('Workout "' + workoutId + '" not found');
+  if (workout.status !== 'planned' && workout.status !== 'active') {
+    throw new Error(
+      'Workout ' + workoutId + ' is ' + (workout.status || 'completed') + ': rest can be changed only on a ' +
+      'planned or active workout. Nothing was written.'
+    );
+  }
+
+  var parsed = parseRestOverrides(payload.rest);
+  var sets = getSets({ workout_id: workoutId });
+  payload.rest.forEach(function (e, i) {
+    if (!e || !Object.prototype.hasOwnProperty.call(parsed.sections, e.section)) return;
+    if (!sets.some(function (s) { return s.section === e.section; })) {
+      parsed.errors.push('rest[' + i + '] (' + e.section + '): workout ' + workoutId + ' has no ' + e.section + ' sets');
+    }
+  });
+  if (parsed.errors.length) throw new Error(parsed.errors.join('; '));
+
+  var fields = restFieldsOf(sets);
+  var targets = resolveRestTargets(sets, parsed.sections, getRestSettings());
+  var changes = [];
+  var keptDone = 0;
+  sets.forEach(function (s, i) {
+    var mine = parsed.sections[s.section];
+    if (!mine || !fields[i] || mine[fields[i]] === undefined) return;
+    if (cell(s.rest_target_s) === targets[i]) return;
+    if (isSetDone(s)) {
+      keptDone++;
+      return;
+    }
+    changes.push({ set: s, before: cell(s.rest_target_s), after: targets[i] });
+  });
+
+  var result = {
+    dry_run: !confirm, workout_id: workoutId, count: changes.length, kept_done: keptDone,
+    changes: changes.map(function (c) {
+      return {
+        exercise_id: c.set.exercise_id, exercise_name: c.set.exercise_name, section: c.set.section,
+        exercise_order: c.set.exercise_order, set_number: c.set.set_number,
+        before: c.before, after: c.after,
+      };
+    }),
+  };
+  if (!confirm || !changes.length) return result;
+
+  var sheet = getSheet(SETS_SHEET);
+  var targetSets = changes.map(function (c) { return c.set; });
+  var fresh = targetSets.map(function (s) {
+    return sheet.getRange(s.sheetRow, 1, 1, SET_IDENTITY_COLUMN_COUNT).getDisplayValues()[0];
+  });
+  var stale = findStaleSetRows(targetSets, fresh);
+  if (stale.length) {
+    throw new Error(
+      'Set rows moved since they were read (sheet rows ' +
+      stale.map(function (s) { return s.sheetRow; }).join(', ') + '). Nothing was written; retry.'
+    );
+  }
+  // Column K alone: the rest of the row, Lift Mode's L:M included, is left as it is.
+  var restColumn = SET_FIELDS.indexOf('rest_target_s') + 1;
+  for (var j = 0; j < changes.length; j++) {
+    sheet.getRange(changes[j].set.sheetRow, restColumn, 1, 1).setValues([asText([changes[j].after])]);
+  }
+  return result;
 }
 
 /**

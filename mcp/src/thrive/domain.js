@@ -11,7 +11,9 @@
 // "today" lands on tomorrow.
 
 
-export const WORKOUT_TYPES = ['weight', 'stretch', 'bike', 'hike', 'run', 'walk'];
+import { checkRest, templateRestOf } from './rest.js';
+
+export const WORKOUT_TYPES =['weight', 'stretch', 'bike', 'hike', 'run', 'walk'];
 export const EFFORTS = ['Easy', 'Medium', 'Hard'];
 export const SECTIONS = ['warmup', 'primary', 'SS1', 'SS2', 'SS3', 'burnout', 'cooldown'];
 
@@ -155,10 +157,18 @@ export function buildSchedulePlan(specs, resolve) {
  * go through here, so a week is validated exactly like a single session (#121).
  *
  * `resolveExercise(ref)` and `resolveTemplate(ref)` return a match or throw.
+ *
+ * `rest` (#583) is checked here against the plan's sections. The result's
+ * `restPlan` is what appendSets resolves the sets' rest from — the template id
+ * and the overrides — and `templateRest` the template's stored rest, for the
+ * summary.
  */
 export function prepareSchedule(input, { library, resolveExercise, resolveTemplate }) {
-  const { date, name, type = 'weight', template, exercises, notes, status = 'planned', estimated_min } = input;
+  const {
+    date, name, type = 'weight', template, exercises, notes, status = 'planned', estimated_min, rest,
+  } = input;
   const errors = [];
+  let templateRest = {};
 
   const when = normalizeDate(date);
   if (!when) errors.push(`could not read "${date}" as a date — use YYYY-MM-DD, 'today', 'tomorrow' or '+3d'`);
@@ -193,6 +203,7 @@ export function prepareSchedule(input, { library, resolveExercise, resolveTempla
       } else {
         const currentName = new Map(library.map((e) => [e.id, e.name]));
         templateId = tpl.id;
+        templateRest = templateRestOf(tpl.exercises);
         plan = tpl.exercises.map((e) => ({
           exercise_id: e.exercise_id,
           exercise_name: currentName.get(e.exercise_id),
@@ -210,6 +221,10 @@ export function prepareSchedule(input, { library, resolveExercise, resolveTempla
   } else if (type === 'weight') {
     errors.push('a weight workout needs either a template or an exercises list');
   }
+
+  // Against the plan's sections only once there is a plan, or a template that
+  // failed to resolve would make every section look missing.
+  errors.push(...checkRest(rest, errors.length ? undefined : new Set(plan.map((e) => e.section))));
 
   if (errors.length) return { errors };
 
@@ -236,7 +251,8 @@ export function prepareSchedule(input, { library, resolveExercise, resolveTempla
     reps: '',
     effort: '',
   })));
-  return { workout, rows, plan, errors: [] };
+  const restPlan = { template_id: templateId, ...(rest?.length ? { rest } : {}) };
+  return { workout, rows, plan, restPlan, templateRest, errors: [] };
 }
 
 /**

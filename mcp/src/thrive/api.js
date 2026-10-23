@@ -260,6 +260,8 @@ export const fetchWorkoutPayload = (id, offset) => apiGet('getWorkoutPayload', {
 export const fetchDrinks = (from, to) => apiGet('getDrinks', { from, to });
 /** The change log, newest call first (#434). The API caps one answer at 1000 rows. */
 export const fetchChangeLog = () => apiGet('getChangeLog', { limit: 1000 });
+/** Every setting with its default filled in (#576): the rest defaults a schedule's summary names (#583). */
+export const fetchSettings = () => apiGet('getSettings');
 
 // --- undo (#412) -----------------------------------------------------
 
@@ -298,25 +300,82 @@ export const createTemplate = (data) => apiWrite('createTemplate', { data });
 export const replaceTemplate = (templateId, data) =>
   apiWrite('replaceTemplate', { template_id: templateId, data });
 
+/**
+ * Re-resolve a planned or active workout's rest targets (#583). The preview is
+ * the API's own dry run, so it resolves exactly as the write will; it writes
+ * nothing and is not a write to count.
+ */
+export const previewWorkoutRest = (workoutId, rest) =>
+  apiDry('setWorkoutRest', { workout_id: workoutId, rest });
+export const setWorkoutRest = (workoutId, rest) =>
+  apiWrite('setWorkoutRest', { workout_id: workoutId, rest, confirm: true });
+
 export const previewSetUpdates = (workoutId, updates) =>
   apiWrite('previewSetUpdates', { workout_id: workoutId, updates });
 export const updateSets = (workoutId, updates) =>
   apiWrite('updateSets', { workout_id: workoutId, updates });
 
 /**
- * Append set rows, chunked to fit (#132 AC5).
+ * The units a set list may be chunked at without changing its rest (#583).
+ *
+ * The API resolves a superset or burnout round's switch and rest from the
+ * round's sets in one request, so a round must never be split across chunks.
+ * Each such section of a workout is one unit, in order, or, when it is too
+ * large to send alone, one unit per round. Every other set is its own unit.
+ */
+function restUnits(sets, size, limit) {
+  const units = [];
+  const sections = new Map();
+  for (const s of sets) {
+    if (!['SS1', 'SS2', 'SS3', 'burnout'].includes(s.section)) {
+      units.push([s]);
+      continue;
+    }
+    const key = `${s.workout_id}\u0000${s.section}`;
+    if (!sections.has(key)) {
+      sections.set(key, []);
+      units.push(sections.get(key));
+    }
+    sections.get(key).push(s);
+  }
+  return units.flatMap((unit) => {
+    if (unit.length === 1 || size(unit) <= limit) return [unit];
+    const rounds = new Map();
+    for (const s of unit) {
+      if (!rounds.has(s.set_number)) rounds.set(s.set_number, []);
+      rounds.get(s.set_number).push(s);
+    }
+    return [...rounds.values()];
+  });
+}
+
+/**
+ * Append set rows, chunked to fit (#132 AC5), never splitting a round (#583).
+ *
+ * `restPlans` (#583) is `{ <workout_id>: { template_id, rest? } }`: the
+ * template and the section overrides the API resolves each workout's rest
+ * from, sent because the workout row does not exist yet. Each chunk carries
+ * the plans of its own workouts.
  *
  * If a later chunk fails, the error says how many rows already landed — a
  * failure that implied nothing happened would send the caller back to write
  * the early rows a second time.
  */
-export async function appendSets(sets) {
+export async function appendSets(sets, restPlans = {}) {
   if (!sets.length) return 0;
-  const chunks = chunkByPayload(sets, (run) => ({ sets: run }));
+  const wrap = (run) => {
+    const ids = [...new Set(run.map((s) => s.workout_id))].filter((id) => id in restPlans);
+    return ids.length
+      ? { sets: run, rest_plans: Object.fromEntries(ids.map((id) => [id, restPlans[id]])) }
+      : { sets: run };
+  };
+  const size = (run) => encodeURIComponent(JSON.stringify(wrap(run))).length;
+  const chunks = chunkByPayload(restUnits(sets, size, MAX_ENCODED_PAYLOAD), (units) => wrap(units.flat()))
+    .map((units) => units.flat());
   let written = 0;
   for (const [i, chunk] of chunks.entries()) {
     try {
-      await apiWrite('appendSets', { sets: chunk });
+      await apiWrite('appendSets', wrap(chunk));
     } catch (err) {
       // Refused before anything was sent: the limit's own words, not "0 of N written".
       if (err instanceof WriteLimitError) throw err;

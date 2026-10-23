@@ -58,7 +58,15 @@ const REST_TEMPLATES = [{
 const REST_EXERCISES = [
   { id: 'ex_ohp', name: 'OH Press', tags: '', notes: '', created: '' },
   { id: 'ex_arnold', name: 'Arnold Press', tags: '', notes: '', created: '' },
+  // #583: the rest of Upper Push B, so it can be scheduled.
+  { id: 'ex_lat', name: 'Lateral Raise', tags: '', notes: '', created: '' },
+  { id: 'ex_abw', name: 'Ab Wheel', tags: '', notes: '', created: '' },
 ];
+// #576: getSettings with the defaults.
+const SETTINGS = {
+  rest_primary_s: 90, rest_superset_s: 45, switch_superset_s: 15, rest_burnout_s: 45, switch_burnout_s: 10,
+  water_goal_ml: 1893,
+};
 const restSet = (set_number, rest) => ({
   workout_id: 'w_enr', exercise_id: 'ex_ohp', exercise_name: 'OH Press', section: 'primary',
   exercise_order: 1, set_number, planned_reps: '5', weight: '95', reps: '5', effort: '',
@@ -161,7 +169,29 @@ before(async () => {
         break;
       case 'getExercises': data = REST_EXERCISES; break;
       case 'getTemplates': data = REST_TEMPLATES; break;
+      case 'getSettings': data = SETTINGS; break;
       case 'replaceTemplate': data = JSON.parse(p.payload).data; break;
+      case 'createTemplate': data = { id: 'tpl_new', ...JSON.parse(p.payload).data }; break;
+      // #583: the API's dry run and write, answered the way setWorkoutRest answers.
+      case 'setWorkoutRest': {
+        const { workout_id: id, confirm } = JSON.parse(p.payload);
+        if (id === 'w_nope') {
+          res.end(JSON.stringify({ success: false, error: 'Workout "w_nope" not found' }));
+          return;
+        }
+        if (id === 'w_done') {
+          res.end(JSON.stringify({ success: false, error: 'Workout w_done is completed: rest can be changed only on a planned or active workout. Nothing was written.' }));
+          return;
+        }
+        const change = (exercise_name, set_number, before, after) =>
+          ({ exercise_id: 'x', exercise_name, section: 'burnout', exercise_order: 8, set_number, before, after });
+        data = id === 'w_same'
+          ? { dry_run: !confirm, workout_id: id, count: 0, kept_done: 1, changes: [] }
+          : { dry_run: !confirm, workout_id: id, count: 3, kept_done: 2, changes: [
+            change('Ab Wheel', 1, '10', '5'), change('Ab Wheel', 2, '10', '5'), change('Wrist Flexor', 1, '45', '60'),
+          ] };
+        break;
+      }
       case 'appendSets': data = { appended: 0 }; break;
       case 'createWorkout': data = JSON.parse(p.payload).data; break;
       case 'updateWorkout': {
@@ -582,6 +612,225 @@ test('thrive_get_workout shows a set rest_target_s, set_s and rest_s where prese
   assert.equal(isError, false, text);
   assert.match(text, /- set 1: .*\(rest target 90s, set 41s, rested 95s\)\n/);
   assert.match(text, /- set 2: 95 lbs x 5 reps$/m);
+});
+
+// --- #583: rest when scheduling, on templates and on a planned workout --------
+
+const actionsSince = (n) => calls.slice(n).map((c) => c.action);
+const lastPayload = (action) => sentWithoutCallId(calls.filter((c) => c.action === action).at(-1));
+
+test('thrive_schedule_workout from a template names it in rest_plans, sets before the workout row', async () => {
+  const before = calls.length;
+  const res = await call('thrive_schedule_workout', { date: '2099-12-31', name: 'Push', template: 'Upper Push B' });
+  assert.equal(res.isError, false, res.text);
+  const writes = actionsSince(before).filter((a) => a === 'appendSets' || a === 'createWorkout');
+  assert.deepEqual(writes, ['appendSets', 'createWorkout']);
+  const { sets, rest_plans: plans } = lastPayload('appendSets');
+  const id = lastPayload('createWorkout').data.id;
+  assert.deepEqual(plans, { [id]: { template_id: 'tpl_upb' } });
+  assert.ok(sets.every((s) => !('rest_target_s' in s)), 'the API resolves rest, the MCP sends none');
+  // The summary: the template's SS1 and burnout switch, the defaults elsewhere.
+  assert.match(res.text, /- Rest:\n {2}Primary — rest 1:30\n {2}Superset 1 — rest 1:00, switch 0:20\n {2}Burnout — rest 0:45, switch 0:00$/);
+});
+
+test('thrive_schedule_workout passes rest as it was given, and the summary shows it over the template', async () => {
+  const res = await call('thrive_schedule_workout', {
+    date: '2099-12-31', name: 'Push', template: 'Upper Push B',
+    rest: [{ section: 'primary', rest_s: 120 }, { section: 'SS1', switch_s: null }],
+  });
+  assert.equal(res.isError, false, res.text);
+  const id = lastPayload('createWorkout').data.id;
+  assert.deepEqual(lastPayload('appendSets').rest_plans, {
+    [id]: { template_id: 'tpl_upb', rest: [{ section: 'primary', rest_s: 120 }, { section: 'SS1', switch_s: null }] },
+  });
+  assert.match(res.text, /Primary — rest 2:00\n {2}Superset 1 — rest 1:00, switch 0:15\n/);
+});
+
+test('thrive_schedule_week resolves each entry on its own: one plan per workout, sent with its sets', async () => {
+  const before = calls.length;
+  const res = await call('thrive_schedule_week', { workouts: [
+    { date: '2099-12-30', name: 'A', template: 'Upper Push B', rest: [{ section: 'burnout', rest_s: 60, switch_s: 5 }] },
+    { date: '2099-12-31', name: 'B', template: 'Upper Push B' },
+  ] });
+  assert.equal(res.isError, false, res.text);
+  const ids = calls.filter((c) => c.action === 'createWorkout').slice(-2).map((c) => JSON.parse(c.payload).data.id);
+  // The sets may be chunked; every chunk carries the plans of the workouts whose sets it holds.
+  const plans = {};
+  for (const c of calls.slice(before).filter((x) => x.action === 'appendSets')) {
+    const { sets, rest_plans: chunkPlans } = JSON.parse(c.payload);
+    assert.deepEqual(Object.keys(chunkPlans).sort(), [...new Set(sets.map((s) => s.workout_id))].sort());
+    Object.assign(plans, chunkPlans);
+  }
+  assert.deepEqual(plans, {
+    [ids[0]]: { template_id: 'tpl_upb', rest: [{ section: 'burnout', rest_s: 60, switch_s: 5 }] },
+    [ids[1]]: { template_id: 'tpl_upb' },
+  });
+  assert.match(res.text, /\*\*A\*\*.*\n {2}Rest: Primary — rest 1:30; Superset 1 — rest 1:00, switch 0:20; Burnout — rest 1:00, switch 0:05\n/);
+  assert.match(res.text, /\*\*B\*\*.*\n {2}Rest: Primary — rest 1:30; Superset 1 — rest 1:00, switch 0:20; Burnout — rest 0:45, switch 0:00$/);
+});
+
+test('an explicit exercise list sends no template, so SS1 takes the rest given and the rest the defaults', async () => {
+  const res = await call('thrive_schedule_workout', {
+    date: '2099-12-31', name: 'Custom', exercises: [
+      { exercise: 'OH Press', section: 'primary', sets: 3, reps: '5' },
+      { exercise: 'Arnold Press', section: 'SS1', sets: 3, reps: '10' },
+      { exercise: 'Lateral Raise', section: 'SS1', sets: 3, reps: '12' },
+    ],
+    rest: [{ section: 'SS1', rest_s: 75, switch_s: 20 }],
+  });
+  assert.equal(res.isError, false, res.text);
+  const id = lastPayload('createWorkout').data.id;
+  assert.deepEqual(lastPayload('appendSets').rest_plans, {
+    [id]: { template_id: '', rest: [{ section: 'SS1', rest_s: 75, switch_s: 20 }] },
+  });
+  assert.match(res.text, /Primary — rest 1:30\n {2}Superset 1 — rest 1:15, switch 0:20$/);
+});
+
+test('a bad rest is refused, naming the entry, section and problem, and nothing is written', async () => {
+  const cases = [
+    [{ section: 'primary', rest_s: 14 }, /rest\[0\] \(primary\): rest_s must be whole seconds, 15 to 600/],
+    [{ section: 'primary', rest_s: 601 }, /rest\[0\] \(primary\): rest_s must be whole seconds, 15 to 600/],
+    [{ section: 'SS1', switch_s: 121 }, /rest\[0\] \(SS1\): switch_s must be whole seconds, 0 to 120/],
+    [{ section: 'SS1', switch_s: -1 }, /rest\[0\] \(SS1\): switch_s must be whole seconds, 0 to 120/],
+    [{ section: 'SS1', rest_s: 60.5 }, /rest\[0\] \(SS1\): rest_s must be whole seconds/],
+    [{ section: 'primary', switch_s: 10 }, /rest\[0\] \(primary\): switch_s applies only to SS1, SS2, SS3 and burnout/],
+    [{ section: 'core', rest_s: 60 }, /rest\[0\] \(core\): section must be one of primary, SS1, SS2, SS3, burnout/],
+    [{ section: 'warmup', rest_s: 60 }, /rest\[0\] \(warmup\): section must be one of/],
+    [{ section: 'SS3', rest_s: 60 }, /rest\[0\] \(SS3\): the workout has no SS3 exercises/],
+    [{ section: 'SS1', rest_s: 60, wait: 5 }, /rest\[0\] \(SS1\): unknown field "wait"/],
+  ];
+  for (const [entry, message] of cases) {
+    const before = calls.length;
+    const res = await call('thrive_schedule_workout', { date: '2099-12-31', name: 'P', template: 'Upper Push B', rest: [entry] });
+    assert.equal(res.isError, true, JSON.stringify(entry));
+    assert.match(res.text, /^Error: Nothing was scheduled/);
+    assert.match(res.text, message);
+    assert.deepEqual(actionsSince(before).filter((a) => a === 'appendSets' || a === 'createWorkout'), []);
+  }
+});
+
+test('in thrive_schedule_week one bad entry stops the whole call, and names the entry', async () => {
+  const before = calls.length;
+  const res = await call('thrive_schedule_week', { workouts: [
+    { date: '2099-12-30', name: 'A', template: 'Upper Push B', rest: [{ section: 'primary', rest_s: 120 }] },
+    { date: '2099-12-31', name: 'B', template: 'Upper Push B', rest: [{ section: 'SS2', rest_s: 60 }] },
+  ] });
+  assert.equal(res.isError, true);
+  assert.match(res.text, /workouts\[1\] "B": rest\[0\] \(SS2\): the workout has no SS2 exercises/);
+  assert.deepEqual(actionsSince(before).filter((a) => a === 'appendSets' || a === 'createWorkout'), []);
+});
+
+test('thrive_create_template writes rest on every row of a named section, and nothing on the others', async () => {
+  const res = await call('thrive_create_template', {
+    name: 'Push C',
+    exercises: [
+      { exercise: 'OH Press', section: 'primary', sets: 4, reps: '5' },
+      { exercise: 'Arnold Press', section: 'SS1', sets: 3, reps: '10' },
+      { exercise: 'Lateral Raise', section: 'SS1', sets: 3, reps: '12' },
+      { exercise: 'Ab Wheel', section: 'burnout', sets: 2, reps: '10' },
+    ],
+    rest: [{ section: 'SS1', rest_s: 60, switch_s: 20 }, { section: 'primary', rest_s: 150 }],
+  });
+  assert.equal(res.isError, false, res.text);
+  const sent = lastPayload('createTemplate').data.exercises;
+  assert.deepEqual(sent.map((e) => [e.section, e.rest_s, e.switch_s]), [
+    ['primary', '150', undefined], ['SS1', '60', '20'], ['SS1', '60', '20'], ['burnout', undefined, undefined],
+  ]);
+  assert.match(res.text, /- Rest:\n {2}Primary — rest 2:30\n {2}Superset 1 — rest 1:00, switch 0:20\n {2}Burnout — rest default, switch default$/);
+});
+
+test('thrive_create_template refuses rest for a section it does not have, before any write', async () => {
+  const before = calls.length;
+  const res = await call('thrive_create_template', {
+    name: 'X', exercises: [{ exercise: 'OH Press', section: 'primary', sets: 4, reps: '5' }],
+    rest: [{ section: 'SS2', rest_s: 60 }],
+  });
+  assert.equal(res.isError, true);
+  assert.match(res.text, /rest\[0\] \(SS2\): the template has no SS2 exercises/);
+  assert.equal(calls.length, before);
+});
+
+const upbExercises = [
+  { exercise: 'OH Press', section: 'primary', sets: 4, reps: '5' },
+  { exercise: 'Arnold Press', section: 'SS1', sets: 3, reps: '10' },
+  { exercise: 'Lateral Raise', section: 'SS1', sets: 3, reps: '10' },
+  { exercise: 'Ab Wheel', section: 'burnout', sets: 3, reps: '10' },
+];
+
+test('thrive_update_template dry run shows rest before and after, and writes nothing', async () => {
+  const before = calls.length;
+  const res = await call('thrive_update_template', {
+    template: 'Upper Push B', exercises: upbExercises, rest: [{ section: 'SS1', rest_s: 90 }],
+  });
+  assert.equal(res.isError, false, res.text);
+  assert.match(res.text, /^DRY RUN/);
+  assert.match(res.text, /Rest, before -> after \("default" is the Settings default\):\n {2}Primary — rest default \(unchanged\)\n {2}Superset 1 — rest 1:00 -> 1:30, switch 0:20 \(unchanged\)\n {2}Burnout — rest default \(unchanged\), switch 0:00 \(unchanged\)\n/);
+  assert.equal(actionsSince(before).includes('replaceTemplate'), false);
+});
+
+test('thrive_update_template sends rest for the named section only, so the others keep theirs; null blanks', async () => {
+  const res = await call('thrive_update_template', {
+    template: 'Upper Push B', exercises: upbExercises, rest: [{ section: 'SS1', rest_s: null }], confirm: true,
+  });
+  assert.equal(res.isError, false, res.text);
+  const sent = lastPayload('replaceTemplate').data.exercises;
+  assert.deepEqual(sent.map((e) => [e.section, 'rest_s' in e ? e.rest_s : 'kept', 'switch_s' in e ? e.switch_s : 'kept']), [
+    ['primary', 'kept', 'kept'], ['SS1', '', 'kept'], ['SS1', '', 'kept'], ['burnout', 'kept', 'kept'],
+  ]);
+  assert.match(res.text, /Superset 1 — rest 1:00 -> default, switch 0:20 \(unchanged\)/);
+});
+
+test('thrive_set_workout_rest is a destructive write tool, dry-run by default', async () => {
+  const { tools } = await client.listTools();
+  const t = tools.find((x) => x.name === 'thrive_set_workout_rest');
+  assert.ok(t);
+  assert.deepEqual(Object.keys(t.inputSchema.properties).sort(), ['confirm', 'rest', 'workout_id']);
+  assert.equal(t.annotations?.destructiveHint, true);
+  assert.match(t.description, /Dry-run by default/);
+  assert.match(t.description, /Refuses a completed workout/);
+});
+
+test('thrive_set_workout_rest previews each changed set, old to new, and writes only with confirm', async () => {
+  const rest = [{ section: 'burnout', rest_s: 60, switch_s: 5 }];
+  const before = calls.length;
+  const dry = await call('thrive_set_workout_rest', { workout_id: 'w_plan', rest });
+  assert.equal(dry.isError, false, dry.text);
+  assert.match(dry.text, /^DRY RUN — nothing written\. On w_plan this would change 3 sets:\n/);
+  assert.match(dry.text, /- Ab Wheel \[burnout\] set 1: rest target 0:10 -> 0:05\n/);
+  assert.match(dry.text, /- Wrist Flexor \[burnout\] set 1: rest target 0:45 -> 1:00\n/);
+  assert.match(dry.text, /2 sets already done keep the target they ran against\./);
+  const sentDry = calls.slice(before).filter((c) => c.action === 'setWorkoutRest');
+  assert.equal(sentDry.length, 1);
+  assert.deepEqual(JSON.parse(sentDry[0].payload), { workout_id: 'w_plan', rest }, 'a dry run: no confirm, no call_id');
+
+  const done = await call('thrive_set_workout_rest', { workout_id: 'w_plan', rest, confirm: true });
+  assert.equal(done.isError, false, done.text);
+  assert.match(done.text, /^Updated the rest target of 3 sets on w_plan:\n/);
+  assert.deepEqual(lastPayload('setWorkoutRest'), { workout_id: 'w_plan', rest, confirm: true });
+});
+
+test('thrive_set_workout_rest says when nothing changes, and writes nothing', async () => {
+  const before = calls.length;
+  const res = await call('thrive_set_workout_rest', { workout_id: 'w_same', rest: [{ section: 'primary', rest_s: 90 }], confirm: true });
+  assert.equal(res.isError, false, res.text);
+  assert.match(res.text, /^Nothing to change on w_same/);
+  assert.equal(calls.slice(before).filter((c) => c.action === 'setWorkoutRest' && JSON.parse(c.payload).confirm).length, 0);
+});
+
+test('thrive_set_workout_rest refuses a completed or unknown workout, and a bad rest before any request', async () => {
+  const done = await call('thrive_set_workout_rest', { workout_id: 'w_done', rest: [{ section: 'primary', rest_s: 120 }], confirm: true });
+  assert.equal(done.isError, true);
+  assert.match(done.text, /w_done is completed: rest can be changed only on a planned or active workout\. Nothing was written\./);
+
+  const nope = await call('thrive_set_workout_rest', { workout_id: 'w_nope', rest: [{ section: 'primary', rest_s: 120 }] });
+  assert.equal(nope.isError, true);
+  assert.match(nope.text, /No workout with id "w_nope"\./);
+
+  const before = calls.length;
+  const bad = await call('thrive_set_workout_rest', { workout_id: 'w_plan', rest: [{ section: 'primary', switch_s: 10 }] });
+  assert.equal(bad.isError, true);
+  assert.match(bad.text, /rest\[0\] \(primary\): switch_s applies only to SS1, SS2, SS3 and burnout/);
+  assert.equal(calls.length, before);
 });
 
 test('thrive_update_template sends no rest fields, so the API keeps each section rest', async () => {

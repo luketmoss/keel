@@ -99,6 +99,12 @@
 // the Settings default); replaceTemplate keeps a section's values when the
 // payload leaves them out. appendSets resolves `rest_target_s` for a workout
 // whose sets all leave it out, from the workout's template and the defaults.
+// #583: appendSets' optional `rest_plans` names each workout's template and
+// section overrides, so it resolves before the workout row exists:
+//   ?action=appendSets&key=...&payload={"sets":[...],"rest_plans":{"w_1":
+//     {"template_id":"tpl_upb","rest":[{"section":"primary","rest_s":120}]}}}
+//   ?action=setWorkoutRest&key=...&payload={"workout_id":"w_1","rest":[
+//     {"section":"burnout","rest_s":60,"switch_s":5}],"confirm":true}   - no confirm: dry run
 //
 // The Withings sync's runs go to WithingsSyncLog, same layout (#200): add
 // "log":"withings" to appendSyncLog's payload, or &log=withings to getSyncLog.
@@ -406,7 +412,17 @@ function dispatch(action, params, caller) {
         result = fail('payload.sets field required');
         break;
       }
-      result = { success: true, data: appendSets(payload.sets) };
+      result = { success: true, data: appendSets(payload.sets, payload.rest_plans) };
+      break;
+
+    // #583: re-resolve rest_target_s on a planned or active workout's sets.
+    // Dry run unless payload.confirm is true. Key-only.
+    case 'setWorkoutRest':
+      if (!payload.workout_id) {
+        result = fail('payload.workout_id field required');
+        break;
+      }
+      result = { success: true, data: withScriptLock(function () { return setWorkoutRest(payload); }) };
       break;
 
     // AC4: resolution without writing, for a destructive-by-default dry run.

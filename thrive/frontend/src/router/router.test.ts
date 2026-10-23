@@ -80,6 +80,15 @@ describe('router', () => {
     expect(currentRoute.value.params).toEqual({ id: 'w_xyz789' });
   });
 
+  it('parses /workout/:id/lift as workout-lift, not workout-active (#577)', async () => {
+    const { currentRoute } = await import('./router');
+    window.location.hash = '/workout/w_xyz789/lift';
+    window.dispatchEvent(new Event('hashchange'));
+
+    expect(currentRoute.value.name).toBe('workout-lift');
+    expect(currentRoute.value.params).toEqual({ id: 'w_xyz789' });
+  });
+
   it('parses /templates/new as template-new route', async () => {
     const { currentRoute } = await import('./router');
     window.location.hash = '/templates/new';

@@ -26,6 +26,7 @@ import { dayOfMonth, weekdayMonthDay, weekdayName } from '../../day/format';
 import { formatPlannedDate } from '../activities/activities-helpers';
 import { DumbbellIcon, StretchIcon, BikeIcon, MountainIcon, RunIcon, FootprintsIcon } from '../shared/icons';
 import { Panel, PanelNote, type DayPanelProps } from './panel';
+import { ChoiceSheet, type StartMode } from '../workout/choice-sheet';
 
 const isPlanned = (w: WorkoutWithRow) => w.status === 'planned';
 
@@ -356,6 +357,7 @@ function OverdueCard({
   const { token } = useAuth();
   const [busy, setBusy] = useState<Busy>(null);
   const [editing, setEditing] = useState(false);
+  const [choosing, setChoosing] = useState(false);
   const [newDate, setNewDate] = useState(today);
   const dateRef = useRef<HTMLInputElement>(null);
   const rescheduleRef = useRef<HTMLButtonElement>(null);
@@ -390,12 +392,25 @@ function OverdueCard({
     }
   };
 
-  const start = async () => {
+  const start = () => {
     if (!token || busy) return;
     if (activeWorkoutId.value) {
       showToast('Finish your current workout before starting a new one', 'error');
       return;
     }
+    // A weight workout asks how to run it first (#577); the plan is not touched until then.
+    if (w.type === 'weight') setChoosing(true);
+    else void startLogbook();
+  };
+
+  const chosen = (mode: StartMode) => {
+    setChoosing(false);
+    if (mode === 'lift') navigate(`/workout/${w.id}/lift`);
+    else void startLogbook();
+  };
+
+  const startLogbook = async () => {
+    if (!token || busy) return;
     setBusy('start');
     try {
       const id = await startPlannedWorkout(w.id, token);
@@ -496,6 +511,7 @@ function OverdueCard({
           </button>
         </div>
       )}
+      {choosing && <ChoiceSheet onContinue={chosen} onCancel={() => setChoosing(false)} />}
     </div>
   );
 }

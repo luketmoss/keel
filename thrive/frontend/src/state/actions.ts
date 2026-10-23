@@ -67,6 +67,7 @@ import {
   appendSet as appendSetApi,
   appendSets as appendSetsApi,
   updateSet as updateSetApi,
+  updateSetTimings as updateSetTimingsApi,
   deleteSetRow,
   updateExerciseNameInSets,
   findWorkoutRow,
@@ -76,7 +77,7 @@ import {
   replaceWorkoutSets as replaceWorkoutSetsApi,
   updateSetOrders,
 } from '../api/workouts-api';
-import type { WorkoutPatch, SetOrderWrite } from '../api/workouts-api';
+import type { WorkoutPatch, SetOrderWrite, SetTimings } from '../api/workouts-api';
 import { toLocalDateStr, formatPlannedDate } from '../components/activities/activities-helpers';
 import { colorKeyFromName } from '../api/label-colors';
 import type { TemplateExerciseInput } from '../api/templates-api';
@@ -432,9 +433,11 @@ export async function saveWorkoutForLater(
     date?: string;
     /** #145: seconds, or '' / omitted when nobody estimated it. Never defaulted. */
     estimated_seconds?: string;
+    /** #577: no toast, for a plan Lift Mode starts at once. */
+    quiet?: boolean;
   },
   token: string,
-): Promise<void> {
+): Promise<string> {
   try {
     const workout = await createWorkoutApi(
       {
@@ -459,7 +462,8 @@ export async function saveWorkoutForLater(
       await prepopulateSetsFromBuilder(workout.id, data.exercises, token);
     }
 
-    showToast('Workout saved for later', 'success');
+    if (!data.quiet) showToast('Workout saved for later', 'success');
+    return workout.id;
   } catch (err) {
     if (isReauthFailure(err)) throw err;
     showToast('Failed to save workout', 'error');
@@ -728,7 +732,16 @@ export async function saveSet(set: WorkoutSet, token: string, ownRow?: number): 
     if (row > 0) {
       // Update existing row
       await updateSetApi(row, set, token);
-      const updated: SetWithRow = { ...set, sheetRow: row };
+      // K:M (#576, #577) are not written here: keep what the row holds.
+      const held =
+        sets.value.find((s) => s.sheetRow === row) ?? activeWorkoutSets.value.find((s) => s.sheetRow === row);
+      const updated: SetWithRow = {
+        ...set,
+        rest_target_s: set.rest_target_s ?? held?.rest_target_s,
+        set_s: set.set_s ?? held?.set_s,
+        rest_s: set.rest_s ?? held?.rest_s,
+        sheetRow: row,
+      };
 
       activeWorkoutSets.value = activeWorkoutSets.value.map((s) => (s.sheetRow === row ? updated : s));
       sets.value = sets.value.map((s) => (s.sheetRow === row ? updated : s));
@@ -776,6 +789,43 @@ export async function saveSet(set: WorkoutSet, token: string, ownRow?: number): 
     }
     showToast('Failed to save set', 'error');
     throw err;
+  }
+}
+
+/** One Sets row's K:M change (#577): only the cells named are changed. */
+export interface SetTimingsPatch {
+  sheetRow: number;
+  patch: Partial<SetTimings>;
+}
+
+/**
+ * Writes Sets K:M for each row (#577): a set's `set_s`, the `rest_s` after it,
+ * or its `rest_target_s`. A row's cells it is not changing are written back as
+ * `sets` holds them. The signals follow each write, so a later one reads it.
+ * Resolves false, with a toast, when a write failed; a reauth failure throws.
+ */
+export async function saveSetTimings(changes: readonly SetTimingsPatch[], token: string): Promise<boolean> {
+  try {
+    for (const { sheetRow, patch } of changes) {
+      const held = sets.value.find((s) => s.sheetRow === sheetRow);
+      if (!held) continue;
+      const next: SetTimings = {
+        rest_target_s: patch.rest_target_s ?? held.rest_target_s ?? '',
+        set_s: patch.set_s ?? held.set_s ?? '',
+        rest_s: patch.rest_s ?? held.rest_s ?? '',
+      };
+      await updateSetTimingsApi(sheetRow, next, token);
+      const apply = (list: SetWithRow[]) => list.map((s) => (s.sheetRow === sheetRow ? { ...s, ...next } : s));
+      batch(() => {
+        sets.value = apply(sets.value);
+        activeWorkoutSets.value = apply(activeWorkoutSets.value);
+      });
+    }
+    return true;
+  } catch (err) {
+    if (isReauthFailure(err)) throw err;
+    showToast("Couldn't save the timing. Check your connection.", 'error');
+    return false;
   }
 }
 

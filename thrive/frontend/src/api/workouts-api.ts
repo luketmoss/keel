@@ -384,6 +384,25 @@ export async function updateSet(sheetRow: number, set: WorkoutSet, token: string
   await withReauth(token, (t) => sheetsUpdate(`Sets!A${sheetRow}:J${sheetRow}`, [setToRow(set)], t));
 }
 
+/** The three cells an edit leaves alone (#577): the rest planned after a set, and Lift Mode's two stopwatches. */
+export interface SetTimings {
+  rest_target_s: string;
+  set_s: string;
+  rest_s: string;
+}
+
+/**
+ * Writes a Sets row's K:M (#577), the cells `updateSet` never touches. All three
+ * go out together, so the caller passes the row's current values with its change.
+ */
+export async function updateSetTimings(sheetRow: number, t: SetTimings, token: string): Promise<void> {
+  if (isDemo()) return;
+
+  await withReauth(token, (tok) =>
+    sheetsUpdate(`Sets!K${sheetRow}:M${sheetRow}`, [[t.rest_target_s, t.set_s, t.rest_s]], tok),
+  );
+}
+
 export async function updateExerciseNameInSets(
   exerciseId: string,
   newName: string,

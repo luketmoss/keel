@@ -51,6 +51,14 @@
   --range-track: var(--color-border-light);
   --range-band: var(--color-border);
   --range-marker: var(--color-text);
+  /* Lift Mode (#577): the set clock is larger than any figure above, the rest ring is 132px (#580
+     overrides it), and the section colours are the badge text colours, for the Up next border. */
+  --lift-clock-size: 4.5rem;
+  --lift-ring-size: 132px;
+  --sec-warmup: #c2410c;
+  --sec-primary: #1565c0;
+  --sec-ss: #7b1fa2;
+  --sec-burnout: #c62828;
 }
 
 /* ===== Light Theme ===== */
@@ -171,6 +179,10 @@
   --effort-easy: #86efac;
   --effort-medium: #ffb74d;
   --effort-hard: #ef9a9a;
+  --sec-warmup: #ffb74d;
+  --sec-primary: #64b5f6;
+  --sec-ss: #ce93d8;
+  --sec-burnout: #ef9a9a;
 }
 
 /* ===== Base Styles ===== */
@@ -6388,6 +6400,597 @@ a.training-card {
   font-size: var(--text-sm);
 }
 
+/* ===== Lift Mode (#577) =====
+   Cards are the surface on a light border; the action bar sits above the tab bar until #580 hides it. */
+.lift {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding: 0;
+  padding-bottom: calc(52px + var(--space-md) * 2 + env(safe-area-inset-bottom, 0px));
+}
+
+.lift-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding: var(--space-sm) var(--space-md) 0;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.lift-header-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: 44px;
+}
+
+.lift-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lift-session-clock {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.lift-chip {
+  min-height: 44px;
+  padding: 0 var(--space-sm);
+  border: 0;
+  background: transparent;
+  color: var(--color-primary-text);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.lift-progress {
+  height: 4px;
+  margin: 0 calc(-1 * var(--space-md));
+  background: var(--range-track);
+}
+
+.lift-progress-fill {
+  height: 100%;
+  background: var(--color-primary);
+}
+
+.lift-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-md);
+}
+
+.lift-card {
+  padding: var(--space-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
+}
+
+.lift-card-head,
+.lift-check-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.lift-check-head {
+  justify-content: flex-start;
+}
+
+.lift-card-note,
+.lift-hint {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.lift-card-title {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.lift-plan-list,
+.lift-log-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lift-plan-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-xs) 0;
+}
+
+.lift-plan-figures,
+.lift-state {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.lift-state-now {
+  font-weight: 700;
+  color: var(--color-primary-text);
+}
+
+.lift-state-warn {
+  color: var(--color-warning);
+}
+
+.lift-state-skipped {
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+}
+
+.lift-state-muted {
+  color: var(--color-text-muted);
+}
+
+.lift-rest-band {
+  margin-top: var(--space-sm);
+}
+
+.lift-tip {
+  padding: var(--space-md);
+  background: var(--color-bg);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+/* Warm-up and cool-down: one button per exercise. */
+.lift-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
+  color: var(--color-text);
+  text-align: left;
+}
+
+.lift-check-circle {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  color: var(--color-on-fill);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.lift-check-done .lift-check-circle {
+  background: var(--color-success-fill);
+  border-color: var(--color-success-fill);
+  color: var(--color-on-fill);
+}
+
+.lift-check-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.lift-check-done .lift-check-name {
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+}
+
+.lift-check-reps {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The set screen. */
+.lift-set {
+  align-items: center;
+  text-align: center;
+}
+
+.lift-exercise {
+  margin: 0;
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  text-wrap: balance;
+}
+
+.lift-target {
+  margin: 0;
+  font-size: var(--text-base);
+  color: var(--color-text-secondary);
+}
+
+.lift-target strong {
+  color: var(--color-text);
+}
+
+.lift-clock-block {
+  margin: var(--space-md) 0;
+}
+
+.lift-clock {
+  font-size: var(--lift-clock-size);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--color-primary-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.lift-clock-caption {
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.lift-note-card {
+  width: 100%;
+  padding: var(--space-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-base);
+}
+
+.lift-note-card-sm {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+/* The rest screen. */
+.lift-hero {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.lift-ring {
+  position: relative;
+  flex: none;
+  width: var(--lift-ring-size);
+  height: var(--lift-ring-size);
+}
+
+.lift-ring svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.lift-ring-track,
+.lift-ring-arc {
+  fill: none;
+  stroke-width: 10;
+}
+
+.lift-ring-track {
+  stroke: var(--range-track);
+}
+
+.lift-ring-arc {
+  stroke: var(--color-primary);
+  stroke-linecap: round;
+}
+
+.lift-hero-up .lift-ring-arc {
+  stroke: var(--color-warning);
+}
+
+.lift-ring-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.lift-rest-clock {
+  font-size: var(--figure-md);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.lift-overtime {
+  min-height: 1.4em;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-warning);
+  font-variant-numeric: tabular-nums;
+}
+
+.lift-hero-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.lift-hero-label {
+  font-size: var(--text-xl);
+  font-weight: 700;
+}
+
+.lift-hero-up .lift-hero-label {
+  color: var(--color-warning);
+}
+
+.lift-log-item {
+  padding: var(--space-md) 0;
+  border-top: 1px solid var(--color-border-light);
+}
+
+.lift-log-item:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.lift-log-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.lift-log-meta {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.lift-steppers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  margin-bottom: var(--space-sm);
+}
+
+.lift-stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.lift-stepper-value {
+  min-width: 4.5em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.lift-stepper-number {
+  font-weight: 700;
+}
+
+.lift-stepper-unit,
+.lift-bodyweight {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.lift-bodyweight {
+  align-self: center;
+}
+
+.lift-missing {
+  margin: calc(-1 * var(--space-sm)) 0 0;
+  color: var(--color-text-muted);
+}
+
+.lift-next {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-xs);
+}
+
+.lift-next-round {
+  border-width: 2px;
+}
+
+.lift-next-warmup { border-color: var(--sec-warmup); }
+.lift-next-primary { border-color: var(--sec-primary); }
+.lift-next-ss { border-color: var(--sec-ss); }
+.lift-next-burnout { border-color: var(--sec-burnout); }
+
+.lift-next-heading {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+}
+
+.lift-next-exercise {
+  font-size: var(--text-xl);
+  font-weight: 700;
+}
+
+/* The action bar, above the tab bar. */
+.lift-actions {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px));
+  z-index: 90;
+  display: flex;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border-light);
+}
+
+.lift-btn {
+  min-height: 52px;
+  padding: 0 var(--space-md);
+  border-radius: var(--radius-md);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  touch-action: manipulation;
+}
+
+.lift-btn-primary {
+  flex: 1;
+  border: 0;
+  background: var(--color-primary-fill);
+  color: var(--color-on-fill);
+}
+
+.lift-btn-secondary {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.lift-btn-primary.lift-btn-warn {
+  background: var(--color-warning);
+  color: var(--color-on-fill);
+}
+
+@media (hover: hover) {
+  .lift-btn-primary.lift-btn-warn:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--color-warning);
+  }
+}
+
+.lift-btn:disabled {
+  opacity: var(--opacity-disabled);
+}
+
+@keyframes lift-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50% { box-shadow: 0 0 0 6px var(--color-warning-light); }
+}
+
+.lift-pulse {
+  animation: lift-pulse 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lift-pulse {
+    animation: none;
+  }
+}
+
+.lift-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 52px + var(--space-md) * 2 + var(--space-sm));
+  z-index: 1000;
+  width: calc(100% - 32px);
+  max-width: 400px;
+  padding: 12px var(--space-md);
+  transform: translateX(-50%);
+  border-radius: var(--radius-md);
+  background: var(--color-warning);
+  color: var(--color-on-fill);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-align: center;
+  pointer-events: none;
+  box-shadow: 0 4px 16px var(--color-shadow-strong);
+}
+
+/* All sets, a bottom sheet. */
+.lift-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  max-height: 86vh;
+  background: var(--color-bg);
+}
+
+.lift-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.lift-sheet-head h2 {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+
+.lift-sheet-finish {
+  width: 100%;
+}
+
+/* The choice between Lift Mode and Logbook. */
+.lift-choice-heading {
+  margin: 0 0 var(--space-md);
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.lift-choice-cards {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.lift-choice-card {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  background: var(--color-surface);
+  border: 2px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
+  color: var(--color-text);
+  text-align: left;
+}
+
+.lift-choice-card-on {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary-text);
+}
+
+.lift-choice-title {
+  font-weight: 700;
+}
+
+.lift-choice-text {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.lift-choice-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.lift-choice-actions .btn {
+  width: 100%;
+}
+
 /* ===== Library keyboard access (#301) =====
    Template cards are <button>s and the editor's exercise rows are focusable
    buttons. The ring is --color-text (14.70:1 light, 15.54:1 dark), not
@@ -6779,6 +7382,8 @@ a.training-card {
   .exercise-list-item-header:hover:not(:disabled):not([aria-disabled="true"]),
   .settings-row-link:hover:not(:disabled):not([aria-disabled="true"]),
   .day-card-link:hover:not(:disabled):not([aria-disabled="true"]),
+  .lift-check:hover:not(:disabled):not([aria-disabled="true"]),
+  .lift-choice-card:hover:not(:disabled):not([aria-disabled="true"]),
   /* Navigation */
   .bottom-nav-tab:hover:not(:disabled):not([aria-disabled="true"]) {
     background-image: linear-gradient(var(--state-hover), var(--state-hover));
@@ -6853,6 +7458,8 @@ a.workout-card:active:not(:disabled):not([aria-disabled="true"]),
 .exercise-list-item-header:active:not(:disabled):not([aria-disabled="true"]),
 .settings-row-link:active:not(:disabled):not([aria-disabled="true"]),
 .day-card-link:active:not(:disabled):not([aria-disabled="true"]),
+.lift-check:active:not(:disabled):not([aria-disabled="true"]),
+.lift-choice-card:active:not(:disabled):not([aria-disabled="true"]),
 /* Navigation */
 .bottom-nav-tab:active:not(:disabled):not([aria-disabled="true"]) {
   background-image: linear-gradient(var(--state-pressed), var(--state-pressed));

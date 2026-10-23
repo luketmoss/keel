@@ -5,7 +5,7 @@
 import { currentRoute } from '../router/router';
 import { pendingSyncCount, isSyncing } from './store';
 
-export const EDIT_ROUTES = new Set(['workout-new', 'workout-active', 'workout-edit']);
+export const EDIT_ROUTES = new Set(['workout-new', 'workout-active', 'workout-lift', 'workout-edit']);
 
 export function queueBusy(): boolean {
   return pendingSyncCount.value > 0 || isSyncing.value;

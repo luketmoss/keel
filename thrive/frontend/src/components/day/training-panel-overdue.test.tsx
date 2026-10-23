@@ -88,6 +88,14 @@ function panel(state: DayState = 'today', date = D) {
 const names = (c: Element) => [...c.querySelectorAll('.workout-name')].map((e) => e.textContent);
 const button = (c: Element, label: string) =>
   [...c.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === label)!;
+/** #577: Start now asks Lift Mode or Logbook first; these answer it. */
+const radio = (c: Element, name: string) =>
+  [...c.querySelectorAll<HTMLElement>('[role="radio"]')].find((r) => r.textContent!.startsWith(name))!;
+async function chooseAndContinue(c: Element, name: 'Lift Mode' | 'Logbook') {
+  fireEvent.click(radio(c, name));
+  fireEvent.click(button(c, 'Continue'));
+  await flush();
+}
 async function flush() {
   await act(async () => {
     await Promise.resolve();
@@ -324,8 +332,32 @@ describe('AC5 — Start now', () => {
     const { container } = panel();
     fireEvent.click(button(container, 'Start now'));
     await flush();
+    expect(startPlannedWorkout).not.toHaveBeenCalled();
+    await chooseAndContinue(container, 'Logbook');
     expect(startPlannedWorkout).toHaveBeenCalledWith('o', 'tok');
     expect(navigate).toHaveBeenCalledWith('/workout/o');
+  });
+
+  it('Lift Mode opens its start screen and starts nothing (#577)', async () => {
+    workouts.value = [wk('o', { name: 'Pull', status: 'planned', date: '2026-09-27' })];
+    const { container } = panel();
+    fireEvent.click(button(container, 'Start now'));
+    await flush();
+    await chooseAndContinue(container, 'Lift Mode');
+    expect(startPlannedWorkout).not.toHaveBeenCalled();
+    expect(navigate).toHaveBeenCalledWith('/workout/o/lift');
+  });
+
+  it('Cancel on the choice leaves the plan as it was (#577)', async () => {
+    workouts.value = [wk('o', { name: 'Pull', status: 'planned', date: '2026-09-27' })];
+    const { container } = panel();
+    fireEvent.click(button(container, 'Start now'));
+    await flush();
+    fireEvent.click(button(container, 'Cancel'));
+    await flush();
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(startPlannedWorkout).not.toHaveBeenCalled();
+    expect(navigate).not.toHaveBeenCalled();
   });
 
   it('refuses while another workout is active, writing nothing', async () => {
@@ -373,6 +405,7 @@ describe('AC6 — in flight and failure', () => {
     const { container } = panel();
     fireEvent.click(button(container, 'Start now'));
     await flush();
+    await chooseAndContinue(container, 'Logbook');
     expect(button(container, 'Starting…').disabled).toBe(true);
     cleanup();
 

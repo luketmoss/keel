@@ -86,6 +86,8 @@ const FAMILIES = {
     'exercise-list-item-header',
     'settings-row-link',
     'day-card-link',
+    'lift-check',
+    'lift-choice-card',
   ],
   Navigation: ['bottom-nav-tab'],
   Fields: ['form-input', 'form-select', 'form-textarea'],

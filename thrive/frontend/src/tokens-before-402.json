@@ -47,7 +47,13 @@
     "--drink-bar-height": "6px",
     "--range-track": "var(--color-border-light)",
     "--range-band": "var(--color-border)",
-    "--range-marker": "var(--color-text)"
+    "--range-marker": "var(--color-text)",
+    "--lift-clock-size": "4.5rem",
+    "--lift-ring-size": "132px",
+    "--sec-warmup": "#c2410c",
+    "--sec-primary": "#1565c0",
+    "--sec-ss": "#7b1fa2",
+    "--sec-burnout": "#c62828"
   },
   "[data-theme=\"light\"]": {
     "--color-bg": "#f0f2f5",
@@ -193,6 +199,10 @@
     "--type-walk": "#7fded3",
     "--effort-easy": "#86efac",
     "--effort-medium": "#ffb74d",
-    "--effort-hard": "#ef9a9a"
+    "--effort-hard": "#ef9a9a",
+    "--sec-warmup": "#ffb74d",
+    "--sec-primary": "#64b5f6",
+    "--sec-ss": "#ce93d8",
+    "--sec-burnout": "#ef9a9a"
   }
 }

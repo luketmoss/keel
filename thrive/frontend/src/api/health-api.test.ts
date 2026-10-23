@@ -79,17 +79,22 @@ describe('AC1: each field list mirrors types.js', () => {
     expect(BODY_MEASUREMENT_FIELDS).toHaveLength(20);
   });
 
-  it('DAILY_SUMMARY_FIELDS matches, name for name and in order (A:AB)', () => {
+  it('DAILY_SUMMARY_FIELDS matches, name for name and in order (A:AC)', () => {
     expect([...DAILY_SUMMARY_FIELDS]).toEqual(fieldsIn('DAILY_SUMMARY_FIELDS'));
-    expect(DAILY_SUMMARY_FIELDS).toHaveLength(28);
-    // #522, #562: appended after bp_count, in the same position as types.js
-    expect(DAILY_SUMMARY_FIELDS.slice(24)).toEqual(['bp_count', 'water_ml', 'alcohol_drinks', 'coffee_cups']);
+    // #522, #562, #592: appended after bp_count, in the same position as types.js
+    expect(DAILY_SUMMARY_FIELDS.slice(24, 29)).toEqual([
+      'bp_count',
+      'water_ml',
+      'alcohol_drinks',
+      'coffee_cups',
+      'unwind_mg',
+    ]);
   });
 
   it('derives each read range from its list length', () => {
     expect(readRange('DailyHealth', DAILY_HEALTH_FIELDS)).toBe('DailyHealth!A2:S');
     expect(readRange('BodyMeasurements', BODY_MEASUREMENT_FIELDS)).toBe('BodyMeasurements!A2:T');
-    expect(readRange('DailySummary', DAILY_SUMMARY_FIELDS)).toBe('DailySummary!A2:AB');
+    expect(readRange('DailySummary', DAILY_SUMMARY_FIELDS)).toBe('DailySummary!A2:AC');
     // Appending a column is a one-line change: the range follows the list.
     expect(readRange('DailyHealth', [...DAILY_HEALTH_FIELDS, 'next'])).toBe('DailyHealth!A2:T');
   });
@@ -226,7 +231,7 @@ describe('AC3/AC4: fetching each tab', () => {
           ['g1', '2026-09-20'],
           ['', '2026-09-20'],
         ];
-      if (range === 'DailySummary!A2:AB') return [['2026-09-20', '1'], ['']];
+      if (range === 'DailySummary!A2:AC') return [['2026-09-20', '1'], ['']];
       throw new Error(`unexpected range ${range}`);
     });
     const [h, b, s] = await Promise.all([

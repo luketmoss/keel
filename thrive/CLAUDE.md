@@ -239,7 +239,7 @@ Google Sheet "Groundwork" with these tabs:
   or 8 (1 is a guest or another user) are never written. The SPA reads it,
   read-only and still in kg, through `frontend/src/api/health-api.ts` (luketmoss/thrive#236).
   Later columns are only ever appended.
-- **DailySummary** (A:AB) — **derived, never authoritative** (luketmoss/thrive#131). One row per
+- **DailySummary** (A:AC) — **derived, never authoritative** (luketmoss/thrive#131). One row per
   local calendar day, rebuildable at any time from `Workouts` + `DailyHealth` +
   `BodyMeasurements` + `Drinks`. Nothing writes here by hand. If it disagrees with
   `Workouts`, `Workouts` is right and this is stale. The SPA reads it,
@@ -250,7 +250,7 @@ Google Sheet "Groundwork" with these tabs:
   ascent_withdata, max_effort, effort_counts, steps, resting_hr, hrv,
   sleep_total_s, training_load, computed_at, moving_withdata, elapsed_withdata,
   weight_kg, fat_ratio_pct, systolic_mmhg, diastolic_mmhg, bp_count, water_ml,
-  alcohol_drinks, coffee_cups.
+  alcohol_drinks, coffee_cups, unwind_mg.
   Every total carries its coverage: `total_moving_s`/`total_elapsed_s` are blank
   when no activity recorded them, and S/T count those that did out of
   `activity_count` (luketmoss/thrive#181). S/T are appended, not beside D/E, because agents and the API read
@@ -280,6 +280,10 @@ Google Sheet "Groundwork" with these tabs:
   blank, never `0`, on a day with no coffee, by the same rules; a missing
   `Drinks` tab leaves Z:AB blank. Added by
   `scripts/migrate-562-daily-summary-coffee.mjs`.
+  AC (#592) is `unwind_mg`, the sum of the day's unwind `amount`s in mg,
+  blank, never `0`, on a day with none, by the same rules; a missing
+  `Drinks` tab leaves Z:AC blank. Added by
+  `scripts/migrate-592-daily-summary-unwind.mjs`.
 - **SyncLog** (A:N) — one row per COROS sync run (luketmoss/thrive#156): run_id, started_at,
   finished_at, window_start, window_end, n_seen, n_new, n_updated, n_enriched,
   n_fit_fetched, n_errors, status (`ok`/`partial`/`failed`), error_detail,

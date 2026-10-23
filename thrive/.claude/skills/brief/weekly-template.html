@@ -284,7 +284,7 @@ h1, h2, h3, p { margin: 0; text-wrap: balance; }
       }
     ],
     "note": "Example note.",
-    "drinks": "Water 52 oz a day on average, on the 6 days you logged it (81% of your 64 oz goal) · Coffee 12 cups in total · Alcohol 5 drinks in total"
+    "drinks": "Water 52 oz a day on average, on the 6 days you logged it (81% of your 64 oz goal) · Coffee 12 cups in total · Alcohol 5 drinks in total · Unwind 40 mg in total"
   },
   "recovery": {
     "note": "dashed line is the week before",
@@ -678,7 +678,7 @@ h1, h2, h3, p { margin: 0; text-wrap: balance; }
     lc.appendChild(key);
     if (D.week.note) lc.appendChild(small(D.week.note));
     ws.appendChild(lc);
-    // #522, #562: one line of the week's water, coffee and alcohol, as text.
+    // #522, #562, #592: one line of the week's water, coffee, alcohol and Unwind, as text.
     if (D.week.drinks) ws.appendChild(el("div", "card", null, [el("span", "label", "Drinks"), el("p", null, D.week.drinks)]));
     root.appendChild(ws);
   }

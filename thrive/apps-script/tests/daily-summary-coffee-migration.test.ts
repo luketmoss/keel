@@ -14,7 +14,8 @@ const SCRIPT = pathToFileURL(
 // A plain JS module with no types; imported by URL so tsc does not resolve it.
 const load = async (): Promise<any> => import(/* @vite-ignore */ SCRIPT);
 
-const FIELDS: string[] = [...loadApi().sandbox.DAILY_SUMMARY_FIELDS];
+// A:AB, the header this migration writes; #592 appends AC after it.
+const FIELDS: string[] = [...loadApi().sandbox.DAILY_SUMMARY_FIELDS].slice(0, 28);
 const A_TO_AA = FIELDS.slice(0, 27);
 
 interface Tab { rows: string[][]; columns: number }

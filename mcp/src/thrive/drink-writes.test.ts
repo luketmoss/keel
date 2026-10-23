@@ -132,7 +132,7 @@ describe('thrive_log_drink', () => {
     expect(store[0]).toMatchObject({ date: '2026-10-22', time: '22:00:00', amount: '473', source: 'mcp' })
     expect(r.text.split('\n').slice(0, 3)).toEqual([
       'Logged 16 oz (473 ml) of water on 2026-10-22 at 22:00.',
-      '- 2026-10-22: water 16 oz (473 ml), 25% of goal · no coffee logged · no alcohol logged (1 entry)',
+      '- 2026-10-22: water 16 oz (473 ml), 25% of goal · no coffee logged · no alcohol logged · no unwind logged (1 entry)',
       `  - 22:00 water 16 oz (473 ml) [mcp] (${id})`,
     ])
     expect(r.text.endsWith(`\n\n${REMINDER}`)).toBe(true)
@@ -169,12 +169,32 @@ describe('thrive_log_drink', () => {
     expect(budget.stored.thrive).toEqual([{ t: expect.any(Number), rows: 3 }])
     expect(r.text.split('\n').slice(0, 2)).toEqual([
       'Logged 3 alcohol drinks on 2026-10-22 at 23:59.',
-      '- 2026-10-22: no water logged · no coffee logged · alcohol 3 drinks (3 entries)',
+      '- 2026-10-22: no water logged · no coffee logged · alcohol 3 drinks · no unwind logged (3 entries)',
     ])
   })
 
+  it('#592: logs unwind as one entry of 5 mg, and count 2 as two entries of 5, naming Unwind and mg', async () => {
+    const requests = fakeApi()
+    const one = await call('thrive_log_drink', { kind: 'unwind', date: '2026-10-22', time: '21:00' })
+    expect(one.isError).toBeUndefined()
+    expect(one.text.split('\n')[0]).toBe('Logged 5 mg of Unwind on 2026-10-22 at 21:00.')
+    const two = await call('thrive_log_drink', { kind: 'unwind', count: 2, date: '2026-10-22', time: '22:10' })
+    const sent = writes(requests)
+    expect(sent.map((q) => [q.payload.kind, q.payload.amount])).toEqual([
+      ['unwind', 5], ['unwind', 5], ['unwind', 5],
+    ])
+    expect(new Set(sent.slice(1).map((q) => q.payload.call_id)).size).toBe(1)
+    expect(two.text.split('\n').slice(0, 3)).toEqual([
+      'Logged 10 mg of Unwind (2 entries) on 2026-10-22 at 22:10.',
+      '- 2026-10-22: no water logged · no coffee logged · no alcohol logged · unwind 15 mg (3 entries)',
+      `  - 22:10 unwind 5 mg [mcp] (${sent[1].payload.id})`,
+    ])
+    expect(two.text.endsWith(REMINDER)).toBe(true)
+  })
+
   const refusals: [string, Record<string, unknown>, RegExp][] = [
-    ['amount_oz on coffee', { kind: 'coffee', amount_oz: 8 }, /^Error: amount_oz is only for water: coffee and alcohol are always 1 per entry\. Use count to log several\.$/],
+    ['amount_oz on unwind', { kind: 'unwind', amount_oz: 2 }, /^Error: amount_oz is only for water: coffee, alcohol and unwind have a fixed amount per entry\. Use count to log several\.$/],
+    ['amount_oz on coffee', { kind: 'coffee', amount_oz: 8 }, /^Error: amount_oz is only for water: coffee, alcohol and unwind have a fixed amount per entry\. Use count to log several\.$/],
     ['amount_oz on alcohol', { kind: 'alcohol', amount_oz: 12 }, /^Error: amount_oz is only for water/],
     ['amount_oz of 0', { kind: 'water', amount_oz: 0 }, /amount_oz must be a whole number of ounces from 1 to 67/],
     ['amount_oz of 68', { kind: 'water', amount_oz: 68 }, /amount_oz must be a whole number/],
@@ -213,7 +233,7 @@ describe('thrive_update_drink', () => {
     ])
     expect(r.text.split('\n').slice(0, 2)).toEqual([
       'Updated the 2026-10-22 water entry (w1): 4 oz → 16 oz (473 ml), 23:59 → 22:00.',
-      '- 2026-10-22: water 16 oz (473 ml), 25% of goal · no coffee logged · alcohol 1 drink (2 entries)',
+      '- 2026-10-22: water 16 oz (473 ml), 25% of goal · no coffee logged · alcohol 1 drink · no unwind logged (2 entries)',
     ])
     expect(r.text.endsWith(REMINDER)).toBe(true)
   })
@@ -223,6 +243,23 @@ describe('thrive_update_drink', () => {
     const r = await call('thrive_update_drink', { id: 'a1', time: '21:30' })
     expect(writes(requests).map((q) => q.action)).toEqual(['updateDrinkTime'])
     expect(r.text).toMatch(/^Updated the 2026-10-22 alcohol entry \(a1\): 20:15 → 21:30\./)
+  })
+
+  it("#592: changes an unwind entry's time, and refuses amount_oz on it", async () => {
+    store.push(drink({ id: 'u1', kind: 'unwind', amount: '5', time: '22:10:00' }))
+    const requests = fakeApi()
+    const r = await call('thrive_update_drink', { id: 'u1', time: '21:45' })
+    expect(writes(requests).map((q) => [q.action, q.payload.id, q.payload.time])).toEqual([
+      ['updateDrinkTime', 'u1', '21:45:00'],
+    ])
+    expect(r.text.split('\n').slice(0, 2)).toEqual([
+      'Updated the 2026-10-22 unwind entry (u1): 22:10 → 21:45.',
+      '- 2026-10-22: water 4 oz (118 ml), 6% of goal · no coffee logged · alcohol 1 drink · unwind 5 mg (3 entries)',
+    ])
+    const amount = await call('thrive_update_drink', { id: 'u1', amount_oz: 2 })
+    expect(amount.isError).toBe(true)
+    expect(amount.text).toMatch(/coffee, alcohol and unwind have a fixed amount per entry/)
+    expect(writes(requests)).toHaveLength(1)
   })
 
   it('sends nothing for a value equal to the stored one', async () => {
@@ -281,10 +318,24 @@ describe('thrive_delete_drink', () => {
     expect(writes(requests).map((q) => [q.action, q.payload.id])).toEqual([['deleteDrink', 'a1']])
     expect(r.text.split('\n').slice(0, 2)).toEqual([
       'Deleted 2026-10-22 20:15 alcohol 1 drink [app] (a1).',
-      '- 2026-10-22: water 4 oz (118 ml), 6% of goal · no coffee logged · no alcohol logged (1 entry)',
+      '- 2026-10-22: water 4 oz (118 ml), 6% of goal · no coffee logged · no alcohol logged · no unwind logged (1 entry)',
     ])
     expect(r.text.endsWith(REMINDER)).toBe(true)
     expect(budget.stored.thrive).toHaveLength(1)
+  })
+
+  it('#592: deletes an unwind entry, naming it in mg', async () => {
+    store.push(drink({ id: 'u1', kind: 'unwind', amount: '5', time: '22:10:00', source: 'widget' }))
+    const requests = fakeApi()
+    const dry = await call('thrive_delete_drink', { id: 'u1' })
+    expect(dry.text).toContain('- 2026-10-22 22:10 unwind 5 mg [widget] (u1)')
+    const r = await call('thrive_delete_drink', { id: 'u1', confirm: true })
+    expect(writes(requests).map((q) => [q.action, q.payload.id])).toEqual([['deleteDrink', 'u1']])
+    expect(r.text.split('\n').slice(0, 2)).toEqual([
+      'Deleted 2026-10-22 22:10 unwind 5 mg [widget] (u1).',
+      '- 2026-10-22: water 4 oz (118 ml), 6% of goal · no coffee logged · alcohol 1 drink · no unwind logged (2 entries)',
+    ])
+    expect(store.map((d) => d.id)).toEqual(['w1', 'a1'])
   })
 
   it('refuses an unknown id', async () => {

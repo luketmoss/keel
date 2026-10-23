@@ -63,9 +63,9 @@ signal — several `Easy` sessions on a lift mean it's time to add load.
 `thrive_daily_health`, `thrive_daily_summary`, `thrive_body_measurements`, `thrive_journal`,
 `thrive_drinks`.
 
-`thrive_drinks` reads the water, coffee and alcohol the user logged (default: today): each
+`thrive_drinks` reads the water, coffee, alcohol and Unwind the user logged (default: today): each
 entry, per-day totals (water in oz and ml against the daily goal, coffee in cups, alcohol in
-standard drinks) and the goal, each entry ending with its id. A day with nothing logged is unknown, not a day
+standard drinks, Unwind in mg) and the goal, each entry ending with its id. A day with nothing logged is unknown, not a day
 without water. With Thrive (write) on, `thrive_log_drink` logs on today or an earlier day (`date: 'yesterday'`,
 `time: '22:00'`; water in whole oz, `count` for several coffees or drinks), `thrive_update_drink` changes a
 drink's water amount or time by id, and `thrive_delete_drink` removes one, dry-run until `confirm: true` (#595).

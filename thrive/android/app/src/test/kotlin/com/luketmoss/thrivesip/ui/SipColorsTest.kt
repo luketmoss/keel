@@ -26,6 +26,13 @@ class SipColorsTest {
     }
 
     @Test
+    fun unwindMirrorsTheAppsMetricColour() {
+        // --metric-unwind in thrive/frontend/src/global.css, light and dark (#590).
+        assertTrue(SipColors.UNWIND_LIGHT == 0xFF5E7C62)
+        assertTrue(SipColors.UNWIND_DARK == 0xFF9CBF9F)
+    }
+
+    @Test
     fun theLabelOnEveryAccentFillMeetsAA() {
         val pairs = mapOf(
             "water light" to (SipColors.ON_ACCENT_LIGHT to SipColors.WATER_LIGHT),
@@ -34,6 +41,8 @@ class SipColorsTest {
             "coffee dark" to (SipColors.ON_ACCENT_DARK to SipColors.COFFEE_DARK),
             "alcohol light" to (SipColors.ON_ACCENT_LIGHT to SipColors.ALCOHOL_LIGHT),
             "alcohol dark" to (SipColors.ON_ACCENT_DARK to SipColors.ALCOHOL_DARK),
+            "unwind light" to (SipColors.ON_ACCENT_LIGHT to SipColors.UNWIND_LIGHT),
+            "unwind dark" to (SipColors.ON_ACCENT_DARK to SipColors.UNWIND_DARK),
         )
         pairs.forEach { (name, p) ->
             val ratio = contrast(p.first, p.second)

@@ -2,7 +2,7 @@ package com.luketmoss.thrivesip.ui
 
 /**
  * The one place a colour is written down. Hex values are Thrive's own
- * `--metric-water`, `--metric-coffee` and `--metric-alcohol` (frontend/src/global.css), light and
+ * `--metric-water`, `--metric-coffee`, `--metric-alcohol` and `--metric-unwind` (frontend/src/global.css), light and
  * dark, so the widget and the app match the Day cards. Plain Longs, so this has
  * no Compose or Glance in it and both toolkits wrap the same numbers.
  */
@@ -13,8 +13,10 @@ object SipColors {
     const val COFFEE_DARK = 0xFFC9A27E
     const val ALCOHOL_LIGHT = 0xFFB45309
     const val ALCOHOL_DARK = 0xFFF5A524
+    const val UNWIND_LIGHT = 0xFF5E7C62
+    const val UNWIND_DARK = 0xFF9CBF9F
 
-    /** Text on a water, coffee or alcohol fill: white on the light accents, near-black on the dark ones. */
+    /** Text on a water, coffee, alcohol or Unwind fill: white on the light accents, near-black on the dark ones. */
     const val ON_ACCENT_LIGHT = 0xFFFFFFFF
     const val ON_ACCENT_DARK = 0xFF0B1520
 

@@ -66,7 +66,15 @@ private val SMALL = DpSize(110.dp, 100.dp)
 private val WIDE = DpSize(250.dp, 100.dp)
 private val SMALL_TALL = DpSize(110.dp, 150.dp)
 private val WIDE_TALL = DpSize(250.dp, 150.dp)
+
+/**
+ * Two cells tall and 310dp wide or more: a fourth fixed column for Unwind (#591).
+ * Water keeps 105dp: 310 - 24 (padding) - 3 * 8 (gaps) - 3 * 52 (counts) = 106.
+ */
+private val WIDEST = DpSize(310.dp, 100.dp)
+private val WIDEST_TALL = DpSize(310.dp, 150.dp)
 private val WIDE_FROM = 200.dp
+private val WIDEST_FROM = 310.dp
 
 /** From this up a one-row widget has room for coffee as well as water and alcohol. */
 private val WIDER_FROM = 300.dp
@@ -95,6 +103,7 @@ private fun accent(light: Long, dark: Long): androidx.glance.unit.ColorProvider 
 private val WATER = accent(SipColors.WATER_LIGHT, SipColors.WATER_DARK)
 private val COFFEE = accent(SipColors.COFFEE_LIGHT, SipColors.COFFEE_DARK)
 private val ALCOHOL = accent(SipColors.ALCOHOL_LIGHT, SipColors.ALCOHOL_DARK)
+private val UNWIND = accent(SipColors.UNWIND_LIGHT, SipColors.UNWIND_DARK)
 private val ON_ACCENT = accent(SipColors.ON_ACCENT_LIGHT, SipColors.ON_ACCENT_DARK)
 private val TRACK = accent(SipColors.TRACK_LIGHT, SipColors.TRACK_DARK)
 
@@ -105,7 +114,7 @@ private val TRACK = accent(SipColors.TRACK_LIGHT, SipColors.TRACK_DARK)
  * already running.
  */
 class SipWidget : GlanceAppWidget() {
-    override val sizeMode = SizeMode.Responsive(setOf(SMALL_SHORT, WIDE_SHORT, WIDER_SHORT, SMALL, WIDE, SMALL_TALL, WIDE_TALL))
+    override val sizeMode = SizeMode.Responsive(setOf(SMALL_SHORT, WIDE_SHORT, WIDER_SHORT, SMALL, WIDE, SMALL_TALL, WIDE_TALL, WIDEST, WIDEST_TALL))
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val store = SipStore(context)
@@ -120,6 +129,7 @@ class SipWidget : GlanceAppWidget() {
                     short = size.height < SHORT_BELOW,
                     tall = size.height >= TALL_FROM,
                     wider = size.width >= WIDER_FROM,
+                    widest = size.width >= WIDEST_FROM,
                 )
             }
         }
@@ -139,7 +149,7 @@ object WidgetUpdater {
 }
 
 @Composable
-private fun Content(view: WidgetView, wide: Boolean, short: Boolean, tall: Boolean, wider: Boolean) {
+private fun Content(view: WidgetView, wide: Boolean, short: Boolean, tall: Boolean, wider: Boolean, widest: Boolean) {
     val openThrive: Action = actionStartActivity<OpenThriveActivity>()
     val openSettings: Action = actionStartActivity<MainActivity>()
     val bodyAction = if (view.mode == Mode.NOT_CONFIGURED || view.mode == Mode.KEY_REJECTED) openSettings else openThrive
@@ -196,6 +206,10 @@ private fun Content(view: WidgetView, wide: Boolean, short: Boolean, tall: Boole
                 Spacer(GlanceModifier.width(COLUMN_GAP))
                 Column(modifier = GlanceModifier.width(COUNT_COLUMN)) { AlcoholFigure(view, countOnly = true) }
             }
+            if (widest) {
+                Spacer(GlanceModifier.width(COLUMN_GAP))
+                Column(modifier = GlanceModifier.width(COUNT_COLUMN)) { UnwindFigure(view) }
+            }
         }
 
         if (view.progress != null && view.mode != Mode.LOADING) {
@@ -211,6 +225,7 @@ private fun Content(view: WidgetView, wide: Boolean, short: Boolean, tall: Boole
                     // Holds the bar to the water column, so it ends where the water button does.
                     Spacer(GlanceModifier.width(COLUMN_GAP + COUNT_COLUMN + COLUMN_GAP + COUNT_COLUMN))
                 }
+                if (widest) Spacer(GlanceModifier.width(COLUMN_GAP + COUNT_COLUMN))
             }
         }
 
@@ -244,6 +259,17 @@ private fun Content(view: WidgetView, wide: Boolean, short: Boolean, tall: Boole
                     modifier = GlanceModifier.width(COUNT_COLUMN).height(BUTTON_HEIGHT)
                         .semantics { contentDescription = "Add one alcoholic drink" },
                     colors = ButtonDefaults.buttonColors(backgroundColor = ALCOHOL, contentColor = ON_ACCENT),
+                )
+            }
+            if (widest) {
+                Spacer(GlanceModifier.width(COLUMN_GAP))
+                Button(
+                    text = "+ 5",
+                    onClick = actionRunCallback<AddUnwindAction>(),
+                    enabled = view.buttonsEnabled,
+                    modifier = GlanceModifier.width(COUNT_COLUMN).height(BUTTON_HEIGHT)
+                        .semantics { contentDescription = "Add 5 mg of Unwind" },
+                    colors = ButtonDefaults.buttonColors(backgroundColor = UNWIND, contentColor = ON_ACCENT),
                 )
             }
         }
@@ -325,6 +351,26 @@ private fun CoffeeFigure(view: WidgetView) {
         )
         Spacer(GlanceModifier.width(4.dp))
         Text(text = view.coffeeText, style = TextStyle(color = onSurface, fontSize = 20.sp, fontWeight = FontWeight.Bold))
+    }
+}
+
+/** Icon and mg; the unit stays in the content description. */
+@Composable
+private fun UnwindFigure(view: WidgetView) {
+    val onSurface = GlanceTheme.colors.onSurface
+    if (view.unwindText == null) return
+    Row(
+        modifier = GlanceModifier.semantics { contentDescription = view.unwindDescription },
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        Image(
+            provider = ImageProvider(R.drawable.ic_unwind),
+            contentDescription = null,
+            modifier = GlanceModifier.size(20.dp),
+            colorFilter = ColorFilter.tint(UNWIND),
+        )
+        Spacer(GlanceModifier.width(4.dp))
+        Text(text = view.unwindText, style = TextStyle(color = onSurface, fontSize = 20.sp, fontWeight = FontWeight.Bold))
     }
 }
 

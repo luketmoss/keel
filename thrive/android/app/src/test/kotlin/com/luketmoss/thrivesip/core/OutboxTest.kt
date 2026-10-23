@@ -173,4 +173,19 @@ class OutboxTest {
         assertEquals("coffee", server.rows.getValue(first.id).getValue("kind").jsonPrimitive.content)
         assertEquals("1", server.rows.getValue(second.id).getValue("amount").jsonPrimitive.content)
     }
+
+    @Test
+    fun unwindTapsAreQueuedSeparatelyAsFiveMgEach() = runBlocking {
+        val first = outbox.enqueue(Kind.UNWIND, 5)
+        val second = outbox.enqueue(Kind.UNWIND, 5)
+        assertNotEquals(first.id, second.id)
+        assertEquals("unwind", first.kind)
+        assertEquals(5, first.amount)
+        assertEquals(2, queue.load().size)
+
+        val server = FakeServer()
+        outbox.flush(api(server))
+        assertEquals("unwind", server.rows.getValue(first.id).getValue("kind").jsonPrimitive.content)
+        assertEquals("5", server.rows.getValue(second.id).getValue("amount").jsonPrimitive.content)
+    }
 }

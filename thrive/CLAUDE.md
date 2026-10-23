@@ -95,7 +95,7 @@ comes from the API's `getWorkoutTrack` with the user's Google token, never from 
 ## Sip widget (#524)
 
 `android/` is Thrive Sip's home-screen widget and one-screen settings app
-(Kotlin, Jetpack Glance), logging water (+4 oz), coffee (+1 cup, #561) and alcohol (+1) in one tap.
+(Kotlin, Jetpack Glance), logging water (+4 oz), coffee (+1 cup, #561), alcohol (+1) and Unwind (+5 mg, #591, from 310dp wide) in one tap.
 It calls the Apps Script API with `WIDGET_API_KEY`, which can run `logDrink` and
 `getDrinkTotals` only, and queues taps locally so a tap offline is sent later
 with its own id and tap time.

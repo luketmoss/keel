@@ -81,4 +81,16 @@ class SipApiTest {
         val out = totals("""{"success":true,"data":{"date":"2026-10-20","water_ml":1420,"alcohol_drinks":2,"water_goal_ml":1893}}""")
         assertEquals(0, (out as TotalsOutcome.Ok).totals.coffeeCups)
     }
+
+    @Test
+    fun unwindMgIsReadWhenTheServerSendsIt() {
+        val out = totals("""{"success":true,"data":{"date":"2026-10-20","water_ml":0,"alcohol_drinks":0,"water_goal_ml":1893,"unwind_mg":10}}""")
+        assertEquals(10, (out as TotalsOutcome.Ok).totals.unwindMg)
+    }
+
+    @Test
+    fun aReplyWithoutUnwindMgStillParsesWithUnwindAtZero() {
+        val out = totals("""{"success":true,"data":{"date":"2026-10-20","water_ml":1420,"alcohol_drinks":2,"water_goal_ml":1893}}""")
+        assertEquals(0, (out as TotalsOutcome.Ok).totals.unwindMg)
+    }
 }

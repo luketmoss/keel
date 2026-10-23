@@ -17,6 +17,7 @@ object Kind {
     const val WATER = "water"
     const val ALCOHOL = "alcohol"
     const val COFFEE = "coffee"
+    const val UNWIND = "unwind"
 }
 
 /**
@@ -46,8 +47,11 @@ data class Totals(
     @SerialName("water_goal_ml") val waterGoalMl: Int,
     /** Defaulted so a deployment that predates coffee (#560) still reads. */
     @SerialName("coffee_cups") val coffeeCups: Int = 0,
+    /** Mg. Defaulted so a deployment that predates Unwind (#590) still reads. */
+    @SerialName("unwind_mg") val unwindMg: Int = 0,
 ) {
-    fun isSane(): Boolean = waterMl >= 0 && alcoholDrinks >= 0 && waterGoalMl >= 0 && coffeeCups >= 0
+    fun isSane(): Boolean =
+        waterMl >= 0 && alcoholDrinks >= 0 && waterGoalMl >= 0 && coffeeCups >= 0 && unwindMg >= 0
 }
 
 /** The tap instant in the form the API takes: ISO 8601 UTC, whole seconds, `...Z`. */

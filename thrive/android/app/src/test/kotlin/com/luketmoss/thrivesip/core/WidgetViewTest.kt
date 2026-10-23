@@ -168,4 +168,42 @@ class WidgetViewTest {
         assertNull(off.coffeeText)
         assertEquals("Set up Thrive Sip", off.coffeeDescription)
     }
+
+    @Test
+    fun unwindIsTodaysMgPlusFiveForEachQueuedTap() {
+        val withUnwind = today.copy(unwindMg = 5)
+        val view = WidgetViews.build(snapshot(totals = withUnwind, pending = listOf(tap(Kind.UNWIND, 5))))
+        assertEquals("10", view.unwindText)
+        assertEquals("10 mg of Unwind", view.unwindDescription)
+        // The queue counts Unwind: one queued tap is "1 queued".
+        assertEquals("offline · 1 queued", view.status)
+    }
+
+    @Test
+    fun unwindDescriptionReadsZeroFiveAndTen() {
+        val zero = WidgetViews.build(snapshot())
+        assertEquals("0 mg of Unwind", zero.unwindDescription)
+        assertEquals("0", zero.unwindText)
+        val five = WidgetViews.build(snapshot(totals = today.copy(unwindMg = 5)))
+        assertEquals("5 mg of Unwind", five.unwindDescription)
+        val ten = WidgetViews.build(snapshot(pending = listOf(tap(Kind.UNWIND, 5), tap(Kind.UNWIND, 5))))
+        assertEquals("10 mg of Unwind", ten.unwindDescription)
+        assertEquals("offline · 2 queued", ten.status)
+    }
+
+    @Test
+    fun unwindFromBeforeDenverMidnightCountsFromZero() {
+        val yesterday = today.copy(unwindMg = 15)
+        val view = WidgetViews.build(snapshot(totals = yesterday, at = Instant.parse("2026-10-21T06:30:00Z")))
+        assertEquals("0", view.unwindText)
+        assertEquals("0 mg of Unwind", view.unwindDescription)
+    }
+
+    @Test
+    fun unwindIsAbsentWhileLoadingAndWhenNotConfigured() {
+        assertNull(WidgetViews.build(snapshot(totals = null)).unwindText)
+        val off = WidgetViews.build(snapshot(configured = false, totals = null))
+        assertNull(off.unwindText)
+        assertEquals("Set up Thrive Sip", off.unwindDescription)
+    }
 }

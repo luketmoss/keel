@@ -46,7 +46,7 @@ import { describeBodyRange } from './body.js';
 import { describeJournalRange, describeJournalDay } from './journal.js';
 import {
   checkDrinksRange, describeDrinksRange, describeDrink, describeDrinkDay, drinkLine,
-  planDrinkLog, describeLogged, checkAmountOz, checkTime, describeAmountChange, findWindowStart,
+  planDrinkLog, describeLogged, checkAmountOz, checkTime, describeAmountChange, findWindowStart, UNWIND_MG,
   WATER_OZ_MAX, WATER_OZ_DEFAULT, LOG_COUNT_MAX,
 } from './drinks.js';
 import {
@@ -449,12 +449,12 @@ tool(
     'time with how many of the day\'s sessions recorded them, outdoor distance and ascent with how many ' +
     'outdoor sessions were measured, session effort, and the ' +
     "day's steps, resting HR, HRV, sleep and training load, weight and BP, and the water (oz and ml), " +
-    'coffee (cups) and alcohol (drinks) logged. Use it for volume and load across days. ' +
+    'coffee (cups), alcohol (drinks) and Unwind (mg) logged. Use it for volume and load across days. ' +
     'Default range: the 7 days ending today. Distance and ascent are OUTDOOR ONLY, so on a day with an ' +
     "indoor session they will not equal the sum of that day's activity distances. The rollup is derived " +
     'from the workouts and daily health, rebuilt on every COROS sync run: if it disagrees with ' +
     'thrive_list_workouts, the workouts are right. "—" means unknown, never zero: "moving — (recorded ' +
-    'on 0 of 2 sessions)" means nobody recorded it, not that you stood still. Water, coffee and alcohol catch up ' +
+    'on 0 of 2 sessions)" means nobody recorded it, not that you stood still. Water, coffee, alcohol and Unwind catch up ' +
     'on the next rebuild: for drinks logged since, or entry by entry, use thrive_drinks.',
   RANGE_SHAPE,
   async (args) => {
@@ -466,10 +466,10 @@ tool(
 
 tool(
   'thrive_drinks',
-  'Water, coffee and alcohol the user logged (Thrive Sip), read straight from the Drinks log: each entry with its ' +
+  'Water, coffee, alcohol and Unwind the user logged (Thrive Sip), read straight from the Drinks log: each entry with its ' +
     'local time, kind and amount, per-day totals (water in oz and ml with the % of the daily goal, coffee in cups, ' +
-    'alcohol in standard drinks), and the water goal. Over several days it also gives the average water on the days ' +
-    'it was logged and the total coffee and alcohol. Default: today only. At most 400 days per call. A day or a kind with nothing logged is ' +
+    'alcohol in standard drinks, Unwind in mg), and the water goal. Over several days it also gives the average water on the days ' +
+    'it was logged and the total coffee, alcohol and Unwind. Default: today only. At most 400 days per call. A day or a kind with nothing logged is ' +
     'unknown, never zero. Each entry ends with its id in parentheses, which thrive_update_drink and ' +
     'thrive_delete_drink take; those and thrive_log_drink are on the Thrive (write) connector.',
   {
@@ -507,14 +507,15 @@ async function dayLine(date) {
 
 tool(
   'thrive_log_drink',
-  'Log water, coffee or alcohol in Thrive Sip, on today or an earlier day. Water is in whole US fl oz (default ' +
-    `${WATER_OZ_DEFAULT} oz, the widget's tap; at most ${WATER_OZ_MAX}); coffee is 1 cup and alcohol 1 standard ` +
-    `drink per entry, so log several with count ("3 beers" is kind alcohol, count 3; at most ${LOG_COUNT_MAX}). ` +
+  'Log water, coffee, alcohol or Unwind in Thrive Sip, on today or an earlier day. Water is in whole US fl oz (default ' +
+    `${WATER_OZ_DEFAULT} oz, the widget's tap; at most ${WATER_OZ_MAX}); coffee is 1 cup, alcohol 1 standard ` +
+    `drink and Unwind ${UNWIND_MG} mg per entry, so log several with count ("3 beers" is kind alcohol, count 3; ` +
+    `at most ${LOG_COUNT_MAX}). ` +
     "time is the local time (America/Denver). Omitted, it is now on today and 23:59 on an earlier day, as the app's " +
     'Day view does. A date and time after now is refused. Each entry is its own row with its own id, marked [mcp], ' +
     'and one thrive_undo call removes them all.',
   {
-    kind: z.enum(['water', 'coffee', 'alcohol']).describe('What was drunk'),
+    kind: z.enum(['water', 'coffee', 'alcohol', 'unwind']).describe('What was logged'),
     amount_oz: z.number().optional().describe(`Water only: whole US fl oz, 1-${WATER_OZ_MAX}. Default ${WATER_OZ_DEFAULT}`),
     count: z.number().optional().describe(`How many separate entries to log, 1-${LOG_COUNT_MAX}. Default 1`),
     date: z.string().optional().describe("The day (YYYY-MM-DD, 'today', 'yesterday' or '-2d'). Default: today"),
@@ -545,7 +546,7 @@ tool(
 tool(
   'thrive_update_drink',
   "Change a logged drink's water amount, its time, or both, by its id from thrive_drinks. amount_oz is for water " +
-    `only (whole US fl oz, 1-${WATER_OZ_MAX}): coffee and alcohol are always 1 per entry. time is HH:MM local time ` +
+    `only (whole US fl oz, 1-${WATER_OZ_MAX}): coffee, alcohol and Unwind have a fixed amount per entry. time is HH:MM local time ` +
     'and stays on the same day: to move a drink to another day, delete it and log it again. A value equal to the ' +
     'stored one is left alone.',
   {

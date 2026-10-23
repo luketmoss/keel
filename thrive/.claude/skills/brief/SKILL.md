@@ -94,7 +94,7 @@ Make these calls in parallel. They don't depend on each other.
 | Planned sessions, today + look-ahead | `thrive_list_workouts` with `date_from` = today, `date_to` = today + 3 days, `status: 'planned'` |
 | Body | `thrive_body_measurements` with `date_from` = 7 days ago |
 | Yesterday's note | `thrive_journal` with `date_from` = `date_to` = yesterday |
-| Yesterday's drinks | `thrive_drinks` with `date_from` = `date_to` = yesterday. It reads the Drinks log directly, so use it rather than the summary's water, coffee and alcohol, which lag until the next rebuild |
+| Yesterday's drinks | `thrive_drinks` with `date_from` = `date_to` = yesterday. It reads the Drinks log directly, so use it rather than the summary's water, coffee, alcohol and Unwind, which lag until the next rebuild |
 | Board | `hive_list_items` with `due_before` = today + 3 days, once with `status: 'To Do'` and once with `status: 'In Progress'`. If a call errors (it has returned a 404 page once), retry it once before giving up. Never call it without a `status`: `due_before` has no lower bound, so an unfiltered call returns every finished item ever due and buries the open ones. Keep the Hive owner's items (see Settings). Overdue means a due date before today; list those separately from today's and the look-ahead's, oldest first, and say how many days overdue. |
 | Calendar | Events for today + 3 days from **each** calendar in Settings, if a calendar tool is connected. Pass the time zone from Settings, since a calendar's own zone can differ. Pass `eventType` as `DEFAULT`, `OUT_OF_OFFICE`, `FOCUS_TIME`, `FROM_GMAIL` and `BIRTHDAY`: birthdays are left out unless asked for. An empty result from one calendar is not "no events": say "no events" only when every calendar was read and all were empty. |
 | Weather | One Open-Meteo forecast for today + 3 days (below) |
@@ -245,9 +245,12 @@ them. Mention a trend only when it changes what to do today.
 nothing else: no advice, no judgement, no "too little" or "well done". Water
 in oz with its percentage of the goal, then coffee in cups (#562), then alcohol
 in drinks, each part said as not logged when that kind has no entry, never as
-zero:
+zero. Unwind in mg (#592) comes **last, and only when some was logged**: a day
+with none leaves it off the line, never *"No unwind logged"*:
 
 - all three: *"Water 48 oz, 75% of your 64 oz goal · Coffee 2 cups · Alcohol 2 drinks"*
+- with Unwind: *"Water 48 oz, 75% of your 64 oz goal · Coffee 2 cups · Alcohol 2 drinks · Unwind 10 mg"*
+- Unwind only: *"No water logged · No coffee logged · No alcohol logged · Unwind 5 mg"*
 - no coffee: *"Water 48 oz, 75% of your 64 oz goal · No coffee logged · Alcohol 2 drinks"*
 - water only: *"Water 48 oz, 75% of your 64 oz goal · No coffee logged · No alcohol logged"*
 - coffee only: *"No water logged · Coffee 1 cup · No alcohol logged"*
@@ -370,7 +373,10 @@ order, and the data for each (leave a key out and the section disappears):
   logged it (81% of your 64 oz goal) · Coffee 12 cups in total · Alcohol 5
   drinks in total"*. A kind with no entry all week is *"No water logged"*,
   *"No coffee logged"* or *"No alcohol logged"*, and a week with none of them
-  is *"No drinks logged."*, never zero. Figures only, as on the daily page.
+  is *"No drinks logged."*, never zero. Unwind (#592) is added last, as the
+  week's total in mg, and only when some was logged: *"… · Alcohol 5 drinks
+  in total · Unwind 40 mg in total"*; a week with none leaves it off the line.
+  Figures only, as on the daily page.
 - `recovery`: `{note, sleep, hrv, rhr}` as on the daily page, but each value
   is the week's average with the change from the week before in `sub`, plus
   the worst night with its likely cause if the journal says one. `series`

@@ -3,7 +3,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { checkDrinksRange, dayTotals, describeDrink, describeDrinkDay, describeDrinksRange } from './drinks.js';
+import {
+  checkDrinksRange, dayTotals, describeDrink, describeDrinkDay, describeDrinksRange, describeLogged, planDrinkLog,
+} from './drinks.js';
 import { mlToOz } from './domain.js';
 
 /** A drink as getDrinks returns it (#519). */
@@ -30,7 +32,8 @@ test('ml converts to whole US fl oz, as the app shows it, and blank stays blank'
 });
 
 test('a day sums its water ml and its alcohol drinks', () => {
-  assert.deepEqual(dayTotals(DAY), { water: 354, waterCount: 3, coffee: 0, coffeeCount: 0, alcohol: 2, alcoholCount: 2 });
+  assert.deepEqual(dayTotals(DAY), { water: 354, waterCount: 3, coffee: 0, coffeeCount: 0, alcohol: 2, alcoholCount: 2,
+    unwind: 0, unwindCount: 0 });
 });
 
 test('each entry shows its local time, kind, amount, source and id (#595)', () => {
@@ -42,7 +45,7 @@ test('each entry shows its local time, kind, amount, source and id (#595)', () =
 test('a day line gives water in oz and ml with the % of goal, and alcohol in drinks', () => {
   assert.equal(
     describeDrinkDay('2026-10-19', DAY, 1893),
-    '- 2026-10-19: water 12 oz (354 ml), 19% of goal · no coffee logged · alcohol 2 drinks (5 entries)',
+    '- 2026-10-19: water 12 oz (354 ml), 19% of goal · no coffee logged · alcohol 2 drinks · no unwind logged (5 entries)',
   );
 });
 
@@ -50,7 +53,7 @@ test('a kind not logged says so, never 0', () => {
   const waterOnly = describeDrinkDay('2026-10-19', DAY.slice(0, 1), 1893);
   assert.match(waterOnly, /· no alcohol logged/);
   const alcoholOnly = describeDrinkDay('2026-10-19', DAY.slice(3, 4), 1893);
-  assert.match(alcoholOnly, /^- 2026-10-19: no water logged · no coffee logged · alcohol 1 drink \(1 entry\)$/);
+  assert.match(alcoholOnly, /^- 2026-10-19: no water logged · no coffee logged · alcohol 1 drink · no unwind logged \(1 entry\)$/);
   assert.doesNotMatch(waterOnly + alcoholOnly, /\b0 (oz|drinks)/);
 });
 
@@ -81,7 +84,7 @@ test('several days: the missing days, the average water on logged days and the t
   assert.match(text, /^Drinks, 2026-10-19 to 2026-10-22: 7 entries on 2 days\./);
   assert.match(text, /No drinks logged for 2 days: 2026-10-20, 2026-10-22\./);
   // (354 + 1000) / 2 = 677 ml
-  assert.match(text, /Across the range: water logged on 2 of 4 days, averaging 23 oz \(677 ml\) \(36% of goal\) on those days; no coffee logged; alcohol 2 drinks in total, on 1 day\./);
+  assert.match(text, /Across the range: water logged on 2 of 4 days, averaging 23 oz \(677 ml\) \(36% of goal\) on those days; no coffee logged; alcohol 2 drinks in total, on 1 day; no unwind logged\./);
   assert.ok(text.indexOf('- 2026-10-19:') < text.indexOf('- 2026-10-21:'));
 });
 
@@ -116,10 +119,12 @@ test('#562: each entry is listed under its own kind, coffee in cups', () => {
 });
 
 test('#562: a day with water, coffee and alcohol sums each, and says coffee between water and alcohol', () => {
-  assert.deepEqual(dayTotals(MIXED), { water: 354, waterCount: 1, coffee: 2, coffeeCount: 2, alcohol: 2, alcoholCount: 2 });
+  assert.deepEqual(dayTotals(MIXED), {
+    water: 354, waterCount: 1, coffee: 2, coffeeCount: 2, alcohol: 2, alcoholCount: 2, unwind: 0, unwindCount: 0,
+  });
   assert.equal(
     describeDrinkDay('2026-10-19', MIXED, 1893),
-    '- 2026-10-19: water 12 oz (354 ml), 19% of goal · coffee 2 cups · alcohol 2 drinks (5 entries)',
+    '- 2026-10-19: water 12 oz (354 ml), 19% of goal · coffee 2 cups · alcohol 2 drinks · no unwind logged (5 entries)',
   );
   const text = describeDrinksRange({ drinks: MIXED, water_goal_ml: 1893 }, { from: '2026-10-19', to: '2026-10-19' });
   assert.match(text, /coffee in cups/);
@@ -137,9 +142,11 @@ test('#562: an unknown kind is said by its raw kind and amount, never as alcohol
   const tea = drink('t1', 'tea', '1', '2026-10-19', '15:00:00');
   assert.equal(describeDrink(tea), '  - 15:00 tea 1 [app] (t1)');
   assert.equal(describeDrink({ ...tea, amount: 'a mug' }), '  - 15:00 tea a mug [app] (t1)');
-  assert.deepEqual(dayTotals([tea]), { water: 0, waterCount: 0, coffee: 0, coffeeCount: 0, alcohol: 0, alcoholCount: 0 });
+  assert.deepEqual(dayTotals([tea]), {
+    water: 0, waterCount: 0, coffee: 0, coffeeCount: 0, alcohol: 0, alcoholCount: 0, unwind: 0, unwindCount: 0,
+  });
   const text = describeDrinksRange({ drinks: [tea], water_goal_ml: 1893 }, { from: '2026-10-19', to: '2026-10-19' });
-  assert.match(text, /- 2026-10-19: no water logged · no coffee logged · no alcohol logged \(1 entry\)/);
+  assert.match(text, /- 2026-10-19: no water logged · no coffee logged · no alcohol logged · no unwind logged \(1 entry\)/);
   assert.doesNotMatch(text.split('\n').filter((l) => l.startsWith('  - ')).join('\n'), /alcohol/);
 });
 
@@ -149,10 +156,67 @@ test('#562: over several days the range line adds the coffee total and its days'
     drink('m6', 'coffee', '1', '2026-10-21', '07:00:00'),
   ];
   const text = describeDrinksRange({ drinks, water_goal_ml: 1893 }, { from: '2026-10-19', to: '2026-10-22' });
-  assert.match(text, /; coffee 3 cups in total, on 2 days; alcohol 2 drinks in total, on 1 day\./);
+  assert.match(text, /; coffee 3 cups in total, on 2 days; alcohol 2 drinks in total, on 1 day; no unwind logged\./);
   const one = describeDrinksRange({ drinks: [drink('c', 'coffee', '1', '2026-10-20', '07:00:00')], water_goal_ml: 1893 },
     { from: '2026-10-19', to: '2026-10-20' });
   assert.match(one, /; coffee 1 cup in total, on 1 day;/);
   const none = describeDrinksRange({ drinks: DAY, water_goal_ml: 1893 }, { from: '2026-10-19', to: '2026-10-20' });
   assert.match(none, /; no coffee logged; alcohol 2 drinks in total/);
+});
+
+// #592: Unwind, in mg, narrated as itself, after alcohol.
+const ALL_FOUR = [
+  ...MIXED,
+  drink('u1', 'unwind', '5', '2026-10-19', '21:30:00', 'app'),
+  drink('u2', 'unwind', '5', '2026-10-19', '22:10:00', 'widget'),
+];
+
+test('#592: a day with all four kinds lists each entry under its own kind, unwind in mg', () => {
+  const text = describeDrinksRange({ drinks: ALL_FOUR, water_goal_ml: 1893 }, { from: '2026-10-19', to: '2026-10-19' });
+  assert.match(text, / {2}- 06:50 water 12 oz \(354 ml\) \[widget\] \(m1\)/);
+  assert.match(text, / {2}- 07:10 coffee 1 cup \[app\] \(m2\)/);
+  assert.match(text, / {2}- 19:10 alcohol 1 drink \[app\] \(m4\)/);
+  assert.match(text, / {2}- 22:10 unwind 5 mg \[widget\] \(u2\)/);
+  assert.match(text, /Unwind in mg/);
+});
+
+test('#592: the day line says unwind after alcohol, in mg', () => {
+  assert.deepEqual(dayTotals(ALL_FOUR), {
+    water: 354, waterCount: 1, coffee: 2, coffeeCount: 2, alcohol: 2, alcoholCount: 2, unwind: 10, unwindCount: 2,
+  });
+  assert.equal(
+    describeDrinkDay('2026-10-19', ALL_FOUR, 1893),
+    '- 2026-10-19: water 12 oz (354 ml), 19% of goal · coffee 2 cups · alcohol 2 drinks · unwind 10 mg (7 entries)',
+  );
+});
+
+test('#592: a day without unwind says "no unwind logged", never 0', () => {
+  const line = describeDrinkDay('2026-10-19', MIXED, 1893);
+  assert.match(line, /· alcohol 2 drinks · no unwind logged \(5 entries\)$/);
+  assert.doesNotMatch(line, /unwind 0/);
+});
+
+test('#592: over several days the range line adds the unwind total and its days', () => {
+  const drinks = [...ALL_FOUR, drink('u3', 'unwind', '5', '2026-10-21', '22:00:00')];
+  const text = describeDrinksRange({ drinks, water_goal_ml: 1893 }, { from: '2026-10-19', to: '2026-10-22' });
+  assert.match(text, /; alcohol 2 drinks in total, on 1 day; unwind 15 mg in total, on 2 days\./);
+  const none = describeDrinksRange({ drinks: MIXED, water_goal_ml: 1893 }, { from: '2026-10-19', to: '2026-10-20' });
+  assert.match(none, /; no unwind logged\./);
+});
+
+test('#592: planDrinkLog plans unwind at 5 mg an entry, refuses amount_oz and an unknown kind', () => {
+  const now = new Date('2026-10-23T15:00:00Z');
+  assert.deepEqual(
+    planDrinkLog({ kind: 'unwind', date: '2026-10-22', time: '22:10' }, now),
+    { kind: 'unwind', amount: 5, count: 1, date: '2026-10-22', time: '22:10', logged_at_utc: '2026-10-23T04:10:00.000Z' },
+  );
+  const two = planDrinkLog({ kind: 'unwind', count: 2, date: '2026-10-22', time: '22:10' }, now);
+  assert.equal(two.amount, 5);
+  assert.equal(two.count, 2);
+  assert.equal(describeLogged(two), 'Logged 10 mg of Unwind (2 entries) on 2026-10-22 at 22:10.');
+  assert.throws(
+    () => planDrinkLog({ kind: 'unwind', amount_oz: 2 }, now),
+    { message: 'amount_oz is only for water: coffee, alcohol and unwind have a fixed amount per entry. Use count to log several.' },
+  );
+  assert.throws(() => planDrinkLog({ kind: 'tea' }, now), { message: 'kind must be water, coffee, alcohol or unwind; got "tea".' });
 });

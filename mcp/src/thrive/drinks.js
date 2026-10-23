@@ -1,12 +1,12 @@
-// Narration for thrive_drinks (#522): Thrive Sip's water, coffee and alcohol log,
-// and the checks and wording of the drink write tools (#595).
+// Narration for thrive_drinks (#522): Thrive Sip's water, coffee, alcohol and
+// Unwind log, and the checks and wording of the drink write tools (#595).
 //
 // Pure. The API's getDrinks (#519) answers { drinks, water_goal_ml }, each
 // drink a domain object ({ id, kind, amount, date, time, logged_at_utc,
 // source, created, updated }); nothing here knows a column. Water `amount` is
-// whole ml, coffee `amount` cups (#562), alcohol `amount` standard drinks. A
-// kind this file does not know is narrated by its raw kind and amount, never
-// as one it does.
+// whole ml, coffee `amount` cups (#562), alcohol `amount` standard drinks,
+// unwind `amount` mg (#592). A kind this file does not know is narrated by its
+// raw kind and amount, never as one it does.
 
 import { datesBetween, describeDateRuns } from './daily.js';
 import { ML_PER_OZ, addDays, mlToOz, normalizeDate, nowTimeStr, startedAtUtc, todayStr } from './domain.js';
@@ -36,15 +36,18 @@ function amountOf(drink) {
   return /^\d+$/.test(s) ? Number(s) : null;
 }
 
-/** One day's entries -> { water, waterCount, coffee, coffeeCount, alcohol, alcoholCount }. */
+/** One day's entries -> { water, waterCount, coffee, coffeeCount, alcohol, alcoholCount, unwind, unwindCount }. */
 export function dayTotals(entries) {
-  const t = { water: 0, waterCount: 0, coffee: 0, coffeeCount: 0, alcohol: 0, alcoholCount: 0 };
+  const t = {
+    water: 0, waterCount: 0, coffee: 0, coffeeCount: 0, alcohol: 0, alcoholCount: 0, unwind: 0, unwindCount: 0,
+  };
   for (const d of entries) {
     const n = amountOf(d);
     if (n === null) continue;
     if (d.kind === 'water') { t.water += n; t.waterCount += 1; }
     else if (d.kind === 'coffee') { t.coffee += n; t.coffeeCount += 1; }
     else if (d.kind === 'alcohol') { t.alcohol += n; t.alcoholCount += 1; }
+    else if (d.kind === 'unwind') { t.unwind += n; t.unwindCount += 1; }
   }
   return t;
 }
@@ -57,6 +60,7 @@ const AMOUNT_OF_KIND = {
   water,
   coffee: (n) => plural(n, 'cup'),
   alcohol: (n) => plural(n, 'drink'),
+  unwind: (n) => `${n} mg`,
 };
 
 /** One entry -> "07:45 water 4 oz (118 ml) [app] (d1)": its id is what the write tools take (#595). */
@@ -79,7 +83,9 @@ export function describeDrinkDay(date, entries, goal) {
     : 'no water logged';
   const coffeePart = t.coffeeCount ? `coffee ${plural(t.coffee, 'cup')}` : 'no coffee logged';
   const alcoholPart = t.alcoholCount ? `alcohol ${plural(t.alcohol, 'drink')}` : 'no alcohol logged';
-  return `- ${date}: ${waterPart} · ${coffeePart} · ${alcoholPart} (${plural(entries.length, 'entry', 'entries')})`;
+  const unwindPart = t.unwindCount ? `unwind ${t.unwind} mg` : 'no unwind logged';
+  return `- ${date}: ${waterPart} · ${coffeePart} · ${alcoholPart} · ${unwindPart} ` +
+    `(${plural(entries.length, 'entry', 'entries')})`;
 }
 
 /** The thrive_drinks response. */
@@ -99,7 +105,7 @@ export function describeDrinksRange({ drinks, water_goal_ml: goal }, { from, to 
       : `Drinks, ${range}: no drinks logged.`,
     `Water goal: ${mlToOz(goal)} oz (${goal} ml) a day. It is the current setting, applied to every day shown: ` +
       'past goals are not kept.',
-    'Water is in US fl oz and ml; coffee in cups; alcohol in standard drinks. A day, or a kind, with nothing logged is unknown, ' +
+    'Water is in US fl oz and ml; coffee in cups; alcohol in standard drinks; Unwind in mg. A day, or a kind, with nothing logged is unknown, ' +
       'not zero. Times are local (America/Denver).',
   ];
 
@@ -113,6 +119,7 @@ export function describeDrinksRange({ drinks, water_goal_ml: goal }, { from, to 
       const waterDays = totals.filter((t) => t.waterCount);
       const coffeeDays = totals.filter((t) => t.coffeeCount);
       const alcoholDays = totals.filter((t) => t.alcoholCount);
+      const unwindDays = totals.filter((t) => t.unwindCount);
       const waterLine = waterDays.length
         ? (() => {
           const avg = Math.round(waterDays.reduce((s, t) => s + t.water, 0) / waterDays.length);
@@ -128,7 +135,10 @@ export function describeDrinksRange({ drinks, water_goal_ml: goal }, { from, to 
         ? `alcohol ${plural(alcoholDays.reduce((s, t) => s + t.alcohol, 0), 'drink')} in total, ` +
           `on ${plural(alcoholDays.length, 'day')}`
         : 'no alcohol logged';
-      out.push(`Across the range: ${waterLine}; ${coffeeLine}; ${alcoholLine}.`);
+      const unwindLine = unwindDays.length
+        ? `unwind ${unwindDays.reduce((s, t) => s + t.unwind, 0)} mg in total, on ${plural(unwindDays.length, 'day')}`
+        : 'no unwind logged';
+      out.push(`Across the range: ${waterLine}; ${coffeeLine}; ${alcoholLine}; ${unwindLine}.`);
     }
   }
 
@@ -151,7 +161,10 @@ export const WATER_OZ_DEFAULT = 4;
 /** Entries one thrive_log_drink call may log ("3 beers"). */
 export const LOG_COUNT_MAX = 10;
 
-const DRINK_KINDS = ['water', 'coffee', 'alcohol'];
+/** UNWIND_AMOUNT_MG in apps-script/src/types.js: every unwind entry is 5 mg (#590). */
+export const UNWIND_MG = 5;
+
+const DRINK_KINDS = ['water', 'coffee', 'alcohol', 'unwind'];
 const DATE_FORMS = "YYYY-MM-DD, 'today', 'yesterday' or '-2d'";
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -162,7 +175,7 @@ export const ozToMl = (oz) => Math.round(oz * ML_PER_OZ);
 export function checkAmountOz(amountOz, kind) {
   if (kind !== 'water') {
     throw new Error(
-      'amount_oz is only for water: coffee and alcohol are always 1 per entry. Use count to log several.',
+      'amount_oz is only for water: coffee, alcohol and unwind have a fixed amount per entry. Use count to log several.',
     );
   }
   if (!Number.isInteger(amountOz) || amountOz < 1 || amountOz > WATER_OZ_MAX) {
@@ -195,8 +208,9 @@ function realDate(value, now) {
  * instant, DST-aware, from which the API derives the row's date and time.
  */
 export function planDrinkLog({ kind, amount_oz: amountOz, count = 1, date, time }, now = new Date()) {
-  if (!DRINK_KINDS.includes(kind)) throw new Error(`kind must be water, coffee or alcohol; got "${kind}".`);
-  const amount = amountOz === undefined ? (kind === 'water' ? ozToMl(WATER_OZ_DEFAULT) : 1) : checkAmountOz(amountOz, kind);
+  if (!DRINK_KINDS.includes(kind)) throw new Error(`kind must be water, coffee, alcohol or unwind; got "${kind}".`);
+  const fixed = kind === 'water' ? ozToMl(WATER_OZ_DEFAULT) : kind === 'unwind' ? UNWIND_MG : 1;
+  const amount = amountOz === undefined ? fixed : checkAmountOz(amountOz, kind);
   if (!Number.isInteger(count) || count < 1 || count > LOG_COUNT_MAX) {
     throw new Error(`count must be a whole number from 1 to ${LOG_COUNT_MAX}; got ${count}.`);
   }
@@ -230,6 +244,11 @@ export function describeLogged({ kind, amount, count, date, time }) {
       : `Logged ${count} water entries of ${water(amount)} each ${when}`;
   }
   if (kind === 'coffee') return `Logged ${plural(count, 'cup')} of coffee ${when}`;
+  if (kind === 'unwind') {
+    return count === 1
+      ? `Logged ${amount} mg of Unwind ${when}`
+      : `Logged ${amount * count} mg of Unwind (${count} entries) ${when}`;
+  }
   return `Logged ${plural(count, 'alcohol drink')} ${when}`;
 }
 

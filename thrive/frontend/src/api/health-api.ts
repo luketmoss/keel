@@ -91,6 +91,7 @@ export const DAILY_SUMMARY_FIELDS = [
   'water_ml', // Z  #522: the day's water from Drinks, ml; blank when none
   'alcohol_drinks', // AA #522: the day's alcohol from Drinks, standard drinks; blank when none
   'coffee_cups', // AB #562: the day's coffee from Drinks, cups; blank when none
+  'unwind_mg', // AC #592: the day's unwind from Drinks, mg; blank when none
 ] as const;
 
 export type DailyHealthField = (typeof DAILY_HEALTH_FIELDS)[number];

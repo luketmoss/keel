@@ -18,7 +18,7 @@ const COL = {
   sleep_total_s: 15, training_load: 16, computed_at: 17,
   moving_withdata: 18, elapsed_withdata: 19,
   weight_kg: 20, fat_ratio_pct: 21, systolic_mmhg: 22, diastolic_mmhg: 23, bp_count: 24,
-  water_ml: 25, alcohol_drinks: 26, coffee_cups: 27,
+  water_ml: 25, alcohol_drinks: 26, coffee_cups: 27, unwind_mg: 28,
 };
 
 function rebuild(
@@ -459,13 +459,14 @@ describe('the tab is readable, and history bounds are discoverable', () => {
     expect(res.data).toEqual({ from: '2026-03-04', to: '2026-09-15' });
   });
 
-  it('returns all 28 columns on a read', () => {
+  it('returns every column on a read', () => {
     const first = rebuild({
       workouts: [workoutRow({ id: 'w_1', date: '2026-09-15', type: 'weight' })],
     }, '2026-09-15', '2026-09-15');
     const res = callDoGet<any[]>(first.sandbox, { action: 'getDailySummary' });
-    expect(Object.keys(res.data[0])).toHaveLength(29); // 28 + sheetRow
-    expect(first.summaryRows[0]).toHaveLength(28);
+    const fields: string[] = [...first.sandbox.DAILY_SUMMARY_FIELDS];
+    expect(Object.keys(res.data[0])).toEqual([...fields, 'sheetRow']);
+    expect(first.summaryRows[0]).toHaveLength(fields.length);
   });
 });
 
@@ -926,7 +927,7 @@ describe('#203 AC5: the rollup stays idempotent with the body columns', () => {
 // --- #522: water and alcohol, rolled up from Drinks -------------------------
 
 /** One Drinks row, A:I, as the API writes it (DRINK_FIELDS). */
-function drinkRow(id: string, kind: 'water' | 'alcohol' | 'coffee', amount: string, date: string, time = '08:00:00'): CellValue[] {
+function drinkRow(id: string, kind: 'water' | 'alcohol' | 'coffee' | 'unwind', amount: string, date: string, time = '08:00:00'): CellValue[] {
   return [id, kind, amount, date, time, `${date}T14:00:00.000Z`, 'app', `${date}T14:00:01.000Z`, `${date}T14:00:01.000Z`];
 }
 
@@ -1060,9 +1061,7 @@ describe('#562 AC3: AB is appended, and the migration matches', () => {
   it('appends coffee_cups after alcohol_drinks, moving nothing', () => {
     const { sandbox } = loadApi();
     const fields = [...sandbox.DAILY_SUMMARY_FIELDS];
-    expect(fields.slice(-3)).toEqual(['water_ml', 'alcohol_drinks', 'coffee_cups']);
-    expect(fields).toHaveLength(28);
-    expect(sandbox.DAILY_SUMMARY_COLUMN_COUNT).toBe(28);
+    expect(fields.slice(25, 28)).toEqual(['water_ml', 'alcohol_drinks', 'coffee_cups']);
   });
 });
 
@@ -1112,7 +1111,7 @@ describe('#562 AC2: the day sums its coffee cups', () => {
     }, '2026-10-19', '2026-10-19');
     expect(res.success, res.error).toBe(true);
     expect(drinkRows).toBeUndefined();
-    expect(summaryRows[0].slice(COL.water_ml)).toEqual(['', '', '']);
+    expect(summaryRows[0].slice(COL.water_ml, COL.coffee_cups + 1)).toEqual(['', '', '']);
   });
 
   it('reads coffee_cups back by name', () => {
@@ -1122,5 +1121,76 @@ describe('#562 AC2: the day sums its coffee cups', () => {
     }, '2026-10-19', '2026-10-19');
     const res = callDoGet<any[]>(first.sandbox, { action: 'getDailySummary', from: '2026-10-19', to: '2026-10-19' });
     expect(res.data[0].coffee_cups).toBe('2');
+  });
+});
+
+// --- #592: unwind, rolled up from Drinks ------------------------------------
+
+describe('#592 AC3: AC is appended, and the migration matches', () => {
+  it('appends unwind_mg after coffee_cups, moving nothing', () => {
+    const { sandbox } = loadApi();
+    const fields = [...sandbox.DAILY_SUMMARY_FIELDS];
+    expect(fields.slice(25, 29)).toEqual(['water_ml', 'alcohol_drinks', 'coffee_cups', 'unwind_mg']);
+    expect(sandbox.DAILY_SUMMARY_COLUMN_COUNT).toBe(fields.length);
+  });
+});
+
+describe('#592 AC2: the day sums its unwind mg', () => {
+  it('writes 10 for two entries of 5, and leaves water, alcohol and coffee as they were', () => {
+    const { res, summaryRows } = rebuild({
+      workouts: [],
+      drinks: [
+        drinkRow('d1', 'water', '354', '2026-10-19', '07:00:00'),
+        drinkRow('c1', 'coffee', '1', '2026-10-19', '07:10:00'),
+        drinkRow('u1', 'unwind', '5', '2026-10-19', '21:00:00'),
+        drinkRow('d2', 'alcohol', '1', '2026-10-19', '19:00:00'),
+        drinkRow('u2', 'unwind', '5', '2026-10-19', '22:10:00'),
+        // Another day's unwind never leaks in.
+        drinkRow('u3', 'unwind', '5', '2026-10-20'),
+      ],
+    }, '2026-10-19', '2026-10-19');
+    expect(res.success, res.error).toBe(true);
+    expect(summaryRows).toHaveLength(1);
+    expect(summaryRows[0][COL.unwind_mg]).toBe('10');
+    expect(summaryRows[0][COL.water_ml]).toBe('354');
+    expect(summaryRows[0][COL.alcohol_drinks]).toBe('1');
+    expect(summaryRows[0][COL.coffee_cups]).toBe('1');
+  });
+
+  it('leaves unwind_mg blank, not 0, on a day with none', () => {
+    const { summaryRows } = rebuild({
+      workouts: [workoutRow({ id: 'w_1', date: '2026-10-19', type: 'weight' })],
+      drinks: [drinkRow('d1', 'water', '250', '2026-10-19'), drinkRow('u1', 'unwind', '5', '2026-10-18')],
+    }, '2026-10-19', '2026-10-19');
+    expect(summaryRows[0][COL.unwind_mg]).toBe('');
+    expect(summaryRows[0][COL.water_ml]).toBe('250');
+  });
+
+  it('gives an unwind-only day a row, with the other drinks blank', () => {
+    const { summaryRows } = rebuild({
+      workouts: [],
+      drinks: [drinkRow('u1', 'unwind', '5', '2026-10-19')],
+    }, '2026-10-19', '2026-10-19');
+    expect(summaryRows).toHaveLength(1);
+    expect(summaryRows[0][COL.unwind_mg]).toBe('5');
+    expect(summaryRows[0].slice(COL.water_ml, COL.unwind_mg)).toEqual(['', '', '']);
+  });
+
+  it('leaves Z:AC blank, without error, when there is no Drinks tab', () => {
+    const { res, drinkRows, summaryRows } = rebuild({
+      workouts: [workoutRow({ id: 'w_1', date: '2026-10-19', type: 'weight' })],
+    }, '2026-10-19', '2026-10-19');
+    expect(res.success, res.error).toBe(true);
+    expect(drinkRows).toBeUndefined();
+    expect(summaryRows[0].slice(COL.water_ml, COL.unwind_mg + 1)).toEqual(['', '', '', '']);
+  });
+
+  it('reads unwind_mg back by name', () => {
+    const first = rebuild({
+      workouts: [],
+      drinks: [drinkRow('u1', 'unwind', '5', '2026-10-19'), drinkRow('u2', 'unwind', '5', '2026-10-19')],
+    }, '2026-10-19', '2026-10-19');
+    const res = callDoGet<any[]>(first.sandbox, { action: 'getDailySummary', from: '2026-10-19', to: '2026-10-19' });
+    expect(res.data[0].unwind_mg).toBe('10');
   });
 });

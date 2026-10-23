@@ -232,8 +232,8 @@ Apps Script deploy that ships them first; until then `rest_plans` is ignored and
 
 **Drinks (#522, #595).** `thrive_drinks` reads Thrive Sip's log through
 `getDrinks`, each entry with its id, and `thrive_daily_summary` shows the summary's `water_ml`,
-`coffee_cups` (#562) and `alcohol_drinks`. Each entry is narrated by its own kind
-(water, coffee or alcohol); a kind the Worker does not know is said by its raw kind and
+`coffee_cups` (#562), `alcohol_drinks` and `unwind_mg` (#592). Each entry is narrated by its own kind
+(water, coffee, alcohol, or unwind in mg); a kind the Worker does not know is said by its raw kind and
 amount, never as alcohol. Three write tools correct the log on any day:
 `thrive_log_drink` (`logDrink`, one request per entry with a Worker-minted UUID and
 `source: 'mcp'`, all under one `call_id`), `thrive_update_drink` (`updateDrinkAmount`,
@@ -242,7 +242,8 @@ water only, and `updateDrinkTime`) and `thrive_delete_drink` (`deleteDrink`, dry
 API's change log records all four actions on the Drinks tab, so `thrive_undo` reverts
 them. Moving a drink to another day is deliberately not a tool: delete and re-log.
 **Deploy the Apps Script first**: until then `logDrink` refuses `source: 'mcp'` and the
-drink writes are not logged for undo.
+drink writes are not logged for undo. `thrive_log_drink` takes `unwind` at 5 mg an entry (#592); an
+API from before #590's deploy refuses it, and the tool passes that refusal on.
 
 ## Approving the destructive tools
 

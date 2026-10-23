@@ -182,6 +182,9 @@ const coffee = (n) => (isBlank(n) ? BLANK : `${n} cup${Number(n) === 1 ? '' : 's
 /** "2" -> "2 drinks"; blank -> "—" (#522). */
 const alcohol = (n) => (isBlank(n) ? BLANK : `${n} drink${Number(n) === 1 ? '' : 's'}`);
 
+/** "10" -> "10 mg"; blank -> "—" (#592). */
+const unwind = (n) => (isBlank(n) ? BLANK : `${n} mg`);
+
 /** One DailySummary object -> one line. */
 export function describeSummaryDay(s) {
   const parts = [`- ${s.date}:`];
@@ -214,6 +217,8 @@ export function describeSummaryDay(s) {
   // A row from before #562's migration has no coffee_cups: blank, so "—".
   parts.push(`· coffee ${coffee(s.coffee_cups)}`);
   parts.push(`· alcohol ${alcohol(s.alcohol_drinks)}`);
+  // A row from before #592's migration has no unwind_mg: blank, so "—".
+  parts.push(`· unwind ${unwind(s.unwind_mg)}`);
   return parts.join(' ');
 }
 
@@ -235,7 +240,7 @@ export function describeSummaryRange(rows, { from, to }) {
     "day's readings, with the count behind it. Both are rolled up from BodyMeasurements (#203); \"—\" means no such reading that day.",
   );
   out.push(
-    'Water, coffee (in cups) and alcohol are the day\'s totals from the Drinks log (#522, #562): "—" means none ' +
+    'Water, coffee (in cups), alcohol and Unwind (in mg) are the day\'s totals from the Drinks log (#522, #562, #592): "—" means none ' +
     'of that kind was logged, not zero. They catch up on the next rebuild, so a drink logged since may be missing here; thrive_drinks ' +
     'reads the log directly.',
   );

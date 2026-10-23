@@ -1,4 +1,4 @@
-// DailySummary tab (A:AB) — one row per local calendar day, rolled up from
+// DailySummary tab (A:AC) — one row per local calendar day, rolled up from
 // Workouts, DailyHealth, BodyMeasurements (#203) and Drinks (#522).
 //
 // **Derived, never authoritative.** Every row is rebuildable at any time from
@@ -174,7 +174,7 @@ function getBodyMeasurementsByDate() {
 /**
  * Every Drinks row, grouped by its local `date` (#522). A missing tab leaves
  * this `{}`, as a missing BodyMeasurements tab does: every day is then
- * legitimately drink-less, and Z:AB stay blank everywhere.
+ * legitimately drink-less, and Z:AC stay blank everywhere.
  */
 function getDrinksByDate() {
   var sheet = getSpreadsheet().getSheetByName(DRINKS_SHEET);
@@ -192,15 +192,17 @@ function getDrinksByDate() {
 }
 
 /**
- * The day's three drinks columns (#522, #562): `water_ml` the sum of its
+ * The day's four drinks columns (#522, #562, #592): `water_ml` the sum of its
  * water amounts, `alcohol_drinks` the sum of its alcohol amounts,
- * `coffee_cups` the sum of its coffee amounts. Each is blank,
+ * `coffee_cups` the sum of its coffee amounts, `unwind_mg` the sum of its
+ * unwind amounts. Each is blank,
  * never `0`, on a day with no drink of that kind: blank means not recorded,
  * the rule every other column here keeps. An amount that is not a whole
  * number is skipped; the API never writes one.
  */
 function summarizeDrinksDay(dayDrinks) {
   var water = 0, waterCount = 0, alcohol = 0, alcoholCount = 0, coffee = 0, coffeeCount = 0;
+  var unwind = 0, unwindCount = 0;
   var list = dayDrinks || [];
   for (var i = 0; i < list.length; i++) {
     var amount = String(list[i].amount).trim();
@@ -208,11 +210,13 @@ function summarizeDrinksDay(dayDrinks) {
     if (list[i].kind === 'water') { water += Number(amount); waterCount += 1; }
     else if (list[i].kind === 'alcohol') { alcohol += Number(amount); alcoholCount += 1; }
     else if (list[i].kind === 'coffee') { coffee += Number(amount); coffeeCount += 1; }
+    else if (list[i].kind === 'unwind') { unwind += Number(amount); unwindCount += 1; }
   }
   return {
     water_ml: waterCount ? String(water) : '',
     alcohol_drinks: alcoholCount ? String(alcohol) : '',
     coffee_cups: coffeeCount ? String(coffee) : '',
+    unwind_mg: unwindCount ? String(unwind) : '',
   };
 }
 
@@ -336,6 +340,8 @@ function buildDaySummary(date, workouts, health, computedAt, body, drinks) {
     alcohol_drinks: drinksSummary.alcohol_drinks,
     // Appended after AA (#562), for the same reason.
     coffee_cups: drinksSummary.coffee_cups,
+    // Appended after AB (#592), for the same reason.
+    unwind_mg: drinksSummary.unwind_mg,
   };
 }
 

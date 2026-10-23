@@ -96,6 +96,8 @@ const DRINKS = [
   // #562: coffee, in cups.
   drinkEntry('d5', 'coffee', '1', '2026-10-19', '07:10:00'),
   drinkEntry('d6', 'coffee', '1', '2026-10-19', '13:30:00'),
+  // #592: Unwind, in mg.
+  drinkEntry('d7', 'unwind', '5', '2026-10-19', '22:10:00'),
 ];
 
 // #412: every write request carries its tool call's id; what else it carries is the assertion.
@@ -130,7 +132,7 @@ before(async () => {
       // #522: one rebuilt day carrying the drinks columns, as the API sends it.
       case 'getDailySummary':
         data = p.from <= '2026-10-19' && p.to >= '2026-10-19'
-          ? [{ date: '2026-10-19', steps: '8400', computed_at: '2026-10-20T13:00:00.000Z', water_ml: '354', alcohol_drinks: '1', coffee_cups: '2' }]
+          ? [{ date: '2026-10-19', steps: '8400', computed_at: '2026-10-20T13:00:00.000Z', water_ml: '354', alcohol_drinks: '1', coffee_cups: '2', unwind_mg: '10' }]
           : [];
         break;
       case 'getBodyMeasurements':
@@ -566,8 +568,9 @@ test('thrive_drinks returns each entry with its time and kind, per-day totals in
   assert.equal(sent[0].to, '2026-10-19');
   assert.equal(sent[0].payload, undefined); // a read: nothing sent to write
   assert.match(text, /Water goal: 64 oz \(1893 ml\) a day/);
-  assert.match(text, /- 2026-10-19: water 12 oz \(354 ml\), 19% of goal · coffee 2 cups · alcohol 1 drink \(6 entries\)/);
+  assert.match(text, /- 2026-10-19: water 12 oz \(354 ml\), 19% of goal · coffee 2 cups · alcohol 1 drink · unwind 5 mg \(7 entries\)/);
   assert.match(text, / {2}- 07:10 coffee 1 cup \[app\]/);
+  assert.match(text, / {2}- 22:10 unwind 5 mg \[app\] \(d7\)/);
   assert.match(text, / {2}- 07:45 water 4 oz \(118 ml\) \[app\]/);
   assert.match(text, / {2}- 19:10 alcohol 1 drink \[app\]/);
   assert.match(text, /No drinks logged for 1 day: 2026-10-18\./);
@@ -595,10 +598,15 @@ test('thrive_drinks refuses a range over 400 days before any request', async () 
 test('thrive_daily_summary shows water and alcohol for a day that has them', async () => {
   const { text, isError } = await call('thrive_daily_summary', { date_from: '2026-10-19', date_to: '2026-10-19' });
   assert.equal(isError, false, text);
-  assert.match(text, /- 2026-10-19: no activities logged .*· water 12 oz \(354 ml\) · coffee 2 cups · alcohol 1 drink$/m);
+  assert.match(text, /- 2026-10-19: no activities logged .*· water 12 oz \(354 ml\) · coffee 2 cups · alcohol 1 drink · unwind 10 mg$/m);
   const { tools } = await client.listTools();
-  assert.match(tools.find((t) => t.name === 'thrive_daily_summary').description, /water \(oz and ml\), coffee \(cups\) and alcohol/);
-  assert.match(tools.find((t) => t.name === 'thrive_drinks').description, /Water, coffee and alcohol/);
+  assert.match(
+    tools.find((t) => t.name === 'thrive_daily_summary').description,
+    /water \(oz and ml\), coffee \(cups\), alcohol \(drinks\) and Unwind \(mg\)/,
+  );
+  assert.match(tools.find((t) => t.name === 'thrive_drinks').description, /Water, coffee, alcohol and Unwind/);
+  assert.match(tools.find((t) => t.name === 'thrive_drinks').description, /Unwind in mg/);
+  assert.match(tools.find((t) => t.name === 'thrive_log_drink').description, /Unwind 5 mg per entry/);
 });
 
 // --- #576: rest times -------------------------------------------------------

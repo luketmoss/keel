@@ -47,6 +47,10 @@ column:
 
 ## One cell tall (`SMALL_SHORT`, `WIDE_SHORT`, new `WIDER_SHORT`)
 
+> **Superseded.** The one-row layout is gone: every height draws the stacked
+> layout, and the widget can no longer be resized to one cell (see
+> `591-sip-unwind-button.md`, "One layout at every height").
+
 The one-row layout puts each drink's figure and button side by side. At 250dp
 it has room for two drinks but not three: three buttons (76 + 48 + 48),
 padding and spacers leave 38dp for all three figures. So:

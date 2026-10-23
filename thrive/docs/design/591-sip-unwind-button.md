@@ -52,13 +52,25 @@ the same trade #561 made for coffee. Resizing the widget wider adds it. Whether
 the default 4×2 placement reports 310dp or more depends on the launcher, which
 is one of the owner's after-install checks.
 
-## One cell tall: no Unwind
+## One layout at every height
 
-The one-row layout puts each figure beside its button. Four of them need
-76 + 3 × 48 (buttons) + 69 + 3 × 36 (figures) + 7 × 8 (gaps) + 24 (padding) =
-**477dp**, wider than a phone's four cells. `SMALL_SHORT`, `WIDE_SHORT` and
-`WIDER_SHORT` are unchanged and show no Unwind. A one-row widget is for water
-and the quick drinks.
+The one-row layout (#524, #561) is gone. Next to the stacked one it read as a
+different widget, and its 48dp buttons cut "+ 1" to "+". Every size now draws
+the stacked layout: figures, bar, then buttons.
+
+- The base sizes are declared 0dp tall (`SMALL`, `WIDE`, `WIDEST`), so a
+  widget of any height gets them; the 150dp sizes add the title row.
+- `minResizeHeight` is 90dp, two cells on a phone, so the stacked layout
+  (about 92dp) is never squeezed into one.
+- Wider than 310dp, only water widens. The count columns stay 52dp.
+
+## Buttons are pills, not Glance's `Button`
+
+Glance's `Button` keeps its own horizontal padding, which left "+ 5" no room in
+a 52dp column ("5" is wider than "1") and drew a bare "+". Every button is now a
+`Box` filled with the accent, corner radius half its 40dp height, with the
+label centred at 14sp medium on one line. Disabled, it takes the track colour
+and the secondary text colour and isn't clickable.
 
 ## Copy and accessibility
 

@@ -101,6 +101,10 @@ Unwind entries join the list, newest first, with the moon icon in
 `--metric-unwind`. The amount reads "5 mg". Edit time and Delete work as they do
 for the other kinds. The delete confirm's detail line is "22:10 · 5 mg".
 
+An Unwind entry's tools are **Edit time · Delete**, on any day, like coffee and
+alcohol. Its amount is always 5 mg, so it never gets #588's Edit amount, which
+stays water only.
+
 The row's count includes Unwind: "Today's log · 6 drinks". "Drinks" stays the
 word, for the same reason #560 gave, and a mixed word would draw attention.
 
@@ -114,7 +118,7 @@ As #560, for four tiles:
 | Read failed | one error panel across the slot titled "Drinks", with Try again |
 | Pending add | the Unwind figure, today's bar and the log count include the 5 mg at once |
 | Log failed | rolled back, with the inline error under the Unwind tile |
-| Past day | no add buttons; Unwind shows "0 mg" when none was logged |
+| Past day | "+ 5 mg" as the other tiles show theirs (#588): a tap files 5 mg under the viewed date at 23:59 Denver, with the accessible name "Add 5 mg of Unwind to Thu, Oct 22". Unwind shows "0 mg" when none was logged |
 | Future day | the slot does not mount |
 
 ## Trends

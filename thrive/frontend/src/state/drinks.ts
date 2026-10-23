@@ -311,8 +311,8 @@ function demoHistory(): Drink[] {
     for (let i = 0; i < cups; i++) {
       out.push(demoEntry(`demo-h-${back}-c${i}`, 'coffee', date, `${String(7 + i * 3).padStart(2, '0')}:15:00`, 'app'));
     }
-    const tablets = back % 5 === 0 ? 0 : back % 3;
-    for (let i = 0; i < tablets; i++) {
+    const evening = back % 5 === 0 ? 0 : back % 3;
+    for (let i = 0; i < evening; i++) {
       out.push(demoEntry(`demo-h-${back}-u${i}`, 'unwind', date, `${String(21 + i)}:00:00`, 'app'));
     }
   }

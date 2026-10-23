@@ -23,6 +23,7 @@ const METRICS = [
   '--metric-water',
   '--metric-alcohol',
   '--metric-coffee',
+  '--metric-unwind',
 ];
 
 /** Deep, REM, light, awake: the order they sit in along the sleep bar. */

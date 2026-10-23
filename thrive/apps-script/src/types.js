@@ -328,8 +328,8 @@ var JOURNAL_COLUMN_COUNT = 4;
 // are only appended.
 var DRINK_FIELDS = [
   'id',            // A  PK, a UUID the caller generates: logging it twice leaves one row
-  'kind',          // B  water | alcohol | coffee
-  'amount',        // C  water in whole ml, alcohol in standard drinks and coffee in cups (always 1); never blank or 0
+  'kind',          // B  water | alcohol | coffee | unwind
+  'amount',        // C  water in whole ml, alcohol in standard drinks and coffee in cups (always 1), unwind in mg (always 5); never blank or 0
   'date',          // D  local YYYY-MM-DD (TIMEZONE), derived from logged_at_utc
   'time',          // E  local HH:MM:SS, editable through updateDrinkTime
   'logged_at_utc', // F  ISO 8601 UTC, the moment the caller says it was taken; never rewritten
@@ -339,7 +339,8 @@ var DRINK_FIELDS = [
 ];
 
 var DRINK_COLUMN_COUNT = 9;
-var DRINK_KINDS = ['water', 'alcohol', 'coffee'];
+var DRINK_KINDS = ['water', 'alcohol', 'coffee', 'unwind'];
+var UNWIND_AMOUNT_MG = 5;
 var DRINK_SOURCES = ['widget', 'app', 'mcp'];
 
 // Settings (A:C): key/value, one row per key, created by

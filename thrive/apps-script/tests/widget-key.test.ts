@@ -50,7 +50,7 @@ describe('the widget key runs logDrink and getDrinkTotals', () => {
       expect(logged.res.data).toMatchObject({ id: 'w1', date: '2026-10-20', time: '07:05:00', source: 'widget' });
       const totals = callEntry<any>(api.sandbox, entry, { action: 'getDrinkTotals', key: WIDGET_KEY });
       expect(totals.res.data).toEqual({
-        date: '2026-10-20', water_ml: 250, alcohol_drinks: 0, coffee_cups: 0, water_goal_ml: 1893,
+        date: '2026-10-20', water_ml: 250, alcohol_drinks: 0, coffee_cups: 0, unwind_mg: 0, water_goal_ml: 1893,
       });
     });
   }

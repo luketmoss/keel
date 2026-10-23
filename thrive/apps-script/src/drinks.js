@@ -14,9 +14,10 @@ var DRINKS_SHEET = 'Drinks';
 // Literals, not types.js constants: Apps Script does not promise a file load order.
 var DRINK_ERRORS = {
   id: 'id is required: 1-64 characters of letters, digits, _ and -',
-  kind: 'kind must be water, alcohol or coffee',
+  kind: 'kind must be water, alcohol, coffee or unwind',
   waterAmount: 'amount for water must be a whole number of ml, 1 to 2000',
   alcoholAmount: 'amount for alcohol or coffee must be 1',
+  unwindAmount: 'amount for unwind must be 5',
   loggedAt: 'logged_at_utc is required: an ISO 8601 UTC time such as 2026-10-20T13:05:00Z',
   source: 'source must be widget, app or mcp',
   range: 'from and to must be given together, as YYYY-MM-DD, from no later than to',
@@ -97,6 +98,8 @@ function logDrink(payload) {
     if (amount === null || amount < 1 || amount > WATER_AMOUNT_MAX_ML) {
       throw new Error(DRINK_ERRORS.waterAmount);
     }
+  } else if (kind === 'unwind') {
+    if (amount !== UNWIND_AMOUNT_MG) throw new Error(DRINK_ERRORS.unwindAmount);
   } else if (amount !== 1) {
     throw new Error(DRINK_ERRORS.alcoholAmount);
   }
@@ -185,13 +188,15 @@ function getDrinkTotals() {
   var water = 0;
   var alcohol = 0;
   var coffee = 0;
+  var unwind = 0;
   for (var i = 0; i < rows.length; i++) {
     var amount = wholeNumber(rows[i].amount) || 0;
     if (rows[i].kind === 'water') water += amount;
     else if (rows[i].kind === 'alcohol') alcohol += amount;
     else if (rows[i].kind === 'coffee') coffee += amount;
+    else if (rows[i].kind === 'unwind') unwind += amount;
   }
-  return { date: date, water_ml: water, alcohol_drinks: alcohol, coffee_cups: coffee, water_goal_ml: getWaterGoal() };
+  return { date: date, water_ml: water, alcohol_drinks: alcohol, coffee_cups: coffee, unwind_mg: unwind, water_goal_ml: getWaterGoal() };
 }
 
 /** Change a drink's local `time` and `updated`; nothing else (#519). */
@@ -214,7 +219,7 @@ function updateDrinkTime(payload) {
 
 /**
  * Change a water drink's `amount` and `updated`; nothing else (#588). Whole ml
- * within logDrink's bounds. Alcohol and coffee are always 1, so they are refused.
+ * within logDrink's bounds. Alcohol, coffee and unwind are fixed amounts, so they are refused.
  */
 function updateDrinkAmount(payload) {
   payload = drinkPayload(payload);

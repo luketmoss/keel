@@ -12,6 +12,7 @@
 import { signal } from '@preact/signals';
 import { isDemo } from '../api/demo-data';
 import {
+  UNWIND_AMOUNT_MG,
   WATER_AMOUNT_MAX_ML,
   WATER_GOAL_DEFAULT_ML,
   WATER_GOAL_KEY,
@@ -181,12 +182,16 @@ function removeEntry(date: string, id: string): void {
 
 // ── Demo data ────────────────────────────────────────────────────────
 
+/** What one tap of a kind stores: 118 ml of water, 5 mg of Unwind, else one. */
+export const quickAmount = (kind: DrinkKind): number =>
+  kind === 'water' ? QUICK_WATER_ML : kind === 'unwind' ? UNWIND_AMOUNT_MG : 1;
+
 function demoEntry(id: string, kind: DrinkKind, date: string, time: string, source: 'app' | 'widget'): DrinkEntry {
   const stamp = `${date}T${time}Z`;
   return {
     id,
     kind,
-    amount: kind === 'water' ? QUICK_WATER_ML : 1,
+    amount: quickAmount(kind),
     date,
     time,
     logged_at_utc: stamp,
@@ -206,6 +211,7 @@ function demoDay(date: string): DrinkEntry[] {
       demoEntry('demo-drink-2', 'water', date, '10:20:00', 'widget'),
       demoEntry('demo-drink-3', 'water', date, '12:05:00', 'app'),
       demoEntry('demo-drink-4', 'alcohol', date, '12:40:00', 'app'),
+      demoEntry('demo-drink-u1', 'unwind', date, '21:30:00', 'app'),
     ];
   }
   if (date === addDays(today, -1)) {
@@ -215,6 +221,8 @@ function demoDay(date: string): DrinkEntry[] {
       demoEntry('demo-drink-6', 'water', date, '13:30:00', 'app'),
       demoEntry('demo-drink-7', 'alcohol', date, '20:15:00', 'app'),
       demoEntry('demo-drink-8', 'alcohol', date, '21:05:00', 'app'),
+      demoEntry('demo-drink-u2', 'unwind', date, '21:45:00', 'app'),
+      demoEntry('demo-drink-u3', 'unwind', date, '22:30:00', 'app'),
     ];
   }
   return [];
@@ -303,6 +311,10 @@ function demoHistory(): Drink[] {
     for (let i = 0; i < cups; i++) {
       out.push(demoEntry(`demo-h-${back}-c${i}`, 'coffee', date, `${String(7 + i * 3).padStart(2, '0')}:15:00`, 'app'));
     }
+    const tablets = back % 5 === 0 ? 0 : back % 3;
+    for (let i = 0; i < tablets; i++) {
+      out.push(demoEntry(`demo-h-${back}-u${i}`, 'unwind', date, `${String(21 + i)}:00:00`, 'app'));
+    }
   }
   return out;
 }
@@ -382,7 +394,7 @@ export async function addDrink(kind: DrinkKind, token: string, viewed?: string):
   const entry: DrinkEntry = {
     id: newId(),
     kind,
-    amount: kind === 'water' ? QUICK_WATER_ML : 1,
+    amount: quickAmount(kind),
     date,
     time,
     logged_at_utc: stamp,

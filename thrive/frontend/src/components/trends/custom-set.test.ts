@@ -106,9 +106,10 @@ describe('the custom group', () => {
     'distance',
     'ascent',
     'steps',
+    'unwind',
   ];
 
-  it('offers 21 metrics in the canonical order, under the six group headings', () => {
+  it('offers 22 metrics in the canonical order, under the seven group headings', () => {
     expect(CUSTOM_PICKABLE.map((m) => m.id)).toEqual(ORDER);
     expect(CUSTOM_SECTIONS.map((s) => s.label)).toEqual([
       'Recovery',
@@ -117,6 +118,7 @@ describe('the custom group', () => {
       'Body',
       'Blood Pressure',
       'Activity',
+      'Intake',
     ]);
   });
   it('is last in the registry', () => {

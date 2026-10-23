@@ -5,6 +5,7 @@ import { workouts, exercises, templates, labels } from '../../state/store';
 import { navigate } from '../../router/router';
 import { CorosSyncStatusRow, WithingsSyncStatusRow } from './sync-status-row';
 import { useSyncNow, SyncNowButton } from './sync-now';
+import { RestTimesGroup } from './rest-times-group';
 import { GOAL_OZ_MAX, GOAL_OZ_MIN, goalOz, loadGoal, ozToGoalMl, saveWaterGoal, waterGoalMl } from '../../state/drinks';
 
 /** The daily water goal (#520): whole ounces in the field, stored as ml. */
@@ -90,6 +91,8 @@ export function SettingsScreen() {
           <h2>Hydration</h2>
           <WaterGoalRow token={token} />
         </div>
+
+        <RestTimesGroup token={token} />
 
         <div class="settings-section">
           <h2>Data</h2>

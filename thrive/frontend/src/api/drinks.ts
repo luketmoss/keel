@@ -11,6 +11,7 @@
 // access token in the body. None throws; a failure is an outcome with a `kind`.
 
 import { callAction, type ActionOutcome } from './thrive-api';
+import type { RestSettingKey } from './rest-times';
 
 /** Drinks' A:I order. */
 export const DRINK_FIELDS = [
@@ -33,7 +34,7 @@ export const DRINK_SOURCES = ['widget', 'app'] as const;
 export type DrinkKind = (typeof DRINK_KINDS)[number];
 export type DrinkSource = (typeof DRINK_SOURCES)[number];
 
-/** The one setting there is. */
+/** The water goal's key. The rest defaults (#576) are in rest-times.ts. */
 export const WATER_GOAL_KEY = 'water_goal_ml';
 /** What the API reports when the row, or the whole tab, is absent: 64 oz. */
 export const WATER_GOAL_DEFAULT_ML = 1893;
@@ -180,9 +181,12 @@ export async function deleteDrink(id: string, token: string): Promise<DrinkOutco
   return parsed(await callAction('deleteDrink', token, { payload: { id } }), asDrink);
 }
 
-/** Set a setting. Only `water_goal_ml` exists: whole ml from 250 to 10000. */
+/**
+ * Set a setting: `water_goal_ml` (whole ml, 250 to 10000) or one of the five
+ * rest defaults (#576, whole seconds; api/rest-times.ts has the ranges).
+ */
 export async function updateSetting(
-  key: typeof WATER_GOAL_KEY,
+  key: typeof WATER_GOAL_KEY | RestSettingKey,
   value: number,
   token: string,
 ): Promise<DrinkOutcome<Setting>> {

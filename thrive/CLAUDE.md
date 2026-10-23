@@ -176,12 +176,20 @@ After that, a column or tab changes only like this:
 ## Data Model
 Google Sheet "Groundwork" with these tabs:
 - **Exercises** (A:E): id, Name, Tags, Notes, Created
-- **Templates** (A:H): template_id, Template Name, Order, exercise_id, Exercise Name, Section, Sets, Reps
+- **Templates** (A:J): template_id, Template Name, Order, exercise_id, Exercise Name, Section, Sets, Reps,
+  rest_s, switch_s (#576: the section's rest and switch in whole seconds, the same on every row of a
+  section; blank means the Settings default; switch only on SS1-SS3 and burnout, neither on warmup or
+  cooldown. A replace that leaves them out keeps the stored values)
 - **Workouts** (A:AC): id, Date, Time, Type, Name, template_id, Notes, Elapsed (s), Created, copied_from, status,
   Moving (s), Effort, Distance (m), Ascent (m), Descent (m), Avg HR (bpm),
   sub_type, source, source_activity_id, raw_ref, fit_ref, fit_fetched_at, synced_at, started_at_utc, calories,
   estimated_seconds, sport_type, track_ref
-- **Sets** (A:J): workout_id, exercise_id, Exercise Name, Section, Exercise Order, Set #, Planned Reps, Weight (lbs), Reps, Effort
+- **Sets** (A:M): workout_id, exercise_id, Exercise Name, Section, Exercise Order, Set #, Planned Reps, Weight (lbs), Reps, Effort,
+  rest_target_s, set_s, rest_s (#576). `rest_target_s` is the rest planned after the set, resolved once when
+  the set is created (from the template section, else the Settings default; the switch time for all but the
+  last exercise of a superset or burnout round) and never recomputed; `set_s`/`rest_s` are Lift Mode's
+  measurements (#577). Only an append writes K:M; every edit writes A:J. Added by
+  `scripts/migrate-576-rest-times.mjs` with the Templates columns
 - **Labels** (A:D): id, name, color_key, created
 - **DailyHealth** (A:S): date, resting_hr, hrv, steps, calories, sleep_total_s,
   sleep_deep_s, sleep_rem_s, sleep_light_s, sleep_awake_s, sleep_score, vo2max,
@@ -329,9 +337,13 @@ Google Sheet "Groundwork" with these tabs:
   `updateDrinkTime`, `deleteDrink`; `apps-script/src/drinks.js`); the SPA does
   not touch the tab directly, it calls `frontend/src/api/drinks.ts`, whose
   `DRINK_FIELDS` mirrors `DRINK_FIELDS` in `apps-script/src/types.js` — change
-  both together. Settings is `key, value, updated` with one key, `water_goal_ml`
+  both together. Settings is `key, value, updated`: `water_goal_ml`
   (250-10000 ml), whose default **1893** (64 oz) the API supplies when the row or
-  the tab is absent. `WIDGET_API_KEY`, a script property, is a third key caller
+  the tab is absent, and the five rest defaults (#576, whole seconds, defaults
+  supplied the same way): `rest_primary_s` 90, `rest_superset_s` 45,
+  `switch_superset_s` 15, `rest_burnout_s` 45, `switch_burnout_s` 10 (rest
+  15-600, switch 0-120). The app reads them with `getSettings` and writes them
+  with `updateSetting` (`apps-script/src/settings.js`). `WIDGET_API_KEY`, a script property, is a third key caller
   that may run `logDrink` and `getDrinkTotals` only. Created by
   `scripts/migrate-519-drinks-tab.mjs` and `scripts/migrate-519-settings-tab.mjs`.
   Later columns are only ever appended.

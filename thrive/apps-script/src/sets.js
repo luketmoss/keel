@@ -1,4 +1,5 @@
-// Sets tab (A:J) — reads, slot resolution, and the atomic bulk update.
+// Sets tab (A:M) — reads, slot resolution, the atomic bulk update, and the
+// planned rest a new set is written with (#576).
 //
 // This module is where #134's shaping principle bites hardest: callers name a
 // set by workout, exercise, section, order and set number, and the *server*
@@ -19,11 +20,16 @@ function rowToSet(row, sheetRow) {
     weight: cell(row[7]),
     reps: cell(row[8]),
     effort: cell(row[9]),
+    // #576. Blank on a row written before the migration, and blank for a set
+    // with no planned rest (warmup, cooldown) or nothing measured yet.
+    rest_target_s: cell(row[10]),
+    set_s: cell(row[11]),
+    rest_s: cell(row[12]),
     sheetRow: sheetRow,
   };
 }
 
-/** Exactly ten cells. #100 removed column K; an eleventh would rewrite it. */
+/** Exactly SET_COLUMN_COUNT cells, A:M (#576). */
 function setToRow(s) {
   var row = [];
   for (var i = 0; i < SET_FIELDS.length; i++) {
@@ -361,9 +367,95 @@ function applySetUpdates(workoutId, updates) {
   return { changes: plan.changes, applied: true };
 }
 
+/**
+ * The rest planned after each set (#576), as text parallel to `sets`, which
+ * are one workout's rows.
+ *
+ * A round is one section's sets with the same set number; an exercise with
+ * fewer sets drops out of later rounds. In a superset or burnout every
+ * exercise but the last in its round (by exercise_order) gets the switch time
+ * and the last gets the round rest. A primary set always gets the primary
+ * rest. Warmup, cooldown and anything else get blank.
+ *
+ * Each value is the template section's (`sectionRest[section]`), else the
+ * Settings default. Mirrors resolveRestTargets in frontend/src/api/rest-times.ts.
+ */
+function resolveRestTargets(sets, sectionRest, defaults) {
+  var kinds = {
+    primary: { rest: 'rest_primary_s' },
+    SS1: { rest: 'rest_superset_s', sw: 'switch_superset_s' },
+    SS2: { rest: 'rest_superset_s', sw: 'switch_superset_s' },
+    SS3: { rest: 'rest_superset_s', sw: 'switch_superset_s' },
+    burnout: { rest: 'rest_burnout_s', sw: 'switch_burnout_s' },
+  };
+  var pick = function (section, field, defaultKey) {
+    var own = sectionRest && sectionRest[section] ? cell(sectionRest[section][field]) : '';
+    return own !== '' ? own : String(defaults[defaultKey]);
+  };
+
+  // The highest exercise_order in each round.
+  var lastInRound = {};
+  sets.forEach(function (s) {
+    var k = s.section + '\u0000' + Number(s.set_number);
+    var order = Number(s.exercise_order) || 0;
+    if (!(k in lastInRound) || order > lastInRound[k]) lastInRound[k] = order;
+  });
+
+  return sets.map(function (s) {
+    var kind = Object.prototype.hasOwnProperty.call(kinds, s.section) ? kinds[s.section] : null;
+    if (!kind) return '';
+    if (!kind.sw) return pick(s.section, 'rest_s', kind.rest);
+    var last = lastInRound[s.section + '\u0000' + Number(s.set_number)] === (Number(s.exercise_order) || 0);
+    return last ? pick(s.section, 'rest_s', kind.rest) : pick(s.section, 'switch_s', kind.sw);
+  });
+}
+
+/**
+ * Fill `rest_target_s` on new sets (#576) for every workout none of whose sets
+ * in this call names it: from the workout's template, by section, else the
+ * Settings defaults. A caller that sends the field, even blank, keeps it.
+ */
+function withRestTargets(sets) {
+  var byWorkout = {};
+  sets.forEach(function (s) {
+    var id = cell(s.workout_id);
+    (byWorkout[id] = byWorkout[id] || []).push(s);
+  });
+
+  var workouts = null;
+  var templates = null;
+  var defaults = null;
+  var out = sets.map(function (s) { return s; });
+
+  Object.keys(byWorkout).forEach(function (id) {
+    var group = byWorkout[id];
+    if (group.some(function (s) { return s.rest_target_s !== undefined; })) return;
+
+    if (workouts === null) workouts = getWorkouts({});
+    if (defaults === null) defaults = getRestSettings();
+    var workout = workouts.filter(function (w) { return w.id === id; })[0];
+    var sectionRest = {};
+    if (workout && workout.template_id) {
+      if (templates === null) templates = getTemplates();
+      var tpl = templates.filter(function (t) { return t.id === workout.template_id; })[0];
+      if (tpl) sectionRest = sectionRestOf(tpl.exercises);
+    }
+
+    var targets = resolveRestTargets(group, sectionRest, defaults);
+    group.forEach(function (s, i) {
+      var copy = {};
+      Object.keys(s).forEach(function (k) { copy[k] = s[k]; });
+      copy.rest_target_s = targets[i];
+      out[sets.indexOf(s)] = copy;
+    });
+  });
+  return out;
+}
+
 /** Append set rows. Used when a workout is scheduled or built. */
 function appendSets(sets) {
   if (!sets || !sets.length) throw new Error('sets are required');
+  sets = withRestTargets(sets);
   var sheet = getSheet(SETS_SHEET);
   var appended = [];
   for (var i = 0; i < sets.length; i++) {

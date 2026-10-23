@@ -586,6 +586,8 @@ describe('AC4: an aria-disabled control dims, and its focus ring does not', () =
         'reorder-btn',
         'reorder-btn',
         'btn',
+        // #576: the duration stepper's end buttons.
+        'btn-icon',
       ].sort(),
     );
   });

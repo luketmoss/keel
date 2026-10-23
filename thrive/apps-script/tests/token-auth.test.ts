@@ -359,6 +359,8 @@ const READ_PARAMS: Record<string, Record<string, string>> = {
   getWorkoutTrack: { id: 'w_001' },
   // #519: the app's drinks reads.
   getDrinks: { from: '2026-09-01', to: '2026-09-30' }, getDrinkTotals: {},
+  // #576: the app's Settings screen and its rest defaults.
+  getSettings: {},
 };
 
 describe('AC4: token callers run only the named reads', () => {

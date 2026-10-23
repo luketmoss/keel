@@ -34,7 +34,7 @@ needs a matching change here.**
 | `thrive_body_measurements` | Withings weight, body composition and blood pressure readings for a date range (default: the 30 days ending today), grouped by local date. Mass shown in kg and lb; filter by `kind` (`scale` / `bp`) |
 | `thrive_journal` | The user's own journal for a date range (default: the 30 days ending today): one free-text note per day, oldest first, with days that have no note listed as having none |
 | `thrive_list_exercises` | The exercise library, filterable by search text or tag |
-| `thrive_list_templates` | Templates with their exercises, sections, sets and reps |
+| `thrive_list_templates` | Templates with their exercises, sections, sets and reps, and a section's rest and switch where the template sets one (#576) |
 | `thrive_exercise_history` | Progression for one exercise over time — the tool for deciding whether to add weight or volume |
 
 ### Scheduling and authoring

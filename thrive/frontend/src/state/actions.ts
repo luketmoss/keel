@@ -80,6 +80,8 @@ import type { WorkoutPatch, SetOrderWrite } from '../api/workouts-api';
 import { toLocalDateStr, formatPlannedDate } from '../components/activities/activities-helpers';
 import { colorKeyFromName } from '../api/label-colors';
 import type { TemplateExerciseInput } from '../api/templates-api';
+import { sectionRestOf, withRestTargets, type SectionRest } from '../api/rest-times';
+import { restDefaultsForNewSets } from './rest-settings';
 import type {
   ExerciseWithRow,
   LabelWithRow,
@@ -615,12 +617,13 @@ async function prepopulateSetsFromTemplate(
     }
   }
 
-  return { rows: await writePrepopulatedSets(workoutId, newSets, token), warmups };
+  return { rows: await writePrepopulatedSets(workoutId, newSets, token, sectionRestOf(tpl.exercises)), warmups };
 }
 
 /**
  * Write a workout's set rows from builder exercises and update `sets` (live
  * and demo). Never touches the active signals: the caller decides (#351).
+ * Build Custom has no template, so its rest comes from the defaults (#576).
  */
 async function prepopulateSetsFromBuilder(
   workoutId: string,
@@ -633,11 +636,22 @@ async function prepopulateSetsFromBuilder(
     .filter((s) => s.section === 'warmup')
     .map((s) => ({ exercise_id: s.exercise_id, exercise_name: s.exercise_name, exercise_order: s.exercise_order }));
 
-  return { rows: await writePrepopulatedSets(workoutId, newSets, token), warmups };
+  return { rows: await writePrepopulatedSets(workoutId, newSets, token, {}), warmups };
 }
 
-/** Append one workout's new set rows, update `sets`, and return its rows with their `sheetRow`s. */
-async function writePrepopulatedSets(workoutId: string, newSets: WorkoutSet[], token: string): Promise<SetWithRow[]> {
+/**
+ * Append one workout's new set rows, update `sets`, and return its rows with
+ * their `sheetRow`s. Each row is written with its `rest_target_s` (#576),
+ * resolved now from `sectionRest` (the template's sections, or none) and the
+ * Settings defaults, and never recomputed after.
+ */
+async function writePrepopulatedSets(
+  workoutId: string,
+  unresolved: WorkoutSet[],
+  token: string,
+  sectionRest: Record<string, SectionRest>,
+): Promise<SetWithRow[]> {
+  const newSets = withRestTargets(unresolved, sectionRest, await restDefaultsForNewSets(token));
   if (isDemo()) {
     // In demo mode, appendSets is a no-op and fetchSets returns static data
     // that won't contain our new workout ID. Add the rows to `sets` directly.
@@ -993,7 +1007,8 @@ export async function copyWorkout(sourceWorkoutId: string, token: string): Promi
       .sort((a, b) => a.exercise_order - b.exercise_order || a.set_number - b.set_number);
 
     if (sourceSets.length > 0) {
-      const newSets: WorkoutSet[] = sourceSets.map((s) => ({
+      // A copy takes its rest from the Settings defaults, never the source's (#576).
+      const unresolved: WorkoutSet[] = sourceSets.map((s) => ({
         workout_id: workout.id,
         exercise_id: s.exercise_id,
         exercise_name: s.exercise_name,
@@ -1005,6 +1020,7 @@ export async function copyWorkout(sourceWorkoutId: string, token: string): Promi
         reps: '',
         effort: '',
       }));
+      const newSets = withRestTargets(unresolved, {}, await restDefaultsForNewSets(token));
 
       await appendSetsApi(newSets, token);
 

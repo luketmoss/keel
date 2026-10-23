@@ -1,5 +1,5 @@
-// Templates tab (A:H). One row per exercise; a template is the group of rows
-// sharing a template_id.
+// Templates tab (A:J). One row per exercise; a template is the group of rows
+// sharing a template_id. I/J (#576) are the section's rest and switch seconds.
 
 var TEMPLATES_SHEET = 'Templates';
 
@@ -23,6 +23,8 @@ function rowToTemplateRow(row, sheetRow) {
     section: cell(row[5]),
     sets: normalizeRangeToMax(cell(row[6])),
     reps: normalizeRangeToMax(cell(row[7])),
+    rest_s: cell(row[8]),   // #576: blank on a row written before the migration
+    switch_s: cell(row[9]),
     sheetRow: sheetRow,
   };
 }
@@ -32,7 +34,98 @@ function templateRowValues(templateId, name, ex, order) {
     templateId, name, order,
     cell(ex.exercise_id), cell(ex.exercise_name), cell(ex.section),
     String(ex.sets), String(ex.reps),
+    cell(ex.rest_s), cell(ex.switch_s),
   ];
+}
+
+/** The sections that carry a rest (#576), and those of them that also carry a switch. */
+var REST_SECTIONS = ['primary', 'SS1', 'SS2', 'SS3', 'burnout'];
+var SWITCH_SECTIONS = ['SS1', 'SS2', 'SS3', 'burnout'];
+
+/**
+ * One rest or switch value from a caller: '' for blank (use the default), or
+ * the seconds as text. Throws with the range on anything else.
+ */
+function templateRestValue(where, field, value, min, max) {
+  if (value === undefined || value === null || value === '') return '';
+  var n = wholeNumber(value);
+  if (n === null || n < min || n > max) {
+    throw new Error(where + ': ' + field + ' must be whole seconds, ' + min + ' to ' + max + ', or blank');
+  }
+  return String(n);
+}
+
+/**
+ * Give every row of a section the same `rest_s` and `switch_s` (#576).
+ *
+ * A section's values come from the first exercise that names them (the key
+ * present, even as blank), else from `inherited[section]` (replaceTemplate's
+ * existing rows), else blank. Two exercises naming different values for one
+ * section are refused. Sections with no rest (warmup, cooldown, none) are
+ * always blank; a non-blank value there is refused.
+ */
+function applySectionRest(entries, resolved, inherited, errors) {
+  var chosen = {};
+  entries.forEach(function (e) {
+    var ex = e.input;
+    var section = resolved[e.index].section;
+    var where = 'exercises[' + e.at + ']';
+    var hasRest = ex.rest_s !== undefined;
+    var hasSwitch = ex.switch_s !== undefined;
+    if (!hasRest && !hasSwitch) return;
+
+    var rest = '';
+    var sw = '';
+    try {
+      rest = templateRestValue(where, 'rest_s', ex.rest_s, REST_SECONDS_MIN, REST_SECONDS_MAX);
+      sw = templateRestValue(where, 'switch_s', ex.switch_s, SWITCH_SECONDS_MIN, SWITCH_SECONDS_MAX);
+    } catch (err) {
+      errors.push(err.message);
+      return;
+    }
+    if (REST_SECTIONS.indexOf(section) === -1 && (rest !== '' || sw !== '')) {
+      errors.push(where + ': section "' + (section || 'none') + '" has no rest');
+      return;
+    }
+    if (SWITCH_SECTIONS.indexOf(section) === -1 && sw !== '') {
+      errors.push(where + ': switch_s applies only to SS1, SS2, SS3 and burnout');
+      return;
+    }
+
+    var mine = chosen[section] || (chosen[section] = {});
+    ['rest_s', 'switch_s'].forEach(function (field) {
+      var given = field === 'rest_s' ? hasRest : hasSwitch;
+      if (!given) return;
+      var value = field === 'rest_s' ? rest : sw;
+      if (mine[field] !== undefined && mine[field] !== value) {
+        errors.push(where + ': every exercise in section ' + section + ' must have the same ' + field);
+        return;
+      }
+      mine[field] = value;
+    });
+  });
+
+  for (var i = 0; i < resolved.length; i++) {
+    var section = resolved[i].section;
+    var own = chosen[section] || {};
+    var old = (inherited && inherited[section]) || {};
+    var hasRest = REST_SECTIONS.indexOf(section) !== -1;
+    var hasSwitch = SWITCH_SECTIONS.indexOf(section) !== -1;
+    resolved[i].rest_s = !hasRest ? '' : own.rest_s !== undefined ? own.rest_s : cell(old.rest_s);
+    resolved[i].switch_s = !hasSwitch ? '' : own.switch_s !== undefined ? own.switch_s : cell(old.switch_s);
+  }
+}
+
+/** { section: { rest_s, switch_s } } from a template's stored rows: the first row of each section wins. */
+function sectionRestOf(rows) {
+  var out = {};
+  for (var i = 0; i < rows.length; i++) {
+    var s = rows[i].section;
+    if (!Object.prototype.hasOwnProperty.call(out, s)) {
+      out[s] = { rest_s: cell(rows[i].rest_s), switch_s: cell(rows[i].switch_s) };
+    }
+  }
+  return out;
 }
 
 /** Every template row, in sheet order. */
@@ -97,9 +190,10 @@ function resolveTemplate(ref, templates) {
  * Every problem is collected rather than thrown on the first: someone fixing
  * a template should see all of them at once, not one per round trip.
  */
-function resolveTemplateExercises(exercises, library) {
+function resolveTemplateExercises(exercises, library, inheritedRest) {
   var resolved = [];
   var errors = [];
+  var entries = [];
 
   exercises.forEach(function (ex, i) {
     var where = 'exercises[' + i + '] "' + (ex.exercise || ex.exercise_id || '') + '"';
@@ -123,6 +217,7 @@ function resolveTemplateExercises(exercises, library) {
       return;
     }
 
+    entries.push({ index: resolved.length, at: i, input: ex });
     resolved.push({
       exercise_id: found.id,
       // The library's name, never the caller's copy — that is #120.
@@ -133,6 +228,7 @@ function resolveTemplateExercises(exercises, library) {
     });
   });
 
+  applySectionRest(entries, resolved, inheritedRest, errors);
   return { exercises: resolved, errors: errors };
 }
 
@@ -173,7 +269,8 @@ function replaceTemplate(templateId, data) {
 
   var name = data.name || existing[0].template_name;
 
-  var resolved = resolveTemplateExercises(data.exercises, getExercises());
+  // #576: a section the payload says nothing about keeps its stored rest.
+  var resolved = resolveTemplateExercises(data.exercises, getExercises(), sectionRestOf(existing));
   if (resolved.errors.length) throw new Error(resolved.errors.join('; '));
 
   var sheet = getSheet(TEMPLATES_SHEET);

@@ -22,24 +22,52 @@ export interface TemplateExerciseInput {
   section: string;
   sets: string;
   reps: string;
+  /** #576: the section's rest and switch seconds; '' or absent means "use the default". */
+  rest_s?: string;
+  switch_s?: string;
+}
+
+/**
+ * Templates' A:J order. Mirrors TEMPLATE_FIELDS in apps-script/src/types.js
+ * (change both together; workout-fields-drift.test.ts fails if they drift).
+ * I and J are #576's.
+ */
+export const TEMPLATE_FIELDS = [
+  'template_id',
+  'template_name',
+  'order',
+  'exercise_id',
+  'exercise_name',
+  'section',
+  'sets',
+  'reps',
+  'rest_s',
+  'switch_s',
+] as const;
+
+/** A `Templates` row. A row from before #576 reads its I/J as ''. */
+export function rowToTemplateRow(row: readonly string[], sheetRow: number): TemplateRowWithRow {
+  return {
+    template_id: row[0] || '',
+    template_name: row[1] || '',
+    order: Number(row[2]) || 0,
+    exercise_id: row[3] || '',
+    exercise_name: row[4] || '',
+    section: (row[5] || '') as Section | string,
+    sets: normalizeRangeToMax(row[6] || ''),
+    reps: normalizeRangeToMax(row[7] || ''),
+    rest_s: row[8] || '',
+    switch_s: row[9] || '',
+    sheetRow,
+  };
 }
 
 export async function fetchTemplateRows(token: string): Promise<TemplateRowWithRow[]> {
   if (isDemo()) return [...DEMO_TEMPLATE_ROWS];
 
   return withReauth(token, async (t) => {
-    const rows = await sheetsGet('Templates!A2:H', t);
-    return rows.map((row, i) => ({
-      template_id: row[0] || '',
-      template_name: row[1] || '',
-      order: Number(row[2]) || 0,
-      exercise_id: row[3] || '',
-      exercise_name: row[4] || '',
-      section: (row[5] || '') as Section | string,
-      sets: normalizeRangeToMax(row[6] || ''),
-      reps: normalizeRangeToMax(row[7] || ''),
-      sheetRow: i + 2,
-    }));
+    const rows = await sheetsGet('Templates!A2:J', t);
+    return rows.map((row, i) => rowToTemplateRow(row, i + 2));
   });
 }
 
@@ -60,13 +88,25 @@ export function groupTemplateRows(rows: TemplateRowWithRow[]): Template[] {
 }
 
 /**
- * Builds a `Templates!A:H` row. Both the create and the edit path go through
+ * Builds a `Templates!A:J` row. Both the create and the edit path go through
  * here: `sheetsAppend` uses its range only to locate the table and then writes
- * every value it is given, so a builder that emitted more cells than the range
- * spans would silently recreate the columns removed in #100.
+ * every value it is given, so the row is exactly TEMPLATE_FIELDS wide. The
+ * edit path deletes and re-appends a template's rows, so I/J (#576) are always
+ * written, from what the caller carries: a caller that drops them blanks them.
  */
 export function templateRowValues(r: Omit<TemplateRowWithRow, 'sheetRow'>): (string | number)[] {
-  return [r.template_id, r.template_name, r.order, r.exercise_id, r.exercise_name, r.section, r.sets, r.reps];
+  return [
+    r.template_id,
+    r.template_name,
+    r.order,
+    r.exercise_id,
+    r.exercise_name,
+    r.section,
+    r.sets,
+    r.reps,
+    r.rest_s ?? '',
+    r.switch_s ?? '',
+  ];
 }
 
 export async function createTemplate(
@@ -85,12 +125,14 @@ export async function createTemplate(
     section: ex.section,
     sets: ex.sets,
     reps: ex.reps,
+    rest_s: ex.rest_s ?? '',
+    switch_s: ex.switch_s ?? '',
     sheetRow: -1, // placeholder; corrected on re-fetch
   }));
 
   if (!isDemo()) {
     const sheetValues = templateRows.map(templateRowValues);
-    await withReauth(token, (t) => sheetsAppend('Templates!A:H', sheetValues, t));
+    await withReauth(token, (t) => sheetsAppend('Templates!A:J', sheetValues, t));
   }
 
   return { id: templateId, name, exercises: templateRows };
@@ -127,10 +169,12 @@ export async function updateTemplate(
         section: ex.section,
         sets: ex.sets,
         reps: ex.reps,
+        rest_s: ex.rest_s ?? '',
+        switch_s: ex.switch_s ?? '',
       }),
     );
     if (sheetValues.length > 0) {
-      await sheetsAppend('Templates!A:H', sheetValues, t);
+      await sheetsAppend('Templates!A:J', sheetValues, t);
     }
   });
 }

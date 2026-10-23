@@ -1,4 +1,7 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
+import { sectionRestOf } from '../../api/rest-times';
+import { loadRestSettings, restSettings } from '../../state/rest-settings';
+import { restLine } from './template-rest';
 import { templates, activeWorkoutId, showToast } from '../../state/store';
 import { removeTemplate, startWorkout } from '../../state/actions';
 import { useAuth } from '../../auth/auth-context';
@@ -16,6 +19,10 @@ export function TemplateDetail({ templateId }: Props) {
   const tpl = templates.value.find((t) => t.id === templateId);
   const [deleting, setDeleting] = useState(false);
   const [starting, setStarting] = useState(false);
+
+  useEffect(() => {
+    if (token) void loadRestSettings(token);
+  }, [token]);
 
   if (!tpl) {
     return (
@@ -61,6 +68,12 @@ export function TemplateDetail({ templateId }: Props) {
     }
   };
 
+  // #576: one rest line under each section's last exercise.
+  const rest = sectionRestOf(tpl.exercises);
+  const defaults = restSettings.value;
+  const lastOfSection = new Map<string, number>();
+  tpl.exercises.forEach((ex, i) => lastOfSection.set(ex.section, i));
+
   return (
     <div class="screen template-detail-screen">
       <div class="template-editor-header">
@@ -77,16 +90,20 @@ export function TemplateDetail({ templateId }: Props) {
       </h2>
 
       <div class="compact-card-list">
-        {tpl.exercises.map((ex, i) => (
-          <div key={`${ex.exercise_id}-${i}`}>
-            <ExerciseCompactCard
-              section={ex.section as string}
-              exerciseName={ex.exercise_name}
-              sets={ex.sets}
-              reps={ex.reps}
-            />
-          </div>
-        ))}
+        {tpl.exercises.map((ex, i) => {
+          const line = lastOfSection.get(ex.section) === i ? restLine(ex.section, rest[ex.section], defaults) : null;
+          return (
+            <div key={`${ex.exercise_id}-${i}`}>
+              <ExerciseCompactCard
+                section={ex.section as string}
+                exerciseName={ex.exercise_name}
+                sets={ex.sets}
+                reps={ex.reps}
+              />
+              {line && <p class="rest-note template-rest-line">{line}</p>}
+            </div>
+          );
+        })}
       </div>
 
       <div class="template-detail-footer">

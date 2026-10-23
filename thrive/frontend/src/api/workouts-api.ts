@@ -285,7 +285,27 @@ export async function deleteWorkoutRows(
   });
 }
 
-// ── Sets tab (A:J) ──────────────────────────────────────────────────
+// ── Sets tab (A:M) ──────────────────────────────────────────────────
+
+/**
+ * Sets' A:M order. Mirrors SET_FIELDS in apps-script/src/types.js (change both
+ * together; workout-fields-drift.test.ts fails if they drift). K:M are #576's.
+ */
+export const SET_FIELDS = [
+  'workout_id',
+  'exercise_id',
+  'exercise_name',
+  'section',
+  'exercise_order',
+  'set_number',
+  'planned_reps',
+  'weight',
+  'reps',
+  'effort',
+  'rest_target_s',
+  'set_s',
+  'rest_s',
+] as const;
 
 export async function fetchSets(token: string): Promise<SetWithRow[]> {
   if (isDemo()) return [...DEMO_SETS];
@@ -294,8 +314,13 @@ export async function fetchSets(token: string): Promise<SetWithRow[]> {
 }
 
 async function fetchSetsRaw(token: string): Promise<SetWithRow[]> {
-  const rows = await sheetsGet('Sets!A2:J', token);
-  return rows.map((row, i) => ({
+  const rows = await sheetsGet('Sets!A2:M', token);
+  return rows.map((row, i) => rowToSet(row, i + 2));
+}
+
+/** A `Sets` row as a set. A row from before #576 reads its K:M as ''. */
+export function rowToSet(row: readonly string[], sheetRow: number): SetWithRow {
+  return {
     workout_id: row[0] || '',
     exercise_id: row[1] || '',
     exercise_name: row[2] || '',
@@ -306,14 +331,19 @@ async function fetchSetsRaw(token: string): Promise<SetWithRow[]> {
     weight: row[7] || '',
     reps: row[8] || '',
     effort: (row[9] || '') as SetWithRow['effort'],
-    sheetRow: i + 2,
-  }));
+    rest_target_s: row[10] || '',
+    set_s: row[11] || '',
+    rest_s: row[12] || '',
+    sheetRow,
+  };
 }
 
 /**
- * Builds a `Sets!A:J` row. Reads named fields, so a payload carrying extra
- * properties — an offline-queue entry serialized under the old shape, say —
- * contributes no stray trailing cell.
+ * Builds a `Sets!A:J` row: the cells every edit writes. Reads named fields, so
+ * a payload carrying extra properties — an offline-queue entry serialized
+ * under the old shape, say — contributes no stray trailing cell. K:M (#576)
+ * are left out on purpose, so an edit never blanks the planned rest or Lift
+ * Mode's measurements: only `setToNewRow` writes them, when the row is made.
  */
 export function setToRow(s: WorkoutSet): (string | number)[] {
   return [
@@ -330,17 +360,22 @@ export function setToRow(s: WorkoutSet): (string | number)[] {
   ];
 }
 
+/** A new `Sets!A:M` row (#576): A:J, then K:M as the set carries them, '' where it does not. */
+export function setToNewRow(s: WorkoutSet): (string | number)[] {
+  return [...setToRow(s), s.rest_target_s ?? '', s.set_s ?? '', s.rest_s ?? ''];
+}
+
 export async function appendSet(set: WorkoutSet, token: string): Promise<void> {
   if (isDemo()) return;
 
-  await withReauth(token, (t) => sheetsAppend('Sets!A:J', [setToRow(set)], t));
+  await withReauth(token, (t) => sheetsAppend('Sets!A:M', [setToNewRow(set)], t));
 }
 
 export async function appendSets(sets: WorkoutSet[], token: string): Promise<void> {
   if (isDemo()) return;
   if (sets.length === 0) return;
 
-  await withReauth(token, (t) => sheetsAppend('Sets!A:J', sets.map(setToRow), t));
+  await withReauth(token, (t) => sheetsAppend('Sets!A:M', sets.map(setToNewRow), t));
 }
 
 export async function updateSet(sheetRow: number, set: WorkoutSet, token: string): Promise<void> {

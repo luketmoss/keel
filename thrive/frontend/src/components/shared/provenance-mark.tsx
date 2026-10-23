@@ -1,8 +1,3 @@
-import type { Workout } from '../../api/types';
-import { provenanceMark } from '../../api/provenance';
-
-type Fields = Pick<Workout, 'source' | 'source_activity_id'>;
-
 /** A small watch outline; follows the text colour in both themes. */
 export function WatchGlyph() {
   return (
@@ -24,22 +19,5 @@ export function WatchGlyph() {
         stroke-linejoin="round"
       />
     </svg>
-  );
-}
-
-/**
- * The card's quiet provenance mark (#157, sync plan §8): "COROS" for a synced
- * row, "+ COROS" for an enriched one, nothing for a manual one. Text, not a
- * chip: the type badge stays the only chip on the card. aria-hidden, because
- * the card is one button whose aria-label already says it.
- */
-export function ProvenanceMark({ workout }: { workout: Fields }) {
-  const mark = provenanceMark(workout);
-  if (!mark) return null;
-  return (
-    <span class="provenance-mark" aria-hidden="true">
-      <WatchGlyph />
-      {mark}
-    </span>
   );
 }

@@ -1,6 +1,5 @@
 // #201 — getBodyMeasurements: BodyMeasurements rows for a date range and
-// optional kind, oldest first by measured_at_utc, read through the key or
-// almanac's token.
+// optional kind, oldest first by measured_at_utc, read through the key.
 
 import { describe, it, expect } from 'vitest';
 import {
@@ -94,10 +93,11 @@ describe('AC1: getBodyMeasurements filters by local date and kind', () => {
   });
 });
 
-describe('AC2: almanac token can call it, and nothing can write through it', () => {
-  it('is on the token read allow-list', () => {
+describe('AC2: key-only, read and write', () => {
+  // almanac read it by token; the app reads the tab through the Sheets API.
+  it('is off the token read allow-list', () => {
     const { sandbox } = loadApi();
-    expect(sandbox.TOKEN_READ_ACTIONS).toContain('getBodyMeasurements');
+    expect(sandbox.TOKEN_READ_ACTIONS).not.toContain('getBodyMeasurements');
   });
 
   it('upsertBodyMeasurements stays off the token read allow-list', () => {

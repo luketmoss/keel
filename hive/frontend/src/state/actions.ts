@@ -12,7 +12,6 @@ import {
   currentUserEmail,
   selectItem,
   clearSelectedItem,
-  boardItems as boardItemsComputed,
   statuses,
   isTerminalStatus,
   defaultStatusName,
@@ -1728,7 +1727,7 @@ export async function deleteStatusWithMigration(
     }
 
     // Delete status row
-    const statusWithRow = await getStatusSheetRow(statusId, token, oldStatuses);
+    const statusWithRow = await getStatusSheetRow(statusId, token);
     if (statusWithRow) {
       await deleteStatusRowApi(statusWithRow.sheetRow, token);
     }
@@ -1746,11 +1745,7 @@ export async function deleteStatusWithMigration(
 }
 
 /** Helper to get the sheet row for a status (requires fetching with rows). */
-async function getStatusSheetRow(
-  statusId: string,
-  token: string,
-  statusList?: BoardStatus[],
-): Promise<{ sheetRow: number } | null> {
+async function getStatusSheetRow(statusId: string, token: string): Promise<{ sheetRow: number } | null> {
   try {
     const withRows = await fetchStatusesWithRowsApi(token);
     const match = withRows.find((s) => s.id === statusId);

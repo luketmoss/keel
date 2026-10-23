@@ -6,13 +6,11 @@ import {
   createModalInitialDueDate,
   clearCreateItemUrlParams,
   owners,
-  labels as labelsStore,
 } from '../../state/board-store';
 import { createItem, createItemWithSubtasks } from '../../state/actions';
 import type { StagedSubtask } from '../../state/actions';
 import { LabelPickerManager } from '../labels/label-picker-manager';
 import { useFocusTrap } from '../../hooks/use-focus-trap';
-import { getContrastTextColor } from '../../utils/color';
 import { QuickDateChips } from '../shared/quick-date-chips';
 
 export function CreateItemModal() {

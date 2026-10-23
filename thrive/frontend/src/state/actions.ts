@@ -270,17 +270,6 @@ async function bootstrapLabels(exerciseData: ExerciseWithRow[], token: string): 
 
 // ── Templates ────────────────────────────────────────────────────────
 
-export async function loadTemplates(token: string): Promise<void> {
-  try {
-    const rows = await fetchTemplateRows(token);
-    templates.value = groupTemplateRows(rows);
-  } catch (err) {
-    if (isReauthFailure(err)) throw err;
-    showToast('Failed to load templates', 'error');
-    throw err;
-  }
-}
-
 export async function addTemplate(name: string, exerciseInputs: TemplateExerciseInput[], token: string): Promise<void> {
   try {
     const created = await createTemplateApi(name, exerciseInputs, token);

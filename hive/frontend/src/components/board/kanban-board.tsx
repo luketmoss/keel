@@ -15,7 +15,6 @@ import {
   allDoneItems,
   hasArchivedItems,
   showArchiveDialog,
-  boards,
   showCreateBoardModal,
   showShareModal,
   showDeleteBoardModal,
@@ -40,7 +39,7 @@ import {
   isTerminalStatus,
 } from '../../state/board-store';
 import type { SortMode } from '../../state/board-store';
-import { moveItem, reorderItem, createItem, deleteItem, copyItem } from '../../state/actions';
+import { moveItem, reorderItem, deleteItem, copyItem } from '../../state/actions';
 import { useKeyboardShortcuts } from '../../hooks/use-keyboard-shortcuts';
 import type { Shortcut } from '../../hooks/use-keyboard-shortcuts';
 import { Column } from './column';

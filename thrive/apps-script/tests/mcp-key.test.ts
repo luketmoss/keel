@@ -9,7 +9,7 @@ import {
 
 const MCP_KEY = 'mcp-worker-key';
 const REFUSED = '{"success":false,"error":"Invalid or missing API key"}';
-const read = { action: 'getWorkouts' };
+const read = { action: 'getSettings' };
 const write = {
   action: 'createWorkout',
   payload: JSON.stringify({ data: { type: 'bike', name: 'Evening Ride' } }),
@@ -81,7 +81,7 @@ describe('AC3: API_KEY stays mandatory', () => {
 });
 
 describe('AC4: the token door is untouched', () => {
-  const CLIENT_ID = 'almanac-1234.apps.googleusercontent.com';
+  const CLIENT_ID = 'thrive-1234.apps.googleusercontent.com';
   const EMAIL = 'owner@example.com';
   const tokeninfo = (): FetchReply => ({
     status: 200,

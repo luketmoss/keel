@@ -5,7 +5,6 @@ import type {
   LabelWithRow,
   JournalEntryWithRow,
   TemplateRowWithRow,
-  Template,
   Workout,
   WorkoutWithRow,
   SetWithRow,
@@ -185,8 +184,6 @@ function buildDemoLabels(): LabelWithRow[] {
 
 export const DEMO_LABELS: LabelWithRow[] = buildDemoLabels();
 
-const now = '2025-01-15T00:00:00.000Z';
-
 export const DEMO_TEMPLATE_ROWS: TemplateRowWithRow[] = [
   // Upper Push A
   {
@@ -346,26 +343,6 @@ export const DEMO_TEMPLATE_ROWS: TemplateRowWithRow[] = [
     sheetRow: 15,
   },
 ];
-
-/** Group flat template rows into Template objects. */
-function groupRows(rows: TemplateRowWithRow[]): Template[] {
-  const map = new Map<string, Template>();
-  for (const row of rows) {
-    let tpl = map.get(row.template_id);
-    if (!tpl) {
-      tpl = { id: row.template_id, name: row.template_name, exercises: [] };
-      map.set(row.template_id, tpl);
-    }
-    tpl.exercises.push(row);
-  }
-  // Sort exercises within each template by order
-  for (const tpl of map.values()) {
-    tpl.exercises.sort((a, b) => a.order - b.order);
-  }
-  return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-}
-
-export const DEMO_TEMPLATES: Template[] = groupRows(DEMO_TEMPLATE_ROWS);
 
 // ── Demo Workouts ────────────────────────────────────────────────────
 

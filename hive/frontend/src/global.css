@@ -1370,15 +1370,6 @@ body {
 }
 
 /* === Board Switcher === */
-.board-switcher {
-  display: flex;
-  align-items: center;
-  padding: 8px 20px;
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
-  flex-shrink: 0;
-}
-
 .board-switcher-select {
   padding: 6px 12px;
   border: 1px solid var(--color-border);
@@ -1456,25 +1447,6 @@ body {
 .icon-swatch-selected {
   border-color: var(--color-primary);
   background: var(--color-todo);
-}
-
-.share-btn {
-  margin-left: 8px;
-  min-width: 44px;
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px;
-  border-radius: var(--radius);
-  color: var(--color-text-secondary);
-}
-
-@media (hover: hover) {
-  .share-btn:hover {
-    color: var(--color-primary);
-    background: var(--color-primary-light);
-  }
 }
 
 /* === Share Modal === */
@@ -4755,7 +4727,6 @@ body {
 .archive-search-clear:hover:not(:disabled):not([aria-disabled="true"]),
 .filter-search-clear:hover:not(:disabled):not([aria-disabled="true"]),
 .filter-popup-close:hover:not(:disabled):not([aria-disabled="true"]),
-.share-btn:hover:not(:disabled):not([aria-disabled="true"]),
 .share-remove-btn:hover:not(:disabled):not([aria-disabled="true"]),
 .staged-subtask-remove:hover:not(:disabled):not([aria-disabled="true"]),
 .label-gear-btn:hover:not(:disabled):not([aria-disabled="true"]),
@@ -4830,7 +4801,6 @@ body {
 .archive-search-clear:active:not(:disabled):not([aria-disabled="true"]),
 .filter-search-clear:active:not(:disabled):not([aria-disabled="true"]),
 .filter-popup-close:active:not(:disabled):not([aria-disabled="true"]),
-.share-btn:active:not(:disabled):not([aria-disabled="true"]),
 .share-remove-btn:active:not(:disabled):not([aria-disabled="true"]),
 .staged-subtask-remove:active:not(:disabled):not([aria-disabled="true"]),
 .label-gear-btn:active:not(:disabled):not([aria-disabled="true"]),
@@ -4902,7 +4872,6 @@ body {
 .archive-search-clear:active:not(:disabled):not([aria-disabled="true"]),
 .filter-search-clear:active:not(:disabled):not([aria-disabled="true"]),
 .filter-popup-close:active:not(:disabled):not([aria-disabled="true"]),
-.share-btn:active:not(:disabled):not([aria-disabled="true"]),
 .share-remove-btn:active:not(:disabled):not([aria-disabled="true"]),
 .staged-subtask-remove:active:not(:disabled):not([aria-disabled="true"]),
 .label-gear-btn:active:not(:disabled):not([aria-disabled="true"]),
@@ -4963,7 +4932,6 @@ textarea:disabled {
 .user-dropdown-trigger,
 .theme-toggle-btn,
 .filter-popup-close,
-.share-btn,
 .label-new-pill,
 .column-settings-name,
 .column-settings-terminal-toggle,

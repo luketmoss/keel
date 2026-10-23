@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks';
-import { workouts, sets, templates, activeWorkoutId, showToast } from '../../state/store';
+import { workouts, sets, activeWorkoutId, showToast } from '../../state/store';
 import { deleteWorkout, copyWorkout, saveWorkoutAsTemplate, startPlannedWorkout } from '../../state/actions';
 import { useAuth } from '../../auth/auth-context';
 import { navigate, goBack } from '../../router/router';

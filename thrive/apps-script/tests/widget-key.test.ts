@@ -124,7 +124,7 @@ describe('an unset or blank widget key is never a door', () => {
   it('a token present makes a token caller whatever key is sent with it', () => {
     const api = load();
     const { res } = callEntry<any>(api.sandbox, 'doPost', {
-      action: 'getWorkouts', key: WIDGET_KEY, access_token: TOKEN,
+      action: 'getSettings', key: WIDGET_KEY, access_token: TOKEN,
     });
     expect(res.success).toBe(true);
     const bad = callEntry<any>(api.sandbox, 'doPost', {

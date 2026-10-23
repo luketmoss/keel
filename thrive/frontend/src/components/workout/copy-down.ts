@@ -1,6 +1,6 @@
 import type { TrackerExercise } from './exercise-row';
 import type { TrackerSet } from './set-row';
-import type { SetWithRow, Effort } from '../../api/types';
+import type { SetWithRow } from '../../api/types';
 
 export interface CopyDownResult {
   exercises: TrackerExercise[];

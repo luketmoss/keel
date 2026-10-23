@@ -52,8 +52,7 @@ their data as a URL-encoded `payload` query parameter.
 
 **`doPost` exists too (#144), and behaves identically.** Both entry points run
 one handler over `e.parameter`, which Apps Script fills from a form-encoded
-body exactly as from a query string. The SPA (#410; almanac, retired, before
-it), a browser app, POSTs so a live Google token never sits in a URL. A browser `fetch` follows the 302 as a `GET`,
+body exactly as from a query string. The SPA (#410), a browser app, POSTs so a live Google token never sits in a URL. A browser `fetch` follows the 302 as a `GET`,
 and both hops carry `Access-Control-Allow-Origin: *`, so it works provided the
 request stays CORS-simple: a `URLSearchParams` body, no headers set by hand.
 There is no `doOptions`, so a request that needs a preflight fails before it
@@ -99,7 +98,7 @@ existed.
 
 A browser app cannot hold the key: a key in a public bundle is not a secret.
 It sends `access_token`, a Google access token from its own sign-in, instead.
-Since #410 that caller is the SPA (almanac, the first, is retired):
+Since #410 that caller is the SPA:
 `TOKEN_CLIENT_ID` is the SPA's OAuth client ID, the value of
 `VITE_GOOGLE_CLIENT_ID`.
 
@@ -123,11 +122,11 @@ the token expires (at most an hour), refused for five minutes, never when
 Google could not be reached. The raw token is in no cache key, log line, error
 or response.
 
-A token caller may run `getWorkouts`, `getWorkout`, `getPlannedWorkouts`,
-`getExercises`, `getExercise`, `getExerciseHistory`, `getTemplates`,
-`getTemplate`, `getSets`, `getWorkoutSets`, `getDailySummary`,
-`getHistoryDateRange`, `getDailyHealth`, `getSyncLog` and `getBodyMeasurements`
-— `TOKEN_READ_ACTIONS` in `src/auth.js`. It is an allow-list: **an action
+A token caller may run only the reads the app makes: `getWorkoutTrack`,
+`getDrinks`, `getDrinkTotals` and `getSettings` — `TOKEN_READ_ACTIONS` in
+`src/auth.js`. The workout, exercise, template, set, health, summary,
+sync-log and body-measurement reads were on it for almanac and are key-only
+since it retired: the app reads those tabs through the Sheets API. It is an allow-list: **an action
 added later is refused to token callers until someone names it there**, and a
 test fails until every `case` in `main.js` is classified. `previewSetUpdates`
 is deliberately off it: it writes nothing, but it is the dry run of a write
@@ -137,8 +136,7 @@ and takes a write payload.
 `requestSync` (see [Sync now](#sync-now-requestsync-410)) and the app's four
 drinks writes, `logDrink`, `updateDrinkTime`, `deleteDrink` and `updateSetting`
 (see [Drinks](#drinks-and-settings-519)), kept apart from the reads so a write
-is never added by accident; a test pins the list. `getDrinks` and
-`getDrinkTotals` are on `TOKEN_READ_ACTIONS`. Every other write still answers a
+is never added by accident; a test pins the list. Every other write still answers a
 token caller `read_only`, before dispatch.
 
 | `code` | Meaning | The SPA does |
@@ -335,8 +333,8 @@ cell as `''` and never `0`, and no `sheetRow`. `from`/`to` filter on the local
 `date` column, exactly as `getDailyHealth`; rows are sorted by `measured_at_utc`
 parsed as an instant, not sheet order, which a backfill scrambles. A `kind`
 other than `scale`/`bp` is refused, naming the valid values. With no
-`BodyMeasurements` tab it answers `[]`. It is a read, and is on
-`TOKEN_READ_ACTIONS`, so a token caller can call it.
+`BodyMeasurements` tab it answers `[]`. It is a read, but key-only: it was on
+`TOKEN_READ_ACTIONS` for almanac, and the app reads the tab through Sheets.
 
 One row per Withings measure group, A:T (`BODY_MEASUREMENT_FIELDS` in
 `src/types.js`), SI units. Called by the Withings sync alone, **key only**: it is
@@ -814,7 +812,7 @@ under ~2 s, by changing the constant, pushing, and running
      blank, it matches nothing.
    - `SPREADSHEET_ID` — the Groundwork sheet id
    - `TOKEN_CLIENT_ID` — the SPA's OAuth client ID, the value of
-     `VITE_GOOGLE_CLIENT_ID` (#410; almanac's, retired, before it, #144)
+     `VITE_GOOGLE_CLIENT_ID` (#410, #144)
    - `TOKEN_ALLOWED_EMAIL` — the one Google account allowed to call with a
      token: the owner's (#144)
 

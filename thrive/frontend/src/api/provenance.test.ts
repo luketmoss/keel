@@ -2,14 +2,7 @@
 // alone (sync plan §8), and says so in words.
 
 import { describe, it, expect } from 'vitest';
-import {
-  provenanceOf,
-  provenanceMark,
-  provenanceSpeech,
-  provenanceDetail,
-  sourceName,
-  formatLocalStamp,
-} from './provenance';
+import { provenanceOf, provenanceSpeech, provenanceDetail, sourceName, formatLocalStamp } from './provenance';
 
 const manual = { source: '', source_activity_id: '', synced_at: '' };
 const synced = { source: 'coros', source_activity_id: '472210938', synced_at: '2025-01-09T18:00:00.000Z' };
@@ -31,20 +24,11 @@ describe('provenanceOf (§8 three states)', () => {
   });
 });
 
-describe('AC1: the card mark', () => {
-  it('names the source on a synced row', () => {
-    expect(provenanceMark(synced)).toBe('COROS');
-    expect(provenanceMark({ ...synced, source: 'garmin_import' })).toBe('Garmin');
-  });
-  it('falls back to "Synced" for a source this build does not know', () => {
+describe('sourceName', () => {
+  it('names the sources this build knows, and nothing for another', () => {
+    expect(sourceName('coros')).toBe('COROS');
+    expect(sourceName('garmin_import')).toBe('Garmin');
     expect(sourceName('strava')).toBe('');
-    expect(provenanceMark({ ...synced, source: 'strava' })).toBe('Synced');
-  });
-  it('reads "+ COROS" on an enriched row', () => {
-    expect(provenanceMark(enriched)).toBe('+ COROS');
-  });
-  it('is absent on a manual row', () => {
-    expect(provenanceMark(manual)).toBeNull();
   });
 });
 

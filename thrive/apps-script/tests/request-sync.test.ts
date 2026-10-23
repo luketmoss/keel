@@ -391,7 +391,7 @@ describe('AC3: a request that cannot be found', () => {
 describe('AC4: owner-only, and it cannot be steered', () => {
   it.each([
     ['another Google account', { email: 'someone@example.com' }],
-    ['another OAuth client', { aud: 'almanac-1234.apps.googleusercontent.com', azp: 'almanac-1234.apps.googleusercontent.com' }],
+    ['another OAuth client', { aud: 'other-1234.apps.googleusercontent.com', azp: 'other-1234.apps.googleusercontent.com' }],
     ['an unverified email', { email_verified: 'false' }],
   ])('a token from %s is token_forbidden and dispatches nothing', (_name, over) => {
     const h = harness({ requests: [req()], info: tokeninfo(over) });

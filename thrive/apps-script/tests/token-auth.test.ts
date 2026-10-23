@@ -1,6 +1,6 @@
-// #144 — a browser caller (almanac then, the SPA since #410) calls with a Google
-// access token instead of the key, and may only read, plus the one write in
-// TOKEN_WRITE_ACTIONS (requestSync, covered in request-sync.test.ts).
+// #144 — a browser caller (the SPA since #410) calls with a Google access token
+// instead of the key, and may run only the reads the app makes, plus the writes
+// in TOKEN_WRITE_ACTIONS (requestSync is covered in request-sync.test.ts).
 
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -14,13 +14,13 @@ import {
 
 const SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'src');
 
-const CLIENT_ID = 'almanac-1234.apps.googleusercontent.com';
+const CLIENT_ID = 'thrive-1234.apps.googleusercontent.com';
 const EMAIL = 'owner@example.com';
 // Characters that URL-encode differently, so a leak of either spelling shows.
 const TOKEN = 'ya29.a0Live/Token+Value=_with-chars';
 const TOKEN_PROPS = { TOKEN_CLIENT_ID: CLIENT_ID, TOKEN_ALLOWED_EMAIL: EMAIL };
 
-/** What tokeninfo says about a good almanac token, with `overrides` applied. */
+/** What tokeninfo says about a good app token, with `overrides` applied. */
 function info(overrides: Record<string, unknown> = {}): FetchReply {
   const body: Record<string, unknown> = {
     azp: CLIENT_ID, aud: CLIENT_ID, sub: '1234567890', scope: 'openid email',
@@ -49,7 +49,7 @@ function load(
   );
 }
 
-const read = { action: 'getWorkouts' };
+const read = { action: 'getSettings' };
 const tokenRead = { ...read, access_token: TOKEN };
 
 /** The cache key the spec names: namespace + hex SHA-256 of token|client|email. */
@@ -121,7 +121,7 @@ describe('AC2: verifying the token', () => {
     const api = load();
     const { res } = callEntry(api.sandbox, 'doPost', tokenRead);
     expect(res.success).toBe(true);
-    expect(res.data).toHaveLength(1);
+    expect(res.data).toHaveProperty('water_goal_ml', 1893);
     expect(api.fetches).toEqual([
       'https://oauth2.googleapis.com/tokeninfo?access_token=' + encodeURIComponent(TOKEN),
     ]);
@@ -226,7 +226,7 @@ describe('AC3: the verdict is cached under a hash', () => {
     const api = load();
     expect(callEntry(api.sandbox, 'doGet', tokenRead).res.success).toBe(true);
     expect(callEntry(api.sandbox, 'doPost', tokenRead).res.success).toBe(true);
-    expect(callEntry(api.sandbox, 'doGet', { action: 'getTemplates', access_token: TOKEN }).res.success).toBe(true);
+    expect(callEntry(api.sandbox, 'doGet', { action: 'getDrinkTotals', access_token: TOKEN }).res.success).toBe(true);
     expect(api.fetches).toHaveLength(1);
   });
 
@@ -303,8 +303,8 @@ describe('AC3: the token goes nowhere', () => {
       (url) => ({ throws: 'Address unavailable: ' + url }), tokenRead],
     ['a 500 from tokeninfo', () => ({ status: 500, body: TOKEN }), tokenRead],
     ['a write refused as read_only', () => info(), { action: 'createWorkout', access_token: TOKEN }],
-    ['a read that throws', () => info(), { action: 'getWorkouts', type: 'swimming', access_token: TOKEN }],
-    ['a read that echoes a parameter', () => info(), { action: 'getWorkout', id: TOKEN, access_token: TOKEN }],
+    ['a read that throws', () => info(), { action: 'getDrinks', from: '2026-09-01', access_token: TOKEN }],
+    ['a read that echoes a parameter', () => info(), { action: 'getWorkoutTrack', id: TOKEN, access_token: TOKEN }],
   ];
 
   for (const [name, reply, params] of scenarios) {
@@ -334,6 +334,11 @@ describe('AC3: the token goes nowhere', () => {
 // Every `case` in the dispatcher, classified. A new action fails the last test
 // below until someone decides which list it belongs on.
 const KEY_ONLY_ACTIONS = [
+  // Reads, but key-only: almanac read them by token, and the app does not.
+  'getWorkouts', 'getWorkout', 'getPlannedWorkouts',
+  'getExercises', 'getExercise', 'getExerciseHistory',
+  'getTemplates', 'getTemplate', 'getSets', 'getWorkoutSets',
+  'getDailySummary', 'getHistoryDateRange', 'getDailyHealth', 'getSyncLog', 'getBodyMeasurements',
   'createWorkout', 'updateWorkout', 'deleteWorkout',
   'createExercise', 'updateExercise', 'deleteExercise',
   'createTemplate', 'replaceTemplate',
@@ -351,13 +356,6 @@ const KEY_ONLY_ACTIONS = [
 ];
 
 const READ_PARAMS: Record<string, Record<string, string>> = {
-  getWorkouts: {}, getWorkout: { id: 'w_001' }, getPlannedWorkouts: { date: '2026-09-15' },
-  getExercises: {}, getExercise: { ref: 'ex_001' }, getExerciseHistory: { ref: 'ex_001' },
-  getTemplates: {}, getTemplate: { ref: 'tpl_001' },
-  getSets: { workout_id: 'w_001' }, getWorkoutSets: { workout_id: 'w_001' },
-  getDailySummary: { from: '2026-09-01', to: '2026-09-30' }, getHistoryDateRange: {},
-  getDailyHealth: { from: '2026-09-01', to: '2026-09-30' }, getSyncLog: { limit: '1' },
-  getBodyMeasurements: { from: '2026-09-01', to: '2026-09-30' },
   getWorkoutTrack: { id: 'w_001' },
   // #519: the app's drinks reads.
   getDrinks: { from: '2026-09-01', to: '2026-09-30' }, getDrinkTotals: {},
@@ -421,7 +419,7 @@ describe('AC4: token callers run only the named reads', () => {
       api.sandbox.previewSetUpdates = () => { ran = true; return []; };
 
       const { text } = callEntry(api.sandbox, 'doPost', {
-        action, access_token: TOKEN, payload: JSON.stringify(WRITE_PAYLOADS[action]),
+        action, access_token: TOKEN, payload: JSON.stringify(WRITE_PAYLOADS[action] ?? {}),
       });
       expect(JSON.parse(text)).toEqual({
         success: false, code: 'read_only',
@@ -478,7 +476,7 @@ describe('AC5: a form-encoded POST behaves exactly like a GET', () => {
     { action: 'getWorkout', key: 'test-key' },
     { action: 'getWorkouts', key: 'wrong' },
     { action: 'noSuchAction', key: 'test-key' },
-    { action: 'getWorkouts', access_token: TOKEN },
+    { action: 'getSettings', access_token: TOKEN },
     { action: 'appendSets', access_token: TOKEN },
   ];
   for (const params of calls) {

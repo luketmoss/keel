@@ -648,7 +648,6 @@ export async function fetchStatuses(token: string): Promise<BoardStatus[]> {
 }
 
 export async function createStatusRow(status: BoardStatus, token: string): Promise<void> {
-  await ensureStatusesTab(token);
   return withReauth(token, (t) =>
     sheetsAppend(
       'Statuses!A:G',
@@ -729,21 +728,6 @@ export async function cascadeStatusRename(
   for (const item of itemsToUpdate) {
     const row = item as ItemWithRow;
     await sheetsUpdate(`Items!D${row.sheetRow}`, [[newName]], token);
-  }
-}
-
-async function ensureStatusesTab(token: string): Promise<void> {
-  try {
-    await sheetsGet('Statuses!A1', token);
-  } catch {
-    // Tab doesn't exist, create it
-    const spreadsheet = await withReauth(token, (t) =>
-      sheetsGet('Sheet1!A1', t).then(() => {
-        // Get spreadsheet ID from token context (complex — for now assume it exists)
-        // In real impl, would parse from spreadsheetId constant
-      }),
-    );
-    // For MVP, assume Statuses sheet auto-created via Apps Script on first append
   }
 }
 

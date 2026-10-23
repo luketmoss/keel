@@ -5,7 +5,6 @@ import {
   boardStatuses,
   isTerminalStatus,
 } from '../../state/board-store';
-import { labels as labelsStore } from '../../state/board-store';
 import type { ItemWithRow, ItemStatus } from '../../api/types';
 import { LabelBadge } from '../shared/label-badge';
 import { KebabMenu } from './kebab-menu';

@@ -36,18 +36,6 @@ export function sourceName(source: string): string {
   }
 }
 
-/** The card's quiet mark: "COROS", "+ COROS", or null for a manual row. */
-export function provenanceMark(w: ProvenanceFields): string | null {
-  switch (provenanceOf(w)) {
-    case 'synced':
-      return sourceName(w.source) || 'Synced';
-    case 'enriched':
-      return '+ COROS';
-    default:
-      return null;
-  }
-}
-
 /** What the card's aria-label says about provenance; '' for a manual row. */
 export function provenanceSpeech(w: ProvenanceFields): string {
   switch (provenanceOf(w)) {

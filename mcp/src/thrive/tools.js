@@ -26,6 +26,7 @@ import {
   createTemplate, replaceTemplate,
   previewSetUpdates, updateSets, appendSets, rowCap,
   fetchChangeLog, previewUndo, applyUndo,
+  fetchSettings, previewWorkoutRest, setWorkoutRest,
 } from './api.js';
 import { describeRowChange, keyText, listCalls } from '../undo-format.js';
 import {
@@ -44,6 +45,9 @@ import { resolveRange, describeHealthRange, describeSummaryRange } from './daily
 import { describeBodyRange } from './body.js';
 import { describeJournalRange, describeJournalDay } from './journal.js';
 import { checkDrinksRange, describeDrinksRange } from './drinks.js';
+import {
+  checkRest, mss, resolvedRestLines, timedSections, withTemplateRest, templateRestChanges, templateRestLines,
+} from './rest.js';
 
 // --- helpers --------------------------------------------------------
 
@@ -64,6 +68,8 @@ const DESTRUCTIVE = new Set([
   'thrive_delete_workout', 'thrive_delete_exercise', 'thrive_update_template', 'thrive_set_journal_entry',
   // Reverting is a write that can itself destroy later work (#412).
   'thrive_undo',
+  // Overwrites planned rest targets; dry-run by default like the others (#583).
+  'thrive_set_workout_rest',
 ]);
 const annotationsFor = (name) =>
   READ_ONLY.has(name) ? { readOnlyHint: true } : DESTRUCTIVE.has(name) ? { destructiveHint: true } : undefined;
@@ -204,18 +210,47 @@ function setLine(s) {
 }
 
 /**
- * The API's `exercises` shape for a template, from resolved rows. It carries no
- * rest_s / switch_s (#576): the API keeps a section's stored rest when the
- * payload leaves it out, so a replace never blanks rest it was not asked to change.
+ * The API's `exercises` shape for a template, from resolved rows. A row carries
+ * rest_s / switch_s only where the `rest` parameter set them (#583): the API
+ * keeps a section's stored rest when the payload leaves it out (#576), so a
+ * replace never blanks rest it was not asked to change.
  */
 const toTemplateExercises = (rows) =>
-  rows.map((r) => ({ exercise: r.exercise_id, section: r.section, sets: r.sets, reps: r.reps }));
+  rows.map((r) => ({
+    exercise: r.exercise_id, section: r.section, sets: r.sets, reps: r.reps,
+    ...(r.rest_s !== undefined ? { rest_s: r.rest_s } : {}),
+    ...(r.switch_s !== undefined ? { switch_s: r.switch_s } : {}),
+  }));
 
-/** Whole seconds as m:ss (#576): 90 -> "1:30". */
-const mss = (seconds) => {
-  const s = Math.max(0, Math.round(Number(seconds)));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-};
+/**
+ * The `rest` parameter (#583), the same shape on every tool that takes it.
+ * Passthrough so a misnamed field is refused by name (checkRest), not stripped.
+ */
+const restEntries = () => z.array(
+  z.object({
+    section: z.string().describe('primary, SS1, SS2, SS3 or burnout. Warmup and cooldown have no rest'),
+    rest_s: z.number().nullable().optional().describe(
+      'Rest in whole seconds, 15 to 600: after each set of primary, after each round of a superset or burnout. ' +
+      'null = the Settings default',
+    ),
+    switch_s: z.number().nullable().optional().describe(
+      'SS1-SS3 and burnout only: the pause between exercises within a round, whole seconds, 0 to 120. ' +
+      'null = the Settings default',
+    ),
+  }).passthrough(),
+);
+const restParam = (description) => restEntries().optional().describe(description);
+
+/** Every problem with a `rest` parameter, as one refusal that writes nothing. */
+function refuseRest(errors) {
+  return new Error(
+    `Nothing was written — ${errors.length} problem${errors.length > 1 ? 's' : ''} with rest:\n` +
+    errors.map((e) => `  - ${e}`).join('\n'),
+  );
+}
+
+/** A rest target for reading: "1:30", or "(none)" for blank. */
+const restTarget = (v) => (v === undefined || v === '' ? '(none)' : mss(v));
 
 /** A template section's rest line (#576), or null when neither value is set. Absent is never 0. */
 function sectionRestLine(row) {
@@ -674,6 +709,11 @@ const scheduleShape = {
     .enum(['planned', 'completed'])
     .optional()
     .describe("Default 'planned'. Use 'completed' only to backfill a workout that already happened."),
+  rest: restParam(
+    "Rest and switch times for this workout, by section (#583): [{ section, rest_s?, switch_s? }]. Each set's " +
+    "planned rest comes from this, then the template's section rest, then the Settings defaults. A section " +
+    'or field left out is as it would be without this. Each named section must have exercises in the workout.',
+  ),
 };
 
 /** Library and templates, read once, plus resolvers for prepareSchedule. */
@@ -685,6 +725,17 @@ async function scheduleContext() {
     resolveTemplate: (ref) => resolveTemplate(ref, templates),
   };
 }
+
+/**
+ * The rest defaults, read only when a prepared workout has a timed section:
+ * a schedule's summary names each section's resolved rest (#583).
+ */
+async function restDefaultsFor(prepared) {
+  return prepared.some((p) => timedSections(p.plan).length) ? fetchSettings() : {};
+}
+
+/** A prepared workout's resolved rest, one line per timed section. */
+const restLinesOf = (p, defaults) => resolvedRestLines(p.plan, p.templateRest, p.restPlan.rest, defaults);
 
 tool(
   'thrive_schedule_workout',
@@ -718,6 +769,7 @@ tool(
     const detail = plan.map(
       (e, i) => `  ${i + 1}. ${e.exercise_name} [${e.section}] — ${e.sets} x ${e.reps}${describeLoad(e.weights)}`,
     );
+    const rest = rows.length ? restLinesOf(p, await restDefaultsFor([p])) : [];
     const summary = (
       [
         `Scheduled **${workout.name}** for ${workout.date} [${workout.type}]${workout.status === 'planned' ? ' (planned)' : ''}`,
@@ -726,6 +778,8 @@ tool(
         workout.estimated_seconds ? `- Estimated duration: ${secondsToMinutes(workout.estimated_seconds)} min` : null,
         rows.length ? `- ${plan.length} exercises, ${rows.length} planned sets:` : '- No exercises attached.',
         ...detail,
+        rest.length ? '- Rest:' : null,
+        ...rest.map((line) => `  ${line}`),
       ].filter(Boolean).join('\n')
     );
 
@@ -734,8 +788,9 @@ tool(
 
     // Sets before the workout row: if the second write fails, the set rows
     // are invisible orphans, whereas a workout row without its sets would show
-    // up as an empty session.
-    await appendSets(p.rows);
+    // up as an empty session. The row does not exist yet, so the sets carry
+    // the template and rest the API resolves their rest from (#583).
+    await appendSets(p.rows, { [workout.id]: p.restPlan });
     await createWorkout(p.workout);
 
     return text(summary);
@@ -784,12 +839,19 @@ tool(
       );
     }
 
+    const defaults = await restDefaultsFor(prepared);
     const summary = [
       `Scheduled ${prepared.length} workout${prepared.length > 1 ? 's' : ''}:`,
-      ...prepared.map(({ workout: w, rows }) =>
-        `- ${w.date} **${w.name}** [${w.type}]${w.status === 'planned' ? ' (planned)' : ''} — ` +
-        `${rows.length} planned sets` +
-        `${w.estimated_seconds ? `, est. ${secondsToMinutes(w.estimated_seconds)} min` : ''} (id: ${w.id})`),
+      ...prepared.flatMap((p) => {
+        const { workout: w, rows } = p;
+        const rest = rows.length ? restLinesOf(p, defaults) : [];
+        return [
+          `- ${w.date} **${w.name}** [${w.type}]${w.status === 'planned' ? ' (planned)' : ''} — ` +
+          `${rows.length} planned sets` +
+          `${w.estimated_seconds ? `, est. ${secondsToMinutes(w.estimated_seconds)} min` : ''} (id: ${w.id})`,
+          ...(rest.length ? [`  Rest: ${rest.join('; ')}`] : []),
+        ];
+      }),
     ].join('\n');
 
     const held = capHold(prepared.reduce((n, p) => n + p.rows.length + 1, 0), summary, confirm);
@@ -798,7 +860,10 @@ tool(
     // Every set first, for the reason given in thrive_schedule_workout, then
     // the workouts. appendSets chunks a large week to fit the API's payload
     // limit (#132 AC5); if a workout write fails partway, say which landed.
-    await appendSets(prepared.flatMap((p) => p.rows));
+    await appendSets(
+      prepared.flatMap((p) => p.rows),
+      Object.fromEntries(prepared.map((p) => [p.workout.id, p.restPlan])),
+    );
     const created = [];
     for (const p of prepared) {
       try {
@@ -1113,16 +1178,23 @@ tool(
 
 tool(
   'thrive_create_template',
-  'Create a reusable workout template from an ordered exercise list.',
+  'Create a reusable workout template from an ordered exercise list, optionally with a rest and switch time ' +
+    'per section (otherwise each section uses the Settings defaults).',
   {
     name: z.string().describe('Template name'),
     exercises: z.array(exerciseSpec).describe('Exercises in the order they should be performed'),
+    rest: restParam(
+      'Rest and switch times by section (#583): [{ section, rest_s?, switch_s? }], written on every row of the ' +
+      'section. A section or field left out is blank: the Settings default. Each named section must be in exercises.',
+    ),
     confirm: CONFIRM_OVER_CAP,
   },
-  async ({ name, exercises, confirm }) => {
+  async ({ name, exercises, rest, confirm }) => {
     if (!exercises.length) throw new Error('A template needs at least one exercise.');
+    const restErrors = checkRest(rest, new Set(exercises.map((e) => e.section)), 'template');
+    if (restErrors.length) throw refuseRest(restErrors);
     const library = await fetchExercises();
-    const rows = exercises.map((spec) => {
+    const resolved = exercises.map((spec) => {
       const ex = resolveExercise(spec.exercise, library);
       return {
         exercise_id: ex.id,
@@ -1132,7 +1204,10 @@ tool(
         reps: normalizeRangeToMax(spec.reps),
       };
     });
+    const rows = withTemplateRest(resolved, rest);
     const detail = rows.map((e, i) => `  ${i + 1}. ${e.exercise_name} [${e.section}] — ${e.sets} x ${e.reps}`);
+    const restLines = templateRestLines(rows, rest);
+    if (restLines.length) detail.push('- Rest:', ...restLines.map((line) => `  ${line}`));
     // The id is only known once the API has created the template, so a preview has none.
     const held = capHold(rows.length, `Would create template **${name}**\n${detail.join('\n')}`, confirm);
     if (held) return held;
@@ -1145,19 +1220,27 @@ tool(
 tool(
   'thrive_update_template',
   'Replace a template\'s exercise list wholesale. Destructive — the old rows are deleted. ' +
-    'Dry-run by default: shows the before/after and only writes when confirm is true.',
+    'Each section keeps its stored rest and switch time unless rest names it. ' +
+    'Dry-run by default: shows the before/after, rest included, and only writes when confirm is true.',
   {
     template: z.string().describe('Template name or id'),
     name: z.string().optional().describe('New template name (keeps the existing name if omitted)'),
     exercises: z.array(exerciseSpec).describe('The complete new exercise list — replaces all existing rows'),
+    rest: restParam(
+      'Rest and switch times by section (#583): [{ section, rest_s?, switch_s? }], written on every row of the ' +
+      'section. A section or field left out keeps its stored value; null clears it to the Settings default. ' +
+      'Each named section must be in exercises.',
+    ),
     confirm: z.boolean().optional().describe('Set true to actually write. Default false = preview only.'),
   },
-  async ({ template, name, exercises, confirm = false }) => {
+  async ({ template, name, exercises, rest, confirm = false }) => {
     if (!exercises.length) throw new Error('A template needs at least one exercise.');
+    const restErrors = checkRest(rest, new Set(exercises.map((e) => e.section)), 'template');
+    if (restErrors.length) throw refuseRest(restErrors);
     const tpl = resolveTemplate(template, await fetchTemplates());
     const library = await fetchExercises();
 
-    const rows = exercises.map((spec) => {
+    const resolved = exercises.map((spec) => {
       const ex = resolveExercise(spec.exercise, library);
       return {
         exercise_id: ex.id,
@@ -1168,9 +1251,11 @@ tool(
       };
     });
 
+    const rows = withTemplateRest(resolved, rest);
     const newName = name ?? tpl.name;
     const before = tpl.exercises.map((e, i) => `  ${i + 1}. ${e.exercise_name} [${e.section}] — ${e.sets} x ${e.reps}`);
     const after = rows.map((e, i) => `  ${i + 1}. ${e.exercise_name} [${e.section}] — ${e.sets} x ${e.reps}`);
+    const restChanges = templateRestChanges(tpl.exercises, rows, rest);
 
     if (!confirm) {
       return text(
@@ -1182,6 +1267,9 @@ tool(
           '',
           `Proposed (${rows.length} rows)${newName !== tpl.name ? `, renamed to "${newName}"` : ''}:`,
           ...after,
+          ...(restChanges.length
+            ? ['', 'Rest, before -> after ("default" is the Settings default):', ...restChanges.map((l) => `  ${l}`)]
+            : []),
           '',
           'Call again with confirm: true to apply.',
         ].join('\n'),
@@ -1189,7 +1277,66 @@ tool(
     }
 
     await replaceTemplate(tpl.id, { name: newName, exercises: toTemplateExercises(rows) });
-    return text(`Replaced template **${newName}** (${tpl.id}) — ${tpl.exercises.length} rows removed, ${rows.length} written.\n${after.join('\n')}`);
+    return text(
+      `Replaced template **${newName}** (${tpl.id}) — ${tpl.exercises.length} rows removed, ${rows.length} written.\n` +
+      `${after.join('\n')}${restChanges.length ? `\n- Rest:\n${restChanges.map((l) => `  ${l}`).join('\n')}` : ''}`,
+    );
+  },
+);
+
+tool(
+  'thrive_set_workout_rest',
+  "Change the planned rest and switch times of a planned or active workout, by section. Each set's rest target " +
+    'in the named sections is re-resolved: a superset or burnout round switches between exercises and rests ' +
+    'after the last, as when it was scheduled. Other sections, a field left out, and sets already done (reps ' +
+    'or a timed set logged) keep their targets. Refuses a completed workout. Dry-run by default: lists each set ' +
+    'whose target would change, old to new, and writes only with confirm: true. thrive_undo reverts it.',
+  {
+    workout_id: z.string().describe('Workout id (planned or active)'),
+    rest: restEntries().min(1).describe(
+      'The sections to change: [{ section, rest_s?, switch_s? }]. null = the Settings default. Each named section ' +
+      'must have sets in the workout.',
+    ),
+    confirm: z.boolean().optional().describe('Set true to actually write. Default false = preview only.'),
+  },
+  async ({ workout_id, rest, confirm = false }) => {
+    const errors = checkRest(rest);
+    if (errors.length) throw refuseRest(errors);
+
+    let preview;
+    try {
+      preview = await previewWorkoutRest(workout_id, rest);
+    } catch (err) {
+      if (err instanceof ApiError && /^Workout ".*" not found$/.test(err.message)) {
+        throw new Error(`No workout with id "${workout_id}".`);
+      }
+      throw err;
+    }
+
+    const lines = (changes) => changes.map(
+      (c) => `- ${c.exercise_name} [${c.section}] set ${c.set_number}: rest target ` +
+        `${restTarget(c.before)} -> ${restTarget(c.after)}`,
+    );
+    const n = preview.kept_done;
+    const kept = n ? `${n} set${n > 1 ? 's' : ''} already done keep${n > 1 ? '' : 's'} the target they ran against.` : null;
+    if (!preview.count) {
+      return text([`Nothing to change on ${workout_id}: every set in those sections already has that rest.`, kept]
+        .filter(Boolean).join('\n'));
+    }
+    if (!confirm) {
+      return text([
+        `DRY RUN — nothing written. On ${workout_id} this would change ${preview.count} ` +
+          `set${preview.count > 1 ? 's' : ''}:`,
+        ...lines(preview.changes), ...(kept ? [kept] : []), '', 'Call again with confirm: true to write.',
+      ].join('\n'));
+    }
+
+    declareRows(preview.count);
+    const done = await setWorkoutRest(workout_id, rest);
+    return text([
+      `Updated the rest target of ${done.count} set${done.count > 1 ? 's' : ''} on ${workout_id}:`,
+      ...lines(done.changes), ...(kept ? [kept] : []),
+    ].join('\n'));
   },
 );
 

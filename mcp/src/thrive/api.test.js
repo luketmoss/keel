@@ -179,6 +179,93 @@ test('appendSets with nothing to write makes no request', async () => {
   assert.equal(urls.length, 0);
 });
 
+// --- #583: rest_plans, and a round never split across chunks ---------------
+
+/** One workout's sets, exercise by exercise, as prepareSchedule builds them. */
+const planned = (workoutId, sections) => sections.flatMap(([section, exercises, sets], s) =>
+  Array.from({ length: exercises }, (_, e) => Array.from({ length: sets }, (_, k) => ({
+    workout_id: workoutId, exercise_id: `ex_${s}_${e}`, exercise_name: `Exercise ${s} ${e}`, section,
+    exercise_order: s * 10 + e + 1, set_number: k + 1, planned_reps: '10', weight: '', reps: '', effort: '',
+  }))).flat());
+
+/** For every chunk, the rounds it holds, as `workout section set_number` -> how many sets of it. */
+function roundsPerChunk(urls) {
+  return urls.map((u) => {
+    const counts = {};
+    for (const s of JSON.parse(u.searchParams.get('payload')).sets) {
+      if (!['SS1', 'SS2', 'SS3', 'burnout'].includes(s.section)) continue;
+      const k = `${s.workout_id} ${s.section} ${s.set_number}`;
+      counts[k] = (counts[k] ?? 0) + 1;
+    }
+    return counts;
+  });
+}
+
+test('appendSets sends each workout its rest plan, in the chunks that carry its sets', async () => {
+  const urls = stubFetch(() => ({ body: { success: true, data: [] } }));
+  const sets = [...planned('w_a', [['primary', 1, 2]]), ...planned('w_b', [['SS1', 2, 2]])];
+  await api.appendSets(sets, {
+    w_a: { template_id: 'tpl_1', rest: [{ section: 'primary', rest_s: 120 }] },
+    w_b: { template_id: '' },
+    w_other: { template_id: 'tpl_2' },
+  });
+  assert.equal(urls.length, 1);
+  assert.deepEqual(JSON.parse(urls[0].searchParams.get('payload')).rest_plans, {
+    w_a: { template_id: 'tpl_1', rest: [{ section: 'primary', rest_s: 120 }] },
+    w_b: { template_id: '' },
+  });
+});
+
+test('appendSets never splits a superset or burnout round across chunks', async () => {
+  const urls = stubFetch(() => ({ body: { success: true, data: [] } }));
+  // A week of large sessions: every section of a superset is well over a few sets.
+  const sets = ['w_1', 'w_2', 'w_3'].flatMap((id) =>
+    planned(id, [['warmup', 2, 1], ['primary', 1, 5], ['SS1', 3, 4], ['SS2', 2, 4], ['burnout', 3, 3]]));
+  const plans = Object.fromEntries(['w_1', 'w_2', 'w_3'].map((id) => [id, { template_id: 'tpl_x' }]));
+  const written = await api.appendSets(sets, plans);
+  assert.equal(written, sets.length);
+  assert.ok(urls.length > 1, 'the week needs several chunks');
+  const sent = urls.flatMap((u) => JSON.parse(u.searchParams.get('payload')).sets);
+  assert.equal(sent.length, sets.length);
+
+  // Every round arrives whole in exactly one chunk.
+  const expected = {};
+  for (const s of sets) {
+    if (!['SS1', 'SS2', 'SS3', 'burnout'].includes(s.section)) continue;
+    const k = `${s.workout_id} ${s.section} ${s.set_number}`;
+    expected[k] = (expected[k] ?? 0) + 1;
+  }
+  const seen = {};
+  for (const chunk of roundsPerChunk(urls)) {
+    for (const [k, n] of Object.entries(chunk)) {
+      assert.equal(seen[k], undefined, `round ${k} is split across chunks`);
+      assert.equal(n, expected[k], `round ${k} is incomplete in its chunk`);
+      seen[k] = n;
+    }
+  }
+  assert.deepEqual(Object.keys(seen).sort(), Object.keys(expected).sort());
+});
+
+test('a superset too large to send in one request goes round by round, each round whole', async () => {
+  const urls = stubFetch(() => ({ body: { success: true, data: [] } }));
+  // 3 exercises x 8 sets of one superset: over the payload limit on its own.
+  const sets = planned('w_big', [['SS1', 3, 8]]);
+  assert.ok(encodeURIComponent(JSON.stringify({ sets })).length > MAX_ENCODED_PAYLOAD);
+  await api.appendSets(sets, { w_big: { template_id: '' } });
+  assert.ok(urls.length > 1);
+  for (const chunk of roundsPerChunk(urls)) for (const n of Object.values(chunk)) assert.equal(n, 3);
+});
+
+test('setWorkoutRest previews as a dry run, and writes once with confirm (#583)', async () => {
+  const urls = stubFetch(() => ({ body: { success: true, data: { count: 0, changes: [] } } }));
+  const rest = [{ section: 'burnout', rest_s: 60, switch_s: 5 }];
+  await api.previewWorkoutRest('w_1', rest);
+  await api.setWorkoutRest('w_1', rest);
+  assert.deepEqual(urls.map((u) => u.searchParams.get('action')), ['setWorkoutRest', 'setWorkoutRest']);
+  assert.deepEqual(JSON.parse(urls[0].searchParams.get('payload')), { workout_id: 'w_1', rest });
+  assert.deepEqual(JSON.parse(urls[1].searchParams.get('payload')), { workout_id: 'w_1', rest, confirm: true });
+});
+
 // --- #234 ---------------------------------------------------------------
 
 test('fetchJournal sends action, from and to (#234)', async () => {

@@ -58,7 +58,7 @@
   },
   {
     "name": "thrive_create_template",
-    "description": "Create a reusable workout template from an ordered exercise list.",
+    "description": "Create a reusable workout template from an ordered exercise list, optionally with a rest and switch time per section (otherwise each section uses the Settings defaults).",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -102,10 +102,40 @@
               "section",
               "sets",
               "reps"
-            ],
-            "additionalProperties": false
+            ]
           },
           "description": "Exercises in the order they should be performed"
+        },
+        "rest": {
+          "description": "Rest and switch times by section (#583): [{ section, rest_s?, switch_s? }], written on every row of the section. A section or field left out is blank: the Settings default. Each named section must be in exercises.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "section": {
+                "type": "string",
+                "description": "primary, SS1, SS2, SS3 or burnout. Warmup and cooldown have no rest"
+              },
+              "rest_s": {
+                "description": "Rest in whole seconds, 15 to 600: after each set of primary, after each round of a superset or burnout. null = the Settings default",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "switch_s": {
+                "description": "SS1-SS3 and burnout only: the pause between exercises within a round, whole seconds, 0 to 120. null = the Settings default",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "section"
+            ],
+            "additionalProperties": {}
+          }
         },
         "confirm": {
           "type": "boolean",
@@ -116,7 +146,7 @@
         "name",
         "exercises"
       ],
-      "additionalProperties": true,
+      "additionalProperties": {},
       "$schema": "http://json-schema.org/draft-07/schema#"
     }
   },
@@ -485,8 +515,7 @@
                     "section",
                     "sets",
                     "reps"
-                  ],
-                  "additionalProperties": false
+                  ]
                 },
                 "description": "Explicit exercise list, with optional prescribed loads (ignored if template is given). Validated as a whole before anything is written: any problem rejects the call and lists every problem."
               },
@@ -508,13 +537,44 @@
                   "completed"
                 ],
                 "description": "Default 'planned'. Use 'completed' only to backfill a workout that already happened."
+              },
+              "rest": {
+                "description": "Rest and switch times for this workout, by section (#583): [{ section, rest_s?, switch_s? }]. Each set's planned rest comes from this, then the template's section rest, then the Settings defaults. A section or field left out is as it would be without this. Each named section must have exercises in the workout.",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "section": {
+                      "type": "string",
+                      "description": "primary, SS1, SS2, SS3 or burnout. Warmup and cooldown have no rest"
+                    },
+                    "rest_s": {
+                      "description": "Rest in whole seconds, 15 to 600: after each set of primary, after each round of a superset or burnout. null = the Settings default",
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "switch_s": {
+                      "description": "SS1-SS3 and burnout only: the pause between exercises within a round, whole seconds, 0 to 120. null = the Settings default",
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "section"
+                  ],
+                  "additionalProperties": {}
+                }
               }
             },
             "required": [
               "date",
               "name"
             ],
-            "additionalProperties": true
+            "additionalProperties": {}
           },
           "minItems": 1,
           "description": "The sessions to schedule, in any order."
@@ -527,7 +587,7 @@
       "required": [
         "workouts"
       ],
-      "additionalProperties": true,
+      "additionalProperties": {},
       "$schema": "http://json-schema.org/draft-07/schema#"
     }
   },
@@ -608,8 +668,7 @@
               "section",
               "sets",
               "reps"
-            ],
-            "additionalProperties": false
+            ]
           },
           "description": "Explicit exercise list, with optional prescribed loads (ignored if template is given). Validated as a whole before anything is written: any problem rejects the call and lists every problem."
         },
@@ -631,6 +690,37 @@
             "completed"
           ],
           "description": "Default 'planned'. Use 'completed' only to backfill a workout that already happened."
+        },
+        "rest": {
+          "description": "Rest and switch times for this workout, by section (#583): [{ section, rest_s?, switch_s? }]. Each set's planned rest comes from this, then the template's section rest, then the Settings defaults. A section or field left out is as it would be without this. Each named section must have exercises in the workout.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "section": {
+                "type": "string",
+                "description": "primary, SS1, SS2, SS3 or burnout. Warmup and cooldown have no rest"
+              },
+              "rest_s": {
+                "description": "Rest in whole seconds, 15 to 600: after each set of primary, after each round of a superset or burnout. null = the Settings default",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "switch_s": {
+                "description": "SS1-SS3 and burnout only: the pause between exercises within a round, whole seconds, 0 to 120. null = the Settings default",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "section"
+            ],
+            "additionalProperties": {}
+          }
         },
         "distance_m": {
           "type": "string",
@@ -657,7 +747,7 @@
         "date",
         "name"
       ],
-      "additionalProperties": true,
+      "additionalProperties": {},
       "$schema": "http://json-schema.org/draft-07/schema#"
     }
   },
@@ -686,6 +776,61 @@
       ],
       "additionalProperties": true,
       "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "thrive_set_workout_rest",
+    "description": "Change the planned rest and switch times of a planned or active workout, by section. Each set's rest target in the named sections is re-resolved: a superset or burnout round switches between exercises and rests after the last, as when it was scheduled. Other sections, a field left out, and sets already done (reps or a timed set logged) keep their targets. Refuses a completed workout. Dry-run by default: lists each set whose target would change, old to new, and writes only with confirm: true. thrive_undo reverts it.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "workout_id": {
+          "type": "string",
+          "description": "Workout id (planned or active)"
+        },
+        "rest": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "section": {
+                "type": "string",
+                "description": "primary, SS1, SS2, SS3 or burnout. Warmup and cooldown have no rest"
+              },
+              "rest_s": {
+                "description": "Rest in whole seconds, 15 to 600: after each set of primary, after each round of a superset or burnout. null = the Settings default",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "switch_s": {
+                "description": "SS1-SS3 and burnout only: the pause between exercises within a round, whole seconds, 0 to 120. null = the Settings default",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "section"
+            ],
+            "additionalProperties": {}
+          },
+          "description": "The sections to change: [{ section, rest_s?, switch_s? }]. null = the Settings default. Each named section must have sets in the workout."
+        },
+        "confirm": {
+          "description": "Set true to actually write. Default false = preview only.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "workout_id",
+        "rest"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": {}
     }
   },
   {
@@ -889,7 +1034,7 @@
   },
   {
     "name": "thrive_update_template",
-    "description": "Replace a template's exercise list wholesale. Destructive — the old rows are deleted. Dry-run by default: shows the before/after and only writes when confirm is true.",
+    "description": "Replace a template's exercise list wholesale. Destructive — the old rows are deleted. Each section keeps its stored rest and switch time unless rest names it. Dry-run by default: shows the before/after, rest included, and only writes when confirm is true.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -937,10 +1082,40 @@
               "section",
               "sets",
               "reps"
-            ],
-            "additionalProperties": false
+            ]
           },
           "description": "The complete new exercise list — replaces all existing rows"
+        },
+        "rest": {
+          "description": "Rest and switch times by section (#583): [{ section, rest_s?, switch_s? }], written on every row of the section. A section or field left out keeps its stored value; null clears it to the Settings default. Each named section must be in exercises.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "section": {
+                "type": "string",
+                "description": "primary, SS1, SS2, SS3 or burnout. Warmup and cooldown have no rest"
+              },
+              "rest_s": {
+                "description": "Rest in whole seconds, 15 to 600: after each set of primary, after each round of a superset or burnout. null = the Settings default",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "switch_s": {
+                "description": "SS1-SS3 and burnout only: the pause between exercises within a round, whole seconds, 0 to 120. null = the Settings default",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "section"
+            ],
+            "additionalProperties": {}
+          }
         },
         "confirm": {
           "type": "boolean",
@@ -951,7 +1126,7 @@
         "template",
         "exercises"
       ],
-      "additionalProperties": true,
+      "additionalProperties": {},
       "$schema": "http://json-schema.org/draft-07/schema#"
     }
   },

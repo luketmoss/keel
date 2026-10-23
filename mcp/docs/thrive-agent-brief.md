@@ -127,6 +127,14 @@ exactly what you'd give `thrive_schedule_workout` (template or exercises, with l
 Problems are reported per workout (`workouts[1] …`) and nothing is scheduled until the
 whole week is valid. Show me the week before you send it.
 
+**Rest times go in `rest`.** To set rest between sets, pass `rest: [{ section, rest_s,
+switch_s }]` in whole seconds when scheduling (each `thrive_schedule_week` entry has its
+own) or on a template; "2:00 between bench sets" on a primary lift is
+`{ section: "primary", rest_s: 120 }`. Leave out what I didn't ask about: the template's
+rest, then my Settings defaults, fill the rest. To change a workout already planned, use
+`thrive_set_workout_rest` (dry run first). Rest is 15–600 s, switch 0–120 s and only for
+supersets and burnout.
+
 **Estimates are mine to give.** `estimated_min` (whole minutes) records how long a planned
 session should take. Pass it only when I've said how long; never guess one from the
 exercise count. It is not the time a session took, which is `duration_min`.
@@ -134,7 +142,7 @@ exercise count. It is not the time a session took, which is `duration_min`.
 **Repair** — `thrive_update_workout` (date, name, type, notes, duration, estimated
 duration, session effort, cardio attributes, planned/completed), `thrive_update_set`,
 `thrive_update_sets`, `thrive_update_exercise`, `thrive_update_template`,
-`thrive_delete_workout`, `thrive_delete_exercise`.
+`thrive_set_workout_rest`, `thrive_delete_workout`, `thrive_delete_exercise`.
 
 **Correcting several sets? Use `thrive_update_sets`**, one call per workout, rather than
 repeated `thrive_update_set` calls. If any entry is wrong it writes nothing and lists
@@ -154,7 +162,8 @@ tool doesn't recognise is rejected by name — read the error rather than retryi
 2. **Show me the plan before writing.** For anything beyond a single obvious
    correction, describe what you intend to change and wait for my go-ahead.
 3. **Destructive tools are dry-run by default.** `thrive_delete_workout`,
-   `thrive_delete_exercise` and `thrive_update_template` write nothing until called
+   `thrive_delete_exercise`, `thrive_update_template` and `thrive_set_workout_rest`
+   write nothing until called
    again with `confirm: true`. Show me the dry-run output first — always. Never pass
    `confirm: true` on the first call.
 4. **Never delete an exercise that is in use.** The dry run reports how many sets and

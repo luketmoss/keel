@@ -211,9 +211,29 @@ by hand.
 | `replaceTemplate` | `{"template_id":"...","data":{...}}` |
 | `getSets` | `workout_id`, `exercise_id` (optional) |
 | `getWorkoutSets` | `workout_id` — grouped into slots |
-| `appendSets` | `{"sets":[...]}` |
+| `appendSets` | `{"sets":[...],"rest_plans":{...}}` — `rest_plans` optional (#583), below |
+| `setWorkoutRest` | `{"workout_id":"...","rest":[...],"confirm":true}` — **a dry run without `confirm`** (#583), below |
 | `previewSetUpdates` | `{"workout_id":"...","updates":[...]}` — **writes nothing** |
 | `updateSets` | same payload — **all-or-nothing** |
+
+**Rest set by a caller (#583).** `rest` is a list of `{section, rest_s?, switch_s?}`:
+`primary`, `SS1`-`SS3` or `burnout`, each once; whole seconds, rest 15-600 and
+switch 0-120 and only on SS1-SS3 and burnout; a field left out is left as it
+would be, and `null` is the Settings default. Every problem is refused before
+anything is written, each naming its entry and section.
+
+- `appendSets`' `rest_plans` is `{"<workout_id>":{"template_id":"tpl_x","rest":[...]}}`.
+  A workout's sets resolve `rest_target_s` from its `rest`, then the template the
+  plan names (blank: none), then the Settings defaults. Without a plan the
+  template comes from the workout row, as before; the MCP sends the plan because
+  it appends the sets before the row exists.
+- `setWorkoutRest` re-resolves `rest_target_s` on a `planned` or `active`
+  workout, in the named sections only, and only on sets the entry gives a field
+  for (a rest given alone leaves the switch sets alone) that are not done (no
+  `reps` and no `set_s`). It writes column K alone, under the script lock, and
+  answers `{dry_run, workout_id, count, kept_done, changes:[{exercise_name,
+  section, exercise_order, set_number, before, after}]}`. Key-only, and in the
+  MCP change log.
 
 ### DailySummary (#131)
 
@@ -844,7 +864,7 @@ sheet row it created, changed or deleted: `logged_at`, `call_id`, `action`,
 the journal: `Journal` and `thrive_journal` are the daily notes.
 
 - **Logged actions:** `createWorkout`, `updateWorkout`, `deleteWorkout` (the
-  workout and each of its sets), `appendSets`, `updateSets`, `createExercise`,
+  workout and each of its sets), `appendSets`, `updateSets`, `setWorkoutRest` (#583), `createExercise`,
   `updateExercise` (including the rename's rows in Templates and Sets),
   `deleteExercise`, `createTemplate`, `replaceTemplate` and `upsertJournal`
   (a blanked note is a deletion). Sync-only actions are never logged.

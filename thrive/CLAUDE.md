@@ -207,8 +207,11 @@ Google Sheet "Groundwork" with these tabs:
 - **Sets** (A:M): workout_id, exercise_id, Exercise Name, Section, Exercise Order, Set #, Planned Reps, Weight (lbs), Reps, Effort,
   rest_target_s, set_s, rest_s (#576). `rest_target_s` is the rest planned after the set, resolved once when
   the set is created (from the template section, else the Settings default; the switch time for all but the
-  last exercise of a superset or burnout round) and never recomputed; `set_s`/`rest_s` are Lift Mode's
-  measurements (#577). Only an append writes K:M; every edit writes A:J. Added by
+  last exercise of a superset or burnout round) and never recomputed unless asked (#583, below); `set_s`/`rest_s` are Lift Mode's
+  measurements (#577). Only an append writes K:M; every edit writes A:J, except the API's
+  `setWorkoutRest` (#583), which rewrites K alone on a planned or active workout's sets not yet done,
+  for the MCP's `thrive_set_workout_rest`. When the MCP schedules, `appendSets`' `rest_plans` names
+  each workout's template and section overrides, since the workout row is written after the sets. Added by
   `scripts/migrate-576-rest-times.mjs` with the Templates columns
 - **Labels** (A:D): id, name, color_key, created
 - **DailyHealth** (A:S): date, resting_hr, hrv, steps, calories, sleep_total_s,

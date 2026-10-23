@@ -445,3 +445,18 @@ Sections may be empty in To Do. By Refined, everything above Results is filled.
   return, so a large one is not resumed: start fresh from the epic. One
   coordination session ran five weeks, and its cache rewrites alone were 6.6M
   tokens (#505).
+- **Commands for the owner are PowerShell, and they ask for their values.** A
+  command written for the owner to run by hand (a deploy step in a PR body or
+  `## Results`, the next step a skill reports, a line a script prints) is
+  Windows PowerShell 5.1: `$env:NAME = ...` and `;`, never `NAME=... cmd` or
+  `&&`. A value the owner supplies is prompted for when the command runs
+  (`Read-Host`, or `Read-Host -AsSecureString` for a secret, converted back for
+  the environment variable), never left as a `...` placeholder to edit. For
+  example, the `backfill-131` rebuild:
+
+  ```powershell
+  $env:THRIVE_API_URL = Read-Host 'THRIVE_API_URL'
+  $key = Read-Host 'THRIVE_API_KEY' -AsSecureString
+  $env:THRIVE_API_KEY = [System.Net.NetworkCredential]::new('', $key).Password
+  node scripts/backfill-131-daily-summary.mjs --restart
+  ```

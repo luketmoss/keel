@@ -3,7 +3,14 @@ import { render } from '@testing-library/preact';
 import { LoginScreen } from './login-screen';
 
 vi.mock('./auth-context', () => ({
-  useAuth: () => ({ login: vi.fn() }),
+  useAuth: () => ({
+    login: vi.fn(),
+    continueAs: vi.fn(),
+    rememberedUser: null,
+    ready: true,
+    renewing: false,
+    renewError: null,
+  }),
 }));
 
 vi.mock('../components/shared/hive-logo', () => ({

@@ -230,11 +230,32 @@ body {
   width: 100%;
   cursor: pointer;
   transition: background 0.15s;
+  /* "Continue as <email>": a long address wraps instead of overflowing. */
+  overflow-wrap: anywhere;
 }
 @media (hover: hover) {
   .login-btn:hover:not(:disabled):not([aria-disabled="true"]) {
     background: var(--color-primary-hover);
   }
+}
+
+/* #609: the sign-in failure line, always in the DOM so the layout does not jump. */
+.login-card p.login-error {
+  min-height: 1.5em;
+  margin: var(--space-sm) 0;
+  font-size: var(--text-sm);
+  color: var(--color-danger-text);
+}
+
+.login-link {
+  min-height: var(--touch-target);
+  padding: 0 var(--space-md);
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 /* === Loading === */
@@ -4723,6 +4744,7 @@ body {
 .column-settings-name:hover:not(:disabled):not([aria-disabled="true"]),
 .subtask-date-add-inline:hover:not(:disabled):not([aria-disabled="true"]),
 .overflow-menu-btn:hover:not(:disabled):not([aria-disabled="true"]),
+.login-link:hover:not(:disabled):not([aria-disabled="true"]),
 /* Icon buttons */
 .btn-icon:hover:not(:disabled):not([aria-disabled="true"]),
 .btn-icon-danger:hover:not(:disabled):not([aria-disabled="true"]),
@@ -4797,6 +4819,7 @@ body {
 .column-settings-name:active:not(:disabled):not([aria-disabled="true"]),
 .subtask-date-add-inline:active:not(:disabled):not([aria-disabled="true"]),
 .overflow-menu-btn:active:not(:disabled):not([aria-disabled="true"]),
+.login-link:active:not(:disabled):not([aria-disabled="true"]),
 /* Icon buttons */
 .btn-icon:active:not(:disabled):not([aria-disabled="true"]),
 .btn-icon-danger:active:not(:disabled):not([aria-disabled="true"]),
@@ -4857,6 +4880,7 @@ body {
   .btn-ghost:hover:not(:disabled):not([aria-disabled="true"]),
   .column-settings-add-btn:hover:not(:disabled):not([aria-disabled="true"]),
   .subtask-date-add-inline:hover:not(:disabled):not([aria-disabled="true"]),
+  .login-link:hover:not(:disabled):not([aria-disabled="true"]),
   .kebab-trigger:hover:not(:disabled):not([aria-disabled="true"]),
   .user-dropdown-trigger:hover:not(:disabled):not([aria-disabled="true"]) {
     color: var(--color-text);
@@ -4869,6 +4893,7 @@ body {
 .column-settings-add-btn:active:not(:disabled):not([aria-disabled="true"]),
 .subtask-date-add-inline:active:not(:disabled):not([aria-disabled="true"]),
 .overflow-menu-btn:active:not(:disabled):not([aria-disabled="true"]),
+.login-link:active:not(:disabled):not([aria-disabled="true"]),
 .btn-icon:active:not(:disabled):not([aria-disabled="true"]),
 .btn-icon-danger:active:not(:disabled):not([aria-disabled="true"]),
 .kebab-trigger:active:not(:disabled):not([aria-disabled="true"]),

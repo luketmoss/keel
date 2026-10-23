@@ -28,6 +28,7 @@ export const FAMILIES = {
     'column-settings-name',
     'subtask-date-add-inline',
     'overflow-menu-btn',
+    'login-link',
   ],
   'Icon buttons': [
     'btn-icon',

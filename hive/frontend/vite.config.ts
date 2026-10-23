@@ -5,6 +5,8 @@ import preact from '@preact/preset-vite';
 export default defineConfig({
   plugins: [preact()],
   base: process.env.VITE_BASE_PATH || '/',
+  // Source to be compiled with Hive's own pipeline, not a prebuilt dependency.
+  optimizeDeps: { exclude: ['@keel/auth'] },
   server: {
     port: 5176,
     // global.css imports the suite token file from outside this folder (#446).
@@ -14,6 +16,8 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    // Vitest externalizes node_modules paths; @keel/auth is TypeScript source.
+    server: { deps: { inline: ['@keel/auth'] } },
     setupFiles: ['./src/test-setup.ts'],
   },
 });

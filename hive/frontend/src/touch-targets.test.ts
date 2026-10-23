@@ -182,6 +182,7 @@ const TALL = [
   'view-tab',
   'settings-tab',
   'login-btn',
+  'login-link',
 ];
 
 /** Text inputs, selects and date inputs. */

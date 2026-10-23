@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 
-vi.mock('../auth/reauth', () => ({
+vi.mock('@keel/auth', () => ({
   attemptReauth: vi.fn(),
   ReauthFailedError: class ReauthFailedError extends Error {},
 }));

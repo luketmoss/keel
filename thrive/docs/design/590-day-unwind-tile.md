@@ -10,56 +10,70 @@ the slot's layout, the Unwind tile, the log, and Trends.
 identifier, comment, test name or commit in this work says anything more
 specific than "Unwind" and "mg".
 
-## The slot becomes a 2 × 2 grid
+## The slot: Water across the top, three tiles under it
 
-#560 put Water across the full width because three tiles didn't fit on one row.
-With four tiles, each one gets a half-width cell:
+Water stays the slot's lead tile, full width, as #560 made it. Coffee, Alcohol
+and Unwind share the second row, three across. The owner chose this on
+2026-10-23 over a 2 × 2 grid because Water should be more prominent than the
+others, and because three matching tiles under Water make Unwind just one of a
+set.
 
 ```
-┌ (drop) Water      › ┐ ┌ (cup) Coffee      › ┐
-│ 12 oz  of 64        │ │ 2 cups              │
-│ [███░░░░░░░░░░░]    │ │                     │
-│ ▁ ▃ ▅ ▂ ▆ ▄ █       │ │ ▁ ▃ ▂ ▃ ▂ ▁ ▂       │
-│ [ + 4 oz ]          │ │ [ + 1 ]             │
-└─────────────────────┘ └─────────────────────┘
-┌ (glass) Alcohol   › ┐ ┌ (moon) Unwind     › ┐
-│ 1 drink             │ │ 10 mg               │
-│ ▁ ▁ ▂ ▁ ▃ ▁ ▂       │ │ ▁ ▂ ▁ ▁ ▂ ▁ ▂       │
-│ [ + 1 ]             │ │ [ + 5 mg ]          │
-└─────────────────────┘ └─────────────────────┘
+┌ (drop) Water                                 › ┐
+│ 12 oz  of 64                                   │
+│ [████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░]   │
+│ ▁   ▃   ▅   ▂   ▆   ▄   █                      │
+│ [ + 4 oz ]                                     │
+└────────────────────────────────────────────────┘
+┌ (cup) Coffee ┐ ┌ (glass) Alcohol┐ ┌ (moon) Unwind┐
+│ 2 cups       │ │ 1 drink        │ │ 10 mg        │
+│ ▁▃▂▃▂▁▂      │ │ ▁▁▂▁▃▁▂        │ │ ▁▂▁▁▂▁▂      │
+│ [ + 1 ]      │ │ [ + 1 ]        │ │ [ + 5 mg ]   │
+└──────────────┘ └────────────────┘ └──────────────┘
   Today's log · 6 drinks                     ⌄
 ```
 
-- `.drink-tile-water` loses `grid-column: 1 / -1`, and Water becomes a half-width
-  tile again, as it was in #551. Its figure, goal, progress bar, seven bars and
-  "+ 4 oz" don't change. They had the same 142px inside width before #560.
-- The order follows the day: **Water, Coffee** on the first row, **Alcohol,
-  Unwind** on the second. Unwind sits bottom-right, the last cell, and looks no
-  more prominent than its neighbours.
-- Tiles in a row stretch to the same height, and their buttons sit on one line
-  (#551's rule).
+- `.drinks-grid` becomes three columns (`repeat(3, minmax(0, 1fr))`) with the
+  same `--day-gap`. `.drink-tile-water` keeps `grid-column: 1 / -1`, and nothing
+  else about Water changes.
+- Order follows the day: **Coffee, Alcohol, Unwind**, left to right. Unwind is
+  last, and it looks no different from the two tiles beside it.
+- The three small tiles stretch to the same height, with their buttons on one
+  line (#551's rule).
 
-**Why not keep Water full width and add a third row?** A lone Unwind tile on its
-own row would be the most prominent thing in the slot, which is the opposite of
-what an alias wants. It would also make the slot taller. The 2 × 2 grid matches
-the vitals tiles below it.
+### Making the small tiles fit
+
+#560 measured that three tiles across didn't fit with the tile as it was: the
+title row with its chevron needs about 96px, and a third-width tile has 82px
+inside its padding. Two changes, made only to the three small tiles
+(`.drink-tile:not(.drink-tile-water)`), make it fit:
+
+- **No chevron.** The whole tile is still the link to Intake trends, with the
+  same accessible name, so nothing is lost but the glyph. Water keeps its
+  chevron.
+- **Tighter padding.** The tile's `.day-panel` padding is `--space-sm` instead
+  of `calc(--space-md − --space-xs)`. The add button's inline padding is
+  `--space-sm`.
+
+The title, figure, seven bars and button are otherwise #551's anatomy.
 
 ### Measured
 
-In demo mode at a 375px viewport (2026-10-23), with the 2 × 2 grid mocked in the
-running app by removing Water's span and adding a fourth tile:
+In demo mode at a 375px viewport (2026-10-23), with this layout mocked in the
+running app (three columns, `--day-gap`, no chevrons and `--space-sm` padding on
+the small tiles, plus a fourth Unwind tile):
 
-| Measure | Today (#560) | 2 × 2 |
+| Measure | Today (#560) | This layout |
 |---|---|---|
-| `.drinks-grid` | 343 × 352px | 343 × 352px |
-| Collapsed `.drinks` slot | 370px | **370px** |
-| Water tile | 343 × 176px | 166 × 176px |
-| Coffee / Alcohol / Unwind tile | 166 × 164px | 166 × 176 (row 1), 166 × 164 (row 2) |
-| Water's "+ 4 oz" button | — | 74 × 36px |
-| Water tile content overflowing | — | none |
+| Collapsed `.drinks` slot | 370px | **359px** |
+| Water tile | 343 × 176px | 343 × 176px (unchanged) |
+| Coffee / Alcohol / Unwind tile | 166 × 164px | 106 × 153px, **90px inside** |
+| Widest title row ("Unwind" with its icon) | — | 75px |
+| Widest add button ("+ 5 mg") | — | 68px |
+| Content overflowing any tile | — | none |
 
-The slot keeps the same height with one more tile: the first row is Water's
-176px either way, and Coffee stretches to match it.
+The slot gets 11px shorter even with a fourth tile, because the small tiles are
+shorter than the half-width ones.
 
 ## The Unwind tile
 

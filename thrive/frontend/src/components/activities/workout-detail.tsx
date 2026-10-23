@@ -23,6 +23,7 @@ import { DetailTopBar } from './detail-top-bar';
 import { DetailTitle } from './detail-title';
 import { DetailStats, hasStatsCard } from './detail-stats';
 import { HistoryIcon, PencilLineIcon } from './detail-icons';
+import { ChoiceSheet, type StartMode } from '../workout/choice-sheet';
 
 interface Props {
   workoutId: string;
@@ -77,6 +78,7 @@ export function WorkoutDetail({ workoutId }: Props) {
   const workout = workouts.value.find((w) => w.id === workoutId);
   const [deleting, setDeleting] = useState(false);
   const [startingPlanned, setStartingPlanned] = useState(false);
+  const [choosing, setChoosing] = useState(false);
   const [showLastTime, setShowLastTime] = useState(false);
   // #532: the map hero and the Elevation card read the same track.
   const trackState = useWorkoutTrack(workout && trackAvailable(workout) ? workoutId : null);
@@ -114,13 +116,26 @@ export function WorkoutDetail({ workoutId }: Props) {
     return best ? `Last time (${shortDay(prevWorkout.date)}): ${best}` : '';
   };
 
-  const handleStartPlanned = async () => {
+  const handleStartPlanned = () => {
     if (!token || startingPlanned) return;
     // Guard: cannot start if another workout is already active
     if (activeWorkoutId.value) {
       showToast('Finish your current workout before starting a new one', 'error');
       return;
     }
+    // A weight workout asks how to run it first (#577); the plan is not touched until then.
+    if (workout?.type === 'weight') setChoosing(true);
+    else void startLogbook();
+  };
+
+  const handleChoice = (mode: StartMode) => {
+    setChoosing(false);
+    if (mode === 'lift') navigate(`/workout/${workoutId}/lift`);
+    else void startLogbook();
+  };
+
+  const startLogbook = async () => {
+    if (!token || startingPlanned) return;
     setStartingPlanned(true);
     try {
       const id = await startPlannedWorkout(workoutId, token);
@@ -370,6 +385,7 @@ export function WorkoutDetail({ workoutId }: Props) {
             )}
           </div>
         )}
+        {choosing && <ChoiceSheet onContinue={handleChoice} onCancel={() => setChoosing(false)} />}
       </div>
     </div>
   );

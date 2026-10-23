@@ -15,6 +15,7 @@ export const ROUTE_NAMES = [
   'activities',
   'workout-new',
   'workout-active',
+  'workout-lift',
   'workout-detail',
   'workout-edit',
   'templates',
@@ -69,6 +70,10 @@ function parseHash(hash: string): ParsedRoute {
     const plan = query.get('plan');
     return { name: 'workout-new', params: plan === null ? {} : { plan }, hash: full };
   }
+
+  // /workout/:id/lift (#577): Lift Mode, the guided screen for a weight workout
+  match = path.match(/^\/workout\/([^/]+)\/lift$/);
+  if (match) return { name: 'workout-lift', params: { id: match[1] }, hash: path };
 
   // /workout/:id
   match = path.match(/^\/workout\/([^/]+)$/);
@@ -188,7 +193,7 @@ trail[depth] = normalise(window.location.hash); // after `settle` above
 
 // Screens that are steps of a flow, never somewhere to go "back" to: returning
 // from a workout's detail must not reopen its edit form or its tracker (#235).
-const NOT_A_BACK_TARGET = ['workout-edit', 'workout-active'];
+const NOT_A_BACK_TARGET = ['workout-edit', 'workout-active', 'workout-lift'];
 
 /**
  * A route change (#256), told to listeners before `currentRoute` changes, so the

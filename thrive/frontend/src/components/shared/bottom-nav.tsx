@@ -19,6 +19,7 @@ const TAB_FOR_ROUTE: Record<string, string> = {
   'workout-edit': 'activities',
   'workout-new': 'activities',
   'workout-active': 'activities',
+  'workout-lift': 'activities',
   templates: 'library',
   'template-new': 'library',
   'template-detail': 'library',

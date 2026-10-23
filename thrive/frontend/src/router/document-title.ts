@@ -76,6 +76,10 @@ export function titleFor(route: Pick<ParsedRoute, 'name' | 'params'>, lookups: T
         const n = workoutName();
         return n ? `Log ${n}` : 'Workout';
       }
+      case 'workout-lift': {
+        const n = workoutName();
+        return n ? `Lift ${n}` : 'Workout';
+      }
       case 'workout-edit': {
         const n = workoutName();
         return n ? `Edit ${n}` : 'Workout';

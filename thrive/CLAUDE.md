@@ -123,6 +123,16 @@ with its own id and tap time.
 - Key commands, from `android/`: `./gradlew test`, `./gradlew lintRelease`,
   `./gradlew assembleRelease`.
 
+## Lift Mode (#577)
+
+A guided screen for an active `weight` workout at `#/workout/:id/lift` (`frontend/src/components/workout/lift/`),
+beside the tracker, which it leaves alone. Starting a weight workout, from a planned one or a template, asks
+Lift Mode or Logbook first (`choice-sheet.tsx`); Lift Mode opens a start screen on a plan, and Start workout
+makes it `active` as the tracker's start does. Its run (step, set and rest start times) is kept in
+`localStorage` under `thrive.lift.<workoutId>`, and every clock is read from those timestamps. It writes
+`set_s` on Done and `rest_s` on Start set (`saveSetTimings`, Sets K:M, no `apps-script/` change), and weight,
+reps and effort through `saveSet`. A weight alone does not count as a set logged there: a plan can prescribe one.
+
 ## Key commands
 
 - `npm --prefix frontend run dev` — Vite dev server on port 5175
@@ -411,8 +421,8 @@ Comma-separated, multiple per exercise. Common tags: Push, Pull, Legs, Chest, Ba
 These decisions were made with the user and must be respected by all agents:
 
 - **Landing screen**: the Day view (luketmoss/thrive#228, decided 27 Sep 2026; luketmoss/thrive#235 records the navigation; luketmoss/thrive#237 built the screen).
-- **Set logging**: Logbook-style — record sets when convenient, not real-time per-set
-- **Rest timers**: None in-app — rest times are planning data only (user uses watch)
+- **Set logging**: logbook-style in Logbook (record sets when convenient); set by set in Lift Mode (#577), which a weight workout offers beside Logbook when it starts
+- **Rest timers**: in Lift Mode only (#577): a stopwatch for each set and each rest, counting up toward `rest_target_s`, a reminder and never a stop. Logbook has none, and the watch only records heart rate
 - **Supersets**: Flat list with section labels/colors (not grouped flow)
 - **Start workout**: Choose [From Template] or [Build Custom]
 - **Exercise library**: Inline creation (on-the-fly during workout/template building)

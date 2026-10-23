@@ -10,10 +10,12 @@ import {
 import { templateWarmupsToRestore } from './template-warmups';
 import { startWorkout, saveWorkoutForLater } from '../../state/actions';
 import { useAuth } from '../../auth/auth-context';
-import { navigate } from '../../router/router';
+import { navigate, replaceRoute } from '../../router/router';
+import { loadRun } from './lift/lift-run';
 import { TypeSelector } from './type-selector';
 import { IntentSelector } from './intent-selector';
 import { TemplatePicker } from './template-picker';
+import { ChoiceSheet, type StartMode } from './choice-sheet';
 import { WorkoutTracker } from './workout-tracker';
 import { SimpleWorkout } from './simple-workout';
 import { WorkoutPlanner } from './workout-planner';
@@ -45,6 +47,10 @@ export function WorkoutFlow({ workoutId, planDate }: Props) {
   const [intent, setIntent] = useState<Intent>(linkedPlan ? 'plan' : 'track');
   const [starting, setStarting] = useState(false);
   const [saving, setSaving] = useState(false);
+  // #577: a Track Now start waits here for the choice between Lift Mode and Logbook.
+  const [pendingStart, setPendingStart] = useState<{ templateId: string | null } | null>(null);
+  // The planner is open to build a custom Lift Mode workout, which it saves and starts.
+  const [liftCustom, setLiftCustom] = useState(false);
 
   // Planner state: exercises to pre-populate when user picks a template for "plan for later"
   const [plannerName, setPlannerName] = useState('');
@@ -93,6 +99,12 @@ export function WorkoutFlow({ workoutId, planDate }: Props) {
       templates.value,
     );
 
+    // A workout Lift Mode is running (#577) resumes there, not in the tracker.
+    if (workout.type === 'weight' && workout.status === 'active' && loadRun(workoutId)) {
+      replaceRoute(`/workout/${workoutId}/lift`);
+      return;
+    }
+
     if (workout.type === 'weight') {
       setStep('tracker');
     } else {
@@ -120,21 +132,9 @@ export function WorkoutFlow({ workoutId, planDate }: Props) {
     if (!tpl) return;
 
     if (intent === 'track') {
-      // Track Now: go straight to tracker with template exercises
+      // Track Now: ask how to run it first (#577), then start
       if (!token || starting) return;
-      setStarting(true);
-      try {
-        const name = tpl.name;
-        const id = await startWorkout({ type: 'weight', name, template_id: templateId }, token);
-        setActiveId(id);
-        setWorkoutName(name);
-        setStep('tracker');
-        window.location.hash = `#/workout/${id}`;
-      } catch {
-        // Error toast shown by action
-      } finally {
-        setStarting(false);
-      }
+      setPendingStart({ templateId });
     } else {
       // Plan for Later: populate planner with template exercises
       setPlannerName(tpl.name);
@@ -155,26 +155,57 @@ export function WorkoutFlow({ workoutId, planDate }: Props) {
   // Called when the user taps "Build Custom"
   const handleBuildCustomTap = async () => {
     if (intent === 'track') {
-      // Track Now + Build Custom: go straight to tracker with empty workout
+      // Track Now + Build Custom: ask how to run it first (#577)
       if (!token) return;
-      setStarting(true);
-      try {
-        const name = 'Custom Workout';
-        const id = await startWorkout({ type: 'weight', name }, token);
-        setActiveId(id);
-        setWorkoutName(name);
-        setStep('tracker');
-        window.location.hash = `#/workout/${id}`;
-      } catch {
-        // Error toast shown by action
-      } finally {
-        setStarting(false);
-      }
+      setPendingStart({ templateId: null });
     } else {
       // Plan for Later + Build Custom: go to empty planner
       setPlannerName('');
       setPlannerExercises([]);
       setStep('planner');
+    }
+  };
+
+  // The choice sheet's Continue (#577). Logbook starts as it always did; Lift Mode
+  // makes a plan and opens its start screen, so nothing is active until Start workout.
+  const handleChoice = async (mode: StartMode) => {
+    const pending = pendingStart;
+    if (!pending || !token || starting) return;
+    const tpl = pending.templateId ? templates.value.find((t) => t.id === pending.templateId) : undefined;
+    if (mode === 'lift' && !tpl) {
+      // Build Custom: the planner builds the exercises, and saving opens Lift Mode.
+      setPendingStart(null);
+      setLiftCustom(true);
+      setPlannerName('');
+      setPlannerExercises([]);
+      setStep('planner');
+      return;
+    }
+    setStarting(true);
+    try {
+      if (mode === 'lift' && tpl) {
+        const id = await saveWorkoutForLater(
+          { type: 'weight', name: tpl.name, template_id: tpl.id, quiet: true },
+          token,
+        );
+        setPendingStart(null);
+        navigate(`/workout/${id}/lift`);
+        return;
+      }
+      const name = tpl ? tpl.name : 'Custom Workout';
+      const id = await startWorkout(
+        tpl ? { type: 'weight', name, template_id: tpl.id } : { type: 'weight', name },
+        token,
+      );
+      setPendingStart(null);
+      setActiveId(id);
+      setWorkoutName(name);
+      setStep('tracker');
+      window.location.hash = `#/workout/${id}`;
+    } catch {
+      // Error toast shown by action
+    } finally {
+      setStarting(false);
     }
   };
 
@@ -190,11 +221,20 @@ export function WorkoutFlow({ workoutId, planDate }: Props) {
     try {
       // Each set as its row holds it (#375), as the planned-workout editor saves.
       const builderExercises = plannerToBuilderExercises(exercises);
-      await saveWorkoutForLater(
-        { type: 'weight', name, exercises: builderExercises, date, estimated_seconds: estimatedSeconds },
+      const id = await saveWorkoutForLater(
+        {
+          type: 'weight',
+          name,
+          exercises: builderExercises,
+          date,
+          estimated_seconds: estimatedSeconds,
+          quiet: liftCustom,
+        },
         token,
       );
-      navigate('/activities');
+      // A custom Lift Mode workout goes on to its start screen (#577); a plan goes back to the list.
+      if (liftCustom) navigate(`/workout/${id}/lift`);
+      else navigate('/activities');
     } catch {
       // Error toast shown by action
     } finally {
@@ -224,11 +264,20 @@ export function WorkoutFlow({ workoutId, planDate }: Props) {
       );
     case 'template':
       return (
-        <TemplatePicker
-          onSelectTemplate={handleTemplateCardTap}
-          onBuildCustom={handleBuildCustomTap}
-          onBack={() => setStep('intent')}
-        />
+        <>
+          <TemplatePicker
+            onSelectTemplate={handleTemplateCardTap}
+            onBuildCustom={handleBuildCustomTap}
+            onBack={() => setStep('intent')}
+          />
+          {pendingStart && (
+            <ChoiceSheet
+              onContinue={(m) => void handleChoice(m)}
+              onCancel={() => setPendingStart(null)}
+              busy={starting}
+            />
+          )}
+        </>
       );
     case 'planner':
       return (
@@ -237,7 +286,10 @@ export function WorkoutFlow({ workoutId, planDate }: Props) {
           initialExercises={plannerExercises}
           initialDate={validPlanDate(planDate)}
           onSave={handlePlannerSave}
-          onDiscard={() => setStep('template')}
+          onDiscard={() => {
+            setLiftCustom(false);
+            setStep('template');
+          }}
           saving={saving}
         />
       );

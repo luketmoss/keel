@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, fireEvent, cleanup } from '@testing-library/preact';
 import { h } from 'preact';
-import { templates } from '../../state/store';
+import { templates, workouts } from '../../state/store';
 import { mountConfirmHost, confirmAsked } from '../shared/confirm-test-utils';
 import { toLocalDateStr } from '../activities/activities-helpers';
 
@@ -18,7 +18,11 @@ vi.mock('../../state/actions', () => ({
   saveWorkoutForLater: (data: unknown, token: string) => saveWorkoutForLater(data, token),
 }));
 vi.mock('../../auth/auth-context', () => ({ useAuth: () => ({ token: 'test-token' }) }));
-vi.mock('../../router/router', () => ({ navigate: (p: string) => navigate(p) }));
+const replaceRoute = vi.fn();
+vi.mock('../../router/router', () => ({
+  navigate: (p: string) => navigate(p),
+  replaceRoute: (p: string) => replaceRoute(p),
+}));
 vi.mock('./workout-tracker', () => ({
   WorkoutTracker: ({ workoutId }: { workoutId: string }) => h('div', { 'data-testid': 'tracker' }, workoutId),
 }));
@@ -50,6 +54,12 @@ function button(c: Element, text: string): HTMLElement {
   const el = Array.from(c.querySelectorAll('button')).find((b) => b.textContent?.includes(text));
   if (!el) throw new Error(`No button "${text}" in: ${c.textContent}`);
   return el as HTMLElement;
+}
+
+/** #577: Track Now asks Lift Mode or Logbook before it starts anything. */
+async function chooseLogbook(c: Element) {
+  fireEvent.click(c.querySelectorAll<HTMLElement>('[role="radio"]')[1]);
+  await tap(c, 'Continue');
 }
 
 async function tap(c: Element, text: string) {
@@ -152,12 +162,117 @@ describe('WorkoutFlow ?plan= deep link (#143)', () => {
       await tap(container, 'Back');
       await tap(container, 'Track Now');
       await tap(container, 'Upper Push A');
+      expect(startWorkout).not.toHaveBeenCalled();
+      await chooseLogbook(container);
       await Promise.resolve();
 
       expect(startWorkout).toHaveBeenCalledTimes(1);
       const data = startWorkout.mock.calls[0][0] as Record<string, unknown>;
       expect(data).toEqual({ type: 'weight', name: 'Upper Push A', template_id: 'tpl_push' });
       expect(saveWorkoutForLater).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Lift Mode or Logbook (#577)', () => {
+    it('offers both before anything is written, Lift Mode selected, and Cancel leaves it all as it was', async () => {
+      const { container } = render(<WorkoutFlow planDate="2026-09-24" />);
+      await tap(container, 'Back');
+      await tap(container, 'Track Now');
+      await tap(container, 'Upper Push A');
+      const radios = [...container.querySelectorAll('[role="radio"]')];
+      expect(radios.map((r) => r.textContent)).toEqual([
+        'Lift ModeGuided set by set, with set and rest timers',
+        'LogbookLog sets when convenient, as today',
+      ]);
+      expect(radios.map((r) => r.getAttribute('aria-checked'))).toEqual(['true', 'false']);
+      expect(startWorkout).not.toHaveBeenCalled();
+      expect(saveWorkoutForLater).not.toHaveBeenCalled();
+      await tap(container, 'Cancel');
+      expect(container.querySelector('[role="dialog"]')).toBeNull();
+      expect(heading(container)).toBe('Choose a template');
+    });
+
+    it('Lift Mode makes a plan from the template and opens its start screen, starting nothing', async () => {
+      const { container } = render(<WorkoutFlow planDate="2026-09-24" />);
+      await tap(container, 'Back');
+      await tap(container, 'Track Now');
+      await tap(container, 'Upper Push A');
+      await tap(container, 'Continue');
+      await Promise.resolve();
+      expect(startWorkout).not.toHaveBeenCalled();
+      expect(saveWorkoutForLater).toHaveBeenCalledWith(
+        { type: 'weight', name: 'Upper Push A', template_id: 'tpl_push', quiet: true },
+        'test-token',
+      );
+      expect(navigate).toHaveBeenCalledWith('/workout/w_planned/lift');
+    });
+
+    it('Build Custom with Lift Mode opens the planner, and saving it opens the start screen', async () => {
+      const { container } = render(<WorkoutFlow planDate="2026-09-24" />);
+      await tap(container, 'Back');
+      await tap(container, 'Track Now');
+      await tap(container, 'Build Custom');
+      await tap(container, 'Continue');
+      expect(dateInput(container)).not.toBeNull();
+      expect(startWorkout).not.toHaveBeenCalled();
+    });
+
+    it('a workout Lift Mode is running resumes there, not in the tracker', async () => {
+      workouts.value = [
+        {
+          id: 'w_run',
+          type: 'weight',
+          name: 'Pull',
+          status: 'active',
+          template_id: '',
+          date: '2026-10-22',
+          time: '10:00',
+        } as never,
+      ];
+      window.localStorage.setItem(
+        'thrive.lift.w_run',
+        JSON.stringify({
+          phase: 'set',
+          stepIndex: 0,
+          setStartedAt: 1,
+          restStartedAt: null,
+          restTarget: 0,
+          alertedAt: null,
+          restFor: null,
+          sessionStartedAt: 1,
+        }),
+      );
+      try {
+        const { container } = render(<WorkoutFlow workoutId="w_run" />);
+        await Promise.resolve();
+        expect(replaceRoute).toHaveBeenCalledWith('/workout/w_run/lift');
+        expect(container.querySelector('[data-testid="tracker"]')).toBeNull();
+      } finally {
+        window.localStorage.removeItem('thrive.lift.w_run');
+        workouts.value = [];
+      }
+    });
+
+    it('a workout with no stored Lift run resumes in the tracker as before', async () => {
+      workouts.value = [
+        {
+          id: 'w_log',
+          type: 'weight',
+          name: 'Pull',
+          status: 'active',
+          template_id: '',
+          date: '2026-10-22',
+          time: '10:00',
+        } as never,
+      ];
+      try {
+        const { container } = render(<WorkoutFlow workoutId="w_log" />);
+        await Promise.resolve();
+        expect(replaceRoute).not.toHaveBeenCalled();
+        expect(container.querySelector('[data-testid="tracker"]')?.textContent).toBe('w_log');
+      } finally {
+        workouts.value = [];
+      }
     });
   });
 
@@ -187,6 +302,7 @@ describe('WorkoutFlow ?plan= deep link (#143)', () => {
       await tap(container, 'Back');
       await tap(container, 'Track Now');
       await tap(container, 'Build Custom');
+      await chooseLogbook(container);
       await Promise.resolve();
       expect(container.querySelector('[data-testid="tracker"]')?.textContent).toBe('w_new');
 

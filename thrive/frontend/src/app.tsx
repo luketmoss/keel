@@ -17,6 +17,7 @@ import { TemplatesScreen } from './components/templates/templates-screen';
 import { SettingsScreen } from './components/settings/settings-screen';
 import { ExercisesScreen } from './components/exercises/exercises-screen';
 import { WorkoutFlow } from './components/workout/workout-flow';
+import { LiftMode } from './components/workout/lift/lift-mode';
 import { WorkoutDetail } from './components/activities/workout-detail';
 import { WorkoutEdit } from './components/activities/workout-edit';
 import { DayScreen } from './components/day/day-screen';
@@ -40,6 +41,8 @@ function Router() {
       return <WorkoutFlow planDate={route.params.plan} />;
     case 'workout-active':
       return <WorkoutFlow workoutId={route.params.id} />;
+    case 'workout-lift':
+      return <LiftMode workoutId={route.params.id} />;
     case 'workout-detail':
       return <WorkoutDetail workoutId={route.params.id} />;
     case 'workout-edit':

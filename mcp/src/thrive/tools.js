@@ -20,7 +20,7 @@ import {
   ApiError, scrubSecrets,
   fetchWorkouts, fetchWorkout, fetchSets, fetchExercises, fetchTemplates,
   fetchDailyHealth, fetchDailySummary, fetchBodyMeasurements, fetchWorkoutPayload, fetchJournal,
-  fetchDrinks, upsertJournal,
+  fetchDrinks, upsertJournal, logDrink, updateDrinkTime, updateDrinkAmount, deleteDrink,
   createWorkout, updateWorkout, deleteWorkout,
   createExercise, updateExercise, deleteExercise,
   createTemplate, replaceTemplate,
@@ -34,7 +34,7 @@ import {
 } from './set-updates.js';
 import {
   WORKOUT_TYPES, EFFORTS, SECTIONS,
-  normalizeDate, normalizeRangeToMax, secondsToMinutes, metersToMiles, metersToFeet,
+  normalizeDate, todayStr, normalizeRangeToMax, secondsToMinutes, metersToMiles, metersToFeet,
   parseDurationMinutes, parseEstimateMinutes, findUnknownFields,
   formatWeight, describeLoad, isSetLogged, prepareSchedule,
   slotKey, groupSetsByExercise, describeSetState,
@@ -44,7 +44,11 @@ import {
 import { resolveRange, describeHealthRange, describeSummaryRange } from './daily.js';
 import { describeBodyRange } from './body.js';
 import { describeJournalRange, describeJournalDay } from './journal.js';
-import { checkDrinksRange, describeDrinksRange } from './drinks.js';
+import {
+  checkDrinksRange, describeDrinksRange, describeDrink, describeDrinkDay, drinkLine,
+  planDrinkLog, describeLogged, checkAmountOz, checkTime, describeAmountChange, findWindowStart,
+  WATER_OZ_MAX, WATER_OZ_DEFAULT, LOG_COUNT_MAX,
+} from './drinks.js';
 import {
   checkRest, mss, resolvedRestLines, timedSections, withTemplateRest, templateRestChanges, templateRestLines,
 } from './rest.js';
@@ -61,7 +65,7 @@ const READ_ONLY = new Set([
   'thrive_list_workouts', 'thrive_get_workout', 'thrive_get_workout_payload', 'thrive_daily_health',
   'thrive_daily_summary', 'thrive_body_measurements', 'thrive_journal', 'thrive_list_exercises',
   'thrive_list_templates', 'thrive_exercise_history',
-  // #522: read-only by design. No tool logs, edits or deletes a drink.
+  // #522. Logging, editing and deleting a drink are write tools (#595).
   'thrive_drinks',
 ]);
 const DESTRUCTIVE = new Set([
@@ -70,6 +74,8 @@ const DESTRUCTIVE = new Set([
   'thrive_undo',
   // Overwrites planned rest targets; dry-run by default like the others (#583).
   'thrive_set_workout_rest',
+  // Removes a logged drink; dry-run by default (#595).
+  'thrive_delete_drink',
 ]);
 const annotationsFor = (name) =>
   READ_ONLY.has(name) ? { readOnlyHint: true } : DESTRUCTIVE.has(name) ? { destructiveHint: true } : undefined;
@@ -464,8 +470,8 @@ tool(
     'local time, kind and amount, per-day totals (water in oz and ml with the % of the daily goal, coffee in cups, ' +
     'alcohol in standard drinks), and the water goal. Over several days it also gives the average water on the days ' +
     'it was logged and the total coffee and alcohol. Default: today only. At most 400 days per call. A day or a kind with nothing logged is ' +
-    'unknown, never zero. Read-only: no tool logs, edits or deletes a drink; the user does that in the app or ' +
-    'the widget.',
+    'unknown, never zero. Each entry ends with its id in parentheses, which thrive_update_drink and ' +
+    'thrive_delete_drink take; those and thrive_log_drink are on the Thrive (write) connector.',
   {
     date_from: z.string().optional().describe("First day, inclusive (YYYY-MM-DD, 'today', '+7d'). Default: date_to"),
     date_to: z.string().optional().describe('Last day, inclusive. Default: today'),
@@ -475,6 +481,121 @@ tool(
     checkDrinksRange(range);
     const data = await fetchDrinks(range.from, range.to);
     return text(describeDrinksRange(data, range));
+  },
+);
+
+// --- drink writes (#595) -------------------------------------------------
+
+/** A drink by id, from the API's longest range ending today, or a refusal. */
+async function resolveDrink(id) {
+  const want = String(id ?? '').trim();
+  const { drinks } = await fetchDrinks(findWindowStart(), todayStr());
+  const found = drinks.find((d) => d.id === want);
+  if (!found) {
+    throw new Error(
+      `id "${want}" is not a drink logged in the last 400 days. thrive_drinks lists each entry's id; nothing was written.`,
+    );
+  }
+  return found;
+}
+
+/** The day's totals line after a write, read back from the API. */
+async function dayLine(date) {
+  const { drinks, water_goal_ml: goal } = await fetchDrinks(date, date);
+  return describeDrinkDay(date, drinks, goal);
+}
+
+tool(
+  'thrive_log_drink',
+  'Log water, coffee or alcohol in Thrive Sip, on today or an earlier day. Water is in whole US fl oz (default ' +
+    `${WATER_OZ_DEFAULT} oz, the widget's tap; at most ${WATER_OZ_MAX}); coffee is 1 cup and alcohol 1 standard ` +
+    `drink per entry, so log several with count ("3 beers" is kind alcohol, count 3; at most ${LOG_COUNT_MAX}). ` +
+    "time is the local time (America/Denver). Omitted, it is now on today and 23:59 on an earlier day, as the app's " +
+    'Day view does. A date and time after now is refused. Each entry is its own row with its own id, marked [mcp], ' +
+    'and one thrive_undo call removes them all.',
+  {
+    kind: z.enum(['water', 'coffee', 'alcohol']).describe('What was drunk'),
+    amount_oz: z.number().optional().describe(`Water only: whole US fl oz, 1-${WATER_OZ_MAX}. Default ${WATER_OZ_DEFAULT}`),
+    count: z.number().optional().describe(`How many separate entries to log, 1-${LOG_COUNT_MAX}. Default 1`),
+    date: z.string().optional().describe("The day (YYYY-MM-DD, 'today', 'yesterday' or '-2d'). Default: today"),
+    time: z.string().optional().describe('HH:MM, 24-hour local time. Default: now on today, 23:59 on an earlier day'),
+  },
+  async (args) => {
+    const plan = planDrinkLog(args);
+    // One call, `count` rows: the hourly budget counts them all at the first request.
+    declareRows(plan.count);
+    const logged = [];
+    for (let i = 0; i < plan.count; i++) {
+      try {
+        logged.push(await logDrink({
+          id: crypto.randomUUID(), kind: plan.kind, amount: plan.amount, logged_at_utc: plan.logged_at_utc,
+        }));
+      } catch (err) {
+        if (!logged.length) throw err;
+        throw new Error(
+          `Logged ${logged.length} of ${plan.count} entries, then: ${err.message}\n` +
+          `Logged:\n${logged.map(describeDrink).join('\n')}`,
+        );
+      }
+    }
+    return text([describeLogged(plan), await dayLine(plan.date), ...logged.map(describeDrink)].join('\n'));
+  },
+);
+
+tool(
+  'thrive_update_drink',
+  "Change a logged drink's water amount, its time, or both, by its id from thrive_drinks. amount_oz is for water " +
+    `only (whole US fl oz, 1-${WATER_OZ_MAX}): coffee and alcohol are always 1 per entry. time is HH:MM local time ` +
+    'and stays on the same day: to move a drink to another day, delete it and log it again. A value equal to the ' +
+    'stored one is left alone.',
+  {
+    id: z.string().describe('The drink id, from thrive_drinks'),
+    amount_oz: z.number().optional().describe(`Water only: the new amount in whole US fl oz, 1-${WATER_OZ_MAX}`),
+    time: z.string().optional().describe('The new local time, HH:MM'),
+  },
+  async ({ id, amount_oz: amountOz, time }) => {
+    if (amountOz === undefined && time === undefined) {
+      throw new Error('Give amount_oz, time or both: there is nothing to change. Nothing was written.');
+    }
+    const newTime = time === undefined ? undefined : checkTime(time);
+    const drink = await resolveDrink(id);
+    const ml = amountOz === undefined ? undefined : checkAmountOz(amountOz, drink.kind);
+
+    const oldTime = String(drink.time).slice(0, 5);
+    const changes = [];
+    if (ml !== undefined && ml !== Number(drink.amount)) {
+      await updateDrinkAmount(drink.id, ml);
+      changes.push(describeAmountChange(drink.amount, ml));
+    }
+    if (newTime !== undefined && newTime !== oldTime) {
+      await updateDrinkTime(drink.id, `${newTime}:00`);
+      changes.push(`${oldTime} → ${newTime}`);
+    }
+    if (!changes.length) {
+      return text(`Nothing to change: the ${drink.date} entry is already ${drinkLine(drink)}. Nothing was written.`);
+    }
+    return text(
+      `Updated the ${drink.date} ${drink.kind} entry (${drink.id}): ${changes.join(', ')}.\n${await dayLine(drink.date)}`,
+    );
+  },
+);
+
+tool(
+  'thrive_delete_drink',
+  'Delete one logged drink by its id from thrive_drinks. Destructive and dry-run by default: shows the entry ' +
+    'that would go, and only deletes when confirm is true. thrive_undo can bring it back.',
+  {
+    id: z.string().describe('The drink id, from thrive_drinks'),
+    confirm: z.boolean().optional().describe('Set true to actually delete. Default false = preview only.'),
+  },
+  async ({ id, confirm = false }) => {
+    const drink = await resolveDrink(id);
+    const entry = `${drink.date} ${drinkLine(drink)}`;
+    if (!confirm) {
+      return text(`DRY RUN — nothing deleted. This would remove:\n- ${entry}\n\nCall again with confirm: true to delete.`);
+    }
+    await deleteDrink(drink.id);
+    return text(`Deleted ${entry}.\n${await dayLine(drink.date)}`);
   },
 );
 

@@ -189,6 +189,28 @@
     }
   },
   {
+    "name": "thrive_delete_drink",
+    "description": "Delete one logged drink by its id from thrive_drinks. Destructive and dry-run by default: shows the entry that would go, and only deletes when confirm is true. thrive_undo can bring it back.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The drink id, from thrive_drinks"
+        },
+        "confirm": {
+          "description": "Set true to actually delete. Default false = preview only.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": {}
+    }
+  },
+  {
     "name": "thrive_delete_exercise",
     "description": "Delete an exercise from the library. Destructive and dry-run by default. Reports how many workouts and templates reference it — deleting one that is in use leaves orphaned history, so prefer this for exercises created by mistake.",
     "inputSchema": {
@@ -238,7 +260,7 @@
   },
   {
     "name": "thrive_drinks",
-    "description": "Water, coffee and alcohol the user logged (Thrive Sip), read straight from the Drinks log: each entry with its local time, kind and amount, per-day totals (water in oz and ml with the % of the daily goal, coffee in cups, alcohol in standard drinks), and the water goal. Over several days it also gives the average water on the days it was logged and the total coffee and alcohol. Default: today only. At most 400 days per call. A day or a kind with nothing logged is unknown, never zero. Read-only: no tool logs, edits or deletes a drink; the user does that in the app or the widget.",
+    "description": "Water, coffee and alcohol the user logged (Thrive Sip), read straight from the Drinks log: each entry with its local time, kind and amount, per-day totals (water in oz and ml with the % of the daily goal, coffee in cups, alcohol in standard drinks), and the water goal. Over several days it also gives the average water on the days it was logged and the total coffee and alcohol. Default: today only. At most 400 days per call. A day or a kind with nothing logged is unknown, never zero. Each entry ends with its id in parentheses, which thrive_update_drink and thrive_delete_drink take; those and thrive_log_drink are on the Thrive (write) connector.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -431,6 +453,45 @@
       },
       "additionalProperties": true,
       "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "thrive_log_drink",
+    "description": "Log water, coffee or alcohol in Thrive Sip, on today or an earlier day. Water is in whole US fl oz (default 4 oz, the widget's tap; at most 67); coffee is 1 cup and alcohol 1 standard drink per entry, so log several with count (\"3 beers\" is kind alcohol, count 3; at most 10). time is the local time (America/Denver). Omitted, it is now on today and 23:59 on an earlier day, as the app's Day view does. A date and time after now is refused. Each entry is its own row with its own id, marked [mcp], and one thrive_undo call removes them all.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "water",
+            "coffee",
+            "alcohol"
+          ],
+          "description": "What was drunk"
+        },
+        "amount_oz": {
+          "description": "Water only: whole US fl oz, 1-67. Default 4",
+          "type": "number"
+        },
+        "count": {
+          "description": "How many separate entries to log, 1-10. Default 1",
+          "type": "number"
+        },
+        "date": {
+          "description": "The day (YYYY-MM-DD, 'today', 'yesterday' or '-2d'). Default: today",
+          "type": "string"
+        },
+        "time": {
+          "description": "HH:MM, 24-hour local time. Default: now on today, 23:59 on an earlier day",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": {}
     }
   },
   {
@@ -849,6 +910,32 @@
           "type": "boolean"
         }
       },
+      "additionalProperties": {}
+    }
+  },
+  {
+    "name": "thrive_update_drink",
+    "description": "Change a logged drink's water amount, its time, or both, by its id from thrive_drinks. amount_oz is for water only (whole US fl oz, 1-67): coffee and alcohol are always 1 per entry. time is HH:MM local time and stays on the same day: to move a drink to another day, delete it and log it again. A value equal to the stored one is left alone.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The drink id, from thrive_drinks"
+        },
+        "amount_oz": {
+          "description": "Water only: the new amount in whole US fl oz, 1-67",
+          "type": "number"
+        },
+        "time": {
+          "description": "The new local time, HH:MM",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
       "additionalProperties": {}
     }
   },

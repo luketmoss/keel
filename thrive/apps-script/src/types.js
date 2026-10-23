@@ -322,8 +322,8 @@ var JOURNAL_COLUMN_COUNT = 4;
 // --- Drinks (A:I) and Settings (A:C) - #519 ---------------------------------
 //
 // One row per drink (Thrive Sip, #518), written by the API alone: the widget
-// and the app go through logDrink and friends (drinks.js). The MCP Worker only
-// reads, through getDrinks (#522). Mirrored, read-only here, by frontend/src/api/drinks.ts; change
+// and the app go through logDrink and friends (drinks.js), and so does the MCP
+// Worker (#595), whose writes the change log records. Mirrored, read-only here, by frontend/src/api/drinks.ts; change
 // both together. Created by scripts/migrate-519-drinks-tab.mjs; later columns
 // are only appended.
 var DRINK_FIELDS = [
@@ -333,14 +333,14 @@ var DRINK_FIELDS = [
   'date',          // D  local YYYY-MM-DD (TIMEZONE), derived from logged_at_utc
   'time',          // E  local HH:MM:SS, editable through updateDrinkTime
   'logged_at_utc', // F  ISO 8601 UTC, the moment the caller says it was taken; never rewritten
-  'source',        // G  widget | app
+  'source',        // G  widget | app | mcp
   'created',       // H  ISO 8601, server clock
   'updated',       // I  ISO 8601, server clock
 ];
 
 var DRINK_COLUMN_COUNT = 9;
 var DRINK_KINDS = ['water', 'alcohol', 'coffee'];
-var DRINK_SOURCES = ['widget', 'app'];
+var DRINK_SOURCES = ['widget', 'app', 'mcp'];
 
 // Settings (A:C): key/value, one row per key, created by
 // scripts/migrate-519-settings-tab.mjs. The API supplies every default, never

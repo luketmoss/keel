@@ -541,14 +541,19 @@ test('thrive_drinks is registered read-only, with date_from and date_to only', a
   assert.deepEqual(Object.keys(t.inputSchema.properties).sort(), ['date_from', 'date_to']);
   assert.equal(t.annotations?.readOnlyHint, true);
   assert.equal(t.annotations?.destructiveHint, undefined);
-  assert.match(t.description, /Read-only: no tool logs, edits or deletes a drink/);
+  assert.match(t.description, /Each entry ends with its id in parentheses/);
   assert.match(t.description, /At most 400 days per call/);
 });
 
-test('no tool can log, edit or delete a drink', async () => {
+test('#595: three write tools log, edit and delete a drink; only the delete is destructive', async () => {
   const { tools } = await client.listTools();
   const drinkTools = tools.filter((t) => /drink/i.test(t.name));
-  assert.deepEqual(drinkTools.map((t) => t.name), ['thrive_drinks']);
+  assert.deepEqual(drinkTools.map((t) => t.name).sort(),
+    ['thrive_delete_drink', 'thrive_drinks', 'thrive_log_drink', 'thrive_update_drink']);
+  const hint = (name) => tools.find((t) => t.name === name).annotations;
+  assert.equal(hint('thrive_delete_drink')?.destructiveHint, true);
+  assert.equal(hint('thrive_log_drink'), undefined);
+  assert.equal(hint('thrive_update_drink'), undefined);
 });
 
 test('thrive_drinks returns each entry with its time and kind, per-day totals in oz, and the goal', async () => {

@@ -65,8 +65,11 @@ signal — several `Easy` sessions on a lift mean it's time to add load.
 
 `thrive_drinks` reads the water, coffee and alcohol the user logged (default: today): each
 entry, per-day totals (water in oz and ml against the daily goal, coffee in cups, alcohol in
-standard drinks) and the goal. A day with nothing logged is unknown, not a day without water. It is read-only:
-no tool logs a drink, so if the user asks you to, tell them to use the app or the widget.
+standard drinks) and the goal, each entry ending with its id. A day with nothing logged is unknown, not a day
+without water. With Thrive (write) on, `thrive_log_drink` logs on today or an earlier day (`date: 'yesterday'`,
+`time: '22:00'`; water in whole oz, `count` for several coffees or drinks), `thrive_update_drink` changes a
+drink's water amount or time by id, and `thrive_delete_drink` removes one, dry-run until `confirm: true` (#595).
+To move a drink to another day, delete it and log it again.
 `thrive_daily_summary` carries the same daily totals, but only as of its last rebuild.
 
 `thrive_exercise_history` is the one for progression decisions: it returns every logged

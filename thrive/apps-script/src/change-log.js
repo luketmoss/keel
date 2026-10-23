@@ -44,6 +44,11 @@ var CHANGE_LOGGED_ACTIONS = {
   createTemplate: ['Templates'],
   replaceTemplate: ['Templates'],
   upsertJournal: ['Journal'],
+  // #595: the MCP logs, re-times, corrects and removes drinks.
+  logDrink: ['Drinks'],
+  updateDrinkTime: ['Drinks'],
+  updateDrinkAmount: ['Drinks'],
+  deleteDrink: ['Drinks'],
 };
 
 var CHANGE_LOG_DEFAULT_LIMIT = 200;
@@ -59,6 +64,7 @@ function changeTabs() {
     Workouts: { sheet: 'Workouts', fields: WORKOUT_FIELDS, key: ['id'] },
     Exercises: { sheet: 'Exercises', fields: EXERCISE_FIELDS, key: ['id'] },
     Journal: { sheet: 'Journal', fields: JOURNAL_FIELDS, key: ['date'] },
+    Drinks: { sheet: 'Drinks', fields: DRINK_FIELDS, key: ['id'] },
     Templates: { sheet: 'Templates', fields: TEMPLATE_FIELDS, key: ['template_id', 'order'] },
     // Sets have no id: the slot, the same identity sets.js addresses them by.
     Sets: { sheet: 'Sets', fields: SET_FIELDS, key: ['workout_id', 'section', 'exercise_order', 'set_number'] },

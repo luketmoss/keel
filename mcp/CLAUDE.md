@@ -67,7 +67,7 @@ disjoint and together are exactly the app's tools.
 | Connector | URL | Serves | Normal state |
 |---|---|---|---|
 | `Thrive` | `<PUBLIC_URL>/thrive/mcp` | the 11 read tools | on |
-| `Thrive (write)` | `<PUBLIC_URL>/thrive/write/mcp` | the 14 write tools | **off** |
+| `Thrive (write)` | `<PUBLIC_URL>/thrive/write/mcp` | the 17 write tools | **off** |
 | `Hive` | `<PUBLIC_URL>/hive/mcp` | the 5 read tools | on |
 | `Hive (write)` | `<PUBLIC_URL>/hive/write/mcp` | the 3 write tools | **off** |
 
@@ -200,7 +200,7 @@ with `npx wrangler secret put`, never committed.
 
 ## Thrive
 
-`/thrive/mcp` and `/thrive/write/mcp` serve the 25 Thrive tools between them, ported from the stdio server
+`/thrive/mcp` and `/thrive/write/mcp` serve the 28 Thrive tools between them, ported from the stdio server
 (retired in #372) and diffed against the tool list recorded from it
 (`test/fixtures/thrive-stdio-tools.json`, frozen the same way). The tool
 reference and the agent brief are in `docs/thrive-tools.md` and
@@ -230,14 +230,19 @@ when scheduling and through `setWorkoutRest` for a planned workout. Both need th
 Apps Script deploy that ships them first; until then `rest_plans` is ignored and
 `setWorkoutRest` is an unknown action. The rules are in `docs/thrive-tools.md`.
 
-**Drinks are read-only here (#522).** `thrive_drinks` reads Thrive Sip's log through
-`getDrinks`, and `thrive_daily_summary` shows the summary's `water_ml`,
+**Drinks (#522, #595).** `thrive_drinks` reads Thrive Sip's log through
+`getDrinks`, each entry with its id, and `thrive_daily_summary` shows the summary's `water_ml`,
 `coffee_cups` (#562) and `alcohol_drinks`. Each entry is narrated by its own kind
 (water, coffee or alcohol); a kind the Worker does not know is said by its raw kind and
-amount, never as alcohol. No tool logs, edits or deletes a drink: the owner does that from
-the widget or the app. So nothing here calls `logDrink`, `updateDrinkTime` or
-`deleteDrink`, and the API's MCP change log (#434), which does not record those
-actions, has nothing to miss from this Worker.
+amount, never as alcohol. Three write tools correct the log on any day:
+`thrive_log_drink` (`logDrink`, one request per entry with a Worker-minted UUID and
+`source: 'mcp'`, all under one `call_id`), `thrive_update_drink` (`updateDrinkAmount`,
+water only, and `updateDrinkTime`) and `thrive_delete_drink` (`deleteDrink`, dry-run until
+`confirm: true`). They find a drink by id in `getDrinks` over the last 400 days. The
+API's change log records all four actions on the Drinks tab, so `thrive_undo` reverts
+them. Moving a drink to another day is deliberately not a tool: delete and re-log.
+**Deploy the Apps Script first**: until then `logDrink` refuses `source: 'mcp'` and the
+drink writes are not logged for undo.
 
 ## Approving the destructive tools
 
@@ -246,8 +251,8 @@ approval is set on that connector's tools.
 
 `thrive_delete_workout`, `thrive_delete_exercise`, `thrive_update_template`
 (it deletes the old rows), `thrive_set_journal_entry` (clearing a note is a
-delete), `thrive_set_workout_rest` (it overwrites planned rest, #583) and
-`thrive_undo` can destroy data. `hive_undo` is the same
+delete), `thrive_set_workout_rest` (it overwrites planned rest, #583),
+`thrive_delete_drink` (#595) and `thrive_undo` can destroy data. `hive_undo` is the same
 for Hive, and gets the same treatment. Reverting can itself destroy work done
 since, so the app's conflict check is the first line and a human approval the second. Their dry-run-until-`confirm: true`
 behaviour only prevents accidents; against prompt injection the one control is a

@@ -114,7 +114,7 @@ describe('logDrink', () => {
     ['a missing logged_at_utc', { logged_at_utc: undefined }, /logged_at_utc is required/],
     ['a local-time logged_at_utc', { logged_at_utc: '2026-10-20T07:05:00-06:00' }, /logged_at_utc is required/],
     ['an impossible logged_at_utc', { logged_at_utc: '2026-13-45T25:00:00Z' }, /logged_at_utc is required/],
-    ['an unknown source', { source: 'mcp' }, /source must be widget or app/],
+    ['an unknown source', { source: 'chat' }, /source must be widget, app or mcp/],
     ['a missing source', { source: undefined }, /source must be/],
   ];
   for (const [label, over, message] of refusals) {

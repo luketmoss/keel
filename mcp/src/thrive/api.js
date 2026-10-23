@@ -254,8 +254,7 @@ export const fetchJournal = (from, to) => apiGet('getJournal', { from, to });
 export const fetchWorkoutPayload = (id, offset) => apiGet('getWorkoutPayload', { id, offset });
 /**
  * Drinks in an inclusive date range, oldest first, with the current water goal
- * (#519, #522): `{ drinks, water_goal_ml }`. A read: nothing in this client
- * calls logDrink, updateDrinkTime or deleteDrink.
+ * (#519, #522): `{ drinks, water_goal_ml }`.
  */
 export const fetchDrinks = (from, to) => apiGet('getDrinks', { from, to });
 /** The change log, newest call first (#434). The API caps one answer at 1000 rows. */
@@ -291,6 +290,13 @@ export function upsertJournal(date, note) {
   }
   return apiWrite('upsertJournal', { date, note });
 }
+
+// Drinks (#595). The caller mints each drink's id, and every drink this client
+// logs says `source: 'mcp'`. Each answers the drink as the API wrote it.
+export const logDrink = (drink) => apiWrite('logDrink', { ...drink, source: 'mcp' });
+export const updateDrinkTime = (id, time) => apiWrite('updateDrinkTime', { id, time });
+export const updateDrinkAmount = (id, amount) => apiWrite('updateDrinkAmount', { id, amount });
+export const deleteDrink = (id) => apiWrite('deleteDrink', { id });
 
 export const createExercise = (data) => apiWrite('createExercise', { data });
 export const updateExercise = (id, changes) => apiWrite('updateExercise', { id, changes });

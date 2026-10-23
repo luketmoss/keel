@@ -310,7 +310,8 @@ Google Sheet "Groundwork" with these tabs:
   row_key, before_json, after_json. Written only by `apps-script/src/change-log.js`
   for calls made with `MCP_API_KEY`; read by `getChangeLog` and reverted by
   `undoCall`. Created by `scripts/migrate-423-mcp-change-log-tab.mjs`; until it
-  exists every MCP write is refused. Row mapping mirrors `CHANGE_LOG_FIELDS` in
+  exists every MCP write is refused. It covers the drink actions too (#595: `logDrink`, `updateDrinkTime`,
+  `updateDrinkAmount`, `deleteDrink`, on the Drinks tab keyed by `id`). Row mapping mirrors `CHANGE_LOG_FIELDS` in
   `apps-script/src/types.js`. Later columns are only ever appended.
 - **SyncRequests** (A:I) — on-demand sync requests (luketmoss/thrive#314, luketmoss/thrive#232's route c): one
   row per vendor per "Sync now" press. request_id, vendor, requested_at,
@@ -356,7 +357,9 @@ Google Sheet "Groundwork" with these tabs:
   (always `1`), **coffee in cups**, never blank or `0`;
   `date`/`time` are local `America/Denver`, derived by the API from
   `logged_at_utc` (the instant the caller says it was taken, never rewritten);
-  `source` is `widget` or `app`. **Written only by the API** (`logDrink`,
+  `source` is `widget`, `app` or `mcp` (#595: logged from a chat through the MCP's `thrive_log_drink`;
+  the frontend's `DRINK_SOURCES` mirrors the list, and `rowToDrink` drops a row whose source it does not
+  know). **Written only by the API** (`logDrink`,
   `updateDrinkTime`, `updateDrinkAmount` (#588, water only), `deleteDrink`; `apps-script/src/drinks.js`); the SPA does
   not touch the tab directly, it calls `frontend/src/api/drinks.ts`, whose
   `DRINK_FIELDS` mirrors `DRINK_FIELDS` in `apps-script/src/types.js` — change

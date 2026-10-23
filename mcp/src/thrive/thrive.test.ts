@@ -9,6 +9,8 @@ const URL_ = 'https://script.google.com/macros/s/thrive/exec'
 const env = { THRIVE_API_URL: URL_, THRIVE_API_KEY: KEY, WRITE_BUDGET: fakeBudget().namespace } as Env
 
 const DESTRUCTIVE = [
+  // #595: dry-run until confirm.
+  'thrive_delete_drink',
   'thrive_delete_exercise',
   'thrive_delete_workout',
   'thrive_set_journal_entry',
@@ -101,11 +103,11 @@ function fakeThrive(answer: (action: string, url: URL) => unknown) {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('thrive tool list', () => {
-  it('serves exactly the 11 read tools on /thrive/mcp and the other 14 on /thrive/write/mcp (#409, #522, #583)', async () => {
+  it('serves exactly the 11 read tools on /thrive/mcp and the other 17 on /thrive/write/mcp (#409, #522, #583, #595)', async () => {
     const read = (await listTools('read')).map((t) => t.name).sort()
     const write = (await listTools('write')).map((t) => t.name).sort()
     expect(read).toEqual([...READ_ONLY].sort())
-    expect(write).toHaveLength(14)
+    expect(write).toHaveLength(17)
     expect(write.filter((n) => read.includes(n))).toEqual([])
     expect([...read, ...write].sort()).toEqual(stdioTools.map((t) => t.name).sort())
   })
@@ -119,18 +121,20 @@ describe('thrive tool list', () => {
       description,
       inputSchema: canon(inputSchema),
     }))
-    expect(worker).toHaveLength(25)
+    expect(worker).toHaveLength(28)
     expect(worker).toEqual(stdio)
   })
 
-  it('marks the six destructive tools and every read tool', async () => {
+  it('marks the seven destructive tools and every read tool', async () => {
     const tools = await listAll()
     const hint = (name: string) => tools.find((t) => t.name === name)?.annotations
     for (const name of DESTRUCTIVE) expect(hint(name)?.destructiveHint, name).toBe(true)
     for (const name of READ_ONLY) expect(hint(name)?.readOnlyHint, name).toBe(true)
-    // #522: thrive_drinks is read-only, and nothing on the write endpoint touches drinks.
+    // #522: thrive_drinks is read-only; #595: the drink writes are on the write endpoint only.
     expect(hint('thrive_drinks')).toEqual({ readOnlyHint: true })
-    expect((await listTools('write')).filter((t) => /drink/i.test(t.name))).toEqual([])
+    const drinkWrites = ['thrive_delete_drink', 'thrive_log_drink', 'thrive_update_drink']
+    expect((await listTools('write')).map((t) => t.name).filter((n) => /drink/.test(n)).sort()).toEqual(drinkWrites)
+    expect((await listTools('read')).map((t) => t.name).filter((n) => drinkWrites.includes(n))).toEqual([])
     // No other tool claims either hint.
     for (const t of tools) {
       if (DESTRUCTIVE.includes(t.name) || READ_ONLY.includes(t.name)) continue
@@ -300,6 +304,16 @@ describe('home time on a UTC Worker', () => {
     expect(normalizeDate('tomorrow')).toBe('2026-10-10')
     expect(normalizeDate('+3d')).toBe('2026-10-12')
     expect(nowTimeStr()).toBe('20:30')
+  })
+
+  it('resolves yesterday and -Nd against the Denver date (#595)', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-10T02:30:00Z'))
+    const { normalizeDate } = await import('./domain.js')
+    expect(normalizeDate('yesterday')).toBe('2026-10-08')
+    expect(normalizeDate('-3d')).toBe('2026-10-06')
+    expect(normalizeDate('-0d')).toBe('2026-10-09')
+    expect(normalizeDate('2026-10-01')).toBe('2026-10-01')
   })
 
   it('keeps counting days correctly across the November DST change', async () => {

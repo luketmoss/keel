@@ -18,7 +18,7 @@ var DRINK_ERRORS = {
   waterAmount: 'amount for water must be a whole number of ml, 1 to 2000',
   alcoholAmount: 'amount for alcohol or coffee must be 1',
   loggedAt: 'logged_at_utc is required: an ISO 8601 UTC time such as 2026-10-20T13:05:00Z',
-  source: 'source must be widget or app',
+  source: 'source must be widget, app or mcp',
   range: 'from and to must be given together, as YYYY-MM-DD, from no later than to',
   rangeTooLong: 'the range may be at most 400 days',
   time: 'time must be HH:MM:SS, 00:00:00 to 23:59:59',

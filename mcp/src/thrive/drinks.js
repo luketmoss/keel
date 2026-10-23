@@ -1,15 +1,15 @@
-// Narration for thrive_drinks (#522): Thrive Sip's water, coffee and alcohol log.
+// Narration for thrive_drinks (#522): Thrive Sip's water, coffee and alcohol log,
+// and the checks and wording of the drink write tools (#595).
 //
 // Pure. The API's getDrinks (#519) answers { drinks, water_goal_ml }, each
 // drink a domain object ({ id, kind, amount, date, time, logged_at_utc,
 // source, created, updated }); nothing here knows a column. Water `amount` is
 // whole ml, coffee `amount` cups (#562), alcohol `amount` standard drinks. A
 // kind this file does not know is narrated by its raw kind and amount, never
-// as one it does. Read-only: no tool logs, edits or deletes a drink. The owner
-// logs from the widget or the app.
+// as one it does.
 
 import { datesBetween, describeDateRuns } from './daily.js';
-import { mlToOz } from './domain.js';
+import { ML_PER_OZ, addDays, mlToOz, normalizeDate, nowTimeStr, startedAtUtc, todayStr } from './domain.js';
 
 /** The API refuses a longer range (DRINKS_MAX_RANGE_DAYS in apps-script/src/types.js). */
 export const DRINKS_MAX_RANGE_DAYS = 400;
@@ -59,14 +59,17 @@ const AMOUNT_OF_KIND = {
   alcohol: (n) => plural(n, 'drink'),
 };
 
-/** One entry -> "  - 07:45 water 4 oz (118 ml) [app]". */
-export function describeDrink(d) {
+/** One entry -> "07:45 water 4 oz (118 ml) [app] (d1)": its id is what the write tools take (#595). */
+export function drinkLine(d) {
   const time = String(d.time ?? '').slice(0, 5) || '—';
   const n = amountOf(d);
   const say = Object.prototype.hasOwnProperty.call(AMOUNT_OF_KIND, d.kind) ? AMOUNT_OF_KIND[d.kind] : null;
   const what = `${d.kind ?? ''} ${n === null || !say ? String(d.amount ?? '') : say(n)}`.trim();
-  return `  - ${time} ${what}${d.source ? ` [${d.source}]` : ''}`;
+  return `${time} ${what}${d.source ? ` [${d.source}]` : ''}${d.id ? ` (${d.id})` : ''}`;
 }
+
+/** One entry -> "  - 07:45 water 4 oz (118 ml) [app] (d1)". */
+export const describeDrink = (d) => `  - ${drinkLine(d)}`;
 
 /** One day's heading line: its totals, each kind said as "no ... logged" when absent, never 0. */
 export function describeDrinkDay(date, entries, goal) {
@@ -138,3 +141,100 @@ export function describeDrinksRange({ drinks, water_goal_ml: goal }, { from, to 
   }
   return out.join('\n');
 }
+
+// --- writes (#595) ----------------------------------------------------
+
+/** WATER_AMOUNT_MAX_ML (2000) in apps-script/src/types.js, in whole oz: 67 oz is 1981 ml. */
+export const WATER_OZ_MAX = 67;
+/** The widget's tap, 4 oz (118 ml). */
+export const WATER_OZ_DEFAULT = 4;
+/** Entries one thrive_log_drink call may log ("3 beers"). */
+export const LOG_COUNT_MAX = 10;
+
+const DRINK_KINDS = ['water', 'coffee', 'alcohol'];
+const DATE_FORMS = "YYYY-MM-DD, 'today', 'yesterday' or '-2d'";
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** Whole oz -> whole ml, as stored. 16 -> 473. */
+export const ozToMl = (oz) => Math.round(oz * ML_PER_OZ);
+
+/** amount_oz checked against the drink's kind: whole ml, or a refusal naming the field. */
+export function checkAmountOz(amountOz, kind) {
+  if (kind !== 'water') {
+    throw new Error(
+      'amount_oz is only for water: coffee and alcohol are always 1 per entry. Use count to log several.',
+    );
+  }
+  if (!Number.isInteger(amountOz) || amountOz < 1 || amountOz > WATER_OZ_MAX) {
+    throw new Error(`amount_oz must be a whole number of ounces from 1 to ${WATER_OZ_MAX} (2000 ml); got ${amountOz}.`);
+  }
+  return ozToMl(amountOz);
+}
+
+/** A time as HH:MM, or a refusal naming the field. */
+export function checkTime(time) {
+  if (typeof time !== 'string' || !TIME_RE.test(time.trim())) {
+    throw new Error(`time must be HH:MM, 24-hour local time (America/Denver), such as 22:00; got "${time}".`);
+  }
+  return time.trim();
+}
+
+/** A real calendar date from normalizeDate's forms, or ''. */
+function realDate(value, now) {
+  const day = normalizeDate(value, now);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return '';
+  const d = new Date(`${day}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === day ? day : '';
+}
+
+/**
+ * thrive_log_drink's arguments -> what to send, or a refusal naming the field.
+ * Every check happens here, before any request. `time` defaults to now on today
+ * and to 23:59 on a past date, as the Day view does (#588); a date and time
+ * after now is refused. `logged_at_utc` is that Denver wall-clock time as a UTC
+ * instant, DST-aware, from which the API derives the row's date and time.
+ */
+export function planDrinkLog({ kind, amount_oz: amountOz, count = 1, date, time }, now = new Date()) {
+  if (!DRINK_KINDS.includes(kind)) throw new Error(`kind must be water, coffee or alcohol; got "${kind}".`);
+  const amount = amountOz === undefined ? (kind === 'water' ? ozToMl(WATER_OZ_DEFAULT) : 1) : checkAmountOz(amountOz, kind);
+  if (!Number.isInteger(count) || count < 1 || count > LOG_COUNT_MAX) {
+    throw new Error(`count must be a whole number from 1 to ${LOG_COUNT_MAX}; got ${count}.`);
+  }
+
+  const today = todayStr(now);
+  const day = date === undefined ? today : realDate(date, now);
+  if (!day) throw new Error(`date could not be read as a date: "${date}". Use ${DATE_FORMS}.`);
+  if (day > today) throw new Error(`date ${day} is in the future: a drink can be logged for now or earlier.`);
+
+  const at = time === undefined ? (day === today ? nowTimeStr(now) : '23:59') : checkTime(time);
+  const local = startedAtUtc(day, at);
+  const instant = local ? new Date(local) : null;
+  if (!instant || Number.isNaN(instant.getTime())) {
+    throw new Error(`date and time could not be read as a time in America/Denver: ${day} ${at}.`);
+  }
+  if (instant.getTime() > now.getTime()) {
+    throw new Error(
+      `time ${at} on ${day} is in the future (it is ${nowTimeStr(now)} in America/Denver): ` +
+      'a drink can be logged for now or earlier.',
+    );
+  }
+  return { kind, amount, count, date: day, time: at, logged_at_utc: instant.toISOString() };
+}
+
+/** The first line of a log's result: "Logged 16 oz (473 ml) of water on 2026-10-22 at 22:00." */
+export function describeLogged({ kind, amount, count, date, time }) {
+  const when = `on ${date} at ${time}.`;
+  if (kind === 'water') {
+    return count === 1
+      ? `Logged ${water(amount)} of water ${when}`
+      : `Logged ${count} water entries of ${water(amount)} each ${when}`;
+  }
+  if (kind === 'coffee') return `Logged ${plural(count, 'cup')} of coffee ${when}`;
+  return `Logged ${plural(count, 'alcohol drink')} ${when}`;
+}
+
+/** The first day of the window the write tools find a drink in: the API's longest range, ending today. */
+export const findWindowStart = (now = new Date()) => addDays(todayStr(now), -(DRINKS_MAX_RANGE_DAYS - 1));
+
+/** "4 oz → 16 oz (473 ml)", for an amount change. */
+export const describeAmountChange = (fromMl, toMl) => `${mlToOz(fromMl)} oz → ${water(toMl)}`;

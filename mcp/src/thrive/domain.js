@@ -51,21 +51,27 @@ function homeParts() {
 }
 
 /** `YYYY-MM-DD` plus whole days, by calendar arithmetic that cannot straddle a DST change. */
-function addDays(dateStr, n) {
+export function addDays(dateStr, n) {
   const d = new Date(`${dateStr}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
 }
 
-/** Accepts YYYY-MM-DD, 'today', 'tomorrow', '+3d', or anything Date can parse. */
-export function normalizeDate(value) {
+/**
+ * Accepts YYYY-MM-DD, 'today', 'tomorrow', 'yesterday', '+3d', '-3d' (#595), or
+ * anything Date can parse. `now` is for tests; relative forms resolve against
+ * its home date.
+ */
+export function normalizeDate(value, now = new Date()) {
   if (!value) return '';
   const v = String(value).trim().toLowerCase();
   if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
-  if (v === 'today') return todayStr();
-  if (v === 'tomorrow') return addDays(todayStr(), 1);
-  const rel = v.match(/^\+(\d+)d$/);
-  if (rel) return addDays(todayStr(), Number(rel[1]));
+  const today = todayStr(now);
+  if (v === 'today') return today;
+  if (v === 'tomorrow') return addDays(today, 1);
+  if (v === 'yesterday') return addDays(today, -1);
+  const rel = v.match(/^([+-])(\d+)d$/);
+  if (rel) return addDays(today, rel[1] === '-' ? -Number(rel[2]) : Number(rel[2]));
   const parsed = new Date(value);
   return isNaN(parsed.getTime()) ? '' : todayStr(parsed);
 }

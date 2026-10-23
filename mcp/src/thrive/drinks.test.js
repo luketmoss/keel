@@ -33,9 +33,10 @@ test('a day sums its water ml and its alcohol drinks', () => {
   assert.deepEqual(dayTotals(DAY), { water: 354, waterCount: 3, coffee: 0, coffeeCount: 0, alcohol: 2, alcoholCount: 2 });
 });
 
-test('each entry shows its local time, kind, amount and source', () => {
-  assert.equal(describeDrink(DAY[0]), '  - 07:45 water 4 oz (118 ml) [widget]');
-  assert.equal(describeDrink(DAY[3]), '  - 19:10 alcohol 1 drink [app]');
+test('each entry shows its local time, kind, amount, source and id (#595)', () => {
+  assert.equal(describeDrink(DAY[0]), '  - 07:45 water 4 oz (118 ml) [widget] (d1)');
+  assert.equal(describeDrink(DAY[3]), '  - 19:10 alcohol 1 drink [app] (d4)');
+  assert.equal(describeDrink({ ...DAY[3], source: 'mcp' }), '  - 19:10 alcohol 1 drink [mcp] (d4)');
 });
 
 test('a day line gives water in oz and ml with the % of goal, and alcohol in drinks', () => {
@@ -108,10 +109,10 @@ const MIXED = [
 ];
 
 test('#562: each entry is listed under its own kind, coffee in cups', () => {
-  assert.equal(describeDrink(MIXED[1]), '  - 07:10 coffee 1 cup [app]');
-  assert.equal(describeDrink(drink('c', 'coffee', '2', '2026-10-19', '08:00:00')), '  - 08:00 coffee 2 cups [app]');
-  assert.equal(describeDrink(MIXED[0]), '  - 06:50 water 12 oz (354 ml) [widget]');
-  assert.equal(describeDrink(MIXED[3]), '  - 19:10 alcohol 1 drink [app]');
+  assert.equal(describeDrink(MIXED[1]), '  - 07:10 coffee 1 cup [app] (m2)');
+  assert.equal(describeDrink(drink('c', 'coffee', '2', '2026-10-19', '08:00:00')), '  - 08:00 coffee 2 cups [app] (c)');
+  assert.equal(describeDrink(MIXED[0]), '  - 06:50 water 12 oz (354 ml) [widget] (m1)');
+  assert.equal(describeDrink(MIXED[3]), '  - 19:10 alcohol 1 drink [app] (m4)');
 });
 
 test('#562: a day with water, coffee and alcohol sums each, and says coffee between water and alcohol', () => {
@@ -134,8 +135,8 @@ test('#562: a day without coffee says "no coffee logged", never 0', () => {
 
 test('#562: an unknown kind is said by its raw kind and amount, never as alcohol', () => {
   const tea = drink('t1', 'tea', '1', '2026-10-19', '15:00:00');
-  assert.equal(describeDrink(tea), '  - 15:00 tea 1 [app]');
-  assert.equal(describeDrink({ ...tea, amount: 'a mug' }), '  - 15:00 tea a mug [app]');
+  assert.equal(describeDrink(tea), '  - 15:00 tea 1 [app] (t1)');
+  assert.equal(describeDrink({ ...tea, amount: 'a mug' }), '  - 15:00 tea a mug [app] (t1)');
   assert.deepEqual(dayTotals([tea]), { water: 0, waterCount: 0, coffee: 0, coffeeCount: 0, alcohol: 0, alcoholCount: 0 });
   const text = describeDrinksRange({ drinks: [tea], water_goal_ml: 1893 }, { from: '2026-10-19', to: '2026-10-19' });
   assert.match(text, /- 2026-10-19: no water logged · no coffee logged · no alcohol logged \(1 entry\)/);

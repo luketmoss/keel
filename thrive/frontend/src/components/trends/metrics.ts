@@ -537,8 +537,7 @@ export const CUSTOM_SECTIONS: { label: string; metrics: TrendMetric[] }[] = [
   { label: 'Body', metrics: BODY_METRICS },
   { label: 'Blood Pressure', metrics: BLOOD_PRESSURE_METRICS },
   { label: 'Activity', metrics: [...ACTIVITY_SUMMARY_METRICS, STEPS] },
-  // Only Unwind is pickable here (#590); Water, Coffee and Alcohol are read in the Intake group alone.
-  { label: 'Intake', metrics: [UNWIND] },
+  { label: 'Intake', metrics: INTAKE_METRICS },
 ];
 export const CUSTOM_PICKABLE: TrendMetric[] = CUSTOM_SECTIONS.flatMap((s) => s.metrics);
 

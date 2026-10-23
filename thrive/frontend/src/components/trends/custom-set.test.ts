@@ -106,10 +106,13 @@ describe('the custom group', () => {
     'distance',
     'ascent',
     'steps',
+    'water',
+    'coffee',
+    'alcohol',
     'unwind',
   ];
 
-  it('offers 22 metrics in the canonical order, under the seven group headings', () => {
+  it('offers 25 metrics in the canonical order, under the seven group headings', () => {
     expect(CUSTOM_PICKABLE.map((m) => m.id)).toEqual(ORDER);
     expect(CUSTOM_SECTIONS.map((s) => s.label)).toEqual([
       'Recovery',

@@ -15,12 +15,12 @@ const boxes = (c: Element) => [...c.querySelectorAll<HTMLInputElement>('input[ty
 const FOUR = ['resting_hr', 'hrv', 'sleep_total', 'sleep_deep'];
 
 describe('CustomMetricsPicker', () => {
-  it('is a labelled modal dialog listing 22 labelled checkboxes under seven headings', () => {
+  it('is a labelled modal dialog listing 25 labelled checkboxes under seven headings', () => {
     const { container } = render(h(Harness, { initial: [] }));
     const dlg = container.querySelector('[role="dialog"]')!;
     expect(dlg.getAttribute('aria-modal')).toBe('true');
     expect(document.getElementById(dlg.getAttribute('aria-labelledby')!)!.textContent).toBe('Choose metrics');
-    expect(boxes(container)).toHaveLength(22);
+    expect(boxes(container)).toHaveLength(25);
     expect([...container.querySelectorAll('h3')].map((x) => x.textContent)).toEqual([
       'Recovery',
       'Sleep',
@@ -49,7 +49,7 @@ describe('CustomMetricsPicker', () => {
   it('at four, unchecked rows stay focusable, are aria-disabled, ignore clicks, and a status says why', () => {
     const { container } = render(h(Harness, { initial: FOUR }));
     const unchecked = boxes(container).filter((b) => !b.checked);
-    expect(unchecked).toHaveLength(18);
+    expect(unchecked).toHaveLength(21);
     for (const b of unchecked) {
       expect(b.getAttribute('aria-disabled')).toBe('true');
       expect(b.disabled).toBe(false);

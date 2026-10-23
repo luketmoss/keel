@@ -15,7 +15,7 @@ export default defineConfig({
   // Source to be compiled with Thrive's own pipeline, not a prebuilt dependency.
   // geo's own imports are named here, since nothing in this folder imports them: the dev
   // server would otherwise serve jszip's CommonJS file raw, and its default import would fail.
-  optimizeDeps: { exclude: ['@keel/geo'], include: ['jszip', '@tmcw/togeojson'] },
+  optimizeDeps: { exclude: ['@keel/geo', '@keel/auth'], include: ['jszip', '@tmcw/togeojson'] },
   server: {
     port: 5175,
     // global.css imports the suite token file from outside this folder (#402).
@@ -26,7 +26,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     // Vitest externalizes node_modules paths; @keel/geo is TypeScript source.
-    server: { deps: { inline: ['@keel/geo'] } },
+    server: { deps: { inline: ['@keel/geo', '@keel/auth'] } },
     setupFiles: ['./src/test-setup.ts'],
     // Vite loads .env.local before the suite, so a developer's real key would leak in as the
     // ambient baseline. Blanking them makes the baseline the same on every machine; a test

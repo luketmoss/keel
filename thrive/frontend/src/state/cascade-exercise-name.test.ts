@@ -44,7 +44,7 @@ vi.mock('../api/label-colors', () => ({
   colorKeyFromName: vi.fn().mockReturnValue('blue'),
 }));
 
-vi.mock('../auth/reauth', () => ({
+vi.mock('@keel/auth', () => ({
   attemptReauth: vi.fn(),
   ReauthFailedError: class extends Error {},
 }));

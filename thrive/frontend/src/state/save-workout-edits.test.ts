@@ -112,7 +112,7 @@ vi.mock('../api/labels-api', () => ({
   appendLabels: vi.fn(),
 }));
 vi.mock('../api/label-colors', () => ({ colorKeyFromName: vi.fn().mockReturnValue('blue') }));
-vi.mock('../auth/reauth', () => ({ attemptReauth: vi.fn(), ReauthFailedError: class extends Error {} }));
+vi.mock('@keel/auth', () => ({ attemptReauth: vi.fn(), ReauthFailedError: class extends Error {} }));
 
 const { saveWorkoutEdits } = await import('./actions');
 const { DEMO_SETS, DEMO_WORKOUTS, isDemo } = await import('../api/demo-data');

@@ -13,7 +13,7 @@ vi.mock('../api/health-api', () => ({
 
 import { loadHealth } from './actions';
 import { dailyHealth, bodyMeasurements, dailySummary } from './store';
-import { ReauthFailedError } from '../auth/reauth';
+import { ReauthFailedError } from '@keel/auth';
 
 const h = (date: string) => ({ date, sheetRow: 2 }) as never;
 

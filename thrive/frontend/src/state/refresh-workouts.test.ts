@@ -14,7 +14,7 @@ vi.mock('../api/demo-data', async (orig) => ({ ...(await orig<object>()), isDemo
 
 import { refreshWorkouts } from './actions';
 import { workouts, sets, loading, exercises, activeWorkoutId } from './store';
-import { ReauthFailedError } from '../auth/reauth';
+import { ReauthFailedError } from '@keel/auth';
 
 const w = (id: string) => ({ id, sheetRow: 2 }) as never;
 const s = (id: string) => ({ workout_id: id, sheetRow: 2 }) as never;

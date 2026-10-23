@@ -56,7 +56,7 @@ vi.mock('../api/demo-data', () => ({
   DEMO_TEMPLATE_ROWS: [],
   shiftDemoWorkouts: (w: unknown) => w,
 }));
-vi.mock('../auth/reauth', () => ({ attemptReauth: vi.fn(), ReauthFailedError: class extends Error {} }));
+vi.mock('@keel/auth', () => ({ attemptReauth: vi.fn(), ReauthFailedError: class extends Error {} }));
 
 const callAction = vi.fn();
 vi.mock('../api/thrive-api', () => ({ callAction: (...a: unknown[]) => callAction(...a) }));

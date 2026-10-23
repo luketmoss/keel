@@ -120,7 +120,7 @@ vi.mock('../../api/demo-data', () => ({
   DEMO_SETS: [],
   shiftDemoWorkouts: (w: unknown) => w,
 }));
-vi.mock('../../auth/reauth', () => ({ attemptReauth: vi.fn(), ReauthFailedError: class extends Error {} }));
+vi.mock('@keel/auth', () => ({ attemptReauth: vi.fn(), ReauthFailedError: class extends Error {} }));
 vi.mock('../../auth/auth-context', () => ({ useAuth: () => ({ token: 'test-token' }) }));
 vi.mock('../../router/router', () => ({ navigate: vi.fn(), goBack: vi.fn() }));
 const finishWorkout = vi.fn(async (..._args: unknown[]) => undefined);

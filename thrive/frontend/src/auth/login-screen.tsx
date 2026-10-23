@@ -47,6 +47,9 @@ export function LoginScreen() {
         <button class="login-btn" onClick={login}>
           Sign in with Google
         </button>
+        <p class="login-error" role="status" aria-live="polite">
+          {renewError ?? ''}
+        </p>
       </div>
     </div>
   );

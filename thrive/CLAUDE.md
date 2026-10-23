@@ -90,7 +90,8 @@ comes from the API's `getWorkoutTrack` with the user's Google token, never from 
   line (`components/activities/route-thumbnail.tsx`), with no basemap and no Maps request or key. Its
   track comes from the same session cache and two-at-a-time queue as the detail screen
   (`src/maps/track-cache.ts`), requested when the card is within a screen height of the viewport.
-- A change under `geo/` rebuilds Thrive (`thrive.yml` and `thrive-pages.yml` trigger on `geo/**`).
+- A change under `geo/` or `auth/` rebuilds Thrive (`thrive.yml` and `thrive-pages.yml` trigger on both).
+- **Sign-in is `@keel/auth`** (#608, a `file:../../auth` dependency, keys prefixed `gw_`). `src/auth/auth-provider.tsx` only mirrors its session into context; `login-screen.tsx` and the demo short-circuit stay here.
 
 ## Sip widget (#524)
 

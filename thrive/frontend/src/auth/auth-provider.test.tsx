@@ -1,8 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, act, fireEvent, cleanup } from '@testing-library/preact';
-import { AuthProvider, loadCachedAuth, loadRememberedUser, RENEW_AHEAD_MS } from './auth-provider';
+import { RENEW_AHEAD_MS, _resetForTesting, attemptReauth } from '@keel/auth';
+import { AuthProvider } from './auth-provider';
 import { useAuth, type AuthState } from './auth-context';
-import { _resetForTesting, attemptReauth } from './reauth';
+
+// The stored keys, read directly: the provider is a mirror of the @keel/auth session.
+function loadRememberedUser() {
+  const user = localStorage.getItem('gw_user');
+  return user ? JSON.parse(user) : null;
+}
 
 const USER = { email: 'me@example.com', name: 'Me', picture: '' };
 
@@ -55,7 +61,8 @@ afterEach(() => {
 describe('cached auth (#353 AC1)', () => {
   it('an expired token is dropped but the user is kept', () => {
     seed(-1000);
-    expect(loadCachedAuth()).toBeNull();
+    mount();
+    expect(auth.isAuthenticated).toBe(false);
     expect(localStorage.getItem('gw_token')).toBeNull();
     expect(loadRememberedUser()).toEqual(USER);
   });
@@ -105,7 +112,7 @@ describe('AuthProvider (#353)', () => {
   it('AC2: a successful Continue signs in', async () => {
     seed(-1000);
     mount();
-    globalThis.fetch = vi.fn(async () => ({ json: async () => USER })) as any;
+    globalThis.fetch = vi.fn(async () => ({ ok: true, json: async () => USER })) as any;
     act(() => auth.continueAs!());
     await act(async () => {
       await gisConfig.callback({ access_token: 'fresh', expires_in: 3600 });
@@ -183,5 +190,29 @@ describe('AuthProvider (#353)', () => {
     mount();
     document.dispatchEvent(new Event('visibilitychange'));
     expect(request).not.toHaveBeenCalled();
+  });
+});
+
+describe('AuthProvider on @keel/auth (#608)', () => {
+  it('a phone signed in before the move is still signed in', () => {
+    seed(60 * 60 * 1000);
+    mount();
+    expect(auth.isAuthenticated).toBe(true);
+    expect(auth.token).toBe('tok');
+    expect(auth.user).toEqual(USER);
+  });
+
+  it('a fresh sign-in whose userinfo fails never shows signed in and says so', async () => {
+    mount();
+    globalThis.fetch = vi.fn(async () => ({ ok: false, status: 401, json: async () => ({}) })) as any;
+    const seen: boolean[] = [];
+    await act(async () => {
+      await gisConfig.callback({ access_token: 'fresh', expires_in: 3600 });
+    });
+    seen.push(auth.isAuthenticated);
+    expect(seen).toEqual([false]);
+    expect(auth.renewError).toMatch(/could not sign you in/i);
+    expect(auth.rememberedUser).toBeNull();
+    expect(localStorage.getItem('gw_token')).toBeNull();
   });
 });

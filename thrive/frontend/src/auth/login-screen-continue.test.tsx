@@ -61,3 +61,18 @@ describe('LoginScreen with a remembered user (#353)', () => {
     expect(queryByText(/Continue as/)).toBeNull();
   });
 });
+
+describe('LoginScreen sign-in failure (#608)', () => {
+  afterEach(cleanup);
+
+  it('shows the failure in the status line under the Sign in button', () => {
+    state = {
+      ...base(),
+      rememberedUser: null,
+      renewError: 'Could not sign you in. Try again, or use a different account.',
+    };
+    const { getByRole } = render(<LoginScreen />);
+    expect(getByRole('status').textContent).toBe('Could not sign you in. Try again, or use a different account.');
+    expect(getByRole('status').className).toBe('login-error');
+  });
+});

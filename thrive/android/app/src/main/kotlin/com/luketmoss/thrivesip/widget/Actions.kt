@@ -29,6 +29,15 @@ class AddCoffeeAction : ActionCallback {
     }
 }
 
+class AddUnwindAction : ActionCallback {
+    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
+        Tap.log(context, Kind.UNWIND, UNWIND_TAP_MG)
+    }
+}
+
+/** What one Unwind tap logs, in mg: the API refuses any other amount (#590). */
+private const val UNWIND_TAP_MG = 5
+
 /**
  * What a button press does, and all it does: queue the drink (with its id and
  * the instant of the tap), show it at once, and ask for a send. The network

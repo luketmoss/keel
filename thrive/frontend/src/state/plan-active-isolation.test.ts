@@ -64,7 +64,7 @@ vi.mock('../api/demo-data', () => ({
   DEMO_SETS: [],
   shiftDemoWorkouts: (w: unknown) => w,
 }));
-vi.mock('../auth/reauth', () => ({ attemptReauth: vi.fn(), ReauthFailedError: class extends Error {} }));
+vi.mock('@keel/auth', () => ({ attemptReauth: vi.fn(), ReauthFailedError: class extends Error {} }));
 
 const { saveWorkoutForLater, startWorkout } = await import('./actions');
 

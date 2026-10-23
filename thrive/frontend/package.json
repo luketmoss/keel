@@ -14,6 +14,7 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
+    "@keel/auth": "file:../../auth",
     "@keel/geo": "file:../../geo",
     "@preact/signals": "^2.0.0",
     "@tmcw/togeojson": "^7.1.3",

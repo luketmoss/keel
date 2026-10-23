@@ -2,7 +2,7 @@
 // No gapi.client dependency — smaller, more control.
 // Only generic utility functions — domain-specific modules import these.
 
-import { attemptReauth } from '../auth/reauth';
+import { attemptReauth } from '@keel/auth';
 
 const SPREADSHEET_ID = import.meta.env.VITE_SPREADSHEET_ID;
 const BASE = 'https://sheets.googleapis.com/v4/spreadsheets';

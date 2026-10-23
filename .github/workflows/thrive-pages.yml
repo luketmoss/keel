@@ -2,7 +2,7 @@ name: thrive-pages
 on:
   push:
     branches: [main]
-    paths: ['thrive/frontend/**', 'geo/**', '.github/workflows/thrive-pages.yml']
+    paths: ['thrive/frontend/**', 'geo/**', 'auth/**', '.github/workflows/thrive-pages.yml']
   workflow_dispatch:
 # One group for every writer to gh-pages (cairn-pages.yml uses the same), so two
 # deploys never push at once. Not cancelled: a running deploy finishes.

@@ -95,7 +95,7 @@ import type {
   BuilderExercise,
   Effort,
 } from '../api/types';
-import { ReauthFailedError } from '../auth/reauth';
+import { ReauthFailedError } from '@keel/auth';
 import { SheetsApiError } from '../api/sheets';
 
 function isReauthFailure(err: unknown): boolean {

@@ -29,7 +29,7 @@ vi.mock('../api/demo-data', async (orig) => ({ ...(await orig<object>()), isDemo
 
 import { refreshLibraryData, libraryRefresh, loadInitialData } from './actions';
 import { exercises, templates, labels, loading, workouts, activeWorkoutId } from './store';
-import { ReauthFailedError } from '../auth/reauth';
+import { ReauthFailedError } from '@keel/auth';
 
 const ex = (id: string) => ({ id, name: id, sheetRow: 2 }) as never;
 const lb = (id: string) => ({ id, name: id, sheetRow: 2 }) as never;

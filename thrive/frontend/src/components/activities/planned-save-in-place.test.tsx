@@ -119,7 +119,7 @@ vi.mock('../../api/demo-data', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/demo-data')>()),
   isDemo: () => demoMode,
 }));
-vi.mock('../../auth/reauth', () => ({ attemptReauth: vi.fn(), ReauthFailedError: class extends Error {} }));
+vi.mock('@keel/auth', () => ({ attemptReauth: vi.fn(), ReauthFailedError: class extends Error {} }));
 vi.mock('../../auth/auth-context', () => ({ useAuth: () => ({ token: 'test-token' }) }));
 const navigate = vi.fn();
 const goBack = vi.fn();
@@ -129,7 +129,7 @@ vi.mock('../../router/router', () => ({
 }));
 
 const sheets = await import('../../api/sheets');
-const { ReauthFailedError } = await import('../../auth/reauth');
+const { ReauthFailedError } = await import('@keel/auth');
 const { savePlannedWorkoutEdits, startPlannedWorkout } = await import('../../state/actions');
 const { WorkoutEdit } = await import('./workout-edit');
 

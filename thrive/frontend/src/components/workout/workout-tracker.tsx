@@ -19,7 +19,7 @@ import {
 } from '../../state/actions';
 import { flushQueue, remapQueuedOrders } from '../../api/sync-queue';
 import type { QueuedOrderMap } from '../../api/sync-queue';
-import { ReauthFailedError } from '../../auth/reauth';
+import { ReauthFailedError } from '@keel/auth';
 import { useAuth } from '../../auth/auth-context';
 import { navigate, goBack } from '../../router/router';
 import { AddExerciseModal } from '../exercises/add-exercise-modal';

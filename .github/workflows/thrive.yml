@@ -1,10 +1,10 @@
 name: thrive
 on:
   pull_request:
-    paths: ['thrive/**', 'geo/**', 'ui/tokens/**', '.github/workflows/thrive.yml']
+    paths: ['thrive/**', 'geo/**', 'auth/**', 'ui/tokens/**', '.github/workflows/thrive.yml']
   push:
     branches: [main]
-    paths: ['thrive/**', 'geo/**', 'ui/tokens/**', '.github/workflows/thrive.yml']
+    paths: ['thrive/**', 'geo/**', 'auth/**', 'ui/tokens/**', '.github/workflows/thrive.yml']
 concurrency:
   group: thrive-${{ github.ref }}
   cancel-in-progress: true

@@ -1,0 +1,26 @@
+name: auth
+on:
+  pull_request:
+    paths: ['auth/**', '.github/workflows/auth.yml']
+  push:
+    branches: [main]
+    paths: ['auth/**', '.github/workflows/auth.yml']
+concurrency:
+  group: auth-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: auth
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: auth/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test

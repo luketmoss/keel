@@ -93,7 +93,7 @@ colour. Two kinds are replaced or completed:
 
 - `.card:focus-visible` (a larger shadow, no ring) loses its `outline: none` and
   gets the global ring.
-- Inset rings (`outline-offset: -2px` on `.view-tab`, `.theme-toggle-btn`,
+- Inset rings (`outline-offset: -2px` on `.rail-item`, `.theme-toggle-btn`,
   `.kebab-item`) stay inset, where the container clips an outside ring.
 
 **Suppression** stays as it is: form fields (border change in the primary colour,
@@ -118,10 +118,10 @@ exempts it from "rendered as a control".
 |---|---|
 | Filled buttons | `.btn-primary`, `.btn-danger`, `.fab`, `.login-btn`, `.filter-popup-apply` |
 | Quiet buttons | `.btn-ghost`, `.share-archive-board-btn`, `.filter-popup-reset`, `.column-archive-link`, `.toast-action`, `.label-new-pill`, `.column-settings-add-btn`, `.column-settings-name`, `.subtask-date-add-inline`, `.overflow-menu-btn`, `.login-link` (#609) |
-| Icon buttons | `.btn-icon`, `.btn-icon-danger`, `.kebab-trigger`, `.subtask-kebab-btn`, `.subtask-action-btn`, `.subtask-add-circle`, `.archive-search-clear`, `.filter-search-clear`, `.filter-popup-close`, `.share-remove-btn`, `.staged-subtask-remove`, `.label-gear-btn`, `.column-add-btn`, `.column-settings-delete-btn`, `.date-clear-btn`, `.user-dropdown-trigger` |
+| Icon buttons | `.btn-icon`, `.btn-icon-danger`, `.kebab-trigger`, `.subtask-kebab-btn`, `.subtask-action-btn`, `.subtask-add-circle`, `.archive-search-clear`, `.filter-search-clear`, `.filter-popup-close`, `.share-remove-btn`, `.staged-subtask-remove`, `.label-gear-btn`, `.column-add-btn`, `.column-settings-delete-btn`, `.date-clear-btn` |
 | Chips and toggles | `.filter-chip`, `.filter-toggle`, `.label-toggle`, `.theme-toggle-btn`, `.color-swatch`, `.column-color-swatch`, `.column-settings-swatch`, `.icon-swatch`, `.quick-date-chip`, `.owner-circle`, `.status-chevron`, `.check-icon`, `.subtask-date-inline` |
-| Rows and cards | `.card`, `.card-title`, `.archive-item`, `.kebab-item`, `.overflow-menu-item`, `.user-dropdown-edit-profile`, `.user-dropdown-signout`, `.subtask-menu-item`, `.subtask-title`, `.editable-value`, `.due-date-btn`, `.completed-date-btn`, `.column-add-row` |
-| Navigation | `.view-tab`, `.settings-tab`, `.column-indicator-dot` |
+| Rows and cards | `.card`, `.card-title`, `.archive-item`, `.kebab-item`, `.overflow-menu-item`, `.subtask-menu-item`, `.subtask-title`, `.editable-value`, `.due-date-btn`, `.completed-date-btn`, `.column-add-row` |
+| Navigation | `.bottom-nav-tab`, `.rail-item`, `.settings-row`, `.settings-tab`, `.column-indicator-dot` |
 | Fields | `.filter-search-input`, `.subtask-add-input`, `.subtask-add-date`, `.subtask-title-input`, `.label-form-input`, `.board-switcher-select`, `.column-sort-select`, `.archive-search-input`, `.profile-email-input`, `.due-date-hidden`, `.column-settings-name-inline`, `.column-settings-name-input`, `.column-settings-delete-select` — keep their focus treatment, gain the disabled state. Radios and checkboxes carry no class and are fields too; so is every input inside a `form-field` wrapper, which styles it |
 
 Selected applies to chips and toggles, the navigation tabs, `.check-icon`,

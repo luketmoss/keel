@@ -33,8 +33,6 @@ import {
   columnAnnouncement,
   showToast,
   activeView,
-  switchToUpcoming,
-  switchToBoard,
   boardStatuses,
   isTerminalStatus,
 } from '../../state/board-store';
@@ -55,9 +53,10 @@ import { MoveToBoardModal } from './move-to-board-modal';
 import { ShortcutsHelp } from './shortcuts-help';
 import { ProfileDialog } from '../profile/profile-dialog';
 import { ArchiveDialog } from '../archive/archive-dialog';
-import { UserDropdown } from '../header/user-dropdown';
 import { ControlBar } from '../header/control-bar';
-import { HiveLogo } from '../shared/hive-logo';
+import { NavRail } from '../shell/nav-rail';
+import { TabBar } from '../shell/tab-bar';
+import { SettingsScreen } from '../shell/settings-screen';
 import { UpcomingView } from '../upcoming/upcoming-view';
 import { ColumnIndicator } from './column-indicator';
 import type { ItemStatus, ItemWithRow } from '../../api/types';
@@ -87,6 +86,9 @@ export function KanbanBoard() {
     ? owners.value.find((o) => o.google_account.toLowerCase() === user.email.toLowerCase())?.name || user.name
     : '';
 
+  /** N, A and the board shortcuts act on a board; Today and Settings have none to act on (#623). */
+  const onBoard = () => activeView.value === 'boards';
+
   /** True when no modal or overlay is open — shortcuts should be active. */
   const noModalOpen = () =>
     !showShareModal.value &&
@@ -109,7 +111,7 @@ export function KanbanBoard() {
         action: () => {
           if (showArchiveDialog.value) {
             showArchiveDialog.value = false;
-          } else if (noModalOpen()) {
+          } else if (onBoard() && noModalOpen()) {
             showArchiveDialog.value = true;
           }
         },
@@ -118,7 +120,7 @@ export function KanbanBoard() {
       {
         key: 'n',
         action: () => {
-          if (noModalOpen()) {
+          if (onBoard() && noModalOpen()) {
             showCreateModal.value = true;
           }
         },
@@ -149,7 +151,7 @@ export function KanbanBoard() {
         ctrl: true,
         shift: true,
         action: () => {
-          if (userBoardRole.value === 'owner' && noModalOpen()) {
+          if (onBoard() && userBoardRole.value === 'owner' && noModalOpen()) {
             showShareModal.value = true;
           }
         },
@@ -159,7 +161,7 @@ export function KanbanBoard() {
         key: String(i + 1),
         ctrl: true,
         action: () => {
-          if (!noModalOpen()) return;
+          if (!onBoard() || !noModalOpen()) return;
           const boardList = accessibleBoards.value;
           if (i < boardList.length) {
             switchBoard(boardList[i].id);
@@ -359,74 +361,47 @@ export function KanbanBoard() {
     );
   };
 
+  const onBoards = activeView.value === 'boards';
+
   return (
-    <div class="board-layout">
-      {/* AC1: Slim header — logo + title on left, user dropdown on right */}
-      <header class="board-header">
-        <div class="board-header-left">
-          <HiveLogo class="board-header-logo" />
-          <h1>Hive</h1>
-          <span class="board-header-brand-sep" aria-hidden="true" />
-          {/* AC1 #198: View mode tabs in header */}
-          <div class="control-bar-view-tabs" role="group" aria-label="View" data-testid="control-bar-view-tabs">
-            <button
-              class={`view-tab${activeView.value === 'upcoming' ? ' view-tab-active' : ''}`}
-              onClick={() => {
-                if (activeView.value !== 'upcoming') switchToUpcoming();
-              }}
-              aria-pressed={activeView.value === 'upcoming' ? 'true' : 'false'}
-              data-testid="view-tab-upcoming"
-            >
-              Upcoming
-            </button>
-            <button
-              class={`view-tab${activeView.value !== 'upcoming' ? ' view-tab-active' : ''}`}
-              onClick={() => {
-                if (activeView.value === 'upcoming') switchToBoard();
-              }}
-              aria-pressed={activeView.value !== 'upcoming' ? 'true' : 'false'}
-              data-testid="view-tab-board"
-            >
-              Boards
-            </button>
-          </div>
-        </div>
-        <div class="board-header-right">
-          {user && (
-            <UserDropdown
+    <div class="app-shell">
+      <NavRail user={user} displayName={displayName} />
+
+      <div class="board-layout">
+        {activeView.value !== 'settings' && <ControlBar />}
+
+        <main class="board-main">
+          {activeView.value === 'today' ? (
+            <UpcomingView />
+          ) : activeView.value === 'settings' ? (
+            <SettingsScreen
               user={user}
-              displayName={displayName}
+              onEditProfile={() => setShowProfile(true)}
+              onOpenArchivedBoards={() => {
+                showArchivedBoardsDialog.value = true;
+              }}
+              onOpenShortcuts={() => setShowShortcutsHelp(true)}
               onSignOut={logout}
-              onOpenProfile={() => setShowProfile(true)}
             />
+          ) : isBoardEmpty ? (
+            <div class="board-welcome" data-testid="board-welcome">
+              <div class="board-welcome-icon">&#128203;</div>
+              <h2>No tasks yet</h2>
+              <p>
+                Click <strong>+</strong> to create your first one.
+              </p>
+            </div>
+          ) : groupBy.value === 'status' ? (
+            <ListView />
+          ) : (
+            renderSwimlanes()
           )}
-        </div>
-      </header>
+        </main>
 
-      {/* AC2: Unified control bar */}
-      <ControlBar />
+        {onBoards && groupBy.value === 'none' && <ColumnIndicator />}
+      </div>
 
-      <main class="board-main">
-        {activeView.value === 'upcoming' ? (
-          <UpcomingView />
-        ) : isBoardEmpty ? (
-          <div class="board-welcome" data-testid="board-welcome">
-            <div class="board-welcome-icon">&#128203;</div>
-            <h2>No tasks yet</h2>
-            <p>
-              Click <strong>+</strong> to create your first one.
-            </p>
-          </div>
-        ) : groupBy.value === 'status' ? (
-          <ListView />
-        ) : (
-          renderSwimlanes()
-        )}
-      </main>
-
-      {activeView.value !== 'upcoming' && groupBy.value === 'none' && <ColumnIndicator />}
-
-      {activeView.value !== 'upcoming' && (
+      {onBoards && (
         <button
           class="fab"
           onClick={() => {
@@ -438,6 +413,9 @@ export function KanbanBoard() {
           +
         </button>
       )}
+
+      {/* The item screen covers the page on a phone, so the tab bar steps aside while it is open. */}
+      {!selectedItem.value && <TabBar />}
 
       {selectedItem.value && <CardDetail />}
       {showCreateModal.value && <CreateItemModal />}
@@ -456,9 +434,9 @@ export function KanbanBoard() {
           token={token}
           onClose={() => {
             setShowProfile(false);
-            // AC6: Return focus to dropdown trigger after dialog closes
+            // AC6: Return focus to the row that opened the dialog
             requestAnimationFrame(() => {
-              const trigger = document.querySelector<HTMLElement>('[data-testid="user-dropdown-trigger"]');
+              const trigger = document.querySelector<HTMLElement>('[data-testid="settings-edit-profile"]');
               trigger?.focus();
             });
           }}

@@ -210,7 +210,7 @@ export function ControlBar() {
     setMenuOpen(false);
   };
 
-  const isUpcoming = activeView.value === 'upcoming';
+  const isUpcoming = activeView.value === 'today';
 
   // Upcoming view: show search + board chips only
   // Shared filter popup renderer (mobile bottom sheet)

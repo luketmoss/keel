@@ -46,7 +46,6 @@ export const FAMILIES = {
     'column-add-btn',
     'column-settings-delete-btn',
     'date-clear-btn',
-    'user-dropdown-trigger',
   ],
   'Chips and toggles': [
     'filter-chip',
@@ -69,8 +68,6 @@ export const FAMILIES = {
     'archive-item',
     'kebab-item',
     'overflow-menu-item',
-    'user-dropdown-edit-profile',
-    'user-dropdown-signout',
     'subtask-menu-item',
     'subtask-title',
     'editable-value',
@@ -78,7 +75,7 @@ export const FAMILIES = {
     'completed-date-btn',
     'column-add-row',
   ],
-  Navigation: ['view-tab', 'settings-tab', 'column-indicator-dot'],
+  Navigation: ['bottom-nav-tab', 'rail-item', 'settings-row', 'settings-tab', 'column-indicator-dot'],
   Fields: [
     'filter-search-input',
     'subtask-add-input',

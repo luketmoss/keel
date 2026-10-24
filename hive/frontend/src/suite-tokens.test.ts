@@ -43,6 +43,12 @@ const HIVE_ROOT = [
   '--focus-ring-offset',
   // #453's touch-target floor
   '--touch-target',
+  // #623's shell: rail widths, icon size, page-title and glance figures
+  '--rail-width',
+  '--rail-width-compact',
+  '--icon-md',
+  '--figure-lg',
+  '--figure-md',
 ];
 const HIVE_THEME = [
   '--color-primary',
@@ -175,6 +181,12 @@ describe('AC3: exactly this moves', () => {
     '--color-overlay',
     '--color-shadow',
     '--color-shadow-strong',
+    // #623's shell tokens are Hive's own and new
+    '--rail-width',
+    '--rail-width-compact',
+    '--icon-md',
+    '--figure-lg',
+    '--figure-md',
   ];
 
   it.each([
@@ -240,11 +252,10 @@ describe('AC4: no hover tint moves by more than 0.02 alpha', () => {
     expect(tokens(resolved, '[data-theme="dark"]')['--color-overlay']).toBe('rgba(0, 0, 0, 0.6)');
   });
 
-  it('the three shadows are shadows, black in both themes', () => {
+  it('the two shadows are shadows, black in both themes', () => {
     for (const [sel, token] of [
       ['.detail-panel', '--color-shadow-strong'],
       ['.theme-toggle-active', '--color-shadow-strong'],
-      ['.view-tab-active', '--color-shadow'],
     ]) {
       const m = new RegExp(`${sel.replace('.', '\\.')}\\s*\\{[^}]*\\}`).exec(raw)!;
       expect(m[0]).toContain(`var(${token})`);

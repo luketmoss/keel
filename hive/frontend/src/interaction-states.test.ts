@@ -651,10 +651,9 @@ describe.each(THEMES)('AC8: quiet and icon controls keep 4.5:1 under hover and p
 
 // ── AC9: the five fills in dark ─────────────────────────────────────────────
 
-describe('AC9: the five gold fills read in dark', () => {
+describe('AC9: the gold fills read in dark', () => {
   const FILLS: [string, string[]][] = [
     ['.fab', ['fab']],
-    ['.user-avatar-placeholder', ['user-avatar-placeholder']],
     ['.filter-badge', ['filter-badge']],
     ['.view-toggle-active', ['view-toggle-btn', 'view-toggle-active']],
     ['.filter-chip-due.filter-chip-active', ['filter-chip', 'filter-chip-due', 'filter-chip-active']],
@@ -696,8 +695,9 @@ describe('AC9: the five gold fills read in dark', () => {
 describe('AC10: selected keeps its ARIA state', () => {
   const SELECTED: Record<string, string[]> = {
     'filter-chip': ['aria-pressed'],
-    'theme-toggle-btn': ['aria-pressed'],
-    'view-tab': ['aria-selected', 'aria-current', 'aria-pressed'],
+    'theme-toggle-btn': ['aria-checked', 'aria-pressed'],
+    'bottom-nav-tab': ['aria-current'],
+    'rail-item': ['aria-current'],
     'settings-tab': ['aria-selected', 'aria-current', 'aria-pressed'],
     'color-swatch': ['aria-checked', 'aria-pressed'],
     'column-color-swatch': ['aria-checked', 'aria-pressed'],
@@ -707,8 +707,12 @@ describe('AC10: selected keeps its ARIA state', () => {
 
   it.each(Object.entries(SELECTED))('every .%s exposes its state', (cls, attrs) => {
     // The overflow menu's group-by choices are the radios; its other items are plain actions.
+    // The rail's New board is an action and its person a second way to Settings, not destinations.
     const found = controls.filter(
-      (c) => c.classes.includes(cls) && (cls !== 'overflow-menu-item' || c.role === 'menuitemradio'),
+      (c) =>
+        c.classes.includes(cls) &&
+        (cls !== 'overflow-menu-item' || c.role === 'menuitemradio') &&
+        !(cls === 'rail-item' && (c.classes.includes('rail-new-board') || c.classes.includes('rail-person'))),
     );
     expect(found.length).toBeGreaterThan(0);
     for (const c of found)

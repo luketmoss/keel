@@ -47,7 +47,7 @@ async function setup() {
     makeItem({ id: 'item-secret', title: 'Hidden', board_id: 'board-3' }),
   ];
   store.activeBoardId.value = 'board-1';
-  store.activeView.value = 'board';
+  store.activeView.value = 'boards';
   store.selectedItemId.value = null;
   store.toastMessage.value = null;
   return store;
@@ -73,12 +73,12 @@ describe('#240 AC1: opening an item puts it in the URL', () => {
 
   it('keeps existing board and view params alongside item', async () => {
     const { selectItem } = await setup();
-    window.history.replaceState(null, '', '?board=board-1&view=upcoming');
+    window.history.replaceState(null, '', '?board=board-1&view=today');
 
     selectItem('item-a');
 
     expect(params().get('board')).toBe('board-1');
-    expect(params().get('view')).toBe('upcoming');
+    expect(params().get('view')).toBe('today');
     expect(params().get('item')).toBe('item-a');
   });
 
@@ -165,7 +165,7 @@ describe('#240 AC2: a cold item URL lands on the item board', () => {
 describe('#240 AC3: closing the detail clears the param', () => {
   it('clearSelectedItem removes item but leaves board and view', async () => {
     const { selectItem, clearSelectedItem, selectedItemId } = await setup();
-    window.history.replaceState(null, '', '?board=board-1&view=upcoming');
+    window.history.replaceState(null, '', '?board=board-1&view=today');
     selectItem('item-a');
 
     clearSelectedItem();
@@ -173,7 +173,7 @@ describe('#240 AC3: closing the detail clears the param', () => {
     expect(selectedItemId.value).toBeNull();
     expect(params().get('item')).toBeNull();
     expect(params().get('board')).toBe('board-1');
-    expect(params().get('view')).toBe('upcoming');
+    expect(params().get('view')).toBe('today');
   });
 
   it('switchBoard drops the item param along with the selection', async () => {
@@ -237,32 +237,32 @@ describe('#240 AC4: an unresolvable item degrades gracefully', () => {
   });
 });
 
-describe('#240 AC5: upcoming view keeps its context', () => {
-  it('opens the item over Upcoming without forcing a board view', async () => {
+describe('#240 AC5: Today keeps its context', () => {
+  it('opens the item over Today without forcing a board view', async () => {
     const store = await setup();
-    window.history.replaceState(null, '', '?view=upcoming&item=item-b');
+    window.history.replaceState(null, '', '?view=today&item=item-b');
     store.initActiveViewFromUrl();
 
     store.initSelectedItemFromUrl();
 
-    expect(store.activeView.value).toBe('upcoming');
+    expect(store.activeView.value).toBe('today');
     expect(store.selectedItemId.value).toBe('item-b');
     // Board resolved for state only - the board param stays absent
     expect(params().get('board')).toBeNull();
     expect(store.activeBoardId.value).toBe('board-2');
   });
 
-  it('returns to Upcoming with view=upcoming intact on close', async () => {
+  it('returns to Today with view=today intact on close', async () => {
     const store = await setup();
-    window.history.replaceState(null, '', '?view=upcoming&item=item-b');
+    window.history.replaceState(null, '', '?view=today&item=item-b');
     store.initActiveViewFromUrl();
     store.initSelectedItemFromUrl();
 
     store.clearSelectedItem();
 
-    expect(params().get('view')).toBe('upcoming');
+    expect(params().get('view')).toBe('today');
     expect(params().get('item')).toBeNull();
-    expect(store.activeView.value).toBe('upcoming');
-    expect(document.title).toBe('Hive — Upcoming');
+    expect(store.activeView.value).toBe('today');
+    expect(document.title).toBe('Hive — Today');
   });
 });

@@ -42,7 +42,7 @@ async function setup() {
   ] as any;
   store.items.value = [makeItem({ id: 'item-a', title: 'Buy milk', board_id: 'board-1' })];
   store.activeBoardId.value = 'board-1';
-  store.activeView.value = 'board';
+  store.activeView.value = 'boards';
   store.selectedItemId.value = null;
   store.showCreateModal.value = false;
   store.createModalInitialDueDate.value = null;

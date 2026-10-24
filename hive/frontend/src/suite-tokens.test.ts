@@ -49,6 +49,11 @@ const HIVE_ROOT = [
   '--icon-md',
   '--figure-lg',
   '--figure-md',
+  // #624's Today: the glance figure, the two rings, the row avatar
+  '--figure-xl',
+  '--ring-lg',
+  '--ring-md',
+  '--avatar-sm',
 ];
 const HIVE_THEME = [
   '--color-primary',
@@ -64,10 +69,6 @@ const HIVE_THEME = [
   '--color-col-pink',
   '--color-col-teal',
   '--color-col-amber',
-  '--color-bucket-overdue',
-  '--color-bucket-this-week',
-  '--color-bucket-next-week',
-  '--color-bucket-later',
   '--color-overdue',
   '--color-demo-bg',
   '--color-demo-text',
@@ -166,6 +167,12 @@ describe('AC3: exactly this moves', () => {
     ['--focus-ring-offset', null, '2px'],
     ['--touch-target', null, '44px'],
   ];
+  const GONE = [
+    '--color-bucket-overdue',
+    '--color-bucket-this-week',
+    '--color-bucket-next-week',
+    '--color-bucket-later',
+  ];
   // Tokens the suite defines and Hive did not: they arrive unused.
   const ARRIVE = [
     '--nav-height',
@@ -187,6 +194,10 @@ describe('AC3: exactly this moves', () => {
     '--icon-md',
     '--figure-lg',
     '--figure-md',
+    '--figure-xl',
+    '--ring-lg',
+    '--ring-md',
+    '--avatar-sm',
   ];
 
   it.each([
@@ -203,6 +214,8 @@ describe('AC3: exactly this moves', () => {
     const want: typeof changed = {};
     for (const [k, a, b] of [...expected, ...STATES]) want[k] = [a, b];
     for (const k of ARRIVE) if (!(k in was)) want[k] = [null, now[k] ?? null];
+    // #624 removed Upcoming's four bucket pastels with the view that drew them.
+    for (const k of GONE) want[k] = [was[k] ?? null, null];
     // Values compared without whitespace; the keys must match exactly.
     expect(sorted(Object.keys(changed))).toEqual(sorted(Object.keys(want)));
     for (const k of Object.keys(want)) {
@@ -277,8 +290,13 @@ describe('AC5: nothing reads --color-border-light as an outline', () => {
     }
   });
 
-  it('no rule reads --color-border-light', () => {
-    expect(stripComments(raw)).not.toContain('var(--color-border-light)');
+  it("no rule reads --color-border-light, except Today's hairlines and ring track (#624)", () => {
+    // A hairline between rows and the unfilled part of a ring are decoration, not the
+    // outline of a control; the design note for #624 names the token for both.
+    const reads = [...stripComments(raw).matchAll(/([^{}]+)\{[^{}]*var\(--color-border-light\)[^{}]*\}/g)].map((m) =>
+      m[1].trim(),
+    );
+    expect(reads.filter((sel) => !/^\.today-/.test(sel))).toEqual([]);
   });
 });
 

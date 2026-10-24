@@ -29,6 +29,15 @@ const { mockBoardStore } = vi.hoisted(() => {
     labels: { value: [{ label: 'Urgent', color: '#ff0000' }] },
     openDetailWithTitleEdit: { value: false },
     clearCreateItemUrlParams: vi.fn(),
+    activeView: { value: 'boards' as string },
+    activeBoardId: { value: 'b1' },
+    accessibleBoards: {
+      value: [
+        { id: 'b1', name: 'Family', icon: '' },
+        { id: 'b2', name: 'Work', icon: '' },
+      ],
+    },
+    firstStatusNameForBoard: (id: string) => (id === 'b2' ? 'Backlog' : 'To Do'),
   };
   return { mockBoardStore };
 });
@@ -56,6 +65,8 @@ beforeEach(() => {
   mockBoardStore.showCreateModal.value = true;
   mockBoardStore.createModalInitialStatus.value = null;
   mockBoardStore.createModalInitialDueDate.value = null;
+  mockBoardStore.activeView.value = 'boards';
+  mockBoardStore.activeBoardId.value = 'b1';
 });
 
 // --- Inline Sub-tasks (Issue #55) ---
@@ -661,5 +672,43 @@ describe('CreateItemModal — deep-link due date pre-fill (Issue #263)', () => {
 
     expect(document.activeElement).toBe(main);
     main.remove();
+  });
+});
+
+// #624: opened from Today, the form asks which board the item goes on.
+describe('Board field (#624)', () => {
+  beforeEach(() => {
+    mockBoardStore.activeView.value = 'today';
+    mockBoardStore.createModalInitialDueDate.value = '2026-10-24';
+  });
+
+  it('is absent on a board, where the board is already known', () => {
+    mockBoardStore.activeView.value = 'boards';
+    const { queryByText } = render(<CreateItemModal />);
+    expect(queryByText('Board')).toBeNull();
+  });
+
+  it('offers one chip per board, defaulting to the active one, with the due date preset', () => {
+    const { getByText, container } = render(<CreateItemModal />);
+    expect(getByText('Board')).not.toBeNull();
+    const chips = container.querySelectorAll('.board-choice-chip');
+    expect(chips.length).toBe(2);
+    expect(chips[0].getAttribute('aria-pressed')).toBe('true');
+    expect(chips[1].getAttribute('aria-pressed')).toBe('false');
+    expect((container.querySelector('#due-date') as HTMLInputElement).value).toBe('2026-10-24');
+  });
+
+  it("creates the item on the chosen board, in that board's first column", () => {
+    const { container } = render(<CreateItemModal />);
+    fireEvent.click(container.querySelectorAll('.board-choice-chip')[1]);
+    fireEvent.input(container.querySelector('#title') as HTMLInputElement, { target: { value: 'Pay invoice' } });
+    fireEvent.submit(container.querySelector('form') as HTMLFormElement);
+    expect(mockCreateItem).toHaveBeenCalledTimes(1);
+    expect(mockCreateItem.mock.calls[0][0]).toMatchObject({
+      title: 'Pay invoice',
+      board_id: 'b2',
+      status: 'Backlog',
+      due_date: '2026-10-24',
+    });
   });
 });

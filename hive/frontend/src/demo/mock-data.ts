@@ -231,7 +231,7 @@ export const MOCK_ITEMS: ItemWithRow[] = [
     title: 'Fix leaky faucet',
     description: 'Kitchen sink has been dripping. Check the washer first.',
     status: 'In Progress',
-    owner: 'Dad',
+    owner: 'Demo User',
     due_date: daysFromNow(7),
 
     labels: 'Home',
@@ -251,7 +251,7 @@ export const MOCK_ITEMS: ItemWithRow[] = [
     title: 'Science fair project',
     description: 'Build a model volcano. Need baking soda, vinegar, and paint.',
     status: 'In Progress',
-    owner: 'Kiddo',
+    owner: 'Demo User',
     due_date: daysFromNow(3),
 
     labels: 'School, Important',
@@ -332,7 +332,7 @@ export const MOCK_ITEMS: ItemWithRow[] = [
     title: 'Return library books',
     description: 'Three books due — check the living room shelf.',
     status: 'To Do',
-    owner: 'Kiddo',
+    owner: 'Demo User',
     due_date: daysAgo(2),
 
     labels: 'Errands',
@@ -452,7 +452,7 @@ export const MOCK_ITEMS: ItemWithRow[] = [
     title: 'Call insurance company',
     description: 'Ask about the home policy renewal.',
     status: 'In Progress',
-    owner: 'Mom',
+    owner: 'Demo User',
     due_date: daysFromNow(0),
 
     labels: '',
@@ -492,7 +492,7 @@ export const MOCK_ITEMS: ItemWithRow[] = [
     title: 'Submit expense report',
     description: 'March expenses need to be filed.',
     status: 'To Do',
-    owner: 'Dad',
+    owner: 'Demo User',
     due_date: daysAgo(3),
 
     labels: 'Errands',

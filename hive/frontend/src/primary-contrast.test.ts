@@ -37,12 +37,6 @@ const COLUMNS = [
   '--color-col-teal',
   '--color-col-amber',
 ];
-const BUCKETS = [
-  '--color-bucket-overdue',
-  '--color-bucket-this-week',
-  '--color-bucket-next-week',
-  '--color-bucket-later',
-];
 
 /** Every light surface the primary is drawn on as text, tints included. */
 function surfaces(): [string, RGB][] {
@@ -57,7 +51,7 @@ function surfaces(): [string, RGB][] {
   // sit on the white surface.
   out.push(['8% tint on page', over(PRIMARY, 0.08, page)]);
   for (const pct of [8, 10, 12, 18]) out.push([`${pct}% tint on surface`, over(PRIMARY, pct / 100, white)]);
-  for (const n of [...COLUMNS, ...BUCKETS]) out.push([n, hex(light[n])]);
+  for (const n of COLUMNS) out.push([n, hex(light[n])]);
   return out;
 }
 

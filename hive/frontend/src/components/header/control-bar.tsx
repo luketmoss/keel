@@ -14,10 +14,6 @@ import {
   setGroupBy,
   boardLabels as labelsStore,
   rootItems,
-  activeView,
-  upcomingFilterSearch,
-  upcomingFilterBoards,
-  toggleUpcomingBoard,
 } from '../../state/board-store';
 
 /**
@@ -135,36 +131,6 @@ export function ControlBar() {
     [localSearch, clearSearch],
   );
 
-  // Upcoming search state
-  const [localUpcomingSearch, setLocalUpcomingSearch] = useState('');
-  const upcomingSearchRef = useRef<HTMLInputElement>(null);
-  const upcomingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const handleUpcomingSearchInput = useCallback((e: Event) => {
-    const value = (e.target as HTMLInputElement).value;
-    setLocalUpcomingSearch(value);
-    if (upcomingDebounceRef.current) clearTimeout(upcomingDebounceRef.current);
-    upcomingDebounceRef.current = setTimeout(() => {
-      upcomingFilterSearch.value = value;
-    }, 150);
-  }, []);
-
-  const clearUpcomingSearch = useCallback(() => {
-    setLocalUpcomingSearch('');
-    upcomingFilterSearch.value = '';
-    upcomingSearchRef.current?.focus();
-  }, []);
-
-  const handleUpcomingSearchKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && localUpcomingSearch) {
-        e.preventDefault();
-        clearUpcomingSearch();
-      }
-    },
-    [localUpcomingSearch, clearUpcomingSearch],
-  );
-
   const handleBoardChange = (e: Event) => {
     const value = (e.target as HTMLSelectElement).value;
     if (value === '__new__') {
@@ -210,9 +176,6 @@ export function ControlBar() {
     setMenuOpen(false);
   };
 
-  const isUpcoming = activeView.value === 'today';
-
-  // Upcoming view: show search + board chips only
   // Shared filter popup renderer (mobile bottom sheet)
   const renderFilterPopup = (content: any, hasActive: boolean, onReset?: () => void) =>
     filtersExpanded ? (
@@ -258,89 +221,6 @@ export function ControlBar() {
         </div>
       </div>
     ) : null;
-
-  if (isUpcoming) {
-    const upcomingActiveCount =
-      (upcomingFilterSearch.value ? 1 : 0) + (upcomingFilterBoards.value.size < accessibleBoards.value.length ? 1 : 0);
-
-    const upcomingFilterChips = (
-      <>
-        <div class="filter-search-wrapper" data-testid="upcoming-search-wrapper">
-          <input
-            ref={upcomingSearchRef}
-            type="text"
-            class="filter-search-input"
-            placeholder="Search cards..."
-            aria-label="Search cards"
-            value={localUpcomingSearch}
-            onInput={handleUpcomingSearchInput}
-            onKeyDown={handleUpcomingSearchKeyDown}
-            data-testid="upcoming-search-input"
-          />
-          {localUpcomingSearch && (
-            <button
-              class="filter-search-clear"
-              aria-label="Clear search"
-              onClick={clearUpcomingSearch}
-              data-testid="upcoming-search-clear"
-            >
-              &times;
-            </button>
-          )}
-        </div>
-
-        {accessibleBoards.value.length > 1 && (
-          <div
-            role="group"
-            aria-label="Filter by board"
-            class="filter-chip-group"
-            data-testid="upcoming-board-filter-group"
-          >
-            <span class="filter-chip-group-label">Board:</span>
-            {accessibleBoards.value.map((b) => {
-              const active = upcomingFilterBoards.value.has(b.id);
-              return (
-                <button
-                  key={b.id}
-                  class={`filter-chip${active ? ' filter-chip-active' : ''}`}
-                  aria-pressed={active ? 'true' : 'false'}
-                  onClick={() => toggleUpcomingBoard(b.id)}
-                  data-testid={`upcoming-board-chip-${b.id}`}
-                >
-                  {b.icon && <span aria-hidden="true">{b.icon} </span>}
-                  {b.name}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </>
-    );
-
-    return (
-      <div class="control-bar" data-testid="control-bar">
-        <div class="control-bar-section control-bar-filters">
-          <button
-            class="filter-toggle"
-            aria-expanded={filtersExpanded}
-            onClick={() => setFiltersExpanded((prev) => !prev)}
-            data-testid="upcoming-filter-toggle"
-          >
-            Filters
-            {upcomingActiveCount > 0 && <span class="filter-badge">{upcomingActiveCount}</span>}
-          </button>
-
-          {/* Desktop: inline (always visible, toggle hidden via CSS) */}
-          <div class="control-bar-filter-content control-bar-filter-desktop" data-testid="upcoming-filter-content">
-            {upcomingFilterChips}
-          </div>
-
-          {/* Mobile: bottom sheet popup */}
-          {renderFilterPopup(upcomingFilterChips, upcomingActiveCount > 0)}
-        </div>
-      </div>
-    );
-  }
 
   const searchInput = (
     <div class="filter-search-wrapper" data-testid="filter-search-wrapper">

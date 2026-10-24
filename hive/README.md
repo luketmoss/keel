@@ -51,7 +51,7 @@ Open http://localhost:5176/?demo=true — you'll see the board with mock data. N
 
 - **Multi-board support** — create separate boards per team, project, or context; share boards with other users
 - Three-column Kanban board (To Do, In Progress, Done) with drag-and-drop and business rule enforcement
-- **Upcoming view** — cross-board timeline of items due today, this week, and later
+- **Today** — what is due across every board: week strip, glance row, overdue, in progress and up next, with check-off in place
 - Card detail panel with inline editing
 - Sub-task support with progress tracking
 - Filter by owner or label
@@ -73,9 +73,9 @@ hive/
 │   ├── src/
 │   │   ├── api/              # Google Sheets REST API wrapper
 │   │   ├── auth/             # Google OAuth (GIS token model)
-│   │   ├── components/       # UI components (board, upcoming view, header, shared)
+│   │   ├── components/       # UI components (board, today, header, shared)
 │   │   │   ├── board/        # Kanban board, board switcher, sharing
-│   │   │   ├── upcoming/     # Upcoming cross-board timeline view
+│   │   │   ├── today/        # Today: what is due across boards
 │   │   │   ├── header/       # App header, control bar, view toggle
 │   │   │   └── shared/       # Reusable components (labels, icons, modals)
 │   │   ├── demo/             # Demo mode (mock data, no auth)

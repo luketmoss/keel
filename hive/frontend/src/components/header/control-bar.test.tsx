@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, cleanup, fireEvent, act } from '@testing-library/preact';
 import { ControlBar } from './control-bar';
 
-const { mockState, mockSwitchBoard, mockSetGroupBy, mockToggleUpcomingBoard } = vi.hoisted(() => ({
+const { mockState, mockSwitchBoard, mockSetGroupBy } = vi.hoisted(() => ({
   mockState: {
     boards: [{ id: 'b1', name: 'Work', icon: '' }] as any[],
     activeBoardId: 'b1',
@@ -28,12 +28,9 @@ const { mockState, mockSwitchBoard, mockSetGroupBy, mockToggleUpcomingBoard } = 
       { id: '2', title: 'Task 2' },
       { id: '3', title: 'Task 3' },
     ] as any[],
-    upcomingFilterSearch: '',
-    upcomingFilterBoards: new Set(['b1', 'b2']) as Set<string>,
   },
   mockSwitchBoard: vi.fn(),
   mockSetGroupBy: vi.fn(),
-  mockToggleUpcomingBoard: vi.fn(),
 }));
 
 vi.mock('../../state/board-store', () => ({
@@ -128,27 +125,12 @@ vi.mock('../../state/board-store', () => ({
       return mockState.activeView;
     },
   },
-  upcomingFilterSearch: {
-    get value() {
-      return mockState.upcomingFilterSearch;
-    },
-    set value(v: string) {
-      mockState.upcomingFilterSearch = v;
-    },
-  },
-  upcomingFilterBoards: {
-    get value() {
-      return mockState.upcomingFilterBoards;
-    },
-  },
-  toggleUpcomingBoard: (...args: any[]) => mockToggleUpcomingBoard(...args),
 }));
 
 afterEach(() => {
   cleanup();
   mockSwitchBoard.mockClear();
   mockSetGroupBy.mockClear();
-  mockToggleUpcomingBoard.mockClear();
   Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 0 });
 });
 
@@ -173,8 +155,6 @@ beforeEach(() => {
     { id: '2', title: 'Task 2' },
     { id: '3', title: 'Task 3' },
   ];
-  mockState.upcomingFilterSearch = '';
-  mockState.upcomingFilterBoards = new Set(['b1', 'b2']);
   Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 0 });
 });
 
@@ -556,77 +536,6 @@ describe('ControlBar', () => {
       const { container } = render(<ControlBar />);
       const todayChip = container.querySelector('[data-testid="filter-due-today"]');
       expect(todayChip!.getAttribute('aria-pressed')).toBe('false');
-    });
-  });
-
-  describe('Today (Upcoming) view — filter bar in control bar', () => {
-    beforeEach(() => {
-      mockState.activeView = 'today';
-    });
-
-    it('renders control-bar (not null) in upcoming view', () => {
-      const { container } = render(<ControlBar />);
-      expect(container.querySelector('[data-testid="control-bar"]')).not.toBeNull();
-    });
-
-    it('renders search input in upcoming view', () => {
-      Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1280 });
-      const { container } = render(<ControlBar />);
-      expect(container.querySelector('[data-testid="upcoming-search-input"]')).not.toBeNull();
-    });
-
-    it('renders board filter chips in upcoming view when multiple boards exist', () => {
-      Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1280 });
-      const { container } = render(<ControlBar />);
-      expect(container.querySelector('[data-testid="upcoming-board-filter-group"]')).not.toBeNull();
-    });
-
-    it('renders one chip per accessible board', () => {
-      Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1280 });
-      const { container } = render(<ControlBar />);
-      const chips = container.querySelectorAll('[data-testid^="upcoming-board-chip-"]');
-      expect(chips.length).toBe(2);
-    });
-
-    it('board chips use filter-chip class', () => {
-      Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1280 });
-      const { container } = render(<ControlBar />);
-      const chip = container.querySelector('[data-testid="upcoming-board-chip-b1"]');
-      expect(chip!.classList.contains('filter-chip')).toBe(true);
-    });
-
-    it('active board chip has filter-chip-active class', () => {
-      mockState.upcomingFilterBoards = new Set(['b1', 'b2']);
-      Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1280 });
-      const { container } = render(<ControlBar />);
-      const chip = container.querySelector('[data-testid="upcoming-board-chip-b1"]');
-      expect(chip!.classList.contains('filter-chip-active')).toBe(true);
-    });
-
-    it('clicking board chip calls toggleUpcomingBoard', () => {
-      Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1280 });
-      const { container } = render(<ControlBar />);
-      fireEvent.click(container.querySelector('[data-testid="upcoming-board-chip-b1"]') as HTMLElement);
-      expect(mockToggleUpcomingBoard).toHaveBeenCalledWith('b1');
-    });
-
-    it('does not render board selector or due/label chips in upcoming view', () => {
-      Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1280 });
-      const { container } = render(<ControlBar />);
-      expect(container.querySelector('[data-testid="control-bar-board-select"]')).toBeNull();
-      expect(container.querySelector('[data-testid="filter-due-today"]')).toBeNull();
-    });
-
-    it('does not render overflow menu in upcoming view', () => {
-      const { container } = render(<ControlBar />);
-      expect(container.querySelector('[data-testid="overflow-menu-btn"]')).toBeNull();
-    });
-
-    it('hides board filter group when only one board', () => {
-      mockState.accessibleBoards = [{ id: 'b1', name: 'Work', icon: '' }];
-      Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1280 });
-      const { container } = render(<ControlBar />);
-      expect(container.querySelector('[data-testid="upcoming-board-filter-group"]')).toBeNull();
     });
   });
 

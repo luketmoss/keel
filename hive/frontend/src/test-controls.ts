@@ -29,6 +29,7 @@ export const FAMILIES = {
     'subtask-date-add-inline',
     'overflow-menu-btn',
     'login-link',
+    'today-action-btn',
   ],
   'Icon buttons': [
     'btn-icon',
@@ -46,6 +47,8 @@ export const FAMILIES = {
     'column-add-btn',
     'column-settings-delete-btn',
     'date-clear-btn',
+    'today-round-btn',
+    'today-check',
   ],
   'Chips and toggles': [
     'filter-chip',
@@ -61,6 +64,9 @@ export const FAMILIES = {
     'status-chevron',
     'check-icon',
     'subtask-date-inline',
+    'today-chip',
+    'today-day',
+    'board-choice-chip',
   ],
   'Rows and cards': [
     'card',
@@ -74,6 +80,7 @@ export const FAMILIES = {
     'due-date-btn',
     'completed-date-btn',
     'column-add-row',
+    'today-row-title',
   ],
   Navigation: ['bottom-nav-tab', 'rail-item', 'settings-row', 'settings-tab', 'column-indicator-dot'],
   Fields: [

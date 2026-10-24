@@ -7,13 +7,13 @@ import {
   initActiveViewFromUrl,
   initSelectedItemFromUrl,
   initCreateItemFromUrl,
-  initUpcomingBoardFilter,
   permissions,
   currentUserEmail,
   selectItem,
   clearSelectedItem,
   statuses,
   isTerminalStatus,
+  isTerminalStatusForBoard,
   defaultStatusName,
   boardStatuses,
 } from './board-store';
@@ -331,7 +331,6 @@ export async function loadBoard(token: string, user?: UserInfo | null) {
     // Initialize active board from URL or default to first accessible board
     if (boardsData.length > 0) {
       initActiveBoardFromUrl();
-      initUpcomingBoardFilter();
       initActiveViewFromUrl();
       // #240: last — board and view resolution both clear the selection.
       initSelectedItemFromUrl();
@@ -599,7 +598,7 @@ export async function moveItem(
 
   const oldItem = { ...item };
   const oldItems = [...items.value];
-  const terminal = isTerminalStatus(newStatus);
+  const terminal = isTerminalStatusForBoard(newStatus, item.board_id || activeBoardId.value);
   // #239: the durable completion event, taken from the item as it was before
   // applyStatusSideEffects clears completed_at. Both branches below use it.
   const completionAction = statusTransitionAuditAction(oldItem, terminal);
@@ -1380,7 +1379,7 @@ export async function moveItemToBoard(
 // are untouched, which is what makes it reversible: unarchiving clears the cell
 // and everything is back exactly as it was.
 
-import { navigate, upcomingFilterBoards, showArchivedBoardsDialog } from './board-store';
+import { navigate, showArchivedBoardsDialog } from './board-store';
 
 /** Long enough to reach the toast's button — the same window item deletes give Undo. */
 const ACTION_TOAST_MS = 10000;
@@ -1404,14 +1403,6 @@ async function setBoardArchived(boardId: string, archivedAt: string, actor: stri
     const next = accessibleBoards.value[0];
     if (next) switchBoard(next.id);
   }
-  // The Upcoming filter is a snapshot of the boards at load. Keep it in step:
-  // an archived board leaves it (or the filter badge miscounts) and a restored one joins it.
-  const oldUpcomingFilter = upcomingFilterBoards.value;
-  const nextUpcomingFilter = new Set(oldUpcomingFilter);
-  if (archiving) nextUpcomingFilter.delete(boardId);
-  else nextUpcomingFilter.add(boardId);
-  upcomingFilterBoards.value = nextUpcomingFilter;
-
   try {
     await setBoardArchivedAtApi(boardId, archivedAt, token);
     await appendAuditEntry(
@@ -1426,7 +1417,6 @@ async function setBoardArchived(boardId: string, archivedAt: string, actor: stri
     return true;
   } catch (err: any) {
     boards.value = oldBoards;
-    upcomingFilterBoards.value = oldUpcomingFilter;
     if (activeBoardId.value !== oldActiveBoardId) switchBoard(oldActiveBoardId);
     if (!isReauthFailure(err)) {
       showToast(`Failed to ${archiving ? 'archive' : 'restore'} board: ` + err.message, 'error');

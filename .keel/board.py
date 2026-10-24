@@ -31,10 +31,11 @@ column that is sorted manually; it warns when a view sorts by a field.
 "nothing to pick" - they are read-only, and written to be called by a schedule
 that has no one to read its output.
 
-Without `gh` (a cloud Claude Code session), the same command runs remotely in
-.github/workflows/board.yml, and its stdout, stderr and exit code come back
-here. Those sessions can reach only repo-scoped REST endpoints, so the board
-itself is out of reach.
+In a cloud Claude Code session (CLAUDE_CODE_REMOTE=true), or without `gh`, the
+same command runs remotely in .github/workflows/board.yml, and its stdout,
+stderr and exit code come back here. Those sessions can reach only repo-scoped
+REST endpoints - a `gh` there is refused GraphQL - so the board itself is out
+of reach.
 """
 
 import argparse
@@ -223,7 +224,7 @@ def item_values(number):
     return values
 
 
-# --- without gh -------------------------------------------------------------
+# --- remotely (cloud sessions) ----------------------------------------------
 
 
 def rest(method, path, body=None):
@@ -737,7 +738,7 @@ def main():
     # board.yml passes its arguments as a JSON array, so none pass through a shell.
     argv = json.loads(os.environ["BOARD_ARGS"]) if os.environ.get("BOARD_ARGS") else sys.argv[1:]
     args = parser.parse_args(argv)
-    if not shutil.which("gh"):
+    if os.environ.get("CLAUDE_CODE_REMOTE") == "true" or not shutil.which("gh"):
         run_remotely(argv)
     args.func(args)
 

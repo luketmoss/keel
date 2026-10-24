@@ -18,7 +18,9 @@ runs still in progress.
 section, replacing an existing one up to the next `## ` heading or appending one
 if there is none. Every other section is left byte for byte as it was.
 
-Requires `gh`. A cloud session has none and keeps the skills' GitHub MCP prose.
+Requires `gh`, and calls only repo-scoped REST through `gh api`, so it also runs
+in a cloud session whose `gh` is refused GraphQL. A session with no `gh` at all
+keeps the skills' GitHub MCP prose.
 """
 
 import argparse
@@ -51,10 +53,16 @@ UNFINISHED = ("queued", "in_progress", "waiting", "pending", "requested")
 # --- gh ----------------------------------------------------------------------
 
 
-def gh(args):
+# REST only, through `gh api`: a cloud session's `gh` is refused GraphQL, which
+# `gh pr view`, `gh run list` and `gh issue view` use underneath.
+
+
+def gh(args, check=True):
     result = subprocess.run(["gh"] + args, capture_output=True,
                             encoding="utf-8")
     if result.returncode != 0:
+        if not check:
+            return None
         sys.exit("gh failed: gh {}\n{}".format(" ".join(args),
                                                result.stderr.strip()))
     return result.stdout
@@ -62,9 +70,8 @@ def gh(args):
 
 def pr_head(pr):
     """(head sha, base branch) - read fresh, because a push moves the head."""
-    data = json.loads(gh(["pr", "view", str(pr), "--repo", REPO, "--json",
-                          "headRefOid,baseRefName"]))
-    return data["headRefOid"], data["baseRefName"]
+    data = json.loads(gh(["api", "repos/{}/pulls/{}".format(REPO, pr)]))
+    return data["head"]["sha"], data["base"]["ref"]
 
 
 def pr_files(pr):
@@ -98,10 +105,28 @@ def base_workflows(base):
 
 
 def head_runs(sha):
-    out = gh(["run", "list", "--repo", REPO, "--commit", sha, "--limit", "100",
-              "--json",
-              "databaseId,workflowName,status,conclusion,url,event"])
-    return json.loads(out)
+    """The head commit's runs, in the shape the rest of this script reads."""
+    out = gh(["api", "repos/{}/actions/runs?head_sha={}&per_page=100".format(
+        REPO, sha)])
+    return [{"databaseId": run["id"], "workflowName": run["name"],
+             "status": run["status"], "conclusion": run["conclusion"] or "",
+             "url": run["html_url"], "event": run["event"]}
+            for run in json.loads(out)["workflow_runs"]]
+
+
+def failed_step(run_id):
+    """(job, step) of the first failed step, from the jobs API.
+
+    The fallback when the log can't be read: log downloads redirect to a blob
+    host that cloud sessions are refused.
+    """
+    out = gh(["api", "repos/{}/actions/runs/{}/jobs".format(REPO, run_id)],
+             check=False)
+    for job in json.loads(out)["jobs"] if out else []:
+        for step in job.get("steps") or []:
+            if step.get("conclusion") == "failure":
+                return job["name"], step["name"]
+    return None
 
 
 # --- path filters ------------------------------------------------------------
@@ -381,10 +406,14 @@ def pick_error(log):
 def failure_quote(run):
     conclusion = run["conclusion"]
     if conclusion == "failure":
-        found = pick_error(gh(["run", "view", str(run["databaseId"]),
-                               "--repo", REPO, "--log-failed"]))
+        log = gh(["run", "view", str(run["databaseId"]), "--repo", REPO,
+                  "--log-failed"], check=False)
+        found = pick_error(log) if log else None
         if found:
             return "failure  {}: {}".format(*found)
+        step = failed_step(run["databaseId"])
+        if step:
+            return "failure  {} / {}".format(*step)
         return "failure"
     if conclusion == "action_required":
         return "action_required  (waiting for approval)"
@@ -555,8 +584,8 @@ def put_results(body, text):
 def cmd_results(args):
     with open(args.file, encoding="utf-8", newline="") as fh:
         text = fh.read()
-    body = json.loads(gh(["issue", "view", str(args.issue), "--repo", REPO,
-                          "--json", "body"]))["body"]
+    issue = "repos/{}/issues/{}".format(REPO, args.issue)
+    body = json.loads(gh(["api", issue]))["body"] or ""
     try:
         updated = put_results(body, text)
     except ValueError as err:
@@ -564,12 +593,11 @@ def cmd_results(args):
     if updated == body:
         print("#{} Results already up to date".format(args.issue))
         return 0
-    handle, path = tempfile.mkstemp(suffix=".md")
+    handle, path = tempfile.mkstemp(suffix=".json")
     try:
         with os.fdopen(handle, "w", encoding="utf-8", newline="") as out:
-            out.write(updated)
-        gh(["issue", "edit", str(args.issue), "--repo", REPO, "--body-file",
-            path])
+            json.dump({"body": updated}, out)
+        gh(["api", "-X", "PATCH", issue, "--input", path])
     finally:
         os.remove(path)
     print("#{} Results written".format(args.issue))

@@ -1,8 +1,9 @@
 name: board
 
 # Runs .keel/board.py for sessions that cannot reach the project board themselves.
-# Cloud Claude Code sessions have no `gh` and their GitHub access stops at
-# repos/luketmoss/keel/..., so a user-owned Projects v2 board is out of reach;
+# Cloud Claude Code sessions either have no `gh` or have one GitHub refuses
+# GraphQL, and their access stops at repos/luketmoss/keel/..., so a user-owned
+# Projects v2 board is out of reach;
 # .keel/board.py dispatches this workflow instead and reads the result back.
 #
 # repository_dispatch, not workflow_dispatch: the Claude GitHub App may not

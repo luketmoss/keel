@@ -46,8 +46,9 @@ exit code is the verdict: **0** every expected run passed, **1** a run failed or
 is absent (back to In Development), **2** the wait timed out with runs still in
 progress (`--timeout SECONDS`, 900 by default). Do not read the workflow files
 to work out what should have run; that is the script's job, from the base
-branch's copies. In a cloud session there is no `gh`: do the same by hand with
-the GitHub MCP tools, following the rules.
+branch's copies. It uses only REST, so it runs in a cloud session too; only
+in one with no `gh` at all, do the same by hand with the GitHub MCP tools,
+following the rules.
 
 1. **List the runs for the head commit.** Take the head SHA from the PR, then
    its runs, cross-checked against `statusCheckRollup`. **Runs for earlier

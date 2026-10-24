@@ -34,7 +34,7 @@ Refuse, and say why, if:
 - checks are failing, pending, or absent — a check that never ran is not a check
   that passed, and `/review` treats an empty rollup the same way. Run
   `python .keel/pr.py ci <pr>` for this: exit 0 clears it, anything else is the
-  refusal, and its output is the reason. (No `gh`, as in a cloud session: read
+  refusal, and its output is the reason. (With no `gh` at all: read
   `statusCheckRollup` from the PR instead.)
 - the PR has conflicts
 
@@ -112,7 +112,7 @@ python .keel/pr.py results <issue> <file>
 ```
 
 It replaces an existing `## Results` section, or appends one, and leaves every
-other section of the body byte for byte as it was. In a cloud session, edit the
+other section of the body byte for byte as it was. With no `gh` at all, edit the
 body through the GitHub MCP tools and keep the other sections the same way.
 
 ## Merge

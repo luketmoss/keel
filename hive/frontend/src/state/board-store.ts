@@ -143,40 +143,74 @@ export function setGroupBy(mode: GroupBy) {
   }
 }
 
-// --- Active view (Board vs Upcoming) ---
-export type ActiveView = 'board' | 'upcoming';
-export const activeView = signal<ActiveView>('board');
+// --- Active destination (#623): Today · Boards · Settings ---
+export type ActiveView = 'today' | 'boards' | 'settings';
+export const activeView = signal<ActiveView>('today');
 
-/** Switch to the upcoming view. Updates URL and hides board param. */
-export function switchToUpcoming() {
-  activeView.value = 'upcoming';
+/** The title for the current destination: a board by name once one is in the URL, else the destination's. */
+export function destinationTitle(): string {
+  if (activeView.value === 'today') return 'Hive \u2014 Today';
+  if (activeView.value === 'settings') return 'Hive \u2014 Settings';
+  const hasBoardParam = !!new URLSearchParams(window.location.search).get('board');
+  const board = hasBoardParam ? boards.value.find((b) => b.id === activeBoardId.value) : null;
+  return board ? `Hive \u2014 ${board.name}` : 'Hive \u2014 Boards';
+}
+
+/**
+ * Go to a destination. `pushState`, so the back button steps back through
+ * destinations. `boardId` opens that board under Boards. Leaving a destination
+ * drops `item`: an item belongs to the page it was opened over.
+ */
+export function navigate(view: ActiveView, boardId?: string) {
+  const url = destinationUrl(view, boardId);
+  selectedItemId.value = null;
+  if (view === 'boards' && boardId && boardId !== activeBoardId.value) enterBoard(boardId);
+  activeView.value = view;
+  if (url.toString() !== window.location.href) window.history.pushState(null, '', url.toString());
+  document.title = destinationTitle();
+}
+
+/** The address of a destination, keeping unrelated parameters such as `demo`. */
+export function destinationUrl(view: ActiveView, boardId?: string): URL {
   const url = new URL(window.location.href);
+  url.searchParams.delete('item');
   url.searchParams.delete('board');
-  url.searchParams.set('view', 'upcoming');
-  window.history.replaceState(null, '', url.toString());
-  document.title = 'Hive — Upcoming';
-}
-
-/** Switch back to board view. Restores board param from activeBoardId. */
-export function switchToBoard() {
-  activeView.value = 'board';
-  const url = new URL(window.location.href);
   url.searchParams.delete('view');
-  if (activeBoardId.value) {
-    url.searchParams.set('board', activeBoardId.value);
-  }
-  window.history.replaceState(null, '', url.toString());
-  const board = boards.value.find((b) => b.id === activeBoardId.value);
-  if (board) document.title = `Hive — ${board.name}`;
+  if (view === 'boards' && boardId) url.searchParams.set('board', boardId);
+  else url.searchParams.set('view', view);
+  return url;
 }
 
-/** Read view from URL on init. */
+/** Read the destination from the URL: on load, and when the back button changes it. */
 export function initActiveViewFromUrl() {
   const params = new URLSearchParams(window.location.search);
-  if (params.get('view') === 'upcoming') {
-    activeView.value = 'upcoming';
-    document.title = 'Hive — Upcoming';
+  const view = params.get('view');
+  if (view === 'settings' || view === 'today' || view === 'boards') {
+    activeView.value = view;
+  } else if (view === 'upcoming') {
+    // An old link: open Today and say so in the address bar, keeping the other parameters.
+    activeView.value = 'today';
+    const url = new URL(window.location.href);
+    url.searchParams.set('view', 'today');
+    window.history.replaceState(null, '', url.toString());
+  } else if (params.get('board') || params.get('item')) {
+    // A board or an item on its own is a link into a board.
+    activeView.value = 'boards';
+  } else {
+    activeView.value = 'today';
   }
+  document.title = destinationTitle();
+}
+
+/** The back and forward buttons: bring the destination, board and item back in step with the URL. */
+export function syncFromLocation() {
+  const boardParam = new URLSearchParams(window.location.search).get('board');
+  if (boardParam && boardParam !== activeBoardId.value && accessibleBoards.value.some((b) => b.id === boardParam)) {
+    activeBoardId.value = boardParam;
+  }
+  initActiveViewFromUrl();
+  selectedItemId.value = null;
+  initSelectedItemFromUrl();
 }
 
 // --- Upcoming view: filter signals ---
@@ -228,9 +262,7 @@ function syncSelectedItemParam(id: string | null) {
 
 /** The title to show when no item detail is open. */
 function contextTitle(): string {
-  if (activeView.value === 'upcoming') return 'Hive — Upcoming';
-  const board = boards.value.find((b) => b.id === activeBoardId.value);
-  return board ? `Hive — ${board.name}` : 'Hive';
+  return destinationTitle();
 }
 
 /**
@@ -277,11 +309,11 @@ export function initSelectedItemFromUrl() {
   }
 
   // AC2: the item's own board wins over whatever `board` named, or its absence.
-  // AC5: in the Upcoming view this is state only — the `board` param stays
+  // AC5: outside Boards this is state only — the `board` param stays
   // deleted and the view is not forced back to the board.
   if (item.board_id && item.board_id !== activeBoardId.value) {
     activeBoardId.value = item.board_id;
-    if (activeView.value !== 'upcoming') {
+    if (activeView.value === 'boards') {
       const url = new URL(window.location.href);
       url.searchParams.set('board', item.board_id);
       window.history.replaceState(null, '', url.toString());
@@ -537,20 +569,27 @@ export const showArchivedBoardsDialog = signal(false);
 // --- UI state for move-to-board modal ---
 export const showMoveToBoardModal = signal(false);
 
-/** Switch to a different board. Resets filters, grouping, and selection. */
-export function switchBoard(boardId: string) {
+/** The state half of opening a board: resets filters, grouping and selection, and lands on Boards. */
+function enterBoard(boardId: string) {
   activeBoardId.value = boardId;
+  activeView.value = 'boards';
   filterOwner.value = null;
   filterLabel.value = null;
   filterSearch.value = '';
   filterDue.value = null;
   groupBy.value = 'none';
   selectedItemId.value = null;
+}
+
+/** Switch to a different board (in place, no history entry). Resets filters, grouping, and selection. */
+export function switchBoard(boardId: string) {
+  enterBoard(boardId);
 
   // Update URL with board param. The `item` deep link belongs to the board we
   // are leaving, so it goes with the selection it described (#240, AC3).
   const url = new URL(window.location.href);
   url.searchParams.set('board', boardId);
+  url.searchParams.delete('view');
   url.searchParams.delete('item');
   window.history.replaceState(null, '', url.toString());
 

@@ -16,11 +16,10 @@ const mockState = {
   selectedItem: null as any,
   accessibleBoards: [] as any[],
   groupByValue: 'none' as string,
+  activeView: 'boards' as string,
 };
 
 const mockSwitchBoard = vi.fn();
-const mockSwitchToUpcoming = vi.fn();
-const mockSwitchToBoard = vi.fn();
 
 afterEach(() => {
   cleanup();
@@ -34,9 +33,8 @@ afterEach(() => {
   mockState.selectedItem = null;
   mockState.accessibleBoards = [];
   mockState.groupByValue = 'none';
+  mockState.activeView = 'boards';
   mockSwitchBoard.mockClear();
-  mockSwitchToUpcoming.mockClear();
-  mockSwitchToBoard.mockClear();
   mockMoveItem.mockClear();
 });
 
@@ -163,9 +161,11 @@ vi.mock('../../state/board-store', () => ({
   },
   setColumnSortMode: () => {},
   columnAnnouncement: { value: null },
-  activeView: { value: 'board' },
-  switchToUpcoming: (...args: any[]) => mockSwitchToUpcoming(...args),
-  switchToBoard: (...args: any[]) => mockSwitchToBoard(...args),
+  activeView: {
+    get value() {
+      return mockState.activeView;
+    },
+  },
   boardStatuses: {
     value: [
       {
@@ -208,17 +208,23 @@ vi.mock('../../state/actions', () => ({
   reorderItem: vi.fn(),
 }));
 
-// Mock new components
-vi.mock('../header/user-dropdown', () => ({
-  UserDropdown: (props: any) => (
-    <div data-testid="user-dropdown">
-      <span data-testid="user-dropdown-name">{props.displayName}</span>
-      {props.onOpenProfile && (
-        <button data-testid="user-dropdown-edit-profile" onClick={props.onOpenProfile}>
-          Edit profile
-        </button>
-      )}
-      <button data-testid="user-dropdown-signout" onClick={props.onSignOut}>
+// The shell has its own tests; here it only has to be there.
+vi.mock('../shell/nav-rail', () => ({
+  NavRail: (props: any) => <nav data-testid="nav-rail">{props.displayName}</nav>,
+}));
+vi.mock('../shell/tab-bar', () => ({
+  TabBar: () => <nav data-testid="tab-bar" />,
+}));
+vi.mock('../shell/settings-screen', () => ({
+  SettingsScreen: (props: any) => (
+    <div data-testid="settings-screen">
+      <button data-testid="settings-edit-profile" onClick={props.onEditProfile}>
+        Edit profile
+      </button>
+      <button data-testid="settings-shortcuts" onClick={props.onOpenShortcuts}>
+        Keyboard shortcuts
+      </button>
+      <button data-testid="settings-signout" onClick={props.onSignOut}>
         Sign out
       </button>
     </div>
@@ -263,9 +269,6 @@ vi.mock('../profile/profile-dialog', () => ({
 }));
 vi.mock('../archive/archive-dialog', () => ({
   ArchiveDialog: () => <div data-testid="archive-dialog" />,
-}));
-vi.mock('../shared/hive-logo', () => ({
-  HiveLogo: (props: any) => <svg data-testid="hive-logo" class={props.class} />,
 }));
 
 const mockAuth: AuthState = {
@@ -368,79 +371,77 @@ describe('KanbanBoard empty/welcome state (Issue #11)', () => {
   });
 });
 
-describe('KanbanBoard compact header (Issue #132)', () => {
-  describe('AC1: Header layout', () => {
-    it('renders UserDropdown instead of standalone theme toggle and sign out', () => {
-      mockState.items = [];
-      const { container } = renderBoard();
-      const dropdown = container.querySelector('[data-testid="user-dropdown"]');
-      expect(dropdown).not.toBeNull();
-      // No standalone ThemeToggle or Sign out in header
-      const headerRight = container.querySelector('.board-header-right');
-      expect(headerRight!.querySelector('[data-testid="theme-toggle"]')).toBeNull();
-    });
+describe('KanbanBoard shell (Issue #623)', () => {
+  it('renders the rail and the tab bar, and no header or user dropdown', () => {
+    mockState.items = [];
+    const { container } = renderBoard();
+    expect(container.querySelector('[data-testid="nav-rail"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="tab-bar"]')).not.toBeNull();
+    expect(container.querySelector('.board-header')).toBeNull();
+    expect(container.querySelector('[data-testid="user-dropdown"]')).toBeNull();
+    expect(container.querySelector('[data-testid="control-bar-view-tabs"]')).toBeNull();
+  });
 
-    it('renders ControlBar', () => {
+  it('passes the display name to the rail', () => {
+    mockState.items = [];
+    const { container } = renderBoard();
+    expect(container.querySelector('[data-testid="nav-rail"]')!.textContent).toBe('Luke');
+  });
+
+  it('hides the tab bar while an item is open', () => {
+    mockState.items = [];
+    mockState.selectedItem = { id: '1', title: 'x' };
+    const { container } = renderBoard();
+    expect(container.querySelector('[data-testid="tab-bar"]')).toBeNull();
+    expect(container.querySelector('[data-testid="card-detail"]')).not.toBeNull();
+  });
+
+  describe('Boards', () => {
+    it('renders the control bar, the board and the new-item button', () => {
       mockState.items = [];
       const { container } = renderBoard();
       expect(container.querySelector('[data-testid="control-bar"]')).not.toBeNull();
-    });
-
-    it('does not render standalone view-toggle-bar', () => {
-      mockState.items = [];
-      const { container } = renderBoard();
-      expect(container.querySelector('[data-testid="view-toggle-bar"]')).toBeNull();
-    });
-  });
-});
-
-describe('KanbanBoard view tabs in header (Issue #198)', () => {
-  describe('AC1: View tabs appear in header, not control bar', () => {
-    it('renders view tab group inside board-header-left', () => {
-      mockState.items = [];
-      const { container } = renderBoard();
-      const headerLeft = container.querySelector('.board-header-left');
-      expect(headerLeft!.querySelector('[data-testid="control-bar-view-tabs"]')).not.toBeNull();
-    });
-
-    it('view tab group has role="group" and aria-label="View"', () => {
-      mockState.items = [];
-      const { container } = renderBoard();
-      const tabGroup = container.querySelector('[data-testid="control-bar-view-tabs"]') as HTMLElement;
-      expect(tabGroup.getAttribute('role')).toBe('group');
-      expect(tabGroup.getAttribute('aria-label')).toBe('View');
+      expect(container.querySelector('[data-testid="board-welcome"]')).not.toBeNull();
+      expect(container.querySelector('.fab')).not.toBeNull();
     });
   });
 
-  describe('AC2 + AC3: Tab state and ARIA', () => {
-    it('Board tab has aria-pressed="true" when in board view', () => {
-      mockState.items = [];
-      const { container } = renderBoard();
-      const boardTab = container.querySelector('[data-testid="view-tab-board"]') as HTMLElement;
-      expect(boardTab.getAttribute('aria-pressed')).toBe('true');
+  describe('Today', () => {
+    beforeEach(() => {
+      mockState.activeView = 'today';
     });
 
-    it('Upcoming tab has aria-pressed="false" when in board view', () => {
-      mockState.items = [];
+    it('shows the existing Upcoming view with its control bar and no new-item button', () => {
       const { container } = renderBoard();
-      const upcomingTab = container.querySelector('[data-testid="view-tab-upcoming"]') as HTMLElement;
-      expect(upcomingTab.getAttribute('aria-pressed')).toBe('false');
+      expect(container.querySelector('[data-testid="upcoming-view"]')).not.toBeNull();
+      expect(container.querySelector('[data-testid="control-bar"]')).not.toBeNull();
+      expect(container.querySelector('.fab')).toBeNull();
+      expect(container.querySelector('[data-testid="board-welcome"]')).toBeNull();
+    });
+  });
+
+  describe('Settings', () => {
+    beforeEach(() => {
+      mockState.activeView = 'settings';
     });
 
-    it('clicking Upcoming tab calls switchToUpcoming', () => {
-      mockState.items = [];
+    it('shows the Settings screen alone: no control bar, board or new-item button', () => {
       const { container } = renderBoard();
-      const upcomingTab = container.querySelector('[data-testid="view-tab-upcoming"]') as HTMLElement;
-      fireEvent.click(upcomingTab);
-      expect(mockSwitchToUpcoming).toHaveBeenCalled();
+      expect(container.querySelector('[data-testid="settings-screen"]')).not.toBeNull();
+      expect(container.querySelector('[data-testid="control-bar"]')).toBeNull();
+      expect(container.querySelector('.fab')).toBeNull();
     });
 
-    it('clicking Board tab when already active does not call switchToBoard', () => {
-      mockState.items = [];
+    it('Edit profile opens the profile dialog', () => {
       const { container } = renderBoard();
-      const boardTab = container.querySelector('[data-testid="view-tab-board"]') as HTMLElement;
-      fireEvent.click(boardTab);
-      expect(mockSwitchToBoard).not.toHaveBeenCalled();
+      fireEvent.click(container.querySelector('[data-testid="settings-edit-profile"]') as HTMLElement);
+      expect(container.querySelector('[data-testid="profile-dialog"]')).not.toBeNull();
+    });
+
+    it('Keyboard shortcuts opens the help', () => {
+      const { container } = renderBoard();
+      fireEvent.click(container.querySelector('[data-testid="settings-shortcuts"]') as HTMLElement);
+      expect(container.querySelector('[data-testid="shortcuts-help"]')).not.toBeNull();
     });
   });
 });
@@ -615,6 +616,28 @@ describe('KanbanBoard keyboard shortcuts (Issue #91)', () => {
     });
   });
 
+  describe('#623: N and A act on a board only', () => {
+    it.each(['today', 'settings'])('N and A do nothing on %s', (view) => {
+      mockState.activeView = view;
+      renderBoard();
+
+      fireEvent.keyDown(document, { key: 'n' });
+      fireEvent.keyDown(document, { key: 'a' });
+
+      expect(mockState.showCreateModal).toBe(false);
+      expect(mockState.showArchiveDialog).toBe(false);
+    });
+
+    it('? still opens the help on Today', () => {
+      mockState.activeView = 'today';
+      const { container } = renderBoard();
+
+      fireEvent.keyDown(document, { key: '?' });
+
+      expect(container.querySelector('[data-testid="shortcuts-help"]')).not.toBeNull();
+    });
+  });
+
   describe('AC4: Shortcuts help overlay', () => {
     it('opens shortcuts help when ? is pressed', () => {
       mockState.items = [];
@@ -624,34 +647,6 @@ describe('KanbanBoard keyboard shortcuts (Issue #91)', () => {
 
       expect(queryByTestId('shortcuts-help')).not.toBeNull();
     });
-  });
-});
-
-describe('KanbanBoard logo in header (Issue #30 AC3)', () => {
-  it('renders HiveLogo in the board-header-left', () => {
-    mockState.items = [];
-    const { container } = renderBoard();
-    const headerLeft = container.querySelector('.board-header-left');
-    expect(headerLeft).not.toBeNull();
-    const logo = headerLeft!.querySelector('[data-testid="hive-logo"]');
-    expect(logo).not.toBeNull();
-  });
-
-  it('logo appears before the h1 heading', () => {
-    mockState.items = [];
-    const { container } = renderBoard();
-    const headerLeft = container.querySelector('.board-header-left');
-    const children = Array.from(headerLeft!.children);
-    const logoIdx = children.findIndex((c) => c.getAttribute('data-testid') === 'hive-logo');
-    const h1Idx = children.findIndex((c) => c.tagName === 'H1');
-    expect(logoIdx).toBeLessThan(h1Idx);
-  });
-
-  it('logo has the board-header-logo class', () => {
-    mockState.items = [];
-    const { container } = renderBoard();
-    const logo = container.querySelector('[data-testid="hive-logo"]');
-    expect(logo!.classList.contains('board-header-logo')).toBe(true);
   });
 });
 
@@ -692,19 +687,5 @@ describe('Status grouping renders ListView (Issue #137)', () => {
     expect(boardMain).not.toBeNull();
     const listView = boardMain!.querySelector('.list-view');
     expect(listView).toBeNull();
-  });
-});
-
-describe('KanbanBoard — Edit profile integration (Issue #136)', () => {
-  // AC2: Clicking "Edit profile" in dropdown opens ProfileDialog
-  it('passes onOpenProfile to UserDropdown and shows ProfileDialog on click', () => {
-    mockState.items = [];
-    const { container } = renderBoard();
-    // The mock UserDropdown renders an "Edit profile" button if onOpenProfile is provided
-    const editBtn = container.querySelector('[data-testid="user-dropdown-edit-profile"]');
-    expect(editBtn).not.toBeNull();
-    fireEvent.click(editBtn as HTMLElement);
-    const dialog = container.querySelector('[data-testid="profile-dialog"]');
-    expect(dialog).not.toBeNull();
   });
 });

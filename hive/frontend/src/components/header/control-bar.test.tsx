@@ -12,7 +12,7 @@ const { mockState, mockSwitchBoard, mockSetGroupBy, mockToggleUpcomingBoard } = 
     ] as any[],
     activeBoard: { name: 'Work' } as any,
     userBoardRole: 'owner' as string | null,
-    activeView: 'board' as string,
+    activeView: 'boards' as string,
     filterLabel: null as string | null,
     filterSearch: '',
     filterDue: null as string | null,
@@ -167,7 +167,7 @@ beforeEach(() => {
   mockState.groupBy = 'none';
   mockState.showCreateBoardModal = false;
   mockState.showShareModal = false;
-  mockState.activeView = 'board';
+  mockState.activeView = 'boards';
   mockState.rootItems = [
     { id: '1', title: 'Task 1' },
     { id: '2', title: 'Task 2' },
@@ -559,9 +559,9 @@ describe('ControlBar', () => {
     });
   });
 
-  describe('Upcoming view — filter bar in control bar', () => {
+  describe('Today (Upcoming) view — filter bar in control bar', () => {
     beforeEach(() => {
-      mockState.activeView = 'upcoming';
+      mockState.activeView = 'today';
     });
 
     it('renders control-bar (not null) in upcoming view', () => {
@@ -677,7 +677,7 @@ describe('ControlBar', () => {
 
   describe('Board view — normal render', () => {
     it('renders normally when activeView is board', () => {
-      mockState.activeView = 'board';
+      mockState.activeView = 'boards';
       const { container } = render(<ControlBar />);
       expect(container.querySelector('[data-testid="control-bar"]')).not.toBeNull();
       expect(container.querySelector('[data-testid="control-bar-board-select"]')).not.toBeNull();

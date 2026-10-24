@@ -73,7 +73,7 @@ beforeEach(() => {
     item('h-todo', 'home', 'To Do', tomorrow),
   ];
   upcomingFilterBoards.value = new Set(['home', 'garage']);
-  activeView.value = 'board';
+  activeView.value = 'boards';
   activeBoardId.value = 'garage';
   toastMessage.value = null;
 });

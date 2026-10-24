@@ -1380,7 +1380,7 @@ export async function moveItemToBoard(
 // are untouched, which is what makes it reversible: unarchiving clears the cell
 // and everything is back exactly as it was.
 
-import { activeView, switchToBoard, upcomingFilterBoards, showArchivedBoardsDialog } from './board-store';
+import { navigate, upcomingFilterBoards, showArchivedBoardsDialog } from './board-store';
 
 /** Long enough to reach the toast's button — the same window item deletes give Undo. */
 const ACTION_TOAST_MS = 10000;
@@ -1388,8 +1388,7 @@ const ACTION_TOAST_MS = 10000;
 /** Show a board in board view, from wherever the user is — including out from under the Archived boards dialog. */
 function openBoard(boardId: string) {
   showArchivedBoardsDialog.value = false;
-  switchBoard(boardId);
-  if (activeView.value !== 'board') switchToBoard();
+  navigate('boards', boardId);
 }
 
 async function setBoardArchived(boardId: string, archivedAt: string, actor: string, token: string): Promise<boolean> {

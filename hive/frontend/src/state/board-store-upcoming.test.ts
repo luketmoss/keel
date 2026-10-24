@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { ItemWithRow } from '../api/types';
 
 function makeItem(overrides: Partial<ItemWithRow>): ItemWithRow {
@@ -243,22 +243,76 @@ describe('AC5: Upcoming view filters', () => {
   });
 });
 
-describe('AC1: activeView routing', () => {
-  it('defaults to board view', async () => {
-    const store = await import('./board-store');
-    expect(store.activeView.value).toBe('board');
+describe('AC1: activeView routing (#623)', () => {
+  beforeEach(() => {
+    window.history.replaceState(null, '', '/');
   });
 
-  it('switches to upcoming view', async () => {
+  it('defaults to Today', async () => {
     const store = await import('./board-store');
-    store.switchToUpcoming();
-    expect(store.activeView.value).toBe('upcoming');
+    expect(store.activeView.value).toBe('today');
   });
 
-  it('switches back to board view', async () => {
+  it('navigates to Settings and back, one history entry each', async () => {
     const store = await import('./board-store');
-    store.switchToUpcoming();
-    store.switchToBoard();
-    expect(store.activeView.value).toBe('board');
+    const push = vi.spyOn(window.history, 'pushState');
+    store.navigate('settings');
+    expect(store.activeView.value).toBe('settings');
+    expect(new URLSearchParams(window.location.search).get('view')).toBe('settings');
+    expect(document.title).toBe('Hive — Settings');
+    store.navigate('today');
+    expect(store.activeView.value).toBe('today');
+    expect(document.title).toBe('Hive — Today');
+    expect(push).toHaveBeenCalledTimes(2);
+    push.mockRestore();
+  });
+
+  it('opens Boards with no board as ?view=boards', async () => {
+    const store = await import('./board-store');
+    store.navigate('boards');
+    expect(new URLSearchParams(window.location.search).get('view')).toBe('boards');
+    expect(document.title).toBe('Hive — Boards');
+  });
+
+  it('navigating to the current address pushes nothing', async () => {
+    const store = await import('./board-store');
+    store.navigate('settings');
+    const push = vi.spyOn(window.history, 'pushState');
+    store.navigate('settings');
+    expect(push).not.toHaveBeenCalled();
+    push.mockRestore();
+  });
+
+  it('keeps unrelated parameters such as demo', async () => {
+    const store = await import('./board-store');
+    window.history.replaceState(null, '', '/?demo=true');
+    store.navigate('settings');
+    expect(new URLSearchParams(window.location.search).get('demo')).toBe('true');
+  });
+
+  it('?view=upcoming opens Today and rewrites the URL, keeping other parameters', async () => {
+    const store = await import('./board-store');
+    window.history.replaceState(null, '', '/?view=upcoming&demo=true');
+    store.initActiveViewFromUrl();
+    const params = new URLSearchParams(window.location.search);
+    expect(store.activeView.value).toBe('today');
+    expect(params.get('view')).toBe('today');
+    expect(params.get('demo')).toBe('true');
+  });
+
+  it('no view opens Today; a board or an item on its own opens Boards', async () => {
+    const store = await import('./board-store');
+    window.history.replaceState(null, '', '/');
+    store.initActiveViewFromUrl();
+    expect(store.activeView.value).toBe('today');
+    window.history.replaceState(null, '', '/?board=board-1');
+    store.initActiveViewFromUrl();
+    expect(store.activeView.value).toBe('boards');
+    window.history.replaceState(null, '', '/?item=abc');
+    store.initActiveViewFromUrl();
+    expect(store.activeView.value).toBe('boards');
+    window.history.replaceState(null, '', '/?view=today&board=board-1');
+    store.initActiveViewFromUrl();
+    expect(store.activeView.value).toBe('today');
   });
 });

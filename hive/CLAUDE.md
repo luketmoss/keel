@@ -154,6 +154,7 @@ removes it. A trigger runs the **pushed** code, not a deployment, so a drifted
 - `hive/.gitattributes` pins `*.js`, `*.mjs` and `*.sh` to LF: vitest cannot load a shebang script checked out with CRLF, and bash rejects a CRLF `apps-script/tests/smoke.sh`
 
 ## Architecture Notes
+- Navigation (#623): a bottom tab bar below 768px, a left rail from there up (`components/shell/`), `?view=today | boards | settings`, `?board=<id>` for a board, `?item=<id>` over either. `navigate()` in `board-store.ts` pushes history; `switchBoard()` swaps the board in place
 - Frontend uses direct `fetch()` to the Sheets REST API (not gapi.client)
 - Auth: Google Identity Services (GIS) token model, through `@keel/auth` (#609, a `file:../../auth` dependency, keys prefixed `hive_`). `src/auth/auth-provider.tsx` only mirrors its session into context (plus the demo short-circuit, the one-time `hive_prior_user` migration and `updateUserName`); `login-screen.tsx` stays here. Renewal happens on the next tap, never on a timer or page load. `withReauth()` wraps every Sheets call and retries once on a 401 via `attemptReauth`. A change under `auth/` rebuilds Hive (`hive.yml` and `hive-pages.yml` trigger on it)
 - State: @preact/signals — module-level `signal()`/`computed()`. `useState` only for component-local state
@@ -240,8 +241,10 @@ deletes find it again.
 Respected by every agent. Add to this list when a decision gets made, so it
 stops being re-litigated three issues later.
 
-- **Desktop-first Kanban**, responsive down to 375px — the inverse of a
-  mobile-first app, because the board is the primary surface
+- **Today is home; a board is reached from Boards** (#622) — the daily question
+  is "what's due", asked on a phone, so the app opens on Today. A board is the
+  planning surface, reached from Boards, and still built to work well on desktop
+  (responsive down to 375px)
 - **Native HTML5 drag and drop** on desktop; touch drag is a separate concern
   (luketmoss/hive#122) and not a reason to add a library
 - **Touch targets ≥ 44×44px** — WCAG 2.5.5

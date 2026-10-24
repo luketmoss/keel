@@ -7,7 +7,7 @@ import { Toast } from './components/shared/toast';
 import { DemoBanner } from './demo/demo-banner';
 import { isDemoMode } from './demo/is-demo-mode';
 import { loadBoard, refreshItems, NotAllowedError } from './state/actions';
-import { loading, showToast } from './state/board-store';
+import { loading, showToast, syncFromLocation } from './state/board-store';
 
 function AuthenticatedApp() {
   const { token, user, logout } = useAuth();
@@ -37,6 +37,12 @@ function AuthenticatedApp() {
     };
   }, [token, demo]);
 
+  // #623: the back and forward buttons step through destinations.
+  useEffect(() => {
+    window.addEventListener('popstate', syncFromLocation);
+    return () => window.removeEventListener('popstate', syncFromLocation);
+  }, []);
+
   if (loading.value) {
     return (
       <div class="loading-screen">
@@ -47,10 +53,10 @@ function AuthenticatedApp() {
   }
 
   return (
-    <>
+    <div class="app-root">
       {demo && <DemoBanner />}
       <KanbanBoard />
-    </>
+    </div>
   );
 }
 

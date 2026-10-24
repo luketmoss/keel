@@ -1,884 +1,640 @@
 <title>Morning Brief</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Schibsted+Grotesk:wght@400;500;700;800&display=swap">
+<meta name="claude:viewport-fit-sides" content="cover">
 <style>
-/* Layout: one column, summary first. Level badge, recovery tiles, today (events, hourly weather for trails and home), load bars, next 3 days with hourly home weather, body and board. Multi-column from 720px. */
+/* Layout: one column on a phone, summary first. Today's call (level gauge, the session, the signals), your day on one
+   time axis (weather, sessions, calendar, wake and bed), last night, yesterday beside training load, the next 3 days,
+   board beside body. Two and three columns from 720px. Tokens are Thrive's own (ui/tokens/suite.css and
+   thrive/frontend/src/global.css), copied so the page stands alone. */
 :root {
-  --bg: #eef1f4;
-  --surface: #ffffff;
-  --ink: #1b2430;
-  --muted: #5d6b7a;
-  --line: #d8dee5;
-  --accent: #2f6f8f;
-  --lvl: #d98a00;
-  --lvl-soft: #fbefd2;
-  --warn: #b4540a;
-  --temp: #c2562b;
-  --wind: #3d78a0;
-  --rain: #1f8a68;
-  --gust: #1b2430;
-  --block: #cfd8e3;
-  --best: #2f8a5c;
-  --bar-easy: #6fae85;
-  --bar-med: #e0a23a;
-  --bar-hard: #cf5c3f;
-  --bar-none: #b9c3ce;
-  --display: "Schibsted Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Consolas, monospace;
+  --bg: #f0f2f5; --surface: #ffffff; --raised: #f5f6f8; --border: #dadce0; --border-light: #e8eaed;
+  --text: #1f1f1f; --text-2: #5f6368; --muted: #606b76;
+  --primary: #2f66f0; --success: #2e7d32; --warning: #a05d00; --warning-light: #fff8e1; --danger: #b71c1c;
+  --heart: #c2185b; --hrv: #00796b; --sleep: #7c3aed; --deep: #1e3a8a; --rem: #7c3aed; --light: #5b8def; --awake: #8a6d00;
+  --water: #0b6fb8; --coffee: #6f4e37; --alcohol: #b45309; --unwind: #5e7c62;
+  --t-weight: #c53030; --t-stretch: #2e7d32; --t-bike: #1565c0; --t-hike: #5d4037; --t-run: #9d174d; --t-walk: #10605a;
+  --e-easy: #2e7d32; --e-medium: #a05d00; --e-hard: #c62828; --e-none: #b9c0c8;
+  --lv-rest: #4f6f8f; --lv-easy: #2e7d32; --lv-plan: #a05d00; --lv-push: #c62828;
+  --night: rgba(30, 40, 70, .09); --cal: #c3d2ee; --cal-text: #1d2b48;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  --r-lg: 16px; --r-md: 8px;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #11171e;
-    --surface: #1a232d;
-    --ink: #e8edf2;
-    --muted: #9aa8b6;
-    --line: #2b3745;
-    --accent: #6fb4d4;
-    --lvl: #f0b43c;
-    --lvl-soft: #3a2f14;
-    --warn: #f0a068;
-    --temp: #f08a5d;
-    --wind: #7fb6d6;
-    --rain: #5cc9a4;
-    --gust: #e8edf2;
-    --block: #33465c;
-    --best: #5cc08a;
-    --bar-easy: #5a9a72;
-    --bar-med: #d09a38;
-    --bar-hard: #d86b4f;
-    --bar-none: #3d4b5a;
+    --bg: #121212; --surface: #1a1a1e; --raised: #252528; --border: #3c3c3c; --border-light: #2c2c31;
+    --text: #e8eaed; --text-2: #9aa0a6; --muted: #868e98;
+    --primary: #6e97ff; --success: #66bb6a; --warning: #ffb74d; --warning-light: #2d2210; --danger: #f26b68;
+    --heart: #f47a95; --hrv: #4fd1c5; --sleep: #b9a3ff; --deep: #5470d0; --rem: #b9a3ff; --light: #4f86f7; --awake: #f2c94c;
+    --water: #5bb8f5; --coffee: #c9a27e; --alcohol: #f5a524; --unwind: #9cbf9f;
+    --t-weight: #fca5a5; --t-stretch: #86efac; --t-bike: #93c5fd; --t-hike: #d7ccc8; --t-run: #f5a8d3; --t-walk: #7fded3;
+    --e-easy: #86efac; --e-medium: #ffb74d; --e-hard: #ef9a9a; --e-none: #3c3c42;
+    --lv-rest: #8fb0d0; --lv-easy: #86efac; --lv-plan: #ffb74d; --lv-push: #ef9a9a;
+    --night: rgba(0, 0, 0, .4); --cal: #4a5f8f; --cal-text: #eef2fb;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #11171e;
-  --surface: #1a232d;
-  --ink: #e8edf2;
-  --muted: #9aa8b6;
-  --line: #2b3745;
-  --accent: #6fb4d4;
-  --lvl: #f0b43c;
-  --lvl-soft: #3a2f14;
-  --warn: #f0a068;
-  --temp: #f08a5d;
-  --wind: #7fb6d6;
-  --rain: #5cc9a4;
-  --gust: #e8edf2;
-  --block: #33465c;
-  --best: #5cc08a;
-  --bar-easy: #5a9a72;
-  --bar-med: #d09a38;
-  --bar-hard: #d86b4f;
-  --bar-none: #3d4b5a;
+  --bg: #121212; --surface: #1a1a1e; --raised: #252528; --border: #3c3c3c; --border-light: #2c2c31;
+  --text: #e8eaed; --text-2: #9aa0a6; --muted: #868e98;
+  --primary: #6e97ff; --success: #66bb6a; --warning: #ffb74d; --warning-light: #2d2210; --danger: #f26b68;
+  --heart: #f47a95; --hrv: #4fd1c5; --sleep: #b9a3ff; --deep: #5470d0; --rem: #b9a3ff; --light: #4f86f7; --awake: #f2c94c;
+  --water: #5bb8f5; --coffee: #c9a27e; --alcohol: #f5a524; --unwind: #9cbf9f;
+  --t-weight: #fca5a5; --t-stretch: #86efac; --t-bike: #93c5fd; --t-hike: #d7ccc8; --t-run: #f5a8d3; --t-walk: #7fded3;
+  --e-easy: #86efac; --e-medium: #ffb74d; --e-hard: #ef9a9a; --e-none: #3c3c42;
+  --lv-rest: #8fb0d0; --lv-easy: #86efac; --lv-plan: #ffb74d; --lv-push: #ef9a9a;
+  --night: rgba(0, 0, 0, .4); --cal: #4a5f8f; --cal-text: #eef2fb;
   color-scheme: dark;
 }
-* { box-sizing: border-box; }
-body { background: var(--bg); color: var(--ink); font-family: var(--display); font-size: 15px; line-height: 1.45; padding-inline: 16px; padding-block: 20px 40px; }
-.wrap { max-width: 920px; margin-inline: auto; display: flex; flex-direction: column; gap: 14px; }
-h1, h2, h3, p { margin: 0; text-wrap: balance; }
-.label { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; }
-.muted { color: var(--muted); }
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 var(--font); -webkit-font-smoothing: antialiased; }
+h1, h2, h3, p { margin: 0; }
+.wrap { max-width: 960px; margin: 0 auto; padding-block: 20px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 12px; }
+.num { font-variant-numeric: tabular-nums; }
+.card { background: var(--surface); border-radius: var(--r-lg); padding: 16px; min-width: 0; }
+.ch { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 8px; margin-bottom: 12px; }
+.ch h2 { font-size: 1rem; font-weight: 600; white-space: nowrap; }
+.ch .aside { font-size: .8125rem; color: var(--text-2); }
+.ic { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.sub { font-size: .8125rem; color: var(--text-2); }
+.na { color: var(--muted); font-weight: 500; }
+.grid { display: grid; gap: 12px; grid-template-columns: 1fr; }
+.notice { background: var(--warning-light); color: var(--text); border-radius: var(--r-md); padding: 10px 14px; font-size: .9375rem; display: flex; gap: 8px; align-items: baseline; }
+.notice .ic { color: var(--warning); width: 16px; height: 16px; position: relative; top: 3px; }
 
-.date { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
-.date h1 { font-size: 15px; font-weight: 500; color: var(--muted); }
-.hero { background: var(--lvl-soft); border: 1px solid var(--lvl); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
-.hero .lv { font-size: clamp(40px, 12vw, 64px); font-weight: 800; line-height: 1; letter-spacing: -.02em; color: var(--lvl); }
-.hero p { max-width: 64ch; }
-.scale { display: flex; gap: 4px; margin-top: 4px; }
-.scale span { flex: 1; text-align: center; font-family: var(--mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; padding: 4px 0; border-radius: 4px; background: var(--surface); color: var(--muted); border: 1px solid var(--line); }
-.scale span.on { background: var(--lvl); color: #1b1300; border-color: var(--lvl); font-weight: 500; }
+.top { display: flex; flex-direction: column; gap: 2px; padding: 4px 2px 8px; }
+.top .meta { display: flex; align-items: center; gap: 8px; font-size: .875rem; color: var(--text-2); flex-wrap: wrap; }
+.top .meta .ic { width: 15px; height: 15px; color: var(--warning); }
+.top h1 { font-size: 2.25rem; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; }
 
-.sec { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.sec > h2 { font-size: 13px; font-weight: 700; letter-spacing: .02em; }
-.grid3 { display: grid; grid-template-columns: 1fr; gap: 10px; }
-.tile { display: flex; flex-direction: column; gap: 6px; }
-.tile .val { font-size: 28px; font-weight: 700; line-height: 1.1; }
-.tile .val small { font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--muted); margin-left: 4px; }
-.tile .sub { font-size: 12.5px; color: var(--muted); }
-.spark { width: 100%; height: 44px; display: block; }
-.spark .avg { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; opacity: .7; }
-.spark .ln { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-.spark .dot { fill: var(--accent); }
+.call { display: grid; grid-template-columns: auto 1fr; gap: 12px 16px; align-items: center; }
+.gauge { width: 112px; height: 100px; position: relative; }
+.gauge svg { width: 100%; height: 100%; overflow: visible; }
+.gauge .lvw { position: absolute; inset: 28px 0 0; text-align: center; }
+.gauge .lvw b { display: block; font-size: 1.6rem; font-weight: 800; line-height: 1.1; color: var(--lvl); }
+.gauge .lvw b.long { font-size: 1.05rem; }
+.gauge .lvw span { font-size: .6875rem; color: var(--text-2); text-transform: uppercase; letter-spacing: .06em; }
+.what { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.what .when { font-size: .8125rem; color: var(--text-2); }
+.what h3 { font-size: 1.375rem; font-weight: 700; line-height: 1.25; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.call .why { grid-column: 1 / -1; font-size: .9375rem; }
+.chip-type { display: inline-flex; align-items: center; gap: 5px; font-size: .75rem; font-weight: 600; padding: 2px 9px 2px 7px; border-radius: 999px; color: var(--tc); background: color-mix(in srgb, var(--tc) 14%, transparent); white-space: nowrap; }
+.chip-type .ic { width: 14px; height: 14px; }
+.signals { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.sig { background: var(--raised); border-radius: var(--r-md); padding: 8px 10px; display: flex; flex-direction: column; gap: 1px; border: 1px solid transparent; }
+.sig.down { border-color: color-mix(in srgb, var(--e-hard) 55%, transparent); }
+.sig .k { font-size: .75rem; color: var(--text-2); display: flex; align-items: center; gap: 5px; }
+.sig .k .ic { width: 13px; height: 13px; color: var(--c); }
+.sig .v { font-size: 1.125rem; font-weight: 700; }
+.sig .v small { font-size: .75rem; font-weight: 500; color: var(--text-2); margin-left: 2px; }
+.sig .d { font-size: .75rem; font-weight: 600; color: var(--text-2); }
+.sig .d.down { color: var(--danger); } .sig .d.good { color: var(--success); }
 
-.bars { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; align-items: end; height: 120px; }
-.bar { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; height: 100%; min-width: 0; }
-.bar .col { width: 100%; border-radius: 4px 4px 0 0; background: var(--bar-none); min-height: 3px; }
-.bar .n { font-family: var(--mono); font-size: 11px; color: var(--muted); }
-.days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 6px; text-align: center; font-family: var(--mono); font-size: 11px; color: var(--muted); }
-.key { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); margin-top: 8px; }
-.key i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.tl { width: 100%; height: auto; display: block; overflow: visible; }
+.tl text { font: 500 10px var(--font); fill: var(--text-2); }
+.tl .t-temp { font-weight: 700; font-size: 10.5px; fill: var(--text); }
+.tl .night { fill: var(--night); }
+.tl .lane { fill: var(--raised); }
+.tl .cal { fill: var(--cal); }
+.tl .cal-t { fill: var(--cal-text); font-weight: 600; }
+.tl .mk { stroke: var(--text-2); stroke-width: 1.2; stroke-dasharray: 2 2; }
+.tl .mk-t { font-size: 9.5px; font-weight: 600; fill: var(--text); }
+.tl .best { fill: none; stroke: var(--success); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.tl-key { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .75rem; color: var(--text-2); margin-top: 6px; }
+.tl-key span::before { content: ""; display: inline-block; width: 12px; height: 9px; border-radius: 2px; background: var(--c); margin-right: 5px; vertical-align: -1px; }
+.tl-key span.dash::before { background: none; border: 1.5px dashed var(--success); width: 9px; height: 6px; }
+.tl-notes { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; font-size: .875rem; }
+.tl-notes div { display: flex; gap: 8px; align-items: baseline; }
+.tl-notes .ic { width: 15px; height: 15px; position: relative; top: 2px; color: var(--text-2); }
+.tl-notes b { font-weight: 600; }
+.tl-notes .flag .ic, .tl-notes .flag b { color: var(--danger); }
 
-.sess { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; justify-content: space-between; }
-.sess h3 { font-size: 20px; font-weight: 700; }
-.pick { margin-top: 8px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--best); display: flex; flex-direction: column; gap: 2px; }
-.pick b { color: var(--best); }
-.wx { margin-top: 14px; display: flex; flex-direction: column; gap: 4px; }
-.wx .hd { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.wx .hd b { font-size: 14px; }
-.chart { width: 100%; height: auto; display: block; overflow: visible; }
-.chart text { font-family: var(--mono); font-size: 9.5px; fill: var(--muted); }
-.chart .tv { fill: var(--temp); font-weight: 500; }
-.chart .grid { stroke: var(--line); stroke-width: 1; }
-.chart .tl { fill: none; stroke: var(--temp); stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; }
-.chart .td { fill: var(--temp); }
-.chart .wb { fill: var(--wind); opacity: .85; }
-.chart .gk { stroke: var(--gust); stroke-width: 1.5; }
-.chart .blk { fill: var(--block); opacity: .7; }
-.chart .bst { fill: none; stroke: var(--best); stroke-width: 1.5; stroke-dasharray: 4 3; }
-.sun { display: inline-flex; align-items: center; gap: 4px; font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
-.sun .ic { width: 18px; height: 18px; fill: none; stroke: var(--lvl); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; margin-left: 8px; }
-.sun .ic:first-child { margin-left: 0; }
-.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11.5px; color: var(--muted); margin-top: 2px; }
-.legend i { display: inline-block; vertical-align: middle; margin-right: 5px; }
-.legend .l1 { width: 14px; height: 2px; background: var(--temp); }
-.legend .l2 { width: 9px; height: 9px; background: var(--wind); opacity: .85; }
-.legend .l3 { width: 2px; height: 9px; background: var(--gust); }
-.legend .l4 { width: 12px; height: 9px; background: var(--block); }
-.legend .l5 { width: 12px; height: 9px; border: 1.5px dashed var(--best); }
-.chart .wv { fill: var(--wind); font-weight: 500; font-size: 11px; }
-.chart .rv { fill: var(--rain); font-weight: 500; font-size: 11px; }
+.sleep-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.big { font-size: 2.25rem; font-weight: 700; line-height: 1; }
+.big small { font-size: 1rem; font-weight: 600; color: var(--text-2); margin: 0 4px 0 1px; }
+.score { text-align: right; }
+.score b { font-size: 1.75rem; font-weight: 700; line-height: 1; display: block; }
+.stages { display: flex; height: 10px; border-radius: 999px; overflow: hidden; gap: 2px; margin: 14px 0 6px; }
+.stages i { display: block; height: 100%; }
+.st-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .8125rem; color: var(--text-2); }
+.st-legend span::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: var(--c); margin-right: 5px; }
+.st-legend b { color: var(--text); font-weight: 600; margin-left: 3px; }
+.mt { display: flex; flex-direction: column; gap: 6px; }
+.mt .k { display: flex; align-items: center; gap: 6px; font-size: .875rem; font-weight: 600; }
+.mt .k .ic { color: var(--c); }
+.mt .val { font-size: 1.75rem; font-weight: 700; line-height: 1.1; }
+.mt .val small { font-size: .875rem; color: var(--text-2); font-weight: 500; margin-left: 3px; }
+.mt .val.na { font-size: 1.125rem; }
+.spark { width: 100%; height: 40px; display: block; overflow: visible; }
+.range { position: relative; height: 18px; margin-top: 2px; }
+.range .track { position: absolute; left: 0; right: 0; top: 7px; height: 4px; border-radius: 2px; background: var(--border-light); }
+.range .avg { position: absolute; top: 3px; width: 2px; height: 12px; background: var(--text-2); border-radius: 1px; }
+.range .me { position: absolute; top: 3px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: var(--c); border: 2px solid var(--surface); }
 
-.ev { display: flex; gap: 8px; align-items: baseline; font-size: 13.5px; }
-.ev .t { font-family: var(--mono); font-size: 11.5px; color: var(--muted); min-width: 96px; flex: none; }
-.ev.plan .t { color: var(--accent); }
-.ev span:last-child { min-width: 0; }
-.evs { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
-.none { font-size: 13px; color: var(--muted); }
-.days4 { display: grid; grid-template-columns: 1fr; gap: 10px; }
-.day { display: flex; flex-direction: column; gap: 6px; }
-.day .hd { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-.day .hd b { font-size: 15px; }
-.day .sm { font-family: var(--mono); font-size: 12px; color: var(--muted); }
-.row2 { display: grid; grid-template-columns: 1fr; gap: 10px; }
-.item { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; padding-block: 4px; border-top: 1px solid var(--line); }
-.item:first-of-type { border-top: 0; }
-.pill { font-family: var(--mono); font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--accent); color: var(--accent); white-space: nowrap; }
-.foot { font-size: 12.5px; color: var(--muted); padding-top: 4px; }
+.sess { display: flex; flex-direction: column; gap: 4px; padding-top: 12px; margin-top: 12px; border-top: 1px solid var(--border-light); }
+.sess:first-of-type { padding-top: 0; margin-top: 0; border-top: 0; }
+.act { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: start; }
+.act h3 { font-size: 1.0625rem; font-weight: 700; }
+.act .fig { font-size: 1.75rem; font-weight: 700; line-height: 1; text-align: right; }
+.act .fig small { font-size: .875rem; color: var(--text-2); font-weight: 500; margin-left: 2px; }
+.tags { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 2px; }
+.eff { display: inline-flex; align-items: center; gap: 5px; font-size: .8125rem; font-weight: 600; color: var(--ec); }
+.eff::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ec); }
+.quote { margin-top: 8px; padding: 10px 12px; border-radius: var(--r-md); background: var(--raised); font-size: .9375rem; }
+.quote .sub { display: block; margin-bottom: 2px; }
+.drinks { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 8px; margin-top: 12px; }
+.dk { background: var(--raised); border-radius: var(--r-md); padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.dk.water { grid-column: span 2; }
+.dk .k { display: flex; align-items: center; gap: 5px; font-size: .75rem; color: var(--text-2); }
+.dk .k .ic { width: 14px; height: 14px; color: var(--c); }
+.dk .v { font-size: 1.25rem; font-weight: 700; line-height: 1.2; }
+.dk .v small { font-size: .75rem; font-weight: 500; color: var(--text-2); margin-left: 2px; }
+.dk .v.na { font-size: .8125rem; padding-top: 4px; }
+.dk .bar { height: 4px; border-radius: 2px; background: var(--border-light); overflow: hidden; margin-top: 3px; }
+.dk .bar i { display: block; height: 100%; background: var(--water); border-radius: 2px; }
+
+.bars { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; align-items: end; height: 92px; }
+.bars .b { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; gap: 3px; }
+.bars .b span { font-size: .6875rem; color: var(--text-2); }
+.bars .b i { display: block; width: 100%; max-width: 28px; border-radius: 6px 6px 3px 3px; background: var(--ec); min-height: 4px; }
+.bars-x { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; text-align: center; font-size: .75rem; color: var(--text-2); margin-top: 6px; }
+.bars-x b { display: block; color: var(--text); font-weight: 600; }
+.key { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: .75rem; color: var(--text-2); margin-top: 10px; }
+.key span::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ec); margin-right: 5px; }
+
+.ahead { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.dc { background: var(--raised); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.dc .hd { display: flex; align-items: center; gap: 10px; }
+.dc .dt { width: 40px; text-align: center; flex: none; }
+.dc .dt span { display: block; font-size: .6875rem; font-weight: 600; color: var(--text-2); text-transform: uppercase; }
+.dc .dt b { font-size: 1.25rem; font-weight: 700; line-height: 1.1; }
+.dc .wx { display: flex; align-items: center; gap: 8px; margin-left: auto; font-size: .8125rem; color: var(--text-2); }
+.dc .wx .ic { width: 26px; height: 26px; color: var(--warning); }
+.dc .wx b { color: var(--text); font-size: .9375rem; }
+.dc .wx .flag { color: var(--danger); font-weight: 600; }
+.dc .ln { display: flex; align-items: baseline; gap: 8px; font-size: .875rem; flex-wrap: wrap; }
+.dc .ln .t { color: var(--text-2); font-size: .75rem; min-width: 66px; flex: none; }
+.dc .last { font-size: .8125rem; color: var(--text-2); border-left: 2px solid var(--border); padding-left: 8px; }
+.dc .none { font-size: .8125rem; color: var(--muted); }
+
+.lbl { font-size: .6875rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--text-2); margin: 10px 0 2px; }
+.lbl:first-of-type { margin-top: 0; }
+.item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border-light); font-size: .9375rem; }
+.lbl + .item { border-top: 0; }
+.item .bd { font-size: .75rem; color: var(--text-2); }
+.item .tag { margin-left: auto; font-size: .6875rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; color: var(--text-2); border: 1px solid var(--border); white-space: nowrap; }
+.item .tag.late { color: var(--danger); border-color: var(--danger); border-style: dashed; }
+.bp { display: flex; gap: 8px 16px; flex-wrap: wrap; align-items: baseline; margin-top: 10px; font-size: .875rem; }
+.bp b { font-size: 1.125rem; }
+.foot { font-size: .8125rem; color: var(--muted); padding: 4px 2px; }
 
 @media (min-width: 720px) {
-  body { font-size: 16px; }
-  .grid3 { grid-template-columns: repeat(3, 1fr); }
-  .days4 { grid-template-columns: repeat(3, 1fr); }
-  .row2 { grid-template-columns: 1fr 1fr; }
-  .today-wx { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .wrap { gap: 14px; }
+  .gauge { width: 132px; height: 116px; }
+  .gauge .lvw { inset: 34px 0 0; }
+  .g2 { grid-template-columns: 1fr 1fr; }
+  .g3 { grid-template-columns: repeat(3, 1fr); }
+  .signals { grid-template-columns: repeat(4, 1fr); }
+  .ahead { grid-template-columns: repeat(3, 1fr); }
 }
-
-/* Level colors. The hero reads --lvl; each level sets it. */
-:root { --lv-rest: #4f6f8f; --lv-easy: #3f8a5c; --lv-mod: #d98a00; --lv-hard: #c4472b; }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) { --lv-rest: #8fb0d0; --lv-easy: #6fcf94; --lv-mod: #f0b43c; --lv-hard: #f08a6b; }
-  :root:not([data-theme="light"]) .hero[data-level="Rest"] .scale .on, :root:not([data-theme="light"]) .hero[data-level="Push"] .scale .on { color: #1b1300; }
-}
-:root[data-theme="dark"] { --lv-rest: #8fb0d0; --lv-easy: #6fcf94; --lv-mod: #f0b43c; --lv-hard: #f08a6b; }
-:root[data-theme="dark"] .hero[data-level="Rest"] .scale .on, :root[data-theme="dark"] .hero[data-level="Push"] .scale .on { color: #1b1300; }
-/* Levels are actions (Rest, Go easy, Train as planned, Push), never the logged effort words. */
-.hero { --lvl: var(--lv-mod); background: color-mix(in srgb, var(--lvl) 14%, var(--surface)); }
-.hero[data-level="Rest"] { --lvl: var(--lv-rest); }
-.hero[data-level="Go easy"] { --lvl: var(--lv-easy); }
-.hero[data-level="Push"] { --lvl: var(--lv-hard); }
-.hero[data-level="Rest"] .scale .on, .hero[data-level="Push"] .scale .on { color: #fff; }
-.scale span { line-height: 1.25; padding-inline: 2px; }
 </style>
-
 <div class="wrap" id="root"></div>
 
 <script id="brief-data" type="application/json">
 {
-  "date": "Monday 5 Oct 2026",
-  "level": "Train as planned",
-  "levelNote": "Sample data. Replace this whole JSON block with the day's real values.",
-  "recovery": {
-    "sleep": {
-      "label": "Slept",
-      "value": "6:51",
-      "series": [
-        426,
-        411,
-        442,
-        432,
-        381,
-        425,
-        444,
-        435,
-        438,
-        440,
-        491,
-        411
-      ],
-      "avgOf": 11,
-      "sub": "Average 7:13. Score 80, in bed 12:00 AM to 7:00 AM, 0:09 awake."
-    },
-    "hrv": {
-      "label": "HRV",
-      "value": "49",
-      "unit": "ms",
-      "series": [
-        46,
-        37,
-        42,
-        46,
-        52,
-        58,
-        48,
-        54,
-        40,
-        50,
-        47,
-        49
-      ],
-      "avgOf": 11,
-      "sub": "Average 47 ms, so +4%."
-    },
-    "rhr": {
-      "label": "Resting HR",
-      "value": "52",
-      "unit": "bpm",
-      "series": [
-        54,
-        54,
-        53,
-        53,
-        53,
-        55,
-        53,
-        47,
-        56,
-        52,
-        53,
-        52
-      ],
-      "avgOf": 11,
-      "sub": "Average 53 bpm, so 1 lower."
-    }
-  },
-  "drinks": "Water 48 oz, 75% of your 64 oz goal · Coffee 2 cups · Alcohol 2 drinks · Unwind 10 mg",
-  "today": {
-    "sessions": [
-      {
-        "name": "Mountain Bike",
-        "note": "planned for today, no time set"
-      }
-    ],
-    "weather": [
-      {
-        "place": "Trails",
-        "sunrise": "7:00 AM",
-        "sunset": "6:37 PM",
-        "T": [
-          48,
-          49,
-          54,
-          58,
-          64,
-          68,
-          72,
-          74,
-          77,
-          78,
-          78,
-          76
-        ],
-        "W": [
-          5,
-          7,
-          7,
-          5,
-          5,
-          5,
-          5,
-          6,
-          6,
-          5,
-          5,
-          4
-        ],
-        "R": [
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          2
-        ],
-        "blocks": [
-          [
-            15,
-            17
-          ]
-        ],
-        "best": [
-          10,
-          15
-        ]
-      },
-      {
-        "place": "Home",
-        "sunrise": "6:59 AM",
-        "sunset": "6:37 PM",
-        "T": [
-          46,
-          48,
-          54,
-          59,
-          65,
-          70,
-          73,
-          75,
-          78,
-          80,
-          80,
-          76
-        ],
-        "W": [
-          6,
-          4,
-          3,
-          2,
-          4,
-          6,
-          4,
-          4,
-          4,
-          5,
-          6,
-          4
-        ],
-        "R": [
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0
-        ],
-        "blocks": [
-          [
-            15,
-            17
-          ]
-        ]
-      }
-    ],
-    "legend": {
-      "best": "Good window to ride",
-      "calendar": "On your calendar"
-    },
-    "note": "Trails are dry: 0.00 in of rain in the last 48 hours.",
+  "date": "Fri, Oct 23",
+  "sunrise": "7:17 AM",
+  "sunset": "6:11 PM",
+  "level": "Rest",
+  "start": "Go easy",
+  "levelNote": "Sample data. A planned stretch starts the day at Go easy, and HRV 18% under its average steps it down one. Rest still leaves room for the stretch.",
+  "call": { "when": "Your usual 7:00 slot · fine on a Rest day", "type": "stretch", "title": "Stretch", "dur": "25 min" },
+  "signals": [
+    { "k": "hrv", "label": "HRV", "value": "44", "unit": "ms", "delta": "−18% vs 54", "state": "down" },
+    { "k": "heart", "label": "Resting HR", "value": "53", "unit": "bpm", "delta": "+1 vs 52", "state": "ok" },
+    { "k": "sleep", "label": "Slept", "value": "7:14", "delta": "+18 min vs 6:56", "state": "good" },
+    { "k": "load", "label": "Hard days", "value": "0", "unit": "of last 3", "delta": "no Hard effort", "state": "ok" }
+  ],
+  "day": {
+    "from": 6, "to": 23, "wake": 6.25, "bed": 22.25, "sunrise": 7.28, "sunset": 18.18,
+    "temps": [28, 29, 31, 36, 41, 46, 50, 53, 55, 56, 55, 52, 47, 43, 40, 38, 36],
+    "sessions": [{ "s": 7, "e": 7.42, "type": "stretch", "label": "Stretch" }],
+    "best": null,
     "events": [
-      {
-        "t": "3:00–5:00 PM",
-        "title": "Example event"
-      }
+      { "s": 9.5, "e": 12.5, "t": "Example event" },
+      { "s": 14.25, "e": 15.75, "t": "Example event" },
+      { "s": 16.5, "e": 19, "t": "Example event" }
+    ],
+    "allday": ["Example all-day event"],
+    "notes": [
+      { "ic": "sun", "b": "Dry and calm.", "text": "28°F at 7 AM, 56°F by 3 PM. Wind under 10 mph all day." },
+      { "ic": "clock", "b": "Free daylight:", "text": "7:30–9:30 AM and 12:30–2:15 PM." },
+      { "ic": "moon", "b": "Lights out by 10:15 PM.", "text": "Your 4 nights of 7:30 or more in the last two weeks all started by 10:17. Your average is 10:47." }
     ]
   },
+  "night": { "slept": "7:14", "avg": "6:56", "score": 92, "bed": "10:50 PM", "wake": "6:15 AM", "stages": { "deep": 83, "rem": 84, "light": 267, "awake": 11 } },
+  "metrics": [
+    { "k": "hrv", "label": "HRV", "value": "44", "unit": "ms", "now": 44, "lo": 37, "hi": 63, "avg": 53.5,
+      "series": [51, 50, 58, 63, 62, 49, 47, 37, 57, 50, 59, 58, 55, 44], "sub": "37–63 over 14 nights" },
+    { "k": "heart", "label": "Resting HR", "value": "53", "unit": "bpm", "now": 53, "lo": 47, "hi": 57, "avg": 52,
+      "series": [51, 52, 51, 50, 47, 54, 49, 57, 51, 57, 53, 51, 53, 53], "sub": "47–57 · in range" },
+    { "k": "sleep", "label": "Slept", "value": "7:14", "now": 434, "lo": 317, "hi": 472, "avg": 416,
+      "series": [407, 330, 429, null, 404, 472, 464, 387, 455, 396, 427, 317, 447, 434], "sub": "5:17–7:52 · above average" }
+  ],
+  "yesterday": {
+    "when": "Thu",
+    "sessions": [
+      { "type": "weight", "name": "6 - Legs B", "time": "7:05 AM", "fig": "45", "figUnit": "min",
+        "stats": "20 of 24 sets · avg HR 107", "effort": "Medium", "note": "Example session note." }
+    ],
+    "journal": null,
+    "drinks": { "water": { "oz": 52, "pct": 81, "goal": 64 }, "coffee": 2, "alcohol": null, "unwind": null }
+  },
   "load": [
-    {
-      "d": "Mon",
-      "load": 0,
-      "e": "easy"
-    },
-    {
-      "d": "Tue",
-      "load": 0,
-      "e": "none"
-    },
-    {
-      "d": "Wed",
-      "load": 43,
-      "e": "med"
-    },
-    {
-      "d": "Thu",
-      "load": 36,
-      "e": "none"
-    },
-    {
-      "d": "Fri",
-      "load": 31,
-      "e": "none"
-    },
-    {
-      "d": "Sat",
-      "load": 27,
-      "e": "easy"
-    },
-    {
-      "d": "Sun",
-      "load": 23,
-      "e": "none"
-    }
+    { "d": "F", "n": "16", "load": 81, "e": "none" },
+    { "d": "S", "n": "17", "load": 70, "e": "none" },
+    { "d": "S", "n": "18", "load": 94, "e": "medium" },
+    { "d": "M", "n": "19", "load": 81, "e": "easy" },
+    { "d": "T", "n": "20", "load": 69, "e": "none" },
+    { "d": "W", "n": "21", "load": 61, "e": "medium" },
+    { "d": "T", "n": "22", "load": 55, "e": "medium" }
   ],
-  "loadNote": "Example note.",
-  "days": [
-    {
-      "name": "Mon 5 Oct",
-      "sm": "49–88°F · wind to 5 · rain 1%",
-      "charts": [
-        {
-          "T": [
-            49,
-            50,
-            59,
-            67,
-            76,
-            82,
-            85,
-            87,
-            88,
-            88,
-            87,
-            82
-          ],
-          "W": [
-            3,
-            3,
-            1,
-            2,
-            4,
-            5,
-            4,
-            2,
-            2,
-            1,
-            5,
-            3
-          ],
-          "R": [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            1,
-            1
-          ]
-        }
-      ],
-      "events": [
-        {
-          "t": "weight",
-          "title": "Planned session",
-          "plan": true
-        },
-        {
-          "t": "7:30–8:00 PM",
-          "title": "Example event 1"
-        }
-      ]
-    },
-    {
-      "name": "Tue 6 Oct",
-      "sm": "64–88°F · wind to 9 · rain 2%",
-      "charts": [
-        {
-          "T": [
-            64,
-            67,
-            71,
-            75,
-            80,
-            84,
-            87,
-            88,
-            88,
-            83,
-            81,
-            77
-          ],
-          "W": [
-            2,
-            1,
-            1,
-            2,
-            1,
-            5,
-            7,
-            9,
-            6,
-            9,
-            9,
-            9
-          ],
-          "R": [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            2,
-            2,
-            2,
-            2,
-            2,
-            2
-          ],
-          "blocks": [
-            [
-              9.5,
-              10.5
-            ],
-            [
-              16.5,
-              18.5
-            ]
-          ]
-        }
-      ],
-      "events": [
-        {
-          "t": "9:30–10:30 AM",
-          "title": "Example event 2"
-        },
-        {
-          "t": "4:30–6:30 PM",
-          "title": "Example event 2"
-        }
-      ],
-      "empty": "Nothing planned for training."
-    },
-    {
-      "name": "Wed 7 Oct",
-      "sm": "59–84°F · wind to 11 · dry",
-      "charts": [
-        {
-          "T": [
-            59,
-            61,
-            66,
-            69,
-            73,
-            75,
-            80,
-            82,
-            83,
-            84,
-            82,
-            78
-          ],
-          "W": [
-            1,
-            3,
-            5,
-            5,
-            5,
-            5,
-            7,
-            6,
-            8,
-            9,
-            11,
-            8
-          ],
-          "R": [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-          ],
-          "blocks": [
-            [
-              16.5,
-              18
-            ]
-          ]
-        }
-      ],
-      "events": [
-        {
-          "t": "4:30–5:00 PM",
-          "title": "Example event 3"
-        },
-        {
-          "t": "5:00–6:00 PM",
-          "title": "Example event 3"
-        }
-      ],
-      "empty": "Nothing planned for training."
-    }
+  "loadNote": "Example note on the load.",
+  "ahead": [
+    { "dow": "Sat", "n": "24", "wx": { "ic": "sun", "hi": 54, "lo": 31, "wind": 8, "rain": 0 },
+      "events": [{ "t": "All day", "title": "Example event" }], "none": "Nothing planned for training." },
+    { "dow": "Sun", "n": "25", "wx": { "ic": "partly", "hi": 61, "lo": 35, "wind": 10, "rain": 5 },
+      "plans": [{ "type": "bike", "title": "Mountain Bike", "sub": "bike:mountain" }],
+      "last": "Trails dry: 0.00 in of rain in the last 48 hours. Best stretch at the trails 10 AM–3 PM." },
+    { "dow": "Mon", "n": "26", "wx": { "ic": "cloud", "hi": 49, "lo": 28, "wind": 16, "rain": 35, "flag": "Wind 16 mph" },
+      "plans": [{ "type": "weight", "title": "2 - Upper Pull A", "sub": "7:00, indoor" }],
+      "events": [{ "t": "7:30 PM", "title": "Example event" }],
+      "board": [{ "title": "Example item" }],
+      "last": "Last time (12 Oct, Easy): “Example note from that session.”" }
   ],
-  "board": {
-    "today": [
-      {
-        "title": "Example item",
-        "board": "Home",
-        "status": "In progress"
-      }
-    ],
-    "note": "Nothing overdue, nothing else due through Wednesday."
-  },
-  "body": {
-    "value": "180.0",
-    "series": [
-      180.4,
-      180.2,
-      179.8,
-      180.1,
-      180
-    ],
-    "sub": "Example note."
-  },
-  "foot": "Not checked: the Family calendar, and birthdays (none in the next 3 days). Training guidance from your own data, not medical advice."
+  "board": { "overdue": [], "today": [], "soon": [{ "title": "Example item", "board": "Home", "due": "Mon 26" }], "note": "Nothing due today or overdue." },
+  "body": { "value": "177.1", "unit": "lb", "series": [178.4, 179.5, 181.8, 180.3, 177.3, 177.1], "sub": "−1.3 lb on 7 days ago", "bp": "139/90", "bpSub": "1 reading · recent 132–141 / 84–89" },
+  "foot": "Sample data. Replace this whole JSON block with the day's real values. Training guidance from your own data, not medical advice."
 }
 </script>
 
 <script>
 (function () {
-  var NS = "http://www.w3.org/2000/svg";
   var D = JSON.parse(document.getElementById("brief-data").textContent);
   var root = document.getElementById("root");
-  var UP = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18h18M7 18a5 5 0 0 1 10 0M12 3v6M9.5 5.5 12 3l2.5 2.5"/></svg>';
-  var DN = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18h18M7 18a5 5 0 0 1 10 0M12 9V3M9.5 6.5 12 9l2.5-2.5"/></svg>';
+  var NS = "http://www.w3.org/2000/svg";
+
+  var P = {
+    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+    partly: '<path d="M8 4v1.5M3.8 6.2l1 1M2.5 11H4"/><path d="M5.6 12.6A4 4 0 1 1 11.5 7"/><path d="M8.5 20h9a3.5 3.5 0 0 0 .5-7 5 5 0 0 0-9.6 1.4A3 3 0 0 0 8.5 20z"/>',
+    cloud: '<path d="M7 19h10a4 4 0 0 0 .6-8 6 6 0 0 0-11.5 1.8A3.2 3.2 0 0 0 7 19z"/>',
+    fog: '<path d="M4 9h16M3 13h18M5 17h14"/>',
+    rain: '<path d="M7 15h10a4 4 0 0 0 .6-8 6 6 0 0 0-11.5 1.8A3.2 3.2 0 0 0 7 15z"/><path d="M8 18l-1 3M12 18l-1 3M16 18l-1 3"/>',
+    snow: '<path d="M7 15h10a4 4 0 0 0 .6-8 6 6 0 0 0-11.5 1.8A3.2 3.2 0 0 0 7 15z"/><path d="M8 19h.01M12 21h.01M16 19h.01"/>',
+    storm: '<path d="M7 15h10a4 4 0 0 0 .6-8 6 6 0 0 0-11.5 1.8A3.2 3.2 0 0 0 7 15z"/><path d="M12 15l-2 4h4l-2 4"/>',
+    moon: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
+    heart: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
+    hrv: '<path d="M2 12h4l2-5 4 10 2-5h8"/>',
+    sleep: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
+    load: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    alert: '<path d="M12 3l10 18H2zM12 10v5M12 18h.01"/>',
+    weight: '<path d="M6 7v10M18 7v10M3 9v6M21 9v6M6 12h12"/>',
+    stretch: '<circle cx="12" cy="4.5" r="2"/><path d="M4 9l8 1 8-1M12 10v5l-4 6M12 15l4 6"/>',
+    bike: '<circle cx="5.5" cy="16.5" r="3.5"/><circle cx="18.5" cy="16.5" r="3.5"/><path d="M5.5 16.5L9 9h6l3.5 7.5M9 9l3 7.5h-6.5M14 5h2.5l-1.5 4"/>',
+    hike: '<path d="M3 20l6-10 4 6 3-4 5 8z"/>',
+    walk: '<circle cx="13" cy="4" r="2"/><path d="M10 21l2-7 3 3v5M12 14l-1-5 4 1 2 3M11 9l-3 2v3"/>',
+    run: '<circle cx="14" cy="4" r="2"/><path d="M6 21l4-6 3 2 1 4M10 15l1-5 4 2 3 1M11 10L7 11l-1 3"/>',
+    water: '<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/>',
+    coffee: '<path d="M4 9h12v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5zM16 11h1.5a2.5 2.5 0 0 1 0 5H16M8 3v3M12 3v3"/>',
+    alcohol: '<path d="M7 3h10l-1 7a4 4 0 0 1-8 0zM12 14v6M8 21h8"/>',
+    unwind: '<path d="M12 21c0-6 4-10 8-11-1 6-4 10-8 11zM12 21c0-5-3-8-7-9 .5 5 3 8 7 9z"/>',
+    yday: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/>',
+    ahead: '<path d="M4 7h16M4 12h16M4 17h10"/><rect x="3" y="4" width="18" height="17" rx="2"/>',
+    board: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/>',
+    body: '<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M9 9a4 4 0 0 1 6 0l-2 3"/>',
+    day: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'
+  };
+  var MCOL = { hrv: "var(--hrv)", heart: "var(--heart)", sleep: "var(--sleep)", load: "var(--primary)" };
+  var TCOL = { weight: "var(--t-weight)", stretch: "var(--t-stretch)", bike: "var(--t-bike)", hike: "var(--t-hike)", run: "var(--t-run)", walk: "var(--t-walk)" };
+  var ECOL = { easy: "var(--e-easy)", medium: "var(--e-medium)", hard: "var(--e-hard)", none: "var(--e-none)" };
+  var LEVELS = ["Rest", "Go easy", "Train as planned", "Push"];
+  var LCOL = { "Rest": "var(--lv-rest)", "Go easy": "var(--lv-easy)", "Train as planned": "var(--lv-plan)", "Push": "var(--lv-push)" };
 
   function el(tag, cls, text, kids) {
     var e = document.createElement(tag);
+    if (Array.isArray(cls)) { kids = cls; cls = null; text = null; }
+    if (Array.isArray(text)) { kids = text; text = null; }
     if (cls) e.className = cls;
     if (text != null) e.textContent = text;
-    (kids || []).forEach(function (k) { if (k) e.appendChild(k); });
+    (kids || []).forEach(function (k) { if (k != null) e.appendChild(typeof k === "string" ? document.createTextNode(k) : k); });
     return e;
   }
-  function svg(cls, vb, label) {
+  function icon(name) {
     var s = document.createElementNS(NS, "svg");
-    s.setAttribute("class", cls);
-    s.setAttribute("viewBox", vb);
-    s.setAttribute("role", "img");
-    s.setAttribute("aria-label", label || "");
+    s.setAttribute("class", "ic");
+    s.setAttribute("viewBox", "0 0 24 24");
+    s.setAttribute("aria-hidden", "true");
+    s.innerHTML = P[name] || P.cloud;
     return s;
   }
-  function sec(title, note) {
-    var h = el("h2", null, title);
-    if (note) { var n = el("span", "label", note); n.style.marginLeft = "6px"; h.appendChild(n); }
-    return el("div", "sec", null, [h]);
+  function card(title, ic, aside, color) {
+    var c = el("section", "card"), i = icon(ic);
+    if (color) i.style.color = color;
+    var h = el("div", "ch", [i, el("h2", null, title)]);
+    if (aside) h.appendChild(el("span", "aside", aside));
+    c.appendChild(h);
+    return c;
   }
-  function small(text) {
-    var p = el("p", "muted", text);
-    p.style.cssText = "margin-top:8px;font-size:13px";
-    return p;
+  function typeChip(type, text) {
+    var base = String(type).split(":")[0];
+    var c = el("span", "chip-type", [icon(base), text || type]);
+    c.style.setProperty("--tc", TCOL[base] || "var(--primary)");
+    return c;
   }
-
-  function spark(vals, avgVals, label) {
-    var s = svg("spark", "0 0 120 44", label);
-    s.setAttribute("preserveAspectRatio", "none");
-    var W = 120, H = 44, pad = 6, base = avgVals || vals;
-    var avg = base.reduce(function (a, b) { return a + b; }, 0) / base.length;
-    var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals), span = Math.max(hi - lo, 1);
-    function x(i) { return pad + i * ((W - 2 * pad) / Math.max(vals.length - 1, 1)); }
-    function y(v) { return H - pad - ((v - lo) / span) * (H - 2 * pad); }
-    var pts = vals.map(function (v, i) { return x(i).toFixed(1) + "," + y(v).toFixed(1); }).join(" ");
-    var last = vals.length - 1;
-    s.innerHTML =
-      '<line class="avg" x1="0" x2="' + W + '" y1="' + y(avg).toFixed(1) + '" y2="' + y(avg).toFixed(1) + '"/>' +
-      '<polyline class="ln" points="' + pts + '"/>' +
-      '<circle class="dot" cx="' + x(last).toFixed(1) + '" cy="' + y(vals[last]).toFixed(1) + '" r="2.8"/>';
-    return s;
+  function figure(cls, v, u) {
+    if (v == null) return el("div", cls + " na", "not synced");
+    var d = el("div", cls + " num", String(v));
+    if (u) d.appendChild(el("small", null, u));
+    return d;
   }
-
-  // Hourly chart, 7 AM to 6 PM: T temperature (line), W sustained wind and R rain chance (numbers every 2 hours).
-  var H0 = 7, H1 = 18, VBW = 360, PL = 16, PR = 16, COLS = [7, 9, 11, 13, 15, 17];
-  var SLOT = (VBW - PL - PR) / (H1 - H0);
-  function hx(t) { return PL + (t - H0) * SLOT; }
-  function ty(t) { return 96 - (t - 40) / 55 * 80; }
-  function hlab(h) { return h === 12 ? "12p" : h > 12 ? (h - 12) + "p" : h + "a"; }
-  function chart(c, label) {
-    var s = svg("chart", "0 0 360 180", label), h = "", BOT = 164;
-    (c.blocks || []).forEach(function (b) {
-      var a = Math.max(b[0], H0), z = Math.min(b[1], H1 + 0.6);
-      if (z > a) h += '<rect class="blk" x="' + hx(a).toFixed(1) + '" y="4" width="' + (hx(z) - hx(a)).toFixed(1) + '" height="' + (BOT - 4) + '" rx="3"/>';
-    });
-    if (c.best) h += '<rect class="bst" x="' + hx(c.best[0]).toFixed(1) + '" y="4" width="' + (hx(c.best[1]) - hx(c.best[0])).toFixed(1) + '" height="' + (BOT - 4) + '" rx="4"/>';
-    h += '<polyline class="tl" points="' + c.T.map(function (t, i) { return hx(H0 + i).toFixed(1) + "," + ty(t).toFixed(1); }).join(" ") + '"/>';
-    c.T.forEach(function (t, i) {
-      var hr = H0 + i, on = COLS.indexOf(hr) >= 0;
-      h += '<circle class="td" cx="' + hx(hr).toFixed(1) + '" cy="' + ty(t).toFixed(1) + '" r="' + (on ? 3 : 1.8) + '"/>';
-      if (on) h += '<text class="tv" x="' + hx(hr).toFixed(1) + '" y="' + (ty(t) - 8).toFixed(1) + '" text-anchor="middle">' + Math.round(t) + '</text>';
-    });
-    COLS.forEach(function (k) {
-      var i = k - H0;
-      h += '<text class="wv" x="' + hx(k).toFixed(1) + '" y="127" text-anchor="middle">' + Math.round(c.W[i]) + '</text>';
-      h += '<text class="rv" x="' + hx(k).toFixed(1) + '" y="147" text-anchor="middle">' + Math.round(c.R[i]) + '%</text>';
-      h += '<text x="' + hx(k).toFixed(1) + '" y="' + (BOT + 12) + '" text-anchor="middle">' + hlab(k) + '</text>';
-    });
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  function fmtH(h) { var hh = Math.floor(h), m = Math.round((h - hh) * 60); return (hh % 12 || 12) + (m ? ":" + String(m).padStart(2, "0") : "") + (hh >= 12 ? "p" : "a"); }
+  // A small line chart; null values leave a gap.
+  function spark(series, color, label, avg) {
+    var s = document.createElementNS(NS, "svg");
+    s.setAttribute("class", "spark"); s.setAttribute("viewBox", "0 0 140 40"); s.setAttribute("preserveAspectRatio", "none");
+    s.setAttribute("role", "img"); s.setAttribute("aria-label", label);
+    var vals = series.filter(function (v) { return v != null; });
+    if (vals.length < 2) return null;
+    var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals), sp = Math.max(hi - lo, 1), n = series.length;
+    function X(i) { return 4 + i * 132 / (n - 1); } function Y(v) { return 36 - (v - lo) / sp * 32; }
+    var segs = [], cur = [];
+    series.forEach(function (v, i) { if (v == null) { if (cur.length) segs.push(cur); cur = []; } else cur.push(X(i).toFixed(1) + "," + Y(v).toFixed(1)); });
+    if (cur.length) segs.push(cur);
+    var h = avg != null ? '<line x1="0" x2="140" y1="' + Y(avg).toFixed(1) + '" y2="' + Y(avg).toFixed(1) + '" style="stroke:var(--text-2);stroke-dasharray:3 3;opacity:.6" vector-effect="non-scaling-stroke"/>' : "";
+    h += segs.map(function (p) { return '<polyline points="' + p.join(" ") + '" style="fill:none;stroke:' + color + ';stroke-width:2;stroke-linejoin:round" vector-effect="non-scaling-stroke"/>'; }).join("");
+    var li = n - 1;
+    if (series[li] != null) h += '<circle cx="' + X(li).toFixed(1) + '" cy="' + Y(series[li]).toFixed(1) + '" r="3.2" style="fill:' + color + '"/>';
     s.innerHTML = h;
     return s;
   }
-  function sun(sr, ss) {
-    var s = el("span", "sun");
-    s.setAttribute("aria-label", "Sunrise " + sr + ", sunset " + ss);
-    s.innerHTML = UP;
-    s.appendChild(document.createTextNode(sr + " "));
-    var d = document.createElement("span");
-    d.innerHTML = DN;
-    s.appendChild(d.firstChild);
-    s.appendChild(document.createTextNode(ss));
-    return s;
-  }
-  function ev(e) { return el("div", "ev" + (e.plan ? " plan" : ""), null, [el("span", "t", e.t), el("span", null, e.title)]); }
 
-  root.appendChild(el("div", "date", null, [el("h1", null, D.date), el("span", "label", D.sources || "Thrive · Hive · Calendar · Open-Meteo")]));
+  // Header, as on Thrive's Day screen
+  var meta = el("div", "meta", [D.date]);
+  if (D.sunrise) { meta.appendChild(document.createTextNode(" · ")); meta.appendChild(icon("sun")); meta.appendChild(document.createTextNode(D.sunrise + " – " + D.sunset)); }
+  root.appendChild(el("header", "top", [meta, el("h1", null, "Morning brief")]));
+  if (D.notice) root.appendChild(el("div", "notice", [icon("alert"), el("span", null, D.notice)]));
 
-  var hero = el("div", "hero", null, [el("div", "lv", D.level), el("p", null, D.levelNote)]);
-  hero.setAttribute("data-level", D.level);
-  var sc = el("div", "scale");
-  ["Rest", "Go easy", "Train as planned", "Push"].forEach(function (l) { sc.appendChild(el("span", l === D.level ? "on" : "", l)); });
-  hero.appendChild(sc);
-  root.appendChild(hero);
-  if (D.notice) root.appendChild(el("div", "notice", null, [el("p", null, D.notice)]));
-
-  if (D.recovery) {
-    var rs = sec("Last night", "dashed line is the average");
-    var g = el("div", "grid3");
-    ["sleep", "hrv", "rhr"].forEach(function (k) {
-      var r = D.recovery[k];
-      if (!r) return;
-      var val = el("div", "val num" + (r.value == null ? " na" : ""), r.value == null ? "not synced" : r.value);
-      if (r.unit && r.value != null) val.appendChild(el("small", null, r.unit));
-      var t = el("div", "card tile", null, [el("span", "label", r.label), val]);
-      if (r.series && r.series.length > 1) t.appendChild(spark(r.series, r.series.slice(0, r.avgOf || r.series.length), r.label + " over recent nights"));
-      if (r.sub) t.appendChild(el("span", "sub", r.sub));
-      g.appendChild(t);
-    });
-    rs.appendChild(g);
-    root.appendChild(rs);
-  }
-
-  // #522, #562, #592: one line of yesterday's water, coffee, alcohol and Unwind, as text.
-  if (D.drinks) {
-    var dk = sec("Drinks", "yesterday");
-    dk.appendChild(el("div", "card", null, [el("p", null, D.drinks)]));
-    root.appendChild(dk);
-  }
-
-  if (D.today) {
-    var T = D.today, ts = sec("Today"), card = el("div", "card");
-    (T.sessions || []).forEach(function (s) {
-      card.appendChild(el("div", "sess", null, [el("h3", null, s.name), el("span", "label", s.note || "")]));
-    });
-    var wx = el("div", "today-wx");
-    (T.weather || []).forEach(function (w) {
-      var hd = el("div", "hd", null, [el("b", null, w.place)]);
-      if (w.sunrise) hd.appendChild(sun(w.sunrise, w.sunset));
-      wx.appendChild(el("div", "wx", null, [hd, chart(w, "Hourly weather at " + w.place)]));
-    });
-    card.appendChild(wx);
-    if (T.legend) {
-      var lg = el("div", "legend");
-      if (T.legend.best) lg.appendChild(el("span", null, T.legend.best, [el("i", "l5")]));
-      if (T.legend.calendar) lg.appendChild(el("span", null, T.legend.calendar, [el("i", "l4")]));
-      card.appendChild(lg);
+  // Today's call: the level on a four-step gauge, the session at the usual time, the signals behind it
+  (function () {
+    var at = LEVELS.indexOf(D.level), st = LEVELS.indexOf(D.start);
+    var c = card("Today's call", "load", D.start && D.start !== D.level ? "the plan says " + D.start + ", recovery says " + D.level : "");
+    var g = el("div", "gauge");
+    g.style.setProperty("--lvl", LCOL[D.level] || "var(--text)");
+    var s = document.createElementNS(NS, "svg");
+    s.setAttribute("viewBox", "0 0 132 116");
+    s.setAttribute("role", "img");
+    s.setAttribute("aria-label", "Level " + D.level + " of Rest, Go easy, Train as planned, Push" + (D.start && D.start !== D.level ? "; the plan started at " + D.start : ""));
+    var cx = 66, cy = 66, r = 54, h = "";
+    for (var i = 0; i < 4; i++) {
+      var a0 = (200 - i * 55 - 2) * Math.PI / 180, a1 = (200 - (i + 1) * 55 + 2) * Math.PI / 180;
+      var on = i === at, from = i === st && i !== at;
+      h += '<path d="M' + (cx + r * Math.cos(a0)).toFixed(1) + " " + (cy - r * Math.sin(a0)).toFixed(1) + " A" + r + " " + r + " 0 0 1 " +
+        (cx + r * Math.cos(a1)).toFixed(1) + " " + (cy - r * Math.sin(a1)).toFixed(1) + '" fill="none" stroke-linecap="round" stroke-width="' + (on ? 12 : 8) +
+        '" style="stroke:' + (on || from ? LCOL[LEVELS[i]] : "var(--border-light)") + (from ? ";opacity:.5" : "") + '"' + (from ? ' stroke-dasharray="3 4"' : "") + "/>";
     }
-    if (T.note) card.appendChild(small(T.note));
-    if (T.events && T.events.length) card.appendChild(el("div", "evs", null, T.events.map(ev)));
-    ts.appendChild(card);
-    root.appendChild(ts);
-  }
-
-  if (D.load) {
-    var ls = sec("Last 7 days", "training load"), lc = el("div", "card");
-    var bars = el("div", "bars"), labs = el("div", "days");
-    var mx = Math.max.apply(null, [50].concat(D.load.map(function (o) { return o.load; })));
-    var col = { easy: "var(--bar-easy)", med: "var(--bar-med)", hard: "var(--bar-hard)", none: "var(--bar-none)" };
-    D.load.forEach(function (o) {
-      var c = el("div", "col");
-      c.style.height = Math.round(o.load / mx * 92) + "px";
-      c.style.background = col[o.e] || col.none;
-      bars.appendChild(el("div", "bar", null, [el("span", "n", String(o.load)), c]));
-      labs.appendChild(el("span", null, o.d));
-    });
-    var key = el("div", "key");
-    [["easy", "Easy"], ["med", "Medium"], ["hard", "Hard"], ["none", "No session logged"]].forEach(function (k) {
-      var i = el("i");
-      i.style.background = col[k[0]];
-      var sp = el("span", null, null, [i]);
-      sp.appendChild(document.createTextNode(k[1]));
-      key.appendChild(sp);
-    });
-    lc.appendChild(bars);
-    lc.appendChild(labs);
-    lc.appendChild(key);
-    if (D.loadNote) lc.appendChild(small(D.loadNote));
-    ls.appendChild(lc);
-    root.appendChild(ls);
-  }
-
-  if (D.days && D.days.length) {
-    var ds = sec("Next " + D.days.length + " days", D.daysNote || "home weather, daylight hours");
-    var dg = el("div", "days4");
-    D.days.forEach(function (d) {
-      var c = el("div", "card day", null, [el("div", "hd", null, [el("b", null, d.name), el("span", "sm", d.sm || "")])]);
-      (d.charts || []).forEach(function (ch) {
-        if (ch.place) c.appendChild(el("span", "label", ch.place));
-        c.appendChild(chart(ch, "Hourly weather " + d.name + (ch.place ? " at " + ch.place : "")));
+    s.innerHTML = h;
+    g.appendChild(s);
+    var lvb = el("b", D.level.length > 8 ? "long" : null, D.level);
+    g.appendChild(el("div", "lvw", [lvb, el("span", null, D.start && D.start !== D.level ? "from " + D.start : "as planned")]));
+    var kids = [g];
+    if (D.call) {
+      kids.push(el("div", "what", [el("div", "when", D.call.when), el("h3", [D.call.title + " ", D.call.dur ? typeChip(D.call.type, D.call.dur) : null])]));
+    } else kids.push(el("div", "what", [el("h3", null, "Nothing planned")]));
+    if (D.levelNote) kids.push(el("p", "why", D.levelNote));
+    if (D.signals) {
+      var sig = el("div", "signals");
+      D.signals.forEach(function (x) {
+        var k = el("div", "k", [icon(x.k), x.label]);
+        var box = el("div", "sig " + (x.state || "ok"), [k, figure("v", x.value, x.unit), x.delta ? el("div", "d " + (x.state || "ok"), (x.state === "down" ? "▼ " : x.state === "good" ? "▲ " : "") + x.delta) : null]);
+        box.style.setProperty("--c", MCOL[x.k] || "var(--primary)");
+        sig.appendChild(box);
       });
-      (d.events || []).forEach(function (e) { c.appendChild(ev(e)); });
-      if (d.empty) c.appendChild(el("p", "none", d.empty));
-      dg.appendChild(c);
-    });
-    ds.appendChild(dg);
-    root.appendChild(ds);
-  }
+      kids.push(sig);
+    }
+    c.appendChild(el("div", "call", kids));
+    root.appendChild(c);
+  })();
 
-  function item(o, pill) {
-    var name = el("span", null, o.title);
-    name.appendChild(document.createTextNode(" "));
-    name.appendChild(el("span", "label", o.board));
-    return el("div", "item", null, [name, el("span", "pill", pill)]);
-  }
-  if (D.board || D.body) {
-    var row = el("div", "row2");
+  // Your day: hourly temperature, sessions, calendar and wake and bed on one time axis
+  if (D.day) (function () {
+    var d = D.day, c = card("Your day", "day", d.allday && d.allday.length ? "all day: " + d.allday.join(", ") : "");
+    root.appendChild(c);
+    var W = Math.max(300, Math.min(document.documentElement.clientWidth, 960) - 64), L = 14, R = 8, span = d.to - d.from;
+    function x(h) { return L + (Math.max(d.from, Math.min(d.to, h)) - d.from) * (W - L - R) / span; }
+    var sessions = d.sessions || [], events = d.events || [];
+    var s = document.createElementNS(NS, "svg");
+    s.setAttribute("class", "tl");
+    s.setAttribute("viewBox", "0 0 " + W + " 136");
+    s.setAttribute("role", "img");
+    s.setAttribute("aria-label", "Your day: " + sessions.map(function (t) { return t.label + " at " + fmtH(t.s); }).concat(events.map(function (e) { return e.t + " " + fmtH(e.s) + " to " + fmtH(e.e); })).join(", ") + (d.bed ? ", bed by " + fmtH(d.bed) : ""));
+    var h = "";
+    [[18, "weather"], [50, "you"], [82, "calendar"]].forEach(function (ln) { h += '<rect class="lane" x="' + L + '" y="' + ln[0] + '" width="' + (W - L - R) + '" height="26" rx="6"/>'; });
+    (d.temps || []).forEach(function (t, i) {
+      var hr = d.from + i;
+      if (hr >= d.to || t == null) return;
+      // cold reads blue, warm reads amber; strength grows away from about 47°F
+      var k = Math.max(0, Math.min(1, (t - 25) / 45));
+      var col = k < 0.5 ? "rgb(91 141 239 / " + (0.15 + (0.5 - k) * 1.1).toFixed(2) + ")" : "rgb(240 150 60 / " + (0.15 + (k - 0.5) * 1.3).toFixed(2) + ")";
+      h += '<rect x="' + (x(hr) + 0.5).toFixed(1) + '" y="18" width="' + (x(hr + 1) - x(hr) - 1).toFixed(1) + '" height="26" rx="3" fill="' + col + '"/>';
+      if ((hr - d.from) % 3 === 1) h += '<text class="t-temp" x="' + ((x(hr) + x(hr + 1)) / 2).toFixed(1) + '" y="35" text-anchor="middle">' + Math.round(t) + "°</text>";
+    });
+    if (d.sunrise != null) h += '<rect class="night" x="' + L + '" y="12" width="' + (x(d.sunrise) - L).toFixed(1) + '" height="102" rx="6"/>';
+    if (d.sunset != null) h += '<rect class="night" x="' + x(d.sunset).toFixed(1) + '" y="12" width="' + (W - R - x(d.sunset)).toFixed(1) + '" height="102" rx="6"/>';
+    if (d.best) h += '<rect class="best" x="' + x(d.best[0]).toFixed(1) + '" y="48" width="' + (x(d.best[1]) - x(d.best[0])).toFixed(1) + '" height="30" rx="6"/>';
+    sessions.forEach(function (t) {
+      var col = TCOL[String(t.type).split(":")[0]] || "var(--primary)", x0 = x(t.s), x1 = Math.max(x(t.e), x0 + 14);
+      h += '<rect x="' + x0.toFixed(1) + '" y="50" width="' + (x1 - x0).toFixed(1) + '" height="26" rx="5" style="fill:' + col + '"/>';
+      h += '<text x="' + (x1 + 5).toFixed(1) + '" y="67" style="font-weight:700;font-size:10.5px;fill:var(--text)">' + esc(t.label) + " " + fmtH(t.s) + "</text>";
+    });
+    events.forEach(function (e) {
+      var x0 = x(e.s), w = x(e.e) - x0;
+      if (w <= 1) return;
+      h += '<rect class="cal" x="' + (x0 + 0.5).toFixed(1) + '" y="82" width="' + (w - 1).toFixed(1) + '" height="26" rx="5"/>';
+      h += '<svg x="' + (x0 + 4).toFixed(1) + '" y="82" width="' + Math.max(w - 8, 0).toFixed(1) + '" height="26"><text class="cal-t" x="0" y="17">' + esc(e.t) + "</text></svg>";
+    });
+    [[d.wake, "wake " + (d.wake != null ? fmtH(d.wake) : ""), 0], [d.bed, "bed by " + (d.bed != null ? fmtH(d.bed) : ""), 1]].forEach(function (m) {
+      if (m[0] == null) return;
+      var mx = x(m[0]);
+      h += '<line class="mk" x1="' + mx.toFixed(1) + '" x2="' + mx.toFixed(1) + '" y1="46" y2="112"/>';
+      h += '<circle cx="' + mx.toFixed(1) + '" cy="63" r="4" style="fill:var(--surface);stroke:var(--text-2);stroke-width:1.4"/>';
+      h += '<text class="mk-t" x="' + (mx + (m[2] ? -4 : 4)).toFixed(1) + '" y="126" text-anchor="' + (m[2] ? "end" : "start") + '">' + m[1] + "</text>";
+    });
+    for (var hr = d.from; hr <= d.to; hr += 3) h += '<text x="' + x(hr).toFixed(1) + '" y="9" text-anchor="middle">' + fmtH(hr) + "</text>";
+    s.innerHTML = h;
+    c.appendChild(s);
+    var key = el("div", "tl-key"), k1 = el("span", null, "Calendar"), k2 = el("span", null, "Before sunrise, after sunset");
+    k1.style.setProperty("--c", "var(--cal)"); k2.style.setProperty("--c", "var(--text-2)"); k2.style.setProperty("opacity", ".8");
+    key.appendChild(k1); key.appendChild(k2);
+    if (d.best) key.appendChild(el("span", "dash", "Best window at the trails"));
+    c.appendChild(key);
+    if (d.notes && d.notes.length) {
+      var notes = el("div", "tl-notes");
+      d.notes.forEach(function (n) { notes.appendChild(el("div", n.flag ? "flag" : null, [icon(n.ic), el("span", [n.b ? el("b", null, n.b + " ") : null, n.text || ""])])); });
+      c.appendChild(notes);
+    }
+  })();
+
+  // Last night: the sleep card, then HRV, resting HR and sleep against 14 nights
+  if (D.night !== undefined || D.metrics) (function () {
+    var kids = [];
+    if (D.night !== undefined) {
+      var n = D.night, sc = card("Sleep", "sleep", "last night", "var(--sleep)");
+      if (!n) sc.appendChild(el("p", "na", "Last night isn't synced yet."));
+      else {
+        var p = String(n.slept).split(":");
+        var big = el("div", "big num", [p[0], el("small", null, "h"), p[1], el("small", null, "m")]);
+        var top = el("div", "sleep-top", [el("div", null, [big, el("div", "sub", "slept" + (n.avg ? " · average " + n.avg : ""))])]);
+        if (n.score != null) top.appendChild(el("div", "score", [el("b", "num", String(n.score)), el("span", "sub", "sleep score")]));
+        sc.appendChild(top);
+        if (n.stages) {
+          var stg = n.stages, tot = (stg.deep || 0) + (stg.rem || 0) + (stg.light || 0) + (stg.awake || 0), bar = el("div", "stages"), lg = el("div", "st-legend");
+          [["deep", "Deep"], ["rem", "REM"], ["light", "Light"], ["awake", "Awake"]].forEach(function (k) {
+            var m = stg[k[0]];
+            if (m == null || !tot) return;
+            var i = el("i"); i.style.width = (m / tot * 100).toFixed(1) + "%"; i.style.background = "var(--" + k[0] + ")"; bar.appendChild(i);
+            var sp = el("span", null, k[1], [el("b", "num", (m >= 60 ? Math.floor(m / 60) + "h " : "") + (m % 60) + "m")]);
+            sp.style.setProperty("--c", "var(--" + k[0] + ")"); lg.appendChild(sp);
+          });
+          sc.appendChild(bar); sc.appendChild(lg);
+        }
+        if (n.bed) { var bt = el("p", "sub", "In bed " + n.bed + " → up " + n.wake + "."); bt.style.marginTop = "8px"; sc.appendChild(bt); }
+      }
+      kids.push(sc);
+    }
+    if (D.metrics) {
+      var g = el("div", "grid g3");
+      D.metrics.forEach(function (m) {
+        var col = MCOL[m.k], cc = el("div", "card mt");
+        var k = el("div", "k", [icon(m.k), m.label]); k.style.setProperty("--c", col);
+        cc.appendChild(k);
+        cc.appendChild(figure("val", m.value, m.unit));
+        var sp = m.series ? spark(m.series, col, m.label + " over recent nights, today last", m.avg) : null;
+        if (sp) cc.appendChild(sp);
+        if (m.now != null && m.hi > m.lo) {
+          var pc = function (v) { return Math.max(0, Math.min(100, (v - m.lo) / (m.hi - m.lo) * 100)).toFixed(1) + "%"; };
+          var a = el("i", "avg"); a.style.left = pc(m.avg);
+          var me = el("i", "me"); me.style.left = pc(m.now); me.style.setProperty("--c", col);
+          cc.appendChild(el("div", "range", [el("i", "track"), a, me]));
+        }
+        if (m.sub) cc.appendChild(el("div", "sub", m.sub));
+        g.appendChild(cc);
+      });
+      kids.push(g);
+    }
+    root.appendChild(el("div", "grid", kids));
+  })();
+
+  // Yesterday beside training load
+  (function () {
+    var row = [];
+    if (D.yesterday) {
+      var y = D.yesterday, c = card("Yesterday", "yday", y.when);
+      if (!y.sessions || !y.sessions.length) c.appendChild(el("p", null, "Rest day."));
+      (y.sessions || []).forEach(function (x) {
+        var left = el("div", null, [el("h3", null, x.name), x.stats ? el("div", "sub", x.stats) : null]);
+        var tags = el("div", "tags", [typeChip(x.type, x.type + (x.time ? " · " + x.time : ""))]);
+        if (x.effort) { var eff = el("span", "eff", x.effort); eff.style.setProperty("--ec", ECOL[x.effort.toLowerCase()] || "var(--text-2)"); tags.appendChild(eff); }
+        left.appendChild(tags);
+        var s = el("div", "sess", [el("div", "act", [left, x.fig ? el("div", "fig num", [x.fig, el("small", null, x.figUnit || "")]) : el("div")])]);
+        if (x.note) s.appendChild(el("div", "quote", [el("span", "sub", "Your note"), "“" + x.note + "”"]));
+        c.appendChild(s);
+      });
+      if (y.journal) c.appendChild(el("div", "quote", [el("span", "sub", "Journal"), "“" + y.journal + "”"]));
+      var dk = y.drinks;
+      if (dk) {
+        if (dk.water == null && dk.coffee == null && dk.alcohol == null && dk.unwind == null) {
+          var nd = el("p", "sub", "No drinks logged."); nd.style.marginTop = "12px"; c.appendChild(nd);
+        } else {
+          var grid = el("div", "drinks");
+          var tile = function (k, label, val, unit, extra) {
+            var kk = el("div", "k", [icon(k), label]); kk.style.setProperty("--c", "var(--" + k + ")");
+            var v = val == null ? el("div", "v na", "Not logged") : el("div", "v num", String(val), [el("small", null, unit)]);
+            return el("div", "dk " + k, [kk, v, extra]);
+          };
+          var bar = null;
+          if (dk.water) { bar = el("div", "bar", [el("i")]); bar.firstChild.style.width = Math.min(dk.water.pct, 100) + "%"; }
+          grid.appendChild(tile("water", "Water", dk.water ? dk.water.oz : null, dk.water ? "oz · " + dk.water.pct + "% of " + dk.water.goal : "", bar));
+          grid.appendChild(tile("coffee", "Coffee", dk.coffee, dk.coffee === 1 ? "cup" : "cups"));
+          grid.appendChild(tile("alcohol", "Alcohol", dk.alcohol, dk.alcohol === 1 ? "drink" : "drinks"));
+          if (dk.unwind != null) grid.appendChild(tile("unwind", "Unwind", dk.unwind, "mg"));
+          c.appendChild(grid);
+        }
+      }
+      row.push(c);
+    }
+    if (D.load) {
+      var lc = card("Training load", "load", "last 7 days");
+      var bars = el("div", "bars"), xs = el("div", "bars-x"), mx = Math.max.apply(null, [60].concat(D.load.map(function (o) { return o.load || 0; })));
+      D.load.forEach(function (o) {
+        var i = el("i"); i.style.height = Math.round((o.load || 0) / mx * 70) + "px"; i.style.setProperty("--ec", ECOL[o.e] || ECOL.none);
+        bars.appendChild(el("div", "b", [el("span", "num", o.load == null ? "–" : String(o.load)), i]));
+        xs.appendChild(el("span", null, o.d, [el("b", "num", o.n)]));
+      });
+      lc.appendChild(bars); lc.appendChild(xs);
+      var key = el("div", "key");
+      [["easy", "Easy"], ["medium", "Medium"], ["hard", "Hard"], ["none", "No effort logged"]].forEach(function (k) { var s = el("span", null, k[1]); s.style.setProperty("--ec", ECOL[k[0]]); key.appendChild(s); });
+      lc.appendChild(key);
+      if (D.loadNote) { var ln = el("p", "sub", D.loadNote); ln.style.marginTop = "8px"; lc.appendChild(ln); }
+      row.push(lc);
+    }
+    if (row.length) root.appendChild(el("div", "grid" + (row.length > 1 ? " g2" : ""), row));
+  })();
+
+  // The next 3 days
+  if (D.ahead && D.ahead.length) (function () {
+    var c = card("Next " + D.ahead.length + " days", "ahead", "home weather · plan · calendar"), g = el("div", "ahead");
+    D.ahead.forEach(function (a) {
+      var hd = el("div", "hd", [el("div", "dt", [el("span", null, a.dow), el("b", "num", a.n)])]);
+      if (a.wx) hd.appendChild(el("div", "wx", [icon(a.wx.ic), el("div", null, [el("b", "num", a.wx.hi + "° / " + a.wx.lo + "°"),
+        el("div", a.wx.flag ? "flag" : null, a.wx.flag ? "▲ " + a.wx.flag : "wind " + a.wx.wind + " · rain " + a.wx.rain + "%")])]));
+      var dc = el("div", "dc", [hd]);
+      (a.plans || []).forEach(function (p) { dc.appendChild(el("div", "ln", [typeChip(p.type, p.title), p.sub ? el("span", "sub", p.sub) : null])); });
+      (a.events || []).forEach(function (e) { dc.appendChild(el("div", "ln", [el("span", "t", e.t), el("span", null, e.title)])); });
+      (a.board || []).forEach(function (b) { dc.appendChild(el("div", "ln", [el("span", "t", "Hive due"), el("span", null, b.title)])); });
+      if (a.none) dc.appendChild(el("p", "none", a.none));
+      if (a.last) dc.appendChild(el("p", "last", a.last));
+      g.appendChild(dc);
+    });
+    c.appendChild(g);
+    root.appendChild(c);
+  })();
+
+  // Board beside body
+  (function () {
+    var row = [];
     if (D.board) {
-      var bs = sec("Board", "Hive"), bc = el("div", "card");
-      if (D.board.overdue && D.board.overdue.length) {
-        bc.appendChild(el("span", "label", "Overdue"));
-        D.board.overdue.forEach(function (o) { bc.appendChild(item(o, o.days)); });
-      }
-      if (D.board.today && D.board.today.length) {
-        bc.appendChild(el("span", "label", "Due today"));
-        D.board.today.forEach(function (o) { bc.appendChild(item(o, o.status)); });
-      }
-      if (D.board.note) {
-        var bn = el("p", "none", D.board.note);
-        bn.style.marginTop = "6px";
-        bc.appendChild(bn);
-      }
-      bs.appendChild(bc);
-      row.appendChild(bs);
+      var b = D.board, bc = card("Board", "board", "Hive");
+      [["Overdue", b.overdue, function (o) { return el("span", "tag late", o.days + "d overdue"); }],
+       ["Due today", b.today, function (o) { return el("span", "tag", o.status || "today"); }],
+       ["Coming up", b.soon, function (o) { return el("span", "tag", o.due); }]].forEach(function (grp) {
+        if (!grp[1] || !grp[1].length) return;
+        bc.appendChild(el("div", "lbl", grp[0]));
+        grp[1].forEach(function (o) { bc.appendChild(el("div", "item", [el("span", null, o.title), o.board ? el("span", "bd", o.board) : null, grp[2](o)])); });
+      });
+      if (b.note) { var bn = el("p", "sub", b.note); bn.style.marginTop = "8px"; bc.appendChild(bn); }
+      row.push(bc);
     }
     if (D.body) {
-      var ys = sec("Body"), yc = el("div", "card tile", null, [el("span", "label", D.body.label || "Weight, lb"), el("div", "val num", D.body.value)]);
-      if (D.body.series && D.body.series.length > 1) yc.appendChild(spark(D.body.series, null, "Weight readings"));
-      if (D.body.sub) yc.appendChild(el("span", "sub", D.body.sub));
-      ys.appendChild(yc);
-      row.appendChild(ys);
+      var y = D.body, yc = card("Body", "body", "morning weigh-in");
+      yc.appendChild(figure("big", y.value, y.unit));
+      if (y.sub) yc.appendChild(el("div", "sub", y.sub));
+      var sp = y.series ? spark(y.series, "var(--primary)", "Weight readings, oldest first") : null;
+      if (sp) { sp.style.marginTop = "8px"; yc.appendChild(sp); }
+      if (y.bp) yc.appendChild(el("div", "bp", [el("span", null, "Blood pressure"), el("b", "num", y.bp), y.bpSub ? el("span", "sub", y.bpSub) : null]));
+      row.push(yc);
     }
-    root.appendChild(row);
-  }
+    if (row.length) root.appendChild(el("div", "grid" + (row.length > 1 ? " g2" : ""), row));
+  })();
 
   if (D.foot) root.appendChild(el("p", "foot", D.foot));
 })();

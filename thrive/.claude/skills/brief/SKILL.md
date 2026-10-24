@@ -29,6 +29,10 @@ Edit these here rather than in the steps below.
   the name, not the id, here, because this repo is public.
 - **Look-ahead:** the next 3 days after today.
 - **Baseline:** the 14 days before today, for HRV, resting HR and sleep.
+- **Training slot:** 7:00 AM. The user trains right after the 6:45 brief, so
+  a planned `weight`, `stretch` or other indoor session, which has a day but no
+  time, is drawn at 7:00 for its estimate (45 min when it has none). An
+  outdoor session is drawn in its best window instead (Step 4).
 - **Weather locations:** in `settings.local.md` next to this file. That
   file is gitignored, because this repo is public and the locations are
   where you live and ride. `settings.example.md` shows its shape. It names
@@ -105,6 +109,7 @@ Make these calls in parallel. They don't depend on each other.
 | Board | `hive_list_items` with `due_before` = today + 3 days, once with `status: 'To Do'` and once with `status: 'In Progress'`. If a call errors (it has returned a 404 page once), retry it once before giving up. Never call it without a `status`: `due_before` has no lower bound, so an unfiltered call returns every finished item ever due and buries the open ones. Keep the Hive owner's items (see Settings). Overdue means a due date before today; list those separately from today's and the look-ahead's, oldest first, and say how many days overdue. |
 | Calendar | Events for today + 3 days from **each** calendar in Settings, if a calendar tool is connected. Pass the time zone from Settings, since a calendar's own zone can differ. Pass `eventType` as `DEFAULT`, `OUT_OF_OFFICE`, `FOCUS_TIME`, `FROM_GMAIL` and `BIRTHDAY`: birthdays are left out unless asked for. An empty result from one calendar is not "no events": say "no events" only when every calendar was read and all were empty. |
 | Weather | One Open-Meteo forecast for today + 3 days (below) |
+| Last time | For each planned session in the look-ahead, `thrive_list_workouts` with `name_contains` = its name, `status: 'completed'`, `limit: 1`: its date, effort and note, for the day's "last time" line. Skip a session whose name is only its type (`Stretch`, `Mountain Bike`), since every one of those matches |
 
 If a call fails, keep going. List what failed in the brief's last line.
 A partial brief beats no brief.
@@ -133,9 +138,17 @@ Planned sessions have a day, never a time. Which forecast each day gets:
 - **Any other day**, including one with a gravel, road or other outdoor
   session: **home** only.
 
-For every forecast a day gets, show temperature and wind hour by hour from
-sunrise to sunset, not only the high and low. Wet-trails flags come from
-**trails**; a gravel or road ride's wind flag comes from **home**.
+Today's page draws the **home** temperature hour by hour from 6 AM to 10 PM,
+on the same axis as the sessions and the calendar. On a trails day the
+**trails** forecast decides the best window, which is drawn there too, and
+its conditions go in the day's notes. Each look-ahead day gets one line: its
+sky, high and low, top wind and top rain chance, and a flag if it has one.
+Wet-trails flags come from **trails**; a gravel or road ride's wind flag
+comes from **home**.
+
+The sky is one word from the day's (or the hour's) `weather_code`: `sun` for
+0–1, `partly` for 2, `cloud` for 3, `fog` for 45–48, `rain` for 51–67 and
+80–82, `snow` for 71–77 and 85–86, `storm` for 95–99.
 
 ## Step 3: Read the signals
 
@@ -149,6 +162,10 @@ Every number in the brief comes from a tool result. Never estimate one.
 - **Hard days**: how many of the last 3 days carried a `Hard` effort.
 - **Load trend**: this week's `training_load` against the week before, if
   both are present.
+- **Bed by**: among the baseline nights with 7:30 or more slept, the latest
+  `bed_time`, rounded down to the quarter hour. Give it with how many such
+  nights there were and the average bed time over all the baseline nights.
+  With fewer than 2 such nights, leave it out.
 
 Blank means unknown, never zero. A missing value is left out of the
 reasoning, not counted as low. Recovery and VO2max are snapshots that are
@@ -222,8 +239,7 @@ not diagnose.
 ## Step 5: Write it
 
 Work out the content first, under the headings below, in this order, and
-leave out any section with nothing in it. Step 6 puts it on the page. The
-weekly brief is still plain text.
+leave out any section with nothing in it. Step 6 puts it on the page.
 
 ```
 **<Weekday d Mon> — <Level>**
@@ -243,6 +259,7 @@ weekly brief is still plain text.
 <calendar: fixed commitments and the free blocks a session could use; birthdays today>
 <birthdays on the next 3 days go on those days' lines below, not here>
 <Hive: due today and overdue, owner's items>
+<bed by: Step 3's time, and the nights behind it>
 
 **Next 3 days**
 <one line per day: planned sessions, weather in a few words, busy calendar, birthdays, Hive due dates>
@@ -315,41 +332,76 @@ the brief. With no `webhook:` line, make no call and end the foot line with
 page, the reply or a file in the repo. A `refresh` run signals again, so the
 phone hears `complete` once sleep is in.
 
-**The data.** Leave a key out and its section disappears.
+**The data.** Leave a key out and its section disappears. Every string is
+shown as text, never as markup. Times on the page's axes are decimal hours
+(9:30 AM is `9.5`, 7:15 PM is `19.25`). A session `type` is a Thrive type,
+with its venue if it has one (`weight`, `bike:mountain`); it picks the
+colour and icon.
 
-- `date`, `level` (`Rest`, `Go easy`, `Train as planned` or `Push`), `levelNote` (the
-  one-line reason), `sources` (optional), `notice` (an optional banner, for
-  example that sleep hasn't synced).
-- `recovery`: `sleep`, `hrv` and `rhr`, each `{label, value, unit, series,
-  avgOf, sub}`. `value` is `null` when not synced, which shows "not synced".
-  `series` is one number a night, oldest first, today last. `avgOf` is how
-  many leading points make the average (the baseline nights before today).
-  Sleep is minutes slept, awake time already taken off.
-- `drinks`: the drinks line (Step 5) as one string. Always present when
-  `thrive_drinks` answered, including "No drinks logged."; left out only when
+- `date` ("Fri, Oct 23"), `sunrise` and `sunset` ("7:17 AM"), `notice` (an
+  optional banner, for example that sleep hasn't synced).
+- `level` (`Rest`, `Go easy`, `Train as planned` or `Push`), `start` (the
+  level the plan started at, Step 4, before any step down or up), and
+  `levelNote` (the one-line reason, with the numbers).
+- `call`: today's session at the training slot, `{when, type, title, dur}`,
+  for example `{"when": "Your usual 7:00 slot", "type": "weight", "title": "2 -
+  Upper Pull A", "dur": "45 min"}`. With a swap (Step 4) it names the swap,
+  and `when` says what it replaces. Left out with nothing planned, which
+  shows "Nothing planned".
+- `signals`: the four readings behind the level, each `{k, label, value,
+  unit, delta, state}`: `k` is `hrv`, `heart`, `sleep` or `load` (hard days);
+  `delta` is the comparison as words ("−18% vs 54"); `state` is `down` for a
+  reading that stepped the level down, `good` for one better than average,
+  and `ok` otherwise. `value: null` shows "not synced".
+- `day`: the one time axis. `{from: 6, to: 23, wake, bed, sunrise, sunset,
+  temps, sessions, best, events, allday, notes}`. `wake` is today's
+  `wake_time`, `bed` is Step 3's bed by (left out with it). `temps` is the
+  home temperature in °F for each hour from `from`, one a value, `null` for
+  an hour the forecast lacks. `sessions` are `[{s, e, type, label}]` at the
+  training slot or the best window. `best` is `[s, e]`, the longest run of
+  hours at the trails with nothing flagged and outside the calendar, only on
+  a trails day; otherwise `null`. `events` are timed calendar events `[{s,
+  e, t}]`; `allday` is a list of all-day event titles. `notes` are up to
+  four lines `[{ic, b, text, flag}]`: `ic` an icon (`sun` or another sky
+  word, `clock`, `moon`, `alert`), `b` a short bold lead, `text` the rest,
+  `flag: true` for a weather flag (Step 4). Use them for the conditions, the
+  free daylight, any flag and what to do, and the bed by line.
+- `night`: last night's sleep, `{slept, avg, score, bed, wake, stages:
+  {deep, rem, light, awake}}`, stages in minutes; `null` when it isn't
+  synced, which says so.
+- `metrics`: HRV, resting HR and sleep, each `{k, label, value, unit, now,
+  lo, hi, avg, series, sub}`. `series` is one number a night over the
+  baseline and today, oldest first, today last, `null` for a night with no
+  reading (sleep in minutes slept). `lo` and `hi` are the series' range and
+  `avg` the baseline average, which place today on the range bar. `value:
+  null` shows "not synced".
+- `yesterday`: `{when, sessions, journal, drinks}`. `sessions` are `[{type,
+  name, time, fig, figUnit, stats, effort, note}]`: `fig` the big figure
+  (distance in miles for an outdoor session, else minutes), `stats` one
+  line ("20 of 24 sets · avg HR 107"), `effort` `Easy`, `Medium` or `Hard`
+  as logged, `note` the session's own note. An empty list shows "Rest day."
+  `journal` is yesterday's note. `drinks` is `{water: {oz, pct, goal},
+  coffee, alcohol, unwind}` from `thrive_drinks`, each `null` when that kind
+  wasn't logged, which shows "Not logged"; Unwind shows only when logged,
+  and all four `null` shows "No drinks logged." Leave `drinks` out only when
   the call failed, which the foot line then names.
-- `today`: `sessions` `[{name, note}]`, `weather`, `legend` `{best,
-  calendar}`, `note` (for example that the trails are dry, with the rain
-  figure), `events` `[{t, title}]`.
-- `weather` is one entry per location the day gets (Step 2): `{place,
-  sunrise, sunset, T, W, R, blocks, best}`. `place` is the `name:` from
-  `settings.local.md`, or "Home" and "Trails". `T`, `W` and `R` are each 12
-  hourly values, 7 AM to 6 PM: temperature °F, **sustained** wind in mph
-  (never gusts), and rain chance %. `blocks` is `[[start, end]]` in decimal
-  hours for timed calendar events (9:30 is 9.5). `best` is `[start, end]`,
-  the longest run of hours at the trails with nothing flagged and outside
-  `blocks`, and only on a day with a trails session.
-- `load`: seven `{d, load, e}`, `e` being `easy`, `med`, `hard` or `none`
-  (the day's top effort), plus `loadNote`.
-- `days`: one per look-ahead day, `{name, sm, charts, events, empty}`. `sm`
-  is the high–low, the top wind and the top rain chance. `charts` has a
-  `weather`-shaped entry per location, with `place` set on each when there
-  are two. `events` are `{t, title, plan}`. A planned session has `plan: true`
-  and its activity type as `t` (`weight`, `bike:mountain`), not a time. `empty` is a line such as "Nothing planned for
-  training".
+- `load`: seven `{d, n, load, e}` for the last 7 days: `d` the weekday's
+  letter, `n` the date, `e` the day's top effort `easy`, `medium`, `hard`
+  or `none`. `loadNote`: one line, only when the trend changes what to do.
+- `ahead`: one per look-ahead day, `{dow, n, wx, plans, events, board,
+  none, last}`. `wx` is `{ic, hi, lo, wind, rain, flag}`, `flag` a short
+  warning ("Wind 16 mph") only by the Step 4 limits. `plans` are `[{type,
+  title, sub}]`, `events` `[{t, title}]` with `t` a time or "All day",
+  `board` the Hive items due `[{title}]`, `none` a line such as "Nothing
+  planned for training.", and `last` one line from the Last time call (date,
+  effort and the note, quoted) or the trails conditions on a trails day.
 - `board`: `{overdue: [{title, board, days}], today: [{title, board,
-  status}], note}`. `body`: `{value, series, sub}`. `foot`: the line
-  naming anything not checked.
+  status}], soon: [{title, board, due}], note}`.
+- `body`: `{value, unit, series, sub, bp, bpSub}`: the morning weight, its
+  readings over the last 7 days, the change in words, and the day's blood
+  pressure with how many readings and the recent range.
+- `foot`: the line naming anything not checked, and that this is training
+  guidance, not medical advice.
 
 ## Weekly brief
 
@@ -364,23 +416,18 @@ does with `kind=weekly&status=complete`, and reply in chat with the first
 suggestion and the link.
 
 The page leads with the week ahead and looks back last. Its sections, in
-order, and the data for each (leave a key out and the section disappears):
+order, and the data for each (leave a key out and the section disappears;
+strings show as text, times are decimal hours as on the daily page):
 
-- `title`: for example "Week of 5 to 11 Oct 2026".
-- `next`: `{note, days}`, one entry per day for 7 days. A day is `{name,
-  wx, tag, events, empty}`. `wx` is `{hi, lo, rain, wind, blurb}` from
-  the home forecast (`forecast_days=8`, no `past_days`): the high and low
-  in °F, the top rain chance in %, the top wind in mph, and one plain
-  sentence on what the day is doing, such as "Cool start, hot afternoon. Dry
-  and calm." On a day with a trails session, add the trails weather to the
-  sentence. `tag` is `{kind: "flag", text}` and only for a weather warning
-  by the Step 4 limits (wind 15 mph or more, rain 40% or more, feels-like
-  under 35°F or over 90°F), so the user doesn't plan a ride there. Nothing
-  else gets a pill in this section. `events` and `empty` work as in the
-  daily page; a planned session has `plan: true` and its activity type as
-  `t`.
-- `suggestions`: 2 to 4 of `{kind, title, why}`. `kind` is `keep` (leave a
-  planned session where it is), `add` (put a session on a day), `move`
+- `date` (the run's date, "Sun, Oct 18"), `range` ("Mon 19 – Sun 25 Oct"),
+  `sun` (`[sunrise, sunset]` at home, from the first day ahead), `notice`
+  (optional).
+- `plan`: `{summary, counts, suggestions}`. `summary` is two sentences on
+  what's planned and whether recovery supports it. `counts` are `[{type,
+  text}]`, the planned sessions by type ("3 lifts"), including a type the
+  week has none of when a suggestion adds it ("0 stretches").
+  `suggestions` are 2 to 4 of `{kind, title, why}`. `kind` is `keep` (leave
+  a planned session where it is), `add` (put a session on a day), `move`
   (shift a planned session to another day) or `skip` (no session or ride on
   a day). `title` names the day and the thing. `why` carries at least one
   figure from the data: planned load, recovery against the week before,
@@ -392,38 +439,66 @@ order, and the data for each (leave a key out and the section disappears):
     the week before: `add` a session;
   - two or more hard days in a row, or a week with no stretch: `add` a
     stretch;
-  - an outdoor session on a day with a weather warning: `skip` it or `move`
-    it;
+  - an outdoor session on a day with a weather warning, or on a day an
+    all-day event fills: `skip` it or `move` it;
   - a planned session with no reason against it: `keep`.
 
   Only `add` a type the user already logs (`weight`, `stretch`, `bike`,
   `hike`, `run`, `walk`). Never invent a workout.
-- `board`: `{done, overdue, open, note}`, each list `{title, board, days |
-  status}`. Finished items are those marked Done this week.
-- `week`: the look back. `{range, stats, load, note}`. `stats` is up to four
-  `{label, value, sub}`: sessions by type, moving time with how many
-  sessions recorded it, outdoor distance, and the effort split. `load` is
-  seven `{d, load, e}` as on the daily page. `note` names the longest or
-  hardest session. `drinks` is one line from `thrive_drinks` over the same
-  seven days, read off its "Across the range" line: the average daily water
-  in oz on the days it was logged, with how many days that was and its
-  percentage of the goal, the week's total coffee in cups, and its total
-  alcohol in drinks, e.g. *"Water 52 oz a day on average, on the 6 days you
-  logged it (81% of your 64 oz goal) · Coffee 12 cups in total · Alcohol 5
-  drinks in total"*. A kind with no entry all week is *"No water logged"*,
-  *"No coffee logged"* or *"No alcohol logged"*, and a week with none of them
-  is *"No drinks logged."*, never zero. Unwind (#592) is added last, as the
-  week's total in mg, and only when some was logged: *"… · Alcohol 5 drinks
-  in total · Unwind 40 mg in total"*; a week with none leaves it off the line.
-  Figures only, as on the daily page.
-- `recovery`: `{note, sleep, hrv, rhr}` as on the daily page, but each value
-  is the week's average with the change from the week before in `sub`, plus
-  the worst night with its likely cause if the journal says one. `series`
-  runs over both weeks and `avgOf` is how many leading points are the week
-  before.
-- `body`: weight change across the week, and any blood pressure readings.
-  `foot`: what wasn't checked, and any thin comparison, such as a week
-  before with only a few nights of data.
+- `days`: one per day for 7 days, `{dow, n, wx, plans, add, events,
+  allday, board, note, sg}`. `wx` is `{ic, hi, lo, wind, rain, flag}` from
+  the home forecast (`forecast_days=8`, no `past_days`), `ic` the sky word
+  (Step 2), and `flag` a short warning ("Wind 18") only by the Step 4 limits
+  (wind 15 mph or more, rain 40% or more, feels-like under 35°F or over
+  90°F). `plans` are the planned sessions, `[{type, title, s, e, struck}]`,
+  `s` and `e` at the training slot or the best window and left out when
+  neither applies; `struck: true` on one a `move` or `skip` suggestion
+  takes off this day. `add` is the session a suggestion puts on this day,
+  in the same shape, drawn dashed. `events` are the timed calendar events
+  `[{s, e, t}]`, `allday` the all-day events' titles as one string, `board`
+  the Hive items due `[{title}]`, `note` one plain line when the weather
+  matters to the day's plan ("Indoors, so the rain doesn't touch it."), and
+  `sg` `{kind, text}` repeats a suggestion on the day it changes.
+- `back`: the look back, `{range, stats, log, note, drinks}`. `stats` is
+  four `{k, v, u, d, up, sub}`: sessions with the types in `sub`, moving
+  time with how many sessions recorded it, outdoor distance with the
+  climb, and the effort split; `d` is the change from the week before in
+  words and `up: true` marks a rise. `log` is the two weeks, `[{label, sub,
+  days}]`, the week before first, each with seven `{ts, load}`: `ts` the
+  day's sessions as `[type, effort]` pairs, effort `easy`, `medium`, `hard`
+  or `null` when not rated, and `load` the day's `training_load`. `note`
+  names the longest and the hardest session. `drinks` is one line from
+  `thrive_drinks` over the same seven days, read off its "Across the range"
+  line: the average daily water in oz on the days it was logged, with how
+  many days that was and its percentage of the goal, the week's total
+  coffee in cups, and its total alcohol in drinks, e.g. *"Water 52 oz a day
+  on average, on the 6 days you logged it (81% of your 64 oz goal) · Coffee
+  12 cups in total · Alcohol 5 drinks in total"*. A kind with no entry all
+  week is *"No water logged"*, *"No coffee logged"* or *"No alcohol
+  logged"*, and a week with none of them is *"No drinks logged."*, never
+  zero. Unwind (#592) is added last, as the week's total in mg, and only
+  when some was logged: *"… · Alcohol 5 drinks in total · Unwind 40 mg in
+  total"*; a week with none leaves it off the line. Figures only, as on the
+  daily page.
+- `recovery`: `{story, metrics}`. `story` is up to three sentences on the
+  week's worst night: its figures, its likely cause if a journal or session
+  note gives one, and how it came back. `metrics` are sleep, HRV and resting
+  HR, each `{k, label, value, unit, d, prev, series, sub}`: `value` last
+  week's average, `prev` the week before's, `d` the change in words, and
+  `series` 14 nights, the week before first, `null` for a night with no
+  reading. A week before with fewer than 7 nights splits elsewhere: give
+  `split`, the number of nights it has.
+- `body`: `{value, unit, d, sub, series, bp, bpSub}`. `value` is last
+  week's average weight, `d` its change from the week before's average,
+  `series` the readings over both weeks (`split` as above when the week
+  before has other than 7), and `bp` the week's mean blood pressure with
+  how many readings in `bpSub`.
+- `board`: `{done, overdue, open, soon, note}`: done this week `[{title,
+  board}]`, overdue `[{title, board, days}]`, in progress `[{title, board,
+  status}]`, and due in the week ahead `[{title, board, due}]`.
+- `foot`: what wasn't checked, any thin comparison, such as a week before
+  with only a few nights of data, and that this is training guidance, not
+  medical advice.
 
 ## Never
 

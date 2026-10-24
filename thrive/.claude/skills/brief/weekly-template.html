@@ -1,712 +1,639 @@
 <title>Weekly Brief</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Schibsted+Grotesk:wght@400;500;700;800&display=swap">
+<meta name="claude:viewport-fit-sides" content="cover">
 <style>
-/* Layout: one column, summary first. Level badge, recovery tiles, today (events, hourly weather for trails and home), load bars, next 3 days with hourly home weather, body and board. Multi-column from 720px. */
+/* Layout: one column on a phone, the week ahead first. The plan and what to change in it, then each day as a
+   6 AM to 10 PM bar (night shaded, calendar and sessions labelled), then last week against the week before
+   (stats, a two-week log, recovery), body beside board. Tokens are Thrive's own, copied so the page stands alone. */
 :root {
-  --bg: #eef1f4;
-  --surface: #ffffff;
-  --ink: #1b2430;
-  --muted: #5d6b7a;
-  --line: #d8dee5;
-  --accent: #2f6f8f;
-  --lvl: #d98a00;
-  --lvl-soft: #fbefd2;
-  --warn: #b4540a;
-  --temp: #c2562b;
-  --wind: #3d78a0;
-  --rain: #1f8a68;
-  --gust: #1b2430;
-  --block: #cfd8e3;
-  --best: #2f8a5c;
-  --bar-easy: #6fae85;
-  --bar-med: #e0a23a;
-  --bar-hard: #cf5c3f;
-  --bar-none: #b9c3ce;
-  --display: "Schibsted Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Consolas, monospace;
+  --bg: #f0f2f5; --surface: #ffffff; --raised: #f5f6f8; --border: #dadce0; --border-light: #e8eaed;
+  --text: #1f1f1f; --text-2: #5f6368; --muted: #606b76;
+  --primary: #2f66f0; --success: #2e7d32; --warning: #a05d00; --warning-light: #fff8e1; --danger: #b71c1c;
+  --heart: #c2185b; --hrv: #00796b; --sleep: #7c3aed; --deep: #1e3a8a; --rem: #7c3aed; --light: #5b8def; --awake: #8a6d00;
+  --water: #0b6fb8; --coffee: #6f4e37; --alcohol: #b45309; --unwind: #5e7c62;
+  --t-weight: #c53030; --t-stretch: #2e7d32; --t-bike: #1565c0; --t-hike: #5d4037; --t-run: #9d174d; --t-walk: #10605a;
+  --e-easy: #2e7d32; --e-medium: #a05d00; --e-hard: #c62828; --e-none: #b9c0c8;
+  --lv-rest: #4f6f8f; --lv-easy: #2e7d32; --lv-plan: #a05d00; --lv-push: #c62828;
+  --night: rgba(30, 40, 70, .09); --cal: #c3d2ee; --cal-text: #1d2b48; --strip-track: #e9ecf1; --strip-night: #cfd4dc;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  --r-lg: 16px; --r-md: 8px;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #11171e;
-    --surface: #1a232d;
-    --ink: #e8edf2;
-    --muted: #9aa8b6;
-    --line: #2b3745;
-    --accent: #6fb4d4;
-    --lvl: #f0b43c;
-    --lvl-soft: #3a2f14;
-    --warn: #f0a068;
-    --temp: #f08a5d;
-    --wind: #7fb6d6;
-    --rain: #5cc9a4;
-    --gust: #e8edf2;
-    --block: #33465c;
-    --best: #5cc08a;
-    --bar-easy: #5a9a72;
-    --bar-med: #d09a38;
-    --bar-hard: #d86b4f;
-    --bar-none: #3d4b5a;
+    --bg: #121212; --surface: #1a1a1e; --raised: #252528; --border: #3c3c3c; --border-light: #2c2c31;
+    --text: #e8eaed; --text-2: #9aa0a6; --muted: #868e98;
+    --primary: #6e97ff; --success: #66bb6a; --warning: #ffb74d; --warning-light: #2d2210; --danger: #f26b68;
+    --heart: #f47a95; --hrv: #4fd1c5; --sleep: #b9a3ff; --deep: #5470d0; --rem: #b9a3ff; --light: #4f86f7; --awake: #f2c94c;
+    --water: #5bb8f5; --coffee: #c9a27e; --alcohol: #f5a524; --unwind: #9cbf9f;
+    --t-weight: #fca5a5; --t-stretch: #86efac; --t-bike: #93c5fd; --t-hike: #d7ccc8; --t-run: #f5a8d3; --t-walk: #7fded3;
+    --e-easy: #86efac; --e-medium: #ffb74d; --e-hard: #ef9a9a; --e-none: #3c3c42;
+    --lv-rest: #8fb0d0; --lv-easy: #86efac; --lv-plan: #ffb74d; --lv-push: #ef9a9a;
+    --night: rgba(0, 0, 0, .4); --cal: #4a5f8f; --cal-text: #eef2fb; --strip-track: #2c2c31; --strip-night: #18181b;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #11171e;
-  --surface: #1a232d;
-  --ink: #e8edf2;
-  --muted: #9aa8b6;
-  --line: #2b3745;
-  --accent: #6fb4d4;
-  --lvl: #f0b43c;
-  --lvl-soft: #3a2f14;
-  --warn: #f0a068;
-  --temp: #f08a5d;
-  --wind: #7fb6d6;
-  --rain: #5cc9a4;
-  --gust: #e8edf2;
-  --block: #33465c;
-  --best: #5cc08a;
-  --bar-easy: #5a9a72;
-  --bar-med: #d09a38;
-  --bar-hard: #d86b4f;
-  --bar-none: #3d4b5a;
+  --bg: #121212; --surface: #1a1a1e; --raised: #252528; --border: #3c3c3c; --border-light: #2c2c31;
+  --text: #e8eaed; --text-2: #9aa0a6; --muted: #868e98;
+  --primary: #6e97ff; --success: #66bb6a; --warning: #ffb74d; --warning-light: #2d2210; --danger: #f26b68;
+  --heart: #f47a95; --hrv: #4fd1c5; --sleep: #b9a3ff; --deep: #5470d0; --rem: #b9a3ff; --light: #4f86f7; --awake: #f2c94c;
+  --water: #5bb8f5; --coffee: #c9a27e; --alcohol: #f5a524; --unwind: #9cbf9f;
+  --t-weight: #fca5a5; --t-stretch: #86efac; --t-bike: #93c5fd; --t-hike: #d7ccc8; --t-run: #f5a8d3; --t-walk: #7fded3;
+  --e-easy: #86efac; --e-medium: #ffb74d; --e-hard: #ef9a9a; --e-none: #3c3c42;
+  --lv-rest: #8fb0d0; --lv-easy: #86efac; --lv-plan: #ffb74d; --lv-push: #ef9a9a;
+  --night: rgba(0, 0, 0, .4); --cal: #4a5f8f; --cal-text: #eef2fb; --strip-track: #2c2c31; --strip-night: #18181b;
   color-scheme: dark;
 }
-* { box-sizing: border-box; }
-body { background: var(--bg); color: var(--ink); font-family: var(--display); font-size: 15px; line-height: 1.45; padding-inline: 16px; padding-block: 20px 40px; }
-.wrap { max-width: 920px; margin-inline: auto; display: flex; flex-direction: column; gap: 14px; }
-h1, h2, h3, p { margin: 0; text-wrap: balance; }
-.label { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; }
-.muted { color: var(--muted); }
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 var(--font); -webkit-font-smoothing: antialiased; }
+h1, h2, h3, p { margin: 0; }
+.wrap { max-width: 960px; margin: 0 auto; padding-block: 20px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 12px; }
+.num { font-variant-numeric: tabular-nums; }
+.card { background: var(--surface); border-radius: var(--r-lg); padding: 16px; min-width: 0; }
+.ch { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 8px; margin-bottom: 12px; }
+.ch h2 { font-size: 1rem; font-weight: 600; white-space: nowrap; }
+.ch .aside { font-size: .8125rem; color: var(--text-2); }
+.ic { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.sub { font-size: .8125rem; color: var(--text-2); }
+.na { color: var(--muted); font-weight: 500; }
+.grid { display: grid; gap: 12px; grid-template-columns: 1fr; }
+.notice { background: var(--warning-light); color: var(--text); border-radius: var(--r-md); padding: 10px 14px; font-size: .9375rem; display: flex; gap: 8px; align-items: baseline; }
+.notice .ic { color: var(--warning); width: 16px; height: 16px; position: relative; top: 3px; }
 
-.date { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
-.date h1 { font-size: 15px; font-weight: 500; color: var(--muted); }
-.hero { background: var(--lvl-soft); border: 1px solid var(--lvl); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
-.hero .lv { font-size: clamp(40px, 12vw, 64px); font-weight: 800; line-height: 1; letter-spacing: -.02em; color: var(--lvl); }
-.hero p { max-width: 64ch; }
-.scale { display: flex; gap: 4px; margin-top: 4px; }
-.scale span { flex: 1; text-align: center; font-family: var(--mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; padding: 4px 0; border-radius: 4px; background: var(--surface); color: var(--muted); border: 1px solid var(--line); }
-.scale span.on { background: var(--lvl); color: #1b1300; border-color: var(--lvl); font-weight: 500; }
+.top { display: flex; flex-direction: column; gap: 2px; padding: 4px 2px 8px; }
+.top .meta { display: flex; align-items: center; gap: 8px; font-size: .875rem; color: var(--text-2); flex-wrap: wrap; }
+.top .meta .ic { width: 15px; height: 15px; color: var(--warning); }
+.top h1 { font-size: 2.25rem; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; }
 
-.sec { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.sec > h2 { font-size: 13px; font-weight: 700; letter-spacing: .02em; }
-.grid3 { display: grid; grid-template-columns: 1fr; gap: 10px; }
-.tile { display: flex; flex-direction: column; gap: 6px; }
-.tile .val { font-size: 28px; font-weight: 700; line-height: 1.1; }
-.tile .val small { font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--muted); margin-left: 4px; }
-.tile .sub { font-size: 12.5px; color: var(--muted); }
-.spark { width: 100%; height: 44px; display: block; }
-.spark .avg { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; opacity: .7; }
-.spark .ln { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-.spark .dot { fill: var(--accent); }
+.call { display: grid; grid-template-columns: auto 1fr; gap: 12px 16px; align-items: center; }
+.gauge { width: 112px; height: 100px; position: relative; }
+.gauge svg { width: 100%; height: 100%; overflow: visible; }
+.gauge .lvw { position: absolute; inset: 28px 0 0; text-align: center; }
+.gauge .lvw b { display: block; font-size: 1.6rem; font-weight: 800; line-height: 1.1; color: var(--lvl); }
+.gauge .lvw b.long { font-size: 1.05rem; }
+.gauge .lvw span { font-size: .6875rem; color: var(--text-2); text-transform: uppercase; letter-spacing: .06em; }
+.what { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.what .when { font-size: .8125rem; color: var(--text-2); }
+.what h3 { font-size: 1.375rem; font-weight: 700; line-height: 1.25; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.call .why { grid-column: 1 / -1; font-size: .9375rem; }
+.chip-type { display: inline-flex; align-items: center; gap: 5px; font-size: .75rem; font-weight: 600; padding: 2px 9px 2px 7px; border-radius: 999px; color: var(--tc); background: color-mix(in srgb, var(--tc) 14%, transparent); white-space: nowrap; }
+.chip-type .ic { width: 14px; height: 14px; }
+.signals { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.sig { background: var(--raised); border-radius: var(--r-md); padding: 8px 10px; display: flex; flex-direction: column; gap: 1px; border: 1px solid transparent; }
+.sig.down { border-color: color-mix(in srgb, var(--e-hard) 55%, transparent); }
+.sig .k { font-size: .75rem; color: var(--text-2); display: flex; align-items: center; gap: 5px; }
+.sig .k .ic { width: 13px; height: 13px; color: var(--c); }
+.sig .v { font-size: 1.125rem; font-weight: 700; }
+.sig .v small { font-size: .75rem; font-weight: 500; color: var(--text-2); margin-left: 2px; }
+.sig .d { font-size: .75rem; font-weight: 600; color: var(--text-2); }
+.sig .d.down { color: var(--danger); } .sig .d.good { color: var(--success); }
 
-.bars { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; align-items: end; height: 120px; }
-.bar { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; height: 100%; min-width: 0; }
-.bar .col { width: 100%; border-radius: 4px 4px 0 0; background: var(--bar-none); min-height: 3px; }
-.bar .n { font-family: var(--mono); font-size: 11px; color: var(--muted); }
-.days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 6px; text-align: center; font-family: var(--mono); font-size: 11px; color: var(--muted); }
-.key { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); margin-top: 8px; }
-.key i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.tl { width: 100%; height: auto; display: block; overflow: visible; }
+.tl text { font: 500 10px var(--font); fill: var(--text-2); }
+.tl .t-temp { font-weight: 700; font-size: 10.5px; fill: var(--text); }
+.tl .night { fill: var(--night); }
+.tl .lane { fill: var(--raised); }
+.tl .cal { fill: var(--cal); }
+.tl .cal-t { fill: var(--cal-text); font-weight: 600; }
+.tl .mk { stroke: var(--text-2); stroke-width: 1.2; stroke-dasharray: 2 2; }
+.tl .mk-t { font-size: 9.5px; font-weight: 600; fill: var(--text); }
+.tl .best { fill: none; stroke: var(--success); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.tl-key { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .75rem; color: var(--text-2); margin-top: 6px; }
+.tl-key span::before { content: ""; display: inline-block; width: 12px; height: 9px; border-radius: 2px; background: var(--c); margin-right: 5px; vertical-align: -1px; }
+.tl-key span.dash::before { background: none; border: 1.5px dashed var(--success); width: 9px; height: 6px; }
+.tl-notes { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; font-size: .875rem; }
+.tl-notes div { display: flex; gap: 8px; align-items: baseline; }
+.tl-notes .ic { width: 15px; height: 15px; position: relative; top: 2px; color: var(--text-2); }
+.tl-notes b { font-weight: 600; }
+.tl-notes .flag .ic, .tl-notes .flag b { color: var(--danger); }
 
-.sess { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; justify-content: space-between; }
-.sess h3 { font-size: 20px; font-weight: 700; }
-.pick { margin-top: 8px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--best); display: flex; flex-direction: column; gap: 2px; }
-.pick b { color: var(--best); }
-.wx { margin-top: 14px; display: flex; flex-direction: column; gap: 4px; }
-.wx .hd { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.wx .hd b { font-size: 14px; }
-.chart { width: 100%; height: auto; display: block; overflow: visible; }
-.chart text { font-family: var(--mono); font-size: 9.5px; fill: var(--muted); }
-.chart .tv { fill: var(--temp); font-weight: 500; }
-.chart .grid { stroke: var(--line); stroke-width: 1; }
-.chart .tl { fill: none; stroke: var(--temp); stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; }
-.chart .td { fill: var(--temp); }
-.chart .wb { fill: var(--wind); opacity: .85; }
-.chart .gk { stroke: var(--gust); stroke-width: 1.5; }
-.chart .blk { fill: var(--block); opacity: .7; }
-.chart .bst { fill: none; stroke: var(--best); stroke-width: 1.5; stroke-dasharray: 4 3; }
-.sun { display: inline-flex; align-items: center; gap: 4px; font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
-.sun .ic { width: 18px; height: 18px; fill: none; stroke: var(--lvl); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; margin-left: 8px; }
-.sun .ic:first-child { margin-left: 0; }
-.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11.5px; color: var(--muted); margin-top: 2px; }
-.legend i { display: inline-block; vertical-align: middle; margin-right: 5px; }
-.legend .l1 { width: 14px; height: 2px; background: var(--temp); }
-.legend .l2 { width: 9px; height: 9px; background: var(--wind); opacity: .85; }
-.legend .l3 { width: 2px; height: 9px; background: var(--gust); }
-.legend .l4 { width: 12px; height: 9px; background: var(--block); }
-.legend .l5 { width: 12px; height: 9px; border: 1.5px dashed var(--best); }
-.chart .wv { fill: var(--wind); font-weight: 500; font-size: 11px; }
-.chart .rv { fill: var(--rain); font-weight: 500; font-size: 11px; }
+.sleep-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.big { font-size: 2.25rem; font-weight: 700; line-height: 1; }
+.big small { font-size: 1rem; font-weight: 600; color: var(--text-2); margin: 0 4px 0 1px; }
+.score { text-align: right; }
+.score b { font-size: 1.75rem; font-weight: 700; line-height: 1; display: block; }
+.stages { display: flex; height: 10px; border-radius: 999px; overflow: hidden; gap: 2px; margin: 14px 0 6px; }
+.stages i { display: block; height: 100%; }
+.st-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .8125rem; color: var(--text-2); }
+.st-legend span::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: var(--c); margin-right: 5px; }
+.st-legend b { color: var(--text); font-weight: 600; margin-left: 3px; }
+.mt { display: flex; flex-direction: column; gap: 6px; }
+.mt .k { display: flex; align-items: center; gap: 6px; font-size: .875rem; font-weight: 600; }
+.mt .k .ic { color: var(--c); }
+.mt .val { font-size: 1.75rem; font-weight: 700; line-height: 1.1; }
+.mt .val small { font-size: .875rem; color: var(--text-2); font-weight: 500; margin-left: 3px; }
+.mt .val.na { font-size: 1.125rem; }
+.spark { width: 100%; height: 40px; display: block; overflow: visible; }
+.range { position: relative; height: 18px; margin-top: 2px; }
+.range .track { position: absolute; left: 0; right: 0; top: 7px; height: 4px; border-radius: 2px; background: var(--border-light); }
+.range .avg { position: absolute; top: 3px; width: 2px; height: 12px; background: var(--text-2); border-radius: 1px; }
+.range .me { position: absolute; top: 3px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: var(--c); border: 2px solid var(--surface); }
 
-.ev { display: flex; gap: 8px; align-items: baseline; font-size: 13.5px; }
-.ev .t { font-family: var(--mono); font-size: 11.5px; color: var(--muted); min-width: 96px; flex: none; }
-.ev.plan .t { color: var(--accent); }
-.ev span:last-child { min-width: 0; }
-.evs { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
-.none { font-size: 13px; color: var(--muted); }
-.days4 { display: grid; grid-template-columns: 1fr; gap: 10px; }
-.day { display: flex; flex-direction: column; gap: 6px; }
-.day .hd { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-.day .hd b { font-size: 15px; }
-.day .sm { font-family: var(--mono); font-size: 12px; color: var(--muted); }
-.row2 { display: grid; grid-template-columns: 1fr; gap: 10px; }
-.item { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; padding-block: 4px; border-top: 1px solid var(--line); }
-.item:first-of-type { border-top: 0; }
-.pill { font-family: var(--mono); font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--accent); color: var(--accent); white-space: nowrap; }
-.foot { font-size: 12.5px; color: var(--muted); padding-top: 4px; }
+.sess { display: flex; flex-direction: column; gap: 4px; padding-top: 12px; margin-top: 12px; border-top: 1px solid var(--border-light); }
+.sess:first-of-type { padding-top: 0; margin-top: 0; border-top: 0; }
+.act { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: start; }
+.act h3 { font-size: 1.0625rem; font-weight: 700; }
+.act .fig { font-size: 1.75rem; font-weight: 700; line-height: 1; text-align: right; }
+.act .fig small { font-size: .875rem; color: var(--text-2); font-weight: 500; margin-left: 2px; }
+.tags { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 2px; }
+.eff { display: inline-flex; align-items: center; gap: 5px; font-size: .8125rem; font-weight: 600; color: var(--ec); }
+.eff::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ec); }
+.quote { margin-top: 8px; padding: 10px 12px; border-radius: var(--r-md); background: var(--raised); font-size: .9375rem; }
+.quote .sub { display: block; margin-bottom: 2px; }
+.drinks { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 8px; margin-top: 12px; }
+.dk { background: var(--raised); border-radius: var(--r-md); padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.dk.water { grid-column: span 2; }
+.dk .k { display: flex; align-items: center; gap: 5px; font-size: .75rem; color: var(--text-2); }
+.dk .k .ic { width: 14px; height: 14px; color: var(--c); }
+.dk .v { font-size: 1.25rem; font-weight: 700; line-height: 1.2; }
+.dk .v small { font-size: .75rem; font-weight: 500; color: var(--text-2); margin-left: 2px; }
+.dk .v.na { font-size: .8125rem; padding-top: 4px; }
+.dk .bar { height: 4px; border-radius: 2px; background: var(--border-light); overflow: hidden; margin-top: 3px; }
+.dk .bar i { display: block; height: 100%; background: var(--water); border-radius: 2px; }
+
+.bars { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; align-items: end; height: 92px; }
+.bars .b { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; gap: 3px; }
+.bars .b span { font-size: .6875rem; color: var(--text-2); }
+.bars .b i { display: block; width: 100%; max-width: 28px; border-radius: 6px 6px 3px 3px; background: var(--ec); min-height: 4px; }
+.bars-x { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; text-align: center; font-size: .75rem; color: var(--text-2); margin-top: 6px; }
+.bars-x b { display: block; color: var(--text); font-weight: 600; }
+.key { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: .75rem; color: var(--text-2); margin-top: 10px; }
+.key span::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ec); margin-right: 5px; }
+
+.ahead { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.dc { background: var(--raised); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.dc .hd { display: flex; align-items: center; gap: 10px; }
+.dc .dt { width: 40px; text-align: center; flex: none; }
+.dc .dt span { display: block; font-size: .6875rem; font-weight: 600; color: var(--text-2); text-transform: uppercase; }
+.dc .dt b { font-size: 1.25rem; font-weight: 700; line-height: 1.1; }
+.dc .wx { display: flex; align-items: center; gap: 8px; margin-left: auto; font-size: .8125rem; color: var(--text-2); }
+.dc .wx .ic { width: 26px; height: 26px; color: var(--warning); }
+.dc .wx b { color: var(--text); font-size: .9375rem; }
+.dc .wx .flag { color: var(--danger); font-weight: 600; }
+.dc .ln { display: flex; align-items: baseline; gap: 8px; font-size: .875rem; flex-wrap: wrap; }
+.dc .ln .t { color: var(--text-2); font-size: .75rem; min-width: 66px; flex: none; }
+.dc .last { font-size: .8125rem; color: var(--text-2); border-left: 2px solid var(--border); padding-left: 8px; }
+.dc .none { font-size: .8125rem; color: var(--muted); }
+
+.lbl { font-size: .6875rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--text-2); margin: 10px 0 2px; }
+.lbl:first-of-type { margin-top: 0; }
+.item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border-light); font-size: .9375rem; }
+.lbl + .item { border-top: 0; }
+.item .bd { font-size: .75rem; color: var(--text-2); }
+.item .tag { margin-left: auto; font-size: .6875rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; color: var(--text-2); border: 1px solid var(--border); white-space: nowrap; }
+.item .tag.late { color: var(--danger); border-color: var(--danger); border-style: dashed; }
+.bp { display: flex; gap: 8px 16px; flex-wrap: wrap; align-items: baseline; margin-top: 10px; font-size: .875rem; }
+.bp b { font-size: 1.125rem; }
+.foot { font-size: .8125rem; color: var(--muted); padding: 4px 2px; }
 
 @media (min-width: 720px) {
-  body { font-size: 16px; }
-  .grid3 { grid-template-columns: repeat(3, 1fr); }
-  .days4 { grid-template-columns: repeat(3, 1fr); }
-  .row2 { grid-template-columns: 1fr 1fr; }
-  .today-wx { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .wrap { gap: 14px; }
+  .gauge { width: 132px; height: 116px; }
+  .gauge .lvw { inset: 34px 0 0; }
+  .g2 { grid-template-columns: 1fr 1fr; }
+  .g3 { grid-template-columns: repeat(3, 1fr); }
+  .signals { grid-template-columns: repeat(4, 1fr); }
+  .ahead { grid-template-columns: repeat(3, 1fr); }
 }
-
-/* Level colors. The hero reads --lvl; each level sets it. */
-:root { --lv-rest: #4f6f8f; --lv-easy: #3f8a5c; --lv-mod: #d98a00; --lv-hard: #c4472b; }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) { --lv-rest: #8fb0d0; --lv-easy: #6fcf94; --lv-mod: #f0b43c; --lv-hard: #f08a6b; }
-  :root:not([data-theme="light"]) .hero[data-level="Rest"] .scale .on, :root:not([data-theme="light"]) .hero[data-level="Hard"] .scale .on { color: #1b1300; }
-}
-:root[data-theme="dark"] { --lv-rest: #8fb0d0; --lv-easy: #6fcf94; --lv-mod: #f0b43c; --lv-hard: #f08a6b; }
-:root[data-theme="dark"] .hero[data-level="Rest"] .scale .on, :root[data-theme="dark"] .hero[data-level="Hard"] .scale .on { color: #1b1300; }
-.hero { --lvl: var(--lv-mod); background: color-mix(in srgb, var(--lvl) 14%, var(--surface)); }
-.hero[data-level="Rest"] { --lvl: var(--lv-rest); }
-.hero[data-level="Easy"] { --lvl: var(--lv-easy); }
-.hero[data-level="Hard"] { --lvl: var(--lv-hard); }
-.hero[data-level="Rest"] .scale .on, .hero[data-level="Hard"] .scale .on { color: #fff; }
-
-/* Weekly additions */
-.hero .lv2 { font-size: clamp(19px, 5vw, 24px); font-weight: 700; line-height: 1.3; max-width: 60ch; }
-.grid4 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-.wkrow { display: flex; flex-direction: column; gap: 6px; padding-block: 12px; border-top: 1px solid var(--line); }
-.wkrow:first-of-type { border-top: 0; padding-top: 2px; }
-.wkrow .who { display: flex; flex-direction: column; gap: 2px; }
-.wkrow .who b { font-size: 15px; }
-.wkrow .sm { font-family: var(--mono); font-size: 12px; color: var(--muted); }
-.wkrow .what { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.tag { align-self: flex-start; font-family: var(--mono); font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--accent); color: var(--accent); }
-.tag.open { border-color: var(--best); color: var(--best); }
-.tag.flag { border-color: var(--warn); color: var(--warn); }
-
-.sugg { display: flex; gap: 12px; align-items: flex-start; padding-block: 10px; border-top: 1px solid var(--line); }
-.sugg:first-child { border-top: 0; padding-top: 0; }
-.act { flex: none; min-width: 52px; text-align: center; margin-top: 2px; font-family: var(--mono); font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; padding: 3px 8px; border-radius: 4px; color: var(--surface); background: var(--accent); }
-.act.add { background: var(--best); }
-.act.skip { background: var(--warn); }
-.sg { display: flex; gap: 10px; align-items: center; font-size: 14px; font-weight: 500; }
-.sg .act { margin-top: 0; min-width: 48px; }
-.pill.quiet { border-color: var(--line); color: var(--muted); }
-.sugg .stxt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.sugg .stxt b { font-size: 15px; font-weight: 700; }
-.sugg .why { font-size: 13.5px; color: var(--muted); }
-.wxb { display: flex; flex-direction: column; gap: 3px; }
-.wxl { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12.5px; color: var(--ink); }
-.wi { display: inline-flex; align-items: center; gap: 4px; }
-.wi svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.wi.t svg { color: var(--temp); }
-.wi.r svg { color: var(--rain); }
-.wi.w svg { color: var(--wind); }
-.blurb { font-size: 13px; color: var(--muted); }
+/* Weekly */
+.plan-sum { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.sug { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; padding: 12px 0; border-top: 1px solid var(--border-light); }
+.sug:first-of-type { border-top: 0; padding-top: 0; }
+.kind { grid-row: span 2; align-self: start; font-size: .6875rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 3px 0; width: 52px; text-align: center; border-radius: 6px; color: var(--kc); background: color-mix(in srgb, var(--kc) 16%, transparent); }
+.sug b { font-weight: 600; }
+.sug .sub { font-size: .875rem; }
+.week { display: flex; flex-direction: column; }
+.wd { display: grid; grid-template-columns: 44px 1fr; gap: 10px; padding: 12px 0; border-top: 1px solid var(--border-light); }
+.wd:first-child { border-top: 0; padding-top: 0; }
+.wd .dt { text-align: center; padding-top: 2px; }
+.wd .dt span { display: block; font-size: .6875rem; font-weight: 600; color: var(--text-2); text-transform: uppercase; }
+.wd .dt b { font-size: 1.25rem; font-weight: 700; line-height: 1.1; }
+.wd .body { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.wd .row1 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.wd .wx { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: .8125rem; color: var(--text-2); white-space: nowrap; }
+.wd .wx .ic { width: 20px; height: 20px; color: var(--warning); }
+.wd .wx b { color: var(--text); }
+.wd .wx .flag { color: var(--danger); font-weight: 600; }
+.strip { width: 100%; height: 30px; display: block; overflow: visible; }
+.strip text { font: 600 10px var(--font); }
+.axis { display: grid; grid-template-columns: 44px 1fr; gap: 10px; margin-bottom: 6px; }
+.axis svg { width: 100%; height: 12px; display: block; overflow: visible; }
+.axis text { font: 500 10px var(--font); fill: var(--text-2); }
+@media (min-width: 720px) { .axis { grid-template-columns: 52px 1fr; } }
+.wd .evs { font-size: .8125rem; color: var(--text-2); }
+.wd .sg { display: inline-flex; align-items: center; gap: 6px; font-size: .8125rem; font-weight: 600; color: var(--kc); }
+.wd .sg i { font-style: normal; font-size: .625rem; letter-spacing: .05em; text-transform: uppercase; padding: 1px 6px; border-radius: 4px; background: color-mix(in srgb, var(--kc) 16%, transparent); }
+.struck { text-decoration: line-through; opacity: .55; }
+.lgd { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .75rem; color: var(--text-2); margin-top: 10px; }
+.lgd span::before { content: ""; display: inline-block; width: 12px; height: 9px; border-radius: 2px; background: var(--c); margin-right: 5px; vertical-align: -1px; }
+.lgd span:last-child::before { border: 1.5px dashed var(--text-2); width: 9px; height: 6px; }
+.stat { display: flex; flex-direction: column; gap: 2px; }
+.stat .k { font-size: .8125rem; color: var(--text-2); }
+.stat .v { font-size: 1.625rem; font-weight: 700; line-height: 1.15; }
+.stat .v small { font-size: .8125rem; color: var(--text-2); font-weight: 500; margin-left: 2px; }
+.stat .d { font-size: .75rem; font-weight: 600; color: var(--text-2); }
+.stat .d.up { color: var(--success); }
+.log { display: grid; grid-template-columns: 64px repeat(7, 1fr); gap: 4px; align-items: stretch; }
+.log .hd { font-size: .6875rem; font-weight: 600; color: var(--text-2); text-align: center; text-transform: uppercase; }
+.log .rl { font-size: .75rem; color: var(--text-2); align-self: center; line-height: 1.2; }
+.log .rl b { display: block; color: var(--text); font-weight: 600; }
+.cell { background: var(--raised); border-radius: 8px; min-height: 58px; padding: 5px 3px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; gap: 2px; }
+.cell .ts { display: flex; gap: 2px; flex-wrap: wrap; justify-content: center; }
+.cell .ts span { width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; color: var(--tc); background: color-mix(in srgb, var(--tc) 18%, transparent); box-shadow: inset 0 -2px 0 var(--ec, transparent); }
+.cell .ts .ic { width: 13px; height: 13px; }
+.cell .ld { font-size: .6875rem; color: var(--text-2); }
+.cell.rest .ld { color: var(--muted); }
+.range-l { display: flex; justify-content: space-between; font-size: .75rem; color: var(--muted); }
+.story { border-left: 3px solid var(--hrv); padding: 2px 0 2px 12px; font-size: .9375rem; display: flex; flex-direction: column; gap: 6px; }
 @media (min-width: 720px) {
-  .grid4 { grid-template-columns: repeat(4, 1fr); }
-  .wkrow { display: grid; grid-template-columns: 200px 1fr; gap: 16px; }
+  .g4 { grid-template-columns: repeat(4, 1fr); }
+  .wd { grid-template-columns: 52px 1fr; }
+  .log { grid-template-columns: 90px repeat(7, 1fr); gap: 6px; }
 }
 </style>
-
 <div class="wrap" id="root"></div>
 
 <script id="brief-data" type="application/json">
 {
-  "title": "Week of 5 to 11 Oct 2026",
-  "week": {
-    "range": "28 Sep to 4 Oct",
-    "stats": [
-      {
-        "label": "Sessions",
-        "value": "3",
-        "sub": "2 weights, 1 stretch"
-      },
-      {
-        "label": "Moving time",
-        "value": "1:05",
-        "sub": "recorded on 2 of 3 sessions"
-      },
-      {
-        "label": "Outdoor distance",
-        "value": "none",
-        "sub": "no outdoor session logged"
-      },
-      {
-        "label": "Efforts",
-        "value": "2 · 1 · 0",
-        "sub": "Easy, Medium, Hard"
-      }
-    ],
-    "load": [
-      {
-        "d": "Mon",
-        "load": 0,
-        "e": "easy"
-      },
-      {
-        "d": "Tue",
-        "load": 0,
-        "e": "none"
-      },
-      {
-        "d": "Wed",
-        "load": 43,
-        "e": "med"
-      },
-      {
-        "d": "Thu",
-        "load": 36,
-        "e": "none"
-      },
-      {
-        "d": "Fri",
-        "load": 31,
-        "e": "none"
-      },
-      {
-        "d": "Sat",
-        "load": 27,
-        "e": "easy"
-      },
-      {
-        "d": "Sun",
-        "load": 23,
-        "e": "none"
-      }
-    ],
-    "note": "Example note.",
-    "drinks": "Water 52 oz a day on average, on the 6 days you logged it (81% of your 64 oz goal) · Coffee 12 cups in total · Alcohol 5 drinks in total · Unwind 40 mg in total"
-  },
-  "recovery": {
-    "note": "dashed line is the week before",
-    "sleep": {
-      "label": "Slept, average",
-      "value": "7:21",
-      "series": [
-        426,
-        411,
-        442,
-        432,
-        381,
-        425,
-        444,
-        435,
-        438,
-        440,
-        491,
-        411
-      ],
-      "avgOf": 5,
-      "sub": "Example note."
-    },
-    "hrv": {
-      "label": "HRV, average",
-      "value": "49",
-      "unit": "ms",
-      "series": [
-        46,
-        37,
-        42,
-        46,
-        52,
-        58,
-        48,
-        54,
-        40,
-        50,
-        47,
-        49
-      ],
-      "avgOf": 5,
-      "sub": "Example note."
-    },
-    "rhr": {
-      "label": "Resting HR, average",
-      "value": "53",
-      "unit": "bpm",
-      "series": [
-        54,
-        54,
-        53,
-        53,
-        53,
-        55,
-        53,
-        47,
-        56,
-        52,
-        53,
-        52
-      ],
-      "avgOf": 5,
-      "sub": "Example note."
-    }
-  },
-  "body": {
-    "value": "180.0",
-    "series": [
-      180.4,
-      180.2,
-      179.8,
-      180.1,
-      180
-    ],
-    "sub": "Example note."
-  },
-  "board": {
-    "open": [
-      {
-        "title": "Example item",
-        "board": "Home",
-        "status": "In progress"
-      }
-    ],
-    "note": "Example note."
-  },
-  "next": {
-    "note": "home weather: high and low, rain chance, top wind in mph",
-    "days": [
-      {
-        "name": "Mon 5 Oct",
-        "events": [
-          {
-            "t": "weight",
-            "title": "Planned session",
-            "plan": true
-          },
-          {
-            "t": "7:30–8:00 PM",
-            "title": "Example event 1"
-          }
-        ],
-        "wx": {
-          "hi": 88,
-          "lo": 49,
-          "rain": 2,
-          "wind": 8,
-          "blurb": "Cool start, hot afternoon. Dry and calm."
-        }
-      },
-      {
-        "name": "Tue 6 Oct",
-        "events": [
-          {
-            "t": "9:30–10:30 AM",
-            "title": "Example event 2"
-          },
-          {
-            "t": "4:30–6:30 PM",
-            "title": "Example event 2"
-          }
-        ],
-        "empty": "Nothing planned for training.",
-        "wx": {
-          "hi": 88,
-          "lo": 59,
-          "rain": 3,
-          "wind": 9,
-          "blurb": "Warm and dry, with the wind picking up by afternoon."
-        }
-      },
-      {
-        "name": "Wed 7 Oct",
-        "events": [
-          {
-            "t": "4:30–5:00 PM",
-            "title": "Example event 3"
-          },
-          {
-            "t": "5:00–6:00 PM",
-            "title": "Example event 3"
-          }
-        ],
-        "empty": "Nothing planned for training.",
-        "wx": {
-          "hi": 84,
-          "lo": 59,
-          "rain": 3,
-          "wind": 11,
-          "blurb": "Warm and dry, breezy by evening."
-        }
-      },
-      {
-        "name": "Thu 8 Oct",
-        "events": [
-          {
-            "t": "4:30–6:30 PM",
-            "title": "Example event 4"
-          }
-        ],
-        "empty": "Nothing planned for training.",
-        "wx": {
-          "hi": 87,
-          "lo": 59,
-          "rain": 3,
-          "wind": 10,
-          "blurb": "Hot afternoon and dry, with a breeze by evening."
-        }
-      },
-      {
-        "name": "Fri 9 Oct",
-        "events": [
-          {
-            "t": "all day",
-            "title": "Example event 5"
-          }
-        ],
-        "empty": "Nothing planned for training.",
-        "wx": {
-          "hi": 83,
-          "lo": 58,
-          "rain": 3,
-          "wind": 9,
-          "blurb": "Warm and dry, light wind."
-        }
-      },
-      {
-        "name": "Sat 10 Oct",
-        "events": [
-          {
-            "t": "7:30 AM–8:00 PM",
-            "title": "Example event 6"
-          }
-        ],
-        "empty": "Nothing planned for training.",
-        "wx": {
-          "hi": 85,
-          "lo": 59,
-          "rain": 5,
-          "wind": 9,
-          "blurb": "Warm and dry, wind building toward evening."
-        }
-      },
-      {
-        "name": "Sun 11 Oct",
-        "empty": "Nothing planned for training.",
-        "wx": {
-          "hi": 82,
-          "lo": 60,
-          "rain": 32,
-          "wind": 18,
-          "blurb": "Windy, with some chance of rain."
-        },
-        "tag": {
-          "kind": "flag",
-          "text": "Windy, rain possible"
-        },
-        "events": []
-      }
+  "date": "Sun, Oct 18",
+  "range": "Mon 19 – Sun 25 Oct",
+  "sun": [7.28, 18.18],
+  "plan": {
+    "summary": "Sample data. 3 lifts and a ride planned, one of them on a day you're out all day. Recovery is level with last week, so the plan holds; it just needs the ride moved.",
+    "counts": [{ "type": "weight", "text": "3 lifts" }, { "type": "bike", "text": "1 ride" }, { "type": "stretch", "text": "0 stretches" }],
+    "suggestions": [
+      { "kind": "move", "title": "Saturday's ride → Sunday", "why": "An all-day event fills Saturday. Sunday is clear, 61°F with wind 10, and lands 72 h after Thursday's legs session." },
+      { "kind": "add", "title": "Friday: stretch, 25 min, at 7:00", "why": "The 7:00 slot is free on a day with 3 calendar blocks, two days before the ride. Last week had 2 stretches; this plan has none." },
+      { "kind": "keep", "title": "Monday: 5 - Upper Pull B", "why": "HRV 57 and resting HR 51 this morning, at or better than last week's averages (52.5 ms, 51.3 bpm)." }
     ]
   },
-  "foot": "Example footer.",
-  "suggestions": [
-    {
-      "kind": "keep",
-      "title": "Monday: a planned session",
-      "why": "Example reason with a figure from the data."
-    },
-    {
-      "kind": "add",
-      "title": "Friday: a ride or a second weights day",
-      "why": "Example reason with a figure from the data."
-    },
-    {
-      "kind": "skip",
-      "title": "Sunday: no ride",
-      "why": "Example reason with a figure from the data."
-    }
-  ]
+  "days": [
+    { "dow": "Mon", "n": "19", "wx": { "ic": "sun", "hi": 58, "lo": 34, "wind": 9, "rain": 0 },
+      "plans": [{ "type": "weight", "title": "5 - Upper Pull B", "s": 7, "e": 7.75 }],
+      "events": [{ "s": 16.5, "e": 19, "t": "Example event" }, { "s": 19.5, "e": 20, "t": "Example event" }],
+      "sg": { "kind": "keep", "text": "Keep" } },
+    { "dow": "Tue", "n": "20", "wx": { "ic": "partly", "hi": 62, "lo": 36, "wind": 18, "rain": 5, "flag": "Wind 18" },
+      "events": [{ "s": 16.5, "e": 20, "t": "Example event" }] },
+    { "dow": "Wed", "n": "21", "wx": { "ic": "sun", "hi": 55, "lo": 33, "wind": 7, "rain": 0 },
+      "plans": [{ "type": "weight", "title": "4 - Upper Push B", "s": 7, "e": 7.75 }],
+      "events": [{ "s": 16.5, "e": 19, "t": "Example event" }] },
+    { "dow": "Thu", "n": "22", "wx": { "ic": "rain", "hi": 50, "lo": 30, "wind": 11, "rain": 40, "flag": "Rain 40%" },
+      "plans": [{ "type": "weight", "title": "6 - Legs B", "s": 7, "e": 7.75 }],
+      "events": [{ "s": 16.5, "e": 19, "t": "Example event" }],
+      "note": "Indoors, so the rain doesn't touch it." },
+    { "dow": "Fri", "n": "23", "wx": { "ic": "sun", "hi": 56, "lo": 31, "wind": 8, "rain": 0 },
+      "add": { "type": "stretch", "title": "Stretch", "s": 7, "e": 7.42 },
+      "events": [{ "s": 9.5, "e": 12.5, "t": "Example event" }, { "s": 14.25, "e": 15.75, "t": "Example event" }, { "s": 16.5, "e": 19, "t": "Example event" }],
+      "allday": "Example all-day event",
+      "sg": { "kind": "add", "text": "Add a stretch" } },
+    { "dow": "Sat", "n": "24", "wx": { "ic": "sun", "hi": 54, "lo": 31, "wind": 8, "rain": 0 },
+      "plans": [{ "type": "bike", "title": "Mountain Bike", "struck": true }],
+      "allday": "Example all-day event",
+      "sg": { "kind": "move", "text": "Move ride to Sunday" } },
+    { "dow": "Sun", "n": "25", "wx": { "ic": "partly", "hi": 61, "lo": 35, "wind": 10, "rain": 5 },
+      "add": { "type": "bike", "title": "Mountain Bike", "s": 10, "e": 12 },
+      "sg": { "kind": "move", "text": "Ride lands here" } }
+  ],
+  "back": {
+    "range": "12 – 18 Oct",
+    "stats": [
+      { "k": "Sessions", "v": "7", "d": "+1 on the week before", "up": true, "sub": "3 lifts · 2 rides · 2 stretches" },
+      { "k": "Moving time", "v": "5:30", "d": "+2:13", "up": true, "sub": "on 5 of 7 sessions" },
+      { "k": "Outdoor distance", "v": "23.2", "u": "mi", "d": "+14.1 mi", "up": true, "sub": "2 rides · 3,260 ft climbed" },
+      { "k": "Efforts", "v": "3 · 3 · 0", "d": "Easy · Medium · Hard", "sub": "1 ride not rated" }
+    ],
+    "log": [
+      { "label": "Week before", "sub": "5–11 Oct", "days": [
+        { "ts": [["stretch", "easy"]], "load": 59 }, { "ts": [["weight", "easy"]], "load": 51 }, { "ts": [], "load": 44 },
+        { "ts": [["weight", "easy"]], "load": 39 }, { "ts": [["weight", "medium"]], "load": 37 }, { "ts": [], "load": 32 },
+        { "ts": [["bike", null], ["stretch", null]], "load": 67 } ] },
+      { "label": "Last week", "sub": "12–18 Oct", "days": [
+        { "ts": [["weight", "easy"]], "load": 58 }, { "ts": [["stretch", "easy"]], "load": 50 }, { "ts": [["weight", "medium"]], "load": 44 },
+        { "ts": [["weight", "medium"]], "load": 40 }, { "ts": [["bike", null]], "load": 81 }, { "ts": [], "load": 70 },
+        { "ts": [["bike", "medium"], ["stretch", "easy"]], "load": 94 } ] }
+    ],
+    "note": "Example note naming the longest and the hardest session.",
+    "drinks": "No drinks logged."
+  },
+  "recovery": {
+    "story": [
+      "Example: the week's worst night, with the figures.",
+      "Example: its likely cause, from your own note on the day before.",
+      "Example: how it came back, and what that changes about this week's plan."
+    ],
+    "metrics": [
+      { "k": "sleep", "label": "Slept", "value": "7:10", "d": "+13 min", "prev": "6:57",
+        "series": [382, 427, 488, 458, 407, 330, 429, null, 404, 472, 464, 387, 455, 396], "sub": "average of 6 nights; one didn't sync" },
+      { "k": "hrv", "label": "HRV", "value": "52.5", "unit": "ms", "d": "−3%", "prev": "54.3",
+        "series": [50, 62, 61, 48, 51, 50, 58, null, 63, 62, 49, 47, 37, 57], "sub": "low of 37 on 17 Oct" },
+      { "k": "heart", "label": "Resting HR", "value": "51.3", "unit": "bpm", "d": "−0.7", "prev": "52.0",
+        "series": [56, 51, 51, 52, 51, 52, 51, null, 50, 47, 54, 49, 57, 51], "sub": "high of 57 on 17 Oct" }
+    ]
+  },
+  "body": { "value": "179.1", "unit": "lb", "d": "−1.1 lb", "sub": "weekly average, against 180.2 the week before. Daily readings swung 176.5–182.4.",
+    "series": [183.3, 179.9, 180.8, 179.3, 176.8, 180.9, 180.4, 182.4, 181.1, 178.5, 176.5, 177.0, 178.4, 179.5],
+    "bp": "133/86", "bpSub": "mean of 5 readings on 3 days" },
+  "board": { "done": [], "overdue": [], "open": [], "soon": [{ "title": "Example item", "board": "Home", "due": "Mon 26" }], "note": "Nothing finished, overdue or due this week." },
+  "foot": "Sample data. Replace this whole JSON block with the week's real values. Training guidance from your own data, not medical advice."
 }
 </script>
 
 <script>
 (function () {
-  var NS = "http://www.w3.org/2000/svg";
   var D = JSON.parse(document.getElementById("brief-data").textContent);
   var root = document.getElementById("root");
-  var UP = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18h18M7 18a5 5 0 0 1 10 0M12 3v6M9.5 5.5 12 3l2.5 2.5"/></svg>';
-  var DN = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18h18M7 18a5 5 0 0 1 10 0M12 9V3M9.5 6.5 12 9l2.5-2.5"/></svg>';
+  var NS = "http://www.w3.org/2000/svg";
+  var P = {
+    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+    partly: '<path d="M8 4v1.5M3.8 6.2l1 1M2.5 11H4"/><path d="M5.6 12.6A4 4 0 1 1 11.5 7"/><path d="M8.5 20h9a3.5 3.5 0 0 0 .5-7 5 5 0 0 0-9.6 1.4A3 3 0 0 0 8.5 20z"/>',
+    cloud: '<path d="M7 19h10a4 4 0 0 0 .6-8 6 6 0 0 0-11.5 1.8A3.2 3.2 0 0 0 7 19z"/>',
+    fog: '<path d="M4 9h16M3 13h18M5 17h14"/>',
+    rain: '<path d="M7 15h10a4 4 0 0 0 .6-8 6 6 0 0 0-11.5 1.8A3.2 3.2 0 0 0 7 15z"/><path d="M8 18l-1 3M12 18l-1 3M16 18l-1 3"/>',
+    snow: '<path d="M7 15h10a4 4 0 0 0 .6-8 6 6 0 0 0-11.5 1.8A3.2 3.2 0 0 0 7 15z"/><path d="M8 19h.01M12 21h.01M16 19h.01"/>',
+    storm: '<path d="M7 15h10a4 4 0 0 0 .6-8 6 6 0 0 0-11.5 1.8A3.2 3.2 0 0 0 7 15z"/><path d="M12 15l-2 4h4l-2 4"/>',
+    moon: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
+    heart: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
+    hrv: '<path d="M2 12h4l2-5 4 10 2-5h8"/>',
+    sleep: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
+    load: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    alert: '<path d="M12 3l10 18H2zM12 10v5M12 18h.01"/>',
+    weight: '<path d="M6 7v10M18 7v10M3 9v6M21 9v6M6 12h12"/>',
+    stretch: '<circle cx="12" cy="4.5" r="2"/><path d="M4 9l8 1 8-1M12 10v5l-4 6M12 15l4 6"/>',
+    bike: '<circle cx="5.5" cy="16.5" r="3.5"/><circle cx="18.5" cy="16.5" r="3.5"/><path d="M5.5 16.5L9 9h6l3.5 7.5M9 9l3 7.5h-6.5M14 5h2.5l-1.5 4"/>',
+    hike: '<path d="M3 20l6-10 4 6 3-4 5 8z"/>',
+    walk: '<circle cx="13" cy="4" r="2"/><path d="M10 21l2-7 3 3v5M12 14l-1-5 4 1 2 3M11 9l-3 2v3"/>',
+    run: '<circle cx="14" cy="4" r="2"/><path d="M6 21l4-6 3 2 1 4M10 15l1-5 4 2 3 1M11 10L7 11l-1 3"/>',
+    water: '<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/>',
+    coffee: '<path d="M4 9h12v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5zM16 11h1.5a2.5 2.5 0 0 1 0 5H16M8 3v3M12 3v3"/>',
+    alcohol: '<path d="M7 3h10l-1 7a4 4 0 0 1-8 0zM12 14v6M8 21h8"/>',
+    unwind: '<path d="M12 21c0-6 4-10 8-11-1 6-4 10-8 11zM12 21c0-5-3-8-7-9 .5 5 3 8 7 9z"/>',
+    yday: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/>',
+    ahead: '<path d="M4 7h16M4 12h16M4 17h10"/><rect x="3" y="4" width="18" height="17" rx="2"/>',
+    board: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/>',
+    body: '<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M9 9a4 4 0 0 1 6 0l-2 3"/>',
+    day: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'
+  };
+  var MCOL = { hrv: "var(--hrv)", heart: "var(--heart)", sleep: "var(--sleep)", load: "var(--primary)" };
+  var TCOL = { weight: "var(--t-weight)", stretch: "var(--t-stretch)", bike: "var(--t-bike)", hike: "var(--t-hike)", run: "var(--t-run)", walk: "var(--t-walk)" };
+  var ECOL = { easy: "var(--e-easy)", medium: "var(--e-medium)", hard: "var(--e-hard)", none: "var(--e-none)" };
+  var LEVELS = ["Rest", "Go easy", "Train as planned", "Push"];
+  var LCOL = { "Rest": "var(--lv-rest)", "Go easy": "var(--lv-easy)", "Train as planned": "var(--lv-plan)", "Push": "var(--lv-push)" };
 
   function el(tag, cls, text, kids) {
     var e = document.createElement(tag);
+    if (Array.isArray(cls)) { kids = cls; cls = null; text = null; }
+    if (Array.isArray(text)) { kids = text; text = null; }
     if (cls) e.className = cls;
     if (text != null) e.textContent = text;
-    (kids || []).forEach(function (k) { if (k) e.appendChild(k); });
+    (kids || []).forEach(function (k) { if (k != null) e.appendChild(typeof k === "string" ? document.createTextNode(k) : k); });
     return e;
   }
-  function svg(cls, vb, label) {
+  function icon(name) {
     var s = document.createElementNS(NS, "svg");
-    s.setAttribute("class", cls);
-    s.setAttribute("viewBox", vb);
-    s.setAttribute("role", "img");
-    s.setAttribute("aria-label", label || "");
+    s.setAttribute("class", "ic");
+    s.setAttribute("viewBox", "0 0 24 24");
+    s.setAttribute("aria-hidden", "true");
+    s.innerHTML = P[name] || P.cloud;
     return s;
   }
-  function sec(title, note) {
-    var h = el("h2", null, title);
-    if (note) { var n = el("span", "label", note); n.style.marginLeft = "6px"; h.appendChild(n); }
-    return el("div", "sec", null, [h]);
+  function card(title, ic, aside, color) {
+    var c = el("section", "card"), i = icon(ic);
+    if (color) i.style.color = color;
+    var h = el("div", "ch", [i, el("h2", null, title)]);
+    if (aside) h.appendChild(el("span", "aside", aside));
+    c.appendChild(h);
+    return c;
   }
-  function small(text) {
-    var p = el("p", "muted", text);
-    p.style.cssText = "margin-top:8px;font-size:13px";
-    return p;
+  function typeChip(type, text) {
+    var base = String(type).split(":")[0];
+    var c = el("span", "chip-type", [icon(base), text || type]);
+    c.style.setProperty("--tc", TCOL[base] || "var(--primary)");
+    return c;
   }
-
-  function spark(vals, avgVals, label) {
-    var s = svg("spark", "0 0 120 44", label);
-    s.setAttribute("preserveAspectRatio", "none");
-    var W = 120, H = 44, pad = 6, base = avgVals || vals;
-    var avg = base.reduce(function (a, b) { return a + b; }, 0) / base.length;
-    var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals), span = Math.max(hi - lo, 1);
-    function x(i) { return pad + i * ((W - 2 * pad) / Math.max(vals.length - 1, 1)); }
-    function y(v) { return H - pad - ((v - lo) / span) * (H - 2 * pad); }
-    var pts = vals.map(function (v, i) { return x(i).toFixed(1) + "," + y(v).toFixed(1); }).join(" ");
-    var last = vals.length - 1;
-    s.innerHTML =
-      '<line class="avg" x1="0" x2="' + W + '" y1="' + y(avg).toFixed(1) + '" y2="' + y(avg).toFixed(1) + '"/>' +
-      '<polyline class="ln" points="' + pts + '"/>' +
-      '<circle class="dot" cx="' + x(last).toFixed(1) + '" cy="' + y(vals[last]).toFixed(1) + '" r="2.8"/>';
+  function figure(cls, v, u) {
+    if (v == null) return el("div", cls + " na", "not synced");
+    var d = el("div", cls + " num", String(v));
+    if (u) d.appendChild(el("small", null, u));
+    return d;
+  }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  function fmtH(h) { var hh = Math.floor(h), m = Math.round((h - hh) * 60); return (hh % 12 || 12) + (m ? ":" + String(m).padStart(2, "0") : "") + (hh >= 12 ? "p" : "a"); }
+  // A small line chart; null values leave a gap.
+  function spark(series, color, label, avg) {
+    var s = document.createElementNS(NS, "svg");
+    s.setAttribute("class", "spark"); s.setAttribute("viewBox", "0 0 140 40"); s.setAttribute("preserveAspectRatio", "none");
+    s.setAttribute("role", "img"); s.setAttribute("aria-label", label);
+    var vals = series.filter(function (v) { return v != null; });
+    if (vals.length < 2) return null;
+    var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals), sp = Math.max(hi - lo, 1), n = series.length;
+    function X(i) { return 4 + i * 132 / (n - 1); } function Y(v) { return 36 - (v - lo) / sp * 32; }
+    var segs = [], cur = [];
+    series.forEach(function (v, i) { if (v == null) { if (cur.length) segs.push(cur); cur = []; } else cur.push(X(i).toFixed(1) + "," + Y(v).toFixed(1)); });
+    if (cur.length) segs.push(cur);
+    var h = avg != null ? '<line x1="0" x2="140" y1="' + Y(avg).toFixed(1) + '" y2="' + Y(avg).toFixed(1) + '" style="stroke:var(--text-2);stroke-dasharray:3 3;opacity:.6" vector-effect="non-scaling-stroke"/>' : "";
+    h += segs.map(function (p) { return '<polyline points="' + p.join(" ") + '" style="fill:none;stroke:' + color + ';stroke-width:2;stroke-linejoin:round" vector-effect="non-scaling-stroke"/>'; }).join("");
+    var li = n - 1;
+    if (series[li] != null) h += '<circle cx="' + X(li).toFixed(1) + '" cy="' + Y(series[li]).toFixed(1) + '" r="3.2" style="fill:' + color + '"/>';
+    s.innerHTML = h;
     return s;
   }
 
+  var KCOL = { keep: "var(--primary)", add: "var(--success)", move: "var(--warning)", skip: "var(--danger)" };
 
-  function item(o, pill) {
-    var name = el("span", null, o.title);
-    name.appendChild(document.createTextNode(" "));
-    name.appendChild(el("span", "label", o.board));
-    return el("div", "item", null, [name, el("span", "pill quiet", pill)]);
-  }
-  var IC = {
-    t: "<path d=\"M10 14V5a2 2 0 1 1 4 0v9a4 4 0 1 1-4 0z\"/>",
-    r: "<path d=\"M12 3c3 4 6 7 6 11a6 6 0 0 1-12 0c0-4 3-7 6-11z\"/>",
-    w: "<path d=\"M3 8h10a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h8\"/>"
-  };
-  function wxItem(k, text) {
-    var s = el("span", "wi " + k);
-    s.innerHTML = "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\">" + IC[k] + "</svg>";
-    s.appendChild(document.createTextNode(text));
-    return s;
-  }
-  function wxBlock(w) {
-    var line = el("div", "wxl", null, [wxItem("t", w.hi + " / " + w.lo + "°F"), wxItem("r", w.rain + "%"), wxItem("w", String(w.wind))]);
-    line.setAttribute("aria-label", "High " + w.hi + ", low " + w.lo + " degrees, rain " + w.rain + " percent, wind " + w.wind + " miles an hour");
-    return el("div", "wxb", null, [line, el("span", "blurb", w.blurb)]);
-  }
-  function ev(e) { return el("div", "ev" + (e.plan ? " plan" : ""), null, [el("span", "t", e.t), el("span", null, e.title)]); }
+  root.appendChild(el("header", "top", [el("div", "meta", D.date + " · " + D.range), el("h1", null, "Week ahead")]));
+  if (D.notice) root.appendChild(el("div", "notice", [icon("alert"), el("span", null, D.notice)]));
 
-  root.appendChild(el("div", "date", null, [el("h1", null, D.title), el("span", "label", D.sources || "Thrive · Hive · Calendar · Open-Meteo")]));
+  // The plan, and what to change in it
+  if (D.plan) (function () {
+    var c = card("This week's plan", "load", "from planned load, recovery, calendar and weather");
+    if (D.plan.counts) c.appendChild(el("div", "plan-sum", D.plan.counts.map(function (x) { return typeChip(x.type, x.text); })));
+    if (D.plan.summary) { var p = el("p", null, D.plan.summary); p.style.marginBottom = "14px"; c.appendChild(p); }
+    (D.plan.suggestions || []).forEach(function (g) {
+      var k = el("span", "kind", g.kind); k.style.setProperty("--kc", KCOL[g.kind] || "var(--primary)");
+      c.appendChild(el("div", "sug", [k, el("b", null, g.title), el("span", "sub", g.why)]));
+    });
+    root.appendChild(c);
+  })();
 
-  if (D.next) {
-    var ns = sec("Next 7 days", D.next.note || "home weather"), nc = el("div", "card");
-    D.next.days.forEach(function (d) {
-      var who = el("div", "who", null, [el("b", null, d.name), d.wx ? wxBlock(d.wx) : el("span", "sm", d.sm)]);
-      var what = el("div", "what");
-      if (d.tag) what.appendChild(el("span", "tag " + d.tag.kind, d.tag.text));
-      (d.events || []).forEach(function (e) { what.appendChild(ev(e)); });
-      if (d.empty) what.appendChild(el("p", "none", d.empty));
-      (d.suggest || []).forEach(function (g) {
-        what.appendChild(el("div", "sg", null, [el("span", "act " + g.kind, g.kind), el("span", null, g.text)]));
+  // Day by day: a 6 AM to 10 PM bar for each day, night shaded, calendar blocks and sessions labelled in place
+  if (D.days) (function () {
+    var c = card("Day by day", "ahead", "each bar runs 6 AM to 10 PM");
+    root.appendChild(c);
+    var ax = el("div", "axis", [el("span")]), wk = el("div", "week");
+    c.appendChild(ax); c.appendChild(wk);
+    var F = 6, T = 22, sr = D.sun ? D.sun[0] : null, ss = D.sun ? D.sun[1] : null;
+    var W = Math.max(240, Math.min(document.documentElement.clientWidth, 960) - 64 - 62);
+    function x(h) { return (Math.max(F, Math.min(T, h)) - F) / (T - F) * W; }
+    function lbl(x0, x1, text, fill) {
+      var w = x1 - x0 - 8;
+      return w < 14 ? "" : '<svg x="' + (x0 + 4).toFixed(1) + '" y="4" width="' + w.toFixed(1) + '" height="22"><text x="0" y="15" style="fill:' + fill + '">' + esc(text) + "</text></svg>";
+    }
+    var as = document.createElementNS(NS, "svg");
+    as.setAttribute("viewBox", "0 0 " + W + " 12"); as.setAttribute("aria-hidden", "true");
+    as.innerHTML = [6, 9, 12, 15, 18, 21].map(function (k) { return '<text x="' + x(k).toFixed(1) + '" y="10" text-anchor="' + (k === 6 ? "start" : "middle") + '">' + fmtH(k) + "</text>"; }).join("");
+    ax.appendChild(as);
+    D.days.forEach(function (d) {
+      var plans = d.plans || [], events = d.events || [];
+      var row1 = el("div", "row1");
+      plans.forEach(function (p) { var ch = typeChip(p.type, p.title); if (p.struck) ch.classList.add("struck"); row1.appendChild(ch); });
+      if (d.add) { var ch = typeChip(d.add.type, d.add.title); ch.style.outline = "1.5px dashed var(--tc)"; ch.style.background = "transparent"; row1.appendChild(ch); }
+      if (!plans.length && !d.add) row1.appendChild(el("span", "sub", "Nothing planned"));
+      if (d.wx) row1.appendChild(el("span", "wx", [icon(d.wx.ic), el("b", "num", d.wx.hi + "°/" + d.wx.lo + "°"), d.wx.flag ? el("span", "flag", "▲ " + d.wx.flag) : el("span", null, "wind " + d.wx.wind)]));
+      var body = el("div", "body", [row1]);
+      var s = document.createElementNS(NS, "svg");
+      s.setAttribute("class", "strip"); s.setAttribute("viewBox", "0 0 " + W + " 30");
+      s.setAttribute("role", "img");
+      s.setAttribute("aria-label", d.dow + ": " + (events.map(function (e) { return e.t + " " + fmtH(e.s) + " to " + fmtH(e.e); }).join(", ") || "no timed events"));
+      var h = '<rect x="0" y="4" width="' + W + '" height="22" rx="5" style="fill:var(--strip-track)"/>';
+      if (sr != null) h += '<rect x="0" y="4" width="' + x(sr).toFixed(1) + '" height="22" rx="5" style="fill:var(--strip-night)"/>';
+      if (ss != null) h += '<rect x="' + x(ss).toFixed(1) + '" y="4" width="' + (W - x(ss)).toFixed(1) + '" height="22" rx="5" style="fill:var(--strip-night)"/>';
+      [9, 12, 15, 18].forEach(function (k) { h += '<line x1="' + x(k).toFixed(1) + '" x2="' + x(k).toFixed(1) + '" y1="4" y2="26" style="stroke:var(--border);stroke-width:1"/>'; });
+      if (d.allday) h += '<rect x="1" y="5" width="' + (W - 2) + '" height="20" rx="5" style="fill:none;stroke:var(--cal);stroke-width:2;stroke-dasharray:5 3"/>';
+      events.forEach(function (e) {
+        var x0 = x(e.s), x1 = x(e.e);
+        if (x1 - x0 <= 1) return;
+        h += '<rect x="' + (x0 + 0.5).toFixed(1) + '" y="4" width="' + (x1 - x0 - 1).toFixed(1) + '" height="22" rx="4" style="fill:var(--cal)"/>' + lbl(x0, x1, e.t, "var(--cal-text)");
       });
-      nc.appendChild(el("div", "wkrow", null, [who, what]));
+      plans.concat(d.add ? [d.add] : []).forEach(function (p) {
+        if (p.s == null || p.struck) return;
+        var sugg = p === d.add, col = TCOL[String(p.type).split(":")[0]] || "var(--primary)", x0 = x(p.s), x1 = Math.max(x(p.e), x0 + 8);
+        h += '<rect x="' + x0.toFixed(1) + '" y="4" width="' + (x1 - x0).toFixed(1) + '" height="22" rx="4" style="fill:' + (sugg ? "var(--surface)" : col) + ";stroke:" + col + ";stroke-width:1.5" + (sugg ? ";stroke-dasharray:3 2" : "") + '"/>';
+      });
+      s.innerHTML = h;
+      body.appendChild(s);
+      var ev = events.map(function (e) { return fmtH(e.s) + " " + e.t; });
+      if (d.allday) ev.unshift("All day: " + d.allday);
+      if (ev.length) body.appendChild(el("div", "evs", ev.join(" · ")));
+      (d.board || []).forEach(function (b) { body.appendChild(el("div", "evs", "Hive due: " + b.title)); });
+      if (d.note) body.appendChild(el("div", "evs", d.note));
+      if (d.sg) { var sg = el("span", "sg", [el("i", null, d.sg.kind), d.sg.text]); sg.style.setProperty("--kc", KCOL[d.sg.kind] || "var(--primary)"); body.appendChild(sg); }
+      wk.appendChild(el("div", "wd", [el("div", "dt", [el("span", null, d.dow), el("b", "num", d.n)]), body]));
     });
-    ns.appendChild(nc);
-    root.appendChild(ns);
-  }
-  if (D.suggestions) {
-    var ss = sec(D.suggestionsTitle || "Suggestions", D.suggestionsNote || "from planned load, recovery, calendar and weather"), sc = el("div", "card");
-    D.suggestions.forEach(function (g) {
-      var t = el("div", "sugg", null, [
-        g.kind ? el("span", "act " + g.kind, g.kind) : null,
-        el("div", "stxt", null, [el("b", null, g.title), el("span", "why", g.why)])
-      ]);
-      sc.appendChild(t);
-    });
-    ss.appendChild(sc);
-    root.appendChild(ss);
-  }
-  if (D.board) {
-    var bs = sec("Board", "Hive"), bc = el("div", "card");
-    [["Finished this week", D.board.done, "Done"], ["Overdue", D.board.overdue, null], ["In progress", D.board.open, null]].forEach(function (b) {
-      if (!b[1] || !b[1].length) return;
-      bc.appendChild(el("span", "label", b[0]));
-      b[1].forEach(function (o) { bc.appendChild(item(o, b[2] || o.days || o.status)); });
-    });
-    if (D.board.note) bc.appendChild(small(D.board.note));
-    bs.appendChild(bc);
-    root.appendChild(bs);
-  }
-  if (D.week) {
-    var ws = sec("Last week", D.week.range), g4 = el("div", "grid4");
-    (D.week.stats || []).forEach(function (s) {
-      var t = el("div", "card tile", null, [el("span", "label", s.label), el("div", "val num", s.value)]);
-      if (s.sub) t.appendChild(el("span", "sub", s.sub));
-      g4.appendChild(t);
-    });
-    ws.appendChild(g4);
-    var lc = el("div", "card");
-    var bars = el("div", "bars"), labs = el("div", "days");
-    var mx = Math.max.apply(null, [50].concat(D.week.load.map(function (o) { return o.load; })));
-    var col = { easy: "var(--bar-easy)", med: "var(--bar-med)", hard: "var(--bar-hard)", none: "var(--bar-none)" };
-    D.week.load.forEach(function (o) {
-      var c = el("div", "col");
-      c.style.height = Math.round(o.load / mx * 92) + "px";
-      c.style.background = col[o.e] || col.none;
-      bars.appendChild(el("div", "bar", null, [el("span", "n", String(o.load)), c]));
-      labs.appendChild(el("span", null, o.d));
-    });
-    var key = el("div", "key");
-    [["easy", "Easy"], ["med", "Medium"], ["hard", "Hard"], ["none", "No session logged"]].forEach(function (k) {
-      var i = el("i");
-      i.style.background = col[k[0]];
-      var sp = el("span", null, null, [i]);
-      sp.appendChild(document.createTextNode(k[1]));
-      key.appendChild(sp);
-    });
-    lc.appendChild(el("span", "label", "Training load by day"));
-    lc.appendChild(bars);
-    lc.appendChild(labs);
-    lc.appendChild(key);
-    if (D.week.note) lc.appendChild(small(D.week.note));
-    ws.appendChild(lc);
-    // #522, #562, #592: one line of the week's water, coffee, alcohol and Unwind, as text.
-    if (D.week.drinks) ws.appendChild(el("div", "card", null, [el("span", "label", "Drinks"), el("p", null, D.week.drinks)]));
-    root.appendChild(ws);
-  }
+    var lg = el("div", "lgd");
+    [["var(--t-weight)", "Planned session, in its type colour"], ["var(--cal)", "Calendar event"], ["var(--strip-night)", "Before sunrise, after sunset"]].forEach(function (k) { var sp = el("span", null, k[1]); sp.style.setProperty("--c", k[0]); lg.appendChild(sp); });
+    var dl = el("span", null, "Dashed outline: suggested, or an all-day event"); dl.style.setProperty("--c", "transparent"); lg.appendChild(dl);
+    c.appendChild(lg);
+  })();
 
-  if (D.recovery) {
-    var rs = sec("Recovery", D.recovery.note || "dashed line is the week before");
-    var g = el("div", "grid3");
-    ["sleep", "hrv", "rhr"].forEach(function (k) {
-      var r = D.recovery[k];
-      if (!r) return;
-      var val = el("div", "val num", r.value);
-      if (r.unit) val.appendChild(el("small", null, r.unit));
-      var t = el("div", "card tile", null, [el("span", "label", r.label), val]);
-      if (r.series && r.series.length > 1) t.appendChild(spark(r.series, r.series.slice(0, r.avgOf || r.series.length), r.label + " over two weeks"));
-      if (r.sub) t.appendChild(el("span", "sub", r.sub));
-      g.appendChild(t);
-    });
-    rs.appendChild(g);
-    root.appendChild(rs);
-  }
+  // Looking back: last week against the week before
+  if (D.back) (function () {
+    var B = D.back;
+    var hdr = el("header", "top", [el("div", "meta", B.range), el("h1", null, "Last week")]);
+    hdr.querySelector("h1").style.fontSize = "1.75rem";
+    hdr.style.paddingTop = "12px";
+    root.appendChild(hdr);
+    if (B.stats) root.appendChild(el("div", "grid g2 g4", B.stats.map(function (s) {
+      return el("div", "card stat", [el("span", "k", s.k), figure("v", s.v, s.u), s.d ? el("span", "d" + (s.up ? " up" : ""), (s.up ? "▲ " : "") + s.d) : null, s.sub ? el("span", "sub", s.sub) : null]);
+    })));
+    if (B.log) {
+      var lc = card("Two weeks of training", "load", "session types · effort underline · COROS load");
+      var log = el("div", "log", [el("span")]);
+      ["M", "T", "W", "T", "F", "S", "S"].forEach(function (d) { log.appendChild(el("span", "hd", d)); });
+      B.log.forEach(function (w) {
+        log.appendChild(el("span", "rl", [el("b", null, w.label), w.sub || ""]));
+        w.days.forEach(function (d) {
+          var ts = el("div", "ts");
+          (d.ts || []).forEach(function (t) {
+            var base = String(t[0]).split(":")[0], sp = el("span", null, [icon(base)]);
+            sp.style.setProperty("--tc", TCOL[base] || "var(--primary)");
+            if (t[1]) sp.style.setProperty("--ec", ECOL[t[1]]);
+            sp.title = t[0] + (t[1] ? ", " + t[1] : ", effort not rated");
+            ts.appendChild(sp);
+          });
+          log.appendChild(el("div", "cell" + (d.ts && d.ts.length ? "" : " rest"), [ts, el("span", "ld num", d.load == null ? "–" : String(d.load))]));
+        });
+      });
+      lc.appendChild(log);
+      var key = el("div", "key");
+      [["easy", "Easy"], ["medium", "Medium"], ["hard", "Hard"]].forEach(function (k) { var s = el("span", null, k[1]); s.style.setProperty("--ec", ECOL[k[0]]); key.appendChild(s); });
+      lc.appendChild(key);
+      if (B.note) { var n = el("p", "sub", B.note); n.style.marginTop = "8px"; lc.appendChild(n); }
+      if (B.drinks) { var dk = el("p", "sub", [icon("water"), " Drinks: " + B.drinks]); dk.style.marginTop = "6px"; lc.appendChild(dk); }
+      root.appendChild(lc);
+    }
+  })();
 
-  if (D.body) {
-    var ys = sec("Body"), yc = el("div", "card tile", null, [el("span", "label", "Weight, lb"), el("div", "val num", D.body.value)]);
-    if (D.body.series && D.body.series.length > 1) yc.appendChild(spark(D.body.series, null, "Weight readings"));
-    if (D.body.sub) yc.appendChild(el("span", "sub", D.body.sub));
-    ys.appendChild(yc);
-    root.appendChild(ys);
-  }
+  // Recovery, week against week
+  if (D.recovery) (function () {
+    var R = D.recovery;
+    if (R.story && R.story.length) {
+      var rc = card("Recovery", "hrv", "week against week", "var(--hrv)");
+      rc.appendChild(el("div", "story", R.story.map(function (t) { return el("p", null, t); })));
+      root.appendChild(rc);
+    }
+    if (!R.metrics) return;
+    var g = el("div", "grid g3");
+    R.metrics.forEach(function (m) {
+      var col = MCOL[m.k], cc = el("div", "card mt");
+      var k = el("div", "k", [icon(m.k), m.label + ", average"]); k.style.setProperty("--c", col);
+      cc.appendChild(k);
+      cc.appendChild(figure("val", m.value, m.unit));
+      if (m.d) cc.appendChild(el("div", "sub", [el("b", null, m.d), " on the week before" + (m.prev ? " (" + m.prev + ")" : "")]));
+      var split = m.split || 7, series = m.series || [], vals = series.filter(function (v) { return v != null; });
+      if (vals.length > 1) {
+        var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals), sp = Math.max(hi - lo, 1), n = series.length;
+        var X = function (i) { return 4 + i * 132 / (n - 1); }, Y = function (v) { return 36 - (v - lo) / sp * 32; };
+        var mean = function (a) { a = a.filter(function (v) { return v != null; }); return a.length ? a.reduce(function (s, v) { return s + v; }, 0) / a.length : null; };
+        var m0 = mean(series.slice(0, split)), m1 = mean(series.slice(split)), mid = ((X(split - 1) + X(split)) / 2).toFixed(1);
+        var segs = [], cur = [];
+        series.forEach(function (v, i) { if (v == null) { if (cur.length) segs.push(cur); cur = []; } else cur.push(X(i).toFixed(1) + "," + Y(v).toFixed(1)); });
+        if (cur.length) segs.push(cur);
+        var s = document.createElementNS(NS, "svg"); s.setAttribute("class", "spark"); s.setAttribute("viewBox", "0 0 140 40"); s.setAttribute("preserveAspectRatio", "none");
+        s.setAttribute("role", "img"); s.setAttribute("aria-label", m.label + " each night over two weeks, with each week's average");
+        s.innerHTML = '<rect x="0" y="0" width="' + mid + '" height="40" style="fill:var(--raised)"/>' +
+          (m0 != null ? '<line x1="0" x2="' + mid + '" y1="' + Y(m0).toFixed(1) + '" y2="' + Y(m0).toFixed(1) + '" style="stroke:var(--text-2);stroke-dasharray:3 3" vector-effect="non-scaling-stroke"/>' : "") +
+          (m1 != null ? '<line x1="' + mid + '" x2="140" y1="' + Y(m1).toFixed(1) + '" y2="' + Y(m1).toFixed(1) + '" style="stroke:' + col + ';stroke-dasharray:3 3" vector-effect="non-scaling-stroke"/>' : "") +
+          segs.map(function (p) { return '<polyline points="' + p.join(" ") + '" style="fill:none;stroke:' + col + ';stroke-width:2;stroke-linejoin:round" vector-effect="non-scaling-stroke"/>'; }).join("");
+        cc.appendChild(s);
+        cc.appendChild(el("div", "range-l", [el("span", null, "week before"), el("span", null, "last week")]));
+      }
+      if (m.sub) cc.appendChild(el("div", "sub", m.sub));
+      g.appendChild(cc);
+    });
+    root.appendChild(g);
+  })();
+
+  // Body beside board
+  (function () {
+    var row = [];
+    if (D.body) {
+      var y = D.body, yc = card("Body", "body", "weekly average weight");
+      yc.appendChild(figure("big", y.value, y.unit));
+      if (y.d || y.sub) yc.appendChild(el("div", "sub", [y.d ? el("b", null, y.d + " ") : null, y.sub || ""]));
+      var ser = y.series || [], n = ser.length;
+      if (n > 1) {
+        var lo = Math.min.apply(null, ser), hi = Math.max.apply(null, ser), sp = Math.max(hi - lo, 1), split = y.split || 7;
+        var X = function (i) { return 4 + i * 132 / (n - 1); }, Y = function (v) { return 38 - (v - lo) / sp * 32; };
+        var avg = function (a) { return a.reduce(function (s, v) { return s + v; }, 0) / a.length; };
+        var a0 = avg(ser.slice(0, split)), a1 = avg(ser.slice(split)), mid = ((X(split - 1) + X(split)) / 2).toFixed(1);
+        var s = document.createElementNS(NS, "svg"); s.setAttribute("class", "spark"); s.setAttribute("viewBox", "0 0 140 44"); s.setAttribute("preserveAspectRatio", "none");
+        s.setAttribute("role", "img"); s.setAttribute("aria-label", "Weight readings over two weeks, with each week's average");
+        s.innerHTML = ser.map(function (v, i) { return '<circle cx="' + X(i).toFixed(1) + '" cy="' + Y(v).toFixed(1) + '" r="2" style="fill:var(--text-2);opacity:.6"/>'; }).join("") +
+          '<line x1="0" x2="' + mid + '" y1="' + Y(a0).toFixed(1) + '" y2="' + Y(a0).toFixed(1) + '" style="stroke:var(--text-2);stroke-width:2" vector-effect="non-scaling-stroke"/>' +
+          '<line x1="' + mid + '" x2="140" y1="' + Y(a1).toFixed(1) + '" y2="' + Y(a1).toFixed(1) + '" style="stroke:var(--primary);stroke-width:2.5" vector-effect="non-scaling-stroke"/>';
+        s.style.marginTop = "8px"; s.style.height = "48px";
+        yc.appendChild(s);
+        yc.appendChild(el("div", "range-l", [el("span", null, "week before"), el("span", null, "last week")]));
+      }
+      if (y.bp) yc.appendChild(el("div", "bp", [el("span", null, "Blood pressure"), el("b", "num", y.bp), y.bpSub ? el("span", "sub", y.bpSub) : null]));
+      row.push(yc);
+    }
+    if (D.board) {
+      var b = D.board, bc = card("Board", "board", "Hive");
+      [["Finished this week", b.done, function () { return el("span", "tag", "Done"); }],
+       ["Overdue", b.overdue, function (o) { return el("span", "tag late", o.days + "d overdue"); }],
+       ["In progress", b.open, function (o) { return el("span", "tag", o.status || "open"); }],
+       ["Coming up", b.soon, function (o) { return el("span", "tag", o.due); }]].forEach(function (grp) {
+        if (!grp[1] || !grp[1].length) return;
+        bc.appendChild(el("div", "lbl", grp[0]));
+        grp[1].forEach(function (o) { bc.appendChild(el("div", "item", [el("span", null, o.title), o.board ? el("span", "bd", o.board) : null, grp[2](o)])); });
+      });
+      if (b.note) { var bn = el("p", "sub", b.note); bn.style.marginTop = "8px"; bc.appendChild(bn); }
+      row.push(bc);
+    }
+    if (row.length) root.appendChild(el("div", "grid" + (row.length > 1 ? " g2" : ""), row));
+  })();
+
   if (D.foot) root.appendChild(el("p", "foot", D.foot));
 })();
 </script>

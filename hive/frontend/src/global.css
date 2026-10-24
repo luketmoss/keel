@@ -41,6 +41,7 @@
   --ring-lg: 140px;
   --ring-md: 96px;
   --avatar-sm: 28px;
+  --avatar-md: 36px;
 }
 
 /* === Light theme === */
@@ -2137,36 +2138,429 @@ body {
   width: min(800px, 70vw);
 }
 
-/* #206: Expand button hidden by default, shown on desktop only */
-.detail-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+/* === Item screen (#627): top bar, status switch, details card, subtasks card, footer === */
+.detail-panel {
+  background: var(--color-bg);
 }
 
-.detail-expand-btn {
-  display: none;
+.detail-topbar {
+  display: flex;
   align-items: center;
-  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  flex-shrink: 0;
+}
+
+/* Phone gets Back, 769px and up gets Close and Expand. The doubled class outranks
+   .today-round-btn's display, which is declared later. */
+.detail-topbar .detail-close-btn,
+.detail-topbar .detail-expand-btn {
+  display: none;
 }
 
 @media (min-width: 769px) {
-  .detail-expand-btn {
+  .detail-topbar .detail-back-btn {
+    display: none;
+  }
+  .detail-topbar .detail-close-btn,
+  .detail-topbar .detail-expand-btn {
     display: inline-flex;
   }
 }
 
-.detail-header {
+.detail-board-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.detail-board-tile {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--color-primary);
+}
+
+.detail-board-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-parent-link {
+  min-height: var(--touch-target);
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.detail-menu {
+  position: relative;
+  flex: none;
+}
+
+.detail-menu .overflow-menu-dropdown {
+  right: 0;
+}
+
+.detail-card {
+  position: relative;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: 0 var(--space-md);
+}
+
+.detail-body {
+  gap: var(--space-md);
+}
+
+/* Status: a switch with one segment per column */
+.status-switch {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: var(--radius-lg);
+  background: var(--color-border-light);
+}
+
+.status-switch-scroll {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.status-switch-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.status-segment {
+  flex: 1 1 0;
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 0 var(--space-md);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.status-switch-scroll .status-segment {
+  flex: 0 0 auto;
+}
+
+@media (hover: hover) {
+  .status-segment:hover {
+    color: var(--color-text);
+  }
+}
+
+.status-segment-on,
+.status-segment[aria-checked="true"] {
+  background-color: var(--color-surface);
+  border-color: var(--color-border);
+  box-shadow: var(--shadow);
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+/* Details card: hairline rows */
+.detail-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  min-height: 52px;
+  padding: var(--space-sm) 0;
+  border-top: 1px solid var(--color-border-light);
+}
+
+.detail-row:first-child {
+  border-top: none;
+}
+
+.detail-row-inline {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.detail-row-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--color-border);
+  gap: var(--space-md);
+  min-height: 36px;
+}
+
+.detail-row-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.detail-row-value {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.detail-row-value-overdue {
+  color: var(--color-danger-text);
+}
+
+.detail-row-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 0 var(--space-xs);
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.detail-row-btn svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  color: var(--color-text-secondary);
+}
+
+.owner-date-feedback {
+  position: absolute;
+  top: var(--space-xs);
+  right: var(--space-md);
+}
+
+/* Owner: initials avatars in 44px buttons */
+.owner-circles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.owner-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.owner-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--avatar-md);
+  height: var(--avatar-md);
+  border-radius: 50%;
+  color: #fff;
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.owner-avatar-none {
+  background: var(--color-border-light);
+  color: var(--color-text-secondary);
+}
+
+.owner-circle.active .owner-avatar {
+  box-shadow:
+    0 0 0 2px var(--color-surface),
+    0 0 0 4px var(--color-primary);
+}
+
+.detail-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs) var(--space-sm);
+}
+
+.detail-chip-row .filter-chip svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Completed */
+.completed-date-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 0 var(--space-xs);
+  border: none;
+  background: transparent;
+  color: var(--color-success);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.completed-date-btn svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
   flex-shrink: 0;
 }
 
-.detail-header h2 {
-  font-size: 18px;
+.completed-date-btn .date-info {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+}
+
+.completed-date-btn .date-text {
+  color: var(--color-success);
+}
+
+.completed-date-btn .date-relative {
+  color: var(--color-text-secondary);
+  font-weight: 400;
+}
+
+/* Subtasks card */
+.detail-subtasks {
+  padding-top: var(--space-md);
+  padding-bottom: var(--space-sm);
+}
+
+.detail-subtasks-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: var(--space-sm);
+}
+
+.detail-subtasks-header h3 {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.detail-subtasks-count {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.subtask-progress {
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-border-light);
+  overflow: hidden;
+  margin-bottom: var(--space-xs);
+}
+
+.subtask-progress-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+}
+
+.subtask-add-plus {
+  display: inline-flex;
+  flex: none;
+  color: var(--color-primary);
+}
+
+.subtask-add-plus svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+}
+
+/* Footer */
+.detail-footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding-bottom: var(--space-lg);
+}
+
+.detail-meta {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.detail-delete-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  color: var(--color-danger-text);
+  font-family: inherit;
+  font-size: var(--text-base);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.detail-delete-btn svg,
+.detail-delete-confirm-title svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+}
+
+.detail-delete-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.detail-delete-confirm-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin: 0;
+  color: var(--color-danger-text);
+  font-weight: 700;
+}
+
+.detail-delete-confirm-message {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.detail-delete-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+
+.detail-delete-confirm-actions .btn-danger {
+  background: var(--color-danger-fill);
+  color: var(--color-on-fill);
+}
+
+.delete-confirm-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-danger);
 }
 
 .detail-body {
@@ -2195,7 +2589,7 @@ body {
   gap: 0;
 }
 .editable-value.editable-value-title {
-  font-size: 28px;
+  font-size: var(--figure-md);
   font-weight: 700;
   line-height: 1.2;
   padding-left: 0;
@@ -2212,7 +2606,7 @@ body {
   color: var(--color-text-secondary);
 }
 .detail-field-no-label input[type="text"] {
-  font-size: 28px;
+  font-size: var(--figure-md);
   font-weight: 700;
   padding-left: 0;
 }
@@ -2222,173 +2616,6 @@ body {
   padding-left: 0;
 }
 
-/* === #220: Status chevron pipeline === */
-.status-pipeline {
-  display: flex;
-  align-items: stretch;
-  padding: 10px 12px;
-  background: var(--color-surface-raised);
-  border-bottom: 1px solid var(--color-border);
-  flex-shrink: 0;
-  gap: 4px;
-}
-.status-chevron {
-  flex: 1;
-  min-width: 0;
-  padding: 10px 8px 10px 16px;
-  border: none;
-  background: var(--overlay-xs);
-  color: var(--color-text-muted);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all var(--transition-fast);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  position: relative;
-  white-space: nowrap;
-  min-height: 40px;
-  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%, 12px 50%);
-}
-.status-chevron:first-child {
-  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%);
-  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
-  padding-left: 12px;
-}
-.status-chevron:last-child {
-  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 12px 50%);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-  padding-right: 12px;
-}
-.status-chevron.reached {
-  background: var(--overlay-sm);
-  color: var(--color-text-secondary);
-}
-.status-chevron.active {
-  color: var(--color-text);
-  font-weight: 700;
-  font-size: 13px;
-}
-@media (hover: hover) {
-  .status-chevron:not(.active):hover {
-    background: var(--overlay-md);
-  }
-}
-
-/* === #220: Owner avatar circles === */
-/* === #220 follow-up: Combined owner + date row === */
-.owner-date-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  position: relative;
-  padding: 4px 0;
-}
-.owner-date-feedback {
-  position: absolute;
-  top: -4px;
-  right: 0;
-}
-.owner-circles {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.row-divider {
-  width: 1px;
-  height: 32px;
-  background: var(--color-border);
-  flex-shrink: 0;
-  display: none;
-}
-.owner-circle-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-.owner-circle {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: inherit;
-  transition: all var(--transition-fast);
-  padding: 0;
-  position: relative;
-  color: #fff;
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-}
-.owner-circle.active {
-  box-shadow: 0 0 0 3px var(--color-surface), 0 0 0 5px var(--color-primary);
-}
-
-.owner-circle-name {
-  font-size: 10px;
-  color: var(--color-text-secondary);
-  margin-top: 2px;
-  text-align: center;
-  max-width: 52px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* === #220 follow-up: Due date (clickable row in owner-date row) === */
-.due-date-btn {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border: none;
-  border-radius: var(--radius);
-  background: transparent;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all var(--transition-fast);
-  text-align: left;
-  min-height: 44px;
-  min-width: 44px;
-}
-
-.due-date-btn svg {
-  width: 24px;
-  height: 24px;
-  flex-shrink: 0;
-  color: var(--color-text-muted);
-}
-.due-date-btn.has-date svg {
-  color: var(--color-primary);
-}
-.due-date-btn .date-info {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.due-date-btn .date-text {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--color-text);
-}
-.due-date-btn .date-relative {
-  font-size: 12px;
-  color: var(--color-text-secondary);
-}
-.due-date-btn .no-date {
-  color: var(--color-text-muted);
-  font-size: 14px;
-}
 .due-date-group {
   display: flex;
   align-items: center;
@@ -2429,44 +2656,6 @@ body {
   color: var(--color-overdue);
 }
 
-/* === #280: Completed date button (44px target; .due-date-btn is 40px, see #281) === */
-.completed-date-btn {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 44px;
-  min-width: 44px;
-  padding: 8px 10px;
-  border: none;
-  border-radius: var(--radius);
-  background: transparent;
-  cursor: pointer;
-  font-family: inherit;
-  text-align: left;
-  transition: all var(--transition-fast);
-}
-
-.completed-date-btn svg {
-  width: 24px;
-  height: 24px;
-  flex-shrink: 0;
-  color: var(--color-success);
-}
-.completed-date-btn .date-info {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.completed-date-btn .date-text {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--color-text);
-}
-.completed-date-btn .date-relative {
-  font-size: 12px;
-  color: var(--color-text-secondary);
-}
-
 /* === #220: Label "New" pill + gear icon === */
 .label-new-pill {
   padding: 5px 14px;
@@ -2490,8 +2679,8 @@ body {
   }
 }
 .label-gear-btn {
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   border: none;
   background: none;
   color: var(--color-text-secondary);
@@ -2577,25 +2766,36 @@ body {
 }
 
 .label-toggle {
-  padding: 4px 12px;
-  border: 2px solid var(--label-color, #999);
-  border-radius: 14px;
-  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  padding: 0 calc(var(--space-md) - 4px);
+  border: 4px solid transparent;
+  border-radius: var(--radius-full);
+  background-color: var(--color-surface);
+  background-clip: padding-box;
+  box-shadow: inset 0 0 0 1px var(--color-border-strong);
   color: var(--color-text);
-  font-size: 13px;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
 }
 
-@media (hover: hover) {
-  .label-toggle:hover:not(:disabled):not([aria-disabled="true"]) {
-    background: color-mix(in srgb, var(--label-color, #999) 15%, transparent);
-  }
+/* The dot is the label's colour; the word is what tells labels apart. */
+.label-toggle-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--label-color, var(--color-text-muted));
 }
 
 .label-toggle-active {
-  background: var(--label-color, #999);
-  color: var(--label-text-color, white);
+  background-color: var(--color-text);
+  box-shadow: inset 0 0 0 1px var(--color-text);
+  color: var(--color-bg);
 }
 
 /* === #220: Sub-tasks in detail (redesigned) === */
@@ -2618,42 +2818,22 @@ body {
   color: var(--color-text-secondary);
 }
 
-/* Circle-plus add button */
-.subtask-add-circle {
-  width: 44px;
-  height: 44px;
-  border: none;
-  background: none;
-  color: var(--color-primary);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  transition: background var(--transition-fast);
-  padding: 0;
-}
-@media (hover: hover) {
-  .subtask-add-circle:hover {
-    background: var(--color-primary-light);
-  }
-}
-
 .subtask-list {
   list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
 }
 
 .subtask-item {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
-  padding: 10px 4px;
-  border-radius: var(--radius-sm);
-  font-size: 14px;
-  min-height: 48px;
+  padding: 4px 0;
+  border-top: 1px solid var(--color-border-light);
+  font-size: var(--text-base);
+  min-height: 52px;
   transition: background var(--transition-fast);
 }
 
@@ -2672,12 +2852,11 @@ body {
   justify-content: center;
   flex-shrink: 0;
   padding: 0;
-  margin: -8px 0;
 }
 .check-box {
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
   border: 2px solid var(--color-border-strong);
   background: transparent;
   display: flex;
@@ -2697,7 +2876,7 @@ body {
 .check-box.checked svg {
   width: 14px;
   height: 14px;
-  stroke: #fff;
+  stroke: var(--color-surface);
   stroke-width: 3;
   fill: none;
 }
@@ -2713,7 +2892,7 @@ body {
 }
 
 .subtask-title {
-  font-size: 14px;
+  font-size: var(--text-base);
   color: var(--color-text);
   line-height: 1.4;
   cursor: pointer;
@@ -2750,34 +2929,9 @@ body {
 }
 
 /* Done items — muted styling */
-.subtask-done {
-  opacity: 0.6;
-}
 .subtask-done .subtask-title {
   text-decoration: line-through;
-  color: var(--color-text-secondary);
-}
-
-/* Divider between active and completed */
-.subtask-divider {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 0;
-  list-style: none;
-}
-.subtask-divider-line {
-  flex: 1;
-  height: 1px;
-  background: var(--color-border);
-}
-.subtask-divider-label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
   color: var(--color-text-muted);
-  flex-shrink: 0;
 }
 
 /* === Sub-task action buttons (delete, reorder, kebab) === */
@@ -3005,47 +3159,29 @@ body {
   box-shadow: var(--focus-ring);
 }
 
-/* === Inline delete confirmation === */
-.delete-confirm-inline {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.delete-confirm-text {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--color-danger);
-}
-
 /* === Inline subtask add === */
 .subtask-add-li {
   list-style: none;
 }
 .subtask-add-wrapper {
-  margin-top: 4px;
+  margin-top: 0;
 }
 
 .subtask-add-inline {
   display: flex;
   gap: 8px;
   align-items: center;
-}
-
-.subtask-add-hint {
-  display: block;
-  margin-top: 4px;
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
+  min-height: 52px;
+  border-top: 1px solid var(--color-border-light);
 }
 
 .subtask-add-input {
-  flex: 1;
+  flex: 1 1 140px;
   min-width: 0;
   padding: 6px 8px;
-  border: 1px solid var(--color-primary);
+  border: none;
   border-radius: var(--radius-sm);
-  font-size: 14px;
+  font-size: var(--text-base);
   font-family: inherit;
   color: var(--color-text);
   background: var(--color-surface);
@@ -3054,30 +3190,6 @@ body {
 
 .subtask-add-input:focus {
   box-shadow: var(--focus-ring);
-}
-
-.detail-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding-top: 16px;
-  border-top: 1px solid var(--color-border);
-  color: var(--color-text-secondary);
-}
-
-.detail-footer {
-  padding: 16px 20px;
-  border-top: 1px solid var(--color-border);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-shrink: 0;
-}
-.detail-footer-left,
-.detail-footer-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 /* Move to board modal */
@@ -5427,13 +5539,13 @@ body {
 .overflow-menu-btn:hover:not(:disabled):not([aria-disabled="true"]),
 .login-link:hover:not(:disabled):not([aria-disabled="true"]),
 .today-action-btn:hover:not(:disabled):not([aria-disabled="true"]),
+.detail-delete-btn:hover:not(:disabled):not([aria-disabled="true"]),
 /* Icon buttons */
 .btn-icon:hover:not(:disabled):not([aria-disabled="true"]),
 .btn-icon-danger:hover:not(:disabled):not([aria-disabled="true"]),
 .kebab-trigger:hover:not(:disabled):not([aria-disabled="true"]),
 .subtask-kebab-btn:hover:not(:disabled):not([aria-disabled="true"]),
 .subtask-action-btn:hover:not(:disabled):not([aria-disabled="true"]),
-.subtask-add-circle:hover:not(:disabled):not([aria-disabled="true"]),
 .archive-search-clear:hover:not(:disabled):not([aria-disabled="true"]),
 .filter-search-clear:hover:not(:disabled):not([aria-disabled="true"]),
 .share-remove-btn:hover:not(:disabled):not([aria-disabled="true"]),
@@ -5455,7 +5567,7 @@ body {
 .icon-swatch:hover:not(:disabled):not([aria-disabled="true"]),
 .quick-date-chip:hover:not(:disabled):not([aria-disabled="true"]),
 .owner-circle:hover:not(:disabled):not([aria-disabled="true"]),
-.status-chevron:hover:not(:disabled):not([aria-disabled="true"]),
+.status-segment:hover:not(:disabled):not([aria-disabled="true"]),
 .check-icon:hover:not(:disabled):not([aria-disabled="true"]),
 .subtask-date-inline:hover:not(:disabled):not([aria-disabled="true"]),
 .today-chip:hover:not(:disabled):not([aria-disabled="true"]),
@@ -5473,7 +5585,7 @@ body {
 .subtask-menu-item:hover:not(:disabled):not([aria-disabled="true"]),
 .subtask-title:hover:not(:disabled):not([aria-disabled="true"]),
 .editable-value:hover:not(:disabled):not([aria-disabled="true"]),
-.due-date-btn:hover:not(:disabled):not([aria-disabled="true"]),
+.detail-row-btn:hover:not(:disabled):not([aria-disabled="true"]),
 .completed-date-btn:hover:not(:disabled):not([aria-disabled="true"]),
 .column-add-row:hover:not(:disabled):not([aria-disabled="true"]),
 .today-row-title:hover:not(:disabled):not([aria-disabled="true"]),
@@ -5507,13 +5619,13 @@ body {
 .overflow-menu-btn:active:not(:disabled):not([aria-disabled="true"]),
 .login-link:active:not(:disabled):not([aria-disabled="true"]),
 .today-action-btn:active:not(:disabled):not([aria-disabled="true"]),
+.detail-delete-btn:active:not(:disabled):not([aria-disabled="true"]),
 /* Icon buttons */
 .btn-icon:active:not(:disabled):not([aria-disabled="true"]),
 .btn-icon-danger:active:not(:disabled):not([aria-disabled="true"]),
 .kebab-trigger:active:not(:disabled):not([aria-disabled="true"]),
 .subtask-kebab-btn:active:not(:disabled):not([aria-disabled="true"]),
 .subtask-action-btn:active:not(:disabled):not([aria-disabled="true"]),
-.subtask-add-circle:active:not(:disabled):not([aria-disabled="true"]),
 .archive-search-clear:active:not(:disabled):not([aria-disabled="true"]),
 .filter-search-clear:active:not(:disabled):not([aria-disabled="true"]),
 .share-remove-btn:active:not(:disabled):not([aria-disabled="true"]),
@@ -5535,7 +5647,7 @@ body {
 .icon-swatch:active:not(:disabled):not([aria-disabled="true"]),
 .quick-date-chip:active:not(:disabled):not([aria-disabled="true"]),
 .owner-circle:active:not(:disabled):not([aria-disabled="true"]),
-.status-chevron:active:not(:disabled):not([aria-disabled="true"]),
+.status-segment:active:not(:disabled):not([aria-disabled="true"]),
 .check-icon:active:not(:disabled):not([aria-disabled="true"]),
 .subtask-date-inline:active:not(:disabled):not([aria-disabled="true"]),
 .today-chip:active:not(:disabled):not([aria-disabled="true"]),
@@ -5553,7 +5665,7 @@ body {
 .subtask-menu-item:active:not(:disabled):not([aria-disabled="true"]),
 .subtask-title:active:not(:disabled):not([aria-disabled="true"]),
 .editable-value:active:not(:disabled):not([aria-disabled="true"]),
-.due-date-btn:active:not(:disabled):not([aria-disabled="true"]),
+.detail-row-btn:active:not(:disabled):not([aria-disabled="true"]),
 .completed-date-btn:active:not(:disabled):not([aria-disabled="true"]),
 .column-add-row:active:not(:disabled):not([aria-disabled="true"]),
 .today-row-title:active:not(:disabled):not([aria-disabled="true"]),
@@ -5646,7 +5758,6 @@ textarea:disabled {
 .btn-icon-danger,
 .kebab-trigger,
 .subtask-action-btn,
-.subtask-add-circle,
 .date-clear-btn,
 .staged-subtask-remove,
 .subtask-kebab-btn,
@@ -5689,7 +5800,7 @@ textarea:disabled {
 .filter-chip,
 .label-toggle,
 .quick-date-chip,
-.status-chevron,
+.status-segment,
 .card-title,
 .archive-item,
 .kebab-item,
@@ -5697,7 +5808,7 @@ textarea:disabled {
 .subtask-menu-item,
 .subtask-title,
 .editable-value,
-.due-date-btn,
+.detail-row-btn,
 .completed-date-btn,
 .column-add-row,
 .settings-tab,
@@ -5705,6 +5816,7 @@ textarea:disabled {
 .today-round-btn,
 .today-check,
 .today-action-btn,
+.detail-delete-btn,
 .today-chip,
 .today-day,
 .board-choice-chip,

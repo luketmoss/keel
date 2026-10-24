@@ -19,6 +19,7 @@ let mockChildren: any[] = [];
 let mockItems: any[] = [];
 
 vi.mock('../../state/board-store', () => ({
+  activeView: { value: 'boards' },
   selectedItemId: {
     get value() {
       return mockSelectedItemId;
@@ -207,45 +208,31 @@ describe('Issue #204: Sub-item display improvements', () => {
     });
   });
 
-  // --- AC2: Flat list with divider between incomplete and done items ---
-  describe('AC2: Flat list with divider separator', () => {
-    it('all items are always visible — incomplete first, then done', () => {
+  // --- AC2: one list in order; done ones stay in place, struck through (#627) ---
+  describe('AC2: One list, done subtasks stay in order', () => {
+    it('all items are always visible, in their own order', () => {
       mockChildren = [
-        makeChild({ id: 'c1', title: 'Incomplete task', status: 'To Do', sort_order: 1 }),
-        makeChild({ id: 'c2', title: 'Done task', status: 'Done', sort_order: 2 }),
+        makeChild({ id: 'c1', title: 'Done first', status: 'Done', sort_order: 1 }),
+        makeChild({ id: 'c2', title: 'Incomplete', status: 'To Do', sort_order: 2 }),
       ];
 
       const { container } = renderDetail();
-      // Both items always visible
       const subtaskItems = container.querySelectorAll('.subtask-item');
       expect(subtaskItems.length).toBe(2);
+      expect(subtaskItems[0].textContent).toContain('Done first');
+      expect(subtaskItems[0].classList.contains('subtask-done')).toBe(true);
+      expect(subtaskItems[1].classList.contains('subtask-done')).toBe(false);
     });
 
-    it('shows a .subtask-divider between incomplete and done items', () => {
-      mockChildren = [
-        makeChild({ id: 'c1', title: 'Incomplete', status: 'To Do', sort_order: 1 }),
-        makeChild({ id: 'c2', title: 'Done one', status: 'Done', sort_order: 2 }),
-        makeChild({ id: 'c3', title: 'Done two', status: 'Done', sort_order: 3 }),
-      ];
-
-      const { container } = renderDetail();
-      const divider = container.querySelector('.subtask-divider');
-      expect(divider).not.toBeNull();
-      // All 3 items visible
-      const subtaskItems = container.querySelectorAll('.subtask-item');
-      expect(subtaskItems.length).toBe(3);
-    });
-
-    it('divider has "completed" label text', () => {
+    it('has no "completed" divider', () => {
       mockChildren = [
         makeChild({ id: 'c1', title: 'Incomplete', status: 'To Do', sort_order: 1 }),
         makeChild({ id: 'c2', title: 'Done', status: 'Done', sort_order: 2 }),
       ];
 
       const { container } = renderDetail();
-      const divider = container.querySelector('.subtask-divider');
-      expect(divider).not.toBeNull();
-      expect(divider!.textContent).toContain('completed');
+      expect(container.querySelector('.subtask-divider')).toBeNull();
+      expect(container.textContent).not.toMatch(/completed/i);
     });
 
     it('when ALL sub-items are completed, all items are still visible', () => {
@@ -259,75 +246,39 @@ describe('Issue #204: Sub-item display improvements', () => {
       expect(subtaskItems.length).toBe(2);
     });
 
-    it('no divider rendered when there are no completed sub-items', () => {
-      mockChildren = [
-        makeChild({ id: 'c1', title: 'Task A', status: 'To Do', sort_order: 1 }),
-        makeChild({ id: 'c2', title: 'Task B', status: 'In Progress', sort_order: 2 }),
-      ];
-
-      const { container } = renderDetail();
-      const divider = container.querySelector('.subtask-divider');
-      expect(divider).toBeNull();
-    });
-
-    it('divider appears whenever there are done sub-items (even if all are done)', () => {
-      mockChildren = [
-        makeChild({ id: 'c1', title: 'Done A', status: 'Done', sort_order: 1 }),
-        makeChild({ id: 'c2', title: 'Done B', status: 'Done', sort_order: 2 }),
-      ];
-
-      const { container } = renderDetail();
-      // Divider always shows when there are done items
-      const divider = container.querySelector('.subtask-divider');
-      expect(divider).not.toBeNull();
+    it('done subtasks are struck through in muted text, not faded', () => {
+      expect(css).toMatch(/\.subtask-done \.subtask-title\s*\{[^}]*line-through/);
+      expect(css).toMatch(/\.subtask-done \.subtask-title\s*\{[^}]*color:\s*var\(--color-text-muted\)/);
+      expect(css).not.toMatch(/\.subtask-done\s*\{[^}]*opacity/);
     });
   });
 
-  // --- AC3: Drag reorder only for incomplete items (arrow buttons removed) ---
+  // --- AC3: Drag reorder (arrow buttons removed) ---
   // #246: #238 moved reorder onto a dedicated grab handle, so the row itself is
-  // no longer draggable. The #204 AC3 rule still holds — it is now carried by
-  // `.subtask-handle`, which is what this asserts against.
-  describe('AC3: Drag reorder only available for incomplete items', () => {
-    it('incomplete items are draggable, done items are not', () => {
-      // Two done children, not one: SubtaskRow receives the per-section list as
-      // `allItems` (incompleteChildren / doneChildren), and the handle is only
-      // draggable when that list has more than one entry. With a single done
-      // child the length check alone would make it inert, and this test would
-      // pass even if the `!isDone` guard were deleted.
+  // no longer draggable; `.subtask-handle` carries it. #627: the list is one list,
+  // so every row's handle is draggable once there is more than one subtask.
+  describe('AC3: Drag reorder through the handle', () => {
+    it('every row has a draggable handle when there is more than one subtask', () => {
       mockChildren = [
         makeChild({ id: 'c1', title: 'Incomplete A', status: 'To Do', sort_order: 1 }),
         makeChild({ id: 'c2', title: 'Incomplete B', status: 'To Do', sort_order: 2 }),
         makeChild({ id: 'c3', title: 'Done C', status: 'Done', sort_order: 3 }),
-        makeChild({ id: 'c4', title: 'Done D', status: 'Done', sort_order: 4 }),
       ];
 
       const { container } = renderDetail();
-      // All 4 items visible (flat list)
       const subtaskItems = container.querySelectorAll('.subtask-item');
-      expect(subtaskItems.length).toBe(4);
-
-      // Every row gets a grab handle, but only the incomplete ones are draggable
-      expect(container.querySelectorAll('.subtask-handle').length).toBe(4);
-      const draggableHandles = container.querySelectorAll('.subtask-handle[draggable="true"]');
-      expect(draggableHandles.length).toBe(2);
-
-      // Both done rows have a handle, and neither is draggable
-      const doneRows = Array.from(subtaskItems).filter(
-        (el) => el.textContent?.includes('Done C') || el.textContent?.includes('Done D'),
-      );
-      expect(doneRows.length).toBe(2);
-      doneRows.forEach((row) => {
-        expect(row.querySelector('.subtask-handle')!.getAttribute('draggable')).not.toBe('true');
-      });
+      expect(subtaskItems.length).toBe(3);
+      expect(container.querySelectorAll('.subtask-handle').length).toBe(3);
+      expect(container.querySelectorAll('.subtask-handle[draggable="true"]').length).toBe(3);
 
       // The row itself is no longer the drag initiator (#238)
       expect(container.querySelectorAll('.subtask-item[draggable="true"]').length).toBe(0);
     });
   });
 
-  // --- AC4: Progress summary in header ---
-  describe('AC4: Progress summary in header', () => {
-    it('header shows done/total format', () => {
+  // --- AC4: Progress summary in the Subtasks card (#627) ---
+  describe('AC4: Progress summary in the heading row', () => {
+    it('says "<done> of <total> done" and fills the bar to that fraction', () => {
       mockChildren = [
         makeChild({ id: 'c1', title: 'Task A', status: 'To Do', sort_order: 1 }),
         makeChild({ id: 'c2', title: 'Task B', status: 'Done', sort_order: 2 }),
@@ -335,49 +286,47 @@ describe('Issue #204: Sub-item display improvements', () => {
       ];
 
       const { container } = renderDetail();
-      const header = container.querySelector('.detail-subtasks-header label');
-      expect(header!.textContent).toContain('2/3');
+      expect(container.querySelector('.detail-subtasks-count')!.textContent).toBe('2 of 3 done');
+      const bar = container.querySelector('.subtask-progress') as HTMLElement;
+      expect(bar.getAttribute('aria-valuenow')).toBe('2');
+      expect(bar.getAttribute('aria-valuemax')).toBe('3');
+      const fill = bar.querySelector('.subtask-progress-fill') as HTMLElement;
+      expect(parseFloat(fill.style.width)).toBeCloseTo(66.67, 1);
     });
 
-    it('header shows 0/N when no items completed', () => {
+    it('says "0 of N done" with an empty bar when none are complete', () => {
       mockChildren = [
         makeChild({ id: 'c1', title: 'Task A', status: 'To Do', sort_order: 1 }),
         makeChild({ id: 'c2', title: 'Task B', status: 'To Do', sort_order: 2 }),
       ];
 
       const { container } = renderDetail();
-      const header = container.querySelector('.detail-subtasks-header label');
-      expect(header!.textContent).toContain('0/2');
+      expect(container.querySelector('.detail-subtasks-count')!.textContent).toBe('0 of 2 done');
+      expect((container.querySelector('.subtask-progress-fill') as HTMLElement).style.width).toBe('0%');
+    });
+
+    it('with no subtasks says "None yet", draws no bar, and still has the add row', () => {
+      mockChildren = [];
+      const { container } = renderDetail();
+      expect(container.querySelector('.detail-subtasks-count')!.textContent).toBe('None yet');
+      expect(container.querySelector('.subtask-progress')).toBeNull();
+      expect(container.querySelector('.subtask-add-input')).not.toBeNull();
     });
   });
 
   // --- AC5: Keyboard and screen reader support ---
   describe('AC5: Keyboard and screen reader support', () => {
-    it('check-icon button is accessible for toggling subtask status', () => {
+    it('check-icon button is named for what pressing it does', () => {
       mockChildren = [
         makeChild({ id: 'c1', title: 'Incomplete', status: 'To Do', sort_order: 1 }),
         makeChild({ id: 'c2', title: 'Done', status: 'Done', sort_order: 2 }),
       ];
 
       const { container } = renderDetail();
-      // Both items always visible
       const checkBtns = container.querySelectorAll('.check-icon');
       expect(checkBtns.length).toBe(2);
-      // Each has aria-label matching the subtask title
-      expect((checkBtns[0] as HTMLElement).getAttribute('aria-label')).toBe('Incomplete');
-      expect((checkBtns[1] as HTMLElement).getAttribute('aria-label')).toBe('Done');
-    });
-
-    it('subtask-divider has aria-hidden to avoid redundant screen reader announcement', () => {
-      mockChildren = [
-        makeChild({ id: 'c1', title: 'Incomplete', status: 'To Do', sort_order: 1 }),
-        makeChild({ id: 'c2', title: 'Done', status: 'Done', sort_order: 2 }),
-      ];
-
-      const { container } = renderDetail();
-      const divider = container.querySelector('.subtask-divider') as HTMLElement;
-      expect(divider).not.toBeNull();
-      expect(divider.getAttribute('aria-hidden')).toBe('true');
+      expect((checkBtns[0] as HTMLElement).getAttribute('aria-label')).toBe('Mark done: Incomplete');
+      expect((checkBtns[1] as HTMLElement).getAttribute('aria-label')).toBe('Mark not done: Done');
     });
 
     it('subtask-item has min-height for touch targets', () => {

@@ -54,6 +54,8 @@ const HIVE_ROOT = [
   '--ring-lg',
   '--ring-md',
   '--avatar-sm',
+  // #627's item screen: the owner choice circle
+  '--avatar-md',
 ];
 const HIVE_THEME = [
   '--color-primary',
@@ -198,6 +200,7 @@ describe('AC3: exactly this moves', () => {
     '--ring-lg',
     '--ring-md',
     '--avatar-sm',
+    '--avatar-md',
   ];
 
   it.each([
@@ -290,14 +293,23 @@ describe('AC5: nothing reads --color-border-light as an outline', () => {
     }
   });
 
-  it("no rule reads --color-border-light, except Today's and Boards' hairlines and tracks and the count badges (#624, #625, #626)", () => {
+  it('no rule reads --color-border-light, except the hairlines, tracks and count badges of Today, Boards, the board and the item screen (#624, #625, #626, #627)', () => {
     // A hairline between rows and the unfilled part of a ring or a bar are decoration, not the
     // outline of a control; the design notes for #624 and #625 name the token for them.
     const reads = [...stripComments(raw).matchAll(/([^{}]+)\{[^{}]*var\(--color-border-light\)[^{}]*\}/g)].map((m) =>
       m[1].trim(),
     );
     // #626: so are the fills of the count badges (column, list section and tab).
-    expect(reads.filter((sel) => !/^\.(today|boards)-|-count$/.test(sel))).toEqual([]);
+    // #627: and the item screen's: the hairlines between rows, the status switch's track, the progress
+    // bar's track and the "None" owner's fill.
+    expect(
+      reads.filter(
+        (sel) =>
+          !/^\.(today|boards|detail)-|^\.(status-switch|subtask-item|subtask-add-inline|subtask-progress|owner-avatar-none)\b|-count$/.test(
+            sel,
+          ),
+      ),
+    ).toEqual([]);
   });
 });
 

@@ -119,3 +119,31 @@ export function CloseIcon() {
     </Icon>
   );
 }
+
+export function ArrowLeftIcon() {
+  return (
+    <Icon>
+      <path d="M19 12H5M11 6l-6 6 6 6" />
+    </Icon>
+  );
+}
+
+export function TrashIcon() {
+  return (
+    <Icon>
+      <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+    </Icon>
+  );
+}
+
+export function ExpandIcon({ collapsed }: { collapsed: boolean }) {
+  return (
+    <Icon>
+      {collapsed ? (
+        <path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7" />
+      ) : (
+        <path d="M20 10h-6V4M4 14h6v6M14 10l7-7M10 14l-7 7" />
+      )}
+    </Icon>
+  );
+}

@@ -157,3 +157,41 @@ subtasks go with it.", "Keep it".
 | owner ring `--color-primary` on surface (3:1) | 5.91 | 9.63 |
 | Completed `--color-success` on surface | 5.13 | 7.34 |
 | muted footer on `--color-bg` (side panel) | 4.85 | 5.65 |
+
+## As built
+
+Decisions the build made where the note was silent or the codebase differed, and the
+contrast it measured (`--color-*` resolved from `ui/tokens/suite.css` and `global.css`).
+
+- **Next week** is the Monday after this one, the week boundary Today already uses.
+- **Board tile** is `--color-primary`: a board has no colour of its own in the sheet.
+- **Selected segment, dark:** `--color-surface-raised` is not a defined token, so the
+  raised segment is `--color-surface` with `--shadow` and its 1px border.
+- **Completed subtasks** keep their place in the one list: the "completed" divider is
+  gone, so reorder (handle and touch) works across all rows, done ones included.
+- **Add subtask** is always the last row. Enter adds and keeps the field focused; the
+  check button adds too; Escape clears a draft, and with nothing typed closes the screen
+  as it always did. Leaving the row with a title typed adds it, as before.
+- **Escape** in the Item options menu closes the menu only.
+- **Board row** shows only when there is another board to move to (as Move to board did).
+- **Copy** is not offered for a subtask (it never was: only top-level cards had it).
+- **Chips** reuse the board's `.filter-chip` for Due; label chips are `.label-toggle`
+  restyled the same way, which also changes the create-item form's label picker.
+
+### Contrast, measured
+
+| Pair | Light | Dark |
+|---|---|---|
+| row labels `--color-text-secondary` on surface | 6.05 | 6.57 |
+| segment text `--color-text-secondary` on the track `--color-border-light` | 5.02 | 5.77 |
+| selected segment `--color-text` on `--color-surface` | 16.48 | 14.39 |
+| "overdue" and the confirm heading `--color-danger-text` on surface | 6.57 | 5.85 |
+| Delete item fill: `--color-on-fill` on `--color-danger-fill` | 4.98 | 5.37 |
+| owner ring `--color-primary` on surface (3:1) | 5.91 | 9.63 |
+| Completed `--color-success` on surface | 5.13 | 7.34 |
+| footer muted `--color-text-muted` on `--color-bg` | 4.85 | 5.65 |
+| applied chip `--color-bg` on `--color-text` | 14.70 | 15.54 |
+| "None" avatar `--color-text-secondary` on `--color-border-light` | 5.02 | 5.77 |
+| initials, white on the owner colours | 4.52 to 11.32 | (same colours) |
+
+All pass 4.5:1 for text and 3:1 for the ring.

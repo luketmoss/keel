@@ -11,6 +11,7 @@ afterEach(() => {
 let mockSelectedItemId: string | null = 'aria-test-1';
 
 vi.mock('../../state/board-store', () => ({
+  activeView: { value: 'boards' },
   selectedItemId: {
     get value() {
       return mockSelectedItemId;
@@ -163,7 +164,7 @@ describe('CardDetail ARIA labels (Issue #7)', () => {
   describe('AC3: Close button has accessible label', () => {
     it('close button has aria-label="Close"', () => {
       const { container } = renderCardDetail();
-      const closeBtn = container.querySelector('.detail-header [aria-label="Close"]') as HTMLElement;
+      const closeBtn = container.querySelector('.detail-topbar [aria-label="Close"]') as HTMLElement;
       expect(closeBtn).not.toBeNull();
       expect(closeBtn.getAttribute('aria-label')).toBe('Close');
     });
@@ -173,11 +174,11 @@ describe('CardDetail ARIA labels (Issue #7)', () => {
   describe('AC5: Subtask checkboxes have accessible labels', () => {
     it('each subtask check button has aria-label matching the subtask title', () => {
       const { container } = renderCardDetail();
-      // #220: Flat list — all items always visible (incomplete first, then divider, then done)
+      // #627: one list in order; each check names what pressing it does
       const checkBtns = container.querySelectorAll('.subtask-list .check-icon');
       expect(checkBtns.length).toBe(2);
-      expect((checkBtns[0] as HTMLElement).getAttribute('aria-label')).toBe('Buy milk');
-      expect((checkBtns[1] as HTMLElement).getAttribute('aria-label')).toBe('Buy bread');
+      expect((checkBtns[0] as HTMLElement).getAttribute('aria-label')).toBe('Mark done: Buy milk');
+      expect((checkBtns[1] as HTMLElement).getAttribute('aria-label')).toMatch(/^Mark (not )?done: Buy bread$/);
     });
   });
 
@@ -268,13 +269,14 @@ describe('CardDetail ARIA labels (Issue #7)', () => {
     });
 
     // AC1 + AC2: focus enters the dialog, so the container's Escape handler is reachable
-    it('focuses the first rendered control, skipping the hidden expand button', () => {
+    it('focuses the first control in the top bar', () => {
       const { container } = renderCardDetail();
       const expandBtn = container.querySelector('.detail-expand-btn') as HTMLElement;
-      const closeBtn = container.querySelector('.detail-header [aria-label="Close"]') as HTMLElement;
+      // Back and Close are both in the markup; the stylesheet shows one. Without layout the first is Back.
+      const backBtn = container.querySelector('.detail-topbar [aria-label^="Back to"]') as HTMLElement;
 
       expect(document.activeElement).not.toBe(expandBtn);
-      expect(document.activeElement).toBe(closeBtn);
+      expect(document.activeElement).toBe(backBtn);
       expect(container.querySelector('.detail-overlay')!.contains(document.activeElement)).toBe(true);
     });
 

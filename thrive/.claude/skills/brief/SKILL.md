@@ -29,6 +29,9 @@ Edit these here rather than in the steps below.
   the name, not the id, here, because this repo is public.
 - **Look-ahead:** the next 3 days after today.
 - **Baseline:** the 14 days before today, for HRV, resting HR and sleep.
+- **Waking hours:** 6 AM to 10 PM local, meaning the hourly values from 06:00
+  up to, not including, 22:00. A look-ahead day's weather is read over these
+  hours only (Step 2, #620).
 - **Training slot:** 7:00 AM. The user trains right after the 6:45 brief, so
   a planned `weight`, `stretch` or other indoor session, which has a day but no
   time, is drawn at 7:00 for its estimate (45 min when it has none). An
@@ -145,6 +148,26 @@ its conditions go in the day's notes. Each look-ahead day gets one line: its
 sky, high and low, top wind and top rain chance, and a flag if it has one.
 Wet-trails flags come from **trails**; a gravel or road ride's wind flag
 comes from **home**.
+
+**A look-ahead day is read over waking hours** (Settings), from the hourly
+forecast, on the daily page's `ahead` and every day of the weekly page:
+
+- `rain`: the highest hourly `precipitation_probability`. Never the daily
+  `precipitation_probability_max`, which runs midnight to midnight and lets
+  one late-night hour stand for the whole day.
+- `wind`: the highest hourly `wind_speed_10m`, not the daily maximum.
+- `ic`: the sky word for the most severe hourly `weather_code`.
+- `hi` and `lo`: the daily high and low, as before.
+
+Its flags (the Step 4 limits) read waking hours too, so weather forecast
+only before 6 AM or from 10 PM raises none. A rain flag names the first
+waking hour at 40% or more: *"Rain 45% from 7 PM"*. The wet-trails rule is
+unchanged: it counts all rain that has already fallen in the past 48 hours,
+overnight included.
+
+For example, 25 Oct at home was 0–4% until 5 PM, 9% at 6 PM, 42–45% from 7
+to 9 PM, and 83% from 10 PM. That day is `rain: 45` with the flag *"Rain 45%
+from 7 PM"*, not the daily maximum's 83.
 
 The sky is one word from the day's (or the hour's) `weather_code`: `sun` for
 0–1, `partly` for 2, `cloud` for 3, `fog` for 45–48, `rain` for 51–67 and
@@ -389,8 +412,9 @@ colour and icon.
   letter, `n` the date, `e` the day's top effort `easy`, `medium`, `hard`
   or `none`. `loadNote`: one line, only when the trend changes what to do.
 - `ahead`: one per look-ahead day, `{dow, n, wx, plans, events, board,
-  none, last}`. `wx` is `{ic, hi, lo, wind, rain, flag}`, `flag` a short
-  warning ("Wind 16 mph") only by the Step 4 limits. `plans` are `[{type,
+  none, last}`. `wx` is `{ic, hi, lo, wind, rain, flag}`, read over waking
+  hours (Step 2), `flag` a short warning ("Wind 16 mph", "Rain 45% from 7
+  PM") only by the Step 4 limits. `plans` are `[{type,
   title, sub}]`, `events` `[{t, title}]` with `t` a time or "All day",
   `board` the Hive items due `[{title}]`, `none` a line such as "Nothing
   planned for training.", and `last` one line from the Last time call (date,
@@ -447,8 +471,9 @@ strings show as text, times are decimal hours as on the daily page):
   `hike`, `run`, `walk`). Never invent a workout.
 - `days`: one per day for 7 days, `{dow, n, wx, plans, add, events,
   allday, board, note, sg}`. `wx` is `{ic, hi, lo, wind, rain, flag}` from
-  the home forecast (`forecast_days=8`, no `past_days`), `ic` the sky word
-  (Step 2), and `flag` a short warning ("Wind 18") only by the Step 4 limits
+  the home forecast (`forecast_days=8`, no `past_days`) read over waking
+  hours as in Step 2, `ic` the sky word, and `flag` a short warning ("Wind
+  18", "Rain 45% from 7 PM") only by the Step 4 limits
   (wind 15 mph or more, rain 40% or more, feels-like under 35°F or over
   90°F). `plans` are the planned sessions, `[{type, title, s, e, struck}]`,
   `s` and `e` at the training slot or the best window and left out when

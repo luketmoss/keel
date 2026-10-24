@@ -36,6 +36,7 @@ import {
   boardOpen,
   boardStatuses,
   isTerminalStatus,
+  selectedColumnIndex,
 } from '../../state/board-store';
 import type { SortMode } from '../../state/board-store';
 import { moveItem, reorderItem, deleteItem, copyItem } from '../../state/actions';
@@ -60,7 +61,7 @@ import { TabBar } from '../shell/tab-bar';
 import { SettingsScreen } from '../shell/settings-screen';
 import { BoardsScreen } from '../boards/boards-screen';
 import { TodayScreen, openCreateForToday } from '../today/today-screen';
-import { ColumnIndicator } from './column-indicator';
+import { ColumnTabs } from './column-tabs';
 import type { ItemStatus, ItemWithRow } from '../../api/types';
 
 export function KanbanBoard() {
@@ -307,7 +308,6 @@ export function KanbanBoard() {
             <Column
               key={status.name}
               status={status.name}
-              color={status.color}
               isTerminal={status.is_terminal}
               items={columns.value[status.name] || []}
               onDrop={handleDrop}
@@ -347,13 +347,15 @@ export function KanbanBoard() {
 
           return (
             <div key={groupValue} class="swimlane">
-              <div class="swimlane-header">{groupValue}</div>
+              <div class="swimlane-header">
+                <h2>{groupValue}</h2>
+                <span class="column-count">{swimlaneItems.length}</span>
+              </div>
               <div class="board-columns">
                 {statuses.map((status) => (
                   <Column
                     key={`${groupValue}-${status.name}`}
                     status={status.name}
-                    color={status.color}
                     isTerminal={status.is_terminal}
                     items={swimlaneItems.filter((i) => i.status === status.name)}
                     onDrop={handleDrop}
@@ -379,6 +381,7 @@ export function KanbanBoard() {
 
       <div class="board-layout">
         {onBoards && <ControlBar />}
+        {onBoards && groupBy.value === 'none' && !isBoardEmpty && <ColumnTabs />}
 
         <main class="board-main">
           {activeView.value === 'today' ? (
@@ -409,14 +412,17 @@ export function KanbanBoard() {
             renderSwimlanes()
           )}
         </main>
-
-        {onBoards && groupBy.value === 'none' && <ColumnIndicator />}
       </div>
 
       {onBoards && (
         <button
           class="fab"
           onClick={() => {
+            // #626: on a phone the FAB adds to the column whose tab is selected.
+            if (groupBy.value === 'none' && window.matchMedia('(max-width: 767px)').matches) {
+              const col = statuses[selectedColumnIndex.value];
+              if (col) createModalInitialStatus.value = col.name;
+            }
             showCreateModal.value = true;
           }}
           title="Create new item"

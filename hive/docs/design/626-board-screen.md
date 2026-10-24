@@ -159,11 +159,19 @@ changes.
 
 ## New tokens
 
-None beyond #623 and #624's. Retired: `--color-todo`, `--color-inprogress`,
-`--color-done`, `--column-color` and `--color-col-*` (Hive's column tints), once
-no rule reads them.
+None beyond #623 and #624's. Retired: `--column-color`. `--color-todo`,
+`--color-inprogress`, `--color-done` and `--color-col-*` stay for now: the item
+screen's column picker (`card-detail.tsx`, #627), the icon picker's selected
+swatch and the column settings' terminal toggle still read them. They go with
+#627, once no rule reads them.
+
+The header's colour tile is `--color-primary`: a board has no colour of its own
+in the frontend's model (the Boards tab's Color column is not read, and the
+schema is frozen).
 
 ## Contrast
+
+Measured from the tokens by `board-screen.test.ts`, which fails if this table and the stylesheet disagree.
 
 | Pair | Light | Dark |
 |---|---|---|
@@ -172,7 +180,7 @@ no rule reads them.
 | "Unassigned" `--color-text-muted` on surface | 5.44 | 5.23 |
 | column heading `--color-text` on `--color-bg` | 14.70 | 15.54 |
 | count badge `--color-text-secondary` on `--color-border-light` | 5.02 | 5.77 |
-| selected tab badge `--color-primary` on `--color-primary-light` | 4.73 | 9.11 |
+| selected tab badge `--color-primary` on `--color-primary-light` | 4.74 | 9.10 |
 | chip on `--color-bg` on `--color-text` | 14.70 | 15.54 |
 | chip outline `--color-border-strong` (3:1) | 3.83 on surface, 3.41 on page | 3.95 |
 | overdue pill `--color-danger-text` on surface | 6.57 | 5.85 |

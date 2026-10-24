@@ -59,3 +59,63 @@ export function ChevronRightIcon() {
     </Icon>
   );
 }
+
+export function ChecklistIcon() {
+  return (
+    <Icon>
+      <path d="M4 6.5l1.5 1.5L8 5M4 12.5l1.5 1.5L8 11M4 18.5l1.5 1.5L8 17M12 7h8M12 13h8M12 19h8" />
+    </Icon>
+  );
+}
+
+export function SortIcon() {
+  return (
+    <Icon>
+      <path d="M4 7h16M7 12h10M10 17h4" />
+    </Icon>
+  );
+}
+
+export function SearchIcon() {
+  return (
+    <Icon>
+      <circle cx="11" cy="11" r="7" />
+      <path d="M20 20l-4-4" />
+    </Icon>
+  );
+}
+
+export function PeopleIcon() {
+  return (
+    <Icon>
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6M16 4.7a3.5 3.5 0 0 1 0 6.6M18 14.3c2.2.7 3.5 2.6 3.5 5.7" />
+    </Icon>
+  );
+}
+
+export function MoreIcon() {
+  return (
+    <Icon>
+      <circle cx="12" cy="5" r="1" />
+      <circle cx="12" cy="12" r="1" />
+      <circle cx="12" cy="19" r="1" />
+    </Icon>
+  );
+}
+
+export function PlusSmallIcon() {
+  return (
+    <Icon>
+      <path d="M12 5v14M5 12h14" />
+    </Icon>
+  );
+}
+
+export function CloseIcon() {
+  return (
+    <Icon>
+      <path d="M18 6L6 18M6 6l12 12" />
+    </Icon>
+  );
+}

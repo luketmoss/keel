@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
+import type { GroupBy } from '../../state/board-store';
 import {
   boards,
   activeBoardId,
   activeBoard,
+  boardSummaries,
+  currentOwnerName,
   destinationUrl,
   showCreateBoardModal,
   showShareModal,
@@ -10,103 +13,98 @@ import {
   filterLabel,
   filterSearch,
   filterDue,
+  filterOwner,
   groupBy,
   setGroupBy,
   boardLabels as labelsStore,
+  labelsInUse,
   rootItems,
 } from '../../state/board-store';
 import { onNavClick } from '../shell/tab-bar';
-import { ChevronLeftIcon } from '../today/today-icons';
+import { ChevronLeftIcon, MoreIcon, PeopleIcon, SearchIcon } from '../today/today-icons';
 
-/**
- * #177: Redesigned control bar with text search, due date filter, label chips,
- * and 3-dot menu with views/grouping/settings sections.
- */
-export function ControlBar() {
-  const [filtersExpanded, setFiltersExpanded] = useState(false);
-  const [localSearch, setLocalSearch] = useState('');
-  const searchRef = useRef<HTMLInputElement>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+const GROUP_LABELS: Record<GroupBy, string> = { none: 'None', status: 'By status', label: 'By label' };
+const GROUP_CHIP_WORDS: Record<GroupBy, string> = { none: 'None', status: 'Status', label: 'Label' };
 
-  // 3-dot overflow menu state
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuBtnRef = useRef<HTMLButtonElement>(null);
-  const menuDropdownRef = useRef<HTMLDivElement>(null);
+/** A popup menu's open state, its dismissal (outside click, Escape) and arrow-key movement. */
+function useMenu() {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  // Close filter popup on Escape
   useEffect(() => {
-    if (!filtersExpanded) return;
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        setFiltersExpanded(false);
+    if (!open) return;
+    const onMouseDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (menuRef.current && !menuRef.current.contains(t) && btnRef.current && !btnRef.current.contains(t)) {
+        setOpen(false);
       }
     };
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [filtersExpanded]);
-
-  // Click-outside to dismiss 3-dot menu
-  useEffect(() => {
-    if (!menuOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        menuDropdownRef.current &&
-        !menuDropdownRef.current.contains(e.target as Node) &&
-        menuBtnRef.current &&
-        !menuBtnRef.current.contains(e.target as Node)
-      ) {
-        setMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [menuOpen]);
-
-  // Escape and arrow key navigation in 3-dot menu
-  useEffect(() => {
-    if (!menuOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setMenuOpen(false);
-        menuBtnRef.current?.focus();
+        setOpen(false);
+        btnRef.current?.focus();
         return;
       }
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();
-        const items = menuDropdownRef.current?.querySelectorAll<HTMLElement>(
-          '[role="menuitem"], [role="menuitemradio"]',
-        );
+        const items = menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"], [role="menuitemradio"]');
         if (!items || items.length === 0) return;
-        const focused = document.activeElement as HTMLElement;
-        const idx = Array.from(items).indexOf(focused);
-        if (e.key === 'ArrowDown') {
-          items[(idx + 1) % items.length].focus();
-        } else {
-          items[(idx - 1 + items.length) % items.length].focus();
-        }
+        const idx = Array.from(items).indexOf(document.activeElement as HTMLElement);
+        if (e.key === 'ArrowDown') items[(idx + 1) % items.length].focus();
+        else items[(idx - 1 + items.length) % items.length].focus();
       }
     };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [menuOpen]);
+    document.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open]);
 
-  // Reset state on board switch
+  return { open, setOpen, btnRef, menuRef };
+}
+
+/**
+ * #626: the board's header (back link, who it is shared with, title, search, Share,
+ * board options) and the filter chips under it. Built on #177's search, due and label
+ * filters; the Filters popup is gone and the chips are one row.
+ */
+export function ControlBar() {
+  const [localSearch, setLocalSearch] = useState('');
+  // Phone: the search field replaces the title row until Cancel
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const options = useMenu();
+  const groupMenu = useMenu();
+
   const currentBoardId = activeBoardId.value;
   useEffect(() => {
-    setFiltersExpanded(false);
-    setMenuOpen(false);
+    options.setOpen(false);
+    groupMenu.setOpen(false);
+    setSearchOpen(false);
     setLocalSearch('');
   }, [currentBoardId]);
 
-  // Sync localSearch from signal (e.g. after board switch clears it)
+  // Sync localSearch from the signal (e.g. after a board switch clears it)
   useEffect(() => {
-    if (filterSearch.value === '' && localSearch !== '') {
-      setLocalSearch('');
-    }
+    if (filterSearch.value === '' && localSearch !== '') setLocalSearch('');
   }, [filterSearch.value]);
 
-  // Debounced search (board view)
+  // A label renamed or deleted while its chip is on: the filter clears.
+  useEffect(() => {
+    if (filterLabel.value && !labelsStore.value.some((l) => l.label === filterLabel.value)) {
+      filterLabel.value = null;
+    }
+  }, [filterLabel.value, labelsStore.value]);
+
+  useEffect(() => {
+    if (searchOpen) searchRef.current?.focus();
+  }, [searchOpen]);
+
   const handleSearchInput = useCallback((e: Event) => {
     const value = (e.target as HTMLInputElement).value;
     setLocalSearch(value);
@@ -122,24 +120,27 @@ export function ControlBar() {
     searchRef.current?.focus();
   }, []);
 
-  // Escape in search input clears it
+  /** Cancel (phone): clear the search and bring the title back. */
+  const cancelSearch = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    setLocalSearch('');
+    filterSearch.value = '';
+    setSearchOpen(false);
+  }, []);
+
   const handleSearchKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && localSearch) {
+      if (e.key !== 'Escape') return;
+      if (searchOpen) {
+        e.preventDefault();
+        cancelSearch();
+      } else if (localSearch) {
         e.preventDefault();
         clearSearch();
       }
     },
-    [localSearch, clearSearch],
+    [localSearch, searchOpen, clearSearch, cancelSearch],
   );
-
-  const isOwner = userBoardRole.value === 'owner';
-
-  // Active filter count for mobile badge
-  const activeCount = (filterSearch.value ? 1 : 0) + (filterDue.value ? 1 : 0) + (filterLabel.value ? 1 : 0);
-
-  // Filtered card count for live region
-  const filteredCount = rootItems.value.length;
 
   // Empty boards: show new board button only
   if (boards.value.length === 0) {
@@ -157,138 +158,64 @@ export function ControlBar() {
     );
   }
 
-  const closeFilters = useCallback(() => setFiltersExpanded(false), []);
+  const isOwner = userBoardRole.value === 'owner';
+  const board = activeBoard.value;
+  const summary = boardSummaries.value.find((s) => s.board.id === currentBoardId);
+  const me = currentOwnerName.value;
 
-  const handleDueClick = (due: 'today' | 'this-week') => {
-    filterDue.value = filterDue.value === due ? null : due;
-  };
+  const anyChip = !!(filterOwner.value || filterDue.value || filterLabel.value);
+  const filterOn = anyChip || !!filterSearch.value;
+  // Filtered card count for the live region
+  const filteredCount = rootItems.value.length;
 
-  const handleGroupClick = (mode: 'none' | 'status' | 'label') => {
-    setGroupBy(mode);
-    setMenuOpen(false);
-  };
-
-  // Shared filter popup renderer (mobile bottom sheet)
-  const renderFilterPopup = (content: any, hasActive: boolean, onReset?: () => void) =>
-    filtersExpanded ? (
-      <div class="filter-popup-backdrop" onClick={closeFilters}>
-        <div class="filter-popup" role="dialog" aria-label="Filters" onClick={(e: Event) => e.stopPropagation()}>
-          <div class="filter-popup-header">
-            <span class="filter-popup-title">Filters</span>
-            <div class="filter-popup-header-actions">
-              {hasActive && onReset && (
-                <button
-                  class="filter-popup-reset"
-                  onClick={() => {
-                    onReset();
-                    closeFilters();
-                  }}
-                >
-                  Reset
-                </button>
-              )}
-              <button class="filter-popup-close" onClick={closeFilters} aria-label="Close filters">
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <path d="M18 6L6 18" />
-                  <path d="M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          </div>
-          <div class="filter-popup-body">
-            {content}
-            <button class="btn btn-primary filter-popup-apply" onClick={closeFilters}>
-              Apply
-            </button>
-          </div>
-        </div>
-      </div>
-    ) : null;
-
-  const searchInput = (
-    <div class="filter-search-wrapper" data-testid="filter-search-wrapper">
-      <input
-        ref={searchRef}
-        type="text"
-        class="filter-search-input"
-        placeholder="Search cards..."
-        aria-label="Search cards"
-        value={localSearch}
-        onInput={handleSearchInput}
-        onKeyDown={handleSearchKeyDown}
-        data-testid="filter-search-input"
-      />
-      {localSearch && (
-        <button
-          class="filter-search-clear"
-          aria-label="Clear search"
-          onClick={clearSearch}
-          data-testid="filter-search-clear"
-        >
-          &times;
-        </button>
-      )}
-    </div>
+  // The label chips: those in use, in the board's order, and the one that is on even if nothing uses it now.
+  const labelChips = labelsStore.value.filter(
+    (l) => l.label === filterLabel.value || labelsInUse.value.some((u) => u.label === l.label),
   );
 
-  const boardFilterChips = (
-    <>
-      {/* AC4/AC5: Due date chips */}
-      <div role="group" aria-label="Filter by due date" class="filter-chip-group" data-testid="filter-due-group">
-        <span class="filter-chip-group-label">Due:</span>
-        {(['today', 'this-week'] as const).map((due) => {
-          const active = filterDue.value === due;
-          const label = due === 'today' ? 'Today' : 'This Week';
-          return (
-            <button
-              key={due}
-              class={`filter-chip filter-chip-due${active ? ' filter-chip-active' : ''}`}
-              aria-pressed={active ? 'true' : 'false'}
-              onClick={() => handleDueClick(due)}
-              data-testid={`filter-due-${due}`}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
+  const clearChips = () => {
+    filterOwner.value = null;
+    filterDue.value = null;
+    filterLabel.value = null;
+  };
 
-      {/* Label chips */}
-      <div role="group" aria-label="Filter by label" class="filter-chip-group">
-        <span class="filter-chip-group-label">Label:</span>
-        {labelsStore.value.map((l) => {
-          const active = filterLabel.value === l.label;
-          return (
-            <button
-              key={l.label}
-              class={`filter-chip filter-chip-label${active ? ' filter-chip-active' : ''}`}
-              aria-pressed={active ? 'true' : 'false'}
-              style={`--label-color: ${l.color}`}
-              onClick={() => {
-                filterLabel.value = active ? null : l.label;
-              }}
-            >
-              {l.label}
-            </button>
-          );
-        })}
-      </div>
-    </>
+  const handleGroupClick = (mode: GroupBy) => {
+    setGroupBy(mode);
+    options.setOpen(false);
+    groupMenu.setOpen(false);
+  };
+
+  const groupItems = (prefix: string) =>
+    (['none', 'status', 'label'] as const).map((mode) => (
+      <button
+        key={mode}
+        role="menuitemradio"
+        class={`overflow-menu-item${groupBy.value === mode ? ' overflow-menu-item-checked' : ''}`}
+        aria-checked={groupBy.value === mode}
+        onClick={() => handleGroupClick(mode)}
+        data-testid={`${prefix}-${mode}`}
+      >
+        {GROUP_LABELS[mode]}
+      </button>
+    ));
+
+  const chip = (key: string, label: string, on: boolean, onClick: () => void, testId: string, dot?: string) => (
+    <button
+      key={key}
+      class={`filter-chip${on ? ' filter-chip-active' : ''}`}
+      aria-pressed={on ? 'true' : 'false'}
+      onClick={onClick}
+      data-testid={testId}
+    >
+      {dot && <span class="filter-chip-dot" style={{ background: dot }} aria-hidden="true" />}
+      {label}
+    </button>
   );
 
   return (
     <div class="control-bar" data-testid="control-bar">
-      {/* #625: back to the list of boards, and which board this is */}
-      <div class="control-bar-section">
+      <div class="board-header">
+        {/* #625: back to the list of boards */}
         <a
           href={destinationUrl('boards').toString()}
           class="boards-back"
@@ -300,124 +227,196 @@ export function ControlBar() {
           </span>
           Boards
         </a>
-        {activeBoard.value && (
-          <span class="control-bar-board-name" data-testid="control-bar-board-name">
-            {boardOptionLabel(activeBoard.value.name, activeBoard.value.icon)}
-          </span>
-        )}
-      </div>
-
-      <span class="control-bar-separator" aria-hidden="true" />
-
-      {/* Filters section */}
-      <div class="control-bar-section control-bar-filters">
-        {/* Mobile: search always visible in bar (hidden on desktop via CSS) */}
-        <div class="control-bar-mobile-search">{searchInput}</div>
-
-        {/* Mobile: Filters toggle */}
-        <button
-          class="filter-toggle"
-          aria-expanded={filtersExpanded}
-          onClick={() => setFiltersExpanded((prev) => !prev)}
-          data-testid="control-bar-filter-toggle"
-        >
-          Filters
-          {activeCount > 0 && <span class="filter-badge">{activeCount}</span>}
-        </button>
-
-        {/* Desktop: inline chips (always visible, toggle hidden via CSS) */}
-        <div class="control-bar-filter-content control-bar-filter-desktop" data-testid="control-bar-filter-content">
-          {searchInput}
-          {boardFilterChips}
-        </div>
-
-        {/* Mobile: full-screen filter popup */}
-        {renderFilterPopup(boardFilterChips, activeCount > 0, () => {
-          filterDue.value = null;
-          filterLabel.value = null;
-        })}
-
-        {/* AC10: Live region for screen readers */}
-        <div aria-live="polite" class="sr-only" data-testid="filter-live-region">
-          {filterSearch.value || filterDue.value || filterLabel.value ? `${filteredCount} cards shown` : ''}
-        </div>
-      </div>
-
-      {/* 3-dot overflow menu */}
-      <div class="control-bar-overflow" data-testid="control-bar-overflow">
-        <button
-          ref={menuBtnRef}
-          class="btn btn-ghost overflow-menu-btn"
-          aria-label="More options"
-          aria-expanded={menuOpen}
-          aria-haspopup="true"
-          onClick={() => setMenuOpen((prev) => !prev)}
-          data-testid="overflow-menu-btn"
-        >
-          ⋯
-        </button>
-        {menuOpen && (
-          <div ref={menuDropdownRef} role="menu" class="overflow-menu-dropdown" data-testid="overflow-menu-dropdown">
-            {/* GROUPING section */}
-            <div class="overflow-menu-section-header" role="presentation">
-              Grouping
-            </div>
-            <button
-              role="menuitemradio"
-              class={`overflow-menu-item${groupBy.value === 'none' ? ' overflow-menu-item-checked' : ''}`}
-              aria-checked={groupBy.value === 'none'}
-              onClick={() => handleGroupClick('none')}
-              data-testid="overflow-menu-group-none"
-            >
-              None
-            </button>
-            <button
-              role="menuitemradio"
-              class={`overflow-menu-item${groupBy.value === 'status' ? ' overflow-menu-item-checked' : ''}`}
-              aria-checked={groupBy.value === 'status'}
-              onClick={() => handleGroupClick('status')}
-              data-testid="overflow-menu-group-status"
-            >
-              By Status
-            </button>
-            <button
-              role="menuitemradio"
-              class={`overflow-menu-item${groupBy.value === 'label' ? ' overflow-menu-item-checked' : ''}`}
-              aria-checked={groupBy.value === 'label'}
-              onClick={() => handleGroupClick('label')}
-              data-testid="overflow-menu-group-label"
-            >
-              By Label
-            </button>
-
-            {/* SETTINGS section — owners only */}
-            {isOwner && (
-              <>
-                <hr class="overflow-menu-divider" />
-                <div class="overflow-menu-section-header" role="presentation">
-                  Settings
-                </div>
-                <button
-                  role="menuitem"
-                  class="overflow-menu-item"
-                  onClick={() => {
-                    showShareModal.value = true;
-                    setMenuOpen(false);
-                  }}
-                  data-testid="overflow-menu-board-settings"
-                >
-                  Board Settings
-                </button>
-              </>
-            )}
+        {summary && (
+          <div class="board-subline" data-testid="board-subline">
+            {summary.sharedWith} · {summary.open} open
           </div>
         )}
+
+        <div class={`board-title-row${searchOpen ? ' board-title-row-searching' : ''}`}>
+          {board && (
+            <>
+              <span class="board-title-tile" aria-hidden="true" />
+              <h1 class="board-title" data-testid="control-bar-board-name">
+                {board.name}
+              </h1>
+            </>
+          )}
+
+          <div class="board-header-actions">
+            <div class={`board-search${searchOpen ? ' board-search-open' : ''}`} data-testid="filter-search-wrapper">
+              <span class="board-search-icon" aria-hidden="true">
+                <SearchIcon />
+              </span>
+              <input
+                ref={searchRef}
+                type="text"
+                class="filter-search-input"
+                placeholder="Search this board"
+                aria-label="Search this board"
+                value={localSearch}
+                onInput={handleSearchInput}
+                onKeyDown={handleSearchKeyDown}
+                data-testid="filter-search-input"
+              />
+              {localSearch && (
+                <button
+                  class="filter-search-clear"
+                  aria-label="Clear search"
+                  onClick={clearSearch}
+                  data-testid="filter-search-clear"
+                >
+                  &times;
+                </button>
+              )}
+            </div>
+            {searchOpen && (
+              <button class="btn btn-ghost board-search-cancel" onClick={cancelSearch} data-testid="search-cancel">
+                Cancel
+              </button>
+            )}
+            <button
+              class="today-round-btn board-search-btn"
+              aria-label="Search"
+              onClick={() => setSearchOpen(true)}
+              data-testid="board-search-btn"
+            >
+              <SearchIcon />
+            </button>
+
+            {isOwner && (
+              <button
+                class="btn btn-ghost board-share-btn"
+                onClick={() => {
+                  showShareModal.value = true;
+                }}
+                data-testid="board-share-btn"
+              >
+                <PeopleIcon />
+                Share
+              </button>
+            )}
+
+            <div class="control-bar-overflow" data-testid="control-bar-overflow">
+              <button
+                ref={options.btnRef}
+                class="btn btn-ghost overflow-menu-btn"
+                aria-label="Board options"
+                aria-expanded={options.open}
+                aria-haspopup="true"
+                onClick={() => options.setOpen((prev) => !prev)}
+                data-testid="overflow-menu-btn"
+              >
+                <MoreIcon />
+              </button>
+              {options.open && (
+                <div
+                  ref={options.menuRef}
+                  role="menu"
+                  class="overflow-menu-dropdown"
+                  data-testid="overflow-menu-dropdown"
+                >
+                  <div class="overflow-menu-section-header" role="presentation">
+                    Grouping
+                  </div>
+                  {groupItems('overflow-menu-group')}
+
+                  {isOwner && (
+                    <>
+                      <hr class="overflow-menu-divider" />
+                      <div class="overflow-menu-section-header" role="presentation">
+                        Settings
+                      </div>
+                      <button
+                        role="menuitem"
+                        class="overflow-menu-item overflow-menu-share"
+                        onClick={() => {
+                          showShareModal.value = true;
+                          options.setOpen(false);
+                        }}
+                        data-testid="overflow-menu-share"
+                      >
+                        Share
+                      </button>
+                      <button
+                        role="menuitem"
+                        class="overflow-menu-item"
+                        onClick={() => {
+                          showShareModal.value = true;
+                          options.setOpen(false);
+                        }}
+                        data-testid="overflow-menu-board-settings"
+                      >
+                        Board Settings
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="filter-row" role="group" aria-label="Filters" data-testid="control-bar-filter-content">
+        {chip('all', 'All', !anyChip, clearChips, 'filter-all')}
+        {me &&
+          chip(
+            'mine',
+            'Mine',
+            filterOwner.value === me,
+            () => {
+              filterOwner.value = filterOwner.value === me ? null : me;
+            },
+            'filter-mine',
+          )}
+        {(['today', 'this-week'] as const).map((due) =>
+          chip(
+            due,
+            due === 'today' ? 'Due today' : 'This week',
+            filterDue.value === due,
+            () => {
+              filterDue.value = filterDue.value === due ? null : due;
+            },
+            `filter-due-${due}`,
+          ),
+        )}
+        {labelChips.map((l) =>
+          chip(
+            `label-${l.label}`,
+            l.label,
+            filterLabel.value === l.label,
+            () => {
+              filterLabel.value = filterLabel.value === l.label ? null : l.label;
+            },
+            `filter-label-${l.label}`,
+            l.color,
+          ),
+        )}
+        <div class="filter-group-wrap">
+          <button
+            ref={groupMenu.btnRef}
+            class="filter-chip filter-chip-group-btn"
+            aria-haspopup="true"
+            aria-expanded={groupMenu.open}
+            onClick={() => groupMenu.setOpen((prev) => !prev)}
+            data-testid="filter-group-btn"
+          >
+            Group: {GROUP_CHIP_WORDS[groupBy.value]}
+            <span aria-hidden="true"> ▾</span>
+          </button>
+          {groupMenu.open && (
+            <div ref={groupMenu.menuRef} role="menu" class="overflow-menu-dropdown filter-group-menu">
+              {groupItems('filter-group')}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Live region for screen readers */}
+      <div aria-live="polite" class="sr-only" data-testid="filter-live-region">
+        {filterOn ? `${filteredCount} cards shown` : ''}
       </div>
     </div>
   );
-}
-
-function boardOptionLabel(name: string, icon?: string): string {
-  const prefix = icon ? `${icon} ` : '';
-  return `${prefix}${name}`;
 }

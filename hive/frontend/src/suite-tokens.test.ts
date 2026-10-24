@@ -290,13 +290,14 @@ describe('AC5: nothing reads --color-border-light as an outline', () => {
     }
   });
 
-  it("no rule reads --color-border-light, except Today's and Boards' hairlines and tracks (#624, #625)", () => {
+  it("no rule reads --color-border-light, except Today's and Boards' hairlines and tracks and the count badges (#624, #625, #626)", () => {
     // A hairline between rows and the unfilled part of a ring or a bar are decoration, not the
     // outline of a control; the design notes for #624 and #625 name the token for them.
     const reads = [...stripComments(raw).matchAll(/([^{}]+)\{[^{}]*var\(--color-border-light\)[^{}]*\}/g)].map((m) =>
       m[1].trim(),
     );
-    expect(reads.filter((sel) => !/^\.(today|boards)-/.test(sel))).toEqual([]);
+    // #626: so are the fills of the count badges (column, list section and tab).
+    expect(reads.filter((sel) => !/^\.(today|boards)-|-count$/.test(sel))).toEqual([]);
   });
 });
 

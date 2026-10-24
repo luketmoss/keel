@@ -2,7 +2,16 @@ import { useState } from 'preact/hooks';
 import { Card, currentDragStatus } from './card';
 import type { ItemStatus, ItemWithRow } from '../../api/types';
 import type { SortMode } from '../../state/board-store';
-import { showToast, columnAnnouncement } from '../../state/board-store';
+import {
+  showToast,
+  columnAnnouncement,
+  filterOwner,
+  filterLabel,
+  filterSearch,
+  filterDue,
+} from '../../state/board-store';
+import { SortMenu, SORT_LABELS } from './sort-menu';
+import { PlusSmallIcon } from '../today/today-icons';
 
 interface Props {
   status: ItemStatus;
@@ -11,8 +20,6 @@ interface Props {
   onReorder?: (itemId: string, newIndex: number, columnItems: ItemWithRow[]) => void;
   onMoveStatus?: (itemId: string, newStatus: ItemStatus) => void;
   compact?: boolean;
-  /** Column header color (from BoardStatus). */
-  color?: string;
   /** Whether this is the terminal (completion) column. */
   isTerminal?: boolean;
   /** Total count of all terminal-column items (for "View all N completed" link). */
@@ -35,34 +42,11 @@ interface Props {
   onDeleteItem?: (itemId: string) => void;
 }
 
-const SORT_LABELS: Record<SortMode, string> = {
-  custom: 'Custom',
-  due_date: 'Due date',
-  created: 'Created',
-};
-
 const SORT_OVERLAY_TEXT: Record<SortMode, string> = {
   custom: '',
   due_date: 'Will be sorted by due date',
   created: 'Will be sorted by creation date',
 };
-
-// Map status colors to theme-aware CSS variables (dark mode support)
-const COLOR_TO_CSS_VAR: Record<string, string> = {
-  '#e3f2fd': 'var(--color-todo)',
-  '#fff3e0': 'var(--color-inprogress)',
-  '#e8f5e9': 'var(--color-done)',
-  '#e8eaf6': 'var(--color-col-indigo)',
-  '#f3e5f5': 'var(--color-col-purple)',
-  '#fce4ec': 'var(--color-col-pink)',
-  '#e0f2f1': 'var(--color-col-teal)',
-  '#fff8e1': 'var(--color-col-amber)',
-};
-
-function resolveColumnColor(color?: string): string {
-  if (!color) return 'var(--color-bg)';
-  return COLOR_TO_CSS_VAR[color] || color;
-}
 
 export function Column({
   status,
@@ -71,7 +55,6 @@ export function Column({
   onReorder,
   onMoveStatus,
   compact,
-  color,
   isTerminal,
   allDoneCount,
   hasArchived,
@@ -92,6 +75,8 @@ export function Column({
   const [sortAnnouncement, setSortAnnouncement] = useState('');
   // AC7/AC8: Cross-column drag overlay for date-sorted destinations
   const [showDateSortOverlay, setShowDateSortOverlay] = useState(false);
+  // #626: a card is being dragged over this column
+  const [dragOver, setDragOver] = useState(false);
 
   const isDateSorted = sortMode && sortMode !== 'custom';
   // Terminal column is always sorted by completion date
@@ -108,33 +93,29 @@ export function Column({
       // AC7/AC8: Show overlay, suppress drop indicators
       setShowDateSortOverlay(true);
       setDropIndicator(null);
-      (e.currentTarget as HTMLElement).classList.remove('column-drag-over');
+      setDragOver(false);
       return;
     }
+
+    setDragOver(true);
 
     const target = (e.target as HTMLElement).closest('.card') as HTMLElement;
 
     if (!target) {
       // Dragging over column but not over a card — show column-level highlight
       setDropIndicator(null);
-      (e.currentTarget as HTMLElement).classList.add('column-drag-over');
       return;
     }
 
     const targetId = target.getAttribute('data-item-id');
     const targetIndex = items.findIndex((i) => i.id === targetId);
-    if (targetIndex === -1) {
-      (e.currentTarget as HTMLElement).classList.add('column-drag-over');
-      return;
-    }
+    if (targetIndex === -1) return;
 
     const rect = target.getBoundingClientRect();
     const midY = rect.top + rect.height / 2;
     const position: 'above' | 'below' = e.clientY < midY ? 'above' : 'below';
 
     setDropIndicator({ index: targetIndex, position });
-    // Remove column-level highlight when showing card-level indicator
-    (e.currentTarget as HTMLElement).classList.remove('column-drag-over');
   };
 
   const handleDragLeave = (e: DragEvent) => {
@@ -144,13 +125,13 @@ export function Column({
     if (!relatedTarget || !column.contains(relatedTarget)) {
       setDropIndicator(null);
       setShowDateSortOverlay(false);
-      column.classList.remove('column-drag-over');
+      setDragOver(false);
     }
   };
 
   const handleDrop = (e: DragEvent) => {
     e.preventDefault();
-    (e.currentTarget as HTMLElement).classList.remove('column-drag-over');
+    setDragOver(false);
     setDropIndicator(null);
     setShowDateSortOverlay(false);
 
@@ -356,8 +337,7 @@ export function Column({
     onReorder(itemId, items.length - 1, items);
   };
 
-  const handleSortChange = (e: Event) => {
-    const mode = (e.currentTarget as HTMLSelectElement).value as SortMode;
+  const handleSortChange = (mode: SortMode) => {
     if (onSortChange) onSortChange(mode);
     setSortAnnouncement(`${status} column: sorted by ${SORT_LABELS[mode].toLowerCase()}`);
   };
@@ -370,15 +350,18 @@ export function Column({
     return '';
   };
 
+  const filtersOn = !!(filterSearch.value || filterDue.value || filterLabel.value || filterOwner.value);
+  const emptyText = dragOver ? 'Drop here' : filtersOn ? 'Nothing matches' : 'Nothing here yet';
+  const showSort = !compact && !isTerminal;
+
   return (
     <div
-      class={`column ${compact ? 'column-compact' : ''}`}
+      class={`column${compact ? ' column-compact' : ''}${dragOver ? ' column-drag-over' : ''}`}
       role="region"
       aria-label={`${status} column, ${items.length} ${items.length === 1 ? 'item' : 'items'}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      style={{ '--column-color': resolveColumnColor(color) } as any}
     >
       {/* aria-live region for sort change and cross-column keyboard move announcements */}
       <div class="sr-only" aria-live="polite" aria-atomic="true">
@@ -388,34 +371,19 @@ export function Column({
         <div class="column-header-row">
           <h2>{status}</h2>
           <span class="column-count">{items.length}</span>
-          {!compact && onAddItem && (
-            <button class="column-add-btn" onClick={onAddItem} aria-label={`Add item to ${status}`}>
-              +
-            </button>
-          )}
-          {/* Sort selector only in board view (not compact/swimlane) */}
-          {!compact && isTerminal && (
-            <select
-              class="column-sort-select"
-              disabled
-              title={`${status} items are always sorted by completion date`}
-              aria-label={`Sort ${status} column`}
-            >
-              <option>Completion date</option>
-            </select>
-          )}
-          {!compact && !isTerminal && (
-            <select
-              class={`column-sort-select${isDateSorted ? ' column-sort-active' : ''}`}
-              value={sortMode}
-              onChange={handleSortChange}
-              aria-label={`Sort ${status} column`}
-            >
-              <option value="custom">Custom</option>
-              <option value="due_date">Due date</option>
-              <option value="created">Created</option>
-            </select>
-          )}
+          <div class="column-header-actions">
+            {!compact && isTerminal && (
+              <span class="column-sort-fixed" title={`${status} items are always sorted by completion date`}>
+                Completion date
+              </span>
+            )}
+            {showSort && <SortMenu status={status} mode={sortMode} onChange={handleSortChange} />}
+            {!compact && onAddItem && (
+              <button class="column-add-btn" onClick={onAddItem} aria-label={`Add to ${status}`}>
+                <PlusSmallIcon />
+              </button>
+            )}
+          </div>
         </div>
         {isTerminal && hasArchived && onOpenArchive && (
           <button class="column-archive-link" ref={archiveTriggerRef} onClick={onOpenArchive}>
@@ -423,6 +391,19 @@ export function Column({
           </button>
         )}
       </div>
+      {/* Phone: the tab is the column's header, so its count and sort sit in a row under the tabs. */}
+      {!compact && (
+        <div class="column-sortrow" data-testid="column-sortrow">
+          <span class="column-sortrow-count">
+            {items.length} {items.length === 1 ? 'item' : 'items'}
+          </span>
+          {isTerminal ? (
+            <span class="column-sort-fixed">Completion date</span>
+          ) : (
+            <SortMenu status={status} mode={sortMode} onChange={handleSortChange} variant="row" />
+          )}
+        </div>
+      )}
       <div class="column-cards" style={{ position: 'relative' }}>
         {items.map((item, index) => (
           <div key={item.id} class="card-wrapper">
@@ -444,7 +425,7 @@ export function Column({
             )}
           </div>
         ))}
-        {items.length === 0 && <div class="column-empty">No items</div>}
+        {items.length === 0 && <div class="column-empty">{emptyText}</div>}
         {/* Hover "Add item" row — only in board view, hidden during drag */}
         {!compact && onAddItem && !currentDragStatus && (
           <button class="column-add-row" onClick={onAddItem} tabIndex={-1}>

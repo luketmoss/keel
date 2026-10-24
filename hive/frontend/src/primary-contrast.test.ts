@@ -126,12 +126,8 @@ describe('AC5: .btn-primary and .login-btn text is --color-on-primary', () => {
   });
 });
 
-describe('AC6: the sort arrow follows the theme, and no #C49200 remains', () => {
-  it('light arrow is #805F00, dark is #F5B700', () => {
-    expect(/\.column-sort-active\s*\{[^}]*\}/.exec(css)![0]).toContain("fill='%23805F00'");
-    expect(/\[data-theme="dark"\]\s*\.column-sort-active\s*\{[^}]*\}/.exec(css)![0]).toContain("fill='%23F5B700'");
-  });
-
+describe('AC6: no #C49200 remains', () => {
+  // The sort <select>'s arrow, which this once also checked, went with the select (#626).
   it('global.css holds no #C49200 or its hover, in any case', () => {
     expect(css).not.toMatch(/c49200|a67b00/i);
   });

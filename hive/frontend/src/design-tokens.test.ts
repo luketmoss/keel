@@ -226,16 +226,6 @@ describe('Design tokens: gold color scheme (Issue #190)', () => {
     it('no #64b5f6 in global.css', () => {
       expect(css).not.toContain('#64b5f6');
     });
-    it('.column-sort-active SVG uses gold fill in light mode', () => {
-      const match = css.match(/\.column-sort-active\s*\{[^}]*\}/);
-      expect(match).not.toBeNull();
-      expect(match![0]).toContain("fill='%23805F00'");
-    });
-    it('[data-theme="dark"] .column-sort-active SVG uses gold fill', () => {
-      const match = css.match(/\[data-theme="dark"\]\s*\.column-sort-active\s*\{[^}]*\}/);
-      expect(match).not.toBeNull();
-      expect(match![0]).toContain("fill='%23F5B700'");
-    });
   });
 
   describe('AC6: Semantic and neutral tokens unchanged', () => {
@@ -427,16 +417,11 @@ describe('Column header text wrapping (Issue #232)', () => {
     return match ? match[1] : '';
   }
 
-  it('AC1: .column-header-row uses align-items: flex-start for text wrapping', () => {
-    const rule = extractRule('.column-header-row');
-    expect(rule).toContain('align-items: flex-start');
-  });
-
-  it('AC1: .column-header h2 has flex sizing for wrapping', () => {
+  it('AC1: .column-header h2 can shrink and wrap a long name, and the row keeps its buttons beside it', () => {
     const rule = extractRule('.column-header h2');
-    expect(rule).toContain('flex: 1 1 0');
     expect(rule).toContain('min-width: 0');
     expect(rule).toContain('word-break: break-word');
+    expect(extractRule('.column-header-row')).toContain('align-items: center');
   });
 
   it('AC2: .column-count has flex-shrink: 0', () => {
@@ -449,8 +434,7 @@ describe('Column header text wrapping (Issue #232)', () => {
     expect(rule).toContain('flex-shrink: 0');
   });
 
-  it('AC2: .column-sort-select has flex-shrink: 0', () => {
-    const rule = extractRule('.column-sort-select');
-    expect(rule).toContain('flex-shrink: 0');
+  it('AC2: .column-sort-btn has flex-shrink: 0', () => {
+    expect(css).toMatch(/\.column-sort-btn,\s*\.column-add-btn\s*\{[^}]*flex-shrink: 0/);
   });
 });

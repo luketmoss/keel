@@ -47,8 +47,16 @@ async function serving(url, title) {
   }
 }
 
+// The app's folder: a nested frontend (hive/frontend) is named by `npm --prefix`
+// in the launch config, not by the config's name.
+function projectDir(name, config) {
+  const args = config.runtimeArgs ?? [];
+  const prefix = args.indexOf('--prefix');
+  return join(root, config.cwd ?? (prefix === -1 ? name : args[prefix + 1]));
+}
+
 async function ensureServer(name, config, env) {
-  const project = join(root, config.cwd ?? name);
+  const project = projectDir(name, config);
   const url = `http://localhost:${config.port}/`;
   const title = readFileSync(join(project, 'index.html'), 'utf8').match(/<title>([^<]*)<\/title>/)?.[1];
   if (await serving(url, title)) return url;

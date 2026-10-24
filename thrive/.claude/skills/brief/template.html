@@ -169,15 +169,17 @@ h1, h2, h3, p { margin: 0; text-wrap: balance; }
 :root { --lv-rest: #4f6f8f; --lv-easy: #3f8a5c; --lv-mod: #d98a00; --lv-hard: #c4472b; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) { --lv-rest: #8fb0d0; --lv-easy: #6fcf94; --lv-mod: #f0b43c; --lv-hard: #f08a6b; }
-  :root:not([data-theme="light"]) .hero[data-level="Rest"] .scale .on, :root:not([data-theme="light"]) .hero[data-level="Hard"] .scale .on { color: #1b1300; }
+  :root:not([data-theme="light"]) .hero[data-level="Rest"] .scale .on, :root:not([data-theme="light"]) .hero[data-level="Push"] .scale .on { color: #1b1300; }
 }
 :root[data-theme="dark"] { --lv-rest: #8fb0d0; --lv-easy: #6fcf94; --lv-mod: #f0b43c; --lv-hard: #f08a6b; }
-:root[data-theme="dark"] .hero[data-level="Rest"] .scale .on, :root[data-theme="dark"] .hero[data-level="Hard"] .scale .on { color: #1b1300; }
+:root[data-theme="dark"] .hero[data-level="Rest"] .scale .on, :root[data-theme="dark"] .hero[data-level="Push"] .scale .on { color: #1b1300; }
+/* Levels are actions (Rest, Go easy, Train as planned, Push), never the logged effort words. */
 .hero { --lvl: var(--lv-mod); background: color-mix(in srgb, var(--lvl) 14%, var(--surface)); }
 .hero[data-level="Rest"] { --lvl: var(--lv-rest); }
-.hero[data-level="Easy"] { --lvl: var(--lv-easy); }
-.hero[data-level="Hard"] { --lvl: var(--lv-hard); }
-.hero[data-level="Rest"] .scale .on, .hero[data-level="Hard"] .scale .on { color: #fff; }
+.hero[data-level="Go easy"] { --lvl: var(--lv-easy); }
+.hero[data-level="Push"] { --lvl: var(--lv-hard); }
+.hero[data-level="Rest"] .scale .on, .hero[data-level="Push"] .scale .on { color: #fff; }
+.scale span { line-height: 1.25; padding-inline: 2px; }
 </style>
 
 <div class="wrap" id="root"></div>
@@ -185,7 +187,7 @@ h1, h2, h3, p { margin: 0; text-wrap: balance; }
 <script id="brief-data" type="application/json">
 {
   "date": "Monday 5 Oct 2026",
-  "level": "Moderate",
+  "level": "Train as planned",
   "levelNote": "Sample data. Replace this whole JSON block with the day's real values.",
   "recovery": {
     "sleep": {
@@ -744,7 +746,7 @@ h1, h2, h3, p { margin: 0; text-wrap: balance; }
   var hero = el("div", "hero", null, [el("div", "lv", D.level), el("p", null, D.levelNote)]);
   hero.setAttribute("data-level", D.level);
   var sc = el("div", "scale");
-  ["Rest", "Easy", "Moderate", "Hard"].forEach(function (l) { sc.appendChild(el("span", l === D.level ? "on" : "", l)); });
+  ["Rest", "Go easy", "Train as planned", "Push"].forEach(function (l) { sc.appendChild(el("span", l === D.level ? "on" : "", l)); });
   hero.appendChild(sc);
   root.appendChild(hero);
   if (D.notice) root.appendChild(el("div", "notice", null, [el("p", null, D.notice)]));

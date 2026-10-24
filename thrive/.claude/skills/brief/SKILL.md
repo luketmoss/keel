@@ -156,18 +156,29 @@ usually blank, so only mention them if today has one.
 
 ## Step 4: Recommend a level for today
 
-Pick one: **Rest**, **Easy**, **Moderate** or **Hard**. Start from today's
-plan: Hard if a hard session is planned, Moderate if any session is, Easy if
-nothing is. Then step it down for each of these that applies:
+Pick one, lowest to highest: **Rest**, **Go easy**, **Train as planned** or
+**Push**. They are advice for how hard to go today, said as an action, and are
+deliberately not the Easy, Medium and Hard of a session's logged effort.
+
+Start from today's plan, taking the highest that applies:
+
+- **Push** if a planned session carries a `Hard` effort.
+- **Train as planned** if a `weight`, `bike`, `hike` or `run` session is
+  planned.
+- **Go easy** if only a `stretch` or `walk` is planned, or nothing is.
+
+Then step it down for each of these that applies:
 
 - HRV is 10% or more below its average
 - Resting HR is 5 bpm or more above its average
 - Sleep slept is under 6 h, or 1 h or more under its average
 - 2 or more of the last 3 days were Hard
 
-Stepping down past Easy gives Rest. Step it **up** by one only if every
-available signal is at or better than its average and yesterday was not
-Hard.
+Stepping down past Go easy gives Rest. Rest still leaves room for a gentle
+`stretch` or an easy `walk`: when one is planned, say it can stay. Step it
+**up** by one only if every available signal is at or better than its average,
+yesterday was not Hard, and something is planned: with nothing planned the day
+stays at Go easy, and adding a session is the weekly brief's job.
 
 Give the reasons in one line, with the numbers, e.g. *"HRV 41 vs 48 avg
 (−15%), 2 hard days in a row."* When the level is below what's planned,
@@ -306,7 +317,7 @@ phone hears `complete` once sleep is in.
 
 **The data.** Leave a key out and its section disappears.
 
-- `date`, `level` (`Rest`, `Easy`, `Moderate` or `Hard`), `levelNote` (the
+- `date`, `level` (`Rest`, `Go easy`, `Train as planned` or `Push`), `levelNote` (the
   one-line reason), `sources` (optional), `notice` (an optional banner, for
   example that sleep hasn't synced).
 - `recovery`: `sleep`, `hrv` and `rhr`, each `{label, value, unit, series,

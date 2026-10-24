@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, cleanup, fireEvent, act } from '@testing-library/preact';
 import { ControlBar } from './control-bar';
 
-const { mockState, mockSwitchBoard, mockSetGroupBy } = vi.hoisted(() => ({
+const { mockState, mockSwitchBoard, mockSetGroupBy, mockNavigate } = vi.hoisted(() => ({
   mockState: {
     boards: [{ id: 'b1', name: 'Work', icon: '' }] as any[],
     activeBoardId: 'b1',
@@ -31,6 +31,7 @@ const { mockState, mockSwitchBoard, mockSetGroupBy } = vi.hoisted(() => ({
   },
   mockSwitchBoard: vi.fn(),
   mockSetGroupBy: vi.fn(),
+  mockNavigate: vi.fn(),
 }));
 
 vi.mock('../../state/board-store', () => ({
@@ -120,6 +121,9 @@ vi.mock('../../state/board-store', () => ({
     },
   },
   openDetailWithTitleEdit: { value: false },
+  destinationUrl: () => new URL('http://localhost/?view=boards'),
+  navigate: (...args: any[]) => mockNavigate(...args),
+  openBoardsTab: () => {},
   activeView: {
     get value() {
       return mockState.activeView;
@@ -160,11 +164,29 @@ beforeEach(() => {
 
 describe('ControlBar', () => {
   describe('Board selector', () => {
-    it('renders board select with current board', () => {
+    it('has no board select at any width (#625)', () => {
+      for (const width of [0, 800, 1280]) {
+        Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: width });
+        const { container, unmount } = render(<ControlBar />);
+        expect(container.querySelector('select.board-switcher-select')).toBeNull();
+        expect(container.querySelector('[data-testid="control-bar-board-select"]')).toBeNull();
+        expect(container.textContent).not.toContain('+ New Board...');
+        unmount();
+      }
+    });
+
+    it('shows a Boards link back to the list, and which board this is (#625)', () => {
       const { container } = render(<ControlBar />);
-      const select = container.querySelector('[data-testid="control-bar-board-select"]') as HTMLSelectElement;
-      expect(select).not.toBeNull();
-      expect(select.value).toBe('b1');
+      const back = container.querySelector('[data-testid="boards-back"]') as HTMLAnchorElement;
+      expect(back.textContent).toBe('Boards');
+      expect(back.getAttribute('href')).toContain('view=boards');
+      expect(container.querySelector('[data-testid="control-bar-board-name"]')!.textContent).toBe('Work');
+    });
+
+    it('the Boards link goes to the list in place (#625)', () => {
+      const { container } = render(<ControlBar />);
+      fireEvent.click(container.querySelector('[data-testid="boards-back"]') as HTMLElement);
+      expect(mockNavigate).toHaveBeenCalledWith('boards', undefined);
     });
 
     it('does not render a board color dot', () => {
@@ -507,21 +529,6 @@ describe('ControlBar', () => {
     });
   });
 
-  describe('Board switcher hints (preserved)', () => {
-    it('select has correct title attribute', () => {
-      const { container } = render(<ControlBar />);
-      const select = container.querySelector('[data-testid="control-bar-board-select"]');
-      expect(select!.getAttribute('title')).toContain('Ctrl+1');
-    });
-
-    it('sr-only hint exists', () => {
-      const { container } = render(<ControlBar />);
-      const hint = container.querySelector('#board-switcher-hint');
-      expect(hint).not.toBeNull();
-      expect(hint!.classList.contains('sr-only')).toBe(true);
-    });
-  });
-
   describe('Due filter group a11y', () => {
     it('due filter group has role="group" and aria-label', () => {
       Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1280 });
@@ -589,7 +596,7 @@ describe('ControlBar', () => {
       mockState.activeView = 'boards';
       const { container } = render(<ControlBar />);
       expect(container.querySelector('[data-testid="control-bar"]')).not.toBeNull();
-      expect(container.querySelector('[data-testid="control-bar-board-select"]')).not.toBeNull();
+      expect(container.querySelector('[data-testid="boards-back"]')).not.toBeNull();
     });
   });
 });

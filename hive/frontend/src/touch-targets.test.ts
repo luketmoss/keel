@@ -188,6 +188,10 @@ const TALL = [
   'today-day',
   'board-choice-chip',
   'today-row-title',
+  'boards-card',
+  'boards-new-card',
+  'boards-archived-row',
+  'boards-back',
 ];
 
 /** Text inputs, selects and date inputs. */
@@ -197,7 +201,6 @@ const FIELDS = [
   'subtask-add-date',
   'subtask-title-input',
   'label-form-input',
-  'board-switcher-select',
   'column-sort-select',
   'archive-search-input',
   'profile-email-input',

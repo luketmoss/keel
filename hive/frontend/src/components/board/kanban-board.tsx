@@ -33,6 +33,7 @@ import {
   columnAnnouncement,
   showToast,
   activeView,
+  boardOpen,
   boardStatuses,
   isTerminalStatus,
 } from '../../state/board-store';
@@ -57,6 +58,7 @@ import { ControlBar } from '../header/control-bar';
 import { NavRail } from '../shell/nav-rail';
 import { TabBar } from '../shell/tab-bar';
 import { SettingsScreen } from '../shell/settings-screen';
+import { BoardsScreen } from '../boards/boards-screen';
 import { TodayScreen, openCreateForToday } from '../today/today-screen';
 import { ColumnIndicator } from './column-indicator';
 import type { ItemStatus, ItemWithRow } from '../../api/types';
@@ -87,7 +89,10 @@ export function KanbanBoard() {
     : '';
 
   /** A and the board shortcuts act on a board; Today and Settings have none to act on (#623). */
-  const onBoard = () => activeView.value === 'boards';
+  const onBoard = () => activeView.value === 'boards' && boardOpen.value;
+
+  /** N needs somewhere to put the item: Today, or a board. */
+  const onBoardOrToday = () => activeView.value === 'today' || onBoard();
 
   /** True when no modal or overlay is open — shortcuts should be active. */
   const noModalOpen = () =>
@@ -120,7 +125,7 @@ export function KanbanBoard() {
       {
         key: 'n',
         action: () => {
-          if (activeView.value === 'settings' || !noModalOpen()) return;
+          if (activeView.value === 'settings' || !onBoardOrToday() || !noModalOpen()) return;
           // #624: on Today the form opens with the selected day as its due date.
           if (activeView.value === 'today') {
             if (accessibleBoards.value.length > 0) openCreateForToday();
@@ -365,14 +370,15 @@ export function KanbanBoard() {
     );
   };
 
-  const onBoards = activeView.value === 'boards';
+  // #625: a board is showing, not the list of boards
+  const onBoards = activeView.value === 'boards' && boardOpen.value;
 
   return (
     <div class="app-shell">
       <NavRail user={user} displayName={displayName} />
 
       <div class="board-layout">
-        {activeView.value === 'boards' && <ControlBar />}
+        {onBoards && <ControlBar />}
 
         <main class="board-main">
           {activeView.value === 'today' ? (
@@ -387,6 +393,8 @@ export function KanbanBoard() {
               onOpenShortcuts={() => setShowShortcutsHelp(true)}
               onSignOut={logout}
             />
+          ) : !boardOpen.value ? (
+            <BoardsScreen />
           ) : isBoardEmpty ? (
             <div class="board-welcome" data-testid="board-welcome">
               <div class="board-welcome-icon">&#128203;</div>

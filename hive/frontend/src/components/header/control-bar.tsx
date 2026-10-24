@@ -2,10 +2,10 @@ import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import {
   boards,
   activeBoardId,
-  switchBoard,
+  activeBoard,
+  destinationUrl,
   showCreateBoardModal,
   showShareModal,
-  accessibleBoards,
   userBoardRole,
   filterLabel,
   filterSearch,
@@ -15,6 +15,8 @@ import {
   boardLabels as labelsStore,
   rootItems,
 } from '../../state/board-store';
+import { onNavClick } from '../shell/tab-bar';
+import { ChevronLeftIcon } from '../today/today-icons';
 
 /**
  * #177: Redesigned control bar with text search, due date filter, label chips,
@@ -130,16 +132,6 @@ export function ControlBar() {
     },
     [localSearch, clearSearch],
   );
-
-  const handleBoardChange = (e: Event) => {
-    const value = (e.target as HTMLSelectElement).value;
-    if (value === '__new__') {
-      showCreateBoardModal.value = true;
-      (e.target as HTMLSelectElement).value = activeBoardId.value;
-      return;
-    }
-    switchBoard(value);
-  };
 
   const isOwner = userBoardRole.value === 'owner';
 
@@ -295,27 +287,24 @@ export function ControlBar() {
 
   return (
     <div class="control-bar" data-testid="control-bar">
-      {/* Board selector */}
+      {/* #625: back to the list of boards, and which board this is */}
       <div class="control-bar-section">
-        <span id="board-switcher-hint" class="sr-only">
-          {BOARD_SWITCHER_HINT}
-        </span>
-        <select
-          class="board-switcher-select"
-          value={activeBoardId.value}
-          onChange={handleBoardChange}
-          aria-label="Select board"
-          aria-describedby="board-switcher-hint"
-          title={BOARD_SWITCHER_HINT}
-          data-testid="control-bar-board-select"
+        <a
+          href={destinationUrl('boards').toString()}
+          class="boards-back"
+          onClick={(e) => onNavClick(e, 'boards')}
+          data-testid="boards-back"
         >
-          {accessibleBoards.value.map((b) => (
-            <option key={b.id} value={b.id}>
-              {boardOptionLabel(b.name, b.icon)}
-            </option>
-          ))}
-          <option value="__new__">+ New Board...</option>
-        </select>
+          <span class="boards-back-icon">
+            <ChevronLeftIcon />
+          </span>
+          Boards
+        </a>
+        {activeBoard.value && (
+          <span class="control-bar-board-name" data-testid="control-bar-board-name">
+            {boardOptionLabel(activeBoard.value.name, activeBoard.value.icon)}
+          </span>
+        )}
       </div>
 
       <span class="control-bar-separator" aria-hidden="true" />
@@ -427,8 +416,6 @@ export function ControlBar() {
     </div>
   );
 }
-
-const BOARD_SWITCHER_HINT = 'Ctrl+1–9 to switch boards · Press ? for all shortcuts';
 
 function boardOptionLabel(name: string, icon?: string): string {
   const prefix = icon ? `${icon} ` : '';

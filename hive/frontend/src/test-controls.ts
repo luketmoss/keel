@@ -81,6 +81,10 @@ export const FAMILIES = {
     'completed-date-btn',
     'column-add-row',
     'today-row-title',
+    'boards-card',
+    'boards-new-card',
+    'boards-archived-row',
+    'boards-back',
   ],
   Navigation: ['bottom-nav-tab', 'rail-item', 'settings-row', 'settings-tab', 'column-indicator-dot'],
   Fields: [
@@ -89,7 +93,6 @@ export const FAMILIES = {
     'subtask-add-date',
     'subtask-title-input',
     'label-form-input',
-    'board-switcher-select',
     'column-sort-select',
     'archive-search-input',
     'profile-email-input',

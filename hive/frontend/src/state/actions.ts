@@ -1099,7 +1099,7 @@ export async function deleteLabel(labelName: string, token: string) {
 // --- Board actions ---
 
 import type { Board } from '../api/types';
-import { switchBoard } from './board-store';
+import { navigate, dropActiveBoard, restoreBoard, boardOpen, activeView } from './board-store';
 
 export async function createBoard(name: string, actor: string, token: string, icon?: string): Promise<boolean> {
   const trimmed = name.trim();
@@ -1181,7 +1181,7 @@ export async function createBoard(name: string, actor: string, token: string, ic
     }
 
     await appendAuditEntry(board.id, 'board_created', '', '', board.name, actor, token);
-    switchBoard(board.id);
+    navigate('boards', board.id);
     showToast('Board created');
     return true;
   } catch (err: any) {
@@ -1379,7 +1379,7 @@ export async function moveItemToBoard(
 // are untouched, which is what makes it reversible: unarchiving clears the cell
 // and everything is back exactly as it was.
 
-import { navigate, showArchivedBoardsDialog } from './board-store';
+import { showArchivedBoardsDialog } from './board-store';
 
 /** Long enough to reach the toast's button — the same window item deletes give Undo. */
 const ACTION_TOAST_MS = 10000;
@@ -1396,13 +1396,12 @@ async function setBoardArchived(boardId: string, archivedAt: string, actor: stri
   const archiving = archivedAt !== '';
   const oldBoards = [...boards.value];
   const oldActiveBoardId = activeBoardId.value;
+  const wasOpen = activeView.value === 'boards' && boardOpen.value;
 
   // Optimistic update
   boards.value = boards.value.map((b) => (b.id === boardId ? { ...b, archived_at: archivedAt } : b));
-  if (archiving && activeBoardId.value === boardId) {
-    const next = accessibleBoards.value[0];
-    if (next) switchBoard(next.id);
-  }
+  // #625: the board that was open gives way to the list
+  if (archiving && activeBoardId.value === boardId) dropActiveBoard();
   try {
     await setBoardArchivedAtApi(boardId, archivedAt, token);
     await appendAuditEntry(
@@ -1417,7 +1416,7 @@ async function setBoardArchived(boardId: string, archivedAt: string, actor: stri
     return true;
   } catch (err: any) {
     boards.value = oldBoards;
-    if (activeBoardId.value !== oldActiveBoardId) switchBoard(oldActiveBoardId);
+    if (activeBoardId.value !== oldActiveBoardId) restoreBoard(oldActiveBoardId, wasOpen);
     if (!isReauthFailure(err)) {
       showToast(`Failed to ${archiving ? 'archive' : 'restore'} board: ` + err.message, 'error');
     }
@@ -1471,6 +1470,7 @@ export async function deleteBoard(
   if (!board) return false;
 
   // Snapshot for rollback
+  const wasOpen = activeView.value === 'boards' && boardOpen.value;
   const oldBoards = [...boards.value];
   const oldPerms = [...permissions.value];
   const oldItems = [...items.value];
@@ -1491,13 +1491,9 @@ export async function deleteBoard(
     items.value = items.value.filter((i) => i.board_id !== boardId);
   }
 
-  // Switch to another board
-  const remaining = accessibleBoards.value;
-  if (targetBoardId && remaining.some((b) => b.id === targetBoardId)) {
-    switchBoard(targetBoardId);
-  } else if (remaining.length > 0) {
-    switchBoard(remaining[0].id);
-  }
+  // #625: the board that was open gives way to the list
+  const wasActive = activeBoardId.value === boardId;
+  if (wasActive) dropActiveBoard(targetBoardId ?? undefined);
 
   try {
     // Perform item operations
@@ -1560,7 +1556,7 @@ export async function deleteBoard(
     statuses.value = oldStatuses;
     labels.value = oldLabels;
     // Restore active board
-    switchBoard(boardId);
+    if (wasActive) restoreBoard(boardId, wasOpen);
     if (!isReauthFailure(err)) {
       showToast('Failed to delete board: ' + err.message, 'error');
     }

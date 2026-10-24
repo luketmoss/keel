@@ -3,6 +3,7 @@ import {
   accessibleBoards,
   activeBoardId,
   activeView,
+  boardOpen,
   destinationUrl,
   items,
   isTerminalStatusForBoard,
@@ -81,10 +82,20 @@ export function NavRail({ user, displayName }: NavRailProps) {
         {/* Compact rail: Boards is a destination. Full rail: it is a heading over the list. */}
         <div class="rail-compact-only">{destination('boards', 'Boards', <BoardsIcon />)}</div>
         <div class="rail-full-only">
-          <h2 class="rail-section-heading">BOARDS</h2>
+          <h2 class="rail-section-heading">
+            <a
+              href={destinationUrl('boards').toString()}
+              class={`rail-item rail-heading-link${view === 'boards' && !boardOpen.value ? ' rail-item-active' : ''}`}
+              aria-current={view === 'boards' && !boardOpen.value ? 'page' : undefined}
+              onClick={(e) => onNavClick(e, 'boards')}
+              data-testid="rail-boards-heading"
+            >
+              BOARDS
+            </a>
+          </h2>
           <ul class="rail-board-list">
             {accessibleBoards.value.map((b) => {
-              const active = view === 'boards' && b.id === activeBoardId.value;
+              const active = view === 'boards' && boardOpen.value && b.id === activeBoardId.value;
               return (
                 <li key={b.id}>
                   <a

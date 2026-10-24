@@ -14,6 +14,8 @@ export const dayLong = (d: string) => fmt(d, { weekday: 'short', month: 'short',
 export const dayShort = (d: string) => `${fmt(d, { weekday: 'short' })} ${parseDay(d).getDate()}`;
 /** "Tue" */
 export const weekdayShort = (d: string) => fmt(d, { weekday: 'short' });
+/** "Oct 22" */
+export const monthDay = (d: string) => fmt(d, { month: 'short', day: 'numeric' });
 /** "T" */
 export const weekdayLetter = (d: string) => fmt(d, { weekday: 'narrow' });
 
@@ -31,7 +33,7 @@ export function initials(name: string): string {
   return name.slice(0, 2).toUpperCase();
 }
 
-const OWNER_COLORS = ['#e65100', '#1976d2', '#2e7d32', '#7b1fa2', '#c62828', '#00838f', '#4e342e', '#455a64'];
+const OWNER_COLORS = ['#c43e00', '#1976d2', '#2e7d32', '#7b1fa2', '#c62828', '#00838f', '#4e342e', '#455a64'];
 
 export function ownerColor(index: number): string {
   return OWNER_COLORS[(index < 0 ? 0 : index) % OWNER_COLORS.length];

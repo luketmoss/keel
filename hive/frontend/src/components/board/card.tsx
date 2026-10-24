@@ -4,9 +4,14 @@ import {
   openDetailWithTitleEdit,
   boardStatuses,
   isTerminalStatus,
+  owners,
+  labels as labelsStore,
+  todayStr,
+  addDays,
 } from '../../state/board-store';
 import type { ItemWithRow, ItemStatus } from '../../api/types';
-import { LabelBadge } from '../shared/label-badge';
+import { CalendarIcon, ChecklistIcon } from '../today/today-icons';
+import { dayLong, initials, monthDay, ownerColor } from '../today/today-format';
 import { KebabMenu } from './kebab-menu';
 import type { KebabAction } from './kebab-menu';
 
@@ -46,10 +51,16 @@ export function Card({
         .filter(Boolean)
     : [];
 
+  const done = isTerminalStatus(item.status);
   const isOverdue =
-    item.due_date &&
-    !isTerminalStatus(item.status) &&
-    parseLocalDate(item.due_date) < new Date(new Date().toDateString());
+    !!item.due_date &&
+    !done &&
+    (isIsoDay(item.due_date)
+      ? item.due_date < todayStr()
+      : parseLocalDate(item.due_date) < new Date(new Date().toDateString()));
+  const ownerIndex = item.owner ? owners.value.findIndex((o) => o.name === item.owner) : -1;
+  // #626: a finished item shows when it was finished; an open one, when it is due.
+  const doneOn = done && item.completed_at ? localDay(item.completed_at) : '';
 
   const handleDragStart = (e: DragEvent) => {
     e.dataTransfer?.setData('text/plain', item.id);
@@ -147,7 +158,7 @@ export function Card({
 
   return (
     <div
-      class="card"
+      class={`card${done ? ' card-done' : ''}`}
       draggable
       onClick={handleCardClick}
       onDragStart={handleDragStart}
@@ -155,7 +166,6 @@ export function Card({
       data-item-id={item.id}
     >
       <div class="card-content">
-        {kebabActions.length > 0 && <KebabMenu actions={kebabActions} itemTitle={item.title} />}
         <button
           class="card-title"
           type="button"
@@ -167,47 +177,60 @@ export function Card({
           {item.title}
         </button>
 
-        {item.description && <div class="card-description">{item.description}</div>}
-
         <div class="card-meta">
-          {item.owner ? <span class="card-owner">{item.owner}</span> : <span class="card-unassigned">Unassigned</span>}
-          {item.due_date && (
-            <span
-              class={`card-due ${isOverdue ? 'card-due-overdue' : ''}`}
-              aria-label={`Due date: ${formatDate(item.due_date)}${isOverdue ? ', overdue' : ''}`}
-            >
-              {'\u{23F0}'} Due: {formatDate(item.due_date)}
-              {isOverdue ? ' (overdue)' : ''}
+          {done && doneOn ? (
+            <span class="card-due" aria-label={`Done ${doneOn}`}>
+              <CalendarIcon />
+              Done {doneOn}
+            </span>
+          ) : isOverdue ? (
+            <span class="today-overdue-pill card-overdue" aria-label={`Overdue, due ${monthDayOf(item.due_date)}`}>
+              OVERDUE · {monthDayOf(item.due_date)}
+            </span>
+          ) : item.due_date ? (
+            <span class="card-due" aria-label={`Due date: ${dueWord(item.due_date)}`}>
+              <CalendarIcon />
+              {dueWord(item.due_date)}
+            </span>
+          ) : null}
+          {childCount.total > 0 && (
+            <span class="card-subtasks" aria-label={`${childCount.done} of ${childCount.total} sub-tasks done`}>
+              <ChecklistIcon />
+              {childCount.done}/{childCount.total}
             </span>
           )}
+          {!item.owner && <span class="card-unassigned">Unassigned</span>}
         </div>
 
         {itemLabels.length > 0 && (
           <div class="card-labels">
             {itemLabels.map((label) => (
-              <LabelBadge key={label} label={label} />
+              <span key={label} class="card-label">
+                <span
+                  class="card-label-dot"
+                  style={{ background: labelsStore.value.find((l) => l.label === label)?.color || '#999' }}
+                  aria-hidden="true"
+                />
+                {label}
+              </span>
             ))}
           </div>
         )}
+      </div>
 
-        {childCount.total > 0 && (
-          <div
-            class="card-subtasks"
-            role="progressbar"
-            aria-valuenow={childCount.done}
-            aria-valuemin={0}
-            aria-valuemax={childCount.total}
-            aria-label="Sub-task progress"
+      <div class="card-side">
+        {item.owner && (
+          <span
+            class="card-avatar"
+            style={{ background: ownerColor(ownerIndex) }}
+            title={item.owner}
+            data-testid="card-avatar"
           >
-            <div
-              class="subtask-bar"
-              style={{ '--progress': `${(childCount.done / childCount.total) * 100}%` } as any}
-            />
-            <span class="subtask-text">
-              {childCount.done}/{childCount.total}
-            </span>
-          </div>
+            <span aria-hidden="true">{initials(item.owner)}</span>
+            <span class="sr-only">{item.owner}</span>
+          </span>
         )}
+        {kebabActions.length > 0 && <KebabMenu actions={kebabActions} itemTitle={item.title} />}
       </div>
     </div>
   );
@@ -220,11 +243,27 @@ function parseLocalDate(dateStr: string): Date {
   return new Date(dateStr);
 }
 
-function formatDate(dateStr: string): string {
-  try {
-    const d = parseLocalDate(dateStr);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  } catch {
-    return dateStr;
-  }
+function isIsoDay(d: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(d);
+}
+
+/** "Oct 22"; a date that is not a plain day is shown as it is stored. */
+function monthDayOf(dateStr: string): string {
+  return isIsoDay(dateStr) ? monthDay(dateStr) : dateStr;
+}
+
+/** "Today", "Tomorrow", or "Sat, Oct 31". */
+function dueWord(dateStr: string): string {
+  if (!isIsoDay(dateStr)) return dateStr;
+  const today = todayStr();
+  if (dateStr === today) return 'Today';
+  if (dateStr === addDays(today, 1)) return 'Tomorrow';
+  return dayLong(dateStr);
+}
+
+/** The local calendar day of a timestamp, as "Oct 23". */
+function localDay(timestamp: string): string {
+  const d = new Date(timestamp);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }

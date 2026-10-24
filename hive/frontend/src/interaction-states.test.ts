@@ -650,9 +650,7 @@ describe.each(THEMES)('AC8: quiet and icon controls keep 4.5:1 under hover and p
 describe('AC9: the gold fills read in dark', () => {
   const FILLS: [string, string[]][] = [
     ['.fab', ['fab']],
-    ['.filter-badge', ['filter-badge']],
     ['.view-toggle-active', ['view-toggle-btn', 'view-toggle-active']],
-    ['.filter-chip-due.filter-chip-active', ['filter-chip', 'filter-chip-due', 'filter-chip-active']],
   ];
 
   it.each(FILLS)('%s text is --color-on-primary, in both themes, at rest and on hover', (_name, classes) => {
@@ -691,6 +689,7 @@ describe('AC9: the gold fills read in dark', () => {
 describe('AC10: selected keeps its ARIA state', () => {
   const SELECTED: Record<string, string[]> = {
     'filter-chip': ['aria-pressed'],
+    'column-tab': ['aria-selected'],
     'theme-toggle-btn': ['aria-checked', 'aria-pressed'],
     'bottom-nav-tab': ['aria-current'],
     'rail-item': ['aria-current'],
@@ -708,6 +707,8 @@ describe('AC10: selected keeps its ARIA state', () => {
       (c) =>
         c.classes.includes(cls) &&
         (cls !== 'overflow-menu-item' || c.role === 'menuitemradio') &&
+        // #626: the Group chip opens a menu; it is not a toggle
+        !(cls === 'filter-chip' && c.classes.includes('filter-chip-group-btn')) &&
         !(cls === 'rail-item' && (c.classes.includes('rail-new-board') || c.classes.includes('rail-person'))),
     );
     expect(found.length).toBeGreaterThan(0);

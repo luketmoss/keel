@@ -47,7 +47,7 @@ function resolveColumnColor(color?: string): string {
 }
 
 // #220: Owner avatar initials + deterministic colors
-const OWNER_COLORS = ['#e65100', '#1976d2', '#2e7d32', '#7b1fa2', '#c62828', '#00838f', '#4e342e', '#455a64'];
+const OWNER_COLORS = ['#c43e00', '#1976d2', '#2e7d32', '#7b1fa2', '#c62828', '#00838f', '#4e342e', '#455a64'];
 
 function getInitials(name: string): string {
   if (!name) return '?';

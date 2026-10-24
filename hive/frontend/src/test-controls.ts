@@ -16,11 +16,10 @@ export const here = dirname(fileURLToPath(import.meta.url));
 
 /** The design note's Families table, as class names. */
 export const FAMILIES = {
-  'Filled buttons': ['btn-primary', 'btn-danger', 'fab', 'login-btn', 'filter-popup-apply'],
+  'Filled buttons': ['btn-primary', 'btn-danger', 'fab', 'login-btn'],
   'Quiet buttons': [
     'btn-ghost',
     'share-archive-board-btn',
-    'filter-popup-reset',
     'column-archive-link',
     'toast-action',
     'label-new-pill',
@@ -40,11 +39,11 @@ export const FAMILIES = {
     'subtask-add-circle',
     'archive-search-clear',
     'filter-search-clear',
-    'filter-popup-close',
     'share-remove-btn',
     'staged-subtask-remove',
     'label-gear-btn',
     'column-add-btn',
+    'column-sort-btn',
     'column-settings-delete-btn',
     'date-clear-btn',
     'today-round-btn',
@@ -52,7 +51,6 @@ export const FAMILIES = {
   ],
   'Chips and toggles': [
     'filter-chip',
-    'filter-toggle',
     'label-toggle',
     'theme-toggle-btn',
     'color-swatch',
@@ -86,14 +84,13 @@ export const FAMILIES = {
     'boards-archived-row',
     'boards-back',
   ],
-  Navigation: ['bottom-nav-tab', 'rail-item', 'settings-row', 'settings-tab', 'column-indicator-dot'],
+  Navigation: ['bottom-nav-tab', 'rail-item', 'settings-row', 'settings-tab', 'column-tab'],
   Fields: [
     'filter-search-input',
     'subtask-add-input',
     'subtask-add-date',
     'subtask-title-input',
     'label-form-input',
-    'column-sort-select',
     'archive-search-input',
     'profile-email-input',
     'due-date-hidden',

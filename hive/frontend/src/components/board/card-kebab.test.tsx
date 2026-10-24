@@ -8,7 +8,11 @@ vi.mock('../../state/board-store', () => ({
   selectedItemId: { value: null },
   openDetailWithTitleEdit: { value: false },
   labels: { value: [] },
+  owners: { value: [] },
+  todayStr: () => '2026-10-24',
+  addDays: (d: string) => d,
   getChildCount: () => ({ done: 0, total: 0 }),
+  isTerminalStatus: (name: string) => name === 'Done',
 }));
 
 function makeItem(overrides: Partial<ItemWithRow> = {}): ItemWithRow {

@@ -131,7 +131,7 @@ const BOX = [
   'share-remove-btn',
   'column-settings-delete-btn',
   'theme-toggle-btn',
-  'filter-popup-close',
+  'column-sort-btn',
   'owner-circle',
   'check-icon',
   'color-swatch',
@@ -146,24 +146,17 @@ const BOX = [
   'today-round-btn',
   'today-check',
 ];
-/** The one control allowed under 44, and only in width. */
-const PAGER_DOT = 'column-indicator-dot';
-const PAGER_DOT_MIN_WIDTH = 24;
-
 /** Rows and text controls: 44 tall, as wide as their content. */
 const TALL = [
   'btn',
   'btn-ghost',
   'share-archive-board-btn',
-  'filter-popup-reset',
-  'filter-popup-apply',
   'column-archive-link',
   'toast-action',
   'column-settings-add-btn',
   'subtask-date-add-inline',
   'subtask-date-inline',
   'filter-chip',
-  'filter-toggle',
   'label-toggle',
   'quick-date-chip',
   'status-chevron',
@@ -192,6 +185,7 @@ const TALL = [
   'boards-new-card',
   'boards-archived-row',
   'boards-back',
+  'column-tab',
 ];
 
 /** Text inputs, selects and date inputs. */
@@ -201,7 +195,6 @@ const FIELDS = [
   'subtask-add-date',
   'subtask-title-input',
   'label-form-input',
-  'column-sort-select',
   'archive-search-input',
   'profile-email-input',
   'column-settings-name-inline',
@@ -223,7 +216,7 @@ const FIELD_RULES = [
 /** Not a target: out of the tab order and hidden from assistive tech (#281), opened by its button. */
 const NOT_A_TARGET = ['due-date-hidden'];
 
-const SIZED = new Set([...BOX, ...TALL, ...FIELDS, PAGER_DOT, ...NOT_A_TARGET]);
+const SIZED = new Set([...BOX, ...TALL, ...FIELDS, ...NOT_A_TARGET]);
 
 describe('AC1: every control class is held to the floor, and no control is in no table', () => {
   it('found the controls', () => {
@@ -270,29 +263,6 @@ describe('AC1: every control class is held to the floor, and no control is in no
   });
 });
 
-describe('The one exception: the pager dots', () => {
-  const dotRules = rulesFor(PAGER_DOT).filter(
-    (r) => r.order > rules.findIndex((x) => x.selector === '.btn-sm' && px(decl(x.body, 'min-height')) === FLOOR),
-  );
-  const own = dotRules.find(
-    (r) => decl(r.body, 'height') !== undefined && decl(r.body, 'min-width') === `${PAGER_DOT_MIN_WIDTH}px`,
-  );
-
-  it('is 44 tall always, no narrower than 24 wide, and shares the row evenly', () => {
-    expect(own, 'the dot rule').toBeDefined();
-    expect(px(decl(own!.body, 'height'))).toBeGreaterThanOrEqual(FLOOR);
-    expect(decl(own!.body, 'flex')).toBe('0 1 var(--touch-target)');
-    expect(decl(own!.body, 'transform')).toBe('none');
-  });
-
-  it('draws the 8px dot inside the box, and no other control may be under 44', () => {
-    const before = rules.find((r) => r.selector === '.column-indicator-dot::before')!;
-    expect(decl(before.body, 'width')).toBe('8px');
-    expect(decl(before.body, 'height')).toBe('8px');
-    expect(BOX.concat(TALL, FIELDS)).not.toContain(PAGER_DOT);
-  });
-});
-
 describe('The shapes keep their size; the box grows around them', () => {
   it.each([
     ['color-swatch', '4px'],
@@ -334,20 +304,33 @@ describe('The shapes keep their size; the box grows around them', () => {
   });
 });
 
-describe('The card: the kebab is a 44px target and the title keeps clear of it', () => {
-  it('the kebab sits in the card corner at 44 x 44', () => {
-    const c = rules.filter((r) => r.selector === '.kebab-menu-container' && decl(r.body, 'top') === '0').pop();
-    expect(c).toBeDefined();
-    expect(decl(c!.body, 'right')).toBe('0');
+describe('The card: the kebab is a 44px target under the owner, and the title is one too', () => {
+  it('the kebab is 44 x 44, in the flow beside the title rather than over it', () => {
     expect(floorOf('kebab-trigger', 'width')).toBeGreaterThanOrEqual(FLOOR);
     expect(floorOf('kebab-trigger', 'height')).toBeGreaterThanOrEqual(FLOOR);
+    const c = rules.filter((r) => r.selector === '.card-side .kebab-menu-container').pop();
+    expect(c).toBeDefined();
+    expect(decl(c!.body, 'position')).toBe('relative');
   });
 
-  it('card titles reserve 32px at the right always, not only when the kebab shows', () => {
-    const t = rules.filter((r) => r.selector === '.card-title' && decl(r.body, 'width')?.includes('32px')).pop()!;
-    expect(decl(t.body, 'width')).toBe('calc(100% - 32px)');
-    // Not conditional on hover or focus: no state rule changes the title's width.
-    expect(rules.filter((r) => /\.card-title:(hover|focus)/.test(r.selector) && decl(r.body, 'width'))).toEqual([]);
+  it('the title is a 44px box across the card, with its margins pulled into the padding', () => {
+    const t = rules.filter((r) => r.selector === '.card-title' && decl(r.body, 'min-height')).pop()!;
+    expect(decl(t.body, 'width')).toBe('100%');
+    expect(px(decl(t.body, 'min-height'))).toBeGreaterThanOrEqual(FLOOR);
+    expect(decl(t.body, 'margin')).toContain('-1');
+  });
+});
+
+describe('The chips: 36px drawn inside a 44px box (#626)', () => {
+  it('a chip is a 44px box whose 4px transparent border is the hit area', () => {
+    expect(floorOf('filter-chip', 'height')).toBeGreaterThanOrEqual(FLOOR);
+    const chip = rules.filter((r) => r.selector === '.filter-chip' && decl(r.body, 'border')).pop()!;
+    expect(decl(chip.body, 'border')).toBe('4px solid transparent');
+    expect(decl(chip.body, 'background-clip')).toBe('padding-box');
+  });
+
+  it('a tab is 48 tall, over the floor', () => {
+    expect(floorOf('column-tab', 'height')).toBeGreaterThanOrEqual(48);
   });
 });
 

@@ -6,6 +6,7 @@ import type { ItemWithRow } from '../../api/types';
 
 // Mock board-store to avoid signal dependency issues
 const mockSelectedItemId = vi.hoisted(() => ({ value: null as string | null }));
+const mockChildCount = vi.hoisted(() => ({}) as Record<string, { done: number; total: number }>);
 
 vi.mock('../../state/board-store', () => ({
   selectedItemId: mockSelectedItemId,
@@ -16,8 +17,26 @@ vi.mock('../../state/board-store', () => ({
     mockSelectedItemId.value = null;
   },
   openDetailWithTitleEdit: { value: false },
-  labels: { value: [] },
-  getChildCount: () => ({ done: 0, total: 0 }),
+  labels: {
+    value: [
+      { label: 'Home', color: '#1976d2', board_id: 'board-1', sheetRow: 2 },
+      { label: 'Errand', color: '#2e7d32', board_id: 'board-1', sheetRow: 3 },
+    ],
+  },
+  owners: {
+    value: [
+      { name: 'Luke', google_account: 'luke@example.com' },
+      { name: 'Mom', google_account: 'mom@example.com' },
+    ],
+  },
+  // Saturday 24 October 2026
+  todayStr: () => '2026-10-24',
+  addDays: (d: string, n: number) => {
+    const [y, m, day] = d.split('-').map(Number);
+    const out = new Date(y, m - 1, day + n);
+    return `${out.getFullYear()}-${String(out.getMonth() + 1).padStart(2, '0')}-${String(out.getDate()).padStart(2, '0')}`;
+  },
+  getChildCount: (id: string) => mockChildCount[id] ?? { done: 0, total: 0 },
   boardStatuses: {
     value: [
       {
@@ -76,124 +95,134 @@ function makeItem(overrides: Partial<ItemWithRow> = {}): ItemWithRow {
 }
 
 describe('Card', () => {
-  // AC1: Due date displays with text label "Due:" and optional alarm icon prefix
-  describe('AC1: Due date displays with text label and alarm icon', () => {
-    it('shows due date with "Due:" text label prefix', () => {
-      const item = makeItem({ due_date: '2099-03-20T12:00:00', status: 'To Do' });
+  // #626: the due date is a drawn calendar icon and a word, never an emoji or a "Due:" prefix
+  describe('Due date', () => {
+    it('shows a calendar icon and the date as "Sat, Oct 31", with no emoji or "Due:" prefix', () => {
+      const item = makeItem({ due_date: '2026-10-31', status: 'To Do' });
       const { container } = render(<Card item={item} />);
-      const dueEl = container.querySelector('.card-due');
-      expect(dueEl).not.toBeNull();
-      expect(dueEl!.textContent).toContain('Due:');
-      expect(dueEl!.textContent).toContain('Mar 20');
+      const dueEl = container.querySelector('.card-due') as HTMLElement;
+      expect(dueEl.textContent).toBe('Sat, Oct 31');
+      expect(dueEl.querySelector('svg')).not.toBeNull();
+      expect(dueEl.textContent).not.toContain('Due:');
+      expect(dueEl.textContent).not.toContain('\u23F0');
     });
 
-    it('retains the .card-due CSS class', () => {
-      const item = makeItem({ due_date: '2099-03-20T12:00:00', status: 'To Do' });
-      const { container } = render(<Card item={item} />);
-      const dueEl = container.querySelector('.card-due');
-      expect(dueEl).not.toBeNull();
-      expect(dueEl!.className).toContain('card-due');
-    });
-  });
-
-  // AC4: Overdue due date retains existing overdue styling
-  describe('AC4: Overdue due date retains existing overdue styling', () => {
-    it('shows "Due:" label, red overdue class, and "(overdue)" suffix for past due date', () => {
-      const item = makeItem({ due_date: '2020-01-01', status: 'To Do' });
-      const { container } = render(<Card item={item} />);
-      const dueEl = container.querySelector('.card-due');
-      expect(dueEl).not.toBeNull();
-      expect(dueEl!.textContent).toContain('Due:');
-      expect(dueEl!.textContent).toContain('(overdue)');
-      expect(dueEl!.className).toContain('card-due-overdue');
+    it('says "Today" and "Tomorrow" for those days', () => {
+      const today = render(<Card item={makeItem({ due_date: '2026-10-24' })} />);
+      expect(today.container.querySelector('.card-due')!.textContent).toBe('Today');
+      today.unmount();
+      const tomorrow = render(<Card item={makeItem({ due_date: '2026-10-25' })} />);
+      expect(tomorrow.container.querySelector('.card-due')!.textContent).toBe('Tomorrow');
     });
 
-    it('adds the card-due-overdue CSS class for overdue items', () => {
-      const item = makeItem({ due_date: '2020-01-01', status: 'In Progress' });
-      const { container } = render(<Card item={item} />);
-      const dueEl = container.querySelector('.card-due');
-      expect(dueEl!.className).toContain('card-due-overdue');
+    it('has an accessible name that says it is a due date', () => {
+      const { container } = render(<Card item={makeItem({ due_date: '2026-10-31' })} />);
+      expect(container.querySelector('.card-due')!.getAttribute('aria-label')).toBe('Due date: Sat, Oct 31');
     });
 
-    it('does NOT show "(overdue)" when status is Done', () => {
-      const item = makeItem({ due_date: '2020-01-01', status: 'Done' });
-      const { container } = render(<Card item={item} />);
-      const dueEl = container.querySelector('.card-due');
-      expect(dueEl).not.toBeNull();
-      expect(dueEl!.textContent).toContain('Due:');
-      expect(dueEl!.textContent).not.toContain('(overdue)');
-    });
-
-    it('does NOT show "(overdue)" when due date is in the future', () => {
-      const item = makeItem({ due_date: '2099-12-31', status: 'To Do' });
-      const { container } = render(<Card item={item} />);
-      const dueEl = container.querySelector('.card-due');
-      expect(dueEl).not.toBeNull();
-      expect(dueEl!.textContent).not.toContain('(overdue)');
-      expect(dueEl!.className).not.toContain('card-due-overdue');
-    });
-
-    it('does NOT render due date element when there is no due date', () => {
-      const item = makeItem({ due_date: '', status: 'To Do' });
-      const { container } = render(<Card item={item} />);
-      const dueEl = container.querySelector('.card-due');
-      expect(dueEl).toBeNull();
+    it('renders nothing for a card with no due date', () => {
+      const { container } = render(<Card item={makeItem({ due_date: '' })} />);
+      expect(container.querySelector('.card-due')).toBeNull();
+      expect(container.querySelector('.card-overdue')).toBeNull();
     });
   });
 
-  // AC5: Only set dates are displayed (no empty placeholders)
-  describe('AC5: Only set dates are rendered', () => {
-    it('renders no date when due_date is empty', () => {
-      const item = makeItem({ due_date: '' });
+  describe('Overdue', () => {
+    it('shows a dashed "OVERDUE · Oct 22" pill with no icon in place of the date', () => {
+      const item = makeItem({ due_date: '2026-10-22', status: 'To Do' });
       const { container } = render(<Card item={item} />);
+      const pill = container.querySelector('.card-overdue') as HTMLElement;
+      expect(pill.textContent).toBe('OVERDUE · Oct 22');
+      expect(pill.classList.contains('today-overdue-pill')).toBe(true);
+      expect(pill.querySelector('svg')).toBeNull();
+      expect(pill.getAttribute('aria-label')).toBe('Overdue, due Oct 22');
       expect(container.querySelector('.card-due')).toBeNull();
     });
 
-    it('renders due date when due_date is set', () => {
-      const item = makeItem({ due_date: '2099-03-20' });
-      const { container } = render(<Card item={item} />);
-      expect(container.querySelector('.card-due')).not.toBeNull();
+    it('is not overdue today, in the future, or when the item is done', () => {
+      for (const [due, status] of [
+        ['2026-10-24', 'To Do'],
+        ['2099-12-31', 'To Do'],
+        ['2020-01-01', 'Done'],
+      ]) {
+        const { container, unmount } = render(<Card item={makeItem({ due_date: due, status })} />);
+        expect(container.querySelector('.card-overdue'), `${due} ${status}`).toBeNull();
+        unmount();
+      }
     });
   });
 
-  // AC8: Date elements have aria-labels for screen readers
-  describe('AC8: Date elements have accessible aria-labels', () => {
-    it('due date (not overdue) has aria-label with "Due date:" text', () => {
-      const item = makeItem({ due_date: '2099-03-20T12:00:00', status: 'To Do' });
+  describe('Done', () => {
+    it('shows when it was done, and strikes the title through', () => {
+      const item = makeItem({ status: 'Done', due_date: '2026-10-20', completed_at: '2026-10-23T15:00:00' });
       const { container } = render(<Card item={item} />);
-      const dueEl = container.querySelector('.card-due');
-      expect(dueEl!.getAttribute('aria-label')).toBe('Due date: Mar 20');
-    });
-
-    it('overdue due date has aria-label with ", overdue" suffix', () => {
-      const item = makeItem({ due_date: '2020-01-01', status: 'To Do' });
-      const { container } = render(<Card item={item} />);
-      const dueEl = container.querySelector('.card-due');
-      expect(dueEl!.getAttribute('aria-label')).toBe('Due date: Jan 1, overdue');
+      expect(container.querySelector('.card-due')!.textContent).toBe('Done Oct 23');
+      expect(container.querySelector('.card')!.classList.contains('card-done')).toBe(true);
     });
   });
 
-  // Unassigned indicator
-  describe('Unassigned indicator shown when owner is empty', () => {
-    it('shows unassigned indicator when owner is empty string', () => {
-      const item = makeItem({ owner: '' });
-      const { container } = render(<Card item={item} />);
-      const unassigned = container.querySelector('.card-unassigned');
-      expect(unassigned).not.toBeNull();
-      expect(unassigned!.textContent).toContain('Unassigned');
+  describe('Sub-tasks', () => {
+    it('shows a checklist icon and "2/3", and no progress bar', () => {
+      mockChildCount['with-subs'] = { done: 2, total: 3 };
+      const { container } = render(<Card item={makeItem({ id: 'with-subs' })} />);
+      const subs = container.querySelector('.card-subtasks') as HTMLElement;
+      expect(subs.textContent).toBe('2/3');
+      expect(subs.querySelector('svg')).not.toBeNull();
+      expect(subs.getAttribute('aria-label')).toBe('2 of 3 sub-tasks done');
+      expect(container.querySelector('[role="progressbar"]')).toBeNull();
+      expect(container.querySelector('.subtask-bar')).toBeNull();
+    });
+
+    it('shows nothing for a card without sub-tasks', () => {
+      const { container } = render(<Card item={makeItem({ id: 'no-subs' })} />);
+      expect(container.querySelector('.card-subtasks')).toBeNull();
     });
   });
 
-  // Unassigned indicator hidden when owner is set
-  describe('Unassigned indicator hidden when owner is set', () => {
-    it('shows owner name and hides unassigned indicator', () => {
-      const item = makeItem({ owner: 'Luke' });
+  describe('Labels', () => {
+    it('are a dot in the label colour and the name, never a filled pill', () => {
+      const { container } = render(<Card item={makeItem({ labels: 'Home, Errand' })} />);
+      const labels = [...container.querySelectorAll('.card-label')] as HTMLElement[];
+      expect(labels.map((l) => l.textContent)).toEqual(['Home', 'Errand']);
+      const dot = labels[0].querySelector('.card-label-dot') as HTMLElement;
+      expect(dot.style.background).toBe('rgb(25, 118, 210)');
+      expect(container.querySelector('.label-badge')).toBeNull();
+    });
+  });
+
+  describe('Owner', () => {
+    it('shows "Unassigned" in italics and no avatar when there is no owner', () => {
+      const { container } = render(<Card item={makeItem({ owner: '' })} />);
+      expect(container.querySelector('.card-unassigned')!.textContent).toBe('Unassigned');
+      expect(container.querySelector('[data-testid="card-avatar"]')).toBeNull();
+    });
+
+    it('shows the owner as initials in a circle, titled with the full name, and not "Unassigned"', () => {
+      const { container } = render(<Card item={makeItem({ owner: 'Mom' })} />);
+      const avatar = container.querySelector('[data-testid="card-avatar"]') as HTMLElement;
+      expect(avatar.textContent).toContain('MO');
+      expect(avatar.getAttribute('title')).toBe('Mom');
+      expect(avatar.style.background).toBe('rgb(25, 118, 210)');
+      expect(container.querySelector('.card-unassigned')).toBeNull();
+      expect(container.querySelector('.card-owner')).toBeNull();
+    });
+  });
+
+  describe('Nothing busy on the card', () => {
+    it('has no description excerpt, progress bar or emoji', () => {
+      mockChildCount['busy'] = { done: 1, total: 2 };
+      const item = makeItem({
+        id: 'busy',
+        description: 'Pick up milk and eggs from the store',
+        due_date: '2026-10-25',
+        owner: 'Luke',
+        labels: 'Home',
+      });
       const { container } = render(<Card item={item} />);
-      const ownerEl = container.querySelector('.card-owner');
-      const unassigned = container.querySelector('.card-unassigned');
-      expect(ownerEl).not.toBeNull();
-      expect(ownerEl!.textContent).toBe('Luke');
-      expect(unassigned).toBeNull();
+      expect(container.querySelector('.card-description')).toBeNull();
+      expect(container.textContent).not.toContain('Pick up milk');
+      expect(container.querySelector('.subtask-bar')).toBeNull();
+      expect(container.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
     });
   });
 
@@ -375,64 +404,6 @@ describe('Card', () => {
         const label = title.getAttribute('aria-label');
         expect(label).toContain('Alt+Up/Down to reorder');
         expect(label).toContain('Arrow keys to move between columns');
-      });
-    });
-  });
-
-  // Issue #12 — Description preview
-  describe('Description preview (Issue #12)', () => {
-    // AC1: Non-empty description shows truncated preview below title
-    describe('AC1: Description preview shows on card', () => {
-      it('renders a description preview when description is non-empty', () => {
-        const item = makeItem({ description: 'Pick up milk and eggs from the store' });
-        const { container } = render(<Card item={item} />);
-        const descEl = container.querySelector('.card-description');
-        expect(descEl).not.toBeNull();
-        expect(descEl!.textContent).toBe('Pick up milk and eggs from the store');
-      });
-
-      it('renders description below the title', () => {
-        const item = makeItem({ description: 'Some notes here' });
-        const { container } = render(<Card item={item} />);
-        const title = container.querySelector('.card-title');
-        const desc = container.querySelector('.card-description');
-        expect(title).not.toBeNull();
-        expect(desc).not.toBeNull();
-        // Description should be a sibling after title
-        expect(title!.nextElementSibling).toBe(desc);
-      });
-    });
-
-    // AC2: Long descriptions are truncated with ellipsis (CSS line-clamp)
-    describe('AC2: Long descriptions are truncated', () => {
-      it('applies CSS line-clamp class for long descriptions', () => {
-        const longDesc = 'This is a very long description that spans multiple lines. '.repeat(10);
-        const item = makeItem({ description: longDesc });
-        const { container } = render(<Card item={item} />);
-        const descEl = container.querySelector('.card-description');
-        expect(descEl).not.toBeNull();
-        expect(descEl!.classList.contains('card-description')).toBe(true);
-        // The CSS class card-description applies -webkit-line-clamp: 2
-      });
-    });
-
-    // AC3: Empty descriptions show nothing
-    describe('AC3: Empty descriptions show nothing', () => {
-      it('does not render description element when description is empty string', () => {
-        const item = makeItem({ description: '' });
-        const { container } = render(<Card item={item} />);
-        const descEl = container.querySelector('.card-description');
-        expect(descEl).toBeNull();
-      });
-
-      it('does not render description element when description is undefined-like', () => {
-        const item = makeItem({ description: '' });
-        const { container } = render(<Card item={item} />);
-        const descEl = container.querySelector('.card-description');
-        expect(descEl).toBeNull();
-        // Verify no empty space is left — card-meta should directly follow card-title
-        const title = container.querySelector('.card-title');
-        expect(title!.nextElementSibling!.classList.contains('card-meta')).toBe(true);
       });
     });
   });

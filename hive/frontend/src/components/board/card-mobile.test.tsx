@@ -17,6 +17,9 @@ vi.mock('../../state/board-store', () => ({
   },
   openDetailWithTitleEdit: { value: false },
   labels: { value: [] },
+  owners: { value: [] },
+  todayStr: () => '2026-10-24',
+  addDays: (d: string) => d,
   getChildCount: () => ({ done: 0, total: 0 }),
   boardStatuses: {
     value: [

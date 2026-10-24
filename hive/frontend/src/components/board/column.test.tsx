@@ -34,6 +34,10 @@ vi.mock('../../state/board-store', () => ({
   getChildCount: () => ({ done: 0, total: 0 }),
   showToast: (...args: unknown[]) => mockShowToast(...args),
   columnAnnouncement: { value: null },
+  filterOwner: { value: null },
+  filterLabel: { value: null },
+  filterSearch: { value: '' },
+  filterDue: { value: null },
   boardStatuses: {
     value: [
       {
@@ -410,50 +414,80 @@ describe('Column sort mode (Issue #157)', () => {
     expect(container.querySelector('.card-sort-lock')).toBeNull();
   });
 
-  it('renders a sort dropdown with Custom, Due date, Created options when sortMode is provided', () => {
+  // #626: the sort control is a button that opens a menu, in place of the per-column <select>.
+  const sortBtn = (container: Element) => container.querySelector('[data-testid="column-sort-btn"]') as HTMLElement;
+  const openSort = (container: Element) => {
+    fireEvent.click(sortBtn(container));
+    return [...container.querySelectorAll('[role="menuitemradio"]')] as HTMLElement[];
+  };
+
+  it('has no <select> sort control any more', () => {
     const { container } = render(<Column status="To Do" items={[]} onDrop={vi.fn()} sortMode="custom" />);
-    const select = container.querySelector('.column-sort-select') as HTMLSelectElement;
-    expect(select).not.toBeNull();
-    const options = select.querySelectorAll('option');
-    expect(options.length).toBe(3);
-    expect(options[0].value).toBe('custom');
-    expect(options[1].value).toBe('due_date');
-    expect(options[2].value).toBe('created');
+    expect(container.querySelector('select')).toBeNull();
+    expect(container.querySelector('.column-sort-select')).toBeNull();
+  });
+
+  it('renders a Sort button that opens Custom, Due date, Created as menuitemradio, and marks the current one', () => {
+    const { container } = render(<Column status="To Do" items={[]} onDrop={vi.fn()} sortMode="due_date" />);
+    const btn = sortBtn(container);
+    expect(btn.getAttribute('aria-label')).toBe('Sort To Do column');
+    expect(btn.getAttribute('aria-haspopup')).toBe('menu');
+    expect(btn.getAttribute('aria-expanded')).toBe('false');
+    expect(container.querySelector('[role="menu"]')).toBeNull();
+
+    const options = openSort(container);
+    expect(btn.getAttribute('aria-expanded')).toBe('true');
+    expect(options.map((o) => o.textContent)).toEqual(['Custom', 'Due date', 'Created']);
+    expect(options.map((o) => o.getAttribute('aria-checked'))).toEqual(['false', 'true', 'false']);
   });
 
   // #466: no stored mode means Custom, and the control is shown for it.
   describe('#466: a column with no sortMode', () => {
-    it('renders the sort select on Custom with all three options', () => {
+    it('shows the Sort button, on Custom', () => {
       const { container } = render(<Column status="To Do" items={[]} onDrop={vi.fn()} />);
-      const select = container.querySelector('.column-sort-select') as HTMLSelectElement;
-      expect(select).not.toBeNull();
-      expect(select.value).toBe('custom');
-      expect([...select.querySelectorAll('option')].map((o) => o.value)).toEqual(['custom', 'due_date', 'created']);
-      expect(select.getAttribute('aria-label')).toBe('Sort To Do column');
-      expect(select.classList.contains('column-sort-active')).toBe(false);
+      expect(sortBtn(container)).not.toBeNull();
+      expect(sortBtn(container).classList.contains('column-sort-active')).toBe(false);
+      expect(openSort(container).map((o) => o.getAttribute('aria-checked'))).toEqual(['true', 'false', 'false']);
     });
 
-    it('reports a choice made from that state', () => {
+    it('reports a choice made from that state, and closes the menu', () => {
       const onSortChange = vi.fn();
       const { container } = render(
         <Column status="In Progress" items={[]} onDrop={vi.fn()} onSortChange={onSortChange} />,
       );
-      const select = container.querySelector('.column-sort-select') as HTMLSelectElement;
-      select.value = 'due_date';
-      fireEvent.change(select);
+      fireEvent.click(openSort(container)[1]);
       expect(onSortChange).toHaveBeenCalledWith('due_date');
+      expect(container.querySelector('[role="menu"]')).toBeNull();
     });
 
-    it('still shows the disabled Completion date control in the terminal column, and none when compact', () => {
+    it('shows the fixed Completion date and no Sort button in the terminal column, and no sort at all when compact', () => {
       const terminal = render(<Column status="Done" items={[]} onDrop={vi.fn()} isTerminal />);
-      const fixed = terminal.container.querySelector('.column-sort-select') as HTMLSelectElement;
-      expect(fixed.disabled).toBe(true);
-      expect(fixed.textContent).toBe('Completion date');
+      expect(terminal.container.querySelector('[data-testid="column-sort-btn"]')).toBeNull();
+      expect(terminal.container.querySelector('.column-sort-fixed')?.textContent).toBe('Completion date');
       terminal.unmount();
 
       const compact = render(<Column status="To Do" items={[]} onDrop={vi.fn()} compact />);
-      expect(compact.container.querySelector('.column-sort-select')).toBeNull();
+      expect(compact.container.querySelector('[data-testid="column-sort-btn"]')).toBeNull();
+      expect(compact.container.querySelector('.column-sort-fixed')).toBeNull();
     });
+  });
+
+  it('Escape closes the sort menu and returns focus to the button', () => {
+    const { container } = render(<Column status="To Do" items={[]} onDrop={vi.fn()} sortMode="custom" />);
+    openSort(container);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(container.querySelector('[role="menu"]')).toBeNull();
+    expect(document.activeElement).toBe(sortBtn(container));
+  });
+
+  it('on a phone the sort sits in a row under the tabs, with the count and the current mode', () => {
+    const items = [makeItem({ id: '1', title: 'A' }), makeItem({ id: '2', title: 'B' })];
+    const { container } = render(<Column status="To Do" items={items} onDrop={vi.fn()} sortMode="created" />);
+    const row = container.querySelector('[data-testid="column-sortrow"]') as HTMLElement;
+    expect(row.textContent).toContain('2 items');
+    const rowBtn = row.querySelector('[data-testid="column-sort-row-btn"]') as HTMLElement;
+    expect(rowBtn.textContent).toBe('Created');
+    expect(rowBtn.getAttribute('aria-label')).toBe('Sort To Do column');
   });
 
   it('renders items in the order passed by parent (sorting handled by parent)', () => {
@@ -468,36 +502,28 @@ describe('Column sort mode (Issue #157)', () => {
     expect(cardIds).toEqual(['sooner', 'later']);
   });
 
-  it('AC7: sort dropdown has active class when sortMode is due_date', () => {
-    const { container } = render(<Column status="To Do" items={[]} onDrop={vi.fn()} sortMode="due_date" />);
-    const select = container.querySelector('.column-sort-select') as HTMLSelectElement;
-    expect(select.classList.contains('column-sort-active')).toBe(true);
+  it('AC7: the Sort button is accented when sortMode is not custom', () => {
+    for (const mode of ['due_date', 'created'] as const) {
+      const { container, unmount } = render(<Column status="To Do" items={[]} onDrop={vi.fn()} sortMode={mode} />);
+      expect(sortBtn(container).classList.contains('column-sort-active')).toBe(true);
+      unmount();
+    }
+    const custom = render(<Column status="To Do" items={[]} onDrop={vi.fn()} sortMode="custom" />);
+    expect(sortBtn(custom.container).classList.contains('column-sort-active')).toBe(false);
   });
 
-  it('AC7: sort dropdown has active class when sortMode is created', () => {
-    const { container } = render(<Column status="To Do" items={[]} onDrop={vi.fn()} sortMode="created" />);
-    const select = container.querySelector('.column-sort-select') as HTMLSelectElement;
-    expect(select.classList.contains('column-sort-active')).toBe(true);
-  });
-
-  it('AC7: sort dropdown has no active class when sortMode is custom', () => {
-    const { container } = render(<Column status="To Do" items={[]} onDrop={vi.fn()} sortMode="custom" />);
-    const select = container.querySelector('.column-sort-select') as HTMLSelectElement;
-    expect(select.classList.contains('column-sort-active')).toBe(false);
-  });
-
-  it('AC7: calls onSortChange when dropdown changes', async () => {
+  it('AC7: calls onSortChange when a sort option is chosen', async () => {
     const onSortChange = vi.fn();
     const { container } = render(
       <Column status="To Do" items={[]} onDrop={vi.fn()} sortMode="custom" onSortChange={onSortChange} />,
     );
-    const select = container.querySelector('.column-sort-select') as HTMLSelectElement;
+    const options = openSort(container);
 
     await act(() => {
-      fireEvent.change(select, { target: { value: 'due_date' } });
+      fireEvent.click(options[2]);
     });
 
-    expect(onSortChange).toHaveBeenCalledWith('due_date');
+    expect(onSortChange).toHaveBeenCalledWith('created');
   });
 });
 
@@ -1001,7 +1027,7 @@ describe('Column — Inline Add Item (Issue #170)', () => {
     const { container } = render(<Column status="To Do" items={[]} onDrop={vi.fn()} onAddItem={onAddItem} />);
     const addBtn = container.querySelector('.column-add-btn') as HTMLButtonElement;
     expect(addBtn).not.toBeNull();
-    expect(addBtn.getAttribute('aria-label')).toBe('Add item to To Do');
+    expect(addBtn.getAttribute('aria-label')).toBe('Add to To Do');
   });
 
   it('header "+" button calls onAddItem when clicked', () => {
@@ -1068,5 +1094,98 @@ describe('Column — Inline Add Item (Issue #170)', () => {
     const { container } = render(<Column status="To Do" items={[]} onDrop={vi.fn()} onAddItem={onAddItem} />);
     const addRow = container.querySelector('.column-add-row') as HTMLButtonElement;
     expect(addRow.tabIndex).toBe(-1);
+  });
+});
+
+// --- The column in Thrive's look (#626) ---
+describe('Column — header, drop target and empty box (#626)', () => {
+  afterEach(() => {
+    cardMock.currentDragStatus = null;
+  });
+
+  it('shows the column name as given, a count badge, a Sort button and an Add button', () => {
+    const items = [makeItem({ id: '1' }), makeItem({ id: '2' })];
+    const { container } = render(
+      <Column status="In Progress" items={items} onDrop={vi.fn()} sortMode="custom" onAddItem={vi.fn()} />,
+    );
+    expect(container.querySelector('.column-header h2')?.textContent).toBe('In Progress');
+    expect(container.querySelector('.column-header .column-count')?.textContent).toBe('2');
+    expect(container.querySelector('.column-header [data-testid="column-sort-btn"]')).not.toBeNull();
+    expect(container.querySelector('.column-header .column-add-btn')).not.toBeNull();
+  });
+
+  it('draws no column colour: no inline --column-color, whatever colour the status has', () => {
+    const { container } = render(<Column status="To Do" items={[]} onDrop={vi.fn()} />);
+    const column = container.querySelector('.column') as HTMLElement;
+    expect(column.getAttribute('style') ?? '').not.toContain('--column-color');
+  });
+
+  it('marks the column under a dragged card as the drop target, over a card too, and clears it on leave and drop', async () => {
+    cardMock.currentDragStatus = 'In Progress';
+    const items = [makeItem({ id: '1', title: 'Task 1' })];
+    const { container } = render(<Column status="To Do" items={items} onDrop={vi.fn()} sortMode="custom" />);
+    const column = container.querySelector('.column') as HTMLElement;
+    const card = container.querySelector('.card') as HTMLElement;
+
+    await act(() => {
+      fireEvent.dragOver(column, { bubbles: true });
+    });
+    expect(column.classList.contains('column-drag-over')).toBe(true);
+
+    await act(() => {
+      fireEvent.dragOver(card, { bubbles: true, clientY: 10 });
+    });
+    expect(column.classList.contains('column-drag-over')).toBe(true);
+
+    await act(() => {
+      fireEvent.dragLeave(column, { relatedTarget: document.body });
+    });
+    expect(column.classList.contains('column-drag-over')).toBe(false);
+
+    await act(() => {
+      fireEvent.dragOver(column, { bubbles: true });
+    });
+    await act(() => {
+      fireEvent.drop(column, { dataTransfer: { getData: () => '' } });
+    });
+    expect(column.classList.contains('column-drag-over')).toBe(false);
+  });
+
+  it('an empty column says "Nothing here yet", "Nothing matches" under a filter, and "Drop here" while dragging over it', async () => {
+    const store = await import('../../state/board-store');
+    const { container, rerender } = render(<Column status="To Do" items={[]} onDrop={vi.fn()} />);
+    const empty = () => container.querySelector('.column-empty')?.textContent;
+    expect(empty()).toBe('Nothing here yet');
+
+    (store.filterDue as { value: string | null }).value = 'today';
+    rerender(<Column status="To Do" items={[]} onDrop={vi.fn()} />);
+    expect(empty()).toBe('Nothing matches');
+    (store.filterDue as { value: string | null }).value = null;
+
+    cardMock.currentDragStatus = 'In Progress';
+    const column = container.querySelector('.column') as HTMLElement;
+    await act(() => {
+      fireEvent.dragOver(column, { bubbles: true });
+    });
+    expect(empty()).toBe('Drop here');
+  });
+
+  it('the Done column keeps its "View all n completed" link under the header', () => {
+    const onOpenArchive = vi.fn();
+    const { container } = render(
+      <Column
+        status="Done"
+        items={[]}
+        onDrop={vi.fn()}
+        isTerminal
+        allDoneCount={3}
+        hasArchived
+        onOpenArchive={onOpenArchive}
+      />,
+    );
+    const link = container.querySelector('.column-archive-link') as HTMLButtonElement;
+    expect(link.textContent).toBe('View all 3 completed');
+    fireEvent.click(link);
+    expect(onOpenArchive).toHaveBeenCalled();
   });
 });

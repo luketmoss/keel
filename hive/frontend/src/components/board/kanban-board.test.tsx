@@ -41,174 +41,181 @@ afterEach(() => {
   mockMoveItem.mockClear();
 });
 
-vi.mock('../../state/board-store', () => ({
-  items: {
-    get value() {
-      return mockState.items;
+vi.mock('../../state/board-store', async () => {
+  const { signal } = await import('@preact/signals');
+  return {
+    items: {
+      get value() {
+        return mockState.items;
+      },
     },
-  },
-  columns: {
-    get value() {
-      return {
-        'To Do': mockState.items.filter((i: any) => i.status === 'To Do' && !i.parent_id),
-        'In Progress': mockState.items.filter((i: any) => i.status === 'In Progress' && !i.parent_id),
-        Done: mockState.items.filter((i: any) => i.status === 'Done' && !i.parent_id),
-      };
+    columns: {
+      get value() {
+        return {
+          'To Do': mockState.items.filter((i: any) => i.status === 'To Do' && !i.parent_id),
+          'In Progress': mockState.items.filter((i: any) => i.status === 'In Progress' && !i.parent_id),
+          Done: mockState.items.filter((i: any) => i.status === 'Done' && !i.parent_id),
+        };
+      },
     },
-  },
-  rootItems: {
-    get value() {
-      return mockState.items.filter((i: any) => !i.parent_id);
+    rootItems: {
+      get value() {
+        return mockState.items.filter((i: any) => !i.parent_id);
+      },
     },
-  },
-  showCreateModal: {
-    get value() {
-      return mockState.showCreateModal;
+    showCreateModal: {
+      get value() {
+        return mockState.showCreateModal;
+      },
+      set value(v: boolean) {
+        mockState.showCreateModal = v;
+      },
     },
-    set value(v: boolean) {
-      mockState.showCreateModal = v;
+    selectedItem: {
+      get value() {
+        return mockState.selectedItem;
+      },
+      set value(v: any) {
+        mockState.selectedItem = v;
+      },
     },
-  },
-  selectedItem: {
-    get value() {
-      return mockState.selectedItem;
+    selectedItemId: { value: null },
+    openDetailWithTitleEdit: { value: false },
+    groupBy: {
+      get value() {
+        return mockState.groupByValue;
+      },
+      set value(v: string) {
+        mockState.groupByValue = v;
+      },
     },
-    set value(v: any) {
-      mockState.selectedItem = v;
-    },
-  },
-  selectedItemId: { value: null },
-  openDetailWithTitleEdit: { value: false },
-  groupBy: {
-    get value() {
-      return mockState.groupByValue;
-    },
-    set value(v: string) {
+    owners: { value: [] },
+    boardLabels: { value: [] },
+    filterOwner: { value: null },
+    filterLabel: { value: null },
+    filterSearch: { value: '' },
+    filterDue: { value: null },
+    selectedColumnIndex: signal(0),
+    createModalInitialStatus: { value: null as string | null },
+    loading: { value: false },
+    getChildCount: () => ({ done: 0, total: 0 }),
+    setGroupBy: (v: string) => {
       mockState.groupByValue = v;
     },
-  },
-  owners: { value: [] },
-  boardLabels: { value: [] },
-  filterOwner: { value: null },
-  filterLabel: { value: null },
-  loading: { value: false },
-  getChildCount: () => ({ done: 0, total: 0 }),
-  setGroupBy: (v: string) => {
-    mockState.groupByValue = v;
-  },
-  allDoneItems: { value: [] },
-  hasArchivedItems: { value: false },
-  showArchiveDialog: {
-    get value() {
-      return mockState.showArchiveDialog;
-    },
-    set value(v: boolean) {
-      mockState.showArchiveDialog = v;
-    },
-  },
-  boards: { value: [] },
-  boardItems: {
-    get value() {
-      return mockState.items;
-    },
-  },
-  showCreateBoardModal: {
-    get value() {
-      return mockState.showCreateBoardModal;
-    },
-    set value(v: boolean) {
-      mockState.showCreateBoardModal = v;
-    },
-  },
-  showShareModal: {
-    get value() {
-      return mockState.showShareModal;
-    },
-    set value(v: boolean) {
-      mockState.showShareModal = v;
-    },
-  },
-  showDeleteBoardModal: {
-    get value() {
-      return mockState.showDeleteBoardModal;
-    },
-    set value(v: boolean) {
-      mockState.showDeleteBoardModal = v;
-    },
-  },
-  showMoveToBoardModal: { value: false },
-  showArchiveBoardModal: { value: false },
-  showArchivedBoardsDialog: { value: false },
-  accessibleBoards: {
-    get value() {
-      return mockState.accessibleBoards;
-    },
-  },
-  activeBoard: { value: null },
-  userBoardRole: {
-    get value() {
-      return mockState.userBoardRole;
-    },
-  },
-  permissions: { value: [] },
-  currentUserEmail: { value: '' },
-  switchBoard: (...args: any[]) => mockSwitchBoard(...args),
-  theme: { value: 'system' },
-  applyTheme: () => {},
-  cycleTheme: () => {},
-  setTheme: () => {},
-  columnSortModes: {
-    get value() {
-      return { 'To Do': 'custom', 'In Progress': 'custom', Done: 'custom' };
-    },
-  },
-  setColumnSortMode: () => {},
-  columnAnnouncement: { value: null },
-  activeView: {
-    get value() {
-      return mockState.activeView;
-    },
-  },
-  boardOpen: {
-    get value() {
-      return mockState.boardOpen;
-    },
-  },
-  boardStatuses: {
-    value: [
-      {
-        id: 's1',
-        board_id: 'board-1',
-        name: 'To Do',
-        sort_order: 1,
-        color: '#e3f2fd',
-        is_terminal: false,
-        created_at: '',
+    allDoneItems: { value: [] },
+    hasArchivedItems: { value: false },
+    showArchiveDialog: {
+      get value() {
+        return mockState.showArchiveDialog;
       },
-      {
-        id: 's2',
-        board_id: 'board-1',
-        name: 'In Progress',
-        sort_order: 2,
-        color: '#fff3e0',
-        is_terminal: false,
-        created_at: '',
+      set value(v: boolean) {
+        mockState.showArchiveDialog = v;
       },
-      {
-        id: 's3',
-        board_id: 'board-1',
-        name: 'Done',
-        sort_order: 3,
-        color: '#e8f5e9',
-        is_terminal: true,
-        created_at: '',
+    },
+    boards: { value: [] },
+    boardItems: {
+      get value() {
+        return mockState.items;
       },
-    ],
-  },
-  isTerminalStatus: (name: string) => name === 'Done',
-  defaultStatusName: () => 'To Do',
-  terminalStatusName: () => 'Done',
-}));
+    },
+    showCreateBoardModal: {
+      get value() {
+        return mockState.showCreateBoardModal;
+      },
+      set value(v: boolean) {
+        mockState.showCreateBoardModal = v;
+      },
+    },
+    showShareModal: {
+      get value() {
+        return mockState.showShareModal;
+      },
+      set value(v: boolean) {
+        mockState.showShareModal = v;
+      },
+    },
+    showDeleteBoardModal: {
+      get value() {
+        return mockState.showDeleteBoardModal;
+      },
+      set value(v: boolean) {
+        mockState.showDeleteBoardModal = v;
+      },
+    },
+    showMoveToBoardModal: { value: false },
+    showArchiveBoardModal: { value: false },
+    showArchivedBoardsDialog: { value: false },
+    accessibleBoards: {
+      get value() {
+        return mockState.accessibleBoards;
+      },
+    },
+    activeBoard: { value: null },
+    userBoardRole: {
+      get value() {
+        return mockState.userBoardRole;
+      },
+    },
+    permissions: { value: [] },
+    currentUserEmail: { value: '' },
+    switchBoard: (...args: any[]) => mockSwitchBoard(...args),
+    theme: { value: 'system' },
+    applyTheme: () => {},
+    cycleTheme: () => {},
+    setTheme: () => {},
+    columnSortModes: {
+      get value() {
+        return { 'To Do': 'custom', 'In Progress': 'custom', Done: 'custom' };
+      },
+    },
+    setColumnSortMode: () => {},
+    columnAnnouncement: { value: null },
+    activeView: {
+      get value() {
+        return mockState.activeView;
+      },
+    },
+    boardOpen: {
+      get value() {
+        return mockState.boardOpen;
+      },
+    },
+    boardStatuses: {
+      value: [
+        {
+          id: 's1',
+          board_id: 'board-1',
+          name: 'To Do',
+          sort_order: 1,
+          color: '#e3f2fd',
+          is_terminal: false,
+          created_at: '',
+        },
+        {
+          id: 's2',
+          board_id: 'board-1',
+          name: 'In Progress',
+          sort_order: 2,
+          color: '#fff3e0',
+          is_terminal: false,
+          created_at: '',
+        },
+        {
+          id: 's3',
+          board_id: 'board-1',
+          name: 'Done',
+          sort_order: 3,
+          color: '#e8f5e9',
+          is_terminal: true,
+          created_at: '',
+        },
+      ],
+    },
+    isTerminalStatus: (name: string) => name === 'Done',
+    defaultStatusName: () => 'To Do',
+    terminalStatusName: () => 'Done',
+  };
+});
 
 const mockMoveItem = vi.fn();
 vi.mock('../../state/actions', () => ({
@@ -350,7 +357,7 @@ describe('KanbanBoard empty/welcome state (Issue #11)', () => {
   });
 
   describe('AC2: Empty columns still show standard text', () => {
-    it('renders columns with "No items" when board has items but some columns are empty', () => {
+    it('renders columns with "Nothing here yet" when board has items but some columns are empty', () => {
       mockState.items = [
         {
           id: '1',
@@ -377,7 +384,7 @@ describe('KanbanBoard empty/welcome state (Issue #11)', () => {
       const emptyColumns = container.querySelectorAll('.column-empty');
       expect(emptyColumns.length).toBe(2);
       emptyColumns.forEach((el) => {
-        expect(el.textContent).toBe('No items');
+        expect(el.textContent).toBe('Nothing here yet');
       });
     });
   });
@@ -748,5 +755,114 @@ describe('Status grouping renders ListView (Issue #137)', () => {
     expect(boardMain).not.toBeNull();
     const listView = boardMain!.querySelector('.list-view');
     expect(listView).toBeNull();
+  });
+});
+
+// --- Column tabs on a phone, in place of the dot pager (#626) ---
+describe('KanbanBoard column tabs (#626)', () => {
+  const sample = (id: string, status: string) => ({
+    id,
+    title: `Task ${id}`,
+    description: '',
+    status,
+    owner: '',
+    due_date: '',
+    labels: '',
+    parent_id: '',
+    created_at: '',
+    updated_at: '',
+    completed_at: '',
+    sort_order: 1,
+    created_by: '',
+    board_id: '',
+    sheetRow: 2,
+  });
+  const tabs = (c: Element) => [...c.querySelectorAll('[role="tab"]')] as HTMLElement[];
+
+  beforeEach(async () => {
+    const store = await import('../../state/board-store');
+    (store.selectedColumnIndex as { value: number }).value = 0;
+    (store.createModalInitialStatus as { value: string | null }).value = null;
+  });
+
+  it('shows one tab per column with its count, the first selected, and no dot pager', () => {
+    mockState.items = [sample('1', 'To Do'), sample('2', 'To Do'), sample('3', 'Done')];
+    const { container } = renderBoard();
+    expect(container.querySelector('[role="tablist"]')).not.toBeNull();
+    expect(tabs(container).map((t) => t.textContent)).toEqual(['To Do2', 'In Progress0', 'Done1']);
+    expect(tabs(container).map((t) => t.getAttribute('aria-selected'))).toEqual(['true', 'false', 'false']);
+    expect(container.querySelector('.column-indicator')).toBeNull();
+    expect(container.querySelector('.column-indicator-dot')).toBeNull();
+  });
+
+  it('tapping a tab selects it and scrolls the columns to it', () => {
+    mockState.items = [sample('1', 'To Do')];
+    const { container } = renderBoard();
+    const main = container.querySelector('.board-main') as HTMLElement;
+    Object.defineProperty(main, 'clientWidth', { value: 400, configurable: true });
+    const scrollTo = vi.fn();
+    main.scrollTo = scrollTo as unknown as typeof main.scrollTo;
+
+    fireEvent.click(tabs(container)[2]);
+    expect(scrollTo).toHaveBeenCalledWith({ left: 800, behavior: 'smooth' });
+    expect(tabs(container).map((t) => t.getAttribute('aria-selected'))).toEqual(['false', 'false', 'true']);
+  });
+
+  it('swiping to a column selects its tab', () => {
+    mockState.items = [sample('1', 'To Do')];
+    const { container } = renderBoard();
+    const main = container.querySelector('.board-main') as HTMLElement;
+    Object.defineProperty(main, 'clientWidth', { value: 400, configurable: true });
+    main.scrollLeft = 400;
+    fireEvent.scroll(main);
+    expect(tabs(container).map((t) => t.getAttribute('aria-selected'))).toEqual(['false', 'true', 'false']);
+  });
+
+  it('arrow keys move between tabs', () => {
+    mockState.items = [sample('1', 'To Do')];
+    const { container } = renderBoard();
+    fireEvent.keyDown(tabs(container)[0], { key: 'ArrowRight' });
+    expect(tabs(container)[1].getAttribute('aria-selected')).toBe('true');
+    fireEvent.keyDown(tabs(container)[1], { key: 'End' });
+    expect(tabs(container)[2].getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('has no tabs when the cards are grouped, or the board is empty', () => {
+    mockState.items = [sample('1', 'To Do')];
+    mockState.groupByValue = 'label';
+    expect(tabs(renderBoard().container)).toHaveLength(0);
+    cleanup();
+    mockState.groupByValue = 'none';
+    mockState.items = [];
+    expect(tabs(renderBoard().container)).toHaveLength(0);
+  });
+
+  it('the new-item button adds to the selected column on a phone, and to the default on a wide screen', async () => {
+    const store = await import('../../state/board-store');
+    const initial = store.createModalInitialStatus as { value: string | null };
+    mockState.items = [sample('1', 'To Do')];
+    const { container } = renderBoard();
+    fireEvent.click(tabs(container)[1]);
+
+    const matchMedia = window.matchMedia;
+    const stub = (matches: boolean) =>
+      (window.matchMedia = ((q: string) => ({
+        matches,
+        media: q,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      })) as unknown as typeof window.matchMedia);
+    try {
+      stub(true);
+      fireEvent.click(container.querySelector('.fab') as HTMLElement);
+      expect(initial.value).toBe('In Progress');
+
+      initial.value = null;
+      stub(false);
+      fireEvent.click(container.querySelector('.fab') as HTMLElement);
+      expect(initial.value).toBeNull();
+    } finally {
+      window.matchMedia = matchMedia;
+    }
   });
 });

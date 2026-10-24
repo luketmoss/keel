@@ -501,6 +501,12 @@ export const filteredItems = computed(() => {
     );
   }
 
+  // #626: Mine. Roots only, as search and due are; a sub-item passes through to its parent's card.
+  if (filterOwner.value) {
+    const owner = filterOwner.value;
+    result = result.filter((i) => i.parent_id || i.owner === owner);
+  }
+
   const search = filterSearch.value.trim();
   const due = filterDue.value;
 
@@ -538,6 +544,19 @@ export const filteredItems = computed(() => {
 });
 
 export const rootItems = computed(() => filteredItems.value.filter((i) => !i.parent_id));
+
+/** Labels used by a root item on the active board, in the board's label order (#626 filter chips). */
+export const labelsInUse = computed(() => {
+  const used = new Set<string>();
+  for (const item of boardItems.value) {
+    if (item.parent_id || !item.labels) continue;
+    for (const l of item.labels.split(',')) used.add(l.trim());
+  }
+  return boardLabels.value.filter((l) => used.has(l.label));
+});
+
+/** The column showing on a phone, by index: its tab is selected and the FAB adds to it (#626). */
+export const selectedColumnIndex = signal(0);
 
 const bySortOrder = (a: ItemWithRow, b: ItemWithRow) => a.sort_order - b.sort_order;
 const byCompletedAtDesc = (a: ItemWithRow, b: ItemWithRow) => {
@@ -594,6 +613,7 @@ export function selectBoard(boardId: string) {
   filterSearch.value = '';
   filterDue.value = null;
   groupBy.value = 'none';
+  selectedColumnIndex.value = 0;
   selectedItemId.value = null;
 }
 

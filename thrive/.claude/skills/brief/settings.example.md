@@ -10,3 +10,11 @@ says "Home" and "Trails".
 
 - **home**: `<lat>, <lon>`. name: Home. Gravel, road, and every other outdoor session
 - **trails**: `<lat>, <lon>`. name: <Park or trailhead>. `bike:mountain` rides and hikes
+
+An optional `webhook:` line is the MacroDroid URL the brief calls once it is
+published, so the phone can open it (#617). It is a **secret**: anyone with it
+can set off the phone's macros, so it belongs only in `settings.local.md`.
+Without it the brief still publishes, and the phone isn't told. Setting up the
+phone: [docs/brief-phone.md](../../../docs/brief-phone.md).
+
+- **webhook**: `https://trigger.macrodroid.com/<device-id>/brief`

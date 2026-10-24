@@ -327,8 +327,10 @@ Google Sheet "Groundwork" with these tabs:
   (`SYNC_SCHEDULE_SLOTS`: 6:30 AM and 6:30 PM daily, America/Denver) it adds
   one `coros` row with `requested_by` = `schedule` (once per slot per day, any
   status counts) and dispatches it that tick — GitHub's own cron is best-effort,
-  a dispatch is not. The phone opens the COROS app at 6:15 (MacroDroid) and the
-  daily brief / Sunday weekly brief run at 6:45. `pollSyncRequests`
+  a dispatch is not. The phone opens the COROS app on the first unlock of the
+  morning (a MacroDroid macro, #617) and the daily brief / Sunday weekly brief
+  run at 6:45, then tell the phone through a MacroDroid webhook that they are
+  up ([docs/brief-phone.md](docs/brief-phone.md)). `pollSyncRequests`
   (`apps-script/src/sync-requests.js`), a 5-minute Apps Script time-driven
   trigger on the bot account, writes every later value in E–I and never
   deletes or writes A–D of a row it did not add. It dispatches the existing

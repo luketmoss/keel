@@ -57,7 +57,7 @@ import { ControlBar } from '../header/control-bar';
 import { NavRail } from '../shell/nav-rail';
 import { TabBar } from '../shell/tab-bar';
 import { SettingsScreen } from '../shell/settings-screen';
-import { UpcomingView } from '../upcoming/upcoming-view';
+import { TodayScreen, openCreateForToday } from '../today/today-screen';
 import { ColumnIndicator } from './column-indicator';
 import type { ItemStatus, ItemWithRow } from '../../api/types';
 
@@ -86,7 +86,7 @@ export function KanbanBoard() {
     ? owners.value.find((o) => o.google_account.toLowerCase() === user.email.toLowerCase())?.name || user.name
     : '';
 
-  /** N, A and the board shortcuts act on a board; Today and Settings have none to act on (#623). */
+  /** A and the board shortcuts act on a board; Today and Settings have none to act on (#623). */
   const onBoard = () => activeView.value === 'boards';
 
   /** True when no modal or overlay is open — shortcuts should be active. */
@@ -120,7 +120,11 @@ export function KanbanBoard() {
       {
         key: 'n',
         action: () => {
-          if (onBoard() && noModalOpen()) {
+          if (activeView.value === 'settings' || !noModalOpen()) return;
+          // #624: on Today the form opens with the selected day as its due date.
+          if (activeView.value === 'today') {
+            if (accessibleBoards.value.length > 0) openCreateForToday();
+          } else {
             showCreateModal.value = true;
           }
         },
@@ -368,11 +372,11 @@ export function KanbanBoard() {
       <NavRail user={user} displayName={displayName} />
 
       <div class="board-layout">
-        {activeView.value !== 'settings' && <ControlBar />}
+        {activeView.value === 'boards' && <ControlBar />}
 
         <main class="board-main">
           {activeView.value === 'today' ? (
-            <UpcomingView />
+            <TodayScreen />
           ) : activeView.value === 'settings' ? (
             <SettingsScreen
               user={user}

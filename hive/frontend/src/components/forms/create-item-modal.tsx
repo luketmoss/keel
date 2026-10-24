@@ -6,6 +6,10 @@ import {
   createModalInitialDueDate,
   clearCreateItemUrlParams,
   owners,
+  activeView,
+  activeBoardId,
+  accessibleBoards,
+  firstStatusNameForBoard,
 } from '../../state/board-store';
 import { createItem, createItemWithSubtasks } from '../../state/actions';
 import type { StagedSubtask } from '../../state/actions';
@@ -24,6 +28,9 @@ export function CreateItemModal() {
   const [owner, setOwner] = useState(defaultOwner);
   const [dueDate, setDueDate] = useState(() => createModalInitialDueDate.value ?? '');
   const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
+  // #624: opened from Today there is no board in view, so the form asks which one.
+  const askBoard = activeView.value === 'today';
+  const [boardId, setBoardId] = useState(() => activeBoardId.value);
   const [subtasks, setSubtasks] = useState<StagedSubtask[]>([]);
   const [subtaskInput, setSubtaskInput] = useState('');
   const subtaskInputRef = useRef<HTMLInputElement>(null);
@@ -57,6 +64,7 @@ export function CreateItemModal() {
       due_date: dueDate,
       labels: selectedLabels.join(', '),
       created_by: user?.email || '',
+      ...(askBoard ? { board_id: boardId, status: firstStatusNameForBoard(boardId) } : {}),
       ...(createModalInitialStatus.value ? { status: createModalInitialStatus.value } : {}),
     };
     const actor = user?.name || 'web';
@@ -128,6 +136,31 @@ export function CreateItemModal() {
                 required
               />
             </div>
+
+            {askBoard && (
+              <div class="form-field">
+                <label id="create-board-label">Board</label>
+                <div class="board-choice" role="group" aria-labelledby="create-board-label">
+                  {accessibleBoards.value.map((b) => (
+                    <button
+                      key={b.id}
+                      type="button"
+                      class="board-choice-chip"
+                      aria-pressed={b.id === boardId ? 'true' : 'false'}
+                      onClick={() => {
+                        // The label picker and the new item's column read the active board.
+                        activeBoardId.value = b.id;
+                        setBoardId(b.id);
+                        setSelectedLabels([]);
+                      }}
+                    >
+                      {b.icon && <span aria-hidden="true">{b.icon}</span>}
+                      {b.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div class="form-field">
               <label for="description">Description</label>

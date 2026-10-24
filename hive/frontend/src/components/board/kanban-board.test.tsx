@@ -20,6 +20,7 @@ const mockState = {
 };
 
 const mockSwitchBoard = vi.fn();
+const mockOpenCreateForToday = vi.fn();
 
 afterEach(() => {
   cleanup();
@@ -239,8 +240,9 @@ vi.mock('../header/control-bar', () => ({
 vi.mock('./list-view', () => ({
   ListView: () => <div class="list-view" data-testid="list-view" />,
 }));
-vi.mock('../upcoming/upcoming-view', () => ({
-  UpcomingView: () => <div class="upcoming-view" data-testid="upcoming-view" />,
+vi.mock('../today/today-screen', () => ({
+  TodayScreen: () => <div class="today-screen" data-testid="today-screen" />,
+  openCreateForToday: () => mockOpenCreateForToday(),
 }));
 vi.mock('./card-detail', () => ({
   CardDetail: () => <div data-testid="card-detail" />,
@@ -411,10 +413,10 @@ describe('KanbanBoard shell (Issue #623)', () => {
       mockState.activeView = 'today';
     });
 
-    it('shows the existing Upcoming view with its control bar and no new-item button', () => {
+    it('shows the Today screen, with no control bar and no board new-item button', () => {
       const { container } = renderBoard();
-      expect(container.querySelector('[data-testid="upcoming-view"]')).not.toBeNull();
-      expect(container.querySelector('[data-testid="control-bar"]')).not.toBeNull();
+      expect(container.querySelector('[data-testid="today-screen"]')).not.toBeNull();
+      expect(container.querySelector('[data-testid="control-bar"]')).toBeNull();
       expect(container.querySelector('.fab')).toBeNull();
       expect(container.querySelector('[data-testid="board-welcome"]')).toBeNull();
     });
@@ -616,8 +618,8 @@ describe('KanbanBoard keyboard shortcuts (Issue #91)', () => {
     });
   });
 
-  describe('#623: N and A act on a board only', () => {
-    it.each(['today', 'settings'])('N and A do nothing on %s', (view) => {
+  describe('#623: A acts on a board only; N also on Today (#624)', () => {
+    it.each(['today', 'settings'])('A does nothing on %s, and N does not open the board form', (view) => {
       mockState.activeView = view;
       renderBoard();
 
@@ -626,6 +628,28 @@ describe('KanbanBoard keyboard shortcuts (Issue #91)', () => {
 
       expect(mockState.showCreateModal).toBe(false);
       expect(mockState.showArchiveDialog).toBe(false);
+    });
+
+    it('N opens the create form for the selected day on Today', () => {
+      mockOpenCreateForToday.mockClear();
+      mockState.activeView = 'today';
+      mockState.accessibleBoards = [{ id: 'b1', name: 'Work' }];
+      renderBoard();
+
+      fireEvent.keyDown(document, { key: 'n' });
+
+      expect(mockOpenCreateForToday).toHaveBeenCalledTimes(1);
+    });
+
+    it('N does nothing on Settings', () => {
+      mockOpenCreateForToday.mockClear();
+      mockState.activeView = 'settings';
+      mockState.accessibleBoards = [{ id: 'b1', name: 'Work' }];
+      renderBoard();
+
+      fireEvent.keyDown(document, { key: 'n' });
+
+      expect(mockOpenCreateForToday).not.toHaveBeenCalled();
     });
 
     it('? still opens the help on Today', () => {

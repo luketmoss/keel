@@ -1,7 +1,7 @@
 // Drawn stroke icons for the shell (#623): 24 x 24, 2px stroke, currentColor. No emoji.
 import type { ComponentChildren } from 'preact';
 
-function Icon({ children }: { children: ComponentChildren }) {
+export function Icon({ children }: { children: ComponentChildren }) {
   return (
     <svg
       viewBox="0 0 24 24"

@@ -482,10 +482,6 @@ describe('AC3: the ring is at least 3:1 on every surface, in both themes', () =>
     '--color-col-pink',
     '--color-col-teal',
     '--color-col-amber',
-    '--color-bucket-overdue',
-    '--color-bucket-this-week',
-    '--color-bucket-next-week',
-    '--color-bucket-later',
   ];
 
   it.each(THEMES)('%s: --color-focus on every surface, the tightest tint included', (theme) => {

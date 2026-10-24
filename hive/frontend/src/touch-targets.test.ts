@@ -143,6 +143,8 @@ const BOX = [
   'label-new-pill',
   'column-settings-name',
   'column-settings-terminal-toggle',
+  'today-round-btn',
+  'today-check',
 ];
 /** The one control allowed under 44, and only in width. */
 const PAGER_DOT = 'column-indicator-dot';
@@ -181,6 +183,11 @@ const TALL = [
   'settings-tab',
   'login-btn',
   'login-link',
+  'today-action-btn',
+  'today-chip',
+  'today-day',
+  'board-choice-chip',
+  'today-row-title',
 ];
 
 /** Text inputs, selects and date inputs. */

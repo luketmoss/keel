@@ -33,7 +33,7 @@ const permittedBoards = computed(() => {
 
 /**
  * Boards the current user has access to, minus archived ones (#288). This is
- * the list every view reads — the switcher, shortcuts, Upcoming, Move to
+ * the list every view reads — the switcher, shortcuts, Today, Move to
  * board, deep links — so an archived board drops out of all of them at once.
  */
 export const accessibleBoards = computed(() => permittedBoards.value.filter((b) => !isBoardArchived(b)));
@@ -211,27 +211,6 @@ export function syncFromLocation() {
   initActiveViewFromUrl();
   selectedItemId.value = null;
   initSelectedItemFromUrl();
-}
-
-// --- Upcoming view: filter signals ---
-export const upcomingFilterSearch = signal('');
-export const upcomingFilterLabel = signal<string | null>(null);
-export const upcomingFilterBoards = signal<Set<string>>(new Set());
-
-/** Initialize upcoming board filter to all accessible boards. */
-export function initUpcomingBoardFilter() {
-  upcomingFilterBoards.value = new Set(accessibleBoards.value.map((b) => b.id));
-}
-
-/** Toggle a board in the upcoming filter. */
-export function toggleUpcomingBoard(boardId: string) {
-  const current = new Set(upcomingFilterBoards.value);
-  if (current.has(boardId)) {
-    current.delete(boardId);
-  } else {
-    current.add(boardId);
-  }
-  upcomingFilterBoards.value = current;
 }
 
 // --- UI state ---
@@ -438,7 +417,7 @@ export function cycleTheme() {
 // --- Derived ---
 
 /** Get today's date as YYYY-MM-DD. */
-function todayStr(): string {
+export function todayStr(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
@@ -697,174 +676,194 @@ export const columns = computed((): Record<string, ItemWithRow[]> => {
   return result;
 });
 
-// --- Upcoming view: time-bucketed items ---
-export type UpcomingBucket = 'overdue' | 'this-week' | 'next-week' | 'later';
+// --- Today (#624): what is due, across boards ---
 
-export interface UpcomingBucketData {
-  key: UpcomingBucket;
-  label: string;
-  items: ItemWithRow[];
+export function addDays(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d + days);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
 }
 
-/** Get Monday of the current week as YYYY-MM-DD. */
-function mondayOfWeek(d: Date): string {
-  const copy = new Date(d);
-  const day = copy.getDay(); // 0=Sun
-  const diff = day === 0 ? -6 : 1 - day; // Mon=1
-  copy.setDate(copy.getDate() + diff);
-  return `${copy.getFullYear()}-${String(copy.getMonth() + 1).padStart(2, '0')}-${String(copy.getDate()).padStart(2, '0')}`;
+function parseDay(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
 }
 
-/** Get Sunday of the current week as YYYY-MM-DD. */
-function sundayOfWeek(d: Date): string {
-  const copy = new Date(d);
-  const day = copy.getDay(); // 0=Sun
-  const diff = day === 0 ? 0 : 7 - day;
-  copy.setDate(copy.getDate() + diff);
-  return `${copy.getFullYear()}-${String(copy.getMonth() + 1).padStart(2, '0')}-${String(copy.getDate()).padStart(2, '0')}`;
+/** Monday of the week containing `dateStr`, as YYYY-MM-DD. */
+export function mondayOf(dateStr: string): string {
+  const day = parseDay(dateStr).getDay(); // 0=Sun
+  return addDays(dateStr, day === 0 ? -6 : 1 - day);
 }
 
-/** Get next week's Monday and Sunday. */
-function nextWeekRange(d: Date): [string, string] {
-  const copy = new Date(d);
-  const day = copy.getDay();
-  const toNextMon = day === 0 ? 1 : 8 - day;
-  copy.setDate(copy.getDate() + toNextMon);
-  const monday = `${copy.getFullYear()}-${String(copy.getMonth() + 1).padStart(2, '0')}-${String(copy.getDate()).padStart(2, '0')}`;
-  copy.setDate(copy.getDate() + 6);
-  const sunday = `${copy.getFullYear()}-${String(copy.getMonth() + 1).padStart(2, '0')}-${String(copy.getDate()).padStart(2, '0')}`;
-  return [monday, sunday];
+/** Sunday of the week containing `dateStr`, as YYYY-MM-DD. */
+export function sundayOf(dateStr: string): string {
+  return addDays(mondayOf(dateStr), 6);
 }
 
-function classifyDueDate(
-  dueDate: string,
-  today: string,
-  thisMonday: string,
-  thisSunday: string,
-  nextMonday: string,
-  nextSunday: string,
-): UpcomingBucket {
-  if (dueDate < today) return 'overdue';
-  if (dueDate >= thisMonday && dueDate <= thisSunday) return 'this-week';
-  if (dueDate >= nextMonday && dueDate <= nextSunday) return 'next-week';
-  return 'later';
+/** The name of a board's first column (lowest sort_order). Falls back to 'To Do'. */
+export function firstStatusNameForBoard(boardId: string): string {
+  const first = statuses.value.filter((s) => s.board_id === boardId).sort((a, b) => a.sort_order - b.sort_order)[0];
+  return first ? first.name : 'To Do';
 }
 
-export const upcomingBuckets = computed((): UpcomingBucketData[] => {
-  const now = new Date();
-  const today = todayStr();
-  const thisMonday = mondayOfWeek(now);
-  const thisSunday = sundayOfWeek(now);
-  const [nextMonday, nextSunday] = nextWeekRange(now);
+/** The name of a board's first terminal column, or null when it has none (and no statuses to fall back on). */
+export function firstTerminalStatusNameForBoard(boardId: string): string | null {
+  const boardStats = statuses.value.filter((s) => s.board_id === boardId).sort((a, b) => a.sort_order - b.sort_order);
+  if (boardStats.length === 0) return 'Done';
+  return boardStats.find((s) => s.is_terminal)?.name ?? null;
+}
 
-  // Get all non-terminal items across all accessible boards. The filter set
-  // is a snapshot taken at load, so archived boards are dropped here as well:
-  // a board archived since then must not keep its items in Upcoming (#288).
-  const selectedBoards = upcomingFilterBoards.value;
-  const archivedIds = new Set(boards.value.filter(isBoardArchived).map((b) => b.id));
-  const allItems = items.value.filter(
-    (i) =>
-      !isTerminalStatusForBoard(i.status, i.board_id) && selectedBoards.has(i.board_id) && !archivedIds.has(i.board_id),
-  );
-
-  const search = upcomingFilterSearch.value.trim();
-  const labelFilter = upcomingFilterLabel.value;
-
-  // Classify items with due dates into buckets
-  const rootsWithDue = allItems.filter((i) => !i.parent_id && i.due_date);
-  const children = allItems.filter((i) => i.parent_id);
-
-  // Build parent → earliest child bucket map for AC3
-  const parentBucketMap = new Map<string, UpcomingBucket>();
-  for (const child of children) {
-    if (!child.due_date) continue;
-    const bucket = classifyDueDate(child.due_date, today, thisMonday, thisSunday, nextMonday, nextSunday);
-    const existing = parentBucketMap.get(child.parent_id);
-    if (!existing || bucketOrder(bucket) < bucketOrder(existing)) {
-      parentBucketMap.set(child.parent_id, bucket);
-    }
-  }
-
-  // Collect all qualifying root items
-  const buckets: Record<UpcomingBucket, ItemWithRow[]> = {
-    overdue: [],
-    'this-week': [],
-    'next-week': [],
-    later: [],
-  };
-
-  // Roots with their own due dates
-  for (const item of rootsWithDue) {
-    const bucket = classifyDueDate(item.due_date, today, thisMonday, thisSunday, nextMonday, nextSunday);
-    buckets[bucket].push(item);
-  }
-
-  // AC3: Parents without qualifying due date but with qualifying children
-  const rootsWithoutDue = allItems.filter((i) => !i.parent_id && !i.due_date);
-  for (const item of rootsWithoutDue) {
-    const childBucket = parentBucketMap.get(item.id);
-    if (childBucket) {
-      buckets[childBucket].push(item);
-    }
-  }
-
-  // Also include roots whose own due_date doesn't qualify but whose children do
-  // (e.g., root due_date is in "later" but child is in "overdue")
-  // The root already appears via its own due date, so skip re-adding
-
-  // Apply search and label filters
-  const applyFilters = (list: ItemWithRow[]): ItemWithRow[] => {
-    let result = list;
-    if (search) {
-      const t = search.toLowerCase();
-      result = result.filter(
-        (i) =>
-          i.title.toLowerCase().includes(t) ||
-          i.description.toLowerCase().includes(t) ||
-          i.labels.toLowerCase().includes(t),
-      );
-    }
-    if (labelFilter) {
-      result = result.filter((i) =>
-        i.labels
-          .split(',')
-          .map((l) => l.trim())
-          .includes(labelFilter),
-      );
-    }
-    return result;
-  };
-
-  // Sort each bucket by due_date ascending
-  const sortByDue = (a: ItemWithRow, b: ItemWithRow) => {
-    if (!a.due_date && !b.due_date) return 0;
-    if (!a.due_date) return 1;
-    if (!b.due_date) return -1;
-    return a.due_date.localeCompare(b.due_date);
-  };
-
-  const result: UpcomingBucketData[] = [];
-  const bucketDefs: { key: UpcomingBucket; label: string }[] = [
-    { key: 'overdue', label: 'Overdue' },
-    { key: 'this-week', label: 'This Week' },
-    { key: 'next-week', label: 'Next Week' },
-    { key: 'later', label: 'Later' },
-  ];
-
-  for (const def of bucketDefs) {
-    const filtered = applyFilters(buckets[def.key]).sort(sortByDue);
-    if (filtered.length > 0) {
-      result.push({ key: def.key, label: def.label, items: filtered });
-    }
-  }
-
-  return result;
+/** The signed-in person's Owners-sheet name, or '' when they have no row. */
+export const currentOwnerName = computed(() => {
+  const email = currentUserEmail.value.toLowerCase();
+  if (!email) return '';
+  return owners.value.find((o) => o.google_account.toLowerCase() === email)?.name ?? '';
 });
 
-function bucketOrder(bucket: UpcomingBucket): number {
-  const order: Record<UpcomingBucket, number> = { overdue: 0, 'this-week': 1, 'next-week': 2, later: 3 };
-  return order[bucket];
+export type TodayWho = 'mine' | 'everyone';
+const TODAY_WHO_KEY = 'hive-today-who';
+
+function loadTodayWho(): TodayWho {
+  try {
+    return localStorage.getItem(TODAY_WHO_KEY) === 'everyone' ? 'everyone' : 'mine';
+  } catch {
+    return 'mine';
+  }
 }
+
+export const todayWho = signal<TodayWho>(loadTodayWho());
+
+export function setTodayWho(who: TodayWho) {
+  todayWho.value = who;
+  try {
+    localStorage.setItem(TODAY_WHO_KEY, who);
+  } catch {
+    /* localStorage unavailable */
+  }
+}
+
+/** Mine applies only to a person with an Owners row; without one it is Everyone. */
+export const effectiveTodayWho = computed((): TodayWho => (currentOwnerName.value ? todayWho.value : 'everyone'));
+
+/** The selected day (YYYY-MM-DD). Today on load; not persisted. */
+export const todaySelectedDay = signal<string>(todayStr());
+/** Monday of the week the strip shows. */
+export const todayWeekStart = signal<string>(mondayOf(todayStr()));
+
+export function selectTodayDay(day: string) {
+  todaySelectedDay.value = day;
+}
+
+export function shiftTodayWeek(weeks: number) {
+  todayWeekStart.value = addDays(todayWeekStart.value, weeks * 7);
+}
+
+export interface TodayRow {
+  item: ItemWithRow;
+  board: Board;
+  /** In one of its board's terminal columns. */
+  done: boolean;
+  /** Open, and not in its board's first column. */
+  started: boolean;
+  /** Title of the parent, for a subtask. */
+  parentTitle: string;
+  /** Whether the item's board has a terminal column to check it into. */
+  canComplete: boolean;
+}
+
+function byDueThenBoard(boardOrder: Map<string, number>) {
+  return (a: TodayRow, b: TodayRow) =>
+    a.item.due_date.localeCompare(b.item.due_date) ||
+    (boardOrder.get(a.board.id) ?? 0) - (boardOrder.get(b.board.id) ?? 0) ||
+    a.item.sort_order - b.item.sort_order;
+}
+
+/**
+ * Every dated item on an accessible, non-archived board, roots and subtasks
+ * alike, narrowed to the signed-in person's own when Mine is on.
+ */
+export const todayRows = computed((): TodayRow[] => {
+  const boardList = accessibleBoards.value;
+  const byId = new Map(boardList.map((b) => [b.id, b]));
+  const all = items.value;
+  const itemById = new Map(all.map((i) => [i.id, i]));
+  const mine = effectiveTodayWho.value === 'mine' ? currentOwnerName.value : '';
+  const rows: TodayRow[] = [];
+  for (const item of all) {
+    if (!item.due_date) continue;
+    const parent = item.parent_id ? itemById.get(item.parent_id) : undefined;
+    const boardId = item.board_id || parent?.board_id || '';
+    const board = byId.get(boardId);
+    if (!board) continue;
+    if (mine && item.owner !== mine) continue;
+    const done = isTerminalStatusForBoard(item.status, boardId);
+    rows.push({
+      item,
+      board,
+      done,
+      started: !done && item.status !== firstStatusNameForBoard(boardId),
+      parentTitle: parent?.title ?? '',
+      canComplete: firstTerminalStatusNameForBoard(boardId) !== null,
+    });
+  }
+  return rows;
+});
+
+export interface TodayDay {
+  date: string;
+  /** Up to the row count: open ones first. */
+  open: number;
+  done: number;
+}
+
+/** The numbers and lists Today draws, for the selected day. */
+export const todayView = computed(() => {
+  const today = todayStr();
+  const selected = todaySelectedDay.value;
+  const horizon = selected > today ? selected : today;
+  const weekEnd = sundayOf(today);
+  const rows = todayRows.value;
+  const boardOrder = new Map(accessibleBoards.value.map((b, i) => [b.id, i]));
+  const sortDue = byDueThenBoard(boardOrder);
+
+  const days: TodayDay[] = [];
+  for (let i = 0; i < 7; i++) {
+    const date = addDays(todayWeekStart.value, i);
+    const due = rows.filter((r) => r.item.due_date === date);
+    days.push({ date, open: due.filter((r) => !r.done).length, done: due.filter((r) => r.done).length });
+  }
+
+  const overdue = rows.filter((r) => !r.done && r.item.due_date < today).sort(sortDue);
+
+  const dueRows = rows.filter((r) => r.item.due_date === selected);
+  const dueOpen = dueRows
+    .filter((r) => !r.done)
+    .sort(
+      (a, b) =>
+        (boardOrder.get(a.board.id) ?? 0) - (boardOrder.get(b.board.id) ?? 0) || a.item.sort_order - b.item.sort_order,
+    );
+  const dueDone = dueRows
+    .filter((r) => r.done)
+    .sort((a, b) => (a.item.completed_at || '').localeCompare(b.item.completed_at || ''));
+
+  const after = rows.filter((r) => !r.done && r.item.due_date > horizon).sort(sortDue);
+  const inProgress = after.filter((r) => r.started);
+
+  return {
+    today,
+    selected,
+    horizon,
+    days,
+    overdue,
+    due: [...dueOpen, ...dueDone],
+    dueOpenCount: dueOpen.length,
+    dueDoneCount: dueDone.length,
+    moreThisWeek: after.filter((r) => r.item.due_date <= weekEnd).length,
+    inProgress,
+    upNext: after.slice(0, 5),
+    anyDated: rows.length > 0,
+  };
+});
 
 export const selectedItem = computed(() =>
   selectedItemId.value ? (items.value.find((i) => i.id === selectedItemId.value) ?? null) : null,

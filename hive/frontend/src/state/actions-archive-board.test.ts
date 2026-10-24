@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // #288: archive / unarchive. Only the two Sheets writes are mocked; the store
-// is real, so accessibleBoards, archivedBoards and Upcoming are exercised as
+// is real, so accessibleBoards, archivedBoards and Today are exercised as
 // the app runs them.
 
 const mockSetBoardArchivedAt = vi.fn().mockResolvedValue(undefined);
@@ -24,8 +24,7 @@ import {
   toastMessage,
   accessibleBoards,
   archivedBoards,
-  upcomingBuckets,
-  upcomingFilterBoards,
+  todayRows,
   activeView,
   showArchivedBoardsDialog,
 } from './board-store';
@@ -72,14 +71,13 @@ beforeEach(() => {
     item('g-doing', 'garage', 'In Progress', tomorrow),
     item('h-todo', 'home', 'To Do', tomorrow),
   ];
-  upcomingFilterBoards.value = new Set(['home', 'garage']);
   activeView.value = 'boards';
   activeBoardId.value = 'garage';
   toastMessage.value = null;
 });
 
 function upcomingIds() {
-  return upcomingBuckets.value.flatMap((b) => b.items.map((i) => i.id));
+  return todayRows.value.map((r) => r.item.id);
 }
 
 describe('archiveBoard (AC1, AC2)', () => {
@@ -114,14 +112,12 @@ describe('archiveBoard (AC1, AC2)', () => {
     expect(toastMessage.value?.action?.label).toBe('Undo');
   });
 
-  it('drops the board from accessibleBoards and its items from Upcoming, whatever their status', async () => {
+  it('drops the board from accessibleBoards and its items from Today, whatever their status', async () => {
     expect(upcomingIds()).toEqual(expect.arrayContaining(['g-todo', 'g-doing']));
     await archiveBoard('garage', ME, 'tok');
     expect(accessibleBoards.value.map((b) => b.id)).toEqual(['home']);
     expect(archivedBoards.value.map((b) => b.id)).toEqual(['garage']);
     expect(upcomingIds()).toEqual(['h-todo']);
-    // Leaves the filter snapshot too, so the filter badge compares like with like.
-    expect([...upcomingFilterBoards.value]).toEqual(['home']);
   });
 
   it('Undo restores the board and goes back to it', async () => {
@@ -146,11 +142,10 @@ describe('archiveBoard (AC1, AC2)', () => {
 describe('unarchiveBoard (AC3)', () => {
   beforeEach(() => {
     boards.value = boards.value.map((b) => (b.id === 'garage' ? { ...b, archived_at: '2026-10-01T00:00:00.000Z' } : b));
-    upcomingFilterBoards.value = new Set(['home']);
     activeBoardId.value = 'home';
   });
 
-  it('clears archived_at, audits it, and brings the items back to Upcoming', async () => {
+  it('clears archived_at, audits it, and brings the items back to Today', async () => {
     expect(await unarchiveBoard('garage', ME, 'tok')).toBe(true);
     expect(mockSetBoardArchivedAt).toHaveBeenCalledWith('garage', '', 'tok');
     expect(mockAppendAuditEntry).toHaveBeenCalledWith(

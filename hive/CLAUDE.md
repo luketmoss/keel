@@ -155,6 +155,7 @@ removes it. A trigger runs the **pushed** code, not a deployment, so a drifted
 
 ## Architecture Notes
 - Navigation (#623): a bottom tab bar below 768px, a left rail from there up (`components/shell/`), `?view=today | boards | settings`, `?board=<id>` for a board, `?item=<id>` over either. `navigate()` in `board-store.ts` pushes history; `switchBoard()` swaps the board in place
+- Today (#624): `components/today/`, reading `todayRows` / `todayView` in `board-store.ts` (scope, done, started, overdue and the glance numbers are computed there, once). Check-off, uncheck and Move to today are `state/actions-today.ts`: the board's own `moveItem` / `updateItem` plus a toast with Undo. Mine / Everyone is `localStorage` `hive-today-who`. Upcoming and its bucket logic are gone
 - Frontend uses direct `fetch()` to the Sheets REST API (not gapi.client)
 - Auth: Google Identity Services (GIS) token model, through `@keel/auth` (#609, a `file:../../auth` dependency, keys prefixed `hive_`). `src/auth/auth-provider.tsx` only mirrors its session into context (plus the demo short-circuit, the one-time `hive_prior_user` migration and `updateUserName`); `login-screen.tsx` stays here. Renewal happens on the next tap, never on a timer or page load. `withReauth()` wraps every Sheets call and retries once on a 401 via `attemptReauth`. A change under `auth/` rebuilds Hive (`hive.yml` and `hive-pages.yml` trigger on it)
 - State: @preact/signals — module-level `signal()`/`computed()`. `useState` only for component-local state

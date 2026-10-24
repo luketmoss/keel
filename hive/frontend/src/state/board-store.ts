@@ -147,27 +147,56 @@ export function setGroupBy(mode: GroupBy) {
 export type ActiveView = 'today' | 'boards' | 'settings';
 export const activeView = signal<ActiveView>('today');
 
+/** #625: under Boards, whether a board is showing (true) or the list of boards (false). */
+export const boardOpen = signal(false);
+/** #625: what Boards last showed this session: a board's id, or null for the list. */
+let boardsMemory: string | null = null;
+
+/** Record what Boards is showing: a board by id, or the list. */
+function showBoardsScreen(boardId: string | null) {
+  boardOpen.value = boardId !== null;
+  boardsMemory = boardId;
+}
+
 /** The title for the current destination: a board by name once one is in the URL, else the destination's. */
 export function destinationTitle(): string {
   if (activeView.value === 'today') return 'Hive \u2014 Today';
   if (activeView.value === 'settings') return 'Hive \u2014 Settings';
-  const hasBoardParam = !!new URLSearchParams(window.location.search).get('board');
-  const board = hasBoardParam ? boards.value.find((b) => b.id === activeBoardId.value) : null;
+  const board = boardOpen.value ? boards.value.find((b) => b.id === activeBoardId.value) : null;
   return board ? `Hive \u2014 ${board.name}` : 'Hive \u2014 Boards';
 }
 
 /**
  * Go to a destination. `pushState`, so the back button steps back through
- * destinations. `boardId` opens that board under Boards. Leaving a destination
- * drops `item`: an item belongs to the page it was opened over.
+ * destinations (`replace` swaps the current entry instead). `boardId` opens that
+ * board under Boards; Boards without one is the list (#625). Leaving a
+ * destination drops `item`: an item belongs to the page it was opened over.
  */
-export function navigate(view: ActiveView, boardId?: string) {
+export function navigate(view: ActiveView, boardId?: string, replace = false) {
   const url = destinationUrl(view, boardId);
   selectedItemId.value = null;
-  if (view === 'boards' && boardId && boardId !== activeBoardId.value) enterBoard(boardId);
+  if (view === 'boards') {
+    if (boardId && boardId !== activeBoardId.value) enterBoard(boardId);
+    showBoardsScreen(boardId ?? null);
+  }
   activeView.value = view;
-  if (url.toString() !== window.location.href) window.history.pushState(null, '', url.toString());
+  if (url.toString() !== window.location.href) {
+    if (replace) window.history.replaceState(null, '', url.toString());
+    else window.history.pushState(null, '', url.toString());
+  }
   document.title = destinationTitle();
+}
+
+/**
+ * The Boards tab (#625). Tapped while Boards is showing, it returns to the list.
+ * Coming from Today or Settings it restores what Boards last had open this
+ * session, a board or the list.
+ */
+export function openBoardsTab() {
+  const remembered = boardsMemory;
+  const restore =
+    activeView.value !== 'boards' && remembered !== null && accessibleBoards.value.some((b) => b.id === remembered);
+  navigate('boards', restore ? (remembered as string) : undefined);
 }
 
 /** The address of a destination, keeping unrelated parameters such as `demo`. */
@@ -185,8 +214,11 @@ export function destinationUrl(view: ActiveView, boardId?: string): URL {
 export function initActiveViewFromUrl() {
   const params = new URLSearchParams(window.location.search);
   const view = params.get('view');
-  if (view === 'settings' || view === 'today' || view === 'boards') {
+  if (view === 'settings' || view === 'today') {
     activeView.value = view;
+  } else if (view === 'boards') {
+    activeView.value = 'boards';
+    showBoardsScreen(null);
   } else if (view === 'upcoming') {
     // An old link: open Today and say so in the address bar, keeping the other parameters.
     activeView.value = 'today';
@@ -194,8 +226,13 @@ export function initActiveViewFromUrl() {
     url.searchParams.set('view', 'today');
     window.history.replaceState(null, '', url.toString());
   } else if (params.get('board') || params.get('item')) {
-    // A board or an item on its own is a link into a board.
+    // A board or an item on its own is a link into a board. A board that
+    // cannot be opened is the list (#625); an item's own board is settled when
+    // the item resolves.
     activeView.value = 'boards';
+    const boardParam = params.get('board');
+    const reachable = !!boardParam && accessibleBoards.value.some((b) => b.id === boardParam);
+    showBoardsScreen(reachable || params.get('item') ? activeBoardId.value : null);
   } else {
     activeView.value = 'today';
   }
@@ -293,6 +330,7 @@ export function initSelectedItemFromUrl() {
   if (item.board_id && item.board_id !== activeBoardId.value) {
     activeBoardId.value = item.board_id;
     if (activeView.value === 'boards') {
+      showBoardsScreen(item.board_id);
       const url = new URL(window.location.href);
       url.searchParams.set('board', item.board_id);
       window.history.replaceState(null, '', url.toString());
@@ -548,16 +586,41 @@ export const showArchivedBoardsDialog = signal(false);
 // --- UI state for move-to-board modal ---
 export const showMoveToBoardModal = signal(false);
 
-/** The state half of opening a board: resets filters, grouping and selection, and lands on Boards. */
-function enterBoard(boardId: string) {
+/** Make a board the active one: resets filters, grouping and selection. Shows nothing by itself. */
+export function selectBoard(boardId: string) {
   activeBoardId.value = boardId;
-  activeView.value = 'boards';
   filterOwner.value = null;
   filterLabel.value = null;
   filterSearch.value = '';
   filterDue.value = null;
   groupBy.value = 'none';
   selectedItemId.value = null;
+}
+
+/** The state half of opening a board: selects it and lands on Boards with that board showing. */
+function enterBoard(boardId: string) {
+  selectBoard(boardId);
+  activeView.value = 'boards';
+  showBoardsScreen(boardId);
+}
+
+/**
+ * #625: the active board was archived or deleted. Something else becomes the
+ * active board for the rest of the app (`preferred` when it is still reachable),
+ * and if that board was showing, Boards shows the list in its place.
+ */
+export function dropActiveBoard(preferredId?: string) {
+  const wasOpen = activeView.value === 'boards' && boardOpen.value;
+  const list = accessibleBoards.value;
+  const next = list.find((b) => b.id === preferredId) ?? list[0];
+  if (next) selectBoard(next.id);
+  if (wasOpen) navigate('boards', undefined, true);
+}
+
+/** #625: undo `dropActiveBoard` after a failed write: the board is active again, and showing if it was. */
+export function restoreBoard(boardId: string, wasOpen: boolean) {
+  if (wasOpen) navigate('boards', boardId, true);
+  else selectBoard(boardId);
 }
 
 /** Switch to a different board (in place, no history entry). Resets filters, grouping, and selection. */
@@ -863,6 +926,91 @@ export const todayView = computed(() => {
     upNext: after.slice(0, 5),
     anyDated: rows.length > 0,
   };
+});
+
+// --- Boards (#625): every board at a glance ---
+
+export interface BoardSummary {
+  board: Board;
+  /** "You, Mom and Dad", "Everyone" or "Just you". */
+  sharedWith: string;
+  /** Root items, finished ones included. Zero means "No items yet". */
+  total: number;
+  /** Open root items: not in a terminal column. */
+  open: number;
+  /** Open, in the board's first column. */
+  notStarted: number;
+  /** Open, past the first column. */
+  started: number;
+  /** In a terminal column and finished within the window the board's Done column shows. */
+  done: number;
+  /** Open items, subtasks too, due before today. */
+  overdue: number;
+  /** The earliest open item due today or later, or null. */
+  next: { title: string; date: string } | null;
+}
+
+function nameFromEmail(email: string): string {
+  const owner = owners.value.find((o) => o.google_account.toLowerCase() === email.toLowerCase());
+  return owner?.name || email.split('@')[0];
+}
+
+/** Who a board is shared with, as one line. Up to three names, then "and N others". */
+export function sharedWithLine(boardId: string): string {
+  const me = currentUserEmail.value.toLowerCase();
+  const rows = permissions.value.filter((p) => p.board_id === boardId);
+  if (rows.some((p) => p.user_email === '*')) return 'Everyone';
+  const others = [...new Set(rows.map((p) => p.user_email.toLowerCase()).filter((e) => e && e !== me))].map(
+    nameFromEmail,
+  );
+  if (others.length === 0) return 'Just you';
+  const names = ['You', ...others];
+  if (names.length <= 3) return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  const rest = names.length - 3;
+  return `${names.slice(0, 3).join(', ')} and ${rest} other${rest === 1 ? '' : 's'}`;
+}
+
+/** One summary per accessible, non-archived board, in the order the rail lists them. */
+export const boardSummaries = computed((): BoardSummary[] => {
+  const today = todayStr();
+  const cutoff = Date.now() - SEVEN_DAYS_MS;
+  const all = items.value;
+  const itemById = new Map(all.map((i) => [i.id, i]));
+  return accessibleBoards.value.map((board) => {
+    const first = firstStatusNameForBoard(board.id);
+    let total = 0;
+    let notStarted = 0;
+    let started = 0;
+    let done = 0;
+    let overdue = 0;
+    let next: ItemWithRow | null = null;
+    for (const item of all) {
+      const boardId = item.board_id || (item.parent_id ? itemById.get(item.parent_id)?.board_id : '') || '';
+      if (boardId !== board.id) continue;
+      const terminal = isTerminalStatusForBoard(item.status, board.id);
+      if (!item.parent_id) {
+        total++;
+        if (terminal) {
+          if (item.completed_at && new Date(item.completed_at).getTime() >= cutoff) done++;
+        } else if (item.status === first) notStarted++;
+        else started++;
+      }
+      if (terminal || !item.due_date) continue;
+      if (item.due_date < today) overdue++;
+      else if (!next || item.due_date < next.due_date) next = item;
+    }
+    return {
+      board,
+      sharedWith: sharedWithLine(board.id),
+      total,
+      open: notStarted + started,
+      notStarted,
+      started,
+      done,
+      overdue,
+      next: next ? { title: next.title, date: next.due_date } : null,
+    };
+  });
 });
 
 export const selectedItem = computed(() =>

@@ -36,3 +36,11 @@ const OWNER_COLORS = ['#e65100', '#1976d2', '#2e7d32', '#7b1fa2', '#c62828', '#0
 export function ownerColor(index: number): string {
   return OWNER_COLORS[(index < 0 ? 0 : index) % OWNER_COLORS.length];
 }
+
+/** When an open item is due, for a Boards card: "today", "tomorrow", "Tue 27", or "Sun, Nov 2" beyond a week out. */
+export function dueWord(dateStr: string, today: string): string {
+  if (dateStr === today) return 'today';
+  if (dateStr === addDays(today, 1)) return 'tomorrow';
+  if (dateStr <= addDays(today, 6)) return dayShort(dateStr);
+  return dayLong(dateStr);
+}

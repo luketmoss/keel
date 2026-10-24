@@ -17,6 +17,7 @@ const mockState = {
   accessibleBoards: [] as any[],
   groupByValue: 'none' as string,
   activeView: 'boards' as string,
+  boardOpen: true,
 };
 
 const mockSwitchBoard = vi.fn();
@@ -35,6 +36,7 @@ afterEach(() => {
   mockState.accessibleBoards = [];
   mockState.groupByValue = 'none';
   mockState.activeView = 'boards';
+  mockState.boardOpen = true;
   mockSwitchBoard.mockClear();
   mockMoveItem.mockClear();
 });
@@ -167,6 +169,11 @@ vi.mock('../../state/board-store', () => ({
       return mockState.activeView;
     },
   },
+  boardOpen: {
+    get value() {
+      return mockState.boardOpen;
+    },
+  },
   boardStatuses: {
     value: [
       {
@@ -239,6 +246,9 @@ vi.mock('../header/control-bar', () => ({
 // Mock other sub-components
 vi.mock('./list-view', () => ({
   ListView: () => <div class="list-view" data-testid="list-view" />,
+}));
+vi.mock('../boards/boards-screen', () => ({
+  BoardsScreen: () => <div class="boards-screen" data-testid="boards-screen" />,
 }));
 vi.mock('../today/today-screen', () => ({
   TodayScreen: () => <div class="today-screen" data-testid="today-screen" />,
@@ -405,6 +415,33 @@ describe('KanbanBoard shell (Issue #623)', () => {
       expect(container.querySelector('[data-testid="control-bar"]')).not.toBeNull();
       expect(container.querySelector('[data-testid="board-welcome"]')).not.toBeNull();
       expect(container.querySelector('.fab')).not.toBeNull();
+    });
+  });
+
+  describe('Boards list (#625)', () => {
+    beforeEach(() => {
+      mockState.boardOpen = false;
+    });
+
+    it('shows the list alone: no control bar, board or new-item button', () => {
+      const { container } = renderBoard();
+      expect(container.querySelector('[data-testid="boards-screen"]')).not.toBeNull();
+      expect(container.querySelector('[data-testid="control-bar"]')).toBeNull();
+      expect(container.querySelector('[data-testid="board-welcome"]')).toBeNull();
+      expect(container.querySelector('.fab')).toBeNull();
+    });
+
+    it('N and A and the board shortcuts do nothing on the list', () => {
+      mockState.accessibleBoards = [{ id: 'b1', name: 'Work' }];
+      renderBoard();
+
+      fireEvent.keyDown(document, { key: 'n' });
+      fireEvent.keyDown(document, { key: 'a' });
+      fireEvent.keyDown(document, { key: '1', ctrlKey: true });
+
+      expect(mockState.showCreateModal).toBe(false);
+      expect(mockState.showArchiveDialog).toBe(false);
+      expect(mockSwitchBoard).not.toHaveBeenCalled();
     });
   });
 

@@ -83,6 +83,11 @@ vi.mock('./board-store', () => ({
     },
   },
   switchBoard: vi.fn(),
+  navigate: vi.fn(),
+  activeView: { value: 'boards' },
+  boardOpen: { value: true },
+  dropActiveBoard: vi.fn(),
+  restoreBoard: vi.fn(),
 }));
 
 // Mock API layer

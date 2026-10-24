@@ -75,10 +75,12 @@ against the project. This is the one board rule stated here rather than in
 `CONVENTIONS.md`, because it binds every session and `CONVENTIONS.md` gives it
 only in the narrower case of adding a project option.
 
-Cloud Claude Code sessions have no `gh`, and their GitHub access is repo-scoped
-REST only. There, `board.py` hands the same command to
+Cloud Claude Code sessions (`CLAUDE_CODE_REMOTE=true`) have repo-scoped REST
+access only: some have no `gh`, and where one is installed GitHub refuses it
+GraphQL. There, `board.py` hands the same command to
 `.github/workflows/board.yml` (a `repository_dispatch`) and relays its output
 and exit code, 15–40 s later; it needs the `BOARD_TOKEN` repo secret, a classic
-PAT with `project`, `repo` and `read:org`. Every other `gh` step in a skill
-means the same operation through the GitHub MCP tools (`mcp__github__*`).
-Nothing changes where `gh` is installed.
+PAT with `project`, `repo` and `read:org`. `pr.py` uses only REST through
+`gh api`, so it works there too wherever `gh` is installed. Every other `gh`
+step in a skill means the same operation through the GitHub MCP tools
+(`mcp__github__*`). Nothing changes on the desktop.

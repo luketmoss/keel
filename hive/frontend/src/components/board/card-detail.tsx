@@ -2,9 +2,12 @@ import { useState, useRef, useCallback, useEffect } from 'preact/hooks';
 import { useAuth } from '../../auth/auth-context';
 import {
   clearSelectedItem,
+  selectItem,
   selectedItem,
   childrenOfSelected,
   owners,
+  items as allItems,
+  activeView,
   showToast,
   openDetailWithTitleEdit,
   accessibleBoards,
@@ -15,7 +18,15 @@ import {
   defaultStatusName,
   terminalStatusName,
 } from '../../state/board-store';
-import { updateItem, deleteItem, deleteSubtask, createItem, moveItem, reorderSubtasks } from '../../state/actions';
+import {
+  updateItem,
+  deleteItem,
+  deleteSubtask,
+  createItem,
+  moveItem,
+  reorderSubtasks,
+  copyItem,
+} from '../../state/actions';
 import { LabelPickerManager } from '../labels/label-picker-manager';
 import { useFocusTrap } from '../../hooks/use-focus-trap';
 import {
@@ -25,64 +36,33 @@ import {
   isFutureLocalDate,
   isOutsideDoneWindow,
   completedRelativeLabel,
+  addLocalDays,
+  mondayOfLocal,
 } from '../../utils/completed-date';
-// QuickDateChips removed in #220 follow-up — native date picker only
+import { dayLong, monthDay, initials, ownerColor } from '../today/today-format';
+import {
+  ArrowLeftIcon,
+  CalendarIcon,
+  CheckIcon,
+  ChevronRightIcon,
+  CloseIcon,
+  ExpandIcon,
+  MoreIcon,
+  PlusSmallIcon,
+  TrashIcon,
+} from '../today/today-icons';
 import type { ItemStatus, ItemWithRow } from '../../api/types';
 
-// #220: Map status colors to theme-aware CSS variables (same as column.tsx)
-const COLOR_TO_CSS_VAR: Record<string, string> = {
-  '#e3f2fd': 'var(--color-todo)',
-  '#fff3e0': 'var(--color-inprogress)',
-  '#e8f5e9': 'var(--color-done)',
-  '#e8eaf6': 'var(--color-col-indigo)',
-  '#f3e5f5': 'var(--color-col-purple)',
-  '#fce4ec': 'var(--color-col-pink)',
-  '#e0f2f1': 'var(--color-col-teal)',
-  '#fff8e1': 'var(--color-col-amber)',
-};
-
-function resolveColumnColor(color?: string): string {
-  if (!color) return 'var(--color-bg)';
-  return COLOR_TO_CSS_VAR[color] || color;
-}
-
-// #220: Owner avatar initials + deterministic colors
-const OWNER_COLORS = ['#c43e00', '#1976d2', '#2e7d32', '#7b1fa2', '#c62828', '#00838f', '#4e342e', '#455a64'];
-
-function getInitials(name: string): string {
-  if (!name) return '?';
-  const parts = name.trim().split(/\s+/);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return name.slice(0, 2).toUpperCase();
-}
-
-function getOwnerColor(index: number): string {
-  return OWNER_COLORS[index % OWNER_COLORS.length];
-}
-
-// #220: Due date relative label
-function getRelativeDateLabel(dateStr: string): string {
-  const d = parseLocalDate(dateStr);
-  const today = new Date(new Date().toDateString());
-  const diff = Math.round((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-  if (diff < 0) return `${Math.abs(diff)} day${Math.abs(diff) === 1 ? '' : 's'} overdue`;
-  if (diff === 0) return 'Today';
-  if (diff === 1) return 'Tomorrow';
-  if (diff <= 7) return `In ${diff} days`;
-  return '';
-}
-
+/** The item screen (#627): a short top bar, the status switch, a card of field rows, a card of subtasks, a quiet footer. */
 export function CardDetail() {
   const { token, user } = useAuth();
   const item = selectedItem.value;
   if (!item) return null;
 
   const actor = user?.name || 'web';
+  // #627: one list in order; done subtasks stay where they are, struck through.
   const children = childrenOfSelected.value;
-
-  // #220: Flat list — incomplete first, then divider, then done
-  const incompleteChildren = children.filter((c) => !isTerminalStatus(c.status));
-  const doneChildren = children.filter((c) => isTerminalStatus(c.status));
+  const doneCount = children.filter((c) => isTerminalStatus(c.status)).length;
 
   // #206: Expand/collapse panel state — #233: default expanded on desktop
   const isDesktop = () => window.matchMedia('(min-width: 769px)').matches;
@@ -93,12 +73,10 @@ export function CardDetail() {
   }, [item.id]);
 
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [addingSubtask, setAddingSubtask] = useState(false);
   const [subtaskTitle, setSubtaskTitle] = useState('');
   const [subtaskDueDate, setSubtaskDueDate] = useState('');
   const subtaskInputRef = useRef<HTMLInputElement>(null);
   const subtaskRowRef = useRef<HTMLDivElement>(null);
-  const addSubtaskBtnRef = useRef<HTMLButtonElement>(null);
   // Prevents the focusout handler from re-submitting after Enter already triggered submitSubtask
   const subtaskSubmittedRef = useRef(false);
   // Mirrors subtaskTitle state so submitSubtask always reads the current value,
@@ -146,10 +124,6 @@ export function CardDetail() {
     return moveItem(item.id, newStatus, actor, token);
   };
 
-  const handleDelete = () => {
-    setConfirmingDelete(true);
-  };
-
   const confirmDelete = () => {
     if (token) {
       deleteItem(item.id, actor, token);
@@ -158,20 +132,14 @@ export function CardDetail() {
     setConfirmingDelete(false);
   };
 
-  const cancelDelete = () => {
-    setConfirmingDelete(false);
-  };
-
-  const handleAddSubtask = () => {
-    subtaskSubmittedRef.current = false;
-    subtaskTitleRef.current = '';
-    setAddingSubtask(true);
-    setSubtaskTitle('');
-    setSubtaskDueDate('');
-    // Focus the input after render
-    requestAnimationFrame(() => {
-      subtaskInputRef.current?.focus();
-    });
+  /** #627: Copy lives in the item's options menu; the copy opens in place of this item. */
+  const handleCopy = async () => {
+    if (!token) return;
+    const newId = await copyItem(item.id, actor, token);
+    if (newId) {
+      selectItem(newId);
+      showToast('Task copied');
+    }
   };
 
   /** Create the subtask from current input state. Returns true if created. */
@@ -191,49 +159,45 @@ export function CardDetail() {
     return false;
   };
 
-  /** #208: Enter path — create subtask and keep the add row open for the next one. */
+  const resetSubtaskDraft = () => {
+    setSubtaskTitle('');
+    subtaskTitleRef.current = '';
+    setSubtaskDueDate('');
+  };
+
+  /** #208: Enter path — create the subtask and keep the field focused for the next one. */
   const submitAndContinue = () => {
     if (subtaskSubmittedRef.current) return;
     subtaskSubmittedRef.current = true;
     const created = doCreateSubtask();
-    // Clear input but keep the add row open
-    setSubtaskTitle('');
-    subtaskTitleRef.current = '';
-    setSubtaskDueDate('');
+    resetSubtaskDraft();
     subtaskSubmittedRef.current = false;
     if (created) {
       requestAnimationFrame(() => subtaskInputRef.current?.focus());
     }
   };
 
-  /** Focusout / confirm button path — create subtask and close the add row. */
+  /** Focusout / confirm button path — create the subtask when there is a title. */
   const submitSubtask = () => {
     if (subtaskSubmittedRef.current) return;
     subtaskSubmittedRef.current = true;
     doCreateSubtask();
-    setAddingSubtask(false);
-    setSubtaskTitle('');
-    subtaskTitleRef.current = '';
-    setSubtaskDueDate('');
-    // Return focus to the "+ Add" trigger button after the row unmounts (#58 AC1/AC3)
-    requestAnimationFrame(() => addSubtaskBtnRef.current?.focus());
+    resetSubtaskDraft();
+    subtaskSubmittedRef.current = false;
   };
 
-  const cancelSubtask = () => {
-    subtaskSubmittedRef.current = true; // prevent focusout from submitting on cancel
-    setAddingSubtask(false);
-    setSubtaskTitle('');
-    subtaskTitleRef.current = '';
-    setSubtaskDueDate('');
-    // Return focus to the "+ Add" trigger button (#58 AC2/AC3)
-    requestAnimationFrame(() => addSubtaskBtnRef.current?.focus());
+  /** Escape clears a draft; with nothing typed it is left to close the screen. */
+  const clearSubtaskDraft = (e: KeyboardEvent) => {
+    if (!subtaskTitleRef.current && !subtaskDueDate) return;
+    e.stopPropagation();
+    resetSubtaskDraft();
   };
 
-  /** Focus-container: only submit when focus leaves the entire creation row */
-  const handleCreationRowFocusOut = (e: FocusEvent) => {
+  /** Focus-container: only submit when focus leaves the entire add row */
+  const handleAddRowFocusOut = (e: FocusEvent) => {
     const container = subtaskRowRef.current;
     const related = e.relatedTarget as Node | null;
-    // If focus moved to another element inside the creation row, don't submit
+    // If focus moved to another element inside the add row, don't submit
     if (container && related && container.contains(related)) return;
     submitSubtask();
   };
@@ -259,18 +223,16 @@ export function CardDetail() {
     setConfirmingSubtaskId(null);
     deleteSubtask(childId, actor, token);
     // The row is gone, so focus goes where it always exists
-    requestAnimationFrame(() => addSubtaskBtnRef.current?.focus());
+    requestAnimationFrame(() => subtaskInputRef.current?.focus());
   };
 
   const handleReorder = (childId: string, direction: 'up' | 'down') => {
     if (!token) return;
-    // #220: Reorder within incomplete children only
-    const reorderList = incompleteChildren;
-    const idx = reorderList.findIndex((c) => c.id === childId);
+    const idx = children.findIndex((c) => c.id === childId);
     if (idx < 0) return;
     const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
-    if (swapIdx < 0 || swapIdx >= reorderList.length) return;
-    reorderSubtasks(reorderList[idx].id, reorderList[swapIdx].id, actor, token);
+    if (swapIdx < 0 || swapIdx >= children.length) return;
+    reorderSubtasks(children[idx].id, children[swapIdx].id, actor, token);
   };
 
   // #116: Per-subtask title editing
@@ -321,7 +283,7 @@ export function CardDetail() {
     const handle = e.currentTarget as HTMLElement;
     const li = handle.closest('.subtask-item') as HTMLElement;
     const list = li.closest('.subtask-list') as HTMLElement;
-    const rowHeight = li.getBoundingClientRect().height + 4; // gap
+    const rowHeight = li.getBoundingClientRect().height;
 
     li.classList.add('subtask-dragging');
 
@@ -332,7 +294,7 @@ export function CardDetail() {
       startY: e.touches[0].clientY,
       listEl: list,
       rowHeight,
-      childIds: incompleteChildren.map((c) => c.id),
+      childIds: children.map((c) => c.id),
     };
   };
 
@@ -353,7 +315,7 @@ export function CardDetail() {
 
     // Calculate target position
     const offset = Math.round(deltaY / drag.rowHeight);
-    drag.targetIdx = Math.max(0, Math.min(items.length - 1, drag.startIdx + offset));
+    drag.targetIdx = Math.max(0, Math.min(drag.childIds.length - 1, drag.startIdx + offset));
 
     // Show drop indicator
     items.forEach((el, i) => {
@@ -398,6 +360,7 @@ export function CardDetail() {
   const isSubtask = !!item.parent_id;
   const otherBoards = accessibleBoards.value.filter((b) => b.id !== activeBoardId.value);
   const showMoveToBoard = !isSubtask && otherBoards.length > 0;
+  const parent = isSubtask ? (selectedParent(item) ?? null) : null;
 
   const toggleChildStatus = (childId: string, currentStatus: ItemStatus) => {
     if (!token) return;
@@ -408,6 +371,19 @@ export function CardDetail() {
   const handleSubtaskDateSave = async (childId: string, field: 'due_date', value: string) => {
     if (!token) return;
     await updateItem(childId, { [field]: value }, actor, token);
+  };
+
+  const board =
+    accessibleBoards.value.find((b) => b.id === item.board_id) ??
+    accessibleBoards.value.find((b) => b.id === activeBoardId.value);
+  const boardName = board?.name ?? '';
+  const backTo = activeView.value === 'today' ? 'Today' : boardName || 'the board';
+
+  const openDelete = () => {
+    setConfirmingDelete(true);
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>('.detail-footer')?.scrollIntoView?.({ block: 'nearest' });
+    });
   };
 
   return (
@@ -422,75 +398,48 @@ export function CardDetail() {
       }}
     >
       <div class={`detail-panel${expanded ? ' detail-panel-expanded' : ''}`}>
-        <div class="detail-header">
-          <h2>Item Details</h2>
-          <div class="detail-header-actions">
-            <button
-              class="btn btn-ghost detail-expand-btn"
-              aria-label={expanded ? 'Collapse panel' : 'Expand panel'}
-              onClick={() => setExpanded(!expanded)}
-            >
-              {expanded ? (
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <line x1="4" y1="20" x2="10" y2="14" />
-                  <polyline points="10 20 4 20 4 14" />
-                  <line x1="20" y1="4" x2="14" y2="10" />
-                  <polyline points="14 4 20 4 20 10" />
-                </svg>
-              ) : (
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <line x1="14" y1="10" x2="20" y2="4" />
-                  <polyline points="20 10 20 4 14 4" />
-                  <line x1="10" y1="14" x2="4" y2="20" />
-                  <polyline points="4 14 4 20 10 20" />
-                </svg>
+        <div class="detail-topbar">
+          {/* Phone gets Back, desktop gets Close; the stylesheet shows one. */}
+          <button class="today-round-btn detail-back-btn" aria-label={`Back to ${backTo}`} onClick={close}>
+            <ArrowLeftIcon />
+          </button>
+          <button class="today-round-btn detail-close-btn" aria-label="Close" onClick={close}>
+            <CloseIcon />
+          </button>
+          <div class="detail-board-line">
+            {board && <span class="detail-board-tile" aria-hidden="true" />}
+            <span class="detail-board-name">
+              {boardName} board
+              {parent && (
+                <>
+                  {' · in '}
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-sm detail-parent-link"
+                    onClick={() => selectItem(parent.id)}
+                  >
+                    {parent.title}
+                  </button>
+                </>
               )}
-            </button>
-            <button class="btn btn-ghost" aria-label="Close" onClick={close}>
-              ✕
-            </button>
+            </span>
           </div>
-        </div>
-
-        {/* #220: Status chevron pipeline — between header and body */}
-        <div class="status-pipeline" role="radiogroup" aria-label="Status">
-          {boardStatuses.value.map((s, i) => {
-            const activeIdx = boardStatuses.value.findIndex((bs) => bs.name === item.status);
-            const isActive = s.name === item.status;
-            const isReached = i < activeIdx;
-            const resolvedColor = resolveColumnColor(s.color);
-            return (
-              <button
-                key={s.id}
-                type="button"
-                class={`status-chevron${isActive ? ' active' : ''}${isReached ? ' reached' : ''}`}
-                role="radio"
-                aria-checked={isActive}
-                style={isActive ? { background: resolvedColor } : undefined}
-                onClick={() => handleMoveStatus(s.name as ItemStatus)}
-              >
-                {s.name}
-              </button>
-            );
-          })}
+          <button
+            class="today-round-btn detail-expand-btn"
+            aria-label={expanded ? 'Collapse panel' : 'Expand panel'}
+            onClick={() => setExpanded(!expanded)}
+          >
+            <ExpandIcon collapsed={!expanded} />
+          </button>
+          <ItemMenu
+            showMoveToBoard={showMoveToBoard}
+            canCopy={!isSubtask}
+            onMove={() => {
+              showMoveToBoardModal.value = true;
+            }}
+            onCopy={handleCopy}
+            onDelete={openDelete}
+          />
         </div>
 
         <div class="detail-body">
@@ -513,267 +462,302 @@ export function CardDetail() {
             multiline
           />
 
-          <OwnerDateRow item={item} owners={owners.value} save={save} />
+          <StatusSwitch item={item} onMove={handleMoveStatus} />
 
-          <SaveFeedbackField label="Labels" hideLabel>
-            {(onFieldSaved) => (
-              <LabelPickerManager
-                currentLabels={item.labels}
-                onToggle={async (labelName) => {
-                  const currentLabels = item.labels
-                    .split(',')
-                    .map((x) => x.trim())
-                    .filter(Boolean);
-                  const isActive = currentLabels.includes(labelName);
-                  const updated = isActive
-                    ? currentLabels.filter((x) => x !== labelName)
-                    : [...currentLabels, labelName];
-                  const ok = await save('labels', updated.join(', '));
-                  onFieldSaved(ok);
-                }}
-                token={token!}
-              />
-            )}
-          </SaveFeedbackField>
+          <DetailsCard
+            item={item}
+            owners={owners.value}
+            save={save}
+            token={token}
+            boardName={boardName}
+            showMoveToBoard={showMoveToBoard}
+          />
 
-          {/* Sub-tasks (#220 redesigned) */}
-          <div class="detail-subtasks">
+          <section class="detail-card detail-subtasks" aria-labelledby="detail-subtasks-heading">
             <div class="detail-subtasks-header">
-              <label>
-                Sub-tasks ({doneChildren.length}/{children.length})
-              </label>
-              {!addingSubtask && (
-                <button
-                  ref={addSubtaskBtnRef}
-                  class="subtask-add-circle"
-                  onClick={handleAddSubtask}
-                  aria-label="Add sub-task"
-                >
-                  <svg
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="12" y1="8" x2="12" y2="16" />
-                    <line x1="8" y1="12" x2="16" y2="12" />
-                  </svg>
-                </button>
-              )}
+              <h3 id="detail-subtasks-heading">Subtasks</h3>
+              <span class="detail-subtasks-count">
+                {children.length === 0 ? 'None yet' : `${doneCount} of ${children.length} done`}
+              </span>
             </div>
-            {(incompleteChildren.length > 0 || doneChildren.length > 0 || addingSubtask) && (
-              <ul class="subtask-list">
-                {incompleteChildren.map((child, idx) => (
-                  <SubtaskRow
-                    key={child.id}
-                    child={child}
-                    idx={idx}
-                    allItems={incompleteChildren}
-                    isDone={false}
-                    editingSubtaskId={editingSubtaskId}
-                    editingSubtaskDraft={editingSubtaskDraft}
-                    setEditingSubtaskDraft={setEditingSubtaskDraft}
-                    commitSubtaskTitleEdit={commitSubtaskTitleEdit}
-                    cancelSubtaskTitleEdit={cancelSubtaskTitleEdit}
-                    startEditSubtaskTitle={startEditSubtaskTitle}
-                    toggleChildStatus={toggleChildStatus}
-                    handleSubtaskDateSave={handleSubtaskDateSave}
-                    confirmingDelete={confirmingSubtaskId === child.id}
-                    requestDeleteSubtask={requestDeleteSubtask}
-                    cancelDeleteSubtask={cancelDeleteSubtask}
-                    confirmDeleteSubtask={confirmDeleteSubtask}
-                    handleReorder={handleReorder}
-                    handleTouchReorderStart={handleTouchReorderStart}
-                    handleTouchReorderMove={handleTouchReorderMove}
-                    handleTouchReorderEnd={handleTouchReorderEnd}
-                    token={token}
-                    actor={actor}
-                    item={item}
-                  />
-                ))}
-                {addingSubtask && (
-                  <li class="subtask-add-li">
-                    <div class="subtask-add-wrapper" ref={subtaskRowRef} onFocusOut={handleCreationRowFocusOut}>
-                      <div class="subtask-add-inline">
-                        <input
-                          ref={subtaskInputRef}
-                          type="text"
-                          class="subtask-add-input"
-                          placeholder="Sub-task title..."
-                          aria-label="Sub-task title"
-                          aria-describedby="subtask-add-hint"
-                          value={subtaskTitle}
-                          onInput={(e) => {
-                            const v = (e.target as HTMLInputElement).value;
-                            subtaskTitleRef.current = v;
-                            setSubtaskTitle(v);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              submitAndContinue();
-                            }
-                            if (e.key === 'Escape') {
-                              e.stopPropagation();
-                              cancelSubtask();
-                            }
-                          }}
-                        />
-                        <input
-                          type="date"
-                          class="subtask-add-date"
-                          value={subtaskDueDate}
-                          aria-label="Due date for new sub-task"
-                          onChange={(e) => setSubtaskDueDate((e.target as HTMLInputElement).value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Escape') {
-                              e.stopPropagation();
-                              cancelSubtask();
-                            }
-                          }}
-                        />
-                        <button
-                          class="btn-icon subtask-action-btn subtask-add-confirm"
-                          aria-label="Add sub-task"
-                          aria-disabled={!subtaskTitle.trim() ? 'true' : undefined}
-                          onClick={() => {
-                            if (subtaskTitle.trim()) submitSubtask();
-                          }}
-                        >
-                          <span>&#10003;</span>
-                        </button>
-                        <button
-                          class="btn-icon subtask-action-btn"
-                          aria-label="Cancel adding sub-task"
-                          onClick={() => cancelSubtask()}
-                        >
-                          &#10005;
-                        </button>
-                      </div>
-                      <span id="subtask-add-hint" class="subtask-add-hint">
-                        Enter to add another · Esc to cancel
-                      </span>
-                    </div>
-                  </li>
-                )}
-                {doneChildren.length > 0 && (
-                  <li class="subtask-divider" aria-hidden="true">
-                    <span class="subtask-divider-line"></span>
-                    <span class="subtask-divider-label">completed</span>
-                    <span class="subtask-divider-line"></span>
-                  </li>
-                )}
-                {doneChildren.map((child, idx) => (
-                  <SubtaskRow
-                    key={child.id}
-                    child={child}
-                    idx={idx}
-                    allItems={doneChildren}
-                    isDone={true}
-                    editingSubtaskId={editingSubtaskId}
-                    editingSubtaskDraft={editingSubtaskDraft}
-                    setEditingSubtaskDraft={setEditingSubtaskDraft}
-                    commitSubtaskTitleEdit={commitSubtaskTitleEdit}
-                    cancelSubtaskTitleEdit={cancelSubtaskTitleEdit}
-                    startEditSubtaskTitle={startEditSubtaskTitle}
-                    toggleChildStatus={toggleChildStatus}
-                    handleSubtaskDateSave={handleSubtaskDateSave}
-                    confirmingDelete={confirmingSubtaskId === child.id}
-                    requestDeleteSubtask={requestDeleteSubtask}
-                    cancelDeleteSubtask={cancelDeleteSubtask}
-                    confirmDeleteSubtask={confirmDeleteSubtask}
-                    handleReorder={handleReorder}
-                    handleTouchReorderStart={handleTouchReorderStart}
-                    handleTouchReorderMove={handleTouchReorderMove}
-                    handleTouchReorderEnd={handleTouchReorderEnd}
-                    token={token}
-                    actor={actor}
-                    item={item}
-                  />
-                ))}
-              </ul>
+            {children.length > 0 && (
+              <div
+                class="subtask-progress"
+                role="progressbar"
+                aria-label="Subtasks done"
+                aria-valuemin={0}
+                aria-valuemax={children.length}
+                aria-valuenow={doneCount}
+              >
+                <div class="subtask-progress-fill" style={{ width: `${(doneCount / children.length) * 100}%` }} />
+              </div>
             )}
+            <ul class="subtask-list">
+              {children.map((child, idx) => (
+                <SubtaskRow
+                  key={child.id}
+                  child={child}
+                  idx={idx}
+                  allItems={children}
+                  isDone={isTerminalStatus(child.status)}
+                  editingSubtaskId={editingSubtaskId}
+                  editingSubtaskDraft={editingSubtaskDraft}
+                  setEditingSubtaskDraft={setEditingSubtaskDraft}
+                  commitSubtaskTitleEdit={commitSubtaskTitleEdit}
+                  cancelSubtaskTitleEdit={cancelSubtaskTitleEdit}
+                  startEditSubtaskTitle={startEditSubtaskTitle}
+                  toggleChildStatus={toggleChildStatus}
+                  handleSubtaskDateSave={handleSubtaskDateSave}
+                  confirmingDelete={confirmingSubtaskId === child.id}
+                  requestDeleteSubtask={requestDeleteSubtask}
+                  cancelDeleteSubtask={cancelDeleteSubtask}
+                  confirmDeleteSubtask={confirmDeleteSubtask}
+                  handleReorder={handleReorder}
+                  handleTouchReorderStart={handleTouchReorderStart}
+                  handleTouchReorderMove={handleTouchReorderMove}
+                  handleTouchReorderEnd={handleTouchReorderEnd}
+                  token={token}
+                  actor={actor}
+                  item={item}
+                />
+              ))}
+              <li class="subtask-add-li">
+                <div class="subtask-add-wrapper" ref={subtaskRowRef} onFocusOut={handleAddRowFocusOut}>
+                  <div class="subtask-add-inline">
+                    <span class="subtask-add-plus" aria-hidden="true">
+                      <PlusSmallIcon />
+                    </span>
+                    <input
+                      ref={subtaskInputRef}
+                      type="text"
+                      class="subtask-add-input"
+                      placeholder="Add a subtask"
+                      aria-label="Add a subtask"
+                      value={subtaskTitle}
+                      onInput={(e) => {
+                        const v = (e.target as HTMLInputElement).value;
+                        subtaskTitleRef.current = v;
+                        setSubtaskTitle(v);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          submitAndContinue();
+                        }
+                        if (e.key === 'Escape') clearSubtaskDraft(e);
+                      }}
+                    />
+                    <input
+                      type="date"
+                      class="subtask-add-date"
+                      value={subtaskDueDate}
+                      aria-label="Due date for new subtask"
+                      onChange={(e) => setSubtaskDueDate((e.target as HTMLInputElement).value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') clearSubtaskDraft(e);
+                      }}
+                    />
+                    <button
+                      class="btn-icon subtask-action-btn subtask-add-confirm"
+                      aria-label="Add subtask"
+                      aria-disabled={!subtaskTitle.trim() ? 'true' : undefined}
+                      onClick={() => {
+                        if (subtaskTitle.trim()) {
+                          submitAndContinue();
+                        }
+                      }}
+                    >
+                      <span>&#10003;</span>
+                    </button>
+                  </div>
+                </div>
+              </li>
+            </ul>
             {/* #88 AC5: Announce reorder to screen readers */}
             <div class="reorder-live-region" aria-live="polite" role="status">
               {reorderAnnouncement}
             </div>
-          </div>
+          </section>
 
-          <div class="detail-meta">
-            {item.created_by && (
-              <small>
-                Created by: {owners.value.find((o) => o.google_account === item.created_by)?.name || item.created_by}
-              </small>
-            )}
-            {!item.created_by && <small>Created by: Unknown</small>}
-            <small>Created: {new Date(item.created_at).toLocaleString()}</small>
-            <small>Updated: {new Date(item.updated_at).toLocaleString()}</small>
-            {item.completed_at && !isTerminalStatus(item.status) && (
-              <small>Completed: {new Date(item.completed_at).toLocaleString()}</small>
-            )}
-          </div>
-        </div>
-
-        <div class="detail-footer">
-          <div class="detail-footer-left">
-            {showMoveToBoard && (
-              <button
-                class="btn btn-ghost"
-                aria-label="Move to board"
-                onClick={() => {
-                  showMoveToBoardModal.value = true;
-                }}
-              >
-                Move to board
-              </button>
-            )}
-          </div>
-          <div class="detail-footer-right">
-            {confirmingDelete ? (
-              <div
-                class="delete-confirm-inline"
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') {
-                    e.stopPropagation();
-                    cancelDelete();
-                  }
-                }}
-              >
-                <span class="delete-confirm-text">Are you sure?</span>
-                <button class="btn btn-ghost btn-sm" onClick={cancelDelete}>
-                  Cancel
-                </button>
-                <button class="btn btn-danger btn-sm" onClick={confirmDelete}>
-                  Delete
-                </button>
-              </div>
-            ) : (
-              <button class="btn btn-danger" onClick={handleDelete}>
-                Delete
-              </button>
-            )}
-          </div>
+          <DetailFooter
+            item={item}
+            owners={owners.value}
+            boardName={boardName}
+            subtaskCount={children.length}
+            confirming={confirmingDelete}
+            onAsk={openDelete}
+            onKeep={() => setConfirmingDelete(false)}
+            onDelete={confirmDelete}
+          />
         </div>
       </div>
     </div>
   );
 }
 
-// --- Combined owner + date row (no labels) ---
+function selectedParent(item: ItemWithRow): ItemWithRow | undefined {
+  return allItems.value.find((i) => i.id === item.parent_id);
+}
 
-function OwnerDateRow({
+// --- Top bar menu: Move to board, Copy, Delete item ---
+
+function ItemMenu({
+  showMoveToBoard,
+  canCopy,
+  onMove,
+  onCopy,
+  onDelete,
+}: {
+  showMoveToBoard: boolean;
+  canCopy: boolean;
+  onMove: () => void;
+  onCopy: () => void;
+  onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+    const onMouseDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (menuRef.current && !menuRef.current.contains(t) && btnRef.current && !btnRef.current.contains(t)) {
+        setOpen(false);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        // The menu takes the Escape; the screen stays open.
+        e.stopPropagation();
+        setOpen(false);
+        btnRef.current?.focus();
+        return;
+      }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        const items = menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]');
+        if (!items || items.length === 0) return;
+        const idx = Array.from(items).indexOf(document.activeElement as HTMLElement);
+        if (e.key === 'ArrowDown') items[(idx + 1) % items.length].focus();
+        else items[(idx - 1 + items.length) % items.length].focus();
+      }
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('keydown', onKeyDown, true);
+    };
+  }, [open]);
+
+  const choose = (action: () => void) => () => {
+    setOpen(false);
+    action();
+  };
+
+  return (
+    <div class="detail-menu">
+      <button
+        ref={btnRef}
+        class="today-round-btn"
+        aria-label="Item options"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <MoreIcon />
+      </button>
+      {open && (
+        <div ref={menuRef} role="menu" aria-label="Item options" class="overflow-menu-dropdown">
+          {showMoveToBoard && (
+            <button role="menuitem" class="overflow-menu-item" onClick={choose(onMove)}>
+              Move to board…
+            </button>
+          )}
+          {canCopy && (
+            <button role="menuitem" class="overflow-menu-item" onClick={choose(onCopy)}>
+              Copy
+            </button>
+          )}
+          <button role="menuitem" class="overflow-menu-item" onClick={choose(onDelete)}>
+            Delete item…
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- Status: a switch with one segment per board column (replaces the arrow strip) ---
+
+function StatusSwitch({ item, onMove }: { item: ItemWithRow; onMove: (status: ItemStatus) => Promise<boolean> }) {
+  const columns = boardStatuses.value;
+  const groupRef = useRef<HTMLDivElement>(null);
+  const activeIdx = columns.findIndex((s) => s.name === item.status);
+
+  // More columns than fit scroll sideways; the selected one comes into view.
+  useEffect(() => {
+    const on = groupRef.current?.querySelector<HTMLElement>('[aria-checked="true"]');
+    on?.scrollIntoView?.({ inline: 'center', block: 'nearest' });
+  }, [item.id]);
+
+  const onKeyDown = (e: KeyboardEvent) => {
+    const forward = e.key === 'ArrowRight' || e.key === 'ArrowDown';
+    const back = e.key === 'ArrowLeft' || e.key === 'ArrowUp';
+    if (!forward && !back) return;
+    e.preventDefault();
+    const from = activeIdx < 0 ? 0 : activeIdx;
+    const next = (from + (forward ? 1 : -1) + columns.length) % columns.length;
+    onMove(columns[next].name as ItemStatus);
+    groupRef.current?.querySelectorAll<HTMLElement>('[role="radio"]')[next]?.focus();
+  };
+
+  return (
+    <div
+      ref={groupRef}
+      class={`status-switch${columns.length > 4 ? ' status-switch-scroll' : ''}`}
+      role="radiogroup"
+      aria-label="Column"
+      onKeyDown={onKeyDown}
+    >
+      {columns.map((s, i) => {
+        const isActive = s.name === item.status;
+        return (
+          <button
+            key={s.id}
+            type="button"
+            class={`status-segment${isActive ? ' status-segment-on' : ''}`}
+            role="radio"
+            aria-checked={isActive}
+            tabIndex={isActive || (activeIdx < 0 && i === 0) ? 0 : -1}
+            onClick={() => onMove(s.name as ItemStatus)}
+          >
+            {s.name}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// --- Details card: Owner, Due, Labels, Completed, Board ---
+
+function DetailsCard({
   item,
   owners: ownersList,
   save,
+  token,
+  boardName,
+  showMoveToBoard,
 }: {
   item: ItemWithRow;
   owners: Array<{ name: string; google_account: string }>;
   save: (field: string, value: string) => Promise<boolean>;
+  token: string | null;
+  boardName: string;
+  showMoveToBoard: boolean;
 }) {
   const [feedback, setFeedback] = useState<'saved' | 'error' | 'future' | null>(null);
   const hiddenDateRef = useRef<HTMLInputElement>(null);
@@ -825,11 +809,38 @@ function OwnerDateRow({
     }
   };
 
+  // --- Due ---
   const dateVal = item.due_date ? item.due_date.split('T')[0] : '';
-  const hasDate = !!dateVal;
+  const today = toLocalYmd(new Date());
+  const quick = [
+    { word: 'Today', ymd: today },
+    { word: 'Tomorrow', ymd: addLocalDays(today, 1) },
+    { word: 'Next week', ymd: addLocalDays(mondayOfLocal(today), 7) },
+    { word: 'No date', ymd: '' },
+  ];
+  const matched = quick.find((q) => q.ymd === dateVal);
+  const overdue = isOverdue(dateVal, item.status);
+  const dueWords = !dateVal
+    ? 'No date'
+    : dateVal === today
+      ? 'Today'
+      : dateVal === addLocalDays(today, 1)
+        ? `${dayLong(dateVal)} · tomorrow`
+        : overdue
+          ? `${monthDay(dateVal)} · overdue`
+          : dayLong(dateVal);
+
+  // --- Owner ---
+  const ownerWords = item.owner || 'Unassigned';
+
+  // --- Labels ---
+  const appliedLabels = item.labels
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean);
 
   return (
-    <div class="owner-date-row">
+    <section class="detail-card detail-details" aria-label="Details">
       {feedback === 'saved' && (
         <span class="save-indicator save-indicator-success owner-date-feedback" data-testid="save-indicator">
           Saved
@@ -849,144 +860,250 @@ function OwnerDateRow({
           Completed date can't be in the future
         </span>
       )}
-      <div class="owner-circles">
-        {ownersList.map((o, i) => (
-          <div key={o.name} class="owner-circle-wrapper">
+
+      <div class="detail-row" role="group" aria-labelledby="detail-owner-label">
+        <div class="detail-row-head">
+          <span id="detail-owner-label" class="detail-row-label">
+            Owner
+          </span>
+          <span class="detail-row-value">{ownerWords}</span>
+        </div>
+        <div class="owner-circles">
+          {ownersList.map((o, i) => (
             <button
+              key={o.name}
               type="button"
               class={`owner-circle${item.owner === o.name ? ' active' : ''}`}
               title={o.name}
-              style={{ background: getOwnerColor(i) }}
+              aria-label={`Owner: ${o.name}`}
+              aria-pressed={item.owner === o.name}
               onClick={async () => onSaved(await save('owner', o.name))}
             >
-              {getInitials(o.name)}
+              <span class="owner-avatar" style={{ background: ownerColor(i) }}>
+                {initials(o.name)}
+              </span>
             </button>
-            <span class="owner-circle-name">{o.name.split(' ')[0]}</span>
-          </div>
-        ))}
-        <div class="owner-circle-wrapper">
+          ))}
           <button
             type="button"
             class={`owner-circle${!item.owner ? ' active' : ''}`}
             title="Unassigned"
-            style={{ background: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+            aria-label="Owner: None"
+            aria-pressed={!item.owner}
             onClick={async () => onSaved(await save('owner', ''))}
           >
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
+            <span class="owner-avatar owner-avatar-none">–</span>
           </button>
-          <span class="owner-circle-name">None</span>
         </div>
       </div>
 
-      <div class="due-date-group">
-        <button
-          type="button"
-          class={`due-date-btn${hasDate ? ' has-date' : ''}`}
-          title={hasDate ? 'Change date' : 'Set due date'}
-          aria-label={`Due date: ${hasDate ? `${formatCompactDate(dateVal)}${getRelativeDateLabel(dateVal) ? `, ${getRelativeDateLabel(dateVal)}` : ''}` : 'No date'}`}
-          onClick={() => hiddenDateRef.current?.showPicker()}
-        >
-          {hasDate ? (
-            <svg viewBox="0 0 24 24" fill="currentColor">
-              <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z" />
-            </svg>
-          ) : (
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
+      <div class="detail-row" role="group" aria-labelledby="detail-due-label">
+        <div class="detail-row-head">
+          <span id="detail-due-label" class="detail-row-label">
+            Due
+          </span>
+          <span class={`detail-row-value${overdue && dateVal !== today ? ' detail-row-value-overdue' : ''}`}>
+            {dueWords}
+          </span>
+        </div>
+        <div class="detail-chip-row">
+          {quick.map((q) => (
+            <button
+              key={q.word}
+              type="button"
+              class={`filter-chip${matched?.word === q.word ? ' filter-chip-active' : ''}`}
+              aria-pressed={matched?.word === q.word}
+              onClick={async () => onSaved(await save('due_date', q.ymd))}
             >
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-              <line x1="16" y1="2" x2="16" y2="6" />
-              <line x1="8" y1="2" x2="8" y2="6" />
-              <line x1="3" y1="10" x2="21" y2="10" />
-            </svg>
-          )}
-          <div class="date-info">
-            {hasDate ? (
-              <>
-                <span class={`date-text${isOverdue(dateVal, item.status) ? ' due-date-overdue-text' : ''}`}>
-                  {formatCompactDate(dateVal)}
-                </span>
-                {getRelativeDateLabel(dateVal) && (
-                  <span class={`date-relative${isOverdue(dateVal, item.status) ? ' due-date-overdue-text' : ''}`}>
-                    {getRelativeDateLabel(dateVal)}
-                  </span>
-                )}
-              </>
-            ) : (
-              <span class="no-date">No date</span>
-            )}
-          </div>
-        </button>
-        <input
-          ref={hiddenDateRef}
-          type="date"
-          class="due-date-hidden"
-          tabIndex={-1}
-          aria-hidden="true"
-          value={dateVal}
-          onChange={async (e) => onSaved(await save('due_date', (e.target as HTMLInputElement).value))}
-        />
-      </div>
-
-      {showCompleted && (
-        <div class="due-date-group completed-date-group">
+              {q.word}
+            </button>
+          ))}
           <button
             type="button"
-            class="completed-date-btn"
-            data-testid="completed-date-btn"
-            aria-label={`Completed ${completedFull}. Change completed date`}
-            onClick={() => completedDateRef.current?.showPicker()}
+            class={`filter-chip${dateVal && !matched ? ' filter-chip-active' : ''}`}
+            aria-pressed={!!dateVal && !matched}
+            onClick={() => hiddenDateRef.current?.showPicker?.()}
           >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="8 12 11 15 16 9" />
-            </svg>
-            <div class="date-info">
-              <span class="date-text">Completed</span>
-              <span class="date-relative">
-                {formatCompactDate(completedYmd)} · {completedRelativeLabel(completedYmd)}
-              </span>
-            </div>
+            <CalendarIcon />
+            Pick a date
           </button>
           <input
-            ref={completedDateRef}
+            ref={hiddenDateRef}
             type="date"
             class="due-date-hidden"
             tabIndex={-1}
             aria-hidden="true"
-            data-testid="completed-date-input"
-            value={completedYmd}
-            max={toLocalYmd(new Date())}
-            onChange={onCompletedChange}
+            aria-label="Due date"
+            value={dateVal}
+            onChange={async (e) => onSaved(await save('due_date', (e.target as HTMLInputElement).value))}
           />
         </div>
+      </div>
+
+      <div class="detail-row" role="group" aria-labelledby="detail-labels-label">
+        <div class="detail-row-head">
+          <span id="detail-labels-label" class="detail-row-label">
+            Labels
+          </span>
+          <span class="detail-row-value">{appliedLabels.length > 0 ? appliedLabels.join(', ') : 'None'}</span>
+        </div>
+        <SaveFeedbackField label="Labels" hideLabel>
+          {(onFieldSaved) => (
+            <LabelPickerManager
+              currentLabels={item.labels}
+              onToggle={async (labelName) => {
+                const isActive = appliedLabels.includes(labelName);
+                const updated = isActive ? appliedLabels.filter((x) => x !== labelName) : [...appliedLabels, labelName];
+                const ok = await save('labels', updated.join(', '));
+                onFieldSaved(ok);
+              }}
+              token={token!}
+            />
+          )}
+        </SaveFeedbackField>
+      </div>
+
+      {showCompleted && (
+        <div class="detail-row detail-row-inline">
+          <span class="detail-row-label">Completed</span>
+          <div class="due-date-group completed-date-group">
+            <button
+              type="button"
+              class="completed-date-btn"
+              data-testid="completed-date-btn"
+              aria-label={`Completed ${completedFull}. Change completed date`}
+              onClick={() => completedDateRef.current?.showPicker?.()}
+            >
+              <CheckIcon />
+              <span class="date-info">
+                <span class="date-text">{completedFull}</span>
+                <span class="date-relative">{completedRelativeLabel(completedYmd)}</span>
+              </span>
+            </button>
+            <input
+              ref={completedDateRef}
+              type="date"
+              class="due-date-hidden"
+              tabIndex={-1}
+              aria-hidden="true"
+              data-testid="completed-date-input"
+              value={completedYmd}
+              max={toLocalYmd(new Date())}
+              onChange={onCompletedChange}
+            />
+          </div>
+        </div>
       )}
-    </div>
+
+      {showMoveToBoard && (
+        <div class="detail-row detail-row-inline">
+          <span class="detail-row-label">Board</span>
+          <button
+            type="button"
+            class="detail-row-btn"
+            aria-label={`Board: ${boardName}. Move to board`}
+            onClick={() => {
+              showMoveToBoardModal.value = true;
+            }}
+          >
+            {boardName}
+            <ChevronRightIcon />
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+// --- Footer: who added it, and Delete item with its in-place confirm ---
+
+function DetailFooter({
+  item,
+  owners: ownersList,
+  boardName,
+  subtaskCount,
+  confirming,
+  onAsk,
+  onKeep,
+  onDelete,
+}: {
+  item: ItemWithRow;
+  owners: Array<{ name: string; google_account: string }>;
+  boardName: string;
+  subtaskCount: number;
+  confirming: boolean;
+  onAsk: () => void;
+  onKeep: () => void;
+  onDelete: () => void;
+}) {
+  const askRef = useRef<HTMLButtonElement>(null);
+  const keepRef = useRef<HTMLButtonElement>(null);
+  const wasConfirming = useRef(false);
+
+  // Focus goes to the safe choice when the confirm opens, and back to Delete item when it closes.
+  useEffect(() => {
+    if (confirming) keepRef.current?.focus();
+    else if (wasConfirming.current) askRef.current?.focus();
+    wasConfirming.current = confirming;
+  }, [confirming]);
+
+  const today = toLocalYmd(new Date());
+  const when = (iso: string): string => {
+    const ymd = localYmdOf(iso);
+    if (!ymd) return '';
+    if (ymd === today) return 'today';
+    if (ymd === addLocalDays(today, -1)) return 'yesterday';
+    return ymd.slice(0, 4) === today.slice(0, 4) ? monthDay(ymd) : `${monthDay(ymd)}, ${ymd.slice(0, 4)}`;
+  };
+  const createdBy = item.created_by
+    ? (ownersList.find((o) => o.google_account === item.created_by)?.name ?? item.created_by)
+    : 'Unknown';
+  const added = when(item.created_at);
+  const changed = localYmdOf(item.updated_at) !== localYmdOf(item.created_at) ? when(item.updated_at) : '';
+  const meta = `Added by ${createdBy}${added ? ` on ${added}` : ''}${changed ? ` · changed ${changed}` : ''}`;
+
+  const title = item.title.trim();
+  const goes =
+    subtaskCount > 0 ? `, and its ${subtaskCount} ${subtaskCount === 1 ? 'subtask goes' : 'subtasks go'} with it` : '';
+
+  return (
+    <footer class="detail-footer">
+      <p class="detail-meta">{meta}</p>
+      {confirming ? (
+        <div
+          class="detail-delete-confirm"
+          role="group"
+          aria-label="Confirm deleting item"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.stopPropagation();
+              onKeep();
+            }
+          }}
+        >
+          <p class="detail-delete-confirm-title">
+            <TrashIcon />
+            {title ? `Delete “${item.title}”?` : 'Delete this item?'}
+          </p>
+          <p class="detail-delete-confirm-message">
+            It comes off the {boardName} board for everyone who shares it{goes}.
+          </p>
+          <div class="detail-delete-confirm-actions">
+            <button ref={keepRef} type="button" class="btn btn-ghost" onClick={onKeep}>
+              Keep it
+            </button>
+            <button type="button" class="btn btn-danger" onClick={onDelete}>
+              Delete item
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button ref={askRef} type="button" class="detail-delete-btn" onClick={onAsk}>
+          <TrashIcon />
+          Delete item
+        </button>
+      )}
+    </footer>
   );
 }
 
@@ -1482,39 +1599,12 @@ function SubtaskRow({
         handleTouchReorderEnd();
       }}
     >
-      {/* #237: Grab handle — sole drag/reorder initiator, keeps rest of row scrollable/tappable.
-          Not a real button: it isn't keyboard-operable (no keyboard reorder yet), so it's
-          hidden from assistive tech rather than exposed as a control that does nothing on activation. */}
-      <span
-        class="subtask-handle"
-        aria-hidden="true"
-        draggable={!isDone && allItems.length > 1}
-        onDragStart={(e) => {
-          if (isDone) return;
-          (e as DragEvent).dataTransfer!.effectAllowed = 'move';
-          (e as DragEvent).dataTransfer!.setData('text/plain', child.id);
-          (e.currentTarget as HTMLElement).closest('.subtask-item')?.classList.add('subtask-dragging');
-        }}
-        onDragEnd={(e) => {
-          (e.currentTarget as HTMLElement).closest('.subtask-item')?.classList.remove('subtask-dragging');
-          document.querySelectorAll('.subtask-drop-target').forEach((el) => el.classList.remove('subtask-drop-target'));
-        }}
-        onTouchStart={(e) => {
-          if (!isDone && allItems.length > 1) handleTouchReorderStart(child.id, idx, e as unknown as TouchEvent);
-        }}
+      {/* #627: round check, named for what pressing it does */}
+      <button
+        class="check-icon"
+        onClick={() => toggleChildStatus(child.id, child.status)}
+        aria-label={`${isDone ? 'Mark not done' : 'Mark done'}: ${child.title}`}
       >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-          <circle cx="5" cy="3" r="1.3" />
-          <circle cx="11" cy="3" r="1.3" />
-          <circle cx="5" cy="8" r="1.3" />
-          <circle cx="11" cy="8" r="1.3" />
-          <circle cx="5" cy="13" r="1.3" />
-          <circle cx="11" cy="13" r="1.3" />
-        </svg>
-      </span>
-
-      {/* Rounded square checkbox */}
-      <button class="check-icon" onClick={() => toggleChildStatus(child.id, child.status)} aria-label={child.title}>
         <span class={`check-box${isTerminalStatus(child.status) ? ' checked' : ''}`}>
           {isTerminalStatus(child.status) && (
             <svg viewBox="0 0 24 24">
@@ -1572,6 +1662,36 @@ function SubtaskRow({
         )}
         <SubtaskDateInline child={child} onSave={handleSubtaskDateSave} />
       </div>
+
+      {/* #237: Grab handle — sole drag/reorder initiator, keeps rest of row scrollable/tappable.
+          Not a real button: it isn't keyboard-operable (no keyboard reorder yet), so it's
+          hidden from assistive tech rather than exposed as a control that does nothing on activation. */}
+      <span
+        class="subtask-handle"
+        aria-hidden="true"
+        draggable={allItems.length > 1}
+        onDragStart={(e) => {
+          (e as DragEvent).dataTransfer!.effectAllowed = 'move';
+          (e as DragEvent).dataTransfer!.setData('text/plain', child.id);
+          (e.currentTarget as HTMLElement).closest('.subtask-item')?.classList.add('subtask-dragging');
+        }}
+        onDragEnd={(e) => {
+          (e.currentTarget as HTMLElement).closest('.subtask-item')?.classList.remove('subtask-dragging');
+          document.querySelectorAll('.subtask-drop-target').forEach((el) => el.classList.remove('subtask-drop-target'));
+        }}
+        onTouchStart={(e) => {
+          if (allItems.length > 1) handleTouchReorderStart(child.id, idx, e as unknown as TouchEvent);
+        }}
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <circle cx="5" cy="3" r="1.3" />
+          <circle cx="11" cy="3" r="1.3" />
+          <circle cx="5" cy="8" r="1.3" />
+          <circle cx="11" cy="8" r="1.3" />
+          <circle cx="5" cy="13" r="1.3" />
+          <circle cx="11" cy="13" r="1.3" />
+        </svg>
+      </span>
 
       {/* Kebab menu (always visible) */}
       <button

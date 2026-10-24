@@ -227,6 +227,7 @@ export function LabelPickerManager({ currentLabels, onToggle, token }: Props) {
                 }}
                 disabled={mode === 'edit'}
               >
+                <span class="label-toggle-dot" aria-hidden="true" />
                 {l.label}
               </button>
               {mode === 'edit' && (

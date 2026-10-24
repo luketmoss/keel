@@ -53,3 +53,16 @@ export function completedRelativeLabel(ymd: string, now: Date = new Date()): str
   if (diff === 1) return 'Yesterday';
   return `${diff} days ago`;
 }
+
+/** The local calendar day `days` after `ymd` (before, when negative), as YYYY-MM-DD. */
+export function addLocalDays(ymd: string, days: number): string {
+  const [y, m, d] = ymd.split('-').map(Number);
+  return toLocalYmd(new Date(y, m - 1, d + days));
+}
+
+/** Monday of the week containing `ymd`, as YYYY-MM-DD. */
+export function mondayOfLocal(ymd: string): string {
+  const [y, m, d] = ymd.split('-').map(Number);
+  const day = new Date(y, m - 1, d).getDay(); // 0=Sun
+  return addLocalDays(ymd, day === 0 ? -6 : 1 - day);
+}

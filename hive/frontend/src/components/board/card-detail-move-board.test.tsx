@@ -19,6 +19,7 @@ let mockShowMoveToBoardModal = false;
 let mockSelectedItemOverrides: Record<string, any> = {};
 
 vi.mock('../../state/board-store', () => ({
+  activeView: { value: 'boards' },
   selectedItemId: {
     get value() {
       return mockSelectedItemId;
@@ -163,18 +164,29 @@ beforeEach(() => {
   mockShowMoveToBoardModal = false;
 });
 
-describe('Move to Board — CardDetail footer button', () => {
-  // AC1: Footer button opens the modal
-  it('shows "Move to board" button in the footer', () => {
+describe('Move to Board — CardDetail options menu and Board row (#627)', () => {
+  const openMenu = (container: Element) => {
+    fireEvent.click(container.querySelector('[aria-label="Item options"]') as HTMLElement);
+    return Array.from(container.querySelectorAll('[role="menuitem"]')) as HTMLButtonElement[];
+  };
+
+  // AC1: the ⋮ menu opens the modal
+  it('shows "Move to board…" in the Item options menu', () => {
     const { container } = renderCardDetail();
-    const btn = container.querySelector('[aria-label="Move to board"]') as HTMLButtonElement;
-    expect(btn).not.toBeNull();
-    expect(btn.textContent).toBe('Move to board');
+    const items = openMenu(container);
+    expect(items.map((i) => i.textContent)).toEqual(['Move to board…', 'Copy', 'Delete item…']);
   });
 
-  it('sets showMoveToBoardModal to true when clicked', () => {
+  it('sets showMoveToBoardModal to true when chosen from the menu', () => {
     const { container } = renderCardDetail();
-    const btn = container.querySelector('[aria-label="Move to board"]') as HTMLButtonElement;
+    fireEvent.click(openMenu(container)[0]);
+    expect(mockShowMoveToBoardModal).toBe(true);
+  });
+
+  it('the Board row names the board and opens the same modal', () => {
+    const { container } = renderCardDetail();
+    const btn = container.querySelector('.detail-row-btn') as HTMLButtonElement;
+    expect(btn.textContent).toBe('Family Board');
     fireEvent.click(btn);
     expect(mockShowMoveToBoardModal).toBe(true);
   });
@@ -184,8 +196,8 @@ describe('Move to Board — CardDetail footer button', () => {
     mockSelectedItemOverrides = { parent_id: 'some-parent' };
 
     const { container } = renderCardDetail();
-    const btn = container.querySelector('[aria-label="Move to board"]');
-    expect(btn).toBeNull();
+    expect(container.querySelector('.detail-row-btn')).toBeNull();
+    expect(openMenu(container).map((i) => i.textContent)).not.toContain('Move to board…');
   });
 
   // AC7: Hidden when user has only one accessible board
@@ -195,7 +207,7 @@ describe('Move to Board — CardDetail footer button', () => {
     ];
 
     const { container } = renderCardDetail();
-    const btn = container.querySelector('[aria-label="Move to board"]');
-    expect(btn).toBeNull();
+    expect(container.querySelector('.detail-row-btn')).toBeNull();
+    expect(openMenu(container).map((i) => i.textContent)).not.toContain('Move to board…');
   });
 });

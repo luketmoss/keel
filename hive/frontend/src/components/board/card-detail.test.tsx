@@ -4,7 +4,7 @@ import { CardDetail } from './card-detail';
 import { AuthContext } from '../../auth/auth-context';
 import type { AuthState } from '../../auth/auth-context';
 import { deleteItem, createItem } from '../../state/actions';
-import { showToast } from '../../state/board-store';
+import { showToast, accessibleBoards } from '../../state/board-store';
 
 afterEach(() => {
   cleanup();
@@ -17,6 +17,7 @@ let mockItems: any[] = [];
 let mockItemOverrides: Record<string, any> = {};
 
 vi.mock('../../state/board-store', () => ({
+  activeView: { value: 'boards' },
   selectedItemId: {
     get value() {
       return mockSelectedItemId;
@@ -289,8 +290,8 @@ describe('CardDetail keyboard accessibility (Issue #6)', () => {
 
     it('focuses the first focusable element when opened', () => {
       const { container } = renderCardDetail();
-      // The expand button is first in DOM (hidden on mobile via CSS, but jsdom ignores CSS)
-      const firstBtn = container.querySelector('.detail-header button') as HTMLElement;
+      // Back is first in the top bar (hidden on desktop via CSS, but jsdom ignores CSS)
+      const firstBtn = container.querySelector('.detail-topbar button') as HTMLElement;
       expect(document.activeElement).toBe(firstBtn);
     });
 
@@ -370,7 +371,7 @@ describe('CardDetail keyboard accessibility (Issue #6)', () => {
 
     it('close button triggers panel close', () => {
       renderCardDetail();
-      const closeBtn = document.querySelector('.detail-header [aria-label="Close"]') as HTMLElement;
+      const closeBtn = document.querySelector('.detail-topbar [aria-label="Close"]') as HTMLElement;
       expect(closeBtn).not.toBeNull();
 
       fireEvent.click(closeBtn);
@@ -394,143 +395,163 @@ describe('CardDetail inline dialogs (Issue #9)', () => {
     mockChildren = [];
     mockItems = [];
     vi.clearAllMocks();
+    // The item sits on the active board; its name is in the confirm
+    (accessibleBoards as { value: unknown }).value = [{ id: 'board-1', name: 'Family' }];
   });
 
-  // AC1: Delete confirmation is inline (not browser confirm())
+  afterEach(() => {
+    (accessibleBoards as { value: unknown }).value = [];
+  });
+
+  // AC1: Delete confirmation is inline (not browser confirm()) — #627: Delete item, then Keep it / Delete item
   describe('AC1: Delete confirmation is inline', () => {
-    it('shows inline confirmation UI when Delete is clicked instead of browser confirm()', () => {
+    it('shows an in-place confirm that names the item when Delete item is clicked', () => {
       const { container } = renderCardDetail();
 
-      // Click the Delete button
-      const deleteBtn = container.querySelector('.detail-footer .btn-danger') as HTMLElement;
+      const deleteBtn = container.querySelector('.detail-footer .detail-delete-btn') as HTMLElement;
       expect(deleteBtn).not.toBeNull();
-      expect(deleteBtn.textContent).toBe('Delete');
+      expect(deleteBtn.textContent).toBe('Delete item');
+      expect(deleteBtn.querySelector('svg')).not.toBeNull();
       fireEvent.click(deleteBtn);
 
-      // Inline confirmation should appear
-      const confirmInline = container.querySelector('.delete-confirm-inline') as HTMLElement;
-      expect(confirmInline).not.toBeNull();
-      expect(confirmInline.querySelector('.delete-confirm-text')!.textContent).toBe('Are you sure?');
+      // The button is replaced, in place, by the confirm
+      expect(container.querySelector('.detail-footer .detail-delete-btn')).toBeNull();
+      const confirm = container.querySelector('.detail-delete-confirm') as HTMLElement;
+      expect(confirm).not.toBeNull();
+      expect(confirm.querySelector('.detail-delete-confirm-title')!.textContent).toBe('Delete “Test Item”?');
+      expect(confirm.querySelector('.detail-delete-confirm-message')!.textContent).toBe(
+        'It comes off the Family board for everyone who shares it.',
+      );
 
-      // Should have Cancel and Delete buttons
-      const buttons = confirmInline.querySelectorAll('button');
+      const buttons = confirm.querySelectorAll('button');
       expect(buttons.length).toBe(2);
-      expect(buttons[0].textContent).toBe('Cancel');
-      expect(buttons[1].textContent).toBe('Delete');
+      expect(buttons[0].textContent).toBe('Keep it');
+      expect(buttons[1].textContent).toBe('Delete item');
+      // Focus lands on the safe choice
+      expect(document.activeElement).toBe(buttons[0]);
+    });
+
+    it('states how many subtasks go with it, and omits the clause when there are none', () => {
+      mockChildren = [
+        { id: 's1', title: 'A', status: 'To Do', parent_id: 'detail-test-1', sort_order: 1, due_date: '' } as any,
+        { id: 's2', title: 'B', status: 'To Do', parent_id: 'detail-test-1', sort_order: 2, due_date: '' } as any,
+        { id: 's3', title: 'C', status: 'To Do', parent_id: 'detail-test-1', sort_order: 3, due_date: '' } as any,
+      ];
+      const { container, unmount } = renderCardDetail();
+      fireEvent.click(container.querySelector('.detail-delete-btn') as HTMLElement);
+      expect(container.querySelector('.detail-delete-confirm-message')!.textContent).toBe(
+        'It comes off the Family board for everyone who shares it, and its 3 subtasks go with it.',
+      );
+      unmount();
+
+      mockChildren = [mockChildren[0]];
+      const again = renderCardDetail();
+      fireEvent.click(again.container.querySelector('.detail-delete-btn') as HTMLElement);
+      expect(again.container.querySelector('.detail-delete-confirm-message')!.textContent).toContain(
+        'and its 1 subtask goes with it.',
+      );
     });
 
     it('does not call browser confirm()', () => {
       const confirmSpy = vi.spyOn(window, 'confirm');
       const { container } = renderCardDetail();
 
-      const deleteBtn = container.querySelector('.detail-footer .btn-danger') as HTMLElement;
-      fireEvent.click(deleteBtn);
+      fireEvent.click(container.querySelector('.detail-footer .detail-delete-btn') as HTMLElement);
+      fireEvent.click(container.querySelector('.detail-delete-confirm .btn-danger') as HTMLElement);
 
       expect(confirmSpy).not.toHaveBeenCalled();
       confirmSpy.mockRestore();
     });
 
-    it('calls deleteItem and closes panel when inline Delete is confirmed', () => {
+    it('calls deleteItem and closes panel when Delete item is confirmed', () => {
       const { container } = renderCardDetail();
 
-      // Click Delete to show confirmation
-      const deleteBtn = container.querySelector('.detail-footer .btn-danger') as HTMLElement;
-      fireEvent.click(deleteBtn);
-
-      // Click the confirm Delete button
-      const confirmBtn = container.querySelector('.delete-confirm-inline .btn-danger') as HTMLElement;
-      fireEvent.click(confirmBtn);
+      fireEvent.click(container.querySelector('.detail-footer .detail-delete-btn') as HTMLElement);
+      fireEvent.click(container.querySelector('.detail-delete-confirm .btn-danger') as HTMLElement);
 
       expect(deleteItem).toHaveBeenCalledWith('detail-test-1', 'Luke', 'test-token');
       expect(mockSelectedItemId).toBeNull();
+    });
+
+    it('the Item options menu opens the same confirm', () => {
+      const { container } = renderCardDetail();
+      fireEvent.click(container.querySelector('[aria-label="Item options"]') as HTMLElement);
+      const items = Array.from(container.querySelectorAll('[role="menuitem"]')) as HTMLElement[];
+      fireEvent.click(items.find((i) => i.textContent === 'Delete item…')!);
+      expect(container.querySelector('.detail-delete-confirm')).not.toBeNull();
+      expect(deleteItem).not.toHaveBeenCalled();
     });
   });
 
   // AC2: Delete can be cancelled
   describe('AC2: Delete can be cancelled', () => {
-    it('dismisses confirmation when Cancel is clicked', () => {
+    it('dismisses confirmation when Keep it is clicked, and returns focus to Delete item', async () => {
       const { container } = renderCardDetail();
 
-      // Show confirmation
-      const deleteBtn = container.querySelector('.detail-footer .btn-danger') as HTMLElement;
-      fireEvent.click(deleteBtn);
-      expect(container.querySelector('.delete-confirm-inline')).not.toBeNull();
+      fireEvent.click(container.querySelector('.detail-footer .detail-delete-btn') as HTMLElement);
+      expect(container.querySelector('.detail-delete-confirm')).not.toBeNull();
 
-      // Click Cancel
-      const cancelBtn = container.querySelector('.delete-confirm-inline .btn-ghost') as HTMLElement;
-      fireEvent.click(cancelBtn);
+      fireEvent.click(container.querySelector('.detail-delete-confirm .btn-ghost') as HTMLElement);
 
-      // Confirmation should be dismissed
-      expect(container.querySelector('.delete-confirm-inline')).toBeNull();
-      // The Delete button should be back
-      expect(container.querySelector('.detail-footer .btn-danger')).not.toBeNull();
-      // Item should not be deleted
+      expect(container.querySelector('.detail-delete-confirm')).toBeNull();
+      const back = container.querySelector('.detail-footer .detail-delete-btn') as HTMLElement;
+      expect(back).not.toBeNull();
+      await waitFor(() => expect(document.activeElement).toBe(back));
       expect(deleteItem).not.toHaveBeenCalled();
     });
 
-    it('dismisses confirmation when Escape is pressed on the confirmation area', () => {
+    it('dismisses confirmation when Escape is pressed on the confirmation area, without closing the screen', () => {
       const { container } = renderCardDetail();
 
-      // Show confirmation
-      const deleteBtn = container.querySelector('.detail-footer .btn-danger') as HTMLElement;
-      fireEvent.click(deleteBtn);
+      fireEvent.click(container.querySelector('.detail-footer .detail-delete-btn') as HTMLElement);
 
-      // Press Escape on the confirmation area
-      const confirmInline = container.querySelector('.delete-confirm-inline') as HTMLElement;
-      fireEvent.keyDown(confirmInline, { key: 'Escape' });
+      const confirm = container.querySelector('.detail-delete-confirm') as HTMLElement;
+      fireEvent.keyDown(confirm, { key: 'Escape' });
 
-      // Confirmation should be dismissed
-      expect(container.querySelector('.delete-confirm-inline')).toBeNull();
+      expect(container.querySelector('.detail-delete-confirm')).toBeNull();
       expect(deleteItem).not.toHaveBeenCalled();
+      expect(mockSelectedItemId).toBe('detail-test-1');
     });
   });
 
-  // AC3: Subtask creation is inline (not browser prompt())
+  // AC3: Subtask creation is inline (not browser prompt()) — #627: the add row is always the last row
   describe('AC3: Subtask creation is inline', () => {
-    it('shows inline text input when + Add is clicked instead of browser prompt()', () => {
+    it('shows the add row with an "Add a subtask" field, no button to open it', () => {
       const { container } = renderCardDetail();
 
-      // Click + Add (circle-plus icon button)
-      const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-      expect(addBtn).not.toBeNull();
-      fireEvent.click(addBtn);
-
-      // Inline input should appear
+      expect(container.querySelector('.subtask-add-circle')).toBeNull();
       const input = container.querySelector('.subtask-add-input') as HTMLInputElement;
       expect(input).not.toBeNull();
-      expect(input.placeholder).toBe('Sub-task title...');
+      expect(input.placeholder).toBe('Add a subtask');
+      expect(input.getAttribute('aria-label')).toBe('Add a subtask');
+    });
+
+    it('is the last row of the list', () => {
+      mockChildren = [
+        { id: 's1', title: 'A', status: 'To Do', parent_id: 'detail-test-1', sort_order: 1, due_date: '' } as any,
+      ];
+      const { container } = renderCardDetail();
+      const rows = container.querySelectorAll('.subtask-list > li');
+      expect(rows[rows.length - 1].classList.contains('subtask-add-li')).toBe(true);
     });
 
     it('does not call browser prompt()', () => {
       const promptSpy = vi.spyOn(window, 'prompt');
       const { container } = renderCardDetail();
 
-      const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-      fireEvent.click(addBtn);
+      const input = container.querySelector('.subtask-add-input') as HTMLInputElement;
+      fireEvent.input(input, { target: { value: 'x' } });
+      fireEvent.keyDown(input, { key: 'Enter' });
 
       expect(promptSpy).not.toHaveBeenCalled();
       promptSpy.mockRestore();
-    });
-
-    it('hides + Add button while input is visible', () => {
-      const { container } = renderCardDetail();
-
-      const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-      fireEvent.click(addBtn);
-
-      // + Add button should be hidden
-      expect(container.querySelector('.detail-subtasks-header .subtask-add-circle')).toBeNull();
     });
   });
 
   // AC4: Subtask creation submits on Enter
   describe('AC4: Subtask creation submits on Enter', () => {
-    it('creates subtask and closes input when Enter is pressed with text', () => {
+    it('creates subtask and keeps the field for the next one when Enter is pressed with text', () => {
       const { container } = renderCardDetail();
-
-      // Open inline input
-      const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-      fireEvent.click(addBtn);
 
       const input = container.querySelector('.subtask-add-input') as HTMLInputElement;
 
@@ -546,17 +567,13 @@ describe('CardDetail inline dialogs (Issue #9)', () => {
         'test-token',
       );
 
-      // #208: Input should stay open (Enter keeps row open for next subtask)
+      // #208: the field stays (Enter keeps it for the next subtask) and is cleared
       expect(container.querySelector('.subtask-add-input')).not.toBeNull();
       expect((container.querySelector('.subtask-add-input') as HTMLInputElement).value).toBe('');
     });
 
     it('does not create subtask if input is empty on Enter', () => {
       const { container } = renderCardDetail();
-
-      // Open inline input
-      const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-      fireEvent.click(addBtn);
 
       const input = container.querySelector('.subtask-add-input') as HTMLInputElement;
 
@@ -569,9 +586,6 @@ describe('CardDetail inline dialogs (Issue #9)', () => {
     it('does not create subtask if input is whitespace-only on Enter', () => {
       const { container } = renderCardDetail();
 
-      const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-      fireEvent.click(addBtn);
-
       const input = container.querySelector('.subtask-add-input') as HTMLInputElement;
       fireEvent.input(input, { target: { value: '   ' } });
       fireEvent.keyDown(input, { key: 'Enter' });
@@ -580,39 +594,28 @@ describe('CardDetail inline dialogs (Issue #9)', () => {
     });
   });
 
-  // AC5: Subtask creation cancels on Escape
-  describe('AC5: Subtask creation cancels on Escape', () => {
-    it('closes input without creating subtask when Escape is pressed', () => {
+  // AC5: Escape clears a draft
+  describe('AC5: Escape clears a draft without creating a subtask', () => {
+    it('clears the field when Escape is pressed, and creates nothing', () => {
       const { container } = renderCardDetail();
-
-      // Open inline input
-      const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-      fireEvent.click(addBtn);
 
       const input = container.querySelector('.subtask-add-input') as HTMLInputElement;
       fireEvent.input(input, { target: { value: 'Some text' } });
 
-      // Press Escape
       fireEvent.keyDown(input, { key: 'Escape' });
 
-      // Input should close
-      expect(container.querySelector('.subtask-add-input')).toBeNull();
-      // No subtask created
+      expect((container.querySelector('.subtask-add-input') as HTMLInputElement).value).toBe('');
       expect(createItem).not.toHaveBeenCalled();
-      // + Add button should return
-      expect(container.querySelector('.detail-subtasks-header .subtask-add-circle')).not.toBeNull();
+      // A draft took the Escape, so the screen is still open
+      expect(mockSelectedItemId).toBe('detail-test-1');
     });
 
-    it('creation row stays open when focus moves between sibling controls', () => {
+    it('typing alone creates nothing (focus-container pattern prevents premature submit)', () => {
       const { container } = renderCardDetail();
-
-      const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-      fireEvent.click(addBtn);
 
       const input = container.querySelector('.subtask-add-input') as HTMLInputElement;
       fireEvent.input(input, { target: { value: 'Some text' } });
 
-      // Verify input is still open (focus-container pattern prevents premature close)
       expect(container.querySelector('.subtask-add-input')).not.toBeNull();
       expect(createItem).not.toHaveBeenCalled();
     });
@@ -634,9 +637,6 @@ describe('CardDetail subtask double-submit fix (Issue #54)', () => {
   // We use dispatchEvent(new FocusEvent('focusout', ...)) to dispatch the correct event.
   it('AC1: pressing Enter creates exactly one sub-task, not two', () => {
     const { container } = renderCardDetail();
-
-    const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-    fireEvent.click(addBtn);
 
     const input = container.querySelector('.subtask-add-input') as HTMLInputElement;
     const row = container.querySelector('.subtask-add-inline') as HTMLElement;
@@ -661,9 +661,6 @@ describe('CardDetail subtask double-submit fix (Issue #54)', () => {
   it('AC2: focusout submits exactly once when Enter was not pressed', () => {
     const { container } = renderCardDetail();
 
-    const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-    fireEvent.click(addBtn);
-
     const input = container.querySelector('.subtask-add-input') as HTMLInputElement;
     fireEvent.input(input, { target: { value: 'Walk the dog' } });
 
@@ -682,9 +679,6 @@ describe('CardDetail subtask double-submit fix (Issue #54)', () => {
   it('AC3: Escape cancels and subsequent focusout does not create a sub-task', () => {
     const { container } = renderCardDetail();
 
-    const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-    fireEvent.click(addBtn);
-
     const input = container.querySelector('.subtask-add-input') as HTMLInputElement;
     const row = container.querySelector('.subtask-add-inline') as HTMLElement;
 
@@ -702,8 +696,6 @@ describe('CardDetail subtask double-submit fix (Issue #54)', () => {
     const { container } = renderCardDetail();
 
     // First sub-task
-    const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-    fireEvent.click(addBtn);
     let input = container.querySelector('.subtask-add-input') as HTMLInputElement;
     fireEvent.input(input, { target: { value: 'First task' } });
     fireEvent.keyDown(input, { key: 'Enter' });
@@ -722,9 +714,6 @@ describe('CardDetail subtask double-submit fix (Issue #54)', () => {
   it('AC5: empty input does not create a sub-task on Enter', () => {
     const { container } = renderCardDetail();
 
-    const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-    fireEvent.click(addBtn);
-
     const input = container.querySelector('.subtask-add-input') as HTMLInputElement;
     fireEvent.keyDown(input, { key: 'Enter' });
 
@@ -733,9 +722,6 @@ describe('CardDetail subtask double-submit fix (Issue #54)', () => {
 
   it('AC5: whitespace-only input does not create a sub-task on focusout', () => {
     const { container } = renderCardDetail();
-
-    const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-    fireEvent.click(addBtn);
 
     const input = container.querySelector('.subtask-add-input') as HTMLInputElement;
     fireEvent.input(input, { target: { value: '   ' } });
@@ -750,12 +736,9 @@ describe('CardDetail subtask double-submit fix (Issue #54)', () => {
   it('AC6: sub-task title input has aria-label independent of placeholder', () => {
     const { container } = renderCardDetail();
 
-    const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-    fireEvent.click(addBtn);
-
     const input = container.querySelector('.subtask-add-input') as HTMLInputElement;
-    expect(input.getAttribute('aria-label')).toBe('Sub-task title');
-    expect(input.getAttribute('placeholder')).toBe('Sub-task title...');
+    expect(input.getAttribute('aria-label')).toBe('Add a subtask');
+    expect(input.getAttribute('placeholder')).toBe('Add a subtask');
   });
 });
 
@@ -764,34 +747,39 @@ describe('CardDetail created_by display (Issue #23)', () => {
     mockSelectedItemId = 'detail-test-1';
   });
 
-  // AC4: Creator displayed in card detail view
-  describe('AC4: Creator displayed in metadata section', () => {
-    it('shows "Created by" line in the detail metadata section', () => {
+  // AC4: Creator displayed in card detail view — #627: the footer line "Added by <name> on <date>"
+  describe('AC4: Creator displayed in the footer line', () => {
+    it('shows an "Added by" line in the footer', () => {
       const { container } = renderCardDetail();
-      const metaSection = container.querySelector('.detail-meta');
-      expect(metaSection).not.toBeNull();
-      const smalls = metaSection!.querySelectorAll('small');
-      const createdByLine = Array.from(smalls).find((s) => s.textContent?.startsWith('Created by:'));
-      expect(createdByLine).not.toBeNull();
+      const meta = container.querySelector('.detail-footer .detail-meta');
+      expect(meta).not.toBeNull();
+      expect(meta!.textContent).toMatch(/^Added by /);
     });
 
     it('resolves email to display name when email matches a known owner', () => {
       // The mock item has created_by: 'luke@example.com' and
       // owners has { name: 'Luke', google_account: 'luke@example.com' }
       const { container } = renderCardDetail();
-      const metaSection = container.querySelector('.detail-meta');
-      const smalls = metaSection!.querySelectorAll('small');
-      const createdByLine = Array.from(smalls).find((s) => s.textContent?.startsWith('Created by:'));
-      expect(createdByLine!.textContent).toBe('Created by: Luke');
+      expect(container.querySelector('.detail-meta')!.textContent).toMatch(/^Added by Luke on /);
+    });
+
+    it('falls back to the email, and to "Unknown" when blank', () => {
+      mockItemOverrides = { created_by: 'someone@else.com' };
+      const first = renderCardDetail();
+      expect(first.container.querySelector('.detail-meta')!.textContent).toMatch(/^Added by someone@else\.com on /);
+      first.unmount();
+
+      mockItemOverrides = { created_by: '' };
+      const second = renderCardDetail();
+      expect(second.container.querySelector('.detail-meta')!.textContent).toMatch(/^Added by Unknown on /);
     });
   });
 
   // AC5: Creator field is read-only
   describe('AC5: Creator field is read-only', () => {
-    it('created_by line is not editable (no input/select in metadata)', () => {
+    it('the footer line is not editable (no input/select in it)', () => {
       const { container } = renderCardDetail();
-      const metaSection = container.querySelector('.detail-meta');
-      const inputs = metaSection!.querySelectorAll('input, select, textarea');
+      const inputs = container.querySelector('.detail-meta')!.querySelectorAll('input, select, textarea');
       expect(inputs.length).toBe(0);
     });
   });
@@ -799,7 +787,7 @@ describe('CardDetail created_by display (Issue #23)', () => {
 
 // Issue #24 subtask owner tests removed — Issue #209 removed subtask owner feature
 
-describe('CardDetail Add/Cancel buttons (Issue #58)', () => {
+describe('CardDetail Add button (Issue #58)', () => {
   beforeEach(() => {
     mockSelectedItemId = 'detail-test-1';
     mockChildren = [];
@@ -811,14 +799,11 @@ describe('CardDetail Add/Cancel buttons (Issue #58)', () => {
   it('AC1: Add button creates sub-task when title is non-empty', () => {
     const { container } = renderCardDetail();
 
-    const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-    fireEvent.click(addBtn);
-
     const input = container.querySelector('.subtask-add-input') as HTMLInputElement;
     fireEvent.input(input, { target: { value: 'New subtask via button' } });
 
     // Click the Add (checkmark) button
-    const confirmBtn = container.querySelector('[aria-label="Add sub-task"]') as HTMLElement;
+    const confirmBtn = container.querySelector('[aria-label="Add subtask"]') as HTMLElement;
     expect(confirmBtn).not.toBeNull();
     fireEvent.click(confirmBtn);
 
@@ -827,85 +812,38 @@ describe('CardDetail Add/Cancel buttons (Issue #58)', () => {
       'Luke',
       'test-token',
     );
-    // Creation row should close
-    expect(container.querySelector('.subtask-add-input')).toBeNull();
+    // #627: the add row is always there; the draft is cleared
+    expect((container.querySelector('.subtask-add-input') as HTMLInputElement).value).toBe('');
   });
 
-  // AC2: Cancel button closes without creating
-  it('AC2: Cancel button closes creation row without creating sub-task', () => {
+  // #627: no Cancel button — the add row is always the last row and Escape clears a draft
+  it('has no Cancel button', () => {
     const { container } = renderCardDetail();
-
-    const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-    fireEvent.click(addBtn);
-
-    const input = container.querySelector('.subtask-add-input') as HTMLInputElement;
-    fireEvent.input(input, { target: { value: 'Should not save' } });
-
-    // Click the Cancel (X) button
-    const cancelBtn = container.querySelector('[aria-label="Cancel adding sub-task"]') as HTMLElement;
-    expect(cancelBtn).not.toBeNull();
-    fireEvent.click(cancelBtn);
-
-    expect(createItem).not.toHaveBeenCalled();
-    expect(container.querySelector('.subtask-add-input')).toBeNull();
-    // + Add button should return
-    expect(container.querySelector('.detail-subtasks-header .subtask-add-circle')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Cancel adding sub-task"]')).toBeNull();
+    expect(container.querySelectorAll('.subtask-add-inline .subtask-action-btn').length).toBe(1);
   });
 
   // AC4: Add button is disabled when input is empty
   it('AC4: Add button is disabled when input is empty', () => {
     const { container } = renderCardDetail();
 
-    const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-    fireEvent.click(addBtn);
-
-    const confirmBtn = container.querySelector('[aria-label="Add sub-task"]') as HTMLElement;
+    const confirmBtn = container.querySelector('[aria-label="Add subtask"]') as HTMLElement;
     expect(confirmBtn.getAttribute('aria-disabled')).toBe('true');
 
     // Clicking disabled button should not create anything
     fireEvent.click(confirmBtn);
     expect(createItem).not.toHaveBeenCalled();
-    // Row should stay open
     expect(container.querySelector('.subtask-add-input')).not.toBeNull();
   });
 
   it('AC4: Add button becomes enabled when text is entered', () => {
     const { container } = renderCardDetail();
 
-    const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-    fireEvent.click(addBtn);
-
     const input = container.querySelector('.subtask-add-input') as HTMLInputElement;
     fireEvent.input(input, { target: { value: 'Some text' } });
 
-    const confirmBtn = container.querySelector('[aria-label="Add sub-task"]') as HTMLElement;
+    const confirmBtn = container.querySelector('[aria-label="Add subtask"]') as HTMLElement;
     expect(confirmBtn.getAttribute('aria-disabled')).toBeNull();
-  });
-
-  // AC5: Buttons have accessible names
-  it('AC5: Add and Cancel buttons have aria-label', () => {
-    const { container } = renderCardDetail();
-
-    const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-    fireEvent.click(addBtn);
-
-    const confirmBtn = container.querySelector('[aria-label="Add sub-task"]');
-    const cancelBtn = container.querySelector('[aria-label="Cancel adding sub-task"]');
-    expect(confirmBtn).not.toBeNull();
-    expect(cancelBtn).not.toBeNull();
-  });
-
-  // AC1/AC2: Button order is Add first, Cancel second
-  it('Buttons are ordered: Add (left) then Cancel (right)', () => {
-    const { container } = renderCardDetail();
-
-    const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-    fireEvent.click(addBtn);
-
-    const buttons = container.querySelectorAll('.subtask-add-inline .subtask-action-btn');
-    expect(buttons.length).toBe(2);
-    expect(buttons[0].getAttribute('aria-label')).toBe('Add sub-task');
-    expect(buttons[1].getAttribute('aria-label')).toBe('Cancel adding sub-task');
   });
 });
 
@@ -917,80 +855,13 @@ describe('CardDetail keyboard hint (Issue #60)', () => {
     vi.clearAllMocks();
   });
 
-  // AC1: Hint text visible when creation row is open
-  it('AC1: shows keyboard hint when creation row is open', () => {
+  // #627: the add row is a plain "Add a subtask" field; the hint line went with the open/close flow
+  it('the add row carries no hint line', () => {
     const { container } = renderCardDetail();
-
-    const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-    fireEvent.click(addBtn);
-
-    const hint = container.querySelector('#subtask-add-hint');
-    expect(hint).not.toBeNull();
-    expect(hint!.textContent).toBe('Enter to add another · Esc to cancel');
-  });
-
-  // AC2: Hint styled as secondary text
-  it('AC2: hint has correct CSS class', () => {
-    const { container } = renderCardDetail();
-
-    const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-    fireEvent.click(addBtn);
-
-    const hint = container.querySelector('.subtask-add-hint');
-    expect(hint).not.toBeNull();
-  });
-
-  // AC3: Hint stays visible after Enter (row stays open per #208)
-  it('AC3: hint stays after Enter submits (row stays open)', () => {
-    const { container } = renderCardDetail();
-
-    const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-    fireEvent.click(addBtn);
-    expect(container.querySelector('#subtask-add-hint')).not.toBeNull();
-
-    const input = container.querySelector('.subtask-add-input') as HTMLInputElement;
-    fireEvent.input(input, { target: { value: 'Test' } });
-    fireEvent.keyDown(input, { key: 'Enter' });
-
-    // #208: Row stays open, hint remains
-    expect(container.querySelector('#subtask-add-hint')).not.toBeNull();
-  });
-
-  it('AC3: hint disappears after Escape cancels', () => {
-    const { container } = renderCardDetail();
-
-    const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-    fireEvent.click(addBtn);
-    expect(container.querySelector('#subtask-add-hint')).not.toBeNull();
-
-    const input = container.querySelector('.subtask-add-input') as HTMLInputElement;
-    fireEvent.keyDown(input, { key: 'Escape' });
-
     expect(container.querySelector('#subtask-add-hint')).toBeNull();
-  });
-
-  // AC4: Screen reader accessibility — aria-describedby on input
-  it('AC4: input references hint via aria-describedby', () => {
-    const { container } = renderCardDetail();
-
-    const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-    fireEvent.click(addBtn);
-
+    expect(container.querySelector('.subtask-add-hint')).toBeNull();
     const input = container.querySelector('.subtask-add-input') as HTMLInputElement;
-    expect(input.getAttribute('aria-describedby')).toBe('subtask-add-hint');
-  });
-
-  // Wrapper contains both the row and the hint
-  it('hint is inside the wrapper div (not inside the flex row)', () => {
-    const { container } = renderCardDetail();
-
-    const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-    fireEvent.click(addBtn);
-
-    const wrapper = container.querySelector('.subtask-add-wrapper');
-    expect(wrapper).not.toBeNull();
-    expect(wrapper!.querySelector('.subtask-add-inline')).not.toBeNull();
-    expect(wrapper!.querySelector('.subtask-add-hint')).not.toBeNull();
+    expect(input.getAttribute('aria-describedby')).toBeNull();
   });
 });
 
@@ -1008,19 +879,18 @@ describe('CardDetail — Touch reorder (Issue #88)', () => {
 
   // AC5: Drag reorder via draggable attribute on the handle (moved off the row in #237)
   describe('AC5: Touch-friendly sub-task reorder', () => {
-    it('incomplete sub-tasks have a draggable="true" handle when 2+ incomplete children exist', () => {
+    it('every sub-task has a draggable="true" handle when there are 2+ sub-tasks (#627: one list)', () => {
       const { container } = renderCardDetail();
       const draggable = container.querySelectorAll('.subtask-handle[draggable="true"]');
-      // Only incomplete items (2 of 3) are draggable
-      expect(draggable.length).toBe(2);
+      expect(draggable.length).toBe(3);
     });
 
-    it('done sub-tasks do not have a draggable handle', () => {
+    it('a done sub-task keeps its place, struck through, with its handle', () => {
       const { container } = renderCardDetail();
       const doneItems = container.querySelectorAll('.subtask-done');
       expect(doneItems.length).toBe(1);
       const handle = doneItems[0].querySelector('.subtask-handle') as HTMLElement;
-      expect(handle.getAttribute('draggable')).not.toBe('true');
+      expect(handle.getAttribute('draggable')).toBe('true');
     });
 
     it('does not make the handle draggable when only 1 sub-task exists', () => {
@@ -1244,28 +1114,19 @@ describe('CardDetail sub-task date fields (Issue #86)', () => {
   describe('AC3: Date fields on sub-task creation', () => {
     it('creation row includes due date input', () => {
       const { container } = renderCardDetail();
-      const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-      fireEvent.click(addBtn);
-
       const dateInputs = container.querySelectorAll('.subtask-add-date');
       expect(dateInputs.length).toBe(1);
-      expect((dateInputs[0] as HTMLInputElement).getAttribute('aria-label')).toBe('Due date for new sub-task');
+      expect((dateInputs[0] as HTMLInputElement).getAttribute('aria-label')).toBe('Due date for new subtask');
     });
 
     it('date input defaults to empty', () => {
       const { container } = renderCardDetail();
-      const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-      fireEvent.click(addBtn);
-
       const dateInputs = container.querySelectorAll('.subtask-add-date') as NodeListOf<HTMLInputElement>;
       expect(dateInputs[0].value).toBe('');
     });
 
     it('submitting with dates includes them in createItem call', () => {
       const { container } = renderCardDetail();
-      const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-      fireEvent.click(addBtn);
-
       const input = container.querySelector('.subtask-add-input') as HTMLInputElement;
       fireEvent.input(input, { target: { value: 'New subtask with dates' } });
 
@@ -1287,9 +1148,6 @@ describe('CardDetail sub-task date fields (Issue #86)', () => {
     it('submitting without dates does not include date fields in createItem call', () => {
       vi.mocked(createItem).mockClear();
       const { container } = renderCardDetail();
-      const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-      fireEvent.click(addBtn);
-
       const input = container.querySelector('.subtask-add-input') as HTMLInputElement;
       fireEvent.input(input, { target: { value: 'No dates subtask' } });
       fireEvent.keyDown(input, { key: 'Enter' });
@@ -1524,18 +1382,13 @@ describe('CardDetail expand panel (Issue #206)', () => {
     expect(expandBtn).not.toBeNull();
   });
 
-  it('AC1: expand button is to the left of close button in header', () => {
+  it('AC1: expand button is between Close and the options menu in the top bar', () => {
     const { container } = renderCardDetail();
-    const header = container.querySelector('.detail-header');
-    const buttons = header!.querySelectorAll('button');
-    const expandBtn = Array.from(buttons).find((b) => b.getAttribute('aria-label') === 'Expand panel');
-    const closeBtn = Array.from(buttons).find((b) => b.getAttribute('aria-label') === 'Close');
-    expect(expandBtn).not.toBeNull();
-    expect(closeBtn).not.toBeNull();
-    // Expand should come before close in DOM order
-    const expandIdx = Array.from(buttons).indexOf(expandBtn!);
-    const closeIdx = Array.from(buttons).indexOf(closeBtn!);
-    expect(expandIdx).toBeLessThan(closeIdx);
+    const bar = container.querySelector('.detail-topbar');
+    const buttons = Array.from(bar!.querySelectorAll('button'));
+    const order = buttons.map((b) => b.getAttribute('aria-label'));
+    expect(order.indexOf('Close')).toBeLessThan(order.indexOf('Expand panel'));
+    expect(order.indexOf('Expand panel')).toBeLessThan(order.indexOf('Item options'));
   });
 
   // AC2: Clicking expand changes to collapse
@@ -1719,17 +1572,19 @@ describe('CardDetail clear date button (Issue #207)', () => {
     expect(mockUpdateItem).toHaveBeenCalledWith('detail-test-1', { due_date: '2026-05-01' }, 'Luke', 'test-token');
   });
 
-  // #281: a11y of the due-date control
-  it('#281: due-date button has an accessible name starting with "Due date"', () => {
+  // #281: a11y of the due-date control — #627: chips state the value, Pick a date opens the input
+  it('#281: the Due row names its value in words, and Pick a date is a named chip', () => {
     mockItemOverrides = { due_date: '' };
     const { container } = renderCardDetail();
-    const btn = container.querySelector('.due-date-btn') as HTMLElement;
-    expect(btn.getAttribute('aria-label')).toBe('Due date: No date');
+    const row = container.querySelector('[aria-labelledby="detail-due-label"]') as HTMLElement;
+    expect(row.querySelector('.detail-row-value')!.textContent).toBe('No date');
+    const pick = Array.from(row.querySelectorAll('button')).find((b) => b.textContent === 'Pick a date');
+    expect(pick).toBeDefined();
   });
 
   it('#281: main hidden date input is out of the tab order and hidden from AT', () => {
     const { container } = renderCardDetail();
-    const input = container.querySelector('.due-date-group .due-date-hidden') as HTMLInputElement;
+    const input = container.querySelector('.detail-details .due-date-hidden') as HTMLInputElement;
     expect(input.getAttribute('tabindex')).toBe('-1');
     expect(input.getAttribute('aria-hidden')).toBe('true');
   });
@@ -1744,14 +1599,14 @@ describe('CardDetail clear date button (Issue #207)', () => {
     });
   });
 
-  // AC3: date button and owner circles are in the same owner-date-row
-  it('AC3: date button is in the owner-date-row alongside owner circles', () => {
+  // AC3: Owner and Due are rows of one card
+  it('AC3: Owner and Due are rows of the same details card', () => {
     mockItemOverrides = { due_date: '2026-04-10' };
     const { container } = renderCardDetail();
-    const row = container.querySelector('.owner-date-row');
-    expect(row).not.toBeNull();
-    const dateBtn = row!.querySelector('.due-date-btn');
-    expect(dateBtn).not.toBeNull();
+    const card = container.querySelector('.detail-details');
+    expect(card).not.toBeNull();
+    expect(card!.querySelector('[aria-labelledby="detail-owner-label"] .owner-circle')).not.toBeNull();
+    expect(card!.querySelector('[aria-labelledby="detail-due-label"] .filter-chip')).not.toBeNull();
   });
 });
 
@@ -1768,9 +1623,6 @@ describe('CardDetail quick-add sub-tasks (Issue #208)', () => {
   it('AC1: pressing Enter creates sub-task and keeps add row open', async () => {
     const { container } = renderCardDetail();
     // Open add row
-    const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-    fireEvent.click(addBtn);
-
     const input = container.querySelector('.subtask-add-input') as HTMLInputElement;
     expect(input).not.toBeNull();
 
@@ -1789,9 +1641,6 @@ describe('CardDetail quick-add sub-tasks (Issue #208)', () => {
   // AC2: Empty title Enter does nothing
   it('AC2: pressing Enter with empty title does nothing', () => {
     const { container } = renderCardDetail();
-    const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-    fireEvent.click(addBtn);
-
     const input = container.querySelector('.subtask-add-input') as HTMLInputElement;
     fireEvent.keyDown(input, { key: 'Enter' });
 
@@ -1799,24 +1648,19 @@ describe('CardDetail quick-add sub-tasks (Issue #208)', () => {
     expect(container.querySelector('.subtask-add-input')).not.toBeNull();
   });
 
-  // AC3: Escape still cancels
-  it('AC3: pressing Escape closes the add row', () => {
+  // AC3: Escape clears a draft
+  it('AC3: pressing Escape clears the field', () => {
     const { container } = renderCardDetail();
-    const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-    fireEvent.click(addBtn);
-
     const input = container.querySelector('.subtask-add-input') as HTMLInputElement;
+    fireEvent.input(input, { target: { value: 'Draft' } });
     fireEvent.keyDown(input, { key: 'Escape' });
 
-    expect(container.querySelector('.subtask-add-input')).toBeNull();
+    expect((container.querySelector('.subtask-add-input') as HTMLInputElement).value).toBe('');
   });
 
-  // AC5: Confirm button still closes
-  it('AC5: clicking confirm button creates and closes add row', () => {
+  // AC5: Confirm button submits, and the field stays for the next one
+  it('AC5: clicking confirm button creates the subtask and clears the field', () => {
     const { container } = renderCardDetail();
-    const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-    fireEvent.click(addBtn);
-
     const input = container.querySelector('.subtask-add-input') as HTMLInputElement;
     fireEvent.input(input, { target: { value: 'Confirmed subtask' } });
 
@@ -1824,18 +1668,7 @@ describe('CardDetail quick-add sub-tasks (Issue #208)', () => {
     fireEvent.click(confirmBtn);
 
     expect(createItem).toHaveBeenCalledTimes(1);
-    expect(container.querySelector('.subtask-add-input')).toBeNull();
-  });
-
-  // AC6: Hint text updated
-  it('AC6: hint text reads "Enter to add another · Esc to cancel"', () => {
-    const { container } = renderCardDetail();
-    const addBtn = container.querySelector('.detail-subtasks-header .subtask-add-circle') as HTMLElement;
-    fireEvent.click(addBtn);
-
-    const hint = container.querySelector('#subtask-add-hint');
-    expect(hint).not.toBeNull();
-    expect(hint!.textContent).toBe('Enter to add another · Esc to cancel');
+    expect((container.querySelector('.subtask-add-input') as HTMLInputElement).value).toBe('');
   });
 });
 

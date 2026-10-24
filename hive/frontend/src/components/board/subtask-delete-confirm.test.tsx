@@ -18,6 +18,7 @@ let mockSelectedItemId: string | null = 'parent-1';
 let mockChildren: any[] = [];
 
 vi.mock('../../state/board-store', () => ({
+  activeView: { value: 'boards' },
   selectedItemId: {
     get value() {
       return mockSelectedItemId;

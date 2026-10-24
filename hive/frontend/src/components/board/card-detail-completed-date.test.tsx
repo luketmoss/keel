@@ -16,6 +16,7 @@ let mockItems: any[] = [];
 let mockItemOverrides: Record<string, any> = {};
 
 vi.mock('../../state/board-store', () => ({
+  activeView: { value: 'boards' },
   selectedItemId: {
     get value() {
       return mockSelectedItemId;
@@ -171,7 +172,8 @@ describe('CardDetail completed date (#280)', () => {
     const { container } = renderCardDetail();
     const btn = container.querySelector('[data-testid="completed-date-btn"]') as HTMLElement;
     expect(btn).not.toBeNull();
-    expect(btn.textContent).toContain('Completed');
+    // The row names it Completed; the button states the date and how long ago
+    expect(btn.closest('.detail-row')!.textContent).toContain('Completed');
     expect(btn.textContent).toContain('3 days ago');
     expect(btn.getAttribute('aria-label')).toMatch(/^Completed .*\d{4}\. Change completed date$/);
     expect(container.querySelector('.detail-meta')!.textContent).not.toContain('Completed:');

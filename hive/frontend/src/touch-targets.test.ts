@@ -119,7 +119,6 @@ const BOX = [
   'btn-icon-danger',
   'kebab-trigger',
   'subtask-action-btn',
-  'subtask-add-circle',
   'date-clear-btn',
   'staged-subtask-remove',
   'subtask-kebab-btn',
@@ -159,7 +158,7 @@ const TALL = [
   'filter-chip',
   'label-toggle',
   'quick-date-chip',
-  'status-chevron',
+  'status-segment',
   'card-title',
   'archive-item',
   'kebab-item',
@@ -167,7 +166,8 @@ const TALL = [
   'subtask-menu-item',
   'subtask-title',
   'editable-value',
-  'due-date-btn',
+  'detail-row-btn',
+  'detail-delete-btn',
   'completed-date-btn',
   'column-add-row',
   'bottom-nav-tab',
@@ -344,9 +344,10 @@ describe('Fields keep 16px on phones', () => {
 describe('What hive#281 and #290 fixed still holds', () => {
   const tsx = readFileSync(resolve(here, 'components/board/card-detail.tsx'), 'utf-8');
 
-  it('the detail due-date button is at least 44 tall and named "Due date"', () => {
-    expect(floorOf('due-date-btn', 'height')).toBeGreaterThanOrEqual(FLOOR);
-    expect(tsx).toMatch(/aria-label=\{[^}]*Due date/);
+  it('the detail Due chips and the Pick a date input are at least 44 tall, and the Due row is named', () => {
+    expect(floorOf('filter-chip', 'height')).toBeGreaterThanOrEqual(FLOOR);
+    expect(floorOf('detail-delete-btn', 'height')).toBeGreaterThanOrEqual(FLOOR);
+    expect(tsx).toMatch(/aria-labelledby="detail-due-label"/);
   });
 
   it('the hidden date inputs are out of the tab order and hidden from assistive tech', () => {

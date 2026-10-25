@@ -31,6 +31,7 @@ function load(): Sandbox {
       statusRow('w3', 'work', 'Done', true),
       statusRow('s1', 'shop', 'To Do'),
       statusRow('s2', 'shop', 'Done', true),
+      statusRow('s3', 'shop', 'Bought'),
     ],
     properties: { MCP_API_KEY: API_KEY },
   });
@@ -68,10 +69,10 @@ describe('moving an item to another board', () => {
 
   it('accepts a status that exists only on the target board, moving in one call', () => {
     const sandbox = load();
-    expect(update(sandbox, 'q1', { board_id: 'shop', status: 'Done' }).success).toBe(true);
+    expect(update(sandbox, 'q1', { board_id: 'shop', status: 'Bought' }).success).toBe(true);
     const q1 = rows(sandbox).find((r) => r[0] === 'q1')!;
     expect(q1[13]).toBe('shop');
-    expect(q1[3]).toBe('Done');
+    expect(q1[3]).toBe('Bought');
   });
 
   it('refuses to move a sub-task on its own', () => {

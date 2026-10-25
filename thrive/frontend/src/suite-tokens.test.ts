@@ -5,6 +5,7 @@
 // five interaction-state tokens to Thrive's :root, and to the snapshot with
 // them, deliberately: the snapshot is what Thrive's tokens resolve to, and
 // those five are new, not changed. #405 did the same for --icon-md and --icon-lg.
+// #644 did the same for --content-max.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';

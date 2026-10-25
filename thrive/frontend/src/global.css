@@ -28,6 +28,9 @@
      the main figure of a large choice card. */
   --icon-md: 24px;
   --icon-lg: 40px;
+  /* The content column (#644). Every screen is capped at it, and the tab bar's tabs and the FAB
+     are bound to it, so a change here moves the column and the fixed controls together. */
+  --content-max: 600px;
   /* The route map (#407). Not overridden in dark: the base map is light in both
      themes, so the line is read against the same map either way. The line is
      Thrive's light primary, written out so the dark theme's lighter primary
@@ -334,6 +337,9 @@ input, select, textarea {
 }
 
 /* ===== Bottom Nav ===== */
+/* The bar spans the window; its tabs sit in a centred band as wide as the column (#644). 100% is
+   the bar's own width, the box .screen centres in, not 100vw, which counts the scrollbar. In a
+   window no wider than the column the side padding is 0, as before. */
 .bottom-nav {
   position: fixed;
   bottom: 0;
@@ -347,6 +353,8 @@ input, select, textarea {
   justify-content: space-around;
   z-index: 100;
   padding-bottom: env(safe-area-inset-bottom, 0);
+  padding-left: max(0px, (100% - var(--content-max)) / 2);
+  padding-right: max(0px, (100% - var(--content-max)) / 2);
 }
 
 .bottom-nav-tab {
@@ -388,10 +396,11 @@ input, select, textarea {
 }
 
 /* ===== FAB (Floating Action Button) ===== */
+/* 16px inside the column's right edge, not the window's (#644); on a phone the column is the window. */
 .fab {
   position: fixed;
   bottom: calc(var(--nav-height) + 16px);
-  right: 16px;
+  right: max(16px, (100% - var(--content-max)) / 2 + 16px);
   width: 56px;
   height: 56px;
   border-radius: 50%;
@@ -480,7 +489,7 @@ input, select, textarea {
 
 .screen {
   padding: var(--space-md);
-  max-width: 600px;
+  max-width: var(--content-max);
   margin: 0 auto;
 }
 
@@ -1323,7 +1332,7 @@ input, select, textarea {
 /* ===== Template Editor ===== */
 .template-editor {
   padding: var(--space-md);
-  max-width: 600px;
+  max-width: var(--content-max);
   margin: 0 auto;
 }
 
@@ -2008,7 +2017,7 @@ input, select, textarea {
 /* ===== Simple Workout Form ===== */
 .simple-workout-form {
   padding: var(--space-md);
-  max-width: 600px;
+  max-width: var(--content-max);
   margin: 0 auto;
 }
 
@@ -2081,6 +2090,16 @@ input, select, textarea {
 
 .activities-chips::-webkit-scrollbar {
   display: none;
+}
+
+/* #644: a mouse can't swipe, so with one the chips wrap instead, at any width. The line gap keeps
+   one chip's 44px hit area off the next line's chips. */
+@media (hover: hover) and (pointer: fine) {
+  .activities-chips {
+    flex-wrap: wrap;
+    row-gap: var(--space-sm);
+    overflow-x: visible;
+  }
 }
 
 .filter-chip {
@@ -2647,6 +2666,24 @@ input, select, textarea {
   scroll-snap-align: start;
 }
 
+/* #644: with a mouse, Up next is a grid across the column instead of a sideways row: as many
+   150px-minimum tracks as fit, in date order. auto-fill keeps a lone card at one track's width. */
+@media (hover: hover) and (pointer: fine) {
+  .up-next-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    margin: 0;
+    padding: 0;
+    overflow-x: visible;
+    scroll-snap-type: none;
+  }
+
+  .workout-card.up-next-card {
+    width: auto;
+    scroll-snap-align: none;
+  }
+}
+
 .up-next-date {
   font-size: var(--text-xs);
   font-weight: 700;
@@ -2694,7 +2731,7 @@ input, select, textarea {
   flex-direction: column;
   gap: calc(var(--space-sm) + var(--space-xs));
   padding: 0 0 var(--space-md);
-  max-width: 600px;
+  max-width: var(--content-max);
   margin: 0 auto;
 }
 
@@ -5314,6 +5351,21 @@ a.training-card {
   border-bottom-color: var(--color-primary-text);
   color: var(--color-primary-text);
   font-weight: 700;
+}
+
+/* #644: with a mouse the tabs tighten to fit the column, and wrap if a font or zoom still
+   overflows it; the rule stays under the whole block. They don't grow, so a wrapped line sits
+   left-aligned under the first rather than stretching two tabs across the column. */
+@media (hover: hover) and (pointer: fine) {
+  .trends-group-row {
+    flex-wrap: wrap;
+    width: auto;
+  }
+
+  .trends-group-btn {
+    flex-grow: 0;
+    padding: var(--space-sm);
+  }
 }
 
 /* ===== Trends: toolbar (#503) ===== */

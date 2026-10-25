@@ -469,7 +469,11 @@ colour and icon.
   planned for training.", and `last` one line from the Last time call (date,
   effort and the note, quoted) or the trails conditions on a trails day.
 - `board`: `{overdue: [{title, board, days}], today: [{title, board,
-  status}], soon: [{title, board, due}], note}`.
+  status}], soon: [{title, board, due}], note}`. `days` is how many days
+  late, at least 1. The page lists `overdue` (most days late first) and
+  `today` at the top of Your day, up to six, so they lead the morning; the
+  Board card keeps `soon` and any past the sixth. Fill them here only, never
+  again under `day`.
 - `body`: `{value, unit, series, sub, bp, bpSub}`: the morning weight, its
   readings over the last 7 days, the change in words, and the day's blood
   pressure with how many readings and the recent range.

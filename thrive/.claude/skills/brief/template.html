@@ -396,14 +396,13 @@ h1, h2, h3, p { margin: 0; }
     return s;
   }
 
-  // Hive items overdue or due today lead Your day, most overdue first. The Board card keeps the rest:
-  // what's coming up, and anything past the first DUE_MAX (or all of it when there is no Your day card).
+  // Hive items overdue or due today, most overdue first. The first DUE_MAX lead Your day; the Board card
+  // lists them all again as its Due today, as Hive's Today view does, then Up next.
   var DUE_MAX = 6, B = D.board || {};
   var dueAll = (B.overdue || []).slice().sort(function (a, b) { return (b.days || 0) - (a.days || 0); })
     .map(function (o) { return { o: o, late: true }; })
     .concat((B.today || []).map(function (o) { return { o: o, late: false }; }));
   var dueShown = D.day ? dueAll.slice(0, DUE_MAX) : [];
-  var inDay = dueShown.map(function (x) { return x.o; });
 
   // Header, as on Thrive's Day screen
   var meta = el("div", "meta", [D.date]);
@@ -650,15 +649,15 @@ h1, h2, h3, p { margin: 0; }
     var row = [];
     if (D.board) {
       var b = D.board, bc = card("Board", "hive", "Hive");
-      var rest = function (list) { return (list || []).filter(function (o) { return inDay.indexOf(o) < 0; }); };
-      if (inDay.length) { var up = el("p", "sub", "Overdue and due today are at the top, in Your day."); up.style.marginBottom = "8px"; bc.appendChild(up); }
-      [["Overdue", rest(b.overdue), function (o) { return el("span", "tag late", o.days + "d overdue"); }],
-       ["Due today", rest(b.today), function (o) { return el("span", "tag", o.status || "today"); }],
-       ["Coming up", b.soon, function (o) { return el("span", "tag", o.due); }]].forEach(function (grp) {
-        if (!grp[1] || !grp[1].length) return;
-        bc.appendChild(el("div", "lbl", grp[0]));
-        grp[1].forEach(function (o) { bc.appendChild(el("div", "item", [el("span", null, o.title), o.board ? el("span", "bd", o.board) : null, grp[2](o)])); });
-      });
+      var row1 = function (o, tag) { bc.appendChild(el("div", "item", [el("span", null, o.title), o.board ? el("span", "bd", o.board) : null, tag])); };
+      if (dueAll.length) {
+        bc.appendChild(el("div", "lbl", "Due today"));
+        dueAll.forEach(function (x) { row1(x.o, x.late ? el("span", "tag late", (x.o.days || 1) + "d overdue") : el("span", "tag", x.o.status || "today")); });
+      }
+      if (b.soon && b.soon.length) {
+        bc.appendChild(el("div", "lbl", "Up next"));
+        b.soon.forEach(function (o) { row1(o, el("span", "tag", o.due)); });
+      }
       if (b.note) { var bn = el("p", "sub", b.note); bn.style.marginTop = "8px"; bc.appendChild(bn); }
       row.push(bc);
     }

@@ -582,7 +582,9 @@ strings show as text, times are decimal hours as on the daily page):
   how many readings in `bpSub`.
 - `board`: `{done, overdue, open, soon, note}`: done this week `[{title,
   board}]`, overdue `[{title, board, days}]`, in progress `[{title, board,
-  status}]`, and due in the week ahead `[{title, board, due}]`.
+  status}]`, and due in the week ahead `[{title, board, due}]`. `overdue`
+  also leads Day by day as one line, since those items fall on no day ahead;
+  `days` is how many days late, at least 1.
 - `foot`: what wasn't checked, any thin comparison, such as a week before
   with only a few nights of data, and that this is training guidance, not
   medical advice.

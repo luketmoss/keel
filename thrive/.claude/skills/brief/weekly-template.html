@@ -220,6 +220,12 @@ h1, h2, h3, p { margin: 0; }
 .axis text { font: 500 10px var(--font); fill: var(--text-2); }
 @media (min-width: 720px) { .axis { grid-template-columns: 52px 1fr; } }
 .wd .evs { font-size: .8125rem; color: var(--text-2); }
+.wd .evs.hive { display: flex; align-items: center; gap: 6px; }
+.wd .evs.hive .ic { width: 14px; height: 14px; }
+.overdue { display: flex; align-items: center; gap: 8px; font-size: .875rem; margin-bottom: 12px; padding: 8px 10px; border-radius: var(--r-md); border: 1px dashed var(--danger); }
+.overdue .ic { width: 18px; height: 18px; }
+.overdue b { color: var(--danger); font-weight: 700; white-space: nowrap; }
+.overdue span { color: var(--text-2); min-width: 0; }
 .wd .sg { display: inline-flex; align-items: center; gap: 6px; font-size: .8125rem; font-weight: 600; color: var(--kc); }
 .wd .sg i { font-style: normal; font-size: .625rem; letter-spacing: .05em; text-transform: uppercase; padding: 1px 6px; border-radius: 4px; background: color-mix(in srgb, var(--kc) 16%, transparent); }
 .struck { text-decoration: line-through; opacity: .55; }
@@ -272,7 +278,7 @@ h1, h2, h3, p { margin: 0; }
       "events": [{ "s": 16.5, "e": 19, "t": "Example event" }, { "s": 19.5, "e": 20, "t": "Example event" }],
       "sg": { "kind": "keep", "text": "Keep" } },
     { "dow": "Tue", "n": "20", "wx": { "ic": "partly", "hi": 62, "lo": 36, "wind": 18, "rain": 5, "flag": "Wind 18" },
-      "events": [{ "s": 16.5, "e": 20, "t": "Example event" }] },
+      "events": [{ "s": 16.5, "e": 20, "t": "Example event" }], "board": [{ "title": "Example item" }] },
     { "dow": "Wed", "n": "21", "wx": { "ic": "sun", "hi": 55, "lo": 33, "wind": 7, "rain": 0 },
       "plans": [{ "type": "weight", "title": "4 - Upper Push B", "s": 7, "e": 7.75 }],
       "events": [{ "s": 16.5, "e": 19, "t": "Example event" }] },
@@ -332,7 +338,8 @@ h1, h2, h3, p { margin: 0; }
   "body": { "value": "179.1", "unit": "lb", "d": "−1.1 lb", "sub": "weekly average, against 180.2 the week before. Daily readings swung 176.5–182.4.",
     "series": [183.3, 179.9, 180.8, 179.3, 176.8, 180.9, 180.4, 182.4, 181.1, 178.5, 176.5, 177.0, 178.4, 179.5],
     "bp": "133/86", "bpSub": "mean of 5 readings on 3 days" },
-  "board": { "done": [], "overdue": [], "open": [], "soon": [{ "title": "Example item", "board": "Home", "due": "Mon 26" }], "note": "Nothing finished, overdue or due this week." },
+  "board": { "done": [], "overdue": [{ "title": "Example overdue item", "board": "Home", "days": 3 }], "open": [],
+    "soon": [{ "title": "Example item", "board": "Home", "due": "Tue 20" }], "note": "One overdue item, three days late." },
   "foot": "Sample data. Replace this whole JSON block with the week's real values. Training guidance from your own data, not medical advice."
 }
 </script>
@@ -369,7 +376,6 @@ h1, h2, h3, p { margin: 0; }
     unwind: '<path d="M12 21c0-6 4-10 8-11-1 6-4 10-8 11zM12 21c0-5-3-8-7-9 .5 5 3 8 7 9z"/>',
     yday: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/>',
     ahead: '<path d="M4 7h16M4 12h16M4 17h10"/><rect x="3" y="4" width="18" height="17" rx="2"/>',
-    board: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/>',
     body: '<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M9 9a4 4 0 0 1 6 0l-2 3"/>',
     day: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'
   };
@@ -396,8 +402,22 @@ h1, h2, h3, p { margin: 0; }
     s.innerHTML = P[name] || P.cloud;
     return s;
   }
+  // Hive's own mark (hive/frontend/public/hive-mark.svg without its shadow and shine), in its own colours
+  function hiveMark() {
+    var s = document.createElementNS(NS, "svg");
+    s.setAttribute("class", "ic");
+    s.setAttribute("viewBox", "28 34 200 200");
+    s.setAttribute("aria-hidden", "true");
+    s.innerHTML = '<g stroke="#1d1406" stroke-width="9" stroke-linejoin="round">' +
+      '<polygon fill="#f4efe2" points="178.2,126.5 222.4,152 222.4,203 178.2,228.5 134.1,203 134.1,152"/>' +
+      '<polygon fill="#c98400" points="77.8,126.5 121.9,152 121.9,203 77.8,228.5 33.6,203 33.6,152"/>' +
+      '<polygon fill="#f5b700" points="128,39.5 172.2,65 172.2,116 128,141.5 83.8,116 83.8,65"/></g>' +
+      '<path d="M106 91.5l15 15 30-32" fill="none" stroke="#1d1406" stroke-width="25" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<path d="M106 91.5l15 15 30-32" fill="none" stroke="#ffffff" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>';
+    return s;
+  }
   function card(title, ic, aside, color) {
-    var c = el("section", "card"), i = icon(ic);
+    var c = el("section", "card"), i = ic === "hive" ? hiveMark() : icon(ic);
     if (color) i.style.color = color;
     var h = el("div", "ch", [i, el("h2", null, title)]);
     if (aside) h.appendChild(el("span", "aside", aside));
@@ -459,6 +479,12 @@ h1, h2, h3, p { margin: 0; }
   if (D.days) (function () {
     var c = card("Day by day", "ahead", "each bar runs 6 AM to 10 PM");
     root.appendChild(c);
+    // Overdue Hive items are due on no day ahead, so they lead the week: one line, most days late first
+    var od = (D.board && D.board.overdue || []).slice().sort(function (a, b) { return (b.days || 0) - (a.days || 0); });
+    if (od.length) {
+      var names = od.slice(0, 3).map(function (o) { return o.title + " (" + (o.days || 1) + "d)"; }).join(", ") + (od.length > 3 ? ", +" + (od.length - 3) + " more" : "");
+      c.appendChild(el("div", "overdue", [hiveMark(), el("b", null, od.length + " overdue in Hive"), el("span", null, names)]));
+    }
     var ax = el("div", "axis", [el("span")]), wk = el("div", "week");
     c.appendChild(ax); c.appendChild(wk);
     var F = 6, T = 22, sr = D.sun ? D.sun[0] : null, ss = D.sun ? D.sun[1] : null;
@@ -504,7 +530,7 @@ h1, h2, h3, p { margin: 0; }
       var ev = events.map(function (e) { return fmtH(e.s) + " " + e.t; });
       if (d.allday) ev.unshift("All day: " + d.allday);
       if (ev.length) body.appendChild(el("div", "evs", ev.join(" · ")));
-      (d.board || []).forEach(function (b) { body.appendChild(el("div", "evs", "Hive due: " + b.title)); });
+      (d.board || []).forEach(function (b) { body.appendChild(el("div", "evs hive", [hiveMark(), el("span", null, "Due: " + b.title)])); });
       if (d.note) body.appendChild(el("div", "evs", d.note));
       if (d.sg) { var sg = el("span", "sg", [el("i", null, d.sg.kind), d.sg.text]); sg.style.setProperty("--kc", KCOL[d.sg.kind] || "var(--primary)"); body.appendChild(sg); }
       wk.appendChild(el("div", "wd", [el("div", "dt", [el("span", null, d.dow), el("b", "num", d.n)]), body]));
@@ -619,11 +645,11 @@ h1, h2, h3, p { margin: 0; }
       row.push(yc);
     }
     if (D.board) {
-      var b = D.board, bc = card("Board", "board", "Hive");
+      var b = D.board, bc = card("Board", "hive", "Hive");
       [["Finished this week", b.done, function () { return el("span", "tag", "Done"); }],
        ["Overdue", b.overdue, function (o) { return el("span", "tag late", o.days + "d overdue"); }],
        ["In progress", b.open, function (o) { return el("span", "tag", o.status || "open"); }],
-       ["Coming up", b.soon, function (o) { return el("span", "tag", o.due); }]].forEach(function (grp) {
+       ["Up next", b.soon, function (o) { return el("span", "tag", o.due); }]].forEach(function (grp) {
         if (!grp[1] || !grp[1].length) return;
         bc.appendChild(el("div", "lbl", grp[0]));
         grp[1].forEach(function (o) { bc.appendChild(el("div", "item", [el("span", null, o.title), o.board ? el("span", "bd", o.board) : null, grp[2](o)])); });

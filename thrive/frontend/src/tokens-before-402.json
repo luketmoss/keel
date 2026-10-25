@@ -33,6 +33,7 @@
     "--focus-ring-offset": "2px",
     "--icon-md": "24px",
     "--icon-lg": "40px",
+    "--content-max": "600px",
     "--map-track": "#2f66f0",
     "--map-track-casing": "#ffffff",
     "--map-track-width": "4px",

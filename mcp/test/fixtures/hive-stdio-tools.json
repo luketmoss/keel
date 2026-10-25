@@ -202,6 +202,10 @@
             "Done"
           ]
         },
+        "board": {
+          "type": "string",
+          "description": "Move the item to this board (e.g., 'Work', 'Family'). Its sub-tasks move with it. The status must exist on the target board; give status to choose one"
+        },
         "due_date": {
           "description": "New due date in ISO format (YYYY-MM-DD)",
           "type": "string"

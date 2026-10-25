@@ -294,6 +294,9 @@ export function registerHiveTools(server: McpServer, cfg: HiveConfig, mode: Mode
         title: z.string().optional().describe('New title'),
         description: z.string().optional().describe('New description'),
         status: z.enum(['To Do', 'In Progress', 'Done']).optional().describe('New status'),
+        board: z.string().optional().describe(
+          "Move the item to this board (e.g., 'Work', 'Family'). Its sub-tasks move with it. The status must exist on the target board; give status to choose one",
+        ),
         due_date: z.string().optional().describe('New due date in ISO format (YYYY-MM-DD)'),
         completed_at: z.string().optional().describe(
           'When the item is in a terminal column: set when it was completed, as a date (YYYY-MM-DD, stored as noon UTC) or a full ISO 8601 timestamp with Z or an offset, not more than 24 hours ahead. Refused for an item in any other column. Cleared by moving the item out of its terminal column, not by an empty value',
@@ -313,6 +316,7 @@ export function registerHiveTools(server: McpServer, cfg: HiveConfig, mode: Mode
         title,
         description,
         status,
+        board,
         due_date,
         completed_at,
         labels,
@@ -323,6 +327,7 @@ export function registerHiveTools(server: McpServer, cfg: HiveConfig, mode: Mode
         title?: string
         description?: string
         status?: 'To Do' | 'In Progress' | 'Done'
+        board?: string
         due_date?: string
         completed_at?: string
         labels?: string
@@ -338,6 +343,12 @@ export function registerHiveTools(server: McpServer, cfg: HiveConfig, mode: Mode
         if (completed_at !== undefined) changes.completed_at = completed_at
         if (labels !== undefined) changes.labels = labels
         if (parent_id !== undefined) changes.parent_id = parent_id
+        let moved: string | undefined
+        if (board !== undefined) {
+          const resolved = await resolveBoard(cfg, board)
+          changes.board_id = resolved.id
+          moved = resolved.name
+        }
 
         // Resolve position: need board_id from the existing item if changing position
         if (position !== undefined) {
@@ -346,7 +357,7 @@ export function registerHiveTools(server: McpServer, cfg: HiveConfig, mode: Mode
           const current = allItems.find((i) => i.id === item_id)
           if (current) {
             const targetStatus = status || current.status
-            const sort_order = await resolvePosition(cfg, current.board_id, targetStatus, position)
+            const sort_order = await resolvePosition(cfg, changes.board_id ?? current.board_id, targetStatus, position)
             if (sort_order !== undefined) changes.sort_order = sort_order
           }
         }
@@ -358,6 +369,7 @@ export function registerHiveTools(server: McpServer, cfg: HiveConfig, mode: Mode
 
         const item = result.data
         const parts = [`Updated **${item.title}**:`]
+        if (moved) parts.push(`- Board: ${moved}`)
         parts.push(`- Status: ${item.status}`)
         if (item.due_date) parts.push(`- Due: ${item.due_date}`)
         if (item.completed_at) parts.push(`- Completed: ${item.completed_at}`)

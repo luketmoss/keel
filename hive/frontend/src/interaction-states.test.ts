@@ -553,7 +553,7 @@ describe('AC7: every family but fields has a pressed state, and no state moves',
     }
   });
 
-  it('no hover or pressed rule sets transform (.fab, .owner-circle, .color-swatch)', () => {
+  it('no hover or pressed rule sets transform (.fab, .color-swatch)', () => {
     expect(stateRules.filter((r) => declarations(r.body).has('transform')).map((r) => r.selector)).toEqual([]);
   });
 

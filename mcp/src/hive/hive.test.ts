@@ -9,7 +9,6 @@ const URL_ = 'https://script.google.com/macros/s/abc/exec'
 const env = {
   HIVE_API_URL: URL_,
   HIVE_API_KEY: KEY,
-  HIVE_DEFAULT_OWNER: 'Default Owner',
   WRITE_BUDGET: fakeBudget().namespace,
 } as Env
 
@@ -22,7 +21,7 @@ function rpc(method: string, params?: unknown): Request {
 }
 
 const HIVE_WRITE = ['hive_add_item', 'hive_create_label', 'hive_undo', 'hive_update_item']
-const HIVE_READ = ['hive_get_item', 'hive_list_boards', 'hive_list_items', 'hive_list_labels', 'hive_list_owners']
+const HIVE_READ = ['hive_get_item', 'hive_list_boards', 'hive_list_items', 'hive_list_labels']
 const REMINDER = "— Hive (write) is on. Turn it off in Search and tools when you've finished writing."
 
 /** A tool is called on the endpoint that serves it (#409). */
@@ -189,20 +188,20 @@ describe('hive tools', () => {
     expect(calls[0].searchParams.get('key')).toBe(KEY)
   })
 
-  it('uses the default owner when hive_add_item gets none', async () => {
+  it('sends no owner when hive_add_item adds an item, and shows none', async () => {
     const calls = fakeHive((url) => {
       const action = url.searchParams.get('action')
       if (action === 'getBoards') return { success: true, data: [{ id: 'b1', name: 'Work' }] }
       if (action === 'createItem') {
         const payload = JSON.parse(url.searchParams.get('payload')!)
-        return { success: true, data: { id: 'i1', title: payload.data.title, status: 'To Do', owner: payload.data.owner } }
+        return { success: true, data: { id: 'i1', title: payload.data.title, status: 'To Do', owner: 'Luke' } }
       }
       return { success: true, data: [] }
     })
     const result = await call('hive_add_item', { board: 'work', title: 'Write tests' })
     const create = calls.find((u) => u.searchParams.get('action') === 'createItem')!
-    expect(JSON.parse(create.searchParams.get('payload')!).data.owner).toBe('Default Owner')
-    expect(result.content[0].text).toContain('Owner: Default Owner')
+    expect(JSON.parse(create.searchParams.get('payload')!).data).not.toHaveProperty('owner')
+    expect(result.content[0].text).not.toContain('Owner')
   })
 
   it("surfaces Hive's invalid-key error as a tool error", async () => {
@@ -281,7 +280,7 @@ describe('completed_at through the tools (#450)', () => {
     const without = (await call('hive_get_item', { item_id: 'i1' })).content[0].text
     expect(without).not.toContain('Completed')
     expect(without).toBe(
-      ['**Milk** (id: i1)', '- Status: Done', '- Owner: Luke', '- Due: 2026-10-20', '- Labels: none', '- Board ID: b1', '- Description: (empty)'].join('\n'),
+      ['**Milk** (id: i1)', '- Status: Done', '- Due: 2026-10-20', '- Labels: none', '- Board ID: b1', '- Description: (empty)'].join('\n'),
     )
   })
 
@@ -293,7 +292,7 @@ describe('completed_at through the tools (#450)', () => {
     api('')
     const line = (await call('hive_list_items', { board: 'work' })).content[0].text
     expect(line).not.toContain('completed')
-    expect(line).toContain('board: Work (Luke) due: 2026-10-20')
+    expect(line).toContain('board: Work due: 2026-10-20')
   })
 
   it('hive_update_item forwards completed_at untouched, alone or with status, even when empty', async () => {

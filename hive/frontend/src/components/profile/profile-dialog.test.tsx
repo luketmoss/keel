@@ -94,7 +94,7 @@ describe('ProfileDialog (Issue #40)', () => {
 
       // Wait for async
       await vi.waitFor(() => {
-        expect(mockUpdateDisplayName).toHaveBeenCalledWith('New Name', 'test@example.com', 'Test User', 'mock-token');
+        expect(mockUpdateDisplayName).toHaveBeenCalledWith('New Name', 'test@example.com', 'mock-token');
       });
     });
 
@@ -304,24 +304,6 @@ describe('ProfileDialog — Display name persistence (Issue #61)', () => {
         expect(errorEl).not.toBeNull();
       });
       expect(onNameUpdated).not.toHaveBeenCalled();
-    });
-
-    it('passes currentName as oldName to updateDisplayName', async () => {
-      mockUpdateDisplayName.mockResolvedValue(true);
-      const props = {
-        ...defaultProps,
-        currentName: 'Alice',
-      };
-      const { container } = render(<ProfileDialog {...props} />);
-      const nameInput = container.querySelector('#profile-name') as HTMLInputElement;
-      const form = container.querySelector('form') as HTMLFormElement;
-
-      fireEvent.input(nameInput, { target: { value: 'A' } });
-      fireEvent.submit(form);
-
-      await vi.waitFor(() => {
-        expect(mockUpdateDisplayName).toHaveBeenCalledWith('A', 'test@example.com', 'Alice', 'mock-token');
-      });
     });
   });
 });

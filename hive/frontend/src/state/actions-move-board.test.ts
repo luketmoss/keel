@@ -82,7 +82,6 @@ vi.mock('../api/sheets', () => ({
   deleteLabelRow: vi.fn(),
   fetchLabelsWithRows: vi.fn().mockResolvedValue([]),
   cascadeLabelUpdate: vi.fn(),
-  cascadeOwnerUpdate: vi.fn(),
   upsertOwner: vi.fn(),
   fetchBoards: vi.fn().mockResolvedValue([]),
   createBoardRow: vi.fn(),

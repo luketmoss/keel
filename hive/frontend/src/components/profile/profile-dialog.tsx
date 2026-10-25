@@ -44,7 +44,7 @@ export function ProfileDialog({ user, currentName, token, onClose, onNameUpdated
     setError('');
 
     try {
-      await updateDisplayName(cleaned, user.email, currentName, token);
+      await updateDisplayName(cleaned, user.email, token);
       onNameUpdated?.(cleaned);
       onClose();
     } catch (err: any) {

@@ -77,11 +77,10 @@ describe('Archive dialog (AC3)', () => {
     expect(titles).toEqual(['Recent task', 'Mid task', 'Old task']);
   });
 
-  it('shows title, owner, and completed date for each item', () => {
+  it('shows title and completed date for each item', () => {
     items.value = [makeItem({ id: 'a', title: 'My Task', owner: 'Mom', completed_at: daysAgoISO(3) })];
     const { container } = render(<ArchiveDialog onClose={onClose} />);
     expect(container.querySelector('.archive-item-title')?.textContent).toBe('My Task');
-    expect(container.querySelector('.archive-item-owner')?.textContent).toBe('Mom');
     expect(container.querySelector('.archive-item-date')?.textContent).toContain('Completed 3 days ago');
   });
 

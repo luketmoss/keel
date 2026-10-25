@@ -12,9 +12,6 @@ import {
   todayRows,
   todaySelectedDay,
   todayWeekStart,
-  todayWho,
-  setTodayWho,
-  effectiveTodayWho,
   shiftTodayWeek,
   todayStr,
   addDays,
@@ -77,7 +74,6 @@ beforeEach(() => {
     status('old', 'To Do', 1),
   ];
   items.value = [];
-  setTodayWho('everyone');
   todaySelectedDay.value = today;
   todayWeekStart.value = mondayOf(today);
 });
@@ -144,28 +140,21 @@ describe('scope', () => {
   });
 });
 
-describe('Mine and Everyone', () => {
-  beforeEach(() => {
-    items.value = [item('mine', { owner: 'Mom' }), item('his', { owner: 'Dad' }), item('nobody', { owner: '' })];
+describe('whose items', () => {
+  it('includes every dated item whatever its owner, a subtask with none among them', () => {
+    items.value = [
+      item('mine', { owner: 'Mom' }),
+      item('his', { owner: 'Dad' }),
+      item('nobody', { owner: '' }),
+      item('sub', { owner: '', parent_id: 'mine' }),
+    ];
+    expect(todayRows.value.map((r) => r.item.id).sort()).toEqual(['his', 'mine', 'nobody', 'sub']);
   });
 
-  it("Mine keeps only the signed-in person's Owners name", () => {
-    setTodayWho('mine');
-    expect(todayRows.value.map((r) => r.item.id)).toEqual(['mine']);
-    setTodayWho('everyone');
-    expect(todayRows.value).toHaveLength(3);
-  });
-
-  it('persists the choice', () => {
-    setTodayWho('everyone');
-    expect(localStorage.getItem('hive-today-who')).toBe('everyone');
-  });
-
-  it('with no Owners row, Everyone applies whatever was chosen', () => {
-    currentUserEmail.value = 'stranger@x.com';
-    todayWho.value = 'mine';
-    expect(effectiveTodayWho.value).toBe('everyone');
-    expect(todayRows.value).toHaveLength(3);
+  it('no longer reads or writes hive-today-who', () => {
+    localStorage.setItem('hive-today-who', 'mine');
+    items.value = [item('his', { owner: 'Dad' })];
+    expect(todayRows.value).toHaveLength(1);
   });
 });
 

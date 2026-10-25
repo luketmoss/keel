@@ -8,7 +8,6 @@ import { readFileSync } from 'fs';
 // @ts-ignore
 import { resolve } from 'path';
 import { readGlobalCss, tokens } from './test-css';
-import { ownerColor } from './components/today/today-format';
 import { here } from './test-controls';
 
 const css = readGlobalCss().replace(/\/\*[\s\S]*?\*\//g, '');
@@ -282,15 +281,6 @@ describe('AC13: both themes pass AA for every new text and surface pair', () => 
         3,
       );
       expect(ratio(tok(t, '--color-border-strong'), tok(t, '--color-bg')), `${t} page`).toBeGreaterThanOrEqual(3);
-    }
-  });
-
-  it('white initials on every owner colour reach 4.5:1, after the first colour darkened', () => {
-    expect(ownerColor(0)).toBe('#c43e00');
-    for (let i = 0; i < 8; i++) {
-      const m = ownerColor(i).match(/^#([0-9a-f]{6})$/i)!;
-      const rgb = [0, 2, 4].map((k) => parseInt(m[1].slice(k, k + 2), 16));
-      expect(ratio([255, 255, 255], rgb), ownerColor(i)).toBeGreaterThanOrEqual(4.5);
     }
   });
 

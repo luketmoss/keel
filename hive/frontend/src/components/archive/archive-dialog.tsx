@@ -112,7 +112,6 @@ function ArchiveItem({ item, onClick }: ArchiveItemProps) {
       <div class="archive-item-content">
         <div class="archive-item-title">{item.title}</div>
         <div class="archive-item-meta">
-          {item.owner && <span class="archive-item-owner">{item.owner}</span>}
           <span class="archive-item-date">{formatRelativeDate(item.completed_at)}</span>
         </div>
         {itemLabels.length > 0 && (

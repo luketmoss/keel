@@ -91,7 +91,7 @@ passing.
 ### Already 44 or more
 
 `.btn` (48 x 44), `.login-btn`, `.fab` (56), `.check-icon` (44 x 44),
-`.owner-circle` (44), `.subtask-add-circle` (44), `.share-btn` (44),
+`.subtask-add-circle` (44), `.share-btn` (44),
 `.filter-toggle`, `.filter-popup-close`, `.filter-popup-reset`,
 `.filter-popup-apply`, `.label-settings-action-btn`, `.archive-item` and the
 form-field inputs in the create modal (48). The test passes these and keeps them

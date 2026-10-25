@@ -1,11 +1,10 @@
-import { useState, useRef, useCallback, useMemo } from 'preact/hooks';
+import { useState, useRef, useCallback } from 'preact/hooks';
 import { useAuth } from '../../auth/auth-context';
 import {
   showCreateModal,
   createModalInitialStatus,
   createModalInitialDueDate,
   clearCreateItemUrlParams,
-  owners,
   activeView,
   activeBoardId,
   accessibleBoards,
@@ -19,13 +18,8 @@ import { QuickDateChips } from '../shared/quick-date-chips';
 
 export function CreateItemModal() {
   const { token, user } = useAuth();
-  const defaultOwner = useMemo(
-    () => owners.value.find((o) => o.google_account.toLowerCase() === user?.email?.toLowerCase())?.name ?? '',
-    [user?.email],
-  );
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [owner, setOwner] = useState(defaultOwner);
   const [dueDate, setDueDate] = useState(() => createModalInitialDueDate.value ?? '');
   const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
   // #624: opened from Today there is no board in view, so the form asks which one.
@@ -60,7 +54,7 @@ export function CreateItemModal() {
     const data = {
       title: title.trim(),
       description,
-      owner,
+      owner: '',
       due_date: dueDate,
       labels: selectedLabels.join(', '),
       created_by: user?.email || '',
@@ -171,18 +165,6 @@ export function CreateItemModal() {
                 placeholder="Details, notes, shopping lists..."
                 rows={3}
               />
-            </div>
-
-            <div class="form-field">
-              <label for="owner">Owner</label>
-              <select id="owner" value={owner} onChange={(e) => setOwner((e.target as HTMLSelectElement).value)}>
-                <option value="">Unassigned</option>
-                {owners.value.map((o) => (
-                  <option key={o.name} value={o.name}>
-                    {o.name}
-                  </option>
-                ))}
-              </select>
             </div>
 
             <div class="form-field">

@@ -26,19 +26,6 @@ export function whenLabel(dateStr: string, today: string): string {
   return dayLong(dateStr).toUpperCase();
 }
 
-export function initials(name: string): string {
-  if (!name) return '?';
-  const parts = name.trim().split(/\s+/);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return name.slice(0, 2).toUpperCase();
-}
-
-const OWNER_COLORS = ['#c43e00', '#1976d2', '#2e7d32', '#7b1fa2', '#c62828', '#00838f', '#4e342e', '#455a64'];
-
-export function ownerColor(index: number): string {
-  return OWNER_COLORS[(index < 0 ? 0 : index) % OWNER_COLORS.length];
-}
-
 /** When an open item is due, for a Boards card: "today", "tomorrow", "Tue 27", or "Sun, Nov 2" beyond a week out. */
 export function dueWord(dateStr: string, today: string): string {
   if (dateStr === today) return 'today';

@@ -39,7 +39,7 @@ import {
   addLocalDays,
   mondayOfLocal,
 } from '../../utils/completed-date';
-import { dayLong, monthDay, initials, ownerColor } from '../today/today-format';
+import { dayLong, monthDay } from '../today/today-format';
 import {
   ArrowLeftIcon,
   CalendarIcon,
@@ -464,14 +464,7 @@ export function CardDetail() {
 
           <StatusSwitch item={item} onMove={handleMoveStatus} />
 
-          <DetailsCard
-            item={item}
-            owners={owners.value}
-            save={save}
-            token={token}
-            boardName={boardName}
-            showMoveToBoard={showMoveToBoard}
-          />
+          <DetailsCard item={item} save={save} token={token} boardName={boardName} showMoveToBoard={showMoveToBoard} />
 
           <section class="detail-card detail-subtasks" aria-labelledby="detail-subtasks-heading">
             <div class="detail-subtasks-header">
@@ -742,18 +735,16 @@ function StatusSwitch({ item, onMove }: { item: ItemWithRow; onMove: (status: It
   );
 }
 
-// --- Details card: Owner, Due, Labels, Completed, Board ---
+// --- Details card: Due, Labels, Completed, Board ---
 
 function DetailsCard({
   item,
-  owners: ownersList,
   save,
   token,
   boardName,
   showMoveToBoard,
 }: {
   item: ItemWithRow;
-  owners: Array<{ name: string; google_account: string }>;
   save: (field: string, value: string) => Promise<boolean>;
   token: string | null;
   boardName: string;
@@ -830,9 +821,6 @@ function DetailsCard({
           ? `${monthDay(dateVal)} · overdue`
           : dayLong(dateVal);
 
-  // --- Owner ---
-  const ownerWords = item.owner || 'Unassigned';
-
   // --- Labels ---
   const appliedLabels = item.labels
     .split(',')
@@ -860,42 +848,6 @@ function DetailsCard({
           Completed date can't be in the future
         </span>
       )}
-
-      <div class="detail-row" role="group" aria-labelledby="detail-owner-label">
-        <div class="detail-row-head">
-          <span id="detail-owner-label" class="detail-row-label">
-            Owner
-          </span>
-          <span class="detail-row-value">{ownerWords}</span>
-        </div>
-        <div class="owner-circles">
-          {ownersList.map((o, i) => (
-            <button
-              key={o.name}
-              type="button"
-              class={`owner-circle${item.owner === o.name ? ' active' : ''}`}
-              title={o.name}
-              aria-label={`Owner: ${o.name}`}
-              aria-pressed={item.owner === o.name}
-              onClick={async () => onSaved(await save('owner', o.name))}
-            >
-              <span class="owner-avatar" style={{ background: ownerColor(i) }}>
-                {initials(o.name)}
-              </span>
-            </button>
-          ))}
-          <button
-            type="button"
-            class={`owner-circle${!item.owner ? ' active' : ''}`}
-            title="Unassigned"
-            aria-label="Owner: None"
-            aria-pressed={!item.owner}
-            onClick={async () => onSaved(await save('owner', ''))}
-          >
-            <span class="owner-avatar owner-avatar-none">–</span>
-          </button>
-        </div>
-      </div>
 
       <div class="detail-row" role="group" aria-labelledby="detail-due-label">
         <div class="detail-row-head">

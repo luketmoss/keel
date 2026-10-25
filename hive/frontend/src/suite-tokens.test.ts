@@ -49,13 +49,10 @@ const HIVE_ROOT = [
   '--icon-md',
   '--figure-lg',
   '--figure-md',
-  // #624's Today: the glance figure, the two rings, the row avatar
+  // #624's Today: the glance figure and the two rings
   '--figure-xl',
   '--ring-lg',
   '--ring-md',
-  '--avatar-sm',
-  // #627's item screen: the owner choice circle
-  '--avatar-md',
 ];
 const HIVE_THEME = [
   '--color-primary',
@@ -199,8 +196,6 @@ describe('AC3: exactly this moves', () => {
     '--figure-xl',
     '--ring-lg',
     '--ring-md',
-    '--avatar-sm',
-    '--avatar-md',
   ];
 
   it.each([

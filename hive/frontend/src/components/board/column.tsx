@@ -2,14 +2,7 @@ import { useState } from 'preact/hooks';
 import { Card, currentDragStatus } from './card';
 import type { ItemStatus, ItemWithRow } from '../../api/types';
 import type { SortMode } from '../../state/board-store';
-import {
-  showToast,
-  columnAnnouncement,
-  filterOwner,
-  filterLabel,
-  filterSearch,
-  filterDue,
-} from '../../state/board-store';
+import { showToast, columnAnnouncement, filterLabel, filterSearch, filterDue } from '../../state/board-store';
 import { SortMenu, SORT_LABELS } from './sort-menu';
 import { PlusSmallIcon } from '../today/today-icons';
 
@@ -350,7 +343,7 @@ export function Column({
     return '';
   };
 
-  const filtersOn = !!(filterSearch.value || filterDue.value || filterLabel.value || filterOwner.value);
+  const filtersOn = !!(filterSearch.value || filterDue.value || filterLabel.value);
   const emptyText = dragOver ? 'Drop here' : filtersOn ? 'Nothing matches' : 'Nothing here yet';
   const showSort = !compact && !isTerminal;
 

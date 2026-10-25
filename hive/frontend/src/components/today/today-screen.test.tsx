@@ -24,10 +24,10 @@ import {
   currentUserEmail,
   todaySelectedDay,
   todayWeekStart,
-  setTodayWho,
   todayStr,
   addDays,
   mondayOf,
+  sundayOf,
   selectedItemId,
   showCreateModal,
   createModalInitialDueDate,
@@ -79,7 +79,6 @@ beforeEach(() => {
   permissions.value = [{ board_id: 'home', user_email: '*', role: 'member' }];
   statuses.value = [col('To Do', 1), col('Doing', 2), col('Done', 3, true)];
   items.value = [];
-  setTodayWho('everyone');
   todaySelectedDay.value = today;
   todayWeekStart.value = mondayOf(today);
   selectedItemId.value = null;
@@ -132,10 +131,12 @@ describe('header, strip and glance', () => {
   });
 
   it('selecting a day changes the title, the Due card and the glance', () => {
-    items.value = [item('a'), item('tom', { due_date: d(1) })];
+    // The strip is Monday to Sunday: on a Sunday tomorrow is not in it, so pick yesterday.
+    const other = today === sundayOf(today) ? d(-1) : d(1);
+    items.value = [item('a'), item('tom', { due_date: other })];
     const { container } = render(<TodayScreen />);
     expect(container.querySelector('[data-testid="today-due-a"]')).not.toBeNull();
-    fireEvent.click(container.querySelector(`[data-testid="today-day-${d(1)}"]`)!);
+    fireEvent.click(container.querySelector(`[data-testid="today-day-${other}"]`)!);
     expect(container.querySelector('[data-testid="today-due-a"]')).toBeNull();
     expect(container.querySelector('[data-testid="today-due-tom"]')).not.toBeNull();
     expect(text(container, 'today-title')).not.toBe('Today');
@@ -224,7 +225,7 @@ describe('Due card', () => {
     const { container } = render(<TodayScreen />);
     expect(container.querySelector('[data-testid="today-due-p"]')).toBeNull();
     expect(container.querySelector('[data-testid="today-due-s"] .today-row-meta')!.textContent).toBe(
-      'Mom · Family · in Grocery shopping',
+      'Family · in Grocery shopping',
     );
   });
 
@@ -250,38 +251,42 @@ describe('In progress and Up next', () => {
     items.value = [item('going', { due_date: d(2), status: 'Doing' })];
     const { container } = render(<TodayScreen />);
     expect(container.querySelector('[data-testid="today-progress-going"] .today-row-meta')!.textContent).toMatch(
-      /^Mom · Family · due /,
+      /^Family · due /,
     );
   });
 
-  it('labels Up next items with when, title, owner and board', () => {
+  it('labels Up next items with when, title and board', () => {
     items.value = [item('tom', { due_date: d(1) }), item('later', { due_date: d(3), owner: '' })];
     const { container } = render(<TodayScreen />);
     const first = container.querySelector('[data-testid="today-next-tom"]')!;
     expect(first.querySelector('.today-upnext-when')!.textContent).toBe('TOMORROW');
-    expect(first.textContent).toContain('Mom · Family');
+    expect(first.textContent).toContain('Family');
     const second = container.querySelector('[data-testid="today-next-later"]')!;
     expect(second.querySelector('.today-upnext-when')!.textContent).toMatch(/^[A-Z]{3} \d{1,2}$/);
-    expect(second.textContent).toContain('Unassigned · Family');
+    expect(second.textContent).toContain('Family');
+    expect(second.textContent).not.toContain('Unassigned');
   });
 });
 
-describe('Mine and Everyone', () => {
-  it('filters to the signed-in person, and the chips are absent without an Owners row', () => {
-    items.value = [item('mine'), item('his', { owner: 'Dad' })];
-    setTodayWho('mine');
-    const { container, rerender } = render(<TodayScreen />);
-    expect(container.querySelector('[data-testid="today-due-mine"]')).not.toBeNull();
-    expect(container.querySelector('[data-testid="today-due-his"]')).toBeNull();
-    fireEvent.click(container.querySelector('[data-testid="today-who-everyone"]')!);
-    expect(container.querySelector('[data-testid="today-due-his"]')).not.toBeNull();
-    expect(container.querySelector('[data-testid="today-who-everyone"]')!.getAttribute('aria-pressed')).toBe('true');
-    cleanup();
-    currentUserEmail.value = 'stranger@x.com';
-    const again = render(<TodayScreen />);
-    expect(again.container.querySelector('[data-testid="today-who-mine"]')).toBeNull();
-    expect(again.container.querySelector('[data-testid="today-due-his"]')).not.toBeNull();
-    void rerender;
+describe('whose items', () => {
+  it('shows every dated item, whoever owns it and whether or not it has an owner', () => {
+    items.value = [
+      item('mine'),
+      item('his', { owner: 'Dad' }),
+      item('nobody', { owner: '' }),
+      item('sub', { owner: '', parent_id: 'mine' }),
+    ];
+    const { container } = render(<TodayScreen />);
+    for (const id of ['mine', 'his', 'nobody', 'sub']) {
+      expect(container.querySelector(`[data-testid="today-due-${id}"]`), id).not.toBeNull();
+    }
+  });
+
+  it('has no Mine / Everyone control and no owner avatar', () => {
+    const { container } = render(<TodayScreen />);
+    expect(container.querySelector('[data-testid^="today-who-"]')).toBeNull();
+    expect(container.querySelector('.today-avatar')).toBeNull();
+    expect(container.textContent).not.toMatch(/Unassigned|Everyone|Mine/);
   });
 });
 

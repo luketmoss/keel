@@ -40,8 +40,6 @@
   --figure-xl: 2.75rem;
   --ring-lg: 140px;
   --ring-md: 96px;
-  --avatar-sm: 28px;
-  --avatar-md: 36px;
 }
 
 /* === Light theme === */
@@ -1532,11 +1530,6 @@ body {
   height: 14px;
 }
 
-.card-unassigned {
-  font-style: italic;
-  color: var(--color-text-muted);
-}
-
 .card-labels {
   display: flex;
   flex-wrap: wrap;
@@ -1558,25 +1551,12 @@ body {
   border-radius: 50%;
 }
 
-/* The owner's initials, with the card's menu beneath */
+/* The card's menu, top-right */
 .card-side {
   display: flex;
   flex-direction: column;
   align-items: center;
   flex: none;
-}
-
-.card-avatar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-  width: var(--avatar-sm);
-  height: var(--avatar-sm);
-  border-radius: 50%;
-  color: #fff;
-  font-size: var(--text-xs);
-  font-weight: 700;
 }
 
 .label-badge {
@@ -1595,12 +1575,11 @@ body {
   z-index: 2;
 }
 
-/* #626: on a card the menu sits under the owner's initials, in the flow */
+/* #626: on a card the menu sits in the flow */
 .card-side .kebab-menu-container {
   position: relative;
   top: auto;
   right: auto;
-  margin-top: calc(var(--space-sm) * -1);
 }
 
 .kebab-trigger {
@@ -2342,49 +2321,6 @@ body {
   position: absolute;
   top: var(--space-xs);
   right: var(--space-md);
-}
-
-/* Owner: initials avatars in 44px buttons */
-.owner-circles {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-xs);
-}
-
-.owner-circle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
-  cursor: pointer;
-  font-family: inherit;
-}
-
-.owner-avatar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--avatar-md);
-  height: var(--avatar-md);
-  border-radius: 50%;
-  color: #fff;
-  font-size: var(--text-sm);
-  font-weight: 700;
-}
-
-.owner-avatar-none {
-  background: var(--color-border-light);
-  color: var(--color-text-secondary);
-}
-
-.owner-circle.active .owner-avatar {
-  box-shadow:
-    0 0 0 2px var(--color-surface),
-    0 0 0 4px var(--color-primary);
 }
 
 .detail-chip-row {
@@ -3528,10 +3464,6 @@ body {
   color: var(--color-text-secondary);
 }
 
-.archive-item-owner {
-  font-weight: 500;
-}
-
 .archive-item-labels {
   display: flex;
   gap: 4px;
@@ -4611,30 +4543,6 @@ body {
   height: var(--icon-md);
 }
 
-.today-chips {
-  display: flex;
-  gap: var(--space-sm);
-  margin-top: var(--space-xs);
-}
-
-.today-chip {
-  min-height: var(--touch-target);
-  padding: 0 var(--space-md);
-  border: 2px solid var(--color-border-strong);
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--color-text);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.today-chip-on {
-  background: var(--color-text);
-  border-color: var(--color-text);
-  color: var(--color-bg);
-}
-
 /* Week strip */
 .today-strip {
   display: grid;
@@ -4937,19 +4845,6 @@ body {
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
   overflow-wrap: anywhere;
-}
-
-.today-avatar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-  width: var(--avatar-sm);
-  height: var(--avatar-sm);
-  border-radius: 50%;
-  color: #fff;
-  font-size: var(--text-xs);
-  font-weight: 700;
 }
 
 .today-check {
@@ -5566,11 +5461,9 @@ body {
 .column-settings-swatch:hover:not(:disabled):not([aria-disabled="true"]),
 .icon-swatch:hover:not(:disabled):not([aria-disabled="true"]),
 .quick-date-chip:hover:not(:disabled):not([aria-disabled="true"]),
-.owner-circle:hover:not(:disabled):not([aria-disabled="true"]),
 .status-segment:hover:not(:disabled):not([aria-disabled="true"]),
 .check-icon:hover:not(:disabled):not([aria-disabled="true"]),
 .subtask-date-inline:hover:not(:disabled):not([aria-disabled="true"]),
-.today-chip:hover:not(:disabled):not([aria-disabled="true"]),
 .today-day:hover:not(:disabled):not([aria-disabled="true"]),
 .board-choice-chip:hover:not(:disabled):not([aria-disabled="true"]),
 /* Rows and cards */
@@ -5646,11 +5539,9 @@ body {
 .column-settings-swatch:active:not(:disabled):not([aria-disabled="true"]),
 .icon-swatch:active:not(:disabled):not([aria-disabled="true"]),
 .quick-date-chip:active:not(:disabled):not([aria-disabled="true"]),
-.owner-circle:active:not(:disabled):not([aria-disabled="true"]),
 .status-segment:active:not(:disabled):not([aria-disabled="true"]),
 .check-icon:active:not(:disabled):not([aria-disabled="true"]),
 .subtask-date-inline:active:not(:disabled):not([aria-disabled="true"]),
-.today-chip:active:not(:disabled):not([aria-disabled="true"]),
 .today-day:active:not(:disabled):not([aria-disabled="true"]),
 .board-choice-chip:active:not(:disabled):not([aria-disabled="true"]),
 /* Rows and cards */
@@ -5774,7 +5665,6 @@ textarea:disabled {
 .label-new-pill,
 .column-settings-name,
 .column-settings-terminal-toggle,
-.owner-circle,
 .check-icon,
 .color-swatch,
 .icon-swatch,
@@ -5817,7 +5707,6 @@ textarea:disabled {
 .today-check,
 .today-action-btn,
 .detail-delete-btn,
-.today-chip,
 .today-day,
 .board-choice-chip,
 .today-row-title,

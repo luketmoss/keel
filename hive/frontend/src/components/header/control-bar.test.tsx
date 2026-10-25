@@ -15,7 +15,6 @@ import {
   activeBoardId,
   activeView,
   boardOpen,
-  filterOwner,
   filterLabel,
   filterSearch,
   filterDue,
@@ -88,7 +87,6 @@ beforeEach(() => {
   activeBoardId.value = 'b1';
   activeView.value = 'boards';
   boardOpen.value = true;
-  filterOwner.value = null;
   filterLabel.value = null;
   filterSearch.value = '';
   filterDue.value = null;
@@ -306,10 +304,10 @@ describe('Share and board options', () => {
 });
 
 describe('Filter chips', () => {
-  it("are All, Mine, Due today, This week, then one per label used on the board in the board's order", () => {
+  it("are All, Due today, This week, then one per label used on the board in the board's order", () => {
     const { container } = render(<ControlBar />);
     // "Unused" is used only by a sub-item, and "Other" belongs to another board.
-    expect(chipNames(container)).toEqual(['All', 'Mine', 'Due today', 'This week', 'Urgent', 'Home']);
+    expect(chipNames(container)).toEqual(['All', 'Due today', 'This week', 'Urgent', 'Home']);
   });
 
   it('are one group named "Filters", not a popup', () => {
@@ -337,16 +335,13 @@ describe('Filter chips', () => {
     expect(all().classList.contains('filter-chip-active')).toBe(true);
 
     fireEvent.click(q(container, 'filter-due-today'));
-    fireEvent.click(q(container, 'filter-mine'));
     fireEvent.click(q(container, 'filter-label-Home'));
     expect(all().getAttribute('aria-pressed')).toBe('false');
     expect(filterDue.value).toBe('today');
-    expect(filterOwner.value).toBe('Luke');
     expect(filterLabel.value).toBe('Home');
 
     fireEvent.click(all());
     expect(filterDue.value).toBeNull();
-    expect(filterOwner.value).toBeNull();
     expect(filterLabel.value).toBeNull();
     expect(all().getAttribute('aria-pressed')).toBe('true');
   });
@@ -372,17 +367,14 @@ describe('Filter chips', () => {
     expect(q(container, 'filter-due-this-week').getAttribute('aria-pressed')).toBe('true');
   });
 
-  it('Mine, one due chip and one label chip combine, and narrow the cards', () => {
+  it('one due chip and one label chip combine, and narrow the cards', () => {
     const { container } = render(<ControlBar />);
-    fireEvent.click(q(container, 'filter-mine'));
-    expect(rootItems.value.map((i) => i.id)).toEqual(['1']);
     fireEvent.click(q(container, 'filter-due-this-week'));
-    fireEvent.click(q(container, 'filter-label-Home'));
-    expect(filterOwner.value).toBe('Luke');
+    fireEvent.click(q(container, 'filter-label-Urgent'));
     expect(filterDue.value).toBe('this-week');
-    expect(filterLabel.value).toBe('Home');
-    expect(rootItems.value.map((i) => i.id)).toEqual(['1']);
-    fireEvent.click(q(container, 'filter-mine'));
+    expect(filterLabel.value).toBe('Urgent');
+    expect(rootItems.value.map((i) => i.id)).toEqual(['2']);
+    fireEvent.click(q(container, 'filter-label-Urgent'));
     expect(rootItems.value.map((i) => i.id).sort()).toEqual(['1', '2']);
   });
 
@@ -392,12 +384,6 @@ describe('Filter chips', () => {
     fireEvent.click(q(container, 'filter-label-Home'));
     expect(filterLabel.value).toBe('Home');
     expect(q(container, 'filter-label-Urgent').getAttribute('aria-pressed')).toBe('false');
-  });
-
-  it('Mine is not offered to someone with no Owners row', () => {
-    owners.value = [{ name: 'Mom', google_account: 'mom@test.com' }];
-    const { container } = render(<ControlBar />);
-    expect(chipNames(container)).not.toContain('Mine');
   });
 
   it('the filter clears when the label it names is deleted', async () => {
@@ -429,11 +415,8 @@ describe('Filter chips', () => {
       expect(q(container, 'filter-live-region').textContent).toBe('1 cards shown');
     });
 
-    it('announces for Mine and for a search too', async () => {
+    it('announces for a search too', async () => {
       const { container } = render(<ControlBar />);
-      fireEvent.click(q(container, 'filter-mine'));
-      expect(q(container, 'filter-live-region').textContent).toBe('1 cards shown');
-      fireEvent.click(q(container, 'filter-mine'));
       await act(() => {
         filterSearch.value = 'Title 3';
       });

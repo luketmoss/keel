@@ -183,23 +183,6 @@ describe('CardDetail save feedback (Issue #11)', () => {
       });
     });
 
-    it('shows "Saved" indicator after clicking owner circle button', async () => {
-      const { container } = renderCardDetail();
-
-      // Find an owner-circle button
-      const ownerBtn = container.querySelector('.owner-circle') as HTMLElement;
-      expect(ownerBtn).not.toBeNull();
-
-      await act(async () => {
-        fireEvent.click(ownerBtn);
-      });
-
-      await waitFor(() => {
-        const indicators = container.querySelectorAll('[data-testid="save-indicator"]');
-        expect(indicators.length).toBeGreaterThan(0);
-      });
-    });
-
     it('shows "Saved" indicator after toggling a label', async () => {
       const { container } = renderCardDetail();
 
@@ -250,15 +233,17 @@ describe('CardDetail save feedback (Issue #11)', () => {
       expect(editableValue?.textContent).toBe('Test Item');
     });
 
-    it('shows error indicator on owner circle button save failure', async () => {
+    it('shows error indicator on a Due quick-date chip save failure', async () => {
       mockUpdateItem.mockResolvedValue(false);
 
       const { container } = renderCardDetail();
 
-      const ownerBtn = container.querySelector('.owner-circle') as HTMLElement;
+      const chip = Array.from(container.querySelectorAll('[aria-labelledby="detail-due-label"] .filter-chip')).find(
+        (b) => b.textContent === 'Tomorrow',
+      ) as HTMLElement;
 
       await act(async () => {
-        fireEvent.click(ownerBtn);
+        fireEvent.click(chip);
       });
 
       await waitFor(() => {
@@ -1599,13 +1584,14 @@ describe('CardDetail clear date button (Issue #207)', () => {
     });
   });
 
-  // AC3: Owner and Due are rows of one card
-  it('AC3: Owner and Due are rows of the same details card', () => {
+  // AC3: Due and Labels are rows of one card
+  it('AC3: Due and Labels are rows of the same details card', () => {
     mockItemOverrides = { due_date: '2026-04-10' };
     const { container } = renderCardDetail();
     const card = container.querySelector('.detail-details');
     expect(card).not.toBeNull();
-    expect(card!.querySelector('[aria-labelledby="detail-owner-label"] .owner-circle')).not.toBeNull();
+    expect(card!.querySelector('[aria-labelledby="detail-owner-label"]')).toBeNull();
+    expect(card!.querySelector('[aria-labelledby="detail-labels-label"]')).not.toBeNull();
     expect(card!.querySelector('[aria-labelledby="detail-due-label"] .filter-chip')).not.toBeNull();
   });
 });

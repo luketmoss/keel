@@ -4,14 +4,13 @@ import {
   openDetailWithTitleEdit,
   boardStatuses,
   isTerminalStatus,
-  owners,
   labels as labelsStore,
   todayStr,
   addDays,
 } from '../../state/board-store';
 import type { ItemWithRow, ItemStatus } from '../../api/types';
 import { CalendarIcon, ChecklistIcon } from '../today/today-icons';
-import { dayLong, initials, monthDay, ownerColor } from '../today/today-format';
+import { dayLong, monthDay } from '../today/today-format';
 import { KebabMenu } from './kebab-menu';
 import type { KebabAction } from './kebab-menu';
 
@@ -58,7 +57,6 @@ export function Card({
     (isIsoDay(item.due_date)
       ? item.due_date < todayStr()
       : parseLocalDate(item.due_date) < new Date(new Date().toDateString()));
-  const ownerIndex = item.owner ? owners.value.findIndex((o) => o.name === item.owner) : -1;
   // #626: a finished item shows when it was finished; an open one, when it is due.
   const doneOn = done && item.completed_at ? localDay(item.completed_at) : '';
 
@@ -199,7 +197,6 @@ export function Card({
               {childCount.done}/{childCount.total}
             </span>
           )}
-          {!item.owner && <span class="card-unassigned">Unassigned</span>}
         </div>
 
         {itemLabels.length > 0 && (
@@ -219,17 +216,6 @@ export function Card({
       </div>
 
       <div class="card-side">
-        {item.owner && (
-          <span
-            class="card-avatar"
-            style={{ background: ownerColor(ownerIndex) }}
-            title={item.owner}
-            data-testid="card-avatar"
-          >
-            <span aria-hidden="true">{initials(item.owner)}</span>
-            <span class="sr-only">{item.owner}</span>
-          </span>
-        )}
         {kebabActions.length > 0 && <KebabMenu actions={kebabActions} itemTitle={item.title} />}
       </div>
     </div>

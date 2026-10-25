@@ -10,8 +10,6 @@ compatibility_flags = ["global_fetch_strictly_public", "nodejs_als"]
 [vars]
 # Set when the GitHub OAuth app is created (#369).
 GITHUB_CLIENT_ID = "Ov23lieyNEsMK4XTtE7m"
-# Owner hive_add_item uses when none is given. Set to your Hive owner name.
-HIVE_DEFAULT_OWNER = "Luke"
 # Write ceilings (#410). A missing or malformed value falls back to these, never to "unlimited".
 # Rows one call may write before it is held for `confirm: true` (Thrive's four bulk tools).
 MAX_ROWS_PER_CALL = "200"

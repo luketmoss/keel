@@ -140,10 +140,10 @@ scheduled and never edited after. Read it with the `wiki:` path from Settings:
    back to an older week.
 3. From that section take two things, and nothing else:
    - **The why for each session:** the rule call or judgment call that names
-     it, e.g. *"Row: +5, not +10, because the last session note flagged a sore joint."*
+     it, e.g. *"Squat: hold the load, because the last session ran long."*
    - **What would change it:** the conditional lines under *What would
-     change the answer* (e.g. *"A short Sunday night: swap Monday and
-     Tuesday."*).
+     change the answer* (e.g. *"A short night before a heavy day: swap
+     it with the next easy day."*).
 4. The weekly brief also reads the newest dated entry in the page's
    `## Outcome log`, for the open items it names for the week ahead.
 
@@ -265,9 +265,9 @@ becomes a `stretch` or an easy `walk` or `bike`. Don't invent a new plan.
 (Step 2, *The plan's why*) is triggered by today's data, such as a short
 night, or a session note about pain, name that line's action as the
 swap rather than a generic one, and say it came from the plan: *"The plan
-says: a short Sunday night swaps Monday and Tuesday."* Judge whether a line
+says: a short night before a heavy day swaps it with the next easy day."* Judge whether a line
 is triggered only from figures and notes the brief has read. A condition the
-brief can't see (how a joint feels this morning) is shown as something to
+brief can't see (how the user feels this morning) is shown as something to
 check, never as triggered.
 
 **Weather and outdoor sessions.** Apply this to every planned session that
@@ -516,8 +516,8 @@ strings show as text, times are decimal hours as on the daily page):
     all-day event fills: `skip` it or `move` it;
   - a planned session with no reason against it: `keep`.
   - a session the plan's why (Step 2) attaches a condition to: `keep` it,
-    with the plan's line in `why` (*"Bench enters 5×6 at 135. Over 45 min,
-    cut the last cable fly set."*). When the data already shows the
+    with the plan's line in `why` (*"Run long if the forecast holds. If it rains,
+    move it to the next dry day."*). When the data already shows the
     condition met, `move` it as the plan says instead.
 
   `summary`'s second sentence may name an open item from the block page's

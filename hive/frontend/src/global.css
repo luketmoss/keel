@@ -1229,17 +1229,14 @@ body {
   border-radius: 2px;
 }
 
-/* #660: Done's "View all N completed" adds a line under its header. When it is showing, every
-   other column reserves the same line so the cards and empty states start level. Phone shows
-   one column at a time, so there is nothing to line up. */
-.column-archive-link {
-  line-height: 16px;
-}
-
+/* #660: Done's "View all N completed" adds a line under its header, as tall as the touch-target
+   floor that every button gets. When it is showing, every other column reserves the same height
+   so the cards and empty states start level. Phone shows one column at a time, so there is
+   nothing to line up. */
 @media (min-width: 768px) {
   .board-columns:has(.column-archive-link) .column-header:not(:has(.column-archive-link))::after {
     content: '';
-    height: 16px;
+    height: var(--touch-target);
   }
 }
 

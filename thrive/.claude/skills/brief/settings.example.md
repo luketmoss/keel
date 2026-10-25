@@ -18,3 +18,9 @@ Without it the brief still publishes, and the phone isn't told. Setting up the
 phone: [docs/brief-phone.md](../../../docs/brief-phone.md).
 
 - **webhook**: `https://trigger.macrodroid.com/<device-id>/brief`
+
+An optional `wiki:` line is the path to the personal wiki checkout. The brief
+reads the active training block page there for the plan's why (SKILL.md Step 2).
+Without it, the brief skips that and says so.
+
+- **wiki**: `<path to the wiki checkout>`

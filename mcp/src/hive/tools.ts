@@ -42,7 +42,6 @@ const UNDO = { readOnlyHint: false, destructiveHint: true } as const
 /** The tools the read endpoint serves (#409). Everything else registered here is a write tool. */
 export const HIVE_READ_TOOLS: ReadonlySet<string> = new Set([
   'hive_list_boards',
-  'hive_list_owners',
   'hive_list_labels',
   'hive_list_items',
   'hive_get_item',
@@ -83,17 +82,6 @@ export function registerHiveTools(server: McpServer, cfg: HiveConfig, mode: Mode
           .map((b) => `- **${b.name}** (id: ${b.id}${b.color ? `, color: ${b.color}` : ''})`)
           .join('\n'),
       )
-    }),
-  )
-
-  server.registerTool(
-    'hive_list_owners',
-    { description: 'List valid owners for Hive board items', annotations: READ },
-    guarded(async () => {
-      const result = await apiGet(cfg, 'getOwners')
-      if (!result.success) return text(`Error: ${result.error}`)
-      const out = (result.data as any[]).map((o) => `- ${o.name} (${o.google_account})`).join('\n')
-      return text(out || 'No owners found.')
     }),
   )
 
@@ -188,7 +176,6 @@ export function registerHiveTools(server: McpServer, cfg: HiveConfig, mode: Mode
           .map((i) => {
             const parts = [`- [${i.status}] **${i.title}** (id: ${i.id})`]
             parts.push(`board: ${boardMap[i.board_id] || 'unknown'}`)
-            if (i.owner) parts.push(`(${i.owner})`)
             if (i.due_date) parts.push(`due: ${i.due_date}`)
             if (i.completed_at) parts.push(`completed: ${i.completed_at}`)
             if (i.labels) parts.push(`labels: ${i.labels}`)
@@ -209,7 +196,6 @@ export function registerHiveTools(server: McpServer, cfg: HiveConfig, mode: Mode
         board: z.string().describe("Board name (e.g., 'Work', 'Family')"),
         title: z.string().describe('Item title'),
         description: z.string().optional().describe('Item description'),
-        owner: z.string().optional().describe('Owner name (must match an existing owner)'),
         due_date: z.string().optional().describe('Due date in ISO format (YYYY-MM-DD)'),
         labels: z.string().optional().describe('Comma-separated labels'),
         status: z.enum(['To Do', 'In Progress', 'Done']).optional().describe("Status (defaults to 'To Do')"),
@@ -226,7 +212,6 @@ export function registerHiveTools(server: McpServer, cfg: HiveConfig, mode: Mode
         board,
         title,
         description,
-        owner,
         due_date,
         labels,
         status,
@@ -236,7 +221,6 @@ export function registerHiveTools(server: McpServer, cfg: HiveConfig, mode: Mode
         board: string
         title: string
         description?: string
-        owner?: string
         due_date?: string
         labels?: string
         status?: 'To Do' | 'In Progress' | 'Done'
@@ -244,7 +228,6 @@ export function registerHiveTools(server: McpServer, cfg: HiveConfig, mode: Mode
         position?: 'top' | 'bottom' | number
       }) => {
         const resolved = await resolveBoard(cfg, board)
-        const itemOwner = owner || cfg.defaultOwner
         const itemStatus = status || 'To Do'
         const sort_order = await resolvePosition(cfg, resolved.id, itemStatus, position)
 
@@ -252,7 +235,6 @@ export function registerHiveTools(server: McpServer, cfg: HiveConfig, mode: Mode
           data: {
             title,
             description: description || '',
-            owner: itemOwner,
             due_date: normalizeDate(due_date),
             labels: labels || '',
             board_id: resolved.id,
@@ -269,7 +251,6 @@ export function registerHiveTools(server: McpServer, cfg: HiveConfig, mode: Mode
         const item = result.data
         const parts = [`Added to **${resolved.name}** board:`, `- **${item.title}**`]
         parts.push(`- Status: ${item.status}`)
-        if (item.owner) parts.push(`- Owner: ${item.owner}`)
         if (item.due_date) parts.push(`- Due: ${item.due_date}`)
         if (item.labels) parts.push(`- Labels: ${item.labels}`)
         parts.push(`- ID: ${item.id}`)
@@ -293,7 +274,6 @@ export function registerHiveTools(server: McpServer, cfg: HiveConfig, mode: Mode
       const parts = [
         `**${i.title}** (id: ${i.id})`,
         `- Status: ${i.status}`,
-        `- Owner: ${i.owner || 'none'}`,
         `- Due: ${i.due_date || 'none'}`,
         ...(i.completed_at ? [`- Completed: ${i.completed_at}`] : []),
         `- Labels: ${i.labels || 'none'}`,
@@ -314,7 +294,6 @@ export function registerHiveTools(server: McpServer, cfg: HiveConfig, mode: Mode
         title: z.string().optional().describe('New title'),
         description: z.string().optional().describe('New description'),
         status: z.enum(['To Do', 'In Progress', 'Done']).optional().describe('New status'),
-        owner: z.string().optional().describe('New owner name'),
         due_date: z.string().optional().describe('New due date in ISO format (YYYY-MM-DD)'),
         completed_at: z.string().optional().describe(
           'When the item is in a terminal column: set when it was completed, as a date (YYYY-MM-DD, stored as noon UTC) or a full ISO 8601 timestamp with Z or an offset, not more than 24 hours ahead. Refused for an item in any other column. Cleared by moving the item out of its terminal column, not by an empty value',
@@ -334,7 +313,6 @@ export function registerHiveTools(server: McpServer, cfg: HiveConfig, mode: Mode
         title,
         description,
         status,
-        owner,
         due_date,
         completed_at,
         labels,
@@ -345,7 +323,6 @@ export function registerHiveTools(server: McpServer, cfg: HiveConfig, mode: Mode
         title?: string
         description?: string
         status?: 'To Do' | 'In Progress' | 'Done'
-        owner?: string
         due_date?: string
         completed_at?: string
         labels?: string
@@ -356,7 +333,6 @@ export function registerHiveTools(server: McpServer, cfg: HiveConfig, mode: Mode
         if (title !== undefined) changes.title = title
         if (description !== undefined) changes.description = description
         if (status !== undefined) changes.status = status
-        if (owner !== undefined) changes.owner = owner
         if (due_date !== undefined) changes.due_date = normalizeDate(due_date)
         // Forwarded untouched, even when empty: the rule lives in Apps Script, and a third copy would drift.
         if (completed_at !== undefined) changes.completed_at = completed_at
@@ -383,7 +359,6 @@ export function registerHiveTools(server: McpServer, cfg: HiveConfig, mode: Mode
         const item = result.data
         const parts = [`Updated **${item.title}**:`]
         parts.push(`- Status: ${item.status}`)
-        if (item.owner) parts.push(`- Owner: ${item.owner}`)
         if (item.due_date) parts.push(`- Due: ${item.due_date}`)
         if (item.completed_at) parts.push(`- Completed: ${item.completed_at}`)
         if (item.labels) parts.push(`- Labels: ${item.labels}`)

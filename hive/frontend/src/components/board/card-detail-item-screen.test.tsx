@@ -291,15 +291,16 @@ describe('#627 status switch', () => {
 });
 
 describe('#627 details card', () => {
-  it('Owner, Due and Labels are labelled rows of one card, separated by hairlines', () => {
+  it('Due and Labels are labelled rows of one card, separated by hairlines', () => {
     const { container } = renderCardDetail();
     const card = container.querySelectorAll('.detail-details');
     expect(card.length).toBe(1);
     const rows = card[0].querySelectorAll('.detail-row');
-    expect(rows.length).toBe(3); // Owner, Due, Labels: no Board row with no other board to move to
-    for (const id of ['detail-owner-label', 'detail-due-label', 'detail-labels-label']) {
-      expect(card[0].querySelector(`#${id}`)!.textContent).toMatch(/^(Owner|Due|Labels)$/);
+    expect(rows.length).toBe(2); // Due, Labels: no Board row with no other board to move to
+    for (const id of ['detail-due-label', 'detail-labels-label']) {
+      expect(card[0].querySelector(`#${id}`)!.textContent).toMatch(/^(Due|Labels)$/);
     }
+    expect(card[0].querySelector('#detail-owner-label')).toBeNull();
     expect(css).toMatch(/\.detail-row\s*\{[^}]*border-top:\s*1px solid var\(--color-border-light\)/);
     expect(css).toMatch(/\.detail-row\s*\{[^}]*min-height:\s*52px/);
   });
@@ -310,50 +311,22 @@ describe('#627 details card', () => {
       { id: 'board-work', name: 'Work', created_at: '', created_by: '' },
     ];
     const { container } = renderCardDetail();
-    expect(container.querySelectorAll('.detail-details .detail-row').length).toBe(4);
+    expect(container.querySelectorAll('.detail-details .detail-row').length).toBe(3);
     expect(container.querySelector('.detail-row-btn')!.textContent).toBe('Family');
   });
 
-  it('states the value in words: owner name or Unassigned, label names or None', () => {
+  it('states the value in words: label names or None', () => {
     const named = renderCardDetail();
-    expect(byLabel(named.container, 'detail-owner-label').querySelector('.detail-row-value')!.textContent).toBe('Luke');
     expect(byLabel(named.container, 'detail-labels-label').querySelector('.detail-row-value')!.textContent).toBe(
       'None',
     );
     named.unmount();
 
-    mockSelectedItemOverrides = { owner: '', labels: 'Errands, Home' };
+    mockSelectedItemOverrides = { labels: 'Errands, Home' };
     const none = renderCardDetail();
-    expect(byLabel(none.container, 'detail-owner-label').querySelector('.detail-row-value')!.textContent).toBe(
-      'Unassigned',
-    );
     expect(byLabel(none.container, 'detail-labels-label').querySelector('.detail-row-value')!.textContent).toBe(
       'Errands, Home',
     );
-  });
-
-  it('owner avatars are pressable buttons named "Owner: <name>", with None last, and save on press', () => {
-    const { container } = renderCardDetail();
-    const buttons = Array.from(byLabel(container, 'detail-owner-label').querySelectorAll('button'));
-    expect(buttons.map((b) => b.getAttribute('aria-label'))).toEqual(['Owner: Luke', 'Owner: Mom', 'Owner: None']);
-    expect(buttons.map((b) => b.getAttribute('aria-pressed'))).toEqual(['true', 'false', 'false']);
-    expect(buttons[0].textContent).toBe('LU');
-    fireEvent.click(buttons[1]);
-    expect(mockUpdateItem).toHaveBeenCalledWith('item-screen-1', { owner: 'Mom' }, 'Luke', 'test-token');
-    fireEvent.click(buttons[2]);
-    expect(mockUpdateItem).toHaveBeenLastCalledWith('item-screen-1', { owner: '' }, 'Luke', 'test-token');
-  });
-
-  it('an owner no longer in Owners shows the stored name and selects no avatar', () => {
-    mockSelectedItemOverrides = { owner: 'Grandma' };
-    const { container } = renderCardDetail();
-    const row = byLabel(container, 'detail-owner-label');
-    expect(row.querySelector('.detail-row-value')!.textContent).toBe('Grandma');
-    expect(Array.from(row.querySelectorAll('button')).map((b) => b.getAttribute('aria-pressed'))).toEqual([
-      'false',
-      'false',
-      'false',
-    ]);
   });
 
   describe('Due', () => {
@@ -389,7 +362,9 @@ describe('#627 details card', () => {
 
       mockSelectedItemOverrides = { due_date: ymd };
       const again = renderCardDetail();
-      expect(on(again.container)).toEqual([word]);
+      // On a Sunday 'Next week' is the same date as 'Tomorrow', and the first match is the one that is on
+      const sameAsTomorrow = word === 'Next week' && ymd === addLocalDays(today, 1);
+      expect(on(again.container)).toEqual([sameAsTomorrow ? 'Tomorrow' : word]);
     });
 
     it('No date clears the date', () => {

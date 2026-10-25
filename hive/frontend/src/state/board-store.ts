@@ -108,7 +108,6 @@ export const boardItems = computed(() => {
 });
 
 // --- Filters ---
-export const filterOwner = signal<string | null>(null);
 export const filterLabel = signal<string | null>(null);
 export const filterSearch = signal('');
 export type DueFilter = 'today' | 'this-week' | null;
@@ -501,12 +500,6 @@ export const filteredItems = computed(() => {
     );
   }
 
-  // #626: Mine. Roots only, as search and due are; a sub-item passes through to its parent's card.
-  if (filterOwner.value) {
-    const owner = filterOwner.value;
-    result = result.filter((i) => i.parent_id || i.owner === owner);
-  }
-
   const search = filterSearch.value.trim();
   const due = filterDue.value;
 
@@ -608,7 +601,6 @@ export const showMoveToBoardModal = signal(false);
 /** Make a board the active one: resets filters, grouping and selection. Shows nothing by itself. */
 export function selectBoard(boardId: string) {
   activeBoardId.value = boardId;
-  filterOwner.value = null;
   filterLabel.value = null;
   filterSearch.value = '';
   filterDue.value = null;
@@ -796,38 +788,6 @@ export function firstTerminalStatusNameForBoard(boardId: string): string | null 
   return boardStats.find((s) => s.is_terminal)?.name ?? null;
 }
 
-/** The signed-in person's Owners-sheet name, or '' when they have no row. */
-export const currentOwnerName = computed(() => {
-  const email = currentUserEmail.value.toLowerCase();
-  if (!email) return '';
-  return owners.value.find((o) => o.google_account.toLowerCase() === email)?.name ?? '';
-});
-
-export type TodayWho = 'mine' | 'everyone';
-const TODAY_WHO_KEY = 'hive-today-who';
-
-function loadTodayWho(): TodayWho {
-  try {
-    return localStorage.getItem(TODAY_WHO_KEY) === 'everyone' ? 'everyone' : 'mine';
-  } catch {
-    return 'mine';
-  }
-}
-
-export const todayWho = signal<TodayWho>(loadTodayWho());
-
-export function setTodayWho(who: TodayWho) {
-  todayWho.value = who;
-  try {
-    localStorage.setItem(TODAY_WHO_KEY, who);
-  } catch {
-    /* localStorage unavailable */
-  }
-}
-
-/** Mine applies only to a person with an Owners row; without one it is Everyone. */
-export const effectiveTodayWho = computed((): TodayWho => (currentOwnerName.value ? todayWho.value : 'everyone'));
-
 /** The selected day (YYYY-MM-DD). Today on load; not persisted. */
 export const todaySelectedDay = signal<string>(todayStr());
 /** Monday of the week the strip shows. */
@@ -863,14 +823,13 @@ function byDueThenBoard(boardOrder: Map<string, number>) {
 
 /**
  * Every dated item on an accessible, non-archived board, roots and subtasks
- * alike, narrowed to the signed-in person's own when Mine is on.
+ * alike.
  */
 export const todayRows = computed((): TodayRow[] => {
   const boardList = accessibleBoards.value;
   const byId = new Map(boardList.map((b) => [b.id, b]));
   const all = items.value;
   const itemById = new Map(all.map((i) => [i.id, i]));
-  const mine = effectiveTodayWho.value === 'mine' ? currentOwnerName.value : '';
   const rows: TodayRow[] = [];
   for (const item of all) {
     if (!item.due_date) continue;
@@ -878,7 +837,6 @@ export const todayRows = computed((): TodayRow[] => {
     const boardId = item.board_id || parent?.board_id || '';
     const board = byId.get(boardId);
     if (!board) continue;
-    if (mine && item.owner !== mine) continue;
     const done = isTerminalStatusForBoard(item.status, boardId);
     rows.push({
       item,

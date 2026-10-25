@@ -31,7 +31,6 @@ import {
   deleteLabelRow as sheetsDeleteLabelRow,
   fetchLabelsWithRows as sheetsFetchLabelsWithRows,
   cascadeLabelUpdate as sheetsCascadeLabelUpdate,
-  cascadeOwnerUpdate as sheetsCascadeOwnerUpdate,
   upsertOwner as sheetsUpsertOwner,
   fetchBoards as sheetsFetchBoards,
   createBoardRow as sheetsCreateBoardRow,
@@ -66,7 +65,6 @@ import {
   deleteLabelRow as mockDeleteLabelRow,
   fetchLabelsWithRows as mockFetchLabelsWithRows,
   cascadeLabelUpdate as mockCascadeLabelUpdate,
-  cascadeOwnerUpdate as mockCascadeOwnerUpdate,
   upsertOwner as mockUpsertOwner,
   fetchBoards as mockFetchBoards,
   createBoardRow as mockCreateBoardRow,
@@ -120,7 +118,6 @@ function api() {
       deleteLabelRow: mockDeleteLabelRow,
       fetchLabelsWithRows: mockFetchLabelsWithRows,
       cascadeLabelUpdate: mockCascadeLabelUpdate,
-      cascadeOwnerUpdate: mockCascadeOwnerUpdate,
       upsertOwner: mockUpsertOwner,
       fetchBoards: mockFetchBoards,
       createBoardRow: mockCreateBoardRow,
@@ -156,7 +153,6 @@ function api() {
     deleteLabelRow: sheetsDeleteLabelRow,
     fetchLabelsWithRows: sheetsFetchLabelsWithRows,
     cascadeLabelUpdate: sheetsCascadeLabelUpdate,
-    cascadeOwnerUpdate: sheetsCascadeOwnerUpdate,
     upsertOwner: sheetsUpsertOwner,
     fetchBoards: sheetsFetchBoards,
     createBoardRow: sheetsCreateBoardRow,
@@ -193,7 +189,6 @@ const deleteLabelRow = (...args: Parameters<typeof sheetsDeleteLabelRow>) => api
 const fetchLabelsWithRows = (...args: Parameters<typeof sheetsFetchLabelsWithRows>) =>
   api().fetchLabelsWithRows(...args);
 const cascadeLabelUpdate = (...args: Parameters<typeof sheetsCascadeLabelUpdate>) => api().cascadeLabelUpdate(...args);
-const cascadeOwnerUpdate = (...args: Parameters<typeof sheetsCascadeOwnerUpdate>) => api().cascadeOwnerUpdate(...args);
 const upsertOwner = (...args: Parameters<typeof sheetsUpsertOwner>) => api().upsertOwner(...args);
 const fetchBoardsApi = (...args: Parameters<typeof sheetsFetchBoards>) => api().fetchBoards(...args);
 const createBoardRowApi = (...args: Parameters<typeof sheetsCreateBoardRow>) => api().createBoardRow(...args);
@@ -934,12 +929,7 @@ export async function reorderItem(
 
 // --- Profile actions ---
 
-export async function updateDisplayName(
-  newName: string,
-  email: string,
-  oldName: string,
-  token: string,
-): Promise<boolean> {
+export async function updateDisplayName(newName: string, email: string, token: string): Promise<boolean> {
   // Strip control characters and newlines
   const cleaned = newName.replace(/[\x00-\x1f\x7f]/g, '').trim();
 
@@ -951,27 +941,19 @@ export async function updateDisplayName(
   }
 
   // Optimistic update
-  const oldItems = [...items.value];
   const oldOwners = [...owners.value];
   owners.value = owners.value.map((o) =>
     o.google_account.toLowerCase() === email.toLowerCase() ? { ...o, name: cleaned } : o,
   );
-  items.value = items.value.map((i) => (i.owner === oldName ? { ...i, owner: cleaned } : i));
 
   try {
     await upsertOwner(cleaned, email, token);
-    if (oldName && oldName !== cleaned) {
-      await cascadeOwnerUpdate(oldName, cleaned, token);
-    }
     // Refresh to get server state
-    const [freshItems, freshOwners] = await Promise.all([fetchAllItems(token), fetchOwners(token)]);
-    items.value = freshItems;
-    owners.value = freshOwners;
+    owners.value = await fetchOwners(token);
     showToast('Display name updated');
     return true;
   } catch (err: any) {
     // Rollback
-    items.value = oldItems;
     owners.value = oldOwners;
     if (!isReauthFailure(err)) {
       throw err; // Re-throw so dialog can show inline error

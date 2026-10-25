@@ -22,7 +22,7 @@ class the TSX renders, which state selectors exist:
 
 - **Hover:** 75 `:hover` rules, none inside `@media (hover: hover)`, so on a
   phone the last-tapped control keeps its hover fill. Four hovers move the
-  control: `scale` on `.fab` (1.05), `.owner-circle` (1.08) and `.color-swatch`
+  control: `scale` on `.fab` (1.05) and `.color-swatch`
   (1.1 and 1.15).
 - **Pressed:** one `:active` rule in the file, and it is a cursor change. Pressed
   effectively does not exist.
@@ -119,13 +119,13 @@ exempts it from "rendered as a control".
 | Filled buttons | `.btn-primary`, `.btn-danger`, `.fab`, `.login-btn` |
 | Quiet buttons | `.btn-ghost`, `.share-archive-board-btn`, `.column-archive-link`, `.toast-action`, `.label-new-pill`, `.column-settings-add-btn`, `.column-settings-name`, `.subtask-date-add-inline`, `.overflow-menu-btn`, `.login-link` (#609), `.today-action-btn` (#624), `.detail-delete-btn` (#627) |
 | Icon buttons | `.btn-icon`, `.btn-icon-danger`, `.kebab-trigger`, `.subtask-kebab-btn`, `.subtask-action-btn`, `.archive-search-clear`, `.filter-search-clear`, `.share-remove-btn`, `.staged-subtask-remove`, `.label-gear-btn`, `.column-add-btn`, `.column-sort-btn` (#626), `.column-settings-delete-btn`, `.date-clear-btn`, `.today-round-btn` (#624), `.today-check` (#624) |
-| Chips and toggles | `.filter-chip`, `.label-toggle`, `.theme-toggle-btn`, `.color-swatch`, `.column-color-swatch`, `.column-settings-swatch`, `.icon-swatch`, `.quick-date-chip`, `.owner-circle`, `.status-segment` (#627), `.check-icon`, `.subtask-date-inline`, `.today-chip` (#624), `.today-day` (#624), `.board-choice-chip` (#624) |
+| Chips and toggles | `.filter-chip`, `.label-toggle`, `.theme-toggle-btn`, `.color-swatch`, `.column-color-swatch`, `.column-settings-swatch`, `.icon-swatch`, `.quick-date-chip`, `.status-segment` (#627), `.check-icon`, `.subtask-date-inline`, `.today-day` (#624), `.board-choice-chip` (#624) |
 | Rows and cards | `.card`, `.card-title`, `.archive-item`, `.kebab-item`, `.overflow-menu-item`, `.subtask-menu-item`, `.subtask-title`, `.editable-value`, `.detail-row-btn` (#627), `.completed-date-btn`, `.column-add-row`, `.today-row-title` (#624), `.boards-card`, `.boards-new-card`, `.boards-archived-row`, `.boards-back` (#625) |
 | Navigation | `.bottom-nav-tab`, `.rail-item`, `.settings-row`, `.settings-tab`, `.column-tab` (#626) |
 | Fields | `.filter-search-input`, `.subtask-add-input`, `.subtask-add-date`, `.subtask-title-input`, `.label-form-input`, `.archive-search-input`, `.profile-email-input`, `.due-date-hidden`, `.column-settings-name-inline`, `.column-settings-name-input`, `.column-settings-delete-select` — keep their focus treatment, gain the disabled state. Radios and checkboxes carry no class and are fields too; so is every input inside a `form-field` wrapper, which styles it |
 
 Selected applies to chips and toggles, the navigation tabs, `.check-icon`,
-`.status-segment`, `.owner-circle`, `.overflow-menu-item` (checked) and
+`.status-segment`, `.overflow-menu-item` (checked) and
 `.label-toggle`. Everything else has five states. Hive's menus use
 `role="menuitemradio"` for the group-by choices: they expose `aria-checked`.
 

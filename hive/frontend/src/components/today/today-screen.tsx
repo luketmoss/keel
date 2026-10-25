@@ -2,11 +2,7 @@
 // The numbers and lists come from `todayView` in board-store; this file only draws them.
 import { useAuth } from '../../auth/auth-context';
 import {
-  owners,
   accessibleBoards,
-  currentOwnerName,
-  effectiveTodayWho,
-  setTodayWho,
   todayView,
   todaySelectedDay,
   todayWeekStart,
@@ -30,16 +26,7 @@ import {
   WarningIcon,
 } from './today-icons';
 import { PlusIcon } from '../shell/nav-icons';
-import {
-  dayLong,
-  dayShort,
-  initials,
-  ownerColor,
-  parseDay,
-  weekdayLetter,
-  weekdayShort,
-  whenLabel,
-} from './today-format';
+import { dayLong, dayShort, parseDay, weekdayLetter, weekdayShort, whenLabel } from './today-format';
 
 function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -59,20 +46,10 @@ function itemHref(id: string): string {
 }
 
 function rowMeta(row: TodayRow, extra?: string): string {
-  const parts = [row.item.owner || 'Unassigned', row.board.name];
+  const parts = [row.board.name];
   if (row.parentTitle) parts.push(`in ${row.parentTitle}`);
   if (extra) parts.push(extra);
   return parts.join(' · ');
-}
-
-function Avatar({ owner }: { owner: string }) {
-  if (!owner) return null;
-  const index = owners.value.findIndex((o) => o.name === owner);
-  return (
-    <span class="today-avatar" style={{ background: ownerColor(index) }} aria-hidden="true">
-      {initials(owner)}
-    </span>
-  );
 }
 
 export function openCreateForToday() {
@@ -87,8 +64,6 @@ export function TodayScreen() {
   const boardCount = accessibleBoards.value.length;
   const isToday = v.selected === v.today;
   const dayName = isToday ? 'today' : dayShort(v.selected);
-  const who = effectiveTodayWho.value;
-  const hasMe = !!currentOwnerName.value;
 
   const total = v.dueOpenCount + v.dueDoneCount;
   const allDone = total > 0 && v.dueOpenCount === 0;
@@ -102,16 +77,13 @@ export function TodayScreen() {
 
   const emptyDue = !v.anyDated
     ? 'Nothing has a due date yet. Dates you add appear here.'
-    : who === 'mine'
-      ? `Nothing of yours due ${isToday ? 'today' : dayLong(v.selected)}.`
-      : `Nothing due ${isToday ? 'today' : dayLong(v.selected)}.`;
+    : `Nothing due ${isToday ? 'today' : dayLong(v.selected)}.`;
 
   return (
     <div class="today-screen" data-testid="today-screen">
       <header class="today-header">
         <p class="today-subline" data-testid="today-subline">
-          {dayLong(v.selected)} {'\u00B7'} {who === 'mine' ? 'Your items on' : 'Everyone on'}{' '}
-          {plural(boardCount, 'board')}
+          {dayLong(v.selected)} {'\u00B7'} {plural(boardCount, 'board')}
         </p>
         <div class="today-title-row">
           <h1 class="today-title" data-testid="today-title">
@@ -138,22 +110,6 @@ export function TodayScreen() {
             )}
           </div>
         </div>
-        {hasMe && (
-          <div class="today-chips" role="group" aria-label="Whose items">
-            {(['mine', 'everyone'] as const).map((w) => (
-              <button
-                key={w}
-                type="button"
-                class={`today-chip${who === w ? ' today-chip-on' : ''}`}
-                aria-pressed={who === w ? 'true' : 'false'}
-                onClick={() => setTodayWho(w)}
-                data-testid={`today-who-${w}`}
-              >
-                {w === 'mine' ? 'Mine' : 'Everyone'}
-              </button>
-            ))}
-          </div>
-        )}
       </header>
 
       <nav class="today-strip" aria-label="Week" data-testid="today-strip">
@@ -384,7 +340,6 @@ export function TodayScreen() {
                         </a>
                         <span class="today-row-meta">{rowMeta(row)}</span>
                       </div>
-                      <Avatar owner={row.item.owner} />
                     </li>
                   ))}
                 </ul>
@@ -422,7 +377,6 @@ export function TodayScreen() {
                           )}
                         </span>
                       </div>
-                      <Avatar owner={row.item.owner} />
                     </li>
                   ))}
                 </ul>
@@ -451,9 +405,7 @@ export function TodayScreen() {
                         >
                           {row.item.title}
                         </a>
-                        <span class="today-row-meta">
-                          {row.item.owner || 'Unassigned'} {'·'} {row.board.name}
-                        </span>
+                        <span class="today-row-meta">{row.board.name}</span>
                       </li>
                     );
                   })}

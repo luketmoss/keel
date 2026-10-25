@@ -190,21 +190,14 @@ describe('Card', () => {
     });
   });
 
-  describe('Owner', () => {
-    it('shows "Unassigned" in italics and no avatar when there is no owner', () => {
-      const { container } = render(<Card item={makeItem({ owner: '' })} />);
-      expect(container.querySelector('.card-unassigned')!.textContent).toBe('Unassigned');
-      expect(container.querySelector('[data-testid="card-avatar"]')).toBeNull();
-    });
-
-    it('shows the owner as initials in a circle, titled with the full name, and not "Unassigned"', () => {
-      const { container } = render(<Card item={makeItem({ owner: 'Mom' })} />);
-      const avatar = container.querySelector('[data-testid="card-avatar"]') as HTMLElement;
-      expect(avatar.textContent).toContain('MO');
-      expect(avatar.getAttribute('title')).toBe('Mom');
-      expect(avatar.style.background).toBe('rgb(25, 118, 210)');
-      expect(container.querySelector('.card-unassigned')).toBeNull();
-      expect(container.querySelector('.card-owner')).toBeNull();
+  describe('Owner (removed, #647)', () => {
+    it('shows no avatar and no "Unassigned" whether or not item.owner is set', () => {
+      for (const owner of ['', 'Mom']) {
+        const { container, unmount } = render(<Card item={makeItem({ owner })} />);
+        expect(container.querySelector('[data-testid="card-avatar"]')).toBeNull();
+        expect(container.textContent).not.toContain('Unassigned');
+        unmount();
+      }
     });
   });
 

@@ -5,7 +5,6 @@ import {
   activeBoardId,
   activeBoard,
   boardSummaries,
-  currentOwnerName,
   destinationUrl,
   showCreateBoardModal,
   showShareModal,
@@ -13,7 +12,6 @@ import {
   filterLabel,
   filterSearch,
   filterDue,
-  filterOwner,
   groupBy,
   setGroupBy,
   boardLabels as labelsStore,
@@ -161,9 +159,8 @@ export function ControlBar() {
   const isOwner = userBoardRole.value === 'owner';
   const board = activeBoard.value;
   const summary = boardSummaries.value.find((s) => s.board.id === currentBoardId);
-  const me = currentOwnerName.value;
 
-  const anyChip = !!(filterOwner.value || filterDue.value || filterLabel.value);
+  const anyChip = !!(filterDue.value || filterLabel.value);
   const filterOn = anyChip || !!filterSearch.value;
   // Filtered card count for the live region
   const filteredCount = rootItems.value.length;
@@ -174,7 +171,6 @@ export function ControlBar() {
   );
 
   const clearChips = () => {
-    filterOwner.value = null;
     filterDue.value = null;
     filterLabel.value = null;
   };
@@ -360,16 +356,6 @@ export function ControlBar() {
 
       <div class="filter-row" role="group" aria-label="Filters" data-testid="control-bar-filter-content">
         {chip('all', 'All', !anyChip, clearChips, 'filter-all')}
-        {me &&
-          chip(
-            'mine',
-            'Mine',
-            filterOwner.value === me,
-            () => {
-              filterOwner.value = filterOwner.value === me ? null : me;
-            },
-            'filter-mine',
-          )}
         {(['today', 'this-week'] as const).map((due) =>
           chip(
             due,

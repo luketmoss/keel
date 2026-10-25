@@ -67,22 +67,19 @@ describe('AC2: Items scoped to a board', () => {
 
 describe('AC3: switchBoard resets filters but not view mode', () => {
   it('resets filters and selection when switching boards', async () => {
-    const { boards, activeBoardId, filterOwner, filterLabel, selectedItemId, switchBoard } =
-      await import('./board-store');
+    const { boards, activeBoardId, filterLabel, selectedItemId, switchBoard } = await import('./board-store');
 
     boards.value = [
       { id: 'board-1', name: 'Family', created_at: '', created_by: '' },
       { id: 'board-2', name: 'Work', created_at: '', created_by: '' },
     ];
     activeBoardId.value = 'board-1';
-    filterOwner.value = 'Mom';
     filterLabel.value = 'Home';
     selectedItemId.value = 'some-item';
 
     switchBoard('board-2');
 
     expect(activeBoardId.value).toBe('board-2');
-    expect(filterOwner.value).toBeNull();
     expect(filterLabel.value).toBeNull();
     expect(selectedItemId.value).toBeNull();
   });

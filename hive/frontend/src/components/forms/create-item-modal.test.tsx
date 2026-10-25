@@ -367,59 +367,25 @@ describe('CreateItemModal — Quick Date Shortcuts (Issue #82)', () => {
   });
 });
 
-// --- Auto-assign creator as default owner (Issue #112) ---
-describe('CreateItemModal — Auto-assign default owner (Issue #112)', () => {
+// --- Owner removed from the create form (Issue #647) ---
+describe('CreateItemModal — no owner field (Issue #647)', () => {
   beforeEach(() => {
     mockCreateItem.mockClear();
     mockCreateItemWithSubtasks.mockClear();
     mockBoardStore.showCreateModal.value = true;
   });
 
-  // AC1: Create Item modal pre-selects current user as owner
-  describe('AC1: Pre-selects current user as owner', () => {
-    it('owner dropdown defaults to the signed-in user when email matches an owner', () => {
-      // Mock auth user is test@example.com, owners include Test User with that email
-      const { container } = render(<CreateItemModal />);
-      const ownerSelect = container.querySelector('#owner') as HTMLSelectElement;
-      expect(ownerSelect.value).toBe('Test User');
-    });
-  });
+  it('has no Owner field and creates the item with owner: ""', () => {
+    const { container } = render(<CreateItemModal />);
+    expect(container.querySelector('#owner')).toBeNull();
 
-  // AC2: Owner is editable before saving
-  describe('AC2: Owner is editable before saving', () => {
-    it('user can change the pre-selected owner before submitting', () => {
-      const { container } = render(<CreateItemModal />);
-      const ownerSelect = container.querySelector('#owner') as HTMLSelectElement;
-      expect(ownerSelect.value).toBe('Test User');
+    const titleInput = container.querySelector('#title') as HTMLInputElement;
+    fireEvent.input(titleInput, { target: { value: 'My task' } });
+    const form = container.querySelector('form') as HTMLFormElement;
+    fireEvent.submit(form);
 
-      fireEvent.change(ownerSelect, { target: { value: 'Mom' } });
-      expect(ownerSelect.value).toBe('Mom');
-
-      // Submit and verify the chosen owner is sent
-      const titleInput = container.querySelector('#title') as HTMLInputElement;
-      fireEvent.input(titleInput, { target: { value: 'My task' } });
-      const form = container.querySelector('form') as HTMLFormElement;
-      fireEvent.submit(form);
-
-      expect(mockCreateItem.mock.calls[0][0].owner).toBe('Mom');
-    });
-  });
-
-  // AC4: Staged subtasks inherit the task owner — removed (Issue #209 removed subtask owner feature)
-
-  // AC5: Graceful fallback when user not in owners list
-  describe('AC5: Fallback to Unassigned when user not in owners list', () => {
-    it('defaults to empty (Unassigned) when auth email does not match any owner', () => {
-      // Temporarily replace owners with none matching test@example.com
-      const original = mockBoardStore.owners.value;
-      mockBoardStore.owners.value = [{ name: 'Mom', google_account: 'mom@test.com' }];
-
-      const { container } = render(<CreateItemModal />);
-      const ownerSelect = container.querySelector('#owner') as HTMLSelectElement;
-      expect(ownerSelect.value).toBe('');
-
-      mockBoardStore.owners.value = original;
-    });
+    expect(mockCreateItem).toHaveBeenCalledTimes(1);
+    expect(mockCreateItem.mock.calls[0][0].owner).toBe('');
   });
 });
 
@@ -439,10 +405,6 @@ describe('CreateItemModal — Inline Add Item (Issue #170)', () => {
     const { container } = render(<CreateItemModal />);
     const titleInput = container.querySelector('#title') as HTMLInputElement;
     fireEvent.input(titleInput, { target: { value: 'New task' } });
-
-    // Set an owner (required for In Progress)
-    const ownerSelect = container.querySelector('#owner') as HTMLSelectElement;
-    fireEvent.change(ownerSelect, { target: { value: 'Mom' } });
 
     const form = container.querySelector('form') as HTMLFormElement;
     fireEvent.submit(form);

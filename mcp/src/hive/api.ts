@@ -10,7 +10,6 @@ import { currentCallId, markWrote, reserveWrite } from '../call-context.js'
 export interface HiveConfig {
   apiUrl: string
   apiKey: string
-  defaultOwner: string
   /** The hourly write counter (#410). Every Hive write touches one row. */
   budget?: { reserve(rows: number): Promise<{ allowed: boolean }> }
 }

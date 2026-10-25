@@ -11,7 +11,6 @@ export function hiveConfig(env: Env, mode: Mode = 'read'): HiveConfig {
   return {
     apiUrl: env.HIVE_API_URL,
     apiKey: env.HIVE_API_KEY,
-    defaultOwner: env.HIVE_DEFAULT_OWNER ?? '',
     // Only the write endpoint writes, so only it has a budget (#410).
     ...(mode === 'write' ? { budget: budgetFor(env, 'hive').budget } : {}),
   }

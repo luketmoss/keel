@@ -108,8 +108,7 @@ h1, h2, h3, p { margin: 0; }
 .tl-notes .flag .ic, .tl-notes .flag b { color: var(--danger); }
 .due { margin: -4px 0 10px; }
 .due .item:first-child { border-top: 0; padding-top: 0; }
-.due .item > .ic { width: 16px; height: 16px; color: var(--text-2); }
-.due .item.late > .ic { color: var(--danger); }
+.due .item > .ic { width: 18px; height: 18px; }
 .due .more { margin-top: 2px; }
 
 .sleep-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
@@ -315,7 +314,6 @@ h1, h2, h3, p { margin: 0; }
     unwind: '<path d="M12 21c0-6 4-10 8-11-1 6-4 10-8 11zM12 21c0-5-3-8-7-9 .5 5 3 8 7 9z"/>',
     yday: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/>',
     ahead: '<path d="M4 7h16M4 12h16M4 17h10"/><rect x="3" y="4" width="18" height="17" rx="2"/>',
-    board: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/>',
     body: '<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M9 9a4 4 0 0 1 6 0l-2 3"/>',
     day: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'
   };
@@ -342,8 +340,22 @@ h1, h2, h3, p { margin: 0; }
     s.innerHTML = P[name] || P.cloud;
     return s;
   }
+  // Hive's own mark (hive/frontend/public/hive-mark.svg without its shadow and shine), in its own colours
+  function hiveMark() {
+    var s = document.createElementNS(NS, "svg");
+    s.setAttribute("class", "ic");
+    s.setAttribute("viewBox", "28 34 200 200");
+    s.setAttribute("aria-hidden", "true");
+    s.innerHTML = '<g stroke="#1d1406" stroke-width="9" stroke-linejoin="round">' +
+      '<polygon fill="#f4efe2" points="178.2,126.5 222.4,152 222.4,203 178.2,228.5 134.1,203 134.1,152"/>' +
+      '<polygon fill="#c98400" points="77.8,126.5 121.9,152 121.9,203 77.8,228.5 33.6,203 33.6,152"/>' +
+      '<polygon fill="#f5b700" points="128,39.5 172.2,65 172.2,116 128,141.5 83.8,116 83.8,65"/></g>' +
+      '<path d="M106 91.5l15 15 30-32" fill="none" stroke="#1d1406" stroke-width="25" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<path d="M106 91.5l15 15 30-32" fill="none" stroke="#ffffff" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>';
+    return s;
+  }
   function card(title, ic, aside, color) {
-    var c = el("section", "card"), i = icon(ic);
+    var c = el("section", "card"), i = ic === "hive" ? hiveMark() : icon(ic);
     if (color) i.style.color = color;
     var h = el("div", "ch", [i, el("h2", null, title)]);
     if (aside) h.appendChild(el("span", "aside", aside));
@@ -447,7 +459,7 @@ h1, h2, h3, p { margin: 0; }
     if (dueShown.length) {
       var dl = el("div", "due");
       dueShown.forEach(function (x) {
-        dl.appendChild(el("div", "item" + (x.late ? " late" : ""), [icon("board"), el("span", null, x.o.title), x.o.board ? el("span", "bd", x.o.board) : null,
+        dl.appendChild(el("div", "item" + (x.late ? " late" : ""), [hiveMark(), el("span", null, x.o.title), x.o.board ? el("span", "bd", x.o.board) : null,
           x.late ? el("span", "tag late", (x.o.days || 1) + "d overdue") : el("span", "tag", "due today")]));
       });
       if (dueAll.length > dueShown.length) dl.appendChild(el("p", "sub more", "+" + (dueAll.length - dueShown.length) + " more in Board"));
@@ -637,7 +649,7 @@ h1, h2, h3, p { margin: 0; }
   (function () {
     var row = [];
     if (D.board) {
-      var b = D.board, bc = card("Board", "board", "Hive");
+      var b = D.board, bc = card("Board", "hive", "Hive");
       var rest = function (list) { return (list || []).filter(function (o) { return inDay.indexOf(o) < 0; }); };
       if (inDay.length) { var up = el("p", "sub", "Overdue and due today are at the top, in Your day."); up.style.marginBottom = "8px"; bc.appendChild(up); }
       [["Overdue", rest(b.overdue), function (o) { return el("span", "tag late", o.days + "d overdue"); }],

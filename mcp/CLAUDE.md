@@ -177,6 +177,10 @@ URL scrubbed. `hive_update_item` accepts `completed_at` and forwards it untouche
 The Apps Script must be redeployed before the Worker that sends it: an old script ignores the
 field and still answers success.
 
+`hive_update_item` also takes `board` to move an item to another board. Apps Script judges the status against the
+target board, refuses a status the target lacks, moves the sub-tasks with their parent, and refuses to move a
+sub-task alone. Same ordering: redeploy the Apps Script first.
+
 ## Board
 
 Project option: `mcp`. Filter the board by it to see only this project's work.

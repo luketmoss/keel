@@ -136,6 +136,23 @@ function updateItem(id, changes, actor, callId) {
   if (changes.board_id !== undefined) assertBoardNotArchived(changes.board_id, archived);
   var allItems = getItems();
   var originalStatus = item.status; // #162: capture before any changes
+  var originalBoardId = item.board_id;
+  // Moving boards: the status is judged against the board the item lands on.
+  var movingBoard = changes.board_id !== undefined && changes.board_id !== item.board_id;
+  var targetBoardId = movingBoard ? changes.board_id : item.board_id;
+  if (movingBoard) {
+    if (item.parent_id) {
+      throw new Error('A sub-task moves with its parent: move the parent item instead');
+    }
+    if (!changes.status && targetBoardId) {
+      var landing = getStatuses(targetBoardId).map(function(s) { return s.name; });
+      if (landing.length > 0 && landing.indexOf(item.status) === -1) {
+        throw new Error(
+          'Status "' + item.status + '" does not exist on the target board. Valid statuses: ' + landing.join(', ')
+        );
+      }
+    }
+  }
   var preCompletedAt = item.completed_at; // #458: the audit row's old value, before any side effect
 
   // #458: an explicit completed_at is validated, and the item's post-call column
@@ -152,8 +169,8 @@ function updateItem(id, changes, actor, callId) {
     }
     var landsIn = changes.status && changes.status !== item.status ? changes.status : item.status;
     var landsTerminal = false;
-    if (item.board_id) {
-      var landsStatus = getStatuses(item.board_id).find(function(s) { return s.name === landsIn; });
+    if (targetBoardId) {
+      var landsStatus = getStatuses(targetBoardId).find(function(s) { return s.name === landsIn; });
       landsTerminal = landsStatus ? landsStatus.is_terminal : false;
     }
     if (!landsTerminal) {
@@ -167,8 +184,8 @@ function updateItem(id, changes, actor, callId) {
 
     // Validate status against board's defined statuses, or fall back to hardcoded list
     var validStatuses = [];
-    if (item.board_id) {
-      var boardStatuses = getStatuses(item.board_id);
+    if (targetBoardId) {
+      var boardStatuses = getStatuses(targetBoardId);
       validStatuses = boardStatuses.map(function(s) { return s.name; });
     }
     if (validStatuses.length === 0) {
@@ -181,8 +198,8 @@ function updateItem(id, changes, actor, callId) {
 
     // Determine if target status is terminal
     var isTerminal = false;
-    if (item.board_id) {
-      var boardStatuses = getStatuses(item.board_id);
+    if (targetBoardId) {
+      var boardStatuses = getStatuses(targetBoardId);
       var targetStatus = boardStatuses.find(function(s) { return s.name === newStatus; });
       isTerminal = targetStatus ? targetStatus.is_terminal : false;
     }
@@ -228,6 +245,26 @@ function updateItem(id, changes, actor, callId) {
 
   var updatedRow = itemToRow(item);
   sheet.getRange(rowNum, 1, 1, ITEM_COLUMN_COUNT).setValues([updatedRow]);
+
+  // A board move carries the sub-tasks with it, keeping their own statuses.
+  if (movingBoard && !item.parent_id) {
+    var movedChildren = getItems().filter(function(i) { return i.parent_id === id; });
+    for (var m = 0; m < movedChildren.length; m++) {
+      var kid = movedChildren[m];
+      var kidRowNum = findRowByItemId(sheet, kid.id);
+      if (kidRowNum === -1) continue;
+      var kidStatuses = getStatuses(item.board_id).map(function(s) { return s.name; });
+      if (changes.status && changes.status !== kid.status) {
+        // The status cascade below sets it; only the board changes here.
+      } else if (kidStatuses.length > 0 && kidStatuses.indexOf(kid.status) === -1) {
+        kid.status = item.status;
+      }
+      kid.board_id = item.board_id;
+      kid.updated_at = isoNow();
+      sheet.getRange(kidRowNum, 1, 1, ITEM_COLUMN_COUNT).setValues([itemToRow(kid)]);
+      writeAuditEntry(kid.id, 'updated', 'board_id', String(originalBoardId), String(item.board_id), actor, callId);
+    }
+  }
 
   // #162: Cascade status to children when a parent item's status changes.
   // Only cascade for root items (no parent_id) that had a status change.

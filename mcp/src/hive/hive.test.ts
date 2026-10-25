@@ -330,3 +330,18 @@ describe('completed_at through the tools (#450)', () => {
     expect(result.content[0].text).toBe('Error updating item: completed_at can only be set on an item in a terminal column')
   })
 })
+
+describe('hive_update_item board move', () => {
+  it('resolves the board name and sends board_id', async () => {
+    const calls = fakeHive((url) => {
+      const action = url.searchParams.get('action')
+      if (action === 'getBoards') return { success: true, data: [{ id: 'b2', name: 'Family' }] }
+      if (action === 'updateItem') return { success: true, data: { id: 'i1', title: 'T', status: 'To Do', board_id: 'b2' } }
+      return { success: true, data: [] }
+    })
+    const result = await call('hive_update_item', { item_id: 'i1', board: 'family' })
+    const update = calls.find((u) => u.searchParams.get('action') === 'updateItem')!
+    expect(JSON.parse(update.searchParams.get('payload')!).changes).toEqual({ board_id: 'b2' })
+    expect(result.content[0].text).toContain('- Board: Family')
+  })
+})

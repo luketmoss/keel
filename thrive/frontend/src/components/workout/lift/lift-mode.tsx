@@ -520,10 +520,13 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
   // ── Set up next (#674): weights held on screen per exercise, written once on Start ──
   const [held, setHeld] = useState<{ at: string; weights: Record<string, string> }>({ at: '', weights: {} });
   const [startingGroup, setStartingGroup] = useState(false);
+  // Set at once, so a second tap before the disabled button renders runs nothing.
+  const groupStarting = useRef(false);
   const startGroup = async () => {
     const at = runRef.current;
     const first = steps[at.stepIndex];
-    if (!first || startingGroup) return;
+    if (!first || groupStarting.current) return;
+    groupStarting.current = true;
     const t = Date.now();
     setStartingGroup(true);
     try {
@@ -551,6 +554,7 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
       if (at.restFor !== null && at.restStartedAt !== null)
         timing(at.restFor, { rest_s: String(wholeSeconds(at.restStartedAt, t)) });
     } finally {
+      groupStarting.current = false;
       setStartingGroup(false);
     }
     go({ phase: 'set', setStartedAt: Date.now(), restStartedAt: null, restTarget: 0, alertedAt: null, restFor: null });

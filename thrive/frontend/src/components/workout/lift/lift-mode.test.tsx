@@ -1217,6 +1217,22 @@ describe('Set up next (#674)', () => {
     expect(clock(container)).toBe('0:00');
   });
 
+  it('a rapid double tap on Start runs once', async () => {
+    const { container } = await toSetup();
+    fireEvent.input(field(container, 'Arnold')!, { target: { value: '50' } });
+    saveSet.mockClear();
+    saveSetTimings.mockClear();
+    const start = byText(container, 'Start Superset 1')!;
+    fireEvent.click(start);
+    fireEvent.click(start);
+    await act(async () => {
+      for (let i = 0; i < 20; i++) await Promise.resolve();
+    });
+    expect(saveSet).toHaveBeenCalledTimes(2);
+    expect(saveSetTimings).toHaveBeenCalledTimes(1);
+    expect(container.querySelector('.lift-exercise')?.textContent).toBe('Arnold');
+  });
+
   it('an unchanged group writes no weight, including one stepped away and back', async () => {
     const { container } = await toSetup();
     await press(card(container, 'Arnold'), 'More weight');

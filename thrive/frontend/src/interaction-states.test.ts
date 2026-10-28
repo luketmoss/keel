@@ -595,6 +595,9 @@ describe('AC4: an aria-disabled control dims, and its focus ring does not', () =
         'btn',
         'btn',
         'btn-icon',
+        // #643: the water goal's Lower and Raise buttons.
+        'btn-icon',
+        'btn-icon',
       ].sort(),
     );
   });

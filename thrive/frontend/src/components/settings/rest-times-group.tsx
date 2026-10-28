@@ -2,18 +2,19 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { kindOfKey, type RestSettingKey } from '../../api/rest-times';
 import { loadRestSettings, restSettings, restSettingsStatus, saveRestSetting } from '../../state/rest-settings';
 import { DurationStepper } from '../shared/duration-stepper';
+import { SettingsCard, SettingsRow, TimerIcon } from './settings-card';
 
 /** A value saves this long after the last press, one call per key (#576). */
 export const REST_SAVE_DELAY_MS = 800;
 /** How long "Saved" stays. */
 export const REST_SAVED_MS = 2000;
 
-const ROWS: { key: RestSettingKey; label: string }[] = [
-  { key: 'rest_primary_s', label: 'Primary, between sets' },
-  { key: 'rest_superset_s', label: 'Supersets, between rounds' },
-  { key: 'switch_superset_s', label: 'Supersets, switch' },
-  { key: 'rest_burnout_s', label: 'Burnout, between rounds' },
-  { key: 'switch_burnout_s', label: 'Burnout, switch' },
+const ROWS: { key: RestSettingKey; word: string; secondary: string }[] = [
+  { key: 'rest_primary_s', word: 'Primary', secondary: 'between sets' },
+  { key: 'rest_superset_s', word: 'Supersets', secondary: 'between rounds' },
+  { key: 'switch_superset_s', word: 'Supersets', secondary: 'switching exercises' },
+  { key: 'rest_burnout_s', word: 'Burnout', secondary: 'between rounds' },
+  { key: 'switch_burnout_s', word: 'Burnout', secondary: 'switching exercises' },
 ];
 
 export const REST_COPY = {
@@ -101,24 +102,31 @@ export function RestTimesGroup({ token }: { token: string | null }) {
   const stored = restSettings.value;
 
   return (
-    <div class="settings-section rest-times">
-      <h2>{REST_COPY.heading}</h2>
-      {ROWS.map(({ key, label }) => (
-        <div class="settings-row rest-row" key={key}>
-          <span class="rest-row-label">{label}</span>
+    <SettingsCard title={REST_COPY.heading} icon={<TimerIcon />} iconColor="var(--sec-primary)" class="rest-times">
+      {ROWS.map(({ key, word, secondary }) => (
+        <SettingsRow
+          class="rest-row"
+          key={key}
+          label={word}
+          secondary={secondary}
+          role="group"
+          ariaLabel={`${word}, ${secondary}`}
+        >
           <DurationStepper
             value={edits[key] ?? stored[key]}
             kind={kindOfKey(key)}
             disabled={!ready}
             onChange={(s) => change(key, s)}
           />
-        </div>
+        </SettingsRow>
       ))}
-      <p class="rest-note">{REST_COPY.helper}</p>
-      {status === 'error' && <p class="rest-note">{REST_COPY.loadFailed}</p>}
-      <p class={note?.kind === 'error' ? 'drink-error' : 'rest-note'} role="status">
-        {note?.text ?? ''}
-      </p>
-    </div>
+      <div class="rest-notes">
+        <p class="rest-note">{REST_COPY.helper}</p>
+        {status === 'error' && <p class="rest-note">{REST_COPY.loadFailed}</p>}
+        <p class={note?.kind === 'error' ? 'drink-error' : 'rest-note'} role="status">
+          {note?.text ?? ''}
+        </p>
+      </div>
+    </SettingsCard>
   );
 }

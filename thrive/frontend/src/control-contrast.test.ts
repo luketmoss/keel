@@ -87,7 +87,7 @@ describe('AC1: a rule filling with a fill token sets color: var(--color-on-fill)
   );
 
   it('finds the filled controls', () => {
-    // login, fab, toasts x2, btn-primary x2, btn-danger x2, settings danger x2,
+    // login, fab, toasts x2, btn-primary x2, btn-danger x2, settings danger x0,
     // tag filter, copy-down hover, five remove hovers.
     expect(filled.length).toBeGreaterThanOrEqual(19);
   });

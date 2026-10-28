@@ -85,10 +85,14 @@ describe('Template editor: per-section rest', () => {
     expect(within(band('Superset 1')).getByText('1:00')).toBeTruthy();
   });
 
-  it('the band sits under the section’s last exercise', () => {
+  it('the rest rows are the last rows inside the section’s card, before Add exercise (#640)', () => {
     render(<TemplateEditor templateId="t1" />);
-    const holder = band('Superset 1').closest('[data-row-key]')!;
-    expect(holder.textContent).toContain('Lateral Raise');
+    const card = band('Superset 1').closest('.tpl-card')!;
+    expect(card.textContent).toContain('Lateral Raise');
+    const kids = [...card.children];
+    const at = kids.indexOf(band('Superset 1'));
+    expect(kids[at - 1].textContent).toContain('Lateral Raise');
+    expect(kids[at + 1].textContent).toBe('Add exercise');
   });
 
   it('Change starts at the default; setting a value and saving writes it to every row of the section', async () => {
@@ -137,8 +141,8 @@ describe('Template editor: per-section rest', () => {
     templates.value = [{ id: 't1', name: 'T', exercises: rows([LIST[1], LIST[2]]) }];
     render(<TemplateEditor templateId="t1" />);
     expect(band('Superset 1')).toBeTruthy();
-    const removes = document.querySelectorAll<HTMLElement>('.compact-card-remove');
-    fireEvent.click(removes[1]);
+    fireEvent.click(document.querySelectorAll<HTMLElement>('.tpl-row-btn[data-row-btn]')[1]);
+    fireEvent.click(within(document.body).getByRole('button', { name: 'Remove' }));
     expect(band('Superset 1')).toBeNull();
   });
 
@@ -146,7 +150,7 @@ describe('Template editor: per-section rest', () => {
     const spy = vi.spyOn(await import('../../state/confirm'), 'ask').mockResolvedValue(false);
     render(<TemplateEditor templateId="t1" />);
     fireEvent.click(within(band('Primary')).getByRole('button', { name: 'Change rest between sets' }));
-    fireEvent.click(document.querySelector('.template-editor-back')!);
+    fireEvent.click(within(document.body).getByLabelText('Close'));
     await vi.waitFor(() => expect(spy).toHaveBeenCalled());
     spy.mockRestore();
   });

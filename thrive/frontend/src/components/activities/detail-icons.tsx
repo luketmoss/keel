@@ -110,3 +110,30 @@ export function HistoryIcon() {
     </Icon>
   );
 }
+
+/** Close (#640): an X. */
+export function CloseIcon() {
+  return (
+    <Icon>
+      <path d="M6 6l12 12M18 6L6 18" />
+    </Icon>
+  );
+}
+
+/** A row that opens in place (#640): a chevron pointing down, flipped by CSS when open. */
+export function ChevronDownIcon() {
+  return (
+    <Icon>
+      <path d="M6 9l6 6 6-6" />
+    </Icon>
+  );
+}
+
+/** Add (#640): a plus. */
+export function PlusIcon() {
+  return (
+    <Icon>
+      <path d="M12 5v14M5 12h14" />
+    </Icon>
+  );
+}

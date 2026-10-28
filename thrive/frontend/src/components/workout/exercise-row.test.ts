@@ -252,9 +252,11 @@ describe('the Change section sheet', () => {
     expect(document.querySelector('[role="alert"]')!.textContent).toContain(
       'Warm-ups are list only, so its 1 logged set is deleted.',
     );
+    expect(document.activeElement).toBe(buttonText(document, 'Cancel')); // focus follows into the warning
     fireEvent.click(buttonText(document, 'Cancel'));
     expect(handlers.onChangeSection).not.toHaveBeenCalled();
     expect(radios()).toHaveLength(7);
+    expect(document.activeElement).toBe(radios()[1]); // and back to the checked row
     fireEvent.click(radios()[0]);
     fireEvent.click(buttonText(document, 'Move to warm-up'));
     expect(handlers.onChangeSection).toHaveBeenCalledWith('warmup');

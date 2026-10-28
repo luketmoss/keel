@@ -2,7 +2,7 @@
 // line, a tile per set with the one open set's editor under them, and the Change section sheet.
 // A warm-up is a list row. thrive/docs/design/667-logbook-redesign.md.
 
-import { useId, useRef, useState } from 'preact/hooks';
+import { useEffect, useId, useRef, useState } from 'preact/hooks';
 import { SetTile, SetEditor } from './set-row';
 import type { TrackerSet, SaveStatus } from './set-row';
 import { LastTimeLine } from './last-time-panel';
@@ -218,6 +218,17 @@ function ChangeSectionSheet({
   useModalFocus(dialog, onClose, { initialFocus: '[role="radio"][aria-checked="true"]' });
 
   const logged = exercise.sets.filter(isLogged).length;
+
+  // The row that held focus is replaced by the warning, and back again: focus goes to what is there now.
+  const shown = useRef(false);
+  useEffect(() => {
+    if (!shown.current) {
+      shown.current = true;
+      return;
+    }
+    const target = warn ? '.lb-keep-btn' : '[role="radio"][aria-checked="true"]';
+    dialog.current?.querySelector<HTMLElement>(target)?.focus();
+  }, [warn]);
 
   const choose = (section: string) => {
     if (section === exercise.section) {

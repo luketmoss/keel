@@ -99,18 +99,18 @@ export function TemplateEditor({ templateId }: Props) {
     }
   }, [templateId]);
 
-  const handleExerciseSelected = (ex: ExerciseWithRow) => {
-    const slot: TemplateExerciseSlot = {
+  const handleExercisesAdded = (picked: ExerciseWithRow[]) => {
+    const slots: TemplateExerciseSlot[] = picked.map((ex) => ({
       exercise_id: ex.id,
       exercise_name: ex.name,
       section: 'primary',
       sets: '1',
       reps: '',
-    };
-    setExercises((prev) => [...prev, slot]);
-    setRowKeys((prev) => [...prev, newRowKey()]);
+    }));
+    setExercises((prev) => [...prev, ...slots]);
+    setRowKeys((prev) => [...prev, ...slots.map(() => newRowKey())]);
     setShowExercisePicker(false);
-    setEditingIndex(exercises.length); // open config for newly added
+    setEditingIndex(exercises.length); // open config for the first one added
   };
 
   const updateExercise = (index: number, updated: Partial<TemplateExerciseSlot>) => {
@@ -298,7 +298,7 @@ export function TemplateEditor({ templateId }: Props) {
       </div>
 
       {showExercisePicker && (
-        <AddExerciseModal onSelect={handleExerciseSelected} onClose={() => setShowExercisePicker(false)} />
+        <AddExerciseModal onAdd={handleExercisesAdded} onClose={() => setShowExercisePicker(false)} />
       )}
     </div>
   );

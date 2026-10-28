@@ -475,11 +475,34 @@ describe('AC4: the new-plan planner behaves the same', () => {
     await tap('Build Custom');
     await tap('+ Add Exercise');
     fireEvent.click(document.querySelector<HTMLElement>('.exercise-list > .exercise-list-item')!);
+    fireEvent.click(document.querySelector<HTMLElement>('.picker-add')!);
     await Promise.resolve();
     expect(setsInput().value).toBe('1');
     expect(rowLabels()).toEqual(['Set 1']);
     expect(rowValues()).toEqual(['']);
     expect(visual(0)).toBe('1 sets');
+  });
+
+  it('several exercises picked at once are all added, in pick order, opening the first', async () => {
+    exercises.value = [
+      { id: 'ex_a', name: 'Dips', tags: '', notes: '', created: '', sheetRow: 2 },
+      { id: 'ex_b', name: 'Plank', tags: '', notes: '', created: '', sheetRow: 3 },
+    ];
+    render(<WorkoutFlow planDate="2099-12-31" />);
+    await tap('Build Custom');
+    await tap('+ Add Exercise');
+    const row = (n: string) =>
+      Array.from(document.querySelectorAll<HTMLElement>('.exercise-list > .exercise-list-item')).find((r) =>
+        r.textContent?.startsWith(n),
+      )!;
+    fireEvent.click(row('Plank'));
+    fireEvent.click(row('Dips'));
+    fireEvent.click(document.querySelector<HTMLElement>('.picker-add')!);
+    await Promise.resolve();
+    expect(cards()).toHaveLength(2);
+    expect(cards()[0].textContent).toContain('Plank');
+    expect(cards()[1].textContent).toContain('Dips');
+    expect(panel()).not.toBeNull();
   });
 });
 

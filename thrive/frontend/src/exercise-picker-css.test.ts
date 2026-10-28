@@ -21,6 +21,7 @@ function rule(selector: string): string {
 }
 
 describe('#319 AC5: picker buttons keep their look and size', () => {
+  const MIN: Record<string, number> = { '.exercise-list > .exercise-list-item': 56, '.create-new-row': 52 };
   for (const sel of ['.exercise-list > .exercise-list-item', '.create-new-row']) {
     it(`${sel} resets the UA button`, () => {
       const r = rule(sel);
@@ -29,13 +30,13 @@ describe('#319 AC5: picker buttons keep their look and size', () => {
       expect(r).toMatch(/font:\s*inherit/);
       expect(r).toMatch(/background:\s*none/);
       expect(r).toMatch(/(?:^|[\s;])border:\s*0/);
-      expect(r).toMatch(/min-height:\s*44px/);
+      expect(r).toMatch(new RegExp(`min-height:\\s*${MIN[sel]}px`));
     });
 
-    it(`no rule sets ${sel} under 44 px tall`, () => {
+    it(`no rule sets ${sel} under ${MIN[sel]} px tall`, () => {
       for (const body of rules(sel)) {
         for (const m of body.matchAll(/(?:min-)?height:\s*(\d+)px/g)) {
-          expect(Number(m[1])).toBeGreaterThanOrEqual(44);
+          expect(Number(m[1])).toBeGreaterThanOrEqual(MIN[sel]);
         }
       }
     });

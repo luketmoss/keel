@@ -595,13 +595,13 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
     }
   };
 
-  const handleAddExercise = (ex: ExerciseWithRow) => {
+  const handleAddExercises = (picked: ExerciseWithRow[]) => {
     const maxOrder = listRef.current.reduce((max, e) => Math.max(max, e.exercise_order), 0);
-    const newExercise: TrackerExercise = {
+    const added: TrackerExercise[] = picked.map((ex, i) => ({
       exercise_id: ex.id,
       exercise_name: ex.name,
       section: 'primary',
-      exercise_order: maxOrder + 1,
+      exercise_order: maxOrder + 1 + i,
       rowKey: newRowKey(),
       sets: [
         {
@@ -617,8 +617,8 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
       quickFillWeight: '',
       quickFillReps: '',
       quickFillEffort: '',
-    };
-    updateList((prev) => [...prev, newExercise]);
+    }));
+    updateList((prev) => [...prev, ...added]);
     setShowExercisePicker(false);
   };
 
@@ -966,7 +966,7 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
       </button>
 
       {showExercisePicker && (
-        <AddExerciseModal onSelect={handleAddExercise} onClose={() => setShowExercisePicker(false)} />
+        <AddExerciseModal onAdd={handleAddExercises} onClose={() => setShowExercisePicker(false)} />
       )}
     </div>
   );

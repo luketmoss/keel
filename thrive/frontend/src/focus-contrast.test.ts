@@ -80,7 +80,6 @@ const AUDITED = [
   // #319: the exercise picker.
   '.exercise-list > .exercise-list-item:focus-visible',
   '.create-new-row:focus-visible',
-  '.modal-content .tag-filter-row .tag-badge:focus-visible',
   '.modal-close:focus-visible',
   // #260: the detail screen's "View on COROS" link, --color-text at +2px.
   '.detail-coros-link:focus-visible',
@@ -206,12 +205,12 @@ describe('#404 AC6: the global ring', () => {
 });
 
 describe('#319 AC5: the exercise picker rings', () => {
-  it('insets the flush rows and puts the chip and Close rings outside', () => {
+  it('insets the flush rows and puts the Close ring outside; the chips take the global ring', () => {
     for (const s of ['.exercise-list > .exercise-list-item:focus-visible', '.create-new-row:focus-visible']) {
       expect(decl(ringOf(s).body, 'outline')).toBe('2px solid var(--color-text)');
       expect(decl(ringOf(s).body, 'outline-offset')).toBe('-2px');
     }
-    for (const s of ['.modal-content .tag-filter-row .tag-badge:focus-visible', '.modal-close:focus-visible']) {
+    for (const s of ['.modal-close:focus-visible']) {
       expect(decl(ringOf(s).body, 'outline')).toBe('2px solid var(--color-text)');
       expect(decl(ringOf(s).body, 'outline-offset')).toBe('2px');
     }

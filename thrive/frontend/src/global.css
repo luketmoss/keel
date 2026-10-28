@@ -1188,9 +1188,11 @@ input, select, textarea {
 .exercise-list {
   display: flex;
   flex-direction: column;
-  max-height: 50vh;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  margin: 0 calc(-1 * var(--space-lg));
+  /* Room for the pinned Add button to sit over the list's end. */
+  padding-bottom: 80px;
 }
 
 .exercise-list-item {
@@ -1200,16 +1202,19 @@ input, select, textarea {
   transition: background var(--transition-fast);
 }
 
-/* The picker's rows are <button>s (#319): reset the UA button so they look as
-   the divs did. Scoped to the picker; the Exercises screen's rows differ. */
+/* The picker's rows are toggle <button>s (#319, #641): reset the UA button. Scoped to the picker;
+   the Exercises screen's rows differ. */
 .exercise-list > .exercise-list-item {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-md);
   width: 100%;
-  min-height: 44px;
+  min-height: 56px;
   /* The explicit min-height replaces the flex item's content-sized minimum, so
-     without this a long list squeezes every row down to 44 px. */
+     without this a long list squeezes every row down. */
   flex-shrink: 0;
   margin: 0;
-  padding: var(--space-md) var(--space-lg);
+  padding: var(--space-sm) var(--space-md);
   border: 0;
   border-bottom: 1px solid var(--color-border-light);
   border-radius: 0;
@@ -1217,10 +1222,40 @@ input, select, textarea {
   font: inherit;
   color: inherit;
   text-align: left;
-  align-items: stretch;
   appearance: none;
   -webkit-appearance: none;
   cursor: pointer;
+}
+
+.exercise-list-item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.exercise-list-item-meta {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+/* The check circle: a ring when off, filled with a check when on. The pressed state says it too. */
+.exercise-list-item-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+}
+
+.exercise-list-item-check.selected {
+  color: var(--color-on-fill);
+  background: var(--color-primary-fill);
+  border-color: var(--color-primary-fill);
 }
 
 @media (hover: hover) {
@@ -1299,9 +1334,9 @@ input, select, textarea {
   align-items: center;
   gap: var(--space-sm);
   width: 100%;
-  min-height: 44px;
+  min-height: 52px;
   margin: 0;
-  padding: var(--space-md) var(--space-lg);
+  padding: var(--space-md);
   background: none;
   font: inherit;
   color: var(--color-primary-text);
@@ -7499,6 +7534,154 @@ body:has(.lift) {
   }
 }
 
+/* ===== Exercise picker sheet (#641) =====
+   A bottom sheet over a scrim: the panel is the app column (--content-max), 72px under the top of
+   the viewport, and only its list scrolls. The Add button is pinned over the list's end. */
+.picker-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  animation: fade-in 0.2s ease;
+}
+
+.picker-sheet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: var(--content-max);
+  height: calc(100% - (var(--space-xl) + var(--space-xl) + var(--space-sm)));
+  background: var(--color-surface-raised);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  overflow: hidden;
+  animation: picker-slide-up var(--transition-normal);
+}
+
+@keyframes picker-slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .picker-sheet {
+    animation: none;
+  }
+}
+
+.picker-grab {
+  align-self: center;
+  flex: none;
+  width: 36px;
+  height: 4px;
+  margin-top: var(--space-sm);
+  border-radius: var(--radius-full);
+  background: var(--color-border-strong);
+}
+
+.picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  flex: none;
+  padding: var(--space-sm) var(--space-sm) var(--space-sm) var(--space-md);
+}
+
+.picker-heading h2 {
+  font-size: var(--text-xl);
+  font-weight: 700;
+}
+
+.picker-subtitle {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.picker-search {
+  position: relative;
+  flex: none;
+  margin: 0 var(--space-md) var(--space-sm);
+}
+
+.picker-search .search-input {
+  min-height: 44px;
+  margin: 0;
+  padding-left: 40px;
+  background: var(--color-bg);
+  border-radius: calc(var(--radius-md) + var(--space-xs));
+}
+
+.picker-search-icon {
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  transform: translateY(-50%);
+  color: var(--color-text-secondary);
+  pointer-events: none;
+}
+
+/* One row that scrolls sideways, no scrollbar drawn. Its padding keeps the focus rings in view. */
+.picker-chips {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: var(--space-xs);
+  min-height: 44px;
+  padding: 0 var(--space-md);
+  margin-bottom: var(--space-xs);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.picker-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.picker-chips .filter-chip:not(.active) {
+  background: var(--color-surface-raised);
+}
+
+.picker-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: var(--radius-full);
+  background: var(--dot, var(--color-primary));
+}
+
+[data-theme="dark"] .picker-dot {
+  background: var(--dot-dark, var(--color-primary));
+}
+
+.picker-chips .filter-chip.active .picker-dot {
+  box-shadow: 0 0 0 1.5px var(--color-bg);
+}
+
+.picker-form {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 var(--space-md) var(--space-md);
+}
+
+.picker-footer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: var(--space-lg) calc(var(--space-sm) + var(--space-xs)) calc(var(--space-sm) + var(--space-xs));
+  background: linear-gradient(to bottom, transparent, var(--color-surface-raised) 40%);
+}
+
+.picker-add {
+  width: 100%;
+  min-height: 48px;
+}
+
 /* ===== Library keyboard access (#301) =====
    Template cards are <button>s and the editor's exercise rows are focusable
    buttons. The ring is --color-text (14.70:1 light, 15.54:1 dark), not
@@ -7540,7 +7723,6 @@ body:has(.lift) {
   outline-offset: -2px;
 }
 
-.modal-content .tag-filter-row .tag-badge:focus-visible,
 .modal-close:focus-visible {
   outline: 2px solid var(--color-text);
   outline-offset: 2px;

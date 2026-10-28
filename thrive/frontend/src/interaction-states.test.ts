@@ -88,6 +88,7 @@ const FAMILIES = {
     'lift-check',
     'lift-set-btn',
     'lift-choice-card',
+    'tpl-row-btn',
   ],
   Navigation: ['bottom-nav-tab'],
   Fields: ['form-input', 'form-select', 'form-textarea'],
@@ -590,6 +591,10 @@ describe('AC4: an aria-disabled control dims, and its focus ring does not', () =
         'btn',
         // #576: the duration stepper's end buttons.
         'btn-icon',
+        // #640: the builder's Save pill, Move up and Move down, and Sets stepper.
+        'btn',
+        'btn',
+        'btn-icon',
       ].sort(),
     );
   });
@@ -828,8 +833,8 @@ describe('AC10: selected keeps its non-colour cue and its ARIA state', () => {
     'bottom-nav-tab': ['aria-current'],
     'calendar-day': ['aria-selected'],
   };
-  // "+ New Label" is a label-chip that creates; it is never selected.
-  const NEVER_SELECTED = ['label-chip-create'];
+  // "+ New Label" is a label-chip that creates; it is never selected. Nor is the builder's "Add a section" pill (#640).
+  const NEVER_SELECTED = ['label-chip-create', 'tpl-pill'];
 
   it.each(Object.entries(SELECTED))('every .%s exposes its state', (cls, attrs) => {
     const found = controls.filter((c) => c.classes.includes(cls) && !c.classes.some((x) => NEVER_SELECTED.includes(x)));

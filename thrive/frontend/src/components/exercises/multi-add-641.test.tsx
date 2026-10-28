@@ -97,11 +97,11 @@ describe('the template editor', () => {
   it('picking two appends both and opens the first added', () => {
     templates.value = [];
     render(<TemplateEditor />);
-    openAndPick('Add Exercise', ['Dips', 'Ab Wheel']);
+    openAndPick('Primary', ['Dips', 'Ab Wheel']);
     const text = document.body.textContent ?? '';
     expect(text).toContain('Dips');
     expect(text).toContain('Ab Wheel');
     expect(text.indexOf('Dips')).toBeLessThan(text.indexOf('Ab Wheel'));
-    expect(document.querySelectorAll('.template-exercise-config')).toHaveLength(1);
+    expect(document.querySelectorAll('.tpl-panel')).toHaveLength(1);
   });
 });

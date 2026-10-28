@@ -43,6 +43,8 @@ const summary = (i: number) => {
   if (!m) return null;
   return (m.querySelector('[aria-hidden="true"]') ?? m).textContent;
 };
+const rowButtons = () => Array.from(document.querySelectorAll<HTMLElement>('.tpl-row-btn[data-row-btn]'));
+const tplSummary = (i: number) => rowButtons()[i].querySelector('.tpl-row-rx')!.textContent;
 const type = (el: HTMLInputElement, value: string) => fireEvent.input(el, { target: { value } });
 const repsInput = () => screen.getByLabelText('Reps') as HTMLInputElement;
 const heldLine = () => document.querySelector<HTMLElement>('.reps-field-held-line');
@@ -59,7 +61,7 @@ const description = (el: HTMLInputElement) =>
 
 function openTemplate(i: number) {
   render(<TemplateEditor templateId="t1" />);
-  fireEvent.click(cards()[i]);
+  fireEvent.click(rowButtons()[i]);
 }
 
 beforeEach(() => {
@@ -115,7 +117,7 @@ describe('AC1: the template editor shows held text read-only', () => {
     expect(visible(line.querySelector('.reps-field-held'))).toBe('Planned: 4-6');
     expect(clears()).toHaveLength(1);
     expect(clears()[0].textContent).toBe('Clear');
-    expect(summary(T.bench)).toBe('5 × 4-6');
+    expect(tplSummary(T.bench)).toBe('5 × 4-6');
   });
 
   it('a whole number shows in the input, editable, with no Planned line and no Clear', () => {
@@ -151,11 +153,11 @@ describe('AC2: replacing, clearing or keeping held text (template editor)', () =
     expect(repsInput().value).toBe('8');
     expect(heldLine()).toBeNull();
     expect(clears()).toHaveLength(0);
-    expect(summary(T.bench)).toBe('5 × 8');
+    expect(tplSummary(T.bench)).toBe('5 × 8');
     type(repsInput(), '');
     expect(repsInput().value).toBe('');
     expect(heldLine()).toBeNull();
-    expect(summary(T.bench)).toBe('5 sets');
+    expect(tplSummary(T.bench)).toBe('5 sets');
   });
 
   it('Clear blanks it, brings back the placeholder and focuses the Reps input', () => {
@@ -166,12 +168,12 @@ describe('AC2: replacing, clearing or keeping held text (template editor)', () =
     expect(clears()).toHaveLength(0);
     expect(repsInput().placeholder).toBe('e.g. 10');
     expect(document.activeElement).toBe(repsInput());
-    expect(summary(T.bench)).toBe('5 sets');
+    expect(tplSummary(T.bench)).toBe('5 sets');
   });
 
   it('Save untouched writes every stored Reps byte for byte', async () => {
     openTemplate(T.bench);
-    fireEvent.click(screen.getByText('Save Template'));
+    fireEvent.click(screen.getByText('Save'));
     await Promise.resolve();
     expect(editTemplate).toHaveBeenCalledTimes(1);
     const inputs = editTemplate.mock.calls[0][2] as { reps: string; sets: string }[];
@@ -181,28 +183,28 @@ describe('AC2: replacing, clearing or keeping held text (template editor)', () =
   it('a replaced held value saves the number', async () => {
     openTemplate(T.bench);
     type(repsInput(), '8');
-    fireEvent.click(screen.getByText('Save Template'));
+    fireEvent.click(screen.getByText('Save'));
     await Promise.resolve();
     expect((editTemplate.mock.calls[0][2] as { reps: string }[])[0].reps).toBe('8');
   });
 
   it('an editor opened (and expanded) but untouched is not dirty: Back does not ask', async () => {
     openTemplate(T.bench);
-    fireEvent.click(screen.getByLabelText('Back'));
+    fireEvent.click(screen.getByLabelText('Close'));
     expect(await confirmAsked()).toBe(false);
   });
 
   it('a refused keystroke does not make it dirty either', async () => {
     openTemplate(T.bench);
     type(repsInput(), '-');
-    fireEvent.click(screen.getByLabelText('Back'));
+    fireEvent.click(screen.getByLabelText('Close'));
     expect(await confirmAsked()).toBe(false);
   });
 
   it('Clear makes it dirty: Back asks', async () => {
     openTemplate(T.bench);
     fireEvent.click(clears()[0]);
-    fireEvent.click(screen.getByLabelText('Back'));
+    fireEvent.click(screen.getByLabelText('Close'));
     expect(await confirmAsked()).toBe(true);
   });
 });
@@ -231,8 +233,8 @@ describe('AC3: whole numbers only', () => {
     openTemplate(T.row);
     type(repsInput(), v);
     expect(repsInput().value).toBe('12');
-    expect(summary(T.row)).toBe('3 × 12');
-    fireEvent.click(screen.getByText('Save Template'));
+    expect(tplSummary(T.row)).toBe('3 × 12');
+    fireEvent.click(screen.getByText('Save'));
     await Promise.resolve();
     expect((editTemplate.mock.calls[0][2] as { reps: string }[])[1].reps).toBe('12');
   });
@@ -241,7 +243,7 @@ describe('AC3: whole numbers only', () => {
     openTemplate(T.curl);
     type(repsInput(), v);
     expect(repsInput().value).toBe('');
-    expect(summary(T.curl)).toBe('3 sets');
+    expect(tplSummary(T.curl)).toBe('3 sets');
   });
 
   it.each(['0', '-', '4-6', '8.5'])('on held 4-6, %j is refused and 4-6 still held', async (v) => {
@@ -249,7 +251,7 @@ describe('AC3: whole numbers only', () => {
     type(repsInput(), v);
     expect(repsInput().value).toBe('');
     expect(visible(heldLine()!.querySelector('.reps-field-held'))).toBe('Planned: 4-6');
-    fireEvent.click(screen.getByText('Save Template'));
+    fireEvent.click(screen.getByText('Save'));
     await Promise.resolve();
     expect((editTemplate.mock.calls[0][2] as { reps: string }[])[0].reps).toBe('4-6');
   });
@@ -257,14 +259,17 @@ describe('AC3: whole numbers only', () => {
   it('blank is valid and saves blank', async () => {
     openTemplate(T.row);
     type(repsInput(), '');
-    fireEvent.click(screen.getByText('Save Template'));
+    fireEvent.click(screen.getByText('Save'));
     await Promise.resolve();
     expect((editTemplate.mock.calls[0][2] as { reps: string }[])[1].reps).toBe('');
   });
 
-  it('the Sets input is unchanged: a number input', () => {
+  it('Sets is a stepper, not an input: 1 to 20 (#640)', () => {
     openTemplate(T.row);
-    expect((screen.getByLabelText('Sets') as HTMLInputElement).type).toBe('number');
+    const more = screen.getByLabelText('More sets');
+    fireEvent.click(more);
+    expect(tplSummary(T.row)).toBe('4 × 12');
+    expect(screen.getByLabelText('Fewer sets').getAttribute('aria-disabled')).toBeNull();
   });
 });
 
@@ -431,16 +436,13 @@ describe('AC5: accessibility', () => {
     ]);
   });
 
-  it("the template editor's Sets and Reps labels are tied by for/id, unique per open panel", () => {
+  it("the template editor's Reps label is tied by for/id, unique per open panel", () => {
     openTemplate(T.bench);
-    const sets = screen.getByLabelText('Sets') as HTMLInputElement;
-    expect(document.querySelector(`label[for="${sets.id}"]`)!.textContent).toBe('Sets');
     expect(document.querySelector(`label[for="${repsInput().id}"]`)!.textContent).toBe('Reps');
-    const first = [sets.id, repsInput().id];
-    fireEvent.click(cards()[T.bench]);
-    fireEvent.click(cards()[T.row]);
-    const second = [(screen.getByLabelText('Sets') as HTMLInputElement).id, repsInput().id];
-    expect(new Set([...first, ...second]).size).toBe(4);
+    const first = repsInput().id;
+    fireEvent.click(rowButtons()[T.row]);
+    expect(rowButtons()[T.bench].getAttribute('aria-expanded')).toBe('false');
+    expect(repsInput().id).not.toBe(first);
   });
 });
 

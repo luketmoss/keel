@@ -60,7 +60,7 @@ function plural(n: number, word: string): string {
 }
 
 /** Counts, segments and legend for a template's rows. */
-export function templateStats(tpl: Template): TemplateStats {
+export function templateStats(tpl: { exercises: readonly { section: string; sets: string }[] }): TemplateStats {
   const totals = new Map<string, number>();
   const rowCounts = new Map<string, number>();
   let workingSets = 0;
@@ -174,14 +174,22 @@ export function templateAriaLabel(name: string, stats: TemplateStats, took: Last
 
 interface TemplateSummaryProps {
   stats: TemplateStats;
-  took: LastTook | null;
+  took?: LastTook | null;
+  /**
+   * The builder's summary (#640): exercises and working sets only, no last took and no mix bar, and the
+   * figures sit in a polite live region so an add or remove is heard.
+   */
+  plan?: boolean;
 }
 
 /** The three figures, the section-mix bar and its legend. Spans only, so it can sit inside a button. */
-export function TemplateSummary({ stats, took }: TemplateSummaryProps) {
+export function TemplateSummary({ stats, took = null, plan = false }: TemplateSummaryProps) {
   return (
     <span class="tpl-summary">
-      <span class="tpl-figures">
+      <span
+        class={plan ? 'tpl-figures tpl-figures-plan' : 'tpl-figures'}
+        {...(plan ? { 'aria-live': 'polite', 'aria-atomic': 'true' } : {})}
+      >
         <span class="tpl-figure">
           <span class="tpl-figure-value">{stats.exercises}</span>
           <span class="tpl-figure-word">{stats.exercises === 1 ? 'exercise' : 'exercises'}</span>
@@ -190,21 +198,23 @@ export function TemplateSummary({ stats, took }: TemplateSummaryProps) {
           <span class="tpl-figure-value">{stats.workingSets}</span>
           <span class="tpl-figure-word">{stats.workingSets === 1 ? 'working set' : 'working sets'}</span>
         </span>
-        <span class="tpl-figure">
-          <span class="tpl-figure-line">
-            {took ? (
-              <>
-                <span class="tpl-figure-value">{took.value}</span>
-                <span class="tpl-figure-unit">{took.unit}</span>
-              </>
-            ) : (
-              <span class="tpl-figure-value tpl-figure-none">—</span>
-            )}
+        {!plan && (
+          <span class="tpl-figure">
+            <span class="tpl-figure-line">
+              {took ? (
+                <>
+                  <span class="tpl-figure-value">{took.value}</span>
+                  <span class="tpl-figure-unit">{took.unit}</span>
+                </>
+              ) : (
+                <span class="tpl-figure-value tpl-figure-none">—</span>
+              )}
+            </span>
+            <span class="tpl-figure-word">last took</span>
           </span>
-          <span class="tpl-figure-word">last took</span>
-        </span>
+        )}
       </span>
-      {stats.segments.length > 0 && (
+      {!plan && stats.segments.length > 0 && (
         <>
           <span class="tpl-mix" aria-hidden="true">
             {stats.segments.map((s) => (

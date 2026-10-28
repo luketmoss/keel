@@ -4230,6 +4230,282 @@ input, select, textarea {
   border: 0;
 }
 
+/* ===== Template builder (#640): section cards, rows that open in place ===== */
+.template-editor.tpl-builder {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space-sm) + var(--space-xs));
+  padding: 0 var(--space-md) var(--space-xl);
+}
+
+.tpl-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: var(--space-sm) 0 0;
+}
+
+.tpl-save.btn {
+  min-height: 44px;
+  padding: 0 calc(var(--space-lg) - 4px);
+  border-radius: var(--radius-full);
+}
+
+.tpl-name-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.detail-date-line[for] {
+  font-weight: 500;
+}
+
+.form-input.tpl-name-input {
+  min-height: 0;
+  padding: 0 0 var(--space-xs);
+  border: none;
+  border-bottom: 2px dashed var(--color-border-strong);
+  border-radius: 0;
+  background: transparent;
+  font-size: var(--figure-lg);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.form-input.tpl-name-input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.form-input.tpl-name-input:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-text);
+  outline-offset: var(--focus-ring-offset);
+  border-bottom-style: solid;
+  border-bottom-color: var(--color-primary);
+  box-shadow: none;
+}
+
+.tpl-figures.tpl-figures-plan {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.tpl-cards {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space-sm) + var(--space-xs));
+}
+
+.tpl-start-note {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.tpl-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.tpl-card-count {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.tpl-row + .tpl-row,
+.tpl-card-head + .tpl-row {
+  border-top: 1px solid var(--color-border-light);
+}
+
+.tpl-card-head + .tpl-row {
+  border-top: none;
+}
+
+.tpl-row-btn {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  min-height: 52px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--text-base);
+  text-align: left;
+  cursor: pointer;
+}
+
+.tpl-row-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.tpl-row-rx {
+  flex: none;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tpl-row-chevron {
+  display: inline-flex;
+  flex: none;
+  color: var(--color-text-secondary);
+}
+
+.tpl-row-chevron svg {
+  width: 16px;
+  height: 16px;
+  transition: transform var(--transition-fast);
+}
+
+.tpl-row-btn[aria-expanded='true'] .tpl-row-chevron svg {
+  transform: rotate(180deg);
+}
+
+.tpl-panel {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space-sm) + var(--space-xs));
+  margin-bottom: calc(var(--space-sm) + var(--space-xs));
+  padding: calc(var(--space-sm) + var(--space-xs));
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+}
+
+.tpl-field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  min-height: 44px;
+}
+
+.tpl-field-label {
+  font-size: var(--text-base);
+  font-weight: 500;
+}
+
+.tpl-reps.form-group {
+  margin: 0;
+  min-width: 0;
+  text-align: right;
+}
+
+.tpl-reps .form-input {
+  min-height: 44px;
+  text-align: right;
+}
+
+.tpl-stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.tpl-step-btn {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-text);
+}
+
+.tpl-stepper-value {
+  min-width: 2.5em;
+  text-align: center;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.tpl-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.btn.tpl-chip {
+  position: relative;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+}
+
+.btn.tpl-chip::before {
+  content: '';
+  position: absolute;
+  inset: -4px 0;
+}
+
+.btn-ghost.tpl-remove {
+  min-height: 44px;
+  margin-left: auto;
+  padding: 0 var(--space-sm);
+  color: var(--color-danger-text);
+}
+
+.btn-ghost.tpl-add-btn {
+  min-height: 44px;
+  align-self: flex-start;
+  gap: var(--space-xs);
+  padding: 0;
+  color: var(--color-primary-text);
+}
+
+.tpl-add-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.tpl-card > .template-rest-band {
+  margin-bottom: var(--space-xs);
+}
+
+.tpl-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.filter-chip.tpl-pill:not(.active) {
+  border-style: dashed;
+}
+
+.tpl-quiet-card {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.tpl-quiet-btn {
+  min-height: 48px;
+  padding: 0;
+  font-weight: 600;
+}
+
+.tpl-quiet-btn + .tpl-quiet-btn {
+  border-top: 1px solid var(--color-border-light);
+}
+
+.tpl-quiet-danger {
+  color: var(--color-danger-text);
+}
+
+.tpl-quiet-danger svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
 /* ===== Cardio Fields (#103) ===== */
 /* A hike form grows past 900px at 375px once four fields appear, and the only
    Save affordance lives in the header. Scoped to .simple-workout-form rather
@@ -6677,9 +6953,9 @@ a.training-card {
 
 .template-rest-band {
   margin-top: var(--space-sm);
-  padding: var(--space-sm) var(--space-md);
+  padding: var(--space-sm) calc(var(--space-sm) + var(--space-xs));
   border-radius: var(--radius-md);
-  background: var(--color-primary-light);
+  background: var(--color-bg);
 }
 
 .template-rest-default {
@@ -8073,6 +8349,7 @@ body:has(.lift) {
   .lift-check:hover:not(:disabled):not([aria-disabled="true"]),
   .lift-set-btn:hover:not(:disabled):not([aria-disabled="true"]),
   .lift-choice-card:hover:not(:disabled):not([aria-disabled="true"]),
+  .tpl-row-btn:hover:not(:disabled):not([aria-disabled="true"]),
   /* Navigation */
   .bottom-nav-tab:hover:not(:disabled):not([aria-disabled="true"]) {
     background-image: linear-gradient(var(--state-hover), var(--state-hover));
@@ -8149,6 +8426,7 @@ a.workout-card:active:not(:disabled):not([aria-disabled="true"]),
 .lift-check:active:not(:disabled):not([aria-disabled="true"]),
 .lift-set-btn:active:not(:disabled):not([aria-disabled="true"]),
 .lift-choice-card:active:not(:disabled):not([aria-disabled="true"]),
+.tpl-row-btn:active:not(:disabled):not([aria-disabled="true"]),
 /* Navigation */
 .bottom-nav-tab:active:not(:disabled):not([aria-disabled="true"]) {
   background-image: linear-gradient(var(--state-pressed), var(--state-pressed));

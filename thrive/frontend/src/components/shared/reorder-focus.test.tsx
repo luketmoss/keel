@@ -1,4 +1,5 @@
-// #328 — after Move up/down in the template editor and the workout planner,
+// #328 — after Move up/down in the workout planner (the template builder's are in
+// templates/template-builder-640.test.tsx),
 // focus stays on the moved exercise's button, ends are aria-disabled, each
 // move is announced, and the open panel travels with its row. Both lists hold
 // "Row BB" twice, so rows must be told apart by more than exercise_id.
@@ -16,7 +17,6 @@ vi.mock('../../state/actions', () => ({
 vi.mock('../../auth/auth-context', () => ({ useAuth: () => ({ token: 'test-token' }) }));
 vi.mock('../../router/router', () => ({ navigate: vi.fn() }));
 
-const { TemplateEditor } = await import('../templates/template-editor');
 const { WorkoutPlanner } = await import('../workout/workout-planner');
 
 const LIST: [string, string, string][] = [
@@ -60,7 +60,6 @@ const plannerExercises = (): PlannerExercise[] =>
 const onSave = vi.fn(async (..._args: unknown[]) => undefined);
 
 const screens: [string, () => void][] = [
-  ['template editor', () => render(<TemplateEditor templateId="t1" />)],
   [
     'workout planner',
     () =>
@@ -152,26 +151,6 @@ describe.each(screens)('%s', (_name, mount) => {
 });
 
 describe('saved order is the displayed order, with no row key in it', () => {
-  it('template editor', async () => {
-    render(<TemplateEditor templateId="t1" />);
-    fireEvent.click(moveBtn(2, 'up'));
-    fireEvent.click(document.querySelector('.btn-primary')!);
-    await vi.waitFor(() => expect(editTemplate).toHaveBeenCalled());
-    const inputs = editTemplate.mock.calls[0][2] as Record<string, unknown>[];
-    expect(inputs.map((x) => x.section)).toEqual(['warmup', 'SS1', 'primary', 'burnout']);
-    // rest_s / switch_s: the section's rest (#576), on every row of it.
-    for (const x of inputs)
-      expect(Object.keys(x).sort()).toEqual([
-        'exercise_id',
-        'exercise_name',
-        'reps',
-        'rest_s',
-        'section',
-        'sets',
-        'switch_s',
-      ]);
-  });
-
   it('workout planner', async () => {
     onSave.mockClear();
     render(

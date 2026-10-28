@@ -3296,6 +3296,81 @@ input, select, textarea {
   color: var(--color-text-secondary);
 }
 
+/* ----- Template detail (#639): #531's bar, #533's section cards, #638's summary ----- */
+.template-detail-title {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.template-detail-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: calc(var(--space-sm) + var(--space-xs)) 0;
+}
+
+.template-detail-row + .template-detail-row {
+  border-top: 1px solid var(--color-border-light);
+}
+
+.template-detail-name {
+  min-width: 0;
+  font-size: var(--text-base);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.template-detail-rx {
+  flex: none;
+  font-size: var(--text-base);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The last line in a section's card: an inset row, so it reads as part of the card. */
+.template-rest-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin: var(--space-sm) 0 0;
+  padding: var(--space-sm) calc(var(--space-sm) + 2px);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.template-rest-line svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.template-detail-missing {
+  margin: 0 0 var(--space-md);
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+/* Pinned above the tab bar; cards scroll under it, fading in over its top --space-md. */
+.workout-detail-screen > .template-detail-footer {
+  position: sticky;
+  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px));
+  z-index: 1;
+  margin: 0;
+  padding: calc(var(--space-md) + var(--space-sm) + var(--space-xs)) var(--space-md) calc(var(--space-sm) + var(--space-xs));
+  background: linear-gradient(to bottom, transparent, var(--color-bg) var(--space-md));
+}
+
+.template-detail-footer .btn {
+  width: 100%;
+}
+
 /* ----- Map hero and sheet (#532) ----- */
 .workout-detail-screen > .detail-sheet {
   display: flex;

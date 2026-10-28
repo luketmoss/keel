@@ -7,27 +7,35 @@ import { ChevronLeftIcon, PencilIcon, DotsIcon, CopyIcon, BookmarkIcon, TrashIco
 
 interface Props {
   /** Copy workout: a completed weight workout (today's Copy rule). */
-  canCopy: boolean;
+  canCopy?: boolean;
   /** Save as template: as Copy, and it has exercises (today's Save Template rule). */
-  canSaveTemplate: boolean;
+  canSaveTemplate?: boolean;
   /** A delete is in flight: More actions is disabled, as the Delete button was. */
   deleting: boolean;
   onBack: () => void;
   onEdit: () => void;
-  onCopy: () => void;
-  onSaveTemplate: () => void;
+  onCopy?: () => void;
+  onSaveTemplate?: () => void;
   onDelete: () => void;
+  /** What the pencil is named, and the focus key it carries (#639: a template). Workout by default. */
+  editLabel?: string;
+  editFocusKey?: string;
+  /** The word on the last menu item. */
+  deleteLabel?: string;
 }
 
 export function DetailTopBar({
-  canCopy,
-  canSaveTemplate,
+  canCopy = false,
+  canSaveTemplate = false,
   deleting,
   onBack,
   onEdit,
   onCopy,
   onSaveTemplate,
   onDelete,
+  editLabel = 'Edit workout',
+  editFocusKey = 'workout-edit',
+  deleteLabel = 'Delete workout',
 }: Props) {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
@@ -94,8 +102,8 @@ export function DetailTopBar({
         <button
           type="button"
           class="detail-icon-btn"
-          aria-label="Edit workout"
-          data-focus-key="workout-edit"
+          aria-label={editLabel}
+          data-focus-key={editFocusKey}
           onClick={onEdit}
         >
           <PencilIcon />
@@ -123,13 +131,13 @@ export function DetailTopBar({
           </button>
           {open && (
             <div class="detail-menu" role="menu" aria-label="More actions" ref={menu} onKeyDown={onMenuKeyDown}>
-              {canCopy && (
+              {canCopy && onCopy && (
                 <button type="button" role="menuitem" class="detail-menu-item" tabIndex={-1} onClick={run(onCopy)}>
                   <CopyIcon />
                   <span>Copy workout</span>
                 </button>
               )}
-              {canSaveTemplate && (
+              {canSaveTemplate && onSaveTemplate && (
                 <button
                   type="button"
                   role="menuitem"
@@ -149,7 +157,7 @@ export function DetailTopBar({
                 onClick={run(onDelete)}
               >
                 <TrashIcon />
-                <span>Delete workout</span>
+                <span>{deleteLabel}</span>
               </button>
             </div>
           )}

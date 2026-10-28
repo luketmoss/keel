@@ -3,13 +3,20 @@ import { describe, it, expect } from 'vitest';
 import type { SetWithRow } from '../../../api/types';
 import {
   buildSteps,
+  cleanWeight,
   doneLabel,
+  endsGroup,
   figuresText,
+  groupMeta,
   isEditable,
   lastTimeLine,
   nextIndex,
+  opensGroup,
+  planLine,
+  plannedWeight,
   progressOf,
   roundUpTo,
+  shortDate,
   signedMSS,
   stepState,
   summaryTotals,
@@ -266,5 +273,58 @@ describe('summaryTotals', () => {
 
   it('keeps a measured zero', () => {
     expect(summaryTotals(buildSteps([mk('primary', 1, 'X', 1, { set_s: '0' })])).liftingS).toBe(0);
+  });
+});
+
+describe('Set up next (#674)', () => {
+  const steps = () => {
+    row = 2;
+    return buildSteps([
+      mk('primary', 1, 'Press', 1, { rest_target_s: '90' }),
+      mk('primary', 1, 'Press', 2, { rest_target_s: '90' }),
+      mk('SS1', 2, 'A', 1),
+      mk('SS1', 3, 'B', 1),
+      mk('SS1', 2, 'A', 2),
+      mk('SS1', 3, 'B', 2),
+    ]);
+  };
+
+  it('a set ends its group when the next set is in another section', () => {
+    const s = steps();
+    expect(endsGroup(s, 0, 1)).toBe(false);
+    expect(endsGroup(s, 1, 2)).toBe(true);
+    expect(endsGroup(s, 1, -1)).toBe(false);
+    expect(doneLabel(s[1], false, true)).toBe('Done · set up next');
+    expect(doneLabel(s[1], true, true)).toBe('Done · finish');
+    expect(doneLabel(s[0], false, false)).toBe('Done · rest 1:30');
+  });
+
+  it('a run opens on setup only where no set of the section is logged', () => {
+    const s = steps();
+    expect(opensGroup(s, 0)).toBe(true);
+    s[3].row.reps = '8';
+    // B's first set logged in Logbook: A's first set is part-way through the superset.
+    expect(opensGroup(s, 2)).toBe(false);
+    expect(opensGroup(s, 0)).toBe(true);
+  });
+
+  it('plan lines, planned weights and group meta', () => {
+    expect(planLine([{ planned_reps: '10' }, { planned_reps: '10' }, { planned_reps: '10' }])).toBe('3 × 10');
+    expect(planLine([{ planned_reps: '10' }, { planned_reps: '8' }, { planned_reps: '6' }])).toBe('3 sets · 10, 8, 6');
+    expect(planLine([{ planned_reps: '' }, { planned_reps: ' ' }])).toBe('2 sets');
+    expect(plannedWeight([{ weight: '' }, { weight: '0' }])).toBe('');
+    expect(plannedWeight([{ weight: '95' }, { weight: '95' }])).toBe('95 lb');
+    expect(plannedWeight([{ weight: '105' }, { weight: '95' }, { weight: '' }])).toBe('95–105 lb');
+    const s = steps();
+    expect(groupMeta(s, 'primary')).toBe('2 sets');
+    expect(groupMeta(s, 'SS1')).toBe('2 exercises · 2 rounds');
+  });
+
+  it('cleans a weight and dates last time, with the year only when it is not this year', () => {
+    expect(cleanWeight('62.50')).toBe('62.5');
+    expect(cleanWeight('0')).toBe('');
+    expect(cleanWeight('abc')).toBe('');
+    expect(shortDate('2026-10-21', new Date('2026-10-28T12:00:00'))).toBe('Oct 21');
+    expect(shortDate('2025-10-21', new Date('2026-10-28T12:00:00'))).toBe('Oct 21, 2025');
   });
 });

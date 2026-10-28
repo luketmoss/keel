@@ -1,7 +1,8 @@
 // #577 — Lift Mode's screens. Presentational: the run, the clocks and every
 // write belong to lift-mode.tsx, which passes in what each one shows.
 
-import { useRef, useState } from 'preact/hooks';
+import type { ComponentChildren } from 'preact';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import type { SetWithRow } from '../../../api/types';
 import { formatMSS, type RestKind, type RestSettings } from '../../../api/rest-times';
 import { DurationStepper } from '../../shared/duration-stepper';
@@ -10,17 +11,24 @@ import { useModalFocus } from '../../shared/use-modal-focus';
 import { sectionTitle } from '../../activities/exercise-detail';
 import { restRowsFor } from '../../templates/template-rest';
 import {
+  cleanWeight,
+  figuresText,
+  groupMeta,
+  groupName,
   isWorkingSection,
   lastTimeLine,
+  shortDate,
+  stepWeight,
   restTargetOf,
   targetParts,
   targetWeight,
   weightText,
   type LastTime,
   type LiftStep,
+  type SetupExercise,
 } from './lift-plan';
 import { sectionValues, type SectionValues } from './lift-rest';
-import { SetControls } from './lift-set-controls';
+import { SetControls, Stepper } from './lift-set-controls';
 import { SetsList } from './lift-sets-list';
 import type { RestView } from './lift-run';
 
@@ -452,6 +460,238 @@ export function UpNextCard({
   );
 }
 
+// ── Set up next (#674) ──────────────────────────────────────────────
+
+/** "ss" for a superset, "burnout", or '' for a section that is not run in rounds. */
+const ROUNDS_CLASS = (section: string): string =>
+  section.startsWith('SS') ? 'ss' : section === 'burnout' ? 'burnout' : '';
+
+/**
+ * The weight as a text field between the stepper's buttons. Typing a number at
+ * or above 0 sets it at once; anything else is put back to the last good value
+ * when the field is left.
+ */
+function WeightField({
+  value,
+  name,
+  onChange,
+  disabled,
+  autoFocus,
+}: {
+  value: string;
+  name: string;
+  onChange: (weight: string) => void;
+  disabled: boolean;
+  autoFocus: boolean;
+}) {
+  const [text, setText] = useState(value);
+  const input = useRef<HTMLInputElement>(null);
+  // Follow a press of − or +, but not the field's own typing.
+  useEffect(() => {
+    if (document.activeElement !== input.current) setText(value);
+  }, [value]);
+  useEffect(() => {
+    if (autoFocus) input.current?.focus();
+  }, []);
+  return (
+    <input
+      ref={input}
+      class="form-input lift-setup-weight-input"
+      type="text"
+      inputMode="decimal"
+      aria-label={`Weight for ${name}`}
+      value={text}
+      disabled={disabled}
+      onInput={(e) => {
+        const raw = (e.target as HTMLInputElement).value;
+        setText(raw);
+        const n = Number(raw);
+        if (raw.trim() !== '' && Number.isFinite(n) && n >= 0) onChange(String(Number(n.toFixed(2))));
+      }}
+      onBlur={() => setText(value)}
+    />
+  );
+}
+
+const EFFORT_LETTER: Record<string, string> = { Easy: 'E', Medium: 'M', Hard: 'H' };
+
+function LastTimeBlock({ ex }: { ex: SetupExercise }) {
+  if (!ex.last) return <p class="lift-setup-first">First time doing this exercise</p>;
+  const date = shortDate(ex.last.workoutDate);
+  return (
+    <div class="lift-setup-last">
+      <div class="lift-setup-last-label">Last time · {date}</div>
+      <ul class="lift-setup-last-rows">
+        {ex.last.sets.map((s) => (
+          <li key={s.set_number} class="lift-setup-last-row">
+            <span class="lift-setup-last-n">{s.set_number}</span>
+            <span class="lift-setup-last-figures">{figuresText(s)}</span>
+            {s.effort && (
+              <span class={`lift-setup-effort lift-setup-effort-${s.effort.toLowerCase()}`}>{s.effort}</span>
+            )}
+          </li>
+        ))}
+      </ul>
+      {/* #580: one line in a short window. */}
+      <p class="lift-setup-last-line">
+        {date}:{' '}
+        {ex.last.sets.map((s, i) => (
+          <span key={s.set_number}>
+            {i > 0 && ' · '}
+            {figuresText(s).replace(' × ', '×')}
+            {s.effort && (
+              <>
+                {' '}
+                <span class={`lift-setup-effort-letter lift-setup-effort-letter-${s.effort.toLowerCase()}`}>
+                  {EFFORT_LETTER[s.effort] ?? s.effort}
+                </span>
+              </>
+            )}
+          </span>
+        ))}
+      </p>
+    </div>
+  );
+}
+
+function SetupCard({
+  ex,
+  section,
+  weight,
+  onWeight,
+  disabled,
+}: {
+  ex: SetupExercise;
+  section: string;
+  /** The weight held for this exercise, '' for none. */
+  weight: string;
+  onWeight: (weight: string) => void;
+  disabled: boolean;
+}) {
+  // Blank and untouched reads Bodyweight; Add weight opens the stepper at 0 with the field focused.
+  const [adding, setAdding] = useState(false);
+  const rounds = ROUNDS_CLASS(section);
+  const changed = cleanWeight(weight) !== ex.startWeight;
+  const n = Number(weight) || 0;
+  const showStepper = weight !== '' || adding;
+  return (
+    <section
+      class={`lift-card lift-setup-card${rounds ? ` lift-setup-card-${rounds}` : ''}`}
+      aria-label={ex.letter ? `${ex.letter} · ${ex.name}` : ex.name}
+    >
+      <h3 class="lift-setup-name">
+        {ex.letter && <span class={`lift-setup-letter lift-setup-letter-${rounds}`}>{ex.letter} · </span>}
+        {ex.name}
+      </h3>
+      <p class="lift-setup-plan">
+        {ex.plan}
+        {ex.planned && (
+          <>
+            {' · planned '}
+            <strong>{ex.planned}</strong>
+          </>
+        )}
+      </p>
+      <LastTimeBlock ex={ex} />
+      {ex.allLogged ? (
+        <div class="lift-setup-weight lift-setup-done">Done</div>
+      ) : (
+        <>
+          <div class="lift-setup-weight">
+            <span class="lift-setup-weight-label">Weight</span>
+            {showStepper ? (
+              <Stepper
+                label="lb"
+                value={String(n)}
+                onLess={() => onWeight(String(stepWeight(n, -1)))}
+                onMore={() => onWeight(String(stepWeight(n, 1)))}
+                what="weight"
+                disabled={disabled}
+                field={
+                  <WeightField
+                    value={String(n)}
+                    name={ex.name}
+                    onChange={onWeight}
+                    disabled={disabled}
+                    autoFocus={adding}
+                  />
+                }
+              />
+            ) : (
+              <span class="lift-setup-bw">
+                <span class="lift-bodyweight">Bodyweight</span>
+                <button
+                  type="button"
+                  class="btn btn-ghost lift-setup-add"
+                  onClick={() => setAdding(true)}
+                  disabled={disabled}
+                >
+                  Add weight
+                </button>
+              </span>
+            )}
+          </div>
+          {changed && <div class="lift-setup-changed">Changed</div>}
+        </>
+      )}
+    </section>
+  );
+}
+
+export function SetupScreen({
+  steps,
+  section,
+  exercises,
+  clock,
+  weights,
+  onWeight,
+  disabled,
+  children,
+}: {
+  steps: readonly LiftStep[];
+  section: string;
+  exercises: readonly SetupExercise[];
+  /** Since the last set, or null before the first group. */
+  clock: string | null;
+  /** The weight held per exercise key; an exercise not in it holds its starting weight. */
+  weights: Readonly<Record<string, string>>;
+  onWeight: (key: string, weight: string) => void;
+  disabled: boolean;
+  /** The previous group's log card, after the exercise cards. */
+  children?: ComponentChildren;
+}) {
+  return (
+    <div class="lift-content lift-setup">
+      {clock !== null && (
+        <div class="lift-setup-since">
+          <span class="lift-setup-since-label">Since last set</span>
+          <span class="lift-setup-since-clock" role="timer" aria-label={`Since last set ${clock}`}>
+            {clock}
+          </span>
+        </div>
+      )}
+      <div class="lift-setup-head">
+        <div class="lift-setup-badge-row">
+          <span class={sectionBadgeClass(section)}>{groupName(section)}</span>
+          <span class="lift-hint">{groupMeta(steps, section)}</span>
+        </div>
+        <h2 class="lift-setup-title">Set up</h2>
+      </div>
+      {exercises.map((ex) => (
+        <SetupCard
+          key={ex.key}
+          ex={ex}
+          section={section}
+          weight={weights[ex.key] ?? ex.startWeight}
+          onWeight={(w) => onWeight(ex.key, w)}
+          disabled={disabled}
+        />
+      ))}
+      {children}
+    </div>
+  );
+}
+
 // ── All sets ────────────────────────────────────────────────────────
 
 export function AllSetsSheet({
@@ -462,9 +702,12 @@ export function AllSetsSheet({
   onClose,
   onFinish,
   onSwitch,
+  setup = false,
 }: {
   steps: readonly LiftStep[];
   current: number | null;
+  /** #674: opened from Set up next, where the current set is the target. */
+  setup?: boolean;
   workoutId: string;
   token: string;
   onClose: () => void;
@@ -494,7 +737,7 @@ export function AllSetsSheet({
             Close
           </button>
         </div>
-        <SetsList steps={steps} current={current} summary={false} workoutId={workoutId} token={token} />
+        <SetsList steps={steps} current={current} summary={false} workoutId={workoutId} token={token} setup={setup} />
         <button type="button" class="btn btn-secondary lift-sheet-finish" onClick={onSwitch}>
           Switch to logbook
         </button>

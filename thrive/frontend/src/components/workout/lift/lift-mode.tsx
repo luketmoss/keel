@@ -7,7 +7,9 @@
 // changes nothing. What is written to the sheet: `set_s` on Done, `rest_s` on
 // Start set, weight, reps and effort through `saveSet` as the tracker does, and
 // `rest_target_s` when today's rest is changed on the start screen. The end of
-// the workout is the summary (#578), not the tracker's finish modal.
+// the workout is the summary (#578), not the tracker's finish modal. Between
+// working sections there is no rest but Set up next (#674): the whole next group,
+// an elapsed clock with no target, and its weights, written on Start.
 
 import { batch } from '@preact/signals';
 import type { JSX } from 'preact';
@@ -35,6 +37,7 @@ import {
   LogCard,
   RestHero,
   SetScreen,
+  SetupScreen,
   StartScreen,
   UpNextCard,
   type ChecklistItem,
@@ -43,13 +46,18 @@ import { flushLogDrafts } from './lift-set-controls';
 import { SummaryScreen } from './lift-summary';
 import {
   buildSteps,
+  cleanWeight,
   doneLabel,
+  endsGroup,
+  groupName,
   isStepLogged,
   lastTimeFor,
   nextIndex,
+  opensGroup,
   progressOf,
   restTargetOf,
   roundUpTo,
+  setupExercises,
   type LiftStep,
 } from './lift-plan';
 import { retargetSection, type SectionValues } from './lift-rest';
@@ -135,7 +143,11 @@ function vibrate(pattern: number[]): void {
   }
 }
 
-/** Where a run opens: the stored step when it still holds, else Ready at the first unlogged working set. */
+/**
+ * Where a run opens: the stored step when it still holds, else the first
+ * unlogged working set, on Set up next when its group has not begun (#674) and
+ * on Ready part-way through one.
+ */
 export function initialRun(status: string | undefined, steps: readonly LiftStep[], stored: LiftRun | null): LiftRun {
   if (status !== 'active') return FRESH_RUN;
   if (stored && stored.phase !== 'start') {
@@ -158,7 +170,12 @@ export function initialRun(status: string | undefined, steps: readonly LiftStep[
     notes: stored?.notes ?? '',
     sessionEffort: stored?.sessionEffort ?? '',
   };
-  return idx >= 0 ? { ...base, phase: 'ready', stepIndex: idx } : { ...base, phase: 'cooldown' };
+  return idx >= 0 ? { ...base, phase: firstPhase(steps, idx), stepIndex: idx } : { ...base, phase: 'cooldown' };
+}
+
+/** The phase a run opens on at `index` with no last set: Set up next at a group's start, else Ready. */
+function firstPhase(steps: readonly LiftStep[], index: number): 'setup' | 'ready' {
+  return opensGroup(steps, index) ? 'setup' : 'ready';
 }
 
 /**
@@ -402,8 +419,9 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
       if (warmups.length > 0) {
         go({ ...FRESH_RUN, phase: 'warmup', sessionStartedAt: t });
       } else {
-        const first = nextIndex(buildSteps(sets.value.filter((s) => s.workout_id === workoutId)), -1);
-        if (first >= 0) go({ ...FRESH_RUN, phase: 'ready', stepIndex: first, sessionStartedAt: t });
+        const fresh = buildSteps(sets.value.filter((s) => s.workout_id === workoutId));
+        const first = nextIndex(fresh, -1);
+        if (first >= 0) go({ ...FRESH_RUN, phase: firstPhase(fresh, first), stepIndex: first, sessionStartedAt: t });
         else {
           go({ ...FRESH_RUN, phase: 'cooldown', sessionStartedAt: t });
           if (cooldowns.length === 0) void openSummary();
@@ -451,7 +469,7 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
 
   const startWorkingSets = () => {
     const first = nextIndex(steps, -1);
-    if (first >= 0) go({ phase: 'ready', stepIndex: first });
+    if (first >= 0) go({ phase: firstPhase(steps, first), stepIndex: first });
     else afterWorking();
   };
 
@@ -465,6 +483,19 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
     const next = nextIndex(steps, run.stepIndex);
     if (next < 0) {
       afterWorking({ index: run.stepIndex, at: t, written });
+      return;
+    }
+    // #674: the next set opens another group, so what follows is setup, not a rest toward a target.
+    if (endsGroup(steps, run.stepIndex, next)) {
+      go({
+        phase: 'setup',
+        stepIndex: next,
+        setStartedAt: null,
+        restStartedAt: t,
+        restTarget: 0,
+        alertedAt: null,
+        restFor: run.stepIndex,
+      });
       return;
     }
     go({
@@ -486,8 +517,52 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
     go({ phase: 'set', setStartedAt: t, restStartedAt: null, restTarget: 0, alertedAt: null, restFor: null });
   };
 
+  // ── Set up next (#674): weights held on screen per exercise, written once on Start ──
+  const [held, setHeld] = useState<{ at: string; weights: Record<string, string> }>({ at: '', weights: {} });
+  const [startingGroup, setStartingGroup] = useState(false);
+  const startGroup = async () => {
+    const at = runRef.current;
+    const first = steps[at.stepIndex];
+    if (!first || startingGroup) return;
+    const t = Date.now();
+    setStartingGroup(true);
+    try {
+      await flushLogDrafts();
+      const weights = held.at === first.key ? held.weights : {};
+      for (const ex of setupExercises(steps, first.section, workoutId)) {
+        const w = weights[ex.key];
+        if (w === undefined || cleanWeight(w) === ex.startWeight || !token) continue;
+        // The tracker's quick-fill rule: every set of the exercise not yet logged, and none that is.
+        const unlogged = sets.value.filter(
+          (s) =>
+            s.workout_id === workoutId &&
+            s.exercise_id === ex.exercise_id &&
+            s.exercise_order === ex.exercise_order &&
+            !isStepLogged(s),
+        );
+        for (const row of unlogged) {
+          try {
+            await saveSet({ ...row, weight: cleanWeight(w) }, token, row.sheetRow);
+          } catch {
+            // saveSet showed its toast; the set screen shows what the row holds, and the person is under the bar.
+          }
+        }
+      }
+      if (at.restFor !== null && at.restStartedAt !== null)
+        timing(at.restFor, { rest_s: String(wholeSeconds(at.restStartedAt, t)) });
+    } finally {
+      setStartingGroup(false);
+    }
+    go({ phase: 'set', setStartedAt: Date.now(), restStartedAt: null, restTarget: 0, alertedAt: null, restFor: null });
+  };
+
   const skipSet = () => {
     const next = nextIndex(steps, run.stepIndex);
+    // Landing in another group sets it up, with the running clock kept and no target (#674).
+    if (endsGroup(steps, run.stepIndex, next)) {
+      go({ phase: 'setup', stepIndex: next, restTarget: 0, alertedAt: null });
+      return;
+    }
     if (next >= 0) {
       go({ stepIndex: next });
       return;
@@ -548,6 +623,16 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
   const restElapsed = secondsSince(run.restStartedAt, now);
   const view = restView(restElapsed, run.restTarget);
 
+  // The round the rest (or setup) follows, to log: its performed sets, newest first.
+  const card = restFor
+    ? roundUpTo(steps, restFor.index)
+        .filter((s) => s.index === restFor.index || isStepLogged(s.row))
+        .reverse()
+    : [];
+  const inCard = new Set(card.map((s) => s.key));
+  const earlier = steps.filter((s) => !inCard.has(s.key) && isStepLogged(s.row) && !s.row.effort).length;
+  const logCard = token && <LogCard items={card} workoutId={workoutId} token={token} earlierWithoutEffort={earlier} />;
+
   let body: JSX.Element | null = null;
   let primary: { label: string; onClick: () => void; warn?: boolean; disabled?: boolean } | null = null;
   let secondary: { label: string; onClick: () => void; disabled?: boolean } | null = null;
@@ -600,14 +685,17 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
       if (step) {
         const target = restTargetOf(step.row);
         const nxt = nextIndex(steps, step.index);
+        const groupEnds = endsGroup(steps, step.index, nxt);
         const nextLine =
           nxt < 0
             ? "That's the last set. Done opens the finish."
-            : !step.lastInRound && step.nextInRound
-              ? `Then switch to ${step.nextInRound.row.exercise_name} (${formatMSS(target)})`
-              : target > 0
-                ? `Then rest ${formatMSS(target)}, next ${steps[nxt].row.exercise_name}`
-                : `Then next ${steps[nxt].row.exercise_name}`;
+            : groupEnds
+              ? `Then set up ${groupName(steps[nxt].section)}`
+              : !step.lastInRound && step.nextInRound
+                ? `Then switch to ${step.nextInRound.row.exercise_name} (${formatMSS(target)})`
+                : target > 0
+                  ? `Then rest ${formatMSS(target)}, next ${steps[nxt].row.exercise_name}`
+                  : `Then next ${steps[nxt].row.exercise_name}`;
         body = (
           <SetScreen
             step={step}
@@ -616,17 +704,34 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
             nextLine={nextLine}
           />
         );
-        primary = { label: doneLabel(step, isLastSet), onClick: doneSet };
+        primary = { label: doneLabel(step, isLastSet, groupEnds), onClick: doneSet };
+      }
+      break;
+    case 'setup':
+      if (step) {
+        body = (
+          <SetupScreen
+            steps={steps}
+            section={step.section}
+            exercises={setupExercises(steps, step.section, workoutId)}
+            clock={run.restStartedAt === null ? null : formatMSS(restElapsed)}
+            weights={held.at === step.key ? held.weights : {}}
+            onWeight={(key, weight) =>
+              setHeld((h) => ({ at: step.key, weights: { ...(h.at === step.key ? h.weights : {}), [key]: weight } }))
+            }
+            disabled={startingGroup}
+          >
+            {logCard}
+          </SetupScreen>
+        );
+        primary = {
+          label: startingGroup ? 'Starting…' : `Start ${groupName(step.section)}`,
+          onClick: () => void startGroup(),
+          disabled: startingGroup,
+        };
       }
       break;
     case 'rest': {
-      const card = restFor
-        ? roundUpTo(steps, restFor.index)
-            .filter((s) => s.index === restFor.index || isStepLogged(s.row))
-            .reverse()
-        : [];
-      const inCard = new Set(card.map((s) => s.key));
-      const earlier = steps.filter((s) => !inCard.has(s.key) && isStepLogged(s.row) && !s.row.effort).length;
       body = (
         <div class="lift-content">
           <RestHero
@@ -636,7 +741,7 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
             view={view}
             final={finalRest}
           />
-          {token && <LogCard items={card} workoutId={workoutId} token={token} earlierWithoutEffort={earlier} />}
+          {logCard}
           {step && !finalRest && <UpNextCard step={step} last={last} inRound={switching} />}
         </div>
       );
@@ -684,7 +789,8 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
     secondary = { label: 'Back', onClick: () => setSummaryAt(null), disabled: finishing };
   }
 
-  const inSets = (run.phase === 'set' || run.phase === 'rest' || run.phase === 'ready') && !finalRest;
+  const inSets =
+    (run.phase === 'set' || run.phase === 'rest' || run.phase === 'ready' || run.phase === 'setup') && !finalRest;
   return (
     <div class="lift screen">
       <LiftHeader
@@ -727,6 +833,7 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
         <AllSetsSheet
           steps={steps}
           current={inSets && step ? step.index : null}
+          setup={run.phase === 'setup'}
           workoutId={workoutId}
           token={token}
           onClose={() => setShowAll(false)}

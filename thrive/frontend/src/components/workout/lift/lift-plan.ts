@@ -3,7 +3,9 @@
 
 import type { SetWithRow } from '../../../api/types';
 import { SWITCH_SECTIONS, formatMSS } from '../../../api/rest-times';
-import { getLastTimeData } from '../last-time-data';
+import { getLastTimeDataFrom, type LastTimeResult } from '../last-time-data';
+import { sets, workouts } from '../../../state/store';
+import { sectionTitle } from '../../activities/exercise-detail';
 
 /** Sections that are not working sets: a checklist before, and one after. */
 export const isWorkingSection = (section: string): boolean => section !== 'warmup' && section !== 'cooldown';
@@ -114,9 +116,13 @@ export function restTargetOf(row: Pick<SetWithRow, 'rest_target_s'>): number {
   return Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
 }
 
-/** "Done · rest 1:30", "Done · switch", "Done · finish", or "Done" when the target is blank. */
-export function doneLabel(step: LiftStep, isLast: boolean): string {
+/**
+ * "Done · rest 1:30", "Done · switch", "Done · finish", "Done · set up next"
+ * when the next set opens another group (#674), or "Done" when the target is blank.
+ */
+export function doneLabel(step: LiftStep, isLast: boolean, endsGroup = false): string {
   if (isLast) return 'Done · finish';
+  if (endsGroup) return 'Done · set up next';
   const target = restTargetOf(step.row);
   if (!target) return 'Done';
   return step.lastInRound ? `Done · rest ${formatMSS(target)}` : 'Done · switch';
@@ -136,8 +142,18 @@ export interface LastTime {
   any: boolean;
 }
 
+/**
+ * The exercise's most recent earlier session: `getLastTimeData` over workouts
+ * that were done, so a planned one (today's, or one scheduled ahead) with
+ * nothing lifted yet is never "last time" (#674).
+ */
+export function lastSession(exerciseId: string, workoutId: string): LastTimeResult | null {
+  const done = workouts.value.filter((w) => w.status !== 'planned');
+  return getLastTimeDataFrom(exerciseId, workoutId, sets.value, done);
+}
+
 export function lastTimeFor(row: Pick<SetWithRow, 'exercise_id' | 'set_number'>, workoutId: string): LastTime {
-  const data = getLastTimeData(row.exercise_id, workoutId);
+  const data = lastSession(row.exercise_id, workoutId);
   if (!data) return { set: null, any: false };
   return { set: data.sets.find((s) => s.set_number === row.set_number) ?? null, any: true };
 }
@@ -258,4 +274,125 @@ export function summaryTotals(steps: readonly LiftStep[]): SummaryTotals {
 /** "+0:12" or "−0:05" (a true minus sign). */
 export function signedMSS(s: number): string {
   return `${s < 0 ? '−' : '+'}${formatMSS(Math.abs(s))}`;
+}
+
+// ── Set up next (#674) ──────────────────────────────────────────────
+
+/** Whether `next` is in another working section than the step at `from`: the set at `from` ends its group. */
+export function endsGroup(steps: readonly LiftStep[], from: number, next: number): boolean {
+  return next >= 0 && !!steps[from] && steps[next].section !== steps[from].section;
+}
+
+/**
+ * Whether a run opening at `index` (a start, the warm-up's end, a reload with
+ * nothing stored, a switch from Logbook) opens on Set up next: no set of its
+ * section is logged yet. Part-way through a section, Ready is shown instead.
+ */
+export function opensGroup(steps: readonly LiftStep[], index: number): boolean {
+  const at = steps[index];
+  return !!at && !steps.some((s) => s.section === at.section && isStepLogged(s.row));
+}
+
+/** "Primary", "Superset 1", "Burnout": the group's name, for its heading and its Start button. */
+export const groupName = (section: string): string => sectionTitle(section);
+
+/** A weight as the setup field holds it: a number at or above 0 as text, or '' for none. */
+export function cleanWeight(weight: string): string {
+  const n = Number(weight);
+  if (weight.trim() === '' || !Number.isFinite(n) || n <= 0) return '';
+  return String(Number(n.toFixed(2)));
+}
+
+export interface SetupExercise {
+  /** `exercise_id|exercise_order`: one card. */
+  key: string;
+  exercise_id: string;
+  exercise_order: number;
+  name: string;
+  letter: string;
+  /** The exercise's rows in this workout, by set number. */
+  rows: SetWithRow[];
+  /** "3 × 10", "3 sets · 10, 8, 6" or "3 sets". */
+  plan: string;
+  /** "95 lb" or "95–105 lb" when any row carries a weight, else ''. */
+  planned: string;
+  last: LastTimeResult | null;
+  /** Planned set 1 weight, else last time's set 1, else ''. */
+  startWeight: string;
+  /** Every set of it is logged: nothing to set up. */
+  allLogged: boolean;
+}
+
+/** The group's exercises in run order, with what each card shows. */
+export function setupExercises(steps: readonly LiftStep[], section: string, workoutId: string): SetupExercise[] {
+  const out: SetupExercise[] = [];
+  for (const step of steps) {
+    if (step.section !== section) continue;
+    const key = `${step.row.exercise_id}|${step.row.exercise_order}`;
+    let ex = out.find((e) => e.key === key);
+    if (!ex) {
+      ex = {
+        key,
+        exercise_id: step.row.exercise_id,
+        exercise_order: step.row.exercise_order,
+        name: step.row.exercise_name,
+        letter: step.letter,
+        rows: [],
+        plan: '',
+        planned: '',
+        last: null,
+        startWeight: '',
+        allLogged: true,
+      };
+      out.push(ex);
+    }
+    ex.rows.push(step.row);
+    if (!isStepLogged(step.row)) ex.allLogged = false;
+  }
+  out.sort((a, b) => a.exercise_order - b.exercise_order);
+  for (const ex of out) {
+    ex.rows.sort((a, b) => a.set_number - b.set_number);
+    ex.plan = planLine(ex.rows);
+    ex.planned = plannedWeight(ex.rows);
+    ex.last = lastSession(ex.exercise_id, workoutId);
+    const lastFirst = ex.last?.sets.find((s) => s.set_number === 1) ?? ex.last?.sets[0];
+    ex.startWeight = cleanWeight(ex.rows[0]?.weight ?? '') || cleanWeight(lastFirst?.weight ?? '');
+  }
+  return out;
+}
+
+/** "3 × 10" when every set plans the same reps, "3 sets · 10, 8, 6" when they differ, "3 sets" with none. */
+export function planLine(rows: readonly Pick<SetWithRow, 'planned_reps'>[]): string {
+  const n = rows.length;
+  const reps = rows.map((r) => r.planned_reps.trim());
+  const sets = `${n} ${n === 1 ? 'set' : 'sets'}`;
+  if (reps.every((r) => r === '')) return sets;
+  if (reps.every((r) => r === reps[0])) return `${n} × ${reps[0]}`;
+  return `${sets} · ${reps.map((r) => r || '—').join(', ')}`;
+}
+
+/** "95 lb", "95–105 lb", or '' when no row carries a weight (never "0 lb"). */
+export function plannedWeight(rows: readonly Pick<SetWithRow, 'weight'>[]): string {
+  const ws = rows.map((r) => Number(cleanWeight(r.weight))).filter((n) => n > 0);
+  if (ws.length === 0) return '';
+  const lo = Math.min(...ws);
+  const hi = Math.max(...ws);
+  return lo === hi ? `${lo} lb` : `${lo}–${hi} lb`;
+}
+
+/** "Oct 21", with the year when it is not this year's. */
+export function shortDate(iso: string, now = new Date()): string {
+  const d = new Date(`${iso}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  const sameYear = d.getFullYear() === now.getFullYear();
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }) });
+}
+
+/** "2 exercises · 3 rounds" for a superset or burnout, "4 sets" elsewhere. */
+export function groupMeta(steps: readonly LiftStep[], section: string): string {
+  const mine = steps.filter((s) => s.section === section);
+  if (!SWITCH_SECTIONS.includes(section)) return `${mine.length} ${mine.length === 1 ? 'set' : 'sets'}`;
+  const exercises = new Set(mine.map((s) => s.row.exercise_order)).size;
+  const rounds = new Set(mine.map((s) => s.row.set_number)).size;
+  return `${exercises} ${exercises === 1 ? 'exercise' : 'exercises'} · ${rounds} ${rounds === 1 ? 'round' : 'rounds'}`;
 }

@@ -105,6 +105,17 @@ const advance = async (ms: number) => {
   });
 };
 const clock = (c: Element, role = 'timer') => c.querySelector(`[role="${role}"]`)?.textContent;
+/** #674: Start <group> on Set up next, which flushes and writes before it opens the set. */
+const startGroup = async (c: Element) => {
+  const b = [...c.querySelectorAll<HTMLElement>('.lift-actions button')].find((x) =>
+    /^Start (Primary|Superset \d|Burnout)$/.test(x.textContent?.trim() ?? ''),
+  );
+  if (!b) throw new Error(`No Start <group> in: ${text(c)}`);
+  fireEvent.click(b);
+  await act(async () => {
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+  });
+};
 
 const vibrate = vi.fn();
 
@@ -224,22 +235,29 @@ describe('the warm-up', () => {
     expect(saveSet).toHaveBeenLastCalledWith(expect.objectContaining({ reps: '' }), 'tok', 2);
   });
 
-  it('Start working sets shows the first working set as Up next', async () => {
+  it('Start working sets opens Set up next for the first group, with no since-last-set clock', async () => {
     const { container } = render(<LiftMode workoutId={W} />);
     await click(container, 'Start workout');
     await click(container, 'Start working sets');
-    expect(text(container)).toContain('UP NEXT');
+    expect(container.querySelector('.lift-setup-title')?.textContent).toBe('Set up');
     expect(text(container)).toContain('OH Press');
-    expect(text(container)).toContain('Set 1 of 2');
-    expect(text(container)).toContain('Working sets. Tap Start set');
+    expect(container.querySelector('.lift-setup-since')).toBeNull();
+    expect(container.querySelector('[role="timer"]')).toBeNull();
+    expect(byText(container, 'Start Primary')).toBeDefined();
+    expect(byText(container, 'Skip set')).toBeUndefined();
+    expect(loadRun(W)?.phase).toBe('setup');
   });
 
-  it('a workout with no warm-up goes straight to its first working set', async () => {
+  it('a workout with no warm-up goes straight to Set up next for its first group', async () => {
     withoutWarmup(() => (sets.value = plan().slice(1)));
     const { container } = render(<LiftMode workoutId={W} />);
     await click(container, 'Start workout');
-    expect(text(container)).toContain('UP NEXT');
-    expect(text(container)).toContain('OH Press');
+    expect(container.querySelector('.lift-setup-title')?.textContent).toBe('Set up');
+    expect(container.querySelector('.lift-setup-since')).toBeNull();
+    await startGroup(container);
+    expect(container.querySelector('.lift-exercise')?.textContent).toBe('OH Press');
+    expect(text(container)).toContain('Set 1 of 2');
+    expect(clock(container)).toBe('0:00');
   });
 });
 
@@ -248,7 +266,7 @@ describe('a set and its rest', () => {
     withoutWarmup(() => (sets.value = plan().slice(1)));
     const view = render(<LiftMode workoutId={W} />);
     await click(view.container, 'Start workout');
-    await click(view.container, 'Start set');
+    await startGroup(view.container);
     return view;
   }
 
@@ -308,7 +326,7 @@ describe('a set and its rest', () => {
     );
     const { container } = render(<LiftMode workoutId={W} />);
     await click(container, 'Start workout');
-    await click(container, 'Start set');
+    await startGroup(container);
     expect(byText(container, 'Done')).toBeDefined();
     await click(container, 'Done');
     await advance(600_000);
@@ -328,15 +346,19 @@ describe('a set and its rest', () => {
     expect(clock(container)).toBe('0:00');
   });
 
-  it('Skip set leaves the next set unlogged and the rest clock running', async () => {
+  it('Skip set into another group opens its Set up next, with the clock still running', async () => {
     const { container } = await startFirstSet();
     await click(container, 'Done · rest 1:30');
     await advance(10_000);
     await click(container, 'Skip set');
-    // Set 2 is passed over: the rest goes on, and Up next is the following set (the superset's A).
-    expect(container.querySelector('.lift-next-exercise')?.textContent).toBe('Arnold');
+    // Set 2 is passed over, and the set after it opens the superset: setup, not Up next.
+    expect(container.querySelector('.lift-next')).toBeNull();
+    expect(container.querySelector('.lift-hero')).toBeNull();
+    expect(container.querySelector('.lift-setup-title')?.textContent).toBe('Set up');
+    expect(text(container)).toContain('Superset 1');
     expect(clock(container)).toBe('0:10');
-    expect(container.querySelector('.lift-hero-label')?.textContent).toBe('Rest');
+    await advance(120_000);
+    expect(vibrate).not.toHaveBeenCalled();
     const skipped = sets.value.find((s) => s.sheetRow === 4)!;
     expect(skipped.reps).toBe('');
     expect(skipped.set_s).toBe('');
@@ -346,7 +368,7 @@ describe('a set and its rest', () => {
     withoutWarmup(() => (sets.value = plan().slice(3)));
     const { container } = render(<LiftMode workoutId={W} />);
     await click(container, 'Start workout');
-    await click(container, 'Start set');
+    await startGroup(container);
     expect(text(container)).toContain('Superset 1 · A');
     expect(text(container)).toContain('Then switch to Lateral (0:15)');
     await click(container, 'Done · switch');
@@ -362,7 +384,7 @@ describe('logging during a rest', () => {
     withoutWarmup(() => (sets.value = plan().slice(1)));
     const view = render(<LiftMode workoutId={W} />);
     await click(view.container, 'Start workout');
-    await click(view.container, 'Start set');
+    await startGroup(view.container);
     await advance(30_000);
     await click(view.container, 'Done · rest 1:30');
     return view;
@@ -406,7 +428,7 @@ describe('logging during a rest', () => {
     withoutWarmup(() => (sets.value = plan().slice(3)));
     const { container } = render(<LiftMode workoutId={W} />);
     await click(container, 'Start workout');
-    await click(container, 'Start set');
+    await startGroup(container);
     await click(container, 'Done · switch');
     await click(container, 'Start set');
     await click(container, 'Done · finish');
@@ -429,7 +451,7 @@ describe('the log card for a round', () => {
     });
     const { container } = render(<LiftMode workoutId={W} />);
     await click(container, 'Start workout');
-    await click(container, 'Start set');
+    await startGroup(container);
     await click(container, 'Done · switch');
     // One set so far: its own heading, and the switch is the rest being taken.
     expect(text(container)).toContain('Log the set you just did');
@@ -556,7 +578,7 @@ describe('the wake lock', () => {
       await Promise.resolve();
     });
     expect(request).toHaveBeenCalled();
-    expect(text(again.container)).toContain('UP NEXT');
+    expect(text(again.container)).toContain('Set up');
     expect(container).toBeDefined();
   });
 });
@@ -762,7 +784,7 @@ describe('the summary', () => {
     withoutWarmup(() => (sets.value = plan().slice(1)));
     const { container } = render(<LiftMode workoutId={W} />);
     await click(container, 'Start workout');
-    await click(container, 'Start set');
+    await startGroup(container);
     await click(container, 'Done · rest 1:30');
     await advance(20_000);
     await openSummary(container);
@@ -777,7 +799,7 @@ describe('the summary', () => {
     withoutWarmup(() => (sets.value = plan().slice(4)));
     workouts.value = [workout('active')];
     const { container } = render(<LiftMode workoutId={W} />);
-    await click(container, 'Start set');
+    await startGroup(container);
     await advance(30_000);
     await click(container, 'Done · finish');
     expect(text(container)).toContain('Session effort');
@@ -800,7 +822,7 @@ describe('the summary', () => {
     });
     workouts.value = [workout('active')];
     const { container } = render(<LiftMode workoutId={W} />);
-    await click(container, 'Start set');
+    await startGroup(container);
     await click(container, 'Done · finish');
     expect(text(container)).toContain('Cool-down');
     expect(text(container)).not.toContain('Session effort');
@@ -841,7 +863,7 @@ describe('All sets', () => {
     });
     const { container } = render(<LiftMode workoutId={W} />);
     await click(container, 'Start workout');
-    await click(container, 'Start set');
+    await startGroup(container);
     await click(container, 'Done · rest 1:30');
     await click(container, 'Skip set');
     await click(container, 'All sets');
@@ -859,7 +881,7 @@ describe('finishing', () => {
     withoutWarmup(() => (sets.value = plan().slice(4)));
     workouts.value = [workout('active')];
     const { container } = render(<LiftMode workoutId={W} />);
-    await click(container, 'Start set');
+    await startGroup(container);
     expect(text(container)).toContain("That's the last set. Done opens the finish.");
     await click(container, 'Done · finish');
     expect(container.querySelector('[role="dialog"]')).toBeNull();
@@ -886,7 +908,7 @@ describe('switching with the tracker (#579)', () => {
     withoutWarmup(() => (sets.value = plan().slice(1)));
     workouts.value = [workout('active')];
     const { container } = render(<LiftMode workoutId={W} />);
-    await click(container, 'Start set');
+    await startGroup(container);
     await click(container, 'Done · rest 1:30');
     await advance(20_000);
     expect(loadRun(W)?.phase).toBe('rest');
@@ -992,5 +1014,267 @@ describe('switching with the tracker (#579)', () => {
     );
     const { container } = render(<LiftMode workoutId={W} />);
     expect(byText(container, 'Save workout')).toBeUndefined();
+  });
+});
+
+describe('Set up next (#674)', () => {
+  /**
+   * Primary (OH Press ×2, planned 90 lb), then a superset: Arnold (no planned weight, last time 40 and 45),
+   * Lateral (planned 25 lb, no history) and Face Pull (neither). Arnold's set 2 was logged in Logbook.
+   */
+  function group(opts: { arnold2Logged?: boolean } = {}) {
+    withoutWarmup(() => {
+      rowNo = 3;
+      sets.value = [
+        mk('primary', 2, 'OH Press', 1, { rest_target_s: '90', weight: '90' }),
+        mk('primary', 2, 'OH Press', 2, { rest_target_s: '90', weight: '90' }),
+        mk('SS1', 3, 'Arnold', 1, { planned_reps: '10', rest_target_s: '15' }),
+        mk('SS1', 3, 'Arnold', 2, {
+          planned_reps: '10',
+          rest_target_s: '15',
+          ...(opts.arnold2Logged ? { reps: '8' } : {}),
+        }),
+        mk('SS1', 4, 'Lateral', 1, { planned_reps: '12', weight: '25', rest_target_s: '15' }),
+        mk('SS1', 4, 'Lateral', 2, { planned_reps: '12', weight: '25', rest_target_s: '15' }),
+        mk('SS1', 5, 'Face Pull', 1, { planned_reps: '15', rest_target_s: '45' }),
+        mk('SS1', 5, 'Face Pull', 2, { planned_reps: '15', rest_target_s: '45' }),
+        // Last time, in another workout.
+        {
+          ...mk('SS1', 3, 'Arnold', 1, { weight: '40', reps: '10', effort: 'Medium' }),
+          workout_id: 'w0',
+          sheetRow: 101,
+        },
+        { ...mk('SS1', 3, 'Arnold', 2, { weight: '45', reps: '8' }), workout_id: 'w0', sheetRow: 102 },
+      ];
+    });
+    workouts.value = [workout('active'), { ...workout(''), id: 'w0', date: '2026-10-15', sheetRow: 3 }];
+    // As the real saveSet does: the store follows the write.
+    saveSet.mockImplementation(async (set: unknown) => {
+      const w = set as SetWithRow;
+      sets.value = sets.value.map((r) => (r.sheetRow === w.sheetRow ? { ...r, ...w } : r));
+      return w;
+    });
+  }
+
+  /** Through the primary to Done on its last set, 30 s after the set started. */
+  async function toSetup() {
+    group();
+    const view = render(<LiftMode workoutId={W} />);
+    await startGroup(view.container);
+    await click(view.container, 'Done · rest 1:30');
+    await click(view.container, 'Start set');
+    await advance(30_000);
+    await click(view.container, 'Done · set up next');
+    return view;
+  }
+  const card = (c: Element, name: string) =>
+    [...c.querySelectorAll<HTMLElement>('.lift-setup-card')].find((x) => text(x).includes(name))!;
+  const field = (c: Element, name: string) =>
+    c.querySelector<HTMLInputElement>(`input[aria-label="Weight for ${name}"]`);
+  const press = async (el: Element, label: string) => {
+    fireEvent.click(el.querySelector(`[aria-label="${label}"]`)!);
+    await act(async () => {
+      await Promise.resolve();
+    });
+  };
+
+  it('opens before the first group with Start Primary and no clock', () => {
+    group();
+    const { container } = render(<LiftMode workoutId={W} />);
+    expect(container.querySelector('.lift-setup-title')?.textContent).toBe('Set up');
+    expect(text(container.querySelector('.lift-setup-head')!)).toContain('2 sets');
+    expect(container.querySelector('.lift-setup-since')).toBeNull();
+    expect(container.querySelector('[aria-label="Log"]')).toBeNull();
+    expect(byText(container, 'Start Primary')).toBeDefined();
+  });
+
+  it('the set screen at the end of a section reads set up next; the last set still reads finish', async () => {
+    group();
+    const { container } = render(<LiftMode workoutId={W} />);
+    await startGroup(container);
+    expect(byText(container, 'Done · rest 1:30')).toBeDefined();
+    await click(container, 'Done · rest 1:30');
+    await click(container, 'Start set');
+    expect(text(container)).toContain('Then set up Superset 1');
+    expect(byText(container, 'Done · set up next')).toBeDefined();
+  });
+
+  it('Done on the last set of a section opens setup: no ring, target, toast or vibration, however long', async () => {
+    const { container } = await toSetup();
+    expect(container.querySelector('.lift-hero')).toBeNull();
+    expect(container.querySelector('.lift-ring')).toBeNull();
+    expect(container.querySelector('.lift-next')).toBeNull();
+    expect(text(container)).not.toContain('Target');
+    expect(text(container)).toContain('Since last set');
+    expect(clock(container)).toBe('0:00');
+    expect(byText(container, 'Skip set')).toBeUndefined();
+    await advance(754_000);
+    expect(clock(container)).toBe('12:34');
+    expect(vibrate).not.toHaveBeenCalled();
+    expect(container.querySelector('.lift-toast')).toBeNull();
+    expect(container.querySelector('.lift-btn-warn')).toBeNull();
+    expect(loadRun(W)?.phase).toBe('setup');
+  });
+
+  it('lists every exercise of the superset in run order with its letter, plan and planned weight', async () => {
+    const { container } = await toSetup();
+    expect(text(container.querySelector('.lift-setup-head')!)).toContain('Superset 1');
+    expect(text(container.querySelector('.lift-setup-head')!)).toContain('3 exercises · 2 rounds');
+    const names = [...container.querySelectorAll('.lift-setup-name')].map((n) => n.textContent);
+    expect(names).toEqual(['A · Arnold', 'B · Lateral', 'C · Face Pull']);
+    expect(card(container, 'Arnold').querySelector('.lift-setup-plan')?.textContent).toBe('2 × 10');
+    expect(card(container, 'Lateral').querySelector('.lift-setup-plan')?.textContent).toBe('2 × 12 · planned 25 lb');
+    expect(card(container, 'Face Pull').querySelector('.lift-setup-plan')?.textContent).toBe('2 × 15');
+    expect(byText(container, 'Start Superset 1')).toBeDefined();
+  });
+
+  it('shows last session by set with its date and effort, or first time', async () => {
+    const { container } = await toSetup();
+    const arnold = card(container, 'Arnold');
+    expect(arnold.querySelector('.lift-setup-last-label')?.textContent).toBe('Last time · Oct 15');
+    const rows = [...arnold.querySelectorAll('.lift-setup-last-row')];
+    expect(rows.map((r) => r.querySelector('.lift-setup-last-figures')?.textContent)).toEqual(['40 × 10', '45 × 8']);
+    expect(rows[0].querySelector('.lift-setup-effort')?.textContent).toBe('Medium');
+    expect(rows[1].querySelector('.lift-setup-effort')).toBeNull();
+    expect(text(card(container, 'Lateral'))).toContain('First time doing this exercise');
+  });
+
+  it('a planned workout with nothing lifted is never last time', async () => {
+    group();
+    rowNo = 200;
+    sets.value = [...sets.value, { ...mk('SS1', 3, 'Arnold', 1), workout_id: 'w9' }];
+    workouts.value = [...workouts.value, { ...workout('planned'), id: 'w9', date: '2026-10-29', sheetRow: 9 }];
+    const { container } = render(<LiftMode workoutId={W} />);
+    await startGroup(container);
+    await click(container, 'Done · rest 1:30');
+    await click(container, 'Start set');
+    await click(container, 'Done · set up next');
+    expect(card(container, 'Arnold').querySelector('.lift-setup-last-label')?.textContent).toBe('Last time · Oct 15');
+    expect(field(container, 'Arnold')?.value).toBe('40');
+  });
+
+  it('weights start at planned, else last time set 1, else Bodyweight with Add weight', async () => {
+    const { container } = await toSetup();
+    expect(field(container, 'Arnold')?.value).toBe('40');
+    expect(field(container, 'Lateral')?.value).toBe('25');
+    expect(field(container, 'Face Pull')).toBeNull();
+    expect(text(card(container, 'Face Pull'))).toContain('Bodyweight');
+    await click(card(container, 'Face Pull'), 'Add weight');
+    expect(field(container, 'Face Pull')?.value).toBe('0');
+    expect(document.activeElement).toBe(field(container, 'Face Pull'));
+  });
+
+  it('steps by 5 from 20 lb, by 1 below, never under 0, types, and marks a change', async () => {
+    const { container } = await toSetup();
+    const arnold = card(container, 'Arnold');
+    await press(arnold, 'More weight');
+    expect(field(container, 'Arnold')?.value).toBe('45');
+    expect(text(arnold)).toContain('Changed');
+    await press(arnold, 'Less weight');
+    expect(field(container, 'Arnold')?.value).toBe('40');
+    expect(text(arnold)).not.toContain('Changed');
+    const input = field(container, 'Arnold')!;
+    fireEvent.input(input, { target: { value: '18' } });
+    await press(arnold, 'More weight');
+    expect(field(container, 'Arnold')?.value).toBe('19');
+    fireEvent.input(field(container, 'Arnold')!, { target: { value: '0' } });
+    await press(arnold, 'Less weight');
+    expect(field(container, 'Arnold')?.value).toBe('0');
+    // A non-number is put back to the last good value when the field is left.
+    input.focus();
+    fireEvent.input(input, { target: { value: '62.5' } });
+    fireEvent.input(input, { target: { value: 'abc' } });
+    fireEvent.blur(input);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(field(container, 'Arnold')?.value).toBe('62.5');
+  });
+
+  it('Start writes a changed weight to every unlogged set of that exercise only, and rest_s to the last set', async () => {
+    group({ arnold2Logged: true });
+    const { container } = render(<LiftMode workoutId={W} />);
+    await startGroup(container);
+    await click(container, 'Done · rest 1:30');
+    await click(container, 'Start set');
+    await click(container, 'Done · set up next');
+    await advance(83_000);
+    fireEvent.input(field(container, 'Arnold')!, { target: { value: '50' } });
+    saveSet.mockClear();
+    saveSetTimings.mockClear();
+    await startGroup(container);
+    // Arnold set 1 only: set 2 is logged, and Lateral and Face Pull were not changed.
+    expect(saveSet).toHaveBeenCalledTimes(1);
+    expect(saveSet).toHaveBeenCalledWith(
+      expect.objectContaining({ exercise_name: 'Arnold', set_number: 1, weight: '50' }),
+      'tok',
+      5,
+    );
+    expect(sets.value.find((s) => s.sheetRow === 6)?.weight).toBe('');
+    expect(saveSetTimings).toHaveBeenCalledWith([{ sheetRow: 4, patch: { rest_s: '83' } }], 'tok');
+    expect(container.querySelector('.lift-exercise')?.textContent).toBe('Arnold');
+    expect(text(container)).toContain('Set 1 of 2 · 10 reps · 50 lb');
+    expect(clock(container)).toBe('0:00');
+  });
+
+  it('an unchanged group writes no weight', async () => {
+    const { container } = await toSetup();
+    saveSet.mockClear();
+    await startGroup(container);
+    expect(saveSet).not.toHaveBeenCalled();
+    expect(container.querySelector('.lift-exercise')?.textContent).toBe('Arnold');
+  });
+
+  it('the previous round log card follows the setup cards and saves as on the rest screen', async () => {
+    const { container } = await toSetup();
+    const log = container.querySelector('[aria-label="Log"]')!;
+    expect(text(log)).toContain('Log the set you just did');
+    const cards = [...container.querySelectorAll('.lift-content > .lift-card')];
+    expect(cards.indexOf(log)).toBe(cards.length - 1);
+    await click(log, 'Hard');
+    expect(saveSet).toHaveBeenLastCalledWith(
+      expect.objectContaining({ exercise_name: 'OH Press', set_number: 2, effort: 'Hard' }),
+      'tok',
+      4,
+    );
+  });
+
+  it('a reload returns to the same setup with the clock from the original Done', async () => {
+    const first = await toSetup();
+    await advance(45_000);
+    first.unmount();
+    cleanup();
+    const { container } = render(<LiftMode workoutId={W} />);
+    await advance(300);
+    expect(container.querySelector('.lift-setup-title')?.textContent).toBe('Set up');
+    expect(byText(container, 'Start Superset 1')).toBeDefined();
+    expect(clock(container)).toBe('0:45');
+  });
+
+  it('switching from Logbook at the start of a group opens its setup', () => {
+    group();
+    sets.value = sets.value.map((s) =>
+      s.workout_id === W && s.section === 'primary' ? { ...s, reps: '8', effort: 'Easy' as const } : s,
+    );
+    window.localStorage.setItem(runKey(W), JSON.stringify({ phase: 'rest', stepIndex: 1, sessionStartedAt: 1 }));
+    resetRun(W);
+    const { container } = render(<LiftMode workoutId={W} />);
+    expect(container.querySelector('.lift-setup-title')?.textContent).toBe('Set up');
+    expect(byText(container, 'Start Superset 1')).toBeDefined();
+    expect(container.querySelector('[role="timer"]')).toBeNull();
+  });
+
+  it('a burnout group is started with Start Burnout', () => {
+    withoutWarmup(() => {
+      rowNo = 3;
+      sets.value = [mk('burnout', 1, 'Push-up', 1), mk('burnout', 2, 'Dips', 1)];
+    });
+    workouts.value = [workout('active')];
+    const { container } = render(<LiftMode workoutId={W} />);
+    expect(byText(container, 'Start Burnout')).toBeDefined();
+    expect([...container.querySelectorAll('.lift-setup-name')].map((n) => n.textContent)).toEqual([
+      'A · Push-up',
+      'B · Dips',
+    ]);
   });
 });

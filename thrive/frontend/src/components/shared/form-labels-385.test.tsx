@@ -121,7 +121,12 @@ describe('AC1/AC5: tracker edit-details panel', () => {
     activeWarmupExercises.value = [];
     workouts.value = [{ ...BIKE, type: 'weight' } as WorkoutWithRow];
     render(h(WorkoutTracker as never, { workoutId: BIKE.id, workoutName: 'Ride' }));
-    expectEffortGroup();
+    // #667: the Details card's pills (Easy, Medium, Hard) are named by the visible "Session effort" label.
+    const group = screen.getByRole('group', { name: 'Session effort' });
+    const label = document.getElementById(group.getAttribute('aria-labelledby')!)!;
+    expect(label.tagName).toBe('SPAN');
+    expect(label.classList.contains('lb-field-label')).toBe(true);
+    expect(screen.getByRole('button', { name: 'Easy' })).toBeTruthy();
     expectNoOrphanLabels();
   });
 });

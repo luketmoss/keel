@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useId } from 'preact/hooks';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useId } from 'preact/hooks';
 import {
   activeWorkoutSets,
   activeWarmupExercises,
@@ -23,11 +23,19 @@ import { ReauthFailedError } from '@keel/auth';
 import { useAuth } from '../../auth/auth-context';
 import { navigate, goBack } from '../../router/router';
 import { AddExerciseModal } from '../exercises/add-exercise-modal';
-import { FinishWorkoutModal } from './finish-modal';
+import { FinishWorkoutSheet } from './finish-modal';
 import { resetRun } from './lift/lift-run';
 import { ExerciseRow } from './exercise-row';
 import type { TrackerExercise } from './exercise-row';
-import type { TrackerSet } from './set-row';
+import { EffortPills } from './set-row';
+import type { TrackerSet, SaveStatus } from './set-row';
+import { ActionMenu } from './tracker-menu';
+import { trackerCards, progressOf, moveToSectionEnd, addToSection } from './tracker-model';
+import { sectionPills } from '../shared/section-pills';
+import { sectionTitle } from '../activities/exercise-detail';
+import { SetsRing } from '../activities/strength-summary';
+import { CloseIcon, HistoryIcon, PlusIcon, TrashIcon, NoSignalIcon } from '../activities/detail-icons';
+import { DumbbellIcon } from '../shared/icons';
 import type { ExerciseWithRow, Effort, SetWithRow } from '../../api/types';
 import { applyQuickFillWeight, applyQuickFillReps, applyQuickFillEffort } from './quick-fill';
 import { applyCopyDown } from './copy-down';
@@ -36,7 +44,6 @@ import { applyChangeSection, applyMoveUp, applyMoveDown } from './section-manage
 import { buildExerciseList, mergeWarmups } from './build-exercise-list';
 import { collectEditedSets } from './edited-sets';
 import { workoutToEditInputs, editInputsToPatch } from '../shared/edit-patch';
-import { EffortToggle } from '../shared/effort-toggle';
 import { newRowKey, useReorderFocus } from '../shared/reorder-focus';
 import type { MoveDirection } from '../shared/reorder-focus';
 import { shiftTrackerRows } from './row-shift';
@@ -108,7 +115,24 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
   const workout = workouts.value.find((w) => w.id === workoutId);
 
   const [exerciseList, setExerciseListState] = useState<TrackerExercise[]>([]);
-  const [showExercisePicker, setShowExercisePicker] = useState(false);
+  // The section the open exercise picker adds to, or null when it is closed (#667).
+  const [pickerSection, setPickerSection] = useState<string | null>(null);
+  // At most one set is open in the whole screen (#667); the Last time chip is the Exercises heading's.
+  const [openSet, setOpenSet] = useState<{ rowKey: string; setNumber: number } | null>(null);
+  const [showLastTime, setShowLastTime] = useState(false);
+  // Sets edited in this session, for the editor's status line: nothing shows before a change.
+  const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
+  // Remove set taps whose write has not finished, as state so their tiles can say so.
+  const [removingTaps, setRemovingTaps] = useState<ReadonlySet<string>>(new Set());
+  const screenRef = useRef<HTMLDivElement>(null);
+  // The row whose options button takes focus once the list has re-rendered (a section change rebuilds the row).
+  const focusRow = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    const key = focusRow.current;
+    if (!key) return;
+    focusRow.current = null;
+    screenRef.current?.querySelector<HTMLElement>(`[data-row-key="${key}"] [data-options-btn]`)?.focus();
+  });
   const [finishing, setFinishing] = useState(false);
   const [notes, setNotes] = useState(editMode ? workout?.notes || '' : '');
   const [showFinishForm, setShowFinishForm] = useState(false);
@@ -125,6 +149,15 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
     listRef.current = next;
     setExerciseListState(next);
   }, []);
+
+  const touchKey = (rowKey: string | undefined, setNumber: number) => `${rowKey ?? ''}|${setNumber}`;
+  const touch = (keys: string[]) => setTouched((prev) => new Set([...prev, ...keys]));
+  const untouch = (key: string) =>
+    setTouched((prev) => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
 
   // #394: the tracker's writes to Sets rows (deletes and the debounced save)
   // go out one at a time, in the order asked for (`trackerWrites`). Each step
@@ -281,7 +314,8 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
           try {
             await saveOwnRow(exKey, set.set_number);
           } catch {
-            // Error toast shown by saveSet action
+            // Error toast shown by saveSet action. A set that did not save shows no status (#667).
+            untouch(touchKey(exKey, set.set_number));
           }
         });
       }, 1000);
@@ -291,12 +325,16 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
     [token, workoutId, editMode],
   );
 
+  const findExercise = (exerciseId: string, exerciseOrder: number) =>
+    listRef.current.find((e) => e.exercise_id === exerciseId && e.exercise_order === exerciseOrder);
+
   const handleUpdateSet = (
     exerciseId: string,
     exerciseOrder: number,
     setNumber: number,
     updates: Partial<TrackerSet>,
   ) => {
+    touch([touchKey(findExercise(exerciseId, exerciseOrder)?.rowKey, setNumber)]);
     updateList((prev) => {
       const next = prev.map((ex) => {
         if (ex.exercise_id !== exerciseId || ex.exercise_order !== exerciseOrder) return ex;
@@ -371,6 +409,21 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
   };
 
   /**
+   * Same for all sets (#667): the open set's weight, reps and effort go to every set of its exercise through
+   * today's quick-fill, which also overwrote every set. A blank field leaves the others as they are.
+   */
+  const handleSameForAll = (exerciseId: string, exerciseOrder: number, setNumber: number) => {
+    const ex = findExercise(exerciseId, exerciseOrder);
+    const source = ex?.sets.find((s) => s.set_number === setNumber);
+    if (!ex || !source) return;
+    handleQuickFillWeight(exerciseId, exerciseOrder, source.weight);
+    handleQuickFillReps(exerciseId, exerciseOrder, source.reps);
+    handleQuickFillEffort(exerciseId, exerciseOrder, source.effort);
+    touch(ex.sets.map((s) => touchKey(ex.rowKey, s.set_number)));
+    showToast(`Copied to all ${ex.sets.length} sets of ${ex.exercise_name}`, 'success');
+  };
+
+  /**
    * Remove sets from one exercise in log mode (#394): Remove set, Copy-down
    * onto fewer sets, Change section to warmup, Remove exercise. Runs as one
    * tracker write. Each row is deleted bottom to top, reading the exercise
@@ -441,9 +494,6 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
     });
   };
 
-  const findExercise = (exerciseId: string, exerciseOrder: number) =>
-    listRef.current.find((e) => e.exercise_id === exerciseId && e.exercise_order === exerciseOrder);
-
   const handleCopyDown = async (exerciseId: string, exerciseOrder: number, lastTimeSets: SetWithRow[]) => {
     const ex = findExercise(exerciseId, exerciseOrder);
     if (!ex?.rowKey) return;
@@ -478,6 +528,12 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
   };
 
   const handleAddSet = (exerciseId: string, exerciseOrder: number) => {
+    const target = findExercise(exerciseId, exerciseOrder);
+    if (target?.rowKey) {
+      // The new set opens (#667).
+      const maxNum = target.sets.reduce((max, s) => Math.max(max, s.set_number), 0);
+      setOpenSet({ rowKey: target.rowKey, setNumber: maxNum + 1 });
+    }
     updateList((prev) =>
       prev.map((ex) => {
         if (ex.exercise_id !== exerciseId || ex.exercise_order !== exerciseOrder) return ex;
@@ -508,6 +564,9 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
       removedSets: e.sets.filter((s) => s.set_number === setNumber),
     });
 
+    // The editor closes with the set (#667).
+    setOpenSet((open) => (open && open.rowKey === ex.rowKey && open.setNumber === setNumber ? null : open));
+
     // In edit mode, just remove from local state — deletion happens on save
     if (editMode) {
       applyRemoval(ex.rowKey, removal);
@@ -518,10 +577,12 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
     const tap = `${ex.rowKey}|${setNumber}`;
     if (pendingRemovals.current.has(tap)) return;
     pendingRemovals.current.add(tap);
+    setRemovingTaps(new Set(pendingRemovals.current));
     try {
       await runRemoval(ex.rowKey, removal);
     } finally {
       pendingRemovals.current.delete(tap);
+      setRemovingTaps(new Set(pendingRemovals.current));
     }
   };
 
@@ -529,13 +590,22 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
     if (!token) return;
     const ex = findExercise(exerciseId, exerciseOrder);
     if (!ex?.rowKey) return;
+    const rowKey = ex.rowKey;
 
-    const removal: Removal = (list, e) => applyChangeSection(list, e.exercise_id, e.exercise_order, newSection);
+    // The exercise goes to the end of its new section's card, which is created when the section is new
+    // (#667, #640); the orders of the rest follow the drawn order.
+    const removal: Removal = (list, e) => {
+      const changed = applyChangeSection(list, e.exercise_id, e.exercise_order, newSection);
+      return { exercises: moveToSectionEnd(changed.exercises, rowKey), removedSets: changed.removedSets };
+    };
+    focusRow.current = rowKey;
+    const moved = () => showToast(`Moved to ${sectionTitle(newSection)}`, 'success');
 
     // In edit mode, don't delete from API
     if (editMode || removal(listRef.current, ex).removedSets.length === 0) {
       const before = listRef.current;
-      applyRemoval(ex.rowKey, removal);
+      applyRemoval(rowKey, removal);
+      moved();
       // Log mode (#395): the new section goes to the exercise's saved rows,
       // and to its queued sets, as a move's order does (#392). Written as a
       // tracker write, after anything ahead of it; the change never waits for
@@ -547,23 +617,29 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
         remapQueue(queuedOrderMap(listRef.current, before));
         void enqueueWrite(writeOrders).catch(() => undefined);
       }
-    } else {
-      await runRemoval(ex.rowKey, removal);
+    } else if (await runRemoval(rowKey, removal)) {
+      // To warm-up: its rows are deleted (above) and nothing else is written now, as before. The orders the
+      // other exercises took stay in the list and are written with the next move, section change or Finish.
+      moved();
     }
   };
 
   // #371: position and announcement come from the current list, outside the
-  // state updater; a move from an end does nothing at all.
+  // state updater; a move from an end does nothing at all. #667: the neighbour
+  // is the next exercise in the same section, and the count is within it.
   const handleMove = (exerciseId: string, exerciseOrder: number, dir: MoveDirection) => {
-    const sorted = [...listRef.current].sort((a, b) => a.exercise_order - b.exercise_order);
-    const from = sorted.findIndex((e) => e.exercise_id === exerciseId && e.exercise_order === exerciseOrder);
+    const moved = findExercise(exerciseId, exerciseOrder);
+    if (!moved) return;
+    const mates = listRef.current
+      .filter((e) => e.section === moved.section)
+      .sort((a, b) => a.exercise_order - b.exercise_order);
+    const from = mates.findIndex((e) => e.exercise_id === exerciseId && e.exercise_order === exerciseOrder);
     const to = dir === 'up' ? from - 1 : from + 1;
-    if (from < 0 || to < 0 || to >= sorted.length) return;
-    const moved = sorted[from];
+    if (from < 0 || to < 0 || to >= mates.length) return;
     const apply = dir === 'up' ? applyMoveUp : applyMoveDown;
     const before = listRef.current;
     updateList((prev) => apply(prev, exerciseId, exerciseOrder));
-    reorder.moved(moved.rowKey ?? '', dir, moved.exercise_name, to + 1, sorted.length);
+    reorder.moved(moved.rowKey ?? '', dir, moved.exercise_name, to + 1, mates.length);
 
     // Log mode: the move goes to the sheet (#392); edit mode writes the order
     // at Save Changes. The queued sets take their new order now. The rows are
@@ -595,31 +671,32 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
     }
   };
 
-  const handleAddExercises = (picked: ExerciseWithRow[]) => {
-    const maxOrder = listRef.current.reduce((max, e) => Math.max(max, e.exercise_order), 0);
-    const added: TrackerExercise[] = picked.map((ex, i) => ({
+  // #667: the exercises join the end of the picked section's card, each with one empty set, and the first
+  // one's set opens. Their orders follow the drawn order and are written as a move's are, once rows exist.
+  const handleAddExercises = (picked: ExerciseWithRow[], section: string) => {
+    const added: TrackerExercise[] = picked.map((ex) => ({
       exercise_id: ex.id,
       exercise_name: ex.name,
-      section: 'primary',
-      exercise_order: maxOrder + 1 + i,
+      section,
+      exercise_order: 0,
       rowKey: newRowKey(),
-      sets: [
-        {
-          set_number: 1,
-          planned_reps: '',
-          weight: '',
-          reps: '',
-          effort: '',
-          saved: false,
-          sheetRow: -1,
-        },
-      ],
+      // A warm-up is list only: no sets.
+      sets:
+        section === 'warmup'
+          ? []
+          : [{ set_number: 1, planned_reps: '', weight: '', reps: '', effort: '', saved: false, sheetRow: -1 }],
       quickFillWeight: '',
       quickFillReps: '',
       quickFillEffort: '',
     }));
-    updateList((prev) => [...prev, ...added]);
-    setShowExercisePicker(false);
+    const before = listRef.current;
+    updateList((prev) => addToSection(prev, added, section));
+    setPickerSection(null);
+    if (section !== 'warmup') setOpenSet({ rowKey: added[0].rowKey!, setNumber: 1 });
+    if (!editMode && token) {
+      remapQueue(queuedOrderMap(listRef.current, before));
+      void enqueueWrite(writeOrders).catch(() => undefined);
+    }
   };
 
   const flushPendingSaves = (): Promise<void> => {
@@ -767,138 +844,186 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
     }
   };
 
+  const cards = trackerCards(exerciseList);
+  const progress = progressOf(exerciseList);
+  const pills = sectionPills(new Set(cards.map((c) => c.section)));
+  const hasExercises = exerciseList.length > 0;
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  const finishSummary = `${progress.logged} of ${progress.total} sets logged${
+    progress.needEffort > 0 ? ` · ${progress.needEffort} need effort` : ''
+  }`;
+
+  const statusFor = (ex: TrackerExercise, setNumber: number): SaveStatus => {
+    if (editMode || !touched.has(touchKey(ex.rowKey, setNumber))) return '';
+    const set = ex.sets.find((s) => s.set_number === setNumber);
+    if (!set || !(set.weight || set.reps)) return '';
+    return set.saved ? 'Saved' : 'Saving…';
+  };
+
+  const removingFor = (ex: TrackerExercise): ReadonlySet<number> =>
+    new Set(ex.sets.filter((s) => removingTaps.has(`${ex.rowKey}|${s.set_number}`)).map((s) => s.set_number));
+
+  const syncNow = async () => {
+    if (isSyncing.value || !token) return;
+    const result = await flushQueue(token);
+    if (result.remaining === 0 && result.synced > 0) {
+      showToast(`${result.synced} set${result.synced === 1 ? '' : 's'} saved`, 'success');
+    } else if (result.failed > 0) {
+      showToast('Some sets failed to sync — will retry on reconnect', 'error');
+    }
+  };
+
+  const openFinish = async () => {
+    // AC7: Guard against finishing with unsynced sets
+    const queuedCount = pendingSyncCount.value;
+    if (queuedCount > 0) {
+      const ok = await ask(finishUnsyncedCopy(queuedCount));
+      if (!ok) return;
+    }
+    setShowFinishForm(true);
+  };
+
+  const editDay = new Date(`${editDate || editInitial.date}T00:00:00`);
+  const editMeta = Number.isNaN(editDay.getTime())
+    ? 'Editing'
+    : `Editing · ${editDay.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`;
+
   return (
-    <div class="screen workout-tracker">
-      <div class="workout-tracker-header">
-        <h2 class="workout-tracker-title">{editMode ? `Edit: ${workoutName}` : workoutName}</h2>
-        {editMode ? (
-          <button class="btn btn-primary" onClick={handleSaveEdits} disabled={finishing}>
-            {finishing ? 'Saving...' : 'Save Changes'}
+    <div class="screen workout-detail-screen workout-tracker lb-screen" ref={screenRef}>
+      {editMode ? (
+        <div class="detail-top-bar">
+          <button type="button" class="detail-icon-btn" aria-label="Close" onClick={handleDiscard}>
+            <CloseIcon />
           </button>
-        ) : (
-          <div class="workout-tracker-actions">
+          <button type="button" class="btn btn-primary tpl-save" onClick={handleSaveEdits} disabled={finishing}>
+            {finishing ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      ) : (
+        <div class="detail-top-bar lb-top-bar">
+          <div class="detail-top-actions">
             {workout?.type === 'weight' && workout.status === 'active' && (
               <button
                 type="button"
-                class="btn btn-secondary workout-tracker-lift"
+                class="btn btn-secondary lb-lift-chip"
                 onClick={() => void switchToLift()}
                 disabled={finishing || switchingToLift}
               >
-                Lift Mode
+                <DumbbellIcon />
+                <span>Lift Mode</span>
               </button>
             )}
-            <button
-              class="btn btn-primary"
-              onClick={async () => {
-                // AC7: Guard against finishing with unsynced sets
-                const queuedCount = pendingSyncCount.value;
-                if (queuedCount > 0) {
-                  const ok = await ask(finishUnsyncedCopy(queuedCount));
-                  if (!ok) return;
-                }
-                setShowFinishForm(!showFinishForm);
-              }}
+            <ActionMenu
+              label="More actions"
               disabled={finishing}
-            >
-              Finish
-            </button>
+              items={[
+                {
+                  key: 'discard',
+                  label: 'Discard workout',
+                  icon: <TrashIcon />,
+                  onSelect: () => void handleDiscard(),
+                  danger: true,
+                },
+              ]}
+            />
           </div>
-        )}
-      </div>
-
-      {/* Sync status bar (AC2) — hidden when queue is empty */}
-      {pendingSyncCount.value > 0 && (
-        <button
-          class="sync-status-bar"
-          onClick={async () => {
-            if (isSyncing.value || !token) return;
-            const result = await flushQueue(token);
-            if (result.remaining === 0 && result.synced > 0) {
-              showToast(`${result.synced} set${result.synced === 1 ? '' : 's'} saved`, 'success');
-            } else if (result.failed > 0) {
-              showToast('Some sets failed to sync — will retry on reconnect', 'error');
-            }
-          }}
-          disabled={isSyncing.value}
-          aria-live="polite"
-          aria-label={`${pendingSyncCount.value} unsynced set${pendingSyncCount.value === 1 ? '' : 's'}, tap to sync now`}
-        >
-          {isSyncing.value ? 'Syncing…' : `${pendingSyncCount.value} unsynced — Sync now`}
-        </button>
+        </div>
       )}
 
-      {/* Edit mode metadata fields */}
+      <div class="lb-title-block">
+        <p class="detail-date-line lb-meta">{editMode ? editMeta : 'Logbook · in progress'}</p>
+        <h1 class="detail-title">{workoutName}</h1>
+      </div>
+
+      {/* Offline banner (AC2) — only when sets are queued */}
+      {!editMode && pendingSyncCount.value > 0 && (
+        <div class="lb-banner" aria-live="polite">
+          <NoSignalIcon />
+          <span class="lb-banner-text">
+            {isSyncing.value ? 'Syncing…' : `${plural(pendingSyncCount.value, 'set')} not synced`}
+          </span>
+          <button
+            type="button"
+            class="lb-text-btn lb-banner-btn"
+            aria-disabled={isSyncing.value ? 'true' : undefined}
+            onClick={() => void syncNow()}
+          >
+            <span>Sync now</span>
+          </button>
+        </div>
+      )}
+
+      {/* Edit mode details */}
       {editMode && (
-        <div class="finish-form" style={{ marginBottom: 'var(--space-md)' }}>
-          <div class="form-group">
-            <label class="form-label" htmlFor="tracker-edit-name">
+        <section class="detail-stats-card lb-details" aria-labelledby="tracker-edit-details">
+          <h2 id="tracker-edit-details" class="lb-details-title">
+            Details
+          </h2>
+          <div class="lb-field">
+            <label class="lb-field-label" htmlFor="tracker-edit-name">
               Name
             </label>
             <input
               id="tracker-edit-name"
-              class="form-input"
+              class="form-input lb-input"
               type="text"
               value={editName}
               onInput={(e) => setEditName((e.target as HTMLInputElement).value)}
             />
           </div>
-          <div class="form-group">
-            <label class="form-label" htmlFor="tracker-edit-date">
-              Date
-            </label>
-            <input
-              id="tracker-edit-date"
-              class="form-input"
-              type="date"
-              value={editDate}
-              onInput={(e) => setEditDate((e.target as HTMLInputElement).value)}
-            />
+          <div class="lb-field-pair">
+            <div class="lb-field">
+              <label class="lb-field-label" htmlFor="tracker-edit-date">
+                Date
+              </label>
+              <input
+                id="tracker-edit-date"
+                class="form-input lb-input"
+                type="date"
+                value={editDate}
+                onInput={(e) => setEditDate((e.target as HTMLInputElement).value)}
+              />
+            </div>
+            <div class="lb-field">
+              <label class="lb-field-label" htmlFor="tracker-edit-duration">
+                Duration (min)
+              </label>
+              <input
+                id="tracker-edit-duration"
+                class="form-input lb-input"
+                type="number"
+                inputMode="numeric"
+                placeholder="e.g. 30"
+                value={editDuration}
+                onInput={(e) => setEditDuration((e.target as HTMLInputElement).value)}
+              />
+            </div>
           </div>
-          <div class="form-group">
-            <label class="form-label" htmlFor="tracker-edit-duration">
-              Duration (minutes)
-            </label>
-            <input
-              id="tracker-edit-duration"
-              class="form-input"
-              type="number"
-              inputMode="numeric"
-              placeholder="e.g. 30"
-              value={editDuration}
-              onInput={(e) => setEditDuration((e.target as HTMLInputElement).value)}
-            />
-          </div>
-          <div class="form-group">
-            <span class="form-label" id={effortLabelId}>
-              Session Effort (optional)
+          <div class="lb-field">
+            <span class="lb-field-label" id={effortLabelId}>
+              Session effort
             </span>
-            <EffortToggle
-              value={editEffort}
-              onChange={setEditEffort}
-              size="session"
-              label="Session effort"
-              labelledBy={effortLabelId}
-            />
+            <EffortPills value={editEffort} onChange={setEditEffort} labelledBy={effortLabelId} />
           </div>
-          <div class="form-group">
-            <label class="form-label" htmlFor="tracker-edit-notes">
+          <div class="lb-field">
+            <label class="lb-field-label" htmlFor="tracker-edit-notes">
               Notes
             </label>
             <textarea
               id="tracker-edit-notes"
-              class="form-textarea"
+              class="form-textarea lb-notes"
               placeholder="How did it go?"
               rows={3}
               value={notes}
               onInput={(e) => setNotes((e.target as HTMLTextAreaElement).value)}
             />
           </div>
-        </div>
+        </section>
       )}
 
-      {/* Finish modal (non-edit mode only) */}
+      {/* Finish sheet (non-edit mode only) */}
       {!editMode && showFinishForm && (
-        <FinishWorkoutModal
+        <FinishWorkoutSheet
           notes={notes}
           onNotesChange={(e) => setNotes((e.target as HTMLTextAreaElement).value)}
           effort={finishEffort}
@@ -906,6 +1031,7 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
           onFinish={handleFinish}
           onCancel={() => setShowFinishForm(false)}
           finishing={finishing}
+          summary={finishSummary}
         />
       )}
 
@@ -914,59 +1040,123 @@ export function WorkoutTracker({ workoutId, workoutName }: Props) {
         {reorder.announcement}
       </div>
 
-      <div class="tracker-exercise-list" ref={reorder.listRef}>
-        {exerciseList.length === 0 && (
-          <div class="empty-state">
-            <p>No exercises yet</p>
-            <p>Add exercises to start tracking</p>
+      {!editMode && hasExercises && (
+        <section class="detail-stats-card strength-hero lb-progress" aria-live="polite" aria-label="Progress">
+          <SetsRing logged={progress.logged} total={progress.total} />
+          <div class="lb-progress-cells">
+            <div class="detail-stat">
+              <span class="detail-stat-value">
+                {progress.exercisesDone}
+                <span class="detail-stat-unit"> of {progress.exercisesTotal}</span>
+              </span>
+              <span class="detail-stat-label">Exercises done</span>
+            </div>
+            {progress.needEffort > 0 && (
+              <div class="detail-stat">
+                <span class="detail-stat-value lb-need-effort">{progress.needEffort}</span>
+                <span class="detail-stat-label">Need effort</span>
+              </div>
+            )}
           </div>
-        )}
+        </section>
+      )}
 
-        {(() => {
-          const sorted = [...exerciseList].sort((a, b) => a.exercise_order - b.exercise_order);
-          return sorted.map((ex, idx) => (
-            <ExerciseRow
-              key={trackerRowKey(ex)}
-              exercise={ex}
-              currentWorkoutId={workoutId}
-              onUpdateSet={(setNum, updates) => handleUpdateSet(ex.exercise_id, ex.exercise_order, setNum, updates)}
-              onAddSet={() => handleAddSet(ex.exercise_id, ex.exercise_order)}
-              onRemoveSet={(setNum) => handleRemoveSet(ex.exercise_id, ex.exercise_order, setNum)}
-              onQuickFillWeight={(weight) => handleQuickFillWeight(ex.exercise_id, ex.exercise_order, weight)}
-              onQuickFillReps={(reps) => handleQuickFillReps(ex.exercise_id, ex.exercise_order, reps)}
-              onQuickFillEffort={(effort) => handleQuickFillEffort(ex.exercise_id, ex.exercise_order, effort)}
-              onCopyDown={(lastTimeSets) => handleCopyDown(ex.exercise_id, ex.exercise_order, lastTimeSets)}
-              onChangeSection={(newSection) => handleChangeSection(ex.exercise_id, ex.exercise_order, newSection)}
-              onMoveUp={() => handleMove(ex.exercise_id, ex.exercise_order, 'up')}
-              onMoveDown={() => handleMove(ex.exercise_id, ex.exercise_order, 'down')}
-              onRemoveExercise={() => handleRemoveExercise(ex.exercise_id, ex.exercise_order)}
-              isFirst={idx === 0}
-              isLast={idx === sorted.length - 1}
-              totalExercises={sorted.length}
-            />
-          ));
-        })()}
+      {hasExercises ? (
+        <div class="strength-exercises-header">
+          <h2 class="strength-exercises-heading">Exercises</h2>
+          <button
+            type="button"
+            class={`filter-chip last-time-chip${showLastTime ? ' active' : ''}`}
+            aria-pressed={showLastTime}
+            onClick={() => setShowLastTime(!showLastTime)}
+          >
+            <HistoryIcon />
+            Last time
+          </button>
+        </div>
+      ) : (
+        <p class="tpl-start-note">Add a section to start.</p>
+      )}
+
+      <div class="lb-cards" ref={reorder.listRef}>
+        {cards.map((card) => (
+          <section class="strength-section-card lb-card" key={card.section}>
+            <div class="lb-card-head">
+              <h2 class="strength-section-heading">{card.title}</h2>
+              <span class="lb-card-count">{plural(card.exercises.length, 'exercise')}</span>
+            </div>
+            {card.exercises.map((ex, at) => (
+              <ExerciseRow
+                key={trackerRowKey(ex)}
+                exercise={ex}
+                currentWorkoutId={workoutId}
+                showLastTime={showLastTime}
+                openSet={openSet && openSet.rowKey === ex.rowKey ? openSet.setNumber : null}
+                statusFor={(setNumber) => statusFor(ex, setNumber)}
+                removing={removingFor(ex)}
+                isFirst={at === 0}
+                isLast={at === card.exercises.length - 1}
+                onOpenSet={(setNumber) =>
+                  setOpenSet(setNumber === null ? null : { rowKey: trackerRowKey(ex), setNumber })
+                }
+                onUpdateSet={(setNum, updates) => handleUpdateSet(ex.exercise_id, ex.exercise_order, setNum, updates)}
+                onAddSet={() => handleAddSet(ex.exercise_id, ex.exercise_order)}
+                onRemoveSet={(setNum) => handleRemoveSet(ex.exercise_id, ex.exercise_order, setNum)}
+                onSameForAll={(setNum) => handleSameForAll(ex.exercise_id, ex.exercise_order, setNum)}
+                onCopyDown={(lastTimeSets) => handleCopyDown(ex.exercise_id, ex.exercise_order, lastTimeSets)}
+                onChangeSection={(newSection) => handleChangeSection(ex.exercise_id, ex.exercise_order, newSection)}
+                onMoveUp={() => handleMove(ex.exercise_id, ex.exercise_order, 'up')}
+                onMoveDown={() => handleMove(ex.exercise_id, ex.exercise_order, 'down')}
+                onRemoveExercise={() => handleRemoveExercise(ex.exercise_id, ex.exercise_order)}
+              />
+            ))}
+            <button
+              type="button"
+              class="btn btn-ghost lb-add-btn"
+              aria-label={`Add exercise to ${card.title}`}
+              onClick={() => setPickerSection(card.section)}
+            >
+              <PlusIcon />
+              <span>Add exercise</span>
+            </button>
+          </section>
+        ))}
       </div>
 
-      <button
-        class="btn btn-secondary"
-        style={{ width: '100%', marginTop: 'var(--space-md)' }}
-        onClick={() => setShowExercisePicker(true)}
-      >
-        + Add Exercise
-      </button>
+      {pills.length > 0 && (
+        <section class="tpl-add-section">
+          <div class="week-heading">
+            <h2>Add a section</h2>
+          </div>
+          <div class="tpl-pills">
+            {pills.map((p) => (
+              <button
+                type="button"
+                key={p.section}
+                class="filter-chip tpl-pill"
+                onClick={() => setPickerSection(p.section)}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
-      <button
-        class="btn btn-danger"
-        style={{ width: '100%', marginTop: 'var(--space-sm)' }}
-        onClick={handleDiscard}
-        disabled={finishing}
-      >
-        {editMode ? 'Discard Changes' : 'Discard Workout'}
-      </button>
+      {!editMode && (
+        <div class="template-detail-footer lb-finish-bar">
+          <button type="button" class="btn btn-primary" onClick={() => void openFinish()} disabled={finishing}>
+            Finish workout
+          </button>
+        </div>
+      )}
 
-      {showExercisePicker && (
-        <AddExerciseModal onAdd={handleAddExercises} onClose={() => setShowExercisePicker(false)} />
+      {pickerSection !== null && (
+        <AddExerciseModal
+          sectionLabel={sectionTitle(pickerSection)}
+          onAdd={(picked) => handleAddExercises(picked, pickerSection)}
+          onClose={() => setPickerSection(null)}
+        />
       )}
     </div>
   );

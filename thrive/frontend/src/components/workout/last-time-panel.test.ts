@@ -1,7 +1,8 @@
+// #667 — an exercise's Last time line in the Logbook: "Last time (Oct 21): 135 lb × 8 · Medium" and a Copy button.
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, fireEvent, cleanup } from '@testing-library/preact';
 import { h } from 'preact';
-import { LastTimePanel } from './last-time-panel';
+import { LastTimeLine } from './last-time-panel';
 import * as lastTimeData from './last-time-data';
 import type { SetWithRow } from '../../api/types';
 
@@ -31,111 +32,58 @@ function makeSet(overrides: Partial<SetWithRow> = {}): SetWithRow {
   };
 }
 
-describe('LastTimePanel', () => {
+describe('LastTimeLine', () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
   });
 
-  function renderPanel(overrides: Record<string, unknown> = {}) {
+  function renderLine(overrides: Record<string, unknown> = {}) {
     const props = {
       exerciseId: 'ex1',
       exerciseName: 'Bench Press',
       currentWorkoutId: 'w1',
       onCopyDown: vi.fn(),
-      onClose: vi.fn(),
       ...overrides,
     };
-    return { ...render(h(LastTimePanel as any, props)), props };
+    return { ...render(h(LastTimeLine as any, props)), props };
   }
 
-  // AC1: Close button appears in history panel
-  describe('AC1: Close button appears in history panel', () => {
-    it('renders a close button next to Copy Down when data is available', () => {
-      vi.mocked(lastTimeData.getLastTimeData).mockReturnValue({
-        workoutDate: '2026-03-10',
-        sets: [makeSet()],
-      });
-      const { container } = renderPanel();
-      const actionArea = container.querySelector('.last-time-actions');
-      expect(actionArea).toBeTruthy();
-      const buttons = actionArea!.querySelectorAll('button');
-      expect(buttons.length).toBe(2); // Copy Down + Close
-      const closeBtn = container.querySelector('.last-time-close-btn');
-      expect(closeBtn).toBeTruthy();
-      expect(closeBtn!.textContent).toContain('✕');
+  it('reads the date and the best set of the previous performance', () => {
+    vi.mocked(lastTimeData.getLastTimeData).mockReturnValue({
+      workoutDate: '2026-10-21',
+      sets: [
+        makeSet({ set_number: 1, weight: '125', reps: '10', effort: '' }),
+        makeSet({ set_number: 2, weight: '135', reps: '8' }),
+      ],
     });
-
-    it('close button is visually smaller than Copy Down', () => {
-      vi.mocked(lastTimeData.getLastTimeData).mockReturnValue({
-        workoutDate: '2026-03-10',
-        sets: [makeSet()],
-      });
-      const { container } = renderPanel();
-      const copyBtn = container.querySelector('.copy-down-btn');
-      const closeBtn = container.querySelector('.last-time-close-btn');
-      expect(copyBtn).toBeTruthy();
-      expect(closeBtn).toBeTruthy();
-      // Copy Down should have flex: 1, close button should not
-      // Both should exist in the same flex container
-      const actionArea = container.querySelector('.last-time-actions');
-      expect(actionArea).toBeTruthy();
-      expect(actionArea!.contains(copyBtn!)).toBe(true);
-      expect(actionArea!.contains(closeBtn!)).toBe(true);
-    });
+    const { container } = renderLine();
+    expect(container.querySelector('.lb-last-time-text')!.textContent).toBe('Last time (Oct 21): 135 lb × 8 · Medium');
   });
 
-  // AC2: Close button collapses the panel and returns focus
-  describe('AC2: Close button collapses the panel', () => {
-    it('calls onClose when close button is clicked', () => {
-      vi.mocked(lastTimeData.getLastTimeData).mockReturnValue({
-        workoutDate: '2026-03-10',
-        sets: [makeSet()],
-      });
-      const { container, props } = renderPanel();
-      const closeBtn = container.querySelector('.last-time-close-btn')!;
-      fireEvent.click(closeBtn);
-      expect(props.onClose).toHaveBeenCalledTimes(1);
-    });
+  it('has a Copy button named for the exercise, which hands over the previous sets', () => {
+    const sets = [makeSet()];
+    vi.mocked(lastTimeData.getLastTimeData).mockReturnValue({ workoutDate: '2026-10-21', sets });
+    const { container, props } = renderLine();
+    const copy = container.querySelector('button')!;
+    expect(copy.textContent).toBe('Copy');
+    expect(copy.getAttribute('aria-label')).toBe('Copy last time into Bench Press');
+    fireEvent.click(copy);
+    expect(props.onCopyDown).toHaveBeenCalledWith(sets);
   });
 
-  // AC3: Close button is accessible
-  describe('AC3: Close button is accessible', () => {
-    it('has aria-label="Close history"', () => {
-      vi.mocked(lastTimeData.getLastTimeData).mockReturnValue({
-        workoutDate: '2026-03-10',
-        sets: [makeSet()],
-      });
-      const { container } = renderPanel();
-      const closeBtn = container.querySelector('.last-time-close-btn')!;
-      expect(closeBtn.getAttribute('aria-label')).toBe('Close history');
-    });
-
-    it('is a button element (keyboard-focusable)', () => {
-      vi.mocked(lastTimeData.getLastTimeData).mockReturnValue({
-        workoutDate: '2026-03-10',
-        sets: [makeSet()],
-      });
-      const { container } = renderPanel();
-      const closeBtn = container.querySelector('.last-time-close-btn')!;
-      expect(closeBtn.tagName).toBe('BUTTON');
-    });
+  it('shows no line, and no "No previous data", when there is no previous performance', () => {
+    vi.mocked(lastTimeData.getLastTimeData).mockReturnValue(null);
+    const { container } = renderLine();
+    expect(container.innerHTML).toBe('');
   });
 
-  // AC4: Empty state has no close button
-  describe('AC4: Empty state has no close button', () => {
-    it('does not render close button when no data available', () => {
-      vi.mocked(lastTimeData.getLastTimeData).mockReturnValue(null);
-      const { container } = renderPanel();
-      const closeBtn = container.querySelector('.last-time-close-btn');
-      expect(closeBtn).toBeNull();
+  it('shows no line when the previous sets hold nothing to show', () => {
+    vi.mocked(lastTimeData.getLastTimeData).mockReturnValue({
+      workoutDate: '2026-10-21',
+      sets: [makeSet({ weight: '', reps: '', effort: '' })],
     });
-
-    it('does not render action area when no data available', () => {
-      vi.mocked(lastTimeData.getLastTimeData).mockReturnValue(null);
-      const { container } = renderPanel();
-      const actionArea = container.querySelector('.last-time-actions');
-      expect(actionArea).toBeNull();
-    });
+    const { container } = renderLine();
+    expect(container.innerHTML).toBe('');
   });
 });

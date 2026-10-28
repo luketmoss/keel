@@ -43,7 +43,10 @@ export function useReorderFocus() {
     const row = Array.from(listRef.current.querySelectorAll<HTMLElement>('[data-row-key]')).find(
       (el) => el.dataset.rowKey === p.key,
     );
-    row?.querySelector<HTMLElement>(`[data-move="${p.dir}"]`)?.focus();
+    // A row whose Move buttons sit in a closed menu (the Logbook, #667) takes focus on its options button.
+    (
+      row?.querySelector<HTMLElement>(`[data-move="${p.dir}"]`) ?? row?.querySelector<HTMLElement>('[data-options-btn]')
+    )?.focus();
   });
 
   const moved = (key: string, dir: MoveDirection, name: string, position: number, total: number) => {

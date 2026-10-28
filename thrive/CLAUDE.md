@@ -136,7 +136,7 @@ reps and effort through `saveSet`. A weight alone does not count as a set logged
 Its end is a summary (#578, `lift-summary.tsx`), not the finish modal: totals, one shared sets list
 (`lift-sets-list.tsx`, also the All sets sheet) whose rows open to the Log card's controls
 (`lift-set-controls.tsx`), then session effort and notes, kept in the stored run under `notes` and
-`sessionEffort`, and Save, which is `finishWorkout`. Logbook keeps the modal.
+`sessionEffort`, and Save, which is `finishWorkout`. Logbook has its own finish sheet (#667).
 The two switch mid-workout (#579): the tracker's header has a Lift Mode button (`resetRun`, so it opens at the first
 unlogged working set with no clock, or on the summary with none left), and All sets has Switch to logbook, which clears
 the stored run and writes nothing for the interrupted step. The start choice is remembered in `localStorage`
@@ -451,10 +451,10 @@ These decisions were made with the user and must be respected by all agents:
 - **Landing screen**: the Day view (luketmoss/thrive#228, decided 27 Sep 2026; luketmoss/thrive#235 records the navigation; luketmoss/thrive#237 built the screen).
 - **Set logging**: logbook-style in Logbook (record sets when convenient); set by set in Lift Mode (#577), which a weight workout offers beside Logbook when it starts
 - **Rest timers**: in Lift Mode only (#577): a stopwatch for each set and each rest, counting up toward `rest_target_s`, a reminder and never a stop. Logbook has none, and the watch only records heart rate
-- **Supersets**: Flat list with section labels/colors (not grouped flow)
+- **Supersets**: grouped in section cards, in Logbook as in templates and the activity detail; moves stay within a section (#667)
 - **Start workout**: Choose [From Template] or [Build Custom]
 - **Exercise library**: Inline creation (on-the-fly during workout/template building)
-- **Set entry**: Quick-fill weight for all sets, override individual sets if different
+- **Set entry**: tap a set to open its editor; Same for all sets copies its weight, reps and effort to the exercise's other sets (#667)
 - **Templates**: Create via dedicated editor AND save-from-workout
 - **Navigation**: Bottom tab bar (Day | Activities | Trends | Library | Settings); Library = Templates + Exercises
 - **Activity cards**: one big figure (distance, else duration), a stats line, day · name, and a visual on the right (route, muscle figure, or type tile); no type badge (decided 2026-10-20, #525). Tap to view details

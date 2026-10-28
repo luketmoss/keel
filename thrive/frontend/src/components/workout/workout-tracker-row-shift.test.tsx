@@ -26,6 +26,14 @@ import {
 } from '../../state/store';
 import type { WorkoutWithRow } from '../../api/types';
 import { mountConfirmHost, answerConfirm, openedConfirm, confirmText } from '../shared/confirm-test-utils';
+import {
+  exerciseRows as cards,
+  cardOf,
+  editorOf,
+  weightField,
+  chooseMenu,
+  removeSetBtn as editorRemoveBtn,
+} from './tracker-test-utils';
 
 type Row = string[];
 let sheet: { Sets: Row[] };
@@ -133,22 +141,33 @@ async function mount(specs: Spec[]) {
   return render(<WorkoutTracker workoutId="w1" workoutName="Push A" />);
 }
 
-/** The exercise cards in screen order (warmups included). */
-const cards = () => [...document.querySelectorAll<HTMLElement>('.tracker-exercise-list > [data-row-key]')];
-const card = (name: string, nth = 0) => cards().filter((c) => c.textContent!.includes(name))[nth];
-const setRows = (c: HTMLElement) => [...c.querySelectorAll<HTMLElement>('.tracker-set')];
-const removeSetBtn = (c: HTMLElement, set: number) =>
-  setRows(c)[set].querySelector<HTMLButtonElement>('.set-remove-btn')!;
-const weightInput = (c: HTMLElement, set = 0) => setRows(c)[set].querySelector<HTMLInputElement>('.set-weight-input')!;
+/** The exercise rows in screen order (warmups included), found by their exact name. */
+const card = (name: string, nth = 0) =>
+  cards().filter((c) => c.querySelector('.lb-exercise-name, .lb-warmup-name')!.textContent === name)[nth];
+/** A row's set tiles, in order. #667: a tile per set; the one open set has an editor under them. */
+const setRows = (c: HTMLElement) => [...c.querySelectorAll<HTMLElement>('.lb-tile[data-set]')];
+/** The editor of the `set`th tile, opened. */
+const editorFor = (c: HTMLElement, set: number) => {
+  const tile = setRows(c)[set];
+  if (tile.getAttribute('aria-expanded') !== 'true') fireEvent.click(tile);
+  return editorOf(c)!;
+};
+const removeSetBtn = (c: HTMLElement, set: number) => editorRemoveBtn(editorFor(c, set));
+const weightInput = (c: HTMLElement, set = 0) => weightField(editorFor(c, set));
+/** The open set's status line reads Saved (it shows nothing before the set has been edited). */
 const saved = (c: HTMLElement, set = 0) =>
-  setRows(c)[set].querySelector('.set-saved')!.getAttribute('aria-hidden') === 'false';
+  editorFor(c, set).querySelector('.lb-editor-status')!.textContent === 'Saved';
 const type = (c: HTMLElement, value: string, set = 0) => fireEvent.input(weightInput(c, set), { target: { value } });
 const removeExercise = async (c: HTMLElement) => {
-  fireEvent.click(c.querySelector<HTMLButtonElement>('.exercise-toolbar-remove')!);
+  chooseMenu(c, 'Remove exercise');
   await answerConfirm(true);
 };
-const move = (c: HTMLElement, dir: 'up' | 'down') =>
-  fireEvent.click(c.querySelector<HTMLButtonElement>(`[data-move="${dir}"]`)!);
+const move = (c: HTMLElement, dir: 'up' | 'down') => chooseMenu(c, dir === 'up' ? 'Move up' : 'Move down');
+/** Change section… and a row of the sheet. */
+const changeSection = (c: HTMLElement, label: string) => {
+  chooseMenu(c, 'Change section…');
+  fireEvent.click([...document.querySelectorAll<HTMLElement>('[role="radio"]')].find((r) => r.textContent === label)!);
+};
 const activeRows = () =>
   activeWorkoutSets.value.map((s) => [s.exercise_id, s.section, s.exercise_order, s.set_number, s.sheetRow]);
 
@@ -331,9 +350,10 @@ describe('#394 AC1: after Remove set, every other set keeps its own row', () => 
     ]);
     fireEvent.click(removeSetBtn(card('Bench'), 0));
     await settle();
-    move(card('Row BB', 0), 'down'); // the primary copy now has order 3
+    // A move stays inside its section (#667); Change section is what takes the primary copy past the other one.
+    changeSection(card('Row BB', 0), 'Superset 2'); // the primary copy now has order 3, in its own card
     // The primary copy is now the second Row BB card.
-    expect(card('Row BB', 1).querySelector('.section-badge-btn')!.textContent).toBe('primary');
+    expect(cardOf(card('Row BB', 1))).toBe('Superset 2');
     fireEvent.click(removeSetBtn(card('Row BB', 1), 0));
     await settle();
     expect(deletes()).toEqual([2, 2]);
@@ -355,8 +375,8 @@ describe('#394 AC2: Copy-down, Change section to warmup and Remove exercise shif
     ];
   };
   const copyDown = async (c: HTMLElement) => {
-    fireEvent.click(c.querySelector<HTMLButtonElement>('.last-time-toggle')!);
-    fireEvent.click(c.querySelector<HTMLButtonElement>('.copy-down-btn')!);
+    fireEvent.click(document.querySelector<HTMLButtonElement>('.last-time-chip')!);
+    fireEvent.click(c.querySelector<HTMLButtonElement>('.lb-copy-btn')!);
     await answerConfirm(true);
   };
 
@@ -426,19 +446,14 @@ describe('#394 AC2: Copy-down, Change section to warmup and Remove exercise shif
       ['w1', 'e_row', 'Row', 'primary', 2, 1, '95', '10'],
       ['w2', 'e_curl', 'Curl', 'primary', 1, 1, '30', '12'],
     ]);
-    const bench = card('Bench');
-    fireEvent.click(bench.querySelector<HTMLButtonElement>('.section-badge-btn')!);
+    changeSection(card('Bench'), 'Warm-up');
+    // Its two logged sets are deleted: the sheet says so first.
     fireEvent.click(
-      [...bench.querySelectorAll<HTMLButtonElement>('.section-picker-row button')].find(
-        (b) => b.textContent === 'warmup',
-      )!,
-    );
-    fireEvent.click(
-      [...bench.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === 'Switch to Warmup')!,
+      [...document.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === 'Move to warm-up')!,
     );
     await settle();
     expect(deletes()).toEqual([3, 2]);
-    expect(card('Bench').classList.contains('tracker-exercise-warmup')).toBe(true);
+    expect(card('Bench').classList.contains('lb-warmup')).toBe(true);
 
     fireEvent.click(removeSetBtn(card('Row'), 0));
     await settle();
@@ -448,7 +463,7 @@ describe('#394 AC2: Copy-down, Change section to warmup and Remove exercise shif
 
   it('Remove exercise names the exercise and its logged sets, and Cancel changes nothing (#403)', async () => {
     await mount(BENCH3_ROW);
-    fireEvent.click(card('Bench').querySelector<HTMLButtonElement>('.exercise-toolbar-remove')!);
+    chooseMenu(card('Bench'), 'Remove exercise');
     await openedConfirm();
     expect(confirmText()).toEqual({
       title: 'Remove "Bench" from this workout?',
@@ -495,8 +510,6 @@ describe('#394 AC2: Copy-down, Change section to warmup and Remove exercise shif
     // All three sets stay on screen; set 3 lost its row and is unsaved.
     const bench = card('Bench');
     expect(setRows(bench)).toHaveLength(3);
-    expect(saved(bench, 0)).toBe(true);
-    expect(saved(bench, 2)).toBe(false);
 
     // Row set 1 moved from row 5 to 4: removing it deletes row 4.
     fireEvent.click(removeSetBtn(card('Row'), 0));
@@ -538,11 +551,13 @@ describe("#394 AC3: the tracker's writes run one at a time", () => {
     const g = gate();
     deleteGate = g.p;
     const btn = removeSetBtn(card('Bench'), 0);
-    expect(btn.disabled).toBe(false);
+    expect(btn.getAttribute('aria-disabled')).toBeNull();
     fireEvent.click(btn);
     await settle();
+    // The set stays until its delete lands; its tile says it is going.
     expect(setRows(card('Bench'))).toHaveLength(3);
-    expect(removeSetBtn(card('Bench'), 0).disabled).toBe(false);
+    expect(setRows(card('Bench'))[0].getAttribute('aria-disabled')).toBe('true');
+    expect(setRows(card('Bench'))[1].getAttribute('aria-disabled')).toBeNull();
     g.open();
     deleteGate = null;
     await settle();
@@ -551,7 +566,7 @@ describe("#394 AC3: the tracker's writes run one at a time", () => {
 
   it('a set removed while its first save is appending has the appended row deleted', async () => {
     await mount(BENCH3_ROW);
-    fireEvent.click(card('Row').querySelector<HTMLButtonElement>('.add-set-btn')!);
+    fireEvent.click(card('Row').querySelector<HTMLButtonElement>('.lb-tile-add')!);
     type(card('Row'), '100', 1);
     const g = gate();
     appendGate = g.p;
@@ -600,13 +615,13 @@ describe("#394 AC3: the tracker's writes run one at a time", () => {
 
   it('Finish waits for a delete in flight before it saves anything or finishes', async () => {
     await mount(BENCH3_ROW);
-    fireEvent.click(card('Row').querySelector<HTMLButtonElement>('.add-set-btn')!);
+    fireEvent.click(card('Row').querySelector<HTMLButtonElement>('.lb-tile-add')!);
     type(card('Row'), '100', 1);
     const g = gate();
     deleteGate = g.p;
     fireEvent.click(removeSetBtn(card('Bench'), 0));
     await settle();
-    fireEvent.click([...document.querySelectorAll('button')].find((b) => b.textContent === 'Finish')!);
+    fireEvent.click([...document.querySelectorAll('button')].find((b) => b.textContent === 'Finish workout')!);
     fireEvent.click(document.querySelector('[role="dialog"] button.btn-primary')!);
     await vi.advanceTimersByTimeAsync(500);
     expect(finishWorkout).not.toHaveBeenCalled();

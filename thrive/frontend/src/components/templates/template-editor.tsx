@@ -6,6 +6,7 @@ import { navigate } from '../../router/router';
 import { AddExerciseModal } from '../exercises/add-exercise-modal';
 import { newRowKey, swapAt, useReorderFocus, type MoveDirection } from '../shared/reorder-focus';
 import { SectionPicker } from '../shared/section-picker';
+import { sectionPills } from '../shared/section-pills';
 import { RepsField } from '../shared/reps-field';
 import type { ExerciseWithRow } from '../../api/types';
 import { ask } from '../../state/confirm';
@@ -94,17 +95,7 @@ function insertAtSectionEnd(rows: readonly Row[], added: readonly Row[]): Row[] 
   return out;
 }
 
-/** What each "Add a section" pill starts, with the lowest free superset (#640); no Superset once all three exist. */
-export function sectionPills(present: ReadonlySet<string>): { label: string; section: string }[] {
-  const pills: { label: string; section: string }[] = [];
-  if (!present.has('warmup')) pills.push({ label: 'Warm-up', section: 'warmup' });
-  if (!present.has('primary')) pills.push({ label: 'Primary', section: 'primary' });
-  const free = ['SS1', 'SS2', 'SS3'].find((s) => !present.has(s));
-  if (free) pills.push({ label: 'Superset', section: free });
-  if (!present.has('burnout')) pills.push({ label: 'Burnout', section: 'burnout' });
-  if (!present.has('cooldown')) pills.push({ label: 'Cool-down', section: 'cooldown' });
-  return pills;
-}
+export { sectionPills };
 
 /** A closed row's accessible name: "Bench Press BB, 5 sets of 4 to 6, edit". */
 function rowLabel(name: string, sets: string, reps: string): string {

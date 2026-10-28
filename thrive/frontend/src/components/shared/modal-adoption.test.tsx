@@ -1,4 +1,4 @@
-// #339: ConfirmModal, FinishWorkoutModal and
+// #339: ConfirmModal, FinishWorkoutSheet (#667) and
 // CustomMetricsPicker all run on useModalFocus: focus in, Tab trap, Escape,
 // focus back to the opener, busy guard, labelled dialog.
 import { describe, it, expect, afterEach, vi } from 'vitest';
@@ -6,7 +6,7 @@ import { render, cleanup, fireEvent } from '@testing-library/preact';
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import { ConfirmModal } from './confirm-modal';
-import { FinishWorkoutModal } from '../workout/finish-modal';
+import { FinishWorkoutSheet } from '../workout/finish-modal';
 import { CustomMetricsPicker } from '../trends/custom-metrics-picker';
 
 afterEach(cleanup);
@@ -76,7 +76,7 @@ describe('ConfirmModal', () => {
   });
 });
 
-describe('FinishWorkoutModal', () => {
+describe('FinishWorkoutSheet', () => {
   const props = (over = {}) => ({
     notes: '',
     onNotesChange: () => {},
@@ -85,11 +85,12 @@ describe('FinishWorkoutModal', () => {
     onFinish: () => {},
     onCancel: () => {},
     finishing: false,
+    summary: '3 of 5 sets logged',
     ...over,
   });
 
   it('focuses the notes textarea, is labelled, and returns focus on Escape', () => {
-    const opener = harness((c) => h(FinishWorkoutModal as any, props({ onCancel: c })));
+    const opener = harness((c) => h(FinishWorkoutSheet as any, props({ onCancel: c })));
     expect(document.activeElement?.tagName).toBe('TEXTAREA');
     expectLabelled();
     fireEvent.keyDown(document, { key: 'Escape' });
@@ -98,18 +99,18 @@ describe('FinishWorkoutModal', () => {
 
   it('ignores Escape and the backdrop while finishing, and closes again after', () => {
     const onCancel = vi.fn();
-    const r = render(h(FinishWorkoutModal as any, props({ onCancel, finishing: true })));
+    const r = render(h(FinishWorkoutSheet as any, props({ onCancel, finishing: true })));
     fireEvent.keyDown(document, { key: 'Escape' });
-    fireEvent.click(document.querySelector('.modal-overlay')!);
+    fireEvent.click(document.querySelector('.lb-sheet-overlay')!);
     expect(onCancel).not.toHaveBeenCalled();
-    r.rerender(h(FinishWorkoutModal as any, props({ onCancel, finishing: false })));
+    r.rerender(h(FinishWorkoutSheet as any, props({ onCancel, finishing: false })));
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
   it('does not close on an IME Escape in the notes textarea', () => {
     const onCancel = vi.fn();
-    render(h(FinishWorkoutModal as any, props({ onCancel })));
+    render(h(FinishWorkoutSheet as any, props({ onCancel })));
     fireEvent.keyDown(document.querySelector('textarea')!, { key: 'Escape', isComposing: true });
     expect(onCancel).not.toHaveBeenCalled();
   });

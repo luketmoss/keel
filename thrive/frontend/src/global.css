@@ -1908,233 +1908,624 @@ input, select, textarea {
   color: var(--color-text);
 }
 
-/* ===== Workout Tracker ===== */
-.workout-tracker-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-md) 0;
-  position: sticky;
-  top: 0;
-  background: var(--color-bg);
-  z-index: 10;
-  gap: var(--space-md);
+/* ===== Logbook (#667) =====
+   The workout tracker in the new look: #531's top bar and menu, #533's ring, section cards and set tiles,
+   #640's Add exercise and Add a section, #639's pinned bar, #641's sheet frame. Tokens only; none are new.
+   thrive/docs/design/667-logbook-redesign.md. */
+.workout-detail-screen > .detail-top-bar.lb-top-bar {
+  justify-content: flex-end;
 }
 
-.workout-tracker-actions {
+.lb-lift-chip.btn {
+  min-height: 44px;
+  gap: var(--space-xs);
+  padding: 0 var(--space-md);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  color: var(--color-primary-text);
+}
+
+.lb-lift-chip svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.lb-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.lb-meta {
+  font-weight: 500;
+}
+
+/* The Last time chip and the Add a section pills are 44 px high here, as every control on this screen is. */
+.lb-screen .filter-chip {
+  min-height: 44px;
+}
+
+/* The offline banner: an inset row, not a full-width button. */
+.lb-banner {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-xs) var(--space-xs) calc(var(--space-sm) + var(--space-xs));
+  border-radius: var(--radius-md);
+  background: var(--color-warning-light);
+  color: var(--color-text);
+  font-size: var(--text-sm);
 }
 
-/* #579: the tracker's way into Lift Mode, drawn like Lift Mode's own header chips. */
-.workout-tracker-lift {
+.lb-banner > svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: var(--color-warning);
+}
+
+.lb-banner-text {
+  flex: 1;
+  min-width: 0;
+}
+
+/* A text button: 44px high, the brand text colour, 600. */
+.lb-text-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
   min-height: 44px;
-  padding: 0 var(--space-md);
+  padding: 0 var(--space-sm);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-primary-text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* The progress card: #533's ring beside two cells. */
+.lb-progress-cells {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.lb-need-effort {
+  color: var(--color-warning);
+}
+
+/* Edit mode's Details card. */
+.lb-details {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space-sm) + var(--space-xs));
+}
+
+.lb-details-title {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.lb-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.lb-field-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: calc(var(--space-sm) + var(--space-xs));
+}
+
+.lb-field-label {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.lb-details .lb-field-label {
+  font-size: var(--text-sm);
+}
+
+.form-input.lb-input {
+  min-height: 44px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.form-textarea.lb-notes {
+  min-height: 72px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+/* Section cards. */
+.lb-cards {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space-sm) + var(--space-xs));
+}
+
+.lb-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.lb-card-count {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.lb-exercise {
+  padding-bottom: calc(var(--space-sm) + var(--space-xs));
+}
+
+.lb-card-head + .lb-exercise {
+  padding-top: var(--space-xs);
+}
+
+.lb-exercise + .lb-exercise {
+  padding-top: var(--space-xs);
+  border-top: 1px solid var(--color-border-light);
+}
+
+.lb-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  min-height: 44px;
+}
+
+/* The round options button sits flush with the card's padding. */
+.lb-name-row .detail-menu-wrap {
+  flex: none;
+  margin-right: calc(-1 * (var(--space-sm) + var(--space-xs)));
+}
+
+.lb-exercise-name {
+  min-width: 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.lb-warmup {
+  padding-bottom: 0;
+}
+
+.lb-warmup .lb-name-row {
+  min-height: 48px;
+}
+
+.lb-warmup-name {
+  min-width: 0;
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.lb-last-time {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.lb-last-time-text {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.lb-copy-btn {
+  margin-right: calc(-1 * var(--space-sm));
+}
+
+/* Set tiles: 58 x 44, four to a row at 375px. */
+.lb-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--space-xs) + 2px);
+  margin-top: var(--space-xs);
+}
+
+.lb-tile {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 44px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: calc(var(--radius-md) + 2px);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+[data-theme="dark"] .lb-tile {
+  background: var(--color-surface-raised);
+}
+
+.lb-tile-face {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.lb-menu-icon {
+  display: inline-flex;
+}
+
+.lb-menu-icon:empty {
+  display: none;
+}
+
+.lb-tile-value {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.lb-tile-note {
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.lb-tile-effort-easy {
+  color: var(--effort-easy);
+}
+
+.lb-tile-effort-medium {
+  color: var(--effort-medium);
+}
+
+.lb-tile-effort-hard {
+  color: var(--effort-hard);
+}
+
+.lb-tile.lb-tile-undone,
+.lb-tile.lb-tile-add {
+  border: 1px dashed var(--color-border-strong);
+  background: transparent;
+}
+
+.lb-tile-undone .lb-tile-value {
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.lb-tile-undone .lb-tile-note {
+  color: var(--color-text-muted);
+}
+
+.lb-tile-add {
+  color: var(--color-primary-text);
+}
+
+.lb-tile-add svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* The open tile: a 2px brand border, also in aria-expanded. */
+.lb-tile.lb-tile-open {
+  border: 2px solid var(--color-primary);
+}
+
+.copy-down-flash .lb-tile {
+  animation: copy-down-highlight 600ms ease-out;
+}
+
+/* The one set editor, under its exercise's tiles. */
+.lb-editor {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space-sm) + var(--space-xs));
+  margin-top: var(--space-sm);
+  padding: calc(var(--space-sm) + var(--space-xs));
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+}
+
+.lb-editor-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+}
+
+.lb-editor-title {
+  font-weight: 600;
+}
+
+.lb-editor-target {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.lb-editor-status {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.lb-steppers {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: calc(var(--space-sm) + var(--space-xs));
+}
+
+.lb-stepper-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.lb-stepper {
+  display: flex;
+  align-items: center;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-full);
   background: var(--color-surface);
-  color: var(--color-primary-text);
-  font-size: var(--text-sm);
-  font-weight: 600;
 }
 
-.workout-tracker-title {
-  font-size: var(--text-xl);
-  font-weight: 700;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.sync-status-bar {
+.lb-step-btn {
   display: flex;
+  flex: none;
   align-items: center;
   justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--text-lg);
+  cursor: pointer;
+}
+
+.form-input.lb-step-input {
+  flex: 1;
   width: 100%;
+  min-width: 0;
   min-height: 44px;
-  background: var(--color-warning-light);
-  color: var(--color-warning);
-  border: 1px solid var(--color-warning);
-  border-radius: var(--radius-md);
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: var(--text-base);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.lb-same-btn {
+  align-self: flex-end;
+}
+
+/* Effort: three equal pills. The selected one is filled with its colour and carries weight as well. */
+.lb-effort {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.lb-effort-pill {
+  flex: 1;
+  min-height: 44px;
+  padding: 0 var(--space-xs);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-text);
   font-size: var(--text-sm);
   font-weight: 600;
-  padding: var(--space-sm) var(--space-md);
   cursor: pointer;
-  margin-bottom: var(--space-sm);
 }
 
-.finish-form {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-md);
-  margin-bottom: var(--space-md);
+.lb-effort-pill.active {
+  border-color: transparent;
+  color: var(--color-on-fill);
+  font-weight: 700;
 }
 
-.finish-form .form-group {
-  margin-bottom: var(--space-sm);
+.lb-effort-easy.active {
+  background: var(--effort-easy);
 }
 
-.finish-form-actions {
-  display: flex;
-  gap: var(--space-sm);
+.lb-effort-medium.active {
+  background: var(--effort-medium);
 }
 
-.tracker-exercise-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
+.lb-effort-hard.active {
+  background: var(--effort-hard);
 }
 
-/* ===== Tracker Exercise Card ===== */
-.tracker-exercise {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-md);
-}
-
-/* Warmup exercises — simplified list-only card */
-.tracker-exercise-warmup {
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  border-left: 3px solid #e65100;
-  padding: var(--space-sm) var(--space-md);
-}
-
-.tracker-exercise-warmup .tracker-exercise-controls {
-  width: 100%;
-  margin-bottom: 0;
-}
-
-.tracker-exercise-warmup .tracker-exercise-name {
-  flex: 1;
-}
-
-[data-theme="dark"] .tracker-exercise-warmup {
-  border-left-color: #ffb74d;
-}
-
-.tracker-exercise-header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  margin-bottom: var(--space-sm);
-}
-
-.tracker-exercise-controls {
+.lb-editor-actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-sm);
-  margin-bottom: var(--space-xs);
 }
 
-.tracker-exercise-actions {
-  display: flex;
-  align-items: center;
+.lb-remove-set {
+  color: var(--color-danger-text);
+  padding-left: 0;
+}
+
+.btn.lb-next-btn {
+  min-height: 44px;
+  padding: 0 var(--space-lg);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+}
+
+/* Add exercise: a text button closing the card, set off by a hairline. */
+.btn-ghost.lb-add-btn {
+  justify-content: flex-start;
   gap: var(--space-xs);
-}
-
-.tracker-exercise-name-row {
-  display: block;
   width: 100%;
-  margin-bottom: var(--space-sm);
+  min-height: 44px;
+  padding: 0;
+  border-top: 1px solid var(--color-border-light);
+  border-radius: 0;
+  color: var(--color-primary-text);
 }
 
-.tracker-exercise-name {
-  font-weight: 600;
-  font-size: var(--text-base);
+.lb-add-btn svg {
+  width: 18px;
+  height: 18px;
 }
 
-.quick-fill-row {
+/* The finish bar: #639's pinned footer, a 48px button. */
+.lb-finish-bar .btn {
+  min-height: 48px;
+}
+
+/* Sheets: #641's frame (scrim, raised panel, rounded top), sized to their content. */
+.lb-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
   display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  margin-bottom: var(--space-sm);
-  border-top: 1px solid var(--color-border);
-  padding-top: var(--space-sm);
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  animation: fade-in 0.2s ease;
 }
 
-.quick-fill-spacer {
-  min-width: 24px;
+/* The finish sheet is a direct child of the screen, whose sections sit --space-md in from the sides. */
+.workout-detail-screen > .lb-sheet-overlay {
+  margin: 0;
 }
 
-.quick-fill-end-spacer {
-  /* set-saved (16px) + gap (4px) + set-remove-btn (24px) */
-  min-width: 44px;
+.lb-sheet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: var(--content-max);
+  max-height: calc(100% - (var(--space-xl) + var(--space-xl) + var(--space-sm)));
+  overflow-y: auto;
+  background: var(--color-surface-raised);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  animation: picker-slide-up var(--transition-normal);
 }
 
-.tracker-set-list {
+@media (prefers-reduced-motion: reduce) {
+  .lb-sheet {
+    animation: none;
+  }
+}
+
+.lb-sheet-body {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space-sm) + var(--space-xs));
+  padding: var(--space-sm) var(--space-md) calc(var(--space-md) + env(safe-area-inset-bottom, 0px));
+}
+
+.lb-sheet-title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.lb-sheet-summary {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.lb-sheet-field {
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
 }
 
-.add-set-btn {
-  margin-top: var(--space-sm);
-  padding: var(--space-xs) var(--space-sm);
+.lb-sheet-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.lb-sheet-actions .btn {
+  width: 100%;
+}
+
+.lb-sheet-actions .lb-save-btn {
+  min-height: 48px;
+}
+
+.lb-sheet-actions .lb-keep-btn {
+  min-height: 44px;
+}
+
+.lb-section-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.lb-section-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  width: 100%;
+  min-height: 48px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--text-base);
+  text-align: left;
+  cursor: pointer;
+}
+
+.lb-section-row + .lb-section-row {
+  border-top: 1px solid var(--color-border-light);
+}
+
+.lb-section-row[aria-checked="true"] {
+  font-weight: 600;
   color: var(--color-primary-text);
-  font-weight: 600;
-  font-size: var(--text-sm);
 }
 
-/* ===== Tracker Set Row ===== */
-.tracker-set {
+.lb-warn {
   display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  padding: var(--space-xs) 0;
-  border-bottom: 1px solid var(--color-border-light);
+  flex-direction: column;
+  gap: calc(var(--space-sm) + var(--space-xs));
+  padding: calc(var(--space-sm) + var(--space-xs));
+  border-radius: var(--radius-md);
+  background: var(--color-warning-light);
 }
 
-.tracker-set:last-child {
-  border-bottom: none;
-}
-
-.tracker-set-number {
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--color-text-muted);
-  min-width: 24px;
-  text-align: center;
-}
-
-.set-planned-target {
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-}
-
-.set-inputs {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  flex: 1;
-}
-
-.set-weight-input,
-.set-reps-input {
-  width: 56px;
-  min-height: 32px;
-  padding: var(--space-xs) var(--space-xs);
-  font-size: var(--text-sm);
-  text-align: center;
-  -moz-appearance: textfield;
-}
-
-.set-weight-input::-webkit-inner-spin-button,
-.set-weight-input::-webkit-outer-spin-button,
-.set-reps-input::-webkit-inner-spin-button,
-.set-reps-input::-webkit-outer-spin-button {
-  -webkit-appearance: none;
+.lb-warn-text {
   margin: 0;
-}
-
-.set-input-separator {
   font-size: var(--text-sm);
-  color: var(--color-text-muted);
+  color: var(--color-text);
 }
 
 /* ===== Effort Toggle ===== */
@@ -2256,32 +2647,6 @@ input, select, textarea {
   background: #2d0a0a;
   color: #ef9a9a;
   border-color: #e5484d;
-}
-
-.set-saved {
-  font-size: var(--text-xs);
-  color: var(--color-success);
-  min-width: 16px;
-  text-align: center;
-}
-
-.set-remove-btn {
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius-full);
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all var(--transition-fast);
-}
-
-@media (hover: hover) {
-  .set-remove-btn:hover {
-    background: var(--color-danger-fill);
-    color: var(--color-on-fill);
-  }
 }
 
 /* ===== Simple Workout Form ===== */
@@ -3823,47 +4188,7 @@ input, select, textarea {
   font-weight: 600;
 }
 
-/* ===== Last Time Toggle Button ===== */
-.last-time-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  transition: color var(--transition-fast), border-color var(--transition-fast);
-}
-
-@media (hover: hover) {
-  .last-time-toggle:hover {
-    color: var(--color-primary-text);
-    border-color: var(--color-primary);
-  }
-}
-
-.last-time-toggle[aria-expanded="true"] {
-  color: var(--color-primary-text);
-  border-color: var(--color-primary);
-  background: var(--color-primary-light);
-}
-
-.last-time-icon {
-  display: block;
-}
-
-/* ===== Last Time Panel ===== */
-.last-time-panel {
-  background: var(--color-primary-light);
-  border-radius: var(--radius-sm);
-  padding: var(--space-sm) var(--space-md);
-  margin-bottom: var(--space-sm);
-  font-size: var(--text-sm);
-}
-
-.last-time-panel-empty {
-  text-align: center;
-  padding: var(--space-md);
-}
+/* ===== Last time (the Exercises screen's panel) ===== */
 
 .last-time-empty-text {
   color: var(--color-text-muted);
@@ -3877,69 +4202,9 @@ input, select, textarea {
   margin-bottom: var(--space-xs);
 }
 
-.last-time-sets .exercise-detail-sets-header,
-.last-time-sets .exercise-detail-set-row {
-  font-size: var(--text-sm);
-}
-
-.last-time-sets .exercise-detail-set-row:last-child {
-  border-bottom: none;
-}
-
-.last-time-actions {
-  display: flex;
-  gap: var(--space-sm);
-  margin-top: var(--space-sm);
-}
-
-.copy-down-btn {
-  flex: 1;
-  min-height: 44px;
-  padding: var(--space-xs) var(--space-sm);
-  color: var(--color-primary-text);
-  font-weight: 600;
-  font-size: var(--text-sm);
-  background: none;
-  border: 1px solid var(--color-primary);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast);
-}
-
-@media (hover: hover) {
-  .copy-down-btn:hover {
-    background: var(--color-primary-fill);
-    color: var(--color-on-fill);
-  }
-}
-
-.last-time-close-btn {
-  min-width: 44px;
-  min-height: 44px;
-  padding: var(--space-xs);
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-  background: none;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast);
-}
-
-@media (hover: hover) {
-  .last-time-close-btn:hover {
-    background: var(--color-border);
-    color: var(--color-text);
-  }
-}
-
 @keyframes copy-down-highlight {
   0% { background-color: var(--color-primary-light); }
   100% { background-color: transparent; }
-}
-
-.copy-down-flash .tracker-set {
-  animation: copy-down-highlight 600ms ease-out;
 }
 
 .detail-actions {
@@ -3970,42 +4235,6 @@ input, select, textarea {
 .theme-toggle-btn.active {
   background: var(--color-primary-fill);
   color: var(--color-on-fill);
-}
-
-/* ===== Superset Visual Treatment ===== */
-.tracker-exercise.section-ss-group {
-  border-left: 3px solid;
-}
-
-.tracker-exercise.section-ss-group.ss-SS1 {
-  border-left-color: #7b1fa2;
-}
-
-.tracker-exercise.section-ss-group.ss-SS2 {
-  border-left-color: #1565c0;
-}
-
-.tracker-exercise.section-ss-group.ss-SS3 {
-  border-left-color: #00695c;
-}
-
-[data-theme="dark"] .tracker-exercise.section-ss-group.ss-SS1 {
-  border-left-color: #ce93d8;
-}
-
-[data-theme="dark"] .tracker-exercise.section-ss-group.ss-SS2 {
-  border-left-color: #64b5f6;
-}
-
-[data-theme="dark"] .tracker-exercise.section-ss-group.ss-SS3 {
-  border-left-color: #80cbc4;
-}
-
-/* Superset label in tracker */
-.tracker-exercise.section-ss-group + .tracker-exercise.section-ss-group {
-  margin-top: calc(-1 * var(--space-md) + 2px);
-  border-top: none;
-  border-radius: 0 0 var(--radius-md) var(--radius-md);
 }
 
 /* ===== Colored Tag Badges ===== */
@@ -4050,7 +4279,6 @@ input, select, textarea {
   font-size: var(--text-base);
   font-weight: 700;
 }
-
 
 .color-swatch.selected {
   border-color: currentColor;
@@ -4248,19 +4476,6 @@ input, select, textarea {
 }
 
 /* ===== Section Badge Button ===== */
-.section-badge-btn {
-  cursor: pointer;
-  border: none;
-  padding: 2px 8px;
-  min-height: 44px;
-  min-width: 44px;
-  border-radius: var(--radius-sm);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  flex-shrink: 0;
-}
 
 /* ===== Section Picker Row ===== */
 .section-picker-row {
@@ -4373,63 +4588,11 @@ input, select, textarea {
 }
 
 /* ===== Exercise Toolbar Row ===== */
-.exercise-toolbar-row {
-  display: flex;
-  gap: var(--space-xs);
-  padding: var(--space-xs) 0;
-}
-
-.exercise-toolbar-btn {
-  position: relative;
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  min-height: 28px;
-  padding: 0;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-raised);
-  color: var(--color-text-secondary);
-  font-size: var(--text-xs);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: opacity 0.1s;
-}
 
 /* Expand touch target to 44x44px while keeping 28px visual size */
-.exercise-toolbar-btn::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 44px;
-  height: 44px;
-  transform: translate(-50%, -50%);
-}
-
-@media (hover: hover) {
-  .exercise-toolbar-btn:hover:not(:disabled):not([aria-disabled="true"]) {
-    color: var(--color-text);
-    border-color: var(--color-border-strong, var(--color-border));
-  }
-}
 
 /* #371 (as #328): an end Move button stays focusable (aria-disabled), and
    takes the shared disabled treatment (#404, Interaction states). */
-
-.exercise-toolbar-remove {
-  color: var(--color-danger-text);
-  border-color: var(--color-danger);
-}
-
-@media (hover: hover) {
-  .exercise-toolbar-remove:hover:not(:disabled):not([aria-disabled="true"]) {
-    background: var(--color-danger-fill);
-    color: var(--color-on-fill);
-  }
-}
 
 /* Screen-reader only utility */
 .sr-only {
@@ -4724,8 +4887,7 @@ input, select, textarea {
 /* A hike form grows past 900px at 375px once four fields appear, and the only
    Save affordance lives in the header. Scoped to .simple-workout-form rather
    than applied to .template-editor-header, which has ten consumers across
-   templates, workout detail and the builder. Same four declarations as
-   .workout-tracker-header, which is structurally identical. */
+   templates, workout detail and the builder. */
 .simple-workout-form .template-editor-header {
   position: sticky;
   top: 0;
@@ -8529,7 +8691,8 @@ body:has(.lift) {
   .effort-btn.active,
   .effort-btn-easy.active,
   .effort-btn-medium.active,
-  .effort-btn-hard.active {
+  .effort-btn-hard.active,
+  .lb-effort-pill.active {
     background: Highlight !important;
     color: HighlightText !important;
     border-color: Highlight;
@@ -8540,6 +8703,23 @@ body:has(.lift) {
 
   .bottom-nav-tab.active {
     box-shadow: none;
+  }
+
+  /* #667: the Logbook's tiles and cards keep an edge when their fills flatten; the open tile a 2px Highlight one. */
+  .lb-tile,
+  .lb-editor,
+  .lb-stepper {
+    border: 1px solid CanvasText;
+  }
+
+  .lb-tile.lb-tile-open {
+    border: 2px solid Highlight;
+  }
+
+  .lb-progress,
+  .lb-card,
+  .lb-details {
+    border: 1px solid CanvasText;
   }
 
   .calendar-day-selected .calendar-day-num,
@@ -8722,16 +8902,14 @@ body:has(.lift) {
   .day-today-btn:hover:not(:disabled):not([aria-disabled="true"]),
   .training-plan-link:hover:not(:disabled):not([aria-disabled="true"]),
   .detail-coros-link:hover:not(:disabled):not([aria-disabled="true"]),
+  .lb-text-btn:hover:not(:disabled):not([aria-disabled="true"]),
   /* Icon buttons */
   .btn-icon:hover:not(:disabled):not([aria-disabled="true"]),
   .modal-close:hover:not(:disabled):not([aria-disabled="true"]),
   .day-arrow:hover:not(:disabled):not([aria-disabled="true"]),
-  .set-remove-btn:hover:not(:disabled):not([aria-disabled="true"]),
   .compact-card-remove:hover:not(:disabled):not([aria-disabled="true"]),
-  .last-time-close-btn:hover:not(:disabled):not([aria-disabled="true"]),
-  .copy-down-btn:hover:not(:disabled):not([aria-disabled="true"]),
   .reorder-btn:hover:not(:disabled):not([aria-disabled="true"]),
-  .exercise-toolbar-btn:hover:not(:disabled):not([aria-disabled="true"]),
+  .lb-step-btn:hover:not(:disabled):not([aria-disabled="true"]),
   .manage-label-delete:hover:not(:disabled):not([aria-disabled="true"]),
   .day-sync-btn:hover:not(:disabled):not([aria-disabled="true"]),
   .sync-now-btn:hover:not(:disabled):not([aria-disabled="true"]),
@@ -8741,6 +8919,7 @@ body:has(.lift) {
   .label-chip:hover:not(:disabled):not([aria-disabled="true"]),
   button.tag-badge:hover:not(:disabled):not([aria-disabled="true"]),
   .effort-btn:hover:not(:disabled):not([aria-disabled="true"]),
+  .lb-effort-pill:hover:not(:disabled):not([aria-disabled="true"]),
   .sub-type-btn:hover:not(:disabled):not([aria-disabled="true"]),
   .theme-toggle-btn:hover:not(:disabled):not([aria-disabled="true"]),
   .trends-group-btn:hover:not(:disabled):not([aria-disabled="true"]),
@@ -8749,7 +8928,6 @@ body:has(.lift) {
   .trends-menu-item:hover:not(:disabled):not([aria-disabled="true"]),
   .detail-menu-item:hover:not(:disabled):not([aria-disabled="true"]),
   .color-swatch:hover:not(:disabled):not([aria-disabled="true"]),
-  .section-badge-btn:hover:not(:disabled):not([aria-disabled="true"]),
   .section-picker-pill:hover:not(:disabled):not([aria-disabled="true"]),
   .week-day:hover:not(:disabled):not([aria-disabled="true"]),
   /* Rows and cards */
@@ -8765,8 +8943,8 @@ body:has(.lift) {
   .calendar-open-day:hover:not(:disabled):not([aria-disabled="true"]),
   .calendar-day:hover:not(:disabled):not([aria-disabled="true"]),
   .manage-label-name:hover:not(:disabled):not([aria-disabled="true"]),
-  .add-set-btn:hover:not(:disabled):not([aria-disabled="true"]),
-  .sync-status-bar:hover:not(:disabled):not([aria-disabled="true"]),
+  .lb-tile:hover:not(:disabled):not([aria-disabled="true"]),
+  .lb-section-row:hover:not(:disabled):not([aria-disabled="true"]),
   .settings-btn:hover:not(:disabled):not([aria-disabled="true"]),
   .exercise-list-item-header:hover:not(:disabled):not([aria-disabled="true"]),
   .settings-row-link:hover:not(:disabled):not([aria-disabled="true"]),
@@ -8799,16 +8977,14 @@ body:has(.lift) {
 .day-today-btn:active:not(:disabled):not([aria-disabled="true"]),
 .training-plan-link:active:not(:disabled):not([aria-disabled="true"]),
 .detail-coros-link:active:not(:disabled):not([aria-disabled="true"]),
+.lb-text-btn:active:not(:disabled):not([aria-disabled="true"]),
 /* Icon buttons */
 .btn-icon:active:not(:disabled):not([aria-disabled="true"]),
 .modal-close:active:not(:disabled):not([aria-disabled="true"]),
 .day-arrow:active:not(:disabled):not([aria-disabled="true"]),
-.set-remove-btn:active:not(:disabled):not([aria-disabled="true"]),
 .compact-card-remove:active:not(:disabled):not([aria-disabled="true"]),
-.last-time-close-btn:active:not(:disabled):not([aria-disabled="true"]),
-.copy-down-btn:active:not(:disabled):not([aria-disabled="true"]),
 .reorder-btn:active:not(:disabled):not([aria-disabled="true"]),
-.exercise-toolbar-btn:active:not(:disabled):not([aria-disabled="true"]),
+.lb-step-btn:active:not(:disabled):not([aria-disabled="true"]),
 .manage-label-delete:active:not(:disabled):not([aria-disabled="true"]),
 .day-sync-btn:active:not(:disabled):not([aria-disabled="true"]),
 .sync-now-btn:active:not(:disabled):not([aria-disabled="true"]),
@@ -8818,6 +8994,7 @@ body:has(.lift) {
 .label-chip:active:not(:disabled):not([aria-disabled="true"]),
 button.tag-badge:active:not(:disabled):not([aria-disabled="true"]),
 .effort-btn:active:not(:disabled):not([aria-disabled="true"]),
+.lb-effort-pill:active:not(:disabled):not([aria-disabled="true"]),
 .sub-type-btn:active:not(:disabled):not([aria-disabled="true"]),
 .theme-toggle-btn:active:not(:disabled):not([aria-disabled="true"]),
 .trends-group-btn:active:not(:disabled):not([aria-disabled="true"]),
@@ -8826,7 +9003,6 @@ button.tag-badge:active:not(:disabled):not([aria-disabled="true"]),
 .trends-menu-item:active:not(:disabled):not([aria-disabled="true"]),
 .detail-menu-item:active:not(:disabled):not([aria-disabled="true"]),
 .color-swatch:active:not(:disabled):not([aria-disabled="true"]),
-.section-badge-btn:active:not(:disabled):not([aria-disabled="true"]),
 .section-picker-pill:active:not(:disabled):not([aria-disabled="true"]),
 .week-day:active:not(:disabled):not([aria-disabled="true"]),
 /* Rows and cards */
@@ -8842,8 +9018,8 @@ a.workout-card:active:not(:disabled):not([aria-disabled="true"]),
 .calendar-open-day:active:not(:disabled):not([aria-disabled="true"]),
 .calendar-day:active:not(:disabled):not([aria-disabled="true"]),
 .manage-label-name:active:not(:disabled):not([aria-disabled="true"]),
-.add-set-btn:active:not(:disabled):not([aria-disabled="true"]),
-.sync-status-bar:active:not(:disabled):not([aria-disabled="true"]),
+.lb-tile:active:not(:disabled):not([aria-disabled="true"]),
+.lb-section-row:active:not(:disabled):not([aria-disabled="true"]),
 .settings-btn:active:not(:disabled):not([aria-disabled="true"]),
 .exercise-list-item-header:active:not(:disabled):not([aria-disabled="true"]),
 .settings-row-link:active:not(:disabled):not([aria-disabled="true"]),

@@ -75,7 +75,7 @@ const RING_STROKE = 10;
 const RING_R = (RING - RING_STROKE) / 2;
 
 /** Logged / total sets as a ring from 12 o'clock, the count inside and "of N sets" under it. */
-function SetsRing({ logged, total }: { logged: number; total: number }) {
+export function SetsRing({ logged, total }: { logged: number; total: number }) {
   const share = total > 0 ? Math.min(100, (logged / total) * 100) : 0;
   const c = RING / 2;
   return (

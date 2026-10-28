@@ -1,312 +1,154 @@
+// #667 — the finish sheet (was the centred Finish Workout dialog): a bottom sheet in the exercise
+// picker's frame with a summary line, session effort, notes, Save workout and Keep logging.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, cleanup } from '@testing-library/preact';
 import { h } from 'preact';
-import { FinishWorkoutModal } from './finish-modal';
+import { FinishWorkoutSheet } from './finish-modal';
 
-describe('FinishWorkoutModal', () => {
-  let onNotesChange: ReturnType<typeof vi.fn>;
-  let onFinish: ReturnType<typeof vi.fn>;
-  let onCancel: ReturnType<typeof vi.fn>;
+function renderSheet(overrides: Record<string, unknown> = {}) {
+  const props = {
+    notes: '',
+    onNotesChange: vi.fn(),
+    effort: '',
+    onEffortChange: vi.fn(),
+    onFinish: vi.fn(),
+    onCancel: vi.fn(),
+    finishing: false,
+    summary: '14 of 17 sets logged · 3 need effort',
+    ...overrides,
+  };
+  return { props, ...render(h(FinishWorkoutSheet as any, props)) };
+}
 
-  beforeEach(() => {
-    onNotesChange = vi.fn();
-    onFinish = vi.fn();
-    onCancel = vi.fn();
+const button = (container: Element, text: string) =>
+  [...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === text)!;
+
+afterEach(cleanup);
+
+describe('the sheet is an accessible dialog', () => {
+  it('has role="dialog", aria-modal and a heading that labels it', () => {
+    const { container } = renderSheet();
+    const dialog = container.querySelector('[role="dialog"]')!;
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    const heading = container.querySelector(`#${dialog.getAttribute('aria-labelledby')}`)!;
+    expect(heading.textContent).toBe('Finish workout');
   });
 
-  afterEach(() => {
-    cleanup();
+  it('sits in the picker sheet frame: a scrim and a panel, not the centred modal', () => {
+    const { container } = renderSheet();
+    expect(container.querySelector('.lb-sheet-overlay .lb-sheet')).toBeTruthy();
+    expect(container.querySelector('.modal-overlay')).toBeNull();
   });
 
-  function renderModal(overrides: Record<string, unknown> = {}) {
-    const props = {
-      notes: '',
-      onNotesChange,
-      effort: '',
-      onEffortChange: vi.fn(),
-      onFinish,
-      onCancel,
-      finishing: false,
-      ...overrides,
-    };
-    return render(h(FinishWorkoutModal as any, props));
-  }
-
-  // AC1: Accessible modal overlay appears on finish
-  describe('AC1: Accessible modal overlay', () => {
-    it('renders with role="dialog" and aria-modal="true"', () => {
-      const { container } = renderModal();
-      const dialog = container.querySelector('[role="dialog"]')!;
-      expect(dialog).toBeTruthy();
-      expect(dialog.getAttribute('aria-modal')).toBe('true');
-    });
-
-    it('has aria-labelledby pointing to the heading', () => {
-      const { container } = renderModal();
-      const dialog = container.querySelector('[role="dialog"]')!;
-      const labelledBy = dialog.getAttribute('aria-labelledby');
-      expect(labelledBy).toBeTruthy();
-      const heading = container.querySelector(`#${labelledBy}`)!;
-      expect(heading).toBeTruthy();
-      expect(heading.textContent).toBe('Finish Workout');
-    });
-
-    it('uses modal-overlay class for fixed positioning', () => {
-      const { container } = renderModal();
-      const overlay = container.querySelector('.modal-overlay');
-      expect(overlay).toBeTruthy();
-    });
-
-    it('auto-focuses the textarea on mount', () => {
-      const { container } = renderModal();
-      const textarea = container.querySelector('textarea');
-      expect(textarea).toBeTruthy();
-      expect(document.activeElement).toBe(textarea);
-    });
-  });
-
-  // AC2: Modal contains notes and correctly-ordered actions
-  describe('AC2: Modal contents and button order', () => {
-    it('contains a "Finish Workout" heading', () => {
-      const { container } = renderModal();
-      const heading = container.querySelector('h2');
-      expect(heading).toBeTruthy();
-      expect(heading!.textContent).toBe('Finish Workout');
-    });
-
-    it('contains a notes textarea with correct placeholder', () => {
-      const { container } = renderModal();
-      const textarea = container.querySelector('textarea');
-      expect(textarea).toBeTruthy();
-      expect(textarea!.getAttribute('placeholder')).toBe('How did it go?');
-    });
-
-    it('contains "Workout Notes (optional)" label', () => {
-      const { container } = renderModal();
-      const label = container.querySelector('.form-label');
-      expect(label).toBeTruthy();
-      expect(label!.textContent).toBe('Workout Notes (optional)');
-    });
-
-    it('has "Save & Finish" button before "Cancel" button', () => {
-      const { container } = renderModal();
-      const buttons = container.querySelectorAll('button');
-      const buttonTexts = Array.from(buttons).map((b) => b.textContent?.trim());
-      const saveIdx = buttonTexts.indexOf('Save & Finish');
-      const cancelIdx = buttonTexts.indexOf('Cancel');
-      expect(saveIdx).toBeGreaterThanOrEqual(0);
-      expect(cancelIdx).toBeGreaterThanOrEqual(0);
-      expect(saveIdx).toBeLessThan(cancelIdx);
-    });
-
-    it('"Save & Finish" is a primary button', () => {
-      const { container } = renderModal();
-      const buttons = Array.from(container.querySelectorAll('button'));
-      const saveBtn = buttons.find((b) => b.textContent?.trim() === 'Save & Finish');
-      expect(saveBtn).toBeTruthy();
-      expect(saveBtn!.classList.contains('btn-primary')).toBe(true);
-    });
-
-    it('"Cancel" is a secondary button', () => {
-      const { container } = renderModal();
-      const buttons = Array.from(container.querySelectorAll('button'));
-      const cancelBtn = buttons.find((b) => b.textContent?.trim() === 'Cancel');
-      expect(cancelBtn).toBeTruthy();
-      expect(cancelBtn!.classList.contains('btn-secondary')).toBe(true);
-    });
-  });
-
-  // AC3: Backdrop click and Escape close the modal (unless saving)
-  describe('AC3: Dismiss behavior', () => {
-    it('calls onCancel when backdrop is clicked', () => {
-      const { container } = renderModal();
-      const overlay = container.querySelector('.modal-overlay')!;
-      fireEvent.click(overlay);
-      expect(onCancel).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not call onCancel when modal content is clicked', () => {
-      const { container } = renderModal();
-      const content = container.querySelector('.modal-content')!;
-      fireEvent.click(content);
-      expect(onCancel).not.toHaveBeenCalled();
-    });
-
-    it('calls onCancel when Escape is pressed', () => {
-      renderModal();
-      fireEvent.keyDown(document, { key: 'Escape' });
-      expect(onCancel).toHaveBeenCalledTimes(1);
-    });
-
-    it('does NOT call onCancel on backdrop click while finishing', () => {
-      const { container } = renderModal({ finishing: true });
-      const overlay = container.querySelector('.modal-overlay')!;
-      fireEvent.click(overlay);
-      expect(onCancel).not.toHaveBeenCalled();
-    });
-
-    it('does NOT call onCancel on Escape while finishing', () => {
-      renderModal({ finishing: true });
-      fireEvent.keyDown(document, { key: 'Escape' });
-      expect(onCancel).not.toHaveBeenCalled();
-    });
-
-    it('disables Cancel button while finishing', () => {
-      const { container } = renderModal({ finishing: true });
-      const buttons = Array.from(container.querySelectorAll('button'));
-      const cancelBtn = buttons.find((b) => b.textContent?.trim() === 'Cancel');
-      expect(cancelBtn).toBeTruthy();
-      expect(cancelBtn!.hasAttribute('disabled')).toBe(true);
-    });
-  });
-
-  // AC4: Save & Finish works from modal
-  describe('AC4: Save & Finish', () => {
-    it('calls onFinish when "Save & Finish" is clicked', () => {
-      const { container } = renderModal();
-      const buttons = Array.from(container.querySelectorAll('button'));
-      const saveBtn = buttons.find((b) => b.textContent?.trim() === 'Save & Finish')!;
-      fireEvent.click(saveBtn);
-      expect(onFinish).toHaveBeenCalledTimes(1);
-    });
-
-    it('shows "Saving..." text while finishing', () => {
-      const { container } = renderModal({ finishing: true });
-      const buttons = Array.from(container.querySelectorAll('button'));
-      const savingBtn = buttons.find((b) => b.textContent?.trim() === 'Saving...');
-      expect(savingBtn).toBeTruthy();
-    });
-
-    it('disables "Save & Finish" button while finishing', () => {
-      const { container } = renderModal({ finishing: true });
-      const buttons = Array.from(container.querySelectorAll('button'));
-      const savingBtn = buttons.find((b) => b.textContent?.trim() === 'Saving...');
-      expect(savingBtn).toBeTruthy();
-      expect(savingBtn!.hasAttribute('disabled')).toBe(true);
-    });
-
-    it('passes notes value to textarea', () => {
-      const { container } = renderModal({ notes: 'Great session!' });
-      const textarea = container.querySelector('textarea') as HTMLTextAreaElement;
-      expect(textarea.value).toBe('Great session!');
-    });
-
-    it('calls onNotesChange when textarea changes', () => {
-      const { container } = renderModal();
-      const textarea = container.querySelector('textarea')!;
-      fireEvent.input(textarea, { target: { value: 'New notes' } });
-      expect(onNotesChange).toHaveBeenCalled();
-    });
+  it('focuses the notes textarea on open', () => {
+    const { container } = renderSheet();
+    expect(document.activeElement).toBe(container.querySelector('textarea'));
   });
 });
 
-// Issue #102 — session effort in the finish modal.
-describe('FinishWorkoutModal — session effort (#102)', () => {
-  let onEffortChange: ReturnType<typeof vi.fn>;
+describe('contents', () => {
+  it('shows the summary line under the heading', () => {
+    const { container } = renderSheet();
+    expect(container.querySelector('.lb-sheet-summary')!.textContent).toBe('14 of 17 sets logged · 3 need effort');
+  });
 
+  it('has Session effort pills, then Notes with its placeholder, then Save workout and Keep logging', () => {
+    const { container } = renderSheet();
+    const group = container.querySelector('[role="group"]')!;
+    const textarea = container.querySelector('textarea')!;
+    expect(textarea.getAttribute('placeholder')).toBe('How did it go?');
+    expect(group.compareDocumentPosition(textarea) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const texts = [...container.querySelectorAll('button')].map((b) => b.textContent?.trim());
+    expect(texts.indexOf('Save workout')).toBeGreaterThan(texts.indexOf('Hard'));
+    expect(texts.indexOf('Save workout')).toBeLessThan(texts.indexOf('Keep logging'));
+  });
+
+  it('Save workout is a primary button and Keep logging a secondary one', () => {
+    const { container } = renderSheet();
+    expect(button(container, 'Save workout').classList.contains('btn-primary')).toBe(true);
+    expect(button(container, 'Keep logging').classList.contains('btn-secondary')).toBe(true);
+  });
+
+  it('passes the notes value to the textarea and reports typing', () => {
+    const { container, props } = renderSheet({ notes: 'Great session!' });
+    const textarea = container.querySelector('textarea') as HTMLTextAreaElement;
+    expect(textarea.value).toBe('Great session!');
+    fireEvent.input(textarea, { target: { value: 'New notes' } });
+    expect(props.onNotesChange).toHaveBeenCalled();
+  });
+});
+
+describe('dismissing', () => {
+  it('Keep logging, the scrim and Escape close it without saving', () => {
+    const { container, props } = renderSheet();
+    fireEvent.click(button(container, 'Keep logging'));
+    fireEvent.click(container.querySelector('.lb-sheet-overlay')!);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(props.onCancel).toHaveBeenCalledTimes(3);
+    expect(props.onFinish).not.toHaveBeenCalled();
+  });
+
+  it('a tap inside the panel does not close it', () => {
+    const { container, props } = renderSheet();
+    fireEvent.click(container.querySelector('.lb-sheet')!);
+    expect(props.onCancel).not.toHaveBeenCalled();
+  });
+
+  it('does nothing on the scrim or Escape while saving, and disables both buttons', () => {
+    const { container, props } = renderSheet({ finishing: true });
+    fireEvent.click(container.querySelector('.lb-sheet-overlay')!);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(props.onCancel).not.toHaveBeenCalled();
+    expect(button(container, 'Saving…').hasAttribute('disabled')).toBe(true);
+    expect(button(container, 'Keep logging').hasAttribute('disabled')).toBe(true);
+  });
+});
+
+describe('saving', () => {
+  it('calls onFinish from Save workout, with effort unset or not', () => {
+    const { container, props } = renderSheet();
+    const save = button(container, 'Save workout');
+    expect(save.hasAttribute('disabled')).toBe(false);
+    fireEvent.click(save);
+    expect(props.onFinish).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('session effort pills', () => {
+  let onEffortChange: ReturnType<typeof vi.fn>;
   beforeEach(() => {
     onEffortChange = vi.fn();
   });
-  afterEach(cleanup);
 
-  function renderWithEffort(overrides: Record<string, unknown> = {}) {
-    return render(
-      h(FinishWorkoutModal as any, {
-        notes: '',
-        onNotesChange: vi.fn(),
-        effort: '',
-        onEffortChange,
-        onFinish: vi.fn(),
-        onCancel: vi.fn(),
-        finishing: false,
-        ...overrides,
-      }),
-    );
-  }
-
-  // AC1: nothing pre-selected, and saving untouched leaves it empty.
-  it('offers the control with nothing pre-selected', () => {
-    const { container } = renderWithEffort();
-    const group = container.querySelector('[role="group"]')!;
-    expect(group).toBeTruthy();
-    expect(group.querySelector('.active')).toBeNull();
+  it('nothing is pre-selected', () => {
+    const { container } = renderSheet({ onEffortChange });
+    expect(container.querySelector('[role="group"] .active')).toBeNull();
   });
 
-  // AC1: the control must sit BELOW the notes textarea so the existing
-  // auto-focus still lands on the first field and Tab order follows reading
-  // order.
-  it('places the effort control after the notes textarea in DOM order', () => {
-    const { container } = renderWithEffort();
-    const textarea = container.querySelector('textarea')!;
-    const group = container.querySelector('[role="group"]')!;
-    expect(textarea.compareDocumentPosition(group) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  });
-
-  it('still auto-focuses the notes textarea, not an effort button', () => {
-    const { container } = renderWithEffort();
-    expect(document.activeElement).toBe(container.querySelector('textarea'));
-  });
-
-  it('reports the chosen effort upward', () => {
-    const { container } = renderWithEffort();
-    const hard = [...container.querySelectorAll('button')].find((b) => b.textContent!.trim() === 'Hard')!;
-    fireEvent.click(hard);
+  it('reports the chosen effort, and clears it when the selected one is tapped again', () => {
+    const first = renderSheet({ onEffortChange });
+    fireEvent.click(button(first.container, 'Hard'));
     expect(onEffortChange).toHaveBeenCalledWith('Hard');
-  });
-
-  // AC2: unset stays reachable from inside the modal.
-  it('clears back to unset when the selected value is tapped again', () => {
-    const { container } = renderWithEffort({ effort: 'Hard' });
-    const hard = [...container.querySelectorAll('button')].find((b) => b.textContent!.trim() === 'Hard')!;
-    fireEvent.click(hard);
+    cleanup();
+    const second = renderSheet({ onEffortChange, effort: 'Hard' });
+    fireEvent.click(button(second.container, 'Hard'));
     expect(onEffortChange).toHaveBeenCalledWith('');
   });
 
-  it('does not block saving when effort is unset', () => {
-    const onFinish = vi.fn();
-    const { container } = renderWithEffort({ onFinish });
-    const save = [...container.querySelectorAll('button')].find((b) => /Save & Finish/.test(b.textContent!))!;
-    expect(save.hasAttribute('disabled')).toBe(false);
-    fireEvent.click(save);
-    expect(onFinish).toHaveBeenCalled();
+  it('marks the selected pill pressed', () => {
+    const { container } = renderSheet({ effort: 'Hard' });
+    expect(button(container, 'Hard').getAttribute('aria-pressed')).toBe('true');
+    expect(button(container, 'Easy').getAttribute('aria-pressed')).toBe('false');
   });
 });
 
-// #372: visible labels name the controls.
-describe('FinishWorkoutModal accessible names (#372)', () => {
-  afterEach(cleanup);
-  const mk = (extra: Record<string, unknown> = {}) =>
-    render(
-      h(FinishWorkoutModal as any, {
-        notes: '',
-        onNotesChange: vi.fn(),
-        effort: '',
-        onEffortChange: vi.fn(),
-        onFinish: vi.fn(),
-        onCancel: vi.fn(),
-        finishing: false,
-        ...extra,
-      }),
-    );
-
-  it('names the notes textarea by its visible label, not the placeholder', () => {
-    const { getByRole } = mk();
-    const box = getByRole('textbox', { name: 'Workout Notes (optional)' });
+describe('accessible names (#372)', () => {
+  it('names the notes box and the effort group by their visible labels', () => {
+    const { getByRole } = renderSheet();
+    const box = getByRole('textbox', { name: 'Notes' });
     expect(box.getAttribute('placeholder')).toBe('How did it go?');
-  });
-
-  it('names the effort group by its visible label', () => {
-    const { getByRole, container } = mk();
-    const group = getByRole('group', { name: 'Session Effort (optional)' });
+    const group = getByRole('group', { name: 'Session effort' });
     expect(group.hasAttribute('aria-label')).toBe(false);
-    expect(container.querySelector('label.form-label[for]')?.textContent).toBe('Workout Notes (optional)');
-    expect([...container.querySelectorAll('label')].some((l) => /Session Effort/.test(l.textContent!))).toBe(false);
-  });
-
-  it('keeps the effort button names and pressed state', () => {
-    const { getByRole } = mk({ effort: 'Hard' });
-    expect(getByRole('button', { name: 'Session effort: Hard' }).getAttribute('aria-pressed')).toBe('true');
-    expect(getByRole('button', { name: 'Session effort: Easy' }).getAttribute('aria-pressed')).toBe('false');
   });
 
   it('generates distinct ids for two instances in one tree', () => {
@@ -318,9 +160,10 @@ describe('FinishWorkoutModal accessible names (#372)', () => {
       onFinish: vi.fn(),
       onCancel: vi.fn(),
       finishing: false,
+      summary: '',
     };
     const { container } = render(
-      h('div', null, h(FinishWorkoutModal as any, props), h(FinishWorkoutModal as any, props)),
+      h('div', null, h(FinishWorkoutSheet as any, props), h(FinishWorkoutSheet as any, props)),
     );
     const ids = [...container.querySelectorAll('textarea')].map((t) => t.id);
     expect(ids.length).toBe(2);

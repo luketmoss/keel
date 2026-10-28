@@ -65,6 +65,11 @@ export function getLastTimeDataFrom(
   };
 }
 
+/** "Oct 21": the day a previous workout was done. */
+export function formatShortDay(date: string): string {
+  return new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
 /** Format a date string as "Mar 10, 2026 (5 days ago)". */
 export function formatLastTimeDate(dateStr: string): string {
   const date = new Date(dateStr + 'T00:00:00');

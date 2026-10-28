@@ -97,8 +97,8 @@ const { saveSimpleWorkoutEdits } = await import('../../state/actions');
 const { navigate, goBack } = await import('../../router/router');
 
 /** Clicks Save and waits for the save to finish, which ends in goBack (#348). */
-async function clickSave(view: ReturnType<typeof render>) {
-  fireEvent.click(view.getAllByText('Save Changes')[0]);
+async function clickSave(view: ReturnType<typeof render>, label = 'Save Changes') {
+  fireEvent.click(view.getAllByText(label)[0]);
   await vi.waitFor(() => expect(goBack).toHaveBeenCalled());
   expect(goBack).toHaveBeenCalledWith('/activities');
   expect(navigate).not.toHaveBeenCalled();
@@ -273,15 +273,15 @@ describe('AC4: the strength edit mode behaves the same', () => {
     isEditMode.value = true;
     activeWorkoutId.value = ENRICHED.id;
     const view = render(h(WorkoutTracker, { workoutId: ENRICHED.id, workoutName: ENRICHED.name }));
-    return { ...view, save: () => clickSave(view) };
+    return { ...view, save: () => clickSave(view, 'Save') }; // #667: the Logbook's edit mode says Save
   }
 
   it('a notes-and-effort save keeps 343 s and every enriched column', async () => {
     const t = renderTracker();
-    expect((t.getByLabelText('Duration (minutes)') as HTMLInputElement).value).toBe('6');
+    expect((t.getByLabelText('Duration (min)') as HTMLInputElement).value).toBe('6');
 
     fireEvent.input(t.getByLabelText('Notes'), { target: { value: 'Solid, shoulder ok' } });
-    fireEvent.click(t.getByLabelText('Session effort: Hard'));
+    fireEvent.click(t.getByRole('button', { name: 'Hard' }));
     await t.save();
 
     expect(row(3)).toEqual({ ...ENRICHED, notes: 'Solid, shoulder ok', effort: 'Hard' });
@@ -289,7 +289,7 @@ describe('AC4: the strength edit mode behaves the same', () => {
 
   it('a real duration edit in the strength form still saves', async () => {
     const t = renderTracker();
-    fireEvent.input(t.getByLabelText('Duration (minutes)'), { target: { value: '50' } });
+    fireEvent.input(t.getByLabelText('Duration (min)'), { target: { value: '50' } });
     await t.save();
 
     expect(row(3)).toEqual({ ...ENRICHED, elapsed_seconds: '3000' });
@@ -361,7 +361,7 @@ describe('AC6: the edit forms label their text inputs', () => {
     isEditMode.value = true;
     activeWorkoutId.value = ENRICHED.id;
     const t = render(h(WorkoutTracker, { workoutId: ENRICHED.id, workoutName: ENRICHED.name }));
-    const ids = ['Name', 'Date', 'Duration (minutes)', 'Notes'].map((l) => (t.getByLabelText(l) as HTMLElement).id);
+    const ids = ['Name', 'Date', 'Duration (min)', 'Notes'].map((l) => (t.getByLabelText(l) as HTMLElement).id);
     expect(ids).toEqual(['tracker-edit-name', 'tracker-edit-date', 'tracker-edit-duration', 'tracker-edit-notes']);
   });
 });
@@ -414,7 +414,7 @@ describe('#348: leaving the edit forms uses goBack', () => {
     sheetsUpdate.mockRejectedValueOnce(new Error('boom'));
     const t = renderTracker();
     fireEvent.input(t.getByLabelText('Notes'), { target: { value: 'changed' } });
-    fireEvent.click(t.getAllByText('Save Changes')[0]);
+    fireEvent.click(t.getAllByText('Save')[0]);
     await vi.waitFor(() => expect(sheetsUpdate).toHaveBeenCalled());
     await new Promise((r) => setTimeout(r, 20));
     expect(goBack).not.toHaveBeenCalled();
@@ -424,11 +424,11 @@ describe('#348: leaving the edit forms uses goBack', () => {
   it('Tracker edit mode: a cancelled Discard calls neither, a confirmed one goBack once', async () => {
     mountConfirmHost();
     const t = renderTracker();
-    fireEvent.click(t.getByText('Discard Changes'));
+    fireEvent.click(t.getByLabelText('Close')); // #667: Close is the edit mode's discard
     await answerConfirm(false);
     expect(goBack).not.toHaveBeenCalled();
     expect(navigate).not.toHaveBeenCalled();
-    fireEvent.click(t.getAllByText('Discard Changes')[0]);
+    fireEvent.click(t.getByLabelText('Close'));
     await answerConfirm(true);
     await vi.waitFor(() => expect(goBack).toHaveBeenCalledTimes(1));
     expect(goBack).toHaveBeenCalledWith('/activities');

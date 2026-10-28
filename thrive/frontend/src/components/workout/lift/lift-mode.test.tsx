@@ -1217,8 +1217,10 @@ describe('Set up next (#674)', () => {
     expect(clock(container)).toBe('0:00');
   });
 
-  it('an unchanged group writes no weight', async () => {
+  it('an unchanged group writes no weight, including one stepped away and back', async () => {
     const { container } = await toSetup();
+    await press(card(container, 'Arnold'), 'More weight');
+    await press(card(container, 'Arnold'), 'Less weight');
     saveSet.mockClear();
     await startGroup(container);
     expect(saveSet).not.toHaveBeenCalled();

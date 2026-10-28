@@ -28,9 +28,9 @@ const flush = () =>
 const LABELS = [
   'Primary, between sets',
   'Supersets, between rounds',
-  'Supersets, switch',
+  'Supersets, switching exercises',
   'Burnout, between rounds',
-  'Burnout, switch',
+  'Burnout, switching exercises',
 ];
 
 function mount() {
@@ -39,7 +39,7 @@ function mount() {
       <RestTimesGroup token="tok" />
     </AuthContext.Provider>,
   );
-  const row = (label: string) => view.getByText(label).closest('.rest-row') as HTMLElement;
+  const row = (label: string) => view.getByRole('group', { name: label });
   const valueOf = (label: string) => row(label).querySelector('.duration-stepper-value')!.textContent;
   const btn = (label: string, name: string) => within(row(label)).getByRole('button', { name });
   const status = () => view.container.querySelector('[role="status"]')!;
@@ -126,12 +126,12 @@ describe('Settings edits', () => {
     api.updateSetting.mockResolvedValue({ ok: true, data: { key: 'x', value: '0', updated: 'u' } });
     const v = mount();
     await flush();
-    fireEvent.click(v.btn('Burnout, switch', 'Less switch time'));
-    fireEvent.click(v.btn('Burnout, switch', 'Less switch time'));
-    expect(v.valueOf('Burnout, switch')).toBe('0:00');
-    expect(v.btn('Burnout, switch', 'Less switch time').getAttribute('aria-disabled')).toBe('true');
-    fireEvent.click(v.btn('Burnout, switch', 'Less switch time'));
-    expect(v.valueOf('Burnout, switch')).toBe('0:00');
+    fireEvent.click(v.btn('Burnout, switching exercises', 'Less switch time'));
+    fireEvent.click(v.btn('Burnout, switching exercises', 'Less switch time'));
+    expect(v.valueOf('Burnout, switching exercises')).toBe('0:00');
+    expect(v.btn('Burnout, switching exercises', 'Less switch time').getAttribute('aria-disabled')).toBe('true');
+    fireEvent.click(v.btn('Burnout, switching exercises', 'Less switch time'));
+    expect(v.valueOf('Burnout, switching exercises')).toBe('0:00');
     for (let i = 0; i < 3; i++) fireEvent.click(v.btn('Supersets, between rounds', 'Less rest'));
     expect(v.valueOf('Supersets, between rounds')).toBe('0:15');
   });
@@ -140,13 +140,13 @@ describe('Settings edits', () => {
     api.updateSetting.mockResolvedValue({ ok: false, kind: 'failed', message: 'nope' });
     const v = mount();
     await flush();
-    fireEvent.click(v.btn('Supersets, switch', 'More switch time'));
-    expect(v.valueOf('Supersets, switch')).toBe('0:20');
+    fireEvent.click(v.btn('Supersets, switching exercises', 'More switch time'));
+    expect(v.valueOf('Supersets, switching exercises')).toBe('0:20');
     await act(async () => {
       vi.advanceTimersByTime(REST_SAVE_DELAY_MS);
     });
     await flush();
-    expect(v.valueOf('Supersets, switch')).toBe('0:15');
+    expect(v.valueOf('Supersets, switching exercises')).toBe('0:15');
     expect(v.status().textContent).toBe("Couldn't save rest times. Try again.");
     expect(v.status().className).toBe('drink-error');
   });

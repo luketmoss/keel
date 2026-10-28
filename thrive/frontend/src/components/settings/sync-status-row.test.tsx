@@ -71,8 +71,8 @@ describe('AC1: each row reads its own log and names itself', () => {
     render(h(CorosSyncStatusRow, { token: 'tok' }));
     render(h(WithingsSyncStatusRow, { token: 'tok' }));
 
-    const corosLabel = screen.getByText('COROS last synced');
-    const withingsLabel = screen.getByText('Withings last synced');
+    const corosLabel = screen.getByText('COROS');
+    const withingsLabel = screen.getByText('Withings');
     const [corosStatus, withingsStatus] = statusRegions();
 
     expect(corosStatus.getAttribute('aria-labelledby')).toBe(corosLabel.id);

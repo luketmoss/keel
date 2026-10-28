@@ -128,13 +128,13 @@ export function useSyncNow(token: string | null, email: string, onLanded?: () =>
 
 export type SyncNow = ReturnType<typeof useSyncNow>;
 
-/** The button, above the two vendor rows so the rows growing never moves it. */
+/** The button, in the Sync card's title row so the rows growing never moves it (#643). */
 export function SyncNowButton({ sync }: { sync: SyncNow }) {
   const busy = sync.bothOpen || sync.asking;
   return (
     <button
       type="button"
-      class="btn btn-primary sync-now-btn"
+      class="btn sync-now-btn"
       aria-disabled={busy ? 'true' : undefined}
       onClick={() => {
         if (!busy) sync.press();

@@ -12,6 +12,7 @@ import {
 } from '../../api/sync-status';
 import { formatLocalStamp } from '../../api/provenance';
 import type { RequestView } from '../../api/sync-request-state';
+import { SettingsRow } from './settings-card';
 
 const MINUTE = 60 * 1000;
 
@@ -19,6 +20,8 @@ interface SyncStatusRowProps {
   /** Unique id for the row's own label, so the status region can be named by it (aria-labelledby, #210). */
   id: string;
   label: string;
+  /** The line under the label: what the vendor brings in. */
+  secondary: string;
   token: string | null;
   log: SyncLogState;
   staleAfterHours: number;
@@ -35,7 +38,16 @@ interface SyncStatusRowProps {
  * shown. Rendered twice — once per vendor — each with its own log, threshold
  * and load, so one vendor's read failing never blanks the other's row.
  */
-export function SyncStatusRow({ id, label, token, log, staleAfterHours, loadFn, requestLine }: SyncStatusRowProps) {
+export function SyncStatusRow({
+  id,
+  label,
+  secondary,
+  token,
+  log,
+  staleAfterHours,
+  loadFn,
+  requestLine,
+}: SyncStatusRowProps) {
   // A one-minute tick, so "just now" does not sit there for an hour.
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -86,8 +98,7 @@ export function SyncStatusRow({ id, label, token, log, staleAfterHours, loadFn, 
   }
 
   return (
-    <div class="settings-row sync-status-row">
-      <span id={id}>{label}</span>
+    <SettingsRow class="sync-status-row" label={label} labelId={id} secondary={secondary}>
       <span class="sync-status" role="status" aria-labelledby={id}>
         {body}
         {requestLine && (
@@ -98,7 +109,7 @@ export function SyncStatusRow({ id, label, token, log, staleAfterHours, loadFn, 
           </span>
         )}
       </span>
-    </div>
+    </SettingsRow>
   );
 }
 
@@ -107,7 +118,8 @@ export function CorosSyncStatusRow({ token, requestLine }: { token: string | nul
   return (
     <SyncStatusRow
       id="sync-status-coros"
-      label="COROS last synced"
+      label="COROS"
+      secondary="Activities, sleep, HRV"
       token={token}
       log={syncLog.value}
       staleAfterHours={COROS_STALE_AFTER_HOURS}
@@ -128,7 +140,8 @@ export function WithingsSyncStatusRow({
   return (
     <SyncStatusRow
       id="sync-status-withings"
-      label="Withings last synced"
+      label="Withings"
+      secondary="Weight, blood pressure"
       token={token}
       log={withingsSyncLog.value}
       staleAfterHours={WITHINGS_STALE_AFTER_HOURS}

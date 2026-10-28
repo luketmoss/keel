@@ -4,6 +4,7 @@ import { render, cleanup, fireEvent } from '@testing-library/preact';
 import { h } from 'preact';
 import { LibraryHeader } from './library-header';
 import { currentRoute, type RouteName } from '../../router/router';
+import { templates, exercises } from '../../state/store';
 
 afterEach(cleanup);
 
@@ -13,6 +14,26 @@ function renderAt(name: RouteName) {
 }
 
 describe('LibraryHeader', () => {
+  it('shows a meta line above the title, singular for one, and none while nothing is loaded', () => {
+    templates.value = [];
+    exercises.value = [];
+    expect(renderAt('templates').container.querySelector('.library-meta')).toBeNull();
+    cleanup();
+    templates.value = [{ id: 't', name: 'T', exercises: [] }] as never;
+    exercises.value = [{ id: 'a' }, { id: 'b' }] as never;
+    const { container } = renderAt('exercises');
+    expect(container.querySelector('.library-meta')?.textContent).toBe('1 template · 2 exercises');
+    expect(container.querySelector('h1.day-title')?.textContent).toBe('Library');
+    templates.value = [];
+    exercises.value = [];
+  });
+
+  it('draws the switch as filter chips', () => {
+    const { container } = renderAt('templates');
+    expect(container.querySelectorAll('nav .filter-chip')).toHaveLength(2);
+    expect(container.querySelector('.filter-chip.active')?.textContent).toBe('Templates');
+  });
+
   it('shows one h1 "Library" and a nav labelled Library, not a tablist', () => {
     const { container } = renderAt('templates');
     expect(container.querySelectorAll('h1')).toHaveLength(1);

@@ -25,7 +25,6 @@ const block = forcedBlock();
 const SELECTORS = [
   // AC1
   '.theme-toggle-btn.active',
-  '.library-switch-btn.active',
   '.sub-type-btn.active',
   '.calendar-shade-toggle .sub-type-btn.active',
   '.trends-group-btn.active',

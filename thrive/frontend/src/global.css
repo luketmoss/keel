@@ -1268,14 +1268,89 @@ input, select, textarea {
   background: var(--color-primary-light);
 }
 
-.exercise-list-item-header {
+/* ===== Library · Exercises tab (#642) =====
+   Search, one scrolling filter row, a count and sort line, then one Day-style card per group with
+   hairline-separated rows. The rows are <button>s that open in place. */
+.ex-search {
+  position: relative;
+}
+
+.ex-search .search-input {
+  min-height: 44px;
+  margin: 0;
+  padding-left: 40px;
+  background: var(--color-surface);
+  border: 0;
+  border-radius: calc(var(--radius-md) + var(--space-xs));
+}
+
+.ex-search-icon {
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  transform: translateY(-50%);
+  color: var(--color-text-secondary);
+  pointer-events: none;
+}
+
+/* The shared chip row, tucked under the search and edge to edge in the column. */
+.ex-chips {
+  margin-bottom: 0;
+}
+
+.ex-count-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-md) var(--space-lg);
-  min-height: 44px;
-  cursor: pointer;
   gap: var(--space-sm);
+}
+
+.ex-count {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.btn-ghost.ex-sort {
+  gap: var(--space-xs);
+  min-height: 44px;
+  padding: 0 var(--space-sm);
+  font-size: var(--text-sm);
+  color: var(--color-primary-text);
+}
+
+.ex-groups {
+  /* Room to clear the FAB. */
+  padding-bottom: 88px;
+}
+
+.ex-card {
+  padding: 0 var(--space-md);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+}
+
+.ex-row + .ex-row {
+  border-top: 1px solid var(--color-border-light);
+}
+
+.exercise-list-item-header {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 64px;
+  margin: 0;
+  padding: var(--space-sm) 0;
+  gap: var(--space-sm);
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
 }
 
 @media (hover: hover) {
@@ -1297,23 +1372,62 @@ input, select, textarea {
 }
 
 .exercise-list-item-name {
+  font-size: var(--text-base);
   font-weight: 600;
   color: var(--color-text);
 }
 
-.exercise-list-item-last-date {
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
-
-.exercise-list-item-tags {
+.ex-row-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-xs);
+  gap: 2px calc(var(--space-sm) + 2px);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.ex-row-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.picker-dot.ex-row-dot {
+  width: 7px;
+  height: 7px;
+}
+
+.ex-row-when {
+  flex: none;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.ex-row-chevron {
+  flex: none;
+  color: var(--color-text-secondary);
+  transition: transform var(--transition-fast);
+}
+
+.ex-row-chevron.expanded {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ex-row-chevron {
+    transition: none;
+  }
 }
 
 .exercise-list-item-panel {
-  padding: 0 var(--space-lg) var(--space-md);
+  margin-bottom: calc(var(--space-sm) + var(--space-xs));
+  padding: calc(var(--space-sm) + var(--space-xs));
+  background: var(--color-bg);
+  border-radius: var(--radius-md);
+}
+
+.exercise-list-item-panel .exercise-detail-sets {
+  padding: 0;
 }
 
 .exercise-list-item-edit-btn {

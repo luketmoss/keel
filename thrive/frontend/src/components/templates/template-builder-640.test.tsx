@@ -216,6 +216,14 @@ describe('adding exercises', () => {
     expect(document.activeElement).toBe(rowBtn('Plank'));
   });
 
+  it('adding to a card that is not last lands at the end of that card, not the end of the template', () => {
+    render(<TemplateEditor templateId="t1" />);
+    fireEvent.click(document.querySelector('[aria-label="Add exercise to Primary"]')!);
+    pick('Dips');
+    expect(cardTitles()).toEqual(['Primary', 'Superset 1']);
+    expect(names('Primary')).toEqual(['Bench Press', 'Row BB', 'Dips']);
+  });
+
   it('pills start sections: only absent kinds, the next free superset, and the card appears once something is added', () => {
     render(<TemplateEditor templateId="t1" />);
     expect([...document.querySelectorAll('.tpl-pill')].map((p) => p.textContent)).toEqual([

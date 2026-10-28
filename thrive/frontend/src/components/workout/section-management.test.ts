@@ -221,3 +221,30 @@ describe('applyMoveDown', () => {
     });
   });
 });
+
+// #667: a move stays inside its section, so the neighbour is the next exercise of the same section.
+describe('moves stay within a section (#667)', () => {
+  const list = () => [
+    makeExercise({ exercise_id: 'a', section: 'primary', exercise_order: 1 }),
+    makeExercise({ exercise_id: 'b', section: 'SS1', exercise_order: 2 }),
+    makeExercise({ exercise_id: 'c', section: 'primary', exercise_order: 3 }),
+    makeExercise({ exercise_id: 'd', section: 'burnout', exercise_order: 4 }),
+  ];
+  const orders = (l: TrackerExercise[]) => Object.fromEntries(l.map((e) => [e.exercise_id, e.exercise_order]));
+
+  it('Move up swaps with the previous exercise of the section, past one of another section', () => {
+    expect(orders(applyMoveUp(list(), 'c', 3))).toEqual({ a: 3, b: 2, c: 1, d: 4 });
+  });
+
+  it('Move down swaps with the next exercise of the section, past one of another section', () => {
+    expect(orders(applyMoveDown(list(), 'a', 1))).toEqual({ a: 3, b: 2, c: 1, d: 4 });
+  });
+
+  it('does nothing from the end of a section, even with an exercise of another section beyond it', () => {
+    const l = list();
+    expect(applyMoveUp(l, 'a', 1)).toBe(l);
+    expect(applyMoveDown(l, 'c', 3)).toBe(l);
+    expect(applyMoveUp(l, 'b', 2)).toBe(l);
+    expect(applyMoveDown(l, 'b', 2)).toBe(l);
+  });
+});

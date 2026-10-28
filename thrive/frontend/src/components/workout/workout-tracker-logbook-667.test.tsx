@@ -31,6 +31,8 @@ import {
   menuItem,
 } from './tracker-test-utils';
 
+// Held open by a test that wants to look at the screen while a Remove set is in flight.
+let removeGate: Promise<void> | null = null;
 const saveSet = vi.fn(async (..._args: unknown[]) => ({ sheetRow: 99 }));
 const saveWorkoutEdits = vi.fn(async (..._args: unknown[]) => undefined);
 const finishWorkout = vi.fn(async (..._args: unknown[]) => undefined);
@@ -39,7 +41,9 @@ const saveExerciseOrders = vi.fn(async (..._args: unknown[]) => undefined);
 vi.mock('../../state/actions', () => ({
   saveExerciseOrders: (...args: unknown[]) => saveExerciseOrders(...args),
   saveSet: (...args: unknown[]) => saveSet(...args),
-  removeSet: vi.fn(async () => undefined),
+  removeSet: vi.fn(async () => {
+    if (removeGate) await removeGate;
+  }),
   finishWorkout: (...args: unknown[]) => finishWorkout(...args),
   deleteWorkout: (...args: unknown[]) => deleteWorkout(...args),
   saveWorkoutEdits: (...args: unknown[]) => saveWorkoutEdits(...args),
@@ -118,6 +122,7 @@ beforeEach(() => {
   saveWorkoutEdits.mockClear();
   saveExerciseOrders.mockClear();
   vi.mocked(navigate).mockClear();
+  removeGate = null;
   mountConfirmHost();
 });
 afterEach(() => {
@@ -347,7 +352,10 @@ describe('the one set editor', () => {
     expect(
       [...row.querySelectorAll('.lb-tile[data-set]')].map((t) => t.querySelector('.lb-tile-value')!.textContent),
     ).toEqual(['135×8', '135×8', '135×8']);
-    expect(effortPill(editorOf(row)!, 'Medium').getAttribute('aria-pressed')).toBe('true');
+    // The effort goes too: every tile reads MED, not only the open set's.
+    expect(
+      [...row.querySelectorAll('.lb-tile[data-set]')].map((t) => t.querySelector('.lb-tile-note')?.textContent),
+    ).toEqual(['MED', 'MED', 'MED']);
     expect(toasts.value.map((t) => t.text)).toContain('Copied to all 3 sets of Row');
     await vi.advanceTimersByTimeAsync(1200);
     // Every set with data is saved, as today's quick-fill did.
@@ -368,13 +376,21 @@ describe('the one set editor', () => {
     expect(editorOf(row)).toBeNull();
   });
 
-  it('Remove set removes the set and closes its editor', async () => {
+  it('Remove set closes its editor at once, marks its tile while the delete is in flight, and removes the set when it lands', async () => {
+    let land!: () => void;
+    removeGate = new Promise<void>((resolve) => {
+      land = resolve;
+    });
     mount();
     const row = rowNamed('Row');
     openSet(row, 3);
     tapButtonIn(editorOf(row)!, 'Remove set');
-    await vi.waitFor(() => expect(row.querySelectorAll('.lb-tile[data-set]')).toHaveLength(2));
+    await vi.advanceTimersByTimeAsync(0);
     expect(editorOf(row)).toBeNull();
+    expect(row.querySelectorAll('.lb-tile[data-set]')).toHaveLength(3);
+    expect(tileOf(row, 3).getAttribute('aria-disabled')).toBe('true');
+    land();
+    await vi.waitFor(() => expect(row.querySelectorAll('.lb-tile[data-set]')).toHaveLength(2));
   });
 
   it('the Add set tile adds a set and opens its editor', () => {

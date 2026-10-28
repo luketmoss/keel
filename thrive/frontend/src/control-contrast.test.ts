@@ -227,21 +227,14 @@ describe.each(THEMES)('#293 AC1: the selected pill of the theme toggle and Libra
 });
 
 describe('#293 AC1: the pill rules', () => {
-  it.each(['.theme-toggle-btn.active', '.library-switch-btn.active'])(
-    '%s fills with the fill token, no surface or shadow',
-    (sel) => {
-      const { body } = rule(sel);
-      expect(decl(body, 'background')).toBe('var(--color-primary-fill)');
-      expect(decl(body, 'color')).toBe('var(--color-on-fill)');
-      expect(body).not.toMatch(/box-shadow|--color-surface/);
-    },
-  );
-  it('the track, the Library label weight and the 44 px segments are unchanged', () => {
+  it.each(['.theme-toggle-btn.active'])('%s fills with the fill token, no surface or shadow', (sel) => {
+    const { body } = rule(sel);
+    expect(decl(body, 'background')).toBe('var(--color-primary-fill)');
+    expect(decl(body, 'color')).toBe('var(--color-on-fill)');
+    expect(body).not.toMatch(/box-shadow|--color-surface/);
+  });
+  it('the track is unchanged', () => {
     expect(decl(rule('.theme-toggle').body, 'background')).toBe('var(--color-border-light)');
-    expect(decl(rule('.library-switch').body, 'background')).toBe('var(--color-border-light)');
-    expect(decl(rule('.library-switch-btn.active').body, 'font-weight')).toBe('700');
-    expect(decl(rule('.library-switch-btn').body, 'min-height')).toBe('44px');
-    expect(decl(rule('.library-switch-btn').body, 'color')).toBe('var(--color-text-muted)');
   });
 });
 

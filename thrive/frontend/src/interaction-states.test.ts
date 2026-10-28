@@ -62,7 +62,6 @@ const FAMILIES = {
     'trends-view-btn',
     'trends-menu-item',
     'detail-menu-item',
-    'library-switch-btn',
     'color-swatch',
     'section-badge-btn',
     'section-picker-pill',
@@ -814,7 +813,7 @@ describe.each(THEMES)('AC9: --color-on-fill on every #183 fill, with the overlay
 
 describe('AC10: selected keeps its non-colour cue and its ARIA state', () => {
   const SELECTED: Record<string, string[]> = {
-    'filter-chip': ['aria-pressed', 'aria-expanded'],
+    'filter-chip': ['aria-pressed', 'aria-expanded', 'aria-current'],
     'label-chip': ['aria-pressed'],
     'effort-btn': ['aria-pressed'],
     'sub-type-btn': ['aria-pressed'],
@@ -823,7 +822,6 @@ describe('AC10: selected keeps its non-colour cue and its ARIA state', () => {
     'trends-chip': ['aria-expanded'],
     'trends-view-btn': ['aria-pressed'],
     'trends-menu-item': ['aria-checked'],
-    'library-switch-btn': ['aria-current'],
     'color-swatch': ['aria-checked'],
     'section-picker-pill': ['aria-pressed'],
     'week-day': ['aria-pressed'],

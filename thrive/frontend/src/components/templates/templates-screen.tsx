@@ -1,50 +1,82 @@
-import { templates } from '../../state/store';
+import { templates, workouts, activeWorkoutId } from '../../state/store';
 import { navigate } from '../../router/router';
 import { currentRoute } from '../../router/router';
 import { TemplateEditor } from './template-editor';
 import { TemplateDetail } from './template-detail';
 import { LibraryHeader } from '../shared/library-header';
-import { pluralExercise } from '../activities/activities-helpers';
+import { DumbbellIcon } from '../shared/icons';
+import {
+  TemplateSummary,
+  lastDone,
+  lastDoneByTemplate,
+  lastTook,
+  orderTemplates,
+  templateAriaLabel,
+  templateStats,
+} from './template-summary';
 
-function sectionSummary(tpl: { exercises: Array<{ section: string }> }): string {
-  const sections = new Set(tpl.exercises.map((e) => e.section));
-  const parts: string[] = [];
-  if (sections.has('warmup')) parts.push('Warmup');
-  if (sections.has('primary')) parts.push('Primary');
-  const ssCount = ['SS1', 'SS2', 'SS3'].filter((s) => sections.has(s)).length;
-  if (ssCount > 0) parts.push(`${ssCount} Superset${ssCount > 1 ? 's' : ''}`);
-  if (sections.has('burnout')) parts.push('Burnout');
-  if (sections.has('cooldown')) parts.push('Cooldown');
-  return parts.join(' · ');
+function ChevronRight() {
+  return (
+    <svg
+      class="tpl-chevron"
+      viewBox="0 0 24 24"
+      width="16"
+      height="16"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M9 6l6 6-6 6" />
+    </svg>
+  );
 }
 
 function TemplateList() {
+  const last = lastDoneByTemplate(workouts.value, activeWorkoutId.value);
+  const ordered = orderTemplates(templates.value, last);
   return (
     <div class="screen templates-screen">
       <LibraryHeader />
       <div class="screen-body">
-        {templates.value.length === 0 ? (
-          <div class="empty-state">
-            <p>No templates yet</p>
-            <p>Create a template to speed up workout logging</p>
-          </div>
+        {ordered.length === 0 ? (
+          <p class="library-empty">No templates yet. Tap + to build one.</p>
         ) : (
           <div class="template-list">
-            {templates.value.map((t) => (
-              <button
-                type="button"
-                key={t.id}
-                data-focus-key={`template:${t.id}`}
-                class="template-card"
-                onClick={() => navigate(`/templates/${t.id}`)}
-              >
-                <span class="template-card-body">
-                  <span class="template-name">{t.name}</span>
-                  <span class="template-summary">{sectionSummary(t)}</span>
-                </span>
-                <span class="template-count">{pluralExercise(t.exercises.length)}</span>
-              </button>
-            ))}
+            {ordered.map((t) => {
+              const stats = templateStats(t);
+              const w = last.get(t.id);
+              const took = lastTook(w);
+              const done = lastDone(w);
+              return (
+                <button
+                  type="button"
+                  key={t.id}
+                  data-focus-key={`template:${t.id}`}
+                  class="template-card template-card-lib"
+                  aria-label={templateAriaLabel(t.name, stats, took, done)}
+                  onClick={() => navigate(`/templates/${t.id}`)}
+                >
+                  <span class="tpl-name-row">
+                    <span class="tpl-name-icon" aria-hidden="true">
+                      <DumbbellIcon />
+                    </span>
+                    <span class="tpl-name">{t.name}</span>
+                  </span>
+                  <TemplateSummary stats={stats} took={took} />
+                  <span class="tpl-footer">
+                    <span class="tpl-last-done">{done.text}</span>
+                    <span class="tpl-view">
+                      View
+                      <ChevronRight />
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>

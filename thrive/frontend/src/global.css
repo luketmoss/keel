@@ -4292,31 +4292,167 @@ input, select, textarea {
   font-weight: 600;
 }
 
-/* ===== Library switch (#235) — Templates | Exercises, after .theme-toggle ===== */
-.library-switch {
-  display: flex;
-  gap: 2px;
-  background: var(--color-border-light);
-  border-radius: var(--radius-md);
-  padding: 2px;
-  margin-bottom: var(--space-md);
-}
-
-.library-switch-btn {
-  flex: 1;
-  min-height: 44px;
-  padding: var(--space-xs) var(--space-md);
-  border-radius: var(--radius-sm);
+/* ===== Library header and template cards (#638) ===== */
+.library-meta {
   font-size: var(--text-sm);
   font-weight: 500;
-  color: var(--color-text-muted);
-  transition: all var(--transition-fast);
+  color: var(--color-text-secondary);
 }
 
-.library-switch-btn.active {
-  background: var(--color-primary-fill);
-  color: var(--color-on-fill);
+.library-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-top: var(--space-xs);
+}
+
+.library-empty {
+  padding: var(--space-xl);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.template-list {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space-sm) + var(--space-xs));
+}
+
+/* The Library card: the shared .template-card (the picker still uses it) without its border. */
+.template-card.template-card-lib {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-sm);
+  border: 0;
+  border-radius: var(--radius-lg);
+  box-shadow: none;
+}
+
+.tpl-name-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.tpl-name-icon {
+  display: inline-flex;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: var(--type-weight);
+}
+
+.tpl-name-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.tpl-name {
+  min-width: 0;
+  font-size: var(--text-lg);
   font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.tpl-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.tpl-figures {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.tpl-figure {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.tpl-figure-line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+}
+
+.tpl-figure-value {
+  font-size: var(--figure-md);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.tpl-figure-none {
+  color: var(--color-text-muted);
+}
+
+.tpl-figure-unit {
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+.tpl-figure-word {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.tpl-mix {
+  display: flex;
+  gap: calc(var(--space-xs) - 1px);
+  height: 6px;
+}
+
+.tpl-mix-seg {
+  flex-basis: 0;
+  min-width: 6px;
+  border-radius: var(--radius-full);
+}
+
+.tpl-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) calc(var(--space-sm) + var(--space-xs));
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.tpl-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.tpl-legend-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-sm);
+}
+
+.tpl-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: calc(var(--space-sm) + var(--space-xs));
+  border-top: 1px solid var(--color-border-light);
+  font-size: var(--text-sm);
+}
+
+.tpl-last-done {
+  color: var(--color-text-secondary);
+}
+
+.tpl-view {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--color-primary-text);
+  font-weight: 600;
 }
 
 /* ===== Trends (#242) ===== */
@@ -7416,7 +7552,6 @@ body:has(.lift) {
   }
 
   .theme-toggle-btn.active,
-  .library-switch-btn.active,
   .sub-type-btn.active,
   .sub-type-toggle .sub-type-btn.active,
   .calendar-shade-toggle .sub-type-btn.active,
@@ -7655,7 +7790,6 @@ body:has(.lift) {
   .trends-view-btn:hover:not(:disabled):not([aria-disabled="true"]),
   .trends-menu-item:hover:not(:disabled):not([aria-disabled="true"]),
   .detail-menu-item:hover:not(:disabled):not([aria-disabled="true"]),
-  .library-switch-btn:hover:not(:disabled):not([aria-disabled="true"]),
   .color-swatch:hover:not(:disabled):not([aria-disabled="true"]),
   .section-badge-btn:hover:not(:disabled):not([aria-disabled="true"]),
   .section-picker-pill:hover:not(:disabled):not([aria-disabled="true"]),
@@ -7732,7 +7866,6 @@ button.tag-badge:active:not(:disabled):not([aria-disabled="true"]),
 .trends-view-btn:active:not(:disabled):not([aria-disabled="true"]),
 .trends-menu-item:active:not(:disabled):not([aria-disabled="true"]),
 .detail-menu-item:active:not(:disabled):not([aria-disabled="true"]),
-.library-switch-btn:active:not(:disabled):not([aria-disabled="true"]),
 .color-swatch:active:not(:disabled):not([aria-disabled="true"]),
 .section-badge-btn:active:not(:disabled):not([aria-disabled="true"]),
 .section-picker-pill:active:not(:disabled):not([aria-disabled="true"]),

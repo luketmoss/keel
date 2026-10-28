@@ -2,14 +2,15 @@
 // resumes the same step, and the clock arithmetic every screen shares. Times
 // are epoch ms, and every clock is read from them, never counted. Since #578 it
 // also holds the summary's notes and session effort, so a reload keeps them.
+// #674 adds `setup`, Set up next at the start of a working section.
 
 import type { Effort } from '../../../api/types';
 
-export type LiftPhase = 'start' | 'warmup' | 'ready' | 'set' | 'rest' | 'cooldown';
+export type LiftPhase = 'start' | 'warmup' | 'ready' | 'setup' | 'set' | 'rest' | 'cooldown';
 
 export interface LiftRun {
   phase: LiftPhase;
-  /** The step on screen: the set being done, or Up next during a rest and Ready. */
+  /** The step on screen: the set being done, Up next during a rest and Ready, or the group's first set in setup. */
   stepIndex: number;
   setStartedAt: number | null;
   restStartedAt: number | null;
@@ -17,7 +18,7 @@ export interface LiftRun {
   restTarget: number;
   /** When the last rest alert fired. */
   alertedAt: number | null;
-  /** The step whose rest this is, which Start set writes `rest_s` to. */
+  /** The step whose rest this is (in setup, the set that ended the last group), which Start writes `rest_s` to. */
   restFor: number | null;
   /** When Start workout was pressed: the session clock's zero. */
   sessionStartedAt: number | null;
@@ -40,7 +41,7 @@ export const FRESH_RUN: LiftRun = {
   sessionEffort: '',
 };
 
-const PHASES: readonly string[] = ['start', 'warmup', 'ready', 'set', 'rest', 'cooldown'];
+const PHASES: readonly string[] = ['start', 'warmup', 'ready', 'setup', 'set', 'rest', 'cooldown'];
 export const runKey = (workoutId: string): string => `thrive.lift.${workoutId}`;
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);

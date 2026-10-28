@@ -15,10 +15,13 @@ export function SetsList({
   summary,
   workoutId,
   token,
+  setup = false,
 }: {
   steps: readonly LiftStep[];
   /** The set on screen, or null (the summary). */
   current: number | null;
+  /** #674: Set up next is on screen, so the current set is the target, not being lifted. */
+  setup?: boolean;
   /** The workout is over: every set opens, and what was not done reads skipped. */
   summary: boolean;
   workoutId: string;
@@ -43,6 +46,7 @@ export function SetsList({
                   step={s}
                   state={stepState(s, current, summary)}
                   summary={summary}
+                  setup={setup}
                   open={open === s.key}
                   onToggle={() => setOpen(open === s.key ? null : s.key)}
                   workoutId={workoutId}
@@ -60,6 +64,7 @@ function SetRow({
   step,
   state,
   summary,
+  setup,
   open,
   onToggle,
   workoutId,
@@ -68,6 +73,7 @@ function SetRow({
   step: LiftStep;
   state: StepState;
   summary: boolean;
+  setup: boolean;
   open: boolean;
   onToggle: () => void;
   workoutId: string;
@@ -79,7 +85,7 @@ function SetRow({
     <>
       <span class="lift-set-no">Set {row.set_number}</span>
       <span class="lift-set-name">{row.exercise_name}</span>
-      <StateText step={step} state={state} />
+      <StateText step={step} state={state} setup={setup} />
     </>
   );
   return (
@@ -111,9 +117,9 @@ function SetRow({
   );
 }
 
-function StateText({ step, state }: { step: LiftStep; state: StepState }) {
+function StateText({ step, state, setup }: { step: LiftStep; state: StepState; setup: boolean }) {
   const row = step.row;
-  if (state === 'now') return <span class="lift-state lift-state-now">lifting now</span>;
+  if (state === 'now' && !setup) return <span class="lift-state lift-state-now">lifting now</span>;
   if (state === 'skipped') return <span class="lift-state lift-state-muted">skipped</span>;
   if (state === 'logged')
     return (

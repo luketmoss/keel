@@ -29,22 +29,39 @@ export function Stepper({
   onLess,
   onMore,
   what,
+  field,
+  disabled = false,
 }: {
   label: string;
   value: string;
   onLess: () => void;
   onMore: () => void;
   what: string;
+  /** #674: a text field in place of the number, which Set up next types into. */
+  field?: ComponentChildren;
+  disabled?: boolean;
 }) {
   return (
     <div class="lift-stepper" role="group" aria-label={what}>
-      <button type="button" class="btn-icon duration-stepper-btn" aria-label={`Less ${what}`} onClick={onLess}>
+      <button
+        type="button"
+        class="btn-icon duration-stepper-btn"
+        aria-label={`Less ${what}`}
+        onClick={onLess}
+        disabled={disabled}
+      >
         <span aria-hidden="true">−</span>
       </button>
       <span class="lift-stepper-value">
-        <span class="lift-stepper-number">{value}</span> <span class="lift-stepper-unit">{label}</span>
+        {field ?? <span class="lift-stepper-number">{value}</span>} <span class="lift-stepper-unit">{label}</span>
       </span>
-      <button type="button" class="btn-icon duration-stepper-btn" aria-label={`More ${what}`} onClick={onMore}>
+      <button
+        type="button"
+        class="btn-icon duration-stepper-btn"
+        aria-label={`More ${what}`}
+        onClick={onMore}
+        disabled={disabled}
+      >
         <span aria-hidden="true">+</span>
       </button>
     </div>

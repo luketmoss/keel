@@ -7641,6 +7641,178 @@ body:has(.lift) {
   font-weight: 700;
 }
 
+/* ===== Lift Mode, Set up next (#674) =====
+   At the start of every working group: the whole group's exercises with last time and a weight to set,
+   an elapsed clock with no target, then the previous group's log card. */
+.lift-setup-since {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.lift-setup-since-label {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.lift-setup-since-clock {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+
+.lift-setup-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.lift-setup-badge-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.lift-setup-title {
+  margin: 0;
+  font-size: var(--text-2xl);
+  font-weight: 700;
+}
+
+.lift-setup-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.lift-setup-card-ss { border-left: 4px solid var(--sec-ss); }
+.lift-setup-card-burnout { border-left: 4px solid var(--sec-burnout); }
+.lift-setup-letter-ss { color: var(--sec-ss); }
+.lift-setup-letter-burnout { color: var(--sec-burnout); }
+
+.lift-setup-name {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: 700;
+}
+
+.lift-setup-plan {
+  margin: 0;
+  font-size: var(--text-base);
+  color: var(--color-text-secondary);
+}
+
+.lift-setup-plan strong {
+  color: var(--color-text);
+}
+
+.lift-setup-first {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.lift-setup-last {
+  font-size: var(--text-sm);
+}
+
+.lift-setup-last-label {
+  margin-bottom: var(--space-xs);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.lift-setup-last-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lift-setup-last-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: 24px;
+  font-variant-numeric: tabular-nums;
+}
+
+.lift-setup-last-n {
+  min-width: 1em;
+  color: var(--color-text-muted);
+}
+
+.lift-setup-last-figures {
+  color: var(--color-text);
+}
+
+.lift-setup-effort {
+  padding: 0 var(--space-xs);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.lift-setup-effort-easy { color: var(--effort-easy); background: color-mix(in srgb, var(--effort-easy) 14%, transparent); }
+.lift-setup-effort-medium { color: var(--effort-medium); background: color-mix(in srgb, var(--effort-medium) 14%, transparent); }
+.lift-setup-effort-hard { color: var(--effort-hard); background: color-mix(in srgb, var(--effort-hard) 14%, transparent); }
+.lift-setup-effort-letter { font-weight: 700; }
+.lift-setup-effort-letter-easy { color: var(--effort-easy); }
+.lift-setup-effort-letter-medium { color: var(--effort-medium); }
+.lift-setup-effort-letter-hard { color: var(--effort-hard); }
+
+/* One line of last time, only in a short window. */
+.lift-setup-last-line {
+  display: none;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.lift-setup-weight {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-light);
+}
+
+.lift-setup-weight-label,
+.lift-setup-done {
+  font-weight: 600;
+}
+
+/* A .form-input sized to "000.0" between the stepper's buttons. */
+.form-input.lift-setup-weight-input {
+  width: 6.5ch;
+  min-height: 40px;
+  padding: var(--space-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.lift-setup-bw {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.lift-setup-add {
+  color: var(--color-primary-text);
+  font-weight: 600;
+}
+
+.lift-setup-changed {
+  margin-top: calc(-1 * var(--space-xs));
+  font-size: var(--text-xs);
+  color: var(--color-primary-text);
+}
+
 /* The action bar, at the bottom of the screen. */
 .lift-actions {
   position: fixed;
@@ -8016,6 +8188,32 @@ body:has(.lift) {
 
   .lift-next-exercise {
     font-size: var(--text-base);
+  }
+
+  /* Set up next (#674): the heading, the first exercise's name and Start fit; the rest scrolls. */
+  .lift-setup-since-clock {
+    font-size: var(--text-base);
+  }
+
+  .lift-setup-title {
+    font-size: var(--text-lg);
+  }
+
+  .lift-setup-name {
+    font-size: var(--text-base);
+  }
+
+  .lift-setup-card {
+    gap: var(--space-xs);
+  }
+
+  .lift-setup-last-label,
+  .lift-setup-last-rows {
+    display: none;
+  }
+
+  .lift-setup-last-line {
+    display: block;
   }
 
   /* The action bar and its buttons. */

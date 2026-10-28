@@ -143,6 +143,11 @@ the stored run and writes nothing for the interrupted step. The start choice is 
 `thrive.weightMode` and only preselects the choice sheet.
 In a window 560 CSS px tall or less (Android split screen under a video, #580) Lift Mode uses a compact layout from one
 `@media (max-height: 560px)` block in `global.css`, live as the divider moves; the tab bar is not rendered on this route at any height.
+Between working sections there is no rest but **Set up next** (#674, phase `setup`): every exercise of the next group
+with its plan, last session (`lastSession`, which skips planned workouts) and a weight held on screen, an elapsed
+"since last set" clock with no target or alert, and the previous round's log card. Start <group> writes a changed
+weight to that exercise's unlogged sets and `rest_s` to the set that ended the last group. It also opens a run at a
+section's start; part-way through one, Ready stays.
 
 ## Key commands
 

@@ -1,12 +1,14 @@
-// #371 — Move up/down in the workout tracker (log and edit mode): focus stays
-// on the moved exercise's button, ends are aria-disabled, each move is
-// announced once in the shared wording, and a row keeps its own state. The
+// #371 — Move up/down in the workout tracker (log and edit mode): focus follows
+// the moved exercise, ends are aria-disabled, each move is announced once in
+// the shared wording, and a row keeps its own state. #667: the moves are items in
+// each exercise's options menu and stay within the exercise's section. The
 // list holds "Row BB" twice, so rows must be told apart by more than
 // exercise_id. The row key is client-only: no payload may carry it.
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/preact';
 import { activeWorkoutSets, activeWarmupExercises, isEditMode, workouts } from '../../state/store';
 import type { SetWithRow } from '../../api/types';
+import { exerciseRows as rows, cardOf, menuItem, chooseMenu, editorOf, typeWeight } from './tracker-test-utils';
 
 const saveSet = vi.fn(async (..._args: unknown[]) => ({ sheetRow: 99 }));
 const saveWorkoutEdits = vi.fn(async (..._args: unknown[]) => undefined);
@@ -63,11 +65,10 @@ afterEach(() => {
   isEditMode.value = false;
 });
 
-const rows = () => [...document.querySelectorAll<HTMLElement>('.tracker-exercise-list > [data-row-key]')];
-const sections = () => rows().map((r) => r.querySelector('.section-badge-btn')!.textContent);
-const moveBtn = (row: number, dir: 'up' | 'down') =>
-  rows()[row].querySelector<HTMLButtonElement>(`[data-move="${dir}"]`)!;
-const status = () => document.querySelector('.workout-tracker [role="status"]')!;
+const sections = () => rows().map(cardOf);
+const names = () => rows().map((r) => r.querySelector('.lb-exercise-name')!.textContent);
+const trigger = (row: number) => rows()[row].querySelector<HTMLButtonElement>('[data-options-btn]')!;
+const status = () => document.querySelector('.workout-tracker > [role="status"]')!;
 
 const modes: [string, boolean][] = [
   ['log mode', false],
@@ -85,85 +86,83 @@ describe.each(modes)('%s', (_name, edit) => {
     const keys = rows().map((r) => r.dataset.rowKey);
     expect(keys).toHaveLength(4);
     expect(new Set(keys).size).toBe(4);
-    rows().forEach((r) => expect(r.classList.contains('tracker-exercise')).toBe(true));
+    rows().forEach((r) => expect(r.classList.contains('lb-exercise')).toBe(true));
   });
 
-  it('AC1 + AC3: focus follows the moved duplicate, and pressing again moves it again', () => {
+  it('draws one card per section, in order of first appearance', () => {
     mount();
-    // The second "Row BB" (SS1), third of four.
-    const key = rows()[2].dataset.rowKey;
-    moveBtn(2, 'up').focus();
-    fireEvent.click(moveBtn(2, 'up'));
-    expect(sections()).toEqual(['primary', 'SS1', 'primary', 'burnout']);
-    expect(rows()[1].dataset.rowKey).toBe(key);
-    expect(document.activeElement).toBe(moveBtn(1, 'up'));
-    expect(status().textContent).toBe('Row BB moved to position 2 of 4');
-
-    fireEvent.click(document.activeElement as HTMLElement);
-    expect(sections()).toEqual(['SS1', 'primary', 'primary', 'burnout']);
-    expect(document.activeElement).toBe(moveBtn(0, 'up'));
+    expect(sections()).toEqual(['Primary', 'Primary', 'Superset 1', 'Burnout']);
   });
 
-  it('AC1: Move down keeps focus on Move down', () => {
+  it('AC1 + AC3: a move stays inside the section, focus follows the moved row, and pressing again moves it again', () => {
     mount();
-    moveBtn(1, 'down').focus();
-    fireEvent.click(moveBtn(1, 'down'));
-    expect(sections()).toEqual(['primary', 'SS1', 'primary', 'burnout']);
-    expect(document.activeElement).toBe(moveBtn(2, 'down'));
-    expect(status().textContent).toBe('Pull-up moved to position 3 of 4');
+    // Pull-up, second of the Primary card.
+    const key = rows()[1].dataset.rowKey;
+    chooseMenu(rows()[1], 'Move up');
+    expect(names()).toEqual(['Pull-up', 'Row BB', 'Row BB', 'Curl']);
+    expect(rows()[0].dataset.rowKey).toBe(key);
+    expect(document.activeElement).toBe(trigger(0));
+    expect(status().textContent).toBe('Pull-up moved to position 1 of 2');
+
+    // At the top of its card now: Move up is aria-disabled and does nothing.
+    expect(menuItem(rows()[0], 'Move up').getAttribute('aria-disabled')).toBe('true');
+    fireEvent.click(menuItem(rows()[0], 'Move up'));
+    expect(names()).toEqual(['Pull-up', 'Row BB', 'Row BB', 'Curl']);
   });
 
-  it('AC2: end buttons are aria-disabled, not disabled, and do nothing', () => {
+  it('AC1: Move down moves within the section and announces the position inside it', () => {
     mount();
-    const top = moveBtn(0, 'up');
-    const bottom = moveBtn(3, 'down');
-    for (const b of [top, bottom]) {
-      expect(b.getAttribute('aria-disabled')).toBe('true');
-      expect(b.hasAttribute('disabled')).toBe(false);
-      expect(b.querySelector('span[aria-hidden="true"]')).not.toBeNull();
-    }
-    expect(moveBtn(1, 'up').hasAttribute('aria-disabled')).toBe(false);
-    top.focus();
+    chooseMenu(rows()[0], 'Move down');
+    expect(names()).toEqual(['Pull-up', 'Row BB', 'Row BB', 'Curl']);
+    expect(sections()).toEqual(['Primary', 'Primary', 'Superset 1', 'Burnout']);
+    expect(document.activeElement).toBe(trigger(1));
+    expect(status().textContent).toBe('Row BB moved to position 2 of 2');
+  });
+
+  it('AC2: end items are aria-disabled, not disabled, and do nothing', () => {
+    mount();
+    const top = menuItem(rows()[0], 'Move up');
+    expect(top.getAttribute('aria-disabled')).toBe('true');
+    expect(top.hasAttribute('disabled')).toBe(false);
+    expect(top.querySelector('span')).not.toBeNull();
     fireEvent.click(top);
-    fireEvent.click(bottom);
-    expect(sections()).toEqual(['primary', 'primary', 'SS1', 'burnout']);
+    expect(names()).toEqual(['Row BB', 'Pull-up', 'Row BB', 'Curl']);
     expect(status().textContent).toBe('');
+    // The last of Primary cannot move down into Superset 1.
+    expect(menuItem(rows()[1], 'Move down').getAttribute('aria-disabled')).toBe('true');
+    // A section of one cannot move at all.
+    expect(menuItem(rows()[2], 'Move up').getAttribute('aria-disabled')).toBe('true');
+    expect(menuItem(rows()[2], 'Move down').getAttribute('aria-disabled')).toBe('true');
+    expect(menuItem(rows()[1], 'Move up').hasAttribute('aria-disabled')).toBe(false);
   });
 
-  it('AC2: a move to the last position keeps focus on the now aria-disabled button', () => {
+  it('AC4: an open set editor travels with the row; set values are kept', () => {
     mount();
-    moveBtn(2, 'down').focus();
-    fireEvent.click(moveBtn(2, 'down'));
-    expect(sections()).toEqual(['primary', 'primary', 'burnout', 'SS1']);
-    const btn = moveBtn(3, 'down');
-    expect(document.activeElement).toBe(btn);
-    expect(btn.getAttribute('aria-disabled')).toBe('true');
-  });
-
-  it('AC4: an open panel and section picker travel with the row; set values are kept', () => {
-    mount();
-    const row = rows()[2];
-    fireEvent.click(row.querySelector('.last-time-toggle')!);
-    fireEvent.click(row.querySelector('.section-badge-btn')!);
-    const weight = row.querySelector<HTMLInputElement>('.tracker-set-list .set-weight-input')!;
-    fireEvent.input(weight, { target: { value: '135' } });
-
-    fireEvent.click(moveBtn(2, 'up'));
-    const moved = rows()[1];
+    const row = rows()[1];
+    typeWeight(row, 1, '135');
+    chooseMenu(row, 'Move up');
+    const moved = rows()[0];
     expect(moved).toBe(row);
-    expect(moved.querySelector('.last-time-panel')).not.toBeNull();
-    expect(moved.querySelector('.section-picker-row')).not.toBeNull();
-    expect(moved.querySelector<HTMLInputElement>('.tracker-set-list .set-weight-input')!.value).toBe('135');
+    expect(editorOf(moved)).not.toBeNull();
+    expect(editorOf(moved)!.querySelector<HTMLInputElement>('input.lb-step-input')!.value).toBe('135');
     // The row it swapped with did not pick up the open state.
-    expect(rows()[2].querySelector('.last-time-panel')).toBeNull();
-    expect(rows()[2].querySelector('.section-picker-row')).toBeNull();
+    expect(editorOf(rows()[1])).toBeNull();
   });
 
   it('AC5: one announcement per move, in the shared wording', () => {
     mount();
-    fireEvent.click(moveBtn(3, 'up'));
-    expect(status().textContent).toBe('Curl moved to position 3 of 4');
-    expect(document.querySelectorAll('.workout-tracker [role="status"]')).toHaveLength(1);
+    chooseMenu(rows()[1], 'Move up');
+    expect(status().textContent).toBe('Pull-up moved to position 1 of 2');
+    expect(document.querySelectorAll('.workout-tracker > [role="status"]')).toHaveLength(1);
+  });
+
+  it('a duplicate in another section is told apart by its row key', () => {
+    mount();
+    // Row BB appears in Primary and Superset 1; moving the Primary one does not touch the other.
+    const superset = rows()[2].dataset.rowKey;
+    chooseMenu(rows()[0], 'Move down');
+    expect(rows()[2].dataset.rowKey).toBe(superset);
+    expect(sections()[2]).toBe('Superset 1');
   });
 });
 
@@ -171,30 +170,30 @@ describe('AC6: the row key never reaches a payload', () => {
   it('edit-mode save swaps exercise_order and carries no rowKey', async () => {
     isEditMode.value = true;
     const view = render(<WorkoutTracker workoutId="w1" workoutName="Pull A" />);
-    fireEvent.click(moveBtn(2, 'up'));
-    fireEvent.click(view.getByText('Save Changes'));
+    chooseMenu(rows()[1], 'Move up');
+    fireEvent.click(view.getByText('Save'));
     await vi.waitFor(() => expect(saveWorkoutEdits).toHaveBeenCalled());
     const edited = saveWorkoutEdits.mock.calls[0][2] as Record<string, unknown>[];
     expect(JSON.stringify(saveWorkoutEdits.mock.calls[0])).not.toContain('row-');
     for (const s of edited) expect(Object.keys(s)).not.toContain('rowKey');
     expect(saveExerciseOrders).not.toHaveBeenCalled(); // #392 AC6: edit mode writes at Save Changes
-    const orderOf = (section: string) => edited.find((s) => s.section === section)!.exercise_order;
-    expect(orderOf('SS1')).toBe(2);
-    expect(edited.find((s) => s.exercise_id === 'e2')!.exercise_order).toBe(3);
+    // Pull-up and the Primary Row BB swapped orders (1 and 2); the others are unmoved.
+    expect(edited.find((s) => s.exercise_id === 'e2')!.exercise_order).toBe(1);
+    expect(edited.find((s) => s.section === 'primary' && s.exercise_id === 'e1')!.exercise_order).toBe(2);
+    expect(edited.find((s) => s.section === 'SS1')!.exercise_order).toBe(3);
   });
 
   it('finish saves sets with the swapped order and no rowKey', async () => {
     const view = render(<WorkoutTracker workoutId="w1" workoutName="Pull A" />);
-    const weight = rows()[2].querySelector<HTMLInputElement>('.tracker-set-list .set-weight-input')!;
-    fireEvent.input(weight, { target: { value: '135' } });
-    fireEvent.click(moveBtn(2, 'up'));
-    fireEvent.click(view.getAllByText('Finish')[0]);
-    const finishBtns = view.getAllByRole('button', { name: /finish/i });
-    fireEvent.click(finishBtns[finishBtns.length - 1]);
+    // The Superset 1 copy of Row BB, logged, then Pull-up moved above the Primary Row BB.
+    typeWeight(rows()[2], 1, '135');
+    chooseMenu(rows()[1], 'Move up');
+    fireEvent.click(view.getByText('Finish workout'));
+    fireEvent.click(await view.findByText('Save workout'));
     await vi.waitFor(() => expect(finishWorkout).toHaveBeenCalled());
     const payload = saveSet.mock.calls[saveSet.mock.calls.length - 1][0] as Record<string, unknown>;
     expect(Object.keys(payload)).not.toContain('rowKey');
-    expect(payload).toMatchObject({ exercise_id: 'e1', section: 'SS1', exercise_order: 2, weight: '135' });
+    expect(payload).toMatchObject({ exercise_id: 'e1', section: 'SS1', exercise_order: 3, weight: '135' });
     // #392: the order writes carry rows and orders only.
     expect(saveExerciseOrders).toHaveBeenCalled();
     expect(JSON.stringify(saveExerciseOrders.mock.calls)).not.toMatch(/rowKey|row-/);

@@ -15,7 +15,7 @@ export interface SectionChangeResult {
 /**
  * Change the section of a specific exercise.
  * - to warmup: clears all sets (returns them in removedSets for API deletion)
- * - from warmup to non-warmup: adds a single empty set
+ * - from warmup to non-warmup: adds a single empty set (on the warm-up's stored row, if it has one)
  * - non-warmup to non-warmup: just updates section, preserves sets
  */
 export function applyChangeSection(
@@ -36,6 +36,10 @@ export function applyChangeSection(
       removedSets = [...ex.sets];
       return { ...ex, section: newSection, sets: [] };
     } else if (wasWarmup) {
+      // #667: a change also moves the exercise to the end of its new card, so its order changes, and a
+      // stored warm-up row could no longer be found again by order. The new first set keeps that row
+      // instead; the section and order writes that follow a change bring it to the new section.
+      const stored = ex.sets.find((s) => s.sheetRow > 0);
       const emptySet: TrackerSet = {
         set_number: 1,
         planned_reps: '',
@@ -43,7 +47,7 @@ export function applyChangeSection(
         reps: '',
         effort: '',
         saved: false,
-        sheetRow: -1,
+        sheetRow: stored ? stored.sheetRow : -1,
       };
       return { ...ex, section: newSection, sets: [emptySet] };
     } else {
@@ -54,16 +58,24 @@ export function applyChangeSection(
   return { exercises: updated, removedSets };
 }
 
+/** The exercises of the target's section, by order. */
+function inSectionOf(exercises: TrackerExercise[], exerciseId: string, exerciseOrder: number): TrackerExercise[] {
+  const target = exercises.find((e) => e.exercise_id === exerciseId && e.exercise_order === exerciseOrder);
+  return exercises
+    .filter((e) => target && e.section === target.section)
+    .sort((a, b) => a.exercise_order - b.exercise_order);
+}
+
 /**
- * Swap exercise_order of the target exercise with the one above it.
- * Returns the same array if already first.
+ * Swap exercise_order of the target exercise with the one above it in its section (#667: a move
+ * stays within its card). Returns the same array if already first in the section.
  */
 export function applyMoveUp(
   exercises: TrackerExercise[],
   exerciseId: string,
   exerciseOrder: number,
 ): TrackerExercise[] {
-  const sorted = [...exercises].sort((a, b) => a.exercise_order - b.exercise_order);
+  const sorted = inSectionOf(exercises, exerciseId, exerciseOrder);
   const idx = sorted.findIndex((e) => e.exercise_id === exerciseId && e.exercise_order === exerciseOrder);
   if (idx <= 0) return exercises;
 
@@ -84,15 +96,15 @@ export function applyMoveUp(
 }
 
 /**
- * Swap exercise_order of the target exercise with the one below it.
- * Returns the same array if already last.
+ * Swap exercise_order of the target exercise with the one below it in its section (#667).
+ * Returns the same array if already last in the section.
  */
 export function applyMoveDown(
   exercises: TrackerExercise[],
   exerciseId: string,
   exerciseOrder: number,
 ): TrackerExercise[] {
-  const sorted = [...exercises].sort((a, b) => a.exercise_order - b.exercise_order);
+  const sorted = inSectionOf(exercises, exerciseId, exerciseOrder);
   const idx = sorted.findIndex((e) => e.exercise_id === exerciseId && e.exercise_order === exerciseOrder);
   if (idx < 0 || idx >= sorted.length - 1) return exercises;
 

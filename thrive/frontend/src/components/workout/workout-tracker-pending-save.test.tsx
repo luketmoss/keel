@@ -9,6 +9,15 @@ import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/preact';
 import { mountConfirmHost, answerConfirm } from '../shared/confirm-test-utils';
 import {
+  exerciseRows as cards,
+  editorOf,
+  weightField,
+  repsField,
+  chooseMenu,
+  removeSetBtn as editorRemoveBtn,
+  tapButton,
+} from './tracker-test-utils';
+import {
   activeWorkoutId,
   activeWorkoutSets,
   activeWarmupExercises,
@@ -126,9 +135,10 @@ const BENCH_ROW_CURL: Spec[] = [
   ['e_row', 'Row', 'primary', 2, 1, '', ''],
   ['e_curl', 'Curl', 'burnout', 3, 1, '', ''],
 ];
+// #667: a move stays in its section, so the twins share one.
 const ROWBB_TWINS: Spec[] = [
   ['e_row', 'Row BB', 'primary', 1, 1, '95', '8'],
-  ['e_row', 'Row BB', 'SS1', 2, 1, '', ''],
+  ['e_row', 'Row BB', 'primary', 2, 1, '', ''],
   ['e_curl', 'Curl', 'burnout', 3, 1, '', ''],
 ];
 
@@ -140,13 +150,25 @@ async function mount(specs: Spec[]) {
   return render(<WorkoutTracker workoutId="w1" workoutName="Pull A" />);
 }
 
-const cards = () => [...document.querySelectorAll<HTMLElement>('.tracker-exercise-list > [data-row-key]')];
-const setRows = (card: number) => [...cards()[card].querySelectorAll<HTMLElement>('.tracker-set')];
-const weightInput = (card: number, set = 0) => setRows(card)[set].querySelector<HTMLInputElement>('.set-weight-input')!;
+/** #667: a tile per set; the one open set has an editor under the tiles. */
+const setRows = (card: number) => [...cards()[card].querySelectorAll<HTMLElement>('.lb-tile[data-set]')];
+const editorFor = (card: number, set: number) => {
+  const tile = setRows(card)[set];
+  if (tile.getAttribute('aria-expanded') !== 'true') fireEvent.click(tile);
+  return editorOf(cards()[card])!;
+};
+const weightInput = (card: number, set = 0) => weightField(editorFor(card, set));
+/** The open set's status line reads Saved: it shows nothing before an edit and Saving… until the write lands. */
 const saved = (card: number, set = 0) =>
-  setRows(card)[set].querySelector('.set-saved')!.getAttribute('aria-hidden') === 'false';
+  editorFor(card, set).querySelector('.lb-editor-status')!.textContent === 'Saved';
 const type = (card: number, value: string, set = 0) => fireEvent.input(weightInput(card, set), { target: { value } });
-const moveUp = (card: number) => fireEvent.click(cards()[card].querySelector<HTMLButtonElement>('[data-move="up"]')!);
+const removeSet = (card: number, set: number) => fireEvent.click(editorRemoveBtn(editorFor(card, set)));
+const addSet = (card: number) => fireEvent.click(cards()[card].querySelector<HTMLButtonElement>('.lb-tile-add')!);
+const moveUp = (card: number) => chooseMenu(cards()[card], 'Move up');
+const finishWorkoutSheet = () => {
+  tapButton(document, 'Finish workout');
+  fireEvent.click(document.querySelector('[role="dialog"] button.btn-primary')!);
+};
 /** [exercise_id, section, order, set #, weight] of a Sets row. */
 const brief = (r: Row) => [r[1], r[3], Number(r[4]), Number(r[5]), r[7]];
 
@@ -184,11 +206,9 @@ describe('#389 AC1: a save pending during a move lands once, on the moved row', 
     expect(writes[0].row).toBe(3);
     expect(brief(writes[0].values)).toEqual(['e_row', 'primary', 1, 1, '135']);
     expect(saved(0)).toBe(true); // Row, now first
-    expect(saved(1)).toBe(true); // Bench untouched
 
     // Finish: the set is saved, so the unsaved-sets loop writes nothing.
-    fireEvent.click([...document.querySelectorAll('button')].find((b) => b.textContent === 'Finish')!);
-    fireEvent.click(document.querySelector('[role="dialog"] button.btn-primary')!);
+    finishWorkoutSheet();
     await vi.advanceTimersByTimeAsync(200);
     expect(finishWorkout).toHaveBeenCalledTimes(1);
     expect(writes).toHaveLength(1);
@@ -197,7 +217,7 @@ describe('#389 AC1: a save pending during a move lands once, on the moved row', 
 });
 
 describe("#389 AC2: a duplicate's twin is never written or marked", () => {
-  it("writes the SS1 copy's own row and leaves the primary copy alone", async () => {
+  it("writes the moved copy's own row and leaves its twin alone", async () => {
     await mount(ROWBB_TWINS);
     type(1, '135');
     await vi.advanceTimersByTimeAsync(300);
@@ -206,12 +226,10 @@ describe("#389 AC2: a duplicate's twin is never written or marked", () => {
 
     expect(writes).toHaveLength(1);
     expect(writes[0]).toMatchObject({ kind: 'update', row: 3 });
-    expect(brief(writes[0].values)).toEqual(['e_row', 'SS1', 1, 1, '135']);
-    expect(cards()[0].querySelector('.section-badge-btn')!.textContent).toBe('SS1');
+    expect(brief(writes[0].values)).toEqual(['e_row', 'primary', 1, 1, '135']);
     expect(saved(0)).toBe(true);
-    // The primary copy keeps its row, values and saved state.
+    // The twin keeps its row and values.
     expect(sheet.Sets[0]).toEqual(toRow(['e_row', 'Row BB', 'primary', 2, 1, '95', '8'])); // #392: its order written, values kept
-    expect(saved(1)).toBe(true);
     expect(weightInput(1).value).toBe('95');
 
     // Its sheetRow is still its own: an edit to it writes row 2, not row 3.
@@ -225,7 +243,7 @@ describe("#389 AC2: a duplicate's twin is never written or marked", () => {
 describe('#389 AC3: a set with no row yet is appended once and keeps that row', () => {
   it('Add set, type, move: one append with the current order, and the set holds that row', async () => {
     await mount(BENCH_ROW_CURL);
-    fireEvent.click(cards()[1].querySelector('.add-set-btn')!);
+    addSet(1);
     type(1, '135', 1);
     await vi.advanceTimersByTimeAsync(300);
     moveUp(1);
@@ -248,9 +266,9 @@ describe('#389 AC3: a set with no row yet is appended once and keeps that row', 
     await mount([
       ['e_row', 'Row BB', 'primary', 1, 1, '95', '8'],
       ['e_row', 'Row BB', 'primary', 1, 2, '95', '8'],
-      ['e_row', 'Row BB', 'SS1', 2, 1, '', ''],
+      ['e_row', 'Row BB', 'primary', 2, 1, '', ''],
     ]);
-    fireEvent.click(cards()[1].querySelector('.add-set-btn')!);
+    addSet(1);
     type(1, '135', 1);
     await vi.advanceTimersByTimeAsync(300);
     moveUp(1);
@@ -258,7 +276,7 @@ describe('#389 AC3: a set with no row yet is appended once and keeps that row', 
 
     expect(writes).toHaveLength(1);
     expect(writes[0].kind).toBe('append');
-    expect(brief(writes[0].values)).toEqual(['e_row', 'SS1', 1, 2, '135']);
+    expect(brief(writes[0].values)).toEqual(['e_row', 'primary', 1, 2, '135']);
 
     // A later edit of that set lands on the appended row (5), not the twin's (3).
     type(0, '140', 1);
@@ -282,7 +300,7 @@ describe('#389 AC4: saving a set after a move updates its own row', () => {
     expect(sheet.Sets).toHaveLength(3);
   });
 
-  it('the SS1 copy does not overwrite its primary twin', async () => {
+  it('the moved copy does not overwrite its twin', async () => {
     await mount(ROWBB_TWINS);
     moveUp(1);
     await vi.advanceTimersByTimeAsync(2000);
@@ -291,7 +309,7 @@ describe('#389 AC4: saving a set after a move updates its own row', () => {
 
     expect(writes).toHaveLength(1);
     expect(writes[0]).toMatchObject({ kind: 'update', row: 3 });
-    expect(brief(writes[0].values)).toEqual(['e_row', 'SS1', 1, 1, '135']);
+    expect(brief(writes[0].values)).toEqual(['e_row', 'primary', 1, 1, '135']);
     expect(sheet.Sets[0]).toEqual(toRow(['e_row', 'Row BB', 'primary', 2, 1, '95', '8']));
   });
 });
@@ -362,14 +380,14 @@ describe("#389 with #394: a save after a row delete writes the set's own, shifte
   const CURL = toRow(SPECS[3]);
   const nonDeletes = () => writes.filter((w) => w.kind !== 'delete');
   const removeFirst = async () => {
-    fireEvent.click(cards()[0].querySelector('.exercise-toolbar-remove')!);
+    chooseMenu(cards()[0], 'Remove exercise');
     await answerConfirm(true);
   };
   afterEach(() => vi.restoreAllMocks());
 
   it("Remove set, then edit a set below it: Row's own row is updated, Curl is untouched", async () => {
     await mount(SPECS);
-    fireEvent.click(setRows(0)[1].querySelector('.set-remove-btn')!);
+    removeSet(0, 1);
     await vi.advanceTimersByTimeAsync(0);
     expect(sheet.Sets).toHaveLength(3);
 
@@ -399,7 +417,7 @@ describe("#389 with #394: a save after a row delete writes the set's own, shifte
     await mount(SPECS);
     type(1, '135');
     await vi.advanceTimersByTimeAsync(300);
-    fireEvent.click(setRows(0)[1].querySelector('.set-remove-btn')!);
+    removeSet(0, 1);
     await vi.advanceTimersByTimeAsync(1000);
     expect(nonDeletes()).toHaveLength(1);
     expect(nonDeletes()[0]).toMatchObject({ kind: 'update', row: 3 });
@@ -431,34 +449,31 @@ describe("#389 with #394: a save after a row delete writes the set's own, shifte
     ]);
     expect(sheet.Sets[1]).toEqual(toRow(['e_curl', 'Curl', 'primary', 3, 1, '50', '10']));
     expect(saved(0)).toBe(true);
-    expect(saved(1)).toBe(true);
   });
 
-  it('duplicates in different sections, a delete above them, a move, then typing: the SS1 copy is untouched', async () => {
+  it('duplicates, a delete above them, a move, then typing: the other copy is untouched', async () => {
     await mount([
       ['e_bench', 'Bench', 'primary', 1, 1, '100', '5'],
       ['e_row', 'Row BB', 'primary', 2, 1, '', ''],
-      ['e_row', 'Row BB', 'SS1', 3, 1, '95', '8'],
+      ['e_row', 'Row BB', 'primary', 3, 1, '95', '8'],
     ]);
     await removeFirst();
     await vi.advanceTimersByTimeAsync(0);
-    // Move the primary copy below the SS1 copy: it takes order 3.
-    fireEvent.click(cards()[0].querySelector<HTMLButtonElement>('[data-move="down"]')!);
-    expect(cards()[1].querySelector('.section-badge-btn')!.textContent).toBe('primary');
+    // Move the first copy below the second: it takes order 3. (A move stays in its section, #667.)
+    chooseMenu(cards()[0], 'Move down');
 
     type(1, '135');
     await vi.advanceTimersByTimeAsync(1000);
-    expect(nonDeletes()).toHaveLength(1);
+    expect(nonDeletes().filter((w) => w.kind === 'update')).toHaveLength(1);
     expect(nonDeletes()[0]).toMatchObject({ kind: 'update', row: 2 });
     expect(brief(nonDeletes()[0].values)).toEqual(['e_row', 'primary', 3, 1, '135']);
-    expect(sheet.Sets[1]).toEqual(toRow(['e_row', 'Row BB', 'SS1', 2, 1, '95', '8']));
-    expect(saved(0)).toBe(true);
+    expect(sheet.Sets[1]).toEqual(toRow(['e_row', 'Row BB', 'primary', 2, 1, '95', '8']));
     expect(saved(1)).toBe(true);
   });
 
   it('a set above the deleted row still auto-saves to its own row', async () => {
     await mount(SPECS);
-    fireEvent.click(setRows(0)[1].querySelector('.set-remove-btn')!);
+    removeSet(0, 1);
     await vi.advanceTimersByTimeAsync(0);
     type(0, '110');
     await vi.advanceTimersByTimeAsync(1000);
@@ -471,7 +486,7 @@ describe("#389 with #394: a save after a row delete writes the set's own, shifte
 describe('#389: a set whose offline append the queue flushed is not appended again', () => {
   it('Add set, append fails, queue flushes, edit again: one row, updated in place', async () => {
     await mount(BENCH_ROW_CURL);
-    fireEvent.click(cards()[1].querySelector('.add-set-btn')!);
+    addSet(1);
     appendFailure = new TypeError('Failed to fetch');
     type(1, '135', 1);
     await vi.advanceTimersByTimeAsync(1000);
@@ -499,7 +514,7 @@ describe('#389: a set whose offline append the queue flushed is not appended aga
 
   it('the same after a move: the flushed row (old order) is taken and given the new order', async () => {
     await mount(BENCH_ROW_CURL);
-    fireEvent.click(cards()[1].querySelector('.add-set-btn')!);
+    addSet(1);
     appendFailure = new TypeError('Failed to fetch');
     type(1, '135', 1);
     await vi.advanceTimersByTimeAsync(1000);
@@ -515,13 +530,15 @@ describe('#389: a set whose offline append the queue flushed is not appended aga
 
   it('a quick-fill after the flush re-saves every set of the card without a second row', async () => {
     await mount(BENCH_ROW_CURL);
-    fireEvent.click(cards()[1].querySelector('.add-set-btn')!);
+    addSet(1);
     appendFailure = new TypeError('Failed to fetch');
     type(1, '135', 1);
     await vi.advanceTimersByTimeAsync(1000);
     await flushQueue('test-token');
 
-    fireEvent.input(cards()[1].querySelector('.quick-fill-row .set-reps-input')!, { target: { value: '8' } });
+    // Same for all sets: the open set's reps (and weight) go to every set of the card.
+    fireEvent.input(repsField(editorFor(1, 1)), { target: { value: '8' } });
+    tapButton(editorFor(1, 1), 'Same for all sets');
     await vi.advanceTimersByTimeAsync(1000);
     expect(sheet.Sets.filter((r) => r[1] === 'e_row')).toHaveLength(2);
     expect(writes[writes.length - 1]).toMatchObject({ kind: 'update', row: 5 });
@@ -531,7 +548,7 @@ describe('#389: a set whose offline append the queue flushed is not appended aga
   it("a duplicate's twin row is never taken, even when unclaimed rows exist for the same key", async () => {
     // Twin copies: the primary copy holds row 2 (e_row, order 1, set 1).
     await mount(ROWBB_TWINS);
-    fireEvent.click(cards()[1].querySelector('.add-set-btn')!);
+    addSet(1);
     appendFailure = new TypeError('Failed to fetch');
     type(1, '135', 1);
     await vi.advanceTimersByTimeAsync(1000);
@@ -542,7 +559,7 @@ describe('#389: a set whose offline append the queue flushed is not appended aga
     expect(sheet.Sets).toHaveLength(4);
     expect(writes[writes.length - 1]).toMatchObject({ kind: 'update', row: 5 });
     expect(sheet.Sets[0]).toEqual(toRow(ROWBB_TWINS[0]));
-    expect(brief(sheet.Sets[3])).toEqual(['e_row', 'SS1', 2, 2, '140']);
+    expect(brief(sheet.Sets[3])).toEqual(['e_row', 'primary', 2, 2, '140']);
   });
 
   it("same-section copies: B never takes A's flushed row, and A takes it back on its next edit", async () => {
@@ -553,7 +570,7 @@ describe('#389: a set whose offline append the queue flushed is not appended aga
       ['e_curl', 'Curl', 'burnout', 3, 1, '', ''],
     ]);
     // A's new set 2: the append fails, and the queue flush lands it as row 5.
-    fireEvent.click(cards()[0].querySelector('.add-set-btn')!);
+    addSet(0);
     appendFailure = new TypeError('Failed to fetch');
     type(0, '135', 1);
     await vi.advanceTimersByTimeAsync(1000);
@@ -561,7 +578,7 @@ describe('#389: a set whose offline append the queue flushed is not appended aga
     expect(brief(sheet.Sets[3])).toEqual(['e_row', 'primary', 1, 2, '135']);
 
     // B adds the same set number and types 200: appended, A's row untouched.
-    fireEvent.click(cards()[1].querySelector('.add-set-btn')!);
+    addSet(1);
     type(1, '200', 1);
     await vi.advanceTimersByTimeAsync(1000);
     expect(writes[writes.length - 1].kind).toBe('append');
@@ -585,12 +602,12 @@ describe('#389: a set whose offline append the queue flushed is not appended aga
       ['e_row', 'Row', 'primary', 2, 1, '90', '8'],
       ['e_curl', 'Curl', 'burnout', 3, 1, '', ''],
     ]);
-    fireEvent.click(cards()[0].querySelector('.add-set-btn')!);
+    addSet(0);
     appendFailure = new TypeError('Failed to fetch');
     type(0, '135', 1);
     await vi.advanceTimersByTimeAsync(1000);
     await flushQueue('test-token');
-    fireEvent.click(cards()[1].querySelector('.add-set-btn')!); // B's set 2: blank, no row
+    addSet(1); // B's set 2: blank, no row
 
     type(0, '140', 1);
     await vi.advanceTimersByTimeAsync(1000);

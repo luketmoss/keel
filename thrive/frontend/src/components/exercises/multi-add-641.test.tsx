@@ -78,18 +78,22 @@ describe('the tracker', () => {
       } as SetWithRow,
     ];
     render(<WorkoutTracker workoutId="w1" workoutName="Pull A" />);
-    openAndPick('Add Exercise', ['Plank', 'Ab Wheel', 'Dips']);
+    // #667: each section card has its own Add exercise; the picked three join the end of the Primary card.
+    openAndPick('Add exercise', ['Plank', 'Ab Wheel', 'Dips']);
     expect(document.querySelector('[role="dialog"]')).toBeNull();
-    const list = [...document.querySelectorAll<HTMLElement>('.tracker-exercise-list > [data-row-key]')];
+    const list = [...document.querySelectorAll<HTMLElement>('.lb-cards [data-row-key]')];
     expect(list).toHaveLength(4);
     expect(list.slice(1).map((r) => r.textContent)).toEqual([
       expect.stringContaining('Plank'),
       expect.stringContaining('Ab Wheel'),
       expect.stringContaining('Dips'),
     ]);
+    // One empty set each: a tile apiece.
     for (const r of list.slice(1)) {
-      expect(r.querySelectorAll('.set-row, [data-set]').length).toBeLessThanOrEqual(1);
+      expect(r.querySelectorAll('.lb-tile[data-set]')).toHaveLength(1);
     }
+    // The first one added has its set open.
+    expect(list[1].querySelector('.lb-editor')).not.toBeNull();
   });
 });
 

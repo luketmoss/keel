@@ -137,3 +137,16 @@ export function PlusIcon() {
     </Icon>
   );
 }
+
+/** The offline banner's mark (#667): a signal with a slash through it. */
+export function NoSignalIcon() {
+  return (
+    <Icon>
+      <path d="M3 3l18 18" />
+      <path d="M8.5 16.4a5 5 0 0 1 7 0" />
+      <path d="M5 12.9a10 10 0 0 1 5.2-2.8M13.8 10.1A10 10 0 0 1 19 12.9" />
+      <path d="M2 8.8a15 15 0 0 1 6-3.2M16 5.6a15 15 0 0 1 6 3.2" />
+      <path d="M12 20h.01" />
+    </Icon>
+  );
+}

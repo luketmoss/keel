@@ -1,10 +1,13 @@
-import { describe, it, expect } from 'vitest';
-import { render } from '@testing-library/preact';
+// #667 — one exercise in a Logbook section card: its name and options menu, tiles, the open set's editor,
+// and the Change section sheet.
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render, fireEvent, cleanup } from '@testing-library/preact';
 import { h } from 'preact';
 import { ExerciseRow } from './exercise-row';
 import type { TrackerExercise } from './exercise-row';
 import type { TrackerSet } from './set-row';
-import type { Effort } from '../../api/types';
+
+afterEach(cleanup);
 
 function makeSet(overrides: Partial<TrackerSet> = {}): TrackerSet {
   return {
@@ -25,228 +28,268 @@ function makeExercise(overrides: Partial<TrackerExercise> = {}): TrackerExercise
     exercise_name: 'Bench Press',
     section: 'primary',
     exercise_order: 1,
-    sets: [makeSet()],
+    sets: [makeSet({ set_number: 1, weight: '135', reps: '8' }), makeSet({ set_number: 2, planned_reps: '8' })],
     quickFillWeight: '',
     quickFillReps: '',
     quickFillEffort: '',
+    rowKey: 'row-1',
     ...overrides,
   };
 }
 
-const noopStr = (_s: string) => {};
-const noopEffort = (_e: Effort | '') => {};
-const noop = () => {};
-
-function renderExerciseRow(overrides: Partial<TrackerExercise> = {}, props: Record<string, unknown> = {}) {
-  const exercise = makeExercise(overrides);
-  return render(
+function renderRow(overrides: Partial<TrackerExercise> = {}, props: Record<string, unknown> = {}) {
+  const handlers = {
+    onOpenSet: vi.fn(),
+    onUpdateSet: vi.fn(),
+    onAddSet: vi.fn(),
+    onRemoveSet: vi.fn(),
+    onSameForAll: vi.fn(),
+    onCopyDown: vi.fn(),
+    onChangeSection: vi.fn(),
+    onMoveUp: vi.fn(),
+    onMoveDown: vi.fn(),
+    onRemoveExercise: vi.fn(),
+  };
+  const view = render(
     h(ExerciseRow as any, {
-      exercise,
+      exercise: makeExercise(overrides),
       currentWorkoutId: 'w1',
-      onUpdateSet: () => {},
-      onAddSet: noop,
-      onRemoveSet: () => {},
-      onQuickFillWeight: noopStr,
-      onQuickFillReps: noopStr,
-      onQuickFillEffort: noopEffort,
-      onCopyDown: () => {},
-      onChangeSection: noopStr,
-      onMoveUp: noop,
-      onMoveDown: noop,
-      onRemoveExercise: noop,
+      showLastTime: false,
+      openSet: null,
+      statusFor: () => '',
+      removing: new Set<number>(),
       isFirst: false,
       isLast: false,
-      totalExercises: 3,
+      ...handlers,
       ...props,
     }),
   );
+  return { ...view, handlers };
 }
 
-describe('AC1: Controls row merges section badge and action buttons', () => {
-  it('renders a single controls row with section badge and action buttons when totalExercises > 1', () => {
-    const { container } = renderExerciseRow({ section: 'primary' }, { totalExercises: 3 });
-    const controlsRow = container.querySelector('.tracker-exercise-controls');
-    expect(controlsRow).not.toBeNull();
-    // Section badge inside controls row
-    const badge = controlsRow!.querySelector('.section-badge-btn');
-    expect(badge).not.toBeNull();
-    expect(badge!.textContent).toBe('primary');
-    // Action buttons inside controls row
-    const buttons = controlsRow!.querySelectorAll('.exercise-toolbar-btn');
-    expect(buttons.length).toBeGreaterThanOrEqual(3); // ▲ ▼ ✕
-    // History toggle inside controls row
-    const historyBtn = controlsRow!.querySelector('.last-time-toggle');
-    expect(historyBtn).not.toBeNull();
+const trigger = (c: Element) => c.querySelector<HTMLButtonElement>('[data-options-btn]')!;
+const menuItems = (c: Element) => [...c.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')];
+const openMenu = (c: Element) => fireEvent.click(trigger(c));
+const buttonText = (c: ParentNode, text: string) =>
+  [...c.querySelectorAll('button')].find((b) => b.textContent?.trim() === text)!;
+
+describe('a working exercise', () => {
+  it('shows its name, one tile per set and an Add set tile', () => {
+    const { container } = renderRow();
+    expect(container.querySelector('.lb-exercise-name')!.textContent).toBe('Bench Press');
+    expect(container.querySelectorAll('.lb-tile[data-set]')).toHaveLength(2);
+    expect(container.querySelector('.lb-tile-add')!.getAttribute('aria-label')).toBe('Add a set to Bench Press');
   });
 
-  it('does not render the old separate exercise-toolbar-row', () => {
-    const { container } = renderExerciseRow({ section: 'primary' }, { totalExercises: 3 });
-    const oldToolbar = container.querySelector('.exercise-toolbar-row');
-    expect(oldToolbar).toBeNull();
+  it('carries its row key on the root element', () => {
+    const { container } = renderRow();
+    expect((container.firstElementChild as HTMLElement).dataset.rowKey).toBe('row-1');
   });
 
-  it('renders controls row without move/remove buttons when totalExercises === 1', () => {
-    const { container } = renderExerciseRow({ section: 'primary' }, { totalExercises: 1 });
-    const controlsRow = container.querySelector('.tracker-exercise-controls');
-    expect(controlsRow).not.toBeNull();
-    // Section badge present
-    const badge = controlsRow!.querySelector('.section-badge-btn');
-    expect(badge).not.toBeNull();
-    // No move/remove toolbar buttons (history toggle is always present)
-    const buttons = controlsRow!.querySelectorAll('.exercise-toolbar-btn:not(.last-time-toggle)');
-    expect(buttons.length).toBe(0);
-    // History toggle still present
-    const historyBtn = controlsRow!.querySelector('.last-time-toggle');
-    expect(historyBtn).not.toBeNull();
-  });
-});
-
-describe('AC2: Action buttons render at 28x28px matching effort button size', () => {
-  it('marks move-up aria-disabled (not disabled) when isFirst (#371)', () => {
-    const { container } = renderExerciseRow({}, { isFirst: true, isLast: false, totalExercises: 3 });
-    const controlsRow = container.querySelector('.tracker-exercise-controls');
-    // Get non-history toolbar buttons (history toggle also has exercise-toolbar-btn)
-    const buttons = controlsRow!.querySelectorAll('.exercise-toolbar-btn:not(.last-time-toggle)');
-    // First non-history button is move-up
-    const moveUp = buttons[0] as HTMLButtonElement;
-    expect(moveUp.getAttribute('aria-disabled')).toBe('true');
-    expect(moveUp.disabled).toBe(false);
-    expect(moveUp.dataset.move).toBe('up');
-    expect(moveUp.getAttribute('aria-label')).toContain('Move');
-    expect(moveUp.getAttribute('aria-label')).toContain('up');
+  it('has none of the old chrome: no badge, toolbar, quick-fill row, S1 row or E/M/H buttons', () => {
+    const { container } = renderRow({}, { openSet: 1 });
+    for (const sel of [
+      '.section-badge-btn',
+      '.exercise-toolbar-btn',
+      '.quick-fill-row',
+      '.tracker-set',
+      '.effort-btn',
+      '.set-saved',
+      '.set-remove-btn',
+      '.add-set-btn',
+    ]) {
+      expect(container.querySelector(sel), sel).toBeNull();
+    }
   });
 
-  it('marks move-down aria-disabled (not disabled) when isLast (#371)', () => {
-    const { container } = renderExerciseRow({}, { isFirst: false, isLast: true, totalExercises: 3 });
-    const controlsRow = container.querySelector('.tracker-exercise-controls');
-    // Get non-history toolbar buttons
-    const buttons = controlsRow!.querySelectorAll('.exercise-toolbar-btn:not(.last-time-toggle)');
-    // Second non-history button is move-down
-    const moveDown = buttons[1] as HTMLButtonElement;
-    expect(moveDown.getAttribute('aria-disabled')).toBe('true');
-    expect(moveDown.disabled).toBe(false);
-    expect(moveDown.dataset.move).toBe('down');
-    expect(moveDown.getAttribute('aria-label')).toContain('Move');
-    expect(moveDown.getAttribute('aria-label')).toContain('down');
+  it('opens a set on its tile and passes null when the open tile is tapped again', () => {
+    const { container, handlers } = renderRow();
+    fireEvent.click(container.querySelector('.lb-tile[data-set="2"]')!);
+    expect(handlers.onOpenSet).toHaveBeenLastCalledWith(2);
+    cleanup();
+    const open = renderRow({}, { openSet: 2 });
+    expect(open.container.querySelector('.lb-tile[data-set="2"]')!.getAttribute('aria-expanded')).toBe('true');
+    fireEvent.click(open.container.querySelector('.lb-tile[data-set="2"]')!);
+    expect(open.handlers.onOpenSet).toHaveBeenLastCalledWith(null);
   });
 
-  it('preserves aria-labels on all action buttons', () => {
-    const { container } = renderExerciseRow({ exercise_name: 'Bench Press' }, { totalExercises: 3 });
-    const controlsRow = container.querySelector('.tracker-exercise-controls');
-    // All toolbar buttons (including history) should have aria-labels
-    const buttons = controlsRow!.querySelectorAll('.exercise-toolbar-btn');
-    buttons.forEach((btn) => {
-      expect(btn.getAttribute('aria-label')).toBeTruthy();
-    });
-    // Remove button
-    const removeBtn = controlsRow!.querySelector('.exercise-toolbar-remove');
-    expect(removeBtn!.getAttribute('aria-label')).toContain('Remove');
-    expect(removeBtn!.getAttribute('aria-label')).toContain('Bench Press');
+  it('draws the editor of the open set only, and Next set opens the next one (Done closes)', () => {
+    const { container, handlers } = renderRow({}, { openSet: 1 });
+    expect(container.querySelectorAll('.lb-editor')).toHaveLength(1);
+    expect(container.querySelector('.lb-editor')!.getAttribute('aria-label')).toBe('Bench Press, set 1');
+    fireEvent.click(buttonText(container, 'Next set'));
+    expect(handlers.onOpenSet).toHaveBeenLastCalledWith(2);
+    cleanup();
+    const last = renderRow({}, { openSet: 2 });
+    fireEvent.click(buttonText(last.container, 'Done'));
+    expect(last.handlers.onOpenSet).toHaveBeenLastCalledWith(null);
+  });
+
+  it('Add a set runs onAddSet', () => {
+    const { container, handlers } = renderRow();
+    fireEvent.click(container.querySelector('.lb-tile-add')!);
+    expect(handlers.onAddSet).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the Last time line only while the chip is pressed', () => {
+    expect(renderRow().container.querySelector('.lb-last-time')).toBeNull();
   });
 });
 
-describe('AC3: Exercise name occupies its own full-width row', () => {
-  it('renders exercise name in a dedicated name row below controls', () => {
-    const { container } = renderExerciseRow({ exercise_name: 'Bench Press', section: 'primary' });
-    const nameRow = container.querySelector('.tracker-exercise-name-row');
-    expect(nameRow).not.toBeNull();
-    expect(nameRow!.textContent).toContain('Bench Press');
+describe('the options menu', () => {
+  it('is a button named for the exercise, with a menu of four items', () => {
+    const { container } = renderRow();
+    expect(trigger(container).getAttribute('aria-label')).toBe('Bench Press options');
+    expect(trigger(container).getAttribute('aria-haspopup')).toBe('menu');
+    openMenu(container);
+    expect(container.querySelector('[role="menu"]')).toBeTruthy();
+    expect(menuItems(container).map((b) => b.textContent!.trim())).toEqual([
+      'Move up',
+      'Move down',
+      'Change section…',
+      'Remove exercise',
+    ]);
   });
 
-  it('name row appears after controls row in DOM order', () => {
-    const { container } = renderExerciseRow({ section: 'primary' });
-    const card = container.firstElementChild!;
-    const children = Array.from(card.children);
-    const controlsIdx = children.findIndex((el) => el.classList.contains('tracker-exercise-controls'));
-    const nameIdx = children.findIndex((el) => el.classList.contains('tracker-exercise-name-row'));
-    expect(controlsIdx).toBeGreaterThanOrEqual(0);
-    expect(nameIdx).toBeGreaterThan(controlsIdx);
-  });
-});
-
-describe('AC4: Quick fill section uses border-top divider instead of text label', () => {
-  it('does not render the quick-fill-heading text', () => {
-    const { container } = renderExerciseRow({ section: 'primary' });
-    const heading = container.querySelector('.quick-fill-heading');
-    expect(heading).toBeNull();
+  it('marks Move up aria-disabled (not disabled) on the first of its section, and Move down on the last', () => {
+    const first = renderRow({}, { isFirst: true });
+    openMenu(first.container);
+    const up = menuItems(first.container)[0];
+    expect(up.getAttribute('aria-disabled')).toBe('true');
+    expect(up.hasAttribute('disabled')).toBe(false);
+    expect(up.dataset.move).toBe('up');
+    fireEvent.click(up);
+    expect(first.handlers.onMoveUp).not.toHaveBeenCalled();
+    cleanup();
+    const last = renderRow({}, { isLast: true });
+    openMenu(last.container);
+    expect(menuItems(last.container)[1].getAttribute('aria-disabled')).toBe('true');
+    expect(menuItems(last.container)[1].dataset.move).toBe('down');
   });
 
-  it('still renders the quick-fill-row with inputs', () => {
-    const { container } = renderExerciseRow({ section: 'primary' });
-    const row = container.querySelector('.quick-fill-row');
-    expect(row).not.toBeNull();
-    // Weight and reps inputs
-    const weightInput = row!.querySelector('.set-weight-input');
-    const repsInput = row!.querySelector('.set-reps-input');
-    expect(weightInput).not.toBeNull();
-    expect(repsInput).not.toBeNull();
-    // Effort buttons
-    const effortBtns = row!.querySelectorAll('.effort-btn');
-    expect(effortBtns.length).toBe(3);
-  });
-});
-
-describe('AC5: Warmup cards use same controls layout as other sections', () => {
-  it('warmup cards use tracker-exercise-controls with right-aligned action buttons', () => {
-    const { container } = renderExerciseRow({ section: 'warmup' }, { totalExercises: 3 });
-    const controlsRow = container.querySelector('.tracker-exercise-controls');
-    expect(controlsRow).not.toBeNull();
-    // Section badge inside controls row
-    const badge = controlsRow!.querySelector('.section-badge-btn');
-    expect(badge).not.toBeNull();
-    expect(badge!.textContent).toBe('warmup');
-    // Exercise name inside controls row
-    const name = controlsRow!.querySelector('.tracker-exercise-name');
-    expect(name).not.toBeNull();
-    // Action buttons inside tracker-exercise-actions (right-aligned)
-    const actions = controlsRow!.querySelector('.tracker-exercise-actions');
-    expect(actions).not.toBeNull();
-    const buttons = actions!.querySelectorAll('.exercise-toolbar-btn');
-    expect(buttons.length).toBe(3); // ▲ ▼ ✕
+  it('runs Move up, Move down and Remove exercise and closes the menu', () => {
+    const { container, handlers } = renderRow();
+    openMenu(container);
+    fireEvent.click(menuItems(container)[0]);
+    expect(handlers.onMoveUp).toHaveBeenCalledTimes(1);
+    expect(container.querySelector('[role="menu"]')).toBeNull();
+    openMenu(container);
+    fireEvent.click(menuItems(container)[1]);
+    expect(handlers.onMoveDown).toHaveBeenCalledTimes(1);
+    openMenu(container);
+    fireEvent.click(menuItems(container)[3]);
+    expect(handlers.onRemoveExercise).toHaveBeenCalledTimes(1);
   });
 
-  it('warmup cards do not render the old exercise-toolbar-row', () => {
-    const { container } = renderExerciseRow({ section: 'warmup' }, { totalExercises: 3 });
-    const toolbar = container.querySelector('.exercise-toolbar-row');
-    expect(toolbar).toBeNull();
+  it('closes on Escape and returns focus to its button', () => {
+    const { container } = renderRow();
+    openMenu(container);
+    fireEvent.keyDown(container.querySelector('[role="menu"]')!, { key: 'Escape' });
+    expect(container.querySelector('[role="menu"]')).toBeNull();
+    expect(document.activeElement).toBe(trigger(container));
   });
 
-  it('warmup cards do not render quick fill section', () => {
-    const { container } = renderExerciseRow({ section: 'warmup' });
-    const quickFill = container.querySelector('.quick-fill-row');
-    expect(quickFill).toBeNull();
+  it('moves between items with the arrow keys', () => {
+    const { container } = renderRow();
+    openMenu(container);
+    const items = menuItems(container);
+    expect(document.activeElement).toBe(items[0]);
+    fireEvent.keyDown(container.querySelector('[role="menu"]')!, { key: 'ArrowDown' });
+    expect(document.activeElement).toBe(items[1]);
+    fireEvent.keyDown(container.querySelector('[role="menu"]')!, { key: 'End' });
+    expect(document.activeElement).toBe(items[3]);
   });
 });
 
-describe('#371: row key and guarded end buttons', () => {
-  it('puts data-row-key on the root element of both variants', () => {
-    const normal = renderExerciseRow({ rowKey: 'row-a' });
-    expect((normal.container.firstElementChild as HTMLElement).dataset.rowKey).toBe('row-a');
-    expect(normal.container.firstElementChild!.classList.contains('tracker-exercise')).toBe(true);
-    const warm = renderExerciseRow({ rowKey: 'row-b', section: 'warmup', sets: [] });
-    expect((warm.container.firstElementChild as HTMLElement).dataset.rowKey).toBe('row-b');
-    expect(warm.container.firstElementChild!.classList.contains('tracker-exercise-warmup')).toBe(true);
+describe('the Change section sheet', () => {
+  const openSheet = (c: Element) => {
+    openMenu(c);
+    fireEvent.click(menuItems(c)[2]);
+  };
+  const radios = () => [...document.querySelectorAll<HTMLElement>('[role="radio"]')];
+
+  it('lists every section as a radio row, with the current one checked', () => {
+    const { container } = renderRow();
+    openSheet(container);
+    expect(document.querySelector('[role="dialog"] h2')!.textContent).toBe('Move Bench Press to');
+    expect(radios().map((r) => r.textContent)).toEqual([
+      'Warm-up',
+      'Primary',
+      'Superset 1',
+      'Superset 2',
+      'Superset 3',
+      'Burnout',
+      'Cool-down',
+    ]);
+    expect(radios().map((r) => r.getAttribute('aria-checked'))).toEqual([
+      'false',
+      'true',
+      'false',
+      'false',
+      'false',
+      'false',
+      'false',
+    ]);
   });
 
-  it('an aria-disabled end button does not call its handler', () => {
-    let up = 0;
-    let down = 0;
-    const { container } = renderExerciseRow(
-      {},
-      {
-        isFirst: true,
-        isLast: true,
-        onMoveUp: () => {
-          up++;
-        },
-        onMoveDown: () => {
-          down++;
-        },
-      },
+  it('choosing the current section closes it, and another runs onChangeSection and closes it', () => {
+    const { container, handlers } = renderRow();
+    openSheet(container);
+    fireEvent.click(radios()[1]);
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(handlers.onChangeSection).not.toHaveBeenCalled();
+    openSheet(container);
+    fireEvent.click(radios()[3]);
+    expect(handlers.onChangeSection).toHaveBeenCalledWith('SS2');
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it('warns before a move to warm-up with logged sets, and Cancel changes nothing', () => {
+    const { container, handlers } = renderRow();
+    openSheet(container);
+    fireEvent.click(radios()[0]);
+    expect(handlers.onChangeSection).not.toHaveBeenCalled();
+    expect(document.querySelector('[role="alert"]')!.textContent).toContain(
+      'Warm-ups are list only, so its 1 logged set is deleted.',
     );
-    (container.querySelector('[data-move="up"]') as HTMLButtonElement).click();
-    (container.querySelector('[data-move="down"]') as HTMLButtonElement).click();
-    expect(up).toBe(0);
-    expect(down).toBe(0);
+    expect(document.activeElement).toBe(buttonText(document, 'Cancel')); // focus follows into the warning
+    fireEvent.click(buttonText(document, 'Cancel'));
+    expect(handlers.onChangeSection).not.toHaveBeenCalled();
+    expect(radios()).toHaveLength(7);
+    expect(document.activeElement).toBe(radios()[1]); // and back to the checked row
+    fireEvent.click(radios()[0]);
+    fireEvent.click(buttonText(document, 'Move to warm-up'));
+    expect(handlers.onChangeSection).toHaveBeenCalledWith('warmup');
+  });
+
+  it('moves to warm-up without a warning when nothing is logged', () => {
+    const { container, handlers } = renderRow({ sets: [makeSet()] });
+    openSheet(container);
+    fireEvent.click(radios()[0]);
+    expect(handlers.onChangeSection).toHaveBeenCalledWith('warmup');
+  });
+
+  it('closes on Escape', () => {
+    const { container } = renderRow();
+    openSheet(container);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+  });
+});
+
+describe('a warm-up', () => {
+  it('is a list row: its name and options, no tiles, no editor, no Last time line', () => {
+    const { container } = renderRow({ section: 'warmup', sets: [] }, { showLastTime: true });
+    expect(container.querySelector('.lb-warmup-name')!.textContent).toBe('Bench Press');
+    expect(container.querySelector('.lb-tile')).toBeNull();
+    expect(container.querySelector('.lb-editor')).toBeNull();
+    expect(container.querySelector('.lb-last-time')).toBeNull();
+    expect(trigger(container)).toBeTruthy();
+  });
+
+  it('keeps the options menu, with Move and Change section', () => {
+    const { container } = renderRow({ section: 'warmup', sets: [] });
+    openMenu(container);
+    expect(menuItems(container)).toHaveLength(4);
   });
 });

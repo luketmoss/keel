@@ -194,9 +194,26 @@ the PR; the stack skill says how.
 
 ## Deploying
 
-The Worker is named `keel-mcp` (`wrangler.toml`), so it serves at
-`keel-mcp.<account-subdomain>.workers.dev`. The folder and board option stay
-`mcp`.
+The Worker is named `keel-mcp` (`wrangler.toml`). Its public URL, `PUBLIC_URL`
+in `src/config.ts`, is the custom domain `https://keel-mcp.luketmoss.com`, not
+`keel-mcp.luketmossbot.workers.dev`: some networks (a work laptop's) refuse
+`*.workers.dev` with `ERR_SSL_VERSION_OR_CIPHER_MISMATCH`, and the OAuth sign-in
+runs in the browser, so that network must reach the Worker. The folder and board
+option stay `mcp`.
+
+- **The domain is attached in the dashboard**, not in `wrangler.toml`:
+  `luketmoss.com` is a zone in the `luketmossbot` Cloudflare account (DNS moved
+  from Namecheap; Namecheap stays the registrar), and `keel-mcp.luketmoss.com` is
+  a Custom Domain under keel-mcp → Domains. A deploy whose config names no routes
+  leaves it alone, and declaring it would make every deploy need zone
+  permissions on `CLOUDFLARE_API_TOKEN`.
+- **`workers.dev` still answers**, but nothing should use it: the OAuth issuer
+  and every resource URL are `PUBLIC_URL`, so a connector added at the old host
+  fails sign-in.
+- **Changing `PUBLIC_URL`** changes the issuer and every resource, so every
+  existing grant stops working. In the same step, change the GitHub OAuth app's
+  callback URL to `<PUBLIC_URL>/callback` (it allows one), then remove and re-add
+  all four connectors in every claude.ai account that uses them.
 
 Merge to `main` deploys, once the `CLOUDFLARE_API_TOKEN` repository secret
 exists; until then the deploy job skips with a notice. Worker secrets are set

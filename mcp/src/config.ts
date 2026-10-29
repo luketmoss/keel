@@ -1,9 +1,10 @@
 /**
  * The Worker's public origin. The OAuth provider needs it when it is
  * constructed, before any request or `env` exists, so it cannot come from a
- * binding. Change it here if the Worker is ever renamed or given a domain.
+ * binding. Change it here if the Worker is ever renamed or moved to another
+ * domain. A custom domain, not workers.dev: some networks block *.workers.dev.
  */
-export const PUBLIC_URL = 'https://keel-mcp.luketmossbot.workers.dev'
+export const PUBLIC_URL = 'https://keel-mcp.luketmoss.com'
 
 export const HIVE_RESOURCE = `${PUBLIC_URL}/hive/mcp`
 export const THRIVE_RESOURCE = `${PUBLIC_URL}/thrive/mcp`

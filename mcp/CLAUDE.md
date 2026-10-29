@@ -55,7 +55,14 @@ Setup for a fresh account, once:
 3. In claude.ai, add one custom connector per endpoint (the four below).
 
 Each endpoint is its own OAuth resource, so a token issued for one is refused at
-the others. To add an endpoint: a folder like `src/hive/`, an entry in
+the others.
+
+Several Claude accounts (personal and work) can be signed in at once. They all
+reach the Worker as the same client, claude.ai's, with the same GitHub user, so
+the provider's default of revoking that user's earlier grants on a new sign-in
+signed each account out of the other. `callback` passes
+`revokeExistingGrants: false`; a grant left behind by a reconnect expires on the
+provider's 30-day refresh-token lifetime. To add an endpoint: a folder like `src/hive/`, an entry in
 `resources` in `src/index.ts`, and its URL in `resources` of the authorization
 server (`src/index.ts`) and `src/config.ts`.
 

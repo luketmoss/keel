@@ -39,3 +39,37 @@ describe('consent page', () => {
     expect(await res.text()).toContain('<h1>Allow Claude?</h1>')
   })
 })
+
+describe('callback', () => {
+  it('keeps the grants other Claude accounts already hold', async () => {
+    let options: Record<string, unknown> | undefined
+    const oauth = {
+      finishUpstream: async () => ({
+        request: { scope: [] },
+        data: { verifier: 'v' },
+        headers: new Headers(),
+      }),
+      completeAuthorization: async (o: Record<string, unknown>) => {
+        options = o
+        return { redirectTo: 'https://claude.ai/api/mcp/auth_callback?code=c' }
+      },
+    } as unknown as OAuthHelpers
+    const realFetch = globalThis.fetch
+    globalThis.fetch = (async (input: RequestInfo | URL) =>
+      String(input).includes('access_token')
+        ? Response.json({ access_token: 't' })
+        : Response.json({ id: 42, login: 'owner' })) as typeof fetch
+    try {
+      const res = await handleAuth(
+        new Request('https://example.test/callback?code=c&state=s'),
+        { ...env, ALLOWED_GITHUB_ID: '42' } as Env,
+        oauth,
+      )
+      expect(res.status).toBe(302)
+    } finally {
+      globalThis.fetch = realFetch
+    }
+    expect(options?.userId).toBe('42')
+    expect(options?.revokeExistingGrants).toBe(false)
+  })
+})

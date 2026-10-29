@@ -91,6 +91,12 @@ async function callback(request: Request, env: Env, oauth: OAuthHelpers): Promis
     metadata: {},
     scope: original.scope,
     props,
+    // Every claude.ai account presents the same client (claude.ai's metadata
+    // document and callback), so the default revoke-on-reauthorize let a sign-in
+    // from one Claude account sign out every other. Old grants still expire on
+    // the provider's refresh-token lifetime (30 days), and props never change, so
+    // the stale-props loop the default guards against cannot happen here.
+    revokeExistingGrants: false,
   })
   headers.set('Location', redirectTo)
   return new Response(null, { status: 302, headers })

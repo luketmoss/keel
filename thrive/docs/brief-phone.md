@@ -77,10 +77,12 @@ Named **Brief ready**.
   (`daily` or `weekly`), `status` (`complete`, `no-sleep` or `failed`) and,
   sometimes, `note` to the URL. Make local string variables named `kind`,
   `status` and `note` in this macro: MacroDroid fills them from the URL's
-  parameters of the same name, and `note` stays empty when the brief sends
-  none. `note` is *Not read: Hive* (or calendar) on a partial brief, and the
-  reason on a failed one.
-- **Actions**, as MacroDroid lists them, 21 in all (`today` is
+  parameters of the same name. `note` is *Not read: Hive* (or calendar) on a
+  partial brief, and the reason on a failed one. A local variable **keeps its
+  last value between runs**, and a call without `note` leaves it alone, so
+  the macro empties `note` itself before it ends: otherwise one call's note
+  shows up on every later notification.
+- **Actions**, as MacroDroid lists them, 23 in all (`today` is
   `[year]-[month_digit]-[dayofmonth]`, and `{lv=note}` is the `note` local
   variable inserted with the `...` button):
 
@@ -93,6 +95,7 @@ If status = failed
         Set brief_daily_failed = today
         Notification: Morning brief failed / {lv=note}
     End If
+    Set note = (empty)
     Cancel Macro Actions (This Macro)
 End If
 If kind = weekly
@@ -106,14 +109,18 @@ Else
         Notification: Morning brief ready / Tap to open today's brief. {lv=note}
     End If
 End If
+Set note = (empty)
 ```
 
 Each Notification line is *title / text*. Edit the existing macro rather than
 rebuilding it: the new parts are the `If status = failed` block on top, which
 **Cancel Macro Actions** (under MacroDroid Specific) ends so a failure never
-reaches the "ready" actions below it, and `{lv=note}` at the end of each
-text. MacroDroid adds an action at the bottom; long-press its handle to drag
-it up.
+reaches the "ready" actions below it, `{lv=note}` at the end of each
+text, and the two `Set note = (empty)` actions (Set Variable on the local
+`note`, with the text left blank), one before the cancel and one last.
+MacroDroid adds an action at the bottom; long-press its handle to drag it up.
+If `note` already holds an old value, empty it once in the macro's Local
+Variables panel.
 
 A failed brief sets `…_failed`, never `…_ready`, so an unlock doesn't open
 yesterday's page, and Macro 4 stays quiet because the failure was already

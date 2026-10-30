@@ -432,8 +432,8 @@ export function KanbanBoard() {
         </button>
       )}
 
-      {/* The item screen covers the page on a phone, so the tab bar steps aside while it is open. */}
-      {!selectedItem.value && <TabBar />}
+      {/* The item screen and the Completed page (#655) cover the page on a phone, so the tab bar steps aside while either is open. */}
+      {!selectedItem.value && !showArchiveDialog.value && <TabBar />}
 
       {selectedItem.value && <CardDetail />}
       {showCreateModal.value && <CreateItemModal />}

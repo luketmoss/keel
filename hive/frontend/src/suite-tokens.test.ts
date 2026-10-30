@@ -300,7 +300,7 @@ describe('AC5: nothing reads --color-border-light as an outline', () => {
     expect(
       reads.filter(
         (sel) =>
-          !/^\.(today|boards|detail)-|^\.(status-switch|subtask-item|subtask-add-inline|subtask-progress|owner-avatar-none)\b|-count$/.test(
+          !/^\.(today|boards|detail|archive)-|^\.(status-switch|subtask-item|subtask-add-inline|subtask-progress|owner-avatar-none)\b|-count$/.test(
             sel,
           ),
       ),

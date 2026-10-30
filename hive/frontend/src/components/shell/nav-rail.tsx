@@ -1,6 +1,9 @@
 import type { ComponentChildren } from 'preact';
+import { useEffect, useRef, useState } from 'preact/hooks';
+import { dropIndex } from '../../state/board-order';
 import {
   accessibleBoards,
+  moveBoard,
   activeBoardId,
   activeView,
   boardOpen,
@@ -52,6 +55,72 @@ interface NavRailProps {
  */
 export function NavRail({ user, displayName }: NavRailProps) {
   const view = activeView.value;
+  const boardList = accessibleBoards.value;
+
+  // #656: reorder the board list by drag, or Alt+Up / Alt+Down on a focused board.
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [drop, setDrop] = useState<{ id: string; where: 'before' | 'after' } | null>(null);
+  const [announcement, setAnnouncement] = useState('');
+  const refocus = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (refocus.current) {
+      document.querySelector<HTMLElement>(`[data-testid="rail-board-${refocus.current}"]`)?.focus();
+      refocus.current = null;
+    }
+  });
+
+  const ids = () => accessibleBoards.value.map((b) => b.id);
+  const clearDrop = (e?: DragEvent) => {
+    // dragleave fires moving between children; only clear when leaving the list
+    const list = e?.currentTarget as HTMLElement | undefined;
+    if (e && list && e.relatedTarget instanceof Node && list.contains(e.relatedTarget)) return;
+    setDrop(null);
+  };
+  const endDrag = () => {
+    setDragId(null);
+    setDrop(null);
+  };
+  const onDragStart = (e: DragEvent, id: string) => {
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', id);
+    }
+    setDragId(id);
+  };
+  const targetFor = (e: DragEvent, id: string) => {
+    if (!dragId) return null;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const where = e.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+    const list = ids();
+    const to = dropIndex(list, dragId, id, where);
+    if (to === null || to === list.indexOf(dragId)) return null;
+    return { where, to } as const;
+  };
+  const onDragOver = (e: DragEvent, id: string) => {
+    if (!dragId) return;
+    e.preventDefault();
+    const t = targetFor(e, id);
+    if (e.dataTransfer) e.dataTransfer.dropEffect = t ? 'move' : 'none';
+    setDrop((prev) => (t ? (prev && prev.id === id && prev.where === t.where ? prev : { id, where: t.where }) : null));
+  };
+  const onDrop = (e: DragEvent, id: string) => {
+    e.preventDefault();
+    const t = targetFor(e, id);
+    if (dragId && t) moveBoard(dragId, t.to);
+    endDrag();
+  };
+  const onKeyDown = (e: KeyboardEvent, b: Board) => {
+    if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+    e.preventDefault();
+    const list = ids();
+    const from = list.indexOf(b.id);
+    const to = from + (e.key === 'ArrowUp' ? -1 : 1);
+    if (to < 0 || to >= list.length) return;
+    moveBoard(b.id, to);
+    refocus.current = b.id;
+    setAnnouncement(`${b.name} moved to position ${to + 1} of ${list.length}`);
+  };
 
   const destination = (target: ActiveView, label: string, icon: ComponentChildren) => {
     const active = view === target;
@@ -93,17 +162,35 @@ export function NavRail({ user, displayName }: NavRailProps) {
               BOARDS
             </a>
           </h2>
-          <ul class="rail-board-list">
-            {accessibleBoards.value.map((b) => {
+          <span id="rail-board-order-hint" class="sr-only">
+            Drag, or press Alt+Up or Alt+Down, to reorder.
+          </span>
+          <div class="sr-only" role="status" aria-live="polite" data-testid="rail-board-announce">
+            {announcement}
+          </div>
+          <ul class="rail-board-list" aria-describedby="rail-board-order-hint" onDragLeave={clearDrop}>
+            {boardList.map((b) => {
               const active = view === 'boards' && boardOpen.value && b.id === activeBoardId.value;
+              const dropClass = drop && drop.id === b.id ? ` rail-drop-${drop.where}` : '';
               return (
-                <li key={b.id}>
+                <li
+                  key={b.id}
+                  class={`rail-board-row${dragId === b.id ? ' rail-board-dragging' : ''}${dropClass}`}
+                  draggable
+                  onDragStart={(e) => onDragStart(e, b.id)}
+                  onDragOver={(e) => onDragOver(e, b.id)}
+                  onDrop={(e) => onDrop(e, b.id)}
+                  onDragEnd={endDrag}
+                  data-testid={`rail-row-${b.id}`}
+                >
                   <a
                     href={destinationUrl('boards', b.id).toString()}
                     class={`rail-item rail-board${active ? ' rail-item-active' : ''}`}
                     aria-current={active ? 'page' : undefined}
                     title={b.name}
+                    draggable={false}
                     onClick={(e) => onNavClick(e, 'boards', b.id)}
+                    onKeyDown={(e) => onKeyDown(e, b)}
                     data-testid={`rail-board-${b.id}`}
                   >
                     <BoardTile board={b} />

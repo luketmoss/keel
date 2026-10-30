@@ -10,6 +10,7 @@ import {
   currentUserEmail,
   accessibleBoards,
   resetBoardOrderForTests,
+  forgetBoardOrder,
 } from '../../state/board-store';
 import { NavRail } from './nav-rail';
 
@@ -132,6 +133,15 @@ describe('rail board reorder (#656)', () => {
     expect(ids()).toEqual(['b3', 'b1', 'b2', 'b4', 'b5']);
     boards.value = boards.value.map((b) => (b.id === 'b1' ? { ...b, archived_at: '2026-01-01T00:00:00Z' } : b));
     expect(ids()).toEqual(['b3', 'b2', 'b4', 'b5']);
+  });
+
+  it('forgetBoardOrder (archive) puts an unarchived board back at the end', () => {
+    localStorage.setItem(`hive-board-order:${ME}`, JSON.stringify(['b3', 'b1', 'b2', 'b4']));
+    forgetBoardOrder('b1');
+    boards.value = boards.value.map((b) => (b.id === 'b1' ? { ...b, archived_at: '2026-01-01T00:00:00Z' } : b));
+    expect(ids()).toEqual(['b3', 'b2', 'b4']);
+    boards.value = boards.value.map((b) => ({ ...b, archived_at: undefined }));
+    expect(ids()).toEqual(['b3', 'b2', 'b4', 'b1']);
   });
 
   it('a click without drag still navigates', () => {

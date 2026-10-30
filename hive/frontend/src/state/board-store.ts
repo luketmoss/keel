@@ -61,6 +61,16 @@ export function moveBoard(boardId: string, toIndex: number): void {
   saveBoardOrder(email, next);
 }
 
+/** #656: drop a board from this person's saved order (on archive), so unarchiving puts it back at the end. */
+export function forgetBoardOrder(boardId: string): void {
+  const email = currentUserEmail.value.toLowerCase();
+  const saved = boardOrderOverride.value[email] ?? loadBoardOrder(email);
+  if (!saved.includes(boardId)) return;
+  const next = saved.filter((id) => id !== boardId);
+  boardOrderOverride.value = { ...boardOrderOverride.value, [email]: next };
+  saveBoardOrder(email, next);
+}
+
 /** Test hook (#656): forget orders set this session, so the next read comes from localStorage. */
 export function resetBoardOrderForTests(): void {
   boardOrderOverride.value = {};

@@ -16,6 +16,7 @@ import {
   isTerminalStatusForBoard,
   defaultStatusName,
   boardStatuses,
+  forgetBoardOrder,
 } from './board-store';
 import { applyStatusSideEffects, statusTransitionAuditAction } from './rules';
 import {
@@ -1411,6 +1412,7 @@ export async function archiveBoard(boardId: string, actor: string, token: string
   const name = boards.value.find((b) => b.id === boardId)?.name || 'Board';
   const ok = await setBoardArchived(boardId, new Date().toISOString(), actor, token);
   if (ok) {
+    forgetBoardOrder(boardId); // #656: unarchiving puts it back at the end
     showToast(
       `${name} archived`,
       'success',

@@ -967,6 +967,35 @@ body {
   gap: 2px;
 }
 
+/* #656: a board row can be dragged; the 2px line shows where it will land */
+.rail-board-row {
+  position: relative;
+}
+
+.rail-board-dragging {
+  opacity: var(--opacity-disabled);
+}
+
+.rail-drop-before::before,
+.rail-drop-after::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  pointer-events: none;
+}
+
+.rail-drop-before::before {
+  top: -2px;
+}
+
+.rail-drop-after::after {
+  bottom: -2px;
+}
+
 .rail-board-tile {
   display: inline-flex;
   align-items: center;

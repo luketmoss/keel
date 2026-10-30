@@ -2,6 +2,7 @@ import { signal, computed } from '@preact/signals';
 import type { ItemWithRow, Owner, Label, Board, BoardPermission, PermissionRole, BoardStatus } from '../api/types';
 import { isValidDateForm } from '../utils/validate-date';
 import { isBoardArchived } from './rules';
+import { applyBoardOrder, loadBoardOrder, moveId, saveBoardOrder } from './board-order';
 
 // --- Core data ---
 export const items = signal<ItemWithRow[]>([]);
@@ -36,7 +37,44 @@ const permittedBoards = computed(() => {
  * the list every view reads — the switcher, shortcuts, Today, Move to
  * board, deep links — so an archived board drops out of all of them at once.
  */
-export const accessibleBoards = computed(() => permittedBoards.value.filter((b) => !isBoardArchived(b)));
+export const accessibleBoards = computed(() => {
+  const open = permittedBoards.value.filter((b) => !isBoardArchived(b));
+  const email = currentUserEmail.value.toLowerCase();
+  // #656: this person's own order. Read from localStorage until they reorder in this session.
+  const saved = boardOrderOverride.value[email] ?? loadBoardOrder(email);
+  return applyBoardOrder(open, saved);
+});
+
+/** #656: orders set this session, by lowercased email. Wins over localStorage so a move works even when it cannot save. */
+const boardOrderOverride = signal<Record<string, string[]>>({});
+
+/**
+ * #656: move a board to `toIndex` among the accessible boards. Saves the order of the boards
+ * the person can see (which prunes ids that are gone) and re-renders every reader.
+ */
+export function moveBoard(boardId: string, toIndex: number): void {
+  const email = currentUserEmail.value.toLowerCase();
+  const ids = accessibleBoards.value.map((b) => b.id);
+  const next = moveId(ids, boardId, toIndex);
+  if (next === ids) return;
+  boardOrderOverride.value = { ...boardOrderOverride.value, [email]: next };
+  saveBoardOrder(email, next);
+}
+
+/** #656: drop a board from this person's saved order (on archive), so unarchiving puts it back at the end. */
+export function forgetBoardOrder(boardId: string): void {
+  const email = currentUserEmail.value.toLowerCase();
+  const saved = boardOrderOverride.value[email] ?? loadBoardOrder(email);
+  if (!saved.includes(boardId)) return;
+  const next = saved.filter((id) => id !== boardId);
+  boardOrderOverride.value = { ...boardOrderOverride.value, [email]: next };
+  saveBoardOrder(email, next);
+}
+
+/** Test hook (#656): forget orders set this session, so the next read comes from localStorage. */
+export function resetBoardOrderForTests(): void {
+  boardOrderOverride.value = {};
+}
 
 /** #288: Archived boards the current user can access, most recently archived first. */
 export const archivedBoards = computed(() =>

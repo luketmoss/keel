@@ -80,36 +80,40 @@ Named **Brief ready**.
   parameters of the same name, and `note` stays empty when the brief sends
   none. `note` is *Not read: Hive* (or calendar) on a partial brief, and the
   reason on a failed one.
-- **Actions**, as MacroDroid lists them (`today` is
-  `[year]-[month_digit]-[dayofmonth]`, and `[lv=note]` is the `note` local
+- **Actions**, as MacroDroid lists them, 21 in all (`today` is
+  `[year]-[month_digit]-[dayofmonth]`, and `{lv=note}` is the `note` local
   variable inserted with the `...` button):
 
 ```
 If status = failed
     If kind = weekly
         Set brief_weekly_failed = today
-        Notification: Weekly brief failed / [lv=note]
+        Notification: Weekly brief failed / {lv=note}
     Else
         Set brief_daily_failed = today
-        Notification: Morning brief failed / [lv=note]
+        Notification: Morning brief failed / {lv=note}
     End If
-Else If kind = weekly
+    Cancel Macro Actions (This Macro)
+End If
+If kind = weekly
     Set brief_weekly_ready = today
-    Notification: Weekly brief ready / The week ahead and the week behind. [lv=note]
+    Notification: Weekly brief ready / The week ahead and the week behind. {lv=note}
 Else
     Set brief_daily_ready = today
     If status = no-sleep
-        Notification: Morning brief ready, without sleep / Last night hadn't synced. Reply refresh to the brief in Claude. [lv=note]
+        Notification: Morning brief ready, without sleep / Last night hadn't synced. Reply refresh to the brief in Claude. {lv=note}
     Else
-        Notification: Morning brief ready / Tap to open today's brief. [lv=note]
+        Notification: Morning brief ready / Tap to open today's brief. {lv=note}
     End If
 End If
 ```
 
-Each Notification line is *title / text*. If your MacroDroid has no Else If,
-nest it: an Else holding an If, with its own End If. Edit the existing macro
-rather than rebuilding it: the new parts are the outer `If status = failed`
-block and `[lv=note]` at the end of each text.
+Each Notification line is *title / text*. Edit the existing macro rather than
+rebuilding it: the new parts are the `If status = failed` block on top, which
+**Cancel Macro Actions** (under MacroDroid Specific) ends so a failure never
+reaches the "ready" actions below it, and `{lv=note}` at the end of each
+text. MacroDroid adds an action at the bottom; long-press its handle to drag
+it up.
 
 A failed brief sets `…_failed`, never `…_ready`, so an unlock doesn't open
 yesterday's page, and Macro 4 stays quiet because the failure was already

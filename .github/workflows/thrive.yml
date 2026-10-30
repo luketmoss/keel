@@ -58,8 +58,9 @@ jobs:
       - run: npm ci
       - run: npm test
 
-  # No stack skill and no tests: one-off migrations and admin tools. This
-  # proves each script still parses and that its imports install.
+  # No stack skill: one-off migrations and admin tools. This proves each
+  # script still parses and that its imports install, and runs the few that
+  # have tests (#681's matching rules).
   scripts:
     runs-on: ubuntu-latest
     defaults:
@@ -74,3 +75,4 @@ jobs:
           cache-dependency-path: thrive/scripts/package-lock.json
       - run: npm ci
       - run: for f in *.mjs; do node --check "$f"; done
+      - run: node --test *.test.mjs

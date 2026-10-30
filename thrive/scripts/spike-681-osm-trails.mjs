@@ -26,6 +26,7 @@
  *   node spike-681-osm-trails.mjs                       # newest 20 tracked bike/hike
  *   node spike-681-osm-trails.mjs --types bike,hike,run,walk --limit 30
  *   node spike-681-osm-trails.mjs --ids <id>,<id>       # exactly these, any type
+ *   ... --overpass-url <another Overpass interpreter URL>       # if the main server is overloaded
  *   node spike-681-osm-trails.mjs --score               # after marking; no API or network
  */
 
@@ -52,11 +53,15 @@ const LIMIT = Number(value('--limit', '20'));
 const TYPES = value('--types', 'bike,hike').split(',').map((t) => t.trim()).filter(Boolean);
 const IDS = value('--ids', '').split(',').map((t) => t.trim()).filter(Boolean);
 
-const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
+/** The main instance can be overloaded; --overpass-url takes another public one. */
+const OVERPASS_URL = value('--overpass-url', 'https://overpass-api.de/api/interpreter');
 const USER_AGENT = 'keel-thrive-spike-681/1.0 (one-off trail matching test; https://github.com/luketmoss/keel/issues/681)';
 /** Overpass asks for requests one at a time and paced; a busy server gets a longer wait. */
 const PAUSE_MS = Number(value('--pause-ms', '5000'));
 const RETRY_WAITS_MS = [30_000, 90_000];
+const RETRY_STATUSES = new Set([429, 502, 503, 504]);
+/** Our own limit on one request: the server's is 90 s, so anything longer is a hung connection. */
+const REQUEST_TIMEOUT_MS = 180_000;
 const PAD_M = 50;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -126,22 +131,26 @@ async function runMatch() {
   let requests = 0;
   let cached = 0;
 
-  for (const w of workouts) {
+  for (const [i, w] of workouts.entries()) {
+    const tag = `  [${i + 1}/${workouts.length}] ${w.id} (${w.type})`;
+    const began = Date.now();
     // 2. Track and candidate trails.
     let feature;
     try {
       feature = (await api('getWorkoutTrack', { id: w.id })).track;
     } catch (err) {
-      console.log(`  ${w.id} (${w.type}): skipped, the track could not be read (${err.message})`);
+      console.log(`${tag}: skipped, the track could not be read (${err.message})`);
       continue;
     }
     let overpass;
+    let fromCache;
     try {
       const got = await overpassFor(feature, () => requests++ > 0);
-      if (got.fromCache) cached++;
+      fromCache = got.fromCache;
+      if (fromCache) cached++;
       overpass = got.body;
     } catch (err) {
-      console.log(`  ${w.id} (${w.type}): skipped, ${err.message}`);
+      console.log(`${tag}: skipped, ${err.message}`);
       continue;
     }
 
@@ -150,9 +159,12 @@ async function runMatch() {
     try {
       match = matchActivity(feature, overpass.elements ?? []);
     } catch {
-      console.log(`  ${w.id} (${w.type}): skipped, the track could not be matched`);
+      console.log(`${tag}: skipped, the track could not be matched`);
       continue;
     }
+    const seconds = Math.round((Date.now() - began) / 1000);
+    console.log(`${tag}: ${match.trailCount} trails and ${match.routeCount} routes in the area, ` +
+      `${fromCache ? 'Overpass from cache' : 'Overpass fetched'}, ${seconds} s`);
     results.push({ id: w.id, type: w.type, date: w.date, time: w.time, name: w.name, ...match });
   }
 
@@ -193,23 +205,30 @@ async function overpassFor(feature, needsPause) {
 
   if (needsPause()) await sleep(PAUSE_MS);
   for (let attempt = 0; ; attempt++) {
-    const res = await fetch(OVERPASS_URL, {
-      method: 'POST',
-      headers: { 'User-Agent': USER_AGENT, 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ data: query }),
-    });
+    let res;
+    try {
+      res = await fetch(OVERPASS_URL, {
+        method: 'POST',
+        headers: { 'User-Agent': USER_AGENT, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ data: query }),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+    } catch {
+      // A timeout or a dropped connection. Fixed text, as below.
+      res = { ok: false, status: 'no response' };
+    }
     if (res.ok) {
       const body = await res.json();
       writeFileSync(file, JSON.stringify(body));
       return { fromCache: false, body };
     }
     // Fixed text: Overpass's error page quotes the query, which holds the bounding box.
-    if ((res.status === 429 || res.status === 504) && attempt < RETRY_WAITS_MS.length) {
-      console.log(`  Overpass is busy (HTTP ${res.status}); waiting ${RETRY_WAITS_MS[attempt] / 1000} s`);
+    if ((RETRY_STATUSES.has(res.status) || res.status === 'no response') && attempt < RETRY_WAITS_MS.length) {
+      console.log(`  Overpass is busy (HTTP ${res.status}); retrying in ${RETRY_WAITS_MS[attempt] / 1000} s`);
       await sleep(RETRY_WAITS_MS[attempt]);
       continue;
     }
-    throw new Error(`Overpass returned HTTP ${res.status}`);
+    throw new Error(`Overpass returned HTTP ${res.status} after ${attempt + 1} tries; try again later or pass --overpass-url`);
   }
 }
 
@@ -224,11 +243,15 @@ function overpassQuery(feature) {
   const bbox = [south - padLat, Math.min(...lons) - padLon, north + padLat, Math.max(...lons) + padLon]
     .map((n) => n.toFixed(6))
     .join(',');
+  // Ways come whole, so a trail's share is of all of it. A route relation can be a long-distance
+  // route hundreds of km long, and its whole geometry is enough for the server to give up (502),
+  // so a route is clipped to the box: its positions and share are of the part inside it.
   return (
-    '[out:json][timeout:90];\n(\n' +
-    `  way["highway"~"^(path|track|footway|bridleway|cycleway)$"]["name"](${bbox});\n` +
-    `  relation["route"~"^(mtb|hiking|bicycle|foot)$"]["name"](${bbox});\n` +
-    ');\nout geom;'
+    '[out:json][timeout:90];\n' +
+    `way["highway"~"^(path|track|footway|bridleway|cycleway)$"]["name"](${bbox});\n` +
+    'out geom;\n' +
+    `relation["route"~"^(mtb|hiking|bicycle|foot)$"]["name"](${bbox});\n` +
+    `out geom(${bbox});`
   );
 }
 

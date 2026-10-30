@@ -100,6 +100,14 @@ test('cutting straight across a lone trail produces no pass', () => {
   assert.ok(Math.abs(combo.unmatchedM - 600) < 1);
 });
 
+test('crossing a short trail at 60° produces no pass, though the crossing spans over half of it', () => {
+  // At 25 m the crossing covers ~29 m of a 40 m trail's length: the coverage rule alone would pass it.
+  const angle = (60 * Math.PI) / 180;
+  const at = (s) => [20 + s * Math.cos(angle), s * Math.sin(angle)];
+  const combo = run(track([at(-200), at(200)]), [way('Short', [[0, 0], [40, 0]])], 25, 45);
+  assert.equal(passes(combo).length, 0);
+});
+
 test('the heading tolerance decides a diagonal: 40° off counts at 45° but not at 30°', () => {
   const angle = (40 * Math.PI) / 180;
   const end = [600 * Math.cos(angle), 600 * Math.sin(angle)];

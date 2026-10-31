@@ -216,3 +216,13 @@ describe('AuthProvider on @keel/auth (#608)', () => {
     expect(localStorage.getItem('gw_token')).toBeNull();
   });
 });
+
+describe('sign-out clears the similar-routes cells (#692)', () => {
+  it('removes thrive.cells.v1 when logout runs', () => {
+    seed(60 * 60 * 1000);
+    localStorage.setItem('thrive.cells.v1', '{"f":1,"z":19,"e":{}}');
+    mount();
+    act(() => auth.logout());
+    expect(localStorage.getItem('thrive.cells.v1')).toBeNull();
+  });
+});

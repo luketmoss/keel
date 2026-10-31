@@ -213,7 +213,8 @@ describe('progress and failure', () => {
     });
     ensureIndex('f0', 'tok');
     await settle();
-    expect(requested).toHaveLength(MAX_FAILURES);
+    expect(MAX_FAILURES).toBe(5);
+    expect(requested).toHaveLength(5);
     expect(indexProgress.value.state).toBe('stopped');
     const saved = localStorage.getItem(CELLS_KEY);
     expect(saved === null || Object.keys((JSON.parse(saved) as { e: object }).e).length === 0).toBe(true);

@@ -5237,6 +5237,24 @@ input, select, textarea {
   margin-bottom: var(--space-sm);
 }
 
+/* Near here's line under its heading (#692); the heading's own gap moves below the line. */
+.trail-routes .trail-section-title:has(+ .trail-section-sub) {
+  margin-bottom: 0;
+}
+
+.trail-section-sub {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+/* The similar-routes index status (#692): one quiet line below the last section. */
+.trail-index-status {
+  margin: var(--space-sm) 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
 .trail-routes-list,
 .trail-visits,
 .trail-result-list {

@@ -89,5 +89,65 @@ function ride(): WorkoutTrack {
   };
 }
 
-/** Demo workouts that have a route, by workout id. */
-export const DEMO_TRACKS: Record<string, WorkoutTrack> = { w_demo008: loop(), w_demo011: ride() };
+const M_PER_DEG_LAT = 111_320;
+
+/**
+ * A copy of a track moved `northM` metres north and `eastM` metres east (negative for south and west), for the
+ * similar-routes demo (#692). The distance moved is the hypotenuse.
+ */
+export function shiftTrack(base: WorkoutTrack, northM: number, eastM: number, activityId: string): WorkoutTrack {
+  const dLat = northM / M_PER_DEG_LAT;
+  const coordinates = base.geometry.coordinates.map(([lon, lat]) => {
+    const dLon = eastM / (M_PER_DEG_LAT * Math.cos((lat * Math.PI) / 180));
+    return [Math.round((lon + dLon) * 1e5) / 1e5, Math.round((lat + dLat) * 1e5) / 1e5] as [number, number];
+  });
+  return withCoordinates(base, coordinates, base.properties.t, base.properties.ele, activityId);
+}
+
+/** A copy of a track's first `share` (0 to 1) of its points. */
+export function firstShare(base: WorkoutTrack, share: number, activityId: string): WorkoutTrack {
+  const n = Math.max(2, Math.round(base.geometry.coordinates.length * share));
+  return withCoordinates(
+    base,
+    base.geometry.coordinates.slice(0, n),
+    base.properties.t.slice(0, n),
+    base.properties.ele.slice(0, n),
+    activityId,
+  );
+}
+
+function withCoordinates(
+  base: WorkoutTrack,
+  coordinates: [number, number][],
+  t: number[],
+  ele: (number | null)[],
+  activityId: string,
+): WorkoutTrack {
+  const lons = coordinates.map((c) => c[0]);
+  const lats = coordinates.map((c) => c[1]);
+  return {
+    ...base,
+    bbox: [Math.min(...lons), Math.min(...lats), Math.max(...lons), Math.max(...lats)],
+    properties: { ...base.properties, activity_id: activityId, t, ele, points_in: coordinates.length },
+    geometry: { type: 'LineString', coordinates },
+  };
+}
+
+const LOOP = loop();
+const RIDE = ride();
+
+/**
+ * Demo workouts that have a route, by workout id. Besides the two bundled tracks, variants of them make the
+ * real similar-routes rule (#692) find results: the ride moved 20 m and 10 m (Routes like this), its first 40%
+ * and the ride moved 150 m, 120 north and 90 east (Near here), and the hike's loop moved 20 m and 10 m.
+ */
+export const DEMO_TRACKS: Record<string, WorkoutTrack> = {
+  w_demo008: LOOP,
+  w_demo011: RIDE,
+  w_demo012: shiftTrack(RIDE, 20, 0, 'demo-ride-20'),
+  w_demo034: shiftTrack(RIDE, 10, 0, 'demo-ride-10'),
+  w_demo028: firstShare(RIDE, 0.4, 'demo-ride-part'),
+  w_demo022: shiftTrack(RIDE, 120, 90, 'demo-ride-150'),
+  w_demo031: shiftTrack(LOOP, 20, 0, 'demo-loop-20'),
+  w_demo025: shiftTrack(LOOP, 10, 0, 'demo-loop-10'),
+};

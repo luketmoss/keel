@@ -107,11 +107,3 @@ export const DEMO_TRAIL_ACTIVITIES: DemoTrailActivity[] = [
     unmatchedM: 120,
   },
 ];
-
-/** Routes like this: activities paired with each other, either way round. */
-export const DEMO_ROUTE_PAIRS: readonly (readonly [string, string])[] = [
-  ['w_demo011', 'w_demo012'],
-  ['w_demo011', 'w_demo034'],
-  ['w_demo008', 'w_demo025'],
-  ['w_demo008', 'w_demo031'],
-];

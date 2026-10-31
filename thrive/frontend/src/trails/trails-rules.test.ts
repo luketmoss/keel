@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildTrailIndex, splitTrailName, trailKey, trailPath } from './groups';
 import { compareWithEarlier, isLikeForLike } from './compare';
-import { pairedWith, searchTrails } from './search';
+import { searchTrails } from './search';
 import type { TrailActivity, TrailPass } from './types';
 
 function p(trail: string, startPct = 0, endPct = 100, over: Partial<TrailPass> = {}): TrailPass {
@@ -178,18 +178,5 @@ describe('AC5: search', () => {
   it('finds nothing for a query no name contains, and is no search when blank', () => {
     expect(searchTrails(index.groups.values(), 'juniper x')).toEqual([]);
     expect(searchTrails(index.groups.values(), '   ')).toBeNull();
-  });
-});
-
-describe('Routes like this pairs', () => {
-  it('reads a pair either way round, once each', () => {
-    const pairs = [
-      ['a', 'b'],
-      ['c', 'a'],
-      ['b', 'a'],
-      ['d', 'e'],
-    ] as const;
-    expect(pairedWith(pairs, 'a')).toEqual(['b', 'c']);
-    expect(pairedWith(pairs, 'z')).toEqual([]);
   });
 });

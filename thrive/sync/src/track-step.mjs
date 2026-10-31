@@ -43,6 +43,10 @@ export function createTrackStep({ archive, startedAt, log = console.log }) {
   const counts = { built: 0, rebuilt: 0, none: 0, unreadable: 0, failed: 0 };
   const failures = [];
   const notes = [];
+  // What this run recorded and built, by activity, for the trail step (#688):
+  // the archive file read before this step is stale once it records.
+  const recorded = new Map();
+  const builtFeatures = new Map();
 
   const fail = (message) => {
     counts.failed += 1;
@@ -54,6 +58,7 @@ export function createTrackStep({ archive, startedAt, log = console.log }) {
   async function record(fileId, activityId, track) {
     try {
       await archive.writeTrack(fileId, track);
+      recorded.set(String(activityId), track);
       return true;
     } catch (err) {
       if (err instanceof DriveAuthError) throw err;
@@ -146,10 +151,20 @@ export function createTrackStep({ archive, startedAt, log = console.log }) {
 
     const stored = { status: 'stored', file_id: trackId, ...base, points: built.points };
     if (!(await record(fileId, activityId, stored))) return trackSheetFields(current);
+    builtFeatures.set(String(activityId), built.feature);
     counts[wasStored ? 'rebuilt' : 'built'] += 1;
     log(`  activity ${activityId}: track ${wasStored ? 'rebuilt' : 'built'} (${built.points} points) as ${trackId}`);
     return trackSheetFields(stored);
   }
 
-  return { ensure, counts, failures, notes };
+  return {
+    ensure,
+    counts,
+    failures,
+    notes,
+    /** The track record this run wrote for the activity, or undefined when it wrote none. */
+    recordFor: (activityId) => recorded.get(String(activityId)),
+    /** The track Feature this run built for the activity, or undefined. */
+    featureFor: (activityId) => builtFeatures.get(String(activityId)),
+  };
 }

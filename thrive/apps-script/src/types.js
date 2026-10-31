@@ -6,7 +6,7 @@
 // every consumer arriving later (the COROS sync, the Journal) calls the API
 // instead of adding another copy.
 
-// Column indices for the Workouts sheet (0-based), A:AC after #128/#129/#145/#260/#432.
+// Column indices for the Workouts sheet (0-based), A:AD after #128/#129/#145/#260/#432/#688.
 var COL = {
   ID: 0,                  // A
   DATE: 1,                // B  local calendar date, YYYY-MM-DD
@@ -39,9 +39,11 @@ var COL = {
                           //    blank means unknown, never 0
   TRACK_REF: 28,          // AC Drive file ID of the simplified GPS track (#432). Sync-owned;
                           //    blank means no map, whatever the reason
+  TRAILS: 29,             // AD the OpenStreetMap trails the track rode (#688), a JSON text in
+                          //    #688's format. Sync-owned; blank means not tagged yet, never "none"
 };
 
-var WORKOUT_COLUMN_COUNT = 29;
+var WORKOUT_COLUMN_COUNT = 30;
 
 /**
  * The field name for each column, in sheet order. The read and write mappers
@@ -54,7 +56,7 @@ var WORKOUT_FIELDS = [
   'moving_seconds', 'effort', 'distance_m', 'ascent_m', 'descent_m', 'avg_hr',
   'sub_type', 'source', 'source_activity_id', 'raw_ref', 'fit_ref',
   'fit_fetched_at', 'synced_at', 'started_at_utc', 'calories',
-  'estimated_seconds', 'sport_type', 'track_ref',
+  'estimated_seconds', 'sport_type', 'track_ref', 'trails',
 ];
 
 var WORKOUT_TYPES = ['weight', 'stretch', 'bike', 'hike', 'run', 'walk'];
@@ -81,6 +83,10 @@ var WORKOUT_TYPES = ['weight', 'stretch', 'bike', 'hike', 'run', 'walk'];
  *
  * Track: `track_ref` (#432) is sync-owned and optional the same way, a Drive
  * file ID or '' (no map), always written when sent and left alone when absent.
+ *
+ * Trails: `trails` (#688) is sync-owned but never sent here. The sync writes it
+ * with `updateWorkout` alone, so neither this action nor `enrichWorkout` ever
+ * sets it, and their full-row writes keep what AD holds.
  *
  * Every other column is never set by the action: `effort`, `notes`,
  * `status`, `template_id`, `copied_from` and `estimated_seconds` (#145) stay

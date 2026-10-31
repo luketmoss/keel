@@ -10,7 +10,9 @@
 // Before its merge, each activity passes the run's FIT step (#154,
 // src/fit.mjs), whose `fit_ref` / `fit_fetched_at` ride on the same upsert as
 // sync-owned fields, and then the track step (#432, src/track-step.mjs), whose
-// `track_ref` does too.
+// `track_ref` does too. After the merge, an activity with a stored track goes
+// to the trail step (#688, src/trail-step.mjs), which writes Workouts!AD with
+// its own `updateWorkout` call and never fails the activity.
 //
 // A strength session (402) never gets a row of its own (#155, sync plan §7).
 // It goes to `enrichWorkout`, which fills blanks on the matching hand-logged
@@ -92,7 +94,7 @@ export function sportTypeField(code) {
  *   `updated` counts rows whose merged fields changed (SyncLog's `n_updated`, #156); the API answers `updated` for every existing row, because
  *   `synced_at` always moves, so a row that held what it already held is `unchanged`.
  */
-export async function syncActivities({ archive, api, activityIds, syncedAt, fit = null, track = null, log = console.log }) {
+export async function syncActivities({ archive, api, activityIds, syncedAt, fit = null, track = null, trails = null, log = console.log }) {
   const out = {
     created: 0, updated: 0, unchanged: 0, deleted: 0, skipped: 0,
     enriched: 0, unmatched: 0, notes: [], failures: [],
@@ -204,6 +206,14 @@ export async function syncActivities({ archive, api, activityIds, syncedAt, fit 
 
       if (changed) {
         await archive.writeNormalized(file.fileId, result.written);
+      }
+
+      // #688: trails need the row's id, so they follow the merge, as a call of their own.
+      if (trails) {
+        await trails.ensure({
+          activityId: id, fileId: file.fileId, rowId: result.id,
+          track: track?.recordFor?.(id) ?? file.data.track, record: file.data.trails,
+        });
       }
     } catch (err) {
       fail(`activity ${id}: ${redact(err.message || String(err))}`);

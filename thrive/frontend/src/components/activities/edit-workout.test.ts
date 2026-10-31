@@ -34,6 +34,7 @@ const WORKOUT_WEIGHT: WorkoutWithRow = {
   estimated_seconds: '',
   sport_type: '',
   track_ref: '',
+  trails: '',
   sheetRow: 2,
 };
 
@@ -67,6 +68,7 @@ const WORKOUT_STRETCH: WorkoutWithRow = {
   estimated_seconds: '',
   sport_type: '',
   track_ref: '',
+  trails: '',
   sheetRow: 3,
 };
 

@@ -90,6 +90,7 @@ function workout(over: Partial<WorkoutWithRow> = {}): WorkoutWithRow {
     estimated_seconds: '',
     sport_type: '203',
     track_ref: 'trk',
+    trails: '',
     sheetRow: 2,
     ...over,
   };

@@ -3,7 +3,8 @@
 // apps-script/src/types.js (CLAUDE.md: change both together). This test is
 // what notices when only one side changed, as sync-log-api.test.ts does for
 // SyncLog. It also pins AB `sport_type` on every SPA path: the read, the
-// append (always ''), and the fresh-read-then-write edit (preserved).
+// append (always ''), and the fresh-read-then-write edit (preserved), and AD
+// `trails` (#688) the same way.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'fs';
@@ -59,9 +60,10 @@ describe('Workouts row mapping', () => {
     // Each field holds its own name, so the row reads back as the field order.
     const named = Object.fromEntries(fields.map((f) => [f, f])) as unknown as Workout;
     expect(workoutToRow(named)).toEqual(fields);
-    expect(fields).toHaveLength(29); // A:AC
+    expect(fields).toHaveLength(30); // A:AD
     expect(fields[27]).toBe('sport_type');
     expect(fields[28]).toBe('track_ref'); // #432
+    expect(fields[29]).toBe('trails'); // #688, emitted last
   });
 
   it('rowToWorkout reads every WORKOUT_FIELDS column back into its field', () => {
@@ -79,6 +81,14 @@ describe('Workouts row mapping', () => {
     row[27] = '204';
     expect(rowToWorkout(row, 2).sport_type).toBe('204');
     expect(rowToWorkout(row.slice(0, 27), 2).sport_type).toBe('');
+  });
+
+  it('#688: reads row[29] as trails, and a row with no AD cell as ""', () => {
+    const row = Array.from({ length: 30 }, () => '');
+    row[0] = 'w_1';
+    row[29] = '{"v":1,"m":1,"u":0,"n":[],"p":[]}';
+    expect(rowToWorkout(row, 2).trails).toBe('{"v":1,"m":1,"u":0,"n":[],"p":[]}');
+    expect(rowToWorkout(row.slice(0, 29), 2).trails).toBe('');
   });
 });
 
@@ -183,31 +193,44 @@ describe("#260 AC4: the SPA never sets sport_type, and an edit keeps the sheet's
     sheetsUpdate.mockReset();
   });
 
-  it('createWorkout appends A:AC with a blank AB', async () => {
-    await createWorkout({ type: 'hike', name: 'Hike' }, 'token');
+  it('createWorkout appends A:AD with a blank AB and a blank AD (#688)', async () => {
+    const w = await createWorkout({ type: 'hike', name: 'Hike' }, 'token');
     expect(sheetsAppend).toHaveBeenCalledTimes(1);
     const [range, rows] = sheetsAppend.mock.calls[0];
-    expect(range).toBe('Workouts!A:AC');
-    expect(rows[0]).toHaveLength(29);
+    expect(range).toBe('Workouts!A:AD');
+    expect(rows[0]).toHaveLength(30);
     expect(rows[0][27]).toBe('');
+    expect(rows[0][29]).toBe('');
+    expect(w.trails).toBe('');
   });
 
-  it('updateWorkout reads A:AC fresh and writes back the sport_type the sheet holds', async () => {
-    const fresh = Array.from({ length: 28 }, () => '');
+  it('fetchWorkouts reads A2:AD (#688)', async () => {
+    const { fetchWorkouts } = await import('./workouts-api');
+    sheetsGet.mockResolvedValue([]);
+    await fetchWorkouts('token');
+    expect(sheetsGet).toHaveBeenCalledWith('Workouts!A2:AD', 't');
+  });
+
+  it('updateWorkout reads A:AD fresh and writes back the sport_type and trails the sheet holds', async () => {
+    const tagged = '{"v":1,"m":1,"u":12,"n":[["Invented Path",400]],"p":[[0,0,100,1,400,90,5,0]]}';
+    const fresh = Array.from({ length: 30 }, () => '');
     fresh[0] = 'w_1';
     fresh[18] = 'coros';
-    fresh[19] = '480640601618940011';
+    fresh[19] = '700000000000000001';
     fresh[27] = '204';
+    fresh[29] = tagged;
     sheetsGet.mockResolvedValue([fresh]);
-    // The cached copy predates the backfill: its sport_type is still blank.
-    const cached = { ...rowToWorkout(fresh, 5), sport_type: '', track_ref: '' };
+    // The cached copy predates the backfill and the tagging: AB and AD are still blank.
+    const cached = { ...rowToWorkout(fresh, 5), sport_type: '', track_ref: '', trails: '' };
     const written = await updateWorkout(cached, { notes: 'muddy' }, 'token');
-    expect(sheetsGet).toHaveBeenCalledWith('Workouts!A5:AC5', 't');
+    expect(sheetsGet).toHaveBeenCalledWith('Workouts!A5:AD5', 't');
     const [range, rows] = sheetsUpdate.mock.calls[0];
-    expect(range).toBe('Workouts!A5:AC5');
-    expect(rows[0]).toHaveLength(29);
+    expect(range).toBe('Workouts!A5:AD5');
+    expect(rows[0]).toHaveLength(30);
     expect(rows[0][27]).toBe('204');
+    expect(rows[0][29]).toBe(tagged);
     expect(rows[0][6]).toBe('muddy');
     expect(written.sport_type).toBe('204');
+    expect(written.trails).toBe(tagged);
   });
 });

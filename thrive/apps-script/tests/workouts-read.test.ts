@@ -28,7 +28,7 @@ describe('AC2: the full 28-column shape', () => {
     for (const f of sandbox.WORKOUT_FIELDS) {
       expect(w, f).toHaveProperty(f);
     }
-    expect(sandbox.WORKOUT_FIELDS).toHaveLength(29);
+    expect(sandbox.WORKOUT_FIELDS).toHaveLength(30);
   });
 
   it('carries the sheet row so a caller can write back without re-scanning', () => {

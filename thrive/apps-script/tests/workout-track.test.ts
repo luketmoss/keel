@@ -151,7 +151,7 @@ describe('track_ref is sync-owned column AC', () => {
     const { sandbox } = loadApi([]);
     expect(sandbox.WORKOUT_FIELDS[28]).toBe('track_ref');
     expect(sandbox.COL.TRACK_REF).toBe(28);
-    expect(sandbox.WORKOUT_COLUMN_COUNT).toBe(29);
+    expect(sandbox.WORKOUT_COLUMN_COUNT).toBe(30); // #688 appended AD
   });
 
   it('reads blank for a row written before it existed, and every read returns it', () => {
@@ -195,7 +195,7 @@ describe('upsertSyncedWorkout takes an optional top-level track_ref', () => {
   it('writes it on a new row, as text', () => {
     const { api, res } = upsert([], { track_ref: FILE });
     expect(res.success, res.error).toBe(true);
-    expect(api.rows[0]).toHaveLength(29);
+    expect(api.rows[0]).toHaveLength(30);
     expect(api.rows[0][28]).toBe(FILE);
   });
 

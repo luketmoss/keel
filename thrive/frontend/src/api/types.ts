@@ -90,6 +90,11 @@ export interface Workout {
   // the SPA never sets it, and a full-row write preserves it. '' means no map,
   // whatever the reason.
   track_ref: string;
+  // #688, column AD: the OpenStreetMap trails the track rode, as the sync
+  // writes them (decode with `parseTrailsCell`, trails-cell.ts). Sync-owned
+  // like AC: the SPA never sets it, and a full-row write preserves it. ''
+  // means not tagged yet, never "no trails".
+  trails: string;
 }
 
 /**

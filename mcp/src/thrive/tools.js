@@ -28,7 +28,7 @@ import {
   fetchChangeLog, previewUndo, applyUndo,
   fetchSettings, previewWorkoutRest, setWorkoutRest,
 } from './api.js';
-import { describeRowChange, keyText, listCalls } from '../undo-format.js';
+import { describeRowChange, keyText, listCalls, maskRow } from '../undo-format.js';
 import {
   planAndApplySetUpdates, EntryErrors, isEntryErrors, stripEntryPrefix,
 } from './set-updates.js';
@@ -1581,7 +1581,7 @@ tool(
         `Nothing undone — ${conflicts.length} row${conflicts.length > 1 ? 's' : ''} changed since ${call_id}, ` +
           'so none were restored:',
         ...conflicts.map(
-          (c) => `- ${c.tab} [${keyText(c.row_key)}]: now ${JSON.stringify(c.current)}, expected ${JSON.stringify(c.expected)}`,
+          (c) => `- ${c.tab} [${keyText(c.row_key)}]: now ${JSON.stringify(maskRow(c.current))}, expected ${JSON.stringify(maskRow(c.expected))}`,
         ),
       ].join('\n'));
     };

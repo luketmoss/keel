@@ -9,7 +9,8 @@ import {
   describeHealthDay, describeHealthRange, describeSummaryDay, describeSummaryRange,
 } from './daily.js';
 import {
-  normalizeDate, corosActivityUrl, provenanceOf, provenanceTag, typeLabel, describeSyncedFields,
+  normalizeDate, corosActivityUrl, provenanceOf, provenanceTag, typeLabel, describeSyncedFields, describeTrails,
+  buildWorkout,
 } from './domain.js';
 
 // --- fixtures, as the API returns them --------------------------------
@@ -43,7 +44,7 @@ const WORKOUT_FIELDS = [
   'id', 'date', 'time', 'type', 'name', 'template_id', 'notes', 'elapsed_seconds', 'created',
   'copied_from', 'status', 'moving_seconds', 'effort', 'distance_m', 'ascent_m', 'descent_m',
   'avg_hr', 'sub_type', 'source', 'source_activity_id', 'raw_ref', 'fit_ref', 'fit_fetched_at',
-  'synced_at', 'started_at_utc', 'calories', 'track_ref',
+  'synced_at', 'started_at_utc', 'calories', 'track_ref', 'trails',
 ];
 const workout = (o) => Object.fromEntries(WORKOUT_FIELDS.map((f) => [f, o[f] ?? '']));
 
@@ -352,7 +353,40 @@ test('a synced workout reports moving time, calories, start, provenance and arch
     '- Raw vendor payload: archived in Drive (raw-1); read it with thrive_get_workout_payload',
     '- FIT file: archived in Drive (fit-1), fetched 2026-09-24T17:41:10.000Z',
     '- GPS track: stored in Drive (trk-1)',
+    '- Trails: not tagged yet',
   ]);
+});
+
+test('#688: the Trails line follows the GPS track line, in its four states, and never the raw value', () => {
+  const tagged = '{"v":1,"m":1,"u":12,"n":[["Invented Path",400],["Invented Spur",90]],"p":[[0,0,100,1,400,90,5,0],[1,0,100,1,90,20,null,95],[0,100,0,-1,400,null,null,null]]}';
+  const lineFor = (trails) => {
+    const lines = describeSyncedFields({ ...synced, trails });
+    assert.equal(lines.at(-2), '- GPS track: stored in Drive (trk-1)');
+    return lines.at(-1);
+  };
+  assert.equal(lineFor(''), '- Trails: not tagged yet');
+  assert.equal(lineFor('{"v":1,"m":1,"u":2700,"n":[],"p":[]}'), '- Trails: tagged, no named trail');
+  assert.equal(lineFor(tagged), '- Trails: tagged, 2 named trails, 3 passes');
+  const withX = JSON.stringify({ ...JSON.parse(tagged), x: 4 });
+  assert.equal(lineFor(withX), '- Trails: tagged, 2 named trails, 3 passes, 4 more passes left out');
+  for (const bad of ['{"v":2}', 'not json', '{"v":1,"m":1,"u":0,"n":[["Unused",1]],"p":[]}']) {
+    assert.equal(lineFor(bad), '- Trails: unreadable value');
+  }
+  for (const t of [tagged, withX]) assert.ok(!describeSyncedFields({ ...synced, trails: t }).join(' ').includes('Invented'));
+  // An API from before #688 returns no trails field: not tagged yet.
+  const { trails: _dropped, ...older } = synced;
+  assert.equal(describeSyncedFields(older).at(-1), '- Trails: not tagged yet');
+  assert.equal(describeTrails(undefined), 'not tagged yet');
+});
+
+test('#688: no track_ref, no Trails line; an enriched or manual workout has none either', () => {
+  assert.ok(!describeSyncedFields({ ...synced, track_ref: '', trails: '{"v":1,"m":1,"u":0,"n":[],"p":[]}' }).some((l) => l.startsWith('- Trails')));
+  assert.ok(!describeSyncedFields({ ...enriched, track_ref: 'x' }).some((l) => l.startsWith('- Trails')));
+  assert.ok(!describeSyncedFields(manual).some((l) => l.startsWith('- Trails')));
+});
+
+test('#688: buildWorkout writes trails blank', () => {
+  assert.equal(buildWorkout({ type: 'walk', name: 'Walk' }).trails, '');
 });
 
 test('a synced workout with no track says so, whatever the reason (#432)', () => {

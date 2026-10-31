@@ -1,4 +1,4 @@
-// Read and write actions for the Workouts tab (A:AB).
+// Read and write actions for the Workouts tab (A:AD).
 
 var WORKOUTS_SHEET = 'Workouts';
 
@@ -119,8 +119,84 @@ function normalizeWorkoutFields(data) {
   }
   if (out.sport_type !== undefined) out.sport_type = validateSportType('sport_type', out.sport_type);
   if (out.track_ref !== undefined) out.track_ref = validateTrackRef('track_ref', out.track_ref);
+  if (out.trails !== undefined) out.trails = validateTrails(out.trails);
 
   return out;
+}
+
+/** The one refusal for a `trails` value (#688): fixed text, never the value sent. */
+var TRAILS_REFUSAL =
+  'trails must be "" or a Workouts!AD trails value in the #688 format (version 1); the value sent was not one, so nothing was written';
+
+var TRAILS_KEYS = ['v', 'm', 'u', 'n', 'p', 'x'];
+
+/** A whole number >= 0 (`nullable`: or null). */
+function isWholeNumber(v, nullable) {
+  if (v === null) return !!nullable;
+  return typeof v === 'number' && isFinite(v) && Math.floor(v) === v && v >= 0;
+}
+
+/**
+ * Workouts!AD `trails` (#688): '' (not tagged), or the JSON text the sync
+ * writes, checked strictly so a malformed value never reaches the sheet:
+ *
+ *   {"v":1,"m":<matcher>,"u":<metres>,"n":[[name,lengthM],...],"p":[[i,s,e,d,metres,durationS,climbM,entryOffsetS],...]}
+ *
+ * plus `x` (passes left out to fit) when present. Every name is a non-empty
+ * string used by at least one pass; every index is in range; `s` and `e` are
+ * whole percent; `d` is 1 or -1. The refusal is one fixed text that never
+ * quotes the value, which holds trail names.
+ */
+function validateTrails(value) {
+  var v = cell(value);
+  if (v === '') return '';
+  var t;
+  try {
+    t = JSON.parse(v);
+  } catch (e) {
+    throw new Error(TRAILS_REFUSAL);
+  }
+  if (!t || typeof t !== 'object' || Array.isArray(t)) throw new Error(TRAILS_REFUSAL);
+  var keys = Object.keys(t);
+  for (var k = 0; k < keys.length; k++) {
+    if (TRAILS_KEYS.indexOf(keys[k]) === -1) throw new Error(TRAILS_REFUSAL);
+  }
+  for (var r = 0; r < 5; r++) {
+    if (!Object.prototype.hasOwnProperty.call(t, TRAILS_KEYS[r])) throw new Error(TRAILS_REFUSAL);
+  }
+  if (t.v !== 1) throw new Error(TRAILS_REFUSAL);
+  if (!isWholeNumber(t.m, false) || t.m < 1) throw new Error(TRAILS_REFUSAL);
+  if (!isWholeNumber(t.u, false)) throw new Error(TRAILS_REFUSAL);
+  if (Object.prototype.hasOwnProperty.call(t, 'x') && (!isWholeNumber(t.x, false) || t.x < 1)) {
+    throw new Error(TRAILS_REFUSAL);
+  }
+  if (!Array.isArray(t.n) || !Array.isArray(t.p)) throw new Error(TRAILS_REFUSAL);
+
+  var used = [];
+  for (var n = 0; n < t.n.length; n++) {
+    var entry = t.n[n];
+    if (!Array.isArray(entry) || entry.length !== 2) throw new Error(TRAILS_REFUSAL);
+    if (typeof entry[0] !== 'string' || entry[0] === '') throw new Error(TRAILS_REFUSAL);
+    if (!isWholeNumber(entry[1], false)) throw new Error(TRAILS_REFUSAL);
+    used.push(false);
+  }
+  for (var p = 0; p < t.p.length; p++) {
+    var pass = t.p[p];
+    if (!Array.isArray(pass) || pass.length !== 8) throw new Error(TRAILS_REFUSAL);
+    if (!isWholeNumber(pass[0], false) || pass[0] >= t.n.length) throw new Error(TRAILS_REFUSAL);
+    if (!isWholeNumber(pass[1], false) || pass[1] > 100) throw new Error(TRAILS_REFUSAL);
+    if (!isWholeNumber(pass[2], false) || pass[2] > 100) throw new Error(TRAILS_REFUSAL);
+    if (pass[3] !== 1 && pass[3] !== -1) throw new Error(TRAILS_REFUSAL);
+    if (!isWholeNumber(pass[4], false)) throw new Error(TRAILS_REFUSAL);
+    for (var f = 5; f < 8; f++) {
+      if (!isWholeNumber(pass[f], true)) throw new Error(TRAILS_REFUSAL);
+    }
+    used[pass[0]] = true;
+  }
+  for (var u = 0; u < used.length; u++) {
+    if (!used[u]) throw new Error(TRAILS_REFUSAL);
+  }
+  return v;
 }
 
 /**
@@ -189,6 +265,9 @@ function createWorkout(data) {
   for (var key in fields) {
     if (Object.prototype.hasOwnProperty.call(fields, key)) workout[key] = fields[key];
   }
+
+  // #688: sync-owned, and tagged only after the row exists, by updateWorkout.
+  workout.trails = '';
 
   if (!workout.id) workout.id = 'w_' + Utilities.getUuid().slice(0, 8);
   if (!workout.date) workout.date = todayLocal();

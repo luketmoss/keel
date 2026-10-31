@@ -66,9 +66,9 @@ describe('fetchWorkouts on a pre-migration row', () => {
     sheetsGet.mockResolvedValue([PRE_MIGRATION_ROW]);
   });
 
-  it('reads the tab as A:AC (#260)', async () => {
+  it('reads the tab as A:AD (#260, #432, #688)', async () => {
     await fetchWorkouts('token');
-    expect(sheetsGet).toHaveBeenCalledWith('Workouts!A2:AC', 't');
+    expect(sheetsGet).toHaveBeenCalledWith('Workouts!A2:AD', 't');
   });
 
   // #260 AC4: every row written before AB existed has no cell there.

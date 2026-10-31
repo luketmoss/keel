@@ -135,6 +135,7 @@ const SYNCED: WorkoutWithRow = {
   estimated_seconds: '',
   sport_type: '',
   track_ref: '',
+  trails: '',
   sheetRow: 2,
 };
 
@@ -169,6 +170,7 @@ const ENRICHED: WorkoutWithRow = {
   estimated_seconds: '',
   sport_type: '',
   track_ref: '',
+  trails: '',
   sheetRow: 3,
 };
 

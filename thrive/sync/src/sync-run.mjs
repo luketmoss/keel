@@ -13,6 +13,7 @@ import { syncWindow } from './dates.mjs';
 import { createDrive } from './drive.mjs';
 import { createFitStep, FIT_ALLOWANCE, FIT_TOOL } from './fit.mjs';
 import { createTrackStep, trackSummary } from './track-step.mjs';
+import { createTrailStep, trailSummary } from './trail-step.mjs';
 import { googleTokenProvider, loadGoogleCredentials } from './google.mjs';
 import { ingest, REQUIRED_TOOLS } from './ingest.mjs';
 import { connectCoros } from './mcp.mjs';
@@ -34,6 +35,7 @@ export const defaultDeps = {
   createApi: (env) => createThriveApi(loadThriveApiConfig(env)),
   createFitStep,
   createTrackStep,
+  createTrailStep,
 };
 
 /**
@@ -90,6 +92,7 @@ export async function syncRun({ env = process.env, force = false, now = () => ne
   let client = null;
   let fit = null;
   let track = null;
+  let trails = null;
   try {
     const drive = d.createDrive(env);
     const store = d.createTokenStore(drive);
@@ -125,9 +128,13 @@ export async function syncRun({ env = process.env, force = false, now = () => ne
       }
       // Tracks need no COROS request, so they do not depend on the FIT tool being offered.
       track = d.createTrackStep({ archive, startedAt, log: out.detail });
+      // Trails follow the track (#688). They never add a failure: only notes.
+      trails = d.createTrailStep({
+        archive, api, startedAt, env, featureFor: (id) => track.featureFor?.(id), log: out.detail,
+      });
       const sheet = await d.writeSheet({
         archive, api, window: summary.window, activityIds: summary.activityIds, syncedAt: startedAt,
-        fit, track, log: out.detail,
+        fit, track, trails, log: out.detail,
       });
       failures.push(...sheet.failures);
       counts.created = sheet.activities?.created ?? 0;
@@ -167,6 +174,11 @@ export async function syncRun({ env = process.env, force = false, now = () => ne
     failures.push(...track.failures);
     notes.push(...track.notes);
     out.info(trackSummary(track));
+  }
+
+  if (trails) {
+    notes.push(...trails.notes());
+    out.info(trailSummary(trails));
   }
 
   // Optional, so an API without it (a fake) still works. A retry is not a

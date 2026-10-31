@@ -252,6 +252,23 @@ export function createArchive(drive, { now = () => Date.now() } = {}) {
       await drive.updateJson(fileId, { ...current, track });
     },
 
+    /**
+     * Record the activity's trails outcome (#688): `status` (`tagged` or
+     * `too_large`), `matcher_version`, `fit_fetched_at` and `track_version` of
+     * the track it was made from, `at`, and for a tagged one `passes` and
+     * `omitted`. Every other field is left alone, and an ingest update keeps
+     * it, as it keeps `track`.
+     */
+    async writeTrails(fileId, trails) {
+      const current = await drive.readJson(fileId);
+      await drive.updateJson(fileId, { ...current, trails });
+    },
+
+    /** A stored track Feature, by its Drive file id (#688). */
+    readTrack(trackFileId) {
+      return drive.readJson(trackFileId);
+    },
+
     /** The activity's stored FIT bytes, by its Drive file id (#432). */
     readFit(fitFileId) {
       return drive.readBinary(fitFileId);

@@ -471,6 +471,67 @@ detail prose (`docs/data-architecture.md` §4).
   through `updateWorkout` and lists every row it cannot fill by workout id and
   date. `garmin_import` rows have no FIT and are never touched.
 
+## Trails (#688)
+
+After an activity's row lands, the run works out once which named
+OpenStreetMap trails its track rode, and writes them to `Workouts!AD` `trails`
+(the format: #688 §Column format; the column's states: `thrive/CLAUDE.md`).
+
+- **Which activities.** Every non-strength activity in the run whose row has a
+  stored track (`track_ref` set after the track step) and whose trails are not
+  *settled*. Settled means the archive file's `trails` record says `tagged` or
+  `too_large`, made by the current `TRAILS_MATCHER_VERSION`
+  (`src/trail-match.mjs`) from the track the archive holds now (the same
+  `fit_fetched_at` and track `version`). A rebuilt track or a matcher bump
+  re-tags the activity once. A row the upsert answered `deleted` is skipped.
+- **The lookup** (`src/overpass.mjs`). One `POST` per activity to
+  `THRIVE_OVERPASS_URL`, default `https://overpass-api.de/api/interpreter`,
+  with a `User-Agent` naming `keel-thrive-sync` and this repository, asking for
+  the named `highway` ways of `path|track|footway|bridleway|cycleway` in the
+  track's bounding box padded by 50 m (`out geom`, no relations). Overpass sees
+  only the box, never the track. 45 s per attempt; 3 attempts, waiting 10 s and
+  then 30 s, for no response, HTTP 429/502/503/504, or a 200 carrying Overpass's
+  `remark` (a runtime error or partial result). Any other status, or a body that
+  is not JSON or has no `elements`, fails at once. `THRIVE_OVERPASS_URL` is read
+  from the environment, for a local run against another instance; the
+  scheduled workflow sets nothing and uses the default.
+- **The match** (`src/trail-match.mjs`, ported from #681's spike): the track
+  densified to about 5 m, heading over about 20 m, a 20 m buffer and a 30°
+  heading tolerance either way, the nearest trail only, gaps under 50 m bridged,
+  a pass kept at 200 m or half its trail, and same-named ways joined.
+- **The write.** `updateWorkout({ id, changes: { trails } })`, a call of its own
+  after the upsert, so the value gets the whole payload budget. Only then is
+  the outcome recorded in the archive file, so a failed write is retried. A
+  value that would not fit `MAX_ENCODED_PAYLOAD` leaves out its shortest passes
+  first (`x` says how many) and is never cut mid-pass.
+- **Run budget.** At most 5 lookups a run, 5 s apart; none starts once 3
+  minutes have passed since the first; after one lookup fails all its attempts,
+  none more that run. An activity not looked up is *deferred*: its row is
+  unchanged, and a later run (or #689's backfill) picks it up.
+- **Too large.** A padded box over 50 km on a side is not looked up. It is
+  recorded `too_large` and not retried until its track or the matcher changes;
+  the row stays blank.
+- **It never fails the sync.** Nothing here adds to `n_errors` or changes the
+  run's `status`, and an activity always lands. The one exception is a
+  `DriveAuthError`, which ends the run as in every other step.
+
+Every problem is one `SyncLog` note, and **none needs action**: a later run
+(inside the 10-day window) or #689's backfill heals each.
+
+| Note | Meaning |
+|---|---|
+| `trails <id>: not tagged, the OpenStreetMap lookup failed (<reason>); a later run retries` | `<reason>` is `no response`, `HTTP <status>`, `partial result` or `unreadable response`. Nothing was written or recorded |
+| `trails <id>: not tagged, its area is over 50 km across; not retried until its track or the matcher changes` | Too large to look up. AD stays blank |
+| `trails <id>: not tagged, its track could not be read from Drive; a later run retries` | The stored track could not be read |
+| `trails <id>: tagged but not written (<API message>); a later run retries` | The API refused the write (an API deployed before #688 refuses `trails` as an unknown field) |
+| `trails <id>: tagged, but <k> of <n> passes were left out to fit the column` | Written, with its shortest passes left out |
+| `trails: <k> activities not looked up this run (<the per-run limit \| a failed lookup \| the time limit>); a later run retries` | Deferred, once per run |
+
+No note contains a coordinate, a box, a trail name or any Overpass text, and
+nothing in the log does either. The run's log gets one counts-only line, in
+summary mode too:
+`Trails: <a> tagged, <b> no named trail, <c> too large, <d> failed, <e> deferred.`
+
 ## Schedule, SyncLog and the dead-man's switch (#156)
 
 **Four runs a day**, `17 9,13,18,0 * * *`: 03:17, 07:17, 12:17 and 18:17 MDT,

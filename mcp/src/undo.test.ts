@@ -196,6 +196,18 @@ describe('thrive_undo (#412)', () => {
     }
   })
 
+  it('#688: a conflict on a tagged row shows no raw trails value', async () => {
+    const tagged = '{"v":1,"m":1,"u":0,"n":[["Invented Path",400]],"p":[[0,0,100,1,400,null,null,null]]}'
+    fakeApi(() => ({
+      success: false,
+      error: 'Nothing undone: 1 row(s) changed since call newer',
+      data: { conflicts: [{ tab: 'Workouts', row_key: { id: 'w1' }, current: { name: 'edited', trails: tagged }, expected: { name: 'New', trails: '' } }] },
+    }))
+    const result = await thrive('thrive_undo', { call_id: 'newer' })
+    expect(result.content[0].text).toContain('now {"name":"edited","trails":"(trail tags)"}, expected {"name":"New","trails":""}')
+    expect(result.content[0].text).not.toContain('Invented')
+  })
+
   it('passes the app\'s message on for an unknown call, as a tool error', async () => {
     fakeApi(() => ({ success: false, error: 'No MCP call nope in the change log' }))
     const result = await thrive('thrive_undo', { call_id: 'nope', confirm: true })
@@ -326,5 +338,14 @@ describe('undo wording helpers (#412)', () => {
     expect(describeRowChange({ a: '1', b: 'x' }, { a: '2', b: 'x' })).toBe('a: "1" → "2"')
     expect(describeRowChange(null, { a: '1' })).toBe('(missing) → a="1"')
     expect(describeRowChange({ a: '1' }, null)).toBe('a="1" → (removed)')
+  })
+
+  it('#688: never shows a raw trails value, only that it is set or changed', () => {
+    const tagged = '{"v":1,"m":1,"u":0,"n":[["Invented Path",400]],"p":[[0,0,100,1,400,null,null,null]]}'
+    const other = '{"v":1,"m":1,"u":5,"n":[],"p":[]}'
+    expect(describeRowChange({ id: 'w1', trails: tagged }, { id: 'w1', trails: other })).toBe('trails: changed')
+    expect(describeRowChange({ id: 'w1', trails: '' }, { id: 'w1', trails: tagged })).toBe('trails: (blank) → "(trail tags)"')
+    expect(describeRowChange({ trails: tagged, id: 'w1' }, null)).toBe('trails="(trail tags)", id="w1" → (removed)')
+    expect(describeRowChange({ id: 'w1', trails: tagged, name: 'a' }, { id: 'w1', trails: tagged, name: 'b' })).toBe('name: "a" → "b"')
   })
 })

@@ -45,6 +45,7 @@ function workout(id: string, type: WorkoutWithRow['type'], name: string): Workou
     estimated_seconds: '',
     sport_type: '',
     track_ref: '',
+    trails: '',
     sheetRow: 2,
   };
 }

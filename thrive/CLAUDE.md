@@ -206,10 +206,10 @@ Google Sheet "Groundwork" with these tabs:
   rest_s, switch_s (#576: the section's rest and switch in whole seconds, the same on every row of a
   section; blank means the Settings default; switch only on SS1-SS3 and burnout, neither on warmup or
   cooldown. A replace that leaves them out keeps the stored values)
-- **Workouts** (A:AC): id, Date, Time, Type, Name, template_id, Notes, Elapsed (s), Created, copied_from, status,
+- **Workouts** (A:AD): id, Date, Time, Type, Name, template_id, Notes, Elapsed (s), Created, copied_from, status,
   Moving (s), Effort, Distance (m), Ascent (m), Descent (m), Avg HR (bpm),
   sub_type, source, source_activity_id, raw_ref, fit_ref, fit_fetched_at, synced_at, started_at_utc, calories,
-  estimated_seconds, sport_type, track_ref
+  estimated_seconds, sport_type, track_ref, trails
 - **Sets** (A:M): workout_id, exercise_id, Exercise Name, Section, Exercise Order, Set #, Planned Reps, Weight (lbs), Reps, Effort,
   rest_target_s, set_s, rest_s (#576). `rest_target_s` is the rest planned after the set, resolved once when
   the set is created (from the template section, else the Settings default; the switch time for all but the
@@ -429,6 +429,17 @@ reads the Garmin export's FIT zips, matches each activity FIT with positions to 
 (the FIT file names are upload ids, not activity ids), stores it in `Thrive Garmin/fit/` and sets `fit_ref`;
 the same backfill then builds the track, stored beside COROS's in `Thrive COROS/tracks/` because
 `getWorkoutTrack` reads only from there.
+`Workouts!AD` `trails` (#688) is the named OpenStreetMap trails the activity's track rode, worked out
+once by the COROS sync's trail step (`sync/src/trail-step.mjs`, one Overpass lookup of the track's
+padded box, matched by `sync/src/trail-match.mjs`) and written with its own `updateWorkout` call. Three
+states: **blank** is not tagged yet (not looked up, or the last try failed; a later run or #689's
+backfill retries), never "no trails"; `{"v":1,"m":1,"u":<metres>,"n":[],"p":[]}` is tagged with no
+named trail; and a value with names and passes is tagged with trails. The format (names as OSM writes
+them, unsplit; passes in time order; `x` when passes were left out to fit) is #688's §Column format,
+and `frontend/src/api/trails-cell.ts`'s `parseTrailsCell` is its one decoder in the app. Sync-owned:
+the SPA and the MCP never set it, `createWorkout` writes `''`, `updateWorkout` validates it strictly,
+and every full-row write (`upsertSyncedWorkout`, `enrichWorkout`, the SPA's edit) preserves it. Added
+by `scripts/migrate-688-workouts-trails.mjs`. The app shows no real trail data until #690.
 
 ### Workout Types
 - `weight` — structured weight training with exercises, sets, reps, effort

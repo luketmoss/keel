@@ -52,20 +52,38 @@ export function listCalls(entries, limit = 20) {
 
 const show = (value) => (value === '' || value === undefined || value === null ? '(blank)' : JSON.stringify(value));
 
+/**
+ * Fields whose raw value no tool output may carry, shown as a placeholder.
+ * Thrive's Workouts!AD `trails` (#688) holds trail names and passes: an undo
+ * says only that it changed or that it is set.
+ */
+const MASKED = { trails: '(trail tags)' };
+
+/** `row` with every MASKED field that holds a value replaced by its placeholder. */
+export function maskRow(row) {
+  if (!row || typeof row !== 'object') return row;
+  const out = { ...row };
+  for (const [f, label] of Object.entries(MASKED)) {
+    if (out[f] !== undefined && out[f] !== null && out[f] !== '') out[f] = label;
+  }
+  return out;
+}
+
 /** `a=1, b=2` from a key object. */
 export const keyText = (key) => Object.entries(key ?? {}).map(([k, v]) => `${k}=${v}`).join(', ');
 
 /** The fields that differ between two rows, as `field: "a" → "b"`. */
 function differences(current, restore) {
   const fields = [...new Set([...Object.keys(current), ...Object.keys(restore)])];
+  const [a, b] = [maskRow(current), maskRow(restore)];
   return fields
     .filter((f) => current[f] !== restore[f])
-    .map((f) => `${f}: ${show(current[f])} → ${show(restore[f])}`);
+    .map((f) => (f in MASKED && a[f] === b[f] ? `${f}: changed` : `${f}: ${show(a[f])} → ${show(b[f])}`));
 }
 
 /** The first few set fields of a row, for a row that exists on only one side. */
 function brief(row) {
-  const set = Object.entries(row).filter(([, v]) => v !== '' && v !== null && v !== undefined);
+  const set = Object.entries(maskRow(row)).filter(([, v]) => v !== '' && v !== null && v !== undefined);
   return set.slice(0, 4).map(([k, v]) => `${k}=${show(v)}`).join(', ');
 }
 

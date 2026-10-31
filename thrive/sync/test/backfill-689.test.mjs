@@ -7,18 +7,19 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { createArchive } from '../src/archive.mjs';
-import { ATTEMPT_TIMEOUT_MS, paddedBox, trailQuery, USER_AGENT } from '../src/overpass.mjs';
+import { paddedBox, trailQuery, USER_AGENT } from '../src/overpass.mjs';
 import { ThriveApiError, MAX_ENCODED_PAYLOAD } from '../src/thrive-api.mjs';
 import { matchTrails, TRAILS_MATCHER_VERSION } from '../src/trail-match.mjs';
 import { createTrailStep, encodedPayloadSize, encodeTrails, fitTrails } from '../src/trail-step.mjs';
 import { TRACK_VERSION } from '../src/track.mjs';
 import {
-  backfill, CACHE_MAX_AGE_MS, DEFAULTS, loadProgress, parseArgs, planBackfill, readTrailsCell,
+  backfill, CACHE_MAX_AGE_MS, DEFAULTS, loadProgress, parseArgs, patience, planBackfill, readTrailsCell,
 } from '../../scripts/backfill-689-workouts-trails.mjs';
 import { memoryDrive } from './helpers.mjs';
 import { GOLDEN, GOLDEN_ELEMENTS, GOLDEN_FEATURE, track, way } from './trail-geometry.mjs';
@@ -248,7 +249,7 @@ test('one Overpass POST with the sync\'s query and User-Agent, then one updateWo
   const call = r.overpass.calls[0];
   assert.equal(call.init.method, 'POST');
   assert.equal(call.init.headers['User-Agent'], USER_AGENT);
-  assert.equal(call.query, trailQuery(paddedBox(GOLDEN_FEATURE).box));
+  assert.equal(call.query, trailQuery(paddedBox(GOLDEN_FEATURE).box, { timeoutS: 90 }), 'the patient server timeout');
   assert.equal(r.api.writes.length, 1);
   assert.deepEqual(Object.keys(r.api.writes[0]), ['id', 'changes']);
   assert.deepEqual(Object.keys(r.api.writes[0].changes), ['trails']);
@@ -366,12 +367,12 @@ test('a Sheets write is followed by --pause-ms', async () => {
 // --- A failed lookup never writes ------------------------------------------------
 
 const FAILURES = [
-  ['no response in 45 s', 'hang', 3, 'no response'],
-  ['HTTP 429', { status: 429, body: 'busy' }, 3, 'HTTP 429'],
-  ['HTTP 502', { status: 502, body: 'x' }, 3, 'HTTP 502'],
-  ['HTTP 503', { status: 503, body: 'x' }, 3, 'HTTP 503'],
-  ['HTTP 504', { status: 504, body: 'x' }, 3, 'HTTP 504'],
-  ['a 200 with a remark', { body: { elements: [], remark: 'runtime error: out of memory' } }, 3, 'partial result'],
+  ['no response in 120 s', 'hang', 5, 'no response'],
+  ['HTTP 429', { status: 429, body: 'busy' }, 5, 'HTTP 429'],
+  ['HTTP 502', { status: 502, body: 'x' }, 5, 'HTTP 502'],
+  ['HTTP 503', { status: 503, body: 'x' }, 5, 'HTTP 503'],
+  ['HTTP 504', { status: 504, body: 'x' }, 5, 'HTTP 504'],
+  ['a 200 with a remark', { body: { elements: [], remark: 'runtime error: out of memory' } }, 5, 'partial result'],
   ['a body that is not JSON', { body: '<html>nope</html>' }, 1, 'unreadable response'],
   ['a body with no elements', { body: { version: 0.6 } }, 1, 'unreadable response'],
   ['HTTP 400', { status: 400, body: 'bad query' }, 1, 'HTTP 400'],
@@ -387,8 +388,8 @@ for (const [label, answer, attempts, reason] of FAILURES) {
     });
     assert.equal(r.code, 1);
     assert.equal(r.overpass.calls.length, attempts);
-    assert.deepEqual(timers, Array(attempts).fill(ATTEMPT_TIMEOUT_MS));
-    assert.deepEqual(r.clock.waits, attempts === 3 ? [10_000, 30_000] : []);
+    assert.deepEqual(timers, Array(attempts).fill(120_000));
+    assert.deepEqual(r.clock.waits, attempts === 5 ? [15_000, 60_000, 120_000, 180_000] : []);
     assert.deepEqual(r.api.writes, []);
     assert.deepEqual(w.drive.writes, []);
     assert.deepEqual(r.cacheFiles, []);
@@ -406,7 +407,7 @@ test('after a lookup fails every attempt no further lookup is made, the rest are
   const w = await world([{}, {}, {}]);
   const r = await run(w, { answer: { status: 503, body: 'x' } });
   assert.equal(r.code, 1);
-  assert.equal(r.overpass.calls.length, 3, 'three attempts at the first row, nothing for the others');
+  assert.equal(r.overpass.calls.length, 5, 'five attempts at the first row, nothing for the others');
   assert.deepEqual(r.api.writes, []);
   assert.match(r.out, /NOT TAGGED: 1\n  w_00000001  OpenStreetMap lookup failed \(HTTP 503\)/);
   assert.match(r.out, /Left: 3\. Re-run to continue\./);
@@ -627,6 +628,81 @@ test('an identical query within 30 days is served from the cache; after 30 days,
   }
 });
 
+// --- Patience (#697) -----------------------------------------------------------------
+
+test('the patient defaults: 120 s attempts, a 90 s server timeout, 5 attempts, waits of 15, 60, 120 and 180 s', () => {
+  assert.deepEqual(patience(), {
+    attemptTimeoutMs: 120_000, serverTimeoutS: 90, attempts: 5, retryDelaysMs: [15_000, 60_000, 120_000, 180_000],
+  });
+  const tuned = patience({ attemptTimeoutS: 60, attempts: 2 });
+  assert.equal(tuned.attemptTimeoutMs, 60_000);
+  assert.equal(tuned.serverTimeoutS, 45);
+  assert.equal(tuned.attempts, 2);
+  for (const s of [1, 10, 45, 300]) {
+    const p = patience({ attemptTimeoutS: s });
+    assert.ok(p.serverTimeoutS >= 1 && (s === 1 || p.serverTimeoutS < s), `server timeout under the client's for ${s}`);
+  }
+});
+
+test('--attempt-timeout-s 60 --attempts 2: a 60 s timer, [timeout:45], two attempts and one 15 s wait', async () => {
+  const w = await world([{ feature: GOLDEN_FEATURE }]);
+  const timers = [];
+  const r = await run(w, {
+    answer: { status: 502, body: 'x' },
+    startTimer: (ms) => { timers.push(ms); return () => {}; },
+    args: { attemptTimeoutS: 60, attempts: 2 },
+  });
+  assert.equal(r.code, 1);
+  assert.equal(r.overpass.calls.length, 2);
+  assert.deepEqual(timers, [60_000, 60_000]);
+  assert.deepEqual(r.clock.waits, [15_000]);
+  assert.ok(r.overpass.calls.every((c) => c.query === trailQuery(paddedBox(GOLDEN_FEATURE).box, { timeoutS: 45 })));
+  assert.deepEqual(r.api.writes, []);
+});
+
+test('retry waits are paced: none is under the 5 s lookup spacing, and requests stay one at a time', async () => {
+  assert.ok(patience().retryDelaysMs.every((ms) => ms >= 5_000));
+  const w = await world([{ feature: GOLDEN_FEATURE }]);
+  const r = await run(w, { answer: { status: 502, body: 'x' } });
+  const at = r.overpass.calls.map((c) => c.at);
+  for (let i = 1; i < at.length; i++) assert.ok(at[i] - at[i - 1] >= 5_000, `gap ${i}`);
+  assert.equal(r.overpass.calls.maxActive, 1);
+});
+
+test('a retry that succeeds after failures is written like any answer', async () => {
+  const w = await world([{ feature: GOLDEN_FEATURE }]);
+  const r = await run(w, { answer: [{ status: 502, body: 'x' }, { status: 504, body: 'x' }, { body: { elements: GOLDEN_ELEMENTS } }] });
+  assert.equal(r.code, 0, r.err);
+  assert.equal(r.overpass.calls.length, 3);
+  assert.equal(r.api.writes[0].changes.trails, GOLDEN);
+  assert.deepEqual(r.clock.waits, [15_000, 60_000]);
+});
+
+test('the cache key is the hash of the [timeout:40] query, so answers cached before #697 still hit, and a patient run caches under it', async () => {
+  const w = await world([{ feature: GOLDEN_FEATURE }]);
+  const dir = tempDir();
+  const clock = makeClock();
+  const box = paddedBox(GOLDEN_FEATURE).box;
+  assert.match(trailQuery(box), /^\[out:json\]\[timeout:40\];/);
+  const key = createHash('sha256').update(trailQuery(box)).digest('hex');
+  mkdirSync(join(dir, 'cache'), { recursive: true });
+  writeFileSync(join(dir, 'cache', `${key}.json`), JSON.stringify({ at: new Date(clock.t).toISOString(), elements: GOLDEN_ELEMENTS }));
+  const hit = await run(w, { dir, clock });
+  assert.equal(hit.overpass.calls.length, 0, 'served from the file an earlier run wrote');
+  assert.equal(hit.api.writes[0].changes.trails, GOLDEN);
+
+  for (const attemptTimeoutS of [1, 60, 300]) {
+    resetCells(w.rows);
+    const other = await run(w, { dir, clock, args: { attemptTimeoutS } });
+    assert.equal(other.overpass.calls.length, 0, `--attempt-timeout-s ${attemptTimeoutS} does not change the key`);
+  }
+
+  resetCells(w.rows);
+  const first = await run(w, { dir: tempDir(), clock });
+  assert.equal(first.overpass.calls.length, 1);
+  assert.deepEqual(first.cacheFiles, [`${key}.json`]);
+});
+
 test('--no-cache neither reads nor writes the cache folder', async () => {
   const w = await world([{}]);
   const r = await run(w, { args: { noCache: true } });
@@ -743,5 +819,22 @@ test('invalid flags are refused with a message naming the flag', () => {
     ok: true,
     options: { '--dry-run': true, '--max-lookups': 1, '--max-minutes': 5, '--pause-ms': 0, '--ids': ['a', 'b'], '--restart': true, '--no-cache': true },
   });
+  assert.deepEqual(parseArgs(['--max-lookups', '5', '--max-minutes', '30']), {
+    ok: true, options: { '--max-lookups': 5, '--max-minutes': 30 },
+  });
+  assert.deepEqual(parseArgs(['--attempt-timeout-s', '60', '--attempts', '2']), {
+    ok: true, options: { '--attempt-timeout-s': 60, '--attempts': 2 },
+  });
+  assert.deepEqual(DEFAULTS, { maxLookups: 30, maxMinutes: 20, pauseMs: 1000, attemptTimeoutS: 120, attempts: 5 });
+  for (const flag of ['--attempt-timeout-s', '--attempts']) {
+    for (const bad of ['0', '-1', '1.5', 'abc', '']) {
+      const parsed = parseArgs([flag, bad]);
+      assert.equal(parsed.ok, false, `${flag} ${bad}`);
+      assert.ok(parsed.message.includes(flag), parsed.message);
+    }
+    const missing = parseArgs([flag]);
+    assert.equal(missing.ok, false);
+    assert.ok(missing.message.includes(flag));
+  }
 });
 

@@ -17,6 +17,9 @@
  * results, so the script is slow on purpose and cautious:
  *
  * - at least 5 s between requests, one at a time;
+ * - patient attempts (#697): 5 per lookup, each given 120 s (the server's own
+ *   limit 90 s), waiting 15 s / 60 s / 120 s / 180 s between them; tune with
+ *   `--attempt-timeout-s` and `--attempts`. The sync keeps its short ones;
  * - at most 30 lookups a run (`--max-lookups`) and no new lookup after 20
  *   minutes (`--max-minutes`);
  * - the first lookup that fails all its attempts ends the run (exit 1): that
@@ -53,6 +56,7 @@
  *   node scripts/backfill-689-workouts-trails.mjs --max-lookups 1
  *   node scripts/backfill-689-workouts-trails.mjs
  *   ... --max-lookups 30 --max-minutes 20 --pause-ms 1000 --ids a,b --restart --no-cache
+ *   ... --attempt-timeout-s 120 --attempts 5
  */
 
 import { createHash, randomBytes } from 'node:crypto';
@@ -65,7 +69,25 @@ import { createOverpass, OverpassError, overpassUrl, paddedBox, tooLarge, trailQ
 import { matchTrails, TRAILS_MATCHER_VERSION } from '../sync/src/trail-match.mjs';
 import { encodeTrails, fitTrails, LOOKUP_SPACING_MS } from '../sync/src/trail-step.mjs';
 
-export const DEFAULTS = { maxLookups: 30, maxMinutes: 20, pauseMs: 1000 };
+export const DEFAULTS = { maxLookups: 30, maxMinutes: 20, pauseMs: 1000, attemptTimeoutS: 120, attempts: 5 };
+
+/** Waits before the 2nd, 3rd... attempt; the last repeats when `--attempts` asks for more. */
+export const PATIENT_WAITS_MS = [15_000, 60_000, 120_000, 180_000];
+
+/**
+ * What the backfill hands `createOverpass` (#697): far more patient than the
+ * sync, which has a 3-minute run budget to keep. The server's `[timeout:N]` is
+ * 75% of the client's, so the client always outlasts the server (120 s -> 90 s),
+ * and no wait before a retry is under the spacing between lookups.
+ */
+export function patience({ attemptTimeoutS = DEFAULTS.attemptTimeoutS, attempts = DEFAULTS.attempts } = {}) {
+  return {
+    attemptTimeoutMs: attemptTimeoutS * 1000,
+    serverTimeoutS: Math.max(1, Math.floor(attemptTimeoutS * 0.75)),
+    attempts,
+    retryDelaysMs: PATIENT_WAITS_MS.map((ms) => Math.max(ms, LOOKUP_SPACING_MS)),
+  };
+}
 
 /** A cached answer older than this is ignored (OSM changes). */
 export const CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -183,6 +205,8 @@ function writeAtomic(path, data) {
   renameSync(tmp, path);
 }
 
+// Keyed by the query as the sync sends it, `[timeout:40]` included, whatever
+// timeout this run sends: the patience flags never change a key (#697).
 const cacheFile = (dir, box) => join(dir, `${createHash('sha256').update(trailQuery(box)).digest('hex')}.json`);
 
 // --- The backfill --------------------------------------------------------------
@@ -200,6 +224,7 @@ export async function backfill({
   api, drive, archive, fetchImpl, startTimer, overpassUrl: url, cacheDir, progressPath,
   dryRun = false, restart = false, noCache = false, ids = null,
   maxLookups = DEFAULTS.maxLookups, maxMinutes = DEFAULTS.maxMinutes, pauseMs = DEFAULTS.pauseMs,
+  attemptTimeoutS = DEFAULTS.attemptTimeoutS, attempts = DEFAULTS.attempts,
   matcherVersion = TRAILS_MATCHER_VERSION,
   now = () => Date.now(), wait = (ms) => new Promise((r) => setTimeout(r, ms)),
   log = console.log, error = console.error,
@@ -249,7 +274,7 @@ export async function backfill({
 
   const startedAt = new Date(now()).toISOString();
   const client = createOverpass({
-    ...(url ? { url } : {}), wait, ...(fetchImpl ? { fetchImpl } : {}), ...(startTimer ? { startTimer } : {}),
+    ...(url ? { url } : {}), ...patience({ attemptTimeoutS, attempts }), wait, ...(fetchImpl ? { fetchImpl } : {}), ...(startTimer ? { startTimer } : {}),
   });
   const notTagged = [...plan.notTagged];
   const tally = { tagged: 0, noTrail: 0, tooLarge: 0, failed: 0, unreadableTrack: 0, cached: 0 };
@@ -429,6 +454,7 @@ export async function backfill({
 const FLAGS = {
   '--dry-run': 'boolean', '--restart': 'boolean', '--no-cache': 'boolean',
   '--max-lookups': 'int', '--max-minutes': 'int', '--pause-ms': 'int0', '--ids': 'list',
+  '--attempt-timeout-s': 'int', '--attempts': 'int',
 };
 
 /** @returns {{ ok: true, options: object } | { ok: false, message: string }} */
@@ -484,6 +510,8 @@ async function main() {
       maxLookups: o['--max-lookups'] ?? DEFAULTS.maxLookups,
       maxMinutes: o['--max-minutes'] ?? DEFAULTS.maxMinutes,
       pauseMs: o['--pause-ms'] ?? DEFAULTS.pauseMs,
+      attemptTimeoutS: o['--attempt-timeout-s'] ?? DEFAULTS.attemptTimeoutS,
+      attempts: o['--attempts'] ?? DEFAULTS.attempts,
     });
   } catch (err) {
     console.error(`${err.name ?? 'Error'}: ${redact(err.message || String(err))}`);

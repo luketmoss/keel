@@ -213,9 +213,9 @@ yogurt, an unnamed-nutrition spice). The starter list is a sample of 8. Barcode 
 Food Facts"; any other valid code answers one made-up product (an original name, not a real brand) with an energy
 mismatch warning, so the warning can be seen. The banner of #704 stays visible on every sheet.
 
-## MCP tools (registered by #713)
+## MCP tools (registered by this issue, per #713)
 
-Specified here so #713 can build them without rereading the issue. All five go through the Forage API; the read tools
+Specified here and registered by #707 itself in `mcp/src/forage/tools.ts`: #713 lands only `forage_status`, `forage_import_recipe` and `forage_undo`, and each feature issue registers its own tools. All five go through the Forage API; the read tools
 on the read connector and the other three on the write connector. A write ends with the connector's "Forage (write) is
 on" reminder (#713), naming the food.
 

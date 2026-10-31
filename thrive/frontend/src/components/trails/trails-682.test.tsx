@@ -1,6 +1,6 @@
-// #682 — trail search and per-trail comparison, a demo-mode prototype: the
-// Trails card, Routes like this, the Trail screen and trail search, and none
-// of it outside demo mode.
+// #682 — trail search and per-trail comparison, built on the demo fixture: the
+// Trails card, the Trail screen and trail search. Since #690 the fixture reaches
+// the screens as `trails` cells, the same way a signed-in session's data does.
 
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, cleanup, screen, fireEvent, within } from '@testing-library/preact';
@@ -117,9 +117,10 @@ describe('AC2/AC3/AC7: the Trails card in demo mode', () => {
     const compare = block('Juniper Ridge').querySelector('.trail-pass-compare')!.textContent!;
     expect(compare).toMatch(/^1:12 faster · ↑ 20 ft less than [A-Z][a-z]{2} \d{1,2}(, \d{4})?$/);
     cleanup();
+    // #690: the passes before it are a partial one and one mapped as "Juniper Ridge Trail", so neither compares.
     render(h(WorkoutDetail, { workoutId: 'w_demo022' }));
     const passes = [...block('Juniper Ridge').querySelectorAll('.trail-pass-compare')].map((e) => e.textContent);
-    expect(passes[0]).not.toBe(NO_EARLIER_PASS);
+    expect(passes[0]).toBe(NO_EARLIER_PASS);
     expect(passes[1]).toBe(NO_EARLIER_PASS);
     expect(block('Juniper Ridge').querySelectorAll('.trail-pass-line')[1].textContent).toContain('100 → 0%');
   });
@@ -243,21 +244,27 @@ describe('AC5: trail search on Activities', () => {
   });
 });
 
-describe('AC9: production untouched — demo mode off', () => {
+// #690 replaces #682's "production untouched" tests: a signed-in session now reads the `trails` cell like
+// the demo does. Nothing tagged shows no trail UI but the "not tagged yet" lines; tagged cells show it all;
+// and the demo fixture never leaks into a signed-in session.
+describe('AC9 (#690): demo mode off, trails read from the cells', () => {
+  /** The demo rows with every trails cell blanked: a signed-in sheet nothing has tagged yet. */
+  const untaggedRows = () => shiftDemoWorkouts(new Date()).map((w) => ({ ...w, trails: '' }));
+
   beforeEach(() => {
     demo = false;
-    // trailIndex reads isDemo() once per recompute; a new workouts list makes it read again.
-    workouts.value = shiftDemoWorkouts(new Date());
+    workouts.value = untaggedRows();
   });
 
-  it('has no trail data at all', () => {
-    expect(trailIndex.value).toBeNull();
+  it('has no trail in the index when nothing is tagged', () => {
+    expect(trailIndex.value.groups.size).toBe(0);
   });
 
-  it('shows no Trails card on activity detail (Routes like this is no longer demo-only, #692)', () => {
+  it('shows no Trails card on activity detail, only the line that says it is not tagged yet', () => {
     render(h(WorkoutDetail, { workoutId: 'w_demo011' }));
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Canyon Road Ride');
     expect(document.querySelector('.trail-card')).toBeNull();
+    expect(document.querySelector('.trail-status')!.textContent).toBe('Trails not tagged yet');
   });
 
   it('shows no trail search on Activities', () => {
@@ -265,9 +272,32 @@ describe('AC9: production untouched — demo mode off', () => {
     expect(screen.queryByRole('searchbox', { name: 'Search trails' })).toBeNull();
   });
 
-  it('shows the not-found state for any trail key', () => {
+  it('shows the not-found state for any trail key, with the untagged sentence', () => {
     render(h(TrailScreen, { trailKey: 'juniper ridge' }));
     expect(screen.getByText('Trail not found')).toBeTruthy();
+    expect(document.querySelector('.trail-no-match')!.textContent).toMatch(
+      /^\d+ activities not tagged yet, so it may be in one of them\.$/,
+    );
+  });
+
+  it('shows the card, the field and the Trail screen once cells are tagged', () => {
+    workouts.value = shiftDemoWorkouts(new Date());
+    render(h(WorkoutDetail, { workoutId: 'w_demo011' }));
+    expect(document.querySelector('.trail-card')).not.toBeNull();
+    cleanup();
+    render(h(ActivitiesScreen, {}));
+    expect(screen.getByRole('searchbox', { name: 'Search trails' })).toBeTruthy();
+    cleanup();
+    render(h(TrailScreen, { trailKey: 'juniper ridge' }));
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Juniper Ridge');
+  });
+
+  it('never lets the demo fixture leak: the same id with a blank cell shows no card', () => {
+    // w_demo011 is a demo id; a real row with that id and no cell shows nothing of the fixture.
+    render(h(WorkoutDetail, { workoutId: 'w_demo011' }));
+    expect(document.querySelector('.trail-card')).toBeNull();
+    const src = readFileSync(resolve(here, '../../state/trails.ts'), 'utf-8');
+    expect(src).not.toMatch(/demo-trails|isDemo/);
   });
 });
 

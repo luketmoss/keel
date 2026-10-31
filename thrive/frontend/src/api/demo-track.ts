@@ -150,4 +150,10 @@ export const DEMO_TRACKS: Record<string, WorkoutTrack> = {
   w_demo022: shiftTrack(RIDE, 120, 90, 'demo-ride-150'),
   w_demo031: shiftTrack(LOOP, 20, 0, 'demo-loop-20'),
   w_demo025: shiftTrack(LOOP, 10, 0, 'demo-loop-10'),
+  // #690: tracks for the activities whose trails are not tagged, tagged with none, or unreadable. The loop moved
+  // 5 km each way shares no grid cell with any other demo track, so #692's demo sections are unchanged.
+  w_demo021: shiftTrack(LOOP, 5000, 0, 'demo-loop-n'),
+  w_demo027: shiftTrack(LOOP, -5000, 0, 'demo-loop-s'),
+  w_demo033: shiftTrack(LOOP, 0, 5000, 'demo-loop-e'),
+  w_demo037: shiftTrack(LOOP, 0, -5000, 'demo-loop-w'),
 };

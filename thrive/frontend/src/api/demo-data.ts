@@ -10,6 +10,7 @@ import type {
   SetWithRow,
 } from './types';
 import { DEMO_TRACKS } from './demo-track';
+import { DEMO_TRAIL_CELLS } from './demo-trails';
 import type { DailyHealthRow, BodyMeasurementRow, DailySummaryRow } from './health-api';
 import { colorKeyFromName } from './label-colors';
 import type { SyncLogEntryWithRow } from './sync-log-api';
@@ -953,7 +954,11 @@ function demoHistory(): WorkoutWithRow[] {
 }
 
 // The base fixture, then the #526 additions. DEMO_WORKOUTS is the whole set.
-export const DEMO_WORKOUTS: WorkoutWithRow[] = [...DEMO_WORKOUTS_BASE, ...DEMO_CASES, ...demoHistory()];
+// #690: the demo's trails ride in the rows like the real column's do, written by demo-trails.ts's encoder.
+export const DEMO_WORKOUTS: WorkoutWithRow[] = [...DEMO_WORKOUTS_BASE, ...DEMO_CASES, ...demoHistory()].map((w) => ({
+  ...w,
+  trails: DEMO_TRAIL_CELLS[w.id] ?? w.trails,
+}));
 
 // ── Demo workout dates relative to today (#250) ──────────────────────
 //

@@ -110,7 +110,7 @@ export function useDocumentTitle(): void {
   const title = titleFor(route, {
     workout: (id) => ws.find((w) => w.id === id),
     template: (id) => ts.find((t) => t.id === id),
-    trail: (key) => trails?.groups.get(key),
+    trail: (key) => trails.groups.get(key),
   });
   useLayoutEffect(() => {
     document.title = title;

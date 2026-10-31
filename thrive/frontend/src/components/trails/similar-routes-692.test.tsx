@@ -99,7 +99,8 @@ describe('demo mode, through the real rule', () => {
     expect(trails).not.toMatch(/DEMO_ROUTE_PAIRS/);
     expect(readFileSync(resolve(here, '../../trails/search.ts'), 'utf-8')).not.toMatch(/pairedWith/);
     expect(track).not.toMatch(/-?\d{1,3}\.\d{6,}/);
-    expect(Object.keys(DEMO_TRACKS)).toHaveLength(8);
+    // #692's eight, and #690's four far-away loops for the activities whose trails are not tagged.
+    expect(Object.keys(DEMO_TRACKS)).toHaveLength(12);
     const refs = new Set(DEMO_WORKOUTS.filter((w) => w.id in DEMO_TRACKS).map((w) => w.track_ref));
     expect(refs.has('')).toBe(false);
   });

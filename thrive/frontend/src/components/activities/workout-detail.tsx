@@ -230,7 +230,7 @@ export function WorkoutDetail({ workoutId }: Props) {
           <ElevationProfile track={trackState.track} ascentM={workout.ascent_m} />
         )}
 
-        {/* #682: the activity's trails (demo mode only for now), then #692's Routes like this and Near here. */}
+        {/* #682, #690: the activity's trails, or the line that says why not, then #692's Routes like this and Near here. */}
         <TrailsCard workoutId={workoutId} />
         <SimilarRoutes workout={workout} />
 

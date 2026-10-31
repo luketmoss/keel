@@ -18,6 +18,8 @@ export const USER_AGENT = 'keel-thrive-sync (+https://github.com/luketmoss/keel)
 /** Client-side limit per attempt, and the waits before the 2nd and 3rd attempts. */
 export const ATTEMPT_TIMEOUT_MS = 45_000;
 export const RETRY_DELAYS_MS = [10_000, 30_000];
+/** The server's own `[timeout:N]`, in seconds, in every query the sync sends. */
+export const SERVER_TIMEOUT_S = 40;
 
 /** The track's box is padded by this much on every side, in metres. */
 export const BOX_PADDING_M = 50;
@@ -74,19 +76,25 @@ export function paddedBox(feature) {
 export const tooLarge = ({ heightKm, widthKm }) => heightKm > MAX_BOX_KM || widthKm > MAX_BOX_KM;
 
 /** The Overpass QL for a box: named trail ways only, with their geometry. No relation. */
-export function trailQuery({ s, w, n, e }) {
+export function trailQuery({ s, w, n, e }, { timeoutS = SERVER_TIMEOUT_S } = {}) {
   const f = (v) => v.toFixed(6);
   return (
-    `[out:json][timeout:40];way["highway"~"^(${TRAIL_HIGHWAYS.join('|')})$"]["name"]` +
+    `[out:json][timeout:${timeoutS}];way["highway"~"^(${TRAIL_HIGHWAYS.join('|')})$"]["name"]` +
     `(${f(s)},${f(w)},${f(n)},${f(e)});out geom;`
   );
 }
 
 /**
  * @param {{ url?: string, fetchImpl?: typeof fetch, wait?: (ms: number) => Promise<void>,
- *   startTimer?: (ms: number, onTimeout: () => void) => () => void }} [opts]
+ *   startTimer?: (ms: number, onTimeout: () => void) => () => void,
+ *   attemptTimeoutMs?: number, serverTimeoutS?: number, attempts?: number,
+ *   retryDelaysMs?: number[] }} [opts]
  *   `startTimer` arms the per-attempt timeout and returns its cancel; injected so
- *   a test can fire it without waiting 45 s.
+ *   a test can fire it without waiting 45 s. The last four default to the sync's
+ *   own values (45 s, 40 s, 3 attempts, 10 s / 30 s); only the hand-run backfill
+ *   (#697) passes others, because the sync's run budget cannot afford longer
+ *   attempts. `attempts` defaults to one more than `retryDelaysMs` has entries,
+ *   and a wait list shorter than `attempts - 1` repeats its last entry.
  */
 export function createOverpass({
   url = DEFAULT_OVERPASS_URL,
@@ -96,13 +104,20 @@ export function createOverpass({
     const t = setTimeout(onTimeout, ms);
     return () => clearTimeout(t);
   },
+  attemptTimeoutMs = ATTEMPT_TIMEOUT_MS,
+  serverTimeoutS = SERVER_TIMEOUT_S,
+  retryDelaysMs = RETRY_DELAYS_MS,
+  attempts = retryDelaysMs.length + 1,
 } = {}) {
   let requests = 0;
+  const delays = Array.from({ length: Math.max(0, attempts - 1) }, (_, i) => (
+    retryDelaysMs[Math.min(i, retryDelaysMs.length - 1)] ?? 0
+  ));
 
   async function attempt(query) {
     requests += 1;
     const controller = new AbortController();
-    const cancel = startTimer(ATTEMPT_TIMEOUT_MS, () => controller.abort());
+    const cancel = startTimer(attemptTimeoutMs, () => controller.abort());
     let status;
     let text;
     try {
@@ -143,14 +158,14 @@ export function createOverpass({
     get requests() { return requests; },
 
     /**
-     * The named trail ways in `box`, retried per RETRY_DELAYS_MS. Throws the
+     * The named trail ways in `box`, retried per the configured waits. Throws the
      * last OverpassError when every attempt fails.
      */
     lookup(box) {
-      const query = trailQuery(box);
+      const query = trailQuery(box, { timeoutS: serverTimeoutS });
       return withRetry(() => attempt(query), {
         isRetryable: (err) => err instanceof OverpassError && err.retryable,
-        delays: RETRY_DELAYS_MS,
+        delays,
         wait,
       });
     },

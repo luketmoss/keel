@@ -188,6 +188,56 @@ for (const f of FAILURES) {
   });
 }
 
+// #697: the backfill alone passes other values; the defaults are the sync's.
+test('client: no overrides keeps the sync\'s attempt timeout, server timeout, attempts and waits', async () => {
+  const { fetchImpl, calls } = overpassFetch([{ status: 503, body: '' }]);
+  const { waits, wait } = fakeWait();
+  const timers = [];
+  const client = createOverpass({ fetchImpl, wait, startTimer: (ms) => { timers.push(ms); return () => {}; } });
+  const { box } = paddedBox(track([[0, 0], [100, 0]]));
+  await client.lookup(box).catch(() => {});
+  assert.equal(calls.length, 3);
+  assert.deepEqual(waits, [10_000, 30_000]);
+  assert.deepEqual(timers, [45_000, 45_000, 45_000]);
+  assert.ok(calls.every((c) => c.query === trailQuery(box) && c.query.startsWith('[out:json][timeout:40];')));
+});
+
+test('trailQuery: the server timeout is the only thing a timeoutS changes', () => {
+  const { box } = paddedBox(track([[0, 0], [100, 0]]));
+  assert.equal(trailQuery(box, { timeoutS: 90 }), trailQuery(box).replace('[timeout:40]', '[timeout:90]'));
+  assert.notEqual(trailQuery(box, { timeoutS: 90 }), trailQuery(box));
+});
+
+test('client: overrides set the per-attempt timer, the query timeout, the attempts and the waits', async () => {
+  const { fetchImpl, calls } = overpassFetch([{ status: 502, body: '' }]);
+  const { waits, wait } = fakeWait();
+  const timers = [];
+  const client = createOverpass({
+    fetchImpl, wait, startTimer: (ms) => { timers.push(ms); return () => {}; },
+    attemptTimeoutMs: 120_000, serverTimeoutS: 90, attempts: 5, retryDelaysMs: [15_000, 60_000, 120_000, 180_000],
+  });
+  const { box } = paddedBox(track([[0, 0], [100, 0]]));
+  await client.lookup(box).catch(() => {});
+  assert.equal(calls.length, 5);
+  assert.equal(client.requests, 5);
+  assert.deepEqual(waits, [15_000, 60_000, 120_000, 180_000]);
+  assert.deepEqual(timers, Array(5).fill(120_000));
+  assert.ok(calls.every((c) => c.query === trailQuery(box, { timeoutS: 90 })));
+});
+
+test('client: attempts fewer than the waits uses the first waits; more repeats the last', async () => {
+  const attemptsWith = async (opts) => {
+    const { fetchImpl, calls } = overpassFetch([{ status: 502, body: '' }]);
+    const { waits, wait } = fakeWait();
+    const client = createOverpass({ fetchImpl, wait, ...opts });
+    await client.lookup(paddedBox(track([[0, 0], [100, 0]])).box).catch(() => {});
+    return { n: calls.length, waits };
+  };
+  assert.deepEqual(await attemptsWith({ attempts: 2, retryDelaysMs: [7_000, 9_000, 11_000] }), { n: 2, waits: [7_000] });
+  assert.deepEqual(await attemptsWith({ attempts: 4, retryDelaysMs: [7_000] }), { n: 4, waits: [7_000, 7_000, 7_000] });
+  assert.deepEqual(await attemptsWith({ attempts: 1 }), { n: 1, waits: [] });
+});
+
 test('client: a retry that then succeeds answers the elements', async () => {
   const { fetchImpl, calls } = overpassFetch([{ status: 504, body: '' }, { body: { elements: GOLDEN_ELEMENTS } }]);
   const client = createOverpass({ fetchImpl, ...fakeWait() });

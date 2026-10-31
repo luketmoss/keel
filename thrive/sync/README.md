@@ -551,7 +551,18 @@ exactly what the sync writes.
 - **Flags.** `--dry-run` (reads the sheet only: no Drive, no network, no
   write), `--max-lookups 30`, `--max-minutes 20` (no new lookup after that),
   `--pause-ms 1000` (after each write), `--ids a,b`, `--restart` (deletes the
-  progress file), `--no-cache`.
+  progress file), `--no-cache`, `--attempt-timeout-s 120` and `--attempts 5`
+  (the patience below). Every number is whole and 1 or more (`--pause-ms`
+  0 or more).
+- **Patience (#697).** Unlike the sync, whose 3-minute run budget allows 45 s
+  attempts and 3 tries, the backfill waits for Overpass: 5 attempts per lookup,
+  each given 120 s by the client with a server `[timeout:90]` in the query (75%
+  of the client's, so the client never gives up first), and waits of 15 s, 60 s,
+  120 s and 180 s between them (the last repeats if `--attempts` is higher; no
+  wait is under the 5 s lookup spacing). `--attempt-timeout-s` sets the
+  client's limit and the server timeout follows it. These are `createOverpass`
+  options (`attemptTimeoutMs`, `serverTimeoutS`, `attempts`, `retryDelaysMs`)
+  that default to the sync's values, which the sync does not override.
 - **Pace and stopping.** One request at a time, at least 5 s apart; only real
   Overpass requests count toward `--max-lookups`. **The first lookup that fails
   all its attempts ends the run** (exit 1): that row is not written and nothing
@@ -561,7 +572,9 @@ exactly what the sync writes.
   remembers only the rows whose area is over 50 km (id, `track_ref`, matcher
   version), so they are not read again; `scripts/.backfill-689-cache/` keeps one
   file per complete Overpass answer for 30 days, so a matcher bump or a run
-  stopped before its write does not ask twice. The cache holds trail names, so
+  stopped before its write does not ask twice. A file is named by a hash of the
+  query with the sync's `[timeout:40]`, whatever timeout the run sends, so the
+  patience flags never change a key and earlier answers keep hitting. The cache holds trail names, so
   it is gitignored and nothing in it reaches a log line. Deleting either costs
   only time.
 - **Exit codes.** 0 when the run did what it set out to, including when it hit

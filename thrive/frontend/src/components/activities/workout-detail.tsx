@@ -24,7 +24,7 @@ import { DetailTitle } from './detail-title';
 import { DetailStats, hasStatsCard } from './detail-stats';
 import { ExternalGlyph, HistoryIcon, PencilLineIcon } from './detail-icons';
 import { TrailsCard } from '../trails/trails-card';
-import { RoutesLikeThis } from '../trails/routes-like-this';
+import { SimilarRoutes } from '../trails/similar-routes';
 import { ChoiceSheet, type StartMode } from '../workout/choice-sheet';
 
 interface Props {
@@ -230,9 +230,9 @@ export function WorkoutDetail({ workoutId }: Props) {
           <ElevationProfile track={trackState.track} ascentM={workout.ascent_m} />
         )}
 
-        {/* #682: the activity's trails and the activities on routes like it; demo mode only for now. */}
+        {/* #682: the activity's trails (demo mode only for now), then #692's Routes like this and Near here. */}
         <TrailsCard workoutId={workoutId} />
-        <RoutesLikeThis workoutId={workoutId} />
+        <SimilarRoutes workout={workout} />
 
         {/* Planned workout: compact card view + footer actions */}
         {isPlanned &&

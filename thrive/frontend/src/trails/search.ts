@@ -26,13 +26,3 @@ export function searchTrails(groups: Iterable<TrailGroup>, query: string): Trail
     .filter((g) => [g.name, ...g.otherNames].some((v) => v.toLowerCase().includes(needle)))
     .sort((a, b) => lastWhen(b).localeCompare(lastWhen(a)) || a.name.localeCompare(b.name));
 }
-
-/** Routes like this: the activities a pair list puts beside `id`, as ids, in pair order. */
-export function pairedWith(pairs: readonly (readonly [string, string])[], id: string): string[] {
-  const out: string[] = [];
-  for (const [a, b] of pairs) {
-    const other = a === id ? b : b === id ? a : null;
-    if (other && other !== id && !out.includes(other)) out.push(other);
-  }
-  return out;
-}

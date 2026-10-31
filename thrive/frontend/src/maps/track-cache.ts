@@ -17,11 +17,14 @@ import type { WorkoutTrack } from '../api/types';
 export const MAX_IN_FLIGHT = 2;
 
 const cache = new Map<string, WorkoutTrack>();
-const inFlight = new Map<string, Promise<WorkoutTrack>>();
+// `keep` is true when any asker wants the track held for the session (#692): the similar-routes index
+// asks with keep false, so 600 tracks are not held, while a viewed activity's track still is.
+const inFlight = new Map<string, { promise: Promise<WorkoutTrack>; keep: boolean }>();
 
 interface Waiting {
   id: string;
   token: string | null;
+  keep: boolean;
   resolve: (track: WorkoutTrack) => void;
   reject: (err: unknown) => void;
 }
@@ -42,11 +45,15 @@ export function getCachedTrack(workoutId: string): WorkoutTrack | undefined {
   return cache.get(workoutId);
 }
 
-async function load(workoutId: string, token: string | null): Promise<WorkoutTrack> {
+async function load(workoutId: string, token: string | null, keep: boolean): Promise<WorkoutTrack> {
   const cached = cache.get(workoutId);
   if (cached) return cached;
   const pending = inFlight.get(workoutId);
-  if (pending) return pending;
+  if (pending) {
+    if (keep) pending.keep = true;
+    return pending.promise;
+  }
+  const slot = { promise: null as unknown as Promise<WorkoutTrack>, keep };
 
   const run = (async () => {
     let track: WorkoutTrack;
@@ -59,10 +66,11 @@ async function load(workoutId: string, token: string | null): Promise<WorkoutTra
       if (!out.ok) throw new Error(out.kind);
       track = out.track;
     }
-    cache.set(workoutId, track);
+    if (slot.keep) cache.set(workoutId, track);
     return track;
   })();
-  inFlight.set(workoutId, run);
+  slot.promise = run;
+  inFlight.set(workoutId, slot);
   try {
     return await run;
   } finally {
@@ -74,7 +82,7 @@ function pump(): void {
   while (running < MAX_IN_FLIGHT && queue.length > 0) {
     const next = queue.shift()!;
     running += 1;
-    load(next.id, next.token)
+    load(next.id, next.token, next.keep)
       .then(next.resolve, next.reject)
       .finally(() => {
         running -= 1;
@@ -90,13 +98,13 @@ export interface TrackRequest {
 }
 
 /** Ask for a track. A cached one resolves at once and never takes a slot. */
-export function requestTrack(workoutId: string, token: string | null): TrackRequest {
+export function requestTrack(workoutId: string, token: string | null, options: { keep?: boolean } = {}): TrackRequest {
   const cached = cache.get(workoutId);
   if (cached) return { promise: Promise.resolve(cached), cancel: () => {} };
 
   let entry!: Waiting;
   const promise = new Promise<WorkoutTrack>((resolve, reject) => {
-    entry = { id: workoutId, token, resolve, reject };
+    entry = { id: workoutId, token, keep: options.keep !== false, resolve, reject };
   });
   queue.push(entry);
   pump();

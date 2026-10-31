@@ -4,6 +4,7 @@ import { createAuthSession } from '@keel/auth';
 import { AuthContext, type AuthState } from './auth-context';
 import type { UserInfo } from '../api/types';
 import { isDemo } from '../api/demo-data';
+import { clearSimilarIndex } from '../state/similar-routes';
 
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const SCOPES = 'https://www.googleapis.com/auth/spreadsheets openid email profile';
@@ -58,7 +59,11 @@ function LiveAuthProvider({ children }: Props) {
         user: state.user,
         isAuthenticated: !!state.token,
         login: session.login,
-        logout: session.logout,
+        logout: () => {
+          // #692: the saved map cells go with the session.
+          clearSimilarIndex();
+          session.logout();
+        },
         rememberedUser: state.rememberedUser,
         ready: state.ready,
         renewing: state.renewing,

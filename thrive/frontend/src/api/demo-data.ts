@@ -9,6 +9,7 @@ import type {
   WorkoutWithRow,
   SetWithRow,
 } from './types';
+import { DEMO_TRACKS } from './demo-track';
 import type { DailyHealthRow, BodyMeasurementRow, DailySummaryRow } from './health-api';
 import { colorKeyFromName } from './label-colors';
 import type { SyncLogEntryWithRow } from './sync-log-api';
@@ -760,7 +761,7 @@ const DEMO_CASES: WorkoutWithRow[] = [
     track_ref: 'demo-track-ride',
     sheetRow: 12,
   }),
-  // A bike ride with a distance and no track: something to measure, nothing to draw.
+  // A bike ride with a distance and a track since #692 (a 20 m shift of the ride above).
   demoRow({
     id: 'w_demo012',
     offset: -9,
@@ -775,7 +776,26 @@ const DEMO_CASES: WorkoutWithRow[] = [
     descent_m: '405',
     avg_hr: '139',
     sub_type: 'outdoor',
+    track_ref: 'demo-track-w_demo012',
     sheetRow: 13,
+  }),
+  // A bike ride with a distance and no track: something to measure, nothing to draw (Gravel Loop has a track
+  // since #692, so Routes like this has a second ride to find).
+  demoRow({
+    id: 'w_demo038',
+    offset: -10,
+    type: 'bike',
+    name: 'Dirt Road Spin',
+    time: '12:30',
+    elapsed_seconds: '3600',
+    moving_seconds: '3400',
+    effort: 'Easy',
+    distance_m: '18000',
+    ascent_m: '160',
+    descent_m: '158',
+    avg_hr: '131',
+    sub_type: 'outdoor',
+    sheetRow: 39,
   }),
   // A stretch with neither a note nor an effort.
   demoRow({
@@ -895,9 +915,12 @@ function demoHistory(): WorkoutWithRow[] {
     const k = Math.floor(i / HISTORY_TYPES.length);
     const n = i + 1;
     const cardio = type in HISTORY_METERS;
+    const id = `w_demo${String(21 + i).padStart(3, '0')}`;
     rows.push(
       demoRow({
-        id: `w_demo${String(21 + i).padStart(3, '0')}`,
+        id,
+        // #692: the history rows with a bundled variant track (demo-track.ts) have a route.
+        track_ref: id in DEMO_TRACKS ? `demo-track-${id}` : '',
         offset: -21 - 5 * i,
         type,
         name: HISTORY_NAMES[type][k % 3],

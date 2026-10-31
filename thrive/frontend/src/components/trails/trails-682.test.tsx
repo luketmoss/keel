@@ -21,7 +21,7 @@ vi.mock('../../router/router', async (orig) => ({
 }));
 
 import { DEMO_WORKOUTS, shiftDemoWorkouts } from '../../api/demo-data';
-import { DEMO_ROUTE_PAIRS, DEMO_TRAIL_ACTIVITIES } from '../../api/demo-trails';
+import { DEMO_TRAIL_ACTIVITIES } from '../../api/demo-trails';
 import { workouts, activitiesMonth, filterType } from '../../state/store';
 import { trailIndex, trailQuery } from '../../state/trails';
 import { titleFor } from '../../router/document-title';
@@ -65,7 +65,6 @@ describe('the demo fixture', () => {
       expect(w!.status).toBe('');
       expect(['bike', 'hike']).toContain(w!.type);
     }
-    for (const [a, b] of DEMO_ROUTE_PAIRS) expect(byId.has(a) && byId.has(b)).toBe(true);
   });
 
   it('contains every case the screens have to show', () => {
@@ -163,22 +162,6 @@ describe('AC2/AC3/AC7: the Trails card in demo mode', () => {
   });
 });
 
-describe('AC6: Routes like this', () => {
-  it('shows up to 3 paired activity cards, newest first, each opening its activity', () => {
-    render(h(WorkoutDetail, { workoutId: 'w_demo011' }));
-    const section = screen.getByRole('heading', { name: 'Routes like this' }).closest('section')!;
-    const cards = section.querySelectorAll<HTMLButtonElement>('.activity-card');
-    expect([...cards].map((c) => c.getAttribute('data-focus-key'))).toEqual(['workout:w_demo012', 'workout:w_demo034']);
-    fireEvent.click(cards[0]);
-    expect(navigate).toHaveBeenCalledWith('/history/w_demo012');
-  });
-
-  it('shows no section on an activity with no pairs', () => {
-    render(h(WorkoutDetail, { workoutId: 'w_demo028' }));
-    expect(screen.queryByText('Routes like this')).toBeNull();
-  });
-});
-
 describe('AC1/AC4/AC8: the Trail screen', () => {
   it('answers when it was last done and how it compared', () => {
     render(h(TrailScreen, { trailKey: 'juniper ridge' }));
@@ -271,11 +254,10 @@ describe('AC9: production untouched — demo mode off', () => {
     expect(trailIndex.value).toBeNull();
   });
 
-  it('shows no Trails card and no Routes like this on activity detail', () => {
+  it('shows no Trails card on activity detail (Routes like this is no longer demo-only, #692)', () => {
     render(h(WorkoutDetail, { workoutId: 'w_demo011' }));
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Canyon Road Ride');
     expect(document.querySelector('.trail-card')).toBeNull();
-    expect(screen.queryByText('Routes like this')).toBeNull();
   });
 
   it('shows no trail search on Activities', () => {

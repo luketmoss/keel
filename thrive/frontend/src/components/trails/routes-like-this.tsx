@@ -1,12 +1,13 @@
-// Routes like this (#682): up to 3 of #528's activity cards for the activities
-// the trail source pairs with this one. Not on a card.
+// Routes like this (#682, real rule in #692): up to 3 of #528's activity cards for
+// the activities whose grid cells cover most of this one's, and are covered by it.
+// Not on a card.
 
-import { routesLikeThis } from '../../state/trails';
+import { similarFor } from '../../state/similar-routes';
 import { ActivityCard } from '../activities/activity-card';
 import { toLocalDateStr } from '../activities/activities-helpers';
 
 export function RoutesLikeThis({ workoutId }: { workoutId: string }) {
-  const similar = routesLikeThis(workoutId);
+  const similar = similarFor(workoutId).routes;
   if (similar.length === 0) return null;
   const todayStr = toLocalDateStr(new Date());
   return (

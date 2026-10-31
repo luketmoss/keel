@@ -150,3 +150,27 @@ export function NoSignalIcon() {
     </Icon>
   );
 }
+
+/** A row that opens another screen (#682): a chevron pointing right. */
+export function ChevronRightIcon() {
+  return (
+    <Icon>
+      <path d="M9 5l7 7-7 7" />
+    </Icon>
+  );
+}
+
+/** An arrow out of a box: "opens elsewhere" (#260). Decorative; sized to the text. */
+export function ExternalGlyph() {
+  return (
+    <svg class="detail-coros-link-glyph" viewBox="0 0 12 12" fill="none" aria-hidden="true" focusable="false">
+      <path
+        d="M7 1.5h3.5V5M10.5 1.5 5.5 6.5M9 7.5v2.25c0 .41-.34.75-.75.75h-6a.75.75 0 0 1-.75-.75v-6c0-.41.34-.75.75-.75H4.5"
+        stroke="currentColor"
+        stroke-width="1.25"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+    </svg>
+  );
+}

@@ -87,6 +87,7 @@ const FAMILIES = {
     'lift-set-btn',
     'lift-choice-card',
     'tpl-row-btn',
+    'trail-link',
   ],
   Navigation: ['bottom-nav-tab'],
   Fields: ['form-input', 'form-select', 'form-textarea'],

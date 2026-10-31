@@ -9,6 +9,7 @@
 import { useEffect, useLayoutEffect } from 'preact/hooks';
 import { currentRoute, type ParsedRoute, type RouteName } from './router';
 import { workouts, templates } from '../state/store';
+import { trailIndex } from '../state/trails';
 import { shortDate } from '../day/format';
 import { monthTitle } from '../calendar/dates';
 
@@ -16,6 +17,8 @@ import { monthTitle } from '../calendar/dates';
 export interface TitleLookups {
   workout(id: string): { name: string; type: string } | undefined;
   template(id: string): { name: string } | undefined;
+  /** A trail group by key (#682); absent outside demo mode. */
+  trail?(key: string): { name: string } | undefined;
 }
 
 export const TITLE_SUFFIX = ' — Thrive';
@@ -84,6 +87,8 @@ export function titleFor(route: Pick<ParsedRoute, 'name' | 'params'>, lookups: T
         const n = workoutName();
         return n ? `Edit ${n}` : 'Workout';
       }
+      case 'trail':
+        return clean(lookups.trail?.(route.params.key ?? '')?.name) || 'Trail not found';
       default:
         return unreachable(name);
     }
@@ -101,9 +106,11 @@ export function useDocumentTitle(): void {
   const route = currentRoute.value;
   const ws = workouts.value;
   const ts = templates.value;
+  const trails = trailIndex.value;
   const title = titleFor(route, {
     workout: (id) => ws.find((w) => w.id === id),
     template: (id) => ts.find((t) => t.id === id),
+    trail: (key) => trails?.groups.get(key),
   });
   useLayoutEffect(() => {
     document.title = title;

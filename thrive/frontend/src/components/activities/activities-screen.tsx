@@ -25,6 +25,8 @@ import {
   upNextOrder,
   weekTotals,
 } from './activities-helpers';
+import { trailQuery } from '../../state/trails';
+import { TrailResults, TrailSearchField, trailSearchActive } from '../trails/trail-search';
 
 /** The list's empty line, by what is limiting it. */
 function emptyLine(month: string, currentMonth: string): string {
@@ -48,6 +50,8 @@ export function ActivitiesScreen() {
   const groups = groupWorkoutsByWeek(monthWorkouts, todayStr);
   const isCurrent = month === currentMonth;
   const upNext = upNextOrder(plannedWorkouts.value);
+  // #682: while a trail search is active, its results take the place of everything under the field.
+  const searching = trailSearchActive();
 
   return (
     <div class="screen activities-screen">
@@ -57,90 +61,99 @@ export function ActivitiesScreen() {
           options={options}
           onChoose={(ym) => {
             activitiesMonth.value = ym;
+            trailQuery.value = '';
           }}
         />
         <h1 class="day-title">Activities</h1>
       </header>
 
-      <TypeChips tagsOpen={showTags} onToggleTags={() => setShowTags(!showTags)} tagsId="activities-tag-filters" />
-      {showTags && <ActivitiesFilters id="activities-tag-filters" />}
+      <TrailSearchField />
 
-      <MonthSummary
-        month={month}
-        currentMonth={currentMonth}
-        workouts={monthWorkouts}
-        type={filterType.value}
-        tagsActive={filterTags.value.length > 0}
-        loading={loading.value}
-      />
+      {searching ? (
+        <TrailResults />
+      ) : (
+        <>
+          <TypeChips tagsOpen={showTags} onToggleTags={() => setShowTags(!showTags)} tagsId="activities-tag-filters" />
+          {showTags && <ActivitiesFilters id="activities-tag-filters" />}
 
-      {/* In Progress — tap to resume the active workout. Current month only (#528). */}
-      {isCurrent && activeWorkouts.value.length > 0 && (
-        <div class="planned-section">
-          <div class="date-group-header first">In Progress</div>
-          {activeWorkouts.value.map((w) => (
-            <button
-              type="button"
-              key={w.id}
-              data-focus-key={`workout:${w.id}`}
-              class="workout-card workout-card-active"
-              onClick={() => navigate(`/workout/${w.id}`)}
-              aria-label={`${w.name || w.type}, in progress. Resume workout.`}
-            >
-              <div class="workout-card-center">
-                <span class="workout-name">{w.name || w.type}</span>
-                <span class="workout-meta">Tap to resume</span>
-              </div>
-              <span class="type-badge badge-active">Active</span>
-            </button>
-          ))}
-        </div>
-      )}
+          <MonthSummary
+            month={month}
+            currentMonth={currentMonth}
+            workouts={monthWorkouts}
+            type={filterType.value}
+            tagsActive={filterTags.value.length > 0}
+            loading={loading.value}
+          />
 
-      {/* Up next — plans for today or later, and overdue ones. Current month only. */}
-      {isCurrent && upNext.length > 0 && (
-        <section class="up-next" aria-labelledby="up-next-title">
-          <div class="week-heading">
-            <h2 id="up-next-title">Up next</h2>
-            <span class="week-totals">{upNext.length} planned</span>
-          </div>
-          <div class="up-next-row">
-            {upNext.map((w) => {
-              const workoutSets = sets.value.filter((s) => s.workout_id === w.id);
-              const exerciseCount = new Set(workoutSets.map((s) => `${s.exercise_id}__${s.exercise_order}`)).size;
-              return (
-                <UpNextCard
+          {/* In Progress — tap to resume the active workout. Current month only (#528). */}
+          {isCurrent && activeWorkouts.value.length > 0 && (
+            <div class="planned-section">
+              <div class="date-group-header first">In Progress</div>
+              {activeWorkouts.value.map((w) => (
+                <button
+                  type="button"
                   key={w.id}
-                  workout={w}
-                  todayStr={todayStr}
-                  exerciseCount={exerciseCount}
-                  setCount={workoutSets.length}
-                />
-              );
-            })}
-          </div>
-        </section>
-      )}
+                  data-focus-key={`workout:${w.id}`}
+                  class="workout-card workout-card-active"
+                  onClick={() => navigate(`/workout/${w.id}`)}
+                  aria-label={`${w.name || w.type}, in progress. Resume workout.`}
+                >
+                  <div class="workout-card-center">
+                    <span class="workout-name">{w.name || w.type}</span>
+                    <span class="workout-meta">Tap to resume</span>
+                  </div>
+                  <span class="type-badge badge-active">Active</span>
+                </button>
+              ))}
+            </div>
+          )}
 
-      <div class="screen-body">
-        {!loading.value && monthWorkouts.length === 0 ? (
-          <p class="activities-empty">{emptyLine(month, currentMonth)}</p>
-        ) : (
-          <div class="workout-list">
-            {groups.map((group) => (
-              <section key={group.monday} class="week-group" aria-labelledby={`week-${group.monday}`}>
-                <div class="week-heading">
-                  <h2 id={`week-${group.monday}`}>{group.label}</h2>
-                  <span class="week-totals">{weekTotals(group.workouts)}</span>
-                </div>
-                {group.workouts.map((w) => (
-                  <ActivityCard key={w.id} workout={w} todayStr={todayStr} />
+          {/* Up next — plans for today or later, and overdue ones. Current month only. */}
+          {isCurrent && upNext.length > 0 && (
+            <section class="up-next" aria-labelledby="up-next-title">
+              <div class="week-heading">
+                <h2 id="up-next-title">Up next</h2>
+                <span class="week-totals">{upNext.length} planned</span>
+              </div>
+              <div class="up-next-row">
+                {upNext.map((w) => {
+                  const workoutSets = sets.value.filter((s) => s.workout_id === w.id);
+                  const exerciseCount = new Set(workoutSets.map((s) => `${s.exercise_id}__${s.exercise_order}`)).size;
+                  return (
+                    <UpNextCard
+                      key={w.id}
+                      workout={w}
+                      todayStr={todayStr}
+                      exerciseCount={exerciseCount}
+                      setCount={workoutSets.length}
+                    />
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          <div class="screen-body">
+            {!loading.value && monthWorkouts.length === 0 ? (
+              <p class="activities-empty">{emptyLine(month, currentMonth)}</p>
+            ) : (
+              <div class="workout-list">
+                {groups.map((group) => (
+                  <section key={group.monday} class="week-group" aria-labelledby={`week-${group.monday}`}>
+                    <div class="week-heading">
+                      <h2 id={`week-${group.monday}`}>{group.label}</h2>
+                      <span class="week-totals">{weekTotals(group.workouts)}</span>
+                    </div>
+                    {group.workouts.map((w) => (
+                      <ActivityCard key={w.id} workout={w} todayStr={todayStr} />
+                    ))}
+                  </section>
                 ))}
-              </section>
-            ))}
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </>
+      )}
 
       <button class="fab" onClick={() => navigate('/workout/new')} aria-label="Start workout">
         +

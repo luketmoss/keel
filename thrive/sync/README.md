@@ -532,6 +532,64 @@ nothing in the log does either. The run's log gets one counts-only line, in
 summary mode too:
 `Trails: <a> tagged, <b> no named trail, <c> too large, <d> failed, <e> deferred.`
 
+## Backfilling trails (#689)
+
+The sync's trail step tags the last 10 days and only from the day it shipped.
+`scripts/backfill-689-workouts-trails.mjs` tags the older rows, and re-tags rows
+after a `TRAILS_MATCHER_VERSION` bump. It is hand-run (never from CI or a
+schedule), uses the sync's own Overpass client, matcher and encoder, and writes
+exactly what the sync writes.
+
+- **Which rows.** Every row with a `track_ref`, whatever its `source`
+  (`garmin_import` included). A blank `trails` is tagged; a valid v1 value from
+  an older matcher is re-tagged (a failed re-tag leaves the old value); a value
+  from the current matcher is skipped; one from a newer matcher is counted and
+  left alone; anything else is listed as unreadable and never overwritten.
+  Newest first, ties by id. It reads the track from Drive by `track_ref`: no
+  COROS call. A COROS row it tags is also recorded in its archive file as the
+  sync does, so a later sync run makes no request for it.
+- **Flags.** `--dry-run` (reads the sheet only: no Drive, no network, no
+  write), `--max-lookups 30`, `--max-minutes 20` (no new lookup after that),
+  `--pause-ms 1000` (after each write), `--ids a,b`, `--restart` (deletes the
+  progress file), `--no-cache`.
+- **Pace and stopping.** One request at a time, at least 5 s apart; only real
+  Overpass requests count toward `--max-lookups`. **The first lookup that fails
+  all its attempts ends the run** (exit 1): that row is not written and nothing
+  is remembered about it, so the next run tries it again. A failed or partial
+  answer is never written as "no trails".
+- **Local files, both gitignored.** `scripts/.backfill-689-progress.json`
+  remembers only the rows whose area is over 50 km (id, `track_ref`, matcher
+  version), so they are not read again; `scripts/.backfill-689-cache/` keeps one
+  file per complete Overpass answer for 30 days, so a matcher bump or a run
+  stopped before its write does not ask twice. The cache holds trail names, so
+  it is gitignored and nothing in it reaches a log line. Deleting either costs
+  only time.
+- **Exit codes.** 0 when the run did what it set out to, including when it hit
+  the cap or the time limit; 1 when the API is not ready, a write failed or read
+  back different, or a lookup failed all its attempts.
+- **Output** is workout ids and counts only. A closing `Trails: <a> tagged, ...
+  <f> cached answers used.` line is followed by `Left: <n>. Re-run to continue.`
+  or `Nothing to do.`, and a `NOT TAGGED` list gives each row's reason.
+- **Order.** After #688 is merged and deployed (`migrate-688-workouts-trails.mjs`
+  run, the Apps Script version published) and one sync run has completed. The
+  script refuses to run when `getWorkouts` does not return `trails`. Do not run
+  it during a scheduled sync run (`updateWorkout` takes no script lock).
+
+From `thrive\`, in Windows PowerShell 5.1:
+
+```powershell
+$env:THRIVE_API_URL = Read-Host 'THRIVE_API_URL'
+$key = Read-Host 'THRIVE_API_KEY' -AsSecureString
+$env:THRIVE_API_KEY = [System.Net.NetworkCredential]::new('', $key).Password
+node scripts/backfill-689-workouts-trails.mjs --dry-run
+node scripts/backfill-689-workouts-trails.mjs --max-lookups 1
+node scripts/backfill-689-workouts-trails.mjs
+```
+
+Repeat the last until it prints `Nothing to do.` If it stops with "Overpass is
+struggling", wait a while and run it again. After a matcher bump, run the
+`--dry-run` and the plain command again.
+
 ## Schedule, SyncLog and the dead-man's switch (#156)
 
 **Four runs a day**, `17 9,13,18,0 * * *`: 03:17, 07:17, 12:17 and 18:17 MDT,

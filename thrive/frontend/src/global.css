@@ -51,6 +51,8 @@
   --text-2xs: 0.625rem;
   --day-gap: 0.75rem;
   --drink-bar-height: 6px;
+  /* A trail pass's position bar (#682). Equal to the drink bar today, but they change for different reasons. */
+  --trail-bar-height: 6px;
   --range-track: var(--color-border-light);
   --range-band: var(--color-border);
   --range-marker: var(--color-text);
@@ -5022,6 +5024,279 @@ input, select, textarea {
   outline-offset: 2px;
 }
 
+/* ===== Trails (#682) =====
+   Demo mode only for now: the Trails card and Routes like this on activity detail, the Trail screen,
+   and trail search on Activities. Cards are #531's; rows are 44px buttons in the Rows and cards family. */
+.trail-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+}
+
+.trail-card-header,
+.trail-section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.trail-card-title,
+.trail-section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.trail-card-title svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--color-primary-text);
+}
+
+.trail-card-aside {
+  flex: none;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* One trail group on the card, set off from the one before by a hairline. */
+.trail-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.trail-block + .trail-block {
+  margin-top: var(--space-xs);
+  padding-top: calc(var(--space-sm) + var(--space-xs));
+  border-top: 1px solid var(--color-border-light);
+}
+
+.trail-link {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--text-base);
+  text-align: left;
+  cursor: pointer;
+}
+
+.trail-link > svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--color-text-secondary);
+}
+
+.trail-link-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.trail-link-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.trail-link-meta,
+.trail-activity-meta {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+/* The activity row on the Trail screen: type icon, name, then passes (and the date, in Every time). */
+.trail-activity {
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-sm);
+}
+
+.trail-activity-icon {
+  display: inline-flex;
+  flex: none;
+}
+
+.trail-activity-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.trail-activity-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* A pass: the position bar, its line, and its comparison. */
+.trail-pass {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.trail-pass + .trail-pass {
+  margin-top: var(--space-sm);
+}
+
+.trail-bar {
+  position: relative;
+  height: var(--trail-bar-height);
+  margin: calc(var(--trail-bar-height) / 2) 0 var(--space-xs);
+  border-radius: var(--radius-full);
+  background: var(--range-track);
+}
+
+.trail-bar-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+}
+
+/* A triangle twice the bar's height at the end the pass finished, pointing the way it went. */
+.trail-bar-arrow {
+  position: absolute;
+  top: 50%;
+  width: 0;
+  height: 0;
+  border-top: var(--trail-bar-height) solid transparent;
+  border-bottom: var(--trail-bar-height) solid transparent;
+}
+
+.trail-bar-arrow-forward {
+  border-left: var(--trail-bar-height) solid var(--color-primary);
+  transform: translate(-100%, -50%);
+}
+
+.trail-bar-arrow-reverse {
+  border-right: var(--trail-bar-height) solid var(--color-primary);
+  transform: translate(0, -50%);
+}
+
+.trail-pass-line,
+.trail-pass-compare {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.trail-pass-line {
+  color: var(--color-text);
+}
+
+.trail-pass-compare {
+  color: var(--color-text-secondary);
+}
+
+.trail-card-footer {
+  margin-top: var(--space-xs);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--color-border-light);
+}
+
+.trail-unmatched {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.trail-credit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 0.25em;
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.trail-credit .detail-coros-link {
+  font-size: inherit;
+}
+
+/* Routes like this: a heading and #528's cards, not on a card. */
+.trail-routes .trail-section-title {
+  margin-bottom: var(--space-sm);
+}
+
+.trail-routes-list,
+.trail-visits,
+.trail-result-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+/* The Trail screen's title tile: the trail icon on the brand tint. */
+.trail-tile {
+  background: var(--color-primary-light);
+  color: var(--color-primary-on-light);
+}
+
+.trail-every {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+/* Activities: the search field between the header and the type chips, and its results. */
+.trail-search {
+  margin-bottom: var(--space-sm);
+}
+
+.trail-search .search-input {
+  padding-right: 48px;
+}
+
+.trail-search .search-input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.trail-search-clear {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  color: var(--color-text-secondary);
+}
+
+.trail-results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.trail-result {
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+}
+
+.trail-no-match {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
 /* ===== Last Synced (#157) ===== */
 /* Right-aligned in the vendor row's value side (#643). */
 .sync-status {
@@ -8953,6 +9228,7 @@ body:has(.lift) {
   .lift-set-btn:hover:not(:disabled):not([aria-disabled="true"]),
   .lift-choice-card:hover:not(:disabled):not([aria-disabled="true"]),
   .tpl-row-btn:hover:not(:disabled):not([aria-disabled="true"]),
+  .trail-link:hover:not(:disabled):not([aria-disabled="true"]),
   /* Navigation */
   .bottom-nav-tab:hover:not(:disabled):not([aria-disabled="true"]) {
     background-image: linear-gradient(var(--state-hover), var(--state-hover));
@@ -9028,6 +9304,7 @@ a.workout-card:active:not(:disabled):not([aria-disabled="true"]),
 .lift-set-btn:active:not(:disabled):not([aria-disabled="true"]),
 .lift-choice-card:active:not(:disabled):not([aria-disabled="true"]),
 .tpl-row-btn:active:not(:disabled):not([aria-disabled="true"]),
+.trail-link:active:not(:disabled):not([aria-disabled="true"]),
 /* Navigation */
 .bottom-nav-tab:active:not(:disabled):not([aria-disabled="true"]) {
   background-image: linear-gradient(var(--state-pressed), var(--state-pressed));

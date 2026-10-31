@@ -22,26 +22,13 @@ import { ElevationProfile } from './elevation-profile';
 import { DetailTopBar } from './detail-top-bar';
 import { DetailTitle } from './detail-title';
 import { DetailStats, hasStatsCard } from './detail-stats';
-import { HistoryIcon, PencilLineIcon } from './detail-icons';
+import { ExternalGlyph, HistoryIcon, PencilLineIcon } from './detail-icons';
+import { TrailsCard } from '../trails/trails-card';
+import { RoutesLikeThis } from '../trails/routes-like-this';
 import { ChoiceSheet, type StartMode } from '../workout/choice-sheet';
 
 interface Props {
   workoutId: string;
-}
-
-/** An arrow out of a box: "opens elsewhere". Decorative; sized to the text. */
-function ExternalGlyph() {
-  return (
-    <svg class="detail-coros-link-glyph" viewBox="0 0 12 12" fill="none" aria-hidden="true" focusable="false">
-      <path
-        d="M7 1.5h3.5V5M10.5 1.5 5.5 6.5M9 7.5v2.25c0 .41-.34.75-.75.75h-6a.75.75 0 0 1-.75-.75v-6c0-.41.34-.75.75-.75H4.5"
-        stroke="currentColor"
-        stroke-width="1.25"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
-    </svg>
-  );
 }
 
 /** Find the most recent previous workout with the same template/name (for "last time" reference). */
@@ -242,6 +229,10 @@ export function WorkoutDetail({ workoutId }: Props) {
         {trackState.status === 'ready' && trackState.track && (
           <ElevationProfile track={trackState.track} ascentM={workout.ascent_m} />
         )}
+
+        {/* #682: the activity's trails and the activities on routes like it; demo mode only for now. */}
+        <TrailsCard workoutId={workoutId} />
+        <RoutesLikeThis workoutId={workoutId} />
 
         {/* Planned workout: compact card view + footer actions */}
         {isPlanned &&

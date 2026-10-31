@@ -24,6 +24,7 @@ import { DayScreen } from './components/day/day-screen';
 import { CalendarScreen } from './components/calendar/calendar-screen';
 import { TrendsScreen } from './components/trends/trends-screen';
 import { ManageLabelsScreen } from './components/settings/manage-labels-screen';
+import { TrailScreen } from './components/trails/trail-screen';
 
 function Router() {
   const route = currentRoute.value;
@@ -58,6 +59,8 @@ function Router() {
       return <ManageLabelsScreen />;
     case 'settings':
       return <SettingsScreen />;
+    case 'trail':
+      return <TrailScreen trailKey={route.params.key} />;
     default:
       return <DayScreen />;
   }

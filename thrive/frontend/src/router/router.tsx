@@ -25,6 +25,7 @@ export const ROUTE_NAMES = [
   'exercises',
   'settings',
   'manage-labels',
+  'trail',
 ] as const;
 
 export type RouteName = (typeof ROUTE_NAMES)[number];
@@ -45,6 +46,15 @@ export interface ParsedRoute {
 const LINKABLE_GROUPS: ReadonlySet<string> = new Set(
   TREND_GROUPS.filter((g) => g.id !== CUSTOM_GROUP_ID).map((g) => g.id),
 );
+
+/** A trail key from its URL form; a malformed escape is kept as written. */
+function decodeKey(raw: string): string {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
 
 function parseHash(hash: string): ParsedRoute {
   const full = hash.replace(/^#/, '') || '/';
@@ -114,6 +124,11 @@ function parseHash(hash: string): ParsedRoute {
     return { name: 'trends', params: date === null ? { group: match[1] } : { group: match[1], date }, hash: full };
   }
   if (path.startsWith('/trends/')) return { name: 'trends', params: {}, hash: '/trends', badTrends: true };
+
+  // /trail/<key> (#682): one trail's screen. The key is passed through decoded; the screen
+  // decides whether it names a trail, and outside demo mode none does.
+  match = path.match(/^\/trail\/([^/]+)$/);
+  if (match) return { name: 'trail', params: { key: decodeKey(match[1]) }, hash: path };
 
   // /activities (#235): the list that used to live at `/`
   if (path === '/activities') return { name: 'activities', params: {}, hash: path };

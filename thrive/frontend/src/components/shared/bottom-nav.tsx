@@ -20,6 +20,7 @@ const TAB_FOR_ROUTE: Record<string, string> = {
   'workout-new': 'activities',
   'workout-active': 'activities',
   'workout-lift': 'activities',
+  trail: 'activities', // #682: a trail is reached from Activities and activity detail
   templates: 'library',
   'template-new': 'library',
   'template-detail': 'library',

@@ -200,3 +200,12 @@ export function TableIcon() {
     </Icon>
   );
 }
+
+/** Trail (#682): a winding path from the bottom left to the top right, with two bends. */
+export function TrailIcon() {
+  return (
+    <Icon>
+      <path d="M3 21c6 0 3-8 9-9s3-9 9-9" />
+    </Icon>
+  );
+}

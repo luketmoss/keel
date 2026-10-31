@@ -65,7 +65,7 @@ fix. Fixed text, no stack trace.
 | Unknown line | `prep beef: no ingredient line L99` |
 | Non-optional line never used | `line L5 (canola oil): never used in any prep group or cook step` |
 | Unknown prep id | `cook brown: no prep group "beff"` |
-| Prep group used before made | `cook veg-in "Add the vegetables": uses prep veg, which is only made during simmer, a later step` |
+| Prep group used before made | `cook bloom "Cook the flavor base": uses prep veg, which is only made during simmer, a later step` |
 | Prep group used twice | `cook finish "Thicken and finish": prep beef was already used in cook brown` |
 | Prep made, never used | `prep wine "Measure the wine": made but never used in a cook step` |
 | Waiting group not listed | `prep thicken "Mix the thickener": its wait step veg-in doesn't list it under meanwhile` |

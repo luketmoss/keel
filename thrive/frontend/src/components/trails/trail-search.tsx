@@ -3,7 +3,8 @@
 
 import { useRef } from 'preact/hooks';
 import { navigate } from '../../router/router';
-import { trailIndex, trailQuery } from '../../state/trails';
+import { trailIndex, trailQuery, trailStates } from '../../state/trails';
+import { searchNote } from '../../trails/notes';
 import { trailPath } from '../../trails/groups';
 import { formatTrailDate, plural } from '../../trails/format';
 import { searchTerm, searchTrails } from '../../trails/search';
@@ -12,12 +13,13 @@ import { ChevronRightIcon, CloseIcon } from '../activities/detail-icons';
 
 /** True while the field holds a search: text that is not blank once trimmed. */
 export function trailSearchActive(): boolean {
-  return trailIndex.value !== null && searchTerm(trailQuery.value) !== null;
+  return trailIndex.value.groups.size > 0 && searchTerm(trailQuery.value) !== null;
 }
 
 export function TrailSearchField() {
   const input = useRef<HTMLInputElement>(null);
-  if (!trailIndex.value) return null;
+  // With no trail in the index there is nothing to search, and a field that always answers "No trails match" would mislead.
+  if (trailIndex.value.groups.size === 0) return null;
   const clear = () => {
     trailQuery.value = '';
     input.current?.focus();
@@ -67,9 +69,10 @@ export function TrailSearchField() {
 }
 
 export function TrailResults() {
-  const index = trailIndex.value;
-  const found = index ? searchTrails(index.groups.values(), trailQuery.value) : null;
+  const found = searchTrails(trailIndex.value.groups.values(), trailQuery.value);
   if (!found) return null;
+  const { untagged, unreadable } = trailStates.value;
+  const note = searchNote(untagged.length, unreadable);
   const today = toLocalDateStr(new Date());
   const term = searchTerm(trailQuery.value);
   return (
@@ -106,6 +109,7 @@ export function TrailResults() {
           })}
         </div>
       )}
+      {note && <p class="trail-untagged">{note}</p>}
     </section>
   );
 }

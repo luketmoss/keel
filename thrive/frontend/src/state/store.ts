@@ -20,6 +20,9 @@ export const templates = signal<Template[]>([]);
 export const workouts = signal<WorkoutWithRow[]>([]);
 export const sets = signal<SetWithRow[]>([]);
 export const loading = signal(true);
+// #690: the initial read failed (for any reason but sign-in). A failed background refresh keeps its data and
+// does not set it; a successful initial load clears it.
+export const loadFailed = signal(false);
 
 // Warmup exercise metadata (no sets — display only in tracker)
 export interface WarmupExerciseInfo {

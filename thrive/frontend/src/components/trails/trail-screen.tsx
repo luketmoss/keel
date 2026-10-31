@@ -1,11 +1,14 @@
 // The Trail screen (#682), `#/trail/<key>`: when the trail was last done and
-// how it compared, then every time on it. A key with no group, or any key
-// outside demo mode, is not found.
+// how it compared, then every time on it. A key with no group is not found, and
+// says so differently when the activities never loaded or some are not tagged (#690).
 
 import { goBack, navigate } from '../../router/router';
-import { completedWorkouts } from '../../state/store';
-import { trailIndex } from '../../state/trails';
+import { useAuth } from '../../auth/auth-context';
+import { loadInitialData } from '../../state/actions';
+import { completedWorkouts, loadFailed } from '../../state/store';
+import { trailIndex, trailStates } from '../../state/trails';
 import { formatTrailDate, plural } from '../../trails/format';
+import { notFoundNote, trailScreenNote } from '../../trails/notes';
 import type { TrailGroup, TrailVisit } from '../../trails/types';
 import { TYPE_ICONS } from '../activities/activities-filters';
 import { toLocalDateStr } from '../activities/activities-helpers';
@@ -53,13 +56,33 @@ function Visit({ group, visit, today, withDate }: VisitProps) {
 }
 
 export function TrailScreen({ trailKey }: { trailKey: string }) {
-  const group = trailIndex.value?.groups.get(trailKey);
+  const group = trailIndex.value.groups.get(trailKey);
+  const { untagged, unreadable } = trailStates.value;
+  const { token } = useAuth();
 
   if (!group || group.visits.length === 0) {
+    // The initial read failed: say so rather than "not found", which would claim the trail does not exist.
+    if (loadFailed.value) {
+      return (
+        <div class="screen">
+          <div class="empty-state">
+            <p>Couldn't load your activities, so trails can't be shown.</p>
+            <button class="btn btn-primary" onClick={() => token && void loadInitialData(token)}>
+              Try again
+            </button>
+            <button class="btn btn-secondary" onClick={() => navigate('/activities')}>
+              Back to Activities
+            </button>
+          </div>
+        </div>
+      );
+    }
+    const note = notFoundNote(untagged.length, unreadable);
     return (
       <div class="screen">
         <div class="empty-state">
           <p>Trail not found</p>
+          {note && <p class="trail-no-match">{note}</p>}
           <button class="btn btn-primary" onClick={() => navigate('/activities')}>
             Back to Activities
           </button>
@@ -71,6 +94,7 @@ export function TrailScreen({ trailKey }: { trailKey: string }) {
   const today = toLocalDateStr(new Date());
   const newestFirst = [...group.visits].reverse();
   const last = newestFirst[0];
+  const lastNote = trailScreenNote(untagged, unreadable, { id: last.activityId, date: last.date, time: last.time });
 
   return (
     <div class="screen workout-detail-screen trail-screen">
@@ -102,6 +126,7 @@ export function TrailScreen({ trailKey }: { trailKey: string }) {
           </div>
           <Visit group={group} visit={last} today={today} withDate={false} />
         </section>
+        {lastNote && <p class="trail-untagged">{lastNote}</p>}
 
         <section class="trail-every" aria-labelledby="trail-every-title">
           <div class="trail-section-header">

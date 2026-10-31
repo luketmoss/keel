@@ -1,5 +1,7 @@
-// Demo trail data (#682): passes for some of the demo bike rides and hikes, in
-// the per-pass shape #681's matcher produces, and the Routes like this pairs.
+// Demo trail data (#682, #690): passes for some of the demo bike rides and hikes, in
+// the per-pass shape #681's matcher produces. The demo has no source of its own:
+// `encodeTrailsCell` writes each activity as a `trails` cell (Workouts!AD, #688), and
+// `DEMO_WORKOUTS` carry them, so the real decoder and every state are exercised.
 //
 // Every trail name here is invented, and the fixture holds no date or
 // coordinate: passes hang off demo workout ids, whose dates `demo-data.ts`
@@ -14,6 +16,36 @@ export interface DemoTrailActivity {
   id: string;
   passes: TrailPass[];
   unmatchedM: number;
+  /** Passes left out to fit the column (`x`). */
+  omitted?: number;
+}
+
+/**
+ * An activity as the sync writes it to Workouts!AD (#688): `{"v":1,"m":1,"u","n","p"}`, with `x` last when
+ * passes were left out. Names are listed in the order first seen; a name's length is `lengths[name]`, else
+ * its longest pass.
+ */
+export function encodeTrailsCell(
+  a: { passes: TrailPass[]; unmatchedM: number; omitted?: number },
+  lengths: Record<string, number> = {},
+): string {
+  const names: string[] = [];
+  for (const p of a.passes) if (!names.includes(p.trail)) names.push(p.trail);
+  const n = names.map((name) => [
+    name,
+    lengths[name] ?? Math.max(0, ...a.passes.filter((p) => p.trail === name).map((p) => p.metres ?? 0)),
+  ]);
+  const p = a.passes.map((x) => [
+    names.indexOf(x.trail),
+    x.startPct,
+    x.endPct,
+    x.direction === 'forward' ? 1 : -1,
+    x.metres ?? 0,
+    x.durationS,
+    x.climbM,
+    x.entryOffsetS,
+  ]);
+  return JSON.stringify({ v: 1, m: 1, u: a.unmatchedM, n, p, ...(a.omitted ? { x: a.omitted } : {}) });
 }
 
 function pass(
@@ -49,13 +81,13 @@ export const DEMO_TRAIL_ACTIVITIES: DemoTrailActivity[] = [
     ],
     unmatchedM: 1931,
   },
-  // Gravel Loop: two laps of Juniper Ridge Trail, which never compare with each other, and Heron Loop.
+  // Gravel Loop: two laps of Juniper Ridge, which never compare with each other, and Heron Loop.
   {
     id: 'w_demo012',
     passes: [
-      pass('Juniper Ridge Trail', 0, 100, 951, 134, 312, 3205),
+      pass('Juniper Ridge', 0, 100, 951, 134, 312, 3205),
       pass('Heron Loop', 0, 100, 488, 41, 1290, 2140),
-      pass('Juniper Ridge Trail', 0, 100, 944, 134, 2405, 3212),
+      pass('Juniper Ridge', 0, 100, 944, 134, 2405, 3212),
     ],
     unmatchedM: 4820,
   },
@@ -80,7 +112,8 @@ export const DEMO_TRAIL_ACTIVITIES: DemoTrailActivity[] = [
     ],
     unmatchedM: 2410,
   },
-  // Climb Repeats (history): the oldest Juniper Ridge pass, a full one.
+  // Climb Repeats (history): the oldest Juniper Ridge pass, a full one, mapped as "Juniper Ridge Trail" (so it
+  // is the same group but not like-for-like with the later "Juniper Ridge" passes), and two short passes left out.
   {
     id: 'w_demo034',
     passes: [
@@ -88,6 +121,7 @@ export const DEMO_TRAIL_ACTIVITIES: DemoTrailActivity[] = [
       pass('Aspen Draw;Kestrel Connector', 0, 100, 47, 4, 1580, 161),
     ],
     unmatchedM: 3040,
+    omitted: 2,
   },
   // The demo hike "Ridge Trail" (the one with the bundled track), all on its trail.
   {
@@ -107,3 +141,16 @@ export const DEMO_TRAIL_ACTIVITIES: DemoTrailActivity[] = [
     unmatchedM: 120,
   },
 ];
+
+/**
+ * The `trails` cell of every demo workout that has one. Besides the tagged activities above:
+ * - w_demo021 and w_demo027, tracked and left blank: not tagged yet (both older than the newest Juniper Ridge ride);
+ * - w_demo033, tagged with no named trail: shows nothing and is not counted;
+ * - w_demo037, a cell the decoder rejects (an unknown version): "Trails couldn't be read".
+ * Every other demo workout keeps a blank cell, with no track behind it to tag.
+ */
+export const DEMO_TRAIL_CELLS: Record<string, string> = {
+  ...Object.fromEntries(DEMO_TRAIL_ACTIVITIES.map((a) => [a.id, encodeTrailsCell(a)])),
+  w_demo033: encodeTrailsCell({ passes: [], unmatchedM: 7340 }),
+  w_demo037: '{"v":2}',
+};

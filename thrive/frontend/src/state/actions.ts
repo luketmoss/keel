@@ -9,6 +9,7 @@ import {
   workouts,
   sets,
   loading,
+  loadFailed,
   activeWorkoutId,
   activeWorkoutSets,
   activeWarmupExercises,
@@ -164,11 +165,13 @@ export async function loadInitialData(token: string): Promise<void> {
     }
 
     initPendingCount();
+    loadFailed.value = false;
     loading.value = false;
   } catch (err) {
     if (isReauthFailure(err)) return; // auth-provider handles this
     console.error('Failed to load data:', err);
     showToast('Failed to load data', 'error');
+    loadFailed.value = true;
     loading.value = false;
   }
 }

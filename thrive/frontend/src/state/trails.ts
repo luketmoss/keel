@@ -1,34 +1,25 @@
-// Trail search's state (#682). The only trail source is the demo fixture, so a
-// signed-in session has none and shows no trail UI; #680's build adds a real one.
+// Trail search's state (#682, #690). The one trail source is the `trails` cell of
+// every completed activity (Workouts!AD, #688), read in demo mode and signed in
+// alike: the demo's workouts carry cells like real rows do. Trails ride in the
+// Workouts read, so they load and refresh with it; replacing `workouts` rebuilds
+// everything here.
 
 import { computed, signal } from '@preact/signals';
 import { completedWorkouts } from './store';
-import { isDemo } from '../api/demo-data';
-import { DEMO_TRAIL_ACTIVITIES, type DemoTrailActivity } from '../api/demo-trails';
 import { buildTrailIndex } from '../trails/groups';
+import { readTrailSource, type TrailSourceData } from '../trails/source';
 import type { TrailIndex } from '../trails/types';
 
-interface TrailSource {
-  activities: DemoTrailActivity[];
+/** Every completed activity's trails cell, read. */
+export function trailSource(): TrailSourceData {
+  return readTrailSource(completedWorkouts.value);
 }
 
-/** The trail data this session has: the demo fixture in demo mode, and nothing otherwise. */
-export function trailSource(): TrailSource | null {
-  return isDemo() ? { activities: DEMO_TRAIL_ACTIVITIES } : null;
-}
+/** Each activity's state, and the untagged and unreadable ones the notes count. */
+export const trailStates = computed(trailSource);
 
-/** Every completed activity's trails, grouped; null when there is no trail data. */
-export const trailIndex = computed<TrailIndex | null>(() => {
-  const source = trailSource();
-  if (!source) return null;
-  const byId = new Map(completedWorkouts.value.map((w) => [w.id, w]));
-  return buildTrailIndex(
-    source.activities.flatMap((a) => {
-      const w = byId.get(a.id);
-      return w ? [{ id: a.id, date: w.date, time: w.time, passes: a.passes, unmatchedM: a.unmatchedM }] : [];
-    }),
-  );
-});
+/** Every tagged activity's trails, grouped. Empty while nothing is tagged. */
+export const trailIndex = computed<TrailIndex>(() => buildTrailIndex(trailStates.value.activities));
 
 /** Activities' trail search text. A module signal, so it survives opening a trail and coming Back. */
 export const trailQuery = signal('');

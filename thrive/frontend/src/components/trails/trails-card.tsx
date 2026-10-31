@@ -2,7 +2,7 @@
 // each pass compared with the time before. Shown only when the activity has a pass.
 
 import { navigate } from '../../router/router';
-import { trailIndex } from '../../state/trails';
+import { trailIndex, trailStates } from '../../state/trails';
 import { trailPath } from '../../trails/groups';
 import { formatMiles, plural, showsUnmatched } from '../../trails/format';
 import { toLocalDateStr } from '../activities/activities-helpers';
@@ -13,10 +13,17 @@ import { TrailCredit } from './trail-credit';
 
 export function TrailsCard({ workoutId }: { workoutId: string }) {
   const index = trailIndex.value;
-  const trails = index?.byActivity.get(workoutId);
-  if (!index || !trails || trails.length === 0) return null;
+  const trails = index.byActivity.get(workoutId);
+  const state = trailStates.value.byId.get(workoutId);
+  if (!trails || trails.length === 0) {
+    // #690: where the answer is unknown, one line stands in the card's place.
+    if (state?.status === 'untagged') return <p class="trail-status">Trails not tagged yet</p>;
+    if (state?.status === 'unreadable') return <p class="trail-status">Trails couldn't be read</p>;
+    return null;
+  }
   const today = toLocalDateStr(new Date());
   const unmatched = index.unmatchedM.get(workoutId) ?? null;
+  const omitted = state?.status === 'tagged' ? state.omitted : 0;
 
   return (
     <section class="trail-card" aria-labelledby="trails-card-title">
@@ -52,6 +59,11 @@ export function TrailsCard({ workoutId }: { workoutId: string }) {
         );
       })}
       <div class="trail-card-footer">
+        {omitted > 0 && (
+          <p class="trail-unmatched">
+            {omitted === 1 ? "1 short pass isn't shown" : `${omitted} short passes aren't shown`}
+          </p>
+        )}
         {showsUnmatched(unmatched) && <p class="trail-unmatched">{formatMiles(unmatched)} not on a named trail</p>}
         <TrailCredit />
       </div>

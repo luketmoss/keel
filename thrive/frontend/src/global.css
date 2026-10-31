@@ -5218,6 +5218,14 @@ input, select, textarea {
   color: var(--color-text-secondary);
 }
 
+/* #690: what stands in the Trails card's place, and the notes that keep an absence from reading as "never". */
+.trail-status,
+.trail-untagged {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
 .trail-credit {
   display: flex;
   flex-wrap: wrap;

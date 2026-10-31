@@ -439,7 +439,8 @@ them, unsplit; passes in time order; `x` when passes were left out to fit) is #6
 and `frontend/src/api/trails-cell.ts`'s `parseTrailsCell` is its one decoder in the app. Sync-owned:
 the SPA and the MCP never set it, `createWorkout` writes `''`, `updateWorkout` validates it strictly,
 and every full-row write (`upsertSyncedWorkout`, `enrichWorkout`, the SPA's edit) preserves it. Added
-by `scripts/migrate-688-workouts-trails.mjs`. The app shows no real trail data until #690.
+by `scripts/migrate-688-workouts-trails.mjs`. Older rows are tagged, and rows from an older matcher
+re-tagged, by the hand-run `scripts/backfill-689-workouts-trails.mjs` (`sync/README.md` §Backfilling trails).
 
 ### Workout Types
 - `weight` — structured weight training with exercises, sets, reps, effort

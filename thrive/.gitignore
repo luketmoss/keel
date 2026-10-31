@@ -22,6 +22,10 @@ thrive-sa.json
 # resumable backfill progress (scripts/backfill-*.mjs)
 scripts/.backfill-*-progress.json
 
+# #689 trail backfill: a local cache of complete Overpass answers. It holds trail
+# names and geometry, so it is never committed (the repo is public).
+scripts/.backfill-689-cache/
+
 # COROS sync (#151) — the bot account's Google credential for local runs,
 # written by sync/google-authorize.mjs. In Actions it comes from secrets.
 sync/.google-credentials.json

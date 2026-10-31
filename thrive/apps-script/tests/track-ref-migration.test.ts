@@ -81,7 +81,7 @@ describe('#432 AC4: migrate-421 appends Workouts!AC track_ref', () => {
   it('has 29 headers, one per WORKOUT_FIELDS entry, ending in AB sport_type and AC track_ref', async () => {
     const { HEADERS, BEFORE, TAB } = await load();
     expect(TAB).toBe('Workouts');
-    expect(HEADERS).toHaveLength(FIELDS.length);
+    expect(HEADERS).toHaveLength(FIELDS.length - 1); // #688 appended AD after this migration
     expect(HEADERS[27]).toBe('sport_type');
     expect(HEADERS[28]).toBe(FIELDS[28]);
     expect(HEADERS[28]).toBe('track_ref');

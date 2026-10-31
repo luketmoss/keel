@@ -82,6 +82,7 @@ function ride(over: Partial<WorkoutWithRow> = {}): WorkoutWithRow {
     estimated_seconds: '',
     sport_type: '',
     track_ref: 'trk',
+    trails: '',
     sheetRow: 2 + n,
     ...over,
   };

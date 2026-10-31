@@ -356,6 +356,18 @@ export function createThriveApi({
       return write('reconcileBodyMeasurements', payload);
     },
 
+    /**
+     * Change only the keys in `changes` on one workout (#688: `{ trails }`,
+     * Workouts!AD, a call of its own so the value gets the whole payload
+     * budget). A replay writes the same cells again, so a 404 page is retried
+     * (see `writeRetrying`).
+     *
+     * @param {{ id: string, changes: object }} payload
+     */
+    updateWorkout(payload) {
+      return writeRetrying('updateWorkout', payload);
+    },
+
     /** Recompute DailySummary for `from`..`to`, inclusive, stamped `computedAt`. */
     rebuildDailySummary(from, to, computedAt) {
       return writeRetrying('rebuildDailySummary', { from, to, computed_at: computedAt });

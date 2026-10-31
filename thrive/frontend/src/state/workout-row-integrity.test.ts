@@ -128,9 +128,9 @@ function workoutRow(w: {
   status?: string;
   estimated_seconds?: string;
 }): string[] {
-  // A:AC — eleven original columns, the six nullable attributes (#101),
-  // the nine sync provenance columns (#128), the estimate (#145) and the
-  // COROS sport code (#260).
+  // A:AD — eleven original columns, the six nullable attributes (#101),
+  // the nine sync provenance columns (#128), the estimate (#145), the
+  // COROS sport code (#260), the track (#432) and the trails (#688).
   return [
     w.id,
     w.date,
@@ -159,6 +159,7 @@ function workoutRow(w: {
     '',
     '',
     w.estimated_seconds || '',
+    '',
     '',
     '',
   ];
@@ -200,6 +201,7 @@ function workoutsFromSheet(): WorkoutWithRow[] {
     estimated_seconds: row[26] || '',
     sport_type: row[27] || '',
     track_ref: row[28] || '',
+    trails: '',
     sheetRow: i + 2,
   }));
 }
@@ -284,6 +286,7 @@ describe("AC2: a workout write never targets another workout's row", () => {
       estimated_seconds: '',
       sport_type: '',
       track_ref: '',
+      trails: '',
       sheetRow: 2,
     };
     workouts.value = [staleWorkout];
@@ -336,6 +339,7 @@ describe("AC2: a workout write never targets another workout's row", () => {
       estimated_seconds: '',
       sport_type: '',
       track_ref: '',
+      trails: '',
       sheetRow: 2,
     };
     workouts.value = [staleWorkout];
@@ -406,7 +410,7 @@ describe('#145: a planned workout estimate', () => {
   it('saveWorkoutForLater writes the estimate to AA and leaves H blank', async () => {
     await saveWorkoutForLater({ type: 'weight', name: 'Pull A', date: '2099-12-31', estimated_seconds: '2820' }, TOKEN);
     const row = sheet.Workouts[0];
-    expect(row).toHaveLength(29);
+    expect(row).toHaveLength(30);
     expect(row[26]).toBe('2820');
     expect(row[27]).toBe(''); // #260: the SPA never sets sport_type
     expect(row[7]).toBe('');

@@ -90,6 +90,7 @@ function planned(overrides: Partial<WorkoutWithRow> = {}): WorkoutWithRow {
     estimated_seconds: '2820',
     sport_type: '',
     track_ref: '',
+    trails: '',
     sheetRow: 2,
     ...overrides,
   };

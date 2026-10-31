@@ -57,7 +57,7 @@ export async function syncDailyHealth({ archive, api, runDate, syncedAt, log = c
  * @returns {Promise<{ health: object | null, activities: object | null,
  *   rollup: object | null, failures: string[] }>}
  */
-export async function writeSheet({ archive, api, window, activityIds = [], syncedAt, fit = null, track = null, log = console.log }) {
+export async function writeSheet({ archive, api, window, activityIds = [], syncedAt, fit = null, track = null, trails = null, log = console.log }) {
   const out = { health: null, activities: null, rollup: null, failures: [] };
 
   try {
@@ -70,7 +70,7 @@ export async function writeSheet({ archive, api, window, activityIds = [], synce
   }
 
   try {
-    out.activities = await syncActivities({ archive, api, activityIds, syncedAt, fit, track, log });
+    out.activities = await syncActivities({ archive, api, activityIds, syncedAt, fit, track, trails, log });
     out.failures.push(...out.activities.failures);
     const a = out.activities;
     log(`  Workouts: ${a.created} created, ${a.updated} updated, ${a.unchanged} unchanged, ${a.deleted} deleted in Thrive and left so, ${a.skipped} skipped; strength: ${a.enriched} enriched, ${a.unmatched} unmatched`);

@@ -54,6 +54,7 @@ function w(month: string, overrides: Partial<WorkoutWithRow> = {}): WorkoutWithR
     estimated_seconds: '',
     sport_type: '',
     track_ref: '',
+    trails: '',
     sheetRow: 2 + n,
     ...overrides,
   };

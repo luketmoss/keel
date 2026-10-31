@@ -60,7 +60,7 @@ describe('AC3: no row with that vendor ID appends one, like createWorkout', () =
     expect(res.data.id).toBe('w_a1b2c3d4');
     expect(rows).toHaveLength(1);
     const r = rows[0];
-    expect(r).toHaveLength(29);
+    expect(r).toHaveLength(30);
     expect(r[C.id]).toBe('w_a1b2c3d4');
     expect(r[C.created]).toBe(NOW.toISOString());
     expect(r[C.source]).toBe('coros');
@@ -158,7 +158,7 @@ describe('AC3: one matching row is updated, two are refused', () => {
     expect(second.res.data.status).toBe('updated');
     expect(second.rows).toHaveLength(1);
     const twice = display(second.rows[0]);
-    for (let i = 0; i < 29; i++) {
+    for (let i = 0; i < 30; i++) {
       if (i === C.synced_at) continue;
       expect(twice[i], ORDER[i]).toBe(once[i]);
     }

@@ -22,7 +22,7 @@ const W_FIELDS = [
   'id', 'date', 'time', 'type', 'name', 'template_id', 'notes', 'elapsed_seconds', 'created',
   'copied_from', 'status', 'moving_seconds', 'effort', 'distance_m', 'ascent_m', 'descent_m',
   'avg_hr', 'sub_type', 'source', 'source_activity_id', 'raw_ref', 'fit_ref', 'fit_fetched_at',
-  'synced_at', 'started_at_utc', 'calories', 'estimated_seconds', 'track_ref',
+  'synced_at', 'started_at_utc', 'calories', 'estimated_seconds', 'track_ref', 'trails',
 ];
 const workout = (o) => ({ ...Object.fromEntries(W_FIELDS.map((f) => [f, o[f] ?? ''])), sheetRow: 2 });
 
@@ -344,6 +344,34 @@ test('thrive_get_workout adds the synced fields and omits blanks', async () => {
   const manual = (await call('thrive_get_workout', { workout_id: 'w_man' })).text;
   assert.match(manual, /- Provenance: hand-logged/);
   assert.doesNotMatch(manual, /Calories|Moving time|Distance|FIT|GPS track/);
+});
+
+test('#688: a tracked synced workout gets one Trails line after the GPS track, and no tool shows the raw value', async () => {
+  const value = '{"v":1,"m":1,"u":395,"n":[["Invented Ridge Path",1000],["Invented Draw",150]],"p":[[0,0,100,1,1015,254,30,70],[1,3,97,1,140,35,null,326],[0,100,41,-1,590,null,null,null]],"x":2}';
+  const tracked = workout({
+    id: 'w_trail', date: '2000-01-01', time: '06:00', type: 'walk', name: 'Walk', source: 'coros',
+    source_activity_id: '700000000000000001', raw_ref: 'raw-9', synced_at: '2000-01-02T13:00:00.000Z',
+    track_ref: 'trk-9', trails: value,
+  });
+  WORKOUTS.push(tracked);
+  try {
+    const text = (await call('thrive_get_workout', { workout_id: 'w_trail' })).text;
+    const lines = text.split(String.fromCharCode(10));
+    const gps = lines.indexOf('- GPS track: stored in Drive (trk-9)');
+    assert.ok(gps > 0, text);
+    assert.equal(lines[gps + 1], '- Trails: tagged, 2 named trails, 3 passes, 2 more passes left out');
+    assert.equal(lines.filter((l) => l.startsWith('- Trails:')).length, 1);
+    const listed = (await call('thrive_list_workouts', {})).text;
+    for (const out of [text, listed]) {
+      assert.ok(!out.includes('Invented'), 'no trail name');
+      assert.ok(!out.includes('"v":1'), 'no raw value');
+    }
+  } finally {
+    WORKOUTS.pop();
+  }
+  // Without a track_ref there is no Trails line at all.
+  const untracked = (await call('thrive_get_workout', { workout_id: 'w_sync' })).text;
+  assert.doesNotMatch(untracked, /Trails:/);
 });
 
 // --- #179 ----------------------------------------------------------------

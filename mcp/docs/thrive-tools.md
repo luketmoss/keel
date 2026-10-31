@@ -172,6 +172,12 @@ the API's `getWorkoutPayload`, which runs as the bot and finds the file from the
 A synced workout's detail also says whether the sync has built a simplified GPS track for it
 (`track_ref`, #432): `GPS track: stored in Drive (<id>)` or `GPS track: none`. The track itself is
 not readable here either; the app draws it, and there is no tool that returns one.
+A workout with a track gets one more line, its OpenStreetMap trails (`trails`, Workouts!AD, #688),
+in counts only: `Trails: not tagged yet`, `Trails: tagged, no named trail`,
+`Trails: tagged, <N> named trails, <P> passes` (with `, <x> more passes left out` when the sync had
+to leave some out to fit the column), or `Trails: unreadable value`. "Not tagged yet" is never "no
+trails": the sync or the backfill has not looked yet. No tool prints the value itself, and
+`thrive_undo` shows a changed `trails` as `(trail tags)`.
 
 ### Approval on the destructive tools
 

@@ -295,6 +295,7 @@ const mockWorkouts: WorkoutWithRow[] = [
     estimated_seconds: '',
     sport_type: '',
     track_ref: '',
+    trails: '',
     sheetRow: 2,
   },
 ];
@@ -378,6 +379,7 @@ describe('Issue #23 — Exercise card last-workout info', () => {
           estimated_seconds: '',
           sport_type: '',
           track_ref: '',
+          trails: '',
           sheetRow: 2,
         },
         {
@@ -410,6 +412,7 @@ describe('Issue #23 — Exercise card last-workout info', () => {
           estimated_seconds: '',
           sport_type: '',
           track_ref: '',
+          trails: '',
           sheetRow: 3,
         },
       ];

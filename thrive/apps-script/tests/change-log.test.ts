@@ -54,7 +54,7 @@ describe('AC1: every MCP-key write is logged, row by row', () => {
     expect(rows[0]).toMatchObject({ call_id: 'call-1', action: 'createWorkout', tab: 'Workouts', before: null });
     expect(rows[0].key).toEqual({ id: res.data.id });
     expect(rows[0].after).toMatchObject({ id: res.data.id, type: 'bike', name: 'Ride' });
-    expect(Object.keys(rows[0].after)).toHaveLength(29);
+    expect(Object.keys(rows[0].after)).toHaveLength(30);
     expect(rows[0].logged_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 

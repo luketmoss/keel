@@ -466,6 +466,8 @@ export function buildWorkout(data) {
     calories: '',
     // #432: sync-owned, like the provenance columns above.
     track_ref: '',
+    // #688: sync-owned too; the sync tags a row after it exists.
+    trails: '',
     // #145: a plan's estimate, seconds. Only ever what the caller said.
     estimated_seconds: data.estimated_seconds || '',
   };
@@ -609,8 +611,58 @@ export function describeSyncedFields(w) {
     // reason (indoors, no valid positions, an unreadable FIT, not built yet), so the line says only
     // that there is none, and does not guess why.
     out.push(w.track_ref ? `- GPS track: stored in Drive (${w.track_ref})` : '- GPS track: none');
+    // #688: the named trails the track rode, said in counts. The raw value (names and passes) is
+    // never printed; #691's thrive_trail_history is where trails are read.
+    if (w.track_ref) out.push(`- Trails: ${describeTrails(w.trails)}`);
   }
   return out;
+}
+
+/**
+ * Workouts!AD `trails` (#688) in words: `not tagged yet` (blank, or a row from
+ * an API that does not return it), `tagged, no named trail`, `tagged, <N> named
+ * trails, <P> passes` with `, <x> more passes left out` when the sync had to
+ * leave some out, or `unreadable value`. The checks are the frontend's
+ * parseTrailsCell's, so the two agree on what is readable.
+ */
+export function describeTrails(cell) {
+  const v = cell ?? '';
+  if (v === '') return 'not tagged yet';
+  const t = readTrails(v);
+  if (!t) return 'unreadable value';
+  if (!t.p.length) return 'tagged, no named trail';
+  const more = t.x ? `, ${t.x} more passes left out` : '';
+  return `tagged, ${t.n.length} named trails, ${t.p.length} passes${more}`;
+}
+
+const TRAILS_KEYS = new Set(['v', 'm', 'u', 'n', 'p', 'x']);
+const isWhole = (v) => typeof v === 'number' && Number.isInteger(v) && v >= 0;
+
+/** The parsed value when it is a valid v1 trails value, else null. Never throws. */
+function readTrails(text) {
+  let t;
+  try {
+    t = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (!t || typeof t !== 'object' || Array.isArray(t)) return null;
+  if (Object.keys(t).some((k) => !TRAILS_KEYS.has(k))) return null;
+  if (t.v !== 1 || !isWhole(t.m) || t.m < 1 || !isWhole(t.u)) return null;
+  if ('x' in t && (!isWhole(t.x) || t.x < 1)) return null;
+  if (!Array.isArray(t.n) || !Array.isArray(t.p)) return null;
+  for (const e of t.n) {
+    if (!Array.isArray(e) || e.length !== 2 || typeof e[0] !== 'string' || !e[0] || !isWhole(e[1])) return null;
+  }
+  const used = new Set();
+  for (const p of t.p) {
+    if (!Array.isArray(p) || p.length !== 8) return null;
+    const [i, s, e, d, metres, ...rest] = p;
+    if (!isWhole(i) || i >= t.n.length || !isWhole(s) || s > 100 || !isWhole(e) || e > 100) return null;
+    if ((d !== 1 && d !== -1) || !isWhole(metres) || !rest.every((r) => r === null || isWhole(r))) return null;
+    used.add(i);
+  }
+  return used.size === t.n.length ? t : null;
 }
 
 /**

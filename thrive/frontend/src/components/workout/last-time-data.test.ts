@@ -51,6 +51,7 @@ function makeWorkout(overrides: Partial<WorkoutWithRow> = {}): WorkoutWithRow {
     estimated_seconds: '',
     sport_type: '',
     track_ref: '',
+    trails: '',
     sheetRow: 2,
     ...overrides,
   };
@@ -231,6 +232,7 @@ describe('getLastTimeDataFrom', () => {
         estimated_seconds: '',
         sport_type: '',
         track_ref: '',
+        trails: '',
         sheetRow: 2,
       },
     ];

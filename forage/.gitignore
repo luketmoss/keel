@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment files (the committed template is .env.example)
+.env
+.env.*
+!.env.example
+
+# Credentials: clasp's script id and login, and any key file
+.clasp.json
+.clasprc.json
+*.clasp.json.bak
+*.pem
+*.key
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+npm-debug.log*

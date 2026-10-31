@@ -33,6 +33,17 @@
         "dev"
       ],
       "port": 5176
+    },
+    {
+      "name": "forage",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "forage/frontend",
+        "run",
+        "dev"
+      ],
+      "port": 5177
     }
   ]
 }

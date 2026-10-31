@@ -62,7 +62,7 @@ surfaces, from each app's stylesheet on 2026-10-13. "As text" means 4.5:1 and
 | Hive, light | `#805F00`: 5.91 on white, 5.27 on `--color-bg`, 4.57 on the tightest tint (an 18% tint of itself); white on the fill 5.91 | passes | passes |
 | Hive, dark | 9.63 on `--color-surface` `#1a1a1e` | passes | passes |
 | Forage, light | 5.26 on white, 4.69 on `--color-bg` | passes | passes |
-| Forage, dark | 7.05 on `#1e1e1e` | passes | passes |
+| Forage, dark | 7.34 on `--color-surface` `#1a1a1e`, 6.46 on `--color-surface-raised` `#252528` | passes | passes |
 
 Hive's light value was recorded as failing (`#C49200`: 2.82 on white, below 3:1
 even as a ring) until #447 shipped the replacement: the same gold, 44.5° of hue
@@ -70,6 +70,12 @@ against 44.7°, darkened to `#805F00` (hover `#6B5000`), measured against every
 surface the stylesheet draws it on in
 `hive/docs/design/447-light-primary-aa.md`. The brand accent `#F5B700` is
 unchanged, and so is Hive's dark value.
+
+Forage's dark row was recorded against `#1e1e1e`, which is not a suite surface;
+#702 re-measured it against the suite's dark surfaces, and the tightest is the
+raised surface at 6.46. Forage's tile (#702) puts the dark value on its ground
+`#10281a` as the sun, 6.63:1, with the trail `#ffb45e` at 8.91 and the apple
+`#8fd694` at 9.11.
 
 **Excluded: red.** It reads as danger in both languages. An app whose accent is
 red cannot show a destructive action as different from its own chrome.

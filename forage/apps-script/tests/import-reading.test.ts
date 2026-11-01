@@ -217,6 +217,13 @@ describe('AC: the plain-text format round-trips', () => {
     expect(loadApi().ok('importRecipe', { payload: { text: 'X\nTime: 45 min\nIngredients\n1 egg' } }).recipe.total_min).toBe(45);
   });
 
+  it('a numbered step that runs over two lines stays one step', () => {
+    const preview = loadApi().ok('importRecipe', {
+      payload: { text: 'Stew\nServes 2\nIngredients\n1 lb beef\nSteps\n1. Brown the beef\nin two batches.\nStep 2: Simmer.\n' },
+    });
+    expect(preview.steps.map((s: { text: string }) => s.text)).toEqual(['Brown the beef in two batches.', 'Simmer.']);
+  });
+
   it('steps split on blank lines when not numbered', () => {
     const preview = loadApi().ok('importRecipe', {
       payload: { text: 'Toast\nServes 1\nIngredients\n1 slice bread\nDirections\nPut bread in.\nWait.\n\nEat it.\n' },

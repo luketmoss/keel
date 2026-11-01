@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   loadSources,
   makeWritableSheet,
+  makeItemsSheet,
   makeUtilities,
   type CellValue,
   type Sandbox,
@@ -77,7 +78,7 @@ function harness(rows: CellValue[][]): Harness {
   );
 
   const itemRows = rows.map((r) => [...r]);
-  const items = makeWritableSheet(itemRows, sandbox.ITEM_COLUMN_COUNT);
+  const items = makeItemsSheet(itemRows, sandbox.ITEM_COLUMN_COUNT);
   const auditRows: CellValue[][] = [];
   const auditSheet = makeWritableSheet(auditRows, sandbox.AUDIT_COLUMN_COUNT);
   const statuses = makeWritableSheet(STATUS_ROWS.map((r) => [...r]), sandbox.STATUS_COLUMN_COUNT);

@@ -492,3 +492,41 @@ function deleteItem(id, actor, options) {
     token: token,
   };
 }
+
+/**
+ * #728: one-off, run by the owner in the editor. Rewrites every Items row whose
+ * due-date cell is a date as the same `YYYY-MM-DD` text (local date in
+ * AUDIT_TIMEZONE). Touches only column F of those rows: text, empty cells and
+ * every other column are left alone, and no Audit Log row is written because
+ * the value a reader sees does not change. Dry run unless `confirm` is true.
+ * Idempotent: a second run finds nothing.
+ *
+ * @param {boolean} [confirm]
+ * @returns {{dry_run: boolean, count: number, rows: Array<{id: string, due_date: string}>}}
+ */
+function migrateDueDatesToText(confirm) {
+  var sheet = getSheet('Items');
+  var lastRow = sheet.getLastRow();
+  var found = [];
+  if (lastRow >= 2) {
+    var cells = sheet.getRange(2, 1, lastRow - 1, COL.DUE_DATE + 1).getValues();
+    for (var i = 0; i < cells.length; i++) {
+      var cell = cells[i][COL.DUE_DATE];
+      if (Object.prototype.toString.call(cell) !== '[object Date]') continue;
+      var text = dueDateFromCell(cell);
+      if (!text) continue;
+      found.push({ sheetRow: i + 2, id: cells[i][COL.ID], due_date: text });
+    }
+  }
+  if (confirm === true) {
+    for (var j = 0; j < found.length; j++) {
+      sheet.getRange(found[j].sheetRow, COL.DUE_DATE + 1, 1, 1).setValues([[asText(found[j].due_date)]]);
+    }
+    Logger.log('migrateDueDatesToText: rewrote ' + found.length + ' due date(s) as text');
+  }
+  return {
+    dry_run: confirm !== true,
+    count: found.length,
+    rows: found.map(function(f) { return { id: f.id, due_date: f.due_date }; }),
+  };
+}

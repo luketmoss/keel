@@ -52,12 +52,57 @@ export function makeSheet(rows: CellValue[][], columnCount?: number) {
   };
 }
 
+/** How Sheets types a value written to a column, keyed by 0-based column. */
+export type CellTyping = Record<number, (value: CellValue) => CellValue>;
+
+/**
+ * The Date cell for local midnight on `ymd` in America/Denver, the sheet's own
+ * zone. Resolved through Intl so the MDT/MST boundary is real (2026-03-08 and
+ * 2026-11-01 are DST-change days), not a fixed offset.
+ */
+export function denverMidnight(ymd: string): Date {
+  const [y, m, d] = ymd.split('-').map(Number);
+  for (const offsetHours of [6, 7]) {
+    const candidate = new Date(Date.UTC(y, m - 1, d, offsetHours));
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Denver',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(candidate);
+    const get = (t: string) => parts.find((p) => p.type === t)!.value;
+    if (`${get('year')}-${get('month')}-${get('day')}` === ymd && get('hour') === '00') return candidate;
+  }
+  throw new Error('No America/Denver midnight for ' + ymd);
+}
+
+/**
+ * #728: what Sheets does with a string written to the Items due-date column by
+ * appendRow / setValues. A bare YYYY-MM-DD is parsed to a date cell (a Date for
+ * local midnight in the sheet's zone); a leading apostrophe is Sheets' text
+ * escape, kept as text without the apostrophe. A write that skips the escape
+ * therefore reads back as a Date, which is what the suite must catch.
+ */
+export function typeDueDate(value: CellValue): CellValue {
+  if (typeof value !== 'string') return value;
+  if (value.startsWith("'")) return value.slice(1);
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? denverMidnight(value) : value;
+}
+
+/** A writable Items sheet: the due-date column (F) is typed the way Sheets types it. */
+export function makeItemsSheet(rows: CellValue[][], columnCount?: number) {
+  return makeWritableSheet(rows, columnCount, { 5: typeDueDate });
+}
+
 /**
  * A fake Sheet that can also be written to — `setValues` and `appendRow`.
  * `rows` is the live backing array, so a test can assert against it after a
  * write. Reads go through the same surface `makeSheet` exposes.
  */
-export function makeWritableSheet(rows: CellValue[][], columnCount?: number) {
+export function makeWritableSheet(rows: CellValue[][], columnCount?: number, typing: CellTyping = {}) {
+  const typed = (col0: number, value: CellValue): CellValue => (typing[col0] ? typing[col0](value) : value);
   const lastColumn = columnCount ?? (rows.length ? rows[0].length : 0);
   return {
     rows,
@@ -68,7 +113,7 @@ export function makeWritableSheet(rows: CellValue[][], columnCount?: number) {
       return lastColumn;
     },
     appendRow(row: CellValue[]) {
-      rows.push(row);
+      rows.push(row.map((v, c) => typed(c, v)));
     },
     // #244: 1-based sheet row, header included — `deleteRow(2)` removes the
     // first data row. Modelling the shift is the point: a delete that re-used
@@ -88,7 +133,7 @@ export function makeWritableSheet(rows: CellValue[][], columnCount?: number) {
             const target = startRow - 2 + i;
             if (!rows[target]) rows[target] = [];
             for (let c = 0; c < numCols; c++) {
-              rows[target][startCol - 1 + c] = values[i][c];
+              rows[target][startCol - 1 + c] = typed(startCol - 1 + c, values[i][c]);
             }
           }
         },
@@ -213,6 +258,7 @@ export function loadReadPath(itemRows: CellValue[][], apiKey = 'test-key', board
   const sandbox = loadSources(['types.js', 'utils.js', 'rules.js', 'boards.js', 'items.js', 'main.js'], {
     ContentService: makeContentService(),
     PropertiesService: makePropertiesService({ MCP_API_KEY: apiKey, SPREADSHEET_ID: 'sheet-id' }),
+    Utilities: makeUtilities(),
   });
 
   // Seam for fixture rows: replace the sheet accessor, keep `getAllRows` and
@@ -264,7 +310,7 @@ export function loadDeletePath(itemRows: CellValue[][], apiKey = 'test-key', boa
     Date: globalThis.Date,
   });
 
-  const items = makeWritableSheet(itemRows, sandbox.ITEM_COLUMN_COUNT);
+  const items = makeItemsSheet(itemRows, sandbox.ITEM_COLUMN_COUNT);
   const auditRows: CellValue[][] = [];
   const audit = makeWritableSheet(auditRows, 7);
 
@@ -352,7 +398,7 @@ export function loadAuthPath(opts: {
   // real `createItem` for a key caller and needs both to actually persist.
   // The other tabs stay read-only fakes — nothing in this file's tests
   // writes to them.
-  const itemsSheet = makeWritableSheet(opts.itemRows ?? [], sandbox.ITEM_COLUMN_COUNT);
+  const itemsSheet = makeItemsSheet(opts.itemRows ?? [], sandbox.ITEM_COLUMN_COUNT);
   const auditSheet = makeWritableSheet(opts.auditRows ?? [], sandbox.AUDIT_COLUMN_COUNT);
   sandbox.SpreadsheetApp = makeSpreadsheetApp({
     Owners: makeSheet(opts.ownerRows ?? [], 2),

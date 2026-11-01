@@ -234,6 +234,7 @@ deletes find it again.
   `rules.ts`) only for an item that ends the call in a terminal column, and it wins over the
   automatic stamp. The cascade to children still stamps now. The `completed` audit row keeps
   the time of the move: the log is append-only.
+- **`due_date` is text `YYYY-MM-DD`, never a date cell (#728).** Every API write goes through `itemToRow`, which wraps it in `asText` (Sheets' apostrophe escape); a bare string would become a date cell that reads back as a long locale string and drops out of `due_before` / `due_after`. `rowToItem` still reads a stray date cell as its `America/Denver` date. The owner runs `migrateDueDatesToText()` once (dry run; `true` writes)
 - **`parent_id` makes sub-items**, and a sub-item lives in the same `Items` tab
   as its parent. There is no separate sheet.
 - **No formula-injection sanitizer exists.** Nothing prefixes `'` to input

@@ -356,7 +356,11 @@ function draftFromText(text) {
       if (!draft.name) draft.name = row.replace(/^#+\s*/, '');
       else if ((meta = /^(serves|servings|makes|yield)\b\s*:?\s*(.*)$/i.exec(row))) draft.servings = yieldOf(meta[2]);
       else if ((meta = /^(total time|time)\b\s*:?\s*(.*)$/i.exec(row))) draft.total_min = timeTextMinutes(meta[2]);
-      else if ((meta = /^source\b\s*:?\s*(\S+)/i.exec(row))) draft.source_url = meta[1];
+      else if ((meta = /^source\b\s*:?\s*(.*)$/i.exec(row))) {
+        // A link is the source; anything else ("Grandma") is kept as a note.
+        if (/^https?:\/\/\S+$/i.test(meta[1])) draft.source_url = meta[1];
+        else draft.notes = 'Source: ' + meta[1];
+      }
       return;
     }
     if (block === 'ingredients') {

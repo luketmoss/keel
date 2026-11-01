@@ -224,6 +224,11 @@ describe('AC: the plain-text format round-trips', () => {
     expect(preview.steps.map((s: { text: string }) => s.text)).toEqual(['Put bread in. Wait.', 'Eat it.']);
   });
 
+  it('a Source that is not a link is kept as a note', () => {
+    const preview = loadApi().ok('importRecipe', { payload: { text: 'Toast\nSource: Grandma\nIngredients\n1 slice bread' } });
+    expect(preview.recipe).toMatchObject({ source_url: '', notes: 'Source: Grandma' });
+  });
+
   it('a file with no Ingredients heading is no_recipe', () => {
     const res = loadApi().call('importRecipe', { payload: { text: 'Beef Stew\nServes 6\n2 lb beef\nBrown it.' } });
     expect(res).toMatchObject({ success: false, code: 'no_recipe' });

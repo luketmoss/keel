@@ -57,7 +57,9 @@ JSON text. Ids a caller sends are kept (sending one again upserts); otherwise
 the API makes `<prefix>_` + 8 hex: `fd_`, `rc_`, `pl_`, `tr_`, `lg_`, `ck_`.
 The tabs are created by `scripts/migrate-703-create-tabs.mjs`, which calls the
 key-only `ensureSchema`. Nutrition (unit conversion, per serving, the partial
-rule) is computed only in `apps-script/src/nutrition.js`.
+rule) is computed only in `apps-script/src/nutrition.js`, and recipe import
+(reading pages, the ingredient line parser, matching lines to foods) only in
+`apps-script/src/importer.js`, behind the one `importRecipe` action (#706).
 
 | Tab | Key | Columns |
 |---|---|---|
@@ -122,7 +124,9 @@ What the columns mean:
   the API. `logged_at` is ISO UTC.
 - **Cooks.** `rating` is 1–5, or blank when not rated. `plan_id` is set when
   the cook was the plan's meal.
-- **Config.** `schema_version` (`1`). Later issues add keys here, not tabs.
+- **Config.** `schema_version` (`1`), and `ingredient_aliases` (#706): a JSON
+  object from a normalised ingredient name to the `food_id` a saved import
+  matched it to. Later issues add keys here, not tabs.
 
 **Referential rules.** A write naming a food, recipe, plan entry or trip that
 does not exist is refused, naming the id. Deleting a food used by a recipe
@@ -148,6 +152,9 @@ characters is refused.
   JavaScript origin (`http://localhost:5177` for dev); `VITE_DEMO_MODE=true`
   lets `?demo=true` open signed in as the demo user with no request to Google
 - `cd apps-script && npm test` / `npm run typecheck` — sandboxed `node:vm`
+- `node scripts/check-import-urls.mjs scripts/import-urls/urls.txt scripts/import-urls/heldout.txt`
+  — dry-runs `importRecipe` against the deployed API for each URL (the owner's,
+  with `FORAGE_API_URL` and `FORAGE_API_KEY` prompted for; usage in the file)
 - A session never runs `clasp`; `apps-script/.clasp.json` is gitignored and
   `.clasp.json.example` is the template
 - The user's terminal is PowerShell 5.1 — no `&&`; use `;` or separate commands

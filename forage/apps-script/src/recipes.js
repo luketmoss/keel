@@ -205,7 +205,10 @@ function deleteRecipe(payload) {
     var uses = [];
     if (plans.length) uses.push('plan entries ' + plans.join(', '));
     if (logs.length) uses.push('log entries ' + logs.join(', '));
-    throw new Error('Recipe "' + id + '" is in use, so it was not deleted: ' + uses.join('; '));
+    var err = new Error('Recipe "' + id + '" is in use, so it was not deleted: ' + uses.join('; '));
+    err.code = 'in_use';
+    err.extra = { uses: { plan: plans, log: logs } };
+    throw err;
   }
   return withScriptLock(function () {
     deleteRecordsWhere('RecipeLines', function (l) { return l.recipe_id === id; });

@@ -123,8 +123,10 @@ export type FetchReply = { status: number; body: string } | { throws: string };
 export interface ApiOptions {
   /** Script properties. Defaults give SPREADSHEET_ID and API_KEY. */
   properties?: Record<string, string>;
-  /** Answers each tokeninfo fetch. Absent: UrlFetchApp is not stubbed. */
+  /** Answers each tokeninfo fetch. */
   tokeninfo?: (url: string) => FetchReply;
+  /** Answers each other fetch: a recipe page (#706). Absent, with no tokeninfo: UrlFetchApp is not stubbed. */
+  pages?: (url: string, options: Record<string, unknown>) => FetchReply;
   /** Start with no tabs at all, for ensureSchema. */
   empty?: boolean;
 }
@@ -223,12 +225,15 @@ export function loadApi(options: ApiOptions = {}) {
       },
     },
   };
-  if (options.tokeninfo) {
-    const reply = options.tokeninfo;
+  if (options.tokeninfo || options.pages) {
+    const { tokeninfo, pages } = options;
     globals.UrlFetchApp = {
-      fetch(url: string) {
+      fetch(url: string, opts: Record<string, unknown> = {}) {
         fetches.push(url);
-        const r = reply(url);
+        const isTokeninfo = url.startsWith('https://oauth2.googleapis.com/tokeninfo');
+        const reply = isTokeninfo ? tokeninfo : pages;
+        if (!reply) throw new Error(`Unexpected fetch of ${url}`);
+        const r = reply(url, opts);
         if ('throws' in r) throw new Error(r.throws);
         return { getResponseCode: () => r.status, getContentText: () => r.body };
       },

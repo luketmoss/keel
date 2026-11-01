@@ -1,0 +1,65 @@
+{
+  "url": "https://www.tasteofhome.com/recipes/classic-beef-stew/",
+  "jsonld": {
+    "@context": "https://schema.org",
+    "@type": "Recipe",
+    "name": "Beef Stew",
+    "recipeYield": "6 servings (2-1/4 quarts)",
+    "totalTime": "PT02H30M",
+    "prepTime": "PT30M",
+    "cookTime": "PT02H00M",
+    "recipeIngredient": [
+      "1-1/2 pounds beef stew meat, cut into 1-inch cubes",
+      "1/2 teaspoon salt, divided",
+      "6 tablespoons all-purpose flour, divided",
+      "1/2 teaspoon smoked paprika",
+      "1 tablespoon canola oil",
+      "3 tablespoons tomato paste",
+      "2 teaspoons herbes de Provence",
+      "2 garlic cloves, minced",
+      "2 cups dry red wine",
+      "2 cups beef broth",
+      "1-1/2 teaspoons minced fresh rosemary, divided",
+      "2 bay leaves",
+      "3 cups cubed peeled potatoes",
+      "3 cups coarsely chopped onions (about 2 large)",
+      "2 cups sliced carrots",
+      "2 tablespoons cold water",
+      "2 tablespoons balsamic or red wine vinegar",
+      "1 cup fresh or frozen peas",
+      "Additional fresh rosemary, optional"
+    ],
+    "recipeInstructions": [
+      {
+        "@type": "HowToStep",
+        "name": "Prep the beef",
+        "text": "In a small bowl, toss the beef with …"
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Brown the beef",
+        "text": "In a Dutch oven, brown the beef in …"
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Deglaze the pan",
+        "text": "Pour in the wine and cook until the …"
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Simmer the stew",
+        "text": "Add the beef broth, bay leaves and 1 …"
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Add the veggies",
+        "text": "Add the potatoes, onions and carrots to the …"
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Add the finishing touches",
+        "text": "Pick out and discard the bay leaves. In …"
+      }
+    ]
+  }
+}

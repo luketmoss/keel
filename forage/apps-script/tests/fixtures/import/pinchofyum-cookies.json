@@ -1,0 +1,57 @@
+{
+  "url": "https://pinchofyum.com/the-best-soft-chocolate-chip-cookies",
+  "jsonld": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "name": "Pinch of Yum"
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "Recipe",
+        "name": "The Best Soft Chocolate Chip Cookies",
+        "recipeYield": [
+          "12",
+          "12 cookies"
+        ],
+        "totalTime": "PT20M",
+        "prepTime": "PT10M",
+        "cookTime": "PT10M",
+        "recipeIngredient": [
+          "8 tablespoons of salted butter",
+          "1/2 cup white sugar (I like to use raw cane sugar with a coarser texture)",
+          "1/4 cup packed light brown sugar",
+          "1 teaspoon vanilla",
+          "1 egg",
+          "1 1/2 cups all purpose flour (6.75 ounces)",
+          "1/2 teaspoon baking soda",
+          "1/4 teaspoon salt (but I always add a little extra)",
+          "3/4 cup chocolate chips (I use a combination of chocolate chips and chocolate chunks)"
+        ],
+        "recipeInstructions": [
+          {
+            "@type": "HowToStep",
+            "text": "Preheat the oven to 350 degrees. Microwave the …"
+          },
+          {
+            "@type": "HowToStep",
+            "text": "Using a stand mixer or electric beaters, beat …"
+          },
+          {
+            "@type": "HowToStep",
+            "text": "Add the flour, baking soda, and salt. Mix …"
+          },
+          {
+            "@type": "HowToStep",
+            "text": "Roll the dough into 12 large balls (or …"
+          },
+          {
+            "@type": "HowToStep",
+            "text": "Let them cool on the pan for a …"
+          }
+        ]
+      }
+    ]
+  }
+}

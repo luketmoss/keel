@@ -1,0 +1,107 @@
+{
+  "url": "https://www.recipetineats.com/chicken-stir-fry/",
+  "jsonld": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebPage",
+        "name": "page"
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "Recipe",
+        "name": "Chop Suey - Chicken Stir Fry",
+        "recipeYield": [
+          "2",
+          "2 - 3 people"
+        ],
+        "totalTime": "PT14M",
+        "prepTime": "PT9M",
+        "cookTime": "PT6M",
+        "recipeIngredient": [
+          "180g (6oz )  chicken breast (, thinly sliced)",
+          "1/2 tsp baking soda / bi-carb ((optional, Note 1))",
+          "1 tbsp cornflour / corn starch",
+          "1 1/2 tbsp light soy sauce (, or all purpose soy(Note 3))",
+          "1 tbsp Oyster Sauce ((Note 4))",
+          "1 tbsp Chinese Cooking Wine (OR Mirin (Note 5))",
+          "1/2 tsp sesame oil ((optional))",
+          "Dash of white pepper ((or black))",
+          "3/4 cup (185 ml)  water",
+          "1 1/2 tbsp vegetable oil ((or other cooking oil))",
+          "2  garlic cloves (, finely chopped)",
+          "1/2  onion (, sliced (white, brown, yellow))",
+          "5 - 6  stems choy sum ((or other Asian greens))",
+          "1  medium carrot",
+          "1/2 cup sliced mushrooms ((shiitake is authentic, but any will do))",
+          "1 cup bean sprouts"
+        ],
+        "recipeInstructions": [
+          {
+            "@type": "HowToSection",
+            "name": "\"Velvet\" Chicken (optional, Note 1)",
+            "itemListElement": [
+              {
+                "@type": "HowToStep",
+                "name": "Place chicken in a bowl, sprinkle over baking …",
+                "text": "Place chicken in a bowl, sprinkle over baking …"
+              }
+            ]
+          },
+          {
+            "@type": "HowToSection",
+            "name": "Prep Ingredients:",
+            "itemListElement": [
+              {
+                "@type": "HowToStep",
+                "name": "Sauce: Place cornflour and soy sauce in a …",
+                "text": "Sauce: Place cornflour and soy sauce in a …"
+              },
+              {
+                "@type": "HowToStep",
+                "name": "Chop choy sum: Trim end off choy sum. …",
+                "text": "Chop choy sum: Trim end off choy sum. …"
+              },
+              {
+                "@type": "HowToStep",
+                "name": "Chop carrot - Peel then cut into 3cm …",
+                "text": "Chop carrot - Peel then cut into 3cm …"
+              }
+            ]
+          },
+          {
+            "@type": "HowToSection",
+            "name": "Stir Fry:",
+            "itemListElement": [
+              {
+                "@type": "HowToStep",
+                "name": "Heat oil in a wok or skillet over …",
+                "text": "Heat oil in a wok or skillet over …"
+              },
+              {
+                "@type": "HowToStep",
+                "name": "Add chicken, cook for 1 minute until the …",
+                "text": "Add chicken, cook for 1 minute until the …"
+              },
+              {
+                "@type": "HowToStep",
+                "name": "Add choy sum stems, carrot and mushrooms. Stir …",
+                "text": "Add choy sum stems, carrot and mushrooms. Stir …"
+              },
+              {
+                "@type": "HowToStep",
+                "name": "Add choy sum leaves, bean sprouts and Sauce. …",
+                "text": "Add choy sum leaves, bean sprouts and Sauce. …"
+              },
+              {
+                "@type": "HowToStep",
+                "name": "Serve immediately with rice (for low carb, low …",
+                "text": "Serve immediately with rice (for low carb, low …"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

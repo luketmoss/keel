@@ -1,0 +1,56 @@
+{
+  "url": "https://www.foodnetwork.com/recipes/alton-brown/baked-macaroni-and-cheese-recipe-1939524",
+  "jsonld": [
+    {
+      "@context": "https://schema.org",
+      "@type": "Recipe",
+      "name": "Baked Macaroni and Cheese",
+      "recipeYield": "6 to 8 servings",
+      "totalTime": "P0Y0M0DT1H5M0.000S",
+      "prepTime": "P0Y0M0DT0H20M0.000S",
+      "cookTime": "P0Y0M0DT0H45M0.000S",
+      "recipeIngredient": [
+        "1/2 pound elbow macaroni",
+        "3 tablespoons butter",
+        "3 tablespoons flour",
+        "1 tablespoon powdered mustard",
+        "3 cups milk",
+        "1/2 cup yellow onion, finely diced",
+        "1 bay leaf",
+        "1/2 teaspoon paprika",
+        "1 large egg",
+        "12 ounces sharp cheddar, shredded",
+        "1 teaspoon kosher salt",
+        "Fresh black pepper",
+        "3 tablespoons butter",
+        "1 cup panko bread crumbs"
+      ],
+      "recipeInstructions": [
+        {
+          "@type": "HowToStep",
+          "text": "Preheat oven to 350 degrees F."
+        },
+        {
+          "@type": "HowToStep",
+          "text": "In a large pot of boiling, salted water …"
+        },
+        {
+          "@type": "HowToStep",
+          "text": "While the pasta is cooking, in a separate …"
+        },
+        {
+          "@type": "HowToStep",
+          "text": "Temper in the egg. Stir in 3/4 of …"
+        },
+        {
+          "@type": "HowToStep",
+          "text": "Melt the butter in a saute pan and …"
+        },
+        {
+          "@type": "HowToStep",
+          "text": "Remember to save leftovers for fried Macaroni and …"
+        }
+      ]
+    }
+  ]
+}

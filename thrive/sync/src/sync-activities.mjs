@@ -152,6 +152,7 @@ export async function syncActivities({ archive, api, activityIds, syncedAt, fit 
       const fitFields = fit
         ? await fit.ensure({
           activityId: id, fileId: file.fileId, record: file.data.fit, payloadHash: file.data.payload_hash, args: file.data.args,
+          startTimestamp: file.data.list_entry.startTimestamp,
           localDate: incoming.date,
         })
         : {};

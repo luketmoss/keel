@@ -19,6 +19,8 @@
 // `docs/data-architecture.md` §4 keeps FIT out of normalization, so a FIT the
 // budget delayed never changes a row's values later.
 
+import { Decoder, Stream } from '@garmin/fitsdk';
+
 import { DriveError } from './drive.mjs';
 import { DriveAuthError } from './errors.mjs';
 import { redact } from './redact.mjs';
@@ -46,6 +48,21 @@ export const FIT_MAX_ATTEMPTS = 3;
  * would otherwise cost a request a run for as long as it is in the window.
  */
 export const FIT_MAX_REFETCHES = 3;
+
+/**
+ * How far a FIT's start may be from the list entry's `startTimestamp` and
+ * still be that activity's file (#739). COROS writes both from one clock, so
+ * they agree to the second; the slack is for rounding, not for guessing.
+ */
+export const FIT_START_TOLERANCE_S = 120;
+
+/**
+ * `last_error` of a FIT #737's bug gave up on (#739). Such a record is asked
+ * for once more, then marked `requalified` so it is never asked for again.
+ */
+const MISNAMED_FIT = 'returned a file for a different activity';
+const requalifiable = (record) =>
+  record?.status === 'unavailable' && !record.requalified && String(record.last_error ?? '').includes(MISNAMED_FIT);
 
 /** A result that is not one whole FIT file for the activity asked about. */
 export class FitFormatError extends Error {
@@ -159,23 +176,46 @@ export function uriNamesActivity(uri, activityId) {
 const describeUri = (uri) => (typeof uri === 'string' ? redact(uri.replace(/[?#].*$/s, '')) : `no URI (${typeof uri})`);
 
 /**
- * The FIT bytes in a `downloadActivityFitFiles` result for one activity:
- * exactly one binary resource, named for that activity, holding a whole FIT.
- * Text items are COROS's advice to the reader and are ignored, never kept.
+ * When the activity in a FIT began, in epoch ms: the first session's start,
+ * else the first record's timestamp; null when it has neither or does not
+ * decode. Only times are read, never a position.
  */
-export function fitFromResult(result, activityId) {
+export function fitStartMs(bytes) {
+  try {
+    const { messages } = new Decoder(Stream.fromBuffer(bytes)).read({ convertDateTimesToDates: true });
+    const when = messages?.sessionMesgs?.[0]?.startTime ?? messages?.recordMesgs?.find((r) => r.timestamp)?.timestamp;
+    return when instanceof Date && Number.isFinite(when.getTime()) ? when.getTime() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The FIT bytes in a `downloadActivityFitFiles` result for one activity:
+ * exactly one binary resource holding a whole FIT, for that activity. Text
+ * items are COROS's advice to the reader and are ignored, never kept.
+ *
+ * The URI names the activity, or, since COROS began naming files by another
+ * id by 2026-11-01 (#739), the FIT starts within FIT_START_TOLERANCE_S of the
+ * list entry's `startTimestamp` (epoch seconds).
+ */
+export function fitFromResult(result, activityId, startTimestamp) {
   if (result?.isError) throw new FitFormatError(`${FIT_TOOL} returned an error result`);
   const blobs = (result?.content ?? []).filter((c) => c?.type === 'resource' && typeof c.resource?.blob === 'string');
   if (blobs.length !== 1) {
     throw new FitFormatError(`${FIT_TOOL} returned ${blobs.length} FIT files, expected 1`);
   }
   const { uri } = blobs[0].resource;
-  if (!uriNamesActivity(uri, activityId)) {
-    throw new FitFormatError(`${FIT_TOOL} returned a file for a different activity: ${describeUri(uri)}`);
-  }
   const bytes = Buffer.from(blobs[0].resource.blob, 'base64');
   checkFit(bytes);
-  return bytes;
+  if (uriNamesActivity(uri, activityId)) return bytes;
+
+  const startMs = fitStartMs(bytes);
+  const gapS = startMs === null || !Number.isFinite(startTimestamp)
+    ? null : Math.round(Math.abs(startMs / 1000 - startTimestamp));
+  if (gapS !== null && gapS <= FIT_START_TOLERANCE_S) return bytes;
+  const why = gapS === null ? 'and no start time to check' : `starting ${gapS} s from the activity`;
+  throw new FitFormatError(`${FIT_TOOL} returned a file for a different activity: ${describeUri(uri)}, ${why}`);
 }
 
 // --- the step -------------------------------------------------------------
@@ -194,7 +234,7 @@ export function fitSheetFields(record) {
  * with no `payload_hash` (every one written before #257) counts as changed.
  */
 const settled = (record, payloadHash) => {
-  if (record?.status === 'unavailable') return true;
+  if (record?.status === 'unavailable') return !requalifiable(record);
   if (record?.status !== 'stored') return false;
   return record.stale === true || payloadHash === undefined || record.payload_hash === payloadHash;
 };
@@ -257,13 +297,15 @@ export function createFitStep({ client, archive, api, startedAt, log = console.l
 
   /**
    * @param {{ activityId: string, fileId: string, record: object | undefined,
-   *   payloadHash?: string,
+   *   payloadHash?: string, startTimestamp?: number,
    *   args: { labelId: string, sportType: number }, localDate: string }} activity
    * @returns {Promise<{ fit_ref: string, fit_fetched_at: string }>}
    */
-  async function ensure({ activityId, fileId, record, payloadHash, args, localDate }) {
+  async function ensure({ activityId, fileId, record, payloadHash, startTimestamp, args, localDate }) {
     if (settled(record, payloadHash)) return fitSheetFields(record);
-    if (record?.status === 'stored') return refetch({ activityId, fileId, record, payloadHash, args, localDate });
+    if (record?.status === 'stored') {
+      return refetch({ activityId, fileId, record, payloadHash, startTimestamp, args, localDate });
+    }
 
     const existing = await archive.findFit(activityId);
     if (existing) {
@@ -289,7 +331,7 @@ export function createFitStep({ client, archive, api, startedAt, log = console.l
     const attempts = (record?.attempts ?? 0) + 1;
     let bytes;
     try {
-      bytes = fitFromResult(await client.callTool({ name: FIT_TOOL, arguments: args }), activityId);
+      bytes = fitFromResult(await client.callTool({ name: FIT_TOOL, arguments: args }), activityId, startTimestamp);
     } catch (err) {
       // COROS could not give us the file. This is what the attempt cap is for.
       counts.failed += 1;
@@ -298,6 +340,7 @@ export function createFitStep({ client, archive, api, startedAt, log = console.l
       const next = gaveUp
         ? { status: 'unavailable', fetched_at: startedAt, attempts, last_error: reason }
         : { status: 'failed', attempts, last_attempt_at: startedAt, last_error: reason };
+      if (requalifiable(record) || record?.requalified) next.requalified = true;
       if (gaveUp) counts.gaveUp += 1;
       try {
         await archive.writeFit(fileId, next);
@@ -336,7 +379,7 @@ export function createFitStep({ client, archive, api, startedAt, log = console.l
    * same budget as a first fetch, and a failure of any kind leaves the FIT
    * the row already points at exactly as it was.
    */
-  async function refetch({ activityId, fileId, record, payloadHash, args, localDate }) {
+  async function refetch({ activityId, fileId, record, payloadHash, startTimestamp, args, localDate }) {
     const refetches = record.refetches ?? 0;
     if (refetches >= FIT_MAX_REFETCHES) {
       // Marked once, so the note is too: a stale record is settled.
@@ -362,7 +405,7 @@ export function createFitStep({ client, archive, api, startedAt, log = console.l
     counts.requested += 1;
     let bytes;
     try {
-      bytes = fitFromResult(await client.callTool({ name: FIT_TOOL, arguments: args }), activityId);
+      bytes = fitFromResult(await client.callTool({ name: FIT_TOOL, arguments: args }), activityId, startTimestamp);
     } catch (err) {
       // The request was made, so it counts toward the cap; the old FIT stays.
       counts.failed += 1;

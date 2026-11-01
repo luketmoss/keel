@@ -61,7 +61,7 @@ signal — several `Easy` sessions on a lift mean it's time to add load.
 **Read and analyze** — `thrive_list_workouts`, `thrive_get_workout`,
 `thrive_list_exercises`, `thrive_list_templates`, `thrive_exercise_history`,
 `thrive_daily_health`, `thrive_daily_summary`, `thrive_body_measurements`, `thrive_journal`,
-`thrive_drinks`.
+`thrive_drinks`, `thrive_trail_history`.
 
 `thrive_drinks` reads the water, coffee, alcohol and Unwind the user logged (default: today): each
 entry, per-day totals (water in oz and ml against the daily goal, coffee in cups, alcohol in
@@ -74,6 +74,15 @@ To move a drink to another day, delete it and log it again.
 
 `thrive_exercise_history` is the one for progression decisions: it returns every logged
 set of a lift over time, newest first, with effort.
+
+`thrive_trail_history` is the one for "when did I last ride X, and how did it compare to the time
+before?" (#691). Give it a trail name or part of one: it shows the last visit's passes, each against
+the last pass over the same stretch in the same direction on an earlier activity, then the visits
+newest first. If several trails match it lists them; ask me which, or call again with the full
+name. **"Not tagged yet" is never "never on this trail".** Trails are tagged by the sync after the
+fact, and a tracked activity with blank trails has not been looked at yet. When the answer has a
+`Not tagged yet:` line, say that the history may be incomplete; when it finds no trail and that
+line is there, say you cannot tell yet, never that I have not been there.
 
 `thrive_daily_health` is the one for recovery and readiness; `thrive_daily_summary` for
 volume and load across days. Both take `date_from` / `date_to` and default to the last 7

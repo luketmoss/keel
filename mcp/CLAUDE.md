@@ -73,7 +73,7 @@ disjoint and together are exactly the app's tools.
 
 | Connector | URL | Serves | Normal state |
 |---|---|---|---|
-| `Thrive` | `<PUBLIC_URL>/thrive/mcp` | the 11 read tools | on |
+| `Thrive` | `<PUBLIC_URL>/thrive/mcp` | the 12 read tools | on |
 | `Thrive (write)` | `<PUBLIC_URL>/thrive/write/mcp` | the 17 write tools | **off** |
 | `Hive` | `<PUBLIC_URL>/hive/mcp` | the 5 read tools | on |
 | `Hive (write)` | `<PUBLIC_URL>/hive/write/mcp` | the 3 write tools | **off** |
@@ -228,7 +228,7 @@ with `npx wrangler secret put`, never committed.
 
 ## Thrive
 
-`/thrive/mcp` and `/thrive/write/mcp` serve the 28 Thrive tools between them, ported from the stdio server
+`/thrive/mcp` and `/thrive/write/mcp` serve the 29 Thrive tools between them, ported from the stdio server
 (retired in #372) and diffed against the tool list recorded from it
 (`test/fixtures/thrive-stdio-tools.json`, frozen the same way). The tool
 reference and the agent brief are in `docs/thrive-tools.md` and
@@ -272,6 +272,16 @@ them. Moving a drink to another day is deliberately not a tool: delete and re-lo
 **Deploy the Apps Script first**: until then `logDrink` refuses `source: 'mcp'` and the
 drink writes are not logged for undo. `thrive_log_drink` takes `unwind` at 5 mg an entry (#592); an
 API from before #590's deploy refuses it, and the tool passes that refusal on.
+
+**Trail history (#691).** `thrive_trail_history` (read) answers when a trail was last visited and how
+each pass compared with the time before, from the one `getWorkouts` request and each row's `trails`
+(Workouts!AD, #688). It needs #688's migration and Apps Script deploy first: until then no row carries
+`trails` and the tool says the API has not been updated. A blank `trails` on a tracked activity means
+not tagged yet, never "not on this trail", so the answer counts those activities instead of saying no.
+The grouping and like-for-like rules are a copy of the app's (`src/thrive/trails.js`, from
+`thrive/frontend/src/trails/`), held in step by `test/fixtures/trails-rules-golden.json`, which both
+sides' tests read; `mcp.yml` also runs on a change to the app's copy. A rule change edits the fixture
+and both copies in one pull request, which is therefore human-reviewed.
 
 ## Approving the destructive tools
 

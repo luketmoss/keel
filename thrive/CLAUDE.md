@@ -169,6 +169,14 @@ request**.
   silently. A pull request touching `mcp/` is human-reviewed (#393).
 - **The COROS portal URL rule** (`corosActivityUrl`) has two copies:
   `frontend/src/api/coros-link.ts` and `mcp/src/thrive/domain.js`.
+- **The trail rules** (#691): decoding `trails`, name splitting and keys, grouping,
+  matching and like-for-like. The app's copy is `frontend/src/api/trails-cell.ts` and
+  `frontend/src/trails/`; the MCP Worker's is `mcp/src/thrive/trails.js`. Both are
+  tested against one fixture, `mcp/test/fixtures/trails-rules-golden.json`
+  (`frontend/src/trails/trails-golden.test.ts` and `mcp/src/thrive/trails.test.js`), and
+  `thrive.yml` and `mcp.yml` each run on the other side's half. A rule change edits the
+  fixture and both copies, so it touches `mcp/` and is human-reviewed: intended, since the
+  Worker is the copy no screen shows.
 
 ## Changing the schema
 

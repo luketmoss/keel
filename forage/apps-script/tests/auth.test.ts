@@ -13,7 +13,7 @@ const TOKEN = 'ya29.a0Live/Token+Value=_with-chars';
 const TOKEN_PROPS = { TOKEN_CLIENT_ID: CLIENT_ID, TOKEN_ALLOWED_EMAIL: EMAIL };
 
 /** The actions a token caller is refused. Adding one here is a deliberate decision. */
-const KEY_ONLY = ['getConfig', 'setConfig', 'ensureSchema'];
+const KEY_ONLY = ['getConfig', 'setConfig', 'ensureSchema', 'getChangeLog', 'undoCall'];
 
 function info(overrides: Record<string, unknown> = {}): FetchReply {
   return {

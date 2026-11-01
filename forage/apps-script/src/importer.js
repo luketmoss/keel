@@ -824,6 +824,8 @@ function buildPreview(draft, foods, byId, aliases) {
       optional: parsed.optional,
       flags: parsed.flags,
       food_id: match.food_id,
+      // The matched food's name, so a preview can say what a line became (#713's agent tool).
+      food_name: match.food_id && byId[match.food_id] ? byId[match.food_id].name : '',
       match: match.match,
       suggestions: match.suggestions,
     };

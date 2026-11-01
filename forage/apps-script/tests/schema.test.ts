@@ -1,4 +1,4 @@
-// #703 AC1, AC2: the 11 tabs and their columns, and ensureSchema.
+// #703 AC1, AC2: the tabs and their columns, and ensureSchema; #713 adds the 12th, MCPChangeLog.
 
 import { describe, expect, it } from 'vitest';
 import { loadApi, makeSheet } from './apps-script-sandbox';
@@ -24,18 +24,19 @@ const EXPECTED: Record<string, string[]> = {
   ],
   Cooks: ['id', 'recipe_id', 'date', 'rating', 'note', 'plan_id', 'created'],
   Config: ['key', 'value', 'updated'],
+  MCPChangeLog: ['logged_at', 'call_id', 'action', 'tab', 'row_key', 'before', 'after'],
 };
 
 const KEYS: Record<string, string[]> = {
   Foods: ['id'], Recipes: ['id'], RecipeLines: ['recipe_id', 'line_id'], Steps: ['recipe_id', 'position'],
   Walkthroughs: ['recipe_id'], Plan: ['id'], Trips: ['id'], TripItems: ['trip_id', 'food_id'], FoodLog: ['id'],
-  Cooks: ['id'], Config: ['key'],
+  Cooks: ['id'], Config: ['key'], MCPChangeLog: ['call_id', 'tab', 'row_key'],
 };
 
-describe('AC1: types.js defines the 11 tabs with exactly these columns', () => {
+describe('AC1: types.js defines the 12 tabs with exactly these columns', () => {
   const { sandbox } = loadApi();
 
-  it('has exactly the 11 tabs, in order', () => {
+  it('has exactly the 12 tabs, in order', () => {
     expect(sandbox.TAB_ORDER).toEqual(Object.keys(EXPECTED));
     expect(Object.keys(sandbox.TABS).sort()).toEqual(Object.keys(EXPECTED).sort());
   });
@@ -50,19 +51,19 @@ describe('AC1: types.js defines the 11 tabs with exactly these columns', () => {
 });
 
 describe('AC2: ensureSchema', () => {
-  it('creates all 11 tabs with frozen header rows and schema_version 1 on an empty sheet', () => {
+  it('creates all 12 tabs with frozen header rows and schema_version 2 on an empty sheet', () => {
     const api = loadApi({ empty: true });
     const data = api.ok('ensureSchema');
     expect(data.created).toEqual(Object.keys(EXPECTED));
     expect(data.existing).toEqual([]);
-    expect(data.schema_version).toBe('1');
+    expect(data.schema_version).toBe('2');
     for (const [tab, fields] of Object.entries(EXPECTED)) {
       const sheet = api.ss.getSheetByName(tab)!;
       expect(sheet.rows[0]).toEqual(fields);
       expect(sheet.frozenRows).toBe(1);
     }
-    expect(api.rows('Config').map((r) => r.slice(0, 2))).toEqual([['schema_version', '1']]);
-    expect(api.ok('getConfig')).toEqual({ schema_version: '1' });
+    expect(api.rows('Config').map((r) => r.slice(0, 2))).toEqual([['schema_version', '2']]);
+    expect(api.ok('getConfig')).toEqual({ schema_version: '2' });
   });
 
   it('changes nothing on a second run', () => {
@@ -81,8 +82,28 @@ describe('AC2: ensureSchema', () => {
     api.ss.sheets.set('Foods', makeSheet('Foods', odd));
     const data = api.ok('ensureSchema');
     expect(data.existing).toEqual(['Foods']);
-    expect(data.created).toHaveLength(10);
+    expect(data.created).toHaveLength(11);
     expect(api.ss.getSheetByName('Foods')!.rows).toEqual([['something', 'else'], ['kept', 'as is']]);
+  });
+
+  it('on a sheet at schema_version 1 adds MCPChangeLog, raises the version to 2, and changes no other tab (#713)', () => {
+    const api = loadApi({ empty: true });
+    api.ok('ensureSchema');
+    // Back to how #703 left a sheet: no MCPChangeLog, version 1, and some data.
+    api.ok('setConfig', { payload: { key: 'schema_version', value: '1' } });
+    api.ok('upsertFood', { payload: { id: 'fd_1', name: 'Onion' } });
+    api.ss.sheets.delete('MCPChangeLog');
+    // A key write is refused, not left unlogged, until the tab is back.
+    expect(api.call('upsertFood', { payload: { id: 'fd_2', name: 'Leek' } }).error).toMatch(/MCPChangeLog tab missing/);
+    const others = () =>
+      JSON.stringify([...api.ss.sheets.entries()].filter(([n]) => n !== 'Config' && n !== 'MCPChangeLog').map(([n, s]) => [n, s.rows]));
+    const before = others();
+    const data = api.ok('ensureSchema');
+    expect(data.created).toEqual(['MCPChangeLog']);
+    expect(data.schema_version).toBe('2');
+    expect(api.ss.getSheetByName('MCPChangeLog')!.rows).toEqual([EXPECTED.MCPChangeLog]);
+    expect(others()).toBe(before);
+    expect(api.rows('Config').map((r) => r[0])).toEqual(['schema_version']);
   });
 
   it('is key-only and holds the script lock', () => {

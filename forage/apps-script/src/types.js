@@ -14,7 +14,7 @@ var TIMEZONE = 'America/Denver';
 /** A `payload` longer than this is refused, which keeps a cell under Sheets' 50,000 limit. */
 var MAX_PAYLOAD_CHARS = 45000;
 
-var SCHEMA_VERSION = '1';
+var SCHEMA_VERSION = '2';
 
 var FOOD_FIELDS = [
   'id', 'name', 'kind', 'brand', 'category',
@@ -51,6 +51,13 @@ var COOK_FIELDS = ['id', 'recipe_id', 'date', 'rating', 'note', 'plan_id', 'crea
 
 var CONFIG_FIELDS = ['key', 'value', 'updated'];
 
+/**
+ * #713: one row per sheet row a key-caller write created, changed or deleted.
+ * `row_key` is the row's key fields as JSON; `before` and `after` are the
+ * whole row, field to display text, blank for a row that did not exist.
+ */
+var CHANGE_LOG_FIELDS = ['logged_at', 'call_id', 'action', 'tab', 'row_key', 'before', 'after'];
+
 /** Every tab, in the order `ensureSchema` creates them. */
 var TABS = {
   Foods: {
@@ -86,11 +93,12 @@ var TABS = {
   },
   Cooks: { fields: COOK_FIELDS, key: ['id'], kinds: { rating: 'num' } },
   Config: { fields: CONFIG_FIELDS, key: ['key'], kinds: {} },
+  MCPChangeLog: { fields: CHANGE_LOG_FIELDS, key: ['call_id', 'tab', 'row_key'], kinds: {} },
 };
 
 var TAB_ORDER = [
   'Foods', 'Recipes', 'RecipeLines', 'Steps', 'Walkthroughs', 'Plan', 'Trips', 'TripItems', 'FoodLog', 'Cooks',
-  'Config',
+  'Config', 'MCPChangeLog',
 ];
 
 /** The prefix an API-made id gets, by entity. */

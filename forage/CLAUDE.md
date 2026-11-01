@@ -26,8 +26,11 @@ extractor and its test (`parsing.ts`, `parsing.test.ts`, from
 (`icons/`). Neither component compiles or tests them. #706 moves the extractor
 into code and #702 starts from the icons.
 
-Nothing is deployed from this folder yet: there is no Pages workflow (#705), no
-Apps Script project and no Sheet (the owner's steps in #700).
+`frontend/` is published to `https://luketmoss.github.io/keel/forage/` by
+`.github/workflows/forage-pages.yml` (#705) on every push to `main` that
+touches it, `auth/` or `ui/`. The build gets `FORAGE_GOOGLE_CLIENT_ID` and
+`FORAGE_API_URL` only; the API key and Sheet ID never reach the client.
+`apps-script/` is deployed by the owner (`clasp`), never by CI or a session.
 
 ## Stacks
 

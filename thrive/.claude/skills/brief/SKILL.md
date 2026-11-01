@@ -126,13 +126,23 @@ Make these calls in parallel. They don't depend on each other.
 | Body | `thrive_body_measurements` with `date_from` = 7 days ago |
 | Yesterday's note | `thrive_journal` with `date_from` = `date_to` = yesterday |
 | Yesterday's drinks | `thrive_drinks` with `date_from` = `date_to` = yesterday. It reads the Drinks log directly, so use it rather than the summary's water, coffee, alcohol and Unwind, which lag until the next rebuild |
-| Board | `hive_list_items` with `due_before` = today + 3 days, once with `status: 'To Do'` and once with `status: 'In Progress'`. If a call errors (it has returned a 404 page once), retry it once before giving up. Never call it without a `status`: `due_before` has no lower bound, so an unfiltered call returns every finished item ever due and buries the open ones. Keep the Hive owner's items (see Settings). Overdue means a due date before today; list those separately from today's and the look-ahead's, oldest first, and say how many days overdue. |
+| Board | `hive_list_items` with `status: 'To Do'` and again with `status: 'In Progress'`, and **no** `due_before` or `due_after`. If a call errors (it has returned a 404 page once), retry it once before giving up. Never call it without a `status`: an unfiltered call returns every finished item ever. The brief filters dates itself, because Hive's `due_before` drops without an error any item whose due date comes back in a form it can't compare, and the Board then looks complete when it isn't (#728). Keep the Hive owner's items (see Settings), then file each by its due date as [Reading a Hive due date](#reading-a-hive-due-date) says: before today is overdue, list those separately from today's and the look-ahead's, oldest first, and say how many days overdue; today is due today; today + 1 to today + 3 is the look-ahead; no due date, or later than that, is left out. |
 | Calendar | Events for today + 3 days from **each** calendar in Settings, if a calendar tool is connected. Pass the time zone from Settings, since a calendar's own zone can differ. Pass `eventType` as `DEFAULT`, `OUT_OF_OFFICE`, `FOCUS_TIME`, `FROM_GMAIL` and `BIRTHDAY`: birthdays are left out unless asked for. An empty result from one calendar is not "no events": say "no events" only when every calendar was read and all were empty. |
 | Weather | One Open-Meteo forecast for today + 3 days (below) |
 | Last time | For each planned session in the look-ahead, `thrive_list_workouts` with `name_contains` = its name, `status: 'completed'`, `limit: 1`: its date, effort and note, for the day's "last time" line. Skip a session whose name is only its type (`Stretch`, `Mountain Bike`), since every one of those matches |
 
 If a call fails, keep going. List what failed in the brief's last line.
 A partial brief beats no brief.
+
+### Reading a Hive due date
+
+Read every item's due date as an `America/Denver` calendar date, whichever form it comes back in:
+
+- `YYYY-MM-DD` is that date.
+- The long form Hive returns for a date cell, such as `Sun Nov 01 2026 01:00:00 GMT-0500 (Eastern Standard Time)`, is an **instant**, not a string to slice: convert it to America/Denver and take that date. The example is 2026-11-01 06:00 UTC, which is 2026-11-01 in Denver.
+- Anything else is unreadable. Do not drop the item: count it, and end the foot line with *"N Hive items had a due date I couldn't read."* (singular: *"1 Hive item had a due date I couldn't read."*). Name no titles in that line.
+
+Then file it against today's Denver date: before today is overdue (`days` is the whole days between), today is due today, today + 1 to today + 3 is the look-ahead (the weekly brief's window is today + 7, below). No due date, or one past the window, is left out and is not counted as unreadable.
 
 ### The plan's why
 
@@ -517,7 +527,8 @@ colour and icon.
 - `body`: `{value, unit, series, sub, bp, bpSub}`: the morning weight, its
   readings over the last 7 days, the change in words, and the day's blood
   pressure with how many readings and the recent range.
-- `foot`: the line naming anything not checked, and that this is training
+- `foot`: the line naming anything not checked, any Hive items whose due date
+  couldn't be read (see Reading a Hive due date), and that this is training
   guidance, not medical advice.
 
 ## Weekly brief
@@ -624,10 +635,13 @@ strings show as text, times are decimal hours as on the daily page):
   board}]`, overdue `[{title, board, days}]`, in progress `[{title, board,
   status}]`, and due in the week ahead `[{title, board, due}]`. `overdue`
   also leads Day by day as one line, since those items fall on no day ahead;
-  `days` is how many days late, at least 1.
-- `foot`: what wasn't checked, any thin comparison, such as a week before
-  with only a few nights of data, and that this is training guidance, not
-  medical advice.
+  `days` is how many days late, at least 1. Fetch and file it as the daily Board
+  does: `hive_list_items` per status with no `due_before` / `due_after`, each due
+  date read as an America/Denver date (Reading a Hive due date), "soon" being
+  today + 1 to today + 7.
+- `foot`: what wasn't checked, any Hive items whose due date couldn't be read,
+  any thin comparison, such as a week before with only a few nights of data,
+  and that this is training guidance, not medical advice.
 
 ## Never
 

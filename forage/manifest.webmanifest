@@ -1,0 +1,15 @@
+{
+  "name": "Forage — Meals and Recipes",
+  "short_name": "Forage",
+  "description": "Menu planning, recipes, shopping and a food log",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#10281a",
+  "theme_color": "#10281a",
+  "icons": [
+    { "src": "forage-app-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "forage-app-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "forage-app-icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

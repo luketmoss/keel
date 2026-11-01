@@ -54,7 +54,7 @@ Each app creates one session with its own `storagePrefix` (Thrive: `gw_`, which
 keeps phones signed in across the move). The prefix is the whole isolation
 between apps; the keys are `<prefix>token`, `<prefix>user`, `<prefix>token_expiry`.
 
-Consumers today: Thrive (`gw_`) and Hive (`hive_`, #609).
+Consumers today: Thrive (`gw_`), Hive (`hive_`, #609) and Forage (`forage_`, #704).
 
 ## Rules the session keeps
 

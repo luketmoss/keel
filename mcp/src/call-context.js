@@ -40,7 +40,7 @@ export function declareRows(rows) {
  * have landed. A no-op outside a tool call or with no budget configured.
  *
  * @param {{reserve(rows: number): Promise<{allowed: boolean}>} | undefined} budget
- * @param {'Thrive' | 'Hive'} app
+ * @param {'Thrive' | 'Hive' | 'Forage'} app
  * @param {number} fallbackRows - the first request's own row count
  */
 export async function reserveWrite(budget, app, fallbackRows) {

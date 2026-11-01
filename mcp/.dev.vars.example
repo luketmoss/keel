@@ -24,3 +24,10 @@ THRIVE_API_URL=
 # Thrive's MCP-only key: the MCP_API_KEY script property in Thrive's Apps
 # Script (thrive#364), NOT its API_KEY, which the syncs and admin scripts hold.
 THRIVE_API_KEY=
+
+# Forage's Apps Script web-app URL (the /exec URL, #713). Treated as a secret.
+FORAGE_API_URL=
+
+# Forage's API key: the API_KEY script property in Forage's Apps Script (#703).
+# The app never holds it; this Worker and the owner's hand-run scripts do.
+FORAGE_API_KEY=

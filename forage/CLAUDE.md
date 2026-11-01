@@ -56,8 +56,8 @@ code path defaults a nutrition value or a weight to `0`. "JSON" is one cell of
 JSON text. Ids a caller sends are kept (sending one again upserts); otherwise
 the API makes `<prefix>_` + 8 hex: `fd_`, `rc_`, `pl_`, `tr_`, `lg_`, `ck_`.
 The tabs are created by `scripts/migrate-703-create-tabs.mjs`, which calls the
-key-only `ensureSchema`. Nutrition (unit conversion, per serving, the partial
-rule) is computed only in `apps-script/src/nutrition.js`, and recipe import
+key-only `ensureSchema`; run it again after a release that adds a tab (#713).
+Nutrition (unit conversion, per serving, the partial rule) is computed only in `apps-script/src/nutrition.js`, and recipe import
 (reading pages, the ingredient line parser, matching lines to foods) only in
 `apps-script/src/importer.js`, behind the one `importRecipe` action (#706).
 
@@ -74,6 +74,7 @@ rule) is computed only in `apps-script/src/nutrition.js`, and recipe import
 | **FoodLog** | `id` | id, date, slot, food_id, recipe_id, qty, unit, grams, kcal, protein_g, carbs_g, fat_g, partial, source, logged_at, created, updated |
 | **Cooks** | `id` | id, recipe_id, date, rating, note, plan_id, created |
 | **Config** | `key` | key, value, updated |
+| **MCPChangeLog** | — | logged_at, call_id, action, tab, row_key, before, after |
 
 What the columns mean:
 
@@ -124,9 +125,13 @@ What the columns mean:
   the API. `logged_at` is ISO UTC.
 - **Cooks.** `rating` is 1–5, or blank when not rated. `plan_id` is set when
   the cook was the plan's meal.
-- **Config.** `schema_version` (`1`), and `ingredient_aliases` (#706): a JSON
+- **Config.** `schema_version` (`2` since #713's MCPChangeLog), and `ingredient_aliases` (#706): a JSON
   object from a normalised ingredient name to the `food_id` a saved import
   matched it to. Later issues add keys here, not tabs.
+- **MCPChangeLog** (#713). One row per sheet row a key-caller write created,
+  changed or deleted: `row_key` is its key fields as JSON, `before` and `after`
+  the whole row (field to display text), blank for a row that did not exist.
+  Written only by `change-log.js`; nothing else reads it.
 
 **Referential rules.** A write naming a food, recipe, plan entry or trip that
 does not exist is refused, naming the id. Deleting a food used by a recipe
@@ -136,9 +141,35 @@ lines, steps and walkthrough, and is refused while a plan or log entry uses it.
 **Callers.** The MCP Worker sends `key` (the `API_KEY` script property, held
 as `FORAGE_API_KEY`) and may run every action. The app sends `access_token`,
 checked against `TOKEN_CLIENT_ID` and `TOKEN_ALLOWED_EMAIL`, and may run
-`TOKEN_ACTIONS` in `auth.js`: everything but `getConfig`, `setConfig` and
-`ensureSchema`. Either may POST form-encoded; a `payload` over 45,000
-characters is refused.
+`TOKEN_ACTIONS` in `auth.js`: everything but `getConfig`, `setConfig`,
+`ensureSchema`, `getChangeLog` and `undoCall`. Either may POST form-encoded; a
+`payload` over 45,000 characters is refused.
+
+## MCP tools
+
+Agents reach Forage through two connectors in the Keel MCP Worker (#713):
+`Forage` (read, `/forage/mcp`) and `Forage (write)` (`/forage/write/mcp`),
+normally off. Anything the app can do, an agent can do through them, and the
+tests hold that true:
+
+- **Where a tool is registered:** `mcp/src/forage/tools.ts`. A tool is a write
+  tool unless it is in `FORAGE_READ_TOOLS` there. `mcp/docs/forage-tools.md`
+  is the table of every tool and the steps for adding one. A PR adding one
+  changes `mcp/**` and is human-reviewed.
+- **Undo.** Every key-caller write is logged by `withChangeLog`
+  (`apps-script/src/change-log.js`) for the tabs `CHANGE_LOGGED_ACTIONS` names;
+  `getChangeLog` and `undoCall` (key-only) read and revert it, all or nothing.
+  Token callers (the app) are never logged. `undoCall` refuses a row changed
+  since, and refuses to remove a food, recipe, plan entry or trip that a row
+  outside the call still uses. A key write is refused while the tab is missing.
+- **Parity.** `apps-script/tests/mcp-parity.test.ts` fails when an action in
+  `main.js` has no tool and is on neither `NO_TOOL` (with a reason) nor
+  `PENDING_TOOLS` (with its feature issue), when a pending action already has a
+  tool, and when a write action is on neither `CHANGE_LOGGED_ACTIONS` nor
+  `NOT_LOGGED`. A feature issue (#707 foods, #708 recipes and cooks, #709 plan,
+  #710 trips, #711 walkthroughs, #712 food log) removes its actions from
+  `PENDING_TOOLS` in the PR that adds their tools. `forage.yml` runs on
+  `mcp/src/forage/**` as well, so a Worker change runs it too.
 
 ## Key commands
 

@@ -1,8 +1,8 @@
 # CLAUDE.md — mcp
 
-Remote MCP server for Thrive and Hive on Cloudflare Workers: one Worker, GitHub
-sign-in limited to the owner, so both apps' tools are reachable from the phone,
-the desktop app and Claude Code. The plan and its split are in
+Remote MCP server for Thrive, Hive and Forage on Cloudflare Workers: one Worker,
+GitHub sign-in limited to the owner, so the apps' tools are reachable from the
+phone, the desktop app and Claude Code. The plan and its split are in
 [luketmoss/keel#367](https://github.com/luketmoss/keel/issues/367).
 
 **Stack:** worker. The authoritative conventions for this project are in
@@ -18,23 +18,25 @@ mcp/
 ├── wrangler.toml
 ├── .dev.vars.example   # every secret the Worker reads
 ├── src/
-│   ├── index.ts        # authorization server + one resource server per MCP endpoint
+│   ├── index.ts        # one resource server per MCP endpoint, and routing
+│   ├── oauth.ts        # the authorization server and its list of resources
 │   ├── auth.ts         # /authorize, /callback, /health: consent, GitHub sign-in
 │   ├── allow.ts        # the one-GitHub-user-ID gate
 │   ├── github.ts       # GitHub OAuth calls and PKCE helpers
 │   ├── hive/           # /hive/mcp and /hive/write/mcp: api.ts (Apps Script client), tools.ts, index.ts
 │   ├── thrive/         # /thrive/mcp and /thrive/write/mcp: the ported Thrive modules (JS) + index.ts
+│   ├── forage/         # /forage/mcp and /forage/write/mcp (#713): api.ts, tools.ts, index.ts
 │   ├── mode.js         # read vs write: the reminder line and the endpoints' instructions
 │   ├── budget.js       # the write ceilings as plain functions (window logic, wording, vars)
 │   ├── budget-do.ts    # WriteBudget, the hourly counter's Durable Object
-│   ├── undo-format.js  # the wording of thrive_undo and hive_undo
+│   ├── undo-format.js  # the wording of thrive_undo, hive_undo and forage_undo's lists
 │   ├── call-context.js # state that belongs to one tool call (AsyncLocalStorage)
 │   ├── consent.ts      # consent and message pages
 │   ├── config.ts       # the Worker's public URL and resource URLs
 │   └── env.ts          # the Env interface: every binding
 ├── test/               # `cloudflare:workers` stand-in; fixtures/ holds the retired
 │                       # stdio servers' tool lists the ports are diffed against
-├── docs/               # thrive-tools.md (reference), thrive-agent-brief.md
+├── docs/               # thrive-tools.md and forage-tools.md (references), thrive-agent-brief.md
 └── docs/design/        # UX artifacts, one file per issue
 ```
 
@@ -52,7 +54,7 @@ Setup for a fresh account, once:
    client ID in `wrangler.toml` (`GITHUB_CLIENT_ID`).
 2. `npx wrangler secret put GITHUB_CLIENT_SECRET` and
    `npx wrangler secret put ALLOWED_GITHUB_ID`.
-3. In claude.ai, add one custom connector per endpoint (the four below).
+3. In claude.ai, add one custom connector per endpoint (the six below).
 
 Each endpoint is its own OAuth resource, so a token issued for one is refused at
 the others.
@@ -64,9 +66,10 @@ signed each account out of the other. `callback` passes
 `revokeExistingGrants: false`; a grant left behind by a reconnect expires on the
 provider's 30-day refresh-token lifetime. To add an endpoint: a folder like `src/hive/`, an entry in
 `resources` in `src/index.ts`, and its URL in `resources` of the authorization
-server (`src/index.ts`) and `src/config.ts`.
+server (`src/oauth.ts`) and `src/config.ts`. `src/index.tokens.test.ts` mints a real token for each
+endpoint and checks it is refused at every other: add the new path to its list.
 
-## The four connectors (#409)
+## The six connectors (#409, #713)
 
 Each app has a read connector and a write connector. Their tool lists are
 disjoint and together are exactly the app's tools.
@@ -77,6 +80,8 @@ disjoint and together are exactly the app's tools.
 | `Thrive (write)` | `<PUBLIC_URL>/thrive/write/mcp` | the 17 write tools | **off** |
 | `Hive` | `<PUBLIC_URL>/hive/mcp` | the 4 read tools | on |
 | `Hive (write)` | `<PUBLIC_URL>/hive/write/mcp` | the 5 write tools | **off** |
+| `Forage` | `<PUBLIC_URL>/forage/mcp` | the 1 read tool | on |
+| `Forage (write)` | `<PUBLIC_URL>/forage/write/mcp` | the 2 write tools | **off** |
 
 **The write connectors are off unless you are writing.** claude.ai remembers the
 toggle across chats, so turning `Thrive (write)` on to log a session leaves it on
@@ -92,8 +97,9 @@ connector is on; the reminder and the endpoints' `instructions` only make that
 state visible. Wording and edge cases:
 [`docs/design/409-read-write-connectors.md`](docs/design/409-read-write-connectors.md).
 
-- **Which tool is on which endpoint** is `READ_ONLY` in `src/thrive/tools.js`
-  and `HIVE_READ_TOOLS` in `src/hive/tools.ts`; every other tool is a write tool.
+- **Which tool is on which endpoint** is `READ_ONLY` in `src/thrive/tools.js`,
+  `HIVE_READ_TOOLS` in `src/hive/tools.ts` and `FORAGE_READ_TOOLS` in
+  `src/forage/tools.ts`; every other tool is a write tool.
   A new tool lands on the write endpoint unless it is added to those sets.
 - **A successful write's result ends with** `— <App> (write) is on. Turn it off
   in Search and tools when you've finished writing.` A dry run, a refusal and a
@@ -124,6 +130,8 @@ value falls back to the default, never to "unlimited" (`parseLimits` in
   to write from the plan they already validated, and gain an optional `confirm`
   that does nothing at or under the ceiling. The destructive tools keep their own
   dry runs. Hive writes touch one row each, so Hive has no per-call path.
+  `forage_import_recipe` counts the recipe, its lines and its steps from its own
+  dry run, and takes the same `confirm` (#713).
 - **Hourly budget.** The Worker cannot see sessions, so it is per app over an
   hour, not per session: a runaway loop lives inside one hour, and two sessions
   writing at once share the budget. There is **no `confirm` past it**, because a
@@ -133,7 +141,7 @@ value falls back to the default, never to "unlimited" (`parseLimits` in
   have landed), a call refused before any request does not, and neither does a
   cap preview or `previewSetUpdates`.
 - **Where the count lives.** One Durable Object per app (`WriteBudget`, binding
-  `WRITE_BUDGET`, instance names `thrive` and `hive`), holding only
+  `WRITE_BUDGET`, instance names `thrive`, `hive` and `forage`), holding only
   timestamps and row counts, never arguments or values. KV was rejected: it is
   eventually consistent and takes one write per second per key, so a fast loop
   would slip past it. A write endpoint with no `WRITE_BUDGET` binding answers 503
@@ -226,7 +234,7 @@ option stay `mcp`.
 - **Changing `PUBLIC_URL`** changes the issuer and every resource, so every
   existing grant stops working. In the same step, change the GitHub OAuth app's
   callback URL to `<PUBLIC_URL>/callback` (it allows one), then remove and re-add
-  all four connectors in every claude.ai account that uses them.
+  all six connectors in every claude.ai account that uses them.
 
 Merge to `main` deploys, once the `CLOUDFLARE_API_TOKEN` repository secret
 exists; until then the deploy job skips with a notice. Worker secrets are set
@@ -289,16 +297,40 @@ The grouping and like-for-like rules are a copy of the app's (`src/thrive/trails
 sides' tests read; `mcp.yml` also runs on a change to the app's copy. A rule change edits the fixture
 and both copies in one pull request, which is therefore human-reviewed.
 
+## Forage
+
+`/forage/mcp` and `/forage/write/mcp` (#713) serve Forage's tools: `forage_status` (read), and
+`forage_import_recipe` and `forage_undo` (write). The rest arrive with their feature issues (#707–#712); the
+table of every tool, and how to add one, is `docs/forage-tools.md`. Wording:
+[`docs/design/713-forage-connectors.md`](docs/design/713-forage-connectors.md). Secrets: `FORAGE_API_URL` and
+`FORAGE_API_KEY`, the Forage Apps Script's `API_KEY` (#703); the app never holds it, only this Worker and the
+owner's hand-run scripts. Either missing: both endpoints answer 503, `Forage is not configured on this Worker.`
+Every request is a form-encoded POST, so the key stays out of URLs, and errors are scrubbed of the key and URL.
+
+- **The change log is the API's.** Every key-caller write appends one `MCPChangeLog` row per sheet row it changed
+  (`forage/apps-script/src/change-log.js`, after Thrive's #434), under the payload's `call_id`. `forage_undo` is
+  thin over `getChangeLog` and `undoCall`, which are key-only. Stricter than Thrive: an undo is refused when a row it
+  would remove (a food, recipe, plan entry or trip) is now used by a row outside the call, naming the use.
+- **`undoCall`'s payload `call_id` is the call to revert**, so `apiWrite` leaves a payload's own `call_id` alone
+  rather than stamping the tool call's over it. The API logs the revert under an id it makes.
+- **Ordering.** The Apps Script first: `clasp push` and a new web-app version, then the migration re-run
+  (`forage/scripts/migrate-703-create-tabs.mjs`, which adds `MCPChangeLog` and raises `schema_version` to 2), then
+  the two secrets, then this Worker. Until the API has the tab, every key write is refused ("MCPChangeLog tab
+  missing"), and an API from before #713 answers `forage_undo` as unknown actions: the tool says to redeploy.
+- **Parity.** `forage/apps-script/tests/mcp-parity.test.ts` fails when a `main.js` action has no tool and is on
+  neither `NO_TOOL` nor `PENDING_TOOLS`, or is still pending once it has one. `forage.yml` also runs on a change
+  to `mcp/src/forage/**`, so a Worker PR runs it too.
+
 ## Approving the destructive tools
 
-The tools below are on the write connectors, `Thrive (write)` and `Hive (write)`;
-approval is set on that connector's tools.
+The tools below are on the write connectors, `Thrive (write)`, `Hive (write)` and
+`Forage (write)`; approval is set on that connector's tools.
 
 `thrive_delete_workout`, `thrive_delete_exercise`, `thrive_update_template`
 (it deletes the old rows), `thrive_set_journal_entry` (clearing a note is a
 delete), `thrive_set_workout_rest` (it overwrites planned rest, #583),
 `thrive_delete_drink` (#595) and `thrive_undo` can destroy data. `hive_delete_item` (#725) and
-`hive_undo` are the same for Hive, and gets the same treatment. Reverting can itself destroy work done
+`hive_undo` are the same for Hive, and `forage_undo` (#713) for Forage; they get the same treatment. Reverting can itself destroy work done
 since, so the app's conflict check is the first line and a human approval the second. Their dry-run-until-`confirm: true`
 behaviour only prevents accidents; against prompt injection the one control is a
 human approving each call.
@@ -307,7 +339,7 @@ human approving each call.
 prompt switches it off on that device only, and a new device starts at the
 default. So:
 
-- **Never choose "Always allow" on those tools, `hive_delete_item` and `hive_undo` included, on any device.**
+- **Never choose "Always allow" on those tools, `hive_delete_item`, `hive_undo` and `forage_undo` included, on any device.**
 - On each device you use, set them to "Needs approval" in the connector's tool
   list, and check by calling one.
 

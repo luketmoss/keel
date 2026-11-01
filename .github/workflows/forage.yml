@@ -1,10 +1,10 @@
 name: forage
 on:
   pull_request:
-    paths: ['forage/**', 'auth/**', 'ui/**', '.github/workflows/forage.yml']
+    paths: ['forage/**', 'auth/**', 'ui/**', 'mcp/src/forage/**', '.github/workflows/forage.yml']
   push:
     branches: [main]
-    paths: ['forage/**', 'auth/**', 'ui/**', '.github/workflows/forage.yml']
+    paths: ['forage/**', 'auth/**', 'ui/**', 'mcp/src/forage/**', '.github/workflows/forage.yml']
 concurrency:
   group: forage-${{ github.ref }}
   cancel-in-progress: true

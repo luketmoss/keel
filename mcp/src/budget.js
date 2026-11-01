@@ -103,7 +103,7 @@ export function formatResume(epochMs) {
  * What a refused write call says. Names what was exceeded and when writing
  * resumes; reads are not limited, and it says so.
  *
- * @param {'Thrive' | 'Hive'} app
+ * @param {'Thrive' | 'Hive' | 'Forage'} app
  * @param {{reason: 'writes' | 'rows', limit: number, resumesAt: number}} denial
  */
 export function limitMessage(app, denial) {

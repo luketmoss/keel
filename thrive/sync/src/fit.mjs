@@ -141,6 +141,24 @@ export function checkFit(bytes) {
 }
 
 /**
+ * Whether a resource URI names the activity: its id anywhere in the URI as a
+ * whole token, so `9<id>` or `<id>0` is another activity (#737). The shape
+ * #174 saw, `coros://activity-fit-files/<id>.fit`, changed by 2026-11-01
+ * without notice, so only the id is relied on, not where COROS puts it.
+ */
+export function uriNamesActivity(uri, activityId) {
+  if (typeof uri !== 'string' || !activityId) return false;
+  const id = String(activityId).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?<![0-9])${id}(?![0-9])`).test(uri);
+}
+
+/**
+ * A URI for an error message: the query and fragment dropped, where a signed
+ * URL keeps its signature, then redacted (#737).
+ */
+const describeUri = (uri) => (typeof uri === 'string' ? redact(uri.replace(/[?#].*$/s, '')) : `no URI (${typeof uri})`);
+
+/**
  * The FIT bytes in a `downloadActivityFitFiles` result for one activity:
  * exactly one binary resource, named for that activity, holding a whole FIT.
  * Text items are COROS's advice to the reader and are ignored, never kept.
@@ -152,8 +170,8 @@ export function fitFromResult(result, activityId) {
     throw new FitFormatError(`${FIT_TOOL} returned ${blobs.length} FIT files, expected 1`);
   }
   const { uri } = blobs[0].resource;
-  if (typeof uri !== 'string' || !uri.endsWith(`/${activityId}.fit`)) {
-    throw new FitFormatError(`${FIT_TOOL} returned a file for a different activity`);
+  if (!uriNamesActivity(uri, activityId)) {
+    throw new FitFormatError(`${FIT_TOOL} returned a file for a different activity: ${describeUri(uri)}`);
   }
   const bytes = Buffer.from(blobs[0].resource.blob, 'base64');
   checkFit(bytes);

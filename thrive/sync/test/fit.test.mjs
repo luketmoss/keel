@@ -90,6 +90,62 @@ test('AC1: the one resource named for the activity is taken, and the text is ign
   assert.throws(() => fitFromResult({ ...fitResult('42'), isError: true }, '42'), /error result/);
 });
 
+/** fitResult with the resource's URI replaced. */
+const withUri = (uri, bytes = makeFit()) => {
+  const r = fitResult('unused', bytes);
+  r.content[1].resource.uri = uri;
+  return r;
+};
+
+const ID = '481454377662447819';
+
+test('#737 AC1: the shape #174 saw is still taken', () => {
+  const bytes = makeFit();
+  assert.deepEqual(fitFromResult(withUri(`coros://activity-fit-files/${ID}.fit`, bytes), ID), bytes);
+});
+
+test('#737 AC2: a URI naming the activity in another shape is taken', () => {
+  for (const uri of [
+    `coros://activity-fit-files/${ID}_1.fit`,
+    `coros://activity-fit-files/${ID}.FIT`,
+    `coros://activity-fit-files/${ID}.fit?x=1`,
+    `coros://activity-fit-files/fit-${ID}.fit`,
+    `coros://activity-fit-files/${ID}/activity.fit`,
+    `coros://activity-fit-files/file.fit?labelId=${ID}`,
+  ]) {
+    assert.ok(fitFromResult(withUri(uri), ID), uri);
+  }
+});
+
+test('#737 AC3: another activity, a longer number or no activity is refused, naming the URI', () => {
+  for (const uri of [
+    'coros://activity-fit-files/481455519050006529.fit',
+    `coros://activity-fit-files/9${ID}.fit`,
+    `coros://activity-fit-files/${ID}0.fit`,
+    'coros://activity-fit-files/latest.fit',
+  ]) {
+    assert.throws(
+      () => fitFromResult(withUri(uri), ID),
+      (err) => err instanceof FitFormatError && /different activity/.test(err.message) && err.message.includes(uri),
+      uri,
+    );
+  }
+  assert.throws(() => fitFromResult(withUri(undefined), ID), /different activity: no URI \(undefined\)/);
+});
+
+test('#737 AC4: a signed URL in the refusal loses its query, and a COROS S3 URL is masked', () => {
+  const signed = 'https://bucket.s3.amazonaws.com/fit/other.fit?X-Amz-Signature=abc123secret&X-Amz-Credential=AKIAXYZ';
+  assert.throws(
+    () => fitFromResult(withUri(signed), ID),
+    (err) => err.message.includes('https://bucket.s3.amazonaws.com/fit/other.fit') &&
+      !/abc123secret|AKIAXYZ|X-Amz/.test(err.message),
+  );
+  assert.throws(
+    () => fitFromResult(withUri('https://s3.coros.com/fit/abc/other.fit?sig=1'), ID),
+    (err) => err.message.includes('[fit-url redacted]') && !err.message.includes('s3.coros.com'),
+  );
+});
+
 // --- the budget ---------------------------------------------------------------
 
 const row = (startedAt, n, runId = `r-${startedAt}`) => ({ run_id: runId, started_at: startedAt, n_fit_fetched: String(n) });

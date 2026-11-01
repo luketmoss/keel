@@ -31,7 +31,7 @@ function rowToItem(row) {
     description: row[COL.DESCRIPTION] || '',
     status: row[COL.STATUS] || 'To Do',
     owner: row[COL.OWNER] || '',
-    due_date: row[COL.DUE_DATE] ? String(row[COL.DUE_DATE]) : '',
+    due_date: dueDateFromCell(row[COL.DUE_DATE]),
     labels: row[COL.LABELS] || '',
     parent_id: row[COL.PARENT_ID] || '',
     created_at: row[COL.CREATED_AT] ? String(row[COL.CREATED_AT]) : '',
@@ -43,6 +43,33 @@ function rowToItem(row) {
   };
 }
 
+/**
+ * #728: a due date is text `YYYY-MM-DD`, never a date cell. A date cell reads
+ * back as a `Date` whose String() is a long locale string, which the
+ * due_before / due_after string compare silently drops. A stray date cell (a
+ * hand edit in the sheet) is read as its local calendar date in AUDIT_TIMEZONE,
+ * the zone the sheet itself is in. `toString` rather than `instanceof Date`,
+ * which fails for a Date from another realm.
+ */
+function dueDateFromCell(value) {
+  if (!value) return '';
+  if (Object.prototype.toString.call(value) === '[object Date]') {
+    if (isNaN(value.getTime())) return '';
+    return Utilities.formatDate(value, AUDIT_TIMEZONE, 'yyyy-MM-dd');
+  }
+  return String(value);
+}
+
+/**
+ * #728: Sheets' own text escape. appendRow and setValues parse a string the way
+ * typing does, so a bare `2026-11-01` becomes a date cell; a leading apostrophe
+ * keeps it text and is not stored. Empty stays empty.
+ */
+function asText(value) {
+  if (value === '' || value === null || value === undefined) return '';
+  return "'" + String(value);
+}
+
 function itemToRow(item) {
   return [
     item.id,
@@ -50,7 +77,7 @@ function itemToRow(item) {
     item.description,
     item.status,
     item.owner,
-    item.due_date,
+    asText(item.due_date),
     item.labels,
     item.parent_id,
     item.created_at,

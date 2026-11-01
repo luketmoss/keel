@@ -6,6 +6,7 @@ import {
   makePropertiesService,
   makeUtilities,
   makeWritableSheet,
+  makeItemsSheet,
   type CellValue,
   type Sandbox,
 } from './apps-script-sandbox';
@@ -64,7 +65,7 @@ function harness(opts: { items?: CellValue[][]; labels?: CellValue[][]; boards?:
     ['s2', 'b1', 'Done', 2, '#0c0', true, ''],
   ];
   const sheets: Record<string, unknown> = {
-    Items: makeWritableSheet(items, sandbox.ITEM_COLUMN_COUNT),
+    Items: makeItemsSheet(items, sandbox.ITEM_COLUMN_COUNT),
     Labels: makeWritableSheet(labels, 3),
     'Audit Log': makeWritableSheet(audit, sandbox.AUDIT_COLUMN_COUNT),
     Statuses: makeWritableSheet(statuses, sandbox.STATUS_COLUMN_COUNT),

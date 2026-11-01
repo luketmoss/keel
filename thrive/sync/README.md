@@ -347,11 +347,14 @@ included) has no row to record one on. `src/fit.mjs`:
 
 - **The tool is `downloadActivityFitFiles`**, with `{ labelId, sportType }` from
   the list. It returns the file as a base64 `resource` blob
-  whose URI names the activity (`coros://activity-fit-files/<labelId>.fit` when
-  #174 was built). The URI is taken when the activity ID appears anywhere in it
-  as a whole token, so `9<id>` is another activity; COROS changed the shape by
-  2026-11-01 without notice, so nothing relies on where the ID sits (#737). A
-  refusal names the URI it got, query string dropped and redacted.
+  that must be that activity's. It is when the URI contains the activity ID as
+  a whole token (`coros://activity-fit-files/<labelId>.fit` when #174 was
+  built, #737), or else when the FIT starts within 120 s of the list entry's
+  `startTimestamp` (session start, else first record; #739). By 2026-11-01
+  COROS names the file by another ID plus a hash
+  (`…/481454383022768329_ba14fe7c77.fit`) that nothing the sync keeps
+  carries, so the start time is what identifies it now. A refusal names the
+  URI, query string dropped and redacted, and the gap in seconds.
   `queryActivityFitFileDownloadUrls`
   would return an unauthenticated S3 URL instead, a secret, so the sync never
   calls it and the URL never exists in the process. `redact()` masks one
@@ -675,7 +678,7 @@ the auto-disable after 60 days with no activity on a public repo. That layer is
 | `activity <id>: enrichWorkout: N Workouts rows are enriched from activity …` | Two hand-logged rows carry one strength session's ID | Clear `source_activity_id` on all but one, then re-run |
 | `SyncLog row … was not written` naming `notes` | The API is newer than the tab | Run `scripts/migrate-155-sync-log-notes.mjs` |
 | `activity <id>: FIT request n of 3 failed` | COROS errored, or sent something that is not one whole FIT file for that activity | Nothing. The next run tries again, up to 3 requests in all |
-| `… FIT request n of 3 failed …: downloadActivityFitFiles returned a file for a different activity: <uri>` | The resource's URI does not contain the activity's ID as a whole token. Either COROS sent another activity's file, or it changed the URI shape again (#737) | If `<uri>` holds the activity's ID in a shape `uriNamesActivity` in `src/fit.mjs` misses, widen it before the third attempt, or delete the archive's `fit` record afterwards to retry |
+| `… FIT request n of 3 failed …: downloadActivityFitFiles returned a file for a different activity: <uri>, starting N s from the activity` (or `and no start time to check`) | The URI does not name the activity and the FIT's start is over 120 s from the list's, or the FIT has none (#739). COROS sent another activity's file, or stopped writing a start | Compare the two starts in COROS. A FIT this rule gave up on before #739 is asked for once more automatically (`requalified`); otherwise delete the archive's `fit` record to retry |
 | `activity <id>: FIT request failed 3 times, so the sync has stopped asking for it` | It gave up. The row gets `fit_fetched_at` with `fit_ref` blank | Read `fit.last_error` in the activity's archive file. To retry, delete its `fit` record there |
 | `FIT budget unknown, so no FIT was requested this run` | `getSyncLog` failed, or 100 rows of the last 24 h leave older ones unread | Read the quoted reason. The next run tries again |
 | `activity <id>: FIT downloaded but not stored in Drive` | The Drive upload failed | Nothing. The next run requests it again, which spends one more of the allowance |

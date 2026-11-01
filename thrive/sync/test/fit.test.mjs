@@ -6,11 +6,12 @@
 // coordinates, so none is committed.
 
 import { test } from 'node:test';
+import { Encoder, Profile } from '@garmin/fitsdk';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { createArchive } from '../src/archive.mjs';
 import {
-  checkFit, createFitStep, fitBudget, fitCrc, fitFromResult, FitFormatError, FIT_TOOL,
+  checkFit, createFitStep, fitBudget, fitCrc, fitFromResult, FitFormatError, FIT_TOOL, fitStartMs,
 } from '../src/fit.mjs';
 import { DriveError } from '../src/drive.mjs';
 import { DriveAuthError } from '../src/errors.mjs';
@@ -831,4 +832,117 @@ test('#310 AC3: a record-write failure after a re-creation says so, and the retr
   assert.equal(fitFiles(drive).length, 1, 'found by tag and replaced in place');
   assert.equal(archived(drive, FID).fit.file_id, newId);
   assert.equal(archived(drive, FID).fit.refetches, 1);
+});
+
+// --- #739: a FIT named by another id is identified by when it started --------
+
+/** A FIT with no position, starting at `startS` (epoch seconds): a session, or only records. */
+function timedFit(startS, { session = true, recordS = startS } = {}) {
+  const encoder = new Encoder();
+  encoder.onMesg(Profile.MesgNum.FILE_ID, { manufacturer: 'development', product: 1, timeCreated: new Date(startS * 1000), type: 'activity' });
+  encoder.onMesg(Profile.MesgNum.RECORD, { timestamp: new Date(recordS * 1000), heartRate: 120 });
+  if (session) {
+    encoder.onMesg(Profile.MesgNum.SESSION, { timestamp: new Date((startS + 60) * 1000), startTime: new Date(startS * 1000) });
+  }
+  return Buffer.from(encoder.close());
+}
+
+const LIST_START = 1793546154; // 2026-11-01T15:15:54Z
+const MISNAMED = 'coros://activity-fit-files/481454383022768329_ba14fe7c77.fit';
+
+test('#739: fitStartMs reads the session start, else the first record, else null', () => {
+  assert.equal(fitStartMs(timedFit(LIST_START)), LIST_START * 1000);
+  assert.equal(fitStartMs(timedFit(LIST_START, { recordS: LIST_START - 600 })), LIST_START * 1000, 'the session wins');
+  assert.equal(fitStartMs(timedFit(LIST_START, { session: false })), LIST_START * 1000);
+  assert.equal(fitStartMs(makeFit()), null);
+});
+
+test('#739 AC1: a URI naming the activity is taken whatever the FIT start', () => {
+  const bytes = timedFit(LIST_START - 86400);
+  assert.deepEqual(fitFromResult(withUri(`coros://activity-fit-files/${ID}.fit`, bytes), ID, LIST_START), bytes);
+});
+
+test('#739 AC2: a misnamed URI is taken when the FIT starts within 120 s, by session or by record', () => {
+  for (const [name, bytes] of [
+    ['session, same second', timedFit(LIST_START)],
+    ['session, 120 s early', timedFit(LIST_START - 120)],
+    ['records only, 90 s late', timedFit(LIST_START + 90, { session: false })],
+  ]) {
+    assert.deepEqual(fitFromResult(withUri(MISNAMED, bytes), ID, LIST_START), bytes, name);
+  }
+});
+
+test('#739 AC3: a misnamed URI is refused when the start is far or missing, naming the URI and the gap', () => {
+  assert.throws(
+    () => fitFromResult(withUri(MISNAMED, timedFit(LIST_START + 121)), ID, LIST_START),
+    (err) => err instanceof FitFormatError && err.message.includes(MISNAMED) && /starting 121 s from the activity/.test(err.message),
+  );
+  assert.throws(
+    () => fitFromResult(withUri(MISNAMED, makeFit()), ID, LIST_START),
+    (err) => err.message.includes(MISNAMED) && /no start time to check/.test(err.message),
+  );
+  assert.throws(() => fitFromResult(withUri(MISNAMED, timedFit(LIST_START)), ID, undefined), /no start time to check/);
+});
+
+/** The archive file holding activity `id`'s record. */
+const archiveFileId = (drive, id) => [...drive.files.values()].find((f) => f.props.activity_id === id).id;
+
+/** A client answering as COROS did on 2026-11-01: another id in the name, the right start inside. */
+const renamingCoros = (fixture) => fakeCoros(() => withUri(MISNAMED, timedFit(fixture.list_entry.startTimestamp)));
+
+test('#739: a run stores a misnamed FIT that starts when the activity did', async () => {
+  const f = FIXTURES[0];
+  const { drive, archive } = await archiveWith([f]);
+  const { fit, failures } = await runOnce({ archive, api: fakeApi(), client: renamingCoros(f), activityIds: [f.activity_id] });
+  assert.deepEqual(failures, []);
+  assert.equal(fit.counts.stored, 1);
+  assert.equal(archived(drive, f.activity_id).fit.status, 'stored');
+});
+
+const GAVE_UP_737 = {
+  status: 'unavailable', fetched_at: '2026-11-01T21:30:00.000Z', attempts: 3,
+  last_error: `${FIT_TOOL} returned a file for a different activity: ${MISNAMED}`,
+};
+
+test('#739 AC4: a FIT given up on as misnamed is asked for once more, and stored', async () => {
+  const f = FIXTURES[0];
+  const { drive, archive } = await archiveWith([f]);
+  await archive.writeFit(archiveFileId(drive, f.activity_id), GAVE_UP_737);
+  const client = renamingCoros(f);
+  const { fit, failures } = await runOnce({ archive, api: fakeApi(), client, activityIds: [f.activity_id] });
+  assert.deepEqual(failures, []);
+  assert.equal(client.calls.length, 1);
+  assert.equal(fit.counts.stored, 1);
+  assert.equal(archived(drive, f.activity_id).fit.status, 'stored');
+});
+
+test('#739 AC4: if the one more try fails, it is requalified and never asked for again', async () => {
+  const f = FIXTURES[0];
+  const { drive, archive } = await archiveWith([f]);
+  await archive.writeFit(archiveFileId(drive, f.activity_id), GAVE_UP_737);
+  const client = fakeCoros(() => withUri(MISNAMED, makeFit()));
+  const first = await runOnce({ archive, api: fakeApi(), client, activityIds: [f.activity_id] });
+  assert.equal(client.calls.length, 1);
+  assert.match(first.failures[0], /stopped asking for it/);
+  const record = archived(drive, f.activity_id).fit;
+  assert.equal(record.status, 'unavailable');
+  assert.equal(record.requalified, true);
+
+  const second = await runOnce({ archive, api: fakeApi(), client, startedAt: '2026-11-02T00:17:00.000Z', activityIds: [f.activity_id] });
+  assert.equal(client.calls.length, 1, 'no request after the requalified failure');
+  assert.deepEqual(second.failures, []);
+});
+
+test('#739 AC5: any other give-up, or one already requalified, is still never asked for', async () => {
+  for (const record of [
+    { ...GAVE_UP_737, last_error: 'COROS answered 500' },
+    { ...GAVE_UP_737, requalified: true },
+  ]) {
+    const f = FIXTURES[0];
+    const { drive, archive } = await archiveWith([f]);
+    await archive.writeFit(archiveFileId(drive, f.activity_id), record);
+    const client = renamingCoros(f);
+    await runOnce({ archive, api: fakeApi(), client, activityIds: [f.activity_id] });
+    assert.equal(client.calls.length, 0, record.last_error);
+  }
 });

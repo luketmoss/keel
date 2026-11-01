@@ -30,6 +30,19 @@ export const MAX_LOOKUPS = 5;
 export const LOOKUP_SPACING_MS = 5_000;
 export const LOOKUP_WINDOW_MS = 3 * 60_000;
 
+/**
+ * The sync's Overpass patience (#717): between createOverpass's short defaults,
+ * which failed every few lookups on a slow day, and the backfill's (#697),
+ * whose ~16 min lookup the 20-minute job cannot afford. About 9.25 min at
+ * worst for one lookup; the window above stops a second from starting.
+ */
+export const SYNC_OVERPASS = Object.freeze({
+  attemptTimeoutMs: 90_000,
+  serverTimeoutS: 70,
+  attempts: 4,
+  retryDelaysMs: Object.freeze([15_000, 60_000, 120_000]),
+});
+
 const nullableInt = (v) => (v === null || v === undefined || !Number.isFinite(v) ? null : Math.round(v));
 
 /**
@@ -147,7 +160,9 @@ export function createTrailStep({
   wait = (ms) => new Promise((r) => setTimeout(r, ms)),
   overpass, fetchImpl, featureFor = () => undefined, matcherVersion = TRAILS_MATCHER_VERSION, log = console.log,
 }) {
-  const client = overpass ?? createOverpass({ url: overpassUrl(env), wait, ...(fetchImpl ? { fetchImpl } : {}) });
+  const client = overpass ?? createOverpass({
+    ...SYNC_OVERPASS, url: overpassUrl(env), wait, ...(fetchImpl ? { fetchImpl } : {}),
+  });
   const counts = { tagged: 0, noTrail: 0, tooLarge: 0, failed: 0, deferred: 0 };
   const notes = [];
   let lookups = 0;

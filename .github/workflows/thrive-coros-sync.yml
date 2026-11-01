@@ -42,7 +42,7 @@ jobs:
     # repository variable is set to true. thrive/sync/README.md has the cutover.
     if: vars.THRIVE_SYNCS_LIVE == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: thrive/sync

@@ -13,7 +13,7 @@ import {
 import { MAX_ENCODED_PAYLOAD, ThriveApiError } from '../src/thrive-api.mjs';
 import { matchTrails, TRAILS_MATCHER_VERSION } from '../src/trail-match.mjs';
 import {
-  createTrailStep, encodedPayloadSize, encodeTrails, fitTrails, trailSummary,
+  createTrailStep, encodedPayloadSize, encodeTrails, fitTrails, SYNC_OVERPASS, trailSummary,
 } from '../src/trail-step.mjs';
 import { TRACK_VERSION } from '../src/track.mjs';
 import { GOLDEN, GOLDEN_ELEMENTS, GOLDEN_FEATURE, track, way } from './trail-geometry.mjs';
@@ -525,4 +525,38 @@ test('the counts line is counts only', async () => {
   const t = step();
   await t.s.ensure(activity());
   assert.equal(trailSummary(t.s), 'Trails: 1 tagged, 0 no named trail, 0 too large, 0 failed, 0 deferred.');
+});
+
+// --- #717: the sync's own Overpass patience ------------------------------------
+
+test('#717 AC1: the sync asks Overpass with 90 s attempts, [timeout:70], 4 attempts, waits 15/60/120 s', async () => {
+  assert.deepEqual({ ...SYNC_OVERPASS, retryDelaysMs: [...SYNC_OVERPASS.retryDelaysMs] }, {
+    attemptTimeoutMs: 90_000, serverTimeoutS: 70, attempts: 4, retryDelaysMs: [15_000, 60_000, 120_000],
+  });
+  // Through the step's own client: what reaches the wire.
+  const { fetchImpl, calls } = overpassFetch([{ status: 429, body: 'rate limited' }]);
+  const clock = makeClock();
+  const s = createTrailStep({
+    archive: fakeArchive(), api: fakeApi(), startedAt: STARTED, now: clock.now, wait: clock.wait, fetchImpl, log: () => {},
+  });
+  await s.ensure(activity());
+  assert.equal(calls.length, 4);
+  assert.ok(calls.every((c) => c.query.startsWith('[out:json][timeout:70];')));
+  assert.deepEqual(clock.waits, [15_000, 60_000, 120_000]);
+  assert.equal(s.counts.failed, 1);
+});
+
+test('#717 AC2: a lookup that fails 3 times and answers on the 4th settles the activity that run', async () => {
+  const busy = { status: 504, body: '<html>' };
+  const { fetchImpl, calls } = overpassFetch([busy, busy, busy, { body: { elements: [] } }]);
+  const clock = makeClock();
+  const api = fakeApi();
+  const s = createTrailStep({
+    archive: fakeArchive(), api, startedAt: STARTED, now: clock.now, wait: clock.wait, fetchImpl, log: () => {},
+  });
+  await s.ensure(activity());
+  assert.equal(calls.length, 4);
+  assert.equal(s.counts.failed, 0);
+  assert.equal(s.counts.noTrail, 1);
+  assert.equal(api.calls.length, 1, 'written to the row');
 });

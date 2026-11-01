@@ -75,8 +75,8 @@ disjoint and together are exactly the app's tools.
 |---|---|---|---|
 | `Thrive` | `<PUBLIC_URL>/thrive/mcp` | the 12 read tools | on |
 | `Thrive (write)` | `<PUBLIC_URL>/thrive/write/mcp` | the 17 write tools | **off** |
-| `Hive` | `<PUBLIC_URL>/hive/mcp` | the 5 read tools | on |
-| `Hive (write)` | `<PUBLIC_URL>/hive/write/mcp` | the 3 write tools | **off** |
+| `Hive` | `<PUBLIC_URL>/hive/mcp` | the 4 read tools | on |
+| `Hive (write)` | `<PUBLIC_URL>/hive/write/mcp` | the 5 write tools | **off** |
 
 **The write connectors are off unless you are writing.** claude.ai remembers the
 toggle across chats, so turning `Thrive (write)` on to log a session leaves it on
@@ -171,7 +171,7 @@ successful undo. They are thin: the apps hold the record and do the reverting
 
 ## Hive
 
-`/hive/mcp` and `/hive/write/mcp` serve the 8 Hive tools between them, ported from the stdio server (retired in
+`/hive/mcp` and `/hive/write/mcp` serve the 9 Hive tools between them, ported from the stdio server (retired in
 #372) and diffed against the tool list recorded from it
 (`test/fixtures/hive-stdio-tools.json`, a frozen contract: change a tool on
 purpose, then update the fixture by hand). Secrets:
@@ -187,6 +187,12 @@ field and still answers success.
 `hive_update_item` also takes `board` to move an item to another board. Apps Script judges the status against the
 target board, refuses a status the target lacks, moves the sub-tasks with their parent, and refuses to move a
 sub-task alone. Same ordering: redeploy the Apps Script first.
+
+`hive_delete_item` (#725) deletes an item and its sub-tasks through Apps Script's `deleteItem` (#244), which
+dry-runs by default and wants the dry run's token back on `confirm: true`; a cascade that changed since the
+preview is refused with a fresh one. The agent carries the token, so what is deleted is what it was shown. A
+confirmed delete counts as one write of as many rows as the cascade, and `hive_undo` brings the items back.
+No Apps Script deploy: `deleteItem` and its Audit Log rows have been live since #244 and #457.
 
 ## Board
 
@@ -291,8 +297,8 @@ approval is set on that connector's tools.
 `thrive_delete_workout`, `thrive_delete_exercise`, `thrive_update_template`
 (it deletes the old rows), `thrive_set_journal_entry` (clearing a note is a
 delete), `thrive_set_workout_rest` (it overwrites planned rest, #583),
-`thrive_delete_drink` (#595) and `thrive_undo` can destroy data. `hive_undo` is the same
-for Hive, and gets the same treatment. Reverting can itself destroy work done
+`thrive_delete_drink` (#595) and `thrive_undo` can destroy data. `hive_delete_item` (#725) and
+`hive_undo` are the same for Hive, and gets the same treatment. Reverting can itself destroy work done
 since, so the app's conflict check is the first line and a human approval the second. Their dry-run-until-`confirm: true`
 behaviour only prevents accidents; against prompt injection the one control is a
 human approving each call.
@@ -301,7 +307,7 @@ human approving each call.
 prompt switches it off on that device only, and a new device starts at the
 default. So:
 
-- **Never choose "Always allow" on those tools, `hive_undo` included, on any device.**
+- **Never choose "Always allow" on those tools, `hive_delete_item` and `hive_undo` included, on any device.**
 - On each device you use, set them to "Needs approval" in the connector's tool
   list, and check by calling one.
 

@@ -20,7 +20,7 @@ function rpc(method: string, params?: unknown): Request {
   })
 }
 
-const HIVE_WRITE = ['hive_add_item', 'hive_create_label', 'hive_undo', 'hive_update_item']
+const HIVE_WRITE = ['hive_add_item', 'hive_create_label', 'hive_delete_item', 'hive_undo', 'hive_update_item']
 const HIVE_READ = ['hive_get_item', 'hive_list_boards', 'hive_list_items', 'hive_list_labels']
 const REMINDER = "— Hive (write) is on. Turn it off in Search and tools when you've finished writing."
 
@@ -76,7 +76,7 @@ async function listed(mode: 'read' | 'write') {
 }
 
 describe('hive tool list (#409)', () => {
-  it('serves exactly the 5 read tools on /hive/mcp and the 4 write tools on /hive/write/mcp', async () => {
+  it('serves exactly the 4 read tools on /hive/mcp and the 5 write tools on /hive/write/mcp', async () => {
     expect((await listed('read')).map((t) => t.name)).toEqual(HIVE_READ)
     expect((await listed('write')).map((t) => t.name)).toEqual(HIVE_WRITE)
   })
@@ -343,5 +343,123 @@ describe('hive_update_item board move', () => {
     const update = calls.find((u) => u.searchParams.get('action') === 'updateItem')!
     expect(JSON.parse(update.searchParams.get('payload')!).changes).toEqual({ board_id: 'b2' })
     expect(result.content[0].text).toContain('- Board: Family')
+  })
+})
+
+describe('hive_delete_item (#725)', () => {
+  const cascade = (token: string, extra: any[] = []) => ({
+    dry_run: true,
+    root: { id: 'p1', title: 'Garage' },
+    count: 2 + extra.length,
+    items: [
+      { id: 'p1', title: 'Garage', parent_id: '', depth: 0 },
+      { id: 'c1', title: 'Sweep', parent_id: 'p1', depth: 1 },
+      ...extra,
+    ],
+    token,
+  })
+  const payloadOf = (u: URL) => JSON.parse(u.searchParams.get('payload')!)
+  const deletes = (calls: URL[]) => calls.filter((u) => u.searchParams.get('action') === 'deleteItem')
+
+  it('dry-runs by default: lists the cascade by depth and the token, writes nothing, counts nothing', async () => {
+    const budget = fakeBudget()
+    const calls = fakeHive(() => ({ success: true, data: cascade('t1') }))
+    const result = await call('hive_delete_item', { item_id: 'p1' }, { ...env, WRITE_BUDGET: budget.namespace })
+    expect(result.isError).toBeUndefined()
+    expect(result.content[0].text).toBe(
+      [
+        'DRY RUN — nothing deleted. Deleting "Garage" (p1) would remove 2 item(s):',
+        '- "Garage" (p1)',
+        '  - "Sweep" (c1)',
+        'Call again with confirm: true and token: "t1" to delete. hive_undo can bring them back.',
+      ].join('\n'),
+    )
+    expect(deletes(calls).map(payloadOf)).toEqual([{ id: 'p1' }])
+    expect(budget.stored.hive).toBeUndefined()
+  })
+
+  it('deletes with confirm and the token, under one call id, counting the cascade as its rows', async () => {
+    const budget = fakeBudget({ now: 1_000 })
+    const calls = fakeHive((url) => {
+      const p = payloadOf(url)
+      if (!p.confirm) return { success: true, data: cascade('t1') }
+      return { success: true, data: { ...cascade('t1'), dry_run: false } }
+    })
+    const result = await call(
+      'hive_delete_item',
+      { item_id: 'p1', confirm: true, token: 't1' },
+      { ...env, WRITE_BUDGET: budget.namespace },
+    )
+    const [dry, write] = deletes(calls).map(payloadOf)
+    expect(dry).toEqual({ id: 'p1' })
+    expect(write).toMatchObject({ id: 'p1', confirm: true, token: 't1', actor: 'hive-mcp' })
+    expect(write.call_id).toMatch(/^[0-9a-f-]{36}$/)
+    expect(result.content[0].text).toBe(
+      `Deleted "Garage" (p1), 2 item(s) in all. hive_undo can bring them back: this was call ${write.call_id}.\n\n${REMINDER}`,
+    )
+    expect(budget.stored.hive).toEqual([{ t: 1_000, rows: 2 }])
+  })
+
+  it('refuses confirm without a token before any request', async () => {
+    const calls = fakeHive(() => ({ success: true, data: cascade('t1') }))
+    const result = await call('hive_delete_item', { item_id: 'p1', confirm: true })
+    expect(result.isError).toBe(true)
+    expect(result.content[0].text).toBe(
+      'confirm needs the token from a dry run. Call hive_delete_item without confirm first. Nothing was deleted.',
+    )
+    expect(calls).toHaveLength(0)
+  })
+
+  it('says nothing was deleted, with the fresh preview, when the cascade drifted', async () => {
+    const fresh = cascade('t2', [{ id: 'c2', title: 'Paint', parent_id: 'p1', depth: 1 }])
+    fakeHive((url) => {
+      const p = payloadOf(url)
+      if (!p.confirm) return { success: true, data: cascade('t1') }
+      return { success: false, error: 'The cascade changed since the preview', data: fresh }
+    })
+    const result = await call('hive_delete_item', { item_id: 'p1', confirm: true, token: 't1' })
+    expect(result.isError).toBe(true)
+    expect(result.content[0].text).toBe(
+      [
+        "Nothing deleted — the item's sub-tasks changed since the preview. Deleting it would now remove 3 item(s):",
+        '- "Garage" (p1)',
+        '  - "Sweep" (c1)',
+        '  - "Paint" (c2)',
+        'Call again with confirm: true and token: "t2" to delete. hive_undo can bring them back.',
+      ].join('\n'),
+    )
+    expect(result.content[0].text).not.toContain(REMINDER)
+  })
+
+  it("passes an unknown id or an archived board through as a tool error", async () => {
+    fakeHive(() => ({ success: false, error: 'Item "nope" not found' }))
+    const missing = await call('hive_delete_item', { item_id: 'nope' })
+    expect(missing).toMatchObject({ isError: true, content: [{ text: 'Error: Item "nope" not found' }] })
+
+    fakeHive((url) =>
+      payloadOf(url).confirm
+        ? { success: false, error: 'Board is archived' }
+        : { success: true, data: cascade('t1') },
+    )
+    const archived = await call('hive_delete_item', { item_id: 'p1', confirm: true, token: 't1' })
+    expect(archived).toMatchObject({ isError: true, content: [{ text: 'Error: Board is archived' }] })
+  })
+
+  it('sends a confirm that fails in transit once, and says it may or may not have applied', async () => {
+    const calls = fakeHive((url) =>
+      payloadOf(url).confirm ? new Response('<html>Sign in</html>', { status: 200 }) : { success: true, data: cascade('t1') },
+    )
+    const result = await call('hive_delete_item', { item_id: 'p1', confirm: true, token: 't1' })
+    expect(result.isError).toBe(true)
+    expect(result.content[0].text).toContain('may or may not have applied')
+    expect(result.content[0].text).toContain('hive_get_item')
+    expect(deletes(calls).filter((u) => payloadOf(u).confirm)).toHaveLength(1)
+  })
+
+  it('is a destructive tool on the write endpoint only', async () => {
+    const res = await handleHive(rpc('tools/list'), env, 'write')
+    const tools = ((await res.json()) as { result: { tools: { name: string; annotations?: any }[] } }).result.tools
+    expect(tools.find((t) => t.name === 'hive_delete_item')?.annotations).toMatchObject({ destructiveHint: true })
+    expect((await listed('read')).map((t) => t.name)).not.toContain('hive_delete_item')
   })
 })

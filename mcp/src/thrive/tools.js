@@ -49,6 +49,7 @@ import {
   planDrinkLog, describeLogged, checkAmountOz, checkTime, describeAmountChange, findWindowStart, UNWIND_MG,
   WATER_OZ_MAX, WATER_OZ_DEFAULT, LOG_COUNT_MAX,
 } from './drinks.js';
+import { apiSendsTrails, describeTrailHistory, NOT_UPDATED as TRAILS_NOT_UPDATED } from './trails.js';
 import {
   checkRest, mss, resolvedRestLines, timedSections, withTemplateRest, templateRestChanges, templateRestLines,
 } from './rest.js';
@@ -67,6 +68,8 @@ const READ_ONLY = new Set([
   'thrive_list_templates', 'thrive_exercise_history',
   // #522. Logging, editing and deleting a drink are write tools (#595).
   'thrive_drinks',
+  // #691.
+  'thrive_trail_history',
 ]);
 const DESTRUCTIVE = new Set([
   'thrive_delete_workout', 'thrive_delete_exercise', 'thrive_update_template', 'thrive_set_journal_entry',
@@ -788,6 +791,46 @@ tool(
       out.push(`- ${w.date} — ${detail}  [${w.name || 'unnamed'}]`);
     }
     return text(out.join('\n'));
+  },
+);
+
+tool(
+  'thrive_trail_history',
+  'When the user last rode, ran or walked a named trail, and how each pass compared with the time before: ' +
+    'the last visit with its passes (position along the trail, direction, distance, time, climb), each against ' +
+    'the last pass over the same stretch in the same direction on an earlier activity, then the visits newest ' +
+    'first. Trails are the OpenStreetMap names the COROS sync tagged on each tracked activity; a name with ' +
+    'variants ("Heron Loop", "Heron Loop Trail") is one trail. A trail matching several names lists them to ' +
+    'choose from. NOT TAGGED YET IS NOT "NO": an activity whose trails are blank has not been tagged, so the ' +
+    'answer says how many such activities there are and how many are newer than the last visit. Never tell ' +
+    'the user they have never been on a trail while that count is above 0. A part not shown is unknown, never zero.',
+  {
+    trail: z.string().describe('Trail name, or part of one (case-insensitive). At least 2 characters'),
+    date_from: z.string().optional()
+      .describe("Only visits on or after this date (YYYY-MM-DD, 'today', 'yesterday', '-30d'). Comparisons still reach earlier"),
+    date_to: z.string().optional().describe('Only visits on or before this date'),
+    limit: z.coerce.number().optional()
+      .describe('How many visits the list shows, 1 to 50 (default 10). The last time and its comparisons ignore it'),
+  },
+  async ({ trail, date_from, date_to, limit = 10 }) => {
+    const term = String(trail ?? '').trim();
+    if (term.length < 2) return fail('trail must be at least 2 characters.');
+    const dates = {};
+    for (const [field, value] of [['date_from', date_from], ['date_to', date_to]]) {
+      if (value === undefined) continue;
+      dates[field] = normalizeDate(value);
+      if (!dates[field]) {
+        return fail(`${field} "${value}" is not a date. Use YYYY-MM-DD, today, yesterday or an offset such as -30d.`);
+      }
+    }
+    const from = dates.date_from ?? '';
+    const to = dates.date_to ?? '';
+    if (from && to && from > to) return fail('date_from is after date_to.');
+    if (!Number.isInteger(limit) || limit < 1 || limit > 50) return fail('limit must be a whole number from 1 to 50.');
+
+    const workouts = await fetchWorkouts();
+    if (!apiSendsTrails(workouts)) return fail(TRAILS_NOT_UPDATED);
+    return text(describeTrailHistory(workouts, { trail: term, from, to, limit }));
   },
 );
 

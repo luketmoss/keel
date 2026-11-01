@@ -31,6 +31,8 @@ const READ_ONLY = [
   'thrive_list_exercises',
   'thrive_list_templates',
   'thrive_list_workouts',
+  // #691.
+  'thrive_trail_history',
 ]
 
 function rpc(method: string, params?: unknown): Request {
@@ -103,7 +105,7 @@ function fakeThrive(answer: (action: string, url: URL) => unknown) {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('thrive tool list', () => {
-  it('serves exactly the 11 read tools on /thrive/mcp and the other 17 on /thrive/write/mcp (#409, #522, #583, #595)', async () => {
+  it('serves exactly the 12 read tools on /thrive/mcp and the other 17 on /thrive/write/mcp (#409, #522, #583, #595, #691)', async () => {
     const read = (await listTools('read')).map((t) => t.name).sort()
     const write = (await listTools('write')).map((t) => t.name).sort()
     expect(read).toEqual([...READ_ONLY].sort())
@@ -121,7 +123,7 @@ describe('thrive tool list', () => {
       description,
       inputSchema: canon(inputSchema),
     }))
-    expect(worker).toHaveLength(28)
+    expect(worker).toHaveLength(29)
     expect(worker).toEqual(stdio)
   })
 

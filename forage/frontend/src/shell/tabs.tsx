@@ -1,0 +1,51 @@
+import type { ComponentChildren } from 'preact';
+import type { TabId } from './routes';
+import { EatenIcon, LibraryIcon, PlanIcon, ShopIcon } from './nav-icons';
+
+export interface TabDef {
+  id: TabId;
+  label: string;
+  icon: () => ComponentChildren;
+  /** The empty state for a signed-in user with no data. No button: no add flow exists yet. */
+  empty: { heading: string; sentence: string };
+}
+
+/** In tab-bar order. Copy from forage/docs/design/704-app-shell.md. */
+export const TABS: TabDef[] = [
+  {
+    id: 'plan',
+    label: 'Plan',
+    icon: PlanIcon,
+    empty: {
+      heading: 'Nothing planned yet',
+      sentence: 'Meals you plan for the week will show here, by day. Add one from a recipe.',
+    },
+  },
+  {
+    id: 'shop',
+    label: 'Shop',
+    icon: ShopIcon,
+    empty: {
+      heading: 'No shopping list',
+      sentence: 'When you plan meals, the groceries you need will collect here, grouped by store.',
+    },
+  },
+  {
+    id: 'eaten',
+    label: 'Eaten',
+    icon: EatenIcon,
+    empty: {
+      heading: 'Nothing logged',
+      sentence: 'What you eat will show here by day, with its calories and macros.',
+    },
+  },
+  {
+    id: 'library',
+    label: 'Library',
+    icon: LibraryIcon,
+    empty: {
+      heading: 'No foods yet',
+      sentence: 'Foods you use in recipes and logs will be kept here, with their nutrition.',
+    },
+  },
+];

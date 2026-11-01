@@ -140,6 +140,10 @@ characters is refused.
 - `cd frontend && npm run format` before committing (Prettier: single quotes,
   semicolons; CI runs `format:check`)
 - `cd frontend && npm test` / `npm run typecheck` / `npm run build`
+- `frontend/.env.local` (gitignored, from `.env.example`): `VITE_GOOGLE_CLIENT_ID`
+  for sign-in, whose OAuth client must list the origin as an authorized
+  JavaScript origin (`http://localhost:5177` for dev); `VITE_DEMO_MODE=true`
+  lets `?demo=true` open signed in as the demo user with no request to Google
 - `cd apps-script && npm test` / `npm run typecheck` — sandboxed `node:vm`
 - A session never runs `clasp`; `apps-script/.clasp.json` is gitignored and
   `.clasp.json.example` is the template

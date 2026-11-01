@@ -1,6 +1,6 @@
 # Thrive tools
 
-Reference for the 28 `thrive_*` tools served at `/thrive/mcp`. Carried over from the
+Reference for the 29 `thrive_*` tools served at `/thrive/mcp` (12 read) and `/thrive/write/mcp` (17 write). Carried over from the
 README of the stdio server this Worker replaced (luketmoss/keel#372); the tool
 descriptions in `src/thrive/tools.js` are what an agent actually sees, and are the
 source of truth. For the conventions an agent needs to use the data safely, see
@@ -36,6 +36,7 @@ needs a matching change here.**
 | `thrive_list_exercises` | The exercise library, filterable by search text or tag |
 | `thrive_list_templates` | Templates with their exercises, sections, sets and reps, and a section's rest and switch where the template sets one (#576) |
 | `thrive_exercise_history` | Progression for one exercise over time — the tool for deciding whether to add weight or volume |
+| `thrive_trail_history` | When a named trail was last visited and how each pass compared with the time before (#691): `trail` (a name or part of one), optional `date_from` / `date_to` bounding the visits (comparisons still reach earlier) and `limit` (1–50, default 10) for the list. The last visit's passes, each against the last pass over the same stretch in the same direction on an earlier activity, then the visits newest first. Several matching trails are listed to choose from. Says how many tracked activities are **not tagged yet**, which is never "not on this trail". One `getWorkouts` request; never a coordinate or the raw `trails` value |
 
 ### Scheduling and authoring
 
@@ -178,6 +179,10 @@ in counts only: `Trails: not tagged yet`, `Trails: tagged, no named trail`,
 to leave some out to fit the column), or `Trails: unreadable value`. "Not tagged yet" is never "no
 trails": the sync or the backfill has not looked yet. No tool prints the value itself, and
 `thrive_undo` shows a changed `trails` as `(trail tags)`.
+`thrive_trail_history` (#691) is where trails are read: it groups and compares by the app's rules
+(`src/thrive/trails.js`, kept in step with `thrive/frontend/src/trails/` by
+`test/fixtures/trails-rules-golden.json`), and needs #688's Apps Script deployed: an API that sends
+no `trails` gets a tool error saying so.
 
 ### Approval on the destructive tools
 

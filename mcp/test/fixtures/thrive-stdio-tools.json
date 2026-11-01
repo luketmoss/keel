@@ -896,6 +896,36 @@
     }
   },
   {
+    "name": "thrive_trail_history",
+    "description": "When the user last rode, ran or walked a named trail, and how each pass compared with the time before: the last visit with its passes (position along the trail, direction, distance, time, climb), each against the last pass over the same stretch in the same direction on an earlier activity, then the visits newest first. Trails are the OpenStreetMap names the COROS sync tagged on each tracked activity; a name with variants (\"Heron Loop\", \"Heron Loop Trail\") is one trail. A trail matching several names lists them to choose from. NOT TAGGED YET IS NOT \"NO\": an activity whose trails are blank has not been tagged, so the answer says how many such activities there are and how many are newer than the last visit. Never tell the user they have never been on a trail while that count is above 0. A part not shown is unknown, never zero.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "trail": {
+          "type": "string",
+          "description": "Trail name, or part of one (case-insensitive). At least 2 characters"
+        },
+        "date_from": {
+          "type": "string",
+          "description": "Only visits on or after this date (YYYY-MM-DD, 'today', 'yesterday', '-30d'). Comparisons still reach earlier"
+        },
+        "date_to": {
+          "type": "string",
+          "description": "Only visits on or before this date"
+        },
+        "limit": {
+          "type": "number",
+          "description": "How many visits the list shows, 1 to 50 (default 10). The last time and its comparisons ignore it"
+        }
+      },
+      "required": [
+        "trail"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": {}
+    }
+  },
+  {
     "name": "thrive_undo",
     "description": "Undo one write an agent made through this connector, using Thrive's own change log. With no arguments it lists the last 20 MCP calls, newest first, each with its call id, time, actions and row count. With a call_id it is a dry run: it shows every row it would restore, current value to restored value, and writes nothing. With confirm: true it restores them. If any of those rows has changed since the call, nothing is restored and the changed rows are listed: it is all or nothing. A deleted row comes back with its original id, a created row is deleted. The undo is itself a call in the list, so it can be undone the same way. Only writes made through this connector are in the list: not the app's own edits or the syncs. Reverting can destroy work done since, so only confirm what the user asked to undo.",
     "inputSchema": {

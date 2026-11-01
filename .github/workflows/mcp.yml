@@ -1,10 +1,10 @@
 name: mcp
 on:
   pull_request:
-    paths: ['mcp/**', '.github/workflows/mcp.yml']
+    paths: ['mcp/**', 'thrive/frontend/src/trails/**', 'thrive/frontend/src/api/trails-cell.ts', '.github/workflows/mcp.yml']
   push:
     branches: [main]
-    paths: ['mcp/**', '.github/workflows/mcp.yml']
+    paths: ['mcp/**', 'thrive/frontend/src/trails/**', 'thrive/frontend/src/api/trails-cell.ts', '.github/workflows/mcp.yml']
 concurrency:
   group: mcp-${{ github.ref }}
   cancel-in-progress: true

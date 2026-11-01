@@ -1,0 +1,170 @@
+{
+  "about": "The trail rules' shared golden fixture (#691). Read by mcp/src/thrive/trails.test.js (the Worker's copy) and thrive/frontend/src/trails/trails-golden.test.ts (the app's). A rule change edits this file, which fails the other side until it follows. Synthetic only: invented trail names, 2000-01-01-style dates.",
+  "example": {
+    "cell": "{\"v\":1,\"m\":1,\"u\":395,\"n\":[[\"Heron Ridge Trail\",1000],[\"Aspen Draw;Kestrel Connector\",150],[\"Lower Heron\",380]],\"p\":[[0,0,100,1,1015,254,30,70],[1,3,97,1,140,35,null,326],[1,97,3,-1,140,null,null,null],[0,100,41,-1,590,null,null,null],[2,0,100,1,420,null,null,null]]}",
+    "matcherVersion": 1,
+    "unmatchedM": 395,
+    "omitted": 0,
+    "passes": [
+      { "trail": "Heron Ridge Trail", "startPct": 0, "endPct": 100, "direction": "forward", "metres": 1015, "durationS": 254, "climbM": 30, "entryOffsetS": 70 },
+      { "trail": "Aspen Draw;Kestrel Connector", "startPct": 3, "endPct": 97, "direction": "forward", "metres": 140, "durationS": 35, "climbM": null, "entryOffsetS": 326 },
+      { "trail": "Aspen Draw;Kestrel Connector", "startPct": 97, "endPct": 3, "direction": "reverse", "metres": 140, "durationS": null, "climbM": null, "entryOffsetS": null },
+      { "trail": "Heron Ridge Trail", "startPct": 100, "endPct": 41, "direction": "reverse", "metres": 590, "durationS": null, "climbM": null, "entryOffsetS": null },
+      { "trail": "Lower Heron", "startPct": 0, "endPct": 100, "direction": "forward", "metres": 420, "durationS": null, "climbM": null, "entryOffsetS": null }
+    ]
+  },
+  "names": [
+    { "name": "Heron Ridge Trail", "variants": ["Heron Ridge Trail"], "keys": ["heron ridge"] },
+    { "name": "Aspen Draw;Kestrel Connector", "variants": ["Aspen Draw", "Kestrel Connector"], "keys": ["aspen draw", "kestrel connector"] },
+    { "name": "Fox Hollow / Kestrel Connector", "variants": ["Fox Hollow", "Kestrel Connector"], "keys": ["fox hollow", "kestrel connector"] },
+    { "name": "  Upper   Heron  ; ;Lower Heron ", "variants": ["Upper   Heron", "Lower Heron"], "keys": ["upper heron", "lower heron"] },
+    { "name": "Ridge/Gulch", "variants": ["Ridge/Gulch"], "keys": ["ridge/gulch"] },
+    { "name": "Heron Loop TRAIL", "variants": ["Heron Loop TRAIL"], "keys": ["heron loop"] },
+    { "name": "Trail", "variants": ["Trail"], "keys": ["trail"] },
+    { "name": "Trailhead Spur", "variants": ["Trailhead Spur"], "keys": ["trailhead spur"] }
+  ],
+  "likeForLike": [
+    {
+      "case": "the ';' case: 164 m on Aspen Draw;Kestrel Connector against 7 min on Kestrel Connector",
+      "a": { "trail": "Aspen Draw;Kestrel Connector", "startPct": 0, "endPct": 100, "direction": "forward", "metres": 164, "durationS": null, "climbM": null, "entryOffsetS": 0 },
+      "b": { "trail": "Kestrel Connector", "startPct": 0, "endPct": 100, "direction": "forward", "metres": 170, "durationS": 420, "climbM": 5, "entryOffsetS": 0 },
+      "like": false
+    },
+    {
+      "case": "the ' / ' case: Fox Hollow / Kestrel Connector against Kestrel Connector",
+      "a": { "trail": "Fox Hollow / Kestrel Connector", "startPct": 0, "endPct": 100, "direction": "forward", "metres": 164, "durationS": 40, "climbM": null, "entryOffsetS": 0 },
+      "b": { "trail": "Kestrel Connector", "startPct": 0, "endPct": 100, "direction": "forward", "metres": 164, "durationS": 420, "climbM": null, "entryOffsetS": 0 },
+      "like": false
+    },
+    {
+      "case": "the same name, stretch, direction and length",
+      "a": { "trail": "Kestrel Connector", "startPct": 0, "endPct": 100, "direction": "forward", "metres": 164, "durationS": 40, "climbM": 2, "entryOffsetS": 0 },
+      "b": { "trail": "Kestrel Connector", "startPct": 0, "endPct": 100, "direction": "forward", "metres": 166, "durationS": 44, "climbM": 3, "entryOffsetS": 90 },
+      "like": true
+    },
+    {
+      "case": "the same stretch in the other direction",
+      "a": { "trail": "Juniper Ridge", "startPct": 0, "endPct": 100, "direction": "forward", "metres": 1000, "durationS": 300, "climbM": 20, "entryOffsetS": 0 },
+      "b": { "trail": "Juniper Ridge", "startPct": 0, "endPct": 100, "direction": "reverse", "metres": 1000, "durationS": 300, "climbM": 20, "entryOffsetS": 0 },
+      "like": false
+    },
+    {
+      "case": "start and end each exactly 10 points apart",
+      "a": { "trail": "Juniper Ridge", "startPct": 0, "endPct": 100, "direction": "forward", "metres": 1000, "durationS": 300, "climbM": 20, "entryOffsetS": 0 },
+      "b": { "trail": "Juniper Ridge", "startPct": 10, "endPct": 90, "direction": "forward", "metres": 900, "durationS": 280, "climbM": 18, "entryOffsetS": 0 },
+      "like": true
+    },
+    {
+      "case": "start 11 points apart",
+      "a": { "trail": "Juniper Ridge", "startPct": 0, "endPct": 100, "direction": "forward", "metres": 1000, "durationS": 300, "climbM": 20, "entryOffsetS": 0 },
+      "b": { "trail": "Juniper Ridge", "startPct": 11, "endPct": 100, "direction": "forward", "metres": 900, "durationS": 280, "climbM": 18, "entryOffsetS": 0 },
+      "like": false
+    },
+    {
+      "case": "end 11 points apart",
+      "a": { "trail": "Juniper Ridge", "startPct": 0, "endPct": 100, "direction": "forward", "metres": 1000, "durationS": 300, "climbM": 20, "entryOffsetS": 0 },
+      "b": { "trail": "Juniper Ridge", "startPct": 0, "endPct": 89, "direction": "forward", "metres": 900, "durationS": 280, "climbM": 18, "entryOffsetS": 0 },
+      "like": false
+    },
+    {
+      "case": "a 40 to 60% pass against a 30 to 70% pass, 640 m against 1280 m",
+      "a": { "trail": "Juniper Ridge", "startPct": 40, "endPct": 60, "direction": "forward", "metres": 640, "durationS": 150, "climbM": 10, "entryOffsetS": 0 },
+      "b": { "trail": "Juniper Ridge", "startPct": 30, "endPct": 70, "direction": "forward", "metres": 1280, "durationS": 300, "climbM": 20, "entryOffsetS": 0 },
+      "like": false
+    },
+    {
+      "case": "750 m against 1000 m: exactly 25% of the longer",
+      "a": { "trail": "Juniper Ridge", "startPct": 0, "endPct": 100, "direction": "forward", "metres": 750, "durationS": 300, "climbM": 20, "entryOffsetS": 0 },
+      "b": { "trail": "Juniper Ridge", "startPct": 0, "endPct": 100, "direction": "forward", "metres": 1000, "durationS": 300, "climbM": 20, "entryOffsetS": 0 },
+      "like": true
+    },
+    {
+      "case": "749 m against 1000 m: just over 25%",
+      "a": { "trail": "Juniper Ridge", "startPct": 0, "endPct": 100, "direction": "forward", "metres": 749, "durationS": 300, "climbM": 20, "entryOffsetS": 0 },
+      "b": { "trail": "Juniper Ridge", "startPct": 0, "endPct": 100, "direction": "forward", "metres": 1000, "durationS": 300, "climbM": 20, "entryOffsetS": 0 },
+      "like": false
+    },
+    {
+      "case": "the same key but not the same name as written: Juniper Ridge against Juniper Ridge Trail",
+      "a": { "trail": "Juniper Ridge", "startPct": 0, "endPct": 100, "direction": "forward", "metres": 1000, "durationS": 300, "climbM": 20, "entryOffsetS": 0 },
+      "b": { "trail": "Juniper Ridge Trail", "startPct": 0, "endPct": 100, "direction": "forward", "metres": 1000, "durationS": 300, "climbM": 20, "entryOffsetS": 0 },
+      "like": false
+    },
+    {
+      "case": "an unknown length on one side",
+      "a": { "trail": "Juniper Ridge", "startPct": 0, "endPct": 100, "direction": "forward", "metres": null, "durationS": 300, "climbM": 20, "entryOffsetS": 0 },
+      "b": { "trail": "Juniper Ridge", "startPct": 0, "endPct": 100, "direction": "forward", "metres": 1000, "durationS": 300, "climbM": 20, "entryOffsetS": 0 },
+      "like": false
+    }
+  ],
+  "history": {
+    "activities": [
+      {
+        "id": "a1", "date": "2000-01-01", "time": "08:00",
+        "passes": [
+          { "trail": "Heron Loop", "startPct": 0, "endPct": 100, "direction": "forward", "metres": 1000, "durationS": 300, "climbM": 40, "entryOffsetS": 0 },
+          { "trail": "Aspen Draw;Kestrel Connector", "startPct": 0, "endPct": 100, "direction": "forward", "metres": 160, "durationS": 60, "climbM": 5, "entryOffsetS": 400 },
+          { "trail": "Fox Hollow", "startPct": 0, "endPct": 100, "direction": "forward", "metres": 500, "durationS": 150, "climbM": 10, "entryOffsetS": 800 }
+        ]
+      },
+      {
+        "id": "a2", "date": "2000-01-02", "time": "08:00",
+        "passes": [
+          { "trail": "Heron Loop", "startPct": 2, "endPct": 98, "direction": "forward", "metres": 990, "durationS": 280, "climbM": 41, "entryOffsetS": 500 },
+          { "trail": "Heron Loop", "startPct": 0, "endPct": 100, "direction": "forward", "metres": 1010, "durationS": 290, "climbM": 42, "entryOffsetS": 0 },
+          { "trail": "Heron Loop", "startPct": 100, "endPct": 0, "direction": "reverse", "metres": 1000, "durationS": 250, "climbM": null, "entryOffsetS": 900 }
+        ]
+      },
+      {
+        "id": "a3", "date": "2000-01-02", "time": "17:30",
+        "passes": [
+          { "trail": "Kestrel Connector", "startPct": 0, "endPct": 100, "direction": "forward", "metres": 165, "durationS": 62, "climbM": 5, "entryOffsetS": 100 },
+          { "trail": "Heron Loop Trail", "startPct": 0, "endPct": 100, "direction": "forward", "metres": 1000, "durationS": 295, "climbM": 40, "entryOffsetS": 300 }
+        ]
+      },
+      {
+        "id": "a5", "date": "2000-01-03", "time": "07:00",
+        "passes": [
+          { "trail": "Heron Loop", "startPct": 0, "endPct": 100, "direction": "forward", "metres": 1000, "durationS": 305, "climbM": null, "entryOffsetS": 0 }
+        ]
+      },
+      {
+        "id": "a4", "date": "2000-01-03", "time": "07:00",
+        "passes": [
+          { "trail": "Heron Loop", "startPct": 0, "endPct": 100, "direction": "forward", "metres": 1000, "durationS": 310, "climbM": 39, "entryOffsetS": 0 },
+          { "trail": "Aspen Draw;Kestrel Connector", "startPct": 0, "endPct": 100, "direction": "forward", "metres": 150, "durationS": 55, "climbM": 4, "entryOffsetS": 400 },
+          { "trail": "Heron Loop", "startPct": 0, "endPct": 100, "direction": "forward", "metres": 1400, "durationS": 420, "climbM": 55, "entryOffsetS": 600 }
+        ]
+      },
+      {
+        "id": "a6", "date": "2000-01-04", "time": "09:15",
+        "passes": [
+          { "trail": "Fox Hollow Trail", "startPct": 0, "endPct": 100, "direction": "forward", "metres": 500, "durationS": 140, "climbM": 10, "entryOffsetS": 0 }
+        ]
+      }
+    ],
+    "groups": [
+      { "key": "aspen draw", "name": "Aspen Draw", "otherNames": [], "visits": ["a1", "a4"] },
+      { "key": "fox hollow", "name": "Fox Hollow Trail", "otherNames": ["Fox Hollow"], "visits": ["a1", "a6"] },
+      { "key": "heron loop", "name": "Heron Loop", "otherNames": ["Heron Loop Trail"], "visits": ["a1", "a2", "a3", "a4", "a5"] },
+      { "key": "kestrel connector", "name": "Kestrel Connector", "otherNames": [], "visits": ["a1", "a3", "a4"] }
+    ],
+    "comparisons": [
+      { "group": "heron loop", "activity": "a1", "pass": 0, "previous": null },
+      { "group": "heron loop", "activity": "a2", "pass": 1, "previous": { "activity": "a1", "pass": 0 }, "timeDiffS": -10, "climbDiffM": 2 },
+      { "group": "heron loop", "activity": "a2", "pass": 0, "previous": { "activity": "a1", "pass": 0 }, "timeDiffS": -20, "climbDiffM": 1 },
+      { "group": "heron loop", "activity": "a2", "pass": 2, "previous": null },
+      { "group": "heron loop", "activity": "a3", "pass": 1, "previous": null },
+      { "group": "heron loop", "activity": "a4", "pass": 0, "previous": { "activity": "a2", "pass": 0 }, "timeDiffS": 30, "climbDiffM": -2 },
+      { "group": "heron loop", "activity": "a4", "pass": 2, "previous": null },
+      { "group": "heron loop", "activity": "a5", "pass": 0, "previous": { "activity": "a4", "pass": 0 }, "timeDiffS": -5, "climbDiffM": null },
+      { "group": "aspen draw", "activity": "a1", "pass": 1, "previous": null },
+      { "group": "aspen draw", "activity": "a4", "pass": 1, "previous": { "activity": "a1", "pass": 1 }, "timeDiffS": -5, "climbDiffM": -1 },
+      { "group": "kestrel connector", "activity": "a1", "pass": 1, "previous": null },
+      { "group": "kestrel connector", "activity": "a3", "pass": 0, "previous": null },
+      { "group": "kestrel connector", "activity": "a4", "pass": 1, "previous": { "activity": "a1", "pass": 1 }, "timeDiffS": -5, "climbDiffM": -1 },
+      { "group": "fox hollow", "activity": "a1", "pass": 2, "previous": null },
+      { "group": "fox hollow", "activity": "a6", "pass": 0, "previous": null }
+    ]
+  }
+}

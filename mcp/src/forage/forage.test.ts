@@ -8,7 +8,8 @@ import { FORAGE_READ_TOOLS } from './tools'
 // #713: Forage's two connectors over a fake Apps Script API. The API's own
 // change log and undo are tested in forage/apps-script/tests/change-log.test.ts.
 
-const KEY = 'forage-secret-key-123'
+// Characters that change under URL encoding, so the encoded form is a different string to scrub.
+const KEY = 'forage+secret/key=123'
 const URL_ = 'https://script.google.com/macros/s/forage/exec'
 const T0 = Date.UTC(2026, 10, 1, 18, 0, 0)
 

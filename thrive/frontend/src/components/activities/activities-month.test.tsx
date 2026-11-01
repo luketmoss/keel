@@ -92,7 +92,8 @@ describe('AC1: the old header is gone', () => {
     for (const cls of ['.week-streak-bar', '.week-streak-dots', '.stats-bar', '.stats-row', '.streak-dot']) {
       expect(document.querySelector(cls), cls).toBeNull();
     }
-    expect(screen.queryByText('This week')).toBeNull();
+    // The list's own week heading reads "This week" whenever the 1st falls in the current week.
+    expect(screen.queryAllByText('This week').filter((el) => !el.closest('.week-heading'))).toEqual([]);
     expect(screen.queryByText(/Cardio this week/)).toBeNull();
     expect(screen.queryByRole('button', { name: 'Toggle filters' })).toBeNull();
   });

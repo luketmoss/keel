@@ -87,6 +87,30 @@
     }
   },
   {
+    "name": "hive_delete_item",
+    "description": "Delete a Hive item and all of its sub-tasks. Destructive and dry-run by default: without confirm it lists every item that would go and returns a token, and deletes nothing. Call again with confirm: true and that token to delete. If the sub-tasks changed since the preview, nothing is deleted and a fresh preview comes back. hive_undo can bring the items back. Only delete what the user asked to delete.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "item_id": {
+          "type": "string",
+          "description": "ID of the item to delete, from hive_list_items or hive_get_item"
+        },
+        "confirm": {
+          "description": "Set true to actually delete. Default false = preview only.",
+          "type": "boolean"
+        },
+        "token": {
+          "description": "The token from the dry run. Required with confirm: true",
+          "type": "string"
+        }
+      },
+      "required": [
+        "item_id"
+      ]
+    }
+  },
+  {
     "name": "hive_get_item",
     "description": "Get full details of a single Hive item by ID. Use this to read the current description, status, etc. before updating.",
     "inputSchema": {

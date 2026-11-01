@@ -2,7 +2,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import { WriteLimitError } from '../budget.js'
-import { declareRows, runToolCall } from '../call-context.js'
+import { currentCallId, declareRows, runToolCall } from '../call-context.js'
 import { withReminder, type Mode } from '../mode.js'
 import { describeRowChange, keyText, listCalls } from '../undo-format.js'
 import {
@@ -36,7 +36,7 @@ function guarded<A>(fn: (args: A) => Promise<ToolResult>) {
 
 const READ = { readOnlyHint: true } as const
 const WRITE = { readOnlyHint: false, destructiveHint: false } as const
-// Reverting is a write that can itself destroy later work (#412).
+// Reverting is a write that can itself destroy later work (#412); deleting is the same (#725).
 const UNDO = { readOnlyHint: false, destructiveHint: true } as const
 
 /** The tools the read endpoint serves (#409). Everything else registered here is a write tool. */
@@ -379,6 +379,85 @@ export function registerHiveTools(server: McpServer, cfg: HiveConfig, mode: Mode
       },
     ),
   )
+
+  /** A delete preview (#244): the item and every sub-task, indented by depth, then how to confirm. */
+  const cascadeLines = (preview: any): string[] => [
+    ...(preview.items as any[]).map((i) => `${'  '.repeat(i.depth)}- "${i.title}" (${i.id})`),
+    `Call again with confirm: true and token: "${preview.token}" to delete. hive_undo can bring them back.`,
+  ]
+
+  server.registerTool(
+    'hive_delete_item',
+    {
+      description:
+        'Delete a Hive item and all of its sub-tasks. Destructive and dry-run by default: without confirm it ' +
+        'lists every item that would go and returns a token, and deletes nothing. Call again with confirm: true ' +
+        'and that token to delete. If the sub-tasks changed since the preview, nothing is deleted and a fresh ' +
+        'preview comes back. hive_undo can bring the items back. Only delete what the user asked to delete.',
+      inputSchema: {
+        item_id: z.string().describe('ID of the item to delete, from hive_list_items or hive_get_item'),
+        confirm: z.boolean().optional().describe('Set true to actually delete. Default false = preview only.'),
+        token: z.string().optional().describe('The token from the dry run. Required with confirm: true'),
+      },
+      annotations: UNDO,
+    },
+    guarded(async ({ item_id, confirm, token }: { item_id: string; confirm?: boolean; token?: string }) => {
+      if (confirm && !token) {
+        return {
+          ...text('confirm needs the token from a dry run. Call hive_delete_item without confirm first. Nothing was deleted.'),
+          isError: true,
+        }
+      }
+
+      const preview = await apiDry(cfg, 'deleteItem', { id: item_id })
+      if (!preview.success) return { ...text(`Error: ${preview.error}`), isError: true }
+      const p = preview.data
+      if (!confirm) {
+        return text(
+          [
+            `DRY RUN — nothing deleted. Deleting "${p.root.title}" (${p.root.id}) would remove ${p.count} item(s):`,
+            ...cascadeLines(p),
+          ].join('\n'),
+        )
+      }
+
+      // The whole cascade is one write of as many rows as it holds (#410).
+      declareRows(p.count)
+      let done
+      try {
+        done = await apiWrite(cfg, 'deleteItem', { id: item_id, confirm: true, token, actor: 'hive-mcp' })
+      } catch (err) {
+        if (err instanceof HiveError && /not JSON|Could not reach/.test(err.message)) {
+          throw new HiveError(
+            `${err.message} The delete was sent once and not retried: it may or may not have applied. ` +
+              'Call hive_get_item to check before retrying.',
+          )
+        }
+        throw err
+      }
+      if (!done.success) {
+        // A refused confirm whose cascade drifted carries the fresh preview (#244).
+        if (done.data?.token) {
+          return {
+            ...text(
+              [
+                `Nothing deleted — the item's sub-tasks changed since the preview. Deleting it would now remove ${done.data.count} item(s):`,
+                ...cascadeLines(done.data),
+              ].join('\n'),
+            ),
+            isError: true,
+          }
+        }
+        return { ...text(`Error: ${done.error}`), isError: true }
+      }
+      const d = done.data
+      return text(
+        `Deleted "${d.root.title}" (${d.root.id}), ${d.count} item(s) in all. ` +
+          `hive_undo can bring them back: this was call ${currentCallId()}.`,
+      )
+    }),
+  )
+
   server.registerTool(
     'hive_undo',
     {

@@ -347,7 +347,12 @@ included) has no row to record one on. `src/fit.mjs`:
 
 - **The tool is `downloadActivityFitFiles`**, with `{ labelId, sportType }` from
   the list. It returns the file as a base64 `resource` blob
-  (`coros://activity-fit-files/<labelId>.fit`). `queryActivityFitFileDownloadUrls`
+  whose URI names the activity (`coros://activity-fit-files/<labelId>.fit` when
+  #174 was built). The URI is taken when the activity ID appears anywhere in it
+  as a whole token, so `9<id>` is another activity; COROS changed the shape by
+  2026-11-01 without notice, so nothing relies on where the ID sits (#737). A
+  refusal names the URI it got, query string dropped and redacted.
+  `queryActivityFitFileDownloadUrls`
   would return an unauthenticated S3 URL instead, a secret, so the sync never
   calls it and the URL never exists in the process. `redact()` masks one
   anyway.
@@ -670,6 +675,7 @@ the auto-disable after 60 days with no activity on a public repo. That layer is
 | `activity <id>: enrichWorkout: N Workouts rows are enriched from activity …` | Two hand-logged rows carry one strength session's ID | Clear `source_activity_id` on all but one, then re-run |
 | `SyncLog row … was not written` naming `notes` | The API is newer than the tab | Run `scripts/migrate-155-sync-log-notes.mjs` |
 | `activity <id>: FIT request n of 3 failed` | COROS errored, or sent something that is not one whole FIT file for that activity | Nothing. The next run tries again, up to 3 requests in all |
+| `… FIT request n of 3 failed …: downloadActivityFitFiles returned a file for a different activity: <uri>` | The resource's URI does not contain the activity's ID as a whole token. Either COROS sent another activity's file, or it changed the URI shape again (#737) | If `<uri>` holds the activity's ID in a shape `uriNamesActivity` in `src/fit.mjs` misses, widen it before the third attempt, or delete the archive's `fit` record afterwards to retry |
 | `activity <id>: FIT request failed 3 times, so the sync has stopped asking for it` | It gave up. The row gets `fit_fetched_at` with `fit_ref` blank | Read `fit.last_error` in the activity's archive file. To retry, delete its `fit` record there |
 | `FIT budget unknown, so no FIT was requested this run` | `getSyncLog` failed, or 100 rows of the last 24 h leave older ones unread | Read the quoted reason. The next run tries again |
 | `activity <id>: FIT downloaded but not stored in Drive` | The Drive upload failed | Nothing. The next run requests it again, which spends one more of the allowance |

@@ -497,8 +497,9 @@ OpenStreetMap trails its track rode, and writes them to `Workouts!AD` `trails`
   with a `User-Agent` naming `keel-thrive-sync` and this repository, asking for
   the named `highway` ways of `path|track|footway|bridleway|cycleway` in the
   track's bounding box padded by 50 m (`out geom`, no relations). Overpass sees
-  only the box, never the track. 45 s per attempt; 3 attempts, waiting 10 s and
-  then 30 s, for no response, HTTP 429/502/503/504, or a 200 carrying Overpass's
+  only the box, never the track. The sync's client (`SYNC_OVERPASS` in
+  `src/trail-step.mjs`, #717) gives each attempt 90 s with `[timeout:70]` in
+  the query, and makes 4 attempts, waiting 15 s, 60 s, then 120 s, for no response, HTTP 429/502/503/504, or a 200 carrying Overpass's
   `remark` (a runtime error or partial result). Any other status, or a body that
   is not JSON or has no `elements`, fails at once. `THRIVE_OVERPASS_URL` is read
   from the environment, for a local run against another instance; the
@@ -562,8 +563,8 @@ exactly what the sync writes.
   progress file), `--no-cache`, `--attempt-timeout-s 120` and `--attempts 5`
   (the patience below). Every number is whole and 1 or more (`--pause-ms`
   0 or more).
-- **Patience (#697).** Unlike the sync, whose 3-minute run budget allows 45 s
-  attempts and 3 tries, the backfill waits for Overpass: 5 attempts per lookup,
+- **Patience (#697).** Unlike the sync, whose 20-minute job allows 90 s
+  attempts and 4 tries (#717), the backfill waits for Overpass: 5 attempts per lookup,
   each given 120 s by the client with a server `[timeout:90]` in the query (75%
   of the client's, so the client never gives up first), and waits of 15 s, 60 s,
   120 s and 180 s between them (the last repeats if `--attempts` is higher; no

@@ -1,0 +1,42 @@
+{
+  "url": "https://www.bonappetit.com/recipe/bas-best-chocolate-chip-cookies",
+  "note": "Entities and tags restored as pages often send them: the name, two lines and a step are encoded here on purpose.",
+  "jsonld": {
+    "@context": "https://schema.org",
+    "@type": "Recipe",
+    "name": "BA&#8217;s Best Chocolate Chip Cookies",
+    "recipeYield": "Makes 16",
+    "totalTime": "40 minutes",
+    "cookTime": "20 minutes",
+    "recipeIngredient": [
+      "1½ cups plus 1 Tbsp. (200 g) all-purpose flour (spooning into measuring cups, then leveling)",
+      "1&frac14; tsp. (4 g) Diamond Crystal or &frac34; tsp. (4 g) Morton kosher salt",
+      "¾ tsp. (4 g) baking soda",
+      "¾ cup (1½ sticks; 169 g) unsalted butter, divided",
+      "1 cup (200 g) (packed) dark brown sugar",
+      "¼ cup (50 g) granulated sugar",
+      "1 large egg",
+      "2 large egg yolks",
+      "2 tsp. vanilla extract",
+      "6 oz. (170 g) bittersweet chocolate (60%&ndash;70% cacao), coarsely chopped, or semisweet chocolate chips"
+    ],
+    "recipeInstructions": [
+      {
+        "@type": "HowToStep",
+        "text": "Place racks in upper and lower thirds of …"
+      },
+      {
+        "@type": "HowToStep",
+        "text": "Cook &frac12; cup (1 stick; 113 g) <strong>unsalted</strong> &hellip;"
+      },
+      {
+        "@type": "HowToStep",
+        "text": "Once butter is melted, add 1 cup (200 …"
+      },
+      {
+        "@type": "HowToStep",
+        "text": "Using a 1½-oz. scoop (3 Tbsp.), portion out …"
+      }
+    ]
+  }
+}

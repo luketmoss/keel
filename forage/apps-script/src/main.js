@@ -15,6 +15,7 @@
 //   action=getRecipe&key=...&id=rc_1a2b3c4d  — lines with resolved grams, steps, nutrition
 //   action=upsertRecipe&key=...&payload={"name":"Beef Stew","servings":6,"lines":[...],"steps":[...]}
 //   action=computeNutrition&key=...&payload={"servings":6,"lines":[...]}   — not saved
+//   action=importRecipe&key=...&payload={"url":"https://...","dry_run":true}  — the preview; false saves
 //   action=getPlan&key=...&from=2026-11-01&to=2026-11-07
 //   action=logFood&access_token=...&payload={"date":"2026-11-01","slot":"Dinner","recipe_id":"rc_1","qty":1}
 //   action=getFoodLogTotals&key=...&from=2026-11-01&to=2026-11-07
@@ -25,10 +26,15 @@ function envelope(result) {
   return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
 }
 
-/** A failure. `code` is optional: `token_invalid`, `token_forbidden`, `token_unavailable`, `not_permitted`. */
-function fail(message, code) {
+/**
+ * A failure. `code` is optional: `token_invalid`, `token_forbidden`,
+ * `token_unavailable`, `not_permitted`, and the import's reasons (#706).
+ * `extra` adds fields a caller acts on, such as `duplicate_of`.
+ */
+function fail(message, code, extra) {
   var result = { success: false, error: message };
   if (code) result.code = code;
+  if (extra) Object.keys(extra).forEach(function (k) { result[k] = extra[k]; });
   return result;
 }
 
@@ -74,7 +80,7 @@ function handleRequest(e) {
     }
     result = { success: true, data: dispatch(action, params, caller) };
   } catch (err) {
-    result = fail((err && err.message) || String(err));
+    result = fail((err && err.message) || String(err), err && err.code, err && err.extra);
   }
   if (result && result.error) result.error = withoutToken(result.error, params.access_token);
   return envelope(result);
@@ -98,6 +104,7 @@ function dispatch(action, params, caller) {
     case 'upsertRecipe': return write(upsertRecipe);
     case 'deleteRecipe': return write(deleteRecipe);
     case 'computeNutrition': return computeNutrition(parsePayload(params.payload));
+    case 'importRecipe': return importRecipe(parseImportPayload(params.payload));
     // Walkthroughs
     case 'getWalkthrough': return getWalkthrough(params.recipe_id);
     case 'setWalkthrough': return write(setWalkthrough);

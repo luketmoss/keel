@@ -1,0 +1,93 @@
+{
+  "url": "https://www.kingarthurbaking.com/recipes/fudge-brownies-recipe",
+  "jsonld": {
+    "@context": "https://schema.org",
+    "@type": [
+      "Recipe",
+      "NewsArticle"
+    ],
+    "name": "Fudge Brownies",
+    "recipeYield": [
+      "24",
+      "two dozen 2\" brownies"
+    ],
+    "totalTime": "PT40M",
+    "prepTime": "PT12M",
+    "cookTime": "PT32M",
+    "recipeIngredient": [
+      "4 large eggs",
+      "1 1/4 cups (106g) Dutch-process cocoa",
+      "1 teaspoon table salt",
+      "1 teaspoon baking powder",
+      "1 teaspoon espresso powder, optional for enhanced flavor",
+      "1 tablespoon King Arthur Pure Vanilla Extract",
+      "16 tablespoons (227g) unsalted butter",
+      "2 1/4 cups (447g) granulated sugar",
+      "1 1/2 cups (180g) King Arthur Unbleached All-Purpose Flour",
+      "2 cups (340g) chocolate chips"
+    ],
+    "recipeInstructions": [
+      {
+        "@type": "HowToStep",
+        "name": "Step 1",
+        "text": "Preheat the oven to 350°F. Lightly grease a …"
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Step 2",
+        "text": "In the bowl of a stand mixer fitted …"
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Step 3",
+        "text": "In a saucepan set over low heat or …"
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Step 4",
+        "text": "Add the hot butter/sugar mixture to the egg/cocoa …"
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Step 5",
+        "text": "Add the flour and chocolate chips, stirring until …"
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Step 6",
+        "text": "Transfer the batter to the prepared pan and …"
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Step 7",
+        "text": "Bake the brownies for 28 to 32 minutes, …"
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Step 8",
+        "text": "Remove the brownies from the oven and cool …"
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Step 9",
+        "text": "Store any leftover Fudge Brownies, well-wrapped, at room …"
+      },
+      {
+        "@type": "HowToTip",
+        "text": "This recipe is written using Dutch-process cocoa. If …"
+      },
+      {
+        "@type": "HowToTip",
+        "text": "Looking for a gluten-free version of this recipe? …"
+      },
+      {
+        "@type": "HowToTip",
+        "text": "Want to make brownies with whole wheat flour? …"
+      },
+      {
+        "@type": "HowToTip",
+        "text": "To make mini brownie hearts: Quarter the recipe …"
+      }
+    ]
+  }
+}

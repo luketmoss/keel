@@ -189,6 +189,28 @@ describe('forage_food_log', () => {
   })
 })
 
+describe('forage_food_log: the second lines (#755)', () => {
+  it('the day and each entry with known values beyond the four get a second line of only those; the rest none', async () => {
+    const yogurt = { ...YOGURT, satfat_g: 0.24, sodium_mg: 89.6, sugars_g: 8.1, fiber_g: null }
+    const day = { ...DAY, satfat_g: 3.04, sodium_mg: 640.4, fiber_g: 8, sugars_g: 12.5, transfat_g: null, unknown: { sodium_mg: 2 } }
+    api({ getFoodLog: ok([yogurt, BARS, STEW, HERBS]), getFoodLogTotals: ok({ days: [day] }) })
+    expect(textOf(await call('forage_food_log')).split('\n')).toEqual([
+      'Thu 2026-11-05 — 1,241 kcal so far (low: 1 entry has no nutrition, 1 entry is partial). Protein 62 g · Carbs 140 g · Fat 48 g.',
+      'Sat fat 3 g · Sodium 640 mg · Fiber 8 g · Sugars 12.5 g',
+      'Breakfast',
+      '  lg_1a2b3c4d  Greek yogurt · 1 cup (245 g) · 150 kcal',
+      '      Sat fat 0.2 g · Sodium 90 mg · Sugars 8.1 g',
+      '  lg_9e8f7a6b  KIND bar · 2 bar (80 g) · 380 kcal',
+      'Lunch',
+      '  lg_5d6e7f8a  Beef Stew · 1 serving · 412 kcal (partial)',
+      'Dinner',
+      '  (nothing)',
+      'Snacks',
+      '  lg_herbs  Herbes de Provence · 2 g · no nutrition',
+    ])
+  })
+})
+
 describe('forage_log_food', () => {
   it('is a dry run by default: the preview, no reminder, not counted, no call id', async () => {
     const sent = api({ logFood: (r) => ({ success: true, data: { ...YOGURT, slot: 'Dinner', ...r.payload, id: 'lg_new' } }) })

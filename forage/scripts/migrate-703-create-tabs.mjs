@@ -6,10 +6,17 @@
  * key-only `ensureSchema` action: each missing tab gets its header row from
  * `apps-script/src/types.js`, frozen, and Config gets `schema_version`.
  *
- * Additive only: a tab that already exists is never touched, so a second run
- * changes nothing and says so. Run it again after a release that adds a tab:
- * #713's MCPChangeLog (the 12th) is created on a Sheet at version 1, which
- * becomes 2, and no other tab changes.
+ * Additive only: no existing cell is changed or moved, so a second run changes
+ * nothing and says so. Run it again after a release that adds a tab or
+ * columns:
+ *   - #713's MCPChangeLog (the 12th) is created on a Sheet at version 1, which
+ *     becomes 2, and no other tab changes.
+ *   - #755: run it after the release that ships #755. Foods and FoodLog get
+ *     the seven nutrient columns appended after `updated`, and the Sheet goes
+ *     from version 2 to 3. A tab whose header row is not exactly a prefix of
+ *     its columns (one renamed by hand, say) is left alone and named, and the
+ *     version stays until it is fixed and this is run again. Then run
+ *     backfill-755-starter-nutrition.mjs.
  *
  * Usage (PowerShell; the values are prompted for, never typed into the command):
  *   $env:FORAGE_API_URL = Read-Host 'FORAGE_API_URL'
@@ -44,7 +51,13 @@ if (!body.success) {
   process.exit(1);
 }
 
-const { created, existing, schema_version: version } = body.data;
+const { created, existing, extended = [], mismatched = [], schema_version: version } = body.data;
 console.log(created.length ? `Created: ${created.join(', ')}` : 'Created nothing: every tab already exists.');
-if (existing.length) console.log(`Left untouched: ${existing.join(', ')}`);
+for (const e of extended) console.log(`Added columns to ${e.tab}: ${e.added.join(', ')}`);
+if (!extended.length) console.log('Added no columns: every existing tab has all of its columns.');
+const untouched = existing.filter((t) => !extended.some((e) => e.tab === t) && !mismatched.includes(t));
+if (untouched.length) console.log(`Left untouched: ${untouched.join(', ')}`);
+for (const t of mismatched) {
+  console.log(`NOT CHANGED ${t}: its header row is not the start of its columns in apps-script/src/types.js. Fix it by hand, then run this again.`);
+}
 console.log(`schema_version: ${version ?? '(none)'}`);

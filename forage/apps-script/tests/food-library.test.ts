@@ -194,6 +194,9 @@ describe('lookupBarcode', () => {
       id: '', name: 'Crunch Bar', kind: 'packaged', brand: 'Acme Foods', category: '',
       kcal_100g: 450, protein_100g: 10, carbs_100g: 60, fat_100g: 20,
       servings_json: [{ name: 'bar', g: 40 }], source: 'off', source_ref: CODE, verified: false, barcode: CODE,
+      // #755: the fixture has none of the seven.
+      satfat_100g: null, transfat_100g: null, cholesterol_mg_100g: null, sodium_mg_100g: null, fiber_100g: null,
+      sugars_100g: null, added_sugars_100g: null,
     });
     expect((headers as Record<string, string>)['User-Agent']).toMatch(/^Forage\//);
     expect(api.rows('Foods')).toEqual([]);

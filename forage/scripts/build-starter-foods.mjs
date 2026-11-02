@@ -8,6 +8,15 @@
  * no USDA key: this script is run by hand when the list changes, and the file
  * it writes is committed.
  *
+ * #755 adds six more per 100 g: saturated and trans fat, cholesterol and
+ * sodium (mg), fiber and sugars. A record lacking one gets it blank (null)
+ * rather than failing; SR Legacy has no added sugars, so that one is never
+ * written. Forage refuses a food whose sugars or fiber are more than its
+ * carbs, or whose saturated and trans fat add up to more than its fat
+ * (`upsertFood`), and SR Legacy's carbs are by difference, so a few records
+ * break that (whole milk's sugars are 5.05 g to 4.8 g of carbs). Such a value
+ * is written blank, with a warning, so every starter food can be edited later.
+ *
  * Inputs:
  *   - the SR Legacy JSON download ("SR Legacy", JSON, from
  *     https://fdc.nal.usda.gov/download-datasets), unzipped: one object,
@@ -121,6 +130,19 @@ const FOODS = [
 /** SR Legacy nutrient numbers: energy (kcal), protein, carbohydrate by difference, total fat. */
 const NUTRIENTS = { kcal_100g: '208', protein_100g: '203', carbs_100g: '205', fat_100g: '204' };
 
+/**
+ * #755: saturated fat, trans fat, cholesterol (mg), sodium (mg), fiber and total sugars. Optional: a record
+ * without one gets null, never 0.
+ */
+const MORE_NUTRIENTS = {
+  satfat_100g: '606',
+  transfat_100g: '605',
+  cholesterol_mg_100g: '601',
+  sodium_mg_100g: '307',
+  fiber_100g: '291',
+  sugars_100g: '269',
+};
+
 const round = (n, places) => Math.round(n * 10 ** places) / 10 ** places;
 
 function fail(message) {
@@ -153,6 +175,20 @@ const foods = FOODS.map(([id, name, category, fdc, weights]) => {
     );
     if (!n || typeof n.amount !== 'number') fail(`FDC ${fdc} (${name}) has no ${field}`);
     food[field] = round(n.amount, 2);
+  }
+  for (const [field, number] of Object.entries(MORE_NUTRIENTS)) {
+    const n = record.foodNutrients.find((x) => x.nutrient?.number === number);
+    food[field] = n && typeof n.amount === 'number' ? round(n.amount, 2) : null;
+  }
+  const drop = (field, why) => {
+    console.warn(`FDC ${fdc} (${name}): ${field} ${food[field]} left blank, ${why}`);
+    food[field] = null;
+  };
+  if (food.fiber_100g !== null && food.fiber_100g > food.carbs_100g) drop('fiber_100g', 'more than carbs');
+  if (food.sugars_100g !== null && food.sugars_100g > food.carbs_100g) drop('sugars_100g', 'more than carbs');
+  if (food.satfat_100g !== null && food.satfat_100g > food.fat_100g) drop('satfat_100g', 'more than fat');
+  if ((food.satfat_100g ?? 0) + (food.transfat_100g ?? 0) > food.fat_100g + 1e-9) {
+    drop('transfat_100g', 'saturated and trans fat add up to more than fat');
   }
 
   const portions = (record.foodPortions ?? [])

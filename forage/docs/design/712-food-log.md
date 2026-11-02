@@ -192,6 +192,12 @@ banner stays visible.
 | `unknown_entries` | Entries whose stored snapshot is blank (a food or recipe with no nutrition) |
 | `kcal`, `protein_g`, `carbs_g`, `fat_g` | Sum over the entries that have a value, to 0.1. `null` when no entry that date has one |
 | `partial` | True when any entry is `partial` or unknown: the true total is higher |
+| `satfat_g`, `transfat_g`, `cholesterol_mg`, `sodium_mg`, `fiber_g`, `sugars_g`, `added_sugars_g` | #755. Each summed over the entries that have it, to 0.1; `null` when no entry that date does. mg for cholesterol and sodium, g for the rest |
+| `unknown` | #755. `{ satfat_g: 1, … }`, all seven keys: for each, the entries with a non-null `kcal` and that value `null`. An entry with no nutrition at all is already in `unknown_entries` and is not counted again |
+
+#755 changes none of the fields above it, `partial` included: none of the seven makes a day partial. A reader
+that shows one of them says how many entries it leaves out when its `unknown` count is not 0. Thrive's Food card
+(#714) reads only the four; #757 is the one that shows the seven.
 
 A reader shows `—` for a date that is absent or whose figures are `null`, and says "so far" when the date is today
 (the API does not know what time the day ends). A reader that gets `partial: true` says the total is low. A day an

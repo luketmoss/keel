@@ -8,6 +8,10 @@ import { loadApi, type Api } from './apps-script-sandbox';
 
 const DAY = '2026-11-03';
 
+/** #755's seven, as a day or an entry with none of them answers them. */
+const SEVEN = ['satfat_g', 'transfat_g', 'cholesterol_mg', 'sodium_mg', 'fiber_g', 'sugars_g', 'added_sugars_g'];
+const sevenAre = (v: number | null) => Object.fromEntries(SEVEN.map((k) => [k, v]));
+
 function seed(api: Api) {
   api.ok('upsertFood', {
     payload: {
@@ -59,11 +63,13 @@ describe('getFoodLogTotals: the read shape #714 relies on', () => {
           carbs_g: Math.round((a.carbs_g + b.carbs_g) * 10) / 10,
           fat_g: Math.round((a.fat_g + b.fat_g) * 10) / 10,
           partial: false,
+          ...sevenAre(null),
+          unknown: sevenAre(2),
         },
       ],
     });
     expect(Object.keys(totals.days[0])).toEqual([
-      'date', 'entries', 'unknown_entries', 'kcal', 'protein_g', 'carbs_g', 'fat_g', 'partial',
+      'date', 'entries', 'unknown_entries', 'kcal', 'protein_g', 'carbs_g', 'fat_g', 'partial', ...SEVEN, 'unknown',
     ]);
   });
 
@@ -104,6 +110,8 @@ describe('getFoodLogTotals: the read shape #714 relies on', () => {
       carbs_g: null,
       fat_g: null,
       partial: true,
+      ...sevenAre(null),
+      unknown: sevenAre(0),
     });
   });
 

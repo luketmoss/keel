@@ -1,10 +1,15 @@
 // Foods (#703, #707): the food library. Nutrition is per 100 g, all four
-// values set or all blank; blank means "no nutrition yet", never 0.
+// values set or all blank; blank means "no nutrition yet", never 0. The seven
+// beyond them (#755, EXTRA_NUTRIENTS in nutrition.js) are each blank or a
+// number, independently, and only on a food with the four.
 
 var NUTRITION_FIELDS = ['kcal_100g', 'protein_100g', 'carbs_100g', 'fat_100g'];
 
 /** The most energy 100 g of anything holds: pure fat, 100 g at 9.02 kcal/g. */
 var MAX_KCAL_100G = 902;
+
+/** The most cholesterol or sodium 100 g can hold, in mg: all of it (#755). */
+var MAX_MG_100G = 100000;
 
 /** A food's name as the app shows it: brand, then name. Unique, case-insensitively. */
 function displayName(food) {
@@ -95,6 +100,7 @@ function upsertFood(payload) {
       throw new Error('protein, carbs and fat add up to more than 100 g per 100 g');
     }
   }
+  validateExtraNutrients(food, set === 4);
   food.servings_json = validateServings(food.servings_json);
   food.buy_unit_g = optionalNumber('buy_unit_g', food.buy_unit_g, { positive: true });
   food.usual_store = validateEnum('usual_store', food.usual_store, STORES, true);
@@ -108,6 +114,46 @@ function upsertFood(payload) {
   food.created = existing ? existing.created : now;
   food.updated = now;
   return upsertRecord('Foods', food);
+}
+
+/**
+ * The seven (#755): each blank or a number at least 0, set only when the core
+ * four are, and inside what contains it. Each containment rule is checked only
+ * when both sides are set: saturated + trans fat at most fat, fiber at most
+ * carbs, added sugars at most sugars at most carbs. Cholesterol and sodium are
+ * at most 100,000 mg per 100 g. Refusals name the fields.
+ */
+function validateExtraNutrients(food, hasCore) {
+  EXTRA_NUTRIENTS.forEach(function (x) { food[x.per100] = optionalNumber(x.per100, food[x.per100], { min: 0 }); });
+  var set = EXTRA_NUTRIENTS.filter(function (x) { return food[x.per100] !== null; })
+    .map(function (x) { return x.per100; });
+  if (!set.length) return;
+  if (!hasCore) {
+    throw new Error(set.join(', ') + ' can be set only on a food with kcal_100g, protein_100g, carbs_100g and fat_100g');
+  }
+  var v = function (f) { return food[f]; };
+  var known = function (f) { return v(f) !== null; };
+  if (known('satfat_100g') || known('transfat_100g')) {
+    var fats = (v('satfat_100g') || 0) + (v('transfat_100g') || 0);
+    if (fats > food.fat_100g + 1e-9) {
+      throw new Error('saturated and trans fat add up to more than fat (satfat_100g + transfat_100g > fat_100g)');
+    }
+  }
+  if (known('fiber_100g') && v('fiber_100g') > food.carbs_100g) {
+    throw new Error('fiber is more than carbs (fiber_100g > carbs_100g)');
+  }
+  if (known('sugars_100g') && v('sugars_100g') > food.carbs_100g) {
+    throw new Error('sugars are more than carbs (sugars_100g > carbs_100g)');
+  }
+  if (known('added_sugars_100g') && known('sugars_100g') && v('added_sugars_100g') > v('sugars_100g')) {
+    throw new Error('added sugars are more than sugars (added_sugars_100g > sugars_100g)');
+  }
+  if (known('added_sugars_100g') && v('added_sugars_100g') > food.carbs_100g) {
+    throw new Error('added sugars are more than carbs (added_sugars_100g > carbs_100g)');
+  }
+  ['cholesterol_mg_100g', 'sodium_mg_100g'].forEach(function (f) {
+    if (known(f) && v(f) > MAX_MG_100G) throw new Error(f + ' must be at most ' + MAX_MG_100G + ' mg per 100 g');
+  });
 }
 
 /** Refuse a second food with the same display name, naming the one that has it. */

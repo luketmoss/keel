@@ -189,7 +189,8 @@ type Overlay =
   | { kind: 'addFood'; slot: Slot }
   | { kind: 'barcode'; slot: Slot }
   | { kind: 'starter'; slot: Slot }
-  | { kind: 'form'; slot: Slot; food: Partial<Food>; origin: FoodFormOrigin }
+  // `fill`: opened by a search row's Add nutrition, which comes back to the Add sheet rather than logging.
+  | { kind: 'form'; slot: Slot; food: Partial<Food>; origin: FoodFormOrigin; fill?: boolean }
   | { kind: 'amount'; slot: Slot; target: LogTarget; entry?: FoodLogEntry }
   | { kind: 'nutrition'; recipeId: string; back?: Slot };
 
@@ -254,7 +255,7 @@ export function EatenScreen({ api }: { api: ForageApi }) {
 
   function addNutrition(target: LogTarget, slot: Slot) {
     if (target.kind === 'food') {
-      setOverlay({ kind: 'form', slot, food: target.food, origin: { focusNutrition: true } });
+      setOverlay({ kind: 'form', slot, food: target.food, origin: { focusNutrition: true }, fill: true });
     } else {
       setOverlay({ kind: 'nutrition', recipeId: target.recipe.id, back: slot });
     }
@@ -390,7 +391,7 @@ export function EatenScreen({ api }: { api: ForageApi }) {
           onSaved={(food) => {
             keepFood(food);
             setOverlay(
-              hasNutrition(food)
+              hasNutrition(food) && !overlay.fill
                 ? { kind: 'amount', slot: overlay.slot, target: { kind: 'food', food } }
                 : { kind: 'add', slot: overlay.slot },
             );

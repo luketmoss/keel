@@ -576,8 +576,29 @@ describe('the Add sheet', () => {
     fireEvent.click(herbs);
     await settle();
     expect(screen.queryByTestId('amount-sheet')).toBeNull();
-    expect(screen.getByTestId('food-form')).toBeDefined();
+    const form = screen.getByTestId('food-form');
     expect(api.calls('logFood')).toHaveLength(0);
+
+    // Its nutrition saved, the form comes back to the Add sheet, where the food is now loggable.
+    for (const [k, v] of [
+      ['n-kcal', '276'],
+      ['n-protein', '11'],
+      ['n-carbs', '64'],
+      ['n-fat', '7'],
+    ]) {
+      fireEvent.input(within(form).getByTestId(k), { target: { value: v } });
+    }
+    api.answer('upsertFood', (p) => {
+      const i = api.foods.findIndex((f) => f.id === p.id);
+      api.foods[i] = { ...api.foods[i], ...p };
+      return { success: true, data: api.foods[i] };
+    });
+    fireEvent.click(within(form).getByTestId('food-save'));
+    await settle();
+    expect(screen.queryByTestId('amount-sheet')).toBeNull();
+    const back = screen.getByTestId('add-sheet');
+    fireEvent.input(within(back).getByTestId('add-search'), { target: { value: 'herbes' } });
+    expect(within(back).getAllByTestId('add-result')[0].textContent).toContain('Ingredient · 276 kcal / 100 g');
   });
 
   it('with no text lists what was logged most recently, newest first, each once, without foods lacking nutrition', async () => {

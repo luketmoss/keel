@@ -34,7 +34,7 @@ const WRITE = { readOnlyHint: false, destructiveHint: false } as const
 const UNDO = { readOnlyHint: false, destructiveHint: true } as const
 
 /** The tools the read endpoint serves. Everything else registered here is a write tool. */
-export const FORAGE_READ_TOOLS: ReadonlySet<string> = new Set(['forage_status'])
+export const FORAGE_READ_TOOLS: ReadonlySet<string> = new Set(['forage_status', 'forage_search_foods', 'forage_get_food'])
 
 const NO_UNDO_YET = "Error: Forage's API doesn't have undo yet. Redeploy the Apps Script."
 
@@ -87,9 +87,9 @@ function nutritionLine(nutrition: any): string {
 function previewLine(line: any): string {
   if (line.food_id) return `${line.line_id}  ${line.text} → ${line.food_name || line.food_id} (matched)`
   const suggestions = (line.suggestions ?? []) as any[]
-  const tail = suggestions.length
-    ? `Suggestions: ${suggestions.slice(0, 3).map((s) => `${s.name} (${s.food_id})`).join(', ')}`
-    : 'No suggestions.'
+  // #707: a starter food not yet in the library is named by its starter id, for forage_add_food.
+  const named = (s: any) => (s.food_id ? `${s.name} (${s.food_id})` : `${s.name} (starter_id ${s.starter_id})`)
+  const tail = suggestions.length ? `Suggestions: ${suggestions.slice(0, 3).map(named).join(', ')}` : 'No suggestions.'
   return `${line.line_id}  ${line.text} → not matched. ${tail}`
 }
 
@@ -207,6 +207,134 @@ function inTransit(err: unknown, what: string): never {
     )
   }
   throw err
+}
+
+// ---------------------------------------------------------------- food library (#707)
+
+/** The most foods one forage_add_food call takes. */
+const MAX_FOODS = 20
+
+const NUTRIENT_INPUT = z
+  .object({ kcal: z.number(), protein: z.number(), carbs: z.number(), fat: z.number() })
+  .describe('kcal and grams of protein, carbs and fat')
+
+/** The fields of the app's food form, as an agent sends them. */
+const FOOD_FIELDS = {
+  name: z.string().describe('The food\'s name, without the brand ("Dark Chocolate Nuts & Sea Salt bar")'),
+  kind: z.enum(['ingredient', 'packaged']).optional().describe('Default ingredient'),
+  brand: z.string().optional().describe('Packaged foods only'),
+  category: z.string().optional(),
+  serving: z
+    .object({ name: z.string(), g: z.number() })
+    .optional()
+    .describe('The label serving ("bar", 40 g). It becomes the first, default weight'),
+  per_serving: NUTRIENT_INPUT.optional().describe('Nutrition per `serving`, as a label prints it. Stored per 100 g'),
+  per_100g: NUTRIENT_INPUT.optional().describe('Nutrition per 100 g. Send this or per_serving, not both'),
+  weights: z
+    .array(z.object({ name: z.string(), g: z.number() }))
+    .optional()
+    .describe('Named weights in grams ({name: "cup", g: 125}, {name: "clove", g: 3}); the first is the default'),
+  buy_unit: z.string().optional().describe('Shopping unit, singular ("onion")'),
+  buy_unit_plural: z.string().optional().describe('Shopping unit, plural ("onions")'),
+  buy_unit_g: z.number().optional().describe('Grams in one shopping unit'),
+  usual_store: z.enum(['ks', 'costco', 'other', '']).optional().describe('King Soopers, Costco, other, or blank'),
+  usually_have: z.boolean().optional(),
+  regular: z.boolean().optional(),
+  never_shop: z.boolean().optional(),
+  packs: z.array(z.string()).optional().describe('Pack sizes, as text ("1 gallon")'),
+  barcode: z.string().optional(),
+  source: z
+    .enum(['usda', 'label', 'manual'])
+    .optional()
+    .describe('Where the numbers came from: usda (with source_ref, the FDC id), label, or manual (default)'),
+  source_ref: z.string().optional().describe('For source usda: the USDA FoodData Central id'),
+}
+
+const FOOD_INPUT = z.object(FOOD_FIELDS)
+
+type Nutrients = { kcal: number; protein: number; carbs: number; fat: number }
+
+const round2 = (n: number) => Math.round(n * 100) / 100
+
+/**
+ * A food input as the Foods row upsertFood takes, or the reason it is refused
+ * before any request. `partial` leaves out what was not sent (an update).
+ */
+function foodRow(f: any, partial = false): { row?: Record<string, unknown>; error?: string } {
+  const row: Record<string, unknown> = {}
+  const label = f.name ? `"${f.name}"` : 'the food'
+  if (f.source === 'off') return { error: `${label}: source off is set only through barcode.` }
+  if (f.source === 'usda' && !f.source_ref) return { error: `${label}: a usda food needs source_ref, its FDC id.` }
+  if (f.per_serving && f.per_100g) return { error: `${label}: send per_serving or per_100g, not both.` }
+  if (f.per_serving && !(f.serving?.g > 0)) return { error: `${label}: per_serving needs serving with its grams.` }
+
+  const copy = ['name', 'kind', 'brand', 'category', 'buy_unit', 'buy_unit_plural', 'buy_unit_g', 'usual_store']
+  for (const k of [...copy, 'usually_have', 'regular', 'never_shop', 'barcode', 'source', 'source_ref']) {
+    if (f[k] !== undefined) row[k] = f[k]
+  }
+  if (f.packs !== undefined) row.packs_json = f.packs
+  const per: Nutrients | undefined = f.per_100g
+    ? f.per_100g
+    : f.per_serving
+      ? (Object.fromEntries(
+          Object.entries(f.per_serving as Nutrients).map(([k, v]) => [k, round2((v * 100) / f.serving.g)]),
+        ) as Nutrients)
+      : undefined
+  if (per) {
+    row.kcal_100g = per.kcal
+    row.protein_100g = per.protein
+    row.carbs_100g = per.carbs
+    row.fat_100g = per.fat
+  }
+  if (!partial) {
+    const weights = [...(f.serving ? [f.serving] : []), ...((f.weights ?? []) as any[])]
+    const seen = new Set<string>()
+    const servings = weights.filter((w) => !seen.has(w.name.toLowerCase()) && seen.add(w.name.toLowerCase()))
+    if (servings.length) row.servings_json = servings.map((w) => ({ name: w.name, g: w.g }))
+    row.kind ??= 'ingredient'
+    row.source ??= 'manual'
+  }
+  return { row }
+}
+
+/** `KIND Dark Chocolate bar`: brand, then name. */
+const foodName = (f: any) => [f.brand, f.name].filter(Boolean).join(' ')
+
+/** One line of a food's nutrition: `364 kcal · P 10.3 · C 76.3 · F 1 per 100 g`, or that it has none. */
+function per100(f: any): string {
+  if (typeof f.kcal_100g !== 'number') return 'no nutrition yet'
+  return `${f.kcal_100g} kcal · P ${f.protein_100g} · C ${f.carbs_100g} · F ${f.fat_100g} per 100 g`
+}
+
+/** What a food looks like in a search result: the compact fields the design note lists. */
+function compactFood(f: any) {
+  return {
+    id: f.id,
+    name: f.name,
+    brand: f.brand,
+    kind: f.kind,
+    kcal_100g: f.kcal_100g,
+    protein_100g: f.protein_100g,
+    carbs_100g: f.carbs_100g,
+    fat_100g: f.fat_100g,
+    has_nutrition: typeof f.kcal_100g === 'number',
+    verified: f.verified === true,
+    source: f.source,
+  }
+}
+
+const OFF_WARNINGS: Record<string, string> = {
+  energy_mismatch: "The calories don't match protein × 4 + carbs × 4 + fat × 9. Check the label.",
+}
+
+/** `Nothing deleted — Garlic is used by Beef Stew and Chili. Remove it from those first.` */
+function inUseText(id: string, result: ApiResult): string {
+  const recipes = (result.uses?.recipes ?? []).map((r) => `${r.name} (${r.id})`)
+  const trips = (result.uses?.trips ?? []).map((t) => `trip ${t}`)
+  const uses = [...recipes, ...trips]
+  if (!uses.length) return `Nothing deleted. ${result.error}`
+  const list = uses.length === 1 ? uses[0] : `${uses.slice(0, -1).join(', ')} and ${uses[uses.length - 1]}`
+  return `Nothing deleted — ${id} is used by ${list}. Remove it from those first.`
 }
 
 /**
@@ -422,6 +550,318 @@ export function registerForageTools(server: McpServer, cfg: ForageConfig, mode: 
         `Undid ${call_id}: ${done.data.count} rows restored. This undo is itself call ${done.data.undo_call_id}, ` +
           'and can be undone the same way.',
       )
+    }),
+  )
+
+  // ---------------------------------------------------------------- food library (#707)
+
+  server.registerTool(
+    'forage_search_foods',
+    {
+      description:
+        "Search Forage's food library: ingredients and packaged foods with their nutrition per 100 g. Filter by " +
+        'q (part of the name or brand), kind, regular or barcode. With include_starter, also lists the starter ' +
+        'list (about 75 USDA pantry staples) matching q, each with its starter_id and whether it is already in the ' +
+        'library; add one with forage_add_food and starter_id. Answers JSON.',
+      inputSchema: {
+        q: z.string().optional().describe('Part of the name or brand, case-insensitive'),
+        kind: z.enum(['ingredient', 'packaged']).optional(),
+        regular: z.boolean().optional().describe('Only the foods offered on every shopping list'),
+        barcode: z.string().optional().describe('The food with this barcode'),
+        include_starter: z.boolean().optional().describe('Also search the starter list. Default false'),
+        limit: z.number().int().positive().optional().describe('Most foods to answer. Default 20'),
+      },
+      annotations: READ,
+    },
+    guarded(async (args: any): Promise<ToolResult> => {
+      const result = await apiRead(cfg, 'getFoods', {
+        q: args.q,
+        regular: args.regular === undefined ? undefined : String(args.regular),
+        barcode: args.barcode,
+      })
+      if (!result.success) return failed(`Error: ${result.error}`)
+      const limit = args.limit ?? 20
+      const all = (result.data as any[]).filter((f) => !args.kind || f.kind === args.kind)
+      const out: Record<string, unknown> = { count: all.length, foods: all.slice(0, limit).map(compactFood) }
+      if (args.include_starter) {
+        const starter = await apiRead(cfg, 'getStarterFoods', { q: args.q })
+        if (!starter.success) return failed(`Error: ${starter.error}`)
+        out.starter = (starter.data as any[]).slice(0, limit).map((s) => ({
+          starter_id: s.id,
+          name: s.name,
+          kcal_100g: s.kcal_100g,
+          protein_100g: s.protein_100g,
+          carbs_100g: s.carbs_100g,
+          fat_100g: s.fat_100g,
+          weights: s.servings,
+          in_library: s.in_library || null,
+          can_fill: s.can_fill || null,
+        }))
+      }
+      return text(JSON.stringify(out, null, 2))
+    }),
+  )
+
+  server.registerTool(
+    'forage_get_food',
+    {
+      description:
+        'One food from Forage\'s library by id: its nutrition per 100 g, its named weights (the first is the ' +
+        'default), shopping unit, usual store, pantry switches, pack sizes, source, whether it was checked against ' +
+        'the label, and used_by, the recipes that use it. Answers JSON.',
+      inputSchema: { id: z.string().describe('The food id (fd_...)') },
+      annotations: READ,
+    },
+    guarded(async ({ id }: { id: string }): Promise<ToolResult> => {
+      const result = await apiRead(cfg, 'getFood', { id })
+      if (!result.success) return failed(`Error: ${result.error}`)
+      return text(JSON.stringify(result.data, null, 2))
+    }),
+  )
+
+  server.registerTool(
+    'forage_add_food',
+    {
+      description:
+        "Add a food to Forage's library. Send exactly one of: barcode (looked up on Open Food Facts), starter_id " +
+        '(from the starter list, see forage_search_foods with include_starter), food (the fields of the app\'s ' +
+        'form: per_serving with serving as a label prints it, or per_100g), or foods (up to 20 of those, saved in ' +
+        'one call and undone together). A dry run by default: it shows the food as it would be stored and saves ' +
+        'nothing; call again with dry_run: false to save. A food you looked up in USDA FoodData Central is source ' +
+        "usda with its FDC id as source_ref. Open Food Facts is shared data and can be wrong: set verified only when " +
+        'the user has said the numbers match the label; otherwise the app shows it as not checked.',
+      inputSchema: {
+        barcode: z.string().optional().describe('8, 12, 13 or 14 digits'),
+        starter_id: z.string().optional().describe('A starter list id, e.g. flour-all-purpose'),
+        food: FOOD_INPUT.optional(),
+        foods: z.array(FOOD_INPUT).optional().describe(`Up to ${MAX_FOODS} foods, in place of food`),
+        dry_run: z.boolean().optional().describe('Default true: preview only. Set false to save'),
+        verified: z
+          .boolean()
+          .optional()
+          .describe('Barcode foods only: true when the user has checked the numbers against the label. Default false'),
+      },
+      annotations: WRITE,
+    },
+    guarded(async (args: any): Promise<ToolResult> => {
+      const given = (['barcode', 'starter_id', 'food', 'foods'] as const).filter(
+        (f) => args[f] !== undefined && args[f] !== null && args[f] !== '',
+      )
+      if (given.length !== 1) return failed('Send exactly one of barcode, starter_id, food or foods. Nothing saved.')
+      const dry = args.dry_run !== false
+
+      if (args.barcode) {
+        const found = await apiRead(cfg, 'lookupBarcode', { code: args.barcode })
+        if (!found.success) return failed(`Nothing saved. ${found.error}`)
+        const d = found.data
+        if (d.already_in_library) {
+          return failed(`Nothing saved. That barcode is already ${d.already_in_library.name} (${d.already_in_library.id}).`)
+        }
+        if (!d.found) {
+          return failed(
+            `Nothing saved. Open Food Facts doesn't have barcode ${args.barcode}. Add it with food, typed from the label.`,
+          )
+        }
+        const food = { ...d.food, verified: args.verified === true }
+        delete food.id
+        if (dry) {
+          return text(
+            [
+              'Preview — nothing saved. Found on Open Food Facts: shared data, so check it against the label.',
+              `${foodName(food)}: ${per100(food)}`,
+              ...(d.reason === 'no_nutrition' ? ['Open Food Facts has no nutrition for this one.'] : []),
+              ...(d.warnings as string[]).map((w) => OFF_WARNINGS[w] ?? w),
+              JSON.stringify(food, null, 2),
+              '',
+              'Call again with dry_run: false to save it.',
+            ].join('\n'),
+          )
+        }
+        let saved: ApiResult
+        try {
+          saved = await apiWrite(cfg, 'upsertFood', food)
+        } catch (err) {
+          inTransit(err, 'food')
+        }
+        if (!saved.success) return failed(`Nothing saved. ${saved.error}`)
+        return text(
+          `Saved ${foodName(saved.data)} (${saved.data.id}) from Open Food Facts` +
+            `${saved.data.verified ? ', checked against the label' : ', not checked against the label'}.\n` +
+            `Undo with forage_undo, call ${currentCallId()}`,
+        )
+      }
+
+      if (args.starter_id) {
+        if (dry) {
+          const list = await apiRead(cfg, 'getStarterFoods')
+          if (!list.success) return failed(`Error: ${list.error}`)
+          const s = (list.data as any[]).find((x) => x.id === args.starter_id)
+          if (!s) return failed(`Nothing saved. "${args.starter_id}" is not on the starter list.`)
+          const state = s.in_library
+            ? `Already in the library (${s.in_library}): saving changes nothing.`
+            : s.can_fill
+              ? `Saving fills in the name-only food ${s.can_fill}, keeping what it already has.`
+              : 'Saving adds it as a new food.'
+          const weights = (s.servings as any[]).map((w) => `${w.name} ${w.g} g`).join(', ') || 'none'
+          return text(
+            [
+              'Preview — nothing saved.',
+              `${s.name} (USDA ${s.fdc}): ${per100(s)}. Weights: ${weights}.`,
+              state,
+              '',
+              'Call again with dry_run: false to save it.',
+            ].join('\n'),
+          )
+        }
+        let saved: ApiResult
+        try {
+          saved = await apiWrite(cfg, 'addStarterFoods', { ids: [args.starter_id] })
+        } catch (err) {
+          inTransit(err, 'food')
+        }
+        if (!saved.success) return failed(`Nothing saved. ${saved.error}`)
+        const { added, filled, existing } = saved.data
+        if (existing.length) return text(`${existing[0].name} (${existing[0].id}) is already in the library. Nothing changed.`)
+        const f = added[0] ?? filled[0]
+        return text(
+          `${added.length ? 'Added' : 'Filled in'} ${f.name} (${f.id}) from the starter list.\n` +
+            `Undo with forage_undo, call ${currentCallId()}`,
+        )
+      }
+
+      const inputs: any[] = args.food ? [args.food] : args.foods
+      if (inputs.length > MAX_FOODS) {
+        return failed(`Nothing saved. foods takes up to ${MAX_FOODS} foods; this has ${inputs.length}.`)
+      }
+      const rows: Record<string, unknown>[] = []
+      for (const input of inputs) {
+        const { row, error } = foodRow(input)
+        if (error) return failed(`Nothing saved. ${error}`)
+        rows.push(row!)
+      }
+      if (dry) {
+        return text(
+          [
+            'Preview — nothing saved.',
+            ...rows.map((r) => `${foodName(r)}: ${per100(r)}\n${JSON.stringify(r)}`),
+            '',
+            `Call again with dry_run: false to save ${rows.length === 1 ? 'it' : `all ${rows.length}`}.`,
+          ].join('\n'),
+        )
+      }
+
+      // One write against the hourly budget, its rows counted as rows, under one call_id.
+      declareRows(rows.length)
+      const done: any[] = []
+      for (let i = 0; i < rows.length; i++) {
+        let saved: ApiResult
+        try {
+          saved = await apiWrite(cfg, 'upsertFood', rows[i])
+        } catch (err) {
+          if (!done.length) inTransit(err, 'food')
+          return text(
+            [
+              `Saved ${done.length} of ${rows.length}: ${done.map((f) => `${foodName(f)} (${f.id})`).join(', ')}.`,
+              `${foodName(rows[i])} was sent once and may or may not have been saved; the rest were not sent.`,
+              `Call forage_undo with no arguments to read the list before retrying. This call is ${currentCallId()}.`,
+            ].join('\n'),
+          )
+        }
+        if (!saved.success) {
+          const head = `Not saved: ${foodName(rows[i])}: ${saved.error}`
+          if (!done.length) return failed(`Nothing saved. ${saved.error}`)
+          return text(
+            [
+              `Saved ${done.length} of ${rows.length}: ${done.map((f) => `${foodName(f)} (${f.id})`).join(', ')}.`,
+              head,
+              `Not sent: ${rows.slice(i + 1).map(foodName).join(', ') || 'none'}.`,
+              `Undo what was saved with forage_undo, call ${currentCallId()}`,
+            ].join('\n'),
+          )
+        }
+        done.push(saved.data)
+      }
+      return text(
+        [
+          done.length === 1
+            ? `Saved ${foodName(done[0])} (${done[0].id}): ${per100(done[0])}.`
+            : `Saved ${done.length} foods: ${done.map((f) => `${foodName(f)} (${f.id})`).join(', ')}.`,
+          `Undo with forage_undo, call ${currentCallId()}`,
+        ].join('\n'),
+      )
+    }),
+  )
+
+  server.registerTool(
+    'forage_update_food',
+    {
+      description:
+        "Change a food in Forage's library. Send its id and only the fields to change; the rest are kept. weights " +
+        'sets or replaces each named weight it lists and leaves the others. Nutrition is per_serving (with serving) ' +
+        'or per_100g. Set verified true only when the user has checked the numbers against the label.',
+      inputSchema: {
+        id: z.string().describe('The food id (fd_...)'),
+        ...Object.fromEntries(Object.entries(FOOD_FIELDS).map(([k, v]) => [k, (v as z.ZodTypeAny).optional()])),
+        verified: z.boolean().optional().describe('true when the user has checked the numbers against the label'),
+      },
+      annotations: WRITE,
+    },
+    guarded(async (args: any): Promise<ToolResult> => {
+      const { id, verified, weights, serving, ...rest } = args
+      const { row, error } = foodRow({ ...rest, serving }, true)
+      if (error) return failed(`Nothing saved. ${error}`)
+      if (verified !== undefined) row!.verified = verified
+      const named = [...(serving ? [serving] : []), ...((weights ?? []) as any[])]
+      if (!Object.keys(row!).length && !named.length) return failed('Nothing to change: send a field to change. Nothing saved.')
+
+      declareRows(1)
+      let stored: any
+      try {
+        if (Object.keys(row!).length) {
+          const saved = await apiWrite(cfg, 'upsertFood', { id, ...row })
+          if (!saved.success) return failed(`Nothing saved. ${saved.error}`)
+          stored = saved.data
+        }
+        for (const w of named) {
+          const saved = await apiWrite(cfg, 'setFoodWeight', { food_id: id, unit: w.name, grams: w.g })
+          if (!saved.success) {
+            return stored
+              ? text(`Saved the fields, but not the weight "${w.name}": ${saved.error}\nUndo with forage_undo, call ${currentCallId()}`)
+              : failed(`Nothing saved. ${saved.error}`)
+          }
+          stored = saved.data
+        }
+      } catch (err) {
+        inTransit(err, 'update')
+      }
+      const changed = [...Object.keys(row!), ...(named.length ? ['weights'] : [])]
+      return text(
+        `Updated ${foodName(stored)} (${stored.id}): ${changed.join(', ')}. Now ${per100(stored)}.\n` +
+          `Undo with forage_undo, call ${currentCallId()}`,
+      )
+    }),
+  )
+
+  server.registerTool(
+    'forage_delete_food',
+    {
+      description:
+        "Delete a food from Forage's library. Refused while a recipe or a shopping trip uses it, naming them: " +
+        'change those first. Undo with forage_undo. Only delete what the user asked to delete.',
+      inputSchema: { id: z.string().describe('The food id (fd_...)') },
+      annotations: UNDO,
+    },
+    guarded(async ({ id }: { id: string }): Promise<ToolResult> => {
+      let result: ApiResult
+      try {
+        result = await apiWrite(cfg, 'deleteFood', { id })
+      } catch (err) {
+        inTransit(err, 'delete')
+      }
+      if (!result.success) {
+        return failed(result.code === 'in_use' ? inUseText(id, result) : `Nothing deleted. ${result.error}`)
+      }
+      return text(`Deleted food ${id}.\nUndo with forage_undo, call ${currentCallId()}`)
     }),
   )
 }

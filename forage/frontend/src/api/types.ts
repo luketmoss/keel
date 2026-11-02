@@ -1,4 +1,4 @@
-// The Forage API's shapes (#703, #706, #707, #708), mirrored from apps-script/src. A change
+// The Forage API's shapes (#703, #706, #707, #708, #709), mirrored from apps-script/src. A change
 // to a response shape changes this file in the same pull request.
 
 export type FoodKind = 'ingredient' | 'packaged';
@@ -135,6 +135,46 @@ export interface Cook {
 
 export type Slot = 'Breakfast' | 'Lunch' | 'Dinner' | 'Snacks';
 export const SLOTS: Slot[] = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
+
+/**
+ * #709: a Plan row as `getPlan` and the plan writes answer it. Exactly one of
+ * `recipe_id` and `note` is set. The fields after `updated` are derived by
+ * the API on read: `kcal_serving` is null when unknown, never 0, and is rounded
+ * only for display.
+ */
+export interface PlanEntry {
+  id: string;
+  date: string;
+  slot: Slot;
+  recipe_id: string;
+  note: string;
+  trip_id: string;
+  created: string;
+  updated: string;
+  recipe_name: string;
+  servings: number | null;
+  kcal_serving: number | null;
+  partial: boolean;
+  trip_status: '' | 'open' | 'closed';
+  on_trip: boolean;
+  shopped: boolean;
+}
+
+/** `getPlan`: the entries by date, slot and creation, and the banner's count. */
+export interface PlanResult {
+  entries: PlanEntry[];
+  not_on_trip: number;
+}
+
+/** A new meal as the app plans it, always with its own id so a retry leaves one row. */
+export type PlanEntryInput = { id: string; date: string; slot: Slot } & ({ recipe_id: string } | { note: string });
+
+/** What `movePlanEntry` changes. */
+export interface PlanMove {
+  date?: string;
+  slot?: Slot;
+  note?: string;
+}
 
 /** What the app sends `logFood` for a recipe (#708's finish screen). */
 export interface RecipeLogEntry {

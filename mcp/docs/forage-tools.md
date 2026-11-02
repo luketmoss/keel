@@ -35,6 +35,11 @@ retried, carry the tool call's `call_id` so the API logs their rows for `forage_
 | `forage_log_cook` | write | `upsertCook` | Records a cook: `recipe_id`, `date` (default today), `note`, `rating`, `plan_id`; an `id` of the caller's own makes a retry leave one cook. Eating is logged separately (#708) |
 | `forage_rate_cook` | write | `getCooks`, `getRecipe`, `upsertCook` | `rating` 1 to 5, or null to clear, and `note`, on `cook_id` or the latest cook of `recipe_id`; a recipe never cooked is refused. For after the owner says they ate it (#708) |
 | `forage_delete_recipe` | write | `deleteRecipe` | Deletes the recipe with its lines, steps, walkthrough and cooks; refused while a plan or log entry uses it, naming them. `destructiveHint`. Added for parity: the app's Library deletes a recipe (#708) |
+| `forage_list_plan` | read | `getPlan` | The plan by day from `from` to `to` (default today to today + 7, America/Denver; YYYY-MM-DD, `today`, `tomorrow`, `+3d`): each meal's id, slot, recipe or note, kcal a serving (`, partial`, or `no calories yet`), `on list` / `shopped`, and the count of planned meals not on a trip (#709) |
+| `forage_plan_meal` | write | `planWeek` (dry run), `upsertPlanEntry` | Plans a recipe or a note for a `date` and `slot`; `id` makes a retry safe. Without an `id`, the same recipe in the same day and slot is refused as already planned (no write, not counted) unless `allow_duplicate` (#709) |
+| `forage_move_meal` | write | `getPlan`, `movePlanEntry` | Changes a meal's `date`, `slot` or `note`; an unknown id is refused before any write. Never changes a trip (#709) |
+| `forage_remove_meal` | write | `getPlan`, `deletePlanEntry` | Removes a meal, saying when it was on a trip (which is unchanged); `forage_undo` brings it back (#709) |
+| `forage_plan_week` | write | `planWeek` | Up to 28 `entries`, all or nothing. A dry run by default (`dry_run` true): each meal with its calories and what it would skip as already planned. `dry_run: false` saves; only adds (#709) |
 | `forage_undo` | write | `getChangeLog`, `undoCall` | No arguments: the last 20 calls. `call_id`: a dry run listing every row it would restore, remove or recreate. `confirm: true`: reverts, all or nothing. Refused when a row changed since, or when a row it would remove is now used elsewhere. `destructiveHint` |
 
 ## Adding a tool

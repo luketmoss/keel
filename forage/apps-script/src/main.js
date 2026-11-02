@@ -22,7 +22,9 @@
 //   action=upsertRecipe&key=...&payload={"name":"Beef Stew","servings":6,"lines":[...],"steps":[...]}
 //   action=computeNutrition&key=...&payload={"servings":6,"lines":[...]}   — not saved
 //   action=importRecipe&key=...&payload={"url":"https://...","dry_run":true}  — the preview; false saves
-//   action=getPlan&key=...&from=2026-11-01&to=2026-11-07
+//   action=getPlan&key=...&from=2026-11-01&to=2026-11-07&today=2026-11-01   — derived fields, not_on_trip (#709)
+//   action=movePlanEntry&key=...&payload={"id":"pl_1a2b3c4d","date":"2026-11-03","slot":"Lunch"}
+//   action=planWeek&key=...&payload={"entries":[{"date":"2026-11-03","slot":"Dinner","recipe_id":"rc_1"}],"dry_run":true}
 //   action=logFood&access_token=...&payload={"date":"2026-11-01","slot":"Dinner","recipe_id":"rc_1","qty":1}
 //   action=getFoodLogTotals&key=...&from=2026-11-01&to=2026-11-07
 //   action=ensureSchema&key=...              — key-only: the 703 migration
@@ -132,7 +134,9 @@ function dispatch(action, params, caller) {
     // Plan
     case 'getPlan': return getPlan(params);
     case 'upsertPlanEntry': return write(upsertPlanEntry);
+    case 'movePlanEntry': return write(movePlanEntry);
     case 'deletePlanEntry': return write(deletePlanEntry);
+    case 'planWeek': return write(planWeek);
     // Trips
     case 'getTrips': return getTrips(params);
     case 'getTrip': return getTrip(params.id);

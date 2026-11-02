@@ -31,7 +31,7 @@ var TOKEN_ACTIONS = [
   'lookupBarcode', 'getStarterFoods', 'addStarterFoods',
   'getRecipes', 'getRecipe', 'upsertRecipe', 'deleteRecipe', 'computeNutrition', 'importRecipe',
   'getWalkthrough', 'setWalkthrough', 'deleteWalkthrough',
-  'getPlan', 'upsertPlanEntry', 'deletePlanEntry',
+  'getPlan', 'upsertPlanEntry', 'movePlanEntry', 'deletePlanEntry', 'planWeek',
   'getTrips', 'getTrip', 'createTrip', 'updateTrip', 'upsertTripItems', 'deleteTripItem',
   'getFoodLog', 'getFoodLogTotals', 'logFood', 'updateLogEntry', 'deleteLogEntry',
   'getCooks', 'upsertCook', 'deleteCook',

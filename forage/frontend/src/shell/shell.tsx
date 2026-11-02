@@ -8,6 +8,8 @@ import { ReviewScreen } from '../import/review-screen';
 import { review } from '../import/review-state';
 import { addFoodRequested, librarySection } from '../library/foods-store';
 import { LibraryScreen } from '../library/library-screen';
+import { PlanScreen } from '../plan/plan-screen';
+import { planMealRequested } from '../plan/plan-store';
 import { AccountMenu } from './account-menu';
 import { cookRoute, currentTab, syncFromHash } from './routes';
 import { TabBar } from './tab-bar';
@@ -45,6 +47,16 @@ export function Shell() {
       <header class="tab-header">
         <h1>{tab.label}</h1>
         <div class="header-actions">
+          {tab.id === 'plan' && (
+            <button
+              type="button"
+              class="btn btn-primary btn-small"
+              onClick={() => (planMealRequested.value = true)}
+              data-testid="plan-meal-btn"
+            >
+              Plan a meal
+            </button>
+          )}
           {tab.id === 'library' && librarySection.value === 'recipes' && (
             <button type="button" class="btn btn-primary" onClick={() => setImporting(true)} data-testid="import-btn">
               Import
@@ -65,7 +77,13 @@ export function Shell() {
       </header>
       {isDemoMode() && <DemoBanner />}
       <main class="tab-content" data-testid={`screen-${tab.id}`}>
-        {tab.id === 'library' ? <LibraryScreen api={api} empty={empty} icon={tab.icon} /> : empty}
+        {tab.id === 'library' ? (
+          <LibraryScreen api={api} empty={empty} icon={tab.icon} />
+        ) : tab.id === 'plan' ? (
+          <PlanScreen api={api} empty={empty} />
+        ) : (
+          empty
+        )}
       </main>
       <TabBar />
       {importing && <ImportSheet api={api} onClose={() => setImporting(false)} />}

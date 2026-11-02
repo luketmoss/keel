@@ -114,11 +114,11 @@ describe('AC3: every action exists, with a read and a write round-tripping throu
     const meal = api.ok('upsertPlanEntry', { payload: { date: '2026-11-01', slot: 'Dinner', recipe_id: 'rc_stew' } });
     expect(meal.id).toMatch(/^pl_[0-9a-f]{8}$/);
     const out = api.ok('upsertPlanEntry', { payload: { date: '2026-11-01', slot: 'Lunch', note: 'Eating out' } });
-    expect(api.ok('getPlan', { from: '2026-11-01', to: '2026-11-01' }).map((p: { id: string }) => p.id)).toEqual([
+    expect(api.ok('getPlan', { from: '2026-11-01', to: '2026-11-01' }).entries.map((p: { id: string }) => p.id)).toEqual([
       out.id,
       meal.id,
     ]);
-    expect(api.ok('getPlan', { from: '2026-11-02' })).toEqual([]);
+    expect(api.ok('getPlan', { from: '2026-11-02' }).entries).toEqual([]);
     expect(api.call('upsertPlanEntry', { payload: { date: '2026-11-01', slot: 'Dinner' } }).error).toMatch(/exactly one/);
     api.ok('deletePlanEntry', { payload: { id: out.id } });
     expect(api.rows('Plan')).toHaveLength(1);

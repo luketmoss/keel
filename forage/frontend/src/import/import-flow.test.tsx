@@ -405,8 +405,8 @@ describe('AC: demo mode', () => {
     await settle();
     fireEvent.click(screen.getByTestId('save-recipe'));
     await settle();
-    // #708: the five sample recipes, then the import, newest first.
-    await waitFor(() => expect(screen.getAllByTestId('recipe-row')).toHaveLength(6));
+    // #708, #709: the seven sample recipes, then the import, newest first.
+    await waitFor(() => expect(screen.getAllByTestId('recipe-row')).toHaveLength(8));
     expect(screen.getAllByTestId('recipe-row')[0].textContent).toContain('Weeknight Lentil Soup');
     expect(fetchSpy).not.toHaveBeenCalled();
   });

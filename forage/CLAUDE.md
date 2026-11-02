@@ -57,7 +57,9 @@ JSON text. Ids a caller sends are kept (sending one again upserts); otherwise
 the API makes `<prefix>_` + 8 hex: `fd_`, `rc_`, `pl_`, `tr_`, `lg_`, `ck_`.
 The tabs are created by `scripts/migrate-703-create-tabs.mjs`, which calls the
 key-only `ensureSchema`; run it again after a release that adds a tab (#713).
-Nutrition (unit conversion, per serving, the partial rule) is computed only in `apps-script/src/nutrition.js`, and recipe import
+Nutrition (unit conversion, per serving, the partial rule) is computed only in `apps-script/src/nutrition.js`; the
+plan's derived fields (a meal's kcal a serving, partial, trip status) and the Plan banner's count, `not_on_trip`, only in
+`apps-script/src/plan.js` (#709); and recipe import
 (reading pages, the ingredient line parser, matching lines to foods) only in
 `apps-script/src/importer.js`, behind the one `importRecipe` action (#706).
 The food library (#707): the Open Food Facts lookup is `barcode.js` (`lookupBarcode`, writes nothing), and

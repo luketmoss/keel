@@ -1,8 +1,10 @@
 // #704: the four tabs, the hash, and each tab's empty state.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/preact';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/preact';
 import App from './App';
 import { TABS } from './shell/tabs';
+import { _resetPlan } from './plan/plan-store';
+import { fakeApi } from './test-api';
 
 function signIn() {
   localStorage.setItem('forage_user', JSON.stringify({ email: 'luke@example.com', name: 'Luke', picture: '' }));
@@ -32,6 +34,8 @@ afterEach(() => {
   document.head.querySelectorAll('script').forEach((s) => s.remove());
   window.history.replaceState(null, '', '/');
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  _resetPlan();
 });
 
 describe('the tab bar', () => {
@@ -101,16 +105,19 @@ describe('the tab bar', () => {
 
 describe('empty states', () => {
   const COPY: Record<string, [string, string]> = {
-    plan: ['Nothing planned yet', 'Meals you plan for the week will show here, by day. Add one from a recipe.'],
+    plan: ['Nothing planned yet', 'Meals you plan will show here, by day, with their calories.'],
     shop: ['No shopping list', 'When you plan meals, the groceries you need will collect here, grouped by store.'],
     eaten: ['Nothing logged', 'What you eat will show here by day, with its calories and macros.'],
     library: ['No foods yet', 'Foods you use in recipes and logs will be kept here, with their nutrition.'],
   };
 
-  it.each(Object.entries(COPY))('%s names what will appear, with no control', (id, [heading, sentence]) => {
+  it.each(Object.entries(COPY))('%s names what will appear, with no control', async (id, [heading, sentence]) => {
+    // #709: Plan reads the plan first; with nothing planned it shows the empty state.
+    fakeApi();
     render(<App />);
     go(`#/${id}`);
     const screenEl = screen.getByTestId(`screen-${id}`);
+    await waitFor(() => expect(screenEl.querySelector('h2')!.textContent).toBe(heading));
     expect(screenEl.querySelector('h2')!.textContent).toBe(heading);
     expect(screenEl.querySelector('p')!.textContent).toBe(sentence);
     // #707: Library's Recipes | Foods switch is the only control.

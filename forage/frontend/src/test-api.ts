@@ -2,7 +2,15 @@
 // real client. It records every request and answers each action from a small
 // in-memory store; a test overrides one action with `answer`.
 import { vi } from 'vitest';
-import type { Cook, Food, ImportPreview, RecipeSummary, StructuredLine, StructuredRecipe } from './api/types';
+import type {
+  Cook,
+  Food,
+  ImportPreview,
+  PlanEntry,
+  RecipeSummary,
+  StructuredLine,
+  StructuredRecipe,
+} from './api/types';
 
 export const API_URL = 'https://api.test/exec';
 
@@ -12,6 +20,8 @@ export interface Sent {
   payload: any;
   headers: unknown;
   method: string | undefined;
+  /** Every parameter sent, for a read's filters (#709's getPlan). */
+  params: URLSearchParams;
 }
 
 type Answer = { success: true; data: unknown } | { success: false; error: string; code?: string; [k: string]: unknown };
@@ -143,6 +153,9 @@ export function fakeApi() {
   const foods: Food[] = [];
   const recipes: RecipeSummary[] = [];
   const cooks: Cook[] = [];
+  /** #709: the plan, as getPlan answers it; `notOnTrip` is the banner count it reports. */
+  const plan: PlanEntry[] = [];
+  const counts = { notOnTrip: 0 };
   const overrides = new Map<string, (payload: any) => Answer>();
   let seq = 0;
 
@@ -201,6 +214,42 @@ export function fakeApi() {
         return { success: true, data: { id: payload.id, deleted: true } };
       case 'logFood':
         return { success: true, data: { id: payload.id ?? 'lg_1', ...payload } };
+      case 'getPlan':
+        return { success: true, data: { entries: plan, not_on_trip: counts.notOnTrip } };
+      case 'upsertPlanEntry': {
+        const recipe = recipes.find((r) => r.id === payload.recipe_id);
+        const entry = {
+          recipe_id: '',
+          note: '',
+          trip_id: '',
+          created: 'x',
+          updated: 'x',
+          recipe_name: recipe?.name ?? '',
+          servings: recipe?.servings ?? null,
+          kcal_serving: recipe?.nutrition.per_serving.kcal ?? null,
+          partial: recipe?.partial ?? false,
+          trip_status: '',
+          on_trip: false,
+          shopped: false,
+          ...payload,
+        } as PlanEntry;
+        const i = plan.findIndex((e) => e.id === entry.id);
+        if (i === -1) plan.push(entry);
+        else plan[i] = entry;
+        return { success: true, data: entry };
+      }
+      case 'movePlanEntry': {
+        const entry = plan.find((e) => e.id === payload.id);
+        if (!entry) return { success: false, error: `Plan entry "${payload.id}" not found`, code: 'not_found' };
+        Object.assign(entry, payload);
+        return { success: true, data: entry };
+      }
+      case 'deletePlanEntry': {
+        const i = plan.findIndex((e) => e.id === payload.id);
+        if (i === -1) return { success: false, error: `Plan entry "${payload.id}" not found`, code: 'not_found' };
+        const [gone] = plan.splice(i, 1);
+        return { success: true, data: { ...gone, deleted: true } };
+      }
       default:
         return { success: false, error: `Unknown action "${action}"` };
     }
@@ -218,6 +267,7 @@ export function fakeApi() {
       payload,
       headers: init?.headers,
       method: init?.method,
+      params: body,
     });
     const answer = handle(action, payload);
     return { json: async () => answer } as Response;
@@ -229,6 +279,8 @@ export function fakeApi() {
     foods,
     recipes,
     cooks,
+    plan,
+    counts,
     fetch: fetchMock,
     /** Answer one action with this instead. */
     answer(action: string, fn: (payload: any) => Answer) {

@@ -651,12 +651,15 @@ describe('demo mode', () => {
     _resetDemoApi();
   });
 
-  it('offers five sample recipes with ratings and cooks, and log mode works end to end with no request', async () => {
+  it('offers the sample recipes with ratings and cooks, and log mode works end to end with no request', async () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal('fetch', fetchSpy);
     await go('#/library', true);
-    const rows = screen.getAllByTestId('recipe-row');
-    expect(rows.map((r) => r.querySelector('.recipe-name')!.textContent)).toEqual([
+    // #709 added the last two, for the plan's sample.
+    const rows = screen.getAllByTestId('recipe-row').slice(2);
+    expect(screen.getAllByTestId('recipe-row').map((r) => r.querySelector('.recipe-name')!.textContent)).toEqual([
+      'Overnight oats',
+      'Weeknight chili',
       'One-Pot Chili',
       'Banana Bread',
       'Sheet-Pan Chicken',

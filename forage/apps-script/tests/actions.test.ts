@@ -124,31 +124,29 @@ describe('AC3: every action exists, with a read and a write round-tripping throu
     expect(api.rows('Plan')).toHaveLength(1);
   });
 
-  it('Trips: createTrip, upsertTripItems, getTrip, getTrips, updateTrip, deleteTripItem', () => {
+  it('Trips: startTrip, getTrip, getTrips, setTripItem, closeTrip, discardTrip (#718)', () => {
     const api = seeded();
-    const meal = api.ok('upsertPlanEntry', { payload: { date: '2026-11-01', slot: 'Dinner', recipe_id: 'rc_stew' } });
-    const trip = api.ok('createTrip', { payload: { through: '2026-11-07' } });
-    expect(trip).toMatchObject({ status: 'open', through: '2026-11-07' });
+    const meal = api.ok('upsertPlanEntry', { payload: { date: '2026-11-03', slot: 'Dinner', recipe_id: 'rc_stew' } });
+    const started = api.ok('startTrip', { payload: { through: '2026-11-07', today: '2026-11-02' } });
+    expect(started).toMatchObject({ written: true, dry_run: false, trip: { status: 'open', through: '2026-11-07' } });
+    const trip = started.trip;
     expect(trip.id).toMatch(/^tr_[0-9a-f]{8}$/);
-    const items = api.ok('upsertTripItems', {
-      payload: {
-        trip_id: trip.id,
-        items: [{ food_id: 'beef', lines: [{ plan_id: meal.id, line_id: 'L1', amt: '1 lb', grams: 453.6 }], choice: 'costco', suggested: true }],
-      },
-    });
-    expect(items[0]).toMatchObject({ trip_id: trip.id, food_id: 'beef', choice: 'costco', suggested: true, bought: false });
-    api.ok('upsertTripItems', { payload: { trip_id: trip.id, items: [{ food_id: 'beef', bought: true, buy: '2 lb' }] } });
-    const read = api.ok('getTrip', { id: trip.id });
-    expect(read.items).toHaveLength(1);
-    expect(read.items[0]).toMatchObject({ choice: 'costco', bought: true, buy: '2 lb' });
-    expect(read.items[0].lines_json[0].plan_id).toBe(meal.id);
+    expect(trip.meals.map((m: { plan_id: string }) => m.plan_id)).toEqual([meal.id]);
+    expect(trip.items).toHaveLength(1);
+    expect(trip.items[0]).toMatchObject({ food_id: 'beef', choice: '', suggested: false, need: '1 lb' });
+    expect(api.ok('setTripItem', { payload: { food_id: 'beef', choice: 'costco' } }).item).toMatchObject({ choice: 'costco' });
+    expect(api.ok('setTripItem', { payload: { food_id: 'beef', bought: true } }).item).toMatchObject({ bought: true });
+    expect(api.ok('getTrip').trip.items[0]).toMatchObject({ choice: 'costco', bought: true });
+    expect(api.ok('getTrip', { id: trip.id }).trip.id).toBe(trip.id);
     expect(api.ok('getTrips', { status: 'open' })).toHaveLength(1);
-    const closed = api.ok('updateTrip', { payload: { id: trip.id, changes: { status: 'closed' } } });
+    const closed = api.ok('closeTrip', { payload: {} }).trip;
     expect(closed.status).toBe('closed');
     expect(closed.closed_at).not.toBe('');
     expect(api.ok('getTrips', { status: 'open' })).toEqual([]);
-    api.ok('deleteTripItem', { payload: { trip_id: trip.id, food_id: 'beef' } });
-    expect(api.rows('TripItems')).toEqual([]);
+    expect(api.ok('getTrip')).toEqual({ trip: null });
+    api.ok('startTrip', { payload: { through: '2026-11-07', today: '2026-11-02', plan_ids: [] } });
+    expect(api.ok('discardTrip', { payload: {} })).toMatchObject({ meals_cleared: 0 });
+    expect(api.rows('Trips')).toHaveLength(1);
   });
 
   it('FoodLog: logFood, getFoodLog, getFoodLogTotals, updateLogEntry, deleteLogEntry', () => {
@@ -208,7 +206,7 @@ describe('AC5: caller-supplied ids upsert; API-made ids carry the prefix', () =>
     twice('upsertFood', { id: 'fd_same', name: 'Onion' });
     twice('upsertRecipe', { id: 'rc_same', name: 'Soup', servings: 2, lines: [], steps: [] });
     twice('upsertPlanEntry', { id: 'pl_same', date: '2026-11-02', slot: 'Lunch', note: 'Leftovers' });
-    twice('createTrip', { id: 'tr_same' });
+    twice('startTrip', { id: 'tr_same', through: '2026-11-07' });
     twice('logFood', { id: 'lg_same', date: '2026-11-02', slot: 'Lunch', food_id: 'beef', qty: 100, unit: 'g' });
     twice('upsertCook', { id: 'ck_same', recipe_id: 'rc_stew', date: '2026-11-02' });
     const count = (tab: string, id: string) => api.rows(tab).filter((r) => r[0] === id).length;
@@ -247,7 +245,7 @@ describe('AC10: the referential rules', () => {
     expect(refusal('upsertCook', { recipe_id: 'rc_stew', date: '2026-11-01', plan_id: 'pl_nope' })).toBe(
       'plan_id "pl_nope" is not a plan entry',
     );
-    expect(refusal('upsertTripItems', { trip_id: 'tr_nope', items: [] })).toBe('trip_id "tr_nope" is not a trip');
+    expect(refusal('setTripItem', { trip_id: 'tr_nope', food_id: 'beef', choice: 'ks' })).toBe('No trip tr_nope.');
     expect(refusal('logFood', { date: '2026-11-01', slot: 'Lunch', food_id: 'fd_nope', qty: 1, unit: 'g' })).toBe(
       'food_id "fd_nope" is not a food',
     );
@@ -261,8 +259,8 @@ describe('AC10: the referential rules', () => {
 
   it('refuses deleting a food a recipe line or trip item uses, listing the uses', () => {
     const api = seeded();
-    const trip = api.ok('createTrip', {});
-    api.ok('upsertTripItems', { payload: { trip_id: trip.id, items: [{ food_id: 'beef' }] } });
+    api.ok('upsertPlanEntry', { payload: { date: '2026-11-03', slot: 'Dinner', recipe_id: 'rc_stew' } });
+    const trip = api.ok('startTrip', { payload: { through: '2026-11-07', today: '2026-11-02' } }).trip;
     expect(api.call('deleteFood', { payload: { id: 'beef' } }).error).toBe(
       `Food "beef" is in use, so it was not deleted: recipes Stew (rc_stew); trips ${trip.id}`,
     );
@@ -282,8 +280,10 @@ describe('AC10: the referential rules', () => {
 
   it('refuses a second open trip', () => {
     const api = loadApi();
-    const first = api.ok('createTrip', {});
-    expect(api.call('createTrip', {}).error).toBe(`Trip "${first.id}" is open; close it before starting another`);
+    const first = api.ok('startTrip', { payload: { through: '2026-11-07' } }).trip;
+    expect(api.call('startTrip', { payload: { through: '2026-11-07' } }).error).toBe(
+      `A trip is already open (${first.id}). Close it or throw it away first.`,
+    );
     expect(api.rows('Trips')).toHaveLength(1);
   });
 

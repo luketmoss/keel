@@ -25,6 +25,10 @@
 //   action=getPlan&key=...&from=2026-11-01&to=2026-11-07&today=2026-11-01   — derived fields, not_on_trip (#709)
 //   action=movePlanEntry&key=...&payload={"id":"pl_1a2b3c4d","date":"2026-11-03","slot":"Lunch"}
 //   action=planWeek&key=...&payload={"entries":[{"date":"2026-11-03","slot":"Dinner","recipe_id":"rc_1"}],"dry_run":true}
+//   action=getTrip&key=...                   — the open trip, or {"trip": null}; &id=tr_... for one (#718)
+//   action=startTrip&key=...&payload={"through":"2026-11-07","plan_ids":["pl_1"],"dry_run":true}
+//   action=setTripItem&key=...&payload={"food_id":"fd_1a2b3c4d","choice":"ks"}   — or "bought": true
+//   action=closeTrip&key=...&payload={}      action=discardTrip&key=...&payload={}   — the open trip
 //   action=logFood&access_token=...&payload={"date":"2026-11-01","slot":"Dinner","recipe_id":"rc_1","qty":1}
 //   action=getFoodLogTotals&key=...&from=2026-11-01&to=2026-11-07
 //   action=ensureSchema&key=...              — key-only: the 703 migration
@@ -139,11 +143,11 @@ function dispatch(action, params, caller) {
     case 'planWeek': return write(planWeek);
     // Trips
     case 'getTrips': return getTrips(params);
-    case 'getTrip': return getTrip(params.id);
-    case 'createTrip': return write(createTrip);
-    case 'updateTrip': return write(updateTrip);
-    case 'upsertTripItems': return write(upsertTripItems);
-    case 'deleteTripItem': return write(deleteTripItem);
+    case 'getTrip': return getTrip(params);
+    case 'startTrip': return write(startTrip);
+    case 'setTripItem': return write(setTripItem);
+    case 'closeTrip': return write(closeTrip);
+    case 'discardTrip': return write(discardTrip);
     // FoodLog
     case 'getFoodLog': return getFoodLog(params);
     case 'getFoodLogTotals': return getFoodLogTotals(params);

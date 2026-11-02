@@ -52,10 +52,10 @@ var CHANGE_LOGGED_ACTIONS = {
   movePlanEntry: ['Plan'],
   deletePlanEntry: ['Plan'],
   planWeek: ['Plan'],
-  createTrip: ['Trips'],
-  updateTrip: ['Trips'],
-  upsertTripItems: ['TripItems'],
-  deleteTripItem: ['TripItems'],
+  startTrip: ['Trips', 'TripItems', 'Plan'],
+  setTripItem: ['TripItems', 'Foods'],
+  closeTrip: ['Trips'],
+  discardTrip: ['Trips', 'TripItems', 'Plan'],
   logFood: ['FoodLog'],
   updateLogEntry: ['FoodLog'],
   deleteLogEntry: ['FoodLog'],
@@ -103,14 +103,17 @@ var CHANGE_REFERENCES = {
   ],
 };
 
-/** Whether this caller's action is logged: a key caller, a logged action, and not an import's or planWeek's dry run. */
+/**
+ * Whether this caller's action is logged: a key caller, a logged action, and
+ * not a dry run. An import and planWeek are dry runs unless `dry_run: false`;
+ * startTrip writes unless `dry_run: true` (#718).
+ */
 function isChangeLogged(caller, action, rawPayload) {
   if (!caller || caller.mode !== 'key') return false;
   if (!Object.prototype.hasOwnProperty.call(CHANGE_LOGGED_ACTIONS, action)) return false;
-  if (action === 'importRecipe' || action === 'planWeek') {
-    var dryRun = payloadField(rawPayload, 'dry_run');
-    return dryRun === false || dryRun === 'false';
-  }
+  var dryRun = payloadField(rawPayload, 'dry_run');
+  if (action === 'importRecipe' || action === 'planWeek') return dryRun === false || dryRun === 'false';
+  if (action === 'startTrip') return dryRun !== true && dryRun !== 'true';
   return true;
 }
 
@@ -233,6 +236,8 @@ function withChangeLog(action, params, fn) {
   var callId = resolveChangeCallId(payloadField(params.payload, 'call_id'));
   return withScriptLock(function () {
     if (!getSpreadsheet().getSheetByName(CHANGE_LOG_SHEET)) throw new Error(CHANGE_LOG_MISSING);
+    // #718: a trip write drops the open trip's stale lines first, and that drop is not the call's to undo.
+    if (TRIP_WRITES.indexOf(action) !== -1) pruneOpenTrip();
 
     var before = snapshotTabs(tabs);
     var result;
@@ -388,6 +393,16 @@ function findChangeUses(plan) {
   return uses;
 }
 
+/** The ids of the trips that would be open after the undo, when it touches Trips; else []. */
+function openTripsAfter(plan) {
+  if (!plan.changes.some(function (c) { return c.tab === 'Trips'; })) return [];
+  var rows = plan.state.Trips || readTabRows('Trips');
+  return Object.keys(rows)
+    .map(function (k) { return rows[k].obj; })
+    .filter(function (t) { return t.status === 'open'; })
+    .map(function (t) { return t.id; });
+}
+
 /** Put the planned rows back: in-place rewrites, then deletes bottom-up, then appends. */
 function applyChangeUndo(changes) {
   var byTab = {};
@@ -459,6 +474,16 @@ function undoCall(payload) {
     if (uses.length > 0) {
       throw undoRefusal('Nothing undone: ' + uses.length + ' use(s) outside call ' + callId + ' of rows it would remove', {
         dry_run: !confirm, call_id: callId, uses: uses,
+      });
+    }
+
+    // #718: at most one trip is open. Undoing a close, or a discard, must not reopen a second.
+    var opens = openTripsAfter(plan);
+    if (opens.length > 1) {
+      throw undoRefusal('Nothing undone: it would reopen a trip while trip ' + opens.filter(function (id) {
+        return !plan.changes.some(function (c) { return c.tab === 'Trips' && c.restore && c.restore.id === id; });
+      }).join(', ') + ' is open, and only one trip can be open at a time', {
+        dry_run: !confirm, call_id: callId, open_trips: opens,
       });
     }
 

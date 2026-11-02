@@ -42,6 +42,7 @@ export const FORAGE_READ_TOOLS: ReadonlySet<string> = new Set([
   'forage_get_recipe',
   'forage_cook_history',
   'forage_list_plan',
+  'forage_get_trip',
 ])
 
 const NO_UNDO_YET = "Error: Forage's API doesn't have undo yet. Redeploy the Apps Script."
@@ -514,6 +515,103 @@ const PLAN_ENTRY_INPUT = {
   recipe_id: z.string().optional().describe('The recipe (rc_...). Send this or note'),
   note: z.string().optional().describe('A meal that is not a recipe, 1 to 120 characters ("Eating out", "Leftovers")'),
 }
+
+// ---------------------------------------------------------------- shopping trips (#718)
+
+// Wording fixed by forage/docs/design/718-shopping-trips.md. Every amount, count and breakdown is the API's (trips.js).
+
+const STORE_NAMES: Record<string, string> = { ks: 'King Soopers', costco: 'Costco', other: 'Other' }
+const STORE_ORDER = ['ks', 'costco', 'other'] as const
+const TRIP_CHOICES = ['have', 'ks', 'costco', 'other'] as const
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
+
+/** An item's distinct recipes, in the order its lines name them. */
+function itemRecipes(item: any): string[] {
+  const out: string[] = []
+  for (const l of (item.lines ?? []) as any[]) if (l.recipe_name && !out.includes(l.recipe_name)) out.push(l.recipe_name)
+  return out
+}
+
+/** `  fd_0a1b2c3d  Yellow onion · about 6 onions · Weeknight chili, Beef Stew · bought`. */
+function tripItemLine(item: any): string {
+  const parts = [item.name]
+  if (item.need) parts.push(item.need)
+  const recipes = itemRecipes(item)
+  if (recipes.length) parts.push(recipes.join(', '))
+  if (item.suggested) parts.push('suggested')
+  if (item.bought) parts.push('bought')
+  return `  ${item.food_id}  ${parts.join(' · ')}`
+}
+
+/** `12 items: 3 to sort, 4 have, 3 King Soopers (1 bought), 1 Costco, 1 other.` */
+function tripCountsLine(trip: any): string {
+  const c = trip.counts ?? {}
+  if (!c.all) return 'No items.'
+  const boughtAt = (s: string) => ((trip.items ?? []) as any[]).filter((i) => i.choice === s && i.bought).length
+  const parts: string[] = []
+  if (c.todo) parts.push(`${c.todo} to sort`)
+  if (c.have) parts.push(`${c.have} have`)
+  for (const s of STORE_ORDER) {
+    if (!c[s]) continue
+    const b = boughtAt(s)
+    parts.push(`${c[s]} ${s === 'other' ? 'other' : STORE_NAMES[s]}${b ? ` (${b} bought)` : ''}`)
+  }
+  return `${plural(c.all, 'item')}: ${parts.join(', ')}.`
+}
+
+/** `Not on the list (not matched to a food): "1 bay leaf" in Beef Stew`, or '' when every line is matched. */
+function unmatchedLine(trip: any): string {
+  const lines = (trip.unmatched ?? []) as any[]
+  if (!lines.length) return ''
+  return `Not on the list (not matched to a food): ${lines.map((l) => `"${l.text}" in ${l.recipe_name}`).join('; ')}`
+}
+
+/** forage_get_trip's answer for one trip. */
+function tripText(trip: any): string {
+  const meals = (trip.meals ?? []) as any[]
+  const out = [
+    `Trip ${trip.id} · ${trip.status} · through ${dayText(trip.through)} · ` +
+      (meals.length ? plural(meals.length, 'meal') : 'no meals'),
+    ...meals.map((m) => `  ${m.recipe_name || m.recipe_id} · ${dayText(m.date)} ${m.slot} (${m.plan_id})`),
+    tripCountsLine(trip),
+  ]
+  const items = (trip.items ?? []) as any[]
+  const groups: [string, any[]][] = [
+    ['To sort', items.filter((i) => !i.choice)],
+    ...STORE_ORDER.map((s): [string, any[]] => [STORE_NAMES[s], items.filter((i) => i.choice === s)]),
+    ['Have it', items.filter((i) => i.choice === 'have')],
+  ]
+  const body = groups.filter(([, list]) => list.length).flatMap(([label, list]) => [label, ...list.map(tripItemLine)])
+  if (body.length) out.push('', ...body)
+  const unmatched = unmatchedLine(trip)
+  if (unmatched) out.push('', unmatched)
+  return out.join('\n')
+}
+
+/** `No open trip. Last trip: closed Mon 2026-10-27, 19 items, 17 bought.`, from getTrips' closed rows. */
+function noTripText(trips: any[]): string {
+  const last = trips
+    .filter((t) => t.status === 'closed' && t.closed_at)
+    .sort((a, b) => String(b.closed_at).localeCompare(String(a.closed_at)))[0]
+  if (!last) return 'No open trip. No trips yet.'
+  const closed = homeToday(new Date(last.closed_at))
+  return `No open trip. Last trip: closed ${dayText(closed)}, ${plural(last.items ?? 0, 'item')}, ${last.bought ?? 0} bought.`
+}
+
+/** A refused startTrip: `Nothing saved.`, then one line per meal it names, or the API's text. */
+function startRefusal(result: ApiResult): string {
+  const problems = ((result as any).problems ?? []) as { error: string }[]
+  return ['Nothing saved.', ...(problems.length ? problems.map((p) => p.error) : [result.error ?? ''])].join('\n')
+}
+
+/** `Yellow onion: King Soopers, not bought.`, `Olive oil: Have it.`, `Beef chuck: not sorted.` */
+function itemSavedText(item: any): string {
+  if (STORE_NAMES[item.choice]) return `${item.name}: ${STORE_NAMES[item.choice]}, ${item.bought ? 'bought' : 'not bought'}.`
+  return `${item.name}: ${item.choice === 'have' ? 'Have it' : 'not sorted'}.`
+}
+
+const TRIP_ID_INPUT = z.string().optional().describe('The trip (tr_...). Default the open trip')
 
 /**
  * Register the read tools, or the write tools, never both: the endpoints' lists
@@ -1571,6 +1669,182 @@ export function registerForageTools(server: McpServer, cfg: ForageConfig, mode: 
       const d = saved.data
       return text(
         `Planned ${meals(d.planned)}${d.skipped ? `, skipped ${d.skipped} already planned` : ''}.\n` +
+          `Undo with forage_undo, call ${currentCallId()}`,
+      )
+    }),
+  )
+
+  server.registerTool(
+    'forage_get_trip',
+    {
+      description:
+        "Reads the open shopping trip: its meals, and each item with what the meals need, where it'll be bought, " +
+        "and whether it's bought.",
+      inputSchema: { trip_id: TRIP_ID_INPUT },
+      annotations: READ,
+    },
+    guarded(async ({ trip_id }: { trip_id?: string }): Promise<ToolResult> => {
+      const result = await apiRead(cfg, 'getTrip', { id: trip_id })
+      if (!result.success) return failed(`Error: ${result.error}`)
+      if (result.data?.trip) return text(tripText(result.data.trip))
+      const trips = await apiRead(cfg, 'getTrips', { status: 'closed' })
+      if (!trips.success) return failed(`Error: ${trips.error}`)
+      return text(noTripText((trips.data ?? []) as any[]))
+    }),
+  )
+
+  server.registerTool(
+    'forage_start_trip',
+    {
+      description:
+        'Starts a shopping trip for planned recipe meals after today through a date. Previews first. One trip can ' +
+        'be open at a time.',
+      inputSchema: {
+        through: z.string().describe("The last day the trip shops for: YYYY-MM-DD, 'today', 'tomorrow' or '+5d'"),
+        plan_ids: z
+          .array(z.string())
+          .optional()
+          .describe('The planned meals (pl_...) to shop for. Default every recipe meal after today through that date'),
+        dry_run: z.boolean().optional().describe('Default true: preview only. Set false to start it'),
+      },
+      annotations: WRITE,
+    },
+    guarded(async (args: any): Promise<ToolResult> => {
+      const through = planDate(args.through)
+      if (!through) return failed(`Nothing saved. Could not read "${args.through}" as a date — ${DATE_HINT}.`)
+      const payload: Record<string, unknown> = { through, today: homeToday() }
+      if (args.plan_ids) payload.plan_ids = args.plan_ids
+
+      // Previewed first in every case: a refusal sends no write and is not counted.
+      const preview = await apiDry(cfg, 'startTrip', { ...payload, dry_run: true })
+      if (!preview.success) return failed(startRefusal(preview))
+      const p = preview.data.trip
+      const meals = (p.meals ?? []) as any[]
+      if (args.dry_run !== false) {
+        const c = p.counts
+        const mealList = meals.map((m) => `${m.recipe_name || m.recipe_id} (${dayText(m.date).slice(0, 3)})`).join(', ')
+        const out = [
+          'Preview — nothing saved.',
+          `Trip through ${dayText(through)}, ${meals.length ? `${plural(meals.length, 'meal')}: ${mealList}.` : 'no meals.'}`,
+          c.all
+            ? `${plural(c.all, 'item')}: ${c.have} start as Have it, ${c.to_buy} at their usual store, ${c.todo} to sort.`
+            : 'No items.',
+        ]
+        const unmatched = unmatchedLine(p)
+        if (unmatched) out.push(unmatched)
+        out.push('Call again with dry_run: false to start it.')
+        return text(out.join('\n'))
+      }
+
+      const rows = 1 + (p.items?.length ?? 0) + meals.length
+      declareRows(rows)
+      let saved: ApiResult
+      try {
+        saved = await apiWrite(cfg, 'startTrip', { ...payload, dry_run: false }, rows)
+      } catch (err) {
+        inTransit(err, 'trip')
+      }
+      if (!saved.success) return failed(startRefusal(saved))
+      const t = saved.data.trip
+      return text(
+        `Started trip ${t.id} through ${dayText(t.through)} with ${plural(t.meals.length, 'meal')} and ` +
+          `${plural(t.counts.all, 'item')} (${t.counts.todo} to sort).\nUndo with forage_undo, call ${currentCallId()}`,
+      )
+    }),
+  )
+
+  server.registerTool(
+    'forage_set_trip_item',
+    {
+      description:
+        'Sets an item on the trip to have, ks (King Soopers), costco or other, or marks it bought. Picking a store ' +
+        "also makes it the food's usual store.",
+      inputSchema: {
+        food_id: z.string().describe('The food on the trip (fd_...)'),
+        choice: z.enum(TRIP_CHOICES).optional().describe('have, ks (King Soopers), costco or other'),
+        bought: z.boolean().optional().describe('Only an item with a store can be bought'),
+        trip_id: TRIP_ID_INPUT,
+      },
+      annotations: WRITE,
+    },
+    guarded(async (args: any): Promise<ToolResult> => {
+      if (args.choice === undefined && args.bought === undefined) {
+        return failed('Send choice or bought. Nothing changed.')
+      }
+      let saved: ApiResult
+      try {
+        saved = await apiWrite(cfg, 'setTripItem', sent(args, ['trip_id', 'food_id', 'choice', 'bought']))
+      } catch (err) {
+        inTransit(err, 'change')
+      }
+      if (!saved.success) return failed(`Nothing changed. ${saved.error}`)
+      const item = saved.data.item
+      const remembered = saved.data.remembered ? ` Forage will suggest ${STORE_NAMES[item.choice]} next time.` : ''
+      return text(`${itemSavedText(item)}${remembered}`)
+    }),
+  )
+
+  server.registerTool(
+    'forage_close_trip',
+    {
+      description: 'Closes the open trip after shopping; its meals then read as shopped.',
+      inputSchema: { trip_id: TRIP_ID_INPUT },
+      annotations: WRITE,
+    },
+    guarded(async ({ trip_id }: { trip_id?: string }): Promise<ToolResult> => {
+      let saved: ApiResult
+      try {
+        saved = await apiWrite(cfg, 'closeTrip', trip_id ? { trip_id } : {})
+      } catch (err) {
+        inTransit(err, 'close')
+      }
+      if (!saved.success) return failed(`Nothing changed. ${saved.error}`)
+      const t = saved.data.trip
+      const unbought = ((t.items ?? []) as any[]).filter((i) => STORE_NAMES[i.choice] && !i.bought)
+      const not = unbought.length
+        ? ` Not bought: ${unbought.map((i) => `${i.name} (${STORE_NAMES[i.choice]})`).join(', ')}.`
+        : ''
+      const n = (t.meals ?? []).length
+      const meals = n ? ` Its ${plural(n, 'meal')} now ${n === 1 ? 'reads' : 'read'} as shopped.` : ''
+      return text(`Closed trip ${t.id}: ${t.counts.bought} of ${t.counts.to_buy} bought.${not}${meals}`)
+    }),
+  )
+
+  server.registerTool(
+    'forage_discard_trip',
+    {
+      description: 'Throws the open trip away. Its meals stay planned. Previews unless confirm is true.',
+      inputSchema: {
+        trip_id: TRIP_ID_INPUT,
+        confirm: z.boolean().optional().describe('Set true to throw it away. Default false = preview only'),
+      },
+      annotations: UNDO,
+    },
+    guarded(async ({ trip_id, confirm }: { trip_id?: string; confirm?: boolean }): Promise<ToolResult> => {
+      const found = await apiRead(cfg, 'getTrip', { id: trip_id })
+      if (!found.success) return failed(`Nothing changed. ${found.error}`)
+      const t = found.data?.trip
+      if (!t) return failed('Nothing changed. No shopping trip is open.')
+      if (t.status !== 'open') {
+        return failed(`Nothing changed. Trip ${t.id} is closed; only an open trip can be thrown away.`)
+      }
+      const meals = (t.meals ?? []).length
+      const back = `${plural(meals, 'meal')} ${meals === 1 ? 'goes' : 'go'} back to planned with no trip`
+      if (confirm !== true) {
+        return text(`Would throw away trip ${t.id}: ${plural(t.counts.all, 'item')}, ${back}. Call again with confirm: true.`)
+      }
+      const rows = 1 + t.counts.all + meals
+      declareRows(rows)
+      let saved: ApiResult
+      try {
+        saved = await apiWrite(cfg, 'discardTrip', { trip_id: t.id }, rows)
+      } catch (err) {
+        inTransit(err, 'discard')
+      }
+      if (!saved.success) return failed(`Nothing changed. ${saved.error}`)
+      const cleared = saved.data.meals_cleared
+      return text(
+        `Threw away trip ${t.id}. ${plural(cleared, 'meal')} ${cleared === 1 ? 'is' : 'are'} planned with no trip.\n` +
           `Undo with forage_undo, call ${currentCallId()}`,
       )
     }),

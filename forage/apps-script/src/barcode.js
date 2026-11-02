@@ -10,6 +10,21 @@ var OFF_PRODUCT_URL = 'https://world.openfoodfacts.org/api/v2/product/';
 var OFF_FIELDS = 'code,product_name,brands,serving_size,serving_quantity,nutriments';
 var OFF_USER_AGENT = 'Forage/1.0 (personal meal planner; https://github.com/luketmoss/keel)';
 
+/**
+ * #755: each of the seven's Open Food Facts nutriment, and what to multiply it
+ * by. Open Food Facts gives cholesterol and sodium in g per 100 g; Forage
+ * stores mg.
+ */
+var OFF_EXTRA_NUTRIENTS = {
+  satfat_100g: { off: 'saturated-fat_100g', times: 1 },
+  transfat_100g: { off: 'trans-fat_100g', times: 1 },
+  cholesterol_mg_100g: { off: 'cholesterol_100g', times: 1000 },
+  sodium_mg_100g: { off: 'sodium_100g', times: 1000 },
+  fiber_100g: { off: 'fiber_100g', times: 1 },
+  sugars_100g: { off: 'sugars_100g', times: 1 },
+  added_sugars_100g: { off: 'added-sugars_100g', times: 1 },
+};
+
 /** Why a lookup gave no food. Each is fixed text; the app keys its copy on `code`. */
 var BARCODE_REFUSALS = {
   bad_code: 'A barcode is 8, 12, 13 or 14 digits.',
@@ -35,9 +50,10 @@ function barcodeError(code) {
  *
  * - a code a food in the library already has: `already_in_library` is that
  *   food (`{id, name}`), and Open Food Facts is not asked at all;
- * - a product with all four nutrition values: `food` prefilled, `reason` '';
+ * - a product with all four nutrition values: `food` prefilled, `reason` '',
+ *   with each of the seven (#755) the product has, the rest blank;
  * - a product without them: `food` with its name, brand and code, nutrition
- *   blank, `reason` `no_nutrition`;
+ *   blank, the seven included, `reason` `no_nutrition`;
  * - no such product: `found` false, `reason` `not_found`.
  *
  * A malformed code, a 429 and a failed fetch are refusals with code
@@ -112,6 +128,12 @@ function foodFromProduct(p, code) {
   };
   NUTRITION_FIELDS.forEach(function (f) {
     food[f] = complete ? Math.round(values[f] * 100) / 100 : null;
+  });
+  // The seven only with the four, each on its own: one the product lacks is blank.
+  EXTRA_NUTRIENTS.forEach(function (x) {
+    var source = OFF_EXTRA_NUTRIENTS[x.per100];
+    var v = num(n[source.off]);
+    food[x.per100] = complete && v !== null && v >= 0 ? Math.round(v * source.times * 100) / 100 : null;
   });
   var grams = num(p.serving_quantity);
   if (grams !== null && grams > 0) food.servings_json = [{ name: servingName(p.serving_size), g: Math.round(grams * 10) / 10 }];

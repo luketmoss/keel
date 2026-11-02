@@ -102,6 +102,7 @@ function addStarterFoods(payload) {
     if (status.can_fill) {
       food = foods.filter(function (f) { return f.id === status.can_fill; })[0];
       NUTRITION_FIELDS.forEach(function (f) { if (isBlank(food[f])) food[f] = s[f]; });
+      EXTRA_NUTRIENTS.forEach(function (x) { if (isBlank(food[x.per100])) food[x.per100] = starterValue(s, x.per100); });
       if (isBlank(food.servings_json) && s.servings.length) food.servings_json = s.servings;
       if (isBlank(food.category)) food.category = s.category;
       if (isBlank(food.source)) food.source = 'usda';
@@ -119,6 +120,13 @@ function addStarterFoods(payload) {
         protein_100g: s.protein_100g,
         carbs_100g: s.carbs_100g,
         fat_100g: s.fat_100g,
+        satfat_100g: starterValue(s, 'satfat_100g'),
+        transfat_100g: starterValue(s, 'transfat_100g'),
+        cholesterol_mg_100g: starterValue(s, 'cholesterol_mg_100g'),
+        sodium_mg_100g: starterValue(s, 'sodium_mg_100g'),
+        fiber_100g: starterValue(s, 'fiber_100g'),
+        sugars_100g: starterValue(s, 'sugars_100g'),
+        added_sugars_100g: starterValue(s, 'added_sugars_100g'),
         servings_json: s.servings.length ? s.servings : null,
         source: 'usda',
         source_ref: String(s.fdc),
@@ -132,6 +140,14 @@ function addStarterFoods(payload) {
   });
   if (taught.length) teachStarterAliases(taught);
   return out;
+}
+
+/**
+ * A starter food's value for one of the seven (#755), or null: SR Legacy has
+ * no added sugars, and a record can lack any of the others.
+ */
+function starterValue(s, field) {
+  return typeof s[field] === 'number' ? s[field] : null;
 }
 
 /** Point each starter food's aliases at its food, keeping any alias that already points elsewhere. */

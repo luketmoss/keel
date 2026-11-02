@@ -99,7 +99,11 @@ describe('AC3: every action exists, with a read and a write round-tripping throu
     const n = api.ok('computeNutrition', {
       payload: { servings: 1, lines: [{ text: '100 g beef', qty: 100, unit: 'g', food_id: 'beef' }] },
     });
-    expect(n.per_serving).toEqual({ kcal: 190, protein_g: 19, carbs_g: 0, fat_g: 12 });
+    expect(n.per_serving).toEqual({
+      kcal: 190, protein_g: 19, carbs_g: 0, fat_g: 12,
+      // #755: none of the seven on the food.
+      satfat_g: null, transfat_g: null, cholesterol_mg: null, sodium_mg: null, fiber_g: null, sugars_g: null, added_sugars_g: null,
+    });
     expect(api.rows('Recipes')).toHaveLength(before);
   });
 
@@ -172,7 +176,15 @@ describe('AC3: every action exists, with a read and a write round-tripping throu
     expect(api.ok('getFoodLogTotals', { from: '2026-11-01', to: '2026-11-01' })).toEqual({
       from: '2026-11-01',
       to: '2026-11-01',
-      days: [{ date: '2026-11-01', entries: 2, unknown_entries: 0, kcal: 573.9, protein_g: 55.7, carbs_g: 0.7, fat_g: 36.7, partial: false }],
+      days: [
+        {
+          date: '2026-11-01', entries: 2, unknown_entries: 0, kcal: 573.9, protein_g: 55.7, carbs_g: 0.7, fat_g: 36.7,
+          partial: false,
+          // #755: neither entry has any of the seven.
+          satfat_g: null, transfat_g: null, cholesterol_mg: null, sodium_mg: null, fiber_g: null, sugars_g: null, added_sugars_g: null,
+          unknown: { satfat_g: 2, transfat_g: 2, cholesterol_mg: 2, sodium_mg: 2, fiber_g: 2, sugars_g: 2, added_sugars_g: 2 },
+        },
+      ],
     });
     const edited = api.ok('updateLogEntry', { payload: { id: egg.id, changes: { qty: 1 } } });
     expect(edited).toMatchObject({ grams: 50, kcal: 71.5, logged_at: egg.logged_at, created: egg.created });

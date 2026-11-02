@@ -14,6 +14,30 @@
 
 var MASS_G = { g: 1, kg: 1000, oz: 28.3495, lb: 453.592 };
 
+/**
+ * The seven values beyond the core four (#755): each one's Foods column (per
+ * 100 g) and its name in a log entry's snapshot, a recipe's per serving and a
+ * day's totals. Each is optional and independent of the others: blank is
+ * unknown, and a sum covers only the lines or entries that have it. None of
+ * them makes anything partial. Cholesterol and sodium are in mg, the rest g.
+ */
+var EXTRA_NUTRIENTS = [
+  { per100: 'satfat_100g', key: 'satfat_g' },
+  { per100: 'transfat_100g', key: 'transfat_g' },
+  { per100: 'cholesterol_mg_100g', key: 'cholesterol_mg' },
+  { per100: 'sodium_mg_100g', key: 'sodium_mg' },
+  { per100: 'fiber_100g', key: 'fiber_g' },
+  { per100: 'sugars_100g', key: 'sugars_g' },
+  { per100: 'added_sugars_100g', key: 'added_sugars_g' },
+];
+
+/** `{ satfat_g: value, ... }`, one key for each of the seven. */
+function extraNutrientMap(value) {
+  var out = {};
+  EXTRA_NUTRIENTS.forEach(function (n) { out[n.key] = typeof value === 'function' ? value(n) : value; });
+  return out;
+}
+
 /** Each volume unit as a fraction of a cup. */
 var VOLUME_CUPS = { tsp: 1 / 48, tbsp: 1 / 16, cup: 1, 'fl oz': 1 / 8, ml: 1 / 236.588, l: 1000 / 236.588 };
 
@@ -108,21 +132,29 @@ function lineGrams(line, food) {
   return gramsFor(line.qty, line.unit, food);
 }
 
-/** kcal, protein, carbs and fat in `grams` of `food`, unrounded. */
+/**
+ * kcal, protein, carbs and fat in `grams` of `food`, unrounded, then the
+ * seven (#755), each null when the food lacks it.
+ */
 function nutrientsOf(food, grams) {
-  return {
+  var out = {
     kcal: food.kcal_100g * grams / 100,
     protein_g: food.protein_100g * grams / 100,
     carbs_g: food.carbs_100g * grams / 100,
     fat_g: food.fat_100g * grams / 100,
   };
+  EXTRA_NUTRIENTS.forEach(function (n) {
+    out[n.key] = typeof food[n.per100] === 'number' ? food[n.per100] * grams / 100 : null;
+  });
+  return out;
 }
 
 /**
  * A recipe's nutrition, per serving, from its lines and the foods they name.
  *
- * Returns `{ per_serving: {kcal, protein_g, carbs_g, fat_g}, missing:
- * [{line_id, reason}], partial, lines: [{line_id, grams, reason, kcal}] }`,
+ * Returns `{ per_serving: {kcal, protein_g, carbs_g, fat_g, ...the seven},
+ * per_serving_unknown: {satfat_g, ...}, missing: [{line_id, reason}],
+ * partial, lines: [{line_id, grams, reason, kcal}] }`,
  * where a line's `kcal` is its share of a serving's calories (#707), null
  * when it did not count. Optional lines count toward nothing and are left out
  * of `missing`.
@@ -131,9 +163,16 @@ function nutrientsOf(food, grams) {
  * `no_weight`. Partial is any `no_food`, or `no_weight` on a food with
  * nutrition: a spice with no nutrition is reported but does not make it
  * partial. Each value is rounded to 0.1, and null when no line counted.
+ *
+ * The seven (#755): each is the sum over the counted lines whose food has it,
+ * and null when none does; `per_serving_unknown` counts, for each, the counted
+ * lines whose food lacks it. A line that did not count is already in
+ * `missing`, so it is in neither. None of them changes `partial`.
  */
 function recipeNutrition(lines, servings, foodsById) {
   var total = { kcal: 0, protein_g: 0, carbs_g: 0, fat_g: 0 };
+  var extra = extraNutrientMap(null);
+  var unknown = extraNutrientMap(0);
   var missing = [];
   var perLine = [];
   var partial = false;
@@ -159,6 +198,10 @@ function recipeNutrition(lines, servings, foodsById) {
         total.protein_g += n.protein_g;
         total.carbs_g += n.carbs_g;
         total.fat_g += n.fat_g;
+        EXTRA_NUTRIENTS.forEach(function (x) {
+          if (n[x.key] === null) unknown[x.key]++;
+          else extra[x.key] = (extra[x.key] || 0) + n[x.key];
+        });
         kcal = round1(n.kcal / by);
         counted++;
       }
@@ -172,13 +215,16 @@ function recipeNutrition(lines, servings, foodsById) {
 
   // Nothing counted is unknown, not zero.
   var per = function (v) { return counted ? round1(v / by) : null; };
+  var perServing = {
+    kcal: per(total.kcal),
+    protein_g: per(total.protein_g),
+    carbs_g: per(total.carbs_g),
+    fat_g: per(total.fat_g),
+  };
+  EXTRA_NUTRIENTS.forEach(function (x) { perServing[x.key] = extra[x.key] === null ? null : round1(extra[x.key] / by); });
   return {
-    per_serving: {
-      kcal: per(total.kcal),
-      protein_g: per(total.protein_g),
-      carbs_g: per(total.carbs_g),
-      fat_g: per(total.fat_g),
-    },
+    per_serving: perServing,
+    per_serving_unknown: unknown,
     missing: missing,
     partial: partial,
     lines: perLine,
@@ -187,8 +233,9 @@ function recipeNutrition(lines, servings, foodsById) {
 
 /**
  * A food log entry's snapshot: `qty` of a named serving or grams of a food.
- * Returns `{ grams, kcal, protein_g, carbs_g, fat_g, partial }`; the values
- * are null and partial true when the food has no nutrition.
+ * Returns `{ grams, kcal, protein_g, carbs_g, fat_g, partial, ...the seven }`;
+ * the values are null and partial true when the food has no nutrition. Each of
+ * the seven the food lacks is null, never 0 (#755).
  */
 function foodEntryNutrition(food, qty, unit) {
   var grams;
@@ -200,10 +247,12 @@ function foodEntryNutrition(food, qty, unit) {
     grams = qty * serving.g;
   }
   if (!hasNutrition(food)) {
-    return { grams: round1(grams), kcal: null, protein_g: null, carbs_g: null, fat_g: null, partial: true };
+    var none = { grams: round1(grams), kcal: null, protein_g: null, carbs_g: null, fat_g: null, partial: true };
+    EXTRA_NUTRIENTS.forEach(function (x) { none[x.key] = null; });
+    return none;
   }
   var n = nutrientsOf(food, grams);
-  return {
+  var out = {
     grams: round1(grams),
     kcal: round1(n.kcal),
     protein_g: round1(n.protein_g),
@@ -211,13 +260,15 @@ function foodEntryNutrition(food, qty, unit) {
     fat_g: round1(n.fat_g),
     partial: false,
   };
+  EXTRA_NUTRIENTS.forEach(function (x) { out[x.key] = round1(n[x.key]); });
+  return out;
 }
 
 /** A recipe entry's snapshot: `qty` servings of the recipe's per-serving values. */
 function recipeEntryNutrition(nutrition, qty) {
   var per = nutrition.per_serving;
-  var times = function (v) { return v === null ? null : round1(v * qty); };
-  return {
+  var times = function (v) { return v === null || v === undefined ? null : round1(v * qty); };
+  var out = {
     grams: null,
     kcal: times(per.kcal),
     protein_g: times(per.protein_g),
@@ -225,4 +276,6 @@ function recipeEntryNutrition(nutrition, qty) {
     fat_g: times(per.fat_g),
     partial: nutrition.partial || per.kcal === null,
   };
+  EXTRA_NUTRIENTS.forEach(function (x) { out[x.key] = times(per[x.key]); });
+  return out;
 }

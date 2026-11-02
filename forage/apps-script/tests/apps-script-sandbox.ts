@@ -57,17 +57,31 @@ export function displayOf(value: CellValue | undefined): string {
   return String(value);
 }
 
-/** A fake sheet. `rows` is the live backing array, header row included: rows[0] is sheet row 1. */
+/** How many columns a new sheet has, as in Sheets. A range past the last column is an error there. */
+export const NEW_SHEET_COLUMNS = 26;
+
+/**
+ * A fake sheet. `rows` is the live backing array, header row included: rows[0] is sheet row 1.
+ * It has `maxColumns` columns, 26 or as many as its widest row: a range past them throws, as
+ * in Sheets, while appendRow widens the sheet to fit (#755).
+ */
 export function makeSheet(name: string, rows: CellValue[][] = []) {
   const sheet = {
     name,
     rows,
     frozenRows: 0,
+    maxColumns: Math.max(NEW_SHEET_COLUMNS, ...rows.map((r) => r.length)),
     getName: () => name,
     getLastRow: () => rows.length,
     getLastColumn: () => rows.reduce((max, r) => Math.max(max, r.length), 0),
+    getMaxColumns: () => sheet.maxColumns,
+    insertColumnsAfter(after: number, howMany: number) {
+      if (after !== sheet.maxColumns) throw new Error('insertColumnsAfter stub inserts after the last column only');
+      sheet.maxColumns += howMany;
+    },
     appendRow(row: CellValue[]) {
       rows.push(row.map(storeAsTyped));
+      sheet.maxColumns = Math.max(sheet.maxColumns, row.length);
     },
     deleteRow(rowNum: number) {
       if (rowNum < 1 || rowNum > rows.length) throw new Error('deleteRow out of range');
@@ -77,6 +91,9 @@ export function makeSheet(name: string, rows: CellValue[][] = []) {
       sheet.frozenRows = n;
     },
     getRange(startRow: number, startCol: number, numRows: number, numCols: number) {
+      if (startCol + numCols - 1 > sheet.maxColumns) {
+        throw new Error('The coordinates of the range are outside the dimensions of the sheet.');
+      }
       const slice = () =>
         Array.from({ length: numRows }, (_, i) => rows[startRow - 1 + i] ?? []).map((r) =>
           Array.from({ length: numCols }, (_, c) => r[startCol - 1 + c]),

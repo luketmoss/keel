@@ -119,6 +119,7 @@ function withDerived(recipe, nutrition, cooks, hasWalkthrough) {
   var out = JSON.parse(JSON.stringify(recipe));
   out.nutrition = {
     per_serving: nutrition.per_serving,
+    per_serving_unknown: nutrition.per_serving_unknown,
     missing: nutrition.missing,
     partial: nutrition.partial,
   };

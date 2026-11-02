@@ -4,7 +4,8 @@
 // food changes (#712): changing a food or a recipe later does not rewrite past
 // days, and moving an entry to another meal keeps its numbers. Blank means
 // unknown. logFood and updateLogEntry take `dry_run`: the entry as it would be
-// stored, nothing written, which is the app's amount preview.
+// stored, nothing written, which is the app's amount preview. #755's seven
+// nutrients are part of the snapshot, by the same rule.
 
 function getFoodLog(params) {
   var range = dateRange(params);
@@ -22,6 +23,11 @@ function getFoodLog(params) {
  * never present with zeros. A sum covers the entries that have the value and is
  * null only when none on the date does; `unknown_entries` counts entries whose
  * snapshot is blank; partial when any entry is partial or unknown. To 0.1.
+ *
+ * #755 adds the seven (`satfat_g` ... `added_sugars_g`), each summed over the
+ * entries that have it and null when none does, and `unknown: { satfat_g, ...
+ * }`, for each the entries with a kcal but not that value. They change none
+ * of the fields above, `partial` included.
  */
 function getFoodLogTotals(params) {
   var range = dateRange(params);
@@ -31,16 +37,25 @@ function getFoodLogTotals(params) {
       date: e.date, entries: 0, unknown_entries: 0,
       kcal: null, protein_g: null, carbs_g: null, fat_g: null, partial: false,
     };
+    if (!day.unknown) {
+      EXTRA_NUTRIENTS.forEach(function (x) { day[x.key] = null; });
+      day.unknown = extraNutrientMap(0);
+    }
     day.entries++;
     if (e.kcal === null) day.unknown_entries++;
     ['kcal', 'protein_g', 'carbs_g', 'fat_g'].forEach(function (f) {
       if (e[f] !== null) day[f] = (day[f] || 0) + e[f];
     });
     if (e.partial || e.kcal === null) day.partial = true;
+    EXTRA_NUTRIENTS.forEach(function (x) {
+      if (e[x.key] !== null) day[x.key] = (day[x.key] || 0) + e[x.key];
+      else if (e.kcal !== null) day.unknown[x.key]++;
+    });
   });
   var days = Object.keys(byDate).sort().map(function (d) {
     var day = byDate[d];
     ['kcal', 'protein_g', 'carbs_g', 'fat_g'].forEach(function (f) { day[f] = round1(day[f]); });
+    EXTRA_NUTRIENTS.forEach(function (x) { day[x.key] = round1(day[x.key]); });
     return day;
   });
   return { from: range.from || null, to: range.to || null, days: days };
@@ -90,7 +105,11 @@ function sameAmount(existing, entry) {
     existing.qty === entry.qty && existing.unit === entry.unit;
 }
 
-var SNAPSHOT_FIELDS = ['grams', 'kcal', 'protein_g', 'carbs_g', 'fat_g', 'partial'];
+var SNAPSHOT_FIELDS = [
+  'grams', 'kcal', 'protein_g', 'carbs_g', 'fat_g', 'partial',
+  // #755: the seven, written with the rest and kept with them. An entry from before has them blank.
+  'satfat_g', 'transfat_g', 'cholesterol_mg', 'sodium_mg', 'fiber_g', 'sugars_g', 'added_sugars_g',
+];
 
 function writeLogEntry(existing, fields, id, caller, dryRun) {
   var entry = {

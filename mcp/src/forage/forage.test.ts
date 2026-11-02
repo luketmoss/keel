@@ -592,7 +592,13 @@ describe('forage_search_foods and forage_get_food (read)', () => {
     const r = await call('forage_search_foods', { q: 'oat', kind: 'ingredient', include_starter: true })
     const out = JSON.parse(r.content[0].text)
     expect(out.foods).toEqual([
-      { id: 'fd_1', name: 'Oats', brand: '', kind: 'ingredient', kcal_100g: 379, protein_100g: 13.2, carbs_100g: 67.7, fat_100g: 6.52, has_nutrition: true, verified: false, source: 'usda' },
+      {
+        id: 'fd_1', name: 'Oats', brand: '', kind: 'ingredient', kcal_100g: 379, protein_100g: 13.2, carbs_100g: 67.7, fat_100g: 6.52,
+        // #755: an API from before it, with none of the seven, reads as null.
+        satfat_100g: null, transfat_100g: null, cholesterol_mg_100g: null, sodium_mg_100g: null, fiber_100g: null,
+        sugars_100g: null, added_sugars_100g: null,
+        has_nutrition: true, verified: false, source: 'usda',
+      },
     ])
     expect(out.starter[0]).toMatchObject({ starter_id: 'oats-rolled', in_library: 'fd_1' })
     expect(sent.map((s) => [s.action, s.params.get('q'), s.payload])).toEqual([
@@ -741,5 +747,82 @@ describe('forage_update_food and forage_delete_food', () => {
     const r = await call('forage_delete_food', { id: 'fd_1' })
     expect(r).toMatchObject({ isError: true })
     expect(r.content[0].text).toBe('Nothing deleted — fd_1 is used by Chili (rc_2) and Lasagna (rc_1). Remove it from those first.')
+  })
+})
+
+describe('#755: the seven nutrients beyond the four', () => {
+  const BAR = { name: 'Bar', kind: 'packaged', serving: { name: 'bar', g: 40 }, per_serving: { kcal: 200, protein: 4, carbs: 24, fat: 10 } }
+
+  it('forage_add_food takes them in per_serving, scaled per 100 g as the core four are', async () => {
+    const sent = foodApi()
+    const r = await call('forage_add_food', {
+      food: { ...BAR, per_serving: { ...BAR.per_serving, satfat: 1.2, sodium_mg: 256, fiber: 3, sugars: 12, added_sugars: 10 } },
+      dry_run: false,
+    })
+    expect(sent[0].payload).toMatchObject({
+      kcal_100g: 500, satfat_100g: 3, sodium_mg_100g: 640, fiber_100g: 7.5, sugars_100g: 30, added_sugars_100g: 25,
+    })
+    expect(sent[0].payload).not.toHaveProperty('transfat_100g')
+    expect(sent[0].payload).not.toHaveProperty('cholesterol_mg_100g')
+    expect(r.content[0].text.split('\n').slice(0, 2)).toEqual([
+      'Saved Bar (fd_1): 500 kcal · P 10 · C 60 · F 25 per 100 g.',
+      'Sat fat 3 g · Sodium 640 mg · Fiber 7.5 g · Sugars 30 g · Added sugars 25 g',
+    ])
+  })
+
+  it('and in per_100g, as sent; with none of them the food line is as before and there is no second line', async () => {
+    const sent = foodApi()
+    await call('forage_add_food', {
+      food: { name: 'Oats', per_100g: { kcal: 379, protein: 13, carbs: 68, fat: 6.5, transfat: 0, cholesterol_mg: 0 } },
+      dry_run: false,
+    })
+    expect(sent[0].payload).toMatchObject({ transfat_100g: 0, cholesterol_mg_100g: 0 })
+    const r = await call('forage_add_food', { food: { name: 'Rye', per_100g: { kcal: 338, protein: 10, carbs: 76, fat: 1.6 } }, dry_run: false })
+    expect(r.content[0].text.split('\n')[0]).toBe('Saved Rye (fd_2): 338 kcal · P 10 · C 76 · F 1.6 per 100 g.')
+    expect(r.content[0].text.split('\n')[1]).toMatch(/^Undo with forage_undo/)
+  })
+
+  it("the API's refusal comes back as the tool's error", async () => {
+    foodApi({ upsertFood: () => ({ success: false, error: 'fiber is more than carbs (fiber_100g > carbs_100g)' }) })
+    const r = await call('forage_add_food', { food: { ...BAR, per_serving: { ...BAR.per_serving, fiber: 30 } }, dry_run: false })
+    expect(r).toMatchObject({ isError: true })
+    expect(r.content[0].text).toBe('Nothing saved. fiber is more than carbs (fiber_100g > carbs_100g)')
+  })
+
+  it('forage_update_food sends only the ones given, and its answer has the second line', async () => {
+    const sent = foodApi()
+    const r = await call('forage_update_food', { id: 'fd_9', name: 'Bran', per_100g: { kcal: 100, protein: 1, carbs: 20, fat: 1, sodium_mg: 5 } })
+    expect(sent[0].payload).toMatchObject({ id: 'fd_9', kcal_100g: 100, sodium_mg_100g: 5 })
+    expect(sent[0].payload).not.toHaveProperty('fiber_100g')
+    expect(r.content[0].text.split('\n').slice(0, 2)).toEqual([
+      'Updated Bran (fd_9): name, kcal_100g, protein_100g, carbs_100g, fat_100g, sodium_mg_100g. Now 100 kcal · P 1 · C 20 · F 1 per 100 g.',
+      'Sodium 5 mg',
+    ])
+  })
+
+  it("forage_search_foods' compact food has the seven _100g fields", async () => {
+    fakeForage((r) =>
+      r.action === 'getFoods'
+        ? { success: true, data: [{ id: 'fd_1', name: 'Oats', kcal_100g: 379, protein_100g: 13, carbs_100g: 68, fat_100g: 6.5, fiber_100g: 10, sodium_mg_100g: 6 }] }
+        : { success: false, error: 'no' },
+    )
+    const out = JSON.parse((await call('forage_search_foods', {})).content[0].text)
+    expect(out.foods[0]).toMatchObject({
+      satfat_100g: null, transfat_100g: null, cholesterol_mg_100g: null, sodium_mg_100g: 6, fiber_100g: 10,
+      sugars_100g: null, added_sugars_100g: null,
+    })
+  })
+
+  it("a recipe's nutrition text gains a second line of the known values; none known, no second line", async () => {
+    importApi({
+      preview: {
+        nutrition: { ...PREVIEW.nutrition, per_serving: { ...PREVIEW.nutrition.per_serving, satfat_g: 3.04, sodium_mg: 640.4, fiber_g: 8, sugars_g: 12, transfat_g: null } },
+      },
+    })
+    const lines = (await call('forage_import_recipe', { url: 'https://example.com/beef-stew' })).content[0].text.split('\n')
+    const at = lines.indexOf('About 412 kcal per serving (partial: L7 has no nutrition, L12 has no weight).')
+    expect(at).toBeGreaterThan(0)
+    expect(lines[at + 1]).toBe('Sat fat 3 g · Sodium 640 mg · Fiber 8 g · Sugars 12 g')
+    expect(lines[at + 2]).toBe('')
   })
 })

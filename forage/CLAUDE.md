@@ -61,7 +61,10 @@ code path defaults a nutrition value or a weight to `0`. "JSON" is one cell of
 JSON text. Ids a caller sends are kept (sending one again upserts); otherwise
 the API makes `<prefix>_` + 8 hex: `fd_`, `rc_`, `pl_`, `tr_`, `lg_`, `ck_`.
 The tabs are created by `scripts/migrate-703-create-tabs.mjs`, which calls the
-key-only `ensureSchema`; run it again after a release that adds a tab (#713).
+key-only `ensureSchema`; run it again after a release that adds a tab (#713) or
+columns (#755): an existing tab whose header row is exactly a prefix of its
+fields gets the missing header names appended, and one that is not is left
+alone and named.
 Nutrition (unit conversion, per serving, the partial rule) is computed only in `apps-script/src/nutrition.js`; the
 plan's derived fields (a meal's kcal a serving, partial, trip status) and the Plan banner's count, `not_on_trip`, only in
 `apps-script/src/plan.js` (#709); a trip's items, what the meals need, the default choices and the stale-line
@@ -77,7 +80,7 @@ the starter list is `starter.js`, about 75 USDA SR Legacy foods **generated** by
 
 | Tab | Key | Columns |
 |---|---|---|
-| **Foods** | `id` | id, name, kind, brand, category, kcal_100g, protein_100g, carbs_100g, fat_100g, servings_json, buy_unit, buy_unit_plural, buy_unit_g, usual_store, usually_have, regular, packs_json, last_buy, last_bought_on, never_shop, source, source_ref, verified, barcode, created, updated |
+| **Foods** | `id` | id, name, kind, brand, category, kcal_100g, protein_100g, carbs_100g, fat_100g, servings_json, buy_unit, buy_unit_plural, buy_unit_g, usual_store, usually_have, regular, packs_json, last_buy, last_bought_on, never_shop, source, source_ref, verified, barcode, created, updated, satfat_100g, transfat_100g, cholesterol_mg_100g, sodium_mg_100g, fiber_100g, sugars_100g, added_sugars_100g |
 | **Recipes** | `id` | id, name, source_url, source_site, servings, total_min, notes, created, updated |
 | **RecipeLines** | `recipe_id` + `line_id` | recipe_id, line_id, position, section, text, qty, unit, food_id, grams, optional |
 | **Steps** | `recipe_id` + `position` | recipe_id, position, section, name, text |
@@ -85,7 +88,7 @@ the starter list is `starter.js`, about 75 USDA SR Legacy foods **generated** by
 | **Plan** | `id` | id, date, slot, recipe_id, note, trip_id, created, updated |
 | **Trips** | `id` | id, status, through, created, closed_at |
 | **TripItems** | `trip_id` + `food_id` | trip_id, food_id, lines_json, mine, choice, suggested, buy, bought |
-| **FoodLog** | `id` | id, date, slot, food_id, recipe_id, qty, unit, grams, kcal, protein_g, carbs_g, fat_g, partial, source, logged_at, created, updated |
+| **FoodLog** | `id` | id, date, slot, food_id, recipe_id, qty, unit, grams, kcal, protein_g, carbs_g, fat_g, partial, source, logged_at, created, updated, satfat_g, transfat_g, cholesterol_mg, sodium_mg, fiber_g, sugars_g, added_sugars_g |
 | **Cooks** | `id` | id, recipe_id, date, rating, note, plan_id, created |
 | **Config** | `key` | key, value, updated |
 | **MCPChangeLog** | — | logged_at, call_id, action, tab, row_key, before, after |
@@ -104,7 +107,18 @@ What the columns mean:
   time and `last_bought_on` its date. `never_shop` keeps it off shopping lists
   (water). `source` is `usda`, `off`, `label` or `manual`; `source_ref` the FDC
   id or Open Food Facts code; `verified` means checked against the label,
-  which shared Open Food Facts data needs.
+  which shared Open Food Facts data needs. The seven after `updated` (#755) are
+  saturated fat, trans fat, cholesterol (mg), sodium (mg), fiber, sugars and
+  added sugars, per 100 g (`EXTRA_NUTRIENTS` in `nutrition.js`). Each is blank
+  (unknown) or a number ≥ 0, independently, and can be set only on a food with
+  the core four; a food with the four and none of the seven still has
+  nutrition. `upsertFood` refuses, naming the fields, saturated + trans more
+  than fat, fiber more than carbs, sugars more than carbs, added sugars more
+  than sugars (or carbs), and cholesterol or sodium over 100,000 mg, each
+  checked only when both sides are set. Open Food Facts gives cholesterol and
+  sodium in g, stored ×1000; the starter list has six from SR Legacy (no
+  added sugars), and `scripts/backfill-755-starter-nutrition.mjs` filled them
+  in for starter foods added before.
 - **Recipes.** Rating and last cooked are not stored: reads derive them from
   Cooks (the latest non-blank rating, the latest date).
 - **RecipeLines.** `line_id` is `L1`, `L2`… and stable for the life of the
@@ -148,10 +162,15 @@ What the columns mean:
   `forage/docs/design/712-food-log.md`: a date with nothing logged is absent, a
   sum is null only when every entry that day is blank, and `unknown_entries`
   counts the blank ones. `source` is `app` (token) or `mcp` (key), set by
-  the API. `logged_at` is ISO UTC.
+  the API. `logged_at` is ISO UTC. The seven after `updated` (#755) are part of
+  the snapshot by the same rule, each blank where the food or recipe lacks it
+  (never 0); entries from before #755 keep them blank. A recipe's per serving
+  and a day's totals sum each over the lines or entries that have it (null when
+  none does) and count the rest in `per_serving_unknown` / `unknown`; none of
+  the seven makes anything partial.
 - **Cooks.** `rating` is 1–5, or blank when not rated. `plan_id` is set when
   the cook was the plan's meal.
-- **Config.** `schema_version` (`2` since #713's MCPChangeLog), and `ingredient_aliases` (#706): a JSON
+- **Config.** `schema_version` (`2` since #713's MCPChangeLog, `3` since #755's nutrient columns), and `ingredient_aliases` (#706): a JSON
   object from a normalised ingredient name to the `food_id` a saved import
   matched it to. Later issues add keys here, not tabs.
 - **MCPChangeLog** (#713). One row per sheet row a key-caller write created,

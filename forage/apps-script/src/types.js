@@ -14,7 +14,7 @@ var TIMEZONE = 'America/Denver';
 /** A `payload` longer than this is refused, which keeps a cell under Sheets' 50,000 limit. */
 var MAX_PAYLOAD_CHARS = 45000;
 
-var SCHEMA_VERSION = '2';
+var SCHEMA_VERSION = '3';
 
 var FOOD_FIELDS = [
   'id', 'name', 'kind', 'brand', 'category',
@@ -22,6 +22,9 @@ var FOOD_FIELDS = [
   'servings_json', 'buy_unit', 'buy_unit_plural', 'buy_unit_g',
   'usual_store', 'usually_have', 'regular', 'packs_json', 'last_buy', 'last_bought_on',
   'never_shop', 'source', 'source_ref', 'verified', 'barcode', 'created', 'updated',
+  // #755: the seven optional values beyond the core four, per 100 g.
+  'satfat_100g', 'transfat_100g', 'cholesterol_mg_100g', 'sodium_mg_100g', 'fiber_100g', 'sugars_100g',
+  'added_sugars_100g',
 ];
 
 var RECIPE_FIELDS = [
@@ -45,6 +48,8 @@ var TRIP_ITEM_FIELDS = ['trip_id', 'food_id', 'lines_json', 'mine', 'choice', 's
 var FOOD_LOG_FIELDS = [
   'id', 'date', 'slot', 'food_id', 'recipe_id', 'qty', 'unit', 'grams',
   'kcal', 'protein_g', 'carbs_g', 'fat_g', 'partial', 'source', 'logged_at', 'created', 'updated',
+  // #755: the seven in the snapshot.
+  'satfat_g', 'transfat_g', 'cholesterol_mg', 'sodium_mg', 'fiber_g', 'sugars_g', 'added_sugars_g',
 ];
 
 var COOK_FIELDS = ['id', 'recipe_id', 'date', 'rating', 'note', 'plan_id', 'created'];
@@ -67,6 +72,8 @@ var TABS = {
       kcal_100g: 'num', protein_100g: 'num', carbs_100g: 'num', fat_100g: 'num',
       servings_json: 'json', buy_unit_g: 'num', usually_have: 'bool', regular: 'bool',
       packs_json: 'json', never_shop: 'bool', verified: 'bool',
+      satfat_100g: 'num', transfat_100g: 'num', cholesterol_mg_100g: 'num', sodium_mg_100g: 'num',
+      fiber_100g: 'num', sugars_100g: 'num', added_sugars_100g: 'num',
     },
   },
   Recipes: { fields: RECIPE_FIELDS, key: ['id'], kinds: { servings: 'num', total_min: 'num' } },
@@ -89,6 +96,8 @@ var TABS = {
     key: ['id'],
     kinds: {
       qty: 'num', grams: 'num', kcal: 'num', protein_g: 'num', carbs_g: 'num', fat_g: 'num', partial: 'bool',
+      satfat_g: 'num', transfat_g: 'num', cholesterol_mg: 'num', sodium_mg: 'num', fiber_g: 'num', sugars_g: 'num',
+      added_sugars_g: 'num',
     },
   },
   Cooks: { fields: COOK_FIELDS, key: ['id'], kinds: { rating: 'num' } },

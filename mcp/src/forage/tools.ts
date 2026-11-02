@@ -61,6 +61,41 @@ const READ_REASONS: Record<string, string> = {
 
 const MISSING: Record<string, string> = { no_nutrition: 'has no nutrition', no_weight: 'has no weight' }
 
+/**
+ * #755's seven, in order: the name a food log entry, a recipe's per serving and a day's totals give it, its Foods
+ * column per 100 g, the key forage_add_food takes, its label and unit.
+ */
+const EXTRA_NUTRIENTS = [
+  { key: 'satfat_g', per100: 'satfat_100g', input: 'satfat', label: 'Sat fat', unit: 'g' },
+  { key: 'transfat_g', per100: 'transfat_100g', input: 'transfat', label: 'Trans fat', unit: 'g' },
+  { key: 'cholesterol_mg', per100: 'cholesterol_mg_100g', input: 'cholesterol_mg', label: 'Cholesterol', unit: 'mg' },
+  { key: 'sodium_mg', per100: 'sodium_mg_100g', input: 'sodium_mg', label: 'Sodium', unit: 'mg' },
+  { key: 'fiber_g', per100: 'fiber_100g', input: 'fiber', label: 'Fiber', unit: 'g' },
+  { key: 'sugars_g', per100: 'sugars_100g', input: 'sugars', label: 'Sugars', unit: 'g' },
+  { key: 'added_sugars_g', per100: 'added_sugars_100g', input: 'added_sugars', label: 'Added sugars', unit: 'g' },
+] as const
+
+/**
+ * The second nutrition line (#755): only the values that are known, `Sat fat 3 g · Sodium 640 mg · Fiber 8 g`, or ''
+ * when none is. `per100` reads a food's per-100 g columns; otherwise the snapshot and totals names. mg are whole,
+ * g to 0.1.
+ */
+function extrasText(values: any, per100 = false): string {
+  const known = EXTRA_NUTRIENTS.filter((n) => typeof values?.[per100 ? n.per100 : n.key] === 'number')
+  return known
+    .map((n) => {
+      const v = values[per100 ? n.per100 : n.key] as number
+      return `${n.label} ${n.unit === 'mg' ? Math.round(v) : Math.round(v * 10) / 10} ${n.unit}`
+    })
+    .join(' · ')
+}
+
+/** `\n` and the second line, or '' when there is none. */
+const extrasSuffix = (values: any, per100 = false) => {
+  const extras = extrasText(values, per100)
+  return extras ? `\n${extras}` : ''
+}
+
 /** A refused import, preview or save: the API's fixed text, or the design note's for a read or a duplicate. */
 function importRefusal(result: ApiResult): ToolResult {
   const reason = READ_REASONS[result.code ?? '']
@@ -90,7 +125,7 @@ function nutritionLine(nutrition: any): string {
   if (typeof kcal !== 'number') return 'Nutrition unknown: no line is matched to a food with nutrition and a weight.'
   const missing = missingNutrition(nutrition)
   const note = missing.length ? ` (partial: ${missing.join(', ')})` : nutrition.partial ? ' (partial)' : ''
-  return `About ${Math.round(kcal)} kcal per serving${note}.`
+  return `About ${Math.round(kcal)} kcal per serving${note}.${extrasSuffix(nutrition.per_serving)}`
 }
 
 /** `L1  1.5 lb beef chuck → Beef chuck (matched)`. */
@@ -225,8 +260,24 @@ function inTransit(err: unknown, what: string): never {
 const MAX_FOODS = 20
 
 const NUTRIENT_INPUT = z
-  .object({ kcal: z.number(), protein: z.number(), carbs: z.number(), fat: z.number() })
-  .describe('kcal and grams of protein, carbs and fat')
+  .object({
+    kcal: z.number(),
+    protein: z.number(),
+    carbs: z.number(),
+    fat: z.number(),
+    // #755: each optional and independent; leave out what the label doesn't give.
+    satfat: z.number().optional().describe('Saturated fat, g'),
+    transfat: z.number().optional().describe('Trans fat, g'),
+    cholesterol_mg: z.number().optional().describe('Cholesterol, mg'),
+    sodium_mg: z.number().optional().describe('Sodium, mg'),
+    fiber: z.number().optional().describe('Dietary fiber, g'),
+    sugars: z.number().optional().describe('Total sugars, g'),
+    added_sugars: z.number().optional().describe('Added sugars, g'),
+  })
+  .describe(
+    'kcal and grams of protein, carbs and fat; optionally saturated and trans fat, cholesterol (mg), sodium (mg), ' +
+      'fiber, sugars and added sugars',
+  )
 
 /** The fields of the app's food form, as an agent sends them. */
 const FOOD_FIELDS = {
@@ -262,7 +313,7 @@ const FOOD_FIELDS = {
 
 const FOOD_INPUT = z.object(FOOD_FIELDS)
 
-type Nutrients = { kcal: number; protein: number; carbs: number; fat: number }
+type Nutrients = { kcal: number; protein: number; carbs: number; fat: number } & Partial<Record<string, number>>
 
 const round2 = (n: number) => Math.round(n * 100) / 100
 
@@ -287,7 +338,7 @@ function foodRow(f: any, partial = false): { row?: Record<string, unknown>; erro
     ? f.per_100g
     : f.per_serving
       ? (Object.fromEntries(
-          Object.entries(f.per_serving as Nutrients).map(([k, v]) => [k, round2((v * 100) / f.serving.g)]),
+          Object.entries(f.per_serving as Record<string, number>).map(([k, v]) => [k, round2((v * 100) / f.serving.g)]),
         ) as Nutrients)
       : undefined
   if (per) {
@@ -295,6 +346,8 @@ function foodRow(f: any, partial = false): { row?: Record<string, unknown>; erro
     row.protein_100g = per.protein
     row.carbs_100g = per.carbs
     row.fat_100g = per.fat
+    // #755: only the ones sent; the API checks them against the four.
+    for (const n of EXTRA_NUTRIENTS) if (typeof per[n.input] === 'number') row[n.per100] = per[n.input]
   }
   if (!partial) {
     const weights = [...(f.serving ? [f.serving] : []), ...((f.weights ?? []) as any[])]
@@ -327,6 +380,7 @@ function compactFood(f: any) {
     protein_100g: f.protein_100g,
     carbs_100g: f.carbs_100g,
     fat_100g: f.fat_100g,
+    ...Object.fromEntries(EXTRA_NUTRIENTS.map((n) => [n.per100, f[n.per100] ?? null])),
     has_nutrition: typeof f.kcal_100g === 'number',
     verified: f.verified === true,
     source: f.source,
@@ -767,9 +821,16 @@ function dayLine(date: string, day: any, entries: any[], today: string): string 
 function logDayText(date: string, day: any, entries: any[], names: LogNames, today: string): string[] {
   const out = [dayLine(date, day, entries, today)]
   if (!day) return out
+  // #755: a second line with the day's and each entry's known values beyond the four.
+  const dayExtras = extrasText(day)
+  if (dayExtras) out.push(dayExtras)
   for (const slot of SLOTS) {
     const mine = entries.filter((e) => e.slot === slot)
-    out.push(slot, ...(mine.length ? mine.map((e) => `  ${e.id}  ${entryText(e, names)}`) : ['  (nothing)']))
+    const lines = mine.flatMap((e) => {
+      const extras = extrasText(e)
+      return [`  ${e.id}  ${entryText(e, names)}`, ...(extras ? [`      ${extras}`] : [])]
+    })
+    out.push(slot, ...(lines.length ? lines : ['  (nothing)']))
   }
   return out
 }
@@ -1124,7 +1185,7 @@ export function registerForageTools(server: McpServer, cfg: ForageConfig, mode: 
           return text(
             [
               'Preview — nothing saved. Found on Open Food Facts: shared data, so check it against the label.',
-              `${foodName(food)}: ${per100(food)}`,
+              `${foodName(food)}: ${per100(food)}${extrasSuffix(food, true)}`,
               ...(d.reason === 'no_nutrition' ? ['Open Food Facts has no nutrition for this one.'] : []),
               ...(d.warnings as string[]).map((w) => OFF_WARNINGS[w] ?? w),
               JSON.stringify(food, null, 2),
@@ -1162,7 +1223,7 @@ export function registerForageTools(server: McpServer, cfg: ForageConfig, mode: 
           return text(
             [
               'Preview — nothing saved.',
-              `${s.name} (USDA ${s.fdc}): ${per100(s)}. Weights: ${weights}.`,
+              `${s.name} (USDA ${s.fdc}): ${per100(s)}. Weights: ${weights}.${extrasSuffix(s, true)}`,
               state,
               '',
               'Call again with dry_run: false to save it.',
@@ -1199,7 +1260,7 @@ export function registerForageTools(server: McpServer, cfg: ForageConfig, mode: 
         return text(
           [
             'Preview — nothing saved.',
-            ...rows.map((r) => `${foodName(r)}: ${per100(r)}\n${JSON.stringify(r)}`),
+            ...rows.map((r) => `${foodName(r)}: ${per100(r)}${extrasSuffix(r, true)}\n${JSON.stringify(r)}`),
             '',
             `Call again with dry_run: false to save ${rows.length === 1 ? 'it' : `all ${rows.length}`}.`,
           ].join('\n'),
@@ -1240,7 +1301,7 @@ export function registerForageTools(server: McpServer, cfg: ForageConfig, mode: 
       return text(
         [
           done.length === 1
-            ? `Saved ${foodName(done[0])} (${done[0].id}): ${per100(done[0])}.`
+            ? `Saved ${foodName(done[0])} (${done[0].id}): ${per100(done[0])}.${extrasSuffix(done[0], true)}`
             : `Saved ${done.length} foods: ${done.map((f) => `${foodName(f)} (${f.id})`).join(', ')}.`,
           `Undo with forage_undo, call ${currentCallId()}`,
         ].join('\n'),
@@ -1292,7 +1353,7 @@ export function registerForageTools(server: McpServer, cfg: ForageConfig, mode: 
       }
       const changed = [...Object.keys(row!), ...(named.length ? ['weights'] : [])]
       return text(
-        `Updated ${foodName(stored)} (${stored.id}): ${changed.join(', ')}. Now ${per100(stored)}.\n` +
+        `Updated ${foodName(stored)} (${stored.id}): ${changed.join(', ')}. Now ${per100(stored)}.${extrasSuffix(stored, true)}\n` +
           `Undo with forage_undo, call ${currentCallId()}`,
       )
     }),
@@ -1383,6 +1444,7 @@ export function registerForageTools(server: McpServer, cfg: ForageConfig, mode: 
         has_walkthrough: !!r.has_walkthrough,
         nutrition: {
           per_serving: r.nutrition?.per_serving,
+          per_serving_unknown: r.nutrition?.per_serving_unknown ?? null,
           missing: r.nutrition?.missing ?? [],
           partial: !!r.nutrition?.partial,
         },

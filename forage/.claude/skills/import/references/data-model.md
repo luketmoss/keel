@@ -10,6 +10,11 @@ a write that breaks one; knowing them avoids the refusal.
 - Nutrition is **per 100 g**: kcal, protein, carbs, fat. The four are **all set
   or all blank**. All blank means "no nutrition yet". A label's per-serving
   numbers are converted using the serving's grams.
+- A packaged food's **first weight is the label serving**, named with its
+  quantity when that isn't 1 (`0.75 cup`, 56 g), and then, when the quantity
+  isn't 1, **one unit** (`cup`, 74.7 g). A barcode import returns both; keep
+  both as the dry run shows them, because recipe lines in cups find the second
+  and the food form's per-serving numbers use the first.
 - **Blank means unknown, never 0.** Nothing defaults a nutrition value or a
   weight to 0, and neither do you.
 - Seven more values, each per 100 g and each blank or a number of 0 or more,

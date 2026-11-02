@@ -188,7 +188,10 @@ Started by a barcode, a label photo, or "add <food>".
 3. **Packaged, with a barcode.** Read the digits printed under the bars from the
    photo, never decode the bars. If they cannot be read: `I can't read the
    number under the barcode. What are the digits?` and use what the user types.
-   Then `forage_add_food` with `barcode`, as a dry run.
+   Then `forage_add_food` with `barcode`, as a dry run. Read the dry run's
+   weights as they are: the label serving first (`0.75 cup` at 56 g) and,
+   when the label's quantity isn't 1, one unit (`cup` at 74.7 g). Do not
+   "fix" the two entries into one.
    - **With a label photo too.** Compare Open Food Facts with the label, both
      per 100 g, on the four core values. They agree when **each** is within 5%
      or 1 unit (kcal or g), whichever is larger; that absorbs a label's
@@ -213,6 +216,10 @@ Started by a barcode, a label photo, or "add <food>".
    `per_100g`), `source` label. A panel with no gram weight for its serving is
    asked about, never assumed from volume: `The label says "1 cup (240 mL)" -
    how many grams is that?`
+   When the label's quantity isn't 1 (`0.75 cup (56 g)`), give the food the
+   same two entries a barcode import returns: `serving` named as the label
+   writes it (`0.75 cup`, 56 g), and in `weights` one unit (`cup`, 74.7 g, the
+   label's grams over its quantity). A quantity of 1 needs only `serving`.
 
 Wherever a label is the source, also take saturated fat, trans fat,
 cholesterol, sodium, fiber, sugars and added sugars (`satfat`, `transfat`,

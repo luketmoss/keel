@@ -136,15 +136,81 @@ function foodFromProduct(p, code) {
     food[x.per100] = complete && v !== null && v >= 0 ? Math.round(v * source.times * 100) / 100 : null;
   });
   var grams = num(p.serving_quantity);
-  if (grams !== null && grams > 0) food.servings_json = [{ name: servingName(p.serving_size), g: Math.round(grams * 10) / 10 }];
+  if (grams !== null && grams > 0) food.servings_json = labelServings(p.serving_size, grams);
   return food;
 }
 
-/** The label serving's name: `1 bar (40 g)` is `bar`, `2 cookies (30g)` is `cookies`; else `serving`. */
-function servingName(text) {
-  var s = cell(text).replace(/\([^)]*\)/g, ' ').replace(/[\d.,/½¼¾⅓⅔]+/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
-  s = s.replace(/^(g|gr|grams?|ml|oz)\b\s*/, '').trim();
-  return s && s.length <= 30 ? s : 'serving';
+/** The vulgar fractions a label may print, as numbers. */
+var LABEL_FRACTIONS = { '½': 0.5, '¼': 0.25, '¾': 0.75, '⅓': 1 / 3, '⅔': 2 / 3, '⅛': 0.125 };
+
+/**
+ * #775: the servings an Open Food Facts label serving gives, `grams` being its
+ * `serving_quantity`. The first is always the label serving with the label's
+ * own weight, which the food form shows as the Default and "Per serving":
+ *
+ * - `1 bar (40 g)` is `[{bar, 40}]`: a quantity of exactly 1 names the unit;
+ * - `0.75 cup (56 g)` is `[{0.75 cup, 56}, {cup, 74.7}]` and `2 cookies
+ *   (30 g)` is `[{2 cookies, 30}, {cookie, 15}]`: any other quantity keeps its
+ *   text in the first name and adds the weight of one unit, which is what a
+ *   recipe line in cups finds;
+ * - a mass or ml unit, no unit, or a quantity that cannot be read cleanly
+ *   (`2-3 cookies`, `about 3 pieces`) gives no second entry; the first is named
+ *   `serving` for a mass, ml or no unit, and as written for an unreadable one.
+ *
+ * A name over 30 characters is `serving`.
+ */
+function labelServings(text, grams) {
+  var g = Math.round(grams * 10) / 10;
+  var outside = cell(text).replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+  var fit = function (name) { return name && name.length <= 30 ? name : 'serving'; };
+  var parsed = parseLabelQuantity(outside);
+  if (!parsed) return [{ name: fit(outside), g: g }];
+
+  var unit = parsed.unit;
+  var lead = leadingUnit(unit);
+  if (unit === '' || has(MASS_G, lead) || lead === 'ml') return [{ name: 'serving', g: g }];
+  if (parsed.qty === 1) return [{ name: fit(unit), g: g }];
+
+  var one = singularFirstWord(unit);
+  var servings = [{ name: fit(outside), g: g }];
+  if (one.length <= 30) servings.push({ name: one, g: Math.round(grams / parsed.qty * 10) / 10 });
+  return servings;
+}
+
+/**
+ * `{qty, unit}` for a label's text outside its parentheses (trimmed, lower
+ * case): an integer, a decimal, a fraction, a mixed number or a vulgar
+ * fraction, then a unit that holds no digit. Null when the quantity is not
+ * over 0 or the text is not read cleanly.
+ */
+function parseLabelQuantity(text) {
+  var m = /^(\d+\s+\d+\/\d+|\d+\s*[½¼¾⅓⅔⅛]|\d+\/\d+|[½¼¾⅓⅔⅛]|\d*[.,]?\d+)\s*(.*)$/.exec(text);
+  if (!m) return null;
+  var unit = m[2];
+  if (/[\d\/]/.test(unit) || /^[^a-z]/.test(unit) || /\b(or|to|and)\b/.test(unit)) return null;
+  var q = m[1];
+  var qty;
+  var v = /[½¼¾⅓⅔⅛]$/.exec(q);
+  var f;
+  if (v) {
+    qty = LABEL_FRACTIONS[v[0]] + (q.length > 1 ? Number(q.slice(0, -1)) : 0);
+  } else if ((f = /^(?:(\d+)\s+)?(\d+)\/(\d+)$/.exec(q))) {
+    qty = Number(f[1] || 0) + Number(f[2]) / Number(f[3]);
+  } else {
+    qty = Number(q.replace(',', '.'));
+  }
+  if (!isFinite(qty) || !(qty > 0)) return null;
+  return { qty: qty, unit: unit };
+}
+
+/** The unit text with its first word singular: `cups` is `cup`, `cookies` is `cookie`, `fl oz` stays. */
+function singularFirstWord(unit) {
+  var fl = /^(fl\.? oz\.?|fluid ounces?)(?=$|\s)/.exec(unit);
+  if (fl) return ('fl oz' + unit.slice(fl[0].length)).trim();
+  var words = unit.split(' ');
+  var canon = canonicalUnit(words[0]);
+  words[0] = canon !== words[0] ? canon : words[0].length > 1 && /s$/.test(words[0]) && !/ss$/.test(words[0]) ? words[0].slice(0, -1) : words[0];
+  return words.join(' ');
 }
 
 /**

@@ -98,7 +98,11 @@ What the columns mean:
 
 - **Foods.** `kind` is `ingredient` or `packaged`. The four nutrition columns
   are per 100 g, all set or all blank; all blank is "no nutrition yet". A
-  packaged food's label serving is stored per 100 g. `servings_json` is
+  packaged food's label serving is stored per 100 g. A barcode food's first
+  serving is the label serving with its quantity in the name and the label's
+  own grams (`0.75 cup`, 56 g), and when that quantity isn't 1 a second entry
+  is one unit (`cup`, 74.7 g); a quantity of 1, or a mass or ml serving, has
+  one entry (#775, `labelServings` in `barcode.js`). `servings_json` is
   `[{"name":"cup","g":125},{"name":"clove","g":3}]`, named servings in grams,
   in order. `buy_unit` / `buy_unit_plural` / `buy_unit_g` is the shopping unit
   (`can (6 oz)` / `cans (6 oz)` / `170`). `usual_store` is `ks`, `costco`,

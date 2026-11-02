@@ -41,10 +41,10 @@ POLL = 15          # seconds between queries while a run is in progress
 REQUERY_WAIT = 10  # seconds before looking again for a run not yet listed
 DEFAULT_TIMEOUT = 900
 
-# CONVENTIONS.md §Human-reviewed paths. check.py confirms the first is still
-# named there. The token pattern follows the prose - a file under ui/ whose
-# name begins `tokens` - until #386 settles a real filename and amends it.
-HUMAN_REVIEWED = ["mcp/**", "ui/**/tokens*"]
+# CONVENTIONS.md §Human-reviewed paths. check.py confirms mcp/** is no longer
+# named there (#745). The token pattern follows the prose - a file under ui/
+# whose name begins `tokens` - until #386 settles a real filename and amends it.
+HUMAN_REVIEWED = ["ui/**/tokens*"]
 
 # Statuses that mean a run has not finished and will still change.
 UNFINISHED = ("queued", "in_progress", "waiting", "pending", "requested")

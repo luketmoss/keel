@@ -68,4 +68,7 @@ that registers a tool, in the same PR:
    they can change, so `forage_undo` can revert them.
 4. Adds a row to the table above.
 
-The PR changes `mcp/**`, so it is human-reviewed.
+The PR changes `mcp/`, and merges unattended (#745). `/review` blocks it if it
+puts a write tool in `FORAGE_READ_TOOLS`, or drops a destructive one from
+`mcp/CLAUDE.md` §Approving the destructive tools, unless an acceptance criterion
+asks for exactly that.

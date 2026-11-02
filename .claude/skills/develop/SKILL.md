@@ -74,6 +74,10 @@ standard is unchanged, because "it compiles" was never the bar.
 Where the stack can't be run locally, say exactly what you could and couldn't
 verify.
 
+**Never run `clasp`.** An Apps Script change is tested locally and deployed by
+`/ship`, just before its merge (`stack-apps-script` §Deploying). A push from
+here changes what the live triggers run before anyone has reviewed it.
+
 If the issue turns out to be underspecified in a way that matters, stop, leave
 the branch in place, and say what's missing. Do not invent the answer and bury
 it.

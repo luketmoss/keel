@@ -264,6 +264,20 @@ that looks ready.
 **Exit:** review found nothing blocking and CI is green. Findings send the issue
 back to In Development, not forward with a caveat.
 
+**The MCP safety model.** A PR under `mcp/` merges unattended like any other
+(#745), so `/review` is what stops an agent-authored change from quietly
+weakening it. Each of these is a blocking finding unless the issue's acceptance
+criteria ask for exactly that change:
+
+- moving a tool onto a read connector or into a read-tool list
+  (`FORAGE_READ_TOOLS` and its Thrive and Hive equivalents), or making a write
+  tool reachable from a read endpoint
+- removing a tool from `mcp/CLAUDE.md` §Approving the destructive tools while it
+  can still destroy data, removing its `destructiveHint`, or removing a
+  dry-run-until-`confirm: true` step
+- changing how a request is authenticated, or no longer scrubbing the key or
+  URL from errors
+
 ### 8. Ready to Ship
 
 Reviewed clean, CI green, PR out of draft, main untouched. Everything is done
@@ -277,16 +291,23 @@ The only irreversible action in the system. `/finish` runs it; running it by
 hand is for an issue that parked here and has since been fixed.
 **Exit:** merged.
 
+**`/ship` deploys Apps Script, before the merge.** When the PR changes a file
+under `<project>/apps-script/src/`, `/ship` pushes it and redeploys the live
+web-app deployment immediately before merging, so the API is live before the
+merge deploys the callers that use it. It is the only skill that ever runs
+`clasp`. It deploys only what a push and a new version can carry; anything
+more — a new scope, a trigger, a script property, a migration — or a session
+with no clasp login parks the issue here with the owner's steps. The steps and
+their reports are in `/ship`.
+
 #### Human-reviewed paths
 
 The delivery run merges without a person when the build is green and `/review`
-finds nothing blocking. Two places have a blast radius too large for that: an
-agent-authored change that weakens the MCP safety model, or a token change that
-breaks every app's contrast, should not land unattended.
+finds nothing blocking. Some places have a blast radius too large for that: a
+token change that breaks every app's contrast should not land unattended.
 
 A PR that changes any of these paths is **human-reviewed**:
 
-- `mcp/**`
 - the shared token stylesheet under `ui/` — any file there whose name begins
   `tokens`. A project's own token file (cairn's, Thrive's) is not shared and is
   not on this list. #386 creates the shared one; when it settles the real
@@ -304,6 +325,10 @@ merges only on a yes in chat. The wording is in
 
 This is a rule for the skills. CODEOWNERS, branch protection and required
 reviews are not used, and a person merging by hand is not stopped.
+
+`mcp/` is not on the list (#745). What it guarded against, an agent-authored
+change that weakens the MCP safety model, is a blocking finding in `/review`
+instead — see §7. Code Review.
 
 ### 9. Done
 

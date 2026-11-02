@@ -58,13 +58,19 @@ progress lines and report is in
    as a gate requires.
 3. **Keep only the reports.** The orchestrator reads no code, diffs or test
    output. Print a progress line as each issue ends, and start the next only
-   after the previous one is Done.
+   after the previous one is Done. An issue `/ship` parked because it could
+   not deploy an Apps Script change reads, with the first reason line from
+   `/ship` §Deploy Apps Script, without its full stop:
+
+   ```
+   #712 Parked in Ready to Ship — can't deploy Forage's Apps Script: no clasp login (sonnet)
+   ```
 4. **Halting.** An issue that does not reach Done stops the batch, and the rest
    stay in Refined. The one exception is a halt on a failing criterion whose
    fix wasn't clear: re-run that issue once on Opus, per §Models, and stop the
    batch only if that fails too. Gate halts — human-gated Testing,
-   human-reviewed paths, `/ship` refusals, an underspecified issue — are never
-   retried. A subagent that returns no usable report is a halt with the reason
+   human-reviewed paths, `/ship` refusals and deploy parks, an underspecified
+   issue — are never retried. A subagent that returns no usable report is a halt with the reason
    `subagent ended without a report`, never retried; read the issue's stage
    with `python .keel/board.py show <n>` for its row.
 5. **Close epics.** When every sub-issue of an epic named in the request is
@@ -94,6 +100,12 @@ The run stops early if:
 - the PR changes a human-reviewed path (`CONVENTIONS.md` §Human-reviewed
   paths). `/review` ends clean and `/ship` declines to merge; the issue stays
   in Ready to Ship
+- `/ship` can't deploy an Apps Script change — no clasp login (a cloud session
+  never has one), no recorded script or deployment ID, or a change that needs
+  more than a push and a new version. Nothing deploys or merges; the issue
+  stays in Ready to Ship and the report lists the owner's steps. A deploy that
+  failed part way, or a merge that failed after one, parks the same way with
+  `/ship`'s report of what is live
 - `/ship` refuses — a draft PR, checks failing or absent, a conflict. The issue
   **stays in Ready to Ship**, which is what that column now means: not a queue
   of things to rubber-stamp, but the ones that could not finish on their own
@@ -110,7 +122,15 @@ When the run merges:
 - anything `/review` noted that didn't block
 - any judgment call that could reasonably have gone the other way
 
+When it merged after deploying, add `/ship`'s deploy section — the Apps Script
+version and rollback command, and the `MCP Worker:` line — after the commit.
+
 When it stopped instead, say where and why, and that nothing merged.
+
+When `/ship` parked on a deploy, the report opens with `/ship`'s park report
+(`Parked in Ready to Ship — not merged, nothing deployed.` and its reasons and
+the owner's steps, or the failed-deploy or failed-merge form), then everything
+else the run would normally report.
 
 When it parked on a human-reviewed path, the report opens:
 

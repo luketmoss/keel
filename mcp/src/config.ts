@@ -11,3 +11,6 @@ export const THRIVE_RESOURCE = `${PUBLIC_URL}/thrive/mcp`
 /** #409: the write tools of each app, on their own resource, so a token for one never reaches the other. */
 export const HIVE_WRITE_RESOURCE = `${PUBLIC_URL}/hive/write/mcp`
 export const THRIVE_WRITE_RESOURCE = `${PUBLIC_URL}/thrive/write/mcp`
+/** #713: Forage's read and write tools, the third app, on resources of their own. */
+export const FORAGE_RESOURCE = `${PUBLIC_URL}/forage/mcp`
+export const FORAGE_WRITE_RESOURCE = `${PUBLIC_URL}/forage/write/mcp`

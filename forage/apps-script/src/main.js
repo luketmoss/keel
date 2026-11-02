@@ -20,6 +20,12 @@
 //   action=logFood&access_token=...&payload={"date":"2026-11-01","slot":"Dinner","recipe_id":"rc_1","qty":1}
 //   action=getFoodLogTotals&key=...&from=2026-11-01&to=2026-11-07
 //   action=ensureSchema&key=...              — key-only: the 703 migration
+//   action=getChangeLog&key=...&call_id=...&since=2026-11-01T00:00:00Z&limit=50   — key-only (#713)
+//   action=undoCall&key=...&payload={"call_id":"abc123"}               — key-only; dry run unless confirm: true
+//
+// A key caller's write may carry `call_id` (1-64 of [A-Za-z0-9_-]) in its
+// payload: every row it changes is logged in MCPChangeLog under that id, or
+// under a new one when it sends none (#713).
 
 /** Every response uses this shape, success, refusal and thrown error alike. */
 function envelope(result) {
@@ -78,7 +84,11 @@ function handleRequest(e) {
     if (caller.mode === 'token' && !isTokenAction(action)) {
       return envelope(fail('This action is not permitted with an access token', 'not_permitted'));
     }
-    result = { success: true, data: dispatch(action, params, caller) };
+    // #713: a key caller's write is logged row by row, under the script lock.
+    var data = isChangeLogged(caller, action, params.payload)
+      ? withChangeLog(action, params, function () { return dispatch(action, params, caller); })
+      : dispatch(action, params, caller);
+    result = { success: true, data: data };
   } catch (err) {
     result = fail((err && err.message) || String(err), err && err.code, err && err.extra);
   }
@@ -134,6 +144,10 @@ function dispatch(action, params, caller) {
     case 'getConfig': return getConfig();
     case 'setConfig': return write(setConfig);
     case 'ensureSchema': return ensureSchema();
+    // MCP change log and undo (#713): key-only. undoCall takes its own lock and logs itself.
+    case 'getChangeLog':
+      return getChangeLog({ call_id: params.call_id, since: params.since, limit: params.limit });
+    case 'undoCall': return undoCall(parsePayload(params.payload));
     default:
       throw new Error('Unknown action "' + cell(action) + '"');
   }

@@ -29,9 +29,10 @@ export class WriteBudget extends DurableObject<Env> {
 
 /**
  * The budget and ceilings for one app on this request. One counter per app, so
- * exhausting Thrive's leaves Hive writing, and the reverse.
+ * exhausting Thrive's leaves Hive and Forage writing, and the reverse. The
+ * limits themselves are shared vars; only the count is per app.
  */
-export function budgetFor(env: Env, app: 'thrive' | 'hive') {
+export function budgetFor(env: Env, app: 'thrive' | 'hive' | 'forage') {
   const stub = env.WRITE_BUDGET.get(env.WRITE_BUDGET.idFromName(app))
   const limits = parseLimits(env)
   return { limits, budget: { reserve: (rows: number) => stub.reserve(rows, Date.now(), limits) } }

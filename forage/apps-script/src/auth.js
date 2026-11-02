@@ -3,7 +3,8 @@
 // Two kinds of caller:
 //
 // - A **key caller** sends `key` = the `API_KEY` script property: the MCP
-//   Worker, which holds it as `FORAGE_API_KEY`. It may run every action.
+//   Worker, which holds it as `FORAGE_API_KEY`. It may run every action, and
+//   its writes are logged for undo (change-log.js, #713).
 // - A **token caller** sends `access_token`, a Google access token from the
 //   app's own sign-in. The app is a browser app on GitHub Pages, so it cannot
 //   hold the key. The token must be issued to `TOKEN_CLIENT_ID` (=
@@ -19,7 +20,8 @@
 // nothing here logs, and every message below is fixed text.
 
 /**
- * What a token caller may run: every action but Config's and ensureSchema. An
+ * What a token caller may run: every action but Config's, ensureSchema and the
+ * change log's (getChangeLog, undoCall). An
  * allow-list, never a deny-list: an action added to main.js later is refused
  * to token callers until someone names it here. `auth.test.ts` fails when a
  * `case` in main.js is on neither this list nor the test's key-only list.

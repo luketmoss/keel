@@ -2,12 +2,14 @@
 /**
  * migrate-703-create-tabs.mjs - One-time Sheet migration for issue #703.
  *
- * Creates Forage's 11 tabs in a new Sheet by calling the deployed API's
+ * Creates Forage's tabs in a new Sheet by calling the deployed API's
  * key-only `ensureSchema` action: each missing tab gets its header row from
- * `apps-script/src/types.js`, frozen, and Config gets `schema_version` = 1.
+ * `apps-script/src/types.js`, frozen, and Config gets `schema_version`.
  *
  * Additive only: a tab that already exists is never touched, so a second run
- * changes nothing and says so.
+ * changes nothing and says so. Run it again after a release that adds a tab:
+ * #713's MCPChangeLog (the 12th) is created on a Sheet at version 1, which
+ * becomes 2, and no other tab changes.
  *
  * Usage (PowerShell; the values are prompted for, never typed into the command):
  *   $env:FORAGE_API_URL = Read-Host 'FORAGE_API_URL'

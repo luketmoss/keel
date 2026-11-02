@@ -16,7 +16,11 @@ export interface Env {
   THRIVE_API_URL: string
   /** Thrive's MCP-only API key (`MCP_API_KEY` in Thrive's script properties). */
   THRIVE_API_KEY: string
-  /** The hourly write counters (#410): one Durable Object per app, named `thrive` and `hive`. */
+  /** Forage's Apps Script `/exec` URL (#713). A secret only because the URL plus a key is full access. */
+  FORAGE_API_URL: string
+  /** Forage's API key (the `API_KEY` script property in Forage's Apps Script, #703). */
+  FORAGE_API_KEY: string
+  /** The hourly write counters (#410): one Durable Object per app, named `thrive`, `hive` and `forage`. */
   WRITE_BUDGET: DurableObjectNamespace<import('./budget-do').WriteBudget>
   /** Write ceilings (#410), as vars. A missing or malformed value falls back to the default, never to "unlimited". */
   MAX_ROWS_PER_CALL?: string

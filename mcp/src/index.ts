@@ -1,24 +1,22 @@
-import { OAuthAuthorizationServer, OAuthResourceServer } from '@cloudflare/workers-oauth-provider'
+import { OAuthResourceServer } from '@cloudflare/workers-oauth-provider'
 import { handleAuth } from './auth'
-import { HIVE_RESOURCE, HIVE_WRITE_RESOURCE, PUBLIC_URL, THRIVE_RESOURCE, THRIVE_WRITE_RESOURCE } from './config'
+import {
+  FORAGE_RESOURCE,
+  FORAGE_WRITE_RESOURCE,
+  HIVE_RESOURCE,
+  HIVE_WRITE_RESOURCE,
+  PUBLIC_URL,
+  THRIVE_RESOURCE,
+  THRIVE_WRITE_RESOURCE,
+} from './config'
 import type { Env, Props } from './env'
+import { handleForage } from './forage'
 import { handleHive } from './hive'
+import { authorizationServer } from './oauth'
 import { handleThrive } from './thrive'
 
 // The hourly write counter (#410). Cloudflare finds a Durable Object class on the entry module.
 export { WriteBudget } from './budget-do'
-
-/**
- * The Worker is its own OAuth authorization server, and each MCP endpoint is a
- * separate protected resource. Separate audiences are the point: a token issued
- * for /hive/mcp is refused at any other endpoint.
- */
-const authorizationServer = new OAuthAuthorizationServer<Env>({
-  issuer: PUBLIC_URL,
-  resources: [HIVE_RESOURCE, THRIVE_RESOURCE, HIVE_WRITE_RESOURCE, THRIVE_WRITE_RESOURCE],
-  clientRegistrationEndpoint: '/oauth/register',
-  clientIdMetadataDocumentEnabled: true,
-})
 
 const validateToken = (env: Env) => (resource: string, token: string) =>
   authorizationServer.validateToken<Props>(resource, token, env)
@@ -52,6 +50,12 @@ const resources = [
   {
     path: new URL(THRIVE_WRITE_RESOURCE).pathname,
     server: mcpResource(THRIVE_WRITE_RESOURCE, (request, env) => handleThrive(request, env, 'write')),
+  },
+  // #713: Forage, read and write.
+  { path: new URL(FORAGE_RESOURCE).pathname, server: mcpResource(FORAGE_RESOURCE, handleForage) },
+  {
+    path: new URL(FORAGE_WRITE_RESOURCE).pathname,
+    server: mcpResource(FORAGE_WRITE_RESOURCE, (request, env) => handleForage(request, env, 'write')),
   },
 ]
 

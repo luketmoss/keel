@@ -109,13 +109,15 @@ each deploys immediately before its own merge, never all first.
 
 ### 1. Check it can deploy
 
-Every one of these, or park (below) without running anything that changes the
-live script:
+Every one of these, or park (below). Check them all without running `clasp`
+first, and park on any failure without running it at all; only when every one
+passes does `clasp show-authorized-user` confirm the account:
 
-- **A clasp login.** `clasp show-authorized-user` names an account — the
-  project's deploying account, where its `CLAUDE.md` names one, since the web
-  app executes as whoever deploys it. A cloud session (`CLAUDE_CODE_REMOTE=true`)
-  never has a login: park without running it.
+- **A clasp login.** `~/.clasprc.json` exists — reading for the file runs
+  nothing. A cloud session (`CLAUDE_CODE_REMOTE=true`) never has one. Once the
+  rest pass, `clasp show-authorized-user` must name the project's deploying
+  account, where its `CLAUDE.md` names one, since the web app executes as
+  whoever deploys it.
 - **The IDs are recorded.** The project's `CLAUDE.md` deploy section records
   the script ID and the live web-app deployment ID.
 - **A push and a new version are enough.** `appsscript.json` adds nothing to

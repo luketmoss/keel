@@ -43,6 +43,7 @@ export const FORAGE_READ_TOOLS: ReadonlySet<string> = new Set([
   'forage_cook_history',
   'forage_list_plan',
   'forage_get_trip',
+  'forage_food_log',
 ])
 
 const NO_UNDO_YET = "Error: Forage's API doesn't have undo yet. Redeploy the Apps Script."
@@ -694,6 +695,102 @@ function walkthroughRefusal(problems: string[]): string {
     ...problems.map((p) => (more && p === more[0] ? p : `- ${p}`)),
     count === 1 ? 'Fix it and call again.' : 'Fix these and call again.',
   ].join('\n')
+}
+
+// ---------------------------------------------------------------- the food log (#712)
+
+// Wording fixed by forage/docs/design/712-food-log.md. Every figure is the API's: entries carry their stored
+// snapshot and the day lines come from getFoodLogTotals, so the tools add nothing up.
+
+/** The most days one forage_food_log reads. */
+const LOG_MAX_DAYS = 31
+
+/** `1,240`: a whole number for display. */
+const kcalNum = (n: number) => Math.round(n).toLocaleString('en-US')
+
+/** `6`, `0.4`: a stored gram figure, to 0.1. */
+const grams1 = (n: number) => String(Math.round(n * 10) / 10)
+
+/** Names for the entries: foods brand then name, recipes by name. */
+type LogNames = { foods: Map<string, string>; recipes: Map<string, string> }
+
+async function logNames(cfg: ForageConfig): Promise<LogNames> {
+  const [foods, recipes] = await Promise.all([apiRead(cfg, 'getFoods'), apiRead(cfg, 'getRecipes')])
+  return {
+    foods: new Map(((foods.success ? foods.data : []) as any[]).map((f) => [f.id, foodName(f) || f.id])),
+    recipes: new Map(((recipes.success ? recipes.data : []) as any[]).map((r) => [r.id, r.name || r.id])),
+  }
+}
+
+const entryName = (e: any, names: LogNames) =>
+  e.food_id ? names.foods.get(e.food_id) || e.food_id : names.recipes.get(e.recipe_id) || e.recipe_id
+
+/** `1 cup (245 g)`, `150 g`, `2 servings`. */
+function amountText(e: any): string {
+  if (e.recipe_id) return `${e.qty} ${e.qty === 1 ? 'serving' : 'servings'}`
+  if (e.unit === 'g') return `${e.qty} g`
+  return typeof e.grams === 'number' ? `${e.qty} ${e.unit} (${grams1(e.grams)} g)` : `${e.qty} ${e.unit}`
+}
+
+/** `150 kcal`, `412 kcal (partial)`, or `no nutrition`. */
+function entryKcal(e: any): string {
+  if (typeof e.kcal !== 'number') return 'no nutrition'
+  return `${kcalNum(e.kcal)} kcal${e.partial ? ' (partial)' : ''}`
+}
+
+/** `Protein 6 g · Carbs 9 g · Fat 0.4 g`, or '' when unknown. */
+function macrosText(m: { protein_g: unknown; carbs_g: unknown; fat_g: unknown }, whole = false): string {
+  const f = (v: unknown) => (typeof v === 'number' ? (whole ? String(Math.round(v)) : grams1(v)) : '—')
+  if ([m.protein_g, m.carbs_g, m.fat_g].every((v) => typeof v !== 'number')) return ''
+  return `Protein ${f(m.protein_g)} g · Carbs ${f(m.carbs_g)} g · Fat ${f(m.fat_g)} g`
+}
+
+/** `Greek yogurt · 1 cup (245 g) · 150 kcal`. */
+const entryText = (e: any, names: LogNames) => `${entryName(e, names)} · ${amountText(e)} · ${entryKcal(e)}`
+
+/** The day line: `Thu 2026-11-05 — 1,240 kcal so far (low: 1 entry has no nutrition). Protein 62 g · …`. */
+function dayLine(date: string, day: any, entries: any[], today: string): string {
+  if (!day) return `${dayText(date)} — nothing logged.`
+  const low: string[] = []
+  if (day.unknown_entries) {
+    low.push(`${plural(day.unknown_entries, 'entry', 'entries')} ${day.unknown_entries === 1 ? 'has' : 'have'} no nutrition`)
+  }
+  const partials = entries.filter((e) => e.partial && typeof e.kcal === 'number').length
+  if (partials) low.push(`${plural(partials, 'entry', 'entries')} ${partials === 1 ? 'is' : 'are'} partial`)
+  const note = day.partial ? ` (low: ${low.join(', ') || 'some entries are partial'})` : ''
+  const kcal = typeof day.kcal === 'number' ? `${kcalNum(day.kcal)} kcal${date === today ? ' so far' : ''}` : 'calories unknown'
+  const macros = macrosText(day, true)
+  return `${dayText(date)} — ${kcal}${note}.${macros ? ` ${macros}.` : ''}`
+}
+
+/** One logged day: the day line, then each meal with its entries or `(nothing)`. */
+function logDayText(date: string, day: any, entries: any[], names: LogNames, today: string): string[] {
+  const out = [dayLine(date, day, entries, today)]
+  if (!day) return out
+  for (const slot of SLOTS) {
+    const mine = entries.filter((e) => e.slot === slot)
+    out.push(slot, ...(mine.length ? mine.map((e) => `  ${e.id}  ${entryText(e, names)}`) : ['  (nothing)']))
+  }
+  return out
+}
+
+/** Find a log entry by id, so an unknown one sends no write. getFoodLog has no id filter: it reads the whole log. */
+async function findLogEntry(cfg: ForageConfig, id: string): Promise<{ entry?: any; error?: string }> {
+  const result = await apiRead(cfg, 'getFoodLog')
+  if (!result.success) return { error: result.error }
+  return { entry: ((result.data ?? []) as any[]).find((e) => e.id === id) }
+}
+
+const noEntry = (id: string) => `Nothing changed. No log entry ${id}.`
+
+/** `Dinner · Thu 2026-11-05 · Greek yogurt · 1 cup (245 g) · 150 kcal`. */
+const placedEntry = (e: any, names: LogNames) => `${e.slot} · ${dayText(e.date)} · ${entryText(e, names)}`
+
+const AMOUNT_INPUT = {
+  qty: z.number().positive().max(99999).describe('The amount: servings of the unit, or grams when unit is g'),
+  unit: z
+    .string()
+    .describe("A food's serving name exactly as forage_get_food lists its weights (cup, bar), or g; a recipe's is serving"),
 }
 
 /**
@@ -2057,6 +2154,193 @@ export function registerForageTools(server: McpServer, cfg: ForageConfig, mode: 
       const cleared = saved.data.meals_cleared
       return text(
         `Threw away trip ${t.id}. ${plural(cleared, 'meal')} ${cleared === 1 ? 'is' : 'are'} planned with no trip.\n` +
+          `Undo with forage_undo, call ${currentCallId()}`,
+      )
+    }),
+  )
+
+  server.registerTool(
+    'forage_food_log',
+    {
+      description:
+        "Read Forage's food log for a day or a range (default today, America/Denver; at most 31 days): each day's " +
+        'calories and macros as Forage totals them, then each meal (Breakfast, Lunch, Dinner, Snacks) with its ' +
+        "entries' ids, foods or recipes, amounts and calories. A total that says low leaves out entries with no " +
+        'nutrition or partial recipes. Check here before retrying a food log write whose answer was lost.',
+      inputSchema: {
+        date: z.string().optional().describe("One day: YYYY-MM-DD, 'today', 'yesterday' or '-3d'. Default today"),
+        from: z.string().optional().describe('The first day of a range, in place of date'),
+        to: z.string().optional().describe('The last day of a range. Default from'),
+      },
+      annotations: READ,
+    },
+    guarded(async (args: { date?: string; from?: string; to?: string }): Promise<ToolResult> => {
+      const today = homeToday()
+      const read = (v: string) => (v.trim().toLowerCase() === 'yesterday' ? plusDays(today, -1) : planDate(v))
+      const first = args.from ?? args.date
+      const from = first ? read(first) : today
+      if (!from) return failed(`Could not read "${first}" as a date — ${DATE_HINT}.`)
+      const to = args.from && args.to ? read(args.to) : from
+      if (!to) return failed(`Could not read to "${args.to}" as a date — ${DATE_HINT}.`)
+      if (to < from) return failed(`to (${to}) is before from (${from}).`)
+      if (to > plusDays(from, LOG_MAX_DAYS - 1)) return failed(`That is more than ${LOG_MAX_DAYS} days. Ask for fewer.`)
+
+      const [log, totals, names] = await Promise.all([
+        apiRead(cfg, 'getFoodLog', { from, to }),
+        apiRead(cfg, 'getFoodLogTotals', { from, to }),
+        logNames(cfg),
+      ])
+      if (!log.success) return failed(`Error: ${log.error}`)
+      if (!totals.success) return failed(`Error: ${totals.error}`)
+      const entries = (log.data ?? []) as any[]
+      const days = new Map(((totals.data?.days ?? []) as any[]).map((d) => [d.date, d]))
+      const out: string[] = []
+      for (let day = from; day <= to; day = plusDays(day, 1)) {
+        out.push(...logDayText(day, days.get(day), entries.filter((e) => e.date === day), names, today))
+      }
+      return text(out.join('\n'))
+    }),
+  )
+
+  server.registerTool(
+    'forage_log_food',
+    {
+      description:
+        "Log a food or a recipe to Forage's food log: send exactly one of food_id and recipe_id, qty and unit (a " +
+        "food's serving name or g; a recipe's is serving), the slot and the date (default today, America/Denver). " +
+        'A dry run by default: it shows the entry and its calories and macros as Forage would store them, and logs ' +
+        'nothing. Call again with dry_run: false to log it. A food with no nutrition is logged and counts as ' +
+        'unknown. Each call logs a new entry: if an answer was lost, check forage_food_log before retrying. Only ' +
+        'log what the user said they ate. On the write connector; undo with forage_undo.',
+      inputSchema: {
+        food_id: z.string().optional().describe('The food (fd_...). Send this or recipe_id'),
+        recipe_id: z.string().optional().describe('The recipe (rc_...), logged in servings'),
+        qty: AMOUNT_INPUT.qty,
+        unit: AMOUNT_INPUT.unit.optional(),
+        slot: z.enum(SLOTS).describe('Breakfast, Lunch, Dinner or Snacks'),
+        date: z.string().optional().describe("YYYY-MM-DD, 'today' or '-1d'. Default today"),
+        dry_run: z.boolean().optional().describe('Default true: preview only. false logs it'),
+      },
+      annotations: WRITE,
+    },
+    guarded(async (args: any): Promise<ToolResult> => {
+      if (!args.food_id === !args.recipe_id) return failed('Send exactly one of food_id and recipe_id. Nothing logged.')
+      if (args.food_id && !args.unit) return failed("Send unit: one of the food's servings, or g. Nothing logged.")
+      const date = args.date === undefined ? homeToday() : planDate(args.date)
+      if (!date) return failed(`Nothing logged. Could not read "${args.date}" as a date — ${DATE_HINT}.`)
+      const entry = { ...sent(args, ['food_id', 'recipe_id', 'qty', 'slot']), unit: args.recipe_id ? 'serving' : args.unit, date }
+
+      if (args.dry_run !== false) {
+        const preview = await apiDry(cfg, 'logFood', { ...entry, dry_run: true })
+        if (!preview.success) return failed(`Nothing logged. ${preview.error}`)
+        const e = preview.data
+        const names = await logNames(cfg)
+        const macros = macrosText(e)
+        const out = ['Preview — nothing logged.', `${e.slot} · ${dayText(e.date)}`, `${entryText(e, names)}${macros ? ` · ${macros}` : ''}`]
+        if (typeof e.kcal !== 'number') {
+          out.push(`No nutrition on this ${e.food_id ? 'food' : 'recipe'}, so it will count as unknown.`)
+        }
+        out.push('', 'Call again with dry_run: false to log it.')
+        return text(out.join('\n'))
+      }
+
+      let saved: ApiResult
+      try {
+        saved = await apiWrite(cfg, 'logFood', entry)
+      } catch (err) {
+        inTransit(err, 'log entry')
+      }
+      if (!saved.success) return failed(`Nothing logged. ${saved.error}`)
+      const e = saved.data
+      const names = await logNames(cfg)
+      const kcal = typeof e.kcal === 'number' ? `${kcalNum(e.kcal)} kcal${e.partial ? ' (partial)' : ''}` : 'no nutrition'
+      return text(
+        `Logged ${entryName(e, names)} to ${e.slot} on ${dayText(e.date)}: ${kcal} (id ${e.id}).\n` +
+          `Undo with forage_undo, call ${currentCallId()}`,
+      )
+    }),
+  )
+
+  server.registerTool(
+    'forage_update_log',
+    {
+      description:
+        "Change a food log entry's amount, unit or meal: send its id and any of qty, unit and slot. Changing the " +
+        'amount or unit recalculates its calories from the food as it is now; changing only the meal keeps them. ' +
+        'A dry run by default: it shows the entry before and after, and changes nothing. Call again with ' +
+        'dry_run: false to save it. On the write connector; undo with forage_undo.',
+      inputSchema: {
+        id: z.string().describe('The log entry (lg_...)'),
+        qty: AMOUNT_INPUT.qty.optional(),
+        unit: AMOUNT_INPUT.unit.optional(),
+        slot: z.enum(SLOTS).optional().describe('Breakfast, Lunch, Dinner or Snacks'),
+        dry_run: z.boolean().optional().describe('Default true: preview only. false saves it'),
+      },
+      annotations: WRITE,
+    },
+    guarded(async (args: any): Promise<ToolResult> => {
+      const changes = sent(args, ['qty', 'unit', 'slot'])
+      if (!Object.keys(changes).length) return failed('Send at least one of qty, unit and slot. Nothing changed.')
+      const found = await findLogEntry(cfg, args.id)
+      if (found.error) return failed(`Nothing changed. ${found.error}`)
+      const was = found.entry
+      if (!was) return failed(noEntry(args.id))
+      const payload = { id: args.id, changes }
+
+      if (args.dry_run !== false) {
+        const preview = await apiDry(cfg, 'updateLogEntry', { ...payload, dry_run: true })
+        if (!preview.success) return failed(`Nothing changed. ${preview.error}`)
+        const names = await logNames(cfg)
+        return text(
+          [
+            'Preview — nothing changed.',
+            `Before: ${placedEntry(was, names)}`,
+            `After:  ${placedEntry(preview.data, names)}`,
+            '',
+            'Call again with dry_run: false to save it.',
+          ].join('\n'),
+        )
+      }
+
+      let saved: ApiResult
+      try {
+        saved = await apiWrite(cfg, 'updateLogEntry', payload)
+      } catch (err) {
+        inTransit(err, 'change')
+      }
+      if (!saved.success) return failed(`Nothing changed. ${saved.error}`)
+      const names = await logNames(cfg)
+      return text(
+        `Updated ${args.id}.\nBefore: ${placedEntry(was, names)}\nAfter:  ${placedEntry(saved.data, names)}\n` +
+          `Undo with forage_undo, call ${currentCallId()}`,
+      )
+    }),
+  )
+
+  server.registerTool(
+    'forage_delete_log',
+    {
+      description:
+        "Delete an entry from Forage's food log; its calories come off that day's total. Only delete what the user " +
+        'asked to delete. On the write connector; undo with forage_undo, which brings it back with its numbers.',
+      inputSchema: { id: z.string().describe('The log entry (lg_...)') },
+      annotations: UNDO,
+    },
+    guarded(async ({ id }: { id: string }): Promise<ToolResult> => {
+      const found = await findLogEntry(cfg, id)
+      if (found.error) return failed(`Nothing changed. ${found.error}`)
+      const was = found.entry
+      if (!was) return failed(noEntry(id))
+      let saved: ApiResult
+      try {
+        saved = await apiWrite(cfg, 'deleteLogEntry', { id })
+      } catch (err) {
+        inTransit(err, 'delete')
+      }
+      if (!saved.success) return failed(`Nothing changed. ${saved.error}`)
+      const names = await logNames(cfg)
+      return text(
+        `Deleted ${id} (${entryName(was, names)}, ${was.slot}, ${dayText(was.date)}).\n` +
           `Undo with forage_undo, call ${currentCallId()}`,
       )
     }),

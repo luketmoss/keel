@@ -58,7 +58,8 @@ describe('the tab bar', () => {
   it.each(TABS.map((t) => [t.id, t.label]))('selecting %s shows its header and marks it current', (id, label) => {
     render(<App />);
     go(`#/${id}`);
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(label);
+    // #712: Eaten's heading is the day it shows, opening on today.
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(id === 'eaten' ? 'Today' : label);
     for (const t of TABS) {
       expect(screen.getByTestId(`tab-${t.id}`).getAttribute('aria-current')).toBe(t.id === id ? 'page' : null);
     }
@@ -106,8 +107,8 @@ describe('the tab bar', () => {
 describe('empty states', () => {
   const COPY: Record<string, [string, string]> = {
     plan: ['Nothing planned yet', 'Meals you plan will show here, by day, with their calories.'],
-    // #718: Shop has its own no-trip card, with Plan a trip (shop.test.tsx).
-    eaten: ['Nothing logged', 'What you eat will show here by day, with its calories and macros.'],
+    // #718: Shop has its own no-trip card, with Plan a trip (shop.test.tsx). #712: Eaten is always the day view,
+    // whose "Nothing logged" card is in eaten.test.tsx.
     library: ['No foods yet', 'Foods you use in recipes and logs will be kept here, with their nutrition.'],
   };
 

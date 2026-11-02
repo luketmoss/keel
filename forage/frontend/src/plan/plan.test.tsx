@@ -586,12 +586,12 @@ describe('demo mode', () => {
     _resetDemoApi();
   });
 
-  it('shows 6 sample meals: one On list, one Shopped, one Partial, one note; planning, moving and removing work in memory', async () => {
+  it('shows 7 sample meals: one On list, one Shopped, one Partial, one note, and #712 dinner tonight; planning, moving and removing work in memory', async () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal('fetch', fetchSpy);
     await open(true);
     const all = screen.getAllByTestId('meal-row');
-    expect(all).toHaveLength(6);
+    expect(all).toHaveLength(7);
     expect(
       screen
         .getAllByTestId('trip-chip')
@@ -599,7 +599,10 @@ describe('demo mode', () => {
         .sort(),
     ).toEqual(['On list', 'On list', 'Shopped']);
     expect(screen.getAllByText('Partial')).toHaveLength(1);
-    expect(rowsIn(days()[0]).map((r) => r.getAttribute('aria-label'))).toEqual(['Leftovers, Lunch']);
+    expect(rowsIn(days()[0]).map((r) => r.getAttribute('aria-label'))).toEqual([
+      'Leftovers, Lunch',
+      expect.stringMatching(/^Weeknight chili, Dinner, \d+ kcal a serving/),
+    ]);
     // #719: the sample trip is open, so the banner names its late meal.
     const late = () => screen.getByTestId('plan-banner').querySelector('p')!.textContent;
     expect(late()).toMatch(
@@ -612,7 +615,7 @@ describe('demo mode', () => {
     fireEvent.click(within(screen.getByTestId('plan-meal-sheet')).getByRole('button', { name: 'Sat 7' }));
     fireEvent.click(screen.getAllByTestId('plan-recipe')[0]);
     await settle();
-    expect(screen.getAllByTestId('meal-row')).toHaveLength(7);
+    expect(screen.getAllByTestId('meal-row')).toHaveLength(8);
     expect(late()).toBe('2 meals were planned after this list was made.');
 
     // Move one to today: no longer late.
@@ -620,7 +623,7 @@ describe('demo mode', () => {
     fireEvent.click(within(screen.getByTestId('meal-sheet')).getByRole('button', { name: 'Today' }));
     fireEvent.click(within(screen.getByTestId('meal-sheet')).getByRole('button', { name: 'Save' }));
     await settle();
-    expect(rowsIn(days()[0])).toHaveLength(2);
+    expect(rowsIn(days()[0])).toHaveLength(3);
     expect(late()).toMatch(/was planned after this list was made\.$/);
 
     // Remove one.
@@ -628,7 +631,7 @@ describe('demo mode', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Remove from plan' }));
     fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
     await settle();
-    expect(screen.getAllByTestId('meal-row')).toHaveLength(6);
+    expect(screen.getAllByTestId('meal-row')).toHaveLength(7);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

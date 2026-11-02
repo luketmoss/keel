@@ -108,14 +108,16 @@ var CHANGE_REFERENCES = {
 /**
  * Whether this caller's action is logged: a key caller, a logged action, and
  * not a dry run. An import and planWeek are dry runs unless `dry_run: false`;
- * startTrip writes unless `dry_run: true` (#718).
+ * startTrip, logFood and updateLogEntry write unless `dry_run: true` (#718, #712).
  */
 function isChangeLogged(caller, action, rawPayload) {
   if (!caller || caller.mode !== 'key') return false;
   if (!Object.prototype.hasOwnProperty.call(CHANGE_LOGGED_ACTIONS, action)) return false;
   var dryRun = payloadField(rawPayload, 'dry_run');
   if (action === 'importRecipe' || action === 'planWeek') return dryRun === false || dryRun === 'false';
-  if (action === 'startTrip') return dryRun !== true && dryRun !== 'true';
+  if (action === 'startTrip' || action === 'logFood' || action === 'updateLogEntry') {
+    return dryRun !== true && dryRun !== 'true';
+  }
   return true;
 }
 

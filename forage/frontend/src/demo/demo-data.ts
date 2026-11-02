@@ -181,6 +181,16 @@ export const DEMO_FOODS: Food[] = [
     barcode: '0012345678905',
   }),
   food('fd_demo_herbs', 'Herbes de Provence', {}),
+  // #712: the sample breakfast's granola.
+  food('fd_demo_granola', 'Granola', {
+    kcal_100g: 471,
+    protein_100g: 10,
+    carbs_100g: 64,
+    fat_100g: 20,
+    servings_json: [{ name: 'cup', g: 122 }],
+    source: 'usda',
+    source_ref: '173904',
+  }),
   // #719: two regulars with pack sizes and last time, and the sample trip's added item.
   food('fd_demo_milk', 'Milk', {
     category: 'Dairy',
@@ -457,6 +467,28 @@ export const DEMO_PLAN: {
   { id: 'pl_demo_5', in_days: 3, slot: 'Dinner', recipe_id: 'rc_demo_stew' },
   // #719: pl_demo_5 is the open trip's late meal; this one is after the trip's dates.
   { id: 'pl_demo_6', in_days: 6, slot: 'Dinner', recipe_id: 'rc_demo_weeknight' },
+  // #712: tonight's planned dinner, which Eaten offers as "Planned: Weeknight chili" with Log 1 serving.
+  { id: 'pl_demo_7', in_days: 0, slot: 'Dinner', recipe_id: 'rc_demo_weeknight' },
+];
+
+/**
+ * #712: the sample food log, by days before today. Today: yogurt and granola at breakfast, a partial recipe (Banana
+ * Bread) and a food with no nutrition at lunch, nothing yet at dinner (its planned meal is pl_demo_7), a bar for a snack. The
+ * day before has two entries, and the day before that none (the "—" state).
+ */
+export const DEMO_LOG: {
+  days_ago: number;
+  entry:
+    | { slot: Slot; food_id: string; qty: number; unit: string }
+    | { slot: Slot; recipe_id: string; qty: number; unit: 'serving' };
+}[] = [
+  { days_ago: 0, entry: { slot: 'Breakfast', food_id: 'fd_demo_yogurt', qty: 1, unit: 'cup' } },
+  { days_ago: 0, entry: { slot: 'Breakfast', food_id: 'fd_demo_granola', qty: 50, unit: 'g' } },
+  { days_ago: 0, entry: { slot: 'Lunch', recipe_id: 'rc_demo_bread', qty: 1, unit: 'serving' } },
+  { days_ago: 0, entry: { slot: 'Lunch', food_id: 'fd_demo_herbs', qty: 2, unit: 'g' } },
+  { days_ago: 0, entry: { slot: 'Snacks', food_id: 'fd_demo_bar', qty: 1, unit: 'bar' } },
+  { days_ago: 1, entry: { slot: 'Breakfast', food_id: 'fd_demo_yogurt', qty: 1, unit: 'cup' } },
+  { days_ago: 1, entry: { slot: 'Dinner', recipe_id: 'rc_demo_weeknight', qty: 2, unit: 'serving' } },
 ];
 
 // ---- #718: the sample trips

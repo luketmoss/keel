@@ -1,7 +1,7 @@
 // The demo layer's sample data: the user, and the one recipe every demo
 // import answers with (#706), an original written for Forage.
 import type { AuthUser } from '@keel/auth';
-import type { Food, ImportLine, ImportPreview, StarterFood } from '../api/types';
+import type { Food, ImportLine, ImportPreview, Slot, StarterFood } from '../api/types';
 
 export const DEMO_USER: AuthUser = {
   name: 'Demo User',
@@ -252,7 +252,7 @@ export interface DemoRecipe {
   steps: DemoStep[];
 }
 
-/** Five made-up recipes, originals written for Forage. */
+/** Seven made-up recipes, originals written for Forage. */
 export const DEMO_RECIPES: DemoRecipe[] = [
   {
     id: 'rc_demo_stew',
@@ -362,6 +362,41 @@ export const DEMO_RECIPES: DemoRecipe[] = [
       { text: 'Simmer 40 minutes, stirring now and then.' },
     ],
   },
+  // #709: two more, every line matched, so the plan's sample shows one partial meal and the rest counted.
+  {
+    id: 'rc_demo_weeknight',
+    name: 'Weeknight chili',
+    source_site: 'example.net',
+    servings: 4,
+    total_min: 40,
+    has_walkthrough: false,
+    added_days_ago: 3,
+    lines: [
+      { text: '2 medium onions, chopped', qty: 2, unit: 'medium', food_id: 'fd_demo_onion' },
+      { text: '2 tbsp butter', qty: 2, unit: 'tbsp', food_id: 'fd_demo_butter' },
+      { text: '1/2 cup flour', qty: 0.5, unit: 'cup', food_id: 'fd_demo_flour' },
+      { text: '1 cup plain yogurt, to serve', qty: 1, unit: 'cup', food_id: 'fd_demo_yogurt' },
+    ],
+    steps: [
+      { text: 'Soften the onions in the butter.' },
+      { text: 'Stir in the flour, add water and simmer 30 minutes.' },
+      { text: 'Serve with a spoon of yogurt.' },
+    ],
+  },
+  {
+    id: 'rc_demo_oats',
+    name: 'Overnight oats',
+    source_site: 'example.com',
+    servings: 1,
+    total_min: 5,
+    has_walkthrough: false,
+    added_days_ago: 2,
+    lines: [
+      { text: '1 cup plain yogurt', qty: 1, unit: 'cup', food_id: 'fd_demo_yogurt' },
+      { text: '1 Oat and Honey bar, crumbled', qty: 1, unit: 'bar', food_id: 'fd_demo_bar' },
+    ],
+    steps: [{ text: 'Stir the bar into the yogurt and leave it in the fridge overnight.' }],
+  },
 ];
 
 /** Sample cooks, by days before today: Beef Stew twice (4 stars), the wraps once (5), the chicken once unrated, the chili once (3). */
@@ -372,3 +407,27 @@ export const DEMO_COOKS: { id: string; recipe_id: string; days_ago: number; rati
   { id: 'ck_demo_4', recipe_id: 'rc_demo_chicken', days_ago: 1, rating: null, note: '' },
   { id: 'ck_demo_5', recipe_id: 'rc_demo_chili', days_ago: 14, rating: 3, note: '' },
 ];
+
+/**
+ * #709: the sample plan, by days after today. Weeknight chili tomorrow is on the
+ * open trip, the oats tomorrow on an earlier, closed one; Beef Stew is the
+ * partial meal; today's lunch is a note.
+ */
+export const DEMO_PLAN: {
+  id: string;
+  in_days: number;
+  slot: Slot;
+  recipe_id?: string;
+  note?: string;
+  trip_id?: string;
+}[] = [
+  { id: 'pl_demo_1', in_days: 0, slot: 'Lunch', note: 'Leftovers' },
+  { id: 'pl_demo_2', in_days: 1, slot: 'Breakfast', recipe_id: 'rc_demo_oats', trip_id: 'tr_demo_closed' },
+  { id: 'pl_demo_3', in_days: 1, slot: 'Dinner', recipe_id: 'rc_demo_weeknight', trip_id: 'tr_demo_open' },
+  { id: 'pl_demo_4', in_days: 3, slot: 'Lunch', recipe_id: 'rc_demo_weeknight' },
+  { id: 'pl_demo_5', in_days: 3, slot: 'Dinner', recipe_id: 'rc_demo_stew' },
+  { id: 'pl_demo_6', in_days: 5, slot: 'Dinner', recipe_id: 'rc_demo_weeknight' },
+];
+
+/** The two sample trips the plan's chips read. */
+export const DEMO_TRIPS: Record<string, 'open' | 'closed'> = { tr_demo_open: 'open', tr_demo_closed: 'closed' };

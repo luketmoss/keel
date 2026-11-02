@@ -49,7 +49,9 @@ var CHANGE_LOGGED_ACTIONS = {
   setWalkthrough: ['Walkthroughs'],
   deleteWalkthrough: ['Walkthroughs'],
   upsertPlanEntry: ['Plan'],
+  movePlanEntry: ['Plan'],
   deletePlanEntry: ['Plan'],
+  planWeek: ['Plan'],
   createTrip: ['Trips'],
   updateTrip: ['Trips'],
   upsertTripItems: ['TripItems'],
@@ -101,11 +103,11 @@ var CHANGE_REFERENCES = {
   ],
 };
 
-/** Whether this caller's action is logged: a key caller, a logged action, and not an import's dry run. */
+/** Whether this caller's action is logged: a key caller, a logged action, and not an import's or planWeek's dry run. */
 function isChangeLogged(caller, action, rawPayload) {
   if (!caller || caller.mode !== 'key') return false;
   if (!Object.prototype.hasOwnProperty.call(CHANGE_LOGGED_ACTIONS, action)) return false;
-  if (action === 'importRecipe') {
+  if (action === 'importRecipe' || action === 'planWeek') {
     var dryRun = payloadField(rawPayload, 'dry_run');
     return dryRun === false || dryRun === 'false';
   }

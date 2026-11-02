@@ -41,6 +41,7 @@ export const FORAGE_READ_TOOLS: ReadonlySet<string> = new Set([
   'forage_search_recipes',
   'forage_get_recipe',
   'forage_cook_history',
+  'forage_list_plan',
 ])
 
 const NO_UNDO_YET = "Error: Forage's API doesn't have undo yet. Redeploy the Apps Script."
@@ -395,6 +396,124 @@ function recipeInUseText(id: string, result: ApiResult): string {
 /** The fields of `args` that were sent, in the order named. */
 const sent = (args: any, keys: string[]) =>
   Object.fromEntries(keys.filter((k) => args[k] !== undefined).map((k) => [k, args[k]]))
+
+// ---------------------------------------------------------------- the meal plan (#709)
+
+// Wording fixed by forage/docs/design/709-meal-plan.md.
+
+const SLOTS = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'] as const
+
+/** The most meals one forage_plan_week takes, as the API's planWeek. */
+const PLAN_WEEK_MAX = 28
+
+/** Days the Plan tab shows, today first: forage_list_plan's default range. */
+const PLAN_DAYS = 8
+
+const DATE_HINT = "use YYYY-MM-DD, 'today', 'tomorrow' or '+3d'"
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+let denver: Intl.DateTimeFormat | undefined
+
+/** Today in America/Denver, the zone every Forage date is in. A Worker runs in UTC. */
+function homeToday(now = new Date()): string {
+  denver ??= new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Denver',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+  return denver.format(now)
+}
+
+/** `YYYY-MM-DD` plus whole days, by calendar arithmetic. */
+function plusDays(date: string, n: number): string {
+  const d = new Date(`${date}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+
+/**
+ * A date as an agent writes it, as Thrive's tools take them: YYYY-MM-DD,
+ * `today`, `tomorrow`, `+3d` (or `-3d`), in America/Denver. '' when unreadable;
+ * the API refuses a YYYY-MM-DD that is not a real day.
+ */
+function planDate(value: string | undefined): string {
+  const v = String(value ?? '').trim().toLowerCase()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v
+  const today = homeToday()
+  if (v === 'today') return today
+  if (v === 'tomorrow') return plusDays(today, 1)
+  const rel = /^([+-])(\d{1,3})d$/.exec(v)
+  return rel ? plusDays(today, (rel[1] === '-' ? -1 : 1) * Number(rel[2])) : ''
+}
+
+/** `Wed 2026-11-05`. */
+function dayText(date: string): string {
+  const d = new Date(`${date}T00:00:00Z`)
+  return isNaN(d.getTime()) ? date : `${WEEKDAYS[d.getUTCDay()]} ${date}`
+}
+
+/** The design note's slot column: `Lunch   `, `Dinner  `. */
+const slotCol = (slot: string) => `${slot.padEnd(7)} `
+
+/** A meal's name: the recipe's, or the note's text. */
+const mealName = (e: any) => (e.recipe_id ? e.recipe_name || e.recipe_id : e.note)
+
+/** `412 kcal a serving`, `388 kcal a serving, partial`, or `no calories yet`. */
+function kcalServing(e: any): string {
+  if (typeof e.kcal_serving !== 'number') return 'no calories yet'
+  return `${Math.round(e.kcal_serving)} kcal a serving${e.partial ? ', partial' : ''}`
+}
+
+/** `3 planned meals aren't on a shopping trip yet.`, or '' at 0. */
+function notOnTripText(n: number): string {
+  if (!n) return ''
+  return n === 1 ? "1 planned meal isn't on a shopping trip yet." : `${n} planned meals aren't on a shopping trip yet.`
+}
+
+/** One line of forage_list_plan: `  pl_1  Dinner  Weeknight chili (rc_9) · 412 kcal a serving · on list`. */
+function listLine(e: any): string {
+  const what = e.recipe_id ? `${e.recipe_name || e.recipe_id} (${e.recipe_id}) · ${kcalServing(e)}` : `${e.note} (note)`
+  const trip = e.on_trip ? (e.shopped ? ' · shopped' : ' · on list') : ''
+  return `  ${e.id}  ${slotCol(e.slot)}${what}${trip}`
+}
+
+/** One line of forage_plan_week's preview. */
+function weekLine(e: any): string {
+  const head = `${dayText(e.date)}  ${slotCol(e.slot)}`
+  if (e.skipped) return `${head}${mealName(e)} — already planned there, skipped`
+  return e.recipe_id ? `${head}${mealName(e)} · ${kcalServing(e)}` : `${head}${e.note} (note)`
+}
+
+/** `Nothing saved. Entry 3 (2026-02-30): not a real date.`, one line per entry that failed. */
+function weekRefusal(result: ApiResult): string {
+  const problems = ((result as any).problems ?? []) as { entry: number; date: string; error: string }[]
+  if (!problems.length) return `Nothing saved. ${result.error}.`
+  const short = (error: string) => (/^date must be/.test(error) ? 'not a real date' : error)
+  return problems
+    .map((p, i) => `${i ? '' : 'Nothing saved. '}Entry ${p.entry} (${p.date}): ${short(p.error)}.`)
+    .join('\n')
+}
+
+const duplicateText = (d: any) =>
+  `Already planned: ${mealName(d)} on ${dayText(d.date)}, ${d.slot} (${d.id}). Pass allow_duplicate: true to add another.`
+
+const noMeal = (id: string) => `Nothing changed. No meal ${id} in the plan.`
+
+/** Find a planned meal by id before a move or a remove, so an unknown one sends no write. */
+async function findPlanEntry(cfg: ForageConfig, id: string): Promise<{ entry?: any; error?: string }> {
+  const result = await apiRead(cfg, 'getPlan', { today: homeToday() })
+  if (!result.success) return { error: result.error }
+  return { entry: ((result.data?.entries ?? []) as any[]).find((e) => e.id === id) }
+}
+
+const PLAN_ENTRY_INPUT = {
+  date: z.string().describe("The day: YYYY-MM-DD, 'today', 'tomorrow' or '+3d' (America/Denver)"),
+  slot: z.enum(SLOTS).describe('Breakfast, Lunch, Dinner or Snacks'),
+  recipe_id: z.string().optional().describe('The recipe (rc_...). Send this or note'),
+  note: z.string().optional().describe('A meal that is not a recipe, 1 to 120 characters ("Eating out", "Leftovers")'),
+}
 
 /**
  * Register the read tools, or the write tools, never both: the endpoints' lists
@@ -1232,6 +1351,226 @@ export function registerForageTools(server: McpServer, cfg: ForageConfig, mode: 
       }
       return text(
         `Deleted recipe ${id} with its lines, steps, walkthrough and cooks.\n` +
+          `Undo with forage_undo, call ${currentCallId()}`,
+      )
+    }),
+  )
+
+  server.registerTool(
+    'forage_list_plan',
+    {
+      description:
+        "Read Forage's meal plan by day, from `from` to `to` (default today and the next 7 days, America/Denver): " +
+        'each meal with its id, slot, recipe or note, calories a serving, and whether it is on a shopping trip ' +
+        '(on list) or that trip is done (shopped), plus how many planned meals are not on a trip yet.',
+      inputSchema: {
+        from: z.string().optional().describe("YYYY-MM-DD, 'today', 'tomorrow' or '+3d'. Default today"),
+        to: z.string().optional().describe('The last day, in the same forms. Default 7 days after from'),
+      },
+      annotations: READ,
+    },
+    guarded(async (args: { from?: string; to?: string }): Promise<ToolResult> => {
+      const today = homeToday()
+      const from = args.from ? planDate(args.from) : today
+      if (!from) return failed(`Could not read from "${args.from}" as a date — ${DATE_HINT}.`)
+      const to = args.to ? planDate(args.to) : plusDays(from, PLAN_DAYS - 1)
+      if (!to) return failed(`Could not read to "${args.to}" as a date — ${DATE_HINT}.`)
+      if (to < from) return failed(`to (${to}) is before from (${from}).`)
+      const result = await apiRead(cfg, 'getPlan', { from, to, today })
+      if (!result.success) return failed(`Error: ${result.error}`)
+      const entries = (result.data?.entries ?? []) as any[]
+      if (!entries.length) return text(`Nothing planned from ${from} to ${to}.`)
+
+      const head = [`Plan ${dayText(from)} to ${dayText(to)}.`, notOnTripText(result.data.not_on_trip)]
+      const out = [head.filter(Boolean).join(' '), '']
+      const tomorrow = plusDays(today, 1)
+      for (let day = from; day <= to; day = plusDays(day, 1)) {
+        const label =
+          day === today ? `Today · ${dayText(day)}` : day === tomorrow ? `Tomorrow · ${dayText(day)}` : dayText(day)
+        const meals = entries.filter((e) => e.date === day)
+        out.push(label, ...(meals.length ? meals.map(listLine) : ['  Nothing planned']))
+      }
+      return text(out.join('\n'))
+    }),
+  )
+
+  server.registerTool(
+    'forage_plan_meal',
+    {
+      description:
+        'Plans a recipe or a note (eating out, leftovers) for a day and slot. Slots are Breakfast, Lunch, Dinner, ' +
+        'Snacks. Several meals can share a day. Pass id to make a retry safe. Without an id, the same recipe in ' +
+        'the same day and slot is refused as already planned unless allow_duplicate. Only plan what the user ' +
+        'asked for. Undo with forage_undo.',
+      inputSchema: {
+        ...PLAN_ENTRY_INPUT,
+        id: z.string().optional().describe('A plan id of your own (pl_...), so a retry leaves one meal'),
+        allow_duplicate: z
+          .boolean()
+          .optional()
+          .describe('Plan it even when that recipe is already in that day and slot. Default false'),
+      },
+      annotations: WRITE,
+    },
+    guarded(async (args: any): Promise<ToolResult> => {
+      if (!args.recipe_id === !args.note) return failed('Send exactly one of recipe_id and note. Nothing saved.')
+      const date = planDate(args.date)
+      if (!date) return failed(`Nothing saved. Could not read "${args.date}" as a date — ${DATE_HINT}.`)
+      const entry = { ...sent(args, ['id', 'slot', 'recipe_id', 'note']), date }
+      const allow = args.allow_duplicate === true
+
+      // Checked first, as a dry run: a refusal or a duplicate sends no write and is not counted.
+      const check = await apiDry(cfg, 'planWeek', { entries: [entry], dry_run: true, allow_duplicate: allow })
+      if (!check.success) return failed(weekRefusal(check))
+      const previewed = check.data.entries[0]
+      if (previewed.skipped) return failed(duplicateText({ ...previewed, id: previewed.duplicate_of }))
+
+      let saved: ApiResult
+      try {
+        saved = await apiWrite(cfg, 'upsertPlanEntry', { ...entry, allow_duplicate: allow })
+      } catch (err) {
+        inTransit(err, 'meal')
+      }
+      if (!saved.success) {
+        const dup = (saved as any).duplicate_of
+        return failed(saved.code === 'duplicate' && dup ? duplicateText(dup) : `Nothing saved. ${saved.error}`)
+      }
+      const e = saved.data
+      return text(
+        `Planned ${mealName(e)} for ${dayText(e.date)}, ${e.slot} (${e.id}).\n` +
+          `Undo with forage_undo, call ${currentCallId()}`,
+      )
+    }),
+  )
+
+  server.registerTool(
+    'forage_move_meal',
+    {
+      description:
+        "Changes a planned meal's day, slot or note. It does not change a shopping trip. Send its id and at least " +
+        'one of date, slot and note (a note meal only). Undo with forage_undo.',
+      inputSchema: {
+        id: z.string().describe('The planned meal (pl_...)'),
+        date: PLAN_ENTRY_INPUT.date.optional(),
+        slot: PLAN_ENTRY_INPUT.slot.optional(),
+        note: z.string().optional().describe("A note meal's new text, 1 to 120 characters"),
+      },
+      annotations: WRITE,
+    },
+    guarded(async (args: any): Promise<ToolResult> => {
+      if (args.date === undefined && args.slot === undefined && args.note === undefined) {
+        return failed('Send at least one of date, slot and note. Nothing changed.')
+      }
+      const date = args.date === undefined ? undefined : planDate(args.date)
+      if (date === '') return failed(`Nothing changed. Could not read "${args.date}" as a date — ${DATE_HINT}.`)
+      const found = await findPlanEntry(cfg, args.id)
+      if (found.error) return failed(`Nothing changed. ${found.error}`)
+      const was = found.entry
+      if (!was) return failed(noMeal(args.id))
+      const change: Record<string, unknown> = { ...sent(args, ['slot', 'note']), ...(date ? { date } : {}) }
+      if (Object.entries(change).every(([k, v]) => was[k] === v)) {
+        return failed(`Nothing changed. ${mealName(was)} is already on ${dayText(was.date)}, ${was.slot}.`)
+      }
+
+      let saved: ApiResult
+      try {
+        saved = await apiWrite(cfg, 'movePlanEntry', { id: args.id, ...change })
+      } catch (err) {
+        inTransit(err, 'move')
+      }
+      if (!saved.success) return failed(saved.code === 'not_found' ? noMeal(args.id) : `Nothing changed. ${saved.error}`)
+      const e = saved.data
+      return text(
+        `Moved ${mealName(e)} from ${dayText(was.date)}, ${was.slot} to ${dayText(e.date)}, ${e.slot} (${e.id}).\n` +
+          `Undo with forage_undo, call ${currentCallId()}`,
+      )
+    }),
+  )
+
+  server.registerTool(
+    'forage_remove_meal',
+    {
+      description:
+        "Removes a planned meal from Forage's plan. It does not change a shopping trip it is on. Only remove what " +
+        'the user asked to remove. Undo with forage_undo, which brings it back.',
+      inputSchema: { id: z.string().describe('The planned meal (pl_...)') },
+      annotations: WRITE,
+    },
+    guarded(async ({ id }: { id: string }): Promise<ToolResult> => {
+      const found = await findPlanEntry(cfg, id)
+      if (found.error) return failed(`Nothing changed. ${found.error}`)
+      if (!found.entry) return failed(noMeal(id))
+      let saved: ApiResult
+      try {
+        saved = await apiWrite(cfg, 'deletePlanEntry', { id })
+      } catch (err) {
+        inTransit(err, 'remove')
+      }
+      if (!saved.success) return failed(saved.code === 'not_found' ? noMeal(id) : `Nothing changed. ${saved.error}`)
+      const e = saved.data
+      const trip = e.on_trip ? ' It was on a shopping trip; the trip is unchanged.' : ''
+      return text(
+        `Removed ${mealName(e)} from ${dayText(e.date)}, ${e.slot} (${e.id}).${trip}\n` +
+          `Undo with forage_undo, call ${currentCallId()}`,
+      )
+    }),
+  )
+
+  server.registerTool(
+    'forage_plan_week',
+    {
+      description:
+        'Plans several meals at once. Previews first; only adds, never removes or replaces. Up to 28 entries, each ' +
+        'a date, a slot and a recipe_id or a note. A dry run by default: it lists each meal with its calories and ' +
+        'what it would skip as already planned, and saves nothing. Call again with dry_run: false to save them, ' +
+        'together or not at all. Only plan what the user agreed to. Undo with forage_undo.',
+      inputSchema: {
+        entries: z
+          .array(z.object({ ...PLAN_ENTRY_INPUT, id: z.string().optional().describe('A plan id of your own (pl_...)') }))
+          .min(1)
+          .describe('1 to 28 meals'),
+        dry_run: z.boolean().optional().describe('Default true: preview only. Set false to save'),
+        allow_duplicate: z.boolean().optional().describe('Add meals already planned in that day and slot too'),
+      },
+      annotations: WRITE,
+    },
+    guarded(async (args: any): Promise<ToolResult> => {
+      const given = args.entries as any[]
+      if (given.length > PLAN_WEEK_MAX) {
+        return failed(`Nothing saved. ${given.length} entries is over the limit of ${PLAN_WEEK_MAX}.`)
+      }
+      // A relative date is resolved here; one that can't be read goes to the API as typed, which names it.
+      const entries = given.map((e) => ({ ...e, date: planDate(e.date) || e.date }))
+      const allow = args.allow_duplicate === true
+
+      const preview = await apiDry(cfg, 'planWeek', { entries, dry_run: true, allow_duplicate: allow })
+      if (!preview.success) return failed(weekRefusal(preview))
+      const p = preview.data
+      const meals = (n: number) => `${n} meal${n === 1 ? '' : 's'}`
+      if (args.dry_run !== false) {
+        const skipped = p.skipped ? `, ${p.skipped} already planned (skipped)` : ''
+        return text(
+          [
+            'Preview — nothing saved.',
+            `${meals(p.entries.length)}: ${p.planned} new${skipped}.`,
+            ...(p.entries as any[]).map(weekLine),
+            'Call again with dry_run: false to save them.',
+          ].join('\n'),
+        )
+      }
+      if (!p.planned) return failed(`Nothing saved. All ${meals(p.entries.length)} are already planned.`)
+
+      declareRows(p.planned)
+      let saved: ApiResult
+      try {
+        saved = await apiWrite(cfg, 'planWeek', { entries, dry_run: false, allow_duplicate: allow }, p.planned)
+      } catch (err) {
+        inTransit(err, 'week')
+      }
+      if (!saved.success) return failed(weekRefusal(saved))
+      const d = saved.data
+      return text(
+        `Planned ${meals(d.planned)}${d.skipped ? `, skipped ${d.skipped} already planned` : ''}.\n` +
           `Undo with forage_undo, call ${currentCallId()}`,
       )
     }),

@@ -15,6 +15,7 @@ import type {
   ImportPreview,
   MissingReason,
   Nutrition,
+  PlanEntry,
   RecipeDetail,
   RecipeLogEntry,
   RecipeSort,
@@ -26,7 +27,18 @@ import type {
 } from '../api/types';
 import { localDate } from '../cook/format';
 import { displayName, hasNutrition } from '../library/food-math';
-import { DEMO_COOKS, DEMO_FOODS, DEMO_IMPORT, DEMO_PRODUCT, DEMO_RECIPES, DEMO_STARTERS } from './demo-data';
+import { SLOTS } from '../api/types';
+import { addDays } from '../plan/dates';
+import {
+  DEMO_COOKS,
+  DEMO_FOODS,
+  DEMO_IMPORT,
+  DEMO_PLAN,
+  DEMO_PRODUCT,
+  DEMO_RECIPES,
+  DEMO_STARTERS,
+  DEMO_TRIPS,
+} from './demo-data';
 
 let seq = 0;
 const nextId = (prefix: string) => `${prefix}_demo${(++seq).toString(16).padStart(4, '0')}`;
@@ -180,6 +192,42 @@ export function createDemoApi(): ForageApi {
   const recipes: RecipeDetail[] = seedRecipes(now);
   const cooks: Cook[] = seedCooks(now);
   const eaten: RecipeLogEntry[] = [];
+  // #709: the plan's rows, as stored; reads derive the rest as the API does.
+  const today = localDate(new Date(now));
+  const plan = DEMO_PLAN.map((p, i) => ({
+    id: p.id,
+    date: addDays(today, p.in_days),
+    slot: p.slot,
+    recipe_id: p.recipe_id ?? '',
+    note: p.note ?? '',
+    trip_id: p.trip_id ?? '',
+    created: new Date(now + i).toISOString(),
+    updated: new Date(now + i).toISOString(),
+  }));
+  type PlanRow = (typeof plan)[number];
+
+  /** A Plan row as `getPlan` answers it: the recipe's name and kcal a serving, the trip's status. */
+  function planView(p: PlanRow): PlanEntry {
+    const r = recipes.find((x) => x.id === p.recipe_id);
+    const n = r ? withNutrition(r) : null;
+    const status = p.trip_id ? (DEMO_TRIPS[p.trip_id] ?? '') : '';
+    return {
+      ...clone(p),
+      recipe_name: r?.name ?? '',
+      servings: r?.servings ?? null,
+      kcal_serving: n ? n.nutrition.per_serving.kcal : null,
+      partial: n ? n.partial : false,
+      trip_status: status,
+      on_trip: !!p.trip_id,
+      shopped: status === 'closed',
+    };
+  }
+
+  function findMeal(id: string): PlanRow {
+    const p = plan.find((x) => x.id === id);
+    if (!p) throw new ApiError(`Plan entry "${id}" not found`, 'not_found');
+    return p;
+  }
 
   const byName = (name: string) => foods.find((f) => f.name.toLowerCase() === name.trim().toLowerCase());
   const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x));
@@ -319,6 +367,13 @@ export function createDemoApi(): ForageApi {
     getFoods: async () => clone(foods),
     createFood: (name) => api.saveFood({ name, kind: 'ingredient', source: 'manual' }),
     deleteRecipe: async (id) => {
+      // As the API: a recipe a planned meal uses stays (#703).
+      const planned = plan.filter((p) => p.recipe_id === id).map((p) => p.id);
+      if (planned.length) {
+        throw new ApiError(`Recipe "${id}" is in use, so it was not deleted`, 'in_use', {
+          uses: { plan: planned, log: [] },
+        });
+      }
       const i = recipes.findIndex((r) => r.id === id);
       if (i !== -1) recipes.splice(i, 1);
       for (let j = cooks.length - 1; j >= 0; j--) if (cooks[j].recipe_id === id) cooks.splice(j, 1);
@@ -528,6 +583,48 @@ export function createDemoApi(): ForageApi {
       const i = eaten.findIndex((e) => e.id && e.id === entry.id);
       if (i === -1) eaten.push(clone(entry));
       else eaten[i] = clone(entry);
+    },
+    getPlan: async (from, to, day) => {
+      const last = addDays(day, 7);
+      const order = (a: PlanRow, b: PlanRow) =>
+        a.date.localeCompare(b.date) ||
+        SLOTS.indexOf(a.slot) - SLOTS.indexOf(b.slot) ||
+        a.created.localeCompare(b.created);
+      return {
+        entries: plan
+          .filter((p) => p.date >= from && p.date <= to)
+          .sort(order)
+          .map(planView),
+        not_on_trip: plan.filter((p) => p.recipe_id && !p.trip_id && p.date > day && p.date <= last).length,
+      };
+    },
+    planMeal: async (input) => {
+      if ('recipe_id' in input && !recipes.some((r) => r.id === input.recipe_id)) {
+        throw new ApiError(`recipe_id "${input.recipe_id}" is not a recipe`);
+      }
+      const now = new Date().toISOString();
+      const existing = plan.find((p) => p.id === input.id);
+      const row: PlanRow = {
+        id: input.id,
+        date: input.date,
+        slot: input.slot,
+        recipe_id: 'recipe_id' in input ? input.recipe_id : '',
+        note: 'note' in input ? input.note.trim() : '',
+        trip_id: existing?.trip_id ?? '',
+        created: existing?.created ?? now,
+        updated: now,
+      };
+      if (existing) Object.assign(existing, row);
+      else plan.push(row);
+      return planView(row);
+    },
+    moveMeal: async (id, changes) => {
+      const p = findMeal(id);
+      Object.assign(p, changes, { updated: new Date().toISOString() });
+      return planView(p);
+    },
+    removeMeal: async (id) => {
+      plan.splice(plan.indexOf(findMeal(id)), 1);
     },
   };
   return api;

@@ -63,7 +63,7 @@ describe('AC4: every text column stores exactly what was written', () => {
     const api = loadApi();
     api.ok('upsertRecipe', { payload: { id: 'r1', name: 'Soup', servings: 1 } });
     const meal = api.ok('upsertPlanEntry', { payload: { date: '2026-03-04', slot: 'Lunch', note: '=1+1' } });
-    expect(api.ok('getPlan', {})[0]).toMatchObject({ id: meal.id, date: '2026-03-04', note: '=1+1' });
+    expect(api.ok('getPlan', {}).entries[0]).toMatchObject({ id: meal.id, date: '2026-03-04', note: '=1+1' });
     const cook = api.ok('upsertCook', { payload: { recipe_id: 'r1', date: '2026-03-04', note: '0042' } });
     expect(api.ok('getCooks', {})[0]).toMatchObject({ id: cook.id, date: '2026-03-04', note: '0042' });
   });

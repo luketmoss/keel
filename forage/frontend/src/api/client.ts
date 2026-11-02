@@ -9,6 +9,10 @@ import type {
   FoodDetail,
   ImportInput,
   ImportPreview,
+  PlanEntry,
+  PlanEntryInput,
+  PlanMove,
+  PlanResult,
   RecipeDetail,
   RecipeLogEntry,
   RecipeSort,
@@ -59,6 +63,13 @@ export interface ForageApi {
   saveCook(cook: Partial<Cook> & { id: string }): Promise<Cook>;
   deleteCook(id: string): Promise<void>;
   logFood(entry: RecipeLogEntry): Promise<void>;
+  // #709: the meal plan. `today` is the device's, so the banner counts from the day the app shows.
+  getPlan(from: string, to: string, today: string): Promise<PlanResult>;
+  /** upsertPlanEntry with the app's own id. */
+  planMeal(entry: PlanEntryInput): Promise<PlanEntry>;
+  /** movePlanEntry: refused with code `not_found` for a meal already removed. */
+  moveMeal(id: string, changes: PlanMove): Promise<PlanEntry>;
+  removeMeal(id: string): Promise<void>;
 }
 
 interface Envelope<T> {
@@ -147,6 +158,12 @@ export function createLiveApi(token: string, url = import.meta.env.VITE_FORAGE_A
     },
     logFood: async (entry) => {
       await call('logFood', entry);
+    },
+    getPlan: (from, to, today) => call<PlanResult>('getPlan', undefined, undefined, { from, to, today }),
+    planMeal: (entry) => call<PlanEntry>('upsertPlanEntry', entry),
+    moveMeal: (id, changes) => call<PlanEntry>('movePlanEntry', { id, ...changes }),
+    removeMeal: async (id) => {
+      await call('deletePlanEntry', { id });
     },
   };
 }

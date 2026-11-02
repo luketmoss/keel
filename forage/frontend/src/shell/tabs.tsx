@@ -6,7 +6,7 @@ export interface TabDef {
   id: TabId;
   label: string;
   icon: () => ComponentChildren;
-  /** The empty state for a signed-in user with no data. No button: no add flow exists yet. */
+  /** The empty state for a signed-in user with no data. No button of its own: a tab's add flow is in its header (#709). */
   empty: { heading: string; sentence: string };
 }
 
@@ -18,7 +18,7 @@ export const TABS: TabDef[] = [
     icon: PlanIcon,
     empty: {
       heading: 'Nothing planned yet',
-      sentence: 'Meals you plan for the week will show here, by day. Add one from a recipe.',
+      sentence: 'Meals you plan will show here, by day, with their calories.',
     },
   },
   {

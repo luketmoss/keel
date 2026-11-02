@@ -1,4 +1,4 @@
-// The Forage API's shapes (#703, #706, #707, #708, #709), mirrored from apps-script/src. A change
+// The Forage API's shapes (#703, #706, #707, #708, #709, #718, #719), mirrored from apps-script/src. A change
 // to a response shape changes this file in the same pull request.
 
 export type FoodKind = 'ingredient' | 'packaged';
@@ -32,6 +32,9 @@ export interface Food {
   usually_have?: boolean;
   regular?: boolean;
   packs_json?: string[] | null;
+  /** #719: the pack or amount bought last time, and its date. */
+  last_buy?: string;
+  last_bought_on?: string;
   never_shop?: boolean;
   source_ref?: string;
   verified?: boolean;
@@ -164,6 +167,16 @@ export interface PlanEntry {
 export interface PlanResult {
   entries: PlanEntry[];
   not_on_trip: number;
+  /** #719: the open trip's late meals; [] with no trip open. */
+  late_meals?: LateMeal[];
+}
+
+/** #719: a recipe meal planned after the open trip's list was made, inside its dates, by date then slot. */
+export interface LateMeal {
+  plan_id: string;
+  recipe_name: string;
+  date: string;
+  slot: Slot;
 }
 
 // ---- #718: shopping trips. Every amount, count and breakdown here is the API's (trips.js).
@@ -197,6 +210,10 @@ export interface TripItem {
   /** What the meals need (`about 6 onions`), or null for an item with no lines. */
   need: string | null;
   lines: TripLine[];
+  /** #719: copied from the food, for the buying amount sheet. */
+  packs?: string[];
+  last_buy?: string;
+  last_bought_on?: string;
 }
 
 export interface TripMeal {
@@ -229,6 +246,8 @@ export interface Trip {
   items: TripItem[];
   counts: TripCounts;
   unmatched: { plan_id: string; recipe_name: string; line_id: string; text: string }[];
+  /** #719: meals planned after the list was made, inside its dates; [] for a closed trip. */
+  late_meals?: LateMeal[];
 }
 
 /** A `getTrips` row, for "Last trip". */
@@ -261,6 +280,22 @@ export interface StartTripResult {
 export interface TripItemChange {
   choice?: Exclude<TripChoice, ''>;
   bought?: boolean;
+  /** #719: the buying amount, free text; '' clears it. */
+  buy?: string;
+}
+
+/** #719: what `addToTrip` adds: exactly one of these. */
+export type AddToTripInput = { food_id: string } | { text: string } | { late_meals: true; today: string };
+
+export interface AddToTripResult {
+  trip: Trip;
+  /** Foods newly on the list. */
+  added: string[];
+  /** Foods already on the list whose lines grew. */
+  joined: string[];
+  /** Plan ids put on the trip. */
+  meals: string[];
+  food: { id: string; name: string; created: boolean; matched_existing: boolean } | null;
 }
 
 export interface TripItemResult {

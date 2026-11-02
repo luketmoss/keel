@@ -358,7 +358,10 @@ export function createDemoApi(): ForageApi {
 
   const api: ForageApi = {
     getRecipes: async (query = {}) => search(query.q ?? '', query.sort ?? 'newest'),
-    getFoods: async () => clone(foods),
+    getFoods: async (q) => {
+      const want = (q ?? '').trim().toLowerCase();
+      return clone(foods.filter((f) => !want || `${f.name} ${f.brand}`.toLowerCase().includes(want)));
+    },
     createFood: (name) => api.saveFood({ name, kind: 'ingredient', source: 'manual' }),
     deleteRecipe: async (id) => {
       // As the API: a recipe a planned meal uses stays (#703).
@@ -590,6 +593,7 @@ export function createDemoApi(): ForageApi {
           .sort(order)
           .map(planView),
         not_on_trip: plan.filter((p) => p.recipe_id && !p.trip_id && p.date > day && p.date <= last).length,
+        late_meals: trips.lateMeals(day),
       };
     },
     planMeal: async (input) => {
@@ -626,6 +630,8 @@ export function createDemoApi(): ForageApi {
     setTripItem: trips.setTripItem,
     closeTrip: trips.closeTrip,
     discardTrip: trips.discardTrip,
+    addToTrip: trips.addToTrip,
+    removeTripItem: trips.removeTripItem,
   };
   return api;
 }

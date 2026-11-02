@@ -3,6 +3,8 @@
 // sends no preflight (Apps Script has no doOptions), and carries the user's
 // Google access token, never the API key.
 import type {
+  AddToTripInput,
+  AddToTripResult,
   BarcodeLookup,
   Cook,
   Food,
@@ -44,7 +46,8 @@ export class ApiError extends Error {
 export interface ForageApi {
   /** #708: `q` searches name, ingredient lines and matched foods; `sort` defaults to newest. */
   getRecipes(query?: { q?: string; sort?: RecipeSort }): Promise<RecipeSummary[]>;
-  getFoods(): Promise<Food[]>;
+  /** #719: `q` narrows to a substring of the name or brand. */
+  getFoods(q?: string): Promise<Food[]>;
   createFood(name: string): Promise<Food>;
   deleteRecipe(id: string): Promise<void>;
   /** A dry run: the preview, nothing written. */
@@ -77,14 +80,18 @@ export interface ForageApi {
   moveMeal(id: string, changes: PlanMove): Promise<PlanEntry>;
   removeMeal(id: string): Promise<void>;
   // #718: shopping trips.
-  /** The open trip, or null. */
-  getTrip(): Promise<Trip | null>;
+  /** The open trip, or null. #719: `today` (the device's) dates its late meals. */
+  getTrip(today?: string): Promise<Trip | null>;
   /** Closed trips, newest first. */
   getClosedTrips(): Promise<TripSummary[]>;
   startTrip(input: StartTripInput): Promise<StartTripResult>;
   setTripItem(tripId: string, foodId: string, change: TripItemChange): Promise<TripItemResult>;
   closeTrip(tripId: string): Promise<Trip>;
   discardTrip(tripId: string): Promise<void>;
+  // #719: added items and late meals.
+  addToTrip(tripId: string, input: AddToTripInput): Promise<AddToTripResult>;
+  /** Only an added item with no meals; answers the trip without it. */
+  removeTripItem(tripId: string, foodId: string): Promise<Trip>;
 }
 
 interface Envelope<T> {
@@ -144,7 +151,7 @@ export function createLiveApi(token: string, url = import.meta.env.VITE_FORAGE_A
       if (query.sort) params.sort = query.sort;
       return call<RecipeSummary[]>('getRecipes', undefined, undefined, params);
     },
-    getFoods: () => call<Food[]>('getFoods'),
+    getFoods: (q) => call<Food[]>('getFoods', undefined, undefined, q?.trim() ? { q: q.trim() } : {}),
     createFood: (name) => call<Food>('upsertFood', { name, kind: 'ingredient', source: 'manual' }),
     deleteRecipe: async (id) => {
       await call('deleteRecipe', { id });
@@ -180,7 +187,8 @@ export function createLiveApi(token: string, url = import.meta.env.VITE_FORAGE_A
     removeMeal: async (id) => {
       await call('deletePlanEntry', { id });
     },
-    getTrip: async () => (await call<{ trip: Trip | null }>('getTrip')).trip,
+    getTrip: async (today) =>
+      (await call<{ trip: Trip | null }>('getTrip', undefined, undefined, today ? { today } : {})).trip,
     getClosedTrips: () => call<TripSummary[]>('getTrips', undefined, undefined, { status: 'closed' }),
     startTrip: (input) => call<StartTripResult>('startTrip', input),
     setTripItem: (tripId, foodId, change) =>
@@ -189,5 +197,8 @@ export function createLiveApi(token: string, url = import.meta.env.VITE_FORAGE_A
     discardTrip: async (tripId) => {
       await call('discardTrip', { trip_id: tripId });
     },
+    addToTrip: (tripId, input) => call<AddToTripResult>('addToTrip', { trip_id: tripId, ...input }),
+    removeTripItem: async (tripId, foodId) =>
+      (await call<{ trip: Trip }>('removeTripItem', { trip_id: tripId, food_id: foodId })).trip,
   };
 }

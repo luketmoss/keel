@@ -11,7 +11,7 @@ import { LibraryScreen } from '../library/library-screen';
 import { PlanScreen } from '../plan/plan-screen';
 import { planMealRequested } from '../plan/plan-store';
 import { ShopScreen } from '../shop/shop-screen';
-import { shopTrip, tripMenuRequested } from '../shop/shop-store';
+import { addRequested, shopTrip, tripMenuRequested } from '../shop/shop-store';
 import { Toast } from '../ui/toast';
 import { AccountMenu } from './account-menu';
 import { cookRoute, currentTab, syncFromHash } from './routes';
@@ -58,6 +58,16 @@ export function Shell() {
               data-testid="plan-meal-btn"
             >
               Plan a meal
+            </button>
+          )}
+          {tab.id === 'shop' && shopTrip.value && (
+            <button
+              type="button"
+              class="btn btn-primary btn-small"
+              onClick={() => (addRequested.value = true)}
+              data-testid="add-item-btn"
+            >
+              Add
             </button>
           )}
           {tab.id === 'shop' && shopTrip.value && (

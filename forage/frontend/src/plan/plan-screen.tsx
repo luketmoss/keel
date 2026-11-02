@@ -6,11 +6,13 @@ import { dayName, planDays, shortDay } from './dates';
 import { syncFromHash, tabHash } from '../shell/routes';
 import { clearView, showTrip, shopMode } from '../shop/shop-store';
 import { TripSetupSheet } from '../shop/trip-setup-sheet';
+import { lateSentence } from '../shop/trip-format';
 import { MealSheet } from './meal-sheet';
 import { PlanMealSheet } from './plan-meal-sheet';
 import {
   bannerCount,
   kcalLine,
+  lateMeals,
   loadPlan,
   mealLabel,
   mealName,
@@ -104,7 +106,9 @@ export function PlanScreen({ api, empty }: { api: ForageApi; empty: ComponentChi
   const days = planDays(new Date(`${today}T12:00:00`));
   const entries = planEntries.value;
   const state = planState.value;
-  const banner = bannerCount(notOnTrip.value);
+  // #719: with a trip open, the banner is the late-meals sentence, or nothing; with none, #709's count.
+  const late = tripOpen.value === true ? lateSentence(lateMeals.value) : null;
+  const banner = tripOpen.value === true ? late : bannerCount(notOnTrip.value);
 
   async function wrote() {
     setOverlay(null);
@@ -178,15 +182,29 @@ export function PlanScreen({ api, empty }: { api: ForageApi; empty: ComponentChi
           strong={banner.strong}
           rest={banner.rest}
           action={
-            tripOpen.value === false && (
+            late ? (
               <button
                 type="button"
                 class="btn btn-primary btn-small"
-                onClick={() => setOverlay({ kind: 'trip' })}
-                data-testid="banner-plan-trip"
+                onClick={() => {
+                  window.location.hash = tabHash('shop');
+                  syncFromHash();
+                }}
+                data-testid="banner-add-to-list"
               >
-                Plan a trip
+                Add to list
               </button>
+            ) : (
+              tripOpen.value === false && (
+                <button
+                  type="button"
+                  class="btn btn-primary btn-small"
+                  onClick={() => setOverlay({ kind: 'trip' })}
+                  data-testid="banner-plan-trip"
+                >
+                  Plan a trip
+                </button>
+              )
             )
           }
         />

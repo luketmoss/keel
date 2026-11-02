@@ -111,9 +111,13 @@ What the columns mean:
   conversion. `optional` lines count toward neither nutrition nor shopping.
 - **Steps.** `section` is the source's heading ("For the sauce"), blank when
   none; `name` is the step's own title ("Brown the beef").
-- **Walkthroughs.** `format` is `1`; `walkthrough_json` is the whole document.
-  The API checks only that it is JSON with `format` 1 and the right `recipe`;
-  its structure is #711's.
+- **Walkthroughs.** `format` is `1`; `walkthrough_json` is the whole document,
+  format v1 (#711, `forage/docs/design/711-walkthroughs.md`). Its rules are only
+  in `apps-script/src/walkthroughs.js` (`validateWalkthrough`): `setWalkthrough`
+  refuses a document that fails, listing every problem and saving nothing, and
+  `getRecipe` (`walkthrough`, `walkthrough_check`) and `getRecipes`
+  (`walkthrough_ok`) check the stored one against the current lines on read, so
+  a recipe edit makes it stale rather than being refused. The app never runs it.
 - **Plan.** `slot` is `Breakfast`, `Lunch`, `Dinner` or `Snacks`. Exactly one
   of `recipe_id` and `note` is set (a note is a night out or leftovers).
   `trip_id` is the trip the meal is on; "shopped" (its trip closed) is derived,

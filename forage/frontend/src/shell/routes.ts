@@ -1,7 +1,8 @@
 // The current tab lives in the URL hash (`#/plan`), so reload and back work.
 // Only the hash is ever written: the query, and so `?demo=true`, is kept.
 // #708 adds one full-screen route outside the tabs: log mode,
-// `#/cook/<recipe id>[?plan=<plan id>]`, which #709 and #711 reuse.
+// `#/cook/<recipe id>[?plan=<plan id>]`, which #709 and #711 reuse; #711 adds
+// `mode=walkthrough` for walkthrough mode inside the same frame.
 import { signal } from '@preact/signals';
 
 export const TAB_IDS = ['plan', 'shop', 'eaten', 'library'] as const;
@@ -23,18 +24,29 @@ export interface CookRoute {
   recipeId: string;
   /** The plan entry the cook is, or ''. */
   planId: string;
+  /** #711: `walkthrough` when the Cook choice sheet chose it, else `log`. */
+  mode: 'walkthrough' | 'log';
 }
 
 /** `#/cook/rc_1a2b3c4d?plan=pl_9` as a route, or null. */
 export function parseCookHash(hash: string): CookRoute | null {
   const m = /^#\/cook\/([A-Za-z0-9_-]{1,64})(?:\?(.*))?$/.exec(hash);
   if (!m) return null;
-  const plan = new URLSearchParams(m[2] ?? '').get('plan') ?? '';
-  return { recipeId: m[1], planId: /^[A-Za-z0-9_-]{1,64}$/.test(plan) ? plan : '' };
+  const query = new URLSearchParams(m[2] ?? '');
+  const plan = query.get('plan') ?? '';
+  return {
+    recipeId: m[1],
+    planId: /^[A-Za-z0-9_-]{1,64}$/.test(plan) ? plan : '',
+    mode: query.get('mode') === 'walkthrough' ? 'walkthrough' : 'log',
+  };
 }
 
-export function cookHash(recipeId: string, planId = ''): string {
-  return `#/cook/${recipeId}${planId ? `?plan=${encodeURIComponent(planId)}` : ''}`;
+export function cookHash(recipeId: string, planId = '', mode: 'walkthrough' | 'log' = 'log'): string {
+  const query = new URLSearchParams();
+  if (planId) query.set('plan', planId);
+  if (mode === 'walkthrough') query.set('mode', 'walkthrough');
+  const q = query.toString();
+  return `#/cook/${recipeId}${q ? `?${q}` : ''}`;
 }
 
 export const currentTab = signal<TabId>(parseHash(window.location.hash) ?? DEFAULT_TAB);
@@ -64,7 +76,11 @@ export function syncFromHash(): void {
   const open = cookRoute.value;
   if (open && leaveGuard && leaveGuard()) {
     // Back was pressed mid-cook: put the cook's entry back and let it ask.
-    window.history.pushState(window.history.state, '', `${pathname}${search}${cookHash(open.recipeId, open.planId)}`);
+    window.history.pushState(
+      window.history.state,
+      '',
+      `${pathname}${search}${cookHash(open.recipeId, open.planId, open.mode)}`,
+    );
     return;
   }
   cookRoute.value = null;

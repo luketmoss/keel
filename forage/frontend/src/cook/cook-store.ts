@@ -13,7 +13,13 @@ export interface CookTimer {
   minutes: number;
   /** When it reaches zero, as epoch ms: the countdown is to this, so it is right after the tab slept. */
   ends_at: number;
+  /** #711: a walkthrough step's timer or wait carries its label and the step's id, one per step. */
+  label?: string;
+  step?: string;
 }
+
+/** #711: where a walkthrough cook is. */
+export type WalkthroughStage = 'start' | 'prep' | 'cook';
 
 export interface ActiveCook {
   recipe_id: string;
@@ -26,6 +32,12 @@ export interface ActiveCook {
   plan_id: string;
   /** Made when the cook starts, so a retried Finish upserts the one row. */
   cook_id: string;
+  /** #711: walkthrough mode's state. Absent is log mode. `checked` also holds its task ticks, `T:<group>:<n>`. */
+  mode?: CookMode;
+  servings?: number;
+  stage?: WalkthroughStage;
+  /** The current cook step, by index. */
+  step?: number;
 }
 
 let memory: Record<string, string> = {};

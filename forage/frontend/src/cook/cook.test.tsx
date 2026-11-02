@@ -379,7 +379,7 @@ describe('the Cook choice sheet', () => {
     const sheet = await openChoice(false);
     const walk = within(sheet).getByTestId('mode-walkthrough');
     expect(walk.hasAttribute('disabled')).toBe(true);
-    expect(walk.textContent).toContain('Not built yet for this recipe');
+    expect(walk.textContent).toContain('No walkthrough yet.');
     expect(within(sheet).getByTestId('mode-log').getAttribute('aria-checked')).toBe('true');
     fireEvent.click(within(sheet).getByRole('button', { name: 'Cancel' }));
     expect(screen.queryByTestId('cook-choice')).toBeNull();

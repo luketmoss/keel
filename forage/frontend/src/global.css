@@ -1519,6 +1519,222 @@ textarea.field {
   font-variant-numeric: tabular-nums;
 }
 
+/* === Walkthrough mode (#711): inside the cook frame === */
+
+.stage-label {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.stage-title {
+  margin: var(--space-xs) 0 var(--space-md);
+  font-size: var(--text-2xl);
+}
+
+.plan-row + .plan-row {
+  border-top: 1px solid var(--color-border-light);
+}
+
+.plan-row .stepper .hint {
+  font-weight: 400;
+}
+
+.walk-note {
+  margin: 0 0 var(--space-md);
+  overflow-wrap: anywhere;
+}
+
+.prep-title {
+  font-size: var(--text-base);
+  overflow-wrap: anywhere;
+}
+
+.prep-makes {
+  margin: var(--space-xs) calc(-1 * var(--space-md)) calc(-1 * var(--space-sm));
+  padding: var(--space-sm) var(--space-md);
+  background: var(--overlay-sm);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.uses-list {
+  margin: var(--space-xs) 0;
+}
+
+.uses-row {
+  display: flex;
+  gap: var(--space-sm);
+  padding: var(--space-xs) 0;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.uses-row:last-child {
+  border-bottom: 0;
+}
+
+.uses-amount {
+  flex: none;
+  min-width: 5.5em;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.uses-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.uses-left {
+  display: block;
+  color: var(--color-warning);
+  font-size: var(--text-sm);
+}
+
+.steps-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.step-item + .step-item {
+  border-top: 1px solid var(--color-border-light);
+}
+
+.step-item.is-now {
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}
+
+.step-head {
+  width: 100%;
+  min-height: var(--touch-target);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: 0;
+  background: none;
+  color: var(--color-text-secondary);
+  text-align: left;
+}
+
+.step-num {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.is-past .step-num {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.is-now .step-num {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.step-title {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.is-now .step-title {
+  color: var(--color-text);
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.step-chip {
+  flex: none;
+  padding: 2px var(--space-sm);
+  border-radius: var(--radius-full);
+  background: var(--overlay-sm);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.step-body {
+  padding: 0 var(--space-md) var(--space-md);
+}
+
+.heat-chip {
+  display: inline-block;
+  margin: 0 0 var(--space-sm);
+  padding: 2px var(--space-sm);
+  border-radius: var(--radius-full);
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.step-do {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--text-lg);
+  overflow-wrap: anywhere;
+}
+
+.uses-card {
+  margin: 0 0 var(--space-sm);
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+}
+
+.look-for {
+  margin: 0 0 var(--space-sm);
+  padding: var(--space-sm);
+  border-radius: var(--radius-md);
+  background: var(--overlay-sm);
+  overflow-wrap: anywhere;
+}
+
+.step-timer {
+  width: 100%;
+  min-height: 52px;
+  margin: 0 0 var(--space-sm);
+}
+
+.timer-running {
+  margin: 0 0 var(--space-sm);
+}
+
+.meanwhile {
+  margin-top: var(--space-sm);
+  padding: 0 var(--space-sm) var(--space-xs);
+  border: 2px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+}
+
+.meanwhile .card {
+  box-shadow: none;
+}
+
+.walk-back {
+  flex: 0 1 auto;
+}
+
+.walk-next {
+  min-width: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .walkthrough * {
+    transition: none;
+  }
+}
+
 /* === Meal plan (#709) === */
 
 .btn-small {

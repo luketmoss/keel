@@ -29,6 +29,9 @@ export interface ApiResult {
   duplicate_of?: { id: string; name: string } | null
   /** A refused `deleteFood`'s uses (#707). */
   uses?: { recipes?: { id: string; name: string }[]; trips?: string[] }
+  /** A refused `setWalkthrough`'s problems and warnings (#711). */
+  problems?: string[]
+  warnings?: string[]
 }
 
 /**

@@ -10,7 +10,7 @@ var RECIPE_SORTS = ['newest', 'name', 'rating', 'last_cooked'];
 
 /**
  * Every recipe, with per-serving nutrition, partial, rating, last cooked,
- * cook_count, unrated_cook_id and has_walkthrough (#708).
+ * cook_count, unrated_cook_id and has_walkthrough (#708), and walkthrough_ok (#711).
  *
  * `q` (case-insensitive) keeps the recipes whose name, an ingredient line's
  * text, or the name of the food matched to a line contains it; a match that is
@@ -28,7 +28,7 @@ function getRecipes(params) {
   var lines = groupBy(listRecords('RecipeLines'), 'recipe_id');
   var cooks = groupBy(listRecords('Cooks'), 'recipe_id');
   var walked = {};
-  listRecords('Walkthroughs').forEach(function (w) { walked[w.recipe_id] = true; });
+  listRecords('Walkthroughs').forEach(function (w) { walked[w.recipe_id] = w; });
 
   var out = [];
   listRecords('Recipes').forEach(function (recipe) {
@@ -41,6 +41,9 @@ function getRecipes(params) {
     }
     var nutrition = recipeNutrition(own, recipe.servings, foods);
     var row = withDerived(recipe, nutrition, cooks[recipe.id] || [], !!walked[recipe.id]);
+    // #711: checked on read against the current lines, so a later edit makes it stale.
+    row.walkthrough_ok = !!walked[recipe.id] &&
+      walkthroughCheck(recipe.id, walked[recipe.id].walkthrough_json, own).ok;
     if (q) row.matched_line = matchedLine;
     out.push(row);
   });
@@ -89,9 +92,13 @@ function getRecipe(id) {
     .sort(function (a, b) { return a.position - b.position; });
   var nutrition = recipeNutrition(lines, recipe.servings, foodsById());
   var cooks = listRecords('Cooks', function (c) { return c.recipe_id === recipe.id; });
-  var walked = !!getRecord('Walkthroughs', { recipe_id: recipe.id });
+  var walkthrough = getRecord('Walkthroughs', { recipe_id: recipe.id });
 
-  var out = withDerived(recipe, nutrition, cooks, walked);
+  var out = withDerived(recipe, nutrition, cooks, !!walkthrough);
+  // #711: the document, and its check against the lines as they are now (null with none).
+  out.walkthrough = walkthrough ? walkthrough.walkthrough_json : null;
+  out.walkthrough_check = walkthrough ? walkthroughCheck(recipe.id, walkthrough.walkthrough_json, lines) : null;
+  out.walkthrough_ok = !!walkthrough && out.walkthrough_check.ok;
   // #707: each line's grams and its kcal a serving, so the app computes nothing.
   out.nutrition.by_line = nutrition.lines.map(function (l) {
     return { line_id: l.line_id, grams: l.grams, kcal: l.kcal };

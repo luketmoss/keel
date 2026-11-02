@@ -32,7 +32,7 @@ var TOKEN_ACTIONS = [
   'getRecipes', 'getRecipe', 'upsertRecipe', 'deleteRecipe', 'computeNutrition', 'importRecipe',
   'getWalkthrough', 'setWalkthrough', 'deleteWalkthrough',
   'getPlan', 'upsertPlanEntry', 'movePlanEntry', 'deletePlanEntry', 'planWeek',
-  'getTrips', 'getTrip', 'startTrip', 'setTripItem', 'closeTrip', 'discardTrip',
+  'getTrips', 'getTrip', 'startTrip', 'setTripItem', 'closeTrip', 'discardTrip', 'addToTrip', 'removeTripItem',
   'getFoodLog', 'getFoodLogTotals', 'logFood', 'updateLogEntry', 'deleteLogEntry',
   'getCooks', 'upsertCook', 'deleteCook',
 ];

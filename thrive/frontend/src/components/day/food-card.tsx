@@ -7,7 +7,7 @@
 import { Fragment } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { useAuth } from '../../auth/auth-context';
-import { FORAGE_EATEN_URL, type FoodDay } from '../../api/forage-food';
+import { FORAGE_EATEN_URL, LABEL_KEYS, type FoodDay, type LabelKey } from '../../api/forage-food';
 import type { DayState } from '../../day/dates';
 import { weekdayName } from '../../day/format';
 import { onPageVisible } from '../../state/page-visible';
@@ -52,6 +52,118 @@ function dayNote(day: FoodDay | undefined, date: string, state: DayState): strin
       : `None of ${weekdayName(date)}'s items has nutrition yet.`;
   }
   return day.partial ? LOW_LINE : null;
+}
+
+// #757 - whether More nutrition is open, kept on the device for every day. Storage may throw: closed then.
+const MORE_KEY = 'thrive.foodMore';
+function readMore(): boolean {
+  try {
+    return localStorage.getItem(MORE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+function writeMore(open: boolean): void {
+  try {
+    localStorage.setItem(MORE_KEY, open ? '1' : '0');
+  } catch {
+    // Not remembered; the block still works.
+  }
+}
+
+/** Whether the day has a block: Forage sent the seven, and it is not a "None of ..." day. */
+function hasNutrition(day: FoodDay | undefined): boolean {
+  if (!day?.label) return false;
+  return !(day.kcal === null && day.protein_g === null && day.carbs_g === null && day.fat_g === null);
+}
+
+interface Row {
+  name: string;
+  unit: 'g' | 'mg';
+  value: number | null;
+  /** 0 = a heading row (Fat, Carbs), 1 = a part, 2 = a part of a part. */
+  depth: 0 | 1 | 2;
+  key?: LabelKey;
+}
+
+function MoreNutrition({ day, date, state }: { day: FoodDay; date: string; state: DayState }) {
+  const [open, setOpen] = useState(readMore);
+  const label = day.label!;
+  const rows: Row[] = [
+    { name: 'Fat', unit: 'g', value: day.fat_g, depth: 0 },
+    { name: 'Saturated fat', unit: 'g', value: label.values.satfat_g, depth: 1, key: 'satfat_g' },
+    { name: 'Trans fat', unit: 'g', value: label.values.transfat_g, depth: 1, key: 'transfat_g' },
+    { name: 'Cholesterol', unit: 'mg', value: label.values.cholesterol_mg, depth: 0, key: 'cholesterol_mg' },
+    { name: 'Sodium', unit: 'mg', value: label.values.sodium_mg, depth: 0, key: 'sodium_mg' },
+    { name: 'Carbs', unit: 'g', value: day.carbs_g, depth: 0 },
+    { name: 'Fiber', unit: 'g', value: label.values.fiber_g, depth: 1, key: 'fiber_g' },
+    { name: 'Sugars', unit: 'g', value: label.values.sugars_g, depth: 1, key: 'sugars_g' },
+    { name: 'Added sugars', unit: 'g', value: label.values.added_sugars_g, depth: 2, key: 'added_sugars_g' },
+  ];
+  const none = LABEL_KEYS.every((k) => label.values[k] === null);
+  const atLeast = (r: Row) => r.key !== undefined && r.value !== null && label.unknown[r.key] > 0;
+  const anyAtLeast = rows.some(atLeast);
+  return (
+    <div class="food-more">
+      <button
+        type="button"
+        class="food-link food-more-btn"
+        aria-expanded={open}
+        aria-controls="food-more-list"
+        onClick={() => {
+          const next = !open;
+          setOpen(next);
+          writeMore(next);
+        }}
+      >
+        More nutrition
+        <svg
+          class={open ? 'food-more-chevron food-more-chevron-open' : 'food-more-chevron'}
+          viewBox="0 0 24 24"
+          width={16}
+          height={16}
+          fill="none"
+          stroke="currentColor"
+          stroke-width={2}
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+      <div id="food-more-list" hidden={!open}>
+        {none ? (
+          <p class="food-more-none">
+            {state === 'today'
+              ? "None of today's items has sodium, fiber or the rest yet."
+              : `None of ${weekdayName(date)}'s items has sodium, fiber or the rest yet.`}
+          </p>
+        ) : (
+          <>
+            <dl class="food-more-list">
+              {rows.map((r) => (
+                <div key={r.name} class={`food-more-row food-more-row-${r.depth}`}>
+                  <dt>{r.name}</dt>
+                  <dd>
+                    {r.value === null ? (
+                      <span class="food-more-unknown" role="img" aria-label="not known">
+                        {dash}
+                      </span>
+                    ) : (
+                      `${atLeast(r) ? 'at least ' : ''}${wholeNumber(r.value)} ${r.unit}`
+                    )}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            {anyAtLeast && <p class="food-more-atleast">At least: some items don't have this one.</p>}
+          </>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function Skeleton() {
@@ -143,6 +255,7 @@ export function FoodCard({ date, state }: DayPanelProps) {
             </Fragment>
           ))}
         </p>
+        {day && hasNutrition(day) && <MoreNutrition day={day} date={date} state={state} />}
         {note && <p class="food-note">{note}</p>}
         <p class="food-week-caption">Last 7 days, kcal. A day with nothing logged is a gap.</p>
         <ul class="food-week">

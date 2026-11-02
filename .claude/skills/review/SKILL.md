@@ -117,6 +117,30 @@ it touches. Look for:
 - **Fit** — does it read like the code around it, or like a transplant
 - **Stack conventions** — the specific ones in the stack skill, which exist
   because they've bitten before
+- **The MCP safety model** — when the PR changes anything under `mcp/`. It
+  merges unattended (`CONVENTIONS.md` §7. Code Review), so this check is the
+  only thing standing in for the person who used to read it. Each of these is
+  a **blocking** finding unless an acceptance criterion asks for exactly that
+  change:
+  - moves a tool onto a read connector or into a read-tool list
+    (`FORAGE_READ_TOOLS` and its Thrive and Hive equivalents), or makes a write
+    tool reachable from a read endpoint
+  - removes a tool from `mcp/CLAUDE.md` §Approving the destructive tools while
+    it can still destroy data, removes its `destructiveHint`, or removes a
+    dry-run-until-`confirm: true` step
+  - changes how a request is authenticated, or stops scrubbing the key or URL
+    from errors
+
+  Word it this way, in the PR comment and the report, naming the actual tool
+  or change:
+
+  ```
+  Blocking: this PR <moves forage_delete_food onto the read connector | drops
+  forage_undo from the destructive-tools list | removes the confirm step from
+  <tool> | changes request authentication>, and no acceptance criterion asks
+  for it. MCP safety-model changes need an explicit criterion (CONVENTIONS.md
+  §Code Review).
+  ```
 
 Post findings as PR comments, on the lines they concern. Be specific about what
 breaks and when — a review comment that doesn't say what goes wrong is noise.

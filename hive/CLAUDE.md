@@ -83,8 +83,9 @@ Hive is one repository now, so each pair below changes in **one pull request**.
 - **Response shapes.** A change to `apps-script/` that alters a response shape
   also changes the MCP Worker's client in `mcp/src/hive/` (`tools.ts`,
   `api.ts`) and the frozen fixture `mcp/test/fixtures/hive-stdio-tools.json`,
-  or the Worker's tools break silently. A pull request touching `mcp/` is
-  human-reviewed (#393).
+  or the Worker's tools break silently. A pull request touching `mcp/` merges
+  unattended (#745); `/review` blocks a change to the MCP safety model no
+  criterion asks for.
 
 ## Changing the schema
 
@@ -97,12 +98,16 @@ After that, a column or tab changes only like this:
    read tabs by column position.
 2. The API (`apps-script/`), the frontend mirror (`frontend/src/api/`) and the
    Worker (`mcp/src/hive/`) change in the same pull request.
-3. **Apps Script deploys first**, then its callers. Merging does not deploy it;
-   the steps are the owner's, below.
+3. **Apps Script deploys first**, then its callers. `/ship` deploys it just
+   before the merge, below; a migration to run first is the owner's, and parks
+   the issue until it is done.
 
 ## Apps Script deployment
 
-The owner runs every step here; a session never runs `clasp` (`stack-apps-script`).
+`/ship` deploys a change to `apps-script/src/` just before merging it, with the
+owner's local clasp login, and parks for the owner when it can't
+(`stack-apps-script` §Deploying). Nothing else runs `clasp`. Installing the
+trigger and setting script properties stay the owner's.
 
 - **Live project: "Hive API"**, script ID
   `11J1aR_JwYWmobNTj8w1kbFCac3mAKrUt4sRdgcrIhUB5ROCSQn4whU08`.

@@ -336,19 +336,28 @@ def check_pr_script():
     expect("paths-ignore, one survives",
            names({"i.yml": ignore}, [("docs/a.md", ""), ("a.md", "")]), ["x"])
 
-    # Human-reviewed paths.
-    files = [("mcp/a.ts", "hive/a.ts"), ("mcp/b.ts", ""), ("mcp/c.ts", ""),
-             ("mcp/d.ts", ""), ("hive/z.ts", "")]
-    expect("human-reviewed, rename at both ends",
-           pr.human_reviewed([("hive/a.ts", "mcp/a.ts")]), ["mcp/a.ts"])
+    # Human-reviewed paths. mcp/** left the list in #745; only the shared
+    # token stylesheet gates a PR now.
+    files = [("ui/tokens.css", "ui/old/tokens.css"), ("ui/a/tokens.css", ""),
+             ("ui/b/tokens-dark.css", ""), ("ui/c/tokens.css", ""),
+             ("hive/z.ts", "")]
+    expect("human-reviewed, rename at the old path",
+           pr.human_reviewed([("ui/base.css", "ui/tokens.css")]),
+           ["ui/tokens.css"])
+    expect("human-reviewed, rename at the new path",
+           pr.human_reviewed([("ui/tokens.css", "ui/base.css")]),
+           ["ui/tokens.css"])
     expect("human-reviewed line",
            pr.human_reviewed_line(pr.human_reviewed(files)),
-           "Human-reviewed: this PR changes mcp/a.ts, mcp/b.ts, mcp/c.ts "
-           "and 1 more. It will not merge unattended; /ship will ask first.")
+           "Human-reviewed: this PR changes ui/tokens.css, ui/old/tokens.css, "
+           "ui/a/tokens.css and 2 more. It will not merge unattended; /ship "
+           "will ask first.")
     expect("human-reviewed absent", pr.human_reviewed_line(
         pr.human_reviewed([("hive/a.ts", "")])), None)
+    expect("mcp/ is not human-reviewed", pr.human_reviewed(
+        [("mcp/src/index.ts", ""), ("mcp/a.ts", "mcp/b.ts")]), [])
     expect("human-reviewed list matches CONVENTIONS.md",
-           "`mcp/**`" in read(os.path.join(ROOT, "CONVENTIONS.md")), True)
+           "`mcp/**`" in read(os.path.join(ROOT, "CONVENTIONS.md")), False)
 
     # Reports and exit codes.
     def run(name, status="completed", conclusion="success", ident=1,

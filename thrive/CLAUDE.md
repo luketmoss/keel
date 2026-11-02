@@ -170,6 +170,34 @@ section's start; part-way through one, Ready stays.
 - `cd apps-script && npm test` / `npm run typecheck` — sandboxed `node:vm`
 - `cd sync && npm test` — `node --test`, no network
 
+## Apps Script deployment
+
+`/ship` deploys a change to `apps-script/src/` just before merging it, with the
+owner's local clasp login, and parks for the owner when it can't
+(`stack-apps-script` §Deploying). Nothing else runs `clasp`.
+
+- **Script ID: not yet recorded.** The owner adds it here, from
+  `apps-script/.clasp.json` or the editor's Project Settings.
+  Until it is, `/ship` parks every Apps Script change for the owner.
+  `apps-script/.clasp.json` is gitignored (`.clasp.json.example` is the
+  template), so this line is the only committed record of it.
+- **Live web-app deployment ID:**
+  `AKfycbz1O8FkuHohIi6O3ykBKr8u-6oqWLWz0a79pX2nLrSUCNtKbsXyz_hObQAqt5oj4qF-ew`.
+  It is in the public Pages bundle's API URL, so it is not a secret.
+- **Deploying account: luketmossbot.** The web app executes as the account
+  that deploys it (`USER_DEPLOYING`), and its Drive copies, triggers and
+  script properties are that account's. `/ship` deploys only when its clasp
+  login is luketmossbot, and parks otherwise.
+- **Push command:** `cd apps-script`, `clasp push --force` — the `webapp`
+  block in `src/appsscript.json` keeps access at "Anyone", and `--force`
+  overwrites the server manifest with it. Then
+  `clasp redeploy AKfycbz1O8FkuHohIi6O3ykBKr8u-6oqWLWz0a79pX2nLrSUCNtKbsXyz_hObQAqt5oj4qF-ew --description "..."`,
+  which cuts a new version on the live deployment and keeps its URL. Roll back
+  with the same command and `-V <previous version>`.
+- **`clasp deploy` is never used.** It creates a new deployment with a new URL,
+  and every consumer holding the old one breaks: the Pages build
+  (`VITE_THRIVE_API_URL`), the syncs and the MCP Worker.
+
 ## Change both together
 
 Thrive is one repository now, so each pair below changes in **one pull
@@ -179,7 +207,8 @@ request**.
   are the only two copies. A column or field changes in both.
 - **Response shapes.** A change to `apps-script/` that alters a response shape
   also changes the MCP Worker's client in `mcp/src/thrive/`, or its tools break
-  silently. A pull request touching `mcp/` is human-reviewed (#393).
+  silently. A pull request touching `mcp/` merges unattended (#745); `/review`
+  blocks a change to the MCP safety model no criterion asks for.
 - **The COROS portal URL rule** (`corosActivityUrl`) has two copies:
   `frontend/src/api/coros-link.ts` and `mcp/src/thrive/domain.js`.
 - **The trail rules** (#691): decoding `trails`, name splitting and keys, grouping,
@@ -188,8 +217,8 @@ request**.
   tested against one fixture, `mcp/test/fixtures/trails-rules-golden.json`
   (`frontend/src/trails/trails-golden.test.ts` and `mcp/src/thrive/trails.test.js`), and
   `thrive.yml` and `mcp.yml` each run on the other side's half. A rule change edits the
-  fixture and both copies, so it touches `mcp/` and is human-reviewed: intended, since the
-  Worker is the copy no screen shows.
+  fixture and both copies, so it touches `mcp/`, and `/review` reads the Worker's
+  half as closely as the app's, since the Worker is the copy no screen shows.
 
 ## Changing the schema
 
@@ -203,8 +232,9 @@ After that, a column or tab changes only like this:
    tabs by column position.
 3. The API (`apps-script/`), the frontend mirror (`frontend/src/api/`) and the
    Worker (`mcp/src/thrive/`) change in the same pull request.
-4. **Apps Script deploys first**, then its callers. Merging does not deploy it;
-   the steps are the owner's, per the apps-script stack skill.
+4. **Apps Script deploys first**, then its callers. `/ship` deploys it just
+   before the merge (§Apps Script deployment); a migration to run first is the
+   owner's, and parks the issue until it is done.
 
 ## Environment
 - **Windows machine** — `jq` is NOT available. For JSON parsing in shell commands, use `gh` built-in `--jq` flags. Never pipe to a standalone `jq` command.

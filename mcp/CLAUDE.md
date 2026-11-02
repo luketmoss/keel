@@ -242,6 +242,15 @@ Merge to `main` deploys, once the `CLOUDFLARE_API_TOKEN` repository secret
 exists; until then the deploy job skips with a notice. Worker secrets are set
 with `npx wrangler secret put`, never committed.
 
+A pull request here merges unattended like any other (#745): `/ship` merges
+it, then reports the `mcp.yml` run's `deploy` job, and a failed deploy is
+reported, not reverted. What stands in for a person reading it is `/review`,
+which blocks a change to the safety model — a tool moved onto a read connector,
+a tool dropped from §Approving the destructive tools or its confirm step
+removed, a change to authentication or error scrubbing — unless an acceptance
+criterion asks for exactly that (`CONVENTIONS.md` §7. Code Review). An Apps
+Script change the Worker depends on is deployed by `/ship` before that merge.
+
 ## Thrive
 
 `/thrive/mcp` and `/thrive/write/mcp` serve the 29 Thrive tools between them, ported from the stdio server
@@ -297,7 +306,7 @@ not tagged yet, never "not on this trail", so the answer counts those activities
 The grouping and like-for-like rules are a copy of the app's (`src/thrive/trails.js`, from
 `thrive/frontend/src/trails/`), held in step by `test/fixtures/trails-rules-golden.json`, which both
 sides' tests read; `mcp.yml` also runs on a change to the app's copy. A rule change edits the fixture
-and both copies in one pull request, which is therefore human-reviewed.
+and both copies in one pull request, so `/review` reads both halves.
 
 ## Forage
 
@@ -323,7 +332,7 @@ Every request is a form-encoded POST, so the key stays out of URLs, and errors a
   would remove (a food, recipe, plan entry or trip) is now used by a row outside the call, naming the use.
 - **`undoCall`'s payload `call_id` is the call to revert**, so `apiWrite` leaves a payload's own `call_id` alone
   rather than stamping the tool call's over it. The API logs the revert under an id it makes.
-- **Ordering.** The Apps Script first: `clasp push` and a new web-app version, then the migration re-run
+- **Ordering.** The Apps Script first: `clasp push` and a new web-app version (now `/ship`'s, #745), then the migration re-run
   (`forage/scripts/migrate-703-create-tabs.mjs`, which adds `MCPChangeLog` and raises `schema_version` to 2), then
   the two secrets, then this Worker. Until the API has the tab, every key write is refused ("MCPChangeLog tab
   missing"), and an API from before #713 answers `forage_undo` as unknown actions: the tool says to redeploy.

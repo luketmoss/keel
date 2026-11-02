@@ -141,7 +141,7 @@ usage window left, early in a day the user is around:
    **fresh `origin/main`**, then diff Keel's `src` against the frozen checkout:
    the only difference should be the dispatch target. Only then does the owner
    run `clasp push` and deploy a new version of the existing web-app deployment
-   (the URL does not change). A session never runs these.
+   (the URL does not change). These are the owner's, per Safety rule 2.
 4. **Hand-dispatch each sync once** with `workflow_dispatch` and check its log
    row, then use the app's sync button and confirm the request ends done.
 

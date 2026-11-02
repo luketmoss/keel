@@ -296,8 +296,8 @@ trigger filter (`<slug>/**` and the workflow's own file), concurrency group and
 cache-key prefix are unchanged and are not repeated here; per
 `CONVENTIONS.md` §Continuous integration this job runs on any change in the
 project folder. `<slug>/<component>` is the component's directory. There is no
-deploy step: `clasp push` and the new web-app version are the owner's, per
-SKILL.md.
+deploy step: `clasp push` and the new web-app version are `/ship`'s, before
+the merge, or the owner's when it parks, per SKILL.md.
 
 ```yaml
   <component>:

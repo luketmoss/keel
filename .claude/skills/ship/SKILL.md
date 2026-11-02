@@ -15,10 +15,11 @@ to Ship because a check was red, a PR had a conflict, or a review found
 something — once whatever stopped them is fixed.
 
 Merging to main triggers the build, which means merged is deployed and there is
-no one else between here and `main`. The refusals below are what stands in for
-the person who used to. None of them is a judgment call: every one is a fact
-about the PR, and every one leaves the issue in Ready to Ship for a human rather
-than proceeding.
+no one else between here and `main`. An Apps Script API is the exception CI
+cannot deploy, so this skill deploys it itself, just before the merge. The
+refusals below are what stands in for the person who used to. None of them is a
+judgment call: every one is a fact about the PR, and every one leaves the issue
+in Ready to Ship for a human rather than proceeding.
 
 ## Preconditions
 
@@ -87,6 +88,180 @@ five, then `and N more`.
   nothing is remembered. Shipping several PRs asks once per matching PR and
   merges the unmatched ones without a question.
 
+## Deploy Apps Script
+
+After the human-reviewed check passes and **before `## Results` is written**,
+look at the same changed-file list for a file under
+`<project>/apps-script/src/`. Tests, `package.json` and the rest of
+`apps-script/` are not an Apps Script change: no deploy, no deploy lines. With
+no Apps Script change, skip to Results.
+
+**This is the only place any skill runs `clasp`.** `/develop`, `/test` and
+`/review` never do: a push alone changes what live triggers run, before review.
+Deploying here, before the merge, is what keeps the order every project asks
+for — the API is live before the merge deploys the Worker that calls it.
+
+Name the project by its display name from its `CLAUDE.md` (Forage, Thrive,
+Hive). Two Apps Script projects in one PR deploy in path order, each with its
+own `Deploy:` line and report paragraph; a park on either parks the whole PR,
+and one already deployed is rolled back first (step 5). Shipping several PRs,
+each deploys immediately before its own merge, never all first.
+
+### 1. Check it can deploy
+
+Every one of these, or park (below) without running anything that changes the
+live script:
+
+- **A clasp login.** `clasp show-authorized-user` names an account — the
+  project's deploying account, where its `CLAUDE.md` names one, since the web
+  app executes as whoever deploys it. A cloud session (`CLAUDE_CODE_REMOTE=true`)
+  never has a login: park without running it.
+- **The IDs are recorded.** The project's `CLAUDE.md` deploy section records
+  the script ID and the live web-app deployment ID.
+- **A push and a new version are enough.** `appsscript.json` adds nothing to
+  `oauthScopes` against the base branch, and the issue names no trigger to
+  install, script property to set, or migration or backfill to run first:
+
+  ```bash
+  git diff origin/main -- <project>/apps-script/src/appsscript.json
+  ```
+- **The checkout is exactly the PR.** `HEAD` is the PR's head commit and
+  `git status --porcelain -- <project>/apps-script/src` prints nothing —
+  nothing modified or untracked — so the push sends exactly what was reviewed.
+
+### 2. Record the live version
+
+```bash
+cd <project>/apps-script
+clasp list-deployments
+```
+
+Note the version the live deployment ID serves. It is the "was" in the report
+and the `-V` of every roll back.
+
+### 3. Push and redeploy
+
+Write `.clasp.json` (gitignored) from the recorded script ID, in the form
+`.clasp.json.example` gives, then run the project's push command and redeploy
+the existing deployment:
+
+```bash
+clasp push              # or `clasp push --force` where the project says so
+clasp redeploy <deploymentId> --description "#<issue> <title>"
+```
+
+**Never `clasp deploy` or `clasp create-deployment`.** Either makes a new
+deployment with a new URL, and every consumer holding the old one — the
+Worker's secret, the Pages bundles — breaks.
+
+A failure here parks with the failed-part-way report below.
+
+### 4. Confirm
+
+`clasp list-deployments` again: the live deployment ID now serves a version
+newer than the one recorded in step 2. If it doesn't, that is a failed
+redeploy — park with the failed-part-way report.
+
+### 5. Then Results and the merge
+
+Write `## Results` with the `Deploy:` line below, then merge as the next
+sections say. **If the merge fails after a deploy, roll back** before
+reporting:
+
+```bash
+clasp redeploy <deploymentId> -V <previous>
+git checkout origin/main -- <project>/apps-script/src
+clasp push              # the project's push command: triggers run main's
+```
+
+Then park with the merge-failed report.
+
+### The `Deploy:` line
+
+The last line of `## Results`, as `stack-apps-script` requires. When this
+session deployed:
+
+```
+Deploy: the session pushed and deployed version 58 on <deploymentId>
+(previous 57; roll back with `clasp redeploy <deploymentId> -V 57`). Nothing
+owed.
+```
+
+`Nothing owed.` becomes the steps still owed to the owner, when there are any.
+
+### Parked — cannot deploy
+
+Same shape as the human-reviewed park. Nothing ran, nothing merged, and the
+issue stays in Ready to Ship:
+
+```
+Parked in Ready to Ship — not merged, nothing deployed.
+
+PR #<pr> changes Forage's Apps Script, and this session can't deploy it:
+  <reason>
+
+The owner's steps, in order:
+  1. clasp push --force
+  2. clasp redeploy <deploymentId> --description "#<issue> <title>"
+  3. <re-authorization, trigger, property or migration step, if any>
+Then run /ship <issue> to merge.
+```
+
+Reasons, one line each, every one that applies, in this order:
+
+- `No clasp login in this session (cloud sessions never have one).`
+- `The clasp login is <account>, not <deploying account>, which
+  thrive/CLAUDE.md names.`
+- `forage/CLAUDE.md records no script ID or deployment ID.`
+- `It adds the <scope> scope to appsscript.json, which needs
+  re-authorization in the editor.`
+- `The issue says <trigger / script property / migration> comes first.`
+- `The checkout is not at the PR's head, or apps-script/src has uncommitted
+  changes.`
+
+The owner's steps use the project's own push command and the real deployment
+ID when it is recorded; otherwise `<deploymentId>` stays as written. A step 3
+appears only for the reasons that need one — re-authorization is
+`stack-apps-script` §Deploying step 3.
+
+### Parked — the deploy failed part way
+
+What is live now differs from `main`, so the report says what it is:
+
+```
+Parked in Ready to Ship — not merged.
+
+Deploying Forage's Apps Script failed at <clasp push | clasp redeploy>:
+  <the command's error, first 5 lines>
+
+What is live now:
+  pushed code: <the PR's | unchanged>
+  deployment:  version 57 (unchanged)
+Roll back the push with: git checkout origin/main -- forage/apps-script/src;
+clasp push --force
+```
+
+When the push failed, `pushed code: unchanged` and the roll-back line is left
+out.
+
+### Parked — the merge failed after deploying
+
+```
+Parked in Ready to Ship — not merged.
+
+The merge failed after Forage's Apps Script was deployed:
+  <gh's error>
+Rolled back: deployment is version 57 again, and origin/main's src is pushed.
+```
+
+If the roll back itself fails, the second paragraph is replaced with
+`ROLL BACK FAILED — version 58 (this PR) is live and main does not have it.`
+followed by the failing command's error and the two roll-back commands.
+
+A re-run of `/ship` after any of these parks starts over: it records the live
+version again and pushes and redeploys again. Nothing from the first run is
+remembered.
+
 ## Write the Results first
 
 Before merging, fill in `## Results` on the issue body — what actually happened,
@@ -98,6 +273,9 @@ This has to happen before the merge, because the merge closes the issue.
 It is also the highest-value habit in the pipeline and the easiest to skip.
 Months from now the Results section is the only part of the issue anyone reads.
 Write something worth reading — "done" is not that.
+
+A PR with an Apps Script change ends `## Results` with the `Deploy:` line from
+§Deploy Apps Script.
 
 If `/test` listed criteria as **waived by the owner, not verified** (android,
 mobile), `## Results` lists them under "Watch after install", worded as
@@ -155,6 +333,35 @@ the remedy, and it isn't the first move — reach for it only after the check
 above has run, so using it always means you looked. Reaching for it out of habit
 after every merge is how a one-click board setting stays broken forever.
 
+## The MCP Worker's deploy
+
+When the PR changed anything under `mcp/`, the merge is what deploys the
+Worker: `mcp.yml`'s `deploy` job runs on the push to `main`. Find that run on
+the merge commit and wait for it, **at most 10 minutes**:
+
+```bash
+gh run list --repo luketmoss/keel --workflow mcp.yml --commit <merge-sha> \
+  --json databaseId,status,conclusion,url
+gh run view <run-id> --repo luketmoss/keel --json jobs
+```
+
+Report its `deploy` job in exactly one of these forms:
+
+```
+MCP Worker: deployed by mcp.yml (run <url>).
+MCP Worker: not deployed — mcp.yml skipped its deploy job (no
+CLOUDFLARE_API_TOKEN). The merge is in.
+MCP Worker: deploy FAILED in mcp.yml (run <url>). The merge is in and
+nothing was reverted; the Worker still runs the previous version.
+MCP Worker: mcp.yml still running after 10 minutes (run <url>) — not
+confirmed.
+```
+
+A failed Worker deploy is reported, not reverted. The API is backward
+compatible by rule — columns appended, never moved — so the previous Worker
+against the new API is a known-safe state, and a revert is a new PR for a
+person.
+
 ## Flag Refined siblings
 
 A merge can quietly invalidate the premise another Refined issue was written
@@ -183,5 +390,20 @@ matters.
 ## Report
 
 What merged, the commit on main, and that CI is building. If the project has a
-deploy target, say where it's going. Note any Refined siblings flagged in the
-same Project.
+deploy target, say where it's going.
+
+Then the deploy section, after the commit and before the Refined siblings —
+only for what this PR touched. A PR with no Apps Script change and no `mcp/`
+change reads as above, with no deploy lines:
+
+```
+Deployed Forage's Apps Script before merging: version 58 on the live
+deployment (was 57). Roll back with:
+  clasp redeploy <deploymentId> -V 57
+MCP Worker: deployed by mcp.yml (run <url>).
+```
+
+The deployment ID is printed in full in the rollback command, so it can be
+copied. The MCP line is one of the four forms in §The MCP Worker's deploy.
+
+Note any Refined siblings flagged in the same Project.

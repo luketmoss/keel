@@ -70,6 +70,12 @@ than failing. A repository without the secret is a repository that has not been
 set up yet, not a broken build, and a permanently red `main` teaches everyone to
 ignore it.
 
+A session may merge, and so deploy: `/ship` merges a reviewed PR unattended,
+including one under `mcp/` (#745), and when the PR touched `mcp/**` it reads
+the merge commit's `mcp.yml` run and reports its `deploy` job. A failed deploy
+is reported, not reverted — the API it calls is backward compatible by rule, so
+the previous Worker keeps working, and a revert is a new PR for a person.
+
 Secrets set with `wrangler secret put` live on Cloudflare and are not touched by
 a deploy. Setting one is a deliberate step by the person who owns the account.
 

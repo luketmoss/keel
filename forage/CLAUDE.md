@@ -35,7 +35,8 @@ into code and #702 starts from the icons.
 `.github/workflows/forage-pages.yml` (#705) on every push to `main` that
 touches it, `auth/` or `ui/`. The build gets `FORAGE_GOOGLE_CLIENT_ID` and
 `FORAGE_API_URL` only; the API key and Sheet ID never reach the client.
-`apps-script/` is deployed by the owner (`clasp`), never by CI or a session.
+`apps-script/` is deployed by `/ship` before the merge, or by the owner when
+it parks, never by CI (§Apps Script deployment).
 
 ## Stacks
 
@@ -185,7 +186,8 @@ tests hold that true:
 - **Where a tool is registered:** `mcp/src/forage/tools.ts`. A tool is a write
   tool unless it is in `FORAGE_READ_TOOLS` there. `mcp/docs/forage-tools.md`
   is the table of every tool and the steps for adding one. A PR adding one
-  changes `mcp/**` and is human-reviewed.
+  changes `mcp/` and merges unattended; `/review` blocks a change to the MCP
+  safety model no criterion asks for (`CONVENTIONS.md` §7. Code Review).
 - **Undo.** Every key-caller write is logged by `withChangeLog`
   (`apps-script/src/change-log.js`) for the tabs `CHANGE_LOGGED_ACTIONS` names;
   `getChangeLog` and `undoCall` (key-only) read and revert it, all or nothing.
@@ -200,6 +202,30 @@ tests hold that true:
   #710 trips, #711 walkthroughs, #712 food log) removes its actions from
   `PENDING_TOOLS` in the PR that adds their tools; since #712 the list is empty. `forage.yml` runs on
   `mcp/src/forage/**` as well, so a Worker change runs it too.
+
+## Apps Script deployment
+
+`/ship` deploys a change to `apps-script/src/` just before merging it, with the
+owner's local clasp login, and parks for the owner when it can't
+(`stack-apps-script` §Deploying). Nothing else runs `clasp`.
+
+- **Script ID: not yet recorded.** The owner adds it here, from
+  `apps-script/.clasp.json` or the editor's Project Settings.
+  Until it is, `/ship` parks every Apps Script change for the owner.
+  `apps-script/.clasp.json` is gitignored (`.clasp.json.example` is the
+  template), so this line is the only committed record of it.
+- **Live web-app deployment ID:**
+  `AKfycbxOvmfNj8p0ekkdUNwddqB6coLxQRC1F7L-MKvjXI2fGybhHVq_eSWn4SiYdkJHdRT3`.
+  It is in the public Pages bundle's API URL, so it is not a secret.
+- **Push command:** `cd apps-script`, `clasp push --force` — the `webapp`
+  block in `src/appsscript.json` keeps access at "Anyone", and `--force`
+  overwrites the server manifest with it. Then
+  `clasp redeploy AKfycbxOvmfNj8p0ekkdUNwddqB6coLxQRC1F7L-MKvjXI2fGybhHVq_eSWn4SiYdkJHdRT3 --description "..."`,
+  which cuts a new version on the live deployment and keeps its URL. Roll back
+  with the same command and `-V <previous version>`.
+- **`clasp deploy` is never used.** It creates a new deployment with a new URL,
+  and every consumer holding the old one breaks: the Forage and Thrive Pages
+  builds (`FORAGE_API_URL`) and the MCP Worker.
 
 ## Key commands
 
@@ -216,6 +242,7 @@ tests hold that true:
 - `node scripts/check-import-urls.mjs scripts/import-urls/urls.txt scripts/import-urls/heldout.txt`
   — dry-runs `importRecipe` against the deployed API for each URL (the owner's,
   with `FORAGE_API_URL` and `FORAGE_API_KEY` prompted for; usage in the file)
-- A session never runs `clasp`; `apps-script/.clasp.json` is gitignored and
-  `.clasp.json.example` is the template
+- Only `/ship` runs `clasp` (§Apps Script deployment);
+  `apps-script/.clasp.json` is gitignored and `.clasp.json.example` is the
+  template
 - The user's terminal is PowerShell 5.1 — no `&&`; use `;` or separate commands

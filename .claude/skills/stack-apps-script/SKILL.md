@@ -91,18 +91,38 @@ these it needs. `/test` lists those criteria back; it does not mark them passed.
 
 ## Deploying
 
-**Merged is not deployed here**, an exception to `CONVENTIONS.md` §Done. Apps
-Script serves the last *deployed* version, not the last pushed one, and the
-owner does both by hand. A session never runs `clasp push` or `clasp deploy`,
-and CI does not either: that needs a clasp credential in repo secrets and has a
-different failure model, so it is deliberately not automated.
+**Merged is not deployed by CI here**, an exception to `CONVENTIONS.md` §Done.
+Apps Script serves the last *deployed* version, not the last pushed one, and CI
+does neither: that needs a clasp credential in repo secrets and has a different
+failure model, so it is deliberately not automated.
 
-The owner's steps, in order:
+**`/ship` deploys, before the merge (#745).** When a PR changes
+`apps-script/src/`, `/ship` runs `clasp push` and `clasp redeploy` on the live
+deployment with the owner's local clasp login, then merges. It is the only
+skill that runs `clasp`; `/develop`, `/test` and `/review` never do, because a
+push alone changes what triggers run. It deploys only what a push and a new
+version carry, and parks the issue in Ready to Ship with the owner's steps when
+the change needs more (step 3 below, a trigger, a script property, a
+migration), when the session has no clasp login, or when the project's
+`CLAUDE.md` does not record its script ID and live deployment ID. The
+conditions, the rollback and the reports are in `/ship`. **`clasp deploy` is
+never used**: it creates a new deployment with a new URL, and every consumer
+holding the old one breaks.
+
+Each Apps Script project's `CLAUDE.md` records, in its deploy section, the
+script ID, the live web-app deployment ID and the push command (`clasp push`,
+or `clasp push --force` where the manifest must overwrite the server's). The
+deployment URL ships in public bundles and the script ID alone grants nothing,
+so neither is a secret.
+
+The steps, in order. `/ship` does the first two; the third is always the
+owner's, and a change that needs it parks:
 
 1. `clasp push` — sends `src/` to the script project.
-2. Deploy → Manage deployments → edit the existing web-app deployment → New
-   version → Deploy. The URL stays the same. A new deployment would change it,
-   and every consumer holds the old one.
+2. `clasp redeploy <deploymentId> --description "#<issue> <title>"` — a new
+   version on the existing web-app deployment (in the editor: Deploy → Manage
+   deployments → edit → New version → Deploy). The URL stays the same. A new
+   deployment would change it, and every consumer holds the old one.
 3. If a scope was added to `appsscript.json`, **re-authorize once**: the editor
    prompts only for the scopes the function being run uses, so signed in as the
    script's owner, open the script (`clasp open-script`), paste a throwaway
@@ -121,6 +141,15 @@ both steps, together.
 above that apply — push, new version, re-authorization, install a trigger —
 or saying that none is needed. The merge does not do them, and the Results are
 the only place the owner will see that they are owed.
+
+When `/ship` deployed it, the line says so — the version, the deployment ID,
+the previous version and the rollback command — and then what is still owed:
+
+```
+Deploy: the session pushed and deployed version 58 on <deploymentId>
+(previous 57; roll back with `clasp redeploy <deploymentId> -V 57`). Nothing
+owed.
+```
 
 ## Secrets
 
@@ -158,8 +187,9 @@ client.
   last one, so a caller that predates it still reads every column it knew.
 - **Deploy order: Apps Script first**, then the callers. A caller deployed
   before the script it depends on talks to the old shape.
-- **A pull request touching `mcp/` is human-reviewed (#393).** The delivery run
-  parks it in Ready to Ship rather than merging.
+- **A pull request touching `mcp/` merges unattended (#745).** `/ship` deploys
+  the Apps Script first and the merge deploys the Worker, so the order holds;
+  `/review` blocks any change to the MCP safety model no criterion asks for.
 
 The Worker's own conventions are `stack-worker`'s; this file owns only the
 API it calls.

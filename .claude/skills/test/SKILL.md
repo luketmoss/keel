@@ -36,6 +36,11 @@ Three outcomes per criterion:
 - **Cannot be verified here** — physical hardware, a real device, a visual
   judgment. Name it explicitly; never let it pass silently
 
+**Never run `clasp`** to verify an Apps Script change — not even a push. A push
+changes what the live triggers run before review; `/ship` deploys it, just
+before the merge (`stack-apps-script` §Deploying). What needs the live script
+is listed back as not verified here, as that stack skill says.
+
 A criterion you didn't actually check is a failure, not a pass. Do not infer
 from a green build that behaviour is correct — a compile proves syntax.
 

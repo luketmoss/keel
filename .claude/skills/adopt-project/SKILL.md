@@ -99,10 +99,11 @@ Stated in the plan and inherited by every child:
 1. **The old repo is frozen** after its finish-first list: no commits, PRs,
    settings or issue edits, except the steps marked **[old repo]** (disabling
    workflows, the redirect PR, the archive).
-2. **Nothing deploys Apps Script from Keel before the cutover**, and a session
-   never runs `clasp push` or `clasp deploy` at all (`stack-apps-script`). A
-   push by the owner starts from a fresh `origin/main`, after a diff of Keel's
-   `src` against the frozen checkout.
+2. **Nothing deploys Apps Script from Keel before the cutover**, and the
+   cutover push itself is the owner's — it is one of the risky steps. A push
+   by the owner starts from a fresh `origin/main`, after a diff of Keel's `src`
+   against the frozen checkout. After the cutover the project follows
+   `stack-apps-script` §Deploying, where `/ship` deploys.
 3. **A live gate is never set outside the flip.** A `<SLUG>_SYNCS_LIVE`-style
    variable stays unset until the flip. Rotating-token files are never touched
    and no authorize script is run: copy existing values.

@@ -176,9 +176,8 @@ section's start; part-way through one, Ready stays.
 owner's local clasp login, and parks for the owner when it can't
 (`stack-apps-script` §Deploying). Nothing else runs `clasp`.
 
-- **Script ID: not yet recorded.** The owner adds it here, from
-  `apps-script/.clasp.json` or the editor's Project Settings.
-  Until it is, `/ship` parks every Apps Script change for the owner.
+- **Script ID:**
+  `1jkG-0nK1axvqKI9J8hG6uKiWFLKnnemhdXHA2V8lWNC8yOuzkOYA4Vh5`.
   `apps-script/.clasp.json` is gitignored (`.clasp.json.example` is the
   template), so this line is the only committed record of it.
 - **Live web-app deployment ID:**

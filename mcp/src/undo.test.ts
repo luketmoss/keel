@@ -176,7 +176,9 @@ describe('thrive_undo (#412)', () => {
       'Undid newer: 2 rows restored. This undo is itself call undo-1, and can be undone the same way.',
     )).toBe(true)
     expect(result.content[0].text.endsWith("Turn it off in Search and tools when you've finished writing.")).toBe(true)
-    expect(requests.filter((r) => r.payload.confirm)).toHaveLength(1)
+    const confirmed = requests.filter((r) => r.payload.confirm)
+    expect(confirmed).toHaveLength(1)
+    expect(confirmed[0].payload.call_id).toBe('newer') // the call being undone, not this call's own id
     expect(budget.stored.thrive).toEqual([{ t: T0, rows: 2 }])
   })
 
@@ -256,7 +258,7 @@ describe('hive_undo (#412)', () => {
   it('previews, then restores with confirm', async () => {
     const budget = fakeBudget({ now: T0 })
     const e = { ...env, WRITE_BUDGET: budget.namespace } as Env
-    fakeApi((r) =>
+    const requests = fakeApi((r) =>
       r.payload.confirm
         ? { success: true, data: { dry_run: false, call_id: 'newer', undo_call_id: 'undo-9', count: 1, changes: [] } }
         : {
@@ -278,6 +280,9 @@ describe('hive_undo (#412)', () => {
     expect(done.content[0].text.startsWith(
       'Undid newer: 1 rows restored. This undo is itself call undo-9, and can be undone the same way.',
     )).toBe(true)
+    const confirmed = requests.filter((r) => r.action === 'undoCall' && r.payload.confirm)
+    expect(confirmed).toHaveLength(1)
+    expect(confirmed[0].payload.call_id).toBe('newer') // the call being undone, not this call's own id
     expect(budget.stored.hive).toEqual([{ t: T0, rows: 1 }])
   })
 

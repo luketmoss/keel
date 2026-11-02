@@ -161,9 +161,12 @@ export async function apiWrite(action, payload) {
   }
   // Every write request of one tool call carries that call's id, so the app can
   // log and undo them together (#412). A read never does.
+  // A payload that already names a call_id keeps it: undoCall's is the call to
+  // revert, not this one (#742).
   const callId = isWrite ? currentCallId() : undefined;
+  const own = callId && !('call_id' in payload);
   try {
-    const data = await call(action, {}, callId ? { ...payload, call_id: callId } : payload);
+    const data = await call(action, {}, own ? { ...payload, call_id: callId } : payload);
     // previewSetUpdates rides apiWrite but only resolves; it changes nothing (#409).
     if (action !== 'previewSetUpdates') markWrote();
     return data;

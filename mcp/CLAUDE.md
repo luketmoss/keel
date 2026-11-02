@@ -153,6 +153,8 @@ successful undo. They are thin: the apps hold the record and do the reverting
   state, never in a module variable) and sends it on every write request that
   call makes, so `thrive_schedule_week`'s `appendSets` chunks and each
   `createWorkout` are one undoable unit. Reads and `previewSetUpdates` carry none.
+  An undo keeps its own `call_id`: a payload that already names one (`undoCall`'s,
+  the call to revert) is sent as it is, not stamped with the undo's id (#742).
 - `thrive_undo {}` / `hive_undo {}` list the last 20 MCP calls, newest first:
   `<call_id> · <YYYY-MM-DD HH:MM America/Denver> · <actions> · <n> rows`.
 - `{ call_id }` is a dry run, `{ call_id, confirm: true }` reverts. If any row

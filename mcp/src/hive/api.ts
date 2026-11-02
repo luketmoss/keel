@@ -65,9 +65,11 @@ export async function apiWrite(cfg: HiveConfig, action: string, payload: unknown
   params.set('action', action)
   params.set('key', cfg.apiKey)
   // Every write request of one tool call carries that call's id, so the app can
-  // log and undo them together (#412).
+  // log and undo them together (#412). A payload that already names a call_id
+  // keeps it: undoCall's is the call to revert, not this one (#742).
   const callId = currentCallId()
-  params.set('payload', JSON.stringify(callId ? { ...(payload as object), call_id: callId } : payload))
+  const own = callId && !('call_id' in (payload as object))
+  params.set('payload', JSON.stringify(own ? { ...(payload as object), call_id: callId } : payload))
   const result = await call(cfg, `${url.origin}${url.pathname}?${params.toString()}`)
   // Only a write Hive accepted counts: a refusal changed nothing.
   if (result.success) markWrote()

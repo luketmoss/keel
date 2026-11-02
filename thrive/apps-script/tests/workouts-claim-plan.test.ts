@@ -51,7 +51,7 @@ describe('AC1: a single matching plan is completed, not duplicated', () => {
   it('writes the activity onto the plan, finishes it, and appends nothing', () => {
     const { res, rows } = upsert([plan()]);
     expect(res.success, res.error).toBe(true);
-    expect(res.data).toMatchObject({ status: 'claimed', id: 'w_plan0001', sheetRow: 2 });
+    expect(res.data).toMatchObject({ status: 'claimed', claimed_from: 'planned', id: 'w_plan0001', sheetRow: 2 });
     expect(rows).toHaveLength(1);
     const r = rows[0];
     expect(r[C.status]).toBe('');
@@ -134,7 +134,6 @@ describe('AC2: matching is exact and refuses to guess', () => {
   it('never claims a row that is not a plan for this day and type', () => {
     const notCandidates = [
       plan({ id: 'w_active01', status: 'active' }),
-      plan({ id: 'w_done0001', status: '' }),
       plan({ id: 'w_other_dt', date: '2026-10-12' }),
       plan({ id: 'w_hike0001', type: 'hike' }),
       plan({ id: 'w_linked01', source_activity_id: '471166302945810000' }),
@@ -190,6 +189,126 @@ describe('AC3: only the create path claims', () => {
     expect(res.data.status).toBe('deleted');
     expect(rows).toHaveLength(1);
     expect(display(rows[0])).toEqual(display(p));
+  });
+});
+
+// #736 — a finished hand-logged row is claimed too, the same way.
+
+const finished = (over: Record<string, CellValue> = {}) => plan({
+  id: 'w_done0001', time: '16:30', name: 'Mountain Bike Ride', notes: 'flat tire', template_id: '',
+  estimated_seconds: '', effort: 'Hard', status: '', elapsed_seconds: '4000', distance_m: '20000', ...over,
+});
+
+describe('#736: a finished hand-logged row is claimed', () => {
+  it.each(['', 'complete'])('writes the activity onto a row with status "%s" and appends nothing', (status) => {
+    const { res, rows } = upsert([finished({ status })]);
+    expect(res.success, res.error).toBe(true);
+    expect(res.data).toMatchObject({ status: 'claimed', claimed_from: 'finished', id: 'w_done0001', sheetRow: 2 });
+    expect(rows).toHaveLength(1);
+    const r = rows[0];
+    expect(r[C.status]).toBe('');
+    expect(r[C.source]).toBe('coros');
+    expect(r[C.source_activity_id]).toBe(ID);
+    for (const [f, v] of Object.entries(RIDE)) {
+      if (f !== 'name') expect(r[C[f]], f).toBe(v);
+    }
+  });
+
+  it('keeps name, notes, effort, template and estimate, and records the name as edited', () => {
+    const { res, rows } = upsert([finished({ template_id: 'tpl_ride01', estimated_seconds: '3000' })]);
+    const r = rows[0];
+    expect(r[C.name]).toBe('Mountain Bike Ride');
+    expect(r[C.notes]).toBe('flat tire');
+    expect(r[C.effort]).toBe('Hard');
+    expect(r[C.template_id]).toBe('tpl_ride01');
+    expect(r[C.estimated_seconds]).toBe('3000');
+    expect(res.data.written.edited).toEqual(['name']);
+  });
+
+  it("a finished row with no name takes the activity's", () => {
+    const { res, rows } = upsert([finished({ name: '' })]);
+    expect(rows[0][C.name]).toBe('Mountain Bike');
+    expect(res.data.written.edited).toEqual([]);
+  });
+
+  it('an active row is not claimed: a new row is appended', () => {
+    const { res, rows } = upsert([finished({ status: 'active' })]);
+    expect(res.data.status).toBe('created');
+    expect(rows).toHaveLength(2);
+  });
+
+  it('one planned and one finished row are ambiguous: neither is claimed, both are named', () => {
+    const a = plan();
+    const b = finished();
+    const before = [display(a), display(b)];
+    const { res, rows } = upsert([a, b]);
+    expect(res.data.status).toBe('created');
+    expect(res.data.ambiguous_plans).toEqual(['w_plan0001', 'w_done0001']);
+    expect(rows).toHaveLength(3);
+    expect(display(rows[0])).toEqual(before[0]);
+    expect(display(rows[1])).toEqual(before[1]);
+  });
+
+  it('two finished rows are ambiguous too', () => {
+    const { res, rows } = upsert([finished({ id: 'w_done000a' }), finished({ id: 'w_done000b' })]);
+    expect(res.data.status).toBe('created');
+    expect(res.data.ambiguous_plans).toEqual(['w_done000a', 'w_done000b']);
+    expect(rows).toHaveLength(3);
+  });
+
+  it('a finished row of another type, another date, or already linked is not a candidate', () => {
+    const others = [
+      finished({ id: 'w_other_dt', date: '2026-10-12' }),
+      finished({ id: 'w_hike0001', type: 'hike' }),
+      finished({ id: 'w_linked01', source_activity_id: '471166302945810000' }),
+      finished({ id: 'w_srcd0001', source: 'coros' }),
+    ];
+    const before = others.map(display);
+    const { res, rows } = upsert([...others]);
+    expect(res.data.status).toBe('created');
+    expect(res.data.ambiguous_plans).toBeUndefined();
+    before.forEach((_, i) => expect(display(rows[i]), String(i)).toEqual(before[i]));
+  });
+
+  it('a garmin_import activity claims no finished row', () => {
+    const f = finished();
+    const { res, rows } = upsert([f], { source: 'garmin_import' });
+    expect(res.data.status).toBe('created');
+    expect(res.data.ambiguous_plans).toBeUndefined();
+    expect(display(rows[0])).toEqual(display(f));
+  });
+
+  it('an activity already in Thrive, or whose row was deleted, claims no finished row', () => {
+    const f = finished();
+    const synced = workoutRow({
+      id: 'w_ride0001', ...RIDE, source: 'coros', source_activity_id: ID, raw_ref: 'drive-file-1', synced_at: T1,
+    });
+    const upd = upsert([f, synced], { last_written: RIDE, synced_at: T2 });
+    expect(upd.res.data).toMatchObject({ status: 'updated', id: 'w_ride0001' });
+    expect(display(upd.rows[0])).toEqual(display(f));
+    const del = upsert([f], { last_written: RIDE });
+    expect(del.res.data.status).toBe('deleted');
+    expect(display(del.rows[0])).toEqual(display(f));
+  });
+
+  it('refuses to write if the sheet changed between choosing the finished row and writing', () => {
+    const api = loadApi([finished()], { now: NOW, uuids: ['a1b2c3d4e5f6'] });
+    const scan = api.sandbox.getAllRows;
+    api.sandbox.getAllRows = (sheet: any) => {
+      const out = scan(sheet);
+      api.rows.unshift(workoutRow({ id: 'w_other001' }));
+      return out;
+    };
+    const res = callDoGet<any>(api.sandbox, {
+      action: 'upsertSyncedWorkout',
+      payload: JSON.stringify({
+        source: 'coros', source_activity_id: ID, incoming: RIDE, last_written: null,
+        raw_ref: 'drive-file-1', synced_at: T1,
+      }),
+    });
+    expect(res.success).toBe(false);
+    expect(res.error).toMatch(/sheet changed during the write/);
+    expect(api.rows[1][C.source]).toBe('');
   });
 });
 

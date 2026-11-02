@@ -455,7 +455,17 @@ test('#403 AC2: ambiguous plans are a SyncLog note naming them, not a failure, a
   assert.equal(out.created, 1);
   assert.deepEqual(out.failures, []);
   assert.equal(out.notes.length, 1);
-  assert.match(out.notes[0], new RegExp(`^bike ${GRAVEL.activity_id} on \\d{4}-\\d{2}-\\d{2}: ambiguous, planned w_plan000a, w_plan000b;`));
+  assert.match(out.notes[0], new RegExp(`^bike ${GRAVEL.activity_id} on \\d{4}-\\d{2}-\\d{2}: ambiguous, could be w_plan000a, w_plan000b; none claimed, a new row was written$`));
+});
+
+test('#736: a claimed finished row is logged as claimed logged and counts as new', async () => {
+  const { archive } = await archiveWith([GRAVEL]);
+  const api = claimingApi((_payload, res) => ({ ...res, status: 'claimed', claimed_from: 'finished', id: 'w_done0001' }));
+  const lines = [];
+  const out = await syncActivities({ archive, api, activityIds: [GRAVEL.activity_id], syncedAt: SYNCED, log: (l) => lines.push(l) });
+  assert.equal(out.created, 1);
+  assert.deepEqual(out.failures, []);
+  assert.ok(lines.some((l) => /: claimed logged w_done0001/.test(l)), lines.join('\n'));
 });
 
 test('#403: a status the sync does not know fails that activity rather than counting it silently', async () => {

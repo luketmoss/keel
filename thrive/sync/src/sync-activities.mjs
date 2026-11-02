@@ -22,9 +22,10 @@
 // which are never written again. Hybrid Fitness (1200) takes the same path
 // (#194), without moving time: its `Workout Time` includes the rests.
 //
-// Any other activity new to Thrive completes the day's one plan of its type
-// instead of appending beside it (#403): the API answers `claimed`, counted as
-// created. Two or more such plans are a SyncLog note, and a new row as before.
+// Any other activity new to Thrive completes the day's one plan of its type, or
+// takes over its one finished hand-logged row, instead of appending beside it
+// (#403, #736): the API answers `claimed`, counted as created. Two or more such
+// rows, of either kind, are a SyncLog note, and a new row as before.
 
 import { fitSheetFields } from './fit.mjs';
 import { ActivityFormatError, ACTIVITY_FIELDS, normalizeActivity } from './normalize-activity.mjs';
@@ -193,15 +194,15 @@ export async function syncActivities({ archive, api, activityIds, syncedAt, fit 
       }
       const changed = !sameNormalized(result.written, lastWritten);
       const status = result.status === 'updated' && !changed ? 'unchanged' : result.status;
-      // A claimed plan (#403) is the activity's first row in Thrive: SyncLog's n_new.
+      // A claimed plan or logged row (#403, #736) is the activity's first row in Thrive: SyncLog's n_new.
       out[status === 'claimed' ? 'created' : status] += 1;
-      const what = status === 'claimed' ? 'claimed planned' : status;
+      const what = status === 'claimed' ? `claimed ${result.claimed_from === 'finished' ? 'logged' : 'planned'}` : status;
       const kept = result.kept?.length ? `; kept Thrive edits to ${result.kept.join(', ')}` : '';
       log(`  activity ${id} (${incoming.type}${incoming.sub_type ? `/${incoming.sub_type}` : ''}): ${what} ${result.id}${kept}`);
       if (result.ambiguous_plans?.length) {
         out.notes.push(
-          `${incoming.type} ${id} on ${incoming.date}: ambiguous, planned ${result.ambiguous_plans.join(', ')}; ` +
-          `no plan completed, a new row was written`
+          `${incoming.type} ${id} on ${incoming.date}: ambiguous, could be ${result.ambiguous_plans.join(', ')}; ` +
+          `none claimed, a new row was written`
         );
       }
 

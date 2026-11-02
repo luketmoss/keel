@@ -260,11 +260,15 @@ function planWeek(payload) {
     var problems = [];
     var seen = stored.slice();
     var now = isoNow();
+    var ids = {};
     var planned = list.map(function (raw, i) {
       var entry = { date: '', slot: '', recipe_id: '', note: '' };
       try {
         if (!raw || typeof raw !== 'object') throw new Error('each entry must be an object');
         ['date', 'slot', 'recipe_id', 'note'].forEach(function (f) { if (has(raw, f)) entry[f] = raw[f]; });
+        // One row per id: a second entry with the same id would append a second row with that key.
+        if (raw.id && ids[cell(raw.id)]) throw new Error('id "' + cell(raw.id) + '" is already entry ' + ids[cell(raw.id)]);
+        if (raw.id) ids[cell(raw.id)] = i + 1;
         var existing = raw.id ? getRecord('Plan', { id: cell(raw.id) }) : null;
         entry.id = existing ? existing.id : idFor(raw.id, ID_PREFIXES.plan);
         validatePlanFields(entry);

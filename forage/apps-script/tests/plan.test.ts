@@ -320,6 +320,16 @@ describe('planWeek', () => {
     api.ok('planWeek', { payload: { entries: ids, dry_run: false } });
     expect(api.rows('Plan')).toHaveLength(3);
   });
+
+  it('refuses one id on two entries of the same call, naming both, and writes none', () => {
+    const api = seeded();
+    const twice = [{ ...week[0], id: 'pl_same' }, week[1], { ...week[2], id: 'pl_same' }];
+    const res = api.call('planWeek', { payload: { entries: twice, dry_run: false } });
+    expect((res as unknown as { problems: unknown }).problems).toEqual([
+      { entry: 3, date: '2026-11-05', error: 'id "pl_same" is already entry 1' },
+    ]);
+    expect(api.rows('Plan')).toEqual([]);
+  });
 });
 
 describe('undo reverses each plan write, and keeps a meal that joined a trip', () => {

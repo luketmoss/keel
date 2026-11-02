@@ -93,6 +93,19 @@ comes from the API's `getWorkoutTrack` with the user's Google token, never from 
 - A change under `geo/` or `auth/` rebuilds Thrive (`thrive.yml` and `thrive-pages.yml` trigger on both).
 - **Sign-in is `@keel/auth`** (#608, a `file:../../auth` dependency, keys prefixed `gw_`). `src/auth/auth-provider.tsx` only mirrors its session into context; `login-screen.tsx` and the demo short-circuit stay here.
 
+## Food card (#714)
+
+The Day screen's **Food · from Forage** card (`frontend/src/components/day/food-card.tsx`, state in
+`src/state/food.ts`, the read in `src/api/forage-food.ts`) shows the day's calories, macros and item count and a
+seven-day kcal strip, all from Forage's `getFoodLogTotals`. Thrive adds nothing up, never edits food and never reads
+Forage's Sheet. The call is `callAction` with `url` set to Forage's API, built from `VITE_FORAGE_API_URL` (passed by
+`thrive-pages.yml` from the repository secret `FORAGE_API_URL`, the one `forage-pages.yml` uses). A build without it
+mounts no card and makes no request; demo mode shows built-in data. Forage accepts the call because its API has a
+third caller kind: a token issued to `TOKEN_THRIVE_CLIENT_ID` (= `VITE_GOOGLE_CLIENT_ID`, set as a Forage script
+property) for the allowed email, which may run `getFoodLogTotals` only (`forage/apps-script/src/auth.js`). Until that
+property is set, the card shows its failed state ("Couldn't load your food.") and nothing else on the Day screen
+changes.
+
 ## Sip widget (#524)
 
 `android/` is Thrive Sip's home-screen widget and one-screen settings app

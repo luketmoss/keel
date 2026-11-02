@@ -95,7 +95,7 @@ function handleRequest(e) {
   try {
     var caller = resolveCaller(params);
     if (caller.refusal) return envelope(caller.refusal);
-    if (caller.mode === 'token' && !isTokenAction(action)) {
+    if (caller.mode === 'token' && !isTokenAction(action, caller)) {
       return envelope(fail('This action is not permitted with an access token', 'not_permitted'));
     }
     // #713: a key caller's write is logged row by row, under the script lock.

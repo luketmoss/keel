@@ -12,6 +12,11 @@
 //   run only TOKEN_ACTIONS. Unlike Thrive's app, Forage's reads through the
 //   API too, so the list covers reads and writes.
 //
+// - A **Thrive caller** (#714) is a token caller from Thrive's own OAuth client:
+//   its token must be issued to `TOKEN_THRIVE_CLIENT_ID` for the same
+//   `TOKEN_ALLOWED_EMAIL`, and it may run THRIVE_TOKEN_ACTIONS only, which is
+//   `getFoodLogTotals`. The property unset means there is no such caller.
+//
 // `access_token` present makes a token caller whatever else is sent, `key`
 // included: privilege must never rise by adding a parameter.
 //
@@ -36,6 +41,12 @@ var TOKEN_ACTIONS = [
   'getFoodLog', 'getFoodLogTotals', 'logFood', 'updateLogEntry', 'deleteLogEntry',
   'getCooks', 'upsertCook', 'deleteCook',
 ];
+
+/**
+ * What a Thrive caller (#714) may run: the daily totals and nothing else. Adding
+ * a second action here is a deliberate decision, and `auth.test.ts` fails on it.
+ */
+var THRIVE_TOKEN_ACTIONS = ['getFoodLogTotals'];
 
 var TOKENINFO_URL = 'https://oauth2.googleapis.com/tokeninfo';
 
@@ -77,6 +88,12 @@ function resolveCaller(params) {
   if (params.access_token !== undefined && params.access_token !== null) {
     var verdict = verifyAccessToken(params.access_token);
     if (verdict === 'ok') return { mode: 'token' };
+    // Not the app's token: it may be Thrive's (#714), which is checked against its own client.
+    if (verdict === 'token_forbidden' || verdict === 'unconfigured') {
+      var thrive = verifyThriveToken(params.access_token);
+      if (thrive === 'ok') return { mode: 'token', client: 'thrive' };
+      if (thrive === 'token_unavailable') verdict = thrive;
+    }
     // Both are the owner's to fix, and signing in again cannot: "set up wrong".
     var code = verdict === 'unconfigured' || verdict === 'unauthorized_scope' ? 'token_forbidden' : verdict;
     return { refusal: fail(TOKEN_REFUSAL_MESSAGES[verdict], code) };
@@ -85,8 +102,10 @@ function resolveCaller(params) {
   return { mode: 'key' };
 }
 
-function isTokenAction(action) {
-  return TOKEN_ACTIONS.indexOf(action) !== -1;
+/** Whether this token caller may run `action`: the app's token any allow-listed action, Thrive's only its own. */
+function isTokenAction(action, caller) {
+  var list = caller && caller.client === 'thrive' ? THRIVE_TOKEN_ACTIONS : TOKEN_ACTIONS;
+  return list.indexOf(action) !== -1;
 }
 
 function trimmedProperty(props, name) {
@@ -102,8 +121,22 @@ function trimmedProperty(props, name) {
  */
 function verifyAccessToken(token) {
   var props = PropertiesService.getScriptProperties();
-  var clientId = trimmedProperty(props, 'TOKEN_CLIENT_ID');
-  var allowedEmail = trimmedProperty(props, 'TOKEN_ALLOWED_EMAIL').toLowerCase();
+  return verifyTokenFor(token, trimmedProperty(props, 'TOKEN_CLIENT_ID'),
+    trimmedProperty(props, 'TOKEN_ALLOWED_EMAIL').toLowerCase());
+}
+
+/**
+ * Verify a token as Thrive's (#714): issued to `TOKEN_THRIVE_CLIENT_ID` for the
+ * allowed account. The same verdicts as verifyAccessToken; the property unset is
+ * `'unconfigured'`, so no Thrive caller exists until the owner sets it.
+ */
+function verifyThriveToken(token) {
+  var props = PropertiesService.getScriptProperties();
+  return verifyTokenFor(token, trimmedProperty(props, 'TOKEN_THRIVE_CLIENT_ID'),
+    trimmedProperty(props, 'TOKEN_ALLOWED_EMAIL').toLowerCase());
+}
+
+function verifyTokenFor(token, clientId, allowedEmail) {
   if (!clientId || !allowedEmail) return 'unconfigured';
 
   if (typeof token !== 'string' || token === '') return 'token_invalid';

@@ -9,7 +9,8 @@ afterEach(cleanup);
 
 describe('slots', () => {
   it('orders the slots and drops health and body on a future day', () => {
-    expect(SLOT_ORDER).toEqual(['glance', 'training', 'sleep', 'drinks', 'vitals', 'body', 'note']);
+    // Food (#714) is in the order but mounts only in a build with Forage's API URL, or in demo mode.
+    expect(SLOT_ORDER).toEqual(['glance', 'training', 'sleep', 'food', 'drinks', 'vitals', 'body', 'note']);
     expect(slotsFor('past')).toEqual(['glance', 'training', 'sleep', 'drinks', 'vitals', 'body', 'note']);
     expect(slotsFor('today')).toEqual(['glance', 'training', 'sleep', 'drinks', 'vitals', 'body', 'note']);
     expect(slotsFor('future')).toEqual(['training', 'note']);

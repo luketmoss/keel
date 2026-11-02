@@ -164,7 +164,11 @@ as `FORAGE_API_KEY`) and may run every action. The app sends `access_token`,
 checked against `TOKEN_CLIENT_ID` and `TOKEN_ALLOWED_EMAIL`, and may run
 `TOKEN_ACTIONS` in `auth.js`: everything but `getConfig`, `setConfig`,
 `ensureSchema`, `getChangeLog` and `undoCall`. Either may POST form-encoded; a
-`payload` over 45,000 characters is refused.
+`payload` over 45,000 characters is refused. A third caller (#714) is Thrive's
+Day screen: an `access_token` issued to `TOKEN_THRIVE_CLIENT_ID` (Thrive's OAuth
+client ID, an identifier) for the same `TOKEN_ALLOWED_EMAIL`, which may run
+`THRIVE_TOKEN_ACTIONS` in `auth.js`, only `getFoodLogTotals`, and is refused
+every other action. With the property unset there is no such caller.
 
 ## MCP tools
 

@@ -6,6 +6,8 @@ interface ImportMetaEnv {
   readonly VITE_DEMO_MODE?: string;
   /** The Apps Script API's live /exec URL (#410). Unset: Sync now waits for the poller. */
   readonly VITE_THRIVE_API_URL?: string;
+  /** Forage's API /exec URL (#714). Unset: the Day screen has no Food card and makes no request. */
+  readonly VITE_FORAGE_API_URL?: string;
   /** A browser key for the Maps JavaScript API (#407). Unset: no activity shows a Route section. */
   readonly VITE_GOOGLE_MAPS_API_KEY?: string;
 }

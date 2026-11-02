@@ -24,6 +24,7 @@ const METRICS = [
   '--metric-alcohol',
   '--metric-coffee',
   '--metric-unwind',
+  '--metric-food',
 ];
 
 /** Deep, REM, light, awake: the order they sit in along the sleep bar. */
@@ -59,6 +60,12 @@ describe.each(THEMES)('metric colours (%s)', (theme) => {
   it.each(STAGES.slice(1).map((s, i) => [STAGES[i], s]))('%s and %s differ by at least 1.4:1', (a, b) => {
     const ratio = contrast(token(theme, a), token(theme, b));
     expect(ratio, `${a} / ${b} is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(1.4);
+  });
+
+  // #714: the Food card's title is text in --metric-food, so it is held to the text ratio, not the marks' 3:1.
+  it('--metric-food is at least 4.5:1 on --color-surface, as the Food card title', () => {
+    const ratio = contrast(token(theme, '--metric-food'), token(theme, '--color-surface'));
+    expect(ratio, `--metric-food on the card is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(4.5);
   });
 
   it('no metric colour is a status colour', () => {

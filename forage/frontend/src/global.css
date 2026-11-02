@@ -2344,6 +2344,7 @@ a.text-btn {
 .delete-entry {
   display: block;
   margin: var(--space-sm) auto 0;
+  color: var(--color-danger-text);
 }
 
 .add-food-btn {

@@ -167,6 +167,16 @@ describe('dry_run on logFood and updateLogEntry', () => {
     expect(logged()).toBe(1);
   });
 
+  it("a key caller's dry run is not a logged write: it answers even while the change-log tab is missing", () => {
+    const api = loadApi();
+    seed(api);
+    api.ss.sheets.delete('MCPChangeLog');
+    expect(log(api, { food_id: 'yog', qty: 1, unit: 'cup', dry_run: true })).toMatchObject({ kcal: 149.9 });
+    expect(api.call('logFood', { payload: { date: DAY, slot: 'Dinner', food_id: 'yog', qty: 1, unit: 'cup' } }).success).toBe(
+      false,
+    );
+  });
+
   it('a refused dry run is the same refusal as the write', () => {
     const api = loadApi();
     seed(api);

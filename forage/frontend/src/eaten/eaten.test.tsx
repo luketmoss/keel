@@ -730,6 +730,10 @@ describe('the stylesheet', () => {
     expect(rule(css, '.log-row')).toContain('min-height: 56px');
   });
 
+  it('Delete entry is a danger text button, not the primary colour', () => {
+    expect(rule(css, '.delete-entry')).toContain('color: var(--color-danger-text)');
+  });
+
   it('nothing scrolls sideways at 375px: the day card and macros wrap, names wrap', () => {
     expect(rule(css, '.day-card')).toContain('flex-wrap: wrap');
     expect(rule(css, '.day-macros')).toContain('flex-wrap: wrap');

@@ -234,6 +234,20 @@ describe('the food form: More from the label', () => {
     ]) {
       expect(within(section).getByText(label)).toBeDefined();
     }
+    // #776: one flat column in label order, with no indent and no heading rows.
+    expect(
+      [...section.querySelectorAll('label.extra-field')].map((l) => l.querySelector('.hint')!.textContent),
+    ).toEqual([
+      'Saturated fat g',
+      'Trans fat g',
+      'Cholesterol mg',
+      'Sodium mg',
+      'Fiber g',
+      'Sugars g',
+      'Added sugars g',
+    ]);
+    expect(section.querySelectorAll('.is-indented, .is-indented-2').length).toBe(0);
+    expect(readGlobalCss()).not.toMatch(/is-indented/);
     unmount();
     form(food({ name: 'Rice', fiber_100g: 1 }));
     expect(screen.getByTestId('more-label-toggle').parentElement!.textContent).toContain('Per 100 g');

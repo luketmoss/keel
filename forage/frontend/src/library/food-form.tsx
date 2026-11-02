@@ -58,17 +58,6 @@ const EXTRA_LABELS: Record<ExtraKey, string> = {
   added_sugars_g: 'Added sugars g',
 };
 
-/** How far each is indented under the one it is part of, as on a label. */
-const EXTRA_INDENT: Record<ExtraKey, number> = {
-  satfat_g: 1,
-  transfat_g: 1,
-  cholesterol_mg: 0,
-  sodium_mg: 0,
-  fiber_g: 1,
-  sugars_g: 1,
-  added_sugars_g: 2,
-};
-
 const MAX_MG_100G = 100000;
 
 const text = (n: number | null | undefined) => (n === null || n === undefined ? '' : String(n));
@@ -419,12 +408,8 @@ export function FoodForm({ api, food, origin = {}, onSaved, onCancel }: Props) {
             <p class="hint">{packaged ? 'Per serving' : 'Per 100 g'}</p>
             {EXTRA_KEYS.map((k) => {
               const err = extraErrors[k];
-              const indent = EXTRA_INDENT[k];
               return (
-                <label
-                  key={k}
-                  class={`extra-field${indent === 1 ? ' is-indented' : indent === 2 ? ' is-indented-2' : ''}`}
-                >
+                <label key={k} class="extra-field">
                   <span class="hint">{EXTRA_LABELS[k]}</span>
                   <input
                     class="field"

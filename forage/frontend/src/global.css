@@ -2413,14 +2413,6 @@ a.text-btn {
   display: block;
 }
 
-.extra-field.is-indented {
-  padding-left: var(--space-md);
-}
-
-.extra-field.is-indented-2 {
-  padding-left: calc(var(--space-md) * 2);
-}
-
 .extra-fields {
   display: grid;
   gap: var(--space-sm);

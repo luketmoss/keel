@@ -2,6 +2,7 @@
 // real client. It records every request and answers each action from a small
 // in-memory store; a test overrides one action with `answer`.
 import { vi } from 'vitest';
+import { EXTRA_COLUMN, EXTRA_KEYS, type ExtraKey } from './api/types';
 import type {
   Cook,
   Food,
@@ -277,7 +278,16 @@ export function fakeApi() {
           const mine = log.filter((e) => e.date === date);
           const sum = (f: 'kcal' | 'protein_g' | 'carbs_g' | 'fat_g') =>
             mine.some((e) => e[f] !== null) ? r1(mine.reduce((t, e) => t + (e[f] ?? 0), 0)) : null;
+          // #755: a sum covers the entries that have the value; `unknown` counts those with calories that lack it.
+          const sumX = (k: ExtraKey) =>
+            mine.some((e) => typeof e[k] === 'number') ? r1(mine.reduce((t, e) => t + (e[k] ?? 0), 0)) : null;
+          const extras = Object.fromEntries(EXTRA_KEYS.map((k) => [k, sumX(k)]));
+          const unknown = Object.fromEntries(
+            EXTRA_KEYS.map((k) => [k, mine.filter((e) => e.kcal !== null && typeof e[k] !== 'number').length]),
+          );
           return {
+            ...extras,
+            unknown,
             date,
             entries: mine.length,
             unknown_entries: mine.filter((e) => e.kcal === null).length,
@@ -436,8 +446,15 @@ export function fakeApi() {
       const grams = p.unit === 'g' ? p.qty : p.qty * (w?.g ?? 0);
       const known = typeof f.kcal_100g === 'number';
       const of = (v: number | null) => (known && v !== null ? r1((v * grams) / 100) : null);
+      const more = Object.fromEntries(
+        EXTRA_KEYS.map((k) => {
+          const v = f[EXTRA_COLUMN[k]];
+          return [k, known && typeof v === 'number' ? r1((v * grams) / 100) : null];
+        }),
+      );
       return {
         ...base,
+        ...more,
         grams: r1(grams),
         kcal: of(f.kcal_100g),
         protein_g: of(f.protein_100g),
@@ -452,6 +469,7 @@ export function fakeApi() {
     const times = (v: number | null) => (v === null ? null : r1(v * p.qty));
     return {
       ...base,
+      ...Object.fromEntries(EXTRA_KEYS.map((k) => [k, times(per[k] ?? null)])),
       grams: null,
       kcal: times(per.kcal),
       protein_g: times(per.protein_g),

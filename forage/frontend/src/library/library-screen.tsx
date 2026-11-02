@@ -386,7 +386,9 @@ export function LibraryScreen({ api, empty, icon }: Props) {
         <FoodSheet
           api={api}
           id={overlay.id}
-          onEdit={(food, focusNutrition) => setOverlay({ kind: 'form', food, origin: { focusNutrition } })}
+          onEdit={(food, focusNutrition, focusExtras) =>
+            setOverlay({ kind: 'form', food, origin: { focusNutrition, focusExtras } })
+          }
           onDeleted={(name) => {
             setOverlay(null);
             showFoodsNotice(`Deleted ${name}`);

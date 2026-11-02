@@ -6,6 +6,7 @@ import { readRateSkips, skipRating } from '../cook/cook-store';
 import { shortDate } from '../cook/format';
 import { Stars } from '../cook/stars';
 import { FoodChooser } from '../import/food-chooser';
+import { MoreNutrition } from '../ui/more-nutrition';
 import { Sheet } from '../ui/sheet';
 import { FoodForm } from './food-form';
 import { displayName } from './food-math';
@@ -218,6 +219,17 @@ export function NutritionSheet({ api, recipeId, onChanged, onClose, focusCook }:
                 {Math.round(per.fat_g ?? 0)} g
               </p>
             </>
+          )}
+          {per.kcal !== null && (
+            <MoreNutrition
+              values={per}
+              fat={per.fat_g}
+              carbs={per.carbs_g}
+              rounding="whole"
+              unknown={n.per_serving_unknown}
+              atLeastNote="At least: some ingredients don't have this one."
+              noneText="None of the ingredients has sodium, fiber or the rest yet."
+            />
           )}
         </section>
 

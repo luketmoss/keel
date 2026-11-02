@@ -489,7 +489,7 @@ describe('the Nutrition sheet', () => {
       />,
     );
     await settle();
-    expect(screen.getByTestId('nutrition-card').textContent).toBe(
+    expect(screen.getByTestId('nutrition-card').textContent).toContain(
       '520 kcal a serving, partialProtein 32 g · Carbs 40 g · Fat 22 g',
     );
     const banner = screen.getByTestId('missing-banner');

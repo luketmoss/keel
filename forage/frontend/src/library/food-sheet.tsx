@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ForageApi } from '../api/client';
-import type { FoodDetail, Store } from '../api/types';
+import { EXTRA_COLUMN, EXTRA_KEYS, type Extras, type FoodDetail, type Store } from '../api/types';
+import { MoreNutrition, noneKnown } from '../ui/more-nutrition';
 import { Sheet } from '../ui/sheet';
 import { StoreChips } from './food-form';
 import { displayName, hasNutrition } from './food-math';
@@ -10,7 +11,7 @@ interface Props {
   api: ForageApi;
   id: string;
   /** Edit, or Add nutrition (focused on the first nutrition field). */
-  onEdit: (food: FoodDetail, focusNutrition: boolean) => void;
+  onEdit: (food: FoodDetail, focusNutrition: boolean, focusExtras?: boolean) => void;
   onDeleted: (name: string) => void;
   onClose: () => void;
 }
@@ -110,6 +111,12 @@ export function FoodSheet({ api, id, onEdit, onDeleted, onClose }: Props) {
     { label: '100 g', g: 100 },
   ];
   const unchecked = food.source === 'off' && !food.verified;
+  // #756: the seven for the food's default weight (its first, the label serving for a packaged food), else 100 g.
+  const defaultWeight = food.servings_json?.[0];
+  const dg = defaultWeight?.g ?? 100;
+  const at = (v: number | null | undefined) => (typeof v === 'number' ? (v * dg) / 100 : null);
+  const extras: Extras = {};
+  for (const k of EXTRA_KEYS) extras[k] = at(food[EXTRA_COLUMN[k]]);
   return (
     <Sheet title={name} onClose={onClose} testId="food-sheet">
       <p class="hint">
@@ -152,6 +159,25 @@ export function FoodSheet({ api, id, onEdit, onDeleted, onClose }: Props) {
           </button>
         </div>
       )}
+
+      {hasNutrition(food) &&
+        (noneKnown(extras) ? (
+          <div class="more-missing" data-testid="more-missing">
+            <p class="hint">Sodium, fiber and the rest aren't filled in.</p>
+            <button type="button" class="text-btn" onClick={() => onEdit(food, false, true)}>
+              Add them
+            </button>
+          </div>
+        ) : (
+          <MoreNutrition
+            values={extras}
+            fat={at(food.fat_100g)}
+            carbs={at(food.carbs_100g)}
+            rounding="tenth"
+            caption={defaultWeight ? `Per 1 ${defaultWeight.name} (${fmt(defaultWeight.g)} g)` : 'Per 100 g'}
+            noneText=""
+          />
+        ))}
 
       {food.buy_unit_plural && typeof food.buy_unit_g === 'number' && (
         <p class="hint">

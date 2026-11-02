@@ -3,6 +3,7 @@ import { ApiError, type ForageApi } from '../api/client';
 import { SLOTS, type Food, type FoodLogEntry, type LogEntryInput, type RecipeSummary, type Slot } from '../api/types';
 import { parseAmount } from '../import/amount';
 import { displayName } from '../library/food-math';
+import { MoreNutrition } from '../ui/more-nutrition';
 import { ConfirmSheet, Sheet } from '../ui/sheet';
 import { MAX_QTY, dayPossessive, defaultQty, macrosLine, newLogId, qtyText, stepFor, tenth, wholeKcal } from './format';
 
@@ -264,6 +265,19 @@ export function AmountSheet({ api, target, date, today, slot: initialSlot, entry
           <span class="amount-macros tabular" data-testid="amount-macros">
             {macrosLine(preview)}
           </span>
+        )}
+        {preview && preview.kcal !== null && (
+          <MoreNutrition
+            values={preview}
+            fat={preview.fat_g}
+            carbs={preview.carbs_g}
+            rounding="tenth"
+            noneText={
+              target.kind === 'food'
+                ? "This food doesn't have sodium, fiber or the rest yet."
+                : "This recipe doesn't have sodium, fiber or the rest yet."
+            }
+          />
         )}
         {partial && <span class="hint">Some ingredients are left out.</span>}
         {recalculated && !updating && <span class="hint">Recalculated from the food as it is now.</span>}

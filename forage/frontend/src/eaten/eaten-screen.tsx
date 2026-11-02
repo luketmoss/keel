@@ -1,3 +1,4 @@
+import { MoreNutrition } from '../ui/more-nutrition';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ForageApi } from '../api/client';
 import { SLOTS, type Food, type FoodLogDay, type FoodLogEntry, type PlanEntry, type Slot } from '../api/types';
@@ -82,6 +83,17 @@ function DayCard({ day, date, today }: { day: FoodLogDay | null; date: string; t
         <span>Carbs {wholeGrams(day?.carbs_g ?? null)}</span>
         <span>Fat {wholeGrams(day?.fat_g ?? null)}</span>
       </div>
+      {day && !allUnknown && (
+        <MoreNutrition
+          values={day}
+          fat={day.fat_g}
+          carbs={day.carbs_g}
+          rounding="whole"
+          unknown={day.unknown}
+          atLeastNote="At least: some entries don't have this one."
+          noneText={`None of ${dayPossessive(date, today)} entries has sodium, fiber or the rest yet.`}
+        />
+      )}
       {!day && (
         <p class="day-note" data-testid="day-note">
           {nothingLogged(date, today)}

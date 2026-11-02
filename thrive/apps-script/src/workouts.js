@@ -389,14 +389,16 @@ function normalizeSyncedFields(data, where, required) {
  * tracking the vendor for that activity (sync plan §8).
  * - Two or more rows: refused, naming them. Picking one would be a guess.
  *
- * A new activity completes its plan (#403). Before appending, the create path
- * looks for rows planned for that day: `status = planned`, the activity's
- * `type` and `date`, `source` and `source_activity_id` blank. Sub-type and
- * time are not compared. Exactly one is claimed: written in place as the
- * activity's row, reported as `claimed`. Two or more: appended as before, no
- * plan touched, and their ids returned as `ambiguous_plans`. Only the create
- * path claims, so an activity already in Thrive, or one whose row the user
- * deleted, never takes over a plan.
+ * A new activity completes its plan, or a finished hand-logged row (#403,
+ * #736). Before appending, the create path looks for rows of that day: the
+ * activity's `type` and `date`, `source` and `source_activity_id` blank, and a
+ * `status` of `planned` or finished (anything but `planned` and `active`).
+ * Sub-type and time are not compared. Exactly one, of either kind, is claimed:
+ * written in place as the activity's row, reported as `claimed` with
+ * `claimed_from` `planned` or `finished`. Two or more: appended as before,
+ * nothing touched, and their ids returned as `ambiguous_plans`. Only the
+ * create path claims, so an activity already in Thrive, or one whose row the
+ * user deleted, never takes over a row.
  *
  * Source-generic: #159's Garmin import comes through here too.
  * Key-only: a write, so it never joins #144's token read allow-list.
@@ -406,8 +408,8 @@ function normalizeSyncedFields(data, where, required) {
  *   the sheet now holds it, plus `edited`, for the sync to store as the next
  *   `last_written`. `kept` is the fields this call declined to overwrite.
  *   `status` is `created`, `updated`, `claimed` (#403) or `deleted`; a
- *   `created` with two or more plans for that day also carries
- *   `ambiguous_plans`, their ids.
+ *   `created` with two or more candidate rows for that day also carries
+ *   `ambiguous_plans`, their ids; a `claimed` carries `claimed_from`.
  */
 function upsertSyncedWorkout(payload) {
   payload = payload || {};
@@ -474,11 +476,11 @@ function upsertSyncedWorkout(payload) {
     }
     var plans = [];
     for (var pr = 0; pr < rows.length && SYNC_NO_CLAIM_SOURCES.indexOf(source) === -1; pr++) {
-      if (isClaimablePlan(rows[pr], incoming)) {
+      if (isClaimableRow(rows[pr], incoming)) {
         plans.push({ rowNum: pr + 2, id: cell(rows[pr][COL.ID]) });
       }
     }
-    if (plans.length === 1) return claimPlan(sheet, plans[0], incoming, owned);
+    if (plans.length === 1) return claimRow(sheet, plans[0], incoming, owned);
 
     var data = {};
     for (var k in incoming) {
@@ -779,9 +781,14 @@ function normalizeEditedFields(value) {
   return out;
 }
 
-/** A row planned for this activity's day and type, not yet any activity's (#403). */
-function isClaimablePlan(row, incoming) {
-  return cell(row[COL.STATUS]) === 'planned' &&
+/**
+ * A row planned or finished by hand for this activity's day and type, not yet
+ * any activity's (#403, #736). An `active` row is never a candidate: the user
+ * is still in it. Finished is anything but `planned` and `active`, as in
+ * `enrichWorkout`.
+ */
+function isClaimableRow(row, incoming) {
+  return cell(row[COL.STATUS]) !== 'active' &&
     cell(row[COL.TYPE]) === incoming.type &&
     cell(row[COL.DATE]) === incoming.date &&
     cell(row[COL.SOURCE]) === '' &&
@@ -789,26 +796,29 @@ function isClaimablePlan(row, incoming) {
 }
 
 /**
- * Write a new activity onto its one planned row (#403), which from then on is
- * an ordinary synced row, found by `(source, source_activity_id)`.
+ * Write a new activity onto its one planned or finished row (#403, #736),
+ * which from then on is an ordinary synced row, found by
+ * `(source, source_activity_id)`.
  *
  * The activity fills every merged field but `name`, and the row is finished
- * (`status` ''). The plan's name is the user's, so it is kept and recorded as
- * edited, and later runs never overwrite it; a plan with no name takes the
+ * (`status` ''). The row's name is the user's, so it is kept and recorded as
+ * edited, and later runs never overwrite it; a row with no name takes the
  * activity's. Notes, effort, template_id and estimated_seconds are not merged
- * fields, so they stay as planned.
+ * fields, so they stay as they were. A hand-typed duration or distance on a
+ * finished row is replaced by the watch's.
  */
-function claimPlan(sheet, plan, incoming, owned) {
-  // Row-index drift (sync plan §10): confirm the row is still that plan.
+function claimRow(sheet, plan, incoming, owned) {
+  // Row-index drift (sync plan §10): confirm the row is still that candidate.
   var range = sheet.getRange(plan.rowNum, 1, 1, WORKOUT_COLUMN_COUNT);
   var row = range.getDisplayValues()[0];
-  if (cell(row[COL.ID]) !== plan.id || !isClaimablePlan(row, incoming)) {
+  if (cell(row[COL.ID]) !== plan.id || !isClaimableRow(row, incoming)) {
     throw new Error(
-      'Workouts row ' + plan.rowNum + ' was expected to hold planned workout ' + plan.id +
+      'Workouts row ' + plan.rowNum + ' was expected to hold workout ' + plan.id +
       '. The sheet changed during the write; nothing was written. Re-run the sync.'
     );
   }
   var current = rowToWorkout(row, plan.rowNum);
+  var claimedFrom = current.status === 'planned' ? 'planned' : 'finished';
   var edited = [];
   for (var m = 0; m < SYNC_MERGED_FIELDS.length; m++) {
     var f = SYNC_MERGED_FIELDS[m];
@@ -825,7 +835,7 @@ function claimPlan(sheet, plan, incoming, owned) {
 
   range.setValues([asText(workoutToRow(current))]);
   return {
-    status: 'claimed', id: current.id, sheetRow: plan.rowNum,
+    status: 'claimed', claimed_from: claimedFrom, id: current.id, sheetRow: plan.rowNum,
     written: pickSynced(current, edited),
     kept: current.name !== incoming.name ? ['name'] : [],
   };

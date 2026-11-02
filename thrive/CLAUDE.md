@@ -445,12 +445,13 @@ whole minutes. `frontend/src/api/duration.ts` is the only conversion boundary.
 no code path may default them to `0`. `Workouts!R-Z` are the sync provenance
 columns, nullable for the same reason; a blank `source` positively means
 "logged by hand", so nothing may default it to a vendor name.
-A new synced activity completes the day's one matching plan instead of
-appending beside it (luketmoss/thrive#403): `upsertSyncedWorkout` claims the single
-`status = planned` row of the activity's `type` and `date` with `source` and
-`source_activity_id` blank, keeps its name, notes, template, estimate and
-effort, and finishes it. Two or more such plans claim nothing, and the run's
-SyncLog notes name them.
+A new synced activity completes the day's one matching plan, or takes over its one finished
+hand-logged row, instead of appending beside it (luketmoss/thrive#403, #736): `upsertSyncedWorkout`
+claims the single row of the activity's `type` and `date` with `source` and `source_activity_id`
+blank and a `status` of `planned` or finished (never `active`), keeps its name, notes, template,
+estimate and effort, replaces a hand-typed duration or distance with the watch's, and finishes it,
+answering `claimed_from` `planned` or `finished`. Two or more such rows, of either kind, claim
+nothing, and the run's SyncLog notes name them.
 `Workouts!AA` `estimated_seconds` (luketmoss/thrive#145) is how long a *planned* session is
 meant to take, typed per plan in whole minutes and stored in seconds through
 the same `duration.ts` boundary. It is not time taken: starting a plan never

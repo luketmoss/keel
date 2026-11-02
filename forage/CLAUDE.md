@@ -59,7 +59,9 @@ The tabs are created by `scripts/migrate-703-create-tabs.mjs`, which calls the
 key-only `ensureSchema`; run it again after a release that adds a tab (#713).
 Nutrition (unit conversion, per serving, the partial rule) is computed only in `apps-script/src/nutrition.js`; the
 plan's derived fields (a meal's kcal a serving, partial, trip status) and the Plan banner's count, `not_on_trip`, only in
-`apps-script/src/plan.js` (#709); and recipe import
+`apps-script/src/plan.js` (#709); a trip's items, what the meals need, the default choices and the stale-line
+prune only in `apps-script/src/trips.js` (#718, behind `startTrip`, `setTripItem`, `closeTrip`, `discardTrip`,
+`getTrip`); and recipe import
 (reading pages, the ingredient line parser, matching lines to foods) only in
 `apps-script/src/importer.js`, behind the one `importRecipe` action (#706).
 The food library (#707): the Open Food Facts lookup is `barcode.js` (`lookupBarcode`, writes nothing), and
@@ -123,6 +125,8 @@ What the columns mean:
   by hand. `choice` is `have`, `ks`, `costco`, `other` or blank (not sorted);
   `suggested` means the choice came from the food's defaults. `buy` is the
   buying amount as text; `bought` a boolean.
+  Only the trip actions write Trips and TripItems (#718): #703's row-level `createTrip`, `updateTrip`,
+  `upsertTripItems` and `deleteTripItem` are gone, since they bypassed the trip rules.
 - **FoodLog.** Exactly one of `food_id` and `recipe_id`. A food's `unit` is a
   serving name from `servings_json` or `g`; a recipe's is `serving`. `grams` is
   resolved for a food, blank for a recipe. `kcal`/`protein_g`/`carbs_g`/`fat_g`

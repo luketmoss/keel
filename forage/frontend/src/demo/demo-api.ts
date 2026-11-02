@@ -29,16 +29,8 @@ import { localDate } from '../cook/format';
 import { displayName, hasNutrition } from '../library/food-math';
 import { SLOTS } from '../api/types';
 import { addDays } from '../plan/dates';
-import {
-  DEMO_COOKS,
-  DEMO_FOODS,
-  DEMO_IMPORT,
-  DEMO_PLAN,
-  DEMO_PRODUCT,
-  DEMO_RECIPES,
-  DEMO_STARTERS,
-  DEMO_TRIPS,
-} from './demo-data';
+import { DEMO_COOKS, DEMO_FOODS, DEMO_IMPORT, DEMO_PLAN, DEMO_PRODUCT, DEMO_RECIPES, DEMO_STARTERS } from './demo-data';
+import { createDemoTrips } from './demo-trips';
 
 let seq = 0;
 const nextId = (prefix: string) => `${prefix}_demo${(++seq).toString(16).padStart(4, '0')}`;
@@ -205,12 +197,14 @@ export function createDemoApi(): ForageApi {
     updated: new Date(now + i).toISOString(),
   }));
   type PlanRow = (typeof plan)[number];
+  // #718: the sample trips, over the same plan, foods and recipes.
+  const trips = createDemoTrips({ now, today, plan, foods, recipes, gramsOf });
 
   /** A Plan row as `getPlan` answers it: the recipe's name and kcal a serving, the trip's status. */
   function planView(p: PlanRow): PlanEntry {
     const r = recipes.find((x) => x.id === p.recipe_id);
     const n = r ? withNutrition(r) : null;
-    const status = p.trip_id ? (DEMO_TRIPS[p.trip_id] ?? '') : '';
+    const status = p.trip_id ? trips.statusOf(p.trip_id) : '';
     return {
       ...clone(p),
       recipe_name: r?.name ?? '',
@@ -626,6 +620,12 @@ export function createDemoApi(): ForageApi {
     removeMeal: async (id) => {
       plan.splice(plan.indexOf(findMeal(id)), 1);
     },
+    getTrip: trips.getTrip,
+    getClosedTrips: trips.getClosedTrips,
+    startTrip: trips.startTrip,
+    setTripItem: trips.setTripItem,
+    closeTrip: trips.closeTrip,
+    discardTrip: trips.discardTrip,
   };
   return api;
 }

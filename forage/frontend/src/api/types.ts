@@ -166,6 +166,108 @@ export interface PlanResult {
   not_on_trip: number;
 }
 
+// ---- #718: shopping trips. Every amount, count and breakdown here is the API's (trips.js).
+
+/** Where an item is got: Have it, a store, or '' (not sorted). */
+export type TripChoice = 'have' | 'ks' | 'costco' | 'other' | '';
+export type TripStore = 'ks' | 'costco' | 'other';
+export const TRIP_STORES: TripStore[] = ['ks', 'costco', 'other'];
+
+/** One meal line behind an item, expanded from the item's snapshot. `text` is '' when the recipe line is gone. */
+export interface TripLine {
+  plan_id: string;
+  date: string;
+  slot: string;
+  recipe_name: string;
+  line_id: string;
+  text: string;
+  amt: string;
+}
+
+export interface TripItem {
+  food_id: string;
+  name: string;
+  category: string;
+  choice: TripChoice;
+  suggested: boolean;
+  bought: boolean;
+  /** #719's. */
+  buy: string;
+  mine: boolean;
+  /** What the meals need (`about 6 onions`), or null for an item with no lines. */
+  need: string | null;
+  lines: TripLine[];
+}
+
+export interface TripMeal {
+  plan_id: string;
+  date: string;
+  slot: Slot;
+  recipe_id: string;
+  recipe_name: string;
+}
+
+export interface TripCounts {
+  all: number;
+  todo: number;
+  have: number;
+  ks: number;
+  costco: number;
+  other: number;
+  to_buy: number;
+  bought: number;
+}
+
+/** `getTrip`'s trip. */
+export interface Trip {
+  id: string;
+  status: 'open' | 'closed';
+  through: string;
+  created: string;
+  closed_at: string;
+  meals: TripMeal[];
+  items: TripItem[];
+  counts: TripCounts;
+  unmatched: { plan_id: string; recipe_name: string; line_id: string; text: string }[];
+}
+
+/** A `getTrips` row, for "Last trip". */
+export interface TripSummary {
+  id: string;
+  status: 'open' | 'closed';
+  through: string;
+  created: string;
+  closed_at: string;
+  items: number;
+  bought: number;
+  stores: TripStore[];
+}
+
+export interface StartTripInput {
+  /** The sheet's own id, so a double tap or a retry builds one trip. */
+  id: string;
+  through: string;
+  plan_ids: string[];
+  today: string;
+  dry_run: boolean;
+}
+
+export interface StartTripResult {
+  trip: Trip;
+  written: boolean;
+  dry_run: boolean;
+}
+
+export interface TripItemChange {
+  choice?: Exclude<TripChoice, ''>;
+  bought?: boolean;
+}
+
+export interface TripItemResult {
+  item: TripItem;
+  remembered?: boolean;
+}
+
 /** A new meal as the app plans it, always with its own id so a retry leaves one row. */
 export type PlanEntryInput = { id: string; date: string; slot: Slot } & ({ recipe_id: string } | { note: string });
 

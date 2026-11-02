@@ -26,8 +26,10 @@ export const TABS: TabDef[] = [
     label: 'Shop',
     icon: ShopIcon,
     empty: {
-      heading: 'No shopping list',
-      sentence: 'When you plan meals, the groceries you need will collect here, grouped by store.',
+      // #718: Shop draws its own no-trip card with this copy and its Plan a trip button.
+      heading: 'No trip in progress',
+      sentence:
+        'A trip gathers what your planned meals need, so you can mark what you have and split the rest by store.',
     },
   },
   {

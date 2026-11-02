@@ -409,8 +409,8 @@ export const DEMO_COOKS: { id: string; recipe_id: string; days_ago: number; rati
 ];
 
 /**
- * #709: the sample plan, by days after today. Weeknight chili tomorrow is on the
- * open trip, the oats tomorrow on an earlier, closed one; Beef Stew is the
+ * #709: the sample plan, by days after today. Weeknight chili tomorrow and in 3 days
+ * is on the open trip (#718), the oats tomorrow on an earlier, closed one; Beef Stew is the
  * partial meal; today's lunch is a note.
  */
 export const DEMO_PLAN: {
@@ -424,10 +424,149 @@ export const DEMO_PLAN: {
   { id: 'pl_demo_1', in_days: 0, slot: 'Lunch', note: 'Leftovers' },
   { id: 'pl_demo_2', in_days: 1, slot: 'Breakfast', recipe_id: 'rc_demo_oats', trip_id: 'tr_demo_closed' },
   { id: 'pl_demo_3', in_days: 1, slot: 'Dinner', recipe_id: 'rc_demo_weeknight', trip_id: 'tr_demo_open' },
-  { id: 'pl_demo_4', in_days: 3, slot: 'Lunch', recipe_id: 'rc_demo_weeknight' },
+  { id: 'pl_demo_4', in_days: 3, slot: 'Lunch', recipe_id: 'rc_demo_weeknight', trip_id: 'tr_demo_open' },
   { id: 'pl_demo_5', in_days: 3, slot: 'Dinner', recipe_id: 'rc_demo_stew' },
   { id: 'pl_demo_6', in_days: 5, slot: 'Dinner', recipe_id: 'rc_demo_weeknight' },
 ];
 
-/** The two sample trips the plan's chips read. */
-export const DEMO_TRIPS: Record<string, 'open' | 'closed'> = { tr_demo_open: 'open', tr_demo_closed: 'closed' };
+// ---- #718: the sample trips
+
+export interface DemoTripItem {
+  food_id: string;
+  name: string;
+  category: string;
+  choice: '' | 'have' | 'ks' | 'costco' | 'other';
+  suggested: boolean;
+  bought?: boolean;
+  need: string;
+  /** Each line: the plan entry, the recipe line's text, and the snapshot's amount. */
+  lines: { plan_id: string; text: string; amt: string }[];
+}
+
+const M1 = 'pl_demo_3';
+const M2 = 'pl_demo_4';
+
+/**
+ * The open sample trip, through today + 5, for Weeknight chili on two days: 9 items, 3 unsorted, 2 suggested
+ * Have it, 2 suggested King Soopers, 1 suggested Costco, 1 already Other; olive oil has no shopping unit.
+ * A snapshot as the API would have built it: the demo shows it, it does not recompute it.
+ */
+export const DEMO_TRIP_ITEMS: DemoTripItem[] = [
+  {
+    food_id: 'fd_demo_onion',
+    name: 'Onion',
+    category: 'Produce',
+    choice: 'ks',
+    suggested: true,
+    need: 'about 4 onions',
+    lines: [
+      { plan_id: M1, text: '2 medium onions, chopped', amt: '2 medium' },
+      { plan_id: M2, text: '2 medium onions, chopped', amt: '2 medium' },
+    ],
+  },
+  {
+    food_id: 'fd_demo_garlic',
+    name: 'Garlic',
+    category: 'Produce',
+    choice: 'ks',
+    suggested: true,
+    need: 'about 1 head',
+    lines: [{ plan_id: M1, text: '3 cloves garlic, minced', amt: '3 clove' }],
+  },
+  {
+    food_id: 'fd_demo_cilantro',
+    name: 'Cilantro',
+    category: 'Produce',
+    choice: '',
+    suggested: false,
+    need: '1 bunch',
+    lines: [{ plan_id: M1, text: '1 bunch cilantro', amt: '1 bunch' }],
+  },
+  {
+    food_id: 'fd_demo_butter',
+    name: 'Butter, unsalted',
+    category: 'Dairy',
+    choice: 'costco',
+    suggested: true,
+    need: '2 tbsp + 2 tbsp',
+    lines: [
+      { plan_id: M1, text: '2 tbsp butter', amt: '2 tbsp' },
+      { plan_id: M2, text: '2 tbsp butter', amt: '2 tbsp' },
+    ],
+  },
+  {
+    food_id: 'fd_demo_yogurt',
+    name: 'Hilltop Dairy Plain yogurt',
+    category: 'Dairy',
+    choice: '',
+    suggested: false,
+    need: '1 cup',
+    lines: [{ plan_id: M1, text: '1 cup plain yogurt, to serve', amt: '1 cup' }],
+  },
+  {
+    food_id: 'fd_demo_beans',
+    name: 'Kidney beans',
+    category: 'Pantry',
+    choice: '',
+    suggested: false,
+    need: 'about 2 cans',
+    lines: [{ plan_id: M1, text: '2 cans kidney beans, drained', amt: '2 can' }],
+  },
+  {
+    food_id: 'fd_demo_oil',
+    name: 'Olive oil',
+    category: 'Pantry',
+    choice: 'have',
+    suggested: true,
+    need: '2 tbsp + 1 tbsp',
+    lines: [
+      { plan_id: M1, text: '2 tbsp olive oil', amt: '2 tbsp' },
+      { plan_id: M2, text: '1 tbsp olive oil', amt: '1 tbsp' },
+    ],
+  },
+  {
+    food_id: 'fd_demo_cumin',
+    name: 'Cumin',
+    category: 'Spices',
+    choice: 'have',
+    suggested: true,
+    need: '2 tsp',
+    lines: [{ plan_id: M1, text: '2 tsp cumin', amt: '2 tsp' }],
+  },
+  {
+    food_id: 'fd_demo_chips',
+    name: 'Tortilla chips',
+    category: 'Snacks',
+    choice: 'other',
+    suggested: false,
+    need: '1 bag',
+    lines: [{ plan_id: M1, text: 'Tortilla chips, to serve', amt: '1 bag' }],
+  },
+];
+
+/** The sample trip's one unmatched line. */
+export const DEMO_TRIP_UNMATCHED = { plan_id: M1, line_id: 'L9', text: '1 bay leaf' };
+
+/** The closed sample trip, 4 days ago, for the oats: the Last trip line. */
+export const DEMO_CLOSED_TRIP_ITEMS: DemoTripItem[] = [
+  {
+    food_id: 'fd_demo_yogurt',
+    name: 'Hilltop Dairy Plain yogurt',
+    category: 'Dairy',
+    choice: 'ks',
+    suggested: false,
+    bought: true,
+    need: '1 cup',
+    lines: [{ plan_id: 'pl_demo_2', text: '1 cup plain yogurt', amt: '1 cup' }],
+  },
+  {
+    food_id: 'fd_demo_bar',
+    name: 'Meadowfield Oat and Honey bar',
+    category: 'Snacks',
+    choice: 'costco',
+    suggested: false,
+    bought: true,
+    need: '1 bar',
+    lines: [{ plan_id: 'pl_demo_2', text: '1 Oat and Honey bar, crumbled', amt: '1 bar' }],
+  },
+];

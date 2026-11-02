@@ -10,6 +10,8 @@ import type {
   RecipeSummary,
   StructuredLine,
   StructuredRecipe,
+  Trip,
+  TripSummary,
 } from './api/types';
 
 export const API_URL = 'https://api.test/exec';
@@ -156,6 +158,12 @@ export function fakeApi() {
   /** #709: the plan, as getPlan answers it; `notOnTrip` is the banner count it reports. */
   const plan: PlanEntry[] = [];
   const counts = { notOnTrip: 0 };
+  /** #718: the open trip getTrip answers, the closed ones getTrips answers, and what startTrip builds. */
+  const trips: { open: Trip | null; closed: TripSummary[]; built: Trip | null } = {
+    open: null,
+    closed: [],
+    built: null,
+  };
   const overrides = new Map<string, (payload: any) => Answer>();
   let seq = 0;
 
@@ -250,6 +258,33 @@ export function fakeApi() {
         const [gone] = plan.splice(i, 1);
         return { success: true, data: { ...gone, deleted: true } };
       }
+      case 'getTrip':
+        return { success: true, data: { trip: trips.open } };
+      case 'getTrips':
+        return { success: true, data: trips.closed };
+      case 'startTrip': {
+        const trip = { ...(trips.built as Trip), id: payload.id, through: payload.through };
+        if (!payload.dry_run) trips.open = trip;
+        return { success: true, data: { trip, written: !payload.dry_run, dry_run: !!payload.dry_run } };
+      }
+      case 'setTripItem': {
+        const item = trips.open?.items.find((i) => i.food_id === payload.food_id);
+        if (!trips.open || !item) return { success: false, error: 'Not on the trip', code: 'not_on_trip' };
+        if (payload.choice) Object.assign(item, { choice: payload.choice, suggested: false });
+        if (payload.choice === 'have') item.bought = false;
+        if (payload.bought !== undefined) item.bought = payload.bought;
+        return { success: true, data: { item: { ...item } } };
+      }
+      case 'closeTrip': {
+        const trip = { ...(trips.open as Trip), status: 'closed' as const, closed_at: '2026-11-02T18:00:00.000Z' };
+        trips.open = null;
+        return { success: true, data: { trip } };
+      }
+      case 'discardTrip': {
+        const id = trips.open?.id;
+        trips.open = null;
+        return { success: true, data: { discarded: id, meals_cleared: 0 } };
+      }
       default:
         return { success: false, error: `Unknown action "${action}"` };
     }
@@ -281,6 +316,7 @@ export function fakeApi() {
     cooks,
     plan,
     counts,
+    trips,
     fetch: fetchMock,
     /** Answer one action with this instead. */
     answer(action: string, fn: (payload: any) => Answer) {

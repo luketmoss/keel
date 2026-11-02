@@ -71,11 +71,11 @@ describe('getPlan: derived fields, order, not_on_trip', () => {
 
   it('marks a meal on an open trip on_trip, and one on a closed trip shopped', () => {
     const api = seeded();
-    api.ok('createTrip', { payload: { id: 'tr_old' } });
-    api.ok('updateTrip', { payload: { id: 'tr_old', changes: { status: 'closed' } } });
-    api.ok('createTrip', { payload: { id: 'tr_new' } });
-    plan(api, { id: 'pl_open', date: '2026-11-04', slot: 'Dinner', recipe_id: 'rc_soup', trip_id: 'tr_new' });
-    plan(api, { id: 'pl_shut', date: '2026-11-03', slot: 'Dinner', recipe_id: 'rc_soup', trip_id: 'tr_old' });
+    plan(api, { id: 'pl_shut', date: '2026-11-03', slot: 'Dinner', recipe_id: 'rc_soup' });
+    api.ok('startTrip', { payload: { id: 'tr_old', through: '2026-11-03', today: TODAY } });
+    api.ok('closeTrip', { payload: { trip_id: 'tr_old' } });
+    plan(api, { id: 'pl_open', date: '2026-11-04', slot: 'Dinner', recipe_id: 'rc_soup' });
+    api.ok('startTrip', { payload: { id: 'tr_new', through: '2026-11-04', today: TODAY } });
     const byId = Object.fromEntries(getPlan(api).entries.map((e: { id: string }) => [e.id, e]));
     expect(byId.pl_open).toMatchObject({ trip_status: 'open', on_trip: true, shopped: false });
     expect(byId.pl_shut).toMatchObject({ trip_status: 'closed', on_trip: true, shopped: true });
@@ -84,7 +84,7 @@ describe('getPlan: derived fields, order, not_on_trip', () => {
 
   it('not_on_trip counts recipe meals after today, within the 8 days, on no trip', () => {
     const api = seeded();
-    api.ok('createTrip', { payload: { id: 'tr_1' } });
+    api.ok('startTrip', { payload: { id: 'tr_1', through: '2026-11-08', today: TODAY, plan_ids: [] } });
     plan(api, { date: TODAY, slot: 'Dinner', recipe_id: 'rc_soup' }); // today: not counted
     plan(api, { date: '2026-11-01', slot: 'Dinner', recipe_id: 'rc_soup' }); // yesterday
     plan(api, { date: '2026-11-03', slot: 'Dinner', recipe_id: 'rc_soup' }); // counted
@@ -163,11 +163,9 @@ describe('deletePlanEntry', () => {
 describe('plan writes never touch Trips, TripItems or Cooks', () => {
   it('moving and removing a meal on a trip, with a cook, leaves those rows as they were', () => {
     const api = seeded();
-    api.ok('createTrip', { payload: { id: 'tr_1', through: '2026-11-08' } });
-    plan(api, { id: 'pl_1', date: '2026-11-03', slot: 'Dinner', recipe_id: 'rc_soup', trip_id: 'tr_1' });
-    api.ok('upsertTripItems', {
-      payload: { trip_id: 'tr_1', items: [{ food_id: 'beef', lines: [{ plan_id: 'pl_1', line_id: 'L1', amt: '1 lb', grams: 453.6 }] }] },
-    });
+    plan(api, { id: 'pl_1', date: '2026-11-03', slot: 'Dinner', recipe_id: 'rc_soup' });
+    api.ok('startTrip', { payload: { id: 'tr_1', through: '2026-11-08', today: TODAY } });
+    expect(api.rows('TripItems')).toHaveLength(1);
     api.ok('upsertCook', { payload: { id: 'ck_1', recipe_id: 'rc_soup', date: '2026-11-03', plan_id: 'pl_1' } });
     const snapshot = () => JSON.stringify(['Trips', 'TripItems', 'Cooks'].map((t) => api.rows(t)));
     const before = snapshot();
@@ -363,19 +361,16 @@ describe('undo reverses each plan write, and keeps a meal that joined a trip', (
   it('refuses to remove a meal that has since joined a trip, naming it', () => {
     const api = seeded();
     plan(api, { id: 'pl_1', date: '2026-11-03', slot: 'Dinner', recipe_id: 'rc_soup', call_id: 'c-add' });
-    api.ok('createTrip', { payload: { id: 'tr_1' } });
-    api.ok('upsertTripItems', {
-      payload: { trip_id: 'tr_1', items: [{ food_id: 'beef', lines: [{ plan_id: 'pl_1', line_id: 'L1', amt: '1 lb', grams: 453.6 }] }] },
-    });
+    api.ok('startTrip', { payload: { id: 'tr_1', through: '2026-11-08', today: TODAY } });
     const res = undo(api, 'c-add');
     expect(res).toMatchObject({ success: false, code: 'undo_refused' });
-    expect(res.data.uses).toEqual([expect.objectContaining({ tab: 'Plan', id: 'pl_1', name: '2026-11-03 Dinner', by: 'TripItems' })]);
+    expect(res.data.conflicts[0]).toMatchObject({ tab: 'Plan', row_key: { id: 'pl_1' }, current: { trip_id: 'tr_1' } });
     expect(api.rows('Plan')).toHaveLength(1);
 
     // A trip_id written onto the row is a change since the call, and refuses it too.
     const api2 = seeded();
     plan(api2, { id: 'pl_1', date: '2026-11-03', slot: 'Dinner', recipe_id: 'rc_soup', call_id: 'c-add' });
-    api2.ok('createTrip', { payload: { id: 'tr_1' } });
+    api2.ok('startTrip', { payload: { id: 'tr_1', through: '2026-11-08', today: TODAY, plan_ids: [] } });
     plan(api2, { id: 'pl_1', trip_id: 'tr_1' });
     const res2 = undo(api2, 'c-add');
     expect(res2.data.conflicts[0]).toMatchObject({ tab: 'Plan', row_key: { id: 'pl_1' } });

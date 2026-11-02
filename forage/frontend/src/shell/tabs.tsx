@@ -36,6 +36,7 @@ export const TABS: TabDef[] = [
     id: 'eaten',
     label: 'Eaten',
     icon: EatenIcon,
+    // #712: Eaten is always the day view, with its own "Nothing logged" day card; this copy is no longer shown.
     empty: {
       heading: 'Nothing logged',
       sentence: 'What you eat will show here by day, with its calories and macros.',

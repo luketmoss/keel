@@ -108,6 +108,7 @@ const SORTS: { id: RecipeSort; label: string }[] = [
   { id: 'last_cooked', label: 'Last cooked' },
 ];
 
+export type LibraryOverlay = Overlay;
 type Overlay =
   | { kind: 'add' }
   | { kind: 'barcode' }
@@ -117,7 +118,7 @@ type Overlay =
   | { kind: 'nutrition'; recipeId: string; focusCook?: boolean };
 
 /** The "Add a food" sheet's three routes. */
-function AddFoodSheet({ onPick, onClose }: { onPick: (o: Overlay) => void; onClose: () => void }) {
+export function AddFoodSheet({ onPick, onClose }: { onPick: (o: Overlay) => void; onClose: () => void }) {
   const routes: { title: string; line: string; icon: string; to: Overlay }[] = [
     { title: 'Scan or enter a barcode', line: 'Looks it up on Open Food Facts.', icon: '▥', to: { kind: 'barcode' } },
     {

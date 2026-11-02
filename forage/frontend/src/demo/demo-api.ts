@@ -11,13 +11,15 @@ import type {
   Cook,
   Food,
   FoodDetail,
+  FoodLogDay,
+  FoodLogEntry,
   ImportLine,
+  LogEntryInput,
   ImportPreview,
   MissingReason,
   Nutrition,
   PlanEntry,
   RecipeDetail,
-  RecipeLogEntry,
   RecipeSort,
   RecipeSummary,
   StarterFood,
@@ -30,7 +32,16 @@ import { DEMO_STEW_WALKTHROUGH } from './demo-walkthrough';
 import { displayName, hasNutrition } from '../library/food-math';
 import { SLOTS } from '../api/types';
 import { addDays } from '../plan/dates';
-import { DEMO_COOKS, DEMO_FOODS, DEMO_IMPORT, DEMO_PLAN, DEMO_PRODUCT, DEMO_RECIPES, DEMO_STARTERS } from './demo-data';
+import {
+  DEMO_COOKS,
+  DEMO_FOODS,
+  DEMO_IMPORT,
+  DEMO_LOG,
+  DEMO_PLAN,
+  DEMO_PRODUCT,
+  DEMO_RECIPES,
+  DEMO_STARTERS,
+} from './demo-data';
 import { createDemoTrips } from './demo-trips';
 
 let seq = 0;
@@ -188,7 +199,8 @@ export function createDemoApi(): ForageApi {
   const now = Date.now();
   const recipes: RecipeDetail[] = seedRecipes(now);
   const cooks: Cook[] = seedCooks(now);
-  const eaten: RecipeLogEntry[] = [];
+  // #712: the food log, as stored. Each entry's snapshot is the demo's stand-in for the API's, taken when written.
+  const log: FoodLogEntry[] = [];
   // #709: the plan's rows, as stored; reads derive the rest as the API does.
   const today = localDate(new Date(now));
   const plan = DEMO_PLAN.map((p, i) => ({
@@ -251,6 +263,91 @@ export function createDemoApi(): ForageApi {
       reason: (nutrition.missing.find((m) => m.line_id === l.line_id)?.reason ?? '') as Line['reason'],
     }));
     return { ...r, lines, nutrition, partial: nutrition.partial, ...cookFields(r.id) };
+  }
+
+  /** A log entry's snapshot as the API takes it (#703): a food by its grams, a recipe by its servings. */
+  function snapshotOf(input: LogEntryInput) {
+    if ('food_id' in input) {
+      const food = foods.find((f) => f.id === input.food_id);
+      if (!food) throw new ApiError(`food_id "${input.food_id}" is not a food`);
+      const serving = (food.servings_json ?? []).find((w) => w.name === input.unit);
+      if (input.unit !== 'g' && !serving) {
+        throw new ApiError(`unit "${input.unit}" is not one of this food's servings, or g`);
+      }
+      const grams = input.unit === 'g' ? input.qty : input.qty * serving!.g;
+      const known = hasNutrition(food);
+      const of = (v: number | null) => (known ? round1((v! * grams) / 100) : null);
+      return {
+        grams: round1(grams),
+        kcal: of(food.kcal_100g),
+        protein_g: of(food.protein_100g),
+        carbs_g: of(food.carbs_100g),
+        fat_g: of(food.fat_100g),
+        partial: !known,
+      };
+    }
+    const r = recipes.find((x) => x.id === input.recipe_id);
+    if (!r) throw new ApiError(`recipe_id "${input.recipe_id}" is not a recipe`);
+    const { per_serving: per, partial } = withNutrition(r).nutrition;
+    const times = (v: number | null) => (v === null ? null : round1(v * input.qty));
+    return {
+      grams: null,
+      kcal: times(per.kcal),
+      protein_g: times(per.protein_g),
+      carbs_g: times(per.carbs_g),
+      fat_g: times(per.fat_g),
+      partial: partial || per.kcal === null,
+    };
+  }
+
+  /** logFood: the same id again replaces that entry; a dry run answers it and stores nothing. */
+  function writeLog(input: LogEntryInput, dryRun: boolean, keep?: FoodLogEntry): FoodLogEntry {
+    const id = input.id ?? nextId('lg');
+    const existing = keep ?? log.find((e) => e.id === id);
+    const isRecipe = 'recipe_id' in input;
+    const unit = isRecipe ? 'serving' : input.unit;
+    const same =
+      !!existing &&
+      existing.qty === input.qty &&
+      existing.unit === unit &&
+      (isRecipe ? existing.recipe_id === input.recipe_id : existing.food_id === input.food_id);
+    const snap =
+      same && existing
+        ? {
+            grams: existing.grams,
+            kcal: existing.kcal,
+            protein_g: existing.protein_g,
+            carbs_g: existing.carbs_g,
+            fat_g: existing.fat_g,
+            partial: existing.partial,
+          }
+        : snapshotOf(input);
+    const now = new Date().toISOString();
+    const entry: FoodLogEntry = {
+      id,
+      date: input.date,
+      slot: input.slot,
+      food_id: isRecipe ? '' : input.food_id,
+      recipe_id: isRecipe ? input.recipe_id : '',
+      qty: input.qty,
+      unit,
+      ...snap,
+      source: existing?.source ?? 'app',
+      logged_at: existing?.logged_at ?? now,
+      created: existing?.created ?? now,
+      updated: now,
+    };
+    if (dryRun) return entry;
+    const i = log.findIndex((e) => e.id === id);
+    if (i === -1) log.push(entry);
+    else log[i] = entry;
+    return clone(entry);
+  }
+
+  function findLog(id: string): FoodLogEntry {
+    const e = log.find((x) => x.id === id);
+    if (!e) throw new ApiError(`Log entry "${id}" not found`);
+    return e;
   }
 
   /** `getRecipes` `q` and `sort`, as the API does them. */
@@ -579,12 +676,63 @@ export function createDemoApi(): ForageApi {
       cooks.splice(i, 1);
     },
     logFood: async (entry) => {
-      if (!recipes.some((r) => r.id === entry.recipe_id)) {
-        throw new ApiError(`recipe_id "${entry.recipe_id}" is not a recipe`);
+      writeLog(entry, false);
+    },
+    getFoodLog: async (from, to) =>
+      clone(
+        log
+          .filter((e) => e.date >= from && e.date <= to)
+          .sort(
+            (a, b) =>
+              a.date.localeCompare(b.date) ||
+              SLOTS.indexOf(a.slot) - SLOTS.indexOf(b.slot) ||
+              a.logged_at.localeCompare(b.logged_at),
+          ),
+      ),
+    getFoodLogTotals: async (from, to) => {
+      const by = new Map<string, FoodLogDay>();
+      for (const e of log.filter((x) => x.date >= from && x.date <= to)) {
+        const day = by.get(e.date) ?? {
+          date: e.date,
+          entries: 0,
+          unknown_entries: 0,
+          kcal: null,
+          protein_g: null,
+          carbs_g: null,
+          fat_g: null,
+          partial: false,
+        };
+        day.entries++;
+        if (e.kcal === null) day.unknown_entries++;
+        for (const f of ['kcal', 'protein_g', 'carbs_g', 'fat_g'] as const) {
+          const v = e[f];
+          if (v !== null) day[f] = (day[f] ?? 0) + v;
+        }
+        if (e.partial || e.kcal === null) day.partial = true;
+        by.set(e.date, day);
       }
-      const i = eaten.findIndex((e) => e.id && e.id === entry.id);
-      if (i === -1) eaten.push(clone(entry));
-      else eaten[i] = clone(entry);
+      const r1 = (v: number | null) => (v === null ? null : round1(v));
+      const days = [...by.values()]
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map((d) => ({
+          ...d,
+          kcal: r1(d.kcal),
+          protein_g: r1(d.protein_g),
+          carbs_g: r1(d.carbs_g),
+          fat_g: r1(d.fat_g),
+        }));
+      return { from, to, days };
+    },
+    logEntry: async (entry, dryRun = false) => writeLog(entry, dryRun),
+    updateLogEntry: async (id, changes, dryRun = false) => {
+      const was = findLog(id);
+      const base: LogEntryInput = was.recipe_id
+        ? { id, date: was.date, slot: was.slot, recipe_id: was.recipe_id, qty: was.qty, unit: 'serving' }
+        : { id, date: was.date, slot: was.slot, food_id: was.food_id, qty: was.qty, unit: was.unit };
+      return writeLog({ ...base, ...changes } as LogEntryInput, dryRun, was);
+    },
+    deleteLogEntry: async (id) => {
+      log.splice(log.indexOf(findLog(id)), 1);
     },
     getPlan: async (from, to, day) => {
       const last = addDays(day, 7);
@@ -638,5 +786,12 @@ export function createDemoApi(): ForageApi {
     addToTrip: trips.addToTrip,
     removeTripItem: trips.removeTripItem,
   };
+  // #712: the sample days, logged through the same path as the app's entries, in the order logged.
+  DEMO_LOG.forEach((d, i) => {
+    const date = addDays(today, -d.days_ago);
+    writeLog({ ...d.entry, id: `lg_demo_${i + 1}`, date } as LogEntryInput, false);
+    const at = new Date(now - d.days_ago * DAY - (DEMO_LOG.length - i) * 60000).toISOString();
+    Object.assign(log[log.length - 1], { logged_at: at, created: at, updated: at });
+  });
   return api;
 }

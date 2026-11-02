@@ -5,6 +5,7 @@ import { vi } from 'vitest';
 import type {
   Cook,
   Food,
+  FoodLogEntry,
   ImportPreview,
   LateMeal,
   PlanEntry,
@@ -167,6 +168,8 @@ export function fakeApi() {
     closed: [],
     built: null,
   };
+  /** #712: the food log as stored. Its snapshots are a stand-in for the API's: a food by grams, a recipe by servings. */
+  const log: FoodLogEntry[] = [];
   const overrides = new Map<string, (payload: any) => Answer>();
   let seq = 0;
 
@@ -228,8 +231,65 @@ export function fakeApi() {
           1,
         );
         return { success: true, data: { id: payload.id, deleted: true } };
-      case 'logFood':
-        return { success: true, data: { id: payload.id ?? 'lg_1', ...payload } };
+      case 'getFood': {
+        const food = foods.find((f) => f.id === params?.get('id'));
+        return food
+          ? { success: true, data: { ...food, used_by: [] } }
+          : { success: false, error: `Food "${params?.get('id')}" not found` };
+      }
+      case 'logFood': {
+        const out = logEntry(payload);
+        if ('error' in out) return { success: false, error: out.error };
+        if (!payload.dry_run) {
+          const i = log.findIndex((e) => e.id === out.id);
+          if (i === -1) log.push(out);
+          else log[i] = out;
+        }
+        return { success: true, data: out };
+      }
+      case 'updateLogEntry': {
+        const was = log.find((e) => e.id === payload.id);
+        if (!was) return { success: false, error: `Log entry "${payload.id}" not found` };
+        const next = { ...was, ...payload.changes };
+        const same = next.qty === was.qty && next.unit === was.unit;
+        const out = same ? { ...next } : logEntry({ ...next, dry_run: true });
+        if ('error' in out) return { success: false, error: out.error };
+        if (!payload.dry_run) log[log.indexOf(was)] = out;
+        return { success: true, data: out };
+      }
+      case 'deleteLogEntry': {
+        const i = log.findIndex((e) => e.id === payload.id);
+        if (i === -1) return { success: false, error: `Log entry "${payload.id}" not found` };
+        log.splice(i, 1);
+        return { success: true, data: { id: payload.id, deleted: true } };
+      }
+      case 'getFoodLog': {
+        const from = params?.get('from') ?? '';
+        const to = params?.get('to') ?? '9999';
+        return { success: true, data: log.filter((e) => e.date >= from && e.date <= to) };
+      }
+      case 'getFoodLogTotals': {
+        const from = params?.get('from') ?? '';
+        const to = params?.get('to') ?? '9999';
+        const dates = [...new Set(log.filter((e) => e.date >= from && e.date <= to).map((e) => e.date))].sort();
+        const r1 = (n: number) => Math.round(n * 10) / 10;
+        const days = dates.map((date) => {
+          const mine = log.filter((e) => e.date === date);
+          const sum = (f: 'kcal' | 'protein_g' | 'carbs_g' | 'fat_g') =>
+            mine.some((e) => e[f] !== null) ? r1(mine.reduce((t, e) => t + (e[f] ?? 0), 0)) : null;
+          return {
+            date,
+            entries: mine.length,
+            unknown_entries: mine.filter((e) => e.kcal === null).length,
+            kcal: sum('kcal'),
+            protein_g: sum('protein_g'),
+            carbs_g: sum('carbs_g'),
+            fat_g: sum('fat_g'),
+            partial: mine.some((e) => e.partial || e.kcal === null),
+          };
+        });
+        return { success: true, data: { from, to, days } };
+      }
       case 'getPlan':
         return { success: true, data: { entries: plan, not_on_trip: counts.notOnTrip, late_meals: [...lateMeals] } };
       case 'upsertPlanEntry': {
@@ -353,6 +413,54 @@ export function fakeApi() {
     }
   }
 
+  /** logFood's answer: the entry as it would be stored, or the API's refusal. */
+  function logEntry(p: any): FoodLogEntry | { error: string } {
+    const r1 = (n: number) => Math.round(n * 10) / 10;
+    const base = {
+      id: p.id ?? `lg_${++seq}`,
+      date: p.date,
+      slot: p.slot,
+      food_id: p.food_id ?? '',
+      recipe_id: p.recipe_id ?? '',
+      qty: p.qty,
+      unit: p.recipe_id ? 'serving' : p.unit,
+      source: 'app' as const,
+      logged_at: p.logged_at ?? new Date(2026, 10, 2, 10, seq).toISOString(),
+      created: 'x',
+      updated: 'x',
+    };
+    if (p.food_id) {
+      const f = foods.find((x) => x.id === p.food_id);
+      if (!f) return { error: `food_id "${p.food_id}" is not a food` };
+      const w = (f.servings_json ?? []).find((x) => x.name === p.unit);
+      const grams = p.unit === 'g' ? p.qty : p.qty * (w?.g ?? 0);
+      const known = typeof f.kcal_100g === 'number';
+      const of = (v: number | null) => (known && v !== null ? r1((v * grams) / 100) : null);
+      return {
+        ...base,
+        grams: r1(grams),
+        kcal: of(f.kcal_100g),
+        protein_g: of(f.protein_100g),
+        carbs_g: of(f.carbs_100g),
+        fat_g: of(f.fat_100g),
+        partial: !known,
+      };
+    }
+    const r = recipes.find((x) => x.id === p.recipe_id);
+    if (!r) return { error: `recipe_id "${p.recipe_id}" is not a recipe` };
+    const per = r.nutrition.per_serving;
+    const times = (v: number | null) => (v === null ? null : r1(v * p.qty));
+    return {
+      ...base,
+      grams: null,
+      kcal: times(per.kcal),
+      protein_g: times(per.protein_g),
+      carbs_g: times(per.carbs_g),
+      fat_g: times(per.fat_g),
+      partial: r.partial || per.kcal === null,
+    };
+  }
+
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     if (url !== API_URL) throw new Error(`unexpected fetch ${url}`);
     const body = init?.body as URLSearchParams;
@@ -378,6 +486,7 @@ export function fakeApi() {
     recipes,
     cooks,
     plan,
+    log,
     counts,
     lateMeals,
     trips,

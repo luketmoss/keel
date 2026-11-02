@@ -3,6 +3,7 @@ import { useApi } from '../api/use-api';
 import { LogMode } from '../cook/log-mode';
 import { isDemoMode } from '../demo/is-demo-mode';
 import { DemoBanner } from '../demo/demo-banner';
+import { EatenHeader, EatenScreen } from '../eaten/eaten-screen';
 import { ImportSheet } from '../import/import-sheet';
 import { ReviewScreen } from '../import/review-screen';
 import { review } from '../import/review-state';
@@ -50,7 +51,7 @@ export function Shell() {
   return (
     <div class="shell">
       <header class="tab-header">
-        <h1>{tab.label}</h1>
+        {tab.id === 'eaten' ? <EatenHeader api={api} /> : <h1>{tab.label}</h1>}
         <div class="header-actions">
           {tab.id === 'plan' && (
             <button
@@ -109,7 +110,7 @@ export function Shell() {
         ) : tab.id === 'shop' ? (
           <ShopScreen api={api} />
         ) : (
-          empty
+          <EatenScreen api={api} />
         )}
       </main>
       <TabBar />

@@ -9,7 +9,11 @@ import type {
   Cook,
   Food,
   FoodDetail,
+  FoodLogEntry,
+  FoodLogTotals,
   ImportInput,
+  LogEntryChange,
+  LogEntryInput,
   ImportPreview,
   PlanEntry,
   PlanEntryInput,
@@ -72,6 +76,13 @@ export interface ForageApi {
   saveCook(cook: Partial<Cook> & { id: string }): Promise<Cook>;
   deleteCook(id: string): Promise<void>;
   logFood(entry: RecipeLogEntry): Promise<void>;
+  // #712: the food log. Every figure is the API's: entries carry their snapshot, the day its totals.
+  getFoodLog(from: string, to: string): Promise<FoodLogEntry[]>;
+  getFoodLogTotals(from: string, to: string): Promise<FoodLogTotals>;
+  /** logFood with the app's own id; `dryRun` answers the entry as it would be stored, writing nothing. */
+  logEntry(entry: LogEntryInput, dryRun?: boolean): Promise<FoodLogEntry>;
+  updateLogEntry(id: string, changes: LogEntryChange, dryRun?: boolean): Promise<FoodLogEntry>;
+  deleteLogEntry(id: string): Promise<void>;
   // #709: the meal plan. `today` is the device's, so the banner counts from the day the app shows.
   getPlan(from: string, to: string, today: string): Promise<PlanResult>;
   /** upsertPlanEntry with the app's own id. */
@@ -180,6 +191,14 @@ export function createLiveApi(token: string, url = import.meta.env.VITE_FORAGE_A
     },
     logFood: async (entry) => {
       await call('logFood', entry);
+    },
+    getFoodLog: (from, to) => call<FoodLogEntry[]>('getFoodLog', undefined, undefined, { from, to }),
+    getFoodLogTotals: (from, to) => call<FoodLogTotals>('getFoodLogTotals', undefined, undefined, { from, to }),
+    logEntry: (entry, dryRun = false) => call<FoodLogEntry>('logFood', dryRun ? { ...entry, dry_run: true } : entry),
+    updateLogEntry: (id, changes, dryRun = false) =>
+      call<FoodLogEntry>('updateLogEntry', dryRun ? { id, changes, dry_run: true } : { id, changes }),
+    deleteLogEntry: async (id) => {
+      await call('deleteLogEntry', { id });
     },
     getPlan: (from, to, today) => call<PlanResult>('getPlan', undefined, undefined, { from, to, today }),
     planMeal: (entry) => call<PlanEntry>('upsertPlanEntry', entry),

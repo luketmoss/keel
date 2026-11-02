@@ -1,4 +1,4 @@
-// The Forage API's shapes (#703, #706, #707, #708, #709, #718, #719), mirrored from apps-script/src. A change
+// The Forage API's shapes (#703, #706, #707, #708, #709, #718, #719, #712), mirrored from apps-script/src. A change
 // to a response shape changes this file in the same pull request.
 
 export type FoodKind = 'ingredient' | 'packaged';
@@ -323,6 +323,66 @@ export interface RecipeLogEntry {
   recipe_id: string;
   qty: number;
   unit: 'serving';
+}
+
+// ---- #712: the food log
+
+/** What the app sends `logFood`: a food in one of its serving names or `g`, or a recipe in servings. Always its own id. */
+export type LogEntryInput =
+  RecipeLogEntry | { id?: string; date: string; slot: Slot; food_id: string; qty: number; unit: string };
+
+/**
+ * A FoodLog row. `kcal`…`fat_g` and `partial` are the snapshot the API stored when the entry was written: null is
+ * unknown (a food or recipe with no nutrition), never 0. `grams` is null for a recipe.
+ */
+export interface FoodLogEntry {
+  id: string;
+  date: string;
+  slot: Slot;
+  food_id: string;
+  recipe_id: string;
+  qty: number;
+  unit: string;
+  grams: number | null;
+  kcal: number | null;
+  protein_g: number | null;
+  carbs_g: number | null;
+  fat_g: number | null;
+  partial: boolean;
+  source: 'app' | 'mcp';
+  logged_at: string;
+  created: string;
+  updated: string;
+}
+
+/** What `updateLogEntry` changes. Only an amount, unit or food change re-snapshots; a slot change keeps the numbers. */
+export interface LogEntryChange {
+  slot?: Slot;
+  qty?: number;
+  unit?: string;
+}
+
+/**
+ * One day of `getFoodLogTotals`, the read Thrive's Day screen relies on (#714). A sum covers the entries that have
+ * it, to 0.1, and is null only when no entry that day does. `partial` means the true total is higher.
+ */
+export interface FoodLogDay {
+  date: string;
+  entries: number;
+  /** Entries whose snapshot is blank. */
+  unknown_entries: number;
+  kcal: number | null;
+  protein_g: number | null;
+  carbs_g: number | null;
+  fat_g: number | null;
+  partial: boolean;
+}
+
+/** `getFoodLogTotals`: a date with nothing logged is absent from `days`, never present with zeros. */
+export interface FoodLogTotals {
+  from: string | null;
+  to: string | null;
+  days: FoodLogDay[];
 }
 
 /** A RecipeLines row. */

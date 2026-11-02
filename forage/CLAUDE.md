@@ -135,8 +135,14 @@ What the columns mean:
   serving name from `servings_json` or `g`; a recipe's is `serving`. `grams` is
   resolved for a food, blank for a recipe. `kcal`/`protein_g`/`carbs_g`/`fat_g`
   and `partial` are a **snapshot** the API computes when the entry is written
-  and recomputes only when that entry is edited: editing a food or recipe later
-  does not rewrite past days. `source` is `app` (token) or `mcp` (key), set by
+  and recomputes only when that entry's `qty`, `unit` or food changes (#712):
+  editing a food or recipe later does not rewrite past days, and moving an
+  entry to another meal keeps its numbers. `logFood` and `updateLogEntry` take
+  `dry_run` (the entry as it would be stored, nothing written), the app's amount
+  preview. `getFoodLogTotals` is the one read Thrive (#714) relies on, shaped in
+  `forage/docs/design/712-food-log.md`: a date with nothing logged is absent, a
+  sum is null only when every entry that day is blank, and `unknown_entries`
+  counts the blank ones. `source` is `app` (token) or `mcp` (key), set by
   the API. `logged_at` is ISO UTC.
 - **Cooks.** `rating` is 1–5, or blank when not rated. `plan_id` is set when
   the cook was the plan's meal.
@@ -183,7 +189,7 @@ tests hold that true:
   tool, and when a write action is on neither `CHANGE_LOGGED_ACTIONS` nor
   `NOT_LOGGED`. A feature issue (#707 foods, #708 recipes and cooks, #709 plan,
   #710 trips, #711 walkthroughs, #712 food log) removes its actions from
-  `PENDING_TOOLS` in the PR that adds their tools. `forage.yml` runs on
+  `PENDING_TOOLS` in the PR that adds their tools; since #712 the list is empty. `forage.yml` runs on
   `mcp/src/forage/**` as well, so a Worker change runs it too.
 
 ## Key commands

@@ -6058,6 +6058,74 @@ a.training-card {
   font-variant-numeric: tabular-nums;
 }
 
+/* #757 - More nutrition: a Quiet button (it is a .food-link) and a label-style list behind it. */
+.food-more-btn {
+  gap: var(--space-xs);
+  padding-left: 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.food-more-chevron {
+  flex: none;
+}
+
+.food-more-chevron-open {
+  transform: rotate(180deg);
+}
+
+.food-more [hidden] {
+  display: none;
+}
+
+.food-more-list {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.food-more-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-xs) 0;
+}
+
+.food-more-row dt {
+  margin: 0;
+  min-width: 0;
+  color: var(--color-text-secondary);
+}
+
+.food-more-row dd {
+  margin: 0;
+  flex: none;
+  text-align: right;
+  white-space: nowrap;
+  color: var(--color-text);
+}
+
+.food-more-row-1 dt {
+  padding-left: var(--space-md);
+}
+
+.food-more-row-2 dt {
+  padding-left: calc(var(--space-md) * 2);
+}
+
+.food-more-unknown {
+  color: var(--color-text-muted);
+}
+
+.food-more-atleast,
+.food-more-none {
+  margin: var(--space-xs) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
 .food-note {
   margin: 0;
   font-size: var(--text-sm);

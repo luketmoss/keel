@@ -106,6 +106,11 @@ property) for the allowed email, which may run `getFoodLogTotals` only (`forage/
 property is set, the card shows its failed state ("Couldn't load your food.") and nothing else on the Day screen
 changes.
 
+A **More nutrition** toggle under the macro line (#757, open state in `localStorage` `thrive.foodMore`) lists
+saturated and trans fat, cholesterol, sodium, fiber, sugars and added sugars from the same reply, "at least" where Forage's
+`unknown` counts say so. `parseDay` reads the seven all or nothing into `FoodDay.label`; a reply without them (Forage
+before #755's deploy) shows the card without the block.
+
 ## Sip widget (#524)
 
 `android/` is Thrive Sip's home-screen widget and one-screen settings app

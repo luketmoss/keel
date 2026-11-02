@@ -4,7 +4,7 @@
 // and from the starter list. The columns and ensureSchema are in schema.test.ts.
 
 import { describe, expect, it } from 'vitest';
-import { loadApi, type Api, type FetchReply } from './apps-script-sandbox';
+import { loadApi, type Api, type CellValue, type FetchReply } from './apps-script-sandbox';
 import { STEW_FOODS, STEW_RECIPE } from './fixtures/beef-stew';
 
 const PER_100 = [
@@ -387,5 +387,42 @@ describe('the starter list: the seven', () => {
     }
     expect(flour.added_sugars_100g).toBeNull();
     expect(salt.added_sugars_100g).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------- undo across the migration
+
+describe('undo of a call logged before the seven columns existed', () => {
+  it('a Foods or FoodLog row logged without them still undoes, and the seven stay blank', () => {
+    const api = loadApi();
+    api.ok('upsertFood', { payload: { id: 'oats', name: 'Oats', ...CORE, call_id: 'old-food' } });
+    api.ok('logFood', { payload: { date: DAY, slot: 'Breakfast', food_id: 'oats', qty: 10, unit: 'g', call_id: 'old-log' } });
+    api.ok('upsertFood', { payload: { id: 'oats', name: 'Rolled oats', call_id: 'old-rename' } });
+    // As #713 logged them: whole rows with no key for any of the seven.
+    const sheet = api.ss.getSheetByName('MCPChangeLog')!;
+    const drop = (text: CellValue): CellValue => {
+      if (typeof text !== 'string' || text === '') return text;
+      const obj = JSON.parse(text);
+      for (const k of [...PER_100, ...SEVEN]) delete obj[k];
+      return JSON.stringify(obj);
+    };
+    for (const row of sheet.rows.slice(1)) {
+      row[5] = drop(row[5]);
+      row[6] = drop(row[6]);
+    }
+    expect(String(sheet.rows[1][6])).not.toContain('satfat');
+
+    const res = api.call('undoCall', { payload: { call_id: 'old-rename', confirm: true } });
+    expect(res.error).toBeUndefined();
+    expect(api.ok('getFood', { id: 'oats' })).toMatchObject({ name: 'Oats', satfat_100g: null, fiber_100g: null });
+    expect(api.call('undoCall', { payload: { call_id: 'old-log', confirm: true } }).error).toBeUndefined();
+    expect(api.rows('FoodLog')).toEqual([]);
+  });
+
+  it('a row that did change since is still refused', () => {
+    const api = loadApi();
+    api.ok('upsertFood', { payload: { id: 'oats', name: 'Oats', ...CORE, call_id: 'c1' } });
+    api.ok('upsertFood', { payload: { id: 'oats', fiber_100g: 3 } });
+    expect(api.call('undoCall', { payload: { call_id: 'c1', confirm: true } }).error).toMatch(/changed since call c1/);
   });
 });

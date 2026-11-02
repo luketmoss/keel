@@ -185,7 +185,11 @@ function snapshotTabs(tabNames) {
 }
 
 function sameChangeRow(a, b) {
-  return JSON.stringify(a) === JSON.stringify(b);
+  // A field one side lacks reads as blank: a row logged before a column was
+  // appended (#755's seven nutrients) has no key for it, and the same row
+  // read now has it blank.
+  var keys = Object.keys(a).concat(Object.keys(b));
+  return keys.every(function (k) { return cell(a[k]) === cell(b[k]); });
 }
 
 /** Log entries for what differs between two snapshots: deletes, updates, creates. */

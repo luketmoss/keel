@@ -37,8 +37,9 @@ describe('AC9: the food log keeps its snapshot', () => {
     api.ok('upsertFood', { payload: { id: 'f', name: 'Oats', kcal_100g: 380, protein_100g: 13, carbs_100g: 68, fat_100g: 7 } });
     const entry = api.ok('logFood', { payload: { date: '2026-11-01', slot: 'Breakfast', food_id: 'f', qty: 40, unit: 'g' } });
     api.ok('upsertFood', { payload: { id: 'f', kcal_100g: 400, protein_100g: 13, carbs_100g: 68, fat_100g: 7 } });
-    const edited = api.ok('updateLogEntry', { payload: { id: entry.id, changes: { qty: 40 } } });
-    expect(edited.kcal).toBe(160);
+    // #712 narrows this: an edit re-snapshots only when the amount, unit or food changes.
+    const edited = api.ok('updateLogEntry', { payload: { id: entry.id, changes: { qty: 50 } } });
+    expect(edited.kcal).toBe(200);
   });
 
   it('a food with no nutrition logs as unknown, never 0, and the day is partial', () => {

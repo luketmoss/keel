@@ -24,9 +24,7 @@ const NO_TOOL: Record<string, string> = {
 };
 
 /** Actions whose tool a later issue adds. That issue removes them from here. */
-const PENDING_TOOLS: Record<string, number> = {
-  getFoodLog: 712, getFoodLogTotals: 712, logFood: 712, updateLogEntry: 712, deleteLogEntry: 712,
-};
+const PENDING_TOOLS: Record<string, number> = {};
 
 /** Reads are named get*, plus the computation and the barcode lookup that save nothing. Everything else writes. */
 const READS_NOT_NAMED_GET = ['computeNutrition', 'lookupBarcode'];
@@ -67,10 +65,11 @@ function parityProblems(actions: string[], called: string[]): string[] {
 describe('MCP parity: every action has a tool, or a reason, or an owner', () => {
   it('finds the Worker\'s Forage tools', () => {
     expect(workerActions()).toEqual([
-      'addStarterFoods', 'addToTrip', 'closeTrip', 'deleteFood', 'deletePlanEntry', 'deleteRecipe', 'deleteWalkthrough', 'discardTrip', 'getChangeLog',
-      'getConfig', 'getCooks', 'getFood', 'getFoods', 'getPlan', 'getRecipe', 'getRecipes', 'getStarterFoods', 'getTrip',
-      'getTrips', 'importRecipe', 'lookupBarcode', 'movePlanEntry', 'planWeek', 'removeTripItem', 'setFoodWeight', 'setTripItem', 'setWalkthrough',
-      'startTrip', 'undoCall', 'upsertCook', 'upsertFood', 'upsertPlanEntry', 'upsertRecipe',
+      'addStarterFoods', 'addToTrip', 'closeTrip', 'deleteFood', 'deleteLogEntry', 'deletePlanEntry', 'deleteRecipe', 'deleteWalkthrough',
+      'discardTrip', 'getChangeLog', 'getConfig', 'getCooks', 'getFood', 'getFoodLog', 'getFoodLogTotals', 'getFoods', 'getPlan', 'getRecipe',
+      'getRecipes', 'getStarterFoods', 'getTrip', 'getTrips', 'importRecipe', 'logFood', 'lookupBarcode', 'movePlanEntry', 'planWeek',
+      'removeTripItem', 'setFoodWeight', 'setTripItem', 'setWalkthrough', 'startTrip', 'undoCall', 'updateLogEntry', 'upsertCook', 'upsertFood',
+      'upsertPlanEntry', 'upsertRecipe',
     ]);
   });
 
@@ -85,9 +84,14 @@ describe('MCP parity: every action has a tool, or a reason, or an owner', () => 
   });
 
   it('fails for a pending action that already has a tool, so the list only shrinks', () => {
-    expect(parityProblems(mainActions(), [...workerActions(), 'getFoodLog'])).toEqual([
-      'getFoodLog is on more than one of: a tool, PENDING_TOOLS',
-    ]);
+    PENDING_TOOLS.getFoodLog = 712;
+    try {
+      expect(parityProblems(mainActions(), workerActions())).toEqual([
+        'getFoodLog is on more than one of: a tool, PENDING_TOOLS',
+      ]);
+    } finally {
+      delete PENDING_TOOLS.getFoodLog;
+    }
   });
 
   it('every pending action names one of the feature issues', () => {

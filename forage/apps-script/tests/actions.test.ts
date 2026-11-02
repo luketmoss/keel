@@ -172,7 +172,7 @@ describe('AC3: every action exists, with a read and a write round-tripping throu
     expect(api.ok('getFoodLogTotals', { from: '2026-11-01', to: '2026-11-01' })).toEqual({
       from: '2026-11-01',
       to: '2026-11-01',
-      days: [{ date: '2026-11-01', entries: 2, kcal: 573.9, protein_g: 55.7, carbs_g: 0.7, fat_g: 36.7, partial: false }],
+      days: [{ date: '2026-11-01', entries: 2, unknown_entries: 0, kcal: 573.9, protein_g: 55.7, carbs_g: 0.7, fat_g: 36.7, partial: false }],
     });
     const edited = api.ok('updateLogEntry', { payload: { id: egg.id, changes: { qty: 1 } } });
     expect(edited).toMatchObject({ grams: 50, kcal: 71.5, logged_at: egg.logged_at, created: egg.created });

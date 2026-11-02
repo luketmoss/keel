@@ -10,8 +10,48 @@ export interface Weight {
   g: number;
 }
 
+/** #755: the seven values beyond the core four, in label order. Cholesterol and sodium are mg, the rest g. */
+export const EXTRA_KEYS = [
+  'satfat_g',
+  'transfat_g',
+  'cholesterol_mg',
+  'sodium_mg',
+  'fiber_g',
+  'sugars_g',
+  'added_sugars_g',
+] as const;
+export type ExtraKey = (typeof EXTRA_KEYS)[number];
+
+/** Each one's Foods column (per 100 g). */
+export const EXTRA_COLUMN: Record<ExtraKey, keyof FoodExtras> = {
+  satfat_g: 'satfat_100g',
+  transfat_g: 'transfat_100g',
+  cholesterol_mg: 'cholesterol_mg_100g',
+  sodium_mg: 'sodium_mg_100g',
+  fiber_g: 'fiber_100g',
+  sugars_g: 'sugars_100g',
+  added_sugars_g: 'added_sugars_100g',
+};
+
+/** The seven as an entry, a serving or a day carries them: null is unknown, never 0. Absent reads as null. */
+export type Extras = Partial<Record<ExtraKey, number | null>>;
+
+/** For each of the seven, how many counted lines or entries lack it (`per_serving_unknown`, a day's `unknown`). */
+export type ExtraCounts = Partial<Record<ExtraKey, number>>;
+
+/** A Foods row's seven columns (#755), per 100 g. */
+export interface FoodExtras {
+  satfat_100g?: number | null;
+  transfat_100g?: number | null;
+  cholesterol_mg_100g?: number | null;
+  sodium_mg_100g?: number | null;
+  fiber_100g?: number | null;
+  sugars_100g?: number | null;
+  added_sugars_100g?: number | null;
+}
+
 /** A Foods row. Nutrition is per 100 g; null is unknown, never 0. Fields after `source` are #707's. */
-export interface Food {
+export interface Food extends FoodExtras {
   id: string;
   name: string;
   kind: FoodKind;
@@ -79,7 +119,7 @@ export interface BarcodeLookup {
   already_in_library: { id: string; name: string } | null;
 }
 
-export interface PerServing {
+export interface PerServing extends Extras {
   kcal: number | null;
   protein_g: number | null;
   carbs_g: number | null;
@@ -91,6 +131,8 @@ export type MissingReason = 'no_food' | 'no_nutrition' | 'no_weight';
 /** What `computeNutrition` and the import preview answer. */
 export interface Nutrition {
   per_serving: PerServing;
+  /** #755: for each of the seven, the counted lines whose food lacks it. */
+  per_serving_unknown?: ExtraCounts;
   missing: { line_id: string; reason: MissingReason }[];
   partial: boolean;
   lines?: { line_id: string; grams: number | null; reason: MissingReason | ''; kcal?: number | null }[];
@@ -335,7 +377,7 @@ export type LogEntryInput =
  * A FoodLog row. `kcal`…`fat_g` and `partial` are the snapshot the API stored when the entry was written: null is
  * unknown (a food or recipe with no nutrition), never 0. `grams` is null for a recipe.
  */
-export interface FoodLogEntry {
+export interface FoodLogEntry extends Extras {
   id: string;
   date: string;
   slot: Slot;
@@ -366,11 +408,13 @@ export interface LogEntryChange {
  * One day of `getFoodLogTotals`, the read Thrive's Day screen relies on (#714). A sum covers the entries that have
  * it, to 0.1, and is null only when no entry that day does. `partial` means the true total is higher.
  */
-export interface FoodLogDay {
+export interface FoodLogDay extends Extras {
   date: string;
   entries: number;
   /** Entries whose snapshot is blank. */
   unknown_entries: number;
+  /** #755: for each of the seven, the entries with calories but not that value. */
+  unknown?: ExtraCounts;
   kcal: number | null;
   protein_g: number | null;
   carbs_g: number | null;

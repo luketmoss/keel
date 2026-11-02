@@ -30,7 +30,7 @@ import type {
 import { localDate } from '../cook/format';
 import { DEMO_STEW_WALKTHROUGH } from './demo-walkthrough';
 import { displayName, hasNutrition } from '../library/food-math';
-import { SLOTS } from '../api/types';
+import { EXTRA_COLUMN, EXTRA_KEYS, SLOTS, type ExtraKey } from '../api/types';
 import { addDays } from '../plan/dates';
 import {
   DEMO_COOKS,
@@ -83,6 +83,9 @@ function nutritionOf(lines: Line[], servings: number | null, foods: Food[]): Rec
   const missing: { line_id: string; reason: MissingReason }[] = [];
   const byLine: { line_id: string; grams: number | null; kcal: number | null }[] = [];
   let counted = 0;
+  // #755: each of the seven sums over the counted lines whose food has it; the rest are counted, never zeros.
+  const extra: Partial<Record<ExtraKey, number>> = {};
+  const unknown = Object.fromEntries(EXTRA_KEYS.map((k) => [k, 0])) as Record<ExtraKey, number>;
   for (const l of lines) {
     const food = foods.find((f) => f.id === l.food_id);
     const grams = gramsOf(l, food);
@@ -104,6 +107,11 @@ function nutritionOf(lines: Line[], servings: number | null, foods: Food[]): Rec
         total.fat_g += (f.fat_100g! * grams!) / 100;
         kcal = round1((f.kcal_100g! * grams!) / 100 / by);
         counted++;
+        for (const k of EXTRA_KEYS) {
+          const v = f[EXTRA_COLUMN[k]];
+          if (typeof v === 'number') extra[k] = (extra[k] ?? 0) + (v * grams!) / 100;
+          else unknown[k]++;
+        }
       }
     }
     byLine.push({ line_id: l.line_id, grams: grams === null ? null : round1(grams), kcal });
@@ -115,7 +123,9 @@ function nutritionOf(lines: Line[], servings: number | null, foods: Food[]): Rec
       protein_g: per(total.protein_g),
       carbs_g: per(total.carbs_g),
       fat_g: per(total.fat_g),
+      ...Object.fromEntries(EXTRA_KEYS.map((k) => [k, extra[k] === undefined ? null : round1(extra[k]! / by)])),
     },
+    per_serving_unknown: unknown,
     missing,
     partial: missing.some((m) => m.reason !== 'no_nutrition'),
     by_line: byLine,
@@ -277,7 +287,14 @@ export function createDemoApi(): ForageApi {
       const grams = input.unit === 'g' ? input.qty : input.qty * serving!.g;
       const known = hasNutrition(food);
       const of = (v: number | null) => (known ? round1((v! * grams) / 100) : null);
+      const more = Object.fromEntries(
+        EXTRA_KEYS.map((k) => {
+          const v = food[EXTRA_COLUMN[k]];
+          return [k, known && typeof v === 'number' ? round1((v * grams) / 100) : null];
+        }),
+      );
       return {
+        ...more,
         grams: round1(grams),
         kcal: of(food.kcal_100g),
         protein_g: of(food.protein_100g),
@@ -291,6 +308,7 @@ export function createDemoApi(): ForageApi {
     const { per_serving: per, partial } = withNutrition(r).nutrition;
     const times = (v: number | null) => (v === null ? null : round1(v * input.qty));
     return {
+      ...Object.fromEntries(EXTRA_KEYS.map((k) => [k, times(per[k] ?? null)])),
       grams: null,
       kcal: times(per.kcal),
       protein_g: times(per.protein_g),
@@ -314,6 +332,7 @@ export function createDemoApi(): ForageApi {
     const snap =
       same && existing
         ? {
+            ...Object.fromEntries(EXTRA_KEYS.map((k) => [k, existing[k] ?? null])),
             grams: existing.grams,
             kcal: existing.kcal,
             protein_g: existing.protein_g,
@@ -701,6 +720,8 @@ export function createDemoApi(): ForageApi {
           carbs_g: null,
           fat_g: null,
           partial: false,
+          ...Object.fromEntries(EXTRA_KEYS.map((k) => [k, null])),
+          unknown: Object.fromEntries(EXTRA_KEYS.map((k) => [k, 0])) as Record<ExtraKey, number>,
         };
         day.entries++;
         if (e.kcal === null) day.unknown_entries++;
@@ -709,6 +730,11 @@ export function createDemoApi(): ForageApi {
           if (v !== null) day[f] = (day[f] ?? 0) + v;
         }
         if (e.partial || e.kcal === null) day.partial = true;
+        for (const k of EXTRA_KEYS) {
+          const v = e[k];
+          if (typeof v === 'number') day[k] = (day[k] ?? 0) + v;
+          else if (e.kcal !== null) day.unknown![k]!++;
+        }
         by.set(e.date, day);
       }
       const r1 = (v: number | null) => (v === null ? null : round1(v));
@@ -720,6 +746,7 @@ export function createDemoApi(): ForageApi {
           protein_g: r1(d.protein_g),
           carbs_g: r1(d.carbs_g),
           fat_g: r1(d.fat_g),
+          ...Object.fromEntries(EXTRA_KEYS.map((k) => [k, r1(d[k] ?? null)])),
         }));
       return { from, to, days };
     },

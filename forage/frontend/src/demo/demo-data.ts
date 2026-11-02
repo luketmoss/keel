@@ -119,6 +119,27 @@ function food(id: string, name: string, extra: Partial<Food>): Food {
   };
 }
 
+/** #756: the seven values a label lists beyond the core four, in label order, per 100 g. */
+function seven(
+  satfat: number | null,
+  transfat: number | null,
+  cholesterol: number | null,
+  sodium: number | null,
+  fiber: number | null,
+  sugars: number | null,
+  added: number | null,
+): Partial<Food> {
+  return {
+    satfat_100g: satfat,
+    transfat_100g: transfat,
+    cholesterol_mg_100g: cholesterol,
+    sodium_mg_100g: sodium,
+    fiber_100g: fiber,
+    sugars_100g: sugars,
+    added_sugars_100g: added,
+  };
+}
+
 /** The Foods list's six sample foods. Made-up brands, never real ones. */
 export const DEMO_FOODS: Food[] = [
   food('fd_demo_flour', 'Flour, all-purpose', {
@@ -146,6 +167,7 @@ export const DEMO_FOODS: Food[] = [
     usual_store: 'ks',
     source: 'usda',
     source_ref: '170000',
+    ...seven(0.02, 0, 0, 4, 1.7, 4.24, 0),
   }),
   food('fd_demo_butter', 'Butter, unsalted', {
     kcal_100g: 717,
@@ -156,6 +178,7 @@ export const DEMO_FOODS: Food[] = [
     usual_store: 'costco',
     source: 'usda',
     source_ref: '173430',
+    ...seven(51.4, 3.3, 215, 11, 0, 0.06, 0),
   }),
   food('fd_demo_bar', 'Oat and Honey bar', {
     kind: 'packaged',
@@ -167,6 +190,7 @@ export const DEMO_FOODS: Food[] = [
     servings_json: [{ name: 'bar', g: 40 }],
     source: 'label',
     regular: true,
+    ...seven(5, 0, 0, 375, 7.5, 25, 20),
   }),
   food('fd_demo_yogurt', 'Plain yogurt', {
     kind: 'packaged',
@@ -179,6 +203,7 @@ export const DEMO_FOODS: Food[] = [
     source: 'off',
     source_ref: '0012345678905',
     barcode: '0012345678905',
+    ...seven(2.1, 0, 12, 46, 0, 4.7, 0),
   }),
   food('fd_demo_herbs', 'Herbes de Provence', {}),
   // #712: the sample breakfast's granola.
@@ -190,6 +215,7 @@ export const DEMO_FOODS: Food[] = [
     servings_json: [{ name: 'cup', g: 122 }],
     source: 'usda',
     source_ref: '173904',
+    ...seven(3.5, null, 0, 60, 8, 24, null),
   }),
   // #719: two regulars with pack sizes and last time, and the sample trip's added item.
   food('fd_demo_milk', 'Milk', {
@@ -251,6 +277,7 @@ export const DEMO_PRODUCT: Food = food('', 'Crunchy Cocoa Squares', {
   fat_100g: 12,
   servings_json: [{ name: 'cup', g: 30 }],
   source: 'off',
+  ...seven(4, 0, 0, 400, 5, 30, 20),
 });
 
 // ---- #708: sample recipes with ratings and cooks

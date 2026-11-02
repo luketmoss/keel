@@ -1,6 +1,15 @@
 import { useState } from 'preact/hooks';
 import { ApiError, type ForageApi } from '../api/client';
-import type { BarcodeLookup, Food, FoodKind, Store, Weight } from '../api/types';
+import {
+  EXTRA_COLUMN,
+  EXTRA_KEYS,
+  type BarcodeLookup,
+  type ExtraKey,
+  type Food,
+  type FoodKind,
+  type Store,
+  type Weight,
+} from '../api/types';
 import { Sheet } from '../ui/sheet';
 import {
   COLUMN,
@@ -24,6 +33,8 @@ export interface FoodFormOrigin {
   fromLabel?: boolean;
   /** Focus the first nutrition field ("Add nutrition"). */
   focusNutrition?: boolean;
+  /** #756: open More from the label and focus Saturated fat ("Add them"). */
+  focusExtras?: boolean;
 }
 
 interface Props {
@@ -36,6 +47,29 @@ interface Props {
 }
 
 const LABELS: Record<Nutrient, string> = { kcal: 'kcal', protein: 'Protein g', carbs: 'Carbs g', fat: 'Fat g' };
+
+const EXTRA_LABELS: Record<ExtraKey, string> = {
+  satfat_g: 'Saturated fat g',
+  transfat_g: 'Trans fat g',
+  cholesterol_mg: 'Cholesterol mg',
+  sodium_mg: 'Sodium mg',
+  fiber_g: 'Fiber g',
+  sugars_g: 'Sugars g',
+  added_sugars_g: 'Added sugars g',
+};
+
+/** How far each is indented under the one it is part of, as on a label. */
+const EXTRA_INDENT: Record<ExtraKey, number> = {
+  satfat_g: 1,
+  transfat_g: 1,
+  cholesterol_mg: 0,
+  sodium_mg: 0,
+  fiber_g: 1,
+  sugars_g: 1,
+  added_sugars_g: 2,
+};
+
+const MAX_MG_100G = 100000;
 
 const text = (n: number | null | undefined) => (n === null || n === undefined ? '' : String(n));
 
@@ -58,9 +92,15 @@ function initial(food: Partial<Food>) {
     const v = food[COLUMN[k]];
     n[k] = typeof v !== 'number' ? '' : serving ? String(perServing(v, serving.g)) : String(v);
   }
+  const x = {} as Record<ExtraKey, string>;
+  for (const k of EXTRA_KEYS) {
+    const v = food[EXTRA_COLUMN[k]];
+    x[k] = typeof v !== 'number' ? '' : serving ? String(perServing(v, serving.g)) : String(v);
+  }
   return {
     kind,
     n,
+    x,
     servingName: serving?.name ?? '',
     servingG: serving ? String(serving.g) : '',
     weights: (serving ? servings.slice(1) : servings).map(row),
@@ -77,6 +117,10 @@ export function FoodForm({ api, food, origin = {}, onSaved, onCancel }: Props) {
   const [servingName, setServingName] = useState(start.servingName);
   const [servingG, setServingG] = useState(start.servingG);
   const [n, setN] = useState(start.n);
+  const [x, setX] = useState(start.x);
+  const [moreOpen, setMoreOpen] = useState(
+    !!origin.focusExtras || EXTRA_KEYS.some((k) => typeof food[EXTRA_COLUMN[k]] === 'number'),
+  );
   const [weights, setWeights] = useState<WeightRow[]>(start.weights);
   const [buyUnit, setBuyUnit] = useState(food.buy_unit ?? '');
   const [buyPlural, setBuyPlural] = useState(food.buy_unit_plural ?? '');
@@ -106,11 +150,73 @@ export function FoodForm({ api, food, origin = {}, onSaved, onCancel }: Props) {
   const badWeight = weights.some((w) => !w.name.trim() || !((numberOf(w.g) ?? 0) > 0) || (numberOf(w.g) ?? 0) > 9999);
   const badBarcode = barcode.trim() !== '' && !barcodeDigits(barcode);
   const unchecked = isOff && !checked;
-  const blocked =
-    !name.trim() || partly || badNumber || needsServing || badServing || badWeight || badBarcode || unchecked;
-
   const per100g =
     filled === 4 && !needsServing && !badNumber ? values.map((v) => (packaged ? per100(v!, sg!) : v!)) : null;
+  const extraErrors = extraProblems();
+  const blocked =
+    Object.keys(extraErrors).length > 0 ||
+    !name.trim() ||
+    partly ||
+    badNumber ||
+    needsServing ||
+    badServing ||
+    badWeight ||
+    badBarcode ||
+    unchecked;
+
+  /** One of the seven as typed, or null when blank or not a number. */
+  function extraValue(k: ExtraKey) {
+    return numberOf(x[k]);
+  }
+  /** One of the seven per 100 g, as stored, or null when blank or it cannot be worked out. */
+  function extra100(k: ExtraKey): number | null {
+    const v = extraValue(k);
+    if (v === null) return null;
+    return packaged ? (sg !== null && sg > 0 ? per100(v, sg) : null) : v;
+  }
+
+  /** #755's rules on the field they concern, one message each, checked on the per-100 g values. */
+  function extraProblems(): Partial<Record<ExtraKey, string>> {
+    const out: Partial<Record<ExtraKey, string>> = {};
+    const v = (k: ExtraKey) => extra100(k);
+    const set = EXTRA_KEYS.filter((k) => x[k].trim() !== '');
+    for (const k of set) {
+      const n = extraValue(k);
+      if (n === null || n < 0) out[k] = 'Enter a number, 0 or more.';
+    }
+    const good = set.filter((k) => !out[k]);
+    if (good.length && !per100g) out[good[0]] = 'Needs the calories and macros too.';
+    if (!per100g) return out;
+    const [, , carbs, fat] = per100g;
+    const fail = (k: ExtraKey, message: string) => {
+      if (!out[k]) out[k] = message;
+    };
+    if (
+      (v('satfat_g') ?? 0) + (v('transfat_g') ?? 0) > fat + 1e-9 &&
+      (v('satfat_g') !== null || v('transfat_g') !== null)
+    ) {
+      fail('satfat_g', 'Saturated and trans fat add up to more than fat.');
+    }
+    if (v('fiber_g') !== null && v('fiber_g')! > carbs) fail('fiber_g', 'Fiber is more than carbs.');
+    if (v('sugars_g') !== null && v('sugars_g')! > carbs) fail('sugars_g', 'Sugars are more than carbs.');
+    if (v('added_sugars_g') !== null) {
+      if (v('sugars_g') !== null ? v('added_sugars_g')! > v('sugars_g')! : v('added_sugars_g')! > carbs) {
+        fail(
+          'added_sugars_g',
+          v('sugars_g') !== null ? 'Added sugars are more than sugars.' : 'Added sugars are more than carbs.',
+        );
+      }
+    }
+    for (const k of ['cholesterol_mg', 'sodium_mg'] as const) {
+      if (v(k) !== null && v(k)! > MAX_MG_100G) fail(k, "That's more than 100,000 mg per 100 g.");
+    }
+    return out;
+  }
+
+  function setExtra(k: ExtraKey, value: string) {
+    setX({ ...x, [k]: value });
+    if (isOff && food.verified) setChecked(false);
+  }
 
   function setNutrient(k: Nutrient, v: string) {
     setN({ ...n, [k]: v });
@@ -135,6 +241,7 @@ export function FoodForm({ api, food, origin = {}, onSaved, onCancel }: Props) {
     };
     if (food.id) out.id = food.id;
     for (const [i, k] of NUTRIENTS.entries()) out[COLUMN[k]] = per100g ? per100g[i] : null;
+    for (const k of EXTRA_KEYS) out[EXTRA_COLUMN[k]] = per100g ? extra100(k) : null;
     const list: Weight[] = [];
     if (packaged && servingName.trim() && sg) list.push({ name: servingName.trim(), g: sg });
     for (const w of weights) list.push({ name: w.name.trim(), g: numberOf(w.g)! });
@@ -291,6 +398,55 @@ export function FoodForm({ api, food, origin = {}, onSaved, onCancel }: Props) {
           </p>
         )}
       </fieldset>
+
+      <div class="form-group">
+        <button
+          type="button"
+          class="text-btn more-toggle"
+          aria-expanded={moreOpen}
+          aria-controls={moreOpen ? 'more-from-label' : undefined}
+          onClick={() => setMoreOpen(!moreOpen)}
+          data-testid="more-label-toggle"
+        >
+          More from the label
+          <span class="more-chevron" aria-hidden="true">
+            {moreOpen ? '▴' : '▾'}
+          </span>
+        </button>
+        {moreOpen && (
+          <div id="more-from-label" class="extra-fields">
+            <p class="hint">Leave any blank that the label doesn't list.</p>
+            <p class="hint">{packaged ? 'Per serving' : 'Per 100 g'}</p>
+            {EXTRA_KEYS.map((k) => {
+              const err = extraErrors[k];
+              const indent = EXTRA_INDENT[k];
+              return (
+                <label
+                  key={k}
+                  class={`extra-field${indent === 1 ? ' is-indented' : indent === 2 ? ' is-indented-2' : ''}`}
+                >
+                  <span class="hint">{EXTRA_LABELS[k]}</span>
+                  <input
+                    class="field"
+                    inputMode="decimal"
+                    value={x[k]}
+                    data-autofocus={origin.focusExtras && k === 'satfat_g' ? true : undefined}
+                    aria-invalid={err ? true : undefined}
+                    aria-describedby={err ? `x-${k}-error` : undefined}
+                    onInput={(e) => setExtra(k, e.currentTarget.value)}
+                    data-testid={`x-${k}`}
+                  />
+                  {err && (
+                    <span class="field-error" id={`x-${k}-error`}>
+                      {err}
+                    </span>
+                  )}
+                </label>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       <fieldset class="form-group">
         <legend class="field-label">Weights</legend>

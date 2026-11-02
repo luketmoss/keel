@@ -241,6 +241,95 @@ describe('lookupBarcode', () => {
   });
 });
 
+// #775: the label serving keeps its quantity, and a second serving is one unit.
+const PENNE = {
+  ...PRODUCT,
+  product: {
+    ...PRODUCT.product,
+    product_name: 'Whole Wheat Penne',
+    serving_size: '0.75 cup (56 g)',
+    serving_quantity: 56,
+    nutriments: { 'energy-kcal_100g': 321.43, proteins_100g: 12.5, carbohydrates_100g: 71.43, fat_100g: 2.68 },
+  },
+};
+
+function servingsFor(size: string, quantity: unknown): unknown {
+  const product = { ...PENNE.product, serving_size: size, serving_quantity: quantity };
+  return offApi(() => json(200, { ...PENNE, product })).ok('lookupBarcode', { code: CODE }).food.servings_json;
+}
+
+describe('lookupBarcode servings (#775)', () => {
+  it('0.75 cup (56 g) keeps the label serving first and adds one cup at 74.7 g', () => {
+    expect(servingsFor('0.75 cup (56 g)', 56)).toEqual([{ name: '0.75 cup', g: 56 }, { name: 'cup', g: 74.7 }]);
+  });
+
+  it('2 cookies (30g) adds one cookie at 15 g', () => {
+    expect(servingsFor('2 cookies (30g)', 30)).toEqual([{ name: '2 cookies', g: 30 }, { name: 'cookie', g: 15 }]);
+  });
+
+  it('reads fractions, mixed numbers and vulgar fractions', () => {
+    expect(servingsFor('1/2 cup (30 g)', 30)).toEqual([{ name: '1/2 cup', g: 30 }, { name: 'cup', g: 60 }]);
+    expect(servingsFor('½ cup (30 g)', 30)).toEqual([{ name: '½ cup', g: 30 }, { name: 'cup', g: 60 }]);
+    expect(servingsFor('1 1/2 cups (90 g)', 90)).toEqual([{ name: '1 1/2 cups', g: 90 }, { name: 'cup', g: 60 }]);
+    expect(servingsFor('1½ cups (90 g)', 90)).toEqual([{ name: '1½ cups', g: 90 }, { name: 'cup', g: 60 }]);
+    expect(servingsFor('0,75 cup (56 g)', 56)).toEqual([{ name: '0,75 cup', g: 56 }, { name: 'cup', g: 74.7 }]);
+  });
+
+  it('3 pieces and 8 fl oz name one piece and one fl oz', () => {
+    expect(servingsFor('3 pieces (45 g)', 45)).toEqual([{ name: '3 pieces', g: 45 }, { name: 'piece', g: 15 }]);
+    expect(servingsFor('8 fl oz (240 ml)', 240)).toEqual([{ name: '8 fl oz', g: 240 }, { name: 'fl oz', g: 30 }]);
+    expect(servingsFor('2 tbs (30 g)', 30)).toEqual([{ name: '2 tbs', g: 30 }, { name: 'tbsp', g: 15 }]);
+  });
+
+  it('a quantity of 1 names the unit alone, with no second entry', () => {
+    expect(servingsFor('1 bar (40 g)', 40)).toEqual([{ name: 'bar', g: 40 }]);
+    expect(servingsFor('1 cup (240 mL)', 240)).toEqual([{ name: 'cup', g: 240 }]);
+  });
+
+  it('a mass or millilitre serving is named serving, with no second entry', () => {
+    expect(servingsFor('30 g', 30)).toEqual([{ name: 'serving', g: 30 }]);
+    expect(servingsFor('2 oz (56 g)', 56)).toEqual([{ name: 'serving', g: 56 }]);
+    expect(servingsFor('240 ml', 240)).toEqual([{ name: 'serving', g: 240 }]);
+  });
+
+  it('a quantity that cannot be read cleanly keeps its text as written, with no second entry', () => {
+    expect(servingsFor('2-3 cookies (45 g)', 45)).toEqual([{ name: '2-3 cookies', g: 45 }]);
+    expect(servingsFor('about 3 pieces (45 g)', 45)).toEqual([{ name: 'about 3 pieces', g: 45 }]);
+    expect(servingsFor('1 cup or 2 pieces (45 g)', 45)).toEqual([{ name: '1 cup or 2 pieces', g: 45 }]);
+  });
+
+  it('no text, or one over 30 characters, is serving; no quantity or 0 gives no servings', () => {
+    expect(servingsFor('', 40)).toEqual([{ name: 'serving', g: 40 }]);
+    expect(servingsFor('1 extra large family size sharing bag (40 g)', 40)).toEqual([{ name: 'serving', g: 40 }]);
+    expect(servingsFor('0.75 cup (56 g)', undefined)).toBeNull();
+    expect(servingsFor('0.75 cup (56 g)', 0)).toBeNull();
+  });
+
+  it('a recipe line of 1 cup of the penne weighs 74.7 g, a log entry of 1 cup logs 74.7 g, and the label serving still gives 180 kcal', () => {
+    const api = offApi(() => json(200, PENNE));
+    const food = api.ok('lookupBarcode', { code: CODE }).food;
+    const saved = api.ok('upsertFood', { payload: { ...food, id: 'penne' } });
+    expect(saved.servings_json).toEqual([{ name: '0.75 cup', g: 56 }, { name: 'cup', g: 74.7 }]);
+    api.ok('upsertRecipe', {
+      payload: {
+        id: 'rc_p', name: 'Penne', servings: 1,
+        lines: [
+          { text: '1 cup penne', qty: 1, unit: 'cup', food_id: 'penne' },
+          { text: 'penne', qty: 1, unit: '', food_id: 'penne' },
+        ],
+      },
+    });
+    const byLine = api.ok('getRecipe', { id: 'rc_p' }).nutrition.by_line;
+    expect(byLine.map((l: { grams: number }) => l.grams)).toEqual([74.7, 56]);
+
+    const entry = api.ok('logFood', { payload: { date: '2026-11-01', slot: 'Dinner', food_id: 'penne', qty: 1, unit: 'cup' } });
+    expect(entry.grams).toBe(74.7);
+    const label = api.ok('logFood', { payload: { date: '2026-11-01', slot: 'Dinner', food_id: 'penne', qty: 1, unit: '0.75 cup' } });
+    expect(label.grams).toBe(56);
+    expect(label.kcal).toBe(180);
+  });
+});
+
 // ---------------------------------------------------------------- the starter list
 
 describe('the generated starter list', () => {

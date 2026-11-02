@@ -15,7 +15,10 @@
 //   action=setFoodWeight&key=...&payload={"food_id":"fd_1a2b3c4d","unit":"carton","grams":425.2}
 //   action=lookupBarcode&key=...&code=0123456789012   — Open Food Facts, writes nothing (#707)
 //   action=getStarterFoods&key=...&q=flour   action=addStarterFoods&key=...&payload={"ids":["flour-all-purpose"]}
+//   action=getRecipes&key=...&q=chicken&sort=rating   — search and sort (#708)
 //   action=getRecipe&key=...&id=rc_1a2b3c4d  — lines with resolved grams, steps, nutrition
+//   action=getCooks&key=...&recipe_id=rc_1a2b3c4d   — newest first, with recipe_name
+//   action=upsertCook&key=...&payload={"recipe_id":"rc_1a2b3c4d","rating":4}  — merges; no date is today
 //   action=upsertRecipe&key=...&payload={"name":"Beef Stew","servings":6,"lines":[...],"steps":[...]}
 //   action=computeNutrition&key=...&payload={"servings":6,"lines":[...]}   — not saved
 //   action=importRecipe&key=...&payload={"url":"https://...","dry_run":true}  — the preview; false saves
@@ -116,7 +119,7 @@ function dispatch(action, params, caller) {
     case 'getStarterFoods': return getStarterFoods(params);
     case 'addStarterFoods': return write(addStarterFoods);
     // Recipes
-    case 'getRecipes': return getRecipes();
+    case 'getRecipes': return getRecipes(params);
     case 'getRecipe': return getRecipe(params.id);
     case 'upsertRecipe': return write(upsertRecipe);
     case 'deleteRecipe': return write(deleteRecipe);

@@ -141,7 +141,7 @@ What the columns mean:
 **Referential rules.** A write naming a food, recipe, plan entry or trip that
 does not exist is refused, naming the id. Deleting a food used by a recipe
 line or trip item is refused, listing the uses. Deleting a recipe deletes its
-lines, steps and walkthrough, and is refused while a plan or log entry uses it.
+lines, steps, walkthrough and cooks (#708), and is refused while a plan or log entry uses it.
 
 **Callers.** The MCP Worker sends `key` (the `API_KEY` script property, held
 as `FORAGE_API_KEY`) and may run every action. The app sends `access_token`,

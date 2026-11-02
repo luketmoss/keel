@@ -1,23 +1,83 @@
 // Recipes, their lines and steps (#703). A recipe is written whole: the row
 // plus its full lines and steps, replaced together. Rating and last cooked are
-// not stored here; reads derive them from Cooks.
+// not stored here; reads derive them from Cooks. Search and sort are #708's.
 //
 // `line_id` (L1, L2...) is stable for the life of the recipe, because
 // walkthroughs cite it: a replace keeps the ids the caller sends, and a line
 // sent without one gets the next number after every id the recipe has used.
 
-/** Every recipe, with per-serving nutrition, partial, rating, last cooked and has_walkthrough. */
-function getRecipes() {
+var RECIPE_SORTS = ['newest', 'name', 'rating', 'last_cooked'];
+
+/**
+ * Every recipe, with per-serving nutrition, partial, rating, last cooked,
+ * cook_count, unrated_cook_id and has_walkthrough (#708).
+ *
+ * `q` (case-insensitive) keeps the recipes whose name, an ingredient line's
+ * text, or the name of the food matched to a line contains it; a match that is
+ * not the name carries `matched_line`, the first such line verbatim. `sort` is
+ * `newest` (the default: last added first), `name` (A to Z), `rating`
+ * (highest first, unrated last) or `last_cooked` (most recent first,
+ * never-cooked last); ties fall back to newest.
+ */
+function getRecipes(params) {
+  params = params || {};
+  var q = cell(params.q).trim().toLowerCase();
+  var sort = cell(params.sort).trim() || 'newest';
+  validateEnum('sort', sort, RECIPE_SORTS);
   var foods = foodsById();
   var lines = groupBy(listRecords('RecipeLines'), 'recipe_id');
   var cooks = groupBy(listRecords('Cooks'), 'recipe_id');
   var walked = {};
   listRecords('Walkthroughs').forEach(function (w) { walked[w.recipe_id] = true; });
 
-  return listRecords('Recipes').map(function (recipe) {
-    var nutrition = recipeNutrition(sortLines(lines[recipe.id] || []), recipe.servings, foods);
-    return withDerived(recipe, nutrition, cooks[recipe.id] || [], !!walked[recipe.id]);
-  }).sort(function (a, b) { return a.name.localeCompare(b.name); });
+  var out = [];
+  listRecords('Recipes').forEach(function (recipe) {
+    var own = sortLines(lines[recipe.id] || []);
+    var matchedLine = '';
+    if (q && recipe.name.toLowerCase().indexOf(q) === -1) {
+      var hit = own.filter(function (l) { return lineMatches(l, q, foods); })[0];
+      if (!hit) return;
+      matchedLine = hit.text;
+    }
+    var nutrition = recipeNutrition(own, recipe.servings, foods);
+    var row = withDerived(recipe, nutrition, cooks[recipe.id] || [], !!walked[recipe.id]);
+    if (q) row.matched_line = matchedLine;
+    out.push(row);
+  });
+  return out.sort(recipeOrder(sort));
+}
+
+/** Whether a line's text, or the name of the food matched to it, contains `q` (already lower case). */
+function lineMatches(line, q, foods) {
+  if (cell(line.text).toLowerCase().indexOf(q) !== -1) return true;
+  var food = line.food_id ? foods[line.food_id] : null;
+  return !!food && cell(food.name).toLowerCase().indexOf(q) !== -1;
+}
+
+/** The comparator for a sort, every one falling back to newest. */
+function recipeOrder(sort) {
+  var newest = function (a, b) { return cell(b.created).localeCompare(cell(a.created)) || a.id.localeCompare(b.id); };
+  // Nulls last, whatever the direction.
+  var desc = function (field) {
+    return function (a, b) {
+      var x = a[field];
+      var y = b[field];
+      if (x === null && y === null) return newest(a, b);
+      if (x === null) return 1;
+      if (y === null) return -1;
+      if (x < y) return 1;
+      if (x > y) return -1;
+      return newest(a, b);
+    };
+  };
+  if (sort === 'name') {
+    return function (a, b) {
+      return a.name.toLowerCase().localeCompare(b.name.toLowerCase()) || newest(a, b);
+    };
+  }
+  if (sort === 'rating') return desc('rating');
+  if (sort === 'last_cooked') return desc('last_cooked');
+  return newest;
 }
 
 /** One recipe with its lines (resolved grams and any reason), steps and nutrition, with `by_line`. */
@@ -59,11 +119,14 @@ function withDerived(recipe, nutrition, cooks, hasWalkthrough) {
   var latest = latestCooks(cooks);
   out.rating = latest.rating;
   out.last_cooked = latest.date;
+  out.cook_count = cooks.length;
+  // #708: the latest cook, while it has no rating, so the app can ask "How was it?".
+  out.unrated_cook_id = latest.cook && latest.cook.rating === null ? latest.cook.id : null;
   out.has_walkthrough = hasWalkthrough;
   return out;
 }
 
-/** The latest non-blank rating and the latest cook date, or null. */
+/** The latest non-blank rating, the latest cook date, and the latest cook itself, or null. */
 function latestCooks(cooks) {
   var ordered = cooks.slice().sort(function (a, b) {
     return (a.date + a.created).localeCompare(b.date + b.created);
@@ -74,7 +137,7 @@ function latestCooks(cooks) {
     if (c.rating !== null) rating = c.rating;
     if (c.date) date = c.date;
   });
-  return { rating: rating, date: date };
+  return { rating: rating, date: date, cook: ordered.length ? ordered[ordered.length - 1] : null };
 }
 
 /**
@@ -197,8 +260,8 @@ function assignLineIds(raw, recipeId) {
 }
 
 /**
- * Delete a recipe with its lines, steps and walkthrough. Refused while a plan
- * or log entry uses it, listing them.
+ * Delete a recipe with its lines, steps, walkthrough and cook history (#708).
+ * Refused while a plan or log entry uses it, listing them.
  */
 function deleteRecipe(payload) {
   var id = requireString('id', payload && payload.id);
@@ -218,6 +281,7 @@ function deleteRecipe(payload) {
     deleteRecordsWhere('RecipeLines', function (l) { return l.recipe_id === id; });
     deleteRecordsWhere('Steps', function (s) { return s.recipe_id === id; });
     deleteRecordsWhere('Walkthroughs', function (w) { return w.recipe_id === id; });
+    deleteRecordsWhere('Cooks', function (c) { return c.recipe_id === id; });
     deleteRecord('Recipes', { id: id });
     return { id: id, deleted: true };
   });

@@ -44,7 +44,7 @@ var CHANGE_LOGGED_ACTIONS = {
   setFoodWeight: ['Foods'],
   addStarterFoods: ['Foods'],
   upsertRecipe: ['Recipes', 'RecipeLines', 'Steps'],
-  deleteRecipe: ['Recipes', 'RecipeLines', 'Steps', 'Walkthroughs'],
+  deleteRecipe: ['Recipes', 'RecipeLines', 'Steps', 'Walkthroughs', 'Cooks'],
   importRecipe: ['Foods', 'Recipes', 'RecipeLines', 'Steps'],
   setWalkthrough: ['Walkthroughs'],
   deleteWalkthrough: ['Walkthroughs'],
@@ -74,7 +74,7 @@ var CHANGE_LOG_MAX_LIMIT = 1000;
 /**
  * What a row's id is used by, for the undo's reference check: by tab, the
  * field in another tab that names it. `lines_json` holds plan ids in a list.
- * Recipes count their own lines, steps and walkthrough: an undo removing a
+ * Recipes count their own lines, steps, walkthrough and cooks (#708): an undo removing a
  * recipe must also be removing every one of those.
  */
 var CHANGE_REFERENCES = {
@@ -87,6 +87,7 @@ var CHANGE_REFERENCES = {
     { tab: 'RecipeLines', field: 'recipe_id' },
     { tab: 'Steps', field: 'recipe_id' },
     { tab: 'Walkthroughs', field: 'recipe_id' },
+    { tab: 'Cooks', field: 'recipe_id' },
     { tab: 'Plan', field: 'recipe_id' },
     { tab: 'FoodLog', field: 'recipe_id' },
   ],

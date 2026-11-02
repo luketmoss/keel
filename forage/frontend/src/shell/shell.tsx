@@ -34,7 +34,9 @@ export function Shell() {
 
   if (review.value) return <ReviewScreen api={api} />;
   const cook = cookRoute.value;
-  if (cook) return <LogMode key={cook.recipeId} api={api} recipeId={cook.recipeId} planId={cook.planId} />;
+  if (cook) {
+    return <LogMode key={cook.recipeId} api={api} recipeId={cook.recipeId} planId={cook.planId} mode={cook.mode} />;
+  }
 
   const tab = TABS.find((t) => t.id === currentTab.value) ?? TABS[0];
   const empty = (

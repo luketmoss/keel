@@ -2,7 +2,8 @@
 // with no tab bar. The source's ingredient lines and steps as a checklist, an
 // elapsed clock and quick timers. A timer counts down and rings; it never
 // checks, advances or finishes anything. The cook in progress is kept in
-// localStorage (cook-store.ts), so a reload returns to it exactly.
+// localStorage (cook-store.ts), so a reload returns to it exactly. #711's
+// walkthrough mode (walkthrough-mode.tsx) runs inside this same frame.
 import type { ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { ApiError, type ForageApi } from '../api/client';
@@ -11,7 +12,8 @@ import { librarySection } from '../library/foods-store';
 import { recipesNotice, reopenRecipe } from '../library/recipes-store';
 import { cookHash, setLeaveGuard } from '../shell/routes';
 import { Sheet } from '../ui/sheet';
-import { clearCook, readCook, writeCook, type ActiveCook, type CookTimer } from './cook-store';
+import { clearCook, readCook, writeCook, type ActiveCook, type CookMode, type CookTimer } from './cook-store';
+import { WalkthroughMode } from './walkthrough-mode';
 import {
   clockText,
   durationWords,
@@ -27,6 +29,8 @@ interface Props {
   api: ForageApi;
   recipeId: string;
   planId: string;
+  /** #711: the mode the route asked for; walkthrough mode needs a walkthrough that passes its check. */
+  mode?: CookMode;
 }
 
 /** The most timers at once. */
@@ -78,7 +82,12 @@ function CheckRow({
   );
 }
 
-export function LogMode({ api, recipeId, planId }: Props) {
+/** Whether a recipe can be cooked in walkthrough mode now. */
+function canWalk(r: RecipeDetail): boolean {
+  return !!r.walkthrough && r.walkthrough_check?.ok !== false;
+}
+
+export function LogMode({ api, recipeId, planId, mode = 'log' }: Props) {
   const [recipe, setRecipe] = useState<RecipeDetail | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [cook, setCook] = useState<ActiveCook | null>(null);
@@ -108,6 +117,9 @@ export function LogMode({ api, recipeId, planId }: Props) {
       plan_id: planId,
       cook_id: newCookId(),
     };
+    if (mode === 'walkthrough' && canWalk(r)) {
+      Object.assign(c, { mode: 'walkthrough', servings: r.servings ?? 1, stage: 'start', step: 0 });
+    }
     writeCook(c);
     setCook(c);
     setNow(Date.now());
@@ -213,7 +225,9 @@ export function LogMode({ api, recipeId, planId }: Props) {
     } catch {
       // Not everywhere.
     }
-    setAnnounce(fresh.map((t) => `${timerLabel(t.minutes)} timer is done`).join('. '));
+    setAnnounce(
+      fresh.map((t) => (t.label ? `${t.label} timer is up` : `${timerLabel(t.minutes)} timer is done`)).join('. '),
+    );
     document.title = 'Timer done · Forage';
   }, [now, cook, phase]);
 
@@ -225,8 +239,10 @@ export function LogMode({ api, recipeId, planId }: Props) {
     }));
   }
 
-  function addTimer(minutes: number) {
+  function addTimer(minutes: number, label?: string, step?: string) {
     if (!cook) return;
+    // #711: one timer a walkthrough step.
+    if (step && cook.timers.some((t) => t.step === step)) return;
     if (cook.timers.length >= MAX_TIMERS) {
       setStatus('Six timers is the most. Remove one first.');
       return;
@@ -237,6 +253,8 @@ export function LogMode({ api, recipeId, planId }: Props) {
       minutes,
       ends_at: Date.now() + minutes * 60000,
     };
+    if (label) t.label = label;
+    if (step) t.step = step;
     update((c) => ({ ...c, timers: [...c.timers, t] }));
     setNow(Date.now());
   }
@@ -331,7 +349,7 @@ export function LogMode({ api, recipeId, planId }: Props) {
             <button
               type="button"
               class="btn btn-primary"
-              onClick={() => goTo(cookHash(other.recipe_id, other.plan_id))}
+              onClick={() => goTo(cookHash(other.recipe_id, other.plan_id, other.mode ?? 'log'))}
             >
               Go to it
             </button>
@@ -357,6 +375,7 @@ export function LogMode({ api, recipeId, planId }: Props) {
   const lines = grouped(recipe.lines);
   const steps = grouped(recipe.steps);
   const serves = recipe.servings ? `serves ${recipe.servings}` : '';
+  const walking = cook.mode === 'walkthrough' && !!recipe.walkthrough;
 
   return (
     <div class="cook-screen" data-testid="log-mode">
@@ -386,7 +405,7 @@ export function LogMode({ api, recipeId, planId }: Props) {
             {cook.timers.map((t) => {
               const left = t.ends_at - now;
               const done = left <= 0;
-              const label = timerLabel(t.minutes);
+              const label = t.label ?? timerLabel(t.minutes);
               return (
                 <div key={t.id} class={done ? 'timer-chip is-done' : 'timer-chip'} data-testid="timer-chip">
                   <span>{label}</span>
@@ -412,7 +431,25 @@ export function LogMode({ api, recipeId, planId }: Props) {
       </p>
 
       {phase === 'done' && saved ? (
-        <DoneScreen api={api} recipe={recipe} cook={saved} elapsed={elapsed} onClose={close} />
+        <DoneScreen
+          api={api}
+          recipe={recipe}
+          cook={saved}
+          elapsed={elapsed}
+          onClose={close}
+          modeName={walking ? 'Walkthrough' : 'Log mode'}
+        />
+      ) : walking && recipe.walkthrough ? (
+        <WalkthroughMode
+          recipe={recipe}
+          doc={recipe.walkthrough}
+          cook={cook}
+          update={update}
+          addTimer={addTimer}
+          saving={phase === 'saving'}
+          failed={phase === 'failed'}
+          onFinish={() => void finish()}
+        />
       ) : (
         <>
           <div class="cook-body">
@@ -593,10 +630,12 @@ interface DoneProps {
   cook: Cook;
   elapsed: number;
   onClose: () => void;
+  /** `Log mode` or `Walkthrough` (#711). */
+  modeName: string;
 }
 
 /** "Done cooking": the time it took, the cook recorded, and an offer to log servings to Eaten. No rating here. */
-function DoneScreen({ api, recipe, cook, elapsed, onClose }: DoneProps) {
+function DoneScreen({ api, recipe, cook, elapsed, onClose, modeName }: DoneProps) {
   const [servings, setServings] = useState(1);
   const [slot, setSlot] = useState<Slot>(() => slotForTime());
   const [logging, setLogging] = useState(false);
@@ -647,7 +686,7 @@ function DoneScreen({ api, recipe, cook, elapsed, onClose }: DoneProps) {
             {clockText(elapsed)}
           </p>
           <p class="hint">
-            {['Log mode', recipe.servings ? `serves ${recipe.servings}` : ''].filter(Boolean).join(' · ')}
+            {[modeName, recipe.servings ? `serves ${recipe.servings}` : ''].filter(Boolean).join(' · ')}
           </p>
           <p>{removed ? 'Cook removed.' : `Cook recorded for ${shortDate(cook.date)}.`}</p>
         </section>

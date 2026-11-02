@@ -4,6 +4,14 @@
 import { describe, expect, it } from 'vitest';
 import { loadApi, type Api } from './apps-script-sandbox';
 
+/** The smallest valid walkthrough for the seeded one-line recipe (#711's format). */
+const MINIMAL_WALKTHROUGH = {
+  format: 1,
+  recipe: 'rc_stew',
+  prep: [],
+  cook: [{ id: 'cook', title: 'Cook it', do: 'Cook it.', uses: [{ line: 'L1' }], lookFor: 'Done.' }],
+};
+
 const BEEF = { id: 'beef', name: 'Beef', kcal_100g: 190, protein_100g: 19, carbs_100g: 0, fat_100g: 12 };
 
 /** A sheet with one food, one recipe using it, and a plan entry. */
@@ -61,7 +69,7 @@ describe('AC3: every action exists, with a read and a write round-tripping throu
     expect(recipe.nutrition.per_serving.kcal).toBe(430.9);
     expect(api.ok('getRecipes').map((r: { id: string }) => r.id)).toEqual(['rc_stew']);
 
-    api.ok('setWalkthrough', { payload: { recipe_id: 'rc_stew', walkthrough: { format: 1, recipe: 'rc_stew' } } });
+    api.ok('setWalkthrough', { payload: { recipe_id: 'rc_stew', walkthrough: MINIMAL_WALKTHROUGH } });
     expect(api.ok('deleteRecipe', { payload: { id: 'rc_stew' } })).toEqual({ id: 'rc_stew', deleted: true });
     for (const tab of ['Recipes', 'RecipeLines', 'Steps', 'Walkthroughs']) expect(api.rows(tab)).toEqual([]);
   });
@@ -97,14 +105,14 @@ describe('AC3: every action exists, with a read and a write round-tripping throu
 
   it('Walkthroughs: setWalkthrough then getWalkthrough; deleteWalkthrough', () => {
     const api = seeded();
-    const doc = { format: 1, recipe: 'rc_stew', prep: [], cook: [] };
+    const doc = MINIMAL_WALKTHROUGH;
     expect(api.ok('setWalkthrough', { payload: { recipe_id: 'rc_stew', walkthrough: doc } }).walkthrough).toEqual(doc);
     expect(api.ok('getWalkthrough', { recipe_id: 'rc_stew' })).toMatchObject({ format: 1, walkthrough: doc });
     expect(api.ok('getRecipe', { id: 'rc_stew' }).has_walkthrough).toBe(true);
-    expect(api.call('setWalkthrough', { payload: { recipe_id: 'rc_stew', walkthrough: { format: 2, recipe: 'rc_stew' } } }).error)
-      .toBe('walkthrough format must be 1');
-    expect(api.call('setWalkthrough', { payload: { recipe_id: 'rc_stew', walkthrough: { format: 1, recipe: 'other' } } }).error)
-      .toBe('walkthrough recipe must be "rc_stew"');
+    expect(api.call('setWalkthrough', { payload: { recipe_id: 'rc_stew', walkthrough: { ...doc, format: 2 } } }).problems)
+      .toEqual(['format: expected 1, got 2']);
+    expect(api.call('setWalkthrough', { payload: { recipe_id: 'rc_stew', walkthrough: { ...doc, recipe: 'other' } } }).problems)
+      .toEqual(['recipe: this walkthrough is for "other", not "rc_stew"']);
     api.ok('deleteWalkthrough', { payload: { recipe_id: 'rc_stew' } });
     expect(api.ok('getWalkthrough', { recipe_id: 'rc_stew' })).toBeNull();
   });
@@ -250,7 +258,7 @@ describe('AC10: the referential rules', () => {
       'food_id "fd_nope" is not a food',
     );
     expect(refusal('setWalkthrough', { recipe_id: 'rc_nope', walkthrough: { format: 1, recipe: 'rc_nope' } })).toBe(
-      'recipe_id "rc_nope" is not a recipe',
+      'There is no recipe rc_nope',
     );
     expect(refusal('computeNutrition', { servings: 1, lines: [{ text: 'y', food_id: 'fd_nope' }] })).toBe(
       'food_id "fd_nope" is not a food',
@@ -307,7 +315,7 @@ describe('AC12: the payload limit', () => {
 
   it('stores a 10,000-character walkthrough whole', () => {
     const api = seeded();
-    const walkthrough = { format: 1, recipe: 'rc_stew', note: 'n'.repeat(10000) };
+    const walkthrough = { ...MINIMAL_WALKTHROUGH, note: 'n'.repeat(10000) };
     const payload = JSON.stringify({ recipe_id: 'rc_stew', walkthrough });
     expect(payload.length).toBeGreaterThan(10000);
     expect(payload.length).toBeLessThan(45000);

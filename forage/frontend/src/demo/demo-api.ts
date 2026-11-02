@@ -26,6 +26,7 @@ import type {
   StructuredRecipe,
 } from '../api/types';
 import { localDate } from '../cook/format';
+import { DEMO_STEW_WALKTHROUGH } from './demo-walkthrough';
 import { displayName, hasNutrition } from '../library/food-math';
 import { SLOTS } from '../api/types';
 import { addDays } from '../plan/dates';
@@ -135,6 +136,10 @@ function seedRecipes(now: number): RecipeDetail[] {
       rating: null,
       last_cooked: null,
       has_walkthrough: d.has_walkthrough,
+      // #711: the demo does not run the validator; its one walkthrough is the fixture, which passes.
+      walkthrough_ok: d.id === 'rc_demo_stew',
+      walkthrough: d.id === 'rc_demo_stew' ? DEMO_STEW_WALKTHROUGH : null,
+      walkthrough_check: d.id === 'rc_demo_stew' ? { ok: true, problems: [] } : null,
       cook_count: 0,
       unrated_cook_id: null,
       lines: d.lines.map((l, i) => ({

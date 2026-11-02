@@ -20,11 +20,11 @@ const NO_TOOL: Record<string, string> = {
   setConfig: "the owner's configuration, set by hand",
   computeNutrition: "forage_import_recipe's dry run already previews nutrition",
   deleteCook: "removed in the app; an agent's cook is undone with forage_undo",
+  getWalkthrough: 'forage_get_recipe answers the walkthrough with its check (#711)',
 };
 
 /** Actions whose tool a later issue adds. That issue removes them from here. */
 const PENDING_TOOLS: Record<string, number> = {
-  getWalkthrough: 711, setWalkthrough: 711, deleteWalkthrough: 711,
   getFoodLog: 712, getFoodLogTotals: 712, logFood: 712, updateLogEntry: 712, deleteLogEntry: 712,
 };
 
@@ -67,9 +67,9 @@ function parityProblems(actions: string[], called: string[]): string[] {
 describe('MCP parity: every action has a tool, or a reason, or an owner', () => {
   it('finds the Worker\'s Forage tools', () => {
     expect(workerActions()).toEqual([
-      'addStarterFoods', 'addToTrip', 'closeTrip', 'deleteFood', 'deletePlanEntry', 'deleteRecipe', 'discardTrip', 'getChangeLog',
+      'addStarterFoods', 'addToTrip', 'closeTrip', 'deleteFood', 'deletePlanEntry', 'deleteRecipe', 'deleteWalkthrough', 'discardTrip', 'getChangeLog',
       'getConfig', 'getCooks', 'getFood', 'getFoods', 'getPlan', 'getRecipe', 'getRecipes', 'getStarterFoods', 'getTrip',
-      'getTrips', 'importRecipe', 'lookupBarcode', 'movePlanEntry', 'planWeek', 'removeTripItem', 'setFoodWeight', 'setTripItem',
+      'getTrips', 'importRecipe', 'lookupBarcode', 'movePlanEntry', 'planWeek', 'removeTripItem', 'setFoodWeight', 'setTripItem', 'setWalkthrough',
       'startTrip', 'undoCall', 'upsertCook', 'upsertFood', 'upsertPlanEntry', 'upsertRecipe',
     ]);
   });
@@ -85,8 +85,8 @@ describe('MCP parity: every action has a tool, or a reason, or an owner', () => 
   });
 
   it('fails for a pending action that already has a tool, so the list only shrinks', () => {
-    expect(parityProblems(mainActions(), [...workerActions(), 'getWalkthrough'])).toEqual([
-      'getWalkthrough is on more than one of: a tool, PENDING_TOOLS',
+    expect(parityProblems(mainActions(), [...workerActions(), 'getFoodLog'])).toEqual([
+      'getFoodLog is on more than one of: a tool, PENDING_TOOLS',
     ]);
   });
 

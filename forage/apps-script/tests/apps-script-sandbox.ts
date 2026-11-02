@@ -154,6 +154,9 @@ export interface Envelope {
   data?: any;
   error?: string;
   code?: string;
+  /** A refused setWalkthrough's problems and warnings (#711). */
+  problems?: string[];
+  warnings?: string[];
 }
 
 /**

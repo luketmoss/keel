@@ -266,9 +266,11 @@ export function NutritionSheet({ api, recipeId, onChanged, onClose, focusCook }:
             Cook
           </button>
           <p class="hint">
-            {recipe.has_walkthrough
-              ? 'A walkthrough is ready.'
-              : "No walkthrough yet. Cook it in log mode: the source's steps as a checklist."}
+            {!recipe.has_walkthrough
+              ? "No walkthrough yet. Cook it in log mode: the source's steps as a checklist."
+              : recipe.walkthrough_ok === false
+                ? 'The walkthrough needs an update. Log mode still works.'
+                : 'A walkthrough is ready.'}
           </p>
         </div>
 

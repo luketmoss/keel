@@ -1,0 +1,35 @@
+{
+  "id": "stew",
+  "name": "Beef Stew",
+  "source": "https://www.tasteofhome.com/recipes/classic-beef-stew/",
+  "servings": 6,
+  "lines": [
+    { "id": "L1", "text": "1-1/2 pounds beef stew meat, cut into 1-inch cubes", "q": 1.5, "u": "lb", "food": "beefstew" },
+    { "id": "L2", "text": "1/2 teaspoon salt, divided", "q": 0.5, "u": "tsp", "food": "salt" },
+    { "id": "L3", "text": "6 tablespoons all-purpose flour, divided", "q": 6, "u": "tbsp", "food": "flour" },
+    { "id": "L4", "text": "1/2 teaspoon smoked paprika", "q": 0.5, "u": "tsp", "food": "paprika" },
+    { "id": "L5", "text": "1 tablespoon canola oil", "q": 1, "u": "tbsp", "food": "canola" },
+    { "id": "L6", "text": "3 tablespoons tomato paste", "q": 3, "u": "tbsp", "food": "tpaste" },
+    { "id": "L7", "text": "2 teaspoons herbes de Provence", "q": 2, "u": "tsp", "food": "herbes" },
+    { "id": "L8", "text": "2 garlic cloves, minced", "q": 2, "u": "clove", "food": "garlic" },
+    { "id": "L9", "text": "2 cups dry red wine", "q": 2, "u": "cup", "food": "redwine" },
+    { "id": "L10", "text": "2 cups beef broth", "q": 2, "u": "cup", "food": "broth" },
+    { "id": "L11", "text": "1-1/2 teaspoons minced fresh rosemary, divided", "q": 1.5, "u": "tsp", "food": "rosemary" },
+    { "id": "L12", "text": "2 bay leaves", "q": 2, "u": "", "food": "bay" },
+    { "id": "L13", "text": "3 cups cubed peeled potatoes", "q": 3, "u": "cup", "food": "potato" },
+    { "id": "L14", "text": "3 cups coarsely chopped onions (about 2 large)", "q": 3, "u": "cup", "food": "onion" },
+    { "id": "L15", "text": "2 cups sliced carrots", "q": 2, "u": "cup", "food": "carrot" },
+    { "id": "L16", "text": "2 tablespoons cold water", "q": 2, "u": "tbsp", "food": "water" },
+    { "id": "L17", "text": "2 tablespoons balsamic or red wine vinegar", "q": 2, "u": "tbsp", "food": "balsamic" },
+    { "id": "L18", "text": "1 cup fresh or frozen peas", "q": 1, "u": "cup", "food": "peas" },
+    { "id": "L19", "text": "Additional fresh rosemary, optional", "q": null, "u": "", "food": "rosemary", "optional": true }
+  ],
+  "steps": [
+    { "name": "Prep the beef", "text": "In a small bowl, toss the beef with 1/4 teaspoon salt. In a large bowl, combine 4 tablespoons flour with the paprika. Add the beef pieces to the bowl, a few at a time, turning until they're lightly coated." },
+    { "name": "Brown the beef", "text": "In a Dutch oven, brown the beef in oil over medium heat. Stir in the tomato paste, herbes de Provence and garlic, cooking until fragrant and the color of the beef darkens slightly." },
+    { "name": "Deglaze the pan", "text": "Pour in the wine and cook until the mixture just comes to a boil. Simmer until reduced by half, about five minutes." },
+    { "name": "Simmer the stew", "text": "Add the beef broth, bay leaves and 1 teaspoon rosemary, and bring the mixture to a boil. Reduce the heat, and cover the Dutch oven. Let the stew simmer until the meat is almost tender, about 1 hour and 30 minutes." },
+    { "name": "Add the veggies", "text": "Add the potatoes, onions and carrots to the stew. Cover the Dutch oven, and simmer until the meat and vegetables are tender, about 30 minutes longer." },
+    { "name": "Add the finishing touches", "text": "Pick out and discard the bay leaves. In a small bowl, mix the remaining rosemary, salt and flour. Add the cold water and balsamic vinegar and stir until smooth. Pour the mixture into the stew and bring it to a boil. Add the peas and cook, stirring, until the stew is thickened, about two minutes. If desired, top with additional fresh rosemary before serving." }
+  ]
+}

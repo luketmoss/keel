@@ -114,6 +114,8 @@ export interface RecipeSummary {
   rating: number | null;
   last_cooked: string | null;
   has_walkthrough: boolean;
+  /** #711: a walkthrough that passes the API's check against the lines as they are now. */
+  walkthrough_ok?: boolean;
   /** #708: how many cooks, and the latest cook's id while it has no rating, else null. */
   cook_count: number;
   unrated_cook_id: string | null;
@@ -350,6 +352,51 @@ export interface Step {
 export interface RecipeDetail extends RecipeSummary {
   lines: (RecipeLine & { resolved_grams: number | null; reason: MissingReason | '' })[];
   steps: Step[];
+  /** #711: the walkthrough document, or null with none. */
+  walkthrough?: Walkthrough | null;
+  /** #711: the API's check of it against the current lines; null with none. */
+  walkthrough_check?: { ok: boolean; problems: string[]; warnings?: string[] } | null;
+}
+
+// ---- walkthroughs (#711): format 1, as forage/docs/design/711-walkthroughs.md defines it
+
+/** `{line, share?}` (a recipe line and the share of it, default 1) or `{prep}` (a prep group's id). */
+export type WalkthroughUse = { line: string; share?: number } | { prep: string };
+
+export interface WalkthroughClock {
+  min: number;
+  label: string;
+}
+
+export interface PrepGroup {
+  id: string;
+  title: string;
+  /** `start`, or the id of the cook step with a wait during which it is done. */
+  when: string;
+  uses?: WalkthroughUse[];
+  tasks: string[];
+  makes: string;
+}
+
+export interface CookStep {
+  id: string;
+  title: string;
+  do: string;
+  uses?: WalkthroughUse[];
+  heat?: string;
+  lookFor?: string;
+  timer?: WalkthroughClock;
+  wait?: WalkthroughClock;
+  meanwhile?: string[];
+}
+
+export interface Walkthrough {
+  format: 1;
+  recipe: string;
+  note?: string;
+  equipment?: string[];
+  prep: PrepGroup[];
+  cook: CookStep[];
 }
 
 // ---- import (#706)

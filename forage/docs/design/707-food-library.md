@@ -223,7 +223,7 @@ on" reminder (#713), naming the food.
 |---|---|---|---|
 | `forage_search_foods` (read) | `q`, `kind`, `regular`, `barcode`, `include_starter` (default false), `limit` (default 20) | `getFoods`, `getStarterFoods` | Compact foods: `id, name, brand, kind, kcal_100g, protein_100g, carbs_100g, fat_100g, has_nutrition, verified, source`. With `include_starter`, starter rows carry `starter_id` and `in_library` |
 | `forage_get_food` (read) | `id` | `getFood` | The whole food, its weights, its shopping fields and `used_by` |
-| `forage_add_food` (write) | One of `barcode`, `starter_id`, or `food` (the fields of the form: `name`, `kind`, `brand`, `serving` `{name, g}` with `per_serving` `{kcal, protein, carbs, fat}`, or `per_100g`, `weights`, `buy_unit`…). `dry_run` (default true), `verified` (default false) | `lookupBarcode`, `addStarterFoods`, `upsertFood` | The preview with `dry_run` true: the food as it would be stored, the Open Food Facts `warnings` and `already_in_library`. With it false, the stored food |
+| `forage_add_food` (write) | One of `barcode`, `starter_id`, `food` (the fields of the form: `name`, `kind`, `brand`, `serving` `{name, g}` with `per_serving` `{kcal, protein, carbs, fat}`, or `per_100g`, `weights`, `buy_unit`…, plus `source` `usda`, `label` or `manual` and `source_ref`, the FDC id for `usda`), or `foods`, a list of up to 20 `food` inputs. `dry_run` (default true), `verified` (default false) | `lookupBarcode`, `addStarterFoods`, `upsertFood` | The preview with `dry_run` true: the food as it would be stored, the Open Food Facts `warnings` and `already_in_library`. With it false, the stored food |
 | `forage_update_food` (write) | `id` plus any of the food's fields; `weights` replaces the named weights it lists and leaves the others; `verified` | `upsertFood`, `setFoodWeight` | The stored food |
 | `forage_delete_food` (write) | `id` | `deleteFood` | Confirmation, or the refusal with the recipes named |
 
@@ -232,6 +232,12 @@ on" reminder (#713), naming the food.
 - A barcode add with `dry_run` false and `verified` false stores the food unchecked; the app then shows it as "Not
   checked" until the owner ticks the box in Edit.
 - **Undo** is #713's: adding is undone by deleting the food, an update by restoring the prior row.
+- **Agent additions (#734's import skill).** `source` `usda` with no `source_ref` is refused before any request, and
+  `off` is set only through `barcode`. `foods` sends one `upsertFood` per food under the tool call's one `call_id`: one
+  write against the budget (its rows counted as rows), one change-log call and one `forage_undo`. With `dry_run` it
+  previews every food and writes none; 21 or more are refused before any request; a failure partway answers which
+  foods were saved and which were not, and undo covers what landed.
+- A starter food suggested in `forage_import_recipe`'s preview is named `Name (starter_id <id>)`, for `starter_id`.
 - `forage_delete_food` is not in the issue's original four; the epic's parity rule ("anything the app can do, an
   agent can do") needs it because the app can delete.
 

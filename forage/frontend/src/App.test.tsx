@@ -113,7 +113,9 @@ describe('empty states', () => {
     const screenEl = screen.getByTestId(`screen-${id}`);
     expect(screenEl.querySelector('h2')!.textContent).toBe(heading);
     expect(screenEl.querySelector('p')!.textContent).toBe(sentence);
-    expect(screenEl.querySelectorAll('button, a, input').length).toBe(0);
+    // #707: Library's Recipes | Foods switch is the only control.
+    const controls = [...screenEl.querySelectorAll('button, a, input')].filter((el) => !el.closest('.segmented'));
+    expect(controls.length).toBe(0);
   });
 });
 

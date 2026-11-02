@@ -23,6 +23,11 @@ retried, carry the tool call's `call_id` so the API logs their rows for `forage_
 |------|----------|-------|-------------|
 | `forage_status` | read | `getConfig` | Whether the API answers, and its schema version |
 | `forage_import_recipe` | write | `importRecipe` | Import from exactly one of `url`, `jsonld`, `text` or `recipe` (structured, e.g. from a photo). A dry run by default (`dry_run` true): the recipe as read, each line's match or suggestions, nutrition per serving. `dry_run: false` saves it, unmatched lines as unmatched; `allow_duplicate` saves a link already in Forage. Over `MAX_ROWS_PER_CALL` rows (recipe + lines + steps) it previews until `confirm: true` |
+| `forage_search_foods` | read | `getFoods`, `getStarterFoods` | Foods by `q`, `kind`, `regular`, `barcode`, up to `limit` (20): compact rows (`id, name, brand, kind`, the four per-100 g values, `has_nutrition, verified, source`), as JSON. `include_starter` adds the starter list's matches with `starter_id`, `in_library` and `can_fill` (#707) |
+| `forage_get_food` | read | `getFood` | One food, whole: weights, shopping fields, source, `verified` and `used_by` (#707) |
+| `forage_add_food` | write | `lookupBarcode`, `addStarterFoods`, `upsertFood` | Exactly one of `barcode` (Open Food Facts, a read), `starter_id`, `food` (the form's fields: `per_serving` with `serving`, or `per_100g`; `source` `usda` needs `source_ref`, `off` only through `barcode`) or `foods` (up to 20, one `upsertFood` each under the call's one `call_id`: one write, its rows counted, one `forage_undo`). A dry run by default; `verified` only when the owner checked the label (#707) |
+| `forage_update_food` | write | `upsertFood`, `setFoodWeight` | `id` plus the fields to change; `weights` sets or replaces each named weight it lists (#707) |
+| `forage_delete_food` | write | `deleteFood` | Refused while a recipe or trip uses the food, naming the recipes. `destructiveHint` (#707) |
 | `forage_undo` | write | `getChangeLog`, `undoCall` | No arguments: the last 20 calls. `call_id`: a dry run listing every row it would restore, remove or recreate. `confirm: true`: reverts, all or nothing. Refused when a row changed since, or when a row it would remove is now used elsewhere. `destructiveHint` |
 
 ## Adding a tool

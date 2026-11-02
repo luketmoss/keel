@@ -27,7 +27,8 @@
  * `case` in main.js is on neither this list nor the test's key-only list.
  */
 var TOKEN_ACTIONS = [
-  'getFoods', 'getFood', 'upsertFood', 'deleteFood',
+  'getFoods', 'getFood', 'upsertFood', 'deleteFood', 'setFoodWeight',
+  'lookupBarcode', 'getStarterFoods', 'addStarterFoods',
   'getRecipes', 'getRecipe', 'upsertRecipe', 'deleteRecipe', 'computeNutrition', 'importRecipe',
   'getWalkthrough', 'setWalkthrough', 'deleteWalkthrough',
   'getPlan', 'upsertPlanEntry', 'deletePlanEntry',

@@ -122,8 +122,10 @@ function nutrientsOf(food, grams) {
  * A recipe's nutrition, per serving, from its lines and the foods they name.
  *
  * Returns `{ per_serving: {kcal, protein_g, carbs_g, fat_g}, missing:
- * [{line_id, reason}], partial, lines: [{line_id, grams, reason}] }`. Optional
- * lines count toward nothing and are left out of `missing`.
+ * [{line_id, reason}], partial, lines: [{line_id, grams, reason, kcal}] }`,
+ * where a line's `kcal` is its share of a serving's calories (#707), null
+ * when it did not count. Optional lines count toward nothing and are left out
+ * of `missing`.
  *
  * `reason` is `no_food` (not matched), `no_nutrition` (the food has none) or
  * `no_weight`. Partial is any `no_food`, or `no_weight` on a food with
@@ -136,11 +138,13 @@ function recipeNutrition(lines, servings, foodsById) {
   var perLine = [];
   var partial = false;
   var counted = 0;
+  var by = typeof servings === 'number' && servings > 0 ? servings : 1;
 
   lines.forEach(function (line) {
     var food = line.food_id ? foodsById[line.food_id] || null : null;
     var grams = food || typeof line.grams === 'number' ? lineGrams(line, food) : null;
     var reason = '';
+    var kcal = null;
 
     if (!line.optional) {
       if (!line.food_id || !food) {
@@ -155,6 +159,7 @@ function recipeNutrition(lines, servings, foodsById) {
         total.protein_g += n.protein_g;
         total.carbs_g += n.carbs_g;
         total.fat_g += n.fat_g;
+        kcal = round1(n.kcal / by);
         counted++;
       }
       if (reason) {
@@ -162,11 +167,10 @@ function recipeNutrition(lines, servings, foodsById) {
         if (reason !== 'no_nutrition') partial = true;
       }
     }
-    perLine.push({ line_id: line.line_id, grams: round1(grams), reason: reason });
+    perLine.push({ line_id: line.line_id, grams: round1(grams), reason: reason, kcal: kcal });
   });
 
   // Nothing counted is unknown, not zero.
-  var by = typeof servings === 'number' && servings > 0 ? servings : 1;
   var per = function (v) { return counted ? round1(v / by) : null; };
   return {
     per_serving: {

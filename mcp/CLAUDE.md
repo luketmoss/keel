@@ -80,8 +80,8 @@ disjoint and together are exactly the app's tools.
 | `Thrive (write)` | `<PUBLIC_URL>/thrive/write/mcp` | the 17 write tools | **off** |
 | `Hive` | `<PUBLIC_URL>/hive/mcp` | the 4 read tools | on |
 | `Hive (write)` | `<PUBLIC_URL>/hive/write/mcp` | the 5 write tools | **off** |
-| `Forage` | `<PUBLIC_URL>/forage/mcp` | the 1 read tool | on |
-| `Forage (write)` | `<PUBLIC_URL>/forage/write/mcp` | the 2 write tools | **off** |
+| `Forage` | `<PUBLIC_URL>/forage/mcp` | the 3 read tools | on |
+| `Forage (write)` | `<PUBLIC_URL>/forage/write/mcp` | the 5 write tools | **off** |
 
 **The write connectors are off unless you are writing.** claude.ai remembers the
 toggle across chats, so turning `Thrive (write)` on to log a session leaves it on
@@ -301,8 +301,9 @@ and both copies in one pull request, which is therefore human-reviewed.
 
 ## Forage
 
-`/forage/mcp` and `/forage/write/mcp` (#713) serve Forage's tools: `forage_status` (read), and
-`forage_import_recipe` and `forage_undo` (write). The rest arrive with their feature issues (#707–#712); the
+`/forage/mcp` and `/forage/write/mcp` (#713) serve Forage's tools: `forage_status`, `forage_search_foods` and
+`forage_get_food` (read), and `forage_import_recipe`, `forage_add_food`, `forage_update_food`, `forage_delete_food`
+and `forage_undo` (write); the food tools are #707's. The rest arrive with their feature issues (#708–#712); the
 table of every tool, and how to add one, is `docs/forage-tools.md`. Wording:
 [`docs/design/713-forage-connectors.md`](docs/design/713-forage-connectors.md). Secrets: `FORAGE_API_URL` and
 `FORAGE_API_KEY`, the Forage Apps Script's `API_KEY` (#703); the app never holds it, only this Worker and the
@@ -332,7 +333,7 @@ The tools below are on the write connectors, `Thrive (write)`, `Hive (write)` an
 (it deletes the old rows), `thrive_set_journal_entry` (clearing a note is a
 delete), `thrive_set_workout_rest` (it overwrites planned rest, #583),
 `thrive_delete_drink` (#595) and `thrive_undo` can destroy data. `hive_delete_item` (#725) and
-`hive_undo` are the same for Hive, and `forage_undo` (#713) for Forage; they get the same treatment. Reverting can itself destroy work done
+`hive_undo` are the same for Hive, and `forage_undo` (#713) and `forage_delete_food` (#707) for Forage; they get the same treatment. Reverting can itself destroy work done
 since, so the app's conflict check is the first line and a human approval the second. Their dry-run-until-`confirm: true`
 behaviour only prevents accidents; against prompt injection the one control is a
 human approving each call.
@@ -341,7 +342,7 @@ human approving each call.
 prompt switches it off on that device only, and a new device starts at the
 default. So:
 
-- **Never choose "Always allow" on those tools, `hive_delete_item`, `hive_undo` and `forage_undo` included, on any device.**
+- **Never choose "Always allow" on those tools, `hive_delete_item`, `hive_undo`, `forage_undo` and `forage_delete_food` included, on any device.**
 - On each device you use, set them to "Needs approval" in the connector's tool
   list, and check by calling one.
 

@@ -24,7 +24,10 @@ describe('AC: a line is auto-matched only by exact or alias', () => {
     const api = withFoods(['Sugar-apples', 'Brown sugar', 'Flour']);
     const line = preview(api, { name: 'X', servings: 1, lines: ['1 cup sugar'] }).lines[0];
     expect(line).toMatchObject({ food_id: '', match: null });
-    expect(line.suggestions.map((s: { name: string }) => s.name).sort()).toEqual(['Brown sugar', 'Sugar-apples']);
+    const library = line.suggestions.filter((s: { food_id?: string }) => s.food_id);
+    expect(library.map((s: { name: string }) => s.name).sort()).toEqual(['Brown sugar', 'Sugar-apples']);
+    // #707: the third is the starter list's, after the library's.
+    expect(line.suggestions[2]).toEqual({ starter_id: 'sugar-granulated', name: 'Sugar, granulated' });
   });
 
   it('sugar with a food named Sugar is exact; tomatoes matches Tomato', () => {

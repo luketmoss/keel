@@ -29,7 +29,7 @@ describe('AC3: every action exists, with a read and a write round-tripping throu
       payload: { name: 'Garlic', brand: 'Farm', servings_json: [{ name: 'clove', g: 3 }], regular: true, barcode: '0042' },
     });
     expect(food.id).toMatch(/^fd_[0-9a-f]{8}$/);
-    expect(api.ok('getFood', { id: food.id })).toEqual(food);
+    expect(api.ok('getFood', { id: food.id })).toEqual({ ...food, used_by: [] });
     expect(food.servings_json).toEqual([{ name: 'clove', g: 3 }]);
     expect(food.kcal_100g).toBeNull();
     expect(api.ok('getFoods', { q: 'farm' }).map((f: { id: string }) => f.id)).toEqual([food.id]);
@@ -264,7 +264,7 @@ describe('AC10: the referential rules', () => {
     const trip = api.ok('createTrip', {});
     api.ok('upsertTripItems', { payload: { trip_id: trip.id, items: [{ food_id: 'beef' }] } });
     expect(api.call('deleteFood', { payload: { id: 'beef' } }).error).toBe(
-      `Food "beef" is in use, so it was not deleted: recipes rc_stew; trips ${trip.id}`,
+      `Food "beef" is in use, so it was not deleted: recipes Stew (rc_stew); trips ${trip.id}`,
     );
     expect(api.rows('Foods')).toHaveLength(1);
   });

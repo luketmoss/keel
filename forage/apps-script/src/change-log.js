@@ -35,11 +35,14 @@ var CHANGE_LOG_MISSING =
  * importRecipe leaves out Config: the aliases a save learns stay learned after
  * an undo (an alias to a food that still exists is still true), and logging the
  * one shared Config row would make every import refuse to undo once a later
- * import had learned another alias.
+ * import had learned another alias. addStarterFoods leaves it out for the
+ * same reason (#707).
  */
 var CHANGE_LOGGED_ACTIONS = {
   upsertFood: ['Foods'],
   deleteFood: ['Foods'],
+  setFoodWeight: ['Foods'],
+  addStarterFoods: ['Foods'],
   upsertRecipe: ['Recipes', 'RecipeLines', 'Steps'],
   deleteRecipe: ['Recipes', 'RecipeLines', 'Steps', 'Walkthroughs'],
   importRecipe: ['Foods', 'Recipes', 'RecipeLines', 'Steps'],

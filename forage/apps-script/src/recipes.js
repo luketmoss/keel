@@ -20,7 +20,7 @@ function getRecipes() {
   }).sort(function (a, b) { return a.name.localeCompare(b.name); });
 }
 
-/** One recipe with its lines (resolved grams and any reason), steps and nutrition. */
+/** One recipe with its lines (resolved grams and any reason), steps and nutrition, with `by_line`. */
 function getRecipe(id) {
   var recipe = getRecord('Recipes', { id: cell(id) });
   if (!recipe) throw new Error('Recipe "' + cell(id) + '" not found');
@@ -32,6 +32,10 @@ function getRecipe(id) {
   var walked = !!getRecord('Walkthroughs', { recipe_id: recipe.id });
 
   var out = withDerived(recipe, nutrition, cooks, walked);
+  // #707: each line's grams and its kcal a serving, so the app computes nothing.
+  out.nutrition.by_line = nutrition.lines.map(function (l) {
+    return { line_id: l.line_id, grams: l.grams, kcal: l.kcal };
+  });
   out.lines = lines.map(function (line, i) {
     var resolved = nutrition.lines[i];
     var l = JSON.parse(JSON.stringify(line));

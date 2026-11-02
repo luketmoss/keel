@@ -740,9 +740,11 @@ function readAliases(foodsById) {
 
 /**
  * `{ food_id, match, suggestions }` for a cleaned name. Only `exact` and
- * `alias` produce a food_id; word overlap only suggests.
+ * `alias` produce a food_id; word overlap only suggests. Suggestions are up
+ * to three: library foods first (`{ food_id, name }`), then starter foods not
+ * yet in the library (`{ starter_id, name }`, #707) from `starters`.
  */
-function matchFood(name, foods, aliases) {
+function matchFood(name, foods, aliases, starters) {
   var key = normalizeName(name);
   var out = { food_id: '', match: null, suggestions: [] };
   if (!key) return out;
@@ -759,6 +761,7 @@ function matchFood(name, foods, aliases) {
     return out;
   }
   out.suggestions = suggestFoods(key, foods);
+  if (starters) out.suggestions = out.suggestions.concat(starterSuggestions(key, starters, 3 - out.suggestions.length));
   return out;
 }
 
@@ -783,6 +786,7 @@ function suggestFoods(key, foods) {
 
 /** The preview the issue body specifies, from a draft. Refuses a structured line naming no food. */
 function buildPreview(draft, foods, byId, aliases) {
+  var starters = availableStarters(foods);
   var lines = draft.lines.map(function (line, i) {
     var parsed;
     if (line.structured) {
@@ -810,7 +814,7 @@ function buildPreview(draft, foods, byId, aliases) {
       if (!byId[parsed.given_food]) throw new Error('food_id "' + parsed.given_food + '" is not a food');
       match = { food_id: parsed.given_food, match: null, suggestions: [] };
     } else {
-      match = matchFood(parsed.name, foods, aliases);
+      match = matchFood(parsed.name, foods, aliases, starters);
     }
     return {
       line_id: 'L' + (i + 1),

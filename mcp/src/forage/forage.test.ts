@@ -18,8 +18,8 @@ function envWith(over: Partial<Env> = {}): Env {
 }
 const env = envWith()
 
-const FORAGE_WRITE = ['forage_import_recipe', 'forage_undo']
-const FORAGE_READ = ['forage_status']
+const FORAGE_WRITE = ['forage_add_food', 'forage_delete_food', 'forage_import_recipe', 'forage_undo', 'forage_update_food']
+const FORAGE_READ = ['forage_get_food', 'forage_search_foods', 'forage_status']
 const REMINDER = "— Forage (write) is on. Turn it off in Search and tools when you've finished writing."
 
 function rpc(method: string, params?: unknown): Request {
@@ -522,5 +522,189 @@ describe('no output, error or log carries the key or the URL', () => {
       expect(said).not.toContain(URL_)
     }
     vi.restoreAllMocks()
+  })
+})
+
+// ---------------------------------------------------------------- #707: the food tools
+
+/** A fake API that stores Foods rows, as upsertFood answers, with per-action overrides. */
+function foodApi(over: Partial<Record<string, (r: Sent) => unknown>> = {}) {
+  let n = 0
+  return fakeForage((r) => {
+    if (over[r.action]) return over[r.action]!(r)
+    if (r.action === 'upsertFood') return { success: true, data: { id: r.payload.id ?? `fd_${++n}`, ...r.payload } }
+    return { success: false, error: `Unknown action "${r.action}"` }
+  })
+}
+
+describe('forage_search_foods and forage_get_food (read)', () => {
+  it('answers compact foods filtered by kind, and the starter list when asked', async () => {
+    const sent = fakeForage((r) => {
+      if (r.action === 'getFoods') {
+        return {
+          success: true,
+          data: [
+            { id: 'fd_1', name: 'Oats', brand: '', kind: 'ingredient', kcal_100g: 379, protein_100g: 13.2, carbs_100g: 67.7, fat_100g: 6.52, servings_json: null, source: 'usda', verified: false },
+            { id: 'fd_2', name: 'bar', brand: 'KIND', kind: 'packaged', kcal_100g: null, protein_100g: null, carbs_100g: null, fat_100g: null, source: 'off', verified: false },
+          ],
+        }
+      }
+      return {
+        success: true,
+        data: [{ id: 'oats-rolled', name: 'Oats, rolled', fdc: 173904, kcal_100g: 379, protein_100g: 13.2, carbs_100g: 67.7, fat_100g: 6.52, servings: [{ name: 'cup', g: 81 }], in_library: 'fd_1', can_fill: '' }],
+      }
+    })
+    const r = await call('forage_search_foods', { q: 'oat', kind: 'ingredient', include_starter: true })
+    const out = JSON.parse(r.content[0].text)
+    expect(out.foods).toEqual([
+      { id: 'fd_1', name: 'Oats', brand: '', kind: 'ingredient', kcal_100g: 379, protein_100g: 13.2, carbs_100g: 67.7, fat_100g: 6.52, has_nutrition: true, verified: false, source: 'usda' },
+    ])
+    expect(out.starter[0]).toMatchObject({ starter_id: 'oats-rolled', in_library: 'fd_1' })
+    expect(sent.map((s) => [s.action, s.params.get('q'), s.payload])).toEqual([
+      ['getFoods', 'oat', undefined],
+      ['getStarterFoods', 'oat', undefined],
+    ])
+  })
+
+  it('forage_get_food answers the whole food, used_by included', async () => {
+    fakeForage(() => ({ success: true, data: { id: 'fd_1', name: 'Ricotta', used_by: [{ id: 'rc_1', name: 'Lasagna' }] } }))
+    const out = JSON.parse((await call('forage_get_food', { id: 'fd_1' })).content[0].text)
+    expect(out.used_by).toEqual([{ id: 'rc_1', name: 'Lasagna' }])
+  })
+})
+
+describe('forage_add_food', () => {
+  const BAR = { name: 'Bar', kind: 'packaged', serving: { name: 'bar', g: 30 }, per_serving: { kcal: 120, protein: 5, carbs: 15, fat: 4 } }
+
+  it('previews a food by default and sends nothing', async () => {
+    const sent = foodApi()
+    const r = await call('forage_add_food', { food: BAR })
+    expect(sent).toEqual([])
+    expect(r.content[0].text).toMatch(/^Preview — nothing saved\./)
+    expect(r.content[0].text).not.toContain(REMINDER)
+  })
+
+  it('stores a label serving per 100 g: 5 g protein in a 30 g serving is 16.67', async () => {
+    const sent = foodApi()
+    const r = await call('forage_add_food', { food: BAR, dry_run: false })
+    expect(sent[0].payload).toMatchObject({
+      protein_100g: 16.67, kcal_100g: 400, carbs_100g: 50, fat_100g: 13.33, servings_json: [{ name: 'bar', g: 30 }], source: 'manual',
+    })
+    expect(r.content[0].text).toContain(REMINDER)
+  })
+
+  it('a usda food with its FDC id stores both; without source_ref it is refused before any request', async () => {
+    const sent = foodApi()
+    await call('forage_add_food', {
+      food: { name: 'Ricotta', source: 'usda', source_ref: '170851', per_100g: { kcal: 150, protein: 7.54, carbs: 7.27, fat: 10.2 } },
+      dry_run: false,
+    })
+    expect(sent[0].payload).toMatchObject({ source: 'usda', source_ref: '170851' })
+    const refused = await call('forage_add_food', { food: { name: 'Ricotta', source: 'usda' }, dry_run: false })
+    expect(refused).toMatchObject({ isError: true })
+    expect(refused.content[0].text).toBe('Nothing saved. "Ricotta": a usda food needs source_ref, its FDC id.')
+    expect(sent).toHaveLength(1)
+  })
+
+  it('foods of 3 saves 3 rows under one call_id, counted as one write of 3 rows; dry_run writes nothing', async () => {
+    const budget = fakeBudget({ now: T0 })
+    const e = envWith({ WRITE_BUDGET: budget.namespace })
+    const sent = foodApi()
+    const foods = ['Oats', 'Rye', 'Spelt'].map((name) => ({ name }))
+    await call('forage_add_food', { foods }, e)
+    expect(sent).toEqual([])
+    const r = await call('forage_add_food', { foods, dry_run: false }, e)
+    expect(sent.map((s) => s.action)).toEqual(['upsertFood', 'upsertFood', 'upsertFood'])
+    const ids = [...new Set(sent.map((s) => s.payload.call_id))]
+    expect(ids).toHaveLength(1)
+    expect(ids[0]).toMatch(/^[0-9a-f-]{36}$/)
+    expect(budget.stored.forage).toEqual([{ t: T0, rows: 3 }])
+    expect(r.content[0].text).toContain(`Undo with forage_undo, call ${ids[0]}`)
+  })
+
+  it('foods of 21 is refused before any request', async () => {
+    const sent = foodApi()
+    const r = await call('forage_add_food', { foods: Array.from({ length: 21 }, (_, i) => ({ name: `F${i}` })), dry_run: false })
+    expect(r).toMatchObject({ isError: true })
+    expect(r.content[0].text).toBe('Nothing saved. foods takes up to 20 foods; this has 21.')
+    expect(sent).toEqual([])
+  })
+
+  it('a failure partway answers which foods were saved and which were not', async () => {
+    let n = 0
+    foodApi({
+      upsertFood: (r) =>
+        ++n === 2
+          ? { success: false, error: 'a food named Rye already exists' }
+          : { success: true, data: { id: `fd_${n}`, ...r.payload } },
+    })
+    const r = await call('forage_add_food', { foods: [{ name: 'Oats' }, { name: 'Rye' }, { name: 'Spelt' }], dry_run: false })
+    expect(r.content[0].text.split('\n').slice(0, 3)).toEqual([
+      'Saved 1 of 3: Oats (fd_1).',
+      'Not saved: Rye: a food named Rye already exists',
+      'Not sent: Spelt.',
+    ])
+  })
+
+  it('a barcode is looked up as a read, previewed, and saved unchecked unless verified', async () => {
+    const off = {
+      id: '', name: 'Crunch Bar', brand: 'Acme', kind: 'packaged', kcal_100g: 450, protein_100g: 10, carbs_100g: 60, fat_100g: 20,
+      source: 'off', source_ref: '0123456789012', verified: false, barcode: '0123456789012',
+    }
+    const sent = foodApi({
+      lookupBarcode: () => ({ success: true, data: { found: true, reason: '', food: off, warnings: ['energy_mismatch'], already_in_library: null } }),
+    })
+    const preview = await call('forage_add_food', { barcode: '0123456789012' })
+    expect(preview.content[0].text).toContain("The calories don't match")
+    expect(sent.map((s) => [s.action, s.params.get('code'), s.payload])).toEqual([['lookupBarcode', '0123456789012', undefined]])
+    await call('forage_add_food', { barcode: '0123456789012', dry_run: false })
+    expect(sent[2].payload).toMatchObject({ source: 'off', verified: false, barcode: '0123456789012' })
+    expect(sent[2].payload.id).toBeUndefined()
+  })
+
+  it('a barcode already in the library saves nothing', async () => {
+    const sent = foodApi({
+      lookupBarcode: () => ({ success: true, data: { found: true, food: null, warnings: [], already_in_library: { id: 'fd_9', name: 'Acme Crunch Bar' } } }),
+    })
+    const r = await call('forage_add_food', { barcode: '0123456789012', dry_run: false })
+    expect(r.content[0].text).toBe('Nothing saved. That barcode is already Acme Crunch Bar (fd_9).')
+    expect(sent.map((s) => s.action)).toEqual(['lookupBarcode'])
+  })
+
+  it('a starter id is added with addStarterFoods', async () => {
+    const sent = foodApi({
+      addStarterFoods: () => ({ success: true, data: { added: [{ starter_id: 'garlic', id: 'fd_3', name: 'Garlic' }], filled: [], existing: [] } }),
+    })
+    const r = await call('forage_add_food', { starter_id: 'garlic', dry_run: false })
+    expect(sent[0].payload).toMatchObject({ ids: ['garlic'] })
+    expect(r.content[0].text.split('\n')[0]).toBe('Added Garlic (fd_3) from the starter list.')
+  })
+})
+
+describe('forage_update_food and forage_delete_food', () => {
+  it('sends only the fields named, then each weight through setFoodWeight, under one call id', async () => {
+    const sent = foodApi({
+      setFoodWeight: (r) => ({
+        success: true,
+        data: { id: 'fd_1', name: 'Ricotta', kcal_100g: 150, protein_100g: 7.5, carbs_100g: 7.3, fat_100g: 10.2, servings_json: [{ name: r.payload.unit, g: r.payload.grams }] },
+      }),
+    })
+    const r = await call('forage_update_food', { id: 'fd_1', usual_store: 'costco', weights: [{ name: 'carton', g: 425.2 }] })
+    expect(sent.map((s) => s.action)).toEqual(['upsertFood', 'setFoodWeight'])
+    expect(sent[0].payload).toEqual({ id: 'fd_1', usual_store: 'costco', call_id: sent[0].payload.call_id })
+    expect(sent[1].payload).toMatchObject({ food_id: 'fd_1', unit: 'carton', grams: 425.2, call_id: sent[0].payload.call_id })
+    expect(r.content[0].text).toContain(REMINDER)
+  })
+
+  it('a food in use is not deleted, and the recipes are named', async () => {
+    fakeForage(() => ({
+      success: false,
+      code: 'in_use',
+      error: 'Food "fd_1" is in use, so it was not deleted: recipes Chili (rc_2), Lasagna (rc_1)',
+      uses: { recipes: [{ id: 'rc_2', name: 'Chili' }, { id: 'rc_1', name: 'Lasagna' }], trips: [] },
+    }))
+    const r = await call('forage_delete_food', { id: 'fd_1' })
+    expect(r).toMatchObject({ isError: true })
+    expect(r.content[0].text).toBe('Nothing deleted — fd_1 is used by Chili (rc_2) and Lasagna (rc_1). Remove it from those first.')
   })
 })

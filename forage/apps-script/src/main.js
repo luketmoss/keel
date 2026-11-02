@@ -12,6 +12,9 @@
 //
 //   action=getFoods&key=...&q=onion          action=getFood&key=...&id=fd_1a2b3c4d
 //   action=upsertFood&key=...&payload={"name":"Garlic","servings_json":[{"name":"clove","g":3}]}
+//   action=setFoodWeight&key=...&payload={"food_id":"fd_1a2b3c4d","unit":"carton","grams":425.2}
+//   action=lookupBarcode&key=...&code=0123456789012   — Open Food Facts, writes nothing (#707)
+//   action=getStarterFoods&key=...&q=flour   action=addStarterFoods&key=...&payload={"ids":["flour-all-purpose"]}
 //   action=getRecipe&key=...&id=rc_1a2b3c4d  — lines with resolved grams, steps, nutrition
 //   action=upsertRecipe&key=...&payload={"name":"Beef Stew","servings":6,"lines":[...],"steps":[...]}
 //   action=computeNutrition&key=...&payload={"servings":6,"lines":[...]}   — not saved
@@ -108,6 +111,10 @@ function dispatch(action, params, caller) {
     case 'getFood': return getFood(params.id);
     case 'upsertFood': return write(upsertFood);
     case 'deleteFood': return write(deleteFood);
+    case 'setFoodWeight': return write(setFoodWeight);
+    case 'lookupBarcode': return lookupBarcode(params);
+    case 'getStarterFoods': return getStarterFoods(params);
+    case 'addStarterFoods': return write(addStarterFoods);
     // Recipes
     case 'getRecipes': return getRecipes();
     case 'getRecipe': return getRecipe(params.id);

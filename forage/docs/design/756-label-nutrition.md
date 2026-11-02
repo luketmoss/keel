@@ -72,7 +72,7 @@ state is not remembered: it follows the food.
 Inside, seven fields in label order, in the same basis as the core four: **Per serving** for a packaged food with a
 label serving (stored per 100 g, shown per serving rounded to 0.1, as the core four), **Per 100 g** otherwise. Labels:
 `Saturated fat g`, `Trans fat g`, `Cholesterol mg`, `Sodium mg`, `Fiber g`, `Sugars g`, `Added sugars g`, the
-breakdown fields indented as in the list. `inputmode="decimal"`, each optional.
+seven fields in one flat column, not indented (amended by [776](776-flat-label-fields.md)). `inputmode="decimal"`, each optional.
 
 Helper under the toggle, `--color-text-secondary`: "Leave any blank that the label doesn't list."
 

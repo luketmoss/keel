@@ -73,6 +73,10 @@ function stubApi(over: Partial<ForageApi> = {}): ForageApi {
       'addStarterFoods',
       'getRecipe',
       'setLineFood',
+      'getCooks',
+      'saveCook',
+      'deleteCook',
+      'logFood',
     ].map((k) => [k, vi.fn(missing)]),
   );
   return { ...base, ...over } as unknown as ForageApi;
@@ -438,6 +442,8 @@ function recipe(over: Partial<RecipeDetail['nutrition']>): RecipeDetail {
     rating: null,
     last_cooked: null,
     has_walkthrough: false,
+    cook_count: 0,
+    unrated_cook_id: null,
     steps: [],
     lines: [
       line(1, '1 lb ground beef', '', 'lb'),

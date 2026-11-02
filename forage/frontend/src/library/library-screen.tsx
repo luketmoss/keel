@@ -1,7 +1,8 @@
 import type { ComponentChildren } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import type { ForageApi } from '../api/client';
-import type { BarcodeLookup, Food, RecipeSummary } from '../api/types';
+import type { BarcodeLookup, Food, RecipeSort, RecipeSummary } from '../api/types';
+import { Stars } from '../cook/stars';
 import { savedNotice } from '../import/review-state';
 import { ConfirmSheet, Sheet } from '../ui/sheet';
 import { BarcodeSheet } from './barcode-sheet';
@@ -19,7 +20,20 @@ import {
   showFoodsNotice,
 } from './foods-store';
 import { NutritionSheet } from './nutrition-sheet';
-import { deleteRecipe, loadRecipes, recipeMeta, recipes, recipesState } from './recipes-store';
+import {
+  cookedText,
+  deleteRecipe,
+  kcalText,
+  loadRecipes,
+  recipeQuery,
+  recipeSort,
+  recipeTotal,
+  recipes,
+  recipesNotice,
+  recipesSearching,
+  recipesState,
+  reopenRecipe,
+} from './recipes-store';
 import { StarterSheet, starterNotice } from './starter-sheet';
 
 interface Props {
@@ -32,13 +46,27 @@ interface Props {
 
 function RecipeRow({ recipe, onOpen, onDelete }: { recipe: RecipeSummary; onOpen: () => void; onDelete: () => void }) {
   const [menu, setMenu] = useState(false);
-  const meta = recipeMeta(recipe);
+  const kcal = kcalText(recipe);
   return (
     <li class="recipe-row" data-testid="recipe-row">
       <button type="button" class="recipe-text recipe-open" onClick={onOpen}>
         <span class="recipe-name">{recipe.name}</span>
-        {meta && <span class="recipe-meta">{meta}</span>}
+        <span class="recipe-meta" data-testid="recipe-meta">
+          <Stars rating={recipe.rating} />
+          {` · ${cookedText(recipe)}`}
+          {kcal && ` · ${kcal}`}
+        </span>
+        {recipe.matched_line && (
+          <span class="recipe-meta status-muted" data-testid="matched-line">
+            has {recipe.matched_line}
+          </span>
+        )}
       </button>
+      {recipe.unrated_cook_id && (
+        <span class="rate-chip" data-testid="rate-chip">
+          Rate it
+        </span>
+      )}
       <div class="account">
         <button
           type="button"
@@ -70,13 +98,23 @@ function RecipeRow({ recipe, onOpen, onDelete }: { recipe: RecipeSummary; onOpen
   );
 }
 
+/** The search field shows once the library holds this many recipes; the sort chips from SORT_FROM. */
+const SEARCH_FROM = 8;
+const SORT_FROM = 2;
+const SORTS: { id: RecipeSort; label: string }[] = [
+  { id: 'newest', label: 'Newest' },
+  { id: 'name', label: 'Name' },
+  { id: 'rating', label: 'Rating' },
+  { id: 'last_cooked', label: 'Last cooked' },
+];
+
 type Overlay =
   | { kind: 'add' }
   | { kind: 'barcode' }
   | { kind: 'starter'; all: boolean }
   | { kind: 'form'; food: Partial<Food>; origin: FoodFormOrigin }
   | { kind: 'food'; id: string }
-  | { kind: 'nutrition'; recipeId: string };
+  | { kind: 'nutrition'; recipeId: string; focusCook?: boolean };
 
 /** The "Add a food" sheet's three routes. */
 function AddFoodSheet({ onPick, onClose }: { onPick: (o: Overlay) => void; onClose: () => void }) {
@@ -128,6 +166,42 @@ export function LibraryScreen({ api, empty, icon }: Props) {
     void loadFoods(api);
   }, [api]);
 
+  // #708: log mode's Leave and Close come back to the recipe's sheet.
+  useEffect(() => {
+    const again = reopenRecipe.value;
+    if (again) {
+      reopenRecipe.value = null;
+      librarySection.value = 'recipes';
+      setOverlay({ kind: 'nutrition', recipeId: again.id, focusCook: again.focusCook });
+    }
+  }, [reopenRecipe.value]);
+
+  // The search runs 250 ms after the last keystroke.
+  const [typed, setTyped] = useState(recipeQuery.value);
+  useEffect(() => {
+    if (typed.trim() === recipeQuery.value.trim()) {
+      recipeQuery.value = typed;
+      return;
+    }
+    const t = setTimeout(() => {
+      recipeQuery.value = typed;
+      void loadRecipes(api);
+    }, 250);
+    return () => clearTimeout(t);
+  }, [typed]);
+
+  function chooseSort(sort: RecipeSort) {
+    if (sort === recipeSort.value) return;
+    recipeSort.value = sort;
+    void loadRecipes(api);
+  }
+
+  function clearSearch() {
+    setTyped('');
+    recipeQuery.value = '';
+    void loadRecipes(api);
+  }
+
   useEffect(() => {
     if (addFoodRequested.value) {
       addFoodRequested.value = false;
@@ -136,7 +210,9 @@ export function LibraryScreen({ api, empty, icon }: Props) {
   }, [addFoodRequested.value]);
 
   const list = recipes.value;
-  const notice = savedNotice.value ?? status;
+  const notice = savedNotice.value ?? status ?? recipesNotice.value;
+  const total = recipeTotal.value;
+  const q = recipeQuery.value.trim();
 
   async function confirmDelete() {
     const r = doomed!;
@@ -159,7 +235,7 @@ export function LibraryScreen({ api, empty, icon }: Props) {
           aria-pressed={section === 'recipes'}
           onClick={() => (librarySection.value = 'recipes')}
         >
-          Recipes ({list.length})
+          Recipes ({total})
         </button>
         <button
           type="button"
@@ -174,9 +250,41 @@ export function LibraryScreen({ api, empty, icon }: Props) {
 
       {section === 'recipes' ? (
         <>
-          {list.length === 0 ? (
-            empty
-          ) : (
+          {total >= SEARCH_FROM && (
+            <div class="list-search">
+              <label class="visually-hidden" for="recipe-search">
+                Search recipes
+              </label>
+              <input
+                id="recipe-search"
+                class="field"
+                type="search"
+                placeholder="Search recipes"
+                value={typed}
+                onInput={(e) => setTyped((e.target as HTMLInputElement).value)}
+                data-testid="recipe-search"
+              />
+              <span class="hint" role="status">
+                {recipesSearching.value ? 'Searching…' : ''}
+              </span>
+            </div>
+          )}
+          {total >= SORT_FROM && (
+            <div class="chip-row sort-chips" role="group" aria-label="Sort recipes">
+              {SORTS.map((o) => (
+                <button
+                  key={o.id}
+                  type="button"
+                  class="chip"
+                  aria-pressed={recipeSort.value === o.id}
+                  onClick={() => chooseSort(o.id)}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          )}
+          {list.length > 0 ? (
             <ul class="card recipe-list" aria-label="Recipes">
               {list.map((r) => (
                 <RecipeRow
@@ -187,16 +295,28 @@ export function LibraryScreen({ api, empty, icon }: Props) {
                 />
               ))}
             </ul>
+          ) : q && recipesState.value === 'ready' ? (
+            <div class="library-status" data-testid="no-match">
+              <p>No recipe matches "{q}".</p>
+              <button type="button" class="text-btn" onClick={clearSearch}>
+                Clear search
+              </button>
+            </div>
+          ) : recipesState.value === 'error' ? null : (
+            empty
           )}
           {notice && (
             <p class="library-status" role="status">
               {notice}
             </p>
           )}
-          {recipesState.value === 'error' && list.length === 0 && (
-            <p class="library-status" role="status">
-              Couldn't load your recipes.
-            </p>
+          {recipesState.value === 'error' && (
+            <div class="library-status danger-text" role="status">
+              <p>Couldn't load your recipes.</p>
+              <button type="button" class="text-btn" onClick={() => void loadRecipes(api)}>
+                Try again
+              </button>
+            </div>
           )}
         </>
       ) : (
@@ -218,7 +338,7 @@ export function LibraryScreen({ api, empty, icon }: Props) {
       {doomed && (
         <ConfirmSheet
           title={`Delete ${doomed.name}?`}
-          message="Its ingredients and steps go with it."
+          message="Its ingredients, steps and cook history go with it."
           confirm="Delete"
           cancel="Cancel"
           danger
@@ -277,6 +397,7 @@ export function LibraryScreen({ api, empty, icon }: Props) {
         <NutritionSheet
           api={api}
           recipeId={overlay.recipeId}
+          focusCook={overlay.focusCook}
           onChanged={() => void loadRecipes(api)}
           onClose={() => setOverlay(null)}
         />

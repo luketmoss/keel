@@ -4,11 +4,14 @@
 // Google access token, never the API key.
 import type {
   BarcodeLookup,
+  Cook,
   Food,
   FoodDetail,
   ImportInput,
   ImportPreview,
   RecipeDetail,
+  RecipeLogEntry,
+  RecipeSort,
   RecipeSummary,
   StarterFood,
   StarterResult,
@@ -29,7 +32,8 @@ export class ApiError extends Error {
 
 /** What the app asks of the API. The demo layer is another implementation of it. */
 export interface ForageApi {
-  getRecipes(): Promise<RecipeSummary[]>;
+  /** #708: `q` searches name, ingredient lines and matched foods; `sort` defaults to newest. */
+  getRecipes(query?: { q?: string; sort?: RecipeSort }): Promise<RecipeSummary[]>;
   getFoods(): Promise<Food[]>;
   createFood(name: string): Promise<Food>;
   deleteRecipe(id: string): Promise<void>;
@@ -48,6 +52,13 @@ export interface ForageApi {
   getRecipe(id: string): Promise<RecipeDetail>;
   /** Match one saved recipe line to a food: the recipe written back whole, every line id kept. */
   setLineFood(recipeId: string, lineId: string, foodId: string): Promise<RecipeDetail>;
+  // #708: cooks, and logging a cooked recipe to Eaten.
+  /** Newest first; one recipe's, or every recipe's. */
+  getCooks(recipeId?: string): Promise<Cook[]>;
+  /** upsertCook: merges into the cook with that id, or creates one (no date is today, by the API's clock). */
+  saveCook(cook: Partial<Cook> & { id: string }): Promise<Cook>;
+  deleteCook(id: string): Promise<void>;
+  logFood(entry: RecipeLogEntry): Promise<void>;
 }
 
 interface Envelope<T> {
@@ -101,7 +112,12 @@ export function createLiveApi(token: string, url = import.meta.env.VITE_FORAGE_A
   const getRecipe = (id: string) => call<RecipeDetail>('getRecipe', undefined, undefined, { id });
 
   return {
-    getRecipes: () => call<RecipeSummary[]>('getRecipes'),
+    getRecipes: (query = {}) => {
+      const params: Record<string, string> = {};
+      if (query.q?.trim()) params.q = query.q.trim();
+      if (query.sort) params.sort = query.sort;
+      return call<RecipeSummary[]>('getRecipes', undefined, undefined, params);
+    },
     getFoods: () => call<Food[]>('getFoods'),
     createFood: (name) => call<Food>('upsertFood', { name, kind: 'ingredient', source: 'manual' }),
     deleteRecipe: async (id) => {
@@ -123,6 +139,14 @@ export function createLiveApi(token: string, url = import.meta.env.VITE_FORAGE_A
     setLineFood: async (recipeId, lineId, foodId) => {
       const recipe = await getRecipe(recipeId);
       return call<RecipeDetail>('upsertRecipe', { id: recipeId, lines: linesWithFood(recipe, lineId, foodId) });
+    },
+    getCooks: (recipeId) => call<Cook[]>('getCooks', undefined, undefined, recipeId ? { recipe_id: recipeId } : {}),
+    saveCook: (cook) => call<Cook>('upsertCook', cook),
+    deleteCook: async (id) => {
+      await call('deleteCook', { id });
+    },
+    logFood: async (entry) => {
+      await call('logFood', entry);
     },
   };
 }

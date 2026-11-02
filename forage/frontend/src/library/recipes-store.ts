@@ -1,26 +1,52 @@
 // Library's recipes (#706), loaded through the API. Components read the
-// signals; this file owns the fetching.
+// signals; this file owns the fetching. #708 adds the search and the sort,
+// both done by the API (`getRecipes` `q` and `sort`) and remembered for the session.
 import { signal } from '@preact/signals';
 import { ApiError, type ForageApi } from '../api/client';
-import type { RecipeSummary } from '../api/types';
+import type { RecipeSort, RecipeSummary } from '../api/types';
+import { shortDate, starsText } from '../cook/format';
 
 export type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 
 export const recipes = signal<RecipeSummary[]>([]);
 export const recipesState = signal<LoadState>('idle');
+/** The search as typed, and the sort chip. */
+export const recipeQuery = signal('');
+export const recipeSort = signal<RecipeSort>('newest');
+/** How many recipes the library holds, from the last load with no search: it decides whether search and sort show. */
+export const recipeTotal = signal(0);
+/** A search is in flight: the field's helper says "Searching…". */
+export const recipesSearching = signal(false);
+/** A status line for Library to show, from outside it: log mode's "That recipe isn't in your library." */
+export const recipesNotice = signal<string | null>(null);
+/** Open this recipe's sheet when Library next shows (log mode's Leave and Close return there). */
+export const reopenRecipe = signal<{ id: string; focusCook: boolean } | null>(null);
 
 /** Newest first. */
 function newestFirst(list: RecipeSummary[]): RecipeSummary[] {
   return list.slice().sort((a, b) => b.created.localeCompare(a.created));
 }
 
+let latest = 0;
+
+/** Load with the current search and sort. A slower, older answer never replaces a newer one. */
 export async function loadRecipes(api: ForageApi): Promise<void> {
+  const seq = ++latest;
+  const q = recipeQuery.value.trim();
+  const sort = recipeSort.value;
   if (recipesState.value === 'idle' || recipesState.value === 'error') recipesState.value = 'loading';
+  if (q) recipesSearching.value = true;
   try {
-    recipes.value = newestFirst(await api.getRecipes());
+    const list = await api.getRecipes(q ? { q, sort } : { sort });
+    if (seq !== latest) return;
+    recipes.value = sort === 'newest' ? newestFirst(list) : list;
+    if (!q) recipeTotal.value = list.length;
     recipesState.value = 'ready';
   } catch {
+    if (seq !== latest) return;
     recipesState.value = 'error';
+  } finally {
+    if (seq === latest) recipesSearching.value = false;
   }
 }
 
@@ -44,6 +70,7 @@ export async function deleteRecipe(api: ForageApi, id: string): Promise<string |
     return "Couldn't delete it. Try again.";
   }
   recipes.value = recipes.value.filter((r) => r.id !== id);
+  recipeTotal.value = Math.max(0, recipeTotal.value - 1);
   return null;
 }
 
@@ -51,6 +78,12 @@ export async function deleteRecipe(api: ForageApi, id: string): Promise<string |
 export function _resetRecipes(): void {
   recipes.value = [];
   recipesState.value = 'idle';
+  recipeQuery.value = '';
+  recipeSort.value = 'newest';
+  recipeTotal.value = 0;
+  recipesSearching.value = false;
+  recipesNotice.value = null;
+  reopenRecipe.value = null;
 }
 
 /** `serves 6 · example.com · 520 kcal`: partial replaces the figure, and nothing shows when none is known. */
@@ -58,7 +91,24 @@ export function recipeMeta(r: RecipeSummary): string {
   const parts: string[] = [];
   if (r.servings) parts.push(`serves ${r.servings}`);
   if (r.source_site) parts.push(r.source_site);
-  if (r.partial) parts.push('partial');
-  else if (r.nutrition.per_serving.kcal !== null) parts.push(`${Math.round(r.nutrition.per_serving.kcal)} kcal`);
+  const kcal = kcalText(r);
+  if (kcal) parts.push(kcal);
   return parts.join(' · ');
+}
+
+/** `520 kcal`, `partial`, or '' when no food has nutrition. */
+export function kcalText(r: RecipeSummary): string {
+  if (r.partial) return 'partial';
+  if (r.nutrition.per_serving.kcal !== null) return `${Math.round(r.nutrition.per_serving.kcal)} kcal`;
+  return '';
+}
+
+/** A Library row's second line after the stars (#708): ` · cooked Oct 28 · 520 kcal`. */
+export function cookedText(r: RecipeSummary): string {
+  return r.last_cooked ? `cooked ${shortDate(r.last_cooked)}` : 'never cooked';
+}
+
+/** The stars as text with their label, or null for "Not rated". */
+export function ratingParts(rating: number | null): { text: string; label: string } | null {
+  return rating === null ? null : { text: starsText(rating), label: `${rating} of 5 stars` };
 }

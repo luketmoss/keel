@@ -19,12 +19,11 @@ const NO_TOOL: Record<string, string> = {
   ensureSchema: 'the migration, run by the owner',
   setConfig: "the owner's configuration, set by hand",
   computeNutrition: "forage_import_recipe's dry run already previews nutrition",
+  deleteCook: "removed in the app; an agent's cook is undone with forage_undo",
 };
 
 /** Actions whose tool a later issue adds. That issue removes them from here. */
 const PENDING_TOOLS: Record<string, number> = {
-  getRecipes: 708, getRecipe: 708, upsertRecipe: 708, deleteRecipe: 708,
-  getCooks: 708, upsertCook: 708, deleteCook: 708,
   getPlan: 709, upsertPlanEntry: 709, deletePlanEntry: 709,
   getTrips: 710, getTrip: 710, createTrip: 710, updateTrip: 710, upsertTripItems: 710, deleteTripItem: 710,
   getWalkthrough: 711, setWalkthrough: 711, deleteWalkthrough: 711,
@@ -70,8 +69,9 @@ function parityProblems(actions: string[], called: string[]): string[] {
 describe('MCP parity: every action has a tool, or a reason, or an owner', () => {
   it('finds the Worker\'s Forage tools', () => {
     expect(workerActions()).toEqual([
-      'addStarterFoods', 'deleteFood', 'getChangeLog', 'getConfig', 'getFood', 'getFoods', 'getStarterFoods',
-      'importRecipe', 'lookupBarcode', 'setFoodWeight', 'undoCall', 'upsertFood',
+      'addStarterFoods', 'deleteFood', 'deleteRecipe', 'getChangeLog', 'getConfig', 'getCooks', 'getFood', 'getFoods',
+      'getRecipe', 'getRecipes', 'getStarterFoods', 'importRecipe', 'lookupBarcode', 'setFoodWeight', 'undoCall',
+      'upsertCook', 'upsertFood', 'upsertRecipe',
     ]);
   });
 
@@ -86,8 +86,8 @@ describe('MCP parity: every action has a tool, or a reason, or an owner', () => 
   });
 
   it('fails for a pending action that already has a tool, so the list only shrinks', () => {
-    expect(parityProblems(mainActions(), [...workerActions(), 'getRecipes'])).toEqual([
-      'getRecipes is on more than one of: a tool, PENDING_TOOLS',
+    expect(parityProblems(mainActions(), [...workerActions(), 'getPlan'])).toEqual([
+      'getPlan is on more than one of: a tool, PENDING_TOOLS',
     ]);
   });
 

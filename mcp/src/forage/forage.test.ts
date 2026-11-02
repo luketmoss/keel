@@ -18,8 +18,25 @@ function envWith(over: Partial<Env> = {}): Env {
 }
 const env = envWith()
 
-const FORAGE_WRITE = ['forage_add_food', 'forage_delete_food', 'forage_import_recipe', 'forage_undo', 'forage_update_food']
-const FORAGE_READ = ['forage_get_food', 'forage_search_foods', 'forage_status']
+const FORAGE_WRITE = [
+  'forage_add_food',
+  'forage_delete_food',
+  'forage_delete_recipe',
+  'forage_import_recipe',
+  'forage_log_cook',
+  'forage_rate_cook',
+  'forage_undo',
+  'forage_update_food',
+  'forage_update_recipe',
+]
+const FORAGE_READ = [
+  'forage_cook_history',
+  'forage_get_food',
+  'forage_get_recipe',
+  'forage_search_foods',
+  'forage_search_recipes',
+  'forage_status',
+]
 const REMINDER = "— Forage (write) is on. Turn it off in Search and tools when you've finished writing."
 
 function rpc(method: string, params?: unknown): Request {

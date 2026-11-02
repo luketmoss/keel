@@ -19,7 +19,13 @@ import type {
   RecipeSummary,
   StarterFood,
   StarterResult,
+  StartTripInput,
+  StartTripResult,
   StructuredRecipe,
+  Trip,
+  TripItemChange,
+  TripItemResult,
+  TripSummary,
 } from './types';
 
 /** A failed call. `code` is the API's (`blocked`, `duplicate`, `in_use`…), or `network` / `unconfigured`. */
@@ -70,6 +76,15 @@ export interface ForageApi {
   /** movePlanEntry: refused with code `not_found` for a meal already removed. */
   moveMeal(id: string, changes: PlanMove): Promise<PlanEntry>;
   removeMeal(id: string): Promise<void>;
+  // #718: shopping trips.
+  /** The open trip, or null. */
+  getTrip(): Promise<Trip | null>;
+  /** Closed trips, newest first. */
+  getClosedTrips(): Promise<TripSummary[]>;
+  startTrip(input: StartTripInput): Promise<StartTripResult>;
+  setTripItem(tripId: string, foodId: string, change: TripItemChange): Promise<TripItemResult>;
+  closeTrip(tripId: string): Promise<Trip>;
+  discardTrip(tripId: string): Promise<void>;
 }
 
 interface Envelope<T> {
@@ -164,6 +179,15 @@ export function createLiveApi(token: string, url = import.meta.env.VITE_FORAGE_A
     moveMeal: (id, changes) => call<PlanEntry>('movePlanEntry', { id, ...changes }),
     removeMeal: async (id) => {
       await call('deletePlanEntry', { id });
+    },
+    getTrip: async () => (await call<{ trip: Trip | null }>('getTrip')).trip,
+    getClosedTrips: () => call<TripSummary[]>('getTrips', undefined, undefined, { status: 'closed' }),
+    startTrip: (input) => call<StartTripResult>('startTrip', input),
+    setTripItem: (tripId, foodId, change) =>
+      call<TripItemResult>('setTripItem', { trip_id: tripId, food_id: foodId, ...change }),
+    closeTrip: async (tripId) => (await call<{ trip: Trip }>('closeTrip', { trip_id: tripId })).trip,
+    discardTrip: async (tripId) => {
+      await call('discardTrip', { trip_id: tripId });
     },
   };
 }

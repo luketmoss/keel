@@ -4,7 +4,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, within } from '@testing-library/preact';
 import App from '../App';
-import type { PlanEntry, RecipeSummary } from '../api/types';
+import type { PlanEntry, RecipeSummary, Trip } from '../api/types';
 import { _resetDemoApi } from '../api/use-api';
 import { _resetDemoModeCache } from '../demo/is-demo-mode';
 import { _resetRecipes } from '../library/recipes-store';
@@ -78,6 +78,19 @@ function meal(over: Partial<PlanEntry>): PlanEntry {
 }
 
 const CHILI = { recipe_id: 'rc_chili', recipe_name: 'Weeknight chili', servings: 4, kcal_serving: 412.4 };
+
+/** #718: an open trip, so the banner keeps #709's text with no button. */
+const OPEN_TRIP: Trip = {
+  id: 'tr_1',
+  status: 'open',
+  through: '2026-11-07',
+  created: 'x',
+  closed_at: '',
+  meals: [],
+  items: [],
+  counts: { all: 0, todo: 0, have: 0, ks: 0, costco: 0, other: 0, to_buy: 0, bought: 0 },
+  unmatched: [],
+};
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
@@ -258,8 +271,9 @@ describe('the Plan tab', () => {
 });
 
 describe('the banner', () => {
-  it('reads the count in bold, singular and plural, and is absent at 0, with no button', async () => {
+  it('reads the count in bold, singular and plural, and is absent at 0, with no button while a trip is open', async () => {
     const api = fakeApi();
+    api.trips.open = OPEN_TRIP;
     api.plan.push(meal({ ...CHILI }));
     api.counts.notOnTrip = 3;
     await open();
@@ -275,6 +289,7 @@ describe('the banner', () => {
     api.recipes.push(recipe('rc_chili', 'Weeknight chili'));
     api.plan.push(meal({ id: 'pl_0', date: '2026-11-04', ...CHILI }));
     api.counts.notOnTrip = 1;
+    api.trips.open = OPEN_TRIP;
     await open();
     expect(screen.getByTestId('plan-banner').textContent).toBe("1 planned meal isn't on a shopping trip yet.");
 
@@ -553,19 +568,19 @@ describe('demo mode', () => {
         .getAllByTestId('trip-chip')
         .map((c) => c.textContent)
         .sort(),
-    ).toEqual(['On list', 'Shopped']);
+    ).toEqual(['On list', 'On list', 'Shopped']);
     expect(screen.getAllByText('Partial')).toHaveLength(1);
     expect(rowsIn(days()[0]).map((r) => r.getAttribute('aria-label'))).toEqual(['Leftovers, Lunch']);
-    expect(screen.getByTestId('plan-banner').textContent).toBe("3 planned meals aren't on a shopping trip yet.");
+    expect(screen.getByTestId('plan-banner').textContent).toBe("2 planned meals aren't on a shopping trip yet.");
 
-    // Plan: a fourth not on a trip.
+    // Plan: a third not on a trip.
     fireEvent.click(screen.getByTestId('plan-meal-btn'));
     await settle();
     fireEvent.click(within(screen.getByTestId('plan-meal-sheet')).getByRole('button', { name: 'Sat 7' }));
     fireEvent.click(screen.getAllByTestId('plan-recipe')[0]);
     await settle();
     expect(screen.getAllByTestId('meal-row')).toHaveLength(7);
-    expect(screen.getByTestId('plan-banner').textContent).toBe("4 planned meals aren't on a shopping trip yet.");
+    expect(screen.getByTestId('plan-banner').textContent).toBe("3 planned meals aren't on a shopping trip yet.");
 
     // Move one to today: no longer counted.
     fireEvent.click(rowsIn(days()[5])[0]);
@@ -573,7 +588,7 @@ describe('demo mode', () => {
     fireEvent.click(within(screen.getByTestId('meal-sheet')).getByRole('button', { name: 'Save' }));
     await settle();
     expect(rowsIn(days()[0])).toHaveLength(2);
-    expect(screen.getByTestId('plan-banner').textContent).toBe("3 planned meals aren't on a shopping trip yet.");
+    expect(screen.getByTestId('plan-banner').textContent).toBe("2 planned meals aren't on a shopping trip yet.");
 
     // Remove one.
     fireEvent.click(rowsIn(days()[0])[1]);

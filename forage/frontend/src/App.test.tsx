@@ -106,7 +106,7 @@ describe('the tab bar', () => {
 describe('empty states', () => {
   const COPY: Record<string, [string, string]> = {
     plan: ['Nothing planned yet', 'Meals you plan will show here, by day, with their calories.'],
-    shop: ['No shopping list', 'When you plan meals, the groceries you need will collect here, grouped by store.'],
+    // #718: Shop has its own no-trip card, with Plan a trip (shop.test.tsx).
     eaten: ['Nothing logged', 'What you eat will show here by day, with its calories and macros.'],
     library: ['No foods yet', 'Foods you use in recipes and logs will be kept here, with their nutrition.'],
   };

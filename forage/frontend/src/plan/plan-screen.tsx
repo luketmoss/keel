@@ -3,6 +3,9 @@ import { useEffect, useState } from 'preact/hooks';
 import type { ForageApi } from '../api/client';
 import { SLOTS, type PlanEntry } from '../api/types';
 import { dayName, planDays, shortDay } from './dates';
+import { syncFromHash, tabHash } from '../shell/routes';
+import { clearView, showTrip, shopMode } from '../shop/shop-store';
+import { TripSetupSheet } from '../shop/trip-setup-sheet';
 import { MealSheet } from './meal-sheet';
 import { PlanMealSheet } from './plan-meal-sheet';
 import {
@@ -19,6 +22,7 @@ import {
   planState,
   planToday,
   tripChip,
+  tripOpen,
 } from './plan-store';
 
 interface BannerProps {
@@ -71,7 +75,7 @@ function mealsOn(day: string, entries: PlanEntry[]): PlanEntry[] {
     .sort((a, b) => SLOTS.indexOf(a.slot) - SLOTS.indexOf(b.slot) || entries.indexOf(a) - entries.indexOf(b));
 }
 
-type Overlay = { kind: 'plan'; date?: string } | { kind: 'meal'; entry: PlanEntry };
+type Overlay = { kind: 'plan'; date?: string } | { kind: 'meal'; entry: PlanEntry } | { kind: 'trip' };
 
 /**
  * The Plan tab (#709): today and the next 7 days, each with its meals in slot
@@ -169,7 +173,24 @@ export function PlanScreen({ api, empty }: { api: ForageApi; empty: ComponentChi
 
   return (
     <>
-      {banner && state === 'ready' && <PlanBanner strong={banner.strong} rest={banner.rest} />}
+      {banner && state === 'ready' && (
+        <PlanBanner
+          strong={banner.strong}
+          rest={banner.rest}
+          action={
+            tripOpen.value === false && (
+              <button
+                type="button"
+                class="btn btn-primary btn-small"
+                onClick={() => setOverlay({ kind: 'trip' })}
+                data-testid="banner-plan-trip"
+              >
+                Plan a trip
+              </button>
+            )
+          }
+        />
+      )}
       {planNotice.value && (
         <p class="library-status" role="status">
           {planNotice.value}
@@ -184,6 +205,20 @@ export function PlanScreen({ api, empty }: { api: ForageApi; empty: ComponentChi
           today={today}
           date={overlay.date}
           onPlanned={() => void wrote()}
+          onClose={() => setOverlay(null)}
+        />
+      )}
+      {overlay?.kind === 'trip' && (
+        <TripSetupSheet
+          api={api}
+          onBuilt={(trip) => {
+            setOverlay(null);
+            clearView();
+            showTrip(trip);
+            shopMode.value = 'sort';
+            window.location.hash = tabHash('shop');
+            syncFromHash();
+          }}
           onClose={() => setOverlay(null)}
         />
       )}

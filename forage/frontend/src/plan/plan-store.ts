@@ -18,6 +18,8 @@ export const planFailed = signal(false);
 export const planToday = signal(localDate());
 /** The header's "Plan a meal" was tapped: the Plan screen opens its sheet. */
 export const planMealRequested = signal(false);
+/** #718: whether a trip is open, read with the plan; null until known (and after a failed read), so no button. */
+export const tripOpen = signal<boolean | null>(null);
 /** A line for the Plan screen from a sheet that closed: "That meal was already removed." */
 export const planNotice = signal<string | null>(null);
 
@@ -32,8 +34,15 @@ export async function loadPlan(api: ForageApi, now = new Date()): Promise<void> 
   const today = localDate(now);
   if (planState.value === 'idle') planState.value = 'loading';
   try {
-    const out = await api.getPlan(today, addDays(today, PLAN_DAYS - 1), today);
+    const [out, trip] = await Promise.all([
+      api.getPlan(today, addDays(today, PLAN_DAYS - 1), today),
+      api.getTrip().then(
+        (t) => !!t,
+        () => null,
+      ),
+    ]);
     if (seq !== latest) return;
+    tripOpen.value = trip;
     planToday.value = today;
     planEntries.value = out.entries;
     notOnTrip.value = out.not_on_trip;
@@ -90,4 +99,5 @@ export function _resetPlan(): void {
   planToday.value = localDate();
   planMealRequested.value = false;
   planNotice.value = null;
+  tripOpen.value = null;
 }

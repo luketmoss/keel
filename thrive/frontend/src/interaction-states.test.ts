@@ -33,6 +33,7 @@ const FAMILIES = {
     'manage-labels-link',
     'day-today-btn',
     'training-plan-link',
+    'food-link',
     'detail-coros-link',
     'lb-text-btn',
   ],

@@ -24,7 +24,7 @@ function info(overrides: Record<string, unknown> = {}): FetchReply {
   };
 }
 
-function tokenApi(reply: (url: string) => FetchReply = () => info(), properties = TOKEN_PROPS) {
+function tokenApi(reply: (url: string) => FetchReply = () => info(), properties: Record<string, string> = TOKEN_PROPS) {
   return loadApi({ properties, tokeninfo: reply });
 }
 
@@ -130,5 +130,90 @@ describe('a key caller', () => {
     const api = loadApi();
     expect(api.ok('setConfig', { payload: { key: 'a', value: 'b' } })).toMatchObject({ key: 'a', value: 'b' });
     expect(api.ok('getConfig')).toEqual({ a: 'b' });
+  });
+});
+
+// #714: Thrive's Day screen reads the daily totals with a token from its own OAuth client.
+describe('#714: a Thrive caller', () => {
+  const THRIVE_ID = 'thrive-5678.apps.googleusercontent.com';
+  const THRIVE_PROPS = { ...TOKEN_PROPS, TOKEN_THRIVE_CLIENT_ID: THRIVE_ID };
+  /** tokeninfo as Google answers it: the token is Thrive's when `aud` is Thrive's client. */
+  const thriveInfo = (overrides: Record<string, unknown> = {}) => info({ aud: THRIVE_ID, azp: THRIVE_ID, ...overrides });
+  const thriveApi = (reply: (url: string) => FetchReply = () => thriveInfo(), properties: Record<string, string> = THRIVE_PROPS) =>
+    tokenApi(reply, properties);
+
+  it('may run getFoodLogTotals, and that is the only action on its list', () => {
+    const { sandbox } = loadApi();
+    expect([...sandbox.THRIVE_TOKEN_ACTIONS]).toEqual(['getFoodLogTotals']);
+    const res = thriveApi().post({ action: 'getFoodLogTotals', access_token: TOKEN, from: '2026-11-01', to: '2026-11-07' });
+    expect(res).toMatchObject({ success: true, data: { days: [] } });
+  });
+
+  it('is refused every other action, the same way an unlisted action is', () => {
+    const api = thriveApi();
+    const { sandbox } = api;
+    const others = new Set<string>([...mainActions(), ...(sandbox.TOKEN_ACTIONS as string[])]);
+    others.delete('getFoodLogTotals');
+    expect(others.size).toBeGreaterThan(30);
+    for (const action of others) {
+      const res = api.post({ action, access_token: TOKEN, payload: {} });
+      expect(res, action).toEqual({
+        success: false,
+        error: 'This action is not permitted with an access token',
+        code: 'not_permitted',
+      });
+    }
+  });
+
+  it('never writes: its log is read-only and the Sheet is untouched', () => {
+    const api = thriveApi();
+    api.post({ action: 'logFood', access_token: TOKEN, payload: { date: '2026-11-01', slot: 'Lunch', food_id: 'f', qty: 1, unit: 'g' } });
+    expect(api.rows('FoodLog')).toEqual([]);
+  });
+
+  it('is refused everything while TOKEN_THRIVE_CLIENT_ID is unset', () => {
+    const api = thriveApi(() => thriveInfo(), TOKEN_PROPS);
+    expect(api.post({ action: 'getFoodLogTotals', access_token: TOKEN })).toMatchObject({
+      success: false,
+      code: 'token_forbidden',
+    });
+    expect(api.post({ action: 'getFoods', access_token: TOKEN })).toMatchObject({ success: false, code: 'token_forbidden' });
+  });
+
+  it('is refused a token for another account, even from Thrive\'s client', () => {
+    const api = thriveApi(() => thriveInfo({ email: 'someone@else.com' }));
+    expect(api.post({ action: 'getFoodLogTotals', access_token: TOKEN })).toMatchObject({
+      success: false,
+      code: 'token_forbidden',
+    });
+  });
+
+  it('is refused a token from a third client', () => {
+    const api = thriveApi(() => info({ aud: 'third', azp: 'third' }));
+    expect(api.post({ action: 'getFoodLogTotals', access_token: TOKEN })).toMatchObject({
+      success: false,
+      code: 'token_forbidden',
+    });
+  });
+
+  it('with a bad token is refused as an invalid token', () => {
+    const api = thriveApi(() => ({ status: 400, body: '{"error":"invalid_token"}' }));
+    expect(api.post({ action: 'getFoodLogTotals', access_token: TOKEN })).toMatchObject({
+      success: false,
+      code: 'token_invalid',
+    });
+  });
+
+  it('leaves the app\'s own token as it was: every allow-listed action still runs', () => {
+    const api = thriveApi(() => info());
+    for (const action of api.sandbox.TOKEN_ACTIONS as string[]) {
+      expect(api.post({ action, access_token: TOKEN, payload: {} }).code, action).not.toBe('not_permitted');
+    }
+  });
+
+  it('never leaves its token in a cache key', () => {
+    const api = thriveApi();
+    api.post({ action: 'getFoodLogTotals', access_token: TOKEN });
+    for (const k of api.cache.keys()) expect(k).not.toContain(TOKEN);
   });
 });

@@ -29,6 +29,8 @@
 //   action=startTrip&key=...&payload={"through":"2026-11-07","plan_ids":["pl_1"],"dry_run":true}
 //   action=setTripItem&key=...&payload={"food_id":"fd_1a2b3c4d","choice":"ks"}   — or "bought": true
 //   action=closeTrip&key=...&payload={}      action=discardTrip&key=...&payload={}   — the open trip
+//   action=addToTrip&key=...&payload={"text":"Paper towels"}   — or food_id, or "late_meals": true (#719)
+//   action=removeTripItem&key=...&payload={"food_id":"fd_1a2b3c4d"}   — an added item with no meals (#719)
 //   action=logFood&access_token=...&payload={"date":"2026-11-01","slot":"Dinner","recipe_id":"rc_1","qty":1}
 //   action=getFoodLogTotals&key=...&from=2026-11-01&to=2026-11-07
 //   action=ensureSchema&key=...              — key-only: the 703 migration
@@ -148,6 +150,8 @@ function dispatch(action, params, caller) {
     case 'setTripItem': return write(setTripItem);
     case 'closeTrip': return write(closeTrip);
     case 'discardTrip': return write(discardTrip);
+    case 'addToTrip': return write(addToTrip);
+    case 'removeTripItem': return write(removeTripItem);
     // FoodLog
     case 'getFoodLog': return getFoodLog(params);
     case 'getFoodLogTotals': return getFoodLogTotals(params);

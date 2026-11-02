@@ -20,6 +20,7 @@ const env = envWith()
 
 const FORAGE_WRITE = [
   'forage_add_food',
+  'forage_add_to_trip',
   'forage_close_trip',
   'forage_delete_food',
   'forage_delete_recipe',
@@ -30,6 +31,7 @@ const FORAGE_WRITE = [
   'forage_plan_meal',
   'forage_plan_week',
   'forage_rate_cook',
+  'forage_remove_from_trip',
   'forage_remove_meal',
   'forage_set_trip_item',
   'forage_start_trip',

@@ -26,11 +26,12 @@ var PLAN_ERRORS = {
 
 /**
  * Entries from `from` to `to` inclusive (either optional), ordered by date,
- * slot, then creation, each with its derived fields; and `not_on_trip`.
+ * slot, then creation, each with its derived fields; `not_on_trip`; and
+ * `late_meals` (#719).
  * `today` (default today in America/Denver) is the device's day, so the
  * banner counts from the day the app shows.
  *
- * @returns {{ entries: Object[], not_on_trip: number }}
+ * @returns {{ entries: Object[], not_on_trip: number, late_meals: Object[] }}
  */
 function getPlan(params) {
   params = params || {};
@@ -45,6 +46,8 @@ function getPlan(params) {
       .sort(planOrder)
       .map(view),
     not_on_trip: notOnTrip(all, today),
+    // #719: the open trip's late meals, for the Plan banner's open-trip wording; [] with no trip open.
+    late_meals: planLateMeals(all, today),
   };
 }
 

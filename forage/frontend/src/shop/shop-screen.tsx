@@ -5,15 +5,19 @@ import type { Trip, TripItem, TripStore } from '../api/types';
 import { TRIP_STORES } from '../api/types';
 import { syncFromHash, tabHash } from '../shell/routes';
 import { showToast } from '../ui/toast';
+import { AddSheet, BuyAmountSheet, LIST_CLOSED, LateBanner, NeedStoreBanner } from './add-sheets';
 import {
+  addRequested,
   changeItem,
   clearView,
+  grown,
   lastTrip,
   loadTrip,
   remembered,
   saveView,
   shopFailed,
   shopMode,
+  shopNotice,
   shopState,
   shopStore,
   shopTrip,
@@ -24,6 +28,7 @@ import {
 import {
   CHOICES,
   STORE_NAMES,
+  addedByYou,
   breakdownLine,
   countItems,
   countsLine,
@@ -64,18 +69,53 @@ function shopOrder(items: TripItem[]): string[] {
     .map((i) => i.food_id);
 }
 
-function SortItem({ item, onPick }: { item: TripItem; onPick: (choice: (typeof CHOICES)[number]['id']) => void }) {
+/** #719: the amount button: `Buying 18 pack` over `meals need about 3 eggs`, the need alone, or `How much?`. */
+function AmountButton({ item, onAmount }: { item: TripItem; onAmount: () => void }) {
+  return (
+    <button type="button" class="trip-amount" onClick={onAmount} data-testid="amount-btn">
+      {item.buy ? (
+        <>
+          <strong class="trip-buy">Buying {item.buy}</strong>
+          {item.need && <span class="trip-need trip-need-under">meals need {item.need}</span>}
+        </>
+      ) : item.need ? (
+        <strong class="trip-need">{item.need}</strong>
+      ) : (
+        <strong class="trip-need">How much?</strong>
+      )}
+    </button>
+  );
+}
+
+function SortItem({
+  item,
+  everything,
+  onPick,
+  onAmount,
+}: {
+  item: TripItem;
+  everything: boolean;
+  onPick: (choice: (typeof CHOICES)[number]['id']) => void;
+  onAmount: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const why = whyLine(item, remembered.value[item.food_id]);
   const groupId = `item-${item.food_id}`;
+  const more = everything && grown.value.has(item.food_id) && (item.choice === 'have' || item.bought);
   return (
     <li class="trip-item" data-testid="sort-item">
       <div class="trip-item-head">
         <span class="trip-item-name" id={groupId}>
           {item.name}
         </span>
-        {item.need && <strong class="trip-need">{item.need}</strong>}
+        <AmountButton item={item} onAmount={onAmount} />
       </div>
+      {more && (
+        <p class="trip-more-needed" data-testid="more-needed">
+          More needed: {item.need}
+        </p>
+      )}
+      {addedByYou(item) && <p class="trip-muted">Added by you</p>}
       {item.lines.length === 1 && <p class="trip-muted">{breakdownLine(item.lines[0])}</p>}
       {item.lines.length > 1 && (
         <>
@@ -121,7 +161,17 @@ function Footer({ children }: { children: ComponentChildren }) {
 }
 
 /** Sort (#718): each item to Have it or a store, then Make lists. */
-function SortView({ api, trip, onGone }: { api: ForageApi; trip: Trip; onGone: () => void }) {
+function SortView({
+  api,
+  trip,
+  onGone,
+  onAmount,
+}: {
+  api: ForageApi;
+  trip: Trip;
+  onGone: () => void;
+  onAmount: (foodId: string) => void;
+}) {
   const counts = countItems(trip.items);
   const [filter, setFilter] = useState<'todo' | 'all'>(() => {
     if (sortOpensOnEverything.value) {
@@ -173,7 +223,13 @@ function SortView({ api, trip, onGone }: { api: ForageApi; trip: Trip; onGone: (
         <h2 class="card-label">{g.label}</h2>
         <ul class="plain-list">
           {g.items.map((i) => (
-            <SortItem key={i.food_id} item={i} onPick={(c) => pick(i.food_id, c)} />
+            <SortItem
+              key={i.food_id}
+              item={i}
+              everything={filter === 'all'}
+              onPick={(c) => pick(i.food_id, c)}
+              onAmount={() => onAmount(i.food_id)}
+            />
           ))}
         </ul>
       </section>
@@ -182,6 +238,7 @@ function SortView({ api, trip, onGone }: { api: ForageApi; trip: Trip; onGone: (
 
   return (
     <>
+      <LateBanner api={api} trip={trip} onGone={onGone} />
       {trip.items.length > 0 && (
         <>
           <div class="card">
@@ -252,12 +309,14 @@ function ShopView({
   onGone,
   onDone,
   onChangeWhere,
+  onSort,
 }: {
   api: ForageApi;
   trip: Trip;
   onGone: () => void;
   onDone: () => void;
   onChangeWhere: () => void;
+  onSort: () => void;
 }) {
   const counts = countItems(trip.items);
   const stores = TRIP_STORES.filter((s) => trip.items.some((i) => i.choice === s));
@@ -288,6 +347,8 @@ function ShopView({
 
   return (
     <>
+      <LateBanner api={api} trip={trip} onGone={onGone} />
+      <NeedStoreBanner count={counts.todo} onSort={onSort} />
       {stores.length ? (
         <>
           <div
@@ -319,8 +380,13 @@ function ShopView({
             <ul class="plain-list">
               {rows.map((i) => {
                 const recipes = itemRecipes(i).join(', ');
-                const sub = [i.need, recipes].filter(Boolean).join(' · ');
-                const label = [i.name, i.need, i.bought ? 'bought' : 'not bought'].filter(Boolean).join(', ');
+                // #719: a buying amount leads, with what the meals need after it.
+                const sub = i.buy
+                  ? [i.buy, i.need && `meals need ${i.need}`].filter(Boolean).join(' · ')
+                  : addedByYou(i)
+                    ? 'Added by you'
+                    : [i.need, recipes].filter(Boolean).join(' · ');
+                const label = [i.name, i.buy || i.need, i.bought ? 'bought' : 'not bought'].filter(Boolean).join(', ');
                 return (
                   <li key={i.food_id}>
                     <button
@@ -363,7 +429,7 @@ function ShopView({
   );
 }
 
-type Overlay = 'setup' | 'done' | 'menu' | null;
+type Overlay = 'setup' | 'done' | 'menu' | 'add' | { buy: string; from: 'add' | 'sort' } | null;
 
 /**
  * The Shop tab (#718): no trip, Sort, Shop mode, and the setup, done and trip-menu sheets. It reloads the
@@ -371,6 +437,8 @@ type Overlay = 'setup' | 'done' | 'menu' | null;
  */
 export function ShopScreen({ api }: { api: ForageApi }) {
   const [overlay, setOverlay] = useState<Overlay>(null);
+  /** #719: the Add sheet's status line when it comes back from the buying amount sheet. */
+  const [addStatus, setAddStatus] = useState('');
 
   useEffect(() => {
     void loadTrip(api);
@@ -389,11 +457,44 @@ export function ShopScreen({ api }: { api: ForageApi }) {
     }
   }, [tripMenuRequested.value]);
 
+  useEffect(() => {
+    if (addRequested.value) {
+      addRequested.value = false;
+      if (shopTrip.value) {
+        shopNotice.value = '';
+        setAddStatus('');
+        setOverlay('add');
+      }
+    }
+  }, [addRequested.value]);
+
+  useEffect(
+    () => () => {
+      grown.value = new Set();
+      shopNotice.value = '';
+    },
+    [],
+  );
+
   const trip = shopTrip.value;
   const state = shopState.value;
 
   function gone() {
     void loadTrip(api);
+  }
+
+  /** #719: a sheet's write found the trip closed or thrown away elsewhere. */
+  function listClosed() {
+    setOverlay(null);
+    shopNotice.value = LIST_CLOSED;
+    void loadTrip(api);
+  }
+
+  function toSort() {
+    shopMode.value = 'sort';
+    sortOpensOnEverything.value = false;
+    saveView();
+    window.scrollTo?.(0, 0);
   }
 
   function changeWhere() {
@@ -481,18 +582,65 @@ export function ShopScreen({ api }: { api: ForageApi }) {
           {tripSubline(trip)}
         </p>
         {shopMode.value === 'sort' ? (
-          <SortView key={trip.id} api={api} trip={trip} onGone={gone} />
+          <SortView
+            key={trip.id}
+            api={api}
+            trip={trip}
+            onGone={gone}
+            onAmount={(id) => setOverlay({ buy: id, from: 'sort' })}
+          />
         ) : (
-          <ShopView api={api} trip={trip} onGone={gone} onDone={() => setOverlay('done')} onChangeWhere={changeWhere} />
+          <ShopView
+            api={api}
+            trip={trip}
+            onGone={gone}
+            onDone={() => setOverlay('done')}
+            onChangeWhere={changeWhere}
+            onSort={toSort}
+          />
         )}
       </>
     );
   }
 
+  const buying = overlay && typeof overlay === 'object' ? overlay : null;
+  const buyItem = buying && trip ? trip.items.find((i) => i.food_id === buying.buy) : undefined;
+
   return (
     <>
       {failure}
+      <p class="library-status" role="status" data-testid="shop-notice">
+        {shopNotice.value}
+      </p>
       {body}
+      {overlay === 'add' && trip && (
+        <AddSheet
+          api={api}
+          trip={trip}
+          initialStatus={addStatus}
+          onAmount={(id) => setOverlay({ buy: id, from: 'add' })}
+          onGone={listClosed}
+          onClose={() => setOverlay(null)}
+        />
+      )}
+      {buying && trip && buyItem && (
+        <BuyAmountSheet
+          key={buyItem.food_id}
+          api={api}
+          trip={trip}
+          item={buyItem}
+          onGone={listClosed}
+          onDone={(status) => {
+            if (buying.from === 'add') {
+              setAddStatus(status ?? '');
+              setOverlay('add');
+            } else {
+              setOverlay(null);
+              if (status) shopNotice.value = status;
+            }
+          }}
+        />
+      )}
       {overlay === 'setup' && <TripSetupSheet api={api} onBuilt={built} onClose={() => setOverlay(null)} />}
       {overlay === 'done' && trip && (
         <DoneSheet api={api} trip={trip} onClosed={closed} onClose={() => setOverlay(null)} />

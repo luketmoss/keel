@@ -61,7 +61,7 @@ Nutrition (unit conversion, per serving, the partial rule) is computed only in `
 plan's derived fields (a meal's kcal a serving, partial, trip status) and the Plan banner's count, `not_on_trip`, only in
 `apps-script/src/plan.js` (#709); a trip's items, what the meals need, the default choices and the stale-line
 prune only in `apps-script/src/trips.js` (#718, behind `startTrip`, `setTripItem`, `closeTrip`, `discardTrip`,
-`getTrip`); and recipe import
+`getTrip`; #719 adds `addToTrip`, `removeTripItem`, `buy`, late meals and the last-buy write on close); and recipe import
 (reading pages, the ingredient line parser, matching lines to foods) only in
 `apps-script/src/importer.js`, behind the one `importRecipe` action (#706).
 The food library (#707): the Open Food Facts lookup is `barcode.js` (`lookupBarcode`, writes nothing), and

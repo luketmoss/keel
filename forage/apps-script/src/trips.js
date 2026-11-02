@@ -1,7 +1,8 @@
 // Shopping trips (#703, #718): a trip is built from planned recipe meals, one
 // item per food, and each item is sorted to Have it or a store, then bought.
 // The rules are #710's, carried in #718's body; #719 adds added items, buying
-// amounts and late meals on top of these same functions.
+// amounts and late meals on top of these same functions (addToTrip,
+// removeTripItem, `buy` on setTripItem, the last-buy write in closeTrip).
 //
 // - A meal is on a trip when its Plan row's `trip_id` is the trip's id.
 //   startTrip sets it, discardTrip clears it, closeTrip leaves it (closed is
@@ -13,12 +14,24 @@
 //   closed trip is history and is never pruned.
 // - What the meals need (`need`), the per-meal breakdown, the counts and the
 //   unmatched lines are derived on read, here and nowhere else: the app and
-//   the MCP tools only show them.
+//   the MCP tools only show them. So are late meals (#719): recipe meals
+//   after today and through the open trip's `through`, on no trip.
 //
 // At most one trip is open.
 
 /** The trip writes, whose stale lines change-log.js prunes before it takes its snapshot. */
-var TRIP_WRITES = ['startTrip', 'setTripItem', 'closeTrip', 'discardTrip'];
+var TRIP_WRITES = ['startTrip', 'setTripItem', 'closeTrip', 'discardTrip', 'addToTrip', 'removeTripItem'];
+
+/** The longest buying amount (#719). */
+var TRIP_BUY_MAX = 60;
+
+/** The longest name a free-text item gets (#719). */
+var TRIP_ITEM_NAME_MAX = 80;
+
+/** #719's fixed refusals. */
+var TRIP_CLOSED = 'That trip is closed.';
+var TRIP_ADD_ONE = 'Give one of food_id, text or late_meals.';
+var TRIP_ITEM_NAME = 'Give the item a name of 1 to ' + TRIP_ITEM_NAME_MAX + ' characters.';
 
 var TRIP_WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -54,8 +67,9 @@ function findTrip(tripId) {
   return open;
 }
 
-function requireOpen(trip) {
-  if (trip.status !== 'open') throw tripError('Trip ' + trip.id + ' is closed.', 'trip_closed');
+/** Refuse a closed trip: #718's `Trip tr_… is closed.`, or `message` (#719's `That trip is closed.`). */
+function requireOpen(trip, message) {
+  if (trip.status !== 'open') throw tripError(message || 'Trip ' + trip.id + ' is closed.', 'trip_closed');
 }
 
 // ---------------------------------------------------------------- stale lines
@@ -153,6 +167,19 @@ function newTripItem(tripId, food) {
 }
 
 /**
+ * An item added by hand (#719): `mine`, no lines, the food's usual store as a
+ * suggested choice (never Have it: you added it because you want it), and its
+ * last bought amount as the buying amount.
+ */
+function newAddedItem(tripId, food) {
+  var choice = STORES.indexOf(food.usual_store) !== -1 ? food.usual_store : '';
+  return {
+    trip_id: tripId, food_id: food.id, lines_json: [], mine: true,
+    choice: choice, suggested: choice !== '', buy: cell(food.last_buy).trim(), bought: false,
+  };
+}
+
+/**
  * The TripItems rows `meals` make on trip `tripId`: one per food, combined
  * across meals, each with its default choice. A line joins its food's item
  * when it has a food, isn't optional, and the food isn't `never_shop`. #719's
@@ -224,10 +251,34 @@ function tripItemOrder(a, b) {
 }
 
 /**
+ * The late meals of an open trip (#719): recipe meals dated after `today` and
+ * on or before its `through`, on no trip, by date then slot. None for a closed
+ * trip. `plans` are Plan rows; `recipes` by id. Answers the Plan rows.
+ */
+function lateMealRows(trip, today, plans) {
+  if (!trip || trip.status !== 'open') return [];
+  return plans.filter(function (p) {
+    return !!p.recipe_id && !p.trip_id && p.date > today && p.date <= trip.through;
+  }).sort(planOrder);
+}
+
+/** Late meals as getTrip and getPlan answer them: `[{plan_id, recipe_name, date, slot}]`. */
+function lateMealsView(rows, recipes) {
+  return rows.map(function (p) {
+    return { plan_id: p.id, recipe_name: recipes[p.recipe_id] ? recipes[p.recipe_id].name : '', date: p.date, slot: p.slot };
+  });
+}
+
+/** A food's pack sizes as a list of text, or []. */
+function foodPacks(food) {
+  return food && Array.isArray(food.packs_json) ? food.packs_json.map(cell) : [];
+}
+
+/**
  * A trip as getTrip answers it, from its row, its meals and its item rows.
  * `meals` are Plan rows; `items` TripItems rows. Nothing here writes.
  */
-function tripShape(trip, meals, items, data) {
+function tripShape(trip, meals, items, data, today) {
   var recipeName = function (p) { return p && data.recipes[p.recipe_id] ? data.recipes[p.recipe_id].name : ''; };
   var recipeLine = function (p, lineId) {
     var lines = p ? data.linesByRecipe[p.recipe_id] || [] : [];
@@ -248,6 +299,10 @@ function tripShape(trip, meals, items, data) {
       buy: cell(item.buy),
       mine: !!item.mine,
       need: tripNeed(lines, food),
+      // #719: copied from the food, so the buying amount sheet needs no second call.
+      packs: foodPacks(food),
+      last_buy: food ? cell(food.last_buy) : '',
+      last_bought_on: food ? cell(food.last_bought_on) : '',
       lines: lines.map(function (l) {
         var p = data.plans[cell(l.plan_id)] || null;
         var source = recipeLine(p, cell(l.line_id));
@@ -294,17 +349,20 @@ function tripShape(trip, meals, items, data) {
     items: shaped,
     counts: counts,
     unmatched: unmatched,
+    late_meals: lateMealsView(lateMealRows(trip, today || todayLocal(), Object.keys(data.plans).map(function (k) {
+      return data.plans[k];
+    }).filter(function (p) { return meals.indexOf(p) === -1; })), data.recipes),
   };
 }
 
-/** A stored trip as getTrip answers it. */
-function tripView(trip) {
+/** A stored trip as getTrip answers it. `today` (default today in America/Denver) dates its late meals. */
+function tripView(trip, today) {
   var data = tripData();
   var meals = Object.keys(data.plans)
     .map(function (id) { return data.plans[id]; })
     .filter(function (p) { return p.trip_id === trip.id; })
     .sort(planOrder);
-  return tripShape(trip, meals, listRecords('TripItems', function (i) { return i.trip_id === trip.id; }), data);
+  return tripShape(trip, meals, listRecords('TripItems', function (i) { return i.trip_id === trip.id; }), data, today);
 }
 
 /**
@@ -330,14 +388,25 @@ function getTrips(params) {
 /**
  * `{ trip }`: the trip `id` names, or the open one when none is named, which
  * may be `null`. An open trip's stale lines are dropped first (written).
+ * `today` (the device's, as getPlan) dates its late meals.
  */
 function getTrip(params) {
   var id = cell(params && params.id).trim();
+  var today = validateDate('today', params && params.today, true);
   var trip = id ? getRecord('Trips', { id: id }) : openTrip();
   if (id && !trip) throw tripError('No trip ' + id + '.', 'not_found');
   if (!trip) return { trip: null };
   pruneTrip(trip);
-  return { trip: tripView(trip) };
+  return { trip: tripView(trip, today) };
+}
+
+/** getPlan's `late_meals` (#719): the open trip's, or [] with no trip open. */
+function planLateMeals(plans, today) {
+  var trip = openTrip();
+  if (!trip) return [];
+  var recipes = {};
+  listRecords('Recipes').forEach(function (r) { recipes[r.id] = r; });
+  return lateMealsView(lateMealRows(trip, today, plans), recipes);
 }
 
 // ---------------------------------------------------------------- writes
@@ -410,18 +479,19 @@ function startTrip(payload) {
         upsertRecord('Plan', p);
       });
     }
-    return { trip: tripShape(trip, chosen, items, data), written: !dryRun, dry_run: dryRun };
+    return { trip: tripShape(trip, chosen, items, data, today), written: !dryRun, dry_run: dryRun };
   });
 }
 
 /**
- * Sort or tick one item: `{ trip_id?, food_id, choice?, bought? }`, the open
- * trip when `trip_id` is left out. An object of named fields, so #719 adds
- * `buy` without changing the shape. A choice clears `suggested`; `have`
- * clears `bought` and never changes the food; a store that differs from the
- * food's `usual_store` becomes it, and the answer says `remembered: true`.
- * `bought` needs a store. Refused, writing nothing, on a closed trip or a
- * food not on it.
+ * Sort or tick one item: `{ trip_id?, food_id, choice?, bought?, buy? }`, the
+ * open trip when `trip_id` is left out. A choice clears `suggested`; `have`
+ * clears `bought` and never changes the food (nor the buying amount); a store
+ * that differs from the food's `usual_store` becomes it, and the answer says
+ * `remembered: true`. `bought` needs a store. `buy` (#719) is the buying
+ * amount, free text up to 60 characters, trimmed; blank clears it, and it
+ * writes nothing else. Refused, writing nothing, on a closed trip or a food
+ * not on it.
  *
  * @returns {{ item: Object, remembered?: true }}
  */
@@ -430,13 +500,15 @@ function setTripItem(payload) {
   var foodId = requireString('food_id', payload.food_id);
   var hasChoice = has(payload, 'choice');
   var hasBought = has(payload, 'bought');
-  if (!hasChoice && !hasBought) throw new Error('Send choice or bought.');
+  var hasBuy = has(payload, 'buy');
+  if (!hasChoice && !hasBought && !hasBuy) throw new Error('Send choice, bought or buy.');
   var choice = hasChoice ? validateEnum('choice', payload.choice, TRIP_CHOICES) : null;
   if (hasBought && typeof payload.bought !== 'boolean') throw new Error('bought must be true or false');
+  var buy = hasBuy ? tripBuy(payload.buy) : null;
 
   return withScriptLock(function () {
     var trip = findTrip(payload.trip_id);
-    requireOpen(trip);
+    requireOpen(trip, hasBuy ? TRIP_CLOSED : '');
     pruneTrip(trip);
     var stored = getRecord('TripItems', { trip_id: trip.id, food_id: foodId });
     var food = getRecord('Foods', { id: foodId });
@@ -455,6 +527,7 @@ function setTripItem(payload) {
       }
       item.bought = payload.bought;
     }
+    if (buy !== null) item.buy = buy;
     var remembered = !!food && STORES.indexOf(choice) !== -1 && food.usual_store !== choice;
     if (remembered) {
       food.usual_store = choice;
@@ -468,12 +541,40 @@ function setTripItem(payload) {
   });
 }
 
-/** Close the open trip (or `trip_id`): `closed`, `closed_at` now. Unbought items stay as they are; its meals read Shopped. */
+/** A buying amount as sent: text up to 60 characters, trimmed; blank, spaces or null clear it. */
+function tripBuy(value) {
+  if (value === null || value === undefined) return '';
+  if (typeof value !== 'string') throw new Error('buy must be text');
+  var buy = value.trim();
+  if (buy.length > TRIP_BUY_MAX) throw new Error('buy must be at most ' + TRIP_BUY_MAX + ' characters');
+  return buy;
+}
+
+/**
+ * Close the open trip (or `trip_id`): `closed`, `closed_at` now. Unbought
+ * items stay as they are; its meals read Shopped. #719: each item that was
+ * bought, from a store, with a buying amount first writes that amount to its
+ * food's `last_buy` and the closing date (`today`, default today in
+ * America/Denver) to `last_bought_on`. The foods are written before the
+ * status, so a failure leaves the trip open; both are in one change-log call.
+ */
 function closeTrip(payload) {
   return withScriptLock(function () {
     var trip = findTrip(payload && payload.trip_id);
     if (trip.status !== 'open') throw tripError('Trip ' + trip.id + ' is already closed.', 'trip_closed');
+    var today = validateDate('today', payload && payload.today, true) || todayLocal();
     pruneTrip(trip);
+    var now = isoNow();
+    listRecords('TripItems', function (i) { return i.trip_id === trip.id; }).forEach(function (item) {
+      var buy = cell(item.buy).trim();
+      if (!item.bought || STORES.indexOf(item.choice) === -1 || !buy) return;
+      var food = getRecord('Foods', { id: item.food_id });
+      if (!food || (food.last_buy === buy && food.last_bought_on === today)) return;
+      food.last_buy = buy;
+      food.last_bought_on = today;
+      food.updated = now;
+      upsertRecord('Foods', food);
+    });
     trip.status = 'closed';
     trip.closed_at = isoNow();
     upsertRecord('Trips', trip);
@@ -504,6 +605,145 @@ function discardTrip(payload) {
     });
     deleteRecord('Trips', { id: trip.id });
     return { discarded: trip.id, meals_cleared: meals.length };
+  });
+}
+
+/** A free-text item's name: trimmed, inner spaces collapsed, the first letter capitalised, 1 to 80 characters. */
+function tripItemName(text) {
+  if (typeof text !== 'string') throw tripError(TRIP_ITEM_NAME, 'bad_name');
+  var name = text.trim().replace(/\s+/g, ' ');
+  if (name.length < 1 || name.length > TRIP_ITEM_NAME_MAX) throw tripError(TRIP_ITEM_NAME, 'bad_name');
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+/** The food whose name (or brand and name) is `name`, ignoring case and spaces either side, or null. */
+function foodNamed(name) {
+  var want = name.trim().toLowerCase();
+  return listRecords('Foods', function (f) {
+    return cell(f.name).trim().toLowerCase() === want || displayName(f).toLowerCase() === want;
+  })[0] || null;
+}
+
+function refuseNeverShop(food) {
+  if (food.never_shop) {
+    throw tripError(displayName(food) + ' is set to never go on a list. Change that on the food first.', 'never_shop');
+  }
+}
+
+/**
+ * Add to the open trip (or `trip_id`), #719: exactly one of `food_id` (a
+ * library food), `text` (a name: the food with that name, or a new name-only
+ * food, kind ingredient, source manual) or `late_meals: true` (every late
+ * meal, with `today`). An added food becomes an item with `mine` set, its
+ * usual store and its last bought amount; one already on the list changes
+ * nothing. Late meals get the trip's id and their items are built as
+ * startTrip builds them: new items take #710's defaults, and an item already
+ * on the list gains the lines, keeping its choice and bought tick. Every add
+ * is idempotent.
+ *
+ * @returns {{ trip: Object, added: string[], joined: string[], meals: string[], food: Object|null }}
+ */
+function addToTrip(payload) {
+  payload = payload || {};
+  var byId = typeof payload.food_id === 'string' && payload.food_id.trim() !== '';
+  var byText = has(payload, 'text') && payload.text !== null && payload.text !== undefined;
+  var late = payload.late_meals === true || payload.late_meals === 'true';
+  if ((byId ? 1 : 0) + (byText ? 1 : 0) + (late ? 1 : 0) !== 1) throw tripError(TRIP_ADD_ONE, 'bad_input');
+  var today = validateDate('today', payload.today, true) || todayLocal();
+  var name = byText ? tripItemName(payload.text) : '';
+
+  return withScriptLock(function () {
+    var trip = findTrip(payload.trip_id);
+    requireOpen(trip, TRIP_CLOSED);
+    pruneTrip(trip);
+    var out = { trip: null, added: [], joined: [], meals: [], food: null };
+
+    if (late) {
+      var data = tripData();
+      var meals = lateMealRows(trip, today, Object.keys(data.plans).map(function (k) { return data.plans[k]; }));
+      var now = isoNow();
+      var existing = {};
+      listRecords('TripItems', function (i) { return i.trip_id === trip.id; }).forEach(function (i) {
+        existing[i.food_id] = i;
+      });
+      buildTripItems(trip.id, meals, data.foods, data.linesByRecipe).forEach(function (built) {
+        var item = existing[built.food_id];
+        if (!item) {
+          upsertRecord('TripItems', built);
+          out.added.push(built.food_id);
+          return;
+        }
+        var lines = Array.isArray(item.lines_json) ? item.lines_json : [];
+        var seen = {};
+        lines.forEach(function (l) { seen[cell(l.plan_id) + ' ' + cell(l.line_id)] = true; });
+        var fresh = built.lines_json.filter(function (l) { return !seen[l.plan_id + ' ' + l.line_id]; });
+        if (!fresh.length) return;
+        item.lines_json = lines.concat(fresh);
+        upsertRecord('TripItems', item);
+        out.joined.push(built.food_id);
+      });
+      meals.forEach(function (p) {
+        p.trip_id = trip.id;
+        p.updated = now;
+        upsertRecord('Plan', p);
+        out.meals.push(p.id);
+      });
+    } else {
+      var food = null;
+      var created = false;
+      var matched = false;
+      if (byId) {
+        food = getRecord('Foods', { id: payload.food_id.trim() });
+        if (!food) throw tripError('No such food: ' + payload.food_id.trim(), 'not_found');
+        refuseNeverShop(food);
+      } else {
+        food = foodNamed(name);
+        matched = !!food;
+        if (food) refuseNeverShop(food);
+        else {
+          food = upsertFood({ name: name, kind: 'ingredient', source: 'manual' });
+          created = true;
+        }
+      }
+      out.food = { id: food.id, name: displayName(food), created: created, matched_existing: matched };
+      if (!getRecord('TripItems', { trip_id: trip.id, food_id: food.id })) {
+        upsertRecord('TripItems', newAddedItem(trip.id, food));
+        out.added.push(food.id);
+      }
+    }
+    out.trip = tripView(trip, today);
+    return out;
+  });
+}
+
+/**
+ * Take an added item off the open trip (or `trip_id`), #719: `{ food_id }`.
+ * Only an item with no meal lines; the food stays in the library. Refused on
+ * a closed trip, an item with lines (naming how many meals), or a food not on
+ * the list.
+ *
+ * @returns {{ removed: string, name: string, trip: Object }}
+ */
+function removeTripItem(payload) {
+  payload = payload || {};
+  var foodId = requireString('food_id', payload.food_id);
+  return withScriptLock(function () {
+    var trip = findTrip(payload.trip_id);
+    requireOpen(trip, TRIP_CLOSED);
+    pruneTrip(trip);
+    var food = getRecord('Foods', { id: foodId });
+    var name = food ? displayName(food) : foodId;
+    var item = getRecord('TripItems', { trip_id: trip.id, food_id: foodId });
+    if (!item) throw tripError(name + " isn't on the list.", 'not_on_trip');
+    var lines = Array.isArray(item.lines_json) ? item.lines_json : [];
+    if (lines.length) {
+      var meals = unique(lines.map(function (l) { return cell(l.plan_id); })).length;
+      throw tripError(name + ' is on the list for ' + meals + ' planned meal' + (meals === 1 ? '' : 's') + '.', 'has_meals', {
+        meals: meals,
+      });
+    }
+    deleteRecord('TripItems', { trip_id: trip.id, food_id: foodId });
+    return { removed: foodId, name: name, trip: tripView(trip) };
   });
 }
 

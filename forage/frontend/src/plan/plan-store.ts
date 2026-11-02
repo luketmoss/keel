@@ -3,7 +3,7 @@
 // the trip chips, the banner's count) is the API's: the app computes none.
 import { signal } from '@preact/signals';
 import type { ForageApi } from '../api/client';
-import type { PlanEntry } from '../api/types';
+import type { LateMeal, PlanEntry } from '../api/types';
 import { localDate } from '../cook/format';
 import { PLAN_DAYS, addDays } from './dates';
 
@@ -20,6 +20,8 @@ export const planToday = signal(localDate());
 export const planMealRequested = signal(false);
 /** #718: whether a trip is open, read with the plan; null until known (and after a failed read), so no button. */
 export const tripOpen = signal<boolean | null>(null);
+/** #719: the open trip's late meals, from getPlan. */
+export const lateMeals = signal<LateMeal[]>([]);
 /** A line for the Plan screen from a sheet that closed: "That meal was already removed." */
 export const planNotice = signal<string | null>(null);
 
@@ -46,6 +48,7 @@ export async function loadPlan(api: ForageApi, now = new Date()): Promise<void> 
     planToday.value = today;
     planEntries.value = out.entries;
     notOnTrip.value = out.not_on_trip;
+    lateMeals.value = out.late_meals ?? [];
     planFailed.value = false;
     planState.value = 'ready';
   } catch {
@@ -94,6 +97,7 @@ export function mealLabel(e: PlanEntry): string {
 export function _resetPlan(): void {
   planEntries.value = [];
   notOnTrip.value = 0;
+  lateMeals.value = [];
   planState.value = 'idle';
   planFailed.value = false;
   planToday.value = localDate();

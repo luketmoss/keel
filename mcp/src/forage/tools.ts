@@ -533,12 +533,15 @@ function itemRecipes(item: any): string[] {
   return out
 }
 
-/** `  fd_0a1b2c3d  Yellow onion · about 6 onions · Weeknight chili, Beef Stew · bought`. */
+/** `  fd_0a1b2c3d  Yellow onion · about 6 onions · Weeknight chili, Beef Stew · buying 3 lb bag · bought`. */
 function tripItemLine(item: any): string {
   const parts = [item.name]
   if (item.need) parts.push(item.need)
   const recipes = itemRecipes(item)
   if (recipes.length) parts.push(recipes.join(', '))
+  // #719: an item added by hand with no meals, and the buying amount.
+  if (item.mine && !(item.lines ?? []).length) parts.push('added by you')
+  if (item.buy) parts.push(`buying ${item.buy}`)
   if (item.suggested) parts.push('suggested')
   if (item.bought) parts.push('bought')
   return `  ${item.food_id}  ${parts.join(' · ')}`
@@ -586,7 +589,17 @@ function tripText(trip: any): string {
   if (body.length) out.push('', ...body)
   const unmatched = unmatchedLine(trip)
   if (unmatched) out.push('', unmatched)
+  const late = lateLine(trip)
+  if (late) out.push('', late)
   return out.join('\n')
+}
+
+/** #719: `Planned since the list was made: Beef Stew (Thu 2026-11-05 Dinner, pl_…). Add them with forage_add_to_trip late_meals.` */
+function lateLine(trip: any): string {
+  const late = (trip.late_meals ?? []) as any[]
+  if (!late.length) return ''
+  const meals = late.map((m) => `${m.recipe_name || m.plan_id} (${dayText(m.date)} ${m.slot}, ${m.plan_id})`).join(', ')
+  return `Planned since the list was made: ${meals}. Add them with forage_add_to_trip late_meals: true.`
 }
 
 /** `No open trip. Last trip: closed Mon 2026-10-27, 19 items, 17 bought.`, from getTrips' closed rows. */
@@ -605,10 +618,38 @@ function startRefusal(result: ApiResult): string {
   return ['Nothing saved.', ...(problems.length ? problems.map((p) => p.error) : [result.error ?? ''])].join('\n')
 }
 
-/** `Yellow onion: King Soopers, not bought.`, `Olive oil: Have it.`, `Beef chuck: not sorted.` */
+/** `Yellow onion: King Soopers, not bought.`, `Olive oil: Have it.`, `Eggs: not sorted, buying 18 pack.` */
 function itemSavedText(item: any): string {
-  if (STORE_NAMES[item.choice]) return `${item.name}: ${STORE_NAMES[item.choice]}, ${item.bought ? 'bought' : 'not bought'}.`
-  return `${item.name}: ${item.choice === 'have' ? 'Have it' : 'not sorted'}.`
+  const buy = item.buy ? `, buying ${item.buy}` : ''
+  if (STORE_NAMES[item.choice]) {
+    return `${item.name}: ${STORE_NAMES[item.choice]}, ${item.bought ? 'bought' : 'not bought'}${buy}.`
+  }
+  return `${item.name}: ${item.choice === 'have' ? 'Have it' : 'not sorted'}${buy}.`
+}
+
+/** #719: forage_add_to_trip's answer, from addToTrip's. Every line is the design note's. */
+function addedText(d: any): string {
+  const items = new Map<string, any>(((d.trip?.items ?? []) as any[]).map((i) => [i.food_id, i]))
+  if (d.food) {
+    const item = items.get(d.food.id)
+    if (!d.added.length) return `${d.food.name} is already on the list.`
+    const store = item && STORE_NAMES[item.choice]
+    if (d.food.created) return `Added ${d.food.name}, a new item. It needs a store.`
+    const parts = [store, item?.buy].filter(Boolean)
+    const tail = parts.length ? `: ${parts.join(', ')}.` : '.'
+    return `Added ${d.food.name} to the list${tail} (${d.food.id})${store ? '' : ' It needs a store.'}`
+  }
+  const meals = (d.meals ?? []).length
+  if (!meals) return 'Nothing changed. No meals were planned after the list was made.'
+  const added = (d.added ?? []).length
+  const joined = (d.joined ?? []).length
+  const unsorted = ((d.added ?? []) as string[]).filter((id) => !items.get(id)?.choice).length
+  const store = unsorted ? ` ${plural(unsorted, 'item')} ${unsorted === 1 ? 'needs' : 'need'} a store.` : ''
+  if (!added && !joined) {
+    return `Added ${plural(meals, 'meal')} to the trip. ${meals === 1 ? 'It needs' : 'They need'} nothing new on the list.`
+  }
+  const parts = [added && `${added} new`, joined && `more of ${joined} already on the list`].filter(Boolean)
+  return `Added ${meals} meal${meals === 1 ? "'s" : "s'"} items: ${parts.join(', ')}.${store}`
 }
 
 const TRIP_ID_INPUT = z.string().optional().describe('The trip (tr_...). Default the open trip')
@@ -1684,7 +1725,7 @@ export function registerForageTools(server: McpServer, cfg: ForageConfig, mode: 
       annotations: READ,
     },
     guarded(async ({ trip_id }: { trip_id?: string }): Promise<ToolResult> => {
-      const result = await apiRead(cfg, 'getTrip', { id: trip_id })
+      const result = await apiRead(cfg, 'getTrip', { id: trip_id, today: homeToday() })
       if (!result.success) return failed(`Error: ${result.error}`)
       if (result.data?.trip) return text(tripText(result.data.trip))
       const trips = await apiRead(cfg, 'getTrips', { status: 'closed' })
@@ -1763,17 +1804,22 @@ export function registerForageTools(server: McpServer, cfg: ForageConfig, mode: 
         food_id: z.string().describe('The food on the trip (fd_...)'),
         choice: z.enum(TRIP_CHOICES).optional().describe('have, ks (King Soopers), costco or other'),
         bought: z.boolean().optional().describe('Only an item with a store can be bought'),
+        buy: z
+          .string()
+          .max(60)
+          .optional()
+          .describe("What you are buying, as free text, for example '18 pack'. Empty clears it."),
         trip_id: TRIP_ID_INPUT,
       },
       annotations: WRITE,
     },
     guarded(async (args: any): Promise<ToolResult> => {
-      if (args.choice === undefined && args.bought === undefined) {
-        return failed('Send choice or bought. Nothing changed.')
+      if (args.choice === undefined && args.bought === undefined && args.buy === undefined) {
+        return failed('Send choice, bought or buy. Nothing changed.')
       }
       let saved: ApiResult
       try {
-        saved = await apiWrite(cfg, 'setTripItem', sent(args, ['trip_id', 'food_id', 'choice', 'bought']))
+        saved = await apiWrite(cfg, 'setTripItem', sent(args, ['trip_id', 'food_id', 'choice', 'bought', 'buy']))
       } catch (err) {
         inTransit(err, 'change')
       }
@@ -1781,6 +1827,63 @@ export function registerForageTools(server: McpServer, cfg: ForageConfig, mode: 
       const item = saved.data.item
       const remembered = saved.data.remembered ? ` Forage will suggest ${STORE_NAMES[item.choice]} next time.` : ''
       return text(`${itemSavedText(item)}${remembered}`)
+    }),
+  )
+
+  server.registerTool(
+    'forage_add_to_trip',
+    {
+      description:
+        'Adds a food, a new item by name, or the meals planned since the list was made to the open shopping trip. ' +
+        'A new name becomes a food with no nutrition.',
+      inputSchema: {
+        food_id: z.string().optional().describe('A food in the library (fd_...). Send exactly one of food_id, text, late_meals'),
+        text: z.string().optional().describe('A name, 1 to 80 characters: the food with that name, or a new one'),
+        late_meals: z.boolean().optional().describe("true: the recipe meals planned after the list was made, through its date"),
+        today: z.string().optional().describe("For late_meals: YYYY-MM-DD, 'today' or 'tomorrow'. Default today"),
+        trip_id: TRIP_ID_INPUT,
+      },
+      annotations: WRITE,
+    },
+    guarded(async (args: any): Promise<ToolResult> => {
+      const given = [args.food_id !== undefined, args.text !== undefined, args.late_meals === true].filter(Boolean).length
+      if (given !== 1) return failed('Nothing changed. Give one of food_id, text or late_meals.')
+      const today = args.today === undefined ? homeToday() : planDate(args.today)
+      if (!today) return failed(`Nothing changed. Could not read "${args.today}" as a date — ${DATE_HINT}.`)
+      const payload: Record<string, unknown> = { ...sent(args, ['trip_id', 'food_id', 'text', 'late_meals']), today }
+      let saved: ApiResult
+      try {
+        saved = await apiWrite(cfg, 'addToTrip', payload)
+      } catch (err) {
+        inTransit(err, 'add')
+      }
+      if (!saved.success) return failed(`Nothing changed. ${saved.error}`)
+      const d = saved.data
+      const said = addedText(d)
+      const changed = d.added.length || d.joined.length || d.meals.length
+      return changed ? text(`${said}\nUndo with forage_undo, call ${currentCallId()}`) : text(said)
+    }),
+  )
+
+  server.registerTool(
+    'forage_remove_from_trip',
+    {
+      description: "Takes an item you added off the open trip. Items needed by planned meals can't be removed.",
+      inputSchema: {
+        food_id: z.string().describe('The food on the trip (fd_...)'),
+        trip_id: TRIP_ID_INPUT,
+      },
+      annotations: WRITE,
+    },
+    guarded(async (args: any): Promise<ToolResult> => {
+      let saved: ApiResult
+      try {
+        saved = await apiWrite(cfg, 'removeTripItem', sent(args, ['trip_id', 'food_id']))
+      } catch (err) {
+        inTransit(err, 'removal')
+      }
+      if (!saved.success) return failed(`Nothing changed. ${saved.error}`)
+      return text(`Took ${saved.data.name} off the list.\nUndo with forage_undo, call ${currentCallId()}`)
     }),
   )
 

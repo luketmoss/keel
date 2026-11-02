@@ -4,6 +4,7 @@
 import { signal } from '@preact/signals';
 import { ApiError, type ForageApi } from '../api/client';
 import type { Trip, TripItem, TripItemChange, TripStore, TripSummary } from '../api/types';
+import { localDate } from '../cook/format';
 import { showToast } from '../ui/toast';
 
 export type ShopState = 'idle' | 'loading' | 'ready' | 'error';
@@ -25,6 +26,14 @@ export const remembered = signal<Record<string, TripStore>>({});
 export const sortOpensOnEverything = signal(false);
 /** The header's Trip button was tapped: the Shop screen opens its menu. */
 export const tripMenuRequested = signal(false);
+/** #719: the header's Add button was tapped: the Shop screen opens the Add sheet. */
+export const addRequested = signal(false);
+/** #719: the Add sheet's search text, kept while the buying amount sheet is over it. */
+export const addQuery = signal('');
+/** #719: the Shop tab's status line (an add, a removal, late meals added, a list closed elsewhere). */
+export const shopNotice = signal('');
+/** #719: Have it or bought items whose lines grew from late meals, until Shop is left or reloaded. */
+export const grown = signal<Set<string>>(new Set());
 
 export const SAVE_FAILED = "Couldn't save that. Try again.";
 export const TRIP_GONE = 'This trip was closed or thrown away.';
@@ -98,7 +107,7 @@ export async function loadTrip(api: ForageApi): Promise<void> {
   const seq = ++latest;
   if (shopState.value === 'idle') shopState.value = 'loading';
   try {
-    const [trip, closed] = await Promise.all([api.getTrip(), api.getClosedTrips()]);
+    const [trip, closed] = await Promise.all([api.getTrip(localDate()), api.getClosedTrips()]);
     if (seq !== latest) return;
     // A write still on its way would be undone by this read; it lands and confirms on its own.
     if (pendingWrites > 0 && trip && shopTrip.value?.id === trip.id) return;
@@ -134,7 +143,13 @@ function applyChange(item: TripItem, change: TripItemChange): TripItem {
     if (change.choice === 'have') out.bought = false;
   }
   if (change.bought !== undefined) out.bought = change.bought;
+  if (change.buy !== undefined) out.buy = change.buy.trim();
   return out;
+}
+
+/** #719: an item as the API answered it, on screen. */
+export function putItem(item: TripItem): void {
+  replaceItem(item.food_id, () => item);
 }
 
 /**
@@ -199,6 +214,10 @@ export function _resetShop(): void {
   remembered.value = {};
   tripMenuRequested.value = false;
   sortOpensOnEverything.value = false;
+  addRequested.value = false;
+  addQuery.value = '';
+  shopNotice.value = '';
+  grown.value = new Set();
   confirmed.clear();
   queues.clear();
   pendingWrites = 0;

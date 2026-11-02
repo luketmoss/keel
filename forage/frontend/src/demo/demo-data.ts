@@ -181,6 +181,22 @@ export const DEMO_FOODS: Food[] = [
     barcode: '0012345678905',
   }),
   food('fd_demo_herbs', 'Herbes de Provence', {}),
+  // #719: two regulars with pack sizes and last time, and the sample trip's added item.
+  food('fd_demo_milk', 'Milk', {
+    category: 'Dairy',
+    regular: true,
+    usual_store: 'ks',
+    packs_json: ['1 gallon'],
+    last_buy: '1 gallon',
+  }),
+  food('fd_demo_eggs', 'Eggs', {
+    category: 'Dairy',
+    regular: true,
+    usual_store: 'ks',
+    packs_json: ['18 pack', '12 pack'],
+    last_buy: '18 pack',
+  }),
+  food('fd_demo_towels', 'Paper towels', {}),
 ];
 
 function starter(
@@ -426,7 +442,8 @@ export const DEMO_PLAN: {
   { id: 'pl_demo_3', in_days: 1, slot: 'Dinner', recipe_id: 'rc_demo_weeknight', trip_id: 'tr_demo_open' },
   { id: 'pl_demo_4', in_days: 3, slot: 'Lunch', recipe_id: 'rc_demo_weeknight', trip_id: 'tr_demo_open' },
   { id: 'pl_demo_5', in_days: 3, slot: 'Dinner', recipe_id: 'rc_demo_stew' },
-  { id: 'pl_demo_6', in_days: 5, slot: 'Dinner', recipe_id: 'rc_demo_weeknight' },
+  // #719: pl_demo_5 is the open trip's late meal; this one is after the trip's dates.
+  { id: 'pl_demo_6', in_days: 6, slot: 'Dinner', recipe_id: 'rc_demo_weeknight' },
 ];
 
 // ---- #718: the sample trips
@@ -438,6 +455,8 @@ export interface DemoTripItem {
   choice: '' | 'have' | 'ks' | 'costco' | 'other';
   suggested: boolean;
   bought?: boolean;
+  /** #719: added by hand. */
+  mine?: boolean;
   need: string;
   /** Each line: the plan entry, the recipe line's text, and the snapshot's amount. */
   lines: { plan_id: string; text: string; amt: string }[];
@@ -541,6 +560,17 @@ export const DEMO_TRIP_ITEMS: DemoTripItem[] = [
     suggested: false,
     need: '1 bag',
     lines: [{ plan_id: M1, text: 'Tortilla chips, to serve', amt: '1 bag' }],
+  },
+  // #719: added by hand, in no meal, not sorted yet.
+  {
+    food_id: 'fd_demo_towels',
+    name: 'Paper towels',
+    category: '',
+    choice: '',
+    suggested: false,
+    mine: true,
+    need: '',
+    lines: [],
   },
 ];
 

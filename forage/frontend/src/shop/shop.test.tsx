@@ -669,9 +669,9 @@ describe('demo mode', () => {
     vi.stubGlobal('fetch', fetchSpy);
     await open('#/shop', true);
     expect(segment(/^To sort/).getAttribute('aria-pressed')).toBe('true');
-    expect(segment(/^Everything/).textContent).toBe('Everything (9)');
+    expect(segment(/^Everything/).textContent).toBe('Everything (10)');
     expect(screen.getByTestId('sort-counts').textContent).toBe(
-      '6 of 9 sorted · 2 have · 2 King Soopers · 1 Costco · 1 other',
+      '6 of 10 sorted · 2 have · 2 King Soopers · 1 Costco · 1 other',
     );
     expect(screen.getByTestId('unmatched').textContent).toContain('1 bay leaf · Weeknight chili');
     fireEvent.click(segment(/^Everything/));
@@ -681,10 +681,10 @@ describe('demo mode', () => {
       'Suggested: you usually get this at King Soopers',
     );
 
-    for (const name of ['Cilantro', 'Hilltop Dairy Plain yogurt', 'Kidney beans'])
+    for (const name of ['Cilantro', 'Hilltop Dairy Plain yogurt', 'Kidney beans', 'Paper towels'])
       fireEvent.click(choice(itemNamed(name), 'Costco'));
     await settle();
-    expect(screen.getByTestId('make-lists').textContent).toBe('Make lists: 7 to buy');
+    expect(screen.getByTestId('make-lists').textContent).toBe('Make lists: 8 to buy');
     fireEvent.click(screen.getByTestId('make-lists'));
     fireEvent.click(screen.getAllByTestId('shop-row')[0]);
     await settle();

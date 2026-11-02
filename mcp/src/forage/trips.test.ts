@@ -4,7 +4,7 @@ import { fakeBudget } from '../../test/fake-budget'
 import { handleForage } from './index'
 import { FORAGE_READ_TOOLS } from './tools'
 
-// #718: the five trip tools over a fake Forage API, with the wording of
+// #718: the five trip tools, and #719's two plus `buy`, over a fake Forage API, with the wording of
 // forage/docs/design/718-shopping-trips.md. The API's own rules (building, the
 // need, defaults, stale lines, undo) are in forage/apps-script/tests/trips.test.ts.
 
@@ -116,7 +116,7 @@ describe('the trip tools', () => {
     expect(write.forage_start_trip.description).toBe(
       'Starts a shopping trip for planned recipe meals after today through a date. Previews first. One trip can be open at a time.',
     )
-    expect(Object.keys(write.forage_set_trip_item.inputSchema.properties).sort()).toEqual(['bought', 'choice', 'food_id', 'trip_id'])
+    expect(Object.keys(write.forage_set_trip_item.inputSchema.properties).sort()).toEqual(['bought', 'buy', 'choice', 'food_id', 'trip_id'])
     expect(Object.keys(write.forage_discard_trip.inputSchema.properties).sort()).toEqual(['confirm', 'trip_id'])
   })
 })
@@ -250,7 +250,7 @@ describe('forage_set_trip_item', () => {
     expect(r.isError).toBe(true)
     expect(textOf(r)).toBe("Nothing changed. Yellow onion isn't on trip tr_01020304.")
     const sent = api({})
-    expect(textOf(await call('forage_set_trip_item', { food_id: 'fd_1' }))).toBe('Send choice or bought. Nothing changed.')
+    expect(textOf(await call('forage_set_trip_item', { food_id: 'fd_1' }))).toBe('Send choice, bought or buy. Nothing changed.')
     expect(sent).toEqual([])
   })
 })
@@ -297,5 +297,145 @@ describe('forage_discard_trip', () => {
     expect(sent.map((s) => s.action)).toEqual(['getTrip'])
     api({ getTrip: ok({ trip: null }) })
     expect(textOf(await call('forage_discard_trip'))).toBe('Nothing changed. No shopping trip is open.')
+  })
+})
+
+// ---------------------------------------------------------------- #719
+
+describe('#719: forage_add_to_trip, forage_remove_from_trip and buy', () => {
+  const added = (over: Record<string, unknown>) => ({ trip: TRIP, added: [], joined: [], meals: [], food: null, ...over })
+  const withItem = (i: Record<string, unknown>) => ({ ...TRIP, items: [...TRIP.items, item(i)] })
+
+  it("are plain write tools with the design note's descriptions", async () => {
+    const write = Object.fromEntries((await listTools('write')).map((t) => [t.name, t]))
+    expect(write.forage_add_to_trip.description).toBe(
+      'Adds a food, a new item by name, or the meals planned since the list was made to the open shopping trip. ' +
+        'A new name becomes a food with no nutrition.',
+    )
+    expect(write.forage_remove_from_trip.description).toBe(
+      "Takes an item you added off the open trip. Items needed by planned meals can't be removed.",
+    )
+    for (const name of ['forage_add_to_trip', 'forage_remove_from_trip']) {
+      expect(FORAGE_READ_TOOLS.has(name)).toBe(false)
+      expect(write[name].annotations, name).toMatchObject({ readOnlyHint: false, destructiveHint: false })
+    }
+    expect(write.forage_set_trip_item.inputSchema.properties.buy.description).toBe(
+      "What you are buying, as free text, for example '18 pack'. Empty clears it.",
+    )
+  })
+
+  it('adds a food: its store and buying amount, its id, the undo line and the reminder', async () => {
+    const sent = api({
+      addToTrip: ok(
+        added({
+          added: ['fd_1a2b3c4d'],
+          food: { id: 'fd_1a2b3c4d', name: 'Milk', created: false, matched_existing: false },
+          trip: withItem({ food_id: 'fd_1a2b3c4d', name: 'Milk', choice: 'ks', suggested: true, buy: '1 gallon', mine: true }),
+        }),
+      ),
+    })
+    const r = await call('forage_add_to_trip', { food_id: 'fd_1a2b3c4d' })
+    expect(sent[0].payload).toMatchObject({ food_id: 'fd_1a2b3c4d', today: '2026-11-02' })
+    expect(sent[0].payload.call_id).toMatch(/^[0-9a-f-]{36}$/)
+    const lines = textOf(r).split('\n')
+    expect(lines[0]).toBe('Added Milk to the list: King Soopers, 1 gallon. (fd_1a2b3c4d)')
+    expect(lines[1]).toBe(`Undo with forage_undo, call ${sent[0].payload.call_id}`)
+    expect(textOf(r)).toContain(REMINDER)
+  })
+
+  it('a new item by name, one already on the list, and late meals each get their line', async () => {
+    api({
+      addToTrip: ok(
+        added({
+          added: ['fd_new'],
+          food: { id: 'fd_new', name: 'Paper towels', created: true, matched_existing: false },
+          trip: withItem({ food_id: 'fd_new', name: 'Paper towels', mine: true }),
+        }),
+      ),
+    })
+    expect(textOf(await call('forage_add_to_trip', { text: 'paper towels' })).split('\n')[0]).toBe(
+      'Added Paper towels, a new item. It needs a store.',
+    )
+    api({ addToTrip: ok(added({ food: { id: 'fd_1a2b3c4d', name: 'Cilantro', created: false, matched_existing: true } })) })
+    const again = await call('forage_add_to_trip', { text: 'cilantro' })
+    expect(textOf(again).split('\n')[0]).toBe('Cilantro is already on the list.')
+    expect(textOf(again)).not.toContain('Undo with')
+
+    const sent = api({
+      addToTrip: ok(
+        added({
+          meals: ['pl_1', 'pl_2'],
+          added: ['fd_a', 'fd_b', 'fd_c'],
+          joined: ['fd_0a1b2c3d', 'fd_feta'],
+          trip: {
+            ...TRIP,
+            items: [
+              ...TRIP.items,
+              item({ food_id: 'fd_a' }),
+              item({ food_id: 'fd_b', choice: 'ks' }),
+              item({ food_id: 'fd_c', choice: 'have' }),
+            ],
+          },
+        }),
+      ),
+    })
+    const late = await call('forage_add_to_trip', { late_meals: true })
+    expect(sent[0].payload).toMatchObject({ late_meals: true, today: '2026-11-02' })
+    expect(textOf(late).split('\n')[0]).toBe("Added 2 meals' items: 3 new, more of 2 already on the list. 1 item needs a store.")
+    api({ addToTrip: ok(added({ meals: ['pl_1'] })) })
+    expect(textOf(await call('forage_add_to_trip', { late_meals: true })).split('\n')[0]).toBe(
+      'Added 1 meal to the trip. It needs nothing new on the list.',
+    )
+  })
+
+  it('refuses none or two of the inputs before sending; passes API refusals on after Nothing changed', async () => {
+    const sent = api({})
+    for (const args of [{}, { food_id: 'fd_1', text: 'milk' }]) {
+      const r = await call('forage_add_to_trip', args)
+      expect(r.isError).toBe(true)
+      expect(textOf(r)).toBe('Nothing changed. Give one of food_id, text or late_meals.')
+    }
+    expect(sent).toEqual([])
+    api({ addToTrip: () => ({ success: false, code: 'no_open_trip', error: 'No shopping trip is open.' }) })
+    expect(textOf(await call('forage_add_to_trip', { text: 'milk' }))).toBe('Nothing changed. No shopping trip is open.')
+  })
+
+  it('removes an added item; a meal item is refused naming its meals', async () => {
+    const sent = api({ removeTripItem: ok({ removed: 'fd_new', name: 'Paper towels', trip: TRIP }) })
+    const r = await call('forage_remove_from_trip', { food_id: 'fd_new' })
+    expect(sent[0].payload).toMatchObject({ food_id: 'fd_new' })
+    expect(textOf(r).split('\n')[0]).toBe('Took Paper towels off the list.')
+    expect(textOf(r)).toContain(REMINDER)
+    api({
+      removeTripItem: () => ({ success: false, code: 'has_meals', error: 'Onions is on the list for 2 planned meals.' }),
+    })
+    expect(textOf(await call('forage_remove_from_trip', { food_id: 'fd_0a1b2c3d' }))).toBe(
+      'Nothing changed. Onions is on the list for 2 planned meals.',
+    )
+  })
+
+  it('buy on forage_set_trip_item is sent and its saved line gains the buy', async () => {
+    const sent = api({ setTripItem: ok({ item: item({ name: 'Eggs', choice: 'ks', buy: '18 pack' }) }) })
+    const r = await call('forage_set_trip_item', { food_id: 'fd_eggs', buy: '18 pack' })
+    expect(sent[0].payload).toMatchObject({ food_id: 'fd_eggs', buy: '18 pack' })
+    expect(sent[0].payload.choice).toBeUndefined()
+    expect(textOf(r).split('\n')[0]).toBe('Eggs: King Soopers, not bought, buying 18 pack.')
+  })
+
+  it('forage_get_trip shows added items, buying amounts and the late meals', async () => {
+    const sent = api({
+      getTrip: ok({
+        trip: {
+          ...withItem({ food_id: 'fd_tw', name: 'Paper towels', mine: true, buy: '6 rolls' }),
+          late_meals: [{ plan_id: 'pl_thu', recipe_name: 'Beef Stew', date: '2026-11-05', slot: 'Dinner' }],
+        },
+      }),
+    })
+    const lines = textOf(await call('forage_get_trip')).split('\n')
+    expect(sent[0].params.get('today')).toBe('2026-11-02')
+    expect(lines).toContain('  fd_tw  Paper towels · added by you · buying 6 rolls')
+    expect(lines[lines.length - 1]).toBe(
+      'Planned since the list was made: Beef Stew (Thu 2026-11-05 Dinner, pl_thu). Add them with forage_add_to_trip late_meals: true.',
+    )
   })
 })

@@ -4,7 +4,10 @@
 // of it.
 import { ApiError } from '../api/client';
 import type {
+  AddToTripInput,
+  AddToTripResult,
   Food,
+  LateMeal,
   PlanEntry,
   RecipeDetail,
   StartTripInput,
@@ -49,8 +52,8 @@ function seedItem(d: DemoTripItem, i: number): StoredItem {
     suggested: d.suggested,
     bought: !!d.bought,
     buy: '',
-    mine: false,
-    need: d.need,
+    mine: !!d.mine,
+    need: d.lines.length ? d.need : null,
     lines: d.lines.map((l, j) => ({ ...l, line_id: `L${i + 1}-${j + 1}`, grams: null })),
   };
 }
@@ -111,11 +114,23 @@ export function createDemoTrips({ now, today, plan, foods, recipes, gramsOf }: D
       .filter((i) => i.lines.length || i.mine);
   }
 
-  function view(t: StoredTrip, meals = plan.filter((p) => p.trip_id === t.id)): Trip {
+  /** #719: recipe meals after today and through the open trip's date, on no trip. */
+  function lateOf(t: StoredTrip, day = today): LateMeal[] {
+    if (t.status !== 'open') return [];
+    return plan
+      .filter((p) => p.recipe_id && !p.trip_id && p.date > day && p.date <= t.through)
+      .sort(mealOrder)
+      .map((p) => ({ plan_id: p.id, recipe_name: recipeName(p), date: p.date, slot: p.slot }));
+  }
+
+  function view(t: StoredTrip, meals = plan.filter((p) => p.trip_id === t.id), day = today): Trip {
     const sorted = [...meals].sort(mealOrder);
     const items: TripItem[] = t.items
       .map((i) => ({
         ...clone(i),
+        packs: foods.find((f) => f.id === i.food_id)?.packs_json ?? [],
+        last_buy: foods.find((f) => f.id === i.food_id)?.last_buy ?? '',
+        last_bought_on: foods.find((f) => f.id === i.food_id)?.last_bought_on ?? '',
         lines: i.lines.map((l) => {
           const p = plan.find((x) => x.id === l.plan_id);
           return {
@@ -161,6 +176,7 @@ export function createDemoTrips({ now, today, plan, foods, recipes, gramsOf }: D
       items,
       counts,
       unmatched: t.unmatched.filter((u) => on.has(u.plan_id)),
+      late_meals: lateOf(t, day),
     };
   }
 
@@ -216,11 +232,11 @@ export function createDemoTrips({ now, today, plan, foods, recipes, gramsOf }: D
   }
 
   return {
-    getTrip: async (): Promise<Trip | null> => {
+    getTrip: async (day?: string): Promise<Trip | null> => {
       const t = trips.find((x) => x.status === 'open');
       if (!t) return null;
       prune(t);
-      return view(t);
+      return view(t, undefined, day || today);
     },
     getClosedTrips: async (): Promise<TripSummary[]> =>
       trips
@@ -262,7 +278,12 @@ export function createDemoTrips({ now, today, plan, foods, recipes, gramsOf }: D
     },
     setTripItem: async (tripId: string, foodId: string, change: TripItemChange): Promise<TripItemResult> => {
       const t = find(tripId);
-      if (t.status !== 'open') throw new ApiError(`Trip ${t.id} is closed.`, 'trip_closed');
+      if (t.status !== 'open') {
+        throw new ApiError(
+          change.buy !== undefined ? 'That trip is closed.' : `Trip ${t.id} is closed.`,
+          'trip_closed',
+        );
+      }
       const item = t.items.find((i) => i.food_id === foodId);
       if (!item) throw new ApiError(`That food isn't on trip ${t.id}.`, 'not_on_trip');
       const choice = change.choice ?? item.choice;
@@ -279,6 +300,7 @@ export function createDemoTrips({ now, today, plan, foods, recipes, gramsOf }: D
         }
       }
       if (change.bought !== undefined) item.bought = change.bought;
+      if (change.buy !== undefined) item.buy = change.buy.trim().slice(0, 60);
       const out = view(t).items.find((i) => i.food_id === foodId)!;
       return remembered ? { item: out, remembered: true } : { item: out };
     },
@@ -286,6 +308,14 @@ export function createDemoTrips({ now, today, plan, foods, recipes, gramsOf }: D
       const t = find(tripId);
       if (t.status !== 'open') throw new ApiError(`Trip ${t.id} is already closed.`, 'trip_closed');
       prune(t);
+      // #719: what was bought, from a store, with a buying amount is remembered on the food.
+      for (const i of t.items) {
+        const food = foods.find((f) => f.id === i.food_id);
+        if (food && i.bought && isStore(i.choice) && i.buy) {
+          food.last_buy = i.buy;
+          food.last_bought_on = today;
+        }
+      }
       t.status = 'closed';
       t.closed_at = new Date().toISOString();
       return view(t);
@@ -296,6 +326,108 @@ export function createDemoTrips({ now, today, plan, foods, recipes, gramsOf }: D
         throw new ApiError(`Trip ${t.id} is closed; only an open trip can be thrown away.`, 'trip_closed');
       trips.splice(trips.indexOf(t), 1);
       for (const p of plan) if (p.trip_id === t.id) p.trip_id = '';
+    },
+    addToTrip: async (tripId: string, input: AddToTripInput): Promise<AddToTripResult> => {
+      const t = find(tripId);
+      if (t.status !== 'open') throw new ApiError('That trip is closed.', 'trip_closed');
+      prune(t);
+      const out: AddToTripResult = { trip: view(t), added: [], joined: [], meals: [], food: null };
+      if ('late_meals' in input) {
+        const late = plan.filter((p) => lateOf(t, input.today).some((m) => m.plan_id === p.id));
+        const built = build(t.id, t.through, late);
+        for (const b of built.items) {
+          const item = t.items.find((i) => i.food_id === b.food_id);
+          if (!item) {
+            t.items.push(b);
+            out.added.push(b.food_id);
+          } else {
+            item.lines.push(...b.lines);
+            item.need = needOf(
+              item.lines,
+              foods.find((f) => f.id === item.food_id),
+            );
+            out.joined.push(b.food_id);
+          }
+        }
+        for (const p of late) p.trip_id = t.id;
+        out.meals = late.map((p) => p.id);
+        t.unmatched.push(...built.unmatched);
+      } else {
+        let food: Food | undefined;
+        let created = false;
+        if ('food_id' in input) {
+          food = foods.find((f) => f.id === input.food_id);
+          if (!food) throw new ApiError(`No such food: ${input.food_id}`, 'not_found');
+        } else {
+          const name = input.text.trim().replace(/\s+/g, ' ');
+          if (!name || name.length > 80) throw new ApiError('Give the item a name of 1 to 80 characters.', 'bad_name');
+          food = foods.find(
+            (f) => f.name.toLowerCase() === name.toLowerCase() || displayName(f).toLowerCase() === name.toLowerCase(),
+          );
+          if (!food) {
+            const now = new Date().toISOString();
+            food = {
+              id: `fd_demo_${foods.length + 1}`,
+              name: name.charAt(0).toUpperCase() + name.slice(1),
+              kind: 'ingredient',
+              brand: '',
+              category: '',
+              kcal_100g: null,
+              protein_100g: null,
+              carbs_100g: null,
+              fat_100g: null,
+              servings_json: null,
+              source: 'manual',
+              created: now,
+              updated: now,
+            };
+            foods.push(food);
+            created = true;
+          }
+        }
+        if (food.never_shop) {
+          throw new ApiError(
+            `${displayName(food)} is set to never go on a list. Change that on the food first.`,
+            'never_shop',
+          );
+        }
+        out.food = { id: food.id, name: displayName(food), created, matched_existing: !created && 'text' in input };
+        if (!t.items.some((i) => i.food_id === food!.id)) {
+          const choice: TripChoice = isStore(food.usual_store ?? '') ? (food.usual_store as TripStore) : '';
+          t.items.push({
+            food_id: food.id,
+            name: displayName(food),
+            category: food.category,
+            choice,
+            suggested: choice !== '',
+            bought: false,
+            buy: food.last_buy ?? '',
+            mine: true,
+            need: null,
+            lines: [],
+          });
+          out.added.push(food.id);
+        }
+      }
+      out.trip = view(t, undefined, 'late_meals' in input ? input.today : today);
+      return out;
+    },
+    removeTripItem: async (tripId: string, foodId: string): Promise<Trip> => {
+      const t = find(tripId);
+      if (t.status !== 'open') throw new ApiError('That trip is closed.', 'trip_closed');
+      const item = t.items.find((i) => i.food_id === foodId);
+      if (!item) throw new ApiError("That food isn't on the list.", 'not_on_trip');
+      if (item.lines.length) {
+        const n = new Set(item.lines.map((l) => l.plan_id)).size;
+        throw new ApiError(`${item.name} is on the list for ${n} planned meal${n === 1 ? '' : 's'}.`, 'has_meals');
+      }
+      t.items.splice(t.items.indexOf(item), 1);
+      return view(t);
+    },
+    /** The open trip's late meals, for getPlan. */
+    lateMeals: (day: string): LateMeal[] => {
+      const t = trips.find((x) => x.status === 'open');
+      return t ? lateOf(t, day) : [];
     },
     /** The trip's status, for the plan's chips. */
     statusOf: (id: string): '' | 'open' | 'closed' => trips.find((t) => t.id === id)?.status ?? '',

@@ -271,17 +271,46 @@ describe('the Plan tab', () => {
 });
 
 describe('the banner', () => {
-  it('reads the count in bold, singular and plural, and is absent at 0, with no button while a trip is open', async () => {
+  it('reads the count in bold, singular and plural, with no trip open', async () => {
+    const api = fakeApi();
+    api.plan.push(meal({ ...CHILI }));
+    api.counts.notOnTrip = 3;
+    await open();
+    const banner = screen.getByTestId('plan-banner');
+    expect(banner.querySelector('p')!.textContent).toBe("3 planned meals aren't on a shopping trip yet.");
+    expect(banner.querySelector('strong')!.textContent).toBe('3 planned meals');
+    expect(banner.getAttribute('role')).toBeNull();
+  });
+
+  it('#719: with a trip open and nothing late there is no banner, whatever the count', async () => {
     const api = fakeApi();
     api.trips.open = OPEN_TRIP;
     api.plan.push(meal({ ...CHILI }));
     api.counts.notOnTrip = 3;
     await open();
+    expect(screen.queryByTestId('plan-banner')).toBeNull();
+  });
+
+  it('#719: with a trip open and a late meal, the late sentence and Add to list, which opens Shop', async () => {
+    const api = fakeApi();
+    api.trips.open = OPEN_TRIP;
+    api.plan.push(meal({ ...CHILI }));
+    api.lateMeals.push({ plan_id: 'pl_thu', recipe_name: 'Beef Stew', date: '2026-11-05', slot: 'Dinner' });
+    await open();
     const banner = screen.getByTestId('plan-banner');
-    expect(banner.textContent).toBe("3 planned meals aren't on a shopping trip yet.");
-    expect(banner.querySelector('strong')!.textContent).toBe('3 planned meals');
-    expect(banner.querySelector('button')).toBeNull();
-    expect(banner.getAttribute('role')).toBeNull();
+    expect(banner.querySelector('p')!.textContent).toBe('Beef Stew (Thu Nov 5) was planned after this list was made.');
+    expect(banner.querySelector('strong')!.textContent).toBe('Beef Stew');
+    api.lateMeals.push({ plan_id: 'pl_fri', recipe_name: 'Weeknight chili', date: '2026-11-06', slot: 'Dinner' });
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await settle();
+    expect(screen.getByTestId('plan-banner').querySelector('p')!.textContent).toBe(
+      '2 meals were planned after this list was made.',
+    );
+    fireEvent.click(screen.getByTestId('banner-add-to-list'));
+    await settle();
+    expect(window.location.hash).toBe('#/shop');
   });
 
   it('updates after a plan, a move and a remove, with no reload', async () => {
@@ -289,16 +318,16 @@ describe('the banner', () => {
     api.recipes.push(recipe('rc_chili', 'Weeknight chili'));
     api.plan.push(meal({ id: 'pl_0', date: '2026-11-04', ...CHILI }));
     api.counts.notOnTrip = 1;
-    api.trips.open = OPEN_TRIP;
     await open();
-    expect(screen.getByTestId('plan-banner').textContent).toBe("1 planned meal isn't on a shopping trip yet.");
+    const text = () => screen.getByTestId('plan-banner').querySelector('p')!.textContent;
+    expect(text()).toBe("1 planned meal isn't on a shopping trip yet.");
 
     api.counts.notOnTrip = 2;
     fireEvent.click(screen.getByTestId('plan-meal-btn'));
     await settle();
     fireEvent.click(screen.getAllByTestId('plan-recipe')[0]);
     await settle();
-    expect(screen.getByTestId('plan-banner').textContent).toBe("2 planned meals aren't on a shopping trip yet.");
+    expect(text()).toBe("2 planned meals aren't on a shopping trip yet.");
 
     api.counts.notOnTrip = 0;
     fireEvent.click(rowsIn(days()[2])[0]);
@@ -571,24 +600,28 @@ describe('demo mode', () => {
     ).toEqual(['On list', 'On list', 'Shopped']);
     expect(screen.getAllByText('Partial')).toHaveLength(1);
     expect(rowsIn(days()[0]).map((r) => r.getAttribute('aria-label'))).toEqual(['Leftovers, Lunch']);
-    expect(screen.getByTestId('plan-banner').textContent).toBe("2 planned meals aren't on a shopping trip yet.");
+    // #719: the sample trip is open, so the banner names its late meal.
+    const late = () => screen.getByTestId('plan-banner').querySelector('p')!.textContent;
+    expect(late()).toMatch(
+      /^Weeknight beef stew \(\w{3} \w{3} \d+\) was planned after this list was made\.$|was planned after this list was made\.$/,
+    );
 
-    // Plan: a third not on a trip.
+    // Plan: a second late meal, inside the trip's dates.
     fireEvent.click(screen.getByTestId('plan-meal-btn'));
     await settle();
     fireEvent.click(within(screen.getByTestId('plan-meal-sheet')).getByRole('button', { name: 'Sat 7' }));
     fireEvent.click(screen.getAllByTestId('plan-recipe')[0]);
     await settle();
     expect(screen.getAllByTestId('meal-row')).toHaveLength(7);
-    expect(screen.getByTestId('plan-banner').textContent).toBe("3 planned meals aren't on a shopping trip yet.");
+    expect(late()).toBe('2 meals were planned after this list was made.');
 
-    // Move one to today: no longer counted.
+    // Move one to today: no longer late.
     fireEvent.click(rowsIn(days()[5])[0]);
     fireEvent.click(within(screen.getByTestId('meal-sheet')).getByRole('button', { name: 'Today' }));
     fireEvent.click(within(screen.getByTestId('meal-sheet')).getByRole('button', { name: 'Save' }));
     await settle();
     expect(rowsIn(days()[0])).toHaveLength(2);
-    expect(screen.getByTestId('plan-banner').textContent).toBe("2 planned meals aren't on a shopping trip yet.");
+    expect(late()).toMatch(/was planned after this list was made\.$/);
 
     // Remove one.
     fireEvent.click(rowsIn(days()[0])[1]);

@@ -67,9 +67,9 @@ function parityProblems(actions: string[], called: string[]): string[] {
 describe('MCP parity: every action has a tool, or a reason, or an owner', () => {
   it('finds the Worker\'s Forage tools', () => {
     expect(workerActions()).toEqual([
-      'addStarterFoods', 'closeTrip', 'deleteFood', 'deletePlanEntry', 'deleteRecipe', 'discardTrip', 'getChangeLog',
+      'addStarterFoods', 'addToTrip', 'closeTrip', 'deleteFood', 'deletePlanEntry', 'deleteRecipe', 'discardTrip', 'getChangeLog',
       'getConfig', 'getCooks', 'getFood', 'getFoods', 'getPlan', 'getRecipe', 'getRecipes', 'getStarterFoods', 'getTrip',
-      'getTrips', 'importRecipe', 'lookupBarcode', 'movePlanEntry', 'planWeek', 'setFoodWeight', 'setTripItem',
+      'getTrips', 'importRecipe', 'lookupBarcode', 'movePlanEntry', 'planWeek', 'removeTripItem', 'setFoodWeight', 'setTripItem',
       'startTrip', 'undoCall', 'upsertCook', 'upsertFood', 'upsertPlanEntry', 'upsertRecipe',
     ]);
   });

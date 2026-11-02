@@ -6,6 +6,7 @@ import type {
   Cook,
   Food,
   ImportPreview,
+  LateMeal,
   PlanEntry,
   RecipeSummary,
   StructuredLine,
@@ -158,6 +159,8 @@ export function fakeApi() {
   /** #709: the plan, as getPlan answers it; `notOnTrip` is the banner count it reports. */
   const plan: PlanEntry[] = [];
   const counts = { notOnTrip: 0 };
+  /** #719: the late meals getPlan answers (getTrip's are the open trip's own `late_meals`). */
+  const lateMeals: LateMeal[] = [];
   /** #718: the open trip getTrip answers, the closed ones getTrips answers, and what startTrip builds. */
   const trips: { open: Trip | null; closed: TripSummary[]; built: Trip | null } = {
     open: null,
@@ -170,14 +173,19 @@ export function fakeApi() {
   const env = import.meta.env as Record<string, string | undefined>;
   env.VITE_FORAGE_API_URL = API_URL;
 
-  function handle(action: string, payload: any): Answer {
+  function handle(action: string, payload: any, params?: URLSearchParams): Answer {
     const override = overrides.get(action);
     if (override) return override(payload);
     switch (action) {
       case 'getRecipes':
         return { success: true, data: recipes };
-      case 'getFoods':
-        return { success: true, data: foods };
+      case 'getFoods': {
+        const q = String(params?.get('q') ?? '').toLowerCase();
+        return {
+          success: true,
+          data: foods.filter((f) => !q || `${f.name} ${f.brand ?? ''}`.toLowerCase().includes(q)),
+        };
+      }
       case 'upsertFood': {
         const food = { id: `fd_${++seq}`, ...payload } as Food;
         foods.push(food);
@@ -223,7 +231,7 @@ export function fakeApi() {
       case 'logFood':
         return { success: true, data: { id: payload.id ?? 'lg_1', ...payload } };
       case 'getPlan':
-        return { success: true, data: { entries: plan, not_on_trip: counts.notOnTrip } };
+        return { success: true, data: { entries: plan, not_on_trip: counts.notOnTrip, late_meals: [...lateMeals] } };
       case 'upsertPlanEntry': {
         const recipe = recipes.find((r) => r.id === payload.recipe_id);
         const entry = {
@@ -273,6 +281,7 @@ export function fakeApi() {
         if (payload.choice) Object.assign(item, { choice: payload.choice, suggested: false });
         if (payload.choice === 'have') item.bought = false;
         if (payload.bought !== undefined) item.bought = payload.bought;
+        if (payload.buy !== undefined) item.buy = String(payload.buy).trim();
         return { success: true, data: { item: { ...item } } };
       }
       case 'closeTrip': {
@@ -284,6 +293,60 @@ export function fakeApi() {
         const id = trips.open?.id;
         trips.open = null;
         return { success: true, data: { discarded: id, meals_cleared: 0 } };
+      }
+      case 'addToTrip': {
+        const trip = trips.open;
+        if (!trip) return { success: false, error: 'No shopping trip is open.', code: 'no_open_trip' };
+        const out = { trip, added: [] as string[], joined: [] as string[], meals: [] as string[], food: null as any };
+        if (payload.late_meals) {
+          out.meals = (trip.late_meals ?? []).map((m) => m.plan_id);
+          trip.late_meals = [];
+          return { success: true, data: out };
+        }
+        let food = payload.food_id
+          ? foods.find((f) => f.id === payload.food_id)
+          : foods.find((f) => f.name.toLowerCase() === String(payload.text).trim().toLowerCase());
+        if (payload.food_id && !food)
+          return { success: false, error: `No such food: ${payload.food_id}`, code: 'not_found' };
+        const created = !food;
+        if (!food) {
+          const name = String(payload.text).trim();
+          food = {
+            id: `fd_${++seq}`,
+            name: name.charAt(0).toUpperCase() + name.slice(1),
+            brand: '',
+            kind: 'ingredient',
+            source: 'manual',
+          } as Food;
+          foods.push(food);
+        }
+        out.food = { id: food.id, name: food.name, created, matched_existing: !created && !payload.food_id };
+        if (!trip.items.some((i) => i.food_id === food!.id)) {
+          const choice = food.usual_store ?? '';
+          trip.items.push({
+            food_id: food.id,
+            name: food.name,
+            category: food.category ?? '',
+            choice,
+            suggested: choice !== '',
+            bought: false,
+            buy: food.last_buy ?? '',
+            mine: true,
+            need: null,
+            lines: [],
+            packs: food.packs_json ?? [],
+            last_buy: food.last_buy ?? '',
+            last_bought_on: '',
+          });
+          out.added.push(food.id);
+        }
+        return { success: true, data: out };
+      }
+      case 'removeTripItem': {
+        const trip = trips.open;
+        if (!trip) return { success: false, error: 'No shopping trip is open.', code: 'no_open_trip' };
+        trip.items = trip.items.filter((i) => i.food_id !== payload.food_id);
+        return { success: true, data: { removed: payload.food_id, name: '', trip } };
       }
       default:
         return { success: false, error: `Unknown action "${action}"` };
@@ -304,7 +367,7 @@ export function fakeApi() {
       method: init?.method,
       params: body,
     });
-    const answer = handle(action, payload);
+    const answer = handle(action, payload, body);
     return { json: async () => answer } as Response;
   });
   vi.stubGlobal('fetch', fetchMock);
@@ -316,6 +379,7 @@ export function fakeApi() {
     cooks,
     plan,
     counts,
+    lateMeals,
     trips,
     fetch: fetchMock,
     /** Answer one action with this instead. */

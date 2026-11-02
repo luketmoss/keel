@@ -14,10 +14,15 @@ Forage.
 ## History
 
 Forage is a rebuild inside Keel (epic #700), not a port. It began in
-`luketmoss/forage`, which is frozen and still serves the old app at
-`https://luketmoss.github.io/forage/` until the cutover (#715). No git history
-was imported: the code here is written fresh, and the only files carried over
-are reference copies in `docs/reference/` (below). A bare `#N` in Keel is a
+`luketmoss/forage`, which is frozen. Since the cutover (#715) the old URL,
+`https://luketmoss.github.io/forage/`, is only a redirect: that repo's Pages
+site now publishes a single redirect page (luketmoss/forage#13), which sends
+every path, query and hash to the same place under
+`https://luketmoss.github.io/keel/forage/`. The old repo's open issues,
+luketmoss/forage#2 to luketmoss/forage#7, were closed as not planned,
+superseded by the rebuild, and were not transferred; its board, Project 5, is
+closed. No git history was imported: the code here is written fresh, and the
+only files carried over are reference copies in `docs/reference/` (below). A bare `#N` in Keel is a
 Keel issue; the old repo's issues are cited `luketmoss/forage#N`.
 
 `docs/reference/` holds, as reference only, the old Worker's JSON-LD recipe

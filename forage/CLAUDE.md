@@ -60,6 +60,11 @@ key-only `ensureSchema`; run it again after a release that adds a tab (#713).
 Nutrition (unit conversion, per serving, the partial rule) is computed only in `apps-script/src/nutrition.js`, and recipe import
 (reading pages, the ingredient line parser, matching lines to foods) only in
 `apps-script/src/importer.js`, behind the one `importRecipe` action (#706).
+The food library (#707): the Open Food Facts lookup is `barcode.js` (`lookupBarcode`, writes nothing), and
+the starter list is `starter.js`, about 75 USDA SR Legacy foods **generated** by
+`scripts/build-starter-foods.mjs` from the SR Legacy JSON download and `scripts/starter-aliases.json`
+(run by hand, output committed; never edit it), served by `starters.js` (`getStarterFoods`,
+`addStarterFoods`, and the import's starter suggestions). Forage makes no USDA call and has no USDA key.
 
 | Tab | Key | Columns |
 |---|---|---|

@@ -3,7 +3,7 @@
 // the API: an edit or a match refreshes the preview with a fresh dry run.
 import { signal } from '@preact/signals';
 import { ApiError, type ForageApi } from '../api/client';
-import type { Food, ImportFlag, ImportPreview, Nutrition, StructuredRecipe } from '../api/types';
+import type { Food, ImportFlag, ImportPreview, Nutrition, StructuredRecipe, Suggestion } from '../api/types';
 
 export interface DraftLine {
   /** Stable for the life of the review, for keys and focus. */
@@ -19,7 +19,7 @@ export interface DraftLine {
   optional: boolean;
   flags: ImportFlag[];
   food_id: string;
-  suggestions: { food_id: string; name: string }[];
+  suggestions: Suggestion[];
 }
 
 export interface Review {
@@ -185,6 +185,18 @@ export async function refresh(api: ForageApi): Promise<void> {
 export async function createFood(api: ForageApi, name: string): Promise<Food> {
   const food = await api.createFood(name.trim());
   foods.value = [...foods.value, food];
+  return food;
+}
+
+/**
+ * Add a starter food (#707) and answer its library food, now in the list:
+ * the one it became, filled in, or already was.
+ */
+export async function addStarterFood(api: ForageApi, starterId: string): Promise<Food> {
+  const res = await api.addStarterFoods([starterId]);
+  const made = res.added[0] ?? res.filled[0] ?? res.existing[0];
+  const food = await api.getFood(made.id);
+  foods.value = [...foods.value.filter((f) => f.id !== food.id), food];
   return food;
 }
 

@@ -5,6 +5,7 @@ import { DemoBanner } from '../demo/demo-banner';
 import { ImportSheet } from '../import/import-sheet';
 import { ReviewScreen } from '../import/review-screen';
 import { review } from '../import/review-state';
+import { addFoodRequested, librarySection } from '../library/foods-store';
 import { LibraryScreen } from '../library/library-screen';
 import { AccountMenu } from './account-menu';
 import { currentTab, syncFromHash } from './routes';
@@ -38,9 +39,19 @@ export function Shell() {
       <header class="tab-header">
         <h1>{tab.label}</h1>
         <div class="header-actions">
-          {tab.id === 'library' && (
+          {tab.id === 'library' && librarySection.value === 'recipes' && (
             <button type="button" class="btn btn-primary" onClick={() => setImporting(true)} data-testid="import-btn">
               Import
+            </button>
+          )}
+          {tab.id === 'library' && librarySection.value === 'foods' && (
+            <button
+              type="button"
+              class="btn btn-primary"
+              onClick={() => (addFoodRequested.value = true)}
+              data-testid="add-food-btn"
+            >
+              Add food
             </button>
           )}
           <AccountMenu />
@@ -48,7 +59,7 @@ export function Shell() {
       </header>
       {isDemoMode() && <DemoBanner />}
       <main class="tab-content" data-testid={`screen-${tab.id}`}>
-        {tab.id === 'library' ? <LibraryScreen api={api} empty={empty} /> : empty}
+        {tab.id === 'library' ? <LibraryScreen api={api} empty={empty} icon={tab.icon} /> : empty}
       </main>
       <TabBar />
       {importing && <ImportSheet api={api} onClose={() => setImporting(false)} />}

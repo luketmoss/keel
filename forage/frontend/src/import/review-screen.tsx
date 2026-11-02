@@ -9,6 +9,7 @@ import { FoodChooser } from './food-chooser';
 import { LineEdit } from './line-edit';
 import {
   addNewFoods,
+  addStarterFood,
   closeReview,
   createFood,
   foods,
@@ -390,6 +391,15 @@ export function ReviewScreen({ api }: { api: ForageApi }) {
           library={foods.value}
           onClose={() => setOverlay(null)}
           onChoose={(f) => void chooseFood(overlay.key, overlay.draft, f.id)}
+          onChooseStarter={async (id) => {
+            try {
+              const food = await addStarterFood(api, id);
+              await chooseFood(overlay.key, overlay.draft, food.id);
+              return true;
+            } catch {
+              return false;
+            }
+          }}
           onLeave={() => void chooseFood(overlay.key, overlay.draft, '')}
           onCreate={async (name) => {
             try {

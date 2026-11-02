@@ -11,6 +11,11 @@ interface Props {
   /** A close button in the header; dialogs that must be answered leave it out. */
   closable?: boolean;
   testId?: string;
+  /** #707: header controls either side of the title (the food form's Cancel and Save), in place of the close button. */
+  headerStart?: ComponentChildren;
+  headerEnd?: ComponentChildren;
+  /** A sheet as tall as the screen allows, for a long form. */
+  tall?: boolean;
 }
 
 /**
@@ -18,7 +23,7 @@ interface Props {
  * and gives focus back to whatever opened it. The first `[data-autofocus]`
  * inside takes focus on open, else the first control.
  */
-export function Sheet({ title, onClose, children, closable = true, testId }: Props) {
+export function Sheet({ title, onClose, children, closable = true, testId, headerStart, headerEnd, tall }: Props) {
   const panel = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
   close.current = onClose;
@@ -60,7 +65,7 @@ export function Sheet({ title, onClose, children, closable = true, testId }: Pro
     <div class="sheet-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div
         ref={panel}
-        class="sheet"
+        class={tall ? 'sheet sheet-tall' : 'sheet'}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -68,8 +73,10 @@ export function Sheet({ title, onClose, children, closable = true, testId }: Pro
         data-testid={testId}
       >
         <header class="sheet-header">
+          {headerStart}
           <h2 id={titleId}>{title}</h2>
-          {closable && (
+          {headerEnd}
+          {closable && !headerEnd && (
             <button type="button" class="icon-btn" aria-label="Close" onClick={onClose}>
               ×
             </button>

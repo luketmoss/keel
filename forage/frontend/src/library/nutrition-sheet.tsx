@@ -1,11 +1,16 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { ForageApi } from '../api/client';
-import type { Food, FoodDetail, MissingReason, RecipeDetail } from '../api/types';
+import type { Cook, Food, FoodDetail, MissingReason, RecipeDetail } from '../api/types';
+import { CookChoice } from '../cook/cook-choice';
+import { readRateSkips, skipRating } from '../cook/cook-store';
+import { shortDate } from '../cook/format';
+import { Stars } from '../cook/stars';
 import { FoodChooser } from '../import/food-chooser';
 import { Sheet } from '../ui/sheet';
 import { FoodForm } from './food-form';
 import { displayName } from './food-math';
 import { keepFood, libraryFoods, loadFoods } from './foods-store';
+import { HistorySection, RateCard, StepsSection } from './recipe-cooks';
 import { SetWeightSheet } from './set-weight-sheet';
 
 interface Props {
@@ -14,6 +19,8 @@ interface Props {
   /** The recipe's figures changed: Library's list refreshes. */
   onChanged: () => void;
   onClose: () => void;
+  /** #708: coming back from log mode, the Cook button takes focus. */
+  focusCook?: boolean;
 }
 
 type Line = RecipeDetail['lines'][number];
@@ -37,21 +44,31 @@ function lineName(line: Line): string {
 }
 
 /**
- * The recipe Nutrition sheet (#707): per serving, each line's share, and a
- * banner naming every line left out with the action that fixes it. Every
- * figure is the API's (`getRecipe`); after any fix the sheet refetches.
+ * The recipe sheet: #707's Nutrition sheet (per serving, each line's share, and a
+ * banner naming every line left out with the action that fixes it), which #708
+ * extends with the rating, "How was it?", Cook, the steps and the cook history.
+ * Every figure is the API's (`getRecipe`, `getCooks`); after any change the sheet refetches.
  */
-export function NutritionSheet({ api, recipeId, onChanged, onClose }: Props) {
+export function NutritionSheet({ api, recipeId, onChanged, onClose, focusCook }: Props) {
   const [recipe, setRecipe] = useState<RecipeDetail | null>(null);
   const [failed, setFailed] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [overlay, setOverlay] = useState<Overlay | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [cooks, setCooks] = useState<Cook[]>([]);
+  const [busyCook, setBusyCook] = useState<string | null>(null);
+  const [choosing, setChoosing] = useState(false);
+  const [skipped, setSkipped] = useState<string[]>(() => readRateSkips());
+  /** The cook the "How was it?" card is for, kept once rated so the card can take a note. */
+  const [rateFor, setRateFor] = useState<Cook | null>(null);
 
   async function refetch() {
     setUpdating(true);
     try {
-      setRecipe(await api.getRecipe(recipeId));
+      // The history is not worth failing the sheet over: without it, the rest still shows.
+      const [r, c] = await Promise.all([api.getRecipe(recipeId), api.getCooks(recipeId).catch(() => null)]);
+      setRecipe(r);
+      if (c) setCooks(c);
       setFailed(false);
     } catch {
       setFailed(true);
@@ -87,6 +104,43 @@ export function NutritionSheet({ api, recipeId, onChanged, onClose }: Props) {
     onChanged();
   }
 
+  /** Rate, re-rate, note or clear a cook; the sheet and Library's row refresh after. */
+  async function saveCook(cook: Cook, fields: { rating?: number | null; note?: string }) {
+    setBusyCook(cook.id);
+    try {
+      await api.saveCook({ id: cook.id, ...fields });
+      const [r, c] = await Promise.all([api.getRecipe(recipeId), api.getCooks(recipeId)]);
+      setRecipe(r);
+      setCooks(c);
+      onChanged();
+    } finally {
+      setBusyCook(null);
+    }
+  }
+
+  async function rateFromHistory(cook: Cook, rating: number | null) {
+    setStatus(null);
+    try {
+      await saveCook(cook, { rating });
+    } catch {
+      setStatus("Couldn't save the rating.");
+    }
+  }
+
+  async function removeCook(cook: Cook) {
+    setStatus(null);
+    setBusyCook(cook.id);
+    try {
+      await api.deleteCook(cook.id);
+      await refetch();
+      onChanged();
+    } catch {
+      setStatus("Couldn't remove the cook. Try again.");
+    } finally {
+      setBusyCook(null);
+    }
+  }
+
   async function matchLine(line: Line, foodId: string) {
     setOverlay(null);
     setUpdating(true);
@@ -111,13 +165,43 @@ export function NutritionSheet({ api, recipeId, onChanged, onClose }: Props) {
   const per = n.per_serving;
   const byLine = new Map((n.by_line ?? []).map((l) => [l.line_id, l]));
   const missing = new Map(n.missing.map((m) => [m.line_id, m.reason]));
-  const meta = [recipe.servings ? `serves ${recipe.servings}` : '', recipe.source_site].filter(Boolean).join(' · ');
+  const stepCount = recipe.steps.filter((s) => s.text.trim()).length;
+  const meta = [
+    recipe.servings ? `serves ${recipe.servings}` : '',
+    stepCount ? `${stepCount} ${stepCount === 1 ? 'step' : 'steps'}` : '',
+    recipe.last_cooked ? `last cooked ${shortDate(recipe.last_cooked)}` : 'never cooked',
+  ]
+    .filter(Boolean)
+    .join(' · ');
   const left = recipe.lines.filter((l) => missing.has(l.line_id));
+  const unrated = recipe.unrated_cook_id ? cooks.find((c) => c.id === recipe.unrated_cook_id) : undefined;
+  const rateCook = rateFor ?? (unrated && !skipped.includes(unrated.id) ? unrated : null);
 
   return (
     <>
       <Sheet title={recipe.name} onClose={onClose} tall testId="nutrition-sheet">
-        {meta && <p class="hint">{meta}</p>}
+        <div class="recipe-title-block">
+          {recipe.source_site && <p class="site-label">{recipe.source_site}</p>}
+          <p class="hint" data-testid="recipe-sheet-meta">
+            {busyCook ? 'Updating…' : <Stars rating={recipe.rating} />}
+            {` · ${meta}`}
+          </p>
+        </div>
+        {rateCook && (
+          <RateCard
+            key={rateCook.id}
+            cook={rateCook}
+            onSave={async (fields) => {
+              setRateFor(rateCook);
+              await saveCook(rateCook, fields);
+            }}
+            onNotNow={() => {
+              skipRating(rateCook.id);
+              setSkipped(readRateSkips());
+              setRateFor(null);
+            }}
+          />
+        )}
         <section class="card" aria-live="polite" data-testid="nutrition-card">
           {updating ? (
             <p class="nutrition-big">Updating…</p>
@@ -171,6 +255,23 @@ export function NutritionSheet({ api, recipeId, onChanged, onClose }: Props) {
         )}
         {status && <p role="status">{status}</p>}
 
+        <div class="cook-cta">
+          <button
+            type="button"
+            class="btn btn-primary btn-block"
+            onClick={() => setChoosing(true)}
+            data-autofocus={focusCook ? true : undefined}
+            data-testid="cook-btn"
+          >
+            Cook
+          </button>
+          <p class="hint">
+            {recipe.has_walkthrough
+              ? 'A walkthrough is ready.'
+              : "No walkthrough yet. Cook it in log mode: the source's steps as a checklist."}
+          </p>
+        </div>
+
         <h3 class="choice-heading">Ingredients, as the source wrote them</h3>
         <table class="line-table">
           <thead>
@@ -207,7 +308,17 @@ export function NutritionSheet({ api, recipeId, onChanged, onClose }: Props) {
             })}
           </tbody>
         </table>
+
+        <StepsSection steps={recipe.steps} />
+        <HistorySection
+          cooks={cooks}
+          busy={busyCook}
+          onRate={(c, r) => void rateFromHistory(c, r)}
+          onRemove={(c) => void removeCook(c)}
+        />
       </Sheet>
+
+      {choosing && <CookChoice recipe={recipe} onClose={() => setChoosing(false)} />}
 
       {overlay?.kind === 'choose' && (
         <FoodChooser

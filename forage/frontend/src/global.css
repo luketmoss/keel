@@ -1185,3 +1185,336 @@ textarea.field {
     animation: none;
   }
 }
+
+/* === Recipes and log-mode cooking (#708) === */
+
+.not-rated {
+  color: var(--color-text-muted);
+}
+
+.stars {
+  color: var(--color-primary);
+  letter-spacing: 1px;
+}
+
+.sort-chips {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  margin: 0 0 var(--space-md);
+}
+
+.sort-chips .chip {
+  flex: none;
+}
+
+.rate-chip {
+  flex: none;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-full);
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.recipe-title-block {
+  margin-bottom: var(--space-md);
+}
+
+.site-label {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
+}
+
+.star-buttons {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.star-btn {
+  width: var(--touch-target);
+  height: var(--touch-target);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--color-text-muted);
+  font-size: var(--text-xl);
+  line-height: 1;
+}
+
+.star-btn[data-filled='true'] {
+  color: var(--color-primary);
+}
+
+.cook-cta {
+  margin: 0 0 var(--space-md);
+}
+
+.cook-cta .hint {
+  margin-top: var(--space-xs);
+}
+
+.plain-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step-text {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.steps-section,
+.history {
+  margin: var(--space-md) 0;
+}
+
+.history-heading {
+  font-size: var(--text-lg);
+  margin-bottom: var(--space-xs);
+}
+
+.history-row {
+  padding: var(--space-xs) 0;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.history-row:last-child {
+  border-bottom: 0;
+}
+
+.history-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.history-date {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.history-main .star-buttons {
+  flex-wrap: nowrap;
+}
+
+.mode-cards {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.mode-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-height: var(--touch-target);
+  padding: var(--space-md);
+  border: 2px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: inherit;
+  text-align: left;
+}
+
+.mode-card[aria-checked='true'] {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.mode-card:disabled {
+  opacity: 0.6;
+}
+
+/* Log mode: full screen, its own header, the action bar fixed to the bottom. */
+.cook-screen {
+  max-width: var(--column-width);
+  margin: 0 auto;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.cook-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.cook-header-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+}
+
+.cook-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-lg);
+}
+
+.cook-clock,
+.tabular {
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.timer-row {
+  display: flex;
+  gap: var(--space-xs);
+  overflow-x: auto;
+  padding: 0 var(--space-sm) var(--space-xs);
+}
+
+.timer-chip {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding-left: var(--space-sm);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+}
+
+.timer-chip.is-done {
+  border-color: var(--color-warning);
+  background: var(--color-warning-light);
+  color: var(--color-warning);
+  font-weight: 600;
+}
+
+.timer-remove {
+  font-size: var(--text-base);
+}
+
+.cook-body {
+  padding: var(--space-md) var(--space-md) calc(52px + var(--nav-height) + env(safe-area-inset-bottom, 0px));
+}
+
+.cook-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.check-heading {
+  padding: var(--space-sm) 0 var(--space-xs);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.check-row {
+  width: 100%;
+  min-height: 56px;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 0;
+  border: 0;
+  border-bottom: 1px solid var(--color-border-light);
+  background: none;
+  color: inherit;
+  text-align: left;
+}
+
+.plain-list li:last-child > .check-row {
+  border-bottom: 0;
+}
+
+.check-circle {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  color: var(--color-on-primary);
+  font-size: var(--text-sm);
+}
+
+.check-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.check-row[aria-pressed='true'] .check-circle {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+}
+
+.check-row[aria-pressed='true'] .check-text {
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+}
+
+.cook-actions {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  gap: var(--space-sm);
+  max-width: var(--column-width);
+  margin: 0 auto;
+  padding: var(--space-sm) var(--space-md) calc(var(--space-sm) + env(safe-area-inset-bottom, 0px));
+  background: var(--color-bg);
+  border-top: 1px solid var(--color-border-light);
+}
+
+.cook-actions .btn {
+  flex: 1 1 auto;
+  min-height: 52px;
+}
+
+.done-title {
+  font-size: var(--text-2xl);
+  margin-bottom: var(--space-md);
+}
+
+.done-time {
+  font-size: var(--text-xl);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin: var(--space-md) 0 var(--space-xs);
+}
+
+.stepper .field-label {
+  flex: 1;
+  margin: 0;
+}
+
+.stepper .icon-btn {
+  border: 1px solid var(--color-border-strong);
+}
+
+.stepper-value {
+  min-width: 2ch;
+  text-align: center;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}

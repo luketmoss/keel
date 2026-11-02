@@ -253,7 +253,7 @@ describe('AC: the review screen', () => {
     expect(save.recipe.lines.map((l: { text: string }) => l.text)).toEqual(READ_PREVIEW.lines.map((l) => l.text));
     await waitFor(() => expect(screen.getAllByTestId('recipe-row')).toHaveLength(1));
     expect(screen.getByTestId('recipe-row').textContent).toContain('Weeknight Lentil Soup');
-    expect(screen.getByTestId('recipe-row').textContent).toContain('serves 4 · example.com · partial');
+    expect(screen.getByTestId('recipe-row').textContent).toContain('Not rated · never cooked · partial');
     expect(screen.getByText('Saved Weeknight Lentil Soup')).toBeDefined();
   });
 
@@ -331,14 +331,16 @@ describe('AC: Library lists saved recipes and deletes with a confirm', () => {
       rating: null,
       last_cooked: null,
       has_walkthrough: false,
+      cook_count: 0,
+      unrated_cook_id: null,
     });
   }
 
-  it('a recipe shows serves, site and its kcal', async () => {
+  it('a recipe shows its rating, when it was cooked and its kcal (#708)', async () => {
     const api = fakeApi();
     seed(api);
     await openLibrary();
-    expect(screen.getByTestId('recipe-row').textContent).toContain('serves 6 · example.com · 520 kcal');
+    expect(screen.getByTestId('recipe-row').textContent).toContain('Not rated · never cooked · 520 kcal');
   });
 
   it('delete asks, then removes it', async () => {
@@ -348,7 +350,7 @@ describe('AC: Library lists saved recipes and deletes with a confirm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'More for Beef Stew' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Delete recipe' }));
     expect(screen.getByText('Delete Beef Stew?')).toBeDefined();
-    expect(screen.getByText('Its ingredients and steps go with it.')).toBeDefined();
+    expect(screen.getByText('Its ingredients, steps and cook history go with it.')).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
     await settle();
     expect(api.calls('deleteRecipe')[0].payload).toEqual({ id: 'rc_1' });
@@ -403,8 +405,9 @@ describe('AC: demo mode', () => {
     await settle();
     fireEvent.click(screen.getByTestId('save-recipe'));
     await settle();
-    await waitFor(() => expect(screen.getAllByTestId('recipe-row')).toHaveLength(1));
-    expect(screen.getByTestId('recipe-row').textContent).toContain('Weeknight Lentil Soup');
+    // #708: the five sample recipes, then the import, newest first.
+    await waitFor(() => expect(screen.getAllByTestId('recipe-row')).toHaveLength(6));
+    expect(screen.getAllByTestId('recipe-row')[0].textContent).toContain('Weeknight Lentil Soup');
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

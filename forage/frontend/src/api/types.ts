@@ -1,4 +1,4 @@
-// The Forage API's shapes (#703, #706, #707), mirrored from apps-script/src. A change
+// The Forage API's shapes (#703, #706, #707, #708), mirrored from apps-script/src. A change
 // to a response shape changes this file in the same pull request.
 
 export type FoodKind = 'ingredient' | 'packaged';
@@ -111,6 +111,39 @@ export interface RecipeSummary {
   rating: number | null;
   last_cooked: string | null;
   has_walkthrough: boolean;
+  /** #708: how many cooks, and the latest cook's id while it has no rating, else null. */
+  cook_count: number;
+  unrated_cook_id: string | null;
+  /** #708, only on a search: the first ingredient line that matched when the name did not, else ''. */
+  matched_line?: string;
+}
+
+/** #708: `getRecipes` `sort`. */
+export type RecipeSort = 'newest' | 'name' | 'rating' | 'last_cooked';
+
+/** A Cooks row (#703), as `getCooks` and `upsertCook` answer it (#708). `rating` null is not rated. */
+export interface Cook {
+  id: string;
+  recipe_id: string;
+  recipe_name: string;
+  date: string;
+  rating: number | null;
+  note: string;
+  plan_id: string;
+  created: string;
+}
+
+export type Slot = 'Breakfast' | 'Lunch' | 'Dinner' | 'Snacks';
+export const SLOTS: Slot[] = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
+
+/** What the app sends `logFood` for a recipe (#708's finish screen). */
+export interface RecipeLogEntry {
+  id?: string;
+  date: string;
+  slot: Slot;
+  recipe_id: string;
+  qty: number;
+  unit: 'serving';
 }
 
 /** A RecipeLines row. */

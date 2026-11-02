@@ -1,12 +1,14 @@
 // The demo layer (#704's gate): the ForageApi with no network. Any import
-// answers the bundled sample; the library starts with six sample foods (#707);
-// saved recipes and foods live in memory, and a reload resets them.
+// answers the bundled sample; the library starts with six sample foods (#707)
+// and five sample recipes with their cooks (#708); saved recipes, foods, cooks
+// and log entries live in memory, and a reload resets them.
 //
 // Recipe nutrition here is a small stand-in for the API's nutrition.js, enough
 // for the Nutrition sheet to show its states: mass units, a food's named
 // weights, and the partial rule. The live app never computes it.
 import { ApiError, linesWithFood, type ForageApi } from '../api/client';
 import type {
+  Cook,
   Food,
   FoodDetail,
   ImportLine,
@@ -14,14 +16,17 @@ import type {
   MissingReason,
   Nutrition,
   RecipeDetail,
+  RecipeLogEntry,
+  RecipeSort,
   RecipeSummary,
   StarterFood,
   StarterResult,
   StructuredLine,
   StructuredRecipe,
 } from '../api/types';
+import { localDate } from '../cook/format';
 import { displayName, hasNutrition } from '../library/food-math';
-import { DEMO_FOODS, DEMO_IMPORT, DEMO_PRODUCT, DEMO_STARTERS } from './demo-data';
+import { DEMO_COOKS, DEMO_FOODS, DEMO_IMPORT, DEMO_PRODUCT, DEMO_RECIPES, DEMO_STARTERS } from './demo-data';
 
 let seq = 0;
 const nextId = (prefix: string) => `${prefix}_demo${(++seq).toString(16).padStart(4, '0')}`;
@@ -101,12 +106,95 @@ function nutritionOf(lines: Line[], servings: number | null, foods: Food[]): Rec
   };
 }
 
+const DAY = 86400000;
+
+/** The sample recipes as stored rows, dated back from today. */
+function seedRecipes(now: number): RecipeDetail[] {
+  return DEMO_RECIPES.map((d) => {
+    const at = new Date(now - d.added_days_ago * DAY).toISOString();
+    return {
+      id: d.id,
+      name: d.name,
+      source_url: `https://${d.source_site}/${d.id.slice(8)}`,
+      source_site: d.source_site,
+      servings: d.servings,
+      total_min: d.total_min,
+      notes: '',
+      created: at,
+      updated: at,
+      nutrition: {
+        per_serving: { kcal: null, protein_g: null, carbs_g: null, fat_g: null },
+        missing: [],
+        partial: false,
+      },
+      partial: false,
+      rating: null,
+      last_cooked: null,
+      has_walkthrough: d.has_walkthrough,
+      cook_count: 0,
+      unrated_cook_id: null,
+      lines: d.lines.map((l, i) => ({
+        recipe_id: d.id,
+        line_id: `L${i + 1}`,
+        position: i + 1,
+        section: l.section ?? '',
+        text: l.text,
+        qty: l.qty ?? null,
+        unit: l.unit ?? '',
+        food_id: l.food_id ?? '',
+        grams: null,
+        optional: !!l.optional,
+        resolved_grams: null,
+        reason: '',
+      })),
+      steps: d.steps.map((st, i) => ({
+        recipe_id: d.id,
+        position: i + 1,
+        section: st.section ?? '',
+        name: st.name ?? '',
+        text: st.text,
+      })),
+    };
+  });
+}
+
+function seedCooks(now: number): Cook[] {
+  return DEMO_COOKS.map((c, i) => ({
+    id: c.id,
+    recipe_id: c.recipe_id,
+    recipe_name: '',
+    date: localDate(new Date(now - c.days_ago * DAY)),
+    rating: c.rating,
+    note: c.note,
+    plan_id: '',
+    created: new Date(now - c.days_ago * DAY + i).toISOString(),
+  }));
+}
+
+/** Newest first: by date, then when it was recorded. */
+const cookOrder = (a: Cook, b: Cook) => (b.date + b.created).localeCompare(a.date + a.created);
+
 export function createDemoApi(): ForageApi {
   const foods: Food[] = DEMO_FOODS.map((f) => JSON.parse(JSON.stringify(f)));
-  const recipes: RecipeDetail[] = [];
+  const now = Date.now();
+  const recipes: RecipeDetail[] = seedRecipes(now);
+  const cooks: Cook[] = seedCooks(now);
+  const eaten: RecipeLogEntry[] = [];
 
   const byName = (name: string) => foods.find((f) => f.name.toLowerCase() === name.trim().toLowerCase());
   const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x));
+
+  /** What the API derives from Cooks (#703, #708): the latest rating and date, the count, the unrated latest. */
+  function cookFields(id: string) {
+    const mine = cooks.filter((c) => c.recipe_id === id).sort(cookOrder);
+    const rated = mine.find((c) => c.rating !== null);
+    return {
+      rating: rated?.rating ?? null,
+      last_cooked: mine[0]?.date ?? null,
+      cook_count: mine.length,
+      unrated_cook_id: mine[0] && mine[0].rating === null ? mine[0].id : null,
+    };
+  }
 
   function withNutrition(r: RecipeDetail): RecipeDetail {
     const nutrition = nutritionOf(r.lines, r.servings, foods);
@@ -115,7 +203,46 @@ export function createDemoApi(): ForageApi {
       resolved_grams: nutrition.by_line![i].grams,
       reason: (nutrition.missing.find((m) => m.line_id === l.line_id)?.reason ?? '') as Line['reason'],
     }));
-    return { ...r, lines, nutrition, partial: nutrition.partial };
+    return { ...r, lines, nutrition, partial: nutrition.partial, ...cookFields(r.id) };
+  }
+
+  /** `getRecipes` `q` and `sort`, as the API does them. */
+  function search(q: string, sort: RecipeSort): RecipeSummary[] {
+    const needle = q.trim().toLowerCase();
+    const out: RecipeSummary[] = [];
+    for (const r of recipes) {
+      let matched = '';
+      if (needle && !r.name.toLowerCase().includes(needle)) {
+        const hit = r.lines.find((l) => {
+          const food = foods.find((f) => f.id === l.food_id);
+          return l.text.toLowerCase().includes(needle) || !!food?.name.toLowerCase().includes(needle);
+        });
+        if (!hit) continue;
+        matched = hit.text;
+      }
+      const row = summary(r);
+      if (needle) row.matched_line = matched;
+      out.push(row);
+    }
+    const newest = (a: RecipeSummary, b: RecipeSummary) => b.created.localeCompare(a.created);
+    const desc = (k: 'rating' | 'last_cooked') => (a: RecipeSummary, b: RecipeSummary) => {
+      const x = a[k];
+      const y = b[k];
+      if (x === null || y === null) return x === y ? newest(a, b) : x === null ? 1 : -1;
+      return x < y ? 1 : x > y ? -1 : newest(a, b);
+    };
+    const order =
+      sort === 'name'
+        ? (a: RecipeSummary, b: RecipeSummary) =>
+            a.name.toLowerCase().localeCompare(b.name.toLowerCase()) || newest(a, b)
+        : sort === 'rating' || sort === 'last_cooked'
+          ? desc(sort)
+          : newest;
+    return out.sort(order);
+  }
+
+  function withName(c: Cook): Cook {
+    return { ...clone(c), recipe_name: recipes.find((r) => r.id === c.recipe_id)?.name ?? '' };
   }
 
   function summary(r: RecipeDetail): RecipeSummary {
@@ -188,12 +315,13 @@ export function createDemoApi(): ForageApi {
   }
 
   const api: ForageApi = {
-    getRecipes: async () => recipes.map(summary),
+    getRecipes: async (query = {}) => search(query.q ?? '', query.sort ?? 'newest'),
     getFoods: async () => clone(foods),
     createFood: (name) => api.saveFood({ name, kind: 'ingredient', source: 'manual' }),
     deleteRecipe: async (id) => {
       const i = recipes.findIndex((r) => r.id === id);
       if (i !== -1) recipes.splice(i, 1);
+      for (let j = cooks.length - 1; j >= 0; j--) if (cooks[j].recipe_id === id) cooks.splice(j, 1);
     },
     previewImport: async (input) => {
       if ('recipe' in input) return previewStructured(input.recipe);
@@ -226,6 +354,8 @@ export function createDemoApi(): ForageApi {
         rating: null,
         last_cooked: null,
         has_walkthrough: false,
+        cook_count: 0,
+        unrated_cook_id: null,
         lines: p.lines.map((l, i) => ({
           recipe_id: id,
           line_id: l.line_id,
@@ -353,6 +483,51 @@ export function createDemoApi(): ForageApi {
       const next = linesWithFood(r, lineId, foodId);
       r.lines = r.lines.map((l, i) => ({ ...l, food_id: next[i].food_id }));
       return clone(withNutrition(r));
+    },
+    getCooks: async (recipeId) =>
+      cooks
+        .filter((c) => !recipeId || c.recipe_id === recipeId)
+        .sort(cookOrder)
+        .map(withName),
+    saveCook: async (input) => {
+      const existing = cooks.find((c) => c.id === input.id);
+      if (existing) {
+        for (const k of ['rating', 'note', 'date', 'plan_id'] as const) {
+          if (input[k] !== undefined)
+            (existing as unknown as Record<string, unknown>)[k] = input[k] === '' ? null : input[k];
+        }
+        if (existing.note === null) existing.note = '';
+        return withName(existing);
+      }
+      if (!recipes.some((r) => r.id === input.recipe_id)) {
+        throw new ApiError(`recipe_id "${input.recipe_id ?? ''}" is not a recipe`);
+      }
+      if (input.plan_id) throw new ApiError(`plan_id "${input.plan_id}" is not a plan entry`);
+      const cook: Cook = {
+        id: input.id,
+        recipe_id: input.recipe_id!,
+        recipe_name: '',
+        date: input.date ?? localDate(),
+        rating: input.rating ?? null,
+        note: input.note ?? '',
+        plan_id: '',
+        created: new Date().toISOString(),
+      };
+      cooks.push(cook);
+      return withName(cook);
+    },
+    deleteCook: async (id) => {
+      const i = cooks.findIndex((c) => c.id === id);
+      if (i === -1) throw new ApiError(`Cook "${id}" not found`);
+      cooks.splice(i, 1);
+    },
+    logFood: async (entry) => {
+      if (!recipes.some((r) => r.id === entry.recipe_id)) {
+        throw new ApiError(`recipe_id "${entry.recipe_id}" is not a recipe`);
+      }
+      const i = eaten.findIndex((e) => e.id && e.id === entry.id);
+      if (i === -1) eaten.push(clone(entry));
+      else eaten[i] = clone(entry);
     },
   };
   return api;

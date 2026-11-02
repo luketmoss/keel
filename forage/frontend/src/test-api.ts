@@ -2,7 +2,7 @@
 // real client. It records every request and answers each action from a small
 // in-memory store; a test overrides one action with `answer`.
 import { vi } from 'vitest';
-import type { Food, ImportPreview, RecipeSummary, StructuredLine, StructuredRecipe } from './api/types';
+import type { Cook, Food, ImportPreview, RecipeSummary, StructuredLine, StructuredRecipe } from './api/types';
 
 export const API_URL = 'https://api.test/exec';
 
@@ -142,6 +142,7 @@ export function fakeApi() {
   const sent: Sent[] = [];
   const foods: Food[] = [];
   const recipes: RecipeSummary[] = [];
+  const cooks: Cook[] = [];
   const overrides = new Map<string, (payload: any) => Answer>();
   let seq = 0;
 
@@ -183,6 +184,23 @@ export function fakeApi() {
         if (payload.recipe) return { success: true, data: previewOf(payload.recipe) };
         return { success: true, data: JSON.parse(JSON.stringify(READ_PREVIEW)) };
       }
+      case 'getCooks':
+        return { success: true, data: cooks };
+      case 'upsertCook': {
+        const existing = cooks.find((c) => c.id === payload.id);
+        if (existing) Object.assign(existing, payload);
+        const cook = existing ?? ({ date: '2026-11-01', rating: null, note: '', plan_id: '', ...payload } as Cook);
+        if (!existing) cooks.push(cook);
+        return { success: true, data: cook };
+      }
+      case 'deleteCook':
+        cooks.splice(
+          cooks.findIndex((c) => c.id === payload.id),
+          1,
+        );
+        return { success: true, data: { id: payload.id, deleted: true } };
+      case 'logFood':
+        return { success: true, data: { id: payload.id ?? 'lg_1', ...payload } };
       default:
         return { success: false, error: `Unknown action "${action}"` };
     }
@@ -210,6 +228,7 @@ export function fakeApi() {
     sent,
     foods,
     recipes,
+    cooks,
     fetch: fetchMock,
     /** Answer one action with this instead. */
     answer(action: string, fn: (payload: any) => Answer) {

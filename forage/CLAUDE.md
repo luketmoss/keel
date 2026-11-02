@@ -245,6 +245,10 @@ owner's local clasp login, and parks for the owner when it can't
   and every consumer holding the old one breaks: the Forage and Thrive Pages
   builds (`FORAGE_API_URL`) and the MCP Worker.
 
+## Skills
+
+- `/import` (`.claude/skills/import/`, #734): imports recipes (link, file, photo) and foods (barcode, label photo) into Forage through the MCP tools only, with the owner confirming every match; self-contained, so the folder can also be uploaded to claude.ai.
+
 ## Key commands
 
 - `npm --prefix frontend run dev` — Vite dev server on port 5177, at

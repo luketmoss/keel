@@ -46,7 +46,11 @@ async function archiveWith(files) {
  * with the incoming values, and reports `deleted` for a row that is gone
  * while `last_written` is set — the contract, not the merge.
  */
-function fakeApi({ rows = new Map(), fail = {}, enrich = () => ({ status: 'unmatched', reason: 'no match', candidates: [] }) } = {}) {
+function fakeApi({
+  rows = new Map(), fail = {},
+  enrich = () => ({ status: 'unmatched', reason: 'no match', candidates: [] }),
+  enrichRide = () => ({ status: 'unmatched', reason: 'no match', candidates: [] }),
+} = {}) {
   const calls = [];
   let seq = 0;
   return {
@@ -57,6 +61,12 @@ function fakeApi({ rows = new Map(), fail = {}, enrich = () => ({ status: 'unmat
       calls.push({ action: 'enrichWorkout', ...payload });
       if (fail[payload.source_activity_id]) throw fail[payload.source_activity_id];
       return enrich(payload);
+    },
+    /** #773's contract, scripted: the matching itself is tested against the real source. */
+    async enrichRide(payload) {
+      calls.push({ action: 'enrichRide', ...payload });
+      if (fail[payload.source_activity_id]) throw fail[payload.source_activity_id];
+      return enrichRide(payload);
     },
     async upsertSyncedWorkout(payload) {
       calls.push({ action: 'upsertSyncedWorkout', ...payload });
@@ -528,4 +538,148 @@ test('#432: an indoor activity gets no track_ref and no track file', async () =>
   assert.equal(api.calls.find((c) => c.action === 'upsertSyncedWorkout').track_ref, '');
   assert.equal([...drive.files.values()].some((f) => f.props?.kind === 'track'), false);
   assert.equal(track.counts.none, 1);
+});
+
+// --- indoor rides enrich Spin's row (#773) -------------------------------------
+
+const rideCalls = (api) => api.calls.filter((c) => c.action === 'enrichRide');
+const upsertCalls = (api) => api.calls.filter((c) => c.action === 'upsertSyncedWorkout');
+const INDOOR = byPrefix('Indoor');
+const RIDE_WRITTEN = { workout_id: 'w_spin0001', filled: ['avg_hr', 'calories'] };
+
+/** FIT, track and trail steps that fail the test when asked for anything. */
+const noSteps = () => ({
+  fit: { ensure: async () => assert.fail('no FIT for a linked ride') },
+  track: { ensure: async () => assert.fail('no track for a linked ride') },
+  trails: { ensure: async () => assert.fail('no trail step for a linked ride') },
+});
+
+test('#773: an indoor ride (201) calls enrichRide before any FIT, with its start as an instant and the four fields', async () => {
+  const { archive } = await archiveWith([INDOOR]);
+  const order = [];
+  const api = fakeApi({
+    enrichRide: () => {
+      order.push('enrichRide');
+      return { status: 'unmatched', reason: 'no match', candidates: [] };
+    },
+  });
+  const fit = { ensure: async () => { order.push('fit'); return {}; } };
+  await syncActivities({ archive, api, activityIds: [INDOOR.activity_id], syncedAt: SYNCED, fit, log: () => {} });
+
+  assert.deepEqual(order, ['enrichRide', 'fit'], 'enrichRide comes before the FIT is fetched');
+  const [call] = rideCalls(api);
+  assert.deepEqual(Object.keys(call.activity).sort(),
+    ['avg_hr', 'calories', 'date', 'elapsed_seconds', 'moving_seconds', 'started_at_utc', 'time']);
+  assert.match(call.activity.started_at_utc, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
+  assert.equal(call.source_activity_id, INDOOR.activity_id);
+  assert.equal(call.sport_type, '201');
+  assert.equal(call.synced_at, SYNCED);
+  assert.equal(call.last_written, null);
+  assert.ok(!('raw_ref' in call), 'a Spin row keeps its own raw_ref: none is sent');
+  assert.ok(!('source' in call));
+});
+
+test('#773: only code 201 calls enrichRide: plain bike (200), gravel, walk, hike and strength never do', async () => {
+  const bike200 = structuredClone(GRAVEL);
+  bike200.args.sportType = 200;
+  bike200.list_entry.sportType = 200;
+  bike200.activity_id = '471166302945817299';
+  bike200.args.labelId = bike200.activity_id;
+  const walk = byPrefix('Walk');
+  const hike = byPrefix('Hike');
+  const { archive } = await archiveWith([bike200, GRAVEL, walk, hike, STRENGTH]);
+  const api = fakeApi();
+  await syncActivities({
+    archive, api, syncedAt: SYNCED, log: () => {},
+    activityIds: [bike200.activity_id, GRAVEL.activity_id, walk.activity_id, hike.activity_id, STRENGTH.activity_id],
+  });
+  assert.equal(rideCalls(api).length, 0);
+  assert.equal(upsertCalls(api).length, 4);
+});
+
+test('#773: enriched ends the activity: no FIT, track, trails or row; counted, and recorded in normalized only when it changed', async () => {
+  const { drive, archive } = await archiveWith([INDOOR]);
+  const lines = [];
+  let linked = false;
+  const api = fakeApi({
+    enrichRide: (p) => {
+      if (!linked) {
+        linked = true;
+        return { status: 'enriched', id: 'w_spin0001', linked: true, filled: RIDE_WRITTEN.filled, written: RIDE_WRITTEN };
+      }
+      assert.deepEqual(p.last_written, RIDE_WRITTEN, 'the next run sends what the archive recorded');
+      return { status: 'unchanged', id: 'w_spin0001', linked: false, filled: [], written: RIDE_WRITTEN };
+    },
+  });
+  const steps = noSteps();
+  const first = await syncActivities({ archive, api, activityIds: [INDOOR.activity_id], syncedAt: SYNCED, ...steps, log: (l) => lines.push(l) });
+  assert.deepEqual(
+    { enriched: first.enriched, unchanged: first.unchanged, created: first.created, updated: first.updated, failures: first.failures, notes: first.notes },
+    { enriched: 1, unchanged: 0, created: 0, updated: 0, failures: [], notes: [] });
+  assert.equal(upsertCalls(api).length, 0, 'no row of its own');
+  assert.deepEqual(fileOf(drive, INDOOR.activity_id).data.normalized, { enrichment: RIDE_WRITTEN });
+  assert.equal(fileOf(drive, INDOOR.activity_id).data.payload, INDOOR.payload, 'the payload is never touched');
+  assert.ok(lines.some((l) => /indoor ride\): enriched w_spin0001 \(linked; filled avg_hr, calories\)/.test(l)));
+
+  drive.writes.length = 0;
+  const second = await syncActivities({ archive, api, activityIds: [INDOOR.activity_id], syncedAt: '2026-09-25T15:17:02.000Z', ...steps, log: () => {} });
+  assert.deepEqual({ enriched: second.enriched, unchanged: second.unchanged }, { enriched: 0, unchanged: 1 });
+  assert.deepEqual(drive.writes, [], 'normalized unchanged, so nothing written to Drive');
+  assert.equal(upsertCalls(api).length, 0);
+});
+
+test('#773: no match and own row carry on exactly as today: a COROS row of its own, last_written null', async () => {
+  for (const reason of ['no match', 'own row']) {
+    const { archive } = await archiveWith([INDOOR]);
+    const api = fakeApi({ enrichRide: () => ({ status: 'unmatched', reason, candidates: [] }) });
+    const out = await syncActivities({ archive, api, activityIds: [INDOOR.activity_id], syncedAt: SYNCED, log: () => {} });
+    assert.deepEqual(out.failures, [], reason);
+    assert.deepEqual(out.notes, [], reason);
+    assert.equal(out.created, 1, reason);
+    const [upsert] = upsertCalls(api);
+    assert.equal(upsert.source, 'coros');
+    assert.equal(upsert.last_written, null);
+  }
+});
+
+test('#773: ambiguous is a SyncLog note naming the candidates, no row, no failure, nothing recorded', async () => {
+  const { drive, archive } = await archiveWith([INDOOR]);
+  const api = fakeApi({
+    enrichRide: () => ({
+      status: 'unmatched', reason: 'ambiguous',
+      candidates: [{ id: 'w_a', started_at_utc: '2026-09-24T09:00:00Z' }, { id: 'w_b', started_at_utc: '2026-09-24T09:06:00Z' }],
+    }),
+  });
+  drive.writes.length = 0;
+  const out = await syncActivities({ archive, api, activityIds: [INDOOR.activity_id], syncedAt: SYNCED, ...noSteps(), log: () => {} });
+  assert.deepEqual(out.failures, []);
+  assert.equal(upsertCalls(api).length, 0, 'no row');
+  assert.equal(out.created + out.updated + out.enriched, 0);
+  assert.equal(out.notes.length, 1);
+  assert.match(out.notes[0], new RegExp(`indoor ride ${INDOOR.activity_id} on 2026-09-24 at \\d\\d:\\d\\d: ambiguous \\(candidates: w_a at 2026-09-24T09:00:00Z, w_b at 2026-09-24T09:06:00Z\\)`));
+  assert.deepEqual(drive.writes, [], 'nothing recorded, so every run re-evaluates it');
+  assert.equal(fileOf(drive, INDOOR.activity_id).data.normalized, null);
+});
+
+test('#773: an archive holding an enrichment that now answers no match lost its Spin row: a note, no row', async () => {
+  const { drive, archive, ids } = await archiveWith([INDOOR]);
+  await archive.writeNormalized(ids[INDOOR.activity_id], { enrichment: RIDE_WRITTEN });
+  const api = fakeApi({ enrichRide: () => ({ status: 'unmatched', reason: 'no match', candidates: [] }) });
+  drive.writes.length = 0;
+  const out = await syncActivities({ archive, api, activityIds: [INDOOR.activity_id], syncedAt: SYNCED, ...noSteps(), log: () => {} });
+  assert.deepEqual(out.failures, []);
+  assert.equal(upsertCalls(api).length, 0, 'never written as a COROS row of its own');
+  assert.equal(out.notes.length, 1);
+  assert.match(out.notes[0], /its Spin ride is gone \(no match\); no row written/);
+  assert.equal(rideCalls(api)[0].last_written.workout_id, 'w_spin0001');
+  assert.deepEqual(drive.writes, []);
+});
+
+test('#773: an enrichRide the API refuses fails that activity loudly and writes no row', async () => {
+  const { archive } = await archiveWith([INDOOR]);
+  const api = fakeApi({ fail: { [INDOOR.activity_id]: new Error('Unknown action: "enrichRide"') } });
+  const out = await syncActivities({ archive, api, activityIds: [INDOOR.activity_id], syncedAt: SYNCED, log: () => {} });
+  assert.equal(out.failures.length, 1);
+  assert.match(out.failures[0], new RegExp(`activity ${INDOOR.activity_id}: Unknown action`));
+  assert.equal(upsertCalls(api).length, 0);
 });

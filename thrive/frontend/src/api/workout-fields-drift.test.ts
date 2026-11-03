@@ -55,8 +55,17 @@ function workoutFields(): string[] {
 }
 
 describe('Workouts row mapping', () => {
+  it('#773: reads row[39] as coros_activity_id, and a row with no AN cell as ""', () => {
+    const row = Array.from({ length: 40 }, () => '');
+    row[0] = 'w_1';
+    row[39] = '471166302945817201';
+    expect(rowToWorkout(row, 2).coros_activity_id).toBe('471166302945817201');
+    expect(rowToWorkout(row.slice(0, 39), 2).coros_activity_id).toBe('');
+    expect(rowToWorkout([], 2).coros_activity_id).toBe('');
+  });
+
   it('#765: reads row[30..38] as the Spin columns, and a row with no AE:AM cell as ""', () => {
-    const row = Array.from({ length: 39 }, () => '');
+    const row = Array.from({ length: 40 }, () => '');
     row[0] = 'w_1';
     ['190', '215', '0.86', '74', '683', '250', '100', 'rw_1a2b3c4d', 'streamsFile'].forEach((v, i) => {
       row[30 + i] = v;
@@ -93,7 +102,7 @@ describe('Workouts row mapping', () => {
     // Each field holds its own name, so the row reads back as the field order.
     const named = Object.fromEntries(fields.map((f) => [f, f])) as unknown as Workout;
     expect(workoutToRow(named)).toEqual(fields);
-    expect(fields).toHaveLength(39); // A:AM
+    expect(fields).toHaveLength(40); // A:AN
     expect(fields[27]).toBe('sport_type');
     expect(fields[28]).toBe('track_ref'); // #432
     expect(fields[29]).toBe('trails'); // #688
@@ -107,7 +116,8 @@ describe('Workouts row mapping', () => {
       'intensity_pct',
       'ride_workout_id',
       'streams_ref',
-    ]); // #765, emitted last
+      'coros_activity_id',
+    ]); // #765, then #773's link, emitted last
   });
 
   it('rowToWorkout reads every WORKOUT_FIELDS column back into its field', () => {
@@ -237,29 +247,29 @@ describe("#260 AC4: the SPA never sets sport_type, and an edit keeps the sheet's
     sheetsUpdate.mockReset();
   });
 
-  it('createWorkout appends A:AM with a blank AB, a blank AD and nine blank Spin columns (#688, #765)', async () => {
+  it('createWorkout appends A:AN with a blank AB, a blank AD and nine blank Spin columns and a blank COROS link (#688, #765, #773)', async () => {
     const w = await createWorkout({ type: 'hike', name: 'Hike' }, 'token');
     expect(sheetsAppend).toHaveBeenCalledTimes(1);
     const [range, rows] = sheetsAppend.mock.calls[0];
-    expect(range).toBe('Workouts!A:AM');
-    expect(rows[0]).toHaveLength(39);
+    expect(range).toBe('Workouts!A:AN');
+    expect(rows[0]).toHaveLength(40);
     expect(rows[0][27]).toBe('');
     expect(rows[0][29]).toBe('');
-    expect(rows[0].slice(30)).toEqual(Array.from({ length: 9 }, () => ''));
+    expect(rows[0].slice(30)).toEqual(Array.from({ length: 10 }, () => ''));
     expect(w.trails).toBe('');
     expect(w.ride_workout_id).toBe('');
   });
 
-  it('fetchWorkouts reads A2:AM (#765)', async () => {
+  it('fetchWorkouts reads A2:AN (#765)', async () => {
     const { fetchWorkouts } = await import('./workouts-api');
     sheetsGet.mockResolvedValue([]);
     await fetchWorkouts('token');
-    expect(sheetsGet).toHaveBeenCalledWith('Workouts!A2:AM', 't');
+    expect(sheetsGet).toHaveBeenCalledWith('Workouts!A2:AN', 't');
   });
 
-  it('updateWorkout reads A:AM fresh and writes back the sport_type and trails the sheet holds', async () => {
+  it('updateWorkout reads A:AN fresh and writes back the sport_type and trails the sheet holds', async () => {
     const tagged = '{"v":1,"m":1,"u":12,"n":[["Invented Path",400]],"p":[[0,0,100,1,400,90,5,0]]}';
-    const fresh = Array.from({ length: 39 }, () => '');
+    const fresh = Array.from({ length: 40 }, () => '');
     fresh[0] = 'w_1';
     fresh[18] = 'coros';
     fresh[19] = '700000000000000001';
@@ -269,14 +279,30 @@ describe("#260 AC4: the SPA never sets sport_type, and an edit keeps the sheet's
     // The cached copy predates the backfill and the tagging: AB and AD are still blank.
     const cached = { ...rowToWorkout(fresh, 5), sport_type: '', track_ref: '', trails: '' };
     const written = await updateWorkout(cached, { notes: 'muddy' }, 'token');
-    expect(sheetsGet).toHaveBeenCalledWith('Workouts!A5:AM5', 't');
+    expect(sheetsGet).toHaveBeenCalledWith('Workouts!A5:AN5', 't');
     const [range, rows] = sheetsUpdate.mock.calls[0];
-    expect(range).toBe('Workouts!A5:AM5');
-    expect(rows[0]).toHaveLength(39);
+    expect(range).toBe('Workouts!A5:AN5');
+    expect(rows[0]).toHaveLength(40);
     expect(rows[0][27]).toBe('204');
     expect(rows[0][29]).toBe(tagged);
     expect(rows[0][6]).toBe('muddy');
     expect(written.sport_type).toBe('204');
     expect(written.trails).toBe(tagged);
+  });
+
+  it('#773: an edit keeps the coros_activity_id the sheet holds, even over a stale cached copy', async () => {
+    const fresh = Array.from({ length: 40 }, () => '');
+    fresh[0] = 'w_1';
+    fresh[18] = 'spin';
+    fresh[19] = 'ride-1';
+    fresh[39] = '471166302945817201';
+    sheetsGet.mockResolvedValue([fresh]);
+    // The cached copy predates the link: AN is still blank in it.
+    const cached = { ...rowToWorkout(fresh, 5), coros_activity_id: '' };
+    const written = await updateWorkout(cached, { notes: 'felt good' }, 'token');
+    const [, rows] = sheetsUpdate.mock.calls[sheetsUpdate.mock.calls.length - 1];
+    expect(rows[0]).toHaveLength(40);
+    expect(rows[0][39]).toBe('471166302945817201');
+    expect(written.coros_activity_id).toBe('471166302945817201');
   });
 });

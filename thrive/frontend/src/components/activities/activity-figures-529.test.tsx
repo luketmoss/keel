@@ -55,6 +55,7 @@ function workout(id: string, type: WorkoutWithRow['type'], name: string): Workou
     intensity_pct: '',
     ride_workout_id: '',
     streams_ref: '',
+    coros_activity_id: '',
     sheetRow: 2,
   };
 }

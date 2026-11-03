@@ -22,6 +22,16 @@
 // which are never written again. Hybrid Fitness (1200) takes the same path
 // (#194), without moving time: its `Workout Time` includes the rests.
 //
+// An indoor ride (201) is offered to `enrichRide` first (#773), before its FIT or any
+// row. The phone records the same ride as Thrive Spin, so `enriched` or `unchanged`
+// ends the activity: the Spin row is linked and its blanks filled, and no FIT, track,
+// trail step or `upsertSyncedWorkout` follows. `no match` and `own row` carry on as
+// below, and the first COROS-recorded ride gets its own row (Spin's upload later merges
+// onto it, in `saveRide`). `ambiguous` is a SyncLog note and no row. An activity whose
+// archive already holds an enrichment and now answers `no match` lost its Spin row: a
+// note and no row, never a COROS row of its own. Its `normalized` is
+// `{ enrichment: { workout_id, filled } }`, as for a strength session.
+//
 // Any other activity new to Thrive completes the day's one plan of its type, or
 // takes over its one finished hand-logged row, instead of appending beside it
 // (#403, #736): the API answers `claimed`, counted as created. Two or more such
@@ -33,6 +43,9 @@ import { redact } from './redact.mjs';
 import { classifySport } from './sport-codes.mjs';
 
 export const SOURCE = 'coros';
+
+/** COROS's indoor bike: the one code `enrichRide` serves (#773). Plain bike (200) is not it. */
+export const INDOOR_BIKE_CODE = 201;
 
 /** Parsed like any activity: `Workout Time`, `Total Time`, HR, calories. `Sets:` is unused. */
 const STRENGTH_MAPPING = { type: 'weight', sub_type: '' };
@@ -50,6 +63,31 @@ export const strengthActivity = (incoming, { workoutTimeIncludesRests = false } 
   avg_hr: incoming.avg_hr,
   calories: incoming.calories,
 });
+
+/**
+ * What an indoor ride offers its Spin row: its start as an instant, and the fields it
+ * may fill. A blank is never written (#773).
+ */
+export const rideActivity = (incoming) => ({
+  date: incoming.date,
+  time: incoming.time,
+  started_at_utc: incoming.started_at_utc,
+  elapsed_seconds: incoming.elapsed_seconds,
+  moving_seconds: incoming.moving_seconds,
+  avg_hr: incoming.avg_hr,
+  calories: incoming.calories,
+});
+
+/** The SyncLog note for an indoor ride `enrichRide` could not settle: private detail, never the public log. */
+export function rideNote(id, activity, result, { lostRow = false } = {}) {
+  if (lostRow) {
+    return `indoor ride ${id} on ${activity.date} at ${activity.time}: its Spin ride is gone (${result.reason}); no row written`;
+  }
+  const who = result.candidates?.length
+    ? ` (candidates: ${result.candidates.map((c) => `${c.id} at ${c.started_at_utc}`).join(', ')})`
+    : '';
+  return `indoor ride ${id} on ${activity.date} at ${activity.time}: ${result.reason}${who}; no row written, re-checked every run`;
+}
 
 /** The SyncLog note for a session left unmatched: private detail, never the public log. */
 export function unmatchedNote(id, activity, result) {
@@ -134,19 +172,22 @@ export async function syncActivities({ archive, api, activityIds, syncedAt, fit 
         fail(`activity ${id}: not written, unrecognized format in getActivityDetail: ${err.message}`);
         continue;
       }
-      ready.push({ id, file, incoming, strength, sport, sportType: sportTypeField(code) });
+      ready.push({ id, file, incoming, strength, sport, sportType: sportTypeField(code), code });
     } catch (err) {
       fail(`activity ${id}: ${redact(err.message || String(err))}`);
     }
   }
   ready.sort((a, b) => a.file.data.list_entry.startTimestamp - b.file.data.list_entry.startTimestamp);
 
-  for (const { id, file, incoming, strength, sport, sportType } of ready) {
+  for (const { id, file, incoming, strength, sport, sportType, code } of ready) {
     try {
       if (strength) {
         await enrich({ id, file, incoming, sport, sportType });
         continue;
       }
+
+      // #773: an indoor ride is the phone's too. Spin's row, when there is one, is its row.
+      if (Number(code) === INDOOR_BIKE_CODE && await enrichRide({ id, file, incoming, sportType })) continue;
 
       // The FIT first, so a new activity's row is created with its fit_ref in
       // one write, and every later run re-sends what the archive records.
@@ -170,7 +211,8 @@ export async function syncActivities({ archive, api, activityIds, syncedAt, fit 
         })
         : {};
 
-      const lastWritten = file.data.normalized ?? null;
+      // An archive holding an enrichment (#773) is not a COROS row's merge state: compare nothing.
+      const lastWritten = file.data.normalized?.enrichment ? null : (file.data.normalized ?? null);
       const result = await api.upsertSyncedWorkout({
         source: SOURCE,
         source_activity_id: id,
@@ -222,6 +264,45 @@ export async function syncActivities({ archive, api, activityIds, syncedAt, fit 
     }
   }
   return out;
+
+  /**
+   * One indoor ride (#773): link it to its Spin row and fill the row's blanks.
+   * @returns {Promise<boolean>} true when the activity ends here (enriched, unchanged,
+   *   ambiguous or lost its Spin row), false when it goes on to a row of its own.
+   */
+  async function enrichRide({ id, file, incoming, sportType }) {
+    const activity = rideActivity(incoming);
+    const lastWritten = file.data.normalized?.enrichment ?? null;
+    const result = await api.enrichRide({
+      source_activity_id: id,
+      activity,
+      last_written: lastWritten,
+      synced_at: syncedAt,
+      ...sportType,
+    });
+
+    if (result.status === 'unmatched') {
+      const lostRow = result.reason === 'no match' && !!lastWritten;
+      if (result.reason !== 'ambiguous' && !lostRow) return false;
+      const note = rideNote(id, activity, result, { lostRow });
+      out.notes.push(note);
+      log(`  activity ${id} (indoor ride): ${note}`);
+      return true;
+    }
+    if (result.status === 'enriched') {
+      out.enriched += 1;
+      const how = result.linked ? 'linked' : 'already linked';
+      const what = result.filled.length ? `filled ${result.filled.join(', ')}` : 'nothing blank to fill';
+      log(`  activity ${id} (indoor ride): enriched ${result.id} (${how}; ${what})`);
+    } else {
+      out.unchanged += 1;
+      log(`  activity ${id} (indoor ride): unchanged ${result.id}, nothing left to fill`);
+    }
+    if (JSON.stringify(result.written) !== JSON.stringify(lastWritten)) {
+      await archive.writeNormalized(file.fileId, { enrichment: result.written });
+    }
+    return true;
+  }
 
   /** One strength session: enrich its hand-logged row, or note why not. */
   async function enrich({ id, file, incoming, sport, sportType }) {

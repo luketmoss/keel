@@ -1,4 +1,4 @@
-// Read and write actions for the Workouts tab (A:AM).
+// Read and write actions for the Workouts tab (A:AN).
 
 var WORKOUTS_SHEET = 'Workouts';
 
@@ -113,6 +113,15 @@ function normalizeWorkoutFields(data, opts) {
       if (opts.create && out[spinField] === '') continue;
       throw new Error(spinField + ' is written by Thrive Spin alone (saveRide) and cannot be set here');
     }
+  }
+
+  // #773: AN is the COROS link, written by enrichRide and saveRide's merge alone. A create may
+  // carry it blank; nothing else may set or clear it, even a caller holding the Spin key.
+  for (var c = 0; c < COROS_LINK_FIELDS.length; c++) {
+    var linkField = COROS_LINK_FIELDS[c];
+    if (out[linkField] === undefined) continue;
+    if (opts.create && out[linkField] === '') continue;
+    throw new Error(linkField + ' is written by the COROS link alone (enrichRide, saveRide) and cannot be set here');
   }
 
   if (out.type !== undefined) validateEnum('type', out.type, WORKOUT_TYPES);

@@ -128,9 +128,9 @@ function workoutRow(w: {
   status?: string;
   estimated_seconds?: string;
 }): string[] {
-  // A:AM — eleven original columns, the six nullable attributes (#101),
+  // A:AN — eleven original columns, the six nullable attributes (#101),
   // the nine sync provenance columns (#128), the estimate (#145), the
-  // COROS sport code (#260), the track (#432), the trails (#688) and Spin's nine (#765).
+  // COROS sport code (#260), the track (#432), the trails (#688), Spin's nine (#765) and the COROS link (#773).
   return [
     w.id,
     w.date,
@@ -162,7 +162,8 @@ function workoutRow(w: {
     '',
     '',
     '',
-    // AE:AM, #765: Spin's nine columns.
+    // AE:AN, #765: Spin's nine columns, and #773's COROS link.
+    '',
     '',
     '',
     '',
@@ -221,6 +222,7 @@ function workoutsFromSheet(): WorkoutWithRow[] {
     intensity_pct: '',
     ride_workout_id: '',
     streams_ref: '',
+    coros_activity_id: '',
     sheetRow: i + 2,
   }));
 }
@@ -315,6 +317,7 @@ describe("AC2: a workout write never targets another workout's row", () => {
       intensity_pct: '',
       ride_workout_id: '',
       streams_ref: '',
+      coros_activity_id: '',
       sheetRow: 2,
     };
     workouts.value = [staleWorkout];
@@ -377,6 +380,7 @@ describe("AC2: a workout write never targets another workout's row", () => {
       intensity_pct: '',
       ride_workout_id: '',
       streams_ref: '',
+      coros_activity_id: '',
       sheetRow: 2,
     };
     workouts.value = [staleWorkout];
@@ -447,7 +451,7 @@ describe('#145: a planned workout estimate', () => {
   it('saveWorkoutForLater writes the estimate to AA and leaves H blank', async () => {
     await saveWorkoutForLater({ type: 'weight', name: 'Pull A', date: '2099-12-31', estimated_seconds: '2820' }, TOKEN);
     const row = sheet.Workouts[0];
-    expect(row).toHaveLength(39);
+    expect(row).toHaveLength(40);
     expect(row[26]).toBe('2820');
     expect(row[27]).toBe(''); // #260: the SPA never sets sport_type
     expect(row[7]).toBe('');

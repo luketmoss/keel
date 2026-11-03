@@ -326,6 +326,9 @@ request**.
   `thrive.yml` and `mcp.yml` each run on the other side's half. A rule change edits the
   fixture and both copies, so it touches `mcp/`, and `/review` reads the Worker's
   half as closely as the app's, since the Worker is the copy no screen shows.
+- **The COROS link** (#773): the 15-minute window, the candidate rules and the merge are the API's (`apps-script/src/ride-link.js`,
+  `rides.js`), and the sync only calls them (`sync/src/sync-activities.mjs`). The SPA and the Worker carry the column, blank, and
+  nothing else: the SPA's `workoutToRow` keeps it on every edit, the Worker's new-workout object sends it `''`.
 - **The ride steps rules** (#774): the steps v1 limits and checks. The API's copy is `apps-script/src/ride-workouts.js`
   (`validateRideSteps`); the MCP Worker's is `mcp/src/thrive/ride-workouts.js`, tested against
   `mcp/test/fixtures/ride-steps-golden.json`, and Spin's own parser is `android/spin/.../core/workout/`. A rule change
@@ -368,11 +371,11 @@ Google Sheet "Groundwork" with these tabs:
   rest_s, switch_s (#576: the section's rest and switch in whole seconds, the same on every row of a
   section; blank means the Settings default; switch only on SS1-SS3 and burnout, neither on warmup or
   cooldown. A replace that leaves them out keeps the stored values)
-- **Workouts** (A:AM): id, Date, Time, Type, Name, template_id, Notes, Elapsed (s), Created, copied_from, status,
+- **Workouts** (A:AN): id, Date, Time, Type, Name, template_id, Notes, Elapsed (s), Created, copied_from, status,
   Moving (s), Effort, Distance (m), Ascent (m), Descent (m), Avg HR (bpm),
   sub_type, source, source_activity_id, raw_ref, fit_ref, fit_fetched_at, synced_at, started_at_utc, calories,
   estimated_seconds, sport_type, track_ref, trails, avg_power_w, np_w, intensity_factor, tss, work_kj, ftp_w,
-  intensity_pct, ride_workout_id, streams_ref (AE:AM, #765, below)
+  intensity_pct, ride_workout_id, streams_ref (AE:AM, #765, below), coros_activity_id (AN, #773, below)
 - **Sets** (A:M): workout_id, exercise_id, Exercise Name, Section, Exercise Order, Set #, Planned Reps, Weight (lbs), Reps, Effort,
   rest_target_s, set_s, rest_s (#576). `rest_target_s` is the rest planned after the set, resolved once when
   the set is created (from the template section, else the Settings default; the switch time for all but the
@@ -606,6 +609,20 @@ its FTP settings, the newest row current; both are written by the API alone and 
 script property, is a fourth key caller that may run `getRideWorkouts`, `saveRideWorkout`, `deleteRideWorkout`, `getFtp`,
 `addFtp`, `getPlannedWorkouts` and `saveRide` only (`spin_forbidden` otherwise); the app reads a ride back with
 `getWorkoutStreams` and its Google token. Mirrors: `frontend/src/api/spin-rows.ts`, `mcp/src/thrive/domain.js`.
+`Workouts!AN` `coros_activity_id` (#773) is the COROS activity linked to a Spin ride, digits as text, blank when none is linked, never
+`0`. **COROS-link-owned**: only `enrichRide` and `saveRide`'s merge write it. `createWorkout` and `updateWorkout` refuse it (a create may
+carry it blank, as the MCP Worker's new-workout object does) and every full-row write keeps what it holds. Added by
+`scripts/migrate-773-coros-link.mjs`. **One row per ride, whichever device syncs first.** The COROS sync offers every activity with sport
+code **201** (indoor bike; 200, plain bike, never) to the API's `enrichRide` before its FIT or any row: one `source = spin` bike/indoor,
+finished, unlinked row whose `started_at_utc` is within **15 minutes** (inclusive, compared as instants) of the activity's is linked and
+its blanks (`elapsed_seconds`, `moving_seconds`, `avg_hr`, `calories`) filled, and the activity goes no further: no FIT, track, trails or
+row of its own. None: the activity goes on as before and the watch gets its own `source = coros` row. Two or more: `ambiguous`, a SyncLog
+note, no row, re-checked every run. Spin finding the COROS row first is `saveRide`'s `merged`: exactly one `source = coros` bike/indoor
+row within the same 15 minutes takes the ride in place (it becomes `source = spin`, keeps its `id`, `created` and a claimed plan's `name`,
+clears `raw_ref`, and its `coros_activity_id` is the COROS id it held); two or more are never merged, the ride is appended and the answer
+carries `ambiguous_coros`. The 15 minutes is a judgment on no data: revisit it from SyncLog notes. A Spin row and a COROS row that coexist
+from before #773 are left alone; cleaning them is by hand. Nothing renders the link yet. The API's `enrichRide` is
+`apps-script/src/ride-link.js`.
 `Workouts!AD` `trails` (#688) is the named OpenStreetMap trails the activity's track rode, worked out
 once by the COROS sync's trail step (`sync/src/trail-step.mjs`, one Overpass lookup of the track's
 padded box, matched by `sync/src/trail-match.mjs`) and written with its own `updateWorkout` call. Three

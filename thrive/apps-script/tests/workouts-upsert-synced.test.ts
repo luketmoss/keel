@@ -60,7 +60,7 @@ describe('AC3: no row with that vendor ID appends one, like createWorkout', () =
     expect(res.data.id).toBe('w_a1b2c3d4');
     expect(rows).toHaveLength(1);
     const r = rows[0];
-    expect(r).toHaveLength(39);
+    expect(r).toHaveLength(40);
     expect(r[C.id]).toBe('w_a1b2c3d4');
     expect(r[C.created]).toBe(NOW.toISOString());
     expect(r[C.source]).toBe('coros');

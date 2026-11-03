@@ -225,6 +225,11 @@ function fakeApi({ syncLog = [], syncLogError = null } = {}) {
       calls.push({ action: 'enrichWorkout', ...payload });
       return { status: 'unmatched', reason: 'no match', candidates: [] };
     },
+    // An indoor ride (#773) is offered to Spin's row first: none here, so it carries on.
+    async enrichRide(payload) {
+      calls.push({ action: 'enrichRide', ...payload });
+      return { status: 'unmatched', reason: 'no match', candidates: [] };
+    },
   };
 }
 

@@ -343,7 +343,7 @@ const KEY_ONLY_ACTIONS = [
   'createExercise', 'updateExercise', 'deleteExercise',
   'createTemplate', 'replaceTemplate',
   'appendSets', 'previewSetUpdates', 'updateSets',
-  'rebuildDailySummary', 'upsertDailyHealth', 'upsertSyncedWorkout', 'enrichWorkout',
+  'rebuildDailySummary', 'upsertDailyHealth', 'upsertSyncedWorkout', 'enrichWorkout', 'enrichRide',
   'appendSyncLog', 'upsertBodyMeasurements', 'reconcileBodyMeasurements',
   // A read, but key-only (#179): no token caller needs raw vendor text.
   'getWorkoutPayload',
@@ -399,6 +399,7 @@ describe('AC4: token callers run only the named reads', () => {
     upsertDailyHealth: { rows: [{ date: '2026-09-15', steps: '100' }], synced_at: '2026-09-15T00:00:00Z' },
     upsertSyncedWorkout: { incoming: { date: '2026-09-15', type: 'bike', name: 'Ride' }, last_written: null },
     enrichWorkout: { activity: { date: '2026-09-15' }, last_written: null },
+    enrichRide: { activity: { started_at_utc: '2026-09-15T13:00:00Z' }, last_written: null },
     appendSyncLog: { row: { run_id: 'r1', status: 'ok' } },
     upsertBodyMeasurements: {
       rows: [{ grpid: '1', date: '2026-09-15', time: '07:00', measured_at_utc: '2026-09-15T07:00:00-06:00',

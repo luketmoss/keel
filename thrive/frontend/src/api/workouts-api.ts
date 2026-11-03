@@ -26,7 +26,7 @@ export class WorkoutRowMismatchError extends Error {
   }
 }
 
-// ── Workouts tab (A:AM) ──────────────────────────────────────────────
+// ── Workouts tab (A:AN) ──────────────────────────────────────────────
 
 // Demo dates are shifted once per page load (#250): a later call must neither
 // re-shift nor recompute against a `now` that has crossed midnight.
@@ -39,13 +39,13 @@ export async function fetchWorkouts(token: string): Promise<WorkoutWithRow[]> {
   }
 
   return withReauth(token, async (t) => {
-    const rows = await sheetsGet('Workouts!A2:AM', t);
+    const rows = await sheetsGet('Workouts!A2:AN', t);
     return rows.map((row, i) => rowToWorkout(row, i + 2));
   });
 }
 
 /**
- * Reads a `Workouts!A:AM` row. The Sheets API drops trailing empty cells, so a
+ * Reads a `Workouts!A:AN` row. The Sheets API drops trailing empty cells, so a
  * short row is normal and every missing cell reads as `''`.
  */
 export function rowToWorkout(row: string[], sheetRow: number): WorkoutWithRow {
@@ -97,6 +97,8 @@ export function rowToWorkout(row: string[], sheetRow: number): WorkoutWithRow {
     intensity_pct: row[36] || '',
     ride_workout_id: row[37] || '',
     streams_ref: row[38] || '',
+    // #773 AN. Blank on every row but a Spin ride the COROS watch also recorded.
+    coros_activity_id: row[39] || '',
     sheetRow,
   };
 }
@@ -114,7 +116,7 @@ export async function findWorkoutRow(workoutId: string, token: string): Promise<
 }
 
 /**
- * Builds a `Workouts!A:AM` row. Both the create and the edit path go through
+ * Builds a `Workouts!A:AN` row. Both the create and the edit path go through
  * here: `sheetsAppend`/`sheetsUpdate` write every value handed to them
  * regardless of the range, so two builders that had to agree — and didn't —
  * is exactly how #100 nearly resurrected a deleted column.
@@ -160,6 +162,7 @@ export function workoutToRow(w: Workout): (string | number)[] {
     w.intensity_pct,
     w.ride_workout_id,
     w.streams_ref,
+    w.coros_activity_id,
   ];
 }
 
@@ -241,10 +244,12 @@ export async function createWorkout(
     intensity_pct: '',
     ride_workout_id: data.ride_workout_id || '',
     streams_ref: '',
+    // #773: the COROS link, owned by the API's enrichRide and saveRide. Never set here.
+    coros_activity_id: '',
   };
 
   if (!isDemo()) {
-    await withReauth(token, (t) => sheetsAppend('Workouts!A:AM', [workoutToRow(workout)], t));
+    await withReauth(token, (t) => sheetsAppend('Workouts!A:AN', [workoutToRow(workout)], t));
   }
 
   return workout;
@@ -285,7 +290,7 @@ export async function updateWorkout(
   if (isDemo()) return { ...workout, ...patch, id: workout.id, sheetRow };
 
   return withReauth(token, async (t) => {
-    const range = `Workouts!A${sheetRow}:AM${sheetRow}`;
+    const range = `Workouts!A${sheetRow}:AN${sheetRow}`;
     const current = await sheetsGet(range, t);
     if (!current[0] || (current[0][0] || '') !== workout.id) {
       throw new WorkoutRowMismatchError(workout.id);

@@ -195,6 +195,8 @@ export function createThriveApi({
    *    carry the same synced_at and rewrite the same row.
    *  - rebuildDailySummary is a pure function of its sources and computed_at.
    *  - appendSyncLog answers `exists` for a run_id already in the tab.
+   *  - enrichRide is the same as enrichWorkout: a replay answers `unchanged`, with the
+   *    link already made and `filled` naming only what a clearing in Thrive may refill.
    *  - enrichWorkout is not strictly idempotent: if the first call landed,
    *    the replay answers `unchanged` with `filled` missing what the first
    *    call filled, so a field cleared in Thrive in between is refilled once.
@@ -340,6 +342,23 @@ export function createThriveApi({
      */
     enrichWorkout(payload) {
       return writeRetrying('enrichWorkout', payload);
+    },
+
+    /**
+     * One COROS indoor ride (sport code 201), offered to its Spin row (#773).
+     * The match, the fill and the write run in the API, in one execution. A 404
+     * page is retried (see `writeRetrying`). `sport_type` is top-level.
+     *
+     * @param {{ source_activity_id: string, activity: object,
+     *   last_written: { workout_id: string, filled: string[] } | null,
+     *   synced_at: string, sport_type?: string }} payload
+     * @returns {Promise<{ status: 'enriched' | 'unchanged' | 'unmatched', id?: string,
+     *   linked?: boolean, filled?: string[], reason?: 'no match' | 'ambiguous' | 'own row',
+     *   candidates?: { id: string, started_at_utc: string }[],
+     *   written?: { workout_id: string, filled: string[] } }>}
+     */
+    enrichRide(payload) {
+      return writeRetrying('enrichRide', payload);
     },
 
     /**

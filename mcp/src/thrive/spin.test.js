@@ -39,6 +39,12 @@ test('buildWorkout carries the nine Spin fields blank, whatever the caller sends
   for (const f of NINE) assert.equal(w[f], '', f);
 });
 
+test('buildWorkout carries coros_activity_id (#773) blank, whatever the caller sends', () => {
+  const w = buildWorkout({ type: 'bike', name: 'Evening Ride', coros_activity_id: '471166302945817201' });
+  assert.equal(w.coros_activity_id, '');
+  assert.ok(Object.hasOwn(w, 'coros_activity_id'));
+});
+
 test('a Spin ride is named Thrive Spin as its source, in a list line and in the provenance line', () => {
   assert.equal(provenanceOf(ride), 'synced');
   assert.equal(provenanceTag(ride), ' (Thrive Spin)');

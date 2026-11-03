@@ -31,6 +31,7 @@
     "--opacity-disabled": "0.4",
     "--focus-ring-width": "2px",
     "--focus-ring-offset": "2px",
+    "--touch-target": "44px",
     "--icon-md": "24px",
     "--icon-lg": "40px",
     "--content-max": "600px",

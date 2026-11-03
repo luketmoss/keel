@@ -105,9 +105,31 @@ zones** (`ride-zones.tsx`) and a **Ride** card (`ride-card.tsx`); a COROS indoor
 (`spin/streams-cache.ts`: checked at the boundary by `api/spin-streams.ts`, reduced to buckets, interval rows and zone
 seconds, and held for the session by workout id; the chart is at most 300 buckets). The zone bands and colours are
 `spin/zones.ts` and `--zone-1` to `--zone-6`. The Ride card's Spin workout name is read from the `RideWorkouts` tab through
-the Sheets API (`spin/ride-library.ts`, held for the session; #772 reuses it). **The FIT file is not downloadable from the
+the Sheets API (`spin/ride-library.ts`, held for the session; #772 reuses it for the Spin picker and a plan's detail line). **The FIT file is not downloadable from the
 app**: Drive is the script account's, so a download would need a new token action and an Apps Script deploy, and nothing
 consumes it. Demo mode has two Spin rides ("Sweet Spot 3×12" and "Free ride", `api/demo-spin.ts`).
+
+## FTP in Trends, and Spin workouts in bike plans (#772)
+
+**Trends.** FTP joins the **Fitness** group after Training Load as two cards, **FTP** (W) and **FTP per kg** (W/kg), and both
+are in the Custom picker's Fitness section (`components/trends/metrics.ts`). `FtpHistory` is `loadHealth`'s fourth tab
+(`ftpHistory` in `state/store.ts`, `fetchFtpHistory` in `api/health-api.ts`; a missing tab reads as empty). FTP is a **held
+value**, not a daily reading: a metric with `heldEntries()` draws a step line (flat from an entry's day to the day before the
+next, from the first entry to today), a filled dot on a ramp test's day and a ring on a hand-set one, a legend, and an entries
+list under the plot (`held.ts` builds the cells; `trend-chart.tsx` draws them). The Average control and "Your range" do not apply.
+One entry per date (the newest by `created`), none after today, a blank or non-numeric `ftp_w` skipped. W/kg divides each entry by
+**the same day's first scale reading** (`bodyDays()`), so an entry on a day with no weight has none: no dot, the line breaks, the
+list row says `No weight that day`. The summary never compares one entry with another. Demo mode: `demoFtpHistory` (seven entries
+over a year, the five inside its 90 days of weigh-ins on weighed days).
+
+**Plans.** In plan mode (`#/workout/new?plan=<date>`) the template picker has a **Bike workout** card after Build Custom, which
+opens `workout/bike-planner.tsx`: name, date, **Spin workout** (optional), estimate, venue. It saves a `planned` bike row through
+`saveWorkoutForLater` with `ride_workout_id` (`Workouts!AL`) blank or the chosen id. `workout/spin-picker.tsx` is the bottom sheet
+and its field: the library is `spin/ride-library.ts` (#771's loader, read when a screen needs it, held for the session); choosing a
+workout fills the name, the estimate and Indoor only where the owner has not typed or picked something, and `No Spin workout` clears
+the link and touches nothing else. A **planned** bike's edit form has the same field and saves only a changed link; a completed
+bike's form has none and never writes AL. A planned bike's detail screen has one line naming its workout. The Day screen is
+unchanged. `--touch-target` (44px) is the token the new rows take by name.
 
 ## Food card (#714)
 

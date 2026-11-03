@@ -15,7 +15,8 @@
 // the Day view swipes to and every Trends range.
 
 import { sheetsGet, withReauth, isMissingTabError } from './sheets';
-import { isDemo, demoDailyHealth, demoBodyMeasurements, demoDailySummary } from './demo-data';
+import { isDemo, demoDailyHealth, demoBodyMeasurements, demoDailySummary, demoFtpHistory } from './demo-data';
+import { FTP_HISTORY_FIELDS, rowToFtpHistory, type FtpHistoryRow } from './spin-rows';
 
 export const DAILY_HEALTH_FIELDS = [
   'date', // A  PK, local date; sleep is filed under its wake-up day
@@ -105,6 +106,7 @@ export type DailySummaryRow = Record<DailySummaryField, string> & { sheetRow: nu
 export const DAILY_HEALTH_SHEET = 'DailyHealth';
 export const BODY_MEASUREMENTS_SHEET = 'BodyMeasurements';
 export const DAILY_SUMMARY_SHEET = 'DailySummary';
+export const FTP_HISTORY_SHEET = 'FtpHistory';
 
 /** A 1-based column number as its letter(s): 1 → A, 18 → R, 27 → AA. */
 export function columnLetter(n: number): string {
@@ -193,6 +195,18 @@ export async function fetchBodyMeasurements(token: string): Promise<BodyMeasurem
 export async function fetchDailySummary(token: string): Promise<DailySummaryRow[]> {
   if (isDemo()) return demoDailySummary(new Date());
   return readTab(token, DAILY_SUMMARY_SHEET, DAILY_SUMMARY_FIELDS, rowToDailySummary, (r) => !!r.date);
+}
+
+/** Every FtpHistory row with an id, in sheet order (#772). A tab not migrated yet reads as empty. */
+export async function fetchFtpHistory(token: string): Promise<FtpHistoryRow[]> {
+  if (isDemo()) return demoFtpHistory(new Date());
+  return readTab(
+    token,
+    FTP_HISTORY_SHEET,
+    FTP_HISTORY_FIELDS,
+    (row) => rowToFtpHistory(row.map((c) => (c === undefined || c === null ? '' : String(c).trim()))),
+    (r) => !!r.id,
+  );
 }
 
 // ── Range selection ──────────────────────────────────────────────────

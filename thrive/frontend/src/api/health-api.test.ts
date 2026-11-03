@@ -33,6 +33,7 @@ vi.mock('./demo-data', () => ({
   demoDailyHealth: vi.fn(),
   demoBodyMeasurements: vi.fn(),
   demoDailySummary: vi.fn(),
+  demoFtpHistory: vi.fn(),
 }));
 
 import { SheetsApiError as MockSheetsApiError } from './sheets';
@@ -48,6 +49,7 @@ import {
   fetchDailyHealth,
   fetchBodyMeasurements,
   fetchDailySummary,
+  fetchFtpHistory,
   selectDailyRange,
   selectBodyMeasurementRange,
   type BodyMeasurementRow,
@@ -265,5 +267,43 @@ describe('AC3/AC4: fetching each tab', () => {
     await expect(fetchDailySummary('tok')).rejects.toBeInstanceOf(MockSheetsApiError);
     sheetsGet.mockRejectedValueOnce(new TypeError('Failed to fetch'));
     await expect(fetchBodyMeasurements('tok')).rejects.toBeInstanceOf(TypeError);
+  });
+});
+
+// #772 — FtpHistory is read like the other tabs: whole, trimmed, a missing tab as empty.
+describe('fetchFtpHistory (#772)', () => {
+  beforeEach(() => {
+    sheetsGet.mockReset();
+  });
+
+  it('reads FtpHistory A:F from row 2 and maps each row, trimmed, with blank cells as empty text', async () => {
+    sheetsGet.mockResolvedValue([
+      ['f1', '2026-09-24 ', '244', 'ramp_test', 'ride-1', '2026-09-24T15:00:00.000Z'],
+      ['f2', '2026-10-24', '250', 'manual'],
+      [],
+    ]);
+    const rows = await fetchFtpHistory('tok');
+    expect(sheetsGet).toHaveBeenCalledWith('FtpHistory!A2:F', 'tok');
+    expect(rows).toEqual([
+      {
+        id: 'f1',
+        date: '2026-09-24',
+        ftp_w: '244',
+        source: 'ramp_test',
+        ride_id: 'ride-1',
+        created: '2026-09-24T15:00:00.000Z',
+      },
+      { id: 'f2', date: '2026-10-24', ftp_w: '250', source: 'manual', ride_id: '', created: '' },
+    ]);
+  });
+
+  it('reads a tab that does not exist yet as empty, not as an error', async () => {
+    sheetsGet.mockRejectedValue(new MockSheetsApiError(400, 'Unable to parse range: FtpHistory!A2:F'));
+    expect(await fetchFtpHistory('tok')).toEqual([]);
+  });
+
+  it('throws any other failure', async () => {
+    sheetsGet.mockRejectedValue(new MockSheetsApiError(500, 'boom'));
+    await expect(fetchFtpHistory('tok')).rejects.toThrow();
   });
 });

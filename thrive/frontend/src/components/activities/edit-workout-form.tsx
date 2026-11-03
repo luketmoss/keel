@@ -11,6 +11,7 @@ import type { CardioValues } from '../shared/cardio-fields';
 import { workoutToEditInputs, editInputsToPatch, hasEdits } from '../shared/edit-patch';
 import { ask } from '../../state/confirm';
 import { discardChangesCopy } from '../shared/confirm-copy';
+import { SpinWorkoutField } from '../workout/spin-picker';
 
 interface Props {
   workoutId: string;
@@ -32,6 +33,7 @@ export function EditWorkoutForm({ workoutId }: Props) {
   const [notes, setNotes] = useState(initial.notes);
   const [effort, setEffort] = useState<Effort | ''>(initial.effort);
   const [subType, setSubType] = useState(initial.subType);
+  const [rideWorkoutId, setRideWorkoutId] = useState(initial.rideWorkoutId);
   const [cardio, setCardio] = useState<CardioValues>(() => ({
     distance: initial.distance,
     ascent: initial.ascent,
@@ -54,7 +56,9 @@ export function EditWorkoutForm({ workoutId }: Props) {
     );
   }
 
-  const current = { date, name, duration, notes, effort, subType, ...cardio };
+  // #772: only a planned bike names a Spin workout; a ride's own link is what it rode, and an edit keeps it.
+  const spinField = workout.type === 'bike' && workout.status === 'planned';
+  const current = { date, name, duration, notes, effort, subType, ...cardio, ...(spinField ? { rideWorkoutId } : {}) };
 
   const handleSave = async () => {
     if (!token) return;
@@ -116,6 +120,8 @@ export function EditWorkoutForm({ workoutId }: Props) {
           onInput={(e) => setDate((e.target as HTMLInputElement).value)}
         />
       </div>
+
+      {spinField && <SpinWorkoutField value={rideWorkoutId} onChange={(w) => setRideWorkoutId(w ? w.id : '')} />}
 
       <div class="form-group">
         <label class="form-label" htmlFor="edit-duration">

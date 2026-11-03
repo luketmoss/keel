@@ -11,6 +11,7 @@ import type {
 import type { SyncLogEntryWithRow } from '../api/sync-log-api';
 import type { SyncRequestWithRow } from '../api/sync-requests-api';
 import type { DailyHealthRow, BodyMeasurementRow, DailySummaryRow } from '../api/health-api';
+import type { FtpHistoryRow } from '../api/spin-rows';
 import { sortPlannedWorkouts, toLocalDateStr } from '../components/activities/activities-helpers';
 
 // Core data signals
@@ -140,6 +141,8 @@ export type HealthTabState<T> =
 export const dailyHealth = signal<HealthTabState<DailyHealthRow>>({ state: 'idle' });
 export const bodyMeasurements = signal<HealthTabState<BodyMeasurementRow>>({ state: 'idle' });
 export const dailySummary = signal<HealthTabState<DailySummaryRow>>({ state: 'idle' });
+// FtpHistory (#772, written by Thrive Spin's ramp test): the fourth tab `loadHealth` reads, for Trends' FTP cards.
+export const ftpHistory = signal<HealthTabState<FtpHistoryRow>>({ state: 'idle' });
 
 // Journal (#240): every `Journal` row, read whole by `loadJournal` and held in
 // sheet order, one entry per date that has a note. A date with no note has NO

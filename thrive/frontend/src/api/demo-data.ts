@@ -21,6 +21,7 @@ import {
 } from './demo-spin';
 import { DEMO_TRAIL_CELLS } from './demo-trails';
 import type { DailyHealthRow, BodyMeasurementRow, DailySummaryRow } from './health-api';
+import type { FtpHistoryRow } from './spin-rows';
 import { colorKeyFromName } from './label-colors';
 import type { SyncLogEntryWithRow } from './sync-log-api';
 import { SyncLogNotSetUpError } from './sync-log-errors';
@@ -1001,6 +1002,8 @@ const DEMO_CASES: WorkoutWithRow[] = [
     time: '',
     status: 'planned',
     estimated_seconds: '3600',
+    // #772: the plan names a Spin workout, which the detail screen reads out of the library.
+    ride_workout_id: DEMO_SWEET_SPOT_LIBRARY_ID,
     sheetRow: 19,
   }),
   demoRow({
@@ -2671,4 +2674,58 @@ export function demoBodyMeasurements(
 export function demoDailySummary(now: Date, scenario: DemoHealthScenario = demoHealthScenario()): DailySummaryRow[] {
   if (scenario === 'error') throw new Error('Demo: DailySummary unreadable (health=error)');
   return scenario === 'empty' ? [] : buildDemoDailySummary(now, scenario === 'presync');
+}
+
+// ── FtpHistory (#772) ────────────────────────────────────────────────
+
+/**
+ * The demo FtpHistory tab: seven FTP settings over a year, ramp tests and two set by hand, the newest
+ * the 250 W the demo Spin rides were ridden at. The five inside the demo's 90 days of weigh-ins sit on a
+ * day with a scale weight (the nearest one, whichever day the cycle puts it on), so their W/kg shows; the
+ * two older than that have none, so the "No weight that day" row shows too.
+ */
+export function demoFtpHistory(now: Date, scenario: DemoHealthScenario = demoHealthScenario()): FtpHistoryRow[] {
+  if (scenario === 'error') throw new Error('Demo: FtpHistory unreadable (health=error)');
+  if (scenario === 'empty') return [];
+  const today = todayInDenver(now);
+  const weighed = new Set(
+    buildDemoBodyMeasurements(now)
+      .filter((m) => m.kind === 'scale' && m.weight_kg !== '')
+      .map((m) => m.date),
+  );
+  const oldest = addDays(today, -(DEMO_HEALTH_DAYS - 1));
+  const used = new Set<string>();
+  const settings: [number, 'ramp_test' | 'manual', number][] = [
+    [380, 'ramp_test', 212],
+    [330, 'manual', 218],
+    [84, 'ramp_test', 226],
+    [63, 'ramp_test', 232],
+    [45, 'manual', 236],
+    [28, 'ramp_test', 244],
+    [9, 'ramp_test', 250],
+  ];
+  return settings.map(([ago, source, watts], i) => {
+    let date = addDays(today, -ago);
+    if (date >= oldest) {
+      // The nearest weighed day not already taken, looking back first, then forward.
+      for (let k = 0; k < DEMO_HEALTH_DAYS; k++) {
+        const back = addDays(date, -k);
+        const fwd = addDays(date, k);
+        const pick = [back, fwd].find((d) => d >= oldest && d < today && weighed.has(d) && !used.has(d));
+        if (pick) {
+          date = pick;
+          break;
+        }
+      }
+    }
+    used.add(date);
+    return {
+      id: `ftp_demo${i + 1}`,
+      date,
+      ftp_w: String(watts),
+      source,
+      ride_id: source === 'ramp_test' ? `ride-demo-ramp-${i + 1}` : '',
+      created: `${date}T15:00:00.000Z`,
+    };
+  });
 }

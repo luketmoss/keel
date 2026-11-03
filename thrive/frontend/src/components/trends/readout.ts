@@ -6,6 +6,7 @@
 
 import type { TrendMetric, TrendPoint } from './metrics';
 import { rowDate, type MetricSeries } from './series';
+import { sourceWordsLower } from './held';
 
 /** A blank value or a missing average. Never `0`. */
 export const BLANK = '—';
@@ -21,6 +22,10 @@ export interface DayCells {
   partialShort?: string;
   /** The average as formatted, or BLANK; null when the average is Off. */
   average: string | null;
+  /** A held value's words for the day (#772): its source on the entry's day, else "since Nov 7"; the readout and announcement carry it. */
+  note?: string;
+  /** The table's version: the source on an entry's day, or why there is no value. Never "since". */
+  tableNote?: string;
 }
 
 const byDateCache = new WeakMap<MetricSeries, ReadonlyMap<string, TrendPoint>>();
@@ -48,12 +53,23 @@ export function dayCells(
 ): DayCells {
   const p = byDate.get(date);
   const avg = series.average.get(date);
-  return {
+  const cells: DayCells = {
     value: p ? metric.format(p.value) : BLANK,
     partial: p?.partial || undefined,
     partialShort: p?.partialShort || undefined,
-    average: avgDays > 0 ? (avg !== undefined ? metric.format(avg) : BLANK) : null,
+    // A held value has no average, whatever the control says (#772).
+    average: avgDays > 0 && !series.held ? (avg !== undefined ? metric.format(avg) : BLANK) : null,
   };
+  const held = series.held?.cells.get(date);
+  if (held) {
+    // In effect that day: the entry's own value on its day and every day after it until the next entry.
+    cells.value = held.value === null ? BLANK : metric.format(held.value);
+    const noWeight = 'no weight that day';
+    cells.note =
+      held.value === null ? noWeight : held.entry ? sourceWordsLower(held.source) : `since ${held.sinceText}`;
+    if (held.entry) cells.tableNote = held.value === null ? noWeight : sourceWordsLower(held.source);
+  }
+  return cells;
 }
 
 /** "53 bpm", or "—". The unit is never put beside a blank. */
@@ -71,6 +87,7 @@ export function readoutLine(metric: TrendMetric, c: DayCells, avgDays: number): 
   const parts = [valueText(metric, c)];
   const partial = c.partialShort ?? c.partial;
   if (partial) parts[0] += ` ${partial}`;
+  if (c.note) parts.push(c.note);
   const avg = averageText(metric, c, avgDays);
   if (avg) parts.push(avg);
   return parts.join(' · ');
@@ -92,6 +109,7 @@ export function announceText(date: string, today: string, parts: readonly Announ
   const clauses = parts.map(({ metric, series }) => {
     const c = dayCells(metric, series, pointsByDate(series), date, avgDays);
     const bits = [`${metric.label} ${valueText(metric, c)}${c.partial ? ` ${c.partial}` : ''}`];
+    if (c.note) bits.push(c.note);
     const avg = averageText(metric, c, avgDays);
     if (avg) bits.push(avg);
     return `${bits.join(', ')}.`;

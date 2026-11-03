@@ -19,12 +19,13 @@ import { ChoiceSheet, type StartMode } from './choice-sheet';
 import { WorkoutTracker } from './workout-tracker';
 import { SimpleWorkout } from './simple-workout';
 import { WorkoutPlanner } from './workout-planner';
+import { BikePlanner, type BikePlan } from './bike-planner';
 import { validPlanDate } from './plan-date';
 import type { WorkoutType } from '../../api/types';
 import type { PlannerExercise } from './workout-planner';
 import { plannedSetCount, plannerToBuilderExercises } from './planned-reps';
 
-type FlowStep = 'type' | 'intent' | 'template' | 'planner' | 'tracker' | 'simple';
+type FlowStep = 'type' | 'intent' | 'template' | 'planner' | 'bike' | 'tracker' | 'simple';
 type Intent = 'track' | 'plan';
 
 interface Props {
@@ -209,6 +210,30 @@ export function WorkoutFlow({ workoutId, planDate }: Props) {
     }
   };
 
+  // The bike planner's Save (#772): a plan with no exercises, which goes back to the list like any plan.
+  const handleBikeSave = async (plan: BikePlan) => {
+    if (!token || saving) return;
+    setSaving(true);
+    try {
+      await saveWorkoutForLater(
+        {
+          type: 'bike',
+          name: plan.name,
+          date: plan.date,
+          estimated_seconds: plan.estimatedSeconds,
+          sub_type: plan.subType,
+          ride_workout_id: plan.rideWorkoutId,
+        },
+        token,
+      );
+      navigate('/activities');
+    } catch {
+      // Error toast shown by action
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // Planner: "Save Workout" handler
   const handlePlannerSave = async (
     name: string,
@@ -268,6 +293,7 @@ export function WorkoutFlow({ workoutId, planDate }: Props) {
           <TemplatePicker
             onSelectTemplate={handleTemplateCardTap}
             onBuildCustom={handleBuildCustomTap}
+            onPlanBike={intent === 'plan' ? () => setStep('bike') : undefined}
             onBack={() => setStep('intent')}
           />
           {pendingStart && (
@@ -290,6 +316,15 @@ export function WorkoutFlow({ workoutId, planDate }: Props) {
             setLiftCustom(false);
             setStep('template');
           }}
+          saving={saving}
+        />
+      );
+    case 'bike':
+      return (
+        <BikePlanner
+          initialDate={validPlanDate(planDate)}
+          onSave={handleBikeSave}
+          onDiscard={() => setStep('template')}
           saving={saving}
         />
       );

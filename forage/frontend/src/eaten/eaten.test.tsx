@@ -717,14 +717,15 @@ describe('demo mode', () => {
       expect.stringContaining('partial'),
       expect.stringContaining('No nutrition'),
     ]);
-    expect(entriesIn('Dinner')).toHaveLength(0);
+    // #788: the sample salad is dinner's six entries, beside the planned chili.
+    expect(entriesIn('Dinner')).toHaveLength(6);
     expect(within(card('Dinner')).getByTestId('planned-row').textContent).toContain('Planned: Weeknight chili');
     expect(entriesIn('Snacks')).toHaveLength(1);
     expect(screen.getByTestId('day-low')).toBeDefined();
 
     fireEvent.click(within(card('Dinner')).getByTestId('log-planned'));
     await settle();
-    expect(entriesIn('Dinner')).toHaveLength(1);
+    expect(entriesIn('Dinner')).toHaveLength(7);
     expect(within(card('Dinner')).queryAllByTestId('planned-row')).toHaveLength(0);
 
     fireEvent.click(screen.getByRole('button', { name: 'Previous day' }));
@@ -735,6 +736,250 @@ describe('demo mode', () => {
     expect(kcal()).toBe('—');
     expect(screen.getByTestId('day-note').textContent).toMatch(/^Nothing logged on \w+day\.$/);
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('saving a meal as a recipe (#788)', () => {
+  const SPRING = food('fd_spring', 'Spring mix', {
+    kcal_100g: 20,
+    protein_100g: 2,
+    carbs_100g: 3.5,
+    fat_100g: 0.3,
+    servings_json: [{ name: 'cup', g: 42.5 }],
+  });
+  const BASIL = food('fd_basil', 'Basil');
+  const salad = (id: string, food_id: string, over: Partial<FoodLogEntry> = {}) =>
+    entry({ id, slot: 'Dinner', food_id, qty: 2, unit: 'cup', grams: 85, kcal: 17, ...over });
+
+  function seed() {
+    const api = fakeApi();
+    api.foods.push(SPRING, YOGURT, BASIL);
+    api.recipes.push(STEW);
+    api.log.push(
+      salad('lg_a', 'fd_spring', { logged_at: '2026-11-02T18:00:00Z' }),
+      salad('lg_b', 'fd_yog', { qty: 100, unit: 'g', grams: 100, kcal: 61, logged_at: '2026-11-02T18:01:00Z' }),
+      salad('lg_c', 'fd_basil', {
+        qty: 5,
+        unit: 'g',
+        grams: 5,
+        kcal: null,
+        partial: true,
+        logged_at: '2026-11-02T18:02:00Z',
+      }),
+      entry({
+        id: 'lg_r',
+        slot: 'Dinner',
+        recipe_id: 'rc_stew',
+        unit: 'serving',
+        kcal: 412,
+        logged_at: '2026-11-02T18:03:00Z',
+      }),
+      entry({
+        id: 'lg_x',
+        slot: 'Dinner',
+        food_id: 'fd_gone',
+        qty: 10,
+        unit: 'g',
+        grams: 10,
+        kcal: 5,
+        logged_at: '2026-11-02T18:04:00Z',
+      }),
+      entry({ id: 'lg_b1', slot: 'Breakfast', recipe_id: 'rc_stew', unit: 'serving', kcal: 412 }),
+    );
+    return api;
+  }
+  const rows = () => within(card('Dinner')).getAllByTestId('select-row');
+
+  it('Select shows only on a meal with a food entry, and select mode is one meal at a time', async () => {
+    seed();
+    await open();
+    expect(within(card('Dinner')).getByTestId('select-meal').textContent).toBe('Select');
+    // Breakfast holds only a recipe entry, Lunch nothing.
+    expect(within(card('Breakfast')).queryByTestId('select-meal')).toBeNull();
+    expect(within(card('Lunch')).queryByTestId('select-meal')).toBeNull();
+
+    fireEvent.click(within(card('Dinner')).getByTestId('select-meal'));
+    expect(within(card('Dinner')).getByTestId('select-cancel').textContent).toBe('Cancel');
+    expect(rows().map((r) => r.getAttribute('aria-pressed'))).toEqual(['false', 'false', 'false', null, null]);
+    expect(within(card('Dinner')).queryByTestId('add-to-meal')).toBeNull();
+    expect(within(card('Dinner')).getByTestId('save-as-recipe').textContent).toBe('Save as a recipe');
+    expect(card('Dinner').textContent).toContain('Tick the items that go together.');
+    // Recipes and removed foods are dimmed and say why.
+    expect(rows()[3].getAttribute('aria-disabled')).toBe('true');
+    expect(rows()[3].textContent).toContain("Recipes can't go in a recipe");
+    expect(rows()[4].textContent).toContain('This food was deleted');
+
+    fireEvent.click(within(card('Dinner')).getByTestId('select-cancel'));
+    expect(within(card('Dinner')).getByTestId('add-to-meal')).toBeDefined();
+  });
+
+  it('opening select mode in another meal leaves the first', async () => {
+    const api = seed();
+    api.log.push(salad('lg_l', 'fd_spring', { slot: 'Lunch' }));
+    await open();
+    fireEvent.click(within(card('Dinner')).getByTestId('select-meal'));
+    fireEvent.click(within(card('Lunch')).getByTestId('select-meal'));
+    expect(within(card('Dinner')).queryByTestId('select-cancel')).toBeNull();
+    expect(within(card('Lunch')).getByTestId('select-cancel')).toBeDefined();
+  });
+
+  it('a row toggles without opening the Amount sheet, and the foot counts the ticked', async () => {
+    seed();
+    await open();
+    fireEvent.click(within(card('Dinner')).getByTestId('select-meal'));
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[2]);
+    expect(screen.queryByTestId('amount-sheet')).toBeNull();
+    expect(within(card('Dinner')).getByTestId('save-as-recipe').textContent).toBe('Save 2 as a recipe');
+    // A dimmed row can't be ticked.
+    fireEvent.click(rows()[3]);
+    expect(within(card('Dinner')).getByTestId('save-as-recipe').textContent).toBe('Save 2 as a recipe');
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[2]);
+    expect((within(card('Dinner')).getByTestId('save-as-recipe') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('the sheet previews per serving, follows Serves, and flags a partial recipe', async () => {
+    const api = seed();
+    await open();
+    fireEvent.click(within(card('Dinner')).getByTestId('select-meal'));
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[2]);
+    fireEvent.click(within(card('Dinner')).getByTestId('save-as-recipe'));
+    await settle();
+    const sheet = screen.getByTestId('save-recipe-sheet');
+    expect((within(sheet).getByTestId('recipe-name') as HTMLInputElement).value).toBe('');
+    expect((within(sheet).getByTestId('save-recipe') as HTMLButtonElement).disabled).toBe(true);
+    expect(within(sheet).getByTestId('recipe-lines').textContent).toBe('2 cup Spring mix85 g5 g BasilNo nutrition');
+    await waitFor(() => expect(within(sheet).getByTestId('recipe-kcal').textContent).toContain('17 kcal'));
+    expect(within(sheet).getByTestId('recipe-kcal').textContent).toContain('partial');
+    expect(sheet.textContent).toContain('Some ingredients have no nutrition, so this is low.');
+    expect(api.calls('computeNutrition')[0].payload.servings).toBe(1);
+
+    fireEvent.click(within(sheet).getByLabelText('More servings'));
+    expect(sheet.textContent).toContain('The amounts below make all 2 servings.');
+    await waitFor(() => expect(api.calls('computeNutrition')).toHaveLength(2));
+    await waitFor(() => expect(within(sheet).getByTestId('recipe-kcal').textContent).toContain('about 9 kcal'));
+  });
+
+  it('saving creates one recipe from the entries as logged, closes, leaves select mode and changes nothing in the log', async () => {
+    const api = seed();
+    await open();
+    const before = kcal();
+    fireEvent.click(within(card('Dinner')).getByTestId('select-meal'));
+    fireEvent.click(rows()[0]);
+    fireEvent.click(rows()[1]);
+    fireEvent.click(within(card('Dinner')).getByTestId('save-as-recipe'));
+    await settle();
+    const sheet = screen.getByTestId('save-recipe-sheet');
+    fireEvent.input(within(sheet).getByTestId('recipe-name'), { target: { value: '  Side salad ' } });
+    fireEvent.click(within(sheet).getByTestId('save-recipe'));
+    await settle();
+    const [call] = api.calls('upsertRecipe');
+    expect(call.payload.id).toMatch(/^rc_[0-9a-f]{8}$/);
+    expect(call.payload).toMatchObject({
+      name: 'Side salad',
+      servings: 1,
+      notes: 'Saved from Dinner on Mon 2 Nov 2026.',
+      lines: [
+        { text: '2 cup Spring mix', qty: 2, unit: 'cup', food_id: 'fd_spring', grams: 85 },
+        { text: '100 g Greek yogurt', qty: 100, unit: 'g', food_id: 'fd_yog', grams: 100 },
+      ],
+    });
+    expect(screen.queryByTestId('save-recipe-sheet')).toBeNull();
+    expect(within(card('Dinner')).getByTestId('add-to-meal')).toBeDefined();
+    expect(screen.getByTestId('toast').textContent).toBe('Saved Side salad to your recipes');
+    expect(kcal()).toBe(before);
+    expect(api.log).toHaveLength(6);
+    expect(api.calls('logFood')).toHaveLength(0);
+
+    // It is in the Add sheet's search straight away.
+    const add = await addTo('Dinner');
+    fireEvent.input(within(add).getByTestId('add-search'), { target: { value: 'side' } });
+    await settle();
+    expect(
+      within(add)
+        .getAllByTestId('add-result')
+        .map((r) => r.querySelector('.recipe-name')!.textContent),
+    ).toEqual(['Side salad']);
+  });
+
+  it('a failed save keeps the sheet, the name and the ticks', async () => {
+    const api = seed();
+    api.answer('upsertRecipe', () => ({ success: false, error: 'offline', code: 'network' }));
+    await open();
+    fireEvent.click(within(card('Dinner')).getByTestId('select-meal'));
+    fireEvent.click(rows()[0]);
+    fireEvent.click(within(card('Dinner')).getByTestId('save-as-recipe'));
+    await settle();
+    const sheet = screen.getByTestId('save-recipe-sheet');
+    fireEvent.input(within(sheet).getByTestId('recipe-name'), { target: { value: 'Greens' } });
+    fireEvent.click(within(sheet).getByTestId('save-recipe'));
+    await settle();
+    expect(within(sheet).getByTestId('save-recipe-error').textContent).toBe(
+      "Couldn't save. Your changes are kept here. Try again.",
+    );
+    expect((within(sheet).getByTestId('recipe-name') as HTMLInputElement).value).toBe('Greens');
+    expect(within(sheet).getByTestId('save-recipe').getAttribute('aria-busy')).toBe('false');
+
+    // Cancel returns to select mode with the ticks kept.
+    fireEvent.click(within(sheet).getByTestId('save-recipe-cancel'));
+    expect(screen.queryByTestId('save-recipe-sheet')).toBeNull();
+    expect(within(card('Dinner')).getByTestId('save-as-recipe').textContent).toBe('Save 1 as a recipe');
+  });
+
+  it('changing the day leaves select mode with nothing saved', async () => {
+    const api = seed();
+    await open();
+    fireEvent.click(within(card('Dinner')).getByTestId('select-meal'));
+    fireEvent.click(rows()[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Previous day' }));
+    await settle();
+    fireEvent.click(screen.getByRole('button', { name: 'Next day' }));
+    await settle();
+    expect(within(card('Dinner')).getByTestId('select-meal')).toBeDefined();
+    expect(api.calls('upsertRecipe')).toHaveLength(0);
+  });
+
+  it('demo mode saves the sample salad with no network call, and the recipe is searchable', async () => {
+    env.VITE_DEMO_MODE = 'true';
+    _resetDemoModeCache();
+    _resetDemoApi();
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    try {
+      await open(true);
+      fireEvent.click(within(card('Dinner')).getByTestId('select-meal'));
+      const items = within(card('Dinner')).getAllByTestId('select-row');
+      expect(items).toHaveLength(6);
+      items.slice(0, 5).forEach((r) => fireEvent.click(r));
+      expect(within(card('Dinner')).getByTestId('save-as-recipe').textContent).toBe('Save 5 as a recipe');
+      fireEvent.click(within(card('Dinner')).getByTestId('save-as-recipe'));
+      await settle();
+      const sheet = screen.getByTestId('save-recipe-sheet');
+      fireEvent.input(within(sheet).getByTestId('recipe-name'), { target: { value: 'Side salad' } });
+      await waitFor(() => expect(within(sheet).getByTestId('recipe-kcal').textContent).toMatch(/kcal/));
+      fireEvent.click(within(sheet).getByTestId('save-recipe'));
+      await settle();
+      expect(screen.getByTestId('toast').textContent).toBe('Saved Side salad to your recipes');
+      const add = await addTo('Lunch');
+      fireEvent.input(within(add).getByTestId('add-search'), { target: { value: 'side' } });
+      await settle();
+      expect(within(add).getAllByTestId('add-result')).toHaveLength(1);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      delete env.VITE_DEMO_MODE;
+      _resetDemoModeCache();
+      _resetDemoApi();
+    }
+  });
+
+  it('select mode and the sheet keep 44px controls and wrap at 375px', () => {
+    const css = readGlobalCss();
+    expect(rule(css, '.text-btn')).toContain('min-height: var(--touch-target)');
+    expect(rule(css, '.log-row')).toContain('min-height: 56px');
+    expect(rule(css, '.recipe-save-text')).toContain('overflow-wrap: anywhere');
+    expect(rule(css, '.recipe-save-g')).toContain('white-space: nowrap');
   });
 });
 

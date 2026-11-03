@@ -66,6 +66,14 @@ export function refreshRecipes(api: ForageApi): Promise<void> {
   return gate.request(() => loadRecipes(api, true));
 }
 
+/** Put a recipe just created (#788) at the top of the list, as the default newest-first order has it. */
+export function addRecipe(detail: RecipeDetail): void {
+  const { lines: _lines, steps: _steps, walkthrough: _walkthrough, walkthrough_check: _check, ...summary } = detail;
+  if (recipes.value.some((r) => r.id === summary.id)) return patchRecipe(detail);
+  recipes.value = [summary, ...recipes.value];
+  patches++;
+}
+
 /** Put a recipe as a write answered it into its row, when the list shows it (a search or sort may not). */
 export function patchRecipe(detail: RecipeDetail): void {
   // The summary is the detail without its lines, steps and walkthrough.

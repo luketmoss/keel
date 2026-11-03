@@ -233,6 +233,51 @@ export const DEMO_FOODS: Food[] = [
     last_buy: '18 pack',
   }),
   food('fd_demo_towels', 'Paper towels', {}),
+  // #788: the sample dinner's side salad.
+  food('fd_demo_spring', 'Spring mix', {
+    kcal_100g: 20,
+    protein_100g: 2,
+    carbs_100g: 3.5,
+    fat_100g: 0.3,
+    servings_json: [{ name: 'cup', g: 42.5 }],
+    source: 'usda',
+  }),
+  food('fd_demo_redonion', 'Red onion', {
+    kcal_100g: 40,
+    protein_100g: 1,
+    carbs_100g: 9,
+    fat_100g: 0.1,
+    servings_json: [{ name: 'cup', g: 160 }],
+    source: 'usda',
+  }),
+  food('fd_demo_tomato', 'Cherry tomatoes', {
+    kcal_100g: 18,
+    protein_100g: 0.9,
+    carbs_100g: 3.9,
+    fat_100g: 0.2,
+    servings_json: [{ name: 'cup', g: 149 }],
+    source: 'usda',
+  }),
+  food('fd_demo_vinaigrette', 'Blush wine vinaigrette', {
+    kind: 'packaged',
+    brand: "Brianna's",
+    kcal_100g: 400,
+    protein_100g: 0,
+    carbs_100g: 20,
+    fat_100g: 36,
+    servings_json: [{ name: 'tbsp', g: 15 }],
+    source: 'label',
+  }),
+  food('fd_demo_crispy', 'Crispy onions', {
+    kind: 'packaged',
+    kcal_100g: 570,
+    protein_100g: 6,
+    carbs_100g: 50,
+    fat_100g: 38,
+    servings_json: [{ name: 'tbsp', g: 3.5 }],
+    source: 'label',
+  }),
+  food('fd_demo_croutons', 'Homemade croutons', {}),
 ];
 
 function starter(
@@ -500,7 +545,7 @@ export const DEMO_PLAN: {
 
 /**
  * #712: the sample food log, by days before today. Today: yogurt and granola at breakfast, a partial recipe (Banana
- * Bread) and a food with no nutrition at lunch, nothing yet at dinner (its planned meal is pl_demo_7), a bar for a snack. The
+ * Bread) and a food with no nutrition at lunch, a side salad at dinner (#788; its planned meal is pl_demo_7), a bar for a snack. The
  * day before has two entries, and the day before that none (the "—" state).
  */
 export const DEMO_LOG: {
@@ -513,6 +558,13 @@ export const DEMO_LOG: {
   { days_ago: 0, entry: { slot: 'Breakfast', food_id: 'fd_demo_granola', qty: 50, unit: 'g' } },
   { days_ago: 0, entry: { slot: 'Lunch', recipe_id: 'rc_demo_bread', qty: 1, unit: 'serving' } },
   { days_ago: 0, entry: { slot: 'Lunch', food_id: 'fd_demo_herbs', qty: 2, unit: 'g' } },
+  // #788: tonight's side salad, five foods to save as a recipe, and croutons with no nutrition.
+  { days_ago: 0, entry: { slot: 'Dinner', food_id: 'fd_demo_spring', qty: 2, unit: 'cup' } },
+  { days_ago: 0, entry: { slot: 'Dinner', food_id: 'fd_demo_redonion', qty: 20, unit: 'g' } },
+  { days_ago: 0, entry: { slot: 'Dinner', food_id: 'fd_demo_tomato', qty: 0.5, unit: 'cup' } },
+  { days_ago: 0, entry: { slot: 'Dinner', food_id: 'fd_demo_vinaigrette', qty: 2, unit: 'tbsp' } },
+  { days_ago: 0, entry: { slot: 'Dinner', food_id: 'fd_demo_crispy', qty: 2, unit: 'tbsp' } },
+  { days_ago: 0, entry: { slot: 'Dinner', food_id: 'fd_demo_croutons', qty: 15, unit: 'g' } },
   { days_ago: 0, entry: { slot: 'Snacks', food_id: 'fd_demo_bar', qty: 1, unit: 'bar' } },
   { days_ago: 1, entry: { slot: 'Breakfast', food_id: 'fd_demo_yogurt', qty: 1, unit: 'cup' } },
   { days_ago: 1, entry: { slot: 'Dinner', recipe_id: 'rc_demo_weeknight', qty: 2, unit: 'serving' } },

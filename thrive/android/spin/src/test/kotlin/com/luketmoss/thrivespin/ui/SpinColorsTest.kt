@@ -1,6 +1,7 @@
 package com.luketmoss.thrivespin.ui
 
 import com.luketmoss.thrivespin.core.SpinColors
+import com.luketmoss.thrivespin.core.SpinSizes
 import kotlin.math.pow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -72,6 +73,39 @@ class SpinColorsTest {
     }
 
     @Test
+    fun suiteStatusTokensAreMirroredExactly() {
+        // ui/tokens/suite.css, light then dark.
+        pin("--color-danger-text light", 0xFFB71C1C, SpinColors.DANGER_TEXT_LIGHT)
+        pin("--color-danger-text dark", 0xFFF26B68, SpinColors.DANGER_TEXT_DARK)
+        pin("--color-warning light", 0xFFA05D00, SpinColors.WARNING_LIGHT)
+        pin("--color-warning dark", 0xFFFFB74D, SpinColors.WARNING_DARK)
+    }
+
+    @Test
+    fun thePowerZonesHoldTheNotesValuesInLightAndDark() {
+        // thrive/docs/design/767-spin-library.md, New tokens.
+        pin("--zone-1 light", 0xFF8A93A8, SpinColors.ZONE_1_LIGHT)
+        pin("--zone-1 dark", 0xFF9AA3B5, SpinColors.ZONE_1_DARK)
+        pin("--zone-2 light", 0xFF4F86F7, SpinColors.ZONE_2_LIGHT)
+        pin("--zone-2 dark", 0xFF6E97FF, SpinColors.ZONE_2_DARK)
+        pin("--zone-3 light", 0xFF14A098, SpinColors.ZONE_3_LIGHT)
+        pin("--zone-3 dark", 0xFF2CC2B8, SpinColors.ZONE_3_DARK)
+        pin("--zone-4 light", 0xFFE8A317, SpinColors.ZONE_4_LIGHT)
+        pin("--zone-4 dark", 0xFFF2B84B, SpinColors.ZONE_4_DARK)
+        pin("--zone-5 light", 0xFFEE6A1F, SpinColors.ZONE_5_LIGHT)
+        pin("--zone-5 dark", 0xFFF58A4F, SpinColors.ZONE_5_DARK)
+        pin("--zone-6 light", 0xFFCF3A3A, SpinColors.ZONE_6_LIGHT)
+        pin("--zone-6 dark", 0xFFEF6B6B, SpinColors.ZONE_6_DARK)
+    }
+
+    @Test
+    fun theProfileSizesAreInTheThemeModule() {
+        assertEquals(40, SpinSizes.PROFILE_SM)
+        assertEquals(140, SpinSizes.PROFILE_LG)
+        assertEquals(64, SpinSizes.NAV_HEIGHT)
+    }
+
+    @Test
     fun theLabelOnEveryFillMeetsAA() {
         val pairs = mapOf(
             "primary fill light" to (SpinColors.ON_FILL_LIGHT to SpinColors.PRIMARY_FILL_LIGHT),
@@ -84,6 +118,10 @@ class SpinColorsTest {
             "secondary text on the card dark" to (SpinColors.TEXT_SECONDARY_DARK to SpinColors.SURFACE_DARK),
             "muted text on the card light" to (SpinColors.TEXT_MUTED_LIGHT to SpinColors.SURFACE_LIGHT),
             "muted text on the card dark" to (SpinColors.TEXT_MUTED_DARK to SpinColors.SURFACE_DARK),
+            "danger text on the card light" to (SpinColors.DANGER_TEXT_LIGHT to SpinColors.SURFACE_LIGHT),
+            "danger text on the card dark" to (SpinColors.DANGER_TEXT_DARK to SpinColors.SURFACE_DARK),
+            "warning on the card light" to (SpinColors.WARNING_LIGHT to SpinColors.SURFACE_LIGHT),
+            "warning on the card dark" to (SpinColors.WARNING_DARK to SpinColors.SURFACE_DARK),
         )
         pairs.forEach { (name, p) ->
             val ratio = contrast(p.first, p.second)

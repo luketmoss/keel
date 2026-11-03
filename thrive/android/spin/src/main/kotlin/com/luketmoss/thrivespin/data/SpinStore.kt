@@ -2,10 +2,11 @@ package com.luketmoss.thrivespin.data
 
 import android.content.Context
 import com.luketmoss.thrivespin.core.DevicePersistence
+import com.luketmoss.thrivespin.core.library.CachePersistence
 
 /**
  * Everything the app keeps, in its private SharedPreferences: the API URL and
- * key, the saved devices, and whether the permission has been asked for.
+ * key, the saved devices, the library's cache, and whether the permission has been asked for.
  *
  * Nothing here logs. The key is read into a string for the settings field and
  * goes to the network layer in a POST body; it is in no message.
@@ -27,6 +28,15 @@ class SpinStore(context: Context) : DevicePersistence {
         prefs.edit().putString(DEVICES, json).commit()
     }
 
+    /** The library's one cache (#767): the workouts, the FTP and today's plans, as one string. */
+    val libraryCache: CachePersistence = object : CachePersistence {
+        override fun read(): String? = prefs.getString(LIBRARY, null)
+
+        override fun write(text: String) {
+            prefs.edit().putString(LIBRARY, text).commit()
+        }
+    }
+
     /** Whether the system's Nearby devices prompt has ever been shown by this app. */
     var permissionAsked: Boolean
         get() = prefs.getBoolean(PERMISSION_ASKED, false)
@@ -46,6 +56,7 @@ class SpinStore(context: Context) : DevicePersistence {
         const val URL = "url"
         const val KEY = "key"
         const val DEVICES = "devices"
+        const val LIBRARY = "library_cache"
         const val PERMISSION_ASKED = "permission_asked"
         const val AUTO_ASKED = "auto_asked"
     }

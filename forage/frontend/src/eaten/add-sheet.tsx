@@ -6,6 +6,7 @@ import { displayName, hasNutrition } from '../library/food-math';
 import { addDays } from '../plan/dates';
 import { Sheet } from '../ui/sheet';
 import type { LogTarget } from './amount-sheet';
+import { EntryRow } from './entry-row';
 import { foodRowLine, recipeLoggable, recipeRowLine } from './format';
 
 /** How far back the recents look, how many they list, and how many rows a search shows. */
@@ -17,12 +18,35 @@ const FALLBACK_RECIPES = 3;
 /** A row of the Add sheet: a food or a recipe. */
 type Row = { key: string; target: LogTarget };
 
+/** What the Add sheet lists from: loaded once a pass (#786), and kept for its returns. */
+export interface AddLists {
+  foods: Food[];
+  recipes: RecipeSummary[];
+  /** The last 60 days of the log, behind Recent. */
+  log: FoodLogEntry[];
+}
+
 interface Props {
   api: ForageApi;
   slot: Slot;
   today: string;
-  /** The search text to open with: a starter food just added. */
+  /** The search text to open with: the pass's, or a starter food just added. */
   initialQuery?: string;
+  /** The pass's lists (#786), or null until they load: the sheet loads them once and hands them up. */
+  lists: AddLists | null;
+  onLoaded: (lists: AddLists) => void;
+  /** The search text as it changes, so the pass can keep it while the amount sheet is open. */
+  onQuery?: (q: string) => void;
+  /** The entries the pass logged that are still on the day, in the order logged. */
+  added?: { entry: FoodLogEntry; name: string }[];
+  /** A row of the Added list: that entry's amount sheet, in edit mode. */
+  onOpenAdded?: (entry: FoodLogEntry) => void;
+  /** The Added row just logged or saved, which fades in. */
+  fresh?: string | null;
+  /** "Logged Gnocchi": the pass's last save, as a status line under the search. */
+  status?: string | null;
+  /** The pass has logged something: the header's close is Done. */
+  done?: boolean;
   /** A food or recipe that can be logged: the amount sheet opens for it. */
   onPick: (target: LogTarget) => void;
   /** One with no nutrition: #707's food form, or the recipe's Nutrition sheet. */
@@ -101,28 +125,44 @@ function ResultRow({ row, onPick, onAddNutrition }: { row: Row; onPick: () => vo
 
 /**
  * The Add sheet (#712): a search over foods and recipes, with what was logged most recently when it is empty.
- * Recents are derived from the last 60 days of the log itself; nothing new is stored for them.
+ * Recents are derived from the last 60 days of the log itself; nothing new is stored for them. During a pass
+ * (#786) it lists what the pass added above Recent, and comes back with the lists it loaded first.
  */
-export function AddSheet({ api, slot, today, initialQuery = '', onPick, onAddNutrition, onAddFood, onClose }: Props) {
+export function AddSheet({
+  api,
+  slot,
+  today,
+  initialQuery = '',
+  lists,
+  onLoaded,
+  onQuery,
+  added = [],
+  onOpenAdded,
+  fresh,
+  status,
+  done,
+  onPick,
+  onAddNutrition,
+  onAddFood,
+  onClose,
+}: Props) {
   const [q, setQ] = useState(initialQuery);
-  const [foods, setFoods] = useState<Food[] | null>(null);
-  const [recipes, setRecipes] = useState<RecipeSummary[]>([]);
-  const [log, setLog] = useState<FoodLogEntry[]>([]);
   const [failed, setFailed] = useState(false);
+  const foods = lists?.foods ?? null;
+  const recipes = lists?.recipes ?? [];
+  const log = lists?.log ?? [];
 
   function load() {
     setFailed(false);
-    setFoods(null);
     Promise.all([api.getFoods(), api.getRecipes(), api.getFoodLog(addDays(today, -RECENT_DAYS), today)]).then(
-      ([f, r, l]) => {
-        setFoods(f);
-        setRecipes(r);
-        setLog(l);
-      },
+      ([f, r, l]) => onLoaded({ foods: f, recipes: r, log: l }),
       () => setFailed(true),
     );
   }
-  useEffect(load, [api]);
+  useEffect(() => {
+    if (!lists) load();
+  }, [api]);
+  useEffect(() => onQuery?.(q), [q]);
 
   const meal = slot.toLowerCase();
   const text = q.trim();
@@ -171,6 +211,24 @@ export function AddSheet({ api, slot, today, initialQuery = '', onPick, onAddNut
       : recipes.slice(0, FALLBACK_RECIPES).map((r) => ({ key: r.id, target: { kind: 'recipe', recipe: r } }));
     body = (
       <>
+        {added.length > 0 && (
+          <>
+            <p class="card-label" id="added-label">
+              Added to {meal}
+            </p>
+            <ul class="plain-list added-list" aria-labelledby="added-label" data-testid="added-list">
+              {added.map(({ entry, name }) => (
+                <EntryRow
+                  key={entry.id}
+                  entry={entry}
+                  name={name}
+                  fresh={entry.id === fresh}
+                  onOpen={() => onOpenAdded?.(entry)}
+                />
+              ))}
+            </ul>
+          </>
+        )}
         {!recents.length && <p class="library-status">Nothing logged yet. Search for a food or recipe.</p>}
         {rows.length > 0 && (
           <>
@@ -194,7 +252,19 @@ export function AddSheet({ api, slot, today, initialQuery = '', onPick, onAddNut
   }
 
   return (
-    <Sheet title={`Add to ${meal}`} onClose={onClose} testId="add-sheet" tall>
+    <Sheet
+      title={`Add to ${meal}`}
+      onClose={onClose}
+      testId="add-sheet"
+      tall
+      headerEnd={
+        done ? (
+          <button type="button" class="btn btn-secondary" onClick={onClose} data-testid="add-done">
+            Done
+          </button>
+        ) : undefined
+      }
+    >
       <label class="visually-hidden" for="add-search">
         Search foods and recipes
       </label>
@@ -208,6 +278,9 @@ export function AddSheet({ api, slot, today, initialQuery = '', onPick, onAddNut
         data-autofocus
         data-testid="add-search"
       />
+      <p class="hint add-status" role="status" data-testid="add-status">
+        {status ?? ''}
+      </p>
       {body}
       <button type="button" class="btn btn-secondary btn-block add-food-btn" onClick={onAddFood} data-testid="not-here">
         Not here? Add a food

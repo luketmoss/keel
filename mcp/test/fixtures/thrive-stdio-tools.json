@@ -1,5 +1,31 @@
 [
   {
+    "name": "thrive_add_ftp",
+    "description": "Record a new FTP in Thrive Spin: whole watts, 50-1000, on today or an earlier date, as a manual entry (a ramp test FTP only comes from Spin itself). Dry-run by default: shows the current FTP beside the new one, and only writes when confirm is true. A new FTP rescales every future workout's watts, since targets are % of FTP, so confirm only a value the user stated. Rides already ridden keep the FTP they were ridden at and are not rescored. An FTP equal to the current one is refused, and so is a future date. thrive_undo removes it.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "ftp_w": {
+          "type": "number",
+          "description": "The FTP in whole watts, 50-1000"
+        },
+        "date": {
+          "description": "The date it takes effect (YYYY-MM-DD, 'today', 'yesterday', '-3d'). Default: today",
+          "type": "string"
+        },
+        "confirm": {
+          "description": "Set true to actually write it. Default false = preview only.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ftp_w"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": {}
+    }
+  },
+  {
     "name": "thrive_body_measurements",
     "description": "Weight, body composition and blood pressure readings from Withings devices (a Body+ scale, a BPM Connect cuff), one line per reading, grouped by local date. Use it for weight trend, body fat and blood pressure questions. Default range: the 30 days ending today. Mass is stored in kg and every \"_kg\" value is also shown in lb, so a weight question never needs its own conversion. A day may hold several blood pressure readings — each is its own line, never averaged. \"—\" means Withings did not report that value for that reading, and is unknown, never zero. Averages, trends and blood-pressure categories are not computed here — an agent or almanac derives them from the readings. DailySummary's body columns, when present (#203), are a per-day pick, not every reading: use this tool instead for anything reading-level.",
     "inputSchema": {
@@ -54,6 +80,71 @@
       ],
       "additionalProperties": true,
       "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "thrive_create_ride_workout",
+    "description": "Add a workout to Thrive Spin's library, saved straight away (it only adds a row). Targets are % of FTP, never watts. Replies with what was created, its id and its total time. thrive_undo removes it. To build \"75 minutes of sweet spot\": a warm-up ramp, repeat blocks of the hard step and a recovery, and a cool-down, adding up to the time asked for.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The workout name, 1-80 characters"
+        },
+        "category": {
+          "type": "string",
+          "description": "One of Endurance, Sweet spot, Threshold, VO2, Recovery"
+        },
+        "description": {
+          "description": "Optional text, at most 1000 characters",
+          "type": "string"
+        },
+        "steps": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              }
+            },
+            {
+              "type": "object",
+              "properties": {
+                "v": {
+                  "type": "number"
+                },
+                "steps": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                }
+              },
+              "required": [
+                "steps"
+              ],
+              "additionalProperties": {}
+            }
+          ],
+          "description": "The steps, replacing any existing ones whole. Either {\"v\": 1, \"steps\": [...]} or just the list of blocks. A block is a step or a repeat. A step is {\"label\": text of 1-40, \"dur_s\": whole seconds 1-14400, \"mode\", \"cadence\"?: whole rpm 40-150} plus its mode's target: mode \"erg\" takes \"pct\" (whole % of FTP, 0-300, never watts) and optionally \"pct_end\" for a ramp from pct to pct_end; \"resistance\" takes \"level\" (0-100); \"slope\" takes \"grade\" (-10 to 20 percent, one decimal); \"free\" takes none. A repeat is {\"repeat\": 2-50, \"steps\": [1-20 steps]} and does not nest. 1-100 blocks, at most 6 hours in all with repeats counted out. The total time is worked out for you; do not send it. Example: [{\"label\": \"Warm-up\", \"dur_s\": 600, \"mode\": \"erg\", \"pct\": 50, \"pct_end\": 70}, {\"repeat\": 3, \"steps\": [{\"label\": \"Sweet spot\", \"dur_s\": 720, \"mode\": \"erg\", \"pct\": 90, \"cadence\": 90}, {\"label\": \"Recover\", \"dur_s\": 240, \"mode\": \"erg\", \"pct\": 55}]}, {\"label\": \"Cool-down\", \"dur_s\": 360, \"mode\": \"free\"}]"
+        }
+      },
+      "required": [
+        "name",
+        "category",
+        "steps"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": {}
     }
   },
   {
@@ -237,6 +328,28 @@
     }
   },
   {
+    "name": "thrive_delete_ride_workout",
+    "description": "Delete one Thrive Spin library workout by id. Destructive and dry-run by default: shows the workout and its last ridden date, and only deletes when confirm is true. Planned bike days and rides that name it keep the id. thrive_undo can bring it back.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The workout id, from thrive_list_ride_workouts"
+        },
+        "confirm": {
+          "description": "Set true to actually delete. Default false = preview only.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": {}
+    }
+  },
+  {
     "name": "thrive_delete_workout",
     "description": "Delete a workout and all of its sets. Destructive and dry-run by default: shows exactly what would go, and only deletes when confirm is true.",
     "inputSchema": {
@@ -301,6 +414,43 @@
       ],
       "additionalProperties": true,
       "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "thrive_ftp",
+    "description": "The owner's FTP from Thrive Spin: the current one (watts, the date it took effect, and whether a ramp test or a person set it) and the history, newest first, one line each. from and to narrow the history; the current FTP is always shown. A ramp test row names its test ride. A workout's % targets are scaled by the FTP; a ride keeps the FTP it was ridden at. thrive_add_ftp records a new one, on the Thrive (write) connector.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "from": {
+          "description": "Only entries on or after this date (YYYY-MM-DD, 'today', 'yesterday', '-30d')",
+          "type": "string"
+        },
+        "to": {
+          "description": "Only entries on or before this date",
+          "type": "string"
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": {}
+    }
+  },
+  {
+    "name": "thrive_get_ride_workout",
+    "description": "One Thrive Spin library workout by id (from thrive_list_ride_workouts): its category and description, every step in plain words (a repeat as \"3 x [...]\", a ramp as \"50 -> 70%\", targets as % of FTP, never watts), the total time, and the steps JSON v1 to edit and send back as steps to thrive_update_ride_workout.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The workout id, from thrive_list_ride_workouts"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": {}
     }
   },
   {
@@ -380,6 +530,25 @@
       },
       "additionalProperties": true,
       "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "thrive_list_ride_workouts",
+    "description": "Thrive Spin's workout library, one line per workout ordered by name: id, name, category, duration (h:mm) and the date it was last ridden, or \"never ridden\". category and search narrow it. thrive_get_ride_workout shows one's steps. Changing the library is on the Thrive (write) connector: thrive_create_ride_workout, thrive_update_ride_workout and thrive_delete_ride_workout.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "category": {
+          "description": "Only this category: Endurance, Sweet spot, Threshold, VO2, Recovery",
+          "type": "string"
+        },
+        "search": {
+          "description": "Only workouts whose name or description contains this text (case-insensitive)",
+          "type": "string"
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": {}
     }
   },
   {
@@ -998,6 +1167,77 @@
       ],
       "additionalProperties": true,
       "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "thrive_update_ride_workout",
+    "description": "Change a Thrive Spin library workout by id: any of name, category, description and steps; what is not given is kept. Steps are replaced whole, never patched: read them with thrive_get_ride_workout, change them and send the whole list. Destructive and dry-run by default: shows only the fields that change, old to new, with steps in words, and only writes when confirm is true. thrive_undo reverts it.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The workout id, from thrive_list_ride_workouts"
+        },
+        "name": {
+          "description": "The new name, 1-80 characters",
+          "type": "string"
+        },
+        "category": {
+          "description": "One of Endurance, Sweet spot, Threshold, VO2, Recovery",
+          "type": "string"
+        },
+        "description": {
+          "description": "The new description, at most 1000 characters; \"\" clears it",
+          "type": "string"
+        },
+        "steps": {
+          "description": "The steps, replacing any existing ones whole. Either {\"v\": 1, \"steps\": [...]} or just the list of blocks. A block is a step or a repeat. A step is {\"label\": text of 1-40, \"dur_s\": whole seconds 1-14400, \"mode\", \"cadence\"?: whole rpm 40-150} plus its mode's target: mode \"erg\" takes \"pct\" (whole % of FTP, 0-300, never watts) and optionally \"pct_end\" for a ramp from pct to pct_end; \"resistance\" takes \"level\" (0-100); \"slope\" takes \"grade\" (-10 to 20 percent, one decimal); \"free\" takes none. A repeat is {\"repeat\": 2-50, \"steps\": [1-20 steps]} and does not nest. 1-100 blocks, at most 6 hours in all with repeats counted out. The total time is worked out for you; do not send it. Example: [{\"label\": \"Warm-up\", \"dur_s\": 600, \"mode\": \"erg\", \"pct\": 50, \"pct_end\": 70}, {\"repeat\": 3, \"steps\": [{\"label\": \"Sweet spot\", \"dur_s\": 720, \"mode\": \"erg\", \"pct\": 90, \"cadence\": 90}, {\"label\": \"Recover\", \"dur_s\": 240, \"mode\": \"erg\", \"pct\": 55}]}, {\"label\": \"Cool-down\", \"dur_s\": 360, \"mode\": \"free\"}]",
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              }
+            },
+            {
+              "type": "object",
+              "properties": {
+                "v": {
+                  "type": "number"
+                },
+                "steps": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                }
+              },
+              "required": [
+                "steps"
+              ],
+              "additionalProperties": {}
+            }
+          ]
+        },
+        "confirm": {
+          "description": "Set true to actually save. Default false = preview only.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": {}
     }
   },
   {

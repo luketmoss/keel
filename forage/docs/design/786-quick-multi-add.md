@@ -10,7 +10,7 @@ sheet is right when the pass ends. There are no standing documents in `forage/do
 nothing here introduces one.
 
 The clickable mock is https://claude.ai/artifact/BzxrQDW3F4ehVRm5z3Kc3y. It runs the main path, edits from the Added
-list, the meal chip, a failed save and **Done**, with a simulated save delay. Its figures are made up, and it adds the
+list, a failed save and **Done**, with a simulated save delay. Its figures are made up, and it adds the
 day's totals itself, which the app never does.
 
 ## The pass
@@ -51,8 +51,7 @@ comes back when the field is cleared.
 **Added list.** A label `Added to dinner` (`card-label`, the meal as the sheet's title names it), then a group in
 `--color-primary-light` with `--radius-md`, holding one row per entry of the pass that still exists, in the order
 logged. Each row is a button, 56px or more, with #712's entry-row content: line one the food (brand then name) or
-recipe; line two the amount as the day shows it (`1 cup · 140 g`, `2 servings`), then `· Lunch` when the entry went to
-a different meal than the pass's; right, the stored kcal with `kcal` in `--text-sm`, or #712's `—` chip and "No
+recipe; line two the amount as the day shows it (`1 cup · 140 g`, `2 servings`); right, the stored kcal with `kcal` in `--text-sm`, or #712's `—` chip and "No
 nutrition" for an entry without it. Tapping a row opens that entry's amount sheet in edit mode. There is no total for
 the list: the day card is the only sum (#712).
 
@@ -74,7 +73,7 @@ sheet closes, focus returns to the Add row that opened it, and one toast reports
 |---|---|
 | 0 | none (a pass that logged nothing, or whose entries were all deleted: each delete had its own status line) |
 | 1 | "Logged Trader Joe's Potato gnocchi" (#712's wording) |
-| 2 or more | "Logged 7 items to dinner" (the pass's meal; entries moved to another meal count, since they were logged in this pass) |
+| 2 or more | "Logged 7 items to dinner" |
 
 ## Amount sheet during a pass
 
@@ -86,17 +85,19 @@ The sheet is #712's. What changes is where it goes:
 | Close, Escape, backdrop (nothing logged) | the day | the Add sheet, with the search text it had and focus in the field |
 | A failed **Log it** | stays open with its error | the same; nothing is added to the list |
 
-**Meal chip.** Preset to the pass's slot for every new item. Choosing another chip logs that entry to that meal; its
-Added row says `· Lunch`, and the next item picked is preset to Dinner again. The pass does not follow the chip.
+**No meal chips.** During a pass the amount sheet leaves out #712's Meal label and chips, for a new item and for one
+edited from the Added list. Every entry the pass logs goes to the meal its Add row named, which is what the sheet
+under it says (`Add to dinner`); offering Lunch there would contradict it. Moving an entry to another meal is done
+from the day, where the chips stay (below).
 
 **Edit from the Added list.** The amount sheet in edit mode, as #712 specifies (stored numbers first, **Save**,
-**Delete entry**). **Save** answers → back to the Add sheet, the row showing the new amount, kcal and meal, with the
+**Delete entry**), without the chips. **Save** answers → back to the Add sheet, the row showing the new amount and kcal, with the
 same fade; the search text is kept, not cleared, since nothing new was picked. **Delete entry** → #712's confirmation
 → on success back to the Add sheet with the row gone and a status line "Deleted Trader Joe's Potato gnocchi". Close
 without saving → back to the Add sheet unchanged.
 
-**Editing from the day** (tapping an entry row on the day, outside a pass) is unchanged: Save, Delete and close all
-return to the day.
+**Editing from the day** (tapping an entry row on the day, outside a pass) is unchanged: the meal chips are there,
+and Save, Delete and close all return to the day.
 
 ## Not here? Add a food
 
@@ -138,7 +139,6 @@ return to the day.
 
 - Added list label: `Added to dinner` (`Added to breakfast`, `Added to lunch`, `Added to snacks`)
 - Header button: `Done`
-- Meal suffix on an Added row: `· Lunch`
 - In-sheet status after each save: "Logged <name>", "Saved <name>", "Deleted <name>"
 - Toast on ending the pass: "Logged <name>" for one entry, "Logged <n> items to <meal>" for several
 

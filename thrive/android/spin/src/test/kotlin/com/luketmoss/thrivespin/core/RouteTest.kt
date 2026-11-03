@@ -13,6 +13,7 @@ class RouteTest {
         roundTrip(Route.Settings(AppTab.Library))
         roundTrip(Route.Settings(AppTab.Devices))
         roundTrip(Route.Detail("rw_1a2b3c4d"))
+        roundTrip(Route.RampIntro)
         roundTrip(Route.Builder(null, Route.Tab(AppTab.Devices)))
         roundTrip(Route.Builder("rw_1", Route.Detail("rw_1")))
     }

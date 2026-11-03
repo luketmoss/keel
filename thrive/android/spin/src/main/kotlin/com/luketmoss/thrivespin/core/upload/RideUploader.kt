@@ -1,15 +1,8 @@
 package com.luketmoss.thrivespin.core.upload
 
 import com.luketmoss.thrivespin.core.ConnectionTest
-import com.luketmoss.thrivespin.core.SpinJson
 import com.luketmoss.thrivespin.core.Transport
 import com.luketmoss.thrivespin.core.ride.recording.isoSeconds
-import java.io.IOException
-import kotlinx.serialization.SerializationException
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.contentOrNull
 
 /** What one pass over the queue leaves for the worker to do. */
 enum class UploadRun {
@@ -38,18 +31,6 @@ class RideUploader(
     private val config: () -> Pair<String, String>,
     private val now: () -> Long,
 ) {
-    private sealed interface Outcome {
-        data class Success(val answer: SaveAnswer) : Outcome
-
-        data class Refused(val text: String) : Outcome
-
-        data object KeyRefused : Outcome
-
-        data object Offline : Outcome
-
-        data object ServerError : Outcome
-    }
-
     suspend fun runOnce(): UploadRun {
         uploads.finishSent()
         val queued = uploads.queued()
@@ -74,21 +55,21 @@ class RideUploader(
                 uploads.sendingNow(rideId, false)
             }
             when (outcome) {
-                is Outcome.Success -> uploads.markSent(rideId, outcome.answer)
-                is Outcome.Refused -> uploads.update(rideId) {
+                is Answer.Success -> uploads.markSent(rideId, AnswerReader.read(outcome.data))
+                is Answer.Refused -> uploads.update(rideId) {
                     it.copy(state = UploadStage.Rejected, message = outcome.text, serverErrors = 0, lastFailure = null)
                 }
-                Outcome.KeyRefused -> {
+                Answer.KeyRefused -> {
                     uploads.setStageForQueued(UploadStage.NeedsKey)
                     return UploadRun.Done
                 }
-                Outcome.Offline -> {
+                Answer.Offline -> {
                     retry = true
                     uploads.update(rideId) {
                         it.copy(attempts = it.attempts + 1, lastTryUtc = isoSeconds(now()), lastFailure = Failure.Offline, serverErrors = 0)
                     }
                 }
-                Outcome.ServerError -> uploads.update(rideId) {
+                Answer.ServerError -> uploads.update(rideId) {
                     val errors = it.serverErrors + 1
                     val stuck = errors >= STUCK_AFTER
                     if (!stuck) retry = true
@@ -105,32 +86,11 @@ class RideUploader(
         return if (retry) UploadRun.Retry else UploadRun.Done
     }
 
-    private suspend fun send(url: String, key: String, payload: String, fit: ByteArray, streams: ByteArray): Outcome {
-        val body = try {
-            transport.post(url.trim(), SavePayload.form(payload, key, fit, streams))
-        } catch (e: IOException) {
-            return Outcome.Offline
-        }
-        val envelope: JsonObject = try {
-            SpinJson.parseToJsonElement(body) as? JsonObject
-        } catch (e: SerializationException) {
-            null
-        } catch (e: IllegalArgumentException) {
-            null
-        } ?: return Outcome.Offline
-        val success = (envelope["success"] as? JsonPrimitive)?.booleanOrNull ?: return Outcome.Offline
-        if (success) return Outcome.Success(AnswerReader.read(envelope["data"]))
-        val error = (envelope["error"] as? JsonPrimitive)?.contentOrNull
-        val code = (envelope["code"] as? JsonPrimitive)?.contentOrNull
-        return when {
-            error == ConnectionTest.KEY_REJECTED_MESSAGE || code?.endsWith("_forbidden") == true -> Outcome.KeyRefused
-            code == BAD_REQUEST -> Outcome.Refused(error?.takeIf { it.isNotBlank() } ?: "Thrive refused this ride.")
-            else -> Outcome.ServerError
-        }
-    }
+    private suspend fun send(url: String, key: String, payload: String, fit: ByteArray, streams: ByteArray): Answer =
+        Answers.post(transport, url.trim(), SavePayload.form(payload, key, fit, streams), "Thrive refused this ride.")
 
     companion object {
-        const val BAD_REQUEST = "bad_request"
+        const val BAD_REQUEST = Answers.BAD_REQUEST
         const val STUCK_AFTER = 10
         const val MISSING_FILES = "The ride's files are missing from this phone."
     }

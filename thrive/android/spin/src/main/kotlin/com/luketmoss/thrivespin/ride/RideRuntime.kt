@@ -9,8 +9,11 @@ import com.luketmoss.thrivespin.core.ride.RidePhase
 import com.luketmoss.thrivespin.core.ride.RideSession
 import com.luketmoss.thrivespin.core.ride.recording.FileRideStore
 import com.luketmoss.thrivespin.core.ride.recording.RideRecording
+import com.luketmoss.thrivespin.core.ramp.RampDecider
+import com.luketmoss.thrivespin.core.ramp.RampFiles
 import com.luketmoss.thrivespin.core.upload.SummaryHandler
 import com.luketmoss.thrivespin.core.upload.SummaryQueue
+import com.luketmoss.thrivespin.ftp.FtpRuntime
 import java.io.IOException
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,6 +41,9 @@ object RideRuntime {
     val summaries = SummaryQueue()
 
     val handOffs: StateFlow<List<String>> get() = summaries.ids
+
+    /** The ramp tests whose result screen is to be shown (#770), oldest first, one at a time. Later takes the head off; Continue hands the test off. */
+    val results = SummaryQueue()
 
     private var launch: Launch? = null
     private var launching = false
@@ -78,7 +84,8 @@ object RideRuntime {
 
     /**
      * The hand-off (#769): a finished workout opens its summary and is marked handed off at once; a ramp
-     * test is left for #770. The service and the app's recovery both call it.
+     * test (#770) opens its result and stays un-handed-off until Continue. The service and the app's recovery
+     * both call it.
      */
     fun handler(context: Context): RideFinishedHandler {
         val rides = store(context)
@@ -92,6 +99,8 @@ object RideRuntime {
                 }
             },
             show = { id -> enqueue(id) },
+            showResult = { id -> results.add(id) },
+            isHandedOff = { id -> rides.list().firstOrNull { it.id == id }?.handedOff == true },
         )
         return object : RideFinishedHandler {
             override fun onFinished(rideId: String) {
@@ -108,4 +117,18 @@ object RideRuntime {
     fun show(rideId: String) = summaries.showNow(rideId)
 
     fun handedOff(rideId: String) = summaries.remove(rideId)
+
+    /** "See your result" on the ramp screen: this test's result opens above it. */
+    fun showResult(rideId: String) = results.showNow(rideId)
+}
+
+/** The ramp test's files and decisions on this phone (#770). */
+object RampRuntime {
+    fun files(context: Context): RampFiles = RampFiles(RideRuntime.store(context))
+
+    fun decider(context: Context): RampDecider = RampDecider(
+        store = RideRuntime.store(context),
+        files = files(context),
+        queue = FtpRuntime.queue(context),
+    )
 }

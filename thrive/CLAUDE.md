@@ -150,7 +150,7 @@ rate straps over Bluetooth LE for indoor rides. It does not depend on `app`: the
 check, OkHttp transport, envelope reading) are copied. #766 is its shell, Settings and Devices screen
 (`docs/design/766-spin-devices.md`); #767 is the Library, workout detail and builder (`docs/design/767-spin-library.md`);
 #768 is the ride (`docs/design/768-spin-ride.md`); #769 is the FIT file, the summary and the upload queue
-(`docs/design/769-spin-save.md`).
+(`docs/design/769-spin-save.md`); #770 is the ramp test and setting FTP (`docs/design/770-ramp-test.md`).
 
 - **Install is by sideload**, like Sip: download the `thrive-spin-apk` artifact from the latest green
   `thrive-android.yml` run (the same job also uploads `thrive-sip-apk`) and install it beside Thrive Sip. It is signed
@@ -191,6 +191,18 @@ check, OkHttp transport, envelope reading) are copied. #766 is its shell, Settin
   being offline is never an error, and the 10th server error in a row is `stuck`. `upload/UploadWorker` runs it on
   WorkManager; the app also runs it at once on Save. Library gains a banner for rides not finished with. #770 calls
   `RideUploads.prepare(rideId, ftpW)` with the FTP a ramp test decides.
+- **Ramp test and FTP (#770).** A built-in test, not a library workout: a Library card above "All workouts" opens the intro,
+  and `core/ramp/RampTest` builds its `RideSession` (kind `RampTest`: 5:00 warm-up at 100 W, an open-ended `WattsStairs(100, 20, 60)`
+  ending on a tap or `CadenceBelow(60, 5)`, 10:00 cool-down), run by #768's engine with its own screen (`ui/RampScreen`, state in
+  `core/ramp/RampScreenState`). `RampResult.from(recording)` is the best minute (rolling 60 s, 50 readings) and FTP = 75% of it, in
+  exact integer arithmetic; it is frozen into `ramp.json` in the ride's folder when the ramp ends. The result screen
+  (`core/ramp/RampResultState`) adjusts the number ±1 W and confirms it: **Set** writes one `FtpRecord` (`files/ftp/ftp_<ride id>.json`,
+  the commit, outside the ride's folder) and queues `addFtp`; **Keep** writes only `ramp.json`. `core/ftp/FtpQueue` and `FtpUploader`
+  are that write's own queue, classified by `core/upload/Answers`, the one answer table the ride queue shares; `ftp/FtpWorker` runs it
+  on WorkManager. Everything in Spin that reads the FTP reads `core/ftp/CurrentFtp` (the cached `getFtp` `current`, or a newer record
+  not yet sent), so a confirmed FTP is used at once and offline. The ride is scored at the FTP in force after the decision: Continue
+  and every later open of the summary pass it to `RideUploads.prepare`. An undecided result is un-handed-off, so it comes back at each
+  app open. The Library banner for FTP changes and the FTP sheet (Send now, Try again, Drop change) are `ui/FtpSheet`.
 - **Testing is not human-gated**, as for Sip: `/test` passes the JVM and CI criteria; Bluetooth, permission and
   on-phone criteria are waived by the owner and listed in the issue's `## Results` as things to watch. Install the APK
   from the merge's CI run on `main`.

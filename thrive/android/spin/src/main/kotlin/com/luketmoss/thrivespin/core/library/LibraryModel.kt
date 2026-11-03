@@ -1,6 +1,7 @@
 package com.luketmoss.thrivespin.core.library
 
 import com.luketmoss.thrivespin.core.Transport
+import com.luketmoss.thrivespin.core.ftp.FtpRow
 import com.luketmoss.thrivespin.core.workout.Draft
 import java.time.LocalDate
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -85,10 +86,14 @@ class LibraryModel(
                 return RefreshOutcome.Failed(failed.reason)
             }
             val read = LibraryRows.workouts((workouts as ApiResult.Ok).data)
+            val ftpRow = LibraryRows.currentFtpRow((ftp as ApiResult.Ok).data)
             val next = LibraryCache(
                 workouts = read.readable,
                 unreadable = read.unreadable,
-                ftpW = LibraryRows.currentFtp((ftp as ApiResult.Ok).data),
+                ftpW = ftpRow?.ftpW,
+                ftpDate = ftpRow?.date.orEmpty(),
+                ftpSource = ftpRow?.source.orEmpty(),
+                ftpCreated = ftpRow?.created.orEmpty(),
                 plans = LibraryRows.bikePlans((plans as ApiResult.Ok).data),
                 plansDate = date,
                 refreshedAtMs = clock(),
@@ -151,6 +156,17 @@ class LibraryModel(
                 DeleteOutcome.Deleted
             }
         }
+
+    /**
+     * A queued FTP write reached Thrive (#770): the cache's `current` becomes the row it returned, unless
+     * the cache already holds a newer one. Safe from the worker: the model is the process's one.
+     */
+    fun setCurrentFtp(row: FtpRow) {
+        val current = cacheFlow.value ?: LibraryCache(emptyList(), 0, null, emptyList(), "", 0L)
+        val cachedKey = current.ftpDate to current.ftpCreated
+        if (current.ftpW != null && (cachedKey.first > row.date || (cachedKey.first == row.date && cachedKey.second > row.created))) return
+        store(current.withFtp(row))
+    }
 
     private fun putWorkout(w: RideWorkout) {
         val current = cacheFlow.value

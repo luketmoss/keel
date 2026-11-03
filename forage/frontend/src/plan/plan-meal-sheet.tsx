@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import { ApiError, type ForageApi } from '../api/client';
-import { SLOTS, type RecipeSummary, type Slot } from '../api/types';
+import { SLOTS, type PlanEntry, type RecipeSummary, type Slot } from '../api/types';
 import { Stars } from '../cook/stars';
 import { Sheet } from '../ui/sheet';
 import { dayChip, newPlanId } from './dates';
@@ -53,7 +53,8 @@ interface Props {
   today: string;
   /** The day whose "Nothing planned" row was tapped, else Tomorrow. */
   date?: string;
-  onPlanned: () => void;
+  /** Planned: the entry as the API stored it. */
+  onPlanned: (entry: PlanEntry) => void;
   onClose: () => void;
 }
 
@@ -93,8 +94,7 @@ export function PlanMealSheet({ api, days, today, date, onPlanned, onClose }: Pr
     setBusy(busyKey);
     setStatus('');
     try {
-      await api.planMeal({ id, date: day, slot, ...what });
-      onPlanned();
+      onPlanned(await api.planMeal({ id, date: day, slot, ...what }));
     } catch (err) {
       if ('recipe_id' in what && err instanceof ApiError && /is not a recipe/.test(err.message)) {
         setStatus(RECIPE_GONE);

@@ -14,8 +14,8 @@ interface Props {
   entry: PlanEntry;
   days: string[];
   today: string;
-  /** Moved or removed: the plan reloads. */
-  onDone: () => void;
+  /** Moved (the entry as the API stored it) or removed (null): the plan shows it. */
+  onDone: (moved: PlanEntry | null) => void;
   /** It was already removed elsewhere: the sheet closes and the plan reloads with that line. */
   onGone: () => void;
   onClose: () => void;
@@ -45,12 +45,11 @@ export function MealSheet({ api, entry, days, today, onDone, onGone, onClose }: 
   const changed = Object.keys(changes).length > 0;
   const noteOk = !isNote || note.trim().length > 0;
 
-  async function run(write: () => Promise<unknown>) {
+  async function run(write: () => Promise<PlanEntry | void>) {
     setBusy(true);
     setStatus('');
     try {
-      await write();
-      onDone();
+      onDone((await write()) ?? null);
     } catch (err) {
       if (err instanceof ApiError && err.code === 'not_found') onGone();
       else setStatus(SAVE_FAILED);

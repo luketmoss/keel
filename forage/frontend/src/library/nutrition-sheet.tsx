@@ -18,7 +18,8 @@ interface Props {
   api: ForageApi;
   recipeId: string;
   /** The recipe's figures changed: Library's list refreshes. */
-  onChanged: () => void;
+  /** A change was saved: the recipe as it now is, when the sheet has it, for the list behind to patch (#785). */
+  onChanged: (recipe?: RecipeDetail) => void;
   onClose: () => void;
   /** #708: coming back from log mode, the Cook button takes focus. */
   focusCook?: boolean;
@@ -63,7 +64,7 @@ export function NutritionSheet({ api, recipeId, onChanged, onClose, focusCook }:
   /** The cook the "How was it?" card is for, kept once rated so the card can take a note. */
   const [rateFor, setRateFor] = useState<Cook | null>(null);
 
-  async function refetch() {
+  async function refetch(): Promise<RecipeDetail | null> {
     setUpdating(true);
     try {
       // The history is not worth failing the sheet over: without it, the rest still shows.
@@ -71,8 +72,10 @@ export function NutritionSheet({ api, recipeId, onChanged, onClose, focusCook }:
       setRecipe(r);
       if (c) setCooks(c);
       setFailed(false);
+      return r;
     } catch {
       setFailed(true);
+      return null;
     } finally {
       setUpdating(false);
     }
@@ -101,8 +104,7 @@ export function NutritionSheet({ api, recipeId, onChanged, onClose, focusCook }:
 
   async function fixed() {
     setOverlay(null);
-    await refetch();
-    onChanged();
+    onChanged((await refetch()) ?? undefined);
   }
 
   /** Rate, re-rate, note or clear a cook; the sheet and Library's row refresh after. */
@@ -113,7 +115,7 @@ export function NutritionSheet({ api, recipeId, onChanged, onClose, focusCook }:
       const [r, c] = await Promise.all([api.getRecipe(recipeId), api.getCooks(recipeId)]);
       setRecipe(r);
       setCooks(c);
-      onChanged();
+      onChanged(r);
     } finally {
       setBusyCook(null);
     }
@@ -133,8 +135,7 @@ export function NutritionSheet({ api, recipeId, onChanged, onClose, focusCook }:
     setBusyCook(cook.id);
     try {
       await api.deleteCook(cook.id);
-      await refetch();
-      onChanged();
+      onChanged((await refetch()) ?? undefined);
     } catch {
       setStatus("Couldn't remove the cook. Try again.");
     } finally {

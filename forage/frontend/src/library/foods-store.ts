@@ -25,13 +25,16 @@ export function showFoodsNotice(text: string): void {
   noticeTimer = setTimeout(() => (foodsNotice.value = null), 4000);
 }
 
-export async function loadFoods(api: ForageApi): Promise<void> {
-  if (foodsState.value !== 'ready') foodsState.value = 'loading';
+/**
+ * `quiet` is the refresh after a save (#785): a failure leaves the list as it is, and the state is left alone.
+ */
+export async function loadFoods(api: ForageApi, quiet = false): Promise<void> {
+  if (!quiet && foodsState.value !== 'ready') foodsState.value = 'loading';
   try {
     libraryFoods.value = await api.getFoods();
     foodsState.value = 'ready';
   } catch {
-    foodsState.value = 'error';
+    if (!quiet) foodsState.value = 'error';
   }
 }
 

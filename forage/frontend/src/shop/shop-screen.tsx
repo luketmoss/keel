@@ -526,7 +526,6 @@ export function ShopScreen({ api }: { api: ForageApi }) {
     clearView();
     shopTrip.value = null;
     showToast('List thrown away. Your meals are still planned.');
-    void loadTrip(api);
   }
 
   const failure = shopFailed.value && (

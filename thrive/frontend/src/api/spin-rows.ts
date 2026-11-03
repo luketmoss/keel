@@ -2,9 +2,9 @@
 // owner's FTP settings.
 //
 // Mirrors RIDE_WORKOUT_FIELDS and FTP_HISTORY_FIELDS in apps-script/src/types.js (change both
-// together; spin-rows.test.ts fails if they drift). Nothing in the SPA reads or writes these
-// tabs yet: the Spin app uses the API's getRideWorkouts, getFtp and their writes, and #772 reads
-// the FTP and the library here. So this file is the layout and its mappers, and renders nothing.
+// together; spin-rows.test.ts fails if they drift). The SPA only reads these tabs: #771's ride detail
+// reads RideWorkouts for a ride's workout name (spin/ride-library.ts), and #772 reads the FTP and the
+// library. The Spin app uses the API's getRideWorkouts, getFtp and their writes.
 //
 // Every cell is text, as every other row mapping here: `steps` is the stored steps JSON,
 // `duration_s` the API's computed total in seconds, `ftp_w` whole watts.

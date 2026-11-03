@@ -10,6 +10,15 @@ import type {
   SetWithRow,
 } from './types';
 import { DEMO_TRACKS } from './demo-track';
+import {
+  DEMO_FREE_RIDE_ID,
+  DEMO_FREE_RIDE_STREAMS,
+  DEMO_SPIN_FTP,
+  DEMO_SWEET_SPOT_ID,
+  DEMO_SWEET_SPOT_LIBRARY_ID,
+  DEMO_SWEET_SPOT_STREAMS,
+  demoRideFigures,
+} from './demo-spin';
 import { DEMO_TRAIL_CELLS } from './demo-trails';
 import type { DailyHealthRow, BodyMeasurementRow, DailySummaryRow } from './health-api';
 import { colorKeyFromName } from './label-colors';
@@ -1013,6 +1022,50 @@ const DEMO_CASES: WorkoutWithRow[] = [
     status: 'planned',
     estimated_seconds: '4200',
     sheetRow: 21,
+  }),
+  // #771: two Thrive Spin rides, each with bundled streams (demo-spin.ts). The first has heart rate, a
+  // pause and a linked library workout; the second has neither. The existing indoor ride stays as it is:
+  // it is the "no streams" case.
+  demoRow({
+    id: DEMO_SWEET_SPOT_ID,
+    offset: -1,
+    type: 'bike',
+    name: 'Sweet Spot 3×12',
+    time: '06:30',
+    notes: 'Legs felt good. Held every block.',
+    elapsed_seconds: String(DEMO_SWEET_SPOT_STREAMS.power_w.length),
+    effort: 'Hard',
+    avg_hr: '141',
+    sub_type: 'indoor',
+    source: 'spin',
+    source_activity_id: 'ride-demo-sweet-spot',
+    synced_at: '2025-01-13T14:45:00.000Z',
+    started_at_utc: '2025-01-13T13:30:00.000Z',
+    calories: '690',
+    ...demoRideFigures(DEMO_SWEET_SPOT_STREAMS),
+    ftp_w: String(DEMO_SPIN_FTP),
+    intensity_pct: '100',
+    ride_workout_id: DEMO_SWEET_SPOT_LIBRARY_ID,
+    streams_ref: 'demo-streams-sweet-spot',
+    sheetRow: 40,
+  }),
+  demoRow({
+    id: DEMO_FREE_RIDE_ID,
+    offset: -3,
+    type: 'bike',
+    name: 'Free ride',
+    time: '18:00',
+    elapsed_seconds: String(DEMO_FREE_RIDE_STREAMS.power_w.length),
+    sub_type: 'indoor',
+    source: 'spin',
+    source_activity_id: 'ride-demo-free',
+    synced_at: '2025-01-11T01:50:00.000Z',
+    started_at_utc: '2025-01-11T01:00:00.000Z',
+    ...demoRideFigures(DEMO_FREE_RIDE_STREAMS),
+    ftp_w: String(DEMO_SPIN_FTP),
+    intensity_pct: '100',
+    streams_ref: 'demo-streams-free-ride',
+    sheetRow: 41,
   }),
 ];
 

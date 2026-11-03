@@ -31,6 +31,8 @@ export function sourceName(source: string): string {
       return 'COROS';
     case 'garmin_import':
       return 'Garmin';
+    case 'spin':
+      return 'Thrive Spin';
     default:
       return '';
   }
@@ -40,6 +42,8 @@ export function sourceName(source: string): string {
 export function provenanceSpeech(w: ProvenanceFields): string {
   switch (provenanceOf(w)) {
     case 'synced': {
+      // #771: Spin records a ride; it does not sync one.
+      if (w.source === 'spin') return 'recorded with Thrive Spin';
       const name = sourceName(w.source);
       return name ? `synced from ${name}` : 'synced';
     }
@@ -75,6 +79,8 @@ export function provenanceDetail(w: ProvenanceFields & Pick<Workout, 'synced_at'
   const stamp = formatLocalStamp(w.synced_at);
   switch (provenanceOf(w)) {
     case 'synced': {
+      if (w.source === 'spin')
+        return stamp ? `Recorded with Thrive Spin · uploaded ${stamp}` : 'Recorded with Thrive Spin';
       const name = sourceName(w.source);
       const lead = name ? `Synced from ${name}` : 'Synced';
       return stamp ? `${lead} · last synced ${stamp}` : lead;

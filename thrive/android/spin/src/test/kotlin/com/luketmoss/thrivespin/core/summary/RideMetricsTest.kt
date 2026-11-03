@@ -79,9 +79,15 @@ class RideMetricsTest {
 
     @Test
     fun aWindowWithFewerThanFifteenReadingsIsSkipped() {
-        // 14 readings in every window: nothing is kept, so NP is the average.
-        val samples = List(60) { sample(it, if (it % 30 < 14) 400 else null) }
-        assertEquals(RideMetrics.meanPower(samples)!!, RideMetrics.normalizedPower(samples)!!, 0.0001)
+        // 14 readings at 400 W, a long gap, then 15 at 100 W. Only the last window holds 15 readings, so it is
+        // the only one kept: NP is 100, where the average is 245 and the sparse windows would give far more.
+        val samples = List(60) { sample(it, if (it < 14) 400 else if (it >= 45) 100 else null) }
+        assertEquals(100.0, RideMetrics.normalizedPower(samples)!!, 0.0001)
+        assertEquals(245, summary(samples).avgPowerW)
+        assertEquals(100, summary(samples).npW)
+        // 14 readings in every window: nothing is kept, so NP is the average of what was read.
+        val sparse = List(60) { sample(it, if (it % 30 < 14) 400 else null) }
+        assertEquals(RideMetrics.meanPower(sparse)!!, RideMetrics.normalizedPower(sparse)!!, 0.0001)
         // 15 readings: the window counts and NP is its mean (the nulls are not zeros).
         val fifteen = List(30) { sample(it, if (it < 15) 300 else null) }
         assertEquals(300.0, RideMetrics.normalizedPower(fifteen)!!, 0.0001)

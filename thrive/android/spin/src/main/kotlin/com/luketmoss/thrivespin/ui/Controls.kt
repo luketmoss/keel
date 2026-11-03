@@ -48,6 +48,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.luketmoss.thrivespin.core.SpinSizes
@@ -221,13 +222,16 @@ fun StepButton(
     symbol: String,
     description: String,
     enabled: Boolean,
+    width: Dp = SpinSizes.TAP_TARGET.dp,
+    height: Dp = SpinSizes.TAP_TARGET.dp,
     onStep: () -> Unit,
 ) {
     val current by rememberUpdatedState(onStep)
     val scope = rememberCoroutineScope()
     Box(
         modifier = Modifier
-            .size(SpinSizes.TAP_TARGET.dp)
+            .width(width)
+            .height(height)
             .alpha(if (enabled) 1f else SpinSizes.OPACITY_DISABLED)
             .clip(Tokens.radiusMd)
             .border(1.dp, spin.border, Tokens.radiusMd)
@@ -282,7 +286,7 @@ fun Stepper(
     Column(modifier = modifier) {
         SpinText(title, Tokens.TEXT_XS, color = spin.textSecondary, weight = FontWeight.SemiBold)
         Row(verticalAlignment = Alignment.CenterVertically) {
-            StepButton("−", minusDescription, canMinus, onMinus)
+            StepButton("−", minusDescription, canMinus, onStep = onMinus)
             Box(
                 modifier = Modifier
                     .widthIn(min = 72.dp)
@@ -298,7 +302,7 @@ fun Stepper(
             ) {
                 SpinText(value, Tokens.TEXT_BASE, color = spin.text, weight = FontWeight.Bold, maxLines = 1)
             }
-            StepButton("+", plusDescription, canPlus, onPlus)
+            StepButton("+", plusDescription, canPlus, onStep = onPlus)
         }
     }
 }

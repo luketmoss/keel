@@ -38,6 +38,11 @@ object Tokens {
     const val TEXT_XL = 20
     const val TEXT_2XL = 24
     const val FIGURE_LG = 36
+
+    /** `--figure-xl`, `--figure-md` and `--lift-clock-size`: Thrive's tokens, mirrored under the same names (#768). */
+    const val FIGURE_XL = 44
+    const val FIGURE_MD = 28
+    const val LIFT_CLOCK = 72
 }
 
 @Composable

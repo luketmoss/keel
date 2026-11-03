@@ -3,7 +3,10 @@ package com.luketmoss.thrivespin
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.content.Intent
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
 import android.provider.Settings
@@ -33,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.luketmoss.thrivespin.ble.BleEnvironment
 import com.luketmoss.thrivespin.ble.DeviceHub
 import com.luketmoss.thrivespin.ble.DeviceScanner
@@ -51,11 +55,25 @@ import com.luketmoss.thrivespin.core.library.LibraryModel
 import com.luketmoss.thrivespin.core.library.LibraryStates
 import com.luketmoss.thrivespin.core.library.LibraryView
 import com.luketmoss.thrivespin.core.library.SaveOutcome
+import com.luketmoss.thrivespin.core.ride.RideEngine
+import com.luketmoss.thrivespin.core.ride.RideLauncher
+import com.luketmoss.thrivespin.core.ride.RidePhase
+import com.luketmoss.thrivespin.core.ride.RideProfile
+import com.luketmoss.thrivespin.core.ride.RideRecordedText
+import com.luketmoss.thrivespin.core.ride.RideSession
+import com.luketmoss.thrivespin.core.ride.RideState
+import com.luketmoss.thrivespin.core.ride.RideText
+import com.luketmoss.thrivespin.core.ride.StartOutcome
+import com.luketmoss.thrivespin.core.ride.recording.RecoveryOutcome
+import com.luketmoss.thrivespin.core.ride.recording.RideRecording
+import com.luketmoss.thrivespin.core.ride.recording.RideRecovery
 import com.luketmoss.thrivespin.core.workout.DetailState
 import com.luketmoss.thrivespin.core.workout.Draft
-import com.luketmoss.thrivespin.core.workout.PlaceholderRideStarter
+import com.luketmoss.thrivespin.core.workout.RideStarter
 import com.luketmoss.thrivespin.data.OkHttpTransport
 import com.luketmoss.thrivespin.data.SpinStore
+import com.luketmoss.thrivespin.ride.RideRuntime
+import com.luketmoss.thrivespin.ride.RideService
 import com.luketmoss.thrivespin.ui.BuilderActions
 import com.luketmoss.thrivespin.ui.BuilderContent
 import com.luketmoss.thrivespin.ui.DetailActions
@@ -64,6 +82,9 @@ import com.luketmoss.thrivespin.ui.DevicesActions
 import com.luketmoss.thrivespin.ui.DevicesScreen
 import com.luketmoss.thrivespin.ui.LibraryActions
 import com.luketmoss.thrivespin.ui.LibraryContent
+import com.luketmoss.thrivespin.ui.RideActions
+import com.luketmoss.thrivespin.ui.RideRecordedScreen
+import com.luketmoss.thrivespin.ui.RideScreen
 import com.luketmoss.thrivespin.ui.ScanSheet
 import com.luketmoss.thrivespin.ui.SettingsScreen
 import com.luketmoss.thrivespin.ui.SpinDownSheet
@@ -88,9 +109,30 @@ class MainActivity : ComponentActivity() {
     private lateinit var scanner: DeviceScanner
     private lateinit var library: LibraryModel
 
+    private lateinit var rideStarter: RideStarter
+
     private var devices by mutableStateOf(DeviceState())
     private var scanOpen by mutableStateOf(false)
     private var spinDownOpen by mutableStateOf(false)
+
+    /** A line for the snackbar: set from anywhere, shown and cleared by [SpinApp]. */
+    private var snackMessage by mutableStateOf<String?>(null)
+
+    /** The ride waiting on the permission prompt it started. */
+    private var pendingRide: RideSession? = null
+
+    private val ridePermissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        val session = pendingRide
+        pendingRide = null
+        if (session != null) {
+            // The notification is only a convenience, so the ride starts whatever its answer; Bluetooth is not.
+            if (BleEnvironment.permitted(this)) {
+                startRideService(RideRuntime.Launch(session, null))
+            } else {
+                snackMessage = "Allow Nearby devices in Devices first."
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -108,6 +150,20 @@ class MainActivity : ComponentActivity() {
             transport = OkHttpTransport,
             config = { store.savedUrl() to store.savedKey() },
         )
+        rideStarter = RideLauncher(
+            devices = { devices },
+            rideActive = { RideRuntime.active() },
+            newRideId = { UUID.randomUUID().toString() },
+            launch = { session -> launchRide(session) },
+            outcome = { outcome ->
+                when (outcome) {
+                    StartOutcome.NoTrainer -> snackMessage = RideLauncher.NO_TRAINER
+                    StartOutcome.AlreadyRiding -> snackMessage = RideLauncher.ALREADY_RIDING
+                    is StartOutcome.Started -> Unit
+                }
+            },
+        )
+        recoverRides()
 
         setContent {
             SpinTheme {
@@ -134,6 +190,66 @@ class MainActivity : ComponentActivity() {
         hub.setDevices(devices)
     }
 
+    /**
+     * Once per process, before Library is shown: a ride the app was killed in comes back paused or is
+     * finished, and every finished ride not yet handed off goes to the "Ride recorded" screen.
+     */
+    private fun recoverRides() {
+        if (RideRuntime.recovered) return
+        RideRuntime.recovered = true
+        val rideStore = RideRuntime.store(this)
+        val outcome = try {
+            RideRecovery.run(rideStore, System.currentTimeMillis())
+        } catch (e: java.io.IOException) {
+            RecoveryOutcome(null, emptyList())
+        }
+        val resume: RideRecording? = outcome.resume
+        if (resume != null) {
+            if (BleEnvironment.permitted(this)) {
+                startRideService(RideRuntime.Launch(resume.meta.session, resume))
+            } else {
+                // The ride's service needs Nearby devices to run: without it the ride is kept as it stood.
+                rideStore.finishInterrupted(resume.meta.rideId, resume)
+                RideRuntime.enqueue(resume.meta.rideId)
+            }
+        }
+        outcome.handOff.forEach { RideRuntime.enqueue(it) }
+    }
+
+    /** Asks for what a ride needs on the phone, the first time, then starts it. */
+    private fun launchRide(session: RideSession) {
+        val missing = ArrayList<String>()
+        BleEnvironment.PERMISSIONS.filterTo(missing) {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+        val notifications = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            !store.notificationAsked &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        if (notifications) missing += Manifest.permission.POST_NOTIFICATIONS
+        if (missing.isEmpty()) {
+            startRideService(RideRuntime.Launch(session, null))
+        } else {
+            if (notifications) store.notificationAsked = true
+            pendingRide = session
+            ridePermissions.launch(missing.toTypedArray())
+        }
+    }
+
+    private fun startRideService(launch: RideRuntime.Launch) {
+        RideRuntime.queue(launch)
+        try {
+            ContextCompat.startForegroundService(this, Intent(this, RideService::class.java))
+        } catch (e: SecurityException) {
+            RideRuntime.take()
+            RideRuntime.detach()
+            snackMessage = "Couldn't start the ride."
+        } catch (e: IllegalStateException) {
+            RideRuntime.take()
+            RideRuntime.detach()
+            snackMessage = "Couldn't start the ride."
+        }
+    }
+
     @Composable
     private fun SpinApp() {
         var encoded by rememberSaveable { mutableStateOf(Routes.encode(Routes.START)) }
@@ -143,10 +259,27 @@ class MainActivity : ComponentActivity() {
         var category by rememberSaveable { mutableStateOf<String?>(null) }
         val snackbar = remember { SnackbarHostState() }
         val scope = rememberCoroutineScope()
-        val starter = remember { PlaceholderRideStarter { message -> scope.launch { snackbar.showSnackbar(message) } } }
+        val starter = rideStarter
+        val engine by RideRuntime.engine.collectAsState()
+        val handOffs by RideRuntime.handOffs.collectAsState()
+        val current = engine
+        val ride: RideState? = if (current != null) current.state.collectAsState().value else null
+
+        LaunchedEffect(snackMessage) {
+            val message = snackMessage
+            if (message != null) {
+                snackbar.showSnackbar(message)
+                snackMessage = null
+            }
+        }
 
         Box(modifier = Modifier.fillMaxSize()) {
-            when (route) {
+            if (current != null && ride != null && ride.phase != RidePhase.Finished) {
+                // While a ride is active, opening the app always lands on it.
+                RideHost(current, ride)
+            } else if (handOffs.isNotEmpty()) {
+                RecordedHost(handOffs.first(), go)
+            } else when (route) {
                 is Route.Settings -> {
                     BackHandler { go(Route.Tab(route.from)) }
                     SettingsScreen(
@@ -253,7 +386,7 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun DetailHost(route: Route.Detail, starter: PlaceholderRideStarter, go: (Route) -> Unit) {
+    private fun DetailHost(route: Route.Detail, starter: RideStarter, go: (Route) -> Unit) {
         val cache by library.cache.collectAsState()
         val workout = cache?.workouts?.firstOrNull { it.id == route.workoutId }
         BackHandler { go(Routes.START) }
@@ -283,6 +416,58 @@ class MainActivity : ComponentActivity() {
                     if (request != null) starter.start(request)
                 },
             ),
+        )
+    }
+
+    @Composable
+    private fun RideHost(engine: RideEngine, state: RideState) {
+        BackHandler { snackMessage = "The ride keeps going. Use End to stop." }
+        val profile = remember(engine, state.intensityPct) { RideProfile.model(engine.session, state.intensityPct) }
+        val enableBluetooth = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { }
+        RideScreen(
+            state = state,
+            profile = profile,
+            actions = RideActions(
+                onPause = { engine.pause() },
+                onResume = { engine.resume() },
+                onSkip = { engine.skipStep() },
+                onIntensity = { engine.adjustIntensity(it) },
+                onTrainerStep = { engine.adjustModeSetting(it) },
+                onEnd = { engine.end() },
+                onDiscard = { engine.discard() },
+                onCancel = { engine.cancel() },
+                onTurnOnBluetooth = { enableBluetooth.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)) },
+            ),
+        )
+    }
+
+    /** The placeholder #769 replaces: what was kept, and Done, which marks it handed off. */
+    @Composable
+    private fun RecordedHost(rideId: String, go: (Route) -> Unit) {
+        val rideStore = remember { RideRuntime.store(this@MainActivity) }
+        val recording = remember(rideId) {
+            try {
+                rideStore.open(rideId)
+            } catch (e: java.io.IOException) {
+                null
+            } catch (e: kotlinx.serialization.SerializationException) {
+                null
+            }
+        }
+        if (recording == null) {
+            // A folder that cannot be read has nothing to show: skip it.
+            LaunchedEffect(rideId) { RideRuntime.handedOff(rideId) }
+            return
+        }
+        RideRecordedScreen(
+            line = RideRecordedText.line(recording.samples),
+            storageNote = RideRuntime.storageFullAt(rideId)?.let { RideText.storageFull(it) },
+            onDone = {
+                rideStore.markHandedOff(rideId)
+                RideRuntime.handedOff(rideId)
+                // Done returns to Library, whatever screen the ride was started from.
+                go(Routes.START)
+            },
         )
     }
 

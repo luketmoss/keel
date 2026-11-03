@@ -26,15 +26,6 @@ interface RideStarter {
     fun start(request: RideRequest)
 }
 
-/** The starter #767 ships: it says riding is not there yet. #768 replaces the binding. */
-class PlaceholderRideStarter(private val show: (String) -> Unit) : RideStarter {
-    override fun start(request: RideRequest) = show(MESSAGE)
-
-    companion object {
-        const val MESSAGE = "Riding comes in a later update."
-    }
-}
-
 /**
  * The detail screen's own state: one intensity for the whole workout and the trainer mode. It is made
  * afresh each time the screen is opened, so intensity is 100% every time and is never saved. Nothing

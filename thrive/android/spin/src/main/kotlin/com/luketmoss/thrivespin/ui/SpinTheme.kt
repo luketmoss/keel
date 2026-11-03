@@ -105,7 +105,17 @@ val LocalSpin = staticCompositionLocalOf { Light }
 /** Material 3 following the system's light or dark theme, with the palette under it. */
 @Composable
 fun SpinTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
+    SpinThemeFor(dark = isSystemInDarkTheme(), content = content)
+}
+
+/** The dark scheme whatever the system says: the ride screen is read at arm's length, often in a dim room. */
+@Composable
+fun SpinDarkTheme(content: @Composable () -> Unit) {
+    SpinThemeFor(dark = true, content = content)
+}
+
+@Composable
+private fun SpinThemeFor(dark: Boolean, content: @Composable () -> Unit) {
     val p = if (dark) Dark else Light
     val scheme = if (dark) {
         darkColorScheme(

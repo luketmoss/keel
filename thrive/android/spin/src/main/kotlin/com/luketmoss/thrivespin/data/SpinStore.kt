@@ -51,6 +51,13 @@ class SpinStore(context: Context) : DevicePersistence {
             prefs.edit().putBoolean(AUTO_ASKED, value).apply()
         }
 
+    /** Whether the first ride has asked for the notification permission: it is asked once. */
+    var notificationAsked: Boolean
+        get() = prefs.getBoolean(NOTIFICATION_ASKED, false)
+        set(value) {
+            prefs.edit().putBoolean(NOTIFICATION_ASKED, value).apply()
+        }
+
     private companion object {
         const val FILE = "thrive_spin"
         const val URL = "url"
@@ -59,5 +66,6 @@ class SpinStore(context: Context) : DevicePersistence {
         const val LIBRARY = "library_cache"
         const val PERMISSION_ASKED = "permission_asked"
         const val AUTO_ASKED = "auto_asked"
+        const val NOTIFICATION_ASKED = "notification_asked"
     }
 }

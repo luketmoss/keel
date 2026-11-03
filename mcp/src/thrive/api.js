@@ -264,6 +264,10 @@ export const fetchDrinks = (from, to) => apiGet('getDrinks', { from, to });
 export const fetchChangeLog = () => apiGet('getChangeLog', { limit: 1000 });
 /** Every setting with its default filled in (#576): the rest defaults a schedule's summary names (#583). */
 export const fetchSettings = () => apiGet('getSettings');
+/** Thrive Spin's library, ordered by name, each with `steps` parsed and `last_ridden_date` (#774). */
+export const fetchRideWorkouts = () => apiGet('getRideWorkouts');
+/** `{ current, history }`: the FTP settings, newest first, `current` null on an empty history (#774). */
+export const fetchFtp = () => apiGet('getFtp');
 
 // --- undo (#412) -----------------------------------------------------
 
@@ -300,6 +304,26 @@ export const logDrink = (drink) => apiWrite('logDrink', { ...drink, source: 'mcp
 export const updateDrinkTime = (id, time) => apiWrite('updateDrinkTime', { id, time });
 export const updateDrinkAmount = (id, amount) => apiWrite('updateDrinkAmount', { id, amount });
 export const deleteDrink = (id) => apiWrite('deleteDrink', { id });
+
+/**
+ * Thrive Spin's library and FTP (#774). A save without `id` adds a row and one with it replaces that
+ * row, so the tool checks the id exists first. The API works the total out: nothing here sends
+ * `duration_s`. The steps ride in the URL like every write, so an over-long workout is refused here
+ * rather than truncated in transit.
+ */
+export function saveRideWorkout(workout) {
+  const size = encodeURIComponent(JSON.stringify(workout)).length;
+  if (size > MAX_ENCODED_PAYLOAD) {
+    throw new Error(
+      `That workout is too long to send (${size} encoded characters, limit ${MAX_ENCODED_PAYLOAD}). ` +
+      'Writes travel in the URL: use fewer steps, or a repeat block for rounds that are the same.',
+    );
+  }
+  return apiWrite('saveRideWorkout', workout);
+}
+export const deleteRideWorkout = (id) => apiWrite('deleteRideWorkout', { id });
+/** Always a manual FTP: the tool has no way to send another source or a ride. */
+export const addFtp = ({ id, date, ftp_w: ftpW }) => apiWrite('addFtp', { id, date, ftp_w: ftpW, source: 'manual' });
 
 export const createExercise = (data) => apiWrite('createExercise', { data });
 export const updateExercise = (id, changes) => apiWrite('updateExercise', { id, changes });

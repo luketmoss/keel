@@ -13,6 +13,9 @@ const DESTRUCTIVE = [
   'thrive_delete_drink',
   'thrive_delete_exercise',
   'thrive_delete_workout',
+  // #774: replacing a library workout's steps and deleting one are dry-run until confirm.
+  'thrive_delete_ride_workout',
+  'thrive_update_ride_workout',
   'thrive_set_journal_entry',
   // #583: overwrites planned rest targets, dry-run until confirm.
   'thrive_set_workout_rest',
@@ -25,10 +28,14 @@ const READ_ONLY = [
   'thrive_daily_summary',
   'thrive_drinks',
   'thrive_exercise_history',
+  // #774.
+  'thrive_ftp',
+  'thrive_get_ride_workout',
   'thrive_get_workout',
   'thrive_get_workout_payload',
   'thrive_journal',
   'thrive_list_exercises',
+  'thrive_list_ride_workouts',
   'thrive_list_templates',
   'thrive_list_workouts',
   // #691.
@@ -105,11 +112,11 @@ function fakeThrive(answer: (action: string, url: URL) => unknown) {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('thrive tool list', () => {
-  it('serves exactly the 12 read tools on /thrive/mcp and the other 17 on /thrive/write/mcp (#409, #522, #583, #595, #691)', async () => {
+  it('serves exactly the 15 read tools on /thrive/mcp and the other 21 on /thrive/write/mcp (#409, #522, #583, #595, #691, #774)', async () => {
     const read = (await listTools('read')).map((t) => t.name).sort()
     const write = (await listTools('write')).map((t) => t.name).sort()
     expect(read).toEqual([...READ_ONLY].sort())
-    expect(write).toHaveLength(17)
+    expect(write).toHaveLength(21)
     expect(write.filter((n) => read.includes(n))).toEqual([])
     expect([...read, ...write].sort()).toEqual(stdioTools.map((t) => t.name).sort())
   })
@@ -123,11 +130,11 @@ describe('thrive tool list', () => {
       description,
       inputSchema: canon(inputSchema),
     }))
-    expect(worker).toHaveLength(29)
+    expect(worker).toHaveLength(36)
     expect(worker).toEqual(stdio)
   })
 
-  it('marks the seven destructive tools and every read tool', async () => {
+  it('marks the nine destructive tools and every read tool', async () => {
     const tools = await listAll()
     const hint = (name: string) => tools.find((t) => t.name === name)?.annotations
     for (const name of DESTRUCTIVE) expect(hint(name)?.destructiveHint, name).toBe(true)

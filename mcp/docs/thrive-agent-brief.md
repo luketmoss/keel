@@ -61,7 +61,28 @@ signal — several `Easy` sessions on a lift mean it's time to add load.
 **Read and analyze** — `thrive_list_workouts`, `thrive_get_workout`,
 `thrive_list_exercises`, `thrive_list_templates`, `thrive_exercise_history`,
 `thrive_daily_health`, `thrive_daily_summary`, `thrive_body_measurements`, `thrive_journal`,
-`thrive_drinks`, `thrive_trail_history`.
+`thrive_drinks`, `thrive_trail_history`, `thrive_list_ride_workouts`, `thrive_get_ride_workout`, `thrive_ftp`.
+
+**Ride workouts and FTP (#774).** My indoor trainer app, Thrive Spin, has a library of workouts and an FTP. Read the
+library with `thrive_list_ride_workouts` and one workout with `thrive_get_ride_workout`, and the FTP with `thrive_ftp`.
+With Thrive (write) on, `thrive_create_ride_workout` adds a workout, `thrive_update_ride_workout` changes one and
+`thrive_delete_ride_workout` removes one; the update and the delete are dry-run until `confirm: true`, so show me the dry
+run first. `thrive_add_ftp` records an FTP I tell you, `manual` only and dry-run too.
+
+- **Targets are % of FTP, never watts.** `{"mode": "erg", "pct": 90}` is 90% of my FTP, whatever it is today. Don't
+  convert to watts and don't ask me my FTP to build a workout.
+- **Categories** are `Endurance`, `Sweet spot`, `Threshold`, `VO2` and `Recovery`.
+- **A workout is a list of blocks.** A block is a step (`label`, `dur_s` in seconds, `mode`: `erg` with `pct` and an
+  optional `pct_end` for a ramp, `resistance` with `level`, `slope` with `grade`, or `free`; an optional `cadence`) or a
+  repeat, `{"repeat": 3, "steps": [...]}`, which does not nest. Build intervals as a repeat, not as a long list.
+- **"Build me 75 minutes of sweet spot":** a warm-up ramp (`pct` 50 to `pct_end` 70, 10 minutes), repeat blocks of the
+  hard step at 88-94% with a recovery at 55%, and a cool-down, with the durations adding up to 75 minutes (4500 seconds).
+  The reply gives the total the API worked out; check it against what I asked for.
+- **To edit, read first.** `thrive_get_ride_workout` ends with the steps JSON. Change it and send the whole list back as
+  `steps`: it is replaced, never patched. A mistake is named by block and step, so fix it and resend.
+- **FTP rows are never edited.** Only record an FTP I tell you ("set my FTP to 255"). Don't guess one from my rides: a
+  ramp test sets one in the app. A new FTP changes the watts of every future workout; rides already ridden keep theirs.
+- `thrive_undo` reverts any of these writes.
 
 `thrive_drinks` reads the water, coffee, alcohol and Unwind the user logged (default: today): each
 entry, per-day totals (water in oz and ml against the daily goal, coffee in cups, alcohol in
@@ -174,7 +195,8 @@ tool doesn't recognise is rejected by name — read the error rather than retryi
 2. **Show me the plan before writing.** For anything beyond a single obvious
    correction, describe what you intend to change and wait for my go-ahead.
 3. **Destructive tools are dry-run by default.** `thrive_delete_workout`,
-   `thrive_delete_exercise`, `thrive_update_template` and `thrive_set_workout_rest`
+   `thrive_delete_exercise`, `thrive_update_template`, `thrive_set_workout_rest`,
+   `thrive_update_ride_workout`, `thrive_delete_ride_workout` and `thrive_add_ftp`
    write nothing until called
    again with `confirm: true`. Show me the dry-run output first — always. Never pass
    `confirm: true` on the first call.
@@ -199,3 +221,6 @@ tool doesn't recognise is rejected by name — read the error rather than retryi
 - "I bought a dip station — what could I add, and to which template?"
 - "Workout w_xxxx has the wrong date, it was actually the 14th."
 - "Find exercises created by mistake that nothing references, and clean them up."
+- "Build me 75 minutes of sweet spot for the trainer."
+- "What was my FTP in March?"
+- "Make the second block of my Sweet Spot workout 15 minutes instead of 12."

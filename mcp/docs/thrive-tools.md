@@ -1,6 +1,6 @@
 # Thrive tools
 
-Reference for the 29 `thrive_*` tools served at `/thrive/mcp` (12 read) and `/thrive/write/mcp` (17 write). Carried over from the
+Reference for the 36 `thrive_*` tools served at `/thrive/mcp` (15 read) and `/thrive/write/mcp` (21 write). Carried over from the
 README of the stdio server this Worker replaced (luketmoss/keel#372); the tool
 descriptions in `src/thrive/tools.js` are what an agent actually sees, and are the
 source of truth. For the conventions an agent needs to use the data safely, see
@@ -37,6 +37,9 @@ needs a matching change here.**
 | `thrive_list_templates` | Templates with their exercises, sections, sets and reps, and a section's rest and switch where the template sets one (#576) |
 | `thrive_exercise_history` | Progression for one exercise over time — the tool for deciding whether to add weight or volume |
 | `thrive_trail_history` | When a named trail was last visited and how each pass compared with the time before (#691): `trail` (a name or part of one), optional `date_from` / `date_to` bounding the visits (comparisons still reach earlier) and `limit` (1–50, default 10) for the list. The last visit's passes, each against the last pass over the same stretch in the same direction on an earlier activity, then the visits newest first. Several matching trails are listed to choose from. Says how many tracked activities are **not tagged yet**, which is never "not on this trail". One `getWorkouts` request; never a coordinate or the raw `trails` value |
+| `thrive_list_ride_workouts` | Thrive Spin's workout library (#774), one line per workout ordered by name: id, name, category, duration (h:mm) and the date it was last ridden or `never ridden`. Optional `category` and `search` (case-insensitive text in the name or description); an empty library says so |
+| `thrive_get_ride_workout` | One library workout by `id` (#774): header, description, every step in plain words (`Sweet spot 12:00 ERG 90% FTP, 90 rpm`, a repeat as `3 x [...]`, a ramp as `50 -> 70%`), the total, and the steps JSON v1 to edit and send back to `thrive_update_ride_workout`. An unknown id is refused naming it |
+| `thrive_ftp` | Thrive Spin's FTP (#774): the current one (watts, date, source) and the history newest first, one line each; a ramp test row names its test ride. Optional `from` / `to` narrow the history; the current FTP is always shown. An empty history says no FTP is recorded |
 
 ### Scheduling and authoring
 
@@ -46,6 +49,7 @@ needs a matching change here.**
 | `thrive_schedule_week` | (Same 200-row ceiling and `confirm`.) Schedule several workouts in one call, each shaped like a `thrive_schedule_workout` call, `rest` included and resolved per entry. All of them are validated first (any problem schedules none), then the sets are written, chunked if large, followed by the workouts |
 | `thrive_create_exercise` | Add to the exercise library (refuses duplicate names unless overridden) |
 | `thrive_create_template` | (Same 200-row ceiling and `confirm`.) Create a reusable template from an ordered exercise list, with an optional `rest` per section |
+| `thrive_create_ride_workout` | Add a workout to Thrive Spin's library (#774): `name`, `category` (`Endurance`, `Sweet spot`, `Threshold`, `VO2`, `Recovery`), optional `description`, and `steps`. Saved straight away, since it only adds a row; replies with the id and the total time. See Ride workouts and FTP below |
 
 ### Repair
 
@@ -64,12 +68,16 @@ needs a matching change here.**
 | `thrive_log_drink` | Log water, coffee, alcohol or Unwind on today or an earlier day (#595, #592): `kind`, water's `amount_oz` (whole US fl oz, 1-67, default 4; refused on coffee, alcohol and Unwind, which have a fixed amount per entry: 1 cup, 1 drink, 5 mg), `count` (1-10 separate entries, "3 beers"), `date` (default today; `yesterday`, `-2d` and the other relative forms) and `time` (`HH:MM` local; default now on today, 23:59 on an earlier day, as the Day view does). A date and time after now is refused. Each entry gets its own id and `source` `mcp`, all under one `call_id`, so one `thrive_undo` reverts the lot |
 | `thrive_update_drink` | Change a drink's water `amount_oz`, its `time`, or both, by `id` (#595). The time stays on the drink's day; a value equal to the stored one sends nothing. Through the API's `updateDrinkAmount` and `updateDrinkTime` |
 | `thrive_delete_drink` | Delete one drink by `id` (#595). Dry-run until `confirm: true`; `thrive_undo` brings it back with its id |
+| `thrive_update_ride_workout` | Change a library workout by `id` (#774): any of `name`, `category`, `description` and `steps`; the rest are kept. The whole step list is replaced, never patched. Dry-run until `confirm: true`: only the fields that change, old to new, with steps in words. An id not in the library is refused (the API would add a row). `thrive_undo` reverts it |
+| `thrive_delete_ride_workout` | Delete one library workout by `id` (#774). Dry-run until `confirm: true`: the workout and its last ridden date, and a note that plans and rides naming it keep the id. `deleted: false` from the API is reported as already gone, not an error. `thrive_undo` brings it back |
+| `thrive_add_ftp` | Record an FTP in Thrive Spin (#774): `ftp_w` (whole watts, 50-1000) and optional `date` (default today, America/Denver; never in the future). **`manual` only**: there is no `source` or `ride_id` input, since a ramp test row names a ride only Spin recorded. Dry-run until `confirm: true`: the current FTP beside the new one. An FTP equal to the current one is refused. `thrive_undo` removes it |
 
 ## Safety model
 
 Destructive tools — `thrive_delete_workout`, `thrive_delete_exercise`,
-`thrive_update_template`, `thrive_set_workout_rest`, `thrive_delete_drink` and clearing a day's note with
-`thrive_set_journal_entry` — are **dry-run by default**. Called without `confirm: true`
+`thrive_update_template`, `thrive_set_workout_rest`, `thrive_delete_drink`,
+`thrive_update_ride_workout`, `thrive_delete_ride_workout` and clearing a day's note with
+`thrive_set_journal_entry` — are **dry-run by default**. `thrive_add_ftp` is dry-run too. Called without `confirm: true`
 they report exactly what they would change and write nothing. The preview is built from
 API reads (for `thrive_set_workout_rest`, the API's own dry run of the same action), so
 the API's delete, replace and rest actions only ever change data once confirmed:
@@ -184,12 +192,41 @@ trails": the sync or the backfill has not looked yet. No tool prints the value i
 `test/fixtures/trails-rules-golden.json`), and needs #688's Apps Script deployed: an API that sends
 no `trails` gets a tool error saying so.
 
+### Ride workouts and FTP (#774)
+
+Thrive Spin's library and FTP, through #765's API actions (`getRideWorkouts`, `saveRideWorkout`, `deleteRideWorkout`,
+`getFtp`, `addFtp`). The API keeps them in the `RideWorkouts` and `FtpHistory` tabs and in its change log, so
+`thrive_undo` reverts every write here; a confirmed one is one write of one row against the write limits, and a dry run
+or a refusal is none.
+
+- **Steps are structured input**, not a JSON string: `{"v": 1, "steps": [...]}` or just the list of blocks. A block is a
+  step or a repeat. A step is `label` (1-40 characters), `dur_s` (whole seconds, 1-14400), `mode`, an optional `cadence`
+  (40-150 rpm) and its mode's target: `erg` takes `pct` (whole % of FTP, 0-300) and an optional `pct_end` for a ramp,
+  `resistance` takes `level` (0-100), `slope` takes `grade` (-10 to 20, one decimal), `free` takes none. A repeat is
+  `{"repeat": 2-50, "steps": [1-20 steps]}` and does not nest. At most 100 blocks, 6 hours in all with repeats counted
+  out, 5000 characters of JSON. **Targets are % of FTP, never watts.**
+- **A mistake is named by position** and nothing is sent: `block 2, step 1: pct 301 is over 300.` The Worker's copy of the
+  rules is `src/thrive/ride-workouts.js`, pinned by `test/fixtures/ride-steps-golden.json`; the API re-checks and stays the
+  authority. The Worker never sends `duration_s` or a timestamp: the API works the total out, and the reply shows it.
+- **A workout too long for the URL is refused** before it is sent (5000 encoded characters, like every write): use a
+  repeat block for rounds that are the same.
+- **Create is not dry-run, update and delete are.** Adding a row loses nothing; replacing steps or deleting a workout loses
+  the owner's work.
+- **FTP is `manual` only.** A new FTP rescales every future workout's watts, so `thrive_add_ftp` is dry-run and shows the
+  current value beside the new one. It refuses a future date and a value equal to the current FTP. Rides already ridden
+  keep the FTP they were ridden at and are never rescored. FTP rows are append-only: a wrong entry is corrected by
+  `thrive_undo` or a newer row.
+- **An API from before #765's deploy** answers these actions as unknown; the tools say its Apps Script needs the update.
+  Deploy #765's Apps Script first, then this Worker.
+- Putting a Spin workout on a planned bike day (`ride_workout_id`) is not a tool here: it is the app's plan picker (#772).
+
 ### Approval on the destructive tools
 
-Six tools destroy data and are dry-run until `confirm: true`:
+Eight tools destroy data and are dry-run until `confirm: true`:
 `thrive_delete_workout`, `thrive_delete_exercise`, `thrive_update_template`
 (it deletes the old rows), `thrive_set_workout_rest` (it overwrites planned rest),
-`thrive_delete_drink` (#595) and `thrive_set_journal_entry` when it clears a note.
+`thrive_delete_drink` (#595), `thrive_update_ride_workout` (it replaces the whole step list) and
+`thrive_delete_ride_workout` (#774), and `thrive_set_journal_entry` when it clears a note.
 The dry-run only prevents accidents. Against prompt injection the control is a person
 approving each call, and approval is stored **per device**: see "Approving the
 destructive tools" in [../CLAUDE.md](../CLAUDE.md).

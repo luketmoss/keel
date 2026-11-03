@@ -1,0 +1,2464 @@
+{
+  "valid": [
+    {
+      "name": "the example workout, in the object form",
+      "steps": {
+        "v": 1,
+        "steps": [
+          {
+            "label": "Warm-up",
+            "dur_s": 600,
+            "mode": "erg",
+            "pct": 50,
+            "pct_end": 70
+          },
+          {
+            "repeat": 3,
+            "steps": [
+              {
+                "label": "Sweet spot",
+                "dur_s": 720,
+                "mode": "erg",
+                "pct": 90,
+                "cadence": 90
+              },
+              {
+                "label": "Recover",
+                "dur_s": 240,
+                "mode": "erg",
+                "pct": 55
+              }
+            ]
+          },
+          {
+            "label": "Climb",
+            "dur_s": 300,
+            "mode": "slope",
+            "grade": 4.5
+          },
+          {
+            "label": "Spin",
+            "dur_s": 300,
+            "mode": "resistance",
+            "level": 30
+          },
+          {
+            "label": "Cool-down",
+            "dur_s": 360,
+            "mode": "free"
+          }
+        ]
+      },
+      "total_s": 4440
+    },
+    {
+      "name": "the bare list of blocks, v left out",
+      "steps": [
+        {
+          "label": "Warm-up",
+          "dur_s": 600,
+          "mode": "erg",
+          "pct": 50,
+          "pct_end": 70
+        },
+        {
+          "repeat": 3,
+          "steps": [
+            {
+              "label": "Sweet spot",
+              "dur_s": 720,
+              "mode": "erg",
+              "pct": 90,
+              "cadence": 90
+            },
+            {
+              "label": "Recover",
+              "dur_s": 240,
+              "mode": "erg",
+              "pct": 55
+            }
+          ]
+        },
+        {
+          "label": "Climb",
+          "dur_s": 300,
+          "mode": "slope",
+          "grade": 4.5
+        },
+        {
+          "label": "Spin",
+          "dur_s": 300,
+          "mode": "resistance",
+          "level": 30
+        },
+        {
+          "label": "Cool-down",
+          "dur_s": 360,
+          "mode": "free"
+        }
+      ],
+      "total_s": 4440
+    },
+    {
+      "name": "one free step",
+      "steps": [
+        {
+          "label": "Step",
+          "dur_s": 60,
+          "mode": "free"
+        }
+      ],
+      "total_s": 60
+    },
+    {
+      "name": "erg at 0 and at 300, a ramp to 300, cadence 40 and 150",
+      "steps": [
+        {
+          "label": "Step",
+          "dur_s": 60,
+          "mode": "erg",
+          "pct": 0,
+          "cadence": 40
+        },
+        {
+          "label": "Step",
+          "dur_s": 60,
+          "mode": "erg",
+          "pct": 300,
+          "pct_end": 300,
+          "cadence": 150
+        }
+      ],
+      "total_s": 120
+    },
+    {
+      "name": "resistance level 0 and 100",
+      "steps": [
+        {
+          "label": "Step",
+          "dur_s": 60,
+          "mode": "resistance",
+          "level": 0
+        },
+        {
+          "label": "Step",
+          "dur_s": 60,
+          "mode": "resistance",
+          "level": 100
+        }
+      ],
+      "total_s": 120
+    },
+    {
+      "name": "grade -10, 20 and 0.1",
+      "steps": [
+        {
+          "label": "Step",
+          "dur_s": 60,
+          "mode": "slope",
+          "grade": -10
+        },
+        {
+          "label": "Step",
+          "dur_s": 60,
+          "mode": "slope",
+          "grade": 20
+        },
+        {
+          "label": "Step",
+          "dur_s": 60,
+          "mode": "slope",
+          "grade": 0.1
+        }
+      ],
+      "total_s": 180
+    },
+    {
+      "name": "dur_s 1 and 14400",
+      "steps": [
+        {
+          "label": "Step",
+          "dur_s": 1,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 14400,
+          "mode": "free"
+        }
+      ],
+      "total_s": 14401
+    },
+    {
+      "name": "a label of 40 characters",
+      "steps": [
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        }
+      ],
+      "total_s": 60
+    },
+    {
+      "name": "a repeat of 2 and a repeat of 50",
+      "steps": [
+        {
+          "repeat": 2,
+          "steps": [
+            {
+              "label": "Step",
+              "dur_s": 60,
+              "mode": "free"
+            }
+          ]
+        },
+        {
+          "repeat": 50,
+          "steps": [
+            {
+              "label": "Step",
+              "dur_s": 1,
+              "mode": "free"
+            }
+          ]
+        }
+      ],
+      "total_s": 170
+    },
+    {
+      "name": "a repeat of 20 steps",
+      "steps": [
+        {
+          "repeat": 2,
+          "steps": [
+            {
+              "label": "Step",
+              "dur_s": 30,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 30,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 30,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 30,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 30,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 30,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 30,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 30,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 30,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 30,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 30,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 30,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 30,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 30,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 30,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 30,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 30,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 30,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 30,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 30,
+              "mode": "free"
+            }
+          ]
+        }
+      ],
+      "total_s": 1200
+    },
+    {
+      "name": "exactly 6 hours, with repeats counted out",
+      "steps": [
+        {
+          "repeat": 50,
+          "steps": [
+            {
+              "label": "Step",
+              "dur_s": 432,
+              "mode": "free"
+            }
+          ]
+        }
+      ],
+      "total_s": 21600
+    },
+    {
+      "name": "100 blocks",
+      "steps": [
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        }
+      ],
+      "total_s": 1000
+    }
+  ],
+  "invalid": [
+    {
+      "name": "a nested repeat",
+      "steps": [
+        {
+          "label": "Step",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "repeat": 2,
+          "steps": [
+            {
+              "label": "Step",
+              "dur_s": 60,
+              "mode": "free"
+            },
+            {
+              "repeat": 2,
+              "steps": [
+                {
+                  "label": "Step",
+                  "dur_s": 60,
+                  "mode": "free"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "error": "block 2, step 2: a repeat cannot sit inside another repeat. Write the rounds out or use one repeat."
+    },
+    {
+      "name": "an unknown key on a step",
+      "steps": [
+        {
+          "label": "Step",
+          "dur_s": 60,
+          "mode": "free",
+          "speed": 5
+        }
+      ],
+      "error": "block 1: unknown key \"speed\". A step has label, dur_s, mode, optional cadence and its mode's target."
+    },
+    {
+      "name": "an unknown key on the object",
+      "steps": {
+        "v": 1,
+        "steps": [
+          {
+            "label": "Step",
+            "dur_s": 60,
+            "mode": "free"
+          }
+        ],
+        "title": "x"
+      },
+      "error": "steps: unknown key \"title\". Give {\"v\": 1, \"steps\": [...]} or just the list of blocks."
+    },
+    {
+      "name": "an unknown key on a repeat",
+      "steps": [
+        {
+          "repeat": 2,
+          "steps": [
+            {
+              "label": "Step",
+              "dur_s": 60,
+              "mode": "free"
+            }
+          ]
+        },
+        {
+          "repeat": 2,
+          "steps": [
+            {
+              "label": "Step",
+              "dur_s": 60,
+              "mode": "free"
+            }
+          ],
+          "label": "x"
+        }
+      ],
+      "error": "block 2: unknown key \"label\". A repeat is {\"repeat\": 2 to 50, \"steps\": [...]} and has no other key."
+    },
+    {
+      "name": "pct 301",
+      "steps": [
+        {
+          "label": "Step",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "repeat": 3,
+          "steps": [
+            {
+              "label": "Step",
+              "dur_s": 60,
+              "mode": "erg",
+              "pct": 90
+            },
+            {
+              "label": "Step",
+              "dur_s": 60,
+              "mode": "erg",
+              "pct": 301
+            }
+          ]
+        }
+      ],
+      "error": "block 2, step 2: pct 301 is over 300."
+    },
+    {
+      "name": "pct_end 301",
+      "steps": [
+        {
+          "label": "Step",
+          "dur_s": 60,
+          "mode": "erg",
+          "pct": 50,
+          "pct_end": 301
+        }
+      ],
+      "error": "block 1: pct_end 301 is over 300."
+    },
+    {
+      "name": "pct -1",
+      "steps": [
+        {
+          "label": "Step",
+          "dur_s": 60,
+          "mode": "erg",
+          "pct": -1
+        }
+      ],
+      "error": "block 1: pct -1 is under 0."
+    },
+    {
+      "name": "pct 90.5",
+      "steps": [
+        {
+          "label": "Step",
+          "dur_s": 60,
+          "mode": "erg",
+          "pct": 90.5
+        }
+      ],
+      "error": "block 1: pct must be a whole number (got 90.5)."
+    },
+    {
+      "name": "pct as text",
+      "steps": [
+        {
+          "label": "Step",
+          "dur_s": 60,
+          "mode": "erg",
+          "pct": "90"
+        }
+      ],
+      "error": "block 1: pct must be a number, a whole one (got \"90\")."
+    },
+    {
+      "name": "an erg step with no pct",
+      "steps": [
+        {
+          "label": "Step",
+          "dur_s": 60,
+          "mode": "erg"
+        }
+      ],
+      "error": "block 1: an erg step needs pct, the % of FTP."
+    },
+    {
+      "name": "grade 4.55",
+      "steps": [
+        {
+          "label": "Step",
+          "dur_s": 60,
+          "mode": "slope",
+          "grade": 4.55
+        }
+      ],
+      "error": "block 1: grade must have at most one decimal (got 4.55)."
+    },
+    {
+      "name": "grade 20.1",
+      "steps": [
+        {
+          "label": "Step",
+          "dur_s": 60,
+          "mode": "slope",
+          "grade": 20.1
+        }
+      ],
+      "error": "block 1: grade 20.1 is over 20."
+    },
+    {
+      "name": "grade -10.5",
+      "steps": [
+        {
+          "label": "Step",
+          "dur_s": 60,
+          "mode": "slope",
+          "grade": -10.5
+        }
+      ],
+      "error": "block 1: grade -10.5 is under -10."
+    },
+    {
+      "name": "a slope step carrying pct",
+      "steps": [
+        {
+          "label": "Step",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 60,
+          "mode": "slope",
+          "grade": 4,
+          "pct": 90
+        }
+      ],
+      "error": "block 2: pct is not a target in slope mode; slope mode takes grade."
+    },
+    {
+      "name": "an erg step carrying level",
+      "steps": [
+        {
+          "label": "Step",
+          "dur_s": 60,
+          "mode": "erg",
+          "pct": 90,
+          "level": 10
+        }
+      ],
+      "error": "block 1: level is not a target in erg mode; erg mode takes pct and pct_end."
+    },
+    {
+      "name": "a free step carrying pct",
+      "steps": [
+        {
+          "label": "Step",
+          "dur_s": 60,
+          "mode": "free",
+          "pct": 90
+        }
+      ],
+      "error": "block 1: pct is not a target in free mode; free mode takes no target."
+    },
+    {
+      "name": "level 101",
+      "steps": [
+        {
+          "label": "Step",
+          "dur_s": 60,
+          "mode": "resistance",
+          "level": 101
+        }
+      ],
+      "error": "block 1: level 101 is over 100."
+    },
+    {
+      "name": "an unknown mode",
+      "steps": [
+        {
+          "label": "Step",
+          "dur_s": 60,
+          "mode": "power"
+        }
+      ],
+      "error": "block 1: mode must be one of erg, resistance, slope, free (got \"power\")."
+    },
+    {
+      "name": "a repeat of 1",
+      "steps": [
+        {
+          "repeat": 1,
+          "steps": [
+            {
+              "label": "Step",
+              "dur_s": 60,
+              "mode": "free"
+            }
+          ]
+        }
+      ],
+      "error": "block 1: repeat 1 is under 2."
+    },
+    {
+      "name": "a repeat of 51",
+      "steps": [
+        {
+          "repeat": 51,
+          "steps": [
+            {
+              "label": "Step",
+              "dur_s": 1,
+              "mode": "free"
+            }
+          ]
+        }
+      ],
+      "error": "block 1: repeat 51 is over 50."
+    },
+    {
+      "name": "a repeat with no steps",
+      "steps": [
+        {
+          "repeat": 2,
+          "steps": []
+        }
+      ],
+      "error": "block 1: a repeat's steps are a list of 1 to 20 steps."
+    },
+    {
+      "name": "a repeat of 21 steps",
+      "steps": [
+        {
+          "repeat": 2,
+          "steps": [
+            {
+              "label": "Step",
+              "dur_s": 1,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 1,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 1,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 1,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 1,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 1,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 1,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 1,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 1,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 1,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 1,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 1,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 1,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 1,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 1,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 1,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 1,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 1,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 1,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 1,
+              "mode": "free"
+            },
+            {
+              "label": "Step",
+              "dur_s": 1,
+              "mode": "free"
+            }
+          ]
+        }
+      ],
+      "error": "block 1: a repeat's steps are a list of 1 to 20 steps."
+    },
+    {
+      "name": "a label of 41 characters",
+      "steps": [
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        }
+      ],
+      "error": "block 1: label is 41 characters, over 40."
+    },
+    {
+      "name": "a blank label",
+      "steps": [
+        {
+          "label": "  ",
+          "dur_s": 60,
+          "mode": "free"
+        }
+      ],
+      "error": "block 1: label must be 1 to 40 characters and not blank."
+    },
+    {
+      "name": "no label",
+      "steps": [
+        {
+          "dur_s": 60,
+          "mode": "free"
+        }
+      ],
+      "error": "block 1: label must be 1 to 40 characters and not blank."
+    },
+    {
+      "name": "dur_s 0",
+      "steps": [
+        {
+          "label": "Step",
+          "dur_s": 0,
+          "mode": "free"
+        }
+      ],
+      "error": "block 1: dur_s 0 is under 1."
+    },
+    {
+      "name": "dur_s 14401",
+      "steps": [
+        {
+          "label": "Step",
+          "dur_s": 14401,
+          "mode": "free"
+        }
+      ],
+      "error": "block 1: dur_s 14401 is over 14400."
+    },
+    {
+      "name": "dur_s 1.5",
+      "steps": [
+        {
+          "label": "Step",
+          "dur_s": 1.5,
+          "mode": "free"
+        }
+      ],
+      "error": "block 1: dur_s must be a whole number (got 1.5)."
+    },
+    {
+      "name": "cadence 39",
+      "steps": [
+        {
+          "label": "Step",
+          "dur_s": 60,
+          "mode": "free",
+          "cadence": 39
+        }
+      ],
+      "error": "block 1: cadence 39 is under 40."
+    },
+    {
+      "name": "cadence 151",
+      "steps": [
+        {
+          "label": "Step",
+          "dur_s": 60,
+          "mode": "free",
+          "cadence": 151
+        }
+      ],
+      "error": "block 1: cadence 151 is over 150."
+    },
+    {
+      "name": "a total of 21601 seconds",
+      "steps": [
+        {
+          "repeat": 50,
+          "steps": [
+            {
+              "label": "Step",
+              "dur_s": 432,
+              "mode": "free"
+            }
+          ]
+        },
+        {
+          "label": "Step",
+          "dur_s": 1,
+          "mode": "free"
+        }
+      ],
+      "error": "steps: the workout adds up to 6:00:01 (21601 seconds), over the 6 hour limit (21600 seconds)."
+    },
+    {
+      "name": "no blocks",
+      "steps": [],
+      "error": "steps: a workout has 1 to 100 blocks."
+    },
+    {
+      "name": "101 blocks",
+      "steps": [
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        },
+        {
+          "label": "Step",
+          "dur_s": 10,
+          "mode": "free"
+        }
+      ],
+      "error": "steps: a workout has 1 to 100 blocks."
+    },
+    {
+      "name": "v 2",
+      "steps": {
+        "v": 2,
+        "steps": [
+          {
+            "label": "Step",
+            "dur_s": 60,
+            "mode": "free"
+          }
+        ]
+      },
+      "error": "steps: v must be 1 (got 2)."
+    },
+    {
+      "name": "steps that are not a list",
+      "steps": {
+        "v": 1,
+        "steps": "x"
+      },
+      "error": "steps: a workout has 1 to 100 blocks."
+    },
+    {
+      "name": "a step that is not an object",
+      "steps": [
+        {
+          "label": "Step",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        "x"
+      ],
+      "error": "block 2: a step is an object like {\"label\": \"...\", \"dur_s\": 60, \"mode\": \"free\"}."
+    },
+    {
+      "name": "over 5000 characters of JSON",
+      "steps": [
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        },
+        {
+          "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "dur_s": 60,
+          "mode": "free"
+        }
+      ],
+      "error": "steps: 7817 characters as JSON, over the 5000 limit. Use fewer or shorter steps."
+    }
+  ]
+}

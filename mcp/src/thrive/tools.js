@@ -27,6 +27,7 @@ import {
   previewSetUpdates, updateSets, appendSets, rowCap,
   fetchChangeLog, previewUndo, applyUndo,
   fetchSettings, previewWorkoutRest, setWorkoutRest,
+  fetchRideWorkouts, fetchFtp, saveRideWorkout, deleteRideWorkout, addFtp,
 } from './api.js';
 import { describeRowChange, keyText, listCalls, maskRow } from '../undo-format.js';
 import {
@@ -51,6 +52,12 @@ import {
 } from './drinks.js';
 import { apiSendsTrails, describeTrailHistory, NOT_UPDATED as TRAILS_NOT_UPDATED } from './trails.js';
 import {
+  CATEGORIES, NOT_UPDATED as SPIN_NOT_UPDATED, isUnknownAction, checkRideSteps, checkName, checkCategory,
+  checkDescription, checkFtpWatts, checkFtpDate, describeLibrary, describeWorkout, describeCreated,
+  planUpdate, describeUpdatePreview, describeUpdated, describeDeletePreview, describeFtp, describeFtpPreview,
+  describeFtpAdded,
+} from './ride-workouts.js';
+import {
   checkRest, mss, resolvedRestLines, timedSections, withTemplateRest, templateRestChanges, templateRestLines,
 } from './rest.js';
 
@@ -70,6 +77,8 @@ const READ_ONLY = new Set([
   'thrive_drinks',
   // #691.
   'thrive_trail_history',
+  // #774. Creating, updating and deleting a ride workout and adding an FTP are write tools.
+  'thrive_list_ride_workouts', 'thrive_get_ride_workout', 'thrive_ftp',
 ]);
 const DESTRUCTIVE = new Set([
   'thrive_delete_workout', 'thrive_delete_exercise', 'thrive_update_template', 'thrive_set_journal_entry',
@@ -79,6 +88,8 @@ const DESTRUCTIVE = new Set([
   'thrive_set_workout_rest',
   // Removes a logged drink; dry-run by default (#595).
   'thrive_delete_drink',
+  // Replace a library workout's steps, or remove it; dry-run by default (#774).
+  'thrive_update_ride_workout', 'thrive_delete_ride_workout',
 ]);
 const annotationsFor = (name) =>
   READ_ONLY.has(name) ? { readOnlyHint: true } : DESTRUCTIVE.has(name) ? { destructiveHint: true } : undefined;
@@ -831,6 +842,100 @@ tool(
     const workouts = await fetchWorkouts();
     if (!apiSendsTrails(workouts)) return fail(TRAILS_NOT_UPDATED);
     return text(describeTrailHistory(workouts, { trail: term, from, to, limit }));
+  },
+);
+
+// --- Thrive Spin: ride workouts and FTP (#774) -----------------------
+
+/**
+ * Run an API call for the Spin tools. An API from before #765's deploy answers these actions as
+ * unknown; that is said as what to do, not in the script's own words.
+ */
+async function spinApi(run) {
+  try {
+    return await run();
+  } catch (err) {
+    if (err instanceof ApiError && isUnknownAction(err)) throw new Error(SPIN_NOT_UPDATED);
+    throw err;
+  }
+}
+
+/** One library workout by id, with the refusal that names the id when there is none. */
+async function resolveRideWorkout(id) {
+  const library = await spinApi(fetchRideWorkouts);
+  const found = library.find((w) => w.id === id);
+  if (!found) {
+    throw new Error(
+      `No ride workout with id "${id}". thrive_list_ride_workouts shows the ids in Thrive Spin's library. Nothing was written.`,
+    );
+  }
+  return found;
+}
+
+const STEPS_SHAPE =
+  'The steps, replacing any existing ones whole. Either {"v": 1, "steps": [...]} or just the list of blocks. ' +
+  'A block is a step or a repeat. A step is {"label": text of 1-40, "dur_s": whole seconds 1-14400, "mode", ' +
+  '"cadence"?: whole rpm 40-150} plus its mode\'s target: mode "erg" takes "pct" (whole % of FTP, 0-300, never watts) ' +
+  'and optionally "pct_end" for a ramp from pct to pct_end; "resistance" takes "level" (0-100); "slope" takes ' +
+  '"grade" (-10 to 20 percent, one decimal); "free" takes none. A repeat is {"repeat": 2-50, "steps": [1-20 steps]} ' +
+  'and does not nest. 1-100 blocks, at most 6 hours in all with repeats counted out. The total time is worked out ' +
+  'for you; do not send it. Example: [{"label": "Warm-up", "dur_s": 600, "mode": "erg", "pct": 50, "pct_end": 70}, ' +
+  '{"repeat": 3, "steps": [{"label": "Sweet spot", "dur_s": 720, "mode": "erg", "pct": 90, "cadence": 90}, ' +
+  '{"label": "Recover", "dur_s": 240, "mode": "erg", "pct": 55}]}, {"label": "Cool-down", "dur_s": 360, "mode": "free"}]';
+
+// checkRideSteps names the block, step and field of a mistake; a stricter schema here would refuse the
+// blocks with the SDK's wording instead.
+const stepsSchema = z.union([
+  z.array(z.record(z.string(), z.unknown())),
+  z.object({ v: z.number().optional(), steps: z.array(z.record(z.string(), z.unknown())) }).passthrough(),
+]);
+
+tool(
+  'thrive_list_ride_workouts',
+  "Thrive Spin's workout library, one line per workout ordered by name: id, name, category, duration (h:mm) and " +
+    'the date it was last ridden, or "never ridden". category and search narrow it. thrive_get_ride_workout shows ' +
+    "one's steps. Changing the library is on the Thrive (write) connector: thrive_create_ride_workout, " +
+    'thrive_update_ride_workout and thrive_delete_ride_workout.',
+  {
+    category: z.string().optional().describe(`Only this category: ${CATEGORIES.join(', ')}`),
+    search: z.string().optional().describe('Only workouts whose name or description contains this text (case-insensitive)'),
+  },
+  async ({ category, search }) => {
+    const cat = category === undefined ? undefined : checkCategory(category);
+    return text(describeLibrary(await spinApi(fetchRideWorkouts), { category: cat, search }));
+  },
+);
+
+tool(
+  'thrive_get_ride_workout',
+  'One Thrive Spin library workout by id (from thrive_list_ride_workouts): its category and description, every step ' +
+    'in plain words (a repeat as "3 x [...]", a ramp as "50 -> 70%", targets as % of FTP, never watts), the total ' +
+    'time, and the steps JSON v1 to edit and send back as steps to thrive_update_ride_workout.',
+  { id: z.string().describe('The workout id, from thrive_list_ride_workouts') },
+  async ({ id }) => text(describeWorkout(await resolveRideWorkout(id))),
+);
+
+tool(
+  'thrive_ftp',
+  "The owner's FTP from Thrive Spin: the current one (watts, the date it took effect, and whether a ramp test or " +
+    'a person set it) and the history, newest first, one line each. from and to narrow the history; the current ' +
+    "FTP is always shown. A ramp test row names its test ride. A workout's % targets are scaled by the FTP; a ride " +
+    'keeps the FTP it was ridden at. thrive_add_ftp records a new one, on the Thrive (write) connector.',
+  {
+    from: z.string().optional().describe("Only entries on or after this date (YYYY-MM-DD, 'today', 'yesterday', '-30d')"),
+    to: z.string().optional().describe('Only entries on or before this date'),
+  },
+  async ({ from, to }) => {
+    const dates = {};
+    for (const [field, value] of [['from', from], ['to', to]]) {
+      if (value === undefined) continue;
+      dates[field] = normalizeDate(value);
+      if (!dates[field]) {
+        return fail(`${field} "${value}" is not a date. Use YYYY-MM-DD, today, yesterday or an offset such as -30d.`);
+      }
+    }
+    if (dates.from && dates.to && dates.from > dates.to) return fail('from is after to.');
+    return text(describeFtp(await spinApi(fetchFtp), dates));
   },
 );
 
@@ -1588,6 +1693,118 @@ tool(
 
     await deleteExercise(ex.id);
     return text(`Deleted exercise **${ex.name}** (${ex.id}).${inUse ? ' Referencing set/template rows were left in place.' : ''}`);
+  },
+);
+
+tool(
+  'thrive_create_ride_workout',
+  "Add a workout to Thrive Spin's library, saved straight away (it only adds a row). Targets are % of FTP, never " +
+    'watts. Replies with what was created, its id and its total time. thrive_undo removes it. To build "75 minutes ' +
+    'of sweet spot": a warm-up ramp, repeat blocks of the hard step and a recovery, and a cool-down, adding up to the ' +
+    'time asked for.',
+  {
+    name: z.string().describe('The workout name, 1-80 characters'),
+    category: z.string().describe(`One of ${CATEGORIES.join(', ')}`),
+    description: z.string().optional().describe('Optional text, at most 1000 characters'),
+    steps: stepsSchema.describe(STEPS_SHAPE),
+  },
+  async ({ name, category, description, steps }) => {
+    const checked = {
+      name: checkName(name),
+      category: checkCategory(category),
+      ...(description === undefined ? {} : { description: checkDescription(description) }),
+    };
+    const { steps: sent, duration_s: total } = checkRideSteps(steps);
+    const saved = await spinApi(() => saveRideWorkout({ ...checked, steps: sent }));
+    return text(describeCreated({ ...checked, ...saved }, sent, total));
+  },
+);
+
+tool(
+  'thrive_update_ride_workout',
+  'Change a Thrive Spin library workout by id: any of name, category, description and steps; what is not given is ' +
+    'kept. Steps are replaced whole, never patched: read them with thrive_get_ride_workout, change them and send ' +
+    'the whole list. Destructive and dry-run by default: shows only the fields that change, old to new, with steps ' +
+    'in words, and only writes when confirm is true. thrive_undo reverts it.',
+  {
+    id: z.string().describe('The workout id, from thrive_list_ride_workouts'),
+    name: z.string().optional().describe('The new name, 1-80 characters'),
+    category: z.string().optional().describe(`One of ${CATEGORIES.join(', ')}`),
+    description: z.string().optional().describe('The new description, at most 1000 characters; "" clears it'),
+    steps: stepsSchema.optional().describe(STEPS_SHAPE),
+    confirm: z.boolean().optional().describe('Set true to actually save. Default false = preview only.'),
+  },
+  async ({ id, name, category, description, steps, confirm = false }) => {
+    if (name === undefined && category === undefined && description === undefined && steps === undefined) {
+      throw new Error('Give name, category, description or steps: there is nothing to change. Nothing was written.');
+    }
+    const given = {
+      ...(name === undefined ? {} : { name: checkName(name) }),
+      ...(category === undefined ? {} : { category: checkCategory(category) }),
+      ...(description === undefined ? {} : { description: checkDescription(description) }),
+      ...(steps === undefined ? {} : { steps: checkRideSteps(steps).steps }),
+    };
+    const stored = await resolveRideWorkout(id);
+    const plan = planUpdate(stored, given);
+    if (!plan.changes.length) {
+      return text(`Nothing to change: ${stored.name} (${stored.id}) already has these values. Nothing was written.`);
+    }
+    if (!confirm) return text(describeUpdatePreview(stored, plan));
+    const saved = await spinApi(() => saveRideWorkout({ id: stored.id, ...plan.fields }));
+    return text(describeUpdated(stored, plan, saved));
+  },
+);
+
+tool(
+  'thrive_delete_ride_workout',
+  'Delete one Thrive Spin library workout by id. Destructive and dry-run by default: shows the workout and its last ' +
+    'ridden date, and only deletes when confirm is true. Planned bike days and rides that name it keep the id. ' +
+    'thrive_undo can bring it back.',
+  {
+    id: z.string().describe('The workout id, from thrive_list_ride_workouts'),
+    confirm: z.boolean().optional().describe('Set true to actually delete. Default false = preview only.'),
+  },
+  async ({ id, confirm = false }) => {
+    const found = await resolveRideWorkout(id);
+    if (!confirm) return text(describeDeletePreview(found));
+    const done = await spinApi(() => deleteRideWorkout(found.id));
+    if (!done?.deleted) {
+      return text(`${found.name} (${found.id}) was already gone: the API found no such workout. Nothing was deleted.`);
+    }
+    return text(`Deleted ride workout ${found.name} (${found.id}). thrive_undo can restore it.`);
+  },
+);
+
+tool(
+  'thrive_add_ftp',
+  'Record a new FTP in Thrive Spin: whole watts, 50-1000, on today or an earlier date, as a manual entry (a ramp test ' +
+    'FTP only comes from Spin itself). Dry-run by default: shows the current FTP beside the new one, and only writes ' +
+    "when confirm is true. A new FTP rescales every future workout's watts, since targets are % of FTP, so confirm " +
+    'only a value the user stated. Rides already ridden keep the FTP they were ridden at and are not rescored. An ' +
+    'FTP equal to the current one is refused, and so is a future date. thrive_undo removes it.',
+  {
+    ftp_w: z.coerce.number().describe('The FTP in whole watts, 50-1000'),
+    date: z.string().optional().describe("The date it takes effect (YYYY-MM-DD, 'today', 'yesterday', '-3d'). Default: today"),
+    confirm: z.boolean().optional().describe('Set true to actually write it. Default false = preview only.'),
+  },
+  async ({ ftp_w: ftpW, date, confirm = false }) => {
+    const watts = checkFtpWatts(ftpW);
+    const today = todayStr();
+    let day = today;
+    if (date !== undefined) {
+      day = normalizeDate(date);
+      if (!day) throw new Error(`date "${date}" is not a date. Use YYYY-MM-DD, today, yesterday or an offset such as -3d.`);
+    }
+    checkFtpDate(day, today);
+    const { current } = await spinApi(fetchFtp);
+    if (current && Number(current.ftp_w) === watts) {
+      throw new Error(
+        `${watts} W is already the current FTP (set ${current.date}), so there is nothing to change. Nothing was written.`,
+      );
+    }
+    if (!confirm) return text(describeFtpPreview(current, { ftp_w: watts, date: day }));
+    const added = await spinApi(() => addFtp({ id: crypto.randomUUID(), date: day, ftp_w: watts }));
+    return text(describeFtpAdded({ ftp_w: added?.ftp_w ?? watts, date: added?.date ?? day }));
   },
 );
 

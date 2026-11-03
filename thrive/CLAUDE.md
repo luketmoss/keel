@@ -326,6 +326,10 @@ request**.
   `thrive.yml` and `mcp.yml` each run on the other side's half. A rule change edits the
   fixture and both copies, so it touches `mcp/`, and `/review` reads the Worker's
   half as closely as the app's, since the Worker is the copy no screen shows.
+- **The ride steps rules** (#774): the steps v1 limits and checks. The API's copy is `apps-script/src/ride-workouts.js`
+  (`validateRideSteps`); the MCP Worker's is `mcp/src/thrive/ride-workouts.js`, tested against
+  `mcp/test/fixtures/ride-steps-golden.json`, and Spin's own parser is `android/spin/.../core/workout/`. A rule change
+  edits the API, the Worker's copy and the fixture together, so it touches `mcp/`.
 
 ## Changing the schema
 

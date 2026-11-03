@@ -76,8 +76,8 @@ disjoint and together are exactly the app's tools.
 
 | Connector | URL | Serves | Normal state |
 |---|---|---|---|
-| `Thrive` | `<PUBLIC_URL>/thrive/mcp` | the 12 read tools | on |
-| `Thrive (write)` | `<PUBLIC_URL>/thrive/write/mcp` | the 17 write tools | **off** |
+| `Thrive` | `<PUBLIC_URL>/thrive/mcp` | the 15 read tools | on |
+| `Thrive (write)` | `<PUBLIC_URL>/thrive/write/mcp` | the 21 write tools | **off** |
 | `Hive` | `<PUBLIC_URL>/hive/mcp` | the 4 read tools | on |
 | `Hive (write)` | `<PUBLIC_URL>/hive/write/mcp` | the 5 write tools | **off** |
 | `Forage` | `<PUBLIC_URL>/forage/mcp` | the 9 read tools | on |
@@ -253,7 +253,7 @@ Script change the Worker depends on is deployed by `/ship` before that merge.
 
 ## Thrive
 
-`/thrive/mcp` and `/thrive/write/mcp` serve the 29 Thrive tools between them, ported from the stdio server
+`/thrive/mcp` and `/thrive/write/mcp` serve the 36 Thrive tools between them, ported from the stdio server
 (retired in #372) and diffed against the tool list recorded from it
 (`test/fixtures/thrive-stdio-tools.json`, frozen the same way). The tool
 reference and the agent brief are in `docs/thrive-tools.md` and
@@ -308,6 +308,23 @@ The grouping and like-for-like rules are a copy of the app's (`src/thrive/trails
 sides' tests read; `mcp.yml` also runs on a change to the app's copy. A rule change edits the fixture
 and both copies in one pull request, so `/review` reads both halves.
 
+**Ride workouts and FTP (#774).** Thrive Spin's library and FTP, through #765's API actions, in seven tools: `thrive_list_ride_workouts`,
+`thrive_get_ride_workout` and `thrive_ftp` (read), and `thrive_create_ride_workout`, `thrive_update_ride_workout`,
+`thrive_delete_ride_workout` and `thrive_add_ftp` (write). The Worker holds no row mapping: `getRideWorkouts`, `saveRideWorkout`,
+`deleteRideWorkout`, `getFtp` and `addFtp` are in `api.js`, and the steps rules and the wording are `ride-workouts.js`. Steps are
+structured input (the v1 object or the bare list of blocks), checked here before any request so a mistake is named by position
+("block 2, step 1: pct 301 is over 300"); the Worker never sends `duration_s` or a timestamp, and the API re-checks and stays the
+authority. `thrive/apps-script/src/ride-workouts.js` is the rules' other copy, pinned by `test/fixtures/ride-steps-golden.json`, which
+`ride-workouts.test.js` reads: a rule change edits both and the fixture. Create is not dry-run (it adds a row); update (the whole step
+list is replaced, never patched) and delete are, and both carry `destructiveHint`. `thrive_add_ftp` is **`manual` only**: it has no
+`source` or `ride_id` input, since a `ramp_test` row must name a ride only Spin recorded. It is dry-run by default, shows the current
+FTP beside the new one, and refuses a future date and a value equal to the current FTP. All four writes are in the API's change log
+(`RideWorkouts`, `FtpHistory`), so `thrive_undo` reverts them, and a confirmed one is one write of one row against the limits. Steps ride
+in the URL like every write, so a workout over 5000 encoded characters is refused here, not truncated in transit. An update to an id not
+in the library is refused (the API would add a row). An API from before #765's deploy answers the actions as unknown, and the tools
+say its Apps Script needs the update. **Ordering:** #765's Apps Script (deployed as version 48) first, then this Worker. Reference:
+`docs/thrive-tools.md` and `docs/thrive-agent-brief.md`.
+
 ## Forage
 
 `/forage/mcp` and `/forage/write/mcp` (#713) serve Forage's tools: `forage_status`, `forage_search_foods`,
@@ -348,7 +365,7 @@ The tools below are on the write connectors, `Thrive (write)`, `Hive (write)` an
 `thrive_delete_workout`, `thrive_delete_exercise`, `thrive_update_template`
 (it deletes the old rows), `thrive_set_journal_entry` (clearing a note is a
 delete), `thrive_set_workout_rest` (it overwrites planned rest, #583),
-`thrive_delete_drink` (#595) and `thrive_undo` can destroy data. `hive_delete_item` (#725) and
+`thrive_delete_drink` (#595), `thrive_update_ride_workout` and `thrive_delete_ride_workout` (#774; an update replaces the whole step list) and `thrive_undo` can destroy data. `hive_delete_item` (#725) and
 `hive_undo` are the same for Hive, and `forage_undo` (#713), `forage_delete_food` (#707), `forage_delete_recipe` (#708), `forage_discard_trip` (#718), `forage_delete_walkthrough` (#711) and `forage_delete_log` (#712) for Forage; they get the same treatment. Reverting can itself destroy work done
 since, so the app's conflict check is the first line and a human approval the second. Their dry-run-until-`confirm: true`
 behaviour only prevents accidents; against prompt injection the one control is a

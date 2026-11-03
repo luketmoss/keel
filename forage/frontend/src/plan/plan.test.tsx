@@ -650,3 +650,37 @@ describe('the stylesheet', () => {
     expect(rule(css, '.trip-chip')).toContain('flex: none');
   });
 });
+
+describe('a save shows at once (#785)', () => {
+  it('planning, moving and removing show when the sheet closes, whatever the refresh does', async () => {
+    const api = fakeApi();
+    api.recipes.push(recipe('rc_chili', 'Weeknight chili'));
+    api.plan.push(meal({ id: 'pl_0', date: '2026-11-06', note: 'Out' }));
+    // Reads answer a copy, as the wire does: the fake's own array would change under the screen.
+    api.answer('getPlan', () => ({ success: true, data: { entries: [...api.plan], not_on_trip: 0 } }));
+    await open();
+    api.answer('getPlan', () => ({ success: false, error: 'offline' }));
+    fireEvent.click(screen.getByTestId('plan-meal-btn'));
+    await settle();
+    fireEvent.click(screen.getAllByTestId('plan-recipe')[0]);
+    await settle();
+    expect(screen.queryByTestId('plan-meal-sheet')).toBeNull();
+    expect(screen.getByText('Weeknight chili')).toBeDefined();
+    // The failed refresh shows nothing: no error line, no skeleton.
+    expect(screen.queryByTestId('plan-error')).toBeNull();
+    expect(screen.queryByTestId('plan-loading')).toBeNull();
+
+    fireEvent.click(rowsIn(days()[4])[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Lunch' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await settle();
+    expect(rowsIn(days()[4])[0].textContent).toContain('Lunch');
+
+    fireEvent.click(rowsIn(days()[1])[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Remove from plan' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    await settle();
+    expect(screen.queryByText('Weeknight chili')).toBeNull();
+    expect(screen.queryByTestId('plan-error')).toBeNull();
+  });
+});

@@ -19,10 +19,16 @@ interface Props {
   slot: Slot;
   /** Editing this entry, in place of adding one. */
   entry?: FoodLogEntry;
-  /** Saved: the status line's text ("Logged Greek yogurt"). */
-  onSaved: (status: string) => void;
+  /**
+   * Saved: the status line's text ("Logged Greek yogurt") and what the write answered (#785): the stored entry, or
+   * the id of the one deleted. The screen patches its day from it, then closes the sheet.
+   */
+  onSaved: (status: string, saved: SavedLog) => void;
   onClose: () => void;
 }
+
+/** What a save answered: the stored entry, or the id of the entry that was deleted. */
+export type SavedLog = { entry: FoodLogEntry } | { removed: string };
 
 export const targetName = (t: LogTarget) => (t.kind === 'food' ? displayName(t.food) : t.recipe.name);
 
@@ -61,6 +67,8 @@ export function AmountSheet({ api, target, date, today, slot: initialSlot, entry
   // One id per sheet open: a repeated tap or a retry after a lost answer leaves one entry.
   const id = useRef(entry?.id ?? newLogId());
   const seq = useRef(0);
+  // A second tap on Delete while the first is out sends no second write.
+  const deleting = useRef(false);
 
   const qty = parseAmount(typed);
   const valid = typeof qty === 'number' && qty > 0 && qty <= MAX_QTY;
@@ -131,11 +139,10 @@ export function AmountSheet({ api, target, date, today, slot: initialSlot, entry
         if (slot !== entry.slot) changes.slot = slot;
         if (qty !== entry.qty) changes.qty = qty as number;
         if (unit !== entry.unit) changes.unit = unit;
-        if (Object.keys(changes).length) await api.updateLogEntry(entry.id, changes);
-        onSaved(`Saved ${name}`);
+        const stored = Object.keys(changes).length ? await api.updateLogEntry(entry.id, changes) : entry;
+        onSaved(`Saved ${name}`, { entry: stored });
       } else {
-        await api.logEntry(input(qty as number));
-        onSaved(`Logged ${name}`);
+        onSaved(`Logged ${name}`, { entry: await api.logEntry(input(qty as number)) });
       }
     } catch (err) {
       setError(saveRefusal(err));
@@ -144,11 +151,13 @@ export function AmountSheet({ api, target, date, today, slot: initialSlot, entry
   }
 
   async function remove() {
-    if (!entry) return;
+    if (!entry || deleting.current) return;
+    deleting.current = true;
     try {
       await api.deleteLogEntry(entry.id);
-      onSaved(`Deleted ${name}`);
+      onSaved(`Deleted ${name}`, { removed: entry.id });
     } catch {
+      deleting.current = false;
       setConfirming(false);
       setError("Couldn't delete. Try again.");
     }

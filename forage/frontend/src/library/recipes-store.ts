@@ -3,7 +3,7 @@
 // both done by the API (`getRecipes` `q` and `sort`) and remembered for the session.
 import { signal } from '@preact/signals';
 import { ApiError, type ForageApi } from '../api/client';
-import type { RecipeSort, RecipeSummary } from '../api/types';
+import type { RecipeDetail, RecipeSort, RecipeSummary } from '../api/types';
 import { shortDate, starsText } from '../cook/format';
 
 export type LoadState = 'idle' | 'loading' | 'ready' | 'error';
@@ -29,25 +29,47 @@ function newestFirst(list: RecipeSummary[]): RecipeSummary[] {
 
 let latest = 0;
 
-/** Load with the current search and sort. A slower, older answer never replaces a newer one. */
-export async function loadRecipes(api: ForageApi): Promise<void> {
+/** Counts the rows patched in from a reply, so a refresh that began before one can't undo it (#785). */
+let patches = 0;
+
+/**
+ * Load with the current search and sort. A slower, older answer never replaces a newer one. `quiet` is the refresh
+ * after a save (#785): the list stays as it is under a failure, and an answer that began before a patch is dropped.
+ */
+export async function loadRecipes(api: ForageApi, quiet = false): Promise<void> {
   const seq = ++latest;
+  const before = patches;
   const q = recipeQuery.value.trim();
   const sort = recipeSort.value;
-  if (recipesState.value === 'idle' || recipesState.value === 'error') recipesState.value = 'loading';
+  if (!quiet && (recipesState.value === 'idle' || recipesState.value === 'error')) recipesState.value = 'loading';
   if (q) recipesSearching.value = true;
   try {
     const list = await api.getRecipes(q ? { q, sort } : { sort });
     if (seq !== latest) return;
+    if (quiet && patches !== before) return;
     recipes.value = sort === 'newest' ? newestFirst(list) : list;
     if (!q) recipeTotal.value = list.length;
     recipesState.value = 'ready';
   } catch {
-    if (seq !== latest) return;
+    if (seq !== latest || quiet) return;
     recipesState.value = 'error';
   } finally {
     if (seq === latest) recipesSearching.value = false;
   }
+}
+
+/** Refresh the list after a save without a failure showing: its rating and last cooked are derived (#785). */
+export function refreshRecipes(api: ForageApi): Promise<void> {
+  return loadRecipes(api, true);
+}
+
+/** Put a recipe as a write answered it into its row, when the list shows it (a search or sort may not). */
+export function patchRecipe(detail: RecipeDetail): void {
+  // The summary is the detail without its lines, steps and walkthrough.
+  const { lines: _lines, steps: _steps, walkthrough: _walkthrough, walkthrough_check: _check, ...summary } = detail;
+  if (!recipes.value.some((r) => r.id === summary.id)) return;
+  recipes.value = recipes.value.map((r) => (r.id === summary.id ? summary : r));
+  patches++;
 }
 
 /**
@@ -76,6 +98,7 @@ export async function deleteRecipe(api: ForageApi, id: string): Promise<string |
 
 /** Forget what was loaded (tests and sign-out). */
 export function _resetRecipes(): void {
+  patches = 0;
   recipes.value = [];
   recipesState.value = 'idle';
   recipeQuery.value = '';

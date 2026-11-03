@@ -3,7 +3,7 @@
 // the trip chips, the banner's count) is the API's: the app computes none.
 import { signal } from '@preact/signals';
 import type { ForageApi } from '../api/client';
-import type { LateMeal, PlanEntry } from '../api/types';
+import { SLOTS, type LateMeal, type PlanEntry } from '../api/types';
 import { localDate } from '../cook/format';
 import { PLAN_DAYS, addDays } from './dates';
 
@@ -26,13 +26,18 @@ export const lateMeals = signal<LateMeal[]>([]);
 export const planNotice = signal<string | null>(null);
 
 let latest = 0;
+/** Counts the meals patched in from a write's reply, so a refresh that began before one can't undo it (#785). */
+let patches = 0;
 
 /**
  * Load the 8 days from the device's today. Meals already shown stay under a
  * failed refresh, and a slower, older answer never replaces a newer one.
+ * `quiet` is the refresh after a save (#785): a failure shows nothing, and an
+ * answer that began before a later patch is dropped.
  */
-export async function loadPlan(api: ForageApi, now = new Date()): Promise<void> {
+export async function loadPlan(api: ForageApi, now = new Date(), quiet = false): Promise<void> {
   const seq = ++latest;
+  const before = patches;
   const today = localDate(now);
   if (planState.value === 'idle') planState.value = 'loading';
   try {
@@ -44,6 +49,7 @@ export async function loadPlan(api: ForageApi, now = new Date()): Promise<void> 
       ),
     ]);
     if (seq !== latest) return;
+    if (quiet && patches !== before) return;
     tripOpen.value = trip;
     planToday.value = today;
     planEntries.value = out.entries;
@@ -52,10 +58,44 @@ export async function loadPlan(api: ForageApi, now = new Date()): Promise<void> 
     planFailed.value = false;
     planState.value = 'ready';
   } catch {
-    if (seq !== latest) return;
+    if (seq !== latest || quiet) return;
     planFailed.value = true;
     if (planState.value === 'loading') planState.value = 'error';
   }
+}
+
+/** Refresh after a save: the banner's count and the late meals catch up, nothing blanks and no error shows (#785). */
+export function refreshPlan(api: ForageApi): Promise<void> {
+  return loadPlan(api, new Date(), true);
+}
+
+/** The API's order: date, slot, then creation. */
+function inPlanOrder(list: PlanEntry[]): PlanEntry[] {
+  return list.sort(
+    (a, b) =>
+      a.date.localeCompare(b.date) ||
+      SLOTS.indexOf(a.slot) - SLOTS.indexOf(b.slot) ||
+      a.created.localeCompare(b.created),
+  );
+}
+
+/**
+ * Put a meal as the write answered it into the plan: inserted, or replaced where it was. One moved to a day the
+ * 8 days don't show is taken out instead.
+ */
+export function upsertMeal(entry: PlanEntry): void {
+  const first = planToday.value;
+  const last = addDays(first, PLAN_DAYS - 1);
+  const rest = planEntries.value.filter((e) => e.id !== entry.id);
+  const shown = entry.date >= first && entry.date <= last;
+  planEntries.value = inPlanOrder(shown ? [...rest, entry] : rest);
+  patches++;
+}
+
+/** Take a removed meal out of the plan. */
+export function removeMeal(id: string): void {
+  planEntries.value = planEntries.value.filter((e) => e.id !== id);
+  patches++;
 }
 
 /** The banner's text, or null at 0. The number is bold in the banner itself. */
@@ -95,6 +135,7 @@ export function mealLabel(e: PlanEntry): string {
 
 /** Forget what was loaded (tests and sign-out). */
 export function _resetPlan(): void {
+  patches = 0;
   planEntries.value = [];
   notOnTrip.value = 0;
   lateMeals.value = [];

@@ -11,7 +11,7 @@ import { NutritionSheet } from '../library/nutrition-sheet';
 import { StarterSheet } from '../library/starter-sheet';
 import { showToast } from '../ui/toast';
 import { AddSheet } from './add-sheet';
-import { AmountSheet, type LogTarget } from './amount-sheet';
+import { AmountSheet, type LogTarget, type SavedLog } from './amount-sheet';
 import {
   dayEntries,
   dayPlan,
@@ -19,11 +19,15 @@ import {
   dayTotals,
   eatenDate,
   eatenToday,
+  knowFood,
   loadDay,
   logFoods,
   logRecipes,
   moveDay,
+  refreshDay,
+  removeEntry,
   unloggedPlan,
+  upsertEntry,
 } from './eaten-store';
 import {
   amountLine,
@@ -232,10 +236,16 @@ export function EatenScreen({ api }: { api: ForageApi }) {
   const foods = logFoods.value;
   const recipes = logRecipes.value;
 
-  async function done(status: string) {
+  // The write's own answer goes into the day, then the sheet closes and the toast shows, in one update; the totals
+  // catch up quietly behind it (#785).
+  function done(status: string, saved: SavedLog) {
+    if ('entry' in saved) {
+      if (overlay?.kind === 'amount' && overlay.target.kind === 'food') knowFood(overlay.target.food);
+      upsertEntry(saved.entry);
+    } else removeEntry(saved.removed);
     setOverlay(null);
     showToast(status);
-    await loadDay(api);
+    void refreshDay(api);
   }
 
   async function logPlanned(p: PlanEntry) {
@@ -245,9 +255,10 @@ export function EatenScreen({ api }: { api: ForageApi }) {
     setBusyPlan(p.id);
     setFailedPlan(null);
     try {
-      await api.logEntry({ id, date, slot: p.slot, recipe_id: p.recipe_id, qty: 1, unit: 'serving' });
+      const entry = await api.logEntry({ id, date, slot: p.slot, recipe_id: p.recipe_id, qty: 1, unit: 'serving' });
+      upsertEntry(entry);
       showToast(`Logged ${p.recipe_name}`);
-      await loadDay(api);
+      void refreshDay(api);
     } catch {
       setFailedPlan(p.id);
     } finally {
@@ -415,7 +426,7 @@ export function EatenScreen({ api }: { api: ForageApi }) {
         <NutritionSheet
           api={api}
           recipeId={overlay.recipeId}
-          onChanged={() => void loadDay(api)}
+          onChanged={() => void refreshDay(api)}
           onClose={() => setOverlay(overlay.back ? { kind: 'add', slot: overlay.back } : null)}
         />
       )}
@@ -427,7 +438,7 @@ export function EatenScreen({ api }: { api: ForageApi }) {
           today={today}
           slot={overlay.slot}
           entry={overlay.entry}
-          onSaved={(status) => void done(status)}
+          onSaved={done}
           onClose={() => setOverlay(null)}
         />
       )}

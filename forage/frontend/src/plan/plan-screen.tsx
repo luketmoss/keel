@@ -23,8 +23,11 @@ import {
   planNotice,
   planState,
   planToday,
+  refreshPlan,
+  removeMeal,
   tripChip,
   tripOpen,
+  upsertMeal,
 } from './plan-store';
 
 interface BannerProps {
@@ -110,10 +113,13 @@ export function PlanScreen({ api, empty }: { api: ForageApi; empty: ComponentChi
   const late = tripOpen.value === true ? lateSentence(lateMeals.value) : null;
   const banner = tripOpen.value === true ? late : bannerCount(notOnTrip.value);
 
-  async function wrote() {
+  // The write's answer goes into the plan as the sheet closes; the banner's count catches up quietly (#785).
+  function wrote(moved: PlanEntry | null, removedId?: string) {
+    if (moved) upsertMeal(moved);
+    else if (removedId) removeMeal(removedId);
     setOverlay(null);
     planNotice.value = null;
-    await loadPlan(api);
+    void refreshPlan(api);
   }
 
   async function gone() {
@@ -222,7 +228,7 @@ export function PlanScreen({ api, empty }: { api: ForageApi; empty: ComponentChi
           days={days}
           today={today}
           date={overlay.date}
-          onPlanned={() => void wrote()}
+          onPlanned={(e) => wrote(e)}
           onClose={() => setOverlay(null)}
         />
       )}
@@ -246,7 +252,7 @@ export function PlanScreen({ api, empty }: { api: ForageApi; empty: ComponentChi
           entry={overlay.entry}
           days={days}
           today={today}
-          onDone={() => void wrote()}
+          onDone={(moved) => wrote(moved, overlay.entry.id)}
           onGone={() => void gone()}
           onClose={() => setOverlay(null)}
         />

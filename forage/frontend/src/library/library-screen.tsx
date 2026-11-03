@@ -25,6 +25,8 @@ import {
   deleteRecipe,
   kcalText,
   loadRecipes,
+  patchRecipe,
+  refreshRecipes,
   recipeQuery,
   recipeSort,
   recipeTotal,
@@ -368,7 +370,7 @@ export function LibraryScreen({ api, empty, icon }: Props) {
           onAdded={(result) => {
             setOverlay(null);
             showFoodsNotice(starterNotice(result));
-            void loadFoods(api);
+            void loadFoods(api, true);
           }}
           onClose={() => setOverlay(null)}
         />
@@ -401,7 +403,10 @@ export function LibraryScreen({ api, empty, icon }: Props) {
           api={api}
           recipeId={overlay.recipeId}
           focusCook={overlay.focusCook}
-          onChanged={() => void loadRecipes(api)}
+          onChanged={(recipe) => {
+            if (recipe) patchRecipe(recipe);
+            void refreshRecipes(api);
+          }}
           onClose={() => setOverlay(null)}
         />
       )}

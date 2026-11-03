@@ -763,3 +763,106 @@ describe('the stylesheet', () => {
     expect(rule(css, '.recipe-text')).toContain('min-width: 0');
   });
 });
+
+describe('a save shows at once (#785)', () => {
+  const offline = () => ({ success: false as const, error: 'offline' });
+
+  it('a logged food is under its meal when the sheet closes, whatever the refresh does; the old totals stay', async () => {
+    const api = fakeApi();
+    api.foods.push(YOGURT);
+    await open();
+    const sheet = await addTo('Dinner');
+    fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: 'greek' } });
+    fireEvent.click(within(sheet).getAllByTestId('add-result')[0]);
+    await settle();
+    await previewed();
+    // Every read after the save fails: what shows can only be the write's own answer.
+    api.answer('getFoodLog', offline);
+    fireEvent.click(within(screen.getByTestId('amount-sheet')).getByTestId('log-it'));
+    await settle();
+    expect(screen.queryByTestId('amount-sheet')).toBeNull();
+    expect(entriesIn('Dinner')).toHaveLength(1);
+    expect(entriesIn('Dinner')[0].textContent).toContain('Greek yogurt');
+    expect(entriesIn('Dinner')[0].textContent).toContain('150');
+    expect(screen.getByTestId('toast').textContent).toBe('Logged Greek yogurt');
+    // The failed refresh leaves the screen as it is: no error, no skeleton, the previous totals.
+    expect(screen.queryByTestId('day-error')).toBeNull();
+    expect(screen.queryByTestId('day-loading')).toBeNull();
+    expect(kcal()).toBe('—');
+  });
+
+  it('the refresh brings the totals up without the skeleton', async () => {
+    const api = fakeApi();
+    api.foods.push(YOGURT);
+    await open();
+    const sheet = await addTo('Dinner');
+    fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: 'greek' } });
+    fireEvent.click(within(sheet).getAllByTestId('add-result')[0]);
+    await settle();
+    await previewed();
+    fireEvent.click(within(screen.getByTestId('amount-sheet')).getByTestId('log-it'));
+    await act(async () => {});
+    expect(screen.queryByTestId('day-loading')).toBeNull();
+    await settle();
+    expect(kcal()).toBe('150');
+    expect(entriesIn('Dinner')).toHaveLength(1);
+  });
+
+  it('a failed save keeps the sheet open with the error and the screen unchanged', async () => {
+    const api = fakeApi();
+    api.foods.push(YOGURT);
+    await open();
+    const sheet = await addTo('Dinner');
+    fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: 'greek' } });
+    fireEvent.click(within(sheet).getAllByTestId('add-result')[0]);
+    await settle();
+    await previewed();
+    const real = (p: any) => ({ success: true as const, data: entry({ food_id: 'fd_yog', slot: p.slot, kcal: 150 }) });
+    api.answer('logFood', (p) => (p.dry_run ? real(p) : { success: false, error: 'Network error' }));
+    fireEvent.click(within(screen.getByTestId('amount-sheet')).getByTestId('log-it'));
+    await settle();
+    expect(screen.getByTestId('amount-error')).toBeDefined();
+    expect(screen.getByTestId('amount-sheet')).toBeDefined();
+    expect(entriesIn('Dinner')).toHaveLength(0);
+    expect(kcal()).toBe('—');
+  });
+
+  it('an edit and a delete show when the sheet closes, whatever the refresh does', async () => {
+    const api = fakeApi();
+    api.foods.push(YOGURT);
+    api.log.push(
+      entry({ food_id: 'fd_yog', unit: 'cup', grams: 245, kcal: 149.9, protein_g: 6, carbs_g: 9, fat_g: 0.4 }),
+    );
+    await open();
+    api.answer('getFoodLog', offline);
+    fireEvent.click(entriesIn('Breakfast')[0]);
+    await settle();
+    fireEvent.click(within(screen.getByTestId('amount-sheet')).getByRole('button', { name: 'Lunch' }));
+    fireEvent.click(within(screen.getByTestId('amount-sheet')).getByTestId('log-it'));
+    await settle();
+    expect(entriesIn('Breakfast')).toHaveLength(0);
+    expect(entriesIn('Lunch')).toHaveLength(1);
+    fireEvent.click(entriesIn('Lunch')[0]);
+    await settle();
+    fireEvent.click(screen.getByTestId('delete-entry'));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await settle();
+    expect(api.calls('deleteLogEntry')).toHaveLength(1);
+    expect(entriesIn('Lunch')).toHaveLength(0);
+    expect(screen.queryByTestId('day-error')).toBeNull();
+  });
+
+  it('logging a planned meal shows the entry and drops the planned row, whatever the refresh does', async () => {
+    const api = fakeApi();
+    api.recipes.push(STEW);
+    api.plan.push(planned({}));
+    await open();
+    expect(screen.getAllByTestId('planned-row')).toHaveLength(1);
+    api.answer('getFoodLog', offline);
+    fireEvent.click(screen.getByTestId('log-planned'));
+    await settle();
+    expect(screen.queryAllByTestId('planned-row')).toHaveLength(0);
+    expect(entriesIn('Dinner')).toHaveLength(1);
+    expect(screen.queryByTestId('day-error')).toBeNull();
+  });
+});

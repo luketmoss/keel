@@ -170,6 +170,7 @@ describe('Library → Foods', () => {
     const packaged = screen.getByRole('region', { name: 'Packaged' });
     expect(packaged.textContent).toContain('Packaged (1)');
     expect(packaged.textContent).toContain('KIND Dark Chocolate bar');
+    expect(packaged.querySelector('.food-brand')?.textContent).toBe('KIND');
     expect(packaged.textContent).toContain('180 kcal a bar');
     expect(packaged.textContent).toContain('Not checked');
     const ingredients = screen.getByRole('region', { name: 'Ingredients' });
@@ -434,6 +435,27 @@ describe('a barcode', () => {
 });
 
 describe('the food sheet', () => {
+  it('titles the sheet with the name and leads the hint with the brand (#781)', async () => {
+    const detail: FoodDetail = {
+      ...food({ id: 'fd_y', name: 'Plain yogurt', brand: 'Hilltop Dairy', kind: 'packaged', source: 'off' }),
+      used_by: [],
+    };
+    const api = stubApi({ getFood: vi.fn(() => Promise.resolve(detail)) });
+    render(<FoodSheet api={api} id="fd_y" onEdit={() => {}} onDeleted={() => {}} onClose={() => {}} />);
+    await settle();
+    const sheet = screen.getByTestId('food-sheet');
+    expect(within(sheet).getByRole('heading', { level: 2 }).textContent).toBe('Plain yogurt');
+    expect(sheet.querySelector('.hint')?.textContent).toBe('Hilltop Dairy · Packaged food · Open Food Facts');
+  });
+
+  it('keeps the hint as it was for a food with no brand (#781)', async () => {
+    const detail: FoodDetail = { ...food({ id: 'fd_g', name: 'Garlic', source: 'usda' }), used_by: [] };
+    const api = stubApi({ getFood: vi.fn(() => Promise.resolve(detail)) });
+    render(<FoodSheet api={api} id="fd_g" onEdit={() => {}} onDeleted={() => {}} onClose={() => {}} />);
+    await settle();
+    expect(screen.getByTestId('food-sheet').querySelector('.hint')?.textContent).toBe('Ingredient · USDA');
+  });
+
   it('a food a recipe uses is refused, with the recipes named', async () => {
     const detail: FoodDetail = {
       ...food({ id: 'fd_r', name: 'Ricotta' }),

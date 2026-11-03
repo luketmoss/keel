@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { ForageApi } from '../api/client';
 import type { Food, FoodLogEntry, RecipeSummary, Slot } from '../api/types';
+import { FoodName } from '../library/food-name';
 import { displayName, hasNutrition } from '../library/food-math';
 import { addDays } from '../plan/dates';
 import { Sheet } from '../ui/sheet';
@@ -81,7 +82,9 @@ function ResultRow({ row, onPick, onAddNutrition }: { row: Row; onPick: () => vo
         data-testid="add-result"
       >
         <span class="recipe-text">
-          <span class={ok ? 'recipe-name' : 'recipe-name status-muted'}>{name}</span>
+          <span class={ok ? 'recipe-name' : 'recipe-name status-muted'}>
+            {t.kind === 'food' ? <FoodName food={t.food} /> : name}
+          </span>
           <span class="recipe-meta">{line}</span>
         </span>
         {ok ? (

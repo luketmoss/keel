@@ -297,8 +297,10 @@ web-app deployment immediately before merging, so the API is live before the
 merge deploys the callers that use it. It is the only skill that ever runs
 `clasp`. It deploys only what a push and a new version can carry; anything
 more — a new scope, a trigger, a script property, a migration — or a session
-with no clasp login parks the issue here with the owner's steps. The steps and
-their reports are in `/ship`.
+with no clasp login parks the issue here with the owner's steps. Run on its
+own, it asks the owner to confirm a trigger, property, migration or backfill
+step is done, and deploys on a yes (#795); a new scope always parks. The steps
+and their reports are in `/ship`.
 
 #### Human-reviewed paths
 

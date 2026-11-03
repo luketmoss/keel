@@ -68,11 +68,18 @@ PR #<pr> changes Forage's Apps Script, and this session can't deploy it:
   <reason>
 
 The owner's steps, in order:
-  1. clasp push --force
-  2. clasp redeploy <deploymentId> --description "#<issue> <title>"
-  3. <re-authorization, trigger, property or migration step, if any>
+  1. <property, migration or backfill step the issue says comes first>
+  2. clasp push --force
+  3. clasp redeploy <deploymentId> --description "#<issue> <title>"
+  4. <re-authorization or trigger step>
 Then run /ship <issue> to merge.
 ```
+
+#795 reordered the steps, so a step that comes first is listed first, and
+replaced the "comes first" reason below. Run on its own, `/ship` now asks the
+owner to confirm those steps and deploys on a yes. When they are the only
+reason, the park gives just those steps and says so. `/ship` §Deploy Apps
+Script has the question and that report.
 
 Reasons, one line each, every one that applies, in this order:
 

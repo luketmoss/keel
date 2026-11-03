@@ -104,8 +104,10 @@ push alone changes what triggers run. It deploys only what a push and a new
 version carry, and parks the issue in Ready to Ship with the owner's steps when
 the change needs more (step 3 below, a trigger, a script property, a
 migration), when the session has no clasp login, or when the project's
-`CLAUDE.md` does not record its script ID and live deployment ID. The
-conditions, the rollback and the reports are in `/ship`. **`clasp deploy` is
+`CLAUDE.md` does not record its script ID and live deployment ID. Run on its
+own after the owner has done a trigger, property, migration or backfill step,
+it asks them to confirm and then deploys (#795). The conditions, the rollback
+and the reports are in `/ship`. **`clasp deploy` is
 never used**: it creates a new deployment with a new URL, and every consumer
 holding the old one breaks.
 

@@ -1,6 +1,6 @@
 // Who is calling, and what they may do (#130, #144).
 //
-// Three kinds of caller:
+// Four kinds of caller:
 //
 // - A **key caller** sends `key`: the MCP server and the COROS sync. Full
 //   access, exactly as before #144. `key` may be `API_KEY` or, for the remote
@@ -8,6 +8,8 @@
 // - A **widget caller** (#519) sends `key` too, but it is `WIDGET_API_KEY`, held
 //   by the Sip home-screen widget alone. It may run WIDGET_ACTIONS and nothing
 //   else, and can be rotated without touching any other holder.
+// - A **Spin caller** (#765) sends `key` too, but it is `SPIN_API_KEY`, held by the
+//   Thrive Spin app alone. It may run SPIN_ACTIONS and nothing else.
 // - A **token caller** sends `access_token`, a Google access token from the
 //   SPA's own sign-in (#410). The SPA is a
 //   browser app on GitHub Pages, so it cannot hold the key — a key in a public
@@ -39,6 +41,8 @@ var TOKEN_READ_ACTIONS = [
   // #432: the app shows the route on a map. Addressed by workout, never by Drive ID, and
   // confirmed to be that activity's track before anything is returned (track.js).
   'getWorkoutTrack',
+  // #765: the app draws an indoor ride's chart. Addressed and confirmed the same way (streams.js).
+  'getWorkoutStreams',
   // #519: the app shows today's intake and a day's drinks.
   'getDrinks',
   'getDrinkTotals',
@@ -68,6 +72,16 @@ var TOKEN_WRITE_ACTIONS = [
  * widget can neither read the rest of the sheet nor edit or delete a drink.
  */
 var WIDGET_ACTIONS = ['logDrink', 'getDrinkTotals'];
+
+/**
+ * The only actions the Spin key may run (#765): the workout library, the FTP, the
+ * day's plans and the ride upload. `getWorkoutStreams` is not one: the app reads a
+ * ride back with its Google token. Everything else is refused with fixed text.
+ */
+var SPIN_ACTIONS = [
+  'getRideWorkouts', 'saveRideWorkout', 'deleteRideWorkout',
+  'getFtp', 'addFtp', 'getPlannedWorkouts', 'saveRide',
+];
 
 var TOKENINFO_URL ='https://oauth2.googleapis.com/tokeninfo';
 
@@ -117,10 +131,10 @@ function validateApiKey(key) {
 }
 
 /**
- * Which key `key` is: `'api'` (API_KEY), `'mcp'` (MCP_API_KEY), `'widget'` (WIDGET_API_KEY, #519), or null (#434).
+ * Which key `key` is: `'api'` (API_KEY), `'mcp'` (MCP_API_KEY), `'widget'` (WIDGET_API_KEY, #519), `'spin'` (SPIN_API_KEY, #765), or null (#434).
  * The change log is written for the MCP key's writes alone, so the key has to be
  * told apart. API_KEY wins if keys were ever set equal, then MCP_API_KEY: the log must never
- * claim a sync's write, and the narrow widget key must never shadow a wider one.
+ * claim a sync's write, and the narrow widget and Spin keys must never shadow a wider one.
  */
 function identifyApiKey(key) {
   var props = PropertiesService.getScriptProperties();
@@ -131,11 +145,14 @@ function identifyApiKey(key) {
   if (!!mcpKey && key === mcpKey) return 'mcp';
   // #519: the Sip widget's key, rotatable on its own. Unset or blank matches nothing.
   var widgetKey = props.getProperty('WIDGET_API_KEY');
-  return !!widgetKey && key === widgetKey ? 'widget' : null;
+  if (!!widgetKey && key === widgetKey) return 'widget';
+  // #765: the Spin app's key, rotatable on its own. Unset or blank matches nothing.
+  var spinKey = props.getProperty('SPIN_API_KEY');
+  return !!spinKey && key === spinKey ? 'spin' : null;
 }
 
 /**
- * Decide who is calling. Returns `{ mode: 'key' }`, `{ mode: 'mcp' }` (the MCP key), `{ mode: 'widget' }` (the widget key), `{ mode: 'token' }`, or
+ * Decide who is calling. Returns `{ mode: 'key' }`, `{ mode: 'mcp' }` (the MCP key), `{ mode: 'widget' }` (the widget key), `{ mode: 'spin' }` (the Spin key), `{ mode: 'token' }`, or
  * `{ refusal }` — a failure envelope to send back as it is.
  */
 function resolveCaller(params) {
@@ -151,7 +168,8 @@ function resolveCaller(params) {
   if (kind === null) return { refusal: fail('Invalid or missing API key') };
   // `mcp` is a key caller with the same access, told apart so its writes are logged (#434).
   // `widget` is a key caller with almost none: handleRequest limits it to WIDGET_ACTIONS (#519).
-  return { mode: kind === 'mcp' ? 'mcp' : kind === 'widget' ? 'widget' : 'key' };
+  // `spin` is a key caller with seven actions: handleRequest limits it to SPIN_ACTIONS (#765).
+  return { mode: kind === 'mcp' || kind === 'widget' || kind === 'spin' ? kind : 'key' };
 }
 
 function isTokenReadAction(action) {
@@ -160,6 +178,10 @@ function isTokenReadAction(action) {
 
 function isWidgetAction(action) {
   return WIDGET_ACTIONS.indexOf(action) !== -1;
+}
+
+function isSpinAction(action) {
+  return SPIN_ACTIONS.indexOf(action) !== -1;
 }
 
 function isTokenWriteAction(action) {
@@ -277,10 +299,18 @@ function parseExpiresIn(value) {
   return NaN;
 }
 
+/** Lowercase hex SHA-256 of a byte array, as Utilities.base64Decode hands one back (#765). */
+function sha256HexOfBytes(bytes) {
+  return hexOfDigest(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, bytes));
+}
+
 /** Lowercase hex SHA-256 of a UTF-8 string. */
 function sha256Hex(text) {
-  var bytes = Utilities.computeDigest(
-    Utilities.DigestAlgorithm.SHA_256, text, Utilities.Charset.UTF_8);
+  return hexOfDigest(Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256, text, Utilities.Charset.UTF_8));
+}
+
+function hexOfDigest(bytes) {
   var hex = '';
   for (var i = 0; i < bytes.length; i++) {
     // computeDigest returns signed bytes, -128..127.

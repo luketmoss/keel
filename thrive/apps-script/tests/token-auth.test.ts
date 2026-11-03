@@ -353,10 +353,14 @@ const KEY_ONLY_ACTIONS = [
   'getChangeLog', 'undoCall',
   // Re-resolves a planned workout's rest targets (#583): a write, key-only.
   'setWorkoutRest',
+  // #765: Thrive Spin's library, FTP and ride upload. The Spin key runs them; no token caller does.
+  'getRideWorkouts', 'saveRideWorkout', 'deleteRideWorkout', 'getFtp', 'addFtp', 'saveRide',
 ];
 
 const READ_PARAMS: Record<string, Record<string, string>> = {
   getWorkoutTrack: { id: 'w_001' },
+  // #765: the app draws an indoor ride's chart. w_001 is not a Spin ride: one fixed refusal to both callers.
+  getWorkoutStreams: { id: 'w_001' },
   // #519: the app's drinks reads.
   getDrinks: { from: '2026-09-01', to: '2026-09-30' }, getDrinkTotals: {},
   // #576: the app's Settings screen and its rest defaults.
@@ -373,8 +377,8 @@ describe('AC4: token callers run only the named reads', () => {
     it(`runs ${action} for a token caller exactly as for a key caller`, () => {
       const asKey = callEntry(load().sandbox, 'doGet', { action, key: 'test-key', ...params });
       const asToken = callEntry(load().sandbox, 'doPost', { action, access_token: TOKEN, ...params });
-      // getWorkoutTrack answers a fixed refusal for this row (no track): the same one to both callers.
-      if (action !== 'getWorkoutTrack') expect(asKey.res.success, asKey.text).toBe(true);
+      // getWorkoutTrack and getWorkoutStreams answer a fixed refusal for this row: the same one to both callers.
+      if (action !== 'getWorkoutTrack' && action !== 'getWorkoutStreams') expect(asKey.res.success, asKey.text).toBe(true);
       expect(asToken.text).toBe(asKey.text);
     });
   }

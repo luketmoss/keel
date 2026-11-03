@@ -81,10 +81,10 @@ describe('#688: migrate-688 appends Workouts!AD trails', () => {
   it('has 30 headers, one per WORKOUT_FIELDS entry, ending in AC track_ref and AD trails', async () => {
     const { HEADERS, BEFORE, TAB } = await load();
     expect(TAB).toBe('Workouts');
-    expect(HEADERS).toHaveLength(FIELDS.length);
+    expect(HEADERS).toHaveLength(FIELDS.length - 9); // #765 appended AE:AM after this migration
     expect(HEADERS[28]).toBe(FIELDS[28]);
     expect(HEADERS[29]).toBe(FIELDS[29]);
-    expect(HEADERS.slice(26)).toEqual(FIELDS.slice(26));
+    expect(HEADERS.slice(26)).toEqual(FIELDS.slice(26, 30));
     expect(HEADERS[29]).toBe('trails');
     expect(BEFORE).toEqual(HEADERS.slice(0, 29));
   });

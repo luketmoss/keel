@@ -143,11 +143,22 @@ export function makeUtilities(uuids: string[] = []) {
      * The real SHA-256, returned as Apps Script returns it: signed bytes,
      * -128..127, so the source's conversion to hex is exercised for real.
      */
-    computeDigest(algorithm: string, value: string, charset: string) {
-      if (algorithm !== 'SHA_256' || charset !== 'UTF_8') {
-        throw new Error('Utilities.computeDigest stub only supports SHA_256 over UTF_8');
-      }
-      return Array.from(createHash('sha256').update(value, 'utf8').digest()).map((b) => (b > 127 ? b - 256 : b));
+    computeDigest(algorithm: string, value: string | number[], charset?: string) {
+      if (algorithm !== 'SHA_256') throw new Error('Utilities.computeDigest stub only supports SHA_256');
+      // A byte array (signed, as base64Decode hands one back) or a string over UTF_8 (#765).
+      const hash = Array.isArray(value)
+        ? createHash('sha256').update(Buffer.from(value.map((b) => b & 255)))
+        : charset === 'UTF_8'
+          ? createHash('sha256').update(value, 'utf8')
+          : (() => { throw new Error('Utilities.computeDigest stub reads a string over UTF_8 only'); })();
+      return Array.from(hash.digest()).map((b) => (b > 127 ? b - 256 : b));
+    },
+    /** Signed bytes, as Apps Script returns them (#765). */
+    base64Decode(text: string) {
+      return Array.from(Buffer.from(text, 'base64')).map((b) => (b > 127 ? b - 256 : b));
+    },
+    newBlob(data: string | number[], contentType: string, name: string) {
+      return { data, contentType, name };
     },
     getUuid() {
       return uuids[nextUuid++] ?? 'uuid-' + ++nextUuid;
@@ -291,42 +302,77 @@ export function makeUrlFetchApp(calls: string[], reply: (url: string) => FetchRe
 export interface DriveNode {
   name: string;
   parents: string[];
-  /** Files only: the content, and optionally its MIME type and trash state. */
+  /** Files only: the text content, and optionally its trash state. A node with neither this nor `bytes` is a folder. */
   content?: string;
+  /** Files only: binary content, signed bytes as Apps Script has them (#765). */
+  bytes?: number[];
   trashed?: boolean;
 }
 
 /**
- * DriveApp stub (#179) over `nodes`, keyed by id. Records every id asked for,
- * so a test can assert that a refusal made no Drive call at all. `fail`, when
- * given, is thrown from `getFileById` instead — Drive's real permission and
- * not-found messages.
+ * DriveApp stub (#179, #765) over `nodes`, keyed by id. Records every id asked for
+ * through `getFileById`, so a test can assert that a refusal made no Drive call at all.
+ * `fail`, when given, is thrown from `getFileById` instead: Drive's real permission and
+ * not-found messages. Folders can be created and files written into them (`saveRide`),
+ * into the same `nodes`, so a test reads back what was stored. `getFilesByName` skips
+ * trashed files, as Drive does.
  */
 export function makeDriveApp(nodes: Record<string, DriveNode>, calls: string[], fail?: string) {
+  if (!nodes.root) nodes.root = { name: 'My Drive', parents: [] };
+  let created = 0;
+  const isFile = (n: DriveNode) => n.content !== undefined || n.bytes !== undefined;
+  const bytesOf = (n: DriveNode): Buffer =>
+    n.bytes ? Buffer.from(n.bytes.map((b) => b & 255)) : Buffer.from(n.content ?? '', 'utf8');
+  const iterator = (ids: string[]) => ({ hasNext: () => ids.length > 0, next: () => wrap(ids.shift()!) });
+  const children = (id: string, file: boolean, name: string) =>
+    Object.keys(nodes).filter((k) => {
+      const n = nodes[k];
+      return n.parents.includes(id) && isFile(n) === file && n.name === name && !n.trashed;
+    });
   const wrap = (id: string): any => {
     const node = nodes[id];
     return {
+      getId: () => id,
       getName: () => node.name,
       isTrashed: () => !!node.trashed,
-      getSize: () => Buffer.byteLength(node.content ?? '', 'utf8'),
+      setTrashed(trashed: boolean) {
+        node.trashed = trashed;
+        return this;
+      },
+      getSize: () => bytesOf(node).length,
       getParents() {
-        const ids = [...node.parents];
-        return { hasNext: () => ids.length > 0, next: () => wrap(ids.shift()!) };
+        return iterator([...node.parents]);
       },
       getBlob: () => ({
         getDataAsString(charset: string) {
           if (charset !== 'UTF-8') throw new Error('DriveApp stub reads UTF-8 only');
-          return node.content ?? '';
+          return bytesOf(node).toString('utf8');
         },
+        getBytes: () => Array.from(bytesOf(node)).map((b) => (b > 127 ? b - 256 : b)),
       }),
+      getFoldersByName: (name: string) => iterator(children(id, false, name)),
+      getFilesByName: (name: string) => iterator(children(id, true, name)),
+      createFolder(name: string) {
+        const newId = 'drive-' + ++created;
+        nodes[newId] = { name, parents: [id] };
+        return wrap(newId);
+      },
+      createFile(blob: { data: string | number[]; name: string }) {
+        const newId = 'drive-' + ++created;
+        nodes[newId] = typeof blob.data === 'string'
+          ? { name: blob.name, parents: [id], content: blob.data }
+          : { name: blob.name, parents: [id], bytes: [...blob.data] };
+        return wrap(newId);
+      },
     };
   };
   return {
+    getRootFolder: () => wrap('root'),
     getFileById(id: string) {
       calls.push(id);
       if (fail) throw new Error(fail);
       const node = nodes[id];
-      if (!node || node.content === undefined) {
+      if (!node || !isFile(node)) {
         throw new Error('No item with the given ID could be found. Possibly because you have not ' +
           'edited this item or you do not have permission to access it.');
       }
@@ -393,6 +439,9 @@ export interface LoadedApi {
   /** Drinks' and Settings' backing arrays, or undefined when the tab does not exist (#519). */
   drinkRows?: CellValue[][];
   settingRows?: CellValue[][];
+  /** RideWorkouts' and FtpHistory's backing arrays, or undefined when the tab does not exist (#765). */
+  rideWorkoutRows?: CellValue[][];
+  ftpRows?: CellValue[][];
   /** How many times the script lock was taken, and whether it is held now. */
   lock: { acquired: number; held: boolean };
   /** The script cache's live backing map (#144). */
@@ -425,6 +474,9 @@ export interface Fixtures {
   /** As dailyHealth: omit to model the tab not existing (#519). */
   drinks?: CellValue[][];
   settings?: CellValue[][];
+  /** As dailyHealth: omit to model the tab not existing (#765). */
+  rideWorkouts?: CellValue[][];
+  ftpHistory?: CellValue[][];
 }
 
 /**
@@ -481,7 +533,7 @@ export function loadApi(
   const sandbox = loadSources(
     ['types.js', 'utils.js', 'workouts.js', 'exercises.js', 'templates.js', 'sets.js',
       'daily-summary.js', 'daily-health.js', 'journal.js', 'drinks.js', 'settings.js', 'body-measurements.js', 'sync-log.js', 'payload.js', 'track.js', 'auth.js',
-      'sync-requests.js', 'change-log.js', 'main.js'],
+      'ride-workouts.js', 'ftp.js', 'rides.js', 'sync-requests.js', 'change-log.js', 'main.js'],
     {
       LockService: makeLockService(lock),
       ContentService: makeContentService(),
@@ -526,6 +578,12 @@ export function loadApi(
   if (fixtures.settings) {
     sheets.Settings = makeSheet(fixtures.settings, sandbox.SETTING_COLUMN_COUNT);
   }
+  if (fixtures.rideWorkouts) {
+    sheets.RideWorkouts = makeSheet(fixtures.rideWorkouts, sandbox.RIDE_WORKOUT_COLUMN_COUNT);
+  }
+  if (fixtures.ftpHistory) {
+    sheets.FtpHistory = makeSheet(fixtures.ftpHistory, sandbox.FTP_HISTORY_COLUMN_COUNT);
+  }
   if (fixtures.withingsSyncLog) {
     sheets.WithingsSyncLog = makeSheet(fixtures.withingsSyncLog, sandbox.SYNC_LOG_COLUMN_COUNT);
   }
@@ -546,7 +604,8 @@ export function loadApi(
     healthRows: fixtures.dailyHealth, syncLogRows: fixtures.syncLog,
     bodyRows: fixtures.bodyMeasurements, withingsSyncLogRows: fixtures.withingsSyncLog,
     journalRows: fixtures.journal, changeLogRows: fixtures.changeLog,
-    drinkRows: fixtures.drinks, settingRows: fixtures.settings, lock, cache, fetches,
+    drinkRows: fixtures.drinks, settingRows: fixtures.settings,
+    rideWorkoutRows: fixtures.rideWorkouts, ftpRows: fixtures.ftpHistory, lock, cache, fetches,
     driveCalls,
   };
 }
@@ -564,7 +623,8 @@ export interface ApiResponse<T = ApiWorkout[]> {
   data: T;
   error?: string;
   /** Present only on the failures that carry one (#144). */
-  code?: 'token_invalid' | 'token_forbidden' | 'token_unavailable' | 'read_only' | 'bad_request';
+  code?: 'token_invalid' | 'token_forbidden' | 'token_unavailable' | 'read_only' | 'bad_request' |
+    'widget_forbidden' | 'spin_forbidden';
 }
 
 /** Call the sandbox's `doGet` with `params` and return the parsed body. */
@@ -610,6 +670,8 @@ export function workoutRow(overrides: Record<string, CellValue> = {}): CellValue
     'sub_type', 'source', 'source_activity_id', 'raw_ref', 'fit_ref',
     'fit_fetched_at', 'synced_at', 'started_at_utc', 'calories',
     'estimated_seconds', 'sport_type', 'track_ref', 'trails',
+    'avg_power_w', 'np_w', 'intensity_factor', 'tss', 'work_kj', 'ftp_w',
+    'intensity_pct', 'ride_workout_id', 'streams_ref',
   ];
   return ORDER.map((f) => fields[f] ?? '');
 }

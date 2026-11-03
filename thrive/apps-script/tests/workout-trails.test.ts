@@ -29,11 +29,11 @@ const update = (api: ReturnType<typeof loadApi>, trails: unknown) =>
   call(api, 'updateWorkout', { id: 'w_walk', changes: { trails } });
 
 describe('#688: AD is trails, after track_ref', () => {
-  it('ends WORKOUT_FIELDS with sport_type, track_ref, trails; COL.TRAILS is 29 and a row is 30 cells', () => {
+  it('ends WORKOUT_FIELDS with sport_type, track_ref, trails; COL.TRAILS is 29 and a row is 39 cells (#765)', () => {
     const { sandbox } = loadApi([]);
-    expect([...sandbox.WORKOUT_FIELDS].slice(-3)).toEqual(['sport_type', 'track_ref', 'trails']);
+    expect([...sandbox.WORKOUT_FIELDS].slice(27, 30)).toEqual(['sport_type', 'track_ref', 'trails']);
     expect(sandbox.COL.TRAILS).toBe(AD);
-    expect(sandbox.WORKOUT_COLUMN_COUNT).toBe(30);
+    expect(sandbox.WORKOUT_COLUMN_COUNT).toBe(39);
   });
 
   it('getWorkouts and getWorkout return trails as stored; a row with no AD cell reads ""', () => {
@@ -123,7 +123,7 @@ describe('#688: every other write leaves AD alone', () => {
     const api = loadApi([]);
     const res = call(api, 'createWorkout', { data: { type: 'walk', name: 'Walk' } });
     expect(res.success, res.error).toBe(true);
-    expect(api.rows[0]).toHaveLength(30);
+    expect(api.rows[0]).toHaveLength(39);
     expect(api.rows[0][AD]).toBe('');
     expect(res.data.trails).toBe('');
   });

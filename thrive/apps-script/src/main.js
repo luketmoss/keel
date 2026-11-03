@@ -96,6 +96,17 @@
 //   ?action=getSettings&key=...   - every setting, defaults filled in (#576)
 // WIDGET_API_KEY may run logDrink and getDrinkTotals only.
 //
+// Thrive Spin (#765): the library, the FTP and the ride upload.
+//   ?action=getRideWorkouts&key=...   - every library workout, by name
+//   ?action=saveRideWorkout&key=...&payload={"name":"Sweet Spot","category":"Sweet spot",
+//     "steps":{"v":1,"steps":[{"label":"Hold","dur_s":720,"mode":"erg","pct":90}]}}
+//   ?action=deleteRideWorkout&key=...&payload={"id":"rw_1a2b3c4d"}
+//   ?action=getFtp&key=...   - {current, history}
+//   ?action=addFtp&key=...&payload={"id":"ftp_1","date":"2026-11-07","ftp_w":250,"source":"manual"}
+//   action=saveRide&key=...&payload={...}&fit=<base64>&streams=<json text>   - a POST
+//   ?action=getWorkoutStreams&access_token=...&id=w_1a2b3c4d   - a token caller may read it
+// SPIN_API_KEY may run those actions (SPIN_ACTIONS) and getPlannedWorkouts, nothing else.
+//
 // Rest (#576): Templates rows carry a section's `rest_s`/`switch_s` (blank =
 // the Settings default); replaceTemplate keeps a section's values when the
 // payload leaves them out. appendSets resolves `rest_target_s` for a workout
@@ -122,8 +133,8 @@ function envelope(result) {
 
 /**
  * A failure. `code` is optional and additive (#144): `token_invalid`,
- * `token_forbidden`, `token_unavailable`, `read_only`, `widget_forbidden` (#519), or `bad_request`
- * (requestSync's malformed `request_ids`, #410), so a caller can tell
+ * `token_forbidden`, `token_unavailable`, `read_only`, `widget_forbidden` (#519), `spin_forbidden` (#765), or `bad_request`
+ * (requestSync's malformed `request_ids`, #410, and every Spin action's refused input, #765), so a caller can tell
  * the cases apart without matching English. Without one, the envelope is
  * exactly what it was before #144.
  */
@@ -191,6 +202,11 @@ function handleRequest(e) {
       return envelope(fail('Widget caller: this action is not permitted', 'widget_forbidden'));
     }
 
+    // #765: the Spin key runs seven actions. Fixed text, so an action name is not echoed.
+    if (caller.mode === 'spin' && !isSpinAction(action)) {
+      return envelope(fail('Spin caller: this action is not permitted', 'spin_forbidden'));
+    }
+
     if (caller.mode === 'token' && !isTokenReadAction(action) && !isTokenWriteAction(action)) {
       return envelope(fail(
         'Read-only caller: action "' + (action || '') + '" is not permitted', 'read_only'));
@@ -201,7 +217,8 @@ function handleRequest(e) {
       ? withChangeLog(action, params, function () { return dispatch(action, params, caller); })
       : dispatch(action, params, caller);
   } catch (err) {
-    result = fail(err.message || String(err));
+    // #765: only badRequest() sets a code; any other thrown error goes back as it always did.
+    result = fail(err.message || String(err), err && err.code === 'bad_request' ? 'bad_request' : undefined);
   }
 
   // No message goes back carrying the caller's token, whatever echoed it.
@@ -218,6 +235,8 @@ function dispatch(action, params, caller) {
   } catch (err) {
     // requestSync's refusals are fixed text that never quotes the input (#410).
     if (action === 'requestSync') return fail(SYNC_REQUEST_BAD_REQUEST, 'bad_request');
+    // The Spin actions' refusals never quote the input either (#765): V8's JSON error does.
+    if (isSpinAction(action)) return fail(SPIN_BAD_PAYLOAD, 'bad_request');
     throw err;
   }
 
@@ -269,9 +288,24 @@ function dispatch(action, params, caller) {
       result = { success: true, data: getWorkoutTrack(params.id) };
       break;
 
-    // A date with nothing planned returns [], not an error.
+    // A date with nothing planned returns [], not an error. The Spin key may run it (#765),
+    // so its one refusal is fixed text rather than validateDate's, which quotes the date.
     case 'getPlannedWorkouts':
+      if (caller && caller.mode === 'spin' && params.date && !/^\d{4}-\d{2}-\d{2}$/.test(String(params.date))) {
+        result = fail('date must be YYYY-MM-DD', 'bad_request');
+        break;
+      }
       result = { success: true, data: getPlannedWorkouts(params.date) };
+      break;
+
+    // An indoor ride's streams (#765), by workout id. A read, and on TOKEN_READ_ACTIONS: the
+    // signed-in app draws the chart. The Spin key may not run it.
+    case 'getWorkoutStreams':
+      if (!params.id) {
+        result = fail('id parameter required');
+        break;
+      }
+      result = { success: true, data: getWorkoutStreams(params.id) };
       break;
 
     // --- Writes ---
@@ -686,6 +720,37 @@ function dispatch(action, params, caller) {
     // Every setting with its default filled in (#576): the app's Settings screen.
     case 'getSettings':
       result = { success: true, data: getSettings() };
+      break;
+
+    // --- Thrive Spin (#765) ---
+    // The workout library, the FTP and the ride upload. Writes take the script lock. The Spin
+    // key runs SPIN_ACTIONS; none is on the token lists (the app reads a ride's streams only).
+    case 'getRideWorkouts':
+      result = { success: true, data: getRideWorkouts() };
+      break;
+
+    case 'saveRideWorkout':
+      result = { success: true, data: withScriptLock(function () { return saveRideWorkout(payload); }) };
+      break;
+
+    case 'deleteRideWorkout':
+      result = { success: true, data: withScriptLock(function () { return deleteRideWorkout(payload); }) };
+      break;
+
+    case 'getFtp':
+      result = { success: true, data: getFtp() };
+      break;
+
+    case 'addFtp':
+      result = { success: true, data: withScriptLock(function () { return addFtp(payload); }) };
+      break;
+
+    // A form-encoded POST: `payload` (JSON), `fit` (base64) and `streams` (JSON text).
+    case 'saveRide':
+      result = {
+        success: true,
+        data: withScriptLock(function () { return saveRide(payload, params.fit, params.streams); }),
+      };
       break;
 
     default:

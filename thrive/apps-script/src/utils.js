@@ -168,3 +168,82 @@ function withScriptLock(fn) {
     lock.releaseLock();
   }
 }
+
+// --- Refusals and checks shared by the Spin actions (#765) ---------------------
+//
+// The Spin key lives on a phone, so none of these quotes the caller's input back:
+// every message is fixed text. Spin's upload queue reads `code: 'bad_request'` as a
+// permanent refusal (drop it and show it) against a transient failure (`Lock
+// timeout`, a network error), which it retries.
+
+/** An error that goes back as `code: 'bad_request'`. handleRequest reads `.code`. */
+function badRequest(message) {
+  var err = new Error(message);
+  err.code = 'bad_request';
+  return err;
+}
+
+/** What a Spin action answers when `payload` is over the length limit or not JSON. */
+var SPIN_BAD_PAYLOAD =
+  'payload must be JSON of at most 6000 characters. A longer one is truncated in transit, so it is refused.';
+
+/** An id a caller generates: 1-64 of letters, digits, `_` and `-`. */
+var SPIN_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** A plain JSON object, never null, an array or a scalar. */
+function isPlainObject(value) {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+/** Whether `obj` has no key outside `allowed`. */
+function hasOnlyKeys(obj, allowed) {
+  for (var key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key) && allowed.indexOf(key) === -1) return false;
+  }
+  return true;
+}
+
+/** Whether `obj` has `key` set to something other than undefined. */
+function hasKey(obj, key) {
+  return Object.prototype.hasOwnProperty.call(obj, key) && obj[key] !== undefined;
+}
+
+/** A JSON number that is a whole number in [min, max]. Strings are not numbers here. */
+function isWholeIn(value, min, max) {
+  return typeof value === 'number' && isFinite(value) && Math.floor(value) === value &&
+    value >= min && value <= max;
+}
+
+/**
+ * A whole number in [min, max] from a JSON number or a string of digits, else null:
+ * the forms a phone or the MCP Worker sends. Not a way to send a decimal.
+ */
+function spinWhole(value, min, max) {
+  var n = value;
+  if (typeof value === 'string' && /^\d{1,9}$/.test(value.trim())) n = Number(value.trim());
+  return isWholeIn(n, min, max) ? n : null;
+}
+
+/** A real local calendar date, YYYY-MM-DD: 2026-02-30 is not one. */
+function isRealLocalDate(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  var y = Number(value.slice(0, 4));
+  var m = Number(value.slice(5, 7));
+  var d = Number(value.slice(8, 10));
+  var date = new Date(Date.UTC(y, m - 1, d));
+  return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
+}
+
+/** The payload as an object, or a fixed-text refusal. */
+function spinPayload(payload) {
+  if (!isPlainObject(payload)) throw badRequest('payload must be a JSON object');
+  return payload;
+}
+
+/** A caller-supplied id, or a fixed-text refusal that names the field and nothing else. */
+function checkSpinId(value, field) {
+  if (typeof value !== 'string' || !SPIN_ID_PATTERN.test(value)) {
+    throw badRequest(field + ' must be 1 to 64 characters of letters, digits, _ and -');
+  }
+  return value;
+}

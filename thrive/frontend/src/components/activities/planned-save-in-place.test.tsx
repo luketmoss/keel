@@ -173,6 +173,16 @@ function planRow(): string[] {
     'trk/1',
     // AD, #688: the trails, also passed through.
     '{"v":1,"m":1,"u":0,"n":[],"p":[]}',
+    // AE:AM, #765: Spin's columns, also passed through (a plan has no ride, but the link may be set).
+    '190',
+    '215',
+    '0.86',
+    '74',
+    '683',
+    '250',
+    '100',
+    'rw_1a2b3c4d',
+    'streams/1',
   ];
 }
 
@@ -293,6 +303,15 @@ function toWorkouts(): WorkoutWithRow[] {
     sport_type: r[27],
     track_ref: r[28],
     trails: '',
+    avg_power_w: '',
+    np_w: '',
+    intensity_factor: '',
+    tss: '',
+    work_kj: '',
+    ftp_w: '',
+    intensity_pct: '',
+    ride_workout_id: '',
+    streams_ref: '',
     sheetRow: i + 2,
   }));
 }
@@ -370,7 +389,7 @@ describe("AC1: Save keeps the workout's identity and every column it does not ed
 
     const puts = vi.mocked(sheets.sheetsUpdate).mock.calls.filter(([r]) => r.startsWith('Workouts'));
     expect(puts).toHaveLength(1);
-    expect(puts[0][0]).toBe('Workouts!A3:AD3');
+    expect(puts[0][0]).toBe('Workouts!A3:AM3');
     expect(puts[0][1]).toEqual([before.map((v, i) => (i === 4 ? 'Legs B' : v))]);
 
     expect(vi.mocked(sheets.sheetsAppend)).not.toHaveBeenCalled();

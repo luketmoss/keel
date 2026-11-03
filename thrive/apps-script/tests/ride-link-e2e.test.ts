@@ -6,9 +6,13 @@
 import path from 'node:path';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { CellValue, DriveNode } from './apps-script-sandbox';
 import { loadSpin, call, makeRide, saveRide, type SpinFixtures } from './spin-fixtures';
+
+// The sync's FIT step imports the Garmin SDK, which only sync/ installs. This job never decodes a FIT, so
+// the import is stubbed rather than making the apps-script job install the sync's dependencies.
+vi.mock('@garmin/fitsdk', () => ({ Decoder: class {}, Stream: class {} }));
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const syncDir = path.resolve(here, '..', '..', 'sync');

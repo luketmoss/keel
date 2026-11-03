@@ -97,5 +97,11 @@ object SpinSizes {
     const val NAV_HEIGHT = 64
     const val PROFILE_SM = 40
     const val PROFILE_LG = 140
+
+    /** `--spin-profile-ride`: the profile on the ride screen, smaller so the screen fits a phone. */
+    const val PROFILE_RIDE = 88
+
+    /** `--spin-ride-button`: the ride's control row, pressed mid-effort. */
+    const val RIDE_BUTTON = 72
     const val OPACITY_DISABLED = 0.4f
 }

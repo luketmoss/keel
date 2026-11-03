@@ -102,12 +102,4 @@ class DetailTest {
     fun withNoFtpNoRequestIsBuilt() {
         assertNull(DetailState.open("rw_1", null).request("A", exampleSteps(), null))
     }
-
-    @Test
-    fun theShippedStarterOnlyShowsTheLaterUpdateMessage() {
-        val shown = mutableListOf<String>()
-        val starter: RideStarter = PlaceholderRideStarter { shown += it }
-        starter.start(DetailState.open("rw_1", null).request("A", exampleSteps(), 250)!!)
-        assertEquals(listOf("Riding comes in a later update."), shown)
-    }
 }

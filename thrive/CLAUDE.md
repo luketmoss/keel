@@ -149,7 +149,7 @@ with its own id and tap time.
 rate straps over Bluetooth LE for indoor rides. It does not depend on `app`: the small pieces it shares with Sip (URL
 check, OkHttp transport, envelope reading) are copied. #766 is its shell, Settings and Devices screen
 (`docs/design/766-spin-devices.md`); #767 is the Library, workout detail and builder (`docs/design/767-spin-library.md`);
-the ride is #768.
+#768 is the ride (`docs/design/768-spin-ride.md`).
 
 - **Install is by sideload**, like Sip: download the `thrive-spin-apk` artifact from the latest green
   `thrive-android.yml` run (the same job also uploads `thrive-sip-apk`) and install it beside Thrive Sip. It is signed
@@ -170,6 +170,16 @@ the ride is #768.
   detail screen and never saved. Start builds a `RideRequest` for `RideStarter`; #767 ships a placeholder that says riding
   comes later. The builder saves with a caller-made id and **refuses offline edits, never queues them**, so an MCP edit
   cannot be silently overwritten later. Power zone colours are in `SpinColors`; #771 should reuse them.
+- **Ride (#768).** Start (`RideLauncher`, which replaced #767's placeholder) turns a `RideRequest` into a `RideSession` and
+  starts `ride/RideService`: a `connectedDevice` foreground service with a partial wake lock, its own connections
+  (`ride/RideConnections`, since Devices connects only while it is on screen) and an ongoing notification with Pause/Resume. The
+  engine is plain Kotlin and JVM-tested on a fake clock and a fake trainer: `core/ride/RideEngine` (step clock, one sample a
+  ride-second, targets, intensity, pause, skip, end, heart rate choice timing), `TrainerController` (the control sequence, one
+  command in flight, the refusal table) over `core/ble/FtmsControl`'s bytes, and `core/ride/recording/` (`files/rides/<ride_id>/`
+  with `meta.json`, `samples.csv` and `events.jsonl`, written as the ride goes; `RideRecovery` runs when the app next opens and
+  never restarts a ride behind the rider's back). The ride screen is always the dark scheme (`SpinDarkTheme`) and the app
+  always opens on it while a ride is active. #769 plugs in at `RideFinishedHandler` and `RideStore`; a placeholder "Ride recorded"
+  screen ships. #770's ramp test builds its own `RideSession` (`RideKind.RampTest`, open-ended `WattsStairs` and `CadenceBelow`).
 - **Testing is not human-gated**, as for Sip: `/test` passes the JVM and CI criteria; Bluetooth, permission and
   on-phone criteria are waived by the owner and listed in the issue's `## Results` as things to watch. Install the APK
   from the merge's CI run on `main`.

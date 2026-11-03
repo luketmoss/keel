@@ -3,6 +3,7 @@
 // the trip chips, the banner's count) is the API's: the app computes none.
 import { signal } from '@preact/signals';
 import type { ForageApi } from '../api/client';
+import { quietGate } from '../api/quiet-gate';
 import { SLOTS, type LateMeal, type PlanEntry } from '../api/types';
 import { localDate } from '../cook/format';
 import { PLAN_DAYS, addDays } from './dates';
@@ -28,6 +29,7 @@ export const planNotice = signal<string | null>(null);
 let latest = 0;
 /** Counts the meals patched in from a write's reply, so a refresh that began before one can't undo it (#785). */
 let patches = 0;
+const gate = quietGate();
 
 /**
  * Load the 8 days from the device's today. Meals already shown stay under a
@@ -39,6 +41,7 @@ export async function loadPlan(api: ForageApi, now = new Date(), quiet = false):
   const seq = ++latest;
   const before = patches;
   const today = localDate(now);
+  if (!quiet) gate.cancel();
   if (planState.value === 'idle') planState.value = 'loading';
   try {
     const [out, trip] = await Promise.all([
@@ -64,9 +67,9 @@ export async function loadPlan(api: ForageApi, now = new Date(), quiet = false):
   }
 }
 
-/** Refresh after a save: the banner's count and the late meals catch up, nothing blanks and no error shows (#785). */
+/** Refresh after a save, one at a time (#790): the banner's count and the late meals catch up, nothing blanks and no error shows (#785). */
 export function refreshPlan(api: ForageApi): Promise<void> {
-  return loadPlan(api, new Date(), true);
+  return gate.request(() => loadPlan(api, new Date(), true));
 }
 
 /** The API's order: date, slot, then creation. */
@@ -135,6 +138,7 @@ export function mealLabel(e: PlanEntry): string {
 
 /** Forget what was loaded (tests and sign-out). */
 export function _resetPlan(): void {
+  gate.reset();
   patches = 0;
   planEntries.value = [];
   notOnTrip.value = 0;

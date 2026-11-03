@@ -2,6 +2,7 @@
 // The day card is `getFoodLogTotals` for the day and each row an entry's stored snapshot: the app adds nothing up.
 import { signal } from '@preact/signals';
 import type { ForageApi } from '../api/client';
+import { quietGate } from '../api/quiet-gate';
 import type { Food, FoodLogDay, FoodLogEntry, PlanEntry, RecipeSummary } from '../api/types';
 import { localDate } from '../cook/format';
 import { addDays } from '../plan/dates';
@@ -25,6 +26,11 @@ export const logRecipes = signal<RecipeSummary[]>([]);
 let latest = 0;
 /** Counts the entries patched in from a write's reply, so a refresh that began before one can't undo it (#785). */
 let patches = 0;
+const gate = quietGate();
+/** A queued refresh must also fetch the recipes (the Nutrition sheet changed one); cleared when a refresh starts. */
+let wantRecipes = false;
+/** A full load began and its answer hasn't landed: a quiet refresh that supersedes it reads everything, so nothing is lost. */
+let fullOut = false;
 
 /**
  * Load the viewed day: its entries, its totals, its plan, and the library's names. A slower, older answer never wins.
@@ -35,22 +41,32 @@ export async function loadDay(api: ForageApi, date = eatenDate.value, quiet = fa
   const seq = ++latest;
   const before = patches;
   const today = localDate();
+  if (!quiet) {
+    gate.cancel();
+    fullOut = true;
+  }
   eatenToday.value = today;
+  // A log write can't change the plan, the foods or the recipes, so a quiet refresh reads only the log and its
+  // totals, unless the Nutrition sheet changed a recipe (#790).
+  const everything = !quiet || fullOut;
+  const withRecipes = everything || wantRecipes;
+  wantRecipes = false;
   try {
     const [entries, totals, plan, foods, recipes] = await Promise.all([
       api.getFoodLog(date, date),
       api.getFoodLogTotals(date, date),
-      api.getPlan(date, date, today),
-      api.getFoods(),
-      api.getRecipes(),
+      everything ? api.getPlan(date, date, today) : null,
+      everything ? api.getFoods() : null,
+      withRecipes ? api.getRecipes() : null,
     ]);
     if (seq !== latest) return;
     if (quiet && patches !== before) return;
     dayEntries.value = entries;
     dayTotals.value = totals.days.find((d) => d.date === date) ?? null;
-    dayPlan.value = plan.entries.filter((p) => p.date === date && p.recipe_id);
-    logFoods.value = foods;
-    logRecipes.value = recipes;
+    if (plan) dayPlan.value = plan.entries.filter((p) => p.date === date && p.recipe_id);
+    if (foods) logFoods.value = foods;
+    if (recipes) logRecipes.value = recipes;
+    if (everything) fullOut = false;
     dayState.value = 'ready';
   } catch {
     if (seq !== latest || quiet) return;
@@ -58,9 +74,14 @@ export async function loadDay(api: ForageApi, date = eatenDate.value, quiet = fa
   }
 }
 
-/** Refresh the day after a save without touching `dayState`: the totals catch up, nothing blanks (#785). */
-export function refreshDay(api: ForageApi): Promise<void> {
-  return loadDay(api, eatenDate.value, true);
+/**
+ * Refresh the day after a save without touching `dayState`: the totals catch up, nothing blanks (#785). One at a
+ * time (#790): asked again while one is out, it runs once more when that settles. `recipes` also reads the recipe
+ * list, for a change to a recipe's nutrition.
+ */
+export function refreshDay(api: ForageApi, recipes = false): Promise<void> {
+  if (recipes) wantRecipes = true;
+  return gate.request(() => loadDay(api, eatenDate.value, true));
 }
 
 /** Put an entry as the write answered it into the day: inserted, or replaced in place. Another day's is left to the refresh. */
@@ -118,6 +139,9 @@ export function unloggedPlan(plan: PlanEntry[], entries: FoodLogEntry[]): PlanEn
 /** Forget what was loaded (tests and sign-out). */
 export function _resetEaten(): void {
   latest++;
+  gate.reset();
+  wantRecipes = false;
+  fullOut = false;
   patches = 0;
   eatenDate.value = localDate();
   eatenToday.value = localDate();

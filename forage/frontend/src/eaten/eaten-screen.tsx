@@ -426,7 +426,7 @@ export function EatenScreen({ api }: { api: ForageApi }) {
         <NutritionSheet
           api={api}
           recipeId={overlay.recipeId}
-          onChanged={() => void refreshDay(api)}
+          onChanged={() => void refreshDay(api, true)}
           onClose={() => setOverlay(overlay.back ? { kind: 'add', slot: overlay.back } : null)}
         />
       )}

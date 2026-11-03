@@ -4,6 +4,7 @@
 // can follow it.
 import { signal } from '@preact/signals';
 import { ApiError, type ForageApi } from '../api/client';
+import { quietGate } from '../api/quiet-gate';
 import type { Food } from '../api/types';
 import type { LoadState } from './recipes-store';
 
@@ -25,23 +26,42 @@ export function showFoodsNotice(text: string): void {
   noticeTimer = setTimeout(() => (foodsNotice.value = null), 4000);
 }
 
+let latest = 0;
+/** Counts the foods patched in by a save, so a refresh that began before one can't undo it (#790). */
+let patches = 0;
+const gate = quietGate();
+
 /**
- * `quiet` is the refresh after a save (#785): a failure leaves the list as it is, and the state is left alone.
+ * A slower, older answer never replaces a newer one. `quiet` is the refresh after a save (#785): a failure leaves
+ * the list as it is and the state alone, and an answer that began before a later patch is dropped (#790).
  */
 export async function loadFoods(api: ForageApi, quiet = false): Promise<void> {
+  const seq = ++latest;
+  const before = patches;
+  if (!quiet) gate.cancel();
   if (!quiet && foodsState.value !== 'ready') foodsState.value = 'loading';
   try {
-    libraryFoods.value = await api.getFoods();
+    const foods = await api.getFoods();
+    if (seq !== latest) return;
+    if (quiet && patches !== before) return;
+    libraryFoods.value = foods;
     foodsState.value = 'ready';
   } catch {
-    if (!quiet) foodsState.value = 'error';
+    if (seq !== latest || quiet) return;
+    foodsState.value = 'error';
   }
+}
+
+/** Refresh after a save, one at a time (#790). */
+export function refreshFoods(api: ForageApi): Promise<void> {
+  return gate.request(() => loadFoods(api, true));
 }
 
 /** Put a saved food into the list, replacing the old copy. */
 export function keepFood(food: Food): void {
   const rest = libraryFoods.value.filter((f) => f.id !== food.id);
   libraryFoods.value = [...rest, food];
+  patches++;
 }
 
 /**
@@ -61,6 +81,7 @@ export async function deleteFood(api: ForageApi, id: string): Promise<string | n
     return "Couldn't delete it. Try again.";
   }
   libraryFoods.value = libraryFoods.value.filter((f) => f.id !== id);
+  patches++;
   return null;
 }
 
@@ -74,6 +95,9 @@ export function namesList(names: string[]): string {
 
 /** Forget what was loaded (tests and sign-out). */
 export function _resetFoods(): void {
+  latest++;
+  patches = 0;
+  gate.reset();
   libraryFoods.value = [];
   foodsState.value = 'idle';
   foodsNotice.value = null;

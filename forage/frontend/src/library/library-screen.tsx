@@ -17,6 +17,7 @@ import {
   libraryFoods,
   librarySection,
   loadFoods,
+  refreshFoods,
   showFoodsNotice,
 } from './foods-store';
 import { NutritionSheet } from './nutrition-sheet';
@@ -370,7 +371,7 @@ export function LibraryScreen({ api, empty, icon }: Props) {
           onAdded={(result) => {
             setOverlay(null);
             showFoodsNotice(starterNotice(result));
-            void loadFoods(api, true);
+            void refreshFoods(api);
           }}
           onClose={() => setOverlay(null)}
         />

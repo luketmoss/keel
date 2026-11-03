@@ -171,6 +171,19 @@ describe('Fitness: FTP and FTP per kg', () => {
     expect(c.querySelector('.trend-average')).toBeNull();
   });
 
+  it('draws no average even where entries sit close enough for one to exist', () => {
+    load([
+      ftp('a', ago(12), '240', 'ramp_test'),
+      ftp('b', ago(10), '244', 'manual'),
+      ftp('c', ago(8), '248', 'manual'),
+    ]);
+    localStorage.setItem('thrive-trends-average', '30d');
+    const { container } = renderScreen();
+    const c = card(container, 'ftp');
+    expect(c.querySelector('.trend-average')).toBeNull();
+    expect(c.querySelectorAll('path.trend-line')).toHaveLength(1);
+  });
+
   it('lists the entries in the range, newest first, with the source in words', () => {
     const { container } = renderScreen();
     const list = card(container, 'ftp').querySelector('ul.trend-entries')!;

@@ -124,6 +124,18 @@ class StepsTest {
     }
 
     @Test
+    fun theSameRulesApplyToAValueBuiltInTheBuilder() {
+        val s = Step("A", 60, StepMode.Free)
+        assertEquals(StepsProblem.BadRepeat, StepsV1(listOf(Repeat(1, listOf(s)))).problem())
+        assertEquals(StepsProblem.BadRepeat, StepsV1(listOf(Repeat(51, listOf(s)))).problem())
+        assertEquals(StepsProblem.BadRepeat, StepsV1(listOf(Repeat(2, emptyList()))).problem())
+        assertEquals(StepsProblem.TooManySteps, StepsV1(listOf(Repeat(2, List(21) { s }))).problem())
+        assertEquals(StepsProblem.TooManyBlocks, StepsV1(List(101) { s }).problem())
+        assertEquals(StepsProblem.NoBlocks, StepsV1(emptyList()).problem())
+        assertEquals(null, StepsV1(listOf(Repeat(2, listOf(s)))).problem())
+    }
+
+    @Test
     fun twentyOneStepsInARepeatAreRefused() {
         fun repeatOf(n: Int): String {
             val one = """{"label":"A","dur_s":10,"mode":"free"}"""

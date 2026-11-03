@@ -443,6 +443,24 @@ export interface RecipeLine {
   optional: boolean;
 }
 
+/** One line of a recipe saved from logged entries (#788): the entry's food at its logged amount and grams. */
+export interface NewRecipeLine {
+  text: string;
+  qty: number;
+  unit: string;
+  food_id: string;
+  grams: number | null;
+}
+
+/** `upsertRecipe` with the app's own `rc_` id, creating a recipe with lines and no steps (#788). */
+export interface NewRecipeInput {
+  id: string;
+  name: string;
+  servings: number;
+  notes: string;
+  lines: NewRecipeLine[];
+}
+
 /** A Steps row. */
 export interface Step {
   recipe_id: string;

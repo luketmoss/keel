@@ -15,6 +15,9 @@ import type {
   LogEntryChange,
   LogEntryInput,
   ImportPreview,
+  NewRecipeInput,
+  NewRecipeLine,
+  Nutrition,
   PlanEntry,
   PlanEntryInput,
   PlanMove,
@@ -69,6 +72,11 @@ export interface ForageApi {
   getRecipe(id: string): Promise<RecipeDetail>;
   /** Match one saved recipe line to a food: the recipe written back whole, every line id kept. */
   setLineFood(recipeId: string, lineId: string, foodId: string): Promise<RecipeDetail>;
+  // #788: a recipe made from logged entries.
+  /** upsertRecipe with no stored recipe of that `id`: creates it. The same id again replaces it, so a retry leaves one. */
+  createRecipe(input: NewRecipeInput): Promise<RecipeDetail>;
+  /** computeNutrition: per-serving figures for lines and a serving count, nothing saved. */
+  previewRecipe(lines: NewRecipeLine[], servings: number): Promise<Nutrition>;
   // #708: cooks, and logging a cooked recipe to Eaten.
   /** Newest first; one recipe's, or every recipe's. */
   getCooks(recipeId?: string): Promise<Cook[]>;
@@ -184,6 +192,8 @@ export function createLiveApi(token: string, url = import.meta.env.VITE_FORAGE_A
       const recipe = await getRecipe(recipeId);
       return call<RecipeDetail>('upsertRecipe', { id: recipeId, lines: linesWithFood(recipe, lineId, foodId) });
     },
+    createRecipe: (input) => call<RecipeDetail>('upsertRecipe', input),
+    previewRecipe: (lines, servings) => call<Nutrition>('computeNutrition', { servings, lines }),
     getCooks: (recipeId) => call<Cook[]>('getCooks', undefined, undefined, recipeId ? { recipe_id: recipeId } : {}),
     saveCook: (cook) => call<Cook>('upsertCook', cook),
     deleteCook: async (id) => {

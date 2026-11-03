@@ -39,6 +39,12 @@ export function fullDate(date: string): string {
   return `${WEEKDAYS[weekday]} ${d} ${MONTHS[m - 1]} ${y}`;
 }
 
+/** The day as a recipe's note gives it: `Mon 2 Nov 2026`. */
+export function noteDate(date: string): string {
+  const { y, m, d, weekday } = parts(date);
+  return `${WEEKDAYS[weekday].slice(0, 3)} ${d} ${MONTHS[m - 1].slice(0, 3)} ${y}`;
+}
+
 /** `today`, or the weekday: "Nothing logged today." / "Nothing logged on Monday." */
 export function nothingLogged(date: string, today: string): string {
   return date === today ? 'Nothing logged today.' : `Nothing logged on ${WEEKDAYS[parts(date).weekday]}.`;
@@ -115,6 +121,18 @@ export function newLogId(): string {
   const bytes = new Uint8Array(4);
   crypto.getRandomValues(bytes);
   return `lg_${Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')}`;
+}
+
+/** A recipe id made on the device when the New recipe sheet opens, so a retry leaves one recipe: `rc_` + 8 hex. */
+export function newRecipeId(): string {
+  const bytes = new Uint8Array(4);
+  crypto.getRandomValues(bytes);
+  return `rc_${Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')}`;
+}
+
+/** An entry's line as a saved recipe stores it: the amount then the food, `2 cup Spring mix`, `150 g Chicken breast`. */
+export function entryLineText(e: FoodLogEntry, name: string): string {
+  return `${qtyText(e.qty)} ${e.unit} ${name}`;
 }
 
 /** The step of the stepper: half a serving, or 10 g. */

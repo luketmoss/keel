@@ -1,17 +1,27 @@
 import { MoreNutrition } from '../ui/more-nutrition';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ForageApi } from '../api/client';
-import { SLOTS, type Food, type FoodLogDay, type FoodLogEntry, type PlanEntry, type Slot } from '../api/types';
+import {
+  SLOTS,
+  type Food,
+  type RecipeDetail,
+  type FoodLogDay,
+  type FoodLogEntry,
+  type PlanEntry,
+  type Slot,
+} from '../api/types';
 import { BarcodeSheet } from '../library/barcode-sheet';
 import { FoodForm, type FoodFormOrigin } from '../library/food-form';
 import { hasNutrition } from '../library/food-math';
 import { keepFood } from '../library/foods-store';
+import { addRecipe } from '../library/recipes-store';
 import { AddFoodSheet } from '../library/library-screen';
 import { NutritionSheet } from '../library/nutrition-sheet';
 import { StarterSheet } from '../library/starter-sheet';
 import { showToast } from '../ui/toast';
 import { AddSheet } from './add-sheet';
 import { AmountSheet, type LogTarget, type SavedLog } from './amount-sheet';
+import { SaveRecipeSheet } from './save-recipe-sheet';
 import {
   dayEntries,
   dayPlan,
@@ -146,6 +156,55 @@ function EntryRow({ entry, name, onOpen }: { entry: FoodLogEntry; name: string; 
   );
 }
 
+/**
+ * An entry in select mode (#788): a toggle row with a check box. A recipe's entry, or one whose food was deleted,
+ * is dimmed and cannot be ticked, and says why on line two.
+ */
+function SelectRow({
+  entry,
+  name,
+  ticked,
+  blocked,
+  onToggle,
+}: {
+  entry: FoodLogEntry;
+  name: string;
+  ticked: boolean;
+  blocked: string | null;
+  onToggle: () => void;
+}) {
+  const unknown = entry.kcal === null;
+  const line = blocked ? `${amountLine(entry)} · ${blocked}` : amountLine(entry);
+  return (
+    <li>
+      <button
+        type="button"
+        class={blocked ? 'log-row select-row is-blocked' : 'log-row select-row'}
+        aria-pressed={blocked ? undefined : ticked}
+        aria-disabled={blocked ? true : undefined}
+        aria-label={`${name}, ${line}`}
+        onClick={blocked ? undefined : onToggle}
+        data-testid="select-row"
+      >
+        <span class={ticked ? 'tick is-on' : 'tick'} aria-hidden="true">
+          {ticked ? '✓' : ''}
+        </span>
+        <span class="recipe-text">
+          <span class="recipe-name">{name}</span>
+          <span class="recipe-meta">{line}</span>
+        </span>
+        {unknown ? (
+          <span class="chip-flag">—</span>
+        ) : (
+          <span class="log-row-kcal tabular">
+            {wholeKcal(entry.kcal!)} <span class="hint-inline">kcal</span>
+          </span>
+        )}
+      </button>
+    </li>
+  );
+}
+
 /** `412 kcal a serving`, `about 412 kcal a serving, partial`, or `No nutrition yet`. */
 function plannedLine(p: PlanEntry): string {
   if (p.kcal_serving === null) return 'No nutrition yet';
@@ -208,7 +267,9 @@ type Overlay =
   // `fill`: opened by a search row's Add nutrition, which comes back to the Add sheet rather than logging.
   | { kind: 'form'; slot: Slot; food: Partial<Food>; origin: FoodFormOrigin; fill?: boolean }
   | { kind: 'amount'; slot: Slot; target: LogTarget; entry?: FoodLogEntry }
-  | { kind: 'nutrition'; recipeId: string; back?: Slot };
+  | { kind: 'nutrition'; recipeId: string; back?: Slot }
+  // #788: the New recipe sheet, over the meal in select mode.
+  | { kind: 'saveRecipe'; slot: Slot };
 
 /**
  * The Eaten tab (#712): a day of the food log. The day card shows `getFoodLogTotals`, each meal its entries
@@ -220,16 +281,30 @@ export function EatenScreen({ api }: { api: ForageApi }) {
   const [failedPlan, setFailedPlan] = useState<string | null>(null);
   // One entry id per planned meal, kept across taps and retries, so they leave one entry.
   const planIds = useRef(new Map<string, string>());
+  // #788: the one meal in select mode, and the ids of the entries ticked in it.
+  const [selecting, setSelecting] = useState<Slot | null>(null);
+  const [ticked, setTicked] = useState<string[]>([]);
+
+  function leaveSelect() {
+    setSelecting(null);
+    setTicked([]);
+  }
 
   useEffect(() => {
     void loadDay(api);
-    const onVisible = () => document.visibilityState === 'visible' && void loadDay(api);
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      leaveSelect();
+      void loadDay(api);
+    };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [api]);
 
   const date = eatenDate.value;
   const today = eatenToday.value;
+  // A day change leaves select mode with nothing saved.
+  useEffect(() => leaveSelect(), [date]);
   const state = dayState.value;
   const entries = dayEntries.value;
   const planned = unloggedPlan(dayPlan.value, entries);
@@ -284,6 +359,31 @@ export function EatenScreen({ api }: { api: ForageApi }) {
     }
   }
 
+  /** Why an entry can't go in a recipe, or null when it can: recipes are not lines, and a removed food has none. */
+  function blockedReason(e: FoodLogEntry): string | null {
+    if (!e.food_id) return "Recipes can't go in a recipe";
+    return foods.some((f) => f.id === e.food_id) ? null : 'This food was deleted';
+  }
+
+  function toggle(id: string) {
+    setTicked((t) => (t.includes(id) ? t.filter((x) => x !== id) : [...t, id]));
+  }
+
+  function startSelect(slot: Slot) {
+    setSelecting(slot);
+    setTicked([]);
+  }
+
+  function savedRecipe(recipe: RecipeDetail) {
+    // The reply goes into the Add sheet's and the Library's lists, then the sheet closes and the toast shows together.
+    const { lines: _lines, steps: _steps, walkthrough: _walkthrough, walkthrough_check: _check, ...summary } = recipe;
+    logRecipes.value = [summary, ...logRecipes.value.filter((r) => r.id !== summary.id)];
+    addRecipe(recipe);
+    setOverlay(null);
+    leaveSelect();
+    showToast(`Saved ${recipe.name} to your recipes`);
+  }
+
   async function openFood(id: string, slot: Slot) {
     try {
       const food = await api.getFood(id);
@@ -323,38 +423,92 @@ export function EatenScreen({ api }: { api: ForageApi }) {
           const mine = state === 'ready' ? entries.filter((e) => e.slot === slot) : [];
           const plans = state === 'ready' ? planned.filter((p) => p.slot === slot) : [];
           const headId = `meal-${slot.toLowerCase()}`;
+          const selectingHere = selecting === slot;
+          const canSelect = mine.some((e) => !blockedReason(e));
+          const count = selectingHere ? mine.filter((e) => ticked.includes(e.id) && !blockedReason(e)).length : 0;
           return (
             <section key={slot} class="card meal-card" aria-labelledby={headId} data-testid="meal-card">
-              <h2 id={headId} class="meal-card-head">
-                {slot}
-              </h2>
+              <div class="meal-head-row">
+                <h2 id={headId} class="meal-card-head">
+                  {slot}
+                </h2>
+                {state === 'ready' && (canSelect || selectingHere) && (
+                  <button
+                    type="button"
+                    class="text-btn"
+                    onClick={() => (selectingHere ? leaveSelect() : startSelect(slot))}
+                    data-testid={selectingHere ? 'select-cancel' : 'select-meal'}
+                  >
+                    {selectingHere ? 'Cancel' : 'Select'}
+                  </button>
+                )}
+              </div>
               <ul class="plain-list">
-                {mine.map((e) => (
-                  <EntryRow key={e.id} entry={e} name={entryName(e, foods, recipes)} onOpen={() => openEntry(e)} />
-                ))}
-                {plans.map((p) => (
-                  <PlannedRow
-                    key={p.id}
-                    plan={p}
-                    busy={busyPlan === p.id}
-                    failed={failedPlan === p.id}
-                    onLog={() => void logPlanned(p)}
-                    onNutrition={() => setOverlay({ kind: 'nutrition', recipeId: p.recipe_id })}
-                  />
-                ))}
+                {mine.map((e) =>
+                  selectingHere ? (
+                    <SelectRow
+                      key={e.id}
+                      entry={e}
+                      name={entryName(e, foods, recipes)}
+                      ticked={ticked.includes(e.id)}
+                      blocked={blockedReason(e)}
+                      onToggle={() => toggle(e.id)}
+                    />
+                  ) : (
+                    <EntryRow key={e.id} entry={e} name={entryName(e, foods, recipes)} onOpen={() => openEntry(e)} />
+                  ),
+                )}
+                {!selectingHere &&
+                  plans.map((p) => (
+                    <PlannedRow
+                      key={p.id}
+                      plan={p}
+                      busy={busyPlan === p.id}
+                      failed={failedPlan === p.id}
+                      onLog={() => void logPlanned(p)}
+                      onNutrition={() => setOverlay({ kind: 'nutrition', recipeId: p.recipe_id })}
+                    />
+                  ))}
               </ul>
-              <button
-                type="button"
-                class="meal-add"
-                onClick={() => setOverlay({ kind: 'add', slot })}
-                data-testid="add-to-meal"
-              >
-                <span aria-hidden="true">+</span> Add to {slot.toLowerCase()}
-              </button>
+              {selectingHere ? (
+                <>
+                  <button
+                    type="button"
+                    class="btn btn-primary btn-block select-save"
+                    disabled={count === 0}
+                    onClick={() => setOverlay({ kind: 'saveRecipe', slot })}
+                    data-testid="save-as-recipe"
+                  >
+                    {count === 0 ? 'Save as a recipe' : `Save ${count} as a recipe`}
+                  </button>
+                  {count === 0 && <p class="hint select-helper">Tick the items that go together.</p>}
+                </>
+              ) : (
+                <button
+                  type="button"
+                  class="meal-add"
+                  onClick={() => setOverlay({ kind: 'add', slot })}
+                  data-testid="add-to-meal"
+                >
+                  <span aria-hidden="true">+</span> Add to {slot.toLowerCase()}
+                </button>
+              )}
             </section>
           );
         })}
 
+      {overlay?.kind === 'saveRecipe' && (
+        <SaveRecipeSheet
+          api={api}
+          slot={overlay.slot}
+          date={date}
+          lines={entries
+            .filter((e) => e.slot === overlay.slot && ticked.includes(e.id) && !blockedReason(e))
+            .map((e) => ({ entry: e, name: entryName(e, foods, recipes) }))}
+          onSaved={savedRecipe}
+          onClose={() => setOverlay(null)}
+        />
+      )}
       {overlay?.kind === 'add' && (
         <AddSheet
           api={api}

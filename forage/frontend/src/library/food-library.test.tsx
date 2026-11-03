@@ -842,9 +842,9 @@ describe("starter foods in #706's chooser", () => {
 });
 
 describe('the demo layer', () => {
-  it('starts with 10 foods (#719 added Milk, Eggs and Paper towels, #712 Granola), a starter sample of 8, and the two barcodes', async () => {
+  it('starts with 16 foods (#719 added Milk, Eggs and Paper towels, #712 Granola, #788 the side salad), a starter sample of 8, and the two barcodes', async () => {
     const api = createDemoApi();
-    expect(await api.getFoods()).toHaveLength(10);
+    expect(await api.getFoods()).toHaveLength(16);
     expect(await api.getStarterFoods()).toHaveLength(8);
     expect((await api.lookupBarcode('0000000000000')).reason).toBe('not_found');
     const found = await api.lookupBarcode('0123456789012');
@@ -879,10 +879,10 @@ describe('the demo layer', () => {
     render(<App />);
     await settle();
     fireEvent.click(screen.getByTestId('foods-tab'));
-    // #787: 8 ingredients, then the 2 packaged foods behind their chip.
-    await waitFor(() => expect(screen.getAllByTestId('food-row')).toHaveLength(8));
-    fireEvent.click(screen.getByRole('button', { name: 'Packaged (2)' }));
-    expect(screen.getAllByTestId('food-row')).toHaveLength(2);
+    // #787: the ingredients, then the packaged foods behind their chip.
+    await waitFor(() => expect(screen.getAllByTestId('food-row')).toHaveLength(12));
+    fireEvent.click(screen.getByRole('button', { name: 'Packaged (4)' }));
+    expect(screen.getAllByTestId('food-row')).toHaveLength(4);
     expect(screen.getByTestId('demo-banner')).toBeDefined();
   });
 });

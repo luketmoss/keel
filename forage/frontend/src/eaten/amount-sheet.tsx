@@ -36,7 +36,7 @@ export const targetName = (t: LogTarget) => (t.kind === 'food' ? displayName(t.f
 const PREVIEW_DELAY_MS = 400;
 
 /** Why a save was refused, in fixed words: a food or recipe deleted meanwhile, else the API's own text. */
-function saveRefusal(err: unknown): string {
+export function saveRefusal(err: unknown): string {
   if (err instanceof ApiError && err.code !== 'network' && err.code !== 'unconfigured') {
     if (/is not a food/.test(err.message)) return "Couldn't save: this food was deleted.";
     if (/is not a recipe/.test(err.message)) return "Couldn't save: this recipe was deleted.";

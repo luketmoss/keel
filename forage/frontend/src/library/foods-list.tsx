@@ -3,7 +3,7 @@ import { useState } from 'preact/hooks';
 import type { Food } from '../api/types';
 import { FoodName } from './food-name';
 import { STORE_LABELS, displayName, kcalLine } from './food-math';
-import { foodsNotice, foodsState, libraryFoods } from './foods-store';
+import { foodsKind, foodsNotice, foodsState, libraryFoods, type FoodKind } from './foods-store';
 
 interface Props {
   onOpen: (id: string) => void;
@@ -42,7 +42,17 @@ function FoodRow({ food, onOpen }: { food: Food; onOpen: () => void }) {
   );
 }
 
-/** Library → Foods (#707): Packaged and Ingredients cards, sorted by name, with a search. */
+const KINDS: { id: FoodKind; label: string }[] = [
+  { id: 'ingredient', label: 'Ingredients' },
+  { id: 'packaged', label: 'Packaged' },
+];
+
+const kindOf = (f: Food): FoodKind => (f.kind === 'packaged' ? 'packaged' : 'ingredient');
+
+/**
+ * Library → Foods (#707), sorted by name, with a search. With both kinds in the library, chips show one kind
+ * at a time (#787); a search ignores them and shows both cards, Ingredients first.
+ */
 export function FoodsList({ onOpen, onAddNamed, onAddStarter, onAddFood, onRetry, icon }: Props) {
   const [q, setQ] = useState('');
   const all = libraryFoods.value;
@@ -92,10 +102,13 @@ export function FoodsList({ onOpen, onAddNamed, onAddStarter, onAddFood, onRetry
   const matches = all
     .filter((f) => !query || displayName(f).toLowerCase().includes(query))
     .sort((a, b) => a.name.localeCompare(b.name));
-  const cards: [string, Food[]][] = [
-    ['Packaged', matches.filter((f) => f.kind === 'packaged')],
-    ['Ingredients', matches.filter((f) => f.kind !== 'packaged')],
-  ];
+  const counts = Object.fromEntries(KINDS.map((k) => [k.id, all.filter((f) => kindOf(f) === k.id).length]));
+  const chips = !query && KINDS.every((k) => counts[k.id] > 0);
+  const kind = foodsKind.value;
+  const cards: [string, Food[]][] = KINDS.filter((k) => !chips || k.id === kind).map((k) => [
+    k.label,
+    matches.filter((f) => kindOf(f) === k.id),
+  ]);
 
   return (
     <>
@@ -114,6 +127,21 @@ export function FoodsList({ onOpen, onAddNamed, onAddStarter, onAddFood, onRetry
           />
         </>
       )}
+      {chips && (
+        <div class="chip-row sort-chips" role="group" aria-label="Show">
+          {KINDS.map((k) => (
+            <button
+              key={k.id}
+              type="button"
+              class="chip"
+              aria-pressed={kind === k.id}
+              onClick={() => (foodsKind.value = k.id)}
+            >
+              {k.label} ({counts[k.id]})
+            </button>
+          ))}
+        </div>
+      )}
       {query && !matches.length && (
         <div class="library-status">
           <p>No food matches "{q.trim()}".</p>
@@ -126,9 +154,11 @@ export function FoodsList({ onOpen, onAddNamed, onAddStarter, onAddFood, onRetry
         .filter(([, list]) => list.length)
         .map(([label, list]) => (
           <section key={label} class="card" aria-label={label}>
-            <h2 class="card-label">
-              {label} ({list.length})
-            </h2>
+            {!chips && (
+              <h2 class="card-label">
+                {label} ({list.length})
+              </h2>
+            )}
             <ul class="food-list">
               {list.map((f) => (
                 <FoodRow key={f.id} food={f} onOpen={() => onOpen(f.id)} />

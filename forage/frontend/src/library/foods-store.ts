@@ -9,8 +9,11 @@ import type { Food } from '../api/types';
 import type { LoadState } from './recipes-store';
 
 export type LibrarySection = 'recipes' | 'foods';
+export type FoodKind = 'ingredient' | 'packaged';
 
 export const librarySection = signal<LibrarySection>('recipes');
+/** Which kind the Foods chips show (#787), remembered for the session. */
+export const foodsKind = signal<FoodKind>('ingredient');
 export const libraryFoods = signal<Food[]>([]);
 export const foodsState = signal<LoadState>('idle');
 /** "Added 12 foods", "Deleted Garlic": the Foods list's status line, four seconds. */
@@ -102,4 +105,5 @@ export function _resetFoods(): void {
   foodsState.value = 'idle';
   foodsNotice.value = null;
   librarySection.value = 'recipes';
+  foodsKind.value = 'ingredient';
 }

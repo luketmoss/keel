@@ -12,6 +12,7 @@ import { FoodSheet } from './food-sheet';
 import { FoodsList } from './foods-list';
 import {
   addFoodRequested,
+  foodsKind,
   foodsState,
   keepFood,
   libraryFoods,
@@ -226,6 +227,7 @@ export function LibraryScreen({ api, empty, icon }: Props) {
 
   function saved(food: Food) {
     keepFood(food);
+    foodsKind.value = food.kind === 'packaged' ? 'packaged' : 'ingredient';
     setOverlay(null);
     showFoodsNotice(`Saved ${displayName(food)}`);
   }
@@ -370,6 +372,7 @@ export function LibraryScreen({ api, empty, icon }: Props) {
           selectAll={overlay.all}
           onAdded={(result) => {
             setOverlay(null);
+            foodsKind.value = 'ingredient';
             showFoodsNotice(starterNotice(result));
             void refreshFoods(api);
           }}

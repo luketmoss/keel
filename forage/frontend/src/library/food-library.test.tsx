@@ -139,7 +139,7 @@ describe('Library → Foods', () => {
     expect(within(screenEl).getByRole('button', { name: 'Add a food' })).toBeDefined();
   });
 
-  it('groups Packaged and Ingredients, sorted by name, with kcal lines and chips', async () => {
+  function mixedApi() {
     const api = fakeApi();
     api.foods.push(
       food({
@@ -166,21 +166,107 @@ describe('Library → Foods', () => {
       }),
       food({ id: 'c', name: 'Herbes de Provence' }),
     );
-    await openFoods(api);
-    const packaged = screen.getByRole('region', { name: 'Packaged' });
-    expect(packaged.textContent).toContain('Packaged (1)');
-    expect(packaged.textContent).toContain('KIND Dark Chocolate bar');
-    expect(packaged.querySelector('.food-brand')?.textContent).toBe('KIND');
-    expect(packaged.textContent).toContain('180 kcal a bar');
-    expect(packaged.textContent).toContain('Not checked');
+    return api;
+  }
+
+  const chip = (name: RegExp) => within(screen.getByRole('group', { name: 'Show' })).getByRole('button', { name });
+
+  it('#787: chips show one kind at a time, Ingredients first, with kcal lines and chips on the rows', async () => {
+    await openFoods(mixedApi());
+    expect(chip(/^Ingredients \(2\)$/).getAttribute('aria-pressed')).toBe('true');
+    expect(chip(/^Packaged \(1\)$/).getAttribute('aria-pressed')).toBe('false');
+    expect(screen.queryByRole('region', { name: 'Packaged' })).toBeNull();
     const ingredients = screen.getByRole('region', { name: 'Ingredients' });
+    expect(ingredients.querySelector('.card-label')).toBeNull();
     const rows = within(ingredients)
       .getAllByTestId('food-row')
       .map((r) => r.textContent);
+    expect(rows).toHaveLength(2);
     expect(rows[0]).toContain('Herbes de Provence');
     expect(rows[0]).toContain('No nutrition yet');
     expect(rows[1]).toContain('40 kcal / 100 g · usually have');
     expect(rows[1]).toContain('King Soopers');
+
+    fireEvent.click(chip(/^Packaged/));
+    expect(chip(/^Packaged/).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.queryByRole('region', { name: 'Ingredients' })).toBeNull();
+    const packaged = screen.getByRole('region', { name: 'Packaged' });
+    expect(screen.getAllByTestId('food-row')).toHaveLength(1);
+    expect(packaged.textContent).toContain('KIND Dark Chocolate bar');
+    expect(packaged.querySelector('.food-brand')?.textContent).toBe('KIND');
+    expect(packaged.textContent).toContain('180 kcal a bar');
+    expect(packaged.textContent).toContain('Not checked');
+
+    fireEvent.click(chip(/^Ingredients/));
+    expect(screen.getAllByTestId('food-row')).toHaveLength(2);
+  });
+
+  it('#787: the chosen chip survives Recipes and other tabs', async () => {
+    await openFoods(mixedApi());
+    fireEvent.click(chip(/^Packaged/));
+    fireEvent.click(screen.getByRole('button', { name: /^Recipes/ }));
+    await settle();
+    fireEvent.click(screen.getByTestId('foods-tab'));
+    expect(chip(/^Packaged/).getAttribute('aria-pressed')).toBe('true');
+    act(() => {
+      window.location.hash = '#/plan';
+    });
+    await settle();
+    act(() => {
+      window.location.hash = '#/library';
+    });
+    await settle();
+    expect(chip(/^Packaged/).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getAllByTestId('food-row')).toHaveLength(1);
+  });
+
+  it('#787: a search hides the chips and finds both kinds, Ingredients first', async () => {
+    const api = mixedApi();
+    for (let i = 0; i < 5; i++) api.foods.push(food({ id: `x${i}`, name: `Extra ${i}` }));
+    await openFoods(api);
+    fireEvent.click(chip(/^Packaged/));
+    const search = screen.getByPlaceholderText('Search foods');
+    fireEvent.input(search, { target: { value: 'o' } });
+    expect(screen.queryByRole('group', { name: 'Show' })).toBeNull();
+    const cards = screen.getAllByRole('region').map((c) => c.getAttribute('aria-label'));
+    expect(cards).toEqual(['Ingredients', 'Packaged']);
+    expect(screen.getByRole('region', { name: 'Ingredients' }).textContent).toContain('Ingredients (2)');
+    expect(screen.getByRole('region', { name: 'Packaged' }).textContent).toContain('Packaged (1)');
+    fireEvent.input(search, { target: { value: 'zzz' } });
+    expect(screen.getByText('No food matches "zzz".')).toBeDefined();
+    fireEvent.input(search, { target: { value: '' } });
+    expect(chip(/^Packaged \(1\)$/).getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('#787: one kind in the library draws no chips, and its card keeps its heading', async () => {
+    const api = fakeApi();
+    api.foods.push(food({ id: 'a', name: 'Onion' }), food({ id: 'c', name: 'Garlic' }));
+    await openFoods(api);
+    expect(screen.queryByRole('group', { name: 'Show' })).toBeNull();
+    expect(screen.getByRole('region', { name: 'Ingredients' }).textContent).toContain('Ingredients (2)');
+  });
+
+  it('#787: losing the last food of a kind removes the chips', async () => {
+    await openFoods(mixedApi());
+    fireEvent.click(chip(/^Packaged/));
+    act(() => {
+      libraryFoods.value = libraryFoods.value.filter((f) => f.kind !== 'packaged');
+    });
+    expect(screen.queryByRole('group', { name: 'Show' })).toBeNull();
+    expect(screen.getByRole('region', { name: 'Ingredients' }).textContent).toContain('Ingredients (2)');
+  });
+
+  it('#787: a saved food selects its kind', async () => {
+    await openFoods(mixedApi());
+    fireEvent.click(screen.getByTestId('add-food-btn'));
+    await settle();
+    fireEvent.click(screen.getByRole('button', { name: /Type from a label/ }));
+    const form = screen.getByTestId('food-form');
+    fireEvent.input(within(form).getByTestId('food-name'), { target: { value: 'Protein bar' } });
+    fireEvent.click(within(form).getByTestId('food-save'));
+    await settle();
+    expect(chip(/^Packaged \(2\)$/).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('region', { name: 'Packaged' }).textContent).toContain('Protein bar');
   });
 
   it('types a packaged food from the label per serving and stores per 100 g', async () => {
@@ -786,14 +872,17 @@ describe('the demo layer', () => {
     expect(after.nutrition.by_line).toEqual([{ line_id: 'L1', grams: 300, kcal: 60 }]);
   });
 
-  it('opens Library → Foods with the samples in demo mode', async () => {
+  it('opens Library → Foods with the samples in demo mode, by kind', async () => {
     env.VITE_DEMO_MODE = 'true';
     _resetDemoModeCache();
     window.history.replaceState(null, '', '/?demo=true#/library');
     render(<App />);
     await settle();
     fireEvent.click(screen.getByTestId('foods-tab'));
-    await waitFor(() => expect(screen.getAllByTestId('food-row')).toHaveLength(10));
+    // #787: 8 ingredients, then the 2 packaged foods behind their chip.
+    await waitFor(() => expect(screen.getAllByTestId('food-row')).toHaveLength(8));
+    fireEvent.click(screen.getByRole('button', { name: 'Packaged (2)' }));
+    expect(screen.getAllByTestId('food-row')).toHaveLength(2);
     expect(screen.getByTestId('demo-banner')).toBeDefined();
   });
 });

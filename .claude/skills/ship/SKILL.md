@@ -120,16 +120,41 @@ passes does `clasp show-authorized-user` confirm the account:
   whoever deploys it.
 - **The IDs are recorded.** The project's `CLAUDE.md` deploy section records
   the script ID and the live web-app deployment ID.
-- **A push and a new version are enough.** `appsscript.json` adds nothing to
-  `oauthScopes` against the base branch, and the issue names no trigger to
-  install, script property to set, or migration or backfill to run first:
+- **No new scope.** `appsscript.json` adds nothing to `oauthScopes` against
+  the base branch. A new scope always parks: re-authorization comes after the
+  push, so there is nothing to confirm beforehand.
 
   ```bash
   git diff origin/main -- <project>/apps-script/src/appsscript.json
   ```
+- **The owner's steps are done.** The issue names no trigger to install,
+  script property to set, or migration or backfill to run — or it does, and
+  the owner has confirmed them (below).
 - **The checkout is exactly the PR.** `HEAD` is the PR's head commit and
   `git status --porcelain -- <project>/apps-script/src` prints nothing —
   nothing modified or untracked — so the push sends exactly what was reviewed.
+
+**Confirming the owner's steps (#795).** The issue's text is all this check can
+read, and a re-run starts over, so a step the owner has already done would
+park every run. The confirmation follows the human-reviewed rule:
+
+- **Inside `/finish`:** no question. The check fails and the run parks.
+- **On its own:** once every other check passes, so the answer is the last
+  thing standing between the session and the push, ask and wait for the reply:
+
+  ```
+  PR #<pr> (<title>) needs these done before Thrive's Apps Script is deployed:
+    <step, as the issue names it>
+  Have you done them? (yes / no)
+  ```
+
+  One step per line, in the issue's order. A yes, in reply to that question,
+  passes the check, and the deploy goes on to step 2. A no, anything that is
+  not a yes, or a session with no way to ask, parks. The yes covers that PR in
+  this invocation only; a bare `/ship` is not consent and nothing is
+  remembered. A step the issue places after the deploy (installing a trigger
+  that runs the new code, say) is listed with `(after the deploy)` and is not
+  part of the yes: it goes in the `Deploy:` line as owed.
 
 ### 2. Record the live version
 
@@ -190,6 +215,14 @@ owed.
 ```
 
 `Nothing owed.` becomes the steps still owed to the owner, when there are any.
+After a confirmation, the line names what the owner confirmed:
+
+```
+Deploy: the owner confirmed in chat that they had run the migration
+(migrate-765-spin.mjs) and set SPIN_API_KEY; the session then pushed and
+deployed version 58 on <deploymentId> (previous 57; roll back with
+`clasp redeploy <deploymentId> -V 57`). Nothing owed.
+```
 
 ### Parked — cannot deploy
 
@@ -203,9 +236,10 @@ PR #<pr> changes Forage's Apps Script, and this session can't deploy it:
   <reason>
 
 The owner's steps, in order:
-  1. clasp push --force
-  2. clasp redeploy <deploymentId> --description "#<issue> <title>"
-  3. <re-authorization, trigger, property or migration step, if any>
+  1. <property, migration or backfill step the issue says comes first>
+  2. clasp push --force
+  3. clasp redeploy <deploymentId> --description "#<issue> <title>"
+  4. <re-authorization or trigger step>
 Then run /ship <issue> to merge.
 ```
 
@@ -217,14 +251,33 @@ Reasons, one line each, every one that applies, in this order:
 - `forage/CLAUDE.md records no script ID or deployment ID.`
 - `It adds the <scope> scope to appsscript.json, which needs
   re-authorization in the editor.`
-- `The issue says <trigger / script property / migration> comes first.`
+- `The issue names owner steps for the deploy, and inside /finish there is
+  no one to confirm them.` — or, run on its own, `The owner's steps were not
+  confirmed.`
 - `The checkout is not at the PR's head, or apps-script/src has uncommitted
   changes.`
 
 The owner's steps use the project's own push command and the real deployment
-ID when it is recorded; otherwise `<deploymentId>` stays as written. A step 3
-appears only for the reasons that need one — re-authorization is
-`stack-apps-script` §Deploying step 3.
+ID when it is recorded; otherwise `<deploymentId>` stays as written. Steps 1
+and 4 appear only for the reasons that need them, numbered from 1:
+re-authorization is `stack-apps-script` §Deploying step 3, and a trigger the
+issue places after the deploy goes at 4.
+
+**When the owner's steps are the only reason,** the session could deploy, so
+the report gives the steps without the clasp commands and ends differently:
+
+```
+Parked in Ready to Ship — not merged, nothing deployed.
+
+PR #<pr> changes Thrive's Apps Script, and this session can't deploy it:
+  The issue names owner steps for the deploy, and inside /finish there is
+  no one to confirm them.
+
+The owner's steps, in order:
+  1. <property, migration or backfill step>
+Then run /ship <issue> on its own. It asks you to confirm these are done,
+then deploys and merges.
+```
 
 ### Parked — the deploy failed part way
 

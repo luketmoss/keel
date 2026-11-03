@@ -128,9 +128,9 @@ function workoutRow(w: {
   status?: string;
   estimated_seconds?: string;
 }): string[] {
-  // A:AD — eleven original columns, the six nullable attributes (#101),
+  // A:AM — eleven original columns, the six nullable attributes (#101),
   // the nine sync provenance columns (#128), the estimate (#145), the
-  // COROS sport code (#260), the track (#432) and the trails (#688).
+  // COROS sport code (#260), the track (#432), the trails (#688) and Spin's nine (#765).
   return [
     w.id,
     w.date,
@@ -159,6 +159,16 @@ function workoutRow(w: {
     '',
     '',
     w.estimated_seconds || '',
+    '',
+    '',
+    '',
+    // AE:AM, #765: Spin's nine columns.
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
     '',
     '',
     '',
@@ -202,6 +212,15 @@ function workoutsFromSheet(): WorkoutWithRow[] {
     sport_type: row[27] || '',
     track_ref: row[28] || '',
     trails: '',
+    avg_power_w: '',
+    np_w: '',
+    intensity_factor: '',
+    tss: '',
+    work_kj: '',
+    ftp_w: '',
+    intensity_pct: '',
+    ride_workout_id: '',
+    streams_ref: '',
     sheetRow: i + 2,
   }));
 }
@@ -287,6 +306,15 @@ describe("AC2: a workout write never targets another workout's row", () => {
       sport_type: '',
       track_ref: '',
       trails: '',
+      avg_power_w: '',
+      np_w: '',
+      intensity_factor: '',
+      tss: '',
+      work_kj: '',
+      ftp_w: '',
+      intensity_pct: '',
+      ride_workout_id: '',
+      streams_ref: '',
       sheetRow: 2,
     };
     workouts.value = [staleWorkout];
@@ -340,6 +368,15 @@ describe("AC2: a workout write never targets another workout's row", () => {
       sport_type: '',
       track_ref: '',
       trails: '',
+      avg_power_w: '',
+      np_w: '',
+      intensity_factor: '',
+      tss: '',
+      work_kj: '',
+      ftp_w: '',
+      intensity_pct: '',
+      ride_workout_id: '',
+      streams_ref: '',
       sheetRow: 2,
     };
     workouts.value = [staleWorkout];
@@ -410,7 +447,7 @@ describe('#145: a planned workout estimate', () => {
   it('saveWorkoutForLater writes the estimate to AA and leaves H blank', async () => {
     await saveWorkoutForLater({ type: 'weight', name: 'Pull A', date: '2099-12-31', estimated_seconds: '2820' }, TOKEN);
     const row = sheet.Workouts[0];
-    expect(row).toHaveLength(30);
+    expect(row).toHaveLength(39);
     expect(row[26]).toBe('2820');
     expect(row[27]).toBe(''); // #260: the SPA never sets sport_type
     expect(row[7]).toBe('');

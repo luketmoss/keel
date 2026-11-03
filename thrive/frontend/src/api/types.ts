@@ -95,6 +95,20 @@ export interface Workout {
   // like AC: the SPA never sets it, and a full-row write preserves it. ''
   // means not tagged yet, never "no trails".
   trails: string;
+  // #765, columns AE:AM: Thrive Spin's indoor-ride columns, whole numbers as text. All nullable:
+  // '' means not a Spin ride, or nobody said, never '0'. AE:AK and AM are Spin-owned: only the
+  // API's saveRide writes them, the SPA never sets them, and every full-row write preserves them.
+  avg_power_w: string; // AE
+  np_w: string; // AF normalized power
+  intensity_factor: string; // AG NP / FTP, two decimals
+  tss: string; // AH
+  work_kj: string; // AI
+  ftp_w: string; // AJ the FTP the ride was ridden at
+  intensity_pct: string; // AK the ride's intensity setting
+  // AL: a RideWorkouts id. On a ride, the Spin workout that was ridden. On a planned bike workout,
+  // the plan link (#772): the Spin workout the plan names. The one of the nine the SPA may set.
+  ride_workout_id: string;
+  streams_ref: string; // AM Drive file ID of the ride's streams JSON
 }
 
 /**

@@ -49,6 +49,10 @@ var CHANGE_LOGGED_ACTIONS = {
   updateDrinkTime: ['Drinks'],
   updateDrinkAmount: ['Drinks'],
   deleteDrink: ['Drinks'],
+  // #765: the MCP edits the Spin library and the FTP history. saveRide is the phone's alone.
+  saveRideWorkout: ['RideWorkouts'],
+  deleteRideWorkout: ['RideWorkouts'],
+  addFtp: ['FtpHistory'],
 };
 
 var CHANGE_LOG_DEFAULT_LIMIT = 200;
@@ -65,6 +69,8 @@ function changeTabs() {
     Exercises: { sheet: 'Exercises', fields: EXERCISE_FIELDS, key: ['id'] },
     Journal: { sheet: 'Journal', fields: JOURNAL_FIELDS, key: ['date'] },
     Drinks: { sheet: 'Drinks', fields: DRINK_FIELDS, key: ['id'] },
+    RideWorkouts: { sheet: 'RideWorkouts', fields: RIDE_WORKOUT_FIELDS, key: ['id'] },
+    FtpHistory: { sheet: 'FtpHistory', fields: FTP_HISTORY_FIELDS, key: ['id'] },
     Templates: { sheet: 'Templates', fields: TEMPLATE_FIELDS, key: ['template_id', 'order'] },
     // Sets have no id: the slot, the same identity sets.js addresses them by.
     Sets: { sheet: 'Sets', fields: SET_FIELDS, key: ['workout_id', 'section', 'exercise_order', 'set_number'] },

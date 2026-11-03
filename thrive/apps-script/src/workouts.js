@@ -1,4 +1,4 @@
-// Read and write actions for the Workouts tab (A:AD).
+// Read and write actions for the Workouts tab (A:AM).
 
 var WORKOUTS_SHEET = 'Workouts';
 
@@ -89,9 +89,10 @@ function getPlannedWorkouts(date) {
  * Returns only the keys actually present, so an update can tell "set this to
  * empty" from "do not touch this" — the distinction AC3 turns on.
  */
-function normalizeWorkoutFields(data) {
+function normalizeWorkoutFields(data, opts) {
   var out = {};
   if (!data) return out;
+  opts = opts || {};
 
   for (var key in data) {
     if (!Object.prototype.hasOwnProperty.call(data, key)) continue;
@@ -101,6 +102,17 @@ function normalizeWorkoutFields(data) {
       );
     }
     out[key] = cell(data[key]);
+  }
+
+  // #765: AE:AK and AM are Spin-owned, written by saveRide alone. A create may carry them
+  // blank (the MCP Worker's new-workout object does); nothing else may set or clear them.
+  if (!opts.spin) {
+    for (var s = 0; s < SPIN_OWNED_FIELDS.length; s++) {
+      var spinField = SPIN_OWNED_FIELDS[s];
+      if (out[spinField] === undefined) continue;
+      if (opts.create && out[spinField] === '') continue;
+      throw new Error(spinField + ' is written by Thrive Spin alone (saveRide) and cannot be set here');
+    }
   }
 
   if (out.type !== undefined) validateEnum('type', out.type, WORKOUT_TYPES);
@@ -252,8 +264,8 @@ function normalizeSyncedSportType(payload) {
  * `source` blank is not missing information: it positively means the workout
  * was logged by hand rather than synced.
  */
-function createWorkout(data) {
-  var fields = normalizeWorkoutFields(data);
+function createWorkout(data, internal) {
+  var fields = normalizeWorkoutFields(data, { create: true, spin: internal === 'spin' });
 
   if (!fields.type) throw new Error('type is required');
   if (!fields.name) throw new Error('name is required');
@@ -268,6 +280,9 @@ function createWorkout(data) {
 
   // #688: sync-owned, and tagged only after the row exists, by updateWorkout.
   workout.trails = '';
+  // #765: the plan link names a library workout, on a bike row only. saveRide's own append is
+  // exempt: a workout deleted before the upload must not block the queue.
+  if (internal !== 'spin') checkRideWorkoutLink(workout.type, workout.ride_workout_id);
 
   if (!workout.id) workout.id = 'w_' + Utilities.getUuid().slice(0, 8);
   if (!workout.date) workout.date = todayLocal();
@@ -309,6 +324,8 @@ function updateWorkout(id, changes) {
   for (var key in fields) {
     if (Object.prototype.hasOwnProperty.call(fields, key)) existing[key] = fields[key];
   }
+  // #765: only when the call sets it, so a row's existing link never blocks an unrelated edit.
+  if (fields.ride_workout_id !== undefined) checkRideWorkoutLink(existing.type, existing.ride_workout_id);
 
   sheet.getRange(rowNum, 1, 1, WORKOUT_COLUMN_COUNT).setValues([asText(workoutToRow(existing))]);
   return existing;

@@ -468,6 +468,17 @@ export function buildWorkout(data) {
     track_ref: '',
     // #688: sync-owned too; the sync tags a row after it exists.
     trails: '',
+    // #765: Thrive Spin's columns, AE:AM. The nine are always blank in a new workout: the API
+    // refuses a value for any but the plan link (a bike row only), and only saveRide fills the rest.
+    avg_power_w: '',
+    np_w: '',
+    intensity_factor: '',
+    tss: '',
+    work_kj: '',
+    ftp_w: '',
+    intensity_pct: '',
+    ride_workout_id: '',
+    streams_ref: '',
     // #145: a plan's estimate, seconds. Only ever what the caller said.
     estimated_seconds: data.estimated_seconds || '',
   };
@@ -538,7 +549,7 @@ export function provenanceOf(w) {
 
 export const PROVENANCES = ['synced', 'enriched', 'manual'];
 
-const SOURCE_NAMES = { coros: 'COROS', garmin_import: 'a Garmin import' };
+const SOURCE_NAMES = { coros: 'COROS', garmin_import: 'a Garmin import', spin: 'Thrive Spin' };
 const sourceName = (source) => SOURCE_NAMES[source] || source || 'COROS';
 
 /** "bike:gravel" when a venue is set, "bike" otherwise. The DailySummary form. */
@@ -589,12 +600,26 @@ export function describeSyncedFields(w) {
     w.synced_at && `last synced ${w.synced_at}`,
   ].filter(Boolean).join(', ');
   const detail = link ? ` (${link})` : '';
-  if (p === 'synced') out.push(`- Provenance: synced from ${sourceName(w.source)}${detail}`);
+  if (p === 'synced' && w.source === 'spin') out.push(`- Provenance: recorded by ${sourceName(w.source)}${detail}`);
+  else if (p === 'synced') out.push(`- Provenance: synced from ${sourceName(w.source)}${detail}`);
   else if (p === 'enriched') out.push(`- Provenance: hand-logged, enriched from COROS${detail}`);
   else out.push('- Provenance: hand-logged');
 
   const url = corosActivityUrl(w);
   if (url) out.push(`- COROS: ${url}`);
+
+  // #765: an indoor ride's power and load, and the Spin workout a ride rode or a plan names.
+  if (w.source === 'spin') {
+    const ride = describeSpinRide(w);
+    if (ride) out.push(`- Ride: ${ride}`);
+  }
+  if (w.ride_workout_id) {
+    out.push(
+      w.status === 'planned'
+        ? `- Planned Spin workout: ${w.ride_workout_id}`
+        : `- Spin workout ridden: ${w.ride_workout_id}`,
+    );
+  }
 
   if (p !== 'manual') {
     if (w.raw_ref) {
@@ -603,7 +628,11 @@ export function describeSyncedFields(w) {
   }
   // Only synced activities get a FIT: the sync never fetches one for an
   // enriched strength session (#154, #155), so there is nothing to report.
-  if (p === 'synced') {
+  if (p === 'synced' && w.source === 'spin') {
+    // A Spin ride is indoors: no GPS track or trails, but a streams file beside its FIT.
+    if (w.fit_ref) out.push(`- FIT file: archived in Drive (${w.fit_ref}), saved ${w.fit_fetched_at || 'at an unknown time'}`);
+    if (w.streams_ref) out.push(`- Ride streams: stored in Drive (${w.streams_ref})`);
+  } else if (p === 'synced') {
     if (w.fit_ref) out.push(`- FIT file: archived in Drive (${w.fit_ref}), fetched ${w.fit_fetched_at || 'at an unknown time'}`);
     else if (w.fit_fetched_at) out.push(`- FIT file: none, and none will be fetched (settled ${w.fit_fetched_at})`);
     else out.push('- FIT file: not fetched yet');
@@ -616,6 +645,23 @@ export function describeSyncedFields(w) {
     if (w.track_ref) out.push(`- Trails: ${describeTrails(w.trails)}`);
   }
   return out;
+}
+
+/**
+ * A Thrive Spin ride's numbers on one line (#765): `avg 190 W, NP 215 W, IF 0.86, TSS 74, 683 kJ,
+ * FTP 250 W, intensity 100%`. A blank field is left out, never printed as 0; '' when there is
+ * nothing to say.
+ */
+export function describeSpinRide(w) {
+  const parts = [];
+  if (w.avg_power_w) parts.push(`avg ${w.avg_power_w} W`);
+  if (w.np_w) parts.push(`NP ${w.np_w} W`);
+  if (w.intensity_factor) parts.push(`IF ${w.intensity_factor}`);
+  if (w.tss) parts.push(`TSS ${w.tss}`);
+  if (w.work_kj) parts.push(`${w.work_kj} kJ`);
+  if (w.ftp_w) parts.push(`FTP ${w.ftp_w} W`);
+  if (w.intensity_pct) parts.push(`intensity ${w.intensity_pct}%`);
+  return parts.join(', ');
 }
 
 /**

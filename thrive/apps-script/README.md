@@ -35,6 +35,7 @@ added to a tab is added in both.
 | `src/sync-requests.js` | The `SyncRequests` poller: a time-driven trigger that dispatches the sync workflows, and its install/remove functions (#314). Not a web-app action |
 | `src/change-log.js` | The MCP change log: `MCPChangeLog` rows for every MCP-key write, `getChangeLog`, and `undoCall` (#434) |
 | `src/snapshot.js` | The daily Drive copy of the sheet, its install/remove functions, and retention (#433). Not a web-app action |
+| `src/ride-workouts.js`, `src/ftp.js`, `src/rides.js` | Thrive Spin (#765): the `RideWorkouts` library and its steps JSON, the `FtpHistory` tab, and `saveRide` / `getWorkoutStreams`. Bad input is `code: bad_request` with fixed text that quotes nothing |
 | `src/auth.js` | Who is calling: the key, the Google-token check, its cache, the token read allow-list (#144) |
 | `src/main.js` | `doGet`/`doPost` dispatch, response envelope |
 
@@ -106,6 +107,7 @@ Since #410 that caller is the SPA:
 |---|---|---|
 | `key` only | key caller | everything, as before |
 | `key` = `WIDGET_API_KEY` | widget caller (#519) | `logDrink` and `getDrinkTotals` only |
+| `key` = `SPIN_API_KEY` | Spin caller (#765) | `getRideWorkouts`, `saveRideWorkout`, `deleteRideWorkout`, `getFtp`, `addFtp`, `getPlannedWorkouts`, `saveRide` only; anything else is `Spin caller: this action is not permitted`, code `spin_forbidden` |
 | `access_token`, with or without `key` | token caller | the reads below, `requestSync`, and the drinks writes |
 | neither | refused | nothing |
 
@@ -806,6 +808,8 @@ under ~2 s, by changing the constant, pushing, and running
      it can be rotated or revoked without touching `API_KEY`'s holders (the
      syncs, watchdogs and scripts). Leaving it unset changes nothing; it never
      replaces `API_KEY`, which stays required.
+   - `SPIN_API_KEY` — optional (#765): held only by the Thrive Spin app; unset or blank matches nothing. Run
+     `scripts/migrate-765-spin.mjs` first.
    - `WIDGET_API_KEY` — optional (#519): a third long random string held only
      by the Sip home-screen widget. It may run `logDrink` and `getDrinkTotals`
      and nothing else, and rotates without touching any other holder. Unset or

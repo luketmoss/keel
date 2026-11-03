@@ -4,7 +4,7 @@
 // what notices when only one side changed, as sync-log-api.test.ts does for
 // SyncLog. It also pins AB `sport_type` on every SPA path: the read, the
 // append (always ''), and the fresh-read-then-write edit (preserved), and AD
-// `trails` (#688) the same way.
+// `trails` (#688) the same way, and AE:AM (#765) as the Spin columns.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'fs';
@@ -55,15 +55,59 @@ function workoutFields(): string[] {
 }
 
 describe('Workouts row mapping', () => {
+  it('#765: reads row[30..38] as the Spin columns, and a row with no AE:AM cell as ""', () => {
+    const row = Array.from({ length: 39 }, () => '');
+    row[0] = 'w_1';
+    ['190', '215', '0.86', '74', '683', '250', '100', 'rw_1a2b3c4d', 'streamsFile'].forEach((v, i) => {
+      row[30 + i] = v;
+    });
+    expect(rowToWorkout(row, 2)).toMatchObject({
+      avg_power_w: '190',
+      np_w: '215',
+      intensity_factor: '0.86',
+      tss: '74',
+      work_kj: '683',
+      ftp_w: '250',
+      intensity_pct: '100',
+      ride_workout_id: 'rw_1a2b3c4d',
+      streams_ref: 'streamsFile',
+    });
+    const old = rowToWorkout(row.slice(0, 30), 2);
+    for (const f of [
+      'avg_power_w',
+      'np_w',
+      'intensity_factor',
+      'tss',
+      'work_kj',
+      'ftp_w',
+      'intensity_pct',
+      'ride_workout_id',
+      'streams_ref',
+    ] as const) {
+      expect(old[f], f).toBe('');
+    }
+  });
+
   it('workoutToRow emits WORKOUT_FIELDS from apps-script/src/types.js, in order', () => {
     const fields = workoutFields();
     // Each field holds its own name, so the row reads back as the field order.
     const named = Object.fromEntries(fields.map((f) => [f, f])) as unknown as Workout;
     expect(workoutToRow(named)).toEqual(fields);
-    expect(fields).toHaveLength(30); // A:AD
+    expect(fields).toHaveLength(39); // A:AM
     expect(fields[27]).toBe('sport_type');
     expect(fields[28]).toBe('track_ref'); // #432
-    expect(fields[29]).toBe('trails'); // #688, emitted last
+    expect(fields[29]).toBe('trails'); // #688
+    expect(fields.slice(30)).toEqual([
+      'avg_power_w',
+      'np_w',
+      'intensity_factor',
+      'tss',
+      'work_kj',
+      'ftp_w',
+      'intensity_pct',
+      'ride_workout_id',
+      'streams_ref',
+    ]); // #765, emitted last
   });
 
   it('rowToWorkout reads every WORKOUT_FIELDS column back into its field', () => {
@@ -193,27 +237,29 @@ describe("#260 AC4: the SPA never sets sport_type, and an edit keeps the sheet's
     sheetsUpdate.mockReset();
   });
 
-  it('createWorkout appends A:AD with a blank AB and a blank AD (#688)', async () => {
+  it('createWorkout appends A:AM with a blank AB, a blank AD and nine blank Spin columns (#688, #765)', async () => {
     const w = await createWorkout({ type: 'hike', name: 'Hike' }, 'token');
     expect(sheetsAppend).toHaveBeenCalledTimes(1);
     const [range, rows] = sheetsAppend.mock.calls[0];
-    expect(range).toBe('Workouts!A:AD');
-    expect(rows[0]).toHaveLength(30);
+    expect(range).toBe('Workouts!A:AM');
+    expect(rows[0]).toHaveLength(39);
     expect(rows[0][27]).toBe('');
     expect(rows[0][29]).toBe('');
+    expect(rows[0].slice(30)).toEqual(Array.from({ length: 9 }, () => ''));
     expect(w.trails).toBe('');
+    expect(w.ride_workout_id).toBe('');
   });
 
-  it('fetchWorkouts reads A2:AD (#688)', async () => {
+  it('fetchWorkouts reads A2:AM (#765)', async () => {
     const { fetchWorkouts } = await import('./workouts-api');
     sheetsGet.mockResolvedValue([]);
     await fetchWorkouts('token');
-    expect(sheetsGet).toHaveBeenCalledWith('Workouts!A2:AD', 't');
+    expect(sheetsGet).toHaveBeenCalledWith('Workouts!A2:AM', 't');
   });
 
-  it('updateWorkout reads A:AD fresh and writes back the sport_type and trails the sheet holds', async () => {
+  it('updateWorkout reads A:AM fresh and writes back the sport_type and trails the sheet holds', async () => {
     const tagged = '{"v":1,"m":1,"u":12,"n":[["Invented Path",400]],"p":[[0,0,100,1,400,90,5,0]]}';
-    const fresh = Array.from({ length: 30 }, () => '');
+    const fresh = Array.from({ length: 39 }, () => '');
     fresh[0] = 'w_1';
     fresh[18] = 'coros';
     fresh[19] = '700000000000000001';
@@ -223,10 +269,10 @@ describe("#260 AC4: the SPA never sets sport_type, and an edit keeps the sheet's
     // The cached copy predates the backfill and the tagging: AB and AD are still blank.
     const cached = { ...rowToWorkout(fresh, 5), sport_type: '', track_ref: '', trails: '' };
     const written = await updateWorkout(cached, { notes: 'muddy' }, 'token');
-    expect(sheetsGet).toHaveBeenCalledWith('Workouts!A5:AD5', 't');
+    expect(sheetsGet).toHaveBeenCalledWith('Workouts!A5:AM5', 't');
     const [range, rows] = sheetsUpdate.mock.calls[0];
-    expect(range).toBe('Workouts!A5:AD5');
-    expect(rows[0]).toHaveLength(30);
+    expect(range).toBe('Workouts!A5:AM5');
+    expect(rows[0]).toHaveLength(39);
     expect(rows[0][27]).toBe('204');
     expect(rows[0][29]).toBe(tagged);
     expect(rows[0][6]).toBe('muddy');

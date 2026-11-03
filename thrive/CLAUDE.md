@@ -326,10 +326,11 @@ Google Sheet "Groundwork" with these tabs:
   rest_s, switch_s (#576: the section's rest and switch in whole seconds, the same on every row of a
   section; blank means the Settings default; switch only on SS1-SS3 and burnout, neither on warmup or
   cooldown. A replace that leaves them out keeps the stored values)
-- **Workouts** (A:AD): id, Date, Time, Type, Name, template_id, Notes, Elapsed (s), Created, copied_from, status,
+- **Workouts** (A:AM): id, Date, Time, Type, Name, template_id, Notes, Elapsed (s), Created, copied_from, status,
   Moving (s), Effort, Distance (m), Ascent (m), Descent (m), Avg HR (bpm),
   sub_type, source, source_activity_id, raw_ref, fit_ref, fit_fetched_at, synced_at, started_at_utc, calories,
-  estimated_seconds, sport_type, track_ref, trails
+  estimated_seconds, sport_type, track_ref, trails, avg_power_w, np_w, intensity_factor, tss, work_kj, ftp_w,
+  intensity_pct, ride_workout_id, streams_ref (AE:AM, #765, below)
 - **Sets** (A:M): workout_id, exercise_id, Exercise Name, Section, Exercise Order, Set #, Planned Reps, Weight (lbs), Reps, Effort,
   rest_target_s, set_s, rest_s (#576). `rest_target_s` is the rest planned after the set, resolved once when
   the set is created (from the template section, else the Settings default; the switch time for all but the
@@ -550,6 +551,19 @@ reads the Garmin export's FIT zips, matches each activity FIT with positions to 
 (the FIT file names are upload ids, not activity ids), stores it in `Thrive Garmin/fit/` and sets `fit_ref`;
 the same backfill then builds the track, stored beside COROS's in `Thrive COROS/tracks/` because
 `getWorkoutTrack` reads only from there.
+`Workouts!AE:AM` (#765) are Thrive Spin's indoor-ride columns, appended by `scripts/migrate-765-spin.mjs`: `avg_power_w`,
+`np_w`, `intensity_factor` (text, 2 decimals), `tss`, `work_kj`, `ftp_w` (the FTP the ride was ridden at),
+`intensity_pct`, `ride_workout_id` and `streams_ref` (Drive file ID of the streams JSON). All nullable, never `0`. AE:AK and
+AM are Spin-owned: only `saveRide` writes them, `createWorkout`/`updateWorkout` refuse them and every full-row write keeps
+them. AL is settable through `createWorkout`/`updateWorkout` on a `bike` row, to `''` or an existing `RideWorkouts` id: on a
+ride the workout ridden, on a plan the Spin workout it names. `saveRide` (a form POST of `payload`, `fit` base64 and `streams`
+text, sha256-checked) writes `source = spin` rows, claims one planned bike row of the day if there is exactly one, and puts
+the files at `Thrive Spin/fit|streams/<YYYY>/<MM>/<ride_id>.fit|.json`. **RideWorkouts** (A:H: id, name, category, description,
+steps, duration_s, created, updated) is Spin's library, and **FtpHistory** (A:F: id, date, ftp_w, source, ride_id, created)
+its FTP settings, the newest row current; both are written by the API alone and are in the MCP change log. `SPIN_API_KEY`, a
+script property, is a fourth key caller that may run `getRideWorkouts`, `saveRideWorkout`, `deleteRideWorkout`, `getFtp`,
+`addFtp`, `getPlannedWorkouts` and `saveRide` only (`spin_forbidden` otherwise); the app reads a ride back with
+`getWorkoutStreams` and its Google token. Mirrors: `frontend/src/api/spin-rows.ts`, `mcp/src/thrive/domain.js`.
 `Workouts!AD` `trails` (#688) is the named OpenStreetMap trails the activity's track rode, worked out
 once by the COROS sync's trail step (`sync/src/trail-step.mjs`, one Overpass lookup of the track's
 padded box, matched by `sync/src/trail-match.mjs`) and written with its own `updateWorkout` call. Three

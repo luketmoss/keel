@@ -6,7 +6,7 @@
 // every consumer arriving later (the COROS sync, the Journal) calls the API
 // instead of adding another copy.
 
-// Column indices for the Workouts sheet (0-based), A:AD after #128/#129/#145/#260/#432/#688.
+// Column indices for the Workouts sheet (0-based), A:AM after #128/#129/#145/#260/#432/#688/#765.
 var COL = {
   ID: 0,                  // A
   DATE: 1,                // B  local calendar date, YYYY-MM-DD
@@ -41,9 +41,21 @@ var COL = {
                           //    blank means no map, whatever the reason
   TRAILS: 29,             // AD the OpenStreetMap trails the track rode (#688), a JSON text in
                           //    #688's format. Sync-owned; blank means not tagged yet, never "none"
+  // AE:AM are Thrive Spin's indoor-ride columns (#765). All nullable: blank means not a Spin
+  // ride, or nobody said, and never 0. AE:AK and AM are Spin-owned (only saveRide writes them);
+  // AL is settable on a bike row.
+  AVG_POWER_W: 30,        // AE whole W
+  NP_W: 31,               // AF normalized power, whole W
+  INTENSITY_FACTOR: 32,   // AG NP / FTP, text with 2 decimals
+  TSS: 33,                // AH whole number
+  WORK_KJ: 34,            // AI whole kJ
+  FTP_W: 35,              // AJ the FTP the ride was ridden at, whole W
+  INTENSITY_PCT: 36,      // AK the ride's intensity setting, whole %
+  RIDE_WORKOUT_ID: 37,    // AL a RideWorkouts id: the workout ridden, or on a plan the Spin workout it names
+  STREAMS_REF: 38,        // AM Drive file ID of the ride's streams JSON
 };
 
-var WORKOUT_COLUMN_COUNT = 30;
+var WORKOUT_COLUMN_COUNT = 39;
 
 /**
  * The field name for each column, in sheet order. The read and write mappers
@@ -57,6 +69,18 @@ var WORKOUT_FIELDS = [
   'sub_type', 'source', 'source_activity_id', 'raw_ref', 'fit_ref',
   'fit_fetched_at', 'synced_at', 'started_at_utc', 'calories',
   'estimated_seconds', 'sport_type', 'track_ref', 'trails',
+  'avg_power_w', 'np_w', 'intensity_factor', 'tss', 'work_kj', 'ftp_w',
+  'intensity_pct', 'ride_workout_id', 'streams_ref',
+];
+
+/**
+ * The Workouts fields only `saveRide` writes (#765, AE:AK and AM). `createWorkout`
+ * and `updateWorkout` refuse them, and every full-row write keeps what they hold.
+ * `ride_workout_id` (AL) is not here: it is settable on a bike row.
+ */
+var SPIN_OWNED_FIELDS = [
+  'avg_power_w', 'np_w', 'intensity_factor', 'tss', 'work_kj', 'ftp_w',
+  'intensity_pct', 'streams_ref',
 ];
 
 var WORKOUT_TYPES = ['weight', 'stretch', 'bike', 'hike', 'run', 'walk'];
@@ -505,3 +529,38 @@ var BODY_MEASUREMENT_FIELDS = [
 var BODY_MEASUREMENT_COLUMN_COUNT = 20;
 
 var BODY_MEASUREMENT_KINDS = ['scale', 'bp'];
+
+
+// --- RideWorkouts (A:H) and FtpHistory (A:F) - #765 ---------------------------
+//
+// Thrive Spin's workout library and the owner's FTP settings, written by the API
+// alone (ride-workouts.js, ftp.js). Mirrored by frontend/src/api/spin-rows.ts;
+// change both together. Created by scripts/migrate-765-spin.mjs; later columns are
+// only appended.
+var RIDE_WORKOUT_FIELDS = [
+  'id',          // A  PK: the caller's id (1-64 of A-Za-z0-9_-) or rw_ + 8 hex
+  'name',        // B  1-80 characters, not blank
+  'category',    // C  one of RIDE_WORKOUT_CATEGORIES
+  'description', // D  0-1000 characters
+  'steps',       // E  the steps JSON (v1), at most 5000 characters
+  'duration_s',  // F  total seconds with repeats expanded, computed by the API
+  'created',     // G  ISO 8601 UTC, kept on a replace
+  'updated',     // H  ISO 8601 UTC
+];
+
+var RIDE_WORKOUT_COLUMN_COUNT = 8;
+var RIDE_WORKOUT_CATEGORIES = ['Endurance', 'Sweet spot', 'Threshold', 'VO2', 'Recovery'];
+
+var FTP_HISTORY_FIELDS = [
+  'id',      // A  PK, the caller's id: adding it twice leaves one row
+  'date',    // B  local YYYY-MM-DD (TIMEZONE) the FTP took effect
+  'ftp_w',   // C  whole W, 50-1000
+  'source',  // D  ramp_test | manual
+  'ride_id', // E  the test ride's Workouts!T: required for ramp_test, blank for manual
+  'created', // F  ISO 8601 UTC, server clock
+];
+
+var FTP_HISTORY_COLUMN_COUNT = 6;
+var FTP_SOURCES = ['ramp_test', 'manual'];
+var FTP_MIN_W = 50;
+var FTP_MAX_W = 1000;

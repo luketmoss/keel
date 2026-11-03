@@ -35,6 +35,15 @@ const WORKOUT_WEIGHT: WorkoutWithRow = {
   sport_type: '',
   track_ref: '',
   trails: '',
+  avg_power_w: '',
+  np_w: '',
+  intensity_factor: '',
+  tss: '',
+  work_kj: '',
+  ftp_w: '',
+  intensity_pct: '',
+  ride_workout_id: '',
+  streams_ref: '',
   sheetRow: 2,
 };
 
@@ -69,6 +78,15 @@ const WORKOUT_STRETCH: WorkoutWithRow = {
   sport_type: '',
   track_ref: '',
   trails: '',
+  avg_power_w: '',
+  np_w: '',
+  intensity_factor: '',
+  tss: '',
+  work_kj: '',
+  ftp_w: '',
+  intensity_pct: '',
+  ride_workout_id: '',
+  streams_ref: '',
   sheetRow: 3,
 };
 

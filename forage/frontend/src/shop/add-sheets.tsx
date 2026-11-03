@@ -6,6 +6,7 @@ import { ApiError, type ForageApi } from '../api/client';
 import type { Food, LateMeal, Trip, TripItem } from '../api/types';
 import { localDate } from '../cook/format';
 import { displayName } from '../library/food-math';
+import { FoodName } from '../library/food-name';
 import { Sheet } from '../ui/sheet';
 import { SAVE_FAILED, addQuery, grown, isTripGone, putItem, shopNotice, showTrip } from './shop-store';
 import {
@@ -166,7 +167,9 @@ export function AddSheet({
           onClick={() => (item ? onAmount(f.id) : void add({ food_id: f.id }, f.id))}
         >
           <span class="recipe-text">
-            <span class="recipe-name">{name}</span>
+            <span class="recipe-name">
+              <FoodName food={f} />
+            </span>
             <span class="recipe-meta">{addRowLine(f, item)}</span>
           </span>
           <span class={item ? 'add-mark is-on' : 'add-mark'} aria-hidden="true">

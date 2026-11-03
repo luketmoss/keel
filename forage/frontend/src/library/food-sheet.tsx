@@ -78,6 +78,7 @@ export function FoodSheet({ api, id, onEdit, onDeleted, onClose }: Props) {
   }
 
   const name = displayName(food);
+  const brand = (food.brand ?? '').trim();
   if (confirming || refused) {
     return (
       <Sheet title={`Delete ${name}?`} onClose={onClose} closable={false} testId="food-delete">
@@ -118,8 +119,9 @@ export function FoodSheet({ api, id, onEdit, onDeleted, onClose }: Props) {
   const extras: Extras = {};
   for (const k of EXTRA_KEYS) extras[k] = at(food[EXTRA_COLUMN[k]]);
   return (
-    <Sheet title={name} onClose={onClose} testId="food-sheet">
+    <Sheet title={food.name.trim() || name} onClose={onClose} testId="food-sheet">
       <p class="hint">
+        {brand ? `${brand} · ` : ''}
         {food.kind === 'packaged' ? 'Packaged food' : 'Ingredient'}
         {SOURCE[food.source] ?? ''}
       </p>

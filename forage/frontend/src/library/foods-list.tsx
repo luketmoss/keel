@@ -1,6 +1,7 @@
 import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
 import type { Food } from '../api/types';
+import { FoodName } from './food-name';
 import { STORE_LABELS, displayName, kcalLine } from './food-math';
 import { foodsNotice, foodsState, libraryFoods } from './foods-store';
 
@@ -26,7 +27,9 @@ function FoodRow({ food, onOpen }: { food: Food; onOpen: () => void }) {
     <li>
       <button type="button" class="food-row" onClick={onOpen} data-testid="food-row">
         <span class="food-text">
-          <span class="recipe-name">{displayName(food)}</span>
+          <span class="recipe-name">
+            <FoodName food={food} />
+          </span>
           <span class="food-meta">
             {kcal ? <span>{kcal}</span> : <span class="chip-flag">No nutrition yet</span>}
             {food.usually_have && <span> · usually have</span>}

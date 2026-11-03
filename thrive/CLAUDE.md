@@ -149,7 +149,8 @@ with its own id and tap time.
 rate straps over Bluetooth LE for indoor rides. It does not depend on `app`: the small pieces it shares with Sip (URL
 check, OkHttp transport, envelope reading) are copied. #766 is its shell, Settings and Devices screen
 (`docs/design/766-spin-devices.md`); #767 is the Library, workout detail and builder (`docs/design/767-spin-library.md`);
-#768 is the ride (`docs/design/768-spin-ride.md`).
+#768 is the ride (`docs/design/768-spin-ride.md`); #769 is the FIT file, the summary and the upload queue
+(`docs/design/769-spin-save.md`).
 
 - **Install is by sideload**, like Sip: download the `thrive-spin-apk` artifact from the latest green
   `thrive-android.yml` run (the same job also uploads `thrive-sip-apk`) and install it beside Thrive Sip. It is signed
@@ -178,8 +179,18 @@ check, OkHttp transport, envelope reading) are copied. #766 is its shell, Settin
   command in flight, the refusal table) over `core/ble/FtmsControl`'s bytes, and `core/ride/recording/` (`files/rides/<ride_id>/`
   with `meta.json`, `samples.csv` and `events.jsonl`, written as the ride goes; `RideRecovery` runs when the app next opens and
   never restarts a ride behind the rider's back). The ride screen is always the dark scheme (`SpinDarkTheme`) and the app
-  always opens on it while a ride is active. #769 plugs in at `RideFinishedHandler` and `RideStore`; a placeholder "Ride recorded"
-  screen ships. #770's ramp test builds its own `RideSession` (`RideKind.RampTest`, open-ended `WattsStairs` and `CadenceBelow`).
+  always opens on it while a ride is active. #769 took over `RideFinishedHandler`; #770's ramp test builds its own `RideSession` (`RideKind.RampTest`, open-ended `WattsStairs` and `CadenceBelow`).
+- **Save (#769).** A finished workout opens its summary (`ui/RideSummaryScreen`, whose every word and state is
+  `core/summary/SummaryState`) and nothing is sent until the person taps **Save to Thrive**: `saveRide` ignores a repeat
+  and the Spin key cannot edit a saved ride, so effort and notes travel in the one upload that works. The figures
+  (`core/summary/Metrics`: average and normalized power, IF, TSS, kJ, per-step compliance) and #765's streams file are
+  plain Kotlin over the recording; the FIT file is a small hand-written encoder (`core/fit/`), decoded in the tests by the
+  Garmin FIT SDK, a `testImplementation` only. `upload.json` beside the recording holds the state and the frozen payload,
+  and `core/upload/RideUploader` is the queue: any `success: true` is done (the ride is deleted from the phone only then,
+  or when the person discards it), `bad_request` is final (`rejected`, kept on the phone), a refused key is `needs_key`,
+  being offline is never an error, and the 10th server error in a row is `stuck`. `upload/UploadWorker` runs it on
+  WorkManager; the app also runs it at once on Save. Library gains a banner for rides not finished with. #770 calls
+  `RideUploads.prepare(rideId, ftpW)` with the FTP a ramp test decides.
 - **Testing is not human-gated**, as for Sip: `/test` passes the JVM and CI criteria; Bluetooth, permission and
   on-phone criteria are waived by the owner and listed in the issue's `## Results` as things to watch. Install the APK
   from the merge's CI run on `main`.

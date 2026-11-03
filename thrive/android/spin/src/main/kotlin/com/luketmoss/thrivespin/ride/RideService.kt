@@ -118,7 +118,7 @@ class RideService : Service() {
                 sink = store.reopen(restore.meta.rideId),
                 port = link,
                 devices = { devices },
-                handler = RideRuntime.handler,
+                handler = RideRuntime.handler(this),
                 restore = RestoreData.from(restore, startedAtMs = restore.samples.first().epochMs),
             )
         } else {
@@ -128,7 +128,7 @@ class RideService : Service() {
                 sink = store.recorder(launch.session.rideId),
                 port = link,
                 devices = { devices },
-                handler = RideRuntime.handler,
+                handler = RideRuntime.handler(this),
             )
         }
         engine = created

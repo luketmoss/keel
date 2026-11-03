@@ -9,6 +9,9 @@ import com.luketmoss.thrivespin.core.ride.RidePhase
 import com.luketmoss.thrivespin.core.ride.RideSession
 import com.luketmoss.thrivespin.core.ride.recording.FileRideStore
 import com.luketmoss.thrivespin.core.ride.recording.RideRecording
+import com.luketmoss.thrivespin.core.upload.SummaryHandler
+import com.luketmoss.thrivespin.core.upload.SummaryQueue
+import java.io.IOException
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,10 +34,10 @@ object RideRuntime {
     private val _engine = MutableStateFlow<RideEngine?>(null)
     val engine: StateFlow<RideEngine?> get() = _engine
 
-    private val _handOffs = MutableStateFlow<List<String>>(emptyList())
+    /** The summaries to show (#769), oldest first, one at a time. The head is the one on screen. */
+    val summaries = SummaryQueue()
 
-    /** Finished rides not yet handed off, oldest first. The head is the one on screen. */
-    val handOffs: StateFlow<List<String>> get() = _handOffs
+    val handOffs: StateFlow<List<String>> get() = summaries.ids
 
     private var launch: Launch? = null
     private var launching = false
@@ -70,23 +73,39 @@ object RideRuntime {
 
     private val storageFullAt = HashMap<String, Int>()
 
-    /** The second a ride was ended at for want of space, so the "Ride recorded" screen can say so. */
+    /** The second a ride was ended at for want of space, so its summary can say so. */
     fun storageFullAt(rideId: String): Int? = storageFullAt[rideId]
 
-    /** The handler #769 replaces: a finished ride goes to the "Ride recorded" screen. */
-    val handler: RideFinishedHandler = object : RideFinishedHandler {
-        override fun onFinished(rideId: String) {
-            val running = _engine.value
-            if (running != null && running.endedForSpace) storageFullAt[rideId] = running.elapsedS
-            enqueue(rideId)
+    /**
+     * The hand-off (#769): a finished workout opens its summary and is marked handed off at once; a ramp
+     * test is left for #770. The service and the app's recovery both call it.
+     */
+    fun handler(context: Context): RideFinishedHandler {
+        val rides = store(context)
+        val summary = SummaryHandler(
+            kindOf = { id -> rides.list().firstOrNull { it.id == id }?.kind },
+            markHandedOff = { id ->
+                try {
+                    rides.markHandedOff(id)
+                } catch (e: IOException) {
+                    // Not marked: the ride comes back on the next open, which is the safe way round.
+                }
+            },
+            show = { id -> enqueue(id) },
+        )
+        return object : RideFinishedHandler {
+            override fun onFinished(rideId: String) {
+                val running = _engine.value
+                if (running != null && running.endedForSpace) storageFullAt[rideId] = running.elapsedS
+                summary.onFinished(rideId)
+            }
         }
     }
 
-    fun enqueue(rideId: String) {
-        if (rideId !in _handOffs.value) _handOffs.value = _handOffs.value + rideId
-    }
+    fun enqueue(rideId: String) = summaries.add(rideId)
 
-    fun handedOff(rideId: String) {
-        _handOffs.value = _handOffs.value - rideId
-    }
+    /** A banner tap: this ride's summary next. */
+    fun show(rideId: String) = summaries.showNow(rideId)
+
+    fun handedOff(rideId: String) = summaries.remove(rideId)
 }

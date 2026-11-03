@@ -15,10 +15,10 @@ import okhttp3.Request
  * JSON envelope. No logging interceptor, and failures carry no URL or form: the
  * form holds the key.
  */
-object OkHttpTransport : Transport {
+open class HttpTransport(callTimeoutS: Long) : Transport {
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
-        .callTimeout(45, TimeUnit.SECONDS)
+        .callTimeout(callTimeoutS, TimeUnit.SECONDS)
         .build()
 
     override suspend fun post(url: String, form: Map<String, String>): String =
@@ -35,3 +35,9 @@ object OkHttpTransport : Transport {
             }
         }
 }
+
+/** The usual calls: Settings' test, the library, a builder save. */
+object OkHttpTransport : HttpTransport(45)
+
+/** A ride's upload (#769): the API writes two Drive files before it answers, so it is given 60 s. */
+object OkHttpUploadTransport : HttpTransport(60)

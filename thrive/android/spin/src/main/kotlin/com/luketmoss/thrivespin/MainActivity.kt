@@ -2,6 +2,7 @@ package com.luketmoss.thrivespin
 
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.Manifest
 import android.content.pm.PackageManager
@@ -29,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -59,7 +61,6 @@ import com.luketmoss.thrivespin.core.ride.RideEngine
 import com.luketmoss.thrivespin.core.ride.RideLauncher
 import com.luketmoss.thrivespin.core.ride.RidePhase
 import com.luketmoss.thrivespin.core.ride.RideProfile
-import com.luketmoss.thrivespin.core.ride.RideRecordedText
 import com.luketmoss.thrivespin.core.ride.RideSession
 import com.luketmoss.thrivespin.core.ride.RideState
 import com.luketmoss.thrivespin.core.ride.RideText
@@ -67,6 +68,13 @@ import com.luketmoss.thrivespin.core.ride.StartOutcome
 import com.luketmoss.thrivespin.core.ride.recording.RecoveryOutcome
 import com.luketmoss.thrivespin.core.ride.recording.RideRecording
 import com.luketmoss.thrivespin.core.ride.recording.RideRecovery
+import com.luketmoss.thrivespin.core.summary.SummaryStates
+import com.luketmoss.thrivespin.core.upload.Effort
+import com.luketmoss.thrivespin.core.upload.PendingBanner
+import com.luketmoss.thrivespin.core.upload.PendingRides
+import com.luketmoss.thrivespin.core.upload.Preparation
+import com.luketmoss.thrivespin.core.upload.SaveResult
+import com.luketmoss.thrivespin.core.upload.UploadStage
 import com.luketmoss.thrivespin.core.workout.DetailState
 import com.luketmoss.thrivespin.core.workout.Draft
 import com.luketmoss.thrivespin.core.workout.RideStarter
@@ -83,18 +91,22 @@ import com.luketmoss.thrivespin.ui.DevicesScreen
 import com.luketmoss.thrivespin.ui.LibraryActions
 import com.luketmoss.thrivespin.ui.LibraryContent
 import com.luketmoss.thrivespin.ui.RideActions
-import com.luketmoss.thrivespin.ui.RideRecordedScreen
+import com.luketmoss.thrivespin.ui.RideSummaryScreen
 import com.luketmoss.thrivespin.ui.RideScreen
 import com.luketmoss.thrivespin.ui.ScanSheet
 import com.luketmoss.thrivespin.ui.SettingsScreen
 import com.luketmoss.thrivespin.ui.SpinDownSheet
 import com.luketmoss.thrivespin.ui.SpinShell
 import com.luketmoss.thrivespin.ui.SpinTheme
+import com.luketmoss.thrivespin.ui.SummaryActions
+import com.luketmoss.thrivespin.upload.UploadRuntime
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * The app's one activity: Library, Devices (with Settings behind its gear), the workout detail and the
@@ -164,6 +176,7 @@ class MainActivity : ComponentActivity() {
             },
         )
         recoverRides()
+        nudgeUploads()
 
         setContent {
             SpinTheme {
@@ -192,7 +205,7 @@ class MainActivity : ComponentActivity() {
 
     /**
      * Once per process, before Library is shown: a ride the app was killed in comes back paused or is
-     * finished, and every finished ride not yet handed off goes to the "Ride recorded" screen.
+     * finished, and every finished ride not yet handed off goes to its summary (#769).
      */
     private fun recoverRides() {
         if (RideRuntime.recovered) return
@@ -203,6 +216,7 @@ class MainActivity : ComponentActivity() {
         } catch (e: java.io.IOException) {
             RecoveryOutcome(null, emptyList())
         }
+        val handler = RideRuntime.handler(this)
         val resume: RideRecording? = outcome.resume
         if (resume != null) {
             if (BleEnvironment.permitted(this)) {
@@ -210,10 +224,18 @@ class MainActivity : ComponentActivity() {
             } else {
                 // The ride's service needs Nearby devices to run: without it the ride is kept as it stood.
                 rideStore.finishInterrupted(resume.meta.rideId, resume)
-                RideRuntime.enqueue(resume.meta.rideId)
+                handler.onFinished(resume.meta.rideId)
             }
         }
-        outcome.handOff.forEach { RideRuntime.enqueue(it) }
+        outcome.handOff.forEach { handler.onFinished(it) }
+    }
+
+    /** On app open, anything queued goes to WorkManager again. */
+    private fun nudgeUploads() {
+        Thread {
+            val queued = UploadRuntime.uploads(this).pending().any { it.stage == UploadStage.Queued }
+            if (queued) UploadRuntime.kick(this)
+        }.start()
     }
 
     /** Asks for what a ride needs on the phone, the first time, then starts it. */
@@ -277,8 +299,8 @@ class MainActivity : ComponentActivity() {
             if (current != null && ride != null && ride.phase != RidePhase.Finished) {
                 // While a ride is active, opening the app always lands on it.
                 RideHost(current, ride)
-            } else if (handOffs.isNotEmpty()) {
-                RecordedHost(handOffs.first(), go)
+            } else if (handOffs.isNotEmpty() && route !is Route.Settings) {
+                SummaryHost(handOffs.first(), go)
             } else when (route) {
                 is Route.Settings -> {
                     BackHandler { go(Route.Tab(route.from)) }
@@ -292,6 +314,9 @@ class MainActivity : ComponentActivity() {
                                 TestResult.BadUrl
                             } else {
                                 store.saveConfig(url, key)
+                                // Rides waiting on the URL or key go back to the queue (#769).
+                                UploadRuntime.uploads(this@MainActivity).settingsSaved()
+                                UploadRuntime.kick(this@MainActivity)
                                 // A corrected URL or key must not wait out the refresh throttle.
                                 LibraryModel.lastAttemptMs = 0L
                                 null
@@ -344,6 +369,14 @@ class MainActivity : ComponentActivity() {
         val failure by library.failure.collectAsState()
         var pulling by remember { mutableStateOf(false) }
         val scope = rememberCoroutineScope()
+        // The rides that are not finished with (#769), re-read while Library is on screen.
+        val banner by produceState<PendingBanner?>(null) {
+            val uploads = UploadRuntime.uploads(this@MainActivity)
+            while (true) {
+                value = withContext(Dispatchers.IO) { PendingRides.banner(uploads.pending()) }
+                delay(2000)
+            }
+        }
 
         // Whenever Library is shown, at most once a minute, and on a pull.
         LaunchedEffect(Unit) { library.refresh(force = false) }
@@ -382,6 +415,8 @@ class MainActivity : ComponentActivity() {
                 onSearch = onSearch,
                 onCategory = onCategory,
             ),
+            banner = banner,
+            onBanner = { banner?.let { RideRuntime.show(it.rideId) } },
         )
     }
 
@@ -441,33 +476,107 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-    /** The placeholder #769 replaces: what was kept, and Done, which marks it handed off. */
+    /** A finished ride's summary (#769): its figures, whether Thrive has it, and effort and notes to send with it. */
     @Composable
-    private fun RecordedHost(rideId: String, go: (Route) -> Unit) {
-        val rideStore = remember { RideRuntime.store(this@MainActivity) }
-        val recording = remember(rideId) {
-            try {
-                rideStore.open(rideId)
-            } catch (e: java.io.IOException) {
-                null
-            } catch (e: kotlinx.serialization.SerializationException) {
-                null
+    private fun SummaryHost(rideId: String, go: (Route) -> Unit) {
+        val uploads = remember { UploadRuntime.uploads(this@MainActivity) }
+        val scope = rememberCoroutineScope()
+        val zone = remember { ZoneId.systemDefault() }
+        var prep by remember(rideId) { mutableStateOf<Preparation?>(null) }
+        LaunchedEffect(rideId) { prep = withContext(Dispatchers.IO) { uploads.prepare(rideId) } }
+        val upload by uploads.state(rideId).collectAsState()
+        val sendingIds by uploads.sending.collectAsState()
+
+        // Effort and notes start from what the draft already holds, and are kept as they change.
+        var effortWire by rememberSaveable(rideId) { mutableStateOf("") }
+        var notes by rememberSaveable(rideId) { mutableStateOf("") }
+        var loaded by rememberSaveable(rideId) { mutableStateOf(false) }
+        LaunchedEffect(upload != null) {
+            val u = upload
+            if (!loaded && u != null) {
+                effortWire = u.effort
+                notes = u.notes
+                loaded = true
             }
         }
-        if (recording == null) {
-            // A folder that cannot be read has nothing to show: skip it.
-            LaunchedEffect(rideId) { RideRuntime.handedOff(rideId) }
-            return
+        LaunchedEffect(effortWire, notes, loaded) {
+            if (loaded) {
+                delay(300)
+                withContext(Dispatchers.IO) { uploads.setDraft(rideId, Effort.fromWire(effortWire), notes) }
+            }
         }
-        RideRecordedScreen(
-            line = RideRecordedText.line(recording.samples),
+
+        val view = SummaryStates.of(prep, upload, rideId in sendingIds, System.currentTimeMillis(), zone)
+        val summary = (prep as? Preparation.Ready)?.summary
+        val shownEffort = if (view.fieldsEditable) Effort.fromWire(effortWire) else Effort.fromWire(upload?.effort.orEmpty())
+        val shownNotes = if (view.fieldsEditable) notes else upload?.notes.orEmpty()
+
+        // Later, Done and back all leave the screen: a draft stays a draft, and the Library banner counts it.
+        val leave: () -> Unit = {
+            uploads.setDraft(rideId, Effort.fromWire(effortWire), notes)
+            RideRuntime.handedOff(rideId)
+            go(Routes.START)
+        }
+        BackHandler { leave() }
+        RideSummaryScreen(
+            summary = summary,
+            view = view,
+            effort = shownEffort,
+            notes = shownNotes,
+            zone = zone,
             storageNote = RideRuntime.storageFullAt(rideId)?.let { RideText.storageFull(it) },
-            onDone = {
-                rideStore.markHandedOff(rideId)
-                RideRuntime.handedOff(rideId)
-                // Done returns to Library, whatever screen the ride was started from.
-                go(Routes.START)
-            },
+            actions = SummaryActions(
+                onBack = leave,
+                onLater = leave,
+                onDone = leave,
+                onSave = {
+                    scope.launch {
+                        val result = withContext(Dispatchers.IO) { uploads.save(rideId, Effort.fromWire(effortWire), notes) }
+                        if (result == SaveResult.Queued) UploadRuntime.kick(this@MainActivity)
+                    }
+                },
+                onOpenInThrive = {
+                    val url = view.openUrl
+                    if (url != null) {
+                        try {
+                            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                        } catch (e: ActivityNotFoundException) {
+                            snackMessage = "Couldn't open Thrive."
+                        }
+                    }
+                },
+                onSendNow = {
+                    scope.launch {
+                        withContext(Dispatchers.IO) { uploads.retry(rideId) }
+                        UploadRuntime.kick(this@MainActivity)
+                    }
+                },
+                onTryAgain = {
+                    scope.launch {
+                        withContext(Dispatchers.IO) { uploads.retry(rideId) }
+                        UploadRuntime.kick(this@MainActivity)
+                    }
+                },
+                onDeleteFromPhone = {
+                    scope.launch {
+                        if (withContext(Dispatchers.IO) { uploads.deleteFromPhone(rideId) }) {
+                            RideRuntime.handedOff(rideId)
+                            go(Routes.START)
+                        }
+                    }
+                },
+                onDiscard = {
+                    scope.launch {
+                        if (withContext(Dispatchers.IO) { uploads.discard(rideId) }) {
+                            RideRuntime.handedOff(rideId)
+                            go(Routes.START)
+                        }
+                    }
+                },
+                onOpenSettings = { go(Route.Settings(AppTab.Library)) },
+                onEffort = { effortWire = it?.wire.orEmpty() },
+                onNotes = { notes = it },
+            ),
         )
     }
 

@@ -3,6 +3,7 @@
 // both done by the API (`getRecipes` `q` and `sort`) and remembered for the session.
 import { signal } from '@preact/signals';
 import { ApiError, type ForageApi } from '../api/client';
+import { quietGate } from '../api/quiet-gate';
 import type { RecipeDetail, RecipeSort, RecipeSummary } from '../api/types';
 import { shortDate, starsText } from '../cook/format';
 
@@ -31,6 +32,7 @@ let latest = 0;
 
 /** Counts the rows patched in from a reply, so a refresh that began before one can't undo it (#785). */
 let patches = 0;
+const gate = quietGate();
 
 /**
  * Load with the current search and sort. A slower, older answer never replaces a newer one. `quiet` is the refresh
@@ -39,6 +41,7 @@ let patches = 0;
 export async function loadRecipes(api: ForageApi, quiet = false): Promise<void> {
   const seq = ++latest;
   const before = patches;
+  if (!quiet) gate.cancel();
   const q = recipeQuery.value.trim();
   const sort = recipeSort.value;
   if (!quiet && (recipesState.value === 'idle' || recipesState.value === 'error')) recipesState.value = 'loading';
@@ -58,9 +61,9 @@ export async function loadRecipes(api: ForageApi, quiet = false): Promise<void> 
   }
 }
 
-/** Refresh the list after a save without a failure showing: its rating and last cooked are derived (#785). */
+/** Refresh the list after a save, one at a time (#790), without a failure showing: its rating and last cooked are derived (#785). */
 export function refreshRecipes(api: ForageApi): Promise<void> {
-  return loadRecipes(api, true);
+  return gate.request(() => loadRecipes(api, true));
 }
 
 /** Put a recipe as a write answered it into its row, when the list shows it (a search or sort may not). */
@@ -98,6 +101,7 @@ export async function deleteRecipe(api: ForageApi, id: string): Promise<string |
 
 /** Forget what was loaded (tests and sign-out). */
 export function _resetRecipes(): void {
+  gate.reset();
   patches = 0;
   recipes.value = [];
   recipesState.value = 'idle';

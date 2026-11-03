@@ -656,6 +656,8 @@ describe('a save shows at once (#785)', () => {
     const api = fakeApi();
     api.recipes.push(recipe('rc_chili', 'Weeknight chili'));
     api.plan.push(meal({ id: 'pl_0', date: '2026-11-06', note: 'Out' }));
+    // Reads answer a copy, as the wire does: the fake's own array would change under the screen.
+    api.answer('getPlan', () => ({ success: true, data: { entries: [...api.plan], not_on_trip: 0 } }));
     await open();
     api.answer('getPlan', () => ({ success: false, error: 'offline' }));
     fireEvent.click(screen.getByTestId('plan-meal-btn'));

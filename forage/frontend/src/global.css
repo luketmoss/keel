@@ -2338,6 +2338,37 @@ a.text-btn {
   font-weight: 600;
 }
 
+/* #786: what a pass added, above Recent; the row just logged or saved fades in. */
+.added-list {
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-light);
+}
+
+.added-list li:last-child .log-row {
+  border-bottom: 0;
+}
+
+.log-row.is-fresh {
+  animation: added-fade var(--transition-normal);
+}
+
+@keyframes added-fade {
+  from {
+    background: color-mix(in srgb, var(--color-primary) 25%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .log-row.is-fresh {
+    animation: none;
+  }
+}
+
+.add-status:empty {
+  display: none;
+}
+
 .hint-inline {
   color: var(--color-text-secondary);
   font-size: var(--text-sm);

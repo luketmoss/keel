@@ -19,8 +19,9 @@ import { AddFoodSheet } from '../library/library-screen';
 import { NutritionSheet } from '../library/nutrition-sheet';
 import { StarterSheet } from '../library/starter-sheet';
 import { showToast } from '../ui/toast';
-import { AddSheet } from './add-sheet';
+import { AddSheet, type AddLists } from './add-sheet';
 import { AmountSheet, type LogTarget, type SavedLog } from './amount-sheet';
+import { EntryRow } from './entry-row';
 import { SaveRecipeSheet } from './save-recipe-sheet';
 import {
   dayEntries,
@@ -125,34 +126,6 @@ function DayCard({ day, date, today }: { day: FoodLogDay | null; date: string; t
         </p>
       )}
     </section>
-  );
-}
-
-function EntryRow({ entry, name, onOpen }: { entry: FoodLogEntry; name: string; onOpen: () => void }) {
-  const unknown = entry.kcal === null;
-  const line = amountLine(entry);
-  return (
-    <li>
-      <button
-        type="button"
-        class="log-row"
-        onClick={onOpen}
-        aria-label={`${name}, ${line}, ${unknown ? 'no nutrition' : `${wholeKcal(entry.kcal!)} kcal`}`}
-        data-testid="entry-row"
-      >
-        <span class="recipe-text">
-          <span class="recipe-name">{name}</span>
-          <span class="recipe-meta">{line}</span>
-        </span>
-        {unknown ? (
-          <span class="chip-flag">—</span>
-        ) : (
-          <span class="log-row-kcal tabular">
-            {wholeKcal(entry.kcal!)} <span class="hint-inline">kcal</span>
-          </span>
-        )}
-      </button>
-    </li>
   );
 }
 
@@ -272,11 +245,29 @@ type Overlay =
   | { kind: 'saveRecipe'; slot: Slot };
 
 /**
+ * A pass (#786): from an Add row's tap until the Add sheet closes, one meal's adding. The screen holds it because the
+ * Add sheet unmounts while the amount sheet is open.
+ */
+interface Pass {
+  slot: Slot;
+  /** The entries logged in the pass, in the order logged; one deleted again stays here but leaves the list. */
+  ids: string[];
+  /** The Add sheet's lists, loaded at the pass's first open and kept for its returns. */
+  lists: AddLists | null;
+  /** The search text, kept while the amount sheet is open. */
+  q: string;
+  /** The last save's status line, and the entry it touched. */
+  status: string | null;
+  fresh: string | null;
+}
+
+/**
  * The Eaten tab (#712): a day of the food log. The day card shows `getFoodLogTotals`, each meal its entries
  * (their stored snapshots), the day's planned meals not yet logged, and an Add row. The app adds nothing up.
  */
 export function EatenScreen({ api }: { api: ForageApi }) {
   const [overlay, setOverlay] = useState<Overlay | null>(null);
+  const [pass, setPass] = useState<Pass | null>(null);
   const [busyPlan, setBusyPlan] = useState<string | null>(null);
   const [failedPlan, setFailedPlan] = useState<string | null>(null);
   // One entry id per planned meal, kept across taps and retries, so they leave one entry.
@@ -318,9 +309,51 @@ export function EatenScreen({ api }: { api: ForageApi }) {
       if (overlay?.kind === 'amount' && overlay.target.kind === 'food') knowFood(overlay.target.food);
       upsertEntry(saved.entry);
     } else removeEntry(saved.removed);
+    void refreshDay(api);
+    if (pass && overlay?.kind === 'amount') {
+      // #786: back to the Add sheet; a new entry joins the Added list and clears the search.
+      const isNew = !overlay.entry;
+      const id = 'entry' in saved ? saved.entry.id : null;
+      setPass(
+        (p) =>
+          p && {
+            ...p,
+            ids: id && !p.ids.includes(id) ? [...p.ids, id] : p.ids,
+            q: isNew ? '' : p.q,
+            status,
+            fresh: id,
+          },
+      );
+      setOverlay({ kind: 'add', slot: pass.slot, q: isNew ? '' : pass.q });
+      return;
+    }
     setOverlay(null);
     showToast(status);
-    void refreshDay(api);
+  }
+
+  function startPass(slot: Slot) {
+    setPass({ slot, ids: [], lists: null, q: '', status: null, fresh: null });
+    setOverlay({ kind: 'add', slot });
+  }
+
+  /** Done, close, Escape or the backdrop: one toast for what the pass left on the day, and focus on its Add row. */
+  function endPass() {
+    setOverlay(null);
+    setPass(null);
+    if (!pass) return;
+    const left = dayEntries.value.filter((e) => pass.ids.includes(e.id));
+    if (left.length === 1) showToast(`Logged ${entryName(left[0], foods, recipes)}`);
+    else if (left.length > 1) showToast(`Logged ${left.length} items to ${pass.slot.toLowerCase()}`);
+    requestAnimationFrame(() =>
+      document.querySelector<HTMLElement>(`[data-testid="add-to-meal"][data-slot="${pass.slot}"]`)?.focus(),
+    );
+  }
+
+  /** A food added or opened inside a pass joins its loaded foods, so a later search finds it. */
+  function passFood(food: Food) {
+    setPass((p) =>
+      p?.lists ? { ...p, lists: { ...p.lists, foods: [...p.lists.foods.filter((f) => f.id !== food.id), food] } } : p,
+    );
   }
 
   async function logPlanned(p: PlanEntry) {
@@ -388,6 +421,7 @@ export function EatenScreen({ api }: { api: ForageApi }) {
     try {
       const food = await api.getFood(id);
       keepFood(food);
+      passFood(food);
       setOverlay(hasNutrition(food) ? { kind: 'amount', slot, target: { kind: 'food', food } } : { kind: 'add', slot });
     } catch {
       setOverlay({ kind: 'add', slot });
@@ -487,8 +521,9 @@ export function EatenScreen({ api }: { api: ForageApi }) {
                 <button
                   type="button"
                   class="meal-add"
-                  onClick={() => setOverlay({ kind: 'add', slot })}
+                  onClick={() => startPass(slot)}
                   data-testid="add-to-meal"
+                  data-slot={slot}
                 >
                   <span aria-hidden="true">+</span> Add to {slot.toLowerCase()}
                 </button>
@@ -514,11 +549,22 @@ export function EatenScreen({ api }: { api: ForageApi }) {
           api={api}
           slot={overlay.slot}
           today={today}
-          initialQuery={overlay.q}
+          initialQuery={overlay.q ?? pass?.q}
+          lists={pass?.lists ?? null}
+          onLoaded={(lists) => setPass((p) => p && { ...p, lists })}
+          onQuery={(q) => setPass((p) => (p && p.q !== q ? { ...p, q } : p))}
+          added={(pass?.ids ?? []).flatMap((id) => {
+            const e = entries.find((x) => x.id === id);
+            return e ? [{ entry: e, name: entryName(e, foods, recipes) }] : [];
+          })}
+          onOpenAdded={openEntry}
+          fresh={pass?.fresh}
+          status={pass?.status}
+          done={!!pass?.ids.length}
           onPick={(target) => setOverlay({ kind: 'amount', slot: overlay.slot, target })}
           onAddNutrition={(target) => addNutrition(target, overlay.slot)}
           onAddFood={() => setOverlay({ kind: 'addFood', slot: overlay.slot })}
-          onClose={() => setOverlay(null)}
+          onClose={endPass}
         />
       )}
       {overlay?.kind === 'addFood' && (
@@ -555,6 +601,8 @@ export function EatenScreen({ api }: { api: ForageApi }) {
           api={api}
           onAdded={(result) => {
             const named = [...result.added, ...result.filled];
+            // The pass's foods were loaded before these existed: fetch each, so a search in the pass finds it.
+            for (const n of named) void api.getFood(n.id).then(passFood, () => {});
             setOverlay({ kind: 'add', slot: overlay.slot, q: named.length === 1 ? named[0].name : '' });
           }}
           onClose={() => setOverlay({ kind: 'add', slot: overlay.slot })}
@@ -567,6 +615,7 @@ export function EatenScreen({ api }: { api: ForageApi }) {
           origin={overlay.origin}
           onSaved={(food) => {
             keepFood(food);
+            passFood(food);
             setOverlay(
               hasNutrition(food) && !overlay.fill
                 ? { kind: 'amount', slot: overlay.slot, target: { kind: 'food', food } }
@@ -580,7 +629,21 @@ export function EatenScreen({ api }: { api: ForageApi }) {
         <NutritionSheet
           api={api}
           recipeId={overlay.recipeId}
-          onChanged={() => void refreshDay(api, true)}
+          onChanged={(recipe) => {
+            if (recipe) {
+              // A recipe given nutrition inside a pass is loggable in the pass's list too.
+              const { lines: _l, steps: _s, walkthrough: _w, walkthrough_check: _c, ...summary } = recipe;
+              setPass((p) =>
+                p?.lists
+                  ? {
+                      ...p,
+                      lists: { ...p.lists, recipes: p.lists.recipes.map((r) => (r.id === summary.id ? summary : r)) },
+                    }
+                  : p,
+              );
+            }
+            void refreshDay(api, true);
+          }}
           onClose={() => setOverlay(overlay.back ? { kind: 'add', slot: overlay.back } : null)}
         />
       )}
@@ -592,8 +655,9 @@ export function EatenScreen({ api }: { api: ForageApi }) {
           today={today}
           slot={overlay.slot}
           entry={overlay.entry}
+          fixedSlot={!!pass}
           onSaved={done}
-          onClose={() => setOverlay(null)}
+          onClose={() => setOverlay(pass ? { kind: 'add', slot: pass.slot } : null)}
         />
       )}
     </>

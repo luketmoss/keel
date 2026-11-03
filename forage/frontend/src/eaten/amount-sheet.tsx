@@ -19,6 +19,8 @@ interface Props {
   slot: Slot;
   /** Editing this entry, in place of adding one. */
   entry?: FoodLogEntry;
+  /** #786: inside a pass the meal is the Add row's, so the Meal chips are left out. */
+  fixedSlot?: boolean;
   /**
    * Saved: the status line's text ("Logged Greek yogurt") and what the write answered (#785): the stored entry, or
    * the id of the one deleted. The screen patches its day from it, then closes the sheet.
@@ -50,7 +52,17 @@ export function saveRefusal(err: unknown): string {
  * API would store for it (a dry run of the same write), the meal, and Log it or Save. The app works out no
  * nutrition: every figure on this sheet is the API's.
  */
-export function AmountSheet({ api, target, date, today, slot: initialSlot, entry, onSaved, onClose }: Props) {
+export function AmountSheet({
+  api,
+  target,
+  date,
+  today,
+  slot: initialSlot,
+  entry,
+  fixedSlot,
+  onSaved,
+  onClose,
+}: Props) {
   const name = targetName(target);
   const weights = target.kind === 'food' ? (target.food.servings_json ?? []) : [];
   const units = target.kind === 'food' ? [...weights.map((w) => w.name), 'g'] : ['serving'];
@@ -297,23 +309,27 @@ export function AmountSheet({ api, target, date, today, slot: initialSlot, entry
         )}
       </div>
 
-      <p class="field-label" id="log-meal">
-        Meal
-      </p>
-      <div class="chip-row" role="group" aria-labelledby="log-meal">
-        {SLOTS.map((s) => (
-          <button
-            key={s}
-            type="button"
-            class="chip"
-            aria-pressed={slot === s}
-            onClick={() => setSlot(s)}
-            disabled={saving}
-          >
-            {s}
-          </button>
-        ))}
-      </div>
+      {!fixedSlot && (
+        <>
+          <p class="field-label" id="log-meal">
+            Meal
+          </p>
+          <div class="chip-row" role="group" aria-labelledby="log-meal">
+            {SLOTS.map((s) => (
+              <button
+                key={s}
+                type="button"
+                class="chip"
+                aria-pressed={slot === s}
+                onClick={() => setSlot(s)}
+                disabled={saving}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       {error && (
         <p class="danger-text amount-error" role="status" data-testid="amount-error">

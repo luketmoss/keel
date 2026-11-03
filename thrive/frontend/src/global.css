@@ -4363,15 +4363,15 @@ input, select, textarea {
 }
 
 .ride-col-target {
-  width: 72px;
+  width: 80px;
 }
 
 .ride-col-avg {
-  width: 48px;
+  width: 56px;
 }
 
 .ride-col-hr {
-  width: 32px;
+  width: 40px;
 }
 
 .ride-intervals th,

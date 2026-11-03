@@ -41,16 +41,18 @@ export function RideIntervals({ ride }: { ride: RideDerived }) {
         <tbody>
           {rows.map((r, i) => (
             <tr key={i}>
-              <th scope="row" class="ride-step">
-                <span
-                  class="ride-step-swatch"
-                  aria-hidden="true"
-                  style={{ background: r.zone ? zoneVar(r.zone) : 'var(--color-border)' }}
-                />
-                <span class="ride-step-text">
-                  <span class="ride-step-label">{r.label}</span>
-                  <span class="ride-step-duration">{formatClock(r.durationS)}</span>
-                </span>
+              <th scope="row">
+                <div class="ride-step">
+                  <span
+                    class="ride-step-swatch"
+                    aria-hidden="true"
+                    style={{ background: r.zone ? zoneVar(r.zone) : 'var(--color-border)' }}
+                  />
+                  <span class="ride-step-text">
+                    <span class="ride-step-label">{r.label}</span>
+                    <span class="ride-step-duration">{formatClock(r.durationS)}</span>
+                  </span>
+                </div>
               </th>
               <td class="ride-num ride-target">{r.targetText}</td>
               <td class="ride-num ride-avg">{r.avgPower === null ? '—' : `${r.avgPower} W`}</td>

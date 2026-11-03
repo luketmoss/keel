@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.luketmoss.thrivespin.R
 import com.luketmoss.thrivespin.core.SpinSizes
+import com.luketmoss.thrivespin.core.ftp.FtpBanner
 import com.luketmoss.thrivespin.core.library.LibraryScreen
 import com.luketmoss.thrivespin.core.library.LibraryView
 import com.luketmoss.thrivespin.core.library.PlannedCard
@@ -74,6 +75,12 @@ fun LibraryContent(
     /** #769: the rides that are not finished with, under the title and above the search. */
     banner: PendingBanner? = null,
     onBanner: () -> Unit = {},
+    /** #770: the FTP changes not yet in Thrive, above the rides' banner. */
+    ftpBanner: FtpBanner? = null,
+    onFtpBanner: () -> Unit = {},
+    /** #770: the ramp test card's line ("FTP 262 W · set 7 Nov by a ramp test"), and what a tap does. */
+    rampCardLine: String = "",
+    onRampTest: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -87,6 +94,7 @@ fun LibraryContent(
             color = spin.text,
             weight = FontWeight.Bold,
         )
+        PendingFtpBanner(ftpBanner, onFtpBanner)
         PendingRidesBanner(banner, onBanner)
         when (state) {
             LibraryScreen.NotSetUp -> MessageBlock(
@@ -109,7 +117,7 @@ fun LibraryContent(
                 state.reason.text,
                 action = { FilledAction("Try again", actions.onRetry) },
             )
-            is LibraryScreen.Ready -> ReadyContent(state, search, category, today, pulling, actions)
+            is LibraryScreen.Ready -> ReadyContent(state, search, category, today, pulling, actions, rampCardLine, onRampTest)
         }
     }
 }
@@ -123,6 +131,8 @@ private fun ReadyContent(
     today: LocalDate,
     pulling: Boolean,
     actions: LibraryActions,
+    rampCardLine: String,
+    onRampTest: () -> Unit,
 ) {
     if (state.notice != null) {
         SpinText(
@@ -150,6 +160,7 @@ private fun ReadyContent(
             items(state.planned) { card ->
                 PlannedCardView(card, actions.onOpenWorkout)
             }
+            item { RampTestCard(rampCardLine, onRampTest) }
             when (state.empty) {
                 LibraryScreen.Empty.NoWorkouts -> item {
                     MessageBlock("No workouts yet", "Build one with the Build tab.")

@@ -1,6 +1,7 @@
 package com.luketmoss.thrivespin.core.library
 
 import com.luketmoss.thrivespin.core.SpinJson
+import com.luketmoss.thrivespin.core.ftp.FtpRow
 import com.luketmoss.thrivespin.core.workout.Estimates
 import com.luketmoss.thrivespin.core.workout.Maths
 import com.luketmoss.thrivespin.core.workout.StepsParse
@@ -61,7 +62,14 @@ data class LibraryCache(
     val plans: List<PlanRow>,
     val plansDate: String,
     val refreshedAtMs: Long,
+    /** #770: when the cached `current` took effect, how it was set and when the server made it, for [com.luketmoss.thrivespin.core.ftp.CurrentFtp]. */
+    val ftpDate: String = "",
+    val ftpSource: String = "",
+    val ftpCreated: String = "",
 ) {
+    /** The cache with `getFtp`'s current replaced by [row]. */
+    fun withFtp(row: FtpRow): LibraryCache = copy(ftpW = row.ftpW, ftpDate = row.date, ftpSource = row.source, ftpCreated = row.created)
+
     fun withWorkout(w: RideWorkout): LibraryCache =
         if (workouts.any { it.id == w.id }) {
             copy(workouts = workouts.map { if (it.id == w.id) w else it })
@@ -104,11 +112,10 @@ object LibraryRows {
     }
 
     /** `getFtp`'s `current.ftp_w`, or null when there is none. */
-    fun currentFtp(data: JsonElement?): Int? {
-        val current = (data as? JsonObject)?.get("current") as? JsonObject ?: return null
-        val ftp = (current["ftp_w"] as? JsonPrimitive)?.doubleOrNull ?: return null
-        return Maths.roundHalfUp(ftp)
-    }
+    fun currentFtp(data: JsonElement?): Int? = currentFtpRow(data)?.ftpW
+
+    /** `getFtp`'s `current` row, or null when there is none. */
+    fun currentFtpRow(data: JsonElement?): FtpRow? = FtpRow.read((data as? JsonObject)?.get("current"))
 
     /** The `bike` rows of `getPlannedWorkouts`. */
     fun bikePlans(data: JsonElement?): List<PlanRow> {

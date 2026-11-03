@@ -18,6 +18,9 @@ sealed interface Route {
 
     data class Detail(val workoutId: String) : Route
 
+    /** #770: the ramp test's intro. Back returns to Library. */
+    data object RampIntro : Route
+
     /** [editId] is null for a new workout. [from] is where closing returns to. */
     data class Builder(val editId: String?, val from: Route) : Route
 }
@@ -29,6 +32,7 @@ object Routes {
         is Route.Tab -> "tab:${route.tab.wire}"
         is Route.Settings -> "settings:${route.from.wire}"
         is Route.Detail -> "detail:${route.workoutId}"
+        Route.RampIntro -> "ramp"
         is Route.Builder -> "builder:${route.editId.orEmpty()}|${encode(route.from)}"
     }
 
@@ -38,6 +42,7 @@ object Routes {
         return when {
             text.startsWith("tab:") -> tab(text.removePrefix("tab:"))?.let { Route.Tab(it) } ?: START
             text.startsWith("settings:") -> tab(text.removePrefix("settings:"))?.let { Route.Settings(it) } ?: START
+            text == "ramp" -> Route.RampIntro
             text.startsWith("detail:") -> text.removePrefix("detail:").takeIf { it.isNotEmpty() }?.let { Route.Detail(it) } ?: START
             text.startsWith("builder:") -> {
                 val rest = text.removePrefix("builder:")

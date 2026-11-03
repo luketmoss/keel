@@ -262,9 +262,13 @@ class FileRideUploads(
      * yet (its summary has not opened) counts as a draft, so it is never left with nothing pointing at it.
      */
     fun pending(): List<PendingRide> = synchronized(lock) {
-        store.list().filter { it.state == RideFileState.Finished && it.kind == RideKind.Workout }.mapNotNull { info ->
+        store.list().filter { it.state == RideFileState.Finished }.mapNotNull { info ->
             val st = UploadFiles.read(dir(info.id))
             when {
+                // A ramp test (#770) with no upload.json is a decision still pending: its result is
+                // presented at each app open, so the banner does not count it. Once Continue has
+                // prepared it, it is a ride like any other.
+                info.kind == RideKind.RampTest && st == null -> null
                 st == null -> PendingRide(info.id, UploadStage.Draft, info.startedAtUtc ?: "")
                 st.state == UploadStage.Sent -> null
                 else -> PendingRide(info.id, st.state, st.savedAtUtc ?: info.startedAtUtc ?: "")

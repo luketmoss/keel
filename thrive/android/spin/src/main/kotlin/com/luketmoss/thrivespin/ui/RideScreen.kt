@@ -117,7 +117,7 @@ fun RideScreen(state: RideState, profile: ProfileModel, actions: RideActions) {
                         actions.onCancel()
                     }
                 }
-                state.banner?.let { Banner(it, actions.onTurnOnBluetooth) }
+                state.banner?.let { RideBannerCard(it, actions.onTurnOnBluetooth) }
                 StepCard(state)
                 Row(horizontalArrangement = Arrangement.spacedBy(Tokens.spaceSm)) {
                     TargetCard(state, Modifier.weight(1f))
@@ -216,7 +216,7 @@ private fun TopRow(state: RideState, started: Boolean, onEnd: () -> Unit) {
 }
 
 @Composable
-private fun StatusPill(text: String, dot: Color?, modifier: Modifier = Modifier, textColor: Color = spin.textSecondary) {
+internal fun StatusPill(text: String, dot: Color?, modifier: Modifier = Modifier, textColor: Color = spin.textSecondary) {
     Row(
         modifier = modifier
             .clip(Tokens.radiusFull)
@@ -238,7 +238,7 @@ private fun StatusPill(text: String, dot: Color?, modifier: Modifier = Modifier,
 }
 
 @Composable
-private fun Banner(banner: RideBanner, onTurnOnBluetooth: () -> Unit) {
+internal fun RideBannerCard(banner: RideBanner, onTurnOnBluetooth: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -254,7 +254,7 @@ private fun Banner(banner: RideBanner, onTurnOnBluetooth: () -> Unit) {
 }
 
 @Composable
-private fun RideCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+internal fun RideCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Box(
         modifier = modifier
             .clip(Tokens.radiusLg)

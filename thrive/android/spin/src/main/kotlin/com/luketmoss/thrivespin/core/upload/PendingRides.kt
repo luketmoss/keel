@@ -42,18 +42,27 @@ object PendingRides {
 
 /**
  * The hand-off from #768 (`RideFinishedHandler`): a finished workout opens its summary and is marked handed
- * off at once, so an unsaved ride is not re-presented on every app open; a ramp test is #770's and is left
- * untouched.
+ * off at once, so an unsaved ride is not re-presented on every app open. A ramp test (#770) opens its result
+ * screen instead and is **left un-handed-off** until the person presses Continue there, so a decision left
+ * with "Later" comes back at every app open, oldest first, until it is made or the test is discarded.
  */
 class SummaryHandler(
     private val kindOf: (String) -> RideKind?,
     private val markHandedOff: (String) -> Unit,
     private val show: (String) -> Unit,
+    /** Opens a ramp test's result; null leaves a ramp test untouched. */
+    private val showResult: ((String) -> Unit)? = null,
+    private val isHandedOff: (String) -> Boolean = { false },
 ) : com.luketmoss.thrivespin.core.ride.RideFinishedHandler {
     override fun onFinished(rideId: String) {
-        if (kindOf(rideId) != RideKind.Workout) return
-        show(rideId)
-        markHandedOff(rideId)
+        when (kindOf(rideId)) {
+            RideKind.Workout -> {
+                show(rideId)
+                markHandedOff(rideId)
+            }
+            RideKind.RampTest -> if (showResult != null && !isHandedOff(rideId)) showResult.invoke(rideId)
+            null -> Unit
+        }
     }
 }
 

@@ -51,13 +51,34 @@ import com.luketmoss.thrivespin.core.Routes
 import com.luketmoss.thrivespin.core.SavedDevice
 import com.luketmoss.thrivespin.core.SpinJson
 import com.luketmoss.thrivespin.core.TestResult
+import com.luketmoss.thrivespin.core.ftp.CurrentFtp
+import com.luketmoss.thrivespin.core.ftp.FtpDates
+import com.luketmoss.thrivespin.core.ftp.FtpNow
+import com.luketmoss.thrivespin.core.ftp.FtpRecord
+import com.luketmoss.thrivespin.core.ftp.FtpStage
+import com.luketmoss.thrivespin.core.ftp.FtpText
+import com.luketmoss.thrivespin.core.ftp.PendingFtp
 import com.luketmoss.thrivespin.core.library.DeleteOutcome
 import com.luketmoss.thrivespin.core.library.LibraryInputs
 import com.luketmoss.thrivespin.core.library.LibraryModel
 import com.luketmoss.thrivespin.core.library.LibraryStates
 import com.luketmoss.thrivespin.core.library.LibraryView
 import com.luketmoss.thrivespin.core.library.SaveOutcome
+import com.luketmoss.thrivespin.core.ramp.BestMinute
+import com.luketmoss.thrivespin.core.ramp.FtpStepper
+import com.luketmoss.thrivespin.core.ramp.RampDecisions
+import com.luketmoss.thrivespin.core.ramp.RampFile
+import com.luketmoss.thrivespin.core.ramp.RampLauncher
+import com.luketmoss.thrivespin.core.ramp.RampOutcome
+import com.luketmoss.thrivespin.core.ramp.RampPhase
+import com.luketmoss.thrivespin.core.ramp.RampResult
+import com.luketmoss.thrivespin.core.ramp.RampScreenStates
+import com.luketmoss.thrivespin.core.ramp.RampTest
+import com.luketmoss.thrivespin.core.ramp.ResultAction
+import com.luketmoss.thrivespin.core.ramp.ResultInputs
+import com.luketmoss.thrivespin.core.ramp.ResultStates
 import com.luketmoss.thrivespin.core.ride.RideEngine
+import com.luketmoss.thrivespin.core.ride.RideKind
 import com.luketmoss.thrivespin.core.ride.RideLauncher
 import com.luketmoss.thrivespin.core.ride.RidePhase
 import com.luketmoss.thrivespin.core.ride.RideProfile
@@ -79,7 +100,10 @@ import com.luketmoss.thrivespin.core.workout.DetailState
 import com.luketmoss.thrivespin.core.workout.Draft
 import com.luketmoss.thrivespin.core.workout.RideStarter
 import com.luketmoss.thrivespin.data.OkHttpTransport
+import com.luketmoss.thrivespin.ftp.FtpRuntime
+import com.luketmoss.thrivespin.ftp.LibraryRuntime
 import com.luketmoss.thrivespin.data.SpinStore
+import com.luketmoss.thrivespin.ride.RampRuntime
 import com.luketmoss.thrivespin.ride.RideRuntime
 import com.luketmoss.thrivespin.ride.RideService
 import com.luketmoss.thrivespin.ui.BuilderActions
@@ -88,8 +112,15 @@ import com.luketmoss.thrivespin.ui.DetailActions
 import com.luketmoss.thrivespin.ui.DetailContent
 import com.luketmoss.thrivespin.ui.DevicesActions
 import com.luketmoss.thrivespin.ui.DevicesScreen
+import com.luketmoss.thrivespin.ui.FtpSheet
+import com.luketmoss.thrivespin.ui.FtpSheetActions
 import com.luketmoss.thrivespin.ui.LibraryActions
 import com.luketmoss.thrivespin.ui.LibraryContent
+import com.luketmoss.thrivespin.ui.RampActions
+import com.luketmoss.thrivespin.ui.RampIntroScreen
+import com.luketmoss.thrivespin.ui.RampResultScreen
+import com.luketmoss.thrivespin.ui.RampScreen
+import com.luketmoss.thrivespin.ui.ResultActions
 import com.luketmoss.thrivespin.ui.RideActions
 import com.luketmoss.thrivespin.ui.RideSummaryScreen
 import com.luketmoss.thrivespin.ui.RideScreen
@@ -104,6 +135,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
+import kotlinx.serialization.SerializationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -122,6 +154,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var library: LibraryModel
 
     private lateinit var rideStarter: RideStarter
+    private lateinit var rampLauncher: RampLauncher
 
     private var devices by mutableStateOf(DeviceState())
     private var scanOpen by mutableStateOf(false)
@@ -157,11 +190,8 @@ class MainActivity : ComponentActivity() {
         }
         hub.setDevices(devices)
         scanner = DeviceScanner(this)
-        library = LibraryModel(
-            persistence = store.libraryCache,
-            transport = OkHttpTransport,
-            config = { store.savedUrl() to store.savedKey() },
-        )
+        // The process's one model (#770): the FTP worker puts a sent FTP into the same cache the screens read.
+        library = LibraryRuntime.model(this)
         rideStarter = RideLauncher(
             devices = { devices },
             rideActive = { RideRuntime.active() },
@@ -174,6 +204,12 @@ class MainActivity : ComponentActivity() {
                     is StartOutcome.Started -> Unit
                 }
             },
+        )
+        rampLauncher = RampLauncher(
+            devices = { devices },
+            rideActive = { RideRuntime.active() },
+            newRideId = { UUID.randomUUID().toString() },
+            launch = { session -> launchRide(session) },
         )
         recoverRides()
         nudgeUploads()
@@ -235,6 +271,8 @@ class MainActivity : ComponentActivity() {
         Thread {
             val queued = UploadRuntime.uploads(this).pending().any { it.stage == UploadStage.Queued }
             if (queued) UploadRuntime.kick(this)
+            // And any FTP change waiting to send (#770).
+            if (FtpRuntime.queue(this).records.value.any { it.state == FtpStage.Queued }) FtpRuntime.kick(this)
         }.start()
     }
 
@@ -284,6 +322,7 @@ class MainActivity : ComponentActivity() {
         val starter = rideStarter
         val engine by RideRuntime.engine.collectAsState()
         val handOffs by RideRuntime.handOffs.collectAsState()
+        val results by RideRuntime.results.ids.collectAsState()
         val current = engine
         val ride: RideState? = if (current != null) current.state.collectAsState().value else null
 
@@ -296,9 +335,12 @@ class MainActivity : ComponentActivity() {
         }
 
         Box(modifier = Modifier.fillMaxSize()) {
-            if (current != null && ride != null && ride.phase != RidePhase.Finished) {
-                // While a ride is active, opening the app always lands on it.
-                RideHost(current, ride)
+            if (results.isNotEmpty()) {
+                // A ramp test's result (#770), above the ramp screen when its cool-down still runs.
+                RampResultHost(results.first(), go)
+            } else if (current != null && ride != null && ride.phase != RidePhase.Finished) {
+                // While a ride is active, opening the app always lands on it, and a ramp test on its own screen.
+                if (current.session.kind == RideKind.RampTest) RampHost(current, ride) else RideHost(current, ride)
             } else if (handOffs.isNotEmpty() && route !is Route.Settings) {
                 SummaryHost(handOffs.first(), go)
             } else when (route) {
@@ -314,6 +356,9 @@ class MainActivity : ComponentActivity() {
                                 TestResult.BadUrl
                             } else {
                                 store.saveConfig(url, key)
+                                // And the FTP changes waiting on them (#770).
+                                FtpRuntime.queue(this@MainActivity).settingsSaved()
+                                FtpRuntime.kick(this@MainActivity)
                                 // Rides waiting on the URL or key go back to the queue (#769).
                                 UploadRuntime.uploads(this@MainActivity).settingsSaved()
                                 UploadRuntime.kick(this@MainActivity)
@@ -337,6 +382,7 @@ class MainActivity : ComponentActivity() {
                             onCategory = { category = it },
                             onOpen = { go(Route.Detail(it)) },
                             onSettings = { go(Route.Settings(AppTab.Library)) },
+                            onRampTest = { go(Route.RampIntro) },
                         )
                         AppTab.Devices -> DevicesHost(onSettings = {
                             scanOpen = false
@@ -345,6 +391,7 @@ class MainActivity : ComponentActivity() {
                         })
                     }
                 }
+                Route.RampIntro -> RampIntroHost(go)
                 is Route.Detail -> DetailHost(route, starter, go)
                 is Route.Builder -> BuilderHost(route, go)
             }
@@ -363,6 +410,7 @@ class MainActivity : ComponentActivity() {
         onCategory: (String?) -> Unit,
         onOpen: (String) -> Unit,
         onSettings: () -> Unit,
+        onRampTest: () -> Unit,
     ) {
         val cache by library.cache.collectAsState()
         val refreshing by library.refreshing.collectAsState()
@@ -380,6 +428,13 @@ class MainActivity : ComponentActivity() {
 
         // Whenever Library is shown, at most once a minute, and on a pull.
         LaunchedEffect(Unit) { library.refresh(force = false) }
+
+        // The FTP Spin is using (#770): the cache's, or a change not yet in Thrive; and the changes still waiting.
+        val ftpRecords by FtpRuntime.queue(this@MainActivity).records.collectAsState()
+        val ftpNow = remember(cache, ftpRecords) { CurrentFtp.of(cache, ftpRecords) }
+        val ftpBanner = remember(ftpRecords) { PendingFtp.banner(ftpRecords) }
+        var sheetId by rememberSaveable { mutableStateOf<String?>(null) }
+        val thisYear = LocalDate.now().year
 
         val today = LocalDate.now()
         val screen = LibraryStates.screen(
@@ -417,7 +472,47 @@ class MainActivity : ComponentActivity() {
             ),
             banner = banner,
             onBanner = { banner?.let { RideRuntime.show(it.rideId) } },
+            ftpBanner = ftpBanner,
+            onFtpBanner = { ftpBanner?.let { sheetId = it.recordId } },
+            rampCardLine = FtpText.cardLine(ftpNow, thisYear),
+            onRampTest = onRampTest,
         )
+        val sheetRecord = ftpRecords.firstOrNull { it.id == sheetId }
+        if (sheetRecord != null) {
+            FtpSheet(
+                record = sheetRecord,
+                thisYear = thisYear,
+                actions = FtpSheetActions(
+                    onClose = { sheetId = null },
+                    onSendNow = { FtpRuntime.kick(this@MainActivity) },
+                    onOpenSettings = {
+                        sheetId = null
+                        onSettings()
+                    },
+                    onTryAgain = {
+                        scope.launch {
+                            withContext(Dispatchers.IO) { FtpRuntime.queue(this@MainActivity).retry(sheetRecord.id) }
+                            FtpRuntime.kick(this@MainActivity)
+                        }
+                    },
+                    onDrop = {
+                        sheetId = null
+                        FtpRuntime.queue(this@MainActivity).drop(sheetRecord.id)
+                    },
+                ),
+            )
+        } else if (sheetId != null) {
+            // The record went (Thrive took it, or it was dropped) while its sheet was open.
+            LaunchedEffect(sheetId) { sheetId = null }
+        }
+    }
+
+    /** The FTP Spin is using now: the library's cached `current`, or a confirmed change not yet in Thrive (#770). */
+    @Composable
+    private fun currentFtp(): FtpNow? {
+        val cache by library.cache.collectAsState()
+        val records by FtpRuntime.queue(this).records.collectAsState()
+        return remember(cache, records) { CurrentFtp.of(cache, records) }
     }
 
     @Composable
@@ -435,7 +530,7 @@ class MainActivity : ComponentActivity() {
             mutableStateOf(SpinJson.encodeToString(DetailState.serializer(), DetailState.open(route.workoutId, trainer)))
         }
         val state = remember(stateJson) { SpinJson.decodeFromString(DetailState.serializer(), stateJson) }
-        val ftpW = cache?.ftpW
+        val ftpW = currentFtp()?.ftpW
         DetailContent(
             workout = workout,
             state = state,
@@ -483,7 +578,11 @@ class MainActivity : ComponentActivity() {
         val scope = rememberCoroutineScope()
         val zone = remember { ZoneId.systemDefault() }
         var prep by remember(rideId) { mutableStateOf<Preparation?>(null) }
-        LaunchedEffect(rideId) { prep = withContext(Dispatchers.IO) { uploads.prepare(rideId) } }
+        // A ramp test is scored at the FTP in force after its decision, however its summary was reached (#770).
+        val decider = remember { RampRuntime.decider(this@MainActivity) }
+        LaunchedEffect(rideId) {
+            prep = withContext(Dispatchers.IO) { uploads.prepare(rideId, decider.finalFtp(rideId)) }
+        }
         val upload by uploads.state(rideId).collectAsState()
         val sendingIds by uploads.sending.collectAsState()
 
@@ -580,6 +679,219 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    /** The ramp test's intro (#770): what it is, and Start. */
+    @Composable
+    private fun RampIntroHost(go: (Route) -> Unit) {
+        BackHandler { go(Routes.START) }
+        RampIntroScreen(
+            current = currentFtp(),
+            canRun = RampTest.canRun(devices.trainer?.features),
+            thisYear = LocalDate.now().year,
+            onBack = { go(Routes.START) },
+            onStart = {
+                when (rampLauncher.start()) {
+                    StartOutcome.NoTrainer -> snackMessage = RideLauncher.NO_TRAINER
+                    StartOutcome.AlreadyRiding -> snackMessage = RideLauncher.ALREADY_RIDING
+                    is StartOutcome.Started -> Unit
+                }
+            },
+        )
+    }
+
+    /** The ramp test's own ride screen (#770): the warm-up, the ramp, "Test over" and a recovered test. */
+    @Composable
+    private fun RampHost(engine: RideEngine, state: RideState) {
+        val rides = remember { RideRuntime.store(this@MainActivity) }
+        val files = remember { RampRuntime.files(this@MainActivity) }
+        val rideId = state.rideId
+        // The tap is remembered in memory only, to word the reason until the result is frozen from the recording.
+        var tapped by remember(rideId) { mutableStateOf(false) }
+        var outcome by remember(rideId) { mutableStateOf<RampOutcome?>(null) }
+        var best by remember(rideId) { mutableStateOf<BestMinute?>(null) }
+        val past = state.stepIndex >= RampTest.COOLDOWN
+        // The ramp's end freezes the result at once, into ramp.json.
+        LaunchedEffect(rideId, past) {
+            if (past) outcome = withContext(Dispatchers.IO) { files.ensure(rideId)?.outcome() }
+        }
+        // The best minute so far, from the ramp's samples, once a second.
+        LaunchedEffect(rideId, state.rideS) {
+            if (state.stepIndex == RampTest.RAMP && state.phase == RidePhase.Running) {
+                best = withContext(Dispatchers.IO) {
+                    try {
+                        RampResult.soFar(rides.open(rideId).samples)
+                    } catch (e: java.io.IOException) {
+                        null
+                    } catch (e: SerializationException) {
+                        null
+                    } catch (e: IllegalArgumentException) {
+                        null
+                    }
+                }
+            }
+        }
+        val view = RampScreenStates.of(state, outcome, best, tapped)
+        BackHandler { snackMessage = view.backMessage }
+        val enableBluetooth = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { }
+        RampScreen(
+            state = state,
+            view = view,
+            actions = RampActions(
+                onSkip = {
+                    if (view.phase == RampPhase.Ramp) tapped = true
+                    engine.skipStep()
+                },
+                onCancel = { engine.cancel() },
+                onDiscard = { engine.discard() },
+                onSeeResult = { RideRuntime.showResult(rideId) },
+                onEndForResult = { engine.end() },
+                onStopCooldown = { engine.end() },
+                onTurnOnBluetooth = { enableBluetooth.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)) },
+            ),
+        )
+    }
+
+    /**
+     * A ramp test's result (#770): the new FTP to adjust and confirm. The decision is the FTP record (the commit)
+     * and `ramp.json`; this host only reads them and calls the decider. "Later" leaves it pending, and the test
+     * comes back at the next app open.
+     */
+    @Composable
+    private fun RampResultHost(rideId: String, go: (Route) -> Unit) {
+        val rides = remember { RideRuntime.store(this@MainActivity) }
+        val files = remember { RampRuntime.files(this@MainActivity) }
+        val decider = remember { RampRuntime.decider(this@MainActivity) }
+        val uploads = remember { UploadRuntime.uploads(this@MainActivity) }
+        val queue = remember { FtpRuntime.queue(this@MainActivity) }
+        val scope = rememberCoroutineScope()
+        val zone = remember { ZoneId.systemDefault() }
+        var file by remember(rideId) { mutableStateOf<RampFile?>(null) }
+        var startedAt by remember(rideId) { mutableStateOf<String?>(null) }
+        var adjusted by rememberSaveable(rideId) { mutableStateOf<Int?>(null) }
+        var setting by remember(rideId) { mutableStateOf(false) }
+
+        // The result is frozen from the recording; until it can be read the screen says it is measuring.
+        LaunchedEffect(rideId) {
+            startedAt = withContext(Dispatchers.IO) {
+                try {
+                    rides.readMeta(rideId).startedAtUtc
+                } catch (e: java.io.IOException) {
+                    null
+                } catch (e: SerializationException) {
+                    null
+                }
+            }
+            while (file == null) {
+                file = withContext(Dispatchers.IO) { files.ensure(rideId) }
+                if (file == null) delay(1000)
+            }
+            if (adjusted == null) adjusted = file?.adjustedFtpW
+        }
+        // The stepper's value is kept as it changes.
+        LaunchedEffect(adjusted) {
+            val value = adjusted
+            if (value != null) {
+                delay(300)
+                withContext(Dispatchers.IO) { files.adjust(rideId, value) }
+            }
+        }
+
+        val records by queue.records.collectAsState()
+        val cache by library.cache.collectAsState()
+        val running by RideRuntime.engine.collectAsState()
+        val engine = running?.takeIf { it.session.rideId == rideId }
+        val ride: RideState? = if (engine != null) engine.state.collectAsState().value else null
+        val coolLeft = if (ride != null && ride.phase != RidePhase.Finished && ride.stepIndex == RampTest.COOLDOWN) ride.stepLeftS else null
+        val ownId = FtpRecord.idFor(rideId)
+        val decision = RampDecisions.of(file, records.firstOrNull { it.id == ownId })
+        val current = remember(cache, records) { CurrentFtp.of(cache, records.filter { it.id != ownId }) }
+        val outcome = file?.outcome()
+        val view = ResultStates.of(
+            ResultInputs(
+                outcome = outcome,
+                adjustedFtpW = adjusted ?: file?.adjustedFtpW,
+                decision = decision,
+                current = current,
+                coolDownLeftS = coolLeft,
+                startedAtUtc = startedAt ?: "1970-01-01T00:00:00Z",
+                zone = zone,
+                thisYear = LocalDate.now().year,
+                setting = setting,
+            ),
+        )
+
+        val later: () -> Unit = {
+            // Pending stays pending: the ride is not handed off, so the next app open presents it again.
+            RideRuntime.results.remove(rideId)
+            go(Routes.START)
+        }
+        BackHandler { later() }
+        RampResultScreen(
+            view = view,
+            actions = ResultActions(
+                onLater = later,
+                onLower = { view.ftpW?.let { adjusted = FtpStepper.step(it, -1) } },
+                onHigher = { view.ftpW?.let { adjusted = FtpStepper.step(it, 1) } },
+                onReset = { view.resetTo?.let { adjusted = it } },
+                onFooter = { action ->
+                    when (action) {
+                        ResultAction.SetFtp -> {
+                            val measured = outcome as? RampOutcome.Measured
+                            val value = view.ftpW
+                            if (measured != null && value != null && !setting) {
+                                setting = true
+                                scope.launch {
+                                    val set = withContext(Dispatchers.IO) { decider.setFtp(rideId, value, measured.computedFtpW, current) }
+                                    if (set == null) {
+                                        snackMessage = "Couldn't save the FTP on this phone."
+                                    } else {
+                                        file = withContext(Dispatchers.IO) { files.read(rideId) }
+                                        FtpRuntime.kick(this@MainActivity)
+                                    }
+                                    setting = false
+                                }
+                            }
+                        }
+                        ResultAction.Keep -> {
+                            val keep = current?.ftpW
+                            if (keep != null) {
+                                scope.launch {
+                                    withContext(Dispatchers.IO) { decider.keep(rideId, keep) }
+                                    file = withContext(Dispatchers.IO) { files.read(rideId) }
+                                }
+                            }
+                        }
+                        ResultAction.Continue -> {
+                            // The cool-down is stopped first; the hand-off it causes is taken back below.
+                            engine?.end()
+                            scope.launch {
+                                withContext(Dispatchers.IO) {
+                                    uploads.prepare(rideId, decider.finalFtp(rideId))
+                                    try {
+                                        rides.markHandedOff(rideId)
+                                    } catch (e: java.io.IOException) {
+                                        // Not marked: the result comes back on the next open, which is the safe way round.
+                                    }
+                                }
+                                RideRuntime.results.remove(rideId)
+                                RideRuntime.enqueue(rideId)
+                            }
+                        }
+                        ResultAction.DiscardTest -> Unit
+                    }
+                },
+                onDiscard = {
+                    if (engine != null) engine.discard()
+                    scope.launch {
+                        withContext(Dispatchers.IO) { rides.delete(rideId) }
+                        RideRuntime.results.remove(rideId)
+                        go(Routes.START)
+                    }
+                },
+                onStopCooldown = { engine?.end() },
+            ),
+        )
+    }
+
     @Composable
     private fun BuilderHost(route: Route.Builder, go: (Route) -> Unit) {
         val cache by library.cache.collectAsState()
@@ -606,7 +918,7 @@ class MainActivity : ComponentActivity() {
 
         BuilderContent(
             draft = draft,
-            ftpW = cache?.ftpW,
+            ftpW = currentFtp()?.ftpW,
             saving = saving,
             error = error,
             actions = BuilderActions(

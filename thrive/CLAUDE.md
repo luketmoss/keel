@@ -142,6 +142,30 @@ with its own id and tap time.
 - Key commands, from `android/`: `./gradlew test`, `./gradlew lintRelease`,
   `./gradlew assembleRelease`.
 
+## Spin app (#764)
+
+`android/spin/` is Thrive Spin, a second application module beside Sip's `app` (`include(":spin")`; `applicationId`
+`com.luketmoss.thrivespin`, label "Thrive Spin", `minSdk` 31, Kotlin and Compose). It controls the KICKR and reads heart
+rate straps over Bluetooth LE for indoor rides. It does not depend on `app`: the small pieces it shares with Sip (URL
+check, OkHttp transport, envelope reading) are copied. #766 is its shell, Settings and Devices screen
+(`docs/design/766-spin-devices.md`); the Library is #767 and the ride #768.
+
+- **Install is by sideload**, like Sip: download the `thrive-spin-apk` artifact from the latest green
+  `thrive-android.yml` run (the same job also uploads `thrive-sip-apk`) and install it beside Thrive Sip. It is signed
+  with the same four `THRIVE_ANDROID_*` secrets, so each build installs over the last. A push to main fails if the Spin
+  APK is not produced.
+- **Settings.** In the app, set the API URL (the Apps Script web app) and `SPIN_API_KEY`, the key #765 adds to the API
+  for `getFtp`. Until #765 is deployed with it set, Test connection says "Key rejected". Nothing on Devices needs the API.
+- **Permission.** Android 12's Nearby devices (`BLUETOOTH_SCAN` with `neverForLocation`, and `BLUETOOTH_CONNECT`); location
+  is never asked. Spin does no system pairing: "Add" saves the device's address, name and kind in the app.
+- **Bluetooth layer.** The framework BLE API, no third-party library, one serial `GattQueue` per connection. Parsing and
+  encoding (FTMS Feature, Indoor Bike Data, Control Point, Machine Status, Heart Rate Measurement) and the ride's
+  heart rate choice (`RideHeartRate.choose`) are plain Kotlin in `core/`, JVM-tested, for #768 to reuse. Connections are
+  open only while Devices is on screen; the ride's foreground service is #768.
+- **Testing is not human-gated**, as for Sip: `/test` passes the JVM and CI criteria; Bluetooth, permission and
+  on-phone criteria are waived by the owner and listed in the issue's `## Results` as things to watch. Install the APK
+  from the merge's CI run on `main`.
+
 ## Lift Mode (#577)
 
 A guided screen for an active `weight` workout at `#/workout/:id/lift` (`frontend/src/components/workout/lift/`),

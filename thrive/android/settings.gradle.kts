@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "thrive-sip"
 include(":app")
+include(":spin")

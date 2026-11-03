@@ -16,6 +16,7 @@ import type {
   ImportLine,
   LogEntryInput,
   ImportPreview,
+  NewRecipeLine,
   MissingReason,
   Nutrition,
   PlanEntry,
@@ -75,6 +76,24 @@ function gramsOf(line: Pick<Line, 'qty' | 'unit' | 'grams'>, food: Food | undefi
     ? servings.find((s) => sing(s.name.toLowerCase()) === sing(unit))
     : (servings.find((s) => s.name === 'each') ?? servings[0]);
   return hit ? line.qty * hit.g : null;
+}
+
+/** Lines a recipe saved from the log stores: numbered in order, matched, never optional. */
+function demoLines(lines: NewRecipeLine[], recipeId: string): Line[] {
+  return lines.map((l, i) => ({
+    recipe_id: recipeId,
+    line_id: `L${i + 1}`,
+    position: i + 1,
+    section: '',
+    text: l.text,
+    qty: l.qty,
+    unit: l.unit,
+    food_id: l.food_id,
+    grams: l.grams,
+    optional: false,
+    resolved_grams: l.grams,
+    reason: '' as const,
+  }));
 }
 
 function nutritionOf(lines: Line[], servings: number | null, foods: Food[]): RecipeDetail['nutrition'] {
@@ -547,6 +566,44 @@ export function createDemoApi(): ForageApi {
       };
       recipes.push(detail);
       return withNutrition(detail);
+    },
+    createRecipe: async (input) => {
+      for (const l of input.lines) findFood(l.food_id);
+      const now = new Date().toISOString();
+      const old = recipes.find((r) => r.id === input.id);
+      const detail: RecipeDetail = {
+        id: input.id,
+        name: input.name,
+        source_url: '',
+        source_site: '',
+        servings: input.servings,
+        total_min: null,
+        notes: input.notes,
+        created: old?.created ?? now,
+        updated: now,
+        nutrition: noNutrition([]),
+        partial: false,
+        rating: null,
+        last_cooked: null,
+        has_walkthrough: false,
+        cook_count: 0,
+        unrated_cook_id: null,
+        lines: demoLines(input.lines, input.id),
+        steps: [],
+      };
+      if (old) recipes.splice(recipes.indexOf(old), 1, detail);
+      else recipes.push(detail);
+      return clone(withNutrition(detail));
+    },
+    previewRecipe: async (lines, servings) => {
+      for (const l of lines) findFood(l.food_id);
+      const n = nutritionOf(demoLines(lines, ''), servings, foods);
+      return {
+        per_serving: n.per_serving,
+        per_serving_unknown: n.per_serving_unknown,
+        missing: n.missing,
+        partial: n.partial,
+      };
     },
     getFood: async (id) => {
       const f = findFood(id);

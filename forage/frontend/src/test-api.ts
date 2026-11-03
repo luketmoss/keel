@@ -200,6 +200,76 @@ export function fakeApi() {
         recipes.splice(i, 1);
         return { success: true, data: { id: payload.id, deleted: true } };
       }
+      case 'computeNutrition': {
+        // #788: a stand-in for nutrition.js: each line by its explicit grams, a food without nutrition left out.
+        const by = payload.servings || 1;
+        const counted = payload.lines.filter((l: any) => {
+          const f = foods.find((x) => x.id === l.food_id);
+          return f && f.kcal_100g !== null && typeof l.grams === 'number';
+        });
+        const sum = (k: 'kcal_100g' | 'protein_100g' | 'carbs_100g' | 'fat_100g') =>
+          counted.length
+            ? Math.round(
+                (counted.reduce(
+                  (t: number, l: any) => t + (foods.find((x) => x.id === l.food_id)![k]! * l.grams) / 100,
+                  0,
+                ) /
+                  by) *
+                  10,
+              ) / 10
+            : null;
+        return {
+          success: true,
+          data: {
+            per_serving: {
+              kcal: sum('kcal_100g'),
+              protein_g: sum('protein_100g'),
+              carbs_g: sum('carbs_100g'),
+              fat_g: sum('fat_100g'),
+            },
+            missing: [],
+            partial: counted.length < payload.lines.length,
+          },
+        };
+      }
+      case 'upsertRecipe': {
+        const { lines, ...rest } = payload;
+        const detail = {
+          source_url: '',
+          source_site: '',
+          total_min: null,
+          created: 'x',
+          updated: 'x',
+          partial: false,
+          rating: null,
+          last_cooked: null,
+          has_walkthrough: false,
+          cook_count: 0,
+          unrated_cook_id: null,
+          nutrition: {
+            per_serving: { kcal: null, protein_g: null, carbs_g: null, fat_g: null },
+            missing: [],
+            partial: false,
+          },
+          ...rest,
+        };
+        const i = recipes.findIndex((r) => r.id === payload.id);
+        if (i === -1) recipes.push(detail);
+        else recipes[i] = detail;
+        return {
+          success: true,
+          data: {
+            ...detail,
+            lines: lines.map((l: any, n: number) => ({
+              ...l,
+              recipe_id: payload.id,
+              line_id: `L${n + 1}`,
+              position: n + 1,
+            })),
+            steps: [],
+          },
+        };
+      }
       case 'importRecipe': {
         if (payload.recipe && payload.dry_run === false) {
           const p = previewOf(payload.recipe);

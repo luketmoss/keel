@@ -548,7 +548,15 @@ textarea.field {
 }
 
 .sheet-header h2 {
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: var(--text-lg);
+  overflow-wrap: anywhere;
+}
+
+.sheet-header > button {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .sheet-message,

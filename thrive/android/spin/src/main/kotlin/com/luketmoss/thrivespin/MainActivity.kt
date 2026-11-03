@@ -278,7 +278,7 @@ class MainActivity : ComponentActivity() {
                 // While a ride is active, opening the app always lands on it.
                 RideHost(current, ride)
             } else if (handOffs.isNotEmpty()) {
-                RecordedHost(handOffs.first())
+                RecordedHost(handOffs.first(), go)
             } else when (route) {
                 is Route.Settings -> {
                     BackHandler { go(Route.Tab(route.from)) }
@@ -443,7 +443,7 @@ class MainActivity : ComponentActivity() {
 
     /** The placeholder #769 replaces: what was kept, and Done, which marks it handed off. */
     @Composable
-    private fun RecordedHost(rideId: String) {
+    private fun RecordedHost(rideId: String, go: (Route) -> Unit) {
         val rideStore = remember { RideRuntime.store(this@MainActivity) }
         val recording = remember(rideId) {
             try {
@@ -465,6 +465,8 @@ class MainActivity : ComponentActivity() {
             onDone = {
                 rideStore.markHandedOff(rideId)
                 RideRuntime.handedOff(rideId)
+                // Done returns to Library, whatever screen the ride was started from.
+                go(Routes.START)
             },
         )
     }

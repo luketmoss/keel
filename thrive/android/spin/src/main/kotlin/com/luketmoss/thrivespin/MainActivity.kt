@@ -159,6 +159,8 @@ class MainActivity : ComponentActivity() {
                                 TestResult.BadUrl
                             } else {
                                 store.saveConfig(url, key)
+                                // A corrected URL or key must not wait out the refresh throttle.
+                                LibraryModel.lastAttemptMs = 0L
                                 null
                             }
                         },

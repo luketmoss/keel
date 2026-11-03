@@ -97,7 +97,8 @@ fun BuilderContent(
             actions.onDiscard()
         }
     }
-    BackHandler(enabled = !saving) { requestClose() }
+    // Always handled: a back gesture during a save does nothing, rather than leaving mid-request.
+    BackHandler { if (!saving) requestClose() }
 
     Box(modifier = Modifier.fillMaxSize().background(spin.bg).safeDrawingPadding()) {
         Column(modifier = Modifier.fillMaxSize()) {

@@ -119,11 +119,6 @@ private fun ReadyContent(
     pulling: Boolean,
     actions: LibraryActions,
 ) {
-    if (state.empty != LibraryScreen.Empty.NoWorkouts) {
-        SearchField(search, state.placeholder, actions.onSearch)
-        Spacer(Modifier.size(Tokens.spaceSm))
-        CategoryChips(category, actions.onCategory)
-    }
     if (state.notice != null) {
         SpinText(
             state.notice,
@@ -131,6 +126,11 @@ private fun ReadyContent(
             modifier = Modifier.padding(horizontal = Tokens.spaceMd, vertical = Tokens.spaceXs),
             color = spin.textSecondary,
         )
+    }
+    if (state.empty != LibraryScreen.Empty.NoWorkouts) {
+        SearchField(search, state.placeholder, actions.onSearch)
+        Spacer(Modifier.size(Tokens.spaceSm))
+        CategoryChips(category, actions.onCategory)
     }
     PullToRefreshBox(
         isRefreshing = pulling,

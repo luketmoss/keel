@@ -314,13 +314,16 @@ export function EatenScreen({ api }: { api: ForageApi }) {
       // #786: back to the Add sheet; a new entry joins the Added list and clears the search.
       const isNew = !overlay.entry;
       const id = 'entry' in saved ? saved.entry.id : null;
-      setPass({
-        ...pass,
-        ids: id && !pass.ids.includes(id) ? [...pass.ids, id] : pass.ids,
-        q: isNew ? '' : pass.q,
-        status,
-        fresh: id,
-      });
+      setPass(
+        (p) =>
+          p && {
+            ...p,
+            ids: id && !p.ids.includes(id) ? [...p.ids, id] : p.ids,
+            q: isNew ? '' : p.q,
+            status,
+            fresh: id,
+          },
+      );
       setOverlay({ kind: 'add', slot: pass.slot, q: isNew ? '' : pass.q });
       return;
     }

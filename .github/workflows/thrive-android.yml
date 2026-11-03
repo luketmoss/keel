@@ -61,3 +61,9 @@ jobs:
           path: thrive/android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 30
+      - uses: actions/upload-artifact@v4
+        with:
+          name: thrive-spin-apk
+          path: thrive/android/spin/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 30

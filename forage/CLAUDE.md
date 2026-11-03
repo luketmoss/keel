@@ -14,11 +14,17 @@ Forage.
 ## History
 
 Forage is a rebuild inside Keel (epic #700), not a port. It began in
-`luketmoss/forage`, which is frozen. Since the cutover (#715) the old URL,
+`luketmoss/forage`, which is now archived (#716, 2026-11-03: read-only, and its
+settings frozen). Its import Worker, `forage-import` on Cloudflare, is deleted
+(its URL returns 404) and the Gemini key it used is revoked; nothing in Forage
+calls either, and Forage has no LLM. The repo's `VITE_GOOGLE_CLIENT_ID` and
+`VITE_SPREADSHEET_ID` secrets were left in place: they are identifiers only.
+Since the cutover (#715) the old URL,
 `https://luketmoss.github.io/forage/`, is only a redirect: that repo's Pages
-site now publishes a single redirect page (luketmoss/forage#13), which sends
+site publishes a single redirect page (luketmoss/forage#13), which sends
 every path, query and hash to the same place under
-`https://luketmoss.github.io/keel/forage/`. The old repo's open issues,
+`https://luketmoss.github.io/keel/forage/`, and it still serves after
+archiving. The old repo's open issues,
 luketmoss/forage#2 to luketmoss/forage#7, were closed as not planned,
 superseded by the rebuild, and were not transferred; its board, Project 5, is
 closed. No git history was imported: the code here is written fresh, and the

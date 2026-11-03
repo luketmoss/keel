@@ -56,7 +56,11 @@
     "--sec-warmup": "#c2410c",
     "--sec-primary": "#1565c0",
     "--sec-ss": "#7b1fa2",
-    "--sec-burnout": "#c62828"
+    "--sec-burnout": "#c62828",
+    "--detail-ride-hero-height": "376px",
+    "--detail-bar-clearance": "64px",
+    "--ride-hr-plot-height": "56px",
+    "--ride-target-opacity": "0.35"
   },
   "[data-theme=\"light\"]": {
     "--color-bg": "#f0f2f5",
@@ -131,7 +135,13 @@
     "--type-walk": "#10605a",
     "--effort-easy": "#2e7d32",
     "--effort-medium": "#a05d00",
-    "--effort-hard": "#c62828"
+    "--effort-hard": "#c62828",
+    "--zone-1": "#8a93a8",
+    "--zone-2": "#4f86f7",
+    "--zone-3": "#14a098",
+    "--zone-4": "#e8a317",
+    "--zone-5": "#ee6a1f",
+    "--zone-6": "#cf3a3a"
   },
   "[data-theme=\"dark\"]": {
     "--color-bg": "#121212",
@@ -210,6 +220,12 @@
     "--sec-warmup": "#ffb74d",
     "--sec-primary": "#64b5f6",
     "--sec-ss": "#ce93d8",
-    "--sec-burnout": "#ef9a9a"
+    "--sec-burnout": "#ef9a9a",
+    "--zone-1": "#9aa3b5",
+    "--zone-2": "#6e97ff",
+    "--zone-3": "#2cc2b8",
+    "--zone-4": "#f2b84b",
+    "--zone-5": "#f58a4f",
+    "--zone-6": "#ef6b6b"
   }
 }

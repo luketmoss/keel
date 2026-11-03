@@ -23,6 +23,12 @@ import { DetailTopBar } from './detail-top-bar';
 import { DetailTitle } from './detail-title';
 import { DetailStats, hasStatsCard } from './detail-stats';
 import { ExternalGlyph, HistoryIcon, PencilLineIcon } from './detail-icons';
+import { RideHero } from './ride-hero';
+import { RideIntervals } from './ride-intervals';
+import { RideZones } from './ride-zones';
+import { RideCard, rideCardRows } from './ride-card';
+import { rideStreamsAvailable, rowFtp, useRideStreams } from '../../spin/streams-cache';
+import { useRideLibrary } from '../../spin/ride-library';
 import { TrailsCard } from '../trails/trails-card';
 import { SimilarRoutes } from '../trails/similar-routes';
 import { ChoiceSheet, type StartMode } from '../workout/choice-sheet';
@@ -67,8 +73,14 @@ export function WorkoutDetail({ workoutId }: Props) {
   const [startingPlanned, setStartingPlanned] = useState(false);
   const [choosing, setChoosing] = useState(false);
   const [showLastTime, setShowLastTime] = useState(false);
+  // #771: a Thrive Spin ride with streams gets the ride hero instead of the map hero, even with a track too.
+  const rideHero = Boolean(workout && rideStreamsAvailable(workout));
+  const rideState = useRideStreams(rideHero && workout ? workoutId : null, workout ? rowFtp(workout) : null);
+  // The library names the Spin workout a ride followed; read only when this ride links one.
+  const isSpinRide = workout?.source === 'spin' && workout.status !== 'planned' && workout.status !== 'active';
+  const library = useRideLibrary(Boolean(isSpinRide && workout?.ride_workout_id));
   // #532: the map hero and the Elevation card read the same track.
-  const trackState = useWorkoutTrack(workout && trackAvailable(workout) ? workoutId : null);
+  const trackState = useWorkoutTrack(workout && !rideHero && trackAvailable(workout) ? workoutId : null);
 
   if (!workout) {
     return (
@@ -180,7 +192,9 @@ export function WorkoutDetail({ workoutId }: Props) {
   const corosUrl = corosActivityUrl(workout);
   // #407, #532: a drawable track puts the map at the top of the screen, whatever the type, and the
   // route is a detail of its own, so the empty state below does not show over it.
-  const showRoute = routeAvailable(workout);
+  const showRoute = !rideHero && routeAvailable(workout);
+  const hasHero = showRoute || rideHero;
+  const rideCardList = isSpinRide ? rideCardRows(workout, rideState.ride, library) : [];
 
   // Note card (#531), then provenance.
   const noteCard = workout.notes.trim() ? (
@@ -197,8 +211,9 @@ export function WorkoutDetail({ workoutId }: Props) {
   const sectionCards = groupBySection(exerciseGroups);
 
   return (
-    <div class={`screen workout-detail-screen${showRoute ? ' has-hero' : ''}`}>
+    <div class={`screen workout-detail-screen${hasHero ? ' has-hero' : ''}`}>
       {showRoute && <RouteHero trackState={trackState} />}
+      {rideHero && <RideHero state={rideState} />}
 
       <DetailTopBar
         canCopy={!isPlanned && workout.type === 'weight'}
@@ -215,7 +230,18 @@ export function WorkoutDetail({ workoutId }: Props) {
         <DetailTitle workout={workout} />
 
         {/* #531: a completed cardio or stretch activity's figures. */}
-        {hasStatsCard(workout) && <DetailStats workout={workout} hideEmpty={showRoute} />}
+        {hasStatsCard(workout) && (
+          <DetailStats workout={workout} hideEmpty={hasHero} avgCadence={rideState.ride?.avgCadence ?? null} />
+        )}
+
+        {/* #771: a Spin ride's intervals and time in zones once its streams are in, then the Ride card. */}
+        {rideState.status === 'ready' && rideState.ride && (
+          <>
+            <RideIntervals ride={rideState.ride} />
+            <RideZones ride={rideState.ride} />
+          </>
+        )}
+        <RideCard rows={rideCardList} />
 
         {/* #533: a completed weight workout's sets ring and what else is known, then its set effort. */}
         {isCompletedWeight(workout) && (

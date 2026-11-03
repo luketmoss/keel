@@ -93,6 +93,22 @@ comes from the API's `getWorkoutTrack` with the user's Google token, never from 
 - A change under `geo/` or `auth/` rebuilds Thrive (`thrive.yml` and `thrive-pages.yml` trigger on both).
 - **Sign-in is `@keel/auth`** (#608, a `file:../../auth` dependency, keys prefixed `gw_`). `src/auth/auth-provider.tsx` only mirrors its session into context; `login-screen.tsx` and the demo short-circuit stay here.
 
+## Indoor ride detail (#771)
+
+A `source = spin` row with a `streams_ref` opens on a **ride hero** in the map hero's place
+(`components/activities/ride-hero.tsx`): a power panel (target blocks coloured by zone, the power line, an FTP line, pause
+marks) over a heart-rate panel on one time axis, with #532's floating bar and overlapping sheet kept. **Streams win over a
+track**, so a Spin row that also has a `track_ref` gets the ride hero and its track is not fetched. The sheet adds the power
+cells in the stats card (`detail-stats.tsx`, Avg cadence last), **Intervals** (`ride-intervals.tsx`), **Time in power
+zones** (`ride-zones.tsx`) and a **Ride** card (`ride-card.tsx`); a COROS indoor ride, or a Spin row without streams, keeps
+#531's screen. The streams come from the API's `getWorkoutStreams` through `callAction` with the user's token
+(`spin/streams-cache.ts`: checked at the boundary by `api/spin-streams.ts`, reduced to buckets, interval rows and zone
+seconds, and held for the session by workout id; the chart is at most 300 buckets). The zone bands and colours are
+`spin/zones.ts` and `--zone-1` to `--zone-6`. The Ride card's Spin workout name is read from the `RideWorkouts` tab through
+the Sheets API (`spin/ride-library.ts`, held for the session; #772 reuses it). **The FIT file is not downloadable from the
+app**: Drive is the script account's, so a download would need a new token action and an Apps Script deploy, and nothing
+consumes it. Demo mode has two Spin rides ("Sweet Spot 3×12" and "Free ride", `api/demo-spin.ts`).
+
 ## Food card (#714)
 
 The Day screen's **Food · from Forage** card (`frontend/src/components/day/food-card.tsx`, state in

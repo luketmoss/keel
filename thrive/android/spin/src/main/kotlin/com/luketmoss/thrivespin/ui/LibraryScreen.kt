@@ -44,6 +44,7 @@ import com.luketmoss.thrivespin.core.library.LibraryScreen
 import com.luketmoss.thrivespin.core.library.LibraryView
 import com.luketmoss.thrivespin.core.library.PlannedCard
 import com.luketmoss.thrivespin.core.library.RideWorkout
+import com.luketmoss.thrivespin.core.upload.PendingBanner
 import com.luketmoss.thrivespin.core.workout.WorkoutText
 import com.luketmoss.thrivespin.core.workout.Zone
 import java.time.LocalDate
@@ -70,6 +71,9 @@ fun LibraryContent(
     today: LocalDate,
     pulling: Boolean,
     actions: LibraryActions,
+    /** #769: the rides that are not finished with, under the title and above the search. */
+    banner: PendingBanner? = null,
+    onBanner: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -83,6 +87,7 @@ fun LibraryContent(
             color = spin.text,
             weight = FontWeight.Bold,
         )
+        PendingRidesBanner(banner, onBanner)
         when (state) {
             LibraryScreen.NotSetUp -> MessageBlock(
                 "Set up Spin first",

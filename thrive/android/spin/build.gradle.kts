@@ -65,7 +65,10 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.androidx.work.runtime.ktx)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.core)
+    // #769: decodes the FIT files the hand-written encoder writes. Test only: it is not in the APK.
+    testImplementation(libs.garmin.fit)
 }

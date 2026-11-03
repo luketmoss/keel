@@ -352,11 +352,84 @@ describe('a barcode', () => {
     expect(onOpen).toHaveBeenCalledWith('fd_9');
   });
 
-  it('the camera button is drawn only where BarcodeDetector exists', async () => {
-    render(
-      <BarcodeSheet api={stubApi()} onFound={() => {}} onTypeIt={() => {}} onOpen={() => {}} onClose={() => {}} />,
-    );
-    expect(screen.queryByRole('button', { name: 'Scan with the camera' })).toBeNull();
+  describe('the camera button (#779)', () => {
+    const open = () =>
+      render(
+        <BarcodeSheet api={stubApi()} onFound={() => {}} onTypeIt={() => {}} onOpen={() => {}} onClose={() => {}} />,
+      );
+    const withDetector = (formats?: string[]) => {
+      vi.stubGlobal(
+        'BarcodeDetector',
+        Object.assign(function () {}, { getSupportedFormats: () => Promise.resolve(formats) }),
+      );
+    };
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('is not drawn and the field is focused where there is no BarcodeDetector', async () => {
+      open();
+      expect(screen.queryByRole('button', { name: 'Scan with the camera' })).toBeNull();
+      expect(document.activeElement).toBe(screen.getByTestId('barcode-field'));
+    });
+
+    it('leads, above the field, and takes focus where ean_13 and upc_a are supported', async () => {
+      withDetector(['ean_13', 'upc_a', 'ean_8']);
+      open();
+      const scan = await screen.findByRole('button', { name: 'Scan with the camera' });
+      const field = screen.getByTestId('barcode-field');
+      await waitFor(() => expect(document.activeElement).toBe(scan));
+      expect(scan.compareDocumentPosition(field) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(
+        field.compareDocumentPosition(screen.getByTestId('barcode-lookup')) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(document.activeElement?.tagName).not.toBe('INPUT');
+    });
+
+    it('is not drawn and no field is focused where the formats are missing', async () => {
+      withDetector(['qr_code']);
+      open();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(screen.queryByRole('button', { name: 'Scan with the camera' })).toBeNull();
+      expect(document.activeElement).toBe(screen.getByRole('dialog'));
+    });
+
+    it('still lets the owner type and look up, and gives focus back after Cancel', async () => {
+      withDetector(['ean_13', 'upc_a']);
+      const getUserMedia = vi.fn(() => Promise.reject(new Error('no')));
+      vi.stubGlobal('navigator', { mediaDevices: { getUserMedia } });
+      open();
+      const scan = await screen.findByRole('button', { name: 'Scan with the camera' });
+      fireEvent.input(screen.getByTestId('barcode-field'), { target: { value: '01234567' } });
+      expect((screen.getByTestId('barcode-lookup') as HTMLButtonElement).disabled).toBe(false);
+      fireEvent.click(scan);
+      await screen.findByText(/Couldn't use the camera/);
+      await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('barcode-scan')));
+    });
+
+    it('returns to the sheet with the camera button focused when the camera view is cancelled', async () => {
+      vi.stubGlobal(
+        'BarcodeDetector',
+        Object.assign(
+          function () {
+            return { detect: () => Promise.resolve([]) };
+          },
+          { getSupportedFormats: () => Promise.resolve(['ean_13', 'upc_a']) },
+        ),
+      );
+      const track = { stop: vi.fn() };
+      vi.stubGlobal('navigator', {
+        mediaDevices: { getUserMedia: () => Promise.resolve({ getTracks: () => [track] }) },
+      });
+      vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(() => Promise.resolve());
+      open();
+      fireEvent.click(await screen.findByRole('button', { name: 'Scan with the camera' }));
+      const cancel = await screen.findByRole('button', { name: 'Cancel' });
+      fireEvent.click(cancel);
+      const scan = await screen.findByRole('button', { name: 'Scan with the camera' });
+      await waitFor(() => expect(document.activeElement).toBe(scan));
+      expect(track.stop).toHaveBeenCalled();
+    });
   });
 });
 

@@ -50,10 +50,12 @@ A bottom sheet "Add a food" with three full-width rows, each 56px or more with a
 
 ### Barcode sheet
 
-Title "Barcode". A field "Barcode" (`inputmode="numeric"`, digits only, 8, 12, 13 or 14 of them; spaces are dropped)
-focused, and a primary **Look up** disabled until the field holds one of those lengths. Under it, when the browser
-has `BarcodeDetector` with `ean_13` and `upc_a`, a button **Scan with the camera**; otherwise that button is not
-drawn and nothing says it is missing.
+Title "Barcode". Where the browser has `BarcodeDetector` with `ean_13` and `upc_a`, the button **Scan with the camera**
+leads, above the field, and is focused on open so no keyboard rises (#779,
+[`779-barcode-camera-first.md`](779-barcode-camera-first.md)); otherwise it is not drawn and nothing says it is
+missing. A field "Barcode" (`inputmode="numeric"`, digits only, 8, 12, 13 or 14 of them; spaces are dropped), and a
+primary **Look up** disabled until the field holds one of those lengths. The field is focused on open only where
+there is no `BarcodeDetector` at all.
 
 **Camera.** Tapping asks for the camera. The view replaces the sheet body: a live video, a guide frame, "Hold the
 barcode inside the frame." and **Cancel**. The first detected code fills the field, stops the camera and runs the

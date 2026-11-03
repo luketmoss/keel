@@ -16,6 +16,8 @@ interface Props {
   headerEnd?: ComponentChildren;
   /** A sheet as tall as the screen allows, for a long form. */
   tall?: boolean;
+  /** #779: leave focus on the panel itself, so no field takes it and no keyboard opens; the content may focus a control later. */
+  focusPanel?: boolean;
 }
 
 /**
@@ -23,7 +25,17 @@ interface Props {
  * and gives focus back to whatever opened it. The first `[data-autofocus]`
  * inside takes focus on open, else the first control.
  */
-export function Sheet({ title, onClose, children, closable = true, testId, headerStart, headerEnd, tall }: Props) {
+export function Sheet({
+  title,
+  onClose,
+  children,
+  closable = true,
+  testId,
+  headerStart,
+  headerEnd,
+  tall,
+  focusPanel,
+}: Props) {
   const panel = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
   close.current = onClose;
@@ -31,7 +43,9 @@ export function Sheet({ title, onClose, children, closable = true, testId, heade
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
     const root = panel.current!;
-    const first = root.querySelector<HTMLElement>('[data-autofocus]') ?? root.querySelector<HTMLElement>(FOCUSABLE);
+    const first = focusPanel
+      ? null
+      : (root.querySelector<HTMLElement>('[data-autofocus]') ?? root.querySelector<HTMLElement>(FOCUSABLE));
     (first ?? root).focus();
 
     const onKey = (e: KeyboardEvent) => {

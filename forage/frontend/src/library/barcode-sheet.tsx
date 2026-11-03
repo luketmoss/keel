@@ -45,6 +45,7 @@ export function BarcodeSheet({ api, onFound, onTypeIt, onOpen, onClose }: Props)
   const [scanning, setScanning] = useState(false);
   const [cameraError, setCameraError] = useState(false);
   const video = useRef<HTMLVideoElement>(null);
+  const scanButton = useRef<HTMLButtonElement>(null);
   const stream = useRef<MediaStream | null>(null);
 
   const code = barcodeDigits(value);
@@ -60,6 +61,11 @@ export function BarcodeSheet({ api, onFound, onTypeIt, onOpen, onClose }: Props)
       .then((f) => setCanScan(f.includes('ean_13') && f.includes('upc_a')))
       .catch(() => setCanScan(false));
   }, []);
+
+  // #779: the camera button leads, so it takes focus when it appears and when the camera view closes.
+  useEffect(() => {
+    if (canScan && !scanning) scanButton.current?.focus();
+  }, [canScan, scanning]);
 
   function stopCamera() {
     stream.current?.getTracks().forEach((t) => t.stop());
@@ -152,8 +158,22 @@ export function BarcodeSheet({ api, onFound, onTypeIt, onOpen, onClose }: Props)
   }
 
   const busy = outcome.kind === 'busy';
+  // Support is known only once getSupportedFormats resolves, so wherever BarcodeDetector exists the field is not
+  // autofocused: the panel holds focus, and the Scan button takes it when it appears.
+  const hasDetector = detectorClass() !== null;
   return (
-    <Sheet title="Barcode" onClose={close} testId="barcode-sheet">
+    <Sheet title="Barcode" onClose={close} testId="barcode-sheet" focusPanel={hasDetector}>
+      {canScan && (
+        <button
+          ref={scanButton}
+          type="button"
+          class="btn btn-secondary btn-block"
+          onClick={() => void scan()}
+          data-testid="barcode-scan"
+        >
+          Scan with the camera
+        </button>
+      )}
       <label class="form-group">
         <span class="field-label">Barcode</span>
         <input
@@ -161,7 +181,7 @@ export function BarcodeSheet({ api, onFound, onTypeIt, onOpen, onClose }: Props)
           inputMode="numeric"
           autoComplete="off"
           value={value}
-          data-autofocus
+          data-autofocus={hasDetector ? undefined : true}
           onInput={(e) => {
             setValue(e.currentTarget.value.replace(/[^\d\s]/g, ''));
             setOutcome({ kind: 'idle' });
@@ -185,11 +205,6 @@ export function BarcodeSheet({ api, onFound, onTypeIt, onOpen, onClose }: Props)
       >
         Look up
       </button>
-      {canScan && (
-        <button type="button" class="btn btn-secondary btn-block" onClick={() => void scan()}>
-          Scan with the camera
-        </button>
-      )}
       {cameraError && <p role="status">Couldn't use the camera. You can type the barcode instead.</p>}
       <div role="status" class="barcode-status">
         {busy && (

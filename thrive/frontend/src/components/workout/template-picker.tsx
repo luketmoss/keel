@@ -3,10 +3,12 @@ import { templates } from '../../state/store';
 interface Props {
   onSelectTemplate: (templateId: string) => void;
   onBuildCustom: () => void;
+  /** Plan mode only (#772): a bike workout is planned on its own screen. Absent, no card. */
+  onPlanBike?: () => void;
   onBack: () => void;
 }
 
-export function TemplatePicker({ onSelectTemplate, onBuildCustom, onBack }: Props) {
+export function TemplatePicker({ onSelectTemplate, onBuildCustom, onPlanBike, onBack }: Props) {
   return (
     <div class="screen template-picker-screen">
       <div class="template-editor-header">
@@ -24,6 +26,15 @@ export function TemplatePicker({ onSelectTemplate, onBuildCustom, onBack }: Prop
             <span class="template-summary">Start with an empty workout</span>
           </div>
         </button>
+
+        {onPlanBike && (
+          <button class="template-card" onClick={onPlanBike}>
+            <div class="template-card-body">
+              <span class="template-name">Bike workout</span>
+              <span class="template-summary">Plan a ride, with a Spin workout if you like</span>
+            </div>
+          </button>
+        )}
 
         {templates.value.map((tpl) => (
           <button key={tpl.id} class="template-card" onClick={() => onSelectTemplate(tpl.id)}>

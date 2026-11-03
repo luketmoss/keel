@@ -167,16 +167,38 @@ export function demoRideFigures(streams: Streams): DemoRideFigures {
   };
 }
 
-/** The demo library: the one workout the Sweet Spot ride links to. */
+/**
+ * The demo library (#772): four workouts. "Sweet Spot 3×12" is the one the Sweet Spot ride (#771) and the
+ * planned Tempo Ride link to.
+ */
+const demoWorkout = (
+  id: string,
+  name: string,
+  category: string,
+  description: string,
+  seconds: number,
+  day: string,
+) => ({
+  id,
+  name,
+  category,
+  description,
+  steps: '',
+  duration_s: String(seconds),
+  created: `2025-01-${day}T00:00:00.000Z`,
+  updated: `2025-01-${day}T00:00:00.000Z`,
+});
+
 export const DEMO_RIDE_WORKOUTS: RideWorkoutRow[] = [
-  {
-    id: DEMO_SWEET_SPOT_LIBRARY_ID,
-    name: 'Sweet Spot 3×12',
-    category: 'Sweet spot',
-    description: 'Three twelve-minute blocks at 90% of FTP.',
-    steps: '',
-    duration_s: '3480',
-    created: '2025-01-02T00:00:00.000Z',
-    updated: '2025-01-02T00:00:00.000Z',
-  },
+  demoWorkout(
+    DEMO_SWEET_SPOT_LIBRARY_ID,
+    'Sweet Spot 3×12',
+    'Sweet spot',
+    'Three twelve-minute blocks at 90% of FTP.',
+    3480,
+    '02',
+  ),
+  demoWorkout('rw_demo002', 'Endurance 75', 'Endurance', 'Seventy-five minutes steady at 65% of FTP.', 4500, '03'),
+  demoWorkout('rw_demo003', 'VO2 Max 5×3', 'VO2', 'Five three-minute efforts at 120% of FTP.', 3300, '04'),
+  demoWorkout('rw_demo004', 'Recovery Spin 30', 'Recovery', 'Thirty easy minutes at 50% of FTP.', 1800, '05'),
 ];

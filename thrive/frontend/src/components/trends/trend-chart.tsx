@@ -9,18 +9,21 @@
 
 import { useLayoutEffect, useState } from 'preact/hooks';
 import type { TrendGroup, TrendMetric } from './metrics';
+import type { HeldSeries } from './held';
 import {
   RANGE_PHRASE,
   type RangeKey,
   dateTicks,
   dayAtX,
+  rowDate,
   segments,
   tickLabel,
   windowText,
   yDomain,
   type MetricSeries,
 } from './series';
-import { withUnit } from './readout';
+import { BLANK, withUnit } from './readout';
+import { heldRuns, sourceWords } from './held';
 import { TrendReadout } from './trend-readout';
 
 /** Width drawn before the card has been measured (and in jsdom). */
@@ -47,8 +50,23 @@ export function rangeText(metric: TrendMetric, s: MetricSeries, today: string): 
   return `${withUnit(`Your range ${metric.format(lo)}–${metric.format(hi)}`, metric.unit)} ${windowText(from, to, today)}`;
 }
 
+/**
+ * A held value's summary (#772): "Current 262 W since Nov 7 · 2 entries in range". What is in effect
+ * today and how many entries the range holds, and nothing that compares them.
+ */
+export function heldSummaryText(metric: TrendMetric, held: HeldSeries): string {
+  const cur = held.current;
+  if (!cur) return '';
+  const value = cur.value === null ? BLANK : withUnit(metric.format(cur.value), metric.unit);
+  const head = `Current ${value} since ${cur.sinceText}`;
+  if (cur.value === null) return `${head} · no weight that day`;
+  const n = held.entries.length;
+  return `${head} · ${n === 0 ? 'No entries in this range' : n === 1 ? '1 entry in range' : `${n} entries in range`}`;
+}
+
 /** The card's summary line: average, coverage, your range. */
 export function summaryText(metric: TrendMetric, s: MetricSeries, today: string): string {
+  if (s.held) return heldSummaryText(metric, s.held);
   const out: string[] = [];
   // A total over one day is no average (#521).
   if (s.mean !== null && !(metric.bars && s.covered < 2)) {
@@ -108,6 +126,10 @@ export function TrendPlot({
 }: PlotProps) {
   const values = series.points.map((p) => p.value);
   for (const v of series.average.values()) values.push(v);
+  // A held value's line runs through days with no entry, and may begin at an entry before the range.
+  if (series.held) {
+    for (const c of series.held.cells.values()) if (c.value !== null) values.push(c.value);
+  }
   const reference = metric.reference?.() ?? null;
   const dom = yDomain(reference ? [...values, reference.value] : values, series.band, metric.zeroBased);
   const tickLabels = dom.ticks.map((t) =>
@@ -126,7 +148,19 @@ export function TrendPlot({
   const avgPoints = [...series.average].map(([date, value]) => ({ date, value }));
   const xTicks = dateTicks(series.dates[0], series.dates[n - 1], plotW);
   const selected = selectedDate && index.has(selectedDate) ? selectedDate : null;
-  const selectedPoint = selected ? series.points.find((p) => p.date === selected) : undefined;
+  // A held value's marker sits on the step line: its dot's own kind on an entry's day, else the plain marker.
+  const selectedCell = selected && series.held ? series.held.cells.get(selected) : undefined;
+  const selectedPoint = selected
+    ? series.held
+      ? selectedCell && selectedCell.value !== null
+        ? {
+            date: selected,
+            value: selectedCell.value,
+            partial: selectedCell.entry && selectedCell.source !== 'ramp_test' ? '' : undefined,
+          }
+        : undefined
+      : series.points.find((p) => p.date === selected)
+    : undefined;
 
   // Pointer x → plot x, through the svg's own scale (it is width:100%), → a day.
   const pick = (e: PointerEvent) => {
@@ -216,7 +250,21 @@ export function TrendPlot({
       )}
       <g class="trend-dots">
         {(metric.bars ? [] : series.points).map((p) =>
-          p.partial !== undefined ? (
+          p.kind !== undefined && p.kind !== 'ramp_test' ? (
+            // A held value set by hand (#772): a ring, as a ramp test is a filled dot.
+            <circle
+              key={p.date}
+              class="trend-dot trend-dot-hand"
+              data-date={p.date}
+              data-source={p.kind}
+              cx={x(p.date)}
+              cy={y(p.value)}
+              r={Math.max(r, 3)}
+              fill="var(--color-surface)"
+              stroke="var(--chart-line)"
+              stroke-width={1.5}
+            />
+          ) : p.partial !== undefined ? (
             <circle
               key={p.date}
               class="trend-dot trend-dot-partial"
@@ -233,14 +281,44 @@ export function TrendPlot({
               key={p.date}
               class="trend-dot"
               data-date={p.date}
+              data-source={p.kind}
               cx={x(p.date)}
               cy={y(p.value)}
-              r={r}
-              fill="var(--chart-dot)"
+              r={p.kind === undefined ? r : Math.max(r, 3)}
+              fill={p.kind === undefined ? 'var(--chart-dot)' : 'var(--chart-line)'}
             />
           ),
         )}
       </g>
+      {series.held && (
+        <g class="trend-held">
+          {heldRuns(series.dates, series.held.cells).map((run) => {
+            // Flat to the day a new entry takes effect, then straight to its level.
+            let d = '';
+            run.forEach((p, i) => {
+              const px = x(p.date).toFixed(2);
+              if (i === 0) d = `M${px} ${y(p.value).toFixed(2)}`;
+              else if (p.value !== run[i - 1].value)
+                d += ` L${px} ${y(run[i - 1].value).toFixed(2)} L${px} ${y(p.value).toFixed(2)}`;
+            });
+            const last = run[run.length - 1];
+            d += ` L${x(last.date).toFixed(2)} ${y(last.value).toFixed(2)}`;
+            if (run.length === 1) d += ' l0 0';
+            return (
+              <path
+                key={run[0].date}
+                class="trend-line trend-step"
+                fill="none"
+                stroke="var(--chart-line)"
+                stroke-width={2}
+                stroke-linejoin="round"
+                stroke-linecap="round"
+                d={d}
+              />
+            );
+          })}
+        </g>
+      )}
       {avgPoints.length > 0 && (
         <g class="trend-average">
           {segments(avgPoints, avgDays).map((seg) => (
@@ -299,6 +377,62 @@ export function TrendPlot({
   );
 }
 
+/** Under a held value's plot (#772): what the two dot kinds mean, in words, for the kinds the range draws. */
+function HeldLegend({ series }: { series: MetricSeries }) {
+  const kinds = new Set(series.points.map((p) => (p.kind === 'ramp_test' ? 'ramp_test' : 'manual')));
+  if (kinds.size === 0) return null;
+  return (
+    <p class="trend-legend">
+      {kinds.has('ramp_test') && (
+        <span class="trend-legend-item">
+          <span class="trend-legend-mark" aria-hidden="true">
+            ●
+          </span>{' '}
+          Ramp test
+        </span>
+      )}
+      {kinds.has('ramp_test') && kinds.has('manual') && ' '}
+      {kinds.has('manual') && (
+        <span class="trend-legend-item">
+          <span class="trend-legend-mark" aria-hidden="true">
+            ○
+          </span>{' '}
+          Set by hand
+        </span>
+      )}
+    </p>
+  );
+}
+
+/** The held value's entries in the range, newest first (#772): a plain list, never nested cards. */
+function HeldEntries({
+  metric,
+  series,
+  range,
+  today,
+}: {
+  metric: TrendMetric;
+  series: MetricSeries;
+  range: RangeKey;
+  today: string;
+}) {
+  const entries = series.held?.entries ?? [];
+  if (entries.length === 0) return null;
+  return (
+    <ul class="trend-entries" aria-label={`${metric.label} entries, ${RANGE_PHRASE[range]}`}>
+      {entries.map((e) => (
+        <li class="trend-entry" key={e.date}>
+          <span class="trend-entry-date">{rowDate(e.date, today)}</span>{' '}
+          <span class="trend-entry-source">{e.value === null ? 'No weight that day' : sourceWords(e.source)}</span>{' '}
+          <span class="trend-entry-value">
+            {e.value === null ? BLANK : withUnit(metric.format(e.value), metric.unit)}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 interface CardProps {
   metric: TrendMetric;
   /** The metric's series, built once by the screen (#270). */
@@ -322,8 +456,9 @@ export function TrendCard({ metric, series, recorded, range, avgDays, today, sel
   const describedBy = metric.note ? `${noteId} ${summaryId}` : summaryId;
   let body;
   if (!recorded) {
-    body = <p class="trend-empty">{metric.emptyText ?? 'Nothing recorded yet.'}</p>;
-  } else if (series.points.length === 0) {
+    const empty = typeof metric.emptyText === 'function' ? metric.emptyText() : metric.emptyText;
+    body = <p class="trend-empty">{empty ?? 'Nothing recorded yet.'}</p>;
+  } else if (series.points.length === 0 && !series.held) {
     body = <p class="trend-empty">No {midSentence(metric.label)} in this range.</p>;
   } else {
     body = (
@@ -350,6 +485,8 @@ export function TrendCard({ metric, series, recorded, range, avgDays, today, sel
             onSelect={onSelect}
           />
         </div>
+        {series.held && <HeldLegend series={series} />}
+        {series.held && <HeldEntries metric={metric} series={series} range={range} today={today} />}
       </>
     );
   }

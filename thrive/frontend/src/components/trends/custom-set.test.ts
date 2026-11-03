@@ -96,6 +96,8 @@ describe('the custom group', () => {
     'sleep_score',
     'vo2max',
     'training_load',
+    'ftp',
+    'ftp_wkg',
     'weight',
     'body_fat',
     'systolic',
@@ -112,7 +114,7 @@ describe('the custom group', () => {
     'unwind',
   ];
 
-  it('offers 25 metrics in the canonical order, under the seven group headings', () => {
+  it('offers 27 metrics in the canonical order, under the seven group headings', () => {
     expect(CUSTOM_PICKABLE.map((m) => m.id)).toEqual(ORDER);
     expect(CUSTOM_SECTIONS.map((s) => s.label)).toEqual([
       'Recovery',

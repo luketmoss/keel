@@ -23,6 +23,7 @@ import {
   dailyHealth,
   bodyMeasurements,
   dailySummary,
+  ftpHistory,
 } from './store';
 import type { HealthTabState, WarmupExerciseInfo } from './store';
 import { templateWarmupsToRestore } from '../components/workout/template-warmups';
@@ -33,7 +34,7 @@ import { fetchSyncRequests, appendSyncRequests, type SyncRequestVendor } from '.
 import { demoSyncNowScenario } from '../api/sync-now-demo';
 import { requestSync } from '../api/thrive-api';
 import { fetchSyncLog, fetchWithingsSyncLog } from '../api/sync-log-api';
-import { fetchDailyHealth, fetchBodyMeasurements, fetchDailySummary } from '../api/health-api';
+import { fetchDailyHealth, fetchBodyMeasurements, fetchDailySummary, fetchFtpHistory } from '../api/health-api';
 import { SyncLogNotSetUpError } from '../api/sync-log-errors';
 import { enqueueSet, initPendingCount, shiftQueueAfterDelete, dropQueuedAppend } from '../api/sync-queue';
 import { isDemo } from '../api/demo-data';
@@ -427,6 +428,10 @@ export async function saveWorkoutForLater(
     estimated_seconds?: string;
     /** #577: no toast, for a plan Lift Mode starts at once. */
     quiet?: boolean;
+    /** #772: a bike plan's venue, `mountain`, `gravel` or `indoor`; '' or omitted for none. */
+    sub_type?: string;
+    /** #772: a bike plan's Spin workout, a `RideWorkouts` id (`Workouts!AL`); '' or omitted for none. */
+    ride_workout_id?: string;
   },
   token: string,
 ): Promise<string> {
@@ -439,6 +444,8 @@ export async function saveWorkoutForLater(
         date: data.date,
         status: 'planned',
         estimated_seconds: data.estimated_seconds,
+        sub_type: data.sub_type,
+        ride_workout_id: data.ride_workout_id,
       },
       token,
     );
@@ -1226,6 +1233,7 @@ export type EditWorkoutData = Partial<
     | 'descent_m'
     | 'avg_hr'
     | 'sub_type'
+    | 'ride_workout_id'
   >
 >;
 
@@ -1726,7 +1734,7 @@ async function loadHealthTab<T>(
 }
 
 /**
- * Read DailyHealth, BodyMeasurements and DailySummary, each whole and in
+ * Read DailyHealth, BodyMeasurements, DailySummary and FtpHistory (#772), each whole and in
  * parallel. Each tab stands alone: a failure sets only that tab's signal to
  * `error`, and a missing tab loads as empty. Ranges are then selected from
  * these copies in memory, so moving between days or Trends ranges never
@@ -1742,6 +1750,7 @@ export function loadHealth(token: string): Promise<void> {
     loadHealthTab(dailyHealth, fetchDailyHealth, token, 'DailyHealth'),
     loadHealthTab(bodyMeasurements, fetchBodyMeasurements, token, 'BodyMeasurements'),
     loadHealthTab(dailySummary, fetchDailySummary, token, 'DailySummary'),
+    loadHealthTab(ftpHistory, fetchFtpHistory, token, 'FtpHistory'),
   ])
     .then(() => undefined)
     .finally(() => {
@@ -1753,7 +1762,7 @@ export function loadHealth(token: string): Promise<void> {
 /**
  * The Day screen's health load (#237 AC5): on show and on the page becoming
  * visible, never while one is in flight or within 60 s of the last start.
- * Each load is three Sheets reads against a quota of 60 a minute.
+ * Each load is four Sheets reads against a quota of 60 a minute.
  */
 export const healthRefresh = throttled(loadHealth, { minIntervalMs: 60_000 });
 

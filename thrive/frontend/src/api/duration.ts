@@ -67,3 +67,16 @@ export function formatEstimate(estimatedSeconds: string, spoken = false): string
   if (mins === null || mins < 1) return '';
   return spoken ? `about ${mins} minute${mins === 1 ? '' : 's'}` : `about ${mins} min`;
 }
+
+/**
+ * A length for a Spin workout (#772): `30 min`, `1 h`, `1 h 14 min`. `''` for a blank, non-numeric or
+ * under-a-minute value, so nothing is written beside a missing duration.
+ */
+export function formatHoursMinutes(seconds: string): string {
+  const mins = secondsToMinutes(seconds);
+  if (mins === null || mins < 1) return '';
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m === 0 ? `${h} h` : `${h} h ${m} min`;
+}

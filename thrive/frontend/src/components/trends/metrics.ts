@@ -4,7 +4,7 @@
 // chart, the table, the averages and "your range" are the same for every one.
 // Adding a metric is one entry in TREND_GROUPS, with no chart change.
 
-import { dailyHealth, bodyMeasurements, dailySummary } from '../../state/store';
+import { dailyHealth, bodyMeasurements, dailySummary, ftpHistory } from '../../state/store';
 import type { DailyHealthField, BodyMeasurementRow, DailySummaryField } from '../../api/health-api';
 import { parse, kgToLb, metersToMiles, metersToFeet } from '../../api/units';
 import { secondsToMinutes } from '../../api/duration';
@@ -14,6 +14,7 @@ import { drinkHistory, waterGoalMl, formatOz, ML_PER_OZ } from '../../state/drin
 import { today as todaySignal } from '../../day/today';
 import type { DrinkKind } from '../../api/drinks';
 import { datesBetween } from './series';
+import type { HeldEntry } from './held';
 
 export interface TrendPoint {
   date: string;
@@ -22,15 +23,19 @@ export interface TrendPoint {
   partial?: string;
   /** The readout's form of `partial`: the coverage count alone, "(1 of 2)", so the value line stays one line at 320 px (#303). */
   partialShort?: string;
+  /** A held value's kind on its entry day (#772): the FtpHistory source, `ramp_test` or `manual`. */
+  kind?: string;
 }
 
 /** The health tab a metric's `points()` reads; Trends waits on, and reports errors from, exactly these. */
-export type TrendSource = 'dailyHealth' | 'bodyMeasurements' | 'dailySummary' | 'drinks';
+export type TrendSource = 'dailyHealth' | 'bodyMeasurements' | 'dailySummary' | 'drinks' | 'ftpHistory';
 
 export interface TrendMetric {
   id: string;
   /** Which tab `points()` reads. Defaults to `dailyHealth`. */
   source?: TrendSource;
+  /** Further tabs it reads (FTP per kg also reads the weigh-ins), which Trends also waits on and reports errors from. */
+  alsoReads?: TrendSource[];
   label: string;
   unit: string;
   /** Every day with a value, from #236's signals. Blanks omitted. The metric owns any reduction. */
@@ -52,7 +57,13 @@ export interface TrendMetric {
   /** A dashed reference line (the water goal), in the metric's own unit, with its label; null draws none. */
   reference?(): { value: number; label: string } | null;
   /** What the card says when the metric has no value on any date; the default is "Nothing recorded yet." */
-  emptyText?: string;
+  emptyText?: string | (() => string);
+  /**
+   * A held value (#772, FTP): what it was until the next entry, not a reading a day. Every entry up to
+   * today, one per date, oldest first, with a null value where an entry has none (W/kg with no weigh-in).
+   * The card draws a step line, a dot per entry and the entries' list; `points()` is the entries with a value.
+   */
+  heldEntries?(): HeldEntry[];
 }
 
 /** 1–4 metrics, one card each, on one shared x domain. */
@@ -216,7 +227,84 @@ export const TRAINING_LOAD: TrendMetric = {
   band: true,
 };
 
-const FITNESS_METRICS: TrendMetric[] = [VO2MAX, TRAINING_LOAD];
+// ── FTP (#772) ───────────────────────────────────────────────────────
+// Read from FtpHistory (Thrive Spin's ramp test, the MCP, or a hand edit of the sheet). A held value:
+// see `heldEntries`. FTP per kg divides each entry by that day's first scale reading with a weight,
+// fixed per entry, so an entry on a day with no weigh-in has none, never an estimate from a nearby day.
+
+interface FtpEntry {
+  date: string;
+  watts: number;
+  source: string;
+}
+
+/**
+ * The FtpHistory entries Trends draws, oldest first: one per date (the newest by `created`, as `getFtp`
+ * picks the current one), none dated after today, and a blank or non-numeric `ftp_w` skipped, never
+ * drawn as 0. Empty until the tab has loaded.
+ */
+export function ftpEntries(): FtpEntry[] {
+  const s = ftpHistory.value;
+  if (s.state !== 'loaded') return [];
+  const today = todaySignal.value;
+  const newest = new Map<string, { created: string; entry: FtpEntry }>();
+  for (const row of s.rows) {
+    const watts = parse(row.ftp_w);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(row.date) || row.date > today || watts === null || !(watts > 0)) continue;
+    const held = newest.get(row.date);
+    if (!held || row.created >= held.created) {
+      newest.set(row.date, { created: row.created, entry: { date: row.date, watts, source: row.source } });
+    }
+  }
+  return [...newest.values()].map((v) => v.entry).sort((a, b) => (a.date < b.date ? -1 : 1));
+}
+
+/** The entries as a held value: W/kg is the entry's watts over that day's weight in kg, null with none. */
+function ftpHeldEntries(perKg: boolean): HeldEntry[] {
+  const entries = ftpEntries();
+  if (!perKg) return entries.map((e) => ({ date: e.date, value: e.watts, source: e.source }));
+  const kg = new Map(bodyDays().map(([date, day]) => [date, parse(day.weight_kg)]));
+  return entries.map((e) => {
+    const w = kg.get(e.date) ?? null;
+    return { date: e.date, value: w !== null && w > 0 ? e.watts / w : null, source: e.source };
+  });
+}
+
+const heldPoints = (entries: HeldEntry[]): TrendPoint[] =>
+  entries.flatMap((e) => (e.value === null ? [] : [{ date: e.date, value: e.value, kind: e.source }]));
+
+const NO_FTP = 'No FTP yet. A ramp test in Thrive Spin adds one.';
+
+export const FTP: TrendMetric = {
+  id: 'ftp',
+  source: 'ftpHistory',
+  label: 'FTP',
+  unit: 'W',
+  points: () => heldPoints(ftpHeldEntries(false)),
+  heldEntries: () => ftpHeldEntries(false),
+  format: formatWhole,
+  band: false,
+  zeroBased: false,
+  emptyText: NO_FTP,
+};
+
+export const FTP_WKG: TrendMetric = {
+  id: 'ftp_wkg',
+  source: 'ftpHistory',
+  alsoReads: ['bodyMeasurements'],
+  label: 'FTP per kg',
+  unit: 'W/kg',
+  points: () => heldPoints(ftpHeldEntries(true)),
+  heldEntries: () => ftpHeldEntries(true),
+  format: (v) => v.toFixed(2),
+  axisFormat: (v, ticks) => v.toFixed(axisDecimals(ticks)),
+  band: false,
+  zeroBased: false,
+  emptyText: () =>
+    ftpEntries().length > 0 ? 'No FTP per kg yet. It needs a weigh-in on the day of an FTP entry.' : NO_FTP,
+};
+
+const FITNESS_METRICS: TrendMetric[] = [VO2MAX, TRAINING_LOAD, FTP, FTP_WKG];
 
 // ── Body (#244) ──────────────────────────────────────────────────────
 // Stored kg, shown lb: the conversion is the consumer's (units.ts). One value

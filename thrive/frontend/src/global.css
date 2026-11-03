@@ -24,6 +24,9 @@
   --opacity-disabled: 0.4;
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
+  /* The suite language's touch floor (#772). Written as a literal 44px in older rules; the Spin picker and
+     the FTP entries list are the first to take it by name, and those older rules are not migrated here. */
+  --touch-target: 44px;
   /* Drawn icon sizes (#405): a line icon beside or above a short label, and
      the main figure of a large choice card. */
   --icon-md: 24px;
@@ -9496,6 +9499,106 @@ body:has(.lift) {
 .picker-add {
   width: 100%;
   min-height: 48px;
+}
+
+/* FTP on a Trends card (#772): a held value's legend and its entries, under the plot. */
+.trend-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-md);
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.trend-legend-mark {
+  color: var(--chart-line);
+}
+
+.trend-entries {
+  list-style: none;
+  margin: var(--space-xs) 0 0;
+  padding: 0;
+  font-size: var(--text-sm);
+}
+
+.trend-entry {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: var(--touch-target);
+  border-top: 1px solid var(--color-border-light);
+  font-variant-numeric: tabular-nums;
+}
+
+.trend-entry-date,
+.trend-entry-value {
+  white-space: nowrap;
+}
+
+.trend-entry-source {
+  color: var(--color-text-secondary);
+}
+
+.trend-entry-value {
+  font-weight: 700;
+}
+
+/* The Spin workout of a bike plan (#772): the button that opens the picker, the picker's rows, and the
+   detail screen's line. Rows are Lift Mode's radio cards, so they take its states. */
+.spin-pick-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  width: 100%;
+  min-height: var(--touch-target);
+  text-align: left;
+}
+
+.spin-pick-title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.spin-pick-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.spin-pick-row {
+  flex: none;
+  width: 100%;
+  min-height: var(--touch-target);
+}
+
+.spin-pick-row-name {
+  font-size: var(--text-base);
+  font-weight: 700;
+}
+
+.spin-pick-row-on .spin-pick-row-name {
+  color: var(--color-primary-on-light);
+}
+
+.spin-pick-status {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.detail-spin-workout {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.detail-spin-workout-label {
+  color: var(--color-text-secondary);
 }
 
 /* ===== Library keyboard access (#301) =====

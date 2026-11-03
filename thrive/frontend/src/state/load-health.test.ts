@@ -1,37 +1,41 @@
-// #236 AC4 — loadHealth: three tabs, three signals, each standing alone.
+// #236 AC4 — loadHealth: its tabs, one signal each, each standing alone. FtpHistory is the fourth (#772).
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const fetchDailyHealth = vi.fn();
 const fetchBodyMeasurements = vi.fn();
 const fetchDailySummary = vi.fn();
+const fetchFtpHistory = vi.fn();
 vi.mock('../api/health-api', () => ({
   fetchDailyHealth: (t: string) => fetchDailyHealth(t),
   fetchBodyMeasurements: (t: string) => fetchBodyMeasurements(t),
   fetchDailySummary: (t: string) => fetchDailySummary(t),
+  fetchFtpHistory: (t: string) => fetchFtpHistory(t),
 }));
 
 import { loadHealth } from './actions';
-import { dailyHealth, bodyMeasurements, dailySummary } from './store';
+import { dailyHealth, bodyMeasurements, dailySummary, ftpHistory } from './store';
 import { ReauthFailedError } from '@keel/auth';
 
 const h = (date: string) => ({ date, sheetRow: 2 }) as never;
 
 beforeEach(() => {
-  for (const f of [fetchDailyHealth, fetchBodyMeasurements, fetchDailySummary]) f.mockReset();
+  for (const f of [fetchDailyHealth, fetchBodyMeasurements, fetchDailySummary, fetchFtpHistory]) f.mockReset();
+  fetchFtpHistory.mockResolvedValue([]);
   dailyHealth.value = { state: 'idle' };
   bodyMeasurements.value = { state: 'idle' };
   dailySummary.value = { state: 'idle' };
+  ftpHistory.value = { state: 'idle' };
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
 describe('loadHealth', () => {
-  it('reads the three tabs once each, with the token, into their signals', async () => {
+  it('reads the four tabs once each, with the token, into their signals', async () => {
     fetchDailyHealth.mockResolvedValue([h('2026-09-20')]);
     fetchBodyMeasurements.mockResolvedValue([]);
     fetchDailySummary.mockResolvedValue([h('2026-09-20'), h('2026-09-21')]);
     await loadHealth('tok');
-    for (const f of [fetchDailyHealth, fetchBodyMeasurements, fetchDailySummary]) {
+    for (const f of [fetchDailyHealth, fetchBodyMeasurements, fetchDailySummary, fetchFtpHistory]) {
       expect(f).toHaveBeenCalledTimes(1);
       expect(f).toHaveBeenCalledWith('tok');
     }
@@ -39,6 +43,17 @@ describe('loadHealth', () => {
     // Loaded and empty (e.g. a missing tab), not an error.
     expect(bodyMeasurements.value).toEqual({ state: 'loaded', rows: [] });
     expect(dailySummary.value.state).toBe('loaded');
+    expect(ftpHistory.value).toEqual({ state: 'loaded', rows: [] });
+  });
+
+  it('marks FtpHistory as error alone when only it fails (#772)', async () => {
+    fetchDailyHealth.mockResolvedValue([]);
+    fetchBodyMeasurements.mockResolvedValue([]);
+    fetchDailySummary.mockResolvedValue([]);
+    fetchFtpHistory.mockRejectedValue(new Error('Sheets API 500'));
+    await loadHealth('tok');
+    expect(ftpHistory.value).toEqual({ state: 'error' });
+    expect(dailyHealth.value.state).toBe('loaded');
   });
 
   it('reads in parallel, showing loading on each until it settles', async () => {

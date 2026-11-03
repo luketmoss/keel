@@ -10,7 +10,7 @@ import { signal } from '@preact/signals';
 import { useAuth } from '../../auth/auth-context';
 import { loadHealth } from '../../state/actions';
 import { drinkHistory, loadDrinkHistory } from '../../state/drinks';
-import { dailyHealth, bodyMeasurements, dailySummary } from '../../state/store';
+import { dailyHealth, bodyMeasurements, dailySummary, ftpHistory } from '../../state/store';
 import { TREND_GROUPS, CUSTOM_GROUP_ID, customGroup, type TrendGroup, type TrendMetric } from './metrics';
 import {
   type RangeKey,
@@ -177,16 +177,18 @@ export function TrendsScreen() {
       set(v);
     };
 
-  useEffect(() => {
-    if (!token) return;
-    const idle = [dailyHealth, bodyMeasurements, dailySummary].some((s) => s.value.state === 'idle');
-    if (idle) void loadHealth(token);
-  }, [token]);
-
   const picked: TrendGroup = TREND_GROUPS.find((g) => g.id === groupId) ?? TREND_GROUPS[0];
   const isCustom = picked.id === CUSTOM_GROUP_ID;
   // One object per custom set, so the series memo below can key on it.
   const group: TrendGroup = useMemo(() => (isCustom ? customGroup(custom) : picked), [picked, isCustom, custom]);
+  useEffect(() => {
+    if (!token) return;
+    // FtpHistory is read in the same load, so only a group that shows FTP waits on it being idle.
+    const idle = [dailyHealth, bodyMeasurements, dailySummary].some((s) => s.value.state === 'idle');
+    const ftpIdle = ftpHistory.value.state === 'idle' && group.metrics.some((m) => m.source === 'ftpHistory');
+    if (idle || ftpIdle) void loadHealth(token);
+  }, [token, group]);
+
   const setCustom = (ids: string[]) => {
     clearSelection();
     setCustomIds(ids);
@@ -196,7 +198,7 @@ export function TrendsScreen() {
   // Only the tabs this group reads count: a Body group is neither held up by
   // DailyHealth nor spared by a BodyMeasurements failure. A custom set reads
   // exactly the union of its metrics' tabs, and none when nothing is picked.
-  const sources = [...new Set(group.metrics.map((m) => m.source ?? 'dailyHealth'))];
+  const sources = [...new Set(group.metrics.flatMap((m) => [m.source ?? 'dailyHealth', ...(m.alsoReads ?? [])]))];
   const showsDrinks = sources.includes('drinks');
   // Drinks are read on every entry to a group that shows them (#521), not once like the health
   // tabs: a drink logged on the Day view is there on the next visit. Rows already held stay up
@@ -204,7 +206,7 @@ export function TrendsScreen() {
   useEffect(() => {
     if (token && showsDrinks) void loadDrinkHistory(token);
   }, [token, showsDrinks]);
-  const tabs = { dailyHealth, bodyMeasurements, dailySummary, drinks: drinkHistory };
+  const tabs = { dailyHealth, bodyMeasurements, dailySummary, drinks: drinkHistory, ftpHistory };
   const states = sources.map((s) => tabs[s].value.state);
   const avgDays = averageDays(average);
 
@@ -246,6 +248,7 @@ export function TrendsScreen() {
     rowsOf('bodyMeasurements'),
     rowsOf('dailySummary'),
     rowsOf('drinks'),
+    rowsOf('ftpHistory'),
   ]);
 
   // The day the link named (#504), selected once per arrival and only when the charts plot it: a

@@ -36,6 +36,8 @@ export interface EditInputs {
   descent: string;
   /** bpm. */
   avgHr: string;
+  /** A planned bike's Spin workout, a `RideWorkouts` id or '' (#772). Only the planned bike's form offers it. */
+  rideWorkoutId: string;
 }
 
 /** What each input starts with for `w`. An unset field starts blank. */
@@ -47,6 +49,7 @@ export function workoutToEditInputs(w: Workout | undefined): EditInputs {
     notes: w?.notes || '',
     effort: w?.effort || '',
     subType: w?.sub_type || '',
+    rideWorkoutId: w?.ride_workout_id || '',
     ...storedToCardio(w),
   };
 }
@@ -59,6 +62,7 @@ const FIELDS: { [K in keyof EditInputs]: (v: string) => Partial<EditWorkoutData>
   notes: (v) => ({ notes: v.trim() }),
   effort: (v) => ({ effort: v as Effort | '' }),
   subType: (v) => ({ sub_type: v }),
+  rideWorkoutId: (v) => ({ ride_workout_id: v }),
   distance: (v) => ({ distance_m: milesToMeters(v) }),
   ascent: (v) => ({ ascent_m: feetToMeters(v) }),
   descent: (v) => ({ descent_m: feetToMeters(v) }),

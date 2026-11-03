@@ -6,6 +6,7 @@ import {
   formatDuration,
   estimateMinutesToSeconds,
   formatEstimate,
+  formatHoursMinutes,
 } from './duration';
 
 // Issue #101 — Workouts!H stores elapsed seconds; the UI reads and writes
@@ -109,5 +110,17 @@ describe('formatEstimate', () => {
 
   it.each(['', '0', 'garbled'])('shows nothing for %j', (stored) => {
     expect(formatEstimate(stored)).toBe('');
+  });
+});
+
+describe('formatHoursMinutes (#772)', () => {
+  it('writes minutes, whole hours, and hours with minutes', () => {
+    expect(formatHoursMinutes('1800')).toBe('30 min');
+    expect(formatHoursMinutes('3600')).toBe('1 h');
+    expect(formatHoursMinutes('4440')).toBe('1 h 14 min');
+    expect(formatHoursMinutes('7200')).toBe('2 h');
+  });
+  it('writes nothing for a blank, non-numeric or sub-minute value', () => {
+    for (const v of ['', 'abc', '0', '20']) expect(formatHoursMinutes(v)).toBe('');
   });
 });

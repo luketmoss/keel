@@ -180,6 +180,8 @@ export async function createWorkout(
     status?: string;
     sub_type?: string;
     estimated_seconds?: string;
+    /** #772: a planned bike's Spin workout, '' or an existing `RideWorkouts` id. */
+    ride_workout_id?: string;
   },
   token: string,
 ): Promise<Workout> {
@@ -229,7 +231,7 @@ export async function createWorkout(
     track_ref: '',
     // #688: sync-owned too. Never set here.
     trails: '',
-    // #765: Spin's columns. A new workout is never a Spin ride and names no Spin workout.
+    // #765: Spin's columns. A new workout is never a Spin ride; a bike plan may name a Spin workout (#772).
     avg_power_w: '',
     np_w: '',
     intensity_factor: '',
@@ -237,7 +239,7 @@ export async function createWorkout(
     work_kj: '',
     ftp_w: '',
     intensity_pct: '',
-    ride_workout_id: '',
+    ride_workout_id: data.ride_workout_id || '',
     streams_ref: '',
   };
 

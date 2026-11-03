@@ -76,10 +76,12 @@ describe('registry', () => {
     expect(group('sleep').metrics[3].unit).toBe('pts');
     expect(group('sleep').metrics.some((m) => m.excludesToday)).toBe(false);
   });
-  it('Fitness: VO2max one decimal unbanded, training load banded', () => {
+  it('Fitness: VO2max one decimal unbanded, training load banded, then FTP and FTP per kg unbanded (#772)', () => {
     expect(group('fitness').metrics.map((m) => [m.id, m.band])).toEqual([
       ['vo2max', false],
       ['training_load', true],
+      ['ftp', false],
+      ['ftp_wkg', false],
     ]);
     expect(VO2MAX.unit).toBe('mL/kg/min');
     expect(VO2MAX.format(52)).toBe('52.0');

@@ -8,6 +8,7 @@ import type { Workout } from '../../api/types';
 import type { RideLibraryState } from '../../spin/ride-library';
 import { rowFtp } from '../../spin/streams-cache';
 import { formatClock } from './activities-helpers';
+import { workoutMeta } from '../workout/spin-picker';
 
 export interface RideCardRow {
   label: string;
@@ -35,6 +36,23 @@ export function spinWorkoutText(id: string, library: RideLibraryState): string |
   if (library.status !== 'loaded') return null;
   const found = library.workouts.find((w) => w.id === id);
   return found ? found.name || 'Unnamed workout' : 'Removed from your library';
+}
+
+/**
+ * A planned bike's Spin workout on its detail screen (#772), one line under the title: the workout's
+ * name, category and length; or that it was removed from the library; or that the library would not
+ * load. Null while it loads, and with no link.
+ */
+export function planSpinLine(id: string, library: RideLibraryState): { label: string; value: string } | null {
+  if (!id) return null;
+  if (library.status === 'error') return { label: 'Spin workout:', value: "Couldn't load it" };
+  if (library.status !== 'loaded') return null;
+  const found = library.workouts.find((w) => w.id === id);
+  if (!found) return { label: 'Spin workout', value: 'removed from your library' };
+  return {
+    label: 'Spin workout:',
+    value: [found.name || 'Unnamed workout', workoutMeta(found)].filter(Boolean).join(' · '),
+  };
 }
 
 export function rideCardRows(

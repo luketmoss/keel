@@ -5,6 +5,7 @@
 import type { TrendMetric, TrendPoint } from './metrics';
 import { yourRange, type YourRange } from '../../api/your-range';
 import { addDays, dayNumber } from '../../day/dates';
+import { buildHeld, type HeldSeries } from './held';
 
 // ── Dates ────────────────────────────────────────────────────────────
 
@@ -225,6 +226,11 @@ export function shortDate(ymd: string): string {
   return `${MONTHS[p.m]} ${p.d}`;
 }
 
+/** "Nov 7", with ", 2025" only when the year is not `today`'s (#772). */
+export function sinceDate(ymd: string, today: string): string {
+  return ymd.slice(0, 4) === today.slice(0, 4) ? shortDate(ymd) : `${shortDate(ymd)}, ${ymd.slice(0, 4)}`;
+}
+
 /** "Sat, Sep 26", with ", 2025" only when the year is not `today`'s. */
 export function rowDate(ymd: string, today: string): string {
   const p = parts(ymd);
@@ -308,6 +314,8 @@ export interface MetricSeries {
   covered: number;
   /** Your range as of today, when the metric declares a band. */
   band: YourRange | null;
+  /** A held value's cells, entries and current (#772); null for a metric read daily. */
+  held: HeldSeries | null;
 }
 
 /**
@@ -339,10 +347,12 @@ export function metricSeries(
     dates,
     all,
     points,
-    average: rolling(all, dates, avgDays),
+    // The Average control does not apply to a held value (#772).
+    average: metric.heldEntries ? new Map() : rolling(all, dates, avgDays),
     mean,
     covered: points.length,
     band: metric.band ? yourRange(all, today) : null,
+    held: metric.heldEntries ? buildHeld(metric.heldEntries(), dates, today, (d) => sinceDate(d, today)) : null,
   };
 }
 

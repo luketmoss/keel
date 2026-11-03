@@ -26,7 +26,7 @@ import { ExternalGlyph, HistoryIcon, PencilLineIcon } from './detail-icons';
 import { RideHero } from './ride-hero';
 import { RideIntervals } from './ride-intervals';
 import { RideZones } from './ride-zones';
-import { RideCard, rideCardRows } from './ride-card';
+import { RideCard, planSpinLine, rideCardRows } from './ride-card';
 import { rideStreamsAvailable, rowFtp, useRideStreams } from '../../spin/streams-cache';
 import { useRideLibrary } from '../../spin/ride-library';
 import { TrailsCard } from '../trails/trails-card';
@@ -78,7 +78,9 @@ export function WorkoutDetail({ workoutId }: Props) {
   const rideState = useRideStreams(rideHero && workout ? workoutId : null, workout ? rowFtp(workout) : null);
   // The library names the Spin workout a ride followed; read only when this ride links one.
   const isSpinRide = workout?.source === 'spin' && workout.status !== 'planned' && workout.status !== 'active';
-  const library = useRideLibrary(Boolean(isSpinRide && workout?.ride_workout_id));
+  // #772: a planned bike names the Spin workout it is meant to follow, read from the same library.
+  const isPlannedBike = workout?.type === 'bike' && workout.status === 'planned';
+  const library = useRideLibrary(Boolean((isSpinRide || isPlannedBike) && workout?.ride_workout_id));
   // #532: the map hero and the Elevation card read the same track.
   const trackState = useWorkoutTrack(workout && !rideHero && trackAvailable(workout) ? workoutId : null);
 
@@ -228,6 +230,17 @@ export function WorkoutDetail({ workoutId }: Props) {
 
       <div class="detail-sheet">
         <DetailTitle workout={workout} />
+
+        {/* #772: the Spin workout a planned ride follows, as one line; nothing while it loads or with no link. */}
+        {isPlannedBike &&
+          (() => {
+            const line = planSpinLine(workout.ride_workout_id, library);
+            return line ? (
+              <p class="detail-spin-workout">
+                <span class="detail-spin-workout-label">{line.label}</span> {line.value}
+              </p>
+            ) : null;
+          })()}
 
         {/* #531: a completed cardio or stretch activity's figures. */}
         {hasStatsCard(workout) && (

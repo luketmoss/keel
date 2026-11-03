@@ -146,7 +146,7 @@ export function TrendTable({ group, series: built, range, avgDays, today }: Prop
                 {metric.label}
                 {metric.unit ? ` (${metric.unit})` : ''}
               </th>,
-              avgDays > 0 && (
+              avgDays > 0 && !metric.heldEntries && (
                 <th scope="col" key={`${metric.id}-avg`}>
                   {avgDays}-day avg
                 </th>
@@ -179,8 +179,9 @@ export function TrendTable({ group, series: built, range, avgDays, today }: Prop
                   <td key={metric.id}>
                     {c.value}
                     {c.partial && <span class="trend-partial"> {c.partial}</span>}
+                    {c.tableNote && <span class="trend-partial"> {c.tableNote}</span>}
                   </td>,
-                  avgDays > 0 && <td key={`${metric.id}-avg`}>{c.average}</td>,
+                  avgDays > 0 && !metric.heldEntries && <td key={`${metric.id}-avg`}>{c.average}</td>,
                 ];
               })}
             </tr>

@@ -27,6 +27,7 @@ object Tokens {
     val spaceSm = 8.dp
     val spaceMd = 16.dp
     val spaceLg = 24.dp
+    val radiusSm = RoundedCornerShape(4.dp)
     val radiusMd = RoundedCornerShape(8.dp)
     val radiusLg = RoundedCornerShape(16.dp)
     val radiusFull = RoundedCornerShape(percent = 50)

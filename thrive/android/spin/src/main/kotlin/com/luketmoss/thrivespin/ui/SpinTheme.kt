@@ -32,6 +32,10 @@ class SpinPalette(
     val primaryBg: Color,
     val primaryText: Color,
     val primaryFill: Color,
+    val dangerText: Color,
+    val warning: Color,
+    /** Z1 to Z6, in order. */
+    val zones: List<Color>,
 )
 
 private val Light = SpinPalette(
@@ -53,6 +57,16 @@ private val Light = SpinPalette(
     primaryBg = Color(C.PRIMARY_BG_LIGHT),
     primaryText = Color(C.PRIMARY_TEXT_LIGHT),
     primaryFill = Color(C.PRIMARY_FILL_LIGHT),
+    dangerText = Color(C.DANGER_TEXT_LIGHT),
+    warning = Color(C.WARNING_LIGHT),
+    zones = listOf(
+        Color(C.ZONE_1_LIGHT),
+        Color(C.ZONE_2_LIGHT),
+        Color(C.ZONE_3_LIGHT),
+        Color(C.ZONE_4_LIGHT),
+        Color(C.ZONE_5_LIGHT),
+        Color(C.ZONE_6_LIGHT),
+    ),
 )
 
 private val Dark = SpinPalette(
@@ -74,6 +88,16 @@ private val Dark = SpinPalette(
     primaryBg = Color(C.PRIMARY_BG_DARK),
     primaryText = Color(C.PRIMARY_TEXT_DARK),
     primaryFill = Color(C.PRIMARY_FILL_DARK),
+    dangerText = Color(C.DANGER_TEXT_DARK),
+    warning = Color(C.WARNING_DARK),
+    zones = listOf(
+        Color(C.ZONE_1_DARK),
+        Color(C.ZONE_2_DARK),
+        Color(C.ZONE_3_DARK),
+        Color(C.ZONE_4_DARK),
+        Color(C.ZONE_5_DARK),
+        Color(C.ZONE_6_DARK),
+    ),
 )
 
 val LocalSpin = staticCompositionLocalOf { Light }

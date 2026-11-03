@@ -61,6 +61,32 @@ object SpinColors {
     // --color-primary-fill
     const val PRIMARY_FILL_LIGHT = 0xFF2F66F0
     const val PRIMARY_FILL_DARK = 0xFF6E97FF
+    // --color-danger-text
+    const val DANGER_TEXT_LIGHT = 0xFFB71C1C
+    const val DANGER_TEXT_DARK = 0xFFF26B68
+    // --color-warning
+    const val WARNING_LIGHT = 0xFFA05D00
+    const val WARNING_DARK = 0xFFFFB74D
+
+    // Power zones (design note 767, New tokens): Android only, not CSS.
+    // --zone-1
+    const val ZONE_1_LIGHT = 0xFF8A93A8
+    const val ZONE_1_DARK = 0xFF9AA3B5
+    // --zone-2
+    const val ZONE_2_LIGHT = 0xFF4F86F7
+    const val ZONE_2_DARK = 0xFF6E97FF
+    // --zone-3
+    const val ZONE_3_LIGHT = 0xFF14A098
+    const val ZONE_3_DARK = 0xFF2CC2B8
+    // --zone-4
+    const val ZONE_4_LIGHT = 0xFFE8A317
+    const val ZONE_4_DARK = 0xFFF2B84B
+    // --zone-5
+    const val ZONE_5_LIGHT = 0xFFEE6A1F
+    const val ZONE_5_DARK = 0xFFF58A4F
+    // --zone-6
+    const val ZONE_6_LIGHT = 0xFFCF3A3A
+    const val ZONE_6_DARK = 0xFFEF6B6B
 }
 
 /** Size tokens in dp that the suite has no CSS for (design note §New tokens), and the alpha of `--opacity-disabled`. */
@@ -68,5 +94,8 @@ object SpinSizes {
     const val TAP_TARGET = 48
     const val ROW_HEIGHT = 64
     const val CTA_HEIGHT = 52
+    const val NAV_HEIGHT = 64
+    const val PROFILE_SM = 40
+    const val PROFILE_LG = 140
     const val OPACITY_DISABLED = 0.4f
 }

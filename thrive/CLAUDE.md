@@ -148,7 +148,8 @@ with its own id and tap time.
 `com.luketmoss.thrivespin`, label "Thrive Spin", `minSdk` 31, Kotlin and Compose). It controls the KICKR and reads heart
 rate straps over Bluetooth LE for indoor rides. It does not depend on `app`: the small pieces it shares with Sip (URL
 check, OkHttp transport, envelope reading) are copied. #766 is its shell, Settings and Devices screen
-(`docs/design/766-spin-devices.md`); the Library is #767 and the ride #768.
+(`docs/design/766-spin-devices.md`); #767 is the Library, workout detail and builder (`docs/design/767-spin-library.md`);
+the ride is #768.
 
 - **Install is by sideload**, like Sip: download the `thrive-spin-apk` artifact from the latest green
   `thrive-android.yml` run (the same job also uploads `thrive-sip-apk`) and install it beside Thrive Sip. It is signed
@@ -162,6 +163,13 @@ check, OkHttp transport, envelope reading) are copied. #766 is its shell, Settin
   encoding (FTMS Feature, Indoor Bike Data, Control Point, Machine Status, Heart Rate Measurement) and the ride's
   heart rate choice (`RideHeartRate.choose`) are plain Kotlin in `core/`, JVM-tested, for #768 to reuse. Connections are
   open only while Devices is on screen; the ride's foreground service is #768.
+- **Library (#767).** The app opens on Library, with a Library | Build | Devices bar. Workouts, the current FTP and today's
+  bike plans come from #765's `getRideWorkouts`, `getFtp` and `getPlannedWorkouts` and are kept as one cache in private
+  storage, replaced whole only when all three succeed (`core/library/`). The steps v1 parser, expansion, scaled watts,
+  TSS/IF/kJ and zones are plain Kotlin in `core/workout/`, and #768 reuses them. Intensity (50-130%) is per opening of a
+  detail screen and never saved. Start builds a `RideRequest` for `RideStarter`; #767 ships a placeholder that says riding
+  comes later. The builder saves with a caller-made id and **refuses offline edits, never queues them**, so an MCP edit
+  cannot be silently overwritten later. Power zone colours are in `SpinColors`; #771 should reuse them.
 - **Testing is not human-gated**, as for Sip: `/test` passes the JVM and CI criteria; Bluetooth, permission and
   on-phone criteria are waived by the owner and listed in the issue's `## Results` as things to watch. Install the APK
   from the merge's CI run on `main`.

@@ -22,7 +22,7 @@ exactly where they must agree. The root `CLAUDE.md` is keel's project
 | `CLAUDE.md` | workspace rules, loaded in every session, and keel's own |
 | `README.md` | the outside view |
 | `.claude/skills/` | lifecycle and stack skills |
-| `.keel/` | `board.json`, `board.py`, `pr.py`, `check.py` |
+| `.keel/` | `board.json`, `board.py`, `pr.py`, `worktrees.py`, `check.py` |
 | `.github/workflows/` | one per project, generated from stack skills |
 | `docs/design/` | keel's UX artifacts, one file per issue |
 
@@ -94,7 +94,8 @@ python .keel/check.py
 Five things, all of which have a right answer that needs no judgment: `.keel/`
 compiles, every skill's frontmatter parses and matches its directory, every
 relative link in a tracked `.md` file resolves, every design note cited by
-filename is committed, and `pr.py`'s matcher and editors behave on fixtures.
+filename is committed, `pr.py`'s matcher and editors behave on fixtures, and
+`worktrees.py` classifies a worktree correctly on fixtures.
 CI runs this and nothing else, so a green run here is a green run there.
 
 Adding a check means adding a function to `CHECKS` in `check.py`. Do not add one

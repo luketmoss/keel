@@ -245,6 +245,11 @@ decided per touched component: an issue touching a gated one is gated for the
 criteria that component owns. Firmware is the obvious case — a green build
 is not evidence that a solenoid fired at the right microsecond.
 
+Hardware is the only gate. An Apps Script criterion that needs the deployed
+script is not one: `/test` lists it back as not verified, the run continues,
+and `/ship` carries it into `## Results` as a check for after its deploy, which
+is the first moment the deployed script exists.
+
 An owner can instead waive a stack's device check. Those criteria are listed
 back as waived, not verified, never passed; the run continues, and they are
 carried into the issue's `## Results` as things to watch. The stack skill says

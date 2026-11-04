@@ -95,7 +95,9 @@ The run stops early if:
 - the stack gates Testing — firmware always. The run stops in Testing with the
   unverifiable criteria listed. Android and mobile are not gated: their
   device-dependent criteria are waived by the owner, listed back as not
-  verified, and the run continues
+  verified, and the run continues. Apps Script is not gated either: criteria
+  that need the deployed script are listed back as not verified, and the run
+  continues, because only `/ship` deploys
 - `/review` finds something blocking — the issue returns to In Development
 - the PR changes a human-reviewed path (`CONVENTIONS.md` §Human-reviewed
   paths). `/review` ends clean and `/ship` declines to merge; the issue stays
@@ -118,7 +120,9 @@ When the run merges:
 
 - issue and PR, with URLs, and the commit on `main`
 - what changed, in a few lines
-- which acceptance criteria were verified and how
+- which acceptance criteria were verified and how, and any listed back as not
+  verified (waived device criteria, deployed-script criteria to check after the
+  deploy)
 - anything `/review` noted that didn't block
 - any judgment call that could reasonably have gone the other way
 

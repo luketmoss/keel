@@ -99,7 +99,10 @@ failure model, so it is deliberately not automated.
 
 **`/ship` deploys, before the merge (#745).** When a PR changes
 `apps-script/src/`, `/ship` runs `clasp push` and `clasp redeploy` on the live
-deployment with the owner's local clasp login, then merges. It is the only
+deployment with the owner's local clasp login, then merges. It runs them from
+a detached worktree at the PR's head commit, never the shared checkout, whose
+branch other sessions switch (#811), and `clasp pull`s the live source back to
+check it is the PR's before it merges. It is the only
 skill that runs `clasp`; `/develop`, `/test` and `/review` never do, because a
 push alone changes what triggers run. It deploys only what a push and a new
 version carry, and parks the issue in Ready to Ship with the owner's steps when
@@ -118,8 +121,8 @@ or `clasp push --force` where the manifest must overwrite the server's). The
 deployment URL ships in public bundles and the script ID alone grants nothing,
 so neither is a secret.
 
-The steps, in order. `/ship` does the first two; the third is always the
-owner's, and a change that needs it parks:
+The steps, in order. `/ship` does the first two, from that worktree; the
+third is always the owner's, and a change that needs it parks:
 
 1. `clasp push` — sends `src/` to the script project.
 2. `clasp redeploy <deploymentId> --description "#<issue> <title>"` — a new

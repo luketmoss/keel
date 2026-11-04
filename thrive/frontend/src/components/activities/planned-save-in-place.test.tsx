@@ -183,6 +183,8 @@ function planRow(): string[] {
     '100',
     'rw_1a2b3c4d',
     'streams/1',
+    // AN, #773: the COROS link, also passed through.
+    '471166302945817201',
   ];
 }
 
@@ -312,6 +314,7 @@ function toWorkouts(): WorkoutWithRow[] {
     intensity_pct: '',
     ride_workout_id: '',
     streams_ref: '',
+    coros_activity_id: '',
     sheetRow: i + 2,
   }));
 }
@@ -389,7 +392,7 @@ describe("AC1: Save keeps the workout's identity and every column it does not ed
 
     const puts = vi.mocked(sheets.sheetsUpdate).mock.calls.filter(([r]) => r.startsWith('Workouts'));
     expect(puts).toHaveLength(1);
-    expect(puts[0][0]).toBe('Workouts!A3:AM3');
+    expect(puts[0][0]).toBe('Workouts!A3:AN3');
     expect(puts[0][1]).toEqual([before.map((v, i) => (i === 4 ? 'Legs B' : v))]);
 
     expect(vi.mocked(sheets.sheetsAppend)).not.toHaveBeenCalled();

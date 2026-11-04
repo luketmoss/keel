@@ -305,6 +305,7 @@ const mockWorkouts: WorkoutWithRow[] = [
     intensity_pct: '',
     ride_workout_id: '',
     streams_ref: '',
+    coros_activity_id: '',
     sheetRow: 2,
   },
 ];
@@ -398,6 +399,7 @@ describe('Issue #23 — Exercise card last-workout info', () => {
           intensity_pct: '',
           ride_workout_id: '',
           streams_ref: '',
+          coros_activity_id: '',
           sheetRow: 2,
         },
         {
@@ -440,6 +442,7 @@ describe('Issue #23 — Exercise card last-workout info', () => {
           intensity_pct: '',
           ride_workout_id: '',
           streams_ref: '',
+          coros_activity_id: '',
           sheetRow: 3,
         },
       ];

@@ -92,6 +92,7 @@ function ride(over: Partial<WorkoutWithRow> = {}): WorkoutWithRow {
     intensity_pct: '',
     ride_workout_id: '',
     streams_ref: '',
+    coros_activity_id: '',
     sheetRow: 2 + n,
     ...over,
   };

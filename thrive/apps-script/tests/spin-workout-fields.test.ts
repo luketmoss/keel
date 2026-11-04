@@ -48,7 +48,7 @@ describe('createWorkout and updateWorkout refuse the Spin-owned fields', () => {
     const blank = Object.fromEntries(NINE.map((f) => [f, '']));
     const { res, text } = run(api, 'createWorkout', { data: { type: 'bike', name: 'x', ...blank } });
     expect(res.success, text).toBe(true);
-    expect(api.rows[0]).toHaveLength(39);
+    expect(api.rows[0]).toHaveLength(40);
     for (let i = 30; i < 39; i++) expect(api.rows[0][i]).toBe('');
   });
 
@@ -156,6 +156,6 @@ describe('full-row writes leave AE:AM exactly as they were', () => {
     expect(res.data.status, text).toBe('enriched');
     expect(api.rows[0][35]).toBe('250');
     expect(api.rows[0][33]).toBe('12');
-    expect(api.rows[0]).toHaveLength(39);
+    expect(api.rows[0]).toHaveLength(40);
   });
 });

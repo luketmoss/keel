@@ -91,10 +91,11 @@ describe('#765: migrate-765 appends Workouts!AE:AM and creates RideWorkouts and 
   it('holds HEADERS, RideWorkouts and FtpHistory equal to the API field lists', async () => {
     const m = await load();
     expect(m.TAB).toBe('Workouts');
+    // A:AM is this migration's; #773 appended AN after it, so the API's list is one longer.
     expect(m.HEADERS).toHaveLength(39);
-    expect(m.HEADERS).toHaveLength(sandbox.WORKOUT_COLUMN_COUNT);
+    expect(m.HEADERS).toHaveLength(sandbox.WORKOUT_COLUMN_COUNT - 1);
     // A:Z carry the sheet's own display headers; A:AA onward match the field names, and so do AE:AM.
-    expect(m.HEADERS.slice(26)).toEqual(FIELDS.slice(26));
+    expect(m.HEADERS.slice(26)).toEqual(FIELDS.slice(26, 39));
     expect(m.HEADERS.slice(30)).toEqual([
       'avg_power_w', 'np_w', 'intensity_factor', 'tss', 'work_kj', 'ftp_w',
       'intensity_pct', 'ride_workout_id', 'streams_ref',

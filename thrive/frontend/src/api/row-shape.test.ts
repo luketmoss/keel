@@ -144,12 +144,13 @@ describe('workoutToRow', () => {
     intensity_pct: '',
     ride_workout_id: '',
     streams_ref: '',
+    coros_activity_id: '',
   };
 
   // AC2: sheetsAppend writes every value it is handed regardless of the range,
   // so a short row would leave stale cells behind on an edit.
-  it('emits exactly thirty-nine cells, spanning A:AM (#688, #765)', () => {
-    expect(workoutToRow(workout)).toHaveLength(39);
+  it('emits exactly forty cells, spanning A:AN (#688, #765)', () => {
+    expect(workoutToRow(workout)).toHaveLength(40);
   });
 
   // #260 AC4: the COROS sport code is AB, last, and ships blank.

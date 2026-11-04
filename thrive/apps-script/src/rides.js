@@ -260,6 +260,12 @@ function isClaimableRidePlan(row, date) {
  *   `ride_workout_id` becomes the workout ridden, because the row now records that.
  * - `created`: a new row. With two or more candidate plans, none is touched and their
  *   ids come back as `ambiguous_plans`.
+ * - `merged` (#773): the COROS watch got there first. Exactly one `source = coros` bike/indoor
+ *   row starts within RIDE_MATCH_TOLERANCE_MINUTES of the ride, so the ride is written onto
+ *   it (`mergeRideOntoCorosRow`) and the answer adds `coros_activity_id`. It is checked
+ *   before the plan claim, because the COROS row may itself have claimed the day's plan. With
+ *   two or more such rows nothing is merged: the ride is created or claims a plan as above,
+ *   and `ambiguous_coros` names the rows. A ride is never refused or lost for this.
  */
 function saveRide(payload, fit, streams) {
   payload = spinPayload(payload);
@@ -315,6 +321,16 @@ function saveRide(payload, fit, streams) {
   }
 
   var values = rideWorkoutFields(ride, refs, local);
+
+  var rideStart = rideInstant(ride.started_at_utc);
+  var corosRows = [];
+  for (var c = 0; c < rows.length; c++) {
+    if (!isMergeableCorosRow(rows[c])) continue;
+    if (!withinRideTolerance(rideInstant(rows[c][COL.STARTED_AT_UTC]), rideStart)) continue;
+    corosRows.push({ rowNum: c + 2, id: cell(rows[c][COL.ID]) });
+  }
+  if (corosRows.length === 1) return mergeRideOntoCorosRow(sheet, corosRows[0], ride, values, refs, rideStart);
+
   var plans = [];
   for (var r = 0; r < rows.length; r++) {
     if (isClaimableRidePlan(rows[r], local.date)) plans.push({ rowNum: r + 2, id: cell(rows[r][COL.ID]) });
@@ -337,7 +353,9 @@ function saveRide(payload, fit, streams) {
     if (ride.notes !== '') current.notes = ride.notes;
     if (ride.effort !== '') current.effort = ride.effort;
     range.setValues([asText(workoutToRow(current))]);
-    return { status: 'claimed', id: current.id, fit_ref: refs.fit_ref, streams_ref: refs.streams_ref };
+    var claimedResult = { status: 'claimed', id: current.id, fit_ref: refs.fit_ref, streams_ref: refs.streams_ref };
+    if (corosRows.length > 1) claimedResult.ambiguous_coros = corosRows.map(function (m) { return m.id; });
+    return claimedResult;
   }
 
   values.name = ride.name;
@@ -348,7 +366,65 @@ function saveRide(payload, fit, streams) {
   if (plans.length > 1) {
     result.ambiguous_plans = plans.map(function (p) { return p.id; });
   }
+  if (corosRows.length > 1) {
+    result.ambiguous_coros = corosRows.map(function (m) { return m.id; });
+  }
   return result;
+}
+
+/**
+ * Write a ride onto the COROS row the watch already added for it (#773), in one row write,
+ * after the files. From then on the row is a Spin row, found by `source_activity_id = ride_id`
+ * and carrying the COROS activity id in `coros_activity_id`.
+ *
+ * Kept: `id`, `created`, `copied_from`, `template_id`, `estimated_seconds`, `sport_type`,
+ * `track_ref`, `trails`, and the watch's `ascent_m` and `descent_m`. Spin is the authority for
+ * the ride: `date`, `time`, `started_at_utc`, `elapsed_seconds`, `moving_seconds`, `avg_hr`,
+ * `calories` and `distance_m` take Spin's value where it sent one and keep the row's where it
+ * sent none; `effort` and `notes` take Spin's when non-blank. `name` is Spin's unless the row
+ * carries `template_id` or `estimated_seconds`, the marks of a claimed plan, whose name is the
+ * owner's. `raw_ref` is cleared: the row no longer holds a COROS activity id for
+ * `getWorkoutPayload` to check it against. The COROS FIT and archive stay in Drive.
+ */
+function mergeRideOntoCorosRow(sheet, target, ride, values, refs, rideStart) {
+  // Row-index drift: confirm the row is still that COROS candidate before writing onto it.
+  var range = sheet.getRange(target.rowNum, 1, 1, WORKOUT_COLUMN_COUNT);
+  var row = range.getDisplayValues()[0];
+  if (cell(row[COL.ID]) !== target.id || !isMergeableCorosRow(row) ||
+      !withinRideTolerance(rideInstant(row[COL.STARTED_AT_UTC]), rideStart)) {
+    throw new Error(
+      'Workouts row ' + target.rowNum + ' was expected to hold workout ' + target.id +
+      '. The sheet changed during the write; nothing was written to it. Retry the upload.'
+    );
+  }
+  var current = rowToWorkout(row, target.rowNum);
+  var corosId = current.source_activity_id;
+  var planned = current.template_id !== '' || current.estimated_seconds !== '';
+
+  var spinWins = ['date', 'time', 'started_at_utc', 'elapsed_seconds', 'moving_seconds', 'avg_hr', 'calories', 'distance_m'];
+  for (var i = 0; i < spinWins.length; i++) {
+    if (values[spinWins[i]] !== '') current[spinWins[i]] = values[spinWins[i]];
+  }
+  var spinOwned = [
+    'fit_ref', 'fit_fetched_at', 'streams_ref', 'synced_at',
+    'avg_power_w', 'np_w', 'intensity_factor', 'tss', 'work_kj', 'ftp_w', 'intensity_pct', 'ride_workout_id',
+  ];
+  for (var o = 0; o < spinOwned.length; o++) current[spinOwned[o]] = values[spinOwned[o]];
+
+  current.source = 'spin';
+  current.source_activity_id = ride.ride_id;
+  current.coros_activity_id = corosId;
+  current.raw_ref = '';
+  current.status = '';
+  if (!planned) current.name = ride.name;
+  if (ride.notes !== '') current.notes = ride.notes;
+  if (ride.effort !== '') current.effort = ride.effort;
+
+  range.setValues([asText(workoutToRow(current))]);
+  return {
+    status: 'merged', id: current.id, coros_activity_id: corosId,
+    fit_ref: refs.fit_ref, streams_ref: refs.streams_ref,
+  };
 }
 
 // --- Reading a ride's streams back -------------------------------------------------

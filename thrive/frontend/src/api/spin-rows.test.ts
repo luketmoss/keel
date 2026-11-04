@@ -1,5 +1,5 @@
 // #765 - the RideWorkouts and FtpHistory row mappings mirror apps-script/src/types.js, and the
-// Workouts mirror agrees with the API's WORKOUT_FIELDS on all 39 columns.
+// Workouts mirror agrees with the API's WORKOUT_FIELDS on all 40 columns.
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
@@ -32,10 +32,10 @@ const fieldsOf = (name: string): string[] => {
 const numberOf = (name: string): number => Number(typesJs.match(new RegExp(`var ${name} = (\\d+);`))?.[1]);
 
 describe('the three field lists mirror types.js', () => {
-  it('WORKOUT_FIELDS: workoutToRow emits all 39, in order, and rowToWorkout reads them back', () => {
+  it('WORKOUT_FIELDS: workoutToRow emits all 40, in order, and rowToWorkout reads them back', () => {
     const fields = fieldsOf('WORKOUT_FIELDS');
-    expect(fields).toHaveLength(39);
-    expect(numberOf('WORKOUT_COLUMN_COUNT')).toBe(39);
+    expect(fields).toHaveLength(40);
+    expect(numberOf('WORKOUT_COLUMN_COUNT')).toBe(40);
     const named = Object.fromEntries(fields.map((f) => [f, f])) as unknown as Workout;
     expect(workoutToRow(named)).toEqual(fields);
     const w = rowToWorkout(fields, 2) as unknown as Record<string, unknown>;

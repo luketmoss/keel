@@ -338,10 +338,40 @@ The tolerance is one constant, `STRENGTH_MATCH_TOLERANCE_MINUTES` in
 was about 9 minutes before the row's `Time` (the SPA stamps `Time` when Start
 is tapped).
 
+## Indoor rides: COROS enriches Spin's row (#773)
+
+The owner records trainer rides on the phone (Thrive Spin, `source = spin`) and on the watch too, as Indoor Bike. The watch has
+the heart rate and calories the phone may not, so a COROS activity with sport code **201** (indoor bike) is offered to the API's
+`enrichRide` action (see `apps-script/README.md`) **before** its FIT is fetched or any row is written. Other bike codes, plain
+bike (200) included, are untouched.
+
+- **A Spin row within 15 minutes:** exactly one `source = spin` bike/indoor, finished, unlinked row whose `started_at_utc` is
+  within **15 minutes** (inclusive, compared as instants, so midnight and the date column do not matter) of the activity's.
+  It is linked (`coros_activity_id`, `sport_type` `201`, `synced_at`) and its blanks are filled from the watch (`elapsed_seconds`,
+  `moving_seconds`, `avg_hr`, `calories`), **only where the row holds a blank** and this activity has not filled it before.
+  Power, the FIT, track, name, notes, effort, date, time and distance are never touched. The answer is `enriched`, or `unchanged`
+  when there is nothing new, which writes nothing.
+- **Nothing more for a linked ride.** No FIT, no track, no trail step, no `upsertSyncedWorkout`: Spin's own FIT stays the row's
+  `fit_ref`, and COROS's 50-a-day download allowance is saved. The raw payload is still archived in Drive. The archive's
+  `normalized` is `{ enrichment: { workout_id, filled } }`, written only when it changed.
+- **No match, or `own row`:** the activity goes on exactly as any other, and the watch gets its own `source = coros` row. That is
+  the first half of the ordering: when Spin uploads afterwards, the API's `saveRide` merges the ride onto that row. Either way,
+  the end state is one row.
+- **Ambiguous** (two or more Spin rows within the 15 minutes, even if one is nearer): a line in the run's `SyncLog.notes` naming
+  the candidates, no row, and not a failure. Every run re-evaluates it while the activity is in the window.
+- **A row that went away:** an activity whose archive already holds an enrichment and now answers `no match` (its Spin ride was
+  deleted) gets a note and no row. It is never written as a COROS row of its own.
+- **The 15 minutes is a judgment on no data.** The watch is started within minutes of the phone, and two trainer rides are never
+  that close. It is one constant, `RIDE_MATCH_TOLERANCE_MINUTES` in `apps-script/src/types.js`; revisit it from the notes.
+- **Deploy order:** the sync ships on merge, so the API must already know `enrichRide`. An `enrichRide` the API does not know
+  fails the activity loudly (the `Unknown action` row under "When a run fails").
+- A Spin row and a COROS row that coexist for one ride from before #773 are left alone. Clean them by hand.
+
 ## FIT files (#154)
 
 Every activity that gets a `Workouts` row gets its FIT file, indoor ones
 included: an indoor ride's FIT still carries its second-by-second heart rate.
+(An indoor ride linked to a Spin row, #773, gets none: it has no row of its own, and Spin's FIT is the row's.)
 Strength (402) and Hybrid Fitness (1200) are §7's and get none, and an unmapped code (400 gym cardio
 included) has no row to record one on. `src/fit.mjs`:
 
@@ -677,6 +707,8 @@ the auto-disable after 60 days with no activity on a public repo. That layer is
 | `activity <id>: not written, unrecognized format in getActivityDetail: …` | COROS changed how it words a value the activity parser reads | Fix `src/normalize-activity.mjs` for the quoted line, then re-run. The archive still holds the text |
 | `activity <id>: upsertSyncedWorkout: N Workouts rows are coros activity …` | Two rows claim one COROS activity | Delete all but one in Thrive, then re-run |
 | `activity <id>: enrichWorkout: N Workouts rows are enriched from activity …` | Two hand-logged rows carry one strength session's ID | Clear `source_activity_id` on all but one, then re-run |
+| `activity <id>: enrichRide: N Workouts rows are linked to COROS activity …` | Two rows carry one COROS activity's id in `coros_activity_id` | Clear `coros_activity_id` (column AN) on all but one in the sheet, then re-run |
+| `activity <id>: Unknown action: "enrichRide"` | The sync was deployed before the Apps Script version that knows `enrichRide` (#773) | Deploy the API (`clasp push`, new version of the live deployment). The next run heals it |
 | `SyncLog row … was not written` naming `notes` | The API is newer than the tab | Run `scripts/migrate-155-sync-log-notes.mjs` |
 | `activity <id>: FIT request n of 3 failed` | COROS errored, or sent something that is not one whole FIT file for that activity | Nothing. The next run tries again, up to 3 requests in all |
 | `… FIT request n of 3 failed …: downloadActivityFitFiles returned a file for a different activity: <uri>, starting N s from the activity` (or `and no start time to check`) | The URI does not name the activity and the FIT's start is over 120 s from the list's, or the FIT has none (#739). COROS sent another activity's file, or stopped writing a start | Compare the two starts in COROS. A FIT this rule gave up on before #739 is asked for once more automatically (`requalified`); otherwise delete the archive's `fit` record to retry |

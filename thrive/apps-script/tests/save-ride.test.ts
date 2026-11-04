@@ -53,7 +53,7 @@ describe('a valid saveRide creates one indoor Spin row', () => {
     });
     expect(w.fit_ref).toBe(res.data.fit_ref);
     expect(w.streams_ref).toBe(res.data.streams_ref);
-    expect(api.rows[0]).toHaveLength(39);
+    expect(api.rows[0]).toHaveLength(40);
   });
 
   it('the date is the Denver date even when UTC has rolled over', () => {

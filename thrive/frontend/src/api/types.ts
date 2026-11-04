@@ -109,6 +109,10 @@ export interface Workout {
   // the plan link (#772): the Spin workout the plan names. The one of the nine the SPA may set.
   ride_workout_id: string;
   streams_ref: string; // AM Drive file ID of the ride's streams JSON
+  // #773, column AN: the COROS activity linked to a Spin ride, digits as text. Sync-owned: only the API's
+  // enrichRide and saveRide's merge write it, the SPA never sets it and every full-row write keeps it.
+  // '' means no COROS activity is linked, never '0'. Nothing renders it yet.
+  coros_activity_id: string;
 }
 
 /**

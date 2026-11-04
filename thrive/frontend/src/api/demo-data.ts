@@ -401,6 +401,7 @@ const DEMO_WORKOUTS_BASE: WorkoutWithRow[] = [
     intensity_pct: '',
     ride_workout_id: '',
     streams_ref: '',
+    coros_activity_id: '',
     sheetRow: 2,
   },
   {
@@ -443,6 +444,7 @@ const DEMO_WORKOUTS_BASE: WorkoutWithRow[] = [
     intensity_pct: '',
     ride_workout_id: '',
     streams_ref: '',
+    coros_activity_id: '',
     sheetRow: 3,
   },
   {
@@ -485,6 +487,7 @@ const DEMO_WORKOUTS_BASE: WorkoutWithRow[] = [
     intensity_pct: '',
     ride_workout_id: '',
     streams_ref: '',
+    coros_activity_id: '',
     sheetRow: 4,
   },
   {
@@ -527,6 +530,7 @@ const DEMO_WORKOUTS_BASE: WorkoutWithRow[] = [
     intensity_pct: '',
     ride_workout_id: '',
     streams_ref: '',
+    coros_activity_id: '',
     sheetRow: 5,
   },
   // #129: one indoor and one outdoor sub-typed activity, so the venue-driven
@@ -571,6 +575,7 @@ const DEMO_WORKOUTS_BASE: WorkoutWithRow[] = [
     intensity_pct: '',
     ride_workout_id: '',
     streams_ref: '',
+    coros_activity_id: '',
     sheetRow: 7,
   },
   {
@@ -613,6 +618,7 @@ const DEMO_WORKOUTS_BASE: WorkoutWithRow[] = [
     intensity_pct: '',
     ride_workout_id: '',
     streams_ref: '',
+    coros_activity_id: '',
     sheetRow: 8,
   },
   // #172: one COROS-synced hike with a duration and distance that the edit
@@ -661,6 +667,7 @@ const DEMO_WORKOUTS_BASE: WorkoutWithRow[] = [
     intensity_pct: '',
     ride_workout_id: '',
     streams_ref: '',
+    coros_activity_id: '',
     sheetRow: 9,
   },
   // #157: the Enriched example (sync plan §7). Logged by hand, so `source`
@@ -709,6 +716,7 @@ const DEMO_WORKOUTS_BASE: WorkoutWithRow[] = [
     intensity_pct: '',
     ride_workout_id: '',
     streams_ref: '',
+    coros_activity_id: '',
     sheetRow: 10,
   },
   {
@@ -751,6 +759,7 @@ const DEMO_WORKOUTS_BASE: WorkoutWithRow[] = [
     intensity_pct: '',
     ride_workout_id: '',
     streams_ref: '',
+    coros_activity_id: '',
     sheetRow: 6,
   },
   // #347: a plan from two days before the anchor that was never started, so
@@ -796,6 +805,7 @@ const DEMO_WORKOUTS_BASE: WorkoutWithRow[] = [
     intensity_pct: '',
     ride_workout_id: '',
     streams_ref: '',
+    coros_activity_id: '',
     sheetRow: 11,
   },
 ];
@@ -853,6 +863,7 @@ function demoRow(input: DemoRowInput): WorkoutWithRow {
     intensity_pct: '',
     ride_workout_id: '',
     streams_ref: '',
+    coros_activity_id: '',
     ...rest,
   };
 }
@@ -890,6 +901,7 @@ const DEMO_CASES: WorkoutWithRow[] = [
     intensity_pct: '',
     ride_workout_id: '',
     streams_ref: '',
+    coros_activity_id: '',
     sheetRow: 12,
   }),
   // A bike ride with a distance and a track since #692 (a 20 m shift of the ride above).
@@ -918,6 +930,7 @@ const DEMO_CASES: WorkoutWithRow[] = [
     intensity_pct: '',
     ride_workout_id: '',
     streams_ref: '',
+    coros_activity_id: '',
     sheetRow: 13,
   }),
   // A bike ride with a distance and no track: something to measure, nothing to draw (Gravel Loop has a track
@@ -1118,6 +1131,7 @@ function demoHistory(): WorkoutWithRow[] {
         intensity_pct: '',
         ride_workout_id: '',
         streams_ref: '',
+        coros_activity_id: '',
         offset: -21 - 5 * i,
         type,
         name: HISTORY_NAMES[type][k % 3],

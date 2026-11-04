@@ -36,6 +36,7 @@ added to a tab is added in both.
 | `src/change-log.js` | The MCP change log: `MCPChangeLog` rows for every MCP-key write, `getChangeLog`, and `undoCall` (#434) |
 | `src/snapshot.js` | The daily Drive copy of the sheet, its install/remove functions, and retention (#433). Not a web-app action |
 | `src/ride-workouts.js`, `src/ftp.js`, `src/rides.js` | Thrive Spin (#765): the `RideWorkouts` library and its steps JSON, the `FtpHistory` tab, and `saveRide` / `getWorkoutStreams`. Bad input is `code: bad_request` with fixed text that quotes nothing |
+| `src/ride-link.js` | `enrichRide` (#773): a COROS indoor-bike activity linked to its Spin ride, and the 15-minute matching helpers `saveRide`'s merge shares |
 | `src/auth.js` | Who is calling: the key, the Google-token check, its cache, the token read allow-list (#144) |
 | `src/main.js` | `doGet`/`doPost` dispatch, response envelope |
 
@@ -521,6 +522,65 @@ match, the fill and the write happen inside the action. Key only.
   link) and `written`, which is `{ workout_id, filled }` for the sync to store
   as the next `last_written`.
 
+### COROS and Spin rides: one row each (#773)
+
+| Action | Payload |
+|---|---|
+| `enrichRide` | `{"source_activity_id":"471166302945817204","activity":{"date":"2026-11-07","time":"08:03","started_at_utc":"2026-11-07T08:03:30-07:00","elapsed_seconds":"...","moving_seconds":"...","avg_hr":"...","calories":"..."},"last_written":null,"synced_at":"...","sport_type":"201"}` |
+
+The phone records a trainer ride as Thrive Spin (`source = spin`) and the watch records it too, as COROS Indoor Bike (sport code
+**201**). `Workouts!AN` `coros_activity_id` links the two, and whichever device reaches Thrive first, the ride ends as **one row**,
+`source = spin`, with that column set. Matching is by instant (`started_at_utc`), within `RIDE_MATCH_TOLERANCE_MINUTES` (**15**,
+inclusive), so midnight and the date column do not matter. The 15 minutes is a judgment on no data: revisit it from SyncLog notes.
+
+**`enrichRide`: Spin first.** Key only, outside `SPIN_ACTIONS` and the token lists, built like `enrichWorkout`. It never creates a
+row. The COROS sync calls it for code 201 before it fetches the FIT or writes a row.
+
+- **Already linked:** a row whose `coros_activity_id` is this activity's id. More than one is refused, naming them.
+- **Not linked:** a `source = coros` row with this `source_activity_id` is the activity's own row (the watch synced first, Spin has
+  not uploaded): `{"status":"unmatched","reason":"own row"}`. Otherwise a candidate is `source = spin`, `type = bike`,
+  `sub_type = indoor`, `status` blank, `coros_activity_id` blank and a readable `started_at_utc` within 15 minutes of the
+  activity's. Exactly one is linked. None: `reason: "no match"`. Two or more, even if one is nearer: `reason: "ambiguous"` with
+  `candidates` (`{id, started_at_utc}`). No unmatched answer writes anything.
+- **Fill:** the row gains `coros_activity_id`, `sport_type` `201` and `synced_at`. `elapsed_seconds`, `moving_seconds`, `avg_hr` and
+  `calories` are filled **only where the row holds a blank**, COROS has a value, and `last_written.filled` (for the same
+  `workout_id`) does not name it, so a clearing in Thrive sticks. A call that links nothing new and fills nothing writes nothing,
+  `synced_at` included: `unchanged`.
+- **Never touched:** AE:AM (power, NP, IF, TSS, kJ, FTP, intensity, ride workout, streams), `fit_ref`, `fit_fetched_at`,
+  `track_ref`, `trails`, `raw_ref`, `source`, `source_activity_id`, `name`, `notes`, `effort`, `status`, `date`, `time`,
+  `started_at_utc`, `distance_m` (the watch's trainer distance is an estimate), `ascent_m`, `descent_m`, `template_id`,
+  `estimated_seconds`, `copied_from`, `ride_workout_id`.
+- Returns `filled`, `linked` and `written` (`{ workout_id, filled }`, for the sync to store as the next `last_written`), as
+  `enrichWorkout` does.
+
+**`saveRide`: COROS first.** The sync runs up to four times a day, so the watch's activity can reach Thrive before the phone
+uploads, and then it already owns a `source = coros` row. After its idempotency check and its Drive writes, and before its plan
+claim, `saveRide` looks for **COROS candidates**: `source = coros`, `bike`, `indoor`, `status` blank, `started_at_utc` within the
+same 15 minutes of the ride's.
+
+- **Exactly one:** the ride is written onto that row in one write, and the answer is `status: "merged"`, the row's `id` and
+  `coros_activity_id`. The row becomes a Spin row: `source = spin`, `source_activity_id` = the ride id,
+  `coros_activity_id` = the COROS id it held, `status` blank, Spin's `fit_ref`, `fit_fetched_at` and `streams_ref`, AE:AL as sent,
+  `synced_at` now, and `raw_ref` cleared (the row no longer holds a COROS activity id for `getWorkoutPayload` to check it
+  against; the COROS FIT and archive stay in Drive). It keeps its `id`, `created`, `copied_from`, `template_id`,
+  `estimated_seconds`, `sport_type`, `track_ref` and `trails`. `date`, `time`, `started_at_utc`, `elapsed_seconds`,
+  `moving_seconds`, `avg_hr`, `calories` and `distance_m` take Spin's value where it sent one and keep the row's where it sent
+  null. `effort` and `notes` take Spin's when non-blank. `name` is Spin's unless the row has a `template_id` or
+  `estimated_seconds`, the marks of a claimed plan, whose name is the owner's.
+- **None:** #765's behaviour, unchanged.
+- **Two or more:** nothing is merged and a ride is never refused or lost: it is created, or claims a plan, as before, and the
+  answer carries `ambiguous_coros` (their ids).
+- Files are written before the row, by name, and the row write is a single call, so a retry after a half-finished attempt
+  converges on one row and one file of each name. After a merge the sync's next run finds the row by `coros_activity_id` and
+  never recreates a COROS row, even when the archive's record of what was written is lost.
+- The upload queue (#769) treats any `success: true` as done and does not branch on `status`.
+
+A Spin row and a COROS row that coexist for one ride from before this shipped are left alone: cleaning them is by hand.
+
+**Deploy order.** Run `scripts/migrate-773-coros-link.mjs` (`--dry-run` first) before merging, then `clasp push` and a new version
+of the live deployment, then merge. The COROS sync ships on merge and needs the API to know `enrichRide` first: an `enrichRide`
+the API does not know fails the activity loudly. No new secret, scope, trigger or workflow.
+
 ### SyncLog (#156)
 
 | Action | Parameters / payload |
@@ -615,7 +675,7 @@ Drive (`sync/README.md`, "GPS tracks"). Its Drive file ID is `Workouts!AC`
 
 ### The script lock
 
-`upsertSyncedWorkout`, `enrichWorkout`, `upsertDailyHealth`, `upsertBodyMeasurements` and `appendSyncLog` run under
+`upsertSyncedWorkout`, `enrichWorkout`, `enrichRide`, `upsertDailyHealth`, `upsertBodyMeasurements` and `appendSyncLog` run under
 `LockService`'s script lock (`withScriptLock` in `src/utils.js`), so a local
 sync overlapping a scheduled one cannot interleave a read-then-write. A caller
 that waits over 30 s gets `Lock timeout`, and nothing is written. The SPA

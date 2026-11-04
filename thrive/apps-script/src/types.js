@@ -6,7 +6,7 @@
 // every consumer arriving later (the COROS sync, the Journal) calls the API
 // instead of adding another copy.
 
-// Column indices for the Workouts sheet (0-based), A:AM after #128/#129/#145/#260/#432/#688/#765.
+// Column indices for the Workouts sheet (0-based), A:AN after #128/#129/#145/#260/#432/#688/#765/#773.
 var COL = {
   ID: 0,                  // A
   DATE: 1,                // B  local calendar date, YYYY-MM-DD
@@ -53,9 +53,12 @@ var COL = {
   INTENSITY_PCT: 36,      // AK the ride's intensity setting, whole %
   RIDE_WORKOUT_ID: 37,    // AL a RideWorkouts id: the workout ridden, or on a plan the Spin workout it names
   STREAMS_REF: 38,        // AM Drive file ID of the ride's streams JSON
+  COROS_ACTIVITY_ID: 39,  // AN the COROS activity linked to a Spin ride (#773), digits as text.
+                          //    Sync-owned: only enrichRide and saveRide's merge write it; blank
+                          //    means no COROS activity is linked, never 0
 };
 
-var WORKOUT_COLUMN_COUNT = 39;
+var WORKOUT_COLUMN_COUNT = 40;
 
 /**
  * The field name for each column, in sheet order. The read and write mappers
@@ -71,6 +74,7 @@ var WORKOUT_FIELDS = [
   'estimated_seconds', 'sport_type', 'track_ref', 'trails',
   'avg_power_w', 'np_w', 'intensity_factor', 'tss', 'work_kj', 'ftp_w',
   'intensity_pct', 'ride_workout_id', 'streams_ref',
+  'coros_activity_id',
 ];
 
 /**
@@ -82,6 +86,28 @@ var SPIN_OWNED_FIELDS = [
   'avg_power_w', 'np_w', 'intensity_factor', 'tss', 'work_kj', 'ftp_w',
   'intensity_pct', 'streams_ref',
 ];
+
+/**
+ * `coros_activity_id` (#773, AN) is owned by the COROS link: only `enrichRide` and
+ * `saveRide`'s merge write it. `createWorkout` and `updateWorkout` refuse it (a create
+ * may carry it blank, as the MCP Worker's new-workout object does), and every full-row
+ * write keeps what it holds.
+ */
+var COROS_LINK_FIELDS = ['coros_activity_id'];
+
+/**
+ * Indoor rides (#773). COROS sport code 201 is Indoor Bike, the only code `enrichRide`
+ * serves; the others, plain bike (200) included, are untouched.
+ */
+var COROS_INDOOR_BIKE_SPORT = '201';
+
+/**
+ * How far apart, in minutes and as instants, a COROS indoor-bike activity's start and a
+ * Spin ride's may be and still be one ride. Inclusive (#773). A judgment on no data: the
+ * watch is started within minutes of the phone, and two trainer rides are never that
+ * close. Revisit it from SyncLog notes.
+ */
+var RIDE_MATCH_TOLERANCE_MINUTES = 15;
 
 var WORKOUT_TYPES = ['weight', 'stretch', 'bike', 'hike', 'run', 'walk'];
 

@@ -479,6 +479,9 @@ export function buildWorkout(data) {
     intensity_pct: '',
     ride_workout_id: '',
     streams_ref: '',
+    // #773: AN, the COROS link. Blank in a new workout: the API refuses a value, and only
+    // enrichRide and saveRide's merge write it. Nothing here renders it.
+    coros_activity_id: '',
     // #145: a plan's estimate, seconds. Only ever what the caller said.
     estimated_seconds: data.estimated_seconds || '',
   };

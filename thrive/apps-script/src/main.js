@@ -72,6 +72,12 @@
 //     "activity":{"date":"2026-09-23","time":"07:30","avg_hr":"88",...},
 //     "last_written":null,"raw_ref":"<drive id>","synced_at":"...","sport_type":"402"}
 //
+// A COROS indoor ride (sport code 201) links to its Spin ride and fills its blanks (#773):
+//   ?action=enrichRide&key=...&payload={"source_activity_id":"471093115402967311",
+//     "activity":{"date":"2026-11-07","time":"08:03","started_at_utc":"2026-11-07T15:03:30Z",
+//     "elapsed_seconds":"3650","moving_seconds":"3600","avg_hr":"141","calories":"700"},
+//     "last_written":null,"synced_at":"...","sport_type":"201"}
+//
 // One row per sync run (#156):
 //   ?action=appendSyncLog&key=...&payload={"row":{"run_id":"schedule-123-1",
 //     "started_at":"...","finished_at":"...","status":"ok",...}}
@@ -626,6 +632,24 @@ function dispatch(action, params, caller) {
       result = {
         success: true,
         data: withScriptLock(function () { return enrichWorkout(payload); }),
+      };
+      break;
+
+    // --- Indoor ride enrichment (#773) ---
+    // A COROS indoor-bike activity (sport code 201) links to its Spin ride and fills blanks.
+    // A write, so key-only, like enrichWorkout: not a Spin action, not on the token lists.
+    case 'enrichRide':
+      if (!payload.activity) {
+        result = fail('payload.activity field required');
+        break;
+      }
+      if (!Object.prototype.hasOwnProperty.call(payload, 'last_written')) {
+        result = fail('payload.last_written field required (null when nothing was written before)');
+        break;
+      }
+      result = {
+        success: true,
+        data: withScriptLock(function () { return enrichRide(payload); }),
       };
       break;
 

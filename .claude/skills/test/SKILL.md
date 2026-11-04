@@ -73,7 +73,14 @@ back as **waived by the owner, not verified**, in full and by number. They are
 not passes and must not be worded as passes. Then continue as below; the list
 is what `/ship` carries into `## Results` as things to watch after install.
 
-**Otherwise**, when every criterion passes (or is waived, above):
+**If the issue touches Apps Script** and a criterion needs the deployed script
+(`stack-apps-script` §Testing): verify everything the sandbox can, then list
+those criteria back as **not verified here**, in full and by number. They are
+not passes and must not be worded as passes, and they are not a halt: nothing
+deploys before `/ship`. Continue as below; `/ship` carries them into
+`## Results` as things to check after the deploy.
+
+**Otherwise**, when every criterion passes (or is waived or listed back, above):
 
 ```bash
 gh pr ready <pr-number> --repo luketmoss/keel

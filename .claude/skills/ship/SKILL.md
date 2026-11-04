@@ -338,6 +338,12 @@ unverified, and says where the build to install comes from: the APK from the
 merge's CI run on `main` (android), an EAS build of the merged `main` commit
 (mobile).
 
+If `/test` listed criteria that need the deployed Apps Script as **not verified
+here**, `## Results` lists them under "Check after deploy", worded as
+unverified, after the `Deploy:` line, each with how the owner proves it from
+`stack-apps-script` §Testing. When `/ship` parked, they are checked once the
+owner has finished the steps and the script is deployed.
+
 Write the text to a file, then let the script put it in the body:
 
 ```bash

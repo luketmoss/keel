@@ -67,15 +67,16 @@ the test — a stub missing by default fails loudly, which is the intent.
 `@types/google-apps-script`. Its `tsconfig.json` has no `allowJs`, so it does
 not check `src/*.js` itself; the sandbox tests are what exercise the source.
 
-## Testing is partly human-gated
+## Testing is not human-gated, but part of it is deferred
 
 `/test` runs the suite and verifies what it can. Criteria that need the
 **deployed** script cannot be checked in CI or from a session. They are listed
-back explicitly, and the run stops in Testing rather than claiming them — the
-same shape as firmware. If all of an issue's criteria are covered by the
-sandbox, the run continues to Ready to Ship.
+back as **not verified here**, in full and by number, and never as passes. The
+run does not stop in Testing: only `/ship` deploys (see Deploying), so a halt
+before it could never be cleared. It continues to Ready to Ship, and `/ship`
+carries those criteria into `## Results` as things to check after the deploy.
 
-What `/test` cannot verify here, and how the owner proves each:
+What `/test` cannot verify here, and how the owner proves each after the deploy:
 
 | Category | The owner proves it by |
 |---|---|
@@ -87,7 +88,7 @@ What `/test` cannot verify here, and how the owner proves each:
 | Execution quotas | The Executions dashboard: runtime per execution, and the daily trigger runtime, which is shared by every script the owning account owns (90 minutes a day for time-driven triggers in Thrive's measure) |
 
 An issue that touches `apps-script/` states in its acceptance criteria which of
-these it needs. `/test` lists those criteria back; it does not mark them passed.
+these it needs. `/test` lists those criteria back as not verified; it does not mark them passed.
 
 ## Deploying
 

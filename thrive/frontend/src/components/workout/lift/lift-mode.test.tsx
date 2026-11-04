@@ -443,6 +443,32 @@ describe('logging during a rest', () => {
     expect(text(container)).toContain('Session effort');
   });
 
+  it('a stepper change held on the final rest is written before the summary opens', async () => {
+    withoutWarmup(() => (sets.value = plan().slice(4)));
+    workouts.value = [workout('active')];
+    const { container } = render(<LiftMode workoutId={W} />);
+    await startGroup(container);
+    await click(container, 'Done · finish');
+    const more = [...container.querySelectorAll<HTMLButtonElement>('.lift-log-item [aria-label^="More"]')].pop()!;
+    fireEvent.click(more);
+    expect(saveSet).not.toHaveBeenCalled();
+    await click(container, 'Finish workout');
+    await advance(10);
+    expect(saveSet).toHaveBeenCalledTimes(1);
+    expect(text(container)).toContain('Session effort');
+  });
+
+  it('Skip set on the last set goes straight to the summary', async () => {
+    withoutWarmup(() => (sets.value = plan().slice(3)));
+    const { container } = render(<LiftMode workoutId={W} />);
+    await click(container, 'Start workout');
+    await startGroup(container);
+    await click(container, 'Done · switch');
+    await click(container, 'Skip set');
+    await advance(10);
+    expect(text(container)).toContain('Session effort');
+  });
+
   it('an effort set on the final rest is in the summary', async () => {
     withoutWarmup(() => (sets.value = plan().slice(4)));
     workouts.value = [workout('active')];

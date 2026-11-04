@@ -130,9 +130,10 @@ passes does `clasp show-authorized-user` confirm the account:
 - **The owner's steps are done.** The issue names no trigger to install,
   script property to set, or migration or backfill to run — or it does, and
   the owner has confirmed them (below).
-- **The checkout is exactly the PR.** `HEAD` is the PR's head commit and
-  `git status --porcelain -- <project>/apps-script/src` prints nothing —
-  nothing modified or untracked — so the push sends exactly what was reviewed.
+- **The PR's head commit can be fetched.** `gh pr view <pr> --json
+  headRefOid` names it, and `git fetch origin <headRefOid>` brings it local.
+  The push is made from that commit (step 3), so what the shared checkout has
+  checked out, or has uncommitted, does not matter and is not read.
 
 **Confirming the owner's steps (#795).** The issue's text is all this check can
 read, and a re-run starts over, so a step the owner has already done would
@@ -166,11 +167,25 @@ clasp list-deployments
 Note the version the live deployment ID serves. It is the "was" in the report
 and the `-V` of every roll back.
 
-### 3. Push and redeploy
+### 3. Push and redeploy, from a worktree
 
-Write `.clasp.json` (gitignored) from the recorded script ID, in the form
-`.clasp.json.example` gives, then run the project's push command and redeploy
-the existing deployment:
+**Never push from the shared checkout (#811).** Other sessions share it and
+switch its branch, so a check that it is at the PR is true only when read: on
+4 Nov 2026 a push sent main's code in place of #773's. Push from a detached
+worktree at the PR's head commit instead. Remove and prune any leftover at the
+path first, then create it:
+
+```bash
+wt=<temp>/keel-ship-<issue>-<project>
+git worktree remove --force "$wt"; git worktree prune
+git worktree add --detach "$wt" <headRefOid>
+cd "$wt/<project>/apps-script"
+```
+
+Write `.clasp.json` there from the recorded script ID, in the form
+`.clasp.json.example` gives. Never copy it from the shared checkout. Then run
+the project's push command and redeploy the existing deployment, all from the
+worktree:
 
 ```bash
 clasp push              # or `clasp push --force` where the project says so
@@ -181,7 +196,8 @@ clasp redeploy <deploymentId> --description "#<issue> <title>"
 deployment with a new URL, and every consumer holding the old one — the
 Worker's secret, the Pages bundles — breaks.
 
-A failure here parks with the failed-part-way report below.
+A failure here parks with the failed-part-way report below, after step 6's
+clean-up.
 
 ### 4. Confirm
 
@@ -189,16 +205,48 @@ A failure here parks with the failed-part-way report below.
 newer than the one recorded in step 2. If it doesn't, that is a failed
 redeploy — park with the failed-part-way report.
 
-### 5. Then Results and the merge
+### 5. Verify the live source is the PR's
+
+Before anything merges, pull the script's live files into a scratch folder and
+compare them with the PR's `src` at `<headRefOid>`:
+
+```bash
+scratch=<temp>/keel-ship-<issue>-<project>-pull
+rm -rf "$scratch"; mkdir -p "$scratch"
+cp "$wt/<project>/apps-script/.clasp.json" "$scratch/"
+cd "$scratch" && clasp pull
+git diff --no-index --ignore-cr-at-eol --stat \n  "$wt/<project>/apps-script/src" "$scratch/src"
+```
+
+Text files compare with line endings normalised and `appsscript.json` as
+parsed JSON, so formatting alone is not a difference. Any other difference, or
+a failed `clasp pull`, parks with the source-mismatch report below. Do not
+write `## Results` or merge. Verifying the pushed files is the most `clasp`
+can show: it cannot read a version's source, and step 4 confirms the version.
+
+### 6. Clean up, then Results and the merge
+
+Remove the worktree and the scratch folder on every path out of step 3
+onward, the parks included:
+
+```bash
+git worktree remove --force "$wt"; rm -rf "$scratch"; git worktree prune
+```
+
+A clean-up failure is a note after the `Deploy:` line. It never parks or
+reverses a deploy.
 
 Write `## Results` with the `Deploy:` line below, then merge as the next
 sections say. **If the merge fails after a deploy, roll back** before
-reporting:
+reporting, from a second detached worktree at `origin/main` and never by
+`git checkout` in the shared checkout:
 
 ```bash
 clasp redeploy <deploymentId> -V <previous>
-git checkout origin/main -- <project>/apps-script/src
+git worktree add --detach "$wt" origin/main
+cd "$wt/<project>/apps-script"     # with .clasp.json written as in step 3
 clasp push              # the project's push command: triggers run main's
+git worktree remove --force "$wt"
 ```
 
 Then park with the merge-failed report.
@@ -254,8 +302,7 @@ Reasons, one line each, every one that applies, in this order:
 - `The issue names owner steps for the deploy, and inside /finish there is
   no one to confirm them.` — or, run on its own, `The owner's steps were not
   confirmed.`
-- `The checkout is not at the PR's head, or apps-script/src has uncommitted
-  changes.`
+- `The PR's head commit <short sha> could not be fetched from origin.`
 
 The owner's steps use the project's own push command and the real deployment
 ID when it is recorded; otherwise `<deploymentId>` stays as written. Steps 1
@@ -292,12 +339,40 @@ Deploying Forage's Apps Script failed at <clasp push | clasp redeploy>:
 What is live now:
   pushed code: <the PR's | unchanged>
   deployment:  version 57 (unchanged)
-Roll back the push with: git checkout origin/main -- forage/apps-script/src;
-clasp push --force
+Roll back the push with the PowerShell below
 ```
 
-When the push failed, `pushed code: unchanged` and the roll-back line is left
-out.
+```powershell
+git worktree add --detach "$env:TEMP\keel-rollback" origin/main
+Set-Location "$env:TEMP\keel-rollback\forage\apps-script"
+clasp push --force
+Set-Location D:\Projects\code\keel
+git worktree remove --force "$env:TEMP\keel-rollback"
+```
+
+The project's own push command and path stand in where they differ; the
+worktree is at `origin/main`, never the shared checkout. When the push failed,
+`pushed code: unchanged` and the roll-back are left out.
+
+### Parked — the live source is not the PR's
+
+Step 5 found the pushed source differs from the PR's, or could not pull it.
+Nothing merged, and no `Deploy:` line is written:
+
+```
+Parked in Ready to Ship — not merged.
+
+Deploying Thrive's Apps Script pushed, but the live source is not the PR's:
+  <up to 5 differing files, one per line | the pull's first 5 error lines>
+
+What is live now:
+  pushed code: not verified as the PR's
+  deployment:  version 49 (new) — it may not carry this PR
+Roll back with: clasp redeploy <deploymentId> -V 48
+```
+
+The roll-back is the real deployment ID and the version from step 2. Add the
+PowerShell above where the pushed code also needs rolling back.
 
 ### Parked — the merge failed after deploying
 

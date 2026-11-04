@@ -88,8 +88,9 @@ Reasons, one line each, every one that applies, in this order:
 - `It adds the <scope> scope to appsscript.json, which needs
   re-authorization in the editor.`
 - `The issue says <trigger / script property / migration> comes first.`
-- `The checkout is not at the PR's head, or apps-script/src has uncommitted
-  changes.`
+- `The PR's head commit <short sha> could not be fetched from origin.`
+  (#811: the push is made from a worktree at that commit, so the shared
+  checkout's state is not checked.)
 
 The owner's steps list the project's own push command and the real deployment
 ID when it is recorded; otherwise `<deploymentId>` stays as written. A step 3
@@ -107,8 +108,9 @@ Deploying Forage's Apps Script failed at <clasp push | clasp redeploy>:
 What is live now:
   pushed code: <the PR's | unchanged>
   deployment:  version 57 (unchanged)
-Roll back the push with: git checkout origin/main -- forage/apps-script/src;
-clasp push --force
+Roll back the push with the PowerShell in
+docs/design/811-deploy-from-worktree.md (a worktree at origin/main; #811
+replaced the `git checkout` in the shared checkout that stood here)
 ```
 
 When the push failed, `pushed code: unchanged` and the roll-back line is left
@@ -155,6 +157,9 @@ for it. MCP safety-model changes need an explicit criterion (CONVENTIONS.md
 - **Two Apps Script projects in one PR.** Each deploys in path order, each
   gets its own `Deploy:` line and report paragraph. A park on either parks the
   whole PR; one already deployed is rolled back first.
+- **Another session switches the shared checkout mid-deploy.** Not noticed and
+  not relevant since #811: the push comes from a worktree at the PR's head
+  commit, and the live source is pulled back and compared before the merge.
 - **`/ship` re-run after a deploy-failure park.** Starts over: records the
   live version again, pushes and redeploys again. Nothing from the first run
   is remembered.

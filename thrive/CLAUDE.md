@@ -269,6 +269,8 @@ with its plan, last session (`lastSession`, which skips planned workouts) and a 
 "since last set" clock with no target or alert, and the previous round's log card. Start <group> writes a changed
 weight to that exercise's unlogged sets and `rest_s` to the set that ended the last group. It also opens a run at a
 section's start; part-way through one, Ready stays.
+Every log card lists its round in round order, and Done on the last working set opens the **final rest** (#813): its round's
+log card, then Finish workout (the summary) or, with a cool-down, Start cool-down. Only Skip set on the last one goes straight on.
 
 ## Key commands
 

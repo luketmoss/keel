@@ -331,18 +331,14 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
   }, []);
 
   /**
-   * After the last working set: the cool-down checklist, or with none the
-   * summary. `lastDone` is the set just finished by Done, whose rest then stays
-   * on screen behind the summary for Back, without an Up next.
+   * After the last working set. `lastDone` is the set just finished by Done: its
+   * rest (the final rest, no Up next) opens so the round can be logged like any
+   * other (#813), and its action leads on to the cool-down or the summary.
+   * Without one (Skip set, no working sets) it goes straight on.
    */
   const afterWorking = useCallback(
-    (lastDone?: { index: number; at: number; written: Promise<unknown> }) => {
-      const cooldown = checklistFor(
-        'cooldown',
-        sets.value.filter((s) => s.workout_id === workoutId),
-        workout,
-      ).items;
-      if (cooldown.length === 0 && lastDone) {
+    (lastDone?: { index: number; at: number }) => {
+      if (lastDone) {
         go({
           phase: 'rest',
           stepIndex: lastDone.index,
@@ -352,11 +348,16 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
           alertedAt: null,
           restFor: lastDone.index,
         });
-      } else {
-        go({ phase: 'cooldown', setStartedAt: null, restStartedAt: null, restFor: null, restTarget: 0 });
+        return;
       }
+      const cooldown = checklistFor(
+        'cooldown',
+        sets.value.filter((s) => s.workout_id === workoutId),
+        workout,
+      ).items;
+      go({ phase: 'cooldown', setStartedAt: null, restStartedAt: null, restFor: null, restTarget: 0 });
       // Nothing to tick off after the last set: it goes straight to the summary.
-      if (cooldown.length === 0) void openSummary(lastDone?.written);
+      if (cooldown.length === 0) void openSummary();
     },
     [go, workoutId, workout, openSummary],
   );
@@ -477,12 +478,12 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
     const step = steps[run.stepIndex];
     if (!step) return;
     const t = Date.now();
-    const written = timing(run.stepIndex, {
+    timing(run.stepIndex, {
       set_s: String(run.setStartedAt === null ? 0 : wholeSeconds(run.setStartedAt, t)),
     });
     const next = nextIndex(steps, run.stepIndex);
     if (next < 0) {
-      afterWorking({ index: run.stepIndex, at: t, written });
+      afterWorking({ index: run.stepIndex, at: t });
       return;
     }
     // #674: the next set opens another group, so what follows is setup, not a rest toward a target.
@@ -627,11 +628,9 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
   const restElapsed = secondsSince(run.restStartedAt, now);
   const view = restView(restElapsed, run.restTarget);
 
-  // The round the rest (or setup) follows, to log: its performed sets, newest first.
+  // The round the rest (or setup) follows, to log: its performed sets, in round order (#813).
   const card = restFor
-    ? roundUpTo(steps, restFor.index)
-        .filter((s) => s.index === restFor.index || isStepLogged(s.row))
-        .reverse()
+    ? roundUpTo(steps, restFor.index).filter((s) => s.index === restFor.index || isStepLogged(s.row))
     : [];
   const inCard = new Set(card.map((s) => s.key));
   const earlier = steps.filter((s) => !inCard.has(s.key) && isStepLogged(s.row) && !s.row.effort).length;
@@ -692,7 +691,7 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
         const groupEnds = endsGroup(steps, step.index, nxt);
         const nextLine =
           nxt < 0
-            ? "That's the last set. Done opens the finish."
+            ? "That's the last set. Log it, then finish."
             : groupEnds
               ? `Then set up ${groupName(steps[nxt].section)}`
               : !step.lastInRound && step.nextInRound
@@ -750,7 +749,17 @@ export function LiftMode({ workoutId }: { workoutId: string }) {
         </div>
       );
       if (finalRest) {
-        primary = { label: 'Finish workout', onClick: () => void openSummary() };
+        // #813: the last round is logged here; the action leads on to the cool-down or the summary.
+        primary =
+          cooldowns.length > 0
+            ? {
+                label: 'Start cool-down',
+                onClick: () => {
+                  void flushLogDrafts();
+                  go({ phase: 'cooldown', setStartedAt: null, restStartedAt: null, restFor: null, restTarget: 0 });
+                },
+              }
+            : { label: 'Finish workout', onClick: () => void openSummary() };
       } else {
         primary = { label: 'Start set', onClick: startSet, warn: view.up };
         secondary = { label: 'Skip set', onClick: skipSet };

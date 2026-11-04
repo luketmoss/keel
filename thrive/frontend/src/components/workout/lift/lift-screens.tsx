@@ -391,7 +391,7 @@ export function LogCard({
   token,
   earlierWithoutEffort,
 }: {
-  /** The round's performed sets, newest first. */
+  /** The round's performed sets, in round order. */
   items: readonly LiftStep[];
   workoutId: string;
   token: string;

@@ -424,7 +424,7 @@ describe('logging during a rest', () => {
     expect(container.querySelector('.lift-exercise')?.textContent).toBe('OH Press');
   });
 
-  it('the last working set opens the summary rather than a rest', async () => {
+  it('the last working set opens its round to log, not the summary (#813)', async () => {
     withoutWarmup(() => (sets.value = plan().slice(3)));
     const { container } = render(<LiftMode workoutId={W} />);
     await click(container, 'Start workout');
@@ -432,14 +432,64 @@ describe('logging during a rest', () => {
     await click(container, 'Done · switch');
     await click(container, 'Start set');
     await click(container, 'Done · finish');
-    // The last set opens the summary rather than a rest or the finish modal.
     expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(text(container)).not.toContain('Session effort');
+    expect(text(container)).toContain('Log this round');
+    expect(container.querySelectorAll('.lift-log-item').length).toBe(2);
+    expect(container.querySelector('.lift-next')).toBeNull();
+    expect(byText(container, 'Skip set')).toBeUndefined();
+    await click(container, 'Finish workout');
+    await advance(10);
     expect(text(container)).toContain('Session effort');
+  });
+
+  it('a stepper change held on the final rest is written before the summary opens', async () => {
+    withoutWarmup(() => (sets.value = plan().slice(4)));
+    workouts.value = [workout('active')];
+    const { container } = render(<LiftMode workoutId={W} />);
+    await startGroup(container);
+    await click(container, 'Done · finish');
+    const more = [...container.querySelectorAll<HTMLButtonElement>('.lift-log-item [aria-label^="More"]')].pop()!;
+    fireEvent.click(more);
+    expect(saveSet).not.toHaveBeenCalled();
+    await click(container, 'Finish workout');
+    await advance(10);
+    expect(saveSet).toHaveBeenCalledTimes(1);
+    expect(text(container)).toContain('Session effort');
+  });
+
+  it('Skip set on the last set goes straight to the summary', async () => {
+    withoutWarmup(() => (sets.value = plan().slice(3)));
+    const { container } = render(<LiftMode workoutId={W} />);
+    await click(container, 'Start workout');
+    await startGroup(container);
+    await click(container, 'Done · switch');
+    await click(container, 'Skip set');
+    await advance(10);
+    expect(text(container)).toContain('Session effort');
+  });
+
+  it('an effort set on the final rest is in the summary', async () => {
+    withoutWarmup(() => (sets.value = plan().slice(4)));
+    workouts.value = [workout('active')];
+    const { container } = render(<LiftMode workoutId={W} />);
+    await startGroup(container);
+    await click(container, 'Done · finish');
+    await click(container.querySelector('.lift-log-item')!, 'Hard');
+    expect(saveSet).toHaveBeenCalledWith(expect.objectContaining({ effort: 'Hard' }), 'tok', expect.anything());
+    // The store follows the write, as saveSet does.
+    sets.value = sets.value.map((s) =>
+      s.exercise_name === 'Lateral' ? { ...s, effort: 'Hard', reps: s.reps || '8' } : s,
+    );
+    await click(container, 'Finish workout');
+    await advance(10);
+    expect(text(container)).toContain('Session effort');
+    expect(text(container)).not.toContain('need effort');
   });
 });
 
 describe('the log card for a round', () => {
-  it('lists the round newest first and counts earlier sets without effort', async () => {
+  it('lists the round in round order and counts earlier sets without effort', async () => {
     withoutWarmup(() => {
       rowNo = 2;
       sets.value = [
@@ -459,7 +509,7 @@ describe('the log card for a round', () => {
     await click(container, 'Done · rest 0:45');
     expect(text(container)).toContain('Log this round');
     const names = [...container.querySelectorAll('.lift-log-head strong')].map((n) => n.textContent);
-    expect(names).toEqual(['Lateral', 'Arnold']);
+    expect(names).toEqual(['Arnold', 'Lateral']);
     // Tapping an effort on Lateral leaves Arnold set 1 as the one earlier set without one.
     expect(text(container)).not.toContain('earlier set');
     await click(container, 'Start set');
@@ -802,8 +852,10 @@ describe('the summary', () => {
     await startGroup(container);
     await advance(30_000);
     await click(container, 'Done · finish');
-    expect(text(container)).toContain('Session effort');
     expect(saveSetTimings).toHaveBeenCalledWith([{ sheetRow: 6, patch: { set_s: '30' } }], 'tok');
+    await click(container, 'Finish workout');
+    await advance(10);
+    expect(text(container)).toContain('Session effort');
     await advance(10_000);
     await click(container, 'Back');
     expect(clock(container)).toBe('0:10');
@@ -824,6 +876,10 @@ describe('the summary', () => {
     const { container } = render(<LiftMode workoutId={W} />);
     await startGroup(container);
     await click(container, 'Done · finish');
+    // #813: the last set is logged first, then Start cool-down leads on.
+    expect(container.querySelector('.lift-log-item')).not.toBeNull();
+    expect(byText(container, 'Finish workout')).toBeUndefined();
+    await click(container, 'Start cool-down');
     expect(text(container)).toContain('Cool-down');
     expect(text(container)).not.toContain('Session effort');
     await click(container, 'Finish workout');
@@ -877,14 +933,16 @@ describe('All sets', () => {
 });
 
 describe('finishing', () => {
-  it('Done on the last working set opens the summary and Save finishes the workout', async () => {
+  it('Done on the last working set, then Finish workout, opens the summary and Save finishes the workout', async () => {
     withoutWarmup(() => (sets.value = plan().slice(4)));
     workouts.value = [workout('active')];
     const { container } = render(<LiftMode workoutId={W} />);
     await startGroup(container);
-    expect(text(container)).toContain("That's the last set. Done opens the finish.");
+    expect(text(container)).toContain("That's the last set. Log it, then finish.");
     await click(container, 'Done · finish');
     expect(container.querySelector('[role="dialog"]')).toBeNull();
+    await click(container, 'Finish workout');
+    await advance(10);
     await click(container, 'Save workout');
     expect(finishWorkout).toHaveBeenCalledWith(W, '', '', 'tok');
     expect(navigate).toHaveBeenCalledWith('/activities');

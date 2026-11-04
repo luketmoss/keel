@@ -215,7 +215,8 @@ scratch=<temp>/keel-ship-<issue>-<project>-pull
 rm -rf "$scratch"; mkdir -p "$scratch"
 cp "$wt/<project>/apps-script/.clasp.json" "$scratch/"
 cd "$scratch" && clasp pull
-git diff --no-index --ignore-cr-at-eol --stat \n  "$wt/<project>/apps-script/src" "$scratch/src"
+git diff --no-index --ignore-cr-at-eol --stat \
+  "$wt/<project>/apps-script/src" "$scratch/src"
 ```
 
 Text files compare with line endings normalised and `appsscript.json` as

@@ -524,6 +524,19 @@ Refined issue in the Project gets flagged, not just ones that provably
 overlap. `/develop` is what decides, per issue, whether a flag actually
 matters.
 
+## Clean up worktrees
+
+After the merge and the sibling flags, run:
+
+```bash
+python .keel/worktrees.py clean --apply
+```
+
+It removes worktrees under `.claude/worktrees/` whose PR has merged and that
+have nothing uncommitted, with their local branches, and prints why it kept the
+rest. It always exits 0, and a `warn:` line in its output is reported in one
+line. Like the sibling flags, it never blocks or changes the ship's outcome.
+
 ## Report
 
 What merged, the commit on main, and that CI is building. If the project has a

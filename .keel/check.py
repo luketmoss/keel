@@ -12,6 +12,7 @@ by reading:
   - every relative link in a tracked .md file resolves
   - every design note cited by filename is committed
   - pr.py's path-filter matcher, report and Results editor behave on fixtures
+  - worktrees.py keeps or removes each kind of worktree correctly on fixtures
   - board.py's epic grouping and promotion decisions behave on fixtures
 
 Run it locally exactly as CI runs it:
@@ -542,8 +543,58 @@ def check_board_group():
     return "board.py group", "{} cases".format(count[0]), problems
 
 
+def check_worktrees():
+    """worktrees.py's decision for each kind of worktree.
+
+    It deletes folders, so which ones it will touch is held to fixtures: only a
+    clean, merged, remote-less branch under .claude/worktrees/ is removed, and
+    every other kind is kept with its own reason.
+    """
+    sys.path.insert(0, os.path.join(ROOT, ".keel"))
+    try:
+        import worktrees
+    finally:
+        sys.path.pop(0)
+
+    base = os.path.join(ROOT, ".claude", "worktrees")
+    inside = os.path.join(base, "agent-a1")
+    problems = []
+    count = [0]
+
+    def wt(path=inside, branch="x/1-y", main=False, prunable=False):
+        return {"path": path, "branch": branch, "main": main,
+                "prunable": prunable}
+
+    def expect(label, got, want):
+        count[0] += 1
+        if got != want:
+            problems.append("{}: got {!r}, want {!r}".format(label, got, want))
+
+    def decide(w, merged=True, remote=False, dirty=False):
+        return worktrees.classify(w, base, merged, remote, dirty)
+
+    expect("removable", decide(wt()), ("remove", "PR merged, clean"))
+    expect("main checkout", decide(wt(path=ROOT, main=True))[0], "keep")
+    expect("outside the folder",
+           decide(wt(path=os.path.join(ROOT, "..", "keel-765")))[0], "keep")
+    expect("base itself is not inside", decide(wt(path=base))[0], "keep")
+    expect("sibling prefix is not inside",
+           decide(wt(path=base + "-old"))[0], "keep")
+    expect("detached", decide(wt(branch=None)), ("keep", "detached"))
+    expect("no merged PR", decide(wt(), merged=False),
+           ("keep", "no merged PR"))
+    expect("still on origin", decide(wt(), remote=True)[0], "keep")
+    expect("dirty", decide(wt(), dirty=True), ("keep", "uncommitted changes"))
+    expect("prunable inside", decide(wt(prunable=True))[0], "prune")
+    expect("prunable outside",
+           decide(wt(path=os.path.join(ROOT, "..", "keel-765"),
+                     prunable=True))[0], "keep")
+
+    return "worktrees.py", "{} cases".format(count[0]), problems
+
+
 CHECKS = [check_python, check_frontmatter, check_links, check_design_notes,
-          check_pr_script, check_board_group]
+          check_pr_script, check_board_group, check_worktrees]
 
 
 def main():

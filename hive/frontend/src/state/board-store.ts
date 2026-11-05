@@ -319,14 +319,34 @@ function contextTitle(): string {
 }
 
 /**
+ * #240 AC2/AC5, #818: make an item's board the active one, as state only. Outside
+ * Boards the view and address stay where they are; while Boards shows a board,
+ * the board showing and the `board` param follow. A no-op when it is already active.
+ */
+function followItemBoard(boardId: string) {
+  if (!boardId || boardId === activeBoardId.value) return;
+  activeBoardId.value = boardId;
+  if (activeView.value === 'boards') {
+    showBoardsScreen(boardId);
+    const url = new URL(window.location.href);
+    url.searchParams.set('board', boardId);
+    window.history.replaceState(null, '', url.toString());
+  }
+}
+
+/**
  * #240: open an item's detail. The single entry point for selection — every
  * call site routes through here so the URL and document title cannot drift out
  * of sync with `selectedItemId`.
  */
 export function selectItem(id: string) {
+  const item = items.value.find((i) => i.id === id);
+  // #818: the item screen reads the active board for its labels, columns and
+  // done state, so it must be the item's own board. Only an item that is
+  // loaded and on an accessible board moves it.
+  if (item && accessibleBoards.value.some((b) => b.id === item.board_id)) followItemBoard(item.board_id);
   selectedItemId.value = id;
   syncSelectedItemParam(id);
-  const item = items.value.find((i) => i.id === id);
   document.title = item ? `Hive — ${item.title}` : contextTitle();
 }
 
@@ -364,15 +384,7 @@ export function initSelectedItemFromUrl() {
   // AC2: the item's own board wins over whatever `board` named, or its absence.
   // AC5: outside Boards this is state only — the `board` param stays
   // deleted and the view is not forced back to the board.
-  if (item.board_id && item.board_id !== activeBoardId.value) {
-    activeBoardId.value = item.board_id;
-    if (activeView.value === 'boards') {
-      showBoardsScreen(item.board_id);
-      const url = new URL(window.location.href);
-      url.searchParams.set('board', item.board_id);
-      window.history.replaceState(null, '', url.toString());
-    }
-  }
+  followItemBoard(item.board_id);
 
   selectedItemId.value = item.id;
   document.title = `Hive — ${item.title}`;

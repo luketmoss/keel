@@ -1,7 +1,7 @@
 ---
 name: brief
-description: Write the user's daily brief (last night's sleep, yesterday's training, today's plan, an activity recommendation, the weather and what it means for planned rides, the next few days) or, with "weekly", a look back at the past week and ahead to the next. Reads Thrive, Hive, COROS, Google Calendar, a weather forecast and the training plan's reasoning from a local wiki, and publishes the daily and weekly briefs as web pages, then tells the phone they are up; writes nothing else. Use when the user asks for their brief, a morning summary, "how should I train today", or a weekly review.
-argument-hint: [weekly] [scheduled]
+description: Write the user's daily brief (last night's sleep, yesterday's training, today's plan, an activity recommendation, the weather and what it means for planned rides, the next few days) or, with "weekly", a look back at the past week and ahead to the next, or, with "nightly", an evening page for tonight, today closed out and the next five days. Reads Thrive, Hive, COROS, Google Calendar, a weather forecast and the training plan's reasoning from a local wiki, and publishes the daily and weekly briefs as web pages, then tells the phone they are up; writes nothing else. Use when the user asks for their brief, a morning summary, "how should I train today", or a weekly review.
+argument-hint: [weekly | nightly] [scheduled]
 ---
 
 # Daily Brief
@@ -15,7 +15,8 @@ is up (Step 6, #617), or, on a scheduled run, that it couldn't be (*When it
 can't publish*).
 
 `$ARGUMENTS` containing `weekly` runs the [weekly brief](#weekly-brief);
-anything else runs the daily one. `scheduled` means a scheduled task started
+containing `nightly` runs the [nightly brief](#nightly-brief) (#829); anything
+else runs the daily one. `scheduled` means a scheduled task started
 the run and nobody is there to answer a question (see Step 1).
 
 ## Settings
@@ -708,6 +709,170 @@ strings show as text, times are decimal hours as on the daily page):
 - `foot`: what wasn't checked, any Hive items whose due date couldn't be read,
   a checkout `sync` could not update (Where it runs), any thin comparison, such as a week before with only a few nights of data,
   and that this is training guidance, not medical advice.
+
+## Nightly brief
+
+An evening page for tonight, the day just lived and the next five days (#829,
+epic #834). The design is
+[thrive/docs/design/829-nightly-brief.md](../../../docs/design/829-nightly-brief.md);
+this section is the run. It is the same skill with the same Settings, *Where it
+runs* and never-write rules, published from `nightly-template.html` the way
+Step 6 publishes the daily page. Step 1's wait for sleep does not apply: the run
+publishes without it and says so. Not on this page: *What your data says*, each
+day's morning outlook and findings-backed moves (#830), and the trial card
+(#831).
+
+**The rules are code.** The bed-by, each day's bed-by, the moves, the food
+completeness line and the tile states are `nightly.py`, tested in
+`test_nightly.py` on made-up fixtures. Gather first, then:
+
+```
+python thrive\.claude\skills\brief\nightly.py rules < readings.json
+```
+
+(a scratch file in the scratchpad, never in the repo). Its input and output are
+documented at the top of `compute()`; the page's `tonight`, `moves`, each day's
+`bed` and `today.food.yesterday` come from its answer, and a figure the page
+shows still comes from a tool result. `tile_state` is the same file's, for each
+tile's `state`.
+
+### Gather
+
+In parallel, keeping going when one fails. Dates are local; "today" is the run's
+date, whatever the hour.
+
+| What | Call |
+|---|---|
+| Nights, the bed-by and the tiles | `thrive_daily_health`, the 60 days ending today |
+| Daily rows, tiles and water timing | `thrive_daily_summary`, the 14 days ending today |
+| Today's drinks, with times | `thrive_drinks`, today |
+| Today's sessions | `thrive_list_workouts`, today, `completed` |
+| Planned sessions | `thrive_list_workouts`, today to today + 5, `planned` |
+| Today's note | `thrive_journal`, today |
+| Body | `thrive_body_measurements`, 14 days |
+| Food, today and yesterday | `forage_food_log`, yesterday to today |
+| The food week | `forage_food_log`, the 7 days ending yesterday |
+| Meals planned | `forage_list_plan`, tomorrow to today + 5 |
+| Board | Hive as Step 2 reads it, filed over today + 5 |
+| Calendar | both calendars, today to today + 5, as Step 2 reads them |
+| Weather | Open-Meteo as Step 2 reads it, `forecast_days=6`, each day over waking hours |
+| Goals and the plan's why | the wiki's `training-goals` page (the food goals) and the active block page, through the `wiki:` path as *The plan's why* does |
+
+A Forage tool may be deferred: search for it ("forage") before concluding it is
+not connected. A source that fails is named in the foot and in the phone `note`
+(`Not read: Hive`, `calendar` or `Forage`); the page still publishes. Blank is
+unknown, never zero.
+
+### Build the page
+
+Order: header (`Tonight`, meta `Wed, Nov 4 · 9:17 PM`), notice, **Tonight**,
+**Today**, **Next 5 days**, foot. The wording, states and edge cases are the
+design note's; the data keys are below. Titles from the calendar, Hive, the
+journal or a note go in as plain strings.
+
+- **Freshness.** `notice` is `{text, refresh}`. Today's DailyHealth missing or
+  without sleep: *"Last night's sleep hasn't synced. Open the COROS app, then
+  reply refresh to this brief in Claude."* with `refresh: true`; the Slept,
+  Sleep score and Asleep at tiles get `value: null`. A `synced_at` before
+  21:00: *"Thrive last synced at 6:31 PM. A session after that isn't here
+  yet."* **refresh** reruns the whole nightly.
+- `meta`, `asOf` (the run time), `links` (below).
+- `tonight`: `{bedBy, upAt, commit: {type, label, keyText}, why, windDownText,
+  inBedText, moves}`. `bedBy` is `nightly.py`'s `tonight.bed_by`, left out
+  (`null`) when it has none, which the hero says; `upAt` is its `wake_by`
+  without the AM; `commit` is tomorrow's first commitment, left out for *No
+  early start tomorrow*; `moves` are its `moves`, at most three, none leaving
+  the row out. `why` is last night's figures against the 14-night average and
+  what the bed-by rests on, or *"Your 7:00 lift means up by 6:00."* when the
+  commitment set it.
+- `timeline`: `{lastBed, lastWake, windDown, bed, wake, commit}` in decimal
+  hours on the night scale (22:30 is `22.5`, 6:36 AM is `30.6`, 7:00 AM is
+  `31`). `windDown` is bed − 0.5.
+- `today`: `{line, ribbon, tiles, training, food, drinks, body}`.
+  - `line` the day in one line.
+  - `ribbon`: `{from: 5, to: 23, sleepEnd, now, bed, sessions: [{s, e, type,
+    label}], events: [{s, e, t}], water: [hour, ...], coffee: [hour, ...],
+    dry: {s, e, label}}`. `water` has one hour per 4 oz logged. `dry` is the
+    longest daytime dry stretch from `water_gap_max_s`, between 9 AM and 8 PM
+    (when run before 8 PM it counts only up to now); give it whenever there is
+    one, and the page draws it only at 3 hours or more.
+  - `tiles`: eight `{k, label, value, unit, line, state, series, avg, goal,
+    href}` for `slept`, `score`, `hrv`, `heart`, `asleep`, `steps`, `water`,
+    `load`. `series` is 14 values oldest first, today last, `null` for a missing
+    day; `state` from `tile_state` for `hrv`, `heart` and `slept` (minutes) and
+    `ok` for the rest; `value: null` says *Not synced*; `water` carries `goal`.
+    `line` reads like *"1:05 under your 7:15 average"*.
+  - `training`: `{sessions: [{type, name, fig, figUnit, effort, stats, note,
+    href}], journal}`, as the morning's *Yesterday*; no sessions says *Rest
+    day.*
+  - `food`: `{kcal, protein, macro: {c, p, f}, weekDays, goals, slots,
+    yesterday, empty, unreachable, href}`. `weekDays` is how many of the week's
+    7 days are complete (`nightly.complete_day`); `goals` are sodium, protein,
+    fiber and saturated fat from the goals page, each `{label, week, weekRaw,
+    goalRaw, over, today}`, a goal with no number left out; the page shows the
+    bars only with 3 or more complete days. `slots` has all five of Breakfast,
+    Lunch, Dinner, After dinner and Snacks, a name and calories or `null`.
+    `yesterday` is `{text, href}` from `yesterday_line`, linked to Forage Eaten
+    on yesterday's date, left out when yesterday is complete. **Today is never
+    flagged.**
+  - `drinks`: `{water: {oz, pct, goal}, coffee: {cups, last}, alcohol, unwind}`,
+    each `null` when not logged. Figures only.
+  - `body`: `{value, unit, sub, series, bp, bpSub}`, the 14 days' morning
+    weigh-ins (the first reading before noon), and the latest BP or none.
+- `next`: `{aside, overdue: {text, href}, dinners: {text, href}, days}`; each
+  day `{dow, n, href, wx, plans, events, allday, board, why, bed: {time, why}}`
+  as the weekly's `days`, with `bed` from `nightly.py`'s `days`. Tomorrow
+  first. A day's `bed` is the night that ends in the *next* day's morning, so
+  the last day's, whose next morning is not read, is `your usual`.
+- `foot`: what wasn't read, any Hive due date it couldn't read, a checkout
+  `sync` could not update (*Where it runs*), and *Training guidance from your
+  own data, not medical advice.*
+
+### Links
+
+**Phone check: not yet done, so links are off.** Until the owner has confirmed
+that a link in a published page opens Thrive on the phone, set `"links": false`:
+the page then has no anchors and nothing else changes, and the foot says
+*"Links are off until the phone check."* To run the check, publish a test page
+holding one Thrive link, ask the owner to tap it on the phone, and on a yes
+change this paragraph to *"Phone check: passed on <date>, links are on."* in a
+PR (#829's owner check).
+
+With links on, every `href` opens in a new tab and is built **only from ids and
+dates**, never from text in a calendar event, note, journal entry or Hive item:
+
+| What | Opens |
+|---|---|
+| A tile | `https://luketmoss.github.io/keel/thrive/#/trends/<group>?date=<today>` (`group` sleep, recovery, activity, intake or fitness) |
+| A session today | `https://luketmoss.github.io/keel/thrive/#/history/<workout id>` |
+| A day ahead | `https://luketmoss.github.io/keel/thrive/#/day/<date>` |
+| The food card | `https://luketmoss.github.io/keel/forage/#/eaten` |
+| Yesterday's missing meals | `https://luketmoss.github.io/keel/forage/#/eaten/<yesterday>` |
+| The planned-dinners line | `https://luketmoss.github.io/keel/forage/#/plan` |
+| A Hive item | `https://luketmoss.github.io/keel/hive/?board=<board id>&item=<item id>` |
+| A calendar event | the event's own `htmlLink` |
+
+The page drops any `href` that isn't `https://`.
+
+### Publish and signal
+
+As Step 6: copy `nightly-template.html` to a scratch file, replace the JSON in
+`<script id="brief-data">`, never touch the CSS or script. List the user's
+artifacts and publish titled `Nightly Brief` to its existing `url`, or a new one
+with icon `moon` the first time, so the link stays the same. Then signal the
+phone once, never before the page is up:
+
+```
+curl.exe -s -o NUL -w "%{http_code}" --max-time 10 "<webhook>?kind=nightly&status=complete&note=..."
+```
+
+`status=complete`, or `no-sleep` when last night hadn't synced. `note` is
+`nightly.phone_note(not_read, yesterday_line)`: `Not read: Hive`, `calendar`
+and `Forage`, then yesterday's missing meals in the page's words, joined with
+` · `, left out when empty, URL-encoded. A page that couldn't go up on a
+`scheduled` run sends `status=failed` with *When it can't publish*'s notes and
+`kind=nightly`. The morning and weekly calls are unchanged. The phone's macros
+are #836's. Reply in chat with the bed-by and the link, nothing more.
 
 ## Never
 

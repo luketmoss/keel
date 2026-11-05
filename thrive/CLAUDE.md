@@ -63,11 +63,14 @@ The authoritative conventions for each component are in its stack skill:
 - **The MCP server** is not here: it is Keel's `mcp/`, a Cloudflare Worker
   serving `/thrive/mcp` as a thin client of the Apps Script API with its own
   MCP-only key (`MCP_API_KEY`). It holds no row mapping.
-- **`.claude/skills/brief/`** — `/brief`, the Morning and Weekly Brief. A
-  product, not part of the pipeline: two scheduled tasks run it. Its
-  `settings.local.md` (weather locations) is gitignored and never committed.
-  Its one script, `checkouts.py` (stdlib Python, tested by `python -m unittest`
-  in that folder, which the `brief` job in `thrive.yml` runs), is #835's.
+- **`.claude/skills/brief/`** — `/brief`, the Morning, Weekly and (#829)
+  Nightly Brief. A product, not part of the pipeline: scheduled tasks run it.
+  Its `settings.local.md` (weather locations) is gitignored and never
+  committed. Its two scripts are stdlib Python, tested by `python -m unittest`
+  in that folder, which the `brief` job in `thrive.yml` runs: `checkouts.py`
+  (#835) and `nightly.py` (#829), the nightly page's bed-by, moves, food
+  completeness and tile rules, which the skill calls rather than reasoning them
+  out each run.
 
 ## The briefs' folder (#835)
 

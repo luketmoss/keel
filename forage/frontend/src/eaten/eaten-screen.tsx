@@ -18,6 +18,7 @@ import { addRecipe } from '../library/recipes-store';
 import { AddFoodSheet } from '../library/library-screen';
 import { NutritionSheet } from '../library/nutrition-sheet';
 import { StarterSheet } from '../library/starter-sheet';
+import { eatenHash } from '../shell/routes';
 import { showToast } from '../ui/toast';
 import { AddSheet, type AddLists } from './add-sheet';
 import { AmountSheet, type LogTarget, type SavedLog } from './amount-sheet';
@@ -32,6 +33,7 @@ import {
   eatenToday,
   knowFood,
   loadDay,
+  loadedDate,
   logFoods,
   logRecipes,
   moveDay,
@@ -296,6 +298,18 @@ export function EatenScreen({ api }: { api: ForageApi }) {
   const today = eatenToday.value;
   // A day change leaves select mode with nothing saved.
   useEffect(() => leaveSelect(), [date]);
+  // #825: the hash follows the day on screen, rewritten in place; and a day the hash moved to is loaded here.
+  useEffect(() => {
+    const want = eatenHash(date, today);
+    if (window.location.hash !== want) {
+      const { pathname, search } = window.location;
+      window.history.replaceState(window.history.state, '', `${pathname}${search}${want}`);
+    }
+    if (date !== loadedDate) {
+      dayState.value = 'loading';
+      void loadDay(api, date);
+    }
+  }, [date, today, api]);
   const state = dayState.value;
   const entries = dayEntries.value;
   const planned = unloggedPlan(dayPlan.value, entries);

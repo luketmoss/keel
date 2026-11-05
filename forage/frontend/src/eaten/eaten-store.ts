@@ -24,6 +24,8 @@ export const logFoods = signal<Food[]>([]);
 export const logRecipes = signal<RecipeSummary[]>([]);
 
 let latest = 0;
+/** The day the last load was for (#825): a hash that moves `eatenDate` without a day move is loaded by the screen. */
+export let loadedDate = '';
 /** Counts the entries patched in from a write's reply, so a refresh that began before one can't undo it (#785). */
 let patches = 0;
 const gate = quietGate();
@@ -39,6 +41,7 @@ let fullOut = false;
  */
 export async function loadDay(api: ForageApi, date = eatenDate.value, quiet = false): Promise<void> {
   const seq = ++latest;
+  loadedDate = date;
   const before = patches;
   const today = localDate();
   if (!quiet) {
@@ -143,6 +146,7 @@ export function _resetEaten(): void {
   wantRecipes = false;
   fullOut = false;
   patches = 0;
+  loadedDate = '';
   eatenDate.value = localDate();
   eatenToday.value = localDate();
   dayState.value = 'loading';

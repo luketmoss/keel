@@ -585,6 +585,9 @@ def check_worktrees():
            ("keep", "no merged PR"))
     expect("still on origin", decide(wt(), remote=True)[0], "keep")
     expect("dirty", decide(wt(), dirty=True), ("keep", "uncommitted changes"))
+    expect("a detached briefs worktree outside the folder (#835)",
+           decide(wt(path=os.path.join(ROOT, "..", "briefs", "keel"),
+                     branch=None))[0], "keep")
     expect("prunable inside", decide(wt(prunable=True))[0], "prune")
     expect("prunable outside",
            decide(wt(path=os.path.join(ROOT, "..", "keel-765"),

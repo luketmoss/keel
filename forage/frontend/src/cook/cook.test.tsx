@@ -167,8 +167,9 @@ describe('the helpers', () => {
     expect(clockText(3_725_000)).toBe('1:02:05');
     expect(slotForTime(new Date(2026, 0, 1, 10, 59))).toBe('Breakfast');
     expect(slotForTime(new Date(2026, 0, 1, 14, 0))).toBe('Lunch');
+    expect(slotForTime(new Date(2026, 0, 1, 15, 0))).toBe('Dinner');
     expect(slotForTime(new Date(2026, 0, 1, 20, 59))).toBe('Dinner');
-    expect(slotForTime(new Date(2026, 0, 1, 21, 0))).toBe('Snacks');
+    expect(slotForTime(new Date(2026, 0, 1, 21, 0))).toBe('After dinner');
   });
 });
 

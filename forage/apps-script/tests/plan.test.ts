@@ -60,6 +60,19 @@ describe('getPlan: derived fields, order, not_on_trip', () => {
     expect(getPlan(api).entries[0].kcal_serving).toBeNull();
   });
 
+  it('After dinner sorts after Dinner and before Snacks (#826)', () => {
+    const api = seeded();
+    plan(api, { id: 'pl_s', date: '2026-11-03', slot: 'Snacks', note: 'Fruit' });
+    plan(api, { id: 'pl_n', date: '2026-11-03', slot: 'After dinner', note: 'Ice cream' });
+    plan(api, { id: 'pl_d', date: '2026-11-03', slot: 'Dinner', recipe_id: 'rc_soup' });
+    expect(getPlan(api).entries.map((e: { id: string }) => e.id)).toEqual(['pl_d', 'pl_n', 'pl_s']);
+    api.ok('movePlanEntry', { payload: { id: 'pl_s', slot: 'After dinner' } });
+    expect(getPlan(api).entries.find((e: { id: string }) => e.id === 'pl_s')).toMatchObject({ slot: 'After dinner' });
+    expect(api.call('upsertPlanEntry', { payload: { date: '2026-11-03', slot: 'Dessert', note: 'x' } }).error).toMatch(
+      /^slot must be one of/,
+    );
+  });
+
   it('orders by date, slot, then the order planned', () => {
     const api = seeded();
     plan(api, { id: 'pl_b', date: '2026-11-04', slot: 'Dinner', recipe_id: 'rc_soup' });
@@ -211,7 +224,7 @@ describe('fixed-text refusals', () => {
   const cases: [string, object, string][] = [
     ['an invalid date', { date: '2026-02-30', slot: 'Dinner', note: 'x' }, 'date must be a real date as YYYY-MM-DD'],
     ['a date in another shape', { date: '11/03/2026', slot: 'Dinner', note: 'x' }, 'date must be a real date as YYYY-MM-DD'],
-    ['an unknown slot', { date: '2026-11-03', slot: 'Brunch', note: 'x' }, 'slot must be one of Breakfast, Lunch, Dinner, Snacks'],
+    ['an unknown slot', { date: '2026-11-03', slot: 'Brunch', note: 'x' }, 'slot must be one of Breakfast, Lunch, Dinner, After dinner, Snacks'],
     ['a blank note', { date: '2026-11-03', slot: 'Dinner', note: '   ' }, 'note must be 1 to 120 characters'],
     ['an over-long note', { date: '2026-11-03', slot: 'Dinner', note: 'x'.repeat(121) }, 'note must be 1 to 120 characters'],
     ['both', { date: '2026-11-03', slot: 'Dinner', note: 'x', recipe_id: 'rc_soup' }, 'a plan entry has exactly one of recipe_id and note'],
@@ -292,10 +305,10 @@ describe('planWeek', () => {
     expect(res).toMatchObject({ success: false, code: 'invalid_entries' });
     expect((res as unknown as { problems: unknown }).problems).toEqual([
       { entry: 4, date: '2026-02-30', error: PLAN_DATE },
-      { entry: 5, date: '2026-11-06', error: 'slot must be one of Breakfast, Lunch, Dinner, Snacks' },
+      { entry: 5, date: '2026-11-06', error: 'slot must be one of Breakfast, Lunch, Dinner, After dinner, Snacks' },
     ]);
     expect(res.error).toBe(
-      `Nothing saved: entry 4 (2026-02-30): ${PLAN_DATE}; entry 5 (2026-11-06): slot must be one of Breakfast, Lunch, Dinner, Snacks`,
+      `Nothing saved: entry 4 (2026-02-30): ${PLAN_DATE}; entry 5 (2026-11-06): slot must be one of Breakfast, Lunch, Dinner, After dinner, Snacks`,
     );
     expect(api.rows('Plan')).toEqual([]);
   });

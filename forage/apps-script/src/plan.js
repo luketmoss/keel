@@ -19,7 +19,7 @@ var PLAN_NOTE_MAX = 120;
 /** The fixed text of every plan refusal (#709). Literal: no file may read another's globals at load time. */
 var PLAN_ERRORS = {
   date: 'date must be a real date as YYYY-MM-DD',
-  slot: 'slot must be one of Breakfast, Lunch, Dinner, Snacks',
+  slot: 'slot must be one of Breakfast, Lunch, Dinner, After dinner, Snacks',
   note: 'note must be 1 to ' + PLAN_NOTE_MAX + ' characters',
   one: 'a plan entry has exactly one of recipe_id and note',
 };

@@ -180,8 +180,8 @@ export interface Cook {
   created: string;
 }
 
-export type Slot = 'Breakfast' | 'Lunch' | 'Dinner' | 'Snacks';
-export const SLOTS: Slot[] = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
+export type Slot = 'Breakfast' | 'Lunch' | 'Dinner' | 'After dinner' | 'Snacks';
+export const SLOTS: Slot[] = ['Breakfast', 'Lunch', 'Dinner', 'After dinner', 'Snacks'];
 
 /**
  * #709: a Plan row as `getPlan` and the plan writes answer it. Exactly one of

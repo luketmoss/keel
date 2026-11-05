@@ -457,7 +457,10 @@ const sent = (args: any, keys: string[]) =>
 
 // Wording fixed by forage/docs/design/709-meal-plan.md.
 
-const SLOTS = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'] as const
+const SLOTS = ['Breakfast', 'Lunch', 'Dinner', 'After dinner', 'Snacks'] as const
+
+const SLOT_DESCRIPTION =
+  'Breakfast, Lunch, Dinner, After dinner (anything eaten once dinner is over) or Snacks (between meals during the day)'
 
 /** The most meals one forage_plan_week takes, as the API's planWeek. */
 const PLAN_WEEK_MAX = 28
@@ -566,7 +569,7 @@ async function findPlanEntry(cfg: ForageConfig, id: string): Promise<{ entry?: a
 
 const PLAN_ENTRY_INPUT = {
   date: z.string().describe("The day: YYYY-MM-DD, 'today', 'tomorrow' or '+3d' (America/Denver)"),
-  slot: z.enum(SLOTS).describe('Breakfast, Lunch, Dinner or Snacks'),
+  slot: z.enum(SLOTS).describe(SLOT_DESCRIPTION),
   recipe_id: z.string().optional().describe('The recipe (rc_...). Send this or note'),
   note: z.string().optional().describe('A meal that is not a recipe, 1 to 120 characters ("Eating out", "Leftovers")'),
 }
@@ -1805,7 +1808,7 @@ export function registerForageTools(server: McpServer, cfg: ForageConfig, mode: 
     'forage_plan_meal',
     {
       description:
-        'Plans a recipe or a note (eating out, leftovers) for a day and slot. Slots are Breakfast, Lunch, Dinner, ' +
+        'Plans a recipe or a note (eating out, leftovers) for a day and slot. Slots are Breakfast, Lunch, Dinner, After dinner, ' +
         'Snacks. Several meals can share a day. Pass id to make a retry safe. Without an id, the same recipe in ' +
         'the same day and slot is refused as already planned unless allow_duplicate. Only plan what the user ' +
         'asked for. Undo with forage_undo.',
@@ -2226,7 +2229,7 @@ export function registerForageTools(server: McpServer, cfg: ForageConfig, mode: 
     {
       description:
         "Read Forage's food log for a day or a range (default today, America/Denver; at most 31 days): each day's " +
-        'calories and macros as Forage totals them, then each meal (Breakfast, Lunch, Dinner, Snacks) with its ' +
+        'calories and macros as Forage totals them, then each meal (Breakfast, Lunch, Dinner, After dinner, Snacks) with its ' +
         "entries' ids, foods or recipes, amounts and calories. A total that says low leaves out entries with no " +
         'nutrition or partial recipes. Check here before retrying a food log write whose answer was lost.',
       inputSchema: {
@@ -2279,7 +2282,7 @@ export function registerForageTools(server: McpServer, cfg: ForageConfig, mode: 
         recipe_id: z.string().optional().describe('The recipe (rc_...), logged in servings'),
         qty: AMOUNT_INPUT.qty,
         unit: AMOUNT_INPUT.unit.optional(),
-        slot: z.enum(SLOTS).describe('Breakfast, Lunch, Dinner or Snacks'),
+        slot: z.enum(SLOTS).describe(SLOT_DESCRIPTION),
         date: z.string().optional().describe("YYYY-MM-DD, 'today' or '-1d'. Default today"),
         dry_run: z.boolean().optional().describe('Default true: preview only. false logs it'),
       },
@@ -2335,7 +2338,7 @@ export function registerForageTools(server: McpServer, cfg: ForageConfig, mode: 
         id: z.string().describe('The log entry (lg_...)'),
         qty: AMOUNT_INPUT.qty.optional(),
         unit: AMOUNT_INPUT.unit.optional(),
-        slot: z.enum(SLOTS).optional().describe('Breakfast, Lunch, Dinner or Snacks'),
+        slot: z.enum(SLOTS).optional().describe(SLOT_DESCRIPTION),
         dry_run: z.boolean().optional().describe('Default true: preview only. false saves it'),
       },
       annotations: WRITE,

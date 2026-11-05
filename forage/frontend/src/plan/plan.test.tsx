@@ -339,7 +339,7 @@ describe('the banner', () => {
 });
 
 describe('Plan a meal', () => {
-  it('offers 8 days, 4 slots and the recipes; tapping one plans it, closes the sheet, and the meal appears', async () => {
+  it('offers 8 days, 5 slots and the recipes; tapping one plans it, closes the sheet, and the meal appears', async () => {
     const api = fakeApi();
     api.recipes.push(
       recipe('rc_chili', 'Weeknight chili'),
@@ -362,7 +362,7 @@ describe('Plan a meal', () => {
       within(groups[1])
         .getAllByRole('button')
         .map((b) => b.textContent),
-    ).toEqual(['Breakfast', 'Lunch', 'Dinner', 'Snacks']);
+    ).toEqual(['Breakfast', 'Lunch', 'Dinner', 'After dinner', 'Snacks']);
     expect(within(groups[1]).getByRole('button', { name: 'Dinner' }).getAttribute('aria-pressed')).toBe('true');
     const rows = within(sheet).getAllByTestId('plan-recipe');
     expect(rows.map((r) => r.textContent)).toEqual([

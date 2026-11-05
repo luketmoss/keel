@@ -2616,12 +2616,14 @@ function summarizeDemoDay(
     systolic_mmhg: meanHalfUp('systolic_mmhg'),
     diastolic_mmhg: meanHalfUp('diastolic_mmhg'),
     bp_count: bp.length ? String(bp.length) : '',
-    // #522, #562, #592: blank. Nothing in the SPA reads Z:AC (Day and Trends
+    // #522, #562, #592, #827: blank. Nothing in the SPA reads Z:AE (Day and Trends
     // read Drinks directly), and the demo's drinks live in state/drinks.ts, not here.
     water_ml: '',
     alcohol_drinks: '',
     coffee_cups: '',
     unwind_mg: '',
+    water_by_noon_ml: '',
+    water_gap_max_s: '',
   };
 }
 

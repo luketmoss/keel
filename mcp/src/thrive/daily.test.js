@@ -36,7 +36,7 @@ const SUMMARY_FIELDS = [
   'ascent_withdata', 'max_effort', 'effort_counts', 'steps', 'resting_hr', 'hrv',
   'sleep_total_s', 'training_load', 'computed_at', 'moving_withdata', 'elapsed_withdata',
   'weight_kg', 'fat_ratio_pct', 'systolic_mmhg', 'diastolic_mmhg', 'bp_count',
-  'water_ml', 'alcohol_drinks', 'coffee_cups', 'unwind_mg',
+  'water_ml', 'alcohol_drinks', 'coffee_cups', 'unwind_mg', 'water_by_noon_ml', 'water_gap_max_s',
 ];
 const summary = (o) => ({ ...Object.fromEntries(SUMMARY_FIELDS.map((f) => [f, o[f] ?? ''])), sheetRow: 2 });
 
@@ -243,13 +243,13 @@ test('a day with no body reading shows weight, fat and BP as —, and bp_count n
 // #522: water and alcohol rolled up from Drinks.
 test('water shows in oz and ml, and alcohol as drinks, for a day that has them', () => {
   const line = describeSummaryDay(summary({ date: '2026-10-19', water_ml: '354', alcohol_drinks: '2' }));
-  assert.match(line, /· water 12 oz \(354 ml\) · coffee — · alcohol 2 drinks · unwind —$/);
+  assert.match(line, /· water 12 oz \(354 ml\), — by noon, longest daytime gap — · coffee — · alcohol 2 drinks · unwind —$/);
   assert.match(describeSummaryDay(summary({ alcohol_drinks: '1' })), /· alcohol 1 drink · unwind —$/);
 });
 
 test('a kind not logged shows as —, never 0', () => {
   const waterOnly = describeSummaryDay(summary({ date: '2026-10-19', water_ml: '250' }));
-  assert.match(waterOnly, /· water 8 oz \(250 ml\) · coffee — · alcohol — · unwind —$/);
+  assert.match(waterOnly, /· water 8 oz \(250 ml\), — by noon, longest daytime gap — · coffee — · alcohol — · unwind —$/);
   const neither = describeSummaryDay(summary({ date: '2026-10-19' }));
   assert.match(neither, /· water — · coffee — · alcohol — · unwind —$/);
   assert.doesNotMatch(neither, /water 0|alcohol 0/);
@@ -263,7 +263,7 @@ test('a row from before #522, with no drinks fields at all, reads as —', () =>
 // #562: coffee, in cups, between water and alcohol.
 test('coffee shows in cups between water and alcohol, "1 cup" singular', () => {
   const line = describeSummaryDay(summary({ date: '2026-10-19', water_ml: '354', coffee_cups: '2', alcohol_drinks: '2' }));
-  assert.match(line, /· water 12 oz \(354 ml\) · coffee 2 cups · alcohol 2 drinks · unwind —$/);
+  assert.match(line, /· water 12 oz \(354 ml\), — by noon, longest daytime gap — · coffee 2 cups · alcohol 2 drinks · unwind —$/);
   assert.match(describeSummaryDay(summary({ coffee_cups: '1' })), /· coffee 1 cup · alcohol — · unwind —$/);
   assert.match(describeSummaryDay(summary({ water_ml: '354' })), /· coffee — ·/);
   assert.doesNotMatch(describeSummaryDay(summary({})), /coffee 0/);
@@ -271,7 +271,7 @@ test('coffee shows in cups between water and alcohol, "1 cup" singular', () => {
 
 test('a row from before #562, with no coffee_cups, reads coffee —', () => {
   const { coffee_cups: _c, ...older } = summary({ date: '2026-10-19', water_ml: '354', alcohol_drinks: '1' });
-  assert.match(describeSummaryDay(older), /· water 12 oz \(354 ml\) · coffee — · alcohol 1 drink · unwind —$/);
+  assert.match(describeSummaryDay(older), /· water 12 oz \(354 ml\), — by noon, longest daytime gap — · coffee — · alcohol 1 drink · unwind —$/);
 });
 
 // #592: Unwind, in mg, after alcohol.
@@ -279,7 +279,7 @@ test('unwind shows in mg after alcohol, and — when blank', () => {
   const line = describeSummaryDay(
     summary({ date: '2026-10-19', water_ml: '354', coffee_cups: '2', alcohol_drinks: '2', unwind_mg: '10' }),
   );
-  assert.match(line, /· water 12 oz \(354 ml\) · coffee 2 cups · alcohol 2 drinks · unwind 10 mg$/);
+  assert.match(line, /· water 12 oz \(354 ml\), — by noon, longest daytime gap — · coffee 2 cups · alcohol 2 drinks · unwind 10 mg$/);
   assert.match(describeSummaryDay(summary({ coffee_cups: '2', alcohol_drinks: '2' })), /· coffee 2 cups · alcohol 2 drinks · unwind —$/);
   assert.doesNotMatch(describeSummaryDay(summary({})), /unwind 0/);
 });
@@ -441,4 +441,53 @@ test('the portal link carries only the two public ids (#312)', () => {
   const url = corosActivityUrl({ ...synced, sport_type: '204' });
   assert.equal(url.includes(synced.raw_ref), false);
   assert.deepEqual([...new URL(url).searchParams.keys()], ['labelId', 'sportType']);
+});
+
+// #827: water by noon and the longest daytime gap, after the day's water.
+test('water narrates the total, the oz by noon and the longest daytime gap', () => {
+  const line = describeSummaryDay(summary({
+    date: '2026-10-19', water_ml: '1538', water_by_noon_ml: '532', water_gap_max_s: '13200',
+    computed_at: '2026-10-20T13:00:00.000Z',
+  }));
+  assert.match(line, /· water 52 oz \(1538 ml\), 18 oz by noon, longest daytime gap 3 h 40 min · coffee —/);
+  assert.doesNotMatch(line, /so far/);
+});
+
+test('a row computed before 20:00 on its own date says (so far) after the gap', () => {
+  // 15:00 MDT on 2026-10-19 is 21:00Z.
+  const line = describeSummaryDay(summary({
+    date: '2026-10-19', water_ml: '700', water_by_noon_ml: '350', water_gap_max_s: '18000',
+    computed_at: '2026-10-19T21:00:00.000Z',
+  }));
+  assert.match(line, /longest daytime gap 5 h 0 min \(so far\) · coffee/);
+  // 21:00 MDT the same day: the window is over.
+  const closed = describeSummaryDay(summary({
+    date: '2026-10-19', water_ml: '700', water_by_noon_ml: '350', water_gap_max_s: '18000',
+    computed_at: '2026-10-20T03:00:00.000Z',
+  }));
+  assert.doesNotMatch(closed, /so far/);
+});
+
+test('a measured zero by noon stays 0 oz, and a blank gap is — with no (so far)', () => {
+  const line = describeSummaryDay(summary({
+    date: '2026-10-19', water_ml: '500', water_by_noon_ml: '0', water_gap_max_s: '',
+    computed_at: '2026-10-19T13:00:00.000Z', // 07:00 MDT, before the window opens
+  }));
+  assert.match(line, /· water 17 oz \(500 ml\), 0 oz by noon, longest daytime gap — · coffee/);
+});
+
+test('a day with no water is one — whatever the timing columns hold', () => {
+  const line = describeSummaryDay(summary({ date: '2026-10-19', coffee_cups: '1' }));
+  assert.match(line, /· water — · coffee 1 cup/);
+  assert.doesNotMatch(line, /by noon/);
+});
+
+test('a row from before #827, without the two fields, reads — and does not throw', () => {
+  const { water_by_noon_ml: _n, water_gap_max_s: _g, ...older } = summary({ date: '2026-10-19', water_ml: '354' });
+  assert.match(describeSummaryDay(older), /· water 12 oz \(354 ml\), — by noon, longest daytime gap — · coffee —/);
+});
+
+test('gapText rounds to the minute and drops hours under an hour', () => {
+  assert.match(describeSummaryDay(summary({ water_ml: '1', water_gap_max_s: '2400' })), /gap 40 min/);
+  assert.match(describeSummaryDay(summary({ water_ml: '1', water_gap_max_s: '39600' })), /gap 11 h 0 min/);
 });

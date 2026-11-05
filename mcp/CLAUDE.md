@@ -285,7 +285,8 @@ Apps Script deploy that ships them first; until then `rest_plans` is ignored and
 
 **Drinks (#522, #595).** `thrive_drinks` reads Thrive Sip's log through
 `getDrinks`, each entry with its id, and `thrive_daily_summary` shows the summary's `water_ml`,
-`coffee_cups` (#562), `alcohol_drinks` and `unwind_mg` (#592). Each entry is narrated by its own kind
+`coffee_cups` (#562), `alcohol_drinks` and `unwind_mg` (#592), with the day's water by noon and its longest
+daytime water gap (`water_by_noon_ml`, `water_gap_max_s`, #827). Each entry is narrated by its own kind
 (water, coffee, alcohol, or unwind in mg); a kind the Worker does not know is said by its raw kind and
 amount, never as alcohol. Three write tools correct the log on any day:
 `thrive_log_drink` (`logDrink`, one request per entry with a Worker-minted UUID and

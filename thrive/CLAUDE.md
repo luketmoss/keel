@@ -415,7 +415,7 @@ Google Sheet "Groundwork" with these tabs:
   or 8 (1 is a guest or another user) are never written. The SPA reads it,
   read-only and still in kg, through `frontend/src/api/health-api.ts` (luketmoss/thrive#236).
   Later columns are only ever appended.
-- **DailySummary** (A:AC) — **derived, never authoritative** (luketmoss/thrive#131). One row per
+- **DailySummary** (A:AE) — **derived, never authoritative** (luketmoss/thrive#131). One row per
   local calendar day, rebuildable at any time from `Workouts` + `DailyHealth` +
   `BodyMeasurements` + `Drinks`. Nothing writes here by hand. If it disagrees with
   `Workouts`, `Workouts` is right and this is stale. The SPA reads it,
@@ -426,7 +426,7 @@ Google Sheet "Groundwork" with these tabs:
   ascent_withdata, max_effort, effort_counts, steps, resting_hr, hrv,
   sleep_total_s, training_load, computed_at, moving_withdata, elapsed_withdata,
   weight_kg, fat_ratio_pct, systolic_mmhg, diastolic_mmhg, bp_count, water_ml,
-  alcohol_drinks, coffee_cups, unwind_mg.
+  alcohol_drinks, coffee_cups, unwind_mg, water_by_noon_ml, water_gap_max_s.
   Every total carries its coverage: `total_moving_s`/`total_elapsed_s` are blank
   when no activity recorded them, and S/T count those that did out of
   `activity_count` (luketmoss/thrive#181). S/T are appended, not beside D/E, because agents and the API read
@@ -460,6 +460,16 @@ Google Sheet "Groundwork" with these tabs:
   blank, never `0`, on a day with none, by the same rules; a missing
   `Drinks` tab leaves Z:AC blank. Added by
   `scripts/migrate-592-daily-summary-unwind.mjs`.
+  AD:AE (#827) are `water_by_noon_ml`, the day's water `amount`s whose local `time` is
+  before 12:00:00, and `water_gap_max_s`, the longest stretch with no water inside the daytime
+  window, 09:00:00 to 20:00:00 `America/Denver`, in whole seconds (the window's bounds are
+  `WATER_WINDOW_START_S`/`WATER_WINDOW_END_S` in `types.js`). The window's edges count: the
+  stretches run from 09:00 to the first water in it, between each pair, and from the last to
+  20:00, and water outside the window is not in it. Both are blank, never `0`, on a day with no
+  water, and a measured `0` stays `0`. A row computed on its own date ends the window at
+  `computed_at` (local) when that is before 20:00, and leaves the gap blank before 09:00, so
+  the row stays a pure function of its sources and `computed_at`. A missing `Drinks` tab leaves
+  Z:AE blank. Added by `scripts/migrate-827-daily-summary-water-timing.mjs`.
 - **SyncLog** (A:N) — one row per COROS sync run (luketmoss/thrive#156): run_id, started_at,
   finished_at, window_start, window_end, n_seen, n_new, n_updated, n_enriched,
   n_fit_fetched, n_errors, status (`ok`/`partial`/`failed`), error_detail,

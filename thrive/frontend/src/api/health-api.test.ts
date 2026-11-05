@@ -166,14 +166,22 @@ describe('AC2: blank stays blank, 0 stays 0, nothing is converted', () => {
 
   it('reads a DailySummary row with or without the #827 water timing', () => {
     const withTiming = rowToDailySummary(
-      rowOf(DAILY_SUMMARY_FIELDS, { date: '2026-10-19', water_ml: '1538', water_by_noon_ml: '532', water_gap_max_s: '13200' }),
+      rowOf(DAILY_SUMMARY_FIELDS, {
+        date: '2026-10-19',
+        water_ml: '1538',
+        water_by_noon_ml: '532',
+        water_gap_max_s: '13200',
+      }),
       2,
     );
     expect(withTiming.water_by_noon_ml).toBe('532');
     expect(withTiming.water_gap_max_s).toBe('13200');
 
     // A row written before the migration stops at AC; Sheets drops the empty tail.
-    const before = rowToDailySummary(rowOf(DAILY_SUMMARY_FIELDS, { date: '2026-10-19', water_ml: '1538' }).slice(0, 29), 3);
+    const before = rowToDailySummary(
+      rowOf(DAILY_SUMMARY_FIELDS, { date: '2026-10-19', water_ml: '1538' }).slice(0, 29),
+      3,
+    );
     expect(before.water_ml).toBe('1538');
     expect(before.water_by_noon_ml).toBe('');
     expect(before.water_gap_max_s).toBe('');

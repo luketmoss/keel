@@ -57,6 +57,8 @@ class Remote:
 
     def clone(self, dest, detach=False):
         run(os.path.dirname(dest), "clone", "-q", self.bare, dest)
+        run(dest, "config", "user.name", "t")
+        run(dest, "config", "user.email", "t@example.com")
         run(dest, "checkout", "-q", "--detach" if detach else "main")
         return dest
 

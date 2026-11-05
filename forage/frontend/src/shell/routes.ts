@@ -4,6 +4,9 @@
 // `#/cook/<recipe id>[?plan=<plan id>]`, which #709 and #711 reuse; #711 adds
 // `mode=walkthrough` for walkthrough mode inside the same frame.
 import { signal } from '@preact/signals';
+import { localDate } from '../cook/format';
+import { eatenDate } from '../eaten/eaten-store';
+import { addDays } from '../plan/dates';
 
 export const TAB_IDS = ['plan', 'shop', 'eaten', 'library'] as const;
 export type TabId = (typeof TAB_IDS)[number];
@@ -13,11 +16,31 @@ export const DEFAULT_TAB: TabId = 'plan';
 /** The tab a hash names, or null for anything else. */
 export function parseHash(hash: string): TabId | null {
   const id = hash.replace(/^#\/?/, '');
+  // #825: anything under `#/eaten/` is Eaten, whatever follows.
+  if (id.startsWith('eaten/')) return 'eaten';
   return (TAB_IDS as readonly string[]).includes(id) ? (id as TabId) : null;
 }
 
 export function tabHash(id: TabId): string {
   return `#/${id}`;
+}
+
+/**
+ * #825: the day a `#/eaten/<date>` hash names. `null` for a hash that is not under `#/eaten/`, and for the bare
+ * `#/eaten`, which keeps the day last shown. A date that is not `YYYY-MM-DD`, not a calendar date, today or after
+ * it opens today; `rewrite` says the hash should then be put back to `#/eaten`.
+ */
+export function parseEatenHash(hash: string, today = localDate()): { date: string; rewrite: boolean } | null {
+  const m = /^#\/eaten\/(.*)$/.exec(hash);
+  if (!m) return null;
+  const given = m[1];
+  const valid = /^\d{4}-\d{2}-\d{2}$/.test(given) && addDays(given, 0) === given && given < today;
+  return valid ? { date: given, rewrite: false } : { date: today, rewrite: true };
+}
+
+/** The hash that follows the day Eaten shows: dated before today, plain on it. */
+export function eatenHash(date: string, today: string): string {
+  return date < today ? `#/eaten/${date}` : tabHash('eaten');
 }
 
 export interface CookRoute {
@@ -86,6 +109,12 @@ export function syncFromHash(): void {
   cookRoute.value = null;
   const id = parseHash(hash);
   if (id) {
+    const eaten = parseEatenHash(hash);
+    if (eaten) {
+      if (eatenDate.value !== eaten.date) eatenDate.value = eaten.date;
+      if (eaten.rewrite)
+        window.history.replaceState(window.history.state, '', `${pathname}${search}${tabHash('eaten')}`);
+    }
     currentTab.value = id;
     return;
   }

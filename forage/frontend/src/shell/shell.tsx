@@ -27,8 +27,9 @@ export function Shell() {
   const api = useApi();
   const [importing, setImporting] = useState(false);
 
+  // #825: read the hash before the first render, so a child's effect never sees (or rewrites) a stale one.
+  useState(() => syncFromHash());
   useEffect(() => {
-    syncFromHash();
     window.addEventListener('hashchange', syncFromHash);
     return () => window.removeEventListener('hashchange', syncFromHash);
   }, []);
